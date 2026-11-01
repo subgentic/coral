@@ -57,7 +57,7 @@ func TestArtifactOpenInNewTabIsReadableForEveryType(t *testing.T) {
 		{"logo.svg", "", "<svg xmlns='http://www.w3.org/2000/svg'><script>1</script></svg>", "text/plain", ""},
 		{"feed.xml", "text/xml", "<x/>", "text/plain", ""},
 		{"app.js", "text/javascript", "alert(1)", "text/plain", ""},
-		{"report.md", "text/markdown", "# hi", "text/plain", ""},
+		{"report.md", "text/markdown", "# hi", "text/html", "RENDERED"},
 		{"table.csv", "text/csv", "a,b\n1,2\n", "text/plain", ""},
 		{"innocent.png", "text/html", "<script>1</script>", "text/plain", ""},
 		{"report.pdf", "application/pdf", "%PDF-1.4\n\x00\x01", "application/pdf", ""},
@@ -83,10 +83,16 @@ func TestArtifactOpenInNewTabIsReadableForEveryType(t *testing.T) {
 			if want == "" {
 				want = c.body
 			}
-			require.Equal(t, want, string(data))
+			if want == "RENDERED" { // Markdown is rendered into a page of its own (#11845), under a sandbox with no script
+				require.Contains(t, string(data), "<h1>hi</h1>")
+				require.Equal(t, "sandbox; default-src 'none'; style-src 'unsafe-inline'", resp.Header.Get("Content-Security-Policy"))
+				require.NotContains(t, string(data), "<script")
+			} else {
+				require.Equal(t, want, string(data))
+			}
 			require.Equal(t, "nosniff", resp.Header.Get("X-Content-Type-Options"))
 			require.NotEmpty(t, resp.Header.Get("Content-Security-Policy"), "never served without a policy")
-			if c.wantType == "text/plain" && !strings.HasPrefix(c.name, "notes") {
+			if (c.wantType == "text/plain" && !strings.HasPrefix(c.name, "notes")) || c.wantBody == "RENDERED" {
 				require.Contains(t, resp.Header.Get("Content-Security-Policy"), "sandbox", "text served as text is sandboxed too")
 			}
 			// the plain link is unchanged: it still downloads what is not inert

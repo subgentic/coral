@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/subgentic/coral/pkg/hubproxy"
 )
@@ -55,8 +56,12 @@ func artifactURL(digest string) string { return "/api/artifacts/" + digest + "?v
 // every type that is not inert media or plain data (HTML, SVG, XML, JavaScript, PDF, Markdown, CSV, unknown). It reports whether it answered;
 // false leaves the caller to serve the link as before (inert media is shown inline already). Nothing here runs on the dashboard's origin:
 //   - a PDF is shown by the browser's viewer (its own origin), with no script or sub-resource allowed to the page;
-//   - text, whatever its declared type (HTML and SVG included), is served as text/plain: its source, never rendered, under the sandbox;
+//   - Markdown is rendered by renderMarkdownSafe into a page of its own under a sandbox with no script; any other text, whatever its declared type (HTML and SVG included), is served as text/plain: its source, never rendered, under the sandbox;
 //   - a binary file gets a one-line note that says so (Download is the way to save it).
+//
+// maxRenderedMarkdown is the largest Markdown file the new tab renders; a bigger one is shown as its source.
+const maxRenderedMarkdown = 2 << 20
+
 func serveArtifactToRead(w http.ResponseWriter, r *http.Request, f io.ReadSeeker, contentType, filename string, size int64) bool {
 	mt, _, err := mime.ParseMediaType(contentType)
 	mt = strings.ToLower(mt)
@@ -73,6 +78,18 @@ func serveArtifactToRead(w http.ResponseWriter, r *http.Request, f io.ReadSeeker
 		h.Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'")
 		http.ServeContent(w, r, "", time.Time{}, f)
 		return true
+	}
+	if (mt == "text/markdown" || mt == "text/x-markdown") && size <= maxRenderedMarkdown { // rendered, as its own response: the page is built here from escaped text and served under the sandbox with no script (markdown_open.go, #11845)
+		if raw, err := io.ReadAll(io.LimitReader(f, maxRenderedMarkdown+1)); err == nil && int64(len(raw)) <= maxRenderedMarkdown && utf8.Valid(raw) {
+			h.Set("Content-Type", "text/html; charset=utf-8")
+			h.Set("Content-Disposition", hubproxy.Disposition("inline", filename))
+			h.Set("Content-Security-Policy", "sandbox; default-src 'none'; style-src 'unsafe-inline'")
+			_, _ = io.WriteString(w, markdownPage(filename, renderMarkdownSafe(string(raw))))
+			return true
+		}
+		if _, err := f.Seek(0, io.SeekStart); err != nil {
+			return false
+		}
 	}
 	h.Set("Content-Type", "text/plain; charset=utf-8")
 	h.Set("Content-Disposition", hubproxy.Disposition("inline", filename))
