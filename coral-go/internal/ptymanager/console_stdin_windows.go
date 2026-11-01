@@ -189,6 +189,11 @@ func classifyProcess(key stdinKey, wait time.Duration) (stdinKind, bool) {
 
 // probeStdin reads and classifies the standard input of process pid.
 func probeStdin(pid int) stdinKind {
+	if f := probeOpenHook.Load(); f != nil {
+		if err := (*f)(pid); err != nil {
+			return stdinUnreadable // as the real open's failure
+		}
+	}
 	h, err := windows.OpenProcess(windows.PROCESS_QUERY_INFORMATION|windows.PROCESS_VM_READ|windows.PROCESS_DUP_HANDLE, false, uint32(pid))
 	if err != nil {
 		return stdinUnreadable
@@ -220,6 +225,9 @@ func probeStdin(pid int) stdinKind {
 	defer windows.CloseHandle(dup)
 	return classifyStdin(dup)
 }
+
+// probeOpenHook, when set, answers for the probe's OpenProcess first: an error is what the open would have failed with (a test's access denied).
+var probeOpenHook atomic.Pointer[func(pid int) error]
 
 // consoleModeHook, when set, replaces GetConsoleMode (a test's; an atomic, as a worker may still read it).
 var consoleModeHook atomic.Pointer[func(windows.Handle) error]
