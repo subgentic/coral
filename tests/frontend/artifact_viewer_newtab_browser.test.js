@@ -57,7 +57,7 @@ const PNG = png(120, 80);
                 return { text: n.textContent.trim(), hidden: n.hidden, shown: r.width > 0 && r.height > 0, href: n.getAttribute('href'), dl: dl.getAttribute('href'), target: n.target, rel: n.rel, bodyH: b.height, vh: innerHeight, touch: r.height }; })()`);
             assert.equal(v.text, 'Open in new tab', `${tag}: the link says what it does`);
             assert.ok(v.shown && !v.hidden, `${tag}: the link is on screen: ${JSON.stringify(v)}`);
-            assert.equal(v.href, v.dl, `${tag}: it opens the stored bytes, the same as Download's`);
+            assert.equal(v.href, v.dl + '&open=1', `${tag}: it opens the stored bytes as a readable tab (?open=1, #11836), Download's link is the plain one`);
             assert.equal(v.target, '_blank', `${tag}: in a tab of its own`);
             assert.equal(v.rel, 'noopener noreferrer', `${tag}: with no opener`);
             assert.ok(v.bodyH >= Math.min(0.5 * v.vh, 400), `${tag}: a 120x80 picture does not open as a strip: the body is ${v.bodyH}px of ${v.vh}`);

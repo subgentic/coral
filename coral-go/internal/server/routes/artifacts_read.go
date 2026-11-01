@@ -74,6 +74,9 @@ func (h *SessionsHandler) getAgentArtifact(w http.ResponseWriter, r *http.Reques
 	defer f.Close()
 	// An agent chose these bytes and their type: an HTML or SVG upload must not
 	// run on the dashboard's origin when someone opens its link.
+	if r.URL.Query().Get("open") == "1" && serveArtifactToRead(w, r, f, meta.MediaType, meta.Name, info.Size()) { // the viewer's Open in new tab (#11836): a readable tab, never a download
+		return
+	}
 	setUntrustedContentHeaders(w.Header(), meta.MediaType, meta.Name)
 	// The bytes never change for an id, but an artifact can be deleted (#3553): private, so no
 	// shared cache (in front of Coral Hub, a proxy) keeps serving it after that.
