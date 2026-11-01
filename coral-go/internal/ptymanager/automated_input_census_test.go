@@ -56,7 +56,7 @@ type sender struct {
 var allowedSenders = map[string]sender{
 	// The gate's send functions: they run only when nothing waits on the user.
 	"internal/background/agent_exited.go\tdeliverAutomatedIfWanted\tSendInput":               {guardGate, "gate", ""},
-	"internal/server/routes/agent_exited.go\tdeliverAutomatedWhile\tSendInput":               {guardGate, "gate", ""},
+	"internal/server/routes/agent_exited.go\tdeliverAutomatedOutcome\tSendInput":             {guardGate, "gate", ""},
 	"internal/ptymanager/notice_pause.go\ttypeSummary\tSendInput":                            {guardGate, "gate: the one line for held notices is the Send of a DeliverAutomated call (#11387)", ""},
 	"internal/server/routes/agent_ui_request.go\tSessionsHandler.agentUIRequest\tSendPrompt": {guardGate, "gate (its send closure)", ""},
 	// AgentLauncher.SendPrompt, which goes through the gate itself.
@@ -68,7 +68,9 @@ var allowedSenders = map[string]sender{
 	"internal/server/routes/sessions_waiting.go\tSessionsHandler.SendWaitingNow\tSendInput":    {guardHuman, "human: the Operator's Send now (Operator-only), through ptymanager.DeliverNow, which still refuses an open prompt and a draft", ""},
 	// The opt-in auto-accept feature, through its named exemption.
 	"internal/server/routes/auto_accept.go\tAutoAcceptor.check\tAutoAcceptSend": {guardAutoAccept, "auto-accept exemption", ""},
-	"internal/server/routes/auto_accept.go\tAutoAcceptor.check\tSendRawInput":   {guardAutoAccept, "inside AutoAcceptSend", ""},
+	// The dialog timeout's close (goal #14): the Operator's opt-in, inside the agent's lock, on the same prompt re-read just before, only Esc or the reject labelled exactly "No".
+	"internal/server/routes/dialog_timeout.go\tSessionsHandler.dialogTimeout\tSendRawInput": {guardScreen, "dialog timeout: closes a prompt the safe way", "TestTheDialogTimeoutSendsNothingWhenTheScreenIsNotThePrompt"},
+	"internal/server/routes/auto_accept.go\tAutoAcceptor.check\tSendRawInput":               {guardAutoAccept, "inside AutoAcceptSend", ""},
 	// A person's input. /send and /keys gate any caller that isn't a person.
 	"internal/server/routes/websocket.go\tterminalStream.handleFrame\tSendInput":           {guardHuman, "human: terminal typing", ""},
 	"internal/server/routes/prompt_answer.go\tSessionsHandler.AnswerPrompt\tSendInput":     {guardScreen, "human: picks an option", "TestAnswerPrompt_ClaudeStillOpen"},

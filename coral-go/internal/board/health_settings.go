@@ -51,6 +51,31 @@ type HealthSettings struct {
 	// or no assignee that are older than WaitMin, named by number. Each is a switch with its wait and an optional member who is also told.
 	GoalsReady   HealthWaitCheck `json:"goals_ready"`
 	UnownedTasks HealthWaitCheck `json:"unowned_tasks"`
+	// DialogTimeout closes a dialog that waited for a person longer than AfterMin, the safe way (deny or cancel, never allow), and tells the agent to ask the Operator on the board
+	// (goal #14). Off by default: Coral acting in an agent's terminal on its own is the Operator's choice, and only the Operator writes it (this route).
+	DialogTimeout HealthDialogTimeout `json:"dialog_timeout"`
+}
+
+// HealthDialogTimeout: whether a dialog left unanswered is closed, and after how many minutes (DialogTimeoutMin to DialogTimeoutMax; 0 in a body is the default).
+type HealthDialogTimeout struct {
+	On       bool `json:"on"`
+	AfterMin int  `json:"after_min"`
+}
+
+// DialogTimeoutDefault is the wait when none is set: after the 5-minute "At a dialog" item and the 10-minute held notice, so the Operator has had two chances first. DialogTimeoutMin and
+// DialogTimeoutMax bound it.
+const (
+	DialogTimeoutDefault = 15
+	DialogTimeoutMin     = 10
+	DialogTimeoutMax     = 1440
+)
+
+// Problem is what is wrong with the setting as a user saves it, in words for them, or "". A wait the body does not carry (0) is the default and is not a problem.
+func (d HealthDialogTimeout) Problem() string {
+	if d.AfterMin != 0 && (d.AfterMin < DialogTimeoutMin || d.AfterMin > DialogTimeoutMax) {
+		return fmt.Sprintf("dialog_timeout.after_min: %d is outside %d to %d minutes", d.AfterMin, DialogTimeoutMin, DialogTimeoutMax)
+	}
+	return ""
 }
 
 // HealthRelease: the branch and the tag pattern (a git glob, "v*" by default) to compare, how long the branch may be past the newest matching tag before Coral says so, and who else is told.
@@ -244,6 +269,7 @@ func DefaultHealthSettings() HealthSettings {
 		Release:        HealthRelease{On: false, Branch: "main", TagPattern: "v*", WaitMin: 1440},
 		GoalsReady:     HealthWaitCheck{On: true, WaitMin: GoalsReadyWaitMin},
 		UnownedTasks:   HealthWaitCheck{On: true, WaitMin: UnownedTasksWaitMin},
+		DialogTimeout:  HealthDialogTimeout{On: false, AfterMin: DialogTimeoutDefault},
 	}
 }
 
@@ -288,6 +314,10 @@ func (h HealthSettings) Clamp() HealthSettings {
 	h.Release.Nudge = strings.TrimSpace(h.Release.Nudge)
 	h.GoalsReady = h.GoalsReady.clamp(GoalsReadyWaitMin)
 	h.UnownedTasks = h.UnownedTasks.clamp(UnownedTasksWaitMin)
+	if h.DialogTimeout.AfterMin == 0 {
+		h.DialogTimeout.AfterMin = DialogTimeoutDefault
+	}
+	h.DialogTimeout.AfterMin = min(max(h.DialogTimeout.AfterMin, DialogTimeoutMin), DialogTimeoutMax)
 	h.Recipient = strings.TrimSpace(h.Recipient)
 	var revs []string
 	for _, r := range h.DefaultReviewers {

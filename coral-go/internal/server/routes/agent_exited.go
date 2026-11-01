@@ -142,6 +142,12 @@ func deliverAutomated(ctx context.Context, term ptymanager.SessionTerminal, name
 }
 
 func deliverAutomatedWhile(ctx context.Context, term ptymanager.SessionTerminal, name, agentType, sessionID, text, what string, wanted func(context.Context) error) error {
+	_, err := deliverAutomatedOutcome(ctx, term, name, agentType, sessionID, text, what, wanted)
+	return err
+}
+
+// deliverAutomatedOutcome is deliverAutomatedWhile that also says whether the text was typed (ptymanager.Sent) or the gate skipped it.
+func deliverAutomatedOutcome(ctx context.Context, term ptymanager.SessionTerminal, name, agentType, sessionID, text, what string, wanted func(context.Context) error) (ptymanager.Delivery, error) {
 	check := func(ctx context.Context) error {
 		if wanted != nil {
 			if err := wanted(ctx); err != nil {
@@ -154,9 +160,9 @@ func deliverAutomatedWhile(ctx context.Context, term ptymanager.SessionTerminal,
 		return nil
 	}
 	if err := check(ctx); err != nil {
-		return err
+		return ptymanager.Skipped, err
 	}
-	_, err := ptymanager.DeliverAutomated(ctx, ptymanager.AutomatedInput{
+	return ptymanager.DeliverAutomated(ctx, ptymanager.AutomatedInput{
 		Term: term, Name: name, AgentType: agentType, SessionID: sessionID,
 		Text: text, What: what,
 		// As a bracketed paste where the agent takes one: a menu ignores it (#3457).
@@ -170,7 +176,6 @@ func deliverAutomatedWhile(ctx context.Context, term ptymanager.SessionTerminal,
 			return term.SendInput(ctx, terminalinput.Coral, name, text, agentType, sessionID) // Coral's own text
 		},
 	})
-	return err
 }
 
 // sendAutomatedHTTP sends input an automated HTTP caller asked for, through the

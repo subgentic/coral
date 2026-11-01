@@ -117,16 +117,30 @@ func (h *SessionsHandler) dialogPass(ctx context.Context, now time.Time) {
 	if err != nil {
 		return
 	}
-	var awake []liveAgent
+	var awake, opencodeAgents []liveAgent
 	live := map[string]bool{}
 	for _, ls := range lives {
-		if ls.IsSleeping == 1 || ls.IsArchived == 1 || ls.AgentType == at.Terminal || ls.AgentType == at.Opencode {
-			continue // a terminal has no agent screen; opencode's questions are its permission cards
+		if ls.IsSleeping == 1 || ls.IsArchived == 1 || ls.AgentType == at.Terminal {
+			continue // a terminal has no agent screen
+		}
+		if ls.AgentType == at.Opencode { // its questions are its permission cards, from its server: only the dialog timeout looks at them
+			opencodeAgents = append(opencodeAgents, liveAgent{ls.SessionID, ls.AgentName, ls.AgentType, ptr.Value(ls.BoardName)})
+			live[ls.SessionID] = true
+			continue
 		}
 		awake = append(awake, liveAgent{ls.SessionID, ls.AgentName, ls.AgentType, ptr.Value(ls.BoardName)})
 		live[ls.SessionID] = true
 	}
 	h.dialogs.keepOnly(live)
+	h.focus.keepOnly(live)
+	for _, a := range opencodeAgents {
+		if ctx.Err() != nil {
+			return
+		}
+		if _, _, timeout := h.dialogMinutes(ctx, a.board); timeout > 0 {
+			h.opencodeDialogTimeout(ctx, a, timeout, now)
+		}
+	}
 	sort.Slice(awake, func(i, j int) bool { return awake[i].sid < awake[j].sid })
 	if len(awake) == 0 {
 		return
@@ -145,18 +159,27 @@ func (h *SessionsHandler) dialogPass(ctx context.Context, now time.Time) {
 		if err != nil { // a screen that cannot be read says nothing: not a dialog, and not a cleared one either
 			continue
 		}
-		after, notify := h.dialogMinutes(ctx, a.board)
+		after, notify, timeout := h.dialogMinutes(ctx, a.board)
 		h.dialogs.observe(a.sid, screen, shown, now, after, notify)
+		if timeout > 0 && shown {
+			h.dialogTimeout(ctx, a, timeout, now) // the team's dialog timeout (dialog_timeout.go): only for an agent on a team board that turned it on
+		}
 	}
 }
 
 // liveAgent is the part of a live session a pass needs.
 type liveAgent struct{ sid, name, agentType, board string }
 
-// dialogMinutes is how long an agent may wait at a dialog (always atDialogMinutes) and whether its team has the notice on (held_notice.On); an agent on no board has it on.
-func (h *SessionsHandler) dialogMinutes(ctx context.Context, project string) (int, bool) {
+// dialogMinutes is how long an agent may wait at a dialog (always atDialogMinutes), whether its team has the notice on (held_notice.On; an agent on no board has it on), and the team's
+// dialog timeout: 0 when it is off or the agent is on no board (the notice it would type tells the agent to ask on the board).
+func (h *SessionsHandler) dialogMinutes(ctx context.Context, project string) (int, bool, time.Duration) {
 	if h.bs == nil || project == "" {
-		return atDialogMinutes, true
+		return atDialogMinutes, true, 0
 	}
-	return atDialogMinutes, h.bs.GetHealthSettings(ctx, project).HeldNotice.On
+	hs := h.bs.GetHealthSettings(ctx, project)
+	var timeout time.Duration
+	if hs.DialogTimeout.On {
+		timeout = time.Duration(hs.DialogTimeout.AfterMin) * time.Minute
+	}
+	return atDialogMinutes, hs.HeldNotice.On, timeout
 }
