@@ -135,6 +135,11 @@ export function openArtifactViewer(hex, opts = {}) {
     _review.open(hex, { ...opts, board: commentBoard(opts) });
     // "Who can read this", for the Operator (the owner through Coral Hub): drawn only when the machine answers it; anyone else sees nothing.
     _details.clear();
+    if (opts.goal || opts.task) { // a review opened from Needs you says the goal and the task it serves: they are not on the row (#11751)
+        const dl = document.createElement('dl'); dl.className = 'facts detail-facts';
+        for (const [k, v] of [['Goal', opts.goal], ['Task', opts.task]]) if (v) { const dt = document.createElement('dt'), dd = document.createElement('dd'); dt.textContent = k; dd.textContent = visibleName(v); dl.append(dt, dd); }
+        _details.add(dl);
+    }
     readersAllowed(hex, opts.server).then(ok => { if (ok && gen === _gen && !d.hidden) { _details.add(readersBlock(hex, opts.server, _details)); _details.add(privateBlock(hex, opts.server, _details)); } }).catch(() => {});
     if (!opts.switched) d.querySelector('.artifact-viewer-close').focus(); // a version chosen from the bar keeps the keyboard on the bar
     let textShown = false; // the strict text view drew it: comments can point into it. Anything else (a frame, a picture, a PDF, a table, a video, a download) takes whole-document comments (#11444).

@@ -64,7 +64,15 @@ const { coralReady } = require('./helpers/wait');
                 await ev(`(() => { const x = [...document.querySelectorAll('.inbox-folder-toolbar .list-bar-chip')].find(c => /Goal/.test(c.textContent)); if (x) x.click(); return true; })()`);
                 await waitFor(`document.querySelectorAll('#group-table-view [data-review-artifact]').length >= 12`, 'the filter cleared', 8000);
                 if (dir) { fs.mkdirSync(dir, { recursive: true }); for (const theme of ['light', 'dark']) { await ev(`document.documentElement.setAttribute('data-theme','${theme}');true`); fs.writeFileSync(path.join(dir, `inbox-review-goal-${width}-${theme}.png`), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); } }
-                // (the goal and the task are no longer on the row; the Filters' Goal field above is where a goal still narrows the list; the viewer opened from a row does not show them: noted on #11719)
+                // the goal and the task are in the opened file's Details (#11751): they left the row, the viewer says them
+                await ev(`[...document.querySelectorAll('#group-table-view tbody tr button')].find(b => b.getAttribute('aria-label') === 'Open Review file 01.txt').click(); true`);
+                await waitFor(`!!document.querySelector('.artifact-viewer .details-toggle:not([hidden])')`, 'the viewer has a Details button', 10000);
+                await ev(`(() => { const b = document.querySelector('.artifact-viewer .details-toggle'); if (b.getAttribute('aria-expanded') !== 'true') b.click(); return true; })()`);
+                await waitFor(`/Ship the installer/.test((document.querySelector('.artifact-viewer .detail-details') || {}).textContent || '')`, 'the Details name the goal', 6000).catch(() => {});
+                const facts = await ev(`(document.querySelector('.artifact-viewer .detail-details') || {}).textContent || ''`);
+                assert.ok(/Goal/.test(facts) && /Ship the installer/.test(facts) && /Task/.test(facts) && /Build the installer/.test(facts), 'the opened file\'s Details say its goal and its task: ' + JSON.stringify(facts.slice(0, 200)));
+                if (dir) { fs.writeFileSync(path.join(dir, `review-details-${width}.png`), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }
+                await ev(`document.querySelector('.artifact-viewer-close').click(); true`);
                 console.log('PASS review goal ' + width);
                 console.log('PASS review goal ' + width);
             } catch(error){failures.push(width+': '+error.message);console.error(failures.at(-1));}
