@@ -3,6 +3,7 @@
 package ptymanager
 
 import (
+	"errors"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -91,7 +92,11 @@ func classifyProcess(key stdinKey, wait time.Duration) stdinKind {
 		stdinMemo.m[key] = e
 		stdinMemo.workers++
 		go func() {
-			k := stdinProbe(key.pid)
+			k := stdinUnreadable // a fault in the probe is "unreadable", a reader: it never takes the server down
+			func() {
+				defer func() { _ = recover() }()
+				k = stdinProbe(key.pid)
+			}()
 			stdinMemo.Lock()
 			stdinMemo.workers--
 			stdinMemo.Unlock()
@@ -144,6 +149,18 @@ func probeStdin(pid int) stdinKind {
 	return classifyStdin(dup)
 }
 
+// consoleModeHook, when set, replaces GetConsoleMode (a test's; an atomic, as a worker may still read it).
+var consoleModeHook atomic.Pointer[func(windows.Handle) error]
+
+// consoleMode is GetConsoleMode's answer for h (only whether it took it).
+func consoleMode(h windows.Handle) error {
+	if f := consoleModeHook.Load(); f != nil {
+		return (*f)(h)
+	}
+	var mode uint32
+	return windows.GetConsoleMode(h, &mode)
+}
+
 // readProcess reads size bytes at addr of process h into out; false unless all of them were read.
 func readProcess(h windows.Handle, addr uintptr, out unsafe.Pointer, size uintptr) bool {
 	var n uintptr
@@ -151,7 +168,8 @@ func readProcess(h windows.Handle, addr uintptr, out unsafe.Pointer, size uintpt
 }
 
 // classifyStdin tells a handle apart: a pipe or a file is not the console; a character device is the console when GetConsoleMode takes it (it does for a console input or output
-// handle of any console), and not otherwise (NUL, a serial port). Neither call waits on a read another process has pending.
+// handle of any console), is not when GetConsoleMode answers ERROR_INVALID_HANDLE (NUL, a serial port), and is unreadable, so a reader, on any other answer. Neither call waits on a
+// read another process has pending.
 func classifyStdin(h windows.Handle) stdinKind {
 	t, err := windows.GetFileType(h)
 	if err != nil && t == windows.FILE_TYPE_UNKNOWN {
@@ -161,11 +179,13 @@ func classifyStdin(h windows.Handle) stdinKind {
 	case windows.FILE_TYPE_PIPE, windows.FILE_TYPE_DISK:
 		return stdinNotConsole
 	case windows.FILE_TYPE_CHAR:
-		var mode uint32
-		if windows.GetConsoleMode(h, &mode) == nil {
+		switch err := consoleMode(h); {
+		case err == nil:
 			return stdinConsole
+		case errors.Is(err, windows.ERROR_INVALID_HANDLE):
+			return stdinNotConsole // not a console handle: NUL, a serial port
 		}
-		return stdinNotConsole
+		return stdinUnreadable // any other answer cannot say it is not the console
 	}
 	return stdinUnreadable
 }

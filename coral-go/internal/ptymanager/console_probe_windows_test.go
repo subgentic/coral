@@ -3,12 +3,14 @@
 package ptymanager
 
 import (
+	"os"
 	"runtime"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sys/windows"
 
 	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/tmux"
@@ -109,4 +111,38 @@ func TestAReaderBlockedInAReadIsRefusedQuicklyAndHoldsNoOneElse(t *testing.T) {
 	assert.True(t, found)
 	assert.False(t, refused, "the agent beside it gets its text")
 	assert.Less(t, time.Since(start), 2*time.Second)
+}
+
+// Only ERROR_INVALID_HANDLE from GetConsoleMode says a character device is not the console; any other answer is unreadable, a reader. A probe that panics is unreadable too.
+func TestOnlyAnInvalidHandleAnswerSaysNotTheConsole(t *testing.T) {
+	nul, err := os.Open(os.DevNull)
+	require.NoError(t, err)
+	defer nul.Close()
+	h := windows.Handle(nul.Fd()) // a character device
+	for name, tc := range map[string]struct {
+		answer error
+		want   stdinKind
+	}{
+		"taken: a console":     {nil, stdinConsole},
+		"not a console handle": {windows.ERROR_INVALID_HANDLE, stdinNotConsole},
+		"access denied":        {windows.ERROR_ACCESS_DENIED, stdinUnreadable},
+		"any other answer":     {windows.ERROR_INVALID_FUNCTION, stdinUnreadable},
+	} {
+		t.Run(name, func(t *testing.T) {
+			answer := func(windows.Handle) error { return tc.answer }
+			consoleModeHook.Store(&answer)
+			t.Cleanup(func() { consoleModeHook.Store(nil) })
+			assert.Equal(t, tc.want, classifyStdin(h))
+		})
+	}
+	assert.Equal(t, stdinNotConsole, classifyStdin(h), "the real NUL device answers ERROR_INVALID_HANDLE")
+
+	panics := func(int) stdinKind { panic("a fault in the probe") }
+	stdinProbeHook.Store(&panics)
+	resetStdinMemo(t)
+	t.Cleanup(func() {
+		stdinProbeHook.Store(nil)
+		resetStdinMemo(t)
+	})
+	assert.Equal(t, stdinUnreadable, classifyProcess(stdinKey{5, 5}, time.Second), "a probe that panics is a reader, and the process goes on")
 }
