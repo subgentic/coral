@@ -633,17 +633,19 @@ func TestHub_OwnerStampCapabilityNeedsBothHalves(t *testing.T) {
 	reg.put("neither", neither.URL)
 	h := feedHub(reg, time.Hour)
 	startHub(t, h)
+	want := map[string]bool{"both": true, "hubonly": false, "remoteonly": false, "neither": false}
+	var got map[string]bool
+	// Waited for as what is asserted, not for the version: the stamp is read from the same health answer, but a snapshot read in between can still show a computer before its answer is in.
 	require.Eventually(t, func() bool {
-		for _, s := range h.Snapshot().Servers {
+		servers := h.Snapshot().Servers
+		got = map[string]bool{}
+		for _, s := range servers {
 			if s.Version == "" {
 				return false
 			}
+			got[s.ID] = s.OwnerStamp
 		}
-		return len(h.Snapshot().Servers) == 4
-	}, 3*time.Second, 10*time.Millisecond)
-	got := map[string]bool{}
-	for _, s := range h.Snapshot().Servers {
-		got[s.ID] = s.OwnerStamp
-	}
-	assert.Equal(t, map[string]bool{"both": true, "hubonly": false, "remoteonly": false, "neither": false}, got)
+		return len(servers) == len(want) && assert.ObjectsAreEqual(want, got)
+	}, 3*time.Second, 10*time.Millisecond, "the stamp of each computer: both halves only")
+	assert.Equal(t, want, got)
 }

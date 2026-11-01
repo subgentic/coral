@@ -57,9 +57,20 @@ func (s *Store) SleepingSubscribers(ctx context.Context, project string) (map[st
 	return out, nil
 }
 
-// UnreadTagged is how many messages tagged to subscriberID (its name or its role, as MentionsOf counts them) were posted after the
-// last message it read, and when the oldest was posted (zero when there are none). Coral's own lines and its own posts don't count.
-func (s *Store) UnreadTagged(ctx context.Context, project, subscriberID string) (int, time.Time, error) {
+// UnreadTags are the messages tagged to a member (its name or its role, as MentionsOf counts them) that were posted after the last message it read.
+// Directed are the ones that are for it: a question still open to it, or a reply to one of its own posts. The rest tag it among others (a broadcast): they
+// are counted but earn no wake (#11803). Since is when the oldest tag was posted and DirectedSince the oldest directed one (zero when there are none).
+type UnreadTags struct {
+	Total, Directed int
+	Since           time.Time
+	DirectedSince   time.Time
+}
+
+// Broadcasts is how many of the unread tags are for no one in particular.
+func (u UnreadTags) Broadcasts() int { return u.Total - u.Directed }
+
+// UnreadTags reads them for subscriberID. Coral's own lines and its own posts don't count.
+func (s *Store) UnreadTags(ctx context.Context, project, subscriberID string) (UnreadTags, error) {
 	var sub struct {
 		LastReadID   int64  `db:"last_read_id"`
 		JobTitle     string `db:"job_title"`
@@ -67,9 +78,9 @@ func (s *Store) UnreadTagged(ctx context.Context, project, subscriberID string) 
 	}
 	if err := s.reader().GetContext(ctx, &sub, `SELECT last_read_id, job_title, subscribed_at FROM board_subscribers WHERE project = ? AND subscriber_id = ?`, project, subscriberID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return 0, time.Time{}, nil
+			return UnreadTags{}, nil
 		}
-		return 0, time.Time{}, err
+		return UnreadTags{}, err
 	}
 	// Counted by message id (a message in the same second as the last one read still counts); the time only narrows the scan.
 	since, _ := time.Parse(time.RFC3339, sub.SubscribedAt)
@@ -84,7 +95,7 @@ func (s *Store) UnreadTagged(ctx context.Context, project, subscriberID string) 
 	}
 	all, err := s.MentionsOf(ctx, project, subscriberID, sub.JobTitle, since)
 	if err != nil {
-		return 0, time.Time{}, err
+		return UnreadTags{}, err
 	}
 	var mentions []MentionOf
 	for _, m := range all {
@@ -93,10 +104,55 @@ func (s *Store) UnreadTagged(ctx context.Context, project, subscriberID string) 
 		}
 	}
 	if len(mentions) == 0 {
-		return 0, time.Time{}, nil
+		return UnreadTags{}, nil
 	}
-	first, _ := time.Parse(time.RFC3339, mentions[0].CreatedAt)
-	return len(mentions), first, nil
+	directed, err := s.directedAt(ctx, project, subscriberID, mentions)
+	if err != nil {
+		return UnreadTags{}, err
+	}
+	out := UnreadTags{Total: len(mentions)}
+	out.Since, _ = time.Parse(time.RFC3339, mentions[0].CreatedAt)
+	for _, m := range mentions {
+		if directed[m.ID] {
+			out.Directed++
+			if out.DirectedSince.IsZero() {
+				out.DirectedSince, _ = time.Parse(time.RFC3339, m.CreatedAt)
+			}
+		}
+	}
+	return out, nil
+}
+
+// directedAt is which of the mentions are for member: a question still open to it, or a reply to a message it posted.
+func (s *Store) directedAt(ctx context.Context, project, member string, mentions []MentionOf) (map[int64]bool, error) {
+	out := map[int64]bool{}
+	asks, err := s.OpenAsksOf(ctx, project, member, time.Now())
+	if err != nil {
+		return nil, err
+	}
+	for _, a := range asks {
+		out[a.MessageID] = true
+	}
+	ids := make([]int64, len(mentions))
+	for i, m := range mentions {
+		ids[i] = m.ID
+	}
+	for start := 0; start < len(ids); start += idChunkSize {
+		chunk := ids[start:min(start+idChunkSize, len(ids))]
+		args := []any{project, member}
+		for _, id := range chunk {
+			args = append(args, id)
+		}
+		var replies []int64
+		if err := s.reader().SelectContext(ctx, &replies, `SELECT r.message_id FROM board_replies r JOIN board_messages t ON t.id = r.reply_to AND t.project = r.project
+			WHERE r.project = ? AND lower(t.subscriber_id) = lower(?) AND r.message_id IN (`+placeholders(len(chunk))+`)`, args...); err != nil {
+			return nil, err
+		}
+		for _, id := range replies {
+			out[id] = true
+		}
+	}
+	return out, nil
 }
 
 // MentionedBy is when (the first time after since) a message from sender mentioned the member: the check calls a wait STALE when the
