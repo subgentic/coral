@@ -61,6 +61,20 @@ func (s *Store) ensureAsksSchema(ctx context.Context) error {
 			note       TEXT NOT NULL,
 			closed_at  TEXT NOT NULL
 		)`,
+		`CREATE TABLE IF NOT EXISTS board_ask_buttons (
+			id         INTEGER PRIMARY KEY AUTOINCREMENT,
+			project    TEXT NOT NULL,
+			message_id INTEGER NOT NULL,
+			pos        INTEGER NOT NULL,
+			label      TEXT NOT NULL,
+			action     TEXT NOT NULL,
+			arg        TEXT NOT NULL DEFAULT '',
+			state      TEXT NOT NULL DEFAULT 'pending',
+			created_at TEXT NOT NULL,
+			used_at    TEXT NOT NULL DEFAULT '',
+			reply_message_id INTEGER NOT NULL DEFAULT 0
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_board_ask_buttons_msg ON board_ask_buttons(project, message_id)`,
 	} {
 		if _, err := s.db.ExecContext(ctx, stmt); err != nil {
 			return err

@@ -466,7 +466,7 @@ var knownPathParams = map[string]string{
 	"plan":         "a server setup the hub holds, by its random id (#11370): a target; the routes are the Operator's and a person's (humanInputCaller), so who is acting never comes from a path",
 	"cid":          "a comment of an artifact addressed by its id (the artifact is {id}): a target; who is acting comes from the caller derivation, never from a path or a body",
 	"id":           "an id", "taskID": "an id", "groupID": "an id", "workflowID": "an id", "runID": "an id", "jobID": "an id", "jobId": "an id",
-	"tagID": "an id", "presetID": "an id", "noteID": "an id", "messageID": "an id", "subagentID": "an id", "stepIndex": "an index",
+	"tagID": "an id", "presetID": "an id", "noteID": "an id", "messageID": "an id", "buttonID": "an id", "subagentID": "an id", "stepIndex": "an index",
 }
 
 func TestPathParamsAreClassified(t *testing.T) {

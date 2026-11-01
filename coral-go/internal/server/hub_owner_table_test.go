@@ -136,11 +136,13 @@ func TestTheOwnerRoutesOfTheTableAreTheReviewedSet(t *testing.T) {
 		"PATCH /api/artifacts/{hex64}/comments/{id}": "owner-sees", "DELETE /api/artifacts/{hex64}/comments/{id}": "owner-sees",
 		"PUT /api/artifacts/{hex64}/comments/lock": "owner-only", "DELETE /api/artifacts/{hex64}/comments/lock": "owner-only", "POST /api/artifacts/{hex64}/comments/{id}/send": "owner-only",
 		// Approve, or ask changes of, a for-review artifact through the Hub is the owner's alone (#136584, #11354).
-		"POST /api/board/{project}/artifacts/{id}/review":      "owner-only",
-		"POST /api/sessions/live/{name}/dismiss-wait":          "owner-only",
-		"POST /api/board/{project}/operator-artifacts":         "owner-only",
-		"POST /api/board/{project}/operator-artifacts/message": "owner-only",
-		"POST /api/board/{project}/messages":                   "owner-sees", "POST /api/board/{project}/subscribe": "owner-sees", "POST /api/board/{project}/tasks": "owner-sees", "POST /api/board/{project}/goals": "owner-sees", // they can start a new board (#11627)
+		"POST /api/board/{project}/artifacts/{id}/review":                      "owner-only",
+		"POST /api/board/{project}/asks/{messageID}/buttons/{buttonID}/claim":  "owner-only",
+		"POST /api/board/{project}/asks/{messageID}/buttons/{buttonID}/settle": "owner-only",
+		"POST /api/sessions/live/{name}/dismiss-wait":                          "owner-only",
+		"POST /api/board/{project}/operator-artifacts":                         "owner-only",
+		"POST /api/board/{project}/operator-artifacts/message":                 "owner-only",
+		"POST /api/board/{project}/messages":                                   "owner-sees", "POST /api/board/{project}/subscribe": "owner-sees", "POST /api/board/{project}/tasks": "owner-sees", "POST /api/board/{project}/goals": "owner-sees", // they can start a new board (#11627)
 		"POST /api/board/{project}/working-mode/presets": "owner-sees", "PUT /api/board/{project}/working-mode": "owner-sees",
 		"GET /api/board/{project}/settings": "owner-sees", "GET /api/system/update": "owner-update", "POST /api/system/update/relaunch": "owner-update",
 	}

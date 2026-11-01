@@ -7,6 +7,12 @@
       "type": "index"
     },
     {
+      "name": "idx_board_ask_buttons_msg",
+      "sql": "CREATE INDEX idx_board_ask_buttons_msg ON board_ask_buttons(project, message_id)",
+      "tbl_name": "board_ask_buttons",
+      "type": "index"
+    },
+    {
       "name": "idx_board_asks_project",
       "sql": "CREATE INDEX idx_board_asks_project ON board_asks(project, message_id)",
       "tbl_name": "board_asks",
@@ -412,6 +418,12 @@
       "name": "artifact_tags",
       "sql": "CREATE TABLE artifact_tags (\n\t\t\tboard_id TEXT NOT NULL,\n\t\t\thex      TEXT NOT NULL,\n\t\t\ttag      TEXT NOT NULL,\n\t\t\tPRIMARY KEY (board_id, hex, tag)\n\t\t)",
       "tbl_name": "artifact_tags",
+      "type": "table"
+    },
+    {
+      "name": "board_ask_buttons",
+      "sql": "CREATE TABLE board_ask_buttons (\n\t\t\tid         INTEGER PRIMARY KEY AUTOINCREMENT,\n\t\t\tproject    TEXT NOT NULL,\n\t\t\tmessage_id INTEGER NOT NULL,\n\t\t\tpos        INTEGER NOT NULL,\n\t\t\tlabel      TEXT NOT NULL,\n\t\t\taction     TEXT NOT NULL,\n\t\t\targ        TEXT NOT NULL DEFAULT '',\n\t\t\tstate      TEXT NOT NULL DEFAULT 'pending',\n\t\t\tcreated_at TEXT NOT NULL,\n\t\t\tused_at    TEXT NOT NULL DEFAULT '',\n\t\t\treply_message_id INTEGER NOT NULL DEFAULT 0\n\t\t)",
+      "tbl_name": "board_ask_buttons",
       "type": "table"
     },
     {
@@ -1127,6 +1139,144 @@
           "partial": 0,
           "seq": 1,
           "unique": 1
+        }
+      ]
+    },
+    "board_ask_buttons": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "id",
+          "notnull": 0,
+          "pk": 1,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 1,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "project",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 2,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "message_id",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 3,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "pos",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 4,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "label",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 5,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "action",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 6,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "arg",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 7,
+          "dflt_value": "'pending'",
+          "hidden": 0,
+          "name": "state",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 8,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "created_at",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 9,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "used_at",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 10,
+          "dflt_value": "0",
+          "hidden": 0,
+          "name": "reply_message_id",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            {
+              "cid": 1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "project",
+              "seqno": 0
+            },
+            {
+              "cid": 2,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "message_id",
+              "seqno": 1
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 2
+            }
+          ],
+          "name": "idx_board_ask_buttons_msg",
+          "origin": "c",
+          "partial": 0,
+          "seq": 0,
+          "unique": 0
         }
       ]
     },
