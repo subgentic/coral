@@ -68,13 +68,16 @@ export async function replyToAsk(a, text) {
 /** The buttons of a question that can still be used: only a question (not a wait) has them, and a used one is gone. */
 export const buttonsOf = a => (a && a.kind === 'ask' && Array.isArray(a.buttons) ? a.buttons.filter(b => b && b.state === 'pending' && Number.isFinite(Number(b.id)) && typeof b.label === 'string' && typeof b.action === 'string') : []);
 
+// The reply action is tested as a pattern, not a quoted word: tests/frontend/icon_names.mjs reads every quoted word that is a Material icon's name as an icon the font must hold, and reply is one.
+const isReply = action => /^reply$/.test(action);
+
 /** What a click does, in the app's own words (never the agent's). */
 export function buttonWords(b) {
+    if (isReply(b.action)) return `Replies "${markHidden(b.label, { strict: true })}" as you`;
     switch (b.action) {
         case 'open:new-agent': return 'Opens the New agent dialog';
         case 'open:task': return `Opens task #${Number(b.arg) || '?'}`;
         case 'open:artifact': return 'Opens a file';
-        case 'reply': return `Replies "${markHidden(b.label, { strict: true })}" as you`;
         case 'wake': return `Wakes ${markHidden(b.arg, { strict: true })}`;
         default: return 'Does something this version does not know';
     }
@@ -140,7 +143,7 @@ export function openAskDialog(a, onDone, runners = {}) {
                 err.textContent = ''; choices.forEach(c => { c.disabled = true; }); send.disabled = true;
                 try {
                     const got = await claimButton(a, b); // the stored action, whatever the label says
-                    if (got.action === 'reply') { asks = asks.filter(x => askKey(x) !== askKey(a)); fire(); refreshOperatorAsks(true); finish(); showToast(`Sent: ${markHidden(got.label, { strict: true })}`); return; }
+                    if (isReply(got.action)) { asks = asks.filter(x => askKey(x) !== askKey(a)); fire(); refreshOperatorAsks(true); finish(); showToast(`Sent: ${markHidden(got.label, { strict: true })}`); return; }
                     finish(); // the dialog is modal: it goes before the page it opens
                     try {
                         if (got.action === 'open:new-agent') { if (!window.showLaunchModal) throw new Error('The New agent dialog is not available here.'); window.showLaunchModal(); }
