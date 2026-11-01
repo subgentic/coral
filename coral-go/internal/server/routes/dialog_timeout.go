@@ -11,6 +11,7 @@ import (
 	at "github.com/subgentic/coral/internal/agenttypes"
 	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/ptymanager"
+	"github.com/subgentic/coral/internal/safego"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/internal/terminalinput"
 )
@@ -274,17 +275,33 @@ func (h *SessionsHandler) dialogTimeout(ctx context.Context, a liveAgent, after 
 	}
 	h.hints.forget(a.sid)
 	h.forgetDialog(a.sid)
-	outcome := timeoutNoBox
-	if h.waitInputBox(ctx, pane, a, screen) {
-		time.Sleep(promptSettle)
-		delivery, err := deliverNoticeRetrying(ctx, h.terminal, pane, a.agentType, a.sid, dialogTimeoutNotice, "dialog timeout notice")
-		outcome = timeoutNotTyped
-		if err == nil && delivery == ptymanager.Sent {
+	if !h.waitInputBox(ctx, pane, a, screen) {
+		h.recordDialogClosed(ctx, a, first, now, plan.how, timeoutNoBox)
+		return timeoutNoBox
+	}
+	time.Sleep(promptSettle)
+	unlock() // the close is done and the box is back: a person's answer to the next dialog never waits behind this notice and its retries (Security's #6919)
+	return h.afterClose(func() string {
+		outcome := timeoutNotTyped
+		if delivery, err := deliverNoticeRetrying(ctx, h.terminal, pane, a.agentType, a.sid, dialogTimeoutNotice, "dialog timeout notice"); err == nil && delivery == ptymanager.Sent {
 			outcome = timeoutDone
 		}
+		h.recordDialogClosed(ctx, a, first, now, plan.how, outcome)
+		return outcome
+	})
+}
+
+// timeoutNotifying is the outcome of a close whose notice is still being sent (its retries run outside the agent's lock; the event and the team line follow it).
+const timeoutNotifying = "closed_notifying"
+
+// afterClose runs what follows a close (the notice, its retries, the event) on a goroutine of its own, outside the agent's lock, and answers timeoutNotifying; a test that sets
+// noticeInStep runs it in step and gets its outcome.
+func (h *SessionsHandler) afterClose(finish func() string) string {
+	if h.noticeInStep {
+		return finish()
 	}
-	h.recordDialogClosed(ctx, a, first, now, plan.how, outcome)
-	return outcome
+	safego.Go("dialog timeout notice", func() { finish() })
+	return timeoutNotifying
 }
 
 // noticeWouldHold says the gate would hold the notice for a reason other than the dialog itself: the person paused notices or is typing, has unsent text in the terminal (a draft a dialog may hide), a send of theirs is in flight, the CLI is not in

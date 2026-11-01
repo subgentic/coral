@@ -64,6 +64,7 @@ func newTimeoutRig(t *testing.T, agentType, kind, screen string) *timeoutRig {
 	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid, AgentType: agentType, AgentName: "chat", WorkingDir: "/tmp/project"}))
 	term := &agentTerm{mockSessionTerminal: mock}
 	h.terminal = term
+	h.noticeInStep = true // the notice's outcome is checked here; TestTheNoticeIsSentOutsideTheAgentsLock runs it as Coral does
 	r := &timeoutRig{t: t, h: h, term: term, mock: mock, sid: sid, name: name, agent: liveAgent{sid, "chat", agentType, "team"}, t0: time.Date(2026, 11, 1, 5, 0, 0, 0, time.UTC), idle: claudeScreen(t, "idle")}
 	if kind != "" {
 		id := sid
