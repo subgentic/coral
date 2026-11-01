@@ -368,9 +368,11 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
     // ── closing and reopening (#7272, UI/UX's #7270) ─────
 
     /** The files for review on this goal that no one has decided (still in Needs you, read ones too): D and G of Beta #11837, a goal can be closed or read Done with its files never answered. */
+    let reviewsReadAt = 0;
     async function waitingReviews(g) {
         const R = await importOnce('./inbox_reviews.js');
-        await R.refreshReviews();
+        if (Date.now() - reviewsReadAt > 30000) { reviewsReadAt = Date.now(); await R.refreshReviews(true); } // the Inbox's list is only read once the Inbox was shown: a goal page asks for it itself, at most every 30 seconds
+        else await R.refreshReviews();
         return R.reviewItems().filter(a => String(a.goal_id) === String(g.id) && a.team === model.project);
     }
     async function showNeeds(g) {

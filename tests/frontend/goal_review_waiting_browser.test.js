@@ -24,11 +24,11 @@ const { coralReady, framesJs } = require('./helpers/wait');
             const f = (i, goal, title) => ({ id: hex(i), name: 'file-' + i + '.md', media_type: 'text/markdown', size: 30, created_at: new Date(Date.now() - i * 60000).toISOString(), source: 'upload', available: true, tags: ['for review'], produced_by: 'Writer', goal_id: goal, goal_title: title, uri: 'coral://artifacts/' + hex(i) });
             const items = [f(1, ${G1}, 'Sprout app'), f(2, ${G1}, 'Sprout app'), f(3, ${G1}, 'Sprout app'), f(4, ${G2}, 'Other goal'), f(5, 0, '')];
             window.fetch = (url, opts = {}) => { const u = new URL(String(url), location.origin); if ((opts.method || 'GET') === 'GET' && u.pathname === '/api/board/${B}/artifacts') return json({ project: '${B}', artifacts: items.filter(a => !u.searchParams.has('tag') || a.tags.includes(u.searchParams.get('tag'))), has_more: false }); return original(url, opts); }; return true; })()`;
+        await Page.addScriptToEvaluateOnNewDocument({ source: stub }); // before the page reads its files, as the real server answers from the first read
         for (const [w, mobile] of [[1280, false], [390, true]]) {
             const at = `${w} px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: 900, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
-            await load(`/team/${B}/goals/${G1}`); await ev(stub);
-            await ev(`import(${S} + 'inbox_reviews.js').then(m => m.refreshReviews(true)).then(() => true)`);
+            await load(`/team/${B}/goals/${G1}`);
             await waitFor(`!!document.querySelector('#goals-detail-title') && !!document.querySelector('.goal-reviews-waiting:not([hidden])')`, at + 'the goal page says files wait', 15000).catch(async () => { throw new Error(at + 'the line was not drawn: ' + await ev(`(document.querySelector('.goal-reviews-waiting') || {}).outerHTML`)); });
             const line = await ev(`document.querySelector('.goal-reviews-waiting').textContent.replace(/\\s+/g, ' ').trim()`);
             assert.equal(line, '3 files for this goal are waiting for your review. Review them', at + 'the goal page line: ' + line);
@@ -45,8 +45,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
             await waitFor(`document.body.dataset.navTab === 'hub-inbox' && document.querySelectorAll('#group-table-view tbody tr').length === 3`, at + 'Needs you shows this goal\'s three files', 15000);
             assert.ok(await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].every(r => /file-[123]\\.md/.test(r.textContent))`), at + 'and only those');
             // a goal with no files waiting: no warning, no line
-            await load(`/team/${B}/goals/${G3}`); await ev(stub);
-            await ev(`import(${S} + 'inbox_reviews.js').then(m => m.refreshReviews(true)).then(() => true)`);
+            await load(`/team/${B}/goals/${G3}`);
             await waitFor(`!!document.querySelector('#goals-detail-title')`, at + 'the other goal page', 15000);
             await ev(framesJs(10));
             assert.equal(await ev(`!!document.querySelector('.goal-reviews-waiting:not([hidden])')`), false, at + 'a goal with no files waiting says nothing');
