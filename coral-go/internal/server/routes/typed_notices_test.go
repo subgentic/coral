@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -28,6 +29,7 @@ func TestTypedNoticeCensus(t *testing.T) {
 		typedcensus.C("personal task", claimPrompt(&store.AgentTask{ID: 4, Title: "Fix the build"}), claimPrompt(&store.AgentTask{ID: 4, Title: h})),
 		typedcensus.C("task available", taskClaimNudge(12), taskClaimNudge(12)),
 		typedcensus.C("tasks available", taskNudge, taskNudge),
+		typedcensus.C("comment reply reminder", typedReplyNudge(strings.Repeat("a", 64), 28), typedReplyNudge(strings.Repeat("a", 64), 28)),
 		typedcensus.C("goal driver", typedGoalDriverNudge(12), typedGoalDriverNudge(12)),
 		typedcensus.C("artifact reminder", claudeArtifactNudgeText, claudeArtifactNudgeText),
 		typedcensus.C("agent UI action", uiActionPrompt(7, "panel-1", 3), uiActionPrompt(7, "panel-1", 3)),
@@ -64,6 +66,7 @@ func TestEveryTypedSenderIsInTheCensus(t *testing.T) {
 		typedcensus.S("board_notifications.go", `typedPeriodicReminder(`, 1, "census"),
 		typedcensus.S("board_reminders.go", `typedBoardReminder(`, 1, "census"),
 		typedcensus.S("board_goals.go", `typedGoalDriverNudge(id)`, 1, "census: goal driver"),
+		typedcensus.S("artifact_comment_nudge.go", `typedReplyNudge(a.ArtifactID`, 1, "census: comment reply reminder"),
 		typedcensus.S("board_task_create.go", `taskClaimNudge(`, 1, "census"),
 		typedcensus.S("board_task_create.go", `taskNudge)`, 1, "census: tasks available"),
 		typedcensus.S("board_task_edit.go", `taskClaimNudge(`, 4, "census"),

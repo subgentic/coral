@@ -199,6 +199,9 @@ func startIndexingServices(ctx context.Context, cfg *config.Config, srv *server.
 		safeGo(ctx, "remote_agents", func() { srv.RunRemoteAgents(ctx) })
 	}
 
+	// An artifact comment relayed to an agent that it only answered on the board gets one reminder to answer in the thread (#11722).
+	safeGo(ctx, "comment_reply_nudges", func() { srv.RunCommentReplyNudges(ctx) })
+
 	// Git poller. Its cadence is a user setting, re-read before every wait, so
 	// someone on a repository where scanning is slow can stretch it out or
 	// turn it off without restarting.

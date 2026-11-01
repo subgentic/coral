@@ -124,6 +124,8 @@ CREATE TABLE IF NOT EXISTS artifact_comment_asks (
 	expires_at    TEXT NOT NULL,
 	closed_at     TEXT,
 	replies       INTEGER NOT NULL DEFAULT 0,
+	seen_at       TEXT,
+	nudged_at     TEXT,
 	UNIQUE (comment_id, agent_session)
 );
 CREATE INDEX IF NOT EXISTS idx_artifact_comment_asks_artifact ON artifact_comment_asks(artifact_id);

@@ -113,11 +113,12 @@ type SessionsHandler struct {
 	jsonl       *jsonl.SessionReader
 	backend     ptymanager.TerminalBackend // nil = use tmux directly
 
-	boardHandler  *BoardHandler          // for sleep/wake board pausing
-	schedStore    *store.ScheduleStore   // for active runs in websocket
-	notifications *NotificationStore     // for UI notifications via websocket
-	teamStore     *store.TeamStore       // for team persistence
-	tokenStore    *store.TokenUsageStore // for token usage tracking
+	boardHandler   *BoardHandler                                                      // for sleep/wake board pausing
+	replyNudgeSend func(ctx context.Context, project, sessionName, text string) error // how a reminder to answer in a comment thread is typed (nil: through boardHandler); a test sets it (#11722)
+	schedStore     *store.ScheduleStore                                               // for active runs in websocket
+	notifications  *NotificationStore                                                 // for UI notifications via websocket
+	teamStore      *store.TeamStore                                                   // for team persistence
+	tokenStore     *store.TokenUsageStore                                             // for token usage tracking
 
 	goals GoalRequester // nil until the goal generator starts
 
