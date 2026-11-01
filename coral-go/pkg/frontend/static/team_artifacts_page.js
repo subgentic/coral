@@ -231,12 +231,14 @@ export function createArtifactsList({ inbox = false } = {}) {
         document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshQuiet(); });
     }
 
+    /** The list's total: with the For review pill on (and nothing else narrowing it) it is the pill's own count, so the header and the pill are one number (#11694: 34 beside a pill of 31). */
+    function matchedTotal() { const c = model.counts, n = Number(model.tagCounts[REVIEW]) || 0; return c ? (model.filters.tag === REVIEW && !model.filters.q && n && n <= c.matched ? n : c.matched) : model.items.length; }
     function statusLine() {
         if (model.error) return model.error;
         if (model.loading || pendingBoard) return inbox ? 'Loading artifacts…' : model.scope ? 'Loading agent artifacts…' : 'Loading team artifacts…';
         if (!model.items.length) return F.isFiltered(model.filters) ? 'No artifacts match this search.' : model.scope ? 'Nothing shared yet. Files this agent shares appear here.' : hooks.emptyText?.() || 'No artifacts yet. Files your agents share show up here.';
-        const c = model.counts;
-        return c && c.matched > model.items.length ? `Showing ${model.items.length} of ${c.matched}${model.truncated ? '+' : ''}` : `${model.items.length} artifact${model.items.length === 1 ? '' : 's'}`;
+        const c = model.counts, total = matchedTotal();
+        return c && total > model.items.length ? `Showing ${model.items.length} of ${total}${model.truncated ? '+' : ''}` : `${model.items.length} artifact${model.items.length === 1 ? '' : 's'}`;
     }
 
     /** The box the list scrolls in (the tab's panel, or the team page), found from the list up: a redraw that empties it for a moment would let the browser clamp its scroll to the top (#6509). */
@@ -348,7 +350,7 @@ export function createArtifactsList({ inbox = false } = {}) {
                         : [{ key: 'team', label: 'Team', width: '8rem', dropAt: 52, nowrap: false, tone: 'tertiary', cell: item => placeOf(item) }]) : []),
                     ...(model.scope || by === 'goal' ? [] : [{ key: 'goal', label: 'Goal', width: inbox && multipleServers() ? '6.5rem' : '10rem', dropAt: 52, tone: 'tertiary', cell: goalCell }])], // the goal of the file's task, one line (ellipsis, the whole name on hover), a link to the goal (#9274): the Operator finds it the more useful column; the task is in the row's tooltip, its preview and, grouped by task, the group's head (#8617); the head says it where the list is grouped by task; an agent's own list has none // the team's words carry its computer ("alpha · Box Two"), so two same-named teams are told apart (#8774)
                 nameTitle: item => [readableName(item), inbox ? placeOf(item) : '', taskText(item), originBadge(item)].filter(Boolean).join(' · '),
-                footer: { auto: !model.truncated && !model.error, text: `Showing ${model.items.length} of ${model.counts?.matched ?? model.items.length}${model.truncated ? '+' : ''}`,
+                footer: { auto: !model.truncated && !model.error, text: `Showing ${model.items.length} of ${matchedTotal()}${model.truncated ? '+' : ''}`,
                     more: model.hasMore ? { label: 'Load more', busy: !!model.controller, run: () => { if (!model.loadingMore) loadArtifacts({ append: true }); } } : null },
             });
             // This table never folds: optional columns disappear as its container narrows.
