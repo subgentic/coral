@@ -515,11 +515,14 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 /* A Needs you row in three lines (#11719, the operator's Gmail comment; the mockup needs_row_three_lines): the top line is who it is from and the file's name, and at the right how long it has waited (or the buttons, at hover); the two lines under it say why it needs you, cut with an ellipsis. Team, Goal and the task link are not on the row (they are in the opened file and in the filters). */
 .inbox-needs-results tr:has(.inbox-review-item) > td { vertical-align: top; padding-block: 8px; height: auto; }
 .inbox-review-item { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
-.inbox-review-from { flex: none; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--fw-strong); }
+.inbox-review-from { flex: none; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--fw-strong); }
 .inbox-review-from::after { content: " \00b7"; font-weight: var(--fw-regular); color: var(--text-muted); }
 .inbox-review-earlier { flex: none; color: var(--text-muted); font-weight: var(--fw-regular); white-space: nowrap; }
 .inbox-review-earlier::before { content: "\00b7  "; }
 .inbox-needs-results .dt-row.dt-read .inbox-review-from { font-weight: var(--fw-regular); }
+/* The phone's cell is narrow: the line wraps so "2 earlier versions" is not cut off (#11776). */
+.dt-folded .inbox-review-item { flex-wrap: wrap; }
+.dt-folded .inbox-review-item > .inbox-review-name { flex: 1 1 0; }
 .inbox-needs-results tr:has(.inbox-review-item) .dt-subtitle { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; white-space: normal; margin-top: 2px; }
 
 /* A column with nothing in it on any row is not drawn (#9846): its head and its cells; the header draws it again when a row has a value. */
