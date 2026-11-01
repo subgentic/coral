@@ -80,7 +80,6 @@ const { coralReady } = require('./helpers/wait');
             await waitFor(`window.__calls.some(c => c.ask === 71 && c.undo) && window.__calls.some(c => c.review && c.decision === 'unignore')`, at + 'Undo is one request per item too', 8000);
             // one file is approved directly, with no question, as a row's own button did
             await waitFor(`!!(${rowOf('Phone review 4.txt')})`, at + 'the fourth file is there', 8000);
-            await ev(`document.querySelectorAll('.toast').forEach(t => t.remove()); true`); // the toast of the Undo is under the Inbox's tab strip now (#11694) and would take the finger meant for the row
             await press('Phone review 4.txt');
             await ev('window.__calls = []; true'); await pressBar('Approve');
             await waitFor(`window.__calls.some(c => c.review === '${(4).toString(16).padStart(64, '0')}' && c.decision === 'approve')`, at + 'one file: Approve sends at once', 8000);

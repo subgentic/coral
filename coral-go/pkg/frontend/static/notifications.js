@@ -253,6 +253,9 @@ function placeNotices() {
         if (c.right > n.left + 1 && c.left < n.right - 1 && c.top < window.innerHeight) aboveCard = Math.min(Math.ceil(window.innerHeight - c.top) + 8, Math.max(0, window.innerHeight - n.height - 8 - (bar ? Math.round(bar.getBoundingClientRect().bottom) : 0)));
     }
     notices?.style.setProperty("--notice-bottom", `${Math.max(20, pinned ? Math.ceil(window.innerHeight - pinned.top) + 8 : 0, aboveComposer, aboveCard)}px`);
+    // With the Inbox's list on a phone (its tab strip is on screen) the column sits at the bottom, above the bottom bar: a toast at the top covered the first rows and took a finger meant for one (#11768).
+    const phoneBar = document.getElementById("phone-nav"), barRect = phoneBar && phoneBar.getClientRects().length ? phoneBar.getBoundingClientRect() : null;
+    if (notices) { const low = bottomOf(inboxTabs) > 0; notices.toggleAttribute("data-bottom", low); if (low) notices.style.setProperty("--notice-bottom", `${barRect ? Math.ceil(window.innerHeight - barRect.top) + 8 : 20}px`); }
     if (!placeNotices._wired) {
         placeNotices._wired = true; window.addEventListener("resize", placeNotices);
         if (typeof ResizeObserver === 'function') { const observer = new ResizeObserver(placeNotices); if (bar) observer.observe(bar); if (banner) observer.observe(banner); }
