@@ -14,7 +14,7 @@ function normalizeComment(c) {
         authorId: who.subject || '', authorName: who.name || '', authorKind: who.kind || '',
         createdAt: c.created_at || '', editedAt: c.edited_at || '', resolved: !!c.resolved_at, resolvedBy: c.resolved_by ? (c.resolved_by.subject || '') : '', deleted: !!c.deleted, mine: !!c.mine,
         can: { reply: !!can.reply, edit: !!can.edit, delete: !!can.delete, resolve: !!can.resolve },
-        asks: Array.isArray(c.asks) ? c.asks.map(k => ({ agent: String(k.agent || ''), open: !!k.open, replies: Math.max(0, Number(k.replies) || 0) })) : [], // the agents asked into this thread, on the owner's list only (#6462)
+        asks: Array.isArray(c.asks) ? c.asks.map(k => ({ agent: String(k.agent || ''), open: !!k.open, replies: Math.max(0, Number(k.replies) || 0), seen: !!k.seen, nudged: !!k.nudged })) : [], // the agents asked into this thread, on the owner's list only (#6462)
         // the artifact (version) the comment was written on, and, read with series=1 for a later version, where its text stands in the version on show: found, ambiguous, gone or unchecked (#6459)
         artifactId: c.artifact_id || '', version: c.version == null ? null : c.version, fromVersion: c.from_version == null ? null : c.from_version, carried: c.carried || '',
     };

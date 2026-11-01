@@ -16,8 +16,8 @@ const RESULT_WORDS = {
 };
 export const resultWords = (r) => RESULT_WORDS[r.state] || r.reason || 'Not asked';
 
-/** What an agent with an open ask into this thread is called in the picker: asked, and how many times it has replied. */
-export const askedWords = (k) => k.replies > 0 ? `Already asked, ${k.replies} repl${k.replies === 1 ? 'y' : 'ies'} so far` : 'Already asked';
+/** What an agent with an open ask into this thread is called in the picker: asked, how many times it has replied, whether it has seen the thread and whether it was reminded. */
+export const askedWords = (k) => (k.replies > 0 ? `Already asked, ${k.replies} repl${k.replies === 1 ? 'y' : 'ies'} so far` : 'Already asked') + (k.seen ? `, seen by ${k.agent}` : '') + (k.nudged ? ', reminded' : ''); // seen: the agent read the thread; nudged: Coral typed it ONE reminder (#11722)
 
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 
