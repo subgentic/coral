@@ -56,7 +56,7 @@ export async function uploadCommentImage(hex, server, blob, versionOf, board) {
 }
 
 /** Where a picture of a comment is drawn from. */
-export const commentImageUrl = (imageHex, server) => serverUrl(`/api/artifacts/${imageHex}/raw`, server);
+export const commentImageUrl = (imageHex, server) => serverUrl(`/api/artifacts/${imageHex}?v=2`, server);
 export const editComment = (hex, server, id, body) => requestJson('PATCH', `${base(hex, server)}/${id}`, { body }).then(normalizeComment);
 export const deleteComment = (hex, server, id) => requestJson('DELETE', `${base(hex, server)}/${id}`);
 export const resolveComment = (hex, server, id) => requestJson('POST', `${base(hex, server)}/${id}/resolve`, {}).then(normalizeComment);
