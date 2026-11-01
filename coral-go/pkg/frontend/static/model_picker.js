@@ -133,7 +133,7 @@ export async function loadModelPicker(container, agentType) {
     if (!container || !wrap || !select) return;
     const token = container._modelToken = (container._modelToken || 0) + 1;
     container._defaultModelUsed = false; // once for each load of the list (the dialog is opened again, the type changes), not once for the page
-    closeAdd(container, false);
+    if (container._addType !== agentType) closeAdd(container, false); // a reload of the SAME provider's list (a late CLI check, the dialog drawing again) leaves an open add form and the keyboard in it: only another provider's list closes it (#11763)
     if (agentType === 'terminal') { wrap.hidden = true; container._thinkingLevels = []; syncThinking(container); return; }
     const cached = readModelsCache(_acfServer(container), agentType);
     if (cached) fill(container, agentType, cached); else { wrap.hidden = true; if (input) input.hidden = false; }
@@ -168,7 +168,8 @@ function openAdd(container) {
             const res = await addCustomModel({ server: _acfServer(container), agentType, id, name, known: (container._modelList || []).map(m => m.value) });
             if (!res.ok) return res.error;
             clearModelsCache();
-            await loadModelPicker(container, agentType);   // the catalog has it now (this also closes the form)
+            closeAdd(container, false);   // the model is in: the form is done, and the reload below shows it
+            await loadModelPicker(container, agentType);   // the catalog has it now
             const { input: box, select: sel } = parts(container);
             box.value = id.trim(); container._otherChosen = false;
             box.dispatchEvent(new Event('input', { bubbles: true })); markChosen(container);   // a model the person added is theirs (the input event above is untrusted)
@@ -178,13 +179,13 @@ function openAdd(container) {
             return '';
         },
     });
-    add._form = f; add.replaceChildren(f.form); add.hidden = false; f.focus();
+    add._form = f; container._addType = agentType; add.replaceChildren(f.form); add.hidden = false; f.focus();
 }
 
 function closeAdd(container, focusSelect) {
     const { select, add } = parts(container);
     if (!add || !add._form) return;
-    add._form = null; add.replaceChildren(); add.hidden = true;
+    add._form = null; container._addType = ''; add.replaceChildren(); add.hidden = true;
     if (focusSelect && select) select.focus();
 }
 
