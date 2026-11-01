@@ -115,7 +115,7 @@ const stagedFrom = (source, relaunch = {}) => { const st = staged('1.4.160', {},
         await settle(600);
         const box = () => ev(`(() => { const c = document.getElementById('settings-update-auto-install'); return c ? { checked: c.checked, label: document.body.textContent.includes('Install updates automatically when idle') ? 'Install updates automatically when idle' : '' } : null; })()`);
         if (process.platform !== 'win32') { // a Windows server says the install asks a person, so the page does not draw this switch there (update_settings.js, #11170); the case below pins that on every platform
-            await require('./helpers/wait').waitFor(ev, `!!document.getElementById('settings-update-auto-install')`, 'the Updates pane drawing its install switch', 15000); // the pane draws from the update status when its group is shown: wait for it, not a quiet spell (a loaded gate returned before it was there)
+            await require('./helpers/wait').waitFor(ev, `!!document.getElementById('settings-update-auto-install')`, 'the Updates pane drawing its install switch', { timeout: 15000 }); // the pane draws from the update status when its group is shown: wait for it, not a quiet spell (a loaded gate returned before it was there)
             let b = await box();
             check('settings: "Install updates automatically when idle" is there and on (' + JSON.stringify(b) + ')', b && b.checked && /Install updates automatically when idle/.test(b.label));
             await ev(`document.getElementById('settings-update-auto-install').click(); true`);
