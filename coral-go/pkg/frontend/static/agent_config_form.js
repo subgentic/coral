@@ -479,7 +479,7 @@ function placeAcfCliLine(container, opts) {
 }
 
 function wireAcfAgentType(container) {
-    container.dataset.acfLastType = container.querySelector('.acf-agent-type')?.value || 'claude';
+    container._acfLastType = container.querySelector('.acf-agent-type')?.value || 'claude';
     container.querySelector('.acf-agent-type')?.addEventListener('change', () => {
         const agentType = container.querySelector('.acf-agent-type')?.value || 'claude';
         keepModelPerProvider(container, agentType);
@@ -589,8 +589,8 @@ function mountAgentRows(container) {
 //     when the user hasn't touched the field (dirty flag off).
 /** Each provider keeps its own Model (#11786): a model typed under Pi is Pi's, not Claude's. On a change of provider the one box puts away what the old provider had and takes what the new one had, or goes back to its default. */
 function keepModelPerProvider(container, type) {
-    const was = container.dataset.acfLastType || '', box = container.querySelector('.acf-model');
-    container.dataset.acfLastType = type;
+    const was = container._acfLastType || '', box = container.querySelector('.acf-model');
+    container._acfLastType = type;
     if (!box || !was || was === type) return;
     const kept = (container._acfModels ||= {});
     kept[was] = { value: box.value, dirty: container.dataset.acfModelDirty === 'true', other: !!container._otherChosen };
