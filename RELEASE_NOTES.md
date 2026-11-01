@@ -1,5 +1,38 @@
 # Release Notes
 
+## v2.0.27 — pictures on comments and goals with Mark up, and one link per Needs you item
+
+### Changes
+
+#### What you will notice first
+
+- **A comment can carry pictures**: pick, paste or drop (png, jpeg or webp; a phone's picker offers its photos), with thumbnails before Send and the pictures inline in the thread. A picture alone is a comment; at most four go with one comment (a fifth, a text file or a file over 25 MB is refused in words), and Remove names the picture. Pictures are stored as artifacts of the commented file's team, the person's own, with their metadata removed, and a message sent to an agent ends with the picture links.
+- **A new goal has a Description and pictures**: the form has a multi-line Description (up to 2,000 characters, a live count from 1,500) after the title, and the goal's page shows it with its line breaks and draws the goal's pictures under it. A quiet line beside Add image says the pictures are shared with the team's agents as they are. The repeated note under Driver is gone (the Driver field itself stays).
+- **Mark up on a picture**: each ready thumbnail has a Mark up button that opens an editor on first use; Done replaces the thumbnail with the marked copy, which is the next version of the picture (the original is kept as an earlier version, and the editor says the team's agents can see it); Cancel changes nothing, and a failed upload keeps the picture and says why. It works on comments and on the goal form.
+- **A link opens one Needs you item on its own card**: `/inbox/needs/review/<team>/<file id>` and `/inbox/needs/ask/<team>/<question id>`, the address a push notification opens, on phone and desktop. A waiting file opens in the viewer with Approve and Request changes; a decided or missing file and a missing question say so; a question opens with its Reply box. A team on another computer adds `@<server>/` before the team (for example `/inbox/needs/review/@7/<team>/<file id>`). The address alone fetches nothing and grants nothing: the item is looked up with the viewer's own access.
+- **Saved's Files for review rows have the same actions as a Needs you row**: Approve, Changes, Deny and Ignore in Needs you's fixed slots, the three dots with "Move to Needs you", and the buttons showing at hover with a mouse. Ignore takes the file out of Saved with a toast and Undo.
+- **Needs you hover actions no longer stick**: after clicking a row's three dots and moving to another row, the first row kept its buttons; a row now shows its actions only while hovered, while its menu is open, for the keyboard's focus, or as the current row (the same fix for the table's hover controls).
+- **New agent: one Model input however many times the dialog opens**: a reopened dialog used to keep the previous open's Model and Thinking rows and show two.
+
+#### Agents and the chat
+
+- **Health check: a sleeper is woken only for what is for it** (a question open to it, a reply to its post, or a task assigned and not started); broadcasts are counted in the header with no wake, and the item carries an `[ack id]`.
+- **Pictures on the API**: `POST /api/artifacts/{id}/comment-images` and `POST /api/board/{team}/goal-images` store a picture (the file's own bytes decide the type; a declared type that disagrees is refused) for the Operator alone, with `version_of` making a marked-up copy the next version of a picture just added; a goal create names up to four of them (an agent's create is refused). Through Coral Hub both are owner-only.
+- **Through Coral Hub the team and cross-team artifact lists take `versions=newest`** (one row per file), for coral-hub's lists.
+
+#### Known issues
+
+- **Windows: in-app update does not work from 2.0.0 through 2.0.6.** If you're on one of those, download and install the MSI by hand; from 2.0.7 on, in-app update works.
+- **macOS: a Coral of 2.0.5 or earlier cannot install updates in-app; install 2.0.6 or later by hand once.**
+- **OpenCode agents are tested on macOS and Linux; OpenCode on Windows is not yet tested end to end.**
+- Setting up a computer over SSH is supported from a macOS or Linux hub, and is not yet tested from a Windows hub.
+
+#### For developers and releases
+
+- **The static budget rises to 5,953,792 bytes** (+46.25 KiB), for the pictures, Mark up and the item link. This release's tree ships 5,925,673 bytes; the picture rules live in a lazy `css/pictures.css`, loaded with the tray, a comment with pictures, a goal with pictures or the New goal form.
+- The tunnel's route-query table gains `POST /api/board/{}/goal-images: version_of` and `versions` on the two artifact lists (the generator `tools/gen_route_queries.py` carries them); the join census reviews `checkedPictures`.
+- `dialog_requests_golden` treats the model set by script as the person's and waits out the defaults it starts.
+
 ## v2.0.26 — each agent keeps its own model, one Messaging state, and a picture zoom that reads its real scale
 
 ### Changes
