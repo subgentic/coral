@@ -30,6 +30,7 @@ import { browserLocal } from './safe_storage.js';
 import { resolveSessionIdentity, sessionStateInfo } from './session_state.js';
 import { pollEvery } from './overload.js';
 import { setHidden } from './dom_write.js';
+import { loadStyles } from './lazy_styles.js';
 import { syncDisplayPanels } from './display_panel.js';
 import { onViewShown } from './view_switch.js';
 import { importOnce } from './import_once.js';
@@ -39,6 +40,7 @@ const { coralInboxAdapter, savedExpandFor, listInboxGoals } = await importOnce('
 const { openedFrom, backLabelFor } = await importOnce('./inbox_back_label.js'); // the Back words of the Inbox's task and goal screens (#8861)
 const saved = await importOnce('./saved.js');
 const DT = await importOnce('./data_table.js'); // the one table (#7743): the Tasks group's page is its Tasks columns
+await loadStyles('needs_phone.css'); // a phone's Needs you rows: not in the start's stylesheet (page_weight), loaded with the Inbox before a row is drawn
 const { el } = DT;
 const TF = await importOnce('./task_filters.js');
 const TV = await importOnce('./tasks_view.js'); // the one Tasks view

@@ -342,7 +342,7 @@ export function dataTable(cfg) {
         if (next.size === emptyKeys.size && [...next].every(k => emptyKeys.has(k))) return;
         emptyKeys = next;
         for (const th of thead.querySelectorAll('th.dt-th')) th.classList.toggle('dt-col-unused', emptyKeys.has(th.dataset.key));
-        for (const td of tbody.querySelectorAll(':scope > .dt-row > td.dt-td')) td.classList.toggle('dt-col-unused', emptyKeys.has(td.dataset.key));
+        for (const td of tbody.querySelectorAll(':scope > .dt-row > td.dt-td')) { td.classList.toggle('dt-col-unused', emptyKeys.has(td.dataset.key)); td.style.display = emptyKeys.has(td.dataset.key) ? 'none' : ''; } // display-ok: inline, because a folded row's own display: block wins over the class and an empty cell was a 16 px line (#11858)
         applyWidths();
     }
 
@@ -425,7 +425,7 @@ export function dataTable(cfg) {
         td.classList.add(c.line === 1 ? 'dt-line-1' : c.line === 2 ? 'dt-line-2' : 'dt-line-0');
         if (c.foldLabel) td.setAttribute('data-fold-label', c.label); // the folded row has no header: the column's name is drawn before the figure (data_table.css, as text; foldLabel: true, #11463)
         if (c.when && !c.when(r)) td.classList.add('dt-when-off');
-        if (emptyKeys.has(c.key)) td.classList.add('dt-col-unused');
+        if (emptyKeys.has(c.key)) { td.classList.add('dt-col-unused'); td.style.display = 'none'; } // display-ok: as in syncEmptyColumns
         if (c.foldFirst) td.classList.add('dt-fold-first');
         if (st.sort && st.sort.key === c.key) td.classList.add('dt-fold-key'); // folded 'labeled': the figure the rows are sorted by is the one stronger line (#7738)
         if (c.narrowHide) td.classList.add('dt-narrow-hide'); // folded 'labeled': this figure follows the name, ahead of the other "label value" lines
