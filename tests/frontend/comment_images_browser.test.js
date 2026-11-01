@@ -30,7 +30,6 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
                 if (window.__slow) return new Promise(res => { window.__release = () => res(done()); });
                 return done();
             }
-            if (/\\/api\\/artifacts\\/e{63}[0-9a-f]\\/raw/.test(url)) return Promise.resolve(new Response(png, { status: 200, headers: { 'Content-Type': 'image/png' } }));
             if (url.includes('/api/artifacts/${HEX}/comments')) {
                 if (method === 'GET') return json({ comments: window.__cs.map(c => ({ ...c, mine: true, can: can(c) })), locked: false, you: { kind: 'owner', name: 'Operator', can_comment: true, can_lock: true }, limits: { body: 8192, quote: 2048, comments: 500 } });
                 if (method === 'POST') { const b = JSON.parse(o.body); window.__posts.push(b); const c = { id: window.__next++, parent_id: null, anchor: b.anchor, body: b.body, images: (b.images || []).map((h, i) => ({ hex: h, name: 'picture-' + (i + 1) + '.png', content_type: 'image/png' })), author: { kind: 'owner', issuer: 'local', subject: 'Operator' }, created_at: new Date().toISOString() }; window.__cs.push(c); return json({ ...c, can: can(c) }, 201); }
@@ -64,7 +63,7 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
         // a picture in the thread is an <img>, which the page's fetch stub never sees: the browser's own request for a stored picture is answered here
         const { Fetch } = client;
         safePaused(client, ({ requestId }) => Fetch.fulfillRequest({ requestId, responseCode: 200, responseHeaders: [{ name: 'Content-Type', value: 'image/png' }], body: PNG }));
-        await Fetch.enable({ patterns: [{ urlPattern: '*/api/artifacts/eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee*/raw*' }] });
+        await Fetch.enable({ patterns: [{ urlPattern: '*/api/artifacts/eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee*' }] });
         for (const [w, h, mobile] of [[1280, 800, false], [390, 844, true]]) {
             const at = `${w} px: `;
             await load(w, h, mobile);
@@ -138,7 +137,7 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
             assert.ok(post.images.every(h => /^e{63}[0-9a-f]$/.test(h)) && new Set(post.images).size === 3, at + 'each is a stored artifact (' + JSON.stringify(post.images) + ')');
             await waitFor(`document.querySelectorAll('.ac-card .ac-pic-img').length === 3`, at + 'the pictures in the thread', 5000);
             await waitFor(`[...document.querySelectorAll('.ac-card .ac-pic-img')].every(i => i.complete && i.naturalWidth > 0)`, at + 'the pictures drawn', 5000);
-            assert.deepEqual(await ev(`[...document.querySelectorAll('.ac-card .ac-pic-img')].map(i => new URL(i.src).pathname)`), post.images.map(h => `/api/artifacts/${h}/raw`), at + 'drawn from the artifacts\' raw URLs, in the order sent');
+            assert.deepEqual(await ev(`[...document.querySelectorAll('.ac-card .ac-pic-img')].map(i => new URL(i.src).pathname)`), post.images.map(h => `/api/artifacts/${h}`), at + 'drawn from the artifacts\' own URLs (?v=2, there is no /raw route), in the order sent');
             assert.equal(await ev(`!!document.querySelector('.ac-composer .ac-thumb')`), false, at + 'the composer is gone with its pictures');
             assert.equal(await ev(`document.documentElement.scrollWidth - document.documentElement.clientWidth`), 0, at + 'the thread does not scroll sideways');
             assert.equal(await ev(`(() => { const i = document.querySelector('.ac-card .ac-pic-img'), p = document.querySelector('.ac-panel'); return i.getBoundingClientRect().right <= p.getBoundingClientRect().right + 1; })()`), true, at + 'a picture stays inside the panel');
