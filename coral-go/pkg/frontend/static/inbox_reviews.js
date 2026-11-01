@@ -3,7 +3,7 @@
 import { fetchProjects } from './board_fetch.js';
 import { boardFetch, keyLabel, splitKey } from './server_base.js';
 
-let items = [], errors = [], pending = null, lastRead = 0, revision = 0, changed = () => {};
+let items = [], saved = [], errors = [], pending = null, lastRead = 0, revision = 0, changed = () => {};
 let activated = false;
 // One row per artifact (#11533): versions (same uploader, team, name) are one item, the newest, with `earlier`.
 const vkey = a => (a.session_id || a.produced_by) ? JSON.stringify([a.team, a.session_id, a.produced_by, a.name]) : a.reviewKey; // a JSON array: no name or id can run into the next field
@@ -12,6 +12,8 @@ const byAge = (a, b) => String(a.created_at).localeCompare(String(b.created_at))
 export const earlierVersions = row => { const key = row.reviewKey || `${row.team}:${row.id}`, me = items.find(a => a.reviewKey === key) || row; return items.filter(a => a.reviewKey !== key && vkey(a) === vkey(me) && byAge(a, me) < 0); };
 export const reviewItems = () => items.filter(a => !items.some(b => vkey(b) === vkey(a) && byAge(a, b) < 0)).map(a => { const earlier = earlierVersions(a); return earlier.length ? { ...a, earlier } : a; });
 /** A review artifact the operator has opened carries the 'read' tag (#9277): it stays in Needs you, shown as read, but it is not counted (the Inbox badge, the Needs you count). Opening it again, or marking it unread, is the same tags route. */
+/** The files the Operator saved for later (#11641): tagged 'saved', out of Needs you and its counts, listed at the top of Saved with their decisions still there. */
+export const savedFiles = () => saved;
 export const isRead = a => !!(a.tags && a.tags.includes('read'));
 export const unreadReviewItems = () => reviewItems().filter(a => !isRead(a));
 export const reviewErrors = () => errors;
@@ -40,7 +42,7 @@ export function refreshReviews(force = false) {
     lastRead = Date.now();
     pending = (async () => {
         try {
-            const projects = await fetchProjects(), next = [], failed = [];
+            const projects = await fetchProjects(), next = [], failed = [], nextSaved = [];
             for (const { project: team } of projects) {
                 try {
                     const rows = [], seen = new Set();
@@ -50,7 +52,7 @@ export function refreshReviews(force = false) {
                         if (!r.ok) throw new Error('Could not read review artifacts');
                         const data = await r.json();
                         for (const a of data.artifacts || []) {
-                            if (!a.tags?.includes('for review') || !a.available || seen.has(a.id)) continue;
+                            if (!a.tags?.includes('for review') || a.tags.includes('saved') || !a.available || seen.has(a.id)) continue; // a saved file stays tagged for review (its decisions work) but is not in Needs you (#11641)
                             const hex = /(?:sha256:|coral:\/\/artifacts\/)?([a-f0-9]{64})$/i.exec(a.uri || a.digest || a.id || '')?.[1];
                             if (!hex) continue;
                             seen.add(a.id); rows.push({ ...a, team, hex, reviewKey: `${team}:${a.id}` });
@@ -58,13 +60,20 @@ export function refreshReviews(force = false) {
                         if (!data.has_more || !(data.artifacts || []).length) break;
                     }
                     next.push(...rows);
+                    try { // the saved files of this team: one page, a failure here leaves the others alone
+                        const r = await boardFetch(team, '/artifacts?tag=saved&limit=200');
+                        if (r.ok) for (const a of (await r.json()).artifacts || []) {
+                            const hex = /(?:sha256:|coral:\/\/artifacts\/)?([a-f0-9]{64})$/i.exec(a.uri || a.digest || a.id || '')?.[1];
+                            if (a.tags?.includes('saved') && a.available && hex) nextSaved.push({ ...a, team, hex, reviewKey: `${team}:${a.id}` });
+                        }
+                    } catch { nextSaved.push(...saved.filter(a => a.team === team)); }
                 } catch {
                     next.push(...items.filter(a => a.team === team));
                     failed.push(`${keyLabel(team)} review artifacts could not be refreshed.`);
                 }
             }
             if (started !== revision) return;
-            items = next.sort(byAge);
+            items = next.sort(byAge); saved = nextSaved.sort(byAge);
             errors = failed;
         } catch { errors = ['Review artifacts could not be refreshed.']; }
         changed();
@@ -109,7 +118,7 @@ export async function setReviewRead(row, read) {
 export function settleReview(row) {
     revision++;
     const gone = new Set([row.reviewKey || `${row.team}:${row.id}`, ...earlierVersions(row).map(a => a.reviewKey)]); // the versions before it were settled with it (settleEarlierVersions)
-    items = items.filter(a => !gone.has(a.reviewKey));
+    items = items.filter(a => !gone.has(a.reviewKey)); saved = saved.filter(a => !gone.has(a.reviewKey));
     changed();
 }
 

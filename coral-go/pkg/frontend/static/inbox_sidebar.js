@@ -13,7 +13,7 @@ import { welcomeRows, runWelcome, dismissWelcome, hideAllWelcome } from './welco
  * are in Display options. The hub's own framed /inbox is not this: it keeps the frame, full width (inbox_tab.js). */
 import { state } from './state.js';
 
-import { reviewItems, unreadReviewItems, reviewErrors, refreshReviews, reviewGroups, setReviewRead, markOpenedRead, isRead } from './inbox_reviews.js';
+import { reviewItems, unreadReviewItems, reviewErrors, refreshReviews, reviewGroups, setReviewRead, markOpenedRead, isRead, savedFiles } from './inbox_reviews.js';
 import { failedUnread, finishedUnread, refreshRuns, markSeen, runRoute, failureWords } from './automation_runs.js';
 import { operatorAsks, refreshOperatorAsks, askLine, askWhole, askKey, openAskDialog } from './operator_asks.js';
 import { go, note, backIs, currentRoute } from './nav.js';
@@ -179,7 +179,7 @@ const stateOf = t => TV.taskWord(t);
 const inboxTasksState = DT.tableState();
 const needsState = DT.tableState();
 
-async function openReview(row, extra = {}) {
+export async function openReview(row, extra = {}) {
     const { openArtifactViewer } = await importOnce('./artifact_viewer.js');
     openArtifactViewer(row.hex, { server: splitKey(row.team).server, filename: row.name, mediaType: row.media_type, board: splitKey(row.team).name, compare: true, from: subOf({ review: row, board_project: splitKey(row.team).name, server: splitKey(row.team).server }, true), ...extra }); // a later version of a series opens with what changed since the one before (#136588)
     markOpenedRead(row.hex).catch(error => sayLive(error.message)); // opening is reading it: the 'read' tag, so it stops counting everywhere (#9277); the viewer does the same for any for-review artifact, once; a failed save is said, and the item keeps counting
@@ -216,7 +216,7 @@ function moreMenu(items, label) {
 }
 
 /** A review row's actions, the one set on every screen (#11552, approved by the operator): Approve, Changes, Deny, Ignore as words, in that order; Mark unread (a read row) in More, and on a phone Deny and Ignore too. The row itself opens the file. Each action that clears the row keeps the person's place. */
-function reviewActions(row) {
+export function reviewActions(row, inSaved = false) { // inSaved (#11641): a saved file keeps Approve, Changes and Deny; its menu has Move to Needs you, not Ignore and Save
     const compact = compactActions(), box = DT.el('div', `inbox-review-actions inbox-slots${compact ? ' inbox-slots-compact' : ''}`);
     const file = markHidden(row.name, { strict: true }); // what a button, a menu and a spoken line call the file: hidden characters written out (Security's SHOULD, #11552)
     const errorText = DT.el('span', 'inbox-review-error'); errorText.setAttribute('role', 'alert');
@@ -227,6 +227,10 @@ function reviewActions(row) {
     const deny = b => { const settle = keepPlace(b); return importOnce('./artifact_review.js').then(({ openDenyDialog }) => openDenyDialog(row.team, row, async () => { sayLive(`Denied ${file}.`); await settle(); })).catch(error => failed(b, error)); };
     const ignore = b => { b.disabled = true; errorText.textContent = ''; const settle = keepPlace(b);
         return importOnce('./artifact_review.js').then(async ({ ignoreRow, sayIgnored }) => { await ignoreRow(row.team, row); sayIgnored(row.team, row); sayLive(`Ignored ${file}.`); await settle(); }).catch(error => failed(b, error)); };
+    const save = b => { b.disabled = true; errorText.textContent = ''; const settle = keepPlace(b); // Save for later (#11641): out of Needs you, kept in Saved, nobody told
+        return importOnce('./artifact_review.js').then(async ({ saveRow, saySaved }) => { await saveRow(row.team, row); saySaved(row.team, row); sayLive(`Saved ${file} for later.`); await settle(); }).catch(error => failed(b, error)); };
+    const unsave = b => { b.disabled = true; errorText.textContent = '';
+        return importOnce('./artifact_review.js').then(async ({ unsaveRow }) => { await unsaveRow(row.team, row); sayLive(`${file} is back in Needs you.`); }).catch(error => failed(b, error)); };
     const unread = b => { b.disabled = true; errorText.textContent = ''; return setReviewRead(row, false).then(() => sayLive(`Marked ${file} unread.`)).catch(error => failed(b, error)); };
     const star = starControl(row, { hex: row.hex, name: file }); // the review artifact's star: a glyph when starred, a button at a hover (#9834)
     if (star) { star.setAttribute('data-slot', 'star'); box.append(star); box.classList.add('inbox-review-actions-star'); }
@@ -234,10 +238,14 @@ function reviewActions(row) {
     if (!decisionNeedsPerson(splitKey(row.team).server)) { // through Coral Hub a guest cannot decide
         box.append(word('Approve', 'Approve', 'btn-primary', approve), word('Changes', 'Request changes', '', () => openReview(row, { requestChanges: true })));
         box.lastChild.title = 'Request changes';
-        if (compact) menu.push({ label: 'Deny', title: 'A final no: the agent is told', run: deny }, { label: 'Ignore', title: 'Take it out of Needs you; nobody is told', run: ignore });
-        else box.append(word('Deny', 'Deny', 'btn-quiet inbox-deny', deny), word('Ignore', 'Ignore', 'btn-quiet', ignore));
+        if (inSaved) { if (compact) menu.push({ label: 'Deny', title: 'A final no: the agent is told', run: deny }); else box.append(word('Deny', 'Deny', 'btn-quiet inbox-deny', deny)); menu.push({ label: 'Move to Needs you', title: 'Put it back in Needs you as it was', run: unsave }); }
+        else {
+            if (compact) menu.push({ label: 'Deny', title: 'A final no: the agent is told', run: deny }, { label: 'Ignore', title: 'Take it out of Needs you; nobody is told', run: ignore });
+            else box.append(word('Deny', 'Deny', 'btn-quiet inbox-deny', deny), word('Ignore', 'Ignore', 'btn-quiet', ignore));
+            menu.push({ label: 'Save for later', title: 'Keep it in Saved, out of Needs you; nobody is told', run: save });
+        }
     }
-    if (isRead(row)) { box.classList.add('inbox-review-actions-read'); menu.push({ label: 'Mark unread', title: 'Count it in Needs you again', run: unread }); }
+    if (isRead(row) && !inSaved) { box.classList.add('inbox-review-actions-read'); menu.push({ label: 'Mark unread', title: 'Count it in Needs you again', run: unread }); }
     if (menu.length) { const more = moreMenu(menu, file); more.setAttribute('data-slot', 'dots'); box.append(more); }
     box.append(errorText); return box;
 }
@@ -449,7 +457,7 @@ const savedCounts = () => saved.savedView().totals;
 
 // ── The sidebar list ─────────────────────────────────────────────────────
 /** The number beside a folder. Needs you counts what the Inbox badge counts (an alarm: an agent, a review, a run, a proposal, a question); the welcome items are listed but are not alarms, so they are not in either (#11622). */
-const countOf = key => key === 'needs' ? waitingSessions().length + unreadReviewItems().length + failedUnread().length + pendingProposals().length + operatorAsks().length + recordRows().length : key === 'tasks' ? taskRows().length : key === 'goals' ? goals.length : key === 'artifacts' ? IA.artifactCount() ?? undefined : key === 'saved' ? savedCounts().open : undefined;
+const countOf = key => key === 'needs' ? waitingSessions().length + unreadReviewItems().length + failedUnread().length + pendingProposals().length + operatorAsks().length + recordRows().length : key === 'tasks' ? taskRows().length : key === 'goals' ? goals.length : key === 'artifacts' ? IA.artifactCount() ?? undefined : key === 'saved' ? savedCounts().open + savedFiles().length : undefined;
 /** The folders of the Inbox (#7785, the mailbox mock): one view list, a name and a count each. Needs you, Tasks and Saved open their table in the centre; */
 const FOLDER_ICONS = { needs: 'notifications', tasks: 'checklist', goals: 'flag', saved: 'saved-bookmark', artifacts: 'inventory_2',
     chats: 'chat_bubble_outline', [BOARDS_FOLDER]: 'forum', 'chats-notes': 'edit_note', 'chats-starred': 'star', 'chats-active': 'bolt', 'chats-archived': 'folder' }; // UI/UX's existing subset choices (#8866); tagged folders keep their colour dot
@@ -495,15 +503,26 @@ function noteFolder(key) {
     note(route, { replace: !!cur && cur.view === 'chats' });
 }
 /** The folders in the sidebar. Only drawn when a count or the current folder changed (this runs for every message of the feed). */
+let dragging = null; // the review row being dragged toward Saved (#11641)
+/** A review row dropped on the Saved folder is saved for later, as its three dots' item does. */
+function wireSaveDrop(list) {
+    if (list._saveDrop) return; list._saveDrop = true;
+    const target = e => e.target.closest?.('.view-list-item[data-key="saved"]');
+    list.addEventListener('dragover', e => { if (dragging && target(e)) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; target(e).classList.add('drop-over'); } });
+    list.addEventListener('dragleave', e => target(e)?.classList.remove('drop-over'));
+    list.addEventListener('drop', e => { const t = target(e); if (!t || !dragging) return; e.preventDefault(); t.classList.remove('drop-over'); const row = dragging; dragging = null;
+        importOnce('./artifact_review.js').then(async ({ saveRow, saySaved }) => { await saveRow(row.team, row); saySaved(row.team, row); sayLive(`Saved ${markHidden(row.name, { strict: true })} for later.`); }).catch(error => sayLive(error.message)); });
+}
 function renderInboxNav(force = false) {
     const list = $('inbox-nav-list');
     if (!list) return;
+    wireSaveDrop(list);
     if (group === 'artifacts' && nativeInbox() && IA.artifactsOwnerOnly()) setGroup('needs', { auto: true }); // the Artifacts folder on screen (or kept from last time) is gone for a grantee: Needs you, not an empty page (#11071)
     const here = navCurrent(), sections = folderSections();
     // what the tables show is part of the key too: the folder list is drawn from the counts, but the table on screen is refreshed (refreshGroupTable below) only when a row of it changed
     const needs = needsRows(), tk = taskRows(), sv = saved.savedView().shown.map(saved.savedItemFacts);
     const key = JSON.stringify([here, sections, queries.needs, queries.tasks, page && `${page.kind}:${page.project || ''}#${page.id}`,
-        needs.map(s => [sessionServer(s), s.session_id, s.display_name, s.waiting_kind, s.waiting_since, teamOf(s), askOf(s)]), tk.map(t => [t.project, t.id, t.title, t.priority, t.status, t.board, t.updated_at, t.artifact_count]), sv.map(f => [f.id, f.which, f.saved, f.state])]);
+        needs.map(s => [sessionServer(s), s.session_id, s.display_name, s.waiting_kind, s.waiting_since, teamOf(s), askOf(s)]), tk.map(t => [t.project, t.id, t.title, t.priority, t.status, t.board, t.updated_at, t.artifact_count]), sv.map(f => [f.id, f.which, f.saved, f.state]), savedFiles().map(a => a.reviewKey)]);
     if (!force && key === _navKey) return;
     _navKey = key;
     if (needsRows().some(s => s.waiting_since) && !_poll) _poll = pollEvery(() => { refreshReviews(); refreshProposals(); renderInboxNav(true); }, 30000); // "waiting 4 min" in the Needs you table moves on while the tab is open
@@ -523,7 +542,8 @@ function savedListSpec(where = '') {
     const dock = where === 'dock-tab';
     const multi = rows.some(f => f.serverName);
     const empty = v.loading ? 'Loading saved items' : v.error ? v.error : v.filtered ? 'No saved messages match this search.' : v.scoped || (v.tab === 'done' ? 'Nothing is marked done.' : 'Nothing is saved for later.');
-    return { title: 'Saved', noun: ['item', 'items'], headless: dock, chipsLabel: 'Show',
+    const files = dock ? [] : savedFiles(); // the saved review files, listed above the messages (#11641)
+    const spec = { title: 'Saved', noun: ['item', 'items'], headless: dock, chipsLabel: 'Show',
         chips: !dock ? [] : [{ action: 'inbox-saved-chip', data: { tab: 'open' }, label: 'Open', count: v.totals.open, pressed: v.tab === 'open' }, { action: 'inbox-saved-chip', data: { tab: 'done' }, label: 'Done', count: v.totals.done, pressed: v.tab === 'done' }],
         empty: { line: empty, hint: v.loading || v.error || v.filtered || v.tab === 'done' ? '' : 'Save a message from a chat or a board with its bookmark.' },
         note: [v.query ? 'The search covers every saved message, not only these.' : '', ...v.down.map(d => `${d.label || d.id} did not answer, so its saved messages are not shown.`)].filter(Boolean).join(' '), rows,
@@ -547,6 +567,8 @@ function savedListSpec(where = '') {
                     b.addEventListener('click', async () => { const it = saved.findSavedItem(f.id); if (!it) return; const done = !it.done_at; if (await saved.savedSetDone(it, done)) sayLive(done ? 'Marked done' : 'Moved back to Open'); });
                     return b; } },
             ] }).el };
+    if (!files.length) return spec;
+    return { ...spec, empty: rows.length ? spec.empty : null, signature: JSON.stringify([spec.signature, files.map(a => [a.reviewKey, a.name])]), node: () => { const wrap = DT.el('div', 'saved-files-wrap'), host = DT.el('div', 'saved-files'); wrap.append(host); if (rows.length) wrap.append(DT.el('h3', 'saved-files-title', 'Saved messages'), spec.node()); importOnce('./saved_files.js').then(m => m.fillSavedFiles(host, files, { DT, reviewActions, openReview })).catch(() => {}); return wrap; } };
 }
 
 /** A message of the agent's Saved tab, as a sheet over the dock panel (the pane the Artifacts tab uses, detail_pane.js): what the Inbox's page holds (the text, why it cannot be opened, Read the whole message) with Open (the chat) and Remove from saved in its bar. Back, the close button and Escape return to the Saved table, the focus on the row. */
@@ -648,7 +670,7 @@ registerGroupSource('hub-inbox', {
             const manyTeams = new Set(allNeeds().map(teamOf).filter(Boolean)).size > 1; // with two or more teams waiting, a one-line row names its team
             return { title: 'Needs you', noun: ['item', 'items'], rows, count: total > rows.length ? `${rows.length} of ${total}` : total, note: reviewErrors().join(' '), empty: { line: NF.isFiltered(needsFilters) ? 'Nothing that needs you matches the search and filters.' : 'Nothing needs you', hint: NF.isFiltered(needsFilters) ? undefined : answered || 'An agent that asks a question or wants permission, and a review artifact, appear here. A task assigned to you is under Tasks.', go: NF.isFiltered(needsFilters) ? undefined : { action: 'inbox-go-agents', label: 'Go to Agents' } },
                 signature: JSON.stringify([hidden, finishedUnread().length, answered || '', manyTeams, needsOverflow().map(g => [g.name, g.more.map(a => a.reviewKey)]), reviewErrors(), rows.map(blocksOf), rows.map(s => [s.operatorAsk ? [s.operatorAsk.id, s.operatorAsk.text] : 0, sessionServer(s), s.session_id, s.display_name, s.waiting_kind, s.waiting_since, waitingText(s.waiting_since), teamOf(s), askOf(s), goalOf(s) ? s.goal.id : 0, s.task ? [s.task.id, s.task.title] : 0, dirOf(s), s.review ? isRead(s.review) : 0, s.proposal ? s.proposal.state : 0])]), // the words move on with the clock: they are part of what was drawn
-                node: () => { const wrap = DT.el('div', 'inbox-needs-results'); const oneLineNeeds = !rows.some(isItem); const table = DT.dataTable({ label: `Needs you, ${rows.length}`, rows, rowKey: s => `${sessionServer(s)}:${s.session_id}`, decorate: (s, tr) => { if (s.welcome && s.welcome.dismiss) tr.dataset.welcomeId = s.welcome.id; }, state: needsState, rowName: s => s.review ? `${s.review.name}, for review, ${teamOf(s)}` : s.autorun ? `${s.autorun.name}, run failed` : s.operatorAsk ? `${s.operatorAsk.asker}, asks you` : s.welcome ? s.welcome.title : resolveSessionIdentity(s),
+                node: () => { const wrap = DT.el('div', 'inbox-needs-results'); const oneLineNeeds = !rows.some(isItem); const table = DT.dataTable({ label: `Needs you, ${rows.length}`, rows, rowKey: s => `${sessionServer(s)}:${s.session_id}`, decorate: (s, tr) => { if (s.welcome && s.welcome.dismiss) tr.dataset.welcomeId = s.welcome.id; if (s.review && !decisionNeedsPerson(splitKey(s.review.team).server)) { tr.draggable = true; tr.addEventListener('dragstart', e => { e.dataTransfer.setData('text/plain', s.review.name); e.dataTransfer.effectAllowed = 'move'; dragging = s.review; }); tr.addEventListener('dragend', () => { dragging = null; }); } }, state: needsState, rowName: s => s.review ? `${s.review.name}, for review, ${teamOf(s)}` : s.autorun ? `${s.autorun.name}, run failed` : s.operatorAsk ? `${s.operatorAsk.asker}, asks you` : s.welcome ? s.welcome.title : resolveSessionIdentity(s),
                     open: s => { if (s.proposal) { openProposalDialog(s.proposal, 'view'); return; } if (s.review) { openReview(s.review); return; } if (s.autorun) { openRun(s.autorun); return; } if (s.operatorAsk) { openAskDialog(s.operatorAsk); return; } if (s.unrecorded) { recordAllAgents(); return; } if (s.welcome) { runWelcome(s.welcome.id); return; } window.switchNavTab?.('agents'); Promise.resolve(window.selectLiveSession?.(s.name, s.agent_type, s.session_id, sessionServer(s))).then(() => window.showChatView?.()); }, // a row that needs an answer shows the chat card, not the terminal saved last (#10141)
                     columns: [
                         { key: 'agent', label: rows.some(isItem) ? 'Item' : 'Agent', primary: true, width: 'grow', ...(rows.some(s => s.proposal) ? { min: 14, share: 1 } : rows.some(isItem) ? { min: 24, share: 2 } : {}), sort: true, sortValue: s => resolveSessionIdentity(s), line: 1, ...(oneLineNeeds || rows.some(s => s.review || s.operatorAsk) ? { subtitle: s => (s.operatorAsk ? fromOf(s, true) : s.review ? subOf(s, manyTeams) : oneLineNeeds ? askOf(s) : ''), subtitleTitle: s => (s.review || s.operatorAsk ? subOf(s, true) : oneLineNeeds ? askOf(s) : '') } : {}), // a list of agents: the ask is the row's one second line, under the name (UI/UX: the row's purpose is to decide from the list); a file for review says who uploaded it there, and its team when two or more teams wait (#11456)
