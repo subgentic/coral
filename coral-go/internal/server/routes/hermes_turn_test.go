@@ -20,15 +20,14 @@ func evAt(kind string, ago time.Duration, now time.Time) store.AgentEvent {
 }
 
 func TestHermesInterruptIsRecognisedOnTheScreensLastLines(t *testing.T) {
-	assert.True(t, hermesInterruptedOnScreen("some output\n\n  Operation interrupted\n\n> \n"))
-	assert.True(t, hermesInterruptedOnScreen("x\n⚠ Operation interrupted by user\n"))
+	assert.True(t, hermesInterruptedOnScreen("some output\n\n  Operation interrupted: waiting for model response (6.3s elapsed).\n\n> \n"))
 	assert.False(t, hermesInterruptedOnScreen(""))
 	assert.False(t, hermesInterruptedOnScreen("working...\n"))
 	// older than the last lines: a new turn has drawn below it
-	old := "Operation interrupted\n" + strings.Repeat("new output line\n", 6)
+	old := "Operation interrupted: waiting for model response (1.0s elapsed).\n" + strings.Repeat("new output line\n", 8)
 	assert.False(t, hermesInterruptedOnScreen(old))
 	// the words in a long line of ordinary text are not the notice
-	assert.False(t, hermesInterruptedOnScreen("the agent wrote: Operation interrupted can happen when you press ctrl-c in a long turn and more words follow here\n"))
+	assert.False(t, hermesInterruptedOnScreen("the agent wrote: Operation interrupted: can happen when you press ctrl-c in a long turn and more words follow here\n"))
 }
 
 func TestHermesAnOpenTurnIsClosedByAnInterruptedScreenOrTenSilentMinutes(t *testing.T) {
@@ -38,21 +37,21 @@ func TestHermesAnOpenTurnIsClosedByAnInterruptedScreenOrTenSilentMinutes(t *test
 	}
 
 	// an interrupted screen, the last event at least 3 s old: the turn is over
-	kind, at := hermesTurnFallback(open("prompt_submit", 30*time.Second), "x\nOperation interrupted\n", now)
+	kind, at := hermesTurnFallback(open("prompt_submit", 30*time.Second), "x\nOperation interrupted: waiting for model response (2.0s elapsed).\n", now)
 	assert.Equal(t, "stop", kind)
 	assert.Equal(t, now, at)
-	kind, _ = hermesTurnFallback(open("tool_use", 30*time.Second), "Operation interrupted\n", now)
+	kind, _ = hermesTurnFallback(open("tool_use", 30*time.Second), "Operation interrupted: waiting for model response (2.0s elapsed).\n", now)
 	assert.Equal(t, "stop", kind)
 	// the same screen a second after a new prompt: the notice is the old turn's
-	kind, _ = hermesTurnFallback(open("prompt_submit", time.Second), "Operation interrupted\n", now)
+	kind, _ = hermesTurnFallback(open("prompt_submit", time.Second), "Operation interrupted: waiting for model response (2.0s elapsed).\n", now)
 	assert.Equal(t, "", kind)
 	// a request for the person is a wait, not a turn to close
-	kind, _ = hermesTurnFallback(open("permission_request", time.Hour), "Operation interrupted\n", now)
+	kind, _ = hermesTurnFallback(open("permission_request", time.Hour), "Operation interrupted: waiting for model response (2.0s elapsed).\n", now)
 	assert.Equal(t, "", kind)
 	// a turn already closed
-	kind, _ = hermesTurnFallback(open("stop", time.Hour), "Operation interrupted\n", now)
+	kind, _ = hermesTurnFallback(open("stop", time.Hour), "Operation interrupted: waiting for model response (2.0s elapsed).\n", now)
 	assert.Equal(t, "", kind)
-	kind, _ = hermesTurnFallback(nil, "Operation interrupted\n", now)
+	kind, _ = hermesTurnFallback(nil, "Operation interrupted: waiting for model response (2.0s elapsed).\n", now)
 	assert.Equal(t, "", kind)
 
 	// silence: nine minutes is a slow turn, eleven is over, with any screen
@@ -86,8 +85,25 @@ func TestAHermesAgentsInterruptedTurnIsNotWorkingForEver(t *testing.T) {
 		return h.deriveSingleSessionState(ctx, sid, 0).Working
 	}
 	assert.True(t, derive("hermes", "00000000-0000-0000-0000-00000000a001", "prompt_submit", 30*time.Second, "thinking...\n"), "a turn the hooks opened is Working")
-	assert.False(t, derive("hermes", "00000000-0000-0000-0000-00000000a002", "prompt_submit", 30*time.Second, "output\n  Operation interrupted\n> \n"), "an interrupt closes it")
-	assert.True(t, derive("hermes", "00000000-0000-0000-0000-00000000a003", "prompt_submit", time.Second, "Operation interrupted\n"), "the old notice a second after a new prompt does not end the new turn")
+	assert.False(t, derive("hermes", "00000000-0000-0000-0000-00000000a002", "prompt_submit", 30*time.Second, "output\n  Operation interrupted: waiting for model response (2.0s elapsed).\n> \n"), "an interrupt closes it")
+	assert.True(t, derive("hermes", "00000000-0000-0000-0000-00000000a003", "prompt_submit", time.Second, "Operation interrupted: waiting for model response (2.0s elapsed).\n"), "the old notice a second after a new prompt does not end the new turn")
 	assert.False(t, derive("hermes", "00000000-0000-0000-0000-00000000a004", "tool_use", 11*time.Minute, "working\n"), "ten silent minutes close it")
-	assert.True(t, derive("claude", "00000000-0000-0000-0000-00000000a005", "prompt_submit", 30*time.Second, "Operation interrupted\n"), "only Hermes reads this")
+	assert.True(t, derive("claude", "00000000-0000-0000-0000-00000000a005", "prompt_submit", 30*time.Second, "Operation interrupted: waiting for model response (2.0s elapsed).\n"), "only Hermes reads this")
+}
+
+// The three notices a real Hermes v0.22.5 printed after a Ctrl-C (the tester's capture, #11831), each followed by the footer line and the prompt box: all are the interrupt, whatever follows the prefix.
+func TestTheRealInterruptNoticesAreRecognised(t *testing.T) {
+	tail := "\n   ─ 11.1s · 7:56 PM\n\n ╭──────────────────────────────╮\n │ ❯ Ask anything, or type / for commands…   │\n ╰──────────────────────────────╯\n"
+	for _, notice := range []string{
+		"Operation interrupted: waiting for model response (6.3s elapsed).",
+		"Operation interrupted: waiting for the provider to recover (cycle 1/5).",
+		"Operation interrupted: retrying API call after error (retry 2/3).",
+	} {
+		screen := "☤ Hermes\n  " + notice + tail
+		assert.True(t, hermesInterruptedOnScreen(screen), notice)
+	}
+	// the screen of a turn that is going on, with no notice
+	assert.False(t, hermesInterruptedOnScreen("☤ Hermes\n  ⠋ thinking... (3.1s)\n"+tail))
+	// an old notice with enough output after it is not the last thing printed
+	assert.False(t, hermesInterruptedOnScreen("  Operation interrupted: waiting for model response (1.0s elapsed).\n"+strings.Repeat("a new line of output\n", 8)+tail))
 }

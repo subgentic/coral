@@ -58,18 +58,19 @@ func (h *SessionsHandler) hermesTranscript(ctx context.Context, sessionID string
 }
 
 // A Hermes turn the hooks left open is closed by one of two fallbacks, because a Ctrl-C and a provider that gave up fire no closing hook (#11715), and a dot driven by hooks alone would stay Working for ever:
-//   - the pane says the operation was interrupted (hermesInterruptedOnScreen), once the last event is at least hermesInterruptSettle old, so a screen that still shows the old notice a second after a new prompt does
+//   - the pane says the operation was interrupted (hermesInterruptedOnScreen: the real notice, captured on v0.22.5), once the last event is at least hermesInterruptSettle old, so a screen that still shows the old notice a second after a new prompt does
 //     not end the new turn;
 //   - the turn has been silent for hermesTurnSilence. Every tool call fires a pre and a post hook, so ten minutes with none is not a working agent.
 //
-// A request waiting for the person (permission_request) is a wait, not an open turn: neither fallback touches it. The interrupt text is from the tester's report of v0.22.5, not a capture of the screen, so
-// that part is to be confirmed against a real one.
+// A request waiting for the person (permission_request) is a wait, not an open turn: neither fallback touches it.
 const (
 	hermesInterruptSettle = 3 * time.Second
 	hermesTurnSilence     = 10 * time.Minute
 )
 
-// hermesInterruptedOnScreen reports whether the notice "Operation interrupted" is among the last three non-empty lines of screen, as a short line of its own.
+// hermesInterruptedOnScreen reports whether a line "Operation interrupted: <why>" is among the last seven non-empty lines of screen. Hermes v0.22.5 prints it under its name after a Ctrl-C, whatever the turn was
+// waiting for ("waiting for model response (6.3s elapsed).", "waiting for the provider to recover (cycle 1/5).", "retrying API call after error (retry 2/3)."), then a footer line and its prompt box, which is why the
+// window is seven (the tester's capture, #11831). The line must begin with the notice, so the same words inside other text are not it.
 func hermesInterruptedOnScreen(screen string) bool {
 	var lines []string
 	for _, l := range strings.Split(screen, "\n") {
@@ -77,11 +78,11 @@ func hermesInterruptedOnScreen(screen string) bool {
 			lines = append(lines, t)
 		}
 	}
-	if len(lines) > 3 {
-		lines = lines[len(lines)-3:]
+	if len(lines) > 7 {
+		lines = lines[len(lines)-7:]
 	}
 	for _, l := range lines {
-		if len(l) <= 60 && strings.Contains(strings.ToLower(l), "operation interrupted") {
+		if len(l) <= 160 && strings.HasPrefix(l, "Operation interrupted:") {
 			return true
 		}
 	}
