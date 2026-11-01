@@ -24,15 +24,19 @@ func TestARestartOfChiefFollowsTheChiefActionsSetting(t *testing.T) {
 		name, actions, page string
 		sid, stored         string
 		want                string
-		recorded            bool // chief_session follows the restarted agent
+		recorded            bool     // chief_session follows the restarted agent
+		flags               []string // the flags the stored agent was started with
 	}{
-		{"unset is ask first", "", "true", chief, "default", "default", true},
-		{"ask first lowers an agent that was in act", "ask_first", "true", chief, "acceptEdits", "default", true},
-		{"act is accept edits", "act", "true", chief, "default", "acceptEdits", true},
-		{"act is never more than accept edits", "act", "true", chief, "bypassPermissions", "acceptEdits", true},
-		{"another agent is unchanged by act", "act", "true", other, "default", "default", false},
-		{"another agent is unchanged by ask first", "ask_first", "true", other, "plan", "plan", false},
-		{"chief while the page is off is unchanged", "act", "false", chief, "plan", "plan", false},
+		{"unset is ask first", "", "true", chief, "default", "default", true, nil},
+		{"ask first lowers an agent that was in act", "ask_first", "true", chief, "acceptEdits", "default", true, nil},
+		{"act is accept edits", "act", "true", chief, "default", "acceptEdits", true, nil},
+		{"act is never more than accept edits", "act", "true", chief, "bypassPermissions", "acceptEdits", true, nil},
+		{"another agent is unchanged by act", "act", "true", other, "default", "default", false, nil},
+		{"another agent is unchanged by ask first", "ask_first", "true", other, "plan", "plan", false, nil},
+		{"chief while the page is off is unchanged", "act", "false", chief, "plan", "plan", false, nil},
+		// QA's SHOULD: flags that skip every prompt, stored on Chief, are not carried: the restart has only the setting's --permission-mode.
+		{"stored skip-permissions flags are not carried, ask first", "ask_first", "true", chief, "bypassPermissions", "default", true, []string{"--dangerously-skip-permissions"}},
+		{"stored skip-permissions flags are not carried, act", "act", "true", chief, "bypassPermissions", "acceptEdits", true, []string{"--dangerously-skip-permissions"}},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			server, _, term, ss := setupSessionsTestServer(t)
@@ -45,7 +49,7 @@ func TestARestartOfChiefFollowsTheChiefActionsSetting(t *testing.T) {
 			if c.actions != "" {
 				require.NoError(t, ss.SetSetting(ctx, "chief_actions", c.actions))
 			}
-			require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: c.sid, AgentType: "claude", AgentName: "chief", WorkingDir: t.TempDir(), PermissionMode: str(c.stored)}))
+			require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: c.sid, AgentType: "claude", AgentName: "chief", WorkingDir: t.TempDir(), PermissionMode: str(c.stored), Flags: flagsOrNil(c.flags)}))
 			sn := naming.SessionName("claude", c.sid)
 			require.NoError(t, term.CreateSession(ctx, sn, t.TempDir()))
 			body, _ := json.Marshal(map[string]any{"session_id": c.sid, "agent_type": "claude"})
@@ -65,7 +69,9 @@ func TestARestartOfChiefFollowsTheChiefActionsSetting(t *testing.T) {
 			require.NotEmpty(t, cmds)
 			cmd := cmds[len(cmds)-1]
 			assert.Contains(t, cmd, "--permission-mode "+c.want)
-			assert.NotContains(t, cmd, "dangerously-skip-permissions")
+			if c.sid == chief {
+				assert.NotContains(t, cmd, "dangerously-skip-permissions", "Chief's restart never carries a flag that skips the prompts")
+			}
 			st, err := ss.GetSettings(ctx)
 			require.NoError(t, err)
 			if c.recorded {
@@ -75,4 +81,11 @@ func TestARestartOfChiefFollowsTheChiefActionsSetting(t *testing.T) {
 			}
 		})
 	}
+}
+
+func flagsOrNil(f []string) *string {
+	if f == nil {
+		return nil
+	}
+	return store.MarshalFlags(f)
 }
