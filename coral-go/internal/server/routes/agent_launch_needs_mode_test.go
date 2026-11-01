@@ -319,7 +319,35 @@ func TestAnOrchestratorsLaunchStartsAskFirstWhereAnotherAgentIsRefused(t *testin
 	orchTeam := team(as(orch), "orch-team")
 	require.Len(t, orchTeam, 1)
 	assert.Empty(t, orchTeam[0]["error"], "the Orchestrator's member starts: %v", orchTeam[0])
+	memberSID, _ := orchTeam[0]["session_id"].(string)
+	require.NotEmpty(t, memberSID, "the member's session: %v", orchTeam[0])
+	memberCmd := ""
+	rig.term.mu.Lock()
+	for name, cmds := range rig.term.sent {
+		if strings.Contains(name, memberSID) && len(cmds) > 0 {
+			memberCmd = cmds[len(cmds)-1]
+		}
+	}
+	rig.term.mu.Unlock()
+	require.NotEmpty(t, memberCmd, "the member's launch command")
+	assert.NotContains(t, strings.ToLower(memberCmd), "skip-permissions", "the member starts ask first, not in the saved Auto")
+	assert.NotContains(t, memberCmd, "bypassPermissions")
+	assert.NotContains(t, memberCmd, "--permission-mode auto", "the saved default is not inherited by the member")
 	workerTeam := team(as(worker), "worker-team")
 	require.Len(t, workerTeam, 1)
 	assert.Equal(t, agentLaunchNeedsModeCode, workerTeam[0]["code"], "another agent's member is refused: %v", workerTeam[0])
+	// An Orchestrator that has left the board (its subscription is inactive) is any other agent: refused, as a worker is (QA's SHOULD).
+	left, err := bs.Unsubscribe(ctx, "launch-board", "orch")
+	require.NoError(t, err)
+	require.True(t, left)
+	rec, _ = launch(as(orch), at.Claude)
+	assert.Equal(t, http.StatusForbidden, rec.Code, "an Orchestrator that left the board is refused like any agent: %s", rec.Body.String())
+	assert.Equal(t, agentLaunchNeedsModeCode, jsonCode(t, rec), "and for the same reason")
+}
+
+func jsonCode(t *testing.T, rec *httptest.ResponseRecorder) string {
+	t.Helper()
+	var out map[string]string
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &out), rec.Body.String())
+	return out["code"]
 }
