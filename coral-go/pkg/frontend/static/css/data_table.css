@@ -124,7 +124,7 @@
 .dt-flag { display: inline-flex; align-items: center; justify-content: center; width: var(--control-compact-height); height: var(--control-compact-height); padding: 0; border: 0; border-radius: var(--radius-md); background: none; color: var(--table-tertiary-color); cursor: pointer; }
 .dt-row .dt-flag { opacity: 0; }
 .dt-flag .material-icons { font-size: var(--icon-size); }
-.dt-row:hover .dt-flag, .dt-row:focus-within .dt-flag, .dt-row .dt-flag:focus-visible, .dt-row .dt-flag-on { opacity: 1; } /* a chat's Star and Archive show on its row's hover or focus; a starred chat keeps its star drawn */
+.dt-row:is(:hover, :has(:focus-visible)) .dt-flag, .dt-row .dt-flag:focus-visible, .dt-row .dt-flag-on { opacity: 1; } /* a chat's Star and Archive show on its row's hover or focus; a starred chat keeps its star drawn */
 .dt-flag-on { color: var(--warning); }
 .dt-flag:hover { color: var(--table-primary-color); }
 .dt-flag-on:hover { color: var(--warning); }
@@ -473,7 +473,7 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 .dt-saved-text { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: var(--fs-md); font-weight: var(--fw-regular); color: var(--table-secondary-color); }
 @media (hover: hover) and (pointer: fine) {
     .dt-hover-action { opacity: 0; }
-    .dt-row:hover .dt-hover-action, .dt-row:focus-within .dt-hover-action, .dt-hover-action:focus-visible { opacity: 1; }
+    .dt-row:is(:hover, :has(:focus-visible)) .dt-hover-action, .dt-hover-action:focus-visible { opacity: 1; }
 }
 /* The team after a phone row's title (#9654): tertiary, never shrunk by the title's room (it is cut only past 70 percent of the line). */
 .dt-mail-line:has(> .dt-mail-team) > .dt-mail-title { flex-shrink: 100; min-width: 4ch; } /* the agent's name gives way before the team: the computer ends the team, and it tells two same-named teams apart (#9664) */
@@ -541,7 +541,7 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 .dt-title-cell > .dt-star { margin-inline-start: -4px; } /* the star is a 24 px target with an 18 px glyph: the cell's gap and 4 px of the box's own side are the space, so a file name in the Inbox's Name column at 1280 is whole (#9916) */
 
 .dt-star:not(.dt-star-on) { opacity: 0; color: var(--text-muted); }
-.dt-row:hover .dt-star, .dt-row:focus-within .dt-star, .dt-star:focus-visible { opacity: 1; }
+.dt-row:is(:hover, :has(:focus-visible)) .dt-star, .dt-star:focus-visible { opacity: 1; }
 .dt-star:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .dt-star:hover { color: var(--accent); }
 .dt-mail-star { width: auto; height: auto; margin-inline-start: 4px; font-size: var(--fs-lg); flex: none; align-self: center; cursor: default; }
