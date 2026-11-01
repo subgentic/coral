@@ -1274,6 +1274,9 @@ body.panel-dragging .agentic-state {
     letter-spacing: var(--ls-caps);
     color: var(--text-muted);
 }
+/* A picture in a pane with no box of its own (an artifact in the Inbox's detail pane or a goal's list) gets one: centred, as high as most of the screen allows, not a strip as high as the file (#11711); the file preview body and the viewer size their own (below, and components.css). */
+.image-panes .image-pane-frame { display: flex; align-items: center; justify-content: center; min-height: min(60vh, 480px); }
+.image-panes.image-panes-compare .image-pane-frame { min-height: min(40vh, 320px); }
 .image-pane-frame img {
     display: block;
     max-width: 100%;
@@ -1302,6 +1305,7 @@ body.panel-dragging .agentic-state {
 .image-panes { position: relative; }
 .image-pane-zoomable { overflow: hidden; cursor: grab; touch-action: none; user-select: none; }
 .image-pane-zoomable.panning { cursor: grabbing; }
+.image-pane-zoomable:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; } /* the keyboard zooms and moves the picture (#11702) */
 .image-pane-zoomable img { transform-origin: center; will-change: transform; }
 .image-zoom-controls {
     position: absolute;

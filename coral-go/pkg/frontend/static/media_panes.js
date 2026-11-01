@@ -104,22 +104,44 @@ function _enableImagePanZoom(frames) {
             const [px, py] = fromCentre(e);
             zoomAt(Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.002)), px, py);
         }, { passive: false });
-        let drag = null;
+        let drag = null, pinch = null;
+        const pts = new Map(); // the pointers down on the frame: one drags, two pinch around their midpoint (#11702)
+        const spread = () => { const [a, b] = [...pts.values()]; return { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2 }; };
         frame.addEventListener('pointerdown', (e) => {
             if (e.button !== 0) return;
-            drag = { x: e.clientX, y: e.clientY, vx: view.x, vy: view.y };
+            pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
             frame.setPointerCapture(e.pointerId);
             frame.classList.add('panning');
+            if (pts.size === 2) { drag = null; pinch = { d: spread().d, k: view.k }; }
+            else drag = { x: e.clientX, y: e.clientY, vx: view.x, vy: view.y };
         });
         frame.addEventListener('pointermove', (e) => {
+            if (!pts.has(e.pointerId)) return;
+            pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+            if (pinch && pts.size === 2) { const s = spread(), r = frame.getBoundingClientRect(); zoomAt(pinch.k * (s.d / pinch.d) / view.k, s.mx - (r.left + r.width / 2), s.my - (r.top + r.height / 2)); return; }
             if (!drag) return;
             view.x = drag.vx + e.clientX - drag.x;
             view.y = drag.vy + e.clientY - drag.y;
             apply();
         });
-        const end = () => { drag = null; frame.classList.remove('panning'); };
+        const end = (e) => {
+            pts.delete(e.pointerId); pinch = null;
+            if (pts.size === 1) { const [p] = [...pts.values()]; drag = { x: p.x, y: p.y, vx: view.x, vy: view.y }; } // one finger is left: it drags on from where it is
+            else { drag = null; frame.classList.remove('panning'); }
+        };
         frame.addEventListener('pointerup', end);
         frame.addEventListener('pointercancel', end);
+        frame.tabIndex = 0; frame.setAttribute('role', 'group'); frame.setAttribute('aria-label', `${img.alt || 'Image'}: plus and minus zoom, 0 fits, arrow keys move it`);
+        frame.addEventListener('keydown', (e) => { // the keyboard zooms and pans the picture (#11702)
+            if (e.ctrlKey || e.metaKey || e.altKey) return;
+            const step = { ArrowLeft: [48, 0], ArrowRight: [-48, 0], ArrowUp: [0, 48], ArrowDown: [0, -48] }[e.key];
+            if (e.key === '+' || e.key === '=') zoomAt(1.25, 0, 0);
+            else if (e.key === '-' || e.key === '_') zoomAt(1 / 1.25, 0, 0);
+            else if (e.key === '0') reset();
+            else if (step && view.k > 1) { view.x += step[0]; view.y += step[1]; apply(); }
+            else return;
+            e.preventDefault();
+        });
         frame.addEventListener('dblclick', reset);
         img.draggable = false;
     }
