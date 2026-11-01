@@ -1,5 +1,46 @@
 # Release Notes
 
+## v2.0.20 — Inbox first, one set of buttons on Needs you, and Deny and Ignore
+
+### Changes
+
+#### What you will notice first
+
+- **The Inbox is the first tab and the start page on a computer**: the top tabs read Inbox, Agents, Automations, Analytics, (Computers), Docs, and a start with no kept place opens Needs you. A returning computer still reopens the team, agent or chat it left on; a phone keeps the Agents list as its start and its bottom bar (Agents, Inbox, Automations, Analytics).
+- **Needs you review rows have one set of buttons**: Approve, Changes, Deny and Ignore, as words in that order on a wide row (from 1360 px); on a phone and a narrower window, Approve, Changes and a ⋯ menu with Deny, Ignore and, on a read row, Mark unread. The row's name opens the file (a click anywhere on the row does too); there is no Open button and no refresh icon. **Deny** asks "Deny this?" with an optional reason (500 characters), is final, and the agent is told once with your reason; **Ignore** takes the item out with a toast and Undo for 30 seconds and tells nobody. The list keeps your place after each. The Actions column is last, with its buttons at the row's right edge.
+- **Needs you sorts newest first** (it was Blocking first); Blocking first and Waiting longest are still choices, and a choice you pick is kept.
+- **Ignore replaces Dismiss** on welcome items, failed runs and expired proposals, with the same silent behaviour. A question to you has an Ignore with Undo beside its button, and that button says "Answer" (it said "Reply"). Ignored files are not lost: the Artifacts list has an "Ignored" pill beside "For review", and Unignore puts a file back in Needs you as it was.
+- **One row per artifact in Needs you**: the newest version, with a note "N earlier versions" (each version was its own row before); the count and the Inbox badge follow. Approve and Changes act on the newest. The same file on two teams stays two rows.
+- **A file for review shows its question**: under the file's name on a wide row, on a phone's second line, and in the viewer's line under the title.
+- **A "New goal" button in the Inbox's Goals folder** opens the New goal form (it takes the team from the Team filter, or asks which when you have several).
+- **Needs you rows that open on a click can no longer be selected**: the blue bars between their cells are gone. This is the likely cause of rows not opening in the desktop app; we could not reproduce that here, so tell us if it still happens.
+- **The phone's Inbox tab strip says it scrolls**: a chevron shows while tabs are off to the right (five tabs with counts do not fit 390 or 360 px), and the last tab ("Saved") is whole at the end.
+- **Grouped task-queue lines in the board chat are open by default** (a run like "1 task created, 1 claimed" shows its lines); you can close one, and the board remembers your last choice.
+- **Where an agent lives is clearer**: an agent on a detached worktree reads "detached at <commit>" in the header and the agent row (it read "repo : HEAD"), and the top of Files always names the agent's folder and its branch.
+- **Fewer ghost tooltips**: no title repeats text the element already shows (the phone bar's tabs and New button, the agent menu's Open Agent Tab, a preview tab's Pin tab, state chips), and a table's name button shows its tooltip only while its text is cut.
+- Small wording: Copy says "Copied" everywhere (it said "Copied!" in four places), and the task bar's "Not yet: send back" is "Changes".
+
+#### Agents and the chat
+
+- **A task result that asks for review and does not get the tag says why**: the "for review" tag is still left out, and the completion answer now carries a warning (`coral-board task complete` and `submit-review` print "Warning: ...") with the reason in the words of the upload's refusal: no question, not the asker's own upload, or a file Needs you cannot show.
+- **Deny, Ignore and Unignore on a review**: the review route takes `deny` (with a reason cleaned to one line and cut at 500), `ignore` and `unignore`, for the Operator alone; a later approve or changes on a denied file is refused. Undo of a question's close is the person's alone: an agent token or a non-owner is refused.
+- **Coral no longer removes the Hub's phone-push worker** when it cleans up service workers on a cloud-mode load.
+- **For a Coral Hub that has the matching release**: `GET /api/needs-you` (owner only) returns what waits for you in one read, for the Hub's phone push (each line is redacted and cut at 140 characters, and a page can be continued from a cursor, limit 1 to 50).
+
+#### Known issues
+
+- **Windows: in-app update does not work from 2.0.0 through 2.0.6.** If you're on one of those, download and install the MSI by hand; from 2.0.7 on, in-app update works.
+- **macOS: a Coral of 2.0.5 or earlier cannot install updates in-app; install 2.0.6 or later by hand once.**
+- **OpenCode agents are tested on macOS and Linux; OpenCode on Windows is not yet tested end to end.**
+- Setting up a computer over SSH is supported from a macOS or Linux hub, and is not yet tested from a Windows hub.
+
+#### For developers and releases
+
+- The static tree is 5,873,805 bytes of the 5,906,432-byte budget. The first-load baseline in `page_weight` rises by 16 KiB (app.js and the encoded total), so the Inbox-first start page and the Needs you work fit.
+- The release's UI contact sheet is no longer tagged "for review": evidence is untagged and only a decision is tagged, so a release puts nothing in the operator's Needs you. The release screens' seed uploads carry a question.
+- The test runner starts every suite that loads "/" on the Agents page (`helpers/start_on_agents.js`); suites about the start page opt out with `CORAL_KEEP_START=1`.
+- Census and test fixes: the U+202E in two test files is an escape, the needs-you timestamp writers are listed, the join census follows `objectSidecar`, `inbox_ignored_real_browser` counts what it added, and `analytics_pass_browser` answers Today and This month in order on the first of a month.
+
 ## v2.0.19 — Needs you keeps your place after Approve, a question for every review, and one set of action buttons
 
 ### Changes
