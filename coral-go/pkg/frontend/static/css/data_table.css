@@ -506,6 +506,14 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 .dt-row:hover .inbox-actions-hover > .inbox-review-actions, .dt-row:focus-within .inbox-actions-hover > .inbox-review-actions, .dt-row[aria-current="true"] .inbox-actions-hover > .inbox-review-actions, .inbox-actions-hover:has([aria-expanded="true"]) > .inbox-review-actions { opacity: 1; }
 .dt-row:hover .inbox-actions-hover > .inbox-row-when, .dt-row:focus-within .inbox-actions-hover > .inbox-row-when, .dt-row[aria-current="true"] .inbox-actions-hover > .inbox-row-when, .inbox-actions-hover:has([aria-expanded="true"]) > .inbox-row-when { opacity: 0; }
 
+/* A Needs you row in three lines (#11719, the operator's Gmail comment; the mockup needs_row_three_lines): the top line is who it is from and the file's name, and at the right how long it has waited (or the buttons, at hover); the two lines under it say why it needs you, cut with an ellipsis. Team, Goal and the task link are not on the row (they are in the opened file and in the filters). */
+.inbox-needs-results tr:has(.inbox-review-item) > td { vertical-align: top; padding-block: 8px; height: auto; }
+.inbox-review-item { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.inbox-review-from { flex: none; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--fw-strong); }
+.inbox-review-from::after { content: " \00b7"; font-weight: var(--fw-regular); color: var(--text-muted); }
+.inbox-needs-results .dt-row.dt-read .inbox-review-from { font-weight: var(--fw-regular); }
+.inbox-needs-results .dt-subtitle { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; white-space: normal; margin-top: 2px; }
+
 /* A column with nothing in it on any row is not drawn (#9846): its head and its cells; the header draws it again when a row has a value. */
 .dt-table .dt-col-unused, .dt-table .dt-col-tight { display: none; }
 
@@ -558,10 +566,8 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 .dt-team-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: var(--team-accent, var(--text-muted)); }
 .artifact-review-line { color: var(--text-secondary); font-size: var(--fs-sm, 0.8125rem); margin-inline-end: 8px; } /* the review's state in words, in the preview's head (#136584) */
 .artifact-sheet-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; } /* the review line above the tags in a team artifact's sheet (#136584) */
-.dt-box.dt-folded .inbox-review-from { display: inline; } /* a For review row of Needs you on a phone (#11456): who uploaded it leads the second line, the line under the name (cut beside the buttons) is not drawn */
 .dt-box.dt-folded .inbox-review-question { display: inline; }
 .dt-box.dt-folded .inbox-review-question + span { display: none; } /* the words For review give way to the question when there is one */
-.dt-box.dt-folded td:has(> .inbox-review-name, > .inbox-review-item) > .dt-subtitle { display: none; }
 .dt-box.dt-folded td[data-fold-label]::before { content: attr(data-fold-label) ' '; color: var(--text-secondary); font-weight: var(--fw-regular); } /* a column with foldLabel names its figure where the header row is gone (the phone's Computers, #11463) */
 @media (max-width: 760px) { tr[data-welcome-id] { touch-action: pan-y; } } /* a welcome row of Needs you: the page keeps its vertical pans, a horizontal drag is the swipe's (welcome_swipe.js, #11542) */
 .dt-end .inbox-review-actions { justify-content: end; }
