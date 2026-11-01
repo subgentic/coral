@@ -16,7 +16,8 @@ A lone `-` reads stdin for `post` and `send`, and as the value of a task's `--me
 starts with a letter or digit, and is at most 64 characters (no spaces, dots, `@` or `/`);
 `projects`, `tasks` and `remotes` are reserved. Subscribing, posting, creating a task or
 launching an agent or team on a board that doesn't exist yet with any other name gets 400
-`invalid_board_name`. A board that already exists keeps working under its name.
+`invalid_board_name`. A board that already exists keeps working under its name. Through Coral Hub only the
+owner starts a new board (any name): a guest, grantee or guide who names one gets 403 `owner_only`.
 
 **Board ids and labels (#3536):** a board has an **id** and a **label** (its display name).
 Every board API takes the id: `/api/board/{id}/...`. A board that existed before ids keeps its

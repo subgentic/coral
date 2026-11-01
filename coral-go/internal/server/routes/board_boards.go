@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/subgentic/coral/internal/board"
+	"github.com/subgentic/coral/internal/cloud"
 )
 
 // DeleteBoard deletes a board and everything on it: its messages, tasks, members and settings (Store.DeleteProject, one transaction).
@@ -95,23 +96,49 @@ func runningAgentsMessage(names []string) string {
 	return strconv.Itoa(len(names)) + " agents are still on this board (" + who + "): kill them or move them first"
 }
 
-// refuseNewBoardName answers 400 invalid_board_name and returns true when name would start
-// a NEW board (no subscriber or message uses it yet) with a name outside board.NewNamePattern
-// (#3534) or shaped like a generated id (#3536). A board that already exists keeps working
-// under its name, whatever it is.
+// refuseNewBoardName answers and returns true when name would start a NEW board (no subscriber or message uses it yet) that the caller may not make:
+//   - through Coral Hub, anyone but the owner (refuseGuestNewBoard, #11627);
+//   - a name outside board.NewNamePattern (#3534) or shaped like a generated id (#3536): 400 invalid_board_name.
+//
+// A board that already exists keeps working under its name, whatever it is.
 func refuseNewBoardName(w http.ResponseWriter, r *http.Request, bs *board.Store, name string) bool {
 	if bs == nil {
 		return false
 	}
+	guest := hubGuest(r)
 	problem := bs.LabelProblem(name) // the name rule, and never id-shaped (#3536)
-	if problem == "" {
+	if problem == "" && !guest {
 		return false
 	}
 	if exists, err := bs.BoardExists(r.Context(), name); err == nil && exists {
 		return false
 	}
+	if guest {
+		writeNewBoardOwnerOnly(w)
+		return true
+	}
 	writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_board_name", "code": "invalid_board_name", "message": problem})
 	return true
+}
+
+// refuseGuestNewBoard is the Coral Hub half of refuseNewBoardName alone, for a route that stores something under a board's name without a message or a member (the working mode and its presets): through the Hub a
+// guest or grantee, on any tier, never writes under a name no board has (#11627). This computer and the owner are never refused.
+func refuseGuestNewBoard(w http.ResponseWriter, r *http.Request, bs *board.Store, name string) bool {
+	if bs == nil || !hubGuest(r) {
+		return false
+	}
+	if exists, err := bs.BoardExists(r.Context(), name); err == nil && exists {
+		return false
+	}
+	writeNewBoardOwnerOnly(w)
+	return true
+}
+
+// hubGuest says the request came through Coral Hub from anyone but the owner (a guest, a grantee, a guide).
+func hubGuest(r *http.Request) bool { return cloud.Tunneled(r) && !hubOwnerRequest(r).owner }
+
+func writeNewBoardOwnerOnly(w http.ResponseWriter) {
+	writeJSON(w, http.StatusForbidden, map[string]string{"code": "owner_only", "error": "through Coral Hub only the owner starts a new board; ask the owner, or join a board that exists"})
 }
 
 // GET /api/board/{project}: the board's id, label and creation (#3536).

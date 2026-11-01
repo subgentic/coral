@@ -137,6 +137,10 @@ func TestTheOwnerTableAgreesWithTheHandWrittenListItReplaced(t *testing.T) {
 			if m == http.MethodPost && strings.HasPrefix(p, "/api/sessions/live/") && (strings.HasSuffix(p, "/notices/pause") || strings.HasSuffix(p, "/notices/resume")) {
 				continue
 			}
+			// The routes that can start a new board carry the marker (#11627): the old list never had them.
+			if (m == http.MethodPost && regexp.MustCompile(`^/api/board/[^/]+/(messages|subscribe|tasks|goals|working-mode/presets)$`).MatchString(p)) || (m == http.MethodPut && regexp.MustCompile(`^/api/board/[^/]+/working-mode$`).MatchString(p)) {
+				continue
+			}
 			// Chief's state (#11470) is the owner's alone through the hub: the old list never had it.
 			if m == http.MethodGet && p == "/api/chief" {
 				continue
@@ -230,7 +234,7 @@ func TestTheRealConnectorStampsEveryOwnerRouteOfTheTableAndNothingElse(t *testin
 		do(grantee, r.Method, p, forged)
 	}
 	do(owner, http.MethodGet, "/api/board/team/status", forged) // not an owner route
-	do(owner, http.MethodPost, "/api/board/team/messages", forged)
+	do(owner, http.MethodPost, "/api/board/team/tasks/12/complete", forged)
 	mu.Lock()
 	defer mu.Unlock()
 	require.Len(t, got, 2*len(routes)+2)

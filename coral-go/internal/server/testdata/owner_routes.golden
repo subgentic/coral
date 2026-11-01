@@ -44,10 +44,15 @@ POST /api/board/{project}/cross-team/disable launch owner-only-hub
 POST /api/board/{project}/cross-team/enable launch owner-only-hub
 POST /api/board/{project}/cross-team/files/disable launch owner-only-hub
 POST /api/board/{project}/cross-team/files/enable launch owner-only-hub
+POST /api/board/{project}/goals interact owner-sees
+POST /api/board/{project}/messages interact owner-sees
 POST /api/board/{project}/operator-artifacts interact owner-only
 POST /api/board/{project}/operator-artifacts/message interact owner-only
 POST /api/board/{project}/proposals/{id}/approve interact owner-only
 POST /api/board/{project}/proposals/{id}/reject interact owner-only
+POST /api/board/{project}/subscribe interact owner-sees
+POST /api/board/{project}/tasks interact owner-sees
+POST /api/board/{project}/working-mode/presets interact owner-sees
 POST /api/hub-auto-accept launch owner-only-hub
 POST /api/saved interact owner-only
 POST /api/sessions/live/{name}/dismiss-wait interact owner-only
@@ -60,4 +65,5 @@ PUT /api/artifacts/{id}/star interact owner-only
 PUT /api/board/{project}/guide-roster launch owner-only
 PUT /api/board/{project}/orchestrator-grant launch owner-only
 PUT /api/board/{project}/settings launch owner-only
+PUT /api/board/{project}/working-mode interact owner-sees
 PUT /api/custom-models launch owner-only

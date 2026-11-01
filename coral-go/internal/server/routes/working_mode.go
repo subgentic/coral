@@ -21,6 +21,9 @@ func (h *BoardHandler) SetWorkingMode(w http.ResponseWriter, r *http.Request) {
 		errBadRequest(w, "invalid working mode JSON")
 		return
 	}
+	if refuseGuestNewBoard(w, r, h.bs, urlParam(r, "project")) {
+		return
+	}
 	result, err := h.bs.SetWorkingMode(r.Context(), urlParam(r, "project"), mode)
 	if err != nil {
 		errBadRequest(w, err.Error())
@@ -52,6 +55,9 @@ func (h *BoardHandler) SaveWorkflowPreset(w http.ResponseWriter, r *http.Request
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		errBadRequest(w, "invalid preset JSON")
+		return
+	}
+	if refuseGuestNewBoard(w, r, h.bs, urlParam(r, "project")) {
 		return
 	}
 	create := r.Method == http.MethodPost

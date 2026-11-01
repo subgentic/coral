@@ -320,6 +320,18 @@ var routeTable = cat(
 	// What a viewer sees of a board's settings is the machine's to decide (the health setup is the owner's, #5307): the marker is stamped, the handler gives a non-owner less.
 	// The update status (#5280) shows the owner more, with the label optional for a machine linked before it was recorded.
 	owner(OwnerSees, rules(http.MethodGet, TierView, "/api/board/{project}/settings")),
+	// The routes that can start a NEW board (#11627, Security's #11636): the owner marker is stamped so the machine can tell the owner from a guest, a grantee or a guide, and refuses everyone else a name no board has (403 owner_only,
+	// refuseNewBoardName). The handler decides, so a guest still posts, subscribes and writes on a board that exists. Interact, as before.
+	owner(OwnerSees,
+		rules(http.MethodPost, TierInteract,
+			"/api/board/{project}/messages",
+			"/api/board/{project}/subscribe",
+			"/api/board/{project}/tasks",
+			"/api/board/{project}/goals",
+			"/api/board/{project}/working-mode/presets",
+		),
+		rules(http.MethodPut, TierInteract, "/api/board/{project}/working-mode"),
+	),
 	// One team's cross-team switches, the lock and who changed them last, for Coral Hub's guided setup (#5636): the Hub owner's alone, refused to everyone else and to this computer.
 	owner(OwnerHubOnly, rules(http.MethodGet, TierView, "/api/board/{project}/cross-team/settings")),
 	owner(OwnerUpdate, rules(http.MethodGet, TierView, UpdateStatusPath)),
@@ -353,7 +365,6 @@ var routeTable = cat(
 		// A run opened (#9315): the unread dot and the Needs you row of a failed run go on the Hub too. Interact, like the workflow reads: a view-only viewer sees no workflow run to open.
 		"/api/workflows/runs/{id}/seen",
 		"/api/scheduled/runs/{id}/seen",
-		"/api/board/{project}/messages",
 		"/api/board/{project}/external-messages",
 		// A file Coral Hub relayed from another Coral (cross-team artifacts): only with its stamped header.
 		"/api/board/{project}/external-artifacts",
@@ -361,9 +372,7 @@ var routeTable = cat(
 		"/api/board/{project}/hub-notice",
 		// Coral Hub's full list of cross-team links (#5572): only with its stamped header (X-Coral-Hub-Links: snapshot), only on a connection whose hub advertised cross_team_links/1.
 		"/api/cloud/cross-team-links",
-		"/api/board/{project}/subscribe",
 		"/api/board/{project}/reminder",
-		"/api/board/{project}/tasks",
 		"/api/board/{project}/tasks/{id}/complete",
 		// Not .../review, .../approve or .../reject (#3725): a review verdict is given by the
 		// reviewer agent named in subscriber_id, and Coral Hub can't prove it is that agent
@@ -374,9 +383,7 @@ var routeTable = cat(
 		"/api/board/{project}/tasks/{id}/reply",
 		"/api/board/{project}/tasks/{id}/reminder",
 		"/api/board/{project}/tasks/{id}/publish",
-		"/api/board/{project}/working-mode/presets",
 		// Goals (#7087): board text, written as the Operator by the Hub like a task or a message. A write here starts, wakes and messages nothing (a test pins it).
-		"/api/board/{project}/goals",
 		"/api/board/{project}/goals/{id}/close",
 	),
 	rules(http.MethodPut, TierInteract,
@@ -385,7 +392,6 @@ var routeTable = cat(
 		"/api/sessions/live/{name}/display-name",
 		"/api/sessions/live/{name}/icon",
 		"/api/sessions/live/{name}/name-color",
-		"/api/board/{project}/working-mode",
 		"/api/board/{project}/tasks/{id}/goal", // link a task to a goal of its board, or unlink it (#7087)
 	),
 	rules(http.MethodPatch, TierInteract,

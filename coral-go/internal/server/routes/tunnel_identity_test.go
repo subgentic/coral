@@ -649,6 +649,8 @@ func TestTunnelSubscribeIsTheHubUser(t *testing.T) {
 		return rec
 	}
 	const user = "hub-user-1234abcd"
+	_, err := handler.bs.PostMessage(ctx, "p", "Seed", "the board exists before the Hub user joins (a Hub guest never starts one, #11627)", nil)
+	require.NoError(t, err)
 	// The guard still refuses orchestrator names, other members and receive_mode all first
 	// (TestTunnelIdentityGuard); what passes it is the Operator, which Subscribe replaces.
 	for _, body := range []string{
