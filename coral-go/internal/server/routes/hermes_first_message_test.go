@@ -103,3 +103,40 @@ func TestAHermesFirstMessageThatIsALinkIsNotTyped(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "LINKED SECRET", string(b), "the target is untouched")
 }
+
+// Hermes takes 10 to 25 s to draw its screen (and about a minute more the first time in a team's home): text typed before "Welcome to Hermes Agent!" is on screen is lost. The first message waits for that line
+// (the tester's capture: the input box's placeholder rotates, so it is no marker), then a few seconds more. A terminal that cannot show a screen is typed to, as the gate does.
+func TestAHermesFirstMessageWaitsForTheWelcomeLine(t *testing.T) {
+	_, h, mock, _ := setupSessionsTestServer(t)
+	term := &loginScreenTerminal{mockSessionTerminal: mock}
+	h.terminal = term
+	h.hermesSettle = 10 * time.Millisecond
+	data := h.cfg.CoralDir()
+	sid := "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d"
+	name := naming.SessionName("hermes", sid)
+	mock.mu.Lock()
+	mock.sessions[name] = &ptymanager.PaneInfo{SessionName: name, Target: name, CurrentPath: "/tmp/p"}
+	mock.mu.Unlock()
+	writeFirstMessage(t, data, "team-a", sid, "You were automatically joined to message board \"team-a\". Go.")
+
+	term.set("Preparing the isolated Hermes runtime...\n")
+	h.deliverHermesFirstMessage("team-a", name)
+	time.Sleep(400 * time.Millisecond)
+	for _, s := range sentTo(mock, name) {
+		assert.NotContains(t, s, "automatically joined", "not typed while Hermes is still starting")
+	}
+	term.set("Ask anything, or type / for commands…\n") // the placeholder is not the marker
+	time.Sleep(300 * time.Millisecond)
+	for _, s := range sentTo(mock, name) {
+		assert.NotContains(t, s, "automatically joined")
+	}
+	term.set("Welcome to Hermes Agent! Type your message or /help for commands.\n")
+	require.Eventually(t, func() bool {
+		for _, s := range sentTo(mock, name) {
+			if strings.Contains(s, "automatically joined") {
+				return true
+			}
+		}
+		return false
+	}, 5*time.Second, 20*time.Millisecond)
+}

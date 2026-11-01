@@ -170,8 +170,42 @@ func (h *SessionsHandler) deliverHermesFirstMessage(team, target string) {
 	safego.Go("routes:hermesFirstMessage", func() {
 		ctx, cancel := context.WithTimeout(context.Background(), hermesFirstMessageWait)
 		defer cancel()
+		if !h.waitForHermesWelcome(ctx, name, sid) {
+			slog.Warn("hermes: Hermes was not ready for its first message", "session", sid[:8])
+			return
+		}
 		if err := deliverAutomated(ctx, h.terminal, name, at.Hermes, sid, text, "first message"); err != nil {
 			slog.Warn("hermes: the first message was not typed", "session", sid[:8], "error", err)
 		}
 	})
+}
+
+// hermesWelcome is the line Hermes v0.22.5 shows when it is ready for a message (the tester's capture): the input box's placeholder rotates, so it is not a marker.
+const hermesWelcome = "Welcome to Hermes Agent!"
+
+// waitForHermesWelcome waits until the agent's screen shows the welcome line, then hermesSettle more, and reports whether it did before ctx ended. A terminal with no screen to read is not waited for (the gate types
+// to such a terminal too). It only reads the screen: nothing is sent because of what is on it.
+func (h *SessionsHandler) waitForHermesWelcome(ctx context.Context, name, sid string) bool {
+	for {
+		rctx, cancel := context.WithTimeout(ctx, loginScreenTimeout)
+		screen, err := h.agentScreen(rctx, name, at.Hermes, sid, "")
+		cancel()
+		if errors.Is(err, errNoScreen) {
+			return true
+		}
+		if err == nil && strings.Contains(screen, hermesWelcome) {
+			break
+		}
+		select {
+		case <-time.After(500 * time.Millisecond):
+		case <-ctx.Done():
+			return false
+		}
+	}
+	select {
+	case <-time.After(h.hermesSettle):
+		return true
+	case <-ctx.Done():
+		return false
+	}
 }
