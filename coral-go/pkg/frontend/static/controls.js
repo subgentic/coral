@@ -36,6 +36,7 @@ import { killLiveSession, dropKilledRows } from './kill_live.js';
 import { MODES, modeFromFooterText, pressesFor } from './mode_cycle.js';
 import { _getXtermModule, sleepingBlocked } from './control_runtime.js';
 import { activeUploadPromisesBySession, getPendingAttachments, clearAttachments, openImagePicker, removeAttachment, openAttachment } from './image_composer.js';
+import { SVGO } from './svg_open.js';
 
 /** What the composer says when the server still refuses the target after the list was read again: the page's view of this agent is out of date (#10813). */
 const TARGET_CHANGED_MESSAGE = 'This agent was restarted or renamed, so your message was not sent. Reload the page, then send it again.';
@@ -449,9 +450,9 @@ export function renderQuickActions() {
 
     const modeInfo = _modeLabelInfo();
     const modeButtons = `
-        <button class="btn btn-quiet btn-small btn-nav btn-mode" id="btn-mode-toggle" data-on-click="cmd-mode-toggle" data-tooltip="${escapeAttr(modeInfo.tooltip)}" aria-label="${escapeAttr(modeInfo.aria)}"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2h8a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z"/><line x1="6" y1="5" x2="10" y2="5"/><line x1="6" y1="8" x2="10" y2="8"/><line x1="6" y1="11" x2="8" y2="11"/></svg><span class="btn-label">${escapeHtml(modeInfo.label)}</span></button>
-        <button class="btn btn-quiet btn-small btn-nav btn-mode" data-on-click="cmd-quick" data-cmd="!" aria-label="Bash command" data-tooltip="Prefixes your input with ! so Claude runs it as a shell command instead of a prompt."><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h12a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><polyline points="4 7 6 9 4 11"/><line x1="8" y1="11" x2="12" y2="11"/></svg><span class="btn-label">Bash</span></button>
-        <button class="btn btn-quiet btn-small btn-nav btn-mode" data-on-click="cmd-raw-keys" data-keys="Escape,Escape" aria-label="Undo" data-tooltip="Sends two Escape keys to Claude. Interrupts the current response, rejects a pending tool call, or backs out of a permission prompt."><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 2v4h4"/><path d="M3.5 6A5.5 5.5 0 1 1 2.5 8"/></svg><span class="btn-label">Undo</span></button>
+        <button class="btn btn-quiet btn-small btn-nav btn-mode" id="btn-mode-toggle" data-on-click="cmd-mode-toggle" data-tooltip="${escapeAttr(modeInfo.tooltip)}" aria-label="${escapeAttr(modeInfo.aria)}">${SVGO.o0}<path d="M4 2h8a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z"/><line x1="6" y1="5" x2="10" y2="5"/><line x1="6" y1="8" x2="10" y2="8"/><line x1="6" y1="11" x2="8" y2="11"/></svg><span class="btn-label">${escapeHtml(modeInfo.label)}</span></button>
+        <button class="btn btn-quiet btn-small btn-nav btn-mode" data-on-click="cmd-quick" data-cmd="!" aria-label="Bash command" data-tooltip="Prefixes your input with ! so Claude runs it as a shell command instead of a prompt.">${SVGO.o0}<path d="M2 3h12a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><polyline points="4 7 6 9 4 11"/><line x1="8" y1="11" x2="12" y2="11"/></svg><span class="btn-label">Bash</span></button>
+        <button class="btn btn-quiet btn-small btn-nav btn-mode" data-on-click="cmd-raw-keys" data-keys="Escape,Escape" aria-label="Undo" data-tooltip="Sends two Escape keys to Claude. Interrupts the current response, rejects a pending tool call, or backs out of a permission prompt.">${SVGO.o0}<path d="M3.5 2v4h4"/><path d="M3.5 6A5.5 5.5 0 1 1 2.5 8"/></svg><span class="btn-label">Undo</span></button>
     `;
 
     const macroButtons = macros.map((m, i) => {
@@ -483,13 +484,13 @@ export function renderQuickActions() {
         <div class="toolbar-group toolbar-group-nav">
             ${navButtons}
             <div class="toolbar-send-split">
-                <button class="btn btn-primary btn-small btn-nav btn-send" data-on-click="cmd-send" data-tooltip="Sends the text from the input box below to the terminal" aria-label="Send command"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+                <button class="btn btn-primary btn-small btn-nav btn-send" data-on-click="cmd-send" data-tooltip="Sends the text from the input box below to the terminal" aria-label="Send command">${SVGO.o3}<line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
                 <button class="btn btn-primary btn-icon btn-small btn-nav btn-send-dropdown" data-on-click="cmd-send-menu" aria-label="Send options" title="Send options" aria-haspopup="menu" aria-expanded="false">
                     <svg width="8" height="8" viewBox="0 0 16 16" fill="currentColor"><path d="M4 6l4 4 4-4z"/></svg>
                 </button>
                 <div class="menu send-btn-menu" role="menu" aria-label="Send options" style="display:none">
                     <button class="menu-item send-menu-item" role="menuitem" data-on-click="send-menu-send">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                        ${SVGO.o3}<line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
                         Send
                         <span class="send-menu-hint"><kbd>Ctrl</kbd>+<kbd>Enter</kbd></span>
                     </button>
@@ -498,11 +499,11 @@ export function renderQuickActions() {
                         Send + Team Reminder
                     </button>
                     <button class="menu-item send-menu-item" role="menuitem" data-on-click="send-menu-resend">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+                        ${SVGO.o3}<polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
                         Resend Prompt
                     </button>
                     <button class="menu-item send-menu-item" role="menuitem" data-on-click="send-menu-protocol">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="12" y2="16"/></svg>
+                        ${SVGO.o3}<rect x="3" y="3" width="18" height="18" rx="2"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="12" y2="16"/></svg>
                         Send Board Protocol
                     </button>
                 </div>
