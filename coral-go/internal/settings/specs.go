@@ -164,6 +164,11 @@ func init() {
 	boolOff("chief_page", ApplyLive, "Serve /chief, the phone page for the one agent recorded as Chief.")
 	text("chief_team", ApplyLive, "The team the Chief agent is on.")
 	text("chief_session", ApplyLive, "The session id of the Chief agent.")
+	// What Chief looks like (#11796, the Coral dot's front door): a name, a colour of the eight avatar colours and one letter on it, and the team it fronts. Read through chiefLook, which cleans each.
+	register(Spec{Key: "chief_name", Kind: KindText, MaxLen: 40, Apply: ApplyLive, Doc: "The name Chief goes by on /chief."})
+	register(Spec{Key: "chief_avatar", Kind: KindEnum, Values: []string{"1", "2", "3", "4", "5", "6", "7", "8"}, Default: "1", Apply: ApplyLive, Doc: "Which of the eight avatar colours Chief's avatar is."})
+	register(Spec{Key: "chief_avatar_letter", Kind: KindText, MaxLen: 8, Apply: ApplyLive, Doc: "The one letter on Chief's avatar; empty is the first letter of its name."})
+	register(Spec{Key: "chief_fronts", Kind: KindText, MaxLen: 80, Apply: ApplyLive, Doc: "The team Chief fronts, as the Operator names it."})
 	register(Spec{Key: ChiefActions, Kind: KindEnum, Values: []string{ChiefAsksFirst, ChiefActs}, Default: ChiefAsksFirst, Apply: ApplyLive, Doc: "What Chief may do without asking: ask_first (Default permission mode, the default) or act (Accept edits; a shell command still asks). Applies when Chief restarts."})
 	boolOff("home_editions_hidden", ApplyClient, "Hide the editions card on Home.")
 

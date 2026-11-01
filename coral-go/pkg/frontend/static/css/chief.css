@@ -1,0 +1,18 @@
+/* Chief's avatar (chief_look.js, #11796): a circle in one of the eight avatar tokens with a letter on it, in the header of /chief, in Settings > Chief, and (as a pseudo-element, from --chief-color and --chief-letter) beside each of Chief's chat bubbles. */
+.chief-avatar { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 28px; height: 28px; border-radius: 50%; background: var(--avatar-1); color: var(--on-avatar); font-size: var(--fs-sm); font-weight: var(--fw-strong); line-height: 1; margin-right: 8px; vertical-align: middle; }
+.chief-avatar[data-color="2"] { background: var(--avatar-2); } .chief-avatar[data-color="3"] { background: var(--avatar-3); } .chief-avatar[data-color="4"] { background: var(--avatar-4); }
+.chief-avatar[data-color="5"] { background: var(--avatar-5); } .chief-avatar[data-color="6"] { background: var(--avatar-6); } .chief-avatar[data-color="7"] { background: var(--avatar-7); } .chief-avatar[data-color="8"] { background: var(--avatar-8); }
+body[data-chief="true"] .chat-bubble.assistant { position: relative; margin-left: 36px; }
+body[data-chief="true"] .chat-bubble.assistant::before { content: var(--chief-letter, "C"); position: absolute; left: -36px; top: 2px; display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; background: var(--chief-color, var(--avatar-1)); color: var(--on-avatar); font-size: var(--fs-sm); font-weight: var(--fw-strong); }
+.chief-setup { display: grid; gap: 12px; }
+.chief-setup-intro { margin: 0; color: var(--text-secondary); }
+.chief-preview { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 0; }
+.chief-preview .chief-avatar { margin-right: 0; width: 40px; height: 40px; font-size: var(--fs-lg); }
+.chief-preview-name { font-weight: var(--fw-strong); }
+.chief-preview-fronts { color: var(--text-secondary); }
+.chief-swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+.chief-swatch { width: 44px; height: 44px; border-radius: 50%; border: 2px solid transparent; background: var(--avatar-1); cursor: pointer; padding: 0; }
+.chief-swatch[data-color="2"] { background: var(--avatar-2); } .chief-swatch[data-color="3"] { background: var(--avatar-3); } .chief-swatch[data-color="4"] { background: var(--avatar-4); }
+.chief-swatch[data-color="5"] { background: var(--avatar-5); } .chief-swatch[data-color="6"] { background: var(--avatar-6); } .chief-swatch[data-color="7"] { background: var(--avatar-7); } .chief-swatch[data-color="8"] { background: var(--avatar-8); }
+.chief-swatch[aria-checked="true"] { border-color: var(--text-primary); box-shadow: 0 0 0 2px var(--bg-primary); }
+.chief-model { margin: 0; color: var(--text-secondary); }

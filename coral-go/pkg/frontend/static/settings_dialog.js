@@ -23,6 +23,7 @@ export async function showSettingsModal(group) {
     importOnce('./terminal_backend.js').then(m => m.loadTerminalBackendRow()).catch(() => {}); // #3634
     importOnce('./worktrees_panel.js').then(m => m.loadWorktrees()).catch(() => {}); // the kept worktrees, in Storage and cleanup (#6743)
     importOnce('./security_settings.js').then(m => m.loadSecurityRow()).catch(() => {}); // #3948
+    if (!isCloud()) importOnce('./chief_setup.js').then(m => m.mountChiefSetup(document.getElementById('settings-chief-host'))).catch(() => {}); // Settings > Chief: one screen (#11796); the hub has none
     const s = state.settings || {};
     // What this dialog opens with: Save sends only the fields that end up different from it.
     setSettingsAtOpen({ ...s });

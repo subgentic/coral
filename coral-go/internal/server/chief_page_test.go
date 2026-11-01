@@ -144,13 +144,13 @@ func TestChiefStateThroughCoralHubIsTheOwnersAlone(t *testing.T) {
 
 	code, out, _ := call(ownerStamp)
 	assert.Equal(t, http.StatusOK, code)
-	assert.Equal(t, map[string]any{"enabled": true, "session_id": chiefSID, "team": "chief"}, out, "the owner is told the recorded Chief")
+	assert.Equal(t, map[string]any{"enabled": true, "session_id": chiefSID, "team": "chief", "name": "", "avatar": "1", "avatar_letter": "", "fronts": ""}, out, "the owner is told the recorded Chief")
 
 	// the same checks as the local page, on every request
 	elsewhere := "somewhere-else"
 	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: chiefSID, AgentType: "claude", AgentName: "chief", WorkingDir: t.TempDir(), BoardName: &elsewhere}))
 	_, out, _ = call(ownerStamp)
-	assert.Equal(t, map[string]any{"enabled": true, "session_id": "", "team": ""}, out, "the recorded session is no longer on the recorded team: no agent")
+	assert.Equal(t, map[string]any{"enabled": true, "session_id": "", "team": "", "name": "", "avatar": "1", "avatar_letter": "", "fronts": ""}, out, "the recorded session is no longer on the recorded team: no agent")
 	require.NoError(t, ss.SetSetting(ctx, "chief_page", "false"))
 	_, out, _ = call(ownerStamp)
 	assert.Equal(t, map[string]any{"enabled": false, "session_id": "", "team": ""}, out, "setting off: not enabled, nothing named")
@@ -274,4 +274,53 @@ func TestChiefBoardIDIsTheRecordedLiveSessionsBoardWhileThePageIsOn(t *testing.T
 		set("chief_team", "chief team")
 		require.Equal(t, "", srv.chiefBoardID(ctx), "not another spelling")
 	}
+}
+
+// Chief's face (#11796): what the Operator chose is cleaned before anything shows it: a name at most 40 characters with no control or direction-changing character, one of the eight colours,
+// one letter or digit (upper-cased), the team it fronts.
+func TestChiefLookCleansWhatTheOperatorChose(t *testing.T) {
+	long := strings.Repeat("a", 60)
+	for name, c := range map[string]struct {
+		in   map[string]string
+		want ChiefLook
+	}{
+		"nothing chosen":                              {map[string]string{}, ChiefLook{Avatar: "1"}},
+		"a plain look":                                {map[string]string{"chief_name": " Chief ", "chief_avatar": "5", "chief_avatar_letter": "k", "chief_fronts": "Dev team"}, ChiefLook{"Chief", "5", "K", "Dev team"}},
+		"a colour that is not one of the eight":       {map[string]string{"chief_avatar": "9"}, ChiefLook{Avatar: "1"}},
+		"a colour written as words":                   {map[string]string{"chief_avatar": "red"}, ChiefLook{Avatar: "1"}},
+		"a name cut at 40":                            {map[string]string{"chief_name": long}, ChiefLook{Name: long[:40], Avatar: "1"}},
+		"a reordering mark and a control are dropped": {map[string]string{"chief_name": "Ch‮ie\x00f"}, ChiefLook{Name: "Chief", Avatar: "1"}},
+		"a letter that is a symbol is not one":        {map[string]string{"chief_avatar_letter": "<"}, ChiefLook{Avatar: "1"}},
+		"only the first letter counts":                {map[string]string{"chief_avatar_letter": "ab"}, ChiefLook{Avatar: "1", Letter: "A"}},
+	} {
+		t.Run(name, func(t *testing.T) { assert.Equal(t, c.want, chiefLook(c.in)) })
+	}
+}
+
+func TestChiefStateCarriesTheLookWhileThePageIsOn(t *testing.T) {
+	cfg := newE2EConfig(t, t.TempDir())
+	db, err := storetest.Open(t, cfg.DBPath)
+	require.NoError(t, err)
+	t.Cleanup(func() { db.Close() })
+	stack := newTermStack(t)
+	srv := newTestServer(t, cfg, db, stack.backend, stack.terminal)
+	ss := store.NewSessionStore(db)
+	ctx := context.Background()
+	get := func() map[string]any {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/api/chief", nil)
+		req.Host, req.RemoteAddr = "127.0.0.1:8420", "127.0.0.1:50000"
+		srv.Router().ServeHTTP(rec, req)
+		var out map[string]any
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &out))
+		return out
+	}
+	require.NoError(t, ss.SetSetting(ctx, "chief_name", "Ada"))
+	assert.NotContains(t, get(), "name", "the page is off: nothing of the look is given")
+	require.NoError(t, ss.SetSetting(ctx, "chief_page", "true"))
+	for k, v := range map[string]string{"chief_avatar": "3", "chief_avatar_letter": "x", "chief_fronts": "Dev team"} {
+		require.NoError(t, ss.SetSetting(ctx, k, v))
+	}
+	out := get()
+	assert.Equal(t, []any{"Ada", "3", "X", "Dev team"}, []any{out["name"], out["avatar"], out["avatar_letter"], out["fronts"]})
 }

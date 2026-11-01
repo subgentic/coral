@@ -360,10 +360,6 @@ export function _fillFilesAndGit(s) {
     const gitDiffSelect = document.getElementById("settings-git-diff-mode");
     if (gitDiffSelect) gitDiffSelect.value = s.git_diff_mode || 'previous_commit';
 
-    // Chief's actions (#11798): unset is Ask first.
-    const chiefActionsSelect = document.getElementById("settings-chief-actions");
-    if (chiefActionsSelect) chiefActionsSelect.value = s.chief_actions === 'act' ? 'act' : 'ask_first'; // anything else is Ask first, never a wider mode
-
     // Git scan interval, in seconds; "0" means the user scans manually.
     const gitPollSelect = document.getElementById("settings-git-poll-interval");
     if (gitPollSelect) {
