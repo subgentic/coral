@@ -129,3 +129,23 @@ func TestMergeCustomPutsThemAfterTheCLIsModelsAndKeepsTheInputs(t *testing.T) {
 	assert.Equal(t, []string{"a", "b"}, MergeCustomValues([]string{"a"}, "gemini", []Custom{{Family: "agy", Value: "b"}, {Family: "agy", Value: "a"}, {Family: "claude", Value: "c"}}))
 	assert.Equal(t, []string{}, MergeCustomValues(nil, "pi", nil))
 }
+
+// OpenCode's custom models (#11727): the family is one a custom model can be added for, takes no levels, is held to the id rule, and is merged into OpenCode's own list after the CLI's (a model the CLI lists too keeps its place).
+func TestOpencodeIsACustomFamilyWithNoLevels(t *testing.T) {
+	assert.Contains(t, CustomFamilies, "opencode")
+	assert.Equal(t, []string{"opencode"}, FamilyTypes("opencode"))
+	assert.Empty(t, FamilyLevels("opencode"), "no levels, as Antigravity")
+	set, err := ValidateCustomSet([]Custom{{Family: "opencode", Value: "acme/house-model-2", DisplayName: "House"}})
+	require.NoError(t, err)
+	require.Len(t, set, 1)
+	_, err = ValidateCustomSet([]Custom{{Family: "opencode", Value: "acme/m", DisplayName: "x", Efforts: []string{"high"}}})
+	assert.Error(t, err, "levels are refused")
+	_, err = ValidateCustomSet([]Custom{{Family: "opencode", Value: "--help", DisplayName: "x"}})
+	assert.Error(t, err, "a flag-shaped id is refused")
+	merged := MergeCustom([]Model{{Value: "opencode/big-pickle", DisplayName: "Big Pickle"}, {Value: "acme/house-model-2", DisplayName: "Theirs"}}, "opencode", set)
+	require.Len(t, merged, 2, "one the CLI lists too keeps its place")
+	assert.Equal(t, "opencode/big-pickle", merged[0].Value)
+	assert.True(t, merged[1].Custom)
+	assert.Equal(t, "House", merged[1].DisplayName, "and takes the operator's name")
+	assert.Empty(t, MergeCustomValues(nil, "claude", set), "another family's list has none of it")
+}
