@@ -8,6 +8,7 @@ import { importOnce } from './import_once.js';
 
 import { UPDATED_KEY } from './update_flag.js';
 import { pollEvery } from './overload.js';
+import { el as mk } from './dom_el.js';
 const { RESUME_KEY, idleInstallWords, RELEASES_REPO, RELEASES_URL, ACT_INSTALL, ACT_RELAUNCH, releaseNotesUrl, installsLocally, reasonText, requestInstall, requestRelaunch } = await importOnce('./update_api.js');
 
 // After the confirm the dialog is a spinner and one line (the Operator, #11152): none of the per-install details. Windows alone adds what it will be asked, the one thing that is not Coral's doing.
@@ -15,7 +16,6 @@ const INSTALLING = 'Coral is installing the update and will restart.';
 const INSTALLING_WIN = 'Windows will ask for your permission (the usual admin prompt).';
 const STATE_WORDS = { working: 'working', idle: 'idle', waiting: 'waiting for you' };
 
-const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 
 // What happens to each agent after the restart (the server's `after`, by auto_wake's rule), in words: one per agent, and the summary's. "asks" and "stays_asleep" hold for all of them or none.
 const settingOff = 'Wake agents after a restart is off in Settings > Terminal';

@@ -5,6 +5,7 @@
  * names are written by agents. */
 import { compactFigure, formatCost, noDataWords, costDigits } from './format.js';
 import { watchScrollCue } from './scroll_cue.js';
+import { el } from './dom_el.js';
 
 export const METRICS = [
     { key: 'cost_usd', label: 'Cost', fmt: v => formatCost(v, { zeroAsTwo: true }), table: 'cost_usd' },
@@ -20,7 +21,6 @@ export const TOP = 7;
 const STEP_MS = { '5m': 300000, '1h': 3600000, '1d': 86400000 };
 const STEP_WORD = { '5m': 'each 5 minutes', '1h': 'each hour', '1d': 'each day' };
 
-const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 const svg = (tag, attrs, text) => { const e = document.createElementNS('http://www.w3.org/2000/svg', tag); for (const k in attrs || {}) e.setAttribute(k, attrs[k]); if (text != null) e.textContent = text; return e; };
 
 // ── pure: the axis and the series ───────────────────────────────────────

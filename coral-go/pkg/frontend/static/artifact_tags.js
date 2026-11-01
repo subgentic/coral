@@ -4,9 +4,9 @@
  * everything is built with textContent. Lazy: the Artifacts page, the preview pane and the Inbox import it. */
 import { boardFetch } from './server_base.js';
 import { importOnce } from './import_once.js';
+import { el as mk } from './dom_el.js';
 const { STARTER, MAX_TAGS, MAX_LEN, normalizeTag } = await importOnce('./artifact_tag_rules.js');
 
-const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 
 /** Replaces the tags of one stored file; resolves to the tags the server kept, rejects with its words. */
 async function putTags(project, hex, tags) {

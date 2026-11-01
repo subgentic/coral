@@ -4,6 +4,7 @@ import { importOnce } from './import_once.js';
 import { state } from './state.js';
 import { sessionTeamKey } from './server_base.js';
 import { isTerminalToggleKey } from './terminal_leave_key.js';
+import { el } from './dom_el.js';
 
 // The list is the one place that names the keys, in the person's own: a Mac shows Cmd and Option, any other computer Ctrl and Alt (#10579). Each row is [keys, what, group]; the group is the heading it sits under in the dialog (#11246).
 const SHORTCUT_GROUPS = ['Navigation', 'Chat', 'Search', 'Dialogs'];
@@ -33,7 +34,6 @@ const onMac = () => /Mac|iPhone|iPad/i.test((navigator.userAgentData && navigato
 const inMessageBox = t => t instanceof Element && t.id === 'command-input';
 const dialogOpen = () => [...document.querySelectorAll('.modal-overlay, [role="dialog"]')].some(d => d.getClientRects().length > 0 && getComputedStyle(d).display !== 'none');
 
-const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 
 /** The dialog's body: a heading and a list for each group, a row being the keys (<dt>, one <kbd> chip a key) beside what they do (<dd>). */
 function buildShortcuts(mac = onMac()) {

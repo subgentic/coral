@@ -5,12 +5,12 @@ import { plural } from './format.js';
 import { importOnce } from './import_once.js';
 import { copyText, showToast } from './utils.js';
 import { isCloud } from './server_base.js';
-import { mountSettingsView } from './settings_view.js'; // the pane's rows (a startup module: the Settings rows draw from it)
+import { mountSettingsView } from './settings_view.js';
+import { el as mk } from './dom_el.js'; // the pane's rows (a startup module: the Settings rows draw from it)
 const { actName, releaseNotesUrl, RELEASES_REPO, ageTier, canStart, installsLocally, notAvailable, reasonText, notReadyText, foundText, fetchHubRelaunch, requestCheckNow, savePrefs, saveChannel, saveAutoInstall, serverHas } = await importOnce('./update_api.js');
 const { HUB_RELAUNCH_ON, HUB_RELAUNCH_OFF, HUB_RELAUNCH_WINDOWS } = await importOnce('./update_words.js');
 const { failureNotice, getUpdateStatus, refreshUpdateStatus, relaunchOffered } = await importOnce('./update_ui.js');
 
-const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 
 let hubOn = null; // the hub switch as the server has it (GET /api/cloud/status), null when unknown
 const body = () => document.getElementById('update-pane-body');

@@ -2,13 +2,13 @@
  * It is a native <dialog> opened with showModal(): Escape closes it, Tab stays inside, and the focus goes back to the button that opened it. The message is ONE line to the agent (the server delivers it through board.OneLine),
  * so it is normalised the same way as it is sent. A refusal is said in the dialog and the dialog stays open. */
 import { importOnce } from './import_once.js';
+import { el as mk } from './dom_el.js';
 const { oneLine } = await importOnce('./reminder_dialog.js'); // a lazy module loads the others it needs through importOnce, so a failed load is retried
 
 export const REPEATS = [[0, "Don't repeat", ''], [1800, 'Every 30 minutes', 'every 30 minutes'], [3600, 'Every hour', 'every hour'], [14400, 'Every 4 hours', 'every 4 hours'], [86400, 'Every day', 'every day']];
 const DEFAULT_MESSAGE = 'Check your tasks and the board, then carry on.';
 const MAX_MESSAGE = 1000;
 
-const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 let dialog = null;
 const close = () => { if (dialog && dialog.open) dialog.close(); };
 

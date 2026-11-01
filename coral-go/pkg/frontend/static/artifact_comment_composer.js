@@ -1,9 +1,9 @@
 // The comment composer: the form that writes a new comment, a reply or an edit (split out of attachComments, #8379).
 import { importOnce } from './import_once.js';
+import { el } from './dom_el.js';
 const api = await importOnce('./artifact_comments_api.js');
 
 const BODY_MAX = 8192; // the server's cap on a comment (bytes; most text is one byte a character)
-const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 const btn = (cls, text, label) => { const b = el('button', 'btn ' + cls, text); b.type = 'button'; if (label) b.setAttribute('aria-label', label); return b; };
 
 /** The forms of one comments panel: `st` is the panel's state (`st.composing` is what is being written), `run` does a change and redraws, `ownHex` names the version a comment lives on. */

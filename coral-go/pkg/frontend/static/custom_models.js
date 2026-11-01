@@ -3,7 +3,8 @@
  * show them. The form edits a draft and Apply saves it with the rest of Settings (applyCustomModels), the same way the update switches are saved. The server checks every id and level again; the
  * id rule here only lets the form say what is wrong before the save. */
 import { requestJson } from './api.js';
-import { mountSettingsView } from './settings_view.js'; // the add and edit form (a startup module)
+import { mountSettingsView } from './settings_view.js';
+import { el as mk } from './dom_el.js'; // the add and edit form (a startup module)
 
 const ROUTE = '/api/custom-models';
 const PROVIDERS = [['claude', 'Claude'], ['codex', 'Codex'], ['agy', 'Antigravity'], ['pi', 'Pi']];
@@ -22,7 +23,6 @@ let editing = null;       // { provider, index } while a form is open (index -1:
 let host = null;
 let loaded = false;
 
-const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 const clone = (o) => JSON.parse(JSON.stringify(o));
 const label = (p) => (PROVIDERS.find(([k]) => k === p) || [p, p])[1];
 const rows = (p) => (Array.isArray(draft[p]) ? draft[p] : (draft[p] = []));

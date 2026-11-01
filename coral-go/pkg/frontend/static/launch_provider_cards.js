@@ -8,6 +8,7 @@ import { importOnce } from './import_once.js';
 import { modelName } from './model_labels.js';
 import { copyText } from './utils.js';
 import { loadStyles } from './lazy_styles.js';
+import { el } from './dom_el.js';
 
 await loadStyles('provider_cards.css'); // the cards' rules are not in the start's stylesheet: they arrive before the first card is drawn (#11403)
 const { _getDefaultModels } = await importOnce('./launch_models.js');
@@ -35,7 +36,6 @@ async function probe(server, type) {
     } catch { return { found: null }; }
 }
 
-const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 
 export async function buildProviderCards({ group, form, server, implicitDefault }) {
     const select = form && form.querySelector('.acf-agent-type');

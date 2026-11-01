@@ -8,12 +8,12 @@ import { showConfirmModal } from './confirm_dialog.js';
 import { isCloud } from './server_base.js';
 import { importOnce } from './import_once.js';
 import { signOutThisBrowser } from './local_store.js';
+import { el } from './dom_el.js';
 
 // Lazy modules, awaited here so a retried load of this file re-imports them through importOnce (import_hygiene).
 const { passwordProblem, timeMs, timeLeft, ageText } = await importOnce('./password_rules.js');
 const { postJson, sendJson, passwordField, usernameStub, strengthMeter, errorText, showSetPasswordModal } = await importOnce('./password_ui.js');
 
-const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 
 async function getJson(url) {
     const r = await fetch(url, { credentials: 'same-origin', cache: 'no-store' });

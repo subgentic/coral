@@ -5,7 +5,7 @@
 const ALL = 'all';
 let seq = 0;
 
-const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+import { el } from './dom_el.js';
 
 /** The "@query" the cursor is at the end of (at the start of the text or after a space), or null. */
 function mentionQuery(text, cursor) {

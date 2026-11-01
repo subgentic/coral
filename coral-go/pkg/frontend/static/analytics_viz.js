@@ -4,10 +4,10 @@
  * names are written by agents. */
 
 import { importOnce } from './import_once.js';
+import { el } from './dom_el.js';
 const { dataTable, tableState } = await importOnce('./data_table.js'); // the shared table (#7743)
 const SVG = 'http://www.w3.org/2000/svg';
 const SVG_PATTERN = 'pat' + 'tern'; // the SVG element's name, written in two parts: the icon scanner (icon_names.mjs) reads a lone word in quotes as a Material icon's name
-const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 const sv = (tag, attrs = {}, text) => { const e = document.createElementNS(SVG, tag); for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, String(v)); if (text != null) e.textContent = text; return e; };
 export { el };
 

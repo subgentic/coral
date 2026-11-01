@@ -17,6 +17,7 @@ import { state } from './state.js';
 import { boardKeyName, sessionTeamKey, contextServer } from './server_base.js';
 import { browserLocal } from './safe_storage.js';
 import { boardOfPage } from './dock_page.js';
+import { el } from './dom_el.js';
 
 const OPEN_KEY = 'coral-artifact-comments-open'; // explicit choice shared by the viewer and docked preview, at every width
 
@@ -27,7 +28,6 @@ export function commentBoard(opts) {
     return key ? boardKeyName(key) : undefined;
 }
 
-const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 const btn = (cls, text, label) => { const b = el('button', 'btn ' + cls, text); b.type = 'button'; if (label) b.setAttribute('aria-label', label); return b; };
 const KIND = { owner: 'owner', hub: 'Coral Hub', agent: 'agent' };
 

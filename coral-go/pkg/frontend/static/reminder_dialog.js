@@ -1,4 +1,5 @@
 import { plural } from './format.js';
+import { el as mk } from './dom_el.js';
 /* The dialog that starts a periodic reminder (#6329): the instruction to send (for an agent) and how often, with the checks said next to the field. It replaces window.prompt, which the native app
  * does not support. It is a native <dialog> opened with showModal(), so it sits above the Team view dialog it is opened from (the top layer), Escape closes it, Tab stays inside and focus goes back to
  * the button that opened it.
@@ -8,7 +9,6 @@ const REMINDER_MIN_SECONDS = 30;
 const REMINDER_MAX_SECONDS = 86400;
 const MAX_MESSAGE = 1000;
 
-const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 let dialog = null;
 
 /** The instruction as the server will deliver it (board.OneLine): control characters, line and paragraph separators become a space, runs of spaces collapse, the ends are trimmed (trim=false keeps them: a text still being typed). */
