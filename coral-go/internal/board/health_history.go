@@ -24,7 +24,7 @@ func (s *Store) ClaimToDoneDurations(ctx context.Context, project string) (map[s
 	}
 	if err := s.reader().SelectContext(ctx, &rows, `SELECT COALESCE(completed_by, assigned_to) AS agent, claimed_at, completed_at FROM board_tasks
 		WHERE board_id = ? AND status = 'completed' AND claimed_at IS NOT NULL AND completed_at IS NOT NULL AND COALESCE(completed_by, assigned_to) IS NOT NULL
-		ORDER BY completed_at DESC LIMIT ?`, project, historyScan); err != nil {
+		ORDER BY completed_at DESC, id DESC LIMIT ?`, project, historyScan); err != nil {
 		return nil, err
 	}
 	out := map[string][]time.Duration{}
