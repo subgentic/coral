@@ -81,6 +81,7 @@ const STUB = `(() => {
             await shot(`proposals-needs-${view.w}-${view.theme}`);
             // opening the row shows the whole body as text, read first; Edit and approve in it opens the words to change
             const rowOf = name => `[...document.querySelectorAll('${T} tbody tr')].find(tr => tr.querySelector('.inbox-review-name').textContent === ${JSON.stringify(name)})`;
+            check(at + "the row's Team cell says the team's name, not its board id (#11895)", await ev(`(() => { const tr = ${rowOf('Ship the beta')}; const t = tr.textContent; return t.includes('Sprout team') && !t.includes('team-a'); })()`));
             await ev(`window.__posts = []; ${rowOf('Ship the beta')}.querySelector('.inbox-review-name').click(); true`);
             await waitFor(`!!document.querySelector('#proposal-dialog[open]')`, at + 'the detail from the row', 5000);
             const detail = await ev(`(() => { const d = document.querySelector('#proposal-dialog'); const f = [...d.querySelectorAll('input, textarea')]; const before = f.slice(0, 3).every(x => x.readOnly); return { posts: window.__posts.length, whole: f[1].value.endsWith('THE END OF IT.') && f[1].value.length === 3000, readonly: before, buttons: [...d.querySelectorAll('.proposal-buttons button')].filter(b => !b.hidden).map(b => b.textContent) }; })()`);
