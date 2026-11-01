@@ -28,6 +28,7 @@
 // An agent doc's name: its file name without .md (README, coral-board, ...).
  const DOC_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
  const INT_RE = /^[1-9][0-9]{0,15}$/;
+ const HEX_RE = /^[0-9a-f]{64}$/i;
 // The team page's tabs, in order (#7453). /team/<name> with no tab is the first.
 export const TEAM_TABS = ['goals', 'agents', 'tasks', 'artifacts', 'knowledge', 'messages']; // the strip's order, left to right and by the arrow keys (the operator's, #8791): Goals, Agents, Tasks, Artifacts, Knowledge, Board; team settings are a popout (#8853), not a tab
 const TEAM_ITEM_TABS = ['goals', 'tasks', 'messages']; // the tabs with an item: /team/<name>/goals/<id>, /team/<name>/tasks/<id> (pages), /team/<name>/messages/<id> (the Board tab scrolled to that message, #7921)
@@ -131,6 +132,13 @@ export function parse(pathname, search = '') {
         }
         case INBOX:
             if (rest.length === 1 && (rest[0] === 'needs' || rest[0] === 'saved' || rest[0] === 'artifacts')) return { view: 'inbox-folder', folder: rest[0] };
+            if (rest[0] === 'needs' && (rest[1] === 'review' || rest[1] === 'ask')) { // one item of Needs you, for a link from a notification (#11797): /inbox/needs/<review|ask>/[@<server>/]<team>/<file id | question id>
+                const kind = rest[1]; rest.splice(0, 2);
+                const t = take();
+                if (t.bad || rest.length !== 2) return null;
+                const team = name(rest[0]), id = decode(rest[1]);
+                return team !== null && id !== null && (kind === 'review' ? HEX_RE : INT_RE).test(id) ? { view: 'inbox-folder', folder: 'needs', need: { kind, ...(t.server ? { server: t.server } : {}), team, id: id.toLowerCase() } } : null;
+            }
             if (rest[0] === 'chats' && rest.length <= 2 && (rest.length === 1 || INBOX_CHATS_RE.test(rest[1]))) return { view: 'inbox-folder', folder: rest.length === 1 || rest[1] === 'all' ? 'chats' : `chats-${rest[1]}` };
             if (rest[0] === 'chats' && rest.length >= 3 && INBOX_CHATS_RE.test(rest[1])) { // a chat on screen in the Inbox: /inbox/chats/<folder>/[@<server>/]<id> (Goal #100, #9549); the folder is the one it opens under
                 const folder = rest[1] === 'all' ? 'chats' : `chats-${rest[1]}`;
@@ -249,6 +257,7 @@ export function build(r) {
         case 'board':
             return `/board/${srvSeg(r.server)}${seg(r.id)}`;
         case 'inbox-folder':
+            if (r.need && r.folder === 'needs') return `/inbox/needs/${r.need.kind}/${srvSeg(r.need.server)}${seg(r.need.team)}/${seg(r.need.id)}`;
             return INBOX_FOLDER_RE.test(String(r.folder)) ? `/inbox/${r.folder === 'needs' || r.folder === 'saved' || r.folder === 'artifacts' ? r.folder : 'chats/' + (r.folder === 'chats' ? 'all' : r.folder.slice(6))}${r.id && String(r.folder).startsWith('chats') ? '/' + srvSeg(r.server) + seg(r.id) : ''}` : '/';
         case 'workflows':
             return r.id ? `/workflows/${r.id}${r.run ? '/runs/' + r.run : ''}` : '/workflows';
