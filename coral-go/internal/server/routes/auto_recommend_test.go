@@ -18,6 +18,7 @@ import (
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/store"
+	"github.com/subgentic/coral/internal/terminalinput"
 )
 
 // Goal #14 (B), design #6550 with Security's #6548: an agent's single-select question is answered with its one clean "(Recommended)" option only when every condition holds.
@@ -587,4 +588,16 @@ func TestRecordMustListThePickedLabelAtThePickedPosition(t *testing.T) {
 	}
 	assert.True(t, newRecRig(t, "0016", recQuestion("Which color?", "Red (Recommended)", "Green")).h.recordHasOption(
 		"00000000-0000-0000-0000-0000000e0016", time.Date(2026, 10, 31, 6, 0, 0, 0, time.UTC), "Which color?", 1, "Red (Recommended)"))
+}
+
+// Security's #6815 for (B), through the shared pre-check: a person's unsent text (a draft a dialog may hide) holds the pick.
+func TestAutoRecommendIsHeldByAPersonsUnsentText(t *testing.T) {
+	r := newRecRig(t, "0017", recQuestion("Which color?", "Red (Recommended)", "Green"))
+	terminalinput.Record(terminalinput.Person, r.pane, terminalinput.Text, "half a reply")
+	t.Cleanup(func() { terminalinput.Record(terminalinput.Person, r.pane, terminalinput.Keys, "C-u") })
+	require.True(t, terminalinput.PersonDraftPending(r.sid))
+	assert.True(t, r.h.noticeWouldHold(r.ctx, r.pane, liveAgent{sid: r.sid, name: r.pane, agentType: "claude", board: r.board}), "the shared pre-check holds")
+	r.passes(10 * time.Minute)
+	assert.Empty(t, r.raw(), "no pick over a person's draft")
+	assert.Empty(t, r.typed())
 }
