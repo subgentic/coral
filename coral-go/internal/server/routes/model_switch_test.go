@@ -65,6 +65,8 @@ func newSwitchRig(t *testing.T, agentType string) *switchRig {
 	stubCLIPaths(t, ss)
 	setSwitchTiming(t, switchTimings{poll: 5 * time.Millisecond, idleWait: 400 * time.Millisecond, modelConfirm: 400 * time.Millisecond, levelConfirm: 600 * time.Millisecond, settle: 20 * time.Millisecond, landWait: 300 * time.Millisecond})
 	rig := &switchRig{server: &testServer{URL: server.URL}, sid: "abcdef01-2222-3333-4444-555555555555", ss: ss, h: h, term: term}
+	// A switch's run is still writing after the state a test waited for is final: the test ends only when it has returned (#11749: the package's goroutine-leak check named it).
+	t.Cleanup(func() { h.modelSwitches.end(rig.sid, "the test ended"); h.modelSwitches.Wait() })
 	rig.name = agentType + "-" + rig.sid
 	work := t.TempDir()
 	term.addSession(rig.name, work)
@@ -754,4 +756,25 @@ func TestAConfirmedSwitchStaysConfirmedAcrossARestartAndAWake(t *testing.T) {
 	r.assistant(t, "high")
 	r.row(t) // the list reads the transcript
 	assert.Equal(t, "high", r.row(t)["thinking_actual"], "a turn recorded after the setting is the transcript's")
+}
+
+// A switch's background run is counted (#11749): Wait returns only when it has, and a pending one is ended by end, so a test (or a shutdown) can wait for it instead of leaving it writing.
+func TestWaitReturnsOnlyWhenAPendingSwitchHasEnded(t *testing.T) {
+	r := newSwitchRig(t, "claude")
+	code, m := r.post(t, map[string]any{"model": "claude-sonnet-5-5"})
+	require.Equal(t, http.StatusAccepted, code, m)
+	r.waitTyped(t, "/model claude-sonnet-5-5")
+	done := make(chan struct{})
+	go func() { r.h.modelSwitches.Wait(); close(done) }()
+	select {
+	case <-done:
+		t.Fatal("Wait returned while the switch was still pending")
+	case <-time.After(100 * time.Millisecond):
+	}
+	r.h.modelSwitches.end(r.sid, "stopped")
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Wait did not return after the switch was ended")
+	}
 }
