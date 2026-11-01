@@ -1,4 +1,4 @@
-// The artifact viewer's picture box (#11702, the operator: a 2740x570 screenshot got a short box sized to its ratio and was drawn at 57% inside it): the box fills the viewer body whatever the picture's shape (wide, tall, small); the
+// The artifact viewer's picture box, and the side preview's and the Before/After diff's (#11702, #11711, the operator: a 2740x570 screenshot got a short box sized to its ratio and was drawn at 57% inside it): the box fills the viewer body whatever the picture's shape (wide, tall, small); the
 // picture sits in its middle at its own size up to the box (a small one is not blown up); zooming pans inside the box and the box does not change size; the wheel and a pinch zoom around the pointer, a drag pans, and the keyboard
 // zooms (+ - 0) and moves (arrows). 1440 and 390. The artifact's bytes are drawn in the page and answered by a stub. Drives Chrome over CDP through agent_view_harness.js.
 const { connect } = require('./agent_view_harness');
@@ -62,6 +62,37 @@ const hexOf = n => String(n).padStart(64, '0');
                 }
                 await ev(`document.querySelector('.artifact-viewer-close').click(); true`);
             }
+        }
+        // the same box in the side file preview and in a Before/After pair (#11711): the pane's own panes, drawn into a box shaped like the preview body and into a two-picture row
+        for (const [w, h, mobile] of [[1440, 900, false], [390, 844, true]]) {
+            await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
+            const m = await ev(`(async () => { const { renderImagePanes } = await import(${S} + 'utils.js'), sizes = ${JSON.stringify(SIZES)};
+                const draw = n => { const [cw, ch] = sizes[n], c = document.createElement('canvas'); c.width = cw; c.height = ch; const g = c.getContext('2d'); g.fillStyle = '#3a6ea5'; g.fillRect(0, 0, cw, ch); return c.toDataURL('image/png'); };
+                const out = {}; const mount = (cls, width, height) => { const box = document.createElement('div'); box.className = cls; box.style.cssText = 'position:fixed;left:0;top:0;z-index:9999;display:flex;flex-direction:column;background:#111;width:' + width + 'px;height:' + height + 'px'; document.body.append(box); return box; };
+                const settle = box => new Promise(r => { const t = setInterval(() => { const ims = [...box.querySelectorAll('img')]; if (ims.every(i => i.complete && i.naturalWidth)) { clearInterval(t); setTimeout(r, 120); } }, 40); });
+                const geo = (box, k) => { const f = box.querySelectorAll('.image-pane-frame')[k], im = f.querySelector('img'), fr = f.getBoundingClientRect(), ir = im.getBoundingClientRect(), b = box.getBoundingClientRect(); return { boxW: b.width, boxH: b.height, frameW: fr.width, frameH: fr.height, imgW: ir.width, imgH: ir.height, natW: im.naturalWidth, centred: Math.abs((ir.left + ir.width / 2) - (fr.left + fr.width / 2)) < 2 && Math.abs((ir.top + ir.height / 2) - (fr.top + fr.height / 2)) < 2 }; };
+                for (const n of ['wide', 'tall', 'small']) { const box = mount('preview-body', 700, 560); renderImagePanes(box, [{ url: draw(n) }]); await settle(box); out['preview-' + n] = geo(box, 0); box.remove(); }
+                for (const n of ['wide', 'small']) { const box = mount('inbox-detail-pane', 460, 900); box.style.height = 'auto'; box.style.display = 'block'; renderImagePanes(box, [{ url: draw(n) }]); await settle(box); const g = geo(box, 0); out['detail-' + n] = { ...g, frameVh: innerHeight }; box.remove(); } // an artifact opened in the Inbox's detail pane or a goal's list has no box of its own around the preview
+                const row = mount('preview-body', 700, 600); renderImagePanes(row, [{ label: 'Before', url: draw('wide') }, { label: 'After', url: draw('wide') }]); await settle(row); out.compare = geo(row, 0); out.compareVh = innerHeight; row.remove();
+                return out; })()`);
+            for (const n of ['wide', 'tall', 'small']) {
+                const g = m['preview-' + n], at = `${w} px, side preview, ${n}: `;
+                check(g.frameW >= g.boxW * 0.95 && g.frameH >= g.boxH * 0.85, at + `the box fills the preview body (all but its caption): ${JSON.stringify(g)}`);
+                check(g.centred, at + 'the picture is in the middle of the box');
+                if (n === 'wide') check(g.imgW >= g.frameW * 0.95, at + `a wide picture fits the box's width: ${Math.round(g.imgW)} of ${Math.round(g.frameW)}`);
+                if (n === 'small') check(g.imgW <= g.natW + 1, at + `a small picture is not blown up: ${Math.round(g.imgW)} of ${g.natW}`);
+            }
+            for (const n of ['wide', 'small']) {
+                const g = m['detail-' + n], at = `${w} px, detail pane, ${n}: `;
+                check(g.frameH >= Math.min(g.frameVh * 0.6, 480) * 0.95 && g.frameW >= g.boxW * 0.9, at + `the picture has a box of its own, not a strip as high as the file: ${JSON.stringify(g)}`);
+                check(g.centred, at + 'the picture is in the middle of the box');
+                if (n === 'wide') check(g.imgW >= g.frameW * 0.9, at + `a wide picture fits the box's width: ${Math.round(g.imgW)} of ${Math.round(g.frameW)}`);
+                if (n === 'small') check(g.imgW <= g.natW + 1, at + `a small picture is not blown up: ${Math.round(g.imgW)} of ${g.natW}`);
+            }
+            const c = m.compare;
+            check(c.frameW >= c.boxW / 2 * 0.85 && c.frameH >= c.boxH * 0.8, `${w} px, Before/After: each box is half the row wide and fills the pane's height (all but the caption), not as high as the picture: ${JSON.stringify(c)}`);
+            check(c.imgW >= c.frameW * 0.9 && c.centred, `${w} px, Before/After: the wide picture fits its box's width and sits in the middle: ${JSON.stringify(c)}`);
         }
     } finally { await client.close(); }
     if (failures.length) { console.error(failures.join('\n')); process.exit(1); }
