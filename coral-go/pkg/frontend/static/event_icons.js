@@ -19,7 +19,7 @@ const TOOL_ICONS = {
 
 // What Coral did for an agent with Auto-accept on (#3182): approved a prompt, paused itself, left one for the user, or
 // turned it off because the agent restarted, resumed or woke; and every time it was turned on or off.
-const AUTO_ACCEPT_EVENTS = ['auto_accept', 'auto_accept_paused', 'auto_accept_skipped', 'auto_accept_cleared', 'auto_accept_enabled', 'auto_accept_disabled', 'auto_recommend'];
+const AUTO_ACCEPT_EVENTS = ['auto_accept', 'auto_accept_paused', 'auto_accept_skipped', 'auto_accept_cleared', 'auto_accept_enabled', 'auto_accept_disabled', 'auto_recommend', 'auto_recommend_notice_not_typed'];
 
 // Filter groups — maps display label to the set of tool_names/event_types it covers
 export const FILTER_GROUPS = [
@@ -55,6 +55,7 @@ const EVENT_ICONS = {
     auto_accept_enabled: { char: '&#xe877;', cls: 'tool-auto-accept-paused', title: 'Auto-accept turned on' },
     auto_accept_disabled: { char: '&#xe034;', cls: 'tool-auto-accept-skipped', title: 'Auto-accept turned off' },
     auto_recommend:      { char: '&#xe877;', cls: 'tool-auto-accept', title: 'Answered with the Recommended option' },
+    auto_recommend_notice_not_typed: { char: '&#xe034;', cls: 'tool-auto-accept-skipped', title: 'The agent was not told Coral answered' },
 };
 
 export function getToolIcon(toolName, eventType) {

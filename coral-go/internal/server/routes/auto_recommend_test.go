@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/subgentic/coral/internal/board"
+	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/store"
 )
 
@@ -160,6 +161,16 @@ type recRig struct {
 
 const recIdle = screenIdleList
 
+// call is the PreToolUse record of a question call started at t0+at, carrying the rig's question and a description (as Claude's AskUserQuestion input does).
+func (r *recRig) call(id, tool string, at time.Duration) pendingTool {
+	return r.callAbout(id, tool, at, r.question)
+}
+
+func (r *recRig) callAbout(id, tool string, at time.Duration, question string) pendingTool {
+	return pendingTool{ToolUseID: id, ToolName: tool, At: r.t0.Add(at), Input: map[string]any{"questions": []any{map[string]any{
+		"question": question, "options": []any{map[string]any{"label": "Red", "description": "A description of the option"}}}}}}
+}
+
 func newRecRig(t *testing.T, sidSuffix, capture string) *recRig {
 	t.Helper()
 	_, h, term, ss := setupSessionsTestServer(t)
@@ -173,7 +184,8 @@ func newRecRig(t *testing.T, sidSuffix, capture string) *recRig {
 	hs.AutoRecommend = board.HealthAutoRecommend{On: true, GraceMin: 3}
 	require.NoError(t, h.bs.SetHealthSettings(r.ctx, r.board, hs))
 	r.rec = NewAutoRecommender(h)
-	h.pending.set(r.sid, pendingTool{ToolUseID: r.callID, ToolName: "AskUserQuestion", At: r.t0})
+	r.question = parsedQuestion(t, capture).Question
+	h.pending.set(r.sid, r.call(r.callID, "AskUserQuestion", 0))
 	// The pick clears the question; the notice then waits for the CLI's prompt.
 	term.onRaw = func(string) { term.setOutput(r.pane, recIdle) }
 	promptTextDelay = 0
@@ -271,20 +283,20 @@ func TestAutoRecommendNeedsTheLiveQuestionCall(t *testing.T) {
 	// a record of another tool is not a question
 	r2 := newRecRig(t, "0005", recQuestion("Which color?", "Red (Recommended)", "Green"))
 	r2.h.pending.callDone(r2.sid, r2.callID)
-	r2.h.pending.set(r2.sid, pendingTool{ToolUseID: "toolu_bash", ToolName: "Bash", At: r2.t0})
+	r2.h.pending.set(r2.sid, r2.call("toolu_bash", "Bash", 0))
 	r2.passes(10 * time.Minute)
 	assert.Empty(t, r2.raw(), "a Bash call is not a question call")
 
 	// an old record is stale
 	r3 := newRecRig(t, "0006", recQuestion("Which color?", "Red (Recommended)", "Green"))
 	r3.h.pending.callDone(r3.sid, r3.callID)
-	r3.h.pending.set(r3.sid, pendingTool{ToolUseID: "toolu_old", ToolName: "AskUserQuestion", At: r3.t0.Add(-2 * time.Hour)})
+	r3.h.pending.set(r3.sid, r3.call("toolu_old", "AskUserQuestion", -2*time.Hour))
 	r3.passes(10 * time.Minute)
 	assert.Empty(t, r3.raw(), "a record older than the pending-tool limit")
 
 	// two calls in flight: which one is on the screen is not known
 	r4 := newRecRig(t, "0007", recQuestion("Which color?", "Red (Recommended)", "Green"))
-	r4.h.pending.set(r4.sid, pendingTool{ToolUseID: "toolu_q2", ToolName: "request_user_input", At: r4.t0})
+	r4.h.pending.set(r4.sid, r4.call("toolu_q2", "request_user_input", 0))
 	r4.passes(10 * time.Minute)
 	assert.Empty(t, r4.raw())
 }
@@ -293,6 +305,7 @@ func TestAutoRecommendAChangedQuestionStartsTheGraceAgain(t *testing.T) {
 	r := newRecRig(t, "0008", recQuestion("Which color?", "Red (Recommended)", "Green"))
 	r.passes(2*time.Minute + 30*time.Second)
 	r.term.setOutput(r.pane, recQuestion("Which shape?", "Round (Recommended)", "Square"))
+	r.h.pending.set(r.sid, r.callAbout(r.callID, "AskUserQuestion", 0, "Which shape?"))
 	r.pass(3*time.Minute + 15*time.Second)
 	r.pass(3*time.Minute + 30*time.Second)
 	assert.Empty(t, r.raw(), "another ask: the wait starts over")
@@ -330,7 +343,7 @@ func TestAutoRecommendCaps(t *testing.T) {
 	r.passes(4 * time.Minute)
 	require.Equal(t, []string{"1"}, r.raw())
 	r.term.setOutput(r.pane, recQuestion("Which color?", "Red (Recommended)", "Green"))
-	r.h.pending.set(r.sid, pendingTool{ToolUseID: "toolu_q9", ToolName: "AskUserQuestion", At: r.t0.Add(5 * time.Minute)})
+	r.h.pending.set(r.sid, r.call("toolu_q9", "AskUserQuestion", 5*time.Minute))
 	for at := 5 * time.Minute; at <= 12*time.Minute; at += 15 * time.Second {
 		r.pass(at)
 	}
@@ -343,8 +356,9 @@ func TestAutoRecommendCaps(t *testing.T) {
 	for i := 1; i <= 4; i++ {
 		r2.h.pending.callDone(r2.sid, r2.callID)
 		r2.callID = "toolu_" + string(rune('a'+i))
-		r2.h.pending.set(r2.sid, pendingTool{ToolUseID: r2.callID, ToolName: "AskUserQuestion", At: r2.t0.Add(at)})
-		r2.term.setOutput(r2.pane, recQuestion("Question "+string(rune('0'+i))+" or not?", "Red (Recommended)", "Green"))
+		qn := "Question " + string(rune('0'+i)) + " or not?"
+		r2.h.pending.set(r2.sid, r2.callAbout(r2.callID, "AskUserQuestion", at, qn))
+		r2.term.setOutput(r2.pane, recQuestion(qn, "Red (Recommended)", "Green"))
 		for end := at + 4*time.Minute; at <= end; at += 15 * time.Second {
 			r2.pass(at)
 		}
@@ -364,7 +378,7 @@ func TestAutoRecommendTeamCap(t *testing.T) {
 	// the hour passes
 	r.pass(70 * time.Minute)
 	r.pass(70*time.Minute + 15*time.Second)
-	r.h.pending.set(r.sid, pendingTool{ToolUseID: r.callID, ToolName: "AskUserQuestion", At: r.t0.Add(70 * time.Minute)})
+	r.h.pending.set(r.sid, r.call(r.callID, "AskUserQuestion", 70*time.Minute))
 	for at := 71 * time.Minute; at <= 76*time.Minute; at += 15 * time.Second {
 		r.pass(at)
 	}
@@ -417,4 +431,73 @@ func TestCapLabelMakesAnAgentWrittenLabelSafeForAnEvent(t *testing.T) {
 	assert.LessOrEqual(t, len(capLabel(strings.Repeat("é", 500))), autoRecommendLabelMax+len("…"), "the cap, and the ellipsis it adds")
 	assert.True(t, utf8.ValidString(capLabel(strings.Repeat("é", 500))), "cut on a character")
 	assert.Equal(t, "x", capLabel("x\xff"))
+}
+
+// Security's #6773 SHOULD 2: the brake reads every option's description line too, not only the labels.
+func TestRecommendedOptionRefusesARiskWordInADescription(t *testing.T) {
+	clean := recQuestion("Which color?", "Red (Recommended)", "Green")
+	s := parsedQuestion(t, clean)
+	assert.Empty(t, recommendedOption(s, clean).Why)
+	for _, d := range []string{"Drops the table", "Pushes to main", "Uses the SUDO account"} {
+		raw := strings.Replace(clean, "A description of the option", d, 1)
+		assert.NotEmpty(t, recommendedOption(parsedQuestion(t, raw), raw).Why, d)
+		raw2 := strings.Replace(clean, "A description of the option", "fine", 1)
+		raw2 = strings.Replace(raw2, "A description of the option", d, 1) // the other option's description
+		assert.NotEmpty(t, recommendedOption(parsedQuestion(t, raw2), raw2).Why, "second option: "+d)
+	}
+}
+
+// Security's INFO a: the live call's own record must carry the question on the screen, and its descriptions are judged whole.
+func TestRecordMustCarryTheQuestionOnTheScreen(t *testing.T) {
+	assert.True(t, recordMatches(`[{"question":"Which color do you prefer?","options":[]}]`, "Which color do you prefer?"))
+	assert.False(t, recordMatches("", "Which color?"), "a record that kept no questions cannot be compared")
+	assert.False(t, recordMatches(`[{"question":"Which shape?"}]`, "Which color?"), "another question")
+	assert.False(t, recordMatches(`[{"question":"Which color?","options":[{"description":"Drops the table"}]}]`, "Which color?"), "a risk word in a description the screen may not show")
+
+	r := newRecRig(t, "0010", recQuestion("Which color?", "Red (Recommended)", "Green"))
+	r.h.pending.set(r.sid, r.callAbout(r.callID, "AskUserQuestion", 0, "A completely different question"))
+	r.passes(10 * time.Minute)
+	assert.Empty(t, r.raw(), "the screen shows a question the call did not ask")
+}
+
+// Security's #6773 SHOULD 1: the same pre-check as the dialog timeout (notices paused, a person's send in flight, a draft at the last skip).
+func TestAutoRecommendPicksNothingWhenTheNoticeWouldBeHeld(t *testing.T) {
+	r := newRecRig(t, "0011", recQuestion("Which color?", "Red (Recommended)", "Green"))
+	ptymanager.PauseNotices(r.sid, time.Hour)
+	r.passes(10 * time.Minute)
+	assert.Empty(t, r.raw(), "notices are paused for this agent: no pick")
+	assert.Empty(t, r.typed())
+}
+
+// A notice that is not typed after a pick is an agent event and the team line says so.
+func TestAutoRecommendSaysWhenTheAgentWasNotTold(t *testing.T) {
+	r := newRecRig(t, "0012", recQuestion("Which color?", "Red (Recommended)", "Green"))
+	// the moment the pick is sent the terminal stops being the agent's foreground program, so the gate refuses the notice
+	r.term.onRaw = func(string) {
+		r.term.setOutput(r.pane, recIdle)
+		r.h.terminal = noticeGateRig{mockSessionTerminal: r.term, why: "the terminal's foreground program is not the agent"}
+	}
+	r.passes(4 * time.Minute)
+	require.Equal(t, []string{"1"}, r.raw())
+	var told bool
+	for _, e := range r.allEvents(t) {
+		told = told || e.EventType == "auto_recommend_notice_not_typed"
+	}
+	assert.True(t, told, "the agent event")
+	res, err := r.h.bs.QueryMessages(r.ctx, &board.MessageQuery{Project: r.board, Limit: 20})
+	require.NoError(t, err)
+	var line string
+	for _, m := range res.Messages {
+		if strings.Contains(m.Content, "NOT told") {
+			line = m.Content
+		}
+	}
+	assert.Contains(t, line, "auto_recommend_notice_not_typed")
+}
+
+func (r *recRig) allEvents(t *testing.T) []store.AgentEvent {
+	t.Helper()
+	evs, err := r.h.ts.ListAgentEvents(r.ctx, r.pane, 50, nil)
+	require.NoError(t, err)
+	return evs
 }

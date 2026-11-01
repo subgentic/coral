@@ -1,7 +1,9 @@
 package routes
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"log/slog"
 	"regexp"
 	"strconv"
@@ -49,8 +51,8 @@ const (
 // autoRecommendTools are the tools whose call is a question to the person; nothing else binds a pick.
 var autoRecommendTools = []string{"AskUserQuestion", "request_user_input", "ask_question"}
 
-// autoRecommendRisk is the brake: a question or label with one of these as a whole word is not answered.
-var autoRecommendRisk = regexp.MustCompile(`(?i)\b(delete|force|overwrite|deploy|production|push|publish|send|pay|credentials|token|secret|sudo|rm)\b`)
+// autoRecommendRisk is the brake: a question, label or description with one of these words (with its endings) is not answered. A word list is bypassable by wording: a brake, not a boundary.
+var autoRecommendRisk = regexp.MustCompile(`(?i)\b(delet\w*|forc(e|es|ed|ing)|overwr\w+|deploy\w*|production|push\w*|publish\w*|send\w*|sent|pay\w*|paid|credentials?|tokens?|secrets?|sudo|rm|drop\w*|destroy\w*|wipe\w*|erase\w*|truncat\w*)\b`)
 
 const recommendedSuffix = "(Recommended)"
 
@@ -86,6 +88,11 @@ func recommendedOption(s promptScreen, text string) recommendation {
 	}
 	if autoRecommendRisk.MatchString(s.Question) {
 		return no("the question holds a risk word")
+	}
+	if risky, located := riskBelowQuestion(text, s.Question); !located {
+		return no("the question is not found on the screen")
+	} else if risky {
+		return no("a description or label holds a risk word")
 	}
 	pick := -1
 	mentions := 0
@@ -145,6 +152,27 @@ func rowMayWrap(text string, o promptOption) bool {
 		}
 	}
 	return width == 0 || row < 0 || row >= width-8
+}
+
+// riskBelowQuestion looks for a risk word in every line of the dialog from the question's last row down: the labels and the description lines under them. located is false when the question's
+// last row is not on the screen.
+func riskBelowQuestion(text, question string) (risky, located bool) {
+	last := strings.Fields(question)
+	if len(last) == 0 {
+		return false, false
+	}
+	tail := strings.Join(last[max(0, len(last)-4):], " ") // the last words of the question: its last row, wherever the terminal broke it
+	lines := strings.Split(strings.ReplaceAll(text, "\r", ""), "\n")
+	at := -1
+	for i, l := range lines {
+		if strings.Contains(strings.Join(strings.Fields(l), " "), tail) {
+			at = i
+		}
+	}
+	if at < 0 {
+		return false, false
+	}
+	return autoRecommendRisk.MatchString(strings.Join(lines[at:], "\n")), true
 }
 
 // hiddenChar reports a Unicode format (Cf: bidi, zero-width) or control (Cc) character.
@@ -230,6 +258,35 @@ func (h *SessionsHandler) liveQuestionCall(sessionID string, now time.Time) stri
 	return ids[0]
 }
 
+// liveQuestion is liveQuestionCall and the questions that call's PreToolUse record carried (as the text the agent wrote, "" when the record kept none).
+func (h *SessionsHandler) liveQuestion(sessionID string, now time.Time) (call, questions string) {
+	call = h.liveQuestionCall(sessionID, now)
+	if call == "" {
+		return "", ""
+	}
+	if t, ok := h.pending.get(sessionID, now); ok && t.ToolUseID == call {
+		if q, has := t.Input["questions"]; has {
+			var b bytes.Buffer
+			enc := json.NewEncoder(&b)
+			enc.SetEscapeHTML(false)
+			if enc.Encode(q) == nil {
+				questions = b.String()
+			}
+		}
+	}
+	return call, questions
+}
+
+// recordMatches reports whether the live call's own questions carry the question on the screen, and nothing in them is a risk word (they hold the descriptions whole). A record that kept no
+// questions (too long to keep, or a tool that sends none) cannot be compared: no pick.
+func recordMatches(questions, onScreen string) bool {
+	if questions == "" || autoRecommendRisk.MatchString(questions) {
+		return false
+	}
+	squeeze := func(x string) string { return strings.Join(strings.Fields(x), " ") }
+	return strings.Contains(squeeze(questions), squeeze(onScreen))
+}
+
 // withinWindow keeps the times that are still inside the cap window.
 func withinWindow(ts []time.Time, now time.Time) []time.Time {
 	out := ts[:0:0]
@@ -303,14 +360,15 @@ func (r *AutoRecommender) pass(ctx context.Context, a liveAgent, screen promptSc
 		r.unbind(a.sid)
 		return
 	}
-	_, _, text, err := r.h.readPromptScreenText(ctx, a.name, a.agentType, a.sid)
+	pane := naming.SessionName(a.agentType, a.sid)
+	_, _, text, err := r.h.readPromptScreenText(ctx, pane, a.agentType, a.sid)
 	rec := recommendedOption(screen, text)
 	if err != nil || rec.Why != "" || screen.AskID == "" {
 		r.unbind(a.sid)
 		return
 	}
-	call := r.h.liveQuestionCall(a.sid, now)
-	if call == "" {
+	call, questions := r.h.liveQuestion(a.sid, now)
+	if call == "" || !recordMatches(questions, screen.Question) {
 		r.unbind(a.sid)
 		return
 	}
@@ -341,7 +399,7 @@ func (r *AutoRecommender) pick(ctx context.Context, a liveAgent, b recBound, now
 	if !h.bs.GetHealthSettings(ctx, a.board).AutoRecommend.On {
 		return
 	}
-	screen, shown, text, err := h.readPromptScreenText(ctx, a.name, a.agentType, a.sid)
+	screen, shown, text, err := h.readPromptScreenText(ctx, pane, a.agentType, a.sid)
 	if err != nil || !shown || screen.AskID != b.ask {
 		return
 	}
@@ -349,14 +407,15 @@ func (r *AutoRecommender) pick(ctx context.Context, a liveAgent, b recBound, now
 	if rec.Why != "" || rec.N < 1 || rec.N > len(screen.Options) || screen.Options[rec.N-1].N != rec.N {
 		return
 	}
-	if h.liveQuestionCall(a.sid, now) != b.call {
+	if call, questions := h.liveQuestion(a.sid, now); call != b.call || !recordMatches(questions, screen.Question) {
 		return
 	}
 	if h.personPresent(a.sid, now) {
 		return
 	}
-	// The notice is part of the contract: if the gate would hold it (the CLI is not the foreground program, a shell, a terminal agent), nothing is picked.
-	if automatedInputBlocked(ctx, h.terminal, pane, a.agentType, a.sid, "recommended-pick notice") {
+	// The notice is part of the contract, as for the dialog timeout (the same pre-check): if the gate would hold it for any reason but the dialog itself (notices paused, a person typing or sending,
+	// a draft at the last skip, the CLI not the foreground program), nothing is picked.
+	if h.noticeWouldHold(ctx, pane, a) {
 		return
 	}
 	if _, capped := r.capped(a.sid, a.board, b.ask, now); capped {
@@ -382,19 +441,24 @@ func (r *AutoRecommender) pick(ctx context.Context, a liveAgent, b recBound, now
 	if ls, err := h.ss.GetLiveSession(ctx, a.sid); err == nil && ls != nil && ls.DisplayName != nil {
 		who = noticeName(*ls.DisplayName, nil) // cleaned: capped, no @
 	}
-	if _, err := h.bs.PostSystemMessage(ctx, a.board, board.CoralSender, "[Coral] "+who+"'s question was answered with the option it marked Recommended (the operator's setting; nobody was at the terminal).", nil); err != nil {
-		slog.Warn("auto-recommend: the team line failed", "board", a.board, "error", err)
-	}
 	h.kickWS()
 
-	// The notice is typed through the normal gate once the question is gone; not under the lock, and bounded.
+	// The notice is typed through the normal gate once the question is gone; not under the lock, and bounded. The team line says whether the agent was told: an agent that was not still read
+	// "the person answered" in its own log.
 	r.notices.Add(1)
 	go func() {
 		defer r.notices.Done()
 		nctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), autoRecommendNoticeWait)
 		defer cancel()
-		if err := deliverAutomated(nctx, h.terminal, pane, a.agentType, a.sid, autoRecommendNotice, "recommended-pick notice"); err != nil {
+		delivery, err := deliverAutomatedOutcome(nctx, h.terminal, pane, a.agentType, a.sid, autoRecommendNotice, "recommended-pick notice", nil)
+		line := "[Coral] " + who + "'s question was answered with the option it marked Recommended (the operator's setting; nobody was at the terminal). The agent was told so."
+		if err != nil || delivery != ptymanager.Sent {
 			slog.Warn("auto-recommend: the notice was not typed", "session", a.sid, "error", err)
+			recordAutoAcceptEvent(nctx, h.ts, a.name, a.sid, "auto_recommend_notice_not_typed", "The agent was not told that Coral answered its question", "", map[string]any{"agent_type": a.agentType})
+			line = "[Coral] " + who + "'s question was answered with the option it marked Recommended (the operator's setting; nobody was at the terminal). The agent was NOT told (auto_recommend_notice_not_typed): its own log reads as if a person answered."
+		}
+		if _, err := h.bs.PostSystemMessage(nctx, a.board, board.CoralSender, line, nil); err != nil {
+			slog.Warn("auto-recommend: the team line failed", "board", a.board, "error", err)
 		}
 	}()
 }
