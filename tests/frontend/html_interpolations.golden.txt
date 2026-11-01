@@ -2,11 +2,10 @@
 1	agent_config_form.js	agentHTML
 1	agent_config_form.js	autoPermissionsHTML
 1	agent_config_form.js	body
-4	agent_config_form.js	flagsInput
+1	agent_config_form.js	flagsInput
 1	agent_config_form.js	modelPickerHtml()
 1	agent_config_form.js	nameHTML
 1	agent_config_form.js	permEditorHTML(false)
-3	agent_config_form.js	permEditorHTML(true)
 1	agent_config_form.js	presetHTML
 1	agent_config_form.js	thinkingPickerHtml()
 1	agent_config_form.js	title
@@ -203,6 +202,10 @@
 2	group_cards.js	_chevron(boardName, boardCollapsed)
 2	group_cards.js	_collapseAttrs(collapsed)
 1	group_cards.js	_collapseAttrs(wfCollapsed)
+2	group_cards.js	_mk0
+2	group_cards.js	_mk1
+2	group_cards.js	_mk2
+2	group_cards.js	_mk3
 2	group_cards.js	_pinMenuItem(groupName, groupDirRaw)
 2	group_cards.js	_rowNameWithServer(boardName)
 2	group_cards.js	_rowNameWithServer(groupName)
@@ -337,6 +340,8 @@
 4	session_rows.js	SVGO.o2
 2	session_rows.js	SVGO.o4
 2	session_rows.js	_archiveItem
+2	session_rows.js	_mk0
+2	session_rows.js	_mk1
 1	session_rows.js	agentNameColor(s) ? ` style="--agent-name-color:${agentNameColor(s)}"` : ''
 1	session_rows.js	attentionClass
 1	session_rows.js	autoAcceptChip(s)

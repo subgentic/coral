@@ -13,6 +13,10 @@ import { localFirst } from './server_status.js';
 import { killAllItem, deleteTeamItem, teamHealthBtn, _rowNameWithServer, _boardAccentStyle, _pinMenuItem, FOLDER_GROUP_ICON } from './list_card_parts.js';
 import { _pinMatchesFilter } from './list_filter_match.js';
 import { SVGO } from './svg_open.js';
+const _mk0 = "<line x1=\"4\" y1=\"4\" x2=\"12\" y2=\"12\"/><line x1=\"12\" y1=\"4\" x2=\"4\" y2=\"12\"/></svg>\n                    Kill All\n                </button>";
+const _mk1 = "<rect x=\"2\" y=\"3\" width=\"12\" height=\"10\" rx=\"1.5\"/><polyline points=\"5 7 7 9 5 11\"/><line x1=\"9\" y1=\"11\" x2=\"11\" y2=\"11\"/></svg>\n                    <span class=\"menu-item-text\">Add Terminal<span class=\"menu-item-hint\">Opens a shell in this folder</span></span>\n                </button>\n                <hr class=\"overflow-menu-divider\">\n                ";
+const _mk2 = "<path d=\"M8 13V3\"/><path d=\"M4 9l4 4 4-4\"/></svg>\n                    Move Down\n                </button>\n                ";
+const _mk3 = "<rect x=\"5.5\" y=\"5.5\" width=\"8\" height=\"8\" rx=\"1.5\"/><path d=\"M5.5 10.5h-1a1.5 1.5 0 0 1-1.5-1.5v-5a1.5 1.5 0 0 1 1.5-1.5h5a1.5 1.5 0 0 1 1.5 1.5v1\"/></svg></button>";
 
 // Team-first mode: one team as a card: its header, its menu and its agents.
 function _renderTeamCard(boardName, boardSessions) {
@@ -159,11 +163,7 @@ function _renderFolderGroup(groupName, groupSessions) {
                     <span class="menu-item-text">Add Custom Agent<span class="menu-item-hint">Choose its persona, prompt and permissions first</span></span>
                 </button>
                 <button class="menu-item overflow-menu-item" data-on-click="folder-add-terminal" data-dir="${escapeAttr(groupDirRaw)}" data-server="${escapeAttr(splitKey(groupName).server)}">
-                    ${SVGO.o0}<rect x="2" y="3" width="12" height="10" rx="1.5"/><polyline points="5 7 7 9 5 11"/><line x1="9" y1="11" x2="11" y2="11"/></svg>
-                    <span class="menu-item-text">Add Terminal<span class="menu-item-hint">Opens a shell in this folder</span></span>
-                </button>
-                <hr class="overflow-menu-divider">
-                ${_pinMenuItem(groupName, groupDirRaw)}
+                    ${SVGO.o0}${_mk1}${_pinMenuItem(groupName, groupDirRaw)}
                 <button class="menu-item overflow-menu-item" data-on-click="folder-tag" data-group="${escapeAttr(groupName)}">
                     ${SVGO.o0}<path d="M2 8.5V3a1 1 0 0 1 1-1h5.5l5.5 5.5-5.5 5.5L2 8.5z"/><circle cx="5.5" cy="5.5" r="1" fill="currentColor" stroke="none"/></svg>
                     Manage Tags
@@ -173,19 +173,14 @@ function _renderFolderGroup(groupName, groupSessions) {
                     Move Up
                 </button>
                 <button class="menu-item overflow-menu-item" data-on-click="group-move" data-group="${escapeAttr(groupName)}" data-dir="down">
-                    ${SVGO.o0}<path d="M8 13V3"/><path d="M4 9l4 4 4-4"/></svg>
-                    Move Down
-                </button>
-                ${sorted.length ? `<button class="menu-item menu-item-danger overflow-menu-item overflow-menu-danger" data-on-click="group-kill" data-group="${escapeAttr(groupName)}">
-                    ${SVGO.o1}<line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/></svg>
-                    Kill All
-                </button>` : ''}
+                    ${SVGO.o0}${_mk2}${sorted.length ? `<button class="menu-item menu-item-danger overflow-menu-item overflow-menu-danger" data-on-click="group-kill" data-group="${escapeAttr(groupName)}">
+                    ${SVGO.o1}${_mk0}` : ''}
             </div>
         </div>`;
         const fTags = getFolderTags(groupName);
         const tagDots = renderFolderTagPills(fTags);
         const groupWorkDir = groupDirRaw;
-        const copyBtn = `<button class="btn btn-quiet btn-icon btn-xs folder-copy-btn" data-on-click="folder-copy" data-dir="${escapeAttr(groupWorkDir)}" title="Copy path">${SVGO.o4}<rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M5.5 10.5h-1a1.5 1.5 0 0 1-1.5-1.5v-5a1.5 1.5 0 0 1 1.5-1.5h5a1.5 1.5 0 0 1 1.5 1.5v1"/></svg></button>`;
+        const copyBtn = `<button class="btn btn-quiet btn-icon btn-xs folder-copy-btn" data-on-click="folder-copy" data-dir="${escapeAttr(groupWorkDir)}" title="Copy path">${SVGO.o4}${_mk3}`;
         html += `<li class="session-group-header" data-group-name="${escapeAttr(groupName)}" data-on-click="group-collapse" data-group="${escapeAttr(groupName)}"${_collapseAttrs(collapsed)}>${CHEVRON_DECO}
             <div class="group-header-text"><div class="group-name-line">${FOLDER_GROUP_ICON}<span class="group-name-text" title="${escapeAttr(keyLabel(groupName))}">${_rowNameWithServer(groupName)}</span>${countBadge}</div></div>${tagDots}<span class="session-name-spacer"></span>${copyBtn}${groupKebab}</li>`;
 
@@ -215,11 +210,7 @@ function _renderFolderFirstGroup(groupName, groupSessions) {
                     <span class="menu-item-text">Add Custom Agent<span class="menu-item-hint">Choose its persona, prompt and permissions first</span></span>
                 </button>
                 <button class="menu-item overflow-menu-item" data-on-click="folder-add-terminal" data-dir="${escapeAttr(groupDirRaw)}" data-server="${escapeAttr(splitKey(groupName).server)}">
-                    ${SVGO.o0}<rect x="2" y="3" width="12" height="10" rx="1.5"/><polyline points="5 7 7 9 5 11"/><line x1="9" y1="11" x2="11" y2="11"/></svg>
-                    <span class="menu-item-text">Add Terminal<span class="menu-item-hint">Opens a shell in this folder</span></span>
-                </button>
-                <hr class="overflow-menu-divider">
-                ${_pinMenuItem(groupName, groupDirRaw)}
+                    ${SVGO.o0}${_mk1}${_pinMenuItem(groupName, groupDirRaw)}
                 <button class="menu-item overflow-menu-item" data-on-click="folder-tag" data-group="${escapeAttr(groupName)}">
                     ${SVGO.o0}<path d="M2 8.5V3a1 1 0 0 1 1-1h5.5l5.5 5.5-5.5 5.5L2 8.5z"/><circle cx="5.5" cy="5.5" r="1" fill="currentColor" stroke="none"/></svg>
                     Manage Tags
@@ -229,19 +220,14 @@ function _renderFolderFirstGroup(groupName, groupSessions) {
                     Move Up
                 </button>
                 <button class="menu-item overflow-menu-item" data-on-click="group-move" data-group="${escapeAttr(groupName)}" data-dir="down">
-                    ${SVGO.o0}<path d="M8 13V3"/><path d="M4 9l4 4 4-4"/></svg>
-                    Move Down
-                </button>
-                ${sorted.length ? `<button class="menu-item menu-item-danger overflow-menu-item overflow-menu-danger" data-on-click="group-kill" data-group="${escapeAttr(groupName)}">
-                    ${SVGO.o1}<line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/></svg>
-                    Kill All
-                </button>` : ''}
+                    ${SVGO.o0}${_mk2}${sorted.length ? `<button class="menu-item menu-item-danger overflow-menu-item overflow-menu-danger" data-on-click="group-kill" data-group="${escapeAttr(groupName)}">
+                    ${SVGO.o1}${_mk0}` : ''}
             </div>
         </div>`;
         const fTags = getFolderTags(groupName);
         const tagDots = renderFolderTagPills(fTags);
         const groupWorkDir = groupDirRaw;
-        const copyBtn = `<button class="btn btn-quiet btn-icon btn-xs folder-copy-btn" data-on-click="folder-copy" data-dir="${escapeAttr(groupWorkDir)}" title="Copy path">${SVGO.o4}<rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M5.5 10.5h-1a1.5 1.5 0 0 1-1.5-1.5v-5a1.5 1.5 0 0 1 1.5-1.5h5a1.5 1.5 0 0 1 1.5 1.5v1"/></svg></button>`;
+        const copyBtn = `<button class="btn btn-quiet btn-icon btn-xs folder-copy-btn" data-on-click="folder-copy" data-dir="${escapeAttr(groupWorkDir)}" title="Copy path">${SVGO.o4}${_mk3}`;
         html += `<li class="session-group-header" data-group-name="${escapeAttr(groupName)}" data-on-click="group-collapse" data-group="${escapeAttr(groupName)}"${_collapseAttrs(collapsed)}>${CHEVRON_DECO}
             <div class="group-header-text"><div class="group-name-line">${FOLDER_GROUP_ICON}<span class="group-name-text" title="${escapeAttr(keyLabel(groupName))}">${_rowNameWithServer(groupName)}</span>${countBadge}</div></div>${tagDots}<span class="session-name-spacer"></span>${copyBtn}${groupKebab}</li>`;
 
