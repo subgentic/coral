@@ -353,6 +353,7 @@
 .inbox-ask-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
 .inbox-ask-buttons .btn { min-height: 44px; }
 .inbox-review-actions { display: flex; flex-wrap: nowrap; justify-content: flex-end; gap: 8px; align-items: center; } /* the star's 20 px is level with the buttons' centre, not their top (#9904); the words end at the row's right edge (#11552) */
+dialog.inbox-deny-dialog { position: fixed; inset: 0; margin: auto; height: fit-content; color: var(--text-primary); } /* centred with the side gutter: the base reset gives every dialog margin 0, which pinned this one to the top left corner (#11621) */
 .inbox-deny, .inbox-deny-confirm { color: var(--error); } /* Deny is red text, never a red fill (#11552) */
 .inbox-row-more { position: relative; display: flex; flex: none; align-items: center; } /* the row's three dots: its menu opens under them */
 .inbox-review-error { grid-column: 1 / -1; white-space: normal; }
