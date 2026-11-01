@@ -409,6 +409,15 @@ func (s *Server) MintLoginToken() (string, error) {
 // StartMachineHealth samples this machine's health every 15 s for the feeds (#3444): Coral's own
 // process, the agents' process trees (the backend's agent processes), the host, the data folder's
 // disk, and the stall watchdog's probe latencies (wd may be nil: the watchdog is off).
+// RunCommentReplyNudges reminds an agent, once, to answer in the thread of an artifact comment that was relayed to it and that it only answered on the board (#11722). It blocks until ctx is done.
+func (s *Server) RunCommentReplyNudges(ctx context.Context) {
+	if s.sessHandler == nil {
+		<-ctx.Done()
+		return
+	}
+	s.sessHandler.RunCommentReplyNudges(ctx)
+}
+
 // AutoWakeAfterRestart wakes the agents that were running when this pty Coral last stopped
 // (#3636); startup calls it once, on pty.
 func (s *Server) AutoWakeAfterRestart(ctx context.Context) {

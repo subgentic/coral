@@ -371,8 +371,8 @@ func TestTheOwnersListCarriesEachThreadsAsksAndNobodyElsesDoes(t *testing.T) {
 		m := a.(map[string]any)
 		byAgent[m["agent"].(string)] = m
 	}
-	assert.Equal(t, map[string]any{"agent": "Dev", "open": true, "replies": float64(1)}, byAgent["Dev"])
-	assert.Equal(t, map[string]any{"agent": "QA", "open": true, "replies": float64(0)}, byAgent["QA"])
+	assert.Equal(t, map[string]any{"agent": "Dev", "open": true, "replies": float64(1), "seen": true, "nudged": false}, byAgent["Dev"], "a reply is seen")
+	assert.Equal(t, map[string]any{"agent": "QA", "open": true, "replies": float64(0), "seen": false, "nudged": false}, byAgent["QA"])
 	assert.Empty(t, asks(cmtAsOwner, other), "a thread nobody was asked into has none")
 	// the reply (a comment of Dev's) carries none either
 	code, list := rig.do("GET", cp(cmtDoc), cmtAsOwner, nil)

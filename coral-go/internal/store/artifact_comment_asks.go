@@ -39,9 +39,12 @@ type ArtifactAsk struct {
 	ExpiresAt    string  `db:"expires_at" json:"expires_at"`
 	ClosedAt     *string `db:"closed_at" json:"closed_at"`
 	Replies      int     `db:"replies" json:"replies"`
+	// SeenAt is when the agent first read the artifact's threads or replied, NudgedAt when Coral reminded it to answer in the thread (#11722).
+	SeenAt   *string `db:"seen_at" json:"seen_at"`
+	NudgedAt *string `db:"nudged_at" json:"nudged_at"`
 }
 
-const artifactAskCols = "id, comment_id, artifact_id, board, agent_session, agent_name, created_at, expires_at, closed_at, replies"
+const artifactAskCols = "id, comment_id, artifact_id, board, agent_session, agent_name, created_at, expires_at, closed_at, replies, seen_at, nudged_at"
 
 func (a ArtifactAsk) open(now time.Time) bool {
 	if a.ClosedAt != nil {
@@ -69,7 +72,7 @@ func (s *SessionStore) CreateArtifactAsk(ctx context.Context, commentID int64, a
 	case err == nil && cur.open(now):
 		return cur, false, tx.Commit()
 	case err == nil:
-		_, err = tx.ExecContext(ctx, `UPDATE artifact_comment_asks SET artifact_id = ?, board = ?, agent_name = ?, created_at = ?, expires_at = ?, closed_at = NULL, replies = 0 WHERE id = ?`,
+		_, err = tx.ExecContext(ctx, `UPDATE artifact_comment_asks SET artifact_id = ?, board = ?, agent_name = ?, created_at = ?, expires_at = ?, closed_at = NULL, replies = 0, seen_at = NULL, nudged_at = NULL WHERE id = ?`,
 			artifactID, board, agentName, now.UTC().Format(ISOFormat), now.Add(AskTTL).UTC().Format(ISOFormat), cur.ID)
 	case errors.Is(err, sql.ErrNoRows):
 		_, err = tx.ExecContext(ctx, `INSERT INTO artifact_comment_asks (comment_id, artifact_id, board, agent_session, agent_name, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -101,8 +104,8 @@ func (s *SessionStore) ReserveAskReply(ctx context.Context, commentID int64, age
 	if replyBytes > MaxAskReplyBytes {
 		return ErrAskReplyTooBig
 	}
-	res, err := s.db.ExecContext(ctx, `UPDATE artifact_comment_asks SET replies = replies + 1 WHERE comment_id = ? AND agent_session = ? AND closed_at IS NULL AND expires_at > ? AND replies < ?`,
-		commentID, agentSession, now.UTC().Format(ISOFormat), MaxAskReplies)
+	res, err := s.db.ExecContext(ctx, `UPDATE artifact_comment_asks SET replies = replies + 1, seen_at = COALESCE(seen_at, ?) WHERE comment_id = ? AND agent_session = ? AND closed_at IS NULL AND expires_at > ? AND replies < ?`,
+		now.UTC().Format(ISOFormat), commentID, agentSession, now.UTC().Format(ISOFormat), MaxAskReplies)
 	if err != nil {
 		return err
 	}
@@ -156,4 +159,35 @@ func (s *SessionStore) HasArtifactAsk(ctx context.Context, artifactID, agentSess
 	var n int
 	err := s.reader().GetContext(ctx, &n, "SELECT COUNT(*) FROM artifact_comment_asks WHERE artifact_id = ? AND agent_session = ? LIMIT 1", artifactID, agentSession)
 	return n > 0, err
+}
+
+// MarkAsksSeen records that the agent session read the threads of the artifact: the first time, on each of its open asks (#11722). The owner's thread then says "seen by <agent>".
+func (s *SessionStore) MarkAsksSeen(ctx context.Context, artifactID, agentSession string, now time.Time) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE artifact_comment_asks SET seen_at = ? WHERE artifact_id = ? AND agent_session = ? AND closed_at IS NULL AND seen_at IS NULL`, now.UTC().Format(ISOFormat), artifactID, agentSession)
+	return err
+}
+
+// AwaitingAsks are the asks still open at now that the agent has not answered (no reply in the thread) and that Coral has not reminded it about, oldest first, at most limit (#11722). Only asks of a session that is
+// live, awake and not archived: an agent that sleeps or is gone cannot be typed into, and its asks must not fill the batch and starve newer ones.
+func (s *SessionStore) AwaitingAsks(ctx context.Context, now time.Time, limit int) ([]ArtifactAsk, error) {
+	var out []ArtifactAsk
+	err := s.reader().SelectContext(ctx, &out, "SELECT "+artifactAskCols+` FROM artifact_comment_asks WHERE closed_at IS NULL AND expires_at > ? AND replies = 0 AND nudged_at IS NULL
+		AND agent_session IN (SELECT session_id FROM live_sessions WHERE COALESCE(is_archived, 0) = 0 AND COALESCE(is_sleeping, 0) = 0 AND agent_type != 'terminal') ORDER BY id LIMIT ?`, now.UTC().Format(ISOFormat), limit)
+	return out, err
+}
+
+// MarkAskNudged records that Coral reminded the agent to answer in the thread, once: a second call changes nothing and says so (false).
+func (s *SessionStore) MarkAskNudged(ctx context.Context, askID int64, now time.Time) (bool, error) {
+	res, err := s.db.ExecContext(ctx, `UPDATE artifact_comment_asks SET nudged_at = ? WHERE id = ? AND nudged_at IS NULL AND replies = 0 AND closed_at IS NULL`, now.UTC().Format(ISOFormat), askID)
+	if err != nil {
+		return false, err
+	}
+	n, _ := res.RowsAffected()
+	return n == 1, nil
+}
+
+// ClearAskNudged takes back MarkAskNudged for a reminder that could not be typed, so the next pass tries it again (#11722).
+func (s *SessionStore) ClearAskNudged(ctx context.Context, askID int64) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE artifact_comment_asks SET nudged_at = NULL WHERE id = ? AND replies = 0`, askID)
+	return err
 }

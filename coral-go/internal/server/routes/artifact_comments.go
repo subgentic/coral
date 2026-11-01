@@ -145,6 +145,9 @@ type commentAskView struct {
 	Agent   string `json:"agent"`
 	Open    bool   `json:"open"`
 	Replies int    `json:"replies"`
+	// Seen: the agent has read the artifact's threads or replied (#11722): the thread says "seen by <agent>". Nudged: Coral reminded it to answer in the thread.
+	Seen   bool `json:"seen"`
+	Nudged bool `json:"nudged"`
 }
 
 type commentAuthor struct {
@@ -341,6 +344,9 @@ func (h *SessionsHandler) listArtifactComments(w http.ResponseWriter, r *http.Re
 	if caller.Kind == commentCallerAgent && !h.agentMayReadComments(r.Context(), caller.Subject, id) {
 		commentRefuse(w, http.StatusForbidden, "not_yours", "an agent reads the comments of an artifact it uploaded or was asked into")
 		return
+	}
+	if caller.Kind == commentCallerAgent { // the asked agent has read the threads: the owner's thread says "seen by" (#11722)
+		_ = h.ss.MarkAsksSeen(r.Context(), id, caller.Subject, time.Now())
 	}
 	state := r.URL.Query().Get("state")
 	switch state {
@@ -871,7 +877,7 @@ func (h *SessionsHandler) attachAsks(ctx context.Context, views []commentView) {
 		}
 		byComment := map[int64][]commentAskView{}
 		for _, a := range asks {
-			byComment[a.CommentID] = append(byComment[a.CommentID], commentAskView{Agent: a.AgentName, Open: a.OpenAt(now), Replies: a.Replies})
+			byComment[a.CommentID] = append(byComment[a.CommentID], commentAskView{Agent: a.AgentName, Open: a.OpenAt(now), Replies: a.Replies, Seen: a.SeenAt != nil, Nudged: a.NudgedAt != nil})
 		}
 		for _, i := range idx {
 			views[i].Asks = byComment[views[i].ID]
