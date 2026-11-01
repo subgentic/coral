@@ -316,8 +316,8 @@ export function toggleAgenticPanel(forceState) {
 
 
 /* The sidebar's panes (#7443): one pane per tab (header, list, pinned action), shown for the tab on screen. The header's parts and the 56 px rail are the same on every tab;
- * what differs is what the search is for, whether the tab has Display options and groups, and its one pinned action. Hide turns the column into the rail; the choice is the
- * tab's own, kept in this browser. */
+ * what differs is what the search is for, whether the tab has Display options and groups, and its one pinned action. Hide turns the column into the rail; the choice is one for
+ * every tab (#11629), kept in this browser. */
 const SIDEBAR_PANES = {
     agents: { search: 'Search agents', action: { name: 'launch-show', label: 'New agent' } },
     history: { search: 'Search chats', action: null },
@@ -328,7 +328,7 @@ const SIDEBAR_PANES = {
 };
 
 const RAIL_KEY = 'coral-sidebar-collapsed-rail'; // the Agents tab's (its name from before the other tabs had one)
-const railKey = pane => pane === 'agents' ? RAIL_KEY : `${RAIL_KEY}-${pane}`;
+const railKey = () => RAIL_KEY; // one choice for every tab (#11629): the person who opened the sidebar in the Inbox found the Agents tab's own remembered choice railing it again; the keys the other tabs had are no longer read
 let currentPane = 'agents';
 
 function applyRail(collapsed) {
