@@ -1302,6 +1302,7 @@ body.panel-dragging .agentic-state {
 .image-panes { position: relative; }
 .image-pane-zoomable { overflow: hidden; cursor: grab; touch-action: none; user-select: none; }
 .image-pane-zoomable.panning { cursor: grabbing; }
+.image-pane-zoomable:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; } /* the keyboard zooms and moves the picture (#11702) */
 .image-pane-zoomable img { transform-origin: center; will-change: transform; }
 .image-zoom-controls {
     position: absolute;
