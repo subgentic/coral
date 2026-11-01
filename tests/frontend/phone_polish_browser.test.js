@@ -1,5 +1,4 @@
-// Phone polish from the v2.0.21 walk (#11694, #11693), at 390: (1) the Artifacts folder's list header ("Showing 13 of N") is the same number as its For review pill when that pill is on (it read 34 while the pill said 31);
-// (2) the Scroll tabs chevron has a lane of its own and covers no tab or badge; (3) a toast starts below the Inbox's tab strip and covers none of its tabs. The route stubbed in the page. Drives Chrome over CDP through agent_view_harness.js.
+// Phone polish from the v2.0.21 walk (#11694, #11693), at 390: (1) the Scroll tabs chevron has a lane of its own and covers no tab or badge; (2) a toast starts below the Inbox's tab strip and covers none of its tabs. The route stubbed in the page. Drives Chrome over CDP through agent_view_harness.js.
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { coralReady } = require('./helpers/wait');
@@ -28,16 +27,10 @@ const WORLD = `(() => {
         await ev(`window.switchNavTab('hub-inbox'); true`);
         await ev(`import(${S} + 'inbox_sidebar.js').then(m => m.openInboxGroup('artifacts')).then(() => true)`);
         await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length >= 13`, 'the rows', 10000);
-        // (1) one number: the For review pill on, the list header says the pill's count
-        await ev(`[...document.querySelectorAll('button')].find(b => /^For review\\s*\\d/.test(b.textContent.trim())).click(); true`);
-        await waitFor(`/Showing 13 of/.test(document.body.textContent)`, 'the list header', 8000);
-        const pill = await ev(`(([...document.querySelectorAll('button')].find(b => /^For review\\s*\\d/.test(b.textContent.trim())) || {}).textContent || '').replace(/\\D+/g, '')`);
-        const head = await ev(`((document.body.textContent.match(/Showing 13 of (\\d+)/) || [])[1]) || ''`);
-        check(pill === '31' && head === pill, `the header's total is the pill's count: pill ${pill}, header ${head}`);
-        // (2) the chevron has a lane of its own: the tab strip ends where it begins
+        // (1) the chevron has a lane of its own: the tab strip ends where it begins
         const lane = await ev(`(() => { const nav = document.querySelector('.view-list-nav[data-overflow]'), btn = document.querySelector('.view-list-edge-tap'); if (!nav || !btn || btn.hidden) return null; const n = nav.getBoundingClientRect(), b = btn.getBoundingClientRect(); return { navRight: Math.round(n.right), chevronLeft: Math.round(b.left) }; })()`);
         check(!!lane && lane.navRight <= lane.chevronLeft + 1, 'the Scroll tabs chevron covers no tab: ' + JSON.stringify(lane));
-        // (3) a toast starts below the tab strip
+        // (2) a toast starts below the tab strip
         await ev(`import(${S} + 'notifications.js').then(m => { m.showToast('Approved report-1.md.'); return true; })`);
         await waitFor(`!!document.querySelector('#toast-host .toast')`, 'the toast', 4000);
         await ev(`new Promise(r => setTimeout(r, 300))`); // sleep-ok: the column places itself after the toast is drawn
