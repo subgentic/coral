@@ -520,10 +520,9 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 .inbox-review-earlier { flex: none; color: var(--text-muted); font-weight: var(--fw-regular); white-space: nowrap; }
 .inbox-review-earlier::before { content: "\00b7  "; }
 .inbox-needs-results .dt-row.dt-read .inbox-review-from { font-weight: var(--fw-regular); }
-/* The phone's cell is about 230 px: the sender, a name that is at least a thumb wide and "2 earlier versions" do not always fit one line, and the words were cut off at the cell's edge (#11776). The line wraps instead: the name takes what the sender leaves, and the words go under them when there is no room beside. */
-.dt-box.dt-folded .inbox-review-item { flex-wrap: wrap; }
-.dt-box.dt-folded .inbox-review-item > .inbox-review-name { flex: 1 1 0; }
-.dt-box.dt-folded .inbox-review-earlier::before { content: none; }
+/* The phone's cell is narrow: the line wraps so "2 earlier versions" is not cut off (#11776). */
+.dt-folded .inbox-review-item { flex-wrap: wrap; }
+.dt-folded .inbox-review-item > .inbox-review-name { flex: 1 1 0; }
 .inbox-needs-results tr:has(.inbox-review-item) .dt-subtitle { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; white-space: normal; margin-top: 2px; }
 
 /* A column with nothing in it on any row is not drawn (#9846): its head and its cells; the header draws it again when a row has a value. */
