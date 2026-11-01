@@ -1,0 +1,67 @@
+package routes
+
+import (
+	"context"
+	"net/http"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+// #11759 (Security's INFO on #11713): the Orchestrator is the one the team was launched with. A join that claims the role's name or title on a team that already has a holder of it, active or away, is refused; the
+// holder itself may join again; and while the launched Orchestrator is there it is the team's Orchestrator even if another member holds the title.
+func TestAJoinCannotTakeTheOrchestratorSeatWhileTheRealOneIsAway(t *testing.T) {
+	server, h := setupBoardTestServer(t)
+	base := server.URL + "/api/board/seat"
+	ctx := context.Background()
+	// the team was launched with an Orchestrator (the launch marks it can_peek), then that session went away
+	_, err := h.bs.Subscribe(ctx, "seat", "Orchestrator", "Orchestrator", "claude-aaaa", nil, "all", true)
+	require.NoError(t, err)
+	_, err = h.bs.Unsubscribe(ctx, "seat", "Orchestrator")
+	require.NoError(t, err)
+
+	join := func(id, title string) int {
+		resp := postJSON(t, base+"/subscribe", map[string]string{"subscriber_id": id, "job_title": title})
+		defer resp.Body.Close()
+		return resp.StatusCode
+	}
+	assert.Equal(t, http.StatusConflict, join("Dev", "Orchestrator"), "a worker that joins with the title while the real one is away is refused")
+	assert.Equal(t, http.StatusConflict, join("Dev", "Lead orchestrator"), "and with the word anywhere in the title")
+	assert.Equal(t, http.StatusConflict, join("Orchestrator 2", "Agent"), "or in its name")
+	_, err = h.bs.TeamOrchestrator(ctx, "seat")
+	assert.Error(t, err, "nobody else became the Orchestrator")
+
+	assert.Equal(t, http.StatusOK, join("Dev", "Backend Dev"), "a worker with its own role joins as ever")
+	assert.Equal(t, http.StatusOK, join("Orchestrator", "Orchestrator"), "the holder joins again (a restart)")
+	got, err := h.bs.TeamOrchestrator(ctx, "seat")
+	require.NoError(t, err)
+	assert.Equal(t, "Orchestrator", got)
+}
+
+func TestATeamWithNoOrchestratorLetsTheFirstClaimStand(t *testing.T) {
+	server, h := setupBoardTestServer(t)
+	base := server.URL + "/api/board/noseat"
+	resp := postJSON(t, base+"/subscribe", map[string]string{"subscriber_id": "Lead", "job_title": "Orchestrator"})
+	resp.Body.Close()
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	got, err := h.bs.TeamOrchestrator(context.Background(), "noseat")
+	require.NoError(t, err)
+	assert.Equal(t, "Lead", got)
+	resp = postJSON(t, base+"/subscribe", map[string]string{"subscriber_id": "Dev", "job_title": "Orchestrator"})
+	resp.Body.Close()
+	assert.Equal(t, http.StatusConflict, resp.StatusCode, "a second claim is refused")
+}
+
+func TestTheLaunchedOrchestratorIsChosenBeforeAMemberThatHoldsTheTitle(t *testing.T) {
+	_, h := setupBoardTestServer(t)
+	ctx := context.Background()
+	// an older team: a member joined with the title first, the launched one came later
+	_, err := h.bs.Subscribe(ctx, "legacy", "Squatter", "Orchestrator", "claude-bbbb", nil, "mentions")
+	require.NoError(t, err)
+	_, err = h.bs.Subscribe(ctx, "legacy", "Real Orchestrator", "Orchestrator", "claude-cccc", nil, "all", true)
+	require.NoError(t, err)
+	got, err := h.bs.TeamOrchestrator(ctx, "legacy")
+	require.NoError(t, err)
+	assert.Equal(t, "Real Orchestrator", got, "the launched one, not the earlier title-holder")
+}

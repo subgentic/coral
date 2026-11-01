@@ -84,6 +84,19 @@ func (h *BoardHandler) Subscribe(w http.ResponseWriter, r *http.Request) {
 	if body.JobTitle == "" {
 		body.JobTitle = "Agent"
 	}
+	// The Orchestrator is the one the team was launched with, not whoever says so in a join (#11759, Security's INFO on #11713): a join that claims the role's name or title on a team that already has a holder of it, active
+	// or away, is refused. The holder itself may join again (a restart), and a team with none lets the first claim stand.
+	if board.ClaimsOrchestrator(subscriberID, body.JobTitle) {
+		held, err := h.bs.OrchestratorSeatHeldBy(r.Context(), project, subscriberID)
+		if err != nil {
+			errInternalServer(w, err.Error())
+			return
+		}
+		if held != "" {
+			writeError(w, http.StatusConflict, "orchestrator_taken", "this team already has an Orchestrator: join with another role")
+			return
+		}
+	}
 	sub, err := h.bs.Subscribe(r.Context(), project, subscriberID, body.JobTitle, body.SessionName, nil, body.ReceiveMode)
 	if err != nil {
 		errInternalServer(w, err.Error())
