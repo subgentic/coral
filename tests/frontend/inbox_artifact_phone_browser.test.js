@@ -50,6 +50,8 @@ const WORLD = `(() => {
             await ev(`window.switchNavTab('hub-inbox'); true`);
             await ev(`import((window.__coralStatic || '/static/') + 'inbox_sidebar.js').then(m => m.openInboxGroup('artifacts')).then(() => true)`);
             await waitFor(`document.getElementById('group-table-view').dataset.group === 'hub-inbox:artifacts' && document.querySelectorAll('#group-table-view tbody tr').length >= 30 && document.querySelectorAll('#group-table-view tbody .dt-primary').length >= 2`, `${tag}: the rows, and their name buttons`, 10000); // the rows can be there a moment before their buttons are (a slow runner)
+            // the second row's name button, once it has been the same element for 250 ms (QA Reviewer 2, #11692: the list was built twice when the folder count arrived; it no longer is, and a click waits for it to hold still anyway)
+            await waitFor(`(() => { const e = document.querySelectorAll('#group-table-view tbody .dt-primary')[1]; if (!e) { window.__stable = null; return false; } if (!window.__stable || window.__stable.e !== e) window.__stable = { e, at: performance.now() }; return performance.now() - window.__stable.at >= 250; })()`, `${tag}: the second name button holds still`, 10000);
             await ev(`document.querySelectorAll('#group-table-view tbody .dt-primary')[1].click(); true`);
             await waitFor(`(() => { const p = document.querySelector('.inbox-detail-pane'); return !!p && !p.hidden && /alpha-report/.test(p.textContent); })()`, `${tag}: the pane`, 8000);
             await settle(600); await shot(`inbox-artifact-${w}-${theme}`);
