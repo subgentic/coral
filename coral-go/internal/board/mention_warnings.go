@@ -164,6 +164,17 @@ func mentionWarnings(content string, names []string) []string {
 		}
 		rest := content[i+1:]
 		if n := knownLenIn(rest, known); n > 0 {
+			// The mention reached a member, but the text that follows is the rest of a longer name that a member has apart from punctuation at its ends (#11687): it is refused, so the post does not go to the shorter member.
+			if near := nearerMember(rest[:n], rest[n:], display); near != "" {
+				key := "near:" + strings.ToLower(rest[:n]) + "|" + strings.ToLower(near)
+				if !warned[key] {
+					warned[key] = true
+					out = append(out, fmt.Sprintf("'@%s' reaches '%s', but the name that follows is '%s': did you mean '%s'? Use the exact name (the member's name has punctuation at an end), so the post does not go to the wrong member", strings.TrimSpace(rest[:n]), strings.TrimSpace(rest[:n]), near, near))
+					if len(out) == 5 {
+						break
+					}
+				}
+			}
 			i += 1 + n
 			continue
 		}
