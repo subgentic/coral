@@ -3,9 +3,19 @@
 #launch-agent-pick.provider-cards { display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: none; background: none; border: 0; border-radius: 0; margin: 4px 0 0; padding: 0; overflow: visible; }
 .provider-card, .provider-card-body, #launch-agent-pick.provider-cards { min-width: 0; }
 .provider-card-body select, .provider-card-body .acf-model-row, .provider-card-body .acf-model-picker { min-width: 0; max-width: 100%; }
-.provider-card { border: var(--card-border); border-radius: var(--card-radius); background: var(--bg-primary); }
-.provider-card.is-open { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); } /* the open state is the 2 px accent edge, on the card's own surface: the muted text inside keeps 4.5:1 in the light theme (it was 4.4 on a grey fill) */
-.provider-card-head { display: flex !important; flex-direction: row !important; flex-wrap: wrap; align-items: center; gap: 4px 10px; min-height: var(--control-touch-height, 44px); margin: 0; padding: 6px 14px; cursor: pointer; color: var(--text-primary); border-radius: var(--radius-md); } /* (!important: the dialog's labels are a column of text) */
+.provider-missing-entry { border: var(--card-border); border-radius: var(--card-radius); background: var(--bg-primary); } /* a provider this computer lacks: a quiet row, never a tab (#11709) */
+/* Folder tabs (#11709, the operator's browser-tab picture): one tab per agent this computer has, the open one joins its panel (the same surface, no line between, a 3 px accent on top) and holds that agent's Model and Thinking. The tab is the radio: the input is the label's, kept for the keyboard (arrows move and choose). */
+.provider-tabs { display: flex; align-items: flex-end; gap: 2px; margin: 0 0 -1px; padding-inline: 6px; overflow-x: auto; scrollbar-width: none; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); } /* five tabs do not fit a phone: the strip scrolls, and its right edge fades */
+.provider-tabs::-webkit-scrollbar { display: none; }
+.provider-tabs .provider-card-head { position: relative; flex: none; gap: 6px; min-height: var(--control-touch-height, 44px); padding: 0 16px; border: var(--card-border); border-bottom: 0; border-radius: var(--radius-lg) var(--radius-lg) 0 0; background: var(--bg-tertiary); color: var(--text-secondary); font-weight: var(--fw-medium); white-space: nowrap; }
+.provider-tabs .provider-card-head input { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; }
+.provider-tabs .provider-mark, .provider-tabs .provider-status { display: none; } /* the status is the panel's first line */
+.provider-tabs .provider-name { color: inherit; font-weight: inherit; }
+.provider-tabs .provider-card-head.is-open { z-index: 1; background: var(--bg-primary); color: var(--text-primary); font-weight: var(--fw-strong); border-top: 3px solid var(--accent); }
+.provider-panel { border: var(--card-border); border-radius: var(--card-radius); background: var(--bg-primary); }
+.provider-panel:has(> .provider-card-body:not([hidden])) { min-height: 1px; }
+.provider-body-status { margin: 0; padding: 10px 14px 0; color: var(--text-secondary); font-size: var(--fs-sm); }
+.provider-card-head { display: flex !important; flex-direction: row !important; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin: 0; padding: 6px 14px; cursor: pointer; color: var(--text-primary); border-radius: var(--radius-md); } /* (!important: the dialog's labels are a column of text) */
 .provider-card-head:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
 .provider-card-head input { margin: 0; flex: none; width: auto; }
 .provider-mark { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 24px; height: 24px; border-radius: var(--radius-sm); background: var(--bg-tertiary); color: var(--text-primary); font-size: var(--fs-sm); font-weight: var(--fw-strong); }

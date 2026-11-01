@@ -57,7 +57,7 @@ export async function buildProviderCards({ group, form, server, implicitDefault 
     const start = select.value;
     const state = new Map(TYPES.map(([t]) => [t, { found: null, url: '' }])); // found: null until the check answers
     let defaults = {};
-    const cards = new Map();
+    const cards = new Map(), bodies = new Map(); // cards: the tab of each provider (a radio in a label) and the row of each missing one; bodies: the panel of each installed provider (#11709: folder tabs)
     // A provider that must be signed in to a provider of its own (OpenCode, #11364): when the CLI says it is signed in to none, its open card shows the command to run in a terminal (the server's `signin_command`,
     // shown as text, never as markup) with Copy, and Check again asks the CLI itself. Nothing here blocks Launch: the status can be old, and a person may sign in from the agent's own terminal.
     const signin = { type: 'opencode', label: 'OpenCode', signedIn: undefined, command: '' };
@@ -71,7 +71,7 @@ export async function buildProviderCards({ group, form, server, implicitDefault 
         if (group._pickToken === gen) renderSignin();
     }
     function renderSignin() {
-        const box = group.querySelector(`.provider-card[data-type="${signin.type}"] .provider-signin`); if (!box) return;
+        const box = group.querySelector(`.provider-card-body[data-type="${signin.type}"] .provider-signin`); if (!box) return;
         const on = signin.signedIn === false, withCmd = !!signin.command;
         if (withCmd) box.querySelector('.provider-signin-cmd').textContent = signin.command;
         for (const e of box.querySelectorAll('.provider-signin-how, .provider-signin-cmd, .provider-signin-copy')) if (e.hidden === withCmd) e.hidden = !withCmd;
@@ -97,7 +97,7 @@ export async function buildProviderCards({ group, form, server, implicitDefault 
     }
 
     const statusOf = type => { const s = state.get(type); if (s.found === null) return ''; const d = defaults[type]; return d ? `Installed · default ${modelName(type, d, server)}` : 'Installed'; };
-    const noThinking = (card, label) => { const p = card.querySelector('.provider-no-thinking'); if (!p) return; const wrap = thinkingWrap(), known = Array.isArray(form._thinkingLevels); p.hidden = !(card.classList.contains('is-open') && known && wrap && wrap.hidden); p.textContent = `${label} has no thinking levels, so there is nothing to set.`; };
+    const noThinking = (card, label) => { const body = bodies.get(card.dataset.type), p = body && body.querySelector('.provider-no-thinking'); if (!p) return; const wrap = thinkingWrap(), known = Array.isArray(form._thinkingLevels); p.hidden = !(card.classList.contains('is-open') && known && wrap && wrap.hidden); p.textContent = `${label} has no thinking levels, so there is nothing to set.`; };
 
     /** Moving a row blurs what has the focus inside it (the Model field's add form, its select): the provider checks answer late, redraw the cards and move the rows, and Escape then went to the page and not to the form. The focus goes back to what had it. */
     const keepFocus = move => {
@@ -107,7 +107,7 @@ export async function buildProviderCards({ group, form, server, implicitDefault 
     };
     function place() { // the open card holds the Model and Thinking rows; with none open they wait in the hold
         const open = cards.get(typeNow());
-        const into = open && !open.classList.contains('is-missing') ? open.querySelector('.provider-card-body') : hold;
+        const into = open && !open.classList.contains('is-missing') ? bodies.get(open.dataset.type) : hold;
         keepFocus(() => { for (const row of [modelRow, thinkingRow]) if (row && row.parentNode !== into) { const tail = into.querySelector(':scope > .provider-no-thinking'); if (tail) into.insertBefore(row, tail); else into.append(row); } }); // before the "no thinking levels" sentence: it says so under the rows
         // the thinking sentence sits after the rows: the row hides itself when the provider has no levels
         if (open && into !== hold) noThinking(open, TYPES.find(([t]) => t === typeNow())?.[1] || '');
@@ -117,12 +117,15 @@ export async function buildProviderCards({ group, form, server, implicitDefault 
         for (const [type, card] of cards) {
             const on = type === v && !card.classList.contains('is-missing');
             card.classList.toggle('is-open', on);
-            const body = card.querySelector('.provider-card-body'); if (body) body.hidden = !on;
+            if (on && card.isConnected) card.scrollIntoView({ inline: 'nearest', block: 'nearest' }); // five tabs scroll on a phone: the chosen one is always in view
+            const body = bodies.get(type); if (body) body.hidden = !on;
             const r = card.querySelector('input'); if (r) r.checked = on;
         }
         place();
         if (note) { note.hidden = !(v === 'codex' && normServer(server) === LOCAL_SERVER); describeBy(note); }
     }
+
+    const paintStatus = () => { for (const [type, card] of cards) { const st = card.querySelector('.provider-status'), t = statusOf(type); if (st) st.textContent = t; const line = bodies.get(type)?.querySelector('.provider-body-status'); if (line) line.textContent = t ? `${t}` : ''; } };
 
     function draw() {
         keepFocus(() => drawCards());
@@ -130,23 +133,25 @@ export async function buildProviderCards({ group, form, server, implicitDefault 
     function drawCards() {
         for (const row of [modelRow, thinkingRow]) if (row) hold.append(row); // out of the cards before they are replaced
         group.replaceChildren(hold);
-        cards.clear();
+        cards.clear(); bodies.clear();
         const installed = TYPES.filter(([t]) => state.get(t).found !== false), missing = TYPES.filter(([t]) => state.get(t).found === false);
+        const strip = el('div', 'provider-tabs'), panel = el('div', 'provider-panel'); // folder tabs across the top, one per agent; the open tab joins its panel, which holds that agent's Model and Thinking
         for (const [type, label] of installed) {
-            const card = el('div', 'provider-card'); card.dataset.type = type;
-            const head = el('label', 'provider-card-head');
+            const head = el('label', 'provider-card provider-card-head'); head.dataset.type = type;
             const input = el('input'); input.type = 'radio'; input.name = `${group.id}-radios`; input.value = type;
             input.addEventListener('change', () => { if (!input.checked) return; chosen = true; select.value = type; select.dispatchEvent(new Event('change', { bubbles: true })); });
             input.setAttribute('aria-label', label); // the name is the provider's; its status is the description
             const mark = el('span', 'provider-mark', MARKS[type] || label[0]); mark.setAttribute('aria-hidden', 'true');
             const st = el('span', 'provider-status', statusOf(type)); st.id = `${group.id}-st-${type}`;
             head.append(input, mark, el('span', 'provider-name', label), st);
-            const body = el('div', 'provider-card-body'); body.hidden = true;
+            const body = el('div', 'provider-card-body'); body.dataset.type = type; body.hidden = true;
+            const line = el('p', 'provider-body-status sv-hint', statusOf(type)); // the open tab's status, at the top of its panel
             const none = el('p', 'provider-no-thinking sv-hint'); none.hidden = true; none.setAttribute('role', 'status');
-            card.append(head, body); body.append(none);
+            body.append(line, none);
             if (type === signin.type) body.prepend(signinBox());
-            group.append(card); cards.set(type, card);
+            strip.append(head); panel.append(body); cards.set(type, head); bodies.set(type, body);
         }
+        group.append(strip, panel);
         if (missing.length) {
             const sec = el('div', 'provider-missing'); sec.setAttribute('role', 'group');
             const h = el('h5', 'group-head provider-missing-title', 'Not installed'); h.id = `${group.id}-missing`; sec.setAttribute('aria-labelledby', h.id);
@@ -170,7 +175,7 @@ export async function buildProviderCards({ group, form, server, implicitDefault 
     draw();
     group.hidden = false;
     form.classList.add('has-agent-pick'); // the group is the one place that names the provider: the form's own select stays (hidden by css) and follows it (#6407)
-    _getDefaultModels(server).then(d => { if (group._pickToken !== gen) return; defaults = d || {}; for (const [type, card] of cards) { const s = card.querySelector('.provider-status'); if (s) s.textContent = statusOf(type); } }).catch(() => {});
+    _getDefaultModels(server).then(d => { if (group._pickToken !== gen) return; defaults = d || {}; paintStatus(); }).catch(() => {});
     const found = await Promise.all(TYPES.map(([t]) => Promise.race([probe(server, t), new Promise(r => setTimeout(() => r({ found: null }), PROBE_MS))])));
     if (group._pickToken !== gen || !group.isConnected) return; // another New Agent opened meanwhile
     TYPES.forEach(([t], i) => state.set(t, found[i]));
@@ -180,7 +185,7 @@ export async function buildProviderCards({ group, form, server, implicitDefault 
         if (first >= 0) { select.value = TYPES[first][0]; select.dispatchEvent(new Event('change', { bubbles: true })); chosen = false; }
     }
     if (!group.contains(document.activeElement) || !chosen) draw(); // moving a card would drop the keyboard from it: only when nobody is on the group
-    else for (const [type, card] of cards) { const s = card.querySelector('.provider-status'); if (s) s.textContent = statusOf(type); }
+    else paintStatus();
     group.dataset.probed = '1';
     if (state.get(signin.type).found === true) askSignin();
     // a later check of a CLI (Check again, or after Set path and Save) draws its card again from the fresh answer (#10161)
