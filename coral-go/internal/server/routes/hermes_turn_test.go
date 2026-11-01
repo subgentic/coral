@@ -99,7 +99,7 @@ func TestTheRealInterruptNoticesAreRecognised(t *testing.T) {
 		"Operation interrupted: waiting for the provider to recover (cycle 1/5).",
 		"Operation interrupted: retrying API call after error (retry 2/3).",
 	} {
-		screen := "☤ Hermes\n  " + notice + tail
+		screen := strings.Repeat("earlier output\n", 12) + "☤ Hermes\n  " + notice + tail // a real pane is 40 lines: only its last lines count
 		assert.True(t, hermesInterruptedOnScreen(screen), notice)
 	}
 	// the screen of a turn that is going on, with no notice
