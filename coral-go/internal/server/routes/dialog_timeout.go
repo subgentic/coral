@@ -233,6 +233,7 @@ func (h *SessionsHandler) dialogTimeout(ctx context.Context, a liveAgent, after 
 		return timeoutNotDue
 	}
 	if terminalinput.PersonDraftPending(a.sid) {
+		h.postDialogLine(ctx, a, dialogLineLeftAlone, first, now, func(w dialogWork) string { return dialogLeftAloneLine(w, int(now.Sub(first)/time.Minute)) })
 		return timeoutUnsentText // left alone: a close would go over a person's unsent text, and the notice could not follow
 	}
 	if h.personPresent(a.sid, now) {

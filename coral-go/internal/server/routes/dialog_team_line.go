@@ -17,9 +17,10 @@ import (
 // agent's cleaned name, its task and goal numbers, and the minutes; nothing the agent or anyone wrote.
 
 const (
-	dialogLineWaiting = "dialog-line-waiting"
-	dialogLineClosed  = "dialog-line-closed"
-	dialogLineSender  = "Coral Task Queue"
+	dialogLineWaiting   = "dialog-line-waiting"
+	dialogLineClosed    = "dialog-line-closed"
+	dialogLineLeftAlone = "dialog-line-left-alone"
+	dialogLineSender    = "Coral Task Queue"
 )
 
 // dialogWork is what waits with the agent: its task in progress on the board and that task's goal (0 when there is none).
@@ -77,6 +78,11 @@ func dialogClosedLine(w dialogWork, minutes int, how, outcome string) string {
 		told = fmt.Sprintf("The agent was NOT told (%s): it does not know to post its question. Tell it on the board, or look at its terminal.", outcome)
 	}
 	return fmt.Sprintf("[Coral health] Coral closed %s's dialog after %d min (%s); %s goes on. %s", w.name, minutes, how, w.waitsFor(), told)
+}
+
+// dialogLeftAloneLine is the line for a dialog the timeout left alone because a person has unsent text in the agent's terminal (Security's #6815).
+func dialogLeftAloneLine(w dialogWork, minutes int) string {
+	return fmt.Sprintf("[Coral health] Coral left %s's dialog alone after %d min: unsent text in its terminal. %s waits for a person at their terminal.", w.name, minutes, w.waitsFor())
 }
 
 // postDialogClosedLine posts the closed line, for a close that was sent only: a close that failed left the dialog, and the waiting line already told the team.
