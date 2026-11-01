@@ -88,6 +88,15 @@ type HealthAutoRecommend struct {
 	GraceMin int  `json:"grace_min"`
 }
 
+// Problem is what is wrong with the setting as a user saves it, in words for them, or "". A grace the body does not carry (0) is the default and is not a problem; one outside 1 to
+// AutoRecommendGraceMax is refused, as the dialog timeout's wait is, and not quietly changed.
+func (a HealthAutoRecommend) Problem() string {
+	if a.GraceMin != 0 && (a.GraceMin < 1 || a.GraceMin > AutoRecommendGraceMax) {
+		return fmt.Sprintf("auto_recommend.grace_min: %d is outside 1 to %d minutes", a.GraceMin, AutoRecommendGraceMax)
+	}
+	return ""
+}
+
 // AutoRecommendGraceDefault and AutoRecommendGraceMax: the grace stays under the dialog timeout's own minimum (10 minutes), so a question is never closed before it could have been answered.
 const (
 	AutoRecommendGraceDefault = 3

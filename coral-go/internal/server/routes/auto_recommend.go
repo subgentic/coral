@@ -271,6 +271,9 @@ func (h *SessionsHandler) liveQuestion(sessionID string, now time.Time) (call, q
 	}
 	if t, ok := h.pending.get(sessionID, now); ok && t.ToolUseID == call {
 		if q, has := t.Input["questions"]; has {
+			if hiddenIn(q) { // the ConPTY capture drops zero-width characters, so the record's own labels are the second place to see them
+				return call, ""
+			}
 			var b bytes.Buffer
 			enc := json.NewEncoder(&b)
 			enc.SetEscapeHTML(false)
@@ -280,6 +283,27 @@ func (h *SessionsHandler) liveQuestion(sessionID string, now time.Time) (call, q
 		}
 	}
 	return call, questions
+}
+
+// hiddenIn reports a Unicode format (Cf) or control (Cc) character in any string of a decoded JSON value.
+func hiddenIn(v any) bool {
+	switch x := v.(type) {
+	case string:
+		return hiddenChar(x)
+	case []any:
+		for _, e := range x {
+			if hiddenIn(e) {
+				return true
+			}
+		}
+	case map[string]any:
+		for k, e := range x {
+			if hiddenChar(k) || hiddenIn(e) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // recordMatches reports whether the live call's own questions carry the question on the screen, and nothing in them is a risk word (they hold the descriptions whole). A record that kept no
