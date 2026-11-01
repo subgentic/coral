@@ -70,6 +70,7 @@ func (h *SessionsHandler) opencodeDialogTimeout(ctx context.Context, a liveAgent
 	}
 	if !h.waitOpencodeGone(ctx, a.sid, req.ID) {
 		h.recordDialogClosed(ctx, a, req.At, now, dialogDeclined, timeoutNoBox)
+		h.postDialogClosedLine(ctx, a, req.At, now, dialogDeclined, timeoutNoBox)
 		return timeoutNoBox
 	}
 	time.Sleep(promptSettle)
@@ -80,6 +81,7 @@ func (h *SessionsHandler) opencodeDialogTimeout(ctx context.Context, a liveAgent
 			outcome = timeoutDone
 		}
 		h.recordDialogClosed(ctx, a, req.At, now, dialogDeclined, outcome)
+		h.postDialogClosedLine(ctx, a, req.At, now, dialogDeclined, outcome)
 		return outcome
 	})
 }

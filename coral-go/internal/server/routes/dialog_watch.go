@@ -7,6 +7,7 @@ import (
 	"time"
 
 	at "github.com/subgentic/coral/internal/agenttypes"
+	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/ptr"
 	"github.com/subgentic/coral/internal/terminalinput"
 )
@@ -155,7 +156,8 @@ func (h *SessionsHandler) dialogPass(ctx context.Context, now time.Time) {
 		if ctx.Err() != nil {
 			return
 		}
-		if _, _, timeout := h.dialogMinutes(ctx, a.board); timeout > 0 {
+		hs, onTeam := h.teamHealth(ctx, a.board)
+		if _, _, timeout := dialogMinutesOf(hs, onTeam); timeout > 0 {
 			h.opencodeDialogTimeout(ctx, a, timeout, now)
 		}
 	}
@@ -177,8 +179,12 @@ func (h *SessionsHandler) dialogPass(ctx context.Context, now time.Time) {
 		if err != nil { // a screen that cannot be read says nothing: not a dialog, and not a cleared one either
 			continue
 		}
-		after, notify, timeout := h.dialogMinutes(ctx, a.board)
+		hs, onTeam := h.teamHealth(ctx, a.board)
+		after, notify, timeout := dialogMinutesOf(hs, onTeam)
 		h.dialogs.observe(a.sid, screen, shown, now, after, notify)
+		if onTeam && shown {
+			h.dialogWaitingTeamLine(ctx, a, hs, now) // the team is told which task and goal wait (dialog_team_line.go)
+		}
 		if timeout > 0 && shown {
 			h.dialogTimeout(ctx, a, timeout, now) // the team's dialog timeout (dialog_timeout.go): only for an agent on a team board that turned it on
 		}
@@ -191,10 +197,22 @@ type liveAgent struct{ sid, name, agentType, board string }
 // dialogMinutes is how long an agent may wait at a dialog (always atDialogMinutes), whether its team has the notice on (held_notice.On; an agent on no board has it on), and the team's
 // dialog timeout: 0 when it is off or the agent is on no board (the notice it would type tells the agent to ask on the board).
 func (h *SessionsHandler) dialogMinutes(ctx context.Context, project string) (int, bool, time.Duration) {
+	return dialogMinutesOf(h.teamHealth(ctx, project))
+}
+
+// teamHealth is the health settings of the agent's team, read once per agent and pass; false when it is on no board.
+func (h *SessionsHandler) teamHealth(ctx context.Context, project string) (board.HealthSettings, bool) {
 	if h.bs == nil || project == "" {
+		return board.HealthSettings{}, false
+	}
+	return h.bs.GetHealthSettings(ctx, project), true
+}
+
+// dialogMinutesOf is dialogMinutes from settings already read.
+func dialogMinutesOf(hs board.HealthSettings, onTeam bool) (int, bool, time.Duration) {
+	if !onTeam {
 		return atDialogMinutes, true, 0
 	}
-	hs := h.bs.GetHealthSettings(ctx, project)
 	var timeout time.Duration
 	if hs.DialogTimeout.On {
 		timeout = time.Duration(hs.DialogTimeout.AfterMin) * time.Minute
