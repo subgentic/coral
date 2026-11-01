@@ -104,6 +104,8 @@ type Collector struct {
 	gh       func(ctx context.Context, path string, args ...string) ([]byte, string, error)
 	ghLooked time.Time
 	ghFound  string
+	ghPause  time.Time     // no gh call before this, for any repository (a rate limit or a missing sign-in)
+	ghNote   string        // why, until gh answers again
 	kick     chan struct{} // a tab asked for a repository that has no picture yet (Kicks)
 	kicked   time.Time     // the last kick, for kickGap
 	now      func() time.Time
@@ -126,6 +128,7 @@ var readCommands = map[string][]string{
 	"status":       {"--porcelain=v1", "-z", "--untracked-files=no", "--untracked-files=normal", "--no-renames", "--ignore-submodules=all"},
 	"for-each-ref": {refsFormat},
 	"config":       {"--get"},
+	"merge-base":   {"--is-ancestor", "--end-of-options"},
 }
 
 // readOperands pins the operands of the commands that take a fixed one: for-each-ref reads only refs/heads, config reads only the origin's URL.
@@ -161,6 +164,9 @@ func readAllowed(args []string) bool {
 			}
 			if want, pinned := readOperands[args[0]]; pinned && a != want {
 				return false
+			}
+			if args[0] == "merge-base" && (!ended || !validSHA(a)) {
+				return false // commit ids only, after --end-of-options
 			}
 			continue
 		}
@@ -198,6 +204,7 @@ func (c *Collector) Observe(ctx context.Context, roots []string) {
 	ctx, cancel := context.WithTimeout(ctx, passBudget)
 	defer cancel()
 	seen := map[string]bool{}
+	rootOf := map[string]string{}
 	sort.Strings(roots)
 	for _, root := range roots {
 		if ctx.Err() != nil {
@@ -211,6 +218,7 @@ func (c *Collector) Observe(ctx context.Context, roots []string) {
 			continue
 		}
 		seen[key] = true
+		rootOf[key] = root
 		c.mu.Lock()
 		r, until := c.repos[key], c.paused[key]
 		c.mu.Unlock()
@@ -251,6 +259,7 @@ func (c *Collector) Observe(ctx context.Context, roots []string) {
 			return
 		}
 		c.refreshPRs(ctx, a.key, a.r)
+		c.matchPRs(ctx, a.key, rootOf[a.key])
 	}
 }
 
@@ -552,7 +561,7 @@ func (c *Collector) For(dir string) (Repo, int, bool) {
 	}
 	cp := *bestRepo
 	cp.Worktrees = append([]Worktree(nil), bestRepo.Worktrees...)
-	return withPRs(cp, c.prs[cp.key]), best, true
+	return withPRs(cp, c.prs[cp.key], c.ghNote), best, true
 }
 
 // Kicks fires when a tab asked for a folder the collector has no picture of: the git poller runs a Branches pass then (only Observe reads, and only what is wanted), so the
