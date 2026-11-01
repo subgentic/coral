@@ -2,7 +2,6 @@
 import { openTask } from './task_navigation.js';
 import { boardFetch, keyLabel, serverUrl, splitKey } from './server_base.js';
 import { OPERATOR_ID, copyText, showToast } from './utils.js';
-import { browserLocal } from './safe_storage.js';
 import { whenText } from './when_text.js';
 import { toTaskPage, toGoal, errorOf } from './goals_adapter.js';
 import { importOnce } from './import_once.js';
@@ -17,12 +16,6 @@ const DT = await importOnce('./data_table.js');
 const { el } = DT;
 const TV = await importOnce('./tasks_view.js');
 const PAGE = 50;
-
-const NOT_YET_KEY = 'coral.goals.notyet';
-/** "Not yet" said to a goal's all-done prompt, per team, goal and task total: it comes back when a task is added or removed. The goal page and the team's Goals row read the same list (#10692). */
-const goalNotYetKey = (project, g) => `${project}|${g.id}|${W.allTasksOf(g.rollup)}`;
-function notYetList() { try { const v = JSON.parse(browserLocal.get(NOT_YET_KEY) || '[]'); return Array.isArray(v) ? v : []; } catch { return []; } }
-export const goalNotYet = (project, g) => notYetList().includes(goalNotYetKey(project, g));
 
 /** Mount one goal; each mount owns its task pages, search and phone screen. */
 export function mountGoal(host, { team, id, back, onTask, goal, refresh, status, teamLink, focusOnOpen = true, backLabel = 'Goals' }) { // focusOnOpen: false where the page opens in place and the heading should not take the focus (the Inbox, #8681)
@@ -163,7 +156,6 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         }
         const openLeft = g.rollup.active + g.rollup.blocked + g.rollup.queued;
         if ((g.state === 'done' || g.state === 'dropped') && openLeft) main.append(el('p', 'goals-note goals-closed-open', W.closedWithOpenText(openLeft)));
-        if (W.readyToClose(g) && !isNotYet(g)) { main.append(allDoneStrip(g)); announceAllDone(g); }
         const total = totalOf(g.rollup);
         // "2 of 3 tasks done" (#7878): "3 tasks" is a link to the team Tasks tab with this goal chosen
         const progress = el('p', 'goals-tasks-head goals-progress');
@@ -369,23 +361,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         else if (keepBack) main.querySelector('.goals-back')?.focus({ preventScroll: true });
     }
 
-    // ── closing, reopening, and the all-done prompt (#7272, UI/UX's #7270) ─────
-
-    const notYetKey = (g) => goalNotYetKey(model.project, g);
-    const isNotYet = (g) => goalNotYet(model.project, g);
-    const announcedDone = new Set(); // the all-done strips already said, by goal and task total: said once when it first appears, not on every redraw
-    function announceAllDone(g) { const k = notYetKey(g); if (announcedDone.has(k)) return; announcedDone.add(k); say(W.allDoneSaid(W.allTasksOf(g.rollup), g.title)); }
-    function setNotYet(g) { try { browserLocal.set(NOT_YET_KEY, JSON.stringify([...notYetList().filter(k => k !== notYetKey(g)), notYetKey(g)].slice(-100))); } catch { /* the strip comes back on the next read */ } }
-
-    /** The prompt above Tasks when every task of an active goal is done: a labelled region (not an alert), Close as done and Not yet. */
-    function allDoneStrip(g) {
-        const s = el('section', 'goals-alldone'); s.setAttribute('aria-label', 'All tasks done');
-        const words = el('p', 'goals-alldone-text'); words.append(el('strong', null, W.allDoneLine(W.allTasksOf(g.rollup))), document.createTextNode(` ${W.allDoneAsk(g.doneWhen)}`));
-        const acts = el('div', 'goals-alldone-actions');
-        acts.append(btn('btn btn-primary btn-small goals-alldone-close', 'Close as done', () => openClose(g, 'done')), btn('btn btn-small goals-alldone-not-yet', 'Not yet', () => { setNotYet(g); drawDetail(); say(W.notYetSaid); focusDetail(); }));
-        s.append(words, acts, el('p', 'goals-note', W.notYetHint));
-        return s;
-    }
+    // ── closing and reopening (#7272, UI/UX's #7270) ─────
 
     async function reopenGoal(g) {
         try {

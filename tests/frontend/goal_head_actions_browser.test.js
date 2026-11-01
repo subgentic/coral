@@ -1,5 +1,5 @@
 // A goal's page has its actions in its header (#11823, the operator's request): Add task and Close goal (Reopen for a closed goal) sit at the top right, in that order with Close goal the primary, and there is no bar at
-// the bottom of the page. 1280, 390 and 360 px, in the Inbox and on the team page: the buttons are inside the header row, inside the screen (not clipped), above the goal's tasks, and 44 px tall on a phone.
+// the bottom of the page, and a goal whose tasks are all done shows no "Is that true?" box above its tasks (#11824): the Close goal button is enough. 1280, 390 and 360 px, in the Inbox and on the team page: the buttons are inside the header row, inside the screen (not clipped), above the goal's tasks, and 44 px tall on a phone.
 // Drives Chrome through agent_view_harness.js against the isolated dev server.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -49,6 +49,19 @@ const { coralReady } = require('./helpers/wait');
                 if (mobile) assert.ok(p.addH >= 43.5 && p.closeH >= 43.5, at + 'the buttons are 44 px targets: ' + JSON.stringify(p));
                 await shot(`goal-head-${width}-${mount.slice(1)}`);
             }
+        }
+        // every task done: no all-done box (it said "All N tasks are done ... Is that true?" with Close as done / Not yet, #11824); Close goal stays in the header
+        const all = await ev(`fetch('/api/board/${board}/tasks').then(r => r.json())`), taskId = ((Array.isArray(all) ? all : all.tasks || []).find(t => t.title === 'One task') || {}).id;
+        assert.ok(taskId, 'the task is found');
+        assert.ok((await api('POST', `/api/board/${board}/tasks/claim`, { subscriber_id: 'orch', task_id: taskId })).status < 300);
+        assert.ok((await api('POST', `/api/board/${board}/tasks/${taskId}/complete`, { subscriber_id: 'orch', message: 'done', outcome: 'success' })).status < 300);
+        for (const [width, mobile] of [[1280, false], [390, true]]) {
+            await Emulation.setDeviceMetricsOverride({ width, height: 900, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
+            await load(`/inbox/goals/${board}/${id}`);
+            await waitFor(`!!document.querySelector('#inbox-page .goal-head-actions .goals-close') && /^1 of/.test(document.querySelector('#inbox-page .goals-progress').textContent.trim())`, 'the goal page with its task done', 15000);
+            const strip = await ev(`(() => { const p = document.querySelector('#inbox-page'); return { box: !!p.querySelector('.goals-alldone, [aria-label="All tasks done"]'), words: /Is that true|Close as done|Not yet/.test(p.textContent) }; })()`);
+            assert.deepEqual(strip, { box: false, words: false }, `${width} px: a goal with all its tasks done has no all-done box: ${JSON.stringify(strip)}`);
+            await shot(`goal-head-alldone-${width}`);
         }
         // a closed goal: Reopen takes Close goal's place
         await load(`/inbox/goals/${board}/${id}`);
