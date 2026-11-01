@@ -275,6 +275,7 @@ POST /api/agents/models/refresh never
 POST /api/artifacts/prune never
 POST /api/artifacts/received/unlisted/delete never
 POST /api/artifacts/retention/ack never
+POST /api/artifacts/{id}/comment-images interact
 POST /api/artifacts/{id}/comments interact
 POST /api/artifacts/{id}/comments/{cid}/reopen interact
 POST /api/artifacts/{id}/comments/{cid}/reply never

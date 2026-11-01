@@ -35,6 +35,7 @@ GET /api/system/update view owner-update
 GET /api/team-artifacts view owner-only
 PATCH /api/artifacts/{id}/comments/{cid} interact owner-sees
 PATCH /api/saved/{id} interact owner-only
+POST /api/artifacts/{id}/comment-images interact owner-only
 POST /api/artifacts/{id}/comments interact owner-only
 POST /api/artifacts/{id}/comments/{cid}/reopen interact owner-only
 POST /api/artifacts/{id}/comments/{cid}/resolve interact owner-only

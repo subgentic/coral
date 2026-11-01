@@ -15,6 +15,8 @@ import (
 var columnMigrations = []struct {
 	table, column, definition string
 }{
+	// The pictures a person attached to an artifact comment (#11650): a JSON list of {hex, name, content_type}; '' for none.
+	{"artifact_comments", "images_json", "TEXT NOT NULL DEFAULT ''"},
 	// The secret a self-hosted hub signs its owner stamps for this remote with (#11378): a "v1:" envelope under the master key like api_key, with its own AAD; "" when none. Set only by SetOwnerSecret.
 	{"remote_servers", "owner_secret", "TEXT NOT NULL DEFAULT ''"},
 	// A remote server the hub reaches over the owner's SSH session instead of a URL (#11370): transport is "http" (every server before this, and every one added by URL) or "ssh"; ssh_target is the

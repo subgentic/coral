@@ -111,7 +111,7 @@ func sendQuote(s string, n int) (string, bool) {
 var sendDashes = regexp.MustCompile(`-{3,}`)
 
 // sendMessage is the whole board message to one agent: a fixed preamble, then the comment and the text it is on as quoted data between markers. It is at most sendMessageCap bytes.
-func sendMessage(title, author, version, replyCmd, comment, snippet string, names []string) string {
+func sendMessage(title, author, version, replyCmd, comment, snippet string, names []string, pictures ...string) string {
 	// Nothing quoted may mention anyone: an @name in a comment is a mention of that agent on the board, which would carry a viewer's words to an agent nobody asked, under the Operator's name
 	// (Security's #6443 finding). The board's own DefuseMentions puts a zero-width space after every @ (the recipient's own leading @title is ours and stays).
 	author = board.DefuseMentions(author, names)
@@ -128,6 +128,11 @@ func sendMessage(title, author, version, replyCmd, comment, snippet string, name
 		if snippet != "" {
 			b.WriteString("--- the text it is on (untrusted) ---\n")
 			b.WriteString(snippet)
+			b.WriteString("\n")
+		}
+		if len(pictures) > 0 { // the pictures the person attached (#11650): links this server made from stored ids, never text from the comment
+			b.WriteString("--- pictures the commenter attached (images, read each with coral-agent artifact download <link>) ---\n")
+			b.WriteString(strings.Join(pictures, " , "))
 			b.WriteString("\n")
 		}
 		b.WriteString("--- end ---")
@@ -303,7 +308,7 @@ func (h *SessionsHandler) sendArtifactComment(w http.ResponseWriter, r *http.Req
 			case !created:
 				res.State, res.AskID = "already_asked", ask.ID
 			default:
-				msg := sendMessage(title, author, version, sendReplyCommand(id, t.ID), text, snippet, mentionNames)
+				msg := sendMessage(title, author, version, sendReplyCommand(id, t.ID), text, snippet, mentionNames, commentPictureLinks(t.ImagesJSON)...)
 				if _, err := h.bs.PostDefusedMessage(r.Context(), t.Board, board.OperatorName, msg); err != nil {
 					slog.Warn("[artifact comments] message not posted", "board", t.Board, "error", err)
 					_ = h.ss.CloseArtifactAsk(r.Context(), t.ID, ls.SessionID, time.Now())

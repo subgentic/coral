@@ -148,6 +148,7 @@ POST /api/agent/tasks/{taskID}/complete | token-bound
 POST /api/agent/tasks/{taskID}/publish | token-bound
 POST /api/agent/ui-request | unbound | operator-only
 POST /api/agent/ui/{id}/events | token-bound
+POST /api/artifacts/{id}/comment-images | token-session | operator-only
 POST /api/artifacts/{id}/comments | token-session | operator-only
 POST /api/artifacts/{id}/comments/{cid}/reply | token-session
 POST /api/artifacts/{id}/comments/{cid}/send | token-session | operator-only

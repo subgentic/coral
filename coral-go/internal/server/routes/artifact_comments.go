@@ -99,6 +99,7 @@ func (l *commentLimiter) allow(key string, now time.Time) bool {
 // RegisterArtifactComments adds the comment routes.
 func (h *SessionsHandler) RegisterArtifactComments(r chi.Router) {
 	r.Get("/api/artifacts/{id}/comments", h.listArtifactComments)
+	r.Post("/api/artifacts/{id}/comment-images", h.uploadCommentImage) // a person's picture for a comment (#11650)
 	r.With(RefuseSignInLink).Post("/api/artifacts/{id}/comments", h.createArtifactComment)
 	r.With(RefuseSignInLink).Patch("/api/artifacts/{id}/comments/{cid}", h.editArtifactComment)
 	r.Delete("/api/artifacts/{id}/comments/{cid}", h.deleteArtifactComment)
@@ -138,6 +139,8 @@ type commentView struct {
 	CarriedAnchor *commentAnchor `json:"carried_anchor,omitempty"`
 	// The owner's list only (#6462): the agents this thread was sent to. Never in a viewer's, an agent's or a Coral Hub answer.
 	Asks []commentAskView `json:"asks,omitempty"`
+	// The pictures a person attached (#11650), in the order sent: {hex, name, content_type}; drawn from /api/artifacts/{hex}/raw.
+	Images []commentImage `json:"images,omitempty"`
 }
 
 // commentAskView is one agent asked into a thread: who, whether the ask is still open, and how many replies it has left.
@@ -194,7 +197,7 @@ func viewAuthor(viewer commentCaller, kind, issuer, subject, name string) commen
 
 func (h *SessionsHandler) commentView(c commentCaller, t store.ArtifactComment, locked, hubWrite bool) commentView {
 	v := commentView{ID: t.ID, ArtifactID: t.ArtifactID, Board: t.Board, ParentID: t.ParentID, Body: t.Body, CreatedAt: t.CreatedAt, EditedAt: t.EditedAt, ResolvedAt: t.ResolvedAt, Deleted: t.DeletedAt != nil,
-		Author: viewAuthor(c, t.AuthorKind, t.AuthorIssuer, t.AuthorSubject, t.AuthorName)}
+		Author: viewAuthor(c, t.AuthorKind, t.AuthorIssuer, t.AuthorSubject, t.AuthorName), Images: parseCommentImages(t.ImagesJSON)}
 	if t.AnchorJSON != "" {
 		var a commentAnchor
 		if json.Unmarshal([]byte(t.AnchorJSON), &a) == nil {
@@ -561,6 +564,8 @@ func (h *SessionsHandler) createArtifactComment(w http.ResponseWriter, r *http.R
 		Board    string         `json:"board"`
 		// NotifyAgent false keeps the Operator's comment on a "for review" artifact from being sent to the agent that uploaded it (#11420); absent means it is sent.
 		NotifyAgent *bool `json:"notify_agent"`
+		// Images are the pictures just uploaded for this comment (#11650), at most 4: the person's alone, and a comment with pictures may have no words.
+		Images []string `json:"images"`
 	}
 	if g, isGuide := guideOf(r); isGuide {
 		// a guide's comment is body, anchor and parent_id and nothing else (no board, no notify flag): the board is the grant's, and the comment is never sent to an agent by the guide's own request
@@ -629,6 +634,18 @@ func (h *SessionsHandler) createArtifactComment(w http.ResponseWriter, r *http.R
 		b, _ := json.Marshal(in.Anchor)
 		anchorJSON = string(b)
 	}
+	imagesJSON := ""
+	if len(in.Images) > 0 {
+		if _, isGuide := guideOf(r); isGuide || caller.Kind != commentCallerOwner {
+			commentRefuse(w, http.StatusForbidden, "owner_only", "only the person at this computer can add a picture to a comment")
+			return
+		}
+		var msg string
+		if imagesJSON, msg = h.commentImagesOf(id, in.Images); msg != "" {
+			errBadRequest(w, msg)
+			return
+		}
+	}
 	body, ok := redactComment(in.Body)
 	if !ok {
 		commentRefuse(w, http.StatusServiceUnavailable, "redaction_unavailable", "the comment could not be checked for secrets, so it was not kept")
@@ -638,7 +655,7 @@ func (h *SessionsHandler) createArtifactComment(w http.ResponseWriter, r *http.R
 		return
 	}
 	c, err := h.ss.CreateArtifactComment(r.Context(), store.ArtifactComment{ArtifactID: id, Board: in.Board, ParentID: in.ParentID, AnchorJSON: anchorJSON, Body: body,
-		AuthorIssuer: caller.Issuer, AuthorSubject: caller.Subject, AuthorName: caller.Name, AuthorKind: caller.Kind})
+		AuthorIssuer: caller.Issuer, AuthorSubject: caller.Subject, AuthorName: caller.Name, AuthorKind: caller.Kind, ImagesJSON: imagesJSON})
 	switch {
 	case errors.Is(err, store.ErrCommentEmpty):
 		errBadRequest(w, "a comment needs some text")
