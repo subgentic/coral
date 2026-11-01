@@ -40,7 +40,13 @@ function offerAlertsAgainIfWaited(n) {
     const oldest = Math.min(...at);
     if (Date.now() - oldest >= 5 * 60 * 1000) importOnce('./alerts_offer.js').then(m => m.offerAlertsAgain(oldest));
 }
-document.addEventListener('visibilitychange', () => { if (!document.hidden) updateInboxTab(); }); // back in the tab: what waited while it was hidden is looked at again
+/** The background tab's title carries the same number as the badge (#11837). attention.js loads as soon as something waits (a tab that goes to the background after an item arrived must show it), not before: a page with nothing waiting adds neither the module nor a listener at start. The listener for the tab coming back (the alerts offer, #11893) is registered the first time something waits. */
+let attentionReady = false, comebackHooked = false;
+function tellAttention(n) {
+    if (n > 0 && !comebackHooked) { comebackHooked = true; document.addEventListener('visibilitychange', () => { if (!document.hidden) updateInboxTab(); }); }
+    if (n <= 0 && !attentionReady) return;
+    importOnce('./attention.js').then(m => { attentionReady = true; m.setAttentionTotal(n); });
+}
 
 /** Keep the tab's badge (and, where the dashboard builds its own Inbox, the Needs you list) in step with the live list. Safe to call often (after each list update). */
 export function updateInboxTab() {
@@ -65,7 +71,7 @@ export function updateInboxTab() {
     const label = n > 0 ? unreadReviewItems().length || failedUnread().length || operatorAsks().length ? `Inbox, ${n} need your attention` : `Inbox, ${n} waiting for input` : null;
     if (tab.getAttribute('aria-label') !== label) { if (label) tab.setAttribute('aria-label', label); else tab.removeAttribute('aria-label'); }
     setInboxCount('needs', n);
-    importOnce('./attention.js').then(m => m.setAttentionTotal(n)); // the background tab's title carries the same number as the badge (#11837)
+    tellAttention(n);
     offerAlertsAgainIfWaited(n);
     _hooks.needs?.(); // the Needs you rows, once the sidebar is loaded and while the Inbox is on screen
     announceNewlyWaiting(tab);

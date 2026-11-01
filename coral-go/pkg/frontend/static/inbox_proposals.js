@@ -22,7 +22,7 @@ const kindWord = p => (p.kind === 'goal' ? 'goal' : 'task');
 /** What a proposal carries, for the dialog and the row: its words, the instructions and required outputs the assignee will be given (shown in full: the Operator approves what they read), and one line of everything else it sets. */
 export function proposalFacts(p) {
     const pay = p.payload && typeof p.payload === 'object' ? p.payload : {};
-    if (p.kind === 'goal') return { body: pay.outcome || '', instructions: '', outputs: [], also: pay.done_when ? [`Done when: ${pay.done_when}`] : [] };
+    if (p.kind === 'goal') return { body: pay.outcome || '', instructions: '', outputs: [], also: [] }; // its Done when is a field of the card: not said again under it (#11894)
     const wf = pay.workflow && typeof pay.workflow === 'object' ? pay.workflow : {};
     const blocked = Array.isArray(pay.blocked_by) ? pay.blocked_by.map(b => (b && typeof b === 'object' ? `#${b.task_id}` : `#${b}`)) : [];
     const also = [pay.assigned_to ? `assigned to ${pay.assigned_to}` : '', pay.priority ? `priority ${pay.priority}` : '', blocked.length ? `blocked by ${blocked.join(', ')}` : '', pay.remind_at ? `a reminder at ${new Date(pay.remind_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}` : '', pay.draft ? 'a draft (not published)' : '', pay.goal_id ? `under goal #${pay.goal_id}` : '', p.goal_proposal_id ? `for the goal waiting as proposal #${p.goal_proposal_id}` : ''].filter(Boolean);
