@@ -27,7 +27,7 @@ const { installGuard, reached } = require('./helpers/silent_dismiss');
         await installGuard(ev); // nothing a dismissal does reaches an agent (the operator's rule, #11552)
         await ev(`window.switchNavTab('hub-inbox'); import(${S} + 'inbox_tab.js').then(m => { m.updateInboxTab(); return m.selectInboxTab('needs'); }).then(() => true)`);
         await waitFor(`document.querySelectorAll('#group-table-view .inbox-welcome-name').length === 5`, 'five welcome items', 8000);
-        await waitFor(`!!document.querySelector('.inbox-needs-results')._welcomeSwipe`, 'the swipe is attached (lazy, for a touch screen)', 8000);
+        await waitFor(`!!document.getElementById('group-table-view')._welcomeSwipe`, 'the swipe is attached (lazy, for a touch screen)', 8000);
         const titles = () => ev(`[...document.querySelectorAll('#group-table-view .inbox-welcome-name')].map(e => e.firstChild.textContent)`);
         const rowOf = title => `[...document.querySelectorAll('#group-table-view tbody tr')].find(tr => (tr.querySelector('.inbox-welcome-name') || {}).firstChild && tr.querySelector('.inbox-welcome-name').firstChild.textContent === ${JSON.stringify(title)})`;
         const geo = title => ev(`(() => { const tr = ${rowOf(title)}; tr.scrollIntoView({ block: 'center' }); const r = tr.getBoundingClientRect(); return { left: r.left, right: r.right, y: r.top + r.height / 2, width: r.width, id: tr.dataset.welcomeId || '', transform: tr.style.transform, transition: tr.style.transition }; })()`);
