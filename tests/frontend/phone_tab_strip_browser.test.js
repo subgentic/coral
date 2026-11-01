@@ -18,11 +18,11 @@ const { coralReady } = require('./helpers/wait');
                 const items = [{ key: 'needs', label: 'Needs you', count: 3, alert: true }, { key: 'tasks', label: 'Tasks', count: 12 }, { key: 'goals', label: 'Goals', count: 4 }, { key: 'artifacts', label: 'Artifacts', count: 9 }, { key: 'saved', label: 'Saved', count: 2 }];
                 const root = VL.build({ id: 'probe', label: 'Inbox views', tabs: true, current: 'needs', sections: [{ items }], onPick(k) { window.__picks.push(k); } }); host.append(root);
                 const nav = root.querySelector('.view-list-nav'), wait = () => new Promise(r => setTimeout(r, 250)); // sleep-ok: the scroll event and the resize observer settle
-                const cue = () => { const b = root.querySelector('.view-list-edge-btn'); return !!b && !b.hidden && b.getBoundingClientRect().width > 0; }; window.__picks = []; 
+                const cue = () => { const b = root.querySelector('.view-list-edge-tap'); return !!b && !b.hidden && b.getBoundingClientRect().width > 0; }; window.__picks = []; 
                 await wait(); const start = { over: nav.hasAttribute('data-overflow'), cue: cue(), overflow: nav.scrollWidth > nav.clientWidth };
                 nav.scrollLeft = nav.scrollWidth; await wait(); const tabs = [...nav.querySelectorAll('.vl-tab')], last = tabs[tabs.length - 1].getBoundingClientRect(), nr = nav.getBoundingClientRect();
                 const end = { over: nav.hasAttribute('data-overflow'), cue: cue(), lastInside: Math.round(last.right) <= Math.round(nr.right) && Math.round(last.left) >= 0, lastRight: Math.round(last.right), navRight: Math.round(nr.right) };
-                const padEnd = parseFloat(getComputedStyle(nav).paddingRight); nav.scrollLeft = 0; await wait(); const b = root.querySelector('.view-list-edge-btn').getBoundingClientRect(); window.__btn = { x: b.left + b.width / 2, y: b.top + b.height / 2, w: b.width, h: b.height }; window.__edge = { padEnd, left0: nav.scrollLeft };
+                const padEnd = parseFloat(getComputedStyle(nav).paddingRight); nav.scrollLeft = 0; await wait(); const b = root.querySelector('.view-list-edge-tap').getBoundingClientRect(); window.__btn = { x: b.left + b.width / 2, y: b.top + b.height / 2, w: b.width, h: b.height }; window.__edge = { padEnd, left0: nav.scrollLeft };
                 return { start, end }; })()`);
             if (!fits) {
                 const b = await ev('window.__btn'); const before = await ev(`document.querySelector('#tabs-probe .view-list-nav').scrollLeft`);
