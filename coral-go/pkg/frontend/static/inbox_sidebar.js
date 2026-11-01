@@ -221,12 +221,13 @@ function reviewActions(row) {
     const file = markHidden(row.name, { strict: true }); // what a button, a menu and a spoken line call the file: hidden characters written out (Security's SHOULD, #11552)
     const errorText = DT.el('span', 'inbox-review-error'); errorText.setAttribute('role', 'alert');
     const failed = (b, error) => { if (b.isConnected) b.disabled = false; errorText.textContent = error.message; };
-    const word = (text, name, cls, run) => { const b = DT.el('button', `btn btn-small ${cls}`.trim(), text); b.type = 'button'; b.setAttribute('aria-label', `${name}: ${file}`); b.addEventListener('click', () => run(b)); return b; };
+    const word = (text, name, cls, run) => { const b = DT.el('button', `btn btn-small ${cls}`.trim(), text); b.type = 'button'; b.setAttribute('aria-label', `${name}: ${file}`); b.addEventListener('click', () => run(b)); if (text === 'Approve') b.classList.add('inbox-main-action'); return b; };
     const approve = b => { b.disabled = true; errorText.textContent = ''; const settle = keepPlace(b); // replaces Mark reviewed (#136584): it clears the row, marks the review approved and tells the agent that uploaded it
         return importOnce('./artifact_review.js').then(async ({ approveRow, sayApproved }) => { sayApproved(row.name, await approveRow(row.team, row)); sayLive(`Approved ${file}.`); await settle(); }).catch(error => failed(b, error)); };
     const deny = b => { const settle = keepPlace(b); return importOnce('./artifact_review.js').then(({ openDenyDialog }) => openDenyDialog(row.team, row, async () => { sayLive(`Denied ${file}.`); await settle(); })).catch(error => failed(b, error)); };
     const ignore = b => { b.disabled = true; errorText.textContent = ''; const settle = keepPlace(b);
         return importOnce('./artifact_review.js').then(async ({ ignoreRow, sayIgnored }) => { await ignoreRow(row.team, row); sayIgnored(row.team, row); sayLive(`Ignored ${file}.`); await settle(); }).catch(error => failed(b, error)); };
+    box._ignore = ignore; // a swipe on a phone is the same Ignore (#11642)
     const unread = b => { b.disabled = true; errorText.textContent = ''; return setReviewRead(row, false).then(() => sayLive(`Marked ${file} unread.`)).catch(error => failed(b, error)); };
     const star = starControl(row, { hex: row.hex, name: file }); // the review artifact's star: a glyph when starred, a button at a hover (#9834)
     if (star) { box.append(star); box.classList.add('inbox-review-actions-star'); }
@@ -249,14 +250,15 @@ function askActions(a) {
     const box = DT.el('div', 'inbox-review-actions');
     const who = markHidden(a.asker, { strict: true });
     const reply = DT.el('button', 'btn btn-small', 'Answer'); reply.type = 'button'; // Answer, as the approved action set names it (#11552); the dialog it opens still has the reply box
-    reply.setAttribute('aria-label', `Answer the question of ${who}`); reply.addEventListener('click', () => openAskDialog(a, () => $('group-table-view')?.querySelector('input[type=search]')?.focus({ preventScroll: true })));
+    reply.classList.add('inbox-main-action'); reply.setAttribute('aria-label', `Answer the question of ${who}`); reply.addEventListener('click', () => openAskDialog(a, () => $('group-table-view')?.querySelector('input[type=search]')?.focus({ preventScroll: true })));
     box.append(reply);
     if (a.kind === 'ask') { // a wait has no ask row to close: only a question is ignorable
-        const no = DT.el('button', 'btn btn-small btn-quiet', 'Ignore'); no.type = 'button'; no.setAttribute('aria-label', `Ignore the question of ${who}`);
         const failed = DT.el('span', 'inbox-review-error'); failed.setAttribute('role', 'alert');
-        no.addEventListener('click', () => { no.disabled = true; failed.textContent = ''; const settle = keepPlace(no);
-            importOnce('./ask_ignore.js').then(async ({ ignoreAsk }) => { await ignoreAsk(a, who); sayLive(`Ignored the question of ${who}.`); await settle(); }).catch(error => { no.disabled = false; failed.textContent = error.message; }); });
-        box.append(no, failed);
+        const ignore = no => { no.disabled = true; failed.textContent = ''; const settle = keepPlace(no);
+            return importOnce('./ask_ignore.js').then(async ({ ignoreAsk }) => { await ignoreAsk(a, who); sayLive(`Ignored the question of ${who}.`); await settle(); }).catch(error => { no.disabled = false; failed.textContent = error.message; }); };
+        box._ignore = ignore;
+        if (isPhoneLayout()) box.append(moreMenu([{ label: 'Ignore', title: 'Take it out of Needs you; nobody is told', run: ignore }], `the question of ${who}`), failed); // a phone row has no Ignore button: the menu, or a swipe (#11642)
+        else { const no = DT.el('button', 'btn btn-small btn-quiet', 'Ignore'); no.type = 'button'; no.setAttribute('aria-label', `Ignore the question of ${who}`); no.addEventListener('click', () => ignore(no)); box.append(no, failed); }
     }
     return box;
 }
@@ -264,10 +266,12 @@ function askActions(a) {
 function runActions(run) {
     const box = DT.el('div', 'inbox-review-actions');
     const open = DT.el('button', 'btn btn-small', 'Open'); open.type = 'button';
-    open.setAttribute('aria-label', `Open ${run.name}, failed run`); open.addEventListener('click', () => openRun(run));
+    open.classList.add('inbox-main-action'); open.setAttribute('aria-label', `Open ${run.name}, failed run`); open.addEventListener('click', () => openRun(run));
+    const ignore = () => { markSeen(run); sayLive(`Ignored the failed run of ${run.name}.`); $('group-table-view')?.querySelector('input[type=search]')?.focus({ preventScroll: true }); };
+    box._ignore = ignore;
+    if (isPhoneLayout()) { box.append(open, moreMenu([{ label: 'Ignore', title: 'Take it out of Needs you; nobody is told', run: ignore }], run.name)); return box; } // no Ignore button on a phone row: the menu, or a swipe (#11642)
     const done = DT.el('button', 'btn btn-small', 'Ignore'); done.type = 'button';
-    done.setAttribute('aria-label', `Ignore the failed run of ${run.name}`);
-    done.addEventListener('click', () => { markSeen(run); sayLive(`Ignored the failed run of ${run.name}.`); $('group-table-view')?.querySelector('input[type=search]')?.focus({ preventScroll: true }); });
+    done.setAttribute('aria-label', `Ignore the failed run of ${run.name}`); done.addEventListener('click', ignore);
     box.append(open, done); return box;
 }
 
@@ -275,14 +279,17 @@ function runActions(run) {
 function welcomeActions(w) {
     const box = DT.el('div', 'inbox-review-actions inbox-welcome-actions');
     const go = DT.el('button', 'btn btn-small btn-primary', w.go); go.type = 'button';
-    go.setAttribute('aria-label', `${w.go}: ${w.title}`);
+    go.classList.add('inbox-main-action'); go.setAttribute('aria-label', `${w.go}: ${w.title}`);
     go.addEventListener('click', () => runWelcome(w.id));
     box.append(go);
     if (w.dismiss) {
-        const no = DT.el('button', 'btn btn-small btn-quiet', 'Ignore'); no.type = 'button';
-        no.setAttribute('aria-label', `Ignore: ${w.title}`);
-        no.addEventListener('click', () => { dismissWelcome(w.id); sayLive(`Ignored: ${w.title}.`); });
-        box.append(no);
+        const ignore = () => { dismissWelcome(w.id); sayLive(`Ignored: ${w.title}.`); };
+        if (isPhoneLayout()) box.append(moreMenu([{ label: 'Ignore', title: 'Take it out of Needs you; nobody is told', run: ignore }], w.title)); // no Ignore button on a phone row: the menu, or a swipe (#11642)
+        else {
+            const no = DT.el('button', 'btn btn-small btn-quiet', 'Ignore'); no.type = 'button';
+            no.setAttribute('aria-label', `Ignore: ${w.title}`); no.addEventListener('click', ignore);
+            box.append(no);
+        }
     }
     return box;
 }
@@ -698,7 +705,7 @@ registerGroupSource('hub-inbox', {
                         p.append(DT.link('See them', () => go({ view: 'automations', folder: 'recent' })));
                         wrap.append(p);
                     }
-                    if (rows.some(r => r.welcome && r.welcome.dismiss) && matchMedia('(pointer: coarse)').matches) importOnce('./welcome_swipe.js').then(m => m.attachWelcomeSwipe(wrap)).catch(() => {}); // a touch screen swipes a welcome row away (#11542); lazy
+                    if (rows.some(r => (r.welcome && r.welcome.dismiss) || r.review || (r.operatorAsk && r.operatorAsk.kind === 'ask') || r.autorun) && matchMedia('(pointer: coarse)').matches) importOnce('./welcome_swipe.js').then(m => m.attachWelcomeSwipe(wrap)).catch(() => {}); // a touch screen swipes a welcome row away (#11542); lazy
                     return wrap; } };
         }
         if (key === 'tasks') {
