@@ -24,6 +24,8 @@ const { coralReady, framesJs } = require('./helpers/wait');
         sid = launch.body.session_id; sname = launch.body.session_name || launch.body.name;
         if (!sid) throw new Error('no session: ' + JSON.stringify(launch));
         await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: 'Ign Writer', job_title: 'Writer', session_name: sname });
+        const base = Number((await api('GET', '/api/team-artifacts')).body.all) || 0; // files left on the server by earlier runs are not this run's: the All pill counts what was there plus the two uploaded here
+        const ALL = `All ${base + 2}`;
         const ids = {};
         for (const n of ['keep-me.md', 'put-away.md']) { const up = await api('POST', `/api/agent/artifacts?session_id=${sid}&tag=for+review&question=Approve+this%3F`, `content of ${n} ${Date.now()}`, { 'X-Artifact-Name': n, 'X-Artifact-Media-Type': 'text/markdown' }); ids[n] = String(up.body.id || up.body.digest).replace(/^sha256:/, ''); }
         check((await api('POST', `/api/board/${B}/artifacts/${ids['put-away.md']}/review`, { decision: 'ignore' })).status === 200, 'the file was ignored through the real route');
@@ -31,8 +33,8 @@ const { coralReady, framesJs } = require('./helpers/wait');
         await ev(`window.switchNavTab('hub-inbox'); true`);
         await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('artifacts')).then(() => true)`);
         await waitFor(`[...document.querySelectorAll('${T} button')].some(b => /^Ignored \\d+$/.test((b.textContent || '').trim()))`, 'the Ignored pill', 20000);
-        await waitFor(`JSON.stringify([...document.querySelectorAll('${T} button')].map(b => (b.textContent || '').trim()).filter(t => /^(All|For review|Ignored) \\d+$/.test(t))) === JSON.stringify(['All 2', 'For review 1', 'Ignored 1'])`, 'the pill counts settle (the All count is read after the Ignored pill appears)', 15000).catch(() => {});
-        check(JSON.stringify(await pills()) === JSON.stringify(['All 2', 'For review 1', 'Ignored 1']), 'the pills: All, For review, Ignored with their counts: ' + JSON.stringify(await pills()));
+        await waitFor(`JSON.stringify([...document.querySelectorAll('${T} button')].map(b => (b.textContent || '').trim()).filter(t => /^(All|For review|Ignored) \\d+$/.test(t))) === JSON.stringify([${JSON.stringify(ALL)}, 'For review 1', 'Ignored 1'])`, 'the pill counts settle (the All count is read after the Ignored pill appears)', 15000).catch(() => {});
+        check(JSON.stringify(await pills()) === JSON.stringify([ALL, 'For review 1', 'Ignored 1']), 'the pills: All, For review, Ignored with their counts: ' + JSON.stringify(await pills()));
         await ev(`[...document.querySelectorAll('${T} button')].find(b => /^Ignored \\d+$/.test((b.textContent || '').trim())).click(); true`);
         await waitFor(`document.querySelectorAll('${T} tbody tr').length === 1 && /put-away\\.md/.test(document.querySelector('${T} tbody tr').textContent)`, 'the list is the ignored file alone', 15000);
 
