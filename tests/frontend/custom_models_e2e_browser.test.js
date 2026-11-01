@@ -28,7 +28,7 @@ const { coralReady } = require('./helpers/wait');
         await waitFor(`!!document.querySelector('#settings-custom-models [data-cm-add]')`, 'the section from the real route', 8000);
         const lim = await api('GET', '/api/custom-models');
         const claudeLevels = lim.body.limits.efforts.claude;
-        check(`the server's limits drive the level boxes (claude: ${claudeLevels.join()})`, claudeLevels.includes('low') && claudeLevels.includes('high') && lim.body.limits.families.join() === 'claude,codex,agy,pi,opencode');
+        check(`the server's limits drive the level boxes (claude: ${claudeLevels.join()})`, claudeLevels.includes('low') && claudeLevels.includes('high') && lim.body.limits.families.join() === 'claude,codex,agy,pi,opencode,hermes');
         await addFor('claude');
         await ev(`(() => { document.getElementById('cm-id').value = 'e2e-claude-model'; document.getElementById('cm-name').value = 'E2E Claude'; document.querySelectorAll('#settings-custom-models .cm-form input[type=checkbox]').forEach(c => { if (c.value === 'low' || c.value === 'high') c.checked = true; }); document.querySelector('#settings-custom-models .cm-form .sv-save').click(); return true; })()`);
         await addFor('pi');

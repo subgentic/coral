@@ -22,7 +22,8 @@ var lintedPackages = []string{
 // with the reason a planted link can't steer it. Keyed package/file:function:call, never by line;
 // a listed site that no longer exists fails too, so the list stays true.
 var reviewedWriteOpens = map[string]string{
-	"agent/claude.go:writeNoFollow:OpenFile": "O_EXCL (and O_NOFOLLOW on Unix): any existing name, link or not, is refused (#3582)",
+	"agent/claude.go:writeNoFollow:OpenFile":      "O_EXCL (and O_NOFOLLOW on Unix): any existing name, link or not, is refused (#3582)",
+	"agent/hermes_home.go:seedHermesEnv:OpenFile": "O_EXCL: any existing name, link or not, is refused, and the file is made 0600; the Lstat before it refuses a link or a non-regular file as well (#11831)",
 }
 
 // A new os.Create, os.WriteFile, or os.OpenFile that can write (O_WRONLY, O_RDWR, O_CREATE,
