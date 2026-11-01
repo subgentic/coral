@@ -8,7 +8,7 @@ import { recordRecentDir, getRecentDirs, pruneMissingRecents } from './browser.j
 import { teamForm, showTeamWorktree, showTeamWorkers } from './team_form.js';
 import { agentNameForm, agentStatus } from './agent_form.js';
 import { cliPathButton } from './prerequisites.js';
-import { serverFetch, boardFetch, identityKey, LOCAL_SERVER } from './server_base.js';
+import { serverFetch, boardFetch, identityKey, LOCAL_SERVER, isHub } from './server_base.js';
 const { launch } = await importOnce('./launch_state.js');
 const { _acfServer, _effectiveServer, _settingsFor } = await importOnce('./launch_models.js');
 const { trackPermissionPick, _getPermissionFlagsForAgentMode, _normalizePermFlagsForAgent, _updatePermModeDescription, _hasPermFlag } = await importOnce('./permission_flags.js');
@@ -161,7 +161,7 @@ function _syncTeamGate() {
 document.addEventListener('team-step-shown', _syncTeamGate);
 document.addEventListener('cli-blocks-launch', e => { if (e.target.closest?.('#launch-step-team')) _syncTeamGate(); }); // a CLI check that answers while step 3 shows
 document.addEventListener('team-page-open', e => { const page = e.target.closest && e.target.closest('.team-page'); if (page && page.dataset.page) showTeamStep(page.dataset.page); });
-document.addEventListener('input', e => { if (e.target && (e.target.id === 'team-board-name' || e.target.id === 'launch-team-dir')) _syncTeamGate(); });
+document.addEventListener('input', e => { if (e.target && (e.target.id === 'team-board-name' || e.target.id === 'launch-team-dir')) _syncTeamGate(); if (e.target && e.target.id === 'launch-team-dir') teamForm()?.refresh(); }); // the folder decides which trust row shows (#11889)
 
 // Remove keeps the row aside for Undo (one removal back); a new removal, a template or a closed dialog makes the last one final.
 let _removedTeamAgent = null;
@@ -768,6 +768,7 @@ async function launchTeam() {
     };
     if (boardServer) payload.board_server = boardServer;
     if (usesSuggestion(document.getElementById('launch-team-dir'))) payload.create_dir = true; // the folder Coral suggested: it makes it now (#11258)
+    else if (!isHub() && document.getElementById('launch-team-trust')?.checked) payload.trust_folder = true; // the person ticked: trust this existing folder for the agents (#11889)
     if (settings.working_mode) payload.working_mode = settings.working_mode; // the working mode, its guidance and the Additional instructions (#7407)
     if (settings.health_monitor) payload.health_monitor = true;
     if (useWorktree) {
