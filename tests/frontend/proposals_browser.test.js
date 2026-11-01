@@ -16,7 +16,7 @@ const HEX = '71c21f0b' + 'a'.repeat(56);
 const LONGBODY = ('A long body. ' + 'It goes on and on with detail that nobody reads until they must decide. '.repeat(50)).slice(0, 2986) + 'THE END OF IT.'; // 3,000 characters, on one line
 const PROPOSALS = [
     { id: 11, board_id: 'team-a', kind: 'task', title: 'Fix the <b>login</b> page', proposer: 'Backend Dev', state: 'pending', created_at: new Date(Date.now() - 600000).toISOString(), payload: { title: 'Fix the <b>login</b> page', body: 'It fails on Safari. @Orchestrator please look <img src=x onerror="window.__pwned=1">', priority: 'high', assigned_to: 'QA Engineer', blocked_by: [3], draft: true, goal_id: 5, remind_at: new Date(Date.now() + 86400000).toISOString(), workflow: { instructions: 'Read the plan first.\n<b>then</b> run the deploy\u202E script.\nSee coral://artifacts/' + HEX + ').', required_outputs: ['a report', 'the diff\u200B'] } } },
-    { id: 12, board_id: 'team-a', kind: 'goal', title: 'Ship the beta', proposer: 'Orchestrator', state: 'pending', created_at: new Date(Date.now() - 3600000).toISOString(), payload: { title: 'Ship the beta', outcome: LONGBODY, done_when: 'The release is out' } },
+    { id: 12, board_id: 'team-a', board_label: 'Sprout team', kind: 'goal', title: 'Ship the beta', proposer: 'Orchestrator', state: 'pending', created_at: new Date(Date.now() - 3600000).toISOString(), payload: { title: 'Ship the beta', outcome: LONGBODY, done_when: 'The release is out' } },
     { id: 13, board_id: 'team-b', kind: 'task', title: 'An old idea', proposer: 'QA Engineer', state: 'expired', created_at: new Date(Date.now() - 9 * 86400000).toISOString(), payload: { title: 'An old idea', body: 'Nobody decided.' } },
     { id: 14, board_id: 'team-b', kind: 'goal', title: 'Being made right now', proposer: 'Lead Developer', state: 'approving', created_at: new Date(Date.now() - 120000).toISOString(), payload: { title: 'Being made right now', outcome: 'x' } },
 ];
@@ -81,6 +81,7 @@ const STUB = `(() => {
             await shot(`proposals-needs-${view.w}-${view.theme}`);
             // opening the row shows the whole body as text, read first; Edit and approve in it opens the words to change
             const rowOf = name => `[...document.querySelectorAll('${T} tbody tr')].find(tr => tr.querySelector('.inbox-review-name').textContent === ${JSON.stringify(name)})`;
+            check(at + "the row's Team cell says the team's name, not its board id (#11895)", await ev(`(() => { const tr = ${rowOf('Ship the beta')}; const t = tr.textContent; return t.includes('Sprout team') && !t.includes('team-a'); })()`));
             await ev(`window.__posts = []; ${rowOf('Ship the beta')}.querySelector('.inbox-review-name').click(); true`);
             await waitFor(`!!document.querySelector('#proposal-dialog[open]')`, at + 'the detail from the row', 5000);
             const detail = await ev(`(() => { const d = document.querySelector('#proposal-dialog'); const f = [...d.querySelectorAll('input, textarea')]; const before = f.slice(0, 3).every(x => x.readOnly); return { posts: window.__posts.length, whole: f[1].value.endsWith('THE END OF IT.') && f[1].value.length === 3000, readonly: before, buttons: [...d.querySelectorAll('.proposal-buttons button')].filter(b => !b.hidden).map(b => b.textContent) }; })()`);
@@ -110,7 +111,7 @@ const STUB = `(() => {
             await ev(`window.__posts = []; ${rowOf('Ship the beta')}.querySelectorAll('button')[1].click(); true`);
             await waitFor(`!!document.querySelector('#proposal-dialog[open]')`, at + 'the dialog', 5000);
             const dlg = await ev(`(() => { const d = document.querySelector('#proposal-dialog'); const f = [...d.querySelectorAll('input, textarea')]; return { title: f[0].value, outcome: f[1].value.endsWith('THE END OF IT.'), done: f[2].value, who: d.querySelector('.proposal-who').textContent, focus: document.activeElement === f[0] }; })()`);
-            check(at + 'the row Edit opens the dialog: all the words (the whole body) and the proposer, the title focused', dlg.title === 'Ship the beta' && dlg.outcome && dlg.done === 'The release is out' && /Orchestrator proposed it for team-a/.test(dlg.who) && dlg.focus, JSON.stringify(dlg));
+            check(at + 'the row Edit opens the dialog: all the words (the whole body) and the proposer, the title focused', dlg.title === 'Ship the beta' && dlg.outcome && dlg.done === 'The release is out' && /Orchestrator proposed it for Sprout team\./.test(dlg.who) && !/team-a/.test(dlg.who) && dlg.focus, JSON.stringify(dlg));
             const cleanBefore = await ev(`document.querySelector('#proposal-dialog .proposal-hidden').hidden`);
             await shot(`proposals-dialog-${view.w}-${view.theme}`);
             await ev(`(() => { const t = document.querySelector('#proposal-dialog input'); t.value = 'Ship the beta, edited'; t.dispatchEvent(new Event('input', { bubbles: true })); [...document.querySelectorAll('#proposal-dialog button')].find(b => /Approve/.test(b.textContent)).click(); return true; })()`);
