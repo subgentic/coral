@@ -127,7 +127,8 @@ export function showSetPasswordModal({ required = false } = {}) {
     const confirm = passwordField({ id: 'set-password-confirm', label: 'Confirm password', autocomplete: 'new-password', name: 'confirm-password' });
     const err = el('p', 'pw-error'); err.id = 'set-password-error'; err.setAttribute('role', 'alert'); err.hidden = true;
     form.append(usernameStub(), pw.root, confirm.root, meter.root, err); // the advice sits under both fields: its reserved room is no gap between them (#11304)
-    body.append(form, el('p', 'pw-note', 'Forgot it? Run coral reset-password in a terminal on this computer.'));
+    const failed = el('p', 'pw-note', 'If this keeps failing, run coral reset-password in a terminal on this computer.'); failed.id = 'set-password-failed'; failed.hidden = true;
+    body.append(form, failed, el('p', 'pw-note', 'Forgot it? Run coral reset-password in a terminal on this computer.'));
     const foot = el('div', 'modal-actions modal-footer');
     const save = el('button', 'btn btn-primary', 'Set password'); save.type = 'submit'; save.setAttribute('form', 'set-password-form'); save.id = 'set-password-save';
     let cancel = null; if (!required) { cancel = el('button', 'btn', 'Cancel'); cancel.type = 'button'; cancel.id = 'set-password-cancel'; }
@@ -188,7 +189,7 @@ export function showSetPasswordModal({ required = false } = {}) {
             return;
         }
         err.hidden = false; err.textContent = errorText(res, 'Could not set the password.');
-        save.disabled = false; save.textContent = 'Set password';
+        save.disabled = false; save.textContent = 'Try again'; failed.hidden = false; // the server's words, a way to try again, and where to go if it keeps failing: no way out (#11892)
     });
     pw.input.focus();
     return modal;

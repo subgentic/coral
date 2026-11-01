@@ -90,6 +90,12 @@ const BASE = require('./test_base').BASE;
             type('set-password-new', 'x'); type('set-password-confirm', 'x'); submit();
             await waitFor(() => !$('set-password-error').hidden, '429 message');
             out.err429 = $('set-password-error').textContent; out.saveEnabledAfter429 = !$('set-password-save').disabled;
+            // a failed save on the required prompt: the server's words, Try again, where to go if it keeps failing, and still no way out (#11892)
+            reply['/api/auth/password/set'] = { status: 500, body: { error: 'The password could not be saved: disk full' } };
+            type('set-password-new', 'x'); type('set-password-confirm', 'x'); submit();
+            await waitFor(() => /disk full/.test($('set-password-error').textContent), '500 message');
+            out.fail = { err: $('set-password-error').textContent, btn: $('set-password-save').textContent, enabled: !$('set-password-save').disabled, note: $('set-password-failed').hidden ? '' : $('set-password-failed').textContent, buttons: [...document.querySelectorAll('#set-password-modal .modal-footer button')].map(b => b.textContent.trim()) };
+            document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); out.fail.stillOpen = !!$('set-password-modal');
             $('set-password-modal').remove();
             // opened from Settings or the sign-in bar (not the first-run prompt) it has a Cancel and Escape: the person chose to open it
             ui.showSetPasswordModal(); await waitFor(() => $('set-password-modal'), 'the dialog opened on purpose');
@@ -166,6 +172,9 @@ const BASE = require('./test_base').BASE;
         assert.deepEqual(out.setCall, { url: '/api/auth/password/set', body: { password: '  a b  ' } }, 'sent exactly as typed, spaces kept');
         assert.equal(out.laterButton, false, 'no Not now button'); assert.deepEqual(out.buttons, ['Set password'], 'the one action is the only button');
         assert.equal(out.openAfterEscape, true, 'Escape does not close it: a password is always created'); assert.ok(out.askedDespiteFlags, 'an old Not now flag does not keep the prompt away'); assert.ok(out.remoteAsked, 'another computer is asked too');
+        assert.match(out.fail.err, /disk full/, 'the server\'s words'); assert.equal(out.fail.btn, 'Try again', 'a button to try again'); assert.ok(out.fail.enabled);
+        assert.equal(out.fail.note, 'If this keeps failing, run coral reset-password in a terminal on this computer.', 'and where to go if it keeps failing');
+        assert.deepEqual(out.fail.buttons, ['Try again'], 'no way out beside it'); assert.ok(out.fail.stillOpen, 'Escape does not close it');
         assert.deepEqual(out.optionalButtons, ['Cancel', 'Set password'], 'opened on purpose it has a Cancel'); assert.ok(out.optionalEscape && out.optionalCancel, 'and Escape and Cancel close it');
         assert.ok(out.closedOn409);
         assert.equal(out.err429, 'Too many attempts. Try again in 30 s.'); assert.ok(out.saveEnabledAfter429);
