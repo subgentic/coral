@@ -139,6 +139,9 @@ func (s *Store) ListTaskPage(ctx context.Context, project string, q TaskListQuer
 	if limit > TaskListMaxLimit {
 		limit = TaskListMaxLimit
 	}
+	if _, err := s.ReleaseLapsedParks(ctx, project); err != nil { // a park whose end passed: one task in progress per owner before the list says so (#11659)
+		return nil, err
+	}
 	page := &TaskListPage{Tasks: []TaskListItem{}}
 	var err error
 	switch q.Status {
