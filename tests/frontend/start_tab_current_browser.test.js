@@ -6,6 +6,8 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { coralReady } = require('./helpers/wait');
+const { removeBoards } = require('./helpers/board_cleanup');
+const GHOST = 'no-such-team-11616'; // a team that is not there: its link must create nothing (it did: the Messages tab subscribed the viewer, #11624); the cleanup below is only for a regression
 
 const RECORDER = `(() => {
     const seen = [], note = () => { for (const b of document.querySelectorAll('.top-nav-tab[aria-current="page"]')) if (!seen.includes(b.id)) { if (!seen.length) window.__bodyTabAtFirstMark = document.body && document.body.getAttribute('data-nav-tab'); seen.push(b.id); } };
@@ -38,12 +40,13 @@ const RECORDER = `(() => {
             if (want === 'nav-tab-hub-inbox') assert.notEqual(d.bodyTab, 'hub-inbox', `${name}: the start tab was marked by startNav itself, before the Inbox's own switchNavTab ran (body data-nav-tab was ${d.bodyTab}): ${JSON.stringify(d)}`);
         }
         // deep links whose tab depends on where they end (QA's SHOULD, #11616): nothing is marked wrong first, whichever tab each ends on
-        for (const path of ['/chats', '/board/no-such-team-11616', '/servers/no-such-computer-11616']) {
+        for (const path of ['/chats', '/board/' + GHOST, '/servers/no-such-computer-11616']) {
             await ev(`try { localStorage.removeItem('coral-last-place'); } catch {} true`);
             const d = await open(1280, 800, false, path);
+            if (path.startsWith('/board/')) { const made = await ev(`fetch('/api/board/' + ${JSON.stringify(GHOST)} + '/subscribers').then(r => r.ok ? r.json() : []).then(j => (Array.isArray(j) ? j : j.subscribers || []).length)`); assert.equal(made, 0, `${path}: a team that is not there is not made by opening its link (no subscriber was added): ${made}`); }
             assert.equal(d.final.length, 1, `${path}: one current tab at the end: ${JSON.stringify(d)}`);
             assert.deepEqual(d.seen, d.final, `${path}: only the tab it ends on was ever marked current: ${JSON.stringify(d)}`);
         }
         console.log('\nPASS the start tab is the only tab ever marked current');
-    } finally { await client.close(); }
+    } finally { await removeBoards(ev, [GHOST]).catch(() => {}); await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

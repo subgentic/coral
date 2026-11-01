@@ -123,6 +123,7 @@ function registerRouteHandlers() {
     route('board', async r => { // the old board page is gone (#8061): /board/<team> opens the team page's Messages tab, in its place in the history
         await liveListReady;
         switchNavTab('agents', { fromHistory: true });
+        if (await teamIsMissing(routeKey(r))) { await applyTeamRoute(routeKey(r), 'goals', 0, ''); return; } // a stale or mistyped link: the team page's own "No team named" state; opening the Messages tab of a team that is not there would subscribe the viewer and so create the board (#11624)
         await openTeamPage(routeKey(r), { tab: 'messages', replace: true });
     });
 

@@ -205,6 +205,13 @@ const { Page, Runtime, Emulation } = client;
         const TITLE = `(document.getElementById('team-page-title') || {}).textContent`;
         const board = 'routes-qa-3532';
         boards.push(board);
+        // a team that is not there: its link shows the team page's "No team named" state and makes nothing (opening its Messages tab subscribed the viewer and so created the board, #11624)
+        await open(`/board/${board}`);
+        await until(`${TITLE} === ${JSON.stringify(board)} || /No team named/.test(document.body.innerText)`, 'the missing team page');
+        const made = await api('GET', `/api/board/${board}/subscribers`);
+        check('/board/<name> of a team that is not there creates no board', !(await ev(shown('team-page-view'))) || /No team named/.test(await ev('document.body.innerText')), await url());
+        check('and added no subscriber', !Array.isArray(made && made.data) || made.data.length === 0, JSON.stringify(made));
+        await api('POST', `/api/board/${board}/subscribe`, { subscriber_id: 'Routes QA', job_title: 'QA' }); // now it is there
         await open(`/board/${board}`);
         await until(`${TITLE} === ${JSON.stringify(board)}`, 'the board');
         check('/board/<name> opens the board on its team page, at /team/<name>/board', (await ev(shown('team-page-view'))) && (await url()) === `/team/${board}/board`, await url());
