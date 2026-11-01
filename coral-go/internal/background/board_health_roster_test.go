@@ -93,21 +93,23 @@ func TestRosterClassifiesEveryAgent(t *testing.T) {
 		require.NoError(t, err)
 	}
 	out := h.check()
-	assert.Contains(t, out, "[Coral health check] "+h.now.UTC().Format("15:04Z")+" · 1 working · 1 waiting · 1 need input · 1 idle · 1 of unknown state · 1 asleep · 1 offline · 0 claimable tasks")
+	assert.Contains(t, out, "[Coral health check] "+h.now.UTC().Format("15:04Z")+" · Orchestrator, act on these (oldest first):")
+	assert.Contains(t, out, "Counts: 1 working · 1 waiting · 1 need input · 1 idle · 1 of unknown state · 1 asleep · 1 offline · 0 claimable tasks", "the counts are last")
 	assert.NotContains(t, strings.ToLower(out), "progressing")
 	assert.NotContains(t, out, "awake agents are working")
 	assert.NotContains(t, out, "\n")
-	assert.Contains(t, out, "Waiting on YOU (Orchestrator), 1: Waiter ")
+	assert.Contains(t, out, "Waiter has waited ")
+	assert.Contains(t, out, " on YOU. Answer them.")
 	assert.Contains(t, out, "posts.", "volume is only counted")
 	// One word per meaning (#8294), all lower case (#8311): waiting is a wait on a task or a person, "need input" is an agent at a permission prompt (the dashboard's Needs input); the check no longer says "at a prompt".
 	assert.NotContains(t, out, "1 at a prompt", "the header counts them as need input")
-	// The agent at a prompt is named under "Needs you", before the idle one (most urgent first), and the one with no signal is named too, each with its ack id to clear it.
+	// The agents are named in the action list, oldest first, and the one with no signal is named too, each with its ack id to clear it.
 	prompted, idler, blind := strings.Index(out, "Prompted: needs input"), strings.Index(out, "Idler: idle"), strings.Index(out, "Blind: no signal")
 	require.Greater(t, prompted, 0, "the agent at a prompt is named: "+out)
 	require.Greater(t, idler, 0, "the idle agent is named: "+out)
 	require.Greater(t, blind, 0, "the agent with no signal is named: "+out)
-	assert.Less(t, prompted, idler, "needs input comes before idle")
-	assert.Less(t, idler, blind, "no signal comes after idle")
+	assert.Less(t, prompted, idler, "an agent at a dialog is pinned above the older lines (#11431)")
+	assert.Less(t, idler, blind, "an agent with no signal has no age: it comes after the aged ones")
 	for _, name := range []string{"Prompted", "Idler", "Blind"} {
 		i := strings.Index(out, name+": ")
 		assert.Contains(t, out[i:i+strings.Index(out[i:], "[ack ")+len("[ack ")+9], "[ack ", name+" keeps its ack id")
@@ -133,17 +135,22 @@ func TestRosterGroupsWaitsByWhoTheyWaitOn(t *testing.T) {
 	h.wait(14, "Dev E", "commit", "abc123")             // on a commit
 	h.wait(15, "Dev F", "operator", "")                 // on the operator: not a group
 	h.wait(16, "Dev G", "message", "Nobody Here")       // a name that is no member: its own group
+	h.now = time.Now().UTC().Add(20 * time.Minute)      // every wait is now about twenty minutes old
 	out := h.check()
 	assert.Contains(t, out, "7 waiting")
-	iYou := strings.Index(out, "Waiting on YOU (Orchestrator), 2: ")
-	iSec := strings.Index(out, "Waiting on Security Reviewer, 2: ")
-	require.True(t, iYou >= 0 && iSec > iYou, "the recipient's group first, then the larger: %s", out)
-	assert.Contains(t, out, "Dev A ")
-	assert.Contains(t, out, "Dev B ")
-	assert.Contains(t, out, "Waiting on a commit, 1: Dev E ")
-	assert.Contains(t, out, "Waiting on Nobody Here, 1: Dev G ")
-	assert.NotContains(t, out, "Waiting on the Operator", "an operator wait is the operator's question, not a group")
-	assert.Equal(t, 1, strings.Count(out, "Dev F"), "named once, with the operator's questions")
+	assert.Contains(t, out, "Dev A has waited ")
+	assert.Contains(t, out, "Dev B has waited ")
+	assert.Equal(t, 2, strings.Count(out, " on YOU. Answer them."), "by name, and by role and case")
+	assert.Contains(t, out, "Dev C has waited ")
+	assert.Contains(t, out, " min on Security Reviewer; Security Reviewer has posted nothing since.", "a silent target")
+	assert.Contains(t, out, "Dev D has waited ", "a wait on a task is on the task's owner")
+	// what Coral cannot compute is not a line: a commit, a name that is no member, the operator's own
+	assert.NotContains(t, out, "Dev E", "a wait for a commit: nobody to ask")
+	assert.NotContains(t, out, "Dev G", "a name that is no member")
+	assert.Equal(t, 1, strings.Count(out, "Dev F"), "an operator wait is named once, in the section for the Operator")
+	assert.Less(t, strings.Index(out, "Needs the Operator"), strings.Index(out, "Dev F"))
+	assert.Less(t, strings.Index(out, "on YOU"), strings.Index(out, "on Security Reviewer"), "what waits on the recipient is first")
+	_ = ctx
 }
 
 // STALE: the awaited party has mentioned the waiter since the wait began, yet the waiter has not woken.
@@ -160,7 +167,7 @@ func TestRosterFlagsStaleWaits(t *testing.T) {
 	h.wait(3, "Lead", "message", "Security Reviewer")
 	h.wait(4, "Front", "message", "Security Reviewer")
 	out := h.check()
-	assert.NotContains(t, out, "STALE", "a message from before the wait, and none for Front: nothing is stale")
+	assert.NotContains(t, out, "although", "a message from before the wait, and none for Front: nothing is stale")
 	time.Sleep(1100 * time.Millisecond)
 	_, err = h.s.PostMessage(ctx, "team", "Security Reviewer", "@Lead please look at the patch", nil)
 	require.NoError(t, err)
@@ -168,9 +175,9 @@ func TestRosterFlagsStaleWaits(t *testing.T) {
 	require.NoError(t, err)
 	h.now = time.Now().UTC().Add(time.Minute)
 	out = h.check()
-	assert.Contains(t, out, "Lead ")
-	assert.Contains(t, out, "(STALE: Security Reviewer has posted a message mentioning them since the wait started)")
-	assert.Equal(t, 1, strings.Count(out, "STALE"), "only Lead: Front was mentioned by the Orchestrator, not by who it waits on")
+	assert.Contains(t, out, "Lead has waited ")
+	assert.Contains(t, out, " although Security Reviewer has posted a message mentioning them since: check Lead.")
+	assert.Equal(t, 1, strings.Count(out, "although"), "only Lead: Front was mentioned by the Orchestrator, not by who it waits on")
 }
 
 // A sleeping agent with messages tagged to it unread is named, with how many and since when; one that read them, or was never
@@ -196,9 +203,9 @@ func TestRosterNamesSleepersWithUnreadTags(t *testing.T) {
 	require.NotEmpty(t, msgs)
 	out := h.check()
 	assert.Contains(t, out, "3 asleep")
-	assert.Contains(t, out, "Asleep with unread tagged messages: Digital Ocean Expert (2 tagged since ")
-	assert.NotContains(t, out, "Quiet Sleeper (")
-	assert.NotContains(t, out, "Reader (")
+	assert.Contains(t, out, "Digital Ocean Expert is asleep with 2 messages tagged to it unread since ")
+	assert.NotContains(t, out, "Quiet Sleeper is asleep")
+	assert.NotContains(t, out, "Reader is asleep")
 }
 
 // Rule 6: someone who has waited more than ten minutes on X is told to X once, as a direct mention, per wait.
@@ -255,7 +262,7 @@ func TestRosterWaitsAreNotSilenced(t *testing.T) {
 	_, err := h.s.UpdateBoardSettings(context.Background(), "team", board.BoardSettingsUpdate{Health: &hs})
 	require.NoError(t, err)
 	out := h.check()
-	assert.Contains(t, out, "Waiting on YOU (Orchestrator), 1: Dev ", "a wait on the recipient is sent even with the all-clear off")
+	assert.Contains(t, out, "Dev has waited ", "a wait on the recipient is sent even with the all-clear off")
 
 	// With everyone working, no wait and no tag, there is nothing to say and, with the all-clear off, nothing is sent.
 	h2 := newCheckHarness(t)
