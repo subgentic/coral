@@ -46,6 +46,12 @@ const SID = '11111111-2222-4333-8444-555555555555';
             await ev(`document.querySelector('${host} .chief-swatch[aria-label=Teal]').click(); true`);
             assert.deepEqual(await ev(`(() => { const a = document.querySelector('${host} .chief-preview .chief-avatar'); return [a.textContent, a.dataset.color, document.querySelector('${host} .chief-preview-name').textContent]; })()`), ['A', '3', 'Ada'], at + 'the preview is the name\'s first letter on the chosen colour');
             await type(`${host} input[name=chief_avatar_letter]`, 'k');
+            // going to another Settings tab and back keeps what was typed and not yet saved (#11839): real tab clicks
+            await ev(`document.getElementById('settings-tab-agents').click(); true`);
+            await waitFor(`document.getElementById('settings-pane-chief').hidden`, at + 'the Chief tab was left', 5000);
+            await ev(`document.getElementById('settings-tab-chief').click(); true`);
+            await waitFor(`!document.getElementById('settings-pane-chief').hidden`, at + 'the Chief tab is shown again', 5000);
+            assert.deepEqual(await ev(`['chief_name', 'chief_avatar_letter'].map(n => document.querySelector('${host} input[name=' + n + ']').value)`), ['Ada', 'k'], at + 'the unsaved name and letter are still there after another tab and back');
             assert.equal(await ev(`document.querySelector('${host} .chief-preview .chief-avatar').textContent`), 'K', at + 'a chosen letter wins');
             await type(`${host} input[name=chief_name]`, 'x'.repeat(41));
             await ev(`[...document.querySelectorAll('#settings-modal ${host} button, ${host} button')].find(b => /^Save Chief/.test(b.textContent.trim())).click(); true`);

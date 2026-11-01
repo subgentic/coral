@@ -14,10 +14,12 @@ const { setSettingsAtOpen, setFormAtOpen, setPayloadAtOpen } = await importOnce(
 
 export { hideSettingsModal, applySettings }; // the dialog's public surface stays here; closing and Save live in settings_save.js (#8383)
 
-const mountChief = () => importOnce('./chief_setup.js').then(m => m.mountChiefSetup(document.getElementById('settings-chief-host'))).catch(() => {}); // Settings > Chief: one screen (#11796); the hub has none
+let chiefMounted = false; // one mount per open of Settings: going to another group and back keeps what was typed and not yet saved (#11839)
+const mountChief = () => { if (chiefMounted) return; chiefMounted = true; importOnce('./chief_setup.js').then(m => m.mountChiefSetup(document.getElementById('settings-chief-host'))).catch(() => { chiefMounted = false; }); }; // Settings > Chief: one screen (#11796); the hub has none
 document.addEventListener('coral-settings-group', e => { if (e.detail?.id === 'chief' && !isCloud()) mountChief(); });
 
 export async function showSettingsModal(group) {
+    chiefMounted = false; // a fresh open reads the settings again
     await settingsRowsReady(); // the dialog's rows that are fields (settings_fields.js) are in the page before anything reads them by id
     // Focus moves in on open, Tab stays inside, and focus comes back on close (accessibility pass).
     attachDialogFocus(document.getElementById('settings-modal'));
