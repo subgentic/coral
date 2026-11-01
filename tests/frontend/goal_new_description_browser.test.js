@@ -27,7 +27,7 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
                 const hex = 'e'.repeat(63) + (++window.__n).toString(16);
                 return json({ hex, name: 'picture-' + window.__n + '.png', content_type: ct, size: (o.body && o.body.size) || 0 }, 201);
             }
-            if (method === 'POST' && /\\/api\\/board\\/${B}\\/goals$/.test(url)) { window.__posts.push(JSON.parse(o.body)); return json({ id: 999, title: 'x', state: 'active' }, 201); }
+            if (method === 'POST' && /\\/api\\/board\\/${B}\\/goals$/.test(url)) { window.__posts.push(JSON.parse(o.body)); return json({ id: 999, title: 'x', state: 'active', orchestrator_told_at: new Date().toISOString() }, 201); }
             if (method === 'GET' && ${goalId ? 'true' : 'false'} && /\\/api\\/board\\/${B}\\/goals(\\/${goalId})?(\\?|$)/.test(url)) { // the goal as the #11650 slice will give it: with its pictures
                 return real(u, o).then(async r => { const j = await r.clone().json().catch(() => null); if (!j) return r; const add = g => (g && g.id === ${goalId} ? { ...g, images: [{ hex: 'e'.repeat(63) + '1', name: 'one.png', content_type: 'image/png' }, { hex: 'e'.repeat(63) + '2', name: 'two.png', content_type: 'image/png' }] } : g);
                     return json(Array.isArray(j) ? j.map(add) : j.goals ? { ...j, goals: j.goals.map(add) } : add(j)); });
@@ -111,6 +111,7 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
             await waitFor(`window.__posts.length === 1`, at + 'the post', 5000);
             const post = await ev(`window.__posts[0]`);
             assert.equal(post.title, 'Fix the lock');
+            await waitFor(`/Goal created\\. The Orchestrator was told\\./.test(document.querySelector('#toast-host')?.textContent || '')`, at + 'a goal the Orchestrator was told of says so in a toast (#11880)', 5000);
             assert.equal(post.outcome, 'The first line.\nThe second line.', at + 'the Description is the outcome, line breaks kept');
             assert.equal(post.images.length, 3, at + 'three pictures named');
             assert.ok(post.images.every(x => /^e{63}[0-9a-f]$/.test(x)) && new Set(post.images).size === 3, at + 'each a stored artifact ' + JSON.stringify(post.images));

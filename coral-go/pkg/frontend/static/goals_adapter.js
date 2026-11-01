@@ -17,6 +17,7 @@ export function toGoal(g) {
         driver: text(g && g.driver),
         images: Array.isArray(g && g.images) ? g.images.map(i => ({ hex: text(i && i.hex), name: text(i && i.name) })).filter(i => /^[0-9a-f]{64}$/.test(i.hex)) : [], // the pictures the goal was made with, in the order sent (#11653)
         updatedAt: text(g && (g.updated_at ?? g.updatedAt)),
+        toldAt: text(g && g.orchestrator_told_at), // when the team's Orchestrator was told this goal was made (#11866); '' when nobody was
         rollup: { done: count(r.done), active: count(r.active), blocked: count(r.blocked), queued: count(r.queued) },
     };
 }
