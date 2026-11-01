@@ -54,7 +54,7 @@ const B = 'goal-ready-' + Date.now().toString(36);
             }
             if (!mobile) await ev(`[...document.querySelectorAll('#team-panel-goals tbody tr.dt-row')].find(r => r.textContent.includes('Ship the pilot')).querySelector('.dt-primary').click(); true`);
             else await ev(`[...document.querySelectorAll('#team-panel-goals tbody tr.dt-row')].find(r => r.textContent.includes('Ship the pilot')).querySelector('.dt-primary').click(); true`);
-            await waitFor(`!!document.querySelector('#team-panel-goals .goals-alldone, #team-panel-goals .goals-page, #team-panel-goals .goals-back')`, `${w}: the goal's own page opens`, 8000);
+            await waitFor(`!!document.querySelector('#team-panel-goals .goals-page, #team-panel-goals .goals-back')`, `${w}: the goal's own page opens`, 8000);
             await ev(`(document.querySelector('#team-panel-goals .goals-back') || {click() {}}).click(); true`);
             await waitFor(`document.querySelectorAll('#team-panel-goals tbody tr.dt-row').length >= 2`, `${w}: back on the list`, 8000);
             if (big) await ev(`document.documentElement.style.fontSize = ''; true`);
