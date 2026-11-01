@@ -51,7 +51,7 @@ func (s *Store) Subscribe(ctx context.Context, project, subscriberID, jobTitle, 
 		     session_name = excluded.session_name,
 		     subscriber_id = excluded.subscriber_id,
 		     is_active = 1,
-		     can_peek = excluded.can_peek`,
+		     can_peek = MAX(board_subscribers.can_peek, excluded.can_peek)`, // a re-join does not erase the launch record (#11759): can_peek is set by the launch and kept
 		project, subscriberID, subscriberID, sessionName, jobTitle, originServer, receiveMode, carryForwardCursor, now, peekFlag, now)
 	s.subscribersChanged()
 	if err != nil {

@@ -101,16 +101,38 @@ func ClaimsOrchestrator(subscriberID, jobTitle string) bool {
 	return strings.Contains(strings.ToLower(subscriberID), "orchestrator") || strings.Contains(strings.ToLower(jobTitle), "orchestrator")
 }
 
-// OrchestratorSeatHeldBy is the subscriber, other than except, that holds the Orchestrator's name or title on the board: active or not (an Orchestrator that is away still holds it), "" when nobody does. A join
-// that claims the role is refused while this is not empty (#11759): a member cannot take the role by joining with the title while the real one is away.
+// OrchestratorSeatHeldBy is the subscriber, other than except, that stands in the way of except's claim on the Orchestrator's name or title: "" when nobody does. A holder counts whether it is active or away (an
+// Orchestrator that is away still holds the seat), so a member cannot take the role by joining with the title (#11759). The launched Orchestrator (its subscription carries can_peek, set only by the launch) may
+// always join again, and a holder that is already on the team (an older team's title-holder) may join again unless a launched one is there; a claim by anyone else is refused while any holder exists.
 func (s *Store) OrchestratorSeatHeldBy(ctx context.Context, project, except string) (string, error) {
-	var id string
-	err := s.db.GetContext(ctx, &id, `SELECT subscriber_id FROM board_subscribers WHERE project = ? AND subscriber_id <> ?
-		AND (LOWER(job_title) LIKE '%orchestrator%' OR LOWER(subscriber_id) LIKE '%orchestrator%') ORDER BY is_active DESC, id LIMIT 1`, project, except)
-	if errors.Is(err, sql.ErrNoRows) {
-		return "", nil
+	var rows []struct {
+		ID   string `db:"subscriber_id"`
+		Peek int    `db:"can_peek"`
 	}
-	return id, err
+	if err := s.db.SelectContext(ctx, &rows, `SELECT subscriber_id, can_peek FROM board_subscribers WHERE project = ?
+		AND (LOWER(job_title) LIKE '%orchestrator%' OR LOWER(subscriber_id) LIKE '%orchestrator%') ORDER BY can_peek DESC, is_active DESC, id`, project); err != nil {
+		return "", err
+	}
+	own, ownLaunched, otherLaunched, other := false, false, "", ""
+	for _, r := range rows {
+		if r.ID == except {
+			own, ownLaunched = true, r.Peek != 0
+			continue
+		}
+		if other == "" {
+			other = r.ID
+		}
+		if r.Peek != 0 && otherLaunched == "" {
+			otherLaunched = r.ID
+		}
+	}
+	switch {
+	case own && ownLaunched:
+		return "", nil
+	case own:
+		return otherLaunched, nil
+	}
+	return other, nil
 }
 
 // HandToOrchestrator moves a task whose candidate was just recorded (submit-review) to the
