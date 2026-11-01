@@ -480,7 +480,7 @@ Launch a new agent session.
 
 Required: `working_dir`. All other fields are optional.
 
-**Permission mode (#10362):** a launch with no permission flag starts in the saved default mode, or in Auto for the Operator's launch of Claude when none is saved. `"permission_mode": "default"` says Default explicitly: the agent starts in Default, asks before it acts, and Default is what is recorded for a restart. It is the only value (any other mode is 400; send the CLI's own flags for those), and a permission flag of the request's own wins over it.
+**Permission mode (#10362):** a launch with no permission flag starts in the saved default mode, or in Auto for the Operator's launch of Claude when none is saved. `"permission_mode": "default"` says Default explicitly: the agent starts in Default, asks before it acts, and Default is what is recorded for a restart. It is the only value (any other mode is 400; send the CLI's own flags for those), and a permission flag of the request's own wins over it. An AGENT never starts a less-restricted agent: it keeps only `--model`, and when the saved default skips the prompts its launch is refused (`403 agent_launch_needs_mode`), except that the board's **Orchestrator** (the person's helper) starts in the ask-first mode instead (#11713; a Codex, which cannot reach Coral when it asks first, stays refused); the Operator raises the mode later.
 
 **MCP servers:** Coral doesn't configure MCP servers for an agent. Set them up in the agent CLI's
 own configuration. A request that includes `mcpServers` is refused with 400
