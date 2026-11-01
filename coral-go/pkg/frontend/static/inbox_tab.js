@@ -55,6 +55,7 @@ export function updateInboxTab() {
     const label = n > 0 ? unreadReviewItems().length || failedUnread().length || operatorAsks().length ? `Inbox, ${n} need your attention` : `Inbox, ${n} waiting for input` : null;
     if (tab.getAttribute('aria-label') !== label) { if (label) tab.setAttribute('aria-label', label); else tab.removeAttribute('aria-label'); }
     setInboxCount('needs', n);
+    importOnce('./attention.js').then(m => m.setAttentionTotal(n)); // the background tab's title carries the same number as the badge (#11837)
     _hooks.needs?.(); // the Needs you rows, once the sidebar is loaded and while the Inbox is on screen
     announceNewlyWaiting(tab);
 }

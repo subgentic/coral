@@ -162,12 +162,13 @@ export function attachComments(dialog, body, host, opts = {}) {
         const close = btn('ac-sheet-close ic-close', '', 'Hide the comments'); close.addEventListener('click', () => { userSet(false); toggle.focus(); }); head.append(close);
         panel.append(head);
         const d = st.data;
-        if (d.locked) panel.append(el('p', 'ac-note ac-locked', 'Comments are locked: read only.'));
+        if (d.locked) panel.append(el('p', 'ac-note ac-locked', d.canLock ? 'Comments are locked: nobody can add comments to this file. You can unlock it any time.' : 'Comments are locked: read only.'));
         else if (!d.canComment) panel.append(el('p', 'ac-note ac-readonly', d.reason || 'You can read the comments here but not write them.'));
         if (d.canLock) {
-            const lock = btn('ac-lock', d.locked ? 'Unlock comments' : 'Lock comments');
+            const why = d.locked ? 'Comments are locked: nobody can add comments to this file. You can unlock it any time.' : 'Locking stops anyone adding comments to this file. You can unlock it any time.';
+            const lock = btn('ac-lock', d.locked ? 'Unlock comments' : 'Lock comments'); lock.title = why;
             lock.addEventListener('click', async () => { try { await api.setLocked(st.hex, st.server, !d.locked); await refresh(); } catch (e) { showToast(e.message, true); } });
-            panel.append(lock);
+            panel.append(lock); if (!d.locked) panel.append(el('p', 'ac-note ac-lock-note', why)); // locked: the note above says it
         }
         const wrap = el('ul', 'ac-list');
         const shownAll = list.filter(t => st.showResolved || !t.c.resolved);
