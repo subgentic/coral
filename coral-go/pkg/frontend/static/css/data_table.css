@@ -486,6 +486,19 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 .dt-row.dt-unread:not(.dt-mailed) .dt-primary { font-weight: var(--fw-strong); }
 .dt-row.dt-unread:not(.dt-mailed) .dt-primary::before { content: "" / "Unread"; display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: var(--accent); vertical-align: middle; }
 
+/* Needs you reads like a mailbox (#11668, the operator's Gmail shot): an unread row's name is bold on a slightly lighter row, a read row is regular and muted on the plain table; no dot, no pill (a screen reader hears "read" or "unread" in the row). The lighter row is a tint of the text colour on the table in the dark theme and the table's own white in the light one, where the read row is tinted instead. */
+#group-table-view[data-group="hub-inbox:needs"] .dt-row.dt-unread:not(.dt-mailed) .dt-primary::before { content: none; }
+#group-table-view[data-group="hub-inbox:needs"] .dt-row.dt-unread td { background: color-mix(in srgb, var(--text-primary) 5%, var(--table-bg)); }
+#group-table-view[data-group="hub-inbox:needs"] .dt-row.dt-read .dt-primary { font-weight: var(--fw-regular); }
+#group-table-view[data-group="hub-inbox:needs"] .dt-row.dt-read td, #group-table-view[data-group="hub-inbox:needs"] .dt-row.dt-read .dt-subtitle, #group-table-view[data-group="hub-inbox:needs"] .dt-row.dt-read .dt-primary { color: var(--text-secondary); }
+[data-theme="light"] #group-table-view[data-group="hub-inbox:needs"] .dt-row.dt-unread td { background: var(--table-bg); }
+[data-theme="light"] #group-table-view[data-group="hub-inbox:needs"] .dt-row.dt-read td { background: color-mix(in srgb, var(--text-primary) 4%, var(--table-bg)); }
+#group-table-view[data-group="hub-inbox:needs"] .dt-row.dt-unread:hover td, #group-table-view[data-group="hub-inbox:needs"] .dt-row.dt-read:hover td { background: var(--table-hover); }
+#group-table-view[data-group="hub-inbox:needs"] .dt-box.dt-folded .dt-row td { background: none; } /* a folded (phone) row is one block: the tint is on the row, not on each cell */
+#group-table-view[data-group="hub-inbox:needs"] .dt-box.dt-folded .dt-row.dt-unread { background: color-mix(in srgb, var(--text-primary) 5%, var(--table-bg)); }
+[data-theme="light"] #group-table-view[data-group="hub-inbox:needs"] .dt-box.dt-folded .dt-row.dt-unread { background: var(--table-bg); }
+[data-theme="light"] #group-table-view[data-group="hub-inbox:needs"] .dt-box.dt-folded .dt-row.dt-read { background: color-mix(in srgb, var(--text-primary) 4%, var(--table-bg)); }
+
 /* A column with nothing in it on any row is not drawn (#9846): its head and its cells; the header draws it again when a row has a value. */
 .dt-table .dt-col-unused, .dt-table .dt-col-tight { display: none; }
 
