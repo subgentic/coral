@@ -536,8 +536,6 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
     .inbox-needs-results .inbox-review-actions:focus-within > :not(.dt-star) { position: static; width: auto; height: auto; overflow: visible; clip-path: none; }
     .inbox-needs-results .dt-row { -webkit-touch-callout: none; user-select: none; } /* the long press selects the row: not the browser's text selection or menu */
     .inbox-review-actions .btn:not(.btn-icon):not(.dt-star) { padding-inline: 6px; } /* Approve and Changes (and the star and the three dots) fit the Actions column at 360 px, leaving the name its line (#11414) */
-    .inbox-review-actions-star > .dt-star { width: 16px; margin-inline-end: -4px; } /* on a phone the starred glyph is not a button: 16 px, and it leans 4 px into the gap (#9922) */
-    .dt-box.dt-fold-column.dt-folded tr:has(.inbox-review-actions-star > .dt-star-on) td.dt-line-1.dt-grow { flex-basis: 3.5rem; } /* a starred row name has 3.5 rem of its own, not 5, so the actions stay on its line at 360 px (#9922) */
 }
 
 /* A job or workflow Coral added as an example: its name and an Example tag on one line (#10001). */
@@ -571,7 +569,7 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
     .inbox-review-actions.inbox-slots { display: grid; grid-template-columns: 1.5rem 5rem 5rem 4rem 4rem 2.25rem; column-gap: 8px; justify-content: end; }
     .inbox-slots-compact.inbox-review-actions.inbox-slots { grid-template-columns: 1.5rem 5rem 5rem 2.25rem; }
     .inbox-slots > .btn { width: 100%; min-width: 0; padding-inline: 4px; }
-    .inbox-slots > [data-slot="star"] { grid-column: 1; } .inbox-slots > [data-slot="approve"] { grid-column: 2; } .inbox-slots > [data-slot="changes"] { grid-column: 3; }
+    .inbox-slots > [data-slot="save"] { grid-column: 1; } .inbox-slots > [data-slot="approve"] { grid-column: 2; } .inbox-slots > [data-slot="changes"] { grid-column: 3; }
     .inbox-slots > [data-slot="deny"] { grid-column: 4; } .inbox-slots > [data-slot="ignore"] { grid-column: 5; } .inbox-slots > [data-slot="dots"] { grid-column: 6; justify-self: center; }
     .inbox-slots-compact > [data-slot="ignore"] { grid-column: 3; } .inbox-slots-compact > [data-slot="dots"] { grid-column: 4; }
 } /* the Actions column is the last, at the row's right edge: its buttons end there (#11552) */

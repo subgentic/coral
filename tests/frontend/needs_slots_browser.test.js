@@ -1,5 +1,5 @@
 // Needs you buttons are not "all over the place" (#11630, the operator): in the wide table every button is at the same x on every row, whether the row is read (it has a three dots), starred or a question to the
-// operator: Approve (or Answer) in one slot, then Changes, Deny, Ignore, the dots; a star and the dots have their slots always. Also a subtitle's tooltip is set only while it is cut (a title left on a row
+// operator: Approve (or Answer) in one slot, then Changes, Deny, Ignore, the dots; the bookmark and the dots have their slots always. Also a subtitle's tooltip is set only while it is cut (a title left on a row
 // showed "from Frontend Dev" over another row). 1440 (the four words) and 1280 (Approve, Changes, the dots). Review rows and a question stubbed in the page. Drives Chrome over CDP through agent_view_harness.js.
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
@@ -33,9 +33,9 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
             await waitFor(`document.querySelectorAll('${T} tbody tr').length === 6`, at + 'five reviews and a question', 15000);
             await ev(framesJs(4));
-            const xs = await ev(`(() => { const slot = (b) => { const t = b.textContent.trim(); return b.classList.contains('inbox-row-more-toggle') ? 'more' : t === 'Approve' || t === 'Answer' ? 'approve' : ['Changes', 'Deny', 'Ignore'].includes(t) ? t.toLowerCase() : b.classList.contains('dt-star') ? 'star' : ''; };
+            const xs = await ev(`(() => { const slot = (b) => { const t = b.textContent.trim(); return b.classList.contains('inbox-row-more-toggle') ? 'more' : t === 'Approve' || t === 'Answer' ? 'approve' : ['Changes', 'Deny', 'Ignore'].includes(t) ? t.toLowerCase() : b.classList.contains('inbox-bookmark') ? 'save' : ''; };
                 const out = {}; for (const tr of document.querySelectorAll('${T} tbody tr')) for (const b of tr.querySelectorAll('button')) { const s = slot(b); if (s) (out[s] = out[s] || []).push(Math.round(b.getBoundingClientRect().left)); } return out; })()`);
-            for (const s of ['approve', 'changes', ...(w >= 1360 ? ['deny', 'ignore'] : []), 'more', 'star']) {
+            for (const s of ['approve', 'changes', ...(w >= 1360 ? ['deny', 'ignore'] : []), 'more', 'save']) {
                 const v = xs[s] || [];
                 check(v.length > 0 && new Set(v).size === 1, at + `every ${s} button is at the same x on every row: ${JSON.stringify(v)}`);
             }

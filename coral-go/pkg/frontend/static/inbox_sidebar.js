@@ -39,7 +39,6 @@ const { openedFrom, backLabelFor } = await importOnce('./inbox_back_label.js'); 
 const saved = await importOnce('./saved.js');
 const DT = await importOnce('./data_table.js'); // the one table (#7743): the Tasks group's page is its Tasks columns
 const { el } = DT;
-const { starControl } = await importOnce('./artifact_star.js'); // a star on a review artifact's row (#9834)
 const TF = await importOnce('./task_filters.js');
 const TV = await importOnce('./tasks_view.js'); // the one Tasks view
 const VL = await importOnce('./view_list.js'); // the mailbox's view list (#7785)
@@ -205,6 +204,9 @@ function keepPlace(button) {
 /** Four words, the item's name, the task link and the goal need about 1360 px of window (the sidebar takes 320 of it): narrower, and on a phone, Deny and Ignore are in the row's menu. */
 const compactActions = () => isPhoneLayout() || !matchMedia('(min-width: 1360px)').matches;
 let moreMenus = 0;
+/** The bookmark of Save for later, drawn like the Saved folder's (the icon font has no glyph for it). */
+function bookmarkIcon() { const NS = 'http://www.w3.org/2000/svg', svg = document.createElementNS(NS, 'svg'), path = document.createElementNS(NS, 'path'); for (const [k, v] of Object.entries({ viewBox: '0 0 16 16', width: '16', height: '16', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.5', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true' })) svg.setAttribute(k, v); path.setAttribute('d', 'M4 2.5h8v11L8 10.5l-4 3z'); svg.append(path); return svg; }
+
 /** A row's less used actions in one menu behind a three-dot button (menu_button.js: arrow keys, Escape back to the button, Tab or a tap elsewhere closes). items: [{ label, title, run(button) }]. */
 function moreMenu(items, label) {
     const id = `inbox-more-${++moreMenus}`, wrap = DT.el('span', 'inbox-row-more'), toggle = DT.el('button', 'btn btn-quiet btn-icon inbox-row-more-toggle');
@@ -267,8 +269,8 @@ export function reviewActions(row, inSaved = false) { // inSaved (#11641): a sav
         return importOnce('./artifact_review.js').then(async ({ unsaveRow }) => { await unsaveRow(row.team, row); sayLive(`${file} is back in Needs you.`); }).catch(error => failed(b, error)); };
     box._ignore = ignore; // a swipe on a phone is the same Ignore (#11642)
     const unread = b => { b.disabled = true; errorText.textContent = ''; return setReviewRead(row, false).then(() => sayLive(`Marked ${file} unread.`)).catch(error => failed(b, error)); };
-    const star = starControl(row, { hex: row.hex, name: file }); // the review artifact's star: a glyph when starred, a button at a hover (#9834)
-    if (star) { star.setAttribute('data-slot', 'star'); box.append(star); box.classList.add('inbox-review-actions-star'); }
+    const bookmark = !inSaved && !isPhoneLayout() && !decisionNeedsPerson(splitKey(row.team).server); // the star's slot is Save for later (#11672, the operator): a bookmark button; a phone has it in the three dots
+    if (bookmark) { const mark = DT.el('button', 'btn btn-quiet btn-icon inbox-bookmark'); mark.type = 'button'; mark.setAttribute('data-slot', 'save'); mark.setAttribute('aria-label', `Save for later: ${file}`); mark.title = 'Save for later'; mark.append(bookmarkIcon()); mark.addEventListener('click', () => save(mark)); box.append(mark); }
     const menu = [];
     if (!decisionNeedsPerson(splitKey(row.team).server)) { // through Coral Hub a guest cannot decide
         box.append(word('Approve', 'Approve', 'btn-primary', approve), word('Changes', 'Request changes', '', () => openReview(row, { requestChanges: true })));
@@ -277,7 +279,7 @@ export function reviewActions(row, inSaved = false) { // inSaved (#11641): a sav
         else {
             if (compact) menu.push({ label: 'Deny', title: 'A final no: the agent is told', run: deny }, { label: 'Ignore', title: 'Take it out of Needs you; nobody is told', run: ignore });
             else box.append(word('Deny', 'Deny', 'btn-quiet inbox-deny', deny), word('Ignore', 'Ignore', 'btn-quiet', ignore));
-            menu.push({ label: 'Save for later', title: 'Keep it in Saved, out of Needs you; nobody is told', run: save });
+            if (!bookmark) menu.push({ label: 'Save for later', title: 'Keep it in Saved, out of Needs you; nobody is told', run: save });
         }
     }
     if (isRead(row) && !inSaved) { box.classList.add('inbox-review-actions-read'); menu.push({ label: 'Mark unread', title: 'Count it in Needs you again', run: unread }); }

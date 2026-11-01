@@ -45,9 +45,14 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await ev(framesJs(3));
             const dots = file => ev(`(() => { document.querySelector('${T} button[aria-label="More actions for ${file}"]').click(); return true; })()`);
             // the three dots: Save for later
-            await dots('plan-1.md');
-            await waitFor(`!!document.querySelector('${T} .menu-item[aria-label="Save for later: plan-1.md"]')`, at + 'the dots have "Save for later"', 5000);
-            await ev(`document.querySelector('${T} .menu-item[aria-label="Save for later: plan-1.md"]').click(); true`);
+            if (!mobile) { // a wide row's star slot is the bookmark (#11672); the row's dots have no such item
+                check(await ev(`!document.querySelector('${T} .dt-star') && !!document.querySelector('${T} button.inbox-bookmark[aria-label="Save for later: plan-1.md"]')`), at + 'the row has a Save for later bookmark and no star');
+                await ev(`document.querySelector('${T} button.inbox-bookmark[aria-label="Save for later: plan-1.md"]').click(); true`);
+            } else { // a phone's row has it in the three dots
+                await dots('plan-1.md');
+                await waitFor(`!!document.querySelector('${T} .menu-item[aria-label="Save for later: plan-1.md"]')`, at + 'the dots have "Save for later"', 5000);
+                await ev(`document.querySelector('${T} .menu-item[aria-label="Save for later: plan-1.md"]').click(); true`);
+            }
             await waitFor(`document.querySelectorAll('${T} tbody tr').length === 2`, at + 'the saved row leaves Needs you', 8000);
             check(JSON.stringify(await rowsOf()) === JSON.stringify(['plan-2', 'plan-3']), at + 'the others stay: ' + JSON.stringify(await rowsOf()));
             let calls = await ev(`window.__calls`);
