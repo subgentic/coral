@@ -48,7 +48,6 @@
 .ac-body { margin: 4px 0 0; font-size: var(--fs-md, 0.875rem); white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text-primary); }
 .ac-actions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 0; }
 .ac-actions:empty { display: none; }
-.ac-ask-status { margin: 2px 0 0; font-size: var(--fs-sm); color: var(--text-secondary); }
 /* Edit and Delete show when the card is hovered, current or has focus (they are buttons the keyboard reaches: focus shows them), always on a touch screen. The condition is "the pointer is not coarse",
    not "(hover: hover)": a desktop browser with no pointing device reports (hover: none) (GitHub's headless Chrome), as session.css explains for the branch boxes. */
 @media not all and (pointer: coarse) {
