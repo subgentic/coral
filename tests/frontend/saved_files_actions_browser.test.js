@@ -56,7 +56,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await ev(`document.querySelector('.saved-files button[aria-label="More actions for plan-1.md"]').click(); true`);
             await waitFor(`!!document.querySelector('.saved-files .menu:not([hidden]) .menu-item')`, at + 'the dots open', 5000);
             const items = await ev(`[...document.querySelectorAll('.saved-files .menu:not([hidden]) .menu-item')].map(x => x.textContent.trim())`);
-            check(JSON.stringify(items) === JSON.stringify(mobile ? ['Deny', 'Ignore', 'Move to Needs you'] : ['Move to Needs you']), at + 'the dots hold: ' + JSON.stringify(items));
+            check(JSON.stringify(items) === JSON.stringify(mobile ? ['Approve with a note', 'Deny', 'Ignore', 'Move to Needs you'] : ['Approve with a note', 'Move to Needs you']), at + 'the dots hold: ' + JSON.stringify(items));
             await ev(`document.querySelector('.saved-files button[aria-label="More actions for plan-1.md"]').click(); true`); await new Promise(r => setTimeout(r, 250)); // sleep-ok: the menu closes (the same button again)
             // Ignore: out of Saved, with a toast and Undo
             if (!mobile) await ev(`document.querySelector('.saved-files button[aria-label="Ignore: plan-1.md"]').click(); true`);
