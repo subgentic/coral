@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"time"
@@ -32,7 +33,9 @@ func TestHermesInterruptIsRecognisedOnTheScreensLastLines(t *testing.T) {
 
 func TestHermesAnOpenTurnIsClosedByAnInterruptedScreenOrTenSilentMinutes(t *testing.T) {
 	now := time.Date(2026, 11, 1, 12, 0, 0, 0, time.UTC)
-	open := func(kind string, ago time.Duration) []store.AgentEvent { return []store.AgentEvent{evAt(kind, ago, now)} }
+	open := func(kind string, ago time.Duration) []store.AgentEvent {
+		return []store.AgentEvent{evAt(kind, ago, now)}
+	}
 
 	// an interrupted screen, the last event at least 3 s old: the turn is over
 	kind, at := hermesTurnFallback(open("prompt_submit", 30*time.Second), "x\nOperation interrupted\n", now)
@@ -62,4 +65,29 @@ func TestHermesAnOpenTurnIsClosedByAnInterruptedScreenOrTenSilentMinutes(t *test
 	kind, _ = hermesTurnFallback(open("prompt_submit", 11*time.Minute), "", now)
 	assert.Equal(t, "stop", kind)
 	require.True(t, true)
+}
+
+// Through the state the dashboard shows: a Hermes agent whose last hook was a prompt 30 s ago is Working; its pane saying the operation was interrupted makes it not Working; a tool running with no such notice
+// stays Working; and a Claude agent's screen with the same words changes nothing.
+func TestAHermesAgentsInterruptedTurnIsNotWorkingForEver(t *testing.T) {
+	_, h, mock, ss := setupSessionsTestServer(t)
+	term := &loginScreenTerminal{mockSessionTerminal: mock}
+	h.terminal = term
+	ctx := context.Background()
+	derive := func(agentType, sid string, lastEvent string, ago time.Duration, screen string) bool {
+		t.Helper()
+		term.set(screen)
+		h.startupScreens = loginScreens{stampDecides: true}
+		h.loginScreens = loginScreens{}
+		require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid, AgentType: agentType, AgentName: "a-" + sid[len(sid)-4:], WorkingDir: "/tmp/p"}))
+		sidp := sid
+		_, err := h.ts.InsertAgentEvent(ctx, &store.AgentEvent{AgentName: "a-" + sid[len(sid)-4:], SessionID: &sidp, EventType: lastEvent, Summary: "x", CreatedAt: time.Now().Add(-ago).UTC().Format(store.ISOFormat)})
+		require.NoError(t, err)
+		return h.deriveSingleSessionState(ctx, sid, 0).Working
+	}
+	assert.True(t, derive("hermes", "00000000-0000-0000-0000-00000000a001", "prompt_submit", 30*time.Second, "thinking...\n"), "a turn the hooks opened is Working")
+	assert.False(t, derive("hermes", "00000000-0000-0000-0000-00000000a002", "prompt_submit", 30*time.Second, "output\n  Operation interrupted\n> \n"), "an interrupt closes it")
+	assert.True(t, derive("hermes", "00000000-0000-0000-0000-00000000a003", "prompt_submit", time.Second, "Operation interrupted\n"), "the old notice a second after a new prompt does not end the new turn")
+	assert.False(t, derive("hermes", "00000000-0000-0000-0000-00000000a004", "tool_use", 11*time.Minute, "working\n"), "ten silent minutes close it")
+	assert.True(t, derive("claude", "00000000-0000-0000-0000-00000000a005", "prompt_submit", 30*time.Second, "Operation interrupted\n"), "only Hermes reads this")
 }
