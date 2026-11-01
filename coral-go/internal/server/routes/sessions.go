@@ -40,6 +40,7 @@ import (
 // SessionsHandler handles all live session API endpoints.
 type SessionsHandler struct {
 	dialogs  dialogWatch     // the prompts seen on awake agents' screens (#11437)
+	locks    agentLocks      // one lock per agent for whatever answers or closes a prompt on its screen (agent_lock.go)
 	opencode OpencodeRuntime // the opencode servers, one per agent; nil until the server wires it
 
 	// piModelCheck says a Pi model is not one Pi lists (#11105); nil until the server wires it.

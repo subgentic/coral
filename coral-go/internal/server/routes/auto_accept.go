@@ -446,6 +446,12 @@ func (a *AutoAcceptor) check(ctx context.Context, s store.AutoAcceptState) {
 		return
 	}
 
+	// The agent's lock (agent_lock.go): never at the same time as a person's answer or another of Coral's closes or picks; busy means skip this pass, and the re-read below is inside it.
+	unlock, ok := a.h.tryLockAgent(s.SessionID)
+	if !ok {
+		return
+	}
+	defer unlock()
 	// Re-read the screen: answer only if the same prompt is still open.
 	again := classifyApproval(s.AgentType, a.capture(ctx, s))
 	if !again.Approve || again.FP != d.FP || again.N != d.N {
