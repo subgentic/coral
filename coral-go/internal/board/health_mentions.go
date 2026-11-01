@@ -97,12 +97,14 @@ func addressesPrefix(content string, names []string) bool {
 	return false
 }
 
-// NameHasEdgePunctuation: a member's name starts or ends with punctuation or a symbol, which a mention parser may not read as part of the name.
+// NameHasEdgePunctuation: a member's name does not start with a letter or a digit, or does not end with a letter, a digit or a closing bracket: the rule of a member name a person can type after an @ (the
+// one #11687's ValidMemberName makes the join refuse; a name like "QA (2)" or "Dev (night)" is fine). Such a name may not be reached by a mention.
 func NameHasEdgePunctuation(name string) bool {
 	r := []rune(strings.TrimSpace(name))
 	if len(r) == 0 {
 		return false
 	}
-	edge := func(c rune) bool { return unicode.IsPunct(c) || unicode.IsSymbol(c) }
-	return edge(r[0]) || edge(r[len(r)-1])
+	alnum := func(c rune) bool { return unicode.IsLetter(c) || unicode.IsDigit(c) }
+	last := r[len(r)-1]
+	return !alnum(r[0]) || !(alnum(last) || last == ')' || last == ']')
 }

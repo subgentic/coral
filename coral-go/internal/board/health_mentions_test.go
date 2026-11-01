@@ -39,7 +39,11 @@ func TestMentionGapCountsPostsThatAddressAPrefixOnly(t *testing.T) {
 }
 
 func TestNameHasEdgePunctuation(t *testing.T) {
-	for name, want := range map[string]bool{"Backend Dev": false, "Dev 2": false, ".Dev": true, "Dev:": true, "(QA)": true, "@Dev": true, "Dev-": true, "": false, "Équipe": false, "  Dev. ": true} {
+	for name, want := range map[string]bool{
+		"Backend Dev": false, "Dev 2": false, "Équipe": false, "": false,
+		"Dev (night)": false, "QA (2)": false, "Writer [docs]": false, // a closing bracket may end a name (#11687)
+		".Dev": true, "Dev:": true, "(QA)": true, "@Dev": true, "Dev-": true, "Reviewer 2:": true, "  Dev. ": true, "Dev,": true, `Dev"`: true,
+	} {
 		assert.Equal(t, want, NameHasEdgePunctuation(name), name)
 	}
 }
