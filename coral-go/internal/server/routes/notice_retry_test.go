@@ -60,3 +60,25 @@ func TestANoticeHeldForAPassingReasonIsAskedAgainAndTyped(t *testing.T) {
 	typed, _ = r.term.counts()
 	assert.Len(t, typed, 1, "nothing typed while held")
 }
+
+// Security's #6919 point 1: once the close is done and the box is back, the agent's lock is released: the notice and its retries run outside it, so a person's answer to the next
+// dialog does not wait behind them.
+func TestTheNoticeIsSentOutsideTheAgentsLock(t *testing.T) {
+	oldEvery, oldFor := noticeRetryEvery, noticeRetryFor
+	noticeRetryEvery, noticeRetryFor = 50*time.Millisecond, 1*time.Second
+	t.Cleanup(func() { noticeRetryEvery, noticeRetryFor = oldEvery, oldFor })
+	r := newTimeoutRig(t, "claude", "permission", claudeScreen(t, "permission_menu"))
+	r.h.noticeInStep = false
+	held := &holdingTerm{agentTerm: r.term, why: tmux.ReasonChildReads} // once the close has gone, the notice is held for a passing reason the whole time
+	r.h.terminal = held
+	r.onKeys = func([]string) {
+		r.show(r.idle)
+		held.until.Store(time.Now().Add(time.Hour).UnixNano())
+	}
+	assert.Equal(t, timeoutNotifying, r.try())
+	unlock, ok := r.h.tryLockAgent(r.sid)
+	require.True(t, ok, "the agent's lock is free while the notice is retried")
+	unlock()
+	require.Eventually(t, func() bool { return len(r.closeEvents()) == 1 }, 5*time.Second, 20*time.Millisecond, "the event follows the notice's tries")
+	assert.Equal(t, timeoutNotTyped, r.closeEvents()[0]["outcome"])
+}

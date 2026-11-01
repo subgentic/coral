@@ -68,17 +68,20 @@ func (h *SessionsHandler) opencodeDialogTimeout(ctx context.Context, a liveAgent
 		h.recordDialogClosed(ctx, a, req.At, now, dialogDeclined, timeoutSendFailed)
 		return timeoutSendFailed
 	}
-	outcome := timeoutNoBox
-	if h.waitOpencodeGone(ctx, a.sid, req.ID) {
-		time.Sleep(promptSettle)
-		delivery, err := deliverNoticeRetrying(ctx, h.terminal, pane, a.agentType, a.sid, dialogTimeoutNotice, "dialog timeout notice")
-		outcome = timeoutNotTyped
-		if err == nil && delivery == ptymanager.Sent {
+	if !h.waitOpencodeGone(ctx, a.sid, req.ID) {
+		h.recordDialogClosed(ctx, a, req.At, now, dialogDeclined, timeoutNoBox)
+		return timeoutNoBox
+	}
+	time.Sleep(promptSettle)
+	unlock() // as for a screen's close: the notice and its retries run outside the agent's lock
+	return h.afterClose(func() string {
+		outcome := timeoutNotTyped
+		if delivery, err := deliverNoticeRetrying(ctx, h.terminal, pane, a.agentType, a.sid, dialogTimeoutNotice, "dialog timeout notice"); err == nil && delivery == ptymanager.Sent {
 			outcome = timeoutDone
 		}
-	}
-	h.recordDialogClosed(ctx, a, req.At, now, dialogDeclined, outcome)
-	return outcome
+		h.recordDialogClosed(ctx, a, req.At, now, dialogDeclined, outcome)
+		return outcome
+	})
 }
 
 // waitOpencodeGone waits, up to promptClearTimeout, for the server to no longer list the request.
