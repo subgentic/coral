@@ -21,7 +21,7 @@ const startValues = () => ({ first_task: '', save_goal: true, custom_instruction
 
 // The health check's own rows, less who gets it: at launch that is the Orchestrator (a list of one is noise); another recipient is in Team settings.
 const healthRows = () => healthFields({
-    members: () => Promise.resolve([]), hasHeld: () => false, monitorOff: () => false, openSettings: () => {},
+    members: () => Promise.resolve([]), hasHeld: () => false, hasRecommend: () => false, monitorOff: () => false, openSettings: () => {},
     onReset: view => { for (const [k, v] of Object.entries(healthToValues(HEALTH_DEFAULTS))) view.set(k, v); },
 }).filter(f => f.key !== 'recipient' && !f.key.endsWith('_nudge')); // no members to pick from yet
 
