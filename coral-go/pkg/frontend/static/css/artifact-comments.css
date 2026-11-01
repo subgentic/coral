@@ -79,6 +79,7 @@
 .ac-thumb-uploading .ac-thumb-img { opacity: 0.6; }
 .ac-thumb-state { font-size: var(--fs-sm, 0.8125rem); color: var(--text-muted); overflow-wrap: anywhere; }
 .ac-thumb-failed .ac-thumb-state { color: var(--error-text, var(--error)); }
+.ac-images-hint { margin: 0; font-size: var(--fs-sm, 0.8125rem); color: var(--text-muted); overflow-wrap: anywhere; }
 .ac-images-note { margin: 4px 0 0; font-size: var(--fs-sm, 0.8125rem); color: var(--text-muted); }
 .ac-picker { flex: none; }
 /* the pictures of a comment in the thread, under its words */

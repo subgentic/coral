@@ -71,6 +71,7 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
             // the picker: a button, and a file input that takes the three picture types (a phone offers its photos)
             assert.deepEqual(await ev(`(() => { const b = document.querySelector('.ac-composer .ac-add-image'), i = document.querySelector('.ac-composer .ac-picker input'); return { b: !!b && b.textContent, accept: i && i.accept, multiple: i && i.multiple, hidden: i && i.hidden }; })()`), { b: 'Add image', accept: 'image/png,image/jpeg,image/webp', multiple: true, hidden: true }, at + 'the picker');
             assert.equal(await ev(`document.querySelector('.ac-composer .ac-images').hidden`), true, at + 'no pictures: no tray');
+            assert.equal(await ev(`(() => { const h = document.querySelector('.ac-composer .ac-images-hint'); return h && h.getClientRects().length > 0 ? h.textContent : null; })()`), 'Pictures are shared with this team\'s agents as they are; nothing is hidden.', at + 'the quiet line about who sees a picture is beside Add image');
 
             // pick one: a thumbnail before Send, uploaded as the raw file with its own type
             await pick([['one.png', 'image/png']]);

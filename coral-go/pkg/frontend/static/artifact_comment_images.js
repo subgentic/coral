@@ -5,6 +5,7 @@ import { importOnce } from './import_once.js';
 const api = await importOnce('./artifact_comments_api.js'); // lazy: its failure is retried
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 
+const HINT = 'Pictures are shared with this team\'s agents as they are; nothing is hidden.';
 const MAX_BYTES = 25 * 1024 * 1024; // a larger file is refused here with the reason; the server's own cap is the one that counts
 const typeOf = f => String((f && f.type) || '').toLowerCase();
 
@@ -70,6 +71,8 @@ export function createImageTray({ upload, onChange = () => {} }) {
         wrap.append(b, input);
         return wrap;
     }
+    /** The one quiet line beside Add image (Security's INFO on #11650): what happens to a picture once it is sent. */
+    const hint = () => el('p', 'ac-images-hint', HINT);
     /** Pasting a picture into the text, and dropping one on the form, add it; pasted text is left to the field. */
     function attach(form, field) {
         field.addEventListener('paste', e => {
@@ -86,7 +89,7 @@ export function createImageTray({ upload, onChange = () => {} }) {
     function clear(words) { for (const it of items) URL.revokeObjectURL(it.previewUrl); items.length = 0; say(words || ''); draw(); }
     function destroy() { destroyed = true; for (const it of items) URL.revokeObjectURL(it.previewUrl); items.length = 0; list.replaceChildren(); }
     return {
-        node, add, remove, replaceBlob, picker, attach, clear, destroy,
+        node, add, remove, replaceBlob, picker, hint, attach, clear, destroy,
         items: () => items.map(it => ({ id: it.id, name: it.name, blob: it.blob, hex: it.hex, state: it.state })),
         hexes: () => items.filter(it => it.state === 'ready').map(it => it.hex),
         busy: () => items.some(it => it.state === 'uploading'),

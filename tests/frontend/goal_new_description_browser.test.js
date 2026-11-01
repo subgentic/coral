@@ -70,6 +70,7 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
             assert.deepEqual(form, { tag: 'TEXTAREA', label: 'Description (optional)', max: 2000, rows: 4, driverHelp: false, driverHelpId: false, describedby: null }, at + 'the Description field, and the repeated Driver line is gone');
             assert.match(await ev(`document.querySelector('.goals-dialog #goal-new-driver').closest('label').textContent`), /Driver, the agent who looks after it \(optional\)/, at + 'the Driver field keeps its own label');
             await waitFor(`!!document.querySelector('.goals-dialog .ac-picker input')`, at + 'the picture button', 5000);
+            assert.equal(await ev(`(() => { const h = document.querySelector('.goals-dialog .ac-images-hint'); return h && h.getClientRects().length > 0 ? h.textContent : null; })()`), 'Pictures are shared with this team\'s agents as they are; nothing is hidden.', at + 'the quiet line about who sees a picture is beside Add image');
 
             // the count shows only near the limit
             await ev(`(() => { const t = document.querySelector('.goals-dialog #goal-new-description'); t.value = 'x'.repeat(1400); t.dispatchEvent(new Event('input')); return true; })()`);

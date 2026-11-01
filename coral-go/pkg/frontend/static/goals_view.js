@@ -253,7 +253,7 @@ export function openCreate(opts = {}) {
     importOnce('./artifact_comment_images.js').then(m => {
         if (!dlg.isConnected) return;
         tray = m.createImageTray({ upload: uploadImage }); tray.attach(form, desc); tray.listen(sync);
-        pics.append(tray.picker(), tray.node);
+        pics.append(tray.picker(), tray.hint(), tray.node);
     }).catch(() => { /* a goal needs no picture: the form works without the button */ });
     pick.addEventListener('change', () => { if (tray) tray.clear('The pictures were taken out: they were stored on the other team.'); project = pick.value; where.textContent = `Created on this board: ${keyLabel(project)}`; dr.disabled = true; dr.replaceChildren(new Option('Loading this board\'s agents…', '')); loadDrivers(); });
     form.addEventListener('submit', async (e) => {
