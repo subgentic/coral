@@ -15,6 +15,7 @@ const { el } = DT;
 const GC = await importOnce('./goal_columns.js');
 
 import * as W from './goal_words.js';
+const GOAL_DESCRIPTION_MAX = 2000; // the server's cap on a goal's outcome (MaxGoalOutcome)
 const { mountGoal } = await importOnce('./goal_view.js');
 let detail = null, detailHost = null, detailId = 0;
 function clearDetail() { detail?.dispose(); detail = null; detailHost = null; detailId = 0; }
@@ -217,16 +218,19 @@ export function openCreate(opts = {}) {
     const field = (label, input, id) => { const l = el('label', 'goals-field'); l.append(el('span', null, label), input); input.id = id; return l; };
     const t = el('input'); t.type = 'text'; t.maxLength = 200; t.autocomplete = 'off';
     const d = el('input'); d.type = 'text'; d.maxLength = 300; d.autocomplete = 'off';
+    const desc = el('textarea'); desc.rows = 4; desc.maxLength = GOAL_DESCRIPTION_MAX; // the Description is the goal's outcome (#11653); the server's cap is 2,000 characters
+    const descCount = el('span', 'goals-count'); descCount.hidden = true; descCount.setAttribute('role', 'status');
+    desc.addEventListener('input', () => { const n = desc.value.length; descCount.hidden = n < GOAL_DESCRIPTION_MAX - 500; descCount.textContent = `${n} / ${GOAL_DESCRIPTION_MAX}`; }); // the count shows only near the limit
+    const pics = el('div', 'goals-pics'); let tray = null; // the pictures of the goal: the comment box's tray, loaded when the form opens
     const dr = el('select'); dr.disabled = true; dr.append(new Option('Loading this board\'s agents…', '')); // the board's own agents: the route refuses a name that is not a subscriber
     const err = el('p', 'goals-field-error'); err.setAttribute('role', 'alert');
-    const driverNote = el('p', 'goals-note', W.driverHelp); driverNote.id = 'goal-new-driver-help'; dr.setAttribute('aria-describedby', driverNote.id); // what a driver is
     const where = el('p', 'goals-note', `Created on this board: ${keyLabel(project)}`);
     const teams = opts.teams && opts.teams.length > 1 ? opts.teams : null, pick = el('select'); // the Inbox spans teams: which one gets the goal
     if (teams) for (const t of teams) pick.append(new Option(t.label, t.key));
     const go = btn('btn btn-primary', 'Create goal'); go.type = 'submit';
     const cancel = btn('btn', 'Cancel', () => dlg.close());
     const head = el('div', 'goals-form-head'), back = btn('goals-form-back', null, () => dlg.close()); back.setAttribute('aria-label', 'Back'); back.title = 'Back'; back.append(Object.assign(el('span', null, '\u2190'), {})); back.firstChild.setAttribute('aria-hidden', 'true'); head.append(back, title); // a phone's form screen: ← and the title in a bar, the fields under it, the actions pinned at the bottom (#11236, #11239 slice C)
-    const body = el('div', 'goals-form-body'); body.append(field('Title (required)', t, 'goal-new-title'), field('Done when (optional): what a person can check', d, 'goal-new-done'), field('Driver, the agent who looks after it (optional)', dr, 'goal-new-driver'), driverNote, where, err);
+    const body = el('div', 'goals-form-body'); body.append(field('Title (required)', t, 'goal-new-title'), field('Description (optional)', desc, 'goal-new-description'), descCount, pics, field('Done when (optional): what a person can check', d, 'goal-new-done'), field('Driver, the agent who looks after it (optional)', dr, 'goal-new-driver'), where, err);
     if (teams) { pick.value = project; body.prepend(field('Team', pick, 'goal-new-team')); }
     form.append(head, body, el('div', 'goals-actions'));
     form.querySelector('.goals-actions').append(cancel, go);
@@ -239,23 +243,35 @@ export function openCreate(opts = {}) {
         dr.disabled = false;
     }).catch(() => { if (asked !== project) return; dr.replaceChildren(new Option('No driver yet', '')); dr.disabled = false; where.textContent += '. This board\'s agents could not be read, so no driver is set.'; }); };
     loadDrivers();
-    pick.addEventListener('change', () => { project = pick.value; where.textContent = `Created on this board: ${keyLabel(project)}`; dr.disabled = true; dr.replaceChildren(new Option('Loading this board\'s agents…', '')); loadDrivers(); });
+    const uploadImage = async blob => { // a team route: the picture is stored before the goal exists, on the team the goal is for
+        const r = await boardFetch(project, '/goal-images', { method: 'POST', headers: { 'Content-Type': blob.type }, body: blob });
+        let j = {}; try { j = await r.json(); } catch { /* an answer that is not JSON has no reason */ }
+        if (!r.ok || !/^[0-9a-f]{64}$/.test(String(j.hex || ''))) throw new Error((j && typeof j.error === 'string' && j.error) || `The picture was not stored (HTTP ${r.status}).`);
+        return { hex: j.hex, name: String(j.name || ''), contentType: String(j.content_type || blob.type), size: Number(j.size) || blob.size };
+    };
+    const sync = () => { go.disabled = !!tray && (tray.busy() || tray.failed()); }; // Create waits for a picture going up, and for a failed one to be removed
+    importOnce('./artifact_comment_images.js').then(m => {
+        if (!dlg.isConnected) return;
+        tray = m.createImageTray({ upload: uploadImage }); tray.attach(form, desc); tray.listen(sync);
+        pics.append(tray.picker(), tray.hint(), tray.node);
+    }).catch(() => { /* a goal needs no picture: the form works without the button */ });
+    pick.addEventListener('change', () => { if (tray) tray.clear('The pictures were taken out: they were stored on the other team.'); project = pick.value; where.textContent = `Created on this board: ${keyLabel(project)}`; dr.disabled = true; dr.replaceChildren(new Option('Loading this board\'s agents…', '')); loadDrivers(); });
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
         err.textContent = '';
         if (!t.value.trim()) { err.textContent = 'A goal needs a title.'; t.setAttribute('aria-invalid', 'true'); t.focus(); return; }
         t.removeAttribute('aria-invalid'); go.disabled = true;
         try {
-            const r = await boardFetch(project, '/goals', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(createBody({ title: t.value, doneWhen: d.value, driver: dr.value, by: OPERATOR_ID })) });
+            const r = await boardFetch(project, '/goals', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(createBody({ title: t.value, description: desc.value, doneWhen: d.value, driver: dr.value, images: tray ? tray.hexes() : [], by: OPERATOR_ID })) });
             if (!r.ok) throw await failure(r);
             dlg.close();
             if (opts.onCreated) { await opts.onCreated(project); return; }
             say('Goal created');
             await loadGoals();
             root.querySelector('.goals-new')?.focus(); // the list was drawn again: focus goes back to the button that opened the dialog
-        } catch (ex) { err.textContent = `The goal was not created: ${W.errorWords(ex && ex.code, ex && ex.message)}`; go.disabled = false; }
+        } catch (ex) { err.textContent = `The goal was not created: ${W.errorWords(ex && ex.code, ex && ex.message)}`; go.disabled = false; sync(); }
     });
-    dlg.addEventListener('close', () => { model.creating = false; dlg.remove(); (root || document).querySelector('.goals-new')?.focus(); });
+    dlg.addEventListener('close', () => { if (tray) tray.destroy(); model.creating = false; dlg.remove(); (root || document).querySelector('.goals-new')?.focus(); });
     dlg.showModal(); t.focus();
 }
 

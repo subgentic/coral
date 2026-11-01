@@ -273,7 +273,11 @@ var routeTable = cat(
 		"/api/artifacts/{hex64}/comments",
 		"/api/artifacts/{hex64}/comments/{id}/resolve",
 		"/api/artifacts/{hex64}/comments/{id}/reopen",
+		// A picture for a comment (#11650): the owner's alone, as the comment it goes in. The raw file is the body; the machine decides the type by its bytes.
+		"/api/artifacts/{hex64}/comment-images",
 	)),
+	// A picture for a new goal's description (#11650): the owner's alone, like the goal it goes in.
+	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/board/{project}/goal-images")),
 	// The rest of the owner's artifact work through the Hub (#11354, the operator's rule: the owner gets everything): the version list and series reads (their handlers already refuse a non-owner), the edit and
 	// delete of a comment and the lock (the comment policy still decides: the owner edits and deletes what they wrote, the lock is the owner's), and the change-request send, which hands the owner's own words (redacted,
 	// cut, quoted as untrusted data) to an agent: agent input, so Launch, as the other routes that type into an agent. A series DELETE stays unlisted (it removes every version) and so does an agent's reply (POST

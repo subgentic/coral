@@ -35,6 +35,7 @@ GET /api/system/update view owner-update
 GET /api/team-artifacts view owner-only
 PATCH /api/artifacts/{id}/comments/{cid} interact owner-sees
 PATCH /api/saved/{id} interact owner-only
+POST /api/artifacts/{id}/comment-images interact owner-only
 POST /api/artifacts/{id}/comments interact owner-only
 POST /api/artifacts/{id}/comments/{cid}/reopen interact owner-only
 POST /api/artifacts/{id}/comments/{cid}/resolve interact owner-only
@@ -46,6 +47,7 @@ POST /api/board/{project}/cross-team/disable launch owner-only-hub
 POST /api/board/{project}/cross-team/enable launch owner-only-hub
 POST /api/board/{project}/cross-team/files/disable launch owner-only-hub
 POST /api/board/{project}/cross-team/files/enable launch owner-only-hub
+POST /api/board/{project}/goal-images interact owner-only
 POST /api/board/{project}/goals interact owner-sees
 POST /api/board/{project}/messages interact owner-sees
 POST /api/board/{project}/operator-artifacts interact owner-only
