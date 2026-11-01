@@ -20,15 +20,15 @@ var windowsReserved = regexp.MustCompile(`(?i)^(con|prn|aux|nul|com[0-9]|lpt[0-9
 // createSuggestedDir makes the folder the dialog suggested for a first agent or team, <home>/Coral/<name>, when the request says create_dir. It makes only that
 // exact shape: one plain name directly under a Coral folder in the home folder (or in CORAL_ROOT), and never through a link. Any other path is left to
 // launchDirError, so create_dir cannot make a folder anywhere else. It returns "" when nothing is wrong, including when the folder was not asked for.
-func createSuggestedDir(dir string, create bool, roots ...string) string {
+func createSuggestedDirReport(dir string, create bool, roots ...string) (msg string, made bool) {
 	if !create || dir == "" {
-		return ""
+		return "", false
 	}
 	clean := filepath.Clean(dir)
 	name := filepath.Base(clean)
 	parent := filepath.Dir(clean)
 	if !suggestedDirName.MatchString(name) || strings.HasSuffix(name, ".") || windowsReserved.MatchString(name) {
-		return fmt.Sprintf("can't create %s: a folder name takes letters, digits, dots, dashes and underscores, and is not a reserved or dot-ending name", dir)
+		return fmt.Sprintf("can't create %s: a folder name takes letters, digits, dots, dashes and underscores, and is not a reserved or dot-ending name", dir), false
 	}
 	if home, err := os.UserHomeDir(); err == nil {
 		roots = append(roots, home)
@@ -43,18 +43,27 @@ func createSuggestedDir(dir string, create bool, roots ...string) string {
 		}
 		// One level at a time, each Mkdir then an Lstat: a link put in place between the check and the make is seen, not followed.
 		if err := os.Mkdir(coral, 0o700); err != nil && !errors.Is(err, fs.ErrExist) {
-			return fmt.Sprintf("can't create %s: %v", dir, err)
+			return fmt.Sprintf("can't create %s: %v", dir, err), false
 		}
 		if fi, err := os.Lstat(coral); err != nil || fi.Mode()&os.ModeSymlink != 0 || !fi.IsDir() {
-			return fmt.Sprintf("can't create %s: %s is not a plain folder", dir, coral)
+			return fmt.Sprintf("can't create %s: %s is not a plain folder", dir, coral), false
 		}
-		if err := os.Mkdir(clean, 0o700); err != nil && !errors.Is(err, fs.ErrExist) {
-			return fmt.Sprintf("can't create %s: %v", dir, err)
+		made = true
+		if err := os.Mkdir(clean, 0o700); errors.Is(err, fs.ErrExist) {
+			made = false // it was there: not a folder this launch made
+		} else if err != nil {
+			return fmt.Sprintf("can't create %s: %v", dir, err), false
 		}
 		if fi, err := os.Lstat(clean); err != nil || fi.Mode()&os.ModeSymlink != 0 || !fi.IsDir() {
-			return fmt.Sprintf("can't create %s: it is not a plain folder", dir)
+			return fmt.Sprintf("can't create %s: it is not a plain folder", dir), false
 		}
-		return ""
+		return "", made
 	}
-	return fmt.Sprintf("can't create %s: Coral makes only a folder directly under Coral in your home folder", dir)
+	return fmt.Sprintf("can't create %s: Coral makes only a folder directly under Coral in your home folder", dir), false
+}
+
+// createSuggestedDir is createSuggestedDirReport without the report of whether this call made the folder.
+func createSuggestedDir(dir string, create bool, roots ...string) string {
+	msg, _ := createSuggestedDirReport(dir, create, roots...)
+	return msg
 }
