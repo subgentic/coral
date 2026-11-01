@@ -41,12 +41,13 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
         window.__file = (name, type) => new File([png], name, { type });
         window.__dt = files => { const dt = new DataTransfer(); for (const f of files) dt.items.add(f); return dt; };
         return true; })()`;
-    const load = async (w, h, mobile) => {
+    const load = async (w, h, mobile, team) => {
         await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile });
         await Emulation.setTouchEmulationEnabled({ enabled: mobile });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await ev(`try { localStorage.removeItem('coral-artifact-comments-open'); } catch {} true`);
         await ev(STUB);
+        if (team) await ev(`import(${S} + 'state.js').then(m => { m.state.selectedTeam = ${JSON.stringify(team)}; return true; })`);
         await ev(`(async () => { const v = await import(${S} + 'artifact_viewer.js'); v.openArtifactViewer(${JSON.stringify(HEX)}, { filename: 'plan.md' }); return true; })()`);
         await waitFor(`!!document.querySelector('#artifact-viewer .artifact-viewer-markdown')`, 'the document', 8000);
         await waitFor(`!document.querySelector('.ac-toggle').hidden`, 'the Comments button', 5000);
@@ -157,8 +158,14 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
             assert.equal(alone.body, '', at + 'the post has no words');
             assert.equal(alone.images.length, 1, at + 'and one picture');
             await waitFor(`document.querySelectorAll('.ac-card .ac-pic-img').length === 4`, at + 'its picture in the thread', 5000);
+            assert.equal(await ev(`window.__up.some(x => /board=/.test(x.url))`), false, at + 'opened with no team context the uploads carry no board');
             console.log(`   ✓ ${w} px`);
         }
+        // opened from a team, the upload names the team (the route needs it when several teams hold the file)
+        await load(1280, 800, false, '@box/team-x');
+        await pick([['named.png', 'image/png']]);
+        await waitFor(`window.__up.length === 1`, 'the upload', 5000);
+        assert.match(await ev(`window.__up[0].url`), /\/comment-images\?board=team-x$/, 'the upload carries the team\'s bare board name');
         console.log('PASS comment pictures: pick, paste and drop, thumbnails before Send, refusals in words, Send waits, inline in the thread');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

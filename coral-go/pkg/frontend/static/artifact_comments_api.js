@@ -45,10 +45,10 @@ export const COMMENT_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
 export const COMMENT_IMAGE_MAX = 4;
 
 /** Store one picture for a comment (#11651): the raw file as the body; the server keeps it as an artifact on the artifact's team and answers { hex, name, content_type, size }. `versionOf` is the hex of a picture this person
- *  just uploaded, when this one is its marked-up version (a second version of the same artifact). A refusal throws an Error with the server's reason. */
-export async function uploadCommentImage(hex, server, blob, versionOf) {
-    const q = versionOf ? `?version_of=${encodeURIComponent(versionOf)}` : '';
-    const resp = await fetch(serverUrl(`/api/artifacts/${hex}/comment-images${q}`, server), { method: 'POST', headers: { 'Content-Type': blob.type }, body: blob });
+ *  just uploaded, when this one is its marked-up version (a second version of the same artifact); `board` names the team when several hold the artifact. A refusal throws an Error with the server's reason. */
+export async function uploadCommentImage(hex, server, blob, versionOf, board) {
+    const q = [versionOf ? `version_of=${encodeURIComponent(versionOf)}` : '', board ? `board=${encodeURIComponent(board)}` : ''].filter(Boolean).join('&'); // board: the team the comment is on, when several teams hold the file
+    const resp = await fetch(serverUrl(`/api/artifacts/${hex}/comment-images${q ? '?' + q : ''}`, server), { method: 'POST', headers: { 'Content-Type': blob.type }, body: blob });
     let d = {};
     try { d = await resp.json(); } catch { /* an answer that is not JSON has no reason */ }
     if (!resp.ok || !/^[0-9a-f]{64}$/.test(String(d.hex || ''))) { const e = new Error((d && typeof d.error === 'string' && d.error) || `The picture was not stored (HTTP ${resp.status}).`); e.status = resp.status; throw e; }
