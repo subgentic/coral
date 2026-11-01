@@ -219,3 +219,37 @@ func TestAChildThatEndedBeforeItsProbeIsGoneNotUnreadable(t *testing.T) {
 	stdinMemo.Unlock()
 	assert.Zero(t, n, "nothing is kept for it as a reader")
 }
+
+// Security's #6919 point 2: through the real walk and probe, a live child below the agent whose process cannot be opened (access denied) is a reader, and is not taken for gone.
+func TestALiveChildThatCannotBeOpenedIsAReader(t *testing.T) {
+	resetStdinMemo(t)
+	t.Cleanup(func() { resetStdinMemo(t) })
+	cmd := consoletest.HiddenCommand("cmd.exe", "/c", "ping -n 30 127.0.0.1 >nul")
+	cmd.Stdin = bytes.NewReader(nil) // a pipe: readable, it would not be a reader
+	require.NoError(t, cmd.Start())
+	t.Cleanup(func() { _ = cmd.Process.Kill(); _ = cmd.Wait() })
+	child := cmd.Process.Pid
+	deny := func(pid int) error {
+		if pid == child {
+			return windows.ERROR_ACCESS_DENIED
+		}
+		return nil
+	}
+	probeOpenHook.Store(&deny)
+	t.Cleanup(func() { probeOpenHook.Store(nil) })
+
+	src, err := newLiveProcs()
+	require.NoError(t, err)
+	me := os.Getpid()
+	start, ok := processStart(me)
+	require.True(t, ok)
+	p, reads := consoleReaderBelow(src, winProc{pid: me, start: start, known: true})
+	require.True(t, reads, "the denied child is a reader")
+	assert.Equal(t, child, p.pid)
+
+	probeOpenHook.Store(nil)
+	resetStdinMemo(t)
+	src, err = newLiveProcs()
+	require.NoError(t, err)
+	assert.Equal(t, stdinNotConsole, src.stdin(child, func() int64 { s, _ := processStart(child); return s }()), "the same child, opened: a pipe")
+}
