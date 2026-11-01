@@ -38,6 +38,9 @@ const WORLD = `(() => {
         await shot('phone-polish-390');
         const over = await ev(`(() => { const nav = document.querySelector('.view-list-nav'), t = document.getElementById('notices'); if (!nav || !t) return null; return { navBottom: Math.round(nav.getBoundingClientRect().bottom), toastTop: Math.round(t.getBoundingClientRect().top) }; })()`);
         check(!!over && over.toastTop >= over.navBottom, 'the toast is below the tab strip: ' + JSON.stringify(over));
+        // and at the bottom of the screen above the bottom bar, never over the list's top rows (#11768: a long press on row 4 hit the toast)
+        const low = await ev(`(() => { const t = document.getElementById('notices').getBoundingClientRect(), nav = document.getElementById('phone-nav'), n = nav && nav.getClientRects().length ? nav.getBoundingClientRect() : null, rows = [...document.querySelectorAll('#group-table-view tbody tr')].slice(0, 4).map(r => r.getBoundingClientRect()); return { top: Math.round(t.top), bottom: Math.round(t.bottom), navTop: n ? Math.round(n.top) : null, vh: innerHeight, overRows: rows.filter(r => r.height > 0 && t.top < r.bottom && t.bottom > r.top).length }; })()`);
+        check(low.overRows === 0 && low.top > low.vh / 2 && (low.navTop === null || low.bottom <= low.navTop + 1), 'the toast is at the bottom, above the bottom bar, over none of the first four rows: ' + JSON.stringify(low));
     } finally { await client.close(); }
     if (failures.length) { console.error(failures.join('\n')); process.exit(1); }
     console.log('phone_polish_browser: ok');
