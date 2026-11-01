@@ -45,12 +45,14 @@ export function syncRecap() {
     el.replaceChildren(...(p.name ? [b(p.name), ': '] : []), b(p.provider), ', ', Object.assign(b(folder), { title: folder === p.folder ? '' : p.folder }), `, ${p.model}`, ...(p.mode ? [', ', b(p.mode), ' mode'] : []), ...line);
 }
 
+let phoneWidthWired = false;
+
 /** Follow the form once: any change in it, in the folder or the name, and the model default arriving after it was drawn. */
 export function wireRecap() {
     const acf = container();
     if (!acf || acf.dataset.recapWired) return;
     acf.dataset.recapWired = '1';
-    window.matchMedia?.('(max-width: 599px)').addEventListener?.('change', () => syncRecap()); // a rotation or a resized window: the folder is cut or whole again at once, not at the next change in the form (#11791)
+    if (!phoneWidthWired) { phoneWidthWired = true; window.matchMedia?.('(max-width: 599px)').addEventListener?.('change', () => syncRecap()); } // a rotation or a resized window: the folder is cut or whole again at once, not at the next change in the form (#11791); one listener for the page, however many dialogs open (#11794)
     for (const t of ['input', 'change', 'acf-synced']) acf.addEventListener(t, () => syncRecap());
     for (const id of ['launch-dir', 'launch-agent-name-input']) { const e = document.getElementById(id); if (e) for (const t of ['input', 'change']) e.addEventListener(t, () => syncRecap()); }
 }
