@@ -154,3 +154,41 @@ func TestTheFirstLaunchInATeamsHomePreparesItVisiblyAndOnce(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, cmd, "Preparing Hermes for this team")
 }
+
+// #11831 (Security: no board protocol on argv, it shows in ps): what the agent is told at launch (the board protocol, its role, the launch prompt, Coral's session marker) is written to a private file in the team's
+// home for the server to type as the agent's first message once Hermes is ready; the command line carries none of it.
+func TestWhatTheAgentIsToldIsAFileNotTheLine(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("modes")
+	}
+	r := hermesRig(t)
+	const sid = "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d"
+	cmd, err := GetAgent(at.Hermes).LaunchCommand(LaunchParams{SessionID: sid, BoardName: "team-a", Role: "Backend Dev", Prompt: "SECRET-TASK-TEXT do the thing", CoralDir: r.data})
+	require.NoError(t, err)
+	assert.NotContains(t, cmd, "SECRET-TASK-TEXT")
+	assert.NotContains(t, cmd, "team-a")
+	assert.NotContains(t, cmd, "message board")
+
+	path := HermesFirstMessagePath(r.data, "team-a", sid)
+	assert.Equal(t, filepath.Join(HermesTeamHome(r.data, "team-a"), "first-messages", sid+".txt"), path)
+	fi, err := os.Stat(path)
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o600), fi.Mode().Perm())
+	dfi, _ := os.Stat(filepath.Dir(path))
+	assert.Equal(t, os.FileMode(0o700), dfi.Mode().Perm())
+	text := readAll(t, path)
+	assert.Contains(t, text, "SECRET-TASK-TEXT do the thing")
+	assert.Contains(t, text, `message board "team-a"`)
+	assert.Contains(t, text, "Backend Dev")
+	assert.Contains(t, text, "CORAL_SESSION_ID: "+sid)
+	assert.Contains(t, text, "SECRET-TASK-TEXT", "the action prompt is part of it")
+
+	// nothing to tell, nothing written; and an id that is not a session id has no path
+	_, err = GetAgent(at.Hermes).LaunchCommand(LaunchParams{SessionID: "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4e", CoralDir: r.data})
+	require.NoError(t, err)
+	_, err = os.Stat(HermesFirstMessagePath(r.data, "", "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4e"))
+	assert.True(t, os.IsNotExist(err))
+	for _, bad := range []string{"", "../x", "s1", strings.ToUpper(sid), sid + "/../x"} {
+		assert.Equal(t, "", HermesFirstMessagePath(r.data, "team-a", bad), bad)
+	}
+}

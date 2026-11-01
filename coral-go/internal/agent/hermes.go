@@ -58,6 +58,9 @@ func (a *HermesAgent) LaunchCommand(params LaunchParams) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("hermes: the team's Hermes home could not be made: %w", err)
 	}
+	if err := writeHermesFirstMessage(hermesDataDir(params), params); err != nil {
+		return "", fmt.Errorf("hermes: what the agent is told could not be written: %w", err)
+	}
 	var parts, raw []string
 	export := formatEnvExport("HERMES_HOME", home)
 	parts, raw = append(parts, export), append(raw, export)

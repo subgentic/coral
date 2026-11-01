@@ -185,7 +185,11 @@ func (h *SessionsHandler) startAgentCLI(ctx context.Context, team, agentType, ta
 		d = g
 	}
 	if d <= 0 {
-		return sendLaunchCommand(h.withLaunchCLI(ctx, agentType), h.terminal, target, cmd)
+		err := sendLaunchCommand(h.withLaunchCLI(ctx, agentType), h.terminal, target, cmd)
+		if err == nil && agentType == at.Hermes {
+			h.deliverHermesFirstMessage(team, target) // what the agent is told is typed, not on the command line (hermes_runtime.go)
+		}
+		return err
 	}
 	log.Printf("[launch] %s: its start is typed in %s (the team's starts are spaced)", target, d.Round(100*time.Millisecond))
 	h.teamSlot(d, func() {
@@ -193,6 +197,8 @@ func (h *SessionsHandler) startAgentCLI(ctx context.Context, team, agentType, ta
 		defer cancel()
 		if err := sendLaunchCommand(h.withLaunchCLI(bg, agentType), h.terminal, target, cmd); err != nil {
 			log.Printf("[launch] %s: the spaced start failed: %v", target, err)
+		} else if agentType == at.Hermes {
+			h.deliverHermesFirstMessage(team, target)
 		}
 	})
 	return nil

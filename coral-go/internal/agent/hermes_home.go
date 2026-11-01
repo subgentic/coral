@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -304,3 +305,56 @@ func seedTelemetryAnswer(top *yaml.Node) {
 
 // hermesTelemetryOffer is the telemetry offer's version in Hermes v0.22.5.
 const hermesTelemetryOffer = 2
+
+// A Hermes agent is told what other agents get on the command line (the board protocol and its role, the launch prompt, Coral's session marker) by being TYPED it as its first message once Hermes is ready:
+// an argument shows in ps and in the shell's history (Security, #11831). LaunchCommand writes the text to <team home>/first-messages/<Coral session id>.txt (0600, in a 0700 folder), and the server types it and
+// removes the file (internal/server/routes, deliverHermesFirstMessage).
+
+// HermesFirstMessagePath is the file of a session's first message, "" for an id that is not a canonical Coral session id.
+func HermesFirstMessagePath(dataDir, team, sessionID string) string {
+	if !canonicalSessionID.MatchString(sessionID) {
+		return ""
+	}
+	return filepath.Join(HermesTeamHome(dataDir, team), "first-messages", sessionID+".txt")
+}
+
+var canonicalSessionID = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
+
+// hermesFirstMessage is what the agent is told: the board system prompt (with the protocol file), then the action prompt (the launch prompt and the board's action text), then the session marker.
+func hermesFirstMessage(params LaunchParams) string {
+	var sys []string
+	if proto := readProtocolFile(params.ProtocolPath); proto != "" {
+		sys = append(sys, proto)
+	}
+	if b := BuildBoardSystemPrompt(params.BoardName, params.Role, "", params.PromptOverrides, params.BoardType); b != "" {
+		sys = append(sys, b)
+	}
+	action := BuildBoardActionPrompt(params.boardPromptName(), params.Role, params.Prompt, params.PromptOverrides, params.BoardType)
+	if action == "" {
+		action = params.Prompt
+	}
+	if len(sys) == 0 && action == "" {
+		return "" // nothing to tell
+	}
+	sys = appendCoralSessionMarker(sys, params.SessionID)
+	parts := append(sys, action)
+	return strings.TrimSpace(strings.Join(parts, "\n\n"))
+}
+
+// writeHermesFirstMessage writes the first message for a launch ("" text: nothing to write, and a file left by an earlier launch of the session is removed).
+func writeHermesFirstMessage(dataDir string, params LaunchParams) error {
+	path := HermesFirstMessagePath(dataDir, params.BoardName, params.SessionID)
+	if path == "" {
+		return nil
+	}
+	text := hermesFirstMessage(params)
+	if text == "" {
+		_ = os.Remove(path)
+		return nil
+	}
+	dir := filepath.Dir(path)
+	if err := privateDir(dir); err != nil {
+		return err
+	}
+	return writeHomeFile(dir, filepath.Base(path), []byte(text))
+}

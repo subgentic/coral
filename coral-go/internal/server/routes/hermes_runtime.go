@@ -4,13 +4,19 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/subgentic/coral/internal/agent"
+	at "github.com/subgentic/coral/internal/agenttypes"
 	"github.com/subgentic/coral/internal/hermesdb"
 	"github.com/subgentic/coral/internal/jsonl"
+	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/ptymanager"
+	"github.com/subgentic/coral/internal/safefs"
+	"github.com/subgentic/coral/internal/safego"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/internal/transcriptlink"
 )
@@ -122,4 +128,49 @@ func (h *SessionsHandler) hermesScreen(name, agentType, sessionID string) string
 		return err == nil, s // the screen itself is what the cache keeps, so a reused read still has it
 	})
 	return screen
+}
+
+// hermesFirstMessageWait bounds how long a Hermes agent's first message waits for Hermes to be ready (the team home's one-time preparation takes about a minute, then Hermes takes 10 to 25 s to draw its screen).
+const hermesFirstMessageWait = 15 * time.Minute
+
+// hermesFirstMessageMax is the most of a first message that is read (the board protocol and a launch prompt are a few KB; the agent can write in the folder).
+const hermesFirstMessageMax = 256 << 10
+
+// deliverHermesFirstMessage types a Hermes agent its first message, once Hermes is ready (agent.HermesFirstMessagePath: the board protocol, its role and its launch prompt, which are not on the command line so that
+// they do not show in ps). The file is read and removed first, so a restart of the same session finds nothing to type twice; the text goes through the same gate as every automated send (nothing typed into an open
+// prompt or over a draft, held until it is gone). It runs in the background: a start never waits for it. target is the session's name (with its pane suffix, for tmux).
+func (h *SessionsHandler) deliverHermesFirstMessage(team, target string) {
+	name := strings.TrimSuffix(target, ".0")
+	sid := naming.SessionIDFromName(name)
+	if h.cfg == nil || sid == "" {
+		return
+	}
+	path := agent.HermesFirstMessagePath(h.cfg.CoralDir(), team, sid)
+	if path == "" {
+		return
+	}
+	// Read and removed through a Root on the file's own folder: the folder is the agent's to write, so a link there is never followed.
+	root, err := safefs.OpenRoot(filepath.Dir(path))
+	if err != nil {
+		return
+	}
+	b, err := root.ReadFile(filepath.Base(path), hermesFirstMessageMax)
+	if err == nil || !errors.Is(err, os.ErrNotExist) {
+		_ = root.Remove(filepath.Base(path)) // a file that was there is typed at most once, and an unreadable or oversize one is not left to be tried again
+	}
+	root.Close()
+	if err != nil {
+		return
+	}
+	text := strings.TrimSpace(string(b))
+	if text == "" {
+		return
+	}
+	safego.Go("routes:hermesFirstMessage", func() {
+		ctx, cancel := context.WithTimeout(context.Background(), hermesFirstMessageWait)
+		defer cancel()
+		if err := deliverAutomated(ctx, h.terminal, name, at.Hermes, sid, text, "first message"); err != nil {
+			slog.Warn("hermes: the first message was not typed", "session", sid[:8], "error", err)
+		}
+	})
 }
