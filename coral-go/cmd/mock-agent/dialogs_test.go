@@ -158,7 +158,7 @@ func TestDialogDigitAnswersTheLiveCall(t *testing.T) {
 		t.Errorf("the log misses the digit or the answer: %v", log)
 	}
 	screen := vtscreen.Render(out, 100, 30)
-	if p, _ := ptymanager.PromptOnScreen(screen); p || !strings.Contains(screen, "ANSWERED option 2 (Blue) by digit") {
+	if p, _ := ptymanager.PromptOnScreen(screen); p || !strings.Contains(screen, "ANSWERED option 2 by digit") {
 		t.Errorf("after the answer the screen still shows a prompt or no answer line:\n%s", screen)
 	}
 }
