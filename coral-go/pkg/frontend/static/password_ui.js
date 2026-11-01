@@ -189,7 +189,7 @@ export function showSetPasswordModal({ required = false } = {}) {
             return;
         }
         err.hidden = false; err.textContent = errorText(res, 'Could not set the password.');
-        save.disabled = false; save.textContent = 'Try again'; failed.hidden = false; // the server's words, a way to try again, and where to go if it keeps failing: no way out (#11892)
+        save.disabled = false; save.textContent = 'Retry'; failed.hidden = false; // the server's words, a way to try again, and where to go if it keeps failing: no way out (#11892)
     });
     pw.input.focus();
     return modal;
