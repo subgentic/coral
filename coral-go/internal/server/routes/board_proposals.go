@@ -308,6 +308,11 @@ func (h *BoardHandler) ApproveProposal(w http.ResponseWriter, r *http.Request) {
 		p.Title = made
 	}
 	h.tellOnce(r.Context(), project, p, board.ProposalApproved, "")
+	if p.Kind == board.ProposalGoal { // the goal was made in the store, not by the goal route: its driver is told here, once, as a goal made directly tells it (#11663)
+		if g, gerr := h.bs.GetGoal(r.Context(), project, ref); gerr == nil && g != nil {
+			h.announceGoalDriver(project, "Operator", g, "")
+		}
+	}
 	slog.Info("[proposals] approved", "surface", "local", "board", project, "proposal", id, "kind", p.Kind, "ref", ref)
 	writeJSON(w, http.StatusOK, map[string]any{"proposal_id": id, "state": board.ProposalApproved, "kind": p.Kind, "created_id": ref})
 }
