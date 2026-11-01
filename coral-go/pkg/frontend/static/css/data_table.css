@@ -149,6 +149,11 @@
 .dt-bar > * { margin: 0; }
 .dt-bar-count { font-size: var(--table-secondary-size); font-weight: var(--fw-strong); color: var(--table-primary-color); }
 .dt-bar-clear { margin-left: auto; }
+.dt-bar-icons { flex-wrap: nowrap; gap: 4px; } /* a phone's selection bar is one line (#11707): Cancel as an X, the count, icon buttons, three dots */
+.dt-bar-icons .dt-bar-count { margin-right: auto; white-space: nowrap; }
+.dt-bar-icons .dt-bar-cancel, .dt-bar-icons .dt-bar-icon, .dt-bar-icons .dt-bar-more-toggle { flex: none; width: var(--table-touch, 44px); min-width: var(--table-touch, 44px); height: var(--table-touch, 44px); padding: 0; }
+.dt-bar-more { position: relative; display: flex; flex: none; }
+.dt-bar-more .dt-mail-menu { right: 0; top: 100%; }
 .dt-bar-confirm { font-size: var(--table-secondary-size); color: var(--table-primary-color); }
 .dt-danger { color: var(--table-danger); border-color: var(--table-danger); background: none; }
 .dt-sortbar, .dt-select-toggle[hidden] { display: none; }
