@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -95,6 +96,17 @@ func TestListReviewStatesAgreesWithTheHydratedRead(t *testing.T) {
 	assert.Empty(t, other)
 }
 
+// perCall is the mean cost of one call of f, over enough calls to run for a quarter of a second in all: one start and one stop, so a clock that ticks coarsely (Windows' reads a read of under a
+// millisecond as 0 s, and two such reads then do not compare) is a small part of the figure. A read that is a hundred times cheaper than the other still measures as cheaper.
+func perCall(f func()) time.Duration {
+	start, n := time.Now(), 0
+	for n < 3 || time.Since(start) < 250*time.Millisecond {
+		f()
+		n++
+	}
+	return time.Since(start) / time.Duration(n)
+}
+
 func TestListReviewStatesCostOnABigBoard(t *testing.T) {
 	if testing.Short() {
 		t.Skip("seeds 1,500 open tasks")
@@ -106,8 +118,8 @@ func TestListReviewStatesCostOnABigBoard(t *testing.T) {
 		_, err := s.CreateTask(ctx, team, fmt.Sprintf("open %d", i), body, "medium", "lead", "Dev")
 		require.NoError(t, err)
 	}
-	states := bestOf(7, func() { _, _ = s.ListOpenTaskStates(ctx, team) })
-	reviews := bestOf(7, func() { _, _ = s.ListReviewStates(ctx, team) })
+	states := perCall(func() { _, _ = s.ListOpenTaskStates(ctx, team) })
+	reviews := perCall(func() { _, _ = s.ListReviewStates(ctx, team) })
 	t.Logf("1,500 open tasks plus the review tasks: ListOpenTaskStates %v, ListReviewStates %v", states, reviews)
 	assert.Less(t, reviews, states, "the review read costs less than the open-task read it sits beside")
 }
