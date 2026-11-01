@@ -42,7 +42,15 @@ const { coralReady, framesJs } = require('./helpers/wait');
             const rowThere = n => `!!document.querySelector('${T} button[aria-label="Approve: ${n}"]')`;
             await waitFor(Object.values(names).map(rowThere).join(' && '), at + 'the four real review rows', 20000);
             const press = async (n, word) => {
-                if (mobile && word !== 'Approve') {
+                if (mobile && word === 'Approve') { // a phone's row has no Approve button (#11671): a long press selects the file and the bar's Approve (an icon) approves it, with a real press as a person's
+                    const p = await where(n, 'body'); check(!!p, at + `Approve ${n}: the row could be reached`); if (!p) return;
+                    const t = type => client.Input.dispatchTouchEvent({ type, touchPoints: type === 'touchEnd' ? [] : [{ x: p.x, y: p.y, id: 1 }] });
+                    await t('touchStart'); await new Promise(r => setTimeout(r, 700)); await t('touchEnd'); // sleep-ok: a long press is a held finger
+                    await waitFor(`!!document.querySelector('.dt-bar button[aria-label="Approve"]')`, at + 'the selection bar', 5000);
+                    const q = await reveal(`document.querySelector('.dt-bar button[aria-label="Approve"]')`);
+                    check(!!q, at + `Approve ${n}: the bar's Approve could be reached`); if (!q) return;
+                    for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) await client.Input.dispatchMouseEvent({ type, x: q.x, y: q.y, button: type === 'mouseMoved' ? 'none' : 'left', buttons: type === 'mousePressed' ? 1 : 0, clickCount: type === 'mouseMoved' ? 0 : 1 });
+                } else if (mobile && word !== 'Approve') {
                     await ev(`document.querySelector('${T} button[aria-label="More actions for ${n}"]').click(); true`);
                     await waitFor(`document.querySelector('${T} .inbox-row-more-toggle[aria-expanded="true"]')`, at + 'the three dots open', 4000);
                     await ev(`document.querySelector('${T} .menu-item[aria-label="${word}: ${n}"]').click(); true`);
@@ -97,7 +105,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
             await waitFor(rowGone(names.d), at + 'the row approved in the viewer leaves', 15000).catch(() => {});
             await openBy(names.b, 'body', 'after Approve in the viewer, by the body');
             await openBy(names.b, 'name', 'after Approve in the viewer, by the name');
-            { const q = await reveal(`[...document.querySelectorAll('${T} tbody tr')].find(r => /Waiting Agent/.test(r.textContent)).querySelector('.dt-primary, .inbox-review-name, td')`);
+            { const q = await reveal(`[...document.querySelectorAll('${T} tbody tr')].find(r => /Waiting Agent/.test(r.textContent))${mobile ? '' : ".querySelector('.dt-primary, .inbox-review-name, td')"}`); // on a phone the whole row opens the agent (a tap), and the first cell is the hidden selection check
               check(!!q, at + 'the waiting agent row could be reached'); if (q) { await click(q.x, q.y); await waitFor(`window.__opened.length > 0`, at + 'after the Approves, a click on the waiting agent opens it', 4000).catch(() => check(false, at + 'after the Approves, a click on the waiting agent row opened nothing')); } }
         }
     } finally {
