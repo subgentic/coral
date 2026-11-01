@@ -29,7 +29,9 @@ const (
 	// the provider cards with the OpenCode sign-in notice 9.9 KB (launch_provider_cards.js, launch_signin_notice.js), the phone bar of slice D 4.1 KB (phone_bar.js), Dismiss on a stale
 	// permission card 2.7 KB (dismiss_wait.js) and the first-run folder suggestion 2.7 KB (folder_suggestion.js); css 10 KB across components, agentic, mobile, cost_dashboard and goals.
 	// 5.63 MiB (5,906,432 bytes) since the operator said "You can increase the size" (Oct 31, 2026): 64 KiB more, for phone navigation like Gmail (#11472, #11476: about 1.9 KB encoded) and the guide role screens (#11513: about 6 KB), which the v2.0.13 room (about 2.5 KB) could not hold.
-	staticBudget = 5<<20 + 648<<10
+	// 5.68 MiB (5,953,792 bytes) since the operator approved it (Nov 1, 2026, 15:05Z, coral://artifacts/0b2f182284b0fb6dc6de28f22134c2afbff5ff936ded4b2fbbcab3e0926f0130): 46.25 KiB more, for the goal pictures (the picture routes' page, #11650, #11651, #11653),
+	// the Hub start address (#11809) and the one-item Needs you link (#11797), after the v2.0.24 budget work cut 12.5 KB (#11760) and v2.0.26 left 28 bytes of room.
+	staticBudget = 5_953_792
 	// fileBudget is the most one embedded file may hold (the CodeMirror bundle, the largest, is ~1 MB).
 	fileBudget = 1536 << 10
 )
