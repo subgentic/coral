@@ -142,7 +142,7 @@ func TestRosterGroupsWaitsByWhoTheyWaitOn(t *testing.T) {
 	assert.Contains(t, out, "Dev B has waited ")
 	assert.Equal(t, 2, strings.Count(out, " on YOU. Answer them."), "by name, and by role and case")
 	assert.Contains(t, out, "Dev C has waited ")
-	assert.Contains(t, out, " min on Security Reviewer; Security Reviewer has posted nothing since.", "a silent target")
+	assert.Contains(t, out, " min on Security Reviewer; Security Reviewer has not mentioned them since.", "a silent target")
 	assert.Contains(t, out, "Dev D has waited ", "a wait on a task is on the task's owner")
 	// what Coral cannot compute is not a line: a commit, a name that is no member, the operator's own
 	assert.NotContains(t, out, "Dev E", "a wait for a commit: nobody to ask")

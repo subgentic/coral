@@ -190,7 +190,7 @@ type HealthStatusNudge struct {
 	EscalateAfterMin int  `json:"escalate_after_min"`
 }
 
-// HealthActionList are the thresholds of the orchestrator's action list (#11729, coral-hub's rules): a wait is stuck after StuckWaitMin minutes on a member who has posted nothing since; an agent is
+// HealthActionList are the thresholds of the orchestrator's action list (#11729, coral-hub's rules): a wait is stuck after StuckWaitMin minutes on a member who has not mentioned the waiter since; an agent is
 // overloaded with more than OverloadedTasks open tasks while at least OverloadedSleeping agents sleep; a task is stale after StaleReviewHours hours in review. A zero value is the default.
 type HealthActionList struct {
 	StuckWaitMin       int `json:"stuck_wait_min"`

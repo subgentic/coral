@@ -35,7 +35,7 @@ func TestActionListOpensWithWhatToDoOldestFirstAndEndsWithCounts(t *testing.T) {
 	assert.Equal(t, "1) DevOps Engineer has waited 19 min on YOU. Answer them.", lines[1], "what waits on the recipient is first, oldest first")
 	assert.Equal(t, "2) QA Engineer has waited 12 min on YOU (their last message is #140100). Answer them.", lines[2])
 	assert.Equal(t, "3) Digital Ocean Expert is asleep with 2 messages tagged to it unread since 07:23. Wake it.", lines[3], "then the oldest of the rest: 42 min")
-	assert.Equal(t, "4) Frontend Dev has waited 37 min on Security Reviewer; Security Reviewer has posted nothing since. Ask Security Reviewer what is holding it, or check Security Reviewer.", lines[4])
+	assert.Equal(t, "4) Frontend Dev has waited 37 min on Security Reviewer; Security Reviewer has not mentioned them since. Ask Security Reviewer what is holding it, or check Security Reviewer.", lines[4])
 	assert.Equal(t, "5) Lead Developer has waited 17 min although Security Reviewer has posted a message mentioning them since: check Lead Developer.", lines[5])
 	assert.Equal(t, "Since 07:55: 55 posts.", lines[len(lines)-2], "post volume is a count, never 'progressing'")
 	assert.Equal(t, "Counts: 2 working · 8 waiting · 4 asleep · 0 claimable tasks", lines[len(lines)-1], "the counts are last")
@@ -44,13 +44,13 @@ func TestActionListOpensWithWhatToDoOldestFirstAndEndsWithCounts(t *testing.T) {
 	assert.NotContains(t, strings.ToLower(out), "progressing")
 }
 
-// Rule 2: a wait is listed when it is older than the threshold and its target has posted nothing since; a target that has posted is serving it, and a younger wait is not yet a finding.
+// Rule 2: a wait is listed when it is older than the threshold and its target has not mentioned the waiter since; a target that has is serving it, and a younger wait is not yet a finding.
 func TestStuckWaitNeedsALongWaitAndASilentTarget(t *testing.T) {
 	waits := func(w WaitEntry) CheckInput {
 		return listIn(&Roster{Recipient: "O", Counts: counts(1, 1, 0, 0, 0, 0), Waits: []WaitGroup{{On: "Y", Waiters: []WaitEntry{w}}}})
 	}
 	text := func(in CheckInput) string { return strings.Join(ComposeLines(in), "\n") }
-	assert.Contains(t, text(waits(WaitEntry{Name: "X", Age: min10(11), TargetSilent: true})), "X has waited 11 min on Y; Y has posted nothing since")
+	assert.Contains(t, text(waits(WaitEntry{Name: "X", Age: min10(11), TargetSilent: true})), "X has waited 11 min on Y; Y has not mentioned them since")
 	assert.NotContains(t, text(waits(WaitEntry{Name: "X", Age: min10(30), TargetSilent: false})), "has waited", "Y has posted since: the wait is being served")
 	assert.NotContains(t, text(waits(WaitEntry{Name: "X", Age: min10(10), TargetSilent: true})), "has waited", "not past the threshold")
 	in := waits(WaitEntry{Name: "X", Age: min10(6), TargetSilent: true})
