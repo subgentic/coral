@@ -27,14 +27,14 @@ const { coralReady } = require('./helpers/wait');
             await ev(`document.querySelector('#team-settings-workspace .settings-tab[data-section=messaging]').click(); true`);
             await waitFor(`!!document.querySelector('${P} .xt-reach')`, 'the two reaches', 8000);
         };
-        const reach = () => ev(`(() => { const q = s => document.querySelector('${P} ' + s); return { here: q('.xt-reach-here').textContent.replace(/\\s+/g, ' ').trim(), button: !!q('[data-act=turn-on-here]'), msg: q('input[name=cross_team_messaging]').checked }; })()`);
+        const reach = () => ev(`(() => { const q = s => document.querySelector('${P} ' + s); return { here: q('.xt-reach-here').textContent.replace(/\\s+/g, ' ').trim(), button: !!q('[data-act=allow-here]'), msg: q('input[name=cross_team_messaging]').checked }; })()`);
         const state = async () => (await api('/cross-team-state')).body;
 
         // a board that never set the switch
         await open();
         let r = await reach();
         assert.equal(r.msg, true, 'the switch shows on by default');
-        assert.match(r.here, /^Message teams here: off/);
+        assert.match(r.here, /^Teams on this computer: not allowed yet\./);
         assert.equal(r.button, true, 'a button to turn it on for this computer');
         let st = await state();
         assert.equal(st.messaging_elsewhere, true);
@@ -42,9 +42,9 @@ const { coralReady } = require('./helpers/wait');
         console.log('PASS a board that never set the switch: other computers on (needs a link), this computer off');
 
         // the button saves an explicit on
-        assert.equal(await ev(`document.querySelector('${P} [data-act=turn-on-here]').getAttribute('aria-label')`), 'Turn on messaging for teams on this computer', 'the button says which messaging it turns on (its visible words stay "Turn on")');
-        await ev(`document.querySelector('${P} [data-act=turn-on-here]').click(); true`);
-        await waitFor(`document.querySelector('${P} .xt-reach-here')?.textContent.trim() === 'Message teams here: on'`, 'this computer on', 8000);
+        assert.equal(await ev(`document.querySelector('${P} [data-act=allow-here]').getAttribute('aria-label')`), 'Allow teams on this computer', 'the button says what it allows (its visible word is "Allow")');
+        await ev(`document.querySelector('${P} [data-act=allow-here]').click(); true`);
+        await waitFor(`document.querySelector('${P} .xt-reach-here')?.textContent.trim() === 'Teams on this computer: allowed.'`, 'this computer on', 8000);
         r = await reach();
         assert.equal(r.button, false);
         st = await state();
@@ -52,12 +52,12 @@ const { coralReady } = require('./helpers/wait');
         assert.equal(((await api('/settings')).body || {}).cross_team_messaging, true);
         console.log('PASS the button saves an explicit on');
 
-        // an explicit off: both off, no button
-        assert.equal((await put('/settings', { subscriber_id: 'Operator', cross_team_messaging: false })).status, 200);
+        // an explicit off for both switches: nothing to allow, no button
+        assert.equal((await put('/settings', { subscriber_id: 'Operator', cross_team_messaging: false, cross_team_artifacts: false })).status, 200);
         await open();
         r = await reach();
         assert.equal(r.msg, false);
-        assert.equal(r.here, 'Message teams here: off');
+        assert.equal(r.here, 'Teams on this computer: not allowed while both switches are off.');
         assert.equal(r.button, false);
         st = await state();
         assert.equal(st.messaging_elsewhere, false);

@@ -7,6 +7,7 @@ const { mountSettingsView } = await importOnce('./settings_view.js');
 const { healthFields, healthToValues, valuesToHealth } = await importOnce('./team_health_fields.js');
 const { HEALTH_DEFAULTS } = await importOnce('./team_health_settings.js');
 const { requireGoalSentence } = await importOnce('./task_goals.js');
+const { XT_SWITCHES, HERE_NOT_YET } = await importOnce('./team_cross_team_fields.js'); // the two switches and the words about this computer's teams: the same list as Team settings (#11788)
 const { approvalField, presetFlags, wireApproval, NEW_TEAM_APPROVAL } = await importOnce('./team_approval_presets.js'); // how much the Operator approves: a new team starts on 'Operator approves goals' (#11657)
 
 const ASKS_ARE_TASKS_HINT = 'When an agent needs another agent to do something, it creates a task. Plain posts are for questions and status.';
@@ -16,7 +17,7 @@ let _view = null;
 let _defaultMode = 'none'; // the working mode a new team starts with: 'none', or the one the chosen team template names (#8919)
 
 // What a new team starts with: nothing from the last team stays.
-const startValues = () => ({ first_task: '', save_goal: true, custom_instructions: '', mode: _defaultMode, dependency_guidance: false, asks_are_tasks: true, planning_approval: NEW_TEAM_APPROVAL, require_goal: true, ...healthToValues(HEALTH_DEFAULTS), cross_team_messaging: false, cross_team_artifacts: false });
+const startValues = () => ({ first_task: '', save_goal: true, custom_instructions: '', mode: _defaultMode, dependency_guidance: false, asks_are_tasks: true, planning_approval: NEW_TEAM_APPROVAL, require_goal: true, ...healthToValues(HEALTH_DEFAULTS), cross_team_messaging: true, cross_team_artifacts: true });
 
 // The health check's own rows, less who gets it: at launch that is the Orchestrator (a list of one is noise); another recipient is in Team settings.
 const healthRows = () => healthFields({
@@ -88,8 +89,8 @@ export function mountTeamLaunchSettings() {
             ] },
             { id: 'health', label: 'Health check', icon: 'health_and_safety', fields: healthRows() },
             { id: 'messaging', label: 'Messaging', icon: 'forum', fields: [
-                { key: 'cross_team_messaging', type: 'toggle', label: 'Message teams on other computers', help: 'Through Coral Hub.' },
-                { key: 'cross_team_artifacts', type: 'toggle', label: 'Share files with teams on other computers', help: 'Another team can message this team only when its Coral Hub account has linked the two teams and cross-team messaging is on here.' },
+                ...XT_SWITCHES.map(sw => ({ ...sw, type: 'toggle' })),
+                { key: 'xt_here', type: 'notice', render: slot => { slot.innerHTML = `<p class="xt-reach xt-reach-here">${HERE_NOT_YET} Allow it in the team's settings once the team has started.</p>`; } },
             ] },
         ],
     });
@@ -134,8 +135,8 @@ export function readTeamLaunchSettings() {
     const h = valuesToHealth(v, HEALTH_DEFAULTS);
     if (h.on) out.health_monitor = true;
     if (JSON.stringify(h) !== JSON.stringify(HEALTH_DEFAULTS)) board.health = h;
-    if (v.cross_team_messaging) board.cross_team_messaging = true;
-    if (v.cross_team_artifacts) board.cross_team_artifacts = true;
+    if (!v.cross_team_messaging) board.cross_team_messaging = false;
+    if (!v.cross_team_artifacts) board.cross_team_artifacts = false;
     if (Object.keys(board).length) out.board = board;
     return out;
 }

@@ -502,10 +502,12 @@
 1	team_availability.js	label
 1	team_availability.js	tasks(a.tasks)
 1	team_availability.js	tasks(data.unassigned_tasks)
+1	team_cross_team_fields.js	HERE_NOT_YET
 1	team_cross_team_fields.js	[l.machine && escapeHtml(l.machine), l.sid && 'computer ' + escapeHtml(l.sid), l.refreshed && 'confirmed ' + e
+1	team_cross_team_fields.js	allow
 1	team_cross_team_fields.js	buttonFor(st)
 1	team_cross_team_fields.js	links.map(l => `<li><span><b>${escapeHtml(l.team)}</b></span><span class="xt-sub">${[l.machine && escapeHtml(l
-1	team_cross_team_fields.js	turnOn
+1	team_launch_settings.js	HERE_NOT_YET
 1	team_working_mode.js	applicability
 1	team_working_mode.js	body
 1	team_working_mode.js	cards
