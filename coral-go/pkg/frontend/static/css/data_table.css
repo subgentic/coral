@@ -511,8 +511,10 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 .inbox-review-item { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
 .inbox-review-from { flex: none; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--fw-strong); }
 .inbox-review-from::after { content: " \00b7"; font-weight: var(--fw-regular); color: var(--text-muted); }
+.inbox-review-earlier { flex: none; color: var(--text-muted); font-weight: var(--fw-regular); white-space: nowrap; }
+.inbox-review-earlier::before { content: "\00b7  "; }
 .inbox-needs-results .dt-row.dt-read .inbox-review-from { font-weight: var(--fw-regular); }
-.inbox-needs-results .dt-subtitle { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; white-space: normal; margin-top: 2px; }
+.inbox-needs-results tr:has(.inbox-review-item) .dt-subtitle { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; white-space: normal; margin-top: 2px; }
 
 /* A column with nothing in it on any row is not drawn (#9846): its head and its cells; the header draws it again when a row has a value. */
 .dt-table .dt-col-unused, .dt-table .dt-col-tight { display: none; }
