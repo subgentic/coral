@@ -40,7 +40,12 @@ function offerAlertsAgainIfWaited(n) {
     const oldest = Math.min(...at);
     if (Date.now() - oldest >= 5 * 60 * 1000) importOnce('./alerts_offer.js').then(m => m.offerAlertsAgain(oldest));
 }
-document.addEventListener('visibilitychange', () => { if (!document.hidden) updateInboxTab(); }); // back in the tab: what waited while it was hidden is looked at again
+/** The background tab's title carries the same number as the badge (#11837). attention.js is loaded only when a tab is in the background (or once it has been): not at start, and no listener of our own for the tab coming back: the feed's next update does it. */
+let attentionReady = false;
+function tellAttention(n) {
+    if (!document.hidden && !attentionReady) return;
+    importOnce('./attention.js').then(m => { attentionReady = true; m.setAttentionTotal(n); });
+}
 
 /** Keep the tab's badge (and, where the dashboard builds its own Inbox, the Needs you list) in step with the live list. Safe to call often (after each list update). */
 export function updateInboxTab() {
@@ -65,7 +70,7 @@ export function updateInboxTab() {
     const label = n > 0 ? unreadReviewItems().length || failedUnread().length || operatorAsks().length ? `Inbox, ${n} need your attention` : `Inbox, ${n} waiting for input` : null;
     if (tab.getAttribute('aria-label') !== label) { if (label) tab.setAttribute('aria-label', label); else tab.removeAttribute('aria-label'); }
     setInboxCount('needs', n);
-    importOnce('./attention.js').then(m => m.setAttentionTotal(n)); // the background tab's title carries the same number as the badge (#11837)
+    tellAttention(n);
     offerAlertsAgainIfWaited(n);
     _hooks.needs?.(); // the Needs you rows, once the sidebar is loaded and while the Inbox is on screen
     announceNewlyWaiting(tab);

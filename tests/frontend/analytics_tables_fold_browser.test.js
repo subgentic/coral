@@ -53,7 +53,7 @@ const VIEWS = ['provider', 'model', 'thinking', 'team', 'agent', 'branch', 'call
                 assert.deepEqual([p.sideways, p.pageSw], [false, false], 'no sideways scroll: ' + JSON.stringify(p));
                 assert.equal(p.head, 'none', 'the header row is not drawn: ' + JSON.stringify(p));
                 assert.deepEqual(p.roles, ['table', 'row', 'cell'], 'the roles stay: ' + JSON.stringify(p)); assert.ok(p.labels.slice(1).every(Boolean), 'every cell has its column name: ' + JSON.stringify(p.labels));
-                assert.ok(p.firstFull >= p.rowW - 2 * 12 - 2, 'the name takes the row (inside its padding): ' + JSON.stringify(p)); assert.ok(p.tops[1] > p.tops[0], 'the figures are under the name: ' + JSON.stringify(p));
+                assert.ok(p.firstFull >= p.rowW - 2 * 12 - 2, 'the name takes the row (inside its padding): ' + JSON.stringify(p)); assert.ok(p.tops.slice(1).some(t => t > 0) && Math.min(...p.tops.slice(1).filter(t => t > 0)) > p.tops[0], 'the figures that are shown are under the name (a column with nothing in it is not drawn, so its cell has no place: #11858): ' + JSON.stringify(p));
                 assert.ok(p.first.length >= 1 && p.before.every(c => c.length > 2), 'Cost or Calls first, labels drawn: ' + JSON.stringify(p));
                 assert.deepEqual([p.strong.length, p.strong[0] && p.strong[0].slice(1)], [1, ['13px', '600']], 'one stronger figure, the sort key\'s, 13/600: ' + JSON.stringify(p.strong)); assert.deepEqual(p.rest, ['12px,400'], 'the other lines 12/400: ' + JSON.stringify(p.rest));
                 if (key !== 'calls') assert.ok(p.sortBar, 'a Sort by select is above it: ' + JSON.stringify(p));

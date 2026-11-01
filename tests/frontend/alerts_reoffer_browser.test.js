@@ -1,6 +1,6 @@
 // The "Turn on alerts" offer comes back once (#11893, the operator's choice 3, Beta #11837: two questions waited 14 and 29 minutes unseen after the banner was dismissed): a browser that was offered and dismissed, and could
 // still turn alerts on, is offered again when the first thing that needs the person has waited 5 minutes; never more than once (a second dismissal is final); not to a browser that was never offered, that has alerts on or
-// blocked; and not while the tab is hidden (the banner would not be seen: it comes when the person is back). The browser's Notification is a page stub; the waiting agent is a seeded session. 1280 px.
+// blocked; and not while the tab is hidden (the banner would not be seen: it comes with the first update after the person is back). The browser's Notification is a page stub; the waiting agent is a seeded session. 1280 px.
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const { INBOX_WORLD } = require('./helpers/inbox_world');
@@ -44,7 +44,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
         await load({ 'coral-alerts-offered': '1' });
         await ev(`window.__hidden = true; Object.defineProperty(document, 'hidden', { configurable: true, get: () => !!window.__hidden }); true`);
         await setWaiting(8); check(!(await banner()) && (await ev(`localStorage.getItem('coral-alerts-reoffered')`)) === null, 'a hidden tab gets no banner and does not spend the offer');
-        await ev(`window.__hidden = false; document.dispatchEvent(new Event('visibilitychange')); true`);
+        await ev(`window.__hidden = false; document.dispatchEvent(new Event('visibilitychange')); import(${S} + 'inbox_tab.js').then(m => m.updateInboxTab()); true`); // the feed's next update (the page keeps no listener of its own for the tab coming back, so the startup stays as it was)
         await waitFor(`!!document.getElementById('alerts-offer-banner')`, 'the banner when the person is back', 6000).catch(() => {});
         check(await banner(), 'back in the tab, the banner comes');
     } finally { await client.close(); }
