@@ -168,7 +168,13 @@ func livedIn(ctx context.Context, p Probe, now time.Time) (bool, error) {
 
 // readFile reads the id file: at most maxFile bytes, 32 hex digits on the first line and an optional "made at <path>" second line. A malformed file is an error (FOREIGN).
 func readFile(dir string) (id, madeAt string, err error) {
-	f, err := os.Open(filepath.Join(dir, FileName))
+	path := filepath.Join(dir, FileName)
+	if fi, err := os.Lstat(path); err != nil { // a link is refused, as the writer does not follow one (a not-exist error stays one: no file)
+		return "", "", err
+	} else if !fi.Mode().IsRegular() {
+		return "", "", fmt.Errorf("the id file is not a regular file")
+	}
+	f, err := os.Open(path)
 	if err != nil {
 		return "", "", err
 	}

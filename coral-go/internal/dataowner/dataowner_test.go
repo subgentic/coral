@@ -225,3 +225,17 @@ func TestAdoptMakesTheNextStartOwnedAndWakesNothing(t *testing.T) {
 	assert.False(t, v.Foreign)
 	assert.False(t, v.Made)
 }
+
+// Security's INFO c: the id file is read as the writer writes it, without following a link.
+func TestALinkWhereTheIdFileShouldBeIsRefused(t *testing.T) {
+	r := newRig(t)
+	r.row = strings.Repeat("a", 32)
+	target := filepath.Join(t.TempDir(), "elsewhere")
+	require.NoError(t, os.WriteFile(target, []byte(r.row+"\n"), 0o600)) // a valid id, behind a link
+	if err := os.Symlink(target, filepath.Join(r.dir, FileName)); err != nil {
+		t.Skipf("cannot create symbolic links here: %v", err)
+	}
+	v := r.verify()
+	assert.True(t, v.Foreign)
+	assert.Equal(t, ReasonUnreadable, v.Reason)
+}

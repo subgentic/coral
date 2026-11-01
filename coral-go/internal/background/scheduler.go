@@ -182,6 +182,10 @@ func (s *JobScheduler) SetNextFireTimeFn(fn func(cronExpr, tz string, after time
 
 // Run starts the scheduler loop.
 func (s *JobScheduler) Run(ctx context.Context) error {
+	if ptymanager.Foreign() { // a Coral on a copy of another's database launches no scheduled job (internal/dataowner)
+		<-ctx.Done()
+		return nil
+	}
 	s.parentCtx = ctx // store for launchAndWatch goroutines
 	s.logger.Info("scheduler started", "interval", s.interval, "max_concurrent", s.maxConcurrent)
 

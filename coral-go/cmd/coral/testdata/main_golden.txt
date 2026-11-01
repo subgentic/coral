@@ -30,6 +30,8 @@ Main server flags:
 Run 'coral help <command>' for a command's flags, and 'coral --help-all' for every server flag.
 
 Every server flag:
+  -adopt-data-dir
+    	Make this data folder's database its own (a new id in the database and the folder) and exit; for a restored or copied database that Coral treats as foreign. Wakes nothing; Coral must be stopped
   -agent-priority string
     	Priority of agent processes: low (default, nice +10 / below normal so the server stays responsive) or normal. Also CORAL_AGENT_PRIORITY or the Settings choice
   -allow-shared-data-dir
