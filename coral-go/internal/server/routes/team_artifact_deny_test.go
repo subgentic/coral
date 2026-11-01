@@ -35,7 +35,7 @@ func TestDenyIsFinalTellsTheUploaderOnceAndTakesTheRowOut(t *testing.T) {
 
 	msgs := e.messages(t)
 	require.Len(t, msgs, 1)
-	assert.Contains(t, msgs[0], "@Alice [Coral] The operator declined your artifact coral://artifacts/"+e.id+" . Do not resubmit it as it is.")
+	assert.Contains(t, msgs[0], "@Alice [Coral] The operator denied your artifact coral://artifacts/"+e.id+" . This is final: do not upload it again, in any wording, unless the operator asks you to. Tell your Orchestrator and carry on with other work.") // #11884: Beta saw the team repost a reworded notice after a Deny
 	assert.Contains(t, msgs[0], "Not this design.")
 	assert.True(t, strings.Index(msgs[0], "Not this design.") < strings.Index(msgs[0], "plan.md"), "the file name is last: no fixed text follows agent-written data")
 
@@ -72,7 +72,7 @@ func TestDenyReasonIsCleanedCutAndDefused(t *testing.T) {
 	assert.NotContains(t, msg, "\u202e", "hidden characters are out")
 	assert.NotContains(t, msg, "@Bob", "no mention of another agent")
 	assert.NotContains(t, msg, "coral://artifacts/"+strings.Repeat("a", 64), "a link in the reason is not a link to follow")
-	assert.Less(t, len([]rune(msg)), 900, "the reason is cut at 500")
+	assert.Less(t, len([]rune(msg)), 1000, "the reason is cut at 500 (the whole notice, fixed words and name included, is about 910; uncut it would be over 1,150)")
 }
 
 func TestDenyRefusesASignInLinkInTheReason(t *testing.T) {
