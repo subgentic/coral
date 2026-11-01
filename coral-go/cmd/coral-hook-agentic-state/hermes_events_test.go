@@ -85,7 +85,7 @@ func TestFromHermesDropsWhatIsNotSafe(t *testing.T) {
 		assert.False(t, has, id)
 	}
 	// a tool event with no usable name is not recorded; a name with a bidi override or a control character is dropped, not repaired
-	for _, name := range []any{nil, "", 5, "te‮rminal", "ter\x1bminal", "a​b", strings.Repeat("x", 300)} {
+	for _, name := range []any{nil, "", 5, "te\u202erminal", "ter\x1bminal", "a\u200bb", strings.Repeat("x", 300)} {
 		_, ok := fromHermes(map[string]any{"tool_name": name}, "PreToolUse")
 		assert.False(t, ok, "%v", name)
 	}

@@ -20,7 +20,7 @@ func TestHermesThinkingLevelsAreTheCLIsOwn(t *testing.T) {
 		assert.True(t, ValidThinking(at.Hermes, l), l)
 		assert.Equal(t, []string{"--reasoning", l}, ThinkingArgs(at.Hermes, l), l)
 	}
-	for _, l := range []string{"off", "Low", "low ", "--yolo", "high;ls", "ultra2", "‮max"} {
+	for _, l := range []string{"off", "Low", "low ", "--yolo", "high;ls", "ultra2", "\u202emax"} {
 		assert.False(t, ValidThinking(at.Hermes, l), l)
 		assert.Nil(t, ThinkingArgs(at.Hermes, l), l)
 	}
