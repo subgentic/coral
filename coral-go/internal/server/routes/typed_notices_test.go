@@ -80,6 +80,7 @@ func TestEveryTypedSenderIsInTheCensus(t *testing.T) {
 		typedcensus.S("agent_exited.go", `term.SendInput(ctx, terminalinput.Coral, name, text, agentType, sessionID)`, 1, "deliverAutomated's own send: types the text of its callers, listed here"),
 		typedcensus.S("sessions_input.go", `body.Command, body.AgentType`, 1, "exception: POST /send by a caller that is not a person (an agent's tool, a script): the caller's own words, through the gate and its exited-pane guard; who may send is checked before"),
 		typedcensus.S("sessions_input.go", `"/keys"`, 1, "exception: POST /keys by a caller that is not a person: the caller's own keys, through the gate"),
+		typedcensus.S("hermes_runtime.go", `text, "first message")`, 1, "exception: a Hermes agent's own launch instructions (the board protocol, its role and the launch prompt it was given: the text every other type gets on its command line), written by Coral's launch into a private file and typed once through the gate (#11831)"),
 		typedcensus.S("sessions_waiting.go", `ptymanager.DeliverNow(`, 1, "Send now: board.NudgeText (census)"),
 		typedcensus.S("sessions_waiting.go", `name, text, ls.AgentType`, 1, "Send now's send: board.NudgeText (census)"),
 	})

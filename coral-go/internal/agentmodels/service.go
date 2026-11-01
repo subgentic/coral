@@ -55,6 +55,8 @@ func Family(agentType string) string {
 		return "pi"
 	case at.Opencode:
 		return "opencode"
+	case at.Hermes:
+		return "hermes"
 	}
 	return ""
 }
@@ -412,6 +414,8 @@ func FetchFromCLI(ctx context.Context, family, path string) ([]Model, string, er
 		}
 		m, err := ParseOpencodeModels(out)
 		return m, "account", err
+	case "hermes":
+		return nil, "custom", nil // Hermes has no list command Coral knows (#11831): the model is typed or a custom one, and nothing is run to ask
 	case "pi":
 		out, err := runCLI(ctx, path, dir, "--list-models")
 		if err != nil {

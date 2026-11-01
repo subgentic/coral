@@ -47,6 +47,16 @@ func main() {
 		}
 	}
 
+	if opts.hermesEvent != "" {
+		var ok bool
+		if d, ok = fromHermes(d, opts.hermesEvent); !ok { // only the allow-listed keys are read: nothing else in the payload reaches a post
+			hooks.DebugLog("AGENTIC_STATE HERMES_SKIPPED")
+			return
+		}
+	} else if len(os.Args) > 1 && contains(os.Args[1:], "--hermes") {
+		return // --hermes named an event Coral does not record
+	}
+
 	var piStop map[string]any // the Stop a Pi shutdown event carries (fromPi's _pi_stop): read only for a --pi invocation, never from any other payload
 	if opts.piEvent != "" {
 		var ok bool
@@ -76,6 +86,9 @@ func handle(d map[string]any, opts hookArgs, agyModel, agyConversation string) {
 	sessionID := hooks.ResolveSessionID(hooks.StrVal(d, "session_id"))
 	bindTranscripts(d, sessionID, agyConversation)
 	agentName := hooks.ResolveAgentName(d)
+	if opts.hermesEvent != "" {
+		agentName = hermesAgentName() // Hermes runs its hooks in its own install folder: the payload's folder is not the agent's
+	}
 	if agentName == "" {
 		hooks.DebugLog(fmt.Sprintf("DROPPED (no agent_name): hook_type=%s", hookType))
 		return
@@ -177,6 +190,14 @@ func bindTranscripts(d map[string]any, sessionID, agyConversation string) {
 		if threadID := codexThreadID(d); threadID != "" && threadID != sessionID {
 			if err := transcriptlink.BindCodex(sessionID, threadID); err != nil {
 				hooks.DebugLog(fmt.Sprintf("CODEX_LINK_FAILED: %v", err))
+			}
+		}
+	}
+	if strings.HasPrefix(os.Getenv("CORAL_SESSION_NAME"), "hermes-") && transcriptlink.IsSessionID(sessionID) {
+		// Hermes keys its session rows by its own id, which every payload of its hooks names (fromHermes kept it only in the Hermes form): the link is what the chat reads them by (#11831).
+		if id := hooks.StrVal(d, "session_id"); id != "" && id != sessionID {
+			if err := transcriptlink.BindHermes(hooks.CoralDir(), sessionID, id); err != nil {
+				hooks.DebugLog(fmt.Sprintf("HERMES_LINK_FAILED: %v", err))
 			}
 		}
 	}
@@ -294,6 +315,7 @@ type hookArgs struct {
 	sessionClear bool   // --session-clear: a /clear
 	agyEvent     string // --agy <event>: an Antigravity hook
 	piEvent      string // --pi <event>: Coral's Pi extension (pi_events.go); only an event of piEventNames
+	hermesEvent  string // --hermes <event>: Coral's entry in Hermes's config.yaml (hermes_events.go); only an event of hermesEventNames
 	hooksRev     int    // --hooks-rev N: the hook set's revision (#3655 F3); 0 when absent or not a positive number
 }
 
@@ -307,6 +329,8 @@ func parseArgs(args []string) hookArgs {
 			o.agyEvent = args[i+1]
 		case arg == "--pi" && i+1 < len(args):
 			o.piEvent = piEventNames[args[i+1]]
+		case arg == "--hermes" && i+1 < len(args):
+			o.hermesEvent = hermesEventNames[args[i+1]]
 		case arg == "--hooks-rev" && i+1 < len(args):
 			if n, err := strconv.Atoi(args[i+1]); err == nil && n > 0 {
 				o.hooksRev = n

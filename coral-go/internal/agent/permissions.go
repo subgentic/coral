@@ -357,6 +357,12 @@ func PermissionFlagsForAgent(agentType, mode string) []string {
 		default:
 			return nil
 		}
+	case at.Hermes:
+		// Hermes asks before a dangerous command (its 4-choice menu) unless --yolo; only Bypass permissions is that (a person's own flag is stripped before, SplitPermissionFlags).
+		if mode == "bypassPermissions" {
+			return []string{"--yolo"}
+		}
+		return nil
 	case at.Codex:
 		switch mode {
 		case "bypassPermissions":
@@ -483,6 +489,10 @@ func promptKeepingFlag(agentType, name string) func(string) bool {
 	switch agentType {
 	case at.Claude:
 		if name == "--effort" {
+			return anyValue
+		}
+	case at.Hermes:
+		if name == "--reasoning" { // the level of thinking: no more power than the model (#11831)
 			return anyValue
 		}
 	case at.Agy, at.Antigravity, at.Gemini:

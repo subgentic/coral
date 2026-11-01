@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	at "github.com/subgentic/coral/internal/agenttypes"
 	"github.com/subgentic/coral/internal/safego"
 	"github.com/subgentic/coral/internal/terminalinput"
 	"github.com/subgentic/coral/internal/tmux"
@@ -174,7 +175,13 @@ func (m *PTYBackend) SendLineCtx(ctx context.Context, o terminalinput.Origin, na
 		if err := m.SendInput(o, name, []byte(text)); err != nil {
 			return err
 		}
-		time.Sleep(lineSubmitDelay)
+		m.mu.RLock()
+		agentType := ""
+		if s, ok := m.sessions[name]; ok {
+			agentType = s.agentType
+		}
+		m.mu.RUnlock()
+		time.Sleep(submitGap(agentType, lineSubmitDelay))
 	}
 	if !tmux.EnterAllowed(ctx) {
 		return tmux.ErrEnterWithheld
@@ -246,7 +253,7 @@ func (m *PTYBackend) SendText(ctx context.Context, o terminalinput.Origin, name,
 		return fmt.Errorf("write text: %w", err) // nothing reached the PTY
 	}
 	// Input has started: finish regardless of ctx, bounded by the fixed delay.
-	time.Sleep(waits().promptSubmitDelay)
+	time.Sleep(submitGap(s.agentType, waits().promptSubmitDelay))
 	if !tmux.EnterAllowed(ctx) {
 		return tmux.ErrEnterWithheld // a prompt opened: the gate holds the Enter (#3431)
 	}
@@ -310,7 +317,7 @@ func (m *PTYBackend) SendPrompt(ctx context.Context, o terminalinput.Origin, nam
 		return fmt.Errorf("write prompt: %w", err) // nothing reached the PTY
 	}
 	// Input has started: finish regardless of ctx, bounded by the fixed delay.
-	time.Sleep(waits().promptSubmitDelay)
+	time.Sleep(submitGap(s.agentType, waits().promptSubmitDelay))
 	if !tmux.EnterAllowed(ctx) {
 		return tmux.ErrEnterWithheld // a prompt opened: the gate holds the Enter (#3457)
 	}
@@ -637,4 +644,9 @@ func (m *PTYBackend) ShellIdle(name string) (idle bool, shell string, ok bool) {
 		return false, "", false
 	}
 	return idle, shell, true
+}
+
+// submitGap is the wait between text and its Enter: base, or the agent type's own minimum when that is longer (agenttypes.MinSubmitGap).
+func submitGap(agentType string, base time.Duration) time.Duration {
+	return max(base, at.MinSubmitGap(agentType))
 }

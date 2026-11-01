@@ -27,6 +27,8 @@ func IsResumeID(agentType, id string) bool {
 	// unknown type is Claude there, so it gets the UUID rule, not the loose one (Backend's MUST 2
 	// on #3582). Only Codex keys resume on non-UUID native ids.
 	switch GetAgent(agentType).AgentType() {
+	case at.Hermes:
+		return IsHermesSessionID(id) // exactly local- and 64 lowercase hex (the one form Hermes writes; checked on v0.22.5): no other word reaches --resume
 	case at.Codex:
 		return true
 	case at.Opencode:

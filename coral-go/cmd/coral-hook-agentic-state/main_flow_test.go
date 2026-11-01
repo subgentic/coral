@@ -32,8 +32,9 @@ type flowRun struct {
 	cli       string   // the CLI's session-name prefix: claude, codex or agy
 	args      []string // the hook's own arguments
 	stdin     []byte
-	turnEnd   string // what Coral answers to a turn-end question
-	failEvent bool   // Coral answers the events post with a 500
+	turnEnd   string   // what Coral answers to a turn-end question
+	failEvent bool     // Coral answers the events post with a 500
+	env       []string // more of the hook's environment
 }
 
 type flowRequest struct {
@@ -101,6 +102,7 @@ func runFlow(t *testing.T, run flowRun) flowResult {
 		"CORAL_DATA_DIR=" + filepath.Join(home, "coral"), "CORAL_SESSION_ID=" + flowSessionID, "CORAL_SESSION_NAME=" + run.cli + "-" + flowSessionID,
 		"CORAL_URL=" + srv.URL, testguard.TestURLEnv + "=1", "PATH=" + os.Getenv("PATH"),
 	}
+	cmd.Env = append(cmd.Env, run.env...)
 	require.NoError(t, cmd.Run(), "the hook exits 0 whatever happens (a hook that fails stops the CLI)")
 
 	mu.Lock()
