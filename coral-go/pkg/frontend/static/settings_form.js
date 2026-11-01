@@ -59,6 +59,7 @@ export function readSettingsForm() {
     const fileSearchMode = document.getElementById("settings-file-search-mode")?.value || "directory";
     const fileSearchLimit = document.getElementById("settings-file-search-limit")?.value || "500";
     const gitDiffMode = document.getElementById("settings-git-diff-mode")?.value || "branch_point";
+    const chiefActions = document.getElementById("settings-chief-actions")?.value || "ask_first";
     const gitPollIntervalS = document.getElementById("settings-git-poll-interval")?.value ?? "120";
     // The server takes only "low" or "normal" (#3470): a value stored before that check is sent as low.
     const lowBox = document.getElementById("settings-agent-low-priority");
@@ -111,6 +112,7 @@ export function readSettingsForm() {
         file_search_mode: fileSearchMode,
         file_search_limit: fileSearchLimit,
         git_diff_mode: gitDiffMode,
+        chief_actions: chiefActions,
         git_poll_interval_s: gitPollIntervalS,
         agent_priority: agentPriority,
         telemetry_enabled: telemetryEnabled,

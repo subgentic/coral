@@ -62,7 +62,8 @@ type restartPlan struct {
 	capsJSON, toolsJSON                                       *string
 	tools                                                     []string
 	permMode                                                  string
-	modeNotRecorded                                           bool // the stored agent had no mode: it restarts in Default and the answer says so
+	modeNotRecorded                                           bool   // the stored agent had no mode: it restarts in Default and the answer says so
+	chiefMode                                                 string // set when the restarted agent is the recorded Chief: the mode its chief_actions setting names (#11798)
 }
 
 // Restart restarts the agent session: worked out first (restartResolve, restartSettings, restartCommand), so
@@ -225,6 +226,7 @@ func (h *SessionsHandler) restartResolve(ctx context.Context, name string, req r
 		}
 	}
 
+	p.chiefMode = h.chiefRestartMode(ctx, req.SessionID)
 	p.newSessionID = h.uuid()
 	p.newSessionName = naming.SessionName(p.agentType, p.newSessionID)
 	p.newLogPath = naming.LogFile(h.cfg.LogDir, p.agentType, p.newSessionID)
@@ -355,8 +357,11 @@ func (p *restartPlan) restartSettings() {
 			p.modeNotRecorded = p.stored != nil
 		}
 	}
+	if p.chiefMode != "" {
+		p.permMode = p.chiefMode
+	}
 	cleanFlags := restartFlags(storedFlags, p.model, p.req.ExtraFlags)
-	if carried, _ := agent.SplitPermissionFlags(storedFlags); p.caps.IsEmpty() && len(carried) > 0 {
+	if carried, _ := agent.SplitPermissionFlags(storedFlags); p.chiefMode == "" && p.caps.IsEmpty() && len(carried) > 0 {
 		cleanFlags = append(cleanFlags, carried...) // what the agent was started with, as it was (#6423)
 	} else if p.caps.IsEmpty() && p.permMode != "" && p.permMode != "default" {
 		cleanFlags = append(cleanFlags, agent.PermissionFlagsForAgent(p.agentType, p.permMode)...)
@@ -621,12 +626,18 @@ func (h *SessionsHandler) restartRecord(ctx context.Context, p *restartPlan) {
 		Tools:         p.toolsJSON,
 		PID:           restartPID,
 		PermissionMode: func() *string {
+			if p.chiefMode != "" {
+				return &p.chiefMode // Chief's mode is its setting's, not the stored one (#11798)
+			}
 			if p.stored != nil && p.stored.PermissionMode != nil && *p.stored.PermissionMode != "" {
 				return p.stored.PermissionMode
 			}
 			return ptr.NonEmpty(p.permMode) // the mode it restarted in is recorded, so the next restart knows it (#10297)
 		}(),
 	})
+	if p.chiefMode != "" {
+		h.ss.SetSetting(ctx, "chief_session", p.newSessionID) // Chief is still the recorded agent after its restart: the next restart finds it
+	}
 	h.noteLaunchedHooks(ctx, p.newSessionID, p.agentType) // #3665
 	h.noteStartSucceeded(ctx, p.newSessionID)
 	h.ss.MigrateDisplayName(ctx, p.req.SessionID, p.newSessionID)

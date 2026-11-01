@@ -6,7 +6,7 @@
 const ROWS = {
     theme: ['Theme'], custom_theme: ['Theme'],
     default_renderer: ['Render engine'], default_agent_type: ['Default agent type'], default_permission_mode: ['Default permission mode'], default_working_dir: ['Default working directory'],
-    default_thinking_claude: ['Default thinking'],
+    default_thinking_claude: ['Default thinking'], chief_actions: ["Chief's actions"],
     default_model_claude: ['Default models'], default_model_codex: ['Default models'], default_model_agy: ['Default models'], default_model_gemini: ['Default models'], default_model_pi: ['Default models'],
     cli_path_claude: ['CLI paths'], cli_path_codex: ['CLI paths'], cli_path_agy: ['CLI paths'], cli_path_gemini: ['CLI paths'], cli_path_pi: ['CLI paths'],
     fit_pane_width: ['Fit pane width', 'switch'], notify_needs_input: ['Notifications', 'switch'], show_scrollbars: ['Show scrollbars', 'switch'],

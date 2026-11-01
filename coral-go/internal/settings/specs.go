@@ -164,6 +164,7 @@ func init() {
 	boolOff("chief_page", ApplyLive, "Serve /chief, the phone page for the one agent recorded as Chief.")
 	text("chief_team", ApplyLive, "The team the Chief agent is on.")
 	text("chief_session", ApplyLive, "The session id of the Chief agent.")
+	register(Spec{Key: ChiefActions, Kind: KindEnum, Values: []string{ChiefAsksFirst, ChiefActs}, Default: ChiefAsksFirst, Apply: ApplyLive, Doc: "What Chief may do without asking: ask_first (Default permission mode, the default) or act (Accept edits; a shell command still asks). Applies when Chief restarts."})
 	boolOff("home_editions_hidden", ApplyClient, "Hide the editions card on Home.")
 
 	// Storage.
