@@ -149,6 +149,11 @@
 .dt-bar > * { margin: 0; }
 .dt-bar-count { font-size: var(--table-secondary-size); font-weight: var(--fw-strong); color: var(--table-primary-color); }
 .dt-bar-clear { margin-left: auto; }
+.dt-bar-icons { flex-wrap: nowrap; gap: 4px; } /* a phone's selection bar is one line (#11707): Cancel as an X, the count, icon buttons, three dots */
+.dt-bar-icons .dt-bar-count { margin-right: auto; white-space: nowrap; }
+.dt-bar-icons .dt-bar-cancel, .dt-bar-icons .dt-bar-icon, .dt-bar-icons .dt-bar-more-toggle { flex: none; width: var(--table-touch, 44px); min-width: var(--table-touch, 44px); height: var(--table-touch, 44px); padding: 0; }
+.dt-bar-more { position: relative; display: flex; flex: none; }
+.dt-bar-more .dt-mail-menu { right: 0; top: 100%; }
 .dt-bar-confirm { font-size: var(--table-secondary-size); color: var(--table-primary-color); }
 .dt-danger { color: var(--table-danger); border-color: var(--table-danger); background: none; }
 .dt-sortbar, .dt-select-toggle[hidden] { display: none; }
@@ -449,6 +454,7 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
     .gt-toolbar.team-toolbar-selecting { flex-wrap: wrap; }
     .gt-toolbar.team-toolbar-selecting > :is(.list-bar-search-wrap, .dt-select-toggle) { display: none; }
     .gt-toolbar.team-toolbar-selecting > .team-tb-selection { flex: 1 1 100%; }
+    .list-bar-bar:has(> .team-toolbar-selecting) { position: sticky; top: 0; z-index: 25; background: var(--bg-primary); } /* a phone's selection bar is the top row of the screen and stays there while the list scrolls (#11707, the operator's comment 28) */
 }
 @media (max-width: 767px) { /* a phone's mail rows run edge to edge (UI/UX, #9545): no card around them, the page's side padding given back, and no Sort row (a mail list has none) */
     .group-table-view .dt-box.dt-mail-on { margin-inline: calc(-1 * var(--space-2xl)); border-inline: 0; border-radius: 0; }

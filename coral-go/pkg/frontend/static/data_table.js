@@ -2,7 +2,7 @@
  * is a --table-* token (css/data_table.css) and no surface styles a row, a cell or a header.
  *
  *   dataTable({ label, columns, rows, rowKey, groupBy(row) -> { key, label }, open, current, state, onSort, layout, fold, foldAt, sortBar, defaultSortLabel, bare, empty, footer, selectable, rowName, quiet, scroll, detail, decorate, decorateHead }) -> { el, bar, selectButton, selection(), clear(), state }
- *   selectable = { contextKey, onChange(keys), longPress (a touch screen selects a row by pressing and holding it), clearLabel (the bar's last button, 'Clear'), actions (an action may have askWhen(n) and confirm(n): it asks first only when askWhen says so): [{ label, run(rows, keys, value), danger, confirm, choose: { label, options() -> [{ value, label }] } }] }: a danger action confirms in the bar, a choose action asks for its value there.
+ *   selectable = { contextKey, onChange(keys), longPress (a touch screen selects a row by pressing and holding it), clearLabel (the bar's last button, 'Clear'), iconBar (one line: Cancel as an X, the count, actions with icon() as icon buttons, and those with more: true in a three-dot menu), actions (an action may have askWhen(n) and confirm(n): it asks first only when askWhen says so): [{ label, run(rows, keys, value), danger, confirm, choose: { label, options() -> [{ value, label }] } }] }: a danger action confirms in the bar, a choose action asks for its value there.
  *   Column = { key, label, field | cell(row, ctx), primary, tone: 'primary'|'secondary'|'tertiary', width: 'grow'|'content'|'<n>rem', fixed (with a rem width: that width, no resize handle, never squeezed or kept: a list's Actions, #9845), nowrap, align: 'start'|'end', numeric,
  *              sort: true|'number'|'date'|fn(a, b), sortValue(row), firstDir: 'asc'|'desc', foldFirst, narrowHide, line: 0|1|2, foldLabel, when(row), subtitle(row), subtitleTitle(row), title(row), filter: { label, active(), open(button) }, hideLabel }
  *   column widths (#7949): every header has a resize handle on its right edge (drag, Left and Right keys, double-click or Enter to fit the content); the widths are kept per list in this browser (widthsKey, else the label without its row count), and there is no reset button: a double click on a column edge fits it to its content (#9845). minWidth per column (64 px by default), resize: false for one that must not.
@@ -505,18 +505,32 @@ export function dataTable(cfg) {
         bar.hidden = n === 0; bar.replaceChildren();
         live.textContent = n ? `${n} selected` : '';
         if (!n) { st.confirming = -1; st.choices = null; return; }
-        bar.append(el('span', 'dt-bar-count', `${n} selected`));
+        const icons = !!sel.iconBar && st.confirming < 0; // a phone's bar is one line (#11707): Cancel (X), "N selected", icon buttons, and a More menu for the rest; the confirm step keeps words
+        bar.classList.toggle('dt-bar-icons', !!sel.iconBar);
+        if (icons) { const x = button('btn btn-quiet btn-icon ic-close dt-bar-cancel', '', () => clear()); x.setAttribute('aria-label', sel.clearLabel || 'Clear'); x.title = sel.clearLabel || 'Clear'; bar.append(x); }
+        if (!(sel.iconBar && st.confirming >= 0)) bar.append(el('span', 'dt-bar-count', `${n} selected`));
         const actions = sel.actions || [];
         const chosen = () => [...st.selected].map(k => st.rowCache.get(k)).filter(Boolean);
+        const press = (a, i) => async () => {
+            if (a.choose) { st.choices = await a.choose.options(); st.confirming = i; drawBar(); bar.querySelector(a.danger ? '.dt-bar-keep' : '.dt-bar-choice')?.focus(); return; } // an action that needs a value (a person, a priority) asks for it here
+            if (a.danger || a.askWhen?.(chosen().length)) { st.confirming = i; drawBar(); bar.querySelector('.dt-bar-keep')?.focus(); return; } // askWhen(n): an action that asks only for some selections (Approve of several files), in the same Keep / confirm step, not red
+            a.run(chosen(), new Set(st.selected));
+        };
+        const more = [];
         actions.forEach((a, i) => {
             if (st.confirming >= 0) return; // while one asks, the others wait
-            const action = button(`btn btn-small dt-bar-action${a.danger ? ' dt-danger' : ''}`, a.label, async () => {
-                if (a.choose) { st.choices = await a.choose.options(); st.confirming = i; drawBar(); bar.querySelector(a.danger ? '.dt-bar-keep' : '.dt-bar-choice')?.focus(); return; } // an action that needs a value (a person, a priority) asks for it here
-                if (a.danger || a.askWhen?.(chosen().length)) { st.confirming = i; drawBar(); bar.querySelector('.dt-bar-keep')?.focus(); return; } // askWhen(n): an action that asks only for some selections (Approve of several files), in the same Keep / confirm step, not red
-                a.run(chosen(), new Set(st.selected));
-            });
+            if (icons && a.more) { more.push([a, i]); return; }
+            const action = icons && a.icon ? button('btn btn-quiet btn-icon dt-bar-action dt-bar-icon', '', press(a, i)) : button(`btn btn-small dt-bar-action${a.danger ? ' dt-danger' : ''}`, a.label, press(a, i));
+            if (icons && a.icon) { action.append(a.icon()); action.setAttribute('aria-label', a.label); action.title = a.label; }
             action.disabled = !!a.disabled?.(chosen()); bar.append(action);
         });
+        if (more.length) { // the rest of the actions behind one three-dot button (menu_button.js: arrow keys, Escape, a tap elsewhere closes)
+            const id = `dt-bar-more-${n}`, wrap = el('span', 'dt-bar-more'), toggle = button('btn btn-quiet btn-icon ic-more dt-bar-more-toggle', '', async e => { e.stopPropagation(); (await importOnce('./menu_button.js')).toggleMenu(toggle); });
+            toggle.id = id; toggle.setAttribute('aria-haspopup', 'menu'); toggle.setAttribute('aria-expanded', 'false'); toggle.setAttribute('aria-controls', `${id}-menu`); toggle.setAttribute('aria-label', 'More actions'); toggle.title = 'More actions';
+            const menu = el('div', 'menu dt-mail-menu'); menu.id = `${id}-menu`; menu.hidden = true; menu.setAttribute('role', 'menu'); menu.setAttribute('aria-label', 'More actions');
+            for (const [a, i] of more) { const it = button('menu-item', a.label, async e => { e.stopPropagation(); (await importOnce('./menu_button.js')).closeMenus({ restoreFocus: true }); press(a, i)(); }); it.setAttribute('role', 'menuitem'); it.disabled = !!a.disabled?.(chosen()); menu.append(it); }
+            wrap.append(toggle, menu); bar.append(wrap);
+        }
         if (st.confirming >= 0) {
             const a = actions[st.confirming];
             if (a.choose) {
@@ -536,7 +550,7 @@ export function dataTable(cfg) {
                 bar.append(ask, button('btn btn-small dt-bar-keep', 'Keep', () => { st.confirming = -1; drawBar(); }), button(`btn btn-small${a.danger ? ' dt-danger' : ''}`, a.label, () => { st.confirming = -1; a.run(chosen(), new Set(st.selected)); }));
             }
         }
-        bar.append(button('btn btn-small dt-bar-clear', sel.clearLabel || 'Clear', () => clear()));
+        if (!sel.iconBar) bar.append(button('btn btn-small dt-bar-clear', sel.clearLabel || 'Clear', () => clear())); // the icon bar has its Cancel first
     }
 
     function clear() { st.selected.clear(); st.anchor = null; st.confirming = -1; st.choices = null; syncSelection(); }

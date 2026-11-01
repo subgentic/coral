@@ -42,7 +42,8 @@ const { coralReady } = require('./helpers/wait');
             const touch = (type, p) => client.Input.dispatchTouchEvent({ type, touchPoints: type === 'touchEnd' ? [] : [{ x: p.x, y: p.y, id: 1 }] });
             const tap = async name => { const p = await point(name); await touch('touchStart', p); await new Promise(r => setTimeout(r, 60)); await touch('touchEnd', p); await new Promise(r => setTimeout(r, 250)); }; // sleep-ok: a tap, and the table redraws
             const press = async name => { const p = await point(name); await touch('touchStart', p); await new Promise(r => setTimeout(r, 700)); await touch('touchEnd', p); await new Promise(r => setTimeout(r, 300)); }; // sleep-ok: a long press is a held finger
-            const bar = () => ev(`(() => { const b = document.querySelector('${T} .dt-bar, .gt-toolbar .dt-bar'); if (!b || b.hidden || !b.getClientRects().length) return null; return { count: (b.querySelector('.dt-bar-count') || {}).textContent, actions: [...b.querySelectorAll('button')].map(x => ({ label: x.textContent, off: x.disabled })) }; })()`);
+            const bar = () => ev(`(() => { const b = document.querySelector('${T} .dt-bar, .gt-toolbar .dt-bar'); if (!b || b.hidden || !b.getClientRects().length) return null; const r = b.getBoundingClientRect(); const tops = [...b.querySelectorAll(':scope > button, :scope > .dt-bar-more > button')].map(x => Math.round(x.getBoundingClientRect().top)); return { count: (b.querySelector('.dt-bar-count') || {}).textContent, h: Math.round(r.height), oneLine: Math.max(...tops) - Math.min(...tops) <= 4, small: [...b.querySelectorAll(':scope > button, :scope > .dt-bar-more > button')].filter(x => x.getBoundingClientRect().width < 43.5 || x.getBoundingClientRect().height < 43.5).map(x => x.getAttribute('aria-label')), actions: [...b.querySelectorAll('button')].map(x => ({ label: x.getAttribute('aria-label') || x.textContent, off: x.disabled })) }; })()`);
+            const pressBar = label => ev(`[...document.querySelectorAll('.dt-bar button')].find(x => (x.getAttribute('aria-label') || x.textContent) === ${JSON.stringify(label)}).click(); true`);
             const selected = () => ev(`[...document.querySelectorAll('${T} tbody tr.dt-selected')].map(r => r.textContent.slice(0, 60))`);
 
             // no button is on a phone row
@@ -58,14 +59,20 @@ const { coralReady } = require('./helpers/wait');
             { const sel = await selected(); assert.ok(sel.length === 1 && sel[0].includes('Phone review 1.txt'), at + 'a long press selects that row and only it: ' + JSON.stringify(sel)); }
             let b = await bar();
             assert.ok(b && b.count === '1 selected', at + 'the bar says 1 selected: ' + JSON.stringify(b));
-            assert.deepEqual(b.actions.map(a => a.label), ['Approve', 'Changes', 'Ignore', 'Save for later', 'Mark read', 'Mark unread', 'Cancel'], at + 'the actions: ' + JSON.stringify(b.actions));
+            assert.deepEqual(b.actions.map(a => a.label), ['Cancel', 'Approve', 'Ignore', 'Save for later', 'More actions', 'Changes', 'Mark read', 'Mark unread'], at + 'Cancel (X), the icon buttons, then More with Changes, Mark read, Mark unread: ' + JSON.stringify(b.actions));
+            assert.ok(b.oneLine && b.h <= 64 && b.small.length === 0, at + 'the bar is one line, every target 44 px, each named (Gmail, #11707): ' + JSON.stringify({ h: b.h, oneLine: b.oneLine, small: b.small }));
             assert.ok(!b.actions.find(a => a.label === 'Approve').off && !b.actions.find(a => a.label === 'Changes').off, at + 'a file can be approved or sent back');
+            // the three dots hold Changes, Mark read and Mark unread, and open on a tap
+            await ev(`document.querySelector('.dt-bar .dt-bar-more-toggle').click(); true`);
+            await waitFor(`!!document.querySelector('.dt-bar .dt-bar-more .menu:not([hidden]) .menu-item')`, at + 'More opens its menu', 5000);
+            assert.deepEqual(await ev(`[...document.querySelectorAll('.dt-bar .dt-bar-more .menu:not([hidden]) .menu-item')].map(x => [x.textContent, x.disabled])`), [['Changes', false], ['Mark read', false], ['Mark unread', true]], at + 'the menu: Changes and Mark read fit one unread file, Mark unread does not');
+            await ev(`document.querySelector('.dt-bar .dt-bar-more-toggle').click(); true`); await new Promise(r => setTimeout(r, 250)); // sleep-ok: the menu closes (the same button again)
             await tap('Which port should the test server use?');
             b = await bar(); assert.equal(b.count, '2 selected', at + 'a tap adds a row (it does not open it): ' + JSON.stringify(b)); assert.equal(await ev(`!document.querySelector('dialog[open]')`), true, at + 'and opens nothing');
             const off = l => b.actions.find(a => a.label === l).off;
             assert.ok(off('Approve') && off('Changes') && off('Save for later') && !off('Ignore'), at + 'a question cannot be approved, sent back or saved; it can be ignored: ' + JSON.stringify(b.actions));
             // Ignore both: one request each, one toast with Undo, then Undo puts both back
-            await ev(`[...document.querySelectorAll('.dt-bar button')].find(x => x.textContent === 'Ignore').click(); true`);
+            await pressBar('Ignore');
             await waitFor(`window.__calls.some(c => c.ask === 71 && !c.undo) && window.__calls.some(c => c.review && c.decision === 'ignore')`, at + 'one request per item', 8000);
             await waitFor(`[...document.querySelectorAll('.toast')].some(t => /Ignored 2/.test(t.textContent) && [...t.querySelectorAll('button')].some(x => x.textContent.trim() === 'Undo'))`, at + 'one toast with Undo', 8000);
             assert.equal(await bar(), null, at + 'the selection is over');
@@ -74,22 +81,22 @@ const { coralReady } = require('./helpers/wait');
             // one file is approved directly, with no question, as a row's own button did
             await waitFor(`!!(${rowOf('Phone review 4.txt')})`, at + 'the fourth file is there', 8000);
             await press('Phone review 4.txt');
-            await ev(`window.__calls = []; [...document.querySelectorAll('.dt-bar button')].find(x => x.textContent === 'Approve').click(); true`);
+            await ev('window.__calls = []; true'); await pressBar('Approve');
             await waitFor(`window.__calls.some(c => c.review === '${(4).toString(16).padStart(64, '0')}' && c.decision === 'approve')`, at + 'one file: Approve sends at once', 8000);
             // two files: Approve both; Cancel leaves with nothing sent
             await waitFor(`!!(${rowOf('Phone review 2.txt')})`, at + 'the rows are back', 8000);
             await press('Phone review 2.txt'); await tap('Phone review 3.txt');
             b = await bar(); assert.equal(b.count, '2 selected', at + 'two files selected'); assert.ok(!off('Approve') && b.actions.find(a => a.label === 'Changes').off, at + 'Changes is off for two files: ' + JSON.stringify(b.actions));
-            await ev(`window.__calls = []; [...document.querySelectorAll('.dt-bar button')].find(x => x.textContent === 'Cancel').click(); true`); await new Promise(r => setTimeout(r, 300)); // sleep-ok: the bar leaves
+            await ev('window.__calls = []; true'); await pressBar('Cancel'); await new Promise(r => setTimeout(r, 300)); // sleep-ok: the bar leaves
             assert.equal(await bar(), null, at + 'Cancel leaves selection'); assert.deepEqual(await selected(), [], at + 'nothing is selected'); assert.equal(await ev('window.__calls.length'), 0, at + 'and nothing was sent');
             await press('Phone review 2.txt'); await tap('Phone review 3.txt');
             // Approve of several files asks first (Security's SHOULD): "Approve 2 files?", Keep sends nothing, the confirm sends one request per file; one file is approved directly
-            await ev(`window.__calls = []; [...document.querySelectorAll('.dt-bar button')].find(x => x.textContent === 'Approve').click(); true`);
+            await ev('window.__calls = []; true'); await pressBar('Approve');
             await waitFor(`/Approve 2 files\\?/.test(document.querySelector('.dt-bar').textContent)`, at + 'it asks "Approve 2 files?"', 5000);
             assert.equal(await ev('window.__calls.length'), 0, at + 'nothing is sent while it asks');
             await ev(`document.querySelector('.dt-bar .dt-bar-keep').click(); true`); await new Promise(r => setTimeout(r, 200)); // sleep-ok: the bar draws again
             assert.equal(await ev('window.__calls.length'), 0, at + 'Keep sends nothing');
-            await ev(`[...document.querySelectorAll('.dt-bar button')].find(x => x.textContent === 'Approve').click(); true`);
+            await pressBar('Approve');
             await waitFor(`/Approve 2 files\\?/.test(document.querySelector('.dt-bar').textContent)`, at + 'it asks again', 5000);
             await ev(`[...document.querySelectorAll('.dt-bar button')].filter(x => x.textContent === 'Approve').pop().click(); true`);
             await waitFor(`window.__calls.filter(c => c.review && c.decision === 'approve').length === 2`, at + 'confirming is one request per file', 8000);
