@@ -15,7 +15,7 @@ const HISTORY_KEYS = ['type', 'source_types', 'date_from', 'date_to', 'q', 'page
 // What the plan adds (section 3, rows 1 to 6).
 const ADDED_ROUTE = '/api/sessions/history/counts';
 // The Hub-served Inbox's Goals and Artifacts folders (#11071): two more View routes, each read once a computer with their own query keys. A route outside these is still a stray.
-const FOLDER_ROUTES = { '/api/goals': ['limit'], '/api/team-artifacts': ['limit', 'offset', 'sort'] };
+const FOLDER_ROUTES = { '/api/goals': ['limit'], '/api/team-artifacts': ['limit', 'offset', 'sort', 'versions'] };
 const ADDED_KEYS = ['active', 'agent_name', 'archived', 'starred', 'with_notes'];
 // The plan's "not called in cloud mode" list: none of these is asked for through the Hub by this Inbox.
 // GET /api/goals and GET /api/team-artifacts left this list with #11071: coral-hub asked for the Goals and Artifacts folders in the native Inbox (coral-hub #132368, the Orchestrator's task); both are View routes of the Hub's tier (cloud_routes.golden).
