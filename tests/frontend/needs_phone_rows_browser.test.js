@@ -43,7 +43,7 @@ const { coralReady } = require('./helpers/wait');
             const tap = async name => { const p = await point(name); await touch('touchStart', p); await new Promise(r => setTimeout(r, 60)); await touch('touchEnd', p); await new Promise(r => setTimeout(r, 250)); }; // sleep-ok: a tap, and the table redraws
             const press = async name => { const p = await point(name); await touch('touchStart', p); await new Promise(r => setTimeout(r, 700)); await touch('touchEnd', p); await new Promise(r => setTimeout(r, 300)); }; // sleep-ok: a long press is a held finger
             const bar = () => ev(`(() => { const b = document.querySelector('${T} .dt-bar, .gt-toolbar .dt-bar'); if (!b || b.hidden || !b.getClientRects().length) return null; return { count: (b.querySelector('.dt-bar-count') || {}).textContent, actions: [...b.querySelectorAll('button')].map(x => ({ label: x.textContent, off: x.disabled })) }; })()`);
-            const selected = () => ev(`[...document.querySelectorAll('${T} tbody tr.dt-selected')].map(r => r.textContent.slice(0, 20))`);
+            const selected = () => ev(`[...document.querySelectorAll('${T} tbody tr.dt-selected')].map(r => r.textContent.slice(0, 60))`);
 
             // no button is on a phone row
             const visible = await ev(`[...document.querySelectorAll('${T} tbody tr button')].filter(b => { const c = (b.closest('.dt-td') || b).getBoundingClientRect(); return c.width > 2 && c.height > 2 && getComputedStyle(b).visibility !== 'hidden'; }).map(b => b.getAttribute('aria-label') || b.textContent)`);
@@ -55,7 +55,7 @@ const { coralReady } = require('./helpers/wait');
             assert.equal(await bar(), null, at + 'no selection bar before a selection');
             // a long press selects a review file; a tap adds the question; the bar shows what fits
             await press('Phone review 1.txt');
-            { const sel = await selected(); assert.ok(sel.length === 1 && sel[0].startsWith('Phone review 1.txt'), at + 'a long press selects that row and only it: ' + JSON.stringify(sel)); }
+            { const sel = await selected(); assert.ok(sel.length === 1 && sel[0].includes('Phone review 1.txt'), at + 'a long press selects that row and only it: ' + JSON.stringify(sel)); }
             let b = await bar();
             assert.ok(b && b.count === '1 selected', at + 'the bar says 1 selected: ' + JSON.stringify(b));
             assert.deepEqual(b.actions.map(a => a.label), ['Approve', 'Changes', 'Ignore', 'Save for later', 'Mark read', 'Mark unread', 'Cancel'], at + 'the actions: ' + JSON.stringify(b.actions));

@@ -64,6 +64,9 @@ const { coralReady } = require('./helpers/wait');
                 assert.ok(await ev(`![...document.querySelectorAll('#group-table-view .dt-tag')].some(t => t.textContent.trim() === 'read')`),'there is no "read" pill any more (#11668)');
                 assert.equal(await ev(`[...(${row('Read me 1.txt')}).querySelectorAll('button')].some(b=>b.getAttribute('aria-label')==='Mark unread: Read me 1.txt')`),true,'a read item offers Mark unread');
                 const nc = await navCount(); assert.ok(nc !== null && /(^|\D)2$/.test(nc), 'the Needs you folder counts the two unread: ' + nc);
+                // one number (#11639, the operator): the heading and the All pill say the unread count too, the badge's, with the read row still listed
+                assert.equal(await ev(`(document.querySelector('#group-table-view .session-group-count') || {}).textContent`), '2', 'the heading counts the two unread, not the three rows');
+                assert.ok(await ev(`[...document.querySelectorAll('button.goals-chip')].some(e => e.textContent.trim() === 'All 2')`), 'the All pill says 2 like the badge: ' + JSON.stringify(await ev(`[...document.querySelectorAll('button.goals-chip')].map(e => e.textContent.trim())`)));
                 const heights = await ev(`[${row('Read me 1.txt')}.getBoundingClientRect().height, ${row('Read me 2.txt')}.getBoundingClientRect().height]`);
                 assert.ok(Math.abs(heights[0] - heights[1]) <= 2, 'a read row is as tall as an unread one, one line at every width (Goal #79): ' + JSON.stringify(heights));
                 assert.ok(await ev(`${row('Read me 1.txt')}.querySelector('.inbox-review-name').getBoundingClientRect().width >= 36`), 'the read item keeps its name beside the buttons (a read phone row has the tag, Approve, Changes and the three dots of the approved action set, #11552: the name is what is left, 36 px or more)');

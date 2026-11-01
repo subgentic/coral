@@ -13,7 +13,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
     const check = (ok, what) => { if (!ok) failures.push(what); };
     const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const T = '#group-table-view';
-    const rowsOf = () => ev(`[...document.querySelectorAll('${T} tbody tr')].map(tr => ({ text: tr.textContent.replace(/\\s+/g, ' ').trim(), sub: [...tr.querySelectorAll('.dt-subtitle, .inbox-review-from')].filter(e => e.getBoundingClientRect().width > 0).map(e => e.textContent).join('|'), visible: [...tr.querySelectorAll('.dt-subtitle, .inbox-review-from')].filter(e => e.getBoundingClientRect().width > 0).length === 1 }))`); // the one line a width shows: under the name on a table, leading the second line on a phone
+    const rowsOf = () => ev(`[...document.querySelectorAll('${T} tbody tr')].map(tr => ({ text: tr.textContent.replace(/\\s+/g, ' ').trim(), sub: [...tr.querySelectorAll('.inbox-review-from')].filter(e => e.getBoundingClientRect().width > 0).map(e => e.textContent.replace(/ \u00b7$/, '')).join('|'), visible: [...tr.querySelectorAll('.inbox-review-from')].filter(e => e.getBoundingClientRect().width > 0).length === 1 }))`); // who it is from leads the top line, before the file's name, at every width (#11719)
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [w, h, mobile] of [[1280, 820, false], [390, 844, true]]) {
@@ -36,11 +36,11 @@ const { removeBoards } = require('./helpers/board_cleanup');
             const rows = await rowsOf(), by = n => rows.find(r => r.text.includes(n)) || { text: '', sub: '', visible: false };
             const tail = t => (mobile ? '' : ` · ${t}`);
             const a = by('checkout-mockup.html'), b = by('guide-role-design.html'), c = by('orphan-notes.html');
-            check(a.sub === `from Lead Developer${tail(t1)}`, at + 'a file with a task says who sent it and its team: ' + JSON.stringify(a.sub));
-            check(b.sub === `from Frontend<U+202E> Dev<U+200B>${tail(t1)}`, at + 'a file with no task says who sent it too, what hides or reorders the name written out, not drawn: ' + JSON.stringify(b.sub));
-            check(c.sub === `sender unknown${tail(t2)}`, at + 'a file with no uploader on record says so: ' + JSON.stringify(c.sub));
+            check(a.sub === 'Lead Developer', at + 'a file with a task says who sent it, at the head of the top line: ' + JSON.stringify(a.sub));
+            check(b.sub === 'Frontend<U+202E> Dev<U+200B>', at + 'a file with no task says who sent it too, what hides or reorders the name written out, not drawn: ' + JSON.stringify(b.sub));
+            check(c.sub === 'sender unknown', at + 'a file with no uploader on record says so: ' + JSON.stringify(c.sub));
             check(a.visible && b.visible && c.visible, at + 'the line is on screen on every row, once');
-            check(!mobile || (a.text.includes(t1) && c.text.includes(t2)), at + 'a phone row still names the team after it');
+            check(!a.text.includes(t1) && !c.text.includes(t2), at + 'the team is not on the row (it is in the opened file, below, #11719)');
             check(!(await ev(`document.documentElement.scrollWidth > innerWidth + 1`)), at + 'no sideways scroll');
             await shot(`inbox-review-from-${w}`);
             // the opened item says the same in its header
