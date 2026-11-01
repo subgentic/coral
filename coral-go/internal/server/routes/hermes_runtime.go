@@ -60,7 +60,7 @@ func (h *SessionsHandler) hermesTranscript(ctx context.Context, sessionID string
 // A Hermes turn the hooks left open is closed by one of two fallbacks, because a Ctrl-C and a provider that gave up fire no closing hook (#11715), and a dot driven by hooks alone would stay Working for ever:
 //   - the pane says the operation was interrupted (hermesInterruptedOnScreen: the real notice, captured on v0.22.5), once the last event is at least hermesInterruptSettle old, so a screen that still shows the old notice a second after a new prompt does
 //     not end the new turn;
-//   - the turn has been silent for hermesTurnSilence. Every tool call fires a pre and a post hook, so ten minutes with none is not a working agent.
+//   - the turn has been silent for hermesTurnSilence since its prompt, with no tool call after it (a tool call can run for hours, and is a working agent).
 //
 // A request waiting for the person (permission_request) is a wait, not an open turn: neither fallback touches it.
 const (
@@ -104,7 +104,8 @@ func hermesTurnFallback(events []store.AgentEvent, screen string, now time.Time)
 		return "", time.Time{}
 	}
 	age := now.Sub(ts)
-	if age >= hermesTurnSilence || (age >= hermesInterruptSettle && hermesInterruptedOnScreen(screen)) {
+	// Silence closes only a turn that has done nothing since its prompt: a tool call can run for an hour (QA's SHOULD on #11831), so a last event that is a tool call is never closed by it.
+	if (last.EventType == "prompt_submit" && age >= hermesTurnSilence) || (age >= hermesInterruptSettle && hermesInterruptedOnScreen(screen)) {
 		return "stop", now
 	}
 	return "", time.Time{}
@@ -208,4 +209,12 @@ func (h *SessionsHandler) waitForHermesWelcome(ctx context.Context, name, sid st
 	case <-ctx.Done():
 		return false
 	}
+}
+
+// hermesTurnGoing reports whether the session's state is Working: a turn the hooks opened and nothing (the hooks, the interrupt notice, the silence rule) has closed. A request waiting for the person is not it.
+func (h *SessionsHandler) hermesTurnGoing(ctx context.Context, sessionID string) bool {
+	if sessionID == "" {
+		return false
+	}
+	return h.deriveSingleSessionState(ctx, sessionID, 0).Working
 }

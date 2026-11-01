@@ -55,11 +55,19 @@ func TestHermesAnOpenTurnIsClosedByAnInterruptedScreenOrTenSilentMinutes(t *test
 	assert.Equal(t, "", kind)
 
 	// silence: nine minutes is a slow turn, eleven is over, with any screen
-	kind, _ = hermesTurnFallback(open("tool_use", 9*time.Minute), "working\n", now)
+	kind, _ = hermesTurnFallback(open("prompt_submit", 9*time.Minute), "working\n", now)
 	assert.Equal(t, "", kind)
-	kind, at = hermesTurnFallback(open("tool_use", 11*time.Minute), "working\n", now)
+	kind, at = hermesTurnFallback(open("prompt_submit", 11*time.Minute), "working\n", now)
 	assert.Equal(t, "stop", kind)
 	assert.Equal(t, now, at)
+	// a tool call that runs for an hour is a working agent (QA's SHOULD): the silence rule never closes it
+	kind, _ = hermesTurnFallback(open("tool_use", time.Hour), "working\n", now)
+	assert.Equal(t, "", kind)
+	kind, _ = hermesTurnFallback(open("tool_use", time.Hour), "", now)
+	assert.Equal(t, "", kind)
+	// but the interrupt notice still ends it
+	kind, _ = hermesTurnFallback(open("tool_use", time.Hour), "Operation interrupted: waiting for model response (2.0s elapsed).\n", now)
+	assert.Equal(t, "stop", kind)
 	// a screen that could not be read still lets the silence close the turn
 	kind, _ = hermesTurnFallback(open("prompt_submit", 11*time.Minute), "", now)
 	assert.Equal(t, "stop", kind)
@@ -87,7 +95,8 @@ func TestAHermesAgentsInterruptedTurnIsNotWorkingForEver(t *testing.T) {
 	assert.True(t, derive("hermes", "00000000-0000-0000-0000-00000000a001", "prompt_submit", 30*time.Second, "thinking...\n"), "a turn the hooks opened is Working")
 	assert.False(t, derive("hermes", "00000000-0000-0000-0000-00000000a002", "prompt_submit", 30*time.Second, "output\n  Operation interrupted: waiting for model response (2.0s elapsed).\n> \n"), "an interrupt closes it")
 	assert.True(t, derive("hermes", "00000000-0000-0000-0000-00000000a003", "prompt_submit", time.Second, "Operation interrupted: waiting for model response (2.0s elapsed).\n"), "the old notice a second after a new prompt does not end the new turn")
-	assert.False(t, derive("hermes", "00000000-0000-0000-0000-00000000a004", "tool_use", 11*time.Minute, "working\n"), "ten silent minutes close it")
+	assert.False(t, derive("hermes", "00000000-0000-0000-0000-00000000a004", "prompt_submit", 11*time.Minute, "working\n"), "ten silent minutes close it")
+	assert.True(t, derive("hermes", "00000000-0000-0000-0000-00000000a006", "tool_use", 11*time.Minute, "working\n"), "a tool call that runs long keeps the turn open")
 	assert.True(t, derive("claude", "00000000-0000-0000-0000-00000000a005", "prompt_submit", 30*time.Second, "Operation interrupted: waiting for model response (2.0s elapsed).\n"), "only Hermes reads this")
 }
 
