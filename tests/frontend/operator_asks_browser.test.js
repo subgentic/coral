@@ -19,7 +19,7 @@ const LONG = 'Which of the two \u202edesigns do we ship? ' + 'We have weighed th
             await coralReady(ev);
             const at = `${w}: `;
             // the server's list, and the posts the page makes
-            await ev(`(() => { window.__asks = [{ board: 'team', kind: 'ask', id: 41, asker: 'Lead', text: ${JSON.stringify(LONG)}, at: '2026-10-31T01:00:00Z' }, { board: 'team', kind: 'wait', id: 7, asker: 'Dev', text: 'may I delete the old table?', at: '2026-10-31T02:00:00Z' }];
+            await ev(`(() => { window.__asks = [{ board: 'team', kind: 'ask', id: 41, asker: 'Lead', text: ${JSON.stringify(LONG)}, at: '2026-10-31T01:00:00Z' }, { board: 'team', board_label: 'Sprout team', kind: 'wait', id: 7, asker: 'Dev', text: 'may I delete the old table?', at: '2026-10-31T02:00:00Z' }];
                 window.__posts = []; window.__failPost = false; const orig = window.fetch.bind(window);
                 window.fetch = (u, o) => { const url = String(u); const json = (b, status = 200) => Promise.resolve(new Response(JSON.stringify(b), { status, headers: { 'Content-Type': 'application/json' } }));
                     if (url === '/api/operator-asks') return json(window.__asks);
@@ -73,6 +73,7 @@ const LONG = 'Which of the two \u202edesigns do we ship? ' + 'We have weighed th
             await ev(`document.querySelector('button[aria-label="Answer the question of Dev"]').click(); true`);
             await waitFor(`document.querySelector('dialog.inbox-ask-dialog[open]')`, at + 'the wait opens', 4000);
             assert.ok((await ev(`document.querySelector('.inbox-ask-sub').textContent`)).includes('waiting for your reply'), at + 'a wait says it is waiting');
+            assert.equal(await ev(`document.querySelector('.inbox-ask-sub').textContent`), 'On the Sprout team board, waiting for your reply.', at + 'the question says which team by its name, not the internal board id (#11860)');
             await ev(`document.querySelector('.inbox-ask-box').value = 'yes, delete it'; true`);
             await click('dialog.inbox-ask-dialog .btn-primary');
             await waitFor(`!document.querySelector('dialog.inbox-ask-dialog')`, at + 'closed', 4000);
