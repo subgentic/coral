@@ -23,7 +23,8 @@ const BASE = require('./test_base').BASE;
     assert.deepEqual(unchanged,{type:'codex',model:'gpt-6-sol'});
     const custom = await change('my-custom-codex-model','claude');
     assert.deepEqual(custom,{type:'codex',model:'gpt-6-sol',dirty:'false'}); // a model typed under Claude is Claude's (#11786): Codex shows its own default
-    const back = await ev(`(async()=>{const s=document.querySelector('.acf-agent-type'); s.value='claude'; s.dispatchEvent(new Event('change',{bubbles:true})); await new Promise(r=>setTimeout(r,120)); return {type:s.value,model:document.querySelector('.acf-model').value,dirty:document.getElementById('fixture').dataset.acfModelDirty}; })()`);
+    const back = await ev(`(async()=>{const s=document.querySelector('.acf-agent-type'); s.value='claude'; s.dispatchEvent(new Event('change',{bubbles:true})); await new Promise(r=>setTimeout(r,120)); // sleep-ok: the form's model default fetch and redraw, as in the steps above
+    return {type:s.value,model:document.querySelector('.acf-model').value,dirty:document.getElementById('fixture').dataset.acfModelDirty}; })()`);
     assert.deepEqual(back,{type:'claude',model:'my-custom-codex-model',dirty:'true'}); // and back on Claude it returns
     fs.writeFileSync(require('node:os').tmpdir() + '/coral-1492-provider-switch.png', Buffer.from((await Page.captureScreenshot()).data,'base64'));
     console.log(JSON.stringify({claudeToCodex,codexToClaude,unchanged,custom,back}));
