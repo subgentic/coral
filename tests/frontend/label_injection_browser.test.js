@@ -122,10 +122,10 @@ const HOOK = `(() => {
         const sid = standIn.sid, name = standIn.name, tok = { 'X-Coral-Session-Token': standIn.token };
 
         // ── plant ──────────────────────────────────────────────────────────────
-        await plant('board-job-title', 'POST', `/api/board/${BOARD}/subscribe`, { subscriber_id: 'Lead', job_title: 'Orchestrator ' + S('board-job-title') });
-        await plant('board-subscriber-id', 'POST', `/api/board/${BOARD}/subscribe`, { subscriber_id: S('board-subscriber-id'), job_title: 'Dev' });
+        await plant('board-job-title', 'POST', `/api/board/${BOARD}/subscribe`, { subscriber_id: 'Lead', job_title: 'Orchestrator ' + S('board-job-title') + 'x' } /* a member name starts and ends with a letter or a digit (v2.0.23): the payload is in the middle */);
+        await plant('board-subscriber-id', 'POST', `/api/board/${BOARD}/subscribe`, { subscriber_id: 'x' + S('board-subscriber-id') + 'x', job_title: 'Dev' });
         await plant('board-message', 'POST', `/api/board/${BOARD}/messages`, { subscriber_id: 'Lead', content: P('board-message') + '\n\n**bold** ' + P('board-message-md') });
-        await plant('board-message-by-name', 'POST', `/api/board/${BOARD}/messages`, { subscriber_id: S('board-subscriber-id'), content: 'hello' });
+        await plant('board-message-by-name', 'POST', `/api/board/${BOARD}/messages`, { subscriber_id: 'x' + S('board-subscriber-id') + 'x', content: 'hello' });
         await plant('board-task', 'POST', `/api/board/${BOARD}/tasks`, { subscriber_id: 'Operator', title: P('board-task-title'), body: P('board-task-body'), assigned_to: S('board-task-assignee'), priority: 'high' });
         await plant('board-task-2', 'POST', `/api/board/${BOARD}/tasks`, { subscriber_id: 'Operator', title: 'second', body: 'x', assigned_to: 'Lead' });
         await plant('agent-display-name', 'PUT', `/api/sessions/live/${encodeURIComponent(name)}/display-name`, { session_id: sid, display_name: P('agent-display-name') });
