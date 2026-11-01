@@ -1,5 +1,34 @@
 # Release Notes
 
+## v2.0.21 — the right tab is current from the first moment, and phone fixes for the new Inbox
+
+### Changes
+
+#### What you will notice first
+
+- **No top tab is marked "current page" until Coral knows where you are**: every load used to say "Agents, current page" until the route moved it, so a screen reader or a slow phone announced the wrong page first. Now the start tab is marked once (Inbox on a computer's bare start, Agents on a phone or a typed /agents, and each other tab for its own address). A link such as /chats, /board/<team> or a /servers start no longer marks History, Board or Servers on the way: only the tab it ends on is marked.
+- **The Inbox no longer freezes after Approve when many files wait for review** (the version grouping was redone on every update).
+- **A link to a team that is not there no longer makes a board**: /board/<team> of a missing team now shows the team page's "No team named" state (it used to open Messages, which subscribed you and created an empty board, so a mistyped link left a junk board with one subscriber on the server).
+- **The Needs you folder, the Inbox badge and the menu dot now agree**: the folder no longer counts the welcome items of a new install (a phone showed "Needs you 6" beside an Inbox badge of 3). The welcome rows are still listed under the Welcome pill, and a start with only welcome items still opens Needs you.
+- **The phone Deny dialog is centred** with a side gutter (it sat in the top left corner), and a plain toast no longer sits over the file viewer on a phone (an error, or a toast with Undo, stays).
+- **The phone's Inbox tab strip chevron is a real button that only scrolls** beside the strip, 44 px, scrolling it by 60% of its width and picking nothing (it was drawn over the strip and let a tap fall through to the tab under it, "Saved").
+
+#### Agents and the chat
+
+- **OpenCode: Coral can remove everything it keeps for an agent** (its session store, newest-session record, kept newest message and the pointers to its store), each through paths looked at without following links. Nothing calls it yet: an ended agent keeps its records, so Resume of a past chat still works. It is for a "delete this past chat" action that does not exist yet. A manager with no data folder refuses to remove anything.
+
+#### Known issues
+
+- **Windows: in-app update does not work from 2.0.0 through 2.0.6.** If you're on one of those, download and install the MSI by hand; from 2.0.7 on, in-app update works.
+- **macOS: a Coral of 2.0.5 or earlier cannot install updates in-app; install 2.0.6 or later by hand once.**
+- **OpenCode agents are tested on macOS and Linux; OpenCode on Windows is not yet tested end to end.**
+- Setting up a computer over SSH is supported from a macOS or Linux hub, and is not yet tested from a Windows hub.
+
+#### For developers and releases
+
+- The static tree is 5,875,431 bytes of the 5,906,432-byte budget.
+- `start_tab_current_browser` covers the start tab and the three deep links; the join census lists the two joins in OpenCode's remove code with the reason.
+
 ## v2.0.20 — Inbox first, one set of buttons on Needs you, and Deny and Ignore
 
 ### Changes
