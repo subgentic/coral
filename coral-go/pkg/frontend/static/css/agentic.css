@@ -1275,7 +1275,7 @@ body.panel-dragging .agentic-state {
     color: var(--text-muted);
 }
 /* A picture in a pane with no box of its own (an artifact in the Inbox's detail pane or a goal's list) gets one: centred, as high as most of the screen allows, not a strip as high as the file (#11711); the file preview body and the viewer size their own (below, and components.css). */
-.image-panes .image-pane-frame { display: flex; align-items: center; justify-content: center; min-height: min(60vh, 480px); }
+.image-panes .image-pane-frame { display: flex; align-items: center; justify-content: center; min-height: min(60vh, 480px); box-sizing: border-box; padding-top: 44px; }
 .image-panes.image-panes-compare .image-pane-frame { min-height: min(40vh, 320px); }
 .image-pane-frame img {
     display: block;

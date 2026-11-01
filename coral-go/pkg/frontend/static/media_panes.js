@@ -167,7 +167,10 @@ function _imageZoomControls(frames) {
         mk('Fit', 'Reset zoom and position (or double-click the image)', () => frames._view.reset()),
     );
     // frames._view is created by _enableImagePanZoom, which runs right after this.
-    queueMicrotask(() => frames._view?.onChange(k => { level.textContent = `${Math.round(k * 100)}%`; }));
+    const show = () => { const img = frames[0].img, fit = img.naturalWidth ? img.clientWidth / img.naturalWidth : 1; level.textContent = `${Math.round((frames._view ? frames._view.k : 1) * fit * 100)}%`; }; // the picture's real scale: its drawn width over its own, not the zoom on top of the fit (a 1600 px picture drawn 280 px wide reads 18%, #11787)
+    queueMicrotask(() => frames._view?.onChange(show));
+    for (const { img } of frames) img.addEventListener('load', show);
+    if (typeof ResizeObserver === 'function') new ResizeObserver(show).observe(frames[0].frame);
     return bar;
 }
 

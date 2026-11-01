@@ -7,6 +7,7 @@ const { coralReady } = require('./helpers/wait');
 
 const SIZES = { wide: [2740, 570], tall: [400, 1600], small: [48, 48] };
 const hexOf = n => String(n).padStart(64, '0');
+const pct = (fit, k) => `${Math.round(k * fit * 100)}%`; // the zoom reads the picture's real scale: the fit times the zoom (#11787)
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -35,29 +36,32 @@ const hexOf = n => String(n).padStart(64, '0');
                 await waitFor(`(() => { const im = document.querySelector('.artifact-viewer .image-pane-frame img'); return !!im && im.complete && im.naturalWidth > 0; })()`, at + 'the picture loads', 10000);
                 await ev(`new Promise(r => setTimeout(r, 250))`); // sleep-ok: the viewer lays out after the picture arrives
                 const g = await ev(`(() => { const body = document.querySelector('.artifact-viewer-body'), f = document.querySelector('.artifact-viewer .image-pane-frame'), im = f.querySelector('img'), b = body.getBoundingClientRect(), fr = f.getBoundingClientRect(), ir = im.getBoundingClientRect(), cs = getComputedStyle(body), padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight), padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
-                    return { bodyW: b.width - padX, bodyH: b.height - padY, frameW: fr.width, frameH: fr.height, imgW: ir.width, imgH: ir.height, natW: im.naturalWidth, natH: im.naturalHeight, centred: Math.abs((ir.left + ir.width / 2) - (fr.left + fr.width / 2)) < 2 && Math.abs((ir.top + ir.height / 2) - (fr.top + fr.height / 2)) < 2 }; })()`);
+                    return { bodyW: b.width - padX, bodyH: b.height - padY, frameW: fr.width, frameH: fr.height, imgW: ir.width, imgH: ir.height, natW: im.naturalWidth, natH: im.naturalHeight, centred: Math.abs((ir.left + ir.width / 2) - (fr.left + fr.width / 2)) < 2 && Math.abs((ir.top + ir.height / 2) - (fr.top + 18 + fr.height / 2)) < 2 }; })()`);
                 check(g.frameW >= g.bodyW * 0.9 && g.frameH >= g.bodyH * 0.88, at + `the box fills the viewer body (all but its caption line): ${JSON.stringify(g)}`); // the old box was as high as the picture's ratio: 187 px of 614 for the wide one
                 check(g.centred, at + 'the picture is in the middle of the box');
                 if (name === 'wide') check(g.imgW >= g.frameW * 0.9, at + `a wide picture fits the box's width: ${Math.round(g.imgW)} of ${Math.round(g.frameW)}`);
-                if (name === 'tall') check(g.imgH >= g.frameH * 0.95, at + `a tall picture fits the box's height: ${Math.round(g.imgH)} of ${Math.round(g.frameH)}`);
+                if (name === 'tall') check(g.imgH >= (g.frameH - 52) * 0.95, at + `a tall picture fits the box's height: ${Math.round(g.imgH)} of ${Math.round(g.frameH)}`);
                 if (name === 'small') check(Math.round(g.imgW) <= g.natW + 1, at + `a small picture is not blown up: ${Math.round(g.imgW)} of ${g.natW}`);
+                const L = await ev(`(() => { const f = document.querySelector('.artifact-viewer .image-pane-frame'), im = f.querySelector('img'), c = document.querySelector('.artifact-viewer .image-zoom-controls').getBoundingClientRect(), ir = im.getBoundingClientRect(); return { level: document.querySelector('.artifact-viewer .image-zoom-level').textContent, drawn: Math.round(im.clientWidth / im.naturalWidth * 100) + '%', cBottom: c.bottom, iTop: ir.top, nat: im.naturalWidth, w: im.clientWidth }; })()`);
+                check(L.level === L.drawn, at + `the zoom reads the picture's real scale (${L.w} px drawn of ${L.nat}): ${JSON.stringify(L)}`);
+                check(L.iTop >= L.cBottom - 1, at + `the controls are above the picture, not over it: ${JSON.stringify(L)}`);
                 await shot(`image-viewer-${name}-${w}`);
                 if (name === 'wide') { // zoom, in the box
                     const z = await ev(`(() => { const f = document.querySelector('.artifact-viewer .image-pane-frame'), im = f.querySelector('img'), box = () => { const r = f.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)].join('x'); }, lvl = () => document.querySelector('.artifact-viewer .image-zoom-level').textContent, out = {}; out.box0 = box();
-                        f.focus(); f.dispatchEvent(new KeyboardEvent('keydown', { key: '+', bubbles: true })); out.plus = lvl(); f.dispatchEvent(new KeyboardEvent('keydown', { key: '+', bubbles: true })); out.plus2 = lvl();
+                        out.fit0 = im.clientWidth / im.naturalWidth; f.focus(); f.dispatchEvent(new KeyboardEvent('keydown', { key: '+', bubbles: true })); out.plus = lvl(); f.dispatchEvent(new KeyboardEvent('keydown', { key: '+', bubbles: true })); out.plus2 = lvl();
                         f.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true })); out.moved = im.style.transform;
                         out.box1 = box(); f.dispatchEvent(new KeyboardEvent('keydown', { key: '-', bubbles: true })); out.minus = lvl(); f.dispatchEvent(new KeyboardEvent('keydown', { key: '0', bubbles: true })); out.fit = lvl(); out.fitT = im.style.transform;
                         const r = f.getBoundingClientRect(), cx = r.left + r.width / 4, cy = r.top + r.height / 2; // the wheel zooms around the pointer: the point under it stays under it
                         const before = im.getBoundingClientRect(), fx = (cx - before.left) / before.width; f.dispatchEvent(new WheelEvent('wheel', { deltaY: -400, clientX: cx, clientY: cy, bubbles: true, cancelable: true })); const after = im.getBoundingClientRect(); out.wheelK = lvl(); out.anchor = Math.abs((after.left + fx * after.width) - cx) < 2;
                         f.dispatchEvent(new KeyboardEvent('keydown', { key: '0', bubbles: true }));
                         return out; })()`).catch(e => ({ err: String(e) }));
-                    check(z && !z.err && z.plus === '125%' && z.plus2 === '156%' && z.minus === '125%' && z.fit === '100%' && /scale\(1\)/.test(z.fitT), at + 'the keys zoom and fit: ' + JSON.stringify(z));
+                    check(z && !z.err && z.plus === pct(z.fit0, 1.25) && z.plus2 === pct(z.fit0, 1.5625) && z.minus === pct(z.fit0, 1.25) && z.fit === pct(z.fit0, 1) && /scale\(1\)/.test(z.fitT), at + 'the keys zoom and fit: ' + JSON.stringify(z));
                     check(z && /translate\(-?\d+/.test(z.moved) && z.moved !== 'translate(0px, 0px) scale(1.5625)', at + 'an arrow key moves the zoomed picture: ' + (z && z.moved));
                     check(z && z.box0 === z.box1, at + `zooming leaves the box its size: ${z && z.box0} / ${z && z.box1}`);
                     check(z && z.anchor, at + 'the wheel zooms around the pointer');
                     const p = await ev(`(() => { const f = document.querySelector('.artifact-viewer .image-pane-frame'), r = f.getBoundingClientRect(), lvl = () => document.querySelector('.artifact-viewer .image-zoom-level').textContent, cx = r.left + r.width / 2, cy = r.top + r.height / 2, ev = (type, id, x, y) => f.dispatchEvent(new PointerEvent(type, { pointerId: id, pointerType: 'touch', clientX: x, clientY: y, button: 0, bubbles: true, isPrimary: id === 1 }));
                         f.setPointerCapture = () => {}; ev('pointerdown', 1, cx - 50, cy); ev('pointerdown', 2, cx + 50, cy); ev('pointermove', 1, cx - 100, cy); ev('pointermove', 2, cx + 100, cy); const out = lvl(); ev('pointerup', 1, cx - 100, cy); ev('pointerup', 2, cx + 100, cy); return out; })()`);
-                    check(p === '200%', at + 'a pinch (two fingers spreading to twice the distance) zooms to 200%: ' + p);
+                    check(p === pct(z.fit0, 2), at + 'a pinch (two fingers spreading to twice the distance) doubles the scale: ' + p + ' / ' + pct(z.fit0, 2));
                     await ev(`document.querySelector('.artifact-viewer .image-zoom-controls button:last-child').click(); true`);
                 }
                 await ev(`document.querySelector('.artifact-viewer-close').click(); true`);
@@ -71,7 +75,7 @@ const hexOf = n => String(n).padStart(64, '0');
                 const draw = n => { const [cw, ch] = sizes[n], c = document.createElement('canvas'); c.width = cw; c.height = ch; const g = c.getContext('2d'); g.fillStyle = '#3a6ea5'; g.fillRect(0, 0, cw, ch); return c.toDataURL('image/png'); };
                 const out = {}; const mount = (cls, width, height) => { const box = document.createElement('div'); box.className = cls; box.style.cssText = 'position:fixed;left:0;top:0;z-index:9999;display:flex;flex-direction:column;background:#111;width:' + width + 'px;height:' + height + 'px'; document.body.append(box); return box; };
                 const settle = box => new Promise(r => { const t = setInterval(() => { const ims = [...box.querySelectorAll('img')]; if (ims.every(i => i.complete && i.naturalWidth)) { clearInterval(t); setTimeout(r, 120); } }, 40); });
-                const geo = (box, k) => { const f = box.querySelectorAll('.image-pane-frame')[k], im = f.querySelector('img'), fr = f.getBoundingClientRect(), ir = im.getBoundingClientRect(), b = box.getBoundingClientRect(); return { boxW: b.width, boxH: b.height, frameW: fr.width, frameH: fr.height, imgW: ir.width, imgH: ir.height, natW: im.naturalWidth, centred: Math.abs((ir.left + ir.width / 2) - (fr.left + fr.width / 2)) < 2 && Math.abs((ir.top + ir.height / 2) - (fr.top + fr.height / 2)) < 2 }; };
+                const geo = (box, k) => { const f = box.querySelectorAll('.image-pane-frame')[k], im = f.querySelector('img'), fr = f.getBoundingClientRect(), ir = im.getBoundingClientRect(), b = box.getBoundingClientRect(); return { boxW: b.width, boxH: b.height, frameW: fr.width, frameH: fr.height, imgW: ir.width, imgH: ir.height, natW: im.naturalWidth, centred: Math.abs((ir.left + ir.width / 2) - (fr.left + fr.width / 2)) < 2 && Math.abs((ir.top + ir.height / 2) - (fr.top + 18 + fr.height / 2)) < 2 }; };
                 for (const n of ['wide', 'tall', 'small']) { const box = mount('preview-body', 700, 560); renderImagePanes(box, [{ url: draw(n) }]); await settle(box); out['preview-' + n] = geo(box, 0); box.remove(); }
                 for (const n of ['wide', 'small']) { const box = mount('inbox-detail-pane', 460, 900); box.style.height = 'auto'; box.style.display = 'block'; renderImagePanes(box, [{ url: draw(n) }]); await settle(box); const g = geo(box, 0); out['detail-' + n] = { ...g, frameVh: innerHeight }; box.remove(); } // an artifact opened in the Inbox's detail pane or a goal's list has no box of its own around the preview
                 const row = mount('preview-body', 700, 600); renderImagePanes(row, [{ label: 'Before', url: draw('wide') }, { label: 'After', url: draw('wide') }]); await settle(row); out.compare = geo(row, 0); out.compareVh = innerHeight; row.remove();
