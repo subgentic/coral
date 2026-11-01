@@ -16,3 +16,10 @@
 .proposal-carried { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-md); }
 .proposal-pre { margin: 0; padding: 8px; max-height: 12rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--bg-primary); border: 1px solid var(--border); border-radius: var(--radius-md); font: inherit; }
 .proposal-outputs { margin: 0; padding-left: 1.25rem; }
+
+/* A phone (#11894): the card's Approve is the first and widest button, the others in one row under it; a question shows up to two lines; the line under a proposal's name is plain, as under a file's. */
+@media (max-width: 767px) {
+    .proposal-buttons .btn-primary { order: -1; flex: 1 1 100%; }
+    .inbox-ask-name { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+    .inbox-proposal-line { font-weight: inherit; }
+}
