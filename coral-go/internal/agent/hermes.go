@@ -22,7 +22,7 @@ func (a *HermesAgent) HistoryGlobPattern() string { return "" }
 
 // hermesInstallCommand is the vendor's installer line, shown where Hermes is missing; Coral never runs it (the installer is a curl-to-bash script that takes minutes and gigabytes). hermesInstallNote says so.
 const (
-	hermesInstallCommand = "curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash"
+	hermesInstallCommand = "curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash"
 	hermesInstallNote    = "The installer puts hermes in ~/.local/bin and its files in ~/.hermes (about 2.4 GB), and takes several minutes. Coral looks in ~/.local/bin too, so it finds hermes either way. Coral never runs the installer for you."
 )
 
