@@ -107,3 +107,15 @@ func TestAnAgentOnNoTeamGetsNoLine(t *testing.T) {
 	r.h.dialogWaitingTeamLine(context.Background(), r.agent, board.DefaultHealthSettings(), r.t0.Add(30*time.Minute))
 	assert.Empty(t, r.teamLines())
 }
+
+// The closed line is posted on a context of its own: a pass whose context ended still tells the team (Security's SHOULD, #6787, the same for #269).
+func TestTheClosedLineIsPostedWhenThePassContextHasEnded(t *testing.T) {
+	r := newTimeoutRig(t, "claude", "permission", claudeScreen(t, "permission_menu"))
+	r.onTeam()
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	r.h.postDialogClosedLine(ctx, r.agent, r.t0, r.t0.Add(16*time.Minute), dialogDeclined, timeoutNotTyped)
+	lines := r.teamLines()
+	require.Len(t, lines, 1)
+	assert.Contains(t, lines[0], "The agent was NOT told (closed_notice_not_typed)")
+}
