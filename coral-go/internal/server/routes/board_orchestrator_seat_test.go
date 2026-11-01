@@ -99,3 +99,44 @@ func TestAHolderWhoseRoleIsOnlyInItsNameStillHoldsTheSeat(t *testing.T) {
 	resp.Body.Close()
 	assert.Equal(t, http.StatusOK, resp.StatusCode, "and a worker with its own role still joins")
 }
+
+// #11759, Security's INFO: can_peek also grants the Orchestrator's reads and completion review, so it must not linger. Only the join route keeps it; the launch and a restart set it as given, so a member launched as
+// Orchestrator and relaunched under the same name in another role loses it.
+func TestAMemberRelaunchedInAnotherRoleLosesTheLaunchRecord(t *testing.T) {
+	_, h := setupBoardTestServer(t)
+	ctx := context.Background()
+	_, err := h.bs.Subscribe(ctx, "relaunch", "Lead", "Orchestrator", "claude-5555", nil, "all", true) // launched as Orchestrator
+	require.NoError(t, err)
+	before, err := h.bs.GetProjectSubscription(ctx, "relaunch", "Lead")
+	require.NoError(t, err)
+	require.NotZero(t, before.CanPeek)
+	_, err = h.bs.Subscribe(ctx, "relaunch", "Lead", "Backend Dev", "claude-6666", nil, "mentions") // relaunched under the same name in another role (the launch path)
+	require.NoError(t, err)
+	after, err := h.bs.GetProjectSubscription(ctx, "relaunch", "Lead")
+	require.NoError(t, err)
+	assert.Zero(t, after.CanPeek, "the Orchestrator's reads and completion review do not linger on a member that is no longer one")
+	got, err := h.bs.TeamOrchestrator(ctx, "relaunch")
+	assert.Error(t, err, "and it is not the team's Orchestrator any more")
+	assert.Equal(t, "", got)
+}
+
+// #11759, QA's minor SHOULD: two members carry the launch record (a team launched with two orchestrator-like seats); the one that is the holder joins again and is let in, and a member that is neither is still refused.
+func TestAHolderWithTheLaunchRecordJoinsAgainWhileAnotherHoldsOneToo(t *testing.T) {
+	server, h := setupBoardTestServer(t)
+	ctx := context.Background()
+	_, err := h.bs.Subscribe(ctx, "two", "Orchestrator", "Orchestrator", "claude-7777", nil, "all", true)
+	require.NoError(t, err)
+	_, err = h.bs.Subscribe(ctx, "two", "Orchestrator 2", "Orchestrator", "claude-8888", nil, "all", true)
+	require.NoError(t, err)
+	join := func(id, title string) int {
+		resp := postJSON(t, server.URL+"/api/board/two/subscribe", map[string]string{"subscriber_id": id, "job_title": title})
+		defer resp.Body.Close()
+		return resp.StatusCode
+	}
+	assert.Equal(t, http.StatusOK, join("Orchestrator", "Orchestrator"), "the first holder joins again")
+	assert.Equal(t, http.StatusOK, join("Orchestrator 2", "Orchestrator"), "and so does the second: each carries the launch record")
+	assert.Equal(t, http.StatusConflict, join("Dev", "Orchestrator"), "a member that holds neither is refused")
+	sub, err := h.bs.GetProjectSubscription(ctx, "two", "Orchestrator 2")
+	require.NoError(t, err)
+	assert.NotZero(t, sub.CanPeek, "and the join kept the record")
+}

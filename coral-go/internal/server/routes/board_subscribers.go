@@ -97,7 +97,7 @@ func (h *BoardHandler) Subscribe(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	sub, err := h.bs.Subscribe(r.Context(), project, subscriberID, body.JobTitle, body.SessionName, nil, body.ReceiveMode)
+	sub, err := h.bs.Join(r.Context(), project, subscriberID, body.JobTitle, body.SessionName, nil, body.ReceiveMode) // keeps a launch record a re-join cannot carry (#11759)
 	if err != nil {
 		errInternalServer(w, err.Error())
 		return

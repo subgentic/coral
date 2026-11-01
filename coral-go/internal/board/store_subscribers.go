@@ -14,6 +14,16 @@ func (s *Store) Subscribe(ctx context.Context, project, subscriberID, jobTitle, 
 	if len(canPeek) > 0 && canPeek[0] {
 		peekFlag = 1
 	}
+	return s.subscribe(ctx, project, subscriberID, jobTitle, sessionName, originServer, receiveMode, peekFlag, false)
+}
+
+// Join is Subscribe for a join through the board's join route (#11759): a join never carries the launch record (can_peek), so one that arrives for a subscriber the launch marked keeps the mark; the launch and a
+// restart (Subscribe) set can_peek as they are given, so a member relaunched in another role loses it (it also grants the Orchestrator's reads and completion review, and must not linger).
+func (s *Store) Join(ctx context.Context, project, subscriberID, jobTitle, sessionName string, originServer *string, receiveMode string) (*Subscriber, error) {
+	return s.subscribe(ctx, project, subscriberID, jobTitle, sessionName, originServer, receiveMode, 0, true)
+}
+
+func (s *Store) subscribe(ctx context.Context, project, subscriberID, jobTitle, sessionName string, originServer *string, receiveMode string, peekFlag int, keepPeek bool) (*Subscriber, error) {
 	if receiveMode == "" {
 		if isOrchestrator(subscriberID, jobTitle, peekFlag) {
 			receiveMode = "all"
@@ -51,8 +61,8 @@ func (s *Store) Subscribe(ctx context.Context, project, subscriberID, jobTitle, 
 		     session_name = excluded.session_name,
 		     subscriber_id = excluded.subscriber_id,
 		     is_active = 1,
-		     can_peek = MAX(board_subscribers.can_peek, excluded.can_peek)`, // a re-join does not erase the launch record (#11759): can_peek is set by the launch and kept
-		project, subscriberID, subscriberID, sessionName, jobTitle, originServer, receiveMode, carryForwardCursor, now, peekFlag, now)
+		     can_peek = CASE WHEN ? THEN MAX(board_subscribers.can_peek, excluded.can_peek) ELSE excluded.can_peek END`, // only the join route keeps the launch record (#11759)
+		project, subscriberID, subscriberID, sessionName, jobTitle, originServer, receiveMode, carryForwardCursor, now, peekFlag, now, keepPeek)
 	s.subscribersChanged()
 	if err != nil {
 		return nil, err
