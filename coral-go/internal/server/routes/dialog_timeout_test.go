@@ -280,7 +280,7 @@ func TestADashboardTerminalFocusedOnTheAgentBlocksTheTimeout(t *testing.T) {
 
 func TestAPersonTypingInTheTerminalBlocksTheTimeout(t *testing.T) {
 	r := newTimeoutRig(t, "claude", "permission", claudeScreen(t, "permission_menu"))
-	terminalinput.Record(terminalinput.Person, r.name, terminalinput.Keys, "x")
+	terminalinput.Record(terminalinput.Person, r.name, terminalinput.Keys, "x Enter") // typed and sent: present, with nothing unsent
 	assert.Equal(t, timeoutPresent, r.try())
 	assert.Empty(t, r.keys())
 }
@@ -492,4 +492,17 @@ func TestACloseIsRecordedWhenThePassContextHasEnded(t *testing.T) {
 	require.Len(t, evs, 1)
 	assert.Equal(t, timeoutNotTyped, evs[0]["outcome"])
 	assert.False(t, r.h.deriveSingleSessionState(context.Background(), r.sid, 0).NeedsInput)
+}
+
+// Security's #6815: a person's unsent text (typed since their last Enter, Ctrl+C, Ctrl+U or Esc) holds the close: a dialog opened over a draft hides it, and the notice could not follow.
+func TestADialogOverAPersonsUnsentTextIsLeftAlone(t *testing.T) {
+	r := newTimeoutRig(t, "claude", "permission", claudeScreen(t, "permission_menu"))
+	terminalinput.Record(terminalinput.Person, r.name, terminalinput.Text, "half a reply")
+	t.Cleanup(func() { terminalinput.Record(terminalinput.Person, r.name, terminalinput.Keys, "C-u") })
+	assert.True(t, terminalinput.PersonDraftPending(r.sid))
+	assert.Equal(t, timeoutUnsentText, r.try(), "left alone: unsent text (asked before presence, which the same keys also set)")
+	assert.Empty(t, r.keys(), "nothing is closed")
+	assert.True(t, r.h.noticeWouldHold(context.Background(), r.name, r.agent), "and (B), through the same pre-check, is held too")
+	terminalinput.Record(terminalinput.Person, r.name, terminalinput.Keys, "Enter")
+	assert.False(t, terminalinput.PersonDraftPending(r.sid), "sent: nothing unsent")
 }

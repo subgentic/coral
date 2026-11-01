@@ -216,12 +216,69 @@ func notePersonTyped(target string) {
 	})
 }
 
+// A person's unsent text (Security's #6815 condition for the dialog switches): the session has text a person typed since their last Enter, Ctrl+C, Ctrl+U or Esc, which a dialog
+// opened over may hide. Backspace does not clear it (the line may still hold text). It is forgotten after personDraftFor. Only that there is some, and since when: never the text.
+var personDraft sync.Map // session id -> unix nanoseconds the unsent text began
+
+// personDraftFor is how long unsent text is remembered.
+const personDraftFor = 60 * time.Minute
+
+// notePersonDraft updates the session's unsent-text flag from one record of a person's input, in order: text sets it, a submitting or clearing key clears it.
+func notePersonDraft(target string, kind Kind, data string) {
+	if i := strings.IndexByte(target, ':'); i >= 0 {
+		target = target[:i]
+	}
+	m := sessionIDInName.FindStringSubmatch(target)
+	if m == nil {
+		return
+	}
+	sid := strings.ToLower(m[1])
+	set := func() {
+		if _, ok := personDraft.Load(sid); !ok {
+			personDraft.Store(sid, time.Now().UnixNano())
+		}
+	}
+	switch kind {
+	case Keys:
+		for _, k := range strings.Fields(data) {
+			switch k {
+			case "Enter", "C-m", "C-j", "C-c", "C-u", "Escape": // a submit (Enter, a bare line feed), an interrupt, a cleared line, a cancel
+				personDraft.Delete(sid)
+			default:
+				if anyTypedChar(k) {
+					set()
+				}
+			}
+		}
+	case Raw:
+		// an escape sequence (an arrow, a function key): neither text nor a submit
+	default:
+		if hasPrintable(data) {
+			set()
+		}
+	}
+}
+
+// PersonDraftPending says a person typed text into the session's terminal since their last Enter, Ctrl+C, Ctrl+U or Esc, within the last hour.
+func PersonDraftPending(sessionID string) bool {
+	v, ok := personDraft.Load(strings.ToLower(sessionID))
+	if !ok {
+		return false
+	}
+	if time.Since(time.Unix(0, v.(int64))) > personDraftFor {
+		personDraft.Delete(strings.ToLower(sessionID))
+		return false
+	}
+	return true
+}
+
 var sessionIDInName = regexp.MustCompile(`(?i)-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$`)
 
 func Record(o Origin, target string, kind Kind, data string) {
 	if o == Person {
 		lastPerson.Store(time.Now().UnixNano())
 		notePersonTyped(target)
+		notePersonDraft(target, kind, data)
 		if f := personSink.Load(); f != nil {
 			(*f)(target) // only that a person typed to this target: never the data (#11225)
 		}

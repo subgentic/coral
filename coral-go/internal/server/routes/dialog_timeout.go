@@ -218,6 +218,7 @@ const (
 	timeoutBusy       = "busy"
 	timeoutExcluded   = "excluded"
 	timeoutGateHolds  = "gate_holds"
+	timeoutUnsentText = "left_alone_unsent_text" // a person typed text that is not sent: a dialog opened over it may hide it (Security's #6815)
 	timeoutChanged    = "changed"
 	timeoutSendFailed = "send_failed"
 	timeoutNoBox      = "closed_no_input_box"
@@ -230,6 +231,9 @@ func (h *SessionsHandler) dialogTimeout(ctx context.Context, a liveAgent, after 
 	before, first, due := h.dialogs.dialogDue(a.sid, after, now)
 	if !due || h.episodes.closed(a.sid, before.AskID) {
 		return timeoutNotDue
+	}
+	if terminalinput.PersonDraftPending(a.sid) {
+		return timeoutUnsentText // left alone: a close would go over a person's unsent text, and the notice could not follow
 	}
 	if h.personPresent(a.sid, now) {
 		return timeoutPresent
@@ -284,10 +288,10 @@ func (h *SessionsHandler) dialogTimeout(ctx context.Context, a liveAgent, after 
 	return outcome
 }
 
-// noticeWouldHold says the gate would hold the notice for a reason other than the dialog itself: the person paused notices or is typing, a send of theirs is in flight, the CLI is not in
+// noticeWouldHold says the gate would hold the notice for a reason other than the dialog itself: the person paused notices or is typing, has unsent text in the terminal (a draft a dialog may hide), a send of theirs is in flight, the CLI is not in
 // the foreground (an exited CLI, a nested shell), or a draft held the last automated send.
 func (h *SessionsHandler) noticeWouldHold(ctx context.Context, pane string, a liveAgent) bool {
-	if ptymanager.NoticesHeld(a.sid) || ptymanager.PersonSendActive(a.sid) {
+	if ptymanager.NoticesHeld(a.sid) || ptymanager.PersonSendActive(a.sid) || terminalinput.PersonDraftPending(a.sid) {
 		return true
 	}
 	if _, draft := ptymanager.SkippedAtDraft()[pane]; draft {
