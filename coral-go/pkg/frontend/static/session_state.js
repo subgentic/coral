@@ -252,7 +252,7 @@ export function buildSessionTooltip(s, opts = {}) {
         ...(instructions ? [{ label: 'Instructions', text: instructions, title: String(s.prompt).trim().slice(0, 500) }] : []), // its standing instructions, one line (#10285)
         ...(branch ? [{ label: 'Branch', text: branch }] : []),
     ];
-    if (s.working_directory) work.push({ label: 'Directory', text: _shortPath(s.working_directory, 3), title: s.working_directory });
+    if (s.current_directory || s.working_directory) { const dir = s.current_directory || s.working_directory; work.push({ label: 'Directory', text: _shortPath(dir, 3), title: dir }); } // where it is now (#11704)
     if (s.changed_file_count > 0) work.push({ label: 'Files changed', text: String(s.changed_file_count) });
     if (hasWorkingDisplayHint(s)) work.push({ label: 'Permission', text: 'Codex’s terminal shows activity. Permission is not confirmed resolved; queued messages remain held.' });
     if (s.board_project) {

@@ -500,6 +500,7 @@ func (h *SessionsHandler) agentRow(trace *phaseTrace, agent AgentInfo, lv liveIn
 		"staleness_seconds":     listStaleness(staleness),
 		"created_at":            lv.createdAt[sid], // when this agent was started (a fixed time, so a row does not change between lists): the empty chat's "Waiting for the CLI to start" counts from it (#6058)
 		"working_directory":     agent.WorkingDir,
+		"current_directory":     h.currentDirectoryOf(agent.AgentType, sid, agent.WorkingDir), // where the agent is now, when that is another worktree of its repository (#11704)
 		"display_name":          displayVal,
 		"icon":                  iconVal,
 		"name_color":            ptr.NullIfEmpty(d.nameColors[sid]),
@@ -747,4 +748,13 @@ func startedEv(latestEv string, started bool) string {
 		return "started"
 	}
 	return latestEv
+}
+
+// currentDirectoryOf is the folder an agent has moved to, when it is an existing git working tree of the same repository as the folder it was launched in; "" otherwise (the row's working_directory is where it was
+// launched, and is what a restart or a resume uses; this is only where the person sees it to be). The branch, commit and changed files of the row are read from this folder (the git poller follows the same rule).
+func (h *SessionsHandler) currentDirectoryOf(agentType, sessionID, launchDir string) string {
+	if h.currentDir == nil || sessionID == "" {
+		return ""
+	}
+	return h.currentDir(context.Background(), background.AgentInfo{AgentType: agentType, SessionID: sessionID, WorkingDirectory: launchDir})
 }

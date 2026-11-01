@@ -24,6 +24,8 @@ type SessionReader struct {
 	firstPrompts map[string]*firstPromptCache
 	lastMu       sync.Mutex
 	lastMessages map[string]*lastMessageEntry // each session's newest message, by session id (#11097)
+	curMu        sync.Mutex
+	curDirs      map[string]*curDirEntry // where each session's agent is now, by session id (#11704)
 }
 
 type sessionCache struct {
