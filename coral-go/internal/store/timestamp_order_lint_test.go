@@ -48,6 +48,7 @@ var nanoWriters = map[string]nanoWriter{
 	"server/routes/token_usage.go":           {calls: 1, why: "a response field, not stored"},
 	"background/health_held.go":              {calls: 1, why: "part of an episode id, not compared"},
 	"jsonl/parse_hermes.go":                  {calls: 1, why: "a Hermes message's time in a chat reply, parsed by the dashboard; never stored or ordered as text"},
+	"server/routes/dialog_team_line.go":      {calls: 1, why: "part of a dialog episode's id (the team line's once-per-episode key), compared for equality only, never ordered"},
 	"agent/opencode_history.go":              {calls: 1, why: "a message's time, parsed back by the History index (the first and last timestamp of a session row), never ordered as text"},
 	"server/routes/opencode_runtime.go":      {calls: 1, why: "an opencode message's time in a chat reply, parsed by the dashboard; never stored or ordered as text"},
 	"server/routes/needs_you.go":             {calls: 3, why: "response fields of GET /api/needs-you (an item's time and the cursor), parsed back by the same file and by the Hub's poller; never stored or ordered as text (the order is by the parsed time, then the id)"},
