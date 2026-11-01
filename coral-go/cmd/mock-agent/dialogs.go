@@ -588,14 +588,16 @@ func (d *dialogs) closeLocked(event string, extra map[string]any, accepted bool)
 	d.typed.Reset()
 }
 
+// describeAnswer says how a dialog was answered without its labels or text: Coral reads a menu as still drawn while its labels are on the screen
+// (menuStillDrawn), so the line must not repeat them. The log has them.
 func describeAnswer(extra map[string]any) string {
 	switch {
 	case extra["submit"] != nil:
-		return fmt.Sprintf("by Submit: %q", extra["submit"])
+		return fmt.Sprintf("by Submit, %d ticked", len(extra["submit"].([]string)))
 	case extra["text"] != nil:
-		return fmt.Sprintf("by text: %q", extra["text"])
+		return fmt.Sprintf("by text, %d bytes", len(extra["text"].(string)))
 	}
-	return fmt.Sprintf("option %v (%v) by %v", extra["option"], extra["label"], extra["by"])
+	return fmt.Sprintf("option %v by %v", extra["option"], extra["by"])
 }
 
 // runStranger has another program draw the dialog: this executable again with --qa-stranger, holding the terminal until it ends (strangerAttr: on Unix it is the terminal's
