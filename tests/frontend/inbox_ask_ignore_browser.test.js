@@ -30,9 +30,17 @@ const { installGuard, reached } = require('./helpers/silent_dismiss');
             await ev(`window.switchNavTab('hub-inbox'); true`);
             await waitFor(`document.querySelectorAll('${T} tbody tr').length === 3`, at + 'three rows of Needs you', 10000);
             const ignores = await ev(`[...document.querySelectorAll('${T} button[aria-label^="Ignore the question of"]')].map(b => b.getAttribute('aria-label'))`);
-            check(JSON.stringify(ignores.sort()) === JSON.stringify(['Ignore the question of Docs', 'Ignore the question of Lead']), at + 'the two asks have an Ignore, the wait has none: ' + JSON.stringify(ignores));
-            await ev(`document.querySelector('${T} button[aria-label="Ignore the question of Lead"]').click(); true`);
-            await waitFor(`!document.querySelector('${T} button[aria-label="Ignore the question of Lead"]')`, at + 'the ignored question leaves', 8000).catch(() => {});
+            if (mobile) { // a phone row has no Ignore button (#11642): Ignore is in its three-dot menu, so the two asks have a menu and the wait has none
+                const menus = await ev(`[...document.querySelectorAll('${T} .inbox-row-more-toggle')].map(b => b.getAttribute('aria-label')).sort()`);
+                check(JSON.stringify(ignores) === '[]' && JSON.stringify(menus) === JSON.stringify(['More actions for the question of Docs', 'More actions for the question of Lead']), at + 'no Ignore button; the two asks have a menu, the wait has none: ' + JSON.stringify({ ignores, menus }));
+                await ev(`document.querySelector('${T} .inbox-row-more-toggle[aria-label="More actions for the question of Lead"]').click(); true`);
+                await waitFor(`!!document.querySelector('${T} .inbox-row-more .menu:not([hidden]) .menu-item')`, at + 'the menu opens', 5000);
+                await ev(`document.querySelector('${T} .inbox-row-more .menu:not([hidden]) .menu-item').click(); true`);
+            } else {
+                check(JSON.stringify(ignores.sort()) === JSON.stringify(['Ignore the question of Docs', 'Ignore the question of Lead']), at + 'the two asks have an Ignore, the wait has none: ' + JSON.stringify(ignores));
+                await ev(`document.querySelector('${T} button[aria-label="Ignore the question of Lead"]').click(); true`);
+            }
+            await waitFor(`!document.querySelector('${T} button[aria-label="Answer the question of Lead"]')`, at + 'the ignored question leaves', 8000).catch(() => {});
             await ev(framesJs(6));
             const calls = await ev(`window.__calls`);
             check(calls.length === 1 && calls[0].id === 41 && calls[0].body.note === 'Dismissed by the operator' && !calls[0].body.undo, at + 'one close call with the fixed note: ' + JSON.stringify(calls));
@@ -41,7 +49,7 @@ const { installGuard, reached } = require('./helpers/silent_dismiss');
             check(!!toast && toast.undo, at + 'a toast says it, with Undo: ' + JSON.stringify(toast));
             check(await ev(`document.querySelectorAll('${T} tbody tr').length === 2`), at + 'two rows are left');
             await ev(`[...document.querySelectorAll('.toast')].find(x => /Ignored the question of Lead/.test(x.textContent)).querySelectorAll('button').forEach(b => { if (b.textContent.trim() === 'Undo') b.click(); }); true`);
-            await waitFor(`!!document.querySelector('${T} button[aria-label="Ignore the question of Lead"]')`, at + 'Undo brings the question back', 8000).catch(() => {});
+            await waitFor(`!!document.querySelector('${T} button[aria-label="Answer the question of Lead"]')`, at + 'Undo brings the question back', 8000).catch(() => {});
             const all = await ev(`window.__calls`);
             check(all.length === 2 && all[1].body.undo === true && !all[1].body.note, at + 'Undo is the same route with undo:true and no note: ' + JSON.stringify(all));
             check((await reached(ev)).length === 0, at + 'nor did Undo post anything');

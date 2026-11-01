@@ -13,7 +13,7 @@ import { welcomeRows, runWelcome, dismissWelcome, hideAllWelcome } from './welco
  * are in Display options. The hub's own framed /inbox is not this: it keeps the frame, full width (inbox_tab.js). */
 import { state } from './state.js';
 
-import { reviewItems, unreadReviewItems, reviewErrors, refreshReviews, reviewGroups, setReviewRead, markOpenedRead, isRead } from './inbox_reviews.js';
+import { reviewItems, unreadReviewItems, reviewErrors, refreshReviews, reviewGroups, setReviewRead, markOpenedRead, isRead, savedFiles } from './inbox_reviews.js';
 import { failedUnread, finishedUnread, refreshRuns, markSeen, runRoute, failureWords } from './automation_runs.js';
 import { operatorAsks, refreshOperatorAsks, askLine, askWhole, askKey, openAskDialog } from './operator_asks.js';
 import { go, note, backIs, currentRoute } from './nav.js';
@@ -39,7 +39,6 @@ const { openedFrom, backLabelFor } = await importOnce('./inbox_back_label.js'); 
 const saved = await importOnce('./saved.js');
 const DT = await importOnce('./data_table.js'); // the one table (#7743): the Tasks group's page is its Tasks columns
 const { el } = DT;
-const { starControl } = await importOnce('./artifact_star.js'); // a star on a review artifact's row (#9834)
 const TF = await importOnce('./task_filters.js');
 const TV = await importOnce('./tasks_view.js'); // the one Tasks view
 const VL = await importOnce('./view_list.js'); // the mailbox's view list (#7785)
@@ -102,6 +101,11 @@ const fromOf = (s, withTeam) => { if (s.operatorAsk) return [`from ${markHidden(
 const questionOf = s => (s.review && s.review.review_question ? markHidden(s.review.review_question, { strict: true }).replace(/\s+/g, ' ').trim() : '');
 /** What a review row says under its name: the question first (what the person is to decide), then who uploaded it and their team (the name stays beside it, Security's condition on #11555). */
 const subOf = (s, withTeam) => [s.review ? questionOf(s) : '', fromOf(s, withTeam)].filter(Boolean).join(' \u00b7 ');
+/** Whether a Needs you row is unread (#11668): everything that counts in the badge is; a read review and the welcome items (listed, not alarms) are not. */
+const needsUnread = s => !(s.welcome || (s.review && isRead(s.review)));
+/** A wide screen with a real pointer shows a row's actions on its hover or focus, and the waiting time where they are the rest of the time (#11669, the operator's Gmail shot); a touch screen and a phone keep the buttons drawn. */
+const hoverRows = () => !isPhoneLayout() && matchMedia('(hover: hover) and (pointer: fine) and (min-width: 768px)').matches;
+const hoverWrap = (s, box) => { if (!box || !hoverRows()) return box; const wrap = DT.el('div', 'inbox-actions-hover'), when = waitingText(s.waiting_since); wrap.append(box); if (when) wrap.append(DT.el('span', 'inbox-row-when', when)); return wrap; };
 const needsName = s => s.proposal ? markedText(s.proposal.proposer) : s.review ? s.review.produced_by || 'Unknown agent' : s.autorun ? s.autorun.name : s.operatorAsk ? s.operatorAsk.asker : s.welcome ? s.welcome.title : s.unrecorded ? s.display_name : resolveSessionIdentity(s);
 const reviewRows = () => reviewItems().map(a => ({ review: a, goal: a.goal_id && a.goal_title ? { id: a.goal_id, title: String(a.goal_title), board: a.team } : null, task: a.task_id ? { id: a.task_id, title: String(a.task_title || '') } : null, session_id: a.reviewKey, display_name: a.name, board_project: splitKey(a.team).name, server: splitKey(a.team).server, waiting_kind: 'review', waiting_summary: 'For review', waiting_since: a.created_at }));
 /** A failed run of a job or workflow that nobody has opened (#9296): a row of Needs you like a review, opened on its job's or workflow's page, dismissed (marked opened) without opening it. */
@@ -179,7 +183,7 @@ const stateOf = t => TV.taskWord(t);
 const inboxTasksState = DT.tableState();
 const needsState = DT.tableState();
 
-async function openReview(row, extra = {}) {
+export async function openReview(row, extra = {}) {
     const { openArtifactViewer } = await importOnce('./artifact_viewer.js');
     openArtifactViewer(row.hex, { server: splitKey(row.team).server, filename: row.name, mediaType: row.media_type, board: splitKey(row.team).name, from: subOf({ review: row, board_project: splitKey(row.team).name, server: splitKey(row.team).server }, true), ...extra }); // the newest version itself: a diff only when Compare is pressed (#11628)
     markOpenedRead(row.hex).catch(error => sayLive(error.message)); // opening is reading it: the 'read' tag, so it stops counting everywhere (#9277); the viewer does the same for any for-review artifact, once; a failed save is said, and the item keeps counting
@@ -193,13 +197,16 @@ function keepPlace(button) {
     return async () => {
         for (let i = 0; i < 90 && tr && tr.isConnected; i++) await new Promise(r => requestAnimationFrame(r));
         spots.forEach((e, i) => { e.scrollTop = tops[i]; });
-        const next = key && $('group-table-view')?.querySelector(`tr[data-key="${CSS.escape(key)}"]`), to = next ? [...next.querySelectorAll('button, .dt-primary')].find(b => b.getBoundingClientRect().width && !b.classList.contains('dt-star')) : $('group-table-view')?.querySelector('input[type=search]'); // the first control that is drawn (a phone row's star is not)
+        const next = key && $('group-table-view')?.querySelector(`tr[data-key="${CSS.escape(key)}"]`), to = next ? [...next.querySelectorAll('button, .dt-primary')].find(b => b.getBoundingClientRect().width && !b.classList.contains('dt-star') && !(isPhoneLayout() && b.closest('.inbox-review-actions'))) : $('group-table-view')?.querySelector('input[type=search]'); // the first control that is drawn (a phone row's star is not)
         to?.focus({ preventScroll: true });
     };
 }
 /** Four words, the item's name, the task link and the goal need about 1360 px of window (the sidebar takes 320 of it): narrower, and on a phone, Deny and Ignore are in the row's menu. */
 const compactActions = () => isPhoneLayout() || !matchMedia('(min-width: 1360px)').matches;
 let moreMenus = 0;
+/** The bookmark of Save for later, drawn like the Saved folder's (the icon font has no glyph for it). */
+function bookmarkIcon() { const NS = 'http://www.w3.org/2000/svg', svg = document.createElementNS(NS, 'svg'), path = document.createElementNS(NS, 'path'); for (const [k, v] of Object.entries({ viewBox: '0 0 16 16', width: '16', height: '16', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.5', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true' })) svg.setAttribute(k, v); path.setAttribute('d', 'M4 2.5h8v11L8 10.5l-4 3z'); svg.append(path); return svg; }
+
 /** A row's less used actions in one menu behind a three-dot button (menu_button.js: arrow keys, Escape back to the button, Tab or a tap elsewhere closes). items: [{ label, title, run(button) }]. */
 function moreMenu(items, label) {
     const id = `inbox-more-${++moreMenus}`, wrap = DT.el('span', 'inbox-row-more'), toggle = DT.el('button', 'btn btn-quiet btn-icon inbox-row-more-toggle');
@@ -208,55 +215,100 @@ function moreMenu(items, label) {
     const menu = DT.el('div', 'menu dt-mail-menu'); menu.id = `${id}-menu`; menu.hidden = true; menu.setAttribute('role', 'menu'); menu.setAttribute('aria-label', `Actions for ${label}`);
     for (const it of items) {
         const b = DT.el('button', 'menu-item', it.label); b.type = 'button'; b.setAttribute('role', 'menuitem'); b.setAttribute('aria-label', `${it.label}: ${label}`); if (it.title) b.title = it.title; // the word, then the file: the same name the row's own buttons have
-        b.addEventListener('click', async e => { e.stopPropagation(); (await importOnce('./menu_button.js')).closeMenus({ restoreFocus: true }); it.run(b); });
+        b.addEventListener('click', async e => { e.stopPropagation(); (await importOnce('./menu_button.js')).closeMenus({ restoreFocus: !isPhoneLayout() || wrap.contains(document.activeElement) }); it.run(b); }); // a phone row's dots are out of sight (#11671): focus goes back to them only for the keyboard that was in the menu
         menu.append(b);
     }
     toggle.addEventListener('click', async e => { e.stopPropagation(); (await importOnce('./menu_button.js')).toggleMenu(toggle); });
     wrap.append(toggle, menu); return wrap;
 }
 
+let needsTable = null; // the Needs you table on screen: a bulk action clears its selection when it is done
+/** A phone's Needs you selection (#11671, the operator's Gmail-style rows): long-press a row to select it, tap to add more, and the bar that takes the toolbar's line acts on all of them, one request per item through the same routes as a row's own buttons (no bulk route). An action that does not fit every selected row is off. */
+function needsBulkActions() {
+    const reviews = rows => rows.length > 0 && rows.every(s => s.review && !decisionNeedsPerson(splitKey(s.review.team).server));
+    const tell = async (text, announce = text, opts) => { const { showToast, announceNotice } = await importOnce('./notifications.js'); showToast(text, false, undefined, opts); announceNotice(announce); };
+    const each = async (rows, fn) => { let ok = 0; const bad = []; for (const s of rows) { try { await fn(s); ok++; } catch (e) { bad.push(e && e.message ? e.message : 'not saved'); } } return { ok, bad }; };
+    const words = (verb, r, total) => r.bad.length ? `${verb} ${r.ok} of ${total}: ${r.bad[0]}` : `${verb} ${r.ok}`;
+    const done = () => { needsTable?.clear(); };
+    return [
+        { label: 'Approve', disabled: rows => !reviews(rows), askWhen: n => n > 1, confirm: n => `Approve ${n} files?`, run: async rows => { const { approveRow } = await importOnce('./artifact_review.js'); const r = await each(rows, s => approveRow(s.review.team, s.review)); done(); tell(words('Approved', r, rows.length)); } },
+        { label: 'Changes', disabled: rows => !(rows.length === 1 && reviews(rows)), run: rows => { done(); openReview(rows[0].review, { requestChanges: true }); } }, // a change request is words for one file: with several selected it is off
+        { label: 'Ignore', run: async rows => {
+            const { ignoreRow, unignoreRow } = await importOnce('./artifact_review.js'), asks = await importOnce('./ask_ignore.js'), undo = [];
+            const r = await each(rows, async s => {
+                if (s.review) { await ignoreRow(s.review.team, s.review); undo.push(() => unignoreRow(s.review.team, s.review)); }
+                else if (s.operatorAsk && s.operatorAsk.kind === 'ask') { await asks.closeAsk(s.operatorAsk); undo.push(() => asks.reopenAsk(s.operatorAsk)); }
+                else if (s.welcome && s.welcome.dismiss) dismissWelcome(s.welcome.id);
+                else if (s.autorun) markSeen(s.autorun);
+                else throw new Error('that one cannot be ignored');
+            });
+            asks.refreshOperatorAsks(true); done();
+            tell(words('Ignored', r, rows.length), `${words('Ignored', r, rows.length)}.${undo.length ? ' Undo is in the notice.' : ''}`, undo.length ? { action: { label: 'Undo', onClick: () => Promise.allSettled(undo.map(f => f())).then(() => { asks.refreshOperatorAsks(true); refreshReviews(true); tell('Back in Needs you'); }) } } : undefined);
+        } },
+        { label: 'Save for later', disabled: rows => !reviews(rows), run: async rows => { const { saveRow } = await importOnce('./artifact_review.js'); const r = await each(rows, s => saveRow(s.review.team, s.review)); done(); tell(words('Saved', r, rows.length)); } },
+        { label: 'Mark read', disabled: rows => !reviews(rows) || rows.every(s => isRead(s.review)), run: async rows => { const r = await each(rows.filter(s => !isRead(s.review)), s => setReviewRead(s.review, true)); done(); tell(words('Marked read', r, r.ok + r.bad.length)); } },
+        { label: 'Mark unread', disabled: rows => !reviews(rows) || !rows.some(s => isRead(s.review)), run: async rows => { const r = await each(rows.filter(s => isRead(s.review)), s => setReviewRead(s.review, false)); done(); tell(words('Marked unread', r, r.ok + r.bad.length)); } },
+    ];
+}
+
 /** A review row's actions, the one set on every screen (#11552, approved by the operator): Approve, Changes, Deny, Ignore as words, in that order; Mark unread (a read row) in More, and on a phone Deny and Ignore too. The row itself opens the file. Each action that clears the row keeps the person's place. */
-function reviewActions(row) {
-    const compact = compactActions(), box = DT.el('div', 'inbox-review-actions');
+export function reviewActions(row, inSaved = false) { // inSaved (#11641): a saved file keeps Approve, Changes and Deny; its menu has Move to Needs you, not Ignore and Save
+    const compact = compactActions(), box = DT.el('div', `inbox-review-actions inbox-slots${compact ? ' inbox-slots-compact' : ''}`);
     const file = markHidden(row.name, { strict: true }); // what a button, a menu and a spoken line call the file: hidden characters written out (Security's SHOULD, #11552)
     const errorText = DT.el('span', 'inbox-review-error'); errorText.setAttribute('role', 'alert');
     const failed = (b, error) => { if (b.isConnected) b.disabled = false; errorText.textContent = error.message; };
-    const word = (text, name, cls, run) => { const b = DT.el('button', `btn btn-small ${cls}`.trim(), text); b.type = 'button'; b.setAttribute('aria-label', `${name}: ${file}`); b.addEventListener('click', () => run(b)); return b; };
+    const word = (text, name, cls, run) => { const b = DT.el('button', `btn btn-small ${cls}`.trim(), text); b.type = 'button'; b.setAttribute('data-slot', text.toLowerCase()); b.setAttribute('aria-label', `${name}: ${file}`); b.addEventListener('click', () => run(b)); if (text === 'Approve') b.classList.add('inbox-main-action'); return b; }; // a button's place is its column (data-slot): the same x on every row (#11630)
     const approve = b => { b.disabled = true; errorText.textContent = ''; const settle = keepPlace(b); // replaces Mark reviewed (#136584): it clears the row, marks the review approved and tells the agent that uploaded it
         return importOnce('./artifact_review.js').then(async ({ approveRow, sayApproved }) => { sayApproved(row.name, await approveRow(row.team, row)); sayLive(`Approved ${file}.`); await settle(); }).catch(error => failed(b, error)); };
     const deny = b => { const settle = keepPlace(b); return importOnce('./artifact_review.js').then(({ openDenyDialog }) => openDenyDialog(row.team, row, async () => { sayLive(`Denied ${file}.`); await settle(); })).catch(error => failed(b, error)); };
     const ignore = b => { b.disabled = true; errorText.textContent = ''; const settle = keepPlace(b);
         return importOnce('./artifact_review.js').then(async ({ ignoreRow, sayIgnored }) => { await ignoreRow(row.team, row); sayIgnored(row.team, row); sayLive(`Ignored ${file}.`); await settle(); }).catch(error => failed(b, error)); };
+    const save = b => { b.disabled = true; errorText.textContent = ''; const settle = keepPlace(b); // Save for later (#11641): out of Needs you, kept in Saved, nobody told
+        return importOnce('./artifact_review.js').then(async ({ saveRow, saySaved }) => { await saveRow(row.team, row); saySaved(row.team, row); sayLive(`Saved ${file} for later.`); await settle(); }).catch(error => failed(b, error)); };
+    const unsave = b => { b.disabled = true; errorText.textContent = '';
+        return importOnce('./artifact_review.js').then(async ({ unsaveRow }) => { await unsaveRow(row.team, row); sayLive(`${file} is back in Needs you.`); }).catch(error => failed(b, error)); };
+    box._ignore = ignore; // a swipe on a phone is the same Ignore (#11642)
     const unread = b => { b.disabled = true; errorText.textContent = ''; return setReviewRead(row, false).then(() => sayLive(`Marked ${file} unread.`)).catch(error => failed(b, error)); };
-    const star = starControl(row, { hex: row.hex, name: file }); // the review artifact's star: a glyph when starred, a button at a hover (#9834)
-    if (star) { box.append(star); box.classList.add('inbox-review-actions-star'); }
+    const bookmark = !inSaved && !isPhoneLayout() && !decisionNeedsPerson(splitKey(row.team).server); // the star's slot is Save for later (#11672, the operator): a bookmark button; a phone has it in the three dots
+    if (bookmark) { const mark = DT.el('button', 'btn btn-quiet btn-icon inbox-bookmark'); mark.type = 'button'; mark.setAttribute('data-slot', 'save'); mark.setAttribute('aria-label', `Save for later: ${file}`); mark.title = 'Save for later'; mark.append(bookmarkIcon()); mark.addEventListener('click', () => save(mark)); box.append(mark); }
     const menu = [];
     if (!decisionNeedsPerson(splitKey(row.team).server)) { // through Coral Hub a guest cannot decide
         box.append(word('Approve', 'Approve', 'btn-primary', approve), word('Changes', 'Request changes', '', () => openReview(row, { requestChanges: true })));
         box.lastChild.title = 'Request changes';
-        if (compact) menu.push({ label: 'Deny', title: 'A final no: the agent is told', run: deny }, { label: 'Ignore', title: 'Take it out of Needs you; nobody is told', run: ignore });
-        else box.append(word('Deny', 'Deny', 'btn-quiet inbox-deny', deny), word('Ignore', 'Ignore', 'btn-quiet', ignore));
+        if (inSaved) { if (compact) menu.push({ label: 'Deny', title: 'A final no: the agent is told', run: deny }); else box.append(word('Deny', 'Deny', 'btn-quiet inbox-deny', deny)); menu.push({ label: 'Move to Needs you', title: 'Put it back in Needs you as it was', run: unsave }); }
+        else {
+            if (compact) menu.push({ label: 'Deny', title: 'A final no: the agent is told', run: deny }, { label: 'Ignore', title: 'Take it out of Needs you; nobody is told', run: ignore });
+            else box.append(word('Deny', 'Deny', 'btn-quiet inbox-deny', deny), word('Ignore', 'Ignore', 'btn-quiet', ignore));
+            if (!bookmark) menu.push({ label: 'Save for later', title: 'Keep it in Saved, out of Needs you; nobody is told', run: save });
+        }
     }
-    if (isRead(row)) { box.classList.add('inbox-review-actions-read'); menu.push({ label: 'Mark unread', title: 'Count it in Needs you again', run: unread }); }
-    if (menu.length) box.append(moreMenu(menu, file));
+    if (isRead(row) && !inSaved) { box.classList.add('inbox-review-actions-read'); menu.push({ label: 'Mark unread', title: 'Count it in Needs you again', run: unread }); }
+    if (menu.length) { const more = moreMenu(menu, file); more.setAttribute('data-slot', 'dots'); box.append(more); }
     box.append(errorText); return box;
 }
 
 /** A failed run opens on its job's or workflow's page; opening it is what clears it from Needs you. */
 function openRun(run) { markSeen(run); go(runRoute(run)); }
+/** What a button an agent put on a question may open (#11643): the page runs these only after the server claimed the button and named its stored action. */
+const askRunners = {
+    task: (a, id) => openItemRoute('tasks', a.board, id, `${a.board}#${id}`),
+    artifact: async (a, hex) => { const { openArtifactViewer } = await importOnce('./artifact_viewer.js'); openArtifactViewer(hex, { server: splitKey(a.board).server, board: splitKey(a.board).name, filename: `File from ${markHidden(a.asker, { strict: true })}` }); },
+};
 /** A question to the Operator: Answer opens it whole with the reply box (#11417). */
 function askActions(a) {
-    const box = DT.el('div', 'inbox-review-actions');
+    const box = DT.el('div', `inbox-review-actions inbox-slots${compactActions() ? ' inbox-slots-compact' : ''}`);
     const who = markHidden(a.asker, { strict: true });
-    const reply = DT.el('button', 'btn btn-small', 'Answer'); reply.type = 'button'; // Answer, as the approved action set names it (#11552); the dialog it opens still has the reply box
-    reply.setAttribute('aria-label', `Answer the question of ${who}`); reply.addEventListener('click', () => openAskDialog(a, () => $('group-table-view')?.querySelector('input[type=search]')?.focus({ preventScroll: true })));
+    const reply = DT.el('button', 'btn btn-small', 'Answer'); reply.type = 'button'; reply.setAttribute('data-slot', 'approve'); // Answer sits where Approve does (#11630); it is the row's main button
+    reply.classList.add('inbox-main-action'); // Answer, as the approved action set names it (#11552); the dialog it opens still has the reply box
+    reply.setAttribute('aria-label', `Answer the question of ${who}`); reply.addEventListener('click', () => openAskDialog(a, () => $('group-table-view')?.querySelector('input[type=search]')?.focus({ preventScroll: true }), askRunners));
     box.append(reply);
     if (a.kind === 'ask') { // a wait has no ask row to close: only a question is ignorable
-        const no = DT.el('button', 'btn btn-small btn-quiet', 'Ignore'); no.type = 'button'; no.setAttribute('aria-label', `Ignore the question of ${who}`);
         const failed = DT.el('span', 'inbox-review-error'); failed.setAttribute('role', 'alert');
-        no.addEventListener('click', () => { no.disabled = true; failed.textContent = ''; const settle = keepPlace(no);
-            importOnce('./ask_ignore.js').then(async ({ ignoreAsk }) => { await ignoreAsk(a, who); sayLive(`Ignored the question of ${who}.`); await settle(); }).catch(error => { no.disabled = false; failed.textContent = error.message; }); });
-        box.append(no, failed);
+        const ignore = no => { no.disabled = true; failed.textContent = ''; const settle = keepPlace(no);
+            return importOnce('./ask_ignore.js').then(async ({ ignoreAsk }) => { await ignoreAsk(a, who); sayLive(`Ignored the question of ${who}.`); await settle(); }).catch(error => { no.disabled = false; failed.textContent = error.message; }); };
+        box._ignore = ignore;
+        if (isPhoneLayout()) box.append(moreMenu([{ label: 'Ignore', title: 'Take it out of Needs you; nobody is told', run: ignore }], `the question of ${who}`), failed); // a phone row has no Ignore button: the menu, or a swipe (#11642)
+        else { const no = DT.el('button', 'btn btn-small btn-quiet', 'Ignore'); no.type = 'button'; no.setAttribute('data-slot', 'ignore'); no.setAttribute('aria-label', `Ignore the question of ${who}`); no.addEventListener('click', () => ignore(no)); box.append(no, failed); }
     }
     return box;
 }
@@ -264,10 +316,12 @@ function askActions(a) {
 function runActions(run) {
     const box = DT.el('div', 'inbox-review-actions');
     const open = DT.el('button', 'btn btn-small', 'Open'); open.type = 'button';
-    open.setAttribute('aria-label', `Open ${run.name}, failed run`); open.addEventListener('click', () => openRun(run));
+    open.classList.add('inbox-main-action'); open.setAttribute('aria-label', `Open ${run.name}, failed run`); open.addEventListener('click', () => openRun(run));
+    const ignore = () => { markSeen(run); sayLive(`Ignored the failed run of ${run.name}.`); $('group-table-view')?.querySelector('input[type=search]')?.focus({ preventScroll: true }); };
+    box._ignore = ignore;
+    if (isPhoneLayout()) { box.append(open, moreMenu([{ label: 'Ignore', title: 'Take it out of Needs you; nobody is told', run: ignore }], run.name)); return box; } // no Ignore button on a phone row: the menu, or a swipe (#11642)
     const done = DT.el('button', 'btn btn-small', 'Ignore'); done.type = 'button';
-    done.setAttribute('aria-label', `Ignore the failed run of ${run.name}`);
-    done.addEventListener('click', () => { markSeen(run); sayLive(`Ignored the failed run of ${run.name}.`); $('group-table-view')?.querySelector('input[type=search]')?.focus({ preventScroll: true }); });
+    done.setAttribute('aria-label', `Ignore the failed run of ${run.name}`); done.addEventListener('click', ignore);
     box.append(open, done); return box;
 }
 
@@ -275,14 +329,17 @@ function runActions(run) {
 function welcomeActions(w) {
     const box = DT.el('div', 'inbox-review-actions inbox-welcome-actions');
     const go = DT.el('button', 'btn btn-small btn-primary', w.go); go.type = 'button';
-    go.setAttribute('aria-label', `${w.go}: ${w.title}`);
+    go.classList.add('inbox-main-action'); go.setAttribute('aria-label', `${w.go}: ${w.title}`);
     go.addEventListener('click', () => runWelcome(w.id));
     box.append(go);
     if (w.dismiss) {
-        const no = DT.el('button', 'btn btn-small btn-quiet', 'Ignore'); no.type = 'button';
-        no.setAttribute('aria-label', `Ignore: ${w.title}`);
-        no.addEventListener('click', () => { dismissWelcome(w.id); sayLive(`Ignored: ${w.title}.`); });
-        box.append(no);
+        const ignore = () => { dismissWelcome(w.id); sayLive(`Ignored: ${w.title}.`); };
+        if (isPhoneLayout()) box.append(moreMenu([{ label: 'Ignore', title: 'Take it out of Needs you; nobody is told', run: ignore }], w.title)); // no Ignore button on a phone row: the menu, or a swipe (#11642)
+        else {
+            const no = DT.el('button', 'btn btn-small btn-quiet', 'Ignore'); no.type = 'button';
+            no.setAttribute('aria-label', `Ignore: ${w.title}`); no.addEventListener('click', ignore);
+            box.append(no);
+        }
     }
     return box;
 }
@@ -441,14 +498,14 @@ function inboxSavedToolbar() {
     }
     const v = saved.savedView(), filters = saved.savedFiltersNow(), options = saved.savedPageOptions();
     const node = savedBar.draw({ filters, options,
-        pills: { label: 'Show', current: v.tab, items: [{ key: 'open', label: 'Open', count: v.totals.open }, { key: 'done', label: 'Done', count: v.totals.done }], onPick: key => saved.setSavedTab(key) } });
-    return { node, signature: JSON.stringify([filters, v.tab, v.totals, options]) };
+        pills: { label: 'Show', current: v.tab, items: [{ key: 'open', label: 'Open', count: v.totals.open + savedFiles().length }, { key: 'done', label: 'Done', count: v.totals.done }], onPick: key => saved.setSavedTab(key) } });
+    return { node, signature: JSON.stringify([filters, v.tab, v.totals, options, savedFiles().length]) };
 }
 const savedCounts = () => saved.savedView().totals;
 
 // ── The sidebar list ─────────────────────────────────────────────────────
 /** The number beside a folder. Needs you counts what the Inbox badge counts (an alarm: an agent, a review, a run, a proposal, a question); the welcome items are listed but are not alarms, so they are not in either (#11622). */
-const countOf = key => key === 'needs' ? waitingSessions().length + unreadReviewItems().length + failedUnread().length + pendingProposals().length + operatorAsks().length + recordRows().length : key === 'tasks' ? taskRows().length : key === 'goals' ? goals.length : key === 'artifacts' ? IA.artifactCount() ?? undefined : key === 'saved' ? savedCounts().open : undefined;
+const countOf = key => key === 'needs' ? waitingSessions().length + unreadReviewItems().length + failedUnread().length + pendingProposals().length + operatorAsks().length + recordRows().length : key === 'tasks' ? taskRows().length : key === 'goals' ? goals.length : key === 'artifacts' ? IA.artifactCount() ?? undefined : key === 'saved' ? savedCounts().open + savedFiles().length : undefined;
 /** The folders of the Inbox (#7785, the mailbox mock): one view list, a name and a count each. Needs you, Tasks and Saved open their table in the centre; */
 const FOLDER_ICONS = { needs: 'notifications', tasks: 'checklist', goals: 'flag', saved: 'saved-bookmark', artifacts: 'inventory_2',
     chats: 'chat_bubble_outline', [BOARDS_FOLDER]: 'forum', 'chats-notes': 'edit_note', 'chats-starred': 'star', 'chats-active': 'bolt', 'chats-archived': 'folder' }; // UI/UX's existing subset choices (#8866); tagged folders keep their colour dot
@@ -494,15 +551,26 @@ function noteFolder(key) {
     note(route, { replace: !!cur && cur.view === 'chats' });
 }
 /** The folders in the sidebar. Only drawn when a count or the current folder changed (this runs for every message of the feed). */
+let dragging = null; // the review row being dragged toward Saved (#11641)
+/** A review row dropped on the Saved folder is saved for later, as its three dots' item does. */
+function wireSaveDrop(list) {
+    if (list._saveDrop) return; list._saveDrop = true;
+    const target = e => e.target.closest?.('.view-list-item[data-key="saved"]');
+    list.addEventListener('dragover', e => { if (dragging && target(e)) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; target(e).classList.add('drop-over'); } });
+    list.addEventListener('dragleave', e => target(e)?.classList.remove('drop-over'));
+    list.addEventListener('drop', e => { const t = target(e); if (!t || !dragging) return; e.preventDefault(); t.classList.remove('drop-over'); const row = dragging; dragging = null;
+        importOnce('./artifact_review.js').then(async ({ saveRow, saySaved }) => { await saveRow(row.team, row); saySaved(row.team, row); sayLive(`Saved ${markHidden(row.name, { strict: true })} for later.`); }).catch(error => sayLive(error.message)); });
+}
 function renderInboxNav(force = false) {
     const list = $('inbox-nav-list');
     if (!list) return;
+    wireSaveDrop(list);
     if (group === 'artifacts' && nativeInbox() && IA.artifactsOwnerOnly()) setGroup('needs', { auto: true }); // the Artifacts folder on screen (or kept from last time) is gone for a grantee: Needs you, not an empty page (#11071)
     const here = navCurrent(), sections = folderSections();
     // what the tables show is part of the key too: the folder list is drawn from the counts, but the table on screen is refreshed (refreshGroupTable below) only when a row of it changed
     const needs = needsRows(), tk = taskRows(), sv = saved.savedView().shown.map(saved.savedItemFacts);
     const key = JSON.stringify([here, sections, queries.needs, queries.tasks, page && `${page.kind}:${page.project || ''}#${page.id}`,
-        needs.map(s => [sessionServer(s), s.session_id, s.display_name, s.waiting_kind, s.waiting_since, teamOf(s), askOf(s)]), tk.map(t => [t.project, t.id, t.title, t.priority, t.status, t.board, t.updated_at, t.artifact_count]), sv.map(f => [f.id, f.which, f.saved, f.state])]);
+        needs.map(s => [sessionServer(s), s.session_id, s.display_name, s.waiting_kind, s.waiting_since, teamOf(s), askOf(s)]), tk.map(t => [t.project, t.id, t.title, t.priority, t.status, t.board, t.updated_at, t.artifact_count]), sv.map(f => [f.id, f.which, f.saved, f.state]), savedFiles().map(a => a.reviewKey)]);
     if (!force && key === _navKey) return;
     _navKey = key;
     if (needsRows().some(s => s.waiting_since) && !_poll) _poll = pollEvery(() => { refreshReviews(); refreshProposals(); renderInboxNav(true); }, 30000); // "waiting 4 min" in the Needs you table moves on while the tab is open
@@ -522,7 +590,8 @@ function savedListSpec(where = '') {
     const dock = where === 'dock-tab';
     const multi = rows.some(f => f.serverName);
     const empty = v.loading ? 'Loading saved items' : v.error ? v.error : v.filtered ? 'No saved messages match this search.' : v.scoped || (v.tab === 'done' ? 'Nothing is marked done.' : 'Nothing is saved for later.');
-    return { title: 'Saved', noun: ['item', 'items'], headless: dock, chipsLabel: 'Show',
+    const files = dock ? [] : savedFiles(); // the saved review files, listed above the messages (#11641)
+    const spec = { title: 'Saved', noun: ['item', 'items'], headless: dock, chipsLabel: 'Show',
         chips: !dock ? [] : [{ action: 'inbox-saved-chip', data: { tab: 'open' }, label: 'Open', count: v.totals.open, pressed: v.tab === 'open' }, { action: 'inbox-saved-chip', data: { tab: 'done' }, label: 'Done', count: v.totals.done, pressed: v.tab === 'done' }],
         empty: { line: empty, hint: v.loading || v.error || v.filtered || v.tab === 'done' ? '' : 'Save a message from a chat or a board with its bookmark.' },
         note: [v.query ? 'The search covers every saved message, not only these.' : '', ...v.down.map(d => `${d.label || d.id} did not answer, so its saved messages are not shown.`)].filter(Boolean).join(' '), rows,
@@ -546,6 +615,8 @@ function savedListSpec(where = '') {
                     b.addEventListener('click', async () => { const it = saved.findSavedItem(f.id); if (!it) return; const done = !it.done_at; if (await saved.savedSetDone(it, done)) sayLive(done ? 'Marked done' : 'Moved back to Open'); });
                     return b; } },
             ] }).el };
+    if (!files.length) return spec;
+    return { ...spec, count: rows.length + files.length, empty: rows.length ? spec.empty : null, signature: JSON.stringify([spec.signature, files.map(a => [a.reviewKey, a.name])]), node: () => { const wrap = DT.el('div', 'saved-files-wrap'), host = DT.el('div', 'saved-files'); wrap.append(host); if (rows.length) wrap.append(DT.el('h3', 'saved-files-title', 'Saved messages'), spec.node()); importOnce('./saved_files.js').then(m => m.fillSavedFiles(host, files, { DT, reviewActions, openReview, shown: a => markHidden(a.name, { strict: true }), subtitleOf: a => subOf({ review: a, board_project: splitKey(a.team).name, server: splitKey(a.team).server }, true) })).catch(() => {}); return wrap; } };
 }
 
 /** A message of the agent's Saved tab, as a sheet over the dock panel (the pane the Artifacts tab uses, detail_pane.js): what the Inbox's page holds (the text, why it cannot be opened, Read the whole message) with Open (the chat) and Remove from saved in its bar. Back, the close button and Escape return to the Saved table, the focus on the row. */
@@ -647,12 +718,12 @@ registerGroupSource('hub-inbox', {
             const manyTeams = new Set(allNeeds().map(teamOf).filter(Boolean)).size > 1; // with two or more teams waiting, a one-line row names its team
             return { title: 'Needs you', noun: ['item', 'items'], rows, count: total > rows.length ? `${rows.length} of ${total}` : total, note: reviewErrors().join(' '), empty: { line: NF.isFiltered(needsFilters) ? 'Nothing that needs you matches the search and filters.' : 'Nothing needs you', hint: NF.isFiltered(needsFilters) ? undefined : answered || 'An agent that asks a question or wants permission, and a review artifact, appear here. A task assigned to you is under Tasks.', go: NF.isFiltered(needsFilters) ? undefined : { action: 'inbox-go-agents', label: 'Go to Agents' } },
                 signature: JSON.stringify([hidden, finishedUnread().length, answered || '', manyTeams, needsOverflow().map(g => [g.name, g.more.map(a => a.reviewKey)]), reviewErrors(), rows.map(blocksOf), rows.map(s => [s.operatorAsk ? [s.operatorAsk.id, s.operatorAsk.text] : 0, sessionServer(s), s.session_id, s.display_name, s.waiting_kind, s.waiting_since, waitingText(s.waiting_since), teamOf(s), askOf(s), goalOf(s) ? s.goal.id : 0, s.task ? [s.task.id, s.task.title] : 0, dirOf(s), s.review ? isRead(s.review) : 0, s.proposal ? s.proposal.state : 0])]), // the words move on with the clock: they are part of what was drawn
-                node: () => { const wrap = DT.el('div', 'inbox-needs-results'); const oneLineNeeds = !rows.some(isItem); const table = DT.dataTable({ label: `Needs you, ${rows.length}`, rows, rowKey: s => `${sessionServer(s)}:${s.session_id}`, decorate: (s, tr) => { if (s.welcome && s.welcome.dismiss) tr.dataset.welcomeId = s.welcome.id; }, state: needsState, rowName: s => s.review ? `${s.review.name}, for review, ${teamOf(s)}` : s.autorun ? `${s.autorun.name}, run failed` : s.operatorAsk ? `${s.operatorAsk.asker}, asks you` : s.welcome ? s.welcome.title : resolveSessionIdentity(s),
-                    open: s => { if (s.proposal) { openProposalDialog(s.proposal, 'view'); return; } if (s.review) { openReview(s.review); return; } if (s.autorun) { openRun(s.autorun); return; } if (s.operatorAsk) { openAskDialog(s.operatorAsk); return; } if (s.unrecorded) { recordAllAgents(); return; } if (s.welcome) { runWelcome(s.welcome.id); return; } window.switchNavTab?.('agents'); Promise.resolve(window.selectLiveSession?.(s.name, s.agent_type, s.session_id, sessionServer(s))).then(() => window.showChatView?.()); }, // a row that needs an answer shows the chat card, not the terminal saved last (#10141)
+                node: () => { const wrap = DT.el('div', 'inbox-needs-results'); const oneLineNeeds = !rows.some(isItem); const table = DT.dataTable({ label: `Needs you, ${rows.length}`, rows, rowKey: s => `${sessionServer(s)}:${s.session_id}`, unread: needsUnread, ...(isPhoneLayout() ? { selectable: { contextKey: 'inbox-needs', longPress: true, clearLabel: 'Cancel', canSelect: s => !!(s.review || s.operatorAsk || s.welcome || s.autorun), actions: needsBulkActions(), onChange: keys => Toolbar.mountSelection(document.querySelector('#group-table-view .gt-toolbar'), keys.size ? table.bar : null) } } : {}), decorate: (s, tr) => { if (!needsUnread(s)) tr.classList.add('dt-read'); if (s.welcome && s.welcome.dismiss) tr.dataset.welcomeId = s.welcome.id; if (s.review && !decisionNeedsPerson(splitKey(s.review.team).server)) { tr.draggable = true; tr.addEventListener('dragstart', e => { e.dataTransfer.setData('application/x-coral-review', s.review.reviewKey); e.dataTransfer.effectAllowed = 'move'; dragging = s.review; }); tr.addEventListener('dragend', () => { dragging = null; }); } }, state: needsState, rowName: s => s.review ? `${s.review.name}, for review, ${teamOf(s)}` : s.autorun ? `${s.autorun.name}, run failed` : s.operatorAsk ? `${s.operatorAsk.asker}, asks you` : s.welcome ? s.welcome.title : resolveSessionIdentity(s),
+                    open: s => { if (s.proposal) { openProposalDialog(s.proposal, 'view'); return; } if (s.review) { openReview(s.review); return; } if (s.autorun) { openRun(s.autorun); return; } if (s.operatorAsk) { openAskDialog(s.operatorAsk, undefined, askRunners); return; } if (s.unrecorded) { recordAllAgents(); return; } if (s.welcome) { runWelcome(s.welcome.id); return; } window.switchNavTab?.('agents'); Promise.resolve(window.selectLiveSession?.(s.name, s.agent_type, s.session_id, sessionServer(s))).then(() => window.showChatView?.()); }, // a row that needs an answer shows the chat card, not the terminal saved last (#10141)
                     columns: [
                         { key: 'agent', label: rows.some(isItem) ? 'Item' : 'Agent', primary: true, width: 'grow', ...(rows.some(s => s.proposal) ? { min: 14, share: 1 } : rows.some(isItem) ? { min: 24, share: 2 } : {}), sort: true, sortValue: s => resolveSessionIdentity(s), line: 1, ...(oneLineNeeds || rows.some(s => s.review || s.operatorAsk) ? { subtitle: s => (s.operatorAsk ? fromOf(s, true) : s.review ? subOf(s, manyTeams) : oneLineNeeds ? askOf(s) : ''), subtitleTitle: s => (s.review || s.operatorAsk ? subOf(s, true) : oneLineNeeds ? askOf(s) : '') } : {}), // a list of agents: the ask is the row's one second line, under the name (UI/UX: the row's purpose is to decide from the list); a file for review says who uploaded it there, and its team when two or more teams wait (#11456)
                             cell: s => { if (s.operatorAsk) { const name = DT.el('span', 'inbox-review-name', askLine(s.operatorAsk) || markHidden(s.operatorAsk.asker, { strict: true })); name.title = askWhole(s.operatorAsk); return name; } // a question to the Operator reads like a review row: its first line, then who asked and their team
-                             if (s.welcome) { const name = DT.el('span', 'inbox-review-name inbox-welcome-name', s.welcome.title); DT.tipIf(name, s.welcome.title, () => name.scrollWidth > name.clientWidth); if (s.welcome.optional) name.append(DT.tag('optional')); return name; } if (s.unrecorded) { const name = DT.el('span', 'inbox-review-name', s.display_name); DT.tipIf(name, s.display_name, () => name.scrollWidth > name.clientWidth); return name; } if (s.proposal) { const name = DT.el('span', 'inbox-review-name', markedText(s.proposal.title)); DT.tipIf(name, markedText(s.proposal.title), () => name.scrollWidth > name.clientWidth); return name; } if (s.autorun) { const name = DT.el('span', 'inbox-review-name', s.autorun.name); DT.tipIf(name, s.autorun.name, () => name.scrollWidth > name.clientWidth); return name; } if (s.review) { const name = DT.primaryButton(markTitle(s.review.name), `Open ${markTitle(s.review.name)}`); name.classList.add('inbox-review-name'); name.dataset.reviewArtifact = s.review.id; if (!isRead(s.review)) return name; const wrap = DT.el('span', 'inbox-review-item'); wrap.append(name, DT.tag('read')); return wrap; } const w = DT.personButton(resolveSessionIdentity(s), `Open ${resolveSessionIdentity(s)}`); Object.assign(w.querySelector('.dt-primary').dataset, { name: s.name, agentType: s.agent_type, sessionId: s.session_id, server: sessionServer(s) }); return w; } },
+                             if (s.welcome) { const name = DT.el('span', 'inbox-review-name inbox-welcome-name', s.welcome.title); DT.tipIf(name, s.welcome.title, () => name.scrollWidth > name.clientWidth); if (s.welcome.optional) name.append(DT.tag('optional')); return name; } if (s.unrecorded) { const name = DT.el('span', 'inbox-review-name', s.display_name); DT.tipIf(name, s.display_name, () => name.scrollWidth > name.clientWidth); return name; } if (s.proposal) { const name = DT.el('span', 'inbox-review-name', markedText(s.proposal.title)); DT.tipIf(name, markedText(s.proposal.title), () => name.scrollWidth > name.clientWidth); return name; } if (s.autorun) { const name = DT.el('span', 'inbox-review-name', s.autorun.name); DT.tipIf(name, s.autorun.name, () => name.scrollWidth > name.clientWidth); return name; } if (s.review) { const name = DT.primaryButton(markTitle(s.review.name), `Open ${markTitle(s.review.name)}`); name.classList.add('inbox-review-name'); name.dataset.reviewArtifact = s.review.id; const wrap = DT.el('span', 'inbox-review-item'); wrap.append(name, DT.el('span', 'sr-only', isRead(s.review) ? ', read' : ', unread')); return wrap; } const w = DT.personButton(resolveSessionIdentity(s), `Open ${resolveSessionIdentity(s)}`); Object.assign(w.querySelector('.dt-primary').dataset, { name: s.name, agentType: s.agent_type, sessionId: s.session_id, server: sessionServer(s) }); return w; } },
                         ...(rows.some(askOf) && !oneLineNeeds ? [{ key: 'asks', label: rows.some(x => x.proposal) ? 'What was asked' : 'Waiting for', ...(rows.some(x => x.proposal) ? { width: 'grow', min: 22, share: 4 } : { width: 'content', max: 20, drop: 2 }), line: 2, cell: s => {
                             if (s.proposal) { const pr = s.proposal, wrap = DT.el('span', 'inbox-proposal-what'); wrap.append(DT.el('span', 'inbox-proposal-line', `${markedText(pr.proposer)} proposes a ${pr.kind === 'goal' ? 'goal' : 'task'}`)); const snip = proposalSnippet(pr); if (snip) wrap.append(DT.el('span', 'inbox-proposal-body', snip)); if (carriesInstructions(pr)) wrap.append(DT.tag('Carries instructions')); wrap.title = markedText(pr.title); return wrap; } // the proposer's name and the proposal's words are text: the row says what is asked
                             if (s.autorun || s.unrecorded || s.welcome) { const why = DT.el('span', null, askOf(s)); why.title = askOf(s); return why; } // the whole reason is the tooltip: the line is one
@@ -676,10 +747,11 @@ registerGroupSource('hub-inbox', {
                             return cell;
                         } }] : []),
                         ...(rows.some(blocksOf) ? [{ key: 'blocks', label: 'Blocks', ...(oneLineNeeds ? { width: '9rem', dropAt: 52 } : { width: 'content', max: 30, drop: 4 }), line: 2, cell: s => { const p = blocksOf(s); if (!p) return ''; const e = DT.el('span', 'inbox-blocks', oneLineNeeds ? blocksShortOf(s) : p); e.title = p; return e; } }] : []), // a list of agents is one line a row: the short form fits its 9 rem, the whole sentence is the tooltip // what waits on the row (#11442)
-                        { key: 'waiting', label: 'Waiting', ...(oneLineNeeds ? { width: '9rem' } : { min: rows.some(isItem) ? 12 : 18 }), tone: 'tertiary', align: 'end', sort: true, sortValue: s => s.waiting_since || '', firstDir: 'desc', line: rows.some(isItem) ? 2 : 1, cell: s => waitingText(s.waiting_since) || '' },
-                        ...(rows.some(isItem) ? [{ key: 'review', label: 'Actions', fixed: true, align: 'end', width: rows.some(s => s.proposal) ? '15rem' : rows.some(s => s.review) ? (compactActions() ? '13.5rem' : rows.some(s => s.review && isRead(s.review)) ? '24rem' : '20.5rem') : '13.5rem', line: 1, cell: s => (s.proposal ? proposalActions(s.proposal) : s.review ? reviewActions(s.review) : s.autorun ? runActions(s.autorun) : s.operatorAsk ? askActions(s.operatorAsk) : s.unrecorded ? unrecordedActions() : s.welcome ? welcomeActions(s.welcome) : '') }] : []),
+                        { key: 'waiting', label: 'Waiting', ...(oneLineNeeds ? { width: '9rem' } : { min: rows.some(isItem) ? 12 : 18 }), tone: 'tertiary', align: 'end', sort: true, sortValue: s => s.waiting_since || '', firstDir: 'desc', line: rows.some(isItem) ? 2 : 1, cell: s => (hoverRows() && rows.some(isItem) ? '' : waitingText(s.waiting_since) || '') },
+                        ...(rows.some(isItem) ? [{ key: 'review', label: 'Actions', fixed: true, align: 'end', width: rows.some(s => s.proposal) ? '15rem' : rows.some(s => s.review) ? (compactActions() ? '17rem' : '26rem') : '13.5rem', line: 1, cell: s => hoverWrap(s, s.proposal ? proposalActions(s.proposal) : s.review ? reviewActions(s.review) : s.autorun ? runActions(s.autorun) : s.operatorAsk ? askActions(s.operatorAsk) : s.unrecorded ? unrecordedActions() : s.welcome ? welcomeActions(s.welcome) : '') }] : []),
                     ], ...(oneLineNeeds ? { oneLine: true, sortBar: false } : {}), ...(oneLineNeeds ? { mail: s => ({ lead: { text: needsName(s), name: needsName(s) }, title: needsName(s), medium: true, starred: !!(s.review && s.review.starred), team: teamOf(s), teamAlways: multipleServers() || manyTeams, nameTeam: true, snippetTip: true, snippet: [blocksShortOf(s), askOf(s) || sessionStateInfo(s).label].filter(Boolean).join(' \u00b7 '), snippetTitle: [blocksOf(s), askOf(s) || sessionStateInfo(s).label].filter(Boolean).join(' \u00b7 '), state: askOf(s) || sessionStateInfo(s).label, time: DT.shortTime(s.waiting_since), unread: true, mark: 'attention', answers: answerCell(s, { dismiss: false }), actions: rowActions(s) }) } : {}) }); // a phone's row is the mail row: the agent, then the ask on a second line, amber and bold (every row of Needs you is unanswered); a list with a review or a run keeps its own actions. One line a row (Goal #79) for a list of agents: the ask is the row's tooltip, a narrow list drops it, then the team, the folder and the CLI; a list with a review item or a failed run keeps its own folded rows
-                    wrap.append(table.el);
+                    wrap.append(table.el); needsTable = table;
+                    if (isPhoneLayout()) { const bar = document.querySelector('#group-table-view .gt-toolbar'); Toolbar.mountSelection(bar, needsState.selected.size ? table.bar : null); bar?.querySelectorAll('.dt-select-toggle').forEach(b => b.remove()); } // the bar takes the toolbar's line while rows are selected; no Select button: the long press is the way in
                     if (rows.some(r => r.welcome)) { const hide = DT.el('button', 'btn btn-quiet btn-small inbox-welcome-hide', 'Hide all welcome items'); hide.type = 'button'; hide.addEventListener('click', () => { hideAllWelcome(); sayLive('The welcome items are hidden.'); }); wrap.append(hide); } // one quiet way out (#11443)
                     if (hidden > 0) {
                         const only = needsFilters.kind && !needsFilters.q && !needsFilters.team && !needsFilters.agent && !needsFilters.goal && !needsFilters.longer && !needsFilters.server;
@@ -698,7 +770,7 @@ registerGroupSource('hub-inbox', {
                         p.append(DT.link('See them', () => go({ view: 'automations', folder: 'recent' })));
                         wrap.append(p);
                     }
-                    if (rows.some(r => r.welcome && r.welcome.dismiss) && matchMedia('(pointer: coarse)').matches) importOnce('./welcome_swipe.js').then(m => m.attachWelcomeSwipe(wrap)).catch(() => {}); // a touch screen swipes a welcome row away (#11542); lazy
+                    if (rows.some(r => (r.welcome && r.welcome.dismiss) || r.review || (r.operatorAsk && r.operatorAsk.kind === 'ask') || r.autorun) && matchMedia('(pointer: coarse)').matches) importOnce('./welcome_swipe.js').then(m => m.attachWelcomeSwipe(wrap)).catch(() => {}); // a touch screen swipes a welcome row away (#11542); lazy
                     return wrap; } };
         }
         if (key === 'tasks') {

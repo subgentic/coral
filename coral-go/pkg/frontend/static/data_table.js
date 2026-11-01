@@ -2,7 +2,7 @@
  * is a --table-* token (css/data_table.css) and no surface styles a row, a cell or a header.
  *
  *   dataTable({ label, columns, rows, rowKey, groupBy(row) -> { key, label }, open, current, state, onSort, layout, fold, foldAt, sortBar, defaultSortLabel, bare, empty, footer, selectable, rowName, quiet, scroll, detail, decorate, decorateHead }) -> { el, bar, selectButton, selection(), clear(), state }
- *   selectable = { contextKey, onChange(keys), actions: [{ label, run(rows, keys, value), danger, confirm, choose: { label, options() -> [{ value, label }] } }] }: a danger action confirms in the bar, a choose action asks for its value there.
+ *   selectable = { contextKey, onChange(keys), longPress (a touch screen selects a row by pressing and holding it), clearLabel (the bar's last button, 'Clear'), actions (an action may have askWhen(n) and confirm(n): it asks first only when askWhen says so): [{ label, run(rows, keys, value), danger, confirm, choose: { label, options() -> [{ value, label }] } }] }: a danger action confirms in the bar, a choose action asks for its value there.
  *   Column = { key, label, field | cell(row, ctx), primary, tone: 'primary'|'secondary'|'tertiary', width: 'grow'|'content'|'<n>rem', fixed (with a rem width: that width, no resize handle, never squeezed or kept: a list's Actions, #9845), nowrap, align: 'start'|'end', numeric,
  *              sort: true|'number'|'date'|fn(a, b), sortValue(row), firstDir: 'asc'|'desc', foldFirst, narrowHide, line: 0|1|2, foldLabel, when(row), subtitle(row), subtitleTitle(row), title(row), filter: { label, active(), open(button) }, hideLabel }
  *   column widths (#7949): every header has a resize handle on its right edge (drag, Left and Right keys, double-click or Enter to fit the content); the widths are kept per list in this browser (widthsKey, else the label without its row count), and there is no reset button: a double click on a column edge fits it to its content (#9845). minWidth per column (64 px by default), resize: false for one that must not.
@@ -409,7 +409,7 @@ export function dataTable(cfg) {
         if (typeof v === 'string' && c.primary) v = primaryButton(v, `Open ${v}`);
         if (v instanceof Node) td.append(v); else td.textContent = v == null ? '' : String(v);
         if (c.title) { const t = c.title(r); if (t) td.title = t; } // the full name or id on hover
-        if (c.subtitle) { const s = c.subtitle(r); if (s) { const sub = el('span', 'dt-subtitle', s); if (c.subtitleTitle) { const t = c.subtitleTitle(r); if (t) sub.title = t; } td.append(sub); } } // subtitleTitle(row): the whole line on hover when the subtitle is cut with an ellipsis
+        if (c.subtitle) { const s = c.subtitle(r); if (s) { const sub = el('span', 'dt-subtitle', s); if (c.subtitleTitle) { const t = c.subtitleTitle(r); if (t) tipIf(sub, t, () => t !== s || sub.scrollWidth > sub.clientWidth); } td.append(sub); } } // subtitleTitle(row): the whole line on hover when the subtitle is cut with an ellipsis
         return td;
     }
 
@@ -458,6 +458,17 @@ export function dataTable(cfg) {
                 const pick = sel && eligible(r) ? () => { const cb = tr.querySelector('.dt-check input'); if (!cb) return; if (!st.select) { st.select = true; st.mailSelect = true; syncSelectMode(); } cb.dispatchEvent(new MouseEvent('click', { bubbles: true })); } : null;
                 tr.classList.add('dt-mailed'); tr.append(mailCell(m, nameOf(r), !!cfg.open, pick, showTeam, gap));
             } else for (const c of columns) tr.append(cellOf(c, r, tr));
+            if (sel && sel.longPress && eligible(r)) { // a touch screen: pressing a row and holding it selects it, and a tap adds more (#11671); the tap that ends the press is not a tap on the row
+                let timer = 0, from = null;
+                const stop = () => { clearTimeout(timer); timer = 0; from = null; };
+                tr.addEventListener('pointerdown', e => { if (e.pointerType !== 'touch' || e.target.closest('.dt-check')) return; from = { x: e.clientX, y: e.clientY };
+                    timer = setTimeout(() => { timer = 0; const cb = tr.querySelector('.dt-check input'); if (!cb) return;
+                        if (!st.select) { st.select = true; st.mailSelect = true; syncSelectMode(); } cb.dispatchEvent(new MouseEvent('click', { bubbles: true })); navigator.vibrate?.(8);
+                        const mute = ev => { ev.stopPropagation(); ev.preventDefault(); document.removeEventListener('click', mute, true); }; document.addEventListener('click', mute, true); setTimeout(() => document.removeEventListener('click', mute, true), 800); }, 450); }); // after the selecting click, and on the document: the rows move when the checks appear, so the lift of the finger can land on another row
+                tr.addEventListener('pointermove', e => { if (from && Math.hypot(e.clientX - from.x, e.clientY - from.y) > 8) stop(); });
+                for (const type of ['pointerup', 'pointercancel', 'pointerleave']) tr.addEventListener(type, stop);
+                tr.addEventListener('contextmenu', e => { if (timer || st.select) e.preventDefault(); }); // the long press is ours, not the browser's menu
+            }
             if (cfg.open) {
                 tr.classList.add('dt-row-open');
                 tr.addEventListener('click', (e) => {
@@ -501,7 +512,7 @@ export function dataTable(cfg) {
             if (st.confirming >= 0) return; // while one asks, the others wait
             const action = button(`btn btn-small dt-bar-action${a.danger ? ' dt-danger' : ''}`, a.label, async () => {
                 if (a.choose) { st.choices = await a.choose.options(); st.confirming = i; drawBar(); bar.querySelector(a.danger ? '.dt-bar-keep' : '.dt-bar-choice')?.focus(); return; } // an action that needs a value (a person, a priority) asks for it here
-                if (a.danger) { st.confirming = i; drawBar(); bar.querySelector('.dt-bar-keep')?.focus(); return; }
+                if (a.danger || a.askWhen?.(chosen().length)) { st.confirming = i; drawBar(); bar.querySelector('.dt-bar-keep')?.focus(); return; } // askWhen(n): an action that asks only for some selections (Approve of several files), in the same Keep / confirm step, not red
                 a.run(chosen(), new Set(st.selected));
             });
             action.disabled = !!a.disabled?.(chosen()); bar.append(action);
@@ -522,10 +533,10 @@ export function dataTable(cfg) {
                 bar.append(step);
             } else {
                 const ask = el('span', 'dt-bar-confirm', typeof a.confirm === 'function' ? a.confirm(n) : (a.confirm || `${a.label}?`)); ask.setAttribute('role', 'alert');
-                bar.append(ask, button('btn btn-small dt-bar-keep', 'Keep', () => { st.confirming = -1; drawBar(); }), button('btn btn-small dt-danger', a.label, () => { st.confirming = -1; a.run(chosen(), new Set(st.selected)); }));
+                bar.append(ask, button('btn btn-small dt-bar-keep', 'Keep', () => { st.confirming = -1; drawBar(); }), button(`btn btn-small${a.danger ? ' dt-danger' : ''}`, a.label, () => { st.confirming = -1; a.run(chosen(), new Set(st.selected)); }));
             }
         }
-        bar.append(button('btn btn-small dt-bar-clear', 'Clear', () => clear()));
+        bar.append(button('btn btn-small dt-bar-clear', sel.clearLabel || 'Clear', () => clear()));
     }
 
     function clear() { st.selected.clear(); st.anchor = null; st.confirming = -1; st.choices = null; syncSelection(); }

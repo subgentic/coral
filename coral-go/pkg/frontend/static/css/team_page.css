@@ -352,9 +352,17 @@
 .inbox-ask-error { min-height: 1.2em; margin: 0 0 8px; color: var(--danger); }
 .inbox-ask-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
 .inbox-ask-buttons .btn { min-height: 44px; }
+.inbox-ask-offers { margin: 0 0 12px; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-md, 8px); background: var(--bg-secondary); }
+.inbox-ask-offers-head { margin: 0 0 8px; color: var(--text-muted); }
+.inbox-ask-offers-list { display: flex; flex-direction: column; gap: 8px; }
+.inbox-ask-offer { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; min-width: 0; }
+.inbox-ask-offer .btn { min-height: 44px; max-width: 100%; overflow-wrap: anywhere; }
+.inbox-ask-offer-what { color: var(--text-muted); min-width: 0; overflow-wrap: anywhere; }
 .inbox-review-actions { display: flex; flex-wrap: nowrap; justify-content: flex-end; gap: 8px; align-items: center; } /* the star's 20 px is level with the buttons' centre, not their top (#9904); the words end at the row's right edge (#11552) */
 dialog.inbox-deny-dialog { position: fixed; inset: 0; margin: auto; height: fit-content; color: var(--text-primary); } /* centred with the side gutter: the base reset gives every dialog margin 0, which pinned this one to the top left corner (#11621) */
 .inbox-deny, .inbox-deny-confirm { color: var(--error); } /* Deny is red text, never a red fill (#11552) */
+.saved-files-title { margin: 12px 0 6px; font-size: var(--fs-md); font-weight: var(--fw-strong); color: var(--text-secondary); } /* "Files for review" and "Saved messages" over the two lists of Saved (#11641) */
+.view-list-item.drop-over { outline: 2px solid var(--accent); outline-offset: -2px; } /* a review row dragged over the Saved folder */
 .inbox-row-more { position: relative; display: flex; flex: none; align-items: center; } /* the row's three dots: its menu opens under them */
 .inbox-review-error { grid-column: 1 / -1; white-space: normal; }
 .inbox-review-error:empty { display: none; }
@@ -372,11 +380,11 @@ dialog.inbox-deny-dialog { position: fixed; inset: 0; margin: auto; height: fit-
 .inbox-review-more a, .inbox-review-more button { margin-inline-end: 8px; }
 @media (max-width: 760px) {
     .inbox-review-actions button { min-height: 44px; }
-    .inbox-welcome-actions { display: grid; grid-template-columns: 6.25rem 4.75rem; justify-content: end; } /* the welcome rows' buttons line up in two columns, the action then Dismiss, whatever the title's width (#11536) */
-    .inbox-welcome-actions .btn { width: 100%; padding-inline: 4px; }
+    .inbox-review-actions > * { order: 1; }
+    .inbox-review-actions > .btn:not(.inbox-main-action):not(.btn-icon) { padding-inline: 3px; } /* Changes gives the main button its width back: the name and Approve stay on one line at 360 (#11414) */
+    .inbox-review-actions > .inbox-main-action { order: 2; flex: none; width: 4.75rem; padding-inline: 4px; } /* a row's main button (Approve, Answer, Open, the welcome item's action) is one size at the row's right edge, the same on every row; Changes and the three dots sit to its left, and there is no Ignore button on a phone: the menu, or a swipe (#11642) */
     .inbox-swipe-strip { position: absolute; right: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; white-space: nowrap; font-weight: var(--fw-strong); color: var(--text-primary); background: color-mix(in srgb, var(--error) 18%, transparent); border-radius: 0 var(--radius-md) var(--radius-md) 0; pointer-events: none; }
-    .inbox-review-actions { column-gap: 4px; }
-    .inbox-review-actions-star { column-gap: 4px; } /* the starred glyph is a fourth cell: 8 px gaps put the actions 3 px over the line, under the name (#9904) */
+    .inbox-review-actions { column-gap: 4px; margin-inline-start: auto; } /* a row's actions end at the row's right edge, whatever their number (#11642) */
     .inbox-review-metadata { flex-wrap: wrap; max-width: 100%; } /* a phone's second line has the room of its row, and breaks at a gap instead of cutting the team's name (#11414) */
     .inbox-review-metadata > .inbox-review-team { flex: 0 1 auto; min-width: 0; }
     .inbox-review-team { display: block; white-space: normal; overflow-wrap: anywhere; font-size: var(--table-tertiary-size); font-weight: var(--table-tertiary-weight); line-height: var(--lh-label); color: var(--table-tertiary-color); }
