@@ -12,7 +12,7 @@ import (
 
 // Custom is one custom model.
 type Custom struct {
-	Family      string   `json:"family"` // claude, codex, agy or pi
+	Family      string   `json:"family"` // claude, codex, agy, pi or opencode
 	Value       string   `json:"value"`  // what --model takes
 	DisplayName string   `json:"display_name"`
 	Efforts     []string `json:"efforts"` // the thinking levels this model takes; empty: the CLI's default only
@@ -25,7 +25,7 @@ const (
 )
 
 // CustomFamilies are the providers a custom model can be added for, in the order Settings shows them.
-var CustomFamilies = []string{"claude", "codex", "agy", "pi"}
+var CustomFamilies = []string{"claude", "codex", "agy", "pi", "opencode"}
 
 // familyTypes are the agent types that run a family's CLI.
 func familyTypes(family string) []string {
@@ -38,6 +38,8 @@ func familyTypes(family string) []string {
 		return []string{"agy", "antigravity", "gemini"}
 	case "pi":
 		return []string{"pi"}
+	case "opencode":
+		return []string{"opencode"} // #11727: no levels (Coral passes none to its CLI), like Antigravity
 	}
 	return nil
 }
@@ -83,7 +85,7 @@ func ValidateCustomSet(in []Custom) ([]Custom, error) {
 			return &CustomError{Row: i, Family: c.Family, Value: c.Value, Field: field, Msg: msg}
 		}
 		if familyTypes(c.Family) == nil {
-			return nil, fail("family", "must be one of claude, codex, agy, pi")
+			return nil, fail("family", "must be one of claude, codex, agy, pi, opencode")
 		}
 		c.Value = strings.TrimSpace(c.Value)
 		if c.Value == "" {
