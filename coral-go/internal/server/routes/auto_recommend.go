@@ -505,7 +505,7 @@ func (r *AutoRecommender) pick(ctx context.Context, a liveAgent, b recBound, now
 		defer r.notices.Done()
 		nctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), autoRecommendNoticeWait)
 		defer cancel()
-		delivery, err := deliverAutomatedOutcome(nctx, h.terminal, pane, a.agentType, a.sid, autoRecommendNotice, "recommended-pick notice", nil)
+		delivery, err := deliverNoticeRetrying(nctx, h.terminal, pane, a.agentType, a.sid, autoRecommendNotice, "recommended-pick notice")
 		line := "[Coral] " + who + "'s question was answered with the option it marked Recommended (the operator's setting; nobody was at the terminal). The agent was told so."
 		tctx, tcancel := context.WithTimeout(context.WithoutCancel(ctx), autoRecommendTellWait)
 		defer tcancel()
