@@ -88,12 +88,14 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
                 await waitFor(`!${dlg}`, at + 'the editor closes', 5000);
             };
 
+            await ev(`(() => { window.__closed = 0; const c = ImageBitmap.prototype.close; ImageBitmap.prototype.close = function () { window.__closed++; return c.call(this); }; return true; })()`); // the decoded picture is freed when the editor closes
             // Cancel: nothing changes, nothing uploads
             await ev(`${markBtn}.click(); true`); await waitFor(`!!${dlg} && ${dlg}.open`, at + 'opens', 8000);
             assert.equal(await ev(`(() => { const n = ${dlg}.querySelector('.markup-kept'); return n && n.getClientRects().length > 0 ? n.textContent : null; })()`), 'The original is kept as an earlier version and the team\'s agents can see it. To hide something, remove the original instead.', at + 'the quiet line about the original is shown by Done');
             await ev(`[...document.querySelectorAll('.markup-foot button')].find(b => b.textContent === 'Cancel').click(); true`);
             await waitFor(`!${dlg}`, at + 'closed', 5000);
             assert.equal(await ev(`window.__up.length`), 1, at + 'Cancel uploads nothing');
+            assert.equal(await ev(`window.__closed`), 1, at + 'Cancel closes the decoded picture');
 
             // Done: the marked copy goes up as the next version of the first picture, and takes its place
             const before = await ev(`document.querySelector('.ac-composer .ac-thumb-img').src`);
@@ -103,6 +105,8 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
             assert.equal(await ev(`window.__up[1].ct`), 'image/png', at + 'a PNG');
             assert.equal(await thumbs(), 1, at + 'still one picture');
             assert.notEqual(await ev(`document.querySelector('.ac-composer .ac-thumb-img').src`), before, at + 'the thumbnail is the marked copy');
+
+            assert.equal(await ev(`window.__closed`), 2, at + 'Done closes it too');
 
             // marking the marked copy still follows the FIRST hex
             await mark(); await settled();

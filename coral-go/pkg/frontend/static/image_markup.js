@@ -70,7 +70,7 @@ export async function openMarkup(blob) {
         undo.addEventListener('click', () => { marks.pop(); sync(); });
         dlg.addEventListener('keydown', e => { if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === 'z') { e.preventDefault(); if (marks.length) { marks.pop(); sync(); } } });
         let settled = false;
-        const finish = out => { if (settled) return; settled = true; dlg.close(); dlg.remove(); try { opener?.focus?.({ preventScroll: true }); } catch { /* gone */ } resolve(out); };
+        const finish = out => { if (settled) return; settled = true; pic.bmp.close?.(); dlg.close(); dlg.remove(); try { opener?.focus?.({ preventScroll: true }); } catch { /* gone */ } resolve(out); };
         cancel.addEventListener('click', () => finish(null));
         dlg.addEventListener('cancel', e => { e.preventDefault(); finish(null); });
         done.addEventListener('click', () => { live = null; paint(); canvas.toBlob(b => finish(b || null), 'image/png'); });
