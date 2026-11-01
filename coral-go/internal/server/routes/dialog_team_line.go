@@ -89,6 +89,8 @@ func (h *SessionsHandler) postDialogClosedLine(ctx context.Context, a liveAgent,
 
 // postDialogLine posts line to the agent's team once for the episode (rule, the agent and first).
 func (h *SessionsHandler) postDialogLine(ctx context.Context, a liveAgent, rule string, first, now time.Time, line func(dialogWork) string) {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), dialogRecordTimeout) // of its own, as the close's record: a pass whose context ended still tells the team
+	defer cancel()
 	w, ok := h.dialogWorkOf(ctx, a)
 	if !ok {
 		return
