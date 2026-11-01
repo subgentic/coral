@@ -245,23 +245,7 @@ function _taskCostHtml(task) {
         const warningClass = task.cost_usd >= 1.0 ? ' board-task-cost-warning' : '';
         html += `<div class="task-detail-section">
             <div class="task-detail-label">Cost</div>
-            <div class="task-detail-cost-summary${warningClass}">${formatCost(task.cost_usd, { nullAsZero: true, zeroAsTwo: true, subCent: 'lt', precise: true })}</div>
-            <div class="task-detail-tokens">
-                <div class="task-detail-token-item">
-                    <span class="task-detail-token-label">Input</span>
-                    <span class="task-detail-token-value">${_formatTokenCount(task.input_tokens)}</span>
-                </div>
-                <div class="task-detail-token-item">
-                    <span class="task-detail-token-label">Output</span>
-                    <span class="task-detail-token-value">${_formatTokenCount(task.output_tokens)}</span>
-                </div>
-                <div class="task-detail-token-item">
-                    <span class="task-detail-token-label">Cache Read</span>
-                    <span class="task-detail-token-value">${_formatTokenCount(task.cache_read_tokens)}</span>
-                </div>
-                <div class="task-detail-token-item">
-                    <span class="task-detail-token-label">Cache Write</span>
-                    <span class="task-detail-token-value">${_formatTokenCount(task.cache_write_tokens)}</span>
+            <div class="task-detail-cost-summary${warningClass}">${formatCost(task.cost_usd, { nullAsZero: true, zeroAsTwo: true, subCent: 'lt', precise: true })}${_mk0}${_formatTokenCount(task.input_tokens)}${_mk1}${_formatTokenCount(task.output_tokens)}${_mk2}${_formatTokenCount(task.cache_read_tokens)}${_mk3}${_formatTokenCount(task.cache_write_tokens)}</span>
                 </div>
             </div>
         </div>`;
@@ -278,23 +262,7 @@ function _taskLiveCostHtml(liveCost) {
         const warningClass = lc.cost_usd >= 1.0 ? ' board-task-cost-warning' : '';
         html += `<div class="task-detail-section">
             <div class="task-detail-label">Running Cost</div>
-            <div class="task-detail-cost-summary board-task-cost-live${warningClass}">~${formatCost(lc.cost_usd, { nullAsZero: true, zeroAsTwo: true, subCent: 'lt', precise: true })}</div>
-            <div class="task-detail-tokens">
-                <div class="task-detail-token-item">
-                    <span class="task-detail-token-label">Input</span>
-                    <span class="task-detail-token-value">${_formatTokenCount(lc.input_tokens)}</span>
-                </div>
-                <div class="task-detail-token-item">
-                    <span class="task-detail-token-label">Output</span>
-                    <span class="task-detail-token-value">${_formatTokenCount(lc.output_tokens)}</span>
-                </div>
-                <div class="task-detail-token-item">
-                    <span class="task-detail-token-label">Cache Read</span>
-                    <span class="task-detail-token-value">${_formatTokenCount(lc.cache_read_tokens)}</span>
-                </div>
-                <div class="task-detail-token-item">
-                    <span class="task-detail-token-label">Cache Write</span>
-                    <span class="task-detail-token-value">${_formatTokenCount(lc.cache_write_tokens)}</span>
+            <div class="task-detail-cost-summary board-task-cost-live${warningClass}">~${formatCost(lc.cost_usd, { nullAsZero: true, zeroAsTwo: true, subCent: 'lt', precise: true })}${_mk0}${_formatTokenCount(lc.input_tokens)}${_mk1}${_formatTokenCount(lc.output_tokens)}${_mk2}${_formatTokenCount(lc.cache_read_tokens)}${_mk3}${_formatTokenCount(lc.cache_write_tokens)}</span>
                 </div>
             </div>
             <div class="task-detail-token-item" style="margin-top:4px;opacity:0.6">
@@ -329,3 +297,8 @@ export function _taskDetailHtml(task, liveCost) {
     html += _taskLiveCostHtml(liveCost);
     return html;
 }
+
+const _mk0 = "</div>\n            <div class=\"task-detail-tokens\">\n                <div class=\"task-detail-token-item\">\n                    <span class=\"task-detail-token-label\">Input</span>\n                    <span class=\"task-detail-token-value\">";
+const _mk1 = "</span>\n                </div>\n                <div class=\"task-detail-token-item\">\n                    <span class=\"task-detail-token-label\">Output</span>\n                    <span class=\"task-detail-token-value\">";
+const _mk2 = "</span>\n                </div>\n                <div class=\"task-detail-token-item\">\n                    <span class=\"task-detail-token-label\">Cache Read</span>\n                    <span class=\"task-detail-token-value\">";
+const _mk3 = "</span>\n                </div>\n                <div class=\"task-detail-token-item\">\n                    <span class=\"task-detail-token-label\">Cache Write</span>\n                    <span class=\"task-detail-token-value\">";
