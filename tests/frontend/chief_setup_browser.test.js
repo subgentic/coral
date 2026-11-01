@@ -29,13 +29,13 @@ const SID = '11111111-2222-4333-8444-555555555555';
             const at = `${w} px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'settings');
-            await api('PUT', '/api/settings', { chief_page: 'false', chief_name: '', chief_avatar: '1', chief_avatar_letter: '', chief_fronts: '', chief_session: '', chief_team: '' });
+            await api('PUT', '/api/settings', { chief_page: 'false', chief_name: '', chief_avatar: '1', chief_avatar_letter: '', chief_fronts: '', chief_session: '', chief_team: '', chief_actions: 'ask_first' });
             await ev(STUB);
             await ev(`(async () => { await window.showSettingsModal('chief'); return true; })()`);
             await waitFor(`!!document.querySelector('${host} .sv[data-ready]')`, at + 'the Chief screen', 10000);
             assert.equal(await ev(`document.getElementById('settings-tab-chief') && document.getElementById('settings-tab-chief').textContent.replace('chat', '').trim()`), 'Chief', at + 'the Settings dialog has a Chief tab');
             const labels = await ev(`[...document.querySelectorAll('${host} .sv-row .sv-label, ${host} .sv-row label')].map(l => l.textContent.trim()).filter(Boolean).slice(0, 12)`);
-            for (const want of ['Name', 'Avatar colour', 'Avatar letter', 'Which agent', 'Its model', 'Team it fronts', 'Serve the Chief page']) assert.ok(labels.some(l => l.startsWith(want)), at + `a row says "${want}": ${JSON.stringify(labels)}`);
+            for (const want of ['Name', 'Avatar colour', 'Avatar letter', 'Which agent', 'Its model', "Chief's actions", 'Team it fronts', 'Serve the Chief page']) assert.ok(labels.some(l => l.startsWith(want)), at + `a row says "${want}": ${JSON.stringify(labels)}`);
             assert.equal(await ev(`document.querySelectorAll('${host} .chief-swatch').length`), 8, at + 'eight colours');
             assert.equal(await ev(`[...document.querySelectorAll('${host} .chief-swatch')].every(b => b.getBoundingClientRect().height >= 43.5 && b.getBoundingClientRect().width >= 43.5)`), true, at + 'each swatch is a 44 px target');
             assert.equal(await ev(`document.documentElement.scrollWidth - document.documentElement.clientWidth`), 0, at + 'nothing scrolls sideways');
@@ -57,17 +57,23 @@ const SID = '11111111-2222-4333-8444-555555555555';
             await ev(`(() => { const s = document.querySelector('${host} select[name=chief_agent]'); s.value = '${SID}'; s.dispatchEvent(new Event('change', { bubbles: true })); const f = document.querySelector('${host} select[name=chief_fronts]'); f.value = 'Dev team'; f.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
             assert.match(await ev(`document.querySelector('${host} .chief-model').textContent`), /Model: claude-opus-5-5\./, at + 'the agent\'s model is shown');
             assert.equal(await ev(`document.querySelector('${host} .chief-model a').getAttribute('href')`), `/agent/${SID}`, at + 'with the way to change it on the agent\'s page');
+            // Chief's actions (#11798): unset shows Ask first, with its words; choosing Act is saved
+            assert.deepEqual(await ev(`(() => { const s = document.querySelector('${host} select[name=chief_actions]'); return [s.value, [...s.options].map(o => o.value + '=' + o.textContent)]; })()`), ['ask_first', ['ask_first=Ask first', 'act=Act']], at + 'Chief starts on Ask first');
+            assert.match(await ev(`document.querySelector('${host} select[name=chief_actions]').closest('.sv-row').textContent`), /shell command still asks.*restarts/, at + 'the choice says what Act does and when it applies');
+            await ev(`(() => { const s = document.querySelector('${host} select[name=chief_actions]'); s.value = 'act'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
             await ev(`document.querySelector('${host} input[name=chief_page]').click(); true`);
             await ev(`[...document.querySelectorAll('${host} button')].find(b => /^Save Chief/.test(b.textContent.trim())).click(); true`);
             await waitFor(`/Saved/.test(document.querySelector('${host}').textContent)`, at + 'Saved', 8000);
             const st = (await api('GET', '/api/settings')).body.settings;
             assert.deepEqual([st.chief_name, st.chief_avatar, st.chief_avatar_letter, st.chief_session, st.chief_team, st.chief_fronts, String(st.chief_page)], ['Ada', '3', 'k', SID, 'chiefteam', 'Dev team', 'true'], at + 'saved to the machine: ' + JSON.stringify(st));
+            assert.equal(st.chief_actions, 'act', at + 'Act is saved as chief_actions');
             const chief = (await api('GET', '/api/chief')).body;
             assert.deepEqual([chief.name, chief.avatar, chief.avatar_letter, chief.fronts], ['Ada', '3', 'K', 'Dev team'], at + '/api/chief gives the look');
 
             // opened again, the screen shows what was saved
             await ev(`(async () => { const m = await import(${S} + 'chief_setup.js'); await m.mountChiefSetup(document.querySelector('${host}')); return true; })()`);
             await waitFor(`!!document.querySelector('${host} .sv[data-ready]') && document.querySelector('${host} input[name=chief_name]').value === 'Ada'`, at + 'the saved name is shown again', 8000);
+            assert.equal(await ev(`document.querySelector('${host} select[name=chief_actions]').value`), 'act', at + 'a saved Act shows as Act when opened again');
             assert.deepEqual(await ev(`[document.querySelector('${host} select[name=chief_agent]').value, document.querySelector('${host} select[name=chief_fronts]').value, document.querySelector('${host} .chief-swatch[aria-checked=true]').getAttribute('aria-label'), document.querySelector('${host} input[name=chief_avatar_letter]').value]`), [SID, 'Dev team', 'Teal', 'k'], at + 'with the agent, team, colour and letter');
 
             // /chief: the header and the chat bubble
