@@ -71,6 +71,9 @@ var allowedSenders = map[string]sender{
 	// The dialog timeout's close (goal #14): the Operator's opt-in, inside the agent's lock, on the same prompt re-read just before, only Esc or the reject labelled exactly "No".
 	"internal/server/routes/dialog_timeout.go\tSessionsHandler.dialogTimeout\tSendRawInput": {guardScreen, "dialog timeout: closes a prompt the safe way", "TestTheDialogTimeoutSendsNothingWhenTheScreenIsNotThePrompt"},
 	"internal/server/routes/auto_accept.go\tAutoAcceptor.check\tSendRawInput":               {guardAutoAccept, "inside AutoAcceptSend", ""},
+	// The operator's opt-in to answering a question with its Recommended option (goal #14 (B)), through the same exemption, then a fixed notice through the gate.
+	"internal/server/routes/auto_recommend.go\tAutoRecommender.pick\tAutoAcceptSend": {guardAutoAccept, "auto-recommend exemption", ""},
+	"internal/server/routes/auto_recommend.go\tAutoRecommender.pick\tSendRawInput":   {guardAutoAccept, "inside AutoAcceptSend", ""},
 	// A person's input. /send and /keys gate any caller that isn't a person.
 	"internal/server/routes/websocket.go\tterminalStream.handleFrame\tSendInput":           {guardHuman, "human: terminal typing", ""},
 	"internal/server/routes/prompt_answer.go\tSessionsHandler.AnswerPrompt\tSendInput":     {guardScreen, "human: picks an option", "TestAnswerPrompt_ClaudeStillOpen"},

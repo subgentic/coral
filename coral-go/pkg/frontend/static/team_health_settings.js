@@ -8,7 +8,7 @@
  * object, Save reads it again first and changes only what the person changed (#4423): a rule another client changed while the tab was
  * open keeps that change. */
 
-export const HEALTH_LIMITS = { minutes: [5, 1440], nudges: [1, 5], reviewers: 8, goalTasks: [5, 500], landingWait: [15, 10080], releaseWait: [60, 43200], checkWait: [5, 10080], dialogTimeout: [10, 1440] }; // landingWait: the landing alert's wait, in minutes (#8947)
+export const HEALTH_LIMITS = { recommendGrace: [1, 9], minutes: [5, 1440], nudges: [1, 5], reviewers: 8, goalTasks: [5, 500], landingWait: [15, 10080], releaseWait: [60, 43200], checkWait: [5, 10080], dialogTimeout: [10, 1440] }; // landingWait: the landing alert's wait, in minutes (#8947)
 
 // The server's defaults (DefaultHealthSettings); held_notice is the Lead's #4225 field, filled in only when the server returns it.
 export const HEALTH_DEFAULTS = {
@@ -24,5 +24,6 @@ export const HEALTH_DEFAULTS = {
     release: { on: false, branch: 'main', tag_pattern: 'v*', wait_min: 1440, nudge: '' }, // the branch is past its newest release tag (Goal #80, #8948): off until a team turns it on
     landing: { on: false, branch: 'main', wait_min: 120, nudge: '' }, // done work that has not landed on the branch (Goal #80, #8947): off until a team turns it on
     dialog_timeout: { on: false, after_min: 15 }, // close a dialog nobody answered, the safe way (goal #14): off until the Operator turns it on
+    auto_recommend: { on: false, grace_min: 3 }, // a question's Recommended option picked for the agent (goal #14 (B)): off until the operator turns it on
     ask_reminder: { on: true, after_min: 15 }, // a question (post --ask) the member it asks has not answered (#7794): reminded whether or not the check is on
 };

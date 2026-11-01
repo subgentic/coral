@@ -133,6 +133,7 @@ func (s *Server) configureBoardHandlers(h *routeHandlers) (*routes.BoardHandler,
 	autoAccept := routes.NewAutoAcceptor(sessHandler)
 	autoAccept.Start(s.bgCtx)
 	s.goBackground(autoAccept.Run)
+	routes.NewAutoRecommender(sessHandler) // driven by the dialog watch (dialog_watch.go)
 	s.goBackground(sessHandler.RecoverPersonalTaskNotifications)
 	// Sessions launched before their CLI version was recorded get it now (#3573).
 	s.goBackground(sessHandler.BackfillCLIVersions)

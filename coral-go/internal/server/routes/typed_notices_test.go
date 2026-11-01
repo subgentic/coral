@@ -41,6 +41,7 @@ func TestTypedNoticeCensus(t *testing.T) {
 		typedcensus.C("no-team denial", typedNoTeamDenied("report.md", strings.Repeat("a", 64), "Wrong template."), typedNoTeamDenied(h, strings.Repeat("a", 64), h)),
 		typedcensus.C("no-team comment", typedNoTeamComment(strings.Repeat("a", 64), "Please add the Q4 table.", "report.md"), typedNoTeamComment(strings.Repeat("a", 64), h, h)),
 		typedcensus.C("dialog timeout", dialogTimeoutNotice, dialogTimeoutNotice),
+		typedcensus.C("auto recommend", autoRecommendNotice, autoRecommendNotice),
 	}
 	typedcensus.Run(t, cases)
 }
@@ -93,5 +94,6 @@ func TestEveryTypedSenderIsInTheCensus(t *testing.T) {
 		typedcensus.S("dialog_timeout_opencode.go", `dialogTimeoutNotice, "dialog timeout notice"`, 1, "census: dialog timeout (fixed, no digit)"),
 		typedcensus.S("agent_exited.go", `text, what, wanted)`, 1, "deliverAutomatedWhile: forwards the text of its callers, listed here"),
 		typedcensus.S("agent_exited.go", `text, what, nil)`, 1, "deliverNoticeRetrying: forwards the text of its callers, listed here"),
+		typedcensus.S("auto_recommend.go", `autoRecommendNotice, "recommended-pick notice"`, 1, "census: auto-recommend (fixed, no digit)"),
 	})
 }
