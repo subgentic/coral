@@ -87,5 +87,6 @@ func TestEveryTypedSenderIsInTheCensus(t *testing.T) {
 		typedcensus.S("dialog_timeout.go", `dialogTimeoutNotice, "dialog timeout notice"`, 1, "census: dialog timeout (fixed, no digit)"),
 		typedcensus.S("dialog_timeout_opencode.go", `dialogTimeoutNotice, "dialog timeout notice"`, 1, "census: dialog timeout (fixed, no digit)"),
 		typedcensus.S("agent_exited.go", `text, what, wanted)`, 1, "deliverAutomatedWhile: forwards the text of its callers, listed here"),
+		typedcensus.S("agent_exited.go", `text, what, nil)`, 1, "deliverNoticeRetrying: forwards the text of its callers, listed here"),
 	})
 }
