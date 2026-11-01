@@ -33,6 +33,16 @@ const { coralReady, framesJs } = require('./helpers/wait');
                 return { scroller: sc.id || sc.className.toString().slice(0, 40), gap: Math.round(sb.bottom - lb.bottom), scrollH: sc.scrollHeight, clientH: sc.clientHeight, chain }; })()`);
             check(m.noScroll || m.gap <= 24, `${w} px: the last folder is within 24 px of the list's bottom at the end of the scroll: ${JSON.stringify({ scroller: m.scroller, gap: m.gap })}`);
         }
+        // the sidebar itself does not scroll past its pane (the operator's repro: Chrome at about 950 px, the sidebar an overlay, scrolled to its end: Pi and then a blank drawer): the pane's own list scrolls, and the box around it has nothing more to scroll to
+        for (const [w, h] of [[950, 700], [1440, 800], [1280, 800], [950, 1000]]) {
+            await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile: false }); await Emulation.setTouchEmulationEnabled({ enabled: false });
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
+            await ev(`window.switchNavTab('hub-inbox'); true`);
+            await waitFor(`!!document.querySelector('#inbox-nav-list .view-list-item')`, `${w}x${h}: the folders are drawn`, 10000);
+            await ev(`new Promise(r => setTimeout(r, 600))`); // sleep-ok: the folder list fills as the counts arrive
+            const o = await ev(`(() => { const s = document.getElementById('sidebar') || document.querySelector('.sidebar'); return { extra: s.scrollHeight - s.clientHeight, scrollH: s.scrollHeight, clientH: s.clientHeight }; })()`);
+            check(o.extra <= 1, `${w}x${h} px: the sidebar has nothing to scroll past its pane (a blank area under the last folder): ${JSON.stringify(o)}`);
+        }
     } finally { await client.close(); }
     if (failures.length) { console.error(failures.join('\n')); process.exit(1); }
     console.log('sidebar_end_browser: ok');
