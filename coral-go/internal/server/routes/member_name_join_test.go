@@ -29,6 +29,15 @@ func TestJoinRefusesANameWithPunctuationAtAnEnd(t *testing.T) {
 	require.Equal(t, http.StatusOK, code, "%v", out)
 	code, _ = join("sec3", "Reviewer, 3rd")
 	assert.Equal(t, http.StatusOK, code, "punctuation inside a name is fine")
+	code, _ = join("night", "Dev (night)")
+	assert.Equal(t, http.StatusOK, code, "a closing bracket at the end is fine")
+	code, _ = join("qa2", "QA (2)")
+	assert.Equal(t, http.StatusOK, code)
+	for _, bad := range []string{"Dev.", "Dev,", "Dev@", "Dev\u200b", "\u200bDev"} {
+		code, out := join("x1", bad)
+		assert.Equal(t, http.StatusBadRequest, code, "%q", bad)
+		assert.Equal(t, "invalid_member_name", out["code"], "%q", bad)
+	}
 
 	// The shorter member was reached by "@Security Reviewer 2" before: now the exact longer name is a member and is reached whole, nothing goes astray.
 	code, out = call("POST", "/api/board/team/messages", map[string]any{"subscriber_id": "lead", "content": "@Security Reviewer 2 please look"})

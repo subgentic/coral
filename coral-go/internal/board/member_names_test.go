@@ -27,10 +27,10 @@ func TestAMentionThatReachesAShorterMemberWhileANearerOneExistsIsRefused(t *test
 }
 
 func TestAMemberNameStartsAndEndsWithALetterOrADigit(t *testing.T) {
-	for _, bad := range []string{"Security Reviewer 2:", ":Reviewer", "Dev.", "-Dev", "Dev,", "(Dev", "Dev)", "@Dev", "Dev!", "Dev?", "'Dev'", "\"Dev\"", "  Dev:  "} {
+	for _, bad := range []string{"Security Reviewer 2:", ":Reviewer", "Dev.", "-Dev", "Dev,", "(Dev", "(Dev)", "[Dev]", ")Dev", "@Dev", "Dev@", "Dev!", "Dev?", "Dev;", "Dev\u200b", "\u200bDev", "Dev\u202e", "'Dev'", "\"Dev\"", "  Dev:  "} {
 		assert.Error(t, ValidMemberName(bad), "%q", bad)
 	}
-	for _, ok := range []string{"Security Reviewer 2", "Backend Dev", "QA", "dev-2", "Dev_Ops", "R2", "C++ Dev", "Ünal", "hub-user-1234abcd", "claude-3f2a", "  Padded  "} {
+	for _, ok := range []string{"Security Reviewer 2", "Backend Dev", "QA", "dev-2", "Dev_Ops", "R2", "C++ Dev", "Dev (night)", "QA (2)", "Reviewer [b]", "Ünal", "hub-user-1234abcd", "claude-3f2a", "  Padded  "} {
 		assert.NoError(t, ValidMemberName(ok), "%q", ok)
 	}
 	assert.NoError(t, ValidMemberName(""), "an empty name is the caller's own rule, not this one")

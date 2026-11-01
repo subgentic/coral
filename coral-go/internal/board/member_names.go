@@ -6,10 +6,10 @@ import (
 	"unicode"
 )
 
-// ErrMemberNamePunctuation is a member name that starts or ends with something that is not a letter or a digit (#11687).
-var ErrMemberNamePunctuation = errors.New("a name must start and end with a letter or a digit (no colon, comma, bracket, quote or dot at either end)")
+// ErrMemberNamePunctuation is a member name that starts with something that is not a letter or a digit, or ends with something that is not a letter, a digit or a closing bracket (#11687).
+var ErrMemberNamePunctuation = errors.New("a name must start with a letter or a digit and end with a letter, a digit or a closing bracket (no colon, comma, dot, @ or quote at an end)")
 
-// ValidMemberName refuses a name a member could not be addressed by: one whose first or last character, after trimming white space, is not a letter or a digit. "Security Reviewer 2:" joined as it is, and "@Security Reviewer 2" then
+// ValidMemberName refuses a name a member could not be addressed by: one whose first character, after trimming white space, is not a letter or a digit, or whose last is not a letter, a digit or a closing ")" or "]" ("Dev (night)" and "QA (2)" are fine). "Security Reviewer 2:" joined as it is, and "@Security Reviewer 2" then
 // reached the shorter member "Security Reviewer" instead (#11687): punctuation at an end of a name is never part of the name a person types after an @. An empty name is not this rule's to refuse.
 func ValidMemberName(name string) error {
 	name = strings.TrimSpace(name)
@@ -17,7 +17,7 @@ func ValidMemberName(name string) error {
 		return nil
 	}
 	rs := []rune(name)
-	if !alnumRune(rs[0]) || !alnumRune(rs[len(rs)-1]) {
+	if last := rs[len(rs)-1]; !alnumRune(rs[0]) || !(alnumRune(last) || last == ')' || last == ']') {
 		return ErrMemberNamePunctuation
 	}
 	return nil
