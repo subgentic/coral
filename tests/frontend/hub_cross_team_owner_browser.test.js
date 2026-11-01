@@ -62,7 +62,7 @@ const { coralReady } = require('./helpers/wait');
         // The Save bar repeats no permission sentence (the tab's header says it once, #5987), and each switch is described by what is said about it
         assert.equal(await ev(`document.querySelector('#owner-host .sv-status').textContent.trim()`), 'No changes to save.');
         const described = await ev(`['cross_team_messaging', 'cross_team_artifacts'].map(n => { const c = document.querySelector('#owner-host [name=' + n + ']'); return (c.getAttribute('aria-describedby') || '').split(' ').filter(Boolean).map(id => [id, (document.getElementById(id) || {}).textContent]); })`);
-        assert.deepEqual(described.map(d => d.map(x => x[0])), [['xt-changed-cross_team_messaging', 'xt-hub-may'], ['xt-changed-cross_team_artifacts', 'xt-hub-may']]);
+        assert.deepEqual(described.map(d => d.map(x => (/^sv\d+-\d+-ht$/.test(x[0]) ? 'help' : x[0]))), [['help', 'xt-changed-cross_team_messaging', 'xt-hub-may'], ['help', 'xt-changed-cross_team_artifacts', 'xt-hub-may']]); // the switch's own help line (its reach, #11788), then the lines the group adds
         assert.ok(described.flat().every(([id, text]) => text && text.trim()), 'every id names a line that is there: ' + JSON.stringify(described));
         assert.deepEqual(r.changed.map(c => c[0]), ['cross_team_messaging', 'cross_team_artifacts']);
         assert.match(r.changed[0][1], /^Turned on by ada via Coral Hub at .+/); assert.match(r.changed[1][1], /^Turned off on this computer at .+/);
@@ -70,7 +70,7 @@ const { coralReady } = require('./helpers/wait');
         await mount({ status: { state: 'off', text: 'Off.' }, hub_may_change: false, last_changed: {} });
         r = await read(); assert.equal(r.may, null, 'no line when the lock forbids it'); assert.deepEqual(r.changed, [], 'and none for a switch nobody changed');
         assert.equal(await ev(`document.querySelector('#owner-host .sv-status').textContent.trim()`), 'No changes to save.', 'no permission sentence in the Save bar');
-        assert.equal(await ev(`document.querySelector('#owner-host [name=cross_team_messaging]').hasAttribute('aria-describedby')`), false, 'and no empty description');
+        assert.match(await ev(`document.querySelector('#owner-host [name=cross_team_messaging]').getAttribute('aria-describedby') || ''`), /^(sv\d+-\d+-ht)?$/, 'and no description of a line that is not there: only the switch\'s own help (#11788)');
         await mount({ status: { state: 'off', text: 'Off.' } });
         r = await read(); assert.equal(r.may, null, 'an older server (no field) says nothing'); assert.deepEqual(r.changed, []);
         await mount({ status: { state: 'ready', text: 'x' }, hub_may_change: 'yes', last_changed: { cross_team_messaging: { via: 'hub', by: '<img src=x onerror=alert(1)>\u202e<script>', at: 'not a time', on: true }, cross_team_artifacts: 'x', bogus: { via: 'hub' } } });

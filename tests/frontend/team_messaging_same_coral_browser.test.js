@@ -34,9 +34,9 @@ const { coralReady } = require('./helpers/wait');
         const here = () => ev(`document.querySelector('${P} .xt-reach-here').textContent.replace(/\\s+/g, ' ').trim()`);
         const turnOn = async team => {
             await open(team);
-            assert.match(await here(), /^Message teams here: off/, team + ' starts off on this computer');
-            await ev(`document.querySelector('${P} [data-act=turn-on-here]').click(); true`);
-            await waitFor(`document.querySelector('${P} .xt-reach-here')?.textContent.trim() === 'Message teams here: on'`, team + ' on', 8000);
+            assert.match(await here(), /^Teams on this computer: not allowed yet\./, team + ' starts off on this computer');
+            await ev(`document.querySelector('${P} [data-act=allow-here]').click(); true`);
+            await waitFor(`document.querySelector('${P} .xt-reach-here')?.textContent.trim() === 'Teams on this computer: allowed.'`, team + ' on', 8000);
             assert.equal(((await api(team, '/cross-team-state')).body || {}).messaging_here, true, team + ': saved as an explicit on');
         };
         // A team that never set the switch reads "on only by default" (it counts for a team on another computer through a team link, not between two teams of this computer, #11708); one set to off reads "off".
