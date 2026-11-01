@@ -55,6 +55,7 @@ func repoWithWorktrees(t *testing.T) (main, feature, picked string) {
 func TestARepositorysWorktreesAreReadWithTheirCountsAgainstTheBase(t *testing.T) {
 	main, feature, picked := repoWithWorktrees(t)
 	c := New()
+	c.For(feature) // the tab asks first: only then does a pass read the repository
 	c.Observe(context.Background(), []string{feature})
 
 	repo, i, ok := c.For(filepath.Join(feature, "sub-folder-that-need-not-exist", ".."))
@@ -97,6 +98,7 @@ func TestAWorktreeBeyondTheCapIsCountedNotDropped(t *testing.T) {
 		runGit(t, main, "worktree", "add", "-q", "--detach", filepath.Join(t.TempDir(), "w"))
 	}
 	c := New()
+	c.For(main)
 	c.Observe(context.Background(), []string{main})
 	repo, _, ok := c.For(main)
 	require.True(t, ok)
@@ -151,6 +153,9 @@ func TestARepositoryIsReadAgainOnlyAfterItsInterval(t *testing.T) {
 		return readGit(ctx, dir, args...)
 	}
 	c.Observe(context.Background(), []string{main, feature})
+	assert.Zero(t, calls, "nobody asked for this repository: no git runs for it")
+	c.For(feature)
+	c.Observe(context.Background(), []string{main, feature})
 	first := calls
 	require.Positive(t, first)
 	c.Observe(context.Background(), []string{main, feature})
@@ -158,7 +163,73 @@ func TestARepositoryIsReadAgainOnlyAfterItsInterval(t *testing.T) {
 	now = now.Add(refreshEvery)
 	c.Observe(context.Background(), []string{feature})
 	assert.Greater(t, calls, first)
+	now = now.Add(askedFor + refreshEvery)
+	before := calls
+	c.Observe(context.Background(), []string{feature})
+	assert.Equal(t, before, calls, "a tab not read for 10 minutes: its repository is not read again")
 	c.Observe(context.Background(), nil)
 	_, _, ok := c.For(feature)
 	assert.False(t, ok, "a repository no agent works in is forgotten")
+}
+
+// Security's SHOULD 1 on #272: a worktree git lists at a network share, a \\?\ or \\.\ form or a //host path is never resolved, opened or run in; the cap comes first.
+func TestAWorktreeThatIsNotOnALocalDriveIsNeverTouched(t *testing.T) {
+	root := t.TempDir()
+	bad := []string{`\\server\share\w`, `\\?\C:\w`, `\\.\C:\w`, `//host/share/w`}
+	list := "worktree " + root + "\x00HEAD 0123456789012345678901234567890123456789\x00branch refs/heads/main\x00\x00"
+	for _, b := range bad {
+		list += "worktree " + b + "\x00HEAD 0123456789012345678901234567890123456789\x00branch refs/heads/x\x00\x00"
+	}
+	var dirs []string
+	c := New()
+	c.run = func(_ context.Context, dir string, args ...string) ([]byte, error) {
+		dirs = append(dirs, dir)
+		switch args[0] {
+		case "rev-parse":
+			if args[1] == "--path-format=absolute" {
+				return []byte(filepath.Join(root, ".git")), nil
+			}
+			return nil, errNotRead // no base
+		case "worktree":
+			return []byte(list), nil
+		}
+		return nil, nil
+	}
+	require.NoError(t, os.Mkdir(filepath.Join(root, ".git"), 0o755)) // the common git dir the fake names must resolve
+	c.For(root)
+	c.Observe(context.Background(), []string{root})
+	repo, _, ok := c.For(root)
+	require.True(t, ok)
+	require.Len(t, repo.Worktrees, 1+len(bad))
+	for i, w := range repo.Worktrees[1:] {
+		assert.True(t, w.NotLocal, bad[i])
+		assert.Empty(t, w.path, "%s is not resolved", bad[i])
+	}
+	for _, d := range dirs {
+		assert.Equal(t, canonical(root), canonical(d), "git runs only in the local folder")
+		for _, b := range bad {
+			assert.NotEqual(t, b, d)
+		}
+	}
+	assert.False(t, localFixedPath("relative\\path"))
+	assert.False(t, localFixedPath(""))
+}
+
+// Security's INFO a on #272: an untracked scan that did not finish is "not counted", not 0.
+func TestAnUntrackedScanThatDidNotFinishIsNotCounted(t *testing.T) {
+	dir := t.TempDir()
+	c := New()
+	c.run = func(_ context.Context, _ string, args ...string) ([]byte, error) {
+		for _, a := range args {
+			if a == "--untracked-files=normal" {
+				return nil, context.DeadlineExceeded
+			}
+		}
+		return nil, nil
+	}
+	w := Worktree{path: dir}
+	c.status(context.Background(), &w)
+	assert.True(t, w.UntrackedUnknown)
+	assert.Zero(t, w.Untracked)
+	assert.False(t, w.Unreadable, "the tracked changes were read")
 }

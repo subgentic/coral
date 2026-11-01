@@ -31,6 +31,7 @@ const (
 	gitTimeout     = 10 * time.Second // one git process
 	passBudget     = 20 * time.Second // all repositories of one pass
 	refreshEvery   = time.Minute      // a repository is read again at most this often
+	askedFor       = 10 * time.Minute // a repository is read only while its tab was read this recently (Security's SHOULD 2 on #272)
 	timedOutPause  = 5 * time.Minute  // a repository whose git timed out is left alone this long
 	maxBranchRunes = 80
 )
@@ -49,10 +50,16 @@ type Worktree struct {
 	Changed        int  `json:"changed"`   // tracked files with changes
 	Untracked      int  `json:"untracked"` // untracked entries, up to maxUntracked
 	UntrackedMore  bool `json:"untracked_more,omitempty"`
-	Unreadable     bool `json:"unreadable,omitempty"` // its status could not be read
-	Main           bool `json:"main,omitempty"`       // the repository's main worktree (the first git lists)
+	// UntrackedUnknown: the untracked scan did not finish (a big tree, or it ran out of time): the count is not known, which is not 0.
+	UntrackedUnknown bool `json:"untracked_unknown,omitempty"`
+	// NotLocal: git lists this worktree at a path that is not a plain folder on a local fixed drive (a network share, a \\?\ or \\.\ form, a removable drive): it is never opened,
+	// read or run in, so a repository's own records cannot make Coral reach out to another host (Security's SHOULD 1 on #272).
+	NotLocal   bool `json:"not_local,omitempty"`
+	Unreadable bool `json:"unreadable,omitempty"` // its status could not be read
+	Main       bool `json:"main,omitempty"`       // the repository's main worktree (the first git lists)
 
 	path string // canonical: what agents' folders are matched against; never served (Security's MUST 5)
+	raw  string // the path as git listed it: looked at as text only, before it is known to be local
 }
 
 // Repo is one repository's picture.
@@ -78,13 +85,14 @@ type Collector struct {
 	rootKey map[string]string
 	counts  map[string]counts // by base tip + branch tip
 	paused  map[string]time.Time
+	asked   map[string]time.Time // canonical agent folders whose tab was read, and when
 	now     func() time.Time
 	run     func(ctx context.Context, dir string, args ...string) ([]byte, error)
 }
 
 // New is an empty collector that runs git through gitutil.
 func New() *Collector {
-	return &Collector{repos: map[string]*Repo{}, rootKey: map[string]string{}, counts: map[string]counts{}, paused: map[string]time.Time{}, now: time.Now, run: readGit}
+	return &Collector{repos: map[string]*Repo{}, rootKey: map[string]string{}, counts: map[string]counts{}, paused: map[string]time.Time{}, asked: map[string]time.Time{}, now: time.Now, run: readGit}
 }
 
 // errNotRead is a git call this package does not make.
@@ -167,6 +175,9 @@ func (c *Collector) Observe(ctx context.Context, roots []string) {
 		if ctx.Err() != nil {
 			return
 		}
+		if !c.wanted(root) {
+			continue // nobody has the tab open for this repository: no git runs for it
+		}
 		key := c.repoKey(ctx, root)
 		if key == "" || seen[key] {
 			continue
@@ -195,6 +206,26 @@ func (c *Collector) Observe(ctx context.Context, roots []string) {
 		}
 	}
 	c.mu.Unlock()
+}
+
+// wanted says the tab of an agent working in root was read within askedFor; the ones older are forgotten.
+func (c *Collector) wanted(root string) bool {
+	r := canonical(root)
+	if r == "" {
+		return false
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	now := c.now()
+	want := false
+	for dir, at := range c.asked {
+		if now.Sub(at) > askedFor {
+			delete(c.asked, dir)
+			continue
+		}
+		want = want || within(dir, r)
+	}
+	return want
 }
 
 // repoKey is the canonical common git dir of root's repository (its worktrees share it), "" when it cannot be read.
@@ -237,6 +268,11 @@ func (c *Collector) read(ctx context.Context, root string) *Repo {
 	baseName, baseTip := c.base(ctx, root)
 	repo.Base = baseName
 	for _, w := range trees {
+		if localFixedPath(w.raw) {
+			w.path = canonical(w.raw)
+		} else {
+			w.NotLocal = true
+		}
 		if baseTip != "" && w.Head != "" && validSHA(w.Head) {
 			n := c.count(ctx, root, baseTip, w.Head)
 			w.Ahead, w.Behind, w.NothingToMerge = n.ahead, n.behind, n.ahead > 0 && n.nothing
@@ -314,6 +350,9 @@ func (c *Collector) count(ctx context.Context, root, base, tip string) counts {
 
 // status counts w's changed tracked files, then its untracked entries up to maxUntracked (a big tree's untracked scan is the slow part, so it is separate and capped).
 func (c *Collector) status(ctx context.Context, w *Worktree) {
+	if w.NotLocal {
+		return // never read
+	}
 	if w.path == "" {
 		w.Unreadable = true
 		return
@@ -326,6 +365,7 @@ func (c *Collector) status(ctx context.Context, w *Worktree) {
 	w.Changed = len(statusPaths(out))
 	out, err = c.run(ctx, w.path, "status", "--porcelain=v1", "-z", "--untracked-files=normal", "--no-renames", "--ignore-submodules=all")
 	if err != nil {
+		w.UntrackedUnknown = true // not counted, which is not 0 (Security's INFO a on #272)
 		return
 	}
 	n := 0
@@ -370,7 +410,7 @@ func parseWorktrees(out []byte) []Worktree {
 			flush()
 		case strings.HasPrefix(line, "worktree "):
 			flush()
-			cur = &Worktree{path: canonical(strings.TrimPrefix(line, "worktree ")), Main: len(trees) == 0}
+			cur = &Worktree{raw: strings.TrimPrefix(line, "worktree "), Main: len(trees) == 0} // text only: nothing is resolved before the cap and the local-path check (read)
 		case cur == nil:
 		case strings.HasPrefix(line, "HEAD "):
 			cur.Head = strings.TrimPrefix(line, "HEAD ")
@@ -439,6 +479,9 @@ func (c *Collector) For(dir string) (Repo, int, bool) {
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	if len(c.asked) < 1024 {
+		c.asked[d] = c.now() // asking is what makes the next passes read this repository
+	}
 	best, bestRepo, bestLen := -1, (*Repo)(nil), -1
 	for _, r := range c.repos {
 		for i, w := range r.Worktrees {
