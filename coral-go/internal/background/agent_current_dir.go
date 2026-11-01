@@ -16,8 +16,19 @@ import (
 
 const currentDirTTL = 30 * time.Second
 
-// NewCurrentDirFinder is the GitPoller's finder: read is where the transcript says the agent is ("" when it says nothing), and the answer is that place when it passes the checks above, else "".
+// NewCurrentDirFinder is the finder for what the person SEES (a row's current_directory, a text): read is where the transcript says the agent is ("" when it says nothing), and the answer is that place when it
+// passes the checks above, else "". A verdict is kept for currentDirTTL, so a list that is asked for every few seconds runs git once in 30.
 func NewCurrentDirFinder(read func(sessionID, launchDir, agentType string) string) func(ctx context.Context, a AgentInfo) string {
+	return newCurrentDirFinder(read, currentDirTTL, false)
+}
+
+// NewCurrentDirReader is the finder for what Coral READS (the git poller's folder, #11739, Security's INFO on #11704): the checks run again at every call, with no kept verdict, and the answer is the folder's REAL path
+// (links resolved), so a folder swapped for a link to another repository after it was approved is not read: the next poll finds it is not this repository's and reads the launch folder.
+func NewCurrentDirReader(read func(sessionID, launchDir, agentType string) string) func(ctx context.Context, a AgentInfo) string {
+	return newCurrentDirFinder(read, 0, true)
+}
+
+func newCurrentDirFinder(read func(sessionID, launchDir, agentType string) string, ttl time.Duration, resolve bool) func(ctx context.Context, a AgentInfo) string {
 	type verdict struct {
 		ok bool
 		at time.Time
@@ -32,22 +43,38 @@ func NewCurrentDirFinder(read func(sessionID, launchDir, agentType string) strin
 		if cur == "" || filepath.Clean(cur) == filepath.Clean(a.WorkingDirectory) {
 			return ""
 		}
-		key := a.WorkingDirectory + "\x00" + cur
-		mu.Lock()
-		v, ok := seen[key]
-		if len(seen) > 1024 {
-			seen = map[string]verdict{}
-		}
-		mu.Unlock()
-		if !ok || time.Since(v.at) > currentDirTTL {
+		check := func() bool {
 			fi, err := os.Stat(cur)
-			v = verdict{ok: err == nil && fi.IsDir() && gitutil.SameRepo(ctx, a.WorkingDirectory, cur), at: time.Now()}
-			mu.Lock()
-			seen[key] = v
-			mu.Unlock()
+			return err == nil && fi.IsDir() && gitutil.SameRepo(ctx, a.WorkingDirectory, cur)
 		}
-		if !v.ok {
+		ok := false
+		if ttl > 0 {
+			key := a.WorkingDirectory + "\x00" + cur
+			mu.Lock()
+			v, had := seen[key]
+			if len(seen) > 1024 {
+				seen = map[string]verdict{}
+			}
+			mu.Unlock()
+			if !had || time.Since(v.at) > ttl {
+				v = verdict{ok: check(), at: time.Now()}
+				mu.Lock()
+				seen[key] = v
+				mu.Unlock()
+			}
+			ok = v.ok
+		} else {
+			ok = check()
+		}
+		if !ok {
 			return ""
+		}
+		if resolve {
+			real, err := filepath.EvalSymlinks(cur)
+			if err != nil || !gitutil.SameRepo(ctx, a.WorkingDirectory, real) { // the real folder is the one checked: what is read is what was approved
+				return ""
+			}
+			return real
 		}
 		return cur
 	}

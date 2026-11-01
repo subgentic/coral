@@ -2,6 +2,7 @@ package background
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -38,7 +39,7 @@ func TestGitPollerFollowsAnAgentIntoItsOwnWorktree(t *testing.T) {
 		}, nil
 	}
 	where := map[string]string{"s-a": wtA, "s-b": wtB, "s-c": outside, "s-d": ""}
-	p.SetCurrentDirFn(NewCurrentDirFinder(func(sessionID, launch, agentType string) string { return where[sessionID] }))
+	p.SetCurrentDirFn(NewCurrentDirReader(func(sessionID, launch, agentType string) string { return where[sessionID] }))
 	require.NoError(t, p.PollOnce(context.Background()))
 
 	dirOf := func(sid string) (string, string) {
@@ -61,4 +62,42 @@ func TestGitPollerFollowsAnAgentIntoItsOwnWorktree(t *testing.T) {
 	assert.Equal(t, "main", brC)
 	dirD, _ := dirOf("s-d")
 	assert.Equal(t, real(repo), dirD, "an agent with no known place keeps its launch folder")
+}
+
+// #11739 (Security's INFO on #11704): a folder approved as the agent's own worktree and then swapped for a link to another repository is not read: the poller checks again at every poll and reads the real path, so the
+// next poll finds it is not this repository's and reads the launch folder.
+func TestAFolderSwappedForALinkToAnotherRepoIsNotReadAtTheNextPoll(t *testing.T) {
+	repo := t.TempDir()
+	runGit(t, repo, "init", "-q", "-b", "main")
+	runGit(t, repo, "commit", "-q", "--allow-empty", "-m", "base")
+	wt := filepath.Join(t.TempDir(), "wt-a")
+	runGit(t, repo, "worktree", "add", "-q", "-b", "feat-a", wt)
+	other := t.TempDir()
+	runGit(t, other, "init", "-q", "-b", "elsewhere")
+	runGit(t, other, "commit", "-q", "--allow-empty", "-m", "someone else's repository")
+
+	db, err := storetest.Open(t, filepath.Join(t.TempDir(), "sessions.db"))
+	require.NoError(t, err)
+	t.Cleanup(func() { db.Close() })
+	p := NewGitPoller(store.NewGitStore(db), nil, time.Minute)
+	p.discoverFn = func(context.Context) ([]AgentInfo, error) {
+		return []AgentInfo{{AgentName: "coral-go", AgentType: "claude", SessionID: "s-a", WorkingDirectory: repo}}, nil
+	}
+	p.SetCurrentDirFn(NewCurrentDirReader(func(string, string, string) string { return wt }))
+	branch := func() string {
+		var b string
+		require.NoError(t, db.Get(&b, `SELECT branch FROM git_snapshots WHERE session_id = 's-a' ORDER BY id DESC LIMIT 1`))
+		return b
+	}
+	require.NoError(t, p.PollOnce(context.Background()))
+	assert.Equal(t, "feat-a", branch(), "approved: its own worktree")
+
+	require.NoError(t, os.RemoveAll(wt))
+	require.NoError(t, os.Symlink(other, wt)) // the folder is now a link to another repository
+	require.NoError(t, p.PollOnce(context.Background()))
+	assert.Equal(t, "main", branch(), "the swap is not read: the launch folder is")
+
+	// the finder for what the person sees keeps its verdict for 30 s: it is text, never read from
+	seen := NewCurrentDirFinder(func(string, string, string) string { return wt })
+	assert.Equal(t, "", seen(context.Background(), AgentInfo{AgentType: "claude", SessionID: "s-a", WorkingDirectory: repo}), "a link to another repository is not a worktree of this one")
 }
