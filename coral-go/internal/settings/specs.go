@@ -164,6 +164,7 @@ func init() {
 	boolOff("chief_page", ApplyLive, "Serve /chief, the phone page for the one agent recorded as Chief.")
 	text("chief_team", ApplyLive, "The team the Chief agent is on.")
 	text("chief_session", ApplyLive, "The session id of the Chief agent.")
+	register(Spec{Key: GoalDoneHidden, Kind: KindText, Apply: ApplyLive, MaxLen: 8192, Doc: "The goals hidden from Needs you with Not yet or Ignore: a JSON list of team|goal|tasks (or team|goal|*) entries."})
 	boolOff("home_editions_hidden", ApplyClient, "Hide the editions card on Home.")
 
 	// Storage.

@@ -282,3 +282,6 @@ func TextFamily(m map[string]string, key string) string {
 	}
 	panic("settings: " + key + " is not a declared text setting")
 }
+
+// GoalDoneHidden is the setting that lists the goals the Operator hid from Needs you with Not yet or Ignore (#11825).
+const GoalDoneHidden = "goal_done_hidden"
