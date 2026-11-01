@@ -105,6 +105,25 @@ func TestAFolderTheLaunchMadeIsTrustedForTheAgentsThatAsk(t *testing.T) {
 	// the folder is the one the agents started in, and no other entry was made
 	b, _ := os.ReadFile(r.claude)
 	assert.NotContains(t, string(b), r.home+"\"", "home itself is not an entry")
+	// an Operator can see it afterwards: one board message names the folder and the agents
+	notices := r.trustNotices(t, out["board"].(string))
+	require.Len(t, notices, 1, "%v", notices)
+	assert.Contains(t, notices[0], dir)
+	assert.Contains(t, notices[0], "claude, codex")
+}
+
+// trustNotices are the team's board messages that say a folder was trusted.
+func (r *trustRig) trustNotices(t *testing.T, board string) []string {
+	t.Helper()
+	msgs, err := r.h.bs.ListMessages(context.Background(), board, 100, 0, 0)
+	require.NoError(t, err)
+	var out []string
+	for _, m := range msgs {
+		if strings.Contains(m.Content, "trusted") && strings.Contains(m.Content, "Coral") {
+			out = append(out, m.Content)
+		}
+	}
+	return out
 }
 
 func TestOnlyThePersonsOwnDashboardTrustsAFolder(t *testing.T) {
@@ -136,6 +155,7 @@ func TestOnlyThePersonsOwnDashboardTrustsAFolder(t *testing.T) {
 			assert.False(t, r.codexTrusts(t, dir))
 			b, _ := os.ReadFile(r.claude)
 			assert.Equal(t, `{"userID":"abc"}`, string(b), "the file is untouched")
+			assert.Empty(t, r.trustNotices(t, out["board"].(string)), "and nothing is said on the board")
 		})
 	}
 }
