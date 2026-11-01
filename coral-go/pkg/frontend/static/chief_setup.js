@@ -9,9 +9,10 @@ const { COLORS, avatarNode, lookOf } = await importOnce('./chief_look.js');
 
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 const NAME_MAX = 40;
-const KEYS = ['chief_page', 'chief_name', 'chief_avatar', 'chief_avatar_letter', 'chief_fronts', 'chief_session', 'chief_team'];
+const KEYS = ['chief_actions', 'chief_page', 'chief_name', 'chief_avatar', 'chief_avatar_letter', 'chief_fronts', 'chief_session', 'chief_team'];
 
 async function json(url) { const r = await fetch(url, { credentials: 'same-origin', cache: 'no-store' }); return r.ok ? r.json() : null; }
+const ACTIONS = [{ value: 'ask_first', label: 'Ask first' }, { value: 'act', label: 'Act' }]; // Chief's two levels (#11798): the mode its restart runs in; Ask first is Default, Act is Accept edits (a shell command still asks)
 const yes = v => /^(1|true|yes|on)$/i.test(String(v || '').trim());
 
 /** The agents Chief can be: every live agent, named as the Operator knows it, on its team. */
@@ -74,13 +75,14 @@ export async function mountChiefSetup(host) {
             { key: 'chief_avatar_letter', type: 'text', label: 'Avatar letter', default: '', placeholder: 'The name’s first letter', help: 'One letter or digit on the avatar.', validate: v => ([...String(v || '').trim()].length > 1 ? 'One letter or digit.' : '') },
             { key: 'chief_agent', type: 'select', label: 'Which agent', default: '', options: [{ value: '', label: choices.length ? 'No agent picked' : 'No agent is running' }, ...choices.map(c => ({ value: c.value, label: c.label }))], help: 'The running agent that is Chief. Start it on its own team first (a team of one).' },
             { key: 'chief_model', type: 'custom', label: 'Its model', render: slot => { slot.append(modelRow); drawModel(); } },
+            { key: 'chief_actions', type: 'select', label: "Chief's actions", default: 'ask_first', options: ACTIONS, help: 'Ask first: Chief asks before each action. Act: Chief edits without asking, and a shell command still asks. Applies when Chief restarts.' },
             { key: 'chief_fronts', type: 'select', label: 'Team it fronts', default: '', options: [{ value: '', label: 'No team chosen' }, ...teams], help: 'The team whose agents Chief takes your requests to.' },
             { key: 'chief_page', type: 'toggle', label: 'Serve the Chief page', default: false, help: 'Turns on /chief, the page for your phone.' },
         ],
         load: async () => {
             const again = await json('/api/settings'), st = again && again.settings ? again.settings : settings;
             const agent = choices.find(c => c.value === String(st.chief_session || '') && c.team === String(st.chief_team || ''));
-            return { chief_name: String(st.chief_name || ''), chief_avatar: String(st.chief_avatar || '1'), chief_avatar_letter: String(st.chief_avatar_letter || ''), chief_agent: agent ? agent.value : '', chief_fronts: String(st.chief_fronts || ''), chief_page: yes(st.chief_page) };
+            return { chief_name: String(st.chief_name || ''), chief_avatar: String(st.chief_avatar || '1'), chief_avatar_letter: String(st.chief_avatar_letter || ''), chief_agent: agent ? agent.value : '', chief_fronts: String(st.chief_fronts || ''), chief_page: yes(st.chief_page), chief_actions: st.chief_actions === 'act' ? 'act' : 'ask_first' }; // anything else is Ask first, never a wider mode
         },
         save: async (changes, { values }) => {
             const body = {};

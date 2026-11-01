@@ -5,8 +5,6 @@
 const THEME_OPTIONS = [{ value: 'dark', label: 'Dark' }, { value: 'light', label: 'Light' }, { value: 'system', label: 'System' }];
 const AGENT_TYPE_OPTIONS = [{ value: 'claude', label: 'Claude' }, { value: 'agy', label: 'Antigravity (agy)' }, { value: 'codex', label: 'Codex' }, { value: 'pi', label: 'Pi' }];
 
-const CHIEF_ACTION_OPTIONS = [{ value: 'ask_first', label: 'Ask first' }, { value: 'act', label: 'Act' }];
-
 const GENERAL_FIELDS = [
     { key: 'theme', type: 'select', id: 'settings-theme', labelId: 'settings-theme-label', label: 'Theme', options: THEME_OPTIONS,
         action: { label: 'Customize Theme', icon: 'palette', small: true, className: 'settings-theme-btn', setup: el => el.setAttribute('data-on-click', 'm-hide-settings-modal-then-show-theme-configurator') } },
@@ -106,9 +104,6 @@ const AGENTS_FIELDS = host => [
     { key: 'permission_mode', type: 'select', id: 'settings-permission-mode', labelId: 'settings-permission-mode-label', label: 'Default permission mode', options: PERMISSION_OPTIONS,
         help: { text: 'Everything; safety checks on Claude only.', about: 'Default permission mode', docs: { topic: 'how-do-i', answer: 'What the permission modes allow' } }, helpTextClass: 'perm-mode-desc',
         setup: el => { el.setAttribute('data-on-change', 'm-perm-mode-describe'); const warn = document.createElement('span'); warn.className = 'perm-mode-warn sv-help'; warn.hidden = true; warn.textContent = 'Agents cannot start workers in this mode.'; el.closest('.sv-row').querySelector('.sv-text').append(warn); } }, // the line under the select is the chosen mode's meaning, said once; the three modes side by side are the row's More (#10266, after #10000)
-    // Chief's two levels (#11798): the mode the Operator's front agent restarts in; Ask first is Default, Act is Accept edits (a shell command still asks).
-    { key: 'chief_actions', type: 'select', id: 'settings-chief-actions', labelId: 'settings-chief-actions-label', label: "Chief's actions", options: CHIEF_ACTION_OPTIONS,
-        help: 'Ask first: Chief asks before each action. Act: Chief edits without asking, and a shell command still asks. Applies when Chief restarts.' },
     { key: 'working_dir', type: 'text', id: 'settings-working-dir', label: 'Default working directory', help: moreOnly('The folder a new agent starts in.'), placeholder: host.dataset.coralRoot || '', attrs: { 'data-coral-root': host.dataset.coralRoot || '' } },
     { key: 'default_thinking_claude', type: 'select', id: 'settings-default-thinking-claude', label: 'Default thinking', options: THINKING_OPTIONS, attrs: { 'aria-label': 'Claude default thinking' },
         help: moreOnly('How hard Claude thinks before it answers, when a launch does not say.', 'How much Claude thinks before it answers, for agents launched with no choice of their own. A model that does not take a level uses the nearest one it does.') },
