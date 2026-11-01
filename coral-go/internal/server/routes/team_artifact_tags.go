@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -71,6 +72,26 @@ func teamTagCounts(items []teamArtifact) map[string]int {
 	for _, it := range items {
 		for _, t := range it.Tags {
 			counts[t]++
+		}
+	}
+	return counts
+}
+
+// teamTagCountsByFile is teamTagCounts over files, not versions (#11700): a file counts once for a tag when any of its versions carries it, the number the Tag filter then shows rows for.
+func teamTagCountsByFile(items []teamArtifact) map[string]int {
+	type slot struct{ key, tag string }
+	counts := map[string]int{}
+	seen := map[slot]bool{}
+	for i, it := range items {
+		key := artifactVersionKey(it)
+		if key == "" {
+			key = "row:" + strconv.Itoa(i) // a row with no uploader is its own file
+		}
+		for _, t := range it.Tags {
+			if !seen[slot{key, t}] {
+				seen[slot{key, t}] = true
+				counts[t]++
+			}
 		}
 	}
 	return counts
