@@ -41,12 +41,12 @@ func textCrossTeamOff(teams []string) string {
 // textCrossTeamNotSet is the refusal of a send between two teams of this computer when a team's cross-team switch is on only by default (#11708): the default counts for a team on another computer through a team link, and
 // between teams on this computer only the owner's own "on" does. teams are already quoted.
 func textCrossTeamNotSet(teams []string) string {
-	return fmt.Sprintf("Cross-team messaging is on only by default on %s, and between teams on this computer that does not count: ask the Operator to turn it on in %s (it reads \"on (default)\" until they do).", teamList(teams), teamSettingsMessaging)
+	return fmt.Sprintf("Cross-team messaging is on only by default on %s, and between teams on this computer that does not count: ask the Operator to turn it on in %s.", teamList(teams), teamSettingsMessaging)
 }
 
 // textFilesNotSet is textCrossTeamNotSet for the files switch.
 func textFilesNotSet(teams []string) string {
-	return fmt.Sprintf("Sharing files with other teams is on only by default on %s, and between teams on this computer that does not count: ask the Operator to turn on Share files with teams on other computers in %s (it reads \"on (default)\" until they do).", teamList(teams), teamSettingsMessaging)
+	return fmt.Sprintf("Sharing files with other teams is on only by default on %s, and between teams on this computer that does not count: ask the Operator to turn on Share files with teams on other computers in %s.", teamList(teams), teamSettingsMessaging)
 }
 
 // textFilesOff is the refusal of a send with files from or to a team that does not share files.

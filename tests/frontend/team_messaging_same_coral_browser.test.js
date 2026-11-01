@@ -39,11 +39,17 @@ const { coralReady } = require('./helpers/wait');
             await waitFor(`document.querySelector('${P} .xt-reach-here')?.textContent.trim() === 'Message teams here: on'`, team + ' on', 8000);
             assert.equal(((await api(team, '/cross-team-state')).body || {}).messaging_here, true, team + ': saved as an explicit on');
         };
-        const refusedFor = async (res, teams, label) => {
+        // A team that never set the switch reads "on only by default" (it counts for a team on another computer through a team link, not between two teams of this computer, #11708); one set to off reads "off".
+        const refusedFor = async (res, teams, label, how = 'default') => {
             assert.equal(res.status, 403, label + ': ' + JSON.stringify(res));
             const text = (res.body && res.body.error) || '';
-            assert.match(text, /^Cross-team messaging is off on /, label + ': ' + text);
-            assert.ok(text.endsWith('. Turn it on in Team settings > Messaging.'), label + ': tells where to turn it on: ' + text);
+            if (how === 'off') {
+                assert.match(text, /^Cross-team messaging is off on /, label + ': ' + text);
+                assert.ok(text.endsWith('. Turn it on in Team settings > Messaging.'), label + ': tells where to turn it on: ' + text);
+            } else {
+                assert.match(text, /^Cross-team messaging is on only by default on /, label + ': ' + text);
+                assert.ok(text.endsWith(': ask the Operator to turn it on in Team settings > Messaging.'), label + ': tells the agent to ask the Operator, and where: ' + text);
+            }
             const named = [A, B].filter(t => text.includes(JSON.stringify(t)));
             assert.deepEqual(named, teams, label + ': names the teams that are off: ' + text);
         };
@@ -69,7 +75,7 @@ const { coralReady } = require('./helpers/wait');
 
         // 4. An explicit off on A refuses it again, naming A
         assert.equal((await api(A, '/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'Operator', cross_team_messaging: false }) })).status, 200);
-        await refusedFor(await send(B, A, 'is anyone there'), [A], 'A explicitly off');
+        await refusedFor(await send(B, A, 'is anyone there'), [A], 'A explicitly off', 'off');
         console.log('PASS an explicit off on one team refuses the send again, naming it');
         console.log('PASS same-Coral send');
     } finally {

@@ -25,7 +25,7 @@ const TEAM = `qa-parked-${Date.now() % 100000}`;
         const call = (path, body) => ev(`fetch(${JSON.stringify(B + path)}, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: ${JSON.stringify(JSON.stringify(body))} }).then(async r => ({ status: r.status, body: await r.text() }))`);
         for (const k of ['a', 'c']) { // claim, park: the slot is free again for the next claim
             const c = await call('/tasks/claim', { subscriber_id: 'Backend Dev', task_id: ids[k] }); assert.equal(c.status, 200, 'claim ' + k + ': ' + c.body);
-            const p = await call(`/tasks/${ids[k]}/park`, { reason: 'waiting on the operator ' + k, subscriber_id: 'Backend Dev' }); assert.ok(p.status < 300, 'park ' + k + ': ' + p.status + ' ' + p.body);
+            const p = await call(`/tasks/${ids[k]}/park`, { reason: 'waiting on the billing team ' + k, subscriber_id: 'Backend Dev' }); assert.ok(p.status < 300, 'park ' + k + ': ' + p.status + ' ' + p.body);
         }
         const live = await call('/tasks/claim', { subscriber_id: 'Backend Dev', task_id: ids.b }); assert.equal(live.status, 200, 'the live claim: ' + live.body);
         await openTeam(ev, waitFor, TEAM); await goTab(ev, settle, 'Tasks');
