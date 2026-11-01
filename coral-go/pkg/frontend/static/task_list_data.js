@@ -1,6 +1,7 @@
 /* The pure parts of the dock's task list (moved out of task_list.js, #8386): what a task says about its state, which review it is in, and the order the rows are shown in. Node-tested. */
 import { _priorityOrder } from './task_format.js';
 import { isParked } from './goal_words.js';
+import { markHidden } from './visible_marks.js';
 
 /** Whether the completion form offers "Changes", the send back (#10337): the task has an agent to tell, and the Coral Hub's access for the board's machine allows Interact (hubReason is blockedReason's words, '' when it does). */
 export function canSendBack(task, hubReason) {
@@ -75,7 +76,7 @@ export function taskStatus(t) {
         : reviewRequested(t) && t.status === 'in_progress'
         ? statusWrap('blocked', 'Open · Review requested', 'Open · Review requested')
         : isParked(t) && t.status !== 'skipped'
-        ? statusWrap('pending', `Waiting: ${t.parked_reason}`, 'Waiting')
+        ? statusWrap('pending', `Waiting: ${markHidden(t.parked_reason, { strict: true })}`, 'Waiting')
         : t.status === 'in_progress'
         ? statusWrap('in-progress', workingDetail, activelyClaimed ? 'Claimed' : 'Open')
         : t.status === 'skipped'
