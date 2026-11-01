@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -21,6 +22,8 @@ func init() { registerWatchStopper(StopWinAgentWatches) }
 // liveProcs is the Windows process table as a procSource: one snapshot of who is whose child, and each process's image and creation time read through its handle when asked.
 type liveProcs struct {
 	kids map[int][]int
+	// deadline bounds the standard-input probes of one walk (stdinWalkBudget): a probe not answered by then counts as a reader, and the caller goes on.
+	deadline time.Time
 }
 
 func newLiveProcs() (*liveProcs, error) {
@@ -29,7 +32,7 @@ func newLiveProcs() (*liveProcs, error) {
 		return nil, err
 	}
 	defer windows.CloseHandle(snap)
-	l := &liveProcs{kids: map[int][]int{}}
+	l := &liveProcs{kids: map[int][]int{}, deadline: time.Now().Add(stdinWalkBudget)}
 	var e windows.ProcessEntry32
 	e.Size = uint32(unsafe.Sizeof(e))
 	if err := windows.Process32First(snap, &e); err != nil {
