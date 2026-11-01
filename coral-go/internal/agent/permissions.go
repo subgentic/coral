@@ -491,6 +491,10 @@ func promptKeepingFlag(agentType, name string) func(string) bool {
 		if name == "--effort" {
 			return anyValue
 		}
+	case at.Hermes:
+		if name == "--reasoning" { // the level of thinking: no more power than the model (#11831)
+			return anyValue
+		}
 	case at.Agy, at.Antigravity, at.Gemini:
 		switch {
 		case name == "--effort" && agentType != at.Gemini:

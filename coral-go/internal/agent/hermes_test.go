@@ -112,3 +112,12 @@ func TestTheLaunchLineSetsTheWorkdirTheHooksNameTheAgentBy(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, cmd, "CORAL_HERMES_WORKDIR='/work/dev'")
 }
+
+// The reasoning level asks for nothing more than the model does: a request through Coral Hub for it is not a request to skip the prompts; any other value of it, or --yolo beside it, still is.
+func TestHermesReasoningKeepsThePromptsOn(t *testing.T) {
+	assert.False(t, SkipsPermissionPrompts(at.Hermes, []string{"--reasoning", "high"}))
+	assert.False(t, SkipsPermissionPrompts(at.Hermes, []string{"-m", "some/model", "--reasoning=low"}))
+	assert.True(t, SkipsPermissionPrompts(at.Hermes, []string{"--reasoning", "high", "--yolo"}))
+	assert.True(t, SkipsPermissionPrompts(at.Hermes, []string{"--reasoning", "--yolo"}), "a flag is not a value")
+	assert.True(t, SkipsPermissionPrompts(at.Claude, []string{"--reasoning", "high"}), "only Hermes has the flag")
+}

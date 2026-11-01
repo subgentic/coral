@@ -25,7 +25,7 @@ const (
 )
 
 // CustomFamilies are the providers a custom model can be added for, in the order Settings shows them.
-var CustomFamilies = []string{"claude", "codex", "agy", "pi", "opencode"}
+var CustomFamilies = []string{"claude", "codex", "agy", "pi", "opencode", "hermes"}
 
 // familyTypes are the agent types that run a family's CLI.
 func familyTypes(family string) []string {
@@ -38,6 +38,8 @@ func familyTypes(family string) []string {
 		return []string{"agy", "antigravity", "gemini"}
 	case "pi":
 		return []string{"pi"}
+	case "hermes":
+		return []string{"hermes"} // #11831: the model is typed or a custom one (no list), the levels are --reasoning's
 	case "opencode":
 		return []string{"opencode"} // #11727: no levels (Coral passes none to its CLI), like Antigravity
 	}
