@@ -100,3 +100,16 @@ func TestANewVersionSupersedesTheOlderReview(t *testing.T) {
 	assert.False(t, ok, "an approved version is left alone")
 	assert.Equal(t, []string{"approved"}, func() []string { t2, _ := s.ArtifactTags(ctx, "alpha"); return t2[v0] }())
 }
+
+func TestANewVersionTakesTheSavedTagOffTheOlderOne(t *testing.T) {
+	s := testStore(t)
+	ctx := context.Background()
+	v1 := "e3b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9"
+	require.NoError(t, s.SetArtifactTags(ctx, "alpha", v1, []string{"for review", "saved", "read"}))
+	ok, err := s.SupersedeArtifactReview(ctx, "alpha", v1, time.Now())
+	require.NoError(t, err)
+	assert.True(t, ok)
+	tags, err := s.ArtifactTags(ctx, "alpha")
+	require.NoError(t, err)
+	assert.Equal(t, []string{"superseded"}, tags[v1], "a saved older version is not left in Saved: it is settled with the new one")
+}

@@ -211,7 +211,7 @@ func (s *Store) UndoArtifactReview(ctx context.Context, ch ReviewChange) error {
 const ReviewSuperseded = "superseded"
 
 // SupersedeArtifactReview closes the review of an older version of an artifact (#136588): when the agent uploads the next version of the series for review, the older one, still waiting or with changes
-// requested, is no longer something to review ("for review", "read" and "changes requested" go, "superseded" comes), and the new version is the pending one. Anything else (approved, never for review) is left alone.
+// requested, is no longer something to review ("for review", "read", "saved" and "changes requested" go, "superseded" comes), and the new version is the pending one. Anything else (approved, never for review) is left alone.
 func (s *Store) SupersedeArtifactReview(ctx context.Context, boardID, hex string, now time.Time) (bool, error) {
 	tx, err := s.db.BeginTxx(ctx, nil)
 	if err != nil {
@@ -229,7 +229,7 @@ func (s *Store) SupersedeArtifactReview(ctx context.Context, boardID, hex string
 	if !waiting {
 		return false, nil
 	}
-	for _, t := range []string{tagForReview, tagRead, ReviewChangesRequested} {
+	for _, t := range []string{tagForReview, tagRead, ReviewChangesRequested, tagSaved} {
 		if _, err := tx.ExecContext(ctx, `DELETE FROM artifact_tags WHERE board_id = ? AND hex = ? AND tag = ?`, boardID, hex, t); err != nil {
 			return false, err
 		}
