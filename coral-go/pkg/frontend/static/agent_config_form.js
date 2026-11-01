@@ -479,8 +479,10 @@ function placeAcfCliLine(container, opts) {
 }
 
 function wireAcfAgentType(container) {
+    container.dataset.acfLastType = container.querySelector('.acf-agent-type')?.value || 'claude';
     container.querySelector('.acf-agent-type')?.addEventListener('change', () => {
         const agentType = container.querySelector('.acf-agent-type')?.value || 'claude';
+        keepModelPerProvider(container, agentType);
         _checkAgentCLI(agentType, cliWarningOf(container));
         if (container._acfRestartOrigin) { const f = container.querySelector('.acf-flags'), o = container._acfRestartOrigin; if (f) f.value = (agentType === o.type || (o.alias[agentType] || agentType) === (o.alias[o.type] || o.type)) ? o.flags : ''; } // Restart: another provider's CLI does not take the old one's flags; back on the agent's own (aliases are one provider) they are as they were (#8973, #9003)
         setThinking(container, undefined); // a provider has its own levels: the choice goes back to Default and is not sent (#7391; only a provider resets the Model and Thinking)
@@ -585,6 +587,20 @@ function mountAgentRows(container) {
 //   • hides the field entirely for the terminal agent,
 //   • pre-fills the input with the user's default for that type, but only
 //     when the user hasn't touched the field (dirty flag off).
+/** Each provider keeps its own Model (#11786): a model typed under Pi is Pi's, not Claude's. On a change of provider the one box puts away what the old provider had and takes what the new one had, or goes back to its default. */
+function keepModelPerProvider(container, type) {
+    const was = container.dataset.acfLastType || '', box = container.querySelector('.acf-model');
+    container.dataset.acfLastType = type;
+    if (!box || !was || was === type) return;
+    const kept = (container._acfModels ||= {});
+    kept[was] = { value: box.value, dirty: container.dataset.acfModelDirty === 'true', other: !!container._otherChosen };
+    const back = kept[type];
+    box.value = back ? back.value : '';
+    container.dataset.acfModelDirty = back?.dirty ? 'true' : 'false'; container.dataset.acfModelClassifying = 'false';
+    container._otherChosen = !!back?.other;
+    syncModelPicker(container, false);
+}
+
 export function _syncACFModelField(container) {
     if (!container) return;
     const typeSel = container.querySelector('.acf-agent-type');
