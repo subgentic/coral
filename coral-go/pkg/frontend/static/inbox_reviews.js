@@ -77,7 +77,7 @@ export function refreshReviews(force = false) {
                         const r = await boardFetch(team, '/artifacts?tag=saved&limit=200');
                         if (r.ok) for (const a of (await r.json()).artifacts || []) {
                             const hex = /(?:sha256:|coral:\/\/artifacts\/)?([a-f0-9]{64})$/i.exec(a.uri || a.digest || a.id || '')?.[1];
-                            if (a.tags?.includes('saved') && a.available && hex) nextSaved.push({ ...a, team, hex, reviewKey: `${team}:${a.id}` });
+                            if (a.tags?.includes('saved') && a.tags.includes('for review') && a.available && hex) nextSaved.push({ ...a, team, hex, reviewKey: `${team}:${a.id}` });
                         }
                     } catch { nextSaved.push(...saved.filter(a => a.team === team)); }
                 } catch {
