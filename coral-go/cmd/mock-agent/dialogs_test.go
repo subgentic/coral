@@ -27,6 +27,22 @@ var dialogSpecs = map[string]dialogSpec{
 	"first":  {Header: "Color", Question: "First ask?", ChangeAfter: 0.05, ChangeTo: "second", Options: []dialogOption{{"Red (Recommended)", ""}, {"Blue", ""}}},
 	"second": {Header: "Color", Question: "Second ask?", Options: []dialogOption{{"Green (Recommended)", ""}, {"Blue", ""}}},
 	"later":  {Header: "Color", Question: "Later?", OpenAfter: 0.05, Options: []dialogOption{{"Red", ""}, {"Blue", ""}}},
+	"closes": {Header: "Color", Question: "Closes by itself?", CloseAfter: 0.05, Options: []dialogOption{{"Red", ""}, {"Blue", ""}}},
+}
+
+// A dialog with close_after_s closes by itself as an Escape would: Stop, no PostToolUse.
+func TestDialogClosesByItself(t *testing.T) {
+	d, hooks, _ := newTestDialogs(t)
+	captureOut(t, func() {
+		d.start("closes")
+		time.Sleep(300 * time.Millisecond)
+	})
+	if d.isOpen() {
+		t.Fatal("the dialog is still open")
+	}
+	if got := events(*hooks); got != "PreToolUse,PermissionRequest,Stop" {
+		t.Errorf("hook events %s", got)
+	}
 }
 
 type firedHook struct {
@@ -44,17 +60,46 @@ func newTestDialogs(t *testing.T) (*dialogs, *[]firedHook, string) {
 		t.Fatal(err)
 	}
 	t.Setenv("MOCK_AGENT_DIALOGS", file)
-	var mu sync.Mutex
+	// hooksMu: the timers fire hook events while a test reads them
 	var hooks []firedHook
 	d := newDialogs(dir, "sess-1234-5678", func(e string, x map[string]any) {
-		mu.Lock()
+		hooksMu.Lock()
 		hooks = append(hooks, firedHook{e, x})
-		mu.Unlock()
+		hooksMu.Unlock()
 	})
+	term := &lockedBuf{}
+	d.out = term
+	terms.Store(t, term)
+	t.Cleanup(func() { terms.Delete(t) })
 	return d, &hooks, filepath.Join(dir, "sess-1234-5678.dialog.jsonl")
 }
 
-// captureOut runs f with os.Stdout going to a pipe and returns what was written.
+// lockedBuf is a terminal the dialogs' timers may write to while a test reads it.
+type lockedBuf struct {
+	mu sync.Mutex
+	b  []byte
+}
+
+func (l *lockedBuf) Write(p []byte) (int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.b = append(l.b, p...)
+	return len(p), nil
+}
+
+func (l *lockedBuf) take() []byte {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	out := l.b
+	l.b = nil
+	return out
+}
+
+// terms holds each test dialogs' terminal.
+var terms sync.Map
+
+// captureOut runs f and returns what the dialogs wrote meanwhile (all of them write to their own terminal, newTestDialogs's), and what went to
+// os.Stdout (the input box's own lines), in that order.
 func captureOut(t *testing.T, f func()) []byte {
 	t.Helper()
 	r, w, err := os.Pipe()
@@ -68,7 +113,15 @@ func captureOut(t *testing.T, f func()) []byte {
 	f()
 	os.Stdout = stdout
 	w.Close()
-	return <-got
+	box := <-got
+	var dl []byte
+	terms.Range(func(k, v any) bool {
+		if k.(*testing.T) == t {
+			dl = v.(*lockedBuf).take()
+		}
+		return true
+	})
+	return append(dl, box...)
 }
 
 func feedAll(d *dialogs, keys string) {
@@ -101,7 +154,11 @@ func readDialogLog(t *testing.T, path string) []map[string]any {
 	return out
 }
 
+var hooksMu sync.Mutex
+
 func events(hooks []firedHook) string {
+	hooksMu.Lock()
+	defer hooksMu.Unlock()
 	var s []string
 	for _, h := range hooks {
 		s = append(s, h.event)

@@ -11,6 +11,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -46,6 +47,7 @@ type dialogSpec struct {
 	OpenAfter    float64 `json:"open_after_s,omitempty"`   // seconds before it opens (the line's turn waits; a draft typed meanwhile stays in the box)
 	ChangeAfter  float64 `json:"change_after_s,omitempty"` // seconds after it opens, it is redrawn as ChangeTo (the same call, another ask on screen)
 	ChangeTo     string  `json:"change_to,omitempty"`
+	CloseAfter   float64 `json:"close_after_s,omitempty"` // seconds after it opens, it closes by itself as an Escape would (a dialog nothing may answer, closed for the next check)
 }
 
 // dialogRow is one row of a drawn dialog: n is its number (0: unnumbered, the Submit row and a multi-select's "Chat about this").
@@ -79,6 +81,14 @@ type dialogs struct {
 	toolID  string
 	drawn   int // lines the dialog takes on screen, to clear it
 	pending bool
+	out     io.Writer // the terminal; nil: os.Stdout (a test sets its own)
+}
+
+func (d *dialogs) w() io.Writer {
+	if d.out != nil {
+		return d.out
+	}
+	return os.Stdout
 }
 
 // newDialogs reads MOCK_AGENT_DIALOGS (a missing or bad file is said once, at the first MOCK_DIALOG).
@@ -148,12 +158,12 @@ func (d *dialogs) start(name string) bool {
 			why = "no such dialog"
 		}
 		d.mu.Unlock()
-		fmt.Printf("\r\n[mock-agent] MOCK_DIALOG %q: %s\r\n", name, why)
+		fmt.Fprintf(d.w(), "\r\n[mock-agent] MOCK_DIALOG %q: %s\r\n", name, why)
 		return false
 	}
 	if d.open || d.pending {
 		d.mu.Unlock()
-		fmt.Print("\r\n[mock-agent] MOCK_DIALOG: a dialog is already open\r\n")
+		fmt.Fprint(d.w(), "\r\n[mock-agent] MOCK_DIALOG: a dialog is already open\r\n")
 		return false
 	}
 	if spec.Stranger {
@@ -164,7 +174,7 @@ func (d *dialogs) start(name string) bool {
 	if spec.OpenAfter > 0 {
 		d.pending = true
 		d.mu.Unlock()
-		fmt.Printf("\r\n[mock-agent] dialog %s opens in %gs\r\n", name, spec.OpenAfter)
+		fmt.Fprintf(d.w(), "\r\n[mock-agent] dialog %s opens in %gs\r\n", name, spec.OpenAfter)
 		time.AfterFunc(time.Duration(spec.OpenAfter*float64(time.Second)), func() {
 			d.mu.Lock()
 			d.pending = false
@@ -232,13 +242,23 @@ func (d *dialogs) openLocked(name string, spec dialogSpec, late bool) {
 	}
 	d.log("open", map[string]any{"kind": kindOf(spec), "hook": hookOf(spec), "late": late})
 	if late {
-		fmt.Print("\r\n")
+		fmt.Fprint(d.w(), "\r\n")
 	}
-	fmt.Print("\r\x1b[K")
+	fmt.Fprint(d.w(), "\r\x1b[K")
 	d.drawLocked()
 	if spec.ChangeAfter > 0 && spec.ChangeTo != "" {
 		gen := d.gen
 		time.AfterFunc(time.Duration(spec.ChangeAfter*float64(time.Second)), func() { d.change(gen) })
+	}
+	if spec.CloseAfter > 0 {
+		gen := d.gen
+		time.AfterFunc(time.Duration(spec.CloseAfter*float64(time.Second)), func() {
+			d.mu.Lock()
+			defer d.mu.Unlock()
+			if d.open && d.gen == gen {
+				d.closeLocked("dismiss", map[string]any{"by": "close_after_s"}, false) // the box comes back at the next key (the read loop draws it)
+			}
+		})
 	}
 }
 
@@ -317,7 +337,11 @@ func optionRole(label string) string {
 	return ""
 }
 
-func dialogWidth() int {
+// width is the terminal's width (80 when it is not one, or a test's own writer).
+func (d *dialogs) width() int {
+	if d.out != nil {
+		return 80
+	}
 	if w, _, err := term.GetSize(int(os.Stdout.Fd())); err == nil && w > 20 {
 		return w
 	}
@@ -465,15 +489,15 @@ func (d *dialogs) render(width int) []string {
 
 // drawLocked draws the dialog from the cursor's row down and remembers how many rows it took.
 func (d *dialogs) drawLocked() {
-	lines := d.render(dialogWidth())
-	fmt.Print(strings.Join(lines, "\r\n") + "\r\n")
+	lines := d.render(d.width())
+	fmt.Fprint(d.w(), strings.Join(lines, "\r\n")+"\r\n")
 	d.drawn = len(lines)
 }
 
 // eraseLocked clears the dialog from the screen (back to its first row), as the CLI does when it closes or redraws one.
 func (d *dialogs) eraseLocked() {
 	if d.drawn > 0 {
-		fmt.Printf("\x1b[%dA\r\x1b[J", d.drawn)
+		fmt.Fprintf(d.w(), "\x1b[%dA\r\x1b[J", d.drawn)
 	}
 	d.drawn = 0
 }
@@ -560,7 +584,7 @@ func (d *dialogs) takeLocked(r dialogRow, by string) {
 	case r.role == "text":
 		d.typing = true
 		d.log("text_open", map[string]any{"option": r.n, "by": by})
-		fmt.Print(" Type your answer, then Enter:\r\n")
+		fmt.Fprint(d.w(), " Type your answer, then Enter:\r\n")
 		d.drawn++
 	case r.role == "chat":
 		d.closeLocked("answer", map[string]any{"option": r.n, "label": r.label, "chat": true, "by": by}, false)
@@ -575,9 +599,9 @@ func (d *dialogs) closeLocked(event string, extra map[string]any, accepted bool)
 	d.log(event, extra)
 	d.eraseLocked()
 	if event == "dismiss" {
-		fmt.Printf("[mock-agent] DIALOG %s dismissed\r\n", d.name)
+		fmt.Fprintf(d.w(), "[mock-agent] DIALOG %s dismissed\r\n", d.name)
 	} else {
-		fmt.Printf("[mock-agent] DIALOG %s ANSWERED %s\r\n", d.name, describeAnswer(extra))
+		fmt.Fprintf(d.w(), "[mock-agent] DIALOG %s ANSWERED %s\r\n", d.name, describeAnswer(extra))
 	}
 	tool := d.spec.toolOf()
 	if accepted && tool != "" && hookOf(d.spec) == "live" {
@@ -615,19 +639,19 @@ func (d *dialogs) runStranger(name string, spec dialogSpec) {
 	d.mu.Unlock()
 	exe, err := os.Executable()
 	if err != nil {
-		fmt.Printf("\r\n[mock-agent] stranger: %v\r\n", err)
+		fmt.Fprintf(d.w(), "\r\n[mock-agent] stranger: %v\r\n", err)
 		return
 	}
 	cmd := exec.Command(exe, "--qa-stranger", os.Getenv("MOCK_AGENT_DIALOGS"), name, d.logPath)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
 	cmd.SysProcAttr = strangerAttr()
-	fmt.Print("\r\n")
+	fmt.Fprint(d.w(), "\r\n")
 	runErr := cmd.Run()
 	reclaimTerminal()
 	d.mu.Lock()
 	d.log("stranger_exit", map[string]any{"error": fmt.Sprint(runErr)})
 	d.mu.Unlock()
-	fmt.Printf("\r\n[mock-agent] the other program in the terminal ended (%v)\r\n", runErr)
+	fmt.Fprintf(d.w(), "\r\n[mock-agent] the other program in the terminal ended (%v)\r\n", runErr)
 }
 
 // runStrangerChild is the program runStranger starts: it draws the dialog, logs every byte it is sent as "stranger_key", and answers nothing. It ends at an Escape or a Ctrl-C, or after
