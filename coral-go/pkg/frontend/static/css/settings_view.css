@@ -152,3 +152,8 @@
 #launch-modal[data-all-optional] .sv-optional { display: none; }
 
 .provider-card-body .sv-optional { display: none; } /* the provider cards' Model and Thinking (#11235): the defaults are the defaults, nothing there is "optional" */
+
+/* Model and Thinking in the open agent tab's panel (#11709): two rows of a form, the labels in one column (launch_provider_cards.js) */
+.provider-card-body .sv-row { display: grid; grid-template-columns: minmax(0, min(5rem, 38%)) minmax(0, 1fr); align-items: center; gap: 4px 12px; margin: 0; padding: 8px 14px; border: 0; }
+.provider-card-body .sv-row .sv-text { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.provider-card-body .sv-row .sv-error { grid-column: 2; }

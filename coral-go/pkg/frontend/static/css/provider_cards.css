@@ -1,11 +1,20 @@
 /* The provider cards of New Agent's Agent step (#11235, Option B): a radio card for each provider this computer has, the open one holding its Model and Thinking; the ones it has not under "Not installed", with a link and no radio.
    The ring is for the keyboard only (:focus-visible), so the open card is the one unmistakable state. */
-#launch-agent-pick.provider-cards { display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: none; background: none; border: 0; border-radius: 0; margin: 4px 0 0; padding: 0; overflow: visible; }
-.provider-card, .provider-card-body, #launch-agent-pick.provider-cards { min-width: 0; }
+#launch-agent-pick.provider-cards { display: flex; flex-direction: column; gap: 0; width: 100%; max-width: none; background: none; border: 0; border-radius: 0; margin: 4px 0 0; padding: 0; overflow: visible; }
+.provider-card, .provider-card-body, .provider-tabs-wrap, .provider-tabs, .provider-panel, #launch-agent-pick.provider-cards { min-width: 0; max-width: 100%; } /* the strip scrolls inside the step: its tabs never make the step wider than the screen */
 .provider-card-body select, .provider-card-body .acf-model-row, .provider-card-body .acf-model-picker { min-width: 0; max-width: 100%; }
-.provider-card { border: var(--card-border); border-radius: var(--card-radius); background: var(--bg-primary); }
-.provider-card.is-open { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); } /* the open state is the 2 px accent edge, on the card's own surface: the muted text inside keeps 4.5:1 in the light theme (it was 4.4 on a grey fill) */
-.provider-card-head { display: flex !important; flex-direction: row !important; flex-wrap: wrap; align-items: center; gap: 4px 10px; min-height: var(--control-touch-height, 44px); margin: 0; padding: 6px 14px; cursor: pointer; color: var(--text-primary); border-radius: var(--radius-md); } /* (!important: the dialog's labels are a column of text) */
+/* Folder tabs (#11709, the operator's browser-tab picture): one tab per agent this computer has, the open one joins its panel (the same surface, no line between, a 3 px accent on top) and holds that agent's Model and Thinking. The tab is the radio: the input is the label's, kept for the keyboard (arrows move and choose). */
+.provider-tabs { display: flex; align-items: flex-end; gap: 2px; margin: 0 0 -1px; padding-inline: 6px; overflow-x: auto; scrollbar-width: none; -webkit-mask-image: linear-gradient(to right, rgb(var(--black-rgb) / 1) calc(100% - 28px), transparent); mask-image: linear-gradient(to right, rgb(var(--black-rgb) / 1) calc(100% - 28px), transparent); } /* five tabs do not fit a phone: the strip scrolls, and its right edge fades */
+.provider-tabs::-webkit-scrollbar { display: none; }
+.provider-tabs .provider-card-head { margin: 0 !important; position: relative; flex: none; gap: 6px; min-height: var(--control-touch-height, 44px); padding: 0 16px; border: var(--card-border); border-bottom: 0; border-radius: var(--radius-lg) var(--radius-lg) 0 0; background: var(--bg-tertiary); color: var(--text-secondary); font-weight: var(--fw-medium); white-space: nowrap; }
+.provider-tabs .provider-card-head input { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; }
+.provider-tabs .provider-mark, .provider-tabs .provider-status { display: none; } /* the status is the panel's first line */
+.provider-tabs .provider-name { color: inherit; font-weight: inherit; }
+.provider-tabs .provider-card-head.is-open { z-index: 1; background: var(--bg-primary); color: var(--text-primary); font-weight: var(--fw-strong); border-top: 3px solid var(--accent); }
+.provider-panel { border: var(--card-border); border-radius: var(--card-radius); background: var(--bg-primary); }
+.provider-panel:has(> .provider-card-body:not([hidden])) { min-height: 1px; }
+.provider-body-status { margin: 0; padding: 10px 14px 0; color: var(--text-secondary); font-size: var(--fs-sm); }
+.provider-card-head { display: flex !important; flex-direction: row !important; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin: 0; padding: 6px 14px; cursor: pointer; color: var(--text-primary); border-radius: var(--radius-md); } /* (!important: the dialog's labels are a column of text) */
 .provider-card-head:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
 .provider-card-head input { margin: 0; flex: none; width: auto; }
 .provider-mark { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 24px; height: 24px; border-radius: var(--radius-sm); background: var(--bg-tertiary); color: var(--text-primary); font-size: var(--fs-sm); font-weight: var(--fw-strong); }
@@ -18,8 +27,20 @@
 .provider-signin-body p { margin: 0; }
 .provider-signin-cmd { display: block; max-width: 100%; padding: var(--space-sm); border-radius: var(--radius-md); background: var(--bg-primary); color: var(--text-primary); font-family: var(--font-mono); overflow-wrap: anywhere; user-select: all; } /* the command is one click to select (#11364) */
 .provider-signin-actions { display: flex; flex-wrap: wrap; gap: var(--space-sm); }
-.provider-missing { margin-top: 8px; }
-.provider-missing-title { margin: 0 0 6px; }
-.provider-missing-entry { display: flex; flex-wrap: wrap; align-items: center; gap: 0 10px; min-height: var(--control-touch-height, 44px); margin-bottom: 8px; padding: 0 14px; border-style: dashed; background: transparent; }
 .provider-install { margin-left: auto; display: inline-flex; align-items: center; min-height: var(--control-touch-height, 44px); color: var(--link-text); text-decoration: underline; }
-@media (max-width: 359px) { .provider-card-body .seg-group { display: none; } .provider-card-body select.seg-source { display: block; } } /* a strip of six levels does not fit: the select under it does */
+
+/* Model and Thinking are two rows of a form in the open tab's panel (#11709): the labels in one column, the controls the same width; Thinking is one select that never wraps (a strip of eight levels did) */
+.provider-card-body .seg-group { display: none; }
+.provider-card-body select.seg-source { display: block; width: 100%; max-width: none; min-height: var(--control-touch-height, 44px); }
+.provider-card-body .acf-model-select { width: 100%; min-width: 0; }
+/* a missing agent is one quiet line under the panel: the word, its name, Install (no card) */
+.provider-missing { display: flex; flex-wrap: wrap; align-items: center; gap: 0 14px; margin: 8px 0 0; padding: 0 4px; color: var(--text-secondary); font-size: var(--fs-sm); }
+.provider-missing-title { margin: 0; font-size: inherit; font-weight: var(--fw-regular); color: inherit; text-transform: none; letter-spacing: 0; }
+.provider-missing-entry { display: inline-flex; flex-wrap: nowrap; gap: 8px; min-height: var(--control-touch-height, 44px); margin: 0; padding: 0; border: 0; background: none; }
+.provider-missing .provider-mark { display: none; }
+.provider-missing .provider-name { color: var(--text-primary); font-weight: var(--fw-medium); }
+.provider-missing .provider-install { margin-left: 0; min-height: var(--control-touch-height, 44px); } /* still a 44 px target */
+/* the phone's strip: a 44 px chevron button at its edge while there is more to the right; it only scrolls (the Inbox's strip does the same) */
+.provider-tabs-wrap { position: relative; }
+.provider-strip-edge { position: absolute; z-index: 2; right: 0; top: 0; width: var(--control-touch-height, 44px); min-width: var(--control-touch-height, 44px); height: var(--control-touch-height, 44px); padding: 0; background: linear-gradient(to right, transparent, var(--bg-secondary, var(--bg-primary)) 40%); border: 0; cursor: pointer; }
+.provider-strip-edge::before { content: ''; position: absolute; right: 16px; top: calc((100% - 9px) / 2); width: 9px; height: 9px; border-top: 2px solid var(--text-primary); border-right: 2px solid var(--text-primary); transform: rotate(45deg); }

@@ -36,7 +36,7 @@ const { coralReady } = require('./helpers/wait');
         await wizard(390, 844, true, 3);
         await waitFor(`document.querySelectorAll('#launch-agent-pick .provider-card-head').length >= 1`, 'the providers', 8000);
         g = await cardsNow();
-        assert.ok(g.cards.every(c => c[1] >= 44 && c[0] >= g.pickW - 40) && g.inside, 'phone: the cards are full width and 44 px or more: ' + JSON.stringify(g));
+        assert.ok(g.cards.every(c => c[1] >= 44 && c[0] >= 44) && g.inside, 'phone: the agent tabs are 44 px or more each and inside the screen (#11709: folder tabs, not full-width cards): ' + JSON.stringify(g));
         assert.ok(g.pickW >= g.modelW - 60, 'phone: the cards span the form, not a corner of it: ' + JSON.stringify(g));
         await shot('providers-390x844');
         // 2. a short screen: more page between the pinned header and footer
