@@ -512,6 +512,7 @@ func TestProvisionRunWithoutTheHubsEULAMarkerDoesNothing(t *testing.T) {
 	pe.p.eula = func() (bool, bool) { return true, true }
 	code, _ := pe.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{})
 	assert.Equal(t, 202, code)
+	pe.waitPhase(t, plan, "done") // the run is a background writer in the test's folder: wait for it, or the folder is removed under it (#11635)
 }
 
 // startBriefly runs the real start step against the fake ssh, which starts nothing and so never has a key: the step is cut after a second, and what it asked of ssh is in the log.
