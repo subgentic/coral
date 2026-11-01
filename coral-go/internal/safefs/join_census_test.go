@@ -196,6 +196,7 @@ var joinSites = map[string]joinEntry{
 	"internal/executil/editor.go\tEditor.macApp":                                             {1, joinOwn, "a fixed or program-made name in its own folder"},
 	"internal/executil/editor.go\teditorCommand":                                             {1, joinOwn, "a fixed or program-made name in its own folder"},
 	"internal/gitutil/gitutil.go\tResolveGitRoot":                                            {1, joinFixed, "names from a directory listing or numbers and hashes the program makes"},
+	"internal/gitutil/samerepo.go\tcommonDir":                                                {1, joinOwn, "git's own answer for --git-common-dir (a path relative to the folder asked about, or absolute) joined onto that folder, then symbolic links resolved: the result is only COMPARED with another folder's, never opened, read or written (#11704: whether two folders belong to one repository)"},
 	"internal/hooks/cache.go\tTaskCacheWrite":                                                {1, joinOwn, "taskCacheName: a validated task id"},
 	"internal/hooks/cache.go\topenCacheFile":                                                 {1, joinOwn, "taskCacheName: a validated task id"},
 	"internal/hooks/cache.go\tpruneTaskCache":                                                {1, joinOwn, "taskCacheName: a validated task id"},

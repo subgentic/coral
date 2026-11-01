@@ -120,7 +120,7 @@ func plainAbsolutePath(p string) bool {
 		return false
 	}
 	for _, c := range p {
-		if unicode.IsControl(c) || unicode.Is(unicode.Cf, c) || c == ' ' || c == ' ' {
+		if unicode.IsControl(c) || unicode.Is(unicode.Cf, c) || c == '\u2028' || c == '\u2029' {
 			return false
 		}
 	}
