@@ -3,10 +3,10 @@ package agent
 import (
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 
 	at "github.com/subgentic/coral/internal/agenttypes"
+	"github.com/subgentic/coral/internal/hermesdb"
 )
 
 // HermesAgent implements the Agent interface for Hermes Agent (Nous Research, #11831; checked on v0.22.5): `hermes chat` in the agent's pane. Hermes keeps no transcript file: its sessions are rows in
@@ -26,12 +26,9 @@ const (
 	hermesInstallNote    = "The installer puts hermes in ~/.local/bin and its files in ~/.hermes (about 2.4 GB), and takes several minutes. Coral looks in ~/.local/bin too, so it finds hermes either way. Coral never runs the installer for you."
 )
 
-// hermesSessionRe is a Hermes session id as `hermes chat` writes it: local- and exactly 64 lowercase hex digits. It is the only form a resume id may take (the 8-character id in the banner is not one: --resume
-// answers "Session not found"), and it reaches the command line as the value of --resume, never as text the shell reads.
-var hermesSessionRe = regexp.MustCompile(`^local-[0-9a-f]{64}$`)
-
-// IsHermesSessionID reports whether id is a Hermes session id.
-func IsHermesSessionID(id string) bool { return hermesSessionRe.MatchString(id) }
+// IsHermesSessionID reports whether id is a Hermes session id as `hermes chat` writes it: local- and exactly 64 lowercase hex digits (hermesdb.IsSessionID, the one rule the state.db reader asks by too). It is the
+// only form a resume id may take (the 8-character id in the banner is not one: --resume answers "Session not found"), and it reaches the command line as the value of --resume, never as text the shell reads.
+func IsHermesSessionID(id string) bool { return hermesdb.IsSessionID(id) }
 
 // hermesOwnFlags are flags Coral sets itself, or that would change what Coral relies on (which session, whether a command asks, whether hooks are accepted, where it works, how it answers): dropped from a person's
 // flags. The permission flags of the other CLIs are dropped too: Hermes has one, --yolo, which LaunchCommand lets through once (the callers add it from Coral's permission mode). hermesValueFlags are those that take a value.
