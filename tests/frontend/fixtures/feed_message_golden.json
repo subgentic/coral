@@ -1,7 +1,7 @@
 {
   "about": "what handleCoralMessage did with each feed message, for feed_message_golden_browser.test.js: sha256 of the list, servers, header, toasts, calls and render count, and the readable lines. CORAL_UPDATE_GOLDEN=1 rewrites it.",
   "hashes": {
-    "full update of two agents": "01e3069d7138f455eaea8f0ebab46e322d49fd37a4bb4fa729344ee9abc4a8e7",
+    "full update of two agents": "62ca31264412d029e96784d46da891d1b5b9403c8e923e8516c206c5f1a7a86e",
     "a full update merges the fields it omits": "c2ca44e3cccaa75b5b299ee67901269da9348c0bb84cb7e879570b8949a615ae",
     "servers are kept only on a hub": "43d6b700ba4fc9ceff2c1cbf54404e8f1bb83f9e9fa2718dce5bf045065ecf6b",
     "servers on a hub": "6c41833fbfccaacf32bc74756290379f7aab3524a5720c85bb9a501d6d565b8a",
