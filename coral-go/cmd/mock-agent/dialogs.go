@@ -21,6 +21,8 @@ import (
 	"unicode/utf8"
 
 	"golang.org/x/term"
+
+	"github.com/subgentic/coral/internal/safefs"
 )
 
 type dialogOption struct {
@@ -94,7 +96,8 @@ func (d *dialogs) w() io.Writer {
 // newDialogs reads MOCK_AGENT_DIALOGS (a missing or bad file is said once, at the first MOCK_DIALOG).
 func newDialogs(dir, session string, fire func(string, map[string]any)) *dialogs {
 	d := &dialogs{session: session, fire: fire, specs: map[string]dialogSpec{}}
-	if dir != "" {
+	// The log is named after the session, so a name that is not one path element (a separator, "..") gets no log rather than a file outside dir.
+	if dir != "" && safefs.IsSafeID(session) {
 		d.logPath = filepath.Join(dir, session+".dialog.jsonl")
 	}
 	d.specs, d.specErr = loadDialogSpecs(os.Getenv("MOCK_AGENT_DIALOGS"))

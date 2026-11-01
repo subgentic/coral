@@ -366,3 +366,17 @@ func TestInputBoxHandsKeysToTheDialog(t *testing.T) {
 		t.Errorf("submissions %q: the digit went to the box, or the box did not get its keys back", got)
 	}
 }
+
+// A session name that is not one path element gets no dialog record, so the record never lands outside the raw folder.
+func TestDialogRecordNeedsASafeSessionName(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("MOCK_AGENT_DIALOGS", "")
+	for _, name := range []string{"../out", `..\out`, "a/b", "..", ""} {
+		if d := newDialogs(dir, name, func(string, map[string]any) {}); d.logPath != "" {
+			t.Errorf("session %q: dialog record at %q, want none", name, d.logPath)
+		}
+	}
+	if d := newDialogs(dir, "sess-1234-5678", func(string, map[string]any) {}); d.logPath != filepath.Join(dir, "sess-1234-5678.dialog.jsonl") {
+		t.Errorf("a plain session id: dialog record at %q", d.logPath)
+	}
+}
