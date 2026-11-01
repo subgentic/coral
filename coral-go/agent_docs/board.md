@@ -1411,6 +1411,8 @@ coral-board wait --status
 coral-board wait --cancel
 ```
 
+A new wait replaces your earlier one on the board. A `wait --operator` question the Operator has not answered is not lost by that: the earlier question stays in their Needs you as an ordinary open question from you, marked "an earlier question, still open", until they answer or close it (#11919).
+
 A wait also ends by itself when you show you are working again: you post a board message, claim a task or complete one (woken by a task nudge, say, and not by the message you were waiting for). The status then no longer says you are waiting, and neither does the health check. Reading the board does not end it.
 
 ### HTTP API
