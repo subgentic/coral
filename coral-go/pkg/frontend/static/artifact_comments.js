@@ -230,6 +230,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         if (!c.deleted && c.images && c.images.length && !editing(c)) main.append(pictures(c));
         if (top && c.fromVersion != null && groupOf(c) !== 'main') main.append(el('p', 'ac-from ac-from-note', groupOf(c) === 'look' ? `From v${c.fromVersion}. The quote is in this version more than once, so it is not pinned to either.` : `On v${c.fromVersion}. Its text is not in this version.`));
         main.append(actions(c, top));
+        if (top && canAsk(c)) { const asked = [...askedNow(c.id)]; main.append(el('p', 'ac-ask-status', asked.length ? 'Sent to ' + asked.map(([role, words]) => `${role} (${words.toLowerCase()})`).join(', ') : 'Not sent to an agent yet')); } // does the agent have it? said at rest, under the comment: the actions row is hidden until hover
         e.append(main);
         return e;
     }
@@ -270,7 +271,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         if (c.can.edit) row.append(act('Edit', `Edit the comment by ${who}`, () => { st.composing = { editId: c.id }; st.error = ''; render(); panel.querySelector('.ac-input')?.focus(); }));
         if (c.can.delete) row.append(act('Delete', `Delete the comment by ${who}`, () => confirmThen('Delete this comment?', () => run(() => api.deleteComment(ownHex(c), st.server, c.id), 'Comment deleted'))));
         // Send to agent (#6357, #6456): the owner, on this computer, for a thread of this board that is open; never through Coral Hub
-        if (top && canAsk(c)) { const b = act('Send to agent', () => openAsk(c)); b.classList.add('ac-ask-open'); b.setAttribute('aria-label', `Send the comment by ${c.authorName || c.authorId || 'unknown'} to an agent`); b.setAttribute('aria-expanded', String(!!st.ask && st.ask.id === c.id)); row.append(b); const asked = [...askedNow(c.id)]; row.append(el('span', 'ac-ask-status', asked.length ? 'Sent to ' + asked.map(([role, words]) => `${role} (${words.toLowerCase()})`).join(', ') : 'Not sent to an agent yet')); } // does the agent have it? said beside the link
+        if (top && canAsk(c)) { const b = act('Send to agent', () => openAsk(c)); b.classList.add('ac-ask-open'); b.setAttribute('aria-label', `Send the comment by ${c.authorName || c.authorId || 'unknown'} to an agent`); b.setAttribute('aria-expanded', String(!!st.ask && st.ask.id === c.id)); row.append(b); }
         // not an .ac-act: it writes nothing, so a read-only viewer has it too
         if (top && st.ranges.has(c.id)) { const j = btn('ac-jump', 'Show in text', `Show the text of the comment by ${who} in the document`); j.addEventListener('click', () => jumpTo(c.id)); row.append(j); }
         return row;

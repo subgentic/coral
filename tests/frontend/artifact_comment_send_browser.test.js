@@ -77,6 +77,7 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
             console.log(`${tag}: the action`);
             await open('ask-team', undefined, true); // a comment nobody was asked into says so beside the link (#11861)
             check(`${tag}: a comment nobody was asked into says "Not sent to an agent yet"`, (await ev(`document.querySelector('.ac-card[data-id="1"] .ac-ask-status')?.textContent || ''`)) === 'Not sent to an agent yet', await ev(`document.querySelector('.ac-card[data-id="1"] .ac-ask-status')?.textContent || ''`));
+            check(`${tag}: and says it at rest, not only on hover: the line is drawn while the actions row is hidden (#11871)`, await ev(`(() => { const c = document.querySelector('.ac-card[data-id="1"]'), st = c.querySelector('.ac-ask-status'), row = c.querySelector('.ac-actions'); return !c.matches(':hover') && !c.matches(':focus-within') && st.getClientRects().length > 0 && st.getBoundingClientRect().height > 0 && getComputedStyle(st).opacity === '1' && !st.closest('.ac-actions') && (innerWidth < 768 || row.getBoundingClientRect().height === 0 || getComputedStyle(row).opacity === '0'); })()`));
             await ev(`document.querySelector('#artifact-viewer [data-dialog-close], #artifact-viewer .artifact-viewer-close')?.click(); true`);
             await sleep(300); // sleep-ok: the viewer closes over a frame
             await open('ask-team');
