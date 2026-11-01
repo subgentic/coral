@@ -7,6 +7,8 @@ import { showToast, announceNotice } from './notifications.js';
 import { desktopNotifySupported, desktopNotifyEnabled, desktopNotifyBlocked, enableDesktopNotify } from './desktop_notify.js';
 
 export const ALERTS_OFFERED_KEY = 'coral-alerts-offered';
+export const ALERTS_REOFFERED_KEY = 'coral-alerts-reoffered'; // the one second offer (#11893): never a third
+export const REOFFER_AFTER_MS = 5 * 60 * 1000;
 
 /** Offer desktop alerts after an agent started. Does nothing when this browser has no alerts, already has them, blocks them, or was already asked. */
 export function offerAlertsAfterLaunch() {
@@ -14,6 +16,20 @@ export function offerAlertsAfterLaunch() {
     if (typeof Notification !== 'undefined' && Notification.permission !== 'default') return false;
     try { if (browserLocal.get(ALERTS_OFFERED_KEY) === '1') return false; } catch { return false; }
     try { browserLocal.set(ALERTS_OFFERED_KEY, '1'); } catch { /* storage blocked: offered again next time, harmless */ }
+    showOfferBanner();
+    return true;
+}
+
+/** The offer once more, after the person dismissed it and the first thing that needs them has waited 5 minutes (#11893, Beta #11837: two questions waited 14 and 29 minutes with alerts off). `oldestMs` is when the oldest waiting item
+ * began to wait. Only for a browser that was offered, dismissed, and could still turn alerts on; only while the tab is on screen (a banner in a hidden tab is not seen and would spend the one offer); never more than once. */
+export function offerAlertsAgain(oldestMs, now = Date.now()) {
+    if (!Number.isFinite(oldestMs) || now - oldestMs < REOFFER_AFTER_MS || document.hidden) return false;
+    if (!desktopNotifySupported() || desktopNotifyEnabled() || desktopNotifyBlocked()) return false;
+    if (typeof Notification !== 'undefined' && Notification.permission !== 'default') return false;
+    try {
+        if (browserLocal.get(ALERTS_OFFERED_KEY) !== '1' || browserLocal.get(ALERTS_REOFFERED_KEY) === '1') return false;
+        browserLocal.set(ALERTS_REOFFERED_KEY, '1');
+    } catch { return false; }
     showOfferBanner();
     return true;
 }

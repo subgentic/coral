@@ -32,6 +32,16 @@ export function waitingCount() {
     return (state.liveSessions || []).filter(needsYou).length + (unrecordedItem(state.liveSessions) ? 1 : 0); // the agents held until recorded are one item (#11415)
 }
 
+/** Something has waited for the person 5 minutes with alerts still off: the offer comes back once (alerts_offer.js decides whether this browser may be offered again). */
+function offerAlertsAgainIfWaited(n) {
+    if (n <= 0 || document.hidden) return;
+    const at = [...(state.liveSessions || []).filter(needsYou).map(s => Date.parse(s.waiting_since)), ...operatorAsks().map(a => Date.parse(a.at)), ...unreadReviewItems().map(a => Date.parse(a.created_at))].filter(Number.isFinite);
+    if (!at.length) return;
+    const oldest = Math.min(...at);
+    if (Date.now() - oldest >= 5 * 60 * 1000) importOnce('./alerts_offer.js').then(m => m.offerAlertsAgain(oldest));
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) updateInboxTab(); }); // back in the tab: what waited while it was hidden is looked at again
+
 /** Keep the tab's badge (and, where the dashboard builds its own Inbox, the Needs you list) in step with the live list. Safe to call often (after each list update). */
 export function updateInboxTab() {
     const tab = document.getElementById('nav-tab-hub-inbox');
@@ -55,6 +65,7 @@ export function updateInboxTab() {
     const label = n > 0 ? unreadReviewItems().length || failedUnread().length || operatorAsks().length ? `Inbox, ${n} need your attention` : `Inbox, ${n} waiting for input` : null;
     if (tab.getAttribute('aria-label') !== label) { if (label) tab.setAttribute('aria-label', label); else tab.removeAttribute('aria-label'); }
     setInboxCount('needs', n);
+    offerAlertsAgainIfWaited(n);
     _hooks.needs?.(); // the Needs you rows, once the sidebar is loaded and while the Inbox is on screen
     announceNewlyWaiting(tab);
 }
