@@ -8,7 +8,7 @@ const BASE = require('./test_base').BASE;
 const { coralReady } = require('./helpers/wait');
 
 const RECORDER = `(() => {
-    const seen = [], note = () => { for (const b of document.querySelectorAll('.top-nav-tab[aria-current="page"]')) if (!seen.includes(b.id)) seen.push(b.id); };
+    const seen = [], note = () => { for (const b of document.querySelectorAll('.top-nav-tab[aria-current="page"]')) if (!seen.includes(b.id)) { if (!seen.length) window.__bodyTabAtFirstMark = document.body && document.body.getAttribute('data-nav-tab'); seen.push(b.id); } };
     window.__tabsSeenCurrent = seen;
     new MutationObserver(note).observe(document, { subtree: true, childList: true, attributes: true, attributeFilter: ['aria-current'] });
     document.addEventListener('DOMContentLoaded', note);
@@ -19,7 +19,7 @@ const RECORDER = `(() => {
     const open = async (w, h, mobile, path) => {
         await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
         await Page.navigate({ url: BASE + path }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'settings');
-        return ev(`({ seen: window.__tabsSeenCurrent, final: [...document.querySelectorAll('.top-nav-tab[aria-current="page"]')].map(b => b.id), path: location.pathname })`);
+        return ev(`({ seen: window.__tabsSeenCurrent, bodyTab: window.__bodyTabAtFirstMark, final: [...document.querySelectorAll('.top-nav-tab[aria-current="page"]')].map(b => b.id), path: location.pathname })`);
     };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: RECORDER });
@@ -35,6 +35,14 @@ const RECORDER = `(() => {
             const d = await open(w, h, mobile, path);
             assert.deepEqual(d.final, [want], `${name}: the one current tab at the end: ${JSON.stringify(d)}`);
             assert.deepEqual(d.seen, [want], `${name}: no other tab was ever marked current while loading: ${JSON.stringify(d)}`);
+            if (want === 'nav-tab-hub-inbox') assert.notEqual(d.bodyTab, 'hub-inbox', `${name}: the start tab was marked by startNav itself, before the Inbox's own switchNavTab ran (body data-nav-tab was ${d.bodyTab}): ${JSON.stringify(d)}`);
+        }
+        // deep links whose tab depends on where they end (QA's SHOULD, #11616): nothing is marked wrong first, whichever tab each ends on
+        for (const path of ['/chats', '/board/no-such-team-11616', '/servers/no-such-computer-11616']) {
+            await ev(`try { localStorage.removeItem('coral-last-place'); } catch {} true`);
+            const d = await open(1280, 800, false, path);
+            assert.equal(d.final.length, 1, `${path}: one current tab at the end: ${JSON.stringify(d)}`);
+            assert.deepEqual(d.seen, d.final, `${path}: only the tab it ends on was ever marked current: ${JSON.stringify(d)}`);
         }
         console.log('\nPASS the start tab is the only tab ever marked current');
     } finally { await client.close(); }
