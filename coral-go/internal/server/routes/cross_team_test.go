@@ -103,12 +103,18 @@ func TestCrossTeamMessageRules(t *testing.T) {
 	code, out := e.send("alpha", "Orchestrator", "", "hi")
 	require.Equal(t, http.StatusForbidden, code)
 	require.Contains(t, out["error"], `"alpha" and "beta"`)
-	require.Contains(t, out["error"], "Turn it on in Team settings > Messaging.")
+	require.Contains(t, out["error"], "on only by default", "nothing set: on by default, which does not count between two teams of one computer (#11708)")
+	require.Contains(t, out["error"], "turn it on yourself in Team settings > Messaging")
 	e.enable("alpha", true)
 	code, out = e.send("alpha", "Orchestrator", "", "hi")
 	require.Equal(t, http.StatusForbidden, code)
-	require.Contains(t, out["error"], `Cross-team messaging is off on "beta".`)
+	require.Contains(t, out["error"], `Cross-team messaging is on only by default on "beta"`)
 	require.NotContains(t, out["error"], `"alpha"`)
+	e.enable("beta", false) // set to off: it is off, not "on by default"
+	code, out = e.send("alpha", "Orchestrator", "", "hi")
+	require.Equal(t, http.StatusForbidden, code)
+	require.Contains(t, out["error"], `Cross-team messaging is off on "beta".`)
+	require.NotContains(t, out["error"], "by default")
 	e.enable("beta", true)
 
 	// Workers, unknown and inactive senders are refused; the sender's role comes from its subscription.

@@ -43,6 +43,12 @@ type attachEnv struct {
 // X-Test-Session (an agent's verified session id; its tmux name is "claude-<id>") or X-Test-Operator.
 func newAttachEnv(t *testing.T, artifactsOn bool) *attachEnv {
 	t.Helper()
+	return newAttachEnvFiles(t, &artifactsOn)
+}
+
+// newAttachEnvFiles is newAttachEnv with the files switch as given: nil leaves it unset on every board (on only by default, #11708).
+func newAttachEnvFiles(t *testing.T, artifactsOn *bool) *attachEnv {
+	t.Helper()
 	bs, err := boardtest.Open(t.TempDir() + "/board.db")
 	require.NoError(t, err)
 	t.Cleanup(func() { bs.Close() })
@@ -89,7 +95,7 @@ func newAttachEnv(t *testing.T, artifactsOn bool) *attachEnv {
 		require.NoError(t, err)
 	}
 	for _, b := range []string{"alpha", "beta", "gamma"} {
-		_, err := bs.UpdateBoardSettings(ctx, b, board.BoardSettingsUpdate{CrossTeamMessaging: ptrBool(true), CrossTeamArtifacts: ptrBool(artifactsOn)})
+		_, err := bs.UpdateBoardSettings(ctx, b, board.BoardSettingsUpdate{CrossTeamMessaging: ptrBool(true), CrossTeamArtifacts: artifactsOn})
 		require.NoError(t, err)
 	}
 	return e
@@ -558,4 +564,47 @@ func TestAFailedReceivedRenameLeavesNoTempFile(t *testing.T) {
 		names = append(names, en.Name())
 	}
 	assert.Equal(t, []string{rec.ID + ".json"}, names, "only the folder that was there")
+}
+
+// The files switch reads ON on a team that never set it (the default), and a send between two teams on this computer is still refused: the settings say whether the value is SET, and the refusal says that the default
+// does not count here and what to do (#11708, the Operator chose to keep the explicit rule and show it). Set to off it is "off", set to on it works.
+func TestFilesSwitchSetVersusDefaultBetweenTeamsOnOneComputer(t *testing.T) {
+	e := newAttachEnvFiles(t, nil)
+	ctx := context.Background()
+	for _, b := range []string{"alpha", "beta"} {
+		s, err := e.h.bs.GetBoardSettings(ctx, b)
+		require.NoError(t, err)
+		assert.True(t, s.CrossTeamArtifacts, "%s: on by default, as the page shows it", b)
+		assert.False(t, s.ArtifactsStored, "%s: not set", b)
+		assert.True(t, s.MessagingStored, "%s: messaging was set by the env", b)
+		raw, _ := json.Marshal(s)
+		var m map[string]any
+		require.NoError(t, json.Unmarshal(raw, &m))
+		assert.Equal(t, true, m["cross_team_artifacts"], b)
+		assert.Equal(t, false, m["cross_team_artifacts_set"], "the settings say the value is not set")
+		assert.Equal(t, true, m["cross_team_messaging_set"], b)
+	}
+	d := e.upload(alphaOrchSID, "alpha's report")
+	code, out := e.send("alpha", "beta", alphaOrchSID, uri(d))
+	require.Equal(t, http.StatusForbidden, code)
+	assert.Equal(t, "artifacts_off", out["code"])
+	assert.Contains(t, out["error"], `"alpha" and "beta"`)
+	assert.Contains(t, out["error"], "on only by default", "the refusal says the switch is on by default, not off")
+	assert.Contains(t, out["error"], "yourself")
+	assert.NotContains(t, out["error"], "is off on", "it is not off")
+	// alpha sets it on: only beta is named; beta set to OFF is "off", not "by default".
+	_, err := e.h.bs.UpdateBoardSettings(ctx, "alpha", board.BoardSettingsUpdate{CrossTeamArtifacts: ptrBool(true)})
+	require.NoError(t, err)
+	_, out = e.send("alpha", "beta", alphaOrchSID, uri(d))
+	assert.Contains(t, out["error"], `on only by default on "beta"`)
+	assert.NotContains(t, out["error"], `"alpha"`)
+	_, err = e.h.bs.UpdateBoardSettings(ctx, "beta", board.BoardSettingsUpdate{CrossTeamArtifacts: ptrBool(false)})
+	require.NoError(t, err)
+	_, out = e.send("alpha", "beta", alphaOrchSID, uri(d))
+	assert.Contains(t, out["error"], `off on "beta"`)
+	assert.NotContains(t, out["error"], "by default")
+	_, err = e.h.bs.UpdateBoardSettings(ctx, "beta", board.BoardSettingsUpdate{CrossTeamArtifacts: ptrBool(true)})
+	require.NoError(t, err)
+	code, out = e.send("alpha", "beta", alphaOrchSID, uri(d))
+	assert.Equal(t, http.StatusOK, code, "set on both: the send goes through: %v", out)
 }

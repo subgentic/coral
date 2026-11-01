@@ -161,5 +161,6 @@ func (h *BoardHandler) setSwitchForHub(w http.ResponseWriter, r *http.Request, k
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "changed": changed, "announced": announced, "at": change.At,
-		"cross_team_messaging": settings.CrossTeamMessaging, "cross_team_artifacts": settings.CrossTeamArtifacts})
+		"cross_team_messaging": settings.CrossTeamMessaging, "cross_team_artifacts": settings.CrossTeamArtifacts,
+		"cross_team_messaging_set": settings.MessagingStored, "cross_team_artifacts_set": settings.ArtifactsStored})
 }
