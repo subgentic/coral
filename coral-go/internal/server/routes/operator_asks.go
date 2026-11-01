@@ -7,6 +7,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/clitext"
 )
 
@@ -34,6 +35,8 @@ type operatorAskRow struct {
 	Text  string `json:"text"`
 	Cut   bool   `json:"cut,omitempty"`
 	At    string `json:"at"`
+	// Buttons the asker declared on a question (#11643), in order, with their state (pending, used); the Operator's click claims one through the claim route.
+	Buttons []board.AskButton `json:"buttons,omitempty"`
 }
 
 // OperatorAsks answers GET /api/operator-asks.
@@ -57,9 +60,14 @@ func (h *BoardHandler) OperatorAsks(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			continue
 		}
+		ids := make([]int64, 0, len(asks))
+		for _, a := range asks {
+			ids = append(ids, a.MessageID)
+		}
+		withButtons, _ := h.bs.AskButtonsOf(ctx, p.Project, ids)
 		for _, a := range asks {
 			text, cut := operatorAskText(a.Content)
-			rows = append(rows, operatorAskRow{Board: p.Project, Kind: "ask", ID: a.MessageID, Asker: clitext.CleanName(a.Asker), Text: text, Cut: cut, At: a.At.UTC().Format(time.RFC3339)})
+			rows = append(rows, operatorAskRow{Board: p.Project, Kind: "ask", ID: a.MessageID, Asker: clitext.CleanName(a.Asker), Text: text, Cut: cut, At: a.At.UTC().Format(time.RFC3339), Buttons: withButtons[a.MessageID]})
 		}
 		waits, err := h.bs.ListOperatorQuestions(ctx, p.Project)
 		if err != nil {

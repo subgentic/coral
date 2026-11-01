@@ -127,6 +127,13 @@ func (h *BoardHandler) PostMessage(w http.ResponseWriter, r *http.Request) {
 		}
 		asked = to
 	}
+	var buttons []board.AskButton
+	if derr == nil && len(body.Buttons) > 0 {
+		var ok bool
+		if buttons, ok = h.checkAskButtons(w, r, project, body, asked); !ok {
+			return
+		}
+	}
 	if derr == nil && body.ReplyTo != 0 {
 		if body.ReplyTo < 0 || h.bs.CheckReplyTo(r.Context(), project, body.ReplyTo) != nil {
 			errBadRequest(w, "reply_to is not a message of this board")
@@ -146,6 +153,11 @@ func (h *BoardHandler) PostMessage(w http.ResponseWriter, r *http.Request) {
 		if to, err := h.bs.AskTargets(r.Context(), project, msg.SubscriberID, msg.Content); err == nil {
 			if err := h.bs.RecordAsk(r.Context(), project, msg, to); err != nil {
 				slog.Warn("board ask not recorded", "board", project, "message", msg.ID, "error", err)
+			}
+			if len(buttons) > 0 {
+				if err := h.bs.RecordAskButtons(r.Context(), project, msg.ID, buttons, time.Now()); err != nil {
+					slog.Warn("ask buttons not recorded", "board", project, "message", msg.ID, "error", err)
+				}
 			}
 		}
 	}
@@ -187,6 +199,8 @@ type postMessageBody struct {
 	Ask bool `json:"ask,omitempty"`
 	// Guide makes the ask a question to a guide of this team (#11457): the guide's hub label, which must be in the team's roster. Only an agent's own post, and only with Ask.
 	Guide string `json:"guide,omitempty"`
+	// Buttons declares up to three buttons on a question to @Operator (#11643): each "Label=action[:arg]" from a closed list, checked by the server, shown to the Operator, run by nobody until they click.
+	Buttons []string `json:"buttons,omitempty"`
 	// DryRun checks the post (size, mentions) and answers {"ok": true, "dry_run": true} without storing anything: "post --assign" asks before it creates the task, so a refused post leaves nothing behind (#9047).
 	DryRun  bool            `json:"dry_run,omitempty"`
 	ReplyTo int64           `json:"reply_to,omitempty"`
