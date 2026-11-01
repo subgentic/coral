@@ -56,7 +56,12 @@ const { install: installNA, stubModels } = require('./helpers/new_agent');
                 await ev(`document.querySelector('${G} input[value="${type}"]').click(); true`); await settle(500);
                 d = await geo();
                 assert.ok(d.thinkingSelect && !d.segShown, at + `${type}: Thinking is one select and no strip of buttons: ` + JSON.stringify(d));
-                assert.ok(d.thinkH === d.modelH || Math.abs(d.thinkH - d.modelH) <= 24, at + `${type}: Model and Thinking are rows of the same kind: ` + JSON.stringify([d.modelH, d.thinkH]));
+                // #10837: one line says what a level costs, and the refresh is named on sight where there is room (a desktop with a mouse), icon only on a phone
+                const w2 = await ev(`(() => { const g = document.querySelector('${G}'), hint = g.querySelector('.provider-card-body:not([hidden]) .provider-think-hint'), t = g.querySelector('.provider-card-body:not([hidden]) .acf-model-refresh-text'), vis = e => !!e && e.getClientRects().length > 0; return { hint: hint ? hint.textContent : null, hintShown: vis(hint), hintH: hint ? Math.round(hint.getBoundingClientRect().height + 4) : 0, label: t ? t.textContent : null, labelShown: vis(t) }; })()`);
+                assert.equal(w2.hint, 'More thinking is slower and costs more. Default lets the agent choose.', at + `${type}: one line on what Thinking costs: ` + JSON.stringify(w2));
+                assert.ok(w2.hintShown, at + `${type}: the line is on screen`);
+                assert.equal(w2.labelShown, !mobile, at + `${type}: the refresh says "Refresh models" on a desktop and is the icon alone on a phone: ` + JSON.stringify(w2));
+                assert.ok(d.thinkH === d.modelH || Math.abs(d.thinkH - w2.hintH - d.modelH) <= 48, at + `${type}: Model and Thinking are rows of the same kind: ` + JSON.stringify([d.modelH, d.thinkH]));
                 assert.ok(d.modelCtl && d.thinkCtl && Math.abs(d.modelCtl[0] - d.thinkCtl[0]) <= 1, at + `${type}: the labels are one column, so the controls start at the same x: ` + JSON.stringify([d.modelCtl, d.thinkCtl]));
                 assert.ok(!d.sideways, at + `${type}: nothing scrolls sideways`);
             }
