@@ -114,6 +114,7 @@ POST /api/board/{project}/tasks/{taskID}/park | (*BoardHandler).ParkTask-fm
 POST /api/board/{project}/tasks/{taskID}/publish | (*BoardHandler).PublishTask-fm
 POST /api/board/{project}/tasks/{taskID}/reassign | (*BoardHandler).ReassignTask-fm
 POST /api/board/{project}/tasks/{taskID}/reject | (*BoardHandler).RejectReview-fm
+POST /api/board/{project}/tasks/{taskID}/release | (*BoardHandler).ReleaseTaskByID-fm
 POST /api/board/{project}/tasks/{taskID}/release-review | (*BoardHandler).ReleaseCompletionReview-fm
 POST /api/board/{project}/tasks/{taskID}/reminder | (*BoardHandler).RemindTask-fm
 POST /api/board/{project}/tasks/{taskID}/reply | (*BoardHandler).ReplyToTask-fm

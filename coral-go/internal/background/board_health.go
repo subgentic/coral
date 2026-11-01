@@ -218,6 +218,7 @@ func (m *BoardHealthMonitor) composeCheck(ctx context.Context, project, orch str
 	items = append(items, reviewItems(reviews, reviewers, parked, idleNoWork)...)
 	items = append(items, m.poolReviewItems(ctx, project, now)...) // a review that has waited in the pool (#8957)
 	items = append(items, m.askItems(ctx, project, now)...)
+	items = append(items, m.parkItems(ctx, project, all, now)...) // an agent with a park over a day old, or more parks than the cap (#11660)
 	// 4. Queue problems (task numbers only).
 	issues, _, _ := taskQueueIssues(tasks)
 	for _, is := range issues {
@@ -607,4 +608,68 @@ func healthFacts(items []teamhealth.Item, questions []teamhealth.Question, roste
 		set["r:"+f] = true
 	}
 	return set
+}
+
+// parkStale is how long a park may last before the check names the agent that holds it (#11660): a park is for a wait outside the team, and a day on one is work that is not getting done.
+const parkStale = 24 * time.Hour
+
+// parkItems names each agent that holds a park older than parkStale, or more parks than board.MaxParkedPerAgent (parks made before the cap are reported, never touched). A park made before the time was
+// recorded counts from the task's last change.
+func (m *BoardHealthMonitor) parkItems(ctx context.Context, project string, all []board.Task, now time.Time) []teamhealth.Item {
+	since, err := m.store.ParkedSince(ctx, project)
+	if err != nil {
+		return nil
+	}
+	type held struct {
+		ids   []int64
+		stale []int64
+	}
+	byAgent := map[string]*held{}
+	var order []string
+	for _, t := range all {
+		if !t.Parked(now) || t.AssignedTo == nil || *t.AssignedTo == "" {
+			continue
+		}
+		agent := *t.AssignedTo
+		h := byAgent[agent]
+		if h == nil {
+			h = &held{}
+			byAgent[agent] = h
+			order = append(order, agent)
+		}
+		h.ids = append(h.ids, t.ID)
+		at, known := since[t.ID]
+		if !known {
+			at, known = parseTime(t.UpdatedAt)
+		}
+		if known && now.Sub(at) > parkStale {
+			h.stale = append(h.stale, t.ID)
+		}
+	}
+	var items []teamhealth.Item
+	for _, agent := range order {
+		h := byAgent[agent]
+		over := len(h.ids) > board.MaxParkedPerAgent
+		if len(h.stale) == 0 && !over {
+			continue
+		}
+		var problem string
+		switch {
+		case len(h.stale) > 0 && over:
+			problem = fmt.Sprintf("holds %d parked tasks (at most %d), %s parked over 24 h", len(h.ids), board.MaxParkedPerAgent, taskNumbers(h.stale))
+		case len(h.stale) > 0:
+			problem = fmt.Sprintf("has %s parked over 24 h", taskNumbers(h.stale))
+		default:
+			problem = fmt.Sprintf("holds %d parked tasks (at most %d): %s", len(h.ids), board.MaxParkedPerAgent, taskNumbers(h.ids))
+		}
+		items = append(items, teamhealth.Item{Rank: 3, Agent: teamhealth.Name(agent), Problem: problem,
+			Suggest: "a park is for a wait outside the team: release what is not for now (coral-board task release <id>), hand in what waits on a reviewer, finish the rest",
+			Key:     "parked|" + agent, State: taskNumbers(h.ids)})
+	}
+	return items
+}
+
+func parseTime(s string) (time.Time, bool) {
+	t, err := time.Parse(time.RFC3339, s)
+	return t, err == nil
 }

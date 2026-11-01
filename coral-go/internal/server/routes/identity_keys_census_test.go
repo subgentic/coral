@@ -18,6 +18,7 @@ var identityWords = map[string]bool{"subscriber": true, "session": true, "sender
 // notIdentityFields are decoded fields that look like an identity but do not say who a request is
 // from or for: each with why. A new one needs a line here, or to be added to identityKeys.
 var notIdentityFields = map[string]string{
+	"keep_assigned":      "task release (#11660): a flag, whether the released task stays with its owner; the owner is the task's own, never a name from the request",
 	"agent_type":         "which CLI to launch, not a participant",
 	"owner_kind":         "written by the server into the upload record (#5577) from the launch path's team owner; read back from the data folder, never from a request",
 	"owner_id":           "as owner_kind: the owner a record names, a validated hub-user id or the machine owner, set by the server at the upload, never read from a request",
