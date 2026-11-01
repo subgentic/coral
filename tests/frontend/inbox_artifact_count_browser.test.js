@@ -20,6 +20,8 @@ const { coralReady } = require('./helpers/wait');
         await waitFor(`window.__counts.length >= 1`, 'the first count read', 8000);
         const first = await asks();
         assert.equal(first, 1, 'one count read on opening: ' + first);
+        const url = await ev(`window.__counts[0]`);
+        assert.match(url, /[?&]versions=newest(&|$)/, 'the badge counts files, as the list shows them (#11777): one row per file, not one per version: ' + url);
         console.log('2. Switching folders and opening the Inbox again do not ask again');
         for (const folder of ['saved', 'tasks', 'goals', 'needs']) await open(folder);
         await ev(`window.switchNavTab('agents'); true`); await open('needs'); await open('saved');

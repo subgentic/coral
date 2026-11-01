@@ -32,7 +32,7 @@ export function refreshArtifactCount(done) {
     counting = (async () => {
         try {
             const hidden = artifactsOwnerOnly();
-            const d = await readInboxArtifacts(new URLSearchParams({limit:'1'}));
+            const d = await readInboxArtifacts(new URLSearchParams({limit:'1', versions:'newest'}));
             countAt = Date.now();
             let changed = hidden !== artifactsOwnerOnly(); // the folder went (every computer refused)
             if (Number.isSafeInteger(d.all) && d.all !== count) { count = d.all; changed = true; }
