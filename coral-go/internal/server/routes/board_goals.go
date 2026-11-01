@@ -199,9 +199,14 @@ func (h *BoardHandler) announceGoalDriver(project, actor string, g *board.Goal, 
 		}
 		h.postNotice(ctx, project, fmt.Sprintf("@%s [Goal #%d] you now drive this goal: %s — run '%s' to read it", driver, id, h.noticeText(ctx, project, title), show))
 		if h.terminal != nil {
-			_ = h.sendTaskNudge(ctx, project, driver, fmt.Sprintf("[Goal #%d] You now drive this goal. Run '%s' to read it.", id, show))
+			_ = h.sendTaskNudge(ctx, project, driver, typedGoalDriverNudge(id))
 		}
 	})
+}
+
+// typedGoalDriverNudge is what is typed into a goal's new driver: fixed words and the goal's number, no text of the goal (the census, goal #7).
+func typedGoalDriverNudge(id int64) string {
+	return fmt.Sprintf("You now drive goal #%d. Run 'coral-board goal show %d' to read it.", id, id)
 }
 
 // ListGoals: GET /api/board/{project}/goals?state=a,b&limit=n&cursor=c. A page of the board's goals, oldest first, in the task list's shape: limit defaults to 50 and is at most 200, next_cursor
