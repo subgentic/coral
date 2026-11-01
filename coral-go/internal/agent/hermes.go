@@ -65,6 +65,9 @@ func (a *HermesAgent) LaunchCommand(params LaunchParams) (string, error) {
 		wd := formatEnvExport("CORAL_HERMES_WORKDIR", params.WorkingDir)
 		parts, raw = append(parts, wd), append(raw, wd)
 	}
+	if prep := hermesPrepareLine(home, bin); prep != "" {
+		parts, raw = append(parts, prep), append(raw, prep)
+	}
 	parts = append(parts, bin, "chat")
 	if id := params.ResumeSessionID; id != "" && IsHermesSessionID(id) { // one that is not one is ignored: a fresh session, never an argument made of it
 		parts = append(parts, "--resume", id)
@@ -115,4 +118,19 @@ func hermesDataDir(params LaunchParams) string {
 		return filepath.Join(home, ".coral")
 	}
 	return ""
+}
+
+// hermesPreparedMarker is the file in a team's home that says its runtime has been prepared.
+const hermesPreparedMarker = ".coral-prepared"
+
+// hermesPrepareLine is the shell syntax that prepares a team's Hermes home the first time it is used, "" when it has been, or the shell has no such syntax (PowerShell: Hermes on Windows has not been tried with Coral).
+// Hermes prepares its isolated runtime on first use of a home, about a minute and 400 MB (the tester's re-run, #11715), and `hermes hooks list` does that and lists the hooks it will run. It runs in the agent's own
+// pane, where the person sees it, after a plain line saying what it is, and the marker is written only when it succeeded: a failed preparation is tried again by the next launch. The first prompt waits for the
+// chat like any other, so there is no launch timeout for it to hit.
+func hermesPrepareLine(home, bin string) string {
+	marker := filepath.Join(home, hermesPreparedMarker)
+	if _, err := os.Lstat(marker); err == nil || detectShell() == ShellPowerShell {
+		return ""
+	}
+	return fmt.Sprintf("if [ ! -f %s ]; then echo %s; %s && touch %s; fi;", singleQuote(marker), singleQuote("Preparing Hermes for this team (about a minute, once)..."), ShellJoin([]string{bin, "hooks", "list"}), singleQuote(marker))
 }

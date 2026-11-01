@@ -3,6 +3,7 @@ package agent
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -120,4 +121,36 @@ func TestHermesReasoningKeepsThePromptsOn(t *testing.T) {
 	assert.True(t, SkipsPermissionPrompts(at.Hermes, []string{"--reasoning", "high", "--yolo"}))
 	assert.True(t, SkipsPermissionPrompts(at.Hermes, []string{"--reasoning", "--yolo"}), "a flag is not a value")
 	assert.True(t, SkipsPermissionPrompts(at.Claude, []string{"--reasoning", "high"}), "only Hermes has the flag")
+}
+
+// #11831 (the tester's re-run): the first use of a Hermes home prepares its runtime (about a minute and 400 MB). The launch line does it in the pane, where the person sees it, with a plain word first, and only
+// once: Hermes's own `hooks list` is what prepares it, and the marker is written only when that succeeded. Not on a launch timeout, not for a home that was prepared.
+func TestTheFirstLaunchInATeamsHomePreparesItVisiblyAndOnce(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("a POSIX shell line")
+	}
+	r := hermesRig(t)
+	line := func() string {
+		cmd, err := GetAgent(at.Hermes).LaunchCommand(LaunchParams{SessionID: "s1", BoardName: "team-a", CoralDir: r.data})
+		require.NoError(t, err)
+		return cmd
+	}
+	home := HermesTeamHome(r.data, "team-a")
+	first := line()
+	assert.Contains(t, first, "Preparing Hermes for this team")
+	assert.Contains(t, first, "hermes hooks list")
+	assert.Contains(t, first, "touch '"+filepath.Join(home, ".coral-prepared")+"'")
+	assert.True(t, strings.Index(first, "hooks list") < strings.Index(first, "hermes chat"), "prepared before the chat starts")
+	assert.Contains(t, first, "hermes chat")
+
+	require.NoError(t, os.WriteFile(filepath.Join(home, ".coral-prepared"), nil, 0o600))
+	second := line()
+	assert.NotContains(t, second, "Preparing Hermes for this team")
+	assert.NotContains(t, second, "hooks list")
+	assert.Contains(t, second, "hermes chat")
+
+	// another team's home is its own
+	cmd, err := GetAgent(at.Hermes).LaunchCommand(LaunchParams{SessionID: "s2", BoardName: "team-b", CoralDir: r.data})
+	require.NoError(t, err)
+	assert.Contains(t, cmd, "Preparing Hermes for this team")
 }
