@@ -114,6 +114,7 @@ func (s *Server) registerBoardAPI(r *chi.Mux, boardHandler *routes.BoardHandler,
 		r.With(routes.RefuseSignInLink).Get("/api/board/{project}/orchestrator-grant", sessHandler.OrchestratorGrant)
 		r.With(routes.RefuseSignInLink).Put("/api/board/{project}/orchestrator-grant", sessHandler.OrchestratorGrant)
 		r.Get("/api/board/{project}/lifecycle-log", sessHandler.LifecycleLog)
+		r.Get("/api/board/{project}/branches", sessHandler.TeamBranches) // the team's Branches tab (goal #11): read-only, from the git poller's snapshot
 		r.With(routes.RefuseSignInLink).Get("/api/board/{project}/guide-roster", boardHandler.GuideRoster) // #11457: which name goes with which guide: the Operator's, the owner's through Coral Hub
 		r.With(routes.RefuseSignInLink).Put("/api/board/{project}/guide-roster", boardHandler.GuideRoster)
 		r.With(routes.RefuseSignInLink).Post("/api/board/{project}/agents/{subscriber}/wake", sessHandler.OrchestratorWake)

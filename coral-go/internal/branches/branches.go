@@ -58,6 +58,13 @@ type Worktree struct {
 	Unreadable bool `json:"unreadable,omitempty"` // its status could not be read
 	Main       bool `json:"main,omitempty"`       // the repository's main worktree (the first git lists)
 
+	// UpstreamGone: the branch's upstream branch was deleted. Quiet: no commit on it for 14 days. Labels only (marks.go).
+	UpstreamGone bool `json:"upstream_gone,omitempty"`
+	Quiet        bool `json:"quiet,omitempty"`
+	// PR is the pull request of this worktree's branch, from gh (gh.go); nil when there is none or PR state is not read.
+	PR *PR `json:"pr,omitempty"`
+
+	tip  string // the full head commit (Head is its short form)
 	path string // canonical: what agents' folders are matched against; never served (Security's MUST 5)
 	raw  string // the path as git listed it: looked at as text only, before it is known to be local
 }
@@ -68,6 +75,12 @@ type Repo struct {
 	Worktrees []Worktree `json:"worktrees"`
 	More      int        `json:"more"` // worktrees past MaxWorktrees
 	At        time.Time  `json:"at"`
+	// Remote is the origin as host and owner/repo text (remote.go); RemoteUnknown: there is an origin, but not of a shape Coral reads.
+	Remote        *Remote `json:"remote,omitempty"`
+	RemoteUnknown bool    `json:"remote_unknown,omitempty"`
+	// PRNote says why PR state is not shown: gh is not signed in, or it is paused after a rate limit.
+	PRNote string `json:"pr_note,omitempty"`
+	key    string // the collector's key for this repository
 	// Unreadable: git would not read the repository (not a repository any more, or one it calls of dubious ownership, which Coral never overrides).
 	Unreadable bool `json:"unreadable,omitempty"`
 }
@@ -80,19 +93,25 @@ type counts struct {
 
 // Collector holds the pictures. Its zero value is not ready: use New.
 type Collector struct {
-	mu      sync.Mutex
-	repos   map[string]*Repo // by the repository's canonical common git dir
-	rootKey map[string]string
-	counts  map[string]counts // by base tip + branch tip
-	paused  map[string]time.Time
-	asked   map[string]time.Time // canonical agent folders whose tab was read, and when
-	now     func() time.Time
-	run     func(ctx context.Context, dir string, args ...string) ([]byte, error)
+	mu       sync.Mutex
+	repos    map[string]*Repo // by the repository's canonical common git dir
+	rootKey  map[string]string
+	counts   map[string]counts // by base tip + branch tip
+	paused   map[string]time.Time
+	asked    map[string]time.Time // canonical agent folders whose tab was read, and when
+	prs      map[string]*prState  // PR state by repository key (gh.go)
+	gh       func(ctx context.Context, path string, args ...string) ([]byte, string, error)
+	ghLooked time.Time
+	ghFound  string
+	ghPause  time.Time // no gh call before this, for any repository (a rate limit or a missing sign-in)
+	ghNote   string    // why, until gh answers again
+	now      func() time.Time
+	run      func(ctx context.Context, dir string, args ...string) ([]byte, error)
 }
 
 // New is an empty collector that runs git through gitutil.
 func New() *Collector {
-	return &Collector{repos: map[string]*Repo{}, rootKey: map[string]string{}, counts: map[string]counts{}, paused: map[string]time.Time{}, asked: map[string]time.Time{}, now: time.Now, run: readGit}
+	return &Collector{repos: map[string]*Repo{}, rootKey: map[string]string{}, counts: map[string]counts{}, paused: map[string]time.Time{}, asked: map[string]time.Time{}, prs: map[string]*prState{}, now: time.Now, run: readGit, gh: runGh}
 }
 
 // errNotRead is a git call this package does not make.
@@ -100,11 +119,17 @@ var errNotRead = errors.New("branches: not a read command")
 
 // readCommands are the only git commands this package runs, with the flags it may give them (Security's MUST 1: the census lists the flags too, readcensus_test.go).
 var readCommands = map[string][]string{
-	"rev-parse": {"--path-format=absolute", "--git-common-dir", "--show-toplevel", "--verify", "--quiet", "--abbrev-ref", "--end-of-options"},
-	"worktree":  {"list", "--porcelain", "-z"},
-	"rev-list":  {"--left-right", "--cherry-pick", "--right-only", "--count", "--end-of-options"},
-	"status":    {"--porcelain=v1", "-z", "--untracked-files=no", "--untracked-files=normal", "--no-renames", "--ignore-submodules=all"},
+	"rev-parse":    {"--path-format=absolute", "--git-common-dir", "--show-toplevel", "--verify", "--quiet", "--abbrev-ref", "--end-of-options"},
+	"worktree":     {"list", "--porcelain", "-z"},
+	"rev-list":     {"--left-right", "--cherry-pick", "--right-only", "--count", "--end-of-options"},
+	"status":       {"--porcelain=v1", "-z", "--untracked-files=no", "--untracked-files=normal", "--no-renames", "--ignore-submodules=all"},
+	"for-each-ref": {refsFormat},
+	"config":       {"--get"},
+	"merge-base":   {"--is-ancestor", "--end-of-options"},
 }
+
+// readOperands pins the operands of the commands that take a fixed one: for-each-ref reads only refs/heads, config reads only the origin's URL.
+var readOperands = map[string]string{"for-each-ref": "refs/heads", "config": "remote.origin.url"}
 
 // readGit runs one read git command in dir and returns its output: through gitutil.Command, with no GIT_* variable of Coral's own in its environment, stdin closed, and gitTimeout.
 func readGit(ctx context.Context, dir string, args ...string) ([]byte, error) {
@@ -133,6 +158,12 @@ func readAllowed(args []string) bool {
 		if ended || !strings.HasPrefix(a, "-") {
 			if args[0] == "worktree" && a != "list" {
 				return false
+			}
+			if want, pinned := readOperands[args[0]]; pinned && a != want {
+				return false
+			}
+			if args[0] == "merge-base" && (!ended || !validSHA(a)) {
+				return false // commit ids only, after --end-of-options
 			}
 			continue
 		}
@@ -170,6 +201,7 @@ func (c *Collector) Observe(ctx context.Context, roots []string) {
 	ctx, cancel := context.WithTimeout(ctx, passBudget)
 	defer cancel()
 	seen := map[string]bool{}
+	rootOf := map[string]string{}
 	sort.Strings(roots)
 	for _, root := range roots {
 		if ctx.Err() != nil {
@@ -183,6 +215,7 @@ func (c *Collector) Observe(ctx context.Context, roots []string) {
 			continue
 		}
 		seen[key] = true
+		rootOf[key] = root
 		c.mu.Lock()
 		r, until := c.repos[key], c.paused[key]
 		c.mu.Unlock()
@@ -192,6 +225,7 @@ func (c *Collector) Observe(ctx context.Context, roots []string) {
 		}
 		start := time.Now()
 		repo := c.read(ctx, root)
+		repo.key = key
 		c.mu.Lock()
 		c.repos[key] = repo
 		if time.Since(start) >= gitTimeout || errors.Is(ctx.Err(), context.DeadlineExceeded) {
@@ -203,9 +237,27 @@ func (c *Collector) Observe(ctx context.Context, roots []string) {
 	for key := range c.repos { // a repository no agent works in any more is forgotten
 		if !seen[key] {
 			delete(c.repos, key)
+			delete(c.prs, key)
+		}
+	}
+	type ask struct {
+		key string
+		r   Remote
+	}
+	var asks []ask
+	for key := range seen {
+		if r := c.repos[key]; r != nil && r.Remote != nil && prHosts[r.Remote.Host] && len(asks) < prReposPerPass {
+			asks = append(asks, ask{key, *r.Remote})
 		}
 	}
 	c.mu.Unlock()
+	for _, a := range asks { // PR state: only for the repositories read for an open tab this pass (wanted), at most prReposPerPass
+		if ctx.Err() != nil {
+			return
+		}
+		c.refreshPRs(ctx, a.key, a.r)
+		c.matchPRs(ctx, a.key, rootOf[a.key])
+	}
 }
 
 // wanted says the tab of an agent working in root was read within askedFor; the ones older are forgotten.
@@ -267,7 +319,17 @@ func (c *Collector) read(ctx context.Context, root string) *Repo {
 	}
 	baseName, baseTip := c.base(ctx, root)
 	repo.Base = baseName
+	if out, err := c.run(ctx, root, "config", "--get", "remote.origin.url"); err == nil {
+		if r, ok := parseRemote(string(out)); ok {
+			repo.Remote = &r
+		} else {
+			repo.RemoteUnknown = true // shown as an unknown remote, never as its text
+		}
+	}
+	refs := c.refs(ctx, root)
 	for _, w := range trees {
+		w.tip = w.Head
+		mark(&w, refs, c.now())
 		if localFixedPath(w.raw) {
 			w.path = canonical(w.raw)
 		} else {
@@ -495,7 +557,7 @@ func (c *Collector) For(dir string) (Repo, int, bool) {
 	}
 	cp := *bestRepo
 	cp.Worktrees = append([]Worktree(nil), bestRepo.Worktrees...)
-	return cp, best, true
+	return withPRs(cp, c.prs[cp.key], c.ghNote), best, true
 }
 
 // Holds says worktree i of repo holds dir (another agent's folder), for the tab's agent chips.
@@ -524,3 +586,6 @@ func jsonOf(v any) (string, error) {
 	b, err := json.Marshal(v)
 	return strings.ToLower(string(b)), err
 }
+
+// Same says a and b are the same repository (for a team view that groups its agents' folders).
+func (c *Collector) Same(a, b Repo) bool { return a.key != "" && a.key == b.key }

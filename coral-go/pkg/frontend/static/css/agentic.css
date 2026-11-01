@@ -1645,6 +1645,8 @@ body.panel-dragging .agentic-state {
 .branches-name { font-weight:var(--fw-strong); color:var(--text-primary); overflow-wrap:anywhere; }
 .branches-meta, .branches-note { color:var(--text-secondary); font-size:var(--fs-sm); overflow-wrap:anywhere; }
 .branches-note { margin:0 0 8px; }
+.branches-repo + .branches-repo { margin-top:16px; }
+.branches-remote { margin:0 0 4px; font-size:var(--fs-md); font-weight:var(--fw-strong); color:var(--text-primary); overflow-wrap:anywhere; }
 .branches-mark { color:var(--text-muted); font-size:var(--fs-sm); font-weight:var(--fw-regular); }
 .agent-ui-card { margin-bottom:16px; min-width:0; flex-shrink:0; }
 .agent-ui-card:not([hidden]) { display:flex; flex-direction:column; flex:1; min-height:360px; margin-bottom:0; }

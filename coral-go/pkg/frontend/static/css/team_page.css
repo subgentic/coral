@@ -140,7 +140,7 @@
     .team-page-actions { grid-column: 2; grid-row: 1 / span 2; }
     #team-page-add-agent, #team-page-settings, #team-page-stop, #team-page-stop-menu { display: none; }
     .team-page-health { min-height: 44px; grid-column: 1; }
-    .team-tab[data-tab="knowledge"], .team-tab[data-tab="messages"] { display: none; } /* behind More: the row never scrolls sideways */
+    .team-tab[data-tab="knowledge"], .team-tab[data-tab="messages"], .team-tab[data-tab="branches"] { display: none; } /* behind More: the row never scrolls sideways */
     .team-tabs-row > .team-tab-more { display: inline-flex; align-items: center; flex: none; margin: 6px 8px 0 0; padding: 0 8px; }
     .team-tabs-row .team-tab { padding: 0 8px; }
     .team-tabs-row > .team-tabs { gap: 0; padding-left: 8px; }
@@ -456,7 +456,7 @@
     .team-page-health { display: block; grid-column: 2; grid-row: 2; min-height: 0; height: auto; padding: 0; border: 0; background: none; justify-self: start; max-width: 100%; font-size: var(--fs-md); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } /* the status when it is a button (needs attention) is the same context line, not a 44 px row of its own */
     .team-page-status .team-status-dot, .team-page-health .team-status-dot { display: inline-block; vertical-align: middle; margin-right: 6px; }
     .team-tabs-row > .team-tab-more { display: none; } /* every tab is in the strip: no More tab */
-    .team-tab[data-tab="knowledge"], .team-tab[data-tab="messages"] { display: inline-flex; }
+    .team-tab[data-tab="knowledge"], .team-tab[data-tab="messages"], .team-tab[data-tab="branches"] { display: inline-flex; }
     .team-tabs-row > .team-tabs { overflow-x: auto; scrollbar-width: none; padding-left: 0; padding-right: 0; }
     .team-tabs-row > .team-tabs::-webkit-scrollbar { display: none; }
     .team-tabs-row .team-tab { flex: none; min-height: var(--control-touch-height, 44px); padding: 0 14px; }
