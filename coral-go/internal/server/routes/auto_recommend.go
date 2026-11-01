@@ -16,6 +16,7 @@ import (
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/ptymanager"
+	"github.com/subgentic/coral/internal/safego"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/internal/terminalinput"
 )
@@ -502,6 +503,7 @@ func (r *AutoRecommender) pick(ctx context.Context, a liveAgent, b recBound, now
 	// "the person answered" in its own log.
 	r.notices.Add(1)
 	go func() {
+		defer safego.Recover("recommended-pick notice")
 		defer r.notices.Done()
 		nctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), autoRecommendNoticeWait)
 		defer cancel()
