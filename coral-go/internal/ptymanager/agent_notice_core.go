@@ -323,12 +323,12 @@ func decideWinNotice(src procSource, root int, rec winProc) tmux.NoticeVerdict {
 // The reasons text is refused (decideWinText).
 const (
 	reasonCmdShell   = "the terminal's own shell is cmd, which runs a program from the current folder before PATH"
-	reasonCmdBelow   = "the agent started a cmd, which runs a program from the current folder before PATH"
 	reasonUnreadable = "the terminal's processes could not be read"
 )
 
 // decideWinText is whether text (a notice and its Enter) may not be typed at all: the terminal's own shell (root) is cmd, or cannot be read; or the recorded agent, when there is one
-// (recorded), has a cmd anywhere below it, or a program below it that reads the terminal (consoleReaderBelow). Before the agent is recorded (a launch moments ago) only the shell is asked.
+// (recorded), has a program below it that reads the terminal (consoleReaderBelow: a cmd with the console as its input is one). A cmd below the agent with a pipe as its input (an npx or
+// .cmd shim running an MCP server) is not refused: it cannot take typed text. Before the agent is recorded (a launch moments ago) only the shell is asked.
 func decideWinText(src procSource, root int, rec winProc, recorded bool) (bool, string) {
 	r := src.info(root)
 	if !r.known {
@@ -343,42 +343,10 @@ func decideWinText(src procSource, root int, rec winProc, recorded bool) (bool, 
 	if cur := src.info(rec.pid); !cur.known || cur.start != rec.start {
 		return false, "" // the agent has ended: NoticeBlocked says so, and refuses
 	}
-	if cmdBelow(src, rec) {
-		return true, reasonCmdBelow
-	}
 	if _, reads := consoleReaderBelow(src, rec); reads {
 		return true, tmux.ReasonChildReads
 	}
 	return false, ""
-}
-
-// cmdBelow says a cmd runs anywhere below the agent process rec (a walk that hits its bound says yes).
-func cmdBelow(src procSource, rec winProc) bool {
-	seen := map[int]bool{rec.pid: true}
-	type node struct {
-		pid, depth int
-		start      int64
-	}
-	queue := []node{{rec.pid, 0, rec.start}}
-	for len(queue) > 0 {
-		n := queue[0]
-		queue = queue[1:]
-		for _, c := range src.children(n.pid) {
-			if seen[c] {
-				continue
-			}
-			seen[c] = true
-			p := src.info(c)
-			if p.known && p.start < n.start {
-				continue
-			}
-			if n.depth+1 >= maxWinWalkDepth || !p.known || p.name == "cmd" {
-				return true // an unreadable process might be one
-			}
-			queue = append(queue, node{c, n.depth + 1, p.start})
-		}
-	}
-	return false
 }
 
 // winNoticeVerdict is the whole answer for a session: waiting while the record is being made, nothing recorded, or decideWinNotice.

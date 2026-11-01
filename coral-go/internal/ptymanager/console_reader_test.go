@@ -85,8 +85,9 @@ func TestTextIsRefusedWhereTheTerminalCouldRunIt(t *testing.T) {
 		{"a pipe-input tool below the agent", pane().add(root, 300, 30, kindProgram).add(300, 400, 40, kindProgram).withStdin(400, stdinNotConsole), true, ""},
 		{"the terminal's own shell is cmd", named(pane(), root, "cmd").add(root, 300, 30, kindProgram), true, reasonCmdShell},
 		{"the terminal's own shell is cmd, before the agent is recorded", named(pane(), root, "cmd"), false, reasonCmdShell},
-		{"the agent started a cmd, even one with a pipe as its input", named(pane().add(root, 300, 30, kindProgram).add(300, 400, 40, kindVerifiedShell).withStdin(400, stdinNotConsole), 400, "cmd"), true, reasonCmdBelow},
-		{"a cmd two levels below the agent", named(pane().add(root, 300, 30, kindProgram).add(300, 400, 40, kindProgram).add(400, 500, 50, kindVerifiedShell), 500, "cmd"), true, reasonCmdBelow},
+		{"a cmd below the agent with a pipe as its input (an npx or .cmd shim running an MCP server)", named(pane().add(root, 300, 30, kindProgram).add(300, 400, 40, kindVerifiedShell).withStdin(400, stdinNotConsole), 400, "cmd"), true, ""},
+		{"a cmd below the agent with the console as its input", named(pane().add(root, 300, 30, kindProgram).add(300, 400, 40, kindVerifiedShell).withStdin(400, stdinConsole), 400, "cmd"), true, tmux.ReasonChildReads},
+		{"a console-input cmd two levels below the agent", named(pane().add(root, 300, 30, kindProgram).add(300, 400, 40, kindProgram).add(400, 500, 50, kindVerifiedShell).withStdin(500, stdinConsole), 500, "cmd"), true, tmux.ReasonChildReads},
 		{"a console reader below the agent", pane().add(root, 300, 30, kindProgram).add(300, 400, 40, kindVerifiedShell).withStdin(400, stdinConsole), true, tmux.ReasonChildReads},
 		{"before the agent is recorded, a PowerShell terminal", pane(), false, ""},
 	} {
