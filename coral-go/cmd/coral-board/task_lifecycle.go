@@ -326,3 +326,34 @@ func cmdTaskAmend(st *boardState, args []string) {
 	_ = json.Unmarshal(data, &task)
 	fmt.Printf("Amended Task #%d to revision %.0f: %s\n", taskID, task["revision"], task["title"])
 }
+
+// cmdTaskRelease puts "not now" work back in the queue instead of parking it (#11660): unassigned, or with --keep still the caller's to claim again.
+func cmdTaskRelease(st *boardState, args []string) {
+	if len(args) < 1 {
+		fmt.Fprintln(os.Stderr, "Usage: coral-board task release <id> [--keep]")
+		clierr.Exit1()
+	}
+	taskID, err := strconv.ParseInt(args[0], 10, 64)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Invalid task ID: %s\n", args[0])
+		clierr.Exit1()
+	}
+	fs := flag.NewFlagSet("task-release", flag.ContinueOnError)
+	keep := fs.Bool("keep", false, "Keep the task assigned to its owner (default: unassigned, anyone may claim it)")
+	clihelp.ParseFlags(fs, args[1:], func() string { return commandUsage(os.Args[1], os.Args[2:]) })
+	body := map[string]any{"subscriber_id": resolveSubscriberID(), "keep_assigned": *keep}
+	data, status, err := apiCallRaw("POST", fmt.Sprintf("/%s/tasks/%d/release", url.PathEscape(st.Project), taskID), body)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		clierr.Exit1()
+	}
+	if status != http.StatusOK {
+		fmt.Fprintf(os.Stderr, "Error releasing task: %s\n", clierr.Describe(nil, status, data))
+		clierr.Exit1()
+	}
+	if *keep {
+		fmt.Printf("Released Task #%d to pending; it stays assigned\n", taskID)
+	} else {
+		fmt.Printf("Released Task #%d to the queue, unassigned\n", taskID)
+	}
+}

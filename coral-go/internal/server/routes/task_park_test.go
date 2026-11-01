@@ -109,7 +109,7 @@ func TestParkIsTheOrchestratorsOrTheOperatorsAndTheReasonIsCleaned(t *testing.T)
 
 	// The Operator (dashboard) parks until a time, and unparks.
 	until := time.Now().Add(2 * time.Hour).UTC().Format(time.RFC3339)
-	code, task = call(http.MethodPost, stuck.ID, `{"reason":"waiting on the operator","until":"`+until+`"}`, nil)
+	code, task = call(http.MethodPost, stuck.ID, `{"reason":"waiting on another team","until":"`+until+`"}`, nil)
 	require.Equal(t, http.StatusOK, code)
 	assert.Equal(t, until, *task.ParkedUntil)
 	assert.True(t, parked(stuck.ID))

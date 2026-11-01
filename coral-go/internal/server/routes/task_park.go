@@ -1,10 +1,12 @@
 package routes
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -108,6 +110,7 @@ func (h *BoardHandler) ParkTask(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Reason string `json:"reason"`
 		Until  string `json:"until"`
+		AskID  int64  `json:"ask_id"` // the open question to the Operator that a park waiting on the Operator carries (#11660)
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		errBadRequest(w, "invalid JSON")
@@ -122,6 +125,16 @@ func (h *BoardHandler) ParkTask(w http.ResponseWriter, r *http.Request) {
 	reason := teamhealth.StoredText(body.Reason, nil)
 	if strings.TrimSpace(reason) == "" {
 		errBadRequest(w, "a reason is required")
+		return
+	}
+	// A park is for a wait outside the team (#11660, the Operator's rule): the Operator, another team. Waiting on a reviewer is a hand-in for review, which frees the slot; work that is not for now goes back
+	// to the queue. A park that waits on the Operator carries the question that asks them, so it is in their Inbox.
+	if h.parkNamesReviewer(r.Context(), project, reason) {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"code": "park_reviewer", "error": parkReviewerText(taskID)})
+		return
+	}
+	if parkWaitsOnOperator(reason) && !h.parkCarriesOperatorAsk(r.Context(), project, body.AskID) {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"code": "park_needs_ask", "error": "a park that waits on the Operator needs a question in their Inbox: post it with coral-board post --ask \"@Operator ...\" and park with --ask <that message's id>"})
 		return
 	}
 	var until time.Time
@@ -144,6 +157,9 @@ func (h *BoardHandler) ParkTask(w http.ResponseWriter, r *http.Request) {
 	case errors.Is(err, board.ErrNotParkable):
 		errBadRequest(w, err.Error())
 		return
+	case errors.As(err, new(*board.ErrParkCap)):
+		writeJSON(w, http.StatusConflict, map[string]string{"code": "park_cap", "error": err.Error()})
+		return
 	case err != nil:
 		errInternalServer(w, err.Error())
 		return
@@ -156,4 +172,56 @@ func (h *BoardHandler) ParkTask(w http.ResponseWriter, r *http.Request) {
 	}
 	h.bs.PostSystemMessage(r.Context(), project, "Coral Task Queue", fmt.Sprintf("[Task #%d parked by %s%s] no reminders or nudges for it until then", taskID, teamhealth.Name(who), end), nil)
 	writeJSON(w, http.StatusOK, task)
+}
+
+var (
+	reviewWordRE   = regexp.MustCompile(`(?i)\b(review|reviews|reviewer|reviewers|reviewing|reviewed|qa)\b`)
+	operatorWordRE = regexp.MustCompile(`(?i)\boperator\b`)
+)
+
+func parkReviewerText(id int64) string {
+	return fmt.Sprintf("a park is for a wait outside the team (the Operator, another team). Waiting on a reviewer is coral-board task submit-review %d, which frees the slot; work that is not for now goes back to the queue with coral-board task release %d", id, id)
+}
+
+// parkNamesReviewer says the park's reason waits on a reviewer of the team: it says review, reviewer or QA, or names a member who reviews (a reviewer-only member, one with review areas, or a title that says reviewer).
+func (h *BoardHandler) parkNamesReviewer(ctx context.Context, project, reason string) bool {
+	if reviewWordRE.MatchString(reason) {
+		return true
+	}
+	subs, err := h.bs.ListSubscribers(ctx, project)
+	if err != nil {
+		return false
+	}
+	low := strings.ToLower(reason)
+	for _, sub := range subs {
+		if !(sub.ReviewsOnly || len(sub.ReviewAreas) > 0) {
+			continue
+		}
+		for _, name := range []string{sub.SubscriberID, sub.JobTitle} {
+			if n := strings.ToLower(strings.TrimSpace(name)); n != "" && strings.Contains(low, n) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// parkWaitsOnOperator says the park's reason names the Operator as what it waits for.
+func parkWaitsOnOperator(reason string) bool { return operatorWordRE.MatchString(reason) }
+
+// parkCarriesOperatorAsk says askID is a question of this board that the Operator still owes an answer to.
+func (h *BoardHandler) parkCarriesOperatorAsk(ctx context.Context, project string, askID int64) bool {
+	if askID <= 0 {
+		return false
+	}
+	open, err := h.bs.OpenAsksOf(ctx, project, "Operator", time.Now())
+	if err != nil {
+		return false
+	}
+	for _, a := range open {
+		if a.MessageID == askID {
+			return true
+		}
+	}
+	return false
 }

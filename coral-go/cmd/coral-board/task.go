@@ -117,6 +117,8 @@ Subcommands:
 		cmdTaskUnblock(st, taskArgs)
 	case "amend":
 		cmdTaskAmend(st, taskArgs)
+	case "release":
+		cmdTaskRelease(st, taskArgs)
 	case "park", "unpark":
 		cmdTaskPark(st, taskArgs, sub == "unpark")
 	case "--help", "-h", "help":
@@ -158,8 +160,11 @@ Subcommands:
   cancel <id> [--message "reason"]
   reassign <id> [--to "Agent Name"]
   unblock <id> (--blocker ID | --all) Remove one or all prerequisites (orchestrator only)
-  park <id> --reason "why" [--until DATE]  Set a task aside: no reminders, nudges or check items for it until
-                                   it is unparked or DATE passes (orchestrator or Operator only)
+  release <id> [--keep]            Put work that is not for now back in the queue (unassigned; --keep leaves it yours): use it, not park
+  park <id> --reason "why" [--until DATE] [--ask MESSAGE_ID]  Set a task aside for a wait OUTSIDE the team (the Operator, another team):
+                                   no reminders, nudges or check items for it until it is unparked or DATE passes
+                                   (orchestrator or Operator only). At most 2 parked per agent; a reviewer wait is submit-review;
+                                   a wait on the Operator needs the Inbox question: post it with --ask "@Operator ..." and pass its id
   unpark <id>                      Bring a parked task back
   amend <id> --revision N --reason "..." [--body "..." --workflow-instructions "..." --completion-gates JSON (experimental, disabled by default; "[]" clears)]
 
