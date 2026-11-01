@@ -11,6 +11,7 @@
  * and are never derived or matched by name. The session id never appears in
  * visible text, tooltips or document.title. */
 
+import { importOnce } from './import_once.js';
 import { isPhoneLayout } from './phone_layout.js';
 import { state } from './state.js';
 import { resolveSessionIdentity } from './render.js';
@@ -265,6 +266,7 @@ function _renderIdentity(rec) {
     const label = document.getElementById('terminal-header-label');
     if (label) label.textContent = identity;
     _updateTitle(identity);
+    if (label && document.body.dataset.chief === 'true') importOnce('./chief_look.js').then(m => m.showChiefFace(label, identity)).catch(() => { /* the agent's own name stays */ }); // the name and avatar the Operator chose (#11796)
 }
 
 function _updateTitle(identity) {
