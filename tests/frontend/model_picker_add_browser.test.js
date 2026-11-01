@@ -72,6 +72,7 @@ const STUB = `(() => { const R = window.fetch; window.__asks = 0; window.__puts 
             await ev(`window.__getStatus = 200; true`);
 
             // Escape closes the form and gives the keyboard to the list
+            await waitFor(`!!document.activeElement && !!document.activeElement.closest('#acf-t .acf-model-add form')`, `${tag}: the keyboard is in the form`, 5000);
             await key('Escape', 'Escape', 27);
             await waitFor(`!document.querySelector('#acf-t .acf-model-add form')`, `${tag}: Escape closed the form`, 3000);
             b = await box(); assert.equal(b.active, 'select', `${tag}: the keyboard is on the list`); assert.equal(b.value, '');
@@ -105,6 +106,7 @@ const STUB = `(() => { const R = window.fetch; window.__asks = 0; window.__puts 
         await ev(`(() => { const s = document.querySelector('#launch-agent-acf .acf-model-select'); s.value = '__add'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
         await waitFor(`!!document.querySelector('#launch-agent-acf .acf-model-add form')`, 'launch dialog: the form', 3000);
         if (process.env.CORAL_SCREENSHOT_DIR) { fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR, { recursive: true }); fs.writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/picker-add-launch-dialog.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }
+        await waitFor(`!!document.activeElement && !!document.activeElement.closest('#launch-agent-acf .acf-model-add form')`, 'launch dialog: the keyboard is in the form (the dialog moves its focus as it settles, and a key sent before that goes elsewhere)', 5000);
         await key('Escape', 'Escape', 27);
         await waitFor(`!document.querySelector('#launch-agent-acf .acf-model-add form')`, 'launch dialog: Escape closed the form', 3000);
         assert.equal(await ev(`!!document.querySelector('#launch-modal.active, #launch-modal[style*="flex"]') || getComputedStyle(document.getElementById('launch-modal')).display !== 'none'`), true, 'the dialog is still open');
