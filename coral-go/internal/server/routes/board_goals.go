@@ -202,6 +202,7 @@ func (h *BoardHandler) CreateGoal(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	h.announceGoalDriver(project, actor, g, "")
+	h.announceGoalToOrchestrator(project, actor, g)
 	writeJSON(w, http.StatusCreated, g)
 }
 
@@ -227,6 +228,46 @@ func (h *BoardHandler) announceGoalDriver(project, actor string, g *board.Goal, 
 			_ = h.sendTaskNudge(ctx, project, driver, typedGoalDriverNudge(id))
 		}
 	})
+}
+
+// announceGoalToOrchestrator tells the team's Orchestrator that a goal was made, once (#11866): a board message that mentions it and names the command that shows the goal, and a nudge into its terminal when it has no
+// task in progress; the goal keeps the time it was told (orchestrator_told_at) and g carries it back to the writer. Nothing is said when the writer is the Orchestrator, when the team has none, when the goal is only
+// proposed, or when it was told already. An Orchestrator named as the driver is told by announceGoalDriver: this only keeps the time. A message that cannot be sent is logged: the goal is already written.
+func (h *BoardHandler) announceGoalToOrchestrator(project, actor string, g *board.Goal) {
+	if g.State == board.GoalProposed {
+		return
+	}
+	ctx := context.Background()
+	orch, err := h.bs.TeamOrchestrator(ctx, project)
+	if err != nil || board.SameIdentity(orch, actor) {
+		return
+	}
+	first, at, err := h.bs.MarkGoalOrchestratorTold(ctx, project, g.ID)
+	if err != nil || !first {
+		return
+	}
+	g.OrchestratorToldAt = &at
+	if board.SameIdentity(strings.TrimSpace(g.Driver), orch) {
+		return // told as the driver, in the same breath
+	}
+	id, title := g.ID, g.Title
+	h.goBG(func() {
+		show := "coral-board goal show " + strconv.FormatInt(id, 10)
+		busy, _ := h.bs.HasActiveTaskForAssignee(ctx, project, orch, 0)
+		if busy { // as a task assigned to an agent that is busy: the message waits for them, no one is interrupted
+			h.postNotice(ctx, project, fmt.Sprintf("[Goal #%d] a new goal was made: %q — the Orchestrator is busy; run '%s'", id, h.noticeText(ctx, project, title), show))
+			return
+		}
+		h.postNotice(ctx, project, fmt.Sprintf("@%s [Goal #%d] a new goal was made: %s — run '%s' to read it", orch, id, h.noticeText(ctx, project, title), show))
+		if h.terminal != nil {
+			_ = h.sendTaskNudge(ctx, project, orch, typedNewGoalNudge(id))
+		}
+	})
+}
+
+// typedNewGoalNudge is what is typed into the Orchestrator when a goal is made: fixed words and the goal's number, no text of the goal (the census, goal #7).
+func typedNewGoalNudge(id int64) string {
+	return fmt.Sprintf("You have a new goal to read: #%d. Run 'coral-board goal show %d' to read it.", id, id)
 }
 
 // typedGoalDriverNudge is what is typed into a goal's new driver: fixed words and the goal's number, no text of the goal (the census, goal #7).
@@ -415,10 +456,10 @@ func (h *BoardHandler) UpdateGoal(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	var before string
-	if body.Driver != nil {
+	var before, beforeState string
+	if body.Driver != nil || body.State != nil {
 		if cur, err := h.bs.GetGoal(r.Context(), project, id); err == nil {
-			before = cur.Driver
+			before, beforeState = cur.Driver, cur.State
 		}
 	}
 	g, err := h.bs.UpdateGoal(r.Context(), project, id, board.GoalUpdate{Title: body.Title, Outcome: body.Outcome, DoneWhen: body.DoneWhen, State: body.State, BlockedOn: body.BlockedOn, Driver: body.Driver})
@@ -427,6 +468,9 @@ func (h *BoardHandler) UpdateGoal(w http.ResponseWriter, r *http.Request) {
 			errInternalServer(w, err.Error())
 		}
 		return
+	}
+	if beforeState == board.GoalProposed && g.State == board.GoalActive {
+		h.announceGoalToOrchestrator(project, actor, g) // a proposed goal was not told; it is when it becomes one the team works on (#11866)
 	}
 	if body.Driver != nil {
 		h.announceGoalDriver(project, actor, g, before)

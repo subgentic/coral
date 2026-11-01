@@ -91,13 +91,15 @@ type Goal struct {
 	State     string `db:"state" json:"state"`
 	BlockedOn string `db:"blocked_on" json:"blocked_on,omitempty"`
 	// Driver is the board subscriber who drives the goal; "" for none. A blocked goal says why in blocked_on, a plain reason: a goal does not wait on a person (a task or an agent does).
-	Driver       string     `db:"driver" json:"driver,omitempty"`
-	CreatedBy    string     `db:"created_by" json:"created_by"`
-	CreatedAt    string     `db:"created_at" json:"created_at"`
-	UpdatedAt    string     `db:"updated_at" json:"updated_at"`
-	ClosedAt     *string    `db:"closed_at" json:"closed_at,omitempty"`
-	ClosedReason string     `db:"closed_reason" json:"closed_reason,omitempty"`
-	Rollup       GoalRollup `db:"-" json:"rollup"`
+	Driver       string  `db:"driver" json:"driver,omitempty"`
+	CreatedBy    string  `db:"created_by" json:"created_by"`
+	CreatedAt    string  `db:"created_at" json:"created_at"`
+	UpdatedAt    string  `db:"updated_at" json:"updated_at"`
+	ClosedAt     *string `db:"closed_at" json:"closed_at,omitempty"`
+	ClosedReason string  `db:"closed_reason" json:"closed_reason,omitempty"`
+	// OrchestratorToldAt is when the team's Orchestrator was told this goal was made (#11866), once; nil when it was not (the Orchestrator made it, or the team has none).
+	OrchestratorToldAt *string    `db:"orchestrator_told_at" json:"orchestrator_told_at,omitempty"`
+	Rollup             GoalRollup `db:"-" json:"rollup"`
 	// FollowUpsOpen: the open tasks of the goal that were made as follow-ups of another task (task add --follow-up); filled where one goal is read (GetGoal), never in a list.
 	FollowUpsOpen int `db:"-" json:"follow_ups_open,omitempty"`
 	// Images are the pictures the Operator attached to the goal's description (#11650), in the order sent; filled where goals are read.
@@ -108,7 +110,7 @@ type Goal struct {
 func (g Goal) Closed() bool { return g.State == GoalDone || g.State == GoalDropped }
 
 // goalColumns are the columns of a Goal.
-const goalColumns = `id, goal_uid, board_id, title, outcome, done_when, state, blocked_on, driver, created_by, created_at, updated_at, closed_at, closed_reason`
+const goalColumns = `id, goal_uid, board_id, title, outcome, done_when, state, blocked_on, driver, created_by, created_at, updated_at, closed_at, closed_reason, orchestrator_told_at`
 
 // goalLine cleans one line of goal text (no control, bidi or zero-width character, white space as one space) and refuses one longer than max characters.
 func goalLine(field, s string, max int) (string, error) {
