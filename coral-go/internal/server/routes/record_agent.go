@@ -289,9 +289,36 @@ func sameImage(image, cli string) bool {
 	}
 	a, b := resolvedPath(image), resolvedPath(cli)
 	if runtime.GOOS == "windows" {
-		return strings.EqualFold(a, b)
+		return strings.EqualFold(a, b) || isSelfUpdatedImage(a, b)
 	}
 	return a == b
+}
+
+// isSelfUpdatedImage is whether image is the resolved CLI after the CLI updated itself while running: Claude Code renames its running binary to "<name>.old.<n>.<pid>" in its own install folder
+// and puts the new one at the old path. Only that exact shape, in the CLI's own folder (Windows paths compare without case); another folder or another name shape is not the CLI.
+func isSelfUpdatedImage(image, cli string) bool {
+	if !strings.EqualFold(filepath.Dir(image), filepath.Dir(cli)) {
+		return false
+	}
+	name, base := strings.ToLower(filepath.Base(image)), strings.ToLower(filepath.Base(cli))
+	rest, ok := strings.CutPrefix(name, base+".old.")
+	if !ok {
+		return false
+	}
+	n, pid, ok := strings.Cut(rest, ".")
+	return ok && allDigits(n) && allDigits(pid)
+}
+
+func allDigits(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 func resolvedPath(p string) string {
