@@ -82,8 +82,6 @@ export function driverLine(driver, when) {
 const ERRORS = { goal_title_required: 'A goal needs a title.', goal_text_too_long: 'That is too long: shorten it and try again.', goal_driver_unknown: 'That driver is not on this board.', goal_bad_state: 'That state is not one a goal can have.', goal_not_found: 'That goal is no longer on this board.', goal_closed: 'That goal is closed.', goal_already_closed: 'That goal is already closed.', goal_blocked_on_required: 'A blocked goal says who it waits for.', goal_required: 'This board needs a goal on every task.', local_only: 'This can only be done on this computer.' };
 export const errorWords = (code, sentence) => ERRORS[code] || String(sentence || '').trim() || 'try again';
 
-export const driverHelp = 'Driver: the agent who looks after it';
-
 /** A goal that is Closed with tasks still open, said on its page (the close answers with the count, and does not touch them). */
 export const closedWithOpenText = (n) => `Closed with ${plural(n, 'task', 'tasks')} still open. They stay open until someone finishes or moves them.`;
 

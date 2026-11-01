@@ -225,10 +225,21 @@ export function attachComments(dialog, body, host, opts = {}) {
         if (resolveBtn) { const row = el('div', 'ac-headrow'); row.append(m, resolveBtn); main.append(row); } // Resolve at the top right: the name line wraps beside it, never under it
         else main.append(m);
         main.append(editing(c) || (c.deleted ? el('p', 'ac-body ac-deleted', 'Comment deleted') : linkArtifactRefsIn(el('p', 'ac-body', c.body))));
+        if (!c.deleted && c.images && c.images.length && !editing(c)) main.append(pictures(c));
         if (top && c.fromVersion != null && groupOf(c) !== 'main') main.append(el('p', 'ac-from ac-from-note', groupOf(c) === 'look' ? `From v${c.fromVersion}. The quote is in this version more than once, so it is not pinned to either.` : `On v${c.fromVersion}. Its text is not in this version.`));
         main.append(actions(c, top));
         e.append(main);
         return e;
+    }
+    /** The pictures a comment carries, inline under its words, in the order they were sent: each is the image itself (its name for a screen reader) and opens whole in the viewer's own tab on a click. */
+    function pictures(c) {
+        const ul = el('ul', 'ac-pics'); ul.setAttribute('aria-label', 'Pictures in this comment');
+        for (const p of c.images) {
+            const li = el('li', 'ac-pic'), a = el('a', 'ac-pic-link'); a.href = api.commentImageUrl(p.hex, st.server); a.target = '_blank'; a.rel = 'noopener';
+            const img = el('img', 'ac-pic-img'); img.src = api.commentImageUrl(p.hex, st.server); img.alt = p.name || 'Picture in the comment'; img.loading = 'lazy'; img.decoding = 'async';
+            a.append(img); li.append(a); ul.append(li);
+        }
+        return ul;
     }
     function card({ c, replies }) {
         const li = el('li', 'ac-card' + (st.active === c.id ? ' ac-active' : '') + (c.resolved ? ' ac-resolved' : '')); li.dataset.id = String(c.id); li.setAttribute('aria-label', `Comment by ${c.authorName || c.authorId || 'unknown'}`); li.setAttribute('role', 'group');

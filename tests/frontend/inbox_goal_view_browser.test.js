@@ -49,7 +49,7 @@ const { coralReady } = require('./helpers/wait');
             assert.equal(await ev(`document.body.getAttribute('data-nav-tab')`),'hub-inbox');
             assert.equal(await ev(`getComputedStyle(document.querySelector('#inbox-page #goals-detail-title')).outlineStyle`),'none','pointer arrival has no ring around the title');
             assert.equal(await ev('location.pathname'),url);
-            assert.equal(await ev(`document.querySelector('#inbox-page .goals-facts').textContent`),'OutcomeOne shared goal viewDone whenBack returns to the filtered list');
+            assert.equal(await ev(`document.querySelector('#inbox-page .goals-facts').textContent`),'DescriptionOne shared goal viewDone whenBack returns to the filtered list');
             assert.equal(await ev(`document.querySelectorAll('#inbox-page .goal-team-link').length`),1);
             assert.ok(await ev(`document.querySelector('#inbox-page .goal-team-link').getAttribute('aria-label').includes(${JSON.stringify(board)})`));
             if (width===390) assert.equal(await ev(`document.querySelector('#inbox-page .view-list-item[aria-current="true"]').dataset.key`),'goals'); // a phone's folders are a drawer (#9545): the open folder is the current item
@@ -97,7 +97,7 @@ const { coralReady } = require('./helpers/wait');
             await clickGoal('#team-panel-goals'); await detail('#team-panel-goals');
             await ev(`document.documentElement.setAttribute('data-theme','dark'); true`);
             assert.equal(await ev(`document.querySelectorAll('#team-panel-goals .goal-team-link').length`),0);
-            assert.equal(await ev(`document.querySelector('#team-panel-goals .goals-facts').textContent`),'OutcomeOne shared goal viewDone whenBack returns to the filtered list');
+            assert.equal(await ev(`document.querySelector('#team-panel-goals .goals-facts').textContent`),'DescriptionOne shared goal viewDone whenBack returns to the filtered list');
             await shot(`team-goal-${width}-dark`);
             await ev(`document.querySelector('#team-panel-goals .goal-main .goals-back').click(); true`);
             await waitFor(`location.pathname===${JSON.stringify(`/team/${board}/goals`)} && !!document.querySelector('#team-panel-goals .dt-primary')`, 'team Back to Goals');
