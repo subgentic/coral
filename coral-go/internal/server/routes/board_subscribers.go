@@ -5,9 +5,11 @@ package routes
 import (
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/subgentic/coral/internal/board"
+	"github.com/subgentic/coral/internal/clitext"
 	"github.com/subgentic/coral/internal/cloud"
 )
 
@@ -80,6 +82,14 @@ func (h *BoardHandler) Subscribe(w http.ResponseWriter, r *http.Request) {
 	if subscriberID == "" {
 		errBadRequest(w, "subscriber_id required")
 		return
+	}
+	// A name that starts or ends with punctuation ("Security Reviewer 2:") cannot be written after an @ and reaches a shorter member instead: refused at the join (#11687).
+	for _, n := range []string{subscriberID, body.JobTitle} {
+		if board.ValidMemberName(n) != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_member_name", "code": "invalid_member_name",
+				"message": "the name " + strconv.Quote(clitext.Clean(n)) + " starts or ends with punctuation: a name must start and end with a letter or a digit (for example \"Security Reviewer 2\", not \"Security Reviewer 2:\")"})
+			return
+		}
 	}
 	if body.JobTitle == "" {
 		body.JobTitle = "Agent"
