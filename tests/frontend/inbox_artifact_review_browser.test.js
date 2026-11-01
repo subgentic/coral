@@ -27,6 +27,8 @@ const { coralReady } = require('./helpers/wait');
                     const style=document.createElement('style'); style.textContent='*,*::before,*::after{transition:none!important;animation:none!important}';document.head.append(style);
                     window.__reviewWrites=[];window.__reviewFail=false;window.__decisions=[];window.__comments=[];
                     window.__reviewItems=Array.from({length:13},(_,i)=>({id:(i+1).toString(16).padStart(64,'0'),name:'Review file '+String(i+1).padStart(2,'0')+'.txt',media_type:'text/plain',size:30,created_at:new Date(Date.now()-(20-i)*60000).toISOString(),task_id:0,source:'upload',available:true,session_id:i<11?'writer-a':'writer-b',produced_by:i<11?'Writer A':'Writer B',tags:['for review','internal'],uri:'coral://artifacts/'+(i+1).toString(16).padStart(64,'0')}));
+                    window.__reviewItems.push({...window.__reviewItems[2],id:(0x61).toString(16).padStart(64,'0'),created_at:new Date(Date.now()-100*60000).toISOString(),uri:'coral://artifacts/'+(0x61).toString(16).padStart(64,'0')}); // an earlier version of file 03, still waiting: the only row that can be a later version (#11865)
+                    window.__versionCalls=[];
                     const original=window.fetch, json=(body,status=200)=>Promise.resolve(new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json'}}));
                     window.fetch=(url,opts={})=>{
                         const u=new URL(String(url),location.origin);
@@ -42,6 +44,7 @@ const { coralReady } = require('./helpers/wait');
                             else{it.tags=[...new Set(it.tags.concat('for review','changes requested'))];}
                             return json({id,state:body.decision==='approve'?'approved':'changes requested',changed:true,tags:it.tags,review:it.review||null,delivered:body.decision==='approve',to:'Writer'});
                         }
+                        if(u.pathname.endsWith('/versions'))window.__versionCalls.push(u.pathname);
                         if(u.pathname==='/api/artifacts/'+(3).toString(16).padStart(64,'0')+'/versions'){const d=u.pathname.split('/')[3];return json([{digest:(98).toString(16).padStart(64,'0'),version:2,versions:3,is_latest:false,name:'Review file 03.txt',size:30,media_type:'text/plain',at:new Date(Date.now()-7200000).toISOString(),uploader:'Writer A',role:'Writer'},{digest:d,version:3,versions:3,is_latest:true,name:'Review file 03.txt',size:30,media_type:'text/plain',at:new Date().toISOString(),uploader:'Writer A',role:'Writer'}]);} // file 03 is the third version of its file (#11865)
                         if(u.pathname.startsWith('/api/artifacts/')&&u.pathname.endsWith('/versions')&&window.__twoVersions){const d=u.pathname.split('/')[3],old=(99).toString(16).padStart(64,'0');return json([{digest:old,version:1,versions:2,is_latest:false,name:'Review file 01.txt',size:30,media_type:'text/plain',at:new Date(Date.now()-3600000).toISOString(),uploader:'Writer A',role:'Writer'},{digest:d,version:2,versions:2,is_latest:true,name:'Review file 01.txt',size:30,media_type:'text/plain',at:new Date().toISOString(),uploader:'Writer A',role:'Writer'}]);}
                         if(u.pathname.startsWith('/api/artifacts/')&&u.pathname.endsWith('/comments')&&opts.method==='POST'){const b=JSON.parse(opts.body);window.__comments.push(b);return json({id:7,body:b.body,anchor:b.anchor,author_kind:'owner',author_name:'You',state:'open',created_at:new Date().toISOString(),replies:[]},201);}
@@ -63,6 +66,7 @@ const { coralReady } = require('./helpers/wait');
                 await waitFor(`!(${row('Review file 03.txt')}).querySelector('.inbox-review-version').hidden`,'a later version says which one it is',8000);
                 assert.equal(await ev(`(${row('Review file 03.txt')}).querySelector('.inbox-review-version').textContent`),' · version 3','the Needs you row adds the version after the name (#11865): the name is the agent\'s, Coral numbers the versions');
                 assert.equal(await ev(`(${row('Review file 01.txt')}).querySelector('.inbox-review-version').hidden`),true,'a file with one version says nothing');
+                assert.deepEqual(await ev(`window.__versionCalls`),['/api/artifacts/'+(3).toString(16).padStart(64,'0')+'/versions'],'only a row that has an earlier version waiting asks the server for its number: 14 files, one request, not one each (#11865)');
                 assert.equal(await ev(`${rows}.length`),12,'ten from Writer A and two from Writer B');
                 assert.match(await ev(`document.getElementById('group-table-view').textContent`),/1 more/,'overflow remains discoverable');
                 assert.equal(await ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`),'9+','all pending artifacts count: the pill reads 9+ past nine (#9821)');
