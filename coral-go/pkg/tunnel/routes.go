@@ -297,6 +297,8 @@ var routeTable = cat(
 	// (the artifact's name quoted as cleaned data), "changes" only records the state (the comment itself is the comment route above; its send to an agent stays unlisted). The OWNER's alone: a guest or a grantee is refused
 	// by the machine before the handler runs. Interact, as a comment is: it moves no work and runs nothing.
 	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/board/{project}/artifacts/{id}/review")),
+	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/board/{project}/asks/{messageID}/buttons/{buttonID}/claim")),
+	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/board/{project}/asks/{messageID}/buttons/{buttonID}/settle")),
 	// The Operator's Dismiss of a stale wait (#11352) is the OWNER's alone through the hub (the operator's rule: the owner gets everything): a guest or a grantee gets 403 owner_only. It clears Coral's
 	// own record of a wait and types nothing, presses nothing in the agent's terminal, so Interact; the machine's own mode still caps it.
 	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/sessions/live/{name}/dismiss-wait")),

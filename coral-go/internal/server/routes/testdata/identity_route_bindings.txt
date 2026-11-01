@@ -155,6 +155,8 @@ POST /api/board/remotes | board-unchecked | operator-only
 POST /api/board/{project}/agents/{subscriber}/sleep | board-claims +token-session
 POST /api/board/{project}/agents/{subscriber}/wake | board-claims +token-session
 POST /api/board/{project}/artifacts/{id}/review | board-claims | operator-only
+POST /api/board/{project}/asks/{messageID}/buttons/{buttonID}/claim | board-claims | operator-only
+POST /api/board/{project}/asks/{messageID}/buttons/{buttonID}/settle | board-claims | operator-only
 POST /api/board/{project}/asks/{messageID}/close | board-claims
 POST /api/board/{project}/clashes | board-claims +token-session
 POST /api/board/{project}/cross-team-links | board-claims +token-session | operator-only

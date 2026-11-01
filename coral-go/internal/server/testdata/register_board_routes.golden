@@ -71,6 +71,8 @@ POST /api/board/remotes | (*BoardRemotesHandler).AddSubscription-fm
 POST /api/board/{project}/agents/{subscriber}/sleep | (*SessionsHandler).OrchestratorSleep-fm
 POST /api/board/{project}/agents/{subscriber}/wake | (*SessionsHandler).OrchestratorWake-fm
 POST /api/board/{project}/artifacts/{id}/review | (*BoardHandler).ReviewArtifact-fm
+POST /api/board/{project}/asks/{messageID}/buttons/{buttonID}/claim | (*BoardHandler).ClaimAskButton-fm
+POST /api/board/{project}/asks/{messageID}/buttons/{buttonID}/settle | (*BoardHandler).SettleAskButton-fm
 POST /api/board/{project}/asks/{messageID}/close | (*BoardHandler).CloseAsk-fm
 POST /api/board/{project}/clashes | (*BoardHandler).FileClash-fm
 POST /api/board/{project}/cross-team-links | (*BoardHandler).AddLocalLinks-fm

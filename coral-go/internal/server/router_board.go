@@ -141,6 +141,8 @@ func (s *Server) registerBoardMessageRoutes(r chi.Router, boardHandler *routes.B
 	r.Get("/api/operator-asks", boardHandler.OperatorAsks)                                                     // the questions agents asked the Operator (post --ask, wait --operator), for Needs you (#11417)
 	r.Get("/api/needs-you", boardHandler.NeedsYou)                                                             // what waits for the Operator, in one read, for the Hub's phone push (#11596): the owner's alone
 	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/asks/{messageID}/close", boardHandler.CloseAsk) // close a question answered elsewhere (ask close, #11417)
+	r.Post("/api/board/{project}/asks/{messageID}/buttons/{buttonID}/claim", boardHandler.ClaimAskButton)      // the Operator's click on a button an agent declared on a question: claims it once, answers with the stored action (#11643)
+	r.Post("/api/board/{project}/asks/{messageID}/buttons/{buttonID}/settle", boardHandler.SettleAskButton)    // the page ran an open or wake action: done closes the question, failed gives the button back
 	r.Get("/api/board/{project}/messages/all", boardHandler.ListAllMessages)
 	r.Get("/api/board/{project}/messages/search", boardHandler.SearchMessages)
 	r.Post("/api/board/{project}/messages/mark-read", boardHandler.MarkRead)

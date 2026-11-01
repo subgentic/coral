@@ -2,6 +2,7 @@ package board
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"regexp"
@@ -177,4 +178,70 @@ func (s *Store) AskButtonsOf(ctx context.Context, project string, messageIDs []i
 		}
 	}
 	return out, nil
+}
+
+// The click (#11643): the Operator's own click claims a button, once.
+var (
+	ErrButtonUnknown = errors.New("no such button on this question")
+	ErrButtonUsed    = errors.New("this question's button was already used")
+	ErrAskClosed     = errors.New("this question is closed")
+)
+
+// AskButtonByID is one button of an ask of this board, or ErrButtonUnknown.
+func (s *Store) AskButtonByID(ctx context.Context, project string, messageID, buttonID int64) (AskButton, error) {
+	var b AskButton
+	err := s.db.GetContext(ctx, &b, `SELECT id, message_id, pos, label, action, arg, state FROM board_ask_buttons WHERE project = ? AND message_id = ? AND id = ?`, project, messageID, buttonID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return b, ErrButtonUnknown
+	}
+	return b, err
+}
+
+// AskIsClosed reports whether the question was closed by hand or the Operator already answered it.
+func (s *Store) AskIsClosed(ctx context.Context, project string, messageID int64) (bool, error) {
+	var n int
+	err := s.db.GetContext(ctx, &n, `SELECT COUNT(*) FROM board_ask_closed WHERE project = ? AND message_id = ?`, project, messageID)
+	return n > 0, err
+}
+
+// ClaimAskButton moves a pending button to used in ONE statement: it runs only if the button is pending, no other button of the same question is in use and the question is not closed, and the row count is
+// checked, so a double click, two tabs or two buttons run one action. It returns the stored button; nothing the caller sent decides what it is.
+func (s *Store) ClaimAskButton(ctx context.Context, project string, messageID, buttonID int64, now time.Time) (AskButton, error) {
+	b, err := s.AskButtonByID(ctx, project, messageID, buttonID)
+	if err != nil {
+		return b, err
+	}
+	res, err := s.db.ExecContext(ctx, `UPDATE board_ask_buttons SET state = ?, used_at = ?
+		WHERE project = ? AND message_id = ? AND id = ? AND state = ?
+		AND NOT EXISTS (SELECT 1 FROM board_ask_buttons o WHERE o.project = ? AND o.message_id = ? AND o.state = ?)
+		AND NOT EXISTS (SELECT 1 FROM board_ask_closed c WHERE c.project = ? AND c.message_id = ?)`,
+		ButtonUsed, now.UTC().Format(time.RFC3339), project, messageID, buttonID, ButtonPending, project, messageID, ButtonUsed, project, messageID)
+	if err != nil {
+		return b, err
+	}
+	if n, _ := res.RowsAffected(); n != 1 {
+		if closed, cerr := s.AskIsClosed(ctx, project, messageID); cerr == nil && closed {
+			return b, ErrAskClosed
+		}
+		return b, ErrButtonUsed
+	}
+	b.State = ButtonUsed
+	return b, nil
+}
+
+// ReleaseAskButton gives a claimed button back (its action failed): used becomes pending again, unless it already posted its reply. It reports whether it released.
+func (s *Store) ReleaseAskButton(ctx context.Context, project string, messageID, buttonID int64) (bool, error) {
+	res, err := s.db.ExecContext(ctx, `UPDATE board_ask_buttons SET state = ?, used_at = '' WHERE project = ? AND message_id = ? AND id = ? AND state = ? AND reply_message_id = 0`,
+		ButtonPending, project, messageID, buttonID, ButtonUsed)
+	if err != nil {
+		return false, err
+	}
+	n, _ := res.RowsAffected()
+	return n == 1, nil
+}
+
+// SetAskButtonReply records the message a reply button posted, the stored mark that it came from a click.
+func (s *Store) SetAskButtonReply(ctx context.Context, project string, buttonID, replyMessageID int64) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE board_ask_buttons SET reply_message_id = ? WHERE project = ? AND id = ?`, replyMessageID, project, buttonID)
+	return err
 }
