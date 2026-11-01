@@ -55,7 +55,12 @@ type modelSwitchTracker struct {
 	seq   int64
 	typed sync.Map // session id -> when a switch command was last typed
 	runs  sync.Map // session id -> *sync.Mutex: one switch types at a time, a replaced one finishes before the next starts
+	// running counts the switches' background runs: a test waits for them (Wait) so none is still writing when its stores close (#11749). A run ends after the state it reports is final: it still stores the model after.
+	running sync.WaitGroup
 }
+
+// Wait blocks until every background run a switch started has returned.
+func (t *modelSwitchTracker) Wait() { t.running.Wait() }
 
 // runLock is the session's lock for typing a switch's commands: a new choice waits for the one it replaced to stop, so two are never typed at once.
 func (t *modelSwitchTracker) runLock(sessionID string) *sync.Mutex {
@@ -230,7 +235,9 @@ func (h *SessionsHandler) SwitchModel(w http.ResponseWriter, r *http.Request) {
 	started := *sw
 	started.AfterReply = busy
 	workDir := ls.WorkingDir
+	h.modelSwitches.running.Add(1)
 	safego.Go("server/routes/model_switch", func() {
+		defer h.modelSwitches.running.Done()
 		defer cancel()
 		h.runModelSwitch(ctx, seq, name, agentType, ls.SessionID, workDir, body.Model != nil, model, body.Thinking != nil, level)
 	})
