@@ -107,6 +107,7 @@ export function switchAgenticTab(tabName, blockId) {
     document.dispatchEvent(new CustomEvent('coral:dock-changed')); // the Saved button's pressed state follows (saved_marks.js, #4742)
 
     if (tabName === 'agent-ui') refreshAgentUI();
+    if (tabName === 'branches') importOnce('./branches_tab.js').then(m => m.loadBranches()).catch(() => {}); // read only when shown (goal #11)
 
     // Saved for later (#4510): the list is read when its tab is shown, not while the sidebar is shut behind it (the home page's tab is Saved, and startup must not load the list: #4326);
     // opening the sidebar on it reads the list (sidebar.js)

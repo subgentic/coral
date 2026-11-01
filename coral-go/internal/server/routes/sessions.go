@@ -40,6 +40,7 @@ import (
 // SessionsHandler handles all live session API endpoints.
 type SessionsHandler struct {
 	dialogs  dialogWatch     // the prompts seen on awake agents' screens (#11437)
+	branches BranchesSource  // the worktrees of the repositories the live agents work in (branches.go); nil until the server wires it
 	opencode OpencodeRuntime // the opencode servers, one per agent; nil until the server wires it
 
 	// piModelCheck says a Pi model is not one Pi lists (#11105); nil until the server wires it.

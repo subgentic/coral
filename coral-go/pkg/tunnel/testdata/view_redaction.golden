@@ -70,6 +70,7 @@ GET /api/sessions/history/{id}/tasks redact
 GET /api/sessions/live redact
 GET /api/sessions/live/team/{board}/sleep-status redact
 GET /api/sessions/live/{name} redact
+GET /api/sessions/live/{name}/branches redact
 GET /api/sessions/live/{name}/capture redact
 GET /api/sessions/live/{name}/changes.diff redact
 GET /api/sessions/live/{name}/chat redact

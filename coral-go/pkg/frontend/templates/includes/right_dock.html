@@ -35,6 +35,9 @@
                     <button class="tab agentic-tab" data-on-click="agentic-tab" data-tab="agent-ui" data-rare data-where="top" data-scope="agent" id="agentic-tab-agent-ui" title="Agent UI" aria-label="Agent UI">
                         <span class="material-icons" aria-hidden="true">widgets</span><span class="agentic-tab-word">Agent UI</span><span class="tab-count agentic-tab-count" id="agent-ui-count"></span>
                     </button>
+                    <button class="tab agentic-tab" data-on-click="agentic-tab" data-tab="branches" data-rare data-where="top" data-scope="agent" id="agentic-tab-branches" title="Branches: this agent's repository and its worktrees (read-only)" aria-label="Branches">
+                        <span class="material-icons" aria-hidden="true">account_tree</span><span class="agentic-tab-word">Branches</span>
+                    </button>
                     <!-- Saved for later (#4510): the Operator's bookmarks, beside whatever the main view shows -->
                     <button class="tab agentic-tab" data-on-click="agentic-tab" data-tab="saved" data-where="top" data-pages="chats other" id="agentic-tab-saved" data-local-only title="Saved for later: messages you bookmarked" aria-label="Saved for later on this page">
                         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 2.5h8v11L8 10.5l-4 3z"/></svg><span class="agentic-tab-word">Saved</span><span class="tab-count agentic-tab-count" id="saved-tab-count"></span>
@@ -109,6 +112,7 @@
                 </div>
                 <!-- Custom view panels inserted here dynamically -->
                 <div id="agentic-panel-agent-ui" class="agentic-panel"></div>
+                <div id="agentic-panel-branches" class="agentic-panel"></div>
                 <div id="agentic-panel-saved" class="agentic-panel" data-local-only>
                   <!-- The Saved list of the page's scope (an agent's): the Inbox's Saved table, filtered to it (inbox_sidebar.js drawDockSaved, #7631) -->
                   <div id="saved-ui" class="saved-pane" role="region" aria-label="Saved for later">

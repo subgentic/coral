@@ -8,7 +8,7 @@ import { setText, setHidden, setAttr, setTitle, setHtml } from './dom_write.js';
 import { menuMove } from './menu_keys.js';
 import { watchScrollCue } from './scroll_cue.js';
 
-const RARE = ['browse', 'activity', 'agent-ui'];
+const RARE = ['browse', 'activity', 'agent-ui', 'branches'];
 const WIDE = window.matchMedia('(min-width: 1280px)');
 const $ = id => document.getElementById(id);
 const strip = () => document.querySelector('#agentic-block-top .agentic-state-tabs');

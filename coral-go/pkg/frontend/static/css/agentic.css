@@ -1638,6 +1638,14 @@ body.panel-dragging .agentic-state {
 
 /* Generated agent panels */
 #agentic-panel-agent-ui { overflow:auto; min-width:0; padding:12px; }
+#agentic-panel-branches { overflow:auto; min-width:0; padding:12px; }
+.branches-list { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px; }
+.branches-row { padding:8px 0; border-bottom:1px solid var(--border); min-width:0; }
+.branches-row[aria-current="true"] .branches-name { color:var(--accent); }
+.branches-name { font-weight:var(--fw-strong); color:var(--text-primary); overflow-wrap:anywhere; }
+.branches-meta, .branches-note { color:var(--text-secondary); font-size:var(--fs-sm); overflow-wrap:anywhere; }
+.branches-note { margin:0 0 8px; }
+.branches-mark { color:var(--text-muted); font-size:var(--fs-sm); font-weight:var(--fw-regular); }
 .agent-ui-card { margin-bottom:16px; min-width:0; flex-shrink:0; }
 .agent-ui-card:not([hidden]) { display:flex; flex-direction:column; flex:1; min-height:360px; margin-bottom:0; }
 .agent-ui-card:not([hidden]) iframe { flex:1; min-height:260px; }

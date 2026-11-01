@@ -32,7 +32,7 @@
 export const TEAM_TABS = ['goals', 'agents', 'tasks', 'artifacts', 'knowledge', 'messages']; // the strip's order, left to right and by the arrow keys (the operator's, #8791): Goals, Agents, Tasks, Artifacts, Knowledge, Board; team settings are a popout (#8853), not a tab
 const TEAM_ITEM_TABS = ['goals', 'tasks', 'messages']; // the tabs with an item: /team/<name>/goals/<id>, /team/<name>/tasks/<id> (pages), /team/<name>/messages/<id> (the Board tab scrolled to that message, #7921)
 // An agent's own tabs (live_session.html #agentic-tab-<id>); the team-scoped ones belong to /team.
-export const AGENT_SUBTABS = ['board', 'tasks', 'notes', 'files', 'browse', 'artifacts', 'activity', 'agent-ui'];
+export const AGENT_SUBTABS = ['board', 'tasks', 'notes', 'files', 'browse', 'artifacts', 'activity', 'agent-ui', 'branches'];
 // The Analytics pages that have a path (analytics_views.js VIEWS, #8606); /analytics is Overview, and an agent's page (agent-detail) is under By agent.
 export const ANALYTICS_PAGES = ['provider', 'model', 'thinking', 'team', 'agent', 'branch', 'task', 'calls', 'per-commit', 'task-time'];
 // The Automations folders (Goal #74): the two that need attention, then the library. A job or a workflow opens under its own folder; only a workflow has a run page.

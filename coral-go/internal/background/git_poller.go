@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
+	"github.com/subgentic/coral/internal/branches"
 	"github.com/subgentic/coral/internal/logsafe"
 	"log/slog"
 	"os"
@@ -72,12 +73,18 @@ type GitPoller struct {
 	// landing, when set, is told each pass where the agents' repositories are (the landing alert, #8942).
 	landing *LandingWatch
 
+	// branches, when set, reads the worktrees of the agents' repositories each pass (the Branches tab, goal #11).
+	branches *branches.Collector
+
 	// identityHash makes the stored pseudonym of a git email address (store.IdentityHasher); nil stores none, and commits are then matched to sessions by name only.
 	identityHash store.IdentityHasher
 }
 
 // SetLandingWatch gives the poller the landing alert to feed.
 func (p *GitPoller) SetLandingWatch(w *LandingWatch) { p.landing = w }
+
+// SetBranches gives the poller the Branches tab's collector, read once a pass for the repositories the agents work in.
+func (p *GitPoller) SetBranches(c *branches.Collector) { p.branches = c }
 
 // gitFailureBackoff is how long a folder whose git query failed is left alone before it is
 // checked again (it may have become a repository since).
@@ -219,6 +226,13 @@ func (p *GitPoller) PollOnce(ctx context.Context) error {
 
 	if p.landing != nil {
 		p.landing.Observe(ctx, dirToAgents)
+	}
+	if p.branches != nil {
+		roots := make([]string, 0, len(dirToAgents))
+		for root := range dirToAgents {
+			roots = append(roots, root)
+		}
+		p.branches.Observe(ctx, roots)
 	}
 
 	// Forget agents that are gone, so the map stays bounded.

@@ -346,6 +346,7 @@ var queryIdentityReads = map[string]string{
 	"sessions_memory.go session_id":        queryLookup, // GET live/{name}/memory[/{id}]?session_id=: the agent whose files are listed; the Operator's route, an agent's token is refused (#7454)
 	"sessions_attachment.go session_id":    queryLookup,
 	"sessions_files.go session_id":         queryLookup,
+	"branches.go session_id":               queryLookup, // GET live/{name}/branches?session_id=: names the agent whose repository is shown; a bounded caller must name a live session of that agent (requireAgentSession), an agent token one of its own team (agentMayReadAgent)
 	"subagents.go session_id":              queryLookup,
 	"team_artifacts.go session_id":         queryLookup,
 	"websocket.go session_id":              queryLookup,

@@ -464,6 +464,13 @@ func (s *Server) StartMachineHealth(ctx context.Context, wd *stallwatch.Watchdog
 	}
 }
 
+// SetBranches gives the sessions routes the git poller's worktree snapshot (the Branches tab).
+func (s *Server) SetBranches(src routes.BranchesSource) {
+	if s.sessHandler != nil {
+		s.sessHandler.SetBranches(src)
+	}
+}
+
 func (s *Server) BoardStore() *board.Store {
 	return s.boardStore
 }

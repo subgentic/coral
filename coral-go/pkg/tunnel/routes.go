@@ -159,6 +159,7 @@ var routeTable = cat(
 		"/api/sessions/live/{name}/changes.diff",
 		"/api/sessions/live/{name}/search-files",
 		"/api/sessions/live/{name}/git",
+		"/api/sessions/live/{name}/branches",
 		"/api/sessions/live/{name}/file-content",
 		"/api/sessions/live/{name}/file-original",
 		"/api/sessions/live/{name}/resolve-path",

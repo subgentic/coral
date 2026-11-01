@@ -34,7 +34,7 @@ const { settle, coralReady } = require('./helpers/wait');
         const named = r.shown.filter(([t]) => t !== 'customize'); // the Customize button at the row's end is an icon alone, as it was
         assert.deepEqual(named.map(([t, w]) => [t, w]), [['files', 'Files'], ['artifacts', 'Artifacts'], ['tasks', 'Tasks'], ['notes', 'Notes'], ['saved', 'Saved'], ['more', 'More']], 'each shown tab says its word: ' + JSON.stringify(r.shown));
         assert.deepEqual([r.tops.length, r.clipped], [1, false], 'one line, nothing clipped: ' + JSON.stringify(r));
-        assert.ok(!r.shown.some(([t]) => ['browse', 'activity', 'agent-ui'].includes(t)), 'the three rare tabs are not in the row: ' + JSON.stringify(r.shown));
+        assert.ok(!r.shown.some(([t]) => ['browse', 'activity', 'agent-ui', 'branches'].includes(t)), 'the four rare tabs are not in the row: ' + JSON.stringify(r.shown));
         assert.equal(r.more[0], 'More tabs'); ok('Files, Artifacts, Tasks, Notes, Saved and More with their words, on one line');
         await shot('dock-tabs-1280');
 
@@ -53,7 +53,7 @@ const { settle, coralReady } = require('./helpers/wait');
         await key('ArrowDown');
         await waitFor(`!document.getElementById('agentic-more-menu').hidden && document.activeElement.getAttribute('role') === 'menuitem'`, 'the menu opens on ArrowDown with the focus in it', 4000);
         const items = await ev(`[...document.querySelectorAll('#agentic-more-menu [role=menuitem]')].map(i => i.dataset.tab + ':' + i.textContent.trim())`);
-        assert.deepEqual(items, ['browse:folder_openBrowse', 'activity:timelineActivity', 'agent-ui:widgetsAgent UI'], JSON.stringify(items));
+        assert.deepEqual(items, ['browse:folder_openBrowse', 'activity:timelineActivity', 'agent-ui:widgetsAgent UI', 'branches:account_treeBranches'], JSON.stringify(items));
         await shot('dock-tabs-more-open');
         await key('ArrowDown'); await key('Enter');
         await waitFor(`document.getElementById('agentic-panel-activity').classList.contains('active')`, 'Enter opens Activity', 4000);

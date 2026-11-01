@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/subgentic/coral/internal/backendchoice"
+	"github.com/subgentic/coral/internal/branches"
 	"github.com/subgentic/coral/internal/coralnames"
 	"log"
 	"log/slog"
@@ -204,6 +205,9 @@ func startIndexingServices(ctx context.Context, cfg *config.Config, srv *server.
 	// turn it off without restarting.
 	gitPoller := background.NewGitPoller(gitStore, agentRT, time.Duration(cfg.GitPollerIntervalS)*time.Second)
 	gitPoller.SetLandingWatch(landingWatch)
+	branchesCollector := branches.New() // the Branches tab's worktree snapshot: the poller reads it, the route serves it (goal #11)
+	gitPoller.SetBranches(branchesCollector)
+	srv.SetBranches(branchesCollector)
 	gitPoller.SetIdentityHasher(store.NewIdentityHasher(store.NewRemoteServerStore(sessStore.DB(), cfg.CoralDir()))) // a keyed pseudonym of a commit author's email (#8996, #9046)
 	gitPoller.SetIntervalFn(func() time.Duration {
 		return gitPollInterval(ctx, sessStore, cfg.GitPollerIntervalS)
