@@ -2,7 +2,7 @@
  * is a --table-* token (css/data_table.css) and no surface styles a row, a cell or a header.
  *
  *   dataTable({ label, columns, rows, rowKey, groupBy(row) -> { key, label }, open, current, state, onSort, layout, fold, foldAt, sortBar, defaultSortLabel, bare, empty, footer, selectable, rowName, quiet, scroll, detail, decorate, decorateHead }) -> { el, bar, selectButton, selection(), clear(), state }
- *   selectable = { contextKey, onChange(keys), longPress (a touch screen selects a row by pressing and holding it), clearLabel (the bar's last button, 'Clear'), actions: [{ label, run(rows, keys, value), danger, confirm, choose: { label, options() -> [{ value, label }] } }] }: a danger action confirms in the bar, a choose action asks for its value there.
+ *   selectable = { contextKey, onChange(keys), longPress (a touch screen selects a row by pressing and holding it), clearLabel (the bar's last button, 'Clear'), actions (an action may have askWhen(n) and confirm(n): it asks first only when askWhen says so): [{ label, run(rows, keys, value), danger, confirm, choose: { label, options() -> [{ value, label }] } }] }: a danger action confirms in the bar, a choose action asks for its value there.
  *   Column = { key, label, field | cell(row, ctx), primary, tone: 'primary'|'secondary'|'tertiary', width: 'grow'|'content'|'<n>rem', fixed (with a rem width: that width, no resize handle, never squeezed or kept: a list's Actions, #9845), nowrap, align: 'start'|'end', numeric,
  *              sort: true|'number'|'date'|fn(a, b), sortValue(row), firstDir: 'asc'|'desc', foldFirst, narrowHide, line: 0|1|2, foldLabel, when(row), subtitle(row), subtitleTitle(row), title(row), filter: { label, active(), open(button) }, hideLabel }
  *   column widths (#7949): every header has a resize handle on its right edge (drag, Left and Right keys, double-click or Enter to fit the content); the widths are kept per list in this browser (widthsKey, else the label without its row count), and there is no reset button: a double click on a column edge fits it to its content (#9845). minWidth per column (64 px by default), resize: false for one that must not.
@@ -512,7 +512,7 @@ export function dataTable(cfg) {
             if (st.confirming >= 0) return; // while one asks, the others wait
             const action = button(`btn btn-small dt-bar-action${a.danger ? ' dt-danger' : ''}`, a.label, async () => {
                 if (a.choose) { st.choices = await a.choose.options(); st.confirming = i; drawBar(); bar.querySelector(a.danger ? '.dt-bar-keep' : '.dt-bar-choice')?.focus(); return; } // an action that needs a value (a person, a priority) asks for it here
-                if (a.danger) { st.confirming = i; drawBar(); bar.querySelector('.dt-bar-keep')?.focus(); return; }
+                if (a.danger || a.askWhen?.(chosen().length)) { st.confirming = i; drawBar(); bar.querySelector('.dt-bar-keep')?.focus(); return; } // askWhen(n): an action that asks only for some selections (Approve of several files), in the same Keep / confirm step, not red
                 a.run(chosen(), new Set(st.selected));
             });
             action.disabled = !!a.disabled?.(chosen()); bar.append(action);
@@ -533,7 +533,7 @@ export function dataTable(cfg) {
                 bar.append(step);
             } else {
                 const ask = el('span', 'dt-bar-confirm', typeof a.confirm === 'function' ? a.confirm(n) : (a.confirm || `${a.label}?`)); ask.setAttribute('role', 'alert');
-                bar.append(ask, button('btn btn-small dt-bar-keep', 'Keep', () => { st.confirming = -1; drawBar(); }), button('btn btn-small dt-danger', a.label, () => { st.confirming = -1; a.run(chosen(), new Set(st.selected)); }));
+                bar.append(ask, button('btn btn-small dt-bar-keep', 'Keep', () => { st.confirming = -1; drawBar(); }), button(`btn btn-small${a.danger ? ' dt-danger' : ''}`, a.label, () => { st.confirming = -1; a.run(chosen(), new Set(st.selected)); }));
             }
         }
         bar.append(button('btn btn-small dt-bar-clear', sel.clearLabel || 'Clear', () => clear()));

@@ -226,7 +226,7 @@ function needsBulkActions() {
     const words = (verb, r, total) => r.bad.length ? `${verb} ${r.ok} of ${total}: ${r.bad[0]}` : `${verb} ${r.ok}`;
     const done = () => { needsTable?.clear(); };
     return [
-        { label: 'Approve', disabled: rows => !reviews(rows), run: async rows => { const { approveRow } = await importOnce('./artifact_review.js'); const r = await each(rows, s => approveRow(s.review.team, s.review)); done(); tell(words('Approved', r, rows.length)); } },
+        { label: 'Approve', disabled: rows => !reviews(rows), askWhen: n => n > 1, confirm: n => `Approve ${n} files?`, run: async rows => { const { approveRow } = await importOnce('./artifact_review.js'); const r = await each(rows, s => approveRow(s.review.team, s.review)); done(); tell(words('Approved', r, rows.length)); } },
         { label: 'Changes', disabled: rows => !(rows.length === 1 && reviews(rows)), run: rows => { done(); openReview(rows[0].review, { requestChanges: true }); } }, // a change request is words for one file: with several selected it is off
         { label: 'Ignore', run: async rows => {
             const { ignoreRow, unignoreRow } = await importOnce('./artifact_review.js'), asks = await importOnce('./ask_ignore.js'), undo = [];
