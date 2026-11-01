@@ -870,24 +870,29 @@ hour and acts again next hour. The board setting `health_nudges` = `off` turns t
 
 ### The orchestrator's health check
 
-Every few minutes (the board's `health` settings: on, interval, recipient, all-clear line) Coral types a check to the orchestrator, or the recipient the team chose, alone, never as a board post. It is one line of at most 4096 bytes (a newline typed into a terminal would be an Enter), shown here as a list. It says what each agent is really doing, not how many posts there were:
+Every few minutes (the board's `health` settings: on, interval, recipient, all-clear line) Coral types a check to the orchestrator, or the recipient the team chose, alone, never as a board post. It is one line of at most 4096 bytes (a newline typed into a terminal would be an Enter), shown here as a list. It is an **action list** (#11729): what the orchestrator is to do, oldest first, each line saying who, what, for how long and the verb; the counts come last. Every line is a rule Coral computes from what it has, never a judgment:
 
 ```
-[Coral health check] 08:05Z · 2 working · 8 WAITING · 4 asleep · 0 claimable tasks
-- Waiting on YOU (Orchestrator), 6: DevOps Engineer 19m, QA Engineer 12m, ...
-- Waiting on Security Reviewer, 2: Frontend Dev 37m, Lead Developer 17m (STALE: Security Reviewer has posted a message mentioning them since the wait started)
-- Asleep with unread tagged messages: Digital Ocean Expert (2 tagged since 07:23)
-- Needs you, 1: 1) Dev: silent on #12 for 34 min since Coral asked for a status. Suggest: check on it. [ack 3fa9c1d2]
-- Waiting on the operator: Orchestrator asked 50 min ago: ship v1.4.89 tonight?
+[Coral health check] 08:05Z · Orchestrator, act on these (oldest first):
+- 1) DevOps Engineer has waited 19 min on YOU (their last message is #140100). Answer them.
+- 2) Frontend Dev has waited 37 min on Security Reviewer; Security Reviewer has posted nothing since. Ask Security Reviewer what is holding it, or check Security Reviewer.
+- 3) Busy Dev holds 6 open tasks while 2 agents sleep. Reassign some, or wake a sleeper.
+- 4) Task #77 has been in review with QA Engineer for 25 h. Ask QA Engineer, or give the review to someone else.
+- To see why, read their terminal: coral-board peek "DevOps Engineer" --lines 30.
+- Needs the Operator (tell them in one batch):
+- Orchestrator, 50 min ago: ship v1.4.89 tonight?
 - Since 07:55: 3 tasks completed, 12 posts.
+- Counts: 2 working · 8 waiting · 4 asleep · 0 claimable tasks
 ```
 
-- **States**, from the agent's hook events and its session record (the recipient is left out): `working` (in a turn), `WAITING` (parked in `coral-board wait`), `at a prompt` (stopped for input), `idle` (awake, in no turn and no wait), `of unknown state` (no hook events), `asleep`, `offline` (a session with nothing running). The check says "All N awake agents are working. Nothing needs you." only when every awake agent is in a turn and nothing else needs the reader; post counts appear only as "Since HH:MM: N posts", never as "progressing".
-- **Waits** are grouped by who they wait on, the recipient's group first ("Waiting on YOU"), then the larger groups; each waiter is listed longest first with how long it has waited (at most eight, the rest counted). What a wait waits on is read from `coral-board wait`: `--from <name or role>` waits on that member, `--task N` on the task's owner, `--commit` on "a commit", no argument on "any board update"; an `--operator` question is listed with the operator's questions, not as a group. A wait is **STALE** when the party it waits on has posted a message tagging the waiter since the wait began and the waiter has not woken.
-- **Asleep with unread tagged messages**: a sleeping agent with messages tagged to it (its name or role) after the last one it read, how many and since when.
+- **The rules**, each with its threshold in the board's `health.action_list` settings (a missing value is the default): a **wait on the recipient** is always a line, first, with the waiter's last message number; a **stuck wait** (`stuck_wait_min`, 10) is a wait on a member who has posted nothing since it began, and one whose target has posted is being served and is not listed; a wait whose target has mentioned the waiter without it waking says so; an **overloaded** agent (`overloaded_tasks`, more than 5 open tasks, while at least `overloaded_sleeping`, 1, agents sleep); a **stale review** (`stale_review_hours`, 24: a task in review that long, with who holds it); an agent **idle** with no task, **asleep** with tagged messages unread, **blocked** by a usage limit, or stopped at a dialog. A wait for a commit, for "any update" or on a name that is no member is not a line: nothing can be computed about it.
+- **Needs the Operator** is a section of its own, oldest first, so it can be relayed in one batch: the questions agents asked the Operator, each with how long ago.
+- **No line is ever cut.** A long list shows the top lines in full and ends with "and N more: coral-board status".
+- **Quiet when nothing changed:** the check goes out when something new needs the orchestrator, not when the minutes only tick.
+- **States**, from the agent's hook events and its session record (the recipient is left out): `working` (in a turn), `waiting` (parked in `coral-board wait`), `need input` (stopped for input), `idle` (awake, in no turn and no wait), `of unknown state` (no hook events), `asleep`, `offline` (a session with nothing running). What a wait waits on is read from `coral-board wait`: `--from <name or role>` waits on that member, `--task N` on the task's owner, `--operator` on the Operator, `--commit` on "a commit", no argument on "any board update".
 - `claimable tasks` counts pending tasks nobody holds (not parked, not blocked).
-- The items that need the orchestrator's judgment (Coral's escalations, idle agents with nothing assigned, queue problems), each with its `[ack <id>]` (`coral-board health ack <id>`), the operator's questions and the parked count are as before. With the all-clear line off, the check is still sent whenever a wait, a prompt, an idle or unknown agent or a sleeper with tags unread is in it.
-- **Peek hint:** when the check goes to the orchestrator and an agent is idle, waiting, at a prompt or has an item, one line before the progress line says how to see why: `To see why, read their terminal: coral-board peek "<agent>" --lines 30.`, naming the first such agent (`coral-board peek` is the orchestrator's: a check sent to another recipient leaves the line out, and it is the first line dropped when the check nears its size cap).
+- The items that need the orchestrator's judgment (Coral's escalations, idle agents with nothing assigned, queue problems), each with its `[ack <id>]` (`coral-board health ack <id>`), and the parked count, are lines of the list too.
+- **Peek hint:** when the check goes to the orchestrator and an agent is idle, waiting, at a prompt or has an item, one line says how to see why: `To see why, read their terminal: coral-board peek "<agent>" --lines 30.`, naming the first such agent (`coral-board peek` is the orchestrator's: a check sent to another recipient leaves the line out, and it is the first line dropped when the check would not fit).
 - **Escalation, once per wait:** when an agent has waited on another member for more than 10 minutes, Coral posts that member one direct mention from "Coral Health Monitor" ("@Security Reviewer Lead Developer has waited 17 min on you ..."). It is recorded per wait (a restart never repeats it), counts against the health actions' per-agent and per-team limits (a refused one is tried again at the next scan), and is not sent for an operator wait, a commit or a name that is no member.
 
 

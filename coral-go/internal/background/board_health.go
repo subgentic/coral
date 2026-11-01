@@ -237,7 +237,7 @@ func (m *BoardHealthMonitor) composeCheck(ctx context.Context, project, orch str
 	}
 	p, _ := m.store.ProgressSince(ctx, project, since)
 	questions := m.operatorQuestions(ctx, project)
-	roster, attention := m.buildRoster(ctx, rosterInputs{project: project, recipient: rcpt, subs: subs, bySession: bySession, waits: waits, tasks: tasks, now: now})
+	roster, attention := m.buildRoster(ctx, rosterInputs{project: project, recipient: rcpt, subs: subs, bySession: bySession, waits: waits, tasks: tasks, now: now, rules: actionRules(m.store.GetHealthSettings(ctx, project).ActionList)})
 	var goals []teamhealth.GoalLine // the open goals and what the operator has to do: the orchestrator's check only (#11412)
 	reminders := 0
 	if rcpt != nil && rcpt.SubscriberID == orch {
@@ -246,7 +246,12 @@ func (m *BoardHealthMonitor) composeCheck(ctx context.Context, project, orch str
 	return teamhealth.Compose(teamhealth.CheckInput{Now: now, Agents: agents, Items: items, Questions: questions, Goals: goals,
 		Progress: teamhealth.Progress{Since: since, Completed: p.Completed, Reviewed: p.Reviewed, Posts: p.Posts},
 		Parked:   len(parked), BackFromPark: backFromPark, Roster: roster,
-		PeekHint: rcpt != nil && rcpt.SubscriberID == orch}), len(items) + attention + reminders, healthFacts(items, questions, roster, backFromPark, goals), nil
+		PeekHint: rcpt != nil && rcpt.SubscriberID == orch, Rules: actionRules(m.store.GetHealthSettings(ctx, project).ActionList)}), len(items) + attention + reminders, healthFacts(items, questions, roster, backFromPark, goals), nil
+}
+
+// actionRules are the action list's thresholds from the team's settings (#11729).
+func actionRules(a board.HealthActionList) teamhealth.Rules {
+	return teamhealth.Rules{StuckWait: time.Duration(a.StuckWaitMin) * time.Minute, Overloaded: a.OverloadedTasks, Sleeping: a.OverloadedSleeping, StaleReview: time.Duration(a.StaleReviewHours) * time.Hour}
 }
 
 // splitParked leaves parked tasks out: a parked task raises no item (#4175 step 3). A task whose park ended is back:
@@ -292,11 +297,11 @@ func (m *BoardHealthMonitor) escalationItems(ctx context.Context, project string
 		key := "escalation|" + e.Rule + "|" + e.Target + "|" + e.Subject
 		switch e.Rule {
 		case ruleClaimNudge:
-			items = append(items, teamhealth.Item{Rank: 1, Agent: teamhealth.Name(e.Target),
+			items = append(items, teamhealth.Item{Rank: 1, Age: now.Sub(at), Agent: teamhealth.Name(e.Target),
 				Problem: fmt.Sprintf("has not claimed #%s after Coral's claim nudges (escalated %s ago)", e.Subject, ago),
 				Suggest: fmt.Sprintf("ask it, or reassign #%s", e.Subject), Key: key, State: e.At})
 		case ruleStatusNudge:
-			items = append(items, teamhealth.Item{Rank: 1, Agent: teamhealth.Name(e.Target),
+			items = append(items, teamhealth.Item{Rank: 1, Age: now.Sub(at), Agent: teamhealth.Name(e.Target),
 				Problem: fmt.Sprintf("silent on #%s since Coral asked for a status (escalated %s ago)", e.Subject, ago),
 				Said:    said(e.Target), Suggest: fmt.Sprintf("check on it, or reassign #%s", e.Subject), Key: key, State: e.At})
 		}
@@ -318,7 +323,7 @@ func (m *BoardHealthMonitor) dialogItems(ctx context.Context, project string, su
 		if !known || !sig.NeedsInput || sig.InTurn || sig.Since.IsZero() || now.Sub(sig.Since) < after {
 			continue
 		}
-		items = append(items, teamhealth.Item{Rank: 0, Agent: teamhealth.Name(sub.SubscriberID),
+		items = append(items, teamhealth.Item{Rank: 0, Age: now.Sub(sig.Since), Agent: teamhealth.Name(sub.SubscriberID),
 			Problem: fmt.Sprintf("needs input, stopped at a dialog or prompt for %s", teamhealth.Age(now.Sub(sig.Since))),
 			Suggest: "read its terminal to see what it asks, then tell the Operator", Key: "input|" + sub.SubscriberID, State: sig.Since.UTC().Format(time.RFC3339)})
 	}
@@ -369,7 +374,7 @@ func (m *BoardHealthMonitor) idleItems(ctx context.Context, subs []board.Subscri
 			continue // stopped by a usage limit (the roster says so): it does not need work, it cannot take it
 		}
 		idleNoWork[sub.SubscriberID] = true
-		items = append(items, teamhealth.Item{Rank: 2, Agent: teamhealth.Name(sub.SubscriberID),
+		items = append(items, teamhealth.Item{Rank: 2, Age: now.Sub(sig.Since), Agent: teamhealth.Name(sub.SubscriberID),
 			Problem: fmt.Sprintf("idle %s with nothing in progress or assigned", teamhealth.Age(now.Sub(sig.Since))),
 			Suggest: "assign it the next task", Key: "idle|" + sub.SubscriberID, State: sig.Since.UTC().Format(time.RFC3339)})
 	}

@@ -249,7 +249,8 @@ func TestHealthCheckScenario(t *testing.T) {
 	assert.True(t, strings.HasPrefix(heldLines[0], "@Operator [Coral health] waiting at a dialog: Held ("), heldLines[0])
 	c1 := lastCheck()
 	assert.Contains(t, c1, "Spare: idle")
-	assert.Contains(t, c1, "Waiting on the operator: Asker asked 5 min ago: quoted: ship v1.4.74 tonight?")
+	assert.Contains(t, c1, "Needs the Operator")
+	assert.Contains(t, c1, "Asker, 5 min ago: quoted: ship v1.4.74 tonight?")
 	assert.Contains(t, c1, "1 parked")
 	assert.NotContains(t, c1, "Parker", "the parked task raises no item")
 

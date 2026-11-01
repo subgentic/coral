@@ -74,6 +74,7 @@ type rosterInputs struct {
 	waits     []board.RegisteredWait
 	tasks     []board.Task // open, not parked
 	now       time.Time
+	rules     teamhealth.Rules // the action list's thresholds (#11729)
 }
 
 // buildRoster classifies every agent but the recipient from its real state and groups the waits by who they wait on.
@@ -119,7 +120,6 @@ func (m *BoardHealthMonitor) buildRoster(ctx context.Context, in rosterInputs) (
 				if w.WaitType == board.WaitOperator {
 					continue // listed with the operator's questions
 				}
-				attention++
 				on, you := target.label, false
 				var senders []string
 				if target.sub != nil {
@@ -128,11 +128,27 @@ func (m *BoardHealthMonitor) buildRoster(ctx context.Context, in rosterInputs) (
 					senders = []string{target.sub.SubscriberID, target.sub.JobTitle}
 				}
 				entry := teamhealth.WaitEntry{Name: name, Age: in.now.Sub(at)}
+				if id, err := m.store.LastPostID(ctx, in.project, sub.SubscriberID); err == nil {
+					entry.Reply = id // the waiter's last message, so the orchestrator can answer it (#11729)
+				}
+				if w.WaitType == "task" {
+					entry.Reason = fmt.Sprintf("task #%s", teamhealth.Name(w.TargetID)) // a number, never what the agent wrote
+				}
+				if target.sub != nil && !isRecipient(target.sub, in.recipient) && !at.IsZero() {
+					// silent: the awaited member has posted nothing since the wait began; one that has is serving it (#11729)
+					if _, when, err := m.store.LastPostBy(ctx, in.project, target.sub.SubscriberID); err == nil && !when.After(at) {
+						entry.TargetSilent = true
+					}
+				}
 				if len(senders) > 0 && !at.IsZero() {
 					if when, err := m.store.MentionedBy(ctx, in.project, sub.SubscriberID, sub.JobTitle, at, senders...); err == nil && !when.IsZero() {
 						entry.Stale = true
 					}
 				}
+				if !entry.Actionable(you, in.rules) {
+					continue // young, or being served by someone who has posted: not a line of the list, and nothing for the reader (#11729)
+				}
+				attention++
 				key := strings.ToLower(on)
 				g := groups[key]
 				if g == nil {
@@ -175,6 +191,24 @@ func (m *BoardHealthMonitor) buildRoster(ctx context.Context, in rosterInputs) (
 	sort.Strings(order)
 	for _, k := range order {
 		r.Waits = append(r.Waits, *groups[k])
+	}
+	r.Open = map[string]int{}
+	for _, t := range in.tasks {
+		if t.AssignedTo != nil && *t.AssignedTo != "" {
+			r.Open[teamhealth.Name(*t.AssignedTo)]++ // what each agent holds: assigned to it and open, whether or not it has started (#11729)
+		}
+	}
+	if waits, err := m.store.ReviewWaits(ctx, in.project); err == nil {
+		for _, rw := range waits {
+			if rw.Since.IsZero() || len(rw.With) == 0 {
+				continue
+			}
+			names := make([]string, 0, len(rw.With))
+			for _, n := range rw.With {
+				names = append(names, teamhealth.Name(n))
+			}
+			r.Reviews = append(r.Reviews, teamhealth.ReviewAge{Task: rw.Task, With: strings.Join(names, ", "), Age: in.now.Sub(rw.Since)})
+		}
 	}
 	return r, attention
 }
@@ -245,4 +279,9 @@ func (m *BoardHealthMonitor) endFinishedWaitEscalations(ctx context.Context, pro
 			_ = m.store.ResetHealthCounter(ctx, project, e.Rule, e.Target, e.Subject)
 		}
 	}
+}
+
+// isRecipient reports whether sub is the check's recipient.
+func isRecipient(sub *board.Subscriber, recipient *board.Subscriber) bool {
+	return recipient != nil && board.SameIdentity(sub.SubscriberID, recipient.SubscriberID)
 }

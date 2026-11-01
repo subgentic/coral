@@ -93,7 +93,7 @@ func TestCheckGoesToTheOrchestratorOnly(t *testing.T) {
 	require.NoError(t, err)
 	before := len(msgs)
 	out := h.checkTo("Orchestrator")
-	assert.Equal(t, "[Coral health check] "+h.now.UTC().Format("15:04Z")+" · 1 working · 0 waiting · 0 asleep · 0 claimable tasks • No progress since the last check ("+h.now.Add(-10*time.Minute).Format("15:04")+"). • The 1 awake agent is working. Nothing needs you.", out)
+	assert.Equal(t, "[Coral health check] "+h.now.UTC().Format("15:04Z")+" · Nothing needs you. • No progress since the last check ("+h.now.Add(-10*time.Minute).Format("15:04")+"). • Counts: 1 working · 0 waiting · 0 asleep · 0 claimable tasks", out)
 	h.mu.Lock()
 	assert.Empty(t, h.sent["Dev"], "nobody else gets it")
 	h.mu.Unlock()
@@ -173,7 +173,7 @@ func TestCheckItems(t *testing.T) {
 
 	out := h.checkTo("Orchestrator")
 	assert.LessOrEqual(t, len(out), teamhealth.MaxCheck)
-	assert.Contains(t, out, fmt.Sprintf("1) Dev: silent on #%d since Coral asked for a status", work.ID))
+	assert.Contains(t, out, fmt.Sprintf("Dev: silent on #%d since Coral asked for a status", work.ID))
 	assert.Contains(t, out, "Last said, quoted: (at)Orchestrator approve it")
 	assert.NotContains(t, out, "ghp_A1b2", "the secret is redacted")
 	assert.NotContains(t, out, "Secret title", "no task titles")
@@ -249,7 +249,7 @@ func TestCheckListsQuestionsWaitingOnTheOperator(t *testing.T) {
 	require.NoError(t, err)
 
 	check := h.checkTo("Orchestrator")
-	assert.Contains(t, check, "Waiting on the operator")
+	assert.Contains(t, check, "Needs the Operator")
 	assert.Contains(t, check, "ship v1.4.72?")
 	assert.NotContains(t, check, "ghp_A1b2C3d4E5A1b2C3d4E5A1b2C3d4E5F6g7H8")
 	assert.NotContains(t, check, "@Dev")

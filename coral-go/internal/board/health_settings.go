@@ -37,6 +37,8 @@ type HealthSettings struct {
 	// AskReminder reminds a member, once, of a question (post --ask, asks.go) that @mentions them and that they have not answered for AfterMin (#7794). It runs for a team whether or not the
 	// orchestrator's check is on: a reminder to one agent costs the team nothing.
 	AskReminder HealthMentionNudge `json:"ask_reminder"`
+	// ActionList holds the thresholds of the check's action list (#11729): a zero field is its default.
+	ActionList HealthActionList `json:"action_list"`
 	// Landing puts a line in the health check (off by default, #8942, goal #80) when the branch work lands on (Branch, "main" by default) has not moved for WaitMin although tasks were approved or completed
 	// since it last did (#8942, goal #80): done work that is not landed. It reads the local branch only, never CI or GitHub.
 	Landing HealthLanding `json:"landing"`
@@ -188,6 +190,29 @@ type HealthStatusNudge struct {
 	EscalateAfterMin int  `json:"escalate_after_min"`
 }
 
+// HealthActionList are the thresholds of the orchestrator's action list (#11729, coral-hub's rules): a wait is stuck after StuckWaitMin minutes on a member who has posted nothing since; an agent is
+// overloaded with more than OverloadedTasks open tasks while at least OverloadedSleeping agents sleep; a task is stale after StaleReviewHours hours in review. A zero value is the default.
+type HealthActionList struct {
+	StuckWaitMin       int `json:"stuck_wait_min"`
+	OverloadedTasks    int `json:"overloaded_tasks"`
+	OverloadedSleeping int `json:"overloaded_sleeping"`
+	StaleReviewHours   int `json:"stale_review_hours"`
+}
+
+func (a HealthActionList) clamp() HealthActionList {
+	pick := func(v, def, lo, hi int) int { // 0: a body that does not carry the setting means the default
+		if v == 0 {
+			return def
+		}
+		return min(max(v, lo), hi)
+	}
+	a.StuckWaitMin = pick(a.StuckWaitMin, 10, 5, 1440)
+	a.OverloadedTasks = pick(a.OverloadedTasks, 5, 1, 100)
+	a.OverloadedSleeping = pick(a.OverloadedSleeping, 1, 1, 50)
+	a.StaleReviewHours = pick(a.StaleReviewHours, 24, 1, 720)
+	return a
+}
+
 // HealthMentionNudge: remind the orchestrator of a mention unanswered for AfterMin.
 type HealthMentionNudge struct {
 	On       bool `json:"on"`
@@ -209,6 +234,7 @@ func DefaultHealthSettings() HealthSettings {
 		UploadNoTask:   HealthRuleOn{On: true},
 		GoalSize:       HealthGoalSize{On: true, Limit: 15},
 		AskReminder:    HealthMentionNudge{On: true, AfterMin: 15},
+		ActionList:     HealthActionList{StuckWaitMin: 10, OverloadedTasks: 5, OverloadedSleeping: 1, StaleReviewHours: 24},
 		Landing:        HealthLanding{On: false, Branch: "main", WaitMin: 120},
 		Release:        HealthRelease{On: false, Branch: "main", TagPattern: "v*", WaitMin: 1440},
 		GoalsReady:     HealthWaitCheck{On: true, WaitMin: GoalsReadyWaitMin},
@@ -232,6 +258,7 @@ func (h HealthSettings) Clamp() HealthSettings {
 	h.BusyNoTask.AfterMin = min(max(h.BusyNoTask.AfterMin, 5), 1440)
 	h.GoalSize.Limit = min(max(h.GoalSize.Limit, 5), 500)
 	h.AskReminder.AfterMin = min(max(h.AskReminder.AfterMin, 5), 1440)
+	h.ActionList = h.ActionList.clamp()
 	h.Landing.Branch = strings.TrimSpace(h.Landing.Branch)
 	if !LandingBranchValid(h.Landing.Branch) {
 		h.Landing.Branch = "main"

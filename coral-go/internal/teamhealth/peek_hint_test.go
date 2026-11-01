@@ -37,8 +37,9 @@ func TestPeekHintNamesTheFirstAgentToLookAt(t *testing.T) {
 	require.Len(t, hint, 1)
 	assert.Equal(t, `To see why, read their terminal: coral-board peek "DevOps Engineer" --lines 30.`, hint[0], "the recipient's group first, its longest waiter")
 	// Before the progress line, after what needs the reader.
-	assert.Equal(t, hint[0], lines[len(lines)-2])
-	assert.True(t, strings.HasPrefix(lines[len(lines)-1], "Since "), lines[len(lines)-1])
+	assert.Equal(t, hint[0], lines[len(lines)-3])
+	assert.True(t, strings.HasPrefix(lines[len(lines)-2], "Since "), lines[len(lines)-2])
+	assert.True(t, strings.HasPrefix(lines[len(lines)-1], "Counts: "), lines[len(lines)-1])
 	assert.Contains(t, Compose(in), "coral-board peek", "and in the line that is typed")
 	assert.NotContains(t, Compose(in), "\n")
 }
