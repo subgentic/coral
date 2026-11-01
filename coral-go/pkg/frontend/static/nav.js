@@ -7,6 +7,7 @@
 import { isPhoneLayout } from './phone_layout.js';
 import { browserLocal } from './safe_storage.js';
 import { parse, build, fromLegacyHash, normalize, chatsQuery } from './routes.js';
+import { isCloud } from './server_base.js';
 
 const handlers = new Map();
 const LAST_PLACE = 'coral-last-place'; // the team, agent or chat the person had open (#10057): the page at "/" reopens it after a restart; kept in this browser only, as the route's address
@@ -27,8 +28,8 @@ export function currentRoute() { return current; }
 
 // Each entry also records the URL of the entry it was pushed from (prev), so a "back" control
 // can go back in history when that is where it leads, instead of pushing a copy of it.
-function write(route, replace, from) {
-    const url = build(route);
+function write(route, replace, from, keep) { // keep: the address stays as served (the Hub serves "/", not /inbox/needs, #11809)
+    const url = keep ? location.pathname + location.search : build(route);
     const here = location.pathname + location.search;
     if (replace || url === here) {
         const prev = history.state && typeof history.state.prev === 'string' ? history.state.prev : null;
@@ -111,14 +112,14 @@ function markStartTab(r) {
 export function startNav() {
     if (started) return current;
     started = true;
-    let route = startRoute(), restored = false;
+    let route = startRoute(), restored = false, keep = false;
     // The bare start (the address "/", no query; /agents typed on purpose is the list) reopens the place the person left (#10057); a link, a phone (its Home is the Agents list) or a place that is gone is shown as it is.
     if (isHome(route) && (location.pathname === '/' || location.pathname === '') && !location.search && (!location.hash || location.hash === '#') && !isPhoneLayout()) {
         const back = parse(lastPlace() || '', '');
-        if (isPlace(back)) { route = back; restored = true; } else route = { view: 'inbox-folder', folder: 'needs' }; // no place to reopen: a computer starts on the Inbox, the first tab (#11594)
+        if (isPlace(back)) { route = back; restored = true; } else { route = { view: 'inbox-folder', folder: 'needs' }; keep = isCloud(); } // no place to reopen: a computer starts on the Inbox, the first tab (#11594)
     }
     const kept = lastPlace();
-    write(route, true);
+    write(route, true, '', keep);
     markStartTab(route);
     if (kept && isHome(route)) lastPlace(kept); // the start itself is not the person choosing Home: a phone's Home start (or a link's) leaves the place for the next wide start
     window.addEventListener('popstate', () => {
