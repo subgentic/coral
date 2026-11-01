@@ -210,7 +210,7 @@ export function dataTable(cfg) {
     function readWidths() {
         try {
             const o = JSON.parse(browserLocal.get(wkey) || 'null') || {}, out = {};
-            for (const c of columns) { const v = Number(o[c.key]); if (!c.fixed && Number.isFinite(v) && v >= minOf(c) && v <= MAX_W) out[c.key] = Math.round(v); } // a fixed column is never kept
+            for (const c of columns) { const v = Number(o[c.key]); if (!c.fixed && c.width !== 'grow' && !c.primary && Number.isFinite(v) && v >= minOf(c) && v <= MAX_W) out[c.key] = Math.round(v); } // a fixed column is never kept
             return out;
         } catch { return {}; }
     }
@@ -227,6 +227,12 @@ export function dataTable(cfg) {
         return Math.max(wOf(c), Math.floor(box.clientWidth - rest));
     }
     function applyWidths() {
+        // A column that came after the widths were read (Blocks, once the files say what waits on them) has none kept: in a sized table it would have none at all and shrink to nothing (#11886). It takes the width its content needs, at most its own max.
+        if (box.clientWidth && Object.keys(st.widths).length) for (const c of columns) {
+            if (st.widths[c.key] || fixedW(c) || c.fixed || emptyKeys.has(c.key) || tightKeys.has(c.key) || c.primary || c.width === 'grow') continue;
+            const th = thead.querySelector(`th.dt-th[data-key="${c.key}"]`); if (!th || !th.getClientRects().length) continue;
+            st.widths[c.key] = Math.max(minOf(c), Math.min(fitWidth(c, th), c.max ? Math.round(c.max * 8.5) : 800));
+        }
         fitToBox();
         colgroup.replaceChildren();
         const any = Object.keys(st.widths).length > 0;

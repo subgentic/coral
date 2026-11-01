@@ -196,11 +196,12 @@ function inboxNeedsToolbar() {
     const goalNames = [...new Set(all.filter(s => s.review || s.goal).map(goalLabel))].sort((a, b) => (a === NO_GOAL) - (b === NO_GOAL) || a.localeCompare(b)); // review rows and rows with a goal: "No goal" last
     const rows = all.filter(s => NF.matches(s, { ...needsFilters, kind: '' }, needsCtx));
     const counts = NF.KINDS.filter(kindShown).map(k => rows.filter(s => NF.kindOf(s) === k && (k === 'welcome' || needsUnread(s))).length); // a pill counts what the badge counts (the Welcome pill its own items)
+    const listed = NF.KINDS.filter(kindShown).map(k => rows.filter(s => NF.kindOf(s) === k).length), said = (n, m) => (n === m ? n : `${n} of ${m}`); // the rows read ones are listed too: 'For review 0 of 4', one number (the unread) and the list's size when they differ (#11886)
     const node = needsBar.draw({
         filters: needsFilters,
         options: { team: { values: teams, labels: {} }, agent: { values: names, labels: {} }, goal: { values: goalNames, labels: {} } },
         pills: { label: 'Show agents waiting on', current: needsFilters.kind || 'all',
-            items: [{ key: 'all', label: 'All', count: rows.filter(needsUnread).length }, ...NF.KINDS.filter(kindShown).map((k, i) => ({ key: k, label: NF.KIND_LABEL[k], count: counts[i] }))],
+            items: [{ key: 'all', label: 'All', count: said(rows.filter(needsUnread).length, rows.length) }, ...NF.KINDS.filter(kindShown).map((k, i) => ({ key: k, label: NF.KIND_LABEL[k], count: said(counts[i], listed[i]) }))],
             onPick: key => { needsFilters = { ...needsFilters, kind: key === 'all' ? '' : key }; NF.saveFilters(needsFilters); renderInboxNav(true); } },
     });
     return { node, signature: JSON.stringify([needsFilters, teams, names, goalNames, counts, rows.length, rows.filter(needsUnread).length]) };
