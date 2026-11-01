@@ -63,7 +63,7 @@
 /* The phone's tabs: ONE pattern (#11236, #11239 slice A). Under 600 px the view list is a strip of text tabs under the bar, 44 px tall, the current one in the text colour with a 3 px accent underline and its count inside,
  * scrolling sideways with a fade at the edge, in place of the select and the drawer's button. Section titles are not drawn (a strip has no groups): the order is the sections' order. */
 @media (max-width: 600px) {
-    .view-list .view-list-nav { display: flex; flex-direction: row; gap: 0; overflow-x: auto; scrollbar-width: none; padding: 0; margin-bottom: 8px; padding-right: 28px; scroll-padding-inline: 32px; -webkit-mask-image: linear-gradient(90deg, rgb(var(--black-rgb)) calc(100% - 28px), transparent); mask-image: linear-gradient(90deg, rgb(var(--black-rgb)) calc(100% - 28px), transparent); background: none; border: 0; border-bottom: 1px solid var(--border); position: static; width: auto; }
+    .view-list .view-list-nav { display: flex; flex-direction: row; gap: 0; overflow-x: auto; scrollbar-width: none; padding: 0; margin-bottom: 8px; padding-right: var(--control-touch-height, 44px); scroll-padding-inline: 32px; -webkit-mask-image: linear-gradient(90deg, rgb(var(--black-rgb)) calc(100% - 28px), transparent); mask-image: linear-gradient(90deg, rgb(var(--black-rgb)) calc(100% - 28px), transparent); background: none; border: 0; border-bottom: 1px solid var(--border); position: static; width: auto; }
     .view-list .view-list-nav::-webkit-scrollbar { display: none; }
     .view-list .view-list-select, .view-list-drawer .view-list-trigger { display: none; }
     .view-list .view-list-title { display: none; }
@@ -73,7 +73,9 @@
     .view-list .vl-tab .view-list-icon { display: none; } /* text tabs: the folder's glyph is for the column, not the strip */
     .view-list .vl-tab { display: inline-flex; align-items: center; justify-content: center; gap: 6px; flex: none; width: auto; min-width: var(--control-touch-height, 44px); min-height: var(--control-touch-height, 44px); height: auto; padding: 0 14px; border-radius: 0; background: none; border: 0; border-bottom: 3px solid transparent; color: var(--text-secondary); font-weight: var(--fw-medium); white-space: nowrap; }
     .view-list { position: relative; } /* the chevron below is drawn on the list, not on the strip (the strip's edge fade would fade it too) */
-    .view-list:has(> .view-list-nav[data-overflow])::after { content: ''; position: absolute; right: 10px; top: calc((var(--control-touch-height, 44px) - 9px) / 2); width: 9px; height: 9px; border-top: 2px solid var(--text-primary); border-right: 2px solid var(--text-primary); transform: rotate(45deg); pointer-events: none; } /* more tabs to the right: a chevron at the edge while there are (#11583) */
+    .view-list-edge-btn { position: absolute; z-index: 1; right: 0; top: 0; width: var(--control-touch-height, 44px); height: var(--control-touch-height, 44px); } /* more tabs to the right: a chevron button at the edge while there are (#11583); a tap scrolls the strip (#11620) */
+    .view-list-edge-btn::after { content: ''; position: absolute; inset: 0 0 0 -12px; z-index: -1; background: linear-gradient(to right, transparent, var(--bg-primary) 40%); } /* the tabs fade under it */
+    .view-list-edge-btn::before { content: ''; position: absolute; right: 16px; top: calc((100% - 9px) / 2); width: 9px; height: 9px; border-top: 2px solid var(--text-primary); border-right: 2px solid var(--text-primary); transform: rotate(45deg); }
     .view-list .vl-tab.view-list-current { color: var(--text-primary); border-bottom-color: var(--accent); font-weight: var(--fw-strong); box-shadow: none; }
 }
 
