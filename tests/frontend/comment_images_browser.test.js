@@ -142,6 +142,21 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
             assert.equal(await ev(`document.documentElement.scrollWidth - document.documentElement.clientWidth`), 0, at + 'the thread does not scroll sideways');
             assert.equal(await ev(`(() => { const i = document.querySelector('.ac-card .ac-pic-img'), p = document.querySelector('.ac-panel'); return i.getBoundingClientRect().right <= p.getBoundingClientRect().right + 1; })()`), true, at + 'a picture stays inside the panel');
             void names;
+
+            // a picture alone is a comment (the Operator's marked-up screenshot); nothing at all is still refused in words
+            await ev(`document.querySelector('.ac-whole').click(); true`);
+            await waitFor(`!!document.querySelector('.ac-composer .ac-input')`, at + 'the composer again', 5000);
+            await ev(`document.querySelector('.ac-composer').requestSubmit(); true`);
+            assert.equal(await ev(`document.querySelector('.ac-composer .ac-error').textContent`), 'Write something first.', at + 'no words and no picture: refused in words');
+            assert.equal(await ev(`window.__posts.length`), 1, at + 'and nothing was posted');
+            await pick([['alone.png', 'image/png']]);
+            await waitFor(`document.querySelectorAll('.ac-composer .ac-thumb-img').length === 1`, at + 'the picture', 5000); await settled();
+            await ev(`document.querySelector('.ac-composer').requestSubmit(); true`);
+            await waitFor(`window.__posts.length === 2`, at + 'the picture-only post', 5000);
+            const alone = await ev(`window.__posts[1]`);
+            assert.equal(alone.body, '', at + 'the post has no words');
+            assert.equal(alone.images.length, 1, at + 'and one picture');
+            await waitFor(`document.querySelectorAll('.ac-card .ac-pic-img').length === 4`, at + 'its picture in the thread', 5000);
             console.log(`   ✓ ${w} px`);
         }
         console.log('PASS comment pictures: pick, paste and drop, thumbnails before Send, refusals in words, Send waits, inline in the thread');
