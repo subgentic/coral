@@ -100,6 +100,8 @@ type Goal struct {
 	Rollup       GoalRollup `db:"-" json:"rollup"`
 	// FollowUpsOpen: the open tasks of the goal that were made as follow-ups of another task (task add --follow-up); filled where one goal is read (GetGoal), never in a list.
 	FollowUpsOpen int `db:"-" json:"follow_ups_open,omitempty"`
+	// Images are the pictures the Operator attached to the goal's description (#11650), in the order sent; filled where goals are read.
+	Images []GoalImage `db:"-" json:"images,omitempty"`
 }
 
 // Closed reports whether the goal is done or dropped.
@@ -231,6 +233,11 @@ func (s *Store) GetGoal(ctx context.Context, board string, id int64) (*Goal, err
 	if g.FollowUpsOpen, err = s.goalFollowUpsOpen(ctx, board, id); err != nil {
 		return nil, err
 	}
+	one := []Goal{g}
+	if err = s.fillGoalImages(ctx, one); err != nil {
+		return nil, err
+	}
+	g.Images = one[0].Images
 	return &g, nil
 }
 

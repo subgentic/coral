@@ -15,7 +15,7 @@ var boardOwnedRows = []struct{ table, col string }{
 	{"board_subscribers", "project"}, {"board_messages", "project"}, {"board_reminders", "project"}, {"board_groups", "project"},
 	{"board_tasks", "board_id"}, {"board_settings", "project"}, {"board_waits", "project"}, {"board_working_modes", "board_id"},
 	{"board_workflow_presets", "board_id"}, {"health_counters", "project"}, {"health_items", "project"}, {"health_offbooks", "project"}, {"health_goal_size", "project"}, {"boards", "id"},
-	{"board_proposals", "board_id"}, {"board_goals", "board_id"}, {"board_goal_meta", "board_id"}, {"board_goal_events", "board_id"}, {"board_settings_log", "board_id"}, // the goals tables were missing from this census until #7355
+	{"board_proposals", "board_id"}, {"board_goals", "board_id"}, {"board_goal_meta", "board_id"}, {"board_goal_images", "board_id"}, {"board_goal_events", "board_id"}, {"board_settings_log", "board_id"}, // the goals tables were missing from this census until #7355
 	{"board_goal_requests_in", "board_id"}, {"board_goal_requests_out", "board_id"}, // #7361: a goal request goes with either of its two boards
 	{"board_asks", "project"}, {"board_replies", "project"}, {"board_ask_closed", "project"}, {"board_ask_buttons", "project"}, {"board_orch_grant", "project"}, {"board_clashes", "project"}, {"board_lifecycle_log", "project"}, // #7794: a question and the link of a reply go with their board
 	{"artifact_tags", "board_id"},      // #8583: a team's tags of its artifacts
@@ -105,7 +105,8 @@ func fillBoard(t *testing.T, s *Store, project string) (taskIDs []int64) {
 	require.NoError(t, s.SetArtifactTags(ctx, project, strings.Repeat("a", 64), []string{"for review"}))  // a tag the team put on an artifact
 	_, _, err = s.DecideArtifactReview(ctx, project, strings.Repeat("a", 64), ReviewApproved, time.Now()) // and the Operator's decision on it (#136584)
 	require.NoError(t, err)
-	_, err = s.SetArtifactQuestion(ctx, project, strings.Repeat("a", 64), "Approve it?", "sess-1", time.Now()) // and what its upload asked (#11555)
+	require.NoError(t, s.SetGoalImages(ctx, project, goal.ID, []GoalImage{{Hex: strings.Repeat("b", 64), Name: "shot.png", ContentType: "image/png"}})) // and the pictures of its goal (#11650)
+	_, err = s.SetArtifactQuestion(ctx, project, strings.Repeat("a", 64), "Approve it?", "sess-1", time.Now())                                          // and what its upload asked (#11555)
 	require.NoError(t, err)
 	return []int64{first.ID, second.ID}
 }

@@ -104,6 +104,9 @@ func (s *Store) GoalPage(ctx context.Context, board string, q GoalListQuery) (*G
 	for i := range goals {
 		goals[i].Rollup = rollups[goals[i].ID]
 	}
+	if err := s.fillGoalImages(ctx, goals); err != nil {
+		return nil, err
+	}
 	var seq int64
 	if err := s.reader().GetContext(ctx, &seq, `SELECT seq FROM board_goal_meta WHERE board_id = ?`, board); err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, err
@@ -212,6 +215,9 @@ func (s *Store) AllGoalsPage(ctx context.Context, q AllGoalsQuery) (*GoalPage, e
 	}
 	for i := range goals {
 		goals[i].Rollup = rollups[goals[i].ID]
+	}
+	if err := s.fillGoalImages(ctx, goals); err != nil {
+		return nil, err
 	}
 	return &GoalPage{Goals: goals, NextCursor: next}, nil
 }

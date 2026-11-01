@@ -47,19 +47,24 @@ type ArtifactComment struct {
 	ResolvedSubject *string `db:"resolved_by_subject" json:"-"`
 	ResolvedAt      *string `db:"resolved_at" json:"resolved_at"`
 	DeletedAt       *string `db:"deleted_at" json:"deleted_at"`
+	// ImagesJSON is the pictures a person attached (#11650): a JSON list of {hex, name, content_type}, "" for none. A comment with pictures may have no words.
+	ImagesJSON string `db:"images_json" json:"-"`
 }
 
-const artifactCommentCols = "id, artifact_id, board, parent_id, anchor_json, body, author_issuer, author_subject, author_name, author_kind, created_at, edited_at, resolved_by_issuer, resolved_by_subject, resolved_at, deleted_at"
+// MaxArtifactCommentImages is the most bytes of ImagesJSON (four pictures with their names).
+const MaxArtifactCommentImages = 2 << 10
+
+const artifactCommentCols = "id, artifact_id, board, parent_id, anchor_json, body, author_issuer, author_subject, author_name, author_kind, created_at, edited_at, resolved_by_issuer, resolved_by_subject, resolved_at, deleted_at, images_json"
 
 func nowStamp() string { return time.Now().UTC().Format(time.RFC3339Nano) }
 
 // CreateArtifactComment adds a comment, or a reply when c.ParentID is set. The id, the time and the cleared state are the store's; the caller decides the author and the board.
 func (s *SessionStore) CreateArtifactComment(ctx context.Context, c ArtifactComment) (ArtifactComment, error) {
 	body := strings.TrimSpace(c.Body)
-	if body == "" {
+	if body == "" && c.ImagesJSON == "" {
 		return ArtifactComment{}, ErrCommentEmpty
 	}
-	if len(body) > MaxArtifactCommentBody || len(c.AnchorJSON) > MaxArtifactCommentAnchor {
+	if len(body) > MaxArtifactCommentBody || len(c.AnchorJSON) > MaxArtifactCommentAnchor || len(c.ImagesJSON) > MaxArtifactCommentImages {
 		return ArtifactComment{}, ErrCommentTooLong
 	}
 	tx, err := s.db.BeginTxx(ctx, nil)
@@ -87,8 +92,8 @@ func (s *SessionStore) CreateArtifactComment(ctx context.Context, c ArtifactComm
 	if n >= MaxArtifactComments {
 		return ArtifactComment{}, ErrTooManyComments
 	}
-	res, err := tx.ExecContext(ctx, `INSERT INTO artifact_comments (artifact_id, board, parent_id, anchor_json, body, author_issuer, author_subject, author_name, author_kind, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		c.ArtifactID, c.Board, c.ParentID, c.AnchorJSON, body, c.AuthorIssuer, c.AuthorSubject, c.AuthorName, c.AuthorKind, nowStamp())
+	res, err := tx.ExecContext(ctx, `INSERT INTO artifact_comments (artifact_id, board, parent_id, anchor_json, body, author_issuer, author_subject, author_name, author_kind, created_at, images_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		c.ArtifactID, c.Board, c.ParentID, c.AnchorJSON, body, c.AuthorIssuer, c.AuthorSubject, c.AuthorName, c.AuthorKind, nowStamp(), c.ImagesJSON)
 	if err != nil {
 		return ArtifactComment{}, err
 	}
@@ -180,17 +185,18 @@ func (s *SessionStore) ListArtifactComments(ctx context.Context, artifactID, sta
 // EditArtifactComment replaces the body of a live comment and stamps edited_at; ok is false when there is no such live comment.
 func (s *SessionStore) EditArtifactComment(ctx context.Context, artifactID string, id int64, body string) (ArtifactComment, bool, error) {
 	body = strings.TrimSpace(body)
-	if body == "" {
-		return ArtifactComment{}, false, ErrCommentEmpty
-	}
 	if len(body) > MaxArtifactCommentBody {
 		return ArtifactComment{}, false, ErrCommentTooLong
 	}
-	res, err := s.db.ExecContext(ctx, "UPDATE artifact_comments SET body = ?, edited_at = ? WHERE id = ? AND artifact_id = ? AND deleted_at IS NULL", body, nowStamp(), id, artifactID)
+	// A comment with pictures may have no words; one without may not.
+	res, err := s.db.ExecContext(ctx, "UPDATE artifact_comments SET body = ?, edited_at = ? WHERE id = ? AND artifact_id = ? AND deleted_at IS NULL AND (? != '' OR images_json != '')", body, nowStamp(), id, artifactID, body)
 	if err != nil {
 		return ArtifactComment{}, false, err
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
+		if cur, found, _ := s.GetArtifactComment(ctx, artifactID, id); found && cur.DeletedAt == nil && body == "" {
+			return ArtifactComment{}, false, ErrCommentEmpty
+		}
 		return ArtifactComment{}, false, nil
 	}
 	out, ok, err := s.GetArtifactComment(ctx, artifactID, id)
@@ -199,7 +205,7 @@ func (s *SessionStore) EditArtifactComment(ctx context.Context, artifactID strin
 
 // DeleteArtifactComment turns a live comment into a tombstone (its text is erased, its replies stay); ok is false when there is no such live comment.
 func (s *SessionStore) DeleteArtifactComment(ctx context.Context, artifactID string, id int64) (bool, error) {
-	res, err := s.db.ExecContext(ctx, "UPDATE artifact_comments SET body = '', anchor_json = '', deleted_at = ? WHERE id = ? AND artifact_id = ? AND deleted_at IS NULL", nowStamp(), id, artifactID)
+	res, err := s.db.ExecContext(ctx, "UPDATE artifact_comments SET body = '', anchor_json = '', images_json = '', deleted_at = ? WHERE id = ? AND artifact_id = ? AND deleted_at IS NULL", nowStamp(), id, artifactID)
 	if err != nil {
 		return false, err
 	}

@@ -2,6 +2,7 @@
 import { importOnce } from './import_once.js';
 import { el } from './dom_el.js';
 const api = await importOnce('./artifact_comments_api.js');
+const imgs = await importOnce('./artifact_comment_images.js'); // pictures in a comment (#11651)
 
 const BODY_MAX = 8192; // the server's cap on a comment (bytes; most text is one byte a character)
 const btn = (cls, text, label) => { const b = el('button', 'btn ' + cls, text); b.type = 'button'; if (label) b.setAttribute('aria-label', label); return b; };
@@ -21,18 +22,20 @@ export function createComposer({ st, render, run, ownHex }) {
         ta.setAttribute('aria-label', editOf ? 'Edit your comment' : cm.parentId != null ? 'Your reply' : 'Your comment'); ta.placeholder = cm.parentId != null ? 'Write a reply…' : 'Add a comment…';
         const count = el('span', 'ac-counter', `${ta.value.length} / ${BODY_MAX}`);
         ta.addEventListener('input', () => { count.textContent = `${ta.value.length} / ${BODY_MAX}`; cm.draft = ta.value; });
-        const cancel = btn('ac-cancel', 'Cancel'); cancel.addEventListener('click', () => { st.composing = null; st.error = ''; render(); });
+        const tray = editOf ? null : (cm.tray || (cm.tray = imgs.createImageTray({ upload: blob => api.uploadCommentImage(cm.hex || st.hex, st.server, blob, undefined, st.board) }))); // a new comment or reply can carry pictures; an edit keeps the ones it has
+        const cancel = btn('ac-cancel', 'Cancel'); cancel.addEventListener('click', () => { if (tray) tray.destroy(); st.composing = null; st.error = ''; render(); });
         const send = btn('btn-primary ac-send', editOf ? 'Save' : cm.parentId != null ? 'Reply' : 'Comment'); send.type = 'submit';
         const err = el('p', 'ac-error', st.error); err.setAttribute('role', 'alert'); err.hidden = !st.error;
-        const row = el('div', 'ac-composer-row'); row.append(count, cancel, send);
-        box.append(ta, err, row);
+        const row = el('div', 'ac-composer-row'); row.append(count, ...(tray ? [tray.picker()] : []), cancel, send);
+        box.append(ta, ...(tray ? [tray.node, tray.hint()] : []), err, row);
+        if (tray) { tray.attach(box, ta); tray.listen(() => { send.disabled = tray.busy() || tray.failed(); }); send.disabled = tray.busy() || tray.failed(); } // Send waits for a picture still going up, and for a failed one to be removed
         box.addEventListener('submit', (e) => {
             e.preventDefault();
-            const text = ta.value.trim();
-            if (!text) { st.error = 'Write something first.'; err.textContent = st.error; err.hidden = false; return; }
+            const text = ta.value.trim(), pictures = tray ? tray.hexes() : [];
+            if (!text && !pictures.length) { st.error = 'Write something first.'; err.textContent = st.error; err.hidden = false; return; }
             send.disabled = true;
             if (editOf) run(() => api.editComment(ownHex(editOf), st.server, editOf.id, text), 'Comment saved');
-            else run(async () => { const c = await api.createComment(cm.hex || st.hex, st.server, { body: text, anchor: cm.anchor, parentId: cm.parentId, board: st.board }); st.active = c.id; st.scrollCard = true; }, cm.parentId != null ? 'Reply posted' : 'Comment posted');
+            else run(async () => { const c = await api.createComment(cm.hex || st.hex, st.server, { body: text, anchor: cm.anchor, parentId: cm.parentId, board: st.board, images: pictures }); if (tray) tray.destroy(); st.active = c.id; st.scrollCard = true; }, cm.parentId != null ? 'Reply posted' : 'Comment posted');
         });
         ta.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); cancel.click(); } else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) box.requestSubmit(); });
         return box;

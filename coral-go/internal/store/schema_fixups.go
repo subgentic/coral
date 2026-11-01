@@ -15,6 +15,8 @@ import (
 var columnMigrations = []struct {
 	table, column, definition string
 }{
+	// The pictures a person attached to an artifact comment (#11650): a JSON list of {hex, name, content_type}; '' for none.
+	{"artifact_comments", "images_json", "TEXT NOT NULL DEFAULT ''"},
 	// When the asked agent first read the comment's artifact threads or replied (seen_at), and when Coral reminded it to answer in the thread (nudged_at) (#11722); NULL: not yet.
 	{"artifact_comment_asks", "seen_at", "TEXT"},
 	{"artifact_comment_asks", "nudged_at", "TEXT"},

@@ -1,6 +1,6 @@
 // One goal's detail view, shared by the team Goals list and other page hosts.
 import { openTask } from './task_navigation.js';
-import { boardFetch, keyLabel } from './server_base.js';
+import { boardFetch, keyLabel, serverUrl, splitKey } from './server_base.js';
 import { OPERATOR_ID, copyText, showToast } from './utils.js';
 import { browserLocal } from './safe_storage.js';
 import { whenText } from './when_text.js';
@@ -148,11 +148,12 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         copyBtn.title = 'Copies a line to paste to an agent: it runs coral-board goal brief for this goal';
         line.append(copyBtn);
         main.append(line);
-        if (g.outcome || g.doneWhen) {
+        if (g.outcome || g.doneWhen || g.images.length) {
             const dl = el('dl', 'facts goals-facts');
-            if (g.outcome) dl.append(el('dt', null, 'Outcome'), linkedDd(g.outcome));
+            if (g.outcome) dl.append(el('dt', null, 'Description'), linkedDd(g.outcome)); // the outcome field, which the New goal form's Description fills (#11653)
             if (g.doneWhen) dl.append(el('dt', null, 'Done when'), linkedDd(g.doneWhen));
             main.append(dl);
+            if (g.images.length) main.append(goalPictures(g));
         }
         const openLeft = g.rollup.active + g.rollup.blocked + g.rollup.queued;
         if ((g.state === 'done' || g.state === 'dropped') && openLeft) main.append(el('p', 'goals-note goals-closed-open', W.closedWithOpenText(openLeft)));
@@ -339,6 +340,18 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
                 ro.observe(main);
             },
         };
+    }
+
+    /** The pictures a goal was made with, under its description, in the order sent: each is the image itself (its name for a screen reader) and opens whole in a new tab. */
+    function goalPictures(g) {
+        const ul = el('ul', 'goal-pics'); ul.setAttribute('aria-label', 'Pictures of this goal');
+        const server = splitKey(model.project).server;
+        for (const p of g.images) {
+            const li = el('li', 'goal-pic'), a = el('a', 'goal-pic-link'); a.href = serverUrl(`/api/artifacts/${p.hex}?v=2`, server); a.target = '_blank'; a.rel = 'noopener';
+            const img = el('img', 'goal-pic-img'); img.src = a.href; img.alt = p.name || 'Picture of the goal'; img.loading = 'lazy'; img.decoding = 'async';
+            a.append(img); li.append(a); ul.append(li);
+        }
+        return ul;
     }
 
     function drawGoalPageRaw(col) {

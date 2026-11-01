@@ -100,7 +100,8 @@ CREATE TABLE IF NOT EXISTS artifact_comments (
 	resolved_by_issuer  TEXT,
 	resolved_by_subject TEXT,
 	resolved_at TEXT,
-	deleted_at  TEXT
+	deleted_at  TEXT,
+	images_json TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS idx_artifact_comments_artifact ON artifact_comments(artifact_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_artifact_comments_parent ON artifact_comments(parent_id);

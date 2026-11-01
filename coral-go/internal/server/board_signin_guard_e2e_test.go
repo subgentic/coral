@@ -157,6 +157,8 @@ func TestTheBoardRoutesRefuseASignInLinkFromAnyClient(t *testing.T) {
 var writeRoutesWithoutTheGuard = map[string]string{
 	"POST /api/board/{project}/operator-artifacts":                         "the body is the Operator's file, stored as bytes; its name is checked in the handler (hasSignInLink) and the file is never rendered (#11376)",
 	"POST /api/board/{project}/operator-artifacts/message":                 "the body names an agent session and digests this Coral just stored; the message text is made by the server (#11376)",
+	"POST /api/artifacts/{id}/comment-images":                              "the body is a picture, stored as bytes after its own bytes were checked as PNG, JPEG or WebP; its name is checked in the handler (hasSignInLink) and it is never run (#11650)",
+	"POST /api/board/{project}/goal-images":                                "as comment-images: a picture checked by its bytes, its name checked in the handler (hasSignInLink), stored as an artifact of the team (#11650)",
 	"DELETE /api/saved/{id}":                                               "a delete by id: no text is kept",
 	"POST /api/board/{project}/clashes":                                    "the body is a target in a closed form and two message ids (#11457): the question to the Operator is written by Coral from the stored messages",
 	"POST /api/board/{project}/asks/{messageID}/buttons/{buttonID}/claim":  "no body: the ids are in the path and what runs is the stored button (#11643); the reply text is the stored label, which was refused at declaration if it held a link",
