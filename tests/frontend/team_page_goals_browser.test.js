@@ -1,5 +1,5 @@
 // The team page's Goals face, a goal's page and a task's page (#7453, stage 1; UI/UX's team page doc 7aa984fe): Goals is a table (Goal, State, Tasks, Updated, and New goal); choosing a goal swaps the body for the goal's own
-// page (a back link "Goals", an h2 with the name, Outcome and Done when, its tasks in a column beside it, a pinned bar with Add task and Close goal) and Back returns to the list with the focus on the row; a task opens its own
+// page (a back link "Goals", an h2 with the name, Description (the outcome) and Done when, its tasks in a column beside it, a pinned bar with Add task and Close goal) and Back returns to the list with the focus on the row; a task opens its own
 // page the same way (back link "Tasks", h2 "#<id> <title>", its goal as a link); the Agents sidebar has no goals (#7659). 1280 and 390 px. Written failing-first by QA
 // (#7466): controls by role and accessible name (helpers/team_page.js). Isolated dev server.
 const assert = require('node:assert/strict');
@@ -57,12 +57,12 @@ const GOAL = 'Explore goals with two teams';
                 await client.Input.dispatchKeyEvent({ type: 'rawKeyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }); await client.Input.dispatchKeyEvent({ type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }); await settle(300);
                 assert.equal(await ev(`!!document.querySelector('dialog[open]')`), false, 'Escape closed the New goal dialog');
             });
-            await S.run(`${label}: choosing a goal swaps the body for the goal's page: back link, h2, Outcome and Done when, its tasks in a column, and a pinned bar with Add task and Close goal`, async () => {
+            await S.run(`${label}: choosing a goal swaps the body for the goal's page: back link, h2, Description and Done when, its tasks in a column, and a pinned bar with Add task and Close goal`, async () => {
                 await goTab(ev, settle, 'Goals');
                 await click('button, a, [role=row], tr', new RegExp(GOAL), 'goal row');
                 assert.equal(await h2(), GOAL, 'the goal page has the goal name as its h2');
                 const body = await ev(`window.__na.text(window.__tp.page())`);
-                assert.ok(/Outcome/.test(body) && /Try goals, task links and cross-team requests\./.test(body), 'Outcome with its text');
+                assert.ok(/Description/.test(body) && /Try goals, task links and cross-team requests\./.test(body), 'Description (the goal\'s outcome field, #11653) with its text');
                 assert.ok(/Done when/.test(body) && /You have linked tasks and closed a goal\./.test(body), 'Done when with its text');
                 assert.ok(await ev(`!!window.__tp.find('button, a', /^(\\u2190\\s*)?Goals$/)`), 'a back link named Goals');
                 // the goal's tasks are one list under a Tasks | Artifacts tab strip, in the goal's own pane (#8914)

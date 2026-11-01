@@ -15,6 +15,7 @@ export function toGoal(g) {
         state: text(g && g.state).toLowerCase(),
         blockedOn: text(g && (g.blocked_on ?? g.blockedOn)),
         driver: text(g && g.driver),
+        images: Array.isArray(g && g.images) ? g.images.map(i => ({ hex: text(i && i.hex), name: text(i && i.name) })).filter(i => /^[0-9a-f]{64}$/.test(i.hex)) : [], // the pictures the goal was made with, in the order sent (#11653)
         updatedAt: text(g && (g.updated_at ?? g.updatedAt)),
         rollup: { done: count(r.done), active: count(r.active), blocked: count(r.blocked), queued: count(r.queued) },
     };
@@ -78,8 +79,10 @@ export function toDrivers(json) {
 }
 
 /** The body the create route takes; `by` is the writer (the dashboard writes as the Operator). */
-export function createBody({ title, doneWhen, driver, by }) {
+export function createBody({ title, description, doneWhen, driver, images, by }) {
     const body = { title: String(title || '').trim() };
+    if (String(description || '').trim()) body.outcome = String(description).trim(); // the Description is the goal's outcome (#11653)
+    if (Array.isArray(images) && images.length) body.images = images.slice();
     if (by) body.subscriber_id = by;
     if (String(doneWhen || '').trim()) body.done_when = String(doneWhen).trim();
     if (String(driver || '').trim()) body.driver = String(driver).trim();

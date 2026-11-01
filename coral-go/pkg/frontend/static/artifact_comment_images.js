@@ -82,9 +82,11 @@ export function createImageTray({ upload, onChange = () => {} }) {
         form.addEventListener('dragleave', e => { if (!form.contains(e.relatedTarget)) form.classList.remove('ac-drop'); });
         form.addEventListener('drop', e => { if (!hasFiles(e)) return; e.preventDefault(); form.classList.remove('ac-drop'); add(e.dataTransfer.files); });
     }
+    /** Takes every picture out (a goal's form whose team changed: the pictures were stored on the other one). */
+    function clear(words) { for (const it of items) URL.revokeObjectURL(it.previewUrl); items.length = 0; say(words || ''); draw(); }
     function destroy() { destroyed = true; for (const it of items) URL.revokeObjectURL(it.previewUrl); items.length = 0; list.replaceChildren(); }
     return {
-        node, add, remove, replaceBlob, picker, attach, destroy,
+        node, add, remove, replaceBlob, picker, attach, clear, destroy,
         items: () => items.map(it => ({ id: it.id, name: it.name, blob: it.blob, hex: it.hex, state: it.state })),
         hexes: () => items.filter(it => it.state === 'ready').map(it => it.hex),
         busy: () => items.some(it => it.state === 'uploading'),
