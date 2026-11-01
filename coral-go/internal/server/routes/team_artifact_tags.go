@@ -155,6 +155,15 @@ func (h *BoardHandler) applyManifestTags(ctx context.Context, project, asker str
 			continue
 		}
 		clean := board.CleanArtifactTags(tags)
+		var theirs []string
+		for _, raw := range tags {
+			if tag, _ := board.NormalizeArtifactTag(raw); board.OperatorArtifactTag(raw) && !hasTag(theirs, tag) {
+				theirs = append(theirs, tag)
+			}
+		}
+		if len(theirs) > 0 {
+			notes = append(notes, fmt.Sprintf("%q: left out %s: those tags are the Operator's own; an agent does not set them.", a.Name, strings.Join(theirs, ", ")))
+		}
 		if hasTag(clean, tagForReview) {
 			// The same rules as an upload with the tag, and the same words when one is not met: the result is not refused, the tag is left out, and the answer says why (#11581).
 			q, qok := board.CleanReviewQuestion(question)

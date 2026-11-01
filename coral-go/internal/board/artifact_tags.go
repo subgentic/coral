@@ -68,12 +68,23 @@ func NormalizeArtifactTags(in []string) ([]string, error) {
 	return out, nil
 }
 
-// CleanArtifactTags is NormalizeArtifactTags for tags an agent sent: one that is refused is dropped, and those past MaxArtifactTags are left off, so a tag never stops an upload or a result.
+// operatorArtifactTags are the tags that are the Operator's word (#11645): "read", "ignored", "saved" and "denied" are set by a click, and "approved", "changes requested" and "superseded" by a decision (or a newer version).
+// Needs you and the review rows read them, so an agent that could write them would keep its own file out of Needs you or show a decision nobody made. Only the Operator's routes and the review code set them.
+var operatorArtifactTags = map[string]bool{"read": true, "ignored": true, "saved": true, "denied": true, "approved": true, "changes requested": true, "superseded": true}
+
+// OperatorArtifactTag says the tag, as an agent might spell it, is one of the Operator's states.
+func OperatorArtifactTag(s string) bool {
+	tag, ok := NormalizeArtifactTag(s)
+	return ok && operatorArtifactTags[tag]
+}
+
+// CleanArtifactTags is NormalizeArtifactTags for tags an agent sent: one that is refused is dropped, and those past MaxArtifactTags are left off, so a tag never stops an upload or a result. The Operator's own states
+// (OperatorArtifactTag) are dropped too: an agent never sets them.
 func CleanArtifactTags(in []string) []string {
 	out := make([]string, 0, len(in))
 	seen := map[string]bool{}
 	for _, raw := range in {
-		if tag, ok := NormalizeArtifactTag(raw); ok && !seen[tag] && len(out) < MaxArtifactTags {
+		if tag, ok := NormalizeArtifactTag(raw); ok && !seen[tag] && !operatorArtifactTags[tag] && len(out) < MaxArtifactTags {
 			seen[tag] = true
 			out = append(out, tag)
 		}
