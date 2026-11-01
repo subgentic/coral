@@ -61,6 +61,10 @@ func (a *HermesAgent) LaunchCommand(params LaunchParams) (string, error) {
 	var parts, raw []string
 	export := formatEnvExport("HERMES_HOME", home)
 	parts, raw = append(parts, export), append(raw, export)
+	if params.WorkingDir != "" { // Hermes runs its hooks in its own install folder: the hook tool names the agent by this folder, not by the payload's (cmd/coral-hook-agentic-state, hermesAgentName)
+		wd := formatEnvExport("CORAL_HERMES_WORKDIR", params.WorkingDir)
+		parts, raw = append(parts, wd), append(raw, wd)
+	}
 	parts = append(parts, bin, "chat")
 	if id := params.ResumeSessionID; id != "" && IsHermesSessionID(id) { // one that is not one is ignored: a fresh session, never an argument made of it
 		parts = append(parts, "--resume", id)

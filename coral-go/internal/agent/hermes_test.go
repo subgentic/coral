@@ -104,3 +104,11 @@ func TestHermesYoloCountsAsSkipping(t *testing.T) {
 	assert.True(t, SkipsPermissionPrompts(at.Hermes, []string{"--accept-hooks"}))
 	assert.False(t, SkipsPermissionPrompts(at.Hermes, []string{"--model", "m"}))
 }
+
+// The hook tool names the agent by the folder it works in (Hermes runs hooks in its own install folder): the launch line sets it.
+func TestTheLaunchLineSetsTheWorkdirTheHooksNameTheAgentBy(t *testing.T) {
+	hermesRig(t)
+	cmd, err := GetAgent(at.Hermes).LaunchCommand(LaunchParams{SessionID: "s1", BoardName: "t", WorkingDir: "/work/dev"})
+	require.NoError(t, err)
+	assert.Contains(t, cmd, "CORAL_HERMES_WORKDIR='/work/dev'")
+}

@@ -110,3 +110,37 @@ func TestTheInstalledHermesHooksAreTheOnesRecorded(t *testing.T) {
 	}
 	assert.ElementsMatch(t, recorded, agent.HermesHookEvents())
 }
+
+// Hermes runs its hooks in ITS OWN install folder, whatever folder the agent works in (#11715), so the payload's folder is not the agent's name; the launch line's CORAL_HERMES_WORKDIR is. The event is
+// posted for the agent's own folder name and reads as the turn it is.
+func TestAHermesHookIsPostedForTheAgentsOwnFolderNotHermesInstallFolder(t *testing.T) {
+	res := runFlow(t, flowRun{
+		cli: "hermes", args: []string{"--hermes", "pre_llm_call"},
+		stdin: flowPayload(t, map[string]any{"hook_event_name": "pre_llm_call", "session_id": hermesTestID, "cwd": "/opt/hermes-agent", "extra": map[string]any{"user_message": hermesCanary}}),
+		env:   []string{"CORAL_HERMES_WORKDIR=/work/dev"},
+	})
+	require.NotEmpty(t, res.Requests)
+	b, _ := json.Marshal(res)
+	assert.NotContains(t, string(b), hermesCanary)
+	assert.NotContains(t, string(b), "hermes-agent", "the install folder is not a name")
+	var posted bool
+	for _, r := range res.Requests {
+		if r.Method == "POST" && r.Path == "/api/sessions/live/dev/events" {
+			posted = true
+			assert.Equal(t, "prompt_submit", r.Body.(map[string]any)["event_type"])
+		}
+	}
+	assert.True(t, posted, "%s", b)
+}
+
+func TestAHermesHookWithNoWorkdirPostsNothing(t *testing.T) {
+	res := runFlow(t, flowRun{
+		cli: "hermes", args: []string{"--hermes", "pre_llm_call"},
+		stdin: flowPayload(t, map[string]any{"session_id": hermesTestID, "cwd": "/opt/hermes-agent"}),
+	})
+	assert.Empty(t, res.Requests, "no name, no post under the install folder's")
+	for _, bad := range []string{"..", "/", "."} {
+		res = runFlow(t, flowRun{cli: "hermes", args: []string{"--hermes", "pre_llm_call"}, stdin: flowPayload(t, map[string]any{}), env: []string{"CORAL_HERMES_WORKDIR=" + bad}})
+		assert.Empty(t, res.Requests, bad)
+	}
+}

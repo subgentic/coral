@@ -1,7 +1,10 @@
 package main
 
 import (
+	"os"
+
 	"github.com/subgentic/coral/internal/hermesdb"
+	"github.com/subgentic/coral/internal/hooks"
 )
 
 // Hermes (#11831): Hermes Agent runs the shell hooks of its config.yaml (the one Coral writes in its own HERMES_HOME) with a JSON object on standard input; Coral's entries run this binary as
@@ -79,4 +82,14 @@ func fromHermes(d map[string]any, hook string) (map[string]any, bool) {
 		return nil, false
 	}
 	return out, true
+}
+
+// hermesAgentName is the agent's name for a Hermes hook: the folder name of CORAL_HERMES_WORKDIR, which Coral's launch line sets to the folder the agent works in (Hermes runs its hooks, and sets their cwd, in its
+// own install folder, so nothing in the payload says it). "" with none, or one that is not a folder name: the event is then dropped, never posted under the install folder's name.
+func hermesAgentName() string {
+	dir := os.Getenv("CORAL_HERMES_WORKDIR")
+	if dir == "" {
+		return ""
+	}
+	return hooks.ResolveAgentName(map[string]any{"cwd": dir})
 }

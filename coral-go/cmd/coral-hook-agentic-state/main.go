@@ -86,6 +86,9 @@ func handle(d map[string]any, opts hookArgs, agyModel, agyConversation string) {
 	sessionID := hooks.ResolveSessionID(hooks.StrVal(d, "session_id"))
 	bindTranscripts(d, sessionID, agyConversation)
 	agentName := hooks.ResolveAgentName(d)
+	if opts.hermesEvent != "" {
+		agentName = hermesAgentName() // Hermes runs its hooks in its own install folder: the payload's folder is not the agent's
+	}
 	if agentName == "" {
 		hooks.DebugLog(fmt.Sprintf("DROPPED (no agent_name): hook_type=%s", hookType))
 		return
