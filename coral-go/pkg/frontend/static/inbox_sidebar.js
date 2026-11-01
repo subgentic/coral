@@ -447,7 +447,8 @@ function inboxSavedToolbar() {
 const savedCounts = () => saved.savedView().totals;
 
 // ── The sidebar list ─────────────────────────────────────────────────────
-const countOf = key => key === 'needs' ? waitingSessions().length + unreadReviewItems().length + failedUnread().length + pendingProposals().length + operatorAsks().length + recordRows().length + welcomeRows().length : key === 'tasks' ? taskRows().length : key === 'goals' ? goals.length : key === 'artifacts' ? IA.artifactCount() ?? undefined : key === 'saved' ? savedCounts().open : undefined;
+/** The number beside a folder. Needs you counts what the Inbox badge counts (an alarm: an agent, a review, a run, a proposal, a question); the welcome items are listed but are not alarms, so they are not in either (#11622). */
+const countOf = key => key === 'needs' ? waitingSessions().length + unreadReviewItems().length + failedUnread().length + pendingProposals().length + operatorAsks().length + recordRows().length : key === 'tasks' ? taskRows().length : key === 'goals' ? goals.length : key === 'artifacts' ? IA.artifactCount() ?? undefined : key === 'saved' ? savedCounts().open : undefined;
 /** The folders of the Inbox (#7785, the mailbox mock): one view list, a name and a count each. Needs you, Tasks and Saved open their table in the centre; */
 const FOLDER_ICONS = { needs: 'notifications', tasks: 'checklist', goals: 'flag', saved: 'saved-bookmark', artifacts: 'inventory_2',
     chats: 'chat_bubble_outline', [BOARDS_FOLDER]: 'forum', 'chats-notes': 'edit_note', 'chats-starred': 'star', 'chats-active': 'bolt', 'chats-archived': 'folder' }; // UI/UX's existing subset choices (#8866); tagged folders keep their colour dot
@@ -467,7 +468,7 @@ const boardSection = () => (isPhoneLayout() && boardList.length ? [{ title: 'Boa
 const navCurrent = () => (isPhoneLayout() && page?.kind === BOARDS_SUB ? BOARD_ITEM + page.project : pageGroup());
 const FOLDER_TIPS = { needs: 'Agents waiting for you: a question, a permission or a review', tasks: 'Tasks assigned to you', goals: 'The open goals of your teams', saved: 'Messages you saved for later', artifacts: 'Files agents shared' }; // one line each (#10074)
 const folderSections = () => (nativeInbox() ? [{ title: 'Needs attention', items: GROUPS.filter(g => g.key !== 'artifacts' || !IA.artifactsOwnerOnly()).map(g => ({ key: g.key, label: g.label, count: g.key === 'goals' || g.key === 'artifacts' ? countOf(g.key) : undefined })) }, ...CH.chatSections(), ...boardSection()] : [{ title: 'Needs attention', items: [
-    { key: 'needs', label: 'Needs you', count: countOf('needs'), alert: countOf('needs') > welcomeRows().length }, { key: 'tasks', label: 'Tasks', count: countOf('tasks') },
+    { key: 'needs', label: 'Needs you', count: countOf('needs'), alert: countOf('needs') > 0 }, { key: 'tasks', label: 'Tasks', count: countOf('tasks') },
     { key: 'goals', label: 'Goals', count: countOf('goals') },
     { key: 'saved', label: 'Saved', count: countOf('saved') }] },
     { title: 'Files', items: [{ key: 'artifacts', label: 'Artifacts', count: countOf('artifacts') }] }, ...CH.chatSections(), ...boardSection()]).map(section => ({ ...section, items: section.items.map(item => ({ ...item, tip: FOLDER_TIPS[item.key], icon: FOLDER_ICONS[item.key] || (item.key.startsWith(BOARD_ITEM) ? 'forum' : undefined) || (item.key.startsWith('chats-cli-') ? `cli:${item.key.slice(10)}` : undefined) })) }));
@@ -904,7 +905,7 @@ export async function showInbox({ folder = '', quiet = false } = {}) {
     if (folder && groupMeta(folder)) { closePage(false); page = null; $('inbox-page') && ($('inbox-page').hidden = true); group = folder; } // a link to a folder: the folder, not the page that was open
     else if (_asked) _autoFrom = ''; // the folder the person asked for stays
     else if (!_wasShown && !page && !nativeInbox()) { // a reopen: with something waiting for the person, Needs you first, not the folder last on screen (#10205); with nothing waiting again, the folder that was open before it
-        if (countOf('needs') > 0) { if (group !== 'needs') { _autoFrom = group; group = 'needs'; auto = true; } else if (_autoFrom) auto = true; }
+        if (countOf('needs') + welcomeRows().length > 0) { if (group !== 'needs') { _autoFrom = group; group = 'needs'; auto = true; } else if (_autoFrom) auto = true; }
         else if (_autoFrom && group === 'needs') { group = _autoFrom; _autoFrom = ''; }
     }
     _wasShown = true; _asked = false;

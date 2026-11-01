@@ -33,8 +33,8 @@ const { coralReady } = require('./helpers/wait');
             const folderCount = () => ev(`[...document.querySelectorAll('.view-list-item')].filter(r => r.querySelector('.view-list-name, .view-list-label') && /Needs you$/.test(r.querySelector('.view-list-label').textContent.trim())).map(r => (r.querySelector('.view-list-count') || {}).textContent)`);
             const pills = () => ev(`[...document.querySelectorAll('button.goals-chip')].map(e => e.textContent.trim())`);
             const counts = await folderCount();
-            check(counts.length > 0 && counts.every(c => c === '5'), `${tag}: the Needs you folder counts the five welcome items the list shows: ` + JSON.stringify(counts));
-            check(await ev(`[...document.querySelectorAll('.view-list-item')].filter(r => /Needs you$/.test((r.querySelector('.view-list-label') || {}).textContent || '')).every(r => r.querySelector('.view-list-count') && !r.querySelector('.view-list-count').classList.contains('view-list-alert'))`), `${tag}: the count of welcome items alone is not drawn as an alert`);
+            check(counts.length > 0 && counts.every(c => c === '0' || c === '' || c == null), `${tag}: the Needs you folder does not count the five welcome items, as the badge does not (#11622): ` + JSON.stringify(counts));
+            check(await ev(`[...document.querySelectorAll('.view-list-item')].filter(r => /Needs you$/.test((r.querySelector('.view-list-label') || {}).textContent || '')).every(r => !(r.querySelector('.view-list-count') || document.body).classList.contains('view-list-alert'))`), `${tag}: the count of welcome items alone is not drawn as an alert`);
             const chips = await pills();
             check(chips.includes('All 5') && chips.includes('Welcome 5') && chips.includes('Needs input 0'), `${tag}: the pills file them under Welcome, not Needs input: ` + JSON.stringify(chips));
             check(await ev(`document.getElementById('nav-tab-hub-inbox-badge').hidden || document.getElementById('nav-tab-hub-inbox-badge').textContent === ''`), `${tag}: the items are still not in the Inbox badge`);
@@ -47,6 +47,14 @@ const { coralReady } = require('./helpers/wait');
                 check(geo.dismiss.length === 4 && new Set(geo.dismiss.map(g => g.join())).size === 1, `${tag}: the four Ignore buttons share one left edge and one size: ` + JSON.stringify(geo.dismiss));
                 check(geo.actions.every(g => g[2] >= 44) && geo.dismiss.every(g => g[2] >= 44), `${tag}: every button is a 44 px target`);
             }
+            // two agents waiting beside the five welcome items: the folder, the Inbox badge and the phone drawer's count are one number (#11622)
+            await ev(`T.state.liveSessions = [0, 1].map(i => ({ name: 'w' + i, session_id: '0000000' + i + '-0000-4000-8000-0000000000aa', agent_type: 'claude', server: 'local', status: 'idle', display_name: 'Waiting ' + i, working_directory: '/repo/a', waiting_for_input: true, waiting_kind: 'permission', waiting_since: new Date(Date.now() - 300000).toISOString(), sleeping: false })); import(${S} + 'inbox_tab.js').then(m => { m.updateInboxTab(); return true; })`);
+            await waitFor(`document.getElementById('nav-tab-hub-inbox-badge').textContent === '2'`, `${tag}: the badge says 2`, 8000);
+            const mixedCounts = await folderCount();
+            check(mixedCounts.length > 0 && mixedCounts.every(c => c === '2'), `${tag}: with two waiting and five welcome items the folder says 2, like the badge: ` + JSON.stringify(mixedCounts));
+            check(await ev(`import(${S} + 'inbox_tab.js').then(m => m.inboxCountsNow().needs === 2)`), `${tag}: the drawer's count is 2 too`);
+            await ev(`T.state.liveSessions = []; T.state.settings = { ...T.state.settings, inbox_welcome: 'on', inbox_welcome_done: '' }; import(${S} + 'inbox_tab.js').then(m => { m.updateInboxTab(); return true; })`); // the agents go: the five items are back for the rest of the walk
+            await waitFor(`document.querySelectorAll('#group-table-view .inbox-review-name').length === 5`, `${tag}: five welcome items again`, 8000);
             await shot(`inbox-welcome-counts-${w}`);
             await press('Hide all welcome items');
             await waitFor(`document.querySelectorAll('#group-table-view .inbox-welcome-name').length === 0`, `${tag}: the items put away`, 8000);
