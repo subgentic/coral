@@ -42,7 +42,7 @@ function cleanLinks(list) {
 export function createMessaging(team) {
     const hub = _hubForTests === null ? isCloud() : _hubForTests;
     const local = answeredLocally(team);
-    let view = null, state = null, info = { settings: null }, saved = { cross_team_messaging: false, cross_team_artifacts: false }, serverId = '', how = false;
+    let view = null, state = null, info = { settings: null }, saved = { cross_team_messaging: false, cross_team_artifacts: false }, kept = { cross_team_messaging: false, cross_team_artifacts: false }, serverId = '', how = false; // kept: the owner set the switch (to either value), as against the default (the server's cross_team_*_set, #11708)
     const draws = []; // what each line of text draws itself from (state, the switches): redrawn after a load, a change and a save
     const available = () => !!info.settings;
     const draft = () => { const v = view ? view.values() : {}; return { messaging: !!v.cross_team_messaging, files: !!v.cross_team_artifacts }; };
@@ -71,6 +71,8 @@ export function createMessaging(team) {
     // The two reaches of the messaging setting, told apart (#5916, #5962): the box is "Message teams on other computers (through Coral Hub links)": on unless it is turned off, and a team there also needs a
     // Coral Hub link. Teams on this computer are their own line: they need an explicit on (the button). An older Coral that does not say is not guessed about.
     const reachShown = () => available() && !!state && typeof state.messaging_here === 'boolean';
+    // Under each switch: "On (default)" while it is on only because nobody set it, with a button to set it on, and "On" once it is set (#11718). Off needs no line: off is always a choice.
+    const setHTML = (key, name, what) => { const on = draft()[name] && saved[key]; if (!on) return ''; const isDefault = !kept[key]; return `<p class="working-mode-hint xt-set" data-for="${escapeAttr(key)}">${isDefault ? 'On (default)' : 'On'}${isDefault && canChange() ? ` <button type="button" class="btn btn-small" data-act="set-on-${escapeAttr(name)}" aria-label="Set ${escapeAttr(what)} on, so it stays on">Set on</button>` : ''}</p>`; };
     function reachHTML() {
         if (!reachShown()) return '';
         const here = draft().messaging && state.messaging_here;
@@ -115,6 +117,7 @@ export function createMessaging(team) {
         if (!btn || !view) return;
         const act = btn.dataset.act;
         if (act === 'turn-on-here') { await send({ force: true }); }
+        else if (act === 'set-on-messaging' || act === 'set-on-files') { try { await send({ explicit: [act === 'set-on-messaging' ? 'cross_team_messaging' : 'cross_team_artifacts'] }); view.say(act === 'set-on-messaging' ? 'Cross-team messaging is set on.' : 'File sharing is set on.'); } catch (e) { view.error?.(act === 'set-on-messaging' ? 'cross_team_messaging' : 'cross_team_artifacts', e.message); } }
         else if (act === 'turn-on') { view.set('cross_team_messaging', true); redraw(); view.say('Cross-team messaging is on in this form. Save to apply.'); view.host.querySelector('[name="cross_team_messaging"]')?.focus(); }
         else if (act === 'check-hub') window.showSettingsModal?.('network');
         else if (act === 'new-team') { window.showLaunchModal?.(); window._selectLaunchType?.('team'); }
@@ -122,13 +125,13 @@ export function createMessaging(team) {
     }
 
     // PUT only what changed (and the switch as an explicit on when asked: teams on this computer need it, #5916); then read what the server kept and the state again.
-    async function send({ force = false } = {}) {
+    async function send({ force = false, explicit = [] } = {}) { // explicit: switches to send as they are even though they did not change: a switch that is on by default is stored on only when sent (#11718)
         const d = draft();
-        const body = { subscriber_id: 'Operator', ...(d.messaging !== saved.cross_team_messaging || force ? { cross_team_messaging: d.messaging } : {}), ...(d.files !== saved.cross_team_artifacts ? { cross_team_artifacts: d.files } : {}) };
+        const body = { subscriber_id: 'Operator', ...(d.messaging !== saved.cross_team_messaging || force || explicit.includes('cross_team_messaging') ? { cross_team_messaging: d.messaging } : {}), ...(d.files !== saved.cross_team_artifacts || explicit.includes('cross_team_artifacts') ? { cross_team_artifacts: d.files } : {}) };
         const resp = await boardFetch(team, '/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
         if (!resp.ok) throw new Error(`Could not save. ${hub && (resp.status === 404 || resp.status === 403) ? lockedText() : await refusalOf(resp, local)}`); // through Coral Hub a 404 or 403 on this save is "not changeable from here", never a raw word; the refusal in our words
         const fresh = await boardFetch(team, '/settings');
-        if (fresh.ok) { const s = await fresh.json(); saved = { cross_team_messaging: !!s.cross_team_messaging, cross_team_artifacts: !!s.cross_team_artifacts }; } else saved = { cross_team_messaging: d.messaging, cross_team_artifacts: d.files };
+        if (fresh.ok) { const s = await fresh.json(); saved = { cross_team_messaging: !!s.cross_team_messaging, cross_team_artifacts: !!s.cross_team_artifacts }; kept = { cross_team_messaging: !!s.cross_team_messaging_set, cross_team_artifacts: !!s.cross_team_artifacts_set }; } else { saved = { cross_team_messaging: d.messaging, cross_team_artifacts: d.files }; kept = { cross_team_messaging: kept.cross_team_messaging || body.cross_team_messaging !== undefined, cross_team_artifacts: kept.cross_team_artifacts || body.cross_team_artifacts !== undefined }; }
         for (const k of XT_KEYS) view.set(k, saved[k]);
         try { const r = await boardFetch(team, '/cross-team-state'); if (r.ok) state = await r.json(); } catch { /* the line follows the switch */ }
         view.accept(XT_KEYS);
@@ -142,9 +145,11 @@ export function createMessaging(team) {
                 notice('xt_unavailable', () => `<p class="sv-help ct-unavailable" role="status">${escapeHtml(info.refusal ? `Messaging settings: ${info.refusal}` : 'Cross-team messaging settings are not available here.')}</p>`, () => !available()),
                 notice('xt_status', () => { const st = status(); return `<div class="xt-head"><span class="update-state-dot" ${DOT[st.state] ? `data-k="${escapeAttr(DOT[st.state])}"` : ''} aria-hidden="true"></span><span class="xt-line" role="status">${escapeHtml(st.text)}</span></div><div class="xt-row-actions">${buttonFor(st)}</div>`; }),
                 { key: 'cross_team_messaging', type: 'toggle', label: 'Message teams on other computers', default: false, visibleWhen: () => available(), disabledWhen: () => (canChange() ? false : lockedText()) },
+                notice('xt_set_messaging', () => setHTML('cross_team_messaging', 'messaging', 'cross-team messaging'), () => available() && !!setHTML('cross_team_messaging', 'messaging', '')),
                 notice('xt_changed_messaging', () => changedHTML('cross_team_messaging'), () => available() && !!changedText('cross_team_messaging')),
                 notice('xt_reach', reachHTML, reachShown),
                 { key: 'cross_team_artifacts', type: 'toggle', label: 'Share files with teams on other computers', default: false, visibleWhen: () => available(), disabledWhen: () => (canChange() ? false : lockedText()) },
+                notice('xt_set_files', () => setHTML('cross_team_artifacts', 'files', 'file sharing'), () => available() && !!setHTML('cross_team_artifacts', 'files', '')),
                 notice('xt_changed_artifacts', () => changedHTML('cross_team_artifacts'), () => available() && !!changedText('cross_team_artifacts')),
                 notice('xt_notes', () => `${hubMay() ? '<p class="working-mode-hint xt-hub-may" id="xt-hub-may">Coral Hub can change these settings.</p>' : ''}${canChange() ? '' : `<p class="working-mode-hint xt-locked" id="xt-locked">${escapeHtml(lockedText())}</p>`}`, () => available() && (hubMay() || !canChange())),
                 notice('xt_links', linksHTML, () => available() && !!linksHTML()),
@@ -158,6 +163,7 @@ export function createMessaging(team) {
             info = next && typeof next === 'object' ? next : { settings: null };
             state = info.state && typeof info.state === 'object' ? info.state : null;
             saved = { cross_team_messaging: !!(info.settings && info.settings.cross_team_messaging), cross_team_artifacts: !!(info.settings && info.settings.cross_team_artifacts) };
+            kept = { cross_team_messaging: !!(info.settings && info.settings.cross_team_messaging_set), cross_team_artifacts: !!(info.settings && info.settings.cross_team_artifacts_set) };
             serverId = '';
             if (!hub && info.settings) { // this computer's Coral Hub id, for the "How this works" line (text only, and only when it has the shape of an id)
                 try { const r = await fetch('/api/cloud/status'); if (r.ok) { const st = await r.json(); if (['connecting', 'connected', 'retrying'].includes(st.state) && SERVER_ID.test(String(st.server_id || ''))) serverId = String(st.server_id); } } catch { /* no id shown */ }
