@@ -5,8 +5,9 @@ import { boardFetch, identityKey, decisionNeedsPerson } from './server_base.js';
 import { showToast, announceNotice } from './notifications.js';
 import { markHidden } from './visible_marks.js';
 import { importOnce } from './import_once.js';
-const { createComment, sendComment } = await importOnce('./artifact_comments_api.js'); // lazy, as the viewer's other modules: a failure is retried
+const { createComment, sendComment, uploadCommentImage } = await importOnce('./artifact_comments_api.js'); // lazy, as the viewer's other modules: a failure is retried
 const { resultWords } = await importOnce('./artifact_comment_send.js');
+const imgs = await importOnce('./artifact_comment_images.js'); // the pictures of a comment: the same tray as the comment box (thumbnails, Mark up, Remove), so a change request can show what to change (#11837)
 
 const HEX = /(?:sha256:|coral:\/\/artifacts\/)?([a-f0-9]{64})$/i;
 const rowHex = a => HEX.exec(a.uri || a.digest || a.id || '')?.[1]?.toLowerCase() || '';
@@ -143,6 +144,10 @@ export function attachReview(d, { reload }) {
     const stateEl = $('.artifact-review-state'), approve = $('.artifact-review-approve'), changes = $('.artifact-review-changes');
     const form = $('.artifact-review-form'), text = $('#artifact-review-text'), error = $('.artifact-review-error');
     let cur = null, gen = 0, sending = false, done = false;
+    const submitBtn = form.querySelector('button[type=submit]');
+    const tray = imgs.createImageTray({ upload: (blob, versionOf) => uploadCommentImage(cur.hex, cur.server, blob, versionOf, cur.name) });
+    const syncSend = () => { submitBtn.disabled = sending || tray.busy() || tray.failed(); }; // Send waits for a picture still going up, and for a failed one to be removed
+    error.before(tray.picker(), tray.node, tray.hint()); tray.attach(form, text); tray.listen(syncSend);
     const show = (s) => {
         cur = s;
         const waiting = !!s && (s.state === 'pending' || s.state === 'changes');
@@ -166,19 +171,19 @@ export function attachReview(d, { reload }) {
         if (sending) return; // a second tap while the first request is on its way sends nothing
         const body = text.value.trim();
         if (!body || !cur) { error.textContent = 'Say what should change.'; return; }
-        const submit = form.querySelector('button[type=submit]'); sending = true; submit.disabled = true; text.readOnly = true; error.textContent = '';
+        const submit = submitBtn; sending = true; submit.disabled = true; text.readOnly = true; error.textContent = '';
         try {
             const who = cur.row.produced_by;
             if (!who) throw new Error('No agent is recorded for this artifact, so there is nobody to ask: use a comment.');
-            const c = await createComment(cur.hex, cur.server, { body: `Changes requested: ${body}`, anchor: { whole: true }, board: cur.name });
+            const c = await createComment(cur.hex, cur.server, { body: `Changes requested: ${body}`, anchor: { whole: true }, board: cur.name, images: tray.hexes() });
             const sent = await sendComment(cur.hex, cur.server, c.id, [who]);
             const r = sent.results[0];
             if (!sent.ok || !r || (r.state !== 'sent' && r.state !== 'already_asked')) throw new Error(r ? `${who}: ${resultWords(r)}. The request is in the comments.` : (sent.error || 'The agent could not be asked.'));
             await decide(cur.team, cur.row, 'changes');
             importOnce('./inbox_reviews.js').then(m => m.refreshReviews(true)).catch(() => {});
             showToast(`Changes requested. ${who} was asked.`);
-            text.value = ''; done = true; openForm(false); show({ ...cur, state: 'changes' }); changes.focus({ preventScroll: true }); reload();
-        } catch (err) { error.textContent = err.message; } finally { sending = false; submit.disabled = false; text.readOnly = false; }
+            text.value = ''; tray.clear(); done = true; openForm(false); show({ ...cur, state: 'changes' }); changes.focus({ preventScroll: true }); reload();
+        } catch (err) { error.textContent = err.message; } finally { sending = false; syncSend(); text.readOnly = false; }
     });
     return {
         async open(hex, opts = {}) {
@@ -191,6 +196,6 @@ export function attachReview(d, { reload }) {
             show({ ...s, team, hex, server: opts.server, name: opts.board });
             if (opts.requestChanges && !opts.switched && !done && (s.state === 'pending' || s.state === 'changes')) openForm(true); // not on the reload after a send: the form stays closed
         },
-        close() { gen++; show(null); form.hidden = true; },
+        close() { gen++; show(null); form.hidden = true; tray.clear(); },
     };
 }

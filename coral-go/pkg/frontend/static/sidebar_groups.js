@@ -192,6 +192,7 @@ function drawTable() {
         const slots = host.querySelectorAll('.group-table-node'); // one per table that draws its own rows (and has some), in order
         let k = 0;
         for (const x of tables) if (x.node && (x.rows.length || !x.empty)) slots[k++]?.replaceWith(x.node());
+        for (const x of tables) { const f = x.foot && x.foot(); if (f) host.querySelector('.vl-panel') ? host.querySelector('.vl-panel').append(f) : host.append(f); } // a line under the page that is not part of the table (Needs you's alerts offer, #11837); a phone's panel holds the page
     }
     if (toolbarFocus && toolbarFocus.isConnected && document.activeElement !== toolbarFocus) {
         toolbarFocus.focus({ preventScroll: true });
