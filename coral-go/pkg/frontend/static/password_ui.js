@@ -90,7 +90,7 @@ export async function maybePromptSetPassword() {
     if (document.getElementById('set-password-modal')) return;
     const st = await authStatus();
     if (!st || st.authenticated === false || st.password_set !== false) return;
-    showSetPasswordModal();
+    showSetPasswordModal({ required: true });
 }
 
 const coarse = () => window.matchMedia?.('(pointer: coarse)').matches; // a touch screen: no search box takes the focus (its keyboard covers the page)
@@ -108,7 +108,8 @@ function pageControl() {
     return null;
 }
 
-export function showSetPasswordModal() {
+/** `required`: the first-run prompt, which has no way past it (a password is always created, #11892). Opened from Settings or the sign-in bar it has a Cancel and Escape, because the person chose to open it. */
+export function showSetPasswordModal({ required = false } = {}) {
     const existing = document.getElementById('set-password-modal'); // two callers can race (startup, Settings): one prompt
     if (existing) return existing;
     const opener = document.activeElement;
@@ -129,7 +130,8 @@ export function showSetPasswordModal() {
     body.append(form, el('p', 'pw-note', 'Forgot it? Run coral reset-password in a terminal on this computer.'));
     const foot = el('div', 'modal-actions modal-footer');
     const save = el('button', 'btn btn-primary', 'Set password'); save.type = 'submit'; save.setAttribute('form', 'set-password-form'); save.id = 'set-password-save';
-    foot.append(save);
+    let cancel = null; if (!required) { cancel = el('button', 'btn', 'Cancel'); cancel.type = 'button'; cancel.id = 'set-password-cancel'; }
+    foot.append(...(cancel ? [cancel] : []), save);
     content.append(head, body, foot); modal.append(content);
     document.body.append(modal);
 
@@ -159,7 +161,7 @@ export function showSetPasswordModal() {
         document.dispatchEvent(new CustomEvent('coral:password-prompt-closed'));
     };
     const onKey = e => {
-        if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); return; } // no way out but a password (#11892)
+        if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); if (!required) close(); return; } // the first-run prompt has no way out but a password (#11892)
         if (e.key !== 'Tab') return;
         const items = [...modal.querySelectorAll('input:not([hidden]), button')].filter(x => !x.disabled);
         if (!items.length) return;
@@ -169,6 +171,7 @@ export function showSetPasswordModal() {
     };
     document.addEventListener('keydown', onKey, true);
     pw.input.addEventListener('input', () => meter.update(pw.input.value));
+    cancel?.addEventListener('click', close);
     form.addEventListener('submit', async e => {
         e.preventDefault();
         const problem = passwordProblem(pw.input.value, confirm.input.value);

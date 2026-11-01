@@ -91,6 +91,11 @@ const BASE = require('./test_base').BASE;
             await waitFor(() => !$('set-password-error').hidden, '429 message');
             out.err429 = $('set-password-error').textContent; out.saveEnabledAfter429 = !$('set-password-save').disabled;
             $('set-password-modal').remove();
+            // opened from Settings or the sign-in bar (not the first-run prompt) it has a Cancel and Escape: the person chose to open it
+            ui.showSetPasswordModal(); await waitFor(() => $('set-password-modal'), 'the dialog opened on purpose');
+            out.optionalButtons = [...document.querySelectorAll('#set-password-modal .modal-footer button')].map(b => b.textContent.trim());
+            document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); out.optionalEscape = !$('set-password-modal');
+            ui.showSetPasswordModal(); await waitFor(() => $('set-password-modal'), 'the dialog again'); $('set-password-cancel').click(); out.optionalCancel = !$('set-password-modal');
             // signed out or already set: no prompt
             for (const st of [{ authenticated: false, password_set: false, local: true }, { authenticated: true, password_set: true, local: true }]) {
                 status = st; await ui.maybePromptSetPassword(); await sleep(30); if ($('set-password-modal')) out.promptWhen = JSON.stringify(st);
@@ -161,6 +166,7 @@ const BASE = require('./test_base').BASE;
         assert.deepEqual(out.setCall, { url: '/api/auth/password/set', body: { password: '  a b  ' } }, 'sent exactly as typed, spaces kept');
         assert.equal(out.laterButton, false, 'no Not now button'); assert.deepEqual(out.buttons, ['Set password'], 'the one action is the only button');
         assert.equal(out.openAfterEscape, true, 'Escape does not close it: a password is always created'); assert.ok(out.askedDespiteFlags, 'an old Not now flag does not keep the prompt away'); assert.ok(out.remoteAsked, 'another computer is asked too');
+        assert.deepEqual(out.optionalButtons, ['Cancel', 'Set password'], 'opened on purpose it has a Cancel'); assert.ok(out.optionalEscape && out.optionalCancel, 'and Escape and Cancel close it');
         assert.ok(out.closedOn409);
         assert.equal(out.err429, 'Too many attempts. Try again in 30 s.'); assert.ok(out.saveEnabledAfter429);
         assert.equal(out.promptWhen, undefined, 'no prompt when signed out or a password is set: ' + out.promptWhen);

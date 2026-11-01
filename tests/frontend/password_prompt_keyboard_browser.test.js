@@ -20,7 +20,7 @@ const { coralReady } = require('./helpers/wait');
                 await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
                 await coralReady(ev, 'startup', 'liveList', 'settings');
                 if (font) await ev(`document.documentElement.style.fontSize = ${JSON.stringify(font)}; true`);
-                await ev(`document.activeElement && document.activeElement.blur(); import((window.__coralStatic || '/static/') + 'password_ui.js').then(m => { m.showSetPasswordModal({ local: true }); return true; })`);
+                await ev(`document.activeElement && document.activeElement.blur(); import((window.__coralStatic || '/static/') + 'password_ui.js').then(m => { m.showSetPasswordModal({ required: true }); return true; })`);
                 await waitFor(`!!document.getElementById('set-password-modal')`, `${label}: the dialog`, 8000);
                 await new Promise(r => setTimeout(r, 400)); // sleep-ok: the dialog draws
                 await ev(`(() => { const R = window.fetch; window.fetch = (u, o) => String(u).startsWith('/api/auth/password/set') ? Promise.resolve(new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } })) : R(u, o); return true; })()`); // the password is not really set on the shared test server
