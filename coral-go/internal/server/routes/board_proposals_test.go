@@ -509,3 +509,28 @@ func TestAnApprovedGoalProposalTellsItsDriverOnce(t *testing.T) {
 	assert.Equal(t, http.StatusConflict, code)
 	assert.Len(t, told(), 1, "a second Approve tells nothing more")
 }
+
+// #11895: a proposal row carries the team's name beside its internal board id, so the Inbox does not say "b-m4vbvp6neq".
+func TestProposalRowsCarryTheTeamsNameBesideItsBoardID(t *testing.T) {
+	e := newProposalEnv(t)
+	ctx := context.Background()
+	b, err := e.h.bs.CreateBoard(ctx, "Sprout team", "Operator")
+	require.NoError(t, err)
+	_, _, err = e.h.bs.CreateProposal(ctx, board.ProposalInput{Board: b.ID, Kind: board.ProposalGoal, Title: "Ship it", Payload: []byte(`{"title":"Ship it","outcome":"shipped"}`), Proposer: "Orchestrator"})
+	require.NoError(t, err)
+	_, _, err = e.h.bs.CreateProposal(ctx, board.ProposalInput{Board: "nolabel", Kind: board.ProposalTask, Title: "From a board with no row", Payload: []byte(`{"title":"x"}`), Proposer: "Orchestrator"})
+	require.NoError(t, err)
+	code, out := e.call(t, "person", http.MethodGet, "/api/proposals?state=pending", nil)
+	require.Equal(t, http.StatusOK, code)
+	byTitle := map[string]map[string]any{}
+	for _, p := range out["proposals"].([]any) {
+		m := p.(map[string]any)
+		byTitle[m["title"].(string)] = m
+	}
+	require.Contains(t, byTitle, "Ship it")
+	assert.Equal(t, b.ID, byTitle["Ship it"]["board_id"], "the id is still the id")
+	assert.Equal(t, "Sprout team", byTitle["Ship it"]["board_label"], "and the team's name rides with it")
+	require.Contains(t, byTitle, "From a board with no row")
+	_, has := byTitle["From a board with no row"]["board_label"]
+	assert.False(t, has, "a board with no name of its own carries none: the page then says the id")
+}

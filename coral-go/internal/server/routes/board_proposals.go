@@ -15,6 +15,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/subgentic/coral/internal/board"
+	"github.com/subgentic/coral/internal/clitext"
 )
 
 // The Operator's approval of what an agent adds to a team (#11389). With a team's goals_need_approval or tasks_need_approval on, an agent's new goal or task is a PROPOSAL (board_proposals), not a goal or
@@ -203,6 +204,12 @@ func (h *BoardHandler) sweepExpired(ctx context.Context) {
 	}
 }
 
+// proposalRow is a proposal with the team's name beside its internal board id (#11895: the Inbox said the id); "" when the board has no name of its own.
+type proposalRow struct {
+	board.Proposal
+	BoardLabel string `json:"board_label,omitempty"`
+}
+
 // ListProposals: GET /api/board/{project}/proposals?state=pending,expired (and GET /api/proposals for every board). The Operator's: the proposals hold agents' text, so a Hub grantee is refused here and an agent token before it.
 func (h *BoardHandler) ListProposals(w http.ResponseWriter, r *http.Request) {
 	if refuseNonOwner(w, r) { // through Coral Hub the owner alone; on this computer an agent token is refused before the handler (class b of the route census)
@@ -229,10 +236,20 @@ func (h *BoardHandler) ListProposals(w http.ResponseWriter, r *http.Request) {
 		proposalInternal(w, "the proposals could not be listed", err)
 		return
 	}
-	if rows == nil {
-		rows = []board.Proposal{}
+	ids := make([]string, 0, len(rows))
+	for _, p := range rows {
+		ids = append(ids, p.Board)
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"proposals": rows})
+	labels := h.bs.BoardLabels(r.Context(), ids)
+	out := make([]proposalRow, 0, len(rows))
+	for _, p := range rows {
+		label := ""
+		if l := clitext.CleanName(labels[p.Board]); l != p.Board { // a board with no row of its own maps to its id: the page says the id then
+			label = l
+		}
+		out = append(out, proposalRow{Proposal: p, BoardLabel: label})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"proposals": out})
 }
 
 // ApproveProposal: POST /api/board/{project}/proposals/{id}/approve, optionally {"title","body","outcome","done_when","priority","assigned_to"} to edit before it is made. The goal or task is made once.

@@ -95,7 +95,7 @@ let page = null; // { kind: 'task', project, id } | { kind: 'saved', id }: the i
 
 // ── Needs you ────────────────────────────────────────────────────────────
 const waitingSessions = () => (state.liveSessions || []).filter(needsYou).map(askedRow); // an agent that asked something before Coral restarted is listed with its words (#10368)
-const teamOf = s => s.board_project ? teamLabel(identityKey(sessionServer(s), s.board_project)) : ''; // with its computer when a hub has more than one (#8774)
+const teamOf = s => s.board_project ? teamLabel(identityKey(sessionServer(s), s.board_project), s.board_label || '') : ''; // with its computer when a hub has more than one (#8774)
 const fromOf = (s, withTeam) => { if (s.operatorAsk) return [`from ${markHidden(s.operatorAsk.asker, { strict: true }).trim() || 'an agent'}`, teamOf(s)].filter(Boolean).join(' \u00b7 '); if (!s.review) return ''; const who = markHidden(s.review.produced_by, { strict: true }).trim(), team = withTeam ? teamOf(s) : ''; const n = (s.review.earlier || []).length; return [who ? `from ${who}` : 'sender unknown', team, n ? `${n} earlier version${n === 1 ? '' : 's'}` : ''].filter(Boolean).join(' \u00b7 '); }; // who uploaded a file for review, from the upload's record, what hides or reorders the name written out (markHidden strict), and its team (#11456)
 /** The question the uploader put on a file for review (#11555): one line, an agent's text, so hidden characters are written out and it is drawn as text only. */
 const questionOf = s => (s.review && s.review.review_question ? markHidden(s.review.review_question, { strict: true }).replace(/\s+/g, ' ').trim() : '');
@@ -115,7 +115,7 @@ const reviewRows = () => reviewItems().map(a => ({ review: a, goal: a.goal_id &&
 /** A failed run of a job or workflow that nobody has opened (#9296): a row of Needs you like a review, opened on its job's or workflow's page, dismissed (marked opened) without opening it. */
 const runRows = () => failedUnread().map(r => ({ autorun: r, session_id: `automation-run:${r.key}`, display_name: r.name, board_project: '', server: '', waiting_kind: 'run', waiting_summary: failureWords(r) ? `Run failed: ${failureWords(r)}` : 'Run failed', waiting_since: r.finishedAt || r.at }));
 /** What agents asked to add to a team, waiting for the Operator (#11389): a row of Needs you like a review, opened in its dialog. */
-const proposalRows = () => proposalItems().map(p => ({ proposal: p, session_id: p.rowKey, display_name: markedText(p.proposer), board_project: splitKey(p.board_id).name, server: LOCAL_SERVER, waiting_kind: 'proposal', waiting_summary: proposalSummary(p), waiting_since: p.created_at }));
+const proposalRows = () => proposalItems().map(p => ({ proposal: p, session_id: p.rowKey, display_name: markedText(p.proposer), board_project: splitKey(p.board_id).name, board_label: markedText(p.board_label || ''), server: LOCAL_SERVER, waiting_kind: 'proposal', waiting_summary: proposalSummary(p), waiting_since: p.created_at }));
 /** A question an agent asked the Operator (post --ask, wait --operator, #11417): a row of Needs you, opened whole in a dialog with a Reply box. */
 const askRows = () => operatorAsks().map(a => ({ operatorAsk: a, session_id: askKey(a), display_name: a.asker, board_project: a.board, server: '', waiting_kind: 'ask', waiting_summary: askLine(a), waiting_since: a.at }));
 /** After an update, agents whose notices are held until they are recorded: ONE item that opens the Record for all agents confirm (#11415). */
