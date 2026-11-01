@@ -50,6 +50,7 @@ export function wireRecap() {
     const acf = container();
     if (!acf || acf.dataset.recapWired) return;
     acf.dataset.recapWired = '1';
+    window.matchMedia?.('(max-width: 599px)').addEventListener?.('change', () => syncRecap()); // a rotation or a resized window: the folder is cut or whole again at once, not at the next change in the form (#11791)
     for (const t of ['input', 'change', 'acf-synced']) acf.addEventListener(t, () => syncRecap());
     for (const id of ['launch-dir', 'launch-agent-name-input']) { const e = document.getElementById(id); if (e) for (const t of ['input', 'change']) e.addEventListener(t, () => syncRecap()); }
 }
