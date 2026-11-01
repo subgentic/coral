@@ -133,3 +133,29 @@ func TestAskClashSendsTheTargetAndTheTwoMessages(t *testing.T) {
 	}
 	assert.Empty(t, srv2.requests(), "a bad command sends nothing")
 }
+
+// #11643: post --ask --button 'Label=action' sends the declarations as they are (the server checks them); a button is for a question, at most three.
+func TestPostAskButtonsAreSentAndRefusedOffAnAsk(t *testing.T) {
+	srv := newRecordingServer(t)
+	dir := subscribedDataDir(t, srv.URL)
+	res := runBoard(t, srv.URL, dir, "post", "--ask", "--button", "Yes, ship it=reply", "--button", "The plan=open:task:12", "@Operator ship the release?")
+	require.Equal(t, 0, res.code, res.stderr)
+	reqs := srv.requests()
+	require.Len(t, reqs, 1)
+	assert.Contains(t, reqs[0], `"buttons":["Yes, ship it=reply","The plan=open:task:12"]`)
+	assert.Contains(t, reqs[0], `"ask":true`)
+	assert.Contains(t, reqs[0], `"content":"@Operator ship the release?"`, "the buttons are not part of the text")
+
+	srv2 := newRecordingServer(t)
+	dir2 := subscribedDataDir(t, srv2.URL)
+	for name, args := range map[string][]string{
+		"a button with no ask":    {"post", "--button", "Yes=reply", "@Operator hi"},
+		"a button on a guide ask": {"post", "--ask", "--guide", "g1", "--button", "Yes=reply", "hi"},
+		"four buttons":            {"post", "--ask", "--button", "A=reply", "--button", "B=reply", "--button", "C=reply", "--button", "D=reply", "@Operator hi"},
+		"a button with no value":  {"post", "--ask", "@Operator hi", "--button"},
+	} {
+		res := runBoard(t, srv2.URL, dir2, args...)
+		assert.Equal(t, 2, res.code, "%s: %q", name, res.stderr)
+	}
+	assert.Empty(t, srv2.requests(), "a bad option sends nothing")
+}

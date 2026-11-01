@@ -112,6 +112,7 @@ func cmdPost() {
 
 	// Parse --to flag and collect remaining args as the message
 	var toNames, filePath, taskArg, assignArg, goalArg, titleArg, priorityArg, replyArg, guideArg string
+	var buttons []string // --button 'Label=action[:arg]', repeatable: the server checks each one (#11643)
 	ask, broadcast := false, false
 	var msgParts []string
 	literal := false
@@ -140,6 +141,9 @@ func cmdPost() {
 			i++
 		} else if opt == "--guide" && i+1 < len(os.Args) {
 			guideArg = os.Args[i+1]
+			i++
+		} else if opt == "--button" && i+1 < len(os.Args) {
+			buttons = append(buttons, os.Args[i+1])
 			i++
 		} else if (opt == "--assign" || opt == "--goal" || opt == "--title" || opt == "--priority") && i+1 < len(os.Args) {
 			switch opt {
@@ -194,6 +198,14 @@ func cmdPost() {
 		fmt.Fprintln(os.Stderr, "Error: --guide is for a question to a guide: post --ask --guide <label> \"text\"")
 		os.Exit(2)
 	}
+	if len(buttons) > 0 && (!ask || guideArg != "") {
+		fmt.Fprintln(os.Stderr, "Error: --button goes on a question to the Operator: post --ask --button 'Label=action' \"@Operator <question>\"")
+		os.Exit(2)
+	}
+	if len(buttons) > 3 {
+		fmt.Fprintf(os.Stderr, "Error: a question has at most 3 buttons (this one has %d)\n", len(buttons))
+		os.Exit(2)
+	}
 	if guideArg != "" && (assignArg != "" || toNames != "") {
 		fmt.Fprintln(os.Stderr, "Error: a question to a guide (--guide) is for that guide alone: it can't also be --assign or --to")
 		os.Exit(2)
@@ -238,6 +250,9 @@ func cmdPost() {
 	body := map[string]any{"subscriber_id": subscriberID, "content": message}
 	if ask {
 		body["ask"] = true // a question to the members it @mentions, open until each has answered (#7794)
+	}
+	if len(buttons) > 0 {
+		body["buttons"] = buttons // the server checks each against a closed list and this team; the Operator's click runs one (#11643)
 	}
 	if guideArg != "" {
 		body["guide"] = guideArg // a question to a guide of this team, by the label the Operator's roster has for them (#11457)

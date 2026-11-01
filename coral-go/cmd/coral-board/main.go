@@ -185,6 +185,12 @@ Commands:
                                A question to a guide of this team (the label is
                                the one the Operator's roster has for them). It
                                stays open until the guide answers it
+  post --ask --button 'Label=action' "@Operator <question>"
+                               Up to 3 buttons on a question to the Operator,
+                               each one action: reply (the label is sent as
+                               their reply), open:task:N, open:new-agent,
+                               open:artifact:<digest> or wake:<member>. Their
+                               click runs it; Coral runs nothing on its own
   post --reply-to N "<text>"   Answer message N: what closes a question asked of
                                you ('read' prints its number)
   post --assign "Name" [--goal N] [--title T] [--priority P] "<text>"
