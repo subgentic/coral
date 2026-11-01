@@ -1,6 +1,8 @@
 package agent
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -9,6 +11,19 @@ import (
 
 	at "github.com/subgentic/coral/internal/agenttypes"
 )
+
+// hermesRig points the launch at scratch folders: Coral's data folder, the person's own Hermes home (read only) and a hook tools folder holding a stand-in for the hook tool.
+type hermesRigT struct{ data, person, tools string }
+
+func hermesRig(t *testing.T) hermesRigT {
+	t.Helper()
+	r := hermesRigT{data: t.TempDir(), person: t.TempDir(), tools: t.TempDir()}
+	require.NoError(t, os.WriteFile(filepath.Join(r.tools, "coral-hook-agentic-state"), []byte("#!/bin/sh\n"), 0o755))
+	t.Setenv("CORAL_DATA_DIR", r.data)
+	t.Setenv("HERMES_HOME", r.person)
+	t.Setenv("CORAL_HOOK_DIR", r.tools)
+	return r
+}
 
 const hermesID = "local-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 
@@ -39,6 +54,7 @@ func TestHermesResumeIDIsOnlyTheRealForm(t *testing.T) {
 }
 
 func TestHermesLaunchLine(t *testing.T) {
+	hermesRig(t)
 	ag := GetAgent(at.Hermes)
 	cmd, err := ag.LaunchCommand(LaunchParams{SessionID: "s1", ResumeSessionID: hermesID, Prompt: "SECRET-PROMPT", ProtocolPath: "/nope"})
 	require.NoError(t, err)
@@ -59,6 +75,7 @@ func TestHermesLaunchLine(t *testing.T) {
 
 // The permission switch is Coral's: Bypass permissions (put in Flags by the caller) is --yolo, once; the others ask. A person's own flags that name a session, a prompt, hooks or another CLI's permission mode are dropped with their values.
 func TestHermesFlags(t *testing.T) {
+	hermesRig(t)
 	assert.Equal(t, []string{"--yolo"}, PermissionFlagsForAgent(at.Hermes, "bypassPermissions"))
 	for _, m := range []string{"", "default", "plan", "acceptEdits", "auto", "dontAsk"} {
 		assert.Empty(t, PermissionFlagsForAgent(at.Hermes, m), m)

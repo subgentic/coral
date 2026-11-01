@@ -1,9 +1,11 @@
 package agent
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	at "github.com/subgentic/coral/internal/agenttypes"
 	"github.com/subgentic/coral/internal/hermesdb"
@@ -48,7 +50,14 @@ var hermesValueFlags = map[string]bool{
 // first prompt and the board's messages are typed into the pane once Hermes is ready, as every other typed message is (the protocol is the agent's first message).
 func (a *HermesAgent) LaunchCommand(params LaunchParams) (string, error) {
 	bin := resolveBinary(params.CLIPath, "hermes")
+	// The agent runs in its team's own Hermes home, never the person's: a launch that cannot make it does not start (and never falls back to ~/.hermes).
+	home, err := PrepareHermesHome(hermesDataDir(params), params.BoardName, PersonalHermesHome(), time.Now())
+	if err != nil {
+		return "", fmt.Errorf("hermes: the team's Hermes home could not be made: %w", err)
+	}
 	var parts, raw []string
+	export := formatEnvExport("HERMES_HOME", home)
+	parts, raw = append(parts, export), append(raw, export)
 	parts = append(parts, bin, "chat")
 	if id := params.ResumeSessionID; id != "" && IsHermesSessionID(id) { // one that is not one is ignored: a fresh session, never an argument made of it
 		parts = append(parts, "--resume", id)
@@ -76,13 +85,27 @@ func (a *HermesAgent) LaunchCommand(params LaunchParams) (string, error) {
 	return ShellJoin(parts, raw...), nil
 }
 
-// HermesHome is the folder Hermes keeps its state in: $HERMES_HOME, else ~/.hermes. Coral reads state.db under it and writes only its own hook entry (internal/hermeshooks).
-func HermesHome() string {
+// PersonalHermesHome is the person's own Hermes home: $HERMES_HOME, else ~/.hermes. Coral only reads its config.yaml and .env, to seed a team's home (hermes_home.go); it never writes there.
+func PersonalHermesHome() string {
 	if v := os.Getenv("HERMES_HOME"); v != "" {
 		return v
 	}
 	if home, err := os.UserHomeDir(); err == nil {
 		return filepath.Join(home, ".hermes")
+	}
+	return ""
+}
+
+// hermesDataDir is the Coral data folder a launch's team home lives under: the launch's own, else CORAL_DATA_DIR, else ~/.coral.
+func hermesDataDir(params LaunchParams) string {
+	if params.CoralDir != "" {
+		return params.CoralDir
+	}
+	if v := os.Getenv("CORAL_DATA_DIR"); v != "" {
+		return v
+	}
+	if home, err := os.UserHomeDir(); err == nil {
+		return filepath.Join(home, ".coral")
 	}
 	return ""
 }

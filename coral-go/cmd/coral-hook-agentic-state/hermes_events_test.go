@@ -7,6 +7,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/agent"
 )
 
 // #11831: Coral's entries in Hermes's config.yaml run this binary with --hermes <event>; fromHermes reads an allow-list of keys and nothing else.
@@ -98,4 +100,13 @@ func TestFromHermesDropsWhatIsNotSafe(t *testing.T) {
 	got, ok = fromHermes(map[string]any{"extra": "x"}, "Stop")
 	require.True(t, ok)
 	assert.Equal(t, "end_turn", got["reason"])
+}
+
+// The events Coral installs in Hermes's config.yaml are exactly the ones this program records.
+func TestTheInstalledHermesHooksAreTheOnesRecorded(t *testing.T) {
+	var recorded []string
+	for ev := range hermesEventNames {
+		recorded = append(recorded, ev)
+	}
+	assert.ElementsMatch(t, recorded, agent.HermesHookEvents())
 }
