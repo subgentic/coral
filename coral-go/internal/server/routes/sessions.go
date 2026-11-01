@@ -162,7 +162,8 @@ type SessionsHandler struct {
 	hooksRefreshing sync.Map
 	onRefreshHeld   func(sessionID string)
 
-	autoAccept *AutoAcceptor // answers approval prompts for auto-accept sessions (auto_accept.go)
+	autoAccept    *AutoAcceptor    // answers approval prompts for auto-accept sessions (auto_accept.go)
+	autoRecommend *AutoRecommender // answers a question with its Recommended option when the team has that on (auto_recommend.go)
 
 	// autoAcceptOrder orders an enable's store write against a disable-all and a per-session Stop (auto_accept.go). autoAcceptStops counts both; an enable that began
 	// before one must not turn the run on after it. The Cloud Hub sends a disable-all the moment an owner lowers a machine's access and does not wait for an enable that is still deciding.
