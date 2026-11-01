@@ -203,6 +203,7 @@ func (h *BoardHandler) CreateGoal(w http.ResponseWriter, r *http.Request) {
 	}
 	h.announceGoalDriver(project, actor, g, "")
 	h.announceGoalToOrchestrator(project, actor, g)
+	h.markMadeByOrchestrator(r.Context(), project, g)
 	writeJSON(w, http.StatusCreated, g)
 }
 
@@ -305,6 +306,9 @@ func (h *BoardHandler) ListGoals(w http.ResponseWriter, r *http.Request) {
 			errInternalServer(w, err.Error())
 		}
 		return
+	}
+	for i := range page.Goals {
+		h.markMadeByOrchestrator(r.Context(), project, &page.Goals[i])
 	}
 	writeJSON(w, http.StatusOK, page)
 }
@@ -415,6 +419,7 @@ func (h *BoardHandler) GetGoal(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// The requests this goal sent that were accepted (#7361): where it asked, never what the other team made of it (no task, count or title). The cap is 20; the total says how many more.
+	h.markMadeByOrchestrator(r.Context(), project, g)
 	refs, total, err := h.bs.AcceptedGoalRequests(r.Context(), project, id)
 	if err != nil {
 		errInternalServer(w, err.Error())
@@ -475,6 +480,7 @@ func (h *BoardHandler) UpdateGoal(w http.ResponseWriter, r *http.Request) {
 	if body.Driver != nil {
 		h.announceGoalDriver(project, actor, g, before)
 	}
+	h.markMadeByOrchestrator(r.Context(), project, g)
 	writeJSON(w, http.StatusOK, g)
 }
 
@@ -621,4 +627,18 @@ func (h *BoardHandler) listGoalTasks(w http.ResponseWriter, r *http.Request, pro
 		return
 	}
 	writeJSON(w, http.StatusOK, page)
+}
+
+// markMadeByOrchestrator sets MadeByOrchestrator on the goals the team's Orchestrator wrote itself (#11887): the goal page says "The Orchestrator made this goal" for them, where it says nobody was told for a goal made by someone
+// else with no Orchestrator to tell. One lookup of the team's Orchestrator per call; nothing is set when the team has none.
+func (h *BoardHandler) markMadeByOrchestrator(ctx context.Context, project string, goals ...*board.Goal) {
+	orch, err := h.bs.TeamOrchestrator(ctx, project)
+	if err != nil || strings.TrimSpace(orch) == "" {
+		return
+	}
+	for _, g := range goals {
+		if g != nil && board.SameIdentity(orch, g.CreatedBy) {
+			g.MadeByOrchestrator = true
+		}
+	}
 }

@@ -4,7 +4,7 @@ const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
 const { coralReady } = require('./helpers/wait');
-const B = 'goal-none-' + Date.now().toString(36), B2 = B + '-solo';
+const B = 'goal-none-' + Date.now().toString(36), B2 = B + '-solo', B3 = B + '-own';
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -26,10 +26,16 @@ const B = 'goal-none-' + Date.now().toString(36), B2 = B + '-solo';
         await Page.navigate({ url: `${BASE}/team/${B2}/goals/${g2.body.id}` }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await waitFor(`/No tasks yet/.test(document.body.innerText)`, 'the second goal page', 15000);
         assert.match(await ev(`document.body.innerText`), /No tasks yet\. Nobody has been told about this goal\./, 'a goal nobody was told of says so');
+        // #11887: a goal the Orchestrator wrote itself says so, not that nobody was told
+        assert.ok((await api('POST', `/api/board/${B3}/subscribe`, { subscriber_id: 'orch', job_title: 'Orchestrator', session_name: 'orch-s' })).status < 300);
+        const g3 = await api('POST', `/api/board/${B3}/goals`, { subscriber_id: 'orch', title: 'Made by the Orchestrator', outcome: 'o', done_when: 'd' }); assert.equal(g3.status, 201, JSON.stringify(g3));
+        await Page.navigate({ url: `${BASE}/team/${B3}/goals/${g3.body.id}` }); await Page.loadEventFired(); await install(); await coralReady(ev);
+        await waitFor(`/No tasks yet/.test(document.body.innerText)`, 'the Orchestrator own goal page', 15000);
+        assert.match(await ev(`document.body.innerText`), /No tasks yet\. The Orchestrator made this goal and has not planned it\./, 'a goal the Orchestrator wrote itself says so');
         // the Copy for an agent button is a button (a border), and when it wraps under the state it starts at the line's own left edge, not 15 px in (#11027)
         const c = await ev(`(() => { const b = document.querySelector('.goal-copy-agent'), l = document.querySelector('.goals-detail-line'); if (!b || !l) return null; l.style.width = '120px'; /* narrow enough that the button wraps to a row of its own */ const br = b.getBoundingClientRect(), lr = l.getBoundingClientRect(), first = l.firstElementChild.getBoundingClientRect(); return { border: getComputedStyle(b).borderLeftWidth, wrapped: br.top > first.bottom - 2, dx: Math.round(br.left - lr.left) }; })()`);
         assert.ok(c && c.border !== '0px', 'Copy for an agent has a border, so it reads as a button: ' + JSON.stringify(c));
         assert.ok(c.wrapped && c.dx <= 2, 'wrapped under the state it starts at the line\'s left edge: ' + JSON.stringify(c));
         console.log('PASS');
-    } finally { try { await removeBoards(ev, [B, B2]); } catch (e) {} try { await client.close(); } catch (e) {} }
+    } finally { try { await removeBoards(ev, [B, B2, B3]); } catch (e) {} try { await client.close(); } catch (e) {} }
 })().catch(e => { console.error(e); process.exit(1); });
