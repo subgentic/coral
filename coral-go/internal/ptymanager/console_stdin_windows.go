@@ -216,8 +216,11 @@ func probeStdin(pid int) stdinKind {
 	if !ok {
 		return stdinUnreadable
 	}
-	if noStdin(in) {
-		return stdinNotConsole // no standard input at all: never duplicated as a handle
+	switch {
+	case in == 0:
+		return stdinNotConsole // no standard input at all
+	case in == windows.InvalidHandle:
+		return stdinUnreadable // INVALID_HANDLE_VALUE: never duplicated (it is the pseudo-handle of the process itself); it cannot say what the input is, so a reader (Security's #6936 A)
 	}
 	var dup windows.Handle
 	if err := windows.DuplicateHandle(h, in, windows.CurrentProcess(), &dup, 0, false, windows.DUPLICATE_SAME_ACCESS); err != nil {
@@ -275,9 +278,6 @@ func handle32(v uint32) windows.Handle {
 	}
 	return windows.Handle(v)
 }
-
-// noStdin says a standard-input value is no handle: 0, or INVALID_HANDLE_VALUE (in GetCurrentProcess's own pseudo-handle value: duplicating it would give this process's own handle).
-func noStdin(h windows.Handle) bool { return h == 0 || h == windows.InvalidHandle }
 
 // imageFileMachineAMD64 is IMAGE_FILE_MACHINE_AMD64.
 const imageFileMachineAMD64 = 0x8664
