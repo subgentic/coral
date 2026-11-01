@@ -111,3 +111,12 @@
 .goals-title-cell { display: flex; flex-direction: column; min-width: 0; }
 .goals-row-tasks { display: none; font-size: var(--fs-sm); color: var(--text-muted); font-variant-numeric: tabular-nums; }
 @container (max-width: 36rem) { .goals-title-cell .goals-row-tasks { display: block; } } /* the clamp and the wrap are in data_table.css (the census keeps .dt-* rules there) */
+
+/* the New goal form's Description count and pictures (#11653), and a goal's pictures under its description */
+.goals-count { align-self: flex-end; color: var(--text-muted); font-size: var(--fs-sm, 0.8125rem); }
+.goals-count[hidden] { display: none; }
+.goals-pics { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.goals-pics .ac-images { width: 100%; }
+.goal-pics { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; max-width: 70ch; }
+.goal-pic-link { display: block; width: fit-content; max-width: 100%; }
+.goal-pic-img { display: block; max-width: 100%; max-height: 18rem; height: auto; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-tertiary); }

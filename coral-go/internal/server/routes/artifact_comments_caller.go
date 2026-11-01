@@ -172,7 +172,7 @@ func ownerCommentWrite(r *http.Request) bool {
 	pattern, mode := tunnel.OwnerRoute(r.Method, r.URL.Path)
 	switch pattern {
 	case "/api/artifacts/{hex64}/comments", "/api/artifacts/{hex64}/comments/{id}/resolve", "/api/artifacts/{hex64}/comments/{id}/reopen",
-		"/api/artifacts/{hex64}/comments/lock", "/api/artifacts/{hex64}/comments/{id}/send":
+		"/api/artifacts/{hex64}/comments/lock", "/api/artifacts/{hex64}/comments/{id}/send", "/api/artifacts/{hex64}/comment-images":
 		return mode != tunnel.OwnerNone && mode.Refuses()
 	case "/api/artifacts/{hex64}/comments/{id}": // the edit and delete: the owner's (the stamped marker) or the author's, the comment policy decides which (#11354)
 		return mode == tunnel.OwnerSees

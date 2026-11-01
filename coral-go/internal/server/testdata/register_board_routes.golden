@@ -82,6 +82,7 @@ POST /api/board/{project}/cross-team/files/disable | (*BoardHandler).HubCrossTea
 POST /api/board/{project}/cross-team/files/enable | (*BoardHandler).HubCrossTeamFilesEnable-fm
 POST /api/board/{project}/external-artifacts | (*BoardHandler).PostExternalArtifact-fm
 POST /api/board/{project}/external-messages | (*BoardHandler).PostExternalMessage-fm
+POST /api/board/{project}/goal-images | (*BoardHandler).UploadGoalImage-fm
 POST /api/board/{project}/goal-requests | (*BoardHandler).PostGoalRequest-fm
 POST /api/board/{project}/goal-requests/{requestID}/accept | (*BoardHandler).AcceptGoalRequest-fm
 POST /api/board/{project}/goal-requests/{requestID}/decline | (*BoardHandler).DeclineGoalRequest-fm

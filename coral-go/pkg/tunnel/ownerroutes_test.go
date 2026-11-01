@@ -145,12 +145,16 @@ func TestTheOwnerTableAgreesWithTheHandWrittenListItReplaced(t *testing.T) {
 			if (m == http.MethodPost && regexp.MustCompile(`^/api/board/[^/]+/(messages|subscribe|tasks|goals|working-mode/presets)$`).MatchString(p)) || (m == http.MethodPut && regexp.MustCompile(`^/api/board/[^/]+/working-mode$`).MatchString(p)) {
 				continue
 			}
+			// A picture for a new goal's description (#11650) is the owner's alone: the old list never had it.
+			if m == http.MethodPost && strings.HasPrefix(p, "/api/board/") && (strings.HasSuffix(p, "/goal-images") || strings.HasSuffix(p, "/goals")) { // and the goal create, which names them
+				continue
+			}
 			// Chief's state (#11470) is the owner's alone through the hub: the old list never had it.
 			if m == http.MethodGet && p == "/api/chief" {
 				continue
 			}
 			// The owner's comment writes (a comment or reply, a resolve, a reopen) are new (#7052): the old list never had them.
-			if m == http.MethodPost && strings.HasPrefix(p, "/api/artifacts/") && (strings.HasSuffix(p, "/comments") || strings.HasSuffix(p, "/resolve") || strings.HasSuffix(p, "/reopen")) {
+			if m == http.MethodPost && strings.HasPrefix(p, "/api/artifacts/") && (strings.HasSuffix(p, "/comments") || strings.HasSuffix(p, "/resolve") || strings.HasSuffix(p, "/reopen") || strings.HasSuffix(p, "/comment-images")) {
 				continue
 			}
 			// The one difference of #5610: the table's {id} is any one segment, so a task artifact-content path with a non-number id is stamped too (its handler refuses it).

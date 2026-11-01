@@ -16,6 +16,7 @@ function normalizeComment(c) {
         can: { reply: !!can.reply, edit: !!can.edit, delete: !!can.delete, resolve: !!can.resolve },
         asks: Array.isArray(c.asks) ? c.asks.map(k => ({ agent: String(k.agent || ''), open: !!k.open, replies: Math.max(0, Number(k.replies) || 0), seen: !!k.seen, nudged: !!k.nudged })) : [], // the agents asked into this thread, on the owner's list only (#6462)
         // the artifact (version) the comment was written on, and, read with series=1 for a later version, where its text stands in the version on show: found, ambiguous, gone or unchecked (#6459)
+        images: Array.isArray(c.images) ? c.images.map(i => ({ hex: String((i && i.hex) || ''), name: String((i && i.name) || ''), contentType: String((i && i.content_type) || '') })).filter(i => /^[0-9a-f]{64}$/.test(i.hex)) : [], // the pictures the comment carries, in the order they were sent (#11651)
         artifactId: c.artifact_id || '', version: c.version == null ? null : c.version, fromVersion: c.from_version == null ? null : c.from_version, carried: c.carried || '',
     };
 }
@@ -36,8 +37,26 @@ export async function listComments(hex, server, board, series = false) {
 }
 
 /** Make a comment: a thread on an anchor ({quote, prefix, suffix, start_line, end_line} or {whole: true}), or a reply to parentId (a reply has no anchor). */
-export const createComment = (hex, server, { body, anchor, parentId, board }) => requestJson('POST', base(hex, server),
-    { body, ...(parentId != null ? { parent_id: parentId } : { anchor }), ...(board ? { board } : {}) }).then(normalizeComment);
+export const createComment = (hex, server, { body, anchor, parentId, board, images }) => requestJson('POST', base(hex, server),
+    { body, ...(parentId != null ? { parent_id: parentId } : { anchor }), ...(board ? { board } : {}), ...(images && images.length ? { images } : {}) }).then(normalizeComment);
+
+/** The picture types a comment takes, and the most it carries (the server decides again: png, jpeg, webp and four pictures). */
+export const COMMENT_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
+export const COMMENT_IMAGE_MAX = 4;
+
+/** Store one picture for a comment (#11651): the raw file as the body; the server keeps it as an artifact on the artifact's team and answers { hex, name, content_type, size }. `versionOf` is the hex of a picture this person
+ *  just uploaded, when this one is its marked-up version (a second version of the same artifact); `board` names the team when several hold the artifact. A refusal throws an Error with the server's reason. */
+export async function uploadCommentImage(hex, server, blob, versionOf, board) {
+    const q = [versionOf ? `version_of=${encodeURIComponent(versionOf)}` : '', board ? `board=${encodeURIComponent(board)}` : ''].filter(Boolean).join('&'); // board: the team the comment is on, when several teams hold the file
+    const resp = await fetch(serverUrl(`/api/artifacts/${hex}/comment-images${q ? '?' + q : ''}`, server), { method: 'POST', headers: { 'Content-Type': blob.type }, body: blob });
+    let d = {};
+    try { d = await resp.json(); } catch { /* an answer that is not JSON has no reason */ }
+    if (!resp.ok || !/^[0-9a-f]{64}$/.test(String(d.hex || ''))) { const e = new Error((d && typeof d.error === 'string' && d.error) || `The picture was not stored (HTTP ${resp.status}).`); e.status = resp.status; throw e; }
+    return { hex: d.hex, name: String(d.name || ''), contentType: String(d.content_type || blob.type), size: Number(d.size) || blob.size };
+}
+
+/** Where a picture of a comment is drawn from. */
+export const commentImageUrl = (imageHex, server) => serverUrl(`/api/artifacts/${imageHex}?v=2`, server);
 export const editComment = (hex, server, id, body) => requestJson('PATCH', `${base(hex, server)}/${id}`, { body }).then(normalizeComment);
 export const deleteComment = (hex, server, id) => requestJson('DELETE', `${base(hex, server)}/${id}`);
 export const resolveComment = (hex, server, id) => requestJson('POST', `${base(hex, server)}/${id}/resolve`, {}).then(normalizeComment);
