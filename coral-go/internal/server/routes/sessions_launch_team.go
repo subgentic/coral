@@ -67,7 +67,9 @@ type launchTeamRequest struct {
 	// HealthMonitor true turns the team's health check on (#4962). The check is off for a new team; false or absent leaves the team's
 	// setting as it is, so a relaunch never turns off a check the operator turned on.
 	HealthMonitor *bool `json:"health_monitor"`
-	WorkingMode   *struct {
+	// TrustFolder is the person's tick on an existing folder: "Trust this folder: its settings and tools can run" (#11889). A folder this launch makes is trusted without it; only the person's dashboard is heard.
+	TrustFolder bool `json:"trust_folder"`
+	WorkingMode *struct {
 		Mode               string `json:"mode"`
 		DependencyGuidance bool   `json:"dependency_guidance"`
 		CustomInstructions string `json:"custom_instructions"`
@@ -175,7 +177,8 @@ func (h *SessionsHandler) LaunchTeam(w http.ResponseWriter, r *http.Request) {
 		refuse(tracking.FailInvalidRequest, msg)
 		return
 	}
-	if msg := createSuggestedDir(body.WorkingDir, body.CreateDir, h.cfg.CoralRoot); msg != "" {
+	msg, madeDir := createSuggestedDirReport(body.WorkingDir, body.CreateDir, h.cfg.CoralRoot)
+	if msg != "" {
 		refuse(tracking.FailWorkdirUnavailable, msg)
 		return
 	}
@@ -196,6 +199,7 @@ func (h *SessionsHandler) LaunchTeam(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	teamID := h.createTeamRecord(ctx, body, workingDir, worktreePath)
+	trustReply := h.trustTeamFolder(r, body, workingDir, madeDir, worktreePath != "") // before any agent starts, so no card is drawn for it (#11889)
 
 	// Load settings once so we can fall back to per-type default_model_<type>. A read that fails
 	// stops the team before any agent starts: the loop below would otherwise start its agents
@@ -305,6 +309,9 @@ func (h *SessionsHandler) LaunchTeam(w http.ResponseWriter, r *http.Request) {
 	resp := map[string]any{"ok": true, "board": body.BoardName, "board_id": body.BoardName, "board_label": h.boardLabel(body.BoardName), "agents": launched}
 	if teamID > 0 {
 		resp["team_id"] = teamID
+	}
+	if trustReply != nil {
+		resp["trust_folder"] = trustReply
 	}
 	if started < len(launched) {
 		resp["partial"] = true // some members started, the others' entries carry their error

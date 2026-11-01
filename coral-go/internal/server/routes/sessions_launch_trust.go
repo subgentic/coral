@@ -1,0 +1,112 @@
+package routes
+
+import (
+	"net/http"
+	"os"
+	"path/filepath"
+	"sort"
+
+	"github.com/subgentic/coral/internal/cloud"
+	"github.com/subgentic/coral/internal/foldertrust"
+)
+
+// Launching a team in a folder counts as trusting it for the agents that ask (#11889, the Operator's decision), under Security's conditions: only the person's own dashboard asks (never an agent, the Hub or the
+// CLI); only a folder this launch made, or an existing one the person ticked by name; never home, a parent of it, a hidden folder under it or a direct child of it unless Coral made it (foldertrust.Check); and the reply
+// names what was trusted and what was not, so the page and the Operator can see it. The writes are foldertrust's: one entry each, never over a link, never an entry the person turned down.
+
+// trustFolderCaller reports whether the request is the person's own dashboard, the only caller whose launch may trust a folder in this version.
+func trustFolderCaller(r *http.Request) bool {
+	if agentCaller(r) || cloud.Tunneled(r) {
+		return false
+	}
+	kind, _ := r.Context().Value(callerKindKey{}).(string)
+	return kind == callerDashCookie || kind == callerDashNoCookie
+}
+
+// trustCardless names the agent types whose CLI asks about a folder but has no setting Coral can set (nothing documented for Antigravity): their card stays.
+var trustCardless = map[string]string{
+	"agy": "no setting Coral can set: its card stays", "antigravity": "no setting Coral can set: its card stays", "gemini": "no setting Coral can set: its card stays",
+}
+
+// claudeConfigPath is Claude's settings file: $CLAUDE_CONFIG_DIR/.claude.json, else ~/.claude.json.
+func claudeConfigPath(home string) string {
+	if d := os.Getenv("CLAUDE_CONFIG_DIR"); d != "" {
+		return filepath.Join(d, ".claude.json")
+	}
+	return filepath.Join(home, ".claude.json")
+}
+
+// codexConfigPath is Codex's config: $CODEX_HOME/config.toml, else ~/.codex/config.toml.
+func codexConfigPath(home string) string {
+	if d := os.Getenv("CODEX_HOME"); d != "" {
+		return filepath.Join(d, "config.toml")
+	}
+	return filepath.Join(home, ".codex", "config.toml")
+}
+
+// trustTeamFolder trusts the folder the team starts in for its members' CLIs, when the launch asks for it (the folder was made by this launch, or the person ticked it), and answers what the launch reply says: the
+// path, the agent types trusted and, for each that was not, why; or why nothing was. nil when nothing was asked. workdir is where the agents start (a worktree's folder when the team uses one); madeDir says the launch
+// made the chosen folder, which counts only when the agents start in it and not in a worktree of existing code.
+func (h *SessionsHandler) trustTeamFolder(r *http.Request, body launchTeamRequest, workdir string, madeDir, worktree bool) map[string]any {
+	basis := foldertrust.Existing
+	switch {
+	case madeDir && !worktree:
+		basis = foldertrust.Made
+	case body.TrustFolder:
+		basis = foldertrust.Ticked
+	default:
+		return nil // nothing was asked
+	}
+	reply := map[string]any{"path": workdir, "trusted": []string{}}
+	if !trustFolderCaller(r) {
+		reply["refused"] = "only the person's own dashboard trusts a folder for a team"
+		return reply
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		reply["refused"] = "the home folder is not known"
+		return reply
+	}
+	resolved, err := foldertrust.Check(workdir, home, basis)
+	if err != nil {
+		reply["refused"] = err.Error()
+		return reply
+	}
+	reply["path"] = resolved
+	types, _ := teamMemberTypes(body)
+	seen := map[string]bool{}
+	trusted := []string{}
+	not := map[string]string{}
+	for _, typ := range types {
+		if typ == "" {
+			typ = "claude"
+		}
+		if seen[typ] {
+			continue
+		}
+		seen[typ] = true
+		var werr error
+		switch typ {
+		case "claude":
+			_, werr = foldertrust.TrustClaude(claudeConfigPath(home), resolved)
+		case "codex":
+			_, werr = foldertrust.TrustCodex(codexConfigPath(home), resolved)
+		default:
+			if why, ok := trustCardless[typ]; ok {
+				not[typ] = why
+			}
+			continue // the others show no folder-trust card
+		}
+		if werr != nil {
+			not[typ] = werr.Error()
+			continue
+		}
+		trusted = append(trusted, typ)
+	}
+	sort.Strings(trusted)
+	reply["trusted"] = trusted
+	if len(not) > 0 {
+		reply["not"] = not
+	}
+	return reply
+}
