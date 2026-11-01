@@ -539,6 +539,14 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 .dt-box.dt-folded td:has(> .inbox-review-name, > .inbox-review-item) > .dt-subtitle { display: none; }
 .dt-box.dt-folded td[data-fold-label]::before { content: attr(data-fold-label) ' '; color: var(--text-secondary); font-weight: var(--fw-regular); } /* a column with foldLabel names its figure where the header row is gone (the phone's Computers, #11463) */
 @media (max-width: 760px) { tr[data-welcome-id] { touch-action: pan-y; } } /* a welcome row of Needs you: the page keeps its vertical pans, a horizontal drag is the swipe's (welcome_swipe.js, #11542) */
-.dt-end .inbox-review-actions { justify-content: end; } /* the Actions column is the last, at the row's right edge: its buttons end there (#11552) */
+.dt-end .inbox-review-actions { justify-content: end; }
+@media (min-width: 768px) { /* the Actions of a Needs you row sit in fixed columns: star, Approve (or Answer), Changes, Deny, Ignore, the three dots; a button is at the same x on every row whether or not the row has a star, is read or is a question (#11630) */
+    .inbox-review-actions.inbox-slots { display: grid; grid-template-columns: 1.5rem 5rem 5rem 4rem 4rem 2.25rem; column-gap: 8px; justify-content: end; }
+    .inbox-slots-compact.inbox-review-actions.inbox-slots { grid-template-columns: 1.5rem 5rem 5rem 2.25rem; }
+    .inbox-slots > .btn { width: 100%; min-width: 0; padding-inline: 4px; }
+    .inbox-slots > [data-slot="star"] { grid-column: 1; } .inbox-slots > [data-slot="approve"] { grid-column: 2; } .inbox-slots > [data-slot="changes"] { grid-column: 3; }
+    .inbox-slots > [data-slot="deny"] { grid-column: 4; } .inbox-slots > [data-slot="ignore"] { grid-column: 5; } .inbox-slots > [data-slot="dots"] { grid-column: 6; justify-self: center; }
+    .inbox-slots-compact > [data-slot="ignore"] { grid-column: 3; } .inbox-slots-compact > [data-slot="dots"] { grid-column: 4; }
+} /* the Actions column is the last, at the row's right edge: its buttons end there (#11552) */
 .dt-table td:has(.inbox-row-more) { overflow: visible; text-overflow: clip; } /* the cell of a row's three dots shows its menu: a cell clips what it holds (#11552) */
 #group-table-view[data-group="hub-inbox:needs"] .dt-row-open, #group-table-view[data-group="hub-inbox:needs"] .dt-row-open td { -webkit-user-select: none; user-select: none; } /* a row of Needs you that opens on a click is not text to select (the other lists keep their names copyable): a selection across its cells shows as blue bars between them, and a web view takes a click on a selection for the start of a drag of it, so the row stops opening (#11584) */

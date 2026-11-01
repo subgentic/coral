@@ -217,11 +217,11 @@ function moreMenu(items, label) {
 
 /** A review row's actions, the one set on every screen (#11552, approved by the operator): Approve, Changes, Deny, Ignore as words, in that order; Mark unread (a read row) in More, and on a phone Deny and Ignore too. The row itself opens the file. Each action that clears the row keeps the person's place. */
 function reviewActions(row) {
-    const compact = compactActions(), box = DT.el('div', 'inbox-review-actions');
+    const compact = compactActions(), box = DT.el('div', `inbox-review-actions inbox-slots${compact ? ' inbox-slots-compact' : ''}`);
     const file = markHidden(row.name, { strict: true }); // what a button, a menu and a spoken line call the file: hidden characters written out (Security's SHOULD, #11552)
     const errorText = DT.el('span', 'inbox-review-error'); errorText.setAttribute('role', 'alert');
     const failed = (b, error) => { if (b.isConnected) b.disabled = false; errorText.textContent = error.message; };
-    const word = (text, name, cls, run) => { const b = DT.el('button', `btn btn-small ${cls}`.trim(), text); b.type = 'button'; b.setAttribute('aria-label', `${name}: ${file}`); b.addEventListener('click', () => run(b)); return b; };
+    const word = (text, name, cls, run) => { const b = DT.el('button', `btn btn-small ${cls}`.trim(), text); b.type = 'button'; b.setAttribute('data-slot', text.toLowerCase()); b.setAttribute('aria-label', `${name}: ${file}`); b.addEventListener('click', () => run(b)); return b; }; // a button's place is its column (data-slot): the same x on every row (#11630)
     const approve = b => { b.disabled = true; errorText.textContent = ''; const settle = keepPlace(b); // replaces Mark reviewed (#136584): it clears the row, marks the review approved and tells the agent that uploaded it
         return importOnce('./artifact_review.js').then(async ({ approveRow, sayApproved }) => { sayApproved(row.name, await approveRow(row.team, row)); sayLive(`Approved ${file}.`); await settle(); }).catch(error => failed(b, error)); };
     const deny = b => { const settle = keepPlace(b); return importOnce('./artifact_review.js').then(({ openDenyDialog }) => openDenyDialog(row.team, row, async () => { sayLive(`Denied ${file}.`); await settle(); })).catch(error => failed(b, error)); };
@@ -229,7 +229,7 @@ function reviewActions(row) {
         return importOnce('./artifact_review.js').then(async ({ ignoreRow, sayIgnored }) => { await ignoreRow(row.team, row); sayIgnored(row.team, row); sayLive(`Ignored ${file}.`); await settle(); }).catch(error => failed(b, error)); };
     const unread = b => { b.disabled = true; errorText.textContent = ''; return setReviewRead(row, false).then(() => sayLive(`Marked ${file} unread.`)).catch(error => failed(b, error)); };
     const star = starControl(row, { hex: row.hex, name: file }); // the review artifact's star: a glyph when starred, a button at a hover (#9834)
-    if (star) { box.append(star); box.classList.add('inbox-review-actions-star'); }
+    if (star) { star.setAttribute('data-slot', 'star'); box.append(star); box.classList.add('inbox-review-actions-star'); }
     const menu = [];
     if (!decisionNeedsPerson(splitKey(row.team).server)) { // through Coral Hub a guest cannot decide
         box.append(word('Approve', 'Approve', 'btn-primary', approve), word('Changes', 'Request changes', '', () => openReview(row, { requestChanges: true })));
@@ -238,7 +238,7 @@ function reviewActions(row) {
         else box.append(word('Deny', 'Deny', 'btn-quiet inbox-deny', deny), word('Ignore', 'Ignore', 'btn-quiet', ignore));
     }
     if (isRead(row)) { box.classList.add('inbox-review-actions-read'); menu.push({ label: 'Mark unread', title: 'Count it in Needs you again', run: unread }); }
-    if (menu.length) box.append(moreMenu(menu, file));
+    if (menu.length) { const more = moreMenu(menu, file); more.setAttribute('data-slot', 'dots'); box.append(more); }
     box.append(errorText); return box;
 }
 
@@ -246,13 +246,14 @@ function reviewActions(row) {
 function openRun(run) { markSeen(run); go(runRoute(run)); }
 /** A question to the Operator: Answer opens it whole with the reply box (#11417). */
 function askActions(a) {
-    const box = DT.el('div', 'inbox-review-actions');
+    const box = DT.el('div', `inbox-review-actions inbox-slots${compactActions() ? ' inbox-slots-compact' : ''}`);
     const who = markHidden(a.asker, { strict: true });
-    const reply = DT.el('button', 'btn btn-small', 'Answer'); reply.type = 'button'; // Answer, as the approved action set names it (#11552); the dialog it opens still has the reply box
+    const reply = DT.el('button', 'btn btn-small', 'Answer'); reply.type = 'button'; reply.setAttribute('data-slot', 'approve'); // Answer sits where Approve does (#11630)
+    // Answer, as the approved action set names it (#11552); the dialog it opens still has the reply box
     reply.setAttribute('aria-label', `Answer the question of ${who}`); reply.addEventListener('click', () => openAskDialog(a, () => $('group-table-view')?.querySelector('input[type=search]')?.focus({ preventScroll: true })));
     box.append(reply);
     if (a.kind === 'ask') { // a wait has no ask row to close: only a question is ignorable
-        const no = DT.el('button', 'btn btn-small btn-quiet', 'Ignore'); no.type = 'button'; no.setAttribute('aria-label', `Ignore the question of ${who}`);
+        const no = DT.el('button', 'btn btn-small btn-quiet', 'Ignore'); no.type = 'button'; no.setAttribute('data-slot', 'ignore'); no.setAttribute('aria-label', `Ignore the question of ${who}`);
         const failed = DT.el('span', 'inbox-review-error'); failed.setAttribute('role', 'alert');
         no.addEventListener('click', () => { no.disabled = true; failed.textContent = ''; const settle = keepPlace(no);
             importOnce('./ask_ignore.js').then(async ({ ignoreAsk }) => { await ignoreAsk(a, who); sayLive(`Ignored the question of ${who}.`); await settle(); }).catch(error => { no.disabled = false; failed.textContent = error.message; }); });
@@ -677,7 +678,7 @@ registerGroupSource('hub-inbox', {
                         } }] : []),
                         ...(rows.some(blocksOf) ? [{ key: 'blocks', label: 'Blocks', ...(oneLineNeeds ? { width: '9rem', dropAt: 52 } : { width: 'content', max: 30, drop: 4 }), line: 2, cell: s => { const p = blocksOf(s); if (!p) return ''; const e = DT.el('span', 'inbox-blocks', oneLineNeeds ? blocksShortOf(s) : p); e.title = p; return e; } }] : []), // a list of agents is one line a row: the short form fits its 9 rem, the whole sentence is the tooltip // what waits on the row (#11442)
                         { key: 'waiting', label: 'Waiting', ...(oneLineNeeds ? { width: '9rem' } : { min: rows.some(isItem) ? 12 : 18 }), tone: 'tertiary', align: 'end', sort: true, sortValue: s => s.waiting_since || '', firstDir: 'desc', line: rows.some(isItem) ? 2 : 1, cell: s => waitingText(s.waiting_since) || '' },
-                        ...(rows.some(isItem) ? [{ key: 'review', label: 'Actions', fixed: true, align: 'end', width: rows.some(s => s.proposal) ? '15rem' : rows.some(s => s.review) ? (compactActions() ? '13.5rem' : rows.some(s => s.review && isRead(s.review)) ? '24rem' : '20.5rem') : '13.5rem', line: 1, cell: s => (s.proposal ? proposalActions(s.proposal) : s.review ? reviewActions(s.review) : s.autorun ? runActions(s.autorun) : s.operatorAsk ? askActions(s.operatorAsk) : s.unrecorded ? unrecordedActions() : s.welcome ? welcomeActions(s.welcome) : '') }] : []),
+                        ...(rows.some(isItem) ? [{ key: 'review', label: 'Actions', fixed: true, align: 'end', width: rows.some(s => s.proposal) ? '15rem' : rows.some(s => s.review) ? (compactActions() ? '15.5rem' : '24.5rem') : '13.5rem', line: 1, cell: s => (s.proposal ? proposalActions(s.proposal) : s.review ? reviewActions(s.review) : s.autorun ? runActions(s.autorun) : s.operatorAsk ? askActions(s.operatorAsk) : s.unrecorded ? unrecordedActions() : s.welcome ? welcomeActions(s.welcome) : '') }] : []),
                     ], ...(oneLineNeeds ? { oneLine: true, sortBar: false } : {}), ...(oneLineNeeds ? { mail: s => ({ lead: { text: needsName(s), name: needsName(s) }, title: needsName(s), medium: true, starred: !!(s.review && s.review.starred), team: teamOf(s), teamAlways: multipleServers() || manyTeams, nameTeam: true, snippetTip: true, snippet: [blocksShortOf(s), askOf(s) || sessionStateInfo(s).label].filter(Boolean).join(' \u00b7 '), snippetTitle: [blocksOf(s), askOf(s) || sessionStateInfo(s).label].filter(Boolean).join(' \u00b7 '), state: askOf(s) || sessionStateInfo(s).label, time: DT.shortTime(s.waiting_since), unread: true, mark: 'attention', answers: answerCell(s, { dismiss: false }), actions: rowActions(s) }) } : {}) }); // a phone's row is the mail row: the agent, then the ask on a second line, amber and bold (every row of Needs you is unanswered); a list with a review or a run keeps its own actions. One line a row (Goal #79) for a list of agents: the ask is the row's tooltip, a narrow list drops it, then the team, the folder and the CLI; a list with a review item or a failed run keeps its own folded rows
                     wrap.append(table.el);
                     if (rows.some(r => r.welcome)) { const hide = DT.el('button', 'btn btn-quiet btn-small inbox-welcome-hide', 'Hide all welcome items'); hide.type = 'button'; hide.addEventListener('click', () => { hideAllWelcome(); sayLive('The welcome items are hidden.'); }); wrap.append(hide); } // one quiet way out (#11443)

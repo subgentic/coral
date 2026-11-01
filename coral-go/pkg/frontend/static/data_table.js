@@ -409,7 +409,7 @@ export function dataTable(cfg) {
         if (typeof v === 'string' && c.primary) v = primaryButton(v, `Open ${v}`);
         if (v instanceof Node) td.append(v); else td.textContent = v == null ? '' : String(v);
         if (c.title) { const t = c.title(r); if (t) td.title = t; } // the full name or id on hover
-        if (c.subtitle) { const s = c.subtitle(r); if (s) { const sub = el('span', 'dt-subtitle', s); if (c.subtitleTitle) { const t = c.subtitleTitle(r); if (t) sub.title = t; } td.append(sub); } } // subtitleTitle(row): the whole line on hover when the subtitle is cut with an ellipsis
+        if (c.subtitle) { const s = c.subtitle(r); if (s) { const sub = el('span', 'dt-subtitle', s); if (c.subtitleTitle) { const t = c.subtitleTitle(r); if (t) tipIf(sub, t, () => t !== s || sub.scrollWidth > sub.clientWidth); } td.append(sub); } } // subtitleTitle(row): the whole line on hover when the subtitle is cut with an ellipsis
         return td;
     }
 
