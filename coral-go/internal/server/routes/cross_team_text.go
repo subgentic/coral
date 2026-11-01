@@ -38,6 +38,17 @@ func textCrossTeamOff(teams []string) string {
 	return fmt.Sprintf("Cross-team messaging is off on %s. Turn it on in %s.", teamList(teams), teamSettingsMessaging)
 }
 
+// textCrossTeamNotSet is the refusal of a send between two teams of this computer when a team's cross-team switch is on only by default (#11708): the default counts for a team on another computer through a team link, and
+// between teams on this computer only the owner's own "on" does. teams are already quoted.
+func textCrossTeamNotSet(teams []string) string {
+	return fmt.Sprintf("Cross-team messaging is on only by default on %s, and between teams on this computer that does not count: ask the Operator to turn it on in %s (it reads \"on (default)\" until they do).", teamList(teams), teamSettingsMessaging)
+}
+
+// textFilesNotSet is textCrossTeamNotSet for the files switch.
+func textFilesNotSet(teams []string) string {
+	return fmt.Sprintf("Sharing files with other teams is on only by default on %s, and between teams on this computer that does not count: ask the Operator to turn on Share files with teams on other computers in %s (it reads \"on (default)\" until they do).", teamList(teams), teamSettingsMessaging)
+}
+
 // textFilesOff is the refusal of a send with files from or to a team that does not share files.
 func textFilesOff(teams []string) string {
 	return fmt.Sprintf("Sharing files with other teams is off on %s. Turn on Share files with teams on other computers in %s.", teamList(teams), teamSettingsMessaging)
@@ -162,4 +173,16 @@ func textHubSwitchNotice(hubUser string, files, on, changed bool) string {
 // the validated hub user and never any value (#7329).
 func textHubSettingsNotice(hubUser string, what string) string {
 	return "Coral Hub's owner (" + hubUser + ") changed " + what + " for this team. See " + teamSettingsMessaging + "."
+}
+
+// joinRefusals is one refusal sentence for a send some teams of which are on only by default (unset) and some off.
+func joinRefusals(notSet func([]string) string, unset []string, off func([]string) string, offTeams []string) string {
+	var parts []string
+	if len(unset) > 0 {
+		parts = append(parts, notSet(unset))
+	}
+	if len(offTeams) > 0 {
+		parts = append(parts, off(offTeams))
+	}
+	return strings.Join(parts, " ")
 }

@@ -586,19 +586,23 @@ func (h *BoardHandler) crossTeamRecipients(ctx context.Context, from, target, to
 	} else if !ok {
 		return nil, func(w http.ResponseWriter) { errNotFound(w, fmt.Sprintf("board %q not found", target)) }
 	}
-	var disabled []string
+	var disabled, unset []string
 	for _, b := range []string{from, target} {
 		settings, err := h.bs.GetBoardSettings(ctx, b)
 		if err != nil {
 			return nil, func(w http.ResponseWriter) { errInternalServer(w, err.Error()) }
 		}
 		if !settings.ExplicitMessagingOn() { // an explicit opt-in: no default opens two teams of one computer to each other (#5916)
-			disabled = append(disabled, strconv.Quote(b))
+			if settings.CrossTeamMessaging && !settings.MessagingStored {
+				unset = append(unset, strconv.Quote(b)) // on only by default: the page says so, and so does the refusal (#11708)
+			} else {
+				disabled = append(disabled, strconv.Quote(b))
+			}
 		}
 	}
-	if len(disabled) > 0 {
+	if len(disabled) > 0 || len(unset) > 0 {
 		return nil, func(w http.ResponseWriter) {
-			errForbidden(w, textCrossTeamOff(disabled))
+			errForbidden(w, joinRefusals(textCrossTeamNotSet, unset, textCrossTeamOff, disabled))
 		}
 	}
 	recipients, err := h.bs.TargetOrchestrators(ctx, target, strings.TrimSpace(to))
@@ -619,19 +623,23 @@ func (h *BoardHandler) crossTeamAttachments(ctx context.Context, r *http.Request
 	if len(m.Attach) == 0 {
 		return nil, nil
 	}
-	var off []string
+	var off, unset []string
 	for _, b := range []string{m.FromBoard, target} {
 		settings, err := h.bs.GetBoardSettings(ctx, b)
 		if err != nil {
 			return nil, func(w http.ResponseWriter) { errInternalServer(w, err.Error()) }
 		}
 		if !settings.ExplicitFilesOn() {
-			off = append(off, strconv.Quote(b))
+			if settings.CrossTeamArtifacts && !settings.ArtifactsStored {
+				unset = append(unset, strconv.Quote(b)) // on only by default: the page says so, and so does the refusal (#11708)
+			} else {
+				off = append(off, strconv.Quote(b))
+			}
 		}
 	}
-	if len(off) > 0 {
+	if len(off) > 0 || len(unset) > 0 {
 		return nil, func(w http.ResponseWriter) {
-			writeError(w, http.StatusForbidden, "artifacts_off", textFilesOff(off))
+			writeError(w, http.StatusForbidden, "artifacts_off", joinRefusals(textFilesNotSet, unset, textFilesOff, off))
 		}
 	}
 	// With the list in force, a link may turn files off for one sender (#9893): the sender is already admitted, so saying so reveals nothing.

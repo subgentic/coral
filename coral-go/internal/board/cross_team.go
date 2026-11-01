@@ -72,9 +72,10 @@ type BoardSettings struct {
 	TasksNeedApproval bool `json:"tasks_need_approval"`
 	// GoalRequests: other teams may ask this one to create a task for one of their goals (#7361, the goal-requests note). Off by default, even with a team link: a link grants messaging, and being asked to create work is a separate grant. The Operator on this computer or the Hub owner sets it, never an agent.
 	GoalRequests bool `json:"goal_requests"`
-	// MessagingStored and ArtifactsStored say that the owner set the switch (to either value), as against the default.
-	MessagingStored bool `json:"-"`
-	ArtifactsStored bool `json:"-"`
+	// MessagingStored and ArtifactsStored say that the owner set the switch (to either value), as against the default (#11708). They are sent as cross_team_messaging_set and cross_team_artifacts_set so the page can say
+	// "on (default)" and "on": between two teams on one computer only the set "on" counts (ExplicitMessagingOn, ExplicitFilesOn).
+	MessagingStored bool `json:"cross_team_messaging_set"`
+	ArtifactsStored bool `json:"cross_team_artifacts_set"`
 }
 
 // ExplicitMessagingOn is whether the owner turned messaging on, as against the default (#5916). The default-on of the switches is for a team on another Coral through a Coral Hub team link,
