@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"os"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/subgentic/coral/internal/httputil"
@@ -60,15 +61,54 @@ func (h *BoardHandler) UploadGoalImage(w http.ResponseWriter, r *http.Request) {
 		httputil.WriteActionLimit(w, 60, "rate_limited", "too many pictures in a minute; try again shortly")
 		return
 	}
+	// ?version_of=<a picture just added for this team's goal>: the marked-up copy is the next version of that picture (the operator's rule: a marked copy is v2 of the same artifact), never of anything else.
+	versionOf := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("version_of")))
+	if versionOf != "" && (!objectNameRe.MatchString(versionOf) || !recentCommentImage(goalImageScope(project), versionOf, time.Now())) {
+		commentRefuse(w, http.StatusNotFound, "series_not_found", "that is not a picture you just added to this goal")
+		return
+	}
 	pic, ok := receivePicture(w, r, h.coralDir)
 	if !ok {
 		return
 	}
 	defer os.Remove(pic.tmpPath) // a no-op once it is in the store
-	reply, ok := storeReceivedPicture(w, h.coralDir, session, pic, nil, sourceGoalImage)
+	var plan *seriesPlan
+	var stamp *seriesStamp
+	if versionOf != "" {
+		var err error
+		if plan, err = planNewVersion(h.coralDir, versionOf, project, pic.hexID); err != nil {
+			h.answerGoalSeriesRefusal(w, pic.hexID, err)
+			return
+		}
+		defer plan.unlock()
+		if plan.same != nil { // these bytes are the newest version already: that version is the answer
+			writeJSON(w, http.StatusOK, map[string]any{"hex": plan.same.Digest, "uri": "coral://artifacts/" + plan.same.Digest, "series_id": plan.id, "version": plan.same.N, "same": true})
+			return
+		}
+		stamp = &plan.stamp
+	}
+	reply, ok := storeReceivedPicture(w, h.coralDir, session, pic, stamp, sourceGoalImage)
 	if !ok {
 		return
 	}
+	if plan != nil {
+		versions, cerr := plan.commit(h.coralDir, pic.hexID, session)
+		if cerr != nil {
+			errInternalServer(w, "the picture was stored but its series could not be recorded")
+			return
+		}
+		reply["series_id"], reply["version"], reply["versions"] = plan.id, plan.stamp.Version, versions
+	}
 	rememberCommentImage(goalImageScope(project), pic.hexID, time.Now())
 	writeJSON(w, http.StatusCreated, reply)
+}
+
+// answerGoalSeriesRefusal writes a refused new version's answer with the series refusal's own code and words.
+func (h *BoardHandler) answerGoalSeriesRefusal(w http.ResponseWriter, hexID string, err error) {
+	ref, ok := err.(*seriesRefusal)
+	if !ok {
+		errInternalServer(w, "could not store the picture")
+		return
+	}
+	artifactRefusal(w, ref.status, ref.code, "", ref.msg)
 }

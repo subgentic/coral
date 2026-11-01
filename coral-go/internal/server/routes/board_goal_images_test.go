@@ -208,3 +208,55 @@ func TestAFifthPictureOnAGoalIsRefused(t *testing.T) {
 	assert.Equal(t, http.StatusCreated, code, "four are taken: %v", out)
 	assert.Len(t, out["images"], 4)
 }
+
+// The operator's rule for markup (a marked copy is v2 of the same artifact) holds for a goal's pictures too: ?version_of=<a picture just added for this team's goal> makes the new picture the next version of its series; any
+// other reference, another team's picture or a stored file that is not one is refused.
+func TestAMarkedUpGoalPictureIsTheNextVersionOfThePicture(t *testing.T) {
+	_, h, _ := teamArtifactServer(t)
+	old := uploaderLookup
+	uploaderLookup = func(_ context.Context, sessionID string) (string, string, string) { return "alpha", "Alice", "worker" }
+	t.Cleanup(func() { uploaderLookup = old })
+	subscribeSession(t, h, "alpha", "Alice", sessAlice)
+	_, err := h.bs.Subscribe(context.Background(), "beta", "Bob", "Developer", "claude-"+sessBob, nil, "all")
+	require.NoError(t, err)
+	r := chi.NewRouter()
+	r.Post("/api/board/{project}/goal-images", func(w http.ResponseWriter, req *http.Request) {
+		h.UploadGoalImage(w, req.WithContext(context.WithValue(req.Context(), callerKindKey{}, callerDashCookie)))
+	})
+	srv := httptest.NewServer(r)
+	t.Cleanup(srv.Close)
+	upload := func(team, query string, shade uint8) (int, map[string]any) {
+		req, err := http.NewRequest("POST", srv.URL+"/api/board/"+team+"/goal-images"+query, bytes.NewReader(shadePNG(t, shade)))
+		require.NoError(t, err)
+		req.Header.Set("Content-Type", "image/png")
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		var out map[string]any
+		_ = json.NewDecoder(resp.Body).Decode(&out)
+		return resp.StatusCode, out
+	}
+	code, out := upload("alpha", "", 70)
+	require.Equal(t, http.StatusCreated, code, "%v", out)
+	v1 := out["hex"].(string)
+	// the marked copy: v2 of the same series, and marking again still follows the first hex
+	code, out = upload("alpha", "?version_of="+v1, 71)
+	require.Equal(t, http.StatusCreated, code, "%v", out)
+	assert.EqualValues(t, 2, out["version"])
+	assert.NotEmpty(t, out["series_id"])
+	v2 := out["hex"].(string)
+	assert.NotEqual(t, v1, v2)
+	code, out = upload("alpha", "?version_of="+v1, 72)
+	require.Equal(t, http.StatusCreated, code, "%v", out)
+	assert.EqualValues(t, 3, out["version"], "marking again follows the first hex")
+	assert.Equal(t, out["series_id"], func() any { _, o := upload("alpha", "?version_of="+v1, 72); return o["series_id"] }(), "the same series")
+	// a hex nobody added just now, a stored file that is not a goal picture, and another team's picture are refused
+	for name, ref := range map[string]string{"unknown": strings.Repeat("cd", 32), "not hex": "zz", "an empty-looking id": strings.Repeat("0", 64)} {
+		code, _ = upload("alpha", "?version_of="+ref, 80)
+		assert.Equal(t, http.StatusNotFound, code, name)
+	}
+	code, ob := upload("beta", "", 90)
+	require.Equal(t, http.StatusCreated, code, "%v", ob)
+	code, _ = upload("alpha", "?version_of="+ob["hex"].(string), 91)
+	assert.Equal(t, http.StatusNotFound, code, "another team's picture is not this team's to mark up")
+}
