@@ -88,7 +88,7 @@ const { coralReady } = require('./helpers/wait');
             assert.ok(!b.actions.find(a => a.label === 'Approve').off && !b.actions.find(a => a.label === 'Changes').off, at + 'a file can be approved or sent back');
             // the three dots hold Changes, Mark read and Mark unread, and open on a tap
             await ev(`document.querySelector('.dt-bar .dt-bar-more-toggle').click(); true`);
-            await waitFor(`!!document.querySelector('.dt-bar .dt-bar-more .menu:not([hidden]) .menu-item')`, at + 'More opens its menu', 5000);
+            await waitFor(`!!document.querySelector('.dt-bar .dt-bar-more .menu:not([hidden]) .menu-item')`, at + 'More opens its menu', 5000).catch(async e => { throw new Error(e.message + ' | ' + await ev(`JSON.stringify({ toggles: document.querySelectorAll('.dt-bar-more-toggle').length, menus: [...document.querySelectorAll('.dt-bar .menu')].map(m => [m.hidden, m.children.length]), toasts: [...document.querySelectorAll('.toast')].map(t => t.textContent.trim().slice(0, 40)), bar: !!document.querySelector('.dt-bar') })`)); }); // the page's state when it does not open: a lost press, a hidden menu, a toast
             assert.deepEqual(await ev(`[...document.querySelectorAll('.dt-bar .dt-bar-more .menu:not([hidden]) .menu-item')].map(x => [x.textContent, x.disabled])`), [['Changes', false], ['Mark read', false], ['Mark unread', true]], at + 'the menu: Changes and Mark read fit one unread file, Mark unread does not');
             await ev(`document.querySelector('.dt-bar .dt-bar-more-toggle').click(); true`); await new Promise(r => setTimeout(r, 250)); // sleep-ok: the menu closes (the same button again)
             await tap('Which port should the test server use?');
