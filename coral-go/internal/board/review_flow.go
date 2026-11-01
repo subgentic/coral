@@ -70,18 +70,69 @@ type ReviewerState struct {
 // ErrNoOrchestrator: the team has no active orchestrator to review the task.
 var ErrNoOrchestrator = errors.New("the team has no active orchestrator")
 
-// TeamOrchestrator is the board's active orchestrator subscriber.
+// TeamOrchestrator is the board's active orchestrator subscriber: the one Coral launched with the Orchestrator role (its subscription carries can_peek, set only by the launch) before any other that
+// holds the title, so a member that took the title in a later join is never the one chosen while the launched one is there (#11759).
 func (s *Store) TeamOrchestrator(ctx context.Context, project string) (string, error) {
 	subs, err := s.ListSubscribers(ctx, project)
 	if err != nil {
 		return "", err
 	}
+	title := func(sub Subscriber) bool {
+		return sub.IsActive != 0 && strings.EqualFold(strings.TrimSpace(sub.JobTitle), "Orchestrator")
+	}
 	for _, sub := range subs {
-		if sub.IsActive != 0 && strings.EqualFold(strings.TrimSpace(sub.JobTitle), "Orchestrator") {
+		if title(sub) && sub.CanPeek != 0 {
+			return sub.SubscriberID, nil
+		}
+	}
+	for _, sub := range subs {
+		if title(sub) {
 			return sub.SubscriberID, nil
 		}
 	}
 	return "", ErrNoOrchestrator
+}
+
+// ErrOrchestratorTaken refuses a join that claims the Orchestrator's name or title on a team that already has one.
+var ErrOrchestratorTaken = errors.New("this team already has an Orchestrator")
+
+// ClaimsOrchestrator reports whether a join's name or title says Orchestrator (the words the rest of Coral reads as the role).
+func ClaimsOrchestrator(subscriberID, jobTitle string) bool {
+	return strings.Contains(strings.ToLower(subscriberID), "orchestrator") || strings.Contains(strings.ToLower(jobTitle), "orchestrator")
+}
+
+// OrchestratorSeatHeldBy is the subscriber, other than except, that stands in the way of except's claim on the Orchestrator's name or title: "" when nobody does. A holder counts whether it is active or away (an
+// Orchestrator that is away still holds the seat), so a member cannot take the role by joining with the title (#11759). The launched Orchestrator (its subscription carries can_peek, set only by the launch) may
+// always join again, and a holder that is already on the team (an older team's title-holder) may join again unless a launched one is there; a claim by anyone else is refused while any holder exists.
+func (s *Store) OrchestratorSeatHeldBy(ctx context.Context, project, except string) (string, error) {
+	var rows []struct {
+		ID   string `db:"subscriber_id"`
+		Peek int    `db:"can_peek"`
+	}
+	if err := s.db.SelectContext(ctx, &rows, `SELECT subscriber_id, can_peek FROM board_subscribers WHERE project = ?
+		AND (LOWER(job_title) LIKE '%orchestrator%' OR LOWER(subscriber_id) LIKE '%orchestrator%') ORDER BY can_peek DESC, is_active DESC, id`, project); err != nil {
+		return "", err
+	}
+	own, ownLaunched, otherLaunched, other := false, false, "", ""
+	for _, r := range rows {
+		if r.ID == except {
+			own, ownLaunched = true, r.Peek != 0
+			continue
+		}
+		if other == "" {
+			other = r.ID
+		}
+		if r.Peek != 0 && otherLaunched == "" {
+			otherLaunched = r.ID
+		}
+	}
+	switch {
+	case own && ownLaunched:
+		return "", nil
+	case own:
+		return otherLaunched, nil
+	}
+	return other, nil
 }
 
 // HandToOrchestrator moves a task whose candidate was just recorded (submit-review) to the
