@@ -207,7 +207,8 @@ func (s *Server) registerBoardTaskRoutes(r chi.Router, boardHandler *routes.Boar
 	r.Get("/api/analytics/activity", activityHandler.Activity)
 	// Goals (#7087): board text, written by the Operator or an orchestrator, readable like tasks.
 	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/goals", boardHandler.CreateGoal)
-	r.Get("/api/goals", boardHandler.ListAllGoals) // every board's goals (#7260), the Operator's; /api/goals/metrics is the Jobs metrics
+	r.Post("/api/board/{project}/goal-images", boardHandler.UploadGoalImage) // the Operator's picture for a new goal's description (#11650)
+	r.Get("/api/goals", boardHandler.ListAllGoals)                           // every board's goals (#7260), the Operator's; /api/goals/metrics is the Jobs metrics
 	r.Get("/api/board/{project}/goals", boardHandler.ListGoals)
 	r.Get("/api/board/{project}/goals/{goalID}", boardHandler.GetGoal)
 	r.With(routes.RefuseSignInLink).Patch("/api/board/{project}/goals/{goalID}", boardHandler.UpdateGoal)

@@ -122,6 +122,7 @@ var ownerRefusals = map[string]string{
 	tunnel.OwnerRouteKey("DELETE", "/api/artifacts/{hex64}/comments/lock"):          textCommentsOwnerOnly,
 	tunnel.OwnerRouteKey("POST", "/api/artifacts/{hex64}/comments/{id}/send"):       textCommentsOwnerOnly,
 	tunnel.OwnerRouteKey("POST", "/api/artifacts/{hex64}/comment-images"):           textCommentsOwnerOnly,
+	tunnel.OwnerRouteKey("POST", "/api/board/{project}/goal-images"):                "through Coral Hub only the account this computer is linked to can add a picture to a goal",
 	tunnel.OwnerRouteKey("GET", "/api/artifacts/{hex64}/versions"):                  textArtifactsOwnerOnly,
 	tunnel.OwnerRouteKey("GET", "/api/artifacts/series/{series}"):                   textArtifactsOwnerOnly,
 	tunnel.OwnerRouteKey("GET", "/api/artifacts/series/{series}/versions"):          textArtifactsOwnerOnly,

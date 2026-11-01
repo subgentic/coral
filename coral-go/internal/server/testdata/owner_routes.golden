@@ -45,6 +45,7 @@ POST /api/board/{project}/cross-team/disable launch owner-only-hub
 POST /api/board/{project}/cross-team/enable launch owner-only-hub
 POST /api/board/{project}/cross-team/files/disable launch owner-only-hub
 POST /api/board/{project}/cross-team/files/enable launch owner-only-hub
+POST /api/board/{project}/goal-images interact owner-only
 POST /api/board/{project}/goals interact owner-sees
 POST /api/board/{project}/messages interact owner-sees
 POST /api/board/{project}/operator-artifacts interact owner-only

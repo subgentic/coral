@@ -116,6 +116,87 @@ func (h *SessionsHandler) commentImageTeam(artifactID, wantBoard string) (sessio
 	return session, board, session != ""
 }
 
+// receivedPicture is a picture the server took from a request and checked: its bytes are in tmpPath (in the object folder, to be moved into the store), named by hexID.
+type receivedPicture struct {
+	tmpPath string
+	hexID   string
+	size    int64
+	sniffed string
+	name    string
+}
+
+// receivePicture reads one picture from a request and checks it, answering the request itself when it is refused: a declared type of png, jpeg or webp, a size within the cap (said before a byte is read when the length is known),
+// a name of plain text, the bytes' own type (the sniffed one is what is kept; a declared type that disagrees is refused) and the metadata a camera adds removed. The caller removes tmpPath when it is done.
+func receivePicture(w http.ResponseWriter, r *http.Request, coralDir string) (*receivedPicture, bool) {
+	declared := strings.ToLower(strings.TrimSpace(strings.SplitN(r.Header.Get("Content-Type"), ";", 2)[0]))
+	if _, known := commentImageTypes[declared]; !known {
+		commentRefuse(w, http.StatusUnsupportedMediaType, "image_type", "Only PNG, JPEG and WebP pictures can go in a comment")
+		return nil, false
+	}
+	if r.ContentLength > maxCommentImageBytes { // said before a byte is read
+		commentRefuse(w, http.StatusRequestEntityTooLarge, "image_too_large", "A picture can be at most 25 MB")
+		return nil, false
+	}
+	name := strings.TrimSpace(r.Header.Get("X-Artifact-Name"))
+	if name != "" && (!board.ValidLabel(name, 160) || hasSignInLink(name)) {
+		errBadRequest(w, "X-Artifact-Name must be 1–160 characters of plain text")
+		return nil, false
+	}
+	if refuseIfDiskLow(w) {
+		return nil, false
+	}
+	// The picture is read into memory (25 MB at most) and checked there; only a picture that passes is written to the object folder.
+	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxCommentImageBytes+1))
+	var tooBig *http.MaxBytesError
+	if errors.As(err, &tooBig) || len(data) > maxCommentImageBytes {
+		commentRefuse(w, http.StatusRequestEntityTooLarge, "image_too_large", "A picture can be at most 25 MB")
+		return nil, false
+	}
+	if err != nil || len(data) == 0 {
+		errBadRequest(w, "the picture was cut short or empty")
+		return nil, false
+	}
+	sniffed := sniffImageFamily(data)
+	if _, known := commentImageTypes[sniffed]; !known {
+		commentRefuse(w, http.StatusUnsupportedMediaType, "image_type", "Only PNG, JPEG and WebP pictures can go in a comment")
+		return nil, false
+	}
+	if sniffed != declared {
+		commentRefuse(w, http.StatusUnsupportedMediaType, "image_type_mismatch", "The file is not the type it was sent as")
+		return nil, false
+	}
+	clean, changed, cerr := cleanUploadedImage(data)
+	if cerr != nil {
+		commentRefuse(w, http.StatusBadRequest, "image_metadata", cerr.Error())
+		return nil, false
+	}
+	if changed {
+		data = clean
+	}
+	dir := filepath.Join(coralDir, "artifacts", "objects")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		errInternalServer(w, "could not store the picture")
+		return nil, false
+	}
+	tmp, err := os.CreateTemp(dir, artifactUploadTempP+"*")
+	if err != nil {
+		errInternalServer(w, "could not store the picture")
+		return nil, false
+	}
+	tmpPath := tmp.Name()
+	_, werr := tmp.Write(data)
+	if cerr := tmp.Close(); werr != nil || cerr != nil {
+		os.Remove(tmpPath)
+		errInternalServer(w, "could not store the picture")
+		return nil, false
+	}
+	sum := sha256.Sum256(data)
+	if name == "" {
+		name = "picture" + commentImageTypes[sniffed]
+	}
+	return &receivedPicture{tmpPath: tmpPath, hexID: hex.EncodeToString(sum[:]), size: int64(len(data)), sniffed: sniffed, name: name}, true
+}
+
 // uploadCommentImage stores one picture for a comment on an artifact: POST /api/artifacts/{id}/comment-images?board=&version_of=
 // The body is the file; Content-Type is its declared type (png, jpeg or webp) and X-Artifact-Name an optional name. It answers {hex, name, content_type, size}; with version_of=<a picture just uploaded for this artifact>
 // the new picture is the next version of that picture's series (the marked-up copy of a screenshot).
@@ -141,23 +222,6 @@ func (h *SessionsHandler) uploadCommentImage(w http.ResponseWriter, r *http.Requ
 		httputil.WriteActionLimit(w, 60, "rate_limited", "too many pictures in a minute; try again shortly")
 		return
 	}
-	declared := strings.ToLower(strings.TrimSpace(strings.SplitN(r.Header.Get("Content-Type"), ";", 2)[0]))
-	if _, known := commentImageTypes[declared]; !known {
-		commentRefuse(w, http.StatusUnsupportedMediaType, "image_type", "Only PNG, JPEG and WebP pictures can go in a comment")
-		return
-	}
-	if r.ContentLength > maxCommentImageBytes { // said before a byte is read
-		commentRefuse(w, http.StatusRequestEntityTooLarge, "image_too_large", "A picture can be at most 25 MB")
-		return
-	}
-	name := strings.TrimSpace(r.Header.Get("X-Artifact-Name"))
-	if name != "" && (!board.ValidLabel(name, 160) || hasSignInLink(name)) {
-		errBadRequest(w, "X-Artifact-Name must be 1–160 characters of plain text")
-		return
-	}
-	if refuseIfDiskLow(w) {
-		return
-	}
 	coralDir := h.cfg.CoralDir()
 	wantBoard := strings.TrimSpace(r.URL.Query().Get("board"))
 	if wantBoard != "" && !commentBoardRe.MatchString(wantBoard) {
@@ -174,65 +238,17 @@ func (h *SessionsHandler) uploadCommentImage(w http.ResponseWriter, r *http.Requ
 		commentRefuse(w, http.StatusNotFound, "series_not_found", "that is not a picture you just added to this comment")
 		return
 	}
-	dir := filepath.Join(coralDir, "artifacts", "objects")
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		errInternalServer(w, "could not store the picture")
+	pic, ok := receivePicture(w, r, coralDir)
+	if !ok {
 		return
 	}
-	tmp, err := os.CreateTemp(dir, artifactUploadTempP+"*")
-	if err != nil {
-		errInternalServer(w, "could not store the picture")
-		return
-	}
-	tmpPath := tmp.Name()
-	defer os.Remove(tmpPath) // a no-op once it is in the store
-	n, err := io.Copy(tmp, http.MaxBytesReader(w, r.Body, maxCommentImageBytes+1))
-	closeErr := tmp.Close()
-	var tooBig *http.MaxBytesError
-	if errors.As(err, &tooBig) || n > maxCommentImageBytes {
-		commentRefuse(w, http.StatusRequestEntityTooLarge, "image_too_large", "A picture can be at most 25 MB")
-		return
-	}
-	if err != nil || closeErr != nil || n == 0 {
-		errBadRequest(w, "the picture was cut short or empty")
-		return
-	}
-	data, err := os.ReadFile(tmpPath)
-	if err != nil {
-		errInternalServer(w, "could not store the picture")
-		return
-	}
-	sniffed := sniffImageFamily(data)
-	if _, known := commentImageTypes[sniffed]; !known {
-		commentRefuse(w, http.StatusUnsupportedMediaType, "image_type", "Only PNG, JPEG and WebP pictures can go in a comment")
-		return
-	}
-	if sniffed != declared {
-		commentRefuse(w, http.StatusUnsupportedMediaType, "image_type_mismatch", "The file is not the type it was sent as")
-		return
-	}
-	clean, changed, cerr := cleanUploadedImage(data)
-	if cerr != nil {
-		commentRefuse(w, http.StatusBadRequest, "image_metadata", cerr.Error())
-		return
-	}
-	if changed {
-		data = clean
-		if err := os.WriteFile(tmpPath, data, 0o600); err != nil {
-			errInternalServer(w, "could not store the picture")
-			return
-		}
-	}
-	sum := sha256.Sum256(data)
-	hexID, size := hex.EncodeToString(sum[:]), int64(len(data))
-	if name == "" {
-		name = "picture" + commentImageTypes[sniffed]
-	}
+	defer os.Remove(pic.tmpPath) // a no-op once it is in the store
 	var plan *seriesPlan
 	var stamp *seriesStamp
 	if versionOf != "" {
-		if plan, err = planNewVersion(coralDir, versionOf, teamBoard, hexID); err != nil {
-			h.answerSeriesRefusal(w, coralDir, hexID, err)
+		var err error
+		if plan, err = planNewVersion(coralDir, versionOf, teamBoard, pic.hexID); err != nil {
+			h.answerSeriesRefusal(w, coralDir, pic.hexID, err)
 			return
 		}
 		defer plan.unlock()
@@ -242,21 +258,12 @@ func (h *SessionsHandler) uploadCommentImage(w http.ResponseWriter, r *http.Requ
 		}
 		stamp = &plan.stamp
 	}
-	meta, _, err := storeArtifactFileAs(coralDir, session, name, sniffed, tmpPath, hexID, size, stamp, 0, func(rec *agentUploadRecord) {
-		rec.Uploader, rec.Role = board.OperatorName, "operator"
-		rec.UploadedBy, rec.Source = "owner", sourceCommentImage
-	})
-	if errors.Is(err, errStoreFull) {
-		artifactRefusal(w, http.StatusRequestEntityTooLarge, "artifact_quota", "store", "the artifact store is full: delete old artifacts or raise the limit (Settings > Storage and cleanup)")
+	reply, ok := storeReceivedPicture(w, coralDir, session, pic, stamp, sourceCommentImage)
+	if !ok {
 		return
 	}
-	if err != nil {
-		errInternalServer(w, "could not store the picture")
-		return
-	}
-	reply := map[string]any{"hex": hexID, "uri": "coral://artifacts/" + hexID, "name": meta.Name, "content_type": sniffed, "size": meta.Size}
 	if plan != nil {
-		versions, cerr := plan.commit(coralDir, hexID, session)
+		versions, cerr := plan.commit(coralDir, pic.hexID, session)
 		if cerr != nil {
 			slog.Warn("[comment images] a new version was stored but its series could not be recorded", "series", plan.id, "error", cerr)
 			errInternalServer(w, "the picture was stored but its series could not be recorded")
@@ -264,34 +271,61 @@ func (h *SessionsHandler) uploadCommentImage(w http.ResponseWriter, r *http.Requ
 		}
 		reply["series_id"], reply["version"], reply["versions"] = plan.id, plan.stamp.Version, versions
 	}
-	rememberCommentImage(id, hexID, time.Now())
-	slog.Info("[comment images] stored", "surface", "local", "digest", hexID) // which, never a name or a byte
+	rememberCommentImage(id, pic.hexID, time.Now())
+	slog.Info("[comment images] stored", "surface", "local", "digest", pic.hexID) // which, never a name or a byte
 	writeJSON(w, http.StatusCreated, reply)
 }
 
-// commentImagesOf checks the pictures a new comment names: at most maxCommentImages, each one this person just uploaded for this artifact, once. It answers them as they are kept, with the stored name and type.
-func (h *SessionsHandler) commentImagesOf(artifactID string, hexes []string) (string, string) {
+// storeReceivedPicture puts a checked picture in the store as the Operator's upload for the team of session, with the record's source say what it is for, and answers what the route replies; it answers the request itself on a refusal.
+func storeReceivedPicture(w http.ResponseWriter, coralDir, session string, pic *receivedPicture, stamp *seriesStamp, source string) (map[string]any, bool) {
+	meta, _, err := storeArtifactFileAs(coralDir, session, pic.name, pic.sniffed, pic.tmpPath, pic.hexID, pic.size, stamp, 0, func(rec *agentUploadRecord) {
+		rec.Uploader, rec.Role = board.OperatorName, "operator"
+		rec.UploadedBy, rec.Source = "owner", source
+	})
+	if errors.Is(err, errStoreFull) {
+		artifactRefusal(w, http.StatusRequestEntityTooLarge, "artifact_quota", "store", "the artifact store is full: delete old artifacts or raise the limit (Settings > Storage and cleanup)")
+		return nil, false
+	}
+	if err != nil {
+		errInternalServer(w, "could not store the picture")
+		return nil, false
+	}
+	return map[string]any{"hex": pic.hexID, "uri": "coral://artifacts/" + pic.hexID, "name": meta.Name, "content_type": pic.sniffed, "size": meta.Size}, true
+}
+
+// checkedPictures checks the pictures a new comment or goal names: at most maxCommentImages, each one this person just uploaded for scope (an artifact id, or "goal:<team>"), once. It answers them as they are
+// kept, with the stored name and type, or why one is not allowed.
+func checkedPictures(objectDir, scope string, hexes []string) ([]commentImage, string) {
 	if len(hexes) == 0 {
-		return "", ""
+		return nil, ""
 	}
 	if len(hexes) > maxCommentImages {
-		return "", "a comment can carry at most 4 pictures"
+		return nil, "at most 4 pictures can be attached"
 	}
 	seen := map[string]bool{}
 	var out []commentImage
 	for _, raw := range hexes {
 		hexID := strings.ToLower(strings.TrimSpace(raw))
-		if !objectNameRe.MatchString(hexID) || seen[hexID] || !recentCommentImage(artifactID, hexID, time.Now()) {
-			return "", "a picture of this comment was not added to it just now: add it again"
+		if !objectNameRe.MatchString(hexID) || seen[hexID] || !recentCommentImage(scope, hexID, time.Now()) {
+			return nil, "a picture was not added just now: add it again"
 		}
 		seen[hexID] = true
-		meta, ok := readSidecar(filepath.Join(h.artifactDir(), hexID+".json"))
+		meta, ok := readSidecar(filepath.Join(objectDir, hexID+".json"))
 		if !ok {
-			return "", "a picture of this comment is gone: add it again"
+			return nil, "a picture is gone: add it again"
 		}
 		out = append(out, commentImage{Hex: hexID, Name: meta.Name, ContentType: meta.MediaType})
 	}
-	b, _ := json.Marshal(out)
+	return out, ""
+}
+
+// commentImagesOf is checkedPictures for a comment on artifactID, as the JSON kept with the comment.
+func (h *SessionsHandler) commentImagesOf(artifactID string, hexes []string) (string, string) {
+	imgs, why := checkedPictures(h.artifactDir(), artifactID, hexes)
+	if why != "" || len(imgs) == 0 {
+		return "", why
+	}
+	b, _ := json.Marshal(imgs)
 	return string(b), ""
 }
 
