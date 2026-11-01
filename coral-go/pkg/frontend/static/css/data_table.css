@@ -452,7 +452,7 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 .dt-box.dt-mail-on tr.dt-mailed.dt-selected { background: var(--table-selected); }
 @media (max-width: 767px) { /* a phone: what is selected takes the toolbar's line (UI/UX's spec: the app bar becomes the selection bar): the count and the actions, the search and the Select button out of the way */
     .gt-toolbar.team-toolbar-selecting { flex-wrap: wrap; }
-    .gt-toolbar.team-toolbar-selecting > :is(.list-bar-search-wrap, .dt-select-toggle) { display: none; }
+    .gt-toolbar.team-toolbar-selecting > :is(.list-bar-search-wrap, .dt-select-toggle, .btn-icon) { display: none; } /* the toolbar's sort icon is not left alone on a blank row under the selection bar (#11778) */
     .gt-toolbar.team-toolbar-selecting > .team-tb-selection { flex: 1 1 100%; }
     .list-bar-bar:has(> .team-toolbar-selecting) { position: sticky; top: 0; z-index: 25; background: var(--bg-primary); } /* a phone's selection bar is the top row of the screen and stays there while the list scrolls (#11707, the operator's comment 28) */
 }
