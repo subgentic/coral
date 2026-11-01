@@ -10,6 +10,8 @@ import (
 	"unsafe"
 
 	"golang.org/x/sys/windows"
+
+	"github.com/subgentic/coral/internal/safego"
 )
 
 // What a process's standard input is (consoleReaderBelow): read from the process's own parameters (its PEB's RTL_USER_PROCESS_PARAMETERS.StandardInput), the handle duplicated into this
@@ -164,6 +166,7 @@ func classifyProcess(key stdinKey, wait time.Duration) (stdinKind, bool) {
 		stdinMemo.m[key] = e
 		stdinMemo.workers++
 		go func() {
+			defer safego.Recover("console stdin probe")
 			k := stdinUnreadable // a fault in the probe is "unreadable", a reader: it never takes the server down
 			func() {
 				defer func() { _ = recover() }()
