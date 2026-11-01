@@ -192,6 +192,13 @@ func TestAMarkedUpPictureIsTheNextVersionOfThePicture(t *testing.T) {
 	assert.EqualValues(t, 2, out["version"])
 	assert.NotEmpty(t, out["series_id"])
 	assert.NotEqual(t, v1, out["hex"])
+	// QA's SHOULD: the newest version's bytes again add nothing: 200 "same", that version, the same series.
+	series := out["series_id"]
+	code, same := rig.upload(cmtAsOwner, "image/png", "?version_of="+v1, shadePNG(t, 91))
+	require.Equal(t, http.StatusOK, code, "%v", same)
+	assert.Equal(t, true, same["same"])
+	assert.EqualValues(t, 2, same["version"])
+	assert.Equal(t, series, same["series_id"])
 	// Only a picture just added for this file can be marked up.
 	code, _ = rig.upload(cmtAsOwner, "image/png", "?version_of="+strings.Repeat("cd", 32), shadePNG(t, 92))
 	assert.Equal(t, http.StatusNotFound, code)

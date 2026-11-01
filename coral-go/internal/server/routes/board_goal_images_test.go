@@ -249,7 +249,16 @@ func TestAMarkedUpGoalPictureIsTheNextVersionOfThePicture(t *testing.T) {
 	code, out = upload("alpha", "?version_of="+v1, 72)
 	require.Equal(t, http.StatusCreated, code, "%v", out)
 	assert.EqualValues(t, 3, out["version"], "marking again follows the first hex")
-	assert.Equal(t, out["series_id"], func() any { _, o := upload("alpha", "?version_of="+v1, 72); return o["series_id"] }(), "the same series")
+	series := out["series_id"]
+	// QA's SHOULD: sending the newest version's bytes again adds nothing: 200 "same", that version, the same series
+	code, out = upload("alpha", "?version_of="+v1, 72)
+	require.Equal(t, http.StatusOK, code, "%v", out)
+	assert.Equal(t, true, out["same"], "the newest version's bytes again: nothing is added")
+	assert.EqualValues(t, 3, out["version"], "it is the newest version that answers")
+	assert.Equal(t, series, out["series_id"], "the same series")
+	code, out = upload("alpha", "?version_of="+v1, 73)
+	require.Equal(t, http.StatusCreated, code, "%v", out)
+	assert.EqualValues(t, 4, out["version"], "new bytes are still the next version")
 	// a hex nobody added just now, a stored file that is not a goal picture, and another team's picture are refused
 	for name, ref := range map[string]string{"unknown": strings.Repeat("cd", 32), "not hex": "zz", "an empty-looking id": strings.Repeat("0", 64)} {
 		code, _ = upload("alpha", "?version_of="+ref, 80)
