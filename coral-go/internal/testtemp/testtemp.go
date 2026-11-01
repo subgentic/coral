@@ -92,6 +92,14 @@ func setupIn(base string, stderr io.Writer) (cleanup func()) {
 			return func() {}
 		}
 	}
+	if runtime.GOOS == "windows" {
+		// PowerShell keeps its module analysis cache under <profile>\AppData\Local, and writes it relative to the working folder (the checkout of a launched test agent) when the profile has none.
+		for _, d := range []string{filepath.Join(home, "AppData", "Local"), filepath.Join(home, "AppData", "Roaming")} {
+			if err := os.MkdirAll(d, 0o700); err != nil {
+				fmt.Fprintf(stderr, "testtemp: could not make %s: %v\n", d, err)
+			}
+		}
+	}
 	release := hold(dir, tmp, home, data) // closed first in cleanup
 	os.Setenv(Marker, dir)
 	for k, v := range map[string]string{"TMPDIR": tmp, "TMP": tmp, "TEMP": tmp, "GOTMPDIR": tmp, "HOME": home, "USERPROFILE": home, "CORAL_DATA_DIR": data} {

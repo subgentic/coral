@@ -88,6 +88,7 @@ type serverFlags struct {
 	selfTest           *bool
 	showVersion        *bool
 	allowSharedDataDir *bool
+	adoptDataDir       *bool
 }
 
 // defineServerFlags defines every server flag and returns their values.
@@ -95,6 +96,7 @@ func defineServerFlags() *serverFlags {
 	sf := &serverFlags{}
 	// Parse --home early so config.Load() can use it
 	sf.homeDir = flag.String("home", "", "Data directory (default: ~/.coral)")
+	sf.adoptDataDir = flag.Bool("adopt-data-dir", false, "Make this data folder's database its own (a new id in the database and the folder) and exit; for a restored or copied database that Coral treats as foreign. Wakes nothing; Coral must be stopped")
 	sf.host = flag.String("host", "", "Address to listen on, or a comma list of them (e.g. 127.0.0.1,100.101.102.103). Default: this computer only. A network address (or 0.0.0.0) is used only when remote access is on (Settings > Network and Hub, or --remote); otherwise Coral listens on 127.0.0.1")
 	sf.noAutoLoopback = flag.Bool("no-auto-loopback", config.Truthy(os.Getenv("CORAL_NO_AUTO_LOOPBACK")), "When --host names only network addresses, don't also listen on 127.0.0.1 (also CORAL_NO_AUTO_LOOPBACK=1)")
 	sf.port = flag.Int("port", 0, "Port to bind to")
@@ -399,6 +401,15 @@ func main() {
 	cfg, cloudMode := loadServerConfig(sf)
 
 	configureServer(cfg, sf)
+	if *sf.adoptDataDir {
+		if err := startup.AdoptDataDirCommand(context.Background(), cfg, startupOptions(sf, instance)); err != nil {
+			fmt.Fprintf(os.Stderr, "coral: could not adopt the data folder: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Println("coral: this data folder now owns its database; the next start wakes and recovers its agents as usual.")
+		instance.Release()
+		return
+	}
 
 	// Ignore SIGHUP — macOS sends it during sleep/wake transitions and when
 	// the controlling terminal closes. Without this, the default Go behavior
