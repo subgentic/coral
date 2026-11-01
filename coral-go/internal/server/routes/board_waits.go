@@ -75,7 +75,18 @@ func (h *BoardHandler) RegisterWait(w http.ResponseWriter, r *http.Request) {
 		}
 		timeout = d
 	}
+	// An agent waits on one thing per board, so a new wait replaces its old one. A question the Operator has not answered must not go with it (#11919: the second of two questions replaced the first in
+	// Needs you): the one being replaced is kept as an ordinary open question from the same agent, below.
+	var replaced *board.RegisteredWait
+	if body.WaitType == board.WaitOperator {
+		if prior, perr := h.bs.GetActiveWait(r.Context(), project, body.SubscriberID); perr == nil && prior != nil && prior.WaitType == board.WaitOperator && strings.TrimSpace(prior.Reason) != "" && strings.TrimSpace(prior.Reason) != body.Reason {
+			replaced = prior
+		}
+	}
 	wait, err := h.bs.RegisterWait(r.Context(), project, body.SubscriberID, body.SessionName, body.WaitType, body.TargetID, body.Reason, timeout)
+	if err == nil && replaced != nil {
+		h.keepReplacedOperatorQuestion(r.Context(), project, replaced)
+	}
 	if errors.Is(err, board.ErrTooManyWaits) {
 		msg := err.Error()
 		writeJSON(w, http.StatusConflict, map[string]any{"error": msg, "message": msg, "code": "too_many_waits", "max": board.MaxActiveWaitsPerSubscriber, "not_saved": true})
@@ -256,5 +267,21 @@ func (h *BoardHandler) endOwnWaits(ctx context.Context, project, subscriberID st
 	}
 	if err := h.bs.CancelActiveWait(ctx, project, subscriberID); err != nil {
 		slog.Warn("could not end the waits of an agent that is working", "project", project, "subscriber", subscriberID, "error", err)
+	}
+}
+
+// keepReplacedOperatorQuestion makes the question of a wait that a newer wait replaced an ordinary open question (an ask of the Operator, from the same agent) so it stays in Needs you until it is answered or
+// closed like any other (#11919). A failure is logged and does not fail the new wait: the agent's new question stands either way.
+func (h *BoardHandler) keepReplacedOperatorQuestion(ctx context.Context, project string, old *board.RegisteredWait) {
+	msg, err := h.bs.PostMessage(ctx, project, old.SubscriberID, "@Operator (an earlier question, still open) "+strings.TrimSpace(old.Reason), nil)
+	if err == nil {
+		err = h.bs.RecordAsk(ctx, project, msg, []string{board.OperatorName})
+	}
+	if err != nil {
+		slog.Warn("[wait] replaced question not kept", "board", project, "agent", old.SubscriberID, "error", err)
+		return
+	}
+	if h.notifyFn != nil {
+		h.notifyFn(project)
 	}
 }
