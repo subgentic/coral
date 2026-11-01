@@ -1,5 +1,38 @@
 # Release Notes
 
+## v2.0.28 — Chief's own settings screen, a goal that looks done, and Open in new tab that opens
+
+### Changes
+
+#### What you will notice first
+
+- **Settings > Chief is one screen**: Chief's name, its avatar (one of eight colours and a letter), which agent it is, the team it fronts and the /chief page; its model is shown with a link to change it on the agent's page. /chief's header shows the chosen name and avatar, and each of Chief's chat bubbles carries the avatar. Chief's actions has two levels there, "Ask first" (the default) and "Act": a restart of the recorded Chief runs in Default for Ask first and Accept edits for Act, never Bypass Permissions, and stored skip-permissions flags are not carried over. The screen loads when you open that group, and what you typed and have not saved stays when you click another Settings tab and back.
+- **A goal that looks done is one item in Needs you**: an active goal whose tasks are all done shows as "Goal #N looks done: <title>" with its Done-when line and three choices: Close goal, Not yet (hidden until a task is added), and Ignore (with Undo). Close goal opens the goal's page with its Close dialog set to Done; only this computer's goals are items. It counts in the one Inbox number. Not yet and Ignore are kept on the computer, so every browser and the phone push agree.
+- **The goal page has Add task and Close goal in its header** (Reopen for a closed goal), at the top right, and on a phone on the row under the title at the touch height. The pinned bar and the green "All N tasks are done ... Is that true?" box are gone.
+- **Open in new tab opens a readable tab for every type** of file in the viewer (it saved HTML, SVG, XML, JavaScript, PDF, Markdown, CSV and unknown types as downloads): text of any declared type is shown as its source in plain text, a PDF inline, a binary file as a one-line note; images and plain data are unchanged. The plain link is still Download. This applies to files on this computer; a file on another computer still downloads.
+- **A table's column header is always whole and the table always fits its panel**: a column's minimum is what its header needs ("Blocks" was cut to "Bl"); the name column gives room when you widen another column and never grows the table past its panel, so Time and the action buttons stay inside; widths kept from a wider window are fitted to this one, and a narrow panel still drops the optional columns (Blocks first), leaving the rest whole.
+- **Add/Edit member keeps its model**: the dialog shows one Model row on reopen (a reopened member form wired its Model against a stale row, and Save lost the member's model).
+- **The Hub's start keeps its address**: through Coral Hub the bare start shows the Inbox but leaves the address as served (a computer keeps /inbox/needs).
+
+#### Agents and the chat
+
+- **Chief's actions** (`chief_actions`, `ask_first` or `act`) and Chief's name and avatar settings (`chief_name`, `chief_avatar`, `chief_avatar_letter`, `chief_fronts`) are the Operator's: an agent token cannot write them.
+- **A goal that looks done** is `kind: goal_done` in `GET /api/needs-you`.
+
+#### Known issues
+
+- **Windows: in-app update does not work from 2.0.0 through 2.0.6.** If you're on one of those, download and install the MSI by hand; from 2.0.7 on, in-app update works.
+- **macOS: a Coral of 2.0.5 or earlier cannot install updates in-app; install 2.0.6 or later by hand once.**
+- **OpenCode agents are tested on macOS and Linux; OpenCode on Windows is not yet tested end to end.**
+- Setting up a computer over SSH is supported from a macOS or Linux hub, and is not yet tested from a Windows hub.
+- **Open in new tab on a file from another computer still downloads** it instead of opening a readable tab.
+
+#### For developers and releases
+
+- The static tree is 5,940,114 bytes of the 5,953,792-byte budget.
+- `run_cdp_suites.mjs` has a named allowlist (`ALLOWED_SETTING_ROWS`): the eight settings rows `chief_setup_browser` adds are not counted by `--fail-on-leak` (an added row only; a changed row still fails; they stay in the leak report).
+- The Settings group select has nine groups (Chief between Network and Hub and Security); the `settings_modal_trace` golden carries the new option.
+
 ## v2.0.27 — pictures on comments and goals with Mark up, and one link per Needs you item
 
 ### Changes
