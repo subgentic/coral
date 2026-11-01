@@ -93,7 +93,7 @@ func (h *BoardHandler) Subscribe(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if held != "" {
-			writeError(w, http.StatusConflict, "orchestrator_taken", "this team already has an Orchestrator: join with another role")
+			writeError(w, http.StatusConflict, "orchestrator_taken", "this team already has an Orchestrator: join with another role, or remove the old Orchestrator from the team first")
 			return
 		}
 	}
