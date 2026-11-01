@@ -14,6 +14,9 @@ const { coralReady } = require('./helpers/wait');
     const waiting = n => ev(`(async () => { const { state } = await import(${S} + 'state.js'), m = await import(${S} + 'inbox_tab.js');
         state.liveSessions = Array.from({ length: ${n} }, (_, i) => ({ name: 'w' + i, session_id: '0000000' + i + '-0000-4000-8000-0000000000aa', agent_type: 'claude', server: 'local', status: 'idle', display_name: 'Waiting ' + i, working_directory: '/repo/a', waiting_for_input: true, waiting_kind: 'permission', waiting_since: new Date(Date.now() - 300000).toISOString(), sleeping: false }));
         m.updateInboxTab(); return true; })()`);
+    // The same strip to the layout's own rounding: a fractional-width tab (the current one is bolder) lands 0.1 px either side of where it was after a text-size round trip (#11624); a real move is a pixel or more.
+    const near = (a, b) => a.length === b.length && a.every((t, i) => t.id === b[i].id && ['left', 'right', 'width', 'top'].every(k => Math.abs(t[k] - b[i][k]) <= 0.2));
+    const sameTabs = async (want, msg) => { const got = await tabs(); assert.ok(near(got, want), msg + ': ' + JSON.stringify({ want, got })); };
     const tabs = () => ev(`[...document.querySelectorAll('.top-nav-tabs > .top-nav-tab:not(.nav-overflowed)')].filter(t => t.getClientRects().length).map(t => { const r = t.getBoundingClientRect(); return { id: t.id, left: Math.round(r.left * 10) / 10, right: Math.round(r.right * 10) / 10, width: Math.round(r.width * 10) / 10, top: Math.round(r.top * 10) / 10 }; })`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
@@ -32,7 +35,7 @@ const { coralReady } = require('./helpers/wait');
                 await waiting(n);
                 await waitFor(`!document.getElementById('nav-tab-hub-inbox-badge').hidden`, at + 'the badge shows', 5000);
                 assert.equal(await ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`), n > 9 ? '9+' : String(n));
-                assert.deepEqual(await tabs(), none, at + `every tab keeps its place with ${n} waiting`);
+                await sameTabs(none, at + `every tab keeps its place with ${n} waiting`);
                 if (!mobile) {
                     const b = await ev(`(() => { const t = document.getElementById('nav-tab-hub-inbox'), e = document.getElementById('nav-tab-hub-inbox-badge'), tr = t.getBoundingClientRect(), r = e.getBoundingClientRect(); return { pos: getComputedStyle(e).position, h: Math.round(r.height), dTop: Math.round(r.top - tr.top), dLeft: Math.round(r.left - tr.right), label: t.getAttribute('aria-label'), wide: document.documentElement.scrollWidth <= innerWidth }; })()`);
                     assert.equal(b.pos, 'absolute', at + 'the badge is out of the layout'); assert.equal(b.h, 16, at + 'a 16 px pill');
@@ -49,10 +52,10 @@ const { coralReady } = require('./helpers/wait');
                     if (g) assert.ok(g.badgeRight <= g.nextWord && g.wide, at + `${zoom * 100}% text: the "9+" badge ends before the next tab's word: ` + JSON.stringify(g));
                 }
                 await ev(`document.documentElement.style.fontSize = ''; true`);
-                { const until = Date.now() + 3000; while (Date.now() < until && JSON.stringify(await tabs()) !== JSON.stringify(none)) await new Promise(r => setTimeout(r, 100)); } // sleep-ok: the tab row measures itself again when the text size goes back; it is waited for until it is where it was
+                { const until = Date.now() + 3000; while (Date.now() < until && !near(await tabs(), none)) await new Promise(r => setTimeout(r, 100)); } // sleep-ok: the tab row measures itself again when the text size goes back; it is waited for until it is where it was
             }
             await waiting(0);
-            assert.deepEqual(await tabs(), none, at + 'and the tabs are where they were when the badge goes');
+            await sameTabs(none, at + 'and the tabs are where they were when the badge goes');
             console.log(`   ✓ ${at}`);
         }
         console.log('PASS inbox badge: it hangs on the tab; no tab moves when it shows, changes or goes');
