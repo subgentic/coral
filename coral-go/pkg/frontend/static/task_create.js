@@ -29,7 +29,7 @@ function taskFields() {
         { key: 'body', type: 'textarea', id: 'create-task-body', label: 'Description', rows: 3, placeholder: 'Optional description' },
         { key: 'priority', type: 'select', id: 'create-task-priority', label: 'Priority', default: 'medium', options: PRIORITIES },
         // Board tasks only (hidden for an agent that is not on a board)
-        { key: 'assigned_to', type: 'select', id: 'create-task-assignee', label: 'Assigned to', default: '', options: [{ value: '', label: 'Unassigned' }], visibleWhen: board },
+        { key: 'assigned_to', type: 'select', id: 'create-task-assignee', label: 'Assigned to', default: '', options: [{ value: '', label: 'Unassigned' }], help: 'Unassigned: any agent on the team can claim it, and an idle one is told when it is ready. Choose an agent to hand it to them.', visibleWhen: board },
         { key: 'goal_id', type: 'select', id: 'create-task-goal', label: 'Goal', default: '', options: [], visibleWhen: () => board() && _goalShown, messageAsIs: true,
             validate: v => (board() && _goalShown && _requireGoal && !v ? `${chooseGoalLabel}: this board needs a goal on every task.` : '') },
         { key: 'draft', type: 'toggle', id: 'create-task-draft', label: 'Hold back as a draft', default: false, help: 'Agents do not see it until you publish it.', visibleWhen: board },

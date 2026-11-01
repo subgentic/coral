@@ -143,7 +143,7 @@ export function markOpenedRead(hex) {
     if (reading.has(hex)) return reading.get(hex);
     const p = (async () => {
         if (!activated) await refreshReviews(true); else if (pending) await pending;
-        const row = items.find(a => a.hex.toLowerCase() === hex && !isRead(a));
+        const row = items.find(a => a.hex.toLowerCase() === hex && !isRead(a) && !(a.tags || []).includes('changes requested')); // a file the Operator asked changes of waits on the agent: the viewer and the preview redraw it after the request, and that is not reading it again (#11860); it stays counted until the agent answers
         if (row) await setReviewRead(row, true);
     })().finally(() => reading.delete(hex));
     reading.set(hex, p);

@@ -35,6 +35,7 @@ const { coralReady } = require('./helpers/wait');
             await waitFor(`document.querySelectorAll('#team-panel-goals .goal-list tbody tr, #team-panel-goals .goal-list [data-task-id]').length > 8`, at + 'the tasks drawn', 15000);
             for (const [from, to] of [['tasks', 'artifacts'], ['artifacts', 'tasks']]) {
                 if (from === 'artifacts') await waitFor(`document.querySelectorAll('#team-panel-goals .goal-list [data-artifact-id]').length >= 5`, at + 'the files drawn', 15000);
+                if (from === 'artifacts') for (let n = 5; n < 30; n += 5) { await ev(`[...document.querySelectorAll('#team-panel-goals .goal-list button')].find(b => /^Load more/.test(b.textContent.trim()))?.click(); true`); await waitFor(`document.querySelectorAll('#team-panel-goals .goal-list [data-artifact-id]').length >= ${n + 5}`, at + `${n + 5} files drawn`, 8000); } // the whole list: a phone draws 5 of the 30 at first, and a page of 5 rows has nothing to scroll
                 // scroll so the tab strip sits 120 px below the top of the box, and there is a lot of page under it
                 await ev(`(() => { const s = ${SCROLLER}, t = document.querySelector('#team-panel-goals .goal-tabs'); s.scrollTop += t.getBoundingClientRect().top - ${mobile ? 60 : 120} - (s === document.scrollingElement ? 0 : s.getBoundingClientRect().top); return true; })()`);
                 await new Promise(res => setTimeout(res, 150)); // sleep-ok: the scroll settles
@@ -44,7 +45,7 @@ const { coralReady } = require('./helpers/wait');
                 await waitFor(`document.querySelector('#team-panel-goals #goal-tab-${to}').getAttribute('aria-selected') === 'true'`, at + `on ${to}`, 8000);
                 await new Promise(res => setTimeout(res, 300)); // sleep-ok: the panel draws and the list mounts
                 const after = await state();
-                assert.ok(after.top > 0, at + `${from} to ${to}: the page did not jump to the top (${JSON.stringify({ before, after })})`);
+                assert.ok(after.top > 0 || after.max === 0, at + `${from} to ${to}: the page did not jump to the top (${JSON.stringify({ before, after })})`); // a panel that leaves nothing to scroll (the Artifacts list is 5 of 30 rows on a phone, and the page, now without its pinned bar, fits the screen) is at its end at 0 (#11823)
                 const clamped = after.top >= after.max - 2; // a shorter panel shrank the page: it is at its end
                 assert.ok(clamped || Math.abs(after.strip - before.strip) <= 2, at + `${from} to ${to}: the tab strip stays where it was on screen (${JSON.stringify({ before, after })})`);
             }

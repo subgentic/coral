@@ -15,6 +15,8 @@ import "strings"
 //
 //   - pi: --thinking off|minimal|low|medium|high|xhigh|max (pi --help, Pi 1.4.0, #11091).
 //
+//   - hermes: --reasoning none|minimal|low|medium|high|xhigh|max|ultra (hermes chat --help, v0.22.5, #11715).
+//
 // Gemini is not listed (its CLI has no such option): a provider with no levels takes none.
 var thinkingLevels = map[string][]string{
 	"claude":      {"low", "medium", "high", "xhigh", "max"},
@@ -22,6 +24,7 @@ var thinkingLevels = map[string][]string{
 	"antigravity": {"low", "medium", "high", "xhigh", "max"},
 	"codex":       {"minimal", "low", "medium", "high", "xhigh"},
 	"pi":          {"off", "minimal", "low", "medium", "high", "xhigh", "max"},
+	"hermes":      {"none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"},
 }
 
 // ThinkingLevels returns the levels Coral passes to agentType's CLI, nil when that type has none yet. The slice is a copy: a caller that changes it (a sort, an append) cannot change what the server accepts.
@@ -65,6 +68,8 @@ func ThinkingArgs(agentType, level string) []string {
 		return []string{"-c", codexEffortKey + "=" + level}
 	case "pi":
 		return []string{"--thinking", level}
+	case "hermes":
+		return []string{"--reasoning", level}
 	}
 	return nil
 }
@@ -78,13 +83,13 @@ func StripThinkingFlags(flags []string) []string {
 	out := make([]string, 0, len(flags))
 	for i := 0; i < len(flags); i++ {
 		f := flags[i]
-		if f == "--effort" || f == "--thinking" { // --thinking is Pi's
+		if f == "--effort" || f == "--thinking" || f == "--reasoning" { // --thinking is Pi's, --reasoning Hermes's
 			if i+1 < len(flags) && !strings.HasPrefix(flags[i+1], "-") {
 				i++ // its value; a following flag is not a value and stays (a bare --effort must not eat --dangerously-skip-permissions or the like)
 			}
 			continue
 		}
-		if strings.HasPrefix(f, "--effort=") || strings.HasPrefix(f, "--thinking=") {
+		if strings.HasPrefix(f, "--effort=") || strings.HasPrefix(f, "--thinking=") || strings.HasPrefix(f, "--reasoning=") {
 			continue
 		}
 		if f == "-c" && i+1 < len(flags) && strings.HasPrefix(flags[i+1], codexEffortKey+"=") {

@@ -58,7 +58,7 @@ EXTRA = {
     'POST /api/agent/ui-request': {'session_id'},
     # The artifact route is registered by SessionsHandler.RegisterAgentArtifacts (not followed by the scan above). Since v1.4.12
     # (#3168) every artifact link is /api/artifacts/<digest>?v=2; the handler reads v and accepts only absent or 2 (#3179).
-    'GET /api/artifacts/{}': {'v'},
+    'GET /api/artifacts/{}': {'v', 'open'},
     # The machine-wide list (#5575), the owner's: listAllArtifacts reads the page size, the cursor it gave and a board filter.
     'GET /api/artifacts': {'limit', 'cursor', 'board', 'starred'},
     # The comments on an artifact (#5176), registered by SessionsHandler.RegisterArtifactComments (not followed by the scan above):
@@ -90,8 +90,8 @@ ENUM = {
     # One row per file (#11700, coral-hub's ask #11782): versions accepts only newest through the tunnel. The handler also takes "all", which the Hub has no use for; any other word is refused here as it is by the handler.
     'GET /api/board/{}/artifacts': {'versions': ['newest']},
     'GET /api/team-artifacts': {'versions': ['newest']},
-    # The artifact link form (#3168): only v=2 passes; any other value or a second v is refused.
-    'GET /api/artifacts/{}': {'v': ['2']},
+    # The artifact link form (#3168): only v=2 passes; any other value or a second v is refused. open=1 (#11836, #11845) is the viewer's Open in new tab (a readable tab, not a download); only that exact value passes.
+    'GET /api/artifacts/{}': {'v': ['2'], 'open': ['1']},
     # The token-usage summary without its per-session list (#9820, coral-hub): include accepts only totals; any other word is refused here as it is by the handler.
     'GET /api/token-usage/summary': {'include': ['totals']},
     # The prerequisite check (#4579, Launch tier): type is one of the agent types the handler knows (an UNKNOWN type answers found:true, so

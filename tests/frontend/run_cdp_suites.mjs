@@ -315,7 +315,7 @@ const STUB_MARKER = path.join(tmp, 'REAL_CLI_WAS_CALLED');
 // CORAL_TEST_STUB_CLIS: each test server points cli_path_<type> at the built mock-agent (below), so a
 // suite that opens the Launch dialog, probes a CLI version or lists models uses the mock; the stub only
 // fires on a genuine PATH fallback.
-const CLI_TYPES = ['claude', 'codex', 'gemini', 'agy', 'pi', 'antigravity', 'opencode'];
+const CLI_TYPES = ['claude', 'codex', 'gemini', 'agy', 'pi', 'antigravity', 'opencode', 'hermes'];
 const EXE = process.platform === 'win32' ? '.exe' : ''; // go build -o <dir>/ names a program coral.exe on Windows
 const MOCK_AGENT = path.join(tmp, 'mock-agent' + EXE);
 // Each shard gets its OWN stub dir on its server's PATH (writeStubs, in startShard). A stub ALWAYS exits
@@ -869,6 +869,11 @@ async function tryShard(i, force) {
 const lastLines = (s, n) => s.trim().split('\n').slice(-n).join('\n');
 const results = []; // one entry per suite per run
 const leakReport = []; // the suites that left the shared server state changed (#4830)
+// Settings rows a suite may add and leave (named rows only, never a whole suite): a PUT cannot delete a row, so a suite that really saves a setting for the first time leaves its row, and the runner puts the value back. --fail-on-leak does not count these; they are still reported. A row that is changed (not added) is never allowed.
+const ALLOWED_SETTING_ROWS = {
+  'chief_setup_browser.test.js': ['chief_actions', 'chief_avatar', 'chief_avatar_letter', 'chief_fronts', 'chief_name', 'chief_page', 'chief_session', 'chief_team'],
+};
+const allowedSettingLeak = (test, l) => { const m = /^setting (\S+) added /.exec(l); return !!m && (ALLOWED_SETTING_ROWS[test] || []).includes(m[1]); };
 // noteLeaks records what these attempts of one suite left in the shared server state (and what the runner put back or stopped) in the end summary, and returns the LEAK line to print ('' for none).
 function noteLeaks(test, attempts) {
   const leaked = attempts.flatMap(x => x.leaks || []);
@@ -877,7 +882,7 @@ function noteLeaks(test, attempts) {
   const cleanedAll = attempts.map(x => x.cleaned).filter(Boolean);
   const cleanNote = cleanedAll.length ? `; stopped ${cleanedAll.reduce((n, c) => n + c.stopped.length, 0)} agent(s), removed ${cleanedAll.reduce((n, c) => n + c.removed.length, 0)} team(s) and ${cleanedAll.reduce((n, c) => n + (c.boardsRemoved || []).length, 0)} board(s)${cleanedAll.some(c => c.failed.length) ? `; FAILED: ${cleanedAll.flatMap(c => c.failed).join(', ')}` : ''}` : '';
   const rowTables = [...new Set(attempts.flatMap(x => (x.rows || []).map(r => r.table)))].sort();
-  leakReport.push({ test, leaks: [...new Set(leaked)], restored, settingsLeak: leaked.some(l => l.startsWith('setting ')), rowTables, cleanNote });
+  leakReport.push({ test, leaks: [...new Set(leaked)], restored, settingsLeak: leaked.some(l => l.startsWith('setting ') && !allowedSettingLeak(test, l)), rowTables, cleanNote });
   return `LEAK    ${test}: ${[...new Set(leaked)].join('; ')}${restoreState && !isolate ? ` (settings put back: ${restored} row(s)${cleanNote})` : ''}`;
 }
 async function runOnce(run) {

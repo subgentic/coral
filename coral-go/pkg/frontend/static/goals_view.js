@@ -267,8 +267,10 @@ export function openCreate(opts = {}) {
             const r = await boardFetch(project, '/goals', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(createBody({ title: t.value, description: desc.value, doneWhen: d.value, driver: dr.value, images: tray ? tray.hexes() : [], by: OPERATOR_ID })) });
             if (!r.ok) throw await failure(r);
             dlg.close();
+            const made = await r.json().catch(() => null), told = !!(made && made.orchestrator_told_at); // the toast only when it was told (#11880)
+            if (told) showToast('Goal created. The Orchestrator was told.');
             if (opts.onCreated) { await opts.onCreated(project); return; }
-            say('Goal created');
+            say(told ? 'Goal created. The Orchestrator was told.' : 'Goal created');
             await loadGoals();
             root.querySelector('.goals-new')?.focus(); // the list was drawn again: focus goes back to the button that opened the dialog
         } catch (ex) { err.textContent = `The goal was not created: ${W.errorWords(ex && ex.code, ex && ex.message)}`; go.disabled = false; sync(); }

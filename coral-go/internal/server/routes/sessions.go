@@ -131,7 +131,11 @@ type SessionsHandler struct {
 	// loginScreens: whether a Claude agent with no transcript yet shows its login screen (#3830).
 	loginScreens loginScreens
 	// startupScreens: whether an agent that has sent no event yet waits on a prompt its CLI drew at launch (#4543).
-	startupScreens  loginScreens
+	startupScreens loginScreens
+	// hermesSettle is how long a Hermes agent is given after its welcome line before its first message is typed (the tester: give it a few seconds, #11831); a field so a test need not wait.
+	hermesSettle time.Duration
+	// hermesFirstWait is how long a Hermes agent's first message waits for its welcome line before the agent gets a notice instead (#11852).
+	hermesFirstWait time.Duration
 	displayScreens  displayScreenCache  // presentation-only Codex activity evidence (#7974)
 	approvalRefresh approvalFeedRefresh // bounded read-only push after a confirmed answer (#8040)
 	// screens: captures the read-only pollers (the agent poll) share for a moment (#3887)
@@ -351,10 +355,12 @@ func defaultModelFromSettings(settings map[string]string, agentType, requestMode
 func NewSessionsHandler(db *store.DB, cfg *config.Config, backend ptymanager.TerminalBackend, terminal ptymanager.SessionTerminal, bs *board.Store) *SessionsHandler {
 	reader := jsonl.NewSessionReader()
 	return &SessionsHandler{
-		currentDir:     background.NewCurrentDirFinder(reader.CurrentDirectory),
-		autoWake:       autoWaker{sleep: background.SleepCtx, now: time.Now},
-		exits:          exitWatch{after: defaultAfter},
-		startupScreens: loginScreens{stampDecides: true},
+		currentDir:      background.NewCurrentDirFinder(reader.CurrentDirectory),
+		autoWake:        autoWaker{sleep: background.SleepCtx, now: time.Now},
+		exits:           exitWatch{after: defaultAfter},
+		startupScreens:  loginScreens{stampDecides: true},
+		hermesSettle:    3 * time.Second,
+		hermesFirstWait: hermesFirstMessageWait,
 		inOldTmux: func(ctx context.Context, name string) bool {
 			return tmux.HasPrivateAgentSession(ctx, tmux.PrivateSocketPath(cfg.CoralDir()), name)
 		},

@@ -393,6 +393,9 @@ func (h *SessionsHandler) readChatTranscript(ctx context.Context, id string, t c
 	if t.agentType == at.Opencode {
 		return h.opencodeTranscript(ctx, id) // no transcript file: the agent's server has the history
 	}
+	if t.agentType == at.Hermes {
+		return h.hermesTranscript(ctx, t.sessionID) // no transcript file: the rows of the team's Hermes home (hermes_runtime.go)
+	}
 	if t.sessionID == "" {
 		return h.jsonl.ReadTranscriptContext(ctx, id, t.workingDir, t.agentType)
 	}

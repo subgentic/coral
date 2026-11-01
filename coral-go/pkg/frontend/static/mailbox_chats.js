@@ -14,6 +14,8 @@ import { manyTeams, teamOfChat } from './team_names.js';
 const DT = await importOnce('./data_table.js');
 const IR = await importOnce('./inbox_read.js'); // which chats and boards the person has opened since they changed (#9687)
 const readKey = s => `${s.server}:${s.session_id}`, readKind = s => (isGroup(s) ? 'board' : 'chat');
+/** Whether a chat is unread (#11873): changed since the read marker began AND something Coral launched (an agent's chat, a row with an agent name) or a board's history. A transcript Coral did not launch (another Claude on the same computer) is in the list and the totals, never unread: it is not something waiting for the person. */
+const chatUnread = s => (isGroup(s) || !!s.agent_name) && IR.isUnread(readKind(s), readKey(s), stampOf(s));
 const { historyFetch } = await importOnce('./history_source.js');
 const { historyLabel, hitWithoutTitle } = await importOnce('./history_label.js');
 const SA = await importOnce('./mailbox_starred_artifacts.js'); // the Starred folder's second part: starred artifacts (#10258)
@@ -91,7 +93,7 @@ async function loadUnread() {
         }));
         const replies = settled.filter(r => r.status === 'fulfilled').map(r => r.value); // a computer that does not answer must not blank the others' numbers
         if (!replies.length && settled.length) return;
-        const rows = replies.flat().filter(s => IR.isUnread(readKind(s), readKey(s), stampOf(s)));
+        const rows = replies.flat().filter(s => chatUnread(s));
         const next = { chats: rows.filter(s => !isGroup(s)).length, 'chats-group': rows.filter(isGroup).length, 'chats-starred': rows.filter(s => s.starred).length, 'chats-active': rows.filter(s => s.active).length, 'chats-archived': rows.filter(s => s.archived).length };
         for (const [t] of CLIS) { const types = t === 'agy' ? ['agy', 'antigravity', 'gemini'] : [t]; next[`chats-cli-${t}`] = rows.filter(s => !isGroup(s) && types.includes(s.source_type)).length; }
         unread = next;
@@ -104,7 +106,7 @@ const foldersOf = s => [isGroup(s) ? 'chats-group' : 'chats', ...(s.starred ? ['
 const bump = (keys, by) => { if (unread) for (const k of keys) unread[k] = Math.max(0, (unread[k] || 0) + by); };
 /** A chat was opened from the Inbox: marked read, and the numbers of the folders it is in go down by one, in memory, with no request (#9703). */
 export function chatOpened(s) {
-    if (IR.isUnread(readKind(s), readKey(s), stampOf(s))) bump(foldersOf(s), -1);
+    if (chatUnread(s)) bump(foldersOf(s), -1);
     IR.markRead(readKind(s), readKey(s), stampOf(s) || Date.now());
 }
 
@@ -217,7 +219,7 @@ export async function setChatFlag(sessionId, flag, value, server = null) {
     if (cached) cached[flag] = value; // the chat's own page reads its star from this list: one star state everywhere (#10391)
     for (const L of lists.values()) { // an unread chat starred or archived moves between the folders' numbers: in memory, no request (#9703)
         const row = L.rows.find(r => r.session_id === sessionId && (!server || r.server === server));
-        if (row) { if (IR.isUnread(readKind(row), readKey(row), stampOf(row)) && (flag === 'starred' || flag === 'archived')) bump([`chats-${flag}`], value ? 1 : -1); break; }
+        if (row) { if (chatUnread(row) && (flag === 'starred' || flag === 'archived')) bump([`chats-${flag}`], value ? 1 : -1); break; }
     }
     resetChatLists();
     return true;
@@ -257,15 +259,15 @@ function chatFolderSpec(key, ctx) {
         .map(a => ({ session_id: a.session_id, server: sessionServer(a), type: 'agent', title: 'Archived, no messages yet', display_name: a.display_name || a.name, agent_name: a.name, agent_type: a.agent_type, last_timestamp: a.created_at || '', archived: true, openAgent: true })) : [];
     const rows = chatless.length ? [...L.rows, ...chatless] : L.rows;
     return { title: folder.title, noun: ['chat', 'chats'], rows, count: filtered ? (L.done && !L.error ? rows.length : null) : (L.done && !L.error ? Math.max(rows.length, folderCount(key) ?? 0) : folderCount(key) ?? null), /* unfiltered: the folder's total, but never fewer than the chats listed once the list is whole (after a clear the counts route can still say 0 for a moment, #10512) */ /* a search or filter counts the chats it shows once the read is whole, not the folder's total (#10357: "All chats 0" over one result) */ empty: { line: L.error ? (q ? 'Search failed' : 'Chats could not be read') : L.busy || !L.page ? 'Loading chats\u2026' : L.indexing && !rows.length ? 'Reading your past sessions\u2026' : (filtered ? (q && key !== 'chats-archived' && key !== 'chats-group' ? 'No chat matches the search and filters. Archived chats are not listed here: open Archived to search them.' : 'No chat matches the search and filters.') : key === 'chats-archived' ? 'No archived chats yet. Archive a chat or an agent and it is kept here.' : key === 'chats-starred' ? 'Nothing starred yet.' : key === 'chats-notes' ? 'No chats with notes yet. A chat you add a note to is listed here.' : key === 'chats-active' ? 'No chat is active now. Chats of agents that are running are listed here.' : key === 'chats' ? 'No chats yet. Start an agent and its conversation is listed here.' : 'No chats here.'), ...(key === 'chats-starred' && !filtered && !L.error && !L.busy && L.page ? { hint: 'Star a chat or an artifact (the star on its row) and it is kept here.' } : {}) },
-        signature: JSON.stringify([key, q, extra, folderCount(key), L.busy, L.done, L.error, rows.map(s => [s.server, s.session_id, s.title, s.summary, stampOf(s), s.starred, s.archived, s.active, s.duration_sec, IR.isUnread(readKind(s), readKey(s), stampOf(s)), (teamOfChat(s) || {}).name || '', (teamOfChat(s) || {}).color || '']), manyTeams()]),
+        signature: JSON.stringify([key, q, extra, folderCount(key), L.busy, L.done, L.error, rows.map(s => [s.server, s.session_id, s.title, s.summary, stampOf(s), s.starred, s.archived, s.active, s.duration_sec, chatUnread(s), (teamOfChat(s) || {}).name || '', (teamOfChat(s) || {}).color || '']), manyTeams()]),
         node: () => { const table = DT.dataTable({ label: `${folder.title}, ${folderCount(key) ?? rows.length}`, rows, rowKey: s => `${s.server}:${s.session_id}`, state: chatState,
             onModeChange: () => ctx.redraw?.(), // the window crossed 767 px: this spec's selectable (phone only) is decided at draw, so the owner draws the table again
             selectable: isCloud() || !window.matchMedia?.('(max-width: 767px)').matches ? null : { contextKey: key, canSelect: s => !isGroup(s) && !s.openAgent && (!s.server || s.server === 'local'), onChange: keys => ctx.selection?.(keys.size ? table.bar : null),
                 actions: [{ label: 'Star', run: async rows => { for (const s of rows) await setChatFlag(s.session_id, 'starred', true, s.server); chatState.selected.clear(); ctx.after(); } }, { label: 'Archive', run: async rows => { for (const s of rows) await setChatFlag(s.session_id, 'archived', true, s.server); chatState.selected.clear(); ctx.after(); undoToast(rows.length === 1 ? 'Archived 1 chat' : `Archived ${rows.length} chats`, rows, ctx.after); } }] }, // select by the avatar on a phone, then Star or Archive (the flags route: this computer's chats only) rowName: s => name(s) || historyLabel(s),
             groupBy: s => ({ key: dayOf(stampOf(s)), label: dayOf(stampOf(s)) }),
             open: s => (s.openAgent ? window.selectLiveSession(s.agent_name, s.agent_type, s.session_id, s.server, { focusChat: true }) : ctx.open(s)), // an archived agent with no chat opens the agent
-            unread: s => IR.isUnread(readKind(s), readKey(s), stampOf(s)),
-            mail: s => { const group = isGroup(s), who = name(s) || (group ? 'Board' : historyLabel(s)), t = group ? null : teamOfChat(s); return { unread: IR.isUnread(readKind(s), readKey(s), stampOf(s)), lead: { text: who, name: who, square: group }, title: group ? who : agentLabel(s) || who, medium: true, live: s.active && !s.archived ? 'Active now' : '', snippet: group ? '' : (t ? `${t.name} \u00b7 ${hitWithoutTitle(s) || historyLabel(s)}` : (hitWithoutTitle(s) || historyLabel(s))), time: DT.shortTime(stampOf(s)) }; }, // a phone's row: the agent or board, the chat's title after it, the time
+            unread: s => chatUnread(s),
+            mail: s => { const group = isGroup(s), who = name(s) || (group ? 'Board' : historyLabel(s)), t = group ? null : teamOfChat(s); return { unread: chatUnread(s), lead: { text: who, name: who, square: group }, title: group ? who : agentLabel(s) || who, medium: true, live: s.active && !s.archived ? 'Active now' : '', snippet: group ? '' : (t ? `${t.name} \u00b7 ${hitWithoutTitle(s) || historyLabel(s)}` : (hitWithoutTitle(s) || historyLabel(s))), time: DT.shortTime(stampOf(s)) }; }, // a phone's row: the agent or board, the chat's title after it, the time
             footer: (L.done && !L.error) ? undefined : { text: L.error || (L.done ? '' : (L.total != null ? `Showing ${rows.length} of ${L.total}` : '')), auto: !L.done && !L.error, more: L.done ? null : { label: 'Load more', busy: L.busy, run: () => readMore(key, folder, q, extra, ctx.redraw) } },
             oneLine: true, resize: false, sortBar: false, // one line per chat, never folded (#8961, the shared one-row table of #8931): Server, then Agent drop as the box narrows; the role and the first message are in the chat that opens
             columns: [

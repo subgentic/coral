@@ -31,6 +31,7 @@ func TestTypedNoticeCensus(t *testing.T) {
 		typedcensus.C("tasks available", taskNudge, taskNudge),
 		typedcensus.C("comment reply reminder", typedReplyNudge(strings.Repeat("a", 64), 28), typedReplyNudge(strings.Repeat("a", 64), 28)),
 		typedcensus.C("goal driver", typedGoalDriverNudge(12), typedGoalDriverNudge(12)),
+		typedcensus.C("new goal", typedNewGoalNudge(12), typedNewGoalNudge(12)),
 		typedcensus.C("artifact reminder", claudeArtifactNudgeText, claudeArtifactNudgeText),
 		typedcensus.C("agent UI action", uiActionPrompt(7, "panel-1", 3), uiActionPrompt(7, "panel-1", 3)),
 		typedcensus.C("review pool", reviewPoolNudge, reviewPoolNudge),
@@ -66,6 +67,7 @@ func TestEveryTypedSenderIsInTheCensus(t *testing.T) {
 		typedcensus.S("board_notifications.go", `typedPeriodicReminder(`, 1, "census"),
 		typedcensus.S("board_reminders.go", `typedBoardReminder(`, 1, "census"),
 		typedcensus.S("board_goals.go", `typedGoalDriverNudge(id)`, 1, "census: goal driver"),
+		typedcensus.S("board_goals.go", `typedNewGoalNudge(id)`, 1, "census: new goal"),
 		typedcensus.S("artifact_comment_nudge.go", `h.boardHandler.sendAutomated(`, 1, "typedReplyNudge (census: comment reply reminder)"),
 		typedcensus.S("board_task_create.go", `taskClaimNudge(`, 1, "census"),
 		typedcensus.S("board_task_create.go", `taskNudge)`, 1, "census: tasks available"),
@@ -78,6 +80,7 @@ func TestEveryTypedSenderIsInTheCensus(t *testing.T) {
 		typedcensus.S("agent_exited.go", `term.SendInput(ctx, terminalinput.Coral, name, text, agentType, sessionID)`, 1, "deliverAutomated's own send: types the text of its callers, listed here"),
 		typedcensus.S("sessions_input.go", `body.Command, body.AgentType`, 1, "exception: POST /send by a caller that is not a person (an agent's tool, a script): the caller's own words, through the gate and its exited-pane guard; who may send is checked before"),
 		typedcensus.S("sessions_input.go", `"/keys"`, 1, "exception: POST /keys by a caller that is not a person: the caller's own keys, through the gate"),
+		typedcensus.S("hermes_runtime.go", `text, "first message")`, 1, "exception: a Hermes agent's own launch instructions (the board protocol, its role and the launch prompt it was given: the text every other type gets on its command line), written by Coral's launch into a private file and typed once through the gate (#11831)"),
 		typedcensus.S("sessions_waiting.go", `ptymanager.DeliverNow(`, 1, "Send now: board.NudgeText (census)"),
 		typedcensus.S("sessions_waiting.go", `name, text, ls.AgentType`, 1, "Send now's send: board.NudgeText (census)"),
 	})

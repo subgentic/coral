@@ -23,6 +23,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"unicode"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -721,7 +722,51 @@ func (s *Server) chiefState(w http.ResponseWriter, r *http.Request) {
 	}
 	enabled, sessionID, team := s.chiefRecorded(r.Context())
 	w.Header().Set("Cache-Control", "no-store")
-	writeChiefJSON(w, map[string]any{"enabled": enabled, "session_id": sessionID, "team": team})
+	out := map[string]any{"enabled": enabled, "session_id": sessionID, "team": team}
+	if enabled {
+		look := chiefLook(s.chiefSettings(r.Context()))
+		out["name"], out["avatar"], out["avatar_letter"], out["fronts"] = look.Name, look.Avatar, look.Letter, look.Fronts
+	}
+	writeChiefJSON(w, out)
+}
+
+// chiefSettings is the settings map, empty when it cannot be read.
+func (s *Server) chiefSettings(ctx context.Context) map[string]string {
+	st, err := store.NewSessionStore(s.db).GetSettings(ctx)
+	if err != nil {
+		return map[string]string{}
+	}
+	return st
+}
+
+// ChiefLook is what the Operator chose for Chief's face (#11796), every part cleaned: a name of at most 40 characters with no control or direction-changing character, one of the eight avatar colours
+// ("1".."8", "1" when it is anything else), at most one letter or digit for the avatar ("" is the name's first letter, drawn by the page) and the team it fronts (the name as written, cleaned the same way).
+type ChiefLook struct{ Name, Avatar, Letter, Fronts string }
+
+func chiefLook(st map[string]string) ChiefLook {
+	clean := func(v string, max int) string {
+		var b strings.Builder
+		n := 0
+		for _, r := range strings.TrimSpace(v) {
+			if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) {
+				continue
+			}
+			if n++; n > max {
+				break
+			}
+			b.WriteRune(r)
+		}
+		return strings.TrimSpace(b.String())
+	}
+	look := ChiefLook{Name: clean(setreg.Text(st, "chief_name"), 40), Avatar: "1", Fronts: clean(setreg.Text(st, "chief_fronts"), 80)}
+	look.Avatar = setreg.Enum(st, "chief_avatar") // one of "1".."8", the default "1" for anything else
+	for _, r := range strings.TrimSpace(setreg.Text(st, "chief_avatar_letter")) {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			look.Letter = strings.ToUpper(string(r))
+		}
+		break
+	}
+	return look
 }
 
 func writeChiefJSON(w http.ResponseWriter, v any) {

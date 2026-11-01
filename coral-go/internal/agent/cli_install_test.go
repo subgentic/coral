@@ -20,8 +20,8 @@ func TestEveryCLIHasAnInstallCommandAndOfficialPage(t *testing.T) {
 		at.Claude:   "https://code.claude.com/docs/en/overview",
 		at.Codex:    "https://github.com/openai/codex",
 		at.Pi:       "https://pi.dev",
-		at.Opencode: "https://opencode.ai",
-		at.Agy:      "https://antigravity.google", at.Antigravity: "https://antigravity.google", at.Gemini: "https://antigravity.google",
+		at.Opencode: "https://opencode.ai", at.Hermes: "https://hermes-agent.nousresearch.com",
+		at.Agy: "https://antigravity.google", at.Antigravity: "https://antigravity.google", at.Gemini: "https://antigravity.google",
 	}
 	for typ, info := range agentCLIs {
 		assert.NotEmpty(t, info.InstallCommand, typ)

@@ -106,7 +106,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
             await openBy(names.b, 'body', 'after Approve in the viewer, by the body');
             await openBy(names.b, 'name', 'after Approve in the viewer, by the name');
             { const q = await reveal(`[...document.querySelectorAll('${T} tbody tr')].find(r => /Waiting Agent/.test(r.textContent))${mobile ? '' : ".querySelector('.dt-primary, .inbox-review-name, td')"}`); // on a phone the whole row opens the agent (a tap), and the first cell is the hidden selection check
-              check(!!q, at + 'the waiting agent row could be reached'); if (q) { await click(q.x, q.y); await waitFor(`window.__opened.length > 0`, at + 'after the Approves, a click on the waiting agent opens it', 4000).catch(() => check(false, at + 'after the Approves, a click on the waiting agent row opened nothing')); } }
+              check(!!q, at + 'the waiting agent row could be reached'); if (q) { await click(q.x, q.y); await waitFor(`window.__opened.length > 0 || !!document.querySelector('dialog.inbox-ask-dialog[open]')`, at + 'after the Approves, a click on the waiting agent opens it (its card over the Inbox for a permission, #11837, else the agent)', 4000).catch(() => check(false, at + 'after the Approves, a click on the waiting agent row opened nothing')); } }
         }
     } finally {
         if (sid) await ev(`fetch('/api/sessions/live/${encodeURIComponent(sname || '')}/kill', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agent_type: 'terminal', session_id: ${JSON.stringify(sid)} }) }).then(() => true)`).catch(() => {});

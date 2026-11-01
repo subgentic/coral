@@ -215,6 +215,8 @@ func GetAgent(agentType string) Agent {
 		return &OpencodeAgent{}
 	case at.Pi:
 		return &PiAgent{}
+	case at.Hermes:
+		return &HermesAgent{}
 	case at.Claude, "":
 		return &ClaudeAgent{}
 	case at.Terminal:
@@ -243,7 +245,7 @@ func GetAgent(agentType string) Agent {
 // it is a valid agent_type at the API and rejecting it would break terminal
 // sessions.
 func LaunchableAgentTypes() []string {
-	return []string{at.Claude, at.Codex, at.Agy, at.Gemini, at.Pi, at.Opencode, at.Terminal}
+	return []string{at.Claude, at.Codex, at.Agy, at.Gemini, at.Pi, at.Opencode, at.Hermes, at.Terminal}
 }
 
 // ValidateAgentType checks an agent_type supplied by a caller.

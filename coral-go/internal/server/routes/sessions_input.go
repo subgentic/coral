@@ -3,6 +3,7 @@ package routes
 import (
 	"context"
 	"fmt"
+	at "github.com/subgentic/coral/internal/agenttypes"
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/cloud"
 	"log/slog"
@@ -130,6 +131,14 @@ func (h *SessionsHandler) Keys(w http.ResponseWriter, r *http.Request) {
 	// A person's Escape on its own is the Stop button: a touch of kind stop (#11225), recorded before the keys go so the keystroke is not also counted as typing.
 	if len(body.Keys) == 1 && body.Keys[0] == "Escape" {
 		h.touch(r, body.SessionID, board.TouchStop)
+	}
+	// Escape does nothing in Hermes, and Ctrl-C at its idle prompt closes it: the Stop button's lone Escape is Ctrl-C for a Hermes agent while a turn is going on, and nothing when it is not (hermes_runtime.go).
+	if body.AgentType == at.Hermes && len(body.Keys) == 1 && body.Keys[0] == "Escape" {
+		if !h.hermesTurnGoing(r.Context(), body.SessionID) {
+			writeJSON(w, http.StatusOK, map[string]any{"ok": true, "keys": []string{}, "note": "Hermes is not working: nothing was sent (Ctrl-C at its prompt would close it)"})
+			return
+		}
+		body.Keys = []string{"C-c"}
 	}
 	// The origin of the keys: a person's (the dashboard's, the operator's signed CLI) are Person, anything else goes through the gate as Coral's.
 	send := func(ctx context.Context, o terminalinput.Origin) error {

@@ -123,8 +123,6 @@ export const allTasksOf = totalOf;
 /** A goal that can be closed (its state is open) and one that is closed. */
 export const isOpenGoal = (goal) => ['proposed', 'active', 'blocked'].includes(String(goal && goal.state || '').toLowerCase());
 export const isClosedGoal = (goal) => ['done', 'dropped'].includes(String(goal && goal.state || '').toLowerCase());
-/** An active goal with tasks, none of them open: the page asks whether to close it. */
-export const readyToClose = (goal) => String(goal && goal.state || '').toLowerCase() === 'active' && totalOf(goal && goal.rollup) > 0 && openOf(goal && goal.rollup) === 0;
 export const closeTitle = 'Close this goal?';
 export const closeDoneLabel = 'Done: what we wanted is true';
 export const closeDroppedLabel = 'Dropped: we are no longer doing it';
@@ -140,15 +138,7 @@ export function closeWarning(rollup) {
 }
 export const closedAsText = (state, open) => `Closed as ${state === 'dropped' ? 'dropped' : 'done'}.${open ? ` ${plural(open, 'task', 'tasks')} ${open === 1 ? 'is' : 'are'} still open.` : ''}`;
 export const reopenedText = 'Reopened.';
-/** The all-done strip: its line, the goal's done-when, the question, and what Not yet does. */
-export const allDoneLine = (n) => `All ${plural(n, 'task', 'tasks').replace(/^\d+ /, n === 1 ? '1 ' : `${n} `)} ${n === 1 ? 'is' : 'are'} done.`;
-export const allDoneAsk = (doneWhen) => `${doneWhen ? `Done when: ${doneWhen}. ` : ''}Is that true?`;
-export const notYetHint = 'Not yet hides this until a task is added.';
-export const notYetSaid = 'Hidden until a task is added.';
-/** A closed-ready goal's card sentence: the rollup's, and a quiet "ready to close?". */
 export const closeReasonHint = '300 characters at most. Left empty, the agents are told who closed it.';
-/** Said once, politely, when the all-done strip first appears for a goal. */
-export const allDoneSaid = (n, title) => `All ${n} ${n === 1 ? 'task' : 'tasks'} of ${title} ${n === 1 ? 'is' : 'are'} done`;
 
 /** The line the goal page's "Copy for an agent" copies (#11004): the goal's number and title, and the command that briefs an agent on it. The title is cut at 80 characters and its lines joined. */
 export function agentBriefLine(goal) {
@@ -157,3 +147,7 @@ export function agentBriefLine(goal) {
     const shown = title.length > 80 ? title.slice(0, 79).trimEnd() + '\u2026' : title;
     return `Goal #${id}${shown ? ` (${shown})` : ''}: run coral-board goal brief ${id}`;
 }
+/** Files for review on a goal that are still waiting for the person (#11885, Beta #11837 D and G): said in the Close goal dialog and on the goal's page. */
+export const waitingReviewsHead = n => `${n} ${n === 1 ? 'file' : 'files'} for review on this goal ${n === 1 ? 'is' : 'are'} still waiting for you.`;
+export const waitingReviewsStay = n => `${n === 1 ? 'It stays' : 'They stay'} in Needs you after the goal is closed.`;
+export const waitingReviewsLine = n => `${n} ${n === 1 ? 'file' : 'files'} for this goal ${n === 1 ? 'is' : 'are'} waiting for your review.`;

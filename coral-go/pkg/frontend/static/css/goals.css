@@ -74,10 +74,7 @@
 .goals-radios { border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .goals-radios legend { font-size: var(--fs-md); padding: 0; margin-bottom: 2px; }
 .goals-radio { display: flex; align-items: center; gap: 8px; min-height: var(--control-touch-height, 44px); font-size: var(--fs-lg); cursor: pointer; }
-.goals-alldone { border: 1px solid var(--success); border-radius: var(--radius-lg); padding: 10px 12px; background: rgba(var(--success-rgb), 0.1); display: flex; flex-direction: column; gap: 6px; }
-.goals-alldone-text { margin: 0; overflow-wrap: anywhere; }
-.goals-alldone-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.goals-close, .goals-reopen, .goals-alldone-actions .btn { min-height: var(--control-touch-height, 44px); }
+.goals-add-task, .goals-close, .goals-reopen { min-height: var(--control-touch-height, 44px); }
 
 /* Findings of the Goals usability check (#7218, #7224): chips with no goals quieter; a lighter phone header */
 .goals-chip-zero:not([aria-pressed="true"]) { font-size: var(--fs-base); } /* a pill with nothing in it is a little quieter in its text and keeps its edge like every other (#7715: Blocked 0 had none) */

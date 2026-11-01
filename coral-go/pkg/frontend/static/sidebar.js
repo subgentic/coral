@@ -397,5 +397,6 @@ export function initSidebarRail() {
 /** The search of the pane on screen: opens the column first when it is the rail. */
 export function focusSidebarSearch() {
     if (document.querySelector('.layout')?.classList.contains('sidebar-collapsed')) toggleSidebarRail();
-    document.querySelector('.sidebar-pane:not([hidden]) .sidebar-search-input')?.focus();
+    const own = [...document.querySelectorAll('.sidebar-pane:not([hidden]) .sidebar-search-input')].find(e => e.getClientRects().length);
+    (own || document.querySelector('#group-table-view input[type=search]'))?.focus(); // a pane whose box is hidden (the page has its own search): that one
 }

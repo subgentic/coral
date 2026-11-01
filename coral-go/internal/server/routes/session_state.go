@@ -61,6 +61,12 @@ func (h *SessionsHandler) applyTranscriptState(input *SessionStateInput, events 
 			kind = "turn_activity" // the turn going on, not a new turn: it never answers an open request
 		}
 		mergeTranscriptTurnEvent(input, events, kind, atTime)
+	case at.Hermes:
+		// Hermes's hooks open and close a turn, but a Ctrl-C and a provider that gave up fire no closing hook (#11715): the pane's interrupt notice, or ten silent minutes, close a turn they left open (hermes_runtime.go).
+		if claudeTurnOpen(events) {
+			kind, atTime := hermesTurnFallback(events, h.hermesScreen(name, agentType, sessionID), time.Now())
+			mergeTranscriptTurnEvent(input, events, kind, atTime)
+		}
 	case at.Opencode:
 		// opencode keeps no transcript Coral reads: its server's event stream says a turn is going on, ended, or waits for the person.
 		kind, atTime := h.opencodeTurn(sessionID)

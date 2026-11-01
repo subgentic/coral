@@ -202,12 +202,15 @@ export function dataTable(cfg) {
     // ── column widths (#7949): a handle on each header's right edge; the widths are kept per list in this browser ──
     const MIN_W = 64, MAX_W = 2000, STEP = 16;
     const wkey = `coral-dt-widths:${cfg.widthsKey || String(cfg.label).replace(/,\s*\d.*$/, '')}`; // a label that counts its rows ("Tasks, 12") is the list "Tasks"
-    const minOf = (c) => c.minWidth || MIN_W;
+    const headNeed = (c) => { const th = thead.querySelector(`th.dt-th[data-key="${c.key}"]`), t = th && th.querySelector('.dt-sort > span, .dt-head-text'); if (!t || !th.getClientRects().length) return 0; const cs = getComputedStyle(th); return Math.ceil(t.getBoundingClientRect().width + (c.sort ? 20 : 0) + parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight)); }; // the width its whole head needs: the label, the sort arrow and the cell's padding (#11835: Blocks was cut to "Bl")
+    const minOf = (c) => Math.max(c.minWidth || MIN_W, headNeed(c));
+    const wOf = (c) => (st.widths[c.key] ? Math.max(st.widths[c.key], minOf(c)) : 0);
+    const ITEM_MIN = 120; // the name column is the one that gives room: it truncates down to this
     const fixedW = (c) => (c.fixed && /rem$/.test(c.width || '') ? c.width : null); // a fixed column (the Actions of a list) has the width it declares: no handle, never frozen or kept, so no other column's resize squeezes its buttons (#9845)
     function readWidths() {
         try {
             const o = JSON.parse(browserLocal.get(wkey) || 'null') || {}, out = {};
-            for (const c of columns) { const v = Number(o[c.key]); if (!c.fixed && Number.isFinite(v) && v >= minOf(c) && v <= MAX_W) out[c.key] = Math.round(v); } // a fixed column is never kept
+            for (const c of columns) { const v = Number(o[c.key]); if (!c.fixed && c.width !== 'grow' && !c.primary && Number.isFinite(v) && v >= minOf(c) && v <= MAX_W) out[c.key] = Math.round(v); } // a fixed column is never kept
             return out;
         } catch { return {}; }
     }
@@ -217,26 +220,52 @@ export function dataTable(cfg) {
     let emptyKeys = new Set(); // the columns no row has anything in (syncEmptyColumns, below)
     let tightKeys = new Set(); // the columns dropped because the box is narrow (syncTight, below): their <col> is hidden too, or the widths of the colgroup shift onto the wrong columns (#10443)
     st.widths ||= cfg.oneLine ? {} : readWidths();
+    const remPx = () => parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+    /** What the last resizable column takes: its own width, or what the others leave of the box. */
+    function fillPx(c, shown) {
+        const t = thead.querySelector('th.dt-check'), rest = (sel && t ? Math.round(t.getBoundingClientRect().width) : 0) + shown.filter(x => x !== c).reduce((n, x) => n + (wOf(x) || (fixedW(x) ? parseFloat(fixedW(x)) * remPx() : 0)), 0);
+        return Math.max(wOf(c), Math.floor(box.clientWidth - rest));
+    }
     function applyWidths() {
+        // A column that came after the widths were read (Blocks, once the files say what waits on them) has none kept: in a sized table it would have none at all and shrink to nothing (#11886). It takes the width its content needs, at most its own max.
+        if (box.clientWidth && Object.keys(st.widths).length) for (const c of columns) {
+            if (st.widths[c.key] || fixedW(c) || c.fixed || emptyKeys.has(c.key) || tightKeys.has(c.key) || c.primary || c.width === 'grow') continue;
+            const th = thead.querySelector(`th.dt-th[data-key="${c.key}"]`); if (!th || !th.getClientRects().length) continue;
+            st.widths[c.key] = Math.max(minOf(c), Math.min(fitWidth(c, th), c.max ? Math.round(c.max * 8.5) : 800));
+        }
+        fitToBox();
         colgroup.replaceChildren();
         const any = Object.keys(st.widths).length > 0;
-        box.classList.toggle('dt-sized', any);
+        box.classList.toggle('dt-sized', any); if (any) box.style.setProperty('--dt-sized-min', '0px'); else box.style.removeProperty('--dt-sized-min');
         if (cfg.layout !== 'fixed' && !cfg.oneLine) table.style.tableLayout = any ? 'fixed' : '';
         if (!any) { table.style.width = ''; return; }
         if (sel) { const k = el('col'); k.style.width = 'var(--table-check-w)'; colgroup.append(k); }
-        const shown = columns.filter(c => !emptyKeys.has(c.key) && !tightKeys.has(c.key)), all = shown.every(c => st.widths[c.key] || fixedW(c));
-        const part = c => (st.widths[c.key] ? `${st.widths[c.key]}px` : fixedW(c)), checkW = sel ? ['var(--table-check-w)'] : [];
+        const shown = columns.filter(c => !emptyKeys.has(c.key) && !tightKeys.has(c.key)), all = shown.every(c => wOf(c) || fixedW(c));
+        const part = c => (wOf(c) ? `${wOf(c)}px` : fixedW(c)), checkW = sel ? ['var(--table-check-w)'] : [];
         // Every column has a width (the flexible name column's own separator was used): the table is as wide as its columns, never narrower than its box. A fixed table at 100% spreads what is left over
         // across ALL its columns, so shrinking one column grew the others (#9228); so the last column that can be resized takes what the others leave, up to the box's edge (#10443: dragging the last
         // column's right edge left ended the table short of the card, cut its words and left a scrollbar over empty space), and a column's separator changes that column alone. Wider than the box, the table scrolls.
         const fill = all ? [...shown].reverse().find(c => !c.fixed) : null;
         for (const c of columns) {
             const k = el('col');
-            if (c === fill) k.style.width = `max(${part(c)}, calc(100% - (${[...checkW, ...shown.filter(x => x !== c).map(part)].join(' + ') || '0px'})))`;
-            else if (st.widths[c.key]) k.style.width = `${st.widths[c.key]}px`; else if (fixedW(c)) k.style.width = fixedW(c);
+            if (c === fill) k.style.width = box.clientWidth ? `${fillPx(c, shown)}px` : `max(${part(c)}, calc(100% - (${[...checkW, ...shown.filter(x => x !== c).map(part)].join(' + ') || '0px'})))`; // in pixels once the box has a width: a col's calc() mixing % and px is read as auto, which left this column 9 px wide when every column had a width (#11835)
+            else if (wOf(c)) k.style.width = `${wOf(c)}px`; else if (fixedW(c)) k.style.width = fixedW(c);
             if (emptyKeys.has(c.key)) k.classList.add('dt-col-unused'); if (tightKeys.has(c.key)) k.classList.add('dt-col-tight'); colgroup.append(k);
         }
         table.style.width = all ? `max(calc(${[...checkW, ...shown.map(part)].join(' + ')}), 100%)` : '';
+    }
+    /** The table always fits its box (#11835): the name column (primary, or the one that grows) is the elastic one and gives room, down to ITEM_MIN, to the column that was widened (`keep`, which is cut to what is left once the name has given all it can); a box that became narrower than the kept widths takes the room from the name, then from the others right to left. A table of columns that cannot all fit still scrolls. */
+    function fitToBox(keep) {
+        const boxW = box.clientWidth; if (!boxW || box.classList.contains('dt-folded') || !Object.keys(st.widths).length) return;
+        const shown = columns.filter(c => !emptyKeys.has(c.key) && !tightKeys.has(c.key)), prim = shown.find(c => c.primary || c.width === 'grow');
+        const th = c => { const t = thead.querySelector(`th.dt-th[data-key="${c.key}"]`); return t ? Math.round(t.getBoundingClientRect().width) : 0; };
+        const rem = remPx(), now = c => (c === prim ? (wOf(c) || ITEM_MIN) : (wOf(c) || (fixedW(c) ? parseFloat(fixedW(c)) * rem : th(c)))); // a fixed column is its declared width, whatever the layout has made of it
+        const chk = sel ? (thead.querySelector('th.dt-check') ? Math.round(thead.querySelector('th.dt-check').getBoundingClientRect().width) : 0) : 0;
+        let over = chk + shown.reduce((n, c) => n + now(c), 0) - boxW;
+        const give = (c, floor) => { if (over <= 0 || !wOf(c)) return; const w = Math.max(floor, wOf(c) - over); over -= wOf(c) - w; st.widths[c.key] = w; };
+        if (prim && prim !== keep) give(prim, ITEM_MIN);
+        if (keep) { if (over > 0 && keep !== prim) { st.widths[keep.key] = Math.max(minOf(keep), wOf(keep) - over); } else if (over > 0) { st.widths[keep.key] = Math.max(ITEM_MIN, wOf(keep) - over); } return; }
+        for (const c of [...shown].reverse()) if (c !== prim && !c.fixed) give(c, minOf(c));
     }
     /** The first resize freezes the other columns at the widths they have (the title column, 'grow', takes whatever is left) so nothing jumps. */
     function freezeWidths() {
@@ -244,6 +273,7 @@ export function dataTable(cfg) {
     }
     function setWidth(c, w, th) {
         st.widths[c.key] = Math.min(MAX_W, Math.max(minOf(c), Math.round(w)));
+        fitToBox(c);
         applyWidths();
         const h = th && th.querySelector('.dt-resize'); if (h) h.setAttribute('aria-valuenow', String(st.widths[c.key]));
     }
@@ -299,7 +329,7 @@ export function dataTable(cfg) {
     function sizeColumn(c, node) {
         const ATTR = { min: 'data-dt-min', max: 'data-dt-max', w: 'data-dt-w' };
         const set = (name, v) => { node.style.setProperty(`--dt-${name}`, v); node.setAttribute(ATTR[name], ''); }; // custom properties, read by data_table.css only while the table is not folded: a folded (phone) row lays its cells out its own way
-        if (c.min) set('min', `min(${c.min}ch, 40cqw)`); // never more than 40% of the table's box (of the screen where it is not a container): the dock's Tasks table (State, Task, Who) was wider than its box with the name at 24 characters, on a 390 px phone and at 200% text in the 680 px dock (#9917)
+        if (c.min) set('min', `var(--dt-sized-min, min(${c.min}ch, 40cqw))`); // a table with widths of its own sets --dt-sized-min on its box: it is sized in pixels and fits the box, so the name column gives room down to its floor, not down to its characters (#11835) // never more than 40% of the table's box (of the screen where it is not a container): the dock's Tasks table (State, Task, Who) was wider than its box with the name at 24 characters, on a 390 px phone and at 200% text in the 680 px dock (#9917)
         if (c.max) set('max', `${c.max}ch`);
         if (c.fixed && c.width && /rem$/.test(c.width)) { set('min', c.width); set('max', 'none'); set('w', c.width); }
         if (c.share) { set('w', `${Math.round(90 * c.share / shareTotal)}%`); if (!c.max) set('max', '0'); } // a share column is bounded (max-width 0 with its min-width above it): in an auto layout its no-wrap text otherwise sets the column to the width of the text and the table scrolls sideways (UI Accessibility, #9856)
@@ -318,7 +348,7 @@ export function dataTable(cfg) {
         if (next.size === emptyKeys.size && [...next].every(k => emptyKeys.has(k))) return;
         emptyKeys = next;
         for (const th of thead.querySelectorAll('th.dt-th')) th.classList.toggle('dt-col-unused', emptyKeys.has(th.dataset.key));
-        for (const td of tbody.querySelectorAll(':scope > .dt-row > td.dt-td')) td.classList.toggle('dt-col-unused', emptyKeys.has(td.dataset.key));
+        for (const td of tbody.querySelectorAll(':scope > .dt-row > td.dt-td')) { td.classList.toggle('dt-col-unused', emptyKeys.has(td.dataset.key)); td.style.display = emptyKeys.has(td.dataset.key) ? 'none' : ''; } // display-ok: inline, because a folded row's own display: block wins over the class and an empty cell was a 16 px line (#11858)
         applyWidths();
     }
 
@@ -401,7 +431,7 @@ export function dataTable(cfg) {
         td.classList.add(c.line === 1 ? 'dt-line-1' : c.line === 2 ? 'dt-line-2' : 'dt-line-0');
         if (c.foldLabel) td.setAttribute('data-fold-label', c.label); // the folded row has no header: the column's name is drawn before the figure (data_table.css, as text; foldLabel: true, #11463)
         if (c.when && !c.when(r)) td.classList.add('dt-when-off');
-        if (emptyKeys.has(c.key)) td.classList.add('dt-col-unused');
+        if (emptyKeys.has(c.key)) { td.classList.add('dt-col-unused'); td.style.display = 'none'; } // display-ok: as in syncEmptyColumns
         if (c.foldFirst) td.classList.add('dt-fold-first');
         if (st.sort && st.sort.key === c.key) td.classList.add('dt-fold-key'); // folded 'labeled': the figure the rows are sorted by is the one stronger line (#7738)
         if (c.narrowHide) td.classList.add('dt-narrow-hide'); // folded 'labeled': this figure follows the name, ahead of the other "label value" lines
@@ -594,6 +624,7 @@ export function dataTable(cfg) {
         new ResizeObserver(() => { syncFold(); syncTight(); }).observe(box);
         if (document.fonts && document.fonts.status !== 'loaded') document.fonts.ready.then(syncFold); // fonts already in: the observer's first call settles it before the paint; calling it now read the width of a box not yet laid out, a forced layout (#9450)
     }
+    if (typeof ResizeObserver === 'function') new ResizeObserver(() => { if (Object.keys(st.widths).length) applyWidths(); }).observe(box); // sized columns are fitted to the box again whenever it changes (the last column is sized in pixels)
     mailQuery?.addEventListener?.('change', () => { box.classList.toggle('dt-mail-on', mailOn()); drawBody(); cfg.onModeChange?.(); }); // the window crosses the phone's width: the rows are drawn again in the other form; a list whose selection exists on a phone only (selectable is decided when the spec is drawn) asks its owner to draw the table again
     return { el: box, bar, selectButton, selection: () => new Set(st.selected), clear, state: st };
 }

@@ -30,9 +30,9 @@ const piConfigPlaceholder = "/*__CORAL_PI_CONFIG__*/ null"
 var piRuntimeEnv = []string{"HOME", "USERPROFILE", "PATH", "SYSTEMROOT", "TEMP", "TMP", "TMPDIR"}
 
 // piHookEnvNames are the only variables the extension passes to a hook program it starts: never Pi's whole environment, so no provider key (ANTHROPIC_API_KEY, OPENAI_API_KEY, AWS_*, GITHUB_TOKEN)
-// reaches a child. A test generates the list from the hook sources and fails when a hook reads a variable that is not here, or one is here that no hook reads (pi_env_test.go).
+// reaches a child. CORAL_HERMES_WORKDIR is read by the hook for a Hermes agent only (a Pi agent never has it set: it names nothing for Pi). A test generates the list from the hook sources and fails when a hook reads a variable that is not here, or one is here that no hook reads (pi_env_test.go).
 var piHookEnvNames = []string{
-	"CORAL_DATA_DIR", "CORAL_DIR", "CORAL_HOST", "CORAL_PORT", "CORAL_SESSION_AUTH_FILE", "CORAL_SESSION_NAME", "CORAL_SESSION_TOKEN", "CORAL_SUBSCRIBER_ID", "CORAL_URL", "TMUX",
+	"CORAL_DATA_DIR", "CORAL_DIR", "CORAL_HERMES_WORKDIR", "CORAL_HOST", "CORAL_PORT", "CORAL_SESSION_AUTH_FILE", "CORAL_SESSION_NAME", "CORAL_SESSION_TOKEN", "CORAL_SUBSCRIBER_ID", "CORAL_URL", "TMUX",
 	"HOME", "USERPROFILE", "PATH", "SYSTEMROOT", "TEMP", "TMP", "TMPDIR",
 }
 

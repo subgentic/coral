@@ -162,12 +162,13 @@ export function attachComments(dialog, body, host, opts = {}) {
         const close = btn('ac-sheet-close ic-close', '', 'Hide the comments'); close.addEventListener('click', () => { userSet(false); toggle.focus(); }); head.append(close);
         panel.append(head);
         const d = st.data;
-        if (d.locked) panel.append(el('p', 'ac-note ac-locked', 'Comments are locked: read only.'));
+        if (d.locked) panel.append(el('p', 'ac-note ac-locked', d.canLock ? 'Comments are locked: nobody can add comments to this file. You can unlock it any time.' : 'Comments are locked: read only.'));
         else if (!d.canComment) panel.append(el('p', 'ac-note ac-readonly', d.reason || 'You can read the comments here but not write them.'));
         if (d.canLock) {
-            const lock = btn('ac-lock', d.locked ? 'Unlock comments' : 'Lock comments');
+            const why = d.locked ? 'Comments are locked: nobody can add comments to this file. You can unlock it any time.' : 'Locking stops anyone adding comments to this file. You can unlock it any time.';
+            const lock = btn('ac-lock', d.locked ? 'Unlock comments' : 'Lock comments'); lock.title = why;
             lock.addEventListener('click', async () => { try { await api.setLocked(st.hex, st.server, !d.locked); await refresh(); } catch (e) { showToast(e.message, true); } });
-            panel.append(lock);
+            panel.append(lock); if (!d.locked) panel.append(el('p', 'ac-note ac-lock-note', why)); // locked: the note above says it
         }
         const wrap = el('ul', 'ac-list');
         const shownAll = list.filter(t => st.showResolved || !t.c.resolved);
@@ -230,6 +231,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         if (!c.deleted && c.images && c.images.length && !editing(c)) main.append(pictures(c));
         if (top && c.fromVersion != null && groupOf(c) !== 'main') main.append(el('p', 'ac-from ac-from-note', groupOf(c) === 'look' ? `From v${c.fromVersion}. The quote is in this version more than once, so it is not pinned to either.` : `On v${c.fromVersion}. Its text is not in this version.`));
         main.append(actions(c, top));
+        if (top && canAsk(c)) { const asked = [...askedNow(c.id)]; main.append(el('p', 'ac-note ac-ask-status', asked.length ? 'Sent to ' + asked.map(([role, words]) => `${role} (${words.toLowerCase()})`).join(', ') : 'Not sent to an agent yet')); } // does the agent have it? said at rest, under the comment: the actions row is hidden until hover
         e.append(main);
         return e;
     }
@@ -277,7 +279,7 @@ export function attachComments(dialog, body, host, opts = {}) {
     }
     const act = (text, label, fn) => { if (typeof label === 'function') { fn = label; label = ''; } const b = btn('ac-act', text, label); b.addEventListener('click', fn); return b; };
 
-    const { canAsk, openAsk, askBlock } = createAsk({ st, panel, render, announce, refresh, ownHex });
+    const { canAsk, openAsk, askBlock, askedNow } = createAsk({ st, panel, render, announce, refresh, ownHex });
     function confirmThen(msg, fn) { if (window.showConfirmModal) window.showConfirmModal('Delete comment', msg, fn, undefined, { label: 'Delete comment', danger: true }); else fn(); }
     async function run(fn, said) {
         if (st.busy) return;

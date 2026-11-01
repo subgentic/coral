@@ -239,7 +239,10 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
         await waitFor(`document.querySelectorAll('.ac-card').length >= 3`, 'cards', 5000);
         const lk = await ev(`({ note: (document.querySelector('.ac-locked') || {}).textContent, acts: document.querySelectorAll('.ac-act').length, unlock: (document.querySelector('.ac-lock') || {}).textContent })`);
         check('locked: a banner, no actions but the owner\'s own Delete, and the owner can Unlock', /locked/.test(lk.note) && lk.acts === 2 && lk.unlock === 'Unlock comments', JSON.stringify(lk));
+        check('locked: the note says what Lock does and that it can be undone (#11837)', /nobody can add comments to this file\. You can unlock it any time/.test(lk.note || ''), lk.note);
+        check('and the Unlock button says the same as its tooltip', /nobody can add comments/.test(await ev(`document.querySelector('.ac-lock').title`)));
         await click('.ac-lock'); await waitFor(`!document.querySelector('.ac-locked')`, 'unlocked', 4000);
+        check('unlocked: a quiet line under Lock comments says what it does (#11837)', /Locking stops anyone adding comments to this file\. You can unlock it any time/.test(await ev(`(document.querySelector('.ac-lock-note') || {}).textContent || ''`)) && /Locking stops anyone/.test(await ev(`document.querySelector('.ac-lock').title`)));
         check('Unlock sends DELETE .../lock and the panel is writable again', /\/lock$/.test((await ev(`window.__calls.filter(c => c.method === 'DELETE').pop()`)).url) && !!(await ev(`!!document.querySelector('.ac-whole')`)));
 
         // no comments routes: the viewer is as it was

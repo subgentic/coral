@@ -177,12 +177,12 @@ var authPageTmpl = template.Must(template.New("auth").Parse(`{{define "hubwarn"}
     <div class="code"><span id="reset-cmd">coral reset-password</span><button type="button" class="btn btn-small" id="copy-reset">Copy</button></div>
     <ol class="steps" start="3"><li>Choose a new password when it asks. Browsers that were signed in are signed out.</li><li>Come back here and sign in.</li></ol>
     <div class="btnrow"><button type="button" class="btn btn-primary wide" data-back="signin">Back to sign in</button></div>
-    <p class="note">The Coral app opens without a password.</p>
+    <p class="note">A password keeps other people and other devices out of Coral when it is opened in a web browser.</p>
   </section>
 {{else}}
   <section id="panel-create" class="panel">
     <h1>Create a password</h1>
-    <p class="sub">{{if .Local}}A password keeps other people and other devices out of Coral when it is opened in a web browser. Only you use this computer? The Coral app opens without one.{{else}}Coral has no password yet. Choose one to open it in this browser, with the setup code from the computer that runs Coral.{{end}}</p>
+    <p class="sub">{{if .Local}}A password keeps other people and other devices out of Coral when it is opened in a web browser.{{else}}Coral has no password yet. Choose one to open it in this browser, with the setup code from the computer that runs Coral.{{end}}</p>
 {{if or .Locked (not .Local)}}
     <div class="howin" id="how-in" role="note">
       <b>Two ways to sign in</b>
@@ -209,7 +209,7 @@ var authPageTmpl = template.Must(template.New("auth").Parse(`{{define "hubwarn"}
       <label class="check"><input type="checkbox" id="keep"><span>Keep me signed in on this browser<small>For 30 days. Leave it off on a shared computer.</small></span></label>
       <div class="btnrow"><button type="submit" disabled data-needs-script id="submit" class="btn btn-primary wide">Create password and open Coral</button></div>
     </form>
-    <p class="note">Your password manager can save it. Forgot it? Run coral reset-password in a terminal on this computer.</p>
+    <p class="note">It keeps other people and other devices out of Coral in a web browser. Your password manager can save it. Forgot it? Run coral reset-password in a terminal on this computer.</p>
 {{template "hubquiet" .}}
     <div class="linkrow linkcol">{{if eq .HubSignin "unpaired"}}<button type="button" class="link" id="hub-link-open">Link this computer to Coral Hub and sign in</button>{{end}}<button type="button" class="link" id="show-key">Use an API key instead</button></div>
   </section>

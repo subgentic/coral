@@ -488,7 +488,7 @@
     },
     {
       "name": "board_goals",
-      "sql": "CREATE TABLE board_goals (\n\t\t\tid            INTEGER PRIMARY KEY AUTOINCREMENT,\n\t\t\tgoal_uid      TEXT NOT NULL,\n\t\t\tboard_id      TEXT NOT NULL,\n\t\t\ttitle         TEXT NOT NULL,\n\t\t\toutcome       TEXT NOT NULL DEFAULT '',\n\t\t\tdone_when     TEXT NOT NULL DEFAULT '',\n\t\t\tstate         TEXT NOT NULL DEFAULT 'active' CHECK (state IN ('proposed', 'active', 'blocked', 'done', 'dropped')),\n\t\t\tblocked_on    TEXT NOT NULL DEFAULT '',\n\t\t\tdriver        TEXT NOT NULL DEFAULT '',\n\t\t\tcreated_by    TEXT NOT NULL DEFAULT '',\n\t\t\tcreated_at    TEXT NOT NULL,\n\t\t\tupdated_at    TEXT NOT NULL,\n\t\t\tclosed_at     TEXT,\n\t\t\tclosed_reason TEXT NOT NULL DEFAULT ''\n\t\t)",
+      "sql": "CREATE TABLE board_goals (\n\t\t\tid            INTEGER PRIMARY KEY AUTOINCREMENT,\n\t\t\tgoal_uid      TEXT NOT NULL,\n\t\t\tboard_id      TEXT NOT NULL,\n\t\t\ttitle         TEXT NOT NULL,\n\t\t\toutcome       TEXT NOT NULL DEFAULT '',\n\t\t\tdone_when     TEXT NOT NULL DEFAULT '',\n\t\t\tstate         TEXT NOT NULL DEFAULT 'active' CHECK (state IN ('proposed', 'active', 'blocked', 'done', 'dropped')),\n\t\t\tblocked_on    TEXT NOT NULL DEFAULT '',\n\t\t\tdriver        TEXT NOT NULL DEFAULT '',\n\t\t\tcreated_by    TEXT NOT NULL DEFAULT '',\n\t\t\tcreated_at    TEXT NOT NULL,\n\t\t\tupdated_at    TEXT NOT NULL,\n\t\t\tclosed_at     TEXT,\n\t\t\tclosed_reason TEXT NOT NULL DEFAULT ''\n\t\t, orchestrator_told_at TEXT)",
       "tbl_name": "board_goals",
       "type": "table"
     },
@@ -2414,6 +2414,15 @@
           "hidden": 0,
           "name": "closed_reason",
           "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 14,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "orchestrator_told_at",
+          "notnull": 0,
           "pk": 0,
           "type": "TEXT"
         }

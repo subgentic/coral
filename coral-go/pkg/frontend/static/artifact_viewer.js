@@ -159,7 +159,7 @@ export function openArtifactViewer(hex, opts = {}) {
         typeKnown: (entries) => { // the kind is known: Download gets its address (#9941)
             if (gen !== _gen) return;
             dl.removeAttribute('aria-disabled');
-            if (!entries && !isCloud()) { newTab.href = url; newTab.hidden = false; } // through Coral Hub a link can't navigate to /api/remote/...: the bytes are saved, not opened (above)
+            if (!entries && !isCloud()) { newTab.href = url + '&open=1'; newTab.hidden = false; } // on Coral Hub the bytes are saved, not opened (above)
             if (!entries) return void (dl.href = url); // any other artifact: its own bytes, under the stored name
             // a manifest: Download saves its file, not the JSON list (#9925); with several files there is none here (each row has its own)
             const target = manifestDownload(entries, opts.server);

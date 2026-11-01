@@ -282,3 +282,22 @@ func TextFamily(m map[string]string, key string) string {
 	}
 	panic("settings: " + key + " is not a declared text setting")
 }
+
+// The two levels of Chief's actions (#11798), the values of the ChiefActions setting.
+const (
+	ChiefActions   = "chief_actions"
+	ChiefAsksFirst = "ask_first"
+	ChiefActs      = "act"
+)
+
+// ChiefPermissionMode is the permission mode the recorded Chief runs in for the saved chief_actions: act is Accept edits, anything else (unset, ask_first, a value that is not one of the two) is
+// Default. Never Bypass Permissions, Auto or Don't ask: a shell command still asks the Operator.
+func ChiefPermissionMode(m map[string]string) string {
+	if Enum(m, ChiefActions) == ChiefActs {
+		return "acceptEdits"
+	}
+	return "default"
+}
+
+// GoalDoneHidden is the setting that lists the goals the Operator hid from Needs you with Not yet or Ignore (#11825).
+const GoalDoneHidden = "goal_done_hidden"

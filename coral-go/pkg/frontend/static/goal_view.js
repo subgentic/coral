@@ -3,7 +3,6 @@ import { loadStyles } from './lazy_styles.js';
 import { openTask } from './task_navigation.js';
 import { boardFetch, keyLabel, serverUrl, splitKey } from './server_base.js';
 import { OPERATOR_ID, copyText, showToast } from './utils.js';
-import { browserLocal } from './safe_storage.js';
 import { whenText } from './when_text.js';
 import { toTaskPage, toGoal, errorOf } from './goals_adapter.js';
 import { importOnce } from './import_once.js';
@@ -19,12 +18,6 @@ const { el } = DT;
 const TV = await importOnce('./tasks_view.js');
 await loadStyles('pictures.css'); // the picture rules load with this module, before anything draws (page_weight: not at start)
 const PAGE = 50;
-
-const NOT_YET_KEY = 'coral.goals.notyet';
-/** "Not yet" said to a goal's all-done prompt, per team, goal and task total: it comes back when a task is added or removed. The goal page and the team's Goals row read the same list (#10692). */
-const goalNotYetKey = (project, g) => `${project}|${g.id}|${W.allTasksOf(g.rollup)}`;
-function notYetList() { try { const v = JSON.parse(browserLocal.get(NOT_YET_KEY) || '[]'); return Array.isArray(v) ? v : []; } catch { return []; } }
-export const goalNotYet = (project, g) => notYetList().includes(goalNotYetKey(project, g));
 
 /** Mount one goal; each mount owns its task pages, search and phone screen. */
 export function mountGoal(host, { team, id, back, onTask, goal, refresh, status, teamLink, focusOnOpen = true, backLabel = 'Goals' }) { // focusOnOpen: false where the page opens in place and the heading should not take the focus (the Inbox, #8681)
@@ -128,6 +121,8 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
 
     function drawGoalMain(main, g) {
         main.append(backButton(backLabel, () => closeGoal())); // says where it goes: the Inbox passes the screen it was opened from (#8861)
+        const row = el('div', 'goal-back-row'); // the header: the way back, the team link, the actions at the right (#11823), and under them the title
+        row.append(main.querySelector('.goals-back'));
         if (teamLink) {
             const link = el('a', 'goal-team-link', 'Open on team page'); link.href = teamLink;
             link.setAttribute('aria-label', `Open ${keyLabel(team)} on team page`);
@@ -136,12 +131,16 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
                 e.preventDefault();
                 importOnce('./task_goals.js').then(m => m.openGoalOnTeamPage(team, id));
             });
-            const row = el('div', 'goal-back-row');
-            row.append(main.querySelector('.goals-back'), link); main.append(row);
+            row.append(link);
         }
+        // Add task and Close goal (Reopen for a closed one), at the top right of the page's header
+        const acts = el('div', 'goal-head-actions');
+        acts.append(btn('btn goals-add-task', 'Add task', () => { (window.showCreateTaskModal || (() => {}))({ project: model.project, goal_id: g.id, onCreated: loadGoals }); }));
+        if (W.isOpenGoal(g)) { const cb = btn('btn btn-primary goals-close', 'Close goal', () => openClose(g)); cb.setAttribute('aria-label', `Close goal: ${g.title}`); acts.append(cb); } // named for its goal: the Close dialog's own button is just Close goal
+        else if (W.isClosedGoal(g)) acts.append(btn('btn goals-reopen', 'Reopen', () => reopenGoal(g)));
+        row.append(acts); main.append(row);
         const h = el('h2', 'goals-detail-title', g.title); h.tabIndex = -1; h.id = 'goals-detail-title';
-        const backRow = main.querySelector(':scope > .goal-back-row');
-        (backRow || main).append(h); // with the team link the title is in the way-back row: a phone puts the back beside it and the link under (team_page.css), as on the task page
+        row.append(h); // the title is in the header row: a phone puts the back beside it and the link and actions under (team_page.css), as on the task page
         foldWayBack(main, '.goals-back', '.goals-detail-title');
         const line = el('div', 'goals-detail-line'); line.append(stateChip(g));
         const meta = W.driverLine(g.driver, whenText(g.updatedAt)); if (meta) line.append(el('span', 'goal-card-meta', meta));
@@ -150,6 +149,8 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         copyBtn.title = 'Copies a line to paste to an agent: it runs coral-board goal brief for this goal';
         line.append(copyBtn);
         main.append(line);
+        const waitNote = el('p', 'goals-note goal-reviews-waiting'); waitNote.hidden = true; main.append(waitNote); // files for review on this goal that were never answered (Beta #11837 G): said while any wait, whatever the goal's state
+        waitingReviews(g).then(list => { if (!list.length || !waitNote.isConnected) return; waitNote.append(document.createTextNode(`${W.waitingReviewsLine(list.length)} `), btn('btn btn-quiet btn-small goal-reviews-link', 'Review them', () => showNeeds(g))); waitNote.hidden = false; }).catch(() => {});
         if (g.outcome || g.doneWhen || g.images.length) {
             const dl = el('dl', 'facts goals-facts');
             if (g.outcome) dl.append(el('dt', null, 'Description'), linkedDd(g.outcome)); // the outcome field, which the New goal form's Description fills (#11653)
@@ -159,7 +160,6 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         }
         const openLeft = g.rollup.active + g.rollup.blocked + g.rollup.queued;
         if ((g.state === 'done' || g.state === 'dropped') && openLeft) main.append(el('p', 'goals-note goals-closed-open', W.closedWithOpenText(openLeft)));
-        if (W.readyToClose(g) && !isNotYet(g)) { main.append(allDoneStrip(g)); announceAllDone(g); }
         const total = totalOf(g.rollup);
         // "2 of 3 tasks done" (#7878): "3 tasks" is a link to the team Tasks tab with this goal chosen
         const progress = el('p', 'goals-tasks-head goals-progress');
@@ -173,12 +173,6 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         if (total) main.append(rollupBar(g.rollup));
         main.append(el('p', 'goals-note goals-updating', rowsAgree(g) ? '' : 'Updating…')); // the column says it too, and is aria-busy
         main.append(drawTabs(g)); // the Tasks | Artifacts strip and the list under the goal's details (#8914)
-        // The pinned bar: Add task and Close goal (Reopen for a closed one), always at the bottom of the page.
-        const bar = el('div', 'goals-pinbar');
-        bar.append(btn('btn goals-add-task', 'Add task', () => { (window.showCreateTaskModal || (() => {}))({ project: model.project, goal_id: g.id, onCreated: loadGoals }); }));
-        if (W.isOpenGoal(g)) { const cb = btn('btn btn-primary goals-close', 'Close goal', () => openClose(g)); cb.setAttribute('aria-label', `Close goal: ${g.title}`); bar.append(cb); } // named for its goal: the Close dialog's own button is just Close goal
-        else if (W.isClosedGoal(g)) bar.append(btn('btn goals-reopen', 'Reopen', () => reopenGoal(g)));
-        main.append(bar);
         return h;
     }
 
@@ -274,7 +268,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         if (!rowsAgree(g)) list.setAttribute('aria-busy', 'true');
         if (!tasks) { list.append(el('p', 'goals-note', 'Loading tasks\u2026')); return; }
         if (tasks.failed !== undefined) { const f = el('div', 'goals-failed'); f.setAttribute('role', 'alert'); f.append(el('span', null, W.failedText(tasks.failed).replace('Goals', 'Tasks')), btn('btn btn-small', 'Retry', () => loadTasks(g.id))); list.append(f); return; }
-        if (!tasks.rows.length) { list.append(el('p', 'goals-note', 'No tasks yet')); return; }
+        if (!tasks.rows.length) { list.append(el('p', 'goals-note', 'No tasks yet.' + (g.toldAt ? ` The Orchestrator was told ${whenText(g.toldAt)} and has not planned it.` : ' Nobody has been told about this goal.'))); return; } // who has the goal, said where the person looks (#11880)
         const shown = tasks.rows.slice(0, tasks.shown);
         const groups = [['Open', shown.filter(t => !isDone(t))], ['Done', shown.filter(isDone).sort((a, b) => b.id - a.id)]]; // the newest done task first
         for (const [name, rows] of groups) {
@@ -371,22 +365,21 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         else if (keepBack) main.querySelector('.goals-back')?.focus({ preventScroll: true });
     }
 
-    // ── closing, reopening, and the all-done prompt (#7272, UI/UX's #7270) ─────
+    // ── closing and reopening (#7272, UI/UX's #7270) ─────
 
-    const notYetKey = (g) => goalNotYetKey(model.project, g);
-    const isNotYet = (g) => goalNotYet(model.project, g);
-    const announcedDone = new Set(); // the all-done strips already said, by goal and task total: said once when it first appears, not on every redraw
-    function announceAllDone(g) { const k = notYetKey(g); if (announcedDone.has(k)) return; announcedDone.add(k); say(W.allDoneSaid(W.allTasksOf(g.rollup), g.title)); }
-    function setNotYet(g) { try { browserLocal.set(NOT_YET_KEY, JSON.stringify([...notYetList().filter(k => k !== notYetKey(g)), notYetKey(g)].slice(-100))); } catch { /* the strip comes back on the next read */ } }
-
-    /** The prompt above Tasks when every task of an active goal is done: a labelled region (not an alert), Close as done and Not yet. */
-    function allDoneStrip(g) {
-        const s = el('section', 'goals-alldone'); s.setAttribute('aria-label', 'All tasks done');
-        const words = el('p', 'goals-alldone-text'); words.append(el('strong', null, W.allDoneLine(W.allTasksOf(g.rollup))), document.createTextNode(` ${W.allDoneAsk(g.doneWhen)}`));
-        const acts = el('div', 'goals-alldone-actions');
-        acts.append(btn('btn btn-primary btn-small goals-alldone-close', 'Close as done', () => openClose(g, 'done')), btn('btn btn-small goals-alldone-not-yet', 'Not yet', () => { setNotYet(g); drawDetail(); say(W.notYetSaid); focusDetail(); }));
-        s.append(words, acts, el('p', 'goals-note', W.notYetHint));
-        return s;
+    /** The files for review on this goal that no one has decided (still in Needs you, read ones too): D and G of Beta #11837, a goal can be closed or read Done with its files never answered. */
+    let reviewsReadAt = 0;
+    async function waitingReviews(g) {
+        const R = await importOnce('./inbox_reviews.js');
+        if (Date.now() - reviewsReadAt > 30000) { reviewsReadAt = Date.now(); await R.refreshReviews(true); } // the Inbox's list is only read once the Inbox was shown: a goal page asks for it itself, at most every 30 seconds
+        else await R.refreshReviews();
+        return R.reviewItems().filter(a => String(a.goal_id) === String(g.id) && a.team === model.project);
+    }
+    async function showNeeds(g) {
+        window.switchNavTab?.('hub-inbox');
+        const T = await importOnce('./inbox_tab.js');
+        await T.selectInboxTab('needs');
+        (await importOnce('./inbox_sidebar.js')).showNeedsForGoal(g.title);
     }
 
     async function reopenGoal(g) {
@@ -447,6 +440,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         });
         dlg.addEventListener('close', () => { model.creating = false; dlg.remove(); (root.querySelector('.goals-close') || root.querySelector('.goals-detail-col'))?.focus(); });
         dlg.showModal(); (form.querySelector('input[name="goal-close-state"]:checked') || form.querySelector('input[name="goal-close-state"]')).focus();
+        waitingReviews(g).then(list => { if (!list.length || !dlg.isConnected) return; const w = el('div', 'goals-warning goals-reviews-warning'); w.append(el('strong', null, W.waitingReviewsHead(list.length)), document.createTextNode(` ${W.waitingReviewsStay(list.length)}`)); form.insertBefore(w, fs); }).catch(() => {}); // not drawn when the Inbox's list cannot be read
     }
 
 

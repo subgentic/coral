@@ -605,7 +605,7 @@ func TestArtifactLinkVersionIsAnExactValue(t *testing.T) {
 	for _, q := range []string{"v=3", "v=", "v", "v=02", "v=2&v=2", "v=2&x=1", "x=1", "V=2", "v=2;x", "v=2%00", "download=1"} {
 		assert.Equal(t, TierNever, Classify("GET", p, q), q)
 	}
-	assert.Equal(t, "v=2", routeQueries["GET /api/artifacts/{}"])
+	assert.Equal(t, "open=1,v=2", routeQueries["GET /api/artifacts/{}"]) // open=1: the viewer's Open in new tab (#11845)
 }
 
 // #3433: deleting a whole board can't be undone, so through Coral Hub it needs Launch; its

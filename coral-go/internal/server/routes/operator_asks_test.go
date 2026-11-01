@@ -318,3 +318,26 @@ func TestAClosedAskIsOpenedAgainByUndoAndNothingIsPosted(t *testing.T) {
 	assert.False(t, m.Ask.Closed)
 	assert.Equal(t, before, posts(), "close and undo post nothing")
 }
+
+// #11860 (Beta #10): a question says which team it is on by the team's name, not its internal board id; `board` stays the id (the routes take it), `board_label` is what the panel shows. A board with no
+// name of its own has no label, and the page then falls back to the id.
+func TestOperatorAsksCarryTheTeamsNameBesideItsBoardID(t *testing.T) {
+	h, bs := operatorAsksRig(t)
+	ctx := context.Background()
+	b, err := bs.CreateBoard(ctx, "Sprout team", "Operator")
+	require.NoError(t, err)
+	q, err := bs.PostMessage(ctx, b.ID, "Lead", "@Operator may I proceed?", nil)
+	require.NoError(t, err)
+	require.NoError(t, bs.RecordAsk(ctx, b.ID, q, []string{"Operator"}))
+	_, rows, _ := readOperatorAsks(t, h, asPerson)
+	require.Len(t, rows, 1)
+	assert.Equal(t, b.ID, rows[0]["board"], "the id is still the id")
+	assert.Equal(t, "Sprout team", rows[0]["board_label"], "and the team's name rides with it")
+	w, err := bs.RegisterWait(ctx, b.ID, "Dev", "claude-x", board.WaitOperator, "", "may I delete it?", time.Hour)
+	require.NoError(t, err)
+	_ = w
+	_, rows, _ = readOperatorAsks(t, h, asPerson)
+	for _, r := range rows {
+		assert.Equal(t, "Sprout team", r["board_label"], "a wait carries it too")
+	}
+}
