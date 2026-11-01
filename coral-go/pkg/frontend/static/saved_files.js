@@ -7,7 +7,7 @@ export function fillSavedFiles(host, files, { DT, reviewActions, openReview, sho
         open: a => openReview(a),
         columns: [
             { key: 'name', label: 'File', primary: true, width: 'grow', line: 1, cell: a => shown(a), subtitle: a => subtitleOf(a) },
-            { key: 'actions', label: 'Actions', hideLabel: true, fixed: true, align: 'end', width: '24.5rem', line: 1, cell: a => reviewActions(a, true) },
+            { key: 'actions', label: 'Actions', hideLabel: true, fixed: true, align: 'end', width: '26rem', line: 1, cell: a => reviewActions(a, true) },
         ] }).el;
     host.replaceChildren(title, table);
 }
