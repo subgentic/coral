@@ -251,7 +251,7 @@ func (m *BoardHealthMonitor) composeCheck(ctx context.Context, project, orch str
 
 // actionRules are the action list's thresholds from the team's settings (#11729).
 func actionRules(a board.HealthActionList) teamhealth.Rules {
-	return teamhealth.Rules{StuckWait: time.Duration(a.StuckWaitMin) * time.Minute, Overloaded: a.OverloadedTasks, Sleeping: a.OverloadedSleeping, StaleReview: time.Duration(a.StaleReviewHours) * time.Hour}
+	return teamhealth.Rules{StuckWait: time.Duration(a.StuckWaitMin) * time.Minute, Overloaded: a.OverloadedTasks, Sleeping: a.OverloadedSleeping, StaleReview: time.Duration(a.StaleReviewHours) * time.Hour, Mention: time.Duration(a.MentionMin) * time.Minute}
 }
 
 // splitParked leaves parked tasks out: a parked task raises no item (#4175 step 3). A task whose park ended is back:

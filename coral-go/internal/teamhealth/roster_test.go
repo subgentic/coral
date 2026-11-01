@@ -174,3 +174,19 @@ func TestAnAgentAtADialogIsPinnedAboveOlderLines(t *testing.T) {
 	assert.Contains(t, lines[2], "Older: idle 60 min")
 	assert.Contains(t, lines[3], "Idler: idle 45 min")
 }
+
+// Rule 4 (#11729): a member mentions may not reach is a line, with what to do about it; a new one is news for the quiet gate, its age ticking is not.
+func TestNameIssuesAreLinesAndFacts(t *testing.T) {
+	r := &Roster{Recipient: "O", Counts: counts(2, 0, 0, 0, 0, 0), NameIssues: []NameIssue{
+		{Name: "Backend Dev", Posts: 2, Window: 30 * time.Minute, Age: 20 * time.Minute},
+		{Name: ".Odd", Edge: true},
+	}}
+	text := strings.Join(ComposeLines(listIn(r)), "\n")
+	assert.Contains(t, text, "Backend Dev: no mention has reached it in 30 min while 2 posts address a part of its name. Check its name (rename it, or tell the senders the full name).")
+	assert.Contains(t, text, ".Odd: its name starts or ends with punctuation, so mentions may not reach it. Check its name.")
+	before := r.Facts()
+	r.NameIssues[0].Age = 25 * time.Minute
+	assert.Equal(t, before, r.Facts(), "the age ticking is not news")
+	r.NameIssues = append(r.NameIssues, NameIssue{Name: "Third", Posts: 1, Window: 30 * time.Minute})
+	assert.NotEqual(t, before, r.Facts(), "a new one is")
+}

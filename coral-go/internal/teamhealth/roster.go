@@ -69,6 +69,18 @@ type Roster struct {
 	// Open is each agent's open (not parked) tasks, and Reviews the tasks waiting in review: the overloaded and stale-review rules (#11729).
 	Open    map[string]int
 	Reviews []ReviewAge
+	// NameIssues: members mentions may not reach (#11729 rule 4).
+	NameIssues []NameIssue
+}
+
+// NameIssue is a member that mentions may not reach: its name starts or ends with punctuation (Edge), or no mention has reached it for Window while Posts posts @-addressed a part of its name; Age
+// is how long ago the oldest of those posts was (0 for an Edge issue).
+type NameIssue struct {
+	Name   string // a member name, through Name
+	Edge   bool
+	Posts  int
+	Window time.Duration
+	Age    time.Duration
 }
 
 // Awake is how many agents are awake (every state but asleep and offline).
@@ -239,6 +251,9 @@ func (r *Roster) Facts() []string {
 	}
 	for _, b := range r.Blocked {
 		out = append(out, "b:"+b.Name)
+	}
+	for _, ni := range r.NameIssues {
+		out = append(out, fmt.Sprintf("n:%s/%t/%d", ni.Name, ni.Edge, ni.Posts)) // a new one is news; its age ticking is not (#11729)
 	}
 	for _, a := range r.Asleep {
 		out = append(out, fmt.Sprintf("s:%s=%d", a.Name, a.Count))

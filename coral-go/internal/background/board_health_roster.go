@@ -96,6 +96,7 @@ func (m *BoardHealthMonitor) buildRoster(ctx context.Context, in rosterInputs) (
 	groups := map[string]*teamhealth.WaitGroup{}
 	var order []string
 	attention := 0
+	awake := map[string]bool{} // members awake and alive, for the mentions rule (#11729)
 	for i := range in.subs {
 		sub := &in.subs[i]
 		if board.SameIdentity(sub.SubscriberID, in.recipient.SubscriberID) {
@@ -113,6 +114,7 @@ func (m *BoardHealthMonitor) buildRoster(ctx context.Context, in rosterInputs) (
 		case !live:
 			r.Counts[teamhealth.StateOffline]++
 		default:
+			awake[sub.SubscriberID] = true
 			if w, ok := waitOf[sub.SubscriberID]; ok {
 				r.Counts[teamhealth.StateWaiting]++
 				at, _ := time.Parse(time.RFC3339, w.CreatedAt)
@@ -131,9 +133,7 @@ func (m *BoardHealthMonitor) buildRoster(ctx context.Context, in rosterInputs) (
 				if id, err := m.store.LastPostID(ctx, in.project, sub.SubscriberID); err == nil {
 					entry.Reply = id // the waiter's last message, so the orchestrator can answer it (#11729)
 				}
-				if w.WaitType == "task" {
-					entry.Reason = fmt.Sprintf("task #%s", teamhealth.Name(w.TargetID)) // a number, never what the agent wrote
-				}
+				entry.Reason = waitReason(w)
 				if target.sub != nil && !isRecipient(target.sub, in.recipient) && !at.IsZero() {
 					// silent: the awaited member has posted nothing since the wait began; one that has is serving it (#11729)
 					if _, when, err := m.store.LastPostBy(ctx, in.project, target.sub.SubscriberID); err == nil && !when.After(at) {
@@ -192,6 +192,7 @@ func (m *BoardHealthMonitor) buildRoster(ctx context.Context, in rosterInputs) (
 	for _, k := range order {
 		r.Waits = append(r.Waits, *groups[k])
 	}
+	attention += m.nameIssues(ctx, in, r, awake)
 	r.Open = map[string]int{}
 	for _, t := range in.tasks {
 		if t.AssignedTo != nil && *t.AssignedTo != "" {
@@ -253,8 +254,12 @@ func (m *BoardHealthMonitor) escalateWaits(ctx context.Context, project string) 
 			board.HealthLimits{PerTargetPerHour: 6, TeamPerHour: 30}); err != nil || why != "" {
 			continue
 		}
-		text := fmt.Sprintf("@%s %s has waited %s on you (coral-board wait). Reply to them, or tell them what to do instead.",
-			teamhealth.Name(target.sub.SubscriberID), teamhealth.Name(w.SubscriberID), teamhealth.Age(now.Sub(at)))
+		forWhat := ""
+		if reason := waitReason(w); reason != "" {
+			forWhat = ", for " + reason // what it is waiting for, so the reply can be to the point (#11729 rule 11)
+		}
+		text := fmt.Sprintf("@%s %s has waited %s on you (coral-board wait%s). Reply to them, or tell them what to do instead.",
+			teamhealth.Name(target.sub.SubscriberID), teamhealth.Name(w.SubscriberID), teamhealth.Age(now.Sub(at)), forWhat)
 		if _, err := m.store.PostSystemMessage(ctx, project, "Coral Health Monitor", text, nil); err != nil {
 			m.logger.Warn("wait escalation could not be posted", "project", project, "error", err)
 			continue
@@ -284,4 +289,51 @@ func (m *BoardHealthMonitor) endFinishedWaitEscalations(ctx context.Context, pro
 // isRecipient reports whether sub is the check's recipient.
 func isRecipient(sub *board.Subscriber, recipient *board.Subscriber) bool {
 	return recipient != nil && board.SameIdentity(sub.SubscriberID, recipient.SubscriberID)
+}
+
+// nameIssues is rule 4 (#11729): an awake member whose name starts or ends with punctuation, or that no mention has reached for the window while posts @-addressed a part of its name. It adds them to r
+// and returns how many.
+func (m *BoardHealthMonitor) nameIssues(ctx context.Context, in rosterInputs, r *teamhealth.Roster, awake map[string]bool) int {
+	window := in.rules.Mention
+	if window <= 0 {
+		window = teamhealth.DefaultRules().Mention
+	}
+	posts, err := m.store.RecentPosts(ctx, in.project, in.now.Add(-window))
+	if err != nil {
+		posts = nil
+	}
+	n := 0
+	for i := range in.subs {
+		sub := &in.subs[i]
+		if !awake[sub.SubscriberID] || board.SameIdentity(sub.SubscriberID, in.recipient.SubscriberID) {
+			continue
+		}
+		name := teamhealth.Name(sub.SubscriberID)
+		switch {
+		case board.NameHasEdgePunctuation(sub.SubscriberID):
+			r.NameIssues = append(r.NameIssues, teamhealth.NameIssue{Name: name, Edge: true})
+			n++
+		default:
+			if tries, oldest := board.MentionGap(sub.SubscriberID, sub.JobTitle, posts); tries > 0 {
+				r.NameIssues = append(r.NameIssues, teamhealth.NameIssue{Name: name, Posts: tries, Window: window, Age: in.now.Sub(oldest)})
+				n++
+			}
+		}
+	}
+	return n
+}
+
+// waitReason is what a wait is for, to put in the check and the nudge (#11729 rule 11): the task's number for a wait on a task, else the reason the agent gave (coral-board wait --reason), cleaned and
+// cut like any agent words and quoted. "" when there is none.
+func waitReason(w board.RegisteredWait) string {
+	if w.WaitType == "task" {
+		var id int64
+		if _, err := fmt.Sscanf(w.TargetID, "%d", &id); err == nil && id > 0 {
+			return fmt.Sprintf("task #%d", id)
+		}
+	}
+	if t := teamhealth.StoredText(w.Reason, nil); t != "" && t != teamhealth.NotShown {
+		return `"` + t + `"`
+	}
+	return ""
 }
