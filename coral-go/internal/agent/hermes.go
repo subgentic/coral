@@ -22,6 +22,9 @@ func (a *HermesAgent) SupportsResume() bool { return true }
 func (a *HermesAgent) HistoryBasePath() string    { return "" }
 func (a *HermesAgent) HistoryGlobPattern() string { return "" }
 
+// hermesWindowsInstallNote is all a Windows server says: Hermes on Windows (a separate PowerShell installer) has not been tried with Coral.
+const hermesWindowsInstallNote = "Hermes on Windows has not been tried with Coral yet. The vendor's page has its own Windows installer."
+
 // hermesInstallCommand is the vendor's installer line, shown where Hermes is missing; Coral never runs it (the installer is a curl-to-bash script that takes minutes and gigabytes). hermesInstallNote says so.
 const (
 	hermesInstallCommand = "curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash"

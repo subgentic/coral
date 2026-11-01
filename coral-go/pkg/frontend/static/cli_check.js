@@ -19,7 +19,7 @@ export const CLI_INSTALL_INSTRUCTIONS = {
     codex: { name: 'codex', label: 'Codex', cmd: 'npm install -g @openai/codex', url: 'https://github.com/openai/codex' },
     pi: { name: 'pi', label: 'Pi', cmd: 'npm install -g --ignore-scripts @earendil-works/pi-coding-agent', url: 'https://pi.dev' },
     opencode: { name: 'opencode', label: 'opencode', cmd: 'npm install -g opencode-ai', url: 'https://opencode.ai' },
-    hermes: { name: 'hermes', label: 'Hermes', cmd: 'curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash', url: 'https://github.com/NousResearch/hermes-agent', note: 'The installer puts hermes in ~/.local/bin and its files in ~/.hermes (about 2.4 GB), and takes several minutes. Coral looks in ~/.local/bin too, so it finds hermes either way. Coral never runs the installer for you.' },
+    hermes: { name: 'hermes', label: 'Hermes', cmd: 'curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash', url: 'https://hermes-agent.nousresearch.com', note: 'The installer puts hermes in ~/.local/bin and its files in ~/.hermes (about 2.4 GB), and takes several minutes. Coral looks in ~/.local/bin too, so it finds hermes either way. Coral never runs the installer for you.' },
 };
 
 export function _checkAgentCLI(agentType, warning = document.getElementById('cli-check-warning'), force = false) {
