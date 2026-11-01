@@ -530,6 +530,7 @@ export function dataTable(cfg) {
             const menu = el('div', 'menu dt-mail-menu'); menu.id = `${id}-menu`; menu.hidden = true; menu.setAttribute('role', 'menu'); menu.setAttribute('aria-label', 'More actions');
             for (const [a, i] of more) { const it = button('menu-item', a.label, async e => { e.stopPropagation(); (await importOnce('./menu_button.js')).closeMenus({ restoreFocus: true }); press(a, i)(); }); it.setAttribute('role', 'menuitem'); it.disabled = !!a.disabled?.(chosen()); menu.append(it); }
             wrap.append(toggle, menu); bar.append(wrap);
+            importOnce('./menu_button.js').catch(() => {}); // loaded as the bar appears, so the first tap on the three dots never waits on it (a failed load is tried again by the tap)
         }
         if (st.confirming >= 0) {
             const a = actions[st.confirming];

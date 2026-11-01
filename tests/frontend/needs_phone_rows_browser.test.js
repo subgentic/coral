@@ -9,6 +9,7 @@ const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
+    const { Fetch } = client, { safePaused } = require('./helpers/paused');
     const team = 'phone-rows-' + Date.now().toString(36);
     const T = '#group-table-view';
     try {
@@ -18,6 +19,8 @@ const { coralReady } = require('./helpers/wait');
             const at = `${w} px${touchEmu ? '' : ', pointer not coarse'}: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: 800, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: touchEmu });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
+            await Fetch.enable({ patterns: [{ urlPattern: '*/menu_button.js*', requestStage: 'Request' }] }); // a cold, slow phone: the menu's module answers 1.5 s late (what a 2-core runner does to the first tap, v2.0.24)
+            safePaused(client, e => setTimeout(() => Fetch.continueRequest({ requestId: e.requestId }).catch(() => {}), 1500));
             assert.equal(await ev(`fetch('/api/board/${team}/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({subscriber_id:'Review Writer',job_title:'Writer'})}).then(r=>r.status)`), 200);
             await ev(`(() => {
                 const mk = n => ({ id: n.toString(16).padStart(64, '0'), name: 'Phone review ' + n + '.txt', media_type: 'text/plain', size: 30, created_at: new Date(Date.now() - (10 - n) * 60000).toISOString(), tags: ['for review'], available: true, uri: 'coral://artifacts/' + n.toString(16).padStart(64, '0'), produced_by: 'Review Writer', session_id: 'rw-1', task_id: n });
@@ -88,6 +91,11 @@ const { coralReady } = require('./helpers/wait');
             assert.ok(!b.actions.find(a => a.label === 'Approve').off && !b.actions.find(a => a.label === 'Changes').off, at + 'a file can be approved or sent back');
             // the three dots hold Changes, Mark read and Mark unread, and open on a tap
             await ev(`window.__hides = window.__hides || []; (() => { if (window.__hideHook) return; window.__hideHook = true; const d = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'hidden'); Object.defineProperty(HTMLElement.prototype, 'hidden', { configurable: true, get() { return d.get.call(this); }, set(v) { if (v && this.classList.contains('dt-mail-menu')) window.__hides.push(new Error('hide').stack.split('\\n').slice(1, 7).join(' | ')); d.set.call(this, v); } }); })(); true`);
+            // the module for the three dots loads when the bar first appears, so the first tap never waits on it: with it 1.5 s late, a tap made after that opens the menu at once (v2.0.24: the press reached nothing on a cold runner)
+            await new Promise(r => setTimeout(r, 1800)); // sleep-ok: the slow module arrives meanwhile
+            await ev(`document.querySelector('.dt-bar .dt-bar-more-toggle').click(); true`);
+            await waitFor(`!!document.querySelector('.dt-bar .dt-bar-more .menu:not([hidden]) .menu-item')`, at + 'the first tap on More opens its menu at once', 600);
+            await ev(`document.querySelector('.dt-bar .dt-bar-more-toggle').click(); true`); await new Promise(r => setTimeout(r, 250)); // sleep-ok: the menu closes (the same button again)
             // the menu's module loads on the first tap and a refresh can redraw the bar meanwhile (CI, v2.0.24: More did nothing after two swipes): a tap on More with the bar redrawn in the same breath still opens the menu, in the new bar
             await ev(`(() => { const old = document.querySelector('.dt-bar .dt-bar-more-toggle'), q = [...document.querySelectorAll('${T} tbody tr[data-key]')].find(r => r.textContent.includes('Which port should the test server use?')); old.click(); q.click(); window.__oldToggle = old; return true; })()`);
             assert.equal(await ev(`!!window.__oldToggle && !window.__oldToggle.isConnected && document.querySelector('.dt-bar .dt-bar-count').textContent`), '2 selected', at + 'the bar was redrawn under the tap (another row joined the selection)');
