@@ -21,12 +21,13 @@ const MaxCheck = 4096
 // Item is one thing for the orchestrator. Its fields hold member names (Name), task numbers,
 // durations and fixed phrases only; agent-written text goes in Said, already through ShownText.
 type Item struct {
-	Rank     int    // lower first
-	Agent    string // a member name, through Name
-	Problem  string // a fixed phrase with numbers ("silent on #12 for 34 min since Coral asked for a status")
-	Said     string // the agent's last words, quoted (ShownText), or ""
-	Evidence string // a fixed phrase with numbers, or ""
-	Suggest  string // a fixed phrase
+	Rank     int           // lower first
+	Age      time.Duration // how long it has been so, for "oldest first" (0: not known) (#11729)
+	Agent    string        // a member name, through Name
+	Problem  string        // a fixed phrase with numbers ("silent on #12 for 34 min since Coral asked for a status")
+	Said     string        // the agent's last words, quoted (ShownText), or ""
+	Evidence string        // a fixed phrase with numbers, or ""
+	Suggest  string        // a fixed phrase
 	// Key names the item stably across checks (rule, member, task) and State what it says now;
 	// the orchestrator acknowledges it by ItemID(Key) and it stays off the list until State
 	// changes (#4175 step 3). An item without a Key can't be acknowledged.
@@ -78,6 +79,8 @@ type CheckInput struct {
 	PeekHint bool
 	// Goals are the board's open goals, for the orchestrator's check only (#11412): the check lists them, ready ones first, with what the operator has to do. Empty: no segment.
 	Goals []GoalLine
+	// Rules are the action list's thresholds (zero: the defaults) (#11729).
+	Rules Rules
 }
 
 // parkedNote is the team line's note on parked tasks, or "".

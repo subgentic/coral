@@ -507,7 +507,7 @@ lowest id); the others are not nudged until it claims that one. This is by desig
 one next step.
 
 Questions an agent asked the Operator (`coral-board wait --operator "question"`) are listed in
-the check as "Waiting on the operator", with how long ago each was asked, until the Operator
+the check under "Needs the Operator", with how long ago each was asked, until the Operator
 posts on the board. The question is shown as quoted, masked text like any agent words.
 
 Each item ends with `[ack <id>]`. The orchestrator (or the Operator) runs `coral-board health
