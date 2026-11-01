@@ -26,6 +26,7 @@ const { coralReady } = require('./helpers/wait');
                     if (x.pathname === '/api/board/${team}/artifacts') { const items = window.__reviewItems.filter(a => !x.searchParams.has('tag') || a.tags.includes(x.searchParams.get('tag'))); return json({ project: '${team}', artifacts: items, has_more: false }); }
                     const rv = x.pathname.match(/^\\/api\\/board\\/${team}\\/artifacts\\/([0-9a-f]+)\\/review$/);
                     if (rv && method === 'POST') { const body = JSON.parse(o.body); window.__calls.push({ review: rv[1], decision: body.decision }); if (['approve', 'ignore', 'save'].includes(body.decision)) window.__reviewItems = window.__reviewItems.filter(a => a.id !== rv[1]); return json({ ok: true }); }
+                    if (x.pathname === '/api/settings' && method === 'PUT') return json({ ok: true }); // the welcome items complete themselves by detection and save that: nothing is written to the server's settings (the gate's --fail-on-leak)
                     if (url === '/api/operator-asks') return json(window.__asks);
                     const m = url.match(/\\/api\\/board\\/${team}\\/asks\\/(\\d+)\\/close$/);
                     if (m && method === 'POST') { const body = JSON.parse(o.body); window.__calls.push({ ask: Number(m[1]), undo: !!body.undo }); if (!body.undo) window.__asks = window.__asks.filter(a => a.id !== Number(m[1])); return json({ ok: true, closed_by: 'Operator' }); }
