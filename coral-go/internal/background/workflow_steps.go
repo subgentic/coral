@@ -21,6 +21,7 @@ import (
 	"github.com/subgentic/coral/internal/agentsignin"
 	at "github.com/subgentic/coral/internal/agenttypes"
 	"github.com/subgentic/coral/internal/executil"
+	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/store"
 )
 
@@ -437,6 +438,9 @@ func (wr *WorkflowRunner) executeAgentPrint(ctx context.Context, runID int64, st
 // executeAgentInteractive launches an agent in a tmux session (interactive mode).
 // The session is tagged with workflow metadata for frontend grouping.
 func (wr *WorkflowRunner) executeAgentInteractive(ctx context.Context, runID int64, step StepDef, stepDir, repoPath string, env []string, agentCfg *AgentStepConfig, prompt string, result *StepResult) error {
+	if err := ptymanager.RefuseIfForeign(); err != nil { // a Coral on a copy of another's database launches no workflow agent (internal/dataowner)
+		return err
+	}
 	modelArgs, merr := agentmodels.ModelArgs(agentCfg.Model)
 	if merr != nil {
 		return fmt.Errorf("step %q: the model %w", step.Name, merr)
