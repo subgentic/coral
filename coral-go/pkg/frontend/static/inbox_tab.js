@@ -40,10 +40,11 @@ function offerAlertsAgainIfWaited(n) {
     const oldest = Math.min(...at);
     if (Date.now() - oldest >= 5 * 60 * 1000) importOnce('./alerts_offer.js').then(m => m.offerAlertsAgain(oldest));
 }
-/** The background tab's title carries the same number as the badge (#11837). attention.js is loaded only when a tab is in the background (or once it has been): not at start, and no listener of our own for the tab coming back: the feed's next update does it. */
-let attentionReady = false;
+/** The background tab's title carries the same number as the badge (#11837). attention.js loads as soon as something waits (a tab that goes to the background after an item arrived must show it), not before: a page with nothing waiting adds neither the module nor a listener at start. The listener for the tab coming back (the alerts offer, #11893) is registered the first time something waits. */
+let attentionReady = false, comebackHooked = false;
 function tellAttention(n) {
-    if (!document.hidden && !attentionReady) return;
+    if (n > 0 && !comebackHooked) { comebackHooked = true; document.addEventListener('visibilitychange', () => { if (!document.hidden) updateInboxTab(); }); }
+    if (n <= 0 && !attentionReady) return;
     importOnce('./attention.js').then(m => { attentionReady = true; m.setAttentionTotal(n); });
 }
 

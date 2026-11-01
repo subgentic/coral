@@ -44,7 +44,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
         await load({ 'coral-alerts-offered': '1' });
         await ev(`window.__hidden = true; Object.defineProperty(document, 'hidden', { configurable: true, get: () => !!window.__hidden }); true`);
         await setWaiting(8); check(!(await banner()) && (await ev(`localStorage.getItem('coral-alerts-reoffered')`)) === null, 'a hidden tab gets no banner and does not spend the offer');
-        await ev(`window.__hidden = false; document.dispatchEvent(new Event('visibilitychange')); import(${S} + 'inbox_tab.js').then(m => m.updateInboxTab()); true`); // the feed's next update (the page keeps no listener of its own for the tab coming back, so the startup stays as it was)
+        await ev(`window.__hidden = false; document.dispatchEvent(new Event('visibilitychange')); true`); // a real visibilitychange only: the page's own listener (registered once something waited) does the rest
         await waitFor(`!!document.getElementById('alerts-offer-banner')`, 'the banner when the person is back', 6000).catch(() => {});
         check(await banner(), 'back in the tab, the banner comes');
     } finally { await client.close(); }
