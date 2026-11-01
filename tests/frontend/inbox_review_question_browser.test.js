@@ -30,15 +30,14 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await ev(`window.switchNavTab('hub-inbox'); true`);
             await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
             await waitFor(`document.querySelectorAll('${T} tbody tr').length === 3`, at + 'three review rows', 15000);
-            const rowText = n => ev(`(() => { const r = [...document.querySelectorAll('${T} tbody tr')].find(x => x.textContent.includes(${JSON.stringify(n)})); const sub = r.querySelector('.dt-subtitle'), meta = r.querySelector('.inbox-review-metadata'); return { all: r.textContent.replace(/\\s+/g, ' '), sub: sub ? sub.textContent : '', meta: meta ? meta.textContent : '', ask: (r.querySelector('.inbox-review-question') || {}).textContent || '', shown: [...r.querySelectorAll('.inbox-review-metadata span')].filter(x => getComputedStyle(x).display !== 'none').map(x => x.textContent).join(' | ') }; })()`);
+            const rowText = n => ev(`(() => { const r = [...document.querySelectorAll('${T} tbody tr')].find(x => x.textContent.includes(${JSON.stringify(n)})); const sub = r.querySelector('.dt-subtitle'), meta = r.querySelector('.inbox-review-metadata'); return { all: r.textContent.replace(/\\s+/g, ' '), sub: sub ? sub.textContent : '', meta: meta ? meta.textContent : '', ask: (r.querySelector('.inbox-review-question') || {}).textContent || '', shown: [r.querySelector('.inbox-review-from'), sub].filter(x => x && getComputedStyle(x).display !== 'none').map(x => x.textContent).join(' | ') }; })()`);
             const a = await rowText('plan-a.md'), b = await rowText('plan-b.md'), c = await rowText('plan-c.md');
             if (mobile) {
-                check(/from Writer/.test(a.shown) && /Which port should the test server use\?/.test(a.shown) && !/For review/.test(a.shown), at + 'a phone row\'s second line has the uploader and the question where "For review" was: ' + JSON.stringify(a.shown));
+                check(/Writer/.test(a.shown) && /Which port should the test server use\?/.test(a.shown) && !/For review/.test(a.shown), at + 'a phone row has the uploader on its top line and the question under it, not "For review": ' + JSON.stringify(a.shown));
                 check(/For review/.test(c.shown) && !c.ask, at + 'a file with no question still says For review: ' + JSON.stringify(c.shown));
             } else {
-                check(a.sub.startsWith('Which port should the test server use?') && /from Writer/.test(a.sub) && a.sub.indexOf('Which port') < a.sub.indexOf('from Writer'), at + 'the line under the name is the question, then who uploaded it: ' + JSON.stringify(a.sub));
-                check(!/Which port/.test(c.sub) && /from Writer/.test(c.sub), at + 'a file with no question shows only who uploaded it: ' + JSON.stringify(c.sub));
-                check(!/Which port/.test(a.shown), at + 'the Waiting for column does not say the question again: ' + JSON.stringify(a.shown));
+                check(a.sub === 'Which port should the test server use?', at + 'the two lines under the name are the question (the uploader is on the top line, #11719): ' + JSON.stringify(a.sub));
+                check(c.sub === 'For review', at + 'a file with no question says For review under the name: ' + JSON.stringify(c.sub));
             }
             check(/<U\+202E>/.test(b.all) && !b.all.includes('\u202e'), at + 'a hidden character in a question is written out, never drawn raw: ' + JSON.stringify(b.all.slice(0, 160)));
 
