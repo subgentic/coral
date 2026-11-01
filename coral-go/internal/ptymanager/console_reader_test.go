@@ -133,3 +133,14 @@ func TestTheGateTypesNoTextWhereTheTerminalRefusesIt(t *testing.T) {
 		assert.Equal(t, refused, got == Skipped)
 	}
 }
+
+// QA's #6908: a program that ended between the snapshot and its probe (a hook the agent ran) reads nothing: it is not a reader, and what runs below it is still walked.
+func TestAProgramThatEndedBeforeItsProbeIsNotAReader(t *testing.T) {
+	agent := winProc{pid: 300, start: 30}
+	gone := pane().add(root, 300, 30, kindProgram).add(300, 400, 40, kindProgram).withStdin(400, stdinGone)
+	assert.True(t, decideWinNotice(gone, root, agent).OK)
+	refused, _ := decideWinText(gone, root, agent, true)
+	assert.False(t, refused)
+	below := pane().add(root, 300, 30, kindProgram).add(300, 400, 40, kindProgram).withStdin(400, stdinGone).add(400, 500, 50, kindProgram).withStdin(500, stdinConsole)
+	assert.Equal(t, tmux.ReasonChildReads, decideWinNotice(below, root, agent).Reason, "a reader below an ended one is still found")
+}
