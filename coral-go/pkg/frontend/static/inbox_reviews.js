@@ -14,13 +14,17 @@ export const earlierVersions = row => { const key = row.reviewKey || `${row.team
 // (a JSON key built for each pair): with a few hundred files for review one call took a tenth of a second, a few dozen calls a redraw, and an Approve (which redraws three times) froze the Inbox for seconds.
 // The list is rebuilt when `items` is replaced or `revision` moves (a tag written in place, a row settled), and shared between callers in between.
 let viewFor = null, viewRev = -1, view = [];
-export const reviewItems = () => {
-    if (viewFor === items && viewRev === revision) return view;
+/** One row per artifact: the newest version of each series, with the older ones still for review as `earlier` (the same as reviewItems, for any list). */
+function collapseVersions(list) {
     const groups = new Map(); // series key -> its versions, oldest first (items are sorted by age)
-    for (const a of items) { const k = vkey(a); if (groups.has(k)) groups.get(k).push(a); else groups.set(k, [a]); }
+    for (const a of list) { const k = vkey(a); if (groups.has(k)) groups.get(k).push(a); else groups.set(k, [a]); }
     const newest = new Map(); // the newest version of each series -> the versions before it
     for (const group of groups.values()) { const top = group.reduce((m, b) => (byAge(m, b) < 0 ? b : m)); newest.set(top, group.filter(b => b !== top && byAge(b, top) < 0)); }
-    view = items.filter(a => newest.has(a)).map(a => (newest.get(a).length ? { ...a, earlier: newest.get(a) } : a)); // the list's own order: oldest newest-version first
+    return list.filter(a => newest.has(a)).map(a => (newest.get(a).length ? { ...a, earlier: newest.get(a) } : a)); // the list's own order: oldest newest-version first
+}
+export const reviewItems = () => {
+    if (viewFor === items && viewRev === revision) return view;
+    view = collapseVersions(items);
     viewFor = items; viewRev = revision;
     return view;
 };
@@ -45,6 +49,29 @@ export function reviewGroups(rows) {
 }
 
 /** Refresh in bounded pages, coalescing feed updates. Failed teams retain their last known rows. */
+/** One team's files tagged for review (not saved, available), every page: the rows the Inbox reads, for one team. */
+async function readTeam(team) {
+    const rows = [], seen = new Set();
+    for (let offset = 0; offset <= 10000; offset += 200) {
+        const r = await boardFetch(team, `/artifacts?tag=for%20review&limit=200&offset=${offset}`);
+        if (r.status === 403 || r.status === 404) break; // inaccessible teams never contribute rows
+        if (!r.ok) throw new Error('Could not read review artifacts');
+        const data = await r.json();
+        for (const a of data.artifacts || []) {
+            if (!a.tags?.includes('for review') || a.tags.includes('saved') || !a.available || seen.has(a.id)) continue; // a saved file stays tagged for review (its decisions work) but is not in Needs you (#11641)
+            const hex = /(?:sha256:|coral:\/\/artifacts\/)?([a-f0-9]{64})$/i.exec(a.uri || a.digest || a.id || '')?.[1];
+            if (!hex) continue;
+            seen.add(a.id); rows.push({ ...a, team, hex, reviewKey: `${team}:${a.id}` });
+        }
+        if (!data.has_more || !(data.artifacts || []).length) break;
+    }
+    return rows;
+}
+/** The files for review on one goal of one team that nobody decided (one row per file, as Needs you has them): a goal page asks only its own team, not every team (#11913). */
+export async function reviewsOfGoal(team, goalId) {
+    return collapseVersions((await readTeam(team)).sort(byAge)).filter(a => String(a.goal_id) === String(goalId));
+}
+
 export function refreshReviews(force = false) {
     // showInbox requests a forced read; badge/feed updates alone must not start the project scan.
     if (force) activated = true;
@@ -58,20 +85,7 @@ export function refreshReviews(force = false) {
             const projects = await fetchProjects(), next = [], failed = [], nextSaved = [];
             for (const { project: team } of projects) {
                 try {
-                    const rows = [], seen = new Set();
-                    for (let offset = 0; offset <= 10000; offset += 200) {
-                        const r = await boardFetch(team, `/artifacts?tag=for%20review&limit=200&offset=${offset}`);
-                        if (r.status === 403 || r.status === 404) break; // inaccessible teams never contribute rows
-                        if (!r.ok) throw new Error('Could not read review artifacts');
-                        const data = await r.json();
-                        for (const a of data.artifacts || []) {
-                            if (!a.tags?.includes('for review') || a.tags.includes('saved') || !a.available || seen.has(a.id)) continue; // a saved file stays tagged for review (its decisions work) but is not in Needs you (#11641)
-                            const hex = /(?:sha256:|coral:\/\/artifacts\/)?([a-f0-9]{64})$/i.exec(a.uri || a.digest || a.id || '')?.[1];
-                            if (!hex) continue;
-                            seen.add(a.id); rows.push({ ...a, team, hex, reviewKey: `${team}:${a.id}` });
-                        }
-                        if (!data.has_more || !(data.artifacts || []).length) break;
-                    }
+                    const rows = await readTeam(team);
                     next.push(...rows);
                     try { // the saved files of this team: one page, a failure here leaves the others alone
                         const r = await boardFetch(team, '/artifacts?tag=saved&limit=200');

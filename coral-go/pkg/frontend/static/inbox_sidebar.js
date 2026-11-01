@@ -738,9 +738,9 @@ async function openDockSavedSheet(id, opener) {
     });
 }
 
-/** Needs you, narrowed to one goal's rows (a goal page's "Review them", #11885): the page's own Goal filter, set to the goal's title. */
+/** Needs you, narrowed to one goal's rows (a goal page's "Review them", #11885): the page's own Goal filter, set to the goal's title for this view only. */
 export function showNeedsForGoal(title) {
-    needsFilters = NF.clean({ ...NF.EMPTY, goal: String(title || '') }); NF.saveFilters(needsFilters); queries.needs = '';
+    needsFilters = NF.clean({ ...NF.EMPTY, goal: String(title || '') }); queries.needs = ''; // not saved: the person's own filters stay what they were for the next visit (#11913)
     const input = $('inbox-search'); if (input && group === 'needs') input.value = '';
     renderInboxNav(true);
 }

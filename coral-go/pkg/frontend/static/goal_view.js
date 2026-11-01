@@ -150,7 +150,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         line.append(copyBtn);
         main.append(line);
         const waitNote = el('p', 'goals-note goal-reviews-waiting'); waitNote.hidden = true; main.append(waitNote); // files for review on this goal that were never answered (Beta #11837 G): said while any wait, whatever the goal's state
-        waitingReviews(g).then(list => { if (!list.length || !waitNote.isConnected) return; waitNote.append(document.createTextNode(`${W.waitingReviewsLine(list.length)} `), btn('btn btn-quiet btn-small goal-reviews-link', 'Review them', () => showNeeds(g))); waitNote.hidden = false; }).catch(() => {});
+        paintWaiting(g, waitNote);
         if (g.outcome || g.doneWhen || g.images.length) {
             const dl = el('dl', 'facts goals-facts');
             if (g.outcome) dl.append(el('dt', null, 'Description'), linkedDd(g.outcome)); // the outcome field, which the New goal form's Description fills (#11653)
@@ -368,12 +368,28 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
     // ── closing and reopening (#7272, UI/UX's #7270) ─────
 
     /** The files for review on this goal that no one has decided (still in Needs you, read ones too): D and G of Beta #11837, a goal can be closed or read Done with its files never answered. */
-    let reviewsReadAt = 0;
+    /** The files for review on this goal that no one has decided (read ones too: read is not decided): D and G of Beta #11837, a goal can be closed or read Done with its files never answered. One request round for this goal's own team, kept 30 seconds per goal (#11913: it was a scan of every team on each page open). */
+    const reviewsByGoal = new Map();
     async function waitingReviews(g) {
+        const kept = reviewsByGoal.get(g.id);
+        if (kept && Date.now() - kept.at < 30000) return kept.list;
         const R = await importOnce('./inbox_reviews.js');
-        if (Date.now() - reviewsReadAt > 30000) { reviewsReadAt = Date.now(); await R.refreshReviews(true); } // the Inbox's list is only read once the Inbox was shown: a goal page asks for it itself, at most every 30 seconds
-        else await R.refreshReviews();
-        return R.reviewItems().filter(a => String(a.goal_id) === String(g.id) && a.team === model.project);
+        const list = await R.reviewsOfGoal(model.project, g.id);
+        reviewsByGoal.set(g.id, { at: Date.now(), list });
+        return list;
+    }
+    /** The line on the goal page about files waiting for review. The answer is kept per goal, so a redraw fills the line at once; the page is drawn again often, so the line on screen when a read ends is the one filled in. */
+    function fillWaiting(g, list, note) {
+        if (!note) return;
+        note.replaceChildren();
+        if (!list.length) { note.hidden = true; return; }
+        note.append(document.createTextNode(`${W.waitingReviewsLine(list.length)} `), btn('btn btn-quiet btn-small goal-reviews-link', 'Review them', () => showNeeds(g)));
+        note.hidden = false;
+    }
+    function paintWaiting(g, note) {
+        const kept = reviewsByGoal.get(g.id);
+        if (kept) fillWaiting(g, kept.list, note);
+        waitingReviews(g).then(list => fillWaiting(g, list, root.querySelector('.goal-reviews-waiting'))).catch(() => {});
     }
     async function showNeeds(g) {
         window.switchNavTab?.('hub-inbox');
