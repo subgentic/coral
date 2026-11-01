@@ -24,7 +24,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await ev(`fetch('/api/board/${team}/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'Plan Writer', job_title: 'Writer' }) }).then(r => r.status)`);
             await ev(`(() => { const original = window.fetch, json = (b, st = 200) => Promise.resolve(new Response(JSON.stringify(b), { status: st, headers: { 'Content-Type': 'application/json' } }));
                 const hex = n => n.toString(16).padStart(64, '0');
-                const item = i => ({ id: hex(i), name: 'plan-' + i + '.md', media_type: 'text/markdown', size: 30, created_at: new Date(Date.now() - (9 - i) * 60000).toISOString(), source: 'upload', available: true, tags: ['for review'], uploader: 'Plan Writer', question: 'Ship plan ' + i + '?' });
+                const item = i => ({ id: hex(i), name: 'plan-' + i + '.md', media_type: 'text/markdown', size: 30, created_at: new Date(Date.now() - (9 - i) * 60000).toISOString(), source: 'upload', available: true, tags: ['for review'], uploader: 'Plan Writer', produced_by: 'Plan Writer', review_question: 'Ship plan ' + i + '?' });
                 window.__items = [1, 2, 3].map(item); window.__calls = [];
                 window.fetch = (url, opts = {}) => { const u = new URL(String(url), location.origin), method = (opts.method || 'GET').toUpperCase(), m = u.pathname.match(/^\\/api\\/board\\/${team}\\/artifacts(?:\\/([0-9a-f]{64})\\/(review|tags))?$/);
                     if (method !== 'GET' && /^\\/api\\/board\\//.test(u.pathname)) window.__calls.push({ method, path: u.pathname.replace('/api/board/${team}', ''), body: opts.body ? JSON.parse(opts.body) : null });
@@ -56,9 +56,13 @@ const { removeBoards } = require('./helpers/board_cleanup');
             // Saved lists it, with its decisions
             await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('saved')).then(() => true)`);
             await waitFor(`!!document.querySelector('.saved-files') && document.querySelector('.saved-files').textContent.includes('plan-1.md')`, at + 'Saved lists the file under "Files for review"', 10000);
+            check(await ev(`/Ship plan 1\\? .{1,3} from Plan Writer/.test(document.querySelector('.saved-files').textContent.replace(/\\s+/g, ' '))`), at + 'the file\'s question and sender are shown, read from review_question and produced_by as Needs you does');
             const sec = await ev(`(() => { const s = document.querySelector('.saved-files'); const names = [...s.querySelectorAll('button')].map(b => (b.getAttribute('aria-label') || b.textContent).trim()); return { title: (s.querySelector('.saved-files-title') || {}).textContent, names }; })()`);
             check(sec.title === 'Files for review', at + 'the section is "Files for review": ' + JSON.stringify(sec.title));
             check(['Approve: plan-1.md', 'Request changes: plan-1.md'].every(n => sec.names.includes(n)) && sec.names.some(n => /^(Deny: plan-1\.md|More actions for plan-1\.md)$/.test(n)), at + 'Approve, Changes and Deny are still there: ' + JSON.stringify(sec.names));
+            const counts = await ev(`({ title: (document.querySelector('.group-table-title, .inbox-group-title, h2') || {}).textContent, pill: [...document.querySelectorAll('button')].filter(b => /^Open \\d/.test(b.textContent.trim())).map(b => b.textContent.trim()), side: (document.querySelector('.view-list-item[data-key="saved"]') || {}).textContent })`);
+            check(!mobile ? /^Open 1$/.test((counts.pill || [])[0] || '') : true, at + 'the Open pill counts the saved file: ' + JSON.stringify(counts));
+            check(/Saved\s*1/.test(String(counts.title).replace(/\s+/g, ' ')) || !!(await ev(`/Saved\\s*1\\b/.test(document.querySelector('#inbox-page, #group-table-view')?.closest('main, section, div')?.textContent.slice(0, 400) || document.body.textContent.slice(0, 600))`)), at + 'the title count includes the saved file: ' + JSON.stringify(counts));
             await shot(`saved-files-${w}`);
             // Move to Needs you
             await ev(`document.querySelector('.saved-files button[aria-label="More actions for plan-1.md"]').click(); true`);
