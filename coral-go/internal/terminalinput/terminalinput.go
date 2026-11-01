@@ -380,3 +380,22 @@ func ctrlKeyName(b byte) string {
 	}
 	return ""
 }
+
+// ClearPersonDraftSince drops the session's unsent-text flag when it began at or after since: keys a person pressed into a dialog that has gone (a digit that answered it, with no Enter
+// after), not text they typed before the dialog opened.
+func ClearPersonDraftSince(sessionID string, since time.Time) {
+	sid := strings.ToLower(sessionID)
+	if v, ok := personDraft.Load(sid); ok && !time.Unix(0, v.(int64)).Before(since) {
+		personDraft.CompareAndDelete(sid, v)
+	}
+}
+
+// KeepPersonDrafts drops the unsent-text flags of sessions not in live (an agent that ended, slept or was archived).
+func KeepPersonDrafts(live map[string]bool) {
+	personDraft.Range(func(k, _ any) bool {
+		if !live[k.(string)] {
+			personDraft.Delete(k)
+		}
+		return true
+	})
+}

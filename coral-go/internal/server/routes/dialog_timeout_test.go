@@ -506,3 +506,28 @@ func TestADialogOverAPersonsUnsentTextIsLeftAlone(t *testing.T) {
 	terminalinput.Record(terminalinput.Person, r.name, terminalinput.Keys, "Enter")
 	assert.False(t, terminalinput.PersonDraftPending(r.sid), "sent: nothing unsent")
 }
+
+// Security's INFO a on #269: a digit a person pressed to answer a dialog (no Enter after it) is not unsent text once the dialog has gone; text typed before the dialog opened is.
+// INFO c: an agent that is no longer live keeps no flag.
+func TestADigitThatAnsweredADialogIsNotUnsentText(t *testing.T) {
+	const sid = "dddddddd-0425-4000-8000-0000000000a1"
+	name := "claude-" + sid
+	var w dialogWatch
+	screen := promptScreen{Question: "Proceed?", AskID: "a1", Options: []promptOption{{N: 1, Label: "Yes"}, {N: 2, Label: "No"}}}
+	t.Cleanup(func() { terminalinput.KeepPersonDrafts(nil) })
+
+	w.observe(sid, screen, true, time.Now(), atDialogMinutes, true)
+	terminalinput.Record(terminalinput.Person, name, terminalinput.Keys, "2") // the person answers in the terminal
+	assert.True(t, terminalinput.PersonDraftPending(sid))
+	w.observe(sid, promptScreen{}, false, time.Now(), atDialogMinutes, true) // the dialog has gone
+	assert.False(t, terminalinput.PersonDraftPending(sid), "the digit answered the dialog: nothing is unsent")
+
+	terminalinput.Record(terminalinput.Person, name, terminalinput.Text, "a reply in progress")
+	time.Sleep(2 * time.Millisecond)
+	w.observe(sid, screen, true, time.Now(), atDialogMinutes, true) // a dialog opens over the draft
+	w.forget(sid)                                                   // and is answered from the card
+	assert.True(t, terminalinput.PersonDraftPending(sid), "text typed before the dialog is still unsent")
+
+	terminalinput.KeepPersonDrafts(map[string]bool{"another": true})
+	assert.False(t, terminalinput.PersonDraftPending(sid), "an agent that is not live keeps no flag")
+}

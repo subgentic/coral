@@ -8,6 +8,7 @@ import (
 
 	at "github.com/subgentic/coral/internal/agenttypes"
 	"github.com/subgentic/coral/internal/ptr"
+	"github.com/subgentic/coral/internal/terminalinput"
 )
 
 // An agent at a dialog (#11437, the server half of #11430): an agent can sit for hours on a screen that waits for the person (a folder-trust question, a login choice, a permission menu that its hooks
@@ -48,6 +49,9 @@ func (w *dialogWatch) observe(sid string, screen promptScreen, shown bool, now t
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	if !shown {
+		if e := w.seen[sid]; e != nil {
+			dialogGone(sid, e)
+		}
 		delete(w.seen, sid)
 		return
 	}
@@ -55,6 +59,9 @@ func (w *dialogWatch) observe(sid string, screen promptScreen, shown bool, now t
 		w.seen = map[string]*dialogSeen{}
 	}
 	e := w.seen[sid]
+	if e != nil && !samePrompt(e.screen, screen) {
+		dialogGone(sid, e) // answered, and the next prompt is up
+	}
 	if e == nil || !samePrompt(e.screen, screen) {
 		w.seen[sid] = &dialogSeen{screen: screen, first: now, passes: 1, afterMin: afterMin, notify: notify}
 		return
@@ -65,8 +72,18 @@ func (w *dialogWatch) observe(sid string, screen promptScreen, shown bool, now t
 
 func (w *dialogWatch) forget(sid string) {
 	w.mu.Lock()
+	if e := w.seen[sid]; e != nil {
+		dialogGone(sid, e)
+	}
 	delete(w.seen, sid)
 	w.mu.Unlock()
+}
+
+// dialogGone is told that the dialog e is no longer on the agent's screen: keys a person pressed while it was there (a digit that answered it, with no Enter after) are not unsent
+// text, so the flag they set is dropped. Text typed before the dialog was first seen is kept. A dialog answered before any pass saw it keeps the flag until the person's next Enter:
+// the switches are then held, never let through.
+func dialogGone(sid string, e *dialogSeen) {
+	terminalinput.ClearPersonDraftSince(sid, e.first)
 }
 
 // keepOnly drops every entry whose session is not in live (an agent that slept, was archived or ended).
@@ -133,6 +150,7 @@ func (h *SessionsHandler) dialogPass(ctx context.Context, now time.Time) {
 	}
 	h.dialogs.keepOnly(live)
 	h.focus.keepOnly(live)
+	terminalinput.KeepPersonDrafts(live) // an agent that ended, slept or was archived keeps no unsent-text flag
 	for _, a := range opencodeAgents {
 		if ctx.Err() != nil {
 			return

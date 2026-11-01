@@ -9,7 +9,6 @@ import (
 	"time"
 
 	at "github.com/subgentic/coral/internal/agenttypes"
-	"github.com/subgentic/coral/internal/inputlog"
 	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/store"
@@ -267,7 +266,7 @@ func (h *SessionsHandler) dialogTimeout(ctx context.Context, a liveAgent, after 
 	if !h.episodes.take(a.sid, screen.AskID, now) {
 		return timeoutNotDue
 	}
-	inputlog.Note(pane, inputlog.Keys, "[dialog timeout closes a prompt]")
+	ptymanager.NoteDialogClose(pane)
 	if err := h.terminal.SendRawInput(ctx, terminalinput.Internal, pane, plan.keys, a.agentType, a.sid); err != nil {
 		slog.Warn("dialog timeout: the close was not sent", "session", a.sid, "error", err)
 		h.recordDialogClosed(ctx, a, first, now, plan.how, timeoutSendFailed)
