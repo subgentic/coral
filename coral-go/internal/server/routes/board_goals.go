@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -175,7 +176,32 @@ func (h *BoardHandler) CreateGoal(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+	h.announceGoalDriver(project, actor, g, "")
 	writeJSON(w, http.StatusCreated, g)
+}
+
+// announceGoalDriver tells the agent a goal was just given to, once, as a task's assignment does (#11649): a board message that mentions it and names the command that shows the goal, and a nudge into its terminal
+// when it has no task in progress. Nothing is said when there is no driver, when it is the writer, or (on an update) when the driver did not change from before. A message or nudge that cannot be sent is logged:
+// the goal is already written.
+func (h *BoardHandler) announceGoalDriver(project, actor string, g *board.Goal, before string) {
+	driver := strings.TrimSpace(g.Driver)
+	if driver == "" || board.SameIdentity(driver, before) || board.SameIdentity(driver, actor) {
+		return
+	}
+	id, title := g.ID, g.Title
+	h.goBG(func() {
+		ctx := context.Background()
+		show := "coral-board goal show " + strconv.FormatInt(id, 10)
+		busy, _ := h.bs.HasActiveTaskForAssignee(ctx, project, driver, 0)
+		if busy { // as a task assigned to an agent that is busy: the message waits for them, no one is interrupted
+			h.postNotice(ctx, project, fmt.Sprintf("[Goal #%d] %s now drives %q — notification deferred while they have an active task; run '%s'", id, driver, h.noticeText(ctx, project, title), show))
+			return
+		}
+		h.postNotice(ctx, project, fmt.Sprintf("@%s [Goal #%d] you now drive this goal: %s — run '%s' to read it", driver, id, h.noticeText(ctx, project, title), show))
+		if h.terminal != nil {
+			_ = h.sendTaskNudge(ctx, project, driver, fmt.Sprintf("[Goal #%d] You now drive this goal. Run '%s' to read it.", id, show))
+		}
+	})
 }
 
 // ListGoals: GET /api/board/{project}/goals?state=a,b&limit=n&cursor=c. A page of the board's goals, oldest first, in the task list's shape: limit defaults to 50 and is at most 200, next_cursor
@@ -355,8 +381,15 @@ func (h *BoardHandler) UpdateGoal(w http.ResponseWriter, r *http.Request) {
 		errBadRequest(w, "invalid JSON")
 		return
 	}
-	if _, ok := h.goalActor(w, r, project, body.SubscriberID); !ok {
+	actor, ok := h.goalActor(w, r, project, body.SubscriberID)
+	if !ok {
 		return
+	}
+	var before string
+	if body.Driver != nil {
+		if cur, err := h.bs.GetGoal(r.Context(), project, id); err == nil {
+			before = cur.Driver
+		}
 	}
 	g, err := h.bs.UpdateGoal(r.Context(), project, id, board.GoalUpdate{Title: body.Title, Outcome: body.Outcome, DoneWhen: body.DoneWhen, State: body.State, BlockedOn: body.BlockedOn, Driver: body.Driver})
 	if err != nil {
@@ -364,6 +397,9 @@ func (h *BoardHandler) UpdateGoal(w http.ResponseWriter, r *http.Request) {
 			errInternalServer(w, err.Error())
 		}
 		return
+	}
+	if body.Driver != nil {
+		h.announceGoalDriver(project, actor, g, before)
 	}
 	writeJSON(w, http.StatusOK, g)
 }

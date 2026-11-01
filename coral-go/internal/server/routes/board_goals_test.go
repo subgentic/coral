@@ -19,8 +19,7 @@ import (
 	"github.com/subgentic/coral/pkg/tunnel"
 )
 
-// #7087: the goal routes. A goal is board text: the Operator and an orchestrator write it, anyone reads it, a goal of another board looks like no goal, and nothing here starts, wakes or
-// messages an agent.
+// #7087: the goal routes. A goal is board text: the Operator and an orchestrator write it, anyone reads it, a goal of another board looks like no goal, and nothing here starts or wakes an agent (a goal given to a driver is told to it once, as a board message and a nudge to a live agent: TestAGoalDriverIsToldOnce).
 
 func goalCall(t *testing.T, base string) func(method, path string, body any) (int, map[string]any) {
 	t.Helper()
@@ -539,4 +538,60 @@ func TestGoalListCarriesNoGoalOpen(t *testing.T) {
 	code, all = call("GET", "/api/goals?limit=1", nil)
 	require.Equal(t, 200, code)
 	assert.NotContains(t, all, "no_goal_open")
+}
+
+// A goal made with, or moved to, an agent as its driver tells that agent once, as a task assignment does (#11649, the Operator's goal #184 reached its Orchestrator with nothing): a board message that
+// mentions the driver, with the command that shows the goal. Nothing is said when the driver is the writer, when a write leaves the driver as it was, or when the driver is cleared.
+func TestAGoalDriverIsToldOnce(t *testing.T) {
+	server, h := setupBoardTestServer(t)
+	ctx := context.Background()
+	registerTaskPlanner(t, h, "team", "Orchestrator")
+	_, err := h.bs.Subscribe(ctx, "team", "Dev", "Developer", "", nil, "mentions", false)
+	require.NoError(t, err)
+	call := goalCall(t, server.URL)
+	told := func() []string {
+		t.Helper()
+		h.WaitBackground()
+		msgs, err := h.bs.ListMessages(ctx, "team", 100, 0, 0)
+		require.NoError(t, err)
+		var out []string
+		for _, m := range msgs {
+			if strings.Contains(m.Content, "drive") {
+				out = append(out, m.Content)
+			}
+		}
+		return out
+	}
+
+	// The Operator names the Orchestrator as driver: one message that mentions it and says how to read the goal.
+	code, g := call("POST", "/api/board/team/goals", map[string]any{"title": "Phone comments", "outcome": "o", "done_when": "d", "driver": "Orchestrator", "subscriber_id": "Operator"})
+	require.Equal(t, http.StatusCreated, code, "%v", g)
+	id := itoa(int64(g["id"].(float64)))
+	msgs := told()
+	require.Len(t, msgs, 1, "%v", msgs)
+	assert.Contains(t, msgs[0], "@Orchestrator")
+	assert.Contains(t, msgs[0], "Phone comments")
+	assert.Contains(t, msgs[0], "coral-board goal show "+id)
+
+	// Saying the same driver again, or any other change, says nothing more; so does clearing it.
+	code, _ = call("PATCH", "/api/board/team/goals/"+id, map[string]any{"driver": "Orchestrator", "subscriber_id": "Operator"})
+	require.Equal(t, 200, code)
+	code, _ = call("PATCH", "/api/board/team/goals/"+id, map[string]any{"outcome": "a new outcome", "subscriber_id": "Operator"})
+	require.Equal(t, 200, code)
+	assert.Len(t, told(), 1)
+
+	// Moving it to another agent tells that agent once.
+	code, _ = call("PATCH", "/api/board/team/goals/"+id, map[string]any{"driver": "Dev", "subscriber_id": "Operator"})
+	require.Equal(t, 200, code)
+	msgs = told()
+	require.Len(t, msgs, 2, "%v", msgs)
+	assert.Contains(t, msgs[1], "@Dev")
+	code, _ = call("PATCH", "/api/board/team/goals/"+id, map[string]any{"driver": "", "subscriber_id": "Operator"})
+	require.Equal(t, 200, code)
+	assert.Len(t, told(), 2)
+
+	// An orchestrator who names itself as driver is not told what it just did.
+	code, g = call("POST", "/api/board/team/goals", map[string]any{"title": "My own goal", "outcome": "o", "done_when": "d", "driver": "Orchestrator", "subscriber_id": "Orchestrator"})
+	require.Equal(t, http.StatusCreated, code, "%v", g)
+	assert.Len(t, told(), 2)
 }
