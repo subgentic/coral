@@ -514,6 +514,17 @@ function renderInboxNav(force = false) {
     refreshGroupTable('hub-inbox');
 }
 
+/** A count arrived (the Artifacts folder's): the folder list and an open item's own list follow it, and nothing else is drawn. The table on screen is not touched: renderInboxNav ends by drawing it again, and for the Artifacts folder that
+ *  emptied the list and built it a second time within a few milliseconds when the count came in (#11692: a visible flash, and a click that landed between the two). The folder going away (a grantee) still takes the full draw. */
+function renderFolderCounts() {
+    const list = $('inbox-nav-list');
+    if (!list || !_folders || !list.contains(_folders) || (group === 'artifacts' && nativeInbox() && IA.artifactsOwnerOnly())) { renderInboxNav(true); return; }
+    const here = navCurrent(), sections = folderSections();
+    VL.update(_folders, { sections, current: here });
+    const pageList = page && $('inbox-page')?.querySelector('[data-view-list="inbox-goal-folders"], [data-view-list="inbox-item-folders"]');
+    if (pageList) VL.update(pageList, { sections, current: here });
+}
+
 // ── The tables ───────────────────────────────────────────────────────────
 /** Saved uses the same columns in the Inbox and dock; only its opener and table state differ. */
 function savedListSpec(where = '') {
@@ -632,7 +643,7 @@ function hubFrameTable(key) {
 
 registerGroupSource('hub-inbox', {
     signature: () => JSON.stringify([state.hub, state.servers]),
-    toolbar: key => HUB_FRAMES[key] && nativeInbox() ? null : key === 'needs' ? inboxNeedsToolbar() : key === 'tasks' ? inboxTaskToolbar() : key === 'goals' ? inboxGoalsToolbar() : key === 'saved' ? inboxSavedToolbar() : CH.CHAT_KEY.test(key) ? inboxChatsToolbar(key) : key === 'artifacts' ? IA.artifactsToolbar(() => renderInboxNav(true)) : ({ search: { id: 'inbox-search', label: 'Search the Inbox' } }), // the page's toolbar line, the same shape for Needs you, Tasks and Saved (#7723)
+    toolbar: key => HUB_FRAMES[key] && nativeInbox() ? null : key === 'needs' ? inboxNeedsToolbar() : key === 'tasks' ? inboxTaskToolbar() : key === 'goals' ? inboxGoalsToolbar() : key === 'saved' ? inboxSavedToolbar() : CH.CHAT_KEY.test(key) ? inboxChatsToolbar(key) : key === 'artifacts' ? IA.artifactsToolbar(() => renderFolderCounts()) : ({ search: { id: 'inbox-search', label: 'Search the Inbox' } }), // the page's toolbar line, the same shape for Needs you, Tasks and Saved (#7723)
     keys: () => GROUPS.map(g => g.key),
     redraw: () => renderInboxNav(true),
     table: key => {
@@ -915,7 +926,7 @@ export async function showInbox({ folder = '', quiet = false } = {}) {
     refreshBoards(); // the phone drawer's Boards group
     if (nativeInbox()) { // the Hub-served Inbox draws the chat folders, Goals and Artifacts: Needs you, Tasks and Saved are the Hub's own framed pages (no request for them)
         refreshGoals();
-        IA.refreshArtifactCount(() => renderInboxNav(true));
+        IA.refreshArtifactCount(() => renderFolderCounts());
     } else {
         refreshTasks();
         refreshReviews(true);
@@ -923,7 +934,7 @@ export async function showInbox({ folder = '', quiet = false } = {}) {
         refreshRuns(true);
         refreshOperatorAsks(true); // the questions agents asked the Operator (#11417)
         refreshGoals();
-        IA.refreshArtifactCount(() => renderInboxNav(true));
+        IA.refreshArtifactCount(() => renderFolderCounts());
         saved.loadSaved(); // everything's list (the Inbox is the all scope), read for the table and the count
     }
     if (quiet || (folder && state.currentSession && state.currentSession.type === 'history')) return; // a chat is on screen, or being opened (a saved message, a link to a chat): the Inbox is drawn under it, for the way back

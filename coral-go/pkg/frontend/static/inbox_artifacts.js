@@ -59,12 +59,16 @@ export function artifactsToolbar(redraw) {
         folderBar = IT.folderToolbar(inboxBarSpec(), next => list.setFilters(next));
         list.useBar(folderBar.bar, KEY);
     }
-    if (redraw) onCount = redraw; // the list tells the folder when it has read (its count, its teams, its names): the toolbar is drawn again
-    const teams = list.teams();
-    const pills = list.reviewPills();
-    const node = folderBar.draw({ filters: list.filters(), pills, options: { team: { values: teams.map(t => t.board_id), labels: Object.fromEntries(teams.map(t => [t.board_id, `${teamLabel(t.board_id, t.team)} (${t.all})`])) } } });
-    folderBar.bar.names(list.names());
-    return { node, signature: JSON.stringify([list.filters(), teams.map(t => [t.board_id, t.all]), pills && pills.items.map(i => i.count)]) };
+    // The bar is one node that is updated where it is: its pills, its team choices and its names follow the data by drawing into it again, so a count that arrives needs no more than that and the folder list
+    // (the sidebar's `redraw`): the rows on screen are not built again (#11692: they were, because the counts were part of the signature that tells the page to rebuild, and a click between the empty list and the new one hit nothing).
+    const paint = () => {
+        const teams = list.teams(), pills = list.reviewPills();
+        const node = folderBar.draw({ filters: list.filters(), pills, options: { team: { values: teams.map(t => t.board_id), labels: Object.fromEntries(teams.map(t => [t.board_id, `${teamLabel(t.board_id, t.team)} (${t.all})`])) } } });
+        folderBar.bar.names(list.names());
+        return node;
+    };
+    if (redraw) onCount = () => { paint(); redraw(); }; // the list tells the folder when it has read (its count, its teams, its names)
+    return { node: paint(), signature: JSON.stringify(list.filters()) };
 }
 
 /** The folder's page for the group table: its own title row, the list and the detail pane. */
