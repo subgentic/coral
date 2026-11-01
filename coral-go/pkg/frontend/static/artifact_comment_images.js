@@ -9,7 +9,7 @@ const HINT = 'Pictures are shared with this team\'s agents as they are; nothing 
 const MAX_BYTES = 25 * 1024 * 1024; // a larger file is refused here with the reason; the server's own cap is the one that counts
 const typeOf = f => String((f && f.type) || '').toLowerCase();
 
-/** The tray of one comment being written. `upload(blob, versionOf)` stores a picture and resolves its { hex, name, contentType, size }; `onChange()` is told whenever the pictures or their state change. */
+/** The tray of one comment being written. `upload(blob, versionOf)` stores (versionOf only on a marked-up copy; a route that has no versions may ignore it) a picture and resolves its { hex, name, contentType, size }; `onChange()` is told whenever the pictures or their state change. */
 export function createImageTray({ upload, onChange = () => {} }) {
     const node = el('div', 'ac-images'); node.hidden = true;
     const list = el('ul', 'ac-thumbs'); list.setAttribute('aria-label', 'Pictures to send with this comment');
@@ -27,7 +27,9 @@ export function createImageTray({ upload, onChange = () => {} }) {
             const state = el('span', 'ac-thumb-state', stateText); state.hidden = !stateText; if (it.state === 'failed') state.setAttribute('role', 'alert');
             const rm = el('button', 'btn btn-small ac-thumb-remove', 'Remove'); rm.type = 'button'; rm.setAttribute('aria-label', `Remove ${it.name || 'picture'}`);
             rm.addEventListener('click', () => remove(it.id));
-            li.append(img, state, rm);
+            const mk = el('button', 'btn btn-small ac-thumb-markup', 'Mark up'); mk.type = 'button'; mk.setAttribute('aria-label', `Mark up ${it.name || 'picture'}`); mk.hidden = it.state !== 'ready';
+            mk.addEventListener('click', () => markUp(it.id));
+            li.append(img, state, mk, rm);
             return li;
         }));
         node.hidden = items.length === 0 && note.hidden;
@@ -51,9 +53,23 @@ export function createImageTray({ upload, onChange = () => {} }) {
         for (const f of take) {
             const it = { id: ++seq, name: f.name || 'pasted-image', blob: f, previewUrl: URL.createObjectURL(f), hex: '', state: 'uploading', error: '' };
             items.push(it);
-            Promise.resolve().then(() => upload(f)).then(r => { it.hex = r.hex; it.state = 'ready'; }, e => { it.state = 'failed'; it.error = e && e.message ? e.message : 'Not stored'; }).finally(() => { if (!destroyed) draw(); });
+            Promise.resolve().then(() => upload(f, undefined)).then(r => { it.hex = r.hex; it.state = 'ready'; }, e => { it.state = 'failed'; it.error = e && e.message ? e.message : 'Not stored'; }).finally(() => { if (!destroyed) draw(); });
         }
         draw();
+    }
+    /** Mark up (#11654): the editor loads on the first use, its picture goes up as the next version of the one it marks (`versionOf` is the first version's hex, kept through repeated marking), and replaces it here. Cancel, or Done with no marks, changes nothing. */
+    async function markUp(id) {
+        const it = items.find(x => x.id === id); if (!it || it.state !== 'ready' || it.marking) return;
+        it.marking = true;
+        try {
+            const { openMarkup } = await importOnce('./image_markup.js'); // lazy: only Mark up loads it
+            const out = await openMarkup(it.blob);
+            if (!out || destroyed || !items.includes(it)) return;
+            const first = it.first || it.hex; it.state = 'uploading'; say(''); draw();
+            try { const r = await upload(out, first); if (!items.includes(it)) return; it.first = first; replaceBlob(id, out, r.hex); }
+            catch (e) { it.state = 'ready'; say(e && e.message ? e.message : 'The marked picture was not stored.'); draw(); }
+        } catch { say('The markup editor could not be opened.'); }
+        finally { it.marking = false; if (!destroyed) draw(); }
     }
     /** A marked-up version of a picture replaces it, its first version's series staying the comment's (#11654): the new blob is shown and the new hex is what Send names. */
     function replaceBlob(id, blob, hex) {

@@ -53,7 +53,7 @@ export async function openMarkup(blob) {
         const canvas = el('canvas', 'markup-canvas'); canvas.width = pic.w; canvas.height = pic.h; canvas.setAttribute('aria-label', 'The image: draw on it with a pen, finger or mouse');
         const cancel = el('button', 'btn', 'Cancel'); cancel.type = 'button';
         const done = el('button', 'btn btn-primary', 'Done'); done.type = 'button'; done.disabled = true;
-        const bar = el('div', 'markup-bar'); bar.append(tools, undo);
+        const bar = el('div', 'markup-controls'); bar.append(tools, undo);
         const foot = el('div', 'markup-foot'); foot.append(cancel, done);
         dlg.append(title, bar, el('div', 'markup-stage'), say, foot); dlg.querySelector('.markup-stage').append(canvas);
         const ctx = canvas.getContext('2d'), width = Math.max(3, Math.round(Math.max(pic.w, pic.h) / 150));
@@ -61,7 +61,7 @@ export async function openMarkup(blob) {
         const paint = () => { ctx.clearRect(0, 0, pic.w, pic.h); ctx.drawImage(pic.bmp, 0, 0, pic.w, pic.h); for (const s of marks) drawShape(ctx, s, width); if (live) drawShape(ctx, live, width); };
         const sync = () => { undo.disabled = !marks.length; done.disabled = !marks.length; say.textContent = marks.length ? `${marks.length} mark${marks.length === 1 ? '' : 's'}` : ''; paint(); };
         const at = e => { const r = canvas.getBoundingClientRect(); return { x: Math.min(pic.w, Math.max(0, (e.clientX - r.left) * pic.w / r.width)), y: Math.min(pic.h, Math.max(0, (e.clientY - r.top) * pic.h / r.height)) }; };
-        canvas.addEventListener('pointerdown', e => { if (e.button > 0 && e.pointerType === 'mouse') return; e.preventDefault(); canvas.setPointerCapture?.(e.pointerId); live = { tool, pts: [at(e)] }; paint(); });
+        canvas.addEventListener('pointerdown', e => { if (e.button > 0 && e.pointerType !== 'touch') return; e.preventDefault(); canvas.setPointerCapture?.(e.pointerId); live = { tool, pts: [at(e)] }; paint(); });
         canvas.addEventListener('pointermove', e => { if (!live) return; if (live.tool === 'pen') live.pts.push(at(e)); else live.pts = [live.pts[0], at(e)]; paint(); });
         const lift = e => { if (!live) return; const s = live; live = null; if (e.type === 'pointerup') { if (s.tool === 'pen' || s.pts.length > 1) marks.push(s); } sync(); };
         canvas.addEventListener('pointerup', lift); canvas.addEventListener('pointercancel', lift);
