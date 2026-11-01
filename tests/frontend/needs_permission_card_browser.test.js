@@ -43,6 +43,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
             check(await ev(`document.body.dataset.navTab`) === 'hub-inbox', at + 'Open leaves you in the Inbox');
             check(!!d && d.title === 'Backend Dev: Do you trust the files in this folder?' && /\/home\/me\/Coral\/team-a/.test(d.text) && /Only continue for a folder/.test(d.text) && !/files in this folder\? Do you trust/.test(d.text) && (d.text.match(/Do you trust the files/g) || []).length === 1, at + 'the card says what it asks once, the rest of the question and the folder: ' + JSON.stringify(d));
             check(!!d && d.buttons.join('|') === 'Yes, I trust this folder|No, exit', at + 'both of the card\'s own choices are buttons, the lasting one too: ' + JSON.stringify(d && d.buttons));
+            check(await ev(`(() => { const a = document.activeElement; return !!a && !a.closest('.inbox-ask-offers-list') && a.textContent === 'Close'; })()`), at + 'the keyboard is on Close, never on an answer: a key held down while the card draws cannot answer a permission');
             await shot(`needs-permission-card-${w}`);
             // answering: the choice, its number and the ask's id go to the route; the dialog closes and the answer is said
             await ev(`[...document.querySelectorAll('dialog.inbox-ask-dialog[open] .inbox-ask-offers-list button')][0].click(); true`);

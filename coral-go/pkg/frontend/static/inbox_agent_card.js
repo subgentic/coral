@@ -61,8 +61,7 @@ export function openAgentCard(s) {
             b.addEventListener('click', () => choose(card, o, list));
             list.append(b);
         }
-        body.append(list);
-        list.querySelector('button')?.focus();
+        body.append(list); // the keyboard stays on Close, set at open: a key still going down when the card draws must not answer a permission (the Agents chat card never moves the focus onto an answer either)
     };
     async function choose(card, o, list) {
         const buttons = [...list.querySelectorAll('button')]; buttons.forEach(b => { b.disabled = true; });
