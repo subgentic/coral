@@ -22,11 +22,17 @@ import (
 //     ptymanager.RefuseIfForeign.
 //
 // A new function that calls a primitive fails here until a reviewer lists it. A listed one that no longer exists fails too.
+//
+// SCOPE: internal/server/routes and internal/background only. A launcher added in another package (internal/startup, internal/server, cmd) is not seen by this census; such a package must be added
+// to scanDirs when it gains one. The second pass (TestEveryCallerOfAPersonTriggeredFunctionIsAHandlerListedOrGated) covers the callers of the helpers pinned below.
 var primitives = map[string]bool{
 	"Spawn": true, "CreateSession": true, "RestartPane": true,
 	"KillAgent": true, "KillSession": true, "KillSessionOnly": true,
 	"LaunchAgent": true, "wakeExistingSession": true,
 }
+
+// scanDirs are the folders the census reads (see SCOPE above).
+var scanDirs = []string{"../server/routes", "../background"}
 
 const (
 	person = "person-triggered"
@@ -73,13 +79,14 @@ type fnInfo struct {
 	key     string
 	handler bool
 	calls   []string
+	callees map[string]bool // every function called by name in the body
 	gate    bool
 }
 
 func scan(t *testing.T) map[string]*fnInfo {
 	t.Helper()
 	out := map[string]*fnInfo{}
-	for _, dir := range []string{"../server/routes", "../background"} {
+	for _, dir := range scanDirs {
 		files, err := filepath.Glob(filepath.Join(dir, "*.go"))
 		require.NoError(t, err)
 		for _, f := range files {
@@ -103,7 +110,7 @@ func scan(t *testing.T) map[string]*fnInfo {
 						name = id.Name + "." + name
 					}
 				}
-				info := &fnInfo{key: filepath.Base(f) + " " + name}
+				info := &fnInfo{key: filepath.Base(f) + " " + name, callees: map[string]bool{}}
 				for _, p := range fn.Type.Params.List {
 					if sel, ok := p.Type.(*ast.SelectorExpr); ok && sel.Sel.Name == "ResponseWriter" {
 						info.handler = true
@@ -122,6 +129,7 @@ func scan(t *testing.T) map[string]*fnInfo {
 					case *ast.Ident:
 						callee = f.Name
 					}
+					info.callees[callee] = true
 					if primitives[callee] && !seen[callee] {
 						seen[callee] = true
 						info.calls = append(info.calls, callee)
@@ -135,6 +143,9 @@ func scan(t *testing.T) map[string]*fnInfo {
 				if prev, dup := out[info.key]; dup { // the same name twice in a package folder pair: keep both facts
 					prev.calls = append(prev.calls, info.calls...)
 					prev.gate = prev.gate || info.gate
+					for c := range info.callees {
+						prev.callees[c] = true
+					}
 					prev.handler = prev.handler || info.handler
 					continue
 				}
@@ -185,5 +196,59 @@ func TestTheGatedEntriesAskTheForeignGate(t *testing.T) {
 				assert.Contains(t, why, "only reached from", key)
 			}
 		}
+	}
+}
+
+// guardedHelpers are the helpers pinned above as reached only from a person's action or a gated entry. The second pass: every function that CALLS one of them is itself an HTTP handler, pinned in
+// pinnedSites or gatedEntries, or listed in pinnedCallers with why. So a new background caller of startWake or restartTerminal cannot slip past the first pass, which only sees the primitives.
+var guardedHelpers = []string{"startOnBackend", "startOnTmux", "restartTerminal", "startWake", "sleepNow", "killRunSession", "endRunSession", "autoWakeOne", "launchSession", "wakeExistingSession"}
+
+// pinnedCallers are the callers of the guarded helpers that are neither handlers nor pinned above: each is reached only from the handler or gated entry named.
+var pinnedCallers = map[string]string{
+	"scheduler.go JobScheduler.KillRun":                        "the run-kill handler (tasks.go) and the workflow run handlers",
+	"scheduler.go JobScheduler.finishRun":                      "only reached from the scheduler's ticks and watchers (JobScheduler.Run returns at once in a foreign Coral) or a run a person started",
+	"scheduler_reap.go JobScheduler.reapStaleRuns":             "only reached from JobScheduler.Run, which returns at once in a foreign Coral",
+	"scheduler_turn.go JobScheduler.settleOnTurn":              "only reached from the scheduler's turn watchers (started by Run or by a run a person started)",
+	"sessions_launch_session.go SessionsHandler.launchSession": "the launch, team launch, team lifecycle and team reset handlers",
+	"sessions_launch_team.go SessionsHandler.launchTeamMember": "the team launch handlers",
+	"sessions_wake.go SessionsHandler.wakeExistingSession":     "the wake handlers; its two background callers (autoResume, autoWakeOne) are gated entries",
+}
+
+func TestEveryCallerOfAPersonTriggeredFunctionIsAHandlerListedOrGated(t *testing.T) {
+	all := scan(t)
+	isGuarded := map[string]bool{}
+	for _, h := range guardedHelpers {
+		isGuarded[h] = true
+	}
+	var unknown []string
+	for key, fn := range all {
+		if fn.handler {
+			continue
+		}
+		var hits []string
+		for h := range isGuarded {
+			if fn.callees[h] && !strings.HasSuffix(key, " "+h) && !strings.HasSuffix(key, "."+h) {
+				hits = append(hits, h)
+			}
+		}
+		if len(hits) == 0 {
+			continue
+		}
+		_, pinned := pinnedSites[key]
+		_, extra := pinnedCallers[key]
+		gate := false
+		for _, g := range gatedEntries {
+			gate = gate || g == key
+		}
+		if !pinned && !extra && !gate {
+			sort.Strings(hits)
+			unknown = append(unknown, fmt.Sprintf("%s calls %v", key, hits))
+		}
+	}
+	sort.Strings(unknown)
+	assert.Empty(t, unknown, "a function that calls a person-triggered helper must be an HTTP handler, or be listed in pinnedSites, gatedEntries or pinnedCallers")
+	for key := range pinnedCallers {
+		_, ok := all[key]
+		assert.True(t, ok, "%s is listed in pinnedCallers but no longer exists", key)
 	}
 }
