@@ -108,7 +108,7 @@ func Open(home string) (*DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	u := url.URL{Scheme: "file", Path: "/" + strings.TrimPrefix(filepath.ToSlash(p), "/"), RawQuery: "mode=ro&_pragma=busy_timeout(3000)&_pragma=query_only(1)"}
+	u := url.URL{Scheme: "file", Path: "/" + strings.TrimPrefix(filepath.ToSlash(p), "/"), RawQuery: "mode=ro&_pragma=busy_timeout(3000)&_pragma=query_only(1)&_pragma=trusted_schema(0)"}
 	db, err := sql.Open("sqlite", u.String())
 	if err != nil {
 		return nil, err

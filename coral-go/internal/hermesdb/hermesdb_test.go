@@ -237,3 +237,14 @@ func TestAContextThatIsDoneStopsARead(t *testing.T) {
 	_, err := d.Messages(ctx, idA, 0, 0)
 	assert.True(t, errors.Is(err, context.Canceled), "%v", err)
 }
+
+// The file is one the agent can write: the engine does not trust its schema (a view or trigger it planted must not call a function), and query_only stays on.
+func TestTheDatabaseIsOpenedWithAnUntrustedSchema(t *testing.T) {
+	r := newRig(t, fullSchema)
+	d := open(t, r.home)
+	var trusted, queryOnly int
+	require.NoError(t, d.db.QueryRow(`PRAGMA trusted_schema`).Scan(&trusted))
+	require.NoError(t, d.db.QueryRow(`PRAGMA query_only`).Scan(&queryOnly))
+	assert.Equal(t, 0, trusted)
+	assert.Equal(t, 1, queryOnly)
+}

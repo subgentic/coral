@@ -55,6 +55,9 @@ func privateDir(dir string) error {
 	if !fi.IsDir() {
 		return fmt.Errorf("hermes: %s is not a plain folder", filepath.Base(dir))
 	}
+	if fi.Mode().Perm()&0o077 != 0 { // made looser by an earlier version or by hand: the agent can write in it
+		return os.Chmod(dir, 0o700)
+	}
 	return nil
 }
 
@@ -166,6 +169,8 @@ func seedHermesEnv(home, personHome string) error {
 	return werr
 }
 
+// A seeded config carries the person's own Hermes settings into the team home as they are, their approval settings included (a person who turned approvals off in their own Hermes has them off here): only the hooks
+// block, hooks_auto_accept and the telemetry answer are Coral's (#11831, Security's INFO).
 // writeHermesConfig writes the home's config.yaml: the team's own if it has one, else the person's (a seed), with the top-level hooks block replaced by Coral's entries (none when there are none) and hooks_auto_accept
 // removed. Every other setting is kept as it was, comments included.
 func writeHermesConfig(home, personHome string, commands map[string]string) error {

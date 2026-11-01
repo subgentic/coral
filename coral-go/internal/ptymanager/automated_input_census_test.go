@@ -83,8 +83,6 @@ var allowedSenders = map[string]sender{
 	"internal/server/routes/human_send.go\tSessionsHandler.deliverHumanSend\tSendInput":    {guardHuman, "human: a person's message from Chat (#4587)", ""},
 	"internal/server/routes/human_send.go\tSessionsHandler.deliverHumanSend\tSendEnter":    {guardHuman, "human: the same message's Enter again, while exactly its text is still in the box (#4587)", ""},
 	"internal/server/routes/sessions_input.go\tSessionsHandler.Keys\tSendRawInput":         {guardHuman, "human, else gated", ""},
-	// #11831: Hermes's first-run telemetry question, answered with the default only while it is on screen with "No thanks" selected (the screen is read before every Enter, and "Share" is never answered).
-	"internal/ptymanager/hermes_telemetry.go\tAnswerHermesTelemetry\tSendEnter": {guardScreen, "the telemetry question is on screen with No thanks selected, read just before the Enter", "TestAnswerHermesTelemetryNeverAnswersShareAndGivesUpAfterTheWait"},
 	// Launch commands typed into a fresh shell, before any agent CLI runs.
 	"internal/background/runtime_tmux.go\tTmuxRuntime.SpawnAgent\tSendKeysToTarget": {guardLaunch, "launch command", ""},
 	"cmd/launch-coral/main.go\tlaunchAgentSessions\tSendKeysToTarget":               {guardLaunch, "launch command", ""},

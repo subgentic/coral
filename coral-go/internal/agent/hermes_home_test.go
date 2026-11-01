@@ -347,3 +347,23 @@ func TestTheHookIsInstalledOnlyWhenNobodyElseCanChangeTheTool(t *testing.T) {
 	require.NoError(t, os.Symlink(elsewhere, filepath.Join(r2.tools, "coral-hook-agentic-state")))
 	assert.Zero(t, hooksOf(r2))
 }
+
+// An existing folder that is looser than 0700 (made by an earlier version, or by hand) is brought back to 0700: the agent can write in it.
+func TestAnExistingLooserHomeFolderIsMadePrivate(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("modes")
+	}
+	r := hermesRig(t)
+	homes := filepath.Join(r.data, hermesHomesFolder)
+	home := HermesTeamHome(r.data, "t")
+	require.NoError(t, os.MkdirAll(home, 0o755))
+	require.NoError(t, os.Chmod(homes, 0o755))
+	require.NoError(t, os.Chmod(home, 0o755))
+	_, err := PrepareHermesHome(r.data, "t", r.person, time.Now())
+	require.NoError(t, err)
+	for _, p := range []string{homes, home} {
+		fi, err := os.Stat(p)
+		require.NoError(t, err)
+		assert.Equal(t, os.FileMode(0o700), fi.Mode().Perm(), p)
+	}
+}
