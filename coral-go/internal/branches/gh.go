@@ -13,11 +13,15 @@ import (
 	"github.com/subgentic/coral/internal/executil"
 )
 
-// PR state from the GitHub CLI (Security's #6802 MUST 3 and #6804): one `gh pr list` per repository, only for a repository whose origin is on github.com, with -R built from that parsed
-// remote and never the repository's own default; only while the repository's tab was read recently (the collector's wanted rule); at most every prEvery, with jitter, and at most
+// PR state from the GitHub CLI (Security's #6802 MUST 3, #6804 and #6985): one `gh pr list` per repository, only for a repository whose origin is on github.com, with -R built from that
+// parsed remote, host included, and never the repository's own default or gh's default host; only while the repository's tab was read recently (the collector's wanted rule); at most every prEvery, with jitter, and at most
 // prReposPerPass repositories a pass. gh uses its own sign-in (the operator's GitHub identity; Coral never reads, passes or stores a token) and gets a small environment with prompts
 // off and no input. Only the state, draft, checks and review decision of each PR are kept: no title, body or author. gh's own messages are never shown or stored: a rate limit stops
-// it for prPause ("PR status paused (rate limit)"), a missing sign-in says "PR status needs gh signed in" and is asked again after prPause, and no gh at all hides PR state.
+// every gh call of the collector for prPause ("PR status paused (rate limit)"), a missing sign-in says "PR status needs gh signed in" and stops them for prPause too, a refusal (a 403
+// that is not a rate limit) stops that repository's for prPause ("PR status not available"), and no gh at all hides PR state.
+//
+// A PR is shown for a worktree by commit only (matchPRs): its head is the worktree's tip, or its branch's name matches and its head is an ancestor of the tip. Its state is the
+// operator's GitHub identity's view, so it is shown only for commits the repository already has.
 
 const (
 	prEvery        = 2 * time.Minute
@@ -28,8 +32,9 @@ const (
 	ghTimeout      = 15 * time.Second
 	ghLookEvery    = time.Hour
 
-	PRNoteSignIn = "PR status needs gh signed in"
-	PRNotePaused = "PR status paused (rate limit)"
+	PRNoteSignIn   = "PR status needs gh signed in"
+	PRNotePaused   = "PR status paused (rate limit)"
+	PRNoteNoAccess = "PR status not available"
 )
 
 // prHosts are the hosts PR state is asked for: github.com only.
@@ -53,12 +58,17 @@ type prState struct {
 	next   time.Time // when to ask again
 	byOid  map[string]PR
 	byName map[string]PR
-	note   string
+	note   string          // this repository's own note (PRNoteNoAccess); the collector-wide one is Collector.ghNote
+	match  map[string]PR   // each worktree's PR, by matchKey: what withPRs shows
+	anc    map[string]bool // ancestor answers (PR head..tip), kept until the next gh answer
 }
+
+// matchKey is a worktree's key in prState.match.
+func matchKey(w Worktree) string { return w.Branch + "\x00" + w.tip }
 
 // ghArgs is the one command gh is run with, for owner/name.
 func ghArgs(r Remote) []string {
-	return []string{"pr", "list", "-R", r.Owner + "/" + r.Name, "--state", "all", "--limit", prLimit, "--json", prFields}
+	return []string{"pr", "list", "-R", r.Host + "/" + r.Owner + "/" + r.Name, "--state", "all", "--limit", prLimit, "--json", prFields}
 }
 
 // ghEnv is gh's whole environment: what it needs to find itself and its sign-in, and nothing of the repository's or Coral's.
@@ -85,14 +95,17 @@ func runGh(ctx context.Context, path string, args ...string) ([]byte, string, er
 	return out.Bytes(), errOut.String(), err
 }
 
-// ghFailure is what a failed gh run means for the tab: a rate limit pauses it, a missing sign-in says so; anything else is asked again at the next interval.
+// ghFailure is what a failed gh run means for the tab: a rate limit pauses it, a missing sign-in says so, a 403 that is not a rate limit is that repository's refusal (Security's #6985
+// INFO a); anything else is asked again at the next interval.
 func ghFailure(stderr string) string {
 	s := strings.ToLower(stderr)
 	switch {
-	case strings.Contains(s, "rate limit"), strings.Contains(s, "http 403"), strings.Contains(s, "http 429"):
+	case strings.Contains(s, "rate limit"), strings.Contains(s, "http 429"):
 		return PRNotePaused
 	case strings.Contains(s, "gh auth login"), strings.Contains(s, "not logged"), strings.Contains(s, "authentication"), strings.Contains(s, "http 401"):
 		return PRNoteSignIn
+	case strings.Contains(s, "http 403"):
+		return PRNoteNoAccess
 	}
 	return ""
 }
@@ -124,7 +137,7 @@ func (c *Collector) refreshPRs(ctx context.Context, key string, r Remote) {
 		st = &prState{}
 		c.prs[key] = st
 	}
-	due := !now.Before(st.next)
+	due := !now.Before(st.next) && !now.Before(c.ghPause) // one pause for every repository: a rate limit or a sign-in is the operator's, not a repository's
 	c.mu.Unlock()
 	if !due {
 		return
@@ -140,11 +153,13 @@ func (c *Collector) refreshPRs(ctx context.Context, key string, r Remote) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if err != nil {
-		note := ghFailure(stderr)
-		st.note = note
 		st.next = now.Add(prEvery)
-		if note != "" {
-			st.next = now.Add(prPause)
+		switch note := ghFailure(stderr); note {
+		case PRNotePaused, PRNoteSignIn:
+			c.ghPause, c.ghNote = now.Add(prPause), note
+		case PRNoteNoAccess: // gh was answered, signed in: only this repository is refused
+			c.ghNote = ""
+			st.next, st.note, st.byOid, st.byName, st.match, st.anc = now.Add(prPause), note, nil, nil, nil, nil
 		}
 		return
 	}
@@ -153,7 +168,8 @@ func (c *Collector) refreshPRs(ctx context.Context, key string, r Remote) {
 		st.next = now.Add(prEvery)
 		return
 	}
-	st.byOid, st.byName, st.note = byOid, byName, ""
+	c.ghNote = ""
+	st.byOid, st.byName, st.note, st.anc = byOid, byName, "", nil
 	st.next = now.Add(prEvery + time.Duration(rand.Int64N(int64(prJitter))))
 }
 
@@ -228,19 +244,80 @@ func parsePRs(out []byte) (map[string]PR, map[string]PR, bool) {
 	return byOid, byName, true
 }
 
-// withPRs is repo with each worktree's PR, from the PR state of its repository: by the worktree's head commit, else by its branch's name. A merged PR whose head is the worktree's own
-// commit means its commits are in (a squash merge, which git cannot see): no commits left to merge.
-func withPRs(repo Repo, st *prState) Repo {
+// matchPRs finds each worktree's PR in repository key (read in root) by commit only (Security's #6985 SHOULD 1): the PR whose head is the worktree's tip, else the PR of the branch's
+// name when its head is an ancestor of the tip (merge-base --is-ancestor, commit ids only). A name alone never shows a PR: its head must be in the worktree's own history.
+func (c *Collector) matchPRs(ctx context.Context, key, root string) {
+	type check struct {
+		k, oid, tip string
+		pr          PR
+	}
+	c.mu.Lock()
+	st, r := c.prs[key], c.repos[key]
+	if st == nil || r == nil {
+		c.mu.Unlock()
+		return
+	}
+	match := map[string]PR{}
+	var checks []check
+	for _, w := range r.Worktrees {
+		if !validSHA(w.tip) {
+			continue
+		}
+		if pr, ok := st.byOid[w.tip]; ok {
+			match[matchKey(w)] = pr
+			continue
+		}
+		pr, ok := st.byName[w.Branch]
+		if !ok || w.Branch == "" || !validSHA(pr.oid) {
+			continue
+		}
+		if is, known := st.anc[pr.oid+".."+w.tip]; known {
+			if is {
+				match[matchKey(w)] = pr
+			}
+			continue
+		}
+		checks = append(checks, check{matchKey(w), pr.oid, w.tip, pr})
+	}
+	c.mu.Unlock()
+	found := map[string]bool{}
+	for _, ck := range checks {
+		_, err := c.run(ctx, root, "merge-base", "--is-ancestor", "--end-of-options", ck.oid, ck.tip)
+		if ctx.Err() != nil {
+			break // out of time: asked again next pass, never taken for a "no"
+		}
+		found[ck.oid+".."+ck.tip] = err == nil // a head this repository does not have is not an ancestor
+		if err == nil {
+			match[ck.k] = ck.pr
+		}
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.prs[key] != st {
+		return
+	}
+	if st.anc == nil {
+		st.anc = map[string]bool{}
+	}
+	for k, v := range found {
+		st.anc[k] = v
+	}
+	st.match = match
+}
+
+// withPRs is repo with each worktree's PR, as matchPRs found it, and the note of why PR state is not shown (ghNote, the collector's, else the repository's). A merged PR whose head is
+// the worktree's own commit means its commits are in (a squash merge, which git cannot see): no commits left to merge.
+func withPRs(repo Repo, st *prState, ghNote string) Repo {
 	if st == nil {
 		return repo
 	}
-	repo.PRNote = st.note
+	repo.PRNote = ghNote
+	if repo.PRNote == "" {
+		repo.PRNote = st.note
+	}
 	for i := range repo.Worktrees {
 		w := &repo.Worktrees[i]
-		pr, ok := st.byOid[w.tip]
-		if !ok && w.Branch != "" {
-			pr, ok = st.byName[w.Branch]
-		}
+		pr, ok := st.match[matchKey(*w)]
 		if !ok {
 			continue
 		}
