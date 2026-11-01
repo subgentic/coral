@@ -120,12 +120,16 @@ function wireDrawer(root, nav) {
 
 /** The phone's strip scrolls sideways when its tabs do not fit: `data-overflow` is on the nav while there is more to the right, and the stylesheet draws a chevron at the edge then (#11583: the last tab was cut with only a faint fade). */
 function wireEdge(nav) {
-    // The chevron is a button of its own, outside the strip: a tap on it scrolls and picks nothing (it was drawn over the last tab, so the tap fell through and chose that tab, #11620). The strip keeps its own padding under it.
+    // The chevron is a button of its own, beside the strip and never over a tab (#11620, #11656): while the tabs are wider than the list the strip gives 44 px of its width to it (data-edge-room on the list), so a tap on it scrolls and picks nothing, and no tab is under it at any text size. It shows while there is more to the right.
+    const root = nav.parentNode;
     const btn = el('button', 'btn btn-quiet btn-icon view-list-edge-tap'); btn.type = 'button'; btn.hidden = true; btn.tabIndex = -1; btn.setAttribute('aria-hidden', 'true'); btn.setAttribute('aria-label', 'Scroll tabs'); // the keys already move the strip: not a second stop
     btn.addEventListener('click', () => nav.scrollBy({ left: Math.max(96, nav.clientWidth * 0.6), behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }));
     nav.after(btn);
-    const edge = () => { const more = nav.scrollLeft + nav.clientWidth < nav.scrollWidth - 2; nav.toggleAttribute('data-overflow', more); btn.hidden = !more; };
-    nav._edge = edge; nav.addEventListener('scroll', edge, { passive: true }); new ResizeObserver(edge).observe(nav);
+    const edge = () => {
+        const room = nav.scrollWidth > root.clientWidth + 2, more = room && nav.scrollLeft + nav.clientWidth < nav.scrollWidth - 2; // room is measured against the list, not the strip, so giving the strip's end to the button does not flip it
+        root.toggleAttribute('data-edge-room', room); nav.toggleAttribute('data-overflow', more); btn.hidden = !more;
+    };
+    nav._edge = edge; nav.addEventListener('scroll', edge, { passive: true }); const ro = new ResizeObserver(edge); ro.observe(nav); ro.observe(root);
 }
 
 export function build({ id, label, sections, current, onPick, drawer = false, tabs = false }) {

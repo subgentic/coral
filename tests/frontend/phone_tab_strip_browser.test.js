@@ -22,7 +22,7 @@ const { coralReady } = require('./helpers/wait');
                 await wait(); const start = { over: nav.hasAttribute('data-overflow'), cue: cue(), overflow: nav.scrollWidth > nav.clientWidth };
                 nav.scrollLeft = nav.scrollWidth; await wait(); const tabs = [...nav.querySelectorAll('.vl-tab')], last = tabs[tabs.length - 1].getBoundingClientRect(), nr = nav.getBoundingClientRect();
                 const end = { over: nav.hasAttribute('data-overflow'), cue: cue(), lastInside: Math.round(last.right) <= Math.round(nr.right) && Math.round(last.left) >= 0, lastRight: Math.round(last.right), navRight: Math.round(nr.right) };
-                const padEnd = parseFloat(getComputedStyle(nav).paddingRight); nav.scrollLeft = 0; await wait(); const b = root.querySelector('.view-list-edge-tap').getBoundingClientRect(); window.__btn = { x: b.left + b.width / 2, y: b.top + b.height / 2, w: b.width, h: b.height }; window.__edge = { padEnd, left0: nav.scrollLeft };
+                const geo = () => { const bb = root.querySelector('.view-list-edge-tap').getBoundingClientRect(), nr = nav.getBoundingClientRect(), rr = root.getBoundingClientRect(); return { gap: Math.round(rr.right - nr.right), btnW: Math.round(bb.width), btnH: Math.round(bb.height), over: [...nav.querySelectorAll('.vl-tab')].filter(t => { const r0 = t.getBoundingClientRect(), r = { left: Math.max(r0.left, nr.left), right: Math.min(r0.right, nr.right), top: r0.top, bottom: r0.bottom }; /* what the strip shows of the tab: the rest is clipped and takes no tap */ return r.right > bb.left + 0.5 && r.left < bb.right - 0.5 && r.bottom > bb.top + 0.5 && r.top < bb.bottom - 0.5; }).length }; }; window.__geo = geo; nav.scrollLeft = 0; await wait(); const b = root.querySelector('.view-list-edge-tap').getBoundingClientRect(); window.__btn = { x: b.left + b.width / 2, y: b.top + b.height / 2, w: b.width, h: b.height }; window.__edge = { padEnd: 0, left0: nav.scrollLeft };
                 return { start, end }; })()`);
             if (!fits) {
                 const b = await ev('window.__btn'); const before = await ev(`document.querySelector('#tabs-probe .view-list-nav').scrollLeft`);
@@ -31,7 +31,15 @@ const { coralReady } = require('./helpers/wait');
                 const after = await ev(`({ left: document.querySelector('#tabs-probe .view-list-nav').scrollLeft, picks: window.__picks, pad: window.__edge.padEnd })`);
                 assert.ok(after.left > before, `${w}: a tap on the chevron scrolls the strip (${before} -> ${after.left})`);
                 assert.deepEqual(after.picks, [], `${w}: and picks no tab (it chose Saved before, #11620): ${JSON.stringify(after)}`);
-                assert.ok(after.pad >= 44 && b.w >= 44 && b.h >= 44, `${w}: the strip keeps 44 px clear at its end and the button is a touch target: ${JSON.stringify({ after, b })}`);
+                assert.ok(b.w >= 44 && b.h >= 44, `${w}: the button is a touch target: ${JSON.stringify(b)}`);
+                // beside the strip, never over a tab, at 100% and at 200% text (#11656: at 200% the chevron was 22 px wide and over the Tasks tab)
+                for (const zoom of [1, 2]) {
+                    await ev(`document.documentElement.style.fontSize = '${zoom * 16}px'; true`); await new Promise(r => setTimeout(r, 400)); // sleep-ok: the text size settles the strip
+                    await ev(`document.querySelector('#tabs-probe .view-list-nav').scrollLeft = 0; true`); await new Promise(r => setTimeout(r, 300)); // sleep-ok: the scroll event settles
+                    const g = await ev('window.__geo()');
+                    assert.ok(g.gap >= 44 && g.btnW >= 44 && g.btnH >= 44 && g.over === 0, `${w} at ${zoom * 100}% text: the strip ends 44 px short of the list's edge, the button is 44 px and no tab is under it: ${JSON.stringify(g)}`);
+                }
+                await ev(`document.documentElement.style.fontSize = ''; true`);
             }
             if (fits) assert.deepEqual([r.start.overflow, r.start.over, r.start.cue], [false, false, false], `${w}: a strip that fits draws no cue: ${JSON.stringify(r)}`);
             else {
