@@ -27,7 +27,7 @@ export const PAGES = [
     { id: 'agent-chat-waiting', world: 'seeded', path: '/agents/{agentWaiting}', notes: 'an agent waiting for the person: the permission question' },
     { id: 'agent-chat-idle', world: 'seeded', path: '/agents/{agentIdle}', notes: 'an idle agent that has answered' },
     { id: 'agent-asleep', world: 'seeded', path: '/agents/{agentAsleep}', notes: 'a sleeping agent' },
-    ...['board', 'tasks', 'notes', 'files', 'browse', 'artifacts', 'activity', 'agent-ui'].map(sub => agent('tab', 'Working', sub)),
+    ...['board', 'tasks', 'notes', 'files', 'browse', 'artifacts', 'activity', 'agent-ui', 'branches'].map(sub => agent('tab', 'Working', sub)),
     // A team and its tabs (the path word of the Board tab is "board")
     { id: 'team-goals', world: 'seeded', path: '/team/{team}' },
     { id: 'team-agents', world: 'seeded', path: '/team/{team}/agents' },
