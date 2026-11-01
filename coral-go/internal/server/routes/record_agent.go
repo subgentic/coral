@@ -6,6 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -289,28 +290,48 @@ func sameImage(image, cli string) bool {
 	}
 	a, b := resolvedPath(image), resolvedPath(cli)
 	if runtime.GOOS == "windows" {
-		return strings.EqualFold(a, b) || isSelfUpdatedImage(a, b)
+		return strings.EqualFold(a, b) || isSelfUpdatedImage(image, cli)
 	}
 	return a == b
 }
 
 // isSelfUpdatedImage is whether image is the resolved CLI after the CLI updated itself while running: Claude Code renames its running binary to "<name>.old.<n>.<pid>" in its own install folder
-// and puts the new one at the old path. Only that exact shape, in the CLI's own folder (Windows paths compare without case); another folder or another name shape is not the CLI.
+// and puts the new one at the old path. Security's conditions (#6886): the folders are the same after links are resolved on BOTH sides (a link into another folder does not match); the name is the
+// CLI's exact file name (extension included) + ".old." + 1 to 20 digits + "." + 1 to 20 digits and nothing after, case-insensitive; the image is a regular file (no link, no reparse point); and
+// anything that cannot be read or resolved is no match. The caller has already found the process by today's checks (below the terminal's root, not older than its parent): this only decides
+// whether its image is the CLI.
 func isSelfUpdatedImage(image, cli string) bool {
-	if !strings.EqualFold(filepath.Dir(image), filepath.Dir(cli)) {
+	ri, err := safefs.Resolve(image)
+	if err != nil {
 		return false
 	}
-	name, base := strings.ToLower(filepath.Base(image)), strings.ToLower(filepath.Base(cli))
+	rc, err := safefs.Resolve(cli)
+	if err != nil {
+		return false
+	}
+	if !strings.EqualFold(filepath.Dir(filepath.Clean(ri)), filepath.Dir(filepath.Clean(rc))) {
+		return false
+	}
+	name, base := strings.ToLower(filepath.Base(ri)), strings.ToLower(filepath.Base(rc))
 	rest, ok := strings.CutPrefix(name, base+".old.")
 	if !ok {
 		return false
 	}
 	n, pid, ok := strings.Cut(rest, ".")
-	return ok && allDigits(n) && allDigits(pid)
+	if !ok || !digitsUpTo(n, 20) || !digitsUpTo(pid, 20) {
+		return false
+	}
+	for _, p := range []string{image, ri} { // the path the process reports, and where it resolves: both a regular file
+		if fi, err := os.Lstat(p); err != nil || !fi.Mode().IsRegular() {
+			return false
+		}
+	}
+	return true
 }
 
-func allDigits(s string) bool {
-	if s == "" {
+// digitsUpTo is whether s is 1 to max ASCII digits.
+func digitsUpTo(s string, max int) bool {
+	if s == "" || len(s) > max {
 		return false
 	}
 	for _, r := range s {
