@@ -1,5 +1,4 @@
-// #8917: a for-review row in Needs you shows its goal roll-up like the Artifacts folder (the goal, its task under it, or "No goal"): a sortable Goal column, a Goal filter, links that open in the Inbox;
-// at 390 the goal is on the row's second line. Real isolated team; only artifact storage is mocked (as inbox_artifact_review_browser).
+// #8917, then #11719: a for-review row in Needs you no longer shows its goal roll-up (the approved three-line row: no goal, no task link, no Goal column); the Filters panel's Goal field still narrows the list and its chip says the goal. Real isolated team; only artifact storage is mocked (as inbox_artifact_review_browser).
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -46,35 +45,9 @@ const { coralReady } = require('./helpers/wait');
                 await ev(`localStorage.setItem('coral-inbox-needs-filters', JSON.stringify({ sort: 'oldest' }));window.switchNavTab('hub-inbox');true`); // this list is read oldest first: with newest first, a list over the page's 12 rows shows File 01 last, behind "more" (#11552)
                 await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.selectInboxTab('needs')).then(()=>true)`);
                 await waitFor(`!!(${row('Review file 01.txt')})`,'for-review artifact in Needs you',15000);
-                const goals = await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].map(r => ({ name: (r.querySelector('.inbox-review-name') || {}).textContent, goal: (r.querySelector('.inbox-review-goal [data-goal-link]') || {}).textContent || ((r.querySelector('.inbox-review-nogoal') || {}).textContent) || null, task: (r.querySelector('.inbox-review-goal') || {}).title || null, links: r.querySelectorAll('.inbox-review-goal a, .inbox-review-goal button').length,  taskShown: !!(r.querySelector('.inbox-review-task') && r.querySelector('.inbox-review-task').getClientRects().length), inLine2: !!r.querySelector('td[data-key=goal].dt-line-2, td[data-key=goal][class*="line-2"]') }))`);
-                const by = n => goals.find(g => g.name === n);
-                assert.equal(by('Review file 01.txt').goal, 'Ship the installer', 'a review row shows its goal: ' + JSON.stringify(by('Review file 01.txt')));
-                assert.equal(by('Review file 04.txt').goal, 'Docs sweep');
-                assert.equal(by('Review file 05.txt').goal, 'No goal', 'a task with no goal says No goal: ' + JSON.stringify(by('Review file 05.txt')));
-                assert.equal(by('Review file 09.txt').goal, 'No goal');
-                // one line, one goal (#9060): the cell is the goal link alone; the task is in its tooltip, not a second link under it
-                assert.match(by('Review file 01.txt').task, /Goal: Ship the installer · Task: Build the installer/, 'the tooltip says the goal and its task: ' + JSON.stringify(by('Review file 01.txt')));
-                assert.match(by('Review file 05.txt').task, /^No goal · Task: Loose task$/); assert.equal(by('Review file 09.txt').task, 'No goal', 'no task, none said');
-                for (const g of goals) assert.ok(g.links <= 1, 'one goal link in the Goal cell, never two stacked: ' + JSON.stringify(g));
-                if (width === 390) assert.ok(by('Review file 01.txt').inLine2, 'the goal is on the row\'s second line: ' + JSON.stringify(by('Review file 01.txt')));
-                if (width >= 1280) {
-                    assert.ok(await ev(`[...document.querySelectorAll('#group-table-view th')].some(h => h.textContent.replace(/[\u2191\u2193\u2195]/g, '').trim() === 'Goal')`), 'the table has a Goal column');
-                    const geo = await ev(`(() => { const r = ${row('Review file 01.txt')}, c = r.querySelector('.inbox-review-goal'), g = c.querySelector('[data-goal-link]').getBoundingClientRect(); return { oneLine: c.getBoundingClientRect().height <= g.height + 6, h: Math.round(c.getBoundingClientRect().height), gh: Math.round(g.height) }; })()`);
-                    assert.ok(geo.oneLine, 'the Goal cell is one line (the goal link alone): ' + JSON.stringify(geo));
-                    // the Waiting for cell is one line too, with a long task title cut by an ellipsis and its full words in the tooltip (QA Reviewer 2 on #9060)
-                    { const fit = await ev(`(() => { const a = (${row('Review file 04.txt')}).querySelector('.inbox-review-actions'), td = a.closest('td'), last = [...a.querySelectorAll('button')].pop(); return { scroll: td.scrollWidth, client: td.clientWidth, buttonsRight: Math.round(last.getBoundingClientRect().right), cellRight: Math.round(td.getBoundingClientRect().right) }; })()`); assert.ok(fit.scroll <= fit.client + 1 && fit.buttonsRight <= fit.cellRight + 1, 'the Actions cell is narrow and still holds its buttons (Star, Open, Mark reviewed): ' + JSON.stringify(fit)); } assert.equal(await ev(`!!(${row('Review file 04.txt')}).querySelector('.inbox-review-metadata').offsetParent`), true, 'Waiting for (the task link) is kept at every desktop width: the Waiting column is narrow and Actions is as wide as its buttons, so only Team goes at 1440 (#10330); at 1280 the word "Changes" of the approved action set (#11552) takes the room of the task link, a trade-off the operator was told of'); { const line = await ev(`(() => { const r = ${row('Review file 04.txt')}, m = r.querySelector('.inbox-review-metadata'), t = m.querySelector('.inbox-review-task'), f = m.querySelector(':scope > span:not(.inbox-review-from)'); return { mh: Math.round(m.getBoundingClientRect().height), fh: Math.round(f.getBoundingClientRect().height), sameLine: Math.abs(t.getBoundingClientRect().top - f.getBoundingClientRect().top) < 4, cut: t.scrollWidth > t.clientWidth, ellipsis: getComputedStyle(t).textOverflow, title: t.title, rowH: Math.round(r.getBoundingClientRect().height), within: t.getBoundingClientRect().right <= m.getBoundingClientRect().right + 1 }; })()`);
-                    assert.ok(line.sameLine && line.mh <= line.fh + 6, 'For review and the task are on one line: ' + JSON.stringify(line));
-                    assert.ok(line.cut && line.ellipsis === 'ellipsis' && line.within, 'a long task title is cut with an ellipsis, inside its cell: ' + JSON.stringify(line));
-                    assert.match(line.title, /^Task: Write the docs for the whole installer and the update flow, every section, with a screenshot of each step$/, 'the full title is the tooltip');
-                    const itemW = await ev(`(() => { const n = (${row('Review file 04.txt')}).querySelector('.inbox-review-name'); return { w: Math.round(n.getBoundingClientRect().width), cut: n.scrollWidth > n.clientWidth + 1 }; })()`);
-                    assert.ok(!itemW.cut && itemW.w >= 100, 'the Item name keeps its room (the whole "Review file 04.txt", not cut): ' + JSON.stringify(itemW));
-                    assert.ok(line.rowH <= 56, 'the row stays two lines high at most (the name, and who sent it under it, #11456): ' + JSON.stringify(line)); }
-                    // sortable: Docs sweep, Ship the installer, then No goal last
-                    await ev(`[...document.querySelectorAll('#group-table-view th button.dt-sort, #group-table-view th .dt-sort')].find(b => /^Goal/.test(b.textContent.trim())).click(); true`);
-                    await waitFor(`(() => { const t = [...document.querySelectorAll('#group-table-view tbody tr .inbox-review-goal')].map(c => c.firstChild.textContent); return t[0] === 'Docs sweep'; })()`, 'sorted by goal', 6000);
-                    const order = await ev(`[...document.querySelectorAll('#group-table-view tbody tr .inbox-review-goal')].map(c => c.firstChild.textContent)`);
-                    assert.deepEqual([...new Set(order)], ['Docs sweep', 'Ship the installer', 'No goal'], 'sorted by goal, No goal last: ' + JSON.stringify(order));
-                }
+                // the row has no goal, no task link and no Goal column (the operator's approved row, #11719): they are in the opened file and in the Filters
+                const gone = await ev(`(() => { const rows = [...document.querySelectorAll('#group-table-view tbody tr')]; return { rows: rows.length, goalCells: rows.filter(r => r.querySelector('.inbox-review-goal, [data-goal-link], [data-task-link]')).length, noGoalText: rows.filter(r => /No goal/.test(r.textContent)).length, goalHead: [...document.querySelectorAll('#group-table-view th')].filter(h => getComputedStyle(h).display !== 'none').some(h => h.textContent.replace(/[\u2191\u2193\u2195]/g, '').trim() === 'Goal') }; })()`);
+                assert.ok(gone.rows >= 9 && gone.goalCells === 0 && gone.noGoalText === 0 && !gone.goalHead, 'a review row shows no goal, task link or Goal column: ' + JSON.stringify(gone));
                 // the Filters panel's Goal field
                 await ev(`document.querySelector('.inbox-folder-toolbar .list-bar-toggle').click(); true`);
                 await waitFor(`!document.querySelector('.inbox-folder-toolbar .list-bar-menu').hidden`, 'the Filters panel', 6000);
@@ -91,17 +64,20 @@ const { coralReady } = require('./helpers/wait');
                 await ev(`(() => { const x = [...document.querySelectorAll('.inbox-folder-toolbar .list-bar-chip')].find(c => /Goal/.test(c.textContent)); if (x) x.click(); return true; })()`);
                 await waitFor(`document.querySelectorAll('#group-table-view [data-review-artifact]').length >= 12`, 'the filter cleared', 8000);
                 if (dir) { fs.mkdirSync(dir, { recursive: true }); for (const theme of ['light', 'dark']) { await ev(`document.documentElement.setAttribute('data-theme','${theme}');true`); fs.writeFileSync(path.join(dir, `inbox-review-goal-${width}-${theme}.png`), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); } }
-                if (width >= 1280) {
-                    // the task link opens the task in the Inbox, in place (a phone's folded row does not draw it)
-                    await ev(`(${row('Review file 01.txt')}).querySelector('[data-task-link]').click(); true`);
-                    await waitFor(`location.pathname.startsWith('/inbox/tasks/') && location.pathname.endsWith('/11')`, 'the task opens in the Inbox, in place: ' + await ev('location.pathname'), 8000);
-                    assert.equal(await ev(`document.body.dataset.navTab`), 'hub-inbox', 'the Inbox stays for the task');
-                    await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.selectInboxTab('needs')).then(()=>true)`); // back to Needs you for the goal link
-                    await waitFor(`!!(${row('Review file 01.txt')}) && !!(${row('Review file 01.txt')}).querySelector('[data-goal-link]')`, 'Needs you again', 10000);
-                }
-                await ev(`(${row('Review file 01.txt')}).querySelector('[data-goal-link]').click(); true`);
-                await waitFor(`location.pathname.startsWith('/inbox/goals/') && location.pathname.endsWith('/7')`, 'the goal opens in the Inbox, in place', 8000);
-                assert.equal(await ev(`document.body.dataset.navTab`), 'hub-inbox', 'the Inbox stays');
+                // the goal and the task are in the opened file's Details (#11751): they left the row, the viewer says them
+                await ev(`[...document.querySelectorAll('#group-table-view tbody tr button')].find(b => b.getAttribute('aria-label') === 'Open Review file 01.txt').click(); true`);
+                await waitFor(`!!document.querySelector('.artifact-viewer .details-toggle:not([hidden])')`, 'the viewer has a Details button', 10000);
+                await ev(`(() => { const b = document.querySelector('.artifact-viewer .details-toggle'); if (b.getAttribute('aria-expanded') !== 'true') b.click(); return true; })()`);
+                await waitFor(`/Ship the installer/.test((document.querySelector('.artifact-viewer .detail-details') || {}).textContent || '')`, 'the Details name the goal', 6000).catch(() => {});
+                const facts = await ev(`(document.querySelector('.artifact-viewer .detail-details') || {}).textContent || ''`);
+                assert.ok(/Goal/.test(facts) && /Ship the installer/.test(facts) && /Task/.test(facts) && /Build the installer/.test(facts), 'the opened file\'s Details say its goal and its task: ' + JSON.stringify(facts.slice(0, 200)));
+                if (dir) { fs.writeFileSync(path.join(dir, `review-details-${width}.png`), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }
+                // a goal or task title with a right-to-left override is written out, not drawn (it is an agent's text, like the rest of the row)
+                await ev(`(async () => { const v = await import((window.__coralStatic || '/static/') + 'artifact_viewer.js'); v.openArtifactViewer('${'0'.repeat(63)}1', { filename: 'hidden.txt', goal: 'Ship\\u202e it', task: 'Build\\u200b it' }); return true; })()`);
+                await waitFor(`/<U\\+202E>/.test((document.querySelector('.artifact-viewer .detail-details') || {}).textContent || '')`, 'the Details write a hidden character out', 8000);
+                assert.ok(await ev(`(() => { const t = document.querySelector('.artifact-viewer .detail-details').textContent; return t.includes('Ship<U+202E> it') && t.includes('Build<U+200B> it') && !/[\\u202e\\u200b]/.test(t); })()`), 'the goal and task titles are written out, not stripped or drawn');
+                await ev(`document.querySelector('.artifact-viewer-close').click(); true`);
+                console.log('PASS review goal ' + width);
                 console.log('PASS review goal ' + width);
             } catch(error){failures.push(width+': '+error.message);console.error(failures.at(-1));}
         }
