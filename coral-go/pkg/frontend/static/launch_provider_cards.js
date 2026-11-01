@@ -43,7 +43,8 @@ export async function buildProviderCards({ group, form, server, implicitDefault 
     const gen = (group._pickToken = (group._pickToken || 0) + 1);
     delete group.dataset.probed;
     group.classList.add('provider-cards'); group.classList.remove('launch-agent-pick');
-    const modelRow = form.querySelector('.sv-row[data-key="model"]'), thinkingRow = form.querySelector('.sv-row[data-key="thinking"]');
+    const rowOf = k => { const q = `.sv-row[data-key="${k}"]`, a = [...form.querySelectorAll(q)]; if (a.length > 1) a.filter(r => group.contains(r)).forEach(r => r.remove()); return form.querySelector(q); }; // stale rows of a reopened dialog (#11821)
+    const modelRow = rowOf('model'), thinkingRow = rowOf('thinking');
     const hold = el('div', 'provider-hold'); hold.hidden = true; // the rows wait here when no card is open
     const thinkingWrap = () => form.querySelector('.acf-thinking-wrap');
     const note = group.id === 'launch-agent-pick' ? document.getElementById('launch-codex-note') : null; // New Agent's own group: Codex stops on Coral's hooks question the first time (hooks_review.js, #6409): said once
