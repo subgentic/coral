@@ -44,6 +44,12 @@ func DeliverAutomated(ctx context.Context, in AutomatedInput) (Delivery, error) 
 	}
 	unlock := gate.lockSession(in.Name)
 	defer unlock()
+	// No text and no Enter where the terminal could run it or another program could take it (textRefused): checked here, before anything (a leftover's Enter included), and again right
+	// before the text. A person's own Send now too: the text would land in the same place.
+	if refused, why := textRefused(ctx, in); refused {
+		noteSkipped(in, SkipNotAgent+" ("+why+")")
+		return Skipped, nil
+	}
 	if !in.force && PersonSendActive(in.SessionID) {
 		// A person's send to this agent is in flight, or its text may still be in the box: Coral's text would start a turn or join theirs (#10996). Nothing is typed and nothing is recorded (nothing was withheld
 		// from the person's view); the caller asks again on its next pass.
@@ -94,6 +100,10 @@ func DeliverAutomated(ctx context.Context, in AutomatedInput) (Delivery, error) 
 			clearSkipped(in.Name)
 			return Skipped, nil
 		}
+	}
+	if refused, why := textRefused(ctx, in); refused { // asked again right before the text: a program can start while the screen was read
+		noteSkipped(in, SkipNotAgent+" ("+why+")")
+		return Skipped, nil
 	}
 	enterWithheld, err := gate.typeNow(ctx, in)
 	if errors.Is(err, ErrTeamBusy) {

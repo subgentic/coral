@@ -573,6 +573,31 @@ func (m *PTYBackend) NoteLaunch(name, script, cli string) {
 	}
 }
 
+// agentTextProc is implemented by pseudo-terminals that can refuse text altogether (Windows ConPTY: TextTargetChecker).
+type agentTextProc interface {
+	TextRefused() (bool, string, error)
+}
+
+// AgentTextRefused says text must not be typed into a session's terminal now; found is false when the session is gone or its terminal does not say. A terminal that says but cannot read
+// its processes refuses.
+func (m *PTYBackend) AgentTextRefused(name string) (refused bool, why string, found bool) {
+	m.mu.RLock()
+	s, ok := m.sessions[name]
+	m.mu.RUnlock()
+	if !ok || !s.isRunning() {
+		return false, "", false
+	}
+	r, can := s.proc.(agentTextProc)
+	if !can {
+		return false, "", false
+	}
+	refused, why, err := r.TextRefused()
+	if err != nil {
+		return true, reasonUnreadable, true
+	}
+	return refused, why, true
+}
+
 // AgentNoticeVerdict says whether a notice may be typed into a session's terminal. ok is false when the session is gone or the platform cannot tell.
 func (m *PTYBackend) AgentNoticeVerdict(name string) (v tmux.NoticeVerdict, ok bool) {
 	m.mu.RLock()

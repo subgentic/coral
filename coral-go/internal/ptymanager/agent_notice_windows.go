@@ -188,3 +188,19 @@ func (l *liveProcs) commandLine(pid int) (string, bool) {
 const processCommandLineInformation = 60
 
 var procNtQueryInformationProcess = windows.NewLazySystemDLL("ntdll.dll").NewProc("NtQueryInformationProcess")
+
+// TextRefused says text must not be typed into this terminal now (decideWinText): its shell is cmd, the agent started a cmd, or a program below the agent reads the terminal. Read afresh
+// on every call: nothing of it is kept from one send to the next.
+func (p *windowsPTY) TextRefused() (bool, string, error) {
+	root := p.cpty.Pid()
+	if root <= 0 {
+		return false, "", fmt.Errorf("no shell pid")
+	}
+	src, err := newLiveProcs()
+	if err != nil {
+		return false, "", err
+	}
+	rec, adopted, _ := p.agent.snapshot()
+	refused, why := decideWinText(src, root, rec, adopted)
+	return refused, why, nil
+}

@@ -12,14 +12,15 @@ import (
 
 // fakeProcs is a process table: who is whose child and what each process is.
 type fakeProcs struct {
-	mu    sync.Mutex
-	kids  map[int][]int
-	procs map[int]winProc
-	lines map[int]string
+	mu     sync.Mutex
+	kids   map[int][]int
+	procs  map[int]winProc
+	lines  map[int]string
+	stdins map[int]stdinKind
 }
 
 func newFake() *fakeProcs {
-	return &fakeProcs{kids: map[int][]int{}, procs: map[int]winProc{}, lines: map[int]string{}}
+	return &fakeProcs{kids: map[int][]int{}, procs: map[int]winProc{}, lines: map[int]string{}, stdins: map[int]stdinKind{}}
 }
 
 func (f *fakeProcs) add(parent, pid int, start int64, kind procKind) *fakeProcs {
@@ -63,6 +64,23 @@ func (f *fakeProcs) commandLine(pid int) (string, bool) {
 	defer f.mu.Unlock()
 	line, ok := f.lines[pid]
 	return line, ok && len(line) <= launcherCmdMaxLine
+}
+
+// stdin is what withStdin set for pid; a process without one has no console input (the tests written before the console-reader check keep their meaning).
+func (f *fakeProcs) stdin(pid int) stdinKind {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if k, ok := f.stdins[pid]; ok {
+		return k
+	}
+	return stdinNotConsole
+}
+
+func (f *fakeProcs) withStdin(pid int, k stdinKind) *fakeProcs {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.stdins[pid] = k
+	return f
 }
 
 func (f *fakeProcs) withLine(pid int, line string) *fakeProcs {
