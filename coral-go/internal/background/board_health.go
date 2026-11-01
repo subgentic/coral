@@ -220,6 +220,8 @@ func (m *BoardHealthMonitor) composeCheck(ctx context.Context, project, orch str
 	items = append(items, reviewItems(reviews, reviewers, parked, idleNoWork)...)
 	items = append(items, m.poolReviewItems(ctx, project, now)...)                                  // a review that has waited in the pool (#8957)
 	items = append(items, m.deviationItems(ctx, project, rcpt, tasks, parked, waits, subs, now)...) // far past their own usual (#11729)
+	sleepers := m.sleeperTagsOf(ctx, project, subs, rcpt, tasks)
+	items = append(items, sleeperItems(sleepers, subs, now)...) // asleep with something for it: a wake, once acknowledged it stays off (#11803)
 	items = append(items, m.askItems(ctx, project, now)...)
 	items = append(items, m.parkItems(ctx, project, all, now)...) // an agent with a park over a day old, or more parks than the cap (#11660)
 	// 4. Queue problems (task numbers only).
@@ -241,7 +243,7 @@ func (m *BoardHealthMonitor) composeCheck(ctx context.Context, project, orch str
 	}
 	p, _ := m.store.ProgressSince(ctx, project, since)
 	questions := m.operatorQuestions(ctx, project)
-	roster, attention := m.buildRoster(ctx, rosterInputs{project: project, recipient: rcpt, subs: subs, bySession: bySession, waits: waits, tasks: tasks, now: now, rules: actionRules(m.store.GetHealthSettings(ctx, project).ActionList)})
+	roster, attention := m.buildRoster(ctx, rosterInputs{project: project, recipient: rcpt, subs: subs, bySession: bySession, waits: waits, tasks: tasks, now: now, rules: actionRules(m.store.GetHealthSettings(ctx, project).ActionList), sleepers: sleepers})
 	var goals []teamhealth.GoalLine // the open goals and what the operator has to do: the orchestrator's check only (#11412)
 	reminders := 0
 	if rcpt != nil && rcpt.SubscriberID == orch {

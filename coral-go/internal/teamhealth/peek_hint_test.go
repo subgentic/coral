@@ -66,7 +66,7 @@ func TestPeekHintForAnIdleOrStuckAgentWithoutAName(t *testing.T) {
 func TestPeekHintIsLeftOutWhenThereIsNothingToLookAt(t *testing.T) {
 	for name, in := range map[string]CheckInput{
 		"everyone working":     {Roster: &Roster{Recipient: "O", Counts: counts(3, 0, 0, 0, 0, 0)}},
-		"only sleepers":        {Roster: &Roster{Recipient: "O", Counts: counts(1, 0, 0, 0, 2, 0), Asleep: []AsleepUnread{{Name: "Sleeper", Count: 1, Since: rosterNow()}}}},
+		"only sleepers":        {Roster: &Roster{Recipient: "O", Counts: counts(1, 0, 0, 0, 2, 0)}},
 		"not the orchestrator": {Roster: waitingRoster()}, // PeekHint false: the check goes to someone else
 	} {
 		in.Now, in.Progress, in.PeekHint = rosterNow(), Progress{Since: rosterNow()}, name != "not the orchestrator"

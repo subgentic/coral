@@ -50,13 +50,6 @@ type BlockedEntry struct {
 	Resets time.Duration
 }
 
-// AsleepUnread is a sleeping agent with messages tagged to it that it has not read.
-type AsleepUnread struct {
-	Name  string
-	Count int
-	Since time.Time // the oldest of them
-}
-
 // Roster is everything the check says about the agents.
 type Roster struct {
 	legacy    bool   // the check before the action list (#11729), kept for the tests that pin it
@@ -65,7 +58,8 @@ type Roster struct {
 	Claimable int // pending tasks nobody holds, that can be claimed
 	Waits     []WaitGroup
 	Blocked   []BlockedEntry
-	Asleep    []AsleepUnread
+	// SleeperBroadcasts is how many unread tags to sleeping agents tag them among others: counted in the header, no wake (#11803).
+	SleeperBroadcasts int
 	// Open is each agent's open (not parked) tasks, and Reviews the tasks waiting in review: the overloaded and stale-review rules (#11729).
 	Open    map[string]int
 	Reviews []ReviewAge
@@ -93,9 +87,9 @@ func (r *Roster) AllWorking() bool {
 	return r.Awake() > 0 && r.Counts[StateWorking] == r.Awake()
 }
 
-// NeedsAttention: something in the roster is for the reader: a wait, a prompt, an idle agent or a sleeper with tags unread.
+// NeedsAttention: something in the roster is for the reader: a wait, a prompt, an idle agent.
 func (r *Roster) NeedsAttention() bool {
-	return len(r.Waits) > 0 || len(r.Asleep) > 0 || r.Counts[StatePrompt] > 0 || r.Counts[StateBlocked] > 0 || r.Counts[StateIdle] > 0 || r.Counts[StateUnknown] > 0
+	return len(r.Waits) > 0 || r.Counts[StatePrompt] > 0 || r.Counts[StateBlocked] > 0 || r.Counts[StateIdle] > 0 || r.Counts[StateUnknown] > 0
 }
 
 // maxWaiters is how many agents one wait group lists before counting the rest.
@@ -118,7 +112,11 @@ func (r *Roster) headerCounts() string {
 	if n := r.Counts[StateUnknown]; n > 0 {
 		parts = append(parts, fmt.Sprintf("%d of unknown state", n))
 	}
-	parts = append(parts, fmt.Sprintf("%d asleep", r.Counts[StateAsleep]))
+	asleep := fmt.Sprintf("%d asleep", r.Counts[StateAsleep])
+	if r.SleeperBroadcasts > 0 {
+		asleep += fmt.Sprintf(" (%s unread)", plural(r.SleeperBroadcasts, "broadcast", "broadcasts"))
+	}
+	parts = append(parts, asleep)
 	if n := r.Counts[StateOffline]; n > 0 {
 		parts = append(parts, fmt.Sprintf("%d offline", n))
 	}
@@ -254,9 +252,6 @@ func (r *Roster) Facts() []string {
 	}
 	for _, ni := range r.NameIssues {
 		out = append(out, fmt.Sprintf("n:%s/%t/%d", ni.Name, ni.Edge, ni.Posts)) // a new one is news; its age ticking is not (#11729)
-	}
-	for _, a := range r.Asleep {
-		out = append(out, fmt.Sprintf("s:%s=%d", a.Name, a.Count))
 	}
 	sort.Strings(out)
 	return out

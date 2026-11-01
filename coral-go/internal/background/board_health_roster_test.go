@@ -15,6 +15,7 @@ import (
 
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/naming"
+	"github.com/subgentic/coral/internal/teamhealth"
 )
 
 func sessionOf(n int) string {
@@ -180,32 +181,55 @@ func TestRosterFlagsStaleWaits(t *testing.T) {
 	assert.Equal(t, 1, strings.Count(out, "although"), "only Lead: Front was mentioned by the Orchestrator, not by who it waits on")
 }
 
-// A sleeping agent with messages tagged to it unread is named, with how many and since when; one that read them, or was never
-// tagged, is not.
-func TestRosterNamesSleepersWithUnreadTags(t *testing.T) {
+// A sleeping agent is named only when something is for it (#11803): messages that tag it among others are counted in the header and earn no wake; a question
+// open to it earns one, with an ack id and how many broadcasts came besides.
+func TestRosterWakesASleeperOnlyForWhatIsForIt(t *testing.T) {
 	h := newCheckHarness(t)
 	ctx := context.Background()
 	h.member("Orchestrator", "Orchestrator", 1, 0)
-	h.member("Digital Ocean Expert", "Cloud", 2, 0)
-	h.member("Quiet Sleeper", "Cloud", 3, 0)
+	h.member("Broadcast Sleeper", "Cloud", 2, 0)
+	h.member("Asked Sleeper", "Cloud", 3, 0)
 	h.member("Reader", "Cloud", 4, 0)
-	h.sleeping(2)
-	h.sleeping(3)
-	h.sleeping(4)
-	_, err := h.s.PostMessage(ctx, "team", "Orchestrator", "@Digital Ocean Expert the droplet is yours", nil)
+	for _, n := range []int{2, 3, 4} {
+		h.sleeping(n)
+	}
+	for _, text := range []string{"@Broadcast Sleeper @Asked Sleeper status for the team", "@Broadcast Sleeper @Asked Sleeper the build moved", "@Reader read this"} {
+		_, err := h.s.PostMessage(ctx, "team", "Orchestrator", text, nil)
+		require.NoError(t, err)
+	}
+	ask, err := h.s.PostMessage(ctx, "team", "Orchestrator", "@Asked Sleeper which file is it?", nil)
 	require.NoError(t, err)
-	_, err = h.s.PostMessage(ctx, "team", "Orchestrator", "@Digital Ocean Expert and the firewall too", nil)
-	require.NoError(t, err)
-	_, err = h.s.PostMessage(ctx, "team", "Orchestrator", "@Reader read this", nil)
-	require.NoError(t, err)
+	require.NoError(t, h.s.RecordAsk(ctx, "team", ask, []string{"Asked Sleeper"}))
 	msgs, err := h.s.ReadMessages(ctx, "team", "Reader", 100) // Reader reads everything
 	require.NoError(t, err)
 	require.NotEmpty(t, msgs)
 	out := h.check()
-	assert.Contains(t, out, "3 asleep")
-	assert.Contains(t, out, "Digital Ocean Expert is asleep with 2 messages tagged to it unread since ")
-	assert.NotContains(t, out, "Quiet Sleeper is asleep")
-	assert.NotContains(t, out, "Reader is asleep")
+	assert.Contains(t, out, "3 asleep (4 broadcasts unread)", "the broadcasts to the two sleepers are counted, not acted on")
+	assert.NotContains(t, out, "Broadcast Sleeper:", "tagged among others only: no wake")
+	assert.NotContains(t, out, "Reader:")
+	assert.Contains(t, out, "Asked Sleeper: asleep with 1 message for it unread (a question to it or a reply to its post) since ")
+	assert.Contains(t, out, "2 other tags to it are broadcasts")
+	assert.Contains(t, out, "Suggest: wake it. [ack "+teamhealth.ItemID("asleep|Asked Sleeper")+"]")
+}
+
+// A task assigned to a sleeper that it has not started is a reason to wake it; acknowledged, the item stays off until what is waiting changes.
+func TestRosterWakesASleeperWithAnAssignedTaskAndAckKeepsItOff(t *testing.T) {
+	h := newCheckHarness(t)
+	ctx := context.Background()
+	h.member("Orchestrator", "Orchestrator", 1, 0)
+	h.member("Task Sleeper", "Cloud", 2, 0)
+	h.sleeping(2)
+	_, err := h.s.CreateTask(ctx, "team", "Do the droplet", "", "medium", "Orchestrator", "Task Sleeper")
+	require.NoError(t, err)
+	out := h.check()
+	assert.Contains(t, out, "Task Sleeper: asleep with 1 task assigned to it not started")
+	id := teamhealth.ItemID("asleep|Task Sleeper")
+	require.NoError(t, h.s.AckHealthItem(ctx, "team", id, "Orchestrator", h.now))
+	assert.NotContains(t, h.check(), "Task Sleeper: asleep", "acknowledged: off while its state is the same")
+	ask, err := h.s.PostMessage(ctx, "team", "Orchestrator", "@Task Sleeper and one question", nil)
+	require.NoError(t, err)
+	require.NoError(t, h.s.RecordAsk(ctx, "team", ask, []string{"Task Sleeper"}))
+	assert.Contains(t, h.check(), "Task Sleeper: asleep with 1 message for it unread", "something new is waiting: it is back")
 }
 
 // Rule 6: someone who has waited more than ten minutes on X is told to X once, as a direct mention, per wait.
