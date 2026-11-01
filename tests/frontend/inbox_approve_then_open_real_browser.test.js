@@ -20,6 +20,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
     let sid = null, sname = null;
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        const pageErrors = []; await client.Runtime.enable(); client.Runtime.exceptionThrown(e => pageErrors.push(JSON.stringify(e.exceptionDetails && (e.exceptionDetails.exception && e.exceptionDetails.exception.description || e.exceptionDetails.text)).slice(0, 300)));
         for (const [w, h, mobile] of [[1280, 800, false], [390, 800, true]]) {
             const at = `${w} px: `, tag = `w${w}`;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
@@ -31,7 +32,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
                 check((await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: 'Walk Writer', job_title: 'Writer', session_name: sname })).status < 300, 'subscribed');
             }
             const names = { a: `a-${tag}.md`, b: `b-${tag}.md`, c: `c-${tag}.md`, d: `d-${tag}.md` };
-            for (const n of Object.values(names)) {
+            for (const n of [names.a, ...Object.values(names)]) { // a is uploaded twice: one row, with an earlier version behind it
                 const up = await api('POST', `/api/agent/artifacts?session_id=${sid}&tag=for+review&question=Approve+this%3F`, `content of ${n} ${Date.now()}`, { 'X-Artifact-Name': n, 'X-Artifact-Media-Type': 'text/markdown' });
                 check(up.status < 300, at + `uploaded ${n}: ${JSON.stringify(up.body).slice(0, 120)}`);
             }
@@ -69,6 +70,8 @@ const { coralReady, framesJs } = require('./helpers/wait');
             await ev(`window.__opened = []; window.selectLiveSession = (...a) => { window.__opened.push(a[2]); return Promise.resolve(); }; T.state.liveSessions = [{ name: 'wa', session_id: '00000001-0000-4000-8000-0000000000aa', agent_type: 'claude', server: 'local', status: 'idle', display_name: 'Waiting Agent', working_directory: '/repo/a', waiting_for_input: true, waiting_kind: 'permission', waiting_since: new Date(Date.now() - 300000).toISOString(), sleeping: false }]; import(${S} + 'inbox_tab.js').then(m => { m.updateInboxTab(); return true; })`);
             await waitFor(`!![...document.querySelectorAll('${T} tbody tr')].find(r => /Waiting Agent/.test(r.textContent))`, at + 'the waiting agent row', 8000);
             await press(names.a, 'Approve');
+            await new Promise(r => setTimeout(r, 1500)); // sleep-ok: the list settles after the approve
+            console.log(at + 'page errors after Approve: ' + JSON.stringify(pageErrors) + ' open dialogs: ' + (await ev(`document.querySelectorAll('dialog[open]').length`)));
             await waitFor(rowGone(names.a), at + 'the approved row leaves', 15000).catch(() => {});
             check(await ev(rowGone(names.a)), at + 'the approved row is gone');
             await openBy(names.b, 'name', 'after Approve, by the name');

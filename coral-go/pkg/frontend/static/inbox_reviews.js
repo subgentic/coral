@@ -10,7 +10,20 @@ const vkey = a => (a.session_id || a.produced_by) ? JSON.stringify([a.team, a.se
 const byAge = (a, b) => String(a.created_at).localeCompare(String(b.created_at)) || a.reviewKey.localeCompare(b.reviewKey);
 /** The versions older than `row`, still for review. */
 export const earlierVersions = row => { const key = row.reviewKey || `${row.team}:${row.id}`, me = items.find(a => a.reviewKey === key) || row; return items.filter(a => a.reviewKey !== key && vkey(a) === vkey(me) && byAge(a, me) < 0); };
-export const reviewItems = () => items.filter(a => !items.some(b => vkey(b) === vkey(a) && byAge(a, b) < 0)).map(a => { const earlier = earlierVersions(a); return earlier.length ? { ...a, earlier } : a; });
+// Worked out once per change, not once per call (#11633): this is asked for by the badge, the folder count, the pills, the rows and the labels on every update, and the old way compared every item with every other
+// (a JSON key built for each pair): with a few hundred files for review one call took a tenth of a second, a few dozen calls a redraw, and an Approve (which redraws three times) froze the Inbox for seconds.
+// The list is rebuilt when `items` is replaced or `revision` moves (a tag written in place, a row settled), and shared between callers in between.
+let viewFor = null, viewRev = -1, view = [];
+export const reviewItems = () => {
+    if (viewFor === items && viewRev === revision) return view;
+    const groups = new Map(); // series key -> its versions, oldest first (items are sorted by age)
+    for (const a of items) { const k = vkey(a); if (groups.has(k)) groups.get(k).push(a); else groups.set(k, [a]); }
+    const newest = new Map(); // the newest version of each series -> the versions before it
+    for (const group of groups.values()) { const top = group.reduce((m, b) => (byAge(m, b) < 0 ? b : m)); newest.set(top, group.filter(b => b !== top && byAge(b, top) < 0)); }
+    view = items.filter(a => newest.has(a)).map(a => (newest.get(a).length ? { ...a, earlier: newest.get(a) } : a)); // the list's own order: oldest newest-version first
+    viewFor = items; viewRev = revision;
+    return view;
+};
 /** A review artifact the operator has opened carries the 'read' tag (#9277): it stays in Needs you, shown as read, but it is not counted (the Inbox badge, the Needs you count). Opening it again, or marking it unread, is the same tags route. */
 export const isRead = a => !!(a.tags && a.tags.includes('read'));
 export const unreadReviewItems = () => reviewItems().filter(a => !isRead(a));
