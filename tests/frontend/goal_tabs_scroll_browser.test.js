@@ -44,7 +44,7 @@ const { coralReady } = require('./helpers/wait');
                 await waitFor(`document.querySelector('#team-panel-goals #goal-tab-${to}').getAttribute('aria-selected') === 'true'`, at + `on ${to}`, 8000);
                 await new Promise(res => setTimeout(res, 300)); // sleep-ok: the panel draws and the list mounts
                 const after = await state();
-                assert.ok(after.top > 0, at + `${from} to ${to}: the page did not jump to the top (${JSON.stringify({ before, after })})`);
+                assert.ok(after.top > 0 || after.max === 0, at + `${from} to ${to}: the page did not jump to the top (${JSON.stringify({ before, after })})`); // a panel that leaves nothing to scroll (the Artifacts list is 5 of 30 rows on a phone, and the page, now without its pinned bar, fits the screen) is at its end at 0 (#11823)
                 const clamped = after.top >= after.max - 2; // a shorter panel shrank the page: it is at its end
                 assert.ok(clamped || Math.abs(after.strip - before.strip) <= 2, at + `${from} to ${to}: the tab strip stays where it was on screen (${JSON.stringify({ before, after })})`);
             }
