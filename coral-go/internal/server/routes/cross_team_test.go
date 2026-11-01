@@ -104,7 +104,7 @@ func TestCrossTeamMessageRules(t *testing.T) {
 	require.Equal(t, http.StatusForbidden, code)
 	require.Contains(t, out["error"], `"alpha" and "beta"`)
 	require.Contains(t, out["error"], "on only by default", "nothing set: on by default, which does not count between two teams of one computer (#11708)")
-	require.Contains(t, out["error"], "turn it on yourself in Team settings > Messaging")
+	require.Contains(t, out["error"], "ask the Operator to turn it on in Team settings > Messaging")
 	e.enable("alpha", true)
 	code, out = e.send("alpha", "Orchestrator", "", "hi")
 	require.Equal(t, http.StatusForbidden, code)

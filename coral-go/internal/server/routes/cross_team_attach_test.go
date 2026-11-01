@@ -590,7 +590,7 @@ func TestFilesSwitchSetVersusDefaultBetweenTeamsOnOneComputer(t *testing.T) {
 	assert.Equal(t, "artifacts_off", out["code"])
 	assert.Contains(t, out["error"], `"alpha" and "beta"`)
 	assert.Contains(t, out["error"], "on only by default", "the refusal says the switch is on by default, not off")
-	assert.Contains(t, out["error"], "yourself")
+	assert.Contains(t, out["error"], "ask the Operator to turn on Share files with teams on other computers in Team settings > Messaging")
 	assert.NotContains(t, out["error"], "is off on", "it is not off")
 	// alpha sets it on: only beta is named; beta set to OFF is "off", not "by default".
 	_, err := e.h.bs.UpdateBoardSettings(ctx, "alpha", board.BoardSettingsUpdate{CrossTeamArtifacts: ptrBool(true)})
