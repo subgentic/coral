@@ -14,7 +14,7 @@ import (
 
 // GET /api/needs-you?after=<cursor>&limit=<n> (#11596): what is waiting for the Operator, in one read, for the Hub's phone push. It is the Inbox's Needs you as the SERVER can know it: agents waiting on a permission, a question or a
 // plan; questions agents asked the Operator (post --ask, wait --operator); goal and task proposals waiting for a decision; and files for review the Operator has not opened. The count is what the Inbox counts for
-// those four; what only the browser knows (failed runs not yet dismissed, the welcome items, an unrecorded-agents row) is not here, and the answer says so in "not_included". An ignored or denied file, a read
+// those four; what only the browser knows (failed runs not yet dismissed, the welcome items, an unrecorded-agents row) is not here, and the answer says so in "not_included". An ignored, saved or denied file, a read
 // file, and an agent that sleeps are not waiting, so they are not counted. The Operator's alone: on this computer a person, through Coral Hub the owner (an owner row, at the View tier like the lists it reads).
 // Every line is agent-written text, cleaned and cut here (needsYouLineMax), never raw.
 
@@ -186,7 +186,7 @@ func (h *BoardHandler) NeedsYou(w http.ResponseWriter, r *http.Request) {
 			seen := map[string]bool{}
 			dir := h.artifactObjectDir()
 			for _, f := range files {
-				if seen[f.ID] || !hasTag(f.Tags, "for review") || hasTag(f.Tags, "read") {
+				if seen[f.ID] || !hasTag(f.Tags, "for review") || hasTag(f.Tags, "read") || hasTag(f.Tags, "saved") {
 					continue // by tags first: only a row that could count is checked against the stored file
 				}
 				enrichTeamArtifact(&f, dir)

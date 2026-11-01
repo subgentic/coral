@@ -19,6 +19,7 @@ const (
 	tagIgnored             = "ignored" // the Operator took it out of Needs you with no verdict and no message; Unignore puts "for review" back
 	tagForReview           = "for review"
 	tagRead                = "read"
+	tagSaved               = "saved" // the Operator put a file for review aside (#11641): it is still for review, but out of Needs you and its counts until moved back or decided
 	tagReviewed            = "reviewed"
 )
 
@@ -123,16 +124,19 @@ func (s *Store) DecideArtifactReview(ctx context.Context, boardID, hex, state st
 		delete(next, tagForReview)
 		delete(next, tagRead)
 		delete(next, ReviewChangesRequested)
+		delete(next, tagSaved)
 		delete(next, tagReviewed)
 		next[ReviewApproved] = true
 	case ReviewChangesRequested:
 		next[tagForReview] = true
 		next[ReviewChangesRequested] = true
-		delete(next, tagRead) // it is something to read again: the agent changes it
+		delete(next, tagRead)  // it is something to read again: the agent changes it
+		delete(next, tagSaved) // and it is back in Needs you as changes requested
 	case ReviewDenied:
 		delete(next, tagForReview)
 		delete(next, tagRead)
 		delete(next, ReviewChangesRequested)
+		delete(next, tagSaved)
 		delete(next, tagReviewed)
 		next[ReviewDenied] = true
 	}
@@ -207,7 +211,7 @@ func (s *Store) UndoArtifactReview(ctx context.Context, ch ReviewChange) error {
 const ReviewSuperseded = "superseded"
 
 // SupersedeArtifactReview closes the review of an older version of an artifact (#136588): when the agent uploads the next version of the series for review, the older one, still waiting or with changes
-// requested, is no longer something to review ("for review", "read" and "changes requested" go, "superseded" comes), and the new version is the pending one. Anything else (approved, never for review) is left alone.
+// requested, is no longer something to review ("for review", "read", "saved" and "changes requested" go, "superseded" comes), and the new version is the pending one. Anything else (approved, never for review) is left alone.
 func (s *Store) SupersedeArtifactReview(ctx context.Context, boardID, hex string, now time.Time) (bool, error) {
 	tx, err := s.db.BeginTxx(ctx, nil)
 	if err != nil {
@@ -225,7 +229,7 @@ func (s *Store) SupersedeArtifactReview(ctx context.Context, boardID, hex string
 	if !waiting {
 		return false, nil
 	}
-	for _, t := range []string{tagForReview, tagRead, ReviewChangesRequested} {
+	for _, t := range []string{tagForReview, tagRead, ReviewChangesRequested, tagSaved} {
 		if _, err := tx.ExecContext(ctx, `DELETE FROM artifact_tags WHERE board_id = ? AND hex = ? AND tag = ?`, boardID, hex, t); err != nil {
 			return false, err
 		}
@@ -275,7 +279,57 @@ func (s *Store) IgnoreArtifactReview(ctx context.Context, boardID, hex string, i
 	if _, err := tx.ExecContext(ctx, `DELETE FROM artifact_tags WHERE board_id = ? AND hex = ? AND tag = ?`, boardID, hex, from); err != nil {
 		return ch, nil, err
 	}
+	if ignore {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM artifact_tags WHERE board_id = ? AND hex = ? AND tag = ?`, boardID, hex, tagSaved); err != nil {
+			return ch, nil, err
+		}
+	}
 	if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO artifact_tags (board_id, hex, tag) VALUES (?, ?, ?)`, boardID, hex, to); err != nil {
+		return ch, nil, err
+	}
+	var tags []string
+	if err := tx.SelectContext(ctx, &tags, `SELECT tag FROM artifact_tags WHERE board_id = ? AND hex = ? ORDER BY tag`, boardID, hex); err != nil {
+		return ch, nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return ch, nil, err
+	}
+	ch.Changed = true
+	return ch, tags, nil
+}
+
+// SaveArtifactReview puts a file for review aside (save) or moves it back to Needs you (!save), with no verdict and nobody told (#11641): the "saved" tag is added or taken off and every other tag stays,
+// "for review" included, so Approve, Changes and Deny still work on a saved file (each takes "saved" off). Saving twice, or moving back what is not saved, changes nothing; saving what is not waiting for a
+// review is ErrNotForReview.
+func (s *Store) SaveArtifactReview(ctx context.Context, boardID, hex string, save bool) (ReviewChange, []string, error) {
+	ch := ReviewChange{board: boardID, hex: hex}
+	tx, err := s.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return ch, nil, err
+	}
+	defer tx.Rollback()
+	var have []string
+	if err := tx.SelectContext(ctx, &have, `SELECT tag FROM artifact_tags WHERE board_id = ? AND hex = ? ORDER BY tag`, boardID, hex); err != nil {
+		return ch, nil, err
+	}
+	ch.prevTags = have
+	set := map[string]bool{}
+	for _, t := range have {
+		set[t] = true
+	}
+	switch {
+	case save && !set[tagForReview]:
+		return ch, have, ErrNotForReview
+	case save == set[tagSaved]:
+		return ch, have, nil // already as asked
+	case save && len(have) >= MaxArtifactTags:
+		return ch, have, ErrArtifactTag
+	case save:
+		_, err = tx.ExecContext(ctx, `INSERT OR IGNORE INTO artifact_tags (board_id, hex, tag) VALUES (?, ?, ?)`, boardID, hex, tagSaved)
+	default:
+		_, err = tx.ExecContext(ctx, `DELETE FROM artifact_tags WHERE board_id = ? AND hex = ? AND tag = ?`, boardID, hex, tagSaved)
+	}
+	if err != nil {
 		return ch, nil, err
 	}
 	var tags []string
