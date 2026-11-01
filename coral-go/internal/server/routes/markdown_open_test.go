@@ -3,6 +3,7 @@ package routes
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -50,4 +51,29 @@ func TestRenderMarkdownSafeRendersAndNeverRuns(t *testing.T) {
 		})
 	}
 	require.Equal(t, "", renderMarkdownSafe(""))
+}
+
+// The renderer's cost grows with the file, not with its square (Security, #11845): a run of '[' or of '[a](' once cost n squared (each '[' scanned to the end of the file looking for its ']'), so one file an agent wrote
+// could hold a handler for hours. Hostile shapes of 200,000 characters render in a second or two.
+func TestRenderMarkdownSafeIsLinear(t *testing.T) {
+	shapes := map[string]string{
+		"open brackets":       strings.Repeat("[", 200000),
+		"links with no close": strings.Repeat("[a](", 200000),
+		"brackets, one close": strings.Repeat("[", 200000) + "]",
+		"stars":               strings.Repeat("*a", 200000),
+		"backticks":           strings.Repeat("`a", 200000),
+		"underscores":         strings.Repeat("_a ", 200000),
+		"nested marks":        strings.Repeat("**_*", 50000),
+		"many short lines":    strings.Repeat("[x\n", 200000),
+	}
+	for name, src := range shapes {
+		t.Run(name, func(t *testing.T) {
+			start := time.Now()
+			out := renderMarkdownSafe(src)
+			require.Less(t, time.Since(start), 2*time.Second, "rendering %d bytes of %s must not be slow", len(src), name)
+			require.NotContains(t, out, "<script")
+		})
+	}
+	// an ordinary link still renders after a long run of brackets before it (the window is wide enough for a real link)
+	require.Contains(t, renderMarkdownSafe("[[[ and [a real link](https://example.com/x) here"), `<a href="https://example.com/x"`)
 }

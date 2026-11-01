@@ -92,8 +92,30 @@ var (
 	mdLink    = regexp.MustCompile(`^\[([^\]]*)\]\(([^)\s]*)\)`)
 )
 
+// mdLinkWindow is how far a link's text and address may reach. A '[' looks for its "](" only inside it, so a long run of brackets costs a window each, not a scan to the end of the file (Security, #11845).
+const mdLinkWindow = 512
+
+// mdRunMax is the longest run of inline text that is marked up; a longer one is shown as escaped source.
+const mdRunMax = 64 << 10
+
+// mdLinkAt reads a link at the start of rest, only within mdLinkWindow, and only when a "](" is there to find (a cheap search first, so the pattern runs on real candidates alone).
+func mdLinkAt(rest string) []string {
+	win := rest
+	if len(win) > mdLinkWindow {
+		win = win[:mdLinkWindow]
+	}
+	i := strings.IndexByte(win, ']')
+	if i < 0 || i+1 >= len(win) || win[i+1] != '(' {
+		return nil
+	}
+	return mdLink.FindStringSubmatch(win)
+}
+
 // mdInline renders the inline marks of one run of text: `code`, **strong**, *emphasis* or _emphasis_, and [text](address). Everything else is escaped text.
 func mdInline(s string) string {
+	if len(s) > mdRunMax {
+		return html.EscapeString(s)
+	}
 	var out strings.Builder
 	for i := 0; i < len(s); {
 		rest := s[i:]
@@ -117,7 +139,7 @@ func mdInline(s string) string {
 				continue
 			}
 		case rest[0] == '[':
-			if m := mdLink.FindStringSubmatch(rest); m != nil {
+			if m := mdLinkAt(rest); m != nil {
 				if safeLink(m[2]) {
 					out.WriteString(`<a href="` + html.EscapeString(m[2]) + `" rel="noopener noreferrer nofollow" target="_blank">` + html.EscapeString(m[1]) + "</a>")
 				} else {

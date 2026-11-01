@@ -59,8 +59,8 @@ func artifactURL(digest string) string { return "/api/artifacts/" + digest + "?v
 //   - Markdown is rendered by renderMarkdownSafe into a page of its own under a sandbox with no script; any other text, whatever its declared type (HTML and SVG included), is served as text/plain: its source, never rendered, under the sandbox;
 //   - a binary file gets a one-line note that says so (Download is the way to save it).
 //
-// maxRenderedMarkdown is the largest Markdown file the new tab renders; a bigger one is shown as its source.
-const maxRenderedMarkdown = 2 << 20
+// maxRenderedMarkdown is the largest Markdown file the new tab renders (256 KiB); a bigger one is shown as its source.
+const maxRenderedMarkdown = 256 << 10
 
 func serveArtifactToRead(w http.ResponseWriter, r *http.Request, f io.ReadSeeker, contentType, filename string, size int64) bool {
 	mt, _, err := mime.ParseMediaType(contentType)
