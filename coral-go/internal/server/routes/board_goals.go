@@ -307,9 +307,11 @@ func (h *BoardHandler) ListGoals(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+	made := make([]*board.Goal, len(page.Goals)) // one lookup of the Orchestrator for the whole page
 	for i := range page.Goals {
-		h.markMadeByOrchestrator(r.Context(), project, &page.Goals[i])
+		made[i] = &page.Goals[i]
 	}
+	h.markMadeByOrchestrator(r.Context(), project, made...)
 	writeJSON(w, http.StatusOK, page)
 }
 
