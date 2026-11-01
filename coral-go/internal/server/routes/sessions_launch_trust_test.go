@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -217,4 +218,17 @@ func TestAWorktreeIsTrustedOnlyWithTheTick(t *testing.T) {
 	got := r.h.trustTeamFolder(req, body, work, true, true)
 	assert.Equal(t, []string{"claude"}, got["trusted"])
 	assert.True(t, r.claudeTrusts(t, work))
+}
+
+// Security's SHOULD (1): the folder's name is text from the disk (it can hold a quote, a line break's look-alike or a bidi mark), so the board message quotes it, with every unprintable character written out.
+func TestTheBoardNoticeQuotesTheFolderName(t *testing.T) {
+	r := newTrustRig(t)
+	dir := filepath.Join(r.home, "Code", "ap\"p‮gnp.exe")
+	require.NoError(t, os.MkdirAll(dir, 0o755))
+	out := r.launch(t, dir, false, true, asCaller(callerDashCookie))
+	assert.Equal(t, []any{"claude"}, trustOf(t, out)["trusted"], "Codex refuses a name with a quote, Claude does not")
+	notices := r.trustNotices(t, out["board"].(string))
+	require.Len(t, notices, 1, "%v", notices)
+	assert.Contains(t, notices[0], strconv.Quote(dir), "the name is quoted, escapes written out")
+	assert.NotContains(t, notices[0], "‮", "no bidi mark reaches the message")
 }

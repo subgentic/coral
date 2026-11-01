@@ -108,7 +108,7 @@ func (h *SessionsHandler) trustTeamFolder(r *http.Request, body launchTeamReques
 	sort.Strings(trusted)
 	reply["trusted"] = trusted
 	if len(trusted) > 0 && body.BoardName != "" && h.bs != nil { // an Operator can see it afterwards: one message on the team's board
-		h.bs.PostSystemDefusedMessage(r.Context(), body.BoardName, "Coral Task Queue", fmt.Sprintf("[Coral] Coral trusted the folder %s for %s, so its settings and tools run with no question. Turn it off in the agent's own settings if you did not mean it.", resolved, strings.Join(trusted, ", ")), nil)
+		h.bs.PostSystemDefusedMessage(r.Context(), body.BoardName, "Coral Task Queue", fmt.Sprintf("[Coral] Coral trusted the folder %q for %s, so its settings and tools run with no question. Turn it off in the agent's own settings if you did not mean it.", resolved, strings.Join(trusted, ", ")), nil)
 	}
 	if len(not) > 0 {
 		reply["not"] = not

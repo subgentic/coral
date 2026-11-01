@@ -18,6 +18,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/pelletier/go-toml/v2"
@@ -80,6 +81,15 @@ func Check(path, home string, basis Basis) (string, error) {
 		}
 		if len(parts) == 1 && basis != Made {
 			return "", errors.New("a direct child of the home folder would trust every repository the person puts under it")
+		}
+	} else {
+		// Outside home: the folder may be one other people on the computer can write into. A shared root (/tmp, /Users/Shared), a shallow folder (/srv/x, /Volumes/Backup) and a folder that group or others can
+		// write are refused: whoever can write there can plant the settings, hooks and tools that trust would run with no card (Security's SHOULD on #11889).
+		if why := sharedOrShallow(realPath); why != "" {
+			return "", errors.New(why)
+		}
+		if fi, err := os.Stat(realPath); err == nil && runtime.GOOS != "windows" && fi.Mode().Perm()&0o022 != 0 {
+			return "", errors.New("a folder outside home that group or others can write into is never trusted")
 		}
 	}
 	switch basis {
@@ -274,4 +284,23 @@ func TrustCodex(cfg, path string) (bool, error) {
 		return false, err
 	}
 	return true, nil
+}
+
+// sharedRoots are the folders anyone on the computer can write into, at any depth below them.
+var sharedRoots = []string{"/tmp", "/private/tmp", "/var/tmp", "/private/var/tmp", "/Users/Shared"}
+
+// sharedOrShallow says why a folder outside home is too shared or too shallow to trust ("" when it is neither): under a shared root, or with fewer than three components (/srv/x, /Volumes/Backup, /usr/local):
+// a folder that shallow is a root of its own that other people's work lives in.
+func sharedOrShallow(p string) string {
+	slash := filepath.ToSlash(p)
+	for _, root := range sharedRoots {
+		if slash == root || strings.HasPrefix(slash, root+"/") {
+			return "a folder in a shared place (" + root + ") is never trusted: anyone on the computer can write into it"
+		}
+	}
+	rest := strings.Trim(strings.TrimPrefix(slash, filepath.VolumeName(p)), "/")
+	if rest == "" || len(strings.Split(rest, "/")) < 3 {
+		return "a folder this close to the root of a disk is never trusted: other people's work lives beside it"
+	}
+	return ""
 }

@@ -254,3 +254,49 @@ func TestTrustCodexLeavesTheCardWhenAppendingWouldBreakTheFileOrTheNameIsUnsafe(
 		assert.ErrorIs(t, err, ErrLinked)
 	}
 }
+
+// Security's SHOULD on #11889: a folder outside home that others can write into is not trusted: a ticked /tmp/proj, /srv/proj or /Volumes/Backup would let anyone on the computer plant the settings, hooks and tools
+// that then run with no card. Shared roots and folders shallower than three components are refused outside home, and so is an outside folder that group or other can write.
+func TestASharedOrShallowFolderOutsideHomeIsRefused(t *testing.T) {
+	for _, bad := range []string{
+		"/tmp", "/tmp/proj", "/private/tmp/proj", "/private/tmp/a/b", "/var/tmp/x", "/private/var/tmp/x", "/srv/proj", "/opt/proj", "/mnt/proj", "/media/proj", "/Volumes/Backup", "/Users/Shared", "/Users/Shared/proj",
+		"/Users", "/home", "/usr/local", "/var", "/etc",
+	} {
+		assert.NotEmpty(t, sharedOrShallow(bad), bad)
+	}
+	for _, ok := range []string{"/Volumes/Backup/proj", "/srv/team/proj", "/opt/work/proj", "/data/projects/app", "/mnt/disk/proj"} {
+		assert.Empty(t, sharedOrShallow(ok), ok)
+	}
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix paths")
+	}
+	// through Check: a real folder in /tmp is refused whatever it is made of
+	if fi, err := os.Stat("/tmp"); err == nil && fi.IsDir() {
+		dir, err := os.MkdirTemp("/tmp", "foldertrust-test-")
+		if err == nil {
+			t.Cleanup(func() { os.RemoveAll(dir) })
+			home, _ := filepath.EvalSymlinks(t.TempDir())
+			_, err := Check(dir, home, Ticked)
+			assert.Error(t, err, "a ticked folder in /tmp")
+		}
+	}
+}
+
+func TestAnOutsideFolderThatOthersCanWriteIsRefused(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("modes")
+	}
+	r := newRig(t)
+	outside, err := filepath.EvalSymlinks(t.TempDir())
+	require.NoError(t, err)
+	mine := filepath.Join(outside, "a", "b", "proj")
+	require.NoError(t, os.MkdirAll(mine, 0o755))
+	got, err := Check(mine, r.home, Ticked)
+	require.NoError(t, err, "a folder outside home that only its owner can write")
+	assert.Equal(t, mine, got)
+	for _, mode := range []os.FileMode{0o775, 0o757, 0o777} {
+		require.NoError(t, os.Chmod(mine, mode))
+		_, err := Check(mine, r.home, Ticked)
+		assert.Error(t, err, "mode %o: group or other can plant files in it", mode)
+	}
+}
