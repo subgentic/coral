@@ -86,3 +86,32 @@ func TestSwitchModelForHermesSaysToRestartAndThatTheConversationIsNew(t *testing
 	assert.NotContains(t, out, "its conversation resumes")
 	assert.Empty(t, r.typed(), "nothing is typed into Hermes's terminal")
 }
+
+// QA on #12039: the character rule and the byte cap each get a case of their own, so neither can be dropped while the other keeps the test green.
+func TestHermesModelOKCharacterRuleAndByteCapSeparately(t *testing.T) {
+	assert.True(t, hermesModelOK("provider/vendor-model_1.2:tag@x+y"), "the characters model names use")
+	assert.False(t, hermesModelOK("short\x1b[31m"), "a control character alone (well under the cap) is not a model name")
+	assert.False(t, hermesModelOK("two words"), "a space is not one")
+	assert.False(t, hermesModelOK(""), "nothing is not one")
+	assert.True(t, hermesModelOK(strings.Repeat("x", hermesModelMax)), "exactly the cap is shown")
+	assert.False(t, hermesModelOK(strings.Repeat("x", hermesModelMax+1)), "one byte over the cap, all valid characters, is not")
+}
+
+// QA on #12039: the cache is by the database's state, so a model that changes after the first read shows on the next, and a read of an unchanged database is served from the cache.
+func TestHermesModelCacheFollowsAChangeAfterTheFirstRead(t *testing.T) {
+	_, h, _, ss := setupSessionsTestServer(t)
+	const sid = "00000000-0000-0000-0000-000000012042"
+	hermesID := "local-" + strings.Repeat("c9", 32)
+	team := "team-a"
+	require.NoError(t, ss.RegisterLiveSession(context.Background(), &store.LiveSession{SessionID: sid, AgentType: "hermes", AgentName: "repo", WorkingDir: "/tmp/test", BoardName: &team}))
+	w := writeHermesState(t, agent.HermesAgentHome(h.cfg.CoralDir(), team, sid))
+	require.NoError(t, transcriptlink.BindHermes(h.cfg.CoralDir(), sid, hermesID))
+	_, err := w.Exec(`INSERT INTO sessions (id, model, started_at) VALUES (?, 'first/model', 1788000000)`, hermesID)
+	require.NoError(t, err)
+
+	assert.Equal(t, "first/model", h.hermesModel(sid))
+	assert.Equal(t, "first/model", h.hermesModel(sid), "an unchanged database: the same answer")
+	_, err = w.Exec(`UPDATE sessions SET model = 'second/model' WHERE id = ?`, hermesID)
+	require.NoError(t, err)
+	assert.Equal(t, "second/model", h.hermesModel(sid), "the model changed after the first read: the next read has it")
+}
