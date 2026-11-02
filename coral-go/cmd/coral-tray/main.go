@@ -457,7 +457,7 @@ func runForeground(host string, port int, noBrowser, debugMode bool, backendType
 		}
 		refreshExit := func() {
 			a := runningNow.Load().(agentsNow)
-			it := exitItemsWhy(runtime.GOOS, runningBackend.Load().(string), a.count, a.wakes, a.why)
+			it := exitItemsKept(runtime.GOOS, runningBackend.Load().(string), a.count, a.kept, a.wakes, a.why)
 			mShutdown.SetTitle(it.shutdown)
 			mShutdown.SetTooltip(it.shutTip)
 			mQuit.SetTitle(it.quit)

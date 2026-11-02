@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -279,5 +280,86 @@ func TestTheGuardWordsAreCleanedAndCapped(t *testing.T) {
 		if tc.want != "" && why != tc.want {
 			t.Errorf("%s: %q, want %q", name, why, tc.want)
 		}
+	}
+}
+
+// #12360 (the Operator's screenshot: "Quit Coral (29 agents stop)"): agents on the tmux terminal live in tmux sessions and keep running when Coral quits, so the count is of the agents that really stop (the built-in
+// terminal's) and the title says how many keep running. The source is each live row's own "terminal" ("where it really runs"), not the one backend the server runs now.
+func TestQuitCountsOnlyTheAgentsThatReallyStop(t *testing.T) {
+	var rows strings.Builder
+	rows.WriteString("[")
+	add := func(n int, terminal string, sleeping bool) {
+		for i := 0; i < n; i++ {
+			if rows.Len() > 1 {
+				rows.WriteString(",")
+			}
+			fmt.Fprintf(&rows, `{"name":"x","terminal":%q,"sleeping":%v}`, terminal, sleeping)
+		}
+	}
+	add(3, "pty", false)                // end with Coral
+	add(26, "tmux", false)              // keep running
+	add(2, "tmux", true)                // asleep: nothing runs
+	add(4, "pty", true)                 // asleep
+	rows.WriteString(`,{"name":"old"}`) // a row that names no terminal ends with Coral, as before
+	rows.WriteString("]")
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/settings" {
+			io.WriteString(w, `{"settings":{"auto_wake_after_restart":"true"}}`)
+			return
+		}
+		if r.URL.Path != "/api/sessions/live" {
+			http.NotFound(w, r)
+			return
+		}
+		io.WriteString(w, rows.String())
+	}))
+	defer srv.Close()
+	stop, kept := runningAgentsSplit(srv.Client(), srv.URL)
+	if stop != 4 || kept != 26 {
+		t.Errorf("3 pty + 1 unnamed stop, 26 tmux keep running, the sleeping ones are neither: stop %d kept %d", stop, kept)
+	}
+	if got := runningAgents(srv.Client(), srv.URL); got != 4 {
+		t.Errorf("runningAgents is the ones that stop: %d", got)
+	}
+	a := readAgentsNow(srv.URL, t.TempDir())
+	if a.count != 4 || a.kept != 26 || !a.wakes {
+		t.Errorf("agentsNow %+v: the wake rule asks about the 4 that stop, not all 30", a)
+	}
+	var steps []string
+	quitKeepingAgentsPlace(srv.URL, t.TempDir(), func() { steps = append(steps, "close app") }, func() { steps = append(steps, "stop server") }, func(m string) { steps = append(steps, m) }, func() { steps = append(steps, "exit") })
+	if want := "close app|stop server|Coral quit. 4 agents will wake next time you open Coral. 26 in tmux keep running.|exit"; strings.Join(steps, "|") != want {
+		t.Errorf("Quit says what stopped and what keeps running: %q", steps)
+	}
+}
+
+func TestQuitTitleSaysWhatStopsAndWhatKeepsRunning(t *testing.T) {
+	for _, c := range []struct {
+		name         string
+		agents, kept int
+		wakes        bool
+		quit, tip    string
+		note         string
+	}{
+		{"none stop, none in tmux", 0, 0, true, "Quit Coral", "Exit Coral", "Coral quit."},
+		{"3 wake, 26 in tmux", 3, 26, true, "Quit Coral (3 agents wake next time; 26 in tmux keep running)", "3 agents stop now and wake next time you open Coral. 26 agents run in tmux and keep running.", "Coral quit. 3 agents will wake next time you open Coral. 26 in tmux keep running."},
+		{"3 stop, 26 in tmux", 3, 26, false, "Quit Coral (3 agents stop; 26 in tmux keep running)", "3 agents stop now. Wake them from Coral when you want them back. 26 agents run in tmux and keep running.", "Coral quit. 3 agents stopped. Wake them from Coral when you want them back. 26 in tmux keep running."},
+		{"1 stops, 1 in tmux", 1, 1, false, "Quit Coral (1 agent stops; 1 in tmux keeps running)", "1 agent stops now. Wake it from Coral when you want it back. 1 agent runs in tmux and keeps running.", "Coral quit. 1 agent stopped. Wake it from Coral when you want it back. 1 in tmux keeps running."},
+		{"none stop, 26 in tmux: no count of stopping", 0, 26, true, "Quit Coral (26 in tmux keep running)", "Exit Coral. 26 agents run in tmux and keep running.", "Coral quit. 26 in tmux keep running."},
+	} {
+		got := exitItemsKept("darwin", "pty", c.agents, c.kept, c.wakes, "")
+		if !got.oneExit || got.quit != c.quit || got.quitTip != c.tip || got.shutdown != c.quit {
+			t.Errorf("%s: %+v", c.name, got)
+		}
+		if n := quitNoteKept(c.agents, c.kept, c.wakes, ""); n != c.note {
+			t.Errorf("%s: note %q", c.name, n)
+		}
+	}
+	// the server's own tmux backend keeps its two exits, as before
+	if got := exitItemsKept("darwin", "tmux", 0, 26, true, ""); got.oneExit || got.quit != "Quit Coral" {
+		t.Errorf("tmux: %+v", got)
+	}
+	// without any kept the old functions say what they always said
+	if a, b := exitItemsWhy("darwin", "pty", 3, true, ""), exitItemsKept("darwin", "pty", 3, 0, true, ""); a != b {
+		t.Errorf("no tmux agents changes nothing: %+v %+v", a, b)
 	}
 }
