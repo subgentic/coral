@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -27,6 +28,8 @@ type autoSleepTerm struct {
 	killed []string // the session ids whose terminal was killed without ending the session
 	// draftOnceAsleep: once this session's row is asleep, the screen shows a draft (a person typed between the verdict's look and the sleep).
 	draftOnceAsleep func() bool
+	// what the pass read: a foreign Coral reads neither a screen nor a process tree
+	screens, pids atomic.Int32
 }
 
 func (a *autoSleepTerm) KillSessionOnly(ctx context.Context, name, agentType, sessionID string) error {
@@ -35,12 +38,14 @@ func (a *autoSleepTerm) KillSessionOnly(ctx context.Context, name, agentType, se
 }
 
 func (a *autoSleepTerm) AgentScreen(context.Context, string, string, string) (string, error) {
+	a.screens.Add(1)
 	if a.draftOnceAsleep != nil && a.draftOnceAsleep() {
 		return draftBoxScreen, nil
 	}
 	return a.screen, nil
 }
 func (a *autoSleepTerm) PanePID(context.Context, string, string, string) (int, error) {
+	a.pids.Add(1)
 	return os.Getpid(), nil
 }
 
