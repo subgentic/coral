@@ -23,6 +23,11 @@ import (
 // sweepNow is the clock the made-at bounds are read against; a test replaces it.
 var sweepNow = time.Now
 
+// The confirming read after a delete: this many reads, this far apart (a test shortens the wait).
+var sweepConfirmEvery = 3 * time.Second
+
+const sweepConfirmReads = 3
+
 const (
 	sweepCallTimeout = 10 * time.Second // each list and each delete
 	sweepClockSkew   = time.Minute      // the provider's clock against this computer's: made-at may be this much before the launch began or after now, and no more (not the safety control: the tag, name, region, size and count are)
@@ -132,13 +137,22 @@ func sweepOnce(l Lister, p Provider, tag string, want sweepWant, out io.Writer) 
 	case err == nil || errors.Is(err, ErrNotFound):
 		fmt.Fprintf(out, "Deleted machine %s (tag %s).\n", in.ID, tag)
 		// Deleted is not gone until a read says so: the launch's firewall and VPC come off only when this list no longer shows the id (Security's ruling, #9934).
-		rctx, rcancel := context.WithTimeout(context.Background(), sweepCallTimeout)
-		after, lerr := l.List(rctx)
-		rcancel()
-		if lerr != nil || slices.ContainsFunc(after, func(x Instance) bool { return x.ID == in.ID }) {
-			return sweepRefused, sweepByHand(out, p, tag, want.Name, fmt.Sprintf("machine %s was deleted but is not confirmed gone", in.ID))
+		// A provider may still list a droplet for a few seconds after a delete answered: up to sweepConfirmReads reads, a few seconds apart, each bounded. A failed read ends it as not confirmed.
+		for i := 0; i < sweepConfirmReads; i++ {
+			if i > 0 {
+				time.Sleep(sweepConfirmEvery)
+			}
+			rctx, rcancel := context.WithTimeout(context.Background(), sweepCallTimeout)
+			after, lerr := l.List(rctx)
+			rcancel()
+			if lerr != nil {
+				break
+			}
+			if !slices.ContainsFunc(after, func(x Instance) bool { return x.ID == in.ID }) {
+				return sweepDeleted, fmt.Sprintf("; deleted machine %s (tag %s) and confirmed it gone", in.ID, tag)
+			}
 		}
-		return sweepDeleted, fmt.Sprintf("; deleted machine %s (tag %s) and confirmed it gone", in.ID, tag)
+		return sweepRefused, sweepByHand(out, p, tag, want.Name, fmt.Sprintf("machine %s was deleted but is not confirmed gone", in.ID))
 	default:
 		fmt.Fprintf(out, "Could NOT delete machine %s (tag %s): delete it yourself at %s, it costs money while it exists.\n", in.ID, tag, p.Name())
 		return sweepRefused, fmt.Sprintf("; machine %s (tag %s) could NOT be deleted: delete it yourself at %s, it costs money while it exists", in.ID, tag, p.Name())

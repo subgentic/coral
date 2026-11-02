@@ -21,11 +21,19 @@ type sweepProvider struct {
 	lists   int
 	// staysListed: a deleted machine still shows in the list (the delete is not confirmed)
 	staysListed bool
+	// lagReads: the first this-many lists after a delete still show the machine, as a provider does for a few seconds
+	lagReads int
+	ghost    []Instance
 }
 
 // Delete forgets the machine unless staysListed: a provider whose delete is not yet visible in the list.
 func (p *sweepProvider) Delete(ctx context.Context, id string) error {
 	err := p.stubProvider.Delete(ctx, id)
+	if err == nil && p.lagReads > 0 {
+		for _, look := range p.looks {
+			p.ghost = append(p.ghost, look...)
+		}
+	}
 	if err == nil && !p.staysListed {
 		for i, look := range p.looks {
 			var keep []Instance
@@ -46,6 +54,10 @@ func (p *sweepProvider) List(context.Context) ([]Instance, error) {
 	if p.listErr != nil {
 		return nil, p.listErr
 	}
+	if p.lagReads > 0 && p.ghost != nil {
+		p.lagReads--
+		return p.ghost, nil
+	}
 	i := p.lists - 1
 	if i >= len(p.looks) {
 		i = len(p.looks) - 1
@@ -60,6 +72,8 @@ func sweepFixture(looks ...[]Instance) (*sweepProvider, sweepWant, *bytes.Buffer
 func mineAt(tag string) Instance {
 	return Instance{ID: "d1", Name: "coral-1", Region: "ams3", Size: "s-1vcpu-2gb", Created: time.Now(), Tags: []string{Tag, tag}}
 }
+
+func init() { sweepConfirmEvery = time.Millisecond } // the confirming reads, close together in tests
 
 const sweepTag = "coral-launch-0123456789abcdef0123456789abcdef"
 
@@ -202,7 +216,7 @@ func TestSweepDeleteThatIsNotConfirmedGoneIsNotClean(t *testing.T) {
 	p, want, out := sweepFixture([]Instance{mineAt(sweepTag)})
 	p.staysListed = true
 	note, clean := sweepAfterFailedCreate(p, sweepTag, want, context.DeadlineExceeded, time.Millisecond, nil, out)
-	if clean || !strings.Contains(note, "not confirmed gone") || !strings.Contains(note, sweepTag) || p.lists != 2 {
+	if clean || !strings.Contains(note, "not confirmed gone") || !strings.Contains(note, sweepTag) || p.lists != 1+sweepConfirmReads { // the look, then the bounded confirming reads
 		t.Fatalf("clean %v, lists %d, note %q", clean, p.lists, note)
 	}
 	p, want, out = sweepFixture([]Instance{mineAt(sweepTag)})
@@ -311,5 +325,20 @@ func TestSweepAfter502WithTwoOrAMismatch(t *testing.T) {
 		if clean || strings.Contains(strings.Join(p.calls, ","), "delete") {
 			t.Errorf("%s: clean %v, calls %v", name, clean, p.calls)
 		}
+	}
+}
+
+// A provider that still lists the droplet for a read or two after the delete is confirmed gone by the repeated, bounded reads (coral-go Security's INFO).
+func TestSweepConfirmingReadsOutlastABriefLag(t *testing.T) {
+	p, want, out := sweepFixture([]Instance{mineAt(sweepTag)})
+	p.lagReads = 2
+	_, clean := sweepAfterFailedCreate(p, sweepTag, want, context.DeadlineExceeded, time.Millisecond, nil, out)
+	if !clean || p.lists != 1+sweepConfirmReads {
+		t.Fatalf("clean %v, lists %d (want the look and %d reads)", clean, p.lists, sweepConfirmReads)
+	}
+	p, want, out = sweepFixture([]Instance{mineAt(sweepTag)})
+	p.lagReads = 99
+	if _, clean := sweepAfterFailedCreate(p, sweepTag, want, context.DeadlineExceeded, time.Millisecond, nil, out); clean || p.lists != 1+sweepConfirmReads {
+		t.Fatalf("a lag longer than the bound is not confirmed: clean %v, lists %d", clean, p.lists)
 	}
 }

@@ -378,24 +378,130 @@ func TestDeleteCanBeRunAgainAndTheStateFileKeepsWhatIsLeft(t *testing.T) {
 	assert.Error(t, err, "a machine that is gone entirely is said so, not made up")
 }
 
-// With no state file, the machine is found at the provider by its name and the tool's tag, its network by the names this tool gives it.
-func TestDeleteFindsAMachineTheStateFileLost(t *testing.T) {
+// A machine the state file does not know is deleted ONLY by an id the person types (Security's ruling ii, #9934): no id lists the candidates and deletes nothing; an id outside the list, or a name two machines carry, deletes
+// nothing; the right id deletes the instance alone and leaves its network.
+func TestDeleteOfAMachineTheStateFileLostNeedsTheTypedID(t *testing.T) {
 	f := newFake()
-	rec := record("m9", f)
+	record("m9", f)
 	st := stateAt(t) // empty
-	rep, err := Delete(t.Context(), "m9", ManageDeps{Provider: f, State: st, Out: &bytes.Buffer{}, Tune: quick()})
+	var out bytes.Buffer
+	d := ManageDeps{Provider: f, State: st, Out: &out, Tune: quick()}
+	_, err := Delete(t.Context(), "m9", d)
+	require.ErrorIs(t, err, ErrNeedTypedID)
+	assert.Contains(t, out.String(), "id 77", "the candidate is listed")
+	assert.Contains(t, err.Error(), "--id")
+	assert.Len(t, f.drops, 1, "nothing was deleted")
+	assert.NotContains(t, strings.Join(f.calls, ","), "Delete")
+
+	d.TypedID = "99999"
+	_, err = Delete(t.Context(), "m9", d)
+	require.Error(t, err, "an id that is not in the list")
+	assert.Len(t, f.drops, 1)
+
+	f.drops["78"] = Instance{ID: "78", Name: "m9", Tags: []string{Tag}}
+	d.TypedID = "77"
+	_, err = Delete(t.Context(), "m9", d)
+	require.Error(t, err, "two machines carry the name: nothing is deleted, even with a typed id")
+	assert.Len(t, f.drops, 2)
+	delete(f.drops, "78")
+
+	d.TypedID = "77"
+	rep, err := Delete(t.Context(), "m9", d)
 	require.NoError(t, err)
 	assert.True(t, rep.Reconstruct)
 	assert.Empty(t, f.drops)
-	assert.Empty(t, f.vpcs, "the VPC was found by its name %s", VPCName("m9"))
-	assert.Empty(t, f.fws)
-	assert.Contains(t, rep.RevokeNote, "--hub-destroy-file")
-	_ = rec
+	assert.Len(t, f.vpcs, 1, "its network is NOT touched: it cannot be told from another machine's by name")
+	assert.Len(t, f.fws, 1)
+	assert.Contains(t, out.String(), "NOT touched")
+
 	f2 := newFake()
 	f2.drops["5"] = Instance{ID: "5", Name: "someone-elses", Tags: []string{"web"}}
-	_, err = Delete(t.Context(), "someone-elses", ManageDeps{Provider: f2, State: stateAt(t), Out: &bytes.Buffer{}, Tune: quick()})
-	require.Error(t, err, "a droplet without this tool's tag is never found, never deleted")
+	d2 := ManageDeps{Provider: f2, State: stateAt(t), Out: &bytes.Buffer{}, Tune: quick(), TypedID: "5"}
+	_, err = Delete(t.Context(), "someone-elses", d2)
+	require.Error(t, err, "a droplet without this tool's tag is never found, never deleted, even by typed id")
 	assert.Len(t, f2.drops, 1)
+}
+
+// With a record, the droplet is re-read before anything is revoked or deleted: this tool's tag, the record's name and the record's launch tag must all still be on it.
+func TestDeleteRereadsTheDropletAndRefusesAMismatch(t *testing.T) {
+	for name, change := range map[string]func(*Instance){
+		"tag removed":      func(i *Instance) { i.Tags = []string{"coral-launch-0123456789abcdef0123456789abcdef"} },
+		"other name":       func(i *Instance) { i.Name = "someone-elses" },
+		"other launch tag": func(i *Instance) { i.Tags = []string{Tag, "coral-launch-ffffffffffffffffffffffffffffffff"} },
+		"no launch tag":    func(i *Instance) { i.Tags = []string{Tag} },
+	} {
+		f := newFake()
+		st := stateAt(t)
+		require.NoError(t, st.Put(record("m1", f)))
+		in := f.drops["77"]
+		change(&in)
+		f.drops["77"] = in
+		var order []string
+		f.order = &order
+		rev := &fakeRevoker{log: &order}
+		var out bytes.Buffer
+		_, err := Delete(t.Context(), "m1", ManageDeps{Provider: f, Revoker: rev, State: st, Out: &out, Tune: quick()})
+		require.ErrorIs(t, err, ErrDropletMismatch, name)
+		assert.Empty(t, order, "%s: nothing was revoked or deleted", name)
+		assert.Contains(t, f.drops, "77", name)
+		assert.Contains(t, out.String(), "id 77", "%s: what was seen is printed", name)
+		_, ok := st.Get("m1")
+		assert.True(t, ok, "%s: the record stays", name)
+	}
+}
+
+// A record whose droplet id never came back (the create timed out) finds a late droplet by the record's launch tag, re-reads it, and deletes that one; two refuse.
+func TestDeleteFindsALateDropletByTheRecordsLaunchTag(t *testing.T) {
+	f := newFake()
+	st := stateAt(t)
+	r := record("m1", f)
+	r.DropletID = ""
+	require.NoError(t, st.Put(r))
+	var out bytes.Buffer
+	d := ManageDeps{Provider: f, State: st, Out: &out, Tune: quick()}
+	f.drops["88"] = Instance{ID: "88", Name: "m1", Tags: []string{Tag, r.LaunchTag}}
+	delete(f.drops, "77")
+	_, err := Delete(t.Context(), "m1", d)
+	require.NoError(t, err)
+	assert.NotContains(t, f.drops, "88", "the late droplet was found by the launch tag and deleted by its id")
+
+	r2 := record("m2", f)
+	r2.DropletID = ""
+	require.NoError(t, st.Put(r2))
+	f.drops["81"] = Instance{ID: "81", Name: "m2", Tags: []string{Tag, r2.LaunchTag}}
+	f.drops["82"] = Instance{ID: "82", Name: "m2", Tags: []string{Tag, r2.LaunchTag}}
+	_, err = Delete(t.Context(), "m2", d)
+	require.ErrorIs(t, err, ErrDropletMismatch)
+	assert.Contains(t, f.drops, "81")
+	assert.Contains(t, f.drops, "82")
+}
+
+// A droplet the provider no longer has is already gone: the delete goes on to what is left.
+func TestDeleteOfADropletAlreadyGoneStillRemovesTheNetwork(t *testing.T) {
+	f := newFake()
+	st := stateAt(t)
+	require.NoError(t, st.Put(record("m1", f)))
+	delete(f.drops, "77")
+	_, err := Delete(t.Context(), "m1", ManageDeps{Provider: f, State: st, Out: &bytes.Buffer{}, Tune: quick()})
+	require.NoError(t, err)
+	assert.Empty(t, f.vpcs)
+	assert.Empty(t, f.fws)
+}
+
+// ListUnknown is read-only and lists what this state file does not know, by name and by launch tag.
+func TestListUnknownIsReadOnlyAndListsWhatTheStateFileDoesNot(t *testing.T) {
+	f := newFake()
+	st := stateAt(t)
+	require.NoError(t, st.Put(record("m1", f)))
+	f.drops["88"] = Instance{ID: "88", Name: "stray", Tags: []string{Tag, "coral-launch-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}, Region: "nyc3"}
+	f.drops["99"] = Instance{ID: "99", Name: "not-ours", Tags: []string{"web"}}
+	f.calls = nil
+	odd, err := ListUnknown(t.Context(), ManageDeps{Provider: f, State: st, Out: &bytes.Buffer{}})
+	require.NoError(t, err)
+	require.Len(t, odd, 1)
+	assert.Equal(t, "88", odd[0].ID)
+	assert.Empty(t, f.calls, "no delete or any other call was made but the list")
+	assert.Len(t, f.drops, 3)
 }
 
 // ---- list and prune
@@ -423,46 +529,31 @@ func TestListJoinsTheProviderWithTheStateFile(t *testing.T) {
 	assert.NotContains(t, byName, "not-ours")
 }
 
-func TestPruneRemovesOnlyOldOrphansAfterOneConfirmation(t *testing.T) {
+// Prune never takes an instance the state file does not know, however old (Security's ruling iii, #9934): a second computer's launches look exactly like that. It is counted and said, with how to look at them.
+func TestPruneNeverTakesAnInstanceTheStateFileDoesNotKnow(t *testing.T) {
 	f := newFake()
 	st := stateAt(t)
 	f.vpcs["vpc-o"], f.fws["fw-o"] = VPC{ID: "vpc-o", Name: VPCName("orphan")}, Firewall{ID: "fw-o", Name: FirewallName("orphan")}
 	f.drops["1"] = Instance{ID: "1", Name: "orphan", Tags: []string{Tag}, Created: time.Now().Add(-48 * time.Hour)}
-	f.drops["2"] = Instance{ID: "2", Name: "fresh-orphan", Tags: []string{Tag}, Created: time.Now().Add(-1 * time.Hour)}
 	f.drops["3"] = Instance{ID: "3", Name: "mine", Tags: []string{Tag}, Created: time.Now().Add(-90 * time.Hour)}
 	f.drops["4"] = Instance{ID: "4", Name: "not-ours", Tags: []string{"web"}, Created: time.Now().Add(-900 * time.Hour)}
 	mine := goodRecord("mine")
 	mine.DropletID = "3"
 	require.NoError(t, st.Put(mine))
-	var asked []string
-	d := ManageDeps{Provider: f, State: st, Out: &bytes.Buffer{}, Tune: quick(), Confirm: func(s string) (bool, error) { asked = append(asked, s); return false, nil }}
-	rep, err := Prune(t.Context(), PruneOptions{OlderThan: 24 * time.Hour, IncludeUnknown: true}, d)
-	assert.ErrorIs(t, err, ErrDeclined)
-	require.Len(t, asked, 1, "one confirmation lists everything")
-	assert.Contains(t, asked[0], "orphan:")
-	assert.NotContains(t, asked[0], "mine", "a machine the state file knows is left alone")
-	assert.NotContains(t, asked[0], "fresh-orphan", "newer than the age is left alone")
-	assert.NotContains(t, asked[0], "not-ours", "nothing without this tool's tag is touched")
-	assert.Contains(t, asked[0], "cannot revoke a machine's Hub identity")
-	assert.Len(t, f.drops, 4, "declined: nothing was removed")
-	assert.Len(t, rep.Items, 1)
-
-	d.Confirm = func(string) (bool, error) { return true, nil }
-	rep, err = Prune(t.Context(), PruneOptions{OlderThan: 24 * time.Hour, IncludeUnknown: true}, d)
+	var out bytes.Buffer
+	asked := 0
+	d := ManageDeps{Provider: f, State: st, Out: &out, Tune: quick(), Confirm: func(string) (bool, error) { asked++; return true, nil }}
+	rep, err := Prune(t.Context(), PruneOptions{OlderThan: 24 * time.Hour}, d)
 	require.NoError(t, err)
-	assert.Equal(t, []string{"orphan"}, rep.Removed)
-	assert.NotContains(t, f.drops, "1")
-	assert.Empty(t, f.vpcs, "its network went with it, found by name")
-	assert.Empty(t, f.fws)
-	assert.Len(t, f.drops, 3)
-
-	_, err = Prune(t.Context(), PruneOptions{IncludeUnknown: true}, d)
+	assert.Empty(t, rep.Items, "nothing the state file knows is stale, and the unknown instance is not taken")
+	assert.Zero(t, asked)
+	assert.Len(t, f.drops, 3, "nothing was removed")
+	assert.Contains(t, f.vpcs, "vpc-o", "nor its network")
+	assert.Contains(t, out.String(), "1 instance(s)")
+	assert.Contains(t, out.String(), "list --unknown")
+	assert.NotContains(t, out.String(), "include-unknown")
+	_, err = Prune(t.Context(), PruneOptions{}, d)
 	assert.Error(t, err, "an age is required")
-	d.Confirm = nil
-	f.drops["5"] = Instance{ID: "5", Name: "again", Tags: []string{Tag}, Created: time.Now().Add(-72 * time.Hour)}
-	_, err = Prune(t.Context(), PruneOptions{OlderThan: 24 * time.Hour, IncludeUnknown: true}, d)
-	assert.Error(t, err, "no one to ask and no --yes: nothing is removed")
-	assert.Contains(t, f.drops, "5")
 }
 
 func TestPruneTakesStaleRecordsAndOrphanNetworksOnlyAsAsked(t *testing.T) {
@@ -476,38 +567,16 @@ func TestPruneTakesStaleRecordsAndOrphanNetworksOnlyAsAsked(t *testing.T) {
 	f.vpcs["vpc-lone"] = VPC{ID: "vpc-lone", Name: VPCName("lonely")}
 	f.vpcs["vpc-team"] = VPC{ID: "vpc-team", Name: "the-teams-own"}
 	d := ManageDeps{Provider: f, State: st, Out: &bytes.Buffer{}, Tune: quick(), Confirm: func(string) (bool, error) { return true, nil }}
-	rep, err := Prune(t.Context(), PruneOptions{OlderThan: 24 * time.Hour, IncludeUnknown: true}, d)
+	rep, err := Prune(t.Context(), PruneOptions{OlderThan: 24 * time.Hour}, d)
 	require.NoError(t, err)
 	assert.Equal(t, []string{"stale"}, rep.Removed, "a record whose instance is gone, with its leftover network")
 	_, ok := st.Get("stale")
 	assert.False(t, ok)
 	assert.Contains(t, f.vpcs, "vpc-lone", "an orphan network is not taken unless asked: it has no age")
 
-	rep, err = Prune(t.Context(), PruneOptions{OlderThan: 24 * time.Hour, IncludeUnknown: true, IncludeNetworks: true}, d)
+	rep, err = Prune(t.Context(), PruneOptions{OlderThan: 24 * time.Hour, IncludeNetworks: true}, d)
 	require.NoError(t, err)
 	assert.Equal(t, []string{"lonely"}, rep.Removed)
 	assert.NotContains(t, f.vpcs, "vpc-lone")
 	assert.Contains(t, f.vpcs, "vpc-team", "a VPC without this tool's name is never touched")
-}
-
-// SHOULD B (#10944): a machine with this tool's tag that THIS state file does not know is not taken unless the person says so: the tag proves this tool made it, not this state file.
-func TestPruneLeavesUnknownTaggedMachinesAloneUnlessAsked(t *testing.T) {
-	f := newFake()
-	st := stateAt(t)
-	f.drops["1"] = Instance{ID: "1", Name: "someone-elses", Tags: []string{Tag}, Created: time.Now().Add(-300 * time.Hour)}
-	var out bytes.Buffer
-	asked := 0
-	d := ManageDeps{Provider: f, State: st, Out: &out, Tune: quick(), Confirm: func(string) (bool, error) { asked++; return true, nil }}
-	rep, err := Prune(t.Context(), PruneOptions{OlderThan: 24 * time.Hour}, d)
-	require.NoError(t, err)
-	assert.Empty(t, rep.Items, "not taken by default")
-	assert.Zero(t, asked, "so there was nothing to confirm")
-	assert.Contains(t, f.drops, "1", "and it is still there")
-	assert.Contains(t, out.String(), "--include-unknown", "but it is said, with how to take it")
-	assert.Contains(t, out.String(), "1 instance(s)")
-
-	rep, err = Prune(t.Context(), PruneOptions{OlderThan: 24 * time.Hour, IncludeUnknown: true}, d)
-	require.NoError(t, err)
-	assert.Equal(t, []string{"someone-elses"}, rep.Removed)
-	assert.NotContains(t, f.drops, "1")
 }

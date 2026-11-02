@@ -34,10 +34,10 @@ var newMachineRevoker = func(baseURL, destroyKey string) machinelaunch.IdentityR
 }
 
 func machineManageUsage(w io.Writer) {
-	fmt.Fprintln(w, "usage: coral machine list   --provider digitalocean --token-file <path|-> [--state-file PATH]")
+	fmt.Fprintln(w, "usage: coral machine list   --provider digitalocean --token-file <path|-> [--unknown] [--state-file PATH]   (--unknown only lists: it deletes nothing)")
 	fmt.Fprintln(w, "       coral machine delete NAME --provider digitalocean --token-file <path|-> [--hub-destroy-file <path|->] [--hub-url https://app.coralhub.dev]")
-	fmt.Fprintln(w, "         [--continue-if-revoke-fails] [--state-file PATH] [--yes]")
-	fmt.Fprintln(w, "       coral machine prune --older-than 24h|7d --provider digitalocean --token-file <path|-> [--include-unknown] [--include-networks] [--state-file PATH] [--yes]")
+	fmt.Fprintln(w, "         [--id INSTANCE_ID (needed when the state file does not know the machine)] [--continue-if-revoke-fails] [--state-file PATH] [--yes]")
+	fmt.Fprintln(w, "       coral machine prune --older-than 24h|7d --provider digitalocean --token-file <path|-> [--include-networks] [--state-file PATH] [--yes]")
 	fmt.Fprintln(w, "       coral machine egress-files --dir DIR   (writes the machine's egress-block files, for tools/machine-egress-check.sh)")
 }
 
@@ -88,16 +88,18 @@ func runMachineManage(sub string, args []string, stdin io.Reader, stdout, stderr
 	statePath := fs.String("state-file", "", "the state file the launches write (default: machines.json in Coral's data folder)")
 	yes := fs.Bool("yes", false, "go on without asking")
 	var destroyFile, hubURL *string
-	var continueRevoke, includeNetworks, includeUnknown *bool
-	var olderThan *string
+	var continueRevoke, includeNetworks, listUnknown *bool
+	var olderThan, typedID *string
 	switch sub {
+	case "list":
+		listUnknown = fs.Bool("unknown", false, "only list the instances with this tool's tag that this state file does not know (a second computer's launches look like that); it deletes nothing")
 	case "delete":
+		typedID = fs.String("id", "", "the instance id to delete, copied from the list: needed when the state file does not know the machine; nothing is deleted without it")
 		destroyFile = fs.String("hub-destroy-file", "", "file with the automation key's destroy credential (chd_..., mode 0600), or -: revokes the machine's Coral Hub identity before the machine is destroyed")
 		hubURL = fs.String("hub-url", config.TierDefaultCloudURL, "the Coral Hub origin (https)")
 		continueRevoke = fs.Bool("continue-if-revoke-fails", false, "destroy the machine even if its Hub identity could not be revoked (it is still said, and it still has to be removed in Coral Hub)")
 	case "prune":
 		olderThan = fs.String("older-than", "", "how old an instance must be to count as an orphan: 90m, 24h or 7d (required)")
-		includeUnknown = fs.Bool("include-unknown", false, "also take instances with this tool's tag that the state file does not know (they may belong to another computer or a lost state file: by default they are only counted)")
 		includeNetworks = fs.Bool("include-networks", false, "also take private networks and firewalls with this tool's names that have no instance and no record (they carry no age)")
 	}
 	// flags and the machine name may come in either order: the name is the one argument that is not a flag
@@ -169,6 +171,9 @@ func runMachineManage(sub string, args []string, stdin io.Reader, stdout, stderr
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	d := machinelaunch.ManageDeps{Provider: p, Revoker: revoker, State: st, Out: stdout}
+	if typedID != nil {
+		d.TypedID = *typedID
+	}
 	if continueRevoke != nil {
 		d.ContinueIfRevokeFails = *continueRevoke
 	}
@@ -198,6 +203,34 @@ func runMachineManage(sub string, args []string, stdin io.Reader, stdout, stderr
 
 	switch sub {
 	case "list":
+		if *listUnknown { // read-only: no delete call exists on this path
+			odd, err := machinelaunch.ListUnknown(ctx, d)
+			if err != nil {
+				return finish(err)
+			}
+			if len(odd) == 0 {
+				fmt.Fprintln(stdout, "Every machine with this tool's tag is in this state file.")
+				return 0
+			}
+			tw := tabwriter.NewWriter(stdout, 0, 4, 2, ' ', 0)
+			fmt.Fprintln(tw, "ID\tNAME\tREGION\tMADE\tLAUNCH TAG")
+			for _, in := range odd {
+				made := "-"
+				if !in.Created.IsZero() {
+					made = in.Created.UTC().Format(time.RFC3339)
+				}
+				lt := "-"
+				for _, t := range in.Tags {
+					if strings.HasPrefix(t, "coral-launch-") {
+						lt = t
+					}
+				}
+				fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", in.ID, in.Name, in.Region, made, lt)
+			}
+			_ = tw.Flush()
+			fmt.Fprintln(stdout, "These are not in this state file and are never deleted by prune. To delete one: coral machine delete NAME --id ID, typing the id.")
+			return 0
+		}
 		rows, err := machinelaunch.List(ctx, d)
 		if err != nil {
 			return finish(err)
@@ -227,12 +260,16 @@ func runMachineManage(sub string, args []string, stdin io.Reader, stdout, stderr
 		_ = tw.Flush()
 		return 0
 	case "delete":
+		if _, known := st.Get(name); !known && d.TypedID == "" { // not in the state file and no typed id: Delete lists the candidates and refuses; there is nothing to confirm
+			_, err := machinelaunch.Delete(ctx, name, d)
+			return finish(err)
+		}
 		if d.Confirm == nil {
 			return fail("no one can be asked to confirm: pass --yes to go on without asking")
 		}
 		summary := fmt.Sprintf("Delete machine %q at %s: its instance, firewall and private network, and the state file's record. It cannot be undone.", name, p.Name())
 		if rec, ok := st.Get(name); !ok {
-			summary += " The state file does not know it: it is found at the provider by its name and this tool's tag."
+			summary += " The state file does not know it: only the instance with the id you typed is deleted (not its firewall or network)."
 		} else if rec.CredentialID != "" && revoker != nil {
 			summary += " Its Coral Hub identity is revoked first."
 		}
@@ -256,7 +293,7 @@ func runMachineManage(sub string, args []string, stdin io.Reader, stdout, stderr
 		if d.Confirm == nil {
 			return fail("no one can be asked to confirm: pass --yes to go on without asking")
 		}
-		rep, err := machinelaunch.Prune(ctx, machinelaunch.PruneOptions{OlderThan: age, IncludeUnknown: *includeUnknown, IncludeNetworks: *includeNetworks}, d)
+		rep, err := machinelaunch.Prune(ctx, machinelaunch.PruneOptions{OlderThan: age, IncludeNetworks: *includeNetworks}, d)
 		if err == nil && rep != nil && len(rep.Removed) > 0 {
 			fmt.Fprintf(stdout, "Removed: %s.\n", strings.Join(rep.Removed, ", "))
 		}

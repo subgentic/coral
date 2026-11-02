@@ -76,7 +76,7 @@ func manageFixture(t *testing.T) (args []string, p *manageProvider, rev *manageR
 	if err := os.WriteFile(destroyFile, []byte(manageChd+"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	p.drops = []machinelaunch.Instance{{ID: "77", Name: "m1", Tags: []string{machinelaunch.Tag}, Region: "nyc3", Size: "s-2vcpu-4gb", Status: machinelaunch.StatusRunning, Created: time.Now().Add(-26 * time.Hour)}}
+	p.drops = []machinelaunch.Instance{{ID: "77", Name: "m1", Tags: []string{machinelaunch.Tag, "coral-launch-0123456789abcdef0123456789abcdef"}, Region: "nyc3", Size: "s-2vcpu-4gb", Status: machinelaunch.StatusRunning, Created: time.Now().Add(-26 * time.Hour)}}
 	newMachineProvider = func(name, token string) (machinelaunch.Provider, error) {
 		if name != "digitalocean" {
 			return nil, errors.New("unknown provider")
@@ -192,13 +192,43 @@ func TestMachinePruneNeedsAnAgeAndRemovesOrphansAfterConfirmation(t *testing.T) 
 		t.Fatalf("nothing was removed yet: %v", p.log)
 	}
 	code, out, errb := runManage(append([]string{"prune", "--older-than", "2d", "--yes"}, args...)...)
-	if code != 0 || len(p.log) != 0 || !strings.Contains(out, "--include-unknown") {
-		t.Fatalf("without --include-unknown an instance the state file does not know is said and left alone: exit %d log %v out %s %s", code, p.log, out, errb)
+	if code != 0 || len(p.log) != 0 || !strings.Contains(out, "list --unknown") {
+		t.Fatalf("an instance the state file does not know is said and left alone, with how to look: exit %d log %v out %s %s", code, p.log, out, errb)
 	}
-	code, out, errb = runManage(append([]string{"prune", "--older-than", "2d", "--yes", "--include-unknown"}, args...)...)
-	got := strings.Join(p.log, ",")
-	if code != 0 || got != "delete:90" || !strings.Contains(out, "Removed: orphan") {
-		t.Fatalf("only the old orphan, not the machine in the state file: exit %d log %s out %s %s", code, got, out, errb)
+	code, _, errb = runManage(append([]string{"prune", "--older-than", "2d", "--yes", "--include-unknown"}, args...)...)
+	if code != 2 || len(p.log) != 0 {
+		t.Fatalf("--include-unknown no longer exists (Security's ruling iii): exit %d log %v %s", code, p.log, errb)
+	}
+}
+
+// `machine list --unknown` is read-only and prints id, name, region, made and launch tag of what the state file does not know.
+func TestMachineListUnknownIsReadOnly(t *testing.T) {
+	args, p, _, _, _ := manageFixture(t)
+	p.drops = append(p.drops, machinelaunch.Instance{ID: "90", Name: "stray", Region: "sfo3", Tags: []string{machinelaunch.Tag, "coral-launch-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}, Created: time.Now().Add(-100 * time.Hour)})
+	code, out, errb := runManage(append([]string{"list", "--unknown"}, args...)...)
+	if code != 0 || !strings.Contains(out, "90") || !strings.Contains(out, "stray") || !strings.Contains(out, "sfo3") || !strings.Contains(out, "coral-launch-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") || strings.Contains(out, "m1") {
+		t.Fatalf("exit %d: %s %s", code, out, errb)
+	}
+	if len(p.log) != 0 {
+		t.Fatalf("a read-only list made a call that changes something: %v", p.log)
+	}
+}
+
+// A machine the state file does not know is deleted only with its typed id: no id lists and refuses (even with --yes), a wrong id refuses, the right id deletes the instance alone.
+func TestMachineDeleteOfAnUnknownMachineNeedsTheTypedID(t *testing.T) {
+	args, p, _, _, _ := manageFixture(t)
+	p.drops = append(p.drops, machinelaunch.Instance{ID: "90", Name: "stray", Region: "sfo3", Tags: []string{machinelaunch.Tag}, Created: time.Now().Add(-100 * time.Hour)})
+	code, out, errb := runManage(append([]string{"delete", "stray", "--yes"}, args...)...)
+	if code == 0 || len(p.log) != 0 || !strings.Contains(out, "id 90") || !strings.Contains(errb, "--id") {
+		t.Fatalf("no typed id: exit %d log %v out %s err %s", code, p.log, out, errb)
+	}
+	code, _, errb = runManage(append([]string{"delete", "stray", "--yes", "--id", "91"}, args...)...)
+	if code == 0 || len(p.log) != 0 {
+		t.Fatalf("a wrong id: exit %d log %v %s", code, p.log, errb)
+	}
+	code, out, errb = runManage(append([]string{"delete", "stray", "--yes", "--id", "90"}, args...)...)
+	if code != 0 || strings.Join(p.log, ",") != "delete:90" || !strings.Contains(out, "NOT touched") {
+		t.Fatalf("the typed id: exit %d log %v out %s err %s", code, p.log, out, errb)
 	}
 }
 

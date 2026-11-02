@@ -90,15 +90,12 @@ type PruneReport struct {
 // PruneOptions choose what a prune may take.
 type PruneOptions struct {
 	OlderThan time.Duration // how old an instance or a record must be (required)
-	// IncludeUnknown takes instances with this tool's tag that the state file does not know. Without it they are only counted and said: a tag proves a machine was made by this tool, not by THIS state file (a second
-	// computer, another account's launch, a state file that was lost), so removing one is an explicit choice (#10944, Security's SHOULD B).
-	IncludeUnknown bool
 	// IncludeNetworks also takes a VPC or firewall with this tool's names that has no instance and no record.
 	IncludeNetworks bool
 }
 
 // Prune finds what a crashed or forgotten launch left, by this tool's tag and names, and removes it after ONE confirmation that lists it all:
-//   - with IncludeUnknown, an instance with the tool's tag that is at least OlderThan old and that the state file does not know (an orphan; one the state file knows is a machine you launched and is left alone), with its network by name;
+//   - NEVER an instance the state file does not know, however old: a tag proves this tool made it, not that THIS state file did (a second computer's launch looks the same). Those are only counted and said: `coral machine list --unknown` shows them and `coral machine delete NAME --id ID` takes one the person types;
 //   - a state record at least olderThan old whose instance the provider no longer has (its leftover network is removed, the record dropped);
 //   - with includeNetworks, a VPC or firewall with the tool's name prefix whose machine has no instance and no record (these carry no age, so they are only taken when you say so).
 //
@@ -156,13 +153,7 @@ func Prune(ctx context.Context, o PruneOptions, d ManageDeps) (*PruneReport, err
 		if _, known := d.State.Get(in.Name); known {
 			continue // launched by this person, and still theirs
 		}
-		if !o.IncludeUnknown {
-			unknown++ // tagged by this tool but not in this state file: said, not taken
-			continue
-		}
-		vpc, fw := netIDs(in.Name)
-		items = append(items, PruneItem{Name: in.Name, Why: fmt.Sprintf("an instance made %s ago that the state file does not know", age(d.now().Sub(in.Created))), IDs: IDs{DropletID: in.ID, VPCID: vpc, FirewallID: fw}})
-		taken[in.Name] = true
+		unknown++ // tagged by this tool but not in this state file: counted and said, NEVER taken (a tag proves this tool made it, not THIS state file: a second computer's launch looks the same)
 	}
 	for _, r := range d.State.Records() {
 		if alive[r.Name] || r.Created.IsZero() || r.Created.After(cutoff) {
@@ -203,7 +194,7 @@ func Prune(ctx context.Context, o PruneOptions, d ManageDeps) (*PruneReport, err
 	}
 	rep := &PruneReport{Items: items}
 	if unknown > 0 {
-		fmt.Fprintf(d.Out, "%d instance(s) at %s carry this tool's tag, are old enough and are not in this state file: they may belong to another computer or to a state file that was lost, so they are left alone. Pass --include-unknown to take them.\n", unknown, d.Provider.Name())
+		fmt.Fprintf(d.Out, "%d instance(s) at %s carry this tool's tag, are old enough and are not in this state file: they may belong to another computer or to a state file that was lost, so they are left alone. See them with `coral machine list --unknown`; delete one with `coral machine delete NAME --id ID`, typing the id.\n", unknown, d.Provider.Name())
 	}
 	if len(items) == 0 {
 		fmt.Fprintln(d.Out, "Nothing to prune.")
