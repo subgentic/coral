@@ -23,6 +23,8 @@ make_release() { # make_release <folder>
         rm -rf "$pk/t"; mkdir -p "$pk/t"
         printf '#!/bin/sh\necho coral-%s\n' "$a" >"$pk/t/coral"; chmod 755 "$pk/t/coral"
         printf '#!/bin/sh\necho board\n' >"$pk/t/coral-board"; chmod 755 "$pk/t/coral-board"
+        mkdir -p "$pk/t/licenses/vendor/x" "$pk/t/licenses/fonts" # the real package holds a licenses/ tree beside the programs (QA's MUST on #11935)
+        echo "license text" >"$pk/t/licenses/vendor/x/LICENSE"; echo font >"$pk/t/licenses/fonts/F.txt"
         tar czf "$d/coral-linux-$a.tar.gz" -C "$pk/t" .
     done
     if [ "$(uname -s)" = Darwin ]; then
@@ -66,7 +68,7 @@ CORAL_INSTALL_OS=Linux CORAL_INSTALL_ARCH=riscv64 run bash "$script" --dry-run; 
 lx() { CORAL_INSTALL_OS=Linux CORAL_INSTALL_ARCH="${ARCH_UNDER_TEST:-x86_64}" run bash "$script" "$@"; }
 dest="$tmp/lx/bin"
 lx --dir "$dest"
-if [ "$rc" = 0 ] && [ -x "$dest/coral" ] && [ -x "$dest/coral-board" ] && [ "$("$dest/coral")" = coral-amd64 ] && [[ "$output" == *"Checksum-verified only"* ]] && [ -z "$(ls -A "$HOME")" ]; then ok "Linux amd64: installs the programs, says it was checksum-verified only, touches nothing else"; else fail "linux install: $rc $output"; fi
+if [ "$rc" = 0 ] && [ -x "$dest/coral" ] && [ -x "$dest/coral-board" ] && [ "$("$dest/coral")" = coral-amd64 ] && [ ! -e "$dest/licenses" ] && [[ "$output" == *"not programs: licenses"* ]] && [[ "$output" == *"Checksum-verified only"* ]] && [ -z "$(ls -A "$HOME")" ]; then ok "Linux amd64: installs the programs, says it was checksum-verified only, touches nothing else"; else fail "linux install: $rc $output"; fi
 ARCH_UNDER_TEST=aarch64 lx --dir "$tmp/lx2/bin"; [ "$rc" = 0 ] && [ "$("$tmp/lx2/bin/coral")" = coral-arm64 ] && ok "Linux arm64 gets the arm64 tarball" || fail "arm64: $rc $output"
 lx --dir "$dest" --release 9.9.9; [ "$rc" = 0 ] && ok "--release 9.9.9 installs from that release's folder" || fail "release pin: $rc $output"
 lx --dir "$dest" --release 1.0.0; [ "$rc" != 0 ] && ok "a release that does not exist fails" || fail "missing release passed"
@@ -100,13 +102,28 @@ PY
     printf '%s  coral-linux-amd64.tar.gz\n' "$(sha "$d/latest/download/coral-linux-amd64.tar.gz")" >"$d/latest/download/SHA256SUMS.txt"
     echo "$d"
 }
-for how in traverse link nocoral extra; do
+for how in traverse link nocoral; do
     d="$(mk_evil "$how" "$how")"
     CORAL_INSTALL_BASE_URL="file://$d" lx --dir "$tmp/evil-out-$how"
     want_msg=""; [ "$how" != traverse ] || want_msg="unsafe path" # the installer's own refusal, not only tar's
-    [ "$how" != extra ] || want_msg="not one of Coral's programs"
     if [ "$rc" != 0 ] && [[ "$output" == *"$want_msg"* ]] && [ -z "$(ls -A "$tmp/evil-out-$how")" ] && [ ! -e "$tmp/evil-out-$how/../escaped" ] && [ ! -e "$tmp/escaped" ]; then ok "a $how tarball is refused and nothing is installed"; else fail "$how tarball: $rc $output"; fi
 done
+
+# --- a name that is not one of Coral's programs is left behind, never put in the folder (it could shadow a system command) ---
+d="$tmp/extra"; mkdir -p "$d/latest/download" "$d/w/licenses"
+printf '#!/bin/sh\n' >"$d/w/coral"; printf '#!/bin/sh\n' >"$d/w/ls"; echo l >"$d/w/licenses/LICENSE"; chmod 755 "$d/w/coral" "$d/w/ls"
+tar czf "$d/latest/download/coral-linux-amd64.tar.gz" -C "$d/w" .
+printf '%s  coral-linux-amd64.tar.gz\n' "$(sha "$d/latest/download/coral-linux-amd64.tar.gz")" >"$d/latest/download/SHA256SUMS.txt"
+CORAL_INSTALL_BASE_URL="file://$d" lx --dir "$tmp/extra-out"
+if [ "$rc" = 0 ] && [ -x "$tmp/extra-out/coral" ] && [ ! -e "$tmp/extra-out/ls" ] && [ ! -e "$tmp/extra-out/licenses" ] && [[ "$output" == *"not programs:"*"ls"* ]]; then ok "an extra program name is named and left out of the folder; coral is installed"; else fail "extra name: $rc $output"; fi
+
+# --- the real latest release (opt in: it is a network download; run it before a tag) -----------------------------
+if [ "${INSTALL_SH_REAL:-}" = 1 ]; then
+    CORAL_INSTALL_BASE_URL=https://github.com/subgentic/coral/releases lx --dir "$tmp/real-out"
+    if [ "$rc" = 0 ] && [ -x "$tmp/real-out/coral" ] && [ ! -e "$tmp/real-out/licenses" ]; then ok "the real latest Linux tarball installs (checksum checked, licenses/ left out)"; else fail "real latest tarball: $rc $output"; fi
+else
+    echo "skip: the real latest release (set INSTALL_SH_REAL=1 to run it: it downloads the tarball)"
+fi
 
 # --- cosign: a good signature is reported, a bad one stops the install --------------------------------
 stub="$tmp/stubbin"; mkdir -p "$stub"

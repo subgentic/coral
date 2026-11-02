@@ -206,23 +206,25 @@ install_linux() {
         case "$name" in /*|..|../*|*/..|*/../*) die "the tarball holds an unsafe path ($name): not installing." ;; esac
     done < <(tar -tzf "$WORK/coral-linux-$arch.tar.gz")
     tar -xzf "$WORK/coral-linux-$arch.tar.gz" -C "$WORK/unpack" || die "the tarball could not be unpacked."
-    local p known
+    [ -f "$WORK/unpack/coral" ] && [ -x "$WORK/unpack/coral" ] || die "the tarball holds no 'coral' program: not installing."
+    # Only Coral's own programs are installed. Anything else in the package (the licenses/ folder, a notice file) stays out of the folder the programs go in: it is named, and left behind.
+    local p skipped=""
     for f in "$WORK"/unpack/* "$WORK"/unpack/.[!.]*; do
-        [ -e "$f" ] || continue
-        base="$(basename "$f")"; known=0
-        for p in "${PROGRAMS[@]}"; do [ "$base" != "$p" ] || known=1; done
-        [ "$known" = 1 ] || die "the tarball holds '$base', which is not one of Coral's programs: not installing."
-    done
-    [ -x "$WORK/unpack/coral" ] || die "the tarball holds no 'coral' program: not installing."
-    if [ -n "$(find "$WORK/unpack" -mindepth 1 -type d -print -quit)" ]; then die "the tarball holds folders, which this installer does not expect: not installing."; fi
-    note "Installing in $target"
-    for f in "$WORK"/unpack/*; do
+        [ -e "$f" ] || [ -L "$f" ] || continue
         base="$(basename "$f")"
-        if ! { cp "$f" "$target/.$base.new.$$" && chmod 0755 "$target/.$base.new.$$" && mv -f "$target/.$base.new.$$" "$target/$base"; }; then
-            rm -f "$target/.$base.new.$$"; die "could not write $target/$base."
-        fi
-        say "    $target/$base"
+        for p in "${PROGRAMS[@]}"; do [ "$base" != "$p" ] || continue 2; done
+        skipped="$skipped $base"
     done
+    note "Installing in $target"
+    for p in "${PROGRAMS[@]}"; do
+        f="$WORK/unpack/$p"
+        [ -f "$f" ] && [ ! -L "$f" ] || continue
+        if ! { cp "$f" "$target/.$p.new.$$" && chmod 0755 "$target/.$p.new.$$" && mv -f "$target/.$p.new.$$" "$target/$p"; }; then
+            rm -f "$target/.$p.new.$$"; die "could not write $target/$p."
+        fi
+        say "    $target/$p"
+    done
+    [ -z "$skipped" ] || say "    (not installed, not programs:$skipped)"
     finish_linux "$target"
 }
 
