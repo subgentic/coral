@@ -415,6 +415,11 @@ func (s *Server) WakeIdleForDelivery(ctx context.Context, sessionID string) bool
 	return s.sessHandler != nil && s.sessHandler.WakeIdleForDelivery(ctx, sessionID)
 }
 
+// SeedStarterSkills adds the example skills Coral ships to the Skills Store, approved and published by Coral (#12463). Quick, once at start; a store that cannot be written is logged.
+func (s *Server) SeedStarterSkills(ctx context.Context) {
+	routes.NewSkillsHandler(s.db, s.cfg).SeedStarterSkills(ctx)
+}
+
 // RunAutoSleep puts agents idle past the Operator's minutes to sleep, once a minute (#12111). It blocks until ctx is done.
 func (s *Server) RunAutoSleep(ctx context.Context) {
 	if s.sessHandler == nil {

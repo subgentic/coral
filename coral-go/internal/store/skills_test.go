@@ -357,3 +357,27 @@ func TestARefusalOutlivesTheAccessLogTrim(t *testing.T) {
 	_, _, err = addSkill(ctx, ss, AddSkillInput{Skill: skillOf("bad", "d", "b"), Digest: dg(950), Kind: PublisherAgent, Agent: "Dev", Team: "alpha"})
 	assert.ErrorIs(t, err, ErrSkillRefusedBefore, "the bytes are still refused")
 }
+
+// Coral's example skills (#12463) are approved at once like an Operator's, hold only Markdown like an agent's, and are never removed.
+func TestACoralExampleIsApprovedAtOnceHoldsNoScriptsAndCannotBeRemoved(t *testing.T) {
+	ctx, ss, _ := skillStore(t)
+	row, created, err := addSkill(ctx, ss, AddSkillInput{Skill: skillOf("working-in-a-coral-team", "How to work in a team.", "Read the board."), Digest: dg(7), Kind: PublisherCoral})
+	require.NoError(t, err)
+	require.True(t, created)
+	assert.Equal(t, SkillApproved, row.Status)
+	assert.Equal(t, PublisherCoral, row.PublisherKind)
+	hits, err := ss.SearchSkills(ctx, "team", 10)
+	require.NoError(t, err)
+	assert.Len(t, hits, 1, "it is indexed")
+
+	_, _, err = addSkill(ctx, ss, AddSkillInput{Skill: skillOf("scripted-example", "Has a script.", "Run it.", script), Digest: dg(8), Kind: PublisherCoral})
+	assert.ErrorIs(t, err, ErrAgentScripts, "an example holds no script")
+
+	assert.ErrorIs(t, ss.RemoveSkill(ctx, row.ID), ErrStarterSkill)
+	got, err := ss.GetApprovedSkill(ctx, row.ID)
+	require.NoError(t, err)
+	assert.Equal(t, SkillApproved, got.Status)
+	hits, err = ss.SearchSkills(ctx, "team", 10)
+	require.NoError(t, err)
+	assert.Len(t, hits, 1, "still found")
+}

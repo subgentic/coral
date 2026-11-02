@@ -177,3 +177,76 @@ func TestApproveRefusesAnOversizedBodyAndLeavesTheSkillPending(t *testing.T) {
 	code, _ = e.call("POST", "/api/skills/"+row.ID+"/approve", under, "operator")
 	assert.Equal(t, 200, code, "a body under the cap still approves")
 }
+
+// The example skills Coral ships (#12463): on every start they are in the store as approved, published by Coral; a second start adds nothing; a changed text is a new version; a skill of the same name that a
+// person published is left alone; and none of them can be removed (the route and the store both refuse), while a person's skill still can.
+func TestTheStarterSkillsAreSeededOnceAreRefreshedAndCannotBeRemoved(t *testing.T) {
+	e := newSkillsEnv(t)
+	ctx := context.Background()
+	e.h.SeedStarterSkills(ctx)
+	rows, err := e.ss.ListSkills(ctx, "")
+	require.NoError(t, err)
+	require.Len(t, rows, 3)
+	for _, r := range rows {
+		assert.Equal(t, store.SkillApproved, r.Status, r.Name)
+		assert.Equal(t, store.PublisherCoral, r.PublisherKind, r.Name)
+		assert.Equal(t, 1, r.Version, r.Name)
+		got, err := e.ss.GetApprovedSkill(ctx, r.ID)
+		require.NoError(t, err, "an agent can read it: %s", r.Name)
+		assert.Equal(t, r.Digest, got.Digest)
+	}
+	hits, err := e.ss.SearchSkills(ctx, "automation workflow", 10)
+	require.NoError(t, err)
+	require.NotEmpty(t, hits, "an agent finds the automation example by what it is about")
+
+	e.h.SeedStarterSkills(ctx) // the next start
+	rows2, err := e.ss.ListSkills(ctx, "")
+	require.NoError(t, err)
+	assert.Len(t, rows2, 3, "a second start adds nothing")
+
+	// Removing one is refused, by the route and by the store; it is still there and still approved.
+	code, out := e.call("DELETE", "/api/skills/"+rows[0].ID, "", "operator")
+	assert.Equal(t, 409, code, "%v", out)
+	assert.Equal(t, "starter_skill", out["code"])
+	assert.ErrorIs(t, e.ss.RemoveSkill(ctx, rows[0].ID), store.ErrStarterSkill)
+	still, err := e.ss.GetApprovedSkill(ctx, rows[0].ID)
+	require.NoError(t, err)
+	assert.Equal(t, store.SkillApproved, still.Status)
+
+	// A person's own skill is removed as before.
+	own, _ := e.publish(map[string]string{"SKILL.md": skillMD}, store.PublisherOperator)
+	code, _ = e.call("DELETE", "/api/skills/"+own.ID, "", "operator")
+	assert.Equal(t, 200, code)
+}
+
+func TestAStarterSkillOfANameAPersonAlreadyPublishedIsNotTouchedAndTheChangedTextIsANewVersion(t *testing.T) {
+	e := newSkillsEnv(t)
+	ctx := context.Background()
+	// A person's skill named like an example: theirs stays alone, no example is made beside it.
+	mine := "---\nname: creating-coral-skills\ndescription: My own notes on skills.\n---\n# Mine\n"
+	e.publish(map[string]string{"SKILL.md": mine}, store.PublisherOperator)
+	// An older text of another example, as an earlier Coral stored it.
+	old := "---\nname: working-in-a-coral-team\ndescription: An older copy.\n---\n# Older\n"
+	oldRow, _ := e.publish(map[string]string{"SKILL.md": old}, store.PublisherCoral)
+	e.h.SeedStarterSkills(ctx)
+	rows, err := e.ss.ListSkills(ctx, "")
+	require.NoError(t, err)
+	byName := map[string][]store.SkillRow{}
+	for _, r := range rows {
+		byName[r.Name] = append(byName[r.Name], r)
+	}
+	require.Len(t, byName["creating-coral-skills"], 1, "no example beside a person's skill of the name")
+	assert.Equal(t, store.PublisherOperator, byName["creating-coral-skills"][0].PublisherKind)
+	require.Len(t, byName["creating-a-coral-automation"], 1)
+	team := byName["working-in-a-coral-team"]
+	require.Len(t, team, 2, "the changed text is a second version; the first stays for an agent pinned to it")
+	newest := team[0]
+	if team[1].Version > team[0].Version {
+		newest = team[1]
+	}
+	assert.Equal(t, oldRow.Version+1, newest.Version)
+	assert.NotEqual(t, oldRow.Digest, newest.Digest)
+	latest, err := e.ss.LatestApprovedSkill(ctx, "working-in-a-coral-team")
+	require.NoError(t, err)
+	assert.Equal(t, newest.Digest, latest.Digest)
+}
