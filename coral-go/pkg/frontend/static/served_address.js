@@ -3,4 +3,13 @@
  * stands; a push or Back (the person moving on) forgets it. No imports. */
 let served = '';
 export const setServedAddress = addr => { served = typeof addr === 'string' ? addr : ''; };
-export const servedAddress = () => served;
+
+/** The address a sign-in must bring the person back to, from the location on screen (#12406, #12432): the address the page was opened at when that is BELOW the one on screen and the person has not moved on (the app shortened a
+ *  deep link it could not show yet: /agents/@server/session/files became /agents/@server/session), else the one on screen. Any other rewrite (a legacy link, the bare start, a dropped fragment) keeps the canonical address.
+ *  The result is the page's own location: callers still refuse anything that is not a same-origin path. */
+export function returnAddress(loc, { hash = true } = {}) {
+    const here = (loc.pathname || '/') + (loc.search || '') + (hash ? (loc.hash || '') : ''), base = (loc.pathname || '').replace(/\/+$/, '');
+    const servedPath = served.split(/[?#]/)[0];
+    const opened = hash ? served : served.split('#')[0]; // the Hub's next= never carries a fragment (its validator may refuse one): the served address loses it there as the address on screen does
+    return base && served && servedPath.startsWith(base + '/') ? opened : here;
+}

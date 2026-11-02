@@ -3,17 +3,14 @@
  * which returns here once signed in (#7398; it was a "Coral now requires sign-in" dialog). A 401 that is not "signed out" (an agent-only route, an identity
  * refusal) is not handled here: see isSignedOut401 in auth_redirect.js. The Coral Hub has its own sign-in (cloud.js). */
 
-import { servedAddress } from './served_address.js';
+import { returnAddress } from './served_address.js';
 import { state } from './state.js';
 import { setSignedOut, isSignedOut } from './overload.js';
 import { showToast } from './notifications.js';
 
 /** The /auth URL for the current page: return_to is this page's own path (same origin). */
 export function authUrlFor(loc) {
-    const here = (loc.pathname || '/') + (loc.search || '') + (loc.hash || ''), served = servedAddress(), servedPath = served.split(/[?#]/)[0], base = (loc.pathname || '').replace(/\/+$/, '');
-    // The app shortens an address it cannot show yet (a deep link to an agent's Files tab became /agents, #12406): when the page was opened at an address below the one on screen, and the person has not moved on, that
-    // one is what to come back to. Any other rewrite (a legacy link, the bare start, a dropped fragment) is the page's own canonical form and stays as it is.
-    const back = base && served && servedPath.startsWith(base + '/') ? served : here;
+    const back = returnAddress(loc); // the address the page was opened at when the app has shortened it since (#12406), else this page's own
     return '/auth?return_to=' + encodeURIComponent(back.startsWith('/') && !back.startsWith('//') ? back : '/');
 }
 

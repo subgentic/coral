@@ -216,6 +216,7 @@ node task_detail_numbers.test.js
 node task_detail_words.test.mjs
 node enroll_page.test.js
 node cloud_rekey.test.mjs
+node cloud_signin_return.test.mjs
 node iframe_src_census.test.mjs
 node message_listener_census.test.mjs
 node html_interpolation_census.test.js
