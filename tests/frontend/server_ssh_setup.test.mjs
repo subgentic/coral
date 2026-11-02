@@ -221,4 +221,25 @@ function fresh() { const host = doc.createElement('div'); doc.body.append(host);
     await until(() => closed === 1, 'close');
     assert.ok(calls.some(c => c.method === 'DELETE' && c.path === '/api/servers/provision/p1'), 'the plan was left on the hub');
 }
+// ── a stop that was left while it ran is found again (#12372): the flow opens on the hub's plan, keeps watching it, and shows how it ended ──
+{
+    hub(); planKind = 'stop';
+    const host = fresh();
+    let changed = 0;
+    mountSshSetup(host, { mode: 'manage', server: { id: 'ssh-box', label: 'Build box' }, action: 'stop', resume: 'p1', pollMs: 5, onChanged: () => changed++ });
+    await until(() => host.querySelector('.ssh-steps'), 'the steps of the plan the hub has');
+    assert.ok(calls.some(c => c.method === 'GET' && c.path === '/api/servers/provision/p1'), 'it read the plan from the hub');
+    assert.ok(!calls.some(c => c.path === '/api/servers/provision/plan'), 'it made no new plan');
+    assert.ok(!calls.some(c => c.path.endsWith('/run')), 'and started nothing');
+    await until(() => changed === 1 && btn(host, 'Close'), 'the plan finished while it was shown');
+    assert.ok(polls >= 2, 'it kept polling until the plan ended: ' + polls);
+}
+{ // a plan the hub no longer has (it expired or was dismissed) says so
+    hub(); planKind = 'stop';
+    globalThis.fetch = async (url) => new Response(JSON.stringify(String(url).endsWith('/options') ? options : { error: 'no such setup' }), { status: String(url).endsWith('/options') ? 200 : 404, headers: { 'Content-Type': 'application/json' } });
+    const host = fresh();
+    mountSshSetup(host, { mode: 'manage', server: { id: 'ssh-box', label: 'Build box' }, action: 'stop', resume: 'gone', pollMs: 5 });
+    await until(() => host.querySelector('[role="alert"]'), 'the sentence');
+    assert.match(host.textContent, /no such setup|no longer on the hub/);
+}
 console.log('server_ssh_setup: ok');
