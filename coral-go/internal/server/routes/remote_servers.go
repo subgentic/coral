@@ -150,6 +150,9 @@ func viewRemote(s *store.RemoteServer) remoteServerView {
 		return remoteServerView{}
 	}
 	warn := remoteURLWarning(s.URL)
+	if s.Transport == store.RemoteTransportSSH { // reached over the owner's SSH session (ssh -W to the far loopback): the key never crosses a network unencrypted, and the ssh:// row has no URL to judge
+		warn = ""
+	}
 	if renew := keyRenewWarning(s.KeyRenewSince); renew != "" {
 		if warn != "" {
 			warn += "; "
