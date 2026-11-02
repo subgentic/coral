@@ -86,40 +86,49 @@ func TestAnOldDatabaseWithAgentsInABareFolderIsForeignButInItsOwnFolderIsAdopted
 	assert.False(t, verifyDataOwner(ctx, db, dir).Foreign)
 }
 
-// After the upgrade: an install with agents but no board message, in its established folder, is not mistaken for a copy when the database shows earlier use (a setting, or a session older than a day).
+// After the upgrade: an install with agents but no board message, in its established folder, is not mistaken for a copy when the database shows earlier use (a setting, or a session older than a day)
+// AND the folder is older than the sessions. A copy of sessions.db into another folder has the same rows, but every file in the new folder is newer than its sessions.
 func TestAnInstallWithAgentsButNoBoardMessagesIsNotForeignAfterTheUpgrade(t *testing.T) {
 	ctx := context.Background()
-	establish := func(t *testing.T, dir string) {
+	// this test sets the times a real copy cannot: file times are read as the modified time
+	old := dataowner.FileBirth
+	dataowner.FileBirth = func(fi os.FileInfo) (time.Time, bool) { return fi.ModTime(), true }
+	t.Cleanup(func() { dataowner.FileBirth = old })
+	// the folder's files were written at `at`
+	establish := func(t *testing.T, dir string, at time.Time) {
 		t.Helper()
-		key := filepath.Join(dir, "api_key")
-		require.NoError(t, os.WriteFile(key, []byte("k"), 0o600))
-		old := time.Now().Add(-2 * time.Hour)
-		require.NoError(t, os.Chtimes(key, old, old))
-		require.NoError(t, os.WriteFile(filepath.Join(dir, "app.log"), []byte("log"), 0o600))
+		for _, name := range []string{"api_key", "app.log"} {
+			f := filepath.Join(dir, name)
+			require.NoError(t, os.WriteFile(f, []byte("x"), 0o600))
+			require.NoError(t, os.Chtimes(f, at, at))
+		}
+	}
+	register := func(t *testing.T, db *store.DB, createdAgo time.Duration) {
+		t.Helper()
+		require.NoError(t, store.NewSessionStore(db).RegisterLiveSession(ctx, &store.LiveSession{SessionID: "aaaaaaaa-0000-4000-8000-000000000000", AgentName: "agent", AgentType: "claude", WorkingDir: "/tmp",
+			CreatedAt: time.Now().UTC().Add(-createdAgo).Format(store.ISOFormat)}))
 	}
 
-	t.Run("a session older than a day", func(t *testing.T) {
+	t.Run("an in-place upgrade with a session older than a day", func(t *testing.T) {
 		db, dir := ownerRig(t)
-		establish(t, dir)
-		ss := store.NewSessionStore(db)
-		require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: "aaaaaaaa-0000-4000-8000-000000000000", AgentName: "agent", AgentType: "claude", WorkingDir: "/tmp",
-			CreatedAt: time.Now().UTC().Add(-48 * time.Hour).Format(store.ISOFormat)}))
+		establish(t, dir, time.Now().Add(-30*24*time.Hour))
+		register(t, db, 48*time.Hour)
 		v := verifyDataOwner(ctx, db, dir)
 		assert.False(t, v.Foreign)
 		assert.True(t, v.Made)
 	})
 
-	t.Run("a user_settings row", func(t *testing.T) {
+	t.Run("an in-place upgrade with a user_settings row", func(t *testing.T) {
 		db, dir := ownerRig(t)
-		establish(t, dir)
-		addAgents(t, db, 1)
+		establish(t, dir, time.Now().Add(-30*24*time.Hour))
+		addAgents(t, db, 1) // registered just now
 		require.NoError(t, store.NewSessionStore(db).SetSetting(ctx, "theme", "dark"))
 		assert.False(t, verifyDataOwner(ctx, db, dir).Foreign)
 	})
 
 	t.Run("nothing shows earlier use", func(t *testing.T) {
 		db, dir := ownerRig(t)
-		establish(t, dir)
+		establish(t, dir, time.Now().Add(-30*24*time.Hour))
 		addAgents(t, db, 1) // registered just now, and no setting
 		has, err := db.HasUserSettings(ctx)
 		require.NoError(t, err)
@@ -129,16 +138,31 @@ func TestAnInstallWithAgentsButNoBoardMessagesIsNotForeignAfterTheUpgrade(t *tes
 		assert.Equal(t, dataowner.ReasonBare, v.Reason)
 	})
 
-	t.Run("the age of a session is read from the stored text", func(t *testing.T) {
+	t.Run("a copy of sessions.db with a setting and old sessions, started twice, stays foreign", func(t *testing.T) {
+		db, dir := ownerRig(t)
+		register(t, db, 30*24*time.Hour)
+		require.NoError(t, store.NewSessionStore(db).SetSetting(ctx, "theme", "dark"))
+		assert.True(t, verifyDataOwner(ctx, db, dir).Foreign, "first start: no key yet")
+		establish(t, dir, time.Now().Add(-5*time.Minute)) // what the first start left, over a minute old
+		v := verifyDataOwner(ctx, db, dir)
+		assert.True(t, v.Foreign, "every file in the new folder is newer than the sessions")
+		assert.Equal(t, dataowner.ReasonBare, v.Reason)
+		id, err := db.DataDirID(ctx)
+		require.NoError(t, err)
+		assert.Empty(t, id, "nothing was made")
+		require.NoError(t, AdoptDataDir(ctx, db, dir))
+		assert.False(t, verifyDataOwner(ctx, db, dir).Foreign)
+	})
+
+	t.Run("the oldest session is read from the stored text", func(t *testing.T) {
 		db, _ := ownerRig(t)
-		ss := store.NewSessionStore(db)
-		require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: "bbbbbbbb-0000-4000-8000-000000000000", AgentName: "agent", AgentType: "claude", WorkingDir: "/tmp",
-			CreatedAt: time.Now().UTC().Add(-2 * time.Hour).Format(store.ISOFormat)}))
-		old, err := db.HasActiveSessionOlderThan(ctx, time.Now().Add(-24*time.Hour))
+		_, found, err := db.OldestActiveSession(ctx)
 		require.NoError(t, err)
-		assert.False(t, old, "two hours old is not older than a day")
-		old, err = db.HasActiveSessionOlderThan(ctx, time.Now().Add(-time.Hour))
+		assert.False(t, found)
+		register(t, db, 2*time.Hour)
+		at, found, err := db.OldestActiveSession(ctx)
 		require.NoError(t, err)
-		assert.True(t, old)
+		require.True(t, found)
+		assert.WithinDuration(t, time.Now().Add(-2*time.Hour), at, time.Minute)
 	})
 }

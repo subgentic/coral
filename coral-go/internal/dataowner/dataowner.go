@@ -9,8 +9,9 @@
 //     holds the same id, this is a whole-folder copy made next to the live one: FOREIGN;
 //   - file and row present and different, or only one of them: FOREIGN;
 //   - neither: a first start (no live sessions in the database): the id is made, OWNED. A database with live sessions and no id is an old install upgrading in place only if the folder is lived
-//     in (the database shows use: the board has messages, or a user_settings row exists, or a live session is older than a day; and api_key is older than a minute; and there is more in the folder
-//     than the databases and tokens): then the id is made, OWNED. Otherwise FOREIGN.
+//     in: then the id is made, OWNED. Otherwise FOREIGN. Lived in means api_key is older than a minute, there is more in the folder than the databases and tokens, and the database shows use: the board has
+//     messages (messageboard.db is not the file that gets copied), OR a user_settings row exists, OR the oldest live session is more than a day old, where those last two count only if the OLDEST FILE Coral
+//     wrote in this folder (api_key or any other entry) predates the oldest live session. A copy of sessions.db carries the rows and sessions, but every file in a new folder is newer than them.
 //
 // Anything that cannot be read or written is FOREIGN. FOREIGN never stops Coral from starting; it only withholds what acts on the agents.
 package dataowner
@@ -54,14 +55,14 @@ const Notice = "This database was not made in this data folder, so no agent is w
 
 // Probe is what Verify reads and writes. Every field is required.
 type Probe struct {
-	Dir              string                                         // the data folder
-	Marker           func(context.Context) (string, error)          // the id in the database; "" when there is none
-	SetMarker        func(context.Context, string) error            // store the id in the database
-	LiveSessions     func(context.Context) (int, error)             // how many live sessions the database lists
-	BoardHasMessages func(context.Context) (bool, error)            // whether messageboard.db has any message
-	HasSettings      func(context.Context) (bool, error)            // whether sessions.db has a user_settings row (nil: no)
-	OldLiveSession   func(context.Context, time.Time) (bool, error) // whether a live session was created before the given time (nil: no)
-	Now              func() time.Time                               // the clock (time.Now when nil)
+	Dir               string                                         // the data folder
+	Marker            func(context.Context) (string, error)          // the id in the database; "" when there is none
+	SetMarker         func(context.Context, string) error            // store the id in the database
+	LiveSessions      func(context.Context) (int, error)             // how many live sessions the database lists
+	BoardHasMessages  func(context.Context) (bool, error)            // whether messageboard.db has any message
+	HasSettings       func(context.Context) (bool, error)            // whether sessions.db has a user_settings row (nil: no)
+	OldestLiveSession func(context.Context) (time.Time, bool, error) // when the oldest active live session was created; false when there is none (nil: none)
+	Now               func() time.Time                               // the clock (time.Now when nil)
 }
 
 // Verdict is the result of Verify.
@@ -144,13 +145,9 @@ func Adopt(ctx context.Context, p Probe) error {
 	return p.SetMarker(ctx, id)
 }
 
-// livedIn is the strict rule for an old install with no id yet: ALL of the database shows use (usedBefore), api_key predates now by more than a minute, and the folder holds something besides the
-// databases and the tokens.
+// livedIn is the strict rule for an old install with no id yet. ALL of: api_key is a regular file older than a minute; the folder holds something besides the databases and the tokens; and the database
+// shows use (usedBefore).
 func livedIn(ctx context.Context, p Probe, now time.Time) (bool, error) {
-	used, err := usedBefore(ctx, p, now)
-	if err != nil || !used {
-		return false, err
-	}
 	fi, err := os.Lstat(filepath.Join(p.Dir, "api_key"))
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
@@ -158,41 +155,69 @@ func livedIn(ctx context.Context, p Probe, now time.Time) (bool, error) {
 		}
 		return false, err
 	}
-	if !fi.Mode().IsRegular() || now.Sub(fi.ModTime()) <= time.Minute {
+	if !fi.Mode().IsRegular() || now.Sub(birthOrNow(fi, now)) <= time.Minute {
 		return false, nil
 	}
 	entries, err := os.ReadDir(p.Dir)
 	if err != nil {
 		return false, err
 	}
+	// the oldest file Coral wrote in this folder, by CREATION time (Windows) or changed time (elsewhere), never the modified time: copy tools keep the modified time. The key counts; the databases,
+	// tokens, id file and lock do not (a copy can carry or renew them). A time that cannot be read counts as "now": it does not predate anything.
+	oldest := birthOrNow(fi, now)
+	other := false
 	for _, e := range entries {
 		switch name := strings.ToLower(e.Name()); {
 		case strings.HasPrefix(name, "sessions.db"), strings.HasPrefix(name, "messageboard.db"):
 		case name == "api_key", name == "cli-token", name == "login_token", name == "coral-server.lock", name == strings.ToLower(FileName):
 		default:
-			return true, nil
+			other = true
+			if info, err := e.Info(); err == nil {
+				if t := birthOrNow(info, now); t.Before(oldest) {
+					oldest = t
+				}
+			}
 		}
 	}
-	return false, nil
+	if !other {
+		return false, nil
+	}
+	return usedBefore(ctx, p, now, oldest)
 }
 
-// usedBefore is the database's own proof that the install was used before this upgrade: the board has a message, or sessions.db has a user_settings row, or a live session is more than a day old.
-// An install with agents but no board messages is therefore not mistaken for a copy.
-func usedBefore(ctx context.Context, p Probe, now time.Time) (bool, error) {
+// FileBirth is when a file came to exist in this folder (see birth_*.go). A variable so that a test can set the times a copy cannot: only for tests.
+var FileBirth = birthTime
+
+func birthOrNow(fi os.FileInfo, now time.Time) time.Time {
+	if t, ok := FileBirth(fi); ok {
+		return t
+	}
+	return now
+}
+
+// usedBefore is the database's own proof that the install was used before this upgrade. A board message is enough (messageboard.db is not the file that gets copied). A user_settings row, or an
+// oldest live session more than a day old, is enough only when the folder is older than the sessions: oldestFile, the oldest file Coral wrote in this folder, predates the oldest live session. That
+// is true for an in-place upgrade and false for a copy of sessions.db into another folder, where every file is newer than the sessions it holds. An install with agents but no board message is
+// therefore not mistaken for a copy, and a copy is not mistaken for an install.
+func usedBefore(ctx context.Context, p Probe, now, oldestFile time.Time) (bool, error) {
 	if p.BoardHasMessages != nil {
 		if has, err := p.BoardHasMessages(ctx); err != nil || has {
 			return has, err
 		}
+	}
+	if p.OldestLiveSession == nil {
+		return false, nil
+	}
+	oldestSession, ok, err := p.OldestLiveSession(ctx)
+	if err != nil || !ok || !oldestFile.Before(oldestSession) {
+		return false, err
 	}
 	if p.HasSettings != nil {
 		if has, err := p.HasSettings(ctx); err != nil || has {
 			return has, err
 		}
 	}
-	if p.OldLiveSession != nil {
-		return p.OldLiveSession(ctx, now.Add(-24*time.Hour))
-	}
-	return false, nil
+	return oldestSession.Before(now.Add(-24 * time.Hour)), nil
 }
 
 // The file-system calls this package makes on a path: variables so that a test can prove which paths are touched.

@@ -22,8 +22,8 @@ func dataOwnerProbe(db *store.DB, dir string) dataowner.Probe {
 			}
 			return db.TaskEngine.HasMessages(ctx)
 		},
-		HasSettings:    db.HasUserSettings,
-		OldLiveSession: db.HasActiveSessionOlderThan,
+		HasSettings:       db.HasUserSettings,
+		OldestLiveSession: db.OldestActiveSession,
 	}
 }
 
