@@ -53,7 +53,8 @@ func (s *Store) ensureOperatorTouchSchema(ctx context.Context) error {
 			kind  TEXT NOT NULL,
 			team  TEXT NOT NULL,
 			agent TEXT NOT NULL,
-			source TEXT NOT NULL DEFAULT 'local'
+			source TEXT NOT NULL DEFAULT 'local',
+			surface TEXT NOT NULL DEFAULT ''
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_operator_touch_team_at ON operator_touch(team, at)`,
 	} {
@@ -71,12 +72,26 @@ func (s *Store) ensureOperatorTouchSchema(ctx context.Context) error {
 			return err
 		}
 	}
+	// Which part of the page the touch was made in (#12158): one of two words as the page said, or nothing. A table made before it has it, every earlier row nothing.
+	if err := s.db.GetContext(ctx, &has, `SELECT COUNT(*) FROM pragma_table_info('operator_touch') WHERE name = 'surface'`); err != nil {
+		return err
+	}
+	if has == 0 {
+		if _, err := s.db.ExecContext(ctx, `ALTER TABLE operator_touch ADD COLUMN surface TEXT NOT NULL DEFAULT ''`); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
 // RecordOperatorTouch records one touch of agent (its label, as the board shows it) on team at at, from source (TouchLocal or TouchHub). Nothing else is taken: the signature has no text and no length
 // to take.
 func (s *Store) RecordOperatorTouch(ctx context.Context, team, agent, kind, source string, at time.Time) error {
+	return s.RecordOperatorTouchOn(ctx, team, agent, kind, source, "", at)
+}
+
+// RecordOperatorTouchOn is RecordOperatorTouch with the surface the page said it was made in (SurfaceInbox, SurfaceChat or nothing; anything else is nothing).
+func (s *Store) RecordOperatorTouchOn(ctx context.Context, team, agent, kind, source, surface string, at time.Time) error {
 	team, agent = strings.TrimSpace(team), strings.TrimSpace(agent)
 	valid := false
 	for _, k := range TouchKinds {
@@ -88,7 +103,7 @@ func (s *Store) RecordOperatorTouch(ctx context.Context, team, agent, kind, sour
 	if len(agent) > 120 {
 		agent = agent[:120]
 	}
-	_, err := s.db.ExecContext(ctx, `INSERT INTO operator_touch (at, kind, team, agent, source) VALUES (?, ?, ?, ?, ?)`, at.UTC().Format(time.RFC3339), kind, team, agent, source)
+	_, err := s.db.ExecContext(ctx, `INSERT INTO operator_touch (at, kind, team, agent, source, surface) VALUES (?, ?, ?, ?, ?, ?)`, at.UTC().Format(time.RFC3339), kind, team, agent, source, ValidSurface(surface))
 	return err
 }
 

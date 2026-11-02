@@ -1,6 +1,7 @@
 /* Dashboard entry: preserve dependency evaluation order and start the dashboard. */
 
 import { isPhoneLayout } from './phone_layout.js';
+import './surface_hint.js'; // which part of the page an action was taken in, in a header (#12158)
 import './update_banner.js';
 import { importOnce } from './import_once.js';
 import './lazy_styles.js'; // the stylesheets of a lazy tab, loaded with it (#10706)

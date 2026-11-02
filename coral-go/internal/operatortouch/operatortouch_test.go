@@ -14,17 +14,17 @@ import (
 	"github.com/subgentic/coral/internal/terminalinput"
 )
 
-type row struct{ Team, Agent, Kind, Source string }
+type row struct{ Team, Agent, Kind, Source, Surface string }
 
 type fakeStore struct {
 	mu   sync.Mutex
 	rows []row
 }
 
-func (f *fakeStore) RecordOperatorTouch(_ context.Context, team, agent, kind, source string, _ time.Time) error {
+func (f *fakeStore) RecordOperatorTouchOn(_ context.Context, team, agent, kind, source, surface string, _ time.Time) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.rows = append(f.rows, row{team, agent, kind, source})
+	f.rows = append(f.rows, row{team, agent, kind, source, surface})
 	return nil
 }
 func (f *fakeStore) kinds() []string {
@@ -144,4 +144,20 @@ func TestTypedTouchesCarryWhereTheRouteSaidTheyCameFrom(t *testing.T) {
 		got = append(got, x.Kind+"/"+x.Source)
 	}
 	assert.Equal(t, []string{"typed/hub", "typed/local", "wake/hub", "typed/local"}, got)
+}
+
+// #12158: typing to an agent is chat by its nature (the Inbox cannot type to an agent); any other touch carries the surface the page said, and a task's approval too.
+func TestTypedIsAlwaysChatAndOtherTouchesCarryWhatThePageSaid(t *testing.T) {
+	r, st, _ := rec(t)
+	r.Typed(sid1)
+	r.TouchOn(context.Background(), sid1, board.TouchAnswer, board.TouchLocal, board.SurfaceInbox)
+	r.TouchAgentOn(context.Background(), "team", "Dev", board.TouchApprove, board.TouchLocal, board.SurfaceChat)
+	r.Touch(context.Background(), sid1, board.TouchStop, board.TouchLocal)
+	var got []string
+	st.mu.Lock()
+	for _, x := range st.rows {
+		got = append(got, x.Kind+":"+x.Surface)
+	}
+	st.mu.Unlock()
+	assert.Equal(t, []string{"typed:chat", "answer:inbox", "approve:chat", "stop:"}, got)
 }

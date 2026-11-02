@@ -862,7 +862,7 @@ func touchSource(r *http.Request) string {
 // touch records that the Operator touched the session by hand: a person's request only, never an agent's or Coral's own (#11225). Counts only: the kind, which session and where it came from.
 func (h *SessionsHandler) touch(r *http.Request, sessionID, kind string) {
 	if h.touches != nil && humanInputCaller(r) {
-		h.touches.Touch(r.Context(), sessionID, kind, touchSource(r))
+		h.touches.TouchOn(r.Context(), sessionID, kind, touchSource(r), surfaceOf(r))
 	}
 }
 

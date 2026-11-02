@@ -160,3 +160,56 @@ export function pairGrid(rawPairs) {
     const rows = pairs.map(p => ({ from: p.from, to: p.to, messages: p.messages || 0, requests: p.requests || 0, accepted: p.accepted || 0 })).sort((x, y) => (y.messages + y.requests) - (x.messages + x.requests) || (x.from + x.to).localeCompare(y.from + y.to));
     return { names, cells, rows, total: rows.reduce((n, r) => n + r.messages + r.requests, 0) };
 }
+
+/* ---- Inbox versus chat (#12158) ---- */
+
+/** The words of each kind of action the read counts, by side: what the Operator did. */
+export const IVC_KINDS = {
+    approve: 'Approved', changes: 'Asked for changes', deny: 'Denied', ignore: 'Ignored', unignore: 'Put back', save: 'Saved for later', unsave: 'Moved back to Needs you', answer: 'Answered a question (a button)',
+    goal_close: 'Closed a goal', proposal: 'Decided a proposal', mark_read: 'Marked read', dismiss: 'Dismissed', comment: 'Commented on a file or a goal', answer_prompt: 'Answered a question, plan or permission', typed: 'Typed to an agent',
+};
+const ivcWord = k => IVC_KINDS[k] || k;
+const shareOf = (inbox, chat) => (inbox + chat > 0 ? inbox / (inbox + chat) : null);
+const pct = v => `${Math.round(v * 100)}%`;
+export const shareWords = v => (v == null ? 'no actions' : pct(v));
+
+/** What an Inbox-versus-chat read (GET /api/analytics/inbox-vs-chat) becomes: one row per UTC day of the window, from the day the Activity record began (before it the Inbox's side cannot be told apart, so a line
+ *  would only say the share was nothing), each with its day's counts, the 7-day share that is the point of the tab (inbox over inbox plus chat, a day with neither is a gap, and the answers whose side the page did not
+ *  say are left out and counted apart), the kinds of action by side, the teams, and where the Inbox's actions were taken. COUNTS ONLY: the read holds nothing else. */
+export function inboxModel(read) {
+    const c = (read && read.counts) || {}, asked = Math.max(1, Number(read && read.days_asked) || 28);
+    const end = /^\d{4}-\d{2}-\d{2}/.test(String(read && read.generated_at)) ? read.generated_at.slice(0, 10) : new Date().toISOString().slice(0, 10);
+    const byDay = new Map((c.days || []).map(d => [d.day, d]));
+    const all = [];
+    for (let i = asked - 1; i >= 0; i--) {
+        const day = new Date(Date.parse(end + 'T00:00:00Z') - i * 86400000).toISOString().slice(0, 10);
+        const d = byDay.get(day) || {};
+        all.push({ day, label: dayLabel(day), inbox: Number(d.inbox) || 0, chat: Number(d.chat) || 0, unknown: Number(d.unknown) || 0 });
+    }
+    const since = c.record_since || '';
+    const days = since ? all.filter(d => d.day >= since) : [];
+    days.forEach((d, i) => {
+        const win = days.slice(Math.max(0, i - 6), i + 1), inN = win.reduce((n, x) => n + x.inbox, 0), chatN = win.reduce((n, x) => n + x.chat, 0);
+        d.share = shareOf(d.inbox, d.chat); d.roll = shareOf(inN, chatN); d.rollInbox = inN; d.rollChat = chatN;
+    });
+    const inboxN = days.reduce((n, d) => n + d.inbox, 0), chatN = days.reduce((n, d) => n + d.chat, 0), unknownN = days.reduce((n, d) => n + d.unknown, 0);
+    const lastRoll = [...days].reverse().find(d => d.roll != null) || null;
+    const firstRoll = days.find(d => d.roll != null) || null;
+    const kinds = [...new Set([...Object.keys(c.inbox || {}), ...Object.keys(c.chat || {})])]
+        .map(k => ({ key: k, name: ivcWord(k), inbox: Number((c.inbox || {})[k]) || 0, chat: Number((c.chat || {})[k]) || 0 }))
+        .sort((a, b) => (b.inbox + b.chat) - (a.inbox + a.chat) || a.name.localeCompare(b.name));
+    const teams = (c.teams || []).map(t => ({ team: t.team, inbox: Number(t.inbox) || 0, chat: Number(t.chat) || 0, share: shareOf(Number(t.inbox) || 0, Number(t.chat) || 0) }));
+    const phone = c.phone || {}, phoneN = Number(phone.phone) || 0, otherN = Number(phone.other) || 0;
+    const unknownKinds = Object.entries(c.unknown || {}).reduce((n, [, v]) => n + (Number(v) || 0), 0);
+    return { days, started: since, hasRecord: !!since, inbox: inboxN, chat: chatN, unknown: unknownKinds || unknownN, share: shareOf(inboxN, chatN), last: lastRoll, first: firstRoll, kinds, teams,
+        apart: Object.entries(c.apart || {}).map(([k, v]) => ({ key: k, n: Number(v) || 0 })).filter(x => x.n > 0), phoneShare: phoneN + otherN > 0 ? { phone: phoneN, other: otherN, share: phoneN / (phoneN + otherN) } : null,
+        note: String(c.note || '') };
+}
+
+/** The tab's one-sentence reading of the trend, in the words that never claim more than the counts show. */
+export function inboxTrendWords(m) {
+    if (!m.hasRecord) return 'The record of what you do in the Inbox has not begun, so there is nothing to compare yet.';
+    if (!m.last) return 'No action in the Inbox or in a chat in this period.';
+    if (!m.first || m.first.day === m.last.day) return `${shareWords(m.last.roll)} of your actions in the 7 days to ${m.last.label} were in the Inbox.`;
+    return `${shareWords(m.last.roll)} of your actions in the 7 days to ${m.last.label} were in the Inbox, against ${shareWords(m.first.roll)} in the 7 days to ${m.first.label}. Higher is more in the Inbox.`;
+}

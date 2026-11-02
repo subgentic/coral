@@ -674,7 +674,7 @@
     },
     {
       "name": "operator_actions",
-      "sql": "CREATE TABLE operator_actions (\n\t\tid        INTEGER PRIMARY KEY AUTOINCREMENT,\n\t\tat        TEXT NOT NULL,\n\t\tactor     TEXT NOT NULL,\n\t\taction    TEXT NOT NULL,\n\t\titem_kind TEXT NOT NULL,\n\t\titem_id   TEXT NOT NULL,\n\t\tversion   TEXT NOT NULL DEFAULT '',\n\t\tteam      TEXT NOT NULL,\n\t\tsource    TEXT NOT NULL,\n\t\thint      TEXT NOT NULL DEFAULT '',\n\t\ttitle     TEXT NOT NULL DEFAULT '',\n\t\tnote      TEXT NOT NULL DEFAULT '',\n\t\tprev_hash TEXT NOT NULL,\n\t\thash      TEXT NOT NULL\n\t)",
+      "sql": "CREATE TABLE operator_actions (\n\t\tid        INTEGER PRIMARY KEY AUTOINCREMENT,\n\t\tat        TEXT NOT NULL,\n\t\tactor     TEXT NOT NULL,\n\t\taction    TEXT NOT NULL,\n\t\titem_kind TEXT NOT NULL,\n\t\titem_id   TEXT NOT NULL,\n\t\tversion   TEXT NOT NULL DEFAULT '',\n\t\tteam      TEXT NOT NULL,\n\t\tsource    TEXT NOT NULL,\n\t\thint      TEXT NOT NULL DEFAULT '',\n\t\tsurface   TEXT NOT NULL DEFAULT '',\n\t\ttitle     TEXT NOT NULL DEFAULT '',\n\t\tnote      TEXT NOT NULL DEFAULT '',\n\t\tprev_hash TEXT NOT NULL,\n\t\thash      TEXT NOT NULL\n\t)",
       "tbl_name": "operator_actions",
       "type": "table"
     },
@@ -692,7 +692,7 @@
     },
     {
       "name": "operator_touch",
-      "sql": "CREATE TABLE operator_touch (\n\t\t\tid    INTEGER PRIMARY KEY AUTOINCREMENT,\n\t\t\tat    TEXT NOT NULL,\n\t\t\tkind  TEXT NOT NULL,\n\t\t\tteam  TEXT NOT NULL,\n\t\t\tagent TEXT NOT NULL,\n\t\t\tsource TEXT NOT NULL DEFAULT 'local'\n\t\t)",
+      "sql": "CREATE TABLE operator_touch (\n\t\t\tid    INTEGER PRIMARY KEY AUTOINCREMENT,\n\t\t\tat    TEXT NOT NULL,\n\t\t\tkind  TEXT NOT NULL,\n\t\t\tteam  TEXT NOT NULL,\n\t\t\tagent TEXT NOT NULL,\n\t\t\tsource TEXT NOT NULL DEFAULT 'local',\n\t\t\tsurface TEXT NOT NULL DEFAULT ''\n\t\t)",
       "tbl_name": "operator_touch",
       "type": "table"
     },
@@ -6218,7 +6218,7 @@
           "cid": 10,
           "dflt_value": "''",
           "hidden": 0,
-          "name": "title",
+          "name": "surface",
           "notnull": 1,
           "pk": 0,
           "type": "TEXT"
@@ -6227,13 +6227,22 @@
           "cid": 11,
           "dflt_value": "''",
           "hidden": 0,
-          "name": "note",
+          "name": "title",
           "notnull": 1,
           "pk": 0,
           "type": "TEXT"
         },
         {
           "cid": 12,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "note",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 13,
           "dflt_value": null,
           "hidden": 0,
           "name": "prev_hash",
@@ -6242,7 +6251,7 @@
           "type": "TEXT"
         },
         {
-          "cid": 13,
+          "cid": 14,
           "dflt_value": null,
           "hidden": 0,
           "name": "hash",
@@ -6412,6 +6421,15 @@
           "dflt_value": "'local'",
           "hidden": 0,
           "name": "source",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 6,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "surface",
           "notnull": 1,
           "pk": 0,
           "type": "TEXT"
