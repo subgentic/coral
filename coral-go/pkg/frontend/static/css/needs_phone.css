@@ -1,5 +1,5 @@
 /* A phone's Needs you row is as tall as its content (#11858). Loaded with the Inbox (inbox_sidebar.js), not at start. */
 @media (max-width: 760px) {
-    .inbox-needs-results .inbox-review-name { margin: -12px 0; } /* the 44 px target stays, the line is the text's */
+    .inbox-needs-results .inbox-review-item > .inbox-review-name { margin: -12px 0; } /* the 44 px target stays, the line is the text's */
     .inbox-needs-results [data-key=waiting] { align-self: flex-start; line-height: 20px; } /* on the name line: its 20 px, from the row's top padding */
 }
