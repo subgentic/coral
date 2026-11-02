@@ -9,6 +9,7 @@ import (
 	"testing/synctest"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -74,4 +75,30 @@ func TestUploadStallTimeoutIsClamped(t *testing.T) {
 		require.Equal(t, tc.want, Options{UploadStallTimeout: tc.set}.stallTimeout(), name)
 	}
 	require.Equal(t, defaultUploadStallTimeout, (&Handler{}).opts.stallTimeout())
+}
+
+// coral-hub's test (d): ValidateOptions refuses a negative value, one under 100 ms and one over the 30 s default, and accepts zero and the range's ends; a Handler built with a refused value fails closed
+// (every WebSocket upgrade refused, as for a bad origin) and still holds the stall bound inside the range.
+func TestValidateOptionsRefusesAnUploadStallTimeoutOutsideItsRange(t *testing.T) {
+	for _, bad := range []time.Duration{-1, -time.Second, 50 * time.Millisecond, 99 * time.Millisecond, 30*time.Second + 1, time.Minute} {
+		assert.Error(t, ValidateOptions(Options{UploadStallTimeout: bad}), "accepted %v", bad)
+	}
+	for _, ok := range []time.Duration{0, 100 * time.Millisecond, time.Second, 30 * time.Second} {
+		assert.NoError(t, ValidateOptions(Options{UploadStallTimeout: ok}), "refused %v", ok)
+	}
+	assert.NoError(t, ValidateOptions(Options{AllowedOrigins: []string{"hub.test"}, UploadStallTimeout: 5 * time.Second}))
+	assert.Error(t, ValidateOptions(Options{AllowedOrigins: []string{"hub.test"}, UploadStallTimeout: -1}), "a good origin does not excuse a bad bound")
+}
+
+func TestNewWithOptionsFailsClosedOnABadUploadStallTimeout(t *testing.T) {
+	for _, bad := range []time.Duration{-1, 50 * time.Millisecond, 30*time.Second + 1} {
+		h := NewWithOptions(nil, Options{AllowedOrigins: []string{"hub.test"}, UploadStallTimeout: bad})
+		require.Error(t, h.optErr, "%v", bad)
+		_, _, ok := h.originPatterns(httptest.NewRequest("GET", "/", nil), nil)
+		assert.False(t, ok, "%v: a handler built with a bad bound refuses every WebSocket upgrade", bad)
+		got := h.opts.stallTimeout()
+		assert.True(t, got >= 100*time.Millisecond && got <= 30*time.Second, "%v: the bound is still inside its range: %v", bad, got)
+	}
+	good := NewWithOptions(nil, Options{AllowedOrigins: []string{"hub.test"}, UploadStallTimeout: time.Second})
+	assert.NoError(t, good.optErr)
 }
