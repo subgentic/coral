@@ -277,6 +277,9 @@ func runMachineManage(sub string, args []string, stdin io.Reader, stdout, stderr
 		_ = tw.Flush()
 		return 0
 	case "delete":
+		if d.Confirm == nil { // no terminal and no --yes: said before any call, exit 2, as it always was
+			return fail("no one can be asked to confirm: pass --yes to go on without asking")
+		}
 		// Delete re-reads the droplet first, refuses a mismatch, shows the confirm built from what it READ, and only then revokes and deletes (Security's ruling, #9934).
 		rep, err := machinelaunch.Delete(ctx, name, d)
 		if errors.Is(err, machinelaunch.ErrDeleteDeclined) {

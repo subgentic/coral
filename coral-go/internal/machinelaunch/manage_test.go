@@ -481,17 +481,23 @@ func TestDeleteFindsALateDropletByTheRecordsLaunchTag(t *testing.T) {
 	require.NoError(t, st.Put(r))
 	var out bytes.Buffer
 	d := ManageDeps{Provider: f, State: st, Out: &out, Tune: quick(), Confirm: yesConfirm}
-	f.drops["88"] = Instance{ID: "88", Name: "m1", Tags: []string{Tag, r.LaunchTag}}
+	// a late droplet with a DIFFERENT region than the record is refused: the region has to match too
+	f.drops["88"] = Instance{ID: "88", Name: "m1", Region: "sfo3", Tags: []string{Tag, r.LaunchTag}}
 	delete(f.drops, "77")
 	_, err := Delete(t.Context(), "m1", d)
+	require.ErrorIs(t, err, ErrDropletMismatch, "only the region differs")
+	assert.Contains(t, f.drops, "88", "and nothing was deleted")
+	// name, region and both tags match: it IS found by the launch tag and deleted by its id
+	f.drops["88"] = Instance{ID: "88", Name: "m1", Region: r.Region, Tags: []string{Tag, r.LaunchTag}}
+	_, err = Delete(t.Context(), "m1", d)
 	require.NoError(t, err)
 	assert.NotContains(t, f.drops, "88", "the late droplet was found by the launch tag and deleted by its id")
 
 	r2 := record("m2", f)
 	r2.DropletID = ""
 	require.NoError(t, st.Put(r2))
-	f.drops["81"] = Instance{ID: "81", Name: "m2", Tags: []string{Tag, r2.LaunchTag}}
-	f.drops["82"] = Instance{ID: "82", Name: "m2", Tags: []string{Tag, r2.LaunchTag}}
+	f.drops["81"] = Instance{ID: "81", Name: "m2", Region: r2.Region, Tags: []string{Tag, r2.LaunchTag}}
+	f.drops["82"] = Instance{ID: "82", Name: "m2", Region: r2.Region, Tags: []string{Tag, r2.LaunchTag}}
 	_, err = Delete(t.Context(), "m2", d)
 	require.ErrorIs(t, err, ErrDropletMismatch)
 	assert.Contains(t, f.drops, "81")
