@@ -29,8 +29,11 @@ func taskClaimNudge(taskID int64) string {
 
 // BoardHandler handles message board HTTP endpoints.
 type BoardHandler struct {
-	proposalNow func() time.Time // a test's clock for the proposal sweeps (expiry and stuck claims); nil is time.Now
-	selfTaskMu  sync.Mutex       // makes the one-per-title check and the creation of a self task one step (#11247)
+	goalDoneNow func() time.Time // the clock of the "Goal looks done" quiet period (#12161); nil is time.Now
+	// goalDoneQuiet reads the quiet period (goal_done_quiet_minutes, #12161); nil: 15 minutes.
+	goalDoneQuietFn func(ctx context.Context) time.Duration
+	proposalNow     func() time.Time // a test's clock for the proposal sweeps (expiry and stuck claims); nil is time.Now
+	selfTaskMu      sync.Mutex       // makes the one-per-title check and the creation of a self task one step (#11247)
 	// goalReqWake is when each target board had its Orchestrators last woken for a goal request (#7361): one wake per few minutes, with the count, so a loop cannot make a paid turn per request.
 	goalReqWake sync.Map
 	// goalLinks limits the Hub service's reads of GET /api/goal-links per asker (#7411).
@@ -78,6 +81,10 @@ type BoardHandler struct {
 	chiefBoard func(ctx context.Context) string
 	// goalDoneHidden reads the goals hidden from Needs you (goal_done_hidden, #11825); nil: none.
 	goalDoneHidden func(ctx context.Context) []string
+	// goalDoneRead reads the goals the Operator opened in Needs you (goal_done_read, #11983); nil: none.
+	goalDoneRead func(ctx context.Context) []string
+	// commentNews says, per artifact id, how many replies agents left in the Operator's comment threads that the Operator has not opened (#12026); nil: none.
+	commentNews func(ctx context.Context) (map[string]int, error)
 	// listEdits limits how often one owner session edits a board's list (#5508).
 	listEdits editLimiter
 	// hubSwitches limits Coral Hub's requests to turn a team's cross-team switches on or off (#5572); hubCrossTeamLock reads the local lock.

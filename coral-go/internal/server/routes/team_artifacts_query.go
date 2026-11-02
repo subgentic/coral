@@ -415,8 +415,8 @@ func (q *teamArtifactQuery) cheapMatch(it teamArtifact, kept, starred map[string
 	if q.goal != 0 && (it.GoalID == nil || *it.GoalID != q.goal) {
 		return false
 	}
-	if len(q.tags) > 0 && !hasAnyTag(it.Tags, q.tags) {
-		return false
+	if len(q.tags) > 0 && !hasAnyTag(it.Tags, q.tags) && !(it.NewComments > 0 && hasAnyTag([]string{tagNewComments}, q.tags)) {
+		return false // the tag "new comments" is not stored: it matches the rows the Operator's list says have news (#12026)
 	}
 	if q.kept != nil {
 		isKept := it.managed != "" && kept[it.managed]
