@@ -2,6 +2,8 @@
  * view: a radiogroup of buttons that follows the select, whether the person pressed one, a script set the select's value, or the select's options were rebuilt (a provider that takes other thinking levels).
  *   segmentSelect(select, { label, cards })   returns the group element; the group is put right after the select, which is hidden
  * Keys: the arrows (and Home and End) move the choice and select it, one tab stop for the group (the checked one), as a native radio group does. */
+import { importOnce } from './import_once.js';
+const { markOf } = await importOnce('./agent_marks.js');
 let seq = 0;
 
 export function segmentSelect(select, { label = '', labelledby = '', cards = false, className = '' } = {}) {
@@ -27,6 +29,7 @@ export function segmentSelect(select, { label = '', labelledby = '', cards = fal
         for (const o of options()) {
             const b = document.createElement('button');
             b.type = 'button'; b.className = 'btn seg-btn'; b.setAttribute('role', 'radio'); b.dataset.value = o.value;
+            if (select.classList.contains('acf-agent-type') && markOf(o.value)) b.setAttribute('data-mark', markOf(o.value)); // the provider control: OpenCode's and Hermes's letter (#12169)
             const on = o.value === cur;
             b.setAttribute('aria-checked', String(on)); b.tabIndex = on ? 0 : -1;
             const name = document.createElement('span'); name.className = 'seg-name'; name.textContent = o.textContent.trim();

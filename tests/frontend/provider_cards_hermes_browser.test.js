@@ -58,7 +58,17 @@ const WHY = "Hermes isn't offered on Windows yet: it has not been tried with Cor
                     await m.buildAgentPick({ group, form, server: 'local' });
                     return { radios: [...group.querySelectorAll('input')].map(i => i.value), missing: [...group.querySelectorAll('.has-mark input')].map(i => i.value), option: !!form.querySelector('option[value="hermes"]'), line: group.querySelector('.launch-agent-unsupported')?.textContent || null }; })()`);
                 const tag = `${at}old picker ${mode}: `;
-                if (mode === 'installed') { assert.ok(g.radios.includes('hermes') && g.missing.length === 0 && g.option && g.line === null, tag + JSON.stringify(g)); }
+                if (mode === 'installed') { assert.ok(g.radios.includes('hermes') && g.missing.length === 0 && g.option && g.line === null, tag + JSON.stringify(g));
+                    // the chips carry their letter (#12169, QA Reviewer 2): the picker's radios (member and restart dialogs) and the provider segments (team and member forms) say H and O, as C, X, A and P are said
+                    const marks = await ev(`(async () => { const m = await import(${S} + 'launch_agent_pick.js'), seg = await import(${S} + 'segmented.js');
+                        const form = document.createElement('div'); form.innerHTML = '<select class="acf-agent-type"><option value="claude">Claude</option><option value="opencode">OpenCode</option><option value="hermes">Hermes</option></select>'; const group = document.createElement('div'); group.id = 'launch-agent-pick'; document.body.append(form, group);
+                        await m.buildAgentPick({ group, form, server: 'local' });
+                        const wrap = document.createElement('label'); wrap.className = 'acf-provider-label'; const sel = form.querySelector('.acf-agent-type'); wrap.append(sel); document.body.append(wrap); seg.segmentSelect(sel, { label: 'Provider' });
+                        const c = e => e ? getComputedStyle(e, '::before').content : null, radio = t => group.querySelector('.launch-agent-opt:has(input[value="' + t + '"])'), segb = t => wrap.parentElement.querySelector('.seg-btn[data-value="' + t + '"]');
+                        return { radioH: c(radio('hermes')), radioO: c(radio('opencode')), radioC: c(radio('claude')), segH: c(segb('hermes')), segO: c(segb('opencode')), segC: c(segb('claude')) }; })()`);
+                    assert.deepEqual([marks.radioH, marks.radioO, marks.radioC], ['"H"', '"O"', '"C"'], tag + 'the picker radios carry their letters: ' + JSON.stringify(marks));
+                    assert.deepEqual([marks.segH, marks.segO, marks.segC], ['"H"', '"O"', '"C"'], tag + 'the provider segments carry their letters: ' + JSON.stringify(marks));
+                }
                 else if (mode === 'missing') { assert.ok(g.radios.includes('hermes') && g.missing.includes('hermes'), tag + 'marked not installed: ' + JSON.stringify(g)); }
                 else { assert.ok(!g.radios.includes('hermes') && !g.option && g.line === WHY, tag + JSON.stringify(g)); }
             }
