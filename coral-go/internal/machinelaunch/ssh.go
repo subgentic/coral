@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/subgentic/coral/internal/safego"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -246,6 +247,7 @@ func dialContext(ctx context.Context, addr string, cfg *ssh.ClientConfig) (*ssh.
 	}
 	done := make(chan struct{})
 	go func() {
+		defer safego.Recover("machinelaunch ssh dial: close on cancel")
 		select {
 		case <-ctx.Done():
 			conn.Close()

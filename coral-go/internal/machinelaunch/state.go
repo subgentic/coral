@@ -13,6 +13,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/subgentic/coral/internal/fsreplace"
 )
 
 // The state file (#10918, coral-hub's request 3): what a launch made, by id, so `coral machine delete` and the clean-up of a failed launch find every piece even when the provider's own list lags or
@@ -255,5 +257,5 @@ func saveStateFile(path string, recs map[string]Record) error {
 	if err := tmp.Close(); err != nil {
 		return err
 	}
-	return os.Rename(tmpName, path)
+	return fsreplace.Rename(tmpName, path)
 }
