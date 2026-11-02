@@ -361,10 +361,11 @@ function runActions(run) {
 function syncGoalDoneCount() { setGoalDoneCount(goalDoneRows().length); updateInboxTab(); }
 /** The goal's page, from its item; with close the Close dialog is opened on it, set to Done, once the page is up (#11825). */
 let closeAfterOpen = null;
-function openGoalDone(g, close = false) {
+function openGoalDone(g, close = false, rowKey = '') {
     closeAfterOpen = close ? { team: g.board_id, id: g.id } : null;
+    const row = rowKey || document.activeElement?.closest?.('tr[data-key]')?.dataset.key || '', place = $('group-table-view')?.scrollTop || 0; // read before the focus moves off the row (#11964)
     quietFocus($('inbox-view'));
-    itemOpeners.set('needs', { key: document.activeElement?.closest?.('tr[data-key]')?.dataset.key || '', scroll: $('group-table-view')?.scrollTop || 0 }); // Back returns to Needs you as it was (its place), not to the Goals tab (#11950)
+    itemOpeners.set('needs', { key: row, scroll: place }); // Back returns to Needs you as it was (its place), not to the Goals tab (#11950)
     go({ ...folderRoute, id: g.board_id, item: g.id });
 }
 /** A "Goal looks done" item's actions (#11825): Close goal (the goal's Close dialog, set to Done), Not yet (hidden until a task is added) and Ignore (hidden for good, Undo in the notice); on a phone Ignore is in the menu. */
@@ -815,7 +816,7 @@ registerGroupSource('hub-inbox', {
             return { title: 'Needs you', noun: ['item', 'items'], rows, count: totalCounted > rowsCounted ? `${rowsCounted} of ${totalCounted}` : totalCounted, note: reviewErrors().join(' '), empty: { line: NF.isFiltered(needsFilters) ? 'Nothing that needs you matches the search and filters.' : 'Nothing needs you', hint: NF.isFiltered(needsFilters) ? undefined : answered || 'An agent that asks a question or wants permission, and a review artifact, appear here. A task assigned to you is under Tasks.', go: NF.isFiltered(needsFilters) ? undefined : { action: 'inbox-go-agents', label: 'Go to Agents' } },
                 foot: alertsLine, signature: JSON.stringify([alertsOffered(), hidden, finishedUnread().length, answered || '', manyTeams, needsOverflow().map(g => [g.name, g.more.map(a => a.reviewKey)]), reviewErrors(), rows.map(blocksOf), rows.map(s => [s.operatorAsk ? [s.operatorAsk.id, s.operatorAsk.text] : 0, sessionServer(s), s.session_id, s.display_name, s.waiting_kind, s.waiting_since, waitingText(s.waiting_since), teamOf(s), askOf(s), goalOf(s) ? s.goal.id : 0, s.task ? [s.task.id, s.task.title] : 0, dirOf(s), s.review ? isRead(s.review) : 0, s.proposal ? s.proposal.state : 0])]), // the words move on with the clock: they are part of what was drawn
                 node: () => { const wrap = DT.el('div', 'inbox-needs-results'); const oneLineNeeds = !rows.some(isItem); const table = DT.dataTable({ label: `Needs you, ${rows.length}`, rows, rowKey: s => `${sessionServer(s)}:${s.session_id}`, unread: needsUnread, ...(isPhoneLayout() ? { selectable: { contextKey: 'inbox-needs', longPress: true, iconBar: true, clearLabel: 'Cancel', canSelect: s => !!(s.review || s.operatorAsk || s.welcome || s.autorun || s.proposal), actions: needsBulkActions(), onChange: keys => Toolbar.mountSelection(document.querySelector('#group-table-view .gt-toolbar'), keys.size ? table.bar : null) } } : {}), decorate: (s, tr) => { if (!needsUnread(s)) tr.classList.add('dt-read'); if (s.welcome && s.welcome.dismiss) tr.dataset.welcomeId = s.welcome.id; if (s.review && !decisionNeedsPerson(splitKey(s.review.team).server)) { tr.draggable = true; tr.addEventListener('dragstart', e => { e.dataTransfer.setData('application/x-coral-review', s.review.reviewKey); e.dataTransfer.effectAllowed = 'move'; dragging = s.review; }); tr.addEventListener('dragend', () => { dragging = null; }); } }, state: needsState, rowName: s => s.review ? `${s.review.name}${earlierWords(s.review) ? `, ${earlierWords(s.review)}` : ''}, for review, ${teamOf(s)}` : s.autorun ? `${s.autorun.name}, run failed` : s.operatorAsk ? `${s.operatorAsk.asker}, asks you` : s.welcome ? s.welcome.title : resolveSessionIdentity(s),
-                    open: s => { if (s.goalDone) { openGoalDone(s.goalDone); return; } if (s.proposal) { openProposalDialog(s.proposal, 'view'); return; } if (s.review) { openReview(s.review); return; } if (s.autorun) { openRun(s.autorun); return; } if (s.operatorAsk) { openAskDialog(s.operatorAsk, undefined, askRunners); return; } if (s.unrecorded) { recordAllAgents(); return; } if (s.welcome) { runWelcome(s.welcome.id); return; } if (!s.review && !s.autorun && s.waiting_kind === 'permission') { importOnce('./inbox_agent_card.js').then(m => { if (m.canOpenCard(s)) m.openAgentCard(s); else openInAgents(s); }); return; } openInAgents(s); }, // a row that needs an answer shows the chat card, not the terminal saved last (#10141)
+                    open: s => { if (s.goalDone) { openGoalDone(s.goalDone, false, `${sessionServer(s)}:${s.session_id}`); return; } if (s.proposal) { openProposalDialog(s.proposal, 'view'); return; } if (s.review) { openReview(s.review); return; } if (s.autorun) { openRun(s.autorun); return; } if (s.operatorAsk) { openAskDialog(s.operatorAsk, undefined, askRunners); return; } if (s.unrecorded) { recordAllAgents(); return; } if (s.welcome) { runWelcome(s.welcome.id); return; } if (!s.review && !s.autorun && s.waiting_kind === 'permission') { importOnce('./inbox_agent_card.js').then(m => { if (m.canOpenCard(s)) m.openAgentCard(s); else openInAgents(s); }); return; } openInAgents(s); }, // a row that needs an answer shows the chat card, not the terminal saved last (#10141)
                     columns: [
                         { key: 'agent', label: rows.some(isItem) ? 'Item' : 'Agent', primary: true, width: 'grow', ...(rows.some(s => s.proposal) ? { min: 14, share: 1 } : rows.some(isItem) ? { min: 24, share: 2 } : {}), sort: true, sortValue: s => resolveSessionIdentity(s), line: 1, ...(oneLineNeeds || rows.some(s => s.review || s.operatorAsk || s.autorun) ? { subtitle: s => (s.operatorAsk ? askUnder(s.operatorAsk) : s.review ? (questionOf(s) || 'For review') : s.autorun && !oneLineNeeds ? askOf(s) : oneLineNeeds ? askOf(s) : ''), subtitleTitle: s => (s.review || s.operatorAsk ? subOf(s, true) : oneLineNeeds ? askOf(s) : '') } : {}), // a list of agents: the ask is the row's one second line, under the name (UI/UX: the row's purpose is to decide from the list); a file for review says who uploaded it there, and its team when two or more teams wait (#11456)
                             cell: s => { if (s.operatorAsk) { const name = DT.el('span', 'inbox-review-name inbox-ask-name', askLine(s.operatorAsk) || markHidden(s.operatorAsk.asker, { strict: true })); const wrap = DT.el('span', 'inbox-review-item'); wrap.append(DT.el('span', 'inbox-review-from', markHidden(s.operatorAsk.asker, { strict: true }).trim() || 'an agent'), name); return wrap; } // a question to the Operator reads like a review row: its first line, then who asked and their team
@@ -1107,6 +1108,7 @@ export async function showInbox({ folder = '', quiet = false } = {}) {
     if (document.body.getAttribute('data-nav-tab') !== 'hub-inbox') return; // the module arrived after the person had moved on (a notification's click, a chosen agent): its table must not cover that
     noteFolder(group);
     openGroupTable('hub-inbox', group); // a phone too: the table has the folders' select on top
+    const came = folder && group === 'needs' && itemOpeners.get('needs'), tbl = $('group-table-view'); if (came && tbl) putBack(tbl, came); // Back from a goal opened off Needs you: the list's place and the row's focus (#11950, #11964)
 }
 
 /** The group the Inbox opens on the next time it is shown, with nothing drawn (the Saved button names it before it switches to the tab, so the last group is not on screen first). */
@@ -1125,10 +1127,24 @@ export async function openInboxGroup(name) {
     const route = routeForFolder(name); if (route) note(route);
     if (name === 'goals') restoreGoalList();
     const opener = itemOpeners.get(name), table = $('group-table-view');
-    if (opener && table) {
-        table.querySelector(`tr[data-key="${CSS.escape(opener.key)}"] .dt-primary`)?.focus({ preventScroll: true });
-        table.scrollTop = opener.scroll;
-    }
+    if (opener && table) putBack(table, opener);
+}
+
+/** The list a person came back to is drawn (and redrawn) after the route, so its rows may not be there yet and a draw can put the scroll back to the top: for about a second keep its place and the row's focus where they were, until
+ * the person scrolls, presses a key or clicks (#11964). */
+function putBack(table, opener) {
+    let frames = 60, steady = 0, stop = false;
+    const off = () => { stop = true; for (const t of ['wheel', 'touchstart', 'keydown', 'pointerdown']) table.removeEventListener(t, off, true); };
+    for (const t of ['wheel', 'touchstart', 'keydown', 'pointerdown']) table.addEventListener(t, off, { capture: true, once: true, passive: true });
+    const step = () => {
+        if (stop || !table.isConnected || --frames < 0 || steady >= 12) { off(); return; }
+        const tr = opener.key && table.querySelector(`tr[data-key="${CSS.escape(opener.key)}"]`), row = tr && (tr.querySelector('.dt-primary') || (tr.hasAttribute('tabindex') || tr.setAttribute('tabindex', '-1'), tr)); // a row with no link of its own takes the focus itself, so Tab goes on to its buttons and Enter does nothing
+        const a = document.activeElement, lost = row && !tr.contains(a) && !(a && a.closest && a.closest('input, textarea, select, dialog, [contenteditable]')); // the draw (or the Inbox's own focus reset) moved it off the row
+        if (lost) { row.focus({ preventScroll: true }); steady = 0; }
+        if (tr || !opener.key) { if (Math.abs(table.scrollTop - opener.scroll) > 1) { table.scrollTop = opener.scroll; steady = 0; } else steady++; }
+        requestAnimationFrame(step);
+    };
+    step();
 }
 
 function restoreGoalList() {
