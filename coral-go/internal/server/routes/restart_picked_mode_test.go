@@ -103,3 +103,37 @@ func TestARestartRefusesAPickedModeThatIsNotOne(t *testing.T) {
 	defer resp.Body.Close()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 }
+
+// An agent whose mode was never recorded restarts in Default and says so (#10297); when the person picks a mode in the dialog the restart is in THAT mode and says nothing of the kind (QA's SHOULD, #12481).
+func TestARestartWithAPickedModeDoesNotSayItsModeWasNotRecorded(t *testing.T) {
+	server, _, term, ss := setupSessionsTestServer(t)
+	defer server.Close()
+	stubCLIPaths(t, ss)
+	ctx := context.Background()
+	restart := func(sid string, pick *string) map[string]any {
+		sn := naming.SessionName("claude", sid)
+		require.NoError(t, term.CreateSession(ctx, sn, t.TempDir()))
+		require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid, AgentType: "claude", AgentName: "legacy", WorkingDir: t.TempDir()})) // no recorded mode, no permission flags
+		req := map[string]any{"session_id": sid, "agent_type": "claude"}
+		if pick != nil {
+			req["permission_mode"] = *pick
+		}
+		body, _ := json.Marshal(req)
+		resp, err := http.Post(server.URL+"/api/sessions/live/"+sn+"/restart", "application/json", bytes.NewReader(body))
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+		var res map[string]any
+		require.NoError(t, json.NewDecoder(resp.Body).Decode(&res))
+		return res
+	}
+	none := restart("00000000-0000-0000-0000-0000000e1001", nil)
+	assert.Equal(t, "Its mode was not recorded: restarted in Default", none["mode_note"], "without a pick the note stands")
+	bypass := "bypassPermissions"
+	picked := restart("00000000-0000-0000-0000-0000000e1002", &bypass)
+	assert.Nil(t, picked["mode_note"], "with a pick the restart is in the picked mode and says nothing of it being unrecorded")
+	nl, err := ss.GetLiveSession(ctx, picked["session_id"].(string))
+	require.NoError(t, err)
+	require.NotNil(t, nl.PermissionMode)
+	assert.Equal(t, "bypassPermissions", *nl.PermissionMode)
+}
