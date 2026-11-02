@@ -20,8 +20,9 @@ const (
 	// ReleasesList is the newest releases of the repository, newest first (one page).
 	ReleasesList = "https://api.github.com/repos/" + verify.Repo + "/releases?per_page=30"
 
-	// maxListBytes caps the list's size: 30 releases are well under it, and a larger answer is refused, not truncated.
-	maxListBytes = 1 << 20
+	// maxListBytes caps the list's size, and a larger answer is refused, not truncated. The list carries every release's notes (GitHub allows 125,000 characters each) and assets:
+	// the real list of 30 was 1.3 MB (#11938), and 30 full-size notes are under 4 MB, so 8 MiB is room, and still a bound.
+	maxListBytes = 8 << 20
 	// maxPromoteCandidates is how many promotion releases one pass looks at, newest first: junk by anyone with write access costs this many small downloads, no more.
 	maxPromoteCandidates = 10
 )

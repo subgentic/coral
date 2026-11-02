@@ -142,13 +142,18 @@ func (h *UpdateRelaunchHandler) addChannelFacts(r *http.Request, out map[string]
 	if ch == updatecheck.Agentic && !viaTunnel(r) && len(feed.Waiting) > 0 {
 		waiting := make([]map[string]any, 0, len(feed.Waiting))
 		for _, w := range feed.Waiting {
+			if updatecheck.NotNewer(w.Version, config.Version) {
+				continue // the running build is at or past it: nothing to wait for (#11938)
+			}
 			at := ""
 			if !w.PublishedAt.IsZero() {
 				at = w.PublishedAt.UTC().Format(time.RFC3339)
 			}
 			waiting = append(waiting, map[string]any{"version": w.Version, "published_at": at, "notes": w.Notes})
 		}
-		out["waiting"] = waiting
+		if len(waiting) > 0 {
+			out["waiting"] = waiting
+		}
 	}
 }
 

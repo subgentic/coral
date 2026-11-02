@@ -733,3 +733,31 @@ func TestAnInstalledPrereleaseIsOfferedItsRelease(t *testing.T) {
 		assert.Equal(t, "installed_version", res.FailedStage, bad)
 	}
 }
+
+// The API's list of the newest 30 releases carries every release's notes and assets: the real one was 1.3 MB (#11938), over the old 1 MiB cap, so a check on the Agentic
+// channel failed with a network error. A list of that size, with the promotion at the top, is read and its promotion staged.
+func TestARealisticListOfThirtyReleasesIsReadWhole(t *testing.T) {
+	e := newEnv(t, "1.4.125")
+	pt := "promote-v1.4.130-7"
+	items := []string{
+		`{"tag_name":"` + pt + `","draft":false,"prerelease":true,"assets":[{"name":"promote.json"},{"name":"promote.json.sigstore.json"}]}`,
+		`{"tag_name":"v1.4.130","draft":false,"prerelease":false,"assets":[{"name":"SHA256SUMS.txt"}]}`,
+	}
+	for i := 0; i < 28; i++ {
+		items = append(items, fmt.Sprintf(`{"tag_name":"v1.3.%d","draft":false,"prerelease":false,"body":%q,"assets":[{"name":"SHA256SUMS.txt"}]}`, 100-i, strings.Repeat("release notes ", 3400)))
+	}
+	e.rel.list = "[" + strings.Join(items, ",") + "]"
+	require.Greater(t, len(e.rel.list), 1_300_000, "as large as the real list")
+	res := e.check()
+	require.Equal(t, ResultStaged, res.Result, "%+v", res)
+	assert.Equal(t, "1.4.130", res.Version)
+}
+
+// The cap is still a bound: a list over it is refused whole, never read in part.
+func TestAListOverTheCapIsRefusedNotTruncated(t *testing.T) {
+	e := newEnv(t, "1.4.125")
+	e.rel.list = `[{"tag_name":"promote-v1.4.130-7","draft":false,"prerelease":true,"assets":[{"name":"promote.json"}],"body":"` + strings.Repeat("x", maxListBytes) + `"}]`
+	res := e.check()
+	assert.NotEqual(t, ResultStaged, res.Result, "%+v", res)
+	assert.Empty(t, e.stagedVersions())
+}

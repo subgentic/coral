@@ -213,6 +213,33 @@ func TestTheStatusSaysWhenTheRunningBuildIsPastTheApprovedRelease(t *testing.T) 
 	assert.Equal(t, true, out["past_approved"])
 }
 
+// A release that is not newer than the running build is not waiting for anything the person can install (#11938): the build is past it.
+func TestTheWaitingListDropsReleasesTheRunningBuildIsAlreadyPast(t *testing.T) {
+	skipWhenUpdateCheckIsOff(t)
+	withVersion(t, "1.4.145")
+	channelFeeds(t, channelRelease("v1.4.142", true, "n"),
+		channelRelease("v1.4.146", false, "ahead"), channelRelease("v1.4.145", false, "running"), channelRelease("v1.4.144", false, "past"))
+	e := newRelaunchEnv(t)
+	e.h.Feeds = releaseFeeds
+	e.settings["update_channel"] = "agentic"
+	out := settle(t, e, nil, "waiting")
+	w := out["waiting"].([]any)
+	require.Len(t, w, 1, "only the release newer than 1.4.145")
+	assert.Equal(t, "1.4.146", w[0].(map[string]any)["version"])
+}
+
+func TestTheWaitingListIsAbsentWhenTheRunningBuildIsPastEveryUnapprovedRelease(t *testing.T) {
+	skipWhenUpdateCheckIsOff(t)
+	withVersion(t, "1.4.146")
+	channelFeeds(t, channelRelease("v1.4.142", true, "n"),
+		channelRelease("v1.4.145", false, "past"), channelRelease("v1.4.144", false, "past"), channelRelease("v1.4.142", true, "n"))
+	e := newRelaunchEnv(t)
+	e.h.Feeds = releaseFeeds
+	e.settings["update_channel"] = "agentic"
+	out := settle(t, e, nil, "approved")
+	assert.NotContains(t, out, "waiting", "nothing is newer than the running build")
+}
+
 func TestTheStatusListsWhatWaitsForApprovalOnAgenticForTheOperatorNotTheHub(t *testing.T) {
 	skipWhenUpdateCheckIsOff(t)
 	withVersion(t, "1.4.141")
