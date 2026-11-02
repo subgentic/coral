@@ -17,7 +17,7 @@ const SID = '11111111-2222-4333-8444-555555555555';
         window.fetch = (u, o) => {
             const url = String(u), method = (o && o.method) || 'GET';
             if (method === 'GET' && /\\/api\\/sessions\\/live(\\?|$)/.test(url)) return json([{ session_id: '${SID}', name: 'claude-chief', display_name: 'Orchestrator', board_project: 'chiefteam', board_label: 'Chief desk', model: 'claude-opus-5-5' }]);
-            if (method === 'GET' && /\\/api\\/board\\/projects(\\?|$)/.test(url)) return json([{ board_id: 'devteam', label: 'Dev team' }, { board_id: 'chiefteam', label: 'Chief desk' }]);
+            if (method === 'GET' && /\\/api\\/board\\/projects(\\?|$)/.test(url)) return json([{ board_id: 'devteam', board_label: 'Dev team' }, { board_id: 'chiefteam', board_label: 'Chief desk' }]);
             return real(u, o);
         };
         return true; })()`;
@@ -36,6 +36,8 @@ const SID = '11111111-2222-4333-8444-555555555555';
             assert.equal(await ev(`document.getElementById('settings-tab-chief') && document.getElementById('settings-tab-chief').textContent.replace('chat', '').trim()`), 'Chief', at + 'the Settings dialog has a Chief tab');
             const labels = await ev(`[...document.querySelectorAll('${host} .sv-row .sv-label, ${host} .sv-row label')].map(l => l.textContent.trim()).filter(Boolean).slice(0, 12)`);
             for (const want of ['Name', 'Avatar colour', 'Avatar letter', 'Which agent', 'Its model', 'Team it fronts', 'Serve the Chief page']) assert.ok(labels.some(l => l.startsWith(want)), at + `a row says "${want}": ${JSON.stringify(labels)}`);
+            const teamOpts = await ev(`[...document.querySelectorAll('${host} select[name=chief_fronts] option')].map(o => o.textContent.trim())`); // the team's name, never its board id (#12172)
+            assert.deepEqual(teamOpts, ['No team chosen', 'Dev team', 'Chief desk'], at + 'Team it fronts lists the teams by name: ' + JSON.stringify(teamOpts));
             assert.equal(await ev(`document.querySelectorAll('${host} .chief-swatch').length`), 8, at + 'eight colours');
             assert.equal(await ev(`[...document.querySelectorAll('${host} .chief-swatch')].every(b => b.getBoundingClientRect().height >= 43.5 && b.getBoundingClientRect().width >= 43.5)`), true, at + 'each swatch is a 44 px target');
             assert.equal(await ev(`document.documentElement.scrollWidth - document.documentElement.clientWidth`), 0, at + 'nothing scrolls sideways');

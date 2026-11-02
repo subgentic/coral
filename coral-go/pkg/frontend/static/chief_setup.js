@@ -26,7 +26,9 @@ export async function mountChiefSetup(host) {
     const [stored, live, projects] = await Promise.all([json('/api/settings'), json('/api/sessions/live'), json('/api/board/projects')]);
     const settings = stored && typeof stored.settings === 'object' && stored.settings ? stored.settings : {}; // GET /api/settings answers { settings: { key: value } }
     const choices = agentChoices(Array.isArray(live) ? live : live && live.sessions);
-    const teams = (Array.isArray(projects) ? projects : []).filter(p => p && p.board_id).map(p => ({ value: String(p.label || p.board_id), label: String(p.label || p.board_id) }));
+    const teamNames = new Map((Array.isArray(projects) ? projects : []).filter(p => p && p.board_id).map(p => [String(p.board_id), String(p.board_label || p.board_id)])); // the team's name (board_label, #3536), its id only when it has none
+    const teams = [...teamNames.values()].map(n => ({ value: n, label: n }));
+    const frontsOf = v => { const t = String(v || ''); return teamNames.get(t) || t; }; // a team saved by its id (it was, before this) shows by its name
     const section = el('section', 'chief-setup'); section.setAttribute('aria-label', 'Chief');
     const intro = el('p', 'chief-setup-intro', 'Chief is the one agent you talk to, from your phone too. Give it a name and a face, say which team it works with, and turn its page on.');
     const preview = el('div', 'chief-preview'); preview.setAttribute('role', 'img');
@@ -82,7 +84,7 @@ export async function mountChiefSetup(host) {
         load: async () => {
             const again = await json('/api/settings'), st = again && again.settings ? again.settings : settings;
             const agent = choices.find(c => c.value === String(st.chief_session || '') && c.team === String(st.chief_team || ''));
-            return { chief_name: String(st.chief_name || ''), chief_avatar: String(st.chief_avatar || '1'), chief_avatar_letter: String(st.chief_avatar_letter || ''), chief_agent: agent ? agent.value : '', chief_fronts: String(st.chief_fronts || ''), chief_page: yes(st.chief_page), chief_actions: st.chief_actions === 'act' ? 'act' : 'ask_first' }; // anything else is Ask first, never a wider mode
+            return { chief_name: String(st.chief_name || ''), chief_avatar: String(st.chief_avatar || '1'), chief_avatar_letter: String(st.chief_avatar_letter || ''), chief_agent: agent ? agent.value : '', chief_fronts: frontsOf(st.chief_fronts), chief_page: yes(st.chief_page), chief_actions: st.chief_actions === 'act' ? 'act' : 'ask_first' }; // anything else is Ask first, never a wider mode
         },
         save: async (changes, { values }) => {
             const body = {};

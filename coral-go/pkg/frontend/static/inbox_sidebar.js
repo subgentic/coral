@@ -1148,6 +1148,15 @@ function restoreGoalList() {
     table.scrollTop = goalScroll;
 }
 
+/** A link to a goal that looks done (#12172): the goals are read again, and the goal opens on its own page when it is still one item of Needs you; false when it is not (done since, hidden, no such goal). */
+export async function openGoalDoneNeed(team, id) {
+    await refreshGoals();
+    const g = doneGoals(goals, goalTeamHere).find(x => goalTeamHere(x) === team && String(x.id) === String(id));
+    if (!g) return false;
+    openGoalDone(g);
+    return true;
+}
+
 /** The Inbox owns its goal address and Back; the shared component owns the goal. */
 export async function openInboxGoal(team, id) {
     closePage(false);
