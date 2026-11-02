@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -368,4 +369,82 @@ func TestTheOperatorsReplyInAThreadNobodyIsInGoesToTheUploader(t *testing.T) {
 	require.Equal(t, http.StatusCreated, code, fmt.Sprint(rep))
 	assert.Equal(t, "Dev", rep["sent_to"])
 	require.Len(t, rig.operatorMessages(), 1)
+}
+
+// QA's pins on #12203's board filter: a reply reaches only the agents asked into THAT thread on THIS board, once each.
+func (rig *cmtRig) ownerReply(cid int64, body string) (int, map[string]any) {
+	return rig.do("POST", cp(cmtDoc), cmtAsOwner, map[string]any{"body": body, "parent_id": cid, "board": "team-a"})
+}
+
+func (rig *cmtRig) quietRoot() int64 {
+	_, root := rig.commentAs(cmtAsOwner, map[string]any{"notify_agent": false})
+	return int64(root["id"].(float64))
+}
+
+func TestAReplyDoesNotReachAnAgentAskedIntoAnotherThread(t *testing.T) {
+	rig := newCmtRig(t)
+	rig.agent(1, "Dev", false)
+	rig.agent(2, "QA", false)
+	rig.uploadedBy(1, "team-a")
+	one, two := rig.quietRoot(), rig.quietRoot()
+	code, out := rig.send(one, "Dev")
+	require.Equal(t, http.StatusOK, code, fmt.Sprint(out))
+	code, out = rig.send(two, "QA")
+	require.Equal(t, http.StatusOK, code, fmt.Sprint(out))
+	before := len(rig.operatorMessages())
+
+	code, rep := rig.ownerReply(one, "A reply in the first thread.")
+	require.Equal(t, http.StatusCreated, code, fmt.Sprint(rep))
+	assert.Equal(t, "Dev", rep["sent_to"])
+	msgs := rig.operatorMessages()
+	require.Len(t, msgs, before+1)
+	assert.Contains(t, msgs[before].Content, "@Dev ")
+	assert.NotContains(t, msgs[before].Content, "@QA ", "the agent asked into the other thread is not told")
+}
+
+func TestAnAgentThatIsBothTheUploaderAndAskedIntoTheThreadGetsOneMessage(t *testing.T) {
+	rig := newCmtRig(t)
+	rig.agent(1, "Dev", false)
+	rig.uploadedBy(1, "team-a")
+	cid := rig.quietRoot()
+	code, out := rig.send(cid, "Dev")
+	require.Equal(t, http.StatusOK, code, fmt.Sprint(out))
+	before := len(rig.operatorMessages())
+
+	code, rep := rig.ownerReply(cid, "One message, not two.")
+	require.Equal(t, http.StatusCreated, code, fmt.Sprint(rep))
+	assert.Equal(t, "Dev", rep["sent_to"], "named once")
+	assert.Len(t, rig.operatorMessages(), before+1)
+	// the same agent asked into the thread again (an ask that ended, then the reply) is still one ask and one message
+	require.NoError(t, rig.ss.CloseArtifactAsk(context.Background(), cid, sendSid(1), time.Now()))
+	before = len(rig.operatorMessages())
+	code, rep = rig.ownerReply(cid, "And once more.")
+	require.Equal(t, http.StatusCreated, code, fmt.Sprint(rep))
+	assert.Len(t, rig.operatorMessages(), before+1)
+	asks, err := rig.ss.ListArtifactAsks(context.Background(), cmtDoc)
+	require.NoError(t, err)
+	n := 0
+	for _, a := range asks {
+		if a.CommentID == cid && a.AgentSession == sendSid(1) {
+			n++
+		}
+	}
+	assert.Equal(t, 1, n, "one ask row for the agent in the thread")
+}
+
+func TestAnAskOnAnotherBoardIsNotDeliveredTo(t *testing.T) {
+	rig := newCmtRig(t)
+	rig.agent(1, "Dev", false)
+	rig.agent(2, "QA", false) // QA is on team-a, but its ask in this thread is recorded for team-b
+	rig.uploadedBy(1, "team-a")
+	cid := rig.quietRoot()
+	_, _, err := rig.ss.CreateArtifactAsk(context.Background(), cid, cmtDoc, "team-b", sendSid(2), "QA", time.Now())
+	require.NoError(t, err)
+
+	code, rep := rig.ownerReply(cid, "Only this board's agents.")
+	require.Equal(t, http.StatusCreated, code, fmt.Sprint(rep))
+	assert.Equal(t, "Dev", rep["sent_to"], "nobody of this board is in the thread: the uploader")
+	for _, m := range rig.operatorMessages() {
+		assert.NotContains(t, m.Content, "@QA ")
+	}
 }
