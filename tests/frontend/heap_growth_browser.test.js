@@ -165,10 +165,19 @@ async function httpJson(method, path, body) {
         assert.deepEqual(unread, [], 'a failed poll leaves its response body unread (cancel it, or read it): ' + unread.join(', '));
         const series = [];
         let base = null;
+        // The DOM node count is two-level: the same page, at the same point of the loop, holds about 11046 nodes in one sample and about 11317 in the next (a 271-node subtree that is there or not: Windows' runs of
+        // v2.0.35, #12440), so one sample at the warm-up and one at the end cannot tell that from growth. The nodes are judged on the FLOOR of a few samples at the warm-up and at the end: a leak lifts both floors
+        // by what it leaks, the toggle lifts neither.
+        // And every sample is taken in the same state: the same agent selected (the loop selects hg-(n % 20), so the samples at 20, 25, 30 and 35 were looking at four different chats, and the first and the last at the
+        // lightest one), two frames to settle.
+        const floorBase = [], floorEnd = [], FLOOR = 4;
+        const sample = async () => { await select('hg-0'); await ev(framesJs(2)); return metrics(); };
         for (let n = 1; n <= CYCLES; n++) {
             await round(n);
-            if (n === WARM) { base = await metrics(); series.push({ n, ...base }); await snapshot('warm'); if (process.env.HEAP_LISTENERS) lw = await listenerCensus(); }
-            else if (n > WARM && (n % Math.max(5, Math.floor(CYCLES / 12)) === 0 || n === CYCLES)) series.push({ n, ...(await metrics()) });
+            if (n === WARM) { base = await sample(); series.push({ n, ...base }); floorBase.push(base.nodes); await snapshot('warm'); if (process.env.HEAP_LISTENERS) lw = await listenerCensus(); }
+            else if (n > WARM - FLOOR && n < WARM) floorBase.push((await sample()).nodes);
+            else if (n > WARM && (n % Math.max(5, Math.floor(CYCLES / 12)) === 0 || n === CYCLES)) { const m = await sample(); series.push({ n, ...m }); if (n > CYCLES - FLOOR) floorEnd.push(m.nodes); }
+            else if (n > CYCLES - FLOOR && n < CYCLES) floorEnd.push((await sample()).nodes);
         }
         await snapshot('end');
         if (process.env.HEAP_LISTENERS) { const le = await listenerCensus(); const keys = [...new Set([...Object.keys(lw), ...Object.keys(le)])]; console.log('LISTENERS grown: ' + keys.map(k => [k, (le[k] || 0) - (lw[k] || 0)]).filter(x => x[1] !== 0).sort((a, b) => b[1] - a[1]).map(x => x.join('=')).join(', ')); }
@@ -181,10 +190,9 @@ async function httpJson(method, path, body) {
         const grew = (a, b) => b - a;
         // bounds per round after the warm-up (a leak of a node, a listener or a few KB a round shows over the rounds; caches that are bounded do not)
         assert.ok(grew(base.heapMB, end.heapMB) <= 3 + 0.05 * per, `the heap after GC grew ${grew(base.heapMB, end.heapMB).toFixed(1)} MB over ${per} rounds (bound ${(3 + 0.05 * per).toFixed(1)}): ${row(base)} -> ${row(end)}`);
-        // The node count of one sample moves a few hundred up and down between samples (a render that has just run, a card still being removed: Windows' windows-latest runner showed 10983, 11164, 11038, 11148, 11389 in a row,
-        // with nothing growing, #12266), so the end is the median of the last five samples: a leak is a climb through all of them, and the median climbs with it.
-        const tailNodes = series.slice(-5).map(x => x.nodes).sort((x, y) => x - y)[Math.floor(Math.min(5, series.length) / 2)];
-        assert.ok(grew(base.nodes, tailNodes) <= 100 + per / 2, `DOM nodes grew ${grew(base.nodes, tailNodes)} over ${per} rounds (the median of the last five samples; the last one was ${end.nodes})`);
+        // The nodes: the floor of the last FLOOR samples against the floor of the FLOOR samples up to the warm-up (see above). A leak lifts the floor; the 271-node toggle of Windows' runs does not (#12440).
+        const floorGrowth = grew(Math.min(...floorBase), Math.min(...floorEnd));
+        assert.ok(floorGrowth <= 100 + per / 2, `DOM nodes grew ${floorGrowth} over ${per} rounds (the floor of ${FLOOR} samples at the end against ${FLOOR} at the warm-up: ${Math.min(...floorEnd)} against ${Math.min(...floorBase)}; end samples ${floorEnd.join(', ')}, warm-up samples ${floorBase.join(', ')})`);
         assert.ok(grew(base.listeners, end.listeners) <= 40 + per / 5, `event listeners grew ${grew(base.listeners, end.listeners)} over ${per} rounds`);
         assert.ok(grew(base.documents, end.documents) <= 3, `documents grew ${grew(base.documents, end.documents)} (detached frames or windows)`);
         console.log(`PASS heap growth: ${per} rounds after a ${WARM}-round warm-up: heap ${grew(base.heapMB, end.heapMB).toFixed(1)} MB, nodes ${grew(base.nodes, end.nodes)}, listeners ${grew(base.listeners, end.listeners)}`);
