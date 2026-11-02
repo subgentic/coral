@@ -160,3 +160,20 @@ func TestRejectingAndRemovingASkill(t *testing.T) {
 		assert.NotEqual(t, ok.ID, x.(map[string]any)["id"], "a removed skill is not in the list")
 	}
 }
+
+// QA's SHOULD on #12022: the approve route reads at most 1 KiB of body. A body over that is refused (400) and the skill stays pending; one just under it with the right digest still works.
+func TestApproveRefusesAnOversizedBodyAndLeavesTheSkillPending(t *testing.T) {
+	e := newSkillsEnv(t)
+	row, digest := e.publish(map[string]string{"SKILL.md": skillMD}, store.PublisherAgent)
+	big := `{"digest":"` + digest + `","scripts_acked":false,"pad":"` + strings.Repeat("x", 2048) + `"}`
+	require.Greater(t, len(big), 1024)
+	code, _ := e.call("POST", "/api/skills/"+row.ID+"/approve", big, "operator")
+	assert.Equal(t, 400, code, "a body over the cap is refused")
+	code, out := e.call("GET", "/api/skills/"+row.ID, "", "operator")
+	require.Equal(t, 200, code)
+	assert.Equal(t, store.SkillPending, out["skill"].(map[string]any)["status"], "nothing was approved")
+	under := `{"digest":"` + digest + `","scripts_acked":false,"pad":"` + strings.Repeat("x", 800) + `"}`
+	require.Less(t, len(under), 1024)
+	code, _ = e.call("POST", "/api/skills/"+row.ID+"/approve", under, "operator")
+	assert.Equal(t, 200, code, "a body under the cap still approves")
+}
