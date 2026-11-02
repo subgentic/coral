@@ -65,9 +65,11 @@ func controlArgs() []string {
 	return []string{"-o", "ControlMaster=auto", "-o", "ControlPath=" + filepath.Join(d, "%C"), "-o", fmt.Sprintf("ControlPersist=%d", controlPersist)}
 }
 
-// CloseShared ends the shared session to t, if there is one (`ssh -O exit` with the same options, so it names the same socket): used when a host key is forgotten, so the session that was made under the
-// old key is not used again for up to controlPersist seconds. Best effort, and nothing at all when sharing is off; an answer of "no session" is not an error.
+// CloseShared ends what was made to t under a host key that is being forgotten, so none of it is used again: the idle `ssh -W` streams of the hub's stream targets for t (they live 5 minutes whether or not
+// sessions are shared, #12475), and the shared session, if there is one (`ssh -O exit` with the same options, so it names the same socket; it would otherwise live controlPersist seconds). Best effort;
+// the session part is nothing when sharing is off, and an answer of "no session" is not an error.
 func (r Runner) CloseShared(ctx context.Context, t Target) {
+	closeStreamsTo(t)
 	if len(controlArgs()) == 0 {
 		return
 	}

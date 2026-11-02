@@ -61,6 +61,28 @@ var (
 	ErrStreamBackoff = errors.New("sshprov: the last connection failed; waiting a moment")
 )
 
+// liveStreams are the stream targets that have not been closed: CloseShared reaches the idle streams of every one that names the computer whose host key was forgotten (#12475).
+var liveStreams = struct {
+	mu sync.Mutex
+	m  map[*StreamTarget]struct{}
+}{m: map[*StreamTarget]struct{}{}}
+
+// closeStreamsTo ends the idle `ssh -W` streams of every live stream target of t: they were made under a host key that was just forgotten, and would otherwise live out streamIdleFor (5 minutes), whether or not
+// the shared session (control.go) is on. A stream that is serving a request is not cut; it is not pooled again by the next dial, which checks the key afresh.
+func closeStreamsTo(t Target) {
+	liveStreams.mu.Lock()
+	var hit []*StreamTarget
+	for s := range liveStreams.m {
+		if s.target == t {
+			hit = append(hit, s)
+		}
+	}
+	liveStreams.mu.Unlock()
+	for _, s := range hit {
+		s.transport().CloseIdleConnections()
+	}
+}
+
 // NewStreamTarget is the target for the remote server of t, listening on its loopback at port, reached with apiKey. The key stays in this value only; it is never put in argv.
 func NewStreamTarget(r Runner, t Target, port int, apiKey string) (*StreamTarget, error) {
 	if port < 1 || port > 65535 || apiKey == "" {
@@ -72,7 +94,11 @@ func NewStreamTarget(r Runner, t Target, port int, apiKey string) (*StreamTarget
 	if t.Alias != "" && !aliasRe.MatchString(t.Alias) {
 		return nil, ErrBadTarget
 	}
-	return &StreamTarget{r: r, target: t, port: port, apiKey: apiKey, slots: make(chan struct{}, streamCap)}, nil
+	s := &StreamTarget{r: r, target: t, port: port, apiKey: apiKey, slots: make(chan struct{}, streamCap)}
+	liveStreams.mu.Lock()
+	liveStreams.m[s] = struct{}{}
+	liveStreams.mu.Unlock()
+	return s, nil
 }
 
 func (s *StreamTarget) hostPort() string { return "127.0.0.1:" + strconv.Itoa(s.port) }
@@ -105,8 +131,13 @@ func (s *StreamTarget) OwnerStamp(method, target string, body []byte) (string, b
 	return v, err == nil
 }
 
-// Close ends the idle ssh streams.
-func (s *StreamTarget) Close() { s.transport().CloseIdleConnections() }
+// Close ends the idle ssh streams, and the target is no longer one a forgotten host key reaches.
+func (s *StreamTarget) Close() {
+	liveStreams.mu.Lock()
+	delete(liveStreams.m, s)
+	liveStreams.mu.Unlock()
+	s.transport().CloseIdleConnections()
+}
 
 // RoundTrip implements hubproxy.Target.
 func (s *StreamTarget) RoundTrip(req *http.Request) (*http.Response, error) {
