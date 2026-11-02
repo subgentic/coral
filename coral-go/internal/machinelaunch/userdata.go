@@ -424,6 +424,14 @@ WantedBy=multi-user.target
 `, hub, mode)
 }
 
+// releasePrograms are the members taken from the Coral release archive: the programs a Linux package ships (internal/updater/apply linuxPrograms, tests/release/commands.txt plus coral-update). Anything else in the archive is not
+// extracted. An archive that lacks one of them fails the install (set -eu) rather than starting a machine without it.
+var releasePrograms = []string{
+	"coral", "launch-coral", "coral-board", "coral-agent",
+	"coral-hook-agentic-state", "coral-hook-message-check", "coral-hook-session-start", "coral-hook-task-sync",
+	"coral-update",
+}
+
 // setupScript installs the Coral release and stops at the first failure. The tarball is installed only after its SHA-256 matches the digest the launcher pinned for this release and architecture and passed in here: no
 // checksum list is fetched on the machine, so there is nothing for a swapped download to agree with (#10919).
 func setupScript(version string, digests ReleaseDigests) string {
@@ -447,9 +455,15 @@ func setupScript(version string, digests ReleaseDigests) string {
 	p("cd \"$work\"")
 	p("curl -fsSL --proto '=https' --tlsv1.2 -o \"$tarball\" \"$base/$tarball\"")
 	p("echo \"${want}  ${tarball}\" | sha256sum -c -")
-	p("tar -xzf \"$tarball\" -C /usr/local/bin/")
+	p("# Only the named programs are taken from the archive (nothing else in it can land anywhere), and owned by root whatever the archive says.")
+	p("tar -xzf \"$tarball\" -C /usr/local/bin/ --no-same-owner %s", strings.Join(releasePrograms, " "))
 	p("test -x /usr/local/bin/coral")
 	return s.String()
+}
+
+// npmAsCoral turns the table's "npm install -g PKG@VER" into one that installs under /opt/coral-agents with its cache there too (the coral user needs no home folder, and nothing is written outside it).
+func npmAsCoral(cmd string) string {
+	return strings.Replace(cmd, "npm install -g", "npm install -g --prefix /opt/coral-agents --cache /opt/coral-agents/.npm-cache", 1)
 }
 
 // agentsScript installs node and npm and the agent CLIs, from the one table of install commands, pinned where the installer takes a version. It runs after Coral has started, so a slow install
@@ -480,8 +494,11 @@ func agentsScript(agents []agentInstall) string {
 			p("rm -f \"$installer\"")
 			continue
 		}
-		p("# %s %s", a.Binary, a.Pinned)
-		p("%s", a.Command)
+		p("# %s %s: installed by the coral user, never root, into a folder only it writes, and linked into /usr/local/bin; the package's own lifecycle scripts therefore run unprivileged.", a.Binary, a.Pinned)
+		p("install -d -m 0755 -o coral -g coral /opt/coral-agents")
+		p("runuser -u coral -- %s", npmAsCoral(a.Command))
+		p("test -x /opt/coral-agents/bin/%s", a.Binary)
+		p("ln -sf /opt/coral-agents/bin/%s /usr/local/bin/%s", a.Binary, a.Binary)
 	}
 	return s.String()
 }

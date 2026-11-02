@@ -267,8 +267,8 @@ func (s *SSHBootstrap) waitEnrolled(ctx context.Context, client *ssh.Client) (Bo
 	every := orDefault(s.Every, 3*time.Second)
 	var state string
 	for {
-		var out bytes.Buffer
-		if err := run(client, statusCommand, nil, &out); err == nil {
+		out := &capBuffer{max: statusMaxBytes} // the machine's answer is read up to a cap: a machine that answers without end cannot grow the launcher's memory
+		if err := run(client, statusCommand, nil, out); err == nil {
 			state = ""
 			if m := stateLine.FindStringSubmatch(out.String()); m != nil {
 				state = m[1]
@@ -297,6 +297,27 @@ func (s *SSHBootstrap) waitEnrolled(ctx context.Context, client *ssh.Client) (Bo
 		}
 	}
 }
+
+// statusMaxBytes is the most of the machine's `coral cloud status` answer that is kept.
+const statusMaxBytes = 64 << 10
+
+// capBuffer collects up to max bytes and drops the rest (it still reports every byte as written, so the session is not stopped).
+type capBuffer struct {
+	buf bytes.Buffer
+	max int
+}
+
+func (c *capBuffer) Write(p []byte) (int, error) {
+	if room := c.max - c.buf.Len(); room > 0 {
+		if len(p) < room {
+			room = len(p)
+		}
+		c.buf.Write(p[:room])
+	}
+	return len(p), nil
+}
+
+func (c *capBuffer) String() string { return c.buf.String() }
 
 // run runs one command in a new session. stdin is its standard input (the only way a secret reaches the machine); stdout, when given, collects its output.
 func run(client *ssh.Client, command string, stdin io.Reader, stdout io.Writer) error {

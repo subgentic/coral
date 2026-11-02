@@ -212,7 +212,8 @@ write_files:
       cd "$work"
       curl -fsSL --proto '=https' --tlsv1.2 -o "$tarball" "$base/$tarball"
       echo "${want}  ${tarball}" | sha256sum -c -
-      tar -xzf "$tarball" -C /usr/local/bin/
+      # Only the named programs are taken from the archive (nothing else in it can land anywhere), and owned by root whatever the archive says.
+      tar -xzf "$tarball" -C /usr/local/bin/ --no-same-owner coral launch-coral coral-board coral-agent coral-hook-agentic-state coral-hook-message-check coral-hook-session-start coral-hook-task-sync coral-update
       test -x /usr/local/bin/coral
   - path: /usr/local/sbin/coral-machine-finish
     owner: root:root
@@ -245,10 +246,16 @@ write_files:
       # Installs the agent CLIs (after Coral is running). Stops at the first failure: set -eu.
       set -eu
       DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends nodejs npm
-      # claude 2.0.0
-      npm install -g @anthropic-ai/claude-code@2.0.0
-      # codex 0.1.0
-      npm install -g @openai/codex@0.1.0
+      # claude 2.0.0: installed by the coral user, never root, into a folder only it writes, and linked into /usr/local/bin; the package's own lifecycle scripts therefore run unprivileged.
+      install -d -m 0755 -o coral -g coral /opt/coral-agents
+      runuser -u coral -- npm install -g --prefix /opt/coral-agents --cache /opt/coral-agents/.npm-cache @anthropic-ai/claude-code@2.0.0
+      test -x /opt/coral-agents/bin/claude
+      ln -sf /opt/coral-agents/bin/claude /usr/local/bin/claude
+      # codex 0.1.0: installed by the coral user, never root, into a folder only it writes, and linked into /usr/local/bin; the package's own lifecycle scripts therefore run unprivileged.
+      install -d -m 0755 -o coral -g coral /opt/coral-agents
+      runuser -u coral -- npm install -g --prefix /opt/coral-agents --cache /opt/coral-agents/.npm-cache @openai/codex@0.1.0
+      test -x /opt/coral-agents/bin/codex
+      ln -sf /opt/coral-agents/bin/codex /usr/local/bin/codex
       # agy: the vendor's installer takes no version, so the script is fetched to a file, checked against the SHA-256 it was pinned to, and only then run, as the coral user.
       installer=$(mktemp)
       curl -fsSL --proto '=https' --tlsv1.2 -o "$installer" 'https://antigravity.google/cli/install.sh'

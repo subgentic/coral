@@ -154,8 +154,8 @@ func TestUserDataSaysWhatItMustAlwaysSay(t *testing.T) {
 	assert.Less(t, strings.Index(finish, "systemctl mask"), strings.Index(finish, "coral-machine-agents"), "SSH is closed before the slow installs")
 	assert.NotContains(t, setupOf(t, doc), "npm", "nothing slow before the redeem")
 	assert.NotContains(t, setupOf(t, doc), "antigravity")
-	assert.Contains(t, got, "npm install -g @anthropic-ai/claude-code@2.0.0")
-	assert.Contains(t, got, "npm install -g @openai/codex@0.1.0")
+	assert.Contains(t, got, "runuser -u coral -- npm install -g --prefix /opt/coral-agents --cache /opt/coral-agents/.npm-cache @anthropic-ai/claude-code@2.0.0", "an npm agent is installed by the coral user, not root")
+	assert.Contains(t, got, "runuser -u coral -- npm install -g --prefix /opt/coral-agents --cache /opt/coral-agents/.npm-cache @openai/codex@0.1.0")
 	assert.Contains(t, got, "curl -fsSL --proto '=https' --tlsv1.2 -o \"$installer\" 'https://antigravity.google/cli/install.sh'")
 	assert.Contains(t, got, "echo '"+strings.Repeat("ab", 32)+"  '\"$installer\" | sha256sum -c -", "the installer is checked against its pinned hash")
 	assert.Less(t, strings.Index(got, `sha256sum -c -`), strings.Index(got, `runuser -u coral -- bash "$installer"`), "checked before it runs")
@@ -383,4 +383,38 @@ func TestTheSetupScriptAbortsOnADigestMismatch(t *testing.T) {
 	extracted, out = run(good+" swapped", pin)
 	assert.False(t, extracted, "a swapped download is never extracted: "+out)
 	assert.Contains(t, out, "FAILED", "and the checksum says so")
+}
+
+// Slice 6 (coral-go Security): only the named programs are extracted from the Coral archive, owned by root; the npm agents are installed by the coral user into a folder only it writes, never by root.
+func TestSetupScriptExtractsOnlyTheNamedProgramsAsRoot(t *testing.T) {
+	script := setupScript("2.0.3", testDigests())
+	var tarLine string
+	for _, l := range strings.Split(script, "\n") {
+		if strings.HasPrefix(l, "tar ") {
+			tarLine = l
+		}
+	}
+	require.NotEmpty(t, tarLine)
+	assert.Contains(t, tarLine, "--no-same-owner")
+	assert.True(t, strings.HasSuffix(tarLine, strings.Join(releasePrograms, " ")), "the members are named after the options: %s", tarLine)
+	for _, want := range []string{"coral", "coral-board", "coral-agent", "coral-update"} {
+		assert.Contains(t, releasePrograms, want)
+	}
+	for _, m := range releasePrograms {
+		assert.Regexp(t, `^[a-z][a-z0-9-]*$`, m, "a member name is a plain program name: no path, no wildcard")
+	}
+}
+
+func TestAgentsScriptNeverRunsNpmAsRoot(t *testing.T) {
+	agents, err := resolveAgents([]string{"claude@2.0.0", "codex@0.1.0"})
+	require.NoError(t, err)
+	script := agentsScript(agents)
+	for _, l := range strings.Split(script, "\n") {
+		if strings.Contains(l, "npm install") && !strings.HasPrefix(strings.TrimSpace(l), "#") {
+			assert.True(t, strings.HasPrefix(l, "runuser -u coral -- npm install -g --prefix /opt/coral-agents"), "npm install runs as coral: %s", l)
+			assert.Contains(t, l, "--cache /opt/coral-agents/.npm-cache")
+		}
+	}
+	assert.Contains(t, script, "ln -sf /opt/coral-agents/bin/claude /usr/local/bin/claude")
+	assert.Contains(t, script, "test -x /opt/coral-agents/bin/codex")
 }
