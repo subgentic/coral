@@ -135,6 +135,7 @@ const B = 'goal-done-' + Date.now().toString(36);
             assert.ok(bar && /1 selected/.test(bar.count), 'a long press selects the goal row: ' + JSON.stringify(bar));
             const act = label => (bar.actions || []).find(a => a.label === label);
             assert.ok(act('Dismiss') && !act('Dismiss').off, 'Dismiss is on the bar: ' + JSON.stringify(bar.actions));
+            assert.ok(!act('Changes') && !act('Approve') && !act('Save for later'), 'a selected goal is not offered the file actions (Changes, Approve, Save for later) (#12401): ' + JSON.stringify(bar.actions.map(a => a.label)));
             assert.ok(act('Close goal') && !act('Close goal').off, 'Close goal is in the bar menu of a selected goal that looks done, reachable on a phone (#12328): ' + JSON.stringify(bar.actions));
             await ev(`document.querySelector('.dt-bar [aria-label="More actions"]')?.click(); true`);
             await waitFor(`!![...document.querySelectorAll('.menu-item, [role=menuitem]')].find(b => /^Not yet$/.test(b.textContent.trim()))`, 'Not yet in the bar menu (#12328)', 5000);
