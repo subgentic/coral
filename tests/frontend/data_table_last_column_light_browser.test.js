@@ -1,4 +1,4 @@
-// A resized table in the light theme (#10492, on #10443): after the last column's right edge is dragged far left, the header clip cuts what does not fit without a scrollbar over empty space, and the focus rings of the
+// A resized table in the light theme (#10492, on #10443): after the edge before the last column is dragged far right (the last column gives the room and is narrowed; it has no handle of its own, #12409), the header clip cuts what does not fit without a scrollbar over empty space, and the focus rings of the
 // sort button and the resize handle sit inside that clip and are 3:1 against the header (WCAG 1.4.11). Dark and light; at 1280. A fixture table mounted in the dashboard's own page, as data_table_resize_rule does.
 // Drives Chrome over CDP through agent_view_harness.js.
 const assert = require('node:assert/strict');
@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const { setTheme } = require('./helpers/contrast');
 const BASE = require('./test_base').BASE;
-const { coralReady } = require('./helpers/wait');
+const { coralReady, framesJs } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -42,12 +42,12 @@ const { coralReady } = require('./helpers/wait');
         await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         for (const theme of ['light', 'dark']) {
             await setTheme(ev, theme);
-            await mount(SHAPE, false); await drag('updated', -300);
+            await mount(SHAPE, false); await ev(framesJs(8)); await drag('progress', 300); // the last column has no handle of its own (its edge is the table's, #12409): the edge before it is dragged right and the last column gives the room
             await client.Input.dispatchKeyEvent({ type: 'keyDown', key: 'Shift', windowsVirtualKeyCode: 16 }); await client.Input.dispatchKeyEvent({ type: 'keyUp', key: 'Shift', windowsVirtualKeyCode: 16 }); // a key, so the ring is the keyboard's (:focus-visible)
             const t = await ev(`(() => { const b = document.querySelector('#dt-host .dt-box'), th = b.querySelector('th[data-key="updated"]'); return { over: b.scrollWidth - b.clientWidth, thClip: getComputedStyle(th).overflowX, thW: Math.round(th.getBoundingClientRect().width), words: th.textContent.trim() }; })()`);
             if (t.over > 1) problems.push(`${theme}: the narrowed last column leaves a scrollbar over empty space (${t.over} px): ` + JSON.stringify(t));
             if (t.thClip !== 'clip') problems.push(`${theme}: the header cell clips what is wider than its column (${t.thClip})`);
-            for (const [what, sel] of [['sort button', '#dt-host th[data-key="updated"] .dt-sort'], ['resize handle', '#dt-host th[data-key="updated"] .dt-resize'], ['name sort button', '#dt-host th[data-key="name"] .dt-sort']]) {
+            for (const [what, sel] of [['sort button', '#dt-host th[data-key="updated"] .dt-sort'], ['resize handle', '#dt-host th[data-key="progress"] .dt-resize'], ['name sort button', '#dt-host th[data-key="name"] .dt-sort']]) {
                 const r = await ring(sel);
                 if (!r) { problems.push(`${theme}: the ${what} is there`); continue; }
                 await shot(`table-last-column-${theme}-${what.replace(/ /g, '-')}`);

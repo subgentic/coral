@@ -175,10 +175,9 @@ const { coralReady, framesJs } = require('./helpers/wait');
         assert.equal(await ev(`localStorage.getItem(${JSON.stringify(KEY)})`), null, 'a press with no move keeps nothing');
         // (every table is sized in pixels now, #11943: the class dt-sized is always there; what matters is that a press with no move kept nothing, asserted above)
         assert.equal(await ev(`document.querySelector('#dt-host th[data-key="who"]').getAttribute('aria-sort')`), 'none', 'and does not sort');
-        await drag('who', 70);
+        await drag('name', -70); // the edge goes where the pointer goes (#12409): the Name edge left makes Name 70 narrower and Who, on its right, 70 wider; the Count column does not move
         const w1 = { name: await W('name'), who: await W('who'), n: await W('n') };
-        assert.ok(Math.abs(w1.who - (w0.who + 70)) <= 3, 'dragging the Who edge 70 px right widens it by 70: ' + JSON.stringify({ w0, w1 }));
-        assert.ok(w1.name < w0.name - 50 && Math.abs(w1.n - w0.n) <= 2, 'the title column gives the room, the others stay: ' + JSON.stringify({ w0, w1 }));
+        assert.ok(Math.abs(w1.name - (w0.name - 70)) <= 3 && Math.abs(w1.who - (w0.who + 70)) <= 3 && Math.abs(w1.n - w0.n) <= 2, 'dragging the Name edge 70 px left: Name is 70 narrower, Who 70 wider, the rest stay: ' + JSON.stringify({ w0, w1 }));
         assert.equal(await ev(`document.querySelector('#dt-host th[data-key="who"]').getAttribute('aria-sort')`), 'none', 'a drag does not sort');
         assert.equal(await ev(`document.querySelector('#dt-host th[data-key="who"] .dt-resize').getAttribute('aria-valuenow')`), String(w1.who), 'the separator says its width');
         await drag('who', -1000);
@@ -188,17 +187,20 @@ const { coralReady, framesJs } = require('./helpers/wait');
         assert.deepEqual(Object.keys(JSON.parse(await ev(`localStorage.getItem(${JSON.stringify(KEY)})`))).includes('who'), true, 'the width is kept in this browser');
         await mount();
         assert.ok(Math.abs((await W('who')) - kept) <= 2, 'a redraw (a new table for the same list) has the kept width: ' + (await W('who')) + ' vs ' + kept);
-        assert.equal(await ev(`!document.querySelector('#dt-host .dt-reset-widths, #dt-host .dt-widthbar') && !/Reset column widths/.test(document.getElementById('dt-host').textContent)`), true, 'there is no Reset column widths button, however many widths are set (#9845)');
-        // the keyboard
-        await ev(`document.querySelector('#dt-host th[data-key="n"] .dt-resize').focus(); true`);
-        const before = await W('n');
-        await client.Input.dispatchKeyEvent({ type: 'keyDown', key: 'ArrowRight', code: 'ArrowRight', windowsVirtualKeyCode: 39 }); await client.Input.dispatchKeyEvent({ type: 'keyUp', key: 'ArrowRight', code: 'ArrowRight', windowsVirtualKeyCode: 39 });
-        assert.ok(Math.abs((await W('n')) - (before + 16)) <= 2, 'Right widens by 16 px: ' + before + ' to ' + await W('n'));
+        await waitFor(`!!document.querySelector('#dt-host .cols-reset-btn:not([hidden])')`, 'a Reset column widths button is offered once widths are kept (#12409; it was "no reset", #9845)', 4000);
+        await ev(`document.querySelector('#dt-host .cols-reset-btn').click(); true`); await ev(framesJs(6));
+        assert.equal(await ev(`localStorage.getItem(${JSON.stringify(KEY)})`), null, 'Reset takes the kept widths out of this browser');
+        assert.ok(Math.abs((await W('who')) - w0.who) <= 2 && Math.abs((await W('name')) - w0.name) <= 2 && await ev(`document.querySelector('#dt-host .cols-reset-btn').hidden`), 'and every column is the width it had before any drag, and the button is gone');
+        // the keyboard: an edge moves by 16 px a key, the columns on its right give or take the room (#12409): the Name edge left narrows Name and widens Who, right gives it back
+        await ev(`document.querySelector('#dt-host th[data-key="name"] .dt-resize').focus(); true`);
+        const before = await W('name'), whoBefore = await W('who');
         await client.Input.dispatchKeyEvent({ type: 'keyDown', key: 'ArrowLeft', code: 'ArrowLeft', windowsVirtualKeyCode: 37 }); await client.Input.dispatchKeyEvent({ type: 'keyUp', key: 'ArrowLeft', code: 'ArrowLeft', windowsVirtualKeyCode: 37 });
-        assert.ok(Math.abs((await W('n')) - before) <= 2, 'Left narrows it again');
+        assert.ok(Math.abs((await W('name')) - (before - 16)) <= 2 && Math.abs((await W('who')) - (whoBefore + 16)) <= 2, 'Left on the Name edge narrows Name by 16 px and widens Who by 16: ' + before + ' to ' + await W('name'));
+        await client.Input.dispatchKeyEvent({ type: 'keyDown', key: 'ArrowRight', code: 'ArrowRight', windowsVirtualKeyCode: 39 }); await client.Input.dispatchKeyEvent({ type: 'keyUp', key: 'ArrowRight', code: 'ArrowRight', windowsVirtualKeyCode: 39 });
+        assert.ok(Math.abs((await W('name')) - before) <= 2, 'Right gives it back');
         assert.equal(await ev(`document.activeElement.classList.contains('dt-resize')`), true, 'the keyboard stays on the handle');
         // fit to content
-        await drag('who', 200);
+        await drag('name', -200); // Who is made wide by the Name edge going left (the columns on Who's right have no room to give, #12409)
         const wide = await W('who');
         await ev(`document.querySelector('#dt-host th[data-key="who"] .dt-resize').dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); true`);
         const fit = await W('who');

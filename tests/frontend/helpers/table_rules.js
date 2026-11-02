@@ -4,7 +4,7 @@
 //   R2 one elastic column (the primary): exactly one .dt-grow, and it keeps a floor.
 //   R3 every column fits its whole header, and no empty column takes room.
 //   R4 fixed columns (no handle: Time, Actions, checkbox) keep one width at every window width.
-//   R5 resizing: every non-fixed column has a handle; a drag widens it by the drag and takes the room from the elastic column only; the keyboard does the same.
+//   R5 resizing: every non-fixed column but the last on show has a handle; its edge goes where the pointer goes: the column gains the drag, the columns on its right give exactly that (down to their floors), the ones on its left stay; the keyboard does the same (#12409).
 //   R6 kept widths: widths saved from an earlier visit never make the table overflow.
 //   R7 the same for every row mix (the caller runs the mixes) and at 200% text.
 //   R8 a phone (under 600 px): folded rows, no handles, no sideways scroll.

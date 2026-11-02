@@ -1,10 +1,10 @@
 // A list's Actions column is never clipped (#9845, the operator via coral-hub's #9839): it is a fixed column (fixed: true with a rem width): no resize handle, never frozen or kept, so a width saved when the list had fewer buttons, or another column's resize, cannot squeeze
-// its buttons (the third Needs you action was cut off). Also: there is no Reset column widths button. A fixture table in the dashboard's own page, 1280 px; CORAL_SCREENSHOT_DIR saves the picture. Isolated dev server.
+// its buttons (the third Needs you action was cut off). Also: a Reset column widths button is offered when widths are kept (#12409). A fixture table in the dashboard's own page, 1280 px; CORAL_SCREENSHOT_DIR saves the picture. Isolated dev server.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
-const { coralReady } = require('./helpers/wait');
+const { coralReady, framesJs } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -33,16 +33,17 @@ const { coralReady } = require('./helpers/wait');
         assert.ok(Math.abs(m.thW - 304) <= 2, 'the Actions column has the 19 rem it declares, not the 150 px kept for it: ' + JSON.stringify(m));
         assert.equal(m.handle, false, 'a fixed column has no resize handle');
         assert.ok(m.lastRight <= m.tdRight + 1 && m.lastRight <= m.boxRight && !m.cellClipped, 'the third action is whole, inside its cell and inside the table: ' + JSON.stringify(m));
-        assert.equal(await ev(`!!document.querySelector('#dt-host .dt-reset-widths, #dt-host .dt-widthbar') || /Reset column widths/.test(document.getElementById('dt-host').textContent)`), false, 'there is no Reset column widths button');
+        await waitFor(`!!document.querySelector('#dt-host .cols-reset-btn:not([hidden])')`, 'a Reset column widths button is offered when widths are kept', 4000).catch(() => {});
+        assert.equal(await ev(`!!document.querySelector('#dt-host .cols-reset-btn:not([hidden])')`), true, 'widths are kept in this browser, so a Reset column widths button is offered (#12409; it was "no reset" before, #9845), and the Actions column is still the width it declares');
         await shot('table-actions-fixed-1280');
         // resizing another column keeps nothing for the fixed one
-        await ev(`localStorage.removeItem(${JSON.stringify(KEY)}); true`); await mount(true);
-        const h = await ev(`(() => { const r = document.querySelector('#dt-host th[data-key="who"] .dt-resize').getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()`);
+        await ev(`localStorage.removeItem(${JSON.stringify(KEY)}); true`); await mount(true); await ev(framesJs(8)); // the layout settles before the handle is read (the bar of Reset appears above the table when a width is kept)
+        const h = await ev(`(() => { const r = document.querySelector('#dt-host th[data-key="name"] .dt-resize').getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()`);
         const mouse = (type, x, y) => client.Input.dispatchMouseEvent({ type, x, y, button: 'left', buttons: type === 'mouseReleased' ? 0 : 1, clickCount: 1 });
-        await mouse('mouseMoved', h.x, h.y); await mouse('mousePressed', h.x, h.y); for (let i = 1; i <= 4; i++) await mouse('mouseMoved', h.x + 50 * i, h.y); await mouse('mouseReleased', h.x + 200, h.y);
+        await mouse('mouseMoved', h.x, h.y); await mouse('mousePressed', h.x, h.y); for (let i = 1; i <= 4; i++) await mouse('mouseMoved', h.x - 15 * i, h.y); await mouse('mouseReleased', h.x - 60, h.y); // the Name edge is dragged left: Who, on its right, takes the room (the last column on show, Who, has no handle of its own now, #12409)
         const m2 = await measure();
-        assert.ok(Math.abs(m2.thW - 304) <= 2 && m2.lastRight <= m2.boxRight && !m2.cellClipped, 'after widening Who the Actions column is the same width and whole: ' + JSON.stringify(m2));
-        assert.ok(m2.kept && !('act' in JSON.parse(m2.kept)) && 'who' in JSON.parse(m2.kept), 'the width kept is Who\'s, never the fixed column\'s: ' + m2.kept);
+        assert.ok(Math.abs(m2.thW - 304) <= 2 && m2.lastRight <= m2.boxRight && !m2.cellClipped, 'after dragging the Name edge the Actions column is the same width and whole: ' + JSON.stringify(m2));
+        assert.ok(m2.kept && !('act' in JSON.parse(m2.kept)) && 'who' in JSON.parse(m2.kept), 'the width kept is Who\'s (it took the room), never the fixed column\'s: ' + m2.kept);
         await ev(`localStorage.removeItem(${JSON.stringify(KEY)}); true`);
         console.log('PASS the fixed Actions column is never clipped and nothing resets it');
     } finally { await client.close(); }
