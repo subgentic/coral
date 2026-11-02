@@ -13,7 +13,7 @@ import (
 // source (cli_recheck) pass; binary, which would name a program to run, never does, and neither does an unknown type, which the handler
 // answers as found.
 func TestCLICheckRouteIsLaunchAndNarrow(t *testing.T) {
-	for _, typ := range []string{"claude", "codex", "gemini", "agy", "antigravity", "pi"} {
+	for _, typ := range []string{"claude", "codex", "gemini", "agy", "antigravity", "pi", "opencode", "hermes"} {
 		assert.Equal(t, TierLaunch, Classify("GET", "/api/system/cli-check", "type="+typ), typ)
 		assert.Equal(t, TierLaunch, Classify("GET", "/api/system/cli-check", "type="+typ+"&source=cli_recheck"), typ+" recheck")
 		assert.Equal(t, TierLaunch, Classify("GET", "/api/system/cli-check", "source=cli_recheck&type="+typ), typ+" order")
