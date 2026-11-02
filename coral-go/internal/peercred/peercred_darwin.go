@@ -9,6 +9,7 @@ import (
 	"net/netip"
 	"os"
 	"sync"
+	"sync/atomic"
 	"time"
 	"unsafe"
 
@@ -66,15 +67,27 @@ var mySockets = libprocSockets
 // A scan reads every descriptor of every process of the user, and any caller of the loopback address can make Coral ask (the sign-in page, the sign-in link). So scans are bounded (#12542,
 // Security): at most one every scanGap for the whole process, its answer shared by every caller that asks meanwhile, and one caller at a time (the rest queue behind it). A socket the last
 // scan did not show may be a connection made since, so a miss waits out the gap and scans again: asking often costs a wait, never a wrong refusal.
+// At most maxScanWaiters callers are in the queue for the scan, the one scanning among them; the rest are answered at once with errScanBusy, which is not the layout answer: the connection
+// is unattributed and refused, as any connection that cannot be attributed is (#12546, Security).
+const maxScanWaiters = 8
+
+var errScanBusy = errors.New("peercred: too many connections are waiting to be attributed")
+
 var (
-	scanGap  = 100 * time.Millisecond
-	scanMu   sync.Mutex
-	scanAt   time.Time
-	scanSeen map[[2]netip.AddrPort]struct{}
+	scanWaiting atomic.Int32
+	scanGap     = 100 * time.Millisecond
+	scanMu      sync.Mutex
+	scanAt      time.Time
+	scanSeen    map[[2]netip.AddrPort]struct{}
 )
 
 // mySocketEnds says whether a socket of this user's has the ends (client, server) and whether one has (server, client): this process's own end of the connection.
 func mySocketEnds(client, server netip.AddrPort) (found, own bool, err error) {
+	if scanWaiting.Add(1) > maxScanWaiters {
+		scanWaiting.Add(-1)
+		return false, false, errScanBusy // a flood of misses must not queue the owner's own sign-in behind it (#12546)
+	}
+	defer scanWaiting.Add(-1)
 	scanMu.Lock()
 	defer scanMu.Unlock()
 	look := func() (bool, bool) {

@@ -3,6 +3,7 @@
 package peercred
 
 import (
+	"errors"
 	"net"
 	"net/netip"
 	"os"
@@ -119,7 +120,7 @@ func TestScansAreBoundedAndSharedAndANewConnectionIsStillFound(t *testing.T) {
 
 	start := time.Now()
 	var wg sync.WaitGroup
-	for i := 0; i < 40; i++ { // 40 callers at once, all for a socket that exists
+	for i := 0; i < maxScanWaiters; i++ { // as many callers at once as the queue holds, all for a socket that exists
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -129,7 +130,7 @@ func TestScansAreBoundedAndSharedAndANewConnectionIsStillFound(t *testing.T) {
 		}()
 	}
 	wg.Wait()
-	assert.Equal(t, int32(1), scans.Load(), "40 callers for one socket: one scan")
+	assert.Equal(t, int32(1), scans.Load(), "%d callers for one socket: one scan", maxScanWaiters)
 
 	// a connection made after that scan: found, by waiting out the gap and scanning once more
 	second := netip.MustParseAddrPort("127.0.0.1:50002")
@@ -145,7 +146,7 @@ func TestScansAreBoundedAndSharedAndANewConnectionIsStillFound(t *testing.T) {
 		go func(port int) {
 			defer wg.Done()
 			_, err := ownedByMyProcess(netip.MustParseAddrPort("127.0.0.1:"+strconv.Itoa(port)), server)
-			assert.ErrorIs(t, err, ErrLayout, "no socket of this connection seen: the layout answer")
+			assert.True(t, errors.Is(err, ErrLayout) || errors.Is(err, errScanBusy), "no socket of this connection seen: the layout answer, or refused at once when the queue is full (%v)", err)
 		}(60000 + i)
 	}
 	wg.Wait()
@@ -176,5 +177,61 @@ func TestASocketMustHaveBothEndsToBeTheClients(t *testing.T) {
 		mine, err := ownedByMyProcess(client, server)
 		assert.False(t, mine, name)
 		assert.ErrorIs(t, err, ErrNotFound, name)
+	}
+}
+
+// #12546 (Security): a local flood of misses cannot queue the owner's own sign-in. Callers past the queue's bound are answered at once as unattributed (a refusal, never the layout answer),
+// and callers inside it still get their turn.
+func TestCallersPastTheScanQueueAreRefusedAtOnceAndTheRestStillGetTheirTurn(t *testing.T) {
+	real, gap := mySockets, scanGap
+	defer func() { mySockets, scanGap = real, gap; forgetScan() }()
+	scanGap = time.Millisecond
+	forgetScan()
+	server := netip.MustParseAddrPort("127.0.0.1:8420")
+	release := make(chan struct{})
+	var releaseOnce sync.Once
+	closeRelease := func() { releaseOnce.Do(func() { close(release) }) }
+	defer closeRelease() // runs before the restore above: a scan left blocked would hold the lock that restore needs
+	entered := make(chan struct{}, 64)
+	mySockets = func(visit func(local, remote netip.AddrPort) bool) error {
+		entered <- struct{}{}
+		<-release
+		visit(server, netip.MustParseAddrPort("127.0.0.1:50000"))
+		return nil
+	}
+	results := make(chan error, 64)
+	ask := func(port int) {
+		_, err := ownedByMyProcess(netip.MustParseAddrPort("127.0.0.1:"+strconv.Itoa(port)), server)
+		results <- err
+	}
+	go ask(50000) // the one scanning
+	<-entered
+	for i := 1; i < maxScanWaiters; i++ { // fills the queue
+		go ask(50000 + i)
+	}
+	require.Eventually(t, func() bool { return int(scanWaiting.Load()) == maxScanWaiters }, 5*time.Second, time.Millisecond)
+
+	// the next callers are past the bound: answered at once, not as the layout answer
+	for i := 0; i < 5; i++ {
+		go ask(60000 + i)
+	}
+	for i := 0; i < 5; i++ {
+		select {
+		case err := <-results:
+			assert.ErrorIs(t, err, errScanBusy)
+			assert.NotErrorIs(t, err, ErrLayout)
+			assert.NotErrorIs(t, err, ErrNotFound)
+		case <-time.After(5 * time.Second):
+			t.Fatal("a caller past the bound waited instead of being refused")
+		}
+	}
+	closeRelease() // the queue drains: every caller inside the bound gets an answer
+	for i := 0; i < maxScanWaiters; i++ {
+		select {
+		case err := <-results:
+			assert.NotErrorIs(t, err, errScanBusy, "a caller inside the bound is answered by a scan, not refused")
+		case <-time.After(10 * time.Second):
+			t.Fatal("a caller inside the bound never got its turn")
+		}
 	}
 }
