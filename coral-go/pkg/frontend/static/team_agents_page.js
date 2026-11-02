@@ -202,6 +202,8 @@ function watch() {
     pollEvery(refresh, 15000);
     window.addEventListener('focus', refresh);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
+    // Sleep Team or Wake Team: the rows say so now, not at the next poll (#12335).
+    document.addEventListener('coral:team-sleep-changed', e => { if (e.detail && e.detail.team === model.team && root && root.isConnected) load(); });
 }
 
 /** Show the team's agents in `host`. hooks: onCount(n), openAgent(agent, opener). */
