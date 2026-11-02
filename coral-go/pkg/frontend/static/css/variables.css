@@ -340,7 +340,7 @@
 
     /* Diff */
     --diff-view-alpha: 0.14;
-    --diff-line-add: #dafbe1; --diff-line-del: #ffebe9; --diff-word-add: rgba(74, 194, 107, 0.4); --diff-word-del: rgba(255, 129, 130, 0.4); /* GitHub's light diff colours */
+    --diff-line-add: rgba(74, 194, 107, 0.2); --diff-line-del: rgba(255, 129, 130, 0.16); --diff-word-add: rgba(74, 194, 107, 0.4); --diff-word-del: rgba(255, 129, 130, 0.4); /* GitHub's light diff colours (#dafbe1 and #ffebe9 on white), as translucent bands */
     --diff-context-filter: none; --diff-token-filter: brightness(0.8); --diff-line-text: inherit;
     --diff-add-bg:    rgba(26, 127, 55, 0.12);
     --diff-add-color: #1a7f37;
