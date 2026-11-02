@@ -35,7 +35,7 @@ const B = 'goal-done-' + Date.now().toString(36);
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         assert.ok((await api('POST', '/subscribe', { subscriber_id: 'Boss', job_title: 'Orchestrator', session_name: 'boss-' + B })).status < 300);
-        await root('PUT', '/api/settings', { goal_done_hidden: '[]', goal_done_quiet_minutes: '' }); // the default quiet period (15 minutes, #12161) first
+        await root('PUT', '/api/settings', { goal_done_hidden: '[]', goal_done_read: '[]', goal_done_quiet_minutes: '' }); // the default quiet period (15 minutes, #12161) first; read and hidden cleared here, not left to whatever ran before (v2.0.35 gate)
         const mk = async (title, doneWhen) => { const g = await api('POST', '/goals', { subscriber_id: 'Operator', title, done_when: doneWhen }); assert.equal(g.status, 201); return g.json.id || g.json.goal.id; };
         const gid = await mk('Ship the pilot', 'it is shipped');
         await task(gid, true);
