@@ -44,6 +44,12 @@ curl -fsSL https://raw.githubusercontent.com/subgentic/coral/main/install.sh | b
   <a href="https://discord.gg/qhfgY57AZn">Discord</a>
 </p>
 
+<p align="center">
+  <img alt="A file in Coral's review space: version 2 of 2 with Compare, and Approve and Request changes" src="assets/readme/review-approve.png" width="100%" />
+  <br>
+  <sub>A file an agent made, waiting for your review: read it, Approve or Request changes. (Sample data.)</sub>
+</p>
+
 ---
 
 ## The Inbox
@@ -51,6 +57,12 @@ curl -fsSL https://raw.githubusercontent.com/subgentic/coral/main/install.sh | b
 Running agents is easy. *Knowing when one of them needs you* is the part that goes wrong: a permission prompt sits for an hour in a terminal you closed, a question waits behind a tab you forgot, a finished file never gets looked at. Coral puts all of that in one place.
 
 - **Needs you.** Every agent that is waiting for a permission, a question or a decision, and every file an agent asks you to review, in one list. One tap answers it; the agent carries on. The number on the Inbox tab is what is waiting, and you can turn on desktop alerts. While the tab is in the background its title carries the total too.- **Review that keeps its history.** Open a file the agent made, read it, **Approve** or **Request changes**. A new version of the same file arrives as the next version with **Compare**, so you see what changed. Comment on the whole document or a passage, and add a picture you have marked up (pen, arrow, box); the agent is told, and the original is kept. A file that is almost right can be **approved with a note**, and a row you do not want to act on can be **dismissed** (with Undo).- **Goals you can close.** Give a team a goal, watch its tasks and files, and **Close goal** when it is true. Coral tells you when files for a goal are still waiting for you before you close it, and an active goal whose tasks are all done shows up in Needs you as "looks done" for you to close.- **A question to you is an item like a review.** It says who asked and about which goal and task, shows its words rendered, and takes your reply with pictures if you want them; a question whose wait ran out while you were away is kept, not lost.- **Comments come back to you.** When an agent answers a comment on a file or a goal, the file is back in Needs you, and the goal page has its own Comments tab.- **A compact file viewer.** The file first, with its controls on one header row (version chip and Compare, Approve, Request changes, a menu for the rest); on a phone, two thin rows.- **A record of what you decided.** An Activity folder lists your decisions in Needs you, each row chained to the one before it.- **Every chat and every board, searchable.** The Inbox also holds the history of every agent CLI's conversations and each team's message board.
+
+<p align="center">
+  <img alt="Compare: what changed between version 1 and version 2 of a file, the added line marked" src="assets/readme/review-compare.png" width="100%" />
+  <br>
+  <sub>Compare with the earlier version: what changed, marked. (Sample data.)</sub>
+</p>
 
 Coral wraps the agent CLIs you already use (Claude Code, Codex, Antigravity, Pi and OpenCode, and Hermes, which is experimental). It calls no AI API itself: your keys, your subscriptions, your tools. It runs as one Go binary on your laptop or a remote box.
 
