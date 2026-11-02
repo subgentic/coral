@@ -169,6 +169,16 @@ const B = 'goal-done-' + Date.now().toString(36);
             await waitFor(`!![...document.querySelectorAll('.toast button, [role=status] button, #toast-container button')].find(b => /^Undo$/.test(b.textContent.trim()))`, 'the Undo in the notice', 5000);
             await ev(`[...document.querySelectorAll('.toast button, [role=status] button, #toast-container button')].find(b => /^Undo$/.test(b.textContent.trim())).click(); true`); await require('./helpers/wait').settle(ev, 800, 300);
             await waitFor(`[...document.querySelectorAll('${T} tbody tr')].filter(r => /looks done/.test(r.textContent)).length >= 2`, 'Undo brings both back', 10000);
+            // the same for the bar's Ignore: two goals ignored, Undo, both back (each undo rewrites the one hidden list; run at once, one stayed hidden)
+            await openNeeds();
+            await waitFor(`[...document.querySelectorAll('${T} tbody tr')].filter(r => /looks done/.test(r.textContent)).length >= 2`, 'the two goals for Ignore', 20000);
+            await holdRow(0);
+            { const p = await rowAt(1); await touch('touchStart', p); await touch('touchEnd', p); await new Promise(r => setTimeout(r, 300)); } // sleep-ok: a tap adds a row to the selection
+            await ev(`document.querySelector('.dt-bar [aria-label="Ignore"], .dt-bar button[title="Ignore"]')?.click(); true`);
+            await waitFor(`[...document.querySelectorAll('${T} tbody tr')].filter(r => /looks done/.test(r.textContent)).length === 0`, 'both goals ignored', 10000);
+            await waitFor(`!![...document.querySelectorAll('.toast button, [role=status] button, #toast-container button')].find(b => /^Undo$/.test(b.textContent.trim()))`, 'the Undo in the notice', 5000);
+            await ev(`[...document.querySelectorAll('.toast button, [role=status] button, #toast-container button')].find(b => /^Undo$/.test(b.textContent.trim())).click(); true`);
+            await waitFor(`[...document.querySelectorAll('${T} tbody tr')].filter(r => /looks done/.test(r.textContent)).length >= 2`, 'Undo of Ignore brings both goals back', 10000);
             await Emulation.setTouchEmulationEnabled({ enabled: false });
             await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         }
