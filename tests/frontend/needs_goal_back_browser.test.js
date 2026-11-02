@@ -26,7 +26,8 @@ const B = 'needs-goal-back-' + Date.now().toString(36);
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         assert.ok((await api('POST', '/subscribe', { subscriber_id: 'Boss', job_title: 'Orchestrator', session_name: 'boss-' + B })).status < 300);
         await root('PUT', '/api/settings', { goal_done_hidden: '[]', goal_done_quiet_minutes: '0' });
-        for (const title of ['Ship the pilot', 'Ship the second']) {
+        const TITLES = ['Ship the pilot', 'Ship the second', ...Array.from({ length: 7 }, (_, i) => 'Ship extra ' + (i + 1))];
+        for (const title of TITLES) {
             const g = await api('POST', '/goals', { subscriber_id: 'Operator', title, done_when: 'it is shipped' }); assert.equal(g.status, 201); const gid = g.json.id || g.json.goal.id;
             const t = await api('POST', '/tasks', { subscriber_id: 'Operator', title: 'Task', goal_id: gid, assigned_to: 'Boss', created_by: 'Operator', priority: 'medium' }); const tid = t.json.id || t.json.task.id;
             assert.ok((await api('POST', '/tasks/claim', { subscriber_id: 'Boss', task_id: tid })).status < 300);
@@ -51,6 +52,29 @@ const B = 'needs-goal-back-' + Date.now().toString(36);
                 // and one Back more leaves the Inbox's page, not a stray Goals entry (no goals folder was written into the history)
                 const prev = await ev(`history.state && history.state.prev || ''`); assert.ok(!/^\/inbox\/goals/.test(prev), at + `${how}: no Goals entry under Needs you: ` + prev);
             }
+        }
+
+        // #11964 (QA2's INFO on #11950): Back to a scrolled Needs you list keeps the row's place and its focus. A short window so the nine rows scroll; a real mouse click on a row far down; Back; the list is scrolled
+        // to where it was and the row that was opened is still on screen and holds the focus.
+        for (const [w, mobile] of [[1280, false], [390, true]]) {
+            const at = `${w} px, a scrolled list: `;
+            await Emulation.setDeviceMetricsOverride({ width: w, height: 420, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
+            await openNeeds();
+            const SCROLLER = `(() => { const tr = document.querySelector('${T} tbody tr'); for (let e = tr; e; e = e.parentElement) { const o = getComputedStyle(e).overflowY; if ((o === 'auto' || o === 'scroll') && e.scrollHeight > e.clientHeight + 2) return e; } return document.scrollingElement; })()`;
+            const target = await ev(`(() => { const rows = [...document.querySelectorAll('${T} tbody tr')].filter(tr => /looks done/.test(tr.textContent)); const tr = rows[rows.length - 2], sc = ${SCROLLER}; tr.scrollIntoView({ block: 'center' }); return { text: tr.querySelector('.inbox-review-name')?.textContent || '', top: sc.scrollTop, scrollable: sc.scrollHeight > sc.clientHeight + 2, rows: rows.length }; })()`);
+            assert.ok(target.scrollable && target.top > 100, at + 'the list scrolls in this window: ' + JSON.stringify(target));
+            await new Promise(r => setTimeout(r, 300)); // sleep-ok: the scroll settles
+            const pos = await ev(`(() => { const el = [...document.querySelectorAll('${T} tbody tr')].filter(tr => /looks done/.test(tr.textContent)).slice(-2)[0].querySelector('.inbox-review-name'), r = el.getBoundingClientRect(); return { x: r.left + Math.min(r.width / 2, 20), y: r.top + r.height / 2, top: ${SCROLLER}.scrollTop }; })()`);
+            for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) await client.Input.dispatchMouseEvent({ type, x: pos.x, y: pos.y, button: type === 'mouseMoved' ? 'none' : 'left', buttons: type === 'mousePressed' ? 1 : 0, clickCount: type === 'mouseMoved' ? 0 : 1 });
+            await waitFor(`!!document.querySelector('.goals-open')`, at + 'the goal opened by a real click', 10000);
+            await ev(`history.back(); true`);
+            await waitFor(`!document.querySelector('.goals-open') && /looks done/.test(document.querySelector('${T}')?.textContent || '')`, at + 'back on the list', 10000);
+            await new Promise(r => setTimeout(r, 600)); // sleep-ok: the folder draws after the route and restores its place
+            const after = await ev(`(() => { const rows = [...document.querySelectorAll('${T} tbody tr')].filter(tr => /looks done/.test(tr.textContent)), tr = rows.find(r => (r.querySelector('.inbox-review-name')?.textContent || '') === ${JSON.stringify(target.text)}), r = tr && tr.getBoundingClientRect(), a = document.activeElement; return { scroller: (${SCROLLER}).id || (${SCROLLER}).className, top: ${SCROLLER}.scrollTop, rowOnScreen: !!r && r.bottom > 0 && r.top < innerHeight, focusInRow: !!tr && !!a && tr.contains(a), active: a ? a.tagName + '.' + String(a.className).slice(0, 40) : null }; })()`);
+            assert.ok(Math.abs(after.top - pos.top) <= 40, at + `Back keeps the scroll position (${pos.top} before, ${JSON.stringify(after)} after)`);
+            assert.ok(after.rowOnScreen, at + 'the row that was opened is on screen: ' + JSON.stringify(after));
+            assert.ok(after.focusInRow, at + 'and it holds the focus again: ' + JSON.stringify(after));
         }
         console.log('PASS Back from a goal opened off Needs you returns to Needs you');
     } finally { await guard.restore().catch(() => {}); await removeBoards(ev, [B]).catch(() => {}); await client.close(); }
