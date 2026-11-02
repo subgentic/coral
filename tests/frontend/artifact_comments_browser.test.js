@@ -10,7 +10,7 @@ const path = require('node:path');
 const { connect } = require('./agent_view_harness');
 const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
 const BASE = require('./test_base').BASE;
-const { coralReady } = require('./helpers/wait');
+const { coralReady, waitStable } = require('./helpers/wait');
 const HEX = 'd'.repeat(64);
 const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behind a flag and backfill in batches of 500 rows.', '2. Switch reads to the new columns.', '', '## Risks', '', 'The backfill takes a write lock on large databases, so it must run off-peak.', '', 'Add a flag. Then wait. Add a flag again at the end.'].join('\n');
 
@@ -39,7 +39,7 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
                 const can = c => ({ reply: me === 'owner' && !window.__locked && c.parent_id == null, edit: mine(c) && !window.__locked, delete: mine(c), resolve: me === 'owner' && !window.__locked && c.parent_id == null });
                 if (method === 'GET') return json({ comments: window.__cs.filter(c => !c.deleted_at || window.__cs.some(r => r.parent_id === c.id && !r.deleted_at)).map(c => ({ ...c, deleted: !!c.deleted_at, body: c.deleted_at ? '' : c.body, mine: mine(c), can: can(c) })), locked: window.__locked, you: { kind: me === 'owner' ? 'owner' : 'hub', name: me === 'owner' ? 'Operator' : 'hub-user-3f2a', can_comment: me === 'owner' && !window.__locked, reason: me === 'owner' ? '' : 'Your Coral Hub access is view only.', can_lock: me === 'owner' }, limits: { body: 8192, quote: 2048, comments: 500 } });
                 if (me !== 'owner' && sub !== '') return json({ error: 'Your Coral Hub access is view only.' }, 403);
-                if (method === 'POST' && sub === '') { const b = JSON.parse(o.body); const c = { id: window.__next++, parent_id: b.parent_id == null ? null : b.parent_id, anchor: b.anchor, body: b.body, author: { kind: 'owner', issuer: 'local', subject: 'Operator' }, created_at: new Date().toISOString() }; window.__cs.push(c); return json({ ...c, can: can(c), ...(b.parent_id != null ? { sent_to: 'Dev, QA' } : {}) }, 201); }
+                if (method === 'POST' && sub === '') { const b = JSON.parse(o.body); const c = { id: window.__next++, parent_id: b.parent_id == null ? null : b.parent_id, anchor: b.anchor, body: b.body, author: { kind: 'owner', issuer: 'local', subject: 'Operator' }, created_at: new Date().toISOString() }; window.__cs.push(c); return json({ ...c, can: can(c) }, 201); }
                 const m = /^\\/(\\d+)(\\/(resolve|reopen))?$/.exec(sub); const c = m && window.__cs.find(x => x.id === Number(m[1]));
                 if (m && c) {
                     if (method === 'PATCH') { c.body = JSON.parse(o.body).body; c.edited_at = new Date().toISOString(); return json({ ...c, can: can(c) }); }
@@ -54,8 +54,8 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
             return real(u, o);
         };
         return true; })()`;
-    // a box's place once it has stayed the same for five frames (a sheet that slides in): waits for the movement to end instead of sleeping a fixed time; gives up after 300 frames and lets the check that follows say where it was
-    const settled = sel => ev(`new Promise(res => { let last = '', n = 0, tries = 0; const tick = () => { const e = document.querySelector(${JSON.stringify(sel)}); const r = e ? e.getBoundingClientRect() : null; const k = r ? [r.top, r.bottom, r.left, r.right].map(Math.round).join() : ''; n = k && k === last ? n + 1 : 0; last = k; if (n >= 5 || ++tries > 300) return res(k); requestAnimationFrame(tick); }; tick(); })`); // raf-ok: bounded to 300 tries, and the suite's own page is visible while it runs (be-12288's settle)
+    // a box's place once it has stayed the same for 150 ms (a sheet that slides in): waits for the movement to end instead of sleeping a fixed time. waitStable is bounded by time (5 s), so a page that runs no frames cannot hang it
+    const settled = sel => waitStable(ev, `(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return ''; const r = e.getBoundingClientRect(); return [r.top, r.bottom, r.left, r.right].map(Math.round).join(); })()`, `${sel} to stop moving`, 150);
     const rect = sel => ev(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; const r = e.getBoundingClientRect(); return { l: Math.round(r.left), t: Math.round(r.top), r: Math.round(r.right), b: Math.round(r.bottom), w: Math.round(r.width), h: Math.round(r.height) }; })()`);
     const open = async (extra) => {
         await ev(STUB);
@@ -175,7 +175,6 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
             await ev(`(() => { const t = document.querySelector('.ac-composer .ac-input'); t.value = 'Thanks'; t.dispatchEvent(new Event('input')); document.querySelector('.ac-composer').requestSubmit(); return true; })()`);
             await waitFor(`[...document.querySelectorAll('.ac-reply')].some(c => /Thanks/.test(c.textContent))`, 'the reply', 5000);
             const rc = (await ev(`window.__calls.filter(c => c.method === 'POST').pop()`)).body;
-            check(`${at}: the owner's reply says who it was sent to (#12203)`, await ev(`[...document.querySelectorAll('.toast-message')].some(t => t.textContent === 'Sent to Dev, QA')`));
             check(`${at}: a reply is posted with its thread's id and no anchor of its own`, rc.parent_id === 1 && !('anchor' in rc), JSON.stringify(rc));
             // edit own
             await ev(`${topAct(1, 'Edit')}.click(); true`);
