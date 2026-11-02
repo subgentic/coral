@@ -63,3 +63,21 @@ func (s *Store) goalRollups(ctx context.Context, board string, ids []int64) (map
 	}
 	return s.goalRollupsByID(ctx, goals)
 }
+
+// fillLooksDone sets LooksDoneAt on each goal that is active and has all its tasks done: the latest completion among them (one small read per such goal; a goal with open tasks costs nothing).
+func (s *Store) fillLooksDone(ctx context.Context, goals []Goal) error {
+	for i := range goals {
+		g := &goals[i]
+		if g.State != GoalActive || g.Rollup.Total == 0 || g.Rollup.Done != g.Rollup.Total {
+			continue
+		}
+		var at *string
+		if err := s.reader().GetContext(ctx, &at, `SELECT MAX(completed_at) FROM board_tasks WHERE board_id = ? AND goal_id = ? AND status IN ('completed', 'skipped')`, g.BoardID, g.ID); err != nil {
+			return err
+		}
+		if at != nil && *at != "" {
+			g.LooksDoneAt = at
+		}
+	}
+	return nil
+}
