@@ -25,7 +25,7 @@ const B = 'needs-goal-back-' + Date.now().toString(36);
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         assert.ok((await api('POST', '/subscribe', { subscriber_id: 'Boss', job_title: 'Orchestrator', session_name: 'boss-' + B })).status < 300);
-        await root('PUT', '/api/settings', { goal_done_hidden: '[]', goal_done_quiet_minutes: '0' });
+        await root('PUT', '/api/settings', { goal_done_hidden: '[]', goal_done_read: '[]', goal_done_quiet_minutes: '0' });
         const TITLES = ['Ship the pilot', 'Ship the second', ...Array.from({ length: 7 }, (_, i) => 'Ship extra ' + (i + 1))];
         for (const title of TITLES) {
             const g = await api('POST', '/goals', { subscriber_id: 'Operator', title, done_when: 'it is shipped' }); assert.equal(g.status, 201); const gid = g.json.id || g.json.goal.id;
@@ -61,11 +61,13 @@ const B = 'needs-goal-back-' + Date.now().toString(36);
             await Emulation.setDeviceMetricsOverride({ width: w, height: 420, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
             await openNeeds();
+            await require('./helpers/wait').settle(ev, 600, 300); // the list's layout is final before it is scrolled: on a slower machine it still shrank under the scroll position (Linux runner, #10832)
             const SCROLLER = `(() => { const tr = document.querySelector('${T} tbody tr'); for (let e = tr; e; e = e.parentElement) { const o = getComputedStyle(e).overflowY; if ((o === 'auto' || o === 'scroll') && e.scrollHeight > e.clientHeight + 2) return e; } return document.scrollingElement; })()`;
             const target = await ev(`(() => { const rows = [...document.querySelectorAll('${T} tbody tr')].filter(tr => /looks done/.test(tr.textContent)); const tr = rows[rows.length - 2], sc = ${SCROLLER}; tr.scrollIntoView({ block: 'center' }); return { text: tr.querySelector('.inbox-review-name')?.textContent || '', top: sc.scrollTop, scrollable: sc.scrollHeight > sc.clientHeight + 2, rows: rows.length }; })()`);
             assert.ok(target.scrollable && target.top > 100, at + 'the list scrolls in this window: ' + JSON.stringify(target));
             await new Promise(r => setTimeout(r, 300)); // sleep-ok: the scroll settles
             const pos = await ev(`(() => { const el = [...document.querySelectorAll('${T} tbody tr')].filter(tr => /looks done/.test(tr.textContent)).slice(-2)[0].querySelector('.inbox-review-name'), r = el.getBoundingClientRect(); return { x: r.left + Math.min(r.width / 2, 20), y: r.top + r.height / 2, top: ${SCROLLER}.scrollTop }; })()`);
+            assert.equal(await ev(`(() => { const e = document.elementFromPoint(${pos.x}, ${pos.y}); return !!e && !!e.closest('.inbox-review-name'); })()`), true, at + 'the row to click is on screen at the point that is clicked: ' + JSON.stringify(pos));
             for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) await client.Input.dispatchMouseEvent({ type, x: pos.x, y: pos.y, button: type === 'mouseMoved' ? 'none' : 'left', buttons: type === 'mousePressed' ? 1 : 0, clickCount: type === 'mouseMoved' ? 0 : 1 });
             await waitFor(`!!document.querySelector('.goals-open')`, at + 'the goal opened by a real click', 10000);
             await ev(`history.back(); true`);

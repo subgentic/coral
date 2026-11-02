@@ -178,6 +178,7 @@ export function openAskDialog(a, onDone, runners = {}) {
     if (subjects.length) links.append(document.createTextNode(` (named by ${markHidden(a.asker, { strict: true })})`));
     const whole = document.createElement('div'); whole.className = 'inbox-ask-text prose'; whole.tabIndex = 0; whole.setAttribute('role', 'region'); whole.setAttribute('aria-label', 'The question');
     whole.innerHTML = renderMarkdownStrict(parts.body + (a.cut ? '\n\n\u2026 (cut: the board has the rest)' : '')); // raw HTML in the words is written out as text; links keep the page's link policy
+    importOnce('./artifact_refs.js').then(m => { if (whole.isConnected) m.linkArtifactRefsIn(whole, { asWritten: true }); }).catch(() => {}); // a file named in the question opens in the viewer, the words as written (#12361); plain text until the helper is there
     whole.hidden = !parts.body && !a.cut; // a short question is its title
     const label = document.createElement('label'); label.className = 'inbox-ask-label'; label.textContent = 'Your reply';
     const box = document.createElement('textarea'); box.className = 'field inbox-ask-box'; box.rows = 4; box.maxLength = 8000; label.append(box);

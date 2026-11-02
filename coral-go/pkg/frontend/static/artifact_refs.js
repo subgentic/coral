@@ -9,7 +9,7 @@ import { escapeHtml, escapeAttr } from './html_escape.js';
 
 export const ARTIFACT_REF = /(^|[^A-Za-z0-9/])coral:\/\/artifacts\/([a-f0-9]{64})(?![A-Za-z0-9])/gi; // upper-case hex is the same id (the board has always read it so); the hex used is lower-cased
 
-/** The text as parts: { text } for words and { hex } for a reference, in order. */
+/** The text as parts: { text } for words and { hex, written } for a reference (written: the reference as it was typed, upper-case hex and all), in order. */
 export function splitArtifactRefs(text) {
     const s = String(text == null ? '' : text), parts = [];
     let at = 0, m;
@@ -17,7 +17,7 @@ export function splitArtifactRefs(text) {
     while ((m = ARTIFACT_REF.exec(s))) {
         const start = m.index + m[1].length;
         if (start > at) parts.push({ text: s.slice(at, start) });
-        parts.push({ hex: m[2].toLowerCase() });
+        parts.push({ hex: m[2].toLowerCase(), written: s.slice(start, start + 'coral://artifacts/'.length + 64) });
         at = start + 'coral://artifacts/'.length + 64;
     }
     if (at < s.length) parts.push({ text: s.slice(at) });
@@ -25,7 +25,7 @@ export function splitArtifactRefs(text) {
 }
 
 /** One link: its label is the stored name once known, else "artifact 81b837f8"; the full reference is the tooltip. Text only. */
-function linkFor(hex, server) {
+function linkFor(hex, server, written = '') {
     const a = document.createElement('a');
     a.setAttribute('href', serverUrl(artifactPath(hex), server));
     a.target = '_blank';
@@ -33,23 +33,23 @@ function linkFor(hex, server) {
     a.className = 'mb-artifact-ref';
     a.dataset.artifact = hex;
     if (server) a.dataset.server = server;
-    a.textContent = artifactLabel(hex);
+    a.textContent = written || artifactLabel(hex); // written: a Markdown file's own words stay as they were written (#12361); elsewhere the link reads as the artifact's name
     a.title = `coral://artifacts/${hex}`;
     return a;
 }
 
 /** The text as nodes: the words as text nodes, each reference a link. Nothing in it is HTML. */
-export function linkedText(text, { server } = {}) {
+export function linkedText(text, { server, asWritten = false } = {}) {
     const frag = document.createDocumentFragment(), seen = new Set();
     for (const p of splitArtifactRefs(text)) {
-        if (p.hex) { frag.append(linkFor(p.hex, server)); seen.add(p.hex); } else frag.append(document.createTextNode(p.text));
+        if (p.hex) { frag.append(linkFor(p.hex, server, asWritten ? p.written : '')); seen.add(p.hex); } else frag.append(document.createTextNode(p.text));
     }
     if (seen.size) learnArtifactNames(seen);
     return frag;
 }
 
 /** Links the references in text already on the page (a Markdown render, a pre): every text node under `root` outside a link, code or script is split into words and links. A code block under the root is left alone; a root that is itself a pre is not. */
-export function linkArtifactRefsIn(root, { server } = {}) {
+export function linkArtifactRefsIn(root, { server, asWritten = false } = {}) {
     if (!root) return root;
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT), nodes = [];
     for (let n = walker.nextNode(); n; n = walker.nextNode()) {
@@ -62,7 +62,7 @@ export function linkArtifactRefsIn(root, { server } = {}) {
     for (const n of nodes) {
         const parts = splitArtifactRefs(n.nodeValue);
         if (!parts.some(p => p.hex)) continue;
-        const frag = linkedText(n.nodeValue, { server });
+        const frag = linkedText(n.nodeValue, { server, asWritten });
         n.replaceWith(frag);
     }
     return root;
