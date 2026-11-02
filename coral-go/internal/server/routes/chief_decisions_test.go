@@ -192,3 +192,20 @@ func TestChiefHearsDecisionsOnTheTeamTheOperatorNamedWithoutAnAllowedSenderEntry
 	e.h.tellChief(ctx, board.ActDeny, "file", twin.ID, "plan.md", "")
 	require.Len(t, chiefNotices(t, e, "alpha"), 3, "the board's id still names it")
 }
+
+// The notice names the team as the Operator knows it (#12497, from #12460): its label, not the board's id, so Chief tells the Operator "northwind" and not "b-2f4s62a2x5". A team with no label keeps its id.
+func TestChiefDecisionNoticeNamesTheTeamByItsLabel(t *testing.T) {
+	e := newCrossTeamEnv(t)
+	ctx := context.Background()
+	e.h.SetChiefBoard(func(context.Context) string { return "alpha" })
+	nb, err := e.h.bs.CreateBoard(ctx, "Northwind", "Operator")
+	require.NoError(t, err)
+	_, err = e.h.bs.Subscribe(ctx, nb.ID, "Orchestrator", "Orchestrator", "tmux-"+nb.ID, nil, "mentions")
+	require.NoError(t, err)
+	e.h.SetChiefFronts(func(context.Context) string { return nb.ID })
+	e.h.tellChief(ctx, board.ActApprove, "file", nb.ID, "plan.md", "QA")
+	got := chiefNotices(t, e, "alpha")
+	require.Len(t, got, 1)
+	require.Contains(t, got[0], `on team "Northwind".`)
+	require.NotContains(t, got[0], nb.ID, "the id is not what the Operator calls the team")
+}
