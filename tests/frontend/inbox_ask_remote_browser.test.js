@@ -22,14 +22,14 @@ const { coralReady } = require('./helpers/wait');
             await open({});
             let r = await read();
             assert.equal(r.offers, 2, at + 'a question of this computer offers its two buttons');
-            assert.deepEqual(r.buttons, ['Send reply', 'Close'], at + 'beside the plain Reply and Close');
+            assert.deepEqual(r.buttons, ['Close', 'Send reply'], at + 'beside the plain Reply and Close (Send reply on the right)');
             await close();
 
             await open({ server: 'box-2' });
             r = await read();
             assert.equal(r.offersBox, false, at + 'a question from another computer has no offered buttons');
             assert.equal(r.offers, 0);
-            assert.deepEqual(r.buttons, ['Send reply', 'Close'], at + 'only the plain Reply and Close');
+            assert.deepEqual(r.buttons, ['Close', 'Send reply'], at + 'only the plain Reply and Close (Send reply on the right)');
             assert.equal(r.reply, true, at + 'and the Reply box');
             assert.equal(r.text, 'Ship it or hold?', at + 'the question is shown whole: a one-line question is the title of its item (#12143)');
             assert.equal(await ev(`document.documentElement.scrollWidth - document.documentElement.clientWidth`), 0, at + 'nothing scrolls sideways');

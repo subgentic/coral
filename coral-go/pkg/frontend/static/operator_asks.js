@@ -157,7 +157,7 @@ export function openAskDialog(a, onDone, runners = {}) {
     const row = document.createElement('div'); row.className = 'inbox-ask-buttons';
     const send = document.createElement('button'); send.type = 'button'; send.className = 'btn btn-primary'; send.textContent = 'Send reply';
     const close = document.createElement('button'); close.type = 'button'; close.className = 'btn'; close.textContent = 'Close';
-    row.append(send, close);
+    row.append(close, send); // Close on the left, Send reply on the right (as the other dialogs)
     const finish = () => { dlg.close(); dlg.remove(); if (onDone) onDone(); };
     const offers = fromAnotherComputer(a) ? [] : buttonsOf(a); // a question from another computer through the Hub keeps the plain Reply and Close
     let offered = null;
