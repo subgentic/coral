@@ -117,6 +117,15 @@ printf '%s  coral-linux-amd64.tar.gz\n' "$(sha "$d/latest/download/coral-linux-a
 CORAL_INSTALL_BASE_URL="file://$d" lx --dir "$tmp/extra-out"
 if [ "$rc" = 0 ] && [ -x "$tmp/extra-out/coral" ] && [ ! -e "$tmp/extra-out/ls" ] && [ ! -e "$tmp/extra-out/licenses" ] && [[ "$output" == *"not programs:"*"ls"* ]]; then ok "an extra program name is named and left out of the folder; coral is installed"; else fail "extra name: $rc $output"; fi
 
+# --- a read-only folder in the package does not leave the temp folder behind --------------------------------------
+d="$tmp/ro-pkg"; mkdir -p "$d/latest/download" "$d/w/licenses/sub"
+printf '#!/bin/sh\n' >"$d/w/coral"; chmod 755 "$d/w/coral"; echo l >"$d/w/licenses/sub/LICENSE"; chmod 555 "$d/w/licenses/sub" "$d/w/licenses"
+tar czf "$d/latest/download/coral-linux-amd64.tar.gz" -C "$d/w" .; chmod -R u+w "$d/w"
+printf '%s  coral-linux-amd64.tar.gz\n' "$(sha "$d/latest/download/coral-linux-amd64.tar.gz")" >"$d/latest/download/SHA256SUMS.txt"
+mkdir -p "$tmp/own-tmp"
+TMPDIR="$tmp/own-tmp" CORAL_INSTALL_BASE_URL="file://$d" lx --dir "$tmp/ro-out"
+if [ "$rc" = 0 ] && [ -x "$tmp/ro-out/coral" ] && [ -z "$(ls -A "$tmp/own-tmp")" ]; then ok "a read-only licenses/ folder does not leave the temp folder behind"; else fail "read-only package: $rc $(ls -A "$tmp/own-tmp") $output"; fi
+
 # --- the real latest release (opt in: it is a network download; run it before a tag) -----------------------------
 if [ "${INSTALL_SH_REAL:-}" = 1 ]; then
     CORAL_INSTALL_BASE_URL=https://github.com/subgentic/coral/releases lx --dir "$tmp/real-out"

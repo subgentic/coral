@@ -67,7 +67,7 @@ WORK=""
 MOUNT=""
 cleanup() {
     if [ -n "$MOUNT" ]; then hdiutil detach -quiet "$MOUNT" >/dev/null 2>&1 || hdiutil detach -force -quiet "$MOUNT" >/dev/null 2>&1 || true; fi
-    if [ -n "$WORK" ]; then rm -rf "$WORK"; fi
+    if [ -n "$WORK" ]; then chmod -R u+rwX "$WORK" 2>/dev/null || true; rm -rf "$WORK"; fi # a package folder that is read-only would otherwise be left behind
 }
 
 have() { command -v "$1" >/dev/null 2>&1; }
