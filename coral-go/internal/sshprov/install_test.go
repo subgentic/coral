@@ -387,3 +387,22 @@ func TestUnpackRemovesTheRecordedSumFirstAndWritesItLast(t *testing.T) {
 		t.Errorf("order is wrong: %s", text)
 	}
 }
+
+// #12027: an install step that cannot reach the computer says why in a fixed sentence and keeps what ssh said for the log (Cause), never in the sentence.
+func TestInstallConnectFailureSaysWhyAndKeepsTheCauseForTheLog(t *testing.T) {
+	err := connectErr(&ConnectError{Kind: KindAuth, Stderr: "user@box: Permission denied (publickey)."})
+	var ie *ErrInstall
+	if !errors.As(err, &ie) || !strings.Contains(ie.Msg, "refused the sign-in") || strings.Contains(ie.Msg, "Permission denied") {
+		t.Fatalf("sentence: %v", err)
+	}
+	var ce *ConnectError
+	if !errors.As(err, &ce) || ce.Kind != KindAuth {
+		t.Errorf("the cause is kept: %v", err)
+	}
+	if e := connectErr(errors.New("boom")); !strings.Contains(e.Error(), "Could not connect, or a command") {
+		t.Errorf("an unknown cause keeps the generic sentence: %v", e)
+	}
+	if e := connectErr(ErrHostKey); !strings.Contains(e.Error(), "host key no longer matches") {
+		t.Errorf("host key: %v", e)
+	}
+}

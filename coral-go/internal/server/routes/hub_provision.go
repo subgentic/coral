@@ -527,32 +527,7 @@ func (pr *Provisioner) failConnect(p *provisionPlan, step string, err error) {
 }
 
 // connectSentence is the fixed sentence for a failed ssh run.
-func connectSentence(err error) string {
-	switch {
-	case errors.Is(err, sshprov.ErrHostKeyChanged):
-		return "The host key has changed since you last connected. This may be a different computer. Check it, then fix known_hosts yourself."
-	case errors.Is(err, sshprov.ErrHostKey):
-		return "The host key is not in known_hosts under the name ssh uses for this computer. Connect to it once with ssh in a terminal, or check the setup's host name."
-	}
-	var ce *sshprov.ConnectError
-	if errors.As(err, &ce) {
-		switch ce.Kind {
-		case sshprov.KindAuth:
-			return "The computer refused the sign-in: this computer's SSH key or agent is not accepted there."
-		case sshprov.KindTimeout:
-			return "The connection timed out."
-		case sshprov.KindRefused:
-			return "The computer refused the connection. Is SSH running on that port?"
-		case sshprov.KindName:
-			return "That host name could not be found."
-		case sshprov.KindRoute:
-			return "There is no route to that computer."
-		case sshprov.KindClosed:
-			return "The computer closed the connection while signing in."
-		}
-	}
-	return "Could not connect."
-}
+func connectSentence(err error) string { return sshprov.ConnectSentence(err) }
 
 // detectSteps is the first real step of the run: the system and tmux. The install steps follow in later commits; until they exist the run says so and stops, and registers nothing.
 func (pr *Provisioner) detectSteps(ctx context.Context, p *provisionPlan) {
@@ -601,7 +576,12 @@ func (pr *Provisioner) setupSteps(ctx context.Context, p *provisionPlan, arch ss
 		if errors.As(err, &ie) {
 			msg = ie.Msg // a fixed sentence of the installer's, never text from the far side or the network
 		}
-		slog.Info("[provision] install failed", "plan", p.ID, "step", "install")
+		kind, detail := sshprov.KindOther, ""
+		var ce *sshprov.ConnectError
+		if errors.As(err, &ce) {
+			kind, detail = ce.Kind, ce.Stderr
+		}
+		slog.Info("[provision] install failed", "plan", p.ID, "step", "install", "kind", string(kind), "ssh", detail)
 		pr.fail(p, "install", msg)
 		return
 	}

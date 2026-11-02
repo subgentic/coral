@@ -209,6 +209,34 @@ func classifyConnect(stderr string) ConnectKind {
 	return KindOther
 }
 
+// ConnectSentence is the fixed sentence for a failed ssh run: the person sees it, never ssh's own text.
+func ConnectSentence(err error) string {
+	switch {
+	case errors.Is(err, ErrHostKeyChanged):
+		return "The host key has changed since you last connected. This may be a different computer. Check it, then fix known_hosts yourself."
+	case errors.Is(err, ErrHostKey):
+		return "The host key is not in known_hosts under the name ssh uses for this computer. Connect to it once with ssh in a terminal, or check the setup's host name."
+	}
+	var ce *ConnectError
+	if errors.As(err, &ce) {
+		switch ce.Kind {
+		case KindAuth:
+			return "The computer refused the sign-in: this computer's SSH key or agent is not accepted there."
+		case KindTimeout:
+			return "The connection timed out."
+		case KindRefused:
+			return "The computer refused the connection. Is SSH running on that port?"
+		case KindName:
+			return "That host name could not be found."
+		case KindRoute:
+			return "There is no route to that computer."
+		case KindClosed:
+			return "The computer closed the connection while signing in."
+		}
+	}
+	return "Could not connect."
+}
+
 // cleanStderr is the start of ssh's message for the log: control characters out, spaces folded, at most 300 characters.
 func cleanStderr(s string) string {
 	s = strings.Map(func(r rune) rune {
