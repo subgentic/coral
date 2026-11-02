@@ -104,6 +104,9 @@ func untrustedLocationOf(ctx context.Context, cfg *config.Config, ss *store.Sess
 			return "in a temporary folder"
 		}
 	}
+	if standardInstallPlace(p) {
+		return "" // a CLI in a standard install root is not refused for an agent's working folder (#12365): see cli_standard_install.go
+	}
 	if ss != nil {
 		if live, err := ss.GetAllLiveSessions(ctx); err == nil {
 			for _, s := range live {

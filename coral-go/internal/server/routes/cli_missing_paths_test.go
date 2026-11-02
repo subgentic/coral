@@ -121,8 +121,8 @@ func TestNoCodexAnywhereRefusesAWake(t *testing.T) {
 	assert.Equal(t, 1, still, "a refused wake leaves the agent asleep")
 }
 
-// A codex planted in a folder an agent writes to is not a CLI to start: the common install places are screened like a configured path (Security's #3019).
-func TestACodexInTheTempFolderOrAnAgentsFolderIsNotPickedUpFromACommonPlace(t *testing.T) {
+// A codex planted in a temp folder is not a CLI to start: the common install places are screened like a configured path (Security's #3019). One in a standard install folder is taken even when an agent works in a folder that holds it (#12365).
+func TestACodexInTheTempFolderIsNotPickedUpAndOneInAnAgentsStandardFolderIs(t *testing.T) {
 	_, handler, _, ss := setupSessionsTestServer(t)
 	ctx := context.Background()
 	noCLIAnywhere(t)
@@ -159,15 +159,10 @@ func TestACodexInTheTempFolderOrAnAgentsFolderIsNotPickedUpFromACommonPlace(t *t
 	prevTemp := cliTempDirs
 	cliTempDirs = func() []string { return nil } // the tests run in a temp folder; the check below is for the working folder alone
 	t.Cleanup(func() { cliTempDirs = prevTemp })
-	assert.Contains(t, handler.commonPlaceScreen(ctx)(filepath.Join(dir, name)), "in an agent's working folder") // the wording after it names the agent and the way out (#11454)
-	assert.Empty(t, handler.commonPlaceScreen(ctx)(filepath.Join(t.TempDir(), "elsewhere")), "a folder no agent works in passes the screen")
-	// Unscreened it would be found (the file is there, runnable), so the refusals below are the screens' doing.
-	assert.NotEmpty(t, agent.FindCLIInCommonPaths("codex"), "the planted file is in a common place")
-	_, err := agent.LaunchCLIScreened(nil, "codex", handler.commonPlaceScreen(ctx))
-	var nf *agent.CLINotFoundError
-	require.ErrorAs(t, err, &nf, "an agent's own folder is not a place to pick a CLI from")
-	_, err = resolveLaunchCLIScreened("codex", "", handler.commonPlaceScreen(ctx))
-	require.ErrorAs(t, err, &nf)
+	// #12365 (the Operator): a CLI in a standard install folder is not refused because an agent works in a folder that holds it (here ~/.local, below home; on Windows %LOCALAPPDATA%\npm): it is picked up.
+	assert.Empty(t, handler.commonPlaceScreen(ctx)(filepath.Join(dir, name)), "a standard install folder is not an agent's folder to refuse")
+	assert.Empty(t, handler.commonPlaceScreen(ctx)(filepath.Join(t.TempDir(), "elsewhere")), "nor is a folder no agent works in")
+	// (the test's own folders are in the system temp folder, which a launch refuses before any screen, so a launch is not shown here; cli_standard_install_test.go does it in a home of its own)
 	// The same file in the system temp folder is refused without any screen.
 	assert.True(t, agent.InTempFolder(filepath.Join(dir, name)), "the test's folders are in the temp folder")
 	assert.Empty(t, agent.CommonPlaceCLI("codex", nil), "a CLI in the temp folder is not picked up from a common place")
