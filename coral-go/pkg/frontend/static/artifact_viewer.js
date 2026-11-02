@@ -118,6 +118,14 @@ function _build() {
         setSheet: (open) => _comments.setSheet(open),
     });
     _review = attachReview(d, { reload: () => openArtifactViewer(_hex, { ..._lastOpts, switched: true }) });
+    // On a phone Approve and Request changes sit in the bottom bar with Close, and Comments sits by the ⋯ button (two thin rows above the file, #12226); on a computer they are on the header row
+    const phone = matchMedia('(max-width: 768px)'), dock = () => {
+        const q = x => d.querySelector(x), foot = q('.artifact-viewer-foot'), actions = q('.artifact-viewer-actions'), chips = q('.artifact-viewer-chips');
+        const approve = q('.artifact-review-approve'), changes = q('.artifact-review-changes'), toggle = q('.ac-toggle');
+        if (phone.matches) { foot.prepend(...[approve, changes].filter(Boolean)); if (toggle) q('.artifact-viewer-header').insertBefore(toggle, q('.artifact-viewer-morewrap')); }
+        else { if (toggle) actions.prepend(toggle); actions.append(...[approve, changes].filter(Boolean)); }
+    };
+    dock(); phone.addEventListener('change', dock);
     // Back or Forward changes the page under the viewer (#3532 routes): close it with the page.
     window.addEventListener('popstate', () => { if (!_overlay) closeArtifactViewer(); }); // on a phone the viewer has its own history entry (overlay_history.js)
     document.body.appendChild(d);
