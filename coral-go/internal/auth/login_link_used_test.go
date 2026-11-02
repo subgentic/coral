@@ -28,7 +28,7 @@ func TestUsedLoginLinkIsAPage(t *testing.T) {
 	assert.Equal(t, "no-store", rec.Header().Get("Cache-Control"))
 	assert.Equal(t, authPageCSP, rec.Header().Get("Content-Security-Policy"))
 	body := rec.Body.String()
-	for _, want := range []string{"<title>This sign-in link has been used", `name="viewport"`, "/static/css/variables.css", "/static/css/base.css", `class="card"`, "coral open", "works once", `href="/auth"`} {
+	for _, want := range []string{"<title>This sign-in link did not work", `name="viewport"`, "/static/css/variables.css", "/static/css/base.css", `class="card"`, "coral open", "works once", `href="/auth"`} {
 		assert.Contains(t, body, want)
 	}
 	assert.False(t, strings.Contains(body, "<script>"), "no inline script")
@@ -61,7 +61,7 @@ func TestLinkOpenedByAnotherUserHasItsOwnPageThatSaysNothingAboutTheToken(t *tes
 		assert.Contains(t, body, "<title>This sign-in link was opened by a different user")
 		assert.Contains(t, body, "the user that runs Coral")
 		assert.Contains(t, body, "coral open")
-		assert.NotContains(t, body, "has been used", "it is not about the link having been used")
+		assert.NotContains(t, body, "did not work", "it is not about the link having been used")
 		assert.NotContains(t, body, real, "the token is never echoed")
 		assert.False(t, strings.Contains(body, "<script>"))
 	}
@@ -74,5 +74,5 @@ func TestLinkOpenedByAnotherUserHasItsOwnPageThatSaysNothingAboutTheToken(t *tes
 	assert.NotContains(t, ok.Body.String(), "different user")
 	again := get(real)
 	assert.Equal(t, http.StatusForbidden, again.Code)
-	assert.Contains(t, again.Body.String(), "has been used", "once used it says so, as before (#9961)")
+	assert.Contains(t, again.Body.String(), "did not work", "once used it says so, as before (#9961)")
 }

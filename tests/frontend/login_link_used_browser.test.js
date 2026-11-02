@@ -17,7 +17,7 @@ const BASE = require('./test_base').BASE;
                 await ev(`document.documentElement.setAttribute('data-theme', '${theme}'); true`);
                 const p = await ev(`(() => { const q = s => document.querySelector(s), r = e => e.getBoundingClientRect(); const a = q('a.btn'), c = q('.code'), card = q('.card'); return { title: document.title, h1: q('h1') && q('h1').textContent, code: c && c.textContent, href: a && a.getAttribute('href'), btnH: a && Math.round(r(a).height), cardW: card && Math.round(r(card).width), sub: q('.sub') && getComputedStyle(q('.sub')).fontSize, scroll: document.documentElement.scrollWidth > innerWidth + 1, text: document.body.innerText }; })()`);
                 const at = `${w} ${theme}: `;
-                assert.equal(p.h1, 'This sign-in link has been used', at + 'the heading: ' + JSON.stringify(p));
+                assert.equal(p.h1, 'This sign-in link did not work', at + 'the heading: ' + JSON.stringify(p));
                 assert.equal(p.code, 'coral open', at + 'the command is in a code box');
                 assert.equal(p.href, '/auth', at + 'the way to the sign-in page');
                 assert.ok(!p.scroll, at + 'no sideways scroll');

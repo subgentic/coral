@@ -171,7 +171,7 @@ func TestAuthPageFirstRunDetails(t *testing.T) {
 // the computer with coral open, or create a password here with the setup code. Strict local auth is untouched: this is words, and the page still takes nothing it did not before.
 func TestAuthPageSaysHowToGetInWhenThereIsNoPasswordYet(t *testing.T) {
 	remote := AuthPage(PageState{}) // another device, no password
-	for _, want := range []string{`id="how-in"`, "Two ways to sign in", "coral open", "coral setup-code", "On the computer that runs Coral", "create a password", "coral open --print", "127.0.0.1", "works once, for 10 minutes", "do not post it where others can read it"} {
+	for _, want := range []string{`id="how-in"`, "Other ways to sign in", "coral open", "coral setup-code", "On the computer that runs Coral", "create a password", "coral open --print", "127.0.0.1", "works once, for 10 minutes", "do not post it where others can read it"} {
 		assert.Contains(t, remote, want, "another device: "+want)
 	}
 	locked := AuthPage(PageState{Local: true, Locked: true}) // a browser on this computer sent here by a locked page
@@ -223,4 +223,17 @@ func TestAuthPageSaysWhyAPasswordIsNeededAndOffersNoSkip(t *testing.T) {
 	signin := AuthPage(PageState{PasswordSet: true, Local: true, Strict: true})
 	assert.NotContains(t, strings.ToLower(signin), "opens without a password", "the forgot-password note no longer says the app opens without one")
 	assert.Contains(t, signin, `<p class="note">A password keeps other people and other devices out of Coral when it is opened in a web browser.</p>`)
+}
+
+// #12530 (#12525): the Create a password page leads with its form. The other ways to sign in were about 14 lines of text before the first field on a phone; they are one closed line after the form.
+func TestCreatePasswordPageLeadsWithTheFormAndFoldsTheOtherWays(t *testing.T) {
+	for name, s := range map[string]PageState{"remote setup": {}, "locked local setup": {Local: true, Locked: true}} {
+		page := AuthPage(s)
+		form, ways := strings.Index(page, `<form id="create-form"`), strings.Index(page, `id="how-in"`)
+		assert.True(t, form > 0 && ways > form, "%s: the form comes before the other ways to sign in", name)
+		assert.Contains(t, page, `<details class="howin" id="how-in">`, name)
+		assert.NotContains(t, page, `<details class="howin" id="how-in" open`, "%s: folded", name)
+		assert.Contains(t, page, "<summary>Other ways to sign in</summary>", name)
+		assert.Contains(t, page, "coral open", "%s: the way in stays on the page", name)
+	}
 }

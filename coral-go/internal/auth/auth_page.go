@@ -123,6 +123,7 @@ var authPageTmpl = template.Must(template.New("auth").Parse(`{{define "hubwarn"}
   ol.steps li { margin-bottom: 8px; }
   .howin { background: var(--bg-primary); border: 1px solid var(--border-light); border-radius: 8px; padding: 12px; margin: 0 0 20px; font-size: 0.8125rem; line-height: 1.5; color: var(--text-secondary); }
   .howin b { color: var(--text-primary); }
+  .howin summary { cursor: pointer; font-weight: 600; color: var(--text-primary); }
   .howin p { margin: 6px 0 0; }
   .note { font-size: 0.75rem; color: var(--text-secondary); line-height: 1.5; margin: 14px 0 0; }
   .panel[hidden], .err[hidden], .lock[hidden], .warn[hidden] { display: none; }
@@ -183,18 +184,6 @@ var authPageTmpl = template.Must(template.New("auth").Parse(`{{define "hubwarn"}
   <section id="panel-create" class="panel">
     <h1>Create a password</h1>
     <p class="sub">{{if .Local}}A password keeps other people and other devices out of Coral when it is opened in a web browser.{{else}}Coral has no password yet. Choose one to open it in this browser, with the setup code from the computer that runs Coral.{{end}}</p>
-{{if or .Locked (not .Local)}}
-    <div class="howin" id="how-in" role="note">
-      <b>Two ways to sign in</b>
-{{if .Local}}
-      <p><b>Sign in without a password.</b> Open the Coral app on this computer, or, in a terminal there, run <b>coral open</b>: either opens Coral signed in.</p>
-      <p><b>Or create a password below</b> to open Coral in this browser.</p>
-{{else}}
-      <p><b>Sign in on the computer.</b> On the computer that runs Coral, run <b>coral open</b>: it opens Coral there, signed in. To sign in on this device instead, run <b>coral open --print</b>, put the computer's network address in place of <b>127.0.0.1</b> in the link (Coral Mobile shows it) and open the link here: it works once, for 10 minutes, so do not post it where others can read it.</p>
-      <p><b>Or create a password here.</b> Enter the setup code (run <b>coral setup-code</b> on that computer), then choose a password.</p>
-{{end}}
-    </div>
-{{end}}
     <div id="err" class="err" role="alert" hidden></div>
     <div id="lock" class="lock" role="status" hidden><span>&#9202;</span><span><b>Setup is paused.</b> Too many wrong attempts. It opens again in <span class="count" id="count">0:00</span>.</span></div>
     <form id="create-form" autocomplete="on">
@@ -210,6 +199,18 @@ var authPageTmpl = template.Must(template.New("auth").Parse(`{{define "hubwarn"}
       <div class="btnrow"><button type="submit" disabled data-needs-script id="submit" class="btn btn-primary wide">Create password and open Coral</button></div>
     </form>
     <p class="note">It keeps other people and other devices out of Coral in a web browser. Your password manager can save it. Forgot it? Run coral reset-password in a terminal on this computer.</p>
+{{if or .Locked (not .Local)}}
+    <details class="howin" id="how-in">
+      <summary>Other ways to sign in</summary>
+{{if .Local}}
+      <p><b>Sign in without a password.</b> Open the Coral app on this computer, or, in a terminal there, run <b>coral open</b>: either opens Coral signed in.</p>
+      <p><b>Or create a password below</b> to open Coral in this browser.</p>
+{{else}}
+      <p><b>Sign in on the computer.</b> On the computer that runs Coral, run <b>coral open</b>: it opens Coral there, signed in. To sign in on this device instead, run <b>coral open --print</b>, put the computer's network address in place of <b>127.0.0.1</b> in the link (Coral Mobile shows it) and open the link here: it works once, for 10 minutes, so do not post it where others can read it.</p>
+      <p><b>Or create a password here.</b> Enter the setup code (run <b>coral setup-code</b> on that computer), then choose a password.</p>
+{{end}}
+    </details>
+{{end}}
 {{template "hubquiet" .}}
     <div class="linkrow linkcol">{{if eq .HubSignin "unpaired"}}<button type="button" class="link" id="hub-link-open">Link this computer to Coral Hub and sign in</button>{{end}}<button type="button" class="link" id="show-key">Use an API key instead</button></div>
   </section>
@@ -320,8 +321,8 @@ func writeLinkRetry(w http.ResponseWriter, r *http.Request, try int) {
 	next := (&url.URL{Path: r.URL.Path, RawPath: r.URL.RawPath, RawQuery: q.Encode()}).String()
 	next = "/" + strings.TrimLeft(next, "/\\")
 	page := strings.Replace(linkUsedPage, "</head>", `<meta http-equiv="refresh" content="1;url=`+html.EscapeString(next)+`"></head>`, 1)
-	page = strings.Replace(page, "This sign-in link has been used", "Signing you in", 1)
-	page = strings.Replace(page, `<p class="sub">A sign-in link works once, and for 10 minutes. To get a new one, run this in a terminal on the computer that runs Coral:</p>
+	page = strings.Replace(page, linkUsedTitle, "Signing you in", 1)
+	page = strings.Replace(page, `<p class="sub">`+linkUsedSub+`</p>
   <code class="code">coral open</code>`, `<p class="sub">One moment. This page tries again by itself.</p>`, 1)
 	h := w.Header()
 	h.Set("Content-Type", "text/html; charset=utf-8")
@@ -338,8 +339,8 @@ func writeLinkRetry(w http.ResponseWriter, r *http.Request, try int) {
 // opened by ANOTHER USER of this computer gets its own, because that refusal is decided before the link is looked at (the peer check runs first): it says nothing about the token, only who asked, and it names
 // the fix a service user needs (#11463 F5, coral-hub's walk: Coral run as root, a browser tunnel arriving as another user, every fresh link "used").
 const (
-	linkUsedTitle = "This sign-in link has been used"
-	linkUsedSub   = "A sign-in link works once, and for 10 minutes. To get a new one, run this in a terminal on the computer that runs Coral:"
+	linkUsedTitle = "This sign-in link did not work"
+	linkUsedSub   = "A sign-in link works once, and for 10 minutes: this one was already used, has run out, or was not copied whole. To get a new one, run this in a terminal on the computer that runs Coral:"
 
 	linkOtherUserTitle = "This sign-in link was opened by a different user"
 	linkOtherUserSub   = "A sign-in link only works from the user account that runs Coral, and this one was opened from another account on this computer, or by a connection Coral could not tell the user of (for example a browser tunnelled in as a different user). Run this as the user that runs Coral, then open the link it prints from that same account:"
