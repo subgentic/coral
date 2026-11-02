@@ -10,6 +10,7 @@ import { serverFetch, sessionServer } from './server_base.js';
 import { showToast } from './utils.js';
 import { blockedReason, hubBlocked } from './hub_access.js';
 import { resolveSessionIdentity } from './session_state.js';
+import { openAgent } from './agent_live.js';
 import { importOnce } from './import_once.js';
 import { loadStyles } from './lazy_styles.js';
 await loadStyles('inbox_answer.css'); // the step line's rules (#11981) are a sheet of their own: not in the start's stylesheet, and here before any step is drawn
@@ -126,6 +127,13 @@ function fill(s, cell, withDismiss = true) {
             note.className = 'inbox-only-reject';
             note.textContent = 'It can only be rejected here. Open the agent to read it.';
             cell.append(note);
+        }
+        if (!picks.length && !held && !onlyReject) { // nothing here can be answered (Claude's 'Is this a project you trust?' is such a prompt): the way on is the agent's own chat, one click away; nothing is typed for the person (#12346)
+            const o = document.createElement('button'); o.type = 'button'; o.className = 'btn btn-small inbox-open-agent'; o.textContent = 'Open agent';
+            o.setAttribute('aria-label', `Open ${resolveSessionIdentity(s)} to answer`);
+            o.addEventListener('click', e => { e.stopPropagation(); openAgent(s); });
+            o.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); });
+            cell.append(o);
         }
         if (withDismiss && canDismissWait(s, s.waiting_kind)) { // a wait that is no longer true can be cleared here, on this computer only (#11352)
             const d = dismissButton('btn btn-small inbox-dismiss', s);
