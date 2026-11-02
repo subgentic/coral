@@ -41,6 +41,8 @@ var pageSamples = map[string]string{
 	"/docs/*":         "/docs/board",
 	"/servers":        "/servers",
 	"/servers/*":      "/servers/m2",
+	"/skills":         "/skills",
+	"/skills/*":       "/skills/0123456789abcdef0123456789abcdef",
 }
 
 func pageGet(t *testing.T, c *http.Client, method, u string) (*http.Response, string) {

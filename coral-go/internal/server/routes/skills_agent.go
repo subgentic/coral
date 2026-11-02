@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/subgentic/coral/internal/httputil"
 	"io"
 	"net/http"
 	"os"
@@ -105,7 +106,7 @@ func (h *SkillsHandler) who(w http.ResponseWriter, r *http.Request) (kind, name 
 		bucket = kind + ":" + name
 	}
 	if !h.allow(bucket) {
-		writeError(w, http.StatusTooManyRequests, "rate_limited", "too many skill requests: at most 60 a minute")
+		httputil.WriteActionLimit(w, 60, "rate_limited", "too many skill requests: at most 60 a minute") // a per-action limit, marked so the dashboard does not take it for an overloaded server
 		return "", "", false
 	}
 	return kind, name, true
