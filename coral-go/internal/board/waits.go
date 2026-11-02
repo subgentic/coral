@@ -91,6 +91,15 @@ func (s *Store) ensureWaitsSchema(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	// An operator question whose wait ran out is kept once as an ask (#11919): question_kept_at says it was. Rows that expired before this column existed were not lost by this release: not replayed.
+	if _, kerr := tx.ExecContext(ctx, "ALTER TABLE board_waits ADD COLUMN question_kept_at TEXT"); kerr == nil {
+		_, err = tx.ExecContext(ctx, "UPDATE board_waits SET question_kept_at=? WHERE status='expired'", nowUTC())
+	} else if !strings.Contains(kerr.Error(), "duplicate column") {
+		err = kerr
+	}
+	if err != nil {
+		return err
+	}
 	err = tx.Commit()
 	if err != nil {
 		return err
@@ -100,6 +109,34 @@ func (s *Store) ensureWaitsSchema(ctx context.Context) error {
  CREATE INDEX IF NOT EXISTS idx_board_waits_timeout_pending ON board_waits(id) WHERE status='expired' AND timeout_notified_at IS NULL;
  `)
 	return err
+}
+
+// ExpiredOperatorQuestions are the operator waits with a question whose time ran out unanswered and that have not been kept yet (#11919): the Operator's Needs you shows an active wait only, so the question would
+// leave it with no trace. Asking first expires any wait that is past its time.
+func (s *Store) ExpiredOperatorQuestions(ctx context.Context, project string) ([]RegisteredWait, error) {
+	if _, err := s.ListActiveWaits(ctx, project); err != nil {
+		return nil, err
+	}
+	var waits []RegisteredWait
+	err := s.reader().SelectContext(ctx, &waits,
+		"SELECT id, project, subscriber_id, session_name, wait_type, target_id, reason, status, created_at, resolved_at, expires_at FROM board_waits WHERE project = ? AND wait_type = ? AND status = 'expired' AND TRIM(reason) != '' AND question_kept_at IS NULL ORDER BY id",
+		project, WaitOperator)
+	return waits, err
+}
+
+// ClaimExpiredQuestion marks an expired operator question as kept and reports whether this call did it: the one that claims it keeps it, so it is kept once however many reads race. UnclaimExpiredQuestion
+// gives the claim back when keeping it failed.
+func (s *Store) ClaimExpiredQuestion(ctx context.Context, waitID int64) (bool, error) {
+	res, err := s.db.ExecContext(ctx, "UPDATE board_waits SET question_kept_at = ? WHERE id = ? AND question_kept_at IS NULL", nowUTC(), waitID)
+	if err != nil {
+		return false, err
+	}
+	n, _ := res.RowsAffected()
+	return n == 1, nil
+}
+
+func (s *Store) UnclaimExpiredQuestion(ctx context.Context, waitID int64) {
+	_, _ = s.db.ExecContext(ctx, "UPDATE board_waits SET question_kept_at = NULL WHERE id = ?", waitID)
 }
 
 const DefaultWaitTimeout = 2 * time.Hour

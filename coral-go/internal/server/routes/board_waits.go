@@ -75,7 +75,17 @@ func (h *BoardHandler) RegisterWait(w http.ResponseWriter, r *http.Request) {
 		}
 		timeout = d
 	}
+	// An agent waits on one thing per board, so a new wait replaces its old one. A question the Operator has not answered must not go with it (#11919: the second of two questions replaced the first in
+	// Needs you): the one being replaced is kept as an ordinary open question from the same agent, below.
+	h.keepExpiredOperatorQuestions(r.Context(), project)                          // a wait that ran out and was not noticed yet is cancelled below with the rest: keep its question first (#11919)
+	replaced := h.activeOperatorQuestion(r.Context(), project, body.SubscriberID) // whatever the new wait's type: any new wait replaces the old one
+	if replaced != nil && body.WaitType == board.WaitOperator && strings.EqualFold(strings.TrimSpace(replaced.Reason), strings.TrimSpace(body.Reason)) {
+		replaced = nil // the same question asked again: the new wait is it, not a second one
+	}
 	wait, err := h.bs.RegisterWait(r.Context(), project, body.SubscriberID, body.SessionName, body.WaitType, body.TargetID, body.Reason, timeout)
+	if err == nil && replaced != nil {
+		h.keepReplacedOperatorQuestion(r.Context(), project, replaced)
+	}
 	if errors.Is(err, board.ErrTooManyWaits) {
 		msg := err.Error()
 		writeJSON(w, http.StatusConflict, map[string]any{"error": msg, "message": msg, "code": "too_many_waits", "max": board.MaxActiveWaitsPerSubscriber, "not_saved": true})
@@ -254,7 +264,89 @@ func (h *BoardHandler) endOwnWaits(ctx context.Context, project, subscriberID st
 	if subscriberID == "" {
 		return
 	}
+	h.keepExpiredOperatorQuestions(ctx, project)                  // a wait that ran out and nobody noticed yet is cancelled below: keep its question first (#11919)
+	asked := h.activeOperatorQuestion(ctx, project, subscriberID) // an unanswered question to the Operator outlives the agent getting back to work (#11919)
 	if err := h.bs.CancelActiveWait(ctx, project, subscriberID); err != nil {
 		slog.Warn("could not end the waits of an agent that is working", "project", project, "subscriber", subscriberID, "error", err)
+		return
+	}
+	if asked != nil {
+		h.keepReplacedOperatorQuestion(ctx, project, asked)
+	}
+}
+
+// activeOperatorQuestion is the agent's active wait when it is a question to the Operator with its text, else nil: the one thing a wait that ends for any reason but the Operator's answer or the agent's own
+// `wait --cancel` must not take out of Needs you (#11919).
+func (h *BoardHandler) activeOperatorQuestion(ctx context.Context, project, subscriberID string) *board.RegisteredWait {
+	w, err := h.bs.GetActiveWait(ctx, project, subscriberID)
+	if err != nil || w == nil || w.WaitType != board.WaitOperator || strings.TrimSpace(w.Reason) == "" {
+		return nil
+	}
+	return w
+}
+
+// keepReplacedOperatorQuestion makes the question of a wait that ended unanswered an ordinary open question (an ask of the Operator, from the same agent) so it stays in Needs you until it is answered or closed
+// like any other (#11919). It returns the error when the question could not be kept, and nil when it was or already is. A failure never fails the agent's own call (its new wait, its post): the callers log it, and
+// the expiry path gives its claim back so the next read tries again.
+func (h *BoardHandler) keepReplacedOperatorQuestion(ctx context.Context, project string, old *board.RegisteredWait) error {
+	keep := h.keepQuestion
+	if keep == nil {
+		keep = h.postKeptQuestion
+	}
+	if err := keep(ctx, project, old); err != nil {
+		slog.Warn("[wait] question not kept", "board", project, "agent", old.SubscriberID, "error", err)
+		return err
+	}
+	return nil
+}
+
+// postKeptQuestion is the keeping itself: posts the question as an ask of the Operator unless an open ask of the agent already says it.
+func (h *BoardHandler) postKeptQuestion(ctx context.Context, project string, old *board.RegisteredWait) error {
+	reason := strings.TrimSpace(old.Reason)
+	// The same question is not kept twice: the agent asked it with post --ask too, a re-issued wait carried it already, or the new wait is the same question (a trailing space is not a new question).
+	if asks, err := h.bs.OpenAsksOf(ctx, project, board.OperatorName, time.Now()); err == nil {
+		for _, a := range asks {
+			if strings.EqualFold(a.Asker, old.SubscriberID) && strings.EqualFold(askQuestionText(a.Content), reason) {
+				return nil
+			}
+		}
+	}
+	msg, err := h.bs.PostMessage(ctx, project, old.SubscriberID, "@Operator (an earlier question, still open) "+reason, nil)
+	if err == nil {
+		err = h.bs.RecordAsk(ctx, project, msg, []string{board.OperatorName})
+	}
+	if err != nil {
+		return err
+	}
+	if h.notifyFn != nil {
+		h.notifyFn(project)
+	}
+	return nil
+}
+
+// askQuestionText is an ask's question without the @Operator it opens with and without the "earlier question" frame this file adds: what two asks are compared by (a whole question, never a part of one).
+func askQuestionText(content string) string {
+	t := strings.TrimSpace(content)
+	if i := strings.Index(strings.ToLower(t), "@"+strings.ToLower(board.OperatorName)); i >= 0 {
+		t = t[i+len("@"+board.OperatorName):] // what follows the @Operator: a teammate named before it is not part of the question
+	}
+	t = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(t), "(an earlier question, still open)"))
+	return strings.TrimSpace(t)
+}
+
+// keepExpiredOperatorQuestions keeps, once, the questions whose operator wait ran out unanswered on this board (#11919): read when the Operator's Needs you is read. A question kept by the claim is an ask
+// like any other from then on.
+func (h *BoardHandler) keepExpiredOperatorQuestions(ctx context.Context, project string) {
+	waits, err := h.bs.ExpiredOperatorQuestions(ctx, project)
+	if err != nil {
+		return
+	}
+	for i := range waits {
+		if won, err := h.bs.ClaimExpiredQuestion(ctx, waits[i].ID); err != nil || !won {
+			continue
+		}
+		if err := h.keepReplacedOperatorQuestion(ctx, project, &waits[i]); err != nil {
+			h.bs.UnclaimExpiredQuestion(ctx, waits[i].ID) // not kept: the next read tries again
+		}
 	}
 }
