@@ -15,7 +15,7 @@ import (
 )
 
 func goodRecord(name string) Record {
-	return Record{Name: name, Provider: "digitalocean", Region: "nyc3", LaunchTag: "coral-launch-0123456789ab", DropletID: "4242", VPCID: vpcUUID, FirewallID: fwUUID, CredentialID: "5b6c0f2e-0000-4000-8000-000000000001", Created: time.Date(2026, 10, 29, 10, 0, 0, 0, time.UTC)}
+	return Record{Name: name, Provider: "digitalocean", Region: "nyc3", LaunchTag: "coral-launch-0123456789abcdef0123456789abcdef", DropletID: "4242", VPCID: vpcUUID, FirewallID: fwUUID, CredentialID: "5b6c0f2e-0000-4000-8000-000000000001", Created: time.Date(2026, 10, 29, 10, 0, 0, 0, time.UTC)}
 }
 
 // The file is 0600 in a 0700 folder, holds ids, and survives a reopen.
@@ -86,7 +86,7 @@ func TestStateFileRefusesAFileItDoesNotTrust(t *testing.T) {
 		require.NoError(t, os.Chmod(p, mode))
 		return p
 	}
-	good := `{"version":1,"machines":[{"name":"m1","provider":"digitalocean","region":"nyc3","launch_tag":"coral-launch-0123456789ab","droplet_id":"1","created":"2026-10-29T10:00:00Z"}]}`
+	good := `{"version":1,"machines":[{"name":"m1","provider":"digitalocean","region":"nyc3","launch_tag":"coral-launch-0123456789abcdef0123456789abcdef","droplet_id":"1","created":"2026-10-29T10:00:00Z"}]}`
 	_, err := OpenState(write("ok.json", good, 0o600))
 	require.NoError(t, err)
 

@@ -68,7 +68,7 @@ func manageFixture(t *testing.T) (args []string, p *manageProvider, rev *manageR
 	p = &manageProvider{machineStubProvider: base}
 	dir := t.TempDir()
 	statePath = filepath.Join(dir, "machines.json")
-	state := `{"version":1,"machines":[{"name":"m1","provider":"stubcloud","region":"nyc3","launch_tag":"coral-launch-0123456789ab","droplet_id":"77","vpc_id":"vpc-1","firewall_id":"fw-2","credential_id":"` + manageCred + `","created":"2026-10-29T10:00:00Z"}]}`
+	state := `{"version":1,"machines":[{"name":"m1","provider":"stubcloud","region":"nyc3","launch_tag":"coral-launch-0123456789abcdef0123456789abcdef","droplet_id":"77","vpc_id":"vpc-1","firewall_id":"fw-2","credential_id":"` + manageCred + `","created":"2026-10-29T10:00:00Z"}]}`
 	if err := os.WriteFile(statePath, []byte(state), 0o600); err != nil {
 		t.Fatal(err)
 	}

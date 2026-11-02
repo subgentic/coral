@@ -217,27 +217,27 @@ func stateAt(t *testing.T) *State {
 func TestCreateNetworkMakesTheVPCThenTheFirewallWithTheLaunchTag(t *testing.T) {
 	f := newFake()
 	var out bytes.Buffer
-	n, err := CreateNetwork(t.Context(), f, "m1", "nyc3", "coral-launch-0123456789ab", []string{"203.0.113.7/32"}, &out)
+	n, err := CreateNetwork(t.Context(), f, "m1", "nyc3", "coral-launch-0123456789abcdef0123456789abcdef", []string{"203.0.113.7/32"}, &out)
 	require.NoError(t, err)
 	assert.Equal(t, []string{"CreateVPC:coral-vpc-m1", "CreateFirewall:coral-fw-m1:ssh=203.0.113.7/32"}, f.calls, "the VPC first, then the firewall that allows SSH from the one address")
-	assert.Equal(t, "coral-launch-0123456789ab", n.Firewall.Tag)
+	assert.Equal(t, "coral-launch-0123456789abcdef0123456789abcdef", n.Firewall.Tag)
 	assert.Contains(t, out.String(), "SSH is open to 203.0.113.7/32 (1 address) only")
 }
 
 func TestCreateNetworkRemovesTheVPCWhenTheFirewallFails(t *testing.T) {
 	f := newFake()
 	f.failOn["CreateFirewall"] = errors.New("boom")
-	_, err := CreateNetwork(t.Context(), f, "m1", "nyc3", "coral-launch-0123456789ab", []string{"203.0.113.7"}, &bytes.Buffer{})
+	_, err := CreateNetwork(t.Context(), f, "m1", "nyc3", "coral-launch-0123456789abcdef0123456789abcdef", []string{"203.0.113.7"}, &bytes.Buffer{})
 	require.Error(t, err)
 	assert.Empty(t, f.vpcs, "nothing is left behind")
 	assert.Contains(t, err.Error(), "its private network was removed")
 }
 
 func TestCreateNetworkRefusesAProviderWithoutOneAndSSHToTheWorld(t *testing.T) {
-	_, err := CreateNetwork(t.Context(), struct{ Provider }{newFake()}, "m1", "nyc3", "coral-launch-0123456789ab", []string{"203.0.113.7"}, &bytes.Buffer{})
+	_, err := CreateNetwork(t.Context(), struct{ Provider }{newFake()}, "m1", "nyc3", "coral-launch-0123456789abcdef0123456789abcdef", []string{"203.0.113.7"}, &bytes.Buffer{})
 	assert.ErrorIs(t, err, ErrNoNetwork, "a launch is refused, not made without the isolation")
 	f := newFake()
-	_, err = CreateNetwork(t.Context(), f, "m1", "nyc3", "coral-launch-0123456789ab", []string{"0.0.0.0/0"}, &bytes.Buffer{})
+	_, err = CreateNetwork(t.Context(), f, "m1", "nyc3", "coral-launch-0123456789abcdef0123456789abcdef", []string{"0.0.0.0/0"}, &bytes.Buffer{})
 	require.Error(t, err)
 	assert.Empty(t, f.calls, "nothing was made for SSH open to the world")
 }
@@ -279,8 +279,8 @@ func TestTeardownTriesEveryStepWhateverTheOneBeforeDidAndReportsWhatIsLeft(t *te
 
 func record(name string, f *fakeCloud) Record {
 	vpc, _ := f.CreateVPC(context.Background(), VPCName(name), "nyc3")
-	fw, _ := f.CreateFirewall(context.Background(), FirewallSpec{Name: FirewallName(name), Tag: "coral-launch-0123456789ab"})
-	f.drops["77"] = Instance{ID: "77", Name: name, Tags: []string{Tag, "coral-launch-0123456789ab"}, Region: "nyc3", Size: "s-1vcpu-1gb", Created: time.Now().Add(-72 * time.Hour)}
+	fw, _ := f.CreateFirewall(context.Background(), FirewallSpec{Name: FirewallName(name), Tag: "coral-launch-0123456789abcdef0123456789abcdef"})
+	f.drops["77"] = Instance{ID: "77", Name: name, Tags: []string{Tag, "coral-launch-0123456789abcdef0123456789abcdef"}, Region: "nyc3", Size: "s-1vcpu-1gb", Created: time.Now().Add(-72 * time.Hour)}
 	f.calls = nil
 	r := goodRecord(name)
 	r.DropletID, r.VPCID, r.FirewallID = "77", vpc.ID, fw.ID

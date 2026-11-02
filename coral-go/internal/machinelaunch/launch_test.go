@@ -519,7 +519,7 @@ func (t *tagEchoProvider) List(context.Context) ([]Instance, error) {
 	return []Instance{
 		{ID: "mine", Name: "coral-1", Region: mine.Region, Size: mine.Size, Created: time.Now(), Tags: []string{Tag, tag}},
 		{ID: "same-name", Name: "coral-1", Tags: []string{Tag}},
-		{ID: "other-launch", Name: "x", Tags: []string{Tag, "coral-launch-aaaaaaaaaaaa"}},
+		{ID: "other-launch", Name: "x", Tags: []string{Tag, "coral-launch-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}},
 	}, nil
 }
 
