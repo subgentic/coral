@@ -161,6 +161,9 @@ const SIGNED_OUT_LOOPS = {
     'relaunch_badge.js': 2, // the five-minute reads
     'cloud_connect.js': 2, // the Coral Hub panel's poll and the owner check's tick
     'terminal_backend.js': 1, // the auto-wake look
+    'team_dialogs.js': 1, // the list read again 2 s after a team launch
+    'resume_dialog.js': 1, // the same after a resume
+    'launch_dialog.js': 1, // the same after a launch
 };
 const missing = [];
 for (const [f, n] of Object.entries(SIGNED_OUT_LOOPS)) {

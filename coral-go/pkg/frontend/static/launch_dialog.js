@@ -1,5 +1,6 @@
 /* Moved out of modals.js as it was (#4684): The Launch dialog itself: choosing what to launch, opening it, the hub's server picker, the directory resets on a server change, Launch for an agent or a terminal, and the board select. No behaviour change. */
 import { importOnce } from './import_once.js';
+import { isSignedOut } from './overload.js';
 import { state } from './state.js';
 import { showToast, escapeHtml, escapeAttr, boardNameProblem } from './utils.js';
 import { blockedReason } from './hub_access.js';
@@ -549,7 +550,7 @@ export async function launchSession() {
             const opener = document.getElementById('launch-modal')._focusOpener || null; // where the keyboard was when the dialog opened: closing the dialog puts it back there (#10247)
             hideLaunchModal();
             importOnce('./alerts_offer.js').then(m => m.offerAlertsAfterLaunch()).catch(() => {}); // the first agent is when alerts make sense: once per browser (#10068)
-            setTimeout(loadLiveSessions, 2000);
+            setTimeout(() => { if (!isSignedOut()) loadLiveSessions(); }, 2000); // a signed-out page makes no /api request (#12472)
             _refreshAfterLaunch(server, { sessionName: result.session_name, sessionId: result.session_id });
             if (!added) {
                 // The new chat is the answer, on this computer or through the Hub (#11463 F12: a launch from the Hub opened nothing, so the person was left on the list to find the row); when it could not open, the toast says the agent started (#11304)

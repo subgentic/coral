@@ -1,5 +1,6 @@
 /* Moved out of modals.js as it was (#3836): the Resume dialog loads on its own the first time it opens. */
 import { state } from './state.js';
+import { isSignedOut } from './overload.js';
 import { showToast } from './utils.js';
 import { keyLabel, isCloud } from './server_base.js';
 import { importOnce } from './import_once.js';
@@ -204,7 +205,7 @@ export async function resumeLaunchNew() {
             showToast(`Resumed session as new agent`);
             hideResumeModal();
             openResumedAgent(result, agentType); // the person asked for this agent: it opens when it is ready (#10291)
-            setTimeout(loadLiveSessions, 2000);
+            setTimeout(() => { if (!isSignedOut()) loadLiveSessions(); }, 2000); // a signed-out page makes no /api request (#12472)
         }
     } catch (e) {
         showToast("Failed to resume session", true);

@@ -71,7 +71,7 @@ const { JSDOM } = require('jsdom');
     const ld = fs.readFileSync(path.join(dir, 'launch_dialog.js'), 'utf8');
     const td = fs.readFileSync(path.join(dir, 'team_dialogs.js'), 'utf8');
     assert.ok(/hideLaunchModal\(\);\s*importOnce\('\.\/alerts_offer\.js'\)\.then\(m => m\.offerAlertsAfterLaunch\(\)\)/.test(ld), 'launch_dialog.js offers after a launch');
-    assert.ok(/importOnce\('\.\/alerts_offer\.js'\)\.then\(m => m\.offerAlertsAfterLaunch\(\)\)[^\n]*\n\s*setTimeout\(loadLiveSessions/.test(td), 'team_dialogs.js offers after a team started');
+    assert.ok(/importOnce\('\.\/alerts_offer\.js'\)\.then\(m => m\.offerAlertsAfterLaunch\(\)\)[^\n]*\n\s*setTimeout\(\(\) => \{ if \(!isSignedOut\(\)\) loadLiveSessions\(\)/.test(td), 'team_dialogs.js offers after a team started');
     // the offer never reads or sends anything about the agent
     const src = fs.readFileSync(path.join(dir, 'alerts_offer.js'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
     assert.ok(!/fetch\(|sendBeacon|session|agent\.name|display_name/.test(src.replace(/an agent needs you|an agent|every agent/g, '')), 'no agent data');
