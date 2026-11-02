@@ -51,6 +51,12 @@ const { coralReady } = require('./helpers/wait');
             await ev(`document.querySelector('.artifact-review-changes').click(); true`);
             await waitFor(`!document.querySelector('.artifact-review-form').hidden`, `${w}: the change-request form opens`, 4000);
             const f = await m(); assert.ok(f.approveInFoot && f.footBottom <= f.vv + 1, `${w}: the bar stays while the form is open: ` + JSON.stringify(f));
+            // the form and the keyboard together: Send request and Cancel can be scrolled to, inside the viewer
+            await ev(`document.documentElement.style.setProperty('--visual-viewport-height', '328px'); true`);
+            await waitFor(`Math.round(document.querySelector('.artifact-viewer').getBoundingClientRect().height) === 328`, `${w}: the viewer follows the keyboard with the form open`, 4000);
+            const reach = await ev(`(() => { const form = document.querySelector('.artifact-review'), send = form.querySelector('button[type=submit]'), cancel = form.querySelector('.artifact-review-cancel'); send.scrollIntoView({ block: 'nearest' }); const r = e => e.getBoundingClientRect(), box = form.getBoundingClientRect(), foot = document.querySelector('.artifact-viewer-foot').getBoundingClientRect(); return { scrolls: form.scrollHeight > form.clientHeight, sendInside: r(send).top >= box.top - 1 && r(send).bottom <= box.bottom + 1, cancelReachable: cancel.getClientRects().length > 0, sendAboveBar: r(send).bottom <= foot.top + 1 }; })()`);
+            assert.ok(reach.sendInside && reach.sendAboveBar && reach.cancelReachable, `${w}: with the form open and the keyboard up, Send request can be scrolled into view above the bar: ` + JSON.stringify(reach));
+            await ev(`document.documentElement.style.removeProperty('--visual-viewport-height'); true`);
             await ev(`document.querySelector('.artifact-viewer-close').click(); true`);
         }
     } finally { await client.close(); }
