@@ -28,7 +28,7 @@ import (
 var primitives = map[string]bool{
 	"Spawn": true, "CreateSession": true, "RestartPane": true,
 	"KillAgent": true, "KillSession": true, "KillSessionOnly": true,
-	"LaunchAgent": true, "wakeExistingSession": true,
+	"LaunchAgent": true, "wakeExistingSession": true, "wakeSession": true, // wakeSession is the wake itself: wakeExistingSession forwards to it, and so does WakeIdleFor (an agent woken without its starting prompt, #12358)
 }
 
 // scanDirs are the folders the census reads (see SCOPE above).
@@ -58,6 +58,7 @@ var pinnedSites = map[string]string{
 	"sessions_launch_session.go SessionsHandler.startOnTmux":    person + ": the launch handlers",
 	"sessions_restart.go SessionsHandler.restartTerminal":       person + ": the restart and resume handlers",
 	"sessions_wake.go SessionsHandler.startWake":                person + ": wakeExistingSession's own start, below",
+	"sessions_wake.go SessionsHandler.wakeExistingSession":      person + ": the wake handlers' wake; it only forwards to wakeSession, and its background callers (autoResume, autoWakeOne) are gated entries",
 	// the background resumes of a session
 	"agent_exit.go SessionsHandler.autoResume": gated + ": the resume after an agent exit asks first",
 	"auto_wake.go SessionsHandler.autoWakeOne": gated + ": only reached from AutoWakeAfterRestart, which returns at once in a foreign Coral",
@@ -208,7 +209,7 @@ func TestTheGatedEntriesAskTheForeignGate(t *testing.T) {
 
 // guardedHelpers are the helpers pinned above as reached only from a person's action or a gated entry. The second pass: every function that CALLS one of them is itself an HTTP handler, pinned in
 // pinnedSites or gatedEntries, or listed in pinnedCallers with why. So a new background caller of startWake or restartTerminal cannot slip past the first pass, which only sees the primitives.
-var guardedHelpers = []string{"startOnBackend", "startOnTmux", "restartTerminal", "startWake", "sleepNow", "killRunSession", "endRunSession", "autoWakeOne", "launchSession", "wakeExistingSession"}
+var guardedHelpers = []string{"startOnBackend", "startOnTmux", "restartTerminal", "startWake", "sleepNow", "killRunSession", "endRunSession", "autoWakeOne", "launchSession", "wakeExistingSession", "wakeSession"}
 
 // pinnedCallers are the callers of the guarded helpers that are neither handlers nor pinned above: each is reached only from the handler or gated entry named.
 var pinnedCallers = map[string]string{
@@ -219,6 +220,7 @@ var pinnedCallers = map[string]string{
 	"sessions_launch_session.go SessionsHandler.launchSession": "the launch, team launch, team lifecycle and team reset handlers",
 	"sessions_launch_team.go SessionsHandler.launchTeamMember": "the team launch handlers",
 	"sessions_wake.go SessionsHandler.wakeExistingSession":     "the wake handlers; its two background callers (autoResume, autoWakeOne) are gated entries",
+	"sessions_wake.go SessionsHandler.wakeSession":             "wakeExistingSession (the wake handlers and their gated background callers) and WakeIdleFor, a gated entry",
 }
 
 func TestEveryCallerOfAPersonTriggeredFunctionIsAHandlerListedOrGated(t *testing.T) {
