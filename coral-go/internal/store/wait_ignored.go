@@ -5,10 +5,15 @@ import (
 	"time"
 )
 
-// SetWaitIgnored records that the Operator hid this agent's current request (named by key) from Needs you (#11946). One row per agent: the next hidden request replaces it.
+// SetWaitIgnored records that the Operator hid this agent's current request (named by key) from Needs you (#11946). One row per agent: the next hidden request replaces it. It also removes the rows of agents that
+// are no longer live (ended, stopped, replaced by a restart, deleted: no active live_sessions row), so the table holds a row only for an agent that exists and never grows for ever (#11979); a sleeping agent is
+// live and keeps its row.
 func (s *SessionStore) SetWaitIgnored(ctx context.Context, sessionID, requestKey string) error {
-	_, err := s.db.ExecContext(ctx, `INSERT INTO agent_wait_ignored(session_id, request_key, ignored_at) VALUES(?,?,?)
- ON CONFLICT(session_id) DO UPDATE SET request_key=excluded.request_key, ignored_at=excluded.ignored_at`, sessionID, requestKey, time.Now().UTC().Format(time.RFC3339))
+	if _, err := s.db.ExecContext(ctx, `INSERT INTO agent_wait_ignored(session_id, request_key, ignored_at) VALUES(?,?,?)
+ ON CONFLICT(session_id) DO UPDATE SET request_key=excluded.request_key, ignored_at=excluded.ignored_at`, sessionID, requestKey, time.Now().UTC().Format(time.RFC3339)); err != nil {
+		return err
+	}
+	_, err := s.db.ExecContext(ctx, `DELETE FROM agent_wait_ignored WHERE session_id != ? AND session_id NOT IN (SELECT session_id FROM live_sessions WHERE status = 'active')`, sessionID)
 	return err
 }
 
