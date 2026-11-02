@@ -1,7 +1,7 @@
 // One goal's detail view, shared by the team Goals list and other page hosts.
 import { loadStyles } from './lazy_styles.js';
 import { openTask } from './task_navigation.js';
-import { boardFetch, keyLabel, serverUrl, splitKey } from './server_base.js';
+import { boardFetch, keyLabel, serverUrl, splitKey, LOCAL_SERVER } from './server_base.js';
 import { OPERATOR_ID, copyText, showToast } from './utils.js';
 import { whenText } from './when_text.js';
 import { toTaskPage, toGoal, errorOf } from './goals_adapter.js';
@@ -10,6 +10,7 @@ const { agentLink } = await importOnce('./agent_link.js'); // an agent's name is
 import { foldWayBack } from './way_back.js';
 import * as W from './goal_words.js';
 import { onGoalsSeq } from './goals_feed.js';
+import { looksDone, hiddenList, hideGoalDone } from './goal_done.js';
 import { pollEvery } from './overload.js';
 const { linkedText } = await importOnce('./artifact_refs.js');
 const linkedDd = text => { const d = document.createElement('dd'); d.append(linkedText(text)); return d; }; // a coral://artifacts/<hex> in a goal's words is a link (#11416)
@@ -137,6 +138,21 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         // Add task and Close goal (Reopen for a closed one), at the top right of the page's header
         const acts = el('div', 'goal-head-actions');
         acts.append(btn('btn goals-add-task', 'Add task', () => { (window.showCreateTaskModal || (() => {}))({ project: model.project, goal_id: g.id, onCreated: loadGoals }); }));
+        // A goal that looks done has its item in Needs you with Close goal, Not yet and Ignore; its page offers the first two too (#12248): Not yet hides the item until a task is added
+        const sp = splitKey(model.project);
+        if (looksDone(g) && sp.server === LOCAL_SERVER && !hiddenList().some(e => e === `${sp.name}|${g.id}|${W.allTasksOf(g.rollup)}` || e === `${sp.name}|${g.id}|*`)) {
+            const ny = btn('btn goals-not-yet', 'Not yet', async () => {
+                ny.disabled = true;
+                try {
+                    const undo = await hideGoalDone(sp.name, g, 'not-yet');
+                    ny.remove(); // the item is gone from Needs you, so the choice is too; Undo puts both back
+                    showToast('Hidden from Needs you until a task is added', false, 30000, { action: { label: 'Undo', onClick: async () => { try { await undo(); ny.disabled = false; acts.append(ny); } catch { /* it stays hidden */ } } } });
+                } catch (e) { ny.disabled = false; showToast(`Not saved: ${e && e.message ? e.message : 'try again'}`, true); }
+            });
+            ny.title = 'Hide this goal\'s item from Needs you until a task is added';
+            ny.setAttribute('aria-label', `Not yet: ${g.title}`);
+            acts.append(ny);
+        }
         if (W.isOpenGoal(g)) { const cb = btn('btn btn-primary goals-close', 'Close goal', () => openClose(g)); cb.setAttribute('aria-label', `Close goal: ${g.title}`); acts.append(cb); } // named for its goal: the Close dialog's own button is just Close goal
         else if (W.isClosedGoal(g)) acts.append(btn('btn goals-reopen', 'Reopen', () => reopenGoal(g)));
         row.append(acts); main.append(row);
