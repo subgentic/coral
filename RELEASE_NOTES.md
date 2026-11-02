@@ -1,5 +1,51 @@
 # Release Notes
 
+## v2.0.34 — Idle agents sleep by themselves, a goal that looks done, comments that bring a file back to Needs you, and Hermes in New agent
+
+### Changes
+
+#### What you will notice first
+
+- **Auto-sleep**: an agent that has been idle for a while is put to sleep to free its memory, and wakes by itself when something is sent to it (a message that names it, a task assigned to it, a comment on its file, your own Send). It is on by default, with two Settings rows (**Auto-sleep** and **After N min**) and a switch in each awake agent's menu. An agent that is mid-work stays awake: a draft in its box, a dialog, a background run, a task it has claimed, a screen Coral cannot read. A broadcast (`@all`) wakes no one, and a board wakes at most ten sleepers an hour (your own Send and the Wake button are exempt). A sleeping agent whose folder is gone is not woken; it stays a plain sleeper and the board says why. Coral posts one line the first time it sleeps an agent.
+- **Goal looks done**: after the latest task of an active goal is done and a quiet period has passed (a Settings minutes value), the goal's driver is told, and the item in Needs you is yours to open; opened, it is read and not counted. A goal reopened and finished again with the same total is unread again.
+- **A file you commented on comes back when an agent answers**: a reply in your comment thread on a file, or on a goal, marks the file's row "New comments" and unread again, as the same row. Your own comment and reply on a file reach its agents on their own, with a "Sent to" status under it. A file with changes requested counts only when there is news.
+- **Needs you shows a goal's design file once**: a question that only links a file already listed for review is not a second item; a question with words of its own stays.
+- **A question to you says what it is about**: `coral-board post --ask --goal N --task N` (an agent with one claimed task attaches it, with its goal); the row reads "Goal #N · Task #N".
+- **A file opened for review links back to its goal**: a "Goal: <title>" line under the sender, the title a link that closes the viewer and opens the goal's page.
+- **Approve on a file nobody opened asks first** ("Approve without opening?"), also for several files at once; the question panel is centred in the page font.
+- **A multi-question dialog is safer to submit**: Submit answers compares the whole review text and says when a field was cut, and a review whose first option is Cancel or Edit is never drawn as Submit.
+- **A refused wake says why**: the Wake button on a question shows the server's sentence (CLI not found, a path it cannot run, an untrusted folder) instead of "HTTP 422".
+- **A restart or resume starts in the folder its session worked in**, not in the folder the agent's row names.
+- **Hermes in New agent**: Hermes is a card with its badge (H) in New agent and in the member and restart pickers, under Not installed with its Install link when its CLI is not found. The New agent check tells a CLI found where a launch refuses it ("not installed" no longer), and the model list says where each model came from and shows one model once.
+- **Chat import is a Settings switch**: Import and Stop listing chats Coral did not start.
+- **Set up a server: Forget this host key** for a computer whose key changed; the new key's fingerprint is shown beside the one forgotten.
+- **Two wakes of one agent at once no longer leave it without board access**: for example an auto-wake and a Wake click, or Wake all, start the agent once.
+- **Escape with the focus on the page closes what is open**: with the file viewer open, Escape closes the viewer in place (it used to leave the page on /agents, after which no Needs you row opened until a reload); the same for the other overlays.
+- **After Kill All, a wait whose session is gone reads offline**, not "needs attention"; the Autonomy card is tasks done per touch, so a bigger number is better.
+
+#### Known issues
+
+- **Windows: in-app update does not work from 2.0.0 through 2.0.6.** If you're on one of those, download and install the MSI by hand; from 2.0.7 on, in-app update works.
+- **macOS: a Coral of 2.0.5 or earlier cannot install updates in-app; install 2.0.6 or later by hand once.**
+- **OpenCode agents are tested on macOS and Linux; OpenCode on Windows is not yet tested end to end.**
+- **Hermes agents are still experimental**: Windows installs no Hermes hook, and another locale's input hint is recognised only by its styling and only while Hermes's welcome line is on screen.
+- Setting up a computer over SSH is supported from a macOS or Linux hub, and is not yet tested from a Windows hub.
+- Auto-sleep's wake cap is per board, not per sender.
+
+#### For Coral Hub
+
+- **Routes**: one new, `POST /api/sessions/live/{name}/auto-sleep` (the per-agent auto-sleep switch): in the tunnel table at Interact tier, the owner's alone (OwnerRefuse); agent-route census class b. `POST /api/servers/provision/{plan}/forget-key` is the Operator's, census class b, and not in the tunnel table.
+- **Tunnel table**: `GET /api/system/cli-check` now accepts `type=opencode` and `type=hermes` (it was claude, agy, antigravity, gemini, codex, pi); `tools/gen_route_queries.py` and the generated `routes_query.go` agree.
+- **`/api/needs-you`**: question items may carry `goal_id` and `task_id`; review items may carry `new_comments` (all omitted when zero). A file with changes requested is not listed or counted unless it has new comments.
+- **Settings keys**: `auto_sleep`, `auto_sleep_idle_minutes`, `goal_done_quiet_minutes`, and the rows `goal_done_read` and `goal_done_hidden` (the Operator's, through the settings routes as before).
+- **Ready signals, hooks, tokens, framed paths**: nothing changed.
+
+#### For developers and releases
+
+- The static tree stays under its budget; the start CSS stays under its cap: the multi-question step line's three rules moved into the lazy sheet `css/inbox_answer.css`.
+- Census and lint changes: the auto-sleep route has its agent-route line and write-route reason; `goal_new_comments_browser` puts its two settings rows back and the runner allows them for that suite.
+- Test and flake fixes: the Deviation tests measure on the monitor's clock; the OpenCode stand-in server ends with the test process that started it; table-rules checks (R9, live Servers, Artifacts, Analytics).
+
 ## v2.0.33 — Set up a server over SSH works with a Coder host, and says why a step cannot connect
 
 ### Changes
