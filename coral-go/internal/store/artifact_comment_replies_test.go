@@ -9,8 +9,20 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	artC = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+	artD = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+)
+
 // #12026 (the Operator): after the Operator comments on a file, an agent's reply in that thread is something waiting for them, until they open the thread. UnseenAgentReplies lists the threads the OWNER started
 // that an agent has replied in since the owner last opened them, one row per thread; MarkThreadsSeen is the opening.
+// stamp sets a comment's time (the store stamps its own) so the test can order the events.
+func stamp(t *testing.T, s *SessionStore, id int64, at time.Time) {
+	t.Helper()
+	_, err := s.db.ExecContext(context.Background(), `UPDATE artifact_comments SET created_at = ? WHERE id = ?`, at.UTC().Format(ISOFormat), id)
+	require.NoError(t, err)
+}
+
 func TestUnseenAgentRepliesAreTheOwnersThreadsAnAgentAnsweredSinceTheyWereOpened(t *testing.T) {
 	ctx := context.Background()
 	s := newCommentStore(t)
@@ -18,11 +30,13 @@ func TestUnseenAgentRepliesAreTheOwnersThreadsAnAgentAnsweredSinceTheyWereOpened
 	owner := func(artifact string, at time.Time) ArtifactComment {
 		c, err := s.CreateArtifactComment(ctx, ArtifactComment{ArtifactID: artifact, Board: "team-a", Body: "please check", AuthorIssuer: "local", AuthorSubject: "u", AuthorKind: "owner", CreatedAt: at.Format(ISOFormat)})
 		require.NoError(t, err)
+		stamp(t, s, c.ID, at)
 		return c
 	}
 	reply := func(root ArtifactComment, kind, who string, at time.Time) {
-		_, err := s.CreateArtifactComment(ctx, ArtifactComment{ArtifactID: root.ArtifactID, Board: "team-a", ParentID: &root.ID, Body: "done", AuthorIssuer: "agent", AuthorSubject: who, AuthorName: who, AuthorKind: kind, CreatedAt: at.Format(ISOFormat)})
+		c, err := s.CreateArtifactComment(ctx, ArtifactComment{ArtifactID: root.ArtifactID, Board: "team-a", ParentID: &root.ID, Body: "done", AuthorIssuer: "agent", AuthorSubject: who, AuthorName: who, AuthorKind: kind})
 		require.NoError(t, err)
+		stamp(t, s, c.ID, at)
 	}
 	unseen := func() []CommentReply {
 		got, err := s.UnseenAgentReplies(ctx)
@@ -61,8 +75,9 @@ func TestUnseenAgentRepliesAreTheOwnersThreadsAnAgentAnsweredSinceTheyWereOpened
 	reply(other, "owner", "u", now.Add(time.Minute)) // the owner's own follow-up
 	reply(other, "hub", "viewer", now.Add(time.Minute))
 	var hubRoot ArtifactComment
-	hubRoot, err := s.CreateArtifactComment(ctx, ArtifactComment{ArtifactID: artC, Board: "team-a", Body: "hub person", AuthorIssuer: "hub", AuthorSubject: "v", AuthorKind: "hub", CreatedAt: now.Format(ISOFormat)})
+	hubRoot, err := s.CreateArtifactComment(ctx, ArtifactComment{ArtifactID: artC, Board: "team-a", Body: "hub person", AuthorIssuer: "hub", AuthorSubject: "v", AuthorKind: "hub"})
 	require.NoError(t, err)
+	stamp(t, s, hubRoot.ID, now)
 	reply(hubRoot, "agent", "Dev", now.Add(time.Minute))
 	for _, g := range unseen() {
 		assert.Equal(t, thread.ID, g.RootID, "only the owner's thread an agent answered")
@@ -70,9 +85,10 @@ func TestUnseenAgentRepliesAreTheOwnersThreadsAnAgentAnsweredSinceTheyWereOpened
 
 	// a deleted reply, and a deleted thread, are not waiting
 	require.NoError(t, s.MarkThreadsSeen(ctx, artA, now.Add(10*time.Minute)))
+	reply(thread, "agent", "Dev", now.Add(11*time.Minute))
+	require.Len(t, unseen(), 1)
 	_, err = s.db.ExecContext(ctx, `UPDATE artifact_comments SET deleted_at = ? WHERE id = ?`, now.Format(ISOFormat), thread.ID)
 	require.NoError(t, err)
-	reply(thread, "agent", "Dev", now.Add(11*time.Minute))
 	assert.Empty(t, unseen(), "a deleted thread is gone")
 
 	// opening one file's thread does not read another's

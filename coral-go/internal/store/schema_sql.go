@@ -105,6 +105,11 @@ CREATE TABLE IF NOT EXISTS artifact_comments (
 );
 CREATE INDEX IF NOT EXISTS idx_artifact_comments_artifact ON artifact_comments(artifact_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_artifact_comments_parent ON artifact_comments(parent_id);
+-- When the Operator last opened the threads of an artifact (#12026): one row per thread (its first comment). An agent's reply made after that is "new comments" on the file's row; opening the thread clears it.
+CREATE TABLE IF NOT EXISTS artifact_comment_seen (
+	comment_id INTEGER PRIMARY KEY,
+	seen_at    TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS artifact_comment_locks (
 	scope TEXT NOT NULL,
 	key   TEXT NOT NULL,
