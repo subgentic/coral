@@ -58,7 +58,7 @@ var (
 var autoRecommendTools = []string{"AskUserQuestion", "request_user_input", "ask_question"}
 
 // autoRecommendRisk is the brake: a question, label or description with one of these words (with its endings) is not answered. A word list is bypassable by wording: a brake, not a boundary.
-var autoRecommendRisk = regexp.MustCompile(`(?i)\b(delet\w*|forc(e|es|ed|ing)|overwr\w+|deploy\w*|production|push\w*|publish\w*|send\w*|sent|pay\w*|paid|credentials?|tokens?|secrets?|sudo|rm|drop\w*|destroy\w*|wipe\w*|erase\w*|truncat\w*|merg\w*|install\w*|uninstall\w*|reset\w*|revok\w*|revert\w*|remov\w*|purg\w*|rebas\w*|kill\w*)\b`)
+var autoRecommendRisk = regexp.MustCompile(`(?i)\b(delet\w*|forc(e|es|ed|ing)|overwr\w+|deploy\w*|production|push\w*|publish\w*|send\w*|sent|pay\w*|paid|credentials?|tokens?|secrets?|sudo|rm|drop\w*|destroy\w*|wipe\w*|erase\w*|truncat\w*|merg\w*|install\w*|uninstall\w*|reset\w*|revok\w*|revert\w*|remov\w*|purg\w*|rebas\w*|kill\w*|discard\w*|restor\w*|rollback\w*|migrat\w*|releas\w*|grant\w*|authori[sz]\w*|disabl\w*|unlink\w*|chmod)\b`)
 
 const recommendedSuffix = "(Recommended)"
 
