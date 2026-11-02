@@ -2006,3 +2006,4 @@ body.panel-dragging .agentic-state {
 .inline-preview-cm .cm-deletedChunk span { filter: var(--diff-token-filter, none); }
 .inline-preview-cm .cm-merge-b .cm-changedLine,
 .inline-preview-cm .cm-deletedChunk { color: var(--diff-line-text, inherit); }
+.inline-preview-cm .cm-merge-b .cm-line:not(.cm-changedLine) span { filter: var(--diff-context-filter, none); } /* the lines around a change: a comment was 3.9:1 on the dark editor */

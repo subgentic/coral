@@ -46,15 +46,15 @@ const FILES = { 'a.go': { status: 'modified', original: ORIG, current: CUR, addi
                 const root = document.querySelector('#changed-files-list .file-diff[data-filepath="a.go"]');
                 const behind = el => { const chain = []; for (let e = el; e && e !== root.parentElement; e = e.parentElement) chain.push(getComputedStyle(e).backgroundColor); let bg = [255, 255, 255, 1]; for (const c of chain.reverse()) { const p = parse(c); if (p[3] > 0) bg = over(p, bg); } return bg; };
                 const out = [];
-                for (const line of root.querySelectorAll('.cm-changedLine, .cm-deletedChunk')) {
-                    const kind = line.matches('.cm-deletedChunk') ? 'removed' : 'added', walker = document.createTreeWalker(line, NodeFilter.SHOW_TEXT);
+                for (const line of root.querySelectorAll('.cm-changedLine, .cm-deletedChunk, .cm-merge-b .cm-line:not(.cm-changedLine)')) {
+                    const kind = line.matches('.cm-deletedChunk') ? 'removed' : line.matches('.cm-changedLine') ? 'added' : 'unchanged', walker = document.createTreeWalker(line, NodeFilter.SHOW_TEXT);
                     for (let t; (t = walker.nextNode());) { if (!t.nodeValue.trim()) continue; const el = t.parentElement, seen = parse(getComputedStyle(el).color), bg = behind(el); let k = 1; for (let e = el; e && e !== line.parentElement; e = e.parentElement) { const m = getComputedStyle(e).filter.match(/brightness\\(([\\d.]+)\\)/); if (m) k *= Number(m[1]); } /* a brightness() filter changes what is drawn, not the computed colour: apply it */ const fg = [0, 1, 2].map(i => Math.min(255, Math.round(seen[i] * k))); out.push({ kind, text: t.nodeValue.trim().slice(0, 28), color: 'rgb(' + fg.join(', ') + ')', ratio: Math.round(ratio(fg, bg) * 100) / 100 }); }
                 }
                 return out;
             })()`);
             const bad = rows.filter(r => r.ratio < 4.5);
-            if (!rows.some(r => r.kind === 'added') || !rows.some(r => r.kind === 'removed')) problems.push(`${theme}: no added or removed text was measured: ${JSON.stringify(rows).slice(0, 300)}`);
-            if (bad.length) problems.push(`${theme}: text under 4.5:1 on a changed line: ` + bad.map(r => `${r.kind} "${r.text}" ${r.color} ${r.ratio}`).join('; '));
+            if (!rows.some(r => r.kind === 'added') || !rows.some(r => r.kind === 'removed') || !rows.some(r => r.kind === 'unchanged')) problems.push(`${theme}: no added, removed or unchanged text was measured: ${JSON.stringify(rows).slice(0, 300)}`);
+            if (bad.length) problems.push(`${theme}: text under 4.5:1 on a diff line: ` + bad.map(r => `${r.kind} "${r.text}" ${r.color} ${r.ratio}`).join('; '));
             const colours = new Set(rows.filter(r => r.kind === 'added').map(r => r.color));
             if (colours.size < 3) problems.push(`${theme}: the syntax colours were flattened (${colours.size} different colours on the added lines): ${[...colours].join(' ')}`);
         }
