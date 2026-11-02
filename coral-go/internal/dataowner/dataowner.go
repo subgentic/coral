@@ -369,21 +369,20 @@ func sameFolder(a, b string) bool {
 	return norm(a) == norm(b)
 }
 
-// clean makes text from a file safe for a log line or a notice: control and format characters dropped, capped at 120 characters.
+// clean makes text from a file safe for a log line or a notice: control and format characters dropped, and a text over 120 characters cut in the middle (the first 50 and the last 67, with "..."
+// between): what names a folder is the end of its path, and a long temporary or home path used to lose it to a cut at the head (#277 on macOS, where a test's temporary path alone is over 120).
 func clean(s string) string {
-	var b strings.Builder
-	n := 0
+	var kept []rune
 	for _, r := range s {
 		if unicode.Is(unicode.Cc, r) || unicode.Is(unicode.Cf, r) {
 			continue
 		}
-		if n++; n > 120 {
-			b.WriteString("...")
-			break
-		}
-		b.WriteRune(r)
+		kept = append(kept, r)
 	}
-	return b.String()
+	if len(kept) <= 120 {
+		return string(kept)
+	}
+	return string(kept[:50]) + "..." + string(kept[len(kept)-67:])
 }
 
 // LogLine is the one log line of a FOREIGN start.

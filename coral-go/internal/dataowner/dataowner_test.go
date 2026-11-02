@@ -232,6 +232,11 @@ func TestTheMadeAtTextIsCleanedAndCappedBeforeItIsShown(t *testing.T) {
 	assert.NotContains(t, shown, "\u202e")
 	assert.NotContains(t, shown, "\x07")
 	assert.LessOrEqual(t, len([]rune(shown)), 123)
+	// a long path is cut in the middle: its end, which names the folder, stays (a macOS temporary path is over 120 characters before the folder's own name)
+	long := "/var/folders/x6/cfzdf6d96g56ytb84gy8bzdw0000gn/T/" + strings.Repeat("A", 90) + "/001"
+	assert.True(t, strings.HasSuffix(clean(long), "/001"), clean(long))
+	assert.True(t, strings.HasPrefix(clean(long), "/var/folders/"), clean(long))
+	assert.LessOrEqual(t, len([]rune(clean(long))), 120)
 	assert.Contains(t, LogLine(Verdict{Foreign: true, Reason: ReasonCopy, Detail: "D:\\x"}), "D:\\x")
 }
 
