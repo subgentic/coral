@@ -6,12 +6,14 @@ import (
 	"errors"
 
 	"github.com/jmoiron/sqlx"
+
+	"github.com/subgentic/coral/internal/settings"
 )
 
 // The person's choice to list chats Coral did not start (#11970). A brand-new Coral lists only the chats of agents it launched; the Claude Code, Codex and other
 // history already on the computer waits for an explicit import.
 const (
-	historyImportKey = "history_import"
+	historyImportKey = settings.HistoryImport
 	// HistoryImportOn: chats found on the computer are indexed and listed. Every install that already listed them is here.
 	HistoryImportOn = "1"
 	// HistoryImportOff: only chats of agents Coral launched are indexed.
@@ -34,12 +36,12 @@ const importDefaultKey = "history_import_default"
 // it in store_meta: an install that already lists a chat Coral did not start (an index row with no agent name) keeps listing them, so nothing disappears for a current user; a fresh one is off. A fresh
 // Coral indexes only its own agents' chats, which carry their agent's name (and keep it when the agent is gone), so it stays off until the person chooses.
 func (s *SessionStore) DecideHistoryImport(ctx context.Context) (bool, error) {
-	settings, err := s.GetSettings(ctx)
+	all, err := s.GetSettings(ctx)
 	if err != nil {
 		return false, err
 	}
-	if v, ok := settings[historyImportKey]; ok {
-		return v == HistoryImportOn, nil
+	if settings.Has(all, historyImportKey) {
+		return settings.Raw(all, historyImportKey) == HistoryImportOn, nil
 	}
 	var recorded string
 	err = s.reader().GetContext(ctx, &recorded, `SELECT value FROM store_meta WHERE key = ?`, importDefaultKey)
