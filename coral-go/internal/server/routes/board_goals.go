@@ -543,6 +543,9 @@ func (h *BoardHandler) CloseGoal(w http.ResponseWriter, r *http.Request) {
 		noun = "open task"
 	}
 	h.postGoalLine(r, project, actor, "Goal #"+strconv.FormatInt(g.ID, 10)+" \""+g.Title+"\" is closed as "+g.State+": "+g.ClosedReason+" ("+strconv.Itoa(open)+" "+noun+" left)")
+	if actor == board.OperatorName && humanInputCaller(r) {
+		h.recordActivity(r, board.ActGoalDone, "goal", strconv.FormatInt(g.ID, 10), project, g.Title, g.State+": "+g.ClosedReason)
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"goal": g, "open_tasks": open})
 }
 

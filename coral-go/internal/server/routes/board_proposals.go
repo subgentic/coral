@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -332,6 +333,7 @@ func (h *BoardHandler) ApproveProposal(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	slog.Info("[proposals] approved", "surface", "local", "board", project, "proposal", id, "kind", p.Kind, "ref", ref)
+	h.recordActivity(r, board.ActApprove, "proposal", strconv.FormatInt(id, 10), project, p.Title, "")
 	writeJSON(w, http.StatusOK, map[string]any{"proposal_id": id, "state": board.ProposalApproved, "kind": p.Kind, "created_id": ref})
 }
 
@@ -431,6 +433,7 @@ func (h *BoardHandler) RejectProposal(w http.ResponseWriter, r *http.Request) {
 	}
 	h.tellOnce(r.Context(), project, p, board.ProposalRejected, p.Reason)
 	slog.Info("[proposals] rejected", "surface", "local", "board", project, "proposal", id, "kind", p.Kind)
+	h.recordActivity(r, board.ActDeny, "proposal", strconv.FormatInt(id, 10), project, p.Title, body.Reason)
 	writeJSON(w, http.StatusOK, map[string]any{"proposal_id": id, "state": board.ProposalRejected, "kind": p.Kind})
 }
 

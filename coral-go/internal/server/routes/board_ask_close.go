@@ -3,6 +3,7 @@ package routes
 import (
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
@@ -68,6 +69,7 @@ func (h *BoardHandler) CloseAsk(w http.ResponseWriter, r *http.Request) {
 			errInternalServer(w, "could not open the question again")
 			return
 		}
+		h.recordActivity(r, board.ActUnignore, "question", strconv.FormatInt(id, 10), project, "", "")
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "reopened": reopened})
 		return
 	}
@@ -78,6 +80,9 @@ func (h *BoardHandler) CloseAsk(w http.ResponseWriter, r *http.Request) {
 		}
 		errInternalServer(w, "could not close the question")
 		return
+	}
+	if strings.EqualFold(actor, "Operator") && humanInputCaller(r) { // the Operator's own Ignore, not an agent closing its own question
+		h.recordActivity(r, board.ActIgnore, "question", strconv.FormatInt(id, 10), project, "", note)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "closed_by": actor})
 }
