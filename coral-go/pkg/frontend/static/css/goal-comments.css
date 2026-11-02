@@ -1,0 +1,5 @@
+/* A goal's Comments tab (#11955): the document comments' panel in the tab, not as a side column or a bottom sheet. Loaded with the tab (goal_comments.js). */
+.goal-comments { display: flex; flex-direction: column; min-width: 0; }
+.goal-comments > .ac-panel, .goal-comments > .ac-panel.ac-sheet-open { position: static; flex: 1 1 auto; width: auto; max-height: none; transform: none; border: 0; border-radius: 0; box-shadow: none; padding-inline: 0; transition: none; }
+.goal-comments > .ac-panel .ac-sheet-close { display: none; }
+.goal-comments > .ac-panel > .ac-composer { position: static; margin-bottom: 0; padding-bottom: 0; }

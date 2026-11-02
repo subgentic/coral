@@ -190,6 +190,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
     const previewEl = el('aside', 'pane pane-aside detail-pane goal-detail-pane'); previewEl.hidden = true; previewEl.setAttribute('aria-label', 'Details'); // named, as the team page's own Details pane is (#9117)
     const preview = { key: '', rowKey: '' };
     const artifacts = { id: 0, host: null, api: null, total: null };
+    const comments = { id: 0, host: null, api: null, open: null }; // the Comments tab (#11955): one mount for the goal on show, as the Artifacts list has
     const splitEl = () => root.querySelector('.goal-split');
 
     function markPreviewRow() {
@@ -293,10 +294,20 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         list.append(artifacts.host);
     }
 
+    /** The Comments list: the document comments' panel for the goal on show, mounted once (its drafts and open composer survive the page being drawn again). */
+    function commentsList(list, g) {
+        if (comments.id !== g.id) {
+            comments.api?.destroy(); comments.api = null; comments.open = null;
+            const host = comments.host = el('div', 'goal-comments-host'); comments.id = g.id;
+            importOnce('./goal_comments.js').then(m => { if (!disposed && comments.host === host) comments.api = m.mountGoalComments(host, { team: model.project, goalId: g.id, onCount: n => { comments.open = n; const c = root.querySelector('#goal-tab-comments .goal-tab-count'); if (c) c.textContent = ` ${n}`; } }); }).catch(() => {});
+        }
+        list.append(comments.host);
+    }
+
     function drawTabs(g) {
         const wrap = el('div', 'goal-lists');
-        const strip = el('div', 'tabs goal-tabs'); strip.setAttribute('role', 'tablist'); strip.setAttribute('aria-label', `The tasks and artifacts of ${g.title}`);
-        const tabs = [['tasks', 'Tasks', totalOf(g.rollup)], ['artifacts', 'Artifacts', artifacts.total]];
+        const strip = el('div', 'tabs goal-tabs'); strip.setAttribute('role', 'tablist'); strip.setAttribute('aria-label', `The tasks, artifacts and comments of ${g.title}`);
+        const tabs = [['tasks', 'Tasks', totalOf(g.rollup)], ['artifacts', 'Artifacts', artifacts.total], ['comments', 'Comments', comments.id === g.id ? comments.open : null]];
         if (!tabs.some(t => t[0] === model.tab)) model.tab = 'tasks';
         for (const [key, label, n] of tabs) {
             const b = btn('tab goal-tab', null, () => { if (model.tab === key) return; model.tab = key; closePreview(false); drawPage(); root.querySelector(`#goal-tab-${key}`)?.focus({ preventScroll: true }); });
@@ -306,7 +317,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
             strip.append(b);
         }
         const list = el('div', 'goal-list'); list.id = 'goal-list'; list.setAttribute('role', 'tabpanel'); list.setAttribute('aria-labelledby', `goal-tab-${model.tab}`);
-        if (model.tab === 'artifacts') artifactsList(list, g); else tasksList(list, g);
+        if (model.tab === 'artifacts') artifactsList(list, g); else if (model.tab === 'comments') commentsList(list, g); else tasksList(list, g);
         wrap.append(strip, list);
         countArtifacts(g.id);
         return wrap;
@@ -494,6 +505,6 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         window.addEventListener('focus', visibleRefresh);
     }
     return { update, openClose: (g, preset) => openClose(g, preset), refreshTasks: () => loadTasks(id), dispose: () => {
-        disposed = true; narrowQuery?.removeEventListener?.('change', namePane); if (!previewEl.hidden) closeDetailPane(); artifacts.api?.destroy(); stop?.(); if (timer) clearInterval(timer); window.removeEventListener('focus', visibleRefresh);
+        disposed = true; narrowQuery?.removeEventListener?.('change', namePane); if (!previewEl.hidden) closeDetailPane(); artifacts.api?.destroy(); comments.api?.destroy(); stop?.(); if (timer) clearInterval(timer); window.removeEventListener('focus', visibleRefresh);
     }, focus: focusDetail };
 }

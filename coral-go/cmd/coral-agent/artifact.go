@@ -22,8 +22,8 @@ import (
 
 const artifactUsageText = `Usage: coral-agent artifact upload <file> [--name NAME] [--media-type TYPE] [--new-version-of <link>] [--task N | --no-task] [--tag WORD]... [--question TEXT]
        coral-agent artifact download <coral://artifacts/digest> [--output FILE] [--force]
-       coral-agent artifact reply <coral://artifacts/digest> <comment-id> <text | ->
-       coral-agent artifact comments <coral://artifacts/digest>
+       coral-agent artifact reply <coral://artifacts/digest | coral://goals/team/number> <comment-id> <text | ->
+       coral-agent artifact comments <coral://artifacts/digest | coral://goals/team/number>
 Run coral-agent artifact upload --help, artifact download --help, artifact reply --help or artifact comments --help for one of them.`
 
 const artifactUploadUsageText = `Usage: coral-agent artifact upload <file> [--name NAME] [--media-type TYPE] [--new-version-of <link>] [--task N | --no-task] [--tag WORD]... [--question TEXT]
@@ -56,7 +56,7 @@ Windows use coral-board post --file <path> (coral-board help windows); in Bash,
 coral-board post - <<'EOF' (body and closing EOF on separate lines).
 Never put backticks or $( ) inside a double-quoted post argument.`
 
-const artifactReplyUsageText = `Usage: coral-agent artifact reply <coral://artifacts/digest> <comment-id> <text | ->
+const artifactReplyUsageText = `Usage: coral-agent artifact reply <coral://artifacts/digest | coral://goals/team/number> <comment-id> <text | ->
 
 reply answers a comment the Operator sent you (the message names this exact command with the
 link and the comment id filled in): it posts your text into that comment's thread, as you, and
@@ -267,7 +267,7 @@ func cmdArtifactReply(args []string) {
 // replyToComment posts text into the thread of comment commentID of the artifact ref, through the reply route (the agent's own token says who it is; the server decides whether it was
 // asked). It prints one line on success; a refusal is an error carrying Coral's own reason.
 func replyToComment(serverURL, ref, commentID, text string, stdout io.Writer) error {
-	id, err := artifactDigest(serverURL, ref)
+	id, err := commentSubject(serverURL, ref)
 	if err != nil {
 		return err
 	}

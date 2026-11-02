@@ -140,3 +140,31 @@ func TestReplyPathIsExactlyTheDigitsOfTheCommentId(t *testing.T) {
 		}
 	}
 }
+
+// #11955: the same reply command takes a goal's link, and posts into that goal's thread through the same route.
+func TestReplyAndCommentsTakeAGoalLinkAndNothingLooseInItsPlace(t *testing.T) {
+	var got struct{ method, path, ctype, body string }
+	srv := replyServer(t, http.StatusCreated, `{"id":42,"parent_id":7,"body":"done"}`, &got)
+	defer srv.Close()
+	if err := replyToComment(srv.URL, "coral://goals/team-a/12", "7", "Covered.", io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	if got.path != "/api/artifacts/goal:team-a:12/comments/7/reply" {
+		t.Fatalf("path: %q", got.path)
+	}
+	srv2 := replyServer(t, http.StatusOK, `[]`, &got)
+	defer srv2.Close()
+	_ = listArtifactComments(srv2.URL, "coral://goals/team-a/12", io.Discard)
+	if got.path != "/api/artifacts/goal:team-a:12/comments" {
+		t.Fatalf("comments path: %q", got.path)
+	}
+	for _, bad := range []string{"coral://goals/team-a/0", "coral://goals/team-a/12/x", "coral://goals//12", "coral://goals/../12", "coral://goals/team-a/012", "coral://goals/team a/1", "goal:team-a:12"} {
+		if err := replyToComment(srv.URL, bad, "7", "text", io.Discard); err == nil {
+			t.Fatalf("%q was accepted", bad)
+		}
+	}
+	// a goal link is not an artifact: download still refuses it
+	if _, err := artifactDigest(srv.URL, "coral://goals/team-a/12"); err == nil {
+		t.Fatal("download takes artifacts alone")
+	}
+}
