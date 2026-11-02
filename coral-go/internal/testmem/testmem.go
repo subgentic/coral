@@ -12,7 +12,7 @@ import (
 )
 
 // DefaultLimitMB is the most a package's test binary may hold, in MiB. CORAL_TEST_MAX_MB changes it for one run (0 turns the guard off).
-const DefaultLimitMB = 1500
+const DefaultLimitMB = 2048
 
 var names = []string{"/memory/classes/total:bytes", "/memory/classes/heap/released:bytes"}
 

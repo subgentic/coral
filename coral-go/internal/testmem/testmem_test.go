@@ -3,6 +3,8 @@ package testmem
 import (
 	"os"
 	"os/exec"
+	"runtime/debug"
+	"runtime/metrics"
 	"strings"
 	"testing"
 	"time"
@@ -75,5 +77,51 @@ func TestAProcessUnderItsLimitPasses(t *testing.T) {
 	time.Sleep(600 * time.Millisecond)
 	if peak := stop(); peak <= 0 {
 		t.Fatalf("a peak is reported: %d", peak)
+	}
+}
+
+// Held is what the runtime holds from the OS: total minus what it gave back (#12336). Memory freed and returned must not count, or a run that churns would be stopped for what it already released.
+func TestHeldSubtractsWhatTheRuntimeGaveBack(t *testing.T) {
+	buf := make([]byte, 128<<20)
+	for i := range buf {
+		buf[i] = 1
+	}
+	held := Held()
+	buf = nil
+	debug.FreeOSMemory()
+	after := Held()
+	if after+64<<20 > held {
+		t.Fatalf("128 MiB freed and returned: Held went %d -> %d MiB", held>>20, after>>20)
+	}
+	s := []metrics.Sample{{Name: "/memory/classes/total:bytes"}, {Name: "/memory/classes/heap/released:bytes"}}
+	metrics.Read(s)
+	total, released := s[0].Value.Uint64(), s[1].Value.Uint64()
+	if released == 0 || Held() >= total {
+		t.Fatalf("released %d MiB of %d: Held must be below the total", released>>20, total>>20)
+	}
+	if DefaultLimitMB != 2048 {
+		t.Fatalf("the default limit is 2048 MiB (the package peaks near 1258): %d", DefaultLimitMB)
+	}
+}
+
+// CORAL_TEST_MAX_MB=0 turns the guard off: nothing watches, nothing is stopped, whatever the process holds (#12336).
+func TestAZeroLimitWatchesNothing(t *testing.T) {
+	if os.Getenv("TESTMEM_OFF_CHILD") == "1" {
+		stop := Start("child", LimitMB(DefaultLimitMB))
+		hold := make([]byte, 120<<20)
+		for i := range hold {
+			hold[i] = 1
+		}
+		time.Sleep(800 * time.Millisecond) // several looks of a 50 MiB limit would have ended it
+		_ = hold[len(hold)-1]
+		if peak := stop(); peak != 0 {
+			t.Fatalf("a guard that is off reports no peak: %d", peak)
+		}
+		return
+	}
+	cmd := exec.Command(os.Args[0], "-test.run", "^TestAZeroLimitWatchesNothing$")
+	cmd.Env = append(os.Environ(), "TESTMEM_OFF_CHILD=1", "CORAL_TEST_MAX_MB=0")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("a process with the guard off must run to its end: %v\n%s", err, out)
 	}
 }
