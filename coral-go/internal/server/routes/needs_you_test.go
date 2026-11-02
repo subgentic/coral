@@ -454,6 +454,8 @@ func TestNeedsYouAFileWithNewCommentsIsUnreadAgainAsTheSameRow(t *testing.T) {
 	news["ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"] = 5
 	n, _ = count()
 	assert.Zero(t, n, "news on another file is not this file's")
+}
+
 // #12139: a skill waiting for the Operator's approval is one item of GET /api/needs-you (the phone push and the count): who published it from the session, the team, the skill and its version as one cleaned line, a
 // stable id; an approved or rejected skill is not one, and a skills source that cannot be read is named in unread_sources, not counted as none.
 func TestNeedsYouListsTheSkillsWaitingForApproval(t *testing.T) {
