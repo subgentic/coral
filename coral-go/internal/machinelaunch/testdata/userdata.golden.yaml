@@ -246,7 +246,7 @@ write_files:
         touch /var/lib/coral-machine/agents-done
         /usr/local/sbin/coral-machine-agents || rc=1
       fi
-      # Nothing may start this unit again: the path and the timer are switched off for good (and stay off after a reboot).
+      # Nothing may start this unit again, with agents or without: the path and the timer are switched off for good (and stay off after a reboot).
       systemctl disable --now coral-finish.timer coral-finish.path 2>/dev/null || true
       exit $rc
   - path: /usr/local/sbin/coral-machine-agents

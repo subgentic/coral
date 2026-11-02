@@ -431,8 +431,10 @@ func finishScript(withAgents bool) string {
 		p("  touch /var/lib/coral-machine/agents-done")
 		p("  /usr/local/sbin/coral-machine-agents || rc=1")
 		p("fi")
-		p("# Nothing may start this unit again: the path and the timer are switched off for good (and stay off after a reboot).")
-		p("systemctl disable --now coral-finish.timer coral-finish.path 2>/dev/null || true")
+	}
+	p("# Nothing may start this unit again, with agents or without: the path and the timer are switched off for good (and stay off after a reboot).")
+	p("systemctl disable --now coral-finish.timer coral-finish.path 2>/dev/null || true")
+	if withAgents {
 		p("exit $rc") // the machine is enrolled and SSH is closed by now: a failed agent makes this unit FAIL (named in the journal by coral-machine-agents), never a silent success
 		return s.String()
 	}
