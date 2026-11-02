@@ -578,6 +578,7 @@ export function dataTable(cfg) {
         const more = [];
         actions.forEach((a, i) => {
             if (st.confirming >= 0) return; // while one asks, the others wait
+            if (a.hidden?.(chosen())) return; // an action that makes no sense for what is selected is not offered, not shown dimmed (#12401: Changes on a goal)
             if (icons && a.more) { more.push([a, i]); return; }
             const action = icons && a.icon ? button('btn btn-quiet btn-icon dt-bar-action dt-bar-icon', '', press(a, i)) : button(`btn btn-small dt-bar-action${a.danger ? ' dt-danger' : ''}`, a.label, press(a, i));
             if (icons && a.icon) { action.append(a.icon()); action.setAttribute('aria-label', a.label); action.title = a.label; }
