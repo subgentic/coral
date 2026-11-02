@@ -45,12 +45,12 @@ const TEAM = `qa-docs-${Date.now() % 100000}`;
             });
             await S.run(`${label}: automatic paging appends the next page without duplicate or reordered rows`, async () => {
                 await waitFor(`window.__tp.rows().length === 10`, 'ten rows after automatic paging', 6000);
-                const names = await ev(`[...window.__tp.table().querySelectorAll('tbody .dt-primary')].map(b => b.textContent)`);
+                const names = await ev(`[...window.__tp.table().querySelectorAll('tbody .dt-primary')].map(b => (b.textContent.match(/^Report \\d+/) || [b.textContent])[0])`); // a phone's row is a mail row: the name, then its goal and date in the same button (#12230)
                 assert.deepEqual(names, [0, 1, 2, 3, 4, 100, 101, 102, 103, 104].map(n => 'Report ' + n), 'both pages retain their order with no duplicate rows');
                 assert.equal(await ev(`!!window.__tp.find('button', /^Load more$/i)`), false, 'no paging button after the last page');
             });
             await S.run(`${label}: a row's name button opens the pane; Escape closes it and the focus returns to the row`, async () => {
-                assert.ok(await ev(`(() => { const b = [...window.__tp.table().querySelectorAll('button')].find(x => /^Report 1$/.test(window.__na.name(x))); if (!b) return false; b.focus(); b.click(); return true; })()`), 'no row button named Report 1'); await settle(400);
+                assert.ok(await ev(`(() => { const b = [...window.__tp.table().querySelectorAll('button')].find(x => /^Report 1(,|$)/.test(window.__na.name(x))); if (!b) return false; b.focus(); b.click(); return true; })()`), 'no row button named Report 1'); await settle(400);
                 assert.ok(await ev(`!!window.__tp.pane() && /The report text\\./.test(window.__na.text(window.__tp.pane()))`), 'the pane shows the text');
                 await ev(`document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })); true`); await settle(300);
                 assert.equal(await ev(`window.__tp.pane() === null`), true, 'Escape closes the pane');

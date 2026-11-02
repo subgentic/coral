@@ -36,7 +36,8 @@ const { coralReady } = require('./helpers/wait');
             await shot(`words-home-${w}`);
             await Page.navigate({ url: BASE + `/team/${B}/tasks` }); await Page.loadEventFired(); await install(); await coralReady(ev);
             await waitFor(`!!document.querySelector('.btn-create-task')`, at + 'the Tasks tab', 10000);
-            assert.equal(await ev(`document.querySelector('.btn-create-task').textContent.trim()`), 'New task', at + 'the Tasks bar says New task');
+            assert.equal(await ev(`document.querySelector('.btn-create-task').getAttribute('aria-label')`), 'New task', at + 'the Tasks bar says New task (to a screen reader and a tooltip)');
+            if (w > 390) assert.equal(await ev(`document.querySelector('.btn-create-task').textContent.trim()`), 'New task', at + 'the Tasks bar says New task'); // a phone's toolbar has the compact + (#12230)
             // a dialog: no Close X, Cancel closes it
             await ev(`window.showJobModal().then(() => true)`); // the form loads on first use (#10218)
             await waitFor(`getComputedStyle(document.getElementById('job-modal')).display !== 'none'`, at + 'New job', 8000);
