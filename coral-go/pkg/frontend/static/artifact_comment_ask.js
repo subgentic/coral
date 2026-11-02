@@ -1,5 +1,6 @@
 // Send to agent: the picker inside a comment card, and what came of the ask (split out of attachComments, #8376).
 import { importOnce } from './import_once.js';
+import { isSignedOut } from './overload.js';
 import { scrollBehavior } from './motion.js';
 import { decisionNeedsPerson } from './server_base.js';
 const api = await importOnce('./artifact_comments_api.js');
@@ -69,7 +70,7 @@ export function createAsk({ st, panel, render, announce, refresh, ownHex }) {
             for (const r of res.results) if (r.state === 'sent' || r.state === 'already_asked') names.set(r.agent.toLowerCase(), r.agent), asked.set(r.agent.toLowerCase(), r.state === 'sent' ? 'Asked just now' : 'Already asked');
             const n = res.results.filter(r => r.state === 'sent').length;
             announce(n ? `Asked ${n} agent${n === 1 ? '' : 's'}. Their replies come into this thread.` : 'Nobody was asked.');
-            if (n) for (const ms of [10000, 30000, 90000]) setTimeout(() => { if (hex === st.hex) refresh(); }, ms); // the agents' replies are replies in the thread: fetched a few times while they work
+            if (n) for (const ms of [10000, 30000, 90000]) setTimeout(() => { if (hex === st.hex && !isSignedOut()) refresh(); }, ms); // the agents' replies are replies in the thread: fetched a few times while they work
         } else { k.error = res.error || 'The comment was not sent.'; }
         redrawAsk(); redrawStatus(k.id);
         panel.querySelector('.ac-ask .ac-cancel')?.focus();
