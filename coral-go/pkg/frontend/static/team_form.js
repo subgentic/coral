@@ -99,7 +99,9 @@ function mount(modal) {
         { key: 'trustLine', type: 'custom', wide: true, label: ' ', render: slot => { const p = document.createElement('p'); p.id = 'launch-team-trust-line'; p.className = 'sv-help'; p.textContent = 'Coral will start these agents in this folder and trust it for them.'; slot.append(p); },
             visibleWhen: () => { const d = document.getElementById('launch-team-dir'); return !isHub() && usesSuggestion(d) && !suggestionExists(d); } },
         { key: 'trust', type: 'toggle', id: 'launch-team-trust', label: 'Trust this folder: its settings and tools can run', default: false, help: 'Off by default.',
-            helpOf: () => 'Off by default. On, ' + (document.getElementById('launch-team-dir')?.value.trim() || 'this folder') + " is trusted for the team's agents, so settings, tools and hooks in it run with no question. Tick it only for code you trust.",
+            helpOf: () => { const f = document.getElementById('launch-team-dir')?.value.trim() || 'this folder'; // off: say plainly what that means, so a typed folder is not taken for one Coral trusts (#12413)
+                return document.getElementById('launch-team-trust')?.checked ? 'On, ' + f + " is trusted for the team's agents, so settings, tools and hooks in it run with no question. Tick it only for code you trust."
+                    : 'Off by default. Coral will not trust ' + f + " unless this is on, so each agent's CLI asks about the folder when it starts."; },
             visibleWhen: () => { const d = document.getElementById('launch-team-dir'); return !isHub() && !!(d && d.value.trim() && (!usesSuggestion(d) || suggestionExists(d))); } },
         { key: 'server', type: 'text', id: 'team-board-server', label: "Another computer's address", placeholder: 'e.g. http://remote-computer:8420' },
         { key: 'worktree', type: 'toggle', id: 'launch-team-worktree', label: 'Launch in a git worktree', default: false, help: 'The team works on its own branch in an isolated copy of the repository.' },
@@ -107,7 +109,7 @@ function mount(modal) {
     ];
     _view = mountSettingsView(host, { mode: 'form', fields });
     // The folder the person ticked "Trust this folder" for: registered here, when the form is built, not at load (a page-wide listener at start shows in the startup golden, #11889).
-    modal.addEventListener('change', e => { if (e.target && e.target.id === 'launch-team-trust') _trustFor = e.target.checked ? (document.getElementById('launch-team-dir')?.value.trim() || '') : ''; });
+    modal.addEventListener('change', e => { if (!e.target || e.target.id !== 'launch-team-trust') return; _trustFor = e.target.checked ? (document.getElementById('launch-team-dir')?.value.trim() || '') : ''; _view?.refresh(); }); // the sentence under the switch follows it
     joinBrowse('launch-team-dir', 'btn-browse-team'); // Browse at the input's right, as Open folder has it (#9489)
     const server = document.getElementById('team-board-server'); if (server) server.disabled = true; // the machine's own entry reveals it (launch_dialog.js _syncTeamAddress)
     showTeamAddress(false);
