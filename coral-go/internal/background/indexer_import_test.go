@@ -96,3 +96,28 @@ func TestAChatThatWasListedStaysListedWhenItsAgentIsGone(t *testing.T) {
 	require.NoError(t, idx.RunOnce(ctx))
 	require.ElementsMatch(t, []string{"mine.jsonl"}, indexedIDs(t, ss))
 }
+
+// #11970 (Security's MUST on round 2): a FRESH folder stays off whatever its rows look like later. An agent is started and indexed with its name, deleted, its file written to as the CLI exits, and
+// a pass run: the row keeps its name, the earlier history is still held back, no setting was written and the first pass's answer is recorded once.
+func TestAFreshFolderStaysOffAfterItsAgentIsDeletedAndItsFileChanges(t *testing.T) {
+	ctx, ss, fs, idx := importFixture(t)
+	require.NoError(t, idx.RunOnce(ctx))
+	require.NoError(t, ss.UnregisterLiveSession(ctx, "mine"))
+	fs.sessions[0].FileMtime += 5 // the CLI writes more to its file as it exits
+	require.NoError(t, idx.RunOnce(ctx))
+	require.NoError(t, idx.RunOnce(ctx))
+
+	require.ElementsMatch(t, []string{"mine.jsonl"}, indexedIDs(t, ss), "the earlier history is still held back")
+	var name string
+	require.NoError(t, ss.DB().GetContext(ctx, &name, `SELECT COALESCE(agent_name, '') FROM session_index WHERE session_id = 'mine'`))
+	require.Equal(t, "dev", name, "a recorded agent name stays when the agent is gone")
+	settings, err := ss.GetSettings(ctx)
+	require.NoError(t, err)
+	require.NotContains(t, settings, "history_import")
+	on, err := ss.DecideHistoryImport(ctx)
+	require.NoError(t, err)
+	require.False(t, on)
+	var recorded string
+	require.NoError(t, ss.DB().GetContext(ctx, &recorded, `SELECT value FROM store_meta WHERE key = 'history_import_default'`))
+	require.Equal(t, "0", recorded)
+}

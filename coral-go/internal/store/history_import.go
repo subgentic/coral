@@ -2,6 +2,8 @@ package store
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 
 	"github.com/jmoiron/sqlx"
 )
@@ -24,9 +26,13 @@ type UnimportedChat struct {
 	SessionID  string  `db:"session_id"`
 }
 
-// DecideHistoryImport returns whether found chats are indexed. Only the person's choice is ever written (Import, or Off in Settings): with none recorded, an install that already lists a chat
-// Coral did not start (an index row with no agent name) keeps listing them, so nothing disappears for a current user, and a fresh one is off. A fresh Coral indexes only its own agents' chats,
-// which carry their agent's name, so it stays off until the person chooses; nothing is written on the way, so a first pass leaves the settings as they were.
+// importDefaultKey records in store_meta (not a setting the person sees, and not in the settings the test runs compare) what the FIRST pass of a data folder found, so a fresh folder stays off
+// whatever its index rows look like later.
+const importDefaultKey = "history_import_default"
+
+// DecideHistoryImport returns whether found chats are indexed. The person's choice (Import, or Off in Settings) is the only setting ever written. With none, the first pass decides once and records
+// it in store_meta: an install that already lists a chat Coral did not start (an index row with no agent name) keeps listing them, so nothing disappears for a current user; a fresh one is off. A fresh
+// Coral indexes only its own agents' chats, which carry their agent's name (and keep it when the agent is gone), so it stays off until the person chooses.
 func (s *SessionStore) DecideHistoryImport(ctx context.Context) (bool, error) {
 	settings, err := s.GetSettings(ctx)
 	if err != nil {
@@ -35,11 +41,26 @@ func (s *SessionStore) DecideHistoryImport(ctx context.Context) (bool, error) {
 	if v, ok := settings[historyImportKey]; ok {
 		return v == HistoryImportOn, nil
 	}
+	var recorded string
+	err = s.reader().GetContext(ctx, &recorded, `SELECT value FROM store_meta WHERE key = ?`, importDefaultKey)
+	if err == nil {
+		return recorded == HistoryImportOn, nil
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return false, err
+	}
 	var n int
 	if err := s.reader().GetContext(ctx, &n, `SELECT COUNT(*) FROM session_index WHERE COALESCE(agent_name, '') = ''`); err != nil {
 		return false, err
 	}
-	return n > 0, nil
+	v := HistoryImportOff
+	if n > 0 {
+		v = HistoryImportOn
+	}
+	if _, err := s.db.ExecContext(ctx, `INSERT OR IGNORE INTO store_meta (key, value) VALUES (?, ?)`, importDefaultKey, v); err != nil {
+		return false, err
+	}
+	return v == HistoryImportOn, nil
 }
 
 // ImportEarlierChats records the person's choice and forgets what was held back, so the next pass reads those files and indexes them.
