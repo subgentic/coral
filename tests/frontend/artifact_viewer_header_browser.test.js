@@ -23,6 +23,7 @@ const { coralReady } = require('./helpers/wait');
             await ev(`(() => { const orig = window.fetch.bind(window); window.fetch = (u, o) => { const url = String(u);
                 if (/\\/api\\/board\\/team-a\\/artifacts\\?tag=for%20review/.test(url)) return Promise.resolve(new Response(JSON.stringify({ artifacts: [{ id: '${H3}', name: 'release-plan.md', tags: ['for review'], produced_by: 'Writer A', media_type: 'text/markdown', size: 12000, created_at: new Date().toISOString() }], has_more: false }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
                 if (/\\/api\\/board\\/team-a\\/artifacts\\?tag=(approved|reviewed)/.test(url)) return Promise.resolve(new Response(JSON.stringify({ artifacts: [], has_more: false }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+                if (/\\/api\\/board\\/team-a\\/artifacts\\/[0-9a-f]{64}\\/review/.test(url) && o && o.method === 'POST') return Promise.resolve(new Response(JSON.stringify({ state: 'approved', changed: true, tags: ['approved'], review: { state: 'approved', at: new Date().toISOString() }, delivered: true, to: 'Writer A' }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
                 return orig(u, o); }; return true; })()`);
             await ev(`import(${S} + 'artifact_viewer.js').then(v => v.openArtifactViewer('${H3}', { filename: 'release-plan.md', board: 'team-a', from: 'Writer A · team-a' })).then(() => true)`);
             await waitFor(`!!document.querySelector('.artifact-review-approve:not([hidden])') && !!document.querySelector('.av-current')`, `${w}: the viewer shows its review and versions`, 12000);
@@ -50,6 +51,12 @@ const { coralReady } = require('./helpers/wait');
             await ev(`document.querySelector('.av-current').click(); true`);
             await waitFor(`!!document.querySelector('.av-list:not([hidden])')`, `${w}: the version list opens`, 4000);
             assert.ok(await ev(`!!document.querySelector('.av-compare') && document.querySelector('.av-compare').getClientRects().length > 0 && document.querySelector('.av-compare').textContent.includes('Compare with v2')`), `${w}: Compare with v2 is in the version list`);
+            await ev(`document.querySelector('.av-current').click(); true`);
+            // Approve: the status chip says Approved at once, and the two buttons go (#12112's leftover: it kept saying "Waiting for your review")
+            assert.match(await ev(`document.querySelector('.artifact-review-state').textContent`), /Waiting for your review/, `${w}: before Approve the status waits for the review`);
+            await ev(`document.querySelector('.artifact-review-approve').click(); true`);
+            await waitFor(`/^Approved/.test(document.querySelector('.artifact-review-state').textContent)`, `${w}: the status chip says Approved after Approve (it said: ` + await ev(`document.querySelector('.artifact-review-state').textContent`) + ')', 4000);
+            assert.ok(await ev(`document.querySelector('.artifact-review-approve').hidden && document.querySelector('.artifact-review-changes').hidden`), `${w}: Approve and Request changes are gone once approved`);
             await ev(`document.querySelector('.av-current').click(); document.querySelector('.artifact-viewer-close').click(); true`);
         }
         console.log('   heights before/after are in the lines above: ' + JSON.stringify(heights));

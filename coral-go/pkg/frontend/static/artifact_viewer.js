@@ -81,7 +81,7 @@ function _build() {
     _details.button.classList.add('menu-item'); _details.button.setAttribute('role', 'menuitem'); d.querySelector('.artifact-viewer-menu').append(_details.button); // Details is in the ⋯ menu: the content is straight under the one header row (#12223)
     // the HTML preview's banner is said once; after that a "Sandboxed" chip in the header says it, and a tap shows or hides the banner (#12224)
     const chip = document.createElement('button'); chip.type = 'button'; chip.className = 'chip artifact-viewer-sandbox'; chip.hidden = true; chip.setAttribute('aria-expanded', 'false');
-    chip.innerHTML = '<span class="material-icons" aria-hidden="true">shield</span>Sandboxed';
+    chip.textContent = 'Sandboxed'; // words only: the icon font is a subset and has no shield
     d.querySelector('.artifact-viewer-chips').append(chip);
     chip.addEventListener('click', () => { const note = d.querySelector('.artifact-linked-notice'); if (!note) return; note.hidden = !note.hidden; chip.setAttribute('aria-expanded', String(!note.hidden)); });
     // the line under the header (who sent it, what they ask) is one cut line; a tap, Enter or Space shows all of it

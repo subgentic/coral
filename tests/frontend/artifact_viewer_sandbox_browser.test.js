@@ -8,7 +8,7 @@ const BASE = require('./test_base').BASE;
 const { coralReady } = require('./helpers/wait');
 
 const HEX = 'ab'.repeat(32);
-const FROM = 'Writer A · launch-team · asks: Is the spring launch plan ready to share with the whole company, and are the budget lines in section 3 final or still moving? I need to know before Friday.';
+const FROM = 'Writer A · launch-team · asks: Is the spring launch plan ready to share with the whole company, and are the budget lines in section 3 final or still moving? I need to know before Friday, because the board meets on Monday morning and the deck goes out to the whole company, the partners and the press at the same time, so a late change would mean sending it all twice.';
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const S = `(window.__coralStatic || '/static/')`;
