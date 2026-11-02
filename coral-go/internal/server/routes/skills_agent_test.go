@@ -176,6 +176,15 @@ func TestGetChecksTheApprovedDigestOnEveryRead(t *testing.T) {
 	require.NoError(t, os.Symlink(filepath.Join(e.dir, "elsewhere"), filepath.Join(e.dir, "skills", "objects", digest)))
 	code, _ = e.get("/api/agent/skills/"+row.ID, "agent")
 	assert.Equal(t, 404, code)
+	// a link to a file that has exactly the approved bytes is refused too: the object is opened without following a link
+	right := zipOf(t, map[string]string{"SKILL.md": skillMD})
+	require.NoError(t, os.WriteFile(filepath.Join(e.dir, "right.zip"), right, 0o600))
+	require.NoError(t, os.Remove(filepath.Join(e.dir, "skills", "objects", digest)))
+	require.NoError(t, os.Symlink(filepath.Join(e.dir, "right.zip"), filepath.Join(e.dir, "skills", "objects", digest)))
+	sum := sha256.Sum256(right)
+	require.Equal(t, digest, hex.EncodeToString(sum[:]), "the file the link points to is the approved zip")
+	code, _ = e.get("/api/agent/skills/"+row.ID, "agent")
+	assert.Equal(t, 404, code, "a link is not followed, whatever it points to")
 }
 
 func TestAFileThatCannotBeShownAsTextIsNotServedToAnAgent(t *testing.T) {
@@ -261,4 +270,12 @@ func TestTheRateLimitIsPerSessionNotPerName(t *testing.T) {
 	}
 	assert.Equal(t, 429, as("sid-one"))
 	assert.Equal(t, 200, as("sid-two"), "another session with the same agent name has its own minute")
+	// and the two really do share one agent name (so a bucket by name would have refused the second): the log names both as Dev
+	log, err := e.ss.SkillLog(context.Background(), 500)
+	require.NoError(t, err)
+	actors := map[string]bool{}
+	for _, l := range log {
+		actors[l.Actor] = true
+	}
+	assert.Equal(t, map[string]bool{"Dev": true}, actors, "both sessions are logged under the same agent name")
 }
