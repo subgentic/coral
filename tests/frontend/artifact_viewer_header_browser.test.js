@@ -36,7 +36,8 @@ const { coralReady } = require('./helpers/wait');
             heights[w] = g.above; console.log(`   ${w}: controls above the file ${g.above} px (header ${g.headH} px, ${g.headRows} line(s))`);
             await shot('viewer-header-' + w);
             assert.ok(await ev(`(() => { const d = document.querySelector('.artifact-viewer-content').getBoundingClientRect(); return [...document.querySelectorAll('.artifact-viewer-header .btn, .artifact-viewer-header .chip')].filter(e => e.getClientRects().length).every(e => { const r = e.getBoundingClientRect(); return r.left >= d.left - 1 && r.right <= d.right + 1; }); })()`), `${w}: every control of the header is inside the viewer (none is cut off at the edge)`);
-            assert.ok(g.inHead.chip && g.inHead.state && g.inHead.approve && g.inHead.changes && g.inHead.more, `${w}: the version chip, the status, Approve, Request changes and the ⋯ button are all in the header row: ` + JSON.stringify(g.inHead));
+            assert.ok(g.inHead.chip && g.inHead.state && (w === 390 || (g.inHead.approve && g.inHead.changes)) && g.inHead.more, // on a phone Approve and Request changes are in the bottom bar (#12226, artifact_viewer_phone_browser)
+                 `${w}: the version chip, the status, Approve, Request changes and the ⋯ button are all in the header row: ` + JSON.stringify(g.inHead));
             assert.ok(!g.rows.versionBar && !g.rows.reviewBar, `${w}: no separate version bar or review bar row: ` + JSON.stringify(g.rows));
             assert.ok(!g.visibleAtRest.newtab && !g.visibleAtRest.download && !g.visibleAtRest.note && !g.visibleAtRest.compare, `${w}: Open in new tab, Download, Approve with a note and Compare are in menus, not on the row: ` + JSON.stringify(g.visibleAtRest));
             assert.ok(w === 390 ? g.headRows <= 4 : g.headRows === 1, `${w}: the controls are on ${w === 390 ? 'at most four short lines (slice d makes the phone two plus a bottom bar)' : 'one line'}: ${g.headRows}`);

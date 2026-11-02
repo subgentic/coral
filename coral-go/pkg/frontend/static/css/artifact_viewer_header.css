@@ -11,11 +11,23 @@
 .artifact-viewer-menu .details-toggle { padding: 6px 12px; color: var(--text-primary); justify-content: flex-start; }
 .artifact-review-state { flex: none; white-space: nowrap; color: var(--text-secondary); font-size: var(--fs-sm); background: var(--bg-tertiary); border-radius: 999px; padding: 2px 10px; }
 .artifact-review-state[hidden] { display: none; }
-@media (max-width: 768px) { .artifact-viewer-chips, .artifact-viewer-actions { flex-wrap: wrap; max-width: 100%; } .artifact-viewer-actions { flex: 1 1 100%; gap: 4px; } .artifact-viewer-actions .btn { padding-inline: 8px; } .artifact-viewer-chips { gap: 4px; } .artifact-review-state { font-size: var(--fs-sm); padding: 2px 6px; } .artifact-viewer-header { row-gap: 4px; } .artifact-viewer-title { order: -1; flex: 1 0 calc(100% - 52px); } .artifact-viewer-morewrap { order: -1; } }
 /* the sandbox chip and the one-line question (#12224) */
 .artifact-viewer-sandbox { flex: none; cursor: pointer; border: 0; background: var(--bg-tertiary); color: var(--text-secondary); font: inherit; font-size: var(--fs-sm); height: auto; padding: 2px 10px; }
 .artifact-viewer-sandbox[hidden], .artifact-linked-notice[hidden] { display: none; }
 .artifact-viewer-from.is-open { white-space: normal; overflow-wrap: anywhere; }
 .artifact-viewer-header { position: relative; } /* the version list hangs from the header row, so it is as wide as the dialog allows and never past its edge (#12223 review) */
 .artifact-viewer-chips .av-pop { left: 0; right: auto; max-width: 100%; }
-@media (max-width: 768px) { .artifact-viewer-chips .av-pop { left: 8px; right: 8px; min-width: 0; max-width: none; } }
+@media (max-width: 768px) {
+    .artifact-viewer-chips .av-pop { left: 8px; right: 8px; min-width: 0; max-width: none; }
+    /* two thin rows: the name and the ⋯ button, then the chips (version, status, Comments); Approve and Request changes are in the bar at the bottom (#12226) */
+    .artifact-viewer-header { flex-wrap: wrap; align-items: center; row-gap: 2px; }
+    .artifact-viewer-title { order: 0; flex: 1 1 0; min-width: 120px; padding-bottom: 0; } /* the name keeps room to read: at 320 px Comments wraps to the next row (#12226 review) */
+    .artifact-viewer-header > .ac-toggle { order: 1; flex: none; }
+    .artifact-viewer-morewrap { order: 2; }
+    .artifact-viewer-chips { order: 3; flex: 1 0 100%; max-width: 100%; gap: 4px; flex-wrap: wrap; }
+    .artifact-viewer-actions { display: none; }
+    .artifact-review-state { padding: 2px 6px; }
+    .artifact-viewer-foot .artifact-review-approve, .artifact-viewer-foot .artifact-review-changes { flex: 1 1 0; min-height: 44px; }
+    .artifact-review { flex: 0 1 auto; min-height: 0; max-height: max(120px, calc(var(--visual-viewport-height, 100dvh) - 260px)); overflow-y: auto; } /* the change-request form scrolls inside what the keyboard leaves, so Send is reachable (#12226 review) */
+    .artifact-viewer-foot .artifact-review-approve[hidden], .artifact-viewer-foot .artifact-review-changes[hidden] { display: none; }
+}
