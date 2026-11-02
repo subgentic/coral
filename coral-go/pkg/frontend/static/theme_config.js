@@ -10,6 +10,22 @@ import { isCloud } from './server_base.js';
 let variableGroups = {};   // { groupName: { cssVar: label, ... }, ... }
 let currentEdits = {};     // { cssVar: colorValue, ... }
 let savedThemes = [];      // [{ name, description, base }, ...]
+let lastBase = 'dark';     // the base the editor's colours were last taken from (the Based on list; the page's own base when the dialog opens)
+
+const pageBase = () => (document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark');
+
+/** What every variable of the editor is under a base theme (dark or light), read from the page itself: the base is put on the page for a moment with no custom colours over it, then the page is put back as it was. */
+function baseValues(base) {
+    const root = document.documentElement, was = root.getAttribute('data-theme'), saved = {};
+    const names = Object.values(variableGroups).flatMap(vars => Object.keys(vars));
+    for (const cssVar of names) { saved[cssVar] = root.style.getPropertyValue(cssVar); root.style.removeProperty(cssVar); }
+    root.setAttribute('data-theme', base);
+    const out = {}, styles = getComputedStyle(root);
+    for (const cssVar of names) out[cssVar] = styles.getPropertyValue(cssVar).trim();
+    if (was == null) root.removeAttribute('data-theme'); else root.setAttribute('data-theme', was);
+    for (const [cssVar, v] of Object.entries(saved)) if (v) root.style.setProperty(cssVar, v);
+    return out;
+}
 
 export async function showThemeConfigurator() {
     // Load variable definitions and saved themes in parallel
@@ -31,6 +47,8 @@ export async function showThemeConfigurator() {
     }
 
     renderModal();
+    lastBase = pageBase();
+    document.getElementById('theme-save-base').value = lastBase; // a light page starts on Light: a theme saved from it is a light one
     document.getElementById('theme-configurator-modal').style.display = 'flex';
 }
 
@@ -46,6 +64,8 @@ function renderModal() {
         `<option value="${escapeHtml(t.name)}">${escapeHtml(t.name)}</option>`
     ).join('');
 
+    const has = n => savedThemes.some(t => String(t.name).toLowerCase() === n); // Dark and Light are bases of their own; a theme the server lists by that name is shown once, as it is
+    const builtIn = ['dark', 'light'].filter(b => !has(b)).map(b => `<option value="${escapeAttr('base:' + b)}">${b === 'light' ? 'Light' : 'Dark'}</option>`).join('');
     const groups = Object.entries(variableGroups).map(([groupName, vars]) => {
         const rows = Object.entries(vars).map(([cssVar, label]) => {
             const value = currentEdits[cssVar] || '';
@@ -72,6 +92,7 @@ function renderModal() {
             <div class="toolbar toolbar-pad-bare theme-toolbar">
                 <select id="theme-load-select" class="settings-select">
                     <option value="">Load theme...</option>
+                    ${builtIn}
                     ${themeOptions}
                 </select>
                 <button class="btn" data-on-click="theme-load">Load</button>
@@ -90,7 +111,7 @@ function renderModal() {
             <div class="toolbar toolbar-stretch toolbar-pad-bare theme-save-bar">
                 <input type="text" id="theme-save-name" class="settings-input" placeholder="Theme name">
                 <input type="text" id="theme-save-desc" class="settings-input" placeholder="Description (optional)">
-                <select id="theme-save-base" class="settings-select form-control-auto">
+                <select id="theme-save-base" class="settings-select form-control-auto" data-on-change="theme-base-change">
                     <option value="dark">Based on: Dark</option>
                     <option value="light">Based on: Light</option>
                 </select>
@@ -131,6 +152,7 @@ function renderModal() {
 // ── Theme operations ─────────────────────────────────────────────────────
 
 (window.__coral ||= {}).previewTheme = function() {
+    document.documentElement.setAttribute('data-theme', document.getElementById('theme-save-base')?.value === 'light' ? 'light' : 'dark'); // the base the theme is based on, as a saved theme applies it at start
     applyVariablesToDom(currentEdits);
     showToast('Theme preview applied');
 };
@@ -178,6 +200,7 @@ function resetThemeToDefaults() {
         });
         state.settings.custom_theme = name;
 
+        document.documentElement.setAttribute('data-theme', base === 'light' ? 'light' : 'dark');
         applyVariablesToDom(currentEdits);
         showToast(`Theme "${name}" saved and applied`);
         hideThemeConfigurator();
@@ -190,6 +213,13 @@ async function loadSelectedTheme() {
     const select = document.getElementById('theme-load-select');
     const name = select.value;
     if (!name) return;
+    if (name.startsWith('base:')) { // Dark or Light itself: every colour is the base's
+        const base = name.slice(5) === 'light' ? 'light' : 'dark';
+        currentEdits = { ...currentEdits, ...baseValues(base) }; lastBase = base;
+        renderModal(); document.getElementById('theme-save-base').value = base;
+        showToast(`Loaded: ${base === 'light' ? 'Light' : 'Dark'}`);
+        return;
+    }
 
     try {
         const resp = await fetch(`/api/themes/${encodeURIComponent(name)}`);
@@ -202,7 +232,7 @@ async function loadSelectedTheme() {
         currentEdits = { ...currentEdits, ...theme.variables };
         document.getElementById('theme-save-name').value = name;
         document.getElementById('theme-save-desc').value = theme.description || '';
-        document.getElementById('theme-save-base').value = theme.base || 'dark';
+        document.getElementById('theme-save-base').value = theme.base || 'dark'; lastBase = theme.base === 'light' ? 'light' : 'dark';
         renderModal();
         // Restore name/desc after re-render
         document.getElementById('theme-save-name').value = name;
@@ -218,6 +248,7 @@ function deleteSelectedTheme() {
     const select = document.getElementById('theme-load-select');
     const name = select.value;
     if (!name) return;
+    if (name.startsWith('base:')) { showToast('Dark and Light are built in and cannot be deleted', true); return; }
     window.showConfirmModal('Delete theme', `Delete theme "${name}"?`, async () => { try {
         await fetch(`/api/themes/${encodeURIComponent(name)}`, { method: 'DELETE' });
         // If active theme is being deleted, clear the setting
@@ -357,7 +388,7 @@ function importThemeFile() {
             renderModal();
             document.getElementById('theme-save-name').value = result.name;
             document.getElementById('theme-save-desc').value = data.description || '';
-            document.getElementById('theme-save-base').value = data.base || 'dark';
+            document.getElementById('theme-save-base').value = data.base || 'dark'; lastBase = data.base === 'light' ? 'light' : 'dark';
             showToast(`Imported: ${result.name}`);
         } catch (e) {
             showToast('Failed to import theme', true);
@@ -404,7 +435,20 @@ function toHex(color) {
 
 // The theme configurator's color inputs and buttons (#3645): each calls the same function its
 // inline handler did.
+/** The Based on list changed: the colours the person has not touched take the new base's values, the ones they edited stay. */
+async function changeBase(el) {
+    const to = el.value === 'light' ? 'light' : 'dark', from = lastBase;
+    if (to === from) return;
+    const was = baseValues(from), now = baseValues(to), same = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
+    for (const cssVar of Object.keys(currentEdits)) if (same(currentEdits[cssVar], was[cssVar])) currentEdits[cssVar] = now[cssVar];
+    lastBase = to;
+    const name = document.getElementById('theme-save-name').value, desc = document.getElementById('theme-save-desc').value;
+    renderModal();
+    document.getElementById('theme-save-name').value = name; document.getElementById('theme-save-desc').value = desc; document.getElementById('theme-save-base').value = to;
+}
+
 registerActions({
+    'theme-base-change': el => changeBase(el),
     'theme-var': el => window.__coral.updateThemeVar(el),
     'theme-var-text': el => window.__coral.updateThemeVarText(el),
     'theme-load': () => loadSelectedTheme(),
