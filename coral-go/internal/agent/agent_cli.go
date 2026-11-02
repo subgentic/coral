@@ -82,6 +82,10 @@ func CLITypes() []string {
 // GetCLIInfo returns CLI info for an agent type, or nil if unknown.
 func GetCLIInfo(agentType string) *CLIInfo { return cliInfoFor(runtime.GOOS, agentType) }
 
+// CLIInfoOn is GetCLIInfo for the OS goos, for a caller that installs on a machine that is not this one: a cloud machine is always Linux, whatever the OS of the Coral that builds its setup (#12428: on a Windows
+// Coral the builder read agy's Windows command and refused it).
+func CLIInfoOn(goos, agentType string) *CLIInfo { return cliInfoFor(goos, agentType) }
+
 // cliInfoFor is GetCLIInfo for the OS goos: agy (and the types that run it) has its own command and note on Windows, with no bash, export or ~/.local in them.
 func cliInfoFor(goos, agentType string) *CLIInfo {
 	info, ok := agentCLIs[agentType]

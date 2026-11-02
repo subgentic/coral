@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -79,6 +80,9 @@ func TestEgressResolversUnitRunsAfterNetworkOnline(t *testing.T) {
 // The check script, run for real with a fake nft and a fake resolv.conf. "rules" fails when the table is not there; "resolvers" SAYS when a resolver is inside a blocked range and never fails (a boot must not
 // depend on it: #10944 SHOULD C).
 func TestEgressCheckScriptModes(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the check script runs on the Linux machine; this test runs it with a stub nft written as a shell script, which a Windows shell cannot start from a Windows path")
+	}
 	if _, err := exec.LookPath("sh"); err != nil {
 		t.Skip("no sh")
 	}

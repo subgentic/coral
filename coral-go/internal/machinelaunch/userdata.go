@@ -118,7 +118,7 @@ func resolveAgents(entries []string) ([]agentInstall, error) {
 		default:
 			return nil, fmt.Errorf("agent %q is not one Coral installs on a machine (claude, codex, pi, agy)", name)
 		}
-		info := agent.GetCLIInfo(name)
+		info := agent.CLIInfoOn("linux", name) // the machine is Linux, whatever this Coral runs on
 		if info == nil {
 			return nil, fmt.Errorf("agent %q has no install command", name)
 		}
