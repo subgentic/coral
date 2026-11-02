@@ -18,13 +18,23 @@ export const operatorAsks = () => asks;
 export const onOperatorAsksChanged = fn => { listeners.add(fn); return () => listeners.delete(fn); };
 const fire = () => { for (const f of listeners) f(); };
 
-/** A question as one line of a row: hidden characters written out, white space collapsed, cut after marking so a mark is never split. */
+/** The words without their Markdown marks, for a plain-text preview (a row's lines, #12152): emphasis, code, headings, quotes, bullets, links and images become their words; nothing else is touched. */
+export function plainMarkdown(text) {
+    return String(text == null ? '' : text).split('\n').map(l => l
+        .replace(/^\s*```.*$/, '').replace(/^\s{0,3}#{1,6}\s+/, '').replace(/^\s*>\s?/, '').replace(/^\s*[-*+]\s+/, '')
+        .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+        .replace(/`([^`]+)`/g, '$1').replace(/(\*\*|__)(?=\S)(.+?)(?<=\S)\1/g, '$2').replace(/~~(?=\S)(.+?)(?<=\S)~~/g, '$1')
+        .replace(/(^|[\s(])\*(?=\S)(.+?)(?<=\S)\*(?=[\s).,;:!?]|$)/g, '$1$2').replace(/(^|[\s(])_(?=\S)(.+?)(?<=\S)_(?=[\s).,;:!?]|$)/g, '$1$2')).join('\n');
+}
+/** A question as one line of a row: hidden characters written out, Markdown marks dropped, white space collapsed, cut after marking so a mark is never split. */
 export function askLine(a) {
-    const one = markHidden(a && a.text, { strict: true }).replace(/\s+/g, ' ').trim();
+    const one = plainMarkdown(markHidden(a && a.text, { strict: true })).replace(/\s+/g, ' ').trim();
     return one.length > LINE_MAX ? `${one.slice(0, LINE_MAX - 1).trimEnd()}…` : one;
 }
 /** The whole question, hidden characters written out, line breaks kept. */
 export const askWhole = a => markHidden(a && a.text, { strict: true });
+/** The whole question as plain text (a row's second line): the same words, line breaks kept, without the Markdown marks. */
+export const askPlain = a => plainMarkdown(askWhole(a));
 /** A stable id of one question among the rows. */
 export const askKey = a => `operator-ask:${a.board}:${a.kind}:${a.id}`;
 
