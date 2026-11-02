@@ -12,6 +12,7 @@
  * visible text, tooltips or document.title. */
 
 import { importOnce } from './import_once.js';
+import { isSignedOut } from './overload.js';
 import { isPhoneLayout } from './phone_layout.js';
 import { state } from './state.js';
 import { resolveSessionIdentity } from './render.js';
@@ -167,6 +168,7 @@ async function _fetchResolver(id) {
 
  async function resolveAndSelect(attempt = 0, downAttempt = 0) {
     if (!_targetId) { _setState('not-found'); return; }
+    if (isSignedOut()) return; /* a signed-out page makes no /api request (#12444) */
     if (_resolverRetryTimer) { clearTimeout(_resolverRetryTimer); _resolverRetryTimer = null; }
     if (downAttempt === 0) _setState('loading');
     const r = await _fetchResolver(_targetId);

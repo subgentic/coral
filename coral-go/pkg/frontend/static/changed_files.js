@@ -1,6 +1,7 @@
 /* Changed files panel — load and render per-agent file diffs */
 
 import { state } from './state.js';
+import { isSignedOut } from './overload.js';
 import { worktreeMode, setWorktreeMode } from './agent_file_api.js';
 import { deriveSessionState } from './render.js';
 import { escapeHtml, escapeAttr, showToast, refusedTooLarge } from './utils.js';
@@ -331,7 +332,7 @@ function watchFiles() {
     if (_watch) return;
     _watch = setInterval(() => { // interval-ok: only while the Files panel shows for a live agent in a visible tab; it clears itself otherwise
         const cur = state.currentSession;
-        if (!cur || cur.type !== 'live' || document.hidden || !filesPanelShowing()) { clearInterval(_watch); _watch = null; return; }
+        if (!cur || cur.type !== 'live' || document.hidden || isSignedOut() || !filesPanelShowing()) { clearInterval(_watch); _watch = null; return; } // a signed-out page makes no /api request (#12444)
         followRead(true);
     }, watchMs());
 }

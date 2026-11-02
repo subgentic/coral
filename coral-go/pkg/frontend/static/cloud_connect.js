@@ -11,6 +11,7 @@
  * is only used if it is an http(s) URL. The server token is never sent to the page. */
 
 import { copyText } from './utils.js';
+import { isSignedOut } from './overload.js';
 import { importOnce } from './import_once.js';
 const { morePermsWords, operatorLine, spellCode, OFF_TEXT, LEVEL_NOW, HUB_ACCESS_URL, EXPIRED_TEXT, codeExpired, autoAcceptChangedText, severalAccountsText } = await importOnce('./cloud_words.js');
 export const { enrolledRetrying, rekeyText, describe } = await importOnce('./cloud_words.js');
@@ -307,6 +308,7 @@ class CloudPanel {
         } catch { return fail('Could not start. Link this computer again instead.'); }
         const until = Date.parse(reply && reply.armed_until);
         const tick = async () => {
+            if (isSignedOut()) return; /* a signed-out page makes no /api request (#12444) */
             const left = Number.isFinite(until) ? Math.round((until - Date.now()) / 1000) : 0;
             await this.load();
             if (!this.ownerMissing) { if (say) say.textContent = ''; if (btn) btn.disabled = false; return; }
@@ -420,7 +422,7 @@ class CloudPanel {
         clearTimeout(this.timer);
         // loading (#3285): the connector is still reading its stored enrollment, so an
         // enrolled server can look idle for a moment.
-        if ((LIVE.includes(st.state) || st.loading) && this.root.offsetParent !== null) {
+        if ((LIVE.includes(st.state) || st.loading) && this.root.offsetParent !== null && !isSignedOut()) {
             this.timer = setTimeout(() => this.load(), 3000);
         }
     }

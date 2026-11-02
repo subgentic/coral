@@ -1,5 +1,6 @@
 /* Moved out of modals.js as it was (#4684): The AI team wizard, the team-agent dialog, and the Launch dialog's team form: its agents, templates and Launch Team. No behaviour change. */
 import { importOnce } from './import_once.js';
+import { isSignedOut } from './overload.js';
 import { isPhoneLayout } from './phone_layout.js';
 import { scrollBehavior } from './motion.js';
 import { showToast, escapeHtml, escapeAttr, boardNameProblem, OPERATOR_ID } from './utils.js';
@@ -806,7 +807,7 @@ async function launchTeam() {
             if (result.ok !== false) {
                 hideLaunchModal();
                 if (launched.length - failed.length > 0) importOnce('./alerts_offer.js').then(m => m.offerAlertsAfterLaunch()).catch(() => {}); // the first agents are when alerts make sense: once per browser (#10068)
-                setTimeout(loadLiveSessions, 2000);
+                setTimeout(() => { if (!isSignedOut()) loadLiveSessions(); }, 2000); // a signed-out page makes no /api request (#12472)
                 const boardId = result.board_id || boardName; // the id the server made (a repeated name gets its own, "Create another"), not the label that was typed
                 const seen = _refreshAfterLaunch(server, { boardName: boardId });
                 // The team opens the way a single agent does (#5989): its board with the Team view beside it, and the goal, if one was typed, as the Operator's first message to the lead. On a remote this waits for the hub to see the team.

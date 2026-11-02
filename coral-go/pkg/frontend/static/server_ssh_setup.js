@@ -6,6 +6,7 @@
  * far computer records is the person's own (made when they opened Coral), made by the hub from its own marker. Nothing here is a secret: the remote's API key is read and kept by the hub and never reaches this page. */
 
 import { loadStyles } from './lazy_styles.js';
+import { isSignedOut } from './overload.js';
 import { compareVersions } from './server_status.js';
 
 await loadStyles('ssh_setup.css'); // the page's rules are not in the start's stylesheet: they arrive before it is drawn (#11403)
@@ -158,6 +159,7 @@ export function mountSshSetup(host, { mode = 'setup', server = null, action = nu
     function poll() {
         if (st.dead) return;
         st.timer = setTimeout(async () => {
+            if (isSignedOut()) return; /* a signed-out page makes no /api request (#12444) */
             const r = await api('GET', `/api/servers/provision/${encodeURIComponent(st.plan.plan)}`);
             if (st.dead) return;
             if (r.ok) {

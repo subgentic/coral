@@ -3,6 +3,7 @@ import { plural } from './format.js';
  * drawn from the status each time it is shown. The switches are saved with Apply like the rest of Settings (applyUpdatePrefs); the card's buttons act at once: "Update and relaunch" opens the
  * confirmation (a dialog over this one), "Check now" asks the updater to look. A Homebrew or unsupported install says so and why, with the command to run. */
 import { importOnce } from './import_once.js';
+import { isSignedOut } from './overload.js';
 import { copyText, showToast } from './utils.js';
 import { isCloud } from './server_base.js';
 import { mountSettingsView } from './settings_view.js';
@@ -225,6 +226,7 @@ const RETRY_MS = [2000, 5000, 12000];
 function redrawWhenFactsArrive(i) {
     if (i >= RETRY_MS.length) return;
     setTimeout(async () => {
+        if (isSignedOut()) return; /* a signed-out page makes no /api request (#12444) */
         const cur = getUpdateStatus();
         if (!body() || !cur || cur.channel !== 'agentic' || cur.approved) return; // the pane is gone, the choice changed, or the facts are here
         await refreshUpdateStatus();

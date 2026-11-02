@@ -6,7 +6,7 @@ import { state } from './state.js';
 import { escapeHtml, escapeAttr, showToast, showView, setRowCurrent, focusPageHeading } from './utils.js';
 import { announceNotice } from './notifications.js';
 import { registerActions, withId, uuidOf } from './actions.js';
-import { pollEvery } from './overload.js';
+import { pollEvery, isSignedOut } from './overload.js';
 import { compactDuration } from './format.js';
 import { runFailure } from './run_failure.js';
 import { cronWords, atWords, awayWords, whenWords, resultWords, reasonWords, lastWords, limitWords, exitNote, resultLine, zoneNote, deleteJobWords, isExample, jobDescription, RUNS_WHILE_OPEN } from './job_words.js';
@@ -122,7 +122,7 @@ function watchJobRuns(job, runs) {
     const slow = Date.now() - _watchSince >= WATCH_BACKOFF_AFTER_MS;
     paintStillWaiting(job, slow, !runs.some(r => r.status === 'pending'));
     _runsWatch = setTimeout(() => {
-        if (selectedJobId !== job.id) return; // another job, or none: the watch ends
+        if (selectedJobId !== job.id || isSignedOut()) return; // another job, or none: the watch ends; a signed-out page makes no /api request (#12444)
         const shown = document.getElementById('scheduler-view');
         // Hidden (another tab is on screen): read nothing, but keep watching, so coming back to this job shows where its run got to (#9965, QA Reviewer 2).
         if (!shown || shown.getClientRects().length === 0) { watchJobRuns(job, runs); return; }

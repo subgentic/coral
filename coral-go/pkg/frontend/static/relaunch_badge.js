@@ -16,6 +16,7 @@
  * recorded); it does not see it through the gap. Showing every viewer through the gap needs a hub change (a bounded `relaunching` in the machine list). */
 
 import { updatesUiOn } from './update_flag.js';
+import { isSignedOut } from './overload.js';
 import { serverBase } from './server_base.js';
 
 const BADGE_TEXT = 'Updating';
@@ -52,7 +53,7 @@ async function readAndRecord(id) {
     const own = sent.get(id);
     if (own && !flag) own.cleared = true; // a read after our own relaunch with no flag: it is over
     clearTimeout(recheck.get(id)); recheck.delete(id);
-    if (flag && !own) recheck.set(id, setTimeout(() => { recheck.delete(id); readAndRecord(id).then(onChange); }, AGE_OUT_MS));
+    if (flag && !own) recheck.set(id, setTimeout(() => { recheck.delete(id); if (!isSignedOut()) readAndRecord(id).then(onChange); }, AGE_OUT_MS));
     if (own && own.cleared) { clearTimeout(own.timer); sent.delete(id); }
 }
 
@@ -71,7 +72,7 @@ export function noteRelaunchSent(id) {
     const prev = sent.get(id); if (prev) clearTimeout(prev.timer);
     const own = { at: Date.now(), cleared: false, timer: 0 };
     own.timer = setTimeout(async () => { // the five-minute mark: one more read (if it is online), then the badge is whatever the hub says
-        if (wasOnline.get(id) === true) await readAndRecord(id);
+        if (wasOnline.get(id) === true && !isSignedOut()) await readAndRecord(id);
         const cur = sent.get(id); if (cur === own) sent.delete(id);
         onChange();
     }, AGE_OUT_MS);

@@ -144,4 +144,33 @@ for (const f of fs.readdirSync(staticDir)) {
     });
 }
 assert.deepEqual(offenders, [], 'use pollEvery (overload.js) for a poller, or mark the line // interval-ok: <why>');
+
+// Lint: a timer loop that asks /api stops once the page is signed out (#12439, #12444). The pollers and the live feed stop on their own (pollEvery, the socket); a loop built from a bare setTimeout
+// or setInterval does not, and a signed-out page that keeps asking fails the sign-in redirect's 'no /api request while signed out'. Each file below has such a loop and says isSignedOut() before
+// it asks (the number is how many places in the file); a new loop of this kind is added here with its guard.
+const SIGNED_OUT_LOOPS = {
+    'mailbox_chats.js': 1, // the history re-read every 4 s while the server indexes (#10291)
+    'notes.js': 1, // the summary poll
+    'scheduler.js': 1, // a job's run watch
+    'startup_status.js': 2, // the startup check every 2 s, and the database recheck
+    'changed_files.js': 1, // the Files panel's watch
+    'popout.js': 1, // the pop-out's resolver retry
+    'server_ssh_setup.js': 1, // a setup plan's poll
+    'update_settings.js': 1, // the update facts read again a few times
+    'artifact_comment_ask.js': 1, // the thread read again while the agents answer
+    'relaunch_badge.js': 2, // the five-minute reads
+    'cloud_connect.js': 2, // the Coral Hub panel's poll and the owner check's tick
+    'terminal_backend.js': 1, // the auto-wake look
+    'team_dialogs.js': 1, // the list read again 2 s after a team launch
+    'resume_dialog.js': 1, // the same after a resume
+    'launch_dialog.js': 1, // the same after a launch
+};
+const missing = [];
+for (const [f, n] of Object.entries(SIGNED_OUT_LOOPS)) {
+    const src = fs.readFileSync(path.join(staticDir, f), 'utf8');
+    const uses = (src.match(/\bisSignedOut\(\)/g) || []).length;
+    if (!/import \{[^}]*\bisSignedOut\b[^}]*\} from '\.\/overload\.js'/.test(src)) missing.push(`${f}: does not import isSignedOut from overload.js`);
+    else if (uses < n) missing.push(`${f}: ${uses} isSignedOut() checks, ${n} expected (a timer loop that asks /api must stop once signed out)`);
+}
+assert.deepEqual(missing, [], 'a timer loop that asks /api must check isSignedOut() before it asks');
 console.log('overload: ok');

@@ -1,5 +1,6 @@
 /* Polling the server's startup status (moved out of app.js, #5082; no behaviour change). */
 import { markReady } from './ready.js';
+import { isSignedOut } from './overload.js';
 import { fetchSystemStatus } from './system_status.js';
 import { showDatabaseWarning, showFirewallWarning, showSecurityWarning } from './update_check.js';
 import { importOnce } from './import_once.js';
@@ -26,6 +27,7 @@ const _settlePollListLoad = () => { if (!_pollListLoadSettled) { _pollListLoadSe
 const DATABASE_RECHECK_MS = 90_000;
 
 async function recheckDatabases() {
+    if (isSignedOut()) return; /* a signed-out page makes no /api request (#12444) */
     try {
         const resp = await fetchSystemStatus({ fresh: true });
         if (!resp.ok) return;
@@ -39,6 +41,7 @@ export function pollStartupStatus() {
     if (!el) { _settlePollListLoad(); return; }
     let firstCheck = true;   // the first answer may be the one the page's other startup callers share; a retry must be fresh
     const check = async () => {
+        if (isSignedOut()) return; /* a signed-out page makes no /api request (#12444) */
         // The hub has no local startup phase: each machine is its own server, and the merged list
         // fills in as the feed reports them, so there is nothing to wait for here.
         if (isCloud()) {

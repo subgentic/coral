@@ -1,5 +1,6 @@
 import { isCloud } from './server_base.js';
 import { historyFetch, historyServer } from './history_source.js';
+import { isSignedOut } from './overload.js';
 /* Session notes: loading, editing, rendering, and tab switching */
 
 import { state } from './state.js';
@@ -86,6 +87,7 @@ export async function loadSessionNotes(sessionId) {
 
 function pollForSummary(sessionId, source = historyServer()) {
     pollTimer = setTimeout(async () => {
+        if (isSignedOut()) return; /* a signed-out page makes no /api request (#12444) */
         if (isCloud() && (source !== historyServer() || state.currentSession?.type !== 'history' || state.currentSession.name !== sessionId)) return;
         try {
             const resp = await historyFetch(`/api/sessions/history/${encodeURIComponent(sessionId)}/notes`);
