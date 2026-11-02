@@ -271,9 +271,9 @@ func (h *SessionsHandler) deliverHumanSend(ctx context.Context, name, agentType,
 	}()
 	send := func() error { return h.terminal.SendInput(ctx, terminalinput.Person, name, text, agentType, sessionID) }
 	if !ptymanager.InputBoxKnown(agentType) {
-		// No input box is known for Hermes, so nothing on its screen says the CLI is there: its process does. An agent that exited at a plain shell (Hermes, after a first-use setup that failed) would have the
-		// message typed into the shell as a command ('bash: hello: command not found') and be marked Ended only at the reconciler's next pass (#12425). A shell of unknown contents (one a person started) is not refused.
-		if agentType != at.Hermes { // a custom agent may be a shell on purpose (and OpenCode's chat is not typed): only a CLI that is never a shell is refused at one
+		// No input box is known for Hermes or OpenCode, so nothing on their screens says the CLI is there: its process does. An agent that exited at a plain shell (Hermes, after a first-use setup that failed) would have the
+		// message typed into the shell as a command ('bash: hello: command not found') and be marked Ended only at the reconciler's next pass (#12425, #12451 for OpenCode). A shell of unknown contents (one a person started) is not refused.
+		if agentType != at.Hermes && agentType != at.Opencode { // a custom agent may be a shell on purpose: only a CLI that is never a shell is refused at one
 			return send()
 		}
 		if exited, _, _ := ptymanager.AgentExitedForLaunch(ctx, h.terminal, name, agentType, sessionID); exited {
