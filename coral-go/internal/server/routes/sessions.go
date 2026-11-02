@@ -792,6 +792,12 @@ func (h *SessionsHandler) lastMessageOf(sessionID, workingDir, agentType string,
 		}
 		return nil
 	}
+	if agentType == at.Hermes && lastMessageEnabled && sessionID != "" { // no transcript file: its state.db
+		if m, ok := h.hermesLastMessage(sessionID); ok {
+			return lastMessageField(&m, false)
+		}
+		return nil
+	}
 	if !lastMessageEnabled || h.jsonl == nil || sessionID == "" {
 		return nil
 	}
@@ -809,6 +815,9 @@ func lastMessageRow(h *SessionsHandler, sessionID, workingDir, agentType string,
 	}
 	if agentType == at.Opencode {
 		return h.lastMessageOf(sessionID, workingDir, agentType, started) // already only what the manager kept: it reads no file
+	}
+	if agentType == at.Hermes {
+		return h.lastMessageOf(sessionID, workingDir, agentType, started) // two stat calls when nothing changed; it opens the database only when Hermes wrote to it
 	}
 	if !lastMessageEnabled || h.jsonl == nil {
 		return nil

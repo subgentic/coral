@@ -275,24 +275,32 @@ func lastMessageIn(buf []byte, agentType string) (LastMessage, bool) {
 		if json.Unmarshal(line, &entry) != nil {
 			continue
 		}
-		msgs := parseTranscriptEntry(entry, map[string]string{}, agentType)
-		for j := len(msgs) - 1; j >= 0; j-- {
-			m := msgs[j]
-			role, _ := m["type"].(string)
-			if (role != "user" && role != "assistant") || m["local_command"] == true {
-				continue
-			}
-			text, _ := m["text"].(string)
-			if text == "" {
-				text, _ = m["content"].(string)
-			}
-			text = plainLine(text)
-			if text == "" || (role == "user" && agent.IsCoralDelivery(text)) {
-				continue
-			}
-			at, _ := m["timestamp"].(string)
-			return LastMessage{Role: role, Text: text, At: at}, true
+		if m, ok := LastMessageFromEntries(parseTranscriptEntry(entry, map[string]string{}, agentType)); ok {
+			return m, true
 		}
+	}
+	return LastMessage{}, false
+}
+
+// LastMessageFromEntries is the newest message with text among chat entries already parsed (oldest first), by the rules of a transcript's tail: a tool call alone, a tool result and what Coral typed into the
+// agent are not a message. A Hermes agent's rows come from its state.db, not a file, and are read this way (#11936).
+func LastMessageFromEntries(msgs []map[string]any) (LastMessage, bool) {
+	for j := len(msgs) - 1; j >= 0; j-- {
+		m := msgs[j]
+		role, _ := m["type"].(string)
+		if (role != "user" && role != "assistant") || m["local_command"] == true {
+			continue
+		}
+		text, _ := m["text"].(string)
+		if text == "" {
+			text, _ = m["content"].(string)
+		}
+		text = plainLine(text)
+		if text == "" || (role == "user" && agent.IsCoralDelivery(text)) {
+			continue
+		}
+		at, _ := m["timestamp"].(string)
+		return LastMessage{Role: role, Text: text, At: at}, true
 	}
 	return LastMessage{}, false
 }

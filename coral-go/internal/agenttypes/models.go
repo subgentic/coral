@@ -27,5 +27,6 @@ var AgentTypeModels = map[string][]string{
 		"gemini-3.1-pro-high",
 		"claude-sonnet-4-6",
 	},
+	Hermes:   {}, // no curated list: Hermes has no command that lists its models, so the model is typed or one of the operator's custom ones (#11936)
 	Terminal: {},
 }

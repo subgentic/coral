@@ -252,6 +252,13 @@ func (p *PTYSessionTerminal) sendLaunch(ctx context.Context, o terminalinput.Ori
 	return err
 }
 
+// ReadoptAgent starts the watch for the session's agent process again (ReadoptLostAgent).
+func (p *PTYSessionTerminal) ReadoptAgent(_ context.Context, name, _, sessionID string) {
+	if key, err := p.keyFor(name, sessionID); err == nil {
+		p.backend.AdoptAgent(key)
+	}
+}
+
 // AgentNoticeTarget implements NoticeTargetChecker for the PTY backend (#389).
 func (p *PTYSessionTerminal) AgentNoticeTarget(_ context.Context, name, _, sessionID string) (ok, wait bool, why string, known bool) {
 	key, err := p.keyFor(name, sessionID)
