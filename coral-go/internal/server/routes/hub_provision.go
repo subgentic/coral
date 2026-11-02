@@ -866,6 +866,7 @@ func (pr *Provisioner) ForgetKey(w http.ResponseWriter, r *http.Request) {
 		errInternalServer(w, "could not remove the saved host key")
 		return
 	}
+	pr.runner.CloseShared(r.Context(), p.Target)                                     // a session made under the key that was just forgotten is not used again (#12221)
 	slog.Info("[provision] the owner forgot a host key", "plan", p.ID, "host", name) // the host is a name the owner typed or their own ssh config names, never a key
 	p.mu.Lock()
 	p.phase, p.keyChanged, p.failure, p.keys = phasePlanned, false, "", nil
