@@ -44,8 +44,8 @@ var (
 	ErrSkillNotFound = errors.New("store: no such skill")
 	// ErrSkillRemoved is a skill the Operator removed.
 	ErrSkillRemoved = errors.New("store: the skill was removed by the Operator")
-	// ErrAgentScripts: an agent cannot publish a skill with scripts or files that cannot be shown as text (v1).
-	ErrAgentScripts = errors.New("store: an agent cannot publish a skill with scripts or files that cannot be shown as text")
+	// ErrAgentScripts: an agent's skill may hold only SKILL.md and document or data files (.md .txt .json .yaml .yml .csv .toml) in v1.
+	ErrAgentScripts = errors.New("store: an agent's skill may hold only SKILL.md and document or data files")
 	// ErrPendingCap: too many skills wait for the Operator.
 	ErrPendingCap = errors.New("store: too many skills are waiting for the Operator")
 	// ErrTooManySkills: the store is full.
@@ -122,8 +122,11 @@ func (s *SessionStore) AddSkill(ctx context.Context, in AddSkillInput) (*SkillRo
 	if sk == nil || !skillDigestRe.MatchString(in.Digest) || (in.Kind != PublisherOperator && in.Kind != PublisherAgent) || (in.Kind == PublisherAgent && in.Agent == "") {
 		return nil, false, ErrBadSkill
 	}
+	if sk.Digest != in.Digest { // the text that is indexed must be the bytes the digest names
+		return nil, false, ErrSkillDigest
+	}
 	risky := sk.Scripts() > 0 || sk.NotReviewable() > 0
-	if in.Kind == PublisherAgent && risky {
+	if in.Kind == PublisherAgent && (risky || !skills.AgentMayPublish(sk)) {
 		return nil, false, ErrAgentScripts
 	}
 	if in.Kind == PublisherOperator && risky && !in.ScriptsAcked {
@@ -228,7 +231,7 @@ func (s *SessionStore) ApproveSkill(ctx context.Context, id, digest string, scri
 		if row.Status != SkillPending {
 			return ErrSkillState
 		}
-		if row.Digest != digest || sk == nil || sk.Name != row.Name {
+		if row.Digest != digest || sk == nil || sk.Name != row.Name || sk.Digest != digest {
 			return ErrSkillDigest
 		}
 		if (row.HasScripts || row.NotReviewable) && !scriptsAcked {

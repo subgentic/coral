@@ -15,6 +15,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"unicode"
 	"unicode/utf8"
 
 	"gopkg.in/yaml.v3"
@@ -67,6 +68,8 @@ type File struct {
 
 // Skill is a parsed skill.
 type Skill struct {
+	// Digest is the SHA-256 (hex) of the zip bytes Parse read: the store refuses a skill whose digest is not the one it is given with it.
+	Digest        string
 	Name          string
 	Description   string
 	License       string
@@ -114,6 +117,7 @@ func Parse(data []byte) (*Skill, error) {
 	if len(data) == 0 || len(data) > MaxZipBytes {
 		return nil, invalid("the zip must be between 1 byte and %d MiB", MaxZipBytes>>20)
 	}
+	whole := sha256.Sum256(data)
 	zr, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
 	if err != nil {
 		return nil, invalid("that is not a zip file")
@@ -175,7 +179,7 @@ func Parse(data []byte) (*Skill, error) {
 		}
 	}
 	var total int64
-	sk := &Skill{}
+	sk := &Skill{Digest: hex.EncodeToString(whole[:])}
 	var skillMD []byte
 	sort.Slice(entries, func(i, j int) bool { return entries[i].name < entries[j].name })
 	for _, e := range entries {
@@ -235,13 +239,32 @@ func find[T any](xs []T, want string, name func(T) string) (T, bool) {
 	return zero, false
 }
 
+// hasControl reports a control character or an invisible one: any C0 or C1 control, and every format (Cf), line-separator (Zl) and paragraph-separator (Zp) character, which takes in the
+// reordering and zero-width characters and the whole tag block ("ASCII smuggling"): none can be in a name, a front matter field or a file the Operator is shown.
 func hasControl(s string) bool {
 	for _, r := range s {
-		if r < 0x20 || r == 0x7f || (r >= 0x80 && r < 0xa0) || r == 0x202e || r == 0x200b || r == 0xfeff {
+		if r < 0x20 || r == 0x7f || (r >= 0x80 && r < 0xa0) || unicode.In(r, unicode.Cf, unicode.Zl, unicode.Zp) {
 			return true
 		}
 	}
 	return false
+}
+
+// agentExt are the extensions a skill an agent publishes may hold besides SKILL.md: documents and data.
+var agentExt = map[string]bool{".md": true, ".txt": true, ".json": true, ".yaml": true, ".yml": true, ".csv": true, ".toml": true}
+
+// AgentMayPublish reports whether every file of sk is SKILL.md or a document or data file: an agent's skill holds nothing else in v1 (the rule is a form test, not a guarantee: the Operator's
+// reading is the control).
+func AgentMayPublish(sk *Skill) bool {
+	for _, f := range sk.Files {
+		if f.Path == "SKILL.md" {
+			continue
+		}
+		if f.Kind != KindText || !agentExt[strings.ToLower(path.Ext(f.Path))] {
+			return false
+		}
+	}
+	return true
 }
 
 func clip(s string) string {
@@ -264,7 +287,7 @@ func isText(b []byte) bool {
 		return false
 	}
 	for _, r := range string(b) {
-		if r < 0x20 && r != '\n' && r != '\r' && r != '\t' || r == 0x7f {
+		if r < 0x20 && r != '\n' && r != '\r' && r != '\t' || r == 0x7f || (r >= 0x80 && r < 0xa0) || unicode.In(r, unicode.Cf, unicode.Zl, unicode.Zp) {
 			return false
 		}
 	}
@@ -273,6 +296,9 @@ func isText(b []byte) bool {
 
 // parseSkillMD reads the front matter with a YAML reader that refuses anchors, aliases, tags, duplicate keys and depth, then checks the fields against the spec.
 func parseSkillMD(sk *Skill, md []byte) error {
+	if !isText(md) {
+		return invalid("SKILL.md holds a control or invisible character (zero-width, reordering or tag characters are not allowed)")
+	}
 	text := strings.ReplaceAll(string(md), "\r\n", "\n")
 	if !strings.HasPrefix(text, "---\n") {
 		return invalid("SKILL.md must start with a --- front matter")
