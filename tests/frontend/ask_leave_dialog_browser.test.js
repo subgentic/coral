@@ -38,8 +38,8 @@ const { coralReady } = require('./helpers/wait');
 
             // words typed: the click asks first, the question is answerable, Cancel keeps the words, Open chat opens the chat
             await openDialog(at);
-            await ev(`(() => { const t = document.querySelector('dialog.inbox-ask-dialog textarea'); t.focus(); t.value = 'half a reply'; t.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
-            await clickAt('dialog.inbox-ask-dialog .agent-link'); await settle(500);
+            await ev(`(() => { const t = document.querySelector('dialog.inbox-ask-dialog[open] textarea'); t.focus(); t.value = 'half a reply'; t.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
+            await clickAt('dialog.inbox-ask-dialog[open] .agent-link'); await settle(500);
             const c = await confirm();
             assert.ok(c.shown && c.label === 'Open chat', at + 'with words typed, "Leave this dialog?" is asked: ' + JSON.stringify(c));
             if (process.env.CORAL_SCREENSHOT_DIR) { require('node:fs').mkdirSync(process.env.CORAL_SCREENSHOT_DIR, { recursive: true }); require('node:fs').writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/leave-confirm-${w}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); } // CORAL_SCREENSHOT_DIR: a picture of the confirm over the question dialog (for review)
@@ -47,12 +47,12 @@ const { coralReady } = require('./helpers/wait');
             assert.equal(await ev(`!!window.__opened`), false, at + 'nothing opened yet');
             // Escape on the confirm closes the confirm only: the question dialog and its words stay
             await Input.dispatchKeyEvent({ type: 'rawKeyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27, nativeVirtualKeyCode: 27 }); await Input.dispatchKeyEvent({ type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27, nativeVirtualKeyCode: 27 }); await settle(400);
-            assert.ok(!(await confirm()).shown && await ev(`!!document.querySelector('dialog.inbox-ask-dialog[open]') && document.querySelector('dialog.inbox-ask-dialog textarea').value === 'half a reply'`), at + 'Escape closes the confirm only: the question dialog and its words stay');
-            await clickAt('dialog.inbox-ask-dialog .agent-link'); await settle(500);
+            assert.ok(!(await confirm()).shown && await ev(`!!document.querySelector('dialog.inbox-ask-dialog[open]') && document.querySelector('dialog.inbox-ask-dialog[open] textarea').value === 'half a reply'`), at + 'Escape closes the confirm only: the question dialog and its words stay');
+            await clickAt('dialog.inbox-ask-dialog[open] .agent-link'); await settle(500);
             assert.ok((await confirm()).shown, at + 'asked again after Escape');
             await clickConfirm('Cancel'); await settle(400);
-            assert.ok(await ev(`!!document.querySelector('dialog.inbox-ask-dialog[open]') && document.querySelector('dialog.inbox-ask-dialog textarea').value === 'half a reply'`), at + 'Cancel keeps the dialog and the words');
-            await clickAt('dialog.inbox-ask-dialog .agent-link'); await settle(500);
+            assert.ok(await ev(`!!document.querySelector('dialog.inbox-ask-dialog[open]') && document.querySelector('dialog.inbox-ask-dialog[open] textarea').value === 'half a reply'`), at + 'Cancel keeps the dialog and the words');
+            await clickAt('dialog.inbox-ask-dialog[open] .agent-link'); await settle(500);
             await clickConfirm('Open chat'); await settle(500);
             assert.ok(await ev(`!!window.__opened`) && !(await ev(`!!document.querySelector('dialog.inbox-ask-dialog[open]')`)), at + 'Open chat: the chat opens and the dialog closes');
             assert.notEqual(await ev(`location.pathname`), where, at + 'the page moved to the chat');
@@ -61,7 +61,7 @@ const { coralReady } = require('./helpers/wait');
             await ev(`window.__opened = null; window.switchNavTab('hub-inbox'); import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
             await waitFor(`!!document.querySelector('button[aria-label="Answer the question of Orchestrator"]')`, at + 'the row again', 10000);
             await openDialog(at);
-            await clickAt('dialog.inbox-ask-dialog .agent-link'); await settle(500);
+            await clickAt('dialog.inbox-ask-dialog[open] .agent-link'); await settle(500);
             assert.ok(await ev(`!!window.__opened`) && !(await confirm()).shown, at + 'with nothing typed the click opens the chat with no question');
         }
     } finally { await client.close(); }
