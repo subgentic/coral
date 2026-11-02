@@ -1,5 +1,33 @@
 # Release Notes
 
+## v2.0.33 — Set up a server over SSH works with a Coder host, and says why a step cannot connect
+
+### Changes
+
+#### What you will notice first
+
+- **A Coder (or any) host whose own ssh config turns host-key checking off now works with Set up a server**: Coral keeps its own `ssh_known_hosts` in its data folder, and every ssh Coral runs for set-up (the runner and the stream) passes that file, `GlobalKnownHostsFile=/dev/null` and `UpdateHostKeys=no` on the command line, which wins over the host's config. Before, a block with `UserKnownHostsFile /dev/null` and `StrictHostKeyChecking no` (Coder's config-ssh) made the key you confirmed vanish, and the scan failed with "Could not connect." and logged nothing.
+- **SSH servers set up before this release confirm their host key once more**, because the confirmed key now lives in Coral's own `ssh_known_hosts`.
+- **A jump host whose key is not in your `known_hosts` now stops the scan and names it**: a ProxyJump hop is checked as your own config says, against your own `known_hosts`, and an unknown or changed hop stops the scan with a sentence naming the hop.
+- **Every step that cannot connect says why** (sign-in refused, timed out, refused, name not found, no route, connection closed), for connect, detect, identity and the install step; the log keeps the kind and ssh's cleaned, capped message. A changed key's sentence names Coral's own `ssh_known_hosts` and points at the confirm step.
+
+#### Known issues
+
+- **Windows: in-app update does not work from 2.0.0 through 2.0.6.** If you're on one of those, download and install the MSI by hand; from 2.0.7 on, in-app update works.
+- **macOS: a Coral of 2.0.5 or earlier cannot install updates in-app; install 2.0.6 or later by hand once.**
+- **OpenCode agents are tested on macOS and Linux; OpenCode on Windows is not yet tested end to end.**
+- **Hermes agents are still experimental**: Windows installs no Hermes hook, and another locale's input hint is recognised only by its styling and only while Hermes's welcome line is on screen.
+- Setting up a computer over SSH is supported from a macOS or Linux hub, and is not yet tested from a Windows hub.
+
+#### For Coral Hub
+
+- **Nothing changes in routes, the tunnel table, ready signals, hooks, tokens or framed paths.** Only the Set up a server flow (`hub_provision`) and the `sshprov` package change: the ssh command lines it builds (a Coral-owned known-hosts file, the connect error kinds), and the sentences it shows.
+
+#### For developers and releases
+
+- The static tree is unchanged at 5,968,463 bytes of the 6,002,944-byte budget.
+- The scan's kept ssh text goes through the excerpt redactor (a ProxyCommand's token or bearer string is masked) and is cut on a character boundary; the stream's host-file arguments are pinned by a test.
+
 ## v2.0.32 — Comments on a goal, Request changes that hands the turn to the agent, Dismiss on every waiting row, and Hermes fixes from a real run
 
 ### Changes
