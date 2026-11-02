@@ -118,8 +118,17 @@ func (r Runner) Scan(ctx context.Context, host string, port int) (HostKey, error
 	return pick, nil
 }
 
-// DefaultKnownHostsPath is the hub user's ~/.ssh/known_hosts, the file the system ssh reads.
+// ownKnownHosts, when set (UseOwnKnownHosts), is the one file the hub's ssh checks and Trust writes.
+var ownKnownHosts string
+
+// UseOwnKnownHosts makes the hub check and record host keys in path instead of the user's ~/.ssh/known_hosts.
+func UseOwnKnownHosts(path string) { ownKnownHosts = path }
+
+// DefaultKnownHostsPath is the file the hub's ssh checks host keys in and Trust writes to: the hub's own (UseOwnKnownHosts) or else the hub user's ~/.ssh/known_hosts.
 func DefaultKnownHostsPath() string {
+	if ownKnownHosts != "" {
+		return ownKnownHosts
+	}
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return ""

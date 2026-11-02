@@ -161,15 +161,21 @@ func (s *StreamTarget) noteFailure() {
 	s.mu.Unlock()
 }
 
+// argv is the stream ssh's arguments: the fixed options, the hub's host-key file, the keepalives and the one forward (-W) the stream is for.
+func (s *StreamTarget) argv() []string {
+	argv := append([]string{}, sshOptions...)
+	argv = append(argv, s.r.hostFileArgs()...)
+	argv = append(argv, "-o", "ServerAliveInterval=15", "-o", "ServerAliveCountMax=3", "-W", "127.0.0.1:"+strconv.Itoa(s.port))
+	argv = append(argv, s.target.Args()...)
+	return append(argv, "--", s.target.Destination())
+}
+
 func (s *StreamTarget) start(ctx context.Context) (*sshConn, error) {
 	ssh := s.r.SSH
 	if ssh == "" {
 		ssh = "ssh"
 	}
-	argv := append([]string{}, sshOptions...)
-	argv = append(argv, "-o", "ServerAliveInterval=15", "-o", "ServerAliveCountMax=3", "-W", "127.0.0.1:"+strconv.Itoa(s.port))
-	argv = append(argv, s.target.Args()...)
-	argv = append(argv, "--", s.target.Destination())
+	argv := s.argv()
 	cmd := executil.Command(context.WithoutCancel(ctx), ssh, argv...) // the stream outlives the dial's context; closing the conn ends it
 	cmd.Env = minimalEnv()
 	in, err := cmd.StdinPipe()

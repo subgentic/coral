@@ -75,6 +75,7 @@ case "$last" in
   *"uname -sm"*)
     case "` + mode + `" in
       known) echo '` + uname + `'; exit 0;;
+      gone) if [ ! -e '` + filepath.Join(dir, "seen") + `' ]; then touch '` + filepath.Join(dir, "seen") + `'; echo '` + uname + `'; exit 0; fi; cat '` + filepath.Join(dir, "stderr") + `' >&2; exit 255;;
       changed) echo '@@@ WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED! @@@' >&2; exit 255;;
       unknown) if grep -q 'box.example.com' '` + known + `' 2>/dev/null; then echo '` + uname + `'; exit 0; fi; echo 'Host key verification failed.' >&2; exit 255;;
     esac;;
@@ -673,5 +674,30 @@ func TestProvisionStartStepNamesPort8420WhenAnotherHoldsIt(t *testing.T) {
 	_, _, err = pe.p.realStartRemote(ctx, pe.p.plan(plan))
 	if errors.As(err, &ie) {
 		assert.NotEqual(t, portInUseSentence, ie.Msg)
+	}
+}
+
+// #12027: the connect step passed and the next ssh fails: the setup says why (a fixed sentence per kind) instead of "Could not connect.", and the hub's log has the kind and ssh's own words.
+func TestProvisionDetectSaysWhySshFailedAfterTheConnectStepPassed(t *testing.T) {
+	for name, c := range map[string]struct{ stderr, want string }{
+		"host key not found under that name": {"Host key verification failed.\n", "host key is not in known_hosts"},
+		"sign-in refused":                    {"user@box: Permission denied (publickey).\n", "refused the sign-in"},
+		"timed out":                          {"ssh: connect to host box port 22: Connection timed out\n", "timed out"},
+		"refused":                            {"ssh: connect to host box port 22: Connection refused\n", "refused the connection"},
+		"something else":                     {"unheard of\n", "Could not connect."},
+	} {
+		t.Run(name, func(t *testing.T) {
+			pe := newProvEnv(t, "gone", "Linux x86_64", true)
+			require.NoError(t, os.WriteFile(filepath.Join(pe.dir, "stderr"), []byte(c.stderr), 0o600))
+			_, v := pe.do("POST", "/api/servers/provision/plan", map[string]any{"target": "user@box.example.com"})
+			plan := v["plan"].(string)
+			_, v = pe.do("POST", "/api/servers/provision/"+plan+"/connect", nil)
+			require.Equal(t, "connected", v["phase"], "%v", v)
+			code, _ := pe.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{"accept_terms": true, "terms_sha256": terms.EULADigest()})
+			require.Equal(t, 202, code)
+			failed := pe.waitPhase(t, plan, "failed")
+			assert.Contains(t, failed["error"], c.want)
+			assert.NotContains(t, failed["error"], "Permission denied", "ssh's own words are for the log, never the person")
+		})
 	}
 }

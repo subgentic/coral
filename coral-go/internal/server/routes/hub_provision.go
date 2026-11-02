@@ -368,8 +368,7 @@ func (pr *Provisioner) Connect(w http.ResponseWriter, r *http.Request) {
 		p.mu.Unlock()
 		p.setStep("connect", stepPending, "Confirm the host key below.")
 	default:
-		slog.Info("[provision] connect failed", "plan", p.ID, "error", err.Error())
-		pr.fail(p, "connect", "Could not connect.")
+		pr.failConnect(p, "connect", err)
 	}
 	writeJSON(w, http.StatusOK, p.view())
 }
@@ -515,6 +514,46 @@ func (p *provisionPlan) moveFrom(from1, from2, next string) (string, bool) {
 	return prev, true
 }
 
+// failConnect fails step with a sentence that says why ssh could not connect or sign in, and logs the kind and the cleaned start of ssh's own message (#12027: every failure said "Could not connect." and
+// logged nothing). The person sees a fixed sentence per kind, never ssh's text.
+func (pr *Provisioner) failConnect(p *provisionPlan, step string, err error) {
+	var ce *sshprov.ConnectError
+	kind, detail := sshprov.KindOther, ""
+	if errors.As(err, &ce) {
+		kind, detail = ce.Kind, ce.Stderr
+	}
+	slog.Info("[provision] could not reach the computer", "plan", p.ID, "step", step, "kind", string(kind), "ssh", detail, "error", err.Error())
+	pr.fail(p, step, connectSentence(err))
+}
+
+// connectSentence is the fixed sentence for a failed ssh run.
+func connectSentence(err error) string {
+	switch {
+	case errors.Is(err, sshprov.ErrHostKeyChanged):
+		return "The host key has changed since you last connected. This may be a different computer. Check it, then fix known_hosts yourself."
+	case errors.Is(err, sshprov.ErrHostKey):
+		return "The host key is not in known_hosts under the name ssh uses for this computer. Connect to it once with ssh in a terminal, or check the setup's host name."
+	}
+	var ce *sshprov.ConnectError
+	if errors.As(err, &ce) {
+		switch ce.Kind {
+		case sshprov.KindAuth:
+			return "The computer refused the sign-in: this computer's SSH key or agent is not accepted there."
+		case sshprov.KindTimeout:
+			return "The connection timed out."
+		case sshprov.KindRefused:
+			return "The computer refused the connection. Is SSH running on that port?"
+		case sshprov.KindName:
+			return "That host name could not be found."
+		case sshprov.KindRoute:
+			return "There is no route to that computer."
+		case sshprov.KindClosed:
+			return "The computer closed the connection while signing in."
+		}
+	}
+	return "Could not connect."
+}
+
 // detectSteps is the first real step of the run: the system and tmux. The install steps follow in later commits; until they exist the run says so and stops, and registers nothing.
 func (pr *Provisioner) detectSteps(ctx context.Context, p *provisionPlan) {
 	arch, ok := pr.detect(ctx, p)
@@ -529,7 +568,7 @@ func (pr *Provisioner) detect(ctx context.Context, p *provisionPlan) (sshprov.Ar
 	p.setStep("detect", stepRunning, "")
 	res, err := pr.runner.Run(ctx, p.Target, sshprov.CmdUname)
 	if err != nil {
-		pr.fail(p, "detect", "Could not connect.")
+		pr.failConnect(p, "detect", err)
 		return "", false
 	}
 	sys := strings.TrimSpace(res.Stdout)
@@ -539,7 +578,7 @@ func (pr *Provisioner) detect(ctx context.Context, p *provisionPlan) (sshprov.Ar
 	}
 	tm, err := pr.runner.Run(ctx, p.Target, sshprov.CmdHasTmux)
 	if err != nil {
-		pr.fail(p, "detect", "Could not connect.")
+		pr.failConnect(p, "detect", err)
 		return "", false
 	}
 	if tm.ExitCode != 0 {

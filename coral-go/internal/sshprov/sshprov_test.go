@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -110,19 +111,20 @@ func TestRunBuildsOneFixedArgvAndNeverRelaxesHostKeyChecking(t *testing.T) {
 	log := filepath.Join(t.TempDir(), "argv")
 	ssh := newStandIn(t, "ssh", standCfg{Log: log, Stdout: "Linux x86_64\n"})
 	tg, _ := ParseTarget("user@box.example.com:2222")
-	res, err := Runner{SSH: ssh}.Run(context.Background(), tg, CmdUname)
+	hubKnown := filepath.Join(t.TempDir(), "ssh_known_hosts")
+	res, err := Runner{SSH: ssh, KnownHosts: hubKnown}.Run(context.Background(), tg, CmdUname)
 	if err != nil || strings.TrimSpace(res.Stdout) != "Linux x86_64" {
 		t.Fatalf("Run = %+v, %v", res, err)
 	}
 	b, _ := os.ReadFile(log)
 	argv := strings.Split(strings.TrimSpace(string(b)), "\n")
 	joined := strings.Join(argv, " ")
-	for _, want := range []string{"BatchMode=yes", "StrictHostKeyChecking=yes", "ClearAllForwardings=yes", "-p 2222", "ForwardAgent=no", "ForwardX11=no", "PermitLocalCommand=no", "RemoteCommand=none"} {
+	for _, want := range []string{"BatchMode=yes", "StrictHostKeyChecking=yes", "ClearAllForwardings=yes", "-p 2222", "ForwardAgent=no", "ForwardX11=no", "PermitLocalCommand=no", "RemoteCommand=none", "UserKnownHostsFile=" + hubKnown, "GlobalKnownHostsFile=/dev/null", "UpdateHostKeys=no"} {
 		if !strings.Contains(joined, want) {
 			t.Errorf("argv lacks %q: %v", want, argv)
 		}
 	}
-	if strings.Contains(joined, "StrictHostKeyChecking=no") || strings.Contains(joined, "accept-new") || strings.Contains(joined, "UserKnownHostsFile") {
+	if strings.Contains(joined, "StrictHostKeyChecking=no") || strings.Contains(joined, "accept-new") {
 		t.Errorf("host key checking was relaxed: %v", argv)
 	}
 	n := len(argv)
@@ -210,5 +212,150 @@ func TestMinimalEnvIsTheUsersNamesOnly(t *testing.T) {
 		if !strings.Contains(joined, want) {
 			t.Errorf("the environment lacks %q:\n%s", want, joined)
 		}
+	}
+}
+
+// #12027: a failed connection says why, from ssh's own message, and keeps a cleaned, capped copy of it for the log; every kind is still ErrConnect.
+func TestRunNamesWhyItCouldNotConnect(t *testing.T) {
+	tg, _ := ParseTarget("user@box.example.com")
+	for stderr, want := range map[string]ConnectKind{
+		"user@box: Permission denied (publickey).\n":                       KindAuth,
+		"ssh: connect to host box port 22: Connection timed out\n":         KindTimeout,
+		"ssh: connect to host box port 22: Connection refused\n":           KindRefused,
+		"ssh: Could not resolve hostname box: Name or service not known\n": KindName,
+		"ssh: connect to host box port 22: No route to host\n":             KindRoute,
+		"Connection closed by 10.0.0.5 port 22\n":                          KindClosed,
+		"kex_exchange_identification: read: Connection reset by peer\n":    KindClosed,
+		"something nobody has seen before\n":                               KindOther,
+	} {
+		ssh := newStandIn(t, "ssh", standCfg{Stderr: stderr, Exit: 255})
+		_, err := Runner{SSH: ssh}.Run(context.Background(), tg, CmdUname)
+		var ce *ConnectError
+		if !errors.As(err, &ce) || ce.Kind != want || !errors.Is(err, ErrConnect) || errors.Is(err, ErrHostKey) {
+			t.Errorf("%q: %v (want %s)", stderr, err, want)
+		}
+	}
+	long := newStandIn(t, "ssh", standCfg{Stderr: "Permission denied \x1b[31m(publickey)\x1b[0m\n" + strings.Repeat("x", 1000) + "\n", Exit: 255})
+	_, err := Runner{SSH: long}.Run(context.Background(), tg, CmdUname)
+	var ce *ConnectError
+	if !errors.As(err, &ce) || strings.ContainsAny(ce.Stderr, "\x1b\n") || len(ce.Stderr) > 310 {
+		t.Errorf("the kept text is cleaned and capped: %q", ce)
+	}
+}
+
+// #12027: a host block with StrictHostKeyChecking=no and UserKnownHostsFile=/dev/null (Coder's config-ssh writes one) must not decide the hub's host-key check: the command line wins over the
+// config, so ssh -G reports OUR values for the argv the runner builds, for an alias and for a typed target.
+func TestRunnerHostKeyCheckIsOursWhateverTheHostBlockSays(t *testing.T) {
+	sshBin, err := exec.LookPath("ssh")
+	if err != nil {
+		t.Skip("no ssh on this computer")
+	}
+	dir := t.TempDir()
+	cfg := filepath.Join(dir, "config")
+	known := filepath.Join(dir, "hub known hosts")
+	if err := os.WriteFile(cfg, []byte("Host coder.ws\n  HostName coder.ws\n  User dev\n  ProxyCommand /bin/true\n  UserKnownHostsFile /dev/null\n  StrictHostKeyChecking no\n  GlobalKnownHostsFile /etc/ssh/ssh_known_hosts\n  UpdateHostKeys yes\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	alias, err := FromAlias("coder.ws")
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := Runner{KnownHosts: known}
+	argv := append([]string{"-G", "-F", cfg}, r.baseArgv(alias)...)
+	argv = append(argv, "--", alias.Destination())
+	out, err := exec.Command(sshBin, argv...).Output()
+	if err != nil {
+		t.Fatalf("ssh -G: %v", err)
+	}
+	got := map[string]string{}
+	for _, l := range strings.Split(string(out), "\n") {
+		if k, v, ok := strings.Cut(l, " "); ok {
+			got[k] = strings.Trim(v, `"`)
+		}
+	}
+	for k, want := range map[string]string{"stricthostkeychecking": "true", "userknownhostsfile": known, "globalknownhostsfile": "/dev/null", "updatehostkeys": "false"} {
+		if got[k] != want {
+			t.Errorf("%s = %q, want %q (the host block's value won)", k, got[k], want)
+		}
+	}
+}
+
+// effectiveSSH is what ssh -G says it would use for argv under the config at cfg.
+func effectiveSSH(t *testing.T, sshBin, cfg string, argv []string, dest string) map[string]string {
+	t.Helper()
+	full := append([]string{"-G", "-F", cfg}, argv...)
+	full = append(full, "--", dest)
+	out, err := exec.Command(sshBin, full...).Output()
+	if err != nil {
+		t.Fatalf("ssh -G: %v", err)
+	}
+	got := map[string]string{}
+	for _, l := range strings.Split(string(out), "\n") {
+		if k, v, ok := strings.Cut(l, " "); ok {
+			got[k] = strings.Trim(v, `"`)
+		}
+	}
+	return got
+}
+
+// #12031 (Security's point 1): every hub ssh that talks to a host (the runner and the stream) says ForwardAgent=no, ForwardX11=no and ClearAllForwardings=yes, whatever the host block says;
+// read back with ssh -G on a block that asks for all three.
+func TestHubSshNeverForwardsAnythingWhateverTheHostBlockSays(t *testing.T) {
+	sshBin, err := exec.LookPath("ssh")
+	if err != nil {
+		t.Skip("no ssh on this computer")
+	}
+	dir := t.TempDir()
+	cfg := filepath.Join(dir, "config")
+	if err := os.WriteFile(cfg, []byte("Host box\n  HostName box.example.com\n  User dev\n  ForwardAgent yes\n  ForwardX11 yes\n  ForwardX11Trusted yes\n  ClearAllForwardings no\n  LocalForward 9999 localhost:9999\n  RemoteCommand uname\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	alias, err := FromAlias("box")
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := Runner{KnownHosts: filepath.Join(dir, "kh")}
+	st, err := NewStreamTarget(r, alias, 8420, "k")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, argv := range map[string][]string{"runner": r.baseArgv(alias), "stream": st.argv()} {
+		got := effectiveSSH(t, sshBin, cfg, argv, alias.Destination())
+		for k, want := range map[string]string{"forwardagent": "no", "forwardx11": "no", "clearallforwardings": "yes", "stricthostkeychecking": "true"} {
+			if got[k] != want {
+				t.Errorf("%s: %s = %q, want %q", name, k, got[k], want)
+			}
+		}
+		if got["remotecommand"] == "uname" || got["localforward"] != "" {
+			t.Errorf("%s: the host block's command or forward got through: %v", name, got)
+		}
+	}
+}
+
+// #12031: the host-key scan's ssh offers no credential and forwards nothing: no authentication but none, no public key, no agent, only the identities the config names are not tried, and a fresh
+// temporary known_hosts with the check off for this one connection (never the owner's file).
+func TestScanAliasArgvOffersNoCredentialAndForwardsNothing(t *testing.T) {
+	log := filepath.Join(t.TempDir(), "argv")
+	ssh := newStandIn(t, "ssh", standCfg{Log: log, Exit: 255})
+	alias, err := FromAlias("box")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := filepath.Join(t.TempDir(), "config")
+	_ = os.WriteFile(cfg, []byte("Host box\n  HostName box.example.com\n"), 0o600)
+	_, _ = Runner{SSH: ssh, Config: cfg}.ScanAlias(context.Background(), alias) // no key is stored by the stand-in: an error is expected
+	b, _ := os.ReadFile(log)
+	joined := " " + strings.Join(strings.Split(strings.TrimSpace(string(b)), "\n"), " ") + " "
+	for _, want := range []string{"PreferredAuthentications=none", "PubkeyAuthentication=no", "IdentityAgent=none", "IdentitiesOnly=yes", "BatchMode=yes", "ForwardAgent=no", "ForwardX11=no", "ClearAllForwardings=yes",
+		"StrictHostKeyChecking=no", "GlobalKnownHostsFile=/dev/null", "HashKnownHosts=no", "RemoteCommand=none"} {
+		if !strings.Contains(joined, " "+want+" ") {
+			t.Errorf("the scan's argv lacks %q: %s", want, joined)
+		}
+	}
+	if strings.Contains(joined, "StrictHostKeyChecking=yes") || strings.Contains(joined, ".ssh/known_hosts") {
+		t.Errorf("the scan checks nothing against the owner's file and keeps no strict option: %s", joined)
+	}
+	if !strings.Contains(joined, " -F ") || !strings.Contains(joined, "UserKnownHostsFile=") {
+		t.Errorf("the scan uses its own config and its own known_hosts: %s", joined)
 	}
 }
