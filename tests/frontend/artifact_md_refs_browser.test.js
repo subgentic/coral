@@ -49,6 +49,14 @@ const MD_B = '# The plan\n\nSecond file text.';
             await ev(`document.querySelector('#artifact-viewer [data-dialog-close], #artifact-viewer .artifact-viewer-close')?.click(); true`);
             const q = await ev(`import(${S} + 'operator_asks.js').then(async m => { m.openAskDialog({ asker: 'Orchestrator', board: 'x', board_label: 'sprout', kind: 'wait', text: 'Which one?\\n\\nI wrote it up in coral://artifacts/${A} and the plan is coral://artifacts/${B}.' }); const d = document.querySelector('dialog.inbox-ask-dialog[open]'); for (let i = 0; i < 60 && !d.querySelector('a.mb-artifact-ref'); i++) await new Promise(r => setTimeout(r, 50)); const links = [...d.querySelectorAll('a.mb-artifact-ref')].map(a => [a.textContent, a.dataset.artifact]); d.close(); d.remove(); return links; })`);
             check(q.length === 2 && q[0][0] === `coral://artifacts/${A}` && q[1][1] === B, at + 'the question dialog links its references too, the words as written: ' + JSON.stringify(q));
+            // a file seen from ANOTHER computer: its references name files on that computer (#12373), not this one
+            await ev(`(() => { window.__urls = []; const f = window.fetch; window.fetch = (u, o) => { window.__urls.push(String(u && u.url ? u.url : u)); return f(u, o); }; return true; })()`);
+            await ev(`import(${S} + 'artifact_viewer.js').then(m => { m.openArtifactViewer('${A}', { server: 'ws1', filename: 'notes.md' }); return true; })`);
+            await waitFor(`!!document.querySelector('#artifact-viewer .artifact-viewer-markdown a.mb-artifact-ref')`, at + 'the references of a remote file are links', 10000);
+            const rl = await ev(`(() => [...document.querySelectorAll('#artifact-viewer .artifact-viewer-markdown a.mb-artifact-ref')].map(a => ({ href: a.getAttribute('href'), server: a.dataset.server || '' })))()`);
+            check(rl.length === 2 && rl.every(l => l.server === 'ws1' && /^\/api\/remote\/ws1\/api\/artifacts\/[a-f0-9]{64}/.test(l.href)), at + 'a link in a file from another computer points at that computer: ' + JSON.stringify(rl));
+            await ev(`window.__urls = []; document.querySelector('#artifact-viewer .artifact-viewer-markdown a.mb-artifact-ref').click(); true`);
+            await waitFor(`window.__urls.some(u => u.includes('/api/remote/ws1/api/artifacts/${B}'))`, at + 'a click opens the file on that computer', 10000).catch(async e => check(false, at + e.message + ' ' + JSON.stringify(await ev('window.__urls'))));
         }
     } finally { await client.close(); }
     if (failures.length) { console.error('FAIL\n' + failures.join('\n')); process.exitCode = 1; } else console.log('PASS a coral://artifacts reference in a rendered Markdown file is a link that opens that file');

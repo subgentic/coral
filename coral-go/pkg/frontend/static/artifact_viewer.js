@@ -43,11 +43,11 @@ let _details = null;     // the Details button and its panel (the readers' row)
 let _overlay = 0;        // its entry in overlay_history.js while it is open on a phone (#5219)
 
 /** Render an artifact's text: Markdown through the strict renderer, anything else as plain text. */
- function renderArtifactText(el, content, path) {
+ function renderArtifactText(el, content, path, server) {
     if (/\.(?:md|markdown|mdown)$/i.test(path || '')) {
         el.innerHTML = `<div class="prose prose-doc preview-pane-markdown artifact-viewer-markdown">${renderMarkdownStrict(content)}</div>`;
         highlightCodeIn(el);
-        linkArtifactRefsIn(el, { asWritten: true });
+        linkArtifactRefsIn(el, { asWritten: true, server });
     } else {
         el.innerHTML = `<pre class="preview-pane-code artifact-viewer-text"><code>${escapeHtml(content)}</code></pre>`;
     }
@@ -213,7 +213,7 @@ export function openArtifactViewer(hex, opts = {}) {
     Promise.resolve(renderArtifact(body, `coral://artifacts/${hex}`, { server: opts.server, filename: opts.filename, mediaType: opts.mediaType }, {
         signal: _abort.signal,
         isStale: () => gen !== _gen || d.hidden,
-        renderContent: (el, content, path) => { textShown = true; renderArtifactText(el, content, path); _comments.docRendered(content, true); },
+        renderContent: (el, content, path, server) => { textShown = true; renderArtifactText(el, content, path, server); _comments.docRendered(content, true); },
         openEntry: (entry) => {
             const m = /^coral:\/\/artifacts\/([a-f0-9]{64})$/i.exec(entry.uri || '');
             if (m) openArtifactViewer(m[1], { server: opts.server, filename: entry.name, mediaType: entry.media_type });
