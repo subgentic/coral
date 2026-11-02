@@ -92,13 +92,19 @@ func TestEverythingElseUnderTheHomeFolderIsStillRefusedWhileAnAgentWorksThere(t 
 		return p
 	}
 	for name, p := range map[string]string{
-		"a download":                    mk(filepath.Join(r.home, "Downloads", "claude")),
-		"a project's bin":               mk(filepath.Join(r.home, "proj", "bin", "claude")),
-		"another CLI planted in .local": mk(filepath.Join(r.home, ".local", "bin", "codex")),
-		"a file in .local/bin that is not a link into versions": mk(filepath.Join(r.home, ".local", "bin", "claude2")),
-		"a nvm install": mk(filepath.Join(r.home, ".nvm", "versions", "node", "v20", "bin", "claude")),
+		"a download":      mk(filepath.Join(r.home, "Downloads", "claude")),
+		"a project's bin": mk(filepath.Join(r.home, "proj", "bin", "claude")),
+		"a tools folder":  mk(filepath.Join(r.home, "tools", "claude")),
 	} {
 		assert.Contains(t, r.screen(p), "in an agent's working folder", name)
+	}
+	// #12365 (the Operator, with Security): a CLI in a standard install root is no longer refused for the agent in ~, whatever shape it has there (before: only the native installer's link into versions/)
+	for name, p := range map[string]string{
+		"another CLI in .local/bin":  mk(filepath.Join(r.home, ".local", "bin", "codex")),
+		"a plain file in .local/bin": mk(filepath.Join(r.home, ".local", "bin", "claude2")),
+		"a nvm install":              mk(filepath.Join(r.home, ".nvm", "versions", "node", "v20", "bin", "claude")),
+	} {
+		assert.Empty(t, r.screen(p), name)
 	}
 	// a link in the right place to somewhere else is refused
 	elsewhere := mk(filepath.Join(r.home, "Downloads", "evil"))
@@ -114,7 +120,9 @@ func TestEverythingElseUnderTheHomeFolderIsStillRefusedWhileAnAgentWorksThere(t 
 	assert.Contains(t, r.screen(inner), "in an agent's working folder", "a link inside versions/ that leaves it")
 }
 
-func TestAnAgentWorkingInsideTheInstallFoldersStillRefusesThem(t *testing.T) {
+// #12365 (the Operator: "agents can be launched into those folders after starting, so what's the point?", Security's answer on #353): an agent working in the install folders (~/.local, ~/.local/bin, the share
+// folders) no longer refuses the CLIs there either. (It was #11454's ruling that it did.)
+func TestAnAgentWorkingInsideTheInstallFoldersNoLongerRefusesThem(t *testing.T) {
 	for name, dir := range map[string]func(r *nativeRig) string{
 		"~/.local":                func(r *nativeRig) string { return filepath.Join(r.home, ".local") },
 		"~/.local/bin":            func(r *nativeRig) string { return filepath.Join(r.home, ".local", "bin") },
@@ -124,10 +132,8 @@ func TestAnAgentWorkingInsideTheInstallFoldersStillRefusesThem(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			r := newNativeRig(t)
 			r.agentIn("aaaaaaaa-0000-4000-8000-000000000003", dir(r))
-			assert.Contains(t, r.screen(r.link), "in an agent's working folder", "the exemption is for the home folder case only")
-			if name != "~/.local/bin" { // the typed link is the one in ~/.local/bin; its target is under the share folder, which that agent does not work in
-				assert.Contains(t, r.screen(r.version), "in an agent's working folder")
-			}
+			assert.Empty(t, r.screen(r.link))
+			assert.Empty(t, r.screen(r.version))
 		})
 	}
 }

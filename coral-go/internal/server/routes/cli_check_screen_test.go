@@ -42,13 +42,9 @@ func TestCLICheckGivesACommonPlaceTheScreenALaunchGivesIt(t *testing.T) {
 
 	require.NoError(t, h.ss.RegisterLiveSession(context.Background(), &store.LiveSession{SessionID: "44444444-5555-4666-8777-888888888888", AgentType: "claude", AgentName: "w", WorkingDir: filepath.Join(home, ".local")}))
 	out = cliCheck(t, h, "type=agy")
-	assert.Equal(t, false, out["found"], "an agent works in the folder that holds it: a launch refuses it, so the check does not call it installed: %v", out)
-	assert.Contains(t, out["refused"], "working folder")
-	note, _ := out["install_note"].(string)
-	assert.Contains(t, note, "Found but not used")
-	assert.Contains(t, note, "~/.local/bin/agy")
-	assert.Contains(t, note, "cli_path_agy")
-	assert.NotContains(t, out, "install_command", "installing it again would not fix this")
+	assert.Equal(t, true, out["found"], "#12365: an agent works in ~/.local, a standard install folder: the launch uses it, so the check calls it installed: %v", out)
+	assert.Empty(t, out["refused"])
+	assert.NotContains(t, out, "install_note")
 }
 
 // Security's SHOULD on #12053: through Coral Hub the refusal's reason names an agent and its working folder; the answer carries only the generic words.
@@ -75,7 +71,7 @@ func TestCLICheckThroughTheHubDoesNotNameTheAgentOrItsFolder(t *testing.T) {
 	rec := httptest.NewRecorder()
 	h.CLICheck(rec, req)
 	require.Equal(t, 200, rec.Code, rec.Body.String())
-	assert.Contains(t, rec.Body.String(), "Found but not used")
+	assert.Contains(t, rec.Body.String(), `"found":true`, "#12365: a CLI in ~/.local/bin is used though an agent works in ~/.local")
 	assert.NotContains(t, rec.Body.String(), "Secret Agent Name", "an agent's name does not go through the Hub")
 	assert.NotContains(t, rec.Body.String(), ".local", "nor its folder")
 }
