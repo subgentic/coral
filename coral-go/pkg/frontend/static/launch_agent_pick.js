@@ -3,18 +3,19 @@
  * reacts to that select (the missing-CLI line, the model list, the permission mode) still does. When nothing was ever chosen as the default and Claude is missing while another agent is installed, that one is selected. */
 import { serverFetch, normServer, LOCAL_SERVER } from './server_base.js';
 
-const TYPES = [['claude', 'Claude'], ['codex', 'Codex'], ['agy', 'Antigravity'], ['pi', 'Pi'], ['opencode', 'OpenCode']];
+const TYPES = [['claude', 'Claude'], ['codex', 'Codex'], ['agy', 'Antigravity'], ['pi', 'Pi'], ['opencode', 'OpenCode'], ['hermes', 'Hermes']];
 const ALIAS = { gemini: 'agy', antigravity: 'agy' };
 const PROBE_MS = 1500; // a CLI that is slow to answer is "unknown": it keeps its place and is not marked
 
-/** Whether the server has that agent's CLI: true, false, or null when it could not say. */
+/** What the server says of that agent's CLI: found is true, false, or null when it could not say; why is the server's one line when the agent is not offered on its OS (Hermes on Windows, #12038). */
 async function probe(server, type) {
     try {
         const r = await serverFetch(server, `/api/system/cli-check?type=${encodeURIComponent(type)}`);
-        if (!r.ok) return null;
+        if (!r.ok) return { found: null };
         const d = await r.json();
-        return typeof d.found === 'boolean' ? d.found : null;
-    } catch { return null; }
+        if (d.supported === false) return { found: false, why: typeof d.message === 'string' ? d.message.slice(0, 200) : 'Not offered on this computer.' };
+        return { found: typeof d.found === 'boolean' ? d.found : null };
+    } catch { return { found: null }; }
 }
 
 /** Fill `group` (the element) with the radios for the agent select of `form`. The four are drawn at once, in their usual order and usable; when the CLI probes answer (up to PROBE_MS later) the missing ones are marked, the installed ones
@@ -52,12 +53,19 @@ export async function buildAgentPick({ group, form, server, implicitDefault }) {
     sync();
     group.hidden = false;
     form.classList.add('has-agent-pick'); // the group is the one place that names the agent: the form's own select stays (hidden by css) and follows it (#6407)
-    const found = await Promise.all(TYPES.map(([t]) => Promise.race([probe(server, t), new Promise(r => setTimeout(() => r(null), PROBE_MS))])));
+    const res = await Promise.all(TYPES.map(([t]) => Promise.race([probe(server, t), new Promise(r => setTimeout(() => r({ found: null }), PROBE_MS))])));
     if (group._pickToken !== token || !group.isConnected) return; // another New Agent opened meanwhile
-    TYPES.forEach(([type], i) => {
-        if (found[i] === false) { labels.get(type).querySelector('.launch-agent-missing').textContent = ' not installed'; labels.get(type).classList.add('has-mark'); }
+    const found = res.map(r => r.found);
+    TYPES.forEach(([type, label], i) => { // an agent this computer's OS does not offer is not a choice: no radio, no option in the select, and one line says why
+        if (!res[i].why) return;
+        labels.get(type).remove(); labels.delete(type);
+        select.querySelector(`option[value="${type}"]`)?.remove();
+        const line = document.createElement('p'); line.className = 'launch-agent-unsupported settings-hint'; line.dataset.type = type; line.textContent = res[i].why; group.append(line);
     });
-    const order = TYPES.map((_, i) => i).sort((a, b) => (found[b] === true) - (found[a] === true) || a - b); // installed first, then the rest as they were
+    TYPES.forEach(([type], i) => {
+        if (found[i] === false && labels.has(type)) { labels.get(type).querySelector('.launch-agent-missing').textContent = ' not installed'; labels.get(type).classList.add('has-mark'); }
+    });
+    const order = TYPES.map((_, i) => i).filter(i => labels.has(TYPES[i][0])).sort((a, b) => (found[b] === true) - (found[a] === true) || a - b); // installed first, then the rest as they were
     if (!chosen && !group.contains(document.activeElement)) for (const i of order) group.append(labels.get(TYPES[i][0])); // moving a label would drop the keyboard from it: only when nobody is on the group
     // nothing was ever chosen and the built-in default is not here: start on the first agent that is
     if (!chosen && implicitDefault && (ALIAS[select.value] || select.value) === 'claude' && found[0] === false) {

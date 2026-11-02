@@ -34,7 +34,7 @@ const GROUPED = `(() => { const R = window.fetch; window.fetch = (u, o = {}) => 
             assert.ok(oc, `an OpenCode card exists: ${JSON.stringify(cards)}`);
             assert.equal(oc.mark, 'O', 'its badge is O, a letter no other card uses'); assert.equal(oc.name, 'OpenCode');
             if (!missing.length) {
-                assert.deepEqual(cards.radios, ['claude', 'codex', 'agy', 'pi', 'opencode'], 'five radios, OpenCode last');
+                assert.deepEqual(cards.radios, ['claude', 'codex', 'agy', 'pi', 'opencode', 'hermes'], 'six radios, Hermes last');
                 assert.equal(oc.missing, false); assert.match(oc.status || '', /^Installed( · default |$)/, 'the status line says installed and the default model: ' + oc.status);
                 await ev(`document.querySelector('#launch-agent-pick input[value="opencode"]').click(); true`);
                 await waitFor(`document.querySelector('.acf-agent-type').value === 'opencode' && document.querySelector('.provider-card-body[data-type="opencode"]:not([hidden]) .acf-model-select optgroup')`, 'the OpenCode models grouped', 8000);
