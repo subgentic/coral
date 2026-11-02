@@ -172,3 +172,25 @@ func TestTheStoredCommandOfAHermesAgentIsReadFromItsOwnSessionOnly(t *testing.T)
 	require.NoError(t, transcriptlink.BindHermes(handler.cfg.CoralDir(), sid, hid))
 	assert.Equal(t, "rm -rf /home/tester/dan​gerdir", handler.hermesStoredCommand(context.Background(), sid), "the bound session's newest call, with its hidden character")
 }
+
+// QA's SHOULD on #12170: a box with no command rows is not a prompt, so an empty card never offers Allow buttons for nothing.
+func TestAHermesApprovalBoxWithNoCommandIsNotAPrompt(t *testing.T) {
+	const footer = "  ↑/↓ to select, Enter to confirm  (292s)\n"
+	opts := "│ ❯ 1. Allow once                 │\n│   2. Allow for this session     │\n│   3. Deny                       │\n"
+	for name, box := range map[string]string{
+		"heading, blank rows, then the options": "╭─────────────────────────────────╮\n│ ⚠️   Dangerous Command           │\n│                                 │\n│                                 │\n" + opts + "│                                 │\n│ recursive delete                │\n╰─────────────────────────────────╯\n",
+		"heading, one blank row, the options":   "╭─────────────────────────────────╮\n│ ⚠️   Dangerous Command           │\n│                                 │\n" + opts + "│                                 │\n│ recursive delete                │\n╰─────────────────────────────────╯\n",
+		"heading and options, no blank rows":    "╭─────────────────────────────────╮\n│ ⚠️   Dangerous Command           │\n" + opts + "╰─────────────────────────────────╯\n",
+		"heading only":                          "╭─────────────────────────────────╮\n│ ⚠️   Dangerous Command           │\n╰─────────────────────────────────╯\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, ok := parsePromptScreen(box + footer)
+			assert.False(t, ok, "no command, no Allow buttons")
+		})
+	}
+	// the same box with a command is the prompt
+	with := "╭─────────────────────────────────╮\n│ ⚠️   Dangerous Command           │\n│                                 │\n│ rm -rf x                        │\n│                                 │\n" + opts + "╰─────────────────────────────────╯\n"
+	s, ok := parsePromptScreen(with + footer)
+	require.True(t, ok)
+	assert.Equal(t, "rm -rf x", s.Target)
+}
