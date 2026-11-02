@@ -35,6 +35,23 @@ var autoSleepSamples = struct {
 	m map[string]cpuSample
 }{m: map[string]cpuSample{}}
 
+// autoSleepLastWhy is each agent's reason at the last look ("" when it was slept), so a reason is logged when it changes, not every minute (#12335: the v2.0.34 log said nothing for 23 minutes).
+var autoSleepLastWhy = struct {
+	sync.Mutex
+	m map[string]string
+}{m: map[string]string{}}
+
+// noteAutoSleepWhy logs a session's reason at Info when it differs from the last look's. Reasons are counters, never text from the agent.
+func noteAutoSleepWhy(sessionID, agentType, why string) {
+	autoSleepLastWhy.Lock()
+	prev, had := autoSleepLastWhy.m[sessionID]
+	autoSleepLastWhy.m[sessionID] = why
+	autoSleepLastWhy.Unlock()
+	if !had || prev != why {
+		slog.Info("auto_sleep verdict", "session_id", sessionID, "agent", agentType, "reason", why)
+	}
+}
+
 type cpuSample struct {
 	cpu float64
 	at  time.Time
@@ -80,10 +97,12 @@ func (h *SessionsHandler) autoSleepPass(ctx context.Context, now time.Time) {
 		}
 		seen[ls.SessionID] = true
 		in, rss := h.autoSleepInputOf(ctx, ls, settings, idle, now)
-		if why := autoSleepVerdict(in); why != "" {
-			slog.Debug("auto_sleep skipped", "session_id", ls.SessionID, "reason", why)
+		why := autoSleepVerdict(in)
+		if why != "" {
+			noteAutoSleepWhy(ls.SessionID, ls.AgentType, why)
 			continue
 		}
+		noteAutoSleepWhy(ls.SessionID, ls.AgentType, "sleep")
 		h.autoSleepOne(ctx, ls, idle, rss, now)
 	}
 	autoSleepSamples.Lock() // the samples of agents that are gone are dropped
@@ -93,6 +112,13 @@ func (h *SessionsHandler) autoSleepPass(ctx context.Context, now time.Time) {
 		}
 	}
 	autoSleepSamples.Unlock()
+	autoSleepLastWhy.Lock()
+	for sid := range autoSleepLastWhy.m {
+		if !seen[sid] {
+			delete(autoSleepLastWhy.m, sid)
+		}
+	}
+	autoSleepLastWhy.Unlock()
 }
 
 // autoSleepInputOf reads what the verdict needs about one agent, as late and as cheaply as it can: the checks that cost a screen read or a process table read come last, and only for an
@@ -150,7 +176,7 @@ func (h *SessionsHandler) autoSleepInputOf(ctx context.Context, ls *store.LiveSe
 	if autoSleepVerdict(in) != "" {
 		return in, 0
 	}
-	switch ptymanager.ScreenStopsSleep(ctx, h.terminal, name, ls.AgentType, ls.SessionID) {
+	switch ptymanager.ScreenStopsSleep(ctx, h.terminal, name, ls.AgentType, ls.SessionID, h.parkedWait(ctx, ls, sub)) {
 	case "":
 	case ptymanager.SleepStopDialog:
 		in.Dialog = true
@@ -189,6 +215,49 @@ func (h *SessionsHandler) autoSleepProcess(ctx context.Context, ls *store.LiveSe
 		return true, false, rss
 	}
 	return cpu-prev.cpu > autoSleepBusyCPU, false, rss
+}
+
+// parkedWait: the agent has a board wait registered and has run nothing since (a tool or a new prompt after it), so one background shell on its screen is that wait's own command (Security, #12335:
+// an agent that interrupted its wait and started a dev server or a long test has a later tool event, and keeps its shell protected). The turn's own end after the wait is not activity. Unreadable:
+// not parked. Residual: a job started BEFORE the wait, with the wait run in the foreground, would read as the one shell; real teams run the wait in the background, so the footer counts two then.
+func (h *SessionsHandler) parkedWait(ctx context.Context, ls *store.LiveSession, sub *board.Subscriber) bool {
+	if h.bs == nil || h.ts == nil || sub == nil {
+		return false
+	}
+	w, err := h.bs.GetActiveWait(ctx, ptr.Value(ls.BoardName), sub.SubscriberID)
+	if err != nil || w == nil {
+		return false
+	}
+	made, err := time.Parse(time.RFC3339, w.CreatedAt)
+	if err != nil {
+		return false
+	}
+	events, err := h.ts.ListAgentEvents(ctx, "", 500, &ls.SessionID) // newest first, the whole history and not the state's last turn: the wait's turn has ended by now
+	if err != nil {
+		return false
+	}
+	for _, ev := range events {
+		at, err := time.Parse(time.RFC3339Nano, ev.CreatedAt)
+		if err != nil {
+			return false
+		}
+		if !at.After(made.Add(waitCommandSlack)) {
+			break // as old as the wait: the rest is before it
+		}
+		if ev.EventType == "tool_use" || ev.EventType == "prompt_submit" {
+			return false // it did something after it started waiting
+		}
+	}
+	return true
+}
+
+// autoSleepSub is the agent's board subscription (nil when it has none).
+func (h *SessionsHandler) autoSleepSub(ctx context.Context, ls *store.LiveSession) *board.Subscriber {
+	if h.bs == nil || ptr.Value(ls.BoardName) == "" {
+		return nil
+	}
+	sub, _ := h.bs.GetSubscriptionBySessionName(ctx, naming.SessionName(ls.AgentType, ls.SessionID))
+	return sub
 }
 
 // waitCommandSlack is how long after a wait's registration its own command's last event may still be (the tool call that ran `coral-board wait`).
@@ -272,7 +341,7 @@ func (h *SessionsHandler) autoSleepOne(ctx context.Context, ls *store.LiveSessio
 	// The screen is read again right before anything is ended (QA's SHOULD 1): text typed since the verdict's look would be lost with the terminal. A draft, a dialog, a background run or a
 	// screen that cannot be read undoes the sleep: the row is awake again as it was, nothing was killed.
 	name := naming.SessionName(ls.AgentType, ls.SessionID)
-	if why := ptymanager.ScreenStopsSleep(ctx, h.terminal, name, ls.AgentType, ls.SessionID); why != "" {
+	if why := ptymanager.ScreenStopsSleep(ctx, h.terminal, name, ls.AgentType, ls.SessionID, h.parkedWait(ctx, ls, h.autoSleepSub(ctx, ls))); why != "" {
 		if err := h.ss.UndoAutoSleeping(ctx, ls.SessionID); err != nil {
 			slog.Warn("auto_sleep: the sleep was not undone", "session_id", ls.SessionID, "error", err)
 		}
