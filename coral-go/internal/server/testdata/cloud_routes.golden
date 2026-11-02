@@ -34,6 +34,7 @@ DELETE /api/themes/{name} never
 DELETE /api/upload/{name} never
 DELETE /api/views/{id} never
 DELETE /api/workflows/{workflowID} never
+GET /api/activity never
 GET /api/agent-docs never
 GET /api/agent-docs/all never
 GET /api/agent-docs/{name} never

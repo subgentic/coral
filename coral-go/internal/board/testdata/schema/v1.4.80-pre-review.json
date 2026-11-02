@@ -229,6 +229,12 @@
       "type": "index"
     },
     {
+      "name": "idx_operator_actions_team",
+      "sql": "CREATE INDEX idx_operator_actions_team ON operator_actions(team, id)",
+      "tbl_name": "operator_actions",
+      "type": "index"
+    },
+    {
       "name": "idx_operator_touch_team_at",
       "sql": "CREATE INDEX idx_operator_touch_team_at ON operator_touch(team, at)",
       "tbl_name": "operator_touch",
@@ -658,6 +664,18 @@
       "name": "hub_operator_actions",
       "sql": "CREATE TABLE hub_operator_actions (\n\t\tid       INTEGER PRIMARY KEY AUTOINCREMENT,\n\t\tat       TEXT NOT NULL,\n\t\thub_user TEXT NOT NULL,\n\t\tmethod   TEXT NOT NULL,\n\t\tpath     TEXT NOT NULL,\n\t\tproject  TEXT NOT NULL,\n\t\tstatus   INTEGER NOT NULL\n\t, hub_user_id TEXT NOT NULL DEFAULT '')",
       "tbl_name": "hub_operator_actions",
+      "type": "table"
+    },
+    {
+      "name": "operator_actions",
+      "sql": "CREATE TABLE operator_actions (\n\t\tid        INTEGER PRIMARY KEY AUTOINCREMENT,\n\t\tat        TEXT NOT NULL,\n\t\tactor     TEXT NOT NULL,\n\t\taction    TEXT NOT NULL,\n\t\titem_kind TEXT NOT NULL,\n\t\titem_id   TEXT NOT NULL,\n\t\tversion   TEXT NOT NULL DEFAULT '',\n\t\tteam      TEXT NOT NULL,\n\t\tsource    TEXT NOT NULL,\n\t\thint      TEXT NOT NULL DEFAULT '',\n\t\ttitle     TEXT NOT NULL DEFAULT '',\n\t\tnote      TEXT NOT NULL DEFAULT '',\n\t\tprev_hash TEXT NOT NULL,\n\t\thash      TEXT NOT NULL\n\t)",
+      "tbl_name": "operator_actions",
+      "type": "table"
+    },
+    {
+      "name": "operator_actions_head",
+      "sql": "CREATE TABLE operator_actions_head (\n\t\tone       INTEGER PRIMARY KEY CHECK (one = 1),\n\t\tlast_id   INTEGER NOT NULL,\n\t\tlast_hash TEXT NOT NULL\n\t)",
+      "tbl_name": "operator_actions_head",
       "type": "table"
     },
     {
@@ -6044,6 +6062,203 @@
           "dflt_value": "''",
           "hidden": 0,
           "name": "hub_user_id",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        }
+      ],
+      "indexes": []
+    },
+    "operator_actions": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "id",
+          "notnull": 0,
+          "pk": 1,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 1,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "at",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 2,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "actor",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 3,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "action",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 4,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "item_kind",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 5,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "item_id",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 6,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "version",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 7,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "team",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 8,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "source",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 9,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "hint",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 10,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "title",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 11,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "note",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 12,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "prev_hash",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 13,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "hash",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            {
+              "cid": 7,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "team",
+              "seqno": 0
+            },
+            {
+              "cid": 0,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "id",
+              "seqno": 1
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 2
+            }
+          ],
+          "name": "idx_operator_actions_team",
+          "origin": "c",
+          "partial": 0,
+          "seq": 0,
+          "unique": 0
+        }
+      ]
+    },
+    "operator_actions_head": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "one",
+          "notnull": 0,
+          "pk": 1,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 1,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "last_id",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 2,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "last_hash",
           "notnull": 1,
           "pk": 0,
           "type": "TEXT"
