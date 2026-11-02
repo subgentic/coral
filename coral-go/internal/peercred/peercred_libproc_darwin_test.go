@@ -152,3 +152,29 @@ func TestScansAreBoundedAndSharedAndANewConnectionIsStillFound(t *testing.T) {
 	elapsed := time.Since(start)
 	assert.LessOrEqual(t, int(scans.Load()), 2+int(elapsed/scanGap)+1, "scans are at most one per gap however many ask (%d scans in %v)", scans.Load(), elapsed)
 }
+
+// Both ends must match: a socket of this user's whose local end is the client's but whose remote end is another address (the client's connection to somewhere else, or a reused port) is not the
+// client's connection to this server, and neither is one with the server's address as its remote and another local end (#12542, Security).
+func TestASocketMustHaveBothEndsToBeTheClients(t *testing.T) {
+	real := mySockets
+	defer func() { mySockets = real; forgetScan() }()
+	client := netip.MustParseAddrPort("127.0.0.1:51234")
+	server := netip.MustParseAddrPort("127.0.0.1:8420")
+	elsewhere := netip.MustParseAddrPort("127.0.0.1:9999")
+	for name, shown := range map[string][][2]netip.AddrPort{
+		"the client's local end to another remote": {{client, elsewhere}, {server, client}},
+		"the server as remote from another local":  {{elsewhere, server}, {server, client}},
+		"the ends swapped":                         {{server, client}},
+	} {
+		forgetScan()
+		mySockets = func(visit func(local, remote netip.AddrPort) bool) error {
+			for _, ends := range shown {
+				visit(ends[0], ends[1])
+			}
+			return nil
+		}
+		mine, err := ownedByMyProcess(client, server)
+		assert.False(t, mine, name)
+		assert.ErrorIs(t, err, ErrNotFound, name)
+	}
+}
