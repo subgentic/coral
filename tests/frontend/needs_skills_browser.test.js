@@ -39,6 +39,19 @@ const PENDING = [
         assert.equal(bad.test(row.html), false, 'nor in the row markup: ' + JSON.stringify((row.html.match(/.{0,60}[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u2069\ufeff].{0,30}/g) || []).slice(0, 3)));
         assert.match(row.text, /Skill to approve: clean/, 'the words that are words are there');
         assert.match(row.text, /Evil/, 'the publisher is there');
+        // The same at 390 px (#12272): the phone's row draws its title and lead from the skill's name, and the Filters panel lists the names: none of them may carry a hidden character either
+        await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
+        await ev(`window.switchNavTab('hub-inbox'); import((window.__coralStatic || '/static/') + 'inbox_sidebar.js').then(m => m.openInboxGroup('needs')).then(() => true)`);
+        await waitFor(`/clean/.test(document.getElementById('group-table-view')?.textContent || '') && innerWidth === 390`, 'the phone rows', 10000);
+        const phoneView = await ev(`(() => ({ rows: document.getElementById('group-table-view').textContent, html: document.getElementById('group-table-view').innerHTML, bar: document.querySelector('#inbox-view') ? document.querySelector('#inbox-view').innerHTML : '', w: innerWidth }))()`);
+        assert.equal(phoneView.w, 390, 'the phone width was the one checked');
+        assert.equal(bad.test(phoneView.rows), false, 'no hidden character in the phone rows: ' + JSON.stringify(phoneView.rows.slice(0, 400)));
+        assert.equal(bad.test(phoneView.html), false, 'nor in the phone rows\' markup (the title, the lead, the labels)');
+        assert.equal(bad.test(phoneView.bar), false, 'nor anywhere in the Inbox page, the Filters panel and its list of names included');
+        assert.match(phoneView.rows, /clean<U\+0007>-up<U\+200B>-skill<U\+202E>/, 'the words that are words are there, the rest written out');
+        await Emulation.setDeviceMetricsOverride({ width: 1440, height: 900, deviceScaleFactor: 1, mobile: false }); await Emulation.setTouchEmulationEnabled({ enabled: false });
+        await ev(`window.switchNavTab('hub-inbox', { folder: 'needs' }); true`);
+        await waitFor(`/Skill to approve: db-review version 1/.test(document.getElementById('group-table-view').innerText)`, 'the desktop rows again', 10000);
         assert.match(await ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`), /^[2-9]\d*$/, 'the Inbox tab counts them');
         assert.match(await ev(`Array.from(document.querySelectorAll('#group-table-view button')).map(b => b.textContent.trim()).join('|')`), /Review/, 'a Review button on the row');
         // Review opens the Skills tab at that skill
