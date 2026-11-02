@@ -111,3 +111,28 @@ func TestAutoSleepLogsTheReasonOnceWhenItChanges(t *testing.T) {
 	r.h.autoSleepPass(r.ctx, at.Add(2*time.Hour+time.Minute))
 	assert.Contains(t, buf.String(), "reason=process_busy", "the reason changed: logged again")
 }
+
+// A parked real worker's screen names its `coral-board wait` as one background shell (Beta Tester, v2.0.34: background_running for 36 minutes): with its wait registered it sleeps; with no wait, or with a second
+// shell, it does not (#12335).
+func TestAWorkerWhoseOnlyBackgroundShellIsItsWaitSleeps(t *testing.T) {
+	const oneShell = "✻ Cogitated for 4s · done 5:38 PM · 1 shell still running\n\n──────────────────────────────────────────────────────────────────────\n❯ \n──────────────────────────────────────────────────────────────────────\n  ⏵⏵ bypass permissions on · 1 shell · ↓ to manage\n"
+	for name, tc := range map[string]struct {
+		wait   bool
+		screen string
+		asleep int
+	}{
+		"the wait is the one shell": {true, oneShell, 1},
+		"one shell and no wait":     {false, oneShell, 0},
+		"a second shell besides it": {true, strings.ReplaceAll(oneShell, "1 shell", "2 shells"), 0},
+	} {
+		t.Run(name, func(t *testing.T) {
+			r := newSleepRig(t)
+			r.term.screen = tc.screen
+			if tc.wait {
+				_, err := r.h.bs.RegisterWait(r.ctx, "autosleep", "dev", r.name, "message", "", "waiting for a message", 10*time.Hour)
+				require.NoError(t, err)
+			}
+			assert.Equal(t, tc.asleep, r.pass(t).IsSleeping, name)
+		})
+	}
+}

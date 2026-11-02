@@ -176,7 +176,7 @@ func (h *SessionsHandler) autoSleepInputOf(ctx context.Context, ls *store.LiveSe
 	if autoSleepVerdict(in) != "" {
 		return in, 0
 	}
-	switch ptymanager.ScreenStopsSleep(ctx, h.terminal, name, ls.AgentType, ls.SessionID) {
+	switch ptymanager.ScreenStopsSleep(ctx, h.terminal, name, ls.AgentType, ls.SessionID, h.parkedWait(ctx, ls, sub)) {
 	case "":
 	case ptymanager.SleepStopDialog:
 		in.Dialog = true
@@ -215,6 +215,24 @@ func (h *SessionsHandler) autoSleepProcess(ctx context.Context, ls *store.LiveSe
 		return true, false, rss
 	}
 	return cpu-prev.cpu > autoSleepBusyCPU, false, rss
+}
+
+// parkedWait: the agent has a board wait registered, so one background shell on its screen is that wait's own command.
+func (h *SessionsHandler) parkedWait(ctx context.Context, ls *store.LiveSession, sub *board.Subscriber) bool {
+	if h.bs == nil || sub == nil {
+		return false
+	}
+	w, err := h.bs.GetActiveWait(ctx, ptr.Value(ls.BoardName), sub.SubscriberID)
+	return err == nil && w != nil
+}
+
+// autoSleepSub is the agent's board subscription (nil when it has none).
+func (h *SessionsHandler) autoSleepSub(ctx context.Context, ls *store.LiveSession) *board.Subscriber {
+	if h.bs == nil || ptr.Value(ls.BoardName) == "" {
+		return nil
+	}
+	sub, _ := h.bs.GetSubscriptionBySessionName(ctx, naming.SessionName(ls.AgentType, ls.SessionID))
+	return sub
 }
 
 // waitCommandSlack is how long after a wait's registration its own command's last event may still be (the tool call that ran `coral-board wait`).
@@ -298,7 +316,7 @@ func (h *SessionsHandler) autoSleepOne(ctx context.Context, ls *store.LiveSessio
 	// The screen is read again right before anything is ended (QA's SHOULD 1): text typed since the verdict's look would be lost with the terminal. A draft, a dialog, a background run or a
 	// screen that cannot be read undoes the sleep: the row is awake again as it was, nothing was killed.
 	name := naming.SessionName(ls.AgentType, ls.SessionID)
-	if why := ptymanager.ScreenStopsSleep(ctx, h.terminal, name, ls.AgentType, ls.SessionID); why != "" {
+	if why := ptymanager.ScreenStopsSleep(ctx, h.terminal, name, ls.AgentType, ls.SessionID, h.parkedWait(ctx, ls, h.autoSleepSub(ctx, ls))); why != "" {
 		if err := h.ss.UndoAutoSleeping(ctx, ls.SessionID); err != nil {
 			slog.Warn("auto_sleep: the sleep was not undone", "session_id", ls.SessionID, "error", err)
 		}
