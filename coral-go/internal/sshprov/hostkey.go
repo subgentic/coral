@@ -397,7 +397,7 @@ func scanConfig(userConfig string) (string, error) {
 	// owner has already pinned the hops they use, and an unknown or changed hop stops the scan with HopKeyError). Only the last host is scanned, with the options of ScanAlias's own argv, which
 	// ssh does not hand to a hop.
 	for _, l := range []string{
-		"BatchMode yes",
+		"BatchMode yes", "UpdateHostKeys no", // the scan must not append keys a verified hop offers to the owner's own known_hosts
 		"ForwardAgent no", "ForwardX11 no", "ForwardX11Trusted no", "ClearAllForwardings yes", "PermitLocalCommand no", "RemoteCommand none",
 		// no Kerberos sign-in to an unverified hop and no delegating of the owner's tickets to it, and no connection sharing: a multiplexed master of the owner's would carry a hop through the
 		// owner's own, already verified, connection (so the key would never be stored), and a master started here must not outlive the scan

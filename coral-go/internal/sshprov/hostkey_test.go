@@ -260,7 +260,7 @@ func TestScanAliasGivesTheJumpHopsTheScanSafetyAndNoHostKeyRelaxation(t *testing
 	}
 	b, _ := os.ReadFile(copyTo)
 	cfg := string(b)
-	for _, want := range []string{"Host *\n", "BatchMode yes", "ForwardAgent no", "ForwardX11 no", "ClearAllForwardings yes", "PermitLocalCommand no",
+	for _, want := range []string{"Host *\n", "BatchMode yes", "UpdateHostKeys no", "ForwardAgent no", "ForwardX11 no", "ClearAllForwardings yes", "PermitLocalCommand no",
 		"GSSAPIAuthentication no", "GSSAPIDelegateCredentials no", "ControlMaster no", "ControlPath none", "ControlPersist no", `Include "/home/user/my ssh/config"`} {
 		if !strings.Contains(cfg, want) {
 			t.Errorf("the temporary config lacks %q:\n%s", want, cfg)
@@ -388,4 +388,29 @@ func atoiOr(s string, def int) int {
 		return def
 	}
 	return n
+}
+
+// #12031 (Security's SHOULD): read back with ssh -G, the scan's config leaves a hop's UpdateHostKeys off even where the owner's block turns it on: the scan changes no known_hosts of the owner.
+func TestScanConfigNeverLetsAHopUpdateTheOwnersKnownHosts(t *testing.T) {
+	sshBin, err := exec.LookPath("ssh")
+	if err != nil {
+		t.Skip("no ssh on this computer")
+	}
+	dir := t.TempDir()
+	owner := filepath.Join(dir, "owner")
+	if err := os.WriteFile(owner, []byte("Host hop\n  HostName hop.example.com\n  UpdateHostKeys yes\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfgText, err := scanConfig(owner)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := filepath.Join(dir, "scan")
+	if err := os.WriteFile(cfg, []byte(cfgText), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got := effectiveSSH(t, sshBin, cfg, nil, "hop")
+	if got["updatehostkeys"] != "false" {
+		t.Errorf("updatehostkeys = %q, want false (the owner's block won)", got["updatehostkeys"])
+	}
 }
