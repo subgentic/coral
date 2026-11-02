@@ -38,7 +38,7 @@ func (r Reader) Routes() (Entries, error) {
 
 // Settings reads the board settings keys of the ref from the Go files of internal/board (test files left out).
 func (r Reader) Settings() (Entries, error) {
-	list, err := r.git("ls-tree", "--name-only", r.Ref, BoardDir)
+	list, err := r.git("ls-tree", "--full-tree", "--name-only", r.Ref, BoardDir)
 	if err != nil {
 		return nil, err
 	}

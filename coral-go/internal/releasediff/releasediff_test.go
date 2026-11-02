@@ -155,6 +155,20 @@ func TestTheReaderReadsTwoRefsOfARealRepository(t *testing.T) {
 	assert.NotContains(t, s, "bogus")
 	assert.Contains(t, s, "in.on")
 
+	// the default -repo is "." and the tool is run from coral-go: a directory inside the repository reads the same (ls-tree paths are relative to the directory unless asked for from the root)
+	sub := filepath.Join(repo, "coral-go")
+	for _, ref := range []string{"old", "new"} {
+		in, err := Reader{Repo: sub, Ref: ref}.Settings()
+		require.NoError(t, err, "from a subdirectory, "+ref)
+		root, err := Reader{Repo: repo, Ref: ref}.Settings()
+		require.NoError(t, err)
+		assert.Equal(t, root, in, ref)
+		inR, err := Reader{Repo: sub, Ref: ref}.Routes()
+		require.NoError(t, err)
+		rootR, _ := Reader{Repo: repo, Ref: ref}.Routes()
+		assert.Equal(t, rootR, inR, ref)
+	}
+
 	_, err = Resolve(repo, "old")
 	assert.NoError(t, err)
 	_, err = Resolve(repo, "no-such-tag")
