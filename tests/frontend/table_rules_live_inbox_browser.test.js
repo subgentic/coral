@@ -1,0 +1,3 @@
+// cdp-timeout: 300 (the live table rules check, the Inbox folders: Needs you with the operator's mix, Artifacts, Tasks and Goals, 4 widths each, 200% text, kept widths, the first and last column's drag at 1440 and a phone; about 75 s; #11943, split by #12327)
+// The check itself is helpers/table_rules_check.js; the other halves are table_rules_shape_browser and table_rules_live_other_browser. Needs you seeds goal_done_quiet_minutes 0 (a goal that looks done waits 15 minutes before it is an item); without it each mount waited for rows that never came.
+require('./helpers/table_rules_check').run('needs|artifacts|tasks|goals');
