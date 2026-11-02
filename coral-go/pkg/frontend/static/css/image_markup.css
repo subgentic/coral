@@ -6,7 +6,7 @@ dialog.markup-dialog:not([open]) { display: none; }
 .markup-tools { display: flex; gap: 8px; }
 .markup-tools .btn[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
 .markup-stage { display: flex; justify-content: center; min-height: 0; }
-.markup-canvas { display: block; max-width: 100%; max-height: min(64vh, 640px); width: auto; height: auto; touch-action: none; cursor: crosshair; border-radius: var(--radius-md); }
+.markup-canvas { display: block; max-width: 100%; max-height: min(64vh, 640px); width: auto; height: auto; touch-action: none; user-select: none; -webkit-user-select: none; cursor: crosshair; border-radius: var(--radius-md); }
 .markup-status { margin: 0; min-height: 1.4em; color: var(--text-secondary); font-size: var(--fs-sm); }
 .markup-kept { margin: 0; color: var(--text-secondary); font-size: var(--fs-sm); }
 .markup-foot { display: flex; justify-content: flex-end; gap: 8px; }
