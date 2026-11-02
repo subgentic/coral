@@ -2,6 +2,7 @@
 import { serverFetch, normServer } from './server_base.js';
 import { fetchSystemStatus } from './system_status.js';
 import { setHidden } from './dom_write.js';
+import { importOnce } from './import_once.js';
 const cache = new Map();
 const requests = new WeakMap();
 
@@ -79,7 +80,10 @@ export async function checkAgentCLI(type, element, {force = false, command = '',
         }
         if (data.found) { element.style.display = 'none'; blocksLaunch(element, false); return; }
         // Found, and a launch would refuse it (an agent works in its folder, #12053): not plainly installed, and installing it again would not fix it; the note says why and the setting to use.
-        if (data.refused && typeof data.install_note === 'string') { blocksLaunch(element, true); renderCLI(element, `${type} CLI found but not used.`, recheck, {note:data.install_note, pathType: type}); return; }
+        if (data.refused && typeof data.install_note === 'string') { blocksLaunch(element, true); renderCLI(element, `${type} CLI found but not used.`, recheck, {pathType: type});
+            const box = document.createElement('div'); box.className = 'cli-refused-why'; element.insertBefore(box, element.querySelector('.cli-actions, button')); // the same short line and Why? as the list of CLIs (#12364); the server's whole sentence if the helper cannot load
+            Promise.all([importOnce('./cli_missing_list.js'), importOnce('./lazy_styles.js')]).then(async ([m, ls]) => { await ls.loadStyles('provider_cards.css'); box.append(...m.refusedBlock(data.install_note, {})); }).catch(() => { box.textContent = String(data.install_note); });
+            return; }
         // A configured path that cannot be run (#4354): say so, not that the CLI is missing (it is never swapped for the one on PATH).
         if (data.configured && data.message) { renderCLI(element, `${type}: ${data.message}`, recheck, {pathType: type}); blocksLaunch(element, true); return; }
         blocksLaunch(element, true);

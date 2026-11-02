@@ -5,6 +5,7 @@ const { coralReady } = require('./helpers/wait');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { install: installNA, stubModels, stubCliChecks } = require('./helpers/new_agent');
+const FIXTURE = require('./fixtures/cli_refusal_sentences.json').cases; // the server's sentences, one copy shared with the Go test (#12364)
 
 const NOTE = (bin, type) => `Found but not used: ~/.local/bin/${bin} is in an agent's working folder: the agent "Security Reviewer" works in ~. Archive that agent (an asleep one counts too) or restart it in a project folder, then check again, so a launch refuses it. Install it somewhere else, or set its path in Settings > CLI paths (the setting cli_path_${type}).`;
 
@@ -52,6 +53,14 @@ const NOTE = (bin, type) => `Found but not used: ~/.local/bin/${bin} is in an ag
             // Why? opens the steps; Choose a path opens Settings at the CLI paths
             await ev(`document.querySelector('#launch-agent-pick .provider-entry.is-refused .provider-why summary').click(); true`); await settle(200);
             check(await ev(`document.querySelector('#launch-agent-pick .provider-entry.is-refused .provider-why').open === true && document.querySelector('#launch-agent-pick .provider-entry.is-refused .provider-steps').getClientRects().length > 0`), at + 'Why? opens the steps');
+            // every wording the server has (an agent's folder, a temporary folder, Coral's data folder, through the Hub, one never met) is drawn as one short line with a Why? fold
+            const lines = await ev(`import((window.__coralStatic || '/static/') + 'cli_missing_list.js').then(m => ${JSON.stringify(FIXTURE.map(c => c.note))}.map(n => { const [line, det] = m.refusedBlock(n); return { line: line.textContent, fold: det.querySelector('summary').textContent, steps: det.querySelectorAll('li').length }; }))`);
+            check(lines.length === FIXTURE.length && lines.every((l, i) => l.line === FIXTURE[i].line && l.fold === 'Why?' && l.steps >= 2), at + 'each of the server\'s wordings is one short line and a fold: ' + JSON.stringify(lines));
+            // the single-CLI banner of the launch dialog says the same, in the same words (#12364: one message wherever a person meets it)
+            await ev(`(() => { const sel = document.querySelector('#launch-agent-acf .acf-agent-type, #launch-step-agent select.acf-agent-type'); if (!sel) return false; if (![...sel.options].some(o => o.value === 'agy')) sel.append(new Option('Antigravity', 'agy')); sel.value = 'agy'; sel.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+            await waitFor(`!!document.querySelector('#launch-step-agent [data-blocks-launch] .cli-refused-why .provider-why-line')`, at + 'the banner for a CLI found and not used', 10000).catch(e => check(false, at + e.message));
+            const bn = await ev(`(() => { const b = document.querySelector('#launch-step-agent [data-blocks-launch]'); if (!b) return null; return { line: (b.querySelector('.provider-why-line') || {}).textContent || '', agentLink: !!b.querySelector('.provider-why-line .agent-link'), fold: (b.querySelector('summary') || {}).textContent || '', paragraph: !!b.querySelector('.cli-install-note'), over: document.documentElement.scrollWidth - document.documentElement.clientWidth }; })()`);
+            check(bn && /^Not used: ~\/\.local\/bin\/agy is inside Security Reviewer's working folder \(~\)\.$/.test(bn.line) && bn.agentLink && bn.fold === 'Why?' && !bn.paragraph && bn.over <= 0, at + 'the banner has the one short line, the agent link and Why?, not the paragraph: ' + JSON.stringify(bn));
             await ev(`window.hideLaunchModal && window.hideLaunchModal(); true`);
         }
     } finally { await client.close(); }
