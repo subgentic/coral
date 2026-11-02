@@ -16,7 +16,7 @@ import { state } from './state.js';
 
 import { reviewItems, unreadReviewItems, reviewErrors, refreshReviews, reviewGroups, setReviewRead, markOpenedRead, isRead, savedFiles } from './inbox_reviews.js';
 import { failedUnread, finishedUnread, refreshRuns, markSeen, runRoute, failureWords } from './automation_runs.js';
-import { operatorAsks, refreshOperatorAsks, askLine, askWhole, askKey, openAskDialog } from './operator_asks.js';
+import { operatorAsks, refreshOperatorAsks, askLine, askPlain, askKey, openAskDialog } from './operator_asks.js';
 import { go, note, backIs, currentRoute } from './nav.js';
 
 import { build, keyRoute, parse as parseRoute, inboxFolderPath, BOARDS_FOLDER, BOARDS_SUB } from './routes.js';
@@ -130,7 +130,7 @@ const needsUnread = s => !(s.welcome || (s.review && isRead(s.review)));
 const hoverRows = () => !isPhoneLayout() && matchMedia('(hover: hover) and (pointer: fine) and (min-width: 768px)').matches;
 const hoverWrap = (s, box) => { if (!box || !hoverRows()) return box; const wrap = DT.el('div', 'inbox-actions-hover'), when = waitingText(s.waiting_since); wrap.append(box); if (when) wrap.append(DT.el('span', 'inbox-row-when', when)); return wrap; };
 /** What goes under a question to the Operator: the whole question when the name above is only its first words, and "Needs your answer" when the name already says all of it (a short question was on the row twice, #11776). */
-const askUnder = a => { const whole = askWhole(a); return whole.replace(/\s+/g, ' ').trim() === askLine(a) ? 'Needs your answer' : whole; };
+const askUnder = a => { const whole = askPlain(a); return whole.replace(/\s+/g, ' ').trim() === askLine(a) ? 'Needs your answer' : whole; };
 /** "3 earlier versions": the older uploads of one artifact that this row stands for (#11533), muted after the file's name on the top line and in the spoken name (#11719). */
 const earlierWords = r => { const n = Math.max((r.earlier || []).length, (r.version || 1) - 1); return n ? `${n} earlier version${n === 1 ? '' : 's'}` : ''; };
 const needsName = s => s.goalDone ? `Goal #${s.goalDone.id}` : s.proposal ? markedText(s.proposal.proposer) : s.review ? s.review.produced_by || 'Unknown agent' : s.autorun ? s.autorun.name : s.operatorAsk ? s.operatorAsk.asker : s.welcome ? s.welcome.title : s.unrecorded ? s.display_name : resolveSessionIdentity(s);
