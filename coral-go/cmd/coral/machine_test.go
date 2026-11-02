@@ -454,3 +454,20 @@ func TestMachineLaunchRefusesAnEmptyAllowSSHFrom(t *testing.T) {
 		t.Fatalf("a refused flag made calls: %v %v", p.calls, h.labels)
 	}
 }
+
+// The plain-words note about the npm packages is printed when an npm agent is named, and not for Antigravity alone.
+func TestMachineLaunchSaysThatNPMContentIsNotHashVerified(t *testing.T) {
+	tf, kf, _, _ := machineFixture(t)
+	pin := "agy@sha256:" + strings.Repeat("ab", 32)
+	for entries, want := range map[string]bool{"claude@2.1.0": true, "claude@2.1.0," + pin: true, pin: false} {
+		var out, errb bytes.Buffer
+		code := runMachine([]string{"launch", "--provider", "digitalocean", "--token-file", tf, "--hub-key-file", kf, "--hub-url", "https://hub.example", "--coral-version", "2.0.3", "--allow-ssh-from", "9.9.9.9", "--agents", entries, "--yes"}, strings.NewReader(""), &out, &errb)
+		if code != 0 {
+			t.Fatalf("%s: exit %d: %s", entries, code, errb.String())
+		}
+		got := strings.Contains(errb.String(), "NOT yet hash-verified") && strings.Contains(errb.String(), "install scripts OFF")
+		if got != want {
+			t.Errorf("%s: note %v, want %v: %s", entries, got, want, errb.String())
+		}
+	}
+}

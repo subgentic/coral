@@ -154,8 +154,8 @@ func TestUserDataSaysWhatItMustAlwaysSay(t *testing.T) {
 	assert.Less(t, strings.Index(finish, "systemctl mask"), strings.Index(finish, "coral-machine-agents"), "SSH is closed before the slow installs")
 	assert.NotContains(t, setupOf(t, doc), "npm", "nothing slow before the redeem")
 	assert.NotContains(t, setupOf(t, doc), "antigravity")
-	assert.Contains(t, got, "runuser -u coral -- npm install -g --prefix /opt/coral-agents --cache /opt/coral-agents/.npm-cache @anthropic-ai/claude-code@2.0.0", "an npm agent is installed by the coral user, not root")
-	assert.Contains(t, got, "runuser -u coral -- npm install -g --prefix /opt/coral-agents --cache /opt/coral-agents/.npm-cache @openai/codex@0.1.0")
+	assert.Contains(t, got, "runuser -u coral -- npm install -g --ignore-scripts --registry https://registry.npmjs.org/ --prefix /opt/coral-agents --cache /opt/coral-agents/.npm-cache @anthropic-ai/claude-code@2.0.0", "an npm agent is installed by the coral user, not root")
+	assert.Contains(t, got, "runuser -u coral -- npm install -g --ignore-scripts --registry https://registry.npmjs.org/ --prefix /opt/coral-agents --cache /opt/coral-agents/.npm-cache @openai/codex@0.1.0")
 	assert.Contains(t, got, "curl -fsSL --proto '=https' --tlsv1.2 -o \"$installer\" 'https://antigravity.google/cli/install.sh'")
 	assert.Contains(t, got, "echo '"+strings.Repeat("ab", 32)+"  '\"$installer\" | sha256sum -c -", "the installer is checked against its pinned hash")
 	assert.Less(t, strings.Index(got, `sha256sum -c -`), strings.Index(got, `runuser -u coral -- bash "$installer"`), "checked before it runs")
@@ -411,10 +411,84 @@ func TestAgentsScriptNeverRunsNpmAsRoot(t *testing.T) {
 	script := agentsScript(agents)
 	for _, l := range strings.Split(script, "\n") {
 		if strings.Contains(l, "npm install") && !strings.HasPrefix(strings.TrimSpace(l), "#") {
-			assert.True(t, strings.HasPrefix(l, "runuser -u coral -- npm install -g --prefix /opt/coral-agents"), "npm install runs as coral: %s", l)
+			assert.True(t, strings.HasPrefix(l, "runuser -u coral -- npm install -g --ignore-scripts --registry https://registry.npmjs.org/ --prefix /opt/coral-agents"), "npm install runs as coral, with scripts off and the official registry: %s", l)
 			assert.Contains(t, l, "--cache /opt/coral-agents/.npm-cache")
 		}
 	}
 	assert.Contains(t, script, "ln -sf /opt/coral-agents/bin/claude /usr/local/bin/claude")
 	assert.Contains(t, script, "test -x /opt/coral-agents/bin/codex")
+}
+
+// No code path builds an npm install command without --ignore-scripts and the official registry (Security's ruling, #9934): every npm line of the script has both, whatever agents are named.
+func TestEveryNPMInstallHasIgnoreScriptsAndTheOfficialRegistry(t *testing.T) {
+	for _, entries := range [][]string{{"claude@2.0.0"}, {"codex@0.1.0"}, {"pi@0.5.1"}, {"claude@2.0.0", "codex@0.1.0", "pi@0.5.1"}} {
+		agents, err := resolveAgents(entries)
+		if err != nil {
+			t.Fatalf("%v: %v", entries, err)
+		}
+		n := 0
+		for _, l := range strings.Split(agentsScript(agents), "\n") {
+			if strings.Contains(l, "npm install") && !strings.HasPrefix(strings.TrimSpace(l), "#") {
+				n++
+				if !strings.Contains(l, " --ignore-scripts ") || !strings.Contains(l, " --registry "+NPMRegistry+" ") || !strings.HasPrefix(l, "runuser -u coral -- ") {
+					t.Errorf("%v: an npm install without scripts off, the official registry, or the coral user: %s", entries, l)
+				}
+			}
+		}
+		if n != len(agents) {
+			t.Errorf("%v: %d npm installs for %d agents", entries, n, len(agents))
+		}
+	}
+	for _, e := range []string{"claude@latest", "claude@^2.0.0", "claude@2", "claude@2.0.0 --registry=https://evil.example", "claude@2.0.0;reboot"} {
+		if _, err := resolveAgents([]string{e}); err == nil {
+			t.Errorf("%q was accepted: an agent is an exact x.y.z", e)
+		}
+	}
+}
+
+// After an install with --ignore-scripts the CLI is checked: a stub where '<binary> --version' fails prints loudly and the script exits non-zero; one that starts goes on to link it.
+func TestAgentsScriptFailsLoudlyWhenTheCLIDoesNotStart(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("needs sh")
+	}
+	sh, err := exec.LookPath("sh")
+	if err != nil {
+		t.Skip("no sh")
+	}
+	agents, err := resolveAgents([]string{"claude@2.0.0"})
+	require.NoError(t, err)
+	run := func(versionExit string) (int, string, string) {
+		dir := t.TempDir()
+		bin, prefix, localbin := filepath.Join(dir, "bin"), filepath.Join(dir, "agents"), filepath.Join(dir, "localbin")
+		require.NoError(t, os.MkdirAll(bin, 0o755))
+		require.NoError(t, os.MkdirAll(localbin, 0o755))
+		stub := func(name, body string) {
+			require.NoError(t, os.WriteFile(filepath.Join(bin, name), []byte("#!/bin/sh\n"+body+"\n"), 0o755))
+		}
+		stub("apt-get", "exit 0")
+		stub("install", "exit 0")
+		stub("runuser", `shift 3; exec "$@"`) // runuser -u coral -- CMD...
+		stub("npm", `while [ $# -gt 0 ]; do if [ "$1" = --prefix ]; then p="$2"; fi; shift; done; mkdir -p "$p/bin"; printf '#!/bin/sh\nexit `+versionExit+`\n' > "$p/bin/claude"; chmod 755 "$p/bin/claude"`)
+		script := strings.ReplaceAll(strings.ReplaceAll(agentsScript(agents), "/opt/coral-agents", prefix), "/usr/local/bin", localbin)
+		path := filepath.Join(dir, "agents.sh")
+		require.NoError(t, os.WriteFile(path, []byte(script), 0o755))
+		cmd := exec.Command(sh, path)
+		cmd.Env = []string{"PATH=" + bin + ":/usr/bin:/bin", "HOME=" + dir}
+		var stderr strings.Builder
+		cmd.Stderr = &stderr
+		err := cmd.Run()
+		code := 0
+		if ee, ok := err.(*exec.ExitError); ok {
+			code = ee.ExitCode()
+		}
+		_, linkErr := os.Lstat(filepath.Join(localbin, "claude"))
+		return code, stderr.String(), map[bool]string{true: "linked", false: "not linked"}[linkErr == nil]
+	}
+	code, stderr, linked := run("1")
+	assert.NotZero(t, code, "a CLI that does not start fails the script")
+	assert.Contains(t, stderr, "did not start after an install with --ignore-scripts")
+	assert.Equal(t, "not linked", linked, "and is not linked into place")
+	code, stderr, linked = run("0")
+	assert.Zero(t, code, stderr)
+	assert.Equal(t, "linked", linked)
 }

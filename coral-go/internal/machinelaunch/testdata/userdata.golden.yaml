@@ -248,13 +248,17 @@ write_files:
       DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends nodejs npm
       # claude 2.0.0: installed by the coral user, never root, into a folder only it writes, and linked into /usr/local/bin; the package's own lifecycle scripts therefore run unprivileged.
       install -d -m 0755 -o coral -g coral /opt/coral-agents
-      runuser -u coral -- npm install -g --prefix /opt/coral-agents --cache /opt/coral-agents/.npm-cache @anthropic-ai/claude-code@2.0.0
+      runuser -u coral -- npm install -g --ignore-scripts --registry https://registry.npmjs.org/ --prefix /opt/coral-agents --cache /opt/coral-agents/.npm-cache @anthropic-ai/claude-code@2.0.0
       test -x /opt/coral-agents/bin/claude
+      # Scripts were not run, so the CLI is checked: if it does not start it fails LOUDLY here, and nothing turns scripts back on by itself.
+      runuser -u coral -- /opt/coral-agents/bin/claude --version >/dev/null || { echo "coral-machine-agents: claude did not start after an install with --ignore-scripts (its --version failed): it may need its install script, which is not run; tell the person who runs the launch" >&2; exit 1; }
       ln -sf /opt/coral-agents/bin/claude /usr/local/bin/claude
       # codex 0.1.0: installed by the coral user, never root, into a folder only it writes, and linked into /usr/local/bin; the package's own lifecycle scripts therefore run unprivileged.
       install -d -m 0755 -o coral -g coral /opt/coral-agents
-      runuser -u coral -- npm install -g --prefix /opt/coral-agents --cache /opt/coral-agents/.npm-cache @openai/codex@0.1.0
+      runuser -u coral -- npm install -g --ignore-scripts --registry https://registry.npmjs.org/ --prefix /opt/coral-agents --cache /opt/coral-agents/.npm-cache @openai/codex@0.1.0
       test -x /opt/coral-agents/bin/codex
+      # Scripts were not run, so the CLI is checked: if it does not start it fails LOUDLY here, and nothing turns scripts back on by itself.
+      runuser -u coral -- /opt/coral-agents/bin/codex --version >/dev/null || { echo "coral-machine-agents: codex did not start after an install with --ignore-scripts (its --version failed): it may need its install script, which is not run; tell the person who runs the launch" >&2; exit 1; }
       ln -sf /opt/coral-agents/bin/codex /usr/local/bin/codex
       # agy: the vendor's installer takes no version, so the script is fetched to a file, checked against the SHA-256 it was pinned to, and only then run, as the coral user.
       installer=$(mktemp)

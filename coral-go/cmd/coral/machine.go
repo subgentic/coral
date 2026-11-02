@@ -104,6 +104,17 @@ func secondInterrupt(ctx context.Context, finished <-chan struct{}) <-chan struc
 	return second
 }
 
+// npmAgentsIn is whether any agent named is installed through npm (everything but Antigravity's installer, which is pinned by its SHA-256).
+func npmAgentsIn(entries []string) bool {
+	for _, e := range entries {
+		name, _, _ := strings.Cut(e, "@")
+		if name != "agy" && name != "antigravity" {
+			return true
+		}
+	}
+	return false
+}
+
 func runMachine(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) > 0 && (args[0] == "list" || args[0] == "delete" || args[0] == "forget" || args[0] == "prune" || args[0] == "egress-files") {
 		return runMachineManage(args[0], args[1:], stdin, stdout, stderr)
@@ -207,6 +218,9 @@ func runMachine(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			return fail("--allow-ssh-from: %v", verr)
 		}
 		checkSource, *sshFrom = v, v
+	}
+	if npmAgentsIn(agentList) { // said in plain words, to the person, before any secret is read or any call is made (Security's condition on the operator-only cut, #9934)
+		fmt.Fprintln(stderr, "coral machine launch: note: the npm agent packages are installed by exact version from "+machinelaunch.NPMRegistry+" with install scripts OFF, by a non-root user; their CONTENT is NOT yet hash-verified (a lockfile with pinned hashes comes before any other account may launch).")
 	}
 	_, err = machineUserData(checkKeys, checkSource, *maxMode, version, digests, *hubURL, agentList) // the flags are checked by the builder before any secret is read or any call is made
 	checkKeys.Destroy()

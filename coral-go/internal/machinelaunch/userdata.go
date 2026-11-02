@@ -463,8 +463,13 @@ func setupScript(version string, digests ReleaseDigests) string {
 
 // npmAsCoral turns the table's "npm install -g PKG@VER" into one that installs under /opt/coral-agents with its cache there too (the coral user needs no home folder, and nothing is written outside it).
 func npmAsCoral(cmd string) string {
-	return strings.Replace(cmd, "npm install -g", "npm install -g --prefix /opt/coral-agents --cache /opt/coral-agents/.npm-cache", 1)
+	// --ignore-scripts is ALWAYS there (Security's ruling, #9934): an install-time script of a package never runs, as anyone. --registry names the official registry over HTTPS, so no ambient npm configuration on the machine
+	// can point the install elsewhere. This is the ONE place an agent's install command is built.
+	return strings.Replace(cmd, "npm install -g", "npm install -g --ignore-scripts --registry "+NPMRegistry+" --prefix /opt/coral-agents --cache /opt/coral-agents/.npm-cache", 1)
 }
+
+// NPMRegistry is the only registry the agents are installed from.
+const NPMRegistry = "https://registry.npmjs.org/"
 
 // agentsScript installs node and npm and the agent CLIs, from the one table of install commands, pinned where the installer takes a version. It runs after Coral has started, so a slow install
 // never eats into the credential's short life.
@@ -498,6 +503,8 @@ func agentsScript(agents []agentInstall) string {
 		p("install -d -m 0755 -o coral -g coral /opt/coral-agents")
 		p("runuser -u coral -- %s", npmAsCoral(a.Command))
 		p("test -x /opt/coral-agents/bin/%s", a.Binary)
+		p("# Scripts were not run, so the CLI is checked: if it does not start it fails LOUDLY here, and nothing turns scripts back on by itself.")
+		p("runuser -u coral -- /opt/coral-agents/bin/%s --version >/dev/null || { echo \"coral-machine-agents: %s did not start after an install with --ignore-scripts (its --version failed): it may need its install script, which is not run; tell the person who runs the launch\" >&2; exit 1; }", a.Binary, a.Binary)
 		p("ln -sf /opt/coral-agents/bin/%s /usr/local/bin/%s", a.Binary, a.Binary)
 	}
 	return s.String()
