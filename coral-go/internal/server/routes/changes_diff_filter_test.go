@@ -321,6 +321,7 @@ func TestGeneratePersistedDiffManyNewFiles(t *testing.T) {
 	repo := diffRepo(t)
 	body := strings.Repeat("a line of a new file\n", 200) // 4,200 bytes: 3,000 of them are 12 MiB, over the 8 MiB limit
 	require.NoError(t, os.MkdirAll(filepath.Join(repo, "gen"), 0o755))
+	trackFolder(t, repo, "gen") // the folder has a tracked file, so its new files are listed one by one (an untracked folder of this size is folded, #12524)
 	for i := 0; i < 3000; i++ {
 		require.NoError(t, os.WriteFile(filepath.Join(repo, "gen", fmt.Sprintf("f%04d.txt", i)), []byte(body), 0o644))
 	}

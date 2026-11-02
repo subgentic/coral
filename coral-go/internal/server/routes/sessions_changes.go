@@ -3,7 +3,6 @@
 package routes
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -170,26 +169,22 @@ func (h *SessionsHandler) generateChangesDiff(ctx context.Context, workdir strin
 		return nil, err
 	}
 
-	// A normal git diff omits untracked files. Render each as a new-file patch (not for the last commit alone).
-	var untracked []byte
+	// A normal git diff omits untracked files. Render each as a new-file patch (not for the last commit alone). A big untracked folder is one note, a small one its files (listUntracked, #12524).
+	var untracked []untrackedItem
 	if gitutil.IncludesWorkingTree(diffMode) {
-		// --directory: an untracked folder is one entry ("dir/"), as git status and the changed-files list show it, not one per file in it (#12524: a sync tool's trace folder is hundreds of files). Every ignore
-		// rule still holds (--exclude-standard), and an untracked file in a folder that has tracked files is still listed on its own.
-		if untracked, err = gitutil.Command(ctx, workdir, "ls-files", "--others", "--exclude-standard", "--directory", "-z").Output(); err != nil {
+		if untracked, err = listUntracked(workdir, func(args ...string) ([]byte, error) { return gitutil.Command(ctx, workdir, args...).Output() }); err != nil {
 			return nil, err
 		}
 	}
-	for _, rawPath := range bytes.Split(untracked, []byte{0}) {
-		if len(rawPath) == 0 {
-			continue
-		}
-		if rawPath[len(rawPath)-1] == '/' { // a folder: one note line (git apply skips it), no file diffs
+	for _, item := range untracked {
+		if item.Folded { // one note line (git apply skips it), no file diffs
 			if len(diff) > 0 && diff[len(diff)-1] != '\n' {
 				diff = append(diff, '\n')
 			}
-			diff = append(diff, diffNote("new folder %q: untracked, shown as one entry as git status shows it", string(rawPath))...)
+			diff = append(diff, diffNote("%s", item.foldedNote())...)
 			continue
 		}
+		rawPath := []byte(item.Path)
 		cmd := gitutil.Command(ctx, workdir, "diff", "--no-index", "--binary", "--", os.DevNull, string(rawPath))
 		fileDiff, fileErr := cmd.Output()
 		// git diff --no-index returns 1 when differences were found.
