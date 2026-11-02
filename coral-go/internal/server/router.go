@@ -437,6 +437,7 @@ func (s *Server) registerSessions(r *chi.Mux, h *routeHandlers) {
 
 	// Agent session history search & context (coral-agent history search / context)
 	skillsHandler := routes.NewSkillsHandler(s.db, s.cfg) // the Skills Store, read by an agent (#12021): approved skills only
+	skillsHandler.SetActivity(s.boardStore)               // the Operator's decisions on skills are in the Activity record (#12129)
 	r.Get("/api/agent/skills", skillsHandler.ListSkills)
 	r.Get("/api/agent/skills/search", skillsHandler.SearchSkills)
 	r.Post("/api/agent/skills", skillsHandler.PublishSkillAgent)

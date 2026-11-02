@@ -138,6 +138,7 @@ func (h *BoardHandler) ListActivity(w http.ResponseWriter, r *http.Request) {
 var activityActions = map[string]bool{
 	board.ActApprove: true, board.ActChanges: true, board.ActDeny: true, board.ActIgnore: true, board.ActUnignore: true, board.ActSave: true, board.ActUnsave: true, board.ActUndone: true,
 	board.ActAnswer: true, board.ActDismiss: true, board.ActGoalDone: true, board.ActProposal: true, board.ActMarkRead: true, board.ActGoalReview: true,
+	board.ActSkillApprove: true, board.ActSkillReject: true, board.ActSkillRemove: true, board.ActSkillImport: true, board.ActSkillScriptsAck: true, board.ActSkillSecretAck: true,
 }
 
 // recordActivity adds the row of an Operator action that is not a write in the board database's own transaction (best effort: a crash between the action and its row can lose one row, and a row that cannot
@@ -146,7 +147,9 @@ func (h *BoardHandler) recordActivity(r *http.Request, action, kind, item, team,
 	if h.bs == nil {
 		return
 	}
-	_ = h.bs.RecordActivity(context.WithoutCancel(r.Context()), activityMetaFor(r, title, note), action, kind, item, "", team)
+	ctx := context.WithoutCancel(r.Context())
+	_ = h.bs.RecordActivity(ctx, activityMetaFor(r, title, note), action, kind, item, "", team)
+	h.tellChief(ctx, action, kind, team, title, "") // the Operator's decision on a team Chief fronts (#12171)
 }
 
 // surfaceOf is which part of the page a person-only request came from, as the page says (X-Coral-Surface: inbox or chat), or "". It is read only on the routes that record the Operator's own actions (every one of

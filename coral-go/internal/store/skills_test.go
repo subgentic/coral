@@ -351,7 +351,9 @@ func TestARefusalOutlivesTheAccessLogTrim(t *testing.T) {
 	require.NoError(t, ss.LogSkillAccess(ctx, "search", "", "", PublisherAgent, "Dev", "hits=0")) // the trim runs
 	var rejects int
 	require.NoError(t, db.GetContext(ctx, &rejects, `SELECT COUNT(*) FROM skills_log WHERE event = 'reject'`))
-	require.Zero(t, rejects, "the reject row of the access log is gone")
+	require.Equal(t, 1, rejects, "the decision stays in the log: only the agents' search, list and get rows are trimmed (#12129)")
+	_, err = db.ExecContext(ctx, `DELETE FROM skills_log WHERE event = 'reject'`) // and the refusal does not depend on that row either: it has its own table
+	require.NoError(t, err)
 	_, _, err = addSkill(ctx, ss, AddSkillInput{Skill: skillOf("bad", "d", "b"), Digest: dg(950), Kind: PublisherAgent, Agent: "Dev", Team: "alpha"})
 	assert.ErrorIs(t, err, ErrSkillRefusedBefore, "the bytes are still refused")
 }

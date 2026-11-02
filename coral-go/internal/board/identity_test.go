@@ -40,7 +40,7 @@ func TestReservedNamesAreComparedNormalised(t *testing.T) {
 		"Coral Task Queue", "coral task queue", " Coral Task Queue ",
 		"Coral\u00a0Task\u00a0Queue", "Coral\u2009Task\u3000Queue", "Coral\u202fTask Queue",
 		"Coral\u200d Task Queue", "Coral  Task   Queue", "Ｃｏｒａｌ Task Queue", "CORAL HEALTH MONITOR",
-		"hub-user-1234abcd", "Hub-User-x", "hub\u200d-user-1",
+		"hub-user-1234abcd", "Hub-User-x", "hub\u200d-user-1", "Coral Decisions", "coral\u00a0decisions",
 	} {
 		assert.True(t, IsReservedName(s), "%q", s)
 	}

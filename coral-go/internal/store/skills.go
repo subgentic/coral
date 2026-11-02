@@ -407,7 +407,8 @@ func (s *SessionStore) LogSkillAccess(ctx context.Context, event, skillID, diges
 			return err
 		}
 		cutoff := time.Now().UTC().AddDate(0, 0, -skillsLogDays).Format(time.RFC3339)
-		_, err := tx.ExecContext(ctx, `DELETE FROM skills_log WHERE at < ? OR id <= (SELECT MAX(id) FROM skills_log) - ?`, cutoff, skillsLogRows)
+		// only the agents' search, list and get rows are trimmed: the decisions (publish, approve, reject, remove, acknowledgements) stay, and the Activity record keeps the Operator's for a year (#12129)
+		_, err := tx.ExecContext(ctx, `DELETE FROM skills_log WHERE event IN ('search', 'list', 'get') AND (at < ? OR id <= (SELECT MAX(id) FROM skills_log WHERE event IN ('search', 'list', 'get')) - ?)`, cutoff, skillsLogRows)
 		return err
 	})
 }

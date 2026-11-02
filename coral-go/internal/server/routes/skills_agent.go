@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -9,12 +10,14 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/config"
 	"github.com/subgentic/coral/internal/secfile"
 	"github.com/subgentic/coral/internal/skills"
@@ -28,10 +31,26 @@ type SkillsHandler struct {
 	cfg *config.Config
 
 	mu        sync.Mutex
-	recent    map[string][]time.Time // per caller: the times of its requests in the last minute
-	published map[string][]time.Time // per agent session: the times it published in the last hour
-	zipMu     sync.Mutex             // one write of the Skills Store's folder at a time
+	recent    map[string][]time.Time                                                                          // per caller: the times of its requests in the last minute
+	published map[string][]time.Time                                                                          // per agent session: the times it published in the last hour
+	zipMu     sync.Mutex                                                                                      // one write of the Skills Store's folder at a time
+	activity  func(ctx context.Context, m board.ActivityMeta, action, kind, item, version, team string) error // the Activity record (#12129); nil: none
 	nowFunc   func() time.Time
+}
+
+// SetActivity gives the handler the Activity record, where the Operator's decisions are kept a year (#12129).
+func (h *SkillsHandler) SetActivity(bs *board.Store) {
+	if bs != nil {
+		h.activity = bs.RecordActivity
+	}
+}
+
+// record writes one row of the Activity record for the Operator's decision on a skill: the actor and source from the verified request, the skill's name as the title, the digest as the version, best effort.
+func (h *SkillsHandler) record(r *http.Request, action string, row *store.SkillRow, note string) {
+	if h.activity == nil || row == nil {
+		return
+	}
+	_ = h.activity(context.WithoutCancel(r.Context()), activityMetaFor(r, row.Name+" version "+strconv.Itoa(row.Version), note), action, board.ItemSkill, row.ID, row.Digest, row.PublisherTeam)
 }
 
 // NewSkillsHandler returns the Skills Store's agent routes.
