@@ -19,10 +19,13 @@
 @media (max-width: 600px) { .skills-view { padding: 12px 16px 24px; } }
 
 /* ── the skills picker of New agent and New team (#12104) ── */
+.skills-pick-summary { cursor: pointer; padding: 4px 0; color: var(--text-secondary); }
+.skills-pick-more[open] > .skills-pick-summary { margin-bottom: 6px; }
 .skills-pick-search { width: 100%; margin: 0 0 8px; }
-.skills-pick-list { list-style: none; margin: 0 0 8px; padding: 0; max-height: 14rem; overflow-y: auto; }
+.skills-pick-list { list-style: none; margin: 0 0 8px; padding: 0; max-height: 14rem; overflow-y: auto; overflow-x: hidden; }
 .skills-pick[hidden] { display: none; }
 .skills-pick-label { display: grid; grid-template-columns: auto minmax(8rem, 12rem) 1fr; gap: 2px 10px; align-items: baseline; padding: 6px 4px; }
+.skills-pick-label input[type=checkbox] { width: auto; margin: 0; } /* the form's full-width input rule stretched the tick to 898 px and every row to 65 px (#12495) */
 .skills-pick-desc { color: var(--text-secondary); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .skills-pick-flag { grid-column: 2 / -1; font-size: var(--fs-sm, 12px); color: var(--text-secondary); }
 #launch-modal[data-member] #launch-skills-row { display: none; } /* a team member's own dialog carries no skills yet: the team's row (and a launch's) do */

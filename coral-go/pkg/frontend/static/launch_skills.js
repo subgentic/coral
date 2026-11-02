@@ -30,6 +30,7 @@ export async function mountLaunchSkills(rowId, local) {
     const chosen = picked.get(rowId);
     const search = el('input', 'skills-pick-search'); search.type = 'search'; search.placeholder = 'Search skills'; search.setAttribute('aria-label', 'Search skills');
     const note = el('p', 'skills-note');
+    const more = el('details', 'skills-pick-more'), summary = el('summary', 'skills-pick-summary'); // closed: an optional list does not push the dialog's buttons off a short window (#12495)
     const ul = el('ul', 'skills-pick-list');
     const rows = list.map(s => {
         const li = el('li', 'skills-pick'), label = el('label', 'skills-pick-label'), box = el('input'); box.type = 'checkbox'; box.value = s.id;
@@ -41,13 +42,15 @@ export async function mountLaunchSkills(rowId, local) {
         return { s, li, box };
     });
     function sync() {
+        summary.textContent = chosen.size ? `${chosen.size} chosen` : `Choose from ${list.length} skill${list.length === 1 ? '' : 's'}`;
         for (const r of rows) r.box.disabled = !r.box.checked && chosen.size >= MAX;
         note.textContent = chosen.size
             ? `${chosen.size} skill${chosen.size === 1 ? '' : 's'}: the agent is told their names and how to load them (coral-agent skills get --id <id>). A skill with scripts runs only if the agent decides to, with the agent's permissions.`
             : 'Optional. The agent is told which skills apply and how to load them. Only skills you approved are listed.';
     }
     search.addEventListener('input', () => { const q = search.value.trim().toLowerCase(); for (const r of rows) r.li.hidden = !!q && !(`${r.s.name} ${r.s.description}`.toLowerCase().includes(q)); });
-    host.append(search, ul, note);
+    more.append(summary, search, ul, note);
+    host.append(more);
     sync();
     row.hidden = false;
 }
