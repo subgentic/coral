@@ -152,6 +152,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         const list = threads();
         const head = el('div', 'ac-head');
         const h = el('h3', 'ac-title', 'Comments'); h.append(el('span', 'ac-count', String(openCount())));
+        opts.onCanWrite?.(!!(st.data && st.data.canComment && !st.data.locked)); // the viewer shows Mark up only to someone who can comment (#12394)
         opts.onCount?.(openCount()); // a goal's Comments tab says how many are open (#11955)
         head.append(h);
         // Resolved threads are out of the way, as in Docs: one toggle brings them back (and only while there are any).

@@ -30,7 +30,7 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
                 return done();
             }
             if (url.includes('/api/artifacts/${HEX}/comments')) {
-                if (method === 'GET') return json({ comments: window.__cs.map(c => ({ ...c, mine: true, can: can(c) })), locked: false, you: { kind: 'owner', name: 'Operator', can_comment: true, can_lock: true }, limits: { body: 8192, quote: 2048, comments: 500 } });
+                if (method === 'GET') return json({ comments: window.__cs.map(c => ({ ...c, mine: true, can: can(c) })), locked: false, you: { kind: 'owner', name: 'Operator', can_comment: !window.__viewOnly, can_lock: true }, limits: { body: 8192, quote: 2048, comments: 500 } });
                 if (method === 'POST') { const b = JSON.parse(o.body); window.__posts.push(b); const c = { id: window.__next++, parent_id: null, anchor: b.anchor, body: b.body, images: (b.images || []).map((h, i) => ({ hex: h, name: 'picture-' + (i + 1) + '.png', content_type: 'image/png' })), author: { kind: 'owner', issuer: 'local', subject: 'Operator' }, created_at: new Date().toISOString() }; window.__cs.push(c); return json({ ...c, can: can(c) }, 201); }
             }
             if (url.includes('/api/artifacts/${HEX}/versions')) return json([]);
@@ -92,6 +92,12 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
             const posted = await ev(`window.__posts[0]`);
             assert.ok(posted.anchor && posted.anchor.whole === true && posted.images && posted.images.length === 1 && posted.body === 'See the arrow', at + 'a comment on the whole file with the picture: ' + JSON.stringify(posted));
             assert.ok(await ev(`!window.__posts.some(p => !p.body) && window.__up.every(u => u.method === 'POST')`), at + 'only the comment and its picture were written: the file is not changed');
+            // someone who can read the comments but not write them does not see Mark up at all (#12394): not a toast after the press
+            await ev(`document.querySelector('#artifact-viewer .artifact-viewer-close').click(); window.__viewOnly = true; true`);
+            await ev(`(async () => { const v = await import(${S} + 'artifact_viewer.js'); v.openArtifactViewer(${JSON.stringify(HEX)}, { filename: 'screenshot.png', mediaType: 'image/png' }); return true; })()`);
+            await waitFor(`!!document.querySelector('#artifact-viewer .image-panes img') && window.__calls_ok !== 0`, at + 'the picture again', 8000); await ev(framesJs(12));
+            assert.ok(await ev(`[...document.querySelectorAll('#artifact-viewer .artifact-viewer-markup, #artifact-viewer .artifact-viewer-markup-item')].every(b => b.hidden || b.getClientRects().length === 0)`), at + 'a viewer who can read but not write comments has no Mark up');
+            await ev(`window.__viewOnly = false; document.querySelector('#artifact-viewer .artifact-viewer-close').click(); true`);
             // a text file has no Mark up
             await ev(`(async () => { const v = await import(${S} + 'artifact_viewer.js'); v.openArtifactViewer(${JSON.stringify(TXT)}, { filename: 'notes.txt', mediaType: 'text/plain' }); return true; })()`); await ev(framesJs(10));
             assert.ok(await ev(`[...document.querySelectorAll('#artifact-viewer .artifact-viewer-markup, #artifact-viewer .artifact-viewer-markup-item')].every(b => b.hidden)`), at + 'a text file has no Mark up');
