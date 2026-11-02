@@ -31,6 +31,7 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 		DisplayName     string                 `json:"display_name"`
 		Flags           []string               `json:"flags"`
 		Prompt          string                 `json:"prompt"`
+		Skills          []string               `json:"skills"` // approved skills to tell the agent about (#12023): ids from the Skills Store
 		BoardName       string                 `json:"board_name"`
 		BoardID         string                 `json:"board_id"`  // join this board (#3536)
 		NewBoard        bool                   `json:"new_board"` // create another board even if the name exists
@@ -199,11 +200,17 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 		}
 		lifeID = id
 	}
+	skillRows, serr := h.resolveSkillIDs(r.Context(), body.Skills)
+	if serr != nil {
+		attempt.Finish(tracking.OutcomeFailure, tracking.FailInvalidRequest, 0, 1)
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": serr.Error(), "field": "skills"})
+		return
+	}
 	lctx, cancel := lifecycleCtx(r.Context())
 	defer cancel()
 	result, err := h.launchSession(lctx, launchSpec{
 		WorkDir: body.WorkingDir, AgentType: body.AgentType, DisplayName: body.DisplayName, ResumeSessionID: body.ResumeSessionID,
-		Flags: launchFlags, Prompt: body.Prompt, BoardName: body.BoardName, BoardServer: body.BoardServer, Backend: body.Backend,
+		Flags: launchFlags, Prompt: withSkillNote(body.Prompt, launchSkillNote(skillRows)), BoardName: body.BoardName, BoardServer: body.BoardServer, Backend: body.Backend,
 		BoardType: body.BoardType, Model: effectiveModel, Thinking: effectiveThinking, Capabilities: body.Capabilities, Tools: body.Tools, Hooks: body.Hooks, PermissionMode: explicitDefaultMode(body.PermissionMode, launchFlags),
 		AutoByDefault: !agentCaller(r) && autoDefaultAllowed(lctx, r, h.ss), // not for an agent's launch (it may not start a less-restricted agent, #4032), and a Hub request the owner does not let skip prompts asks instead (#5836)
 	})
@@ -232,6 +239,11 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 			body.AgentType, body.BoardName, launchedName(result, body.DisplayName))
 	}
 
+	if sid, _ := result["session_id"].(string); sid != "" && len(skillRows) > 0 { // pinned to the versions approved now; a newer one is an update to offer, never swapped in
+		if err := h.ss.AttachSkillsRetry(r.Context(), sid, skillRows); err != nil {
+			slog.Warn("[launch] the skills attached to an agent were not saved", "session", sid, "error", err)
+		}
+	}
 	tracking.TrackEvent(tracking.EventSessionLaunched, nil)
 	tracking.TrackOnce(tracking.EventFirstAgentLaunched, nil)
 	if sid, _ := result["session_id"].(string); body.Prompt != "" && sid != "" && !agentCaller(r) { // the prompt a person wrote in the launch dialog is their first message (#10004)

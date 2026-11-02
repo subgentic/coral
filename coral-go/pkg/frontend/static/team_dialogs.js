@@ -766,6 +766,8 @@ async function launchTeam() {
         flags,
         agents,
     };
+    const teamSkills = (await importOnce('./launch_skills.js').catch(() => null))?.launchSkillIds('team-skills') || []; // the approved skills ticked for every member (#12104)
+    if (teamSkills.length) payload.skills = teamSkills;
     if (boardServer) payload.board_server = boardServer;
     if (usesSuggestion(document.getElementById('launch-team-dir'))) payload.create_dir = true; // the folder Coral suggested: it makes it now (#11258)
     if (!isHub() && trustTicked()) payload.trust_folder = true; // the person ticked: trust this existing folder for the agents (#11889)

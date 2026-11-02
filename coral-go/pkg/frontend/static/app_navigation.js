@@ -41,7 +41,7 @@ export function switchNavTab(tab, opts = {}) {
     if (tab !== 'servers') importOnce('./servers_tab.js').then(m => m.leaveServersTab());
     // The URL follows the tab (#3532): a tab the user chose is a history entry. Servers writes its
     // own (it can carry a server); the board tab names no board, so it keeps the URL.
-    const TAB_ROUTE = { agents: 'agents', history: 'chats', automations: 'automations', tokens: 'analytics', docs: 'docs' };
+    const TAB_ROUTE = { agents: 'agents', history: 'chats', automations: 'automations', tokens: 'analytics', docs: 'docs', skills: 'skills' };
     if (!opts.fromHistory && TAB_ROUTE[routeTab]) {
         const cur = currentRoute();
         const route = tabRoute(routeTab, TAB_ROUTE[routeTab]);
@@ -49,7 +49,7 @@ export function switchNavTab(tab, opts = {}) {
     }
 
     // Toggle sidebar visibility — full-width views hide the sidebar
-    const fullWidthTabs = new Set(['servers', 'artifacts', ...(isCloud() ? ['hub-inbox'] : [])]); // Workflows, Analytics and the Inbox have their sidebars (#7471, #7473, #7472), except where the hub serves the Inbox as a frame
+    const fullWidthTabs = new Set(['servers', 'artifacts', 'skills', ...(isCloud() ? ['hub-inbox'] : [])]); // Workflows, Analytics and the Inbox have their sidebars (#7471, #7473, #7472), except where the hub serves the Inbox as a frame
     const layout = document.querySelector('.layout');
     if (layout) layout.classList.toggle('sidebar-hidden', fullWidthTabs.has(tab));
 
@@ -81,6 +81,10 @@ export function switchNavTab(tab, opts = {}) {
         const chatOpen = chatsInInbox && state.currentSession && state.currentSession.type === 'history';
         showView(chatOpen ? 'history-session-view' : 'inbox-view');
         importOnce('./inbox_tab.js').then(m => m.showInboxTabContent(chatsInInbox ? { folder: opts.folder || (state.inboxFolder && state.inboxFolder.key) || 'chats', quiet: chatOpen } : { folder: opts.folder || '' }));
+    } else if (tab === 'skills') {
+        // The Skills Store: the Operator's list, the approval view and Import (skills_tab.js), local Coral only; it writes its own address.
+        showView('skills-view');
+        importOnce('./skills_tab.js').then(m => m.showSkillsTab({ id: opts.skillId }));
     } else if (tab === 'artifacts') {
         // The hub's /artifacts page in a frame (artifacts_tab.js), the Inbox's way; the tab writes no address of its own.
         showView('artifacts-view');

@@ -27,6 +27,7 @@ export const PHONE_SCREENS = {
     'team-page-view': { type: 'drill-down', slice: 'B' },                            // a team and its tabs (a bar: ←, the team, ⋯)
     'messageboard-view': { type: 'drill-down', slice: 'B' },
     'history-session-view': { type: 'drill-down', slice: 'B' },                      // a past chat
+    'skills-view': { type: 'top-level', nav: 'menu', slice: 'D' },               // Skills (the list; an open skill is a page in the same view)
     'servers-view': { type: 'top-level', nav: 'menu', slice: 'D' },              // Computers (its item pages have no data-phone-item marker yet: it keeps today's chrome until D)
     'artifacts-view': { type: 'top-level', nav: 'menu', slice: 'D' },            // the Hub's Artifacts
     'welcome-screen': { type: 'top-level', nav: 'nav-agents', slice: 'D' },                             // a wide window's first page: a phone never shows it (#4497)

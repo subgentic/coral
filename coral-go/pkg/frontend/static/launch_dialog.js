@@ -193,7 +193,13 @@ export function showLaunchModal(server, lock = false) {
 
     _syncMobileLaunchSections();
     _syncLaunchAccess();
+    _mountSkills();
     if (launch.server !== LOCAL_SERVER) _onLaunchServerChange(launch.server, { force: true });
+}
+
+/** The approved skills, offered in New agent and New team for this computer's own launch only (#12104). */
+function _mountSkills() {
+    importOnce('./launch_skills.js').then(m => { const local = normServer(launch.server) === LOCAL_SERVER; m.mountLaunchSkills('launch-skills', local); m.mountLaunchSkills('team-skills', local); }).catch(() => {});
 }
 
 // ── Server picker (hub mode) ─────────────────────────────────────────────
@@ -245,6 +251,7 @@ function _resetLaunchDirs(server, opts) {
 
 /** Reload everything that depends on the launch server after the dropdown changes. */
 async function _onLaunchServerChange(value, { force = false } = {}) {
+    queueMicrotask(_mountSkills); // another computer's launch has no skills row; this one's has
     if (value === TEAM_ADDRESS) { _syncTeamAddress(true); return; } // the machine stays; the address is typed
     if (launch.mode === 'team' && launch.teamAddress) _syncTeamAddress(false);
     const next = _effectiveServer(coerceSelection(value, isHub(), state.servers));
@@ -500,6 +507,8 @@ export async function launchSession() {
         if (config.prompt) payload.prompt = config.prompt;
         if (config.model) payload.model = config.model;
         if (config.thinking !== undefined) payload.thinking = config.thinking; // chosen on the form (#4969)
+        const skillIds = (await importOnce('./launch_skills.js').catch(() => null))?.launchSkillIds('launch-skills') || []; // the approved skills ticked (#12104)
+        if (skillIds.length) payload.skills = skillIds;
 
         const boardSelect = document.getElementById("launch-board-select");
         if (boardSelect && boardSelect.value) {

@@ -19,6 +19,9 @@ DELETE /api/sessions/live/{name}/tasks/{taskID} | token-bound
 GET /api/agent/board/search | token-bound
 GET /api/agent/history/context | token-bound
 GET /api/agent/history/search | token-bound
+GET /api/agent/skills | token-bound
+GET /api/agent/skills/search | token-bound
+GET /api/agent/skills/{id} | token-bound
 GET /api/agent/tasks | token-bound
 GET /api/agent/tasks/{taskID} | token-bound
 GET /api/agent/ui | token-bound
@@ -140,6 +143,7 @@ PATCH /api/sessions/history/{sessionID}/flags | unbound | operator-only
 PATCH /api/sessions/live/{name}/notes/{noteID} | token-bound
 PATCH /api/sessions/live/{name}/tasks/{taskID} | token-bound
 POST /api/agent/artifacts | token-bound
+POST /api/agent/skills | token-bound
 POST /api/agent/tasks | token-bound
 POST /api/agent/tasks/claim | token-bound
 POST /api/agent/tasks/current | token-bound
