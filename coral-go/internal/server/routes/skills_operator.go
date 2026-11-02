@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/skills"
 	"github.com/subgentic/coral/internal/store"
 )
@@ -168,6 +169,8 @@ func (h *SkillsHandler) ApproveSkill(w http.ResponseWriter, r *http.Request) {
 		skillDecisionError(w, err)
 		return
 	}
+	h.record(r, board.ActSkillApprove, row, "")
+	h.recordAcks(r, row, req.ScriptsAcked, "")
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
@@ -188,6 +191,7 @@ func (h *SkillsHandler) RejectSkill(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if row != nil {
+		h.record(r, board.ActSkillReject, row, "")
 		h.releaseSkillZip(r, row.Digest)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
@@ -210,6 +214,7 @@ func (h *SkillsHandler) RemoveSkill(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if row != nil {
+		h.record(r, board.ActSkillRemove, row, "")
 		h.releaseSkillZip(r, row.Digest)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
@@ -226,4 +231,18 @@ func (h *SkillsHandler) NeedsYouItems(ctx context.Context) ([]NeedsYouItem, erro
 		items = append(items, NeedsYouItem{Kind: "skill", From: needsYouLine(r.PublisherAgent), Line: needsYouLine("Skill to approve: " + r.Name + " version " + strconv.Itoa(r.Version)), Team: r.PublisherTeam, ID: "skill:" + r.ID, At: needsYouTime(r.CreatedAt)})
 	}
 	return items, nil
+}
+
+// recordAcks writes the Operator's acknowledgements next to the decision they came with: the second click on the scripts and files that cannot be shown as text (when the skill had any), and a file that looks like
+// a key or token going in anyway (the note names the file, never the secret).
+func (h *SkillsHandler) recordAcks(r *http.Request, row *store.SkillRow, scriptsAcked bool, secretFile string) {
+	if row == nil {
+		return
+	}
+	if scriptsAcked && (row.HasScripts || row.NotReviewable) {
+		h.record(r, board.ActSkillScriptsAck, row, "the scripts and files that cannot be shown as text were reviewed")
+	}
+	if secretFile != "" {
+		h.record(r, board.ActSkillSecretAck, row, skillFileName(secretFile))
+	}
 }
