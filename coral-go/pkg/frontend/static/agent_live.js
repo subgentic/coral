@@ -19,7 +19,13 @@ const closeOverlays = () => {
     document.querySelector('#artifact-viewer:not([hidden]) [data-dialog-close], #artifact-viewer:not([hidden]) .artifact-viewer-close')?.click();
     for (const d of document.querySelectorAll('dialog[open]')) { try { d.close(); } catch { /* already closing */ } }
 };
-export const openAgent = s => { closeOverlays(); window.switchNavTab?.('agents'); Promise.resolve(window.selectLiveSession?.(s.name, s.agent_type, s.session_id || '', sessionServer(s))).catch(() => {}); };
+// Words typed into a dialog that is about to close (a question's reply box): closing it would drop them, so the person is asked first (#12299).
+const typedInOverlay = () => [...document.querySelectorAll('dialog[open], #artifact-viewer:not([hidden])')].some(d => [...d.querySelectorAll('textarea, input[type=text], input[type=search], input:not([type])')].some(f => !f.readOnly && !f.disabled && f.value.trim() && f.value !== f.defaultValue));
+export const openAgent = s => {
+    const go = () => { closeOverlays(); window.switchNavTab?.('agents'); Promise.resolve(window.selectLiveSession?.(s.name, s.agent_type, s.session_id || '', sessionServer(s))).catch(() => {}); };
+    if (typedInOverlay() && window.showConfirmModal) window.showConfirmModal('Leave this dialog?', 'What you typed here is not sent and will be lost.', go, null, { label: 'Open chat', danger: false });
+    else go();
+};
 
 // One delegated click for every link and circle that carries data-agent-link, DOM or HTML: in the capture phase and stopped, so a row or card the name sits in does not also open its own page.
 document.addEventListener('click', e => {
