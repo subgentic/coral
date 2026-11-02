@@ -33,31 +33,31 @@ const SHOWN = { claude: ['Yes', 'No'], claudeLasting: ['Yes', 'No'], claudeTrust
             true`);
         let n = 0;
         const draw = async () => ev(`(async () => { const m = await import(${MOD} + 'inbox_answer.js'); const cell = m.answerCell({ name: 'claude-x${++n}', session_id: 'sess-${n}', agent_type: 'claude', waiting_since: 't${n}' }); document.body.append(cell); window.__cell = cell; return true; })()`);
-        const labels = () => ev(`[...window.__cell.querySelectorAll('button')].map(b => b.textContent)`);
+        const labels = () => ev(`[...window.__cell.querySelectorAll('button:not(.inbox-dismiss)')].map(b => b.textContent)`); // the answers: every waiting row also has its Dismiss now (#11946), which is not an answer
         for (const [cli, opts] of Object.entries(SETS)) {
             await ev(`window.__opts = ${JSON.stringify(opts)}; true`); await draw();
-            await waitFor(`window.__cell.querySelectorAll('button').length > 0`, `${cli}: the choices`, 5000);
+            await waitFor(`window.__cell.querySelectorAll('button:not(.inbox-dismiss)').length > 0`, `${cli}: the choices`, 5000);
             assert.deepEqual(await labels(), SHOWN[cli], `${cli}: only the one-time yes and the no, the lasting ones are left to Open`);
         }
         // the ask changes between the draw and the click: nothing is sent
         await ev(`window.__opts = ${JSON.stringify(SETS.claude)}; window.__posts = []; true`); await draw();
-        await waitFor(`window.__cell.querySelectorAll('button').length === 2`, 'claude choices', 5000);
-        await ev(`window.__ask = 'ask-2'; window.__cell.querySelector('button').click(); true`);
+        await waitFor(`window.__cell.querySelectorAll('button:not(.inbox-dismiss)').length === 2`, 'claude choices', 5000);
+        await ev(`window.__ask = 'ask-2'; window.__cell.querySelector('button:not(.inbox-dismiss)').click(); true`);
         await waitFor(`[...document.querySelectorAll('.toast .toast-message')].some(e => /That question changed; look at it again/.test(e.textContent))`, 'the stale click says so', 5000);
         assert.deepEqual(await ev(`window.__posts`), [], 'a stale row sends nothing');
-        await waitFor(`window.__cell.querySelectorAll('button').length === 2 && !window.__cell.querySelector('button').disabled`, 'the choices are drawn again', 5000);
+        await waitFor(`window.__cell.querySelectorAll('button:not(.inbox-dismiss)').length === 2 && !window.__cell.querySelector('button:not(.inbox-dismiss)').disabled`, 'the choices are drawn again', 5000);
         // the same ask: the id rides along; the server's 409 is said the same way
-        await ev(`window.__cell.querySelector('button').click(); true`);
+        await ev(`window.__cell.querySelector('button:not(.inbox-dismiss)').click(); true`);
         await waitFor(`window.__posts.length === 1`, 'the answer is sent', 5000);
         assert.equal(await ev(`window.__posts[0].ask_id`), 'ask-2', 'the ask the row shows rides along');
         await ev(`window.__posts = []; window.__status = 409; window.__ask = 'ask-2'; true`); await draw();
-        await waitFor(`window.__cell.querySelectorAll('button').length === 2`, 'again', 5000);
-        await ev(`document.querySelectorAll('.toast').forEach(t => t.remove()); window.__cell.querySelector('button').click(); true`);
+        await waitFor(`window.__cell.querySelectorAll('button:not(.inbox-dismiss)').length === 2`, 'again', 5000);
+        await ev(`document.querySelectorAll('.toast').forEach(t => t.remove()); window.__cell.querySelector('button:not(.inbox-dismiss)').click(); true`);
         await waitFor(`[...document.querySelectorAll('.toast .toast-message')].some(e => /That question changed; look at it again/.test(e.textContent))`, 'a 409 says the same', 5000);
         // the answer went but the agent's prompt had not cleared (answer_sent_prompt_open): the row says Sent and Still waiting and stays in Needs you; it is not Answered and the Inbox is not told (#10516)
         await ev(`window.__posts = []; window.__status = 'late'; window.__ask = 'ask-2'; window.__told = 0; document.addEventListener('coral:inbox-answered', () => { window.__told++; }); true`); await draw();
-        await waitFor(`window.__cell.querySelectorAll('button').length === 2`, 'again for the late prompt', 5000);
-        await ev(`document.querySelectorAll('.toast').forEach(t => t.remove()); window.__cell.querySelector('button').click(); true`);
+        await waitFor(`window.__cell.querySelectorAll('button:not(.inbox-dismiss)').length === 2`, 'again for the late prompt', 5000);
+        await ev(`document.querySelectorAll('.toast').forEach(t => t.remove()); window.__cell.querySelector('button:not(.inbox-dismiss)').click(); true`);
         await waitFor(`/^Sent: .*Still waiting: check the agent\\.$/.test(window.__cell.textContent)`, 'the row says Sent and Still waiting', 5000);
         await new Promise(r => setTimeout(r, 300)); // sleep-ok: a wrong event or toast would have come by now
         assert.equal(await ev(`window.__told`), 0, 'the Inbox is not told the agent was answered: the row stays');
@@ -65,10 +65,10 @@ const SHOWN = { claude: ['Yes', 'No'], claudeLasting: ['Yes', 'No'], claudeTrust
         assert.ok(!(await ev(`[...document.querySelectorAll('.toast .toast-message')].some(e => /That question changed/.test(e.textContent))`)), 'a sent answer does not say the question changed');
         // nothing was sent (the selection did not move to the option): the buttons stay and the person is told to use the terminal
         await ev(`window.__posts = []; window.__status = 'unmoved'; window.__ask = 'ask-2'; true`); await draw();
-        await waitFor(`window.__cell.querySelectorAll('button').length === 2`, 'again for the unmoved selection', 5000);
-        await ev(`document.querySelectorAll('.toast').forEach(t => t.remove()); window.__cell.querySelector('button').click(); true`);
+        await waitFor(`window.__cell.querySelectorAll('button:not(.inbox-dismiss)').length === 2`, 'again for the unmoved selection', 5000);
+        await ev(`document.querySelectorAll('.toast').forEach(t => t.remove()); window.__cell.querySelector('button:not(.inbox-dismiss)').click(); true`);
         await waitFor(`[...document.querySelectorAll('.toast .toast-message')].some(e => /Could not send the answer/.test(e.textContent))`, 'the person is told it was not sent', 5000);
-        assert.equal(await ev(`window.__cell.querySelectorAll('button').length`), 2, 'the buttons stay');
+        assert.equal(await ev(`window.__cell.querySelectorAll('button:not(.inbox-dismiss)').length`), 2, 'the buttons stay');
         assert.ok(!/^(Answered|Sent)/.test(await ev(`window.__cell.textContent`)), 'and the row does not claim an answer');
         assert.equal(await ev(`window.__told`), 0, 'the row stays in Needs you');
         console.log('PASS Inbox answers: no lasting choice on a row (Claude, Codex, Antigravity), a changed ask sends nothing, a 409 says so');

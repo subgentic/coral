@@ -122,13 +122,22 @@ const answerable = s => !(s.review || s.autorun || !s.agent_type || !s.session_i
 
 /** The actions of a phone Needs you row's ⋯ menu (#137104): the Dismiss of a wait that is no longer true, offered by the rule the desktop row's button follows. */
 export function rowActions(s) {
-    if (!answerable(s) || !canDismissWait(s, s.waiting_kind)) return [];
+    if (!canDismissWait(s, s.waiting_kind)) return []; // every waiting agent's row has one, a sign-in's too (#11946)
     return [{ label: 'Dismiss', title: 'Clear this if the agent is not waiting. Nothing is sent to the agent.', run: b => dismissWait(s, b) }];
 }
 
 /** The Answer cell of a Needs you row: empty for a review or a run, for a viewer through the Hub, otherwise the one-time choices once they are read. `dismiss: false` leaves the Dismiss to the row's ⋯ menu (a phone's). */
 export function answerCell(s, { dismiss = true } = {}) {
-    if (!answerable(s)) return '';
+    if (!answerable(s)) { // a sign-in, or a viewer through the Hub: no answers, but the row can still be hidden (#11946)
+        if (!dismiss || !canDismissWait(s, s.waiting_kind)) return '';
+        const only = document.createElement('span'); only.className = 'inbox-answers';
+        const d = dismissButton('btn btn-small inbox-dismiss', s);
+        d.setAttribute('aria-label', `Dismiss the wait of ${resolveSessionIdentity(s)}`);
+        d.addEventListener('click', e => { e.stopPropagation(); dismissWait(s, d); });
+        d.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); });
+        only.append(d);
+        return only;
+    }
     const cell = document.createElement('span');
     cell.className = 'inbox-answers';
     fill(s, cell, dismiss);
