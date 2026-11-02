@@ -455,6 +455,14 @@ func (s *SessionStore) AttachSkills(ctx context.Context, sessionID string, rows 
 	})
 }
 
+// AttachSkillsRetry is AttachSkills tried a second time when the first fails, so the pin and the note an agent was given stay in step (Security's INFO on slice d).
+func (s *SessionStore) AttachSkillsRetry(ctx context.Context, sessionID string, rows []SkillRow) error {
+	if err := s.AttachSkills(ctx, sessionID, rows); err != nil {
+		return s.AttachSkills(ctx, sessionID, rows)
+	}
+	return nil
+}
+
 // AttachedSkill is a skill attached to an agent with what became of it since.
 type AttachedSkill struct {
 	SkillID       string `db:"skill_id" json:"id"`

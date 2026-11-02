@@ -236,7 +236,7 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if sid, _ := result["session_id"].(string); sid != "" && len(skillRows) > 0 { // pinned to the versions approved now; a newer one is an update to offer, never swapped in
-		if err := h.ss.AttachSkills(r.Context(), sid, skillRows); err != nil {
+		if err := h.ss.AttachSkillsRetry(r.Context(), sid, skillRows); err != nil {
 			slog.Warn("[launch] the skills attached to an agent were not saved", "session", sid, "error", err)
 		}
 	}

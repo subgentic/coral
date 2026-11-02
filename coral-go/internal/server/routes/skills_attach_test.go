@@ -136,6 +136,25 @@ func TestALaunchWithoutSkillsIsUnchangedAndASkillThatIsNotApprovedIsRefused(t *t
 	assert.Equal(t, before, len(e.terminal.sentCommands()), "nothing started")
 }
 
+// QA's two cases: the same approved id twice, and eleven distinct approved ids, each refused for its own reason and with nothing started.
+func TestALaunchRefusesARepeatedSkillIdAndMoreThanTenWithTheirOwnReasons(t *testing.T) {
+	e := newLaunchEnv(t)
+	one := approvedSkill(t, e.ss, "only-one", "d", 1)
+	code, out := e.post("/api/sessions/launch", e.h.Launch, map[string]any{"working_dir": t.TempDir(), "agent_type": "claude", "skills": []string{one.ID, one.ID}})
+	assert.Equal(t, http.StatusBadRequest, code)
+	assert.Equal(t, "skills", out["field"])
+	assert.Contains(t, fmt.Sprint(out["error"]), "skill 2 is not a valid, single skill id", "an approved skill named twice is refused as a repeat")
+	var ids []string
+	for i := 0; i < maxLaunchSkills+1; i++ {
+		ids = append(ids, approvedSkill(t, e.ss, fmt.Sprintf("skill-%d", i), "d", 100+i).ID)
+	}
+	code, out = e.post("/api/sessions/launch", e.h.Launch, map[string]any{"working_dir": t.TempDir(), "agent_type": "claude", "skills": ids})
+	assert.Equal(t, http.StatusBadRequest, code)
+	assert.Contains(t, fmt.Sprint(out["error"]), fmt.Sprintf("at most %d skills", maxLaunchSkills), "eleven real, approved, distinct skills are still too many")
+	code, _ = e.post("/api/sessions/launch", e.h.Launch, map[string]any{"working_dir": t.TempDir(), "agent_type": "claude", "skills": ids[:maxLaunchSkills]})
+	assert.Equal(t, http.StatusOK, code, "ten are fine")
+}
+
 func TestATeamLaunchTellsEveryMemberTheTeamsSkillsAndItsOwn(t *testing.T) {
 	e := newLaunchEnv(t)
 	team := approvedSkill(t, e.ss, "team-wide", "For everyone.", 1)
