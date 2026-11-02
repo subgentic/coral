@@ -62,7 +62,10 @@ const { existing: recentsExist } = require('./helpers/recent_dirs');
             const s = await dirState('launch-team-dir', /Coral creates it for you/);
             assert.ok(/[\\/]Coral[\\/]first-team$/.test(s.value) && s.note && s.described, JSON.stringify(s));
             // #11865: the folder is said with ~ for the home folder (the user name is not the first thing read), the whole path is the tooltip, and the words say what the folder is for
-            assert.equal(s.text, "~/Coral/first-team. The team's agents work in this folder. Coral creates it for you. Choose another folder to work on a project you already have.", JSON.stringify(s));
+            const win = /^[A-Za-z]:|\\/.test(s.value); // a Windows home: the path as the field holds it, ~ is not a convention there (the Operator's rule, v2.0.29)
+            assert.equal(s.text, `${win ? s.value : '~/Coral/first-team'}. The team's agents work in this folder. Coral creates it for you. Choose another folder to work on a project you already have.`, JSON.stringify(s));
+            // the rule itself, on any computer: ~ on a POSIX home, the real path on a Windows one
+            assert.deepEqual(await ev(`import((window.__coralStatic || '/static/') + 'folder_suggestion.js').then(m => [m.tildeFolder('/Users/pat', '/Users/pat/Coral/x'), m.tildeFolder('C:\\\\Users\\\\Pat', 'C:\\\\Users\\\\Pat\\\\Coral\\\\x'), m.tildeFolder('', '/a/b'), m.tildeFolder('/Users/pat', '/work/other')])`), ['~/Coral/x', 'C:\\Users\\Pat\\Coral\\x', '/a/b', '/work/other'], 'the tilde form is for POSIX homes only');
             assert.equal(s.tip, s.value, 'the whole path is the tooltip');
             assert.match(s.label, /^Folder for this team/, 'the field is named for what it is: ' + s.label);
         });
