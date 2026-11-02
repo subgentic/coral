@@ -291,7 +291,17 @@ func hasPlaceholder(screen string) bool {
 func boxPlaceholder(box string) bool {
 	t := strings.TrimSpace(box)
 	return t == "" || strings.HasPrefix(t, `Try "`) || strings.HasPrefix(t, "Ask Codex to do anything") ||
-		strings.HasPrefix(t, "Type your message")
+		strings.HasPrefix(t, "Type your message") || hermesHints[t]
+}
+
+// hermesHints are the hints Hermes v0.22.5 rotates through in its empty input box (seen in a real run, #11936). Each is matched whole: a box that holds one of these and more is a person's text, and a hint
+// not listed here is taken for a draft (nothing is typed over it), never the other way round.
+var hermesHints = map[string]bool{
+	"Explain this error and how to fix it":                 true,
+	"Turn these notes into a to-do list":                   true,
+	"Type / to browse commands, or Ctrl+P for the palette": true,
+	"Summarize what's in this folder":                      true,
+	"Find and fix a failing test":                          true,
 }
 
 // StyledScreenReader is implemented by terminals that can show AgentScreen with each

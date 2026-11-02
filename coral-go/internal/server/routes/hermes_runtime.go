@@ -3,10 +3,12 @@ package routes
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/subgentic/coral/internal/agent"
@@ -24,10 +26,15 @@ import (
 // hermesChatRows is the most recent rows of a session one chat read takes (the reader bounds a read at hermesdb.MaxMessages; a chat needs fewer).
 const hermesChatRows = 2000
 
-// hermesTranscript is a Hermes agent's chat (#11831): the rows of the Hermes session its hooks bound to this Coral session (transcriptlink.HermesSession), read from the state.db of the session's TEAM home only
-// (agent.HermesTeamHome: a session's team decides the folder, so another team's rows are never asked for), read-only and by that one session id (hermesdb). No link yet, no state.db, a layout Coral does not read or a
+// hermesTranscript is a Hermes agent's chat (#11831): the rows of the Hermes session its hooks bound to this Coral session (transcriptlink.HermesSession), read from the state.db of the session's OWN home only
+// (agent.HermesAgentHome: the session decides the folder, so another agent's or team's rows are never asked for), read-only and by that one session id (hermesdb). No link yet, no state.db, a layout Coral does not read or a
 // failed read is an empty chat, never an error to the person: Hermes may not have run a turn, and a newer Hermes may have changed its tables.
 func (h *SessionsHandler) hermesTranscript(ctx context.Context, sessionID string) *jsonl.Transcript {
+	return h.hermesTranscriptRows(ctx, sessionID, hermesChatRows)
+}
+
+// hermesTranscriptRows is hermesTranscript for the newest rows of the session (the list's last message needs a few, not the chat's two thousand).
+func (h *SessionsHandler) hermesTranscriptRows(ctx context.Context, sessionID string, rowLimit int) *jsonl.Transcript {
 	empty := jsonl.NewMemoryTranscript(nil)
 	if h.cfg == nil || !transcriptlink.IsSessionID(sessionID) {
 		return empty
@@ -41,7 +48,11 @@ func (h *SessionsHandler) hermesTranscript(ctx context.Context, sessionID string
 	if ls, err := h.ss.GetLiveSession(ctx, sessionID); err == nil && ls != nil && ls.BoardName != nil {
 		team = *ls.BoardName
 	}
-	db, err := hermesdb.Open(agent.HermesTeamHome(dataDir, team))
+	home := agent.HermesAgentHome(dataDir, team, sessionID)
+	if home == "" {
+		return empty
+	}
+	db, err := hermesdb.Open(home)
 	if err != nil {
 		if !errors.Is(err, hermesdb.ErrNoStore) {
 			slog.Debug("hermes: state.db not read", "error", err)
@@ -49,7 +60,7 @@ func (h *SessionsHandler) hermesTranscript(ctx context.Context, sessionID string
 		return empty
 	}
 	defer db.Close()
-	rows, err := db.Messages(ctx, hermesID, 0, hermesChatRows)
+	rows, err := db.Messages(ctx, hermesID, 0, rowLimit)
 	if err != nil {
 		slog.Debug("hermes: messages not read", "error", err)
 		return empty
@@ -181,6 +192,8 @@ func (h *SessionsHandler) deliverHermesFirstMessage(team, target string) {
 			h.noteHermesFirstMessageNotTyped(sid)
 			return
 		}
+		// The launch line may have run another program first (the one-minute preparation of a new home), which the record of the agent's process took for the agent: record it again now Hermes is up (#11936).
+		ptymanager.ReadoptLostAgent(ctx, h.terminal, name, at.Hermes, sid)
 		if err := deliverAutomated(ctx, h.terminal, name, at.Hermes, sid, text, "first message"); err != nil {
 			slog.Warn("hermes: the first message was not typed", "session", sid[:8], "error", err)
 		}
@@ -244,4 +257,92 @@ func (h *SessionsHandler) noteHermesFirstMessageNotTyped(sessionID string) {
 	}); err != nil {
 		slog.Debug("hermes: the notice was not recorded", "error", err)
 	}
+}
+
+// removeHermesHome removes a deleted Hermes agent's own home (its state.db, hooks and .env), as Kill and a team's kill do: a sleep, a wake and a restart keep it, so the conversation can be resumed. Any other agent
+// type has none.
+func (h *SessionsHandler) removeHermesHome(agentType, team, sessionID string) {
+	if agentType != at.Hermes || h.cfg == nil {
+		return
+	}
+	if err := agent.RemoveHermesHome(h.cfg.CoralDir(), team, sessionID); err != nil {
+		slog.Warn("hermes: the agent's home was not removed", "session", sessionID, "error", err)
+	}
+}
+
+// removeReplacedHermesHome removes the home of a session a restart or a resume replaced with a new one (stored: the replaced session's record, nil when the store did not know it). The replaced session's own team and
+// type are the ones its home was made under.
+func (h *SessionsHandler) removeReplacedHermesHome(stored *store.LiveSession, team, oldID string) {
+	if stored == nil {
+		return
+	}
+	if stored.BoardName != nil {
+		team = *stored.BoardName
+	}
+	h.removeHermesHome(stored.AgentType, team, oldID)
+}
+
+// hermesLastMessageRows is how many of a Hermes session's newest rows the list's last message looks through: a long tool-only stretch is a few rows per turn, and 60 reach the last turn with text.
+const hermesLastMessageRows = 60
+
+// hermesLastCache remembers each Hermes session's last message with the state of its database (size and modification time of state.db and its write-ahead file) it was read at, so a list that polls every few seconds
+// opens the database only when Hermes wrote to it. Bounded: a session that is gone is dropped at the next read of the cache once it is over hermesLastCacheMax.
+var hermesLastCache = struct {
+	sync.Mutex
+	m map[string]hermesLastEntry
+}{m: map[string]hermesLastEntry{}}
+
+type hermesLastEntry struct {
+	stamp string
+	msg   jsonl.LastMessage
+	ok    bool
+}
+
+const hermesLastCacheMax = 512
+
+// hermesStamp is the state of a session's database files, "" when there is none.
+func hermesStamp(home string) string {
+	var parts []string
+	for _, name := range []string{"state.db", "state.db-wal"} {
+		fi, err := os.Lstat(filepath.Join(home, name))
+		if err != nil {
+			parts = append(parts, "-")
+			continue
+		}
+		parts = append(parts, fmt.Sprintf("%d:%d", fi.Size(), fi.ModTime().UnixNano()))
+	}
+	return strings.Join(parts, "|")
+}
+
+// hermesLastMessage is a Hermes agent's newest message as the list shows it: from its own state.db (there is no transcript file), by the rules of the other agents' (jsonl.LastMessageFromEntries).
+func (h *SessionsHandler) hermesLastMessage(sessionID string) (jsonl.LastMessage, bool) {
+	if h.cfg == nil || !transcriptlink.IsSessionID(sessionID) {
+		return jsonl.LastMessage{}, false
+	}
+	team := ""
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if ls, err := h.ss.GetLiveSession(ctx, sessionID); err == nil && ls != nil && ls.BoardName != nil {
+		team = *ls.BoardName
+	}
+	home := agent.HermesAgentHome(h.cfg.CoralDir(), team, sessionID)
+	if home == "" {
+		return jsonl.LastMessage{}, false
+	}
+	stamp := hermesStamp(home) + "#" + transcriptlink.HermesSession(h.cfg.CoralDir(), sessionID)
+	hermesLastCache.Lock()
+	e, hit := hermesLastCache.m[sessionID]
+	hermesLastCache.Unlock()
+	if hit && e.stamp == stamp {
+		return e.msg, e.ok
+	}
+	entries := h.hermesTranscriptRows(ctx, sessionID, hermesLastMessageRows).All(ctx)
+	msg, ok := jsonl.LastMessageFromEntries(entries)
+	hermesLastCache.Lock()
+	if len(hermesLastCache.m) >= hermesLastCacheMax {
+		hermesLastCache.m = map[string]hermesLastEntry{}
+	}
+	hermesLastCache.m[sessionID] = hermesLastEntry{stamp: stamp, msg: msg, ok: ok}
+	hermesLastCache.Unlock()
+	return msg, ok
 }

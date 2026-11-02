@@ -16,6 +16,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	"github.com/subgentic/coral/internal/diskguard"
 	"github.com/subgentic/coral/internal/fsreplace"
 	"github.com/subgentic/coral/internal/safefs"
 )
@@ -37,10 +38,37 @@ var hermesHookEvents = []string{"on_session_start", "pre_llm_call", "pre_tool_ca
 // HermesHookEvents is hermesHookEvents, for the test that keeps it equal to what the hook records.
 func HermesHookEvents() []string { return append([]string(nil), hermesHookEvents...) }
 
-// HermesTeamHome is the folder a team's Hermes agents share: <data dir>/hermes-homes/<16 hex digits of the team name's hash>. The name is only hashed, so no team name can name another folder.
+// HermesTeamHome is the folder a team's Hermes homes are made in: <data dir>/hermes-homes/<16 hex digits of the team name's hash>. The name is only hashed, so no team name can name another folder.
 func HermesTeamHome(dataDir, team string) string {
 	sum := sha256.Sum256([]byte(team))
 	return filepath.Join(dataDir, hermesHomesFolder, hex.EncodeToString(sum[:8]))
+}
+
+// HermesAgentHome is the HERMES_HOME of one agent: <team folder>/<its Coral session id>. Hermes runs ONE gateway process for a home and runs every hook from it with the environment of the agent that started it, so
+// agents that shared a home had their events, Stop and chat taken for the first agent's (the tester's run on v2.0.29, #11936). A home of its own puts each agent's identity where no other agent can stand in for it. The
+// id is a canonical Coral session id (hex digits and dashes only), so it is one path element and names no other folder: "" for anything else.
+func HermesAgentHome(dataDir, team, sessionID string) string {
+	if !canonicalSessionID.MatchString(sessionID) {
+		return ""
+	}
+	return filepath.Join(HermesTeamHome(dataDir, team), sessionID)
+}
+
+// hermesMinFree is the free space a new home needs: Hermes prepares its runtime in it on first use, about 400 MB (the tester's run), and the agent's sessions grow it. A launch under this refuses with a clear message
+// and makes nothing (the team's other agents are not touched).
+const hermesMinFree = 2 << 30
+
+// RemoveHermesHome removes an agent's home when the agent is deleted (a restart or a wake keeps it, so the agent's conversation can be resumed). A home that is not there, or an id that is not one, is nothing to do;
+// a link in its place is removed as a link and never followed.
+func RemoveHermesHome(dataDir, team, sessionID string) error {
+	home := HermesAgentHome(dataDir, team, sessionID)
+	if home == "" {
+		return nil
+	}
+	if _, err := os.Lstat(home); err != nil {
+		return nil
+	}
+	return os.RemoveAll(home)
 }
 
 // privateDir makes dir (and its parents) 0700 if missing and refuses one that is a link or not a folder.
@@ -113,16 +141,32 @@ func hermesHookCommand(event string) string {
 	return cmd
 }
 
-// PrepareHermesHome makes the team's home ready and returns it: the folder, a .env seeded from the person's (0600, created exclusively, kept at 0600, never rewritten), a config.yaml whose hooks block is Coral's own and
-// nothing else of Hermes's settings is changed, and the allowlist of exactly those hooks. personHome is the person's own Hermes home, read only.
-func PrepareHermesHome(dataDir, team, personHome string, now time.Time) (string, error) {
+// PrepareHermesHome makes the agent's home ready and returns it: the folder, a .env seeded from the person's (0600, created exclusively, kept at 0600, never rewritten), a config.yaml whose hooks block is Coral's own and
+// nothing else of Hermes's settings is changed, and the allowlist of exactly those hooks. personHome is the person's own Hermes home, read only. A home that does not exist yet is made only when the volume has
+// hermesMinFree free.
+func PrepareHermesHome(dataDir, team, sessionID, personHome string, now time.Time) (string, error) {
+	return prepareHermesHome(dataDir, team, sessionID, personHome, now, diskguard.FreeBytes)
+}
+
+func prepareHermesHome(dataDir, team, sessionID, personHome string, now time.Time, free func(dir string) (uint64, error)) (string, error) {
 	if dataDir == "" {
 		return "", errors.New("hermes: no Coral data folder")
+	}
+	home := HermesAgentHome(dataDir, team, sessionID)
+	if home == "" {
+		return "", errors.New("hermes: the agent has no session id to name its home by")
 	}
 	if err := privateDir(filepath.Join(dataDir, hermesHomesFolder)); err != nil {
 		return "", err
 	}
-	home := HermesTeamHome(dataDir, team)
+	if err := privateDir(HermesTeamHome(dataDir, team)); err != nil { // each level on its own: a link in any of them is refused, not followed
+		return "", err
+	}
+	if _, err := os.Lstat(home); err != nil {
+		if f, ferr := free(filepath.Dir(home)); ferr == nil && f < hermesMinFree {
+			return "", fmt.Errorf("hermes: not enough free disk to make this agent's home: it needs about 2 GB and %.1f GB is free", float64(f)/(1<<30))
+		}
+	}
 	if err := privateDir(home); err != nil {
 		return "", err
 	}
@@ -312,15 +356,16 @@ func seedTelemetryAnswer(top *yaml.Node) {
 const hermesTelemetryOffer = 2
 
 // A Hermes agent is told what other agents get on the command line (the board protocol and its role, the launch prompt, Coral's session marker) by being TYPED it as its first message once Hermes is ready:
-// an argument shows in ps and in the shell's history (Security, #11831). LaunchCommand writes the text to <team home>/first-messages/<Coral session id>.txt (0600, in a 0700 folder), and the server types it and
+// an argument shows in ps and in the shell's history (Security, #11831). LaunchCommand writes the text to <agent home>/first-messages/<Coral session id>.txt (0600, in a 0700 folder), and the server types it and
 // removes the file (internal/server/routes, deliverHermesFirstMessage).
 
 // HermesFirstMessagePath is the file of a session's first message, "" for an id that is not a canonical Coral session id.
 func HermesFirstMessagePath(dataDir, team, sessionID string) string {
-	if !canonicalSessionID.MatchString(sessionID) {
+	home := HermesAgentHome(dataDir, team, sessionID)
+	if home == "" {
 		return ""
 	}
-	return filepath.Join(HermesTeamHome(dataDir, team), "first-messages", sessionID+".txt")
+	return filepath.Join(home, "first-messages", sessionID+".txt")
 }
 
 var canonicalSessionID = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)

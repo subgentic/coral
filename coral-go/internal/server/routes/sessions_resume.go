@@ -249,6 +249,7 @@ func (h *SessionsHandler) resumeRecord(ctx context.Context, p *restartPlan, resu
 	}
 	oldID := p.req.SessionID
 	h.chatMeta.forget(oldID, p.newSessionID)
+	defer h.removeReplacedHermesHome(p.stored, p.board, oldID) // the agent has a new session id, so a home of its own: the old one is no longer anyone's
 	h.ss.ReplaceLiveSession(ctx, oldID, &store.LiveSession{
 		SessionID:     p.newSessionID,
 		AgentType:     p.agentType,

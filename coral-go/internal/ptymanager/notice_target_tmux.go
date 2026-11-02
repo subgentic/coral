@@ -19,3 +19,8 @@ func (t *TmuxSessionTerminal) AgentNoticeTarget(ctx context.Context, name, agent
 	}
 	return v.OK, v.Wait, v.Reason, true
 }
+
+// ReadoptAgent starts the watch for the session's agent process again (ReadoptLostAgent).
+func (t *TmuxSessionTerminal) ReadoptAgent(ctx context.Context, name, agentType, sessionID string) {
+	t.client.ReadoptAgent(ctx, name, agentType, sessionID)
+}

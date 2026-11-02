@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/store"
+	"github.com/subgentic/coral/internal/tmux"
 )
 
 // #11831: what a Hermes agent is told at launch is a file (agent.HermesFirstMessagePath), not the command line; its start types it as the agent's first message, once, and removes it.
@@ -182,4 +184,66 @@ func TestAHermesThatNeverShowsItsWelcomeLineGetsANoticeAndNothingTyped(t *testin
 	st := h.deriveSingleSessionState(ctx, sid, 0)
 	assert.False(t, st.Working)
 	assert.False(t, st.NeedsInput, "the notice changes no state")
+}
+
+// lostRecordTerm is a terminal whose record of the agent's process is gone (the preparation step that was recorded has ended) until it is told to record again.
+type lostRecordTerm struct {
+	*loginScreenTerminal
+	mu        sync.Mutex
+	readopted int
+	atWelcome []bool // whether the welcome line was on screen at each re-record
+}
+
+func (l *lostRecordTerm) AgentNoticeTarget(context.Context, string, string, string) (ok, wait bool, why string, known bool) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.readopted > 0 {
+		return true, false, "", true
+	}
+	return false, false, tmux.ReasonGone, true
+}
+
+func (l *lostRecordTerm) ReadoptAgent(ctx context.Context, name, agentType, sessionID string) {
+	screen, _ := l.AgentScreen(ctx, name, agentType, sessionID)
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.readopted++
+	l.atWelcome = append(l.atWelcome, strings.Contains(screen, "Welcome to Hermes Agent!"))
+}
+
+// #11936 (the tester's run on v2.0.29): on the first launch of a new home the pane's first foreground program is the one-minute preparation, which Coral recorded as the agent; when it ended, notices were paused
+// ("the agent's process has ended") and the first message was never typed though Hermes was running. Once the welcome line is on screen the record is made again, then the message is typed.
+func TestAHermesFirstMessageRecordsTheAgentAgainOnceItIsUp(t *testing.T) {
+	_, h, mock, _ := setupSessionsTestServer(t)
+	term := &lostRecordTerm{loginScreenTerminal: &loginScreenTerminal{mockSessionTerminal: mock}}
+	h.terminal = term
+	h.hermesSettle = 10 * time.Millisecond
+	data := h.cfg.CoralDir()
+	sid := "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c5a"
+	name := naming.SessionName("hermes", sid)
+	mock.mu.Lock()
+	mock.sessions[name] = &ptymanager.PaneInfo{SessionName: name, Target: name, CurrentPath: "/tmp/p"}
+	mock.mu.Unlock()
+	writeFirstMessage(t, data, "team-a", sid, "You were automatically joined to message board \"team-a\". Go.")
+
+	term.set("Preparing Hermes for this team (about a minute, once)...\n")
+	h.deliverHermesFirstMessage("team-a", name)
+	time.Sleep(300 * time.Millisecond)
+	term.mu.Lock()
+	assert.Zero(t, term.readopted, "not while Hermes is still preparing: the record is made from what runs once it is up")
+	term.mu.Unlock()
+
+	term.set("Welcome to Hermes Agent! Type your message or /help for commands.\n")
+	require.Eventually(t, func() bool {
+		for _, s := range sentTo(mock, name) {
+			if strings.Contains(s, "automatically joined") {
+				return true
+			}
+		}
+		return false
+	}, 5*time.Second, 20*time.Millisecond, "typed once the record is made again")
+	term.mu.Lock()
+	defer term.mu.Unlock()
+	assert.Equal(t, 1, term.readopted)
+	assert.Equal(t, []bool{true}, term.atWelcome)
 }

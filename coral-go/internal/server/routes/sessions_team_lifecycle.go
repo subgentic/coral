@@ -65,6 +65,11 @@ func (h *SessionsHandler) KillTeam(w http.ResponseWriter, r *http.Request) {
 		h.terminal.KillSession(ctx, ls.AgentName, ls.AgentType, ls.SessionID)
 		removeBoardStateFile(ls.AgentName, h.cfg)
 		agent.CleanupTempFiles(ls.SessionID)
+		team := ""
+		if ls.BoardName != nil {
+			team = *ls.BoardName
+		}
+		h.removeHermesHome(ls.AgentType, team, ls.SessionID)
 		killed++
 	}
 

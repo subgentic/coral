@@ -635,6 +635,7 @@ func (h *SessionsHandler) restartRecord(ctx context.Context, p *restartPlan) {
 			return ptr.NonEmpty(p.permMode) // the mode it restarted in is recorded, so the next restart knows it (#10297)
 		}(),
 	})
+	h.removeReplacedHermesHome(p.stored, p.board, p.req.SessionID) // the agent has a new session id, so a home of its own: the old one is no longer anyone's
 	if p.chiefMode != "" {
 		h.ss.SetSetting(ctx, "chief_session", p.newSessionID) // Chief is still the recorded agent after its restart: the next restart finds it
 	}

@@ -130,6 +130,7 @@ func (h *SessionsHandler) Kill(w http.ResponseWriter, r *http.Request) {
 	// live, by its own id (#3598).
 	if sessionFound {
 		agent.CleanupTempFiles(body.SessionID)
+		h.removeHermesHome(body.AgentType, boardName, body.SessionID)
 	}
 
 	// Sleeping agents have no tmux session (it was terminated when they were

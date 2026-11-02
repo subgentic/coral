@@ -7,6 +7,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/subgentic/coral/internal/tmux"
 )
 
 // Board notices are typed only into the session's recorded agent CLI process (#389). "The agent's shell is not idle" is not enough: a nested shell, a program in it, or a CLI started
@@ -152,4 +154,33 @@ func noticePaused(name, what, why string, wait bool) (bool, string) {
 		noteSkipped(AutomatedInput{Name: name, What: what}, SkipNotAgent+" ("+why+")")
 	}
 	return true, why
+}
+
+// agentReadopter is a terminal that can start the watch for its pane's agent process again (tmux and the pseudo-terminals).
+type agentReadopter interface {
+	ReadoptAgent(ctx context.Context, name, agentType, sessionID string)
+}
+
+// ReadoptLostAgent records a pane's agent process again, when the record it had is gone or was never made. It is for an agent that said it is ready (Hermes's welcome line): its launch line ran another program first
+// (Hermes prepares a new home for about a minute, #11936), and the watch that follows a launch line took that program for the agent and gave up after 20 s, so when it ended notices stayed paused though the agent
+// was running. It does nothing for a good record, one being made, a pane whose foreground is not one program of the pane's own, or a terminal that cannot tell: the record is only ever made from the pane's one
+// foreground program, as after a launch.
+func ReadoptLostAgent(ctx context.Context, term SessionTerminal, name, agentType, sessionID string) {
+	if term == nil {
+		return
+	}
+	checker, ok := term.(NoticeTargetChecker)
+	if !ok {
+		return
+	}
+	readopter, ok := term.(agentReadopter)
+	if !ok {
+		return
+	}
+	okNow, wait, why, known := checker.AgentNoticeTarget(ctx, name, agentType, sessionID)
+	if !known || okNow || wait || (why != tmux.ReasonGone && why != tmux.ReasonNotRecorded) {
+		return
+	}
+	slog.Info("recording the agent's process again: the one recorded after its launch line is gone", "session", name, "why", why)
+	readopter.ReadoptAgent(ctx, name, agentType, sessionID)
 }
