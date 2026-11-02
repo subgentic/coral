@@ -244,6 +244,9 @@ func (h *SessionsHandler) commentArtifact(w http.ResponseWriter, r *http.Request
 // WHOLE document (#11444: HTML, pictures, PDFs, tables, video, downloads); only a text-like one takes a comment pointing into its text, and the create route says so.
 func (h *SessionsHandler) commentArtifactKind(w http.ResponseWriter, r *http.Request) (id string, textLike, ok bool) {
 	id = chi.URLParam(r, "id")
+	if strings.HasPrefix(id, "goal:") { // a goal's thread (#11955): the same routes, a goal in the place of a file
+		return id, false, h.goalCommentSubject(w, r, id)
+	}
 	if len(id) != 64 || strings.ToLower(id) != id {
 		errBadRequest(w, "invalid artifact id")
 		return "", false, false
@@ -607,6 +610,9 @@ func (h *SessionsHandler) createArtifactComment(w http.ResponseWriter, r *http.R
 		}
 	} else if !readJSONBody(w, r, 3*store.MaxArtifactCommentBody, &in) {
 		return
+	}
+	if team := goalTeamOf(r); team != "" {
+		in.Board = team // a goal comment belongs to the goal's team, whatever the request says (#11955)
 	}
 	if in.Board != "" && !commentBoardRe.MatchString(in.Board) {
 		errBadRequest(w, "invalid board")
