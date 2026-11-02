@@ -273,10 +273,7 @@ func (a *PiAgent) LaunchCommand(params LaunchParams) (string, error) {
 	}
 
 	// Action prompt as positional argument
-	cliPrompt := BuildBoardActionPrompt(params.boardPromptName(), params.Role, params.Prompt, params.PromptOverrides, params.BoardType)
-	if cliPrompt == "" {
-		cliPrompt = params.Prompt
-	}
+	cliPrompt := params.startMessage()
 	if cliPrompt != "" {
 		cliPrompt = guardPositionalPrompt(cliPrompt)
 		arg := files.promptArg("pi_prompt", params.SessionID, "txt", "", cliPrompt)

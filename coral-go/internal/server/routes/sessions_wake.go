@@ -23,7 +23,13 @@ import (
 // wakeLocks makes the wakes of one session happen one at a time (#12291): each is a launch line with a token of its own, and a second token revokes the first.
 var wakeLocks sync.Map // session id -> *sync.Mutex
 
-func (h *SessionsHandler) wakeExistingSession(ctx context.Context, ls *store.LiveSession) (err error) {
+func (h *SessionsHandler) wakeExistingSession(ctx context.Context, ls *store.LiveSession) error {
+	return h.wakeSession(ctx, ls, false)
+}
+
+// wakeSession is wakeExistingSession; noStartPrompt starts the resumed CLI without its first message (an auto-asleep agent woken by a delivery: what woke it already says what to do, #12358). Every other wake
+// sends the starting prompt as it always did.
+func (h *SessionsHandler) wakeSession(ctx context.Context, ls *store.LiveSession, noStartPrompt bool) (err error) {
 	// One wake of a session at a time, and the one that waited finds it awake and does nothing (#12291, the Beta Tester pressed Wake several times after Sleep Team): a second wake of a row it read
 	// while it was still asleep built a second launch line, whose new token revoked the first agent's (every coral-board call answered 401), and typed it into the terminal the first had made.
 	if ls.IsSleeping == 1 {
@@ -54,7 +60,7 @@ func (h *SessionsHandler) wakeExistingSession(ctx context.Context, ls *store.Liv
 			h.watchWakeToken(ls)                             // a few seconds on, did the agent get its token, and is it still the live one (#12291)
 		}
 	}()
-	plan, err := h.prepareWake(ctx, ls)
+	plan, err := h.prepareWake(ctx, ls, noStartPrompt)
 	if err != nil {
 		return err
 	}
@@ -79,7 +85,7 @@ type wakePlan struct {
 	backend, sessionName, logFile, boardName, displayName string
 }
 
-func (h *SessionsHandler) prepareWake(ctx context.Context, ls *store.LiveSession) (*wakePlan, error) {
+func (h *SessionsHandler) prepareWake(ctx context.Context, ls *store.LiveSession, noStartPrompt bool) (*wakePlan, error) {
 	flags := wakeFlags(ls)
 	prompt := ptr.Value(ls.Prompt)
 	boardName := ptr.Value(ls.BoardName)
@@ -187,6 +193,8 @@ func (h *SessionsHandler) prepareWake(ctx context.Context, ls *store.LiveSession
 	if ls.AgentType == at.Hermes {
 		launchParams.ResumeSessionID = transcriptlink.HermesSession(h.cfg.CoralDir(), ls.SessionID)
 	}
+	// Only a launch that resumes a conversation can go without its first message: one that starts a new conversation (Codex with no saved session, Hermes with no session of its own) has none to lean on.
+	launchParams.NoStartPrompt = noStartPrompt && launchParams.ResumeSessionID != ""
 	return &wakePlan{agentImpl: agentImpl, params: launchParams, backend: backend, sessionName: sessionName, logFile: logFile, boardName: boardName, displayName: displayName}, nil
 }
 

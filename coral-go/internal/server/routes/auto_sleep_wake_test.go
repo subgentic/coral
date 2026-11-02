@@ -3,12 +3,16 @@ package routes
 import (
 	"context"
 	"fmt"
+	"os"
+	"os/exec"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -211,4 +215,83 @@ func TestAGoneFolderDoesNotUseABoardWakeSlot(t *testing.T) {
 	used := len(autoWakeSlots.m["autosleep"])
 	autoWakeSlots.Unlock()
 	assert.Equal(t, 0, used, "no slot was taken for a wake that could not start")
+}
+
+// promptFilesOf reads the files a typed launch line passes to the CLI as the first message: `"$(cat '<file>')"` after the `--`.
+func promptFilesOf(t *testing.T, r *sleepRig) []string {
+	t.Helper()
+	r.term.mu.Lock()
+	defer r.term.mu.Unlock()
+	var out []string
+	re := regexp.MustCompile(`-- "\$\(cat '([^']+)'\)"`)
+	for _, lines := range r.term.sent {
+		for _, l := range lines {
+			for _, m := range re.FindAllStringSubmatch(l, -1) {
+				b, err := os.ReadFile(m[1])
+				require.NoError(t, err, "the launch line names a prompt file that is there")
+				out = append(out, string(b))
+			}
+		}
+	}
+	return out
+}
+
+// The operator's call (#12358): an auto-asleep agent woken by a delivery is started without its first message, because the delivery that woke it says what to do; a manual Wake sends it as it always did.
+func TestAutoWakeSendsNoStartingPromptAndAManualWakeDoes(t *testing.T) {
+	const first = "UNIQUE-FIRST-PROMPT-TEXT"
+	t.Run("auto wake", func(t *testing.T) {
+		autoWakeSlots.Lock() // the board's hourly cap is process-wide: the other tests' wakes on this board are not this test's
+		delete(autoWakeSlots.m, "autosleep")
+		autoWakeSlots.Unlock()
+		r := newSleepRig(t)
+		_, err := r.ss.SetPrompt(r.ctx, r.sid, ptr.NonEmpty(first))
+		require.NoError(t, err)
+		r.autoSleep(t)
+		require.NoError(t, r.term.mockSessionTerminal.KillSessionOnly(r.ctx, r.name, "claude", r.sid)) // a real sleep ended its terminal: the wake starts a new one
+		require.True(t, r.h.WakeIdleForDelivery(r.ctx, r.sid))
+		launched := promptFilesOf(t, r)
+		require.NotEmpty(t, r.term.sent, "the wake typed a launch line")
+		for _, p := range launched {
+			assert.NotContains(t, p, first, "the first prompt is not sent again")
+			assert.NotContains(t, p, "automatically joined", "nor the board's join text")
+		}
+	})
+	t.Run("manual wake", func(t *testing.T) {
+		r := newSleepRig(t)
+		_, err := r.ss.SetPrompt(r.ctx, r.sid, ptr.NonEmpty(first))
+		require.NoError(t, err)
+		require.NoError(t, r.ss.SetSessionSleeping(r.ctx, r.sid, true))
+		require.NoError(t, r.term.mockSessionTerminal.KillSessionOnly(r.ctx, r.name, "claude", r.sid))
+		ls, err := r.ss.GetLiveSession(r.ctx, r.sid)
+		require.NoError(t, err)
+		require.NoError(t, r.h.wakeExistingSession(r.ctx, ls))
+		files := promptFilesOf(t, r)
+		require.NotEmpty(t, files, "a manual wake passes its first message: %v", r.term.sent)
+		assert.Contains(t, strings.Join(files, "\n"), first, "the first prompt is sent as before")
+	})
+}
+
+// A launch that starts a NEW conversation has none to lean on, so it keeps its first message even on an auto-wake (QA's SHOULD, #12358): Codex with no saved session is started without a resume id.
+func TestAutoWakeOfALaunchThatDoesNotResumeKeepsItsFirstMessage(t *testing.T) {
+	r := newSleepRig(t)
+	truePath, lerr := exec.LookPath("true")
+	if lerr != nil {
+		t.Skip("no true(1) to stand in for the Codex CLI")
+	}
+	require.NoError(t, r.ss.SetSetting(r.ctx, "cli_path_codex", truePath))
+	cx := uuid.NewString()
+	team := "autosleep"
+	require.NoError(t, r.ss.RegisterLiveSession(r.ctx, &store.LiveSession{SessionID: cx, AgentName: "cx", AgentType: "codex", BoardName: &team, WorkingDir: t.TempDir()}))
+	ls, err := r.ss.GetLiveSession(r.ctx, cx)
+	require.NoError(t, err)
+	plan, err := r.h.prepareWake(r.ctx, ls, true)
+	require.NoError(t, err)
+	assert.Empty(t, plan.params.ResumeSessionID, "a Codex agent with no saved conversation is started anew")
+	assert.False(t, plan.params.NoStartPrompt, "so it keeps its first message")
+	claude, err := r.ss.GetLiveSession(r.ctx, r.sid)
+	require.NoError(t, err)
+	plan, err = r.h.prepareWake(r.ctx, claude, true)
+	require.NoError(t, err)
+	assert.NotEmpty(t, plan.params.ResumeSessionID)
+	assert.True(t, plan.params.NoStartPrompt, "a resumed Claude conversation goes without")
 }
