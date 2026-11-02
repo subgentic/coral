@@ -6,7 +6,7 @@ import { serverFilter } from './inbox_servers.js';
 import { defineFilters } from './filter_model.js';
 import { browserLocal } from './safe_storage.js';
 
-export const CLIS = [['claude', 'Claude'], ['codex', 'Codex'], ['agy', 'Antigravity'], ['pi', 'Pi']];
+export const CLIS = [['claude', 'Claude'], ['codex', 'Codex'], ['agy', 'Antigravity'], ['pi', 'Pi'], ['hermes', 'Hermes']];
 const CLI_LABEL = Object.fromEntries(CLIS);
 
 /** The tags' names by id, for the tag chip's words (the page sets them from the counts it has read; an id it does not know reads as Tag). */

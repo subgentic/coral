@@ -28,6 +28,7 @@ export const loginBySession = new Map(); // session_id -> { reason } while the C
 const BLOCKING_TOOLS = {
     AskUserQuestion: "question",
     ask_question: "question",
+    clarify: "question", // Hermes's question to the person (#12170)
     ExitPlanMode: "plan",
 };
 
@@ -58,12 +59,12 @@ function needsInputInfoOf(session) {
     if (login) return { kind: "login", reason: login.reason };
     const pt = pendingToolBySession.get(session.session_id) || null;
     const screen = promptOptionsBySession.get(session.session_id) || null;
-    if (pt && BLOCKING_TOOLS[pt.tool_name]) return { kind: BLOCKING_TOOLS[pt.tool_name], tool: pt, screen };
+    if (pt && BLOCKING_TOOLS[pt.tool_name]) return { kind: BLOCKING_TOOLS[pt.tool_name], tool: pt, screen, summary: askWords(String((row && row.waiting_summary) || "").replace(/^Notification:\s*/, "")) }; // the event's words stay: a question with no options on the screen (Hermes' free-text clarify) is its summary
     if (hasWorkingDisplayHint(row) && !(screen && screen.options.length)) return null;
     if (row.waiting_for_input && row.waiting_kind !== "login") {
         const summary = askWords(String(row.waiting_summary || "").replace(/^Notification:\s*/, ""));
         // The event says it is a question ("Wants to know: ...", or the tool's own name): the card is headed Question, not Permission needed (#10195).
-        return { kind: /^(Wants to know:|Has a question for you$)/.test(summary) ? "question" : "permission", tool: pt, screen, summary };
+        return { kind: /^(Wants to know:|Has a question for you$)/.test(summary) || (screen && screen.kind === "question") ? "question" : "permission", tool: pt, screen, summary };
     }
     if (readsPromptsFromScreen(session) && screen && screen.options.length) return { kind: pt ? "permission" : "prompt", tool: pt, screen };
     if (key === "check_terminal") {

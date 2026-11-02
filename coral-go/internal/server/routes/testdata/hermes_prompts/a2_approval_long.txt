@@ -1,0 +1,50 @@
+│                                                                                                                      │
+│                                  21 tools · 54 skills · /help for commands                                           │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+Welcome to Hermes Agent! Type your message or /help for commands.
+✦ Tip: hermes skills install official/security/1password installs optional skills from the repo.
+
+
+
+────────────────────────────────────────
+❯ RUNDANGER short one
+────────────────────────────────────────
+
+⚠ Approval: rm -rf /home/tester/dangerdir → denied
+
+✗ $ rm -rf /home/tester/dangerdir  8.7s [You denied this command — it did not run.]
+
+────────────────────────────────────────
+☤ Hermes
+HERMES_TEST_REPLY
+────────────────────────────────────────
+
+─ 16.2s · 7:10 AM
+
+
+────────────────────────────────────────
+❯ RUNDANGERLONG second
+────────────────────────────────────────
+╭──────────────────────────────────────────────────────────────────╮                                                    
+│ ⚠️   Dangerous Command                                            │
+│                                                                  │                                                    
+│ rm -rf /home/tester/dangerdir/a_long_directory_name_segment_1/a_ │          
+│ long_directory_name_segment_2/a_long_directory_name_segment_3/a_ │
+│ long_directory_name_segment_4/a_long_directory_name_segment_5/a_ │
+│ long_directory_name_segment_6                                    │
+│                                                                  │
+│ ❯ 1. Allow once                                                  │
+│   2. Allow for this session                                      │
+│   3. Add to permanent allowlist                                  │
+│   4. Deny                                                        │
+│   5. Show full command                                           │
+│                                                                  │
+│ recursive delete                                                 │
+╰──────────────────────────────────────────────────────────────────╯
+
+  ↑/↓ to select, Enter to confirm  (287s)
+── ⠙ 💻 rm -rf /home/tester/dangerdir/a_long_directory_name_segment_1/a_long_directory_name_segment_2/a_long_director...
+⚠ ❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ ☤ stub-model · 10/256K · [░░░░░░░░░░] 0% · ◷ 0.0s · ↑ 168 t/s · 1m · ⏱ 13s · ~/work (master) 

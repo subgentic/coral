@@ -171,7 +171,7 @@ export async function sendPromptAnswer(card, n, label, action, text) {
             // A box of a multi-select question: nothing is answered. The card shows the screen the server
             // read after the toggle (the mark it confirmed), never a mark flipped here (#5232).
             const po = (await resp.json().catch(() => null) || {}).prompt_options;
-            if (po) promptOptionsBySession.set(session.session_id, { title: po.title || "", question: po.question || "", options: po.options || [], review: po.review || [], multi: !!po.multi, submit: po.submit || null });
+            if (po) promptOptionsBySession.set(session.session_id, { title: po.title || "", question: po.question || "", kind: po.kind || "", target: po.target || "", only_reject: po.only_reject === true, note: po.note || "", options: po.options || [], review: po.review || [], multi: !!po.multi, submit: po.submit || null });
             const container = document.getElementById("live-history-messages");
             if (container) syncNeedsInputCard(container, session);
             controls.forEach(c => { c.disabled = false; });

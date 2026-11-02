@@ -144,6 +144,7 @@ export function presetEnforcement(agentType, caps, permMode) {
 export function defaultPermissionMode(settings, agentType) {
     const saved = settings && settings.default_permission_mode;
     if (saved) return saved;
+    if (agentType === 'hermes') return 'default'; // Hermes asks before a dangerous command unless --yolo: the safe mode is its default, as the server's is (DefaultLaunchPermissionMode, #12169)
     return !agentType || agentType === 'claude' || agentType === 'codex' ? 'auto' : 'bypassPermissions';
 }
 

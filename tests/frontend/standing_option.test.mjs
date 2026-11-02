@@ -27,6 +27,7 @@ for (const [opts, apart] of [
     [['Yes', "Yes, and don't ask again for go test commands", 'No'], ["Yes, and don't ask again for go test commands"]],
     [['Allow once', 'Allow for this session', 'Allow for all future sessions', 'No'], ['Allow for this session', 'Allow for all future sessions']],
     [['Yes, proceed (y)', "Yes, and don't ask again for this command (p)", 'No, and tell Codex what to do differently (esc)'], ["Yes, and don't ask again for this command (p)"]],
+    [['Allow once', 'Allow for this session', 'Add to permanent allowlist', 'Deny'], ['Allow for this session', 'Add to permanent allowlist']], // Hermes's dangerous-command menu (#12170)
     [['Yes', 'No'], []],
 ]) assert.deepEqual(standingOptions(opts.map(label => ({ label }))).map(o => o.label), apart, opts.join(' | '));
 // the bar of a card never holds a standing label

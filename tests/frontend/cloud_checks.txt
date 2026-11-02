@@ -69,6 +69,7 @@ node below_minimum.test.mjs
 node dom_morph_append.test.mjs
 node modal_chrome.test.mjs
 node launch_state.test.mjs
+node launch_agent_pick_slow_probe.test.mjs
 node restart_stage.test.mjs
 node image_composer.test.mjs
 node css_unused.test.mjs
