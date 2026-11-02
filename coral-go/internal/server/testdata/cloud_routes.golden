@@ -34,7 +34,6 @@ DELETE /api/themes/{name} never
 DELETE /api/upload/{name} never
 DELETE /api/views/{id} never
 DELETE /api/workflows/{workflowID} never
-GET /api/activity never
 GET /api/agent-docs never
 GET /api/agent-docs/all never
 GET /api/agent-docs/{name} never
@@ -384,6 +383,7 @@ POST /api/sessions/live/{name}/answer-prompt interact
 POST /api/sessions/live/{name}/attach launch
 POST /api/sessions/live/{name}/auto-accept/disable interact
 POST /api/sessions/live/{name}/auto-accept/enable launch
+POST /api/sessions/live/{name}/auto-sleep interact
 POST /api/sessions/live/{name}/context-window never
 POST /api/sessions/live/{name}/dismiss-wait interact
 POST /api/sessions/live/{name}/events never

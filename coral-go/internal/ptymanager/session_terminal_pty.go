@@ -393,3 +393,16 @@ func (p *PTYSessionTerminal) AttachCommand(_ string) string {
 // Verify interface compliance at compile time.
 var _ SessionTerminal = (*PTYSessionTerminal)(nil)
 var _ SessionTerminal = (*TmuxSessionTerminal)(nil)
+
+// PanePID is the pid of the process the session's pseudo-terminal started (PanePIDer): known where the terminal says it (Unix), an error where it does not (Windows ConPTY).
+func (p *PTYSessionTerminal) PanePID(_ context.Context, name, agentType, sessionID string) (int, error) {
+	for _, s := range p.backend.ListSessions() {
+		if s.SessionID == sessionID {
+			if pid, ok := p.backend.ShellPIDOf(s.AgentName); ok {
+				return pid, nil
+			}
+			break
+		}
+	}
+	return 0, fmt.Errorf("the terminal does not name its process")
+}

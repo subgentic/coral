@@ -605,6 +605,8 @@ const (
 	StartFailureCLIMissing     = "cli_missing"         // the CLI is on neither PATH nor a common place
 	StartFailureUntrustedMount = "cli_untrusted_mount" // Windows will not open a folder on PATH or the CLI's own (#340)
 	StartFailureCLIPath        = "cli_path_unusable"   // the configured Settings > CLI paths entry can't be run (#115)
+	StartFailureFolderGone     = "folder_gone"         // an auto-asleep agent's folder is gone: it is not woken (#12111)
+	StartFailureWakeFailed     = "wake_failed"         // a delivery's wake of an auto-asleep agent did not start it (#12111)
 )
 
 // SleepReasonCoralStopped: the agent was running when a pty Coral stopped (cleanly, or a crash
@@ -692,7 +694,7 @@ func (s *SessionStore) GetSleepingBoardNames(ctx context.Context) ([]string, err
 	var names []string
 	err := s.reader().SelectContext(ctx, &names,
 		`SELECT board_name FROM live_sessions WHERE board_name IS NOT NULL AND status = 'active'
-		 GROUP BY board_name HAVING COUNT(*) = SUM(CASE WHEN is_sleeping = 1 THEN 1 ELSE 0 END)`)
+		 GROUP BY board_name HAVING COUNT(*) = SUM(CASE WHEN is_sleeping = 1 AND COALESCE(sleep_reason, '') != 'idle' THEN 1 ELSE 0 END)`) // an auto-asleep agent keeps its board awake: a pause would hold the delivery that wakes it (#12111)
 	if err != nil {
 		return nil, err
 	}

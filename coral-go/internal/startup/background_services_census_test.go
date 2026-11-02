@@ -17,7 +17,7 @@ import (
 // and lists the first argument of each safeGo, safego.Go and safego.Restart call. Splitting the function into groups must leave this list as it is:
 // a service dropped, started twice, or started in another order (the scheduler before the board notifier, the workflow runner last) fails here.
 var startedServices = []string{
-	"cloud_connector", "remote_agents", "comment_reply_nudges", "git_poller", "session_indexer", "job_scheduler", "board_notifier", "board_health_monitor", "health_nudges",
+	"cloud_connector", "remote_agents", "comment_reply_nudges", "auto_sleep", "git_poller", "session_indexer", "job_scheduler", "board_notifier", "board_health_monitor", "health_nudges",
 	"task_reminders", "remote_board_poller", "batch_summarizer", "goal_generator", "session_reconciler", "token_poller",
 	"call_metrics_retention", "token_usage_retention", "token_usage_hour_agg", "db_optimize", "db_integrity", "startup/auto_wake",
 	"uploads_retention", "artifact_retention", "dialog_watch", "thinking_tracker",

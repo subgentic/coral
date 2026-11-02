@@ -28,6 +28,8 @@ var systemPostAllowed = map[string]struct {
 	"routes/auto_review.go autoDelegateReview":          {3, "reviewer names through teamhealth.Name, task numbers, fixed words"},
 	"routes/auto_review.go healthBudgetReached":         {1, "a live @orchestrator and a number"},
 	"routes/auto_wake.go sendAutoWakeNotice":            {1, "a live @title and a constant sentence"},
+	"routes/auto_sleep.go noteFirstAutoSleep":           {1, "the agent's cleaned name (noticeName), a number of minutes and fixed words"},
+	"routes/auto_sleep_wake.go autoWakeFailed":          {1, "a live @title and startFailureSentence's fixed text"},
 	"routes/orchestrator_agents.go sayLifecycle":        {1, "the seat's and the target's names (cleaned, no @, cut at 60) and a fixed sentence: no stored text is quoted (#11432)"},
 	"routes/orchestrator_agents.go tellWoken":           {1, "a live @member of the board (cleaned) and one constant sentence: never any text of the caller's (#11432)"},
 	"routes/board_goal_requests.go wakeForGoalRequest":  {1, "Coral's own how-to sentence with a request number"},

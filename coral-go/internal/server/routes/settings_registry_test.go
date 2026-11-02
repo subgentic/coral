@@ -58,6 +58,8 @@ var settingRows = map[string]struct{ good, bad string }{
 	"chief_page":                  {`"true"`, `"nope"`},
 	"chief_actions":               {`"act"`, `"bypassPermissions"`},
 	"goal_done_hidden":            {`"[\"team|1|2\"]"`, `true`},
+	"goal_done_read":              {`"[\"team|1|2\"]"`, `true`},
+	"goal_done_quiet_minutes":     {`30`, `-1`},
 	"chief_team":                  {`"chief"`, `true`},
 	"chief_session":               {`"11111111-2222-4333-8444-555555555555"`, `true`},
 	"chief_name":                  {`"Ada"`, `true`},
@@ -80,7 +82,7 @@ var settingRows = map[string]struct{ good, bad string }{
 	"group_order":                 {`"[]"`, `"x"`},
 }
 
-var validatedElsewhere = []string{"agent_priority", "auto_goals", "auto_resume_after_api_error", "auto_wake_after_restart", "auto_wake_cap",
+var validatedElsewhere = []string{"agent_priority", "auto_goals", "auto_resume_after_api_error", "auto_wake_after_restart", "auto_wake_cap", "auto_sleep", "auto_sleep_idle_minutes",
 	"require_auth_on_loopback", "artifact_store_max_bytes", "artifact_retention_days", "artifact_retention_kinds",
 	"received_artifacts_max_bytes", "received_cap_notice_ack",
 	"hub_limit_global", "hub_limit_long", "hub_limit_search"}

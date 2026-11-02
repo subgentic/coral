@@ -12,7 +12,8 @@ function normalizeComment(c) {
     return {
         id: c.id, parentId: c.parent_id == null ? null : c.parent_id, anchor: c.anchor || { whole: true }, body: String(c.body == null ? '' : c.body),
         authorId: who.subject || '', authorName: who.name || '', authorKind: who.kind || '',
-        createdAt: c.created_at || '', editedAt: c.edited_at || '', resolved: !!c.resolved_at, resolvedBy: c.resolved_by ? (c.resolved_by.subject || '') : '', deleted: !!c.deleted, mine: !!c.mine,
+        createdAt: c.created_at || '', editedAt: c.edited_at || '', resolved: !!c.resolved_at, resolvedBy: c.resolved_by ? (c.resolved_by.subject || '') : '', deleted: !!c.deleted, mine: !!c.mine, sentTo: String(c.sent_to || ''), // sentTo: the agents the owner's new comment or reply was sent to on its own (#12203), on the answer to its creation only
+       
         can: { reply: !!can.reply, edit: !!can.edit, delete: !!can.delete, resolve: !!can.resolve },
         asks: Array.isArray(c.asks) ? c.asks.map(k => ({ agent: String(k.agent || ''), open: !!k.open, replies: Math.max(0, Number(k.replies) || 0), seen: !!k.seen, nudged: !!k.nudged })) : [], // the agents asked into this thread, on the owner's list only (#6462)
         // the artifact (version) the comment was written on, and, read with series=1 for a later version, where its text stands in the version on show: found, ambiguous, gone or unchecked (#6459)

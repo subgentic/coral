@@ -103,7 +103,7 @@ const TURNS = [{ timestamp: day(7) + 'T14:12:00.000Z', model: 'claude-fable-5-1'
                 await waitFor(`document.querySelectorAll('#cost-operator .atab-legend li').length === 7`, 'seven kinds', 8000);
                 assert.equal(await ev(`document.querySelectorAll('#cost-operator .atab-pending').length`), 0);
                 assert.ok(await ev(`!!document.querySelector('#cost-operator .atab-trend svg path.atab-line')`), 'the autonomy line is drawn');
-                assert.match(await text('#cost-operator .atab-trend'), /touches per task done in the 7 days to .*, against .* in the 7 days to .*Fewer is more autonomy/);
+                assert.match(await text('#cost-operator .atab-trend'), /tasks done per touch in the 7 days to .*, against .* in the 7 days to .*More is more autonomy/);
                 const nd = ACTIVITY.days.length;
                 const typedTile = await ev(`(() => { const t = [...document.querySelectorAll('#cost-operator .atab-kpi')].find(k => /Typed to agents/.test(k.textContent)); return t ? t.textContent.replace(/\\s+/g, ' ').trim() : ''; })()`);
                 assert.ok(typedTile.startsWith('Typed to agents' + (nd * 3) + 'in') && /chat or terminal/.test(typedTile), 'the typed tile counts the typing, ' + nd + ' days of 3: ' + typedTile);

@@ -5,6 +5,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/subgentic/coral/internal/proxy"
 	"github.com/subgentic/coral/internal/ptymanager"
@@ -46,6 +47,7 @@ func (s *Server) configureBoardHandlers(h *routeHandlers) (*routes.BoardHandler,
 	boardHandler.SetLiveSessionLookup(routes.LiveSessionLookup(store.NewSessionStore(s.db)))
 	boardHandler.SetSessionAsleepLookup(routes.SessionAsleepLookup(store.NewSessionStore(s.db)))
 	boardHandler.SetNeedsYouAgents(sessHandler.NeedsYouAgents)
+	boardHandler.SetIdleWaker(sessHandler.WakeIdleForDelivery) // any typed delivery to an auto-asleep agent wakes it first (#12111)
 	boardHandler.SetSessionThinkingLookup(routes.SessionThinkingLookup(store.NewSessionStore(s.db)))
 	boardHandler.SetTaskArtifactWriter(s.cfg.CoralDir(), sessHandler.PersistTaskChanges)
 	sessStore := store.NewSessionStore(s.db)
@@ -58,6 +60,31 @@ func (s *Server) configureBoardHandlers(h *routeHandlers) (*routes.BoardHandler,
 			return nil
 		}
 		return routes.GoalDoneHiddenFrom(st)
+	})
+	boardHandler.SetGoalDoneQuiet(func(ctx context.Context) time.Duration {
+		st, err := sessStore.GetSettings(ctx)
+		if err != nil {
+			return 15 * time.Minute
+		}
+		return routes.GoalDoneQuietFrom(st)
+	})
+	boardHandler.SetGoalDoneRead(func(ctx context.Context) []string {
+		st, err := sessStore.GetSettings(ctx)
+		if err != nil {
+			return nil
+		}
+		return routes.GoalDoneReadFrom(st)
+	})
+	boardHandler.SetCommentNews(func(ctx context.Context) (map[string]int, error) { // replies agents left in the Operator's comment threads that they have not opened, per file (#12026)
+		replies, err := sessStore.UnseenAgentReplies(ctx)
+		if err != nil {
+			return nil, err
+		}
+		news := map[string]int{}
+		for _, rp := range replies {
+			news[rp.ArtifactID] += rp.Count
+		}
+		return news, nil
 	})
 	artifactNudger := routes.NewClaudeArtifactNudger(sessStore, s.terminal)
 	boardHandler.SetArtifactNudger(artifactNudger)
@@ -146,7 +173,6 @@ func (s *Server) registerBoardMessageRoutes(r chi.Router, boardHandler *routes.B
 	r.Post("/api/board/{project}/clashes", boardHandler.FileClash)                                             // #11457, S6: an agent files two people's different directions; Coral asks the Operator to decide
 	r.Get("/api/board/{project}/guide-asks", boardHandler.GuideAsks)                                           // #11457: the questions put to a guide (the guide's own label, from the connector's stamp)
 	r.Get("/api/operator-asks", boardHandler.OperatorAsks)                                                     // the questions agents asked the Operator (post --ask, wait --operator), for Needs you (#11417)
-	r.Get("/api/activity", boardHandler.ListActivity)                                                          // the Activity record of what the Operator did in Needs you (#12069): the Operator's alone, local, never through the Hub (not in the tunnel table)
 	r.Get("/api/needs-you", boardHandler.NeedsYou)                                                             // what waits for the Operator, in one read, for the Hub's phone push (#11596): the owner's alone
 	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/asks/{messageID}/close", boardHandler.CloseAsk) // close a question answered elsewhere (ask close, #11417)
 	r.Post("/api/board/{project}/asks/{messageID}/buttons/{buttonID}/claim", boardHandler.ClaimAskButton)      // the Operator's click on a button an agent declared on a question: claims it once, answers with the stored action (#11643)

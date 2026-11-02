@@ -24,7 +24,7 @@ func TestTeamAvailabilityQueuesAndRuntime(t *testing.T) {
 	ctx := context.Background()
 	team := "routing"
 	ids := map[string]string{}
-	for _, name := range []string{"free", "board-busy", "personal-busy", "queued", "working", "input", "sleeping", "offline", "unknown"} {
+	for _, name := range []string{"free", "board-busy", "personal-busy", "queued", "working", "input", "sleeping", "autoasleep", "offline", "unknown"} {
 		sid := uuid.NewString()
 		ids[name] = sid
 		s := &store.LiveSession{SessionID: sid, AgentName: name, AgentType: "claude", BoardName: &team, WorkingDir: "/tmp"}
@@ -32,6 +32,9 @@ func TestTeamAvailabilityQueuesAndRuntime(t *testing.T) {
 			s.IsSleeping = 1
 		}
 		require.NoError(t, ss.RegisterLiveSession(ctx, s))
+		if name == "autoasleep" {
+			require.NoError(t, ss.SetSessionAutoSleeping(ctx, sid, time.Now()))
+		}
 		_, err := h.bs.Subscribe(ctx, team, name, "Developer", "claude-"+sid, nil, "all")
 		require.NoError(t, err)
 		if name != "offline" {
@@ -77,16 +80,16 @@ func TestTeamAvailabilityQueuesAndRuntime(t *testing.T) {
 		Summary    map[string]int     `json:"summary"`
 	}
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &result))
-	expected := map[string]string{"free": "available", "board-busy": "task_idle", "personal-busy": "task_idle", "queued": "queued", "working": "busy", "input": "needs_input", "sleeping": "sleeping", "offline": "offline", "unknown": "unknown"}
+	expected := map[string]string{"free": "available", "board-busy": "task_idle", "personal-busy": "task_idle", "queued": "queued", "working": "busy", "input": "needs_input", "sleeping": "sleeping", "autoasleep": "available", "offline": "offline", "unknown": "unknown"}
 	require.Len(t, result.Agents, len(expected))
 	for _, a := range result.Agents {
 		require.Equal(t, expected[a.Name], a.Availability, a.Name)
-		require.Equal(t, a.Name == "free", a.Available, a.Name)
+		require.Equal(t, a.Name == "free" || a.Name == "autoasleep", a.Available, a.Name)
 		if a.Name == "free" {
 			require.Equal(t, "Free: nothing to do", a.Reason, "a free agent says so in plain words (#10371), not as a log line")
 		}
 	}
-	require.Equal(t, 1, result.Summary["available"])
+	require.Equal(t, 2, result.Summary["available"], "the free agent and the auto-asleep one")
 	require.Len(t, result.Unassigned, 1)
 	require.Equal(t, "no-store", w.Header().Get("Cache-Control"))
 	other := httptest.NewRecorder()
@@ -487,4 +490,28 @@ func TestAvailabilityTaskNamesWhatItWaitsOn(t *testing.T) {
 	require.Empty(t, byID[across.ID].WaitingOn, "a blocker on another board is not a task of this one")
 	require.Equal(t, []availabilityBlocker{{BoardID: "coral-hub", ID: other.ID}}, byID[across.ID].WaitingOnElsewhere, "it is named with its board")
 	require.Empty(t, byID[waiting.ID].WaitingOnElsewhere, "a blocker on this board is not elsewhere")
+}
+
+// #12081: after Kill All the team header still said "1 needs attention" with no agent left: the Orchestrator's registered wait outlived its session, and a subscriber with a wait and no session counted as waiting.
+func TestAWaitWhoseSessionIsGoneIsOfflineNotWaiting(t *testing.T) {
+	_, h, _, _ := setupSessionsTestServer(t)
+	ctx := context.Background()
+	team := "killed-team"
+	_, err := h.bs.Subscribe(ctx, team, "Boss", "Orchestrator", "claude-gone-session", nil, "all")
+	require.NoError(t, err)
+	_, err = h.bs.RegisterWait(ctx, team, "Boss", "claude-gone-session", "message", "Operator", "waiting for the answer", 10*time.Minute)
+	require.NoError(t, err)
+	router := chi.NewRouter()
+	router.Get("/api/teams/detail/{name}/availability", h.TeamAvailability)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, httptest.NewRequest("GET", "/api/teams/detail/killed-team/availability", nil))
+	require.Equal(t, 200, w.Code)
+	var result struct {
+		Agents  []availableAgent `json:"agents"`
+		Summary map[string]int   `json:"summary"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &result))
+	require.Len(t, result.Agents, 1)
+	require.Equal(t, "offline", result.Agents[0].Availability, "its session is gone: nobody is there to need anything")
+	require.Equal(t, 0, result.Summary["waiting"])
 }

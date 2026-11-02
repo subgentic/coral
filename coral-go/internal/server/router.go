@@ -458,6 +458,7 @@ func (s *Server) registerSessions(r *chi.Mux, h *routeHandlers) {
 	r.With(routes.RedactSignInLink).Post("/api/sessions/live/{name}/pending-tool", sessHandler.SetPendingTool)
 	r.Post("/api/sessions/live/{name}/answer-prompt", sessHandler.AnswerPrompt)
 	r.Post("/api/sessions/live/{name}/dismiss-wait", sessHandler.DismissWait)
+	r.Post("/api/sessions/live/{name}/auto-sleep", sessHandler.AutoSleepOpt)
 	r.Get("/api/sessions/live/{name}/events/counts", sessHandler.EventCounts)
 	r.Delete("/api/sessions/live/{name}/events", sessHandler.ClearEvents)
 	r.Post("/api/sessions/live/{name}/token-usage", sessHandler.RecordTokenUsage)
@@ -546,11 +547,6 @@ func (s *Server) registerCloud(r *chi.Mux) {
 	if s.boardStore != nil {
 		touchPrune := background.NewOperatorTouchPrune(s.boardStore)
 		s.goBackground(func(ctx context.Context) { _ = touchPrune.Run(ctx) }) // touches older than 90 days (#11225)
-	}
-	// the Activity record is trimmed to a year or 50,000 rows, daily, with the count logged (#12069)
-	if s.boardStore != nil {
-		activityTrim := background.NewActivityTrim(s.boardStore)
-		s.goBackground(func(ctx context.Context) { _ = activityTrim.Run(ctx) })
 	}
 	// a park whose end passed gives its task the slot back: settled for the reads that do not settle it themselves (#11659)
 	if s.boardStore != nil {

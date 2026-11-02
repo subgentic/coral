@@ -385,3 +385,43 @@ func (h *SessionsHandler) DismissAutoWake(w http.ResponseWriter, r *http.Request
 	h.autoWake.set(func(s *autoWakeStatus) { s.Pending, s.State = nil, "done" })
 	writeJSON(w, http.StatusOK, h.autoWake.snapshot())
 }
+
+// validateAutoSleepSettings checks the two auto-sleep settings in a settings PUT (#12111, Security): a boolean, and a whole number of minutes from 15 to 1440, parsed here and stored as a plain
+// integer string, never trusted from the page. Values are normalised to strings.
+func validateAutoSleepSettings(body map[string]any) error {
+	const minsMsg = setreg.AutoSleepIdleMinutes + " must be a whole number from 15 to 1440"
+	if v, ok := body[setreg.AutoSleep]; ok {
+		switch x := v.(type) {
+		case bool:
+			body[setreg.AutoSleep] = strconv.FormatBool(x)
+		case string:
+			if x != "true" && x != "false" {
+				return errors.New(setreg.AutoSleep + " must be true or false")
+			}
+		default:
+			return errors.New(setreg.AutoSleep + " must be true or false")
+		}
+	}
+	if v, ok := body[setreg.AutoSleepIdleMinutes]; ok {
+		var n int
+		switch x := v.(type) {
+		case float64:
+			if x != float64(int(x)) {
+				return errors.New(minsMsg)
+			}
+			n = int(x)
+		case string:
+			var err error
+			if n, err = strconv.Atoi(strings.TrimSpace(x)); err != nil {
+				return errors.New(minsMsg)
+			}
+		default:
+			return errors.New(minsMsg)
+		}
+		if n < 15 || n > 1440 {
+			return errors.New(minsMsg)
+		}
+		body[setreg.AutoSleepIdleMinutes] = strconv.Itoa(n)
+	}
+	return nil
+}

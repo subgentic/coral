@@ -35,13 +35,20 @@ const B = 'goal-done-' + Date.now().toString(36);
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         assert.ok((await api('POST', '/subscribe', { subscriber_id: 'Boss', job_title: 'Orchestrator', session_name: 'boss-' + B })).status < 300);
-        await root('PUT', '/api/settings', { goal_done_hidden: '[]' });
+        await root('PUT', '/api/settings', { goal_done_hidden: '[]', goal_done_quiet_minutes: '' }); // the default quiet period (15 minutes, #12161) first
         const mk = async (title, doneWhen) => { const g = await api('POST', '/goals', { subscriber_id: 'Operator', title, done_when: doneWhen }); assert.equal(g.status, 201); return g.json.id || g.json.goal.id; };
         const gid = await mk('Ship the pilot', 'it is shipped');
         await task(gid, true);
         const openGoal = await mk('Still going', 'later'); await task(openGoal, true); await task(openGoal, false);
         await mk('No tasks yet', '');
 
+        // #12161 (the Operator): its tasks are all done, but the last one was finished moments ago: the driver has 15 minutes to add the next tasks, so it is not the Operator's item yet: not in the list, and not in
+        // /api/needs-you (the count and the phone push). A suite does not wait 15 minutes: the setting goal_done_quiet_minutes says 0, and the goal is there at once.
+        await openNeeds();
+        await require('./helpers/wait').settle(ev, 600, 300);
+        assert.equal((await doneRows()).length, 0, 'inside its quiet period the goal is not an item of Needs you');
+        assert.ok(!(await root('GET', '/api/needs-you?limit=50')).json.items.some(i => i.id === `goal_done:${B}:${gid}`), 'nor in /api/needs-you');
+        await root('PUT', '/api/settings', { goal_done_quiet_minutes: '0' });
         await openNeeds();
         await waitFor(`/looks done/.test(document.querySelector('${T}')?.textContent || '')`, 'the goal item', 20000);
         let rows = await doneRows();
@@ -65,6 +72,26 @@ const B = 'goal-done-' + Date.now().toString(36);
         await openNeeds();
         await waitFor(`/looks done/.test(document.querySelector('${T}')?.textContent || '')`, 'the item is back after a task was added and finished', 20000);
 
+        // #11983: opening the item reads it: it stays listed and stops counting, in the Inbox number, the badge and /api/needs-you; a task done since has a new total, and it is unread again
+        const unreadBadge = await badge();
+        await ev(`[...document.querySelectorAll('${T} tbody tr')].find(tr => /looks done/.test(tr.textContent)).querySelector('.inbox-review-name').click(); true`);
+        await waitFor(`!!document.querySelector('.goal-view, [data-goal-view], #goal-view') || /goals|goal/i.test(location.hash + location.pathname)`, 'the goal opened', 10000);
+        await openNeeds();
+        await waitFor(`/looks done/.test(document.querySelector('${T}')?.textContent || '')`, 'the opened item is still listed', 20000);
+        await waitFor(`Number((document.getElementById('nav-tab-hub-inbox-badge') || {}).textContent || 0) === ${unreadBadge - 1}`, 'and out of the Inbox number', 10000);
+        assert.equal((await doneRows()).length, 1, 'listed once');
+        assert.ok(await ev(`[...document.querySelectorAll('${T} tbody tr')].find(tr => /looks done/.test(tr.textContent)).classList.contains('dt-read')`), 'the opened row is drawn read (needsUnread, QA #11983)');
+        assert.equal(await ev(`(document.querySelector('${T} .session-group-count') || {}).textContent`), '0', 'the heading counts what the badge counts: nothing unread (needsUnread)');
+        assert.ok(await ev(`[...document.querySelectorAll('button.goals-chip')].some(e => /^All 0 of 1$/.test(e.textContent.trim()))`), 'the All pill says 0 unread of the 1 listed (needsUnread)');
+        const readSaved = JSON.parse((await root('GET', '/api/settings')).json.settings.goal_done_read);
+        assert.equal(readSaved.length, 1);
+        assert.match(readSaved[0], new RegExp(`^${B}\\|${gid}\\|2\\|\\d{4}-\\d\\d-\\d\\dT`), 'kept on the machine at the total and the last change it was opened at: ' + readSaved[0]);
+        assert.ok(!(await root('GET', '/api/needs-you?limit=50')).json.items.some(i => i.id === `goal_done:${B}:${gid}`), 'the phone push and /api/needs-you do not count it either');
+        await task(gid, true);
+        await openNeeds();
+        await waitFor(`Number((document.getElementById('nav-tab-hub-inbox-badge') || {}).textContent || 0) === ${unreadBadge}`, 'unread again after another task was finished', 20000);
+        assert.ok((await root('GET', '/api/needs-you?limit=50')).json.items.some(i => i.id === `goal_done:${B}:${gid}`), 'and in /api/needs-you again');
+
         // Ignore with Undo
         await ev(`[...document.querySelectorAll('${T} tbody tr')].find(tr => /looks done/.test(tr.textContent)).querySelector('button[aria-label^="Ignore"]').click(); true`);
         await waitFor(`!/looks done/.test(document.querySelector('${T}')?.textContent || '')`, 'the item gone after Ignore', 8000);
@@ -84,6 +111,40 @@ const B = 'goal-done-' + Date.now().toString(36);
         await require('./helpers/wait').settle(ev, 600, 300); // the goals were read again when the list opened
         assert.equal((await doneRows()).length, 0, 'gone when the goal closes');
         assert.ok(!(await root('GET', '/api/needs-you?limit=50')).json.items.some(i => i.id === `goal_done:${B}:${gid}`), 'and from the phone-push read');
+        // #12029 (the Mobile Beta Tester): on a phone the row has its title; a long press selects it, and the bar offers Mark read / Mark unread and Ignore (a phone's Needs you row has no buttons: tap opens, long press selects)
+        {
+            const gid2 = await mk('Customers sign up without help', 'Ten customers sign up with no support message'); await task(gid2, true);
+            await root('PUT', '/api/settings', { goal_done_hidden: '[]', goal_done_read: '[]', goal_done_quiet_minutes: '0' });
+            await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
+            await Emulation.setTouchEmulationEnabled({ enabled: true });
+            await openNeeds();
+            await waitFor(`/looks done/.test(document.querySelector('${T}')?.textContent || '')`, 'the goal item on a phone', 20000);
+            const shown = await ev(`(() => {
+                const tr = [...document.querySelectorAll('${T} tbody tr')].find(r => /looks done/.test(r.textContent)); if (!tr) return { error: 'no row' };
+                const title = [...tr.querySelectorAll('*')].find(e => e.children.length === 0 && /looks done: Customers sign up without help/.test(e.textContent)); if (!title) return { error: 'no title element' };
+                title.scrollIntoView({ block: 'center' }); const b = title.getBoundingClientRect(), hit = document.elementFromPoint(b.left + Math.min(20, b.width / 2), b.top + b.height / 2);
+                return { w: Math.round(b.width), h: Math.round(b.height), inView: b.left >= 0 && b.right <= innerWidth, onTop: !!hit && (hit === title || title.contains(hit)) }; // the title itself (or a part of it) is what a finger or an eye meets there: not the row it is clipped inside
+            })()`);
+            assert.ok(shown.w > 40 && shown.h >= 10 && shown.inView && shown.onTop, 'the title is drawn on a phone, not clipped away: ' + JSON.stringify(shown));
+            const touch = (type, p) => client.Input.dispatchTouchEvent({ type, touchPoints: type === 'touchEnd' ? [] : [{ x: p.x, y: p.y, id: 1 }] });
+            const point = () => ev(`(() => { const r = [...document.querySelectorAll('${T} tbody tr')].find(r => /looks done/.test(r.textContent)); r.scrollIntoView({ block: 'center' }); const b = r.getBoundingClientRect(); return { x: b.left + b.width * 0.35, y: b.top + b.height * 0.5 }; })()`);
+            const press = async () => { const p = await point(); await touch('touchStart', p); await new Promise(r => setTimeout(r, 700)); await touch('touchEnd', p); await new Promise(r => setTimeout(r, 300)); }; // sleep-ok: a long press is a held finger
+            await press();
+            const bar = await ev(`(() => { const b = document.querySelector('.dt-bar'); return b ? { count: (b.querySelector('.dt-bar-count, .team-tb-count') || b).textContent.replace(/\\s+/g, ' ').trim(), actions: [...b.querySelectorAll('button')].map(x => ({ label: (x.getAttribute('aria-label') || x.textContent).trim(), off: x.disabled })) } : null; })()`);
+            assert.ok(bar && /1 selected/.test(bar.count), 'a long press selects the goal row: ' + JSON.stringify(bar));
+            const act = label => (bar.actions || []).find(a => a.label === label);
+            assert.ok(act('Ignore') && !act('Ignore').off, 'Ignore is on the bar: ' + JSON.stringify(bar.actions));
+            await ev(`document.querySelector('.dt-bar [aria-label="More actions"]')?.click(); true`);
+            await waitFor(`!![...document.querySelectorAll('.menu-item, [role=menuitem]')].find(b => /^Mark read$/.test(b.textContent.trim()))`, 'Mark read in the bar menu', 5000);
+            await ev(`[...document.querySelectorAll('.menu-item, [role=menuitem]')].find(b => /^Mark read$/.test(b.textContent.trim())).click(); true`);
+            await waitFor(`JSON.parse((window.state || {}).settings?.goal_done_read || '[]').length === 1 || true`, 'settled', 3000).catch(() => {});
+            await require('./helpers/wait').settle(ev, 600, 300);
+            const savedRead = JSON.parse((await root('GET', '/api/settings')).json.settings.goal_done_read);
+            assert.equal(savedRead.length, 1, 'Mark read from the bar kept the goal as read: ' + JSON.stringify(savedRead));
+            assert.ok(!(await root('GET', '/api/needs-you?limit=50')).json.items.some(i => i.id === `goal_done:${B}:${gid2}`), 'and /api/needs-you no longer counts it');
+            await Emulation.setTouchEmulationEnabled({ enabled: false });
+            await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
+        }
         console.log('\nPASS a goal that looks done is one Needs you item: Done-when line, one Inbox number, Close goal, Not yet and Ignore with Undo, kept on the machine');
     } finally { await guard.restore().catch(() => {}); await removeBoards(ev, [B]).catch(() => {}); await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

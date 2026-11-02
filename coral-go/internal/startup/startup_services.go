@@ -203,6 +203,9 @@ func startIndexingServices(ctx context.Context, cfg *config.Config, srv *server.
 	// An artifact comment relayed to an agent that it only answered on the board gets one reminder to answer in the thread (#11722).
 	safeGo(ctx, "comment_reply_nudges", func() { srv.RunCommentReplyNudges(ctx) })
 
+	// An agent idle past the Operator's minutes is put to sleep, and any delivery wakes it (#12111, Settings > auto_sleep).
+	safeGo(ctx, "auto_sleep", func() { srv.RunAutoSleep(ctx) })
+
 	// Git poller. Its cadence is a user setting, re-read before every wait, so
 	// someone on a repository where scanning is slow can stretch it out or
 	// turn it off without restarting.
@@ -271,6 +274,7 @@ func startBoardServices(ctx context.Context, cfg *config.Config, srv *server.Ser
 			ls, err := sessStore.GetLiveSession(ctx, sessionID)
 			return err == nil && ls != nil && ls.IsSleeping == 1
 		})
+		boardNotifier.SetAutoWakeFn(srv.WakeIdleForDelivery)          // a mention, reply or assigned task wakes an auto-asleep agent (#12111)
 		boardNotifier.SetLiftSleepPauseFn(bh.LiftSleepPauseSeenAwake) // a board sleep paused, with an awake agent on it, is resumed by the notifier (#11182)
 		bh.SetNotifyFn(boardNotifier.NotifyBoard)
 	}
@@ -296,6 +300,13 @@ func startBoardServices(ctx context.Context, cfg *config.Config, srv *server.Ser
 		safeGo(ctx, "board_health_monitor", func() { healthMonitor.Run(ctx) })
 		// Coral acts on the mechanical items itself (#4175): claim and status nudges.
 		healthNudges := background.NewHealthNudges(srv.BoardStore(), taskStore, agentRT, discoverFn)
+		healthNudges.SetGoalDoneQuiet(func(ctx context.Context) time.Duration { // the goal that looks done is told to its driver for the minutes the Operator's setting gives (#12161)
+			st, err := sessStore.GetSettings(ctx)
+			if err != nil {
+				return 15 * time.Minute
+			}
+			return time.Duration(setreg.Int(st, setreg.GoalDoneQuietMinutes)) * time.Minute
+		})
 		safeGo(ctx, "health_nudges", func() { healthNudges.Run(ctx) })
 	}
 

@@ -316,7 +316,7 @@ func (h *SessionsHandler) offlineSubscriberStatus(snap *boardStatusSnapshot, nam
 		a.Reason = "Remote agent availability is not observed locally"
 	}
 	a.Tasks = append(a.Tasks, boardTasksAssignedTo(snap.tasks, sub.SubscriberID)...)
-	if wait := snap.waitsBySubscriber[sub.SubscriberID]; wait != nil {
+	if wait := snap.waitsBySubscriber[sub.SubscriberID]; wait != nil && wait.SessionName == "" { // a wait made from a Coral session whose session is gone (Kill All, a crash) is not an agent that needs a person: it is offline (#12081); one made with no session of Coral's is an agent of its own, still waiting
 		a.WaitingOn = wait
 		a.Availability = "waiting"
 		a.Reason = waitingReason(wait)
@@ -492,6 +492,10 @@ func classifyAvailability(a *availableAgent, s store.LiveSession, online, subscr
 		// Never a candidate for work: tasks cannot be assigned to an archived agent.
 		a.Availability = "archived"
 		a.Reason = "Agent is archived; unarchive it before assigning work"
+	case s.IsSleeping != 0 && sleepReason(s) == store.SleepReasonIdle && subscribed: // put to sleep for being idle: a task or a message wakes it (#12111)
+		a.Availability = "available"
+		a.Available = true
+		a.Reason = "Agent is auto-asleep: a task or a message wakes it"
 	case s.IsSleeping != 0:
 		a.Availability = "sleeping"
 		a.Reason = "Agent is sleeping"

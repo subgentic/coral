@@ -131,17 +131,22 @@ export function commModel(activity, { limit = 10 } = {}) {
     return { names, cells, days, agents, tasks, pairs, kpis: { agent: msgs, automated: a.automated_posts == null ? null : a.automated_posts, cross: a.cross_posts == null ? null : a.cross_posts, assigned: a.assigned == null ? null : a.assigned, asks: a.asks || null, busiest: edges[0] || null, tasksDone: done }, truncated: !!a.truncated, empty: !msgs && !(a.cross_posts || 0) && a.agent_posts != null };
 }
 
-/** The autonomy trend: touches per task done over a rolling 7 days, one point a day from the 7th (a window with no task done has no point: it is not a 0). `days` are operatorModel's. */
+/** The autonomy trend: tasks done per Operator touch over a rolling 7 days, one point a day from the 7th; MORE is more autonomy (the Operator's own reading: the bigger it grows the better). A window with no touch has
+ *  no number to divide by: it is a gap marked `untouched` when tasks were done (the best a window can be, said in words, not drawn as a made-up height), and a window with no task and no touch is a gap too. A window with
+ *  touches and no task done is a real 0. `days` are operatorModel's. */
 export function autonomyTrend(days) {
     const points = [];
     for (let i = 6; i < days.length; i++) {
         const win = days.slice(i - 6, i + 1), tasks = win.reduce((n, d) => n + (d.tasks || 0), 0);
         const touches = win.reduce((n, d) => n + Object.values(d.values).reduce((x, v) => x + v, 0), 0);
-        points.push({ label: days[i].label, value: tasks > 0 ? touches / tasks : null, touches, tasks });
+        points.push({ label: days[i].label, value: touches > 0 ? tasks / touches : null, touches, tasks, untouched: touches === 0 && tasks > 0 });
     }
     const done = points.filter(p => p.value != null);
-    return { points, first: done[0] || null, last: done.at(-1) || null, enough: done.length >= 2 };
+    return { points, first: done[0] || null, last: done.at(-1) || null, latest: points.at(-1) || null, enough: done.length >= 2 };
 }
+
+/** A tasks-per-touch number as the card says it: one decimal under 10, whole above (an axis of 0.1, 0.1, 0.0, 0.0 told nothing). */
+export const perTouchWords = (v) => (v >= 10 ? String(Math.round(v)) : v.toFixed(1));
 
 /** The team-to-team traffic of an activity read's `pairs` ([{from, to, messages, requests, accepted}]): the teams (busiest first), a grid of messages plus goal requests (rows ask, columns are asked), and the rows as they are. */
 export function pairGrid(rawPairs) {
