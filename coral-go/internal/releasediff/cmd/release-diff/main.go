@@ -53,5 +53,11 @@ func run(repo, oldRef, newRef string) error {
 	releasediff.WriteRoutes(os.Stdout, releasediff.Compare(or, nr), oldRef, newRef)
 	fmt.Println()
 	releasediff.WriteSettings(os.Stdout, releasediff.Compare(os_, ns), oldRef, newRef)
+	pcs, err := releasediff.PackageChanges(repo, oldRef, newRef)
+	if err != nil {
+		return fmt.Errorf("the Hub's packages: %w", err)
+	}
+	fmt.Println()
+	releasediff.WritePackages(os.Stdout, pcs, oldRef, newRef)
 	return nil
 }

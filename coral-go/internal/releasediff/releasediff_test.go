@@ -195,3 +195,97 @@ func TestARefThatStartsWithADashNeverReachesGit(t *testing.T) {
 	_, err = os.Stat(log)
 	assert.NoError(t, err)
 }
+
+func TestNumstatIsReadByItsNULRecords(t *testing.T) {
+	in := "3\t1\tcoral-go/pkg/tunnel/routes.go\x00-\t-\tcoral-go/pkg/redact/logo.png\x0010\t0\tcoral-go/pkg/hubproxy/a b.go\x00"
+	fs, err := ParseNumstat([]byte(in))
+	require.NoError(t, err)
+	assert.Equal(t, []FileChange{
+		{Path: "coral-go/pkg/hubproxy/a b.go", Added: 10},
+		{Path: "coral-go/pkg/redact/logo.png", Binary: true},
+		{Path: "coral-go/pkg/tunnel/routes.go", Added: 3, Deleted: 1},
+	}, fs, "a path with a space is whole, a binary file has no counts, the files are in path order")
+	_, err = ParseNumstat([]byte("3\t1\x00"))
+	assert.Error(t, err)
+	_, err = ParseNumstat([]byte("x\ty\tp\x00"))
+	assert.Error(t, err)
+}
+
+func TestFilesBelongToTheHubPackageThatHoldsThem(t *testing.T) {
+	pcs := GroupByPackage([]FileChange{
+		{Path: "coral-go/pkg/tunnel/routes.go", Added: 1},
+		{Path: "coral-go/pkg/tunnel/testdata/view_redaction.golden", Added: 1},
+		{Path: "coral-go/pkg/tunnelish/x.go", Added: 1}, // another package whose name starts the same
+		{Path: "coral-go/internal/board/x.go", Added: 1},
+	})
+	require.Len(t, pcs, len(HubPackages))
+	for _, pc := range pcs {
+		if pc.Package == "coral-go/pkg/tunnel" {
+			require.Len(t, pc.Files, 2)
+		} else {
+			assert.Empty(t, pc.Files, pc.Package)
+		}
+	}
+}
+
+func TestThePackagesReportSplitsCodeTestsAndTheRest(t *testing.T) {
+	var sb strings.Builder
+	WritePackages(&sb, GroupByPackage([]FileChange{
+		{Path: "coral-go/pkg/hubproxy/handler.go", Added: 6, Deleted: 5},
+		{Path: "coral-go/pkg/hubproxy/handler_test.go", Added: 40},
+		{Path: "coral-go/pkg/hubproxy/testdata/x.golden", Added: 2, Deleted: 1},
+	}), "v1", "v2")
+	out := sb.String()
+	assert.Contains(t, out, "### Packages Coral Hub compiles in, v1 to v2")
+	assert.Contains(t, out, "`pkg/hubproxy`: 1 file of Go code changed (+6, -5)")
+	assert.Contains(t, out, "- `coral-go/pkg/hubproxy/handler.go`: +6, -5")
+	assert.Contains(t, out, "- test files, not compiled by the Hub: 1 file (+40, -0)")
+	assert.Contains(t, out, "- other files (data, docs), not compiled by the Hub: 1 file (+2, -1)")
+	assert.NotContains(t, out, "handler_test.go", "test files are counted, not listed")
+	assert.Contains(t, out, "Unchanged: `pkg/hubowner`, `pkg/redact`, `pkg/secretbox`, `pkg/tunnel`.")
+	sb.Reset()
+	WritePackages(&sb, GroupByPackage(nil), "v1", "v1")
+	assert.Contains(t, sb.String(), "No file changed in any of them")
+}
+
+// PackageChanges reads two tagged commits of a real repository, from its root and from a directory inside it.
+func TestPackageChangesReadsARealRepositoryFromAnyDirectory(t *testing.T) {
+	repo := t.TempDir()
+	run := func(args ...string) {
+		t.Helper()
+		out, err := exec.Command("git", append([]string{"-C", repo, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.gpgsign=false"}, args...)...).CombinedOutput()
+		require.NoError(t, err, string(out))
+	}
+	put := func(path, body string) {
+		t.Helper()
+		require.NoError(t, os.MkdirAll(filepath.Dir(filepath.Join(repo, path)), 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(repo, path), []byte(body), 0o644))
+	}
+	run("init", "-q")
+	put("coral-go/pkg/hubproxy/handler.go", "package hubproxy\n")
+	put("coral-go/pkg/redact/redact.go", "package redact\n")
+	put("coral-go/internal/board/x.go", "package board\n")
+	run("add", "-A")
+	run("commit", "-q", "-m", "old")
+	run("tag", "old")
+	put("coral-go/pkg/hubproxy/handler.go", "package hubproxy\n\nconst UploadStallTimeout = 1\n")
+	put("coral-go/pkg/hubproxy/handler_test.go", "package hubproxy\n")
+	put("coral-go/internal/board/x.go", "package board\n\nvar X = 1\n") // not a Hub package
+	run("add", "-A")
+	run("commit", "-q", "-m", "new")
+	run("tag", "new")
+
+	for _, dir := range []string{repo, filepath.Join(repo, "coral-go")} {
+		pcs, err := PackageChanges(dir, "old", "new")
+		require.NoError(t, err, dir)
+		var got []string
+		for _, pc := range pcs {
+			for _, f := range pc.Files {
+				got = append(got, f.Path)
+			}
+		}
+		assert.Equal(t, []string{"coral-go/pkg/hubproxy/handler.go", "coral-go/pkg/hubproxy/handler_test.go"}, got, "from "+dir+": a Hub package's files only, with paths from the root")
+	}
+	_, err := PackageChanges(repo, "old", "no-such-tag")
+	assert.Error(t, err)
+}
