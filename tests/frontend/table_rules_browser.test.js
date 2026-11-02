@@ -60,7 +60,7 @@ const SPECS = `(() => {
 
 // CORAL_TABLE_RULES: unset = the check is pending and does not run (the release gate stays green while #11943 makes data_table.js keep the rules); report = run it and print what is broken, exit 0; enforce = run it and
 // fail on any broken rule (the check as it will be once #11943 lands, whose first change is to make enforce the default). Today: CORAL_TABLE_RULES=enforce node run_cdp_suites.mjs --only table_rules_browser.
-const MODE = process.env.CORAL_TABLE_RULES || 'off';
+const MODE = process.env.CORAL_TABLE_RULES || 'enforce'; // enforce is the default now (#11943): off skips the check, report prints what is broken and exits 0
 
 (async () => {
     if (MODE === 'off') { console.log('PASS pending (#11943): set CORAL_TABLE_RULES=report or enforce to run the table rules check'); return; }

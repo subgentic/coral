@@ -247,13 +247,16 @@ export function dataTable(cfg) {
         const baseOf = c => (c === prim ? Math.max(ITEM_MIN, minOf(c), charsOf(c), st.widths[c.key] || 0) : Math.max(minOf(c), 96, charsOf(c), st.widths[c.key] || 0)); // what a flexible column keeps at least (the name: 120 px, or its characters)
         for (const c of live) { if (isFlex(c)) continue; w[c.key] = fixedW(c) ? Math.round(parseFloat(fixedW(c)) * rem) : Math.min(MAX_W, Math.max(minOf(c), st.widths[c.key] || nat[c.key] || 0)); }
         let active = live.slice(); const dropped = new Set(), base = {};
-        for (const c of flex) base[c.key] = baseOf(c);
+        const pref = {}, hardOf = c => Math.max(ITEM_MIN, minOf(c));
+        for (const c of flex) { base[c.key] = baseOf(c); if (c === prim) { pref[c.key] = base[c.key]; if (Object.keys(st.widths).length) base[c.key] = hardOf(c); } } // once a width is kept (a drag), the elastic column counts at its hard floor while columns are dropped and squeezed: its preferred room is only what is left; before that it holds its characters, and optional columns drop to give it room
         const total = () => chk + active.reduce((n, c) => n + (isFlex(c) ? base[c.key] : w[c.key]), 0);
         while (total() > avail) { const next = active.filter(c => c !== prim && c.drop).sort((x, y) => x.drop - y.drop)[0]; if (!next) break; active = active.filter(c => c !== next); dropped.add(next.key); } // the optional columns go, the lowest priority first
         let over = total() - avail;
         for (const c of [...active].reverse()) { if (over <= 0) break; if (isFlex(c) || fixedW(c)) continue; const give = Math.min(over, w[c.key] - minOf(c)); if (give > 0) { w[c.key] -= give; over -= give; } } // then the others give room, down to their whole header
         for (const c of flex) { if (over <= 0) break; const give = Math.min(over, base[c.key] - (c === prim ? Math.max(ITEM_MIN, minOf(c)) : minOf(c))); if (give > 0) { base[c.key] -= give; over -= give; } } // and last the flexible ones, down to their own floor
+        for (let guard = 0; total() > avail && guard < 24; guard++) { const next = [...active].reverse().find(c => c !== prim && !isFlex(c) && !fixedW(c)); if (!next) break; active = active.filter(c => c !== next); dropped.add(next.key); } // a table with no priorities of its own and still too wide at its header widths: the last columns go, rightmost first, before anything scrolls (#11943)
         const others = active.reduce((n, c) => n + (isFlex(c) ? 0 : w[c.key]), chk);
+        if (prim) base[prim.key] = Math.max(hardOf(prim), Math.min(pref[prim.key], avail - others - flex.filter(c => c !== prim && active.includes(c)).reduce((n, c) => n + base[c.key], 0)));
         const set = new Set(flex.filter(c => active.includes(c))); let free = avail - others;
         for (let pass = 0; pass < 8 && set.size; pass++) { // by shares: a column whose part is below its floor keeps the floor
             const sum = [...set].reduce((n, c) => n + (c.share || 1), 0); let moved = false;
@@ -269,13 +272,13 @@ export function dataTable(cfg) {
         for (const c of columns) { const k = el('col'); if (emptyKeys.has(c.key)) k.classList.add('dt-col-unused'); else if (dropped.has(c.key)) k.classList.add('dt-col-tight'); else k.style.width = `${w[c.key]}px`; colgroup.append(k); }
         table.style.tableLayout = 'fixed'; table.style.width = `${Math.max(avail, chk + active.reduce((n, c) => n + w[c.key], 0))}px`;
         box.classList.add('dt-sized'); box.style.setProperty('--dt-sized-min', '0px');
-        L0 = { avail, w, prim, others: others + active.reduce((n, c) => n + (isFlex(c) && c !== prim ? w[c.key] : 0), 0), floor, chk, active };
+        L0 = { avail, w, prim, hard: prim ? Math.max(ITEM_MIN, minOf(prim)) : 0, others: others + active.reduce((n, c) => n + (isFlex(c) && c !== prim ? w[c.key] : 0), 0), floor, chk, active };
         for (const th of thead.querySelectorAll('th.dt-th')) { const c = columns.find(x => x.key === th.dataset.key), h = th.querySelector('.dt-resize'); if (c && h && w[c.key]) { h.setAttribute('aria-valuenow', String(w[c.key])); h.setAttribute('aria-valuemin', String(minOf(c))); } }
     }
     function setWidth(c, w, th) { // a drag or a key: the column widens at the cost of the elastic column only (it stops growing when that has no more room); the other columns do not move
         applyWidths(); // the room is read from a layout of the box as it is now
         if (L0 && c === L0.prim) { const h = th && th.querySelector('.dt-resize'); if (h) h.setAttribute('aria-valuenow', String(L0.w[c.key] || 0)); return; } // the elastic column is the one that gives room: its own separator has nothing to take it from, and it never grows past what the others leave
-        const room = !L0 || !L0.prim ? MAX_W : L0.avail - (L0.others - (L0.w[c.key] || 0)) - L0.floor;
+        const room = !L0 || !L0.prim ? MAX_W : L0.avail - (L0.others - (L0.w[c.key] || 0)) - L0.hard; // a drag may eat into the elastic column's preferred room, down to its hard floor
         st.widths[c.key] = Math.min(MAX_W, Math.max(minOf(c), Math.min(Math.round(w), Math.max(minOf(c), room))));
         applyWidths();
         const h = th && th.querySelector('.dt-resize'); if (h) h.setAttribute('aria-valuenow', String(st.widths[c.key]));
