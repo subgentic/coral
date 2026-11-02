@@ -9,7 +9,7 @@ const { coralReady } = require('./helpers/wait');
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const S = `(window.__coralStatic || '/static/')`;
     const open = (extra) => ev(`(async () => { const m = await import(${S} + 'operator_asks.js'); window.__d = m.openAskDialog(${JSON.stringify({ board: 'team-x', kind: 'ask', id: 7, asker: 'Backend Dev', text: 'Ship it or hold?', cut: false, buttons: [{ id: 1, label: 'Hold', action: 'reply', state: 'pending' }, { id: 2, label: 'Look', action: 'open:task', arg: '12', state: 'pending' }], ...extra })}, () => {}); return true; })()`);
-    const read = () => ev(`(() => { const d = document.querySelector('dialog.inbox-ask-dialog'); return { offers: d.querySelectorAll('.inbox-ask-offer button').length, offersBox: !!d.querySelector('.inbox-ask-offers'), buttons: [...d.querySelectorAll('.inbox-ask-buttons button')].map(b => b.textContent), reply: !!d.querySelector('textarea'), text: d.querySelector('.inbox-ask-text').textContent }; })()`);
+    const read = () => ev(`(() => { const d = document.querySelector('dialog.inbox-ask-dialog'); return { offers: d.querySelectorAll('.inbox-ask-offer button').length, offersBox: !!d.querySelector('.inbox-ask-offers'), buttons: [...d.querySelectorAll('.inbox-ask-buttons button')].map(b => b.textContent), reply: !!d.querySelector('textarea'), text: d.querySelector('h2').textContent }; })()`);
     const close = () => ev(`(() => { const d = document.querySelector('dialog.inbox-ask-dialog'); if (d) { d.close(); d.remove(); } return true; })()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
@@ -22,16 +22,16 @@ const { coralReady } = require('./helpers/wait');
             await open({});
             let r = await read();
             assert.equal(r.offers, 2, at + 'a question of this computer offers its two buttons');
-            assert.deepEqual(r.buttons, ['Send reply', 'Close'], at + 'beside the plain Reply and Close');
+            assert.deepEqual(r.buttons, ['Close', 'Send reply'], at + 'beside the plain Reply and Close (Send reply on the right)');
             await close();
 
             await open({ server: 'box-2' });
             r = await read();
             assert.equal(r.offersBox, false, at + 'a question from another computer has no offered buttons');
             assert.equal(r.offers, 0);
-            assert.deepEqual(r.buttons, ['Send reply', 'Close'], at + 'only the plain Reply and Close');
+            assert.deepEqual(r.buttons, ['Close', 'Send reply'], at + 'only the plain Reply and Close (Send reply on the right)');
             assert.equal(r.reply, true, at + 'and the Reply box');
-            assert.equal(r.text, 'Ship it or hold?', at + 'the question is shown whole as before');
+            assert.equal(r.text, 'Ship it or hold?', at + 'the question is shown whole: a one-line question is the title of its item (#12143)');
             assert.equal(await ev(`document.documentElement.scrollWidth - document.documentElement.clientWidth`), 0, at + 'nothing scrolls sideways');
             await close();
 

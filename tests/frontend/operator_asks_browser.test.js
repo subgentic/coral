@@ -45,9 +45,9 @@ const LONG = 'Which of the two \u202edesigns do we ship? ' + 'We have weighed th
             // opens whole
             await ev(`document.querySelector('button[aria-label="Answer the question of Lead"]').click(); true`);
             await waitFor(`document.querySelector('dialog.inbox-ask-dialog[open]')`, at + 'the dialog opens', 4000);
-            const dlg = await ev(`(() => { const d = document.querySelector('dialog.inbox-ask-dialog'); const r = d.getBoundingClientRect(); const btns = [...d.querySelectorAll('button')].map(b => Math.round(b.getBoundingClientRect().height));
+            const dlg = await ev(`(() => { const d = document.querySelector('dialog.inbox-ask-dialog'); const r = d.getBoundingClientRect(); const btns = [...d.querySelectorAll('.inbox-ask-buttons button, .inbox-ask-offer button')].map(b => Math.round(b.getBoundingClientRect().height));
                 return { whole: d.querySelector('.inbox-ask-text').textContent, title: d.querySelector('h2').textContent, fits: r.left >= 0 && r.right <= innerWidth + 1, btns, focus: document.activeElement && document.activeElement.className }; })()`);
-            assert.equal(dlg.title, 'Lead asks you', at + 'the title');
+            assert.ok(dlg.title.startsWith('Which of the two') && dlg.title.endsWith('\u2026') && dlg.title.length <= 82, at + 'the title is a short subject of the question (an item, #12143): ' + dlg.title);
             assert.ok(dlg.whole.includes('Reply with 1 or 2.') && dlg.whole.includes('<U+202E>evil') && !dlg.whole.includes('\u202e'), at + 'the whole question, marked: ' + dlg.whole.slice(-60));
             assert.ok(dlg.fits, at + 'the dialog fits the screen'); assert.ok(dlg.btns.every(h => h >= 44), at + 'buttons are 44 px tall: ' + dlg.btns); assert.ok(/inbox-ask-box/.test(dlg.focus), at + 'the box has the focus: ' + dlg.focus);
 
@@ -73,7 +73,7 @@ const LONG = 'Which of the two \u202edesigns do we ship? ' + 'We have weighed th
             await ev(`document.querySelector('button[aria-label="Answer the question of Dev"]').click(); true`);
             await waitFor(`document.querySelector('dialog.inbox-ask-dialog[open]')`, at + 'the wait opens', 4000);
             assert.ok((await ev(`document.querySelector('.inbox-ask-sub').textContent`)).includes('waiting for your reply'), at + 'a wait says it is waiting');
-            assert.equal(await ev(`document.querySelector('.inbox-ask-sub').textContent`), 'On the Sprout team board, waiting for your reply.', at + 'the question says which team by its name, not the internal board id (#11860)');
+            assert.ok(/^From Dev \u00b7 Sprout team \u00b7 .+, waiting for your reply$/.test(await ev(`document.querySelector('.inbox-ask-sub').textContent`)), at + 'the question says which team by its name, not the internal board id (#11860)');
             await ev(`document.querySelector('.inbox-ask-box').value = 'yes, delete it'; true`);
             await click('dialog.inbox-ask-dialog .btn-primary');
             await waitFor(`!document.querySelector('dialog.inbox-ask-dialog')`, at + 'closed', 4000);

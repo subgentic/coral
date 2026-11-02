@@ -4,8 +4,11 @@
  * for an ask): it answers the ask, ends a wait, and tells the asker by the post itself. The text is the agent's, so it is written out through markHidden (strict) before it is drawn, then cut. */
 import { markHidden } from './visible_marks.js';
 import { isHiddenAsk } from './ask_filter.js';
-import { OPERATOR_ID } from './utils.js';
+import { OPERATOR_ID, renderMarkdownStrict } from './utils.js';
+import { whenText } from './when_text.js';
 import { state } from './state.js';
+import { importOnce } from './import_once.js';
+import { loadStyles } from './lazy_styles.js';
 import { showToast } from './notifications.js';
 import { isCloud, isLocalServer } from './server_base.js';
 
@@ -18,13 +21,26 @@ export const operatorAsks = () => asks.filter(a => !isHiddenAsk(a));
 export const onOperatorAsksChanged = fn => { listeners.add(fn); return () => listeners.delete(fn); };
 const fire = () => { for (const f of listeners) f(); };
 
-/** A question as one line of a row: hidden characters written out, white space collapsed, cut after marking so a mark is never split. */
+/** The words without their Markdown marks, for a plain-text preview (a row's lines, #12152): emphasis, code, headings, quotes, bullets, links and images become their words; nothing else is touched. */
+export function plainMarkdown(text) {
+    return String(text == null ? '' : text).split('\n').map(l => l
+        .replace(/^\s*```.*$/, '').replace(/^\s{0,3}#{1,6}\s+/, '').replace(/^\s*>\s?/, '').replace(/^\s*[-*+]\s+/, '')
+        .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+        .replace(/`([^`]+)`/g, '$1').replace(/(\*\*|__)(?=\S)(.+?)(?<=\S)\1/g, '$2').replace(/~~(?=\S)(.+?)(?<=\S)~~/g, '$1')
+        .replace(/(^|[\s(])\*(?=\S)(.+?)(?<=\S)\*(?=[\s).,;:!?]|$)/g, '$1$2').replace(/(^|[\s(])_(?=\S)(.+?)(?<=\S)_(?=[\s).,;:!?]|$)/g, '$1$2')).join('\n');
+}
+/** A row only previews: the text is cut to this many characters BEFORE the Markdown marks are dropped (that pass is quadratic on adversarial text: 20 KB took 250 ms a row, #12152), and the marks are written after. */
+const PREVIEW_IN = 500;
+const previewText = a => markHidden(String((a && a.text) == null ? '' : a.text).slice(0, PREVIEW_IN), { strict: true });
+/** A question as one line of a row: hidden characters written out, Markdown marks dropped, white space collapsed, cut after marking so a mark is never split. */
 export function askLine(a) {
-    const one = markHidden(a && a.text, { strict: true }).replace(/\s+/g, ' ').trim();
+    const one = plainMarkdown(previewText(a)).replace(/\s+/g, ' ').trim();
     return one.length > LINE_MAX ? `${one.slice(0, LINE_MAX - 1).trimEnd()}…` : one;
 }
 /** The whole question, hidden characters written out, line breaks kept. */
 export const askWhole = a => markHidden(a && a.text, { strict: true });
+/** The whole question as plain text (a row's second line): the same words, line breaks kept, without the Markdown marks. */
+export const askPlain = a => plainMarkdown(previewText(a));
 /** A stable id of one question among the rows. */
 export const askKey = a => `operator-ask:${a.board}:${a.kind}:${a.id}`;
 
@@ -118,23 +134,60 @@ export async function wakeMember(a, name) {
     }
 }
 
+/** A question the way a review item reads (#12143, the operator): a short subject for the title (the first line when it is short, else the first words), who asked, on which team and when under it, the words as rendered Markdown with the
+ * "@Operator" the asker opened with taken off, and the reply in the item. The body keeps everything the question says: when the first line became the title, the body is the rest; a one-line question has no body. */
+export function askParts(a) {
+    const clean = askWhole(a).replace(/^\s*@Operator\b[:,]?\s*/i, '').trim();
+    const lines = clean.split('\n'), first = (lines[0] || '').trim().replace(/^#{1,6}\s+/, '');
+    if (first.length <= 80) return { title: first.replace(/[*_`]/g, '') || 'A question', body: lines.slice(1).join('\n').trim() };
+    const cut = first.slice(0, 80), at = cut.lastIndexOf(' ');
+    return { title: `${(at > 40 ? cut.slice(0, at) : cut).replace(/[*_`]/g, '').replace(/[\s,;:.-]+$/, '')}\u2026`, body: clean };
+}
+
+/** The goal and the task a question was asked about (#12194, #12164): [{ kind, id, title }], the goal first; empty when the asker named neither. */
+export function askSubjects(a) {
+    const out = [];
+    if (a && Number(a.goal_id) > 0) out.push({ kind: 'goal', id: Number(a.goal_id), title: markHidden(a.goal_title || '', { strict: true }) });
+    if (a && Number(a.task_id) > 0) out.push({ kind: 'task', id: Number(a.task_id), title: markHidden(a.task_title || '', { strict: true }) });
+    return out;
+}
+/** "Goal #7 · Task #12", the short words of a question's subjects (a Needs you row's marker). */
+export const askSubjectWords = a => askSubjects(a).map(x => `${x.kind === 'goal' ? 'Goal' : 'Task'} #${x.id}`).join(' \u00b7 ');
+
 /** The question whole, with a Reply box: a modal dialog (focus kept inside it, Escape closes it). */
 export function openAskDialog(a, onDone, runners = {}) {
     const dlg = document.createElement('dialog');
     dlg.className = 'modal-content dlg-form inbox-ask-dialog'; // the shared dialog rule sizes it (--dlg-max, dlg-form), not a width of its own
     dlg.setAttribute('aria-labelledby', 'inbox-ask-title');
-    const title = document.createElement('h2'); title.id = 'inbox-ask-title'; title.textContent = `${a.asker} asks you`;
-    const sub = document.createElement('p'); sub.className = 'inbox-ask-sub'; sub.textContent = `On the ${a.board_label || a.board} board${a.kind === 'wait' ? ', waiting for your reply' : ''}.`;
-    const whole = document.createElement('pre'); whole.className = 'inbox-ask-text'; whole.tabIndex = 0; whole.setAttribute('role', 'region'); whole.setAttribute('aria-label', 'The question');
-    whole.textContent = askWhole(a) + (a.cut ? '\n… (cut: the board has the rest)' : '');
+    const parts = askParts(a);
+    const title = document.createElement('h2'); title.id = 'inbox-ask-title'; title.textContent = parts.title;
+    const sub = document.createElement('p'); sub.className = 'inbox-ask-sub';
+    sub.textContent = [`From ${markHidden(a.asker, { strict: true })}`, (/\bteam$/i.test(a.board_label || a.board) ? (a.board_label || a.board) : `${a.board_label || a.board} team`), whenText(a.at)].filter(Boolean).join(' \u00b7 ') + (a.kind === 'wait' ? ', waiting for your reply' : '');
+    const subjects = askSubjects(a), links = document.createElement('p'); links.className = 'inbox-ask-subjects'; links.hidden = !subjects.length; if (subjects.length) loadStyles('pictures.css'); // its links are drawn by the lazy picture rules // the goal and task it is about, each a link that opens it in the Inbox
+    if (subjects.length) links.append(document.createTextNode('About ')); // the asker names them: the line says so (Security's INFO on #12164)
+    subjects.forEach((x, i) => {
+        if (i) links.append(document.createTextNode(' \u00b7 '));
+        const word = `${x.kind === 'goal' ? 'Goal' : 'Task'} #${x.id}${x.title ? `: ${x.title.length > 60 ? `${x.title.slice(0, 59).trimEnd()}\u2026` : x.title}` : ''}`;
+        if (fromAnotherComputer(a) || !runners[x.kind]) { links.append(document.createTextNode(word)); return; } // from another computer the ids are that computer's: shown, not opened
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'btn btn-quiet btn-small inbox-ask-subject'; b.textContent = word; b.dataset.kind = x.kind; b.title = `Open ${x.kind} #${x.id}`;
+        b.addEventListener('click', () => { finish(); runners[x.kind](a, String(x.id)); });
+        links.append(b);
+    });
+    if (subjects.length) links.append(document.createTextNode(` (named by ${markHidden(a.asker, { strict: true })})`));
+    const whole = document.createElement('div'); whole.className = 'inbox-ask-text prose'; whole.tabIndex = 0; whole.setAttribute('role', 'region'); whole.setAttribute('aria-label', 'The question');
+    whole.innerHTML = renderMarkdownStrict(parts.body + (a.cut ? '\n\n\u2026 (cut: the board has the rest)' : '')); // raw HTML in the words is written out as text; links keep the page's link policy
+    whole.hidden = !parts.body && !a.cut; // a short question is its title
     const label = document.createElement('label'); label.className = 'inbox-ask-label'; label.textContent = 'Your reply';
     const box = document.createElement('textarea'); box.className = 'field inbox-ask-box'; box.rows = 4; box.maxLength = 8000; label.append(box);
+    const pics = document.createElement('div'); pics.className = 'inbox-ask-pics'; // pictures for the reply (#12173): the comment composer's tray, loaded with the dialog
     const err = document.createElement('p'); err.className = 'inbox-ask-error'; err.setAttribute('role', 'alert');
     const row = document.createElement('div'); row.className = 'inbox-ask-buttons';
     const send = document.createElement('button'); send.type = 'button'; send.className = 'btn btn-primary'; send.textContent = 'Send reply';
     const close = document.createElement('button'); close.type = 'button'; close.className = 'btn'; close.textContent = 'Close';
-    row.append(send, close);
-    const finish = () => { dlg.close(); dlg.remove(); if (onDone) onDone(); };
+    row.append(close, send); // Close on the left, Send reply on the right (as the other dialogs)
+    let tray = null;
+    const finish = () => { if (tray) tray.destroy(); dlg.close(); dlg.remove(); if (onDone) onDone(); };
+    const sync = () => { send.disabled = !!tray && (tray.busy() || tray.failed()); }; // Send waits for a picture going up, and for a failed one to be taken out
     const offers = fromAnotherComputer(a) ? [] : buttonsOf(a); // a question from another computer through the Hub keeps the plain Reply and Close
     let offered = null;
     if (offers.length) { // what the asker offered: one tap per choice, each with what it does
@@ -171,13 +224,23 @@ export function openAskDialog(a, onDone, runners = {}) {
         }
         offered.append(head, list);
     }
-    dlg.append(title, sub, whole, ...(offered ? [offered] : []), label, err, row);
+    const foot = document.createElement('div'); foot.className = 'inbox-ask-foot'; const addSlot = document.createElement('span'); foot.append(addSlot, row); // Add image on the left, Close and Send reply on the right: one row of buttons
+    dlg.append(title, sub, ...(links.hidden ? [] : [links]), ...(whole.hidden ? [] : [whole]), ...(offered ? [offered] : []), label, pics, err, foot);
+    if (!fromAnotherComputer(a)) { // the picture is stored on the question's own team, as a goal's pictures are
+        Promise.all([importOnce('./artifact_comment_images.js'), importOnce('./artifact_comments_api.js')]).then(([m, api]) => {
+            if (!dlg.isConnected) return;
+            tray = m.createImageTray({ upload: (blob, versionOf) => api.uploadCommentImage(null, undefined, blob, versionOf, a.board) });
+            tray.attach(dlg, box); tray.listen(sync);
+            addSlot.append(tray.picker()); pics.append(tray.hint(), tray.node);
+        }).catch(() => { /* a reply needs no picture: the dialog works without the button */ });
+    }
     close.addEventListener('click', finish);
     dlg.addEventListener('cancel', e => { e.preventDefault(); finish(); });
     send.addEventListener('click', async () => {
         err.textContent = ''; send.disabled = true;
-        try { await replyToAsk(a, box.value); finish(); }
-        catch (e) { err.textContent = e.message || 'Not sent.'; send.disabled = false; box.focus(); } // the text stays
+        const links = tray ? tray.hexes().map(h => `coral://artifacts/${h}`) : []; // each picture is named by its artifact link, which the board and the agents read
+        try { await replyToAsk(a, [box.value.trim(), links.join('\n')].filter(Boolean).join('\n\n')); finish(); }
+        catch (e) { err.textContent = e.message || 'Not sent.'; sync(); box.focus(); } // the text stays
     });
     document.body.append(dlg);
     dlg.showModal();
