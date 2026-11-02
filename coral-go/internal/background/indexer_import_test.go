@@ -120,6 +120,7 @@ func TestAFreshFolderStaysOffAfterItsAgentIsDeletedAndItsFileChanges(t *testing.
 	var recorded string
 	require.NoError(t, ss.DB().GetContext(ctx, &recorded, `SELECT value FROM store_meta WHERE key = 'history_import_default'`))
 	require.Equal(t, "0", recorded)
+}
 
 // #11990: the Settings switch turns the import off again: the chats Coral did not start go back to held (rows and text gone, a star kept), a chat of a live agent stays, a later pass does
 // not list them, and turning it on lists them again.
