@@ -28,6 +28,7 @@ func activityMetaFor(r *http.Request, title, note string) board.ActivityMeta {
 	if r.Header.Get("X-Coral-Client") == "phone" {
 		m.Hint = "phone"
 	}
+	m.Surface = surfaceOf(r)
 	if note != "" {
 		if red, ok := redactComment(note); ok {
 			m.Note = red
@@ -146,4 +147,10 @@ func (h *BoardHandler) recordActivity(r *http.Request, action, kind, item, team,
 		return
 	}
 	_ = h.bs.RecordActivity(context.WithoutCancel(r.Context()), activityMetaFor(r, title, note), action, kind, item, "", team)
+}
+
+// surfaceOf is which part of the page a person-only request came from, as the page says (X-Coral-Surface: inbox or chat), or "". It is read only on the routes that record the Operator's own actions (every one of
+// them checks the caller is the person first), never from a body and never on an agent's call; anything but the two words is nothing (#12158).
+func surfaceOf(r *http.Request) string {
+	return board.ValidSurface(r.Header.Get("X-Coral-Surface"))
 }

@@ -55,11 +55,12 @@ const (
 
 // ActivityMeta is what a handler knows about the action, set on the context so the store's own transaction can write the row: the actor and source come from the verified request, never the body.
 type ActivityMeta struct {
-	Actor  string // "local", or "hub:" and an opaque label of the Hub account
-	Source string // "local" or "hub", from the request's own provenance
-	Hint   string // "phone" or "": what the page said about itself, shown as reported by the page
-	Note   string // already cleaned, redacted and cut by the caller ("" when the redactor refused)
-	Title  string // the item's title as text (cleaned and cut here)
+	Actor   string // "local", or "hub:" and an opaque label of the Hub account
+	Source  string // "local" or "hub", from the request's own provenance
+	Hint    string // "phone" or "": what the page said about itself, shown as reported by the page
+	Surface string // "inbox", "chat" or "": which part of the page the action was taken in, as the page said (a closed list; anything else is nothing)
+	Note    string // already cleaned, redacted and cut by the caller ("" when the redactor refused)
+	Title   string // the item's title as text (cleaned and cut here)
 }
 
 type activityKey struct{}
@@ -86,6 +87,7 @@ type OperatorAction struct {
 	Team     string `db:"team" json:"team"`
 	Source   string `db:"source" json:"source"`
 	Hint     string `db:"hint" json:"hint,omitempty"`
+	Surface  string `db:"surface" json:"surface,omitempty"` // what the page said it was (inbox or chat), like Hint: a page-reported word from a closed list, never text
 	Title    string `db:"title" json:"title,omitempty"`
 	Note     string `db:"note" json:"note,omitempty"`
 	PrevHash string `db:"prev_hash" json:"-"`
@@ -104,6 +106,7 @@ func (s *Store) ensureOperatorActionsSchema(ctx context.Context) error {
 		team      TEXT NOT NULL,
 		source    TEXT NOT NULL,
 		hint      TEXT NOT NULL DEFAULT '',
+		surface   TEXT NOT NULL DEFAULT '',
 		title     TEXT NOT NULL DEFAULT '',
 		note      TEXT NOT NULL DEFAULT '',
 		prev_hash TEXT NOT NULL,
@@ -164,7 +167,7 @@ func activityText(s string, n int) string {
 // activityHash chains a row: the SHA-256 of the previous hash and of every field of this row, each length-prefixed so no two rows hash alike by moving a character between fields.
 func activityHash(prev string, a OperatorAction) string {
 	h := sha256.New()
-	for _, f := range []string{prev, a.At, a.Actor, a.Action, a.ItemKind, a.ItemID, a.Version, a.Team, a.Source, a.Hint, a.Title, a.Note} {
+	for _, f := range []string{prev, a.At, a.Actor, a.Action, a.ItemKind, a.ItemID, a.Version, a.Team, a.Source, a.Hint, a.Surface, a.Title, a.Note} {
 		fmt.Fprintf(h, "%d:%s|", len(f), f)
 	}
 	return hex.EncodeToString(h.Sum(nil))
@@ -192,7 +195,8 @@ func appendActivity(ctx context.Context, q activityExec, now time.Time, m Activi
 	if m.Hint == "phone" {
 		hint = "phone"
 	}
-	a := OperatorAction{At: now.UTC().Format(activityTimeFormat), Actor: m.Actor, Action: action, ItemKind: kind, ItemID: item, Version: version, Team: team, Source: source, Hint: hint,
+	surface := ValidSurface(m.Surface)
+	a := OperatorAction{At: now.UTC().Format(activityTimeFormat), Actor: m.Actor, Action: action, ItemKind: kind, ItemID: item, Version: version, Team: team, Source: source, Hint: hint, Surface: surface,
 		Title: activityText(m.Title, activityTextCap), Note: activityText(m.Note, ActivityNoteCap), PrevHash: head.LastHash}
 	if a.Actor == "" {
 		a.Actor = "local"
@@ -207,8 +211,8 @@ func appendActivity(ctx context.Context, q activityExec, now time.Time, m Activi
 		_, _ = q.ExecContext(ctx, `RELEASE activity_row`)
 		return err
 	}
-	res, err := q.ExecContext(ctx, `INSERT INTO operator_actions (at, actor, action, item_kind, item_id, version, team, source, hint, title, note, prev_hash, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		a.At, a.Actor, a.Action, a.ItemKind, a.ItemID, a.Version, a.Team, a.Source, a.Hint, a.Title, a.Note, a.PrevHash, a.Hash)
+	res, err := q.ExecContext(ctx, `INSERT INTO operator_actions (at, actor, action, item_kind, item_id, version, team, source, hint, surface, title, note, prev_hash, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		a.At, a.Actor, a.Action, a.ItemKind, a.ItemID, a.Version, a.Team, a.Source, a.Hint, a.Surface, a.Title, a.Note, a.PrevHash, a.Hash)
 	if err != nil {
 		return fail(err)
 	}
@@ -273,7 +277,7 @@ const ActivityCheckNote = "Edits made outside Coral are shown unless the whole r
 // removed are not checked: the trim moved the anchor.
 func (s *Store) VerifyActivity(ctx context.Context) (ActivityCheck, error) {
 	rows := []OperatorAction{}
-	if err := s.db.SelectContext(ctx, &rows, `SELECT id, at, actor, action, item_kind, item_id, version, team, source, hint, title, note, prev_hash, hash FROM operator_actions ORDER BY id`); err != nil {
+	if err := s.db.SelectContext(ctx, &rows, `SELECT id, at, actor, action, item_kind, item_id, version, team, source, hint, surface, title, note, prev_hash, hash FROM operator_actions ORDER BY id`); err != nil {
 		return ActivityCheck{}, err
 	}
 	var head struct {
@@ -340,7 +344,7 @@ func (s *Store) ListActivity(ctx context.Context, f ActivityFilter) ([]OperatorA
 // ActivityPage is ListActivity and whether more rows exist past the page (it reads one more than the limit). The limit is at most ActivityMaxLimit and 50 when not given; the order is (time, id) newest
 // first, and a cursor (BeforeAt with BeforeID) pages by that pair.
 func (s *Store) ActivityPage(ctx context.Context, f ActivityFilter) ([]OperatorAction, bool, error) {
-	q := `SELECT id, at, actor, action, item_kind, item_id, version, team, source, hint, title, note FROM operator_actions WHERE 1 = 1`
+	q := `SELECT id, at, actor, action, item_kind, item_id, version, team, source, hint, surface, title, note FROM operator_actions WHERE 1 = 1`
 	var args []any
 	if f.Team != "" {
 		q += ` AND team = ?`
@@ -442,4 +446,19 @@ func (s *Store) CountActivityBy(ctx context.Context, actor string) (int, error) 
 	var n int
 	err := s.reader().GetContext(ctx, &n, `SELECT COUNT(*) FROM operator_actions WHERE actor = ?`, actor)
 	return n, err
+}
+
+// The surfaces an action can be taken in, as the page says (the Operator's Inbox versus an agent's chat or terminal, #12158). The page sends one of these words in a header on the person-only routes it calls; the server
+// keeps it only if it is on this list, and anything else is nothing. It is what the page said, and is shown as that: it cannot carry anything but one of two words.
+const (
+	SurfaceInbox = "inbox"
+	SurfaceChat  = "chat"
+)
+
+// ValidSurface is s when it is a surface, else "" (nothing).
+func ValidSurface(s string) string {
+	if s == SurfaceInbox || s == SurfaceChat {
+		return s
+	}
+	return ""
 }

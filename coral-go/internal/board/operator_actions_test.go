@@ -276,3 +276,28 @@ func TestEveryFormatSeparatorAndControlCharacterIsStrippedFromText(t *testing.T)
 	}
 	assert.Equal(t, "a b", activityText("a \t\n  b", 50), "runs of space and line breaks are one space")
 }
+
+// #12158: an action's surface is one of two words as the page said, or nothing; it is in the chain, so a row edited to move an action from one side to the other shows as a break.
+func TestAnActionsSurfaceIsOneOfTwoWordsAndIsInTheChain(t *testing.T) {
+	s := activityStore(t)
+	ctx := context.Background()
+	for i, surface := range []string{"inbox", "chat", "", "<b>x</b>", "Inbox"} {
+		require.NoError(t, s.RecordActivity(ctx, ActivityMeta{Actor: "local", Source: "local", Surface: surface}, ActApprove, "file", hexN(i), hexN(i), "team-a"))
+	}
+	rows, err := s.ListActivity(ctx, ActivityFilter{Limit: 10})
+	require.NoError(t, err)
+	var got []string
+	for i := len(rows) - 1; i >= 0; i-- {
+		got = append(got, rows[i].Surface)
+	}
+	assert.Equal(t, []string{"inbox", "chat", "", "", ""}, got)
+	chk, err := s.VerifyActivity(ctx)
+	require.NoError(t, err)
+	require.True(t, chk.Intact, "%+v", chk)
+	_, err = s.db.ExecContext(ctx, `UPDATE operator_actions SET surface = 'inbox' WHERE id = 2`) // moved from chat to the Inbox, outside Coral
+	require.NoError(t, err)
+	chk, err = s.VerifyActivity(ctx)
+	require.NoError(t, err)
+	assert.False(t, chk.Intact)
+	assert.Equal(t, "edited", chk.Reason)
+}

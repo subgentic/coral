@@ -25,7 +25,7 @@ func TestOperatorTouchHoldsNoText(t *testing.T) {
 	for _, c := range cols {
 		names = append(names, c.Name)
 	}
-	assert.Equal(t, []string{"id", "at", "kind", "team", "agent", "source"}, names, "the table is the whole record: no column for text, a length or anything typed")
+	assert.Equal(t, []string{"id", "at", "kind", "team", "agent", "source", "surface"}, names, "the table is the whole record: no column for text, a length or anything typed (surface is one of two words, or nothing)")
 
 	// What is recorded is only what the signature takes: kind, team, agent and time. A secret typed, a long paste and a name written to look like text leave nothing but the kind and the agent.
 	secret := "correct horse battery staple " + strings.Repeat("x", 4000)
@@ -226,4 +226,20 @@ func TestTaskMessageCountsCompareTimesNotStrings(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, got, 1)
 	assert.Equal(t, 2, got[0].Sent, "the post at the claim's own second counts, the one before it does not (as strings the first was the wrong side)")
+}
+
+// #12158: which part of the page a touch was made in is one of two words as the page said, or nothing: anything else is nothing, so the column cannot carry a text.
+func TestATouchsSurfaceIsOneOfTwoWordsOrNothing(t *testing.T) {
+	s := testStore(t)
+	ctx := context.Background()
+	for _, surface := range []string{SurfaceInbox, SurfaceChat, "", "<script>alert(1)</script>", "INBOX", "inbox ", strings.Repeat("x", 5000)} {
+		require.NoError(t, s.RecordOperatorTouchOn(ctx, "team", "Dev", TouchAnswer, TouchLocal, surface, time.Now()))
+	}
+	var got []string
+	require.NoError(t, s.db.SelectContext(ctx, &got, `SELECT surface FROM operator_touch ORDER BY id`))
+	assert.Equal(t, []string{"inbox", "chat", "", "", "", "", ""}, got)
+	require.NoError(t, s.RecordOperatorTouch(ctx, "team", "Dev", TouchTyped, TouchLocal, time.Now())) // the old signature records no surface
+	var last string
+	require.NoError(t, s.db.GetContext(ctx, &last, `SELECT surface FROM operator_touch ORDER BY id DESC LIMIT 1`))
+	assert.Equal(t, "", last)
 }

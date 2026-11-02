@@ -16,7 +16,7 @@ import (
 
 // Store is what the Recorder writes to (board.Store).
 type Store interface {
-	RecordOperatorTouch(ctx context.Context, team, agent, kind, source string, at time.Time) error
+	RecordOperatorTouchOn(ctx context.Context, team, agent, kind, source, surface string, at time.Time) error
 }
 
 // Resolver says which team and agent a session is: its board and its label there. ok is false for a session that is on no board (a plain terminal, an agent that never joined): it is not recorded.
@@ -64,18 +64,28 @@ func (r *Recorder) NoteSource(sessionID, source string) {
 // Touch records a touch of kind of the session now. Every kind but typed is one touch each time, and it also starts the burst that typed input is coalesced into (an answer's own keystroke is not
 // a second touch).
 func (r *Recorder) Touch(ctx context.Context, sessionID, kind, source string) {
+	r.TouchOn(ctx, sessionID, kind, source, "")
+}
+
+// TouchOn is Touch with the surface the page said the touch was made in (board.SurfaceInbox, board.SurfaceChat or nothing).
+func (r *Recorder) TouchOn(ctx context.Context, sessionID, kind, source, surface string) {
 	if r == nil || sessionID == "" {
 		return
 	}
-	r.record(ctx, sessionID, kind, source, false)
+	r.record(ctx, sessionID, kind, source, surface, false)
 }
 
 // TouchAgent records a touch of an agent known by its label on a team (an approval of its task: no session is at hand).
 func (r *Recorder) TouchAgent(ctx context.Context, team, agent, kind, source string) {
+	r.TouchAgentOn(ctx, team, agent, kind, source, "")
+}
+
+// TouchAgentOn is TouchAgent with the surface the page said it was made in.
+func (r *Recorder) TouchAgentOn(ctx context.Context, team, agent, kind, source, surface string) {
 	if r == nil {
 		return
 	}
-	if err := r.store.RecordOperatorTouch(ctx, team, agent, kind, source, r.now()); err != nil {
+	if err := r.store.RecordOperatorTouchOn(ctx, team, agent, kind, source, surface, r.now()); err != nil {
 		slog.Warn("[analytics] could not record an operator touch", "kind", kind, "error", err)
 	}
 }
@@ -85,7 +95,7 @@ func (r *Recorder) Typed(sessionID string) {
 	if r == nil || sessionID == "" {
 		return
 	}
-	r.record(context.Background(), sessionID, board.TouchTyped, "", true)
+	r.record(context.Background(), sessionID, board.TouchTyped, "", board.SurfaceChat, true) // typing to an agent's terminal or chat box is chat by its nature: the Inbox cannot type to an agent
 }
 
 // TypedTo is Typed for a terminal target named as a session is (claude-<uuid>): the session it names. A target that names none (a plain terminal's) is ignored.
@@ -103,7 +113,7 @@ func (r *Recorder) TypedTo(target string) {
 	}
 }
 
-func (r *Recorder) record(ctx context.Context, sessionID, kind, source string, coalesce bool) {
+func (r *Recorder) record(ctx context.Context, sessionID, kind, source, surface string, coalesce bool) {
 	now := r.now()
 	r.mu.Lock()
 	if coalesce {
@@ -132,7 +142,7 @@ func (r *Recorder) record(ctx context.Context, sessionID, kind, source string, c
 	if !ok {
 		return
 	}
-	if err := r.store.RecordOperatorTouch(ctx, team, agent, kind, source, now); err != nil {
+	if err := r.store.RecordOperatorTouchOn(ctx, team, agent, kind, source, surface, now); err != nil {
 		slog.Warn("[analytics] could not record an operator touch", "kind", kind, "error", err)
 	}
 }

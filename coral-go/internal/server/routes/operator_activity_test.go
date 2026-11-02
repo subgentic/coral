@@ -392,3 +392,25 @@ func TestOnATeamsMachineEachOwnerSeesOnlyTheirOwnRowsAndTheLocalPersonSeesAll(t 
 	assert.NotContains(t, chk, "first_bad", "and the first bad row's id is not told to someone who does not own it")
 	assert.Equal(t, float64(2), chk["rows"])
 }
+
+// #12158: the surface of an action is what the page said in X-Coral-Surface, kept only when it is one of the two words, on the routes that record the Operator's own actions.
+func TestTheSurfaceHeaderIsKeptOnlyAsOneOfTwoWords(t *testing.T) {
+	e := newReviewEnv(t, true)
+	act := e.activityServer(t, true)
+	e.tag(t, `["for review"]`)
+	for _, tc := range []struct{ decision, header, want string }{{"save", "inbox", "inbox"}, {"unsave", "chat", "chat"}, {"ignore", "Inbox", ""}, {"unignore", "<b>x</b>", ""}, {"save", "", ""}} {
+		req, _ := http.NewRequest("POST", e.srv.URL+"/api/board/alpha/artifacts/"+e.id+"/review", strings.NewReader(`{"decision":"`+tc.decision+`"}`))
+		req.Header.Set("Content-Type", "application/json")
+		if tc.header != "" {
+			req.Header.Set("X-Coral-Surface", tc.header)
+		}
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		resp.Body.Close()
+		require.Equal(t, http.StatusOK, resp.StatusCode, tc.decision)
+		_, out := getActivity(t, act.URL, "?limit=1", nil)
+		got, _ := out["actions"].([]any)[0].(map[string]any)["surface"].(string)
+		assert.Equal(t, tc.want, got, tc.decision+" with "+tc.header)
+	}
+	assert.Equal(t, "", surfaceOf(httptest.NewRequest("GET", "/", nil)))
+}
