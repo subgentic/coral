@@ -7,7 +7,7 @@ import { dirname, join } from 'node:path';
 import assert from 'node:assert/strict';
 
 const here = dirname(fileURLToPath(import.meta.url)), statics = join(here, '..', '..', 'coral-go', 'pkg', 'frontend', 'static');
-const COVERS = new Set(['analytics', 'files', 'tasks', 'goals', 'servers', 'settings', 'needs (live Inbox)']);
+const COVERS = new Set(['analytics', 'files', 'tasks', 'goals', 'servers', 'settings', "needs (live, the operator's mix)", 'tasks (live Inbox)', 'goals (live Inbox)']);
 const found = {};
 for (const f of readdirSync(statics).filter(x => x.endsWith('.js') && x !== 'data_table.js')) {
     let n = 0;

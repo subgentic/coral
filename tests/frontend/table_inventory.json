@@ -59,13 +59,13 @@
    "file": "goal_view.js",
    "calls": 1,
    "surface": "Goal page: its tasks (tasksTable)",
-   "covered_by": "tasks"
+   "covered_by": "tasks (live Inbox)"
   },
   {
    "file": "goals_view.js",
    "calls": 1,
    "surface": "Goals list",
-   "covered_by": "goals"
+   "covered_by": "goals (live Inbox)"
   },
   {
    "file": "history_list.js",
@@ -77,7 +77,7 @@
    "file": "inbox_sidebar.js",
    "calls": 4,
    "surface": "Inbox: Saved, Needs you, Tasks, Goals",
-   "covered_by": "needs (live Inbox)"
+   "covered_by": "needs (live, the operator's mix)"
   },
   {
    "file": "mailbox_chats.js",
@@ -113,13 +113,13 @@
    "file": "task_list.js",
    "calls": 1,
    "surface": "Agent tasks (tasksTable)",
-   "covered_by": "tasks"
+   "covered_by": "tasks (live Inbox)"
   },
   {
    "file": "tasks_view.js",
    "calls": 1,
    "surface": "The one Tasks view (tasksTable)",
-   "covered_by": "tasks"
+   "covered_by": "tasks (live Inbox)"
   },
   {
    "file": "team_agents_page.js",
@@ -137,7 +137,7 @@
    "file": "team_tasks_page.js",
    "calls": 2,
    "surface": "Team page: tasks, follow-ups (tasksTable)",
-   "covered_by": "tasks"
+   "covered_by": "tasks (live Inbox)"
   },
   {
    "file": "token_usage_ui.js",
