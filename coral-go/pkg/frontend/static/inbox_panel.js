@@ -22,6 +22,7 @@ const REPLY_MAX = 65536; // characters the box takes; the server's own cap is 25
 
 // ── drafts: in memory only ─────────────────────────────────────────────────────────────────────────────
 const _drafts = new Map();
+const _answering = new Map(); // task -> the id of the newest message of its conversation that is not the person's: the one a reply answers (#12502)
 const _boxes = new Set(); // the reply boxes on screen, so a purge empties what is typed in them too
 /** Drop every unsent reply (sign-out, a change of account): the kept drafts and what is typed in an open box. */
 export function clearInboxDrafts() {
@@ -236,6 +237,7 @@ export function mountInbox(host, adapter, options) {
                 if (nextSig === sig) return;
                 const grew = lastId !== null ? next.filter(m => Number(m.id) > Number(lastId)) : [];
                 sig = nextSig; rows = next;
+                const theirsLast = [...next].reverse().find(m => !m.mine); if (theirsLast) _answering.set(`${task.project}#${task.id}`, theirsLast.id); else _answering.delete(`${task.project}#${task.id}`);
                 lastId = rows.length ? rows[rows.length - 1].id : lastId;
                 await draw();
                 const theirs = grew.filter(m => !m.mine);
@@ -289,7 +291,7 @@ export function mountInbox(host, adapter, options) {
             if (!content || busy) return;
             busy = true; sync(); status.textContent = 'Sending…';
             try {
-                const res = await adapter.replyToTask({ project: task.project, taskId: task.id, content });
+                const res = await adapter.replyToTask({ project: task.project, taskId: task.id, content, replyTo: _answering.get(`${task.project}#${task.id}`) });
                 const warnings = Array.isArray(res && res.warnings) ? res.warnings : [];
                 const who = creator || 'its creator';
                 const text = warnings.includes('creator_not_reachable')

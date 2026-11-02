@@ -5,6 +5,7 @@ import { isBusyStatus, busyRetryingText, machineOf, afterPause } from './overloa
 import { isCloud, keyLabel } from './server_base.js';
 import { nameSaveButton, aboutRow, BOARD_SAVE_BUTTON } from './saved_marks.js';
 import { renderTaskQueueRun, groupTaskQueueRuns } from './board_system_lines.js';
+const { threadItems, hasThreads, answersLoaded } = await importOnce('./board_threads.js'); // a part of the board page's group: loaded with it
 import { authorLabel } from './board_author.js';
 import { getAgentColor, isOperatorId, OPERATOR_ID, escapeAttr, boardMessageColorStyle, escapeHtml, externalMessageBadge, replyWithHtml, hubUserBadge, askBadge, renderBoardMessageBody } from './utils.js';
 let boardLeadName = () => ''; importOnce('./board_members.js').then(m => { boardLeadName = m.boardLeadName; }).catch(() => {}); // not awaited: board_members.js loads the board's own modules, and this one is among them
@@ -159,7 +160,7 @@ function renderBoardItem(item, prev) {
     const prevMsg = prev && prev.kind === 'msg' ? prev.m : null;
     const prevAgent = prevMsg ? (prevMsg.job_title || 'Unknown') : null;
     const sameAsPrev = agent === prevAgent;
-    const spacing = sameAsPrev ? 'mb-message-grouped' : 'mb-message-first';
+    const spacing = sameAsPrev && !item.nested ? 'mb-message-grouped' : 'mb-message-first';
     const isLeader = /orchestrator/i.test(agent) || isOperatorId(m.subscriber_id);
     const alignClass = isLeader ? ' board-msg-left' : ' board-msg-right';
     const selectedClass = isSelectMode() && isSelected(m.id) ? ' mb-message-selected' : '';
@@ -170,7 +171,7 @@ function renderBoardItem(item, prev) {
     const parts = rowParts(m, { agent, timeHtml: messageTimeHtml(m.created_at), moreLabel, replyName: m.reply_to ? (parent ? (parent.job_title || 'Unknown') : 'an earlier message') : '', self: OPERATOR_ID.toLowerCase() }); // the table's head, actions and flags (board_table.js)
     const checkbox = isSelectMode() ? `<input type="checkbox" class="check mb-select-checkbox" data-msg-id="${Number(m.id)}" ${isSelected(m.id) ? 'checked' : ''} data-on-click="mb-msg-select">` : '';
     return `
-        <div class="mb-message ${spacing}${alignClass}${selectedClass}${parts.classes}"${parts.attrs} role="listitem" data-message-id="${escapeAttr(String(m.id))}"${m.reply_to ? ` data-reply-to="${Number(m.reply_to)}"` : ''}${messageAttachmentAttrs(m)} style="${boardMessageColorStyle(color)}">
+        <div class="mb-message ${spacing}${alignClass}${selectedClass}${parts.classes}${item.nested ? ' mb-thread-reply' : ''}"${parts.attrs} role="listitem" data-message-id="${escapeAttr(String(m.id))}"${m.reply_to ? ` data-reply-to="${Number(m.reply_to)}"` : ''}${messageAttachmentAttrs(m)} style="${boardMessageColorStyle(color)}">
             ${parts.toggle}
             <div class="mb-message-header">
                 ${checkbox}
@@ -288,6 +289,7 @@ function syncDays(container) {
     const rows = [...container.querySelectorAll(ROW)];
     let prev = null;
     for (const row of rows) {
+        if (row.classList.contains('mb-thread-reply')) { row.previousElementSibling?.classList.contains('mb-day') && row.previousElementSibling.remove(); continue; } // a reply sits under its message, in that message's day
         const when = at.get(String(rowFirstId(row)));
         const key = when ? new Date(when).toDateString() : null;
         const lead = row.previousElementSibling && row.previousElementSibling.classList.contains('mb-day') ? row.previousElementSibling : null;
@@ -322,8 +324,8 @@ export function renderMessages(messages, { keepAnchor = false, prepended = 0 } =
     const earlierFocused = !!document.activeElement?.closest?.('#mb-messages > .mb-load-earlier');
 
     // Runs of task-queue lines are one collapsed row (#3343), except in select mode.
-    if (!(prepended > 0 && prependEarlier(container, prepended))) {
-        const items = groupTaskQueueRuns(messages, !isSelectMode());
+    if (!(prepended > 0 && !hasThreads(messages) && prependEarlier(container, prepended))) {
+        const items = threadItems(groupTaskQueueRuns(messages, !isSelectMode()));
         container.innerHTML = boardHeaderHtml() + items.map((item, i) => renderBoardItem(item, i > 0 ? items[i - 1] : null)).join('');
         nameBoardButtons(container);
         resolveBoardArtifacts(container, state.currentBoardServer);
@@ -374,7 +376,7 @@ export function appendNewMessages(count) {
     const rows = container.querySelectorAll(ROW);
     const last = rows[rows.length - 1];
     const lastIdx = last ? indexOfId(bs._allMessages, rowFirstId(last)) : -1;
-    if (!last || lastIdx < 0 || lastIdx >= bs._allMessages.length - count || container.querySelector(':scope > .empty-state, :scope > .loading-indicator')) {
+    if (!last || last.classList.contains('mb-thread-reply') || answersLoaded(bs._allMessages, count) || lastIdx < 0 || lastIdx >= bs._allMessages.length - count || container.querySelector(':scope > .empty-state, :scope > .loading-indicator')) {
         renderMessages(bs._allMessages);
         return;
     }
@@ -433,6 +435,7 @@ function trimBoardWindow(container) {
         row.classList.replace('mb-message-grouped', 'mb-message-first');
         break;
     }
+    for (const row of container.querySelectorAll(ROW)) if (!row.classList.contains('mb-queue-run') && rowFirstId(row) < firstKept) row.remove(); // a thread draws a reply away from its place in time: an old message can be below a newer row
 }
 
 // The quiet line above the rows ("Loading earlier messages\u2026", "Start of the board"), after a poll or a load changed it: its text changes in place, and it goes in or out only when it has something to say.

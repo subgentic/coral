@@ -15,7 +15,7 @@ const BASE = require('./test_base').BASE;
     const api = (m, p, body) => ev(`fetch(${JSON.stringify(p)}, { method: ${JSON.stringify(m)}, headers: { 'Content-Type': 'application/json' }, body: ${JSON.stringify(JSON.stringify(body))} }).then(async r => ({ status: r.status, body: await r.json().catch(() => null) }))`);
     const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const post = async (who, content, extra = {}) => { const r = await api('POST', `/api/board/${B}/messages`, { subscriber_id: who, content, ...extra }); assert.equal(r.status, 200, JSON.stringify(r)); return r.body.id || (r.body.message && r.body.message.id); };
-    const ROWS = `[...document.querySelectorAll('#board-panel-msgs > .mb-message')]`;
+    const ROWS = `[...document.querySelectorAll('#board-panel-msgs > .mb-message')].sort((a, b) => a.dataset.messageId - b.dataset.messageId)`; // in the order they were posted: a reply is drawn under its message (#12502)
     const open = async (w, h, mobile, theme, view, dockPx) => {
         await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady();
@@ -51,17 +51,17 @@ const BASE = require('./test_base').BASE;
 
         console.log('An open row: the tags are inside it, Reply and Copy link, no More');
         await open(1280, 800, false, 'dark', 'table', 420);
-        await ev(`document.querySelectorAll('#board-panel-msgs > .mb-message')[1].querySelector('.mb-row-toggle').click(); true`); await settle(250);
-        const o = await ev(`(() => { const r = document.querySelectorAll('#board-panel-msgs > .mb-message')[1]; return { exp: r.querySelector('.mb-row-toggle').getAttribute('aria-expanded'), tags: r.querySelector(':scope > .mb-row-tags-open').getClientRects().length > 0, body: r.querySelector('.mb-message-body').getClientRects().length > 0, controls: r.querySelector('.mb-row-toggle').getAttribute('aria-controls') === r.querySelector('.mb-message-body').id, buttons: [...r.querySelectorAll('.mb-row-actions button')].map(b => b.textContent + ':' + Math.round(b.getBoundingClientRect().height)), replies: r.querySelector('.mb-row-replies').textContent }; })()`);
+        await ev(`${ROWS}[1].querySelector('.mb-row-toggle').click(); true`); await settle(250);
+        const o = await ev(`(() => { const r = ${ROWS}[1]; return { exp: r.querySelector('.mb-row-toggle').getAttribute('aria-expanded'), tags: r.querySelector(':scope > .mb-row-tags-open').getClientRects().length > 0, body: r.querySelector('.mb-message-body').getClientRects().length > 0, controls: r.querySelector('.mb-row-toggle').getAttribute('aria-controls') === r.querySelector('.mb-message-body').id, buttons: [...r.querySelectorAll('.mb-row-actions button')].map(b => b.textContent + ':' + Math.round(b.getBoundingClientRect().height)), replies: r.querySelector('.mb-row-replies').textContent }; })()`);
         assert.equal(o.exp, 'true'); assert.ok(o.tags && o.body && o.controls, JSON.stringify(o));
         assert.deepEqual(o.buttons.map(b => b.split(':')[0]), ['Open task #7757', 'Reply', 'Copy link']); assert.ok(o.buttons.every(b => +b.split(':')[1] >= 44), 'folded buttons are 44 px: ' + o.buttons);
         assert.ok(/Replies \(1\)/.test(o.replies));
         await shot('dock-table-open-default-dark');
 
         console.log('Six marks: the open message in the dock shows every one');
-        await ev(`document.querySelectorAll('#board-panel-msgs > .mb-message')[5].querySelector('.mb-row-toggle').click(); true`); await settle(250);
-        assert.deepEqual(await ev(`[...document.querySelectorAll('#board-panel-msgs > .mb-message')[5].querySelectorAll(':scope > .mb-row-tags-open > *')].map(c => c.textContent.trim())`), ['Reply to QA Engineer', '@Backend Dev', '@QA Engineer', '@Orchestrator', '#7790', 'Question'], 'all six marks inside the open dock row');
-        await ev(`document.querySelectorAll('#board-panel-msgs > .mb-message')[5].querySelector('.mb-row-toggle').click(); true`); await settle(150);
+        await ev(`${ROWS}[5].querySelector('.mb-row-toggle').click(); true`); await settle(250);
+        assert.deepEqual(await ev(`[...${ROWS}[5].querySelectorAll(':scope > .mb-row-tags-open > *')].map(c => c.textContent.trim())`), ['Reply to QA Engineer', '@Backend Dev', '@QA Engineer', '@Orchestrator', '#7790', 'Question'], 'all six marks inside the open dock row');
+        await ev(`${ROWS}[5].querySelector('.mb-row-toggle').click(); true`); await settle(150);
         console.log('Chat view: the same rows, the head hidden; the choice is the page\'s');
         await ev(`[...document.querySelectorAll('.board-chat-header .mb-view-btn')].find(b => b.textContent === 'Chat').click(); true`); await settle(300);
         assert.deepEqual(await ev(`({ view: document.getElementById('board-panel-msgs').dataset.view, head: ${ROWS}.some(r => r.querySelector(':scope > .mb-row-toggle').getClientRects().length), body: ${ROWS}.every(r => r.querySelector('.mb-message-body').getClientRects().length), stored: localStorage.getItem('coral.board.view') })`), { view: 'chat', head: false, body: true, stored: 'chat' });
@@ -69,22 +69,22 @@ const BASE = require('./test_base').BASE;
         await ev(`[...document.querySelectorAll('.board-chat-header .mb-view-btn')].find(b => b.textContent === 'Table').click(); true`); await settle(300);
 
         console.log('Reply fills the box and posts reply_to; Copy link is the message\'s address');
-        await ev(`document.querySelectorAll('#board-panel-msgs > .mb-message')[0].querySelector('.mb-row-toggle').click(); true`); await settle(200);
-        await ev(`document.querySelectorAll('#board-panel-msgs > .mb-message')[0].querySelector('.mb-row-actions').querySelectorAll('button').forEach(b => { if (b.textContent === 'Reply') b.click(); }); true`); await settle(150);
+        await ev(`${ROWS}[0].querySelector('.mb-row-toggle').click(); true`); await settle(200);
+        await ev(`${ROWS}[0].querySelector('.mb-row-actions').querySelectorAll('button').forEach(b => { if (b.textContent === 'Reply') b.click(); }); true`); await settle(150);
         assert.deepEqual(await ev(`({ v: document.getElementById('board-panel-input').value, f: document.activeElement === document.getElementById('board-panel-input') })`), { v: '@QA Engineer ', f: true });
-        const link = await ev(`(() => { let got = ''; Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async t => { got = t; } } }); document.querySelectorAll('#board-panel-msgs > .mb-message')[0].querySelectorAll('.mb-row-actions button').forEach(b => { if (b.textContent === 'Copy link') b.click(); }); return new Promise(r => setTimeout(() => r(got), 200)); })()`);
-        const first = await ev(`document.querySelectorAll('#board-panel-msgs > .mb-message')[0].dataset.messageId`);
+        const link = await ev(`(() => { let got = ''; Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async t => { got = t; } } }); ${ROWS}[0].querySelectorAll('.mb-row-actions button').forEach(b => { if (b.textContent === 'Copy link') b.click(); }); return new Promise(r => setTimeout(() => r(got), 200)); })()`);
+        const first = await ev(`${ROWS}[0].dataset.messageId`);
         assert.ok(link.endsWith(`/team/${B}/board/${first}`), 'the link: ' + link);
         await ev(`(() => { const i = document.getElementById('board-panel-input'); i.value += 'thanks'; i.dispatchEvent(new Event('input', { bubbles: true })); document.querySelector('#agentic-panel-board .btn-send').click(); return true; })()`);
         await waitFor(`document.querySelectorAll('#board-panel-msgs > .mb-message').length >= 7`, 'the reply row', 10000);
         const list = await ev(`fetch('/api/board/${B}/messages/all?limit=20').then(r => r.json())`);
         const mine = (Array.isArray(list) ? list : list.messages || []).find(m => /thanks/.test(m.content));
         assert.ok(mine && mine.reply_to, 'the post carries reply_to: ' + JSON.stringify(mine));
-        assert.ok(await ev(`document.querySelectorAll('#board-panel-msgs > .mb-message')[0].classList.contains('mb-open')`), 'the open row stayed open when the list was drawn again');
+        assert.ok(await ev(`${ROWS}[0].classList.contains('mb-open')`), 'the open row stayed open when the list was drawn again');
 
         console.log('Light theme, default dock');
         await open(1280, 800, false, 'light', 'table', 420);
-        await ev(`document.querySelectorAll('#board-panel-msgs > .mb-message')[1].querySelector('.mb-row-toggle').click(); true`); await settle(250);
+        await ev(`${ROWS}[1].querySelector('.mb-row-toggle').click(); true`); await settle(250);
         await shot('dock-table-open-default-light');
         await open(390, 844, true, 'light', 'table', 390);
         await shot('dock-table-phone-light');

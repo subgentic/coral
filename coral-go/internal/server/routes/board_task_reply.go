@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"log/slog"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -28,12 +29,22 @@ func (h *BoardHandler) ReplyToTask(w http.ResponseWriter, r *http.Request) {
 	}
 	var in struct {
 		Content string `json:"content"`
+		ReplyTo int64  `json:"reply_to,omitempty"` // the message of the task the words answer (the newest one from someone else), so the board threads them under it (#12502)
 	}
 	derr := decodeJSON(r, &in)
+	if derr == nil && in.ReplyTo != 0 && (in.ReplyTo < 0 || h.bs.CheckReplyTo(r.Context(), project, in.ReplyTo) != nil) {
+		errBadRequest(w, "reply_to is not a message of this board") // before anything is posted
+		return
+	}
 	reply := &taskReply{taskID: taskID, creator: task.CreatedBy}
-	msg, ok := h.postMessageCore(w, r, project, derr, postMessageBody{Content: in.Content}, reply)
+	msg, ok := h.postMessageCore(w, r, project, derr, postMessageBody{Content: in.Content, ReplyTo: in.ReplyTo}, reply)
 	if !ok {
 		return
+	}
+	if in.ReplyTo > 0 {
+		if err := h.bs.RecordReply(r.Context(), project, msg.ID, in.ReplyTo); err != nil {
+			slog.Warn("board reply not recorded", "board", project, "message", msg.ID, "error", err)
+		}
 	}
 	notified := reply.notified
 	if notified == nil {

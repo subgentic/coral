@@ -16,7 +16,7 @@ const BASE = require('./test_base').BASE;
     const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const { settle, coralReady } = require('./helpers/wait').bind(ev);
     const post = async (who, content, extra = {}) => { const r = await api('POST', `/api/board/${B}/messages`, { subscriber_id: who, content, ...extra }); assert.equal(r.status, 200, `${who} posts: ${JSON.stringify(r)}`); return r.body.id || (r.body.message && r.body.message.id); };
-    const ROWS = `[...document.querySelectorAll('#mb-messages > .mb-message')]`;
+    const ROWS = `[...document.querySelectorAll('#mb-messages > .mb-message')].sort((a, b) => a.dataset.messageId - b.dataset.messageId)`; // in the order they were posted: a reply is drawn under its message (#12502), the checks below are about each message
     const open = async (w, h, mobile, theme, view = 'table', path = `/team/${B}/messages`) => {
         await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile });
         await Emulation.setTouchEmulationEnabled({ enabled: mobile });
@@ -68,18 +68,18 @@ const BASE = require('./test_base').BASE;
         await shot('board-table-1280-dark');
 
         console.log('2. A row opens in place: the whole message in 80 characters, Reply, Copy link, More; the replies are listed');
-        await ev(`document.querySelectorAll('#mb-messages > .mb-message')[1].querySelector('.mb-row-toggle').click(); true`); await settle(200);
-        const o = await ev(`(() => { const r = document.querySelectorAll('#mb-messages > .mb-message')[1]; const h = r.querySelector(':scope > .mb-row-toggle'), b = r.querySelector('.mb-message-body'), br = b.getBoundingClientRect(); const px = parseFloat(getComputedStyle(b).fontSize); return { expanded: h.getAttribute('aria-expanded'), controls: h.getAttribute('aria-controls'), bodyId: b.id, shown: br.height > 0, ch: br.width / (px * 0.5), actions: [...r.querySelectorAll('.mb-row-actions button')].map(x => x.textContent + ':' + Math.round(x.getBoundingClientRect().height)), replies: r.querySelector('.mb-row-replies').textContent, snippetHidden: getComputedStyle(h.querySelector('.mb-row-snippet')).visibility, hasList: !!b.querySelector('ul'), name: h.textContent.replace(/\\s+/g, ' ').trim() }; })()`);
+        await ev(`${ROWS}[1].querySelector('.mb-row-toggle').click(); true`); await settle(200);
+        const o = await ev(`(() => { const r = ${ROWS}[1]; const h = r.querySelector(':scope > .mb-row-toggle'), b = r.querySelector('.mb-message-body'), br = b.getBoundingClientRect(); const px = parseFloat(getComputedStyle(b).fontSize); return { expanded: h.getAttribute('aria-expanded'), controls: h.getAttribute('aria-controls'), bodyId: b.id, shown: br.height > 0, ch: br.width / (px * 0.5), actions: [...r.querySelectorAll('.mb-row-actions button')].map(x => x.textContent + ':' + Math.round(x.getBoundingClientRect().height)), replies: r.querySelector('.mb-row-replies').textContent, snippetHidden: getComputedStyle(h.querySelector('.mb-row-snippet')).visibility, hasList: !!b.querySelector('ul'), name: h.textContent.replace(/\\s+/g, ' ').trim() }; })()`);
         assert.equal(o.expanded, 'true'); assert.equal(o.controls, o.bodyId); assert.ok(o.shown && o.hasList, 'the whole message with its list is shown');
         assert.ok(o.ch <= 180, 'the column is about 80 characters (box ' + Math.round(o.ch) + ' half-em units)');
         assert.deepEqual(o.actions.map(a => a.split(':')[0]), ['Open task #7757', 'Reply', 'Copy link', 'More']); assert.ok(/Replies \(1\)/.test(o.replies) && /Backend Dev/.test(o.replies), 'the replies are listed: ' + o.replies);
         assert.equal(o.snippetHidden, 'hidden');
         await shot('board-table-open-1280-dark');
-        await ev(`document.querySelectorAll('#mb-messages > .mb-message')[1].querySelector('.mb-row-toggle').click(); true`); await settle(150);
-        assert.equal(await ev(`document.querySelectorAll('#mb-messages > .mb-message')[1].querySelector('.mb-row-toggle').getAttribute('aria-expanded')`), 'false', 'a second press closes it');
+        await ev(`${ROWS}[1].querySelector('.mb-row-toggle').click(); true`); await settle(150);
+        assert.equal(await ev(`${ROWS}[1].querySelector('.mb-row-toggle').getAttribute('aria-expanded')`), 'false', 'a second press closes it');
 
         console.log('3. Keyboard: Enter and Space open and close a row; one Tab stop a row');
-        await ev(`(() => { const h = document.querySelectorAll('#mb-messages > .mb-message')[0].querySelector('.mb-row-toggle'); h.focus(); return document.activeElement === h; })()`);
+        await ev(`(() => { const h = ${ROWS}[0].querySelector('.mb-row-toggle'); h.focus(); return document.activeElement === h; })()`);
         const key = async (k, code) => { await Input.dispatchKeyEvent({ type: 'keyDown', key: k, code, text: k === 'Enter' ? '\r' : ' ' }); await Input.dispatchKeyEvent({ type: 'keyUp', key: k, code }); await settle(120); };
         await key('Enter', 'Enter');
         assert.equal(await ev(`document.activeElement.getAttribute('aria-expanded')`), 'true', 'Enter opens'); await key(' ', 'Space');
@@ -102,8 +102,8 @@ const BASE = require('./test_base').BASE;
         assert.equal(await ev(`${ROWS}.every(r => !r.classList.contains('mb-open'))`), true, 'Collapse all closes them');
 
         console.log('6. Reply puts the name in the composer; the post carries reply_to');
-        await ev(`document.querySelectorAll('#mb-messages > .mb-message')[0].querySelector('.mb-row-toggle').click(); true`); await settle(150);
-        await ev(`document.querySelectorAll('#mb-messages > .mb-message')[0].querySelector('.mb-row-actions').querySelectorAll('button').forEach(b => { if (b.textContent === 'Reply') b.click(); }); true`); await settle(150);
+        await ev(`${ROWS}[0].querySelector('.mb-row-toggle').click(); true`); await settle(150);
+        await ev(`${ROWS}[0].querySelector('.mb-row-actions').querySelectorAll('button').forEach(b => { if (b.textContent === 'Reply') b.click(); }); true`); await settle(150);
         const c = await ev(`({ value: document.getElementById('mb-post-input').value, focused: document.activeElement === document.getElementById('mb-post-input') })`);
         assert.deepEqual(c, { value: '@QA Engineer ', focused: true });
         await ev(`(() => { const i = document.getElementById('mb-post-input'); i.value += 'thanks, noted'; i.dispatchEvent(new Event('input', { bubbles: true })); document.querySelector('#mb-board .mb-post-send-btn').click(); return true; })()`);
@@ -112,7 +112,7 @@ const BASE = require('./test_base').BASE;
         const list = Array.isArray(posted) ? posted : (posted.messages || []);
         const mine = list.find(m => /thanks, noted/.test(m.content));
         assert.ok(mine && mine.reply_to, 'the post carries reply_to: ' + JSON.stringify(mine));
-        assert.ok(await ev(`document.querySelectorAll('#mb-messages > .mb-message')[0].classList.contains('mb-open')`), 'the open row stayed open when a message arrived');
+        assert.ok(await ev(`${ROWS}[0].classList.contains('mb-open')`), 'the open row stayed open when a message arrived');
 
         console.log('6b. A Question that is answered says so on its collapsed row, without a reload (#8170)');
         const liveQ = await post('Lead Developer', '@Backend Dev is the live question answered yet?', { ask: true });
@@ -124,8 +124,8 @@ const BASE = require('./test_base').BASE;
         assert.deepEqual(await badgeOf(liveQ), { head: ['Question · answered'], chat: ['Question · answered'], open: false }, 'the collapsed row, and the chat header, say answered without a reload');
         console.log('   ✓');
         console.log('7. Copy link is the message\'s own address, and opening it lands on the message');
-        const link = await ev(`(() => { let got = ''; Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async t => { got = t; } } }); document.querySelectorAll('#mb-messages > .mb-message')[0].querySelectorAll('.mb-row-actions button').forEach(b => { if (b.textContent === 'Copy link') b.click(); }); return new Promise(r => setTimeout(() => r(got), 200)); })()`);
-        const first = await ev(`document.querySelectorAll('#mb-messages > .mb-message')[0].dataset.messageId`);
+        const link = await ev(`(() => { let got = ''; Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async t => { got = t; } } }); ${ROWS}[0].querySelectorAll('.mb-row-actions button').forEach(b => { if (b.textContent === 'Copy link') b.click(); }); return new Promise(r => setTimeout(() => r(got), 200)); })()`);
+        const first = await ev(`${ROWS}[0].dataset.messageId`);
         assert.ok(link.endsWith(`/team/${B}/board/${first}`), 'the link: ' + link);
         await open(1280, 800, false, 'dark', 'table', `/team/${B}/messages/${qid}`);
         await waitFor(`document.querySelector('#mb-messages > .mb-message[data-message-id="${qid}"].mb-open')`, 'the linked message opens', 10000);
@@ -149,13 +149,13 @@ const BASE = require('./test_base').BASE;
 
         console.log('9. Light theme');
         await open(1280, 800, false, 'light', 'table');
-        await ev(`document.querySelectorAll('#mb-messages > .mb-message')[1].querySelector('.mb-row-toggle').click(); true`); await settle(200);
+        await ev(`${ROWS}[1].querySelector('.mb-row-toggle').click(); true`); await settle(200);
         await shot('board-table-open-1280-light');
 
         console.log('10. Phone: one-line rows (the avatar is the sender), the tags with the open message, 44 px targets');
         for (const theme of ['dark', 'light']) {
             await open(390, 640, true, theme, 'table'); // 640 px high: the board's box is taller without the page pill (#11239 slice B), and the fixture's messages must overflow it for a row to be scrolled under the day line
-            const p = await ev(`(() => ({ rows: ${ROWS}.map(r => { const h = r.querySelector(':scope > .mb-row-toggle'), s = h.querySelector('.mb-row-snippet'), lh = parseFloat(getComputedStyle(s).lineHeight) || 16; return { h: Math.round(h.getBoundingClientRect().height), lines: Math.round(s.getBoundingClientRect().height / lh), tags: [...h.querySelectorAll('.mb-row-tags > *')].filter(x => x.getClientRects().length).length }; }), sideways: document.documentElement.scrollWidth > innerWidth + 1, pitch: (() => { const rs = ${ROWS}.map(r => r.getBoundingClientRect()); return rs.slice(1).map((r, i) => Math.round(r.top - rs[i].top)); })(), rowH: ${ROWS}.map(r => Math.round(r.getBoundingClientRect().height)), gap: getComputedStyle(document.getElementById('mb-messages')).rowGap }))()`);
+            const p = await ev(`(() => ({ rows: [...document.querySelectorAll('#mb-messages > .mb-message')].map(r => { const h = r.querySelector(':scope > .mb-row-toggle'), s = h.querySelector('.mb-row-snippet'), lh = parseFloat(getComputedStyle(s).lineHeight) || 16; return { h: Math.round(h.getBoundingClientRect().height), lines: Math.round(s.getBoundingClientRect().height / lh), tags: [...h.querySelectorAll('.mb-row-tags > *')].filter(x => x.getClientRects().length).length }; }), sideways: document.documentElement.scrollWidth > innerWidth + 1, pitch: (() => { const rs = [...document.querySelectorAll('#mb-messages > .mb-message')].map(r => r.getBoundingClientRect()); return rs.slice(1).map((r, i) => Math.round(r.top - rs[i].top)); })(), rowH: [...document.querySelectorAll('#mb-messages > .mb-message')].map(r => Math.round(r.getBoundingClientRect().height)), gap: getComputedStyle(document.getElementById('mb-messages')).rowGap }))()`);
             assert.ok(p.pitch.every(x => x >= 44 && x <= 46) && p.rowH.every(x => x <= 46), `${theme}: one 44 px line and its hairline, the next row at once: a pitch of 45 px at most, no padding or margin round the row (the pitch, the row boxes, the gap, the toggles): ${JSON.stringify([p.pitch, p.rowH, p.gap, p.rows.map(r => r.h)])}`);
             assert.ok(p.rows.every(r => r.h >= 44 && r.h <= 48 && r.lines <= 1 && r.tags <= 1), `${theme}: one line, 44 px, nothing on the folded row but an open question's dot: ` + JSON.stringify(p.rows));
             const dot = await ev(`(() => { const q = document.querySelector('#mb-messages .mb-row-tags .mb-ask-badge:not(.is-answered)'); const probe = document.createElement('i'); probe.style.backgroundColor = 'var(--warning)'; document.body.appendChild(probe); const w = getComputedStyle(probe).backgroundColor; probe.remove(); return { want: w, got: q && getComputedStyle(q).backgroundColor, w: q && Math.round(q.getBoundingClientRect().width) }; })()`);
@@ -164,16 +164,16 @@ const BASE = require('./test_base').BASE;
             const av = await ev(`${ROWS}.map(r => Math.round(r.querySelector('.mb-row-avatar').getBoundingClientRect().left))`);
             assert.equal(new Set(av).size, 1, `${theme}: the folded rows' avatars start at one edge: ` + JSON.stringify(av));
             await shot(`board-table-390-${theme}`);
-            await ev(`document.querySelectorAll('#mb-messages > .mb-message')[1].querySelector('.mb-row-toggle').click(); true`); await settle(250);
-            const q = await ev(`(() => { const r = document.querySelectorAll('#mb-messages > .mb-message')[1]; return { tagsOpen: r.querySelector(':scope > .mb-row-tags-open') && r.querySelector(':scope > .mb-row-tags-open').getClientRects().length > 0, buttons: [...r.querySelectorAll('.mb-row-actions button, .mb-row-reply')].map(b => Math.round(b.getBoundingClientRect().height)), wide: Math.round(r.querySelector('.mb-message-body').getBoundingClientRect().width) }; })()`);
+            await ev(`${ROWS}[1].querySelector('.mb-row-toggle').click(); true`); await settle(250);
+            const q = await ev(`(() => { const r = ${ROWS}[1]; return { tagsOpen: r.querySelector(':scope > .mb-row-tags-open') && r.querySelector(':scope > .mb-row-tags-open').getClientRects().length > 0, buttons: [...r.querySelectorAll('.mb-row-actions button, .mb-row-reply')].map(b => Math.round(b.getBoundingClientRect().height)), wide: Math.round(r.querySelector('.mb-message-body').getBoundingClientRect().width) }; })()`);
             assert.ok(q.tagsOpen && q.buttons.length >= 4 && q.buttons.every(h => h >= 44), `${theme}: the tags are with the open message and its buttons are 44 px: ` + JSON.stringify(q));
             await shot(`board-table-open-390-${theme}`);
             // The open row's tags are not under the sticky day line: a row opened while its top is scrolled under the line is brought into view with 8 px or more below the line.
-            await ev(`document.querySelectorAll('#mb-messages > .mb-message')[1].querySelector('.mb-row-toggle').click(); true`); await settle(200);
-            await ev(`(() => { const box = document.getElementById('mb-messages'), r = document.querySelectorAll('#mb-messages > .mb-message')[1]; box.scrollTo({ top: r.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop + 12, behavior: 'instant' }); /* by the boxes' own rects, and instant: the board scrolls smoothly, and an animated scroll still running when the row is opened moved the row after the product had measured it */ return true; })()`); await settle(200);
-            await ev(`document.querySelectorAll('#mb-messages > .mb-message')[1].querySelector('.mb-row-toggle').click(); true`); await settle(300);
+            await ev(`${ROWS}[1].querySelector('.mb-row-toggle').click(); true`); await settle(200);
+            await ev(`(() => { const box = document.getElementById('mb-messages'), r = ${ROWS}[1]; box.scrollTo({ top: r.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop + 12, behavior: 'instant' }); /* by the boxes' own rects, and instant: the board scrolls smoothly, and an animated scroll still running when the row is opened moved the row after the product had measured it */ return true; })()`); await settle(200);
+            await ev(`${ROWS}[1].querySelector('.mb-row-toggle').click(); true`); await settle(300);
             await settle(300);
-            const under = await ev(`(() => { const r = document.querySelectorAll('#mb-messages > .mb-message')[1], d = document.querySelector('#mb-messages > .mb-day').getBoundingClientRect(); return { open: r.classList.contains('mb-open'), gap: Math.round(r.getBoundingClientRect().top - d.bottom) }; })()`);
+            const under = await ev(`(() => { const r = ${ROWS}[1], d = document.querySelector('#mb-messages > .mb-day').getBoundingClientRect(); return { open: r.classList.contains('mb-open'), gap: Math.round(r.getBoundingClientRect().top - d.bottom) }; })()`);
             assert.ok(under.open && under.gap >= 8, `${theme}: the opened row starts 8 px or more below the day line: ` + JSON.stringify(under));
             await shot(`board-table-open-below-day-390-${theme}`);
         }
