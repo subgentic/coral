@@ -58,6 +58,9 @@ func (r Reader) Settings() (Entries, error) {
 
 // Resolve checks that a ref names a commit, so a typo is one clear line and not a failed read of a file.
 func Resolve(repo, ref string) (string, error) {
+	if strings.HasPrefix(ref, "-") { // a leading dash would be read by git as an option, not as a ref
+		return "", fmt.Errorf("%q is not a commit, tag or branch of %s", ref, repo)
+	}
 	out, err := Reader{Repo: repo}.git("rev-parse", "--verify", "--quiet", ref+"^{commit}")
 	if err != nil {
 		return "", fmt.Errorf("%q is not a commit, tag or branch of %s", ref, repo)

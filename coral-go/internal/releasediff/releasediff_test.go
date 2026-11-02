@@ -163,3 +163,21 @@ func TestTheReaderReadsTwoRefsOfARealRepository(t *testing.T) {
 	_, err = Reader{Repo: repo, Ref: "old"}.File("coral-go/nothing")
 	assert.Error(t, err)
 }
+
+// A ref that starts with a dash is refused before git is run: git would read it as an option. A git that records its calls proves it is never started.
+func TestARefThatStartsWithADashNeverReachesGit(t *testing.T) {
+	bin, log := t.TempDir(), filepath.Join(t.TempDir(), "calls")
+	require.NoError(t, os.WriteFile(filepath.Join(bin, "git"), []byte("#!/bin/sh\necho \"$@\" >> "+log+"\nexit 1\n"), 0o755))
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	for _, bad := range []string{"--output=x", "-h", "--upload-pack=x"} {
+		_, err := Resolve(t.TempDir(), bad)
+		require.Error(t, err, bad)
+		assert.Contains(t, err.Error(), "is not a commit", bad)
+	}
+	_, err := os.Stat(log)
+	assert.True(t, os.IsNotExist(err), "git was started for a ref that is an option")
+	_, err = Resolve(t.TempDir(), "v1") // an ordinary ref does go to git (the stub), so the stub is a real probe
+	assert.Error(t, err)
+	_, err = os.Stat(log)
+	assert.NoError(t, err)
+}
