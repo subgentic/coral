@@ -172,12 +172,29 @@ func runFar(f farCfg, text string) int {
 				return 2
 			}
 		}
+		bm := regexp.MustCompile(`b=(pty|tmux|keep); `).FindStringSubmatch(text)
+		if bm == nil {
+			fmt.Fprintln(os.Stderr, "the daemon start names no backend")
+			return 2
+		}
+		backend := bm[1]
+		bfile := filepath.Join(install, "backend")
+		if backend == "keep" { // the file, else tmux when it is there (a server set up before the choice existed)
+			b, _ := os.ReadFile(bfile)
+			backend = strings.TrimSpace(string(b))
+			if backend != "pty" && backend != "tmux" {
+				backend = "tmux"
+				if f.flag("notmux") {
+					backend = "pty"
+				}
+			}
+		}
+		if backend == "tmux" && f.flag("notmux") {
+			return 7
+		}
+		_ = os.WriteFile(bfile, []byte(backend), 0o600)
 		appendLine(f.TmuxLog, "daemon-start")
 		f.setFlag("session", true)
-		backend := "tmux"
-		if f.flag("notmux") {
-			backend = "pty"
-		}
 		appendLine(f.ArgsLog, "--host 127.0.0.1 --port 8420 --no-browser --cloud-url off --backend "+backend+" --home "+filepath.Join(install, "data"))
 		_ = os.WriteFile(filepath.Join(filepath.Dir(f.Home), "started"), []byte(fmt.Sprint(time.Now().UnixNano())), 0o600) // the command gave Coral </dev/null, so it gets going
 		return 0

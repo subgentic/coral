@@ -40,8 +40,9 @@ const (
 	// CmdUnpack unpacks that package into <install>/<version>/root and records its SHA-256 in <install>/<version>/package.sha256; arg 0 is the version.
 	CmdUnpack
 	// CmdStartDaemon starts the installed Coral of version arg 0 as a detached process (setsid, nohup, no terminal), listening on loopback only, with its data under the install folder: its PID in <install>/coral.pid
-	// (written by the process itself, which is the one that execs Coral) and its output appended to <install>/coral.log (moved to coral.log.1, replacing the older one, at a start when it is over 10 MiB). Nothing is done when the recorded PID is a Coral of this install that is alive. It asks
-	// for `--backend tmux` when tmux is installed (agents then survive a restart of Coral) and `--backend pty` when it is not (they end with Coral).
+	// (written by the process itself, which is the one that execs Coral) and its output appended to <install>/coral.log (moved to coral.log.1, replacing the older one, at a start when it is over 10 MiB).
+	// Arg 1 is the terminal backend: "pty" (agents end with Coral) or "tmux" (they survive a restart; exit 7 when tmux is not installed), written to <install>/backend; "keep" reads that file, and with none
+	// (a server set up before the choice existed, in tmux) takes tmux when it is installed, else pty. Nothing is done when the recorded PID is a live Coral of this install.
 	// Its standard input is /dev/null: a Coral with a terminal asks "Enable remote access? [y/N]" before it listens and waits for an answer nobody gives (the setup then timed out waiting for its API key).
 	CmdStartDaemon
 	// CmdEnsureInstanceID makes the provisioner's instance id file (32 hex digits, once) and prints it.
@@ -97,6 +98,8 @@ type spec struct {
 // versionRe is a release version as the hub names it: numbers and an optional suffix, never a path.
 var versionRe = regexp.MustCompile(`^[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,4}(-[A-Za-z0-9.]{1,32})?$`)
 
+var backendArgRe = regexp.MustCompile(`^(pty|tmux|keep)$`)
+
 var archRe = regexp.MustCompile(`^(amd64|arm64)$`)
 
 var sha256Re = regexp.MustCompile(`^[0-9a-f]{64}$`)
@@ -112,10 +115,12 @@ var specs = map[Command]spec{
 	CmdMkVersionDir:   {template: "umask 077 && mkdir -p \"$HOME/" + InstallDir + "/%[1]s\" && chmod 700 \"$HOME/" + InstallDir + "\" \"$HOME/" + InstallDir + "/%[1]s\"", args: []*regexp.Regexp{versionRe}},
 	CmdReceive:        {template: "umask 077 && cat > \"$HOME/" + InstallDir + "/%s/package.tar.gz\"", args: []*regexp.Regexp{versionRe}, timeout: 15 * time.Minute},
 	CmdTarList:        {template: "cd \"$HOME/" + InstallDir + "/%s\" && tar -tzf package.tar.gz", args: []*regexp.Regexp{versionRe}, timeout: 2 * time.Minute},
-	CmdStartDaemon: {template: "umask 077 && mkdir -p \"$HOME/" + InstallDir + "/data\" && { " + aliveTest + " || { b=pty; command -v tmux >/dev/null 2>&1 && b=tmux; s=; command -v setsid >/dev/null 2>&1 && s=setsid; " +
+	CmdStartDaemon: {template: "umask 077 && mkdir -p \"$HOME/" + InstallDir + "/data\" && { " + aliveTest + " || { bf=\"$HOME/" + InstallDir + "/backend\"; b=%[2]s; " +
+		"if [ \"$b\" = keep ]; then b=$(cat \"$bf\" 2>/dev/null); case \"$b\" in pty|tmux) ;; *) if command -v tmux >/dev/null 2>&1; then b=tmux; else b=pty; fi;; esac; fi; " +
+		"if [ \"$b\" = tmux ] && ! command -v tmux >/dev/null 2>&1; then exit 7; fi; printf %%s \"$b\" > \"$bf\"; s=; command -v setsid >/dev/null 2>&1 && s=setsid; " +
 		"l=\"$HOME/" + InstallDir + "/coral.log\"; if [ \"$(wc -c < \"$l\" 2>/dev/null || echo 0)\" -gt 10485760 ]; then mv -f \"$l\" \"$l.1\"; fi; " +
 		"P=\"$HOME/" + InstallDir + "/coral.pid\" C=\"$HOME/" + InstallDir + "/%[1]s/root/coral\" B=$b H=\"$HOME/" + InstallDir + "/data\" " +
-		"nohup $s sh -c 'echo $$ > \"$P\"; exec \"$C\" --host 127.0.0.1 --port 8420 --no-browser --cloud-url off --backend \"$B\" --home \"$H\"' </dev/null >>\"$HOME/" + InstallDir + "/coral.log\" 2>&1 & }; }", args: []*regexp.Regexp{versionRe}},
+		"nohup $s sh -c 'echo $$ > \"$P\"; exec \"$C\" --host 127.0.0.1 --port 8420 --no-browser --cloud-url off --backend \"$B\" --home \"$H\"' </dev/null >>\"$l\" 2>&1 & }; }", args: []*regexp.Regexp{versionRe, backendArgRe}},
 	CmdEnsureInstanceID: {template: "umask 077 && mkdir -p \"$HOME/" + InstallDir + "\" && f=\"$HOME/" + InstallDir + "/instance-id\" && { [ -s \"$f\" ] || head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \\n' > \"$f\"; } && cat \"$f\""},
 	CmdReadAPIKey:       {template: "\"$HOME/" + InstallDir + "/%s/root/coral\" api-key --home \"$HOME/" + InstallDir + "/data\" 2>/dev/null", args: []*regexp.Regexp{versionRe}},
 	CmdAcceptTerms:      {template: "\"$HOME/" + InstallDir + "/%s/root/coral\" accept-terms", args: []*regexp.Regexp{versionRe}},

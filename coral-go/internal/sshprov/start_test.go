@@ -31,10 +31,10 @@ func TestStartStartsCoralOnLoopbackOnlyAndOnlyOnce(t *testing.T) {
 	r, home, argsLog, tmuxLog := startSide(t)
 	tg, _ := ParseTarget("user@box.example.com")
 	ctx := context.Background()
-	if err := r.Start(ctx, tg, "2.0.10"); err != nil {
+	if err := r.Start(ctx, tg, "2.0.10", BackendTmux); err != nil {
 		t.Fatal(err)
 	}
-	if err := r.Start(ctx, tg, "2.0.10"); err != nil { // a re-run
+	if err := r.Start(ctx, tg, "2.0.10", BackendTmux); err != nil { // a re-run
 		t.Fatal(err)
 	}
 	deadline := time.Now().Add(5 * time.Second)
@@ -103,7 +103,7 @@ func TestReadAPIKeyWaitsForACoralThatIsStartingAndNeverLogsIt(t *testing.T) {
 	defer func() { keyPoll = oldPoll }()
 	tg, _ := ParseTarget("user@box.example.com")
 	ctx := context.Background()
-	if err := r.Start(ctx, tg, "2.0.10"); err != nil {
+	if err := r.Start(ctx, tg, "2.0.10", BackendTmux); err != nil {
 		t.Fatal(err)
 	}
 	key, err := r.ReadAPIKey(ctx, tg, "2.0.10") // the fake coral makes it 0.3 s after it starts
@@ -213,7 +213,7 @@ func TestStopAndConfirmReturnsOnlyOnAConfirmedStop(t *testing.T) {
 	ctx := context.Background()
 
 	r, _, _, tmuxLog := startSide(t)
-	if err := r.Start(ctx, tg, "2.0.10"); err != nil {
+	if err := r.Start(ctx, tg, "2.0.10", BackendTmux); err != nil {
 		t.Fatal(err)
 	}
 	if err := r.StopAndConfirm(ctx, tg); err != nil {
@@ -228,7 +228,7 @@ func TestStopAndConfirmReturnsOnlyOnAConfirmedStop(t *testing.T) {
 
 	r, home, _, _ := startSide(t)
 	dir := filepath.Dir(home)
-	if err := r.Start(ctx, tg, "2.0.10"); err != nil {
+	if err := r.Start(ctx, tg, "2.0.10", BackendTmux); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(dir, "stuck"), nil, 0o600); err != nil { // the session will not die
@@ -299,7 +299,7 @@ func TestAnotherUsersCoralOn8420IsNotThisUsersStopAndBlocksThisUsersStart(t *tes
 	if err := r.StopAndConfirm(ctx, tg); err != nil {
 		t.Errorf("this user has nothing running, so their stop is confirmed whatever another user holds: %v", err)
 	}
-	if err := r.Start(ctx, tg, "2.0.10"); !errors.Is(err, ErrPortInUse) {
+	if err := r.Start(ctx, tg, "2.0.10", BackendTmux); !errors.Is(err, ErrPortInUse) {
 		t.Errorf("a start with 8420 held by another: %v", err)
 	}
 	if b, _ := os.ReadFile(tmuxLog); strings.Contains(string(b), "new-session") {
@@ -309,13 +309,13 @@ func TestAnotherUsersCoralOn8420IsNotThisUsersStopAndBlocksThisUsersStart(t *tes
 	if err := os.Remove(filepath.Join(dir, "portheld")); err != nil {
 		t.Fatal(err)
 	}
-	if err := r.Start(ctx, tg, "2.0.10"); err != nil {
+	if err := r.Start(ctx, tg, "2.0.10", BackendTmux); err != nil {
 		t.Fatalf("start: %v", err)
 	}
 	if err := os.WriteFile(filepath.Join(dir, "portheld"), nil, 0o600); err != nil { // this user's own Coral now holds it: the session exists
 		t.Fatal(err)
 	}
-	if err := r.Start(ctx, tg, "2.0.10"); err != nil {
+	if err := r.Start(ctx, tg, "2.0.10", BackendTmux); err != nil {
 		t.Errorf("a re-run with this user's own session must not be refused for its own port: %v", err)
 	}
 }
@@ -345,7 +345,7 @@ func TestStopCheckReadsOnlyThisUsersProcessesAndPortCheckOnlyThePort(t *testing.
 
 // No command's text may carry a formatting verb that did not get its argument ("%!s(MISSING)", "%!(EXTRA ...)"): the stop check once did and so always said "stopped" (#11429, QA Engineer's MUST).
 func TestNoRemoteCommandTextHasAFormattingError(t *testing.T) {
-	samples := []string{"2.0.10", "a/b.tgz", "amd64", strings.Repeat("a", 64)}
+	samples := []string{"2.0.10", "a/b.tgz", "amd64", strings.Repeat("a", 64), "pty"}
 	for c, s := range specs {
 		args := make([]string, len(s.args))
 		for i, re := range s.args {
@@ -393,7 +393,7 @@ func TestRemoteTextRefusesATemplateWithAFormattingError(t *testing.T) {
 // no listener, no key, and setup's wait for the key fails. The start command gives it standard input from /dev/null. The far side here (the stand-in) lets Coral get going only when the command did that, so
 // taking the redirect out makes the key never come (the ported FIFO test of be-ssh-start-stdin).
 func TestStartGivesCoralNoTerminalToAskAt(t *testing.T) {
-	text, err := remoteText(CmdStartDaemon, "2.0.10")
+	text, err := remoteText(CmdStartDaemon, "2.0.10", "tmux")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -406,7 +406,7 @@ func TestStartGivesCoralNoTerminalToAskAt(t *testing.T) {
 	defer func() { keyPoll, keyWait = oldPoll, oldWait }()
 	r, _, _, _ := startSide(t)
 	tg, _ := ParseTarget("user@box.example.com")
-	if err := r.Start(context.Background(), tg, "2.0.10"); err != nil {
+	if err := r.Start(context.Background(), tg, "2.0.10", BackendTmux); err != nil {
 		t.Fatal(err)
 	}
 	if key, err := r.ReadAPIKey(context.Background(), tg, "2.0.10"); err != nil || key != testKey {
@@ -414,25 +414,50 @@ func TestStartGivesCoralNoTerminalToAskAt(t *testing.T) {
 	}
 }
 
-// Set up without tmux (#12217): the far Coral is a detached process, and asks for the tmux backend only when tmux exists there (agents then survive a restart); without it, pty (they end with Coral).
-func TestStartAsksForTheTmuxBackendOnlyWhereTmuxExists(t *testing.T) {
-	for _, notmux := range []bool{false, true} {
-		r, home, argsLog, _ := startSide(t)
-		if notmux {
-			(farCfg{Home: home}).setFlag("notmux", true)
-		}
+// The backend is the person's choice at set up (#12233): pty by default, tmux when asked for and installed; an upgrade keeps what the computer was started with, and a computer set up before the choice
+// (no recorded backend) keeps tmux where tmux is installed. tmux asked for where it is not installed is refused and starts nothing.
+func TestStartUsesTheBackendChosenAndAnUpgradeKeepsIt(t *testing.T) {
+	type step struct {
+		backend string
+		notmux  bool
+		want    string // the backend Coral was started with; "" when nothing was started
+		err     error
+	}
+	for name, steps := range map[string][]step{
+		"pty is the default":        {{"", false, "pty", nil}},
+		"tmux when asked":           {{BackendTmux, false, "tmux", nil}},
+		"tmux where there is none":  {{BackendTmux, true, "", ErrNoTmux}},
+		"keep after pty":            {{BackendPTY, false, "pty", nil}, {BackendKeep, false, "pty", nil}},
+		"keep after tmux":           {{BackendTmux, false, "tmux", nil}, {BackendKeep, false, "tmux", nil}},
+		"keep with no record, tmux": {{BackendKeep, false, "tmux", nil}},
+		"keep with no record, none": {{BackendKeep, true, "pty", nil}},
+	} {
+		r, home, argsLog, tmuxLog := startSide(t)
 		tg, _ := ParseTarget("user@box.example.com")
-		if err := r.Start(context.Background(), tg, "2.0.10"); err != nil {
-			t.Fatal(err)
+		for i, st := range steps {
+			if st.notmux {
+				(farCfg{Home: home}).setFlag("notmux", true)
+			}
+			if i > 0 { // the next start is of a Coral that was stopped
+				(farCfg{Home: home}).setFlag("session", false)
+				_ = os.Remove(argsLog)
+			}
+			err := r.Start(context.Background(), tg, "2.0.10", st.backend)
+			if !errors.Is(err, st.err) {
+				t.Errorf("%s step %d: err %v", name, i, err)
+			}
+			b, _ := os.ReadFile(argsLog)
+			if st.want == "" {
+				if len(b) != 0 {
+					t.Errorf("%s step %d: started anyway: %s", name, i, b)
+				}
+				continue
+			}
+			if !strings.Contains(string(b), "--backend "+st.want+" ") {
+				t.Errorf("%s step %d: want backend %s: %s", name, i, st.want, b)
+			}
 		}
-		b, _ := os.ReadFile(argsLog)
-		want := "--backend tmux"
-		if notmux {
-			want = "--backend pty"
-		}
-		if !strings.Contains(string(b), want) {
-			t.Errorf("notmux=%v: %s", notmux, b)
-		}
+		_ = tmuxLog
 	}
 }
 
@@ -443,7 +468,7 @@ func TestDaemonCommandsTestTheCommandLineBeforeTheyActOnAPID(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	start, err := remoteText(CmdStartDaemon, "2.0.10")
+	start, err := remoteText(CmdStartDaemon, "2.0.10", "tmux")
 	if err != nil {
 		t.Fatal(err)
 	}
