@@ -7,7 +7,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// The brake's words (Security's read of #271): merge, install, uninstall, reset, revoke, revert, remove, purge, rebase and kill join delete, drop, force and push. Each is refused in the question, in a
+// The brake's words (Security's read of #271, and its second list: discard, restore, rollback, migrate, release, grant, authorize, disable, unlink and chmod; "clear" is left out, being too common in
+// harmless questions): merge, install, uninstall, reset, revoke, revert, remove, purge, rebase and kill join delete, drop, force and push. Each is refused in the question, in a
 // label and in a description, in the endings a person or an agent writes; a plain question beside them is still answered.
 func TestAutoRecommendRefusesTheWordsOfAnIrreversibleChange(t *testing.T) {
 	clean := recQuestion("Which color?", "Red (Recommended)", "Green")
@@ -15,6 +16,8 @@ func TestAutoRecommendRefusesTheWordsOfAnIrreversibleChange(t *testing.T) {
 	for _, w := range []string{
 		"merge", "Merges", "merged", "install", "installs", "installing", "uninstall", "uninstalls", "reset", "resets", "revoke", "revokes", "revoked", "revert", "reverts", "reverted",
 		"remove", "removes", "removing", "purge", "purged", "rebase", "rebases", "kill", "kills", "killed",
+		"discard", "discards", "discarded", "restore", "restores", "restored", "rollback", "rollbacks", "migrate", "migrates", "migrating", "release", "releases", "released", "grant", "grants", "granted",
+		"authorize", "authorizes", "authorised", "authorization", "disable", "disables", "disabled", "unlink", "unlinks", "chmod",
 		"delete", "deletes", "drop", "force", "push",
 	} {
 		inDescription := strings.Replace(clean, "A description of the option", "It will "+w+" the branch", 1)
