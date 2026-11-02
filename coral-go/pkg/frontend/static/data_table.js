@@ -207,7 +207,8 @@ export function dataTable(cfg) {
     const hiddenMenu = el('div', 'menu cols-hidden-menu'); hiddenMenu.id = `${hiddenId}-menu`; hiddenMenu.hidden = true; hiddenMenu.setAttribute('role', 'menu'); hiddenMenu.setAttribute('aria-label', 'Hidden columns');
     const hiddenBtn = button('btn btn-quiet btn-small cols-hidden-btn', '', async (e) => { e.stopPropagation(); (await importOnce('./menu_button.js')).toggleMenu(hiddenBtn); });
     hiddenBtn.id = hiddenId; hiddenBtn.setAttribute('aria-haspopup', 'menu'); hiddenBtn.setAttribute('aria-expanded', 'false'); hiddenBtn.setAttribute('aria-controls', hiddenMenu.id);
-    hiddenBar.append(hiddenBtn, hiddenMenu);
+    const resetBtn = button('btn btn-quiet btn-small cols-reset-btn', 'Reset column widths', () => resetWidths()); resetBtn.hidden = true; resetBtn.title = 'Give every column the width it has when nobody has dragged one'; // widths kept by a drag can be taken back (#12409)
+    hiddenBar.append(resetBtn, hiddenBtn, hiddenMenu);
     const closeHidden = () => { if (!hiddenMenu.hidden) importOnce('./menu_button.js').then(m => m.closeMenus()).catch(() => {}); };
     box.append(sortBar, hiddenBar, table);
 
@@ -241,9 +242,10 @@ export function dataTable(cfg) {
     /** Every column's width is decided here, in one place (#11943, the operator's table rules, design note 9ced561a): the table always fits its box; ONE column (the primary, or the one that grows) is elastic and takes what the others leave; a column is never narrower than its whole header; a kept width is fitted to the box it meets; Time and Actions (fixed, in rem) keep their width. The columns have the width their content needs (at most their own max), a kept width wins; when they do not fit, the optional ones go by priority (`drop`, lowest first), then the others are squeezed, last first, down to their header, and only then does the table scroll. A phone's folded rows are laid out by CSS: nothing here. */
     function syncHidden(dropped) {
         const gone = columns.filter(c => dropped.has(c.key));
-        hiddenBar.hidden = !gone.length;
+        const kept = Object.keys(st.widths).length > 0;
+        resetBtn.hidden = !kept; hiddenBtn.hidden = !gone.length; hiddenBar.hidden = !gone.length && !kept;
+        if (!hiddenBar.hidden) loadStyles('data_table_hidden.css'); // the bar's rules come the first time a column is hidden or a width is kept, not at start
         if (!gone.length) { closeHidden(); return; }
-        loadStyles('data_table_hidden.css'); // the control's rules come the first time a column is hidden, not at start
         const word = `${gone.length} column${gone.length === 1 ? '' : 's'} hidden`; hiddenBtn.textContent = word; hiddenBtn.setAttribute('aria-label', `${word}: ${gone.map(c => c.label || c.key).join(', ')}. Show one`);
         hiddenMenu.replaceChildren(...gone.map(c => { const b = button('menu-item', `Show ${c.label || c.key}`, async e => { e.stopPropagation(); (st.pinned ||= new Set()).add(c.key); (await importOnce('./menu_button.js')).closeMenus({ restoreFocus: true }); applyWidths(); }); b.setAttribute('role', 'menuitem'); return b; }));
     }
@@ -310,15 +312,28 @@ export function dataTable(cfg) {
         box.classList.add('dt-sized'); box.style.setProperty('--dt-sized-min', '0px');
         L0 = { avail, w, prim, hard: prim ? Math.max(ITEM_MIN, minOf(prim)) : 0, others: others + active.reduce((n, c) => n + (isFlex(c) && c !== prim ? w[c.key] : 0), 0), floor, chk, active };
         for (const th of thead.querySelectorAll('th.dt-th')) { const c = columns.find(x => x.key === th.dataset.key), h = th.querySelector('.dt-resize'); if (c && h && w[c.key]) { h.setAttribute('aria-valuenow', String(w[c.key])); h.setAttribute('aria-valuemin', String(minOf(c))); } }
+        { const movable = active.filter(x => !fixedW(x)); for (const th of thead.querySelectorAll('th.dt-th')) { const h = th.querySelector('.dt-resize'), at = movable.findIndex(x => x.key === th.dataset.key); if (h) h.hidden = at < 0 || at === movable.length - 1; } } // the last column on show has nothing on its right to give or take room: no handle (#12409)
     }
-    function setWidth(c, w, th) { // a drag or a key: the column widens at the cost of the elastic column only (it stops growing when that has no more room); the other columns do not move
+    /** Move the edge on the right of column c (#12409, Beta Tester on v2.0.35): the edge goes where the pointer goes. c takes the width and the columns on its right give it, the nearest first, each down to its floor (the elastic column down to the name's floor);
+     *  a drag the other way gives the room to the nearest. The elastic column is whatever the others leave, so it is never written down; the table keeps its width. `snap` is the layout the drag began on, so a drag that hit a floor and comes back is where it was. */
+    function setWidth(c, w, th, snap) {
         applyWidths(); // the room is read from a layout of the box as it is now
-        if (L0 && c === L0.prim) { const h = th && th.querySelector('.dt-resize'); if (h) h.setAttribute('aria-valuenow', String(L0.w[c.key] || 0)); return; } // the elastic column is the one that gives room: its own separator has nothing to take it from, and it never grows past what the others leave
-        const room = !L0 || !L0.prim ? MAX_W : L0.avail - (L0.others - (L0.w[c.key] || 0)) - L0.hard; // a drag may eat into the elastic column's preferred room, down to its hard floor
-        st.widths[c.key] = Math.min(MAX_W, Math.max(minOf(c), Math.min(Math.round(w), Math.max(minOf(c), room))));
+        const h = th && th.querySelector('.dt-resize');
+        if (!L0) return;
+        const S = snap || { w: { ...L0.w } }, cols = L0.active.filter(x => !fixedW(x)), i = cols.indexOf(c), pool = i < 0 ? [] : cols.slice(i + 1);
+        if (!pool.length) { if (h) h.setAttribute('aria-valuenow', String(L0.w[c.key] || 0)); return; } // the last column's edge is the table's: nothing on its right to give or take room
+        const floorOf = y => (y === L0.prim ? L0.hard : Math.max(minOf(y), y.share ? 96 : 0)), cur = S.w[c.key] || 0, dx = Math.round(w) - cur, change = {};
+        let newW = cur;
+        if (dx >= 0) { let want = Math.min(dx, MAX_W - cur); for (const y of pool) { if (want <= 0) break; const t = Math.min(want, Math.max(0, (S.w[y.key] || 0) - floorOf(y))); if (t > 0) { change[y.key] = -t; want -= t; newW += t; } } }
+        else { const shrink = Math.min(-dx, Math.max(0, cur - (c === L0.prim ? L0.hard : minOf(c)))); newW = cur - shrink; if (shrink > 0) change[pool[0].key] = shrink; }
+        if (c !== L0.prim) st.widths[c.key] = Math.round(newW);
+        for (const y of pool) if (change[y.key] && y !== L0.prim) st.widths[y.key] = Math.round((S.w[y.key] || 0) + change[y.key]);
         applyWidths();
-        const h = th && th.querySelector('.dt-resize'); if (h) h.setAttribute('aria-valuenow', String(st.widths[c.key]));
+        if (h) h.setAttribute('aria-valuenow', String(L0 && L0.w[c.key] || Math.round(newW)));
+        syncHidden(tightKeys); // the bar offers Reset as soon as a width is kept
     }
+    /** Back to the widths nobody dragged: the kept ones go, in this browser too. */
+    function resetWidths() { st.widths = {}; saveWidths(); applyWidths(); }
     /** The width the column needs for its widest cell and its head (laid out at its natural width for a moment). */
     function fitWidth(c) { const live = columns.filter(x => !emptyKeys.has(x.key) && !cssHides(x)), n = measureNatural(live)[c.key] || 0; applyWidths(); return Math.min(800, n); }
     /** Fit the column to its content: when that is the width it has, nothing changed and nothing is kept (no Reset appears for it). */
@@ -337,8 +352,8 @@ export function dataTable(cfg) {
             if (e.button !== 0) return;
             e.preventDefault(); e.stopPropagation();
             h.setPointerCapture(e.pointerId); h.classList.add('dt-resizing');
-            const startX = e.clientX, start = now(); let moved = false;
-            const move = (ev) => { if (!moved) { if (Math.abs(ev.clientX - startX) < 2) return; moved = true; } setWidth(c, start + (ev.clientX - startX), th); }; // a press that does not move changes nothing: no frozen widths, no Reset
+            applyWidths(); const snap = { w: { ...(L0 ? L0.w : {}) } }, startX = e.clientX, start = snap.w[c.key] || now(); let moved = false;
+            const move = (ev) => { if (!moved) { if (Math.abs(ev.clientX - startX) < 2) return; moved = true; } setWidth(c, start + (ev.clientX - startX), th, snap); }; // a press that does not move changes nothing: no frozen widths, no Reset
             const up = () => { h.removeEventListener('pointermove', move); h.removeEventListener('pointerup', up); h.removeEventListener('pointercancel', up); h.classList.remove('dt-resizing'); if (moved) saveWidths(); };
             h.addEventListener('pointermove', move); h.addEventListener('pointerup', up); h.addEventListener('pointercancel', up);
         });
@@ -415,7 +430,7 @@ export function dataTable(cfg) {
                 const icon = el('span', 'material-icons', 'filter_list'); icon.setAttribute('aria-hidden', 'true'); f.append(icon);
                 th.append(f);
             }
-            if (cfg.resize !== false && c.resize !== false && !c.fixed) th.append(resizeHandle(c, th));
+            if (cfg.resize !== false && c.resize !== false && !c.fixed) { const rh = resizeHandle(c, th); rh.hidden = !columns.slice(columns.indexOf(c) + 1).some(x => !x.fixed && !fixedW(x)); th.append(rh); } // the last column has no handle on show: its right edge is the table's (#12409; applyWidths hides and shows it with the layout)
             if (cfg.decorateHead) cfg.decorateHead(th, c);
             if (emptyKeys.has(c.key)) th.classList.add('dt-col-unused');
             tr.append(th);

@@ -1,7 +1,7 @@
 // The table rules, enforced by data_table.js itself (#11943, the operator: "our table column resizing is very broken", the rules are in design note 9ced561a): at 1440, 1280, 1024 and 900 px, with a long name, with kept widths that are too wide,
 // at 200% text and after a drag of each resizable column, a table with the Needs you mix of columns (an elastic Item, What was asked, CLI, Folder, Team, an empty Blocks, Waiting, a fixed Actions) (1) fits its panel with no sideways
-// scroll, (2) has one elastic column that takes what the others leave, (3) shows every header whole and no empty column, (4) keeps its fixed Actions at its declared width, (5) lets a drag take room from the elastic column only
-// and stop when it has none, (6) fits a kept width to the panel it meets. A fixture table in the dashboard's own page (data_table.js), isolated dev server.
+// scroll, (2) has one elastic column that takes what the others leave, (3) shows every header whole and no empty column, (4) keeps its fixed Actions at its declared width, (5) lets a drag take room from the columns on its right
+// and stop when they have none, (6) fits a kept width to the panel it meets. A fixture table in the dashboard's own page (data_table.js), isolated dev server.
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { coralReady, framesJs } = require('./helpers/wait');
@@ -50,15 +50,15 @@ const { coralReady, framesJs } = require('./helpers/wait');
             for (const [name, long, kept] of [['plain', false, null], ['long name', true, null], ['kept too wide', false, { asks: 700, cli: 300, folder: 400, team: 500, waiting: 400 }]]) {
                 await mount(long, kept); await ev(framesJs(8)); const tag = `${width} px, ${name}`; const m = await measure(); rules(m, tag);
                 if (name === 'plain') {
-                    // a drag of each column that has a handle: it widens at the cost of the elastic column only, and the others do not move
+                    // a drag of each column that has a handle (all but the last on show, #12409): its edge goes right and the columns on its right give the room; the ones on its left do not move
                     for (const c of m.cols.filter(x => x.handle)) {
                         const before = await measure(), h = await ev(`(() => { const r = document.querySelector('#dt-host th[data-key="${c.key}"] .dt-resize').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`), I = client.Input;
                         await I.dispatchMouseEvent({ type: 'mouseMoved', x: h.x, y: h.y }); await I.dispatchMouseEvent({ type: 'mousePressed', x: h.x, y: h.y, button: 'left', buttons: 1, clickCount: 1 });
                         for (let i = 1; i <= 8; i++) await I.dispatchMouseEvent({ type: 'mouseMoved', x: h.x + 400 * i / 8, y: h.y, button: 'left', buttons: 1 });
                         await I.dispatchMouseEvent({ type: 'mouseReleased', x: h.x + 400, y: h.y, button: 'left', buttons: 0, clickCount: 1 }); await ev(framesJs(4));
                         const after = await measure(); rules(after, `${tag}, after dragging ${c.key} 400 px right`);
-                        const still = before.cols.filter(x => x.key !== 'agent' && x.key !== 'asks' && x.key !== c.key); // Item and What was asked are the flexible columns of this table (both declare a share): they give the room
-                        check(still.every(x => Math.abs(((after.cols.find(y => y.key === x.key) || {}).w || 0) - x.w) <= 1), `${tag}: dragging ${c.key} moves no other column but the flexible ones: ${JSON.stringify(before.cols.map(x => [x.key, x.w]))} -> ${JSON.stringify(after.cols.map(x => [x.key, x.w]))}`);
+                        const at = before.cols.findIndex(x => x.key === c.key), still = before.cols.slice(0, at); // the edge goes where the pointer goes (#12409): the columns on its left, flexible or not, stay; the ones on its right give the room
+                        check(still.every(x => Math.abs(((after.cols.find(y => y.key === x.key) || {}).w || 0) - x.w) <= 1), `${tag}: dragging the ${c.key} edge leaves the columns on its left alone (it takes its room from the ones on its right): ${JSON.stringify(before.cols.map(x => [x.key, x.w]))} -> ${JSON.stringify(after.cols.map(x => [x.key, x.w]))}`);
                         await mount(false, null); await ev(framesJs(6));
                     }
                 }
@@ -70,7 +70,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
             const kb = await measure(); await ev(`document.querySelector('#dt-host th[data-key="${key}"] .dt-resize').focus(); true`);
             for (let i = 0; i < 3; i++) { await client.Input.dispatchKeyEvent({ type: 'rawKeyDown', key: 'ArrowRight', code: 'ArrowRight', windowsVirtualKeyCode: 39 }); await client.Input.dispatchKeyEvent({ type: 'keyUp', key: 'ArrowRight', code: 'ArrowRight', windowsVirtualKeyCode: 39 }); }
             await ev(framesJs(6)); const ka = await measure(), grew = ka.cols.find(c => c.key === key).w - kb.cols.find(c => c.key === key).w;
-            check(Math.abs(grew - 48) <= 3, `${width} px: Right x3 on ${key} widens it by 48 px: ${grew} ` + JSON.stringify([kb.cols.map(c => [c.key, c.w]), ka.cols.map(c => [c.key, c.w])]));
+            check(grew > 0 && grew <= 51 && kb.cols.slice(0, kb.cols.findIndex(c => c.key === key)).every(c => Math.abs((ka.cols.find(y => y.key === c.key) || {}).w - c.w) <= 1), `${width} px: Right x3 on ${key} widens it by up to 48 px, as far as the columns on its right can give, and the ones on its left stay (#12409): ${grew} ` + JSON.stringify([kb.cols.map(c => [c.key, c.w]), ka.cols.map(c => [c.key, c.w])]));
         }
         // a column left out to fit is never silently gone: a quiet control says how many, lists them, and brings one back (the table still fits, the others give way)
         await Emulation.setDeviceMetricsOverride({ width: 900, height: 800, deviceScaleFactor: 1, mobile: false }); await mount(false, null); await ev(framesJs(8));
