@@ -18,6 +18,8 @@ assert.equal(authUrlFor({ pathname: '/agents', search: '', hash: '' }), '/auth?r
 assert.equal(authUrlFor({ pathname: '/chats', search: '?q=other', hash: '' }), '/auth?return_to=%2Fchats%3Fq%3Dother', 'a rewrite that is not a shortening (here a dropped fragment of the same page) keeps the canonical address') ;
 setServedAddress('/chats?q=other#top');
 assert.equal(authUrlFor({ pathname: '/chats', search: '?q=other', hash: '' }), '/auth?return_to=%2Fchats%3Fq%3Dother', 'the same page: the address on screen');
+setServedAddress('/agents/abcd1234/files?x=1#frag');
+assert.equal(authUrlFor({ pathname: '/agents', search: '', hash: '' }), '/auth?return_to=' + encodeURIComponent('/agents/abcd1234/files?x=1#frag'), "Coral's own sign-in keeps the fragment as opened");
 setServedAddress('//evil.example/x');
 assert.equal(authUrlFor({ pathname: '/agents', search: '', hash: '' }), '/auth?return_to=%2Fagents', 'a protocol-relative served address is never returned to');
 setServedAddress('//evil.example/agents/x');

@@ -10,5 +10,6 @@ export const setServedAddress = addr => { served = typeof addr === 'string' ? ad
 export function returnAddress(loc, { hash = true } = {}) {
     const here = (loc.pathname || '/') + (loc.search || '') + (hash ? (loc.hash || '') : ''), base = (loc.pathname || '').replace(/\/+$/, '');
     const servedPath = served.split(/[?#]/)[0];
-    return base && served && servedPath.startsWith(base + '/') ? served : here;
+    const opened = hash ? served : served.split('#')[0]; // the Hub's next= never carries a fragment (its validator may refuse one): the served address loses it there as the address on screen does
+    return base && served && servedPath.startsWith(base + '/') ? opened : here;
 }
