@@ -57,6 +57,7 @@ const B = 'goal-done-' + Date.now().toString(36);
         assert.match(rows[0].text, /Done when: it is shipped/);
         assert.deepEqual(rows[0].buttons.filter(b => /^(Close goal|Not yet|Dismiss)$/.test(b)), ['Close goal', 'Not yet', 'Dismiss']);
         const badge = async () => Number(await ev(`(document.getElementById('nav-tab-hub-inbox-badge') || {}).textContent || 0`));
+        await waitFor(`Number((document.getElementById('nav-tab-hub-inbox-badge') || {}).textContent || 0) >= 1`, 'the item is in the Inbox number', 20000); // the badge is drawn after the list: read at once it was 0 on a slower machine (Windows, v2.0.35 gate)
         const withItem = await badge(); assert.ok(withItem >= 1, 'the item is in the Inbox number: ' + withItem);
         const asked = await root('GET', '/api/needs-you?limit=50');
         assert.ok(asked.json.items.some(i => i.kind === 'goal_done' && i.id === `goal_done:${B}:${gid}`), 'the phone-push read has it too');
@@ -64,6 +65,7 @@ const B = 'goal-done-' + Date.now().toString(36);
         // Not yet: gone here and on the machine, until a task is added
         await ev(`[...document.querySelectorAll('${T} tbody tr')].find(tr => /looks done/.test(tr.textContent)).querySelector('button[aria-label^="Not yet"]').click(); true`);
         await waitFor(`!/looks done/.test(document.querySelector('${T}')?.textContent || '')`, 'the item gone after Not yet', 8000);
+        await waitFor(`Number((document.getElementById('nav-tab-hub-inbox-badge') || {}).textContent || 0) === ${withItem - 1}`, 'and out of the Inbox number', 10000);
         assert.equal(await badge(), withItem - 1, 'and out of the Inbox number');
         const saved = (await root('GET', '/api/settings')).json.settings.goal_done_hidden;
         assert.deepEqual(JSON.parse(saved), [`${B}|${gid}|1`], 'kept on the machine at the total it was pressed at');
@@ -74,6 +76,7 @@ const B = 'goal-done-' + Date.now().toString(36);
 
         // #11983: opening the item reads it: it stays listed and stops counting, in the Inbox number, the badge and /api/needs-you; a task done since has a new total, and it is unread again
         await require('./helpers/wait').settle(ev, 600, 300);
+        await waitFor(`Number((document.getElementById('nav-tab-hub-inbox-badge') || {}).textContent || 0) >= 1`, 'the badge counts the item before it is read', 15000);
         const unreadBadge = await badge();
         await ev(`[...document.querySelectorAll('${T} tbody tr')].find(tr => /looks done/.test(tr.textContent)).querySelector('.inbox-review-name').click(); true`);
         await waitFor(`!!document.querySelector('.goal-view, [data-goal-view], #goal-view') || /goals|goal/i.test(location.hash + location.pathname)`, 'the goal opened', 10000);
