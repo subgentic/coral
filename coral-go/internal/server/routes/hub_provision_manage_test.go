@@ -344,6 +344,10 @@ func TestManageUpgradeNamesPort8420WhenAnotherHoldsItAndStartsNothing(t *testing
 
 // An upgrade shows the computer's version beside this hub's (#12217) and refuses to put this hub's OLDER release over a newer one unless the person allows it; nothing is stopped or installed by the refusal.
 func TestManageUpgradeRefusesADowngradeUnlessAllowed(t *testing.T) {
+	// this hub's version is set here, not assumed from the tests that ran before (other tests in the package change config.Version): a hub that reads as 99.0.0 or newer, or as unreadable, would plan no downgrade (v2.0.35's go-tests, 61fb4fec5)
+	prev := config.Version
+	config.Version = "2.0.35"
+	t.Cleanup(func() { config.Version = prev })
 	me := newManageEnv(t)
 	hub := config.ReportedVersion()
 	me.p.eula = func() (bool, bool) { return true, true }
