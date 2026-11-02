@@ -52,9 +52,21 @@ const { coralReady } = require('./helpers/wait');
             await openTaskFromGoal(goalUrl, taskUrl, T);
             await ev(`document.querySelector('#team-panel-item .goals-back').click(); true`);
             await waitFor(`document.activeElement?.dataset?.taskId === '${T}'`, at + 'the row is focused first', 8000);
-            await ev(`(() => { const vis = x => x && x.getClientRects().length && !x.disabled, e = [...document.querySelectorAll('#team-page button, #team-tabs button, .team-tab')].find(x => vis(x) && !x.closest('#team-panel-goals')) || [...document.querySelectorAll('#team-panel-goals .goal-main .goal-actions .btn, #team-panel-goals .goal-main button.btn')].find(vis); e.id = e.id || 'moved-on'; e.focus(); window.__movedOn = e.id; return true; })()`); // the person moves on while the goal's list may still be drawn again (a phone's goal page has no tab strip over it: #11314, they move to a button of the page)
+            await ev(`(() => { const vis = x => x && x.getClientRects().length && !x.disabled, e = [...document.querySelectorAll('#team-page button, #team-tabs button, .team-tab, button, a[href]')].find(x => vis(x) && !x.closest('#team-panel-goals, dialog')); /* a control outside the goal's panel: one inside it can be drawn again with the list, which drops the focus and the loop then rightly takes it for the page's (#12547: that was the 390 flake) */ e.id = e.id || 'moved-on'; e.focus(); window.__movedOn = e.id; return true; })()`); // the person moves on while the goal's list may still be drawn again (a phone's goal page has no tab strip over it: #11314, they move to a button of the page)
             await new Promise(r => setTimeout(r, 1500)); // sleep-ok: the row is re-focused for up to 8 s after Back while the list redraws; a focus that stays through 1.5 s of those 50 ms checks is the proof
             assert.equal(await ev(`document.activeElement?.id`), await ev(`window.__movedOn`), at + 'the control the person moved to keeps the focus, the row does not take it back');
+            console.log('   \u2713');
+
+            console.log(`${at}a focus moved before the row is back is left alone too (#12547: the loop took it when it had not yet seen the row focused)`);
+            await openTaskFromGoal(goalUrl, taskUrl, T);
+            await ev(`(() => { const R = window.fetch.bind(window); window.__release = null; window.fetch = (u, o = {}) => { const url = new URL(String(u), location.origin); if (/\\/api\\/board\\/[^/]+\\/tasks$/.test(url.pathname) && url.searchParams.get('goal') && !window.__release) return new Promise(res => { window.__release = () => res(R(u, o)); }); return R(u, o); }; return true; })()`);
+            await ev(`document.querySelector('#team-panel-item .goals-back').click(); true`);
+            await waitFor(`location.pathname === ${JSON.stringify(goalUrl)} && !!window.__release`, at + 'Back is on the goal and its task list is being read', 8000);
+            await ev(`(() => { const vis = x => x && x.getClientRects().length && !x.disabled, e = [...document.querySelectorAll('#team-page button, #team-tabs button, .team-tab, button, a[href]')].find(x => vis(x) && !x.closest('#team-panel-goals, dialog')); e.id = e.id || 'moved-early'; e.focus(); window.__early = e.id; return true; })()`);
+            await ev(`window.__release(); true`);
+            await waitFor(`!!document.querySelector('#team-panel-goals .goal-list .dt-primary[data-task-id="${T}"]')`, at + 'the row is back', 15000);
+            await new Promise(r => setTimeout(r, 1500)); // sleep-ok: the loop looks every 50 ms; a focus that stays through 1.5 s of those looks is the proof
+            assert.equal(await ev(`document.activeElement?.id`), await ev(`window.__early`), at + 'the control the person moved to before the row was back keeps the focus');
             console.log('   \u2713');
 
             console.log(`${at}a task opened by address keeps the Tasks list`);
