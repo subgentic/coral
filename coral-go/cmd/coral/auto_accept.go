@@ -104,6 +104,9 @@ func subcommand(args []string) (int, bool) {
 	if len(args) > 0 && args[0] == "hub-owner-secret" { // the self-hosted hub's owner stamp (#11378); not listed in the help on purpose
 		return runHubOwnerSecret(args[1:], os.Stdin, os.Stdout, os.Stderr, hubowner.WriteFile), true
 	}
+	if len(args) > 0 && args[0] == "machine" && machineLaunchEnabled() { // off unless CORAL_MACHINE_LAUNCH=1: without it `coral machine` is an unknown command (#9934 slice 1b)
+		return runMachine(args[1:], os.Stdin, os.Stdout, os.Stderr), true
+	}
 	if len(args) > 0 && args[0] == "api-key" {
 		return runAPIKey(args[1:], os.Stdout, os.Stderr), true
 	}
