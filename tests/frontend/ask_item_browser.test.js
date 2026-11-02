@@ -47,6 +47,14 @@ const OPERATOR_TEXT = '@Operator TEST ITEM, safe to answer any way: this is a te
             await shot('ask-item-' + w);
             await ev(`document.querySelector('dialog.inbox-ask-dialog .inbox-ask-buttons .btn:not(.btn-primary)').click(); true`);
             await waitFor(`!document.querySelector('dialog.inbox-ask-dialog')`, at + 'Close closes it', 4000);
+            // the title is the agent's first line: a bidi or zero-width character in it is written out, in the title as in the body (Security's SHOULD on #12143; hidden characters reshape what the Operator reads before deciding)
+            const titles = await ev(`import(${S} + 'operator_asks.js').then(m => ({
+                short: m.askParts({ text: '@Operator approve \\u202edeploy\\u200b now?\\nmore' }).title,
+                long: m.askParts({ text: '@Operator \\u202e' + 'Which of the two designs do we ship, given what each costs and what the other would cost us? ' + 'x'.repeat(20) }).title,
+                heading: m.askParts({ text: '## \\u200bship it?' }).title }))`);
+            assert.equal(titles.short, 'approve <U+202E>deploy<U+200B> now?', at + 'a short first line is the title with its hidden characters written out: ' + JSON.stringify(titles.short));
+            assert.ok(titles.long.startsWith('<U+202E>Which of the two designs') && !/[\u202e\u200b]/.test(titles.long), at + 'a long first line is cut after they are written out: ' + JSON.stringify(titles.long));
+            assert.equal(titles.heading, '<U+200B>ship it?', at + 'a Markdown heading mark is taken off, the hidden character stays visible');
             // a one-line question is its own title, with no body
             await ev(`document.querySelector('button[aria-label="Answer the question of Dev"]').click(); true`);
             await waitFor(`document.querySelector('dialog.inbox-ask-dialog[open]')`, at + 'the second opens', 4000);
