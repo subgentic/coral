@@ -302,6 +302,13 @@ func (m *BoardHealthMonitor) nameIssues(ctx context.Context, in rosterInputs, r 
 		posts = nil
 	}
 	n := 0
+	var known []string // every member's name and job title: an @ is resolved to the longest of them it fully matches, as delivery does (#12352)
+	for i := range in.subs {
+		known = append(known, in.subs[i].SubscriberID)
+		if t := strings.TrimSpace(in.subs[i].JobTitle); t != "" {
+			known = append(known, t)
+		}
+	}
 	for i := range in.subs {
 		sub := &in.subs[i]
 		if !awake[sub.SubscriberID] || board.SameIdentity(sub.SubscriberID, in.recipient.SubscriberID) {
@@ -313,7 +320,7 @@ func (m *BoardHealthMonitor) nameIssues(ctx context.Context, in rosterInputs, r 
 			r.NameIssues = append(r.NameIssues, teamhealth.NameIssue{Name: name, Edge: true})
 			n++
 		default:
-			if tries, oldest := board.MentionGap(sub.SubscriberID, sub.JobTitle, posts); tries > 0 {
+			if tries, oldest := board.MentionGapAmong(sub.SubscriberID, sub.JobTitle, known, posts); tries > 0 {
 				r.NameIssues = append(r.NameIssues, teamhealth.NameIssue{Name: name, Posts: tries, Window: window, Age: in.now.Sub(oldest)})
 				n++
 			}
