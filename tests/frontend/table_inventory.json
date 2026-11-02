@@ -1,5 +1,5 @@
 {
- "comment": "#11942: every dataTable()/tasksTable() call site in static/*.js, by file, with the surface it draws and what table_rules_browser covers it with (a synthetic spec of the same shape, or the live surface). A new call site is added here, with its elastic column declared in a spec, or table_inventory.test.mjs fails.",
+ "comment": "#11942: every dataTable()/tasksTable() call site in static/*.js, by file, with the surface it draws and what the table_rules_*_browser suites covers it with (a synthetic spec of the same shape, or the live surface). A new call site is added here, with its elastic column declared in a spec, or table_inventory.test.mjs fails.",
  "tables": [
   {
    "file": "analytics_agent.js",
