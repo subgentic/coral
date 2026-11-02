@@ -414,3 +414,91 @@ func TestScanConfigNeverLetsAHopUpdateTheOwnersKnownHosts(t *testing.T) {
 		t.Errorf("updatehostkeys = %q, want false (the owner's block won)", got["updatehostkeys"])
 	}
 }
+
+func genKey(t *testing.T, dir string) []string {
+	keygen, err := exec.LookPath("ssh-keygen")
+	if err != nil {
+		t.Skip("no ssh-keygen on this computer")
+	}
+	key := filepath.Join(dir, "k"+strconv.Itoa(len(dir)))
+	if out, err := exec.Command(keygen, "-q", "-t", "ed25519", "-N", "", "-f", key).CombinedOutput(); err != nil {
+		t.Fatalf("ssh-keygen: %v %s", err, out)
+	}
+	pub, _ := os.ReadFile(key + ".pub")
+	return strings.Fields(string(pub))
+}
+
+// #12056: forgetting a host key removes the lines of THAT host from the file given, hashed or not, and nothing else; a missing file has nothing to forget; a name that is not a host name is refused.
+func TestForgetHostKeyRemovesOnlyThatHostFromTheGivenFile(t *testing.T) {
+	keygen, err := exec.LookPath("ssh-keygen")
+	if err != nil {
+		t.Skip("no ssh-keygen on this computer")
+	}
+	dir := t.TempDir()
+	a, b := genKey(t, t.TempDir()), genKey(t, t.TempDir())
+	known := filepath.Join(dir, "known")
+	if err := os.WriteFile(known, []byte("box.example.com "+a[0]+" "+a[1]+"\n[other.example.com]:2200 "+b[0]+" "+b[1]+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := ForgetHostKey(context.Background(), known, "box.example.com"); err != nil {
+		t.Fatal(err)
+	}
+	left, _ := os.ReadFile(known)
+	if strings.Contains(string(left), "box.example.com") || !strings.Contains(string(left), "[other.example.com]:2200") {
+		t.Errorf("only box.example.com goes: %q", left)
+	}
+	// a hashed file (the default on Debian and Ubuntu)
+	if out, err := exec.Command(keygen, "-H", "-f", known).CombinedOutput(); err != nil {
+		t.Fatalf("hash: %v %s", err, out)
+	}
+	if err := ForgetHostKey(context.Background(), known, "[other.example.com]:2200"); err != nil {
+		t.Fatal(err)
+	}
+	if out, _ := exec.Command(keygen, "-F", "[other.example.com]:2200", "-f", known).CombinedOutput(); strings.Contains(string(out), b[1]) {
+		t.Errorf("the hashed entry is gone: %s", out)
+	}
+	if err := ForgetHostKey(context.Background(), filepath.Join(dir, "missing"), "box.example.com"); err != nil {
+		t.Errorf("a file that is not there has nothing to forget: %v", err)
+	}
+	for _, bad := range []string{"", "a b", "../x", "-f", "host\nname"} {
+		if err := ForgetHostKey(context.Background(), known, bad); err == nil {
+			t.Errorf("%q must be refused", bad)
+		}
+	}
+	if err := ForgetHostKey(context.Background(), "", "box.example.com"); err == nil {
+		t.Error("no path: refused")
+	}
+}
+
+// #12056: the name the hub holds a host's key under: a typed target is its host (and [host]:port), an alias is what ssh -G says (HostKeyAlias, else HostName with its port), never the alias itself.
+func TestHostKeyNameIsTheNameSshUses(t *testing.T) {
+	sshBin, err := exec.LookPath("ssh")
+	if err != nil {
+		t.Skip("no ssh on this computer")
+	}
+	dir := t.TempDir()
+	cfg := filepath.Join(dir, "config")
+	if err := os.WriteFile(cfg, []byte("Host plain\n  HostName real.example.com\nHost ported\n  HostName real.example.com\n  Port 2200\nHost aliased\n  HostName real.example.com\n  Port 2200\n  HostKeyAlias vault\nHost coder.ws\n  ProxyCommand /bin/true\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	r := Runner{SSH: sshBin, Config: cfg}
+	typed22, _ := ParseTarget("user@box.example.com")
+	typed2222, _ := ParseTarget("user@box.example.com:2222")
+	for name, c := range map[string]struct {
+		target Target
+		want   string
+	}{"typed": {typed22, "box.example.com"}, "typed with a port": {typed2222, "[box.example.com]:2222"}} {
+		if got := r.HostKeyName(context.Background(), c.target); got != c.want {
+			t.Errorf("%s: %q, want %q", name, got, c.want)
+		}
+	}
+	for alias, want := range map[string]string{"plain": "real.example.com", "ported": "[real.example.com]:2200", "aliased": "vault", "coder.ws": "coder.ws"} {
+		tg, _ := FromAlias(alias)
+		if got := r.HostKeyName(context.Background(), tg); got != want {
+			t.Errorf("alias %s: %q, want %q", alias, got, want)
+		}
+	}
+	if got := (Runner{SSH: sshBin, Config: filepath.Join(dir, "missing")}).HostKeyName(context.Background(), Target{Alias: "plain"}); got != "plain" && got != "" {
+		t.Logf("a config that is not there answers %q (ssh's own default)", got)
+	}
+}

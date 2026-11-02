@@ -107,6 +107,15 @@ export function mountSshSetup(host, { mode = 'setup', server = null, action = nu
         draw();
     }
 
+    async function forgetKey() {
+        st.busy = true; st.error = ''; draw();
+        const r = await api('POST', `/api/servers/provision/${encodeURIComponent(st.plan.plan)}/forget-key`);
+        if (st.dead) return;
+        if (!apply(r, 'Could not forget the key.')) { st.step = 'failed'; return draw(); }
+        st.step = 'plan'; // back at the start: Connect shows the key the computer has now, and nothing is trusted until it is confirmed
+        draw();
+    }
+
     async function run() {
         st.busy = true; st.error = ''; draw();
         const body = {};
@@ -283,6 +292,10 @@ export function mountSshSetup(host, { mode = 'setup', server = null, action = nu
         root.append(e);
         root.append(el('p', 'ssh-help', 'Nothing more was done. You can start again; a setup that already finished its earlier steps skips them.'));
         const bar = el('div', 'servers-form-actions');
+        if (p && p.key_changed) { // the computer's key is not the one Coral saved: forgetting the saved one is the way on when the change is expected (a rebuilt machine), and the next connect shows the new key to confirm
+            root.append(el('p', 'ssh-help', 'If you expected this (the computer was rebuilt or reinstalled), forget the saved key: Coral removes only this computer\'s key from its own list, then shows you the key it finds now to confirm. If you did not expect it, do not: it may be a different computer.'));
+            bar.append(button('Forget this host key', '', forgetKey));
+        }
         bar.append(button('Close', 'btn-primary', close));
         root.append(bar);
     }

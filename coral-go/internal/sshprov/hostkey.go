@@ -430,3 +430,72 @@ func withoutStrict(argv []string) []string {
 	}
 	return out
 }
+
+// HostKeyName is the name the hub's known_hosts holds the key of t under: HostKeyAlias when the host's block has one, else the HostName (not the alias) with its port in the [host]:port form for a port other than
+// 22. A typed target is its own host and port; an alias is read with ssh -G on the owner's config (the hub's own safety options after it, so the answer is the one a connection would use). Empty when it cannot be told.
+func (r Runner) HostKeyName(ctx context.Context, t Target) string {
+	if t.Alias == "" {
+		if t.Host == "" {
+			return ""
+		}
+		return KnownHostName(t.Host, t.Port)
+	}
+	sshBin := r.SSH
+	if sshBin == "" {
+		sshBin = "ssh"
+	}
+	userCfg := r.Config
+	if userCfg == "" {
+		userCfg = DefaultConfigPath()
+	}
+	if userCfg == "" || !aliasRe.MatchString(t.Alias) {
+		return ""
+	}
+	cctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	cmd := executil.Command(cctx, sshBin, "-G", "-F", userCfg, "--", t.Alias)
+	var out capped
+	cmd.Stdout, cmd.Stderr, cmd.Env = &out, io.Discard, minimalEnv()
+	if err := cmd.Run(); err != nil {
+		return ""
+	}
+	eff := map[string]string{}
+	for _, l := range strings.Split(out.b.String(), "\n") {
+		if k, v, ok := strings.Cut(l, " "); ok {
+			eff[k] = strings.Trim(v, `"`)
+		}
+	}
+	name := eff["hostname"]
+	if p := eff["port"]; p != "" && p != "22" {
+		if n, err := strconv.Atoi(p); err == nil {
+			name = KnownHostName(eff["hostname"], n)
+		}
+	}
+	if a := eff["hostkeyalias"]; a != "" {
+		name = a
+	}
+	if !knownNameRe.MatchString(name) {
+		return ""
+	}
+	return name
+}
+
+// ForgetHostKey removes the keys the file at path holds for name (ssh-keygen -R, which reads a hashed file too and keeps the old file as <path>.old): the owner's way out of a changed key, after which the next connect scans the host
+// again and the owner confirms what it shows. Only the file given (the hub's own) and only a name that passed knownNameRe; a file that is not there has nothing to forget.
+func ForgetHostKey(ctx context.Context, path, name string) error {
+	if path == "" || !knownNameRe.MatchString(name) {
+		return errors.Join(ErrHostKeyScan, ErrBadTarget)
+	}
+	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	cmd := executil.Command(ctx, keygenProgram, "-R", name, "-f", path)
+	var out, errOut capped
+	cmd.Stdout, cmd.Stderr, cmd.Stdin, cmd.Env = &out, &errOut, nil, minimalEnv()
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("sshprov: could not remove the host key: %w", err)
+	}
+	return nil
+}
