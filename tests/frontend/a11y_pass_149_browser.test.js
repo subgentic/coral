@@ -8,7 +8,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
-const { coralReady } = require('./helpers/wait');
+const { coralReady, framesJs } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -36,6 +36,9 @@ const { coralReady } = require('./helpers/wait');
         await ev(`document.querySelector('.artifact-viewer .artifact-viewer-more').click(); document.querySelector('.artifact-viewer .details-toggle').click(); true`);
         await waitFor(`!!document.querySelector('.artifact-readers .artifact-readers-head') && document.querySelector('.artifact-readers .artifact-readers-head').getClientRects().length > 0`, 'Who can read this, shown by Details');
         await ev(`(document.querySelector('.artifact-viewer-menu').hidden ? 0 : document.querySelector('.artifact-viewer-more').click()); document.querySelector('.artifact-viewer-close').focus(); true`);
+        await waitFor(`(() => { const v = document.querySelector('.artifact-viewer'), m = v.querySelector('.artifact-viewer-more'); return !v.hidden && !!m && m.getClientRects().length > 0 && v.querySelector('.artifact-viewer-close').getClientRects().length > 0; })()`, 'the ⋯ button and Close are both drawn before Tab is pressed (a slow runner pressed it while only Close was a stop)');
+        await ev(framesJs(6)); // the viewer's own async draws (readers, comments, versions) have landed
+        await ev(`document.querySelector('.artifact-viewer-close').focus(); true`);
         const stops = [];
         for (let i = 0; i < 12; i++) {
             await key('Tab', 'Tab', 9);
@@ -43,6 +46,7 @@ const { coralReady } = require('./helpers/wait');
             stops.push(here);
             if (here.isClose) break;
         }
+        console.log('STOPS', JSON.stringify(stops));
         assert.ok(stops.length > 1 && stops[stops.length - 1].isClose, 'Tab goes through the viewer\'s controls and comes back to Close, a trap that wraps: ' + JSON.stringify(stops));
         assert.ok(stops.every(x => x.inViewer && !x.inReaders), 'Who can read this is text, not a stop (#7796), and focus never leaves the viewer: ' + JSON.stringify(stops));
         await key('Tab', 'Tab', 9); // wraps to the first control
