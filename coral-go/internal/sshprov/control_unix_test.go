@@ -64,49 +64,88 @@ func TestControlOptionsAreOnEveryHubSSHExceptTheKeyScan(t *testing.T) {
 	}
 }
 
-// A folder that is not safe is never used: a link, one open to others is made private, and a path that is not absolute, has a space or is too long for a socket's name falls back or turns sharing off.
-func TestControlFolderIsCheckedBeforeItIsTrusted(t *testing.T) {
-	resetControl(t)
+// ensurePrivateDir is the safety check of the shared socket's folder, tested directly (QA: through UseControlDir a long temp path fell back before the check was reached): a folder open to others is made 0700,
+// a link is refused, and a folder owned by another user is refused.
+func TestEnsurePrivateDirChecksTheFolderBeforeItIsTrusted(t *testing.T) {
 	base := t.TempDir()
-	target := filepath.Join(base, "real")
-	if err := os.MkdirAll(target, 0o700); err != nil {
-		t.Fatal(err)
-	}
-	link := filepath.Join(base, "l")
-	if err := os.Symlink(target, link); err != nil {
-		t.Fatal(err)
-	}
-	if got := UseControlDir(link); got == link {
-		t.Errorf("a link was trusted as the control folder")
-	} else if got != "" {
-		t.Cleanup(func() { _ = os.RemoveAll(got) })
-	}
-	open := filepath.Join(base, "o")
+	open := filepath.Join(base, "open")
 	if err := os.MkdirAll(open, 0o777); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Chmod(open, 0o777); err != nil {
 		t.Fatal(err)
 	}
-	if got := UseControlDir(open); got == open {
-		if st, _ := os.Lstat(open); st.Mode().Perm() != 0o700 {
-			t.Errorf("a folder open to others was used as it was: %v", st.Mode())
+	if err := ensurePrivateDir(open); err != nil {
+		t.Fatalf("a folder of ours open to others: %v", err)
+	}
+	if st, _ := os.Lstat(open); st.Mode().Perm() != 0o700 {
+		t.Errorf("it was used as it was: %v", st.Mode())
+	}
+	fresh := filepath.Join(base, "fresh")
+	if err := ensurePrivateDir(fresh); err != nil {
+		t.Fatalf("a new folder: %v", err)
+	}
+	if st, _ := os.Lstat(fresh); !st.IsDir() || st.Mode().Perm() != 0o700 {
+		t.Errorf("a new folder is not 0700: %v", st.Mode())
+	}
+	link := filepath.Join(base, "link")
+	if err := os.Symlink(open, link); err != nil {
+		t.Fatal(err)
+	}
+	if err := ensurePrivateDir(link); err == nil {
+		t.Error("a link was trusted as the control folder")
+	}
+	file := filepath.Join(base, "file")
+	if err := os.WriteFile(file, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := ensurePrivateDir(file); err == nil {
+		t.Error("a file was trusted as the control folder")
+	}
+	if os.Getuid() != 0 {
+		for _, d := range []string{"/usr", "/etc"} { // folders that exist and are owned by root
+			if st, err := os.Lstat(d); err == nil && st.IsDir() {
+				if err := ensurePrivateDir(d); err == nil {
+					t.Errorf("%s, owned by another user, was trusted", d)
+				}
+				break
+			}
 		}
 	}
-	if got := UseControlDir("relative/dir"); got != "" {
-		t.Errorf("a relative folder: %q", got)
+}
+
+// UseControlDir settles on a short, safe folder and refuses the rest, with a SHORT folder so the checks are what decide (a long temp path would fall back before them): a relative path, a space or a quote in
+// the name, and a path too long for a socket's name (which falls back to the folder under /tmp).
+func TestUseControlDirRefusesWhatItShould(t *testing.T) {
+	resetControl(t)
+	short, err := os.MkdirTemp("/tmp", "cs")
+	if err != nil {
+		t.Skip("no short folder under /tmp")
 	}
-	spaced := filepath.Join(base, "has space")
-	if got := UseControlDir(spaced); got == spaced {
-		t.Errorf("a folder with a space: %q", got)
-	} else if got != "" {
-		t.Cleanup(func() { _ = os.RemoveAll(got) })
+	t.Cleanup(func() { _ = os.RemoveAll(short) })
+	if got := UseControlDir(filepath.Join(short, "ok")); got != filepath.Join(short, "ok") {
+		t.Fatalf("a short, safe folder was not used: %q", got)
 	}
-	long := filepath.Join(base, strings.Repeat("d", 80))
+	for _, bad := range []string{"relative/dir", filepath.Join(short, "has space"), filepath.Join(short, `q"uote`), filepath.Join(short, "q'uote")} {
+		got := UseControlDir(bad)
+		if got == bad || got == "relative/dir" {
+			t.Errorf("%q was used", bad)
+		}
+		if got != "" {
+			t.Cleanup(func() { _ = os.RemoveAll(got) })
+		}
+	}
+	long := filepath.Join(short, strings.Repeat("d", 80))
 	if got := UseControlDir(long); got == long {
-		t.Errorf("a folder too long for a socket's name: %q", got)
-	} else if got != "" {
+		t.Errorf("a folder too long for a socket's name was used")
+	} else {
+		if got == "" || !strings.HasPrefix(got, "/tmp/coral-ssh-") {
+			t.Errorf("the fallback: %q", got)
+		}
 		t.Cleanup(func() { _ = os.RemoveAll(got) })
+	}
+	if _, err := os.Stat(long); err == nil {
+		t.Error("the too-long folder was made")
 	}
 }
 
