@@ -125,7 +125,7 @@ func (h *SessionsHandler) autoSleepInputOf(ctx context.Context, ls *store.LiveSe
 	}
 	// A team agent parked in `coral-board wait` ("Waiting for a message") is inside a tool call that has no end until its message comes, so its last event is a tool and it looks mid-turn for ever. It is idle:
 	// the message, task or commit it waits for is a typed nudge, which wakes it. So an open wait that nobody has touched for the idle minutes is no turn (v2.0.34: no real team agent ever slept).
-	if in.InTurn && sub != nil && !in.LastActive.IsZero() && now.Sub(in.LastActive) >= idle && h.parkedInWait(ctx, ptr.Value(ls.BoardName), sub.SubscriberID) {
+	if in.InTurn && sub != nil && !in.LastActive.IsZero() && now.Sub(in.LastActive) >= idle && h.parkedInWait(ctx, ptr.Value(ls.BoardName), sub.SubscriberID, in.LastActive) {
 		in.InTurn = false
 	}
 	if in.LastActive.IsZero() { // an agent that never did anything is idle from its launch: launched_at, which NULL says is created_at (a launch makes a row, a wake stamps it, #353)
@@ -191,10 +191,18 @@ func (h *SessionsHandler) autoSleepProcess(ctx context.Context, ls *store.LiveSe
 	return cpu-prev.cpu > autoSleepBusyCPU, false, rss
 }
 
-// parkedInWait: the agent has a registered board wait open (unreadable: not parked, so it stays awake).
-func (h *SessionsHandler) parkedInWait(ctx context.Context, project, member string) bool {
+// waitCommandSlack is how long after a wait's registration its own command's last event may still be (the tool call that ran `coral-board wait`).
+const waitCommandSlack = 10 * time.Second
+
+// parkedInWait: the agent has a registered board wait open and nothing happened since it was registered, so its last event IS the wait (Security, #12335: an agent that interrupted its wait and
+// started a long command still has the registration, and must keep its in-turn protection). Unreadable: not parked, so it stays awake.
+func (h *SessionsHandler) parkedInWait(ctx context.Context, project, member string, lastActive time.Time) bool {
 	w, err := h.bs.GetActiveWait(ctx, project, member)
-	return err == nil && w != nil
+	if err != nil || w == nil {
+		return false
+	}
+	made, err := time.Parse(time.RFC3339, w.CreatedAt)
+	return err == nil && !lastActive.After(made.Add(waitCommandSlack))
 }
 
 func (h *SessionsHandler) claimedTaskOf(ctx context.Context, project, member string) bool {

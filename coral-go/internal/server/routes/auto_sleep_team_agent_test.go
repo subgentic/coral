@@ -66,3 +66,13 @@ func TestAnAgentInsideABoardWaitIsIdleAndOneInsideAnyOtherToolIsNot(t *testing.T
 	assert.Equal(t, 1, parked(t, true), "a tool call open for two hours inside a registered wait: parked, asleep")
 	assert.Equal(t, 0, parked(t, false), "a tool call open for two hours and no wait: a turn going on (a long build), awake")
 }
+
+// An agent that interrupted its wait and went on to a long command keeps the registration but has a later event: still in its turn (Security, #12335).
+func TestAnAgentThatMovedOnFromItsWaitIsStillInItsTurn(t *testing.T) {
+	r := newQuietSleepRig(t)
+	_, err := r.h.bs.RegisterWait(r.ctx, "autosleep", "dev", r.name, "message", "", "waiting for a message", 10*time.Hour)
+	require.NoError(t, err)
+	_, err = r.h.ts.InsertAgentEvent(r.ctx, &store.AgentEvent{AgentName: "dev", SessionID: &r.sid, EventType: "tool_use", CreatedAt: time.Now().Add(time.Minute).UTC().Format(time.RFC3339Nano)})
+	require.NoError(t, err)
+	assert.Equal(t, 0, r.pass(t).IsSleeping, "a tool call a minute after the wait was registered is not the wait: awake")
+}
