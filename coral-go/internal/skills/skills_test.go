@@ -270,6 +270,7 @@ func TestParseRefusesNamesUnsafeOnWindows(t *testing.T) {
 	}
 	_, err := Parse(makeZip(t, zf{name: "SKILL.md", body: goodMD}, zf{name: "refs/console.md", body: "x"}, zf{name: "refs/com.md", body: "x"}, zf{name: "refs/null-notes.md", body: "x"}))
 	assert.NoError(t, err, "names that only start like a device name are fine")
+}
 
 // #12022: the scanner warns about what a script does that is worth a second look, names every host a script mentions, and reads only scripts: a reference file may say anything.
 func TestScanWarnsAboutScriptsAndNamesTheirHosts(t *testing.T) {
