@@ -182,7 +182,7 @@ export function resolveArtifactSource(uri, options = {}) {
 
 /**
  * Render an artifact into `body`.
- * ctx: { signal, isStale(), renderContent(body, content, path), openEntry({name, uri, media_type}),
+ * ctx: { signal, isStale(), renderContent(body, content, path, server), openEntry({name, uri, media_type}),
  *        setMeta({ title, filename }), typeKnown?(entries|null) }  (typeKnown: once, when the kind is known: the files of a manifest, so a Download can name the file and not the manifest (#9925), or null for any other artifact; a host with a Download offers none before it, #9941)
  */
 export async function renderArtifact(body, uri, options, ctx) {
@@ -260,7 +260,7 @@ async function _renderArtifactInto(body, uri, options, ctx, source, kind) {
             if (delimited && !isMarkdown && !isJSON) { // a table, with a Raw view that is the original text (#11382); the module loads only for such a file
                 const { renderCsvTable } = await importOnce('./csv_table.js');
                 if (ctx.isStale()) return;
-                renderCsvTable(body, content, { name: filename, tsv: delimited === 'tsv', raw: host => ctx.renderContent(host, content, artifactPath) });
+                renderCsvTable(body, content, { name: filename, tsv: delimited === 'tsv', raw: host => ctx.renderContent(host, content, artifactPath, source.server) });
                 return;
             }
             const manifest = isJSON ? _parseManifest(content) : null;
@@ -273,7 +273,7 @@ async function _renderArtifactInto(body, uri, options, ctx, source, kind) {
             } else {
                 // The shared renderer chooses a language from the extension;
                 // artifact display names such as acceptance_report have none.
-                ctx.renderContent(body, content, isMarkdown ? 'artifact.md' : artifactPath);
+                ctx.renderContent(body, content, isMarkdown ? 'artifact.md' : artifactPath, source.server); // the file's server: a reference in it names a file on that computer (#12373)
             }
         }
     } catch (error) {

@@ -52,8 +52,8 @@ export const createdText = (item) => { const d = item.created_at ? new Date(item
 export const taskText = (item) => { const title = visibleName(item.task_title); return item.task_id ? `#${item.task_id}${title ? ' ' + title : ''}` : 'No task'; }; // a task's title is a person's text (Security on #220)
 
 /** The artifact's text: Markdown through the strict renderer (raw HTML shown as text, then the sanitizer), anything else as plain text. */
-export function renderText(host, content, path) {
-    if (/\.(?:md|markdown|mdown)$/i.test(path || '')) { host.innerHTML = `<div class="prose prose-doc preview-pane-markdown artifact-viewer-markdown">${renderMarkdownStrict(content)}</div>`; highlightCodeIn(host); linkArtifactRefsIn(host, { asWritten: true }); }
+export function renderText(host, content, path, server) {
+    if (/\.(?:md|markdown|mdown)$/i.test(path || '')) { host.innerHTML = `<div class="prose prose-doc preview-pane-markdown artifact-viewer-markdown">${renderMarkdownStrict(content)}</div>`; highlightCodeIn(host); linkArtifactRefsIn(host, { asWritten: true, server }); }
     else host.innerHTML = `<pre class="preview-pane-code artifact-viewer-text"><code>${escapeHtml(content)}</code></pre>`;
 }
 
