@@ -322,3 +322,18 @@ func TestMachineTightensTheDefaultStateFolderAndOnlyWarnsAboutAChosenOne(t *test
 		t.Fatalf("and is said: %q", errb.String())
 	}
 }
+
+// `machine forget` needs --unsure and refuses a record that has a droplet id (m1 has): nothing is removed.
+func TestMachineForgetNeedsUnsureAndAnUnsureRecord(t *testing.T) {
+	args, p, _, _, _ := manageFixture(t)
+	if code, _, errb := runManage(append([]string{"forget", "m1"}, args...)...); code != 2 || !strings.Contains(errb, "--unsure") {
+		t.Fatalf("--unsure is required: %d %s", code, errb)
+	}
+	code, _, errb := runManage(append([]string{"forget", "m1", "--unsure", "--confirm", "m1"}, args...)...)
+	if code == 0 || !strings.Contains(errb, "droplet id") || len(p.log) != 0 {
+		t.Fatalf("a record with a droplet id is not forgotten: %d %s log %v", code, errb, p.log)
+	}
+	if code, _, _ := runManage("forget"); code != 2 {
+		t.Fatalf("usage")
+	}
+}

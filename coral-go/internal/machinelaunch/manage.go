@@ -502,3 +502,56 @@ func ListUnknownNetworks(ctx context.Context, d ManageDeps) ([]VPC, []Firewall, 
 	}
 	return ov, of, nil
 }
+
+// minForgetAge is how old an unsure record must be before `forget` will clear it: the launch's own two looks come within a minute of the timeout, and a late create can come after that.
+const minForgetAge = time.Hour
+
+// ErrForgetRefused is a forget that would not clear the record (too young, a droplet exists, the list failed, not confirmed).
+var ErrForgetRefused = errors.New("not cleared")
+
+// Forget clears ONE unsure record (no droplet id) and removes its firewall and VPC by id (Security's ruling, #9934). It refuses unless: the record exists and has no droplet id; it is at least an hour old; a list made NOW,
+// whole (a cut or failed list refuses), shows no machine carrying the record's launch tag; and the person typed the record's name again (d.TypedID) after seeing what will be removed. A matching droplet means refuse: delete
+// finds and removes it by id.
+func Forget(ctx context.Context, name string, d ManageDeps) error {
+	rec, ok := d.State.Get(name)
+	if !ok {
+		return fmt.Errorf("%w: the state file has no record named %q", ErrForgetRefused, name)
+	}
+	if rec.DropletID != "" {
+		return fmt.Errorf("%w: the record has a droplet id (%s): use `coral machine delete %s`", ErrForgetRefused, rec.DropletID, name)
+	}
+	if rec.LaunchTag == "" {
+		return fmt.Errorf("%w: the record has no launch tag to look for", ErrForgetRefused)
+	}
+	if age := d.now().Sub(rec.Created); rec.Created.IsZero() || age < minForgetAge {
+		return fmt.Errorf("%w: the record is %s old and must be at least %s old: a late create can still come", ErrForgetRefused, age.Round(time.Minute), minForgetAge)
+	}
+	all, err := listAll(ctx, d.Provider)
+	if err != nil {
+		return fmt.Errorf("%w: %v", ErrForgetRefused, err)
+	}
+	var found []Instance
+	for _, in := range all {
+		if slices.Contains(in.Tags, Tag) && slices.Contains(in.Tags, rec.LaunchTag) {
+			found = append(found, in)
+		}
+	}
+	if len(found) > 0 {
+		for _, in := range found {
+			fmt.Fprintf(d.Out, "A machine carries this launch's tag: %s.\n", describeInstance(in))
+		}
+		return fmt.Errorf("%w: %d machine(s) carry the launch tag %s: `coral machine delete %s` finds and removes it by its id", ErrForgetRefused, len(found), rec.LaunchTag, name)
+	}
+	fmt.Fprintf(d.Out, "No machine carries the launch tag %s at %s now. Record %s will be cleared and its firewall %s and private network %s removed.\n", rec.LaunchTag, d.Provider.Name(), name, orNone(rec.FirewallID), orNone(rec.VPCID))
+	if d.TypedID != name {
+		return fmt.Errorf("%w: nothing was removed. To go on, type the record name again: --confirm %s", ErrForgetRefused, name)
+	}
+	left := Teardown(ctx, d.Provider, IDs{FirewallID: rec.FirewallID, VPCID: rec.VPCID}, d.Tune, d.Out, func(l IDs) {
+		rec.FirewallID, rec.VPCID = l.FirewallID, l.VPCID
+		_ = d.State.Put(rec)
+	})
+	if !left.Empty() || len(left.Errs) > 0 {
+		return fmt.Errorf("not everything was removed: %w", errors.Join(left.Errs...))
+	}
+	return d.State.Remove(name)
+}

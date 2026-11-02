@@ -105,7 +105,7 @@ func secondInterrupt(ctx context.Context, finished <-chan struct{}) <-chan struc
 }
 
 func runMachine(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
-	if len(args) > 0 && (args[0] == "list" || args[0] == "delete" || args[0] == "prune" || args[0] == "egress-files") {
+	if len(args) > 0 && (args[0] == "list" || args[0] == "delete" || args[0] == "forget" || args[0] == "prune" || args[0] == "egress-files") {
 		return runMachineManage(args[0], args[1:], stdin, stdout, stderr)
 	}
 	if len(args) == 0 || args[0] != "launch" {

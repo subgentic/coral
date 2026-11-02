@@ -85,7 +85,11 @@ type PruneReport struct {
 	Items   []PruneItem
 	Removed []string
 	Failed  []string
+	Unsure  []Record // records with no droplet id: kept, with their firewall and VPC, for `coral machine forget --unsure`
 }
+
+// ErrUnsureRecords is a prune that found records it will not clear: a record with no droplet id is the "unsure" state of a create that never answered, and a late create can still come.
+var ErrUnsureRecords = errors.New("some records are unsure")
 
 // PruneOptions choose what a prune may take.
 type PruneOptions struct {
@@ -99,6 +103,14 @@ type PruneOptions struct {
 //
 // Nothing the person did not launch with this tool is touched: everything is matched by the tool's tag and names. A prune cannot revoke a Hub identity (it has no credential id for an orphan): say so.
 func Prune(ctx context.Context, o PruneOptions, d ManageDeps) (*PruneReport, error) {
+	rep, err := prune(ctx, o, d)
+	if err == nil && rep != nil && len(rep.Unsure) > 0 {
+		err = fmt.Errorf("%w: %d record(s) with no droplet id were kept, with their firewall and private network (check by hand; `coral machine forget --unsure NAME` clears one)", ErrUnsureRecords, len(rep.Unsure))
+	}
+	return rep, err
+}
+
+func prune(ctx context.Context, o PruneOptions, d ManageDeps) (*PruneReport, error) {
 	olderThan := o.OlderThan
 	if olderThan <= 0 {
 		return nil, errors.New("--older-than is needed: how old a machine must be before it is an orphan")
@@ -119,6 +131,7 @@ func Prune(ctx context.Context, o PruneOptions, d ManageDeps) (*PruneReport, err
 		}
 	}
 	var items []PruneItem
+	var unsure []Record
 	unknown := 0
 	taken := map[string]bool{}
 	for _, in := range all {
@@ -154,8 +167,10 @@ func Prune(ctx context.Context, o PruneOptions, d ManageDeps) (*PruneReport, err
 				fmt.Fprintf(d.Out, "The record %s names droplet %s, which is not in the list, but %s: it was left alone, with its firewall and network.\n", r.Name, r.DropletID, why)
 				continue
 			}
-		} else if r.LaunchTag != "" && slices.ContainsFunc(all, func(in Instance) bool { return slices.Contains(in.Tags, r.LaunchTag) }) {
-			fmt.Fprintf(d.Out, "The record %s has no droplet id but a machine carries its launch tag %s: it was left alone.\n", r.Name, r.LaunchTag)
+		} else { // no droplet id: the create never answered. Prune is the bulk, often unattended path, so it keeps the network and says so (Security's ruling, #9934); one record at a time is cleared by `machine forget --unsure`.
+			unsure = append(unsure, r)
+			fmt.Fprintf(d.Out, "UNSURE, check by hand: record %s has no droplet id (its create never answered). Launch tag %s, firewall %s, private network %s, started %s. Kept. To clear it once you know no machine exists: coral machine forget --unsure %s --confirm %s\n",
+				r.Name, orNone(r.LaunchTag), orNone(r.FirewallID), orNone(r.VPCID), r.Created.UTC().Format(time.RFC3339), r.Name, r.Name)
 			continue
 		}
 		if r.VPCID != "" && slices.ContainsFunc(all, func(in Instance) bool { return in.VPCID == r.VPCID }) { // by this fresh read the network still has a member: it stays
@@ -167,7 +182,7 @@ func Prune(ctx context.Context, o PruneOptions, d ManageDeps) (*PruneReport, err
 		items = append(items, PruneItem{Name: r.Name, Why: "a record whose instance is gone", IDs: ids, Record: true})
 		taken[r.Name] = true
 	}
-	rep := &PruneReport{Items: items}
+	rep := &PruneReport{Items: items, Unsure: unsure}
 	if unknown > 0 {
 		fmt.Fprintf(d.Out, "%d instance(s) at %s carry this tool's tag, are old enough and are not in this state file: they may belong to another computer or to a state file that was lost, so they are left alone. See them with `coral machine list --unknown`; delete one with `coral machine delete NAME --id ID`, typing the id.\n", unknown, d.Provider.Name())
 	}

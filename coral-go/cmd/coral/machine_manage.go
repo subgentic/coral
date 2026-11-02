@@ -37,6 +37,7 @@ func machineManageUsage(w io.Writer) {
 	fmt.Fprintln(w, "usage: coral machine list   --provider digitalocean --token-file <path|-> [--unknown] [--state-file PATH]   (--unknown only lists: it deletes nothing)")
 	fmt.Fprintln(w, "       coral machine delete NAME --provider digitalocean --token-file <path|-> [--hub-destroy-file <path|->] [--hub-url https://app.coralhub.dev]")
 	fmt.Fprintln(w, "         [--id INSTANCE_ID (needed when the state file does not know the machine)] [--continue-if-revoke-fails] [--state-file PATH] [--yes]")
+	fmt.Fprintln(w, "       coral machine forget NAME --unsure --provider digitalocean --token-file <path|-> [--confirm NAME] [--state-file PATH]   (clears one record with no droplet id, at least an hour old)")
 	fmt.Fprintln(w, "       coral machine prune --older-than 24h|7d --provider digitalocean --token-file <path|-> [--state-file PATH] [--yes]")
 	fmt.Fprintln(w, "       coral machine egress-files --dir DIR   (writes the machine's egress-block files, for tools/machine-egress-check.sh)")
 }
@@ -89,8 +90,12 @@ func runMachineManage(sub string, args []string, stdin io.Reader, stdout, stderr
 	yes := fs.Bool("yes", false, "go on without asking")
 	var destroyFile, hubURL *string
 	var continueRevoke, listUnknown *bool
-	var olderThan, typedID *string
+	var olderThan, typedID, confirm *string
+	var unsure *bool
 	switch sub {
+	case "forget":
+		unsure = fs.Bool("unsure", false, "required: clear ONE record with no droplet id (a create that never answered) and remove its firewall and private network")
+		confirm = fs.String("confirm", "", "type the record name again to go on; without it nothing is removed")
 	case "list":
 		listUnknown = fs.Bool("unknown", false, "only list the instances with this tool's tag that this state file does not know (a second computer's launches look like that); it deletes nothing")
 	case "delete":
@@ -115,7 +120,7 @@ func runMachineManage(sub string, args []string, stdin io.Reader, stdout, stderr
 		if fs.NArg() == 0 {
 			break
 		}
-		if sub != "delete" || name != "" {
+		if (sub != "delete" && sub != "forget") || name != "" {
 			fmt.Fprintf(stderr, "coral machine %s: unexpected argument %q\n", sub, fs.Arg(0))
 			return 2
 		}
@@ -125,7 +130,7 @@ func runMachineManage(sub string, args []string, stdin io.Reader, stdout, stderr
 		fmt.Fprintf(stderr, "coral machine "+sub+": "+format+"\n", a...)
 		return 2
 	}
-	if *provider == "" || *tokenFile == "" || (sub == "delete" && name == "") {
+	if *provider == "" || *tokenFile == "" || ((sub == "delete" || sub == "forget") && name == "") {
 		machineManageUsage(stderr)
 		return 2
 	}
@@ -172,6 +177,9 @@ func runMachineManage(sub string, args []string, stdin io.Reader, stdout, stderr
 	d := machinelaunch.ManageDeps{Provider: p, Revoker: revoker, State: st, Out: stdout}
 	if typedID != nil {
 		d.TypedID = *typedID
+	}
+	if confirm != nil {
+		d.TypedID = *confirm // forget: the record name typed again
 	}
 	if continueRevoke != nil {
 		d.ContinueIfRevokeFails = *continueRevoke
@@ -277,6 +285,15 @@ func runMachineManage(sub string, args []string, stdin io.Reader, stdout, stderr
 		}
 		if err == nil {
 			fmt.Fprintf(stdout, "Deleted %s.\n", rep.Name)
+		}
+		return finish(err)
+	case "forget":
+		if !*unsure {
+			return fail("--unsure is required: forget clears only a record with no droplet id")
+		}
+		err := machinelaunch.Forget(ctx, name, d)
+		if err == nil {
+			fmt.Fprintf(stdout, "Cleared %s.\n", name)
 		}
 		return finish(err)
 	case "prune":

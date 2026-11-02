@@ -771,3 +771,92 @@ func TestPruneDoesNotTreatAMissingTagAsGone(t *testing.T) {
 	require.ErrorIs(t, err, ErrListTruncated)
 	assert.Len(t, f2.fws, 1)
 }
+
+// A record with NO droplet id is the unsure state: prune keeps it, its firewall and its VPC, lists it (name, tag, ids, time) with the one command that clears it, and ends in an error (Security's ruling, #9934).
+func TestPruneKeepsAnUnsureRecordAndSaysSo(t *testing.T) {
+	f := newFake()
+	st := stateAt(t)
+	r := record("m1", f)
+	r.DropletID = ""
+	r.Created = time.Now().Add(-200 * time.Hour)
+	delete(f.drops, "77")
+	require.NoError(t, st.Put(r))
+	var out bytes.Buffer
+	d := ManageDeps{Provider: f, State: st, Out: &out, Tune: quick(), Confirm: func(string) (bool, error) { return true, nil }}
+	rep, err := Prune(t.Context(), PruneOptions{OlderThan: 24 * time.Hour}, d)
+	require.ErrorIs(t, err, ErrUnsureRecords, "a non-zero exit")
+	assert.Empty(t, rep.Removed)
+	require.Len(t, rep.Unsure, 1)
+	assert.Len(t, f.fws, 1, "the firewall stays")
+	assert.Len(t, f.vpcs, 1, "and the VPC")
+	_, ok := st.Get("m1")
+	assert.True(t, ok, "and the record")
+	for _, want := range []string{"UNSURE, check by hand", "m1", r.LaunchTag, r.FirewallID, r.VPCID, "coral machine forget --unsure m1 --confirm m1"} {
+		assert.Contains(t, out.String(), want)
+	}
+}
+
+func unsureRecord(t *testing.T, f *fakeCloud, st *State, age time.Duration) Record {
+	r := record("m1", f)
+	r.DropletID = ""
+	r.Created = time.Now().Add(-age)
+	delete(f.drops, "77")
+	require.NoError(t, st.Put(r))
+	return r
+}
+
+// `forget --unsure` clears ONE unsure record: it refuses at 59 minutes, with a matching droplet, on a list error or a cut list, with no typed name or the wrong one; at 61 minutes with an empty list and the typed name it removes the
+// firewall and VPC and the record.
+func TestForgetClearsAnUnsureRecordOnlyUnderEveryCondition(t *testing.T) {
+	typed := func(f *fakeCloud, st *State, id string) ManageDeps {
+		return ManageDeps{Provider: f, State: st, Out: &bytes.Buffer{}, Tune: quick(), TypedID: id}
+	}
+	// 59 minutes: too young
+	f := newFake()
+	st := stateAt(t)
+	unsureRecord(t, f, st, 59*time.Minute)
+	err := Forget(t.Context(), "m1", typed(f, st, "m1"))
+	require.ErrorIs(t, err, ErrForgetRefused)
+	assert.Len(t, f.fws, 1)
+	// a matching droplet appears: refused, and delete is the way
+	f = newFake()
+	st = stateAt(t)
+	r := unsureRecord(t, f, st, 61*time.Minute)
+	f.drops["88"] = Instance{ID: "88", Name: "m1", Tags: []string{Tag, r.LaunchTag}}
+	d := typed(f, st, "m1")
+	err = Forget(t.Context(), "m1", d)
+	require.ErrorIs(t, err, ErrForgetRefused)
+	assert.Contains(t, err.Error(), "coral machine delete m1")
+	assert.Contains(t, f.drops, "88", "nothing was deleted")
+	assert.Len(t, f.fws, 1)
+	// a failed list, and a list cut at the page limit
+	for name, mk := range map[string]func(*fakeCloud){"cut": func(f *fakeCloud) { f.listTrunc = true }} {
+		f = newFake()
+		st = stateAt(t)
+		unsureRecord(t, f, st, 61*time.Minute)
+		mk(f)
+		require.ErrorIs(t, Forget(t.Context(), "m1", typed(f, st, "m1")), ErrForgetRefused, name)
+		assert.Len(t, f.fws, 1, name)
+	}
+	// no typed name, a wrong one: nothing removed
+	f = newFake()
+	st = stateAt(t)
+	unsureRecord(t, f, st, 61*time.Minute)
+	for _, id := range []string{"", "m2", "M1"} {
+		require.ErrorIs(t, Forget(t.Context(), "m1", typed(f, st, id)), ErrForgetRefused, "typed %q", id)
+	}
+	assert.Len(t, f.fws, 1)
+	assert.Len(t, f.vpcs, 1)
+	// 61 minutes, an empty list, the typed name: cleared
+	require.NoError(t, Forget(t.Context(), "m1", typed(f, st, "m1")))
+	assert.Empty(t, f.fws)
+	assert.Empty(t, f.vpcs)
+	_, ok := st.Get("m1")
+	assert.False(t, ok)
+	// not an unsure record: unknown name, or one with a droplet id
+	require.ErrorIs(t, Forget(t.Context(), "nope", typed(f, st, "nope")), ErrForgetRefused)
+	f = newFake()
+	st = stateAt(t)
+	require.NoError(t, st.Put(record("m3", f)))
+	require.ErrorIs(t, Forget(t.Context(), "m3", typed(f, st, "m3")), ErrForgetRefused)
+}
