@@ -25,6 +25,8 @@ function parts(container) {
         refresh: container.querySelector('.acf-model-refresh'),
         note: container.querySelector('.acf-model-note'),
         add: container.querySelector('.acf-model-add'),
+        source: container.querySelector('.acf-model-source'),
+        effort: container.querySelector('.acf-model-effort'),
     };
 }
 
@@ -33,14 +35,45 @@ export function modelPickerHtml() {
     return `<span class="acf-model-picker" hidden>`
         + `<span class="acf-model-row"><select class="acf-model-select" aria-label="Model"></select>`
         + `<button type="button" class="acf-model-refresh" aria-label="Refresh the model list" title="Refresh the model list"><span class="material-icons" aria-hidden="true">refresh</span></button></span>`
-        + `<span class="acf-model-id"></span><span class="acf-model-note" role="status"></span><span class="acf-model-add" hidden></span></span>`;
+        + `<span class="acf-model-id"></span><span class="acf-model-note" role="status"></span><span class="acf-model-note acf-model-source"></span><span class="acf-model-note acf-model-effort"></span><span class="acf-model-add" hidden></span></span>`;
+}
+
+// Where a list came from, in words (#12053): the server says it as `source`: "builtin" is Coral's own short list (the CLI could not list its models), "bundled" a list shipped with the CLI, "account" the CLI's account list.
+const CLI_NAME = { claude: 'Claude', codex: 'Codex', agy: 'Antigravity', antigravity: 'Antigravity', gemini: 'Antigravity', pi: 'Pi', opencode: 'OpenCode', hermes: 'Hermes' };
+export function sourceWords(agentType, source) {
+    const cli = CLI_NAME[agentType] || agentType;
+    if (source === 'builtin') return `Coral's own list: ${cli} did not list its models (is it installed, and signed in?).`;
+    if (source === 'bundled') return `The list that comes with ${cli}.`;
+    if (source === 'account') return `The models your ${cli} account offers.`;
+    return source ? `From ${cli} on this computer.` : '';
+}
+
+// A model whose name carries an effort ("Claude Sonnet 5.5 (Low)", agy's own list) is one model with a level: the variants of one model are listed together under its name, the level beside it (#12053). The level is
+// also the Thinking row below the list; the note says which one the launch uses (the model's id is what is launched, nothing here changes it).
+const EFFORT_NAME = /\s*\((low|medium|high|xhigh|max)\)\s*$/i;
+const effortOf = m => { const hit = EFFORT_NAME.exec(m.display_name || ''); return hit ? hit[1] : ''; };
+const baseOf = m => (m.display_name || '').replace(EFFORT_NAME, '');
+const levelWord = l => (l.toLowerCase() === 'xhigh' ? 'XHigh' : l[0].toUpperCase() + l.slice(1).toLowerCase());
+const variantHtml = m => `<option value="${escapeAttr(m.value)}">${escapeHtml(baseOf(m) + ' · ' + levelWord(effortOf(m)))}</option>`;
+function effortGroups(models) {
+    const by = new Map();
+    for (const m of models) if (!m.group && m.custom !== true && effortOf(m)) by.set(baseOf(m), [...(by.get(baseOf(m)) || []), m]);
+    const grouped = new Set([...by].filter(([, v]) => v.length > 1).flatMap(([, v]) => v.map(m => m.value)));
+    if (!grouped.size) return null;
+    const done = new Set(); let out = '';
+    for (const m of models) {
+        if (!grouped.has(m.value)) { out += optionHtml(m); continue; }
+        const base = baseOf(m); if (done.has(base)) continue; done.add(base);
+        out += `<optgroup label="${escapeAttr(base)}">${by.get(base).map(variantHtml).join('')}</optgroup>`;
+    }
+    return out;
 }
 
 const optionHtml = m => `<option value="${escapeAttr(m.value)}">${escapeHtml((m.display_name || m.value) + (m.custom === true ? ' (custom)' : ''))}</option>`;
 
 /** The model options: a list whose models name a provider (Pi's) is one group of choices per provider, the ones the CLI is signed in to first (the server's `groups` order); any other list is flat (#11338). */
 function modelOptions(models, groups) {
-    if (!models.some(m => m.group)) return models.map(optionHtml).join('');
+    if (!models.some(m => m.group)) return effortGroups(models) ?? models.map(optionHtml).join('');
     const order = (Array.isArray(groups) ? groups : []).map(g => g && g.name).filter(Boolean);
     for (const m of models) if (m.group && !order.includes(m.group)) order.push(m.group);
     const signed = new Set((Array.isArray(groups) ? groups : []).filter(g => g && g.signed_in).map(g => g.name));
@@ -55,7 +88,7 @@ function failedListNote(reason) {
 }
 
 function fill(container, agentType, data) {
-    const { input, wrap, select, id, note } = parts(container);
+    const { input, wrap, select, id, note, source } = parts(container);
     container._thinkingLevels = data && Array.isArray(data.thinking) ? data.thinking : [];   // the levels the server passes this type's CLI (#4969)
     syncThinking(container);
     if (!input || !wrap || !select) return;
@@ -67,6 +100,7 @@ function fill(container, agentType, data) {
         + `<option value="${escapeAttr(OTHER)}">Other…</option>`
         + (familyOf(agentType) && peekCanAdd(_acfServer(container)) !== false ? `<option value="${escapeAttr(ADD)}">Add a model…</option>` : '');
     wrap.hidden = false;
+    if (source) source.textContent = sourceWords(agentType, data && data.source);
     if (data && typeof data.default_model === 'string' && data.default_model && input.value.trim() === '' && !container._defaultModelUsed) { // Pi's own default provider is not signed in and another is: the form starts on a model that works (#11338)
         container._defaultModelUsed = true;
         container._defaultModelApplied = { type: agentType, value: data.default_model }; // what the list put in the box and for which CLI: an empty account default that arrives later must not take it away (agent_config_form.js)
@@ -104,6 +138,8 @@ export function syncModelPicker(container, fromCode = true) {
         const hit = models.find(m => m.value === v);
         id.textContent = hit ? [hit.value, hit.description].filter(Boolean).join(' · ') : '';
     }
+    const { effort } = parts(container);
+    if (effort) { const hit = models.find(m => m.value === v), lvl = hit ? effortOf(hit) : ''; effort.textContent = lvl ? `${levelWord(lvl)} effort is part of this model's name. The Thinking setting below is the same setting: leave it on Default, or it is passed as well.` : ''; }
     syncThinking(container);   // the model decides which levels it takes
 }
 

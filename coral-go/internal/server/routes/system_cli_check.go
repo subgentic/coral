@@ -110,7 +110,22 @@ func (h *SystemHandler) CLICheck(w http.ResponseWriter, r *http.Request) {
 	// Try LookPath first, then common install locations
 	resolvedPath, err := cliLookPath(binaryPath)
 	if err != nil {
-		if found := cliCommonPath(binaryPath); found != "" {
+		found := cliCommonPath(binaryPath)
+		var refused agent.CommonLookup
+		if found != "" && agentType != "" && r.URL.Query().Get("binary") == "" {
+			// The same screen a launch gives a CLI found in a common place (#12053): one inside an agent's working folder or Coral's data folder is not used, so the check says it is found
+			// but not used, not that it is installed (the picker showed agy as installed and the launch then refused it).
+			screen := func(p string) string { return untrustedLocationOf(r.Context(), h.cfg, h.ss, p) }
+			if why := screen(found); why != "" {
+				if next := agent.CommonPlaceLookup(binaryPath, screen); next.Path != "" {
+					found = next.Path // a later place holds one a launch would use
+				} else {
+					refused = agent.CommonLookup{Refused: why, RefusedPath: found}
+					found = ""
+				}
+			}
+		}
+		if found != "" {
 			resolvedPath = found
 		} else {
 			result := map[string]any{
@@ -127,6 +142,16 @@ func (h *SystemHandler) CLICheck(w http.ResponseWriter, r *http.Request) {
 			}
 			if installNote != "" {
 				result["install_note"] = installNote
+			}
+			if refused.Refused != "" { // found, and not used: the folder it is in is one a launch refuses (#12053)
+				delete(result, "install_command") // installing it again would not fix this
+				delete(result, "install_url")
+				result["refused"] = refused.Refused
+				result["install_note"] = fmt.Sprintf("Found but not used: %s is %s, so a launch refuses it. Install it somewhere else, or set its path in Settings > CLI paths (the setting %s).", agent.TildePath(refused.RefusedPath), refused.Refused, agent.CLIPathSettingKey(agentType))
+				if cloud.Tunneled(r) {
+					result["refused"] = "in a folder a launch refuses" // the reason names an agent and its folder: not through Coral Hub (Security's SHOULD)
+					result["install_note"] = fmt.Sprintf("Found but not used: it is in a folder a launch refuses (an agent's working folder, a temporary folder or Coral's data folder). Install it somewhere else, or set its path in Settings > CLI paths (the setting %s).", agent.CLIPathSettingKey(agentType))
+				}
 			}
 			if dir, bad := agent.UntrustedMountDir(binaryPath); bad { // the CLI-paths row says why, before a launch (#340)
 				delete(result, "install_command") // the CLI is installed; npm would not fix a folder Windows will not open

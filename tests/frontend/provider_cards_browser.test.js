@@ -20,18 +20,18 @@ const { install: installNA, N, stubModels } = require('./helpers/new_agent');
     const settle = ms => new Promise(r => setTimeout(r, ms)); // sleep-ok: the card redraws over a frame or two after a key or a click
     const press = async (key, vk) => { await Input.dispatchKeyEvent({ type: 'rawKeyDown', key, code: key, windowsVirtualKeyCode: vk }); await Input.dispatchKeyEvent({ type: 'keyUp', key, code: key, windowsVirtualKeyCode: vk }); await settle(300); };
     // The page's own fetches, stood in: Claude, Codex and Pi installed, Antigravity not; Claude's saved default model; Antigravity (when it is installed) has no thinking levels.
-    const stub = (missing, agyHasNoLevels) => ev(`(() => { const R = window.fetch;
+    const stub = (missing, agyHasNoLevels, refused = []) => ev(`(() => { const R = window.fetch;
         window.fetch = (u, o = {}) => { const url = new URL(String(u), location.origin);
             if (url.pathname === '/api/settings' && (!o.method || o.method === 'GET')) return R(u, o).then(async r => { const d = await r.json(); d.settings = { ...(d.settings || {}), default_model_claude: 'claude-big' }; return new Response(JSON.stringify(d), { status: 200, headers: { 'content-type': 'application/json' } }); });
             if (${JSON.stringify(!!agyHasNoLevels)} && url.pathname.startsWith('/api/agents/models') && url.searchParams.get('type') === 'agy') return Promise.resolve(new Response(JSON.stringify({ agent_type: 'agy', fetched_at: '2026-10-25T00:00:00Z', refreshing: false, source: 'account', models: [{ value: 'agy-big', display_name: 'agy Big' }], thinking: [] }), { status: 200, headers: { 'content-type': 'application/json' } }));
             if (url.pathname.startsWith('/api/agents/models') && url.searchParams.get('type') === 'pi') return Promise.resolve(new Response(JSON.stringify({ agent_type: 'pi', fetched_at: '2026-10-25T00:00:00Z', refreshing: false, source: 'account', models: [{ value: 'pi-big', display_name: 'pi Big', efforts: ['off', 'minimal', 'low', 'medium'] }], thinking: ['off', 'minimal', 'low', 'medium'] }), { status: 200, headers: { 'content-type': 'application/json' } }));
             return R(u, o); };
-        return true; })()`).then(() => require('./helpers/new_agent').stubCliChecks(ev, missing));
-    const open = async (w, h, mobile, theme, missing, agyNoLevels, fontPx) => {
+        return true; })()`).then(() => require('./helpers/new_agent').stubCliChecks(ev, missing, [], refused));
+    const open = async (w, h, mobile, theme, missing, agyNoLevels, fontPx, refused = []) => {
         await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev); await installNA(ev);
         await ev(`document.documentElement.setAttribute('data-theme', ${JSON.stringify(theme)}); ${fontPx ? `document.documentElement.style.setProperty('font-size', '${fontPx}px', 'important');` : ''} true`);
-        await stubModels(ev); await stub(missing, agyNoLevels);
+        await stubModels(ev); await stub(missing, agyNoLevels, refused);
         await ev(`(async () => { await window.showLaunchModal(); const c = document.querySelector('#launch-step-chooser [data-arg="agent"]'); if (c && c.getClientRects().length) c.click(); return true; })()`);
         await waitFor(`!!document.getElementById('launch-dir') && document.getElementById('launch-dir').getClientRects().length > 0`, 'the folder step', 8000);
         await ev(`(() => { const i = document.getElementById('launch-dir'); if (!i.value) { i.value = '/tmp'; i.dispatchEvent(new Event('input', { bubbles: true })); } document.getElementById('launch-agent-next').click(); document.getElementById('launch-agent-next').click(); return true; })()`);
@@ -123,6 +123,22 @@ const { install: installNA, N, stubModels } = require('./helpers/new_agent');
         await open(320, 700, true, 'dark', [], false);
         const narrow = await ev(`(() => { const open = document.querySelector('#launch-agent-pick .provider-card-body:not([hidden])'); const vis = e => e && e.getClientRects().length > 0; const sel = open.querySelector('select.acf-thinking'); return { select: vis(sel), segs: [...open.querySelectorAll('.seg-group')].some(vis), sideways: document.documentElement.scrollWidth > innerWidth + 1 }; })()`);
         check(narrow.select && !narrow.segs && !narrow.sideways, `320 px: Thinking is a select and nothing scrolls sideways: ${JSON.stringify(narrow)}`);
+        // #12053 (the operator): an agy that is found where a launch refuses it (an agent works in that folder) is not plainly installed: no radio, 'Found but not used', and the reason, never an Install link
+        await open(1440, 900, false, 'dark', [], false, undefined, ['agy']);
+        d = await ev(READ);
+        check(!d.cards.some(c => c.type === 'agy' || c.name === 'Antigravity'), `refused: Antigravity is not a radio card: ${JSON.stringify(d.cards.map(c => c.name))}`);
+        const refusedRow = await ev(`(() => { const r = [...document.querySelectorAll('#launch-agent-pick .provider-missing .provider-card')].find(c => /Antigravity/.test(c.textContent)); return r ? { status: (r.querySelector('.provider-status') || {}).textContent || '', why: (r.querySelector('.provider-refused') || {}).textContent || '', link: !!r.querySelector('a.provider-install'), radio: !!r.querySelector('input') } : null; })()`);
+        check(refusedRow && refusedRow.status === 'Found but not used' && /refuses it/.test(refusedRow.why) && /cli_path_agy/.test(refusedRow.why) && !refusedRow.link && !refusedRow.radio, `refused: the row says found but not used, with the reason and the setting, and no Install link: ${JSON.stringify(refusedRow)}`);
+        // before a check answers, a provider says Checking…, never Installed
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev); await installNA(ev);
+        await stubModels(ev);
+        await ev(`(() => { const R = window.fetch; window.fetch = (u, o = {}) => new URL(String(u), location.origin).pathname === '/api/system/cli-check' ? new Promise(() => {}) : R(u, o); return true; })()`);
+        await ev(`(async () => { await window.showLaunchModal(); const c = document.querySelector('#launch-step-chooser [data-arg="agent"]'); if (c && c.getClientRects().length) c.click(); return true; })()`);
+        await waitFor(`!!document.getElementById('launch-dir') && document.getElementById('launch-dir').getClientRects().length > 0`, 'the folder step (no checks answered)', 8000);
+        await ev(`(() => { const i = document.getElementById('launch-dir'); if (!i.value) { i.value = '/tmp'; i.dispatchEvent(new Event('input', { bubbles: true })); } document.getElementById('launch-agent-next').click(); return true; })()`);
+        await waitFor(`!!document.querySelector('#launch-agent-pick .provider-status')`, 'the cards (no checks answered)', 8000);
+        const pending = await ev(`[...document.querySelectorAll('#launch-agent-pick .provider-status')].map(e => e.textContent)`);
+        check(pending.length > 0 && pending.every(t => !/Installed/.test(t) && /Checking/.test(t)), `unchecked: no provider says Installed before its check answers: ${JSON.stringify(pending)}`);
     } finally { await client.close(); }
     assert.deepEqual(problems, [], 'the provider cards:\n  ' + problems.slice(0, 30).join('\n  '));
     console.log('PASS provider cards: installed providers as radio cards with their own Model and Thinking, Not installed with a link and no radio, the keyboard, a phone');
