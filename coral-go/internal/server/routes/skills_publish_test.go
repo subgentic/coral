@@ -215,7 +215,7 @@ func TestTheSkillsFolderIsNotFollowedAndDamagedBytesAreNotReplaced(t *testing.T)
 	assert.Equal(t, "not the zip", string(b))
 }
 
-// #12024 (Security's SHOULD): what an agent publishes is checked for secrets before a byte is kept; the reply names the file, never the secret, and the Operator's own skill is not held to it.
+// #12024 (Security's SHOULD): what an agent publishes is checked for secrets before a byte is kept; the reply names the file, never the secret, and the Operator's own is warned once.
 func TestAnAgentsSkillThatHoldsASecretIsRefusedNamingTheFile(t *testing.T) {
 	e := newSkillsEnv(t)
 	token := "ghp_" + strings.Repeat("a1B2c3D4e5", 4)
@@ -239,8 +239,31 @@ func TestAnAgentsSkillThatHoldsASecretIsRefusedNamingTheFile(t *testing.T) {
 	rows, err := e.ss.ListSkills(context.Background(), "")
 	require.NoError(t, err)
 	assert.Empty(t, rows, "nothing was recorded")
-	code, _ := e.call("POST", "/api/skills", zipBody(t, map[string]string{"SKILL.md": skillMD, "references/deploy.md": "token " + token}, false), "operator")
-	assert.Equal(t, 200, code, "the Operator's own skill is theirs to publish")
+	// the Operator's own: warned once, then acknowledged and logged
+	own := map[string]string{"SKILL.md": skillMD, "references/deploy.md": "token " + token}
+	code, out := e.call("POST", "/api/skills", zipBody(t, own, false), "operator")
+	assert.Equal(t, 409, code)
+	assert.Equal(t, "holds_secret", out["code"])
+	assert.Contains(t, fmt.Sprint(out["error"]), "references/deploy.md")
+	assert.NotContains(t, fmt.Sprint(out), token)
+	_, err = os.Stat(e.objectPath(own))
+	assert.True(t, os.IsNotExist(err), "nothing was kept until it is acknowledged")
+	ack, _ := json.Marshal(map[string]any{"zip_base64": base64.StdEncoding.EncodeToString(zipOf(t, own)), "acknowledge_secret": true})
+	code, out = e.call("POST", "/api/skills", string(ack), "operator")
+	require.Equal(t, 200, code, "%v", out)
+	assert.Equal(t, "approved", out["status"])
+	log, err := e.ss.SkillLog(context.Background(), 20)
+	require.NoError(t, err)
+	var logged *store.SkillLogEntry
+	for i := range log {
+		if log[i].Event == "secret_acknowledged" {
+			logged = &log[i]
+		}
+	}
+	require.NotNil(t, logged, "the acknowledgement is in skills_log")
+	assert.Equal(t, "references/deploy.md", logged.Detail)
+	assert.Equal(t, out["id"], logged.SkillID)
+	assert.NotContains(t, logged.Detail+logged.Actor, token)
 }
 
 // #12024 (Security's SHOULD): the bytes of a rejected or removed skill are deleted; the refusal memory is the digest, which stays.

@@ -32,6 +32,8 @@ const maxPublishBody = (skills.MaxZipBytes*4)/3 + 4096
 type publishRequest struct {
 	Zip          string `json:"zip_base64"`
 	ScriptsAcked bool   `json:"scripts_acked"`
+	// AcknowledgeSecret is the Operator's one confirmation that a file of their own skill holds what looks like a key or token and goes in anyway (logged).
+	AcknowledgeSecret bool `json:"acknowledge_secret"`
 }
 
 // allowPublish is the hourly limit on publishing, per agent session.
@@ -177,20 +179,26 @@ func heldSecret(sk *skills.Skill) (file string, err error) {
 }
 
 // publish parses, keeps and records one skill; false when the answer was written.
-func (h *SkillsHandler) publish(w http.ResponseWriter, r *http.Request, data []byte, in store.AddSkillInput) bool {
+func (h *SkillsHandler) publish(w http.ResponseWriter, r *http.Request, data []byte, in store.AddSkillInput, acknowledgeSecret bool) bool {
 	sk, err := skills.Parse(data)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_skill", strings.TrimPrefix(err.Error(), skills.ErrInvalid.Error()+": "))
 		return false
 	}
-	if in.Kind == store.PublisherAgent { // what an agent sends is checked for secrets before a byte is kept; the reply names the file, never the secret
-		file, rerr := heldSecret(sk)
-		if rerr != nil {
-			writeError(w, http.StatusServiceUnavailable, "cannot_check", "the skill could not be checked for secrets: try again")
+	// Everything is checked for secrets before a byte is kept; the reply names the file, never the secret. An agent's skill with one is refused. The Operator's own is warned once: the same publish with
+	// acknowledge_secret goes in and the acknowledgement is logged, so a key is never approved into every agent without being told.
+	secretFile, rerr := heldSecret(sk)
+	if rerr != nil {
+		writeError(w, http.StatusServiceUnavailable, "cannot_check", "the skill could not be checked for secrets: try again")
+		return false
+	}
+	if secretFile != "" {
+		if in.Kind == store.PublisherAgent {
+			writeError(w, http.StatusUnprocessableEntity, "holds_secret", "a file holds what looks like a key, token or password: remove it from "+skillFileName(secretFile)+" and publish again")
 			return false
 		}
-		if file != "" {
-			writeError(w, http.StatusUnprocessableEntity, "holds_secret", "a file holds what looks like a key, token or password: remove it from "+skillFileName(file)+" and publish again")
+		if !acknowledgeSecret {
+			writeError(w, http.StatusConflict, "holds_secret", skillFileName(secretFile)+" holds what looks like a key, token or password, and every agent that has this skill would read it. Remove it, or publish again with acknowledge_secret to put it in anyway.")
 			return false
 		}
 	}
@@ -220,6 +228,9 @@ func (h *SkillsHandler) publish(w http.ResponseWriter, r *http.Request, data []b
 			errInternalServer(w, "could not record the skill")
 		}
 		return false
+	}
+	if secretFile != "" { // the Operator's acknowledgement, in the log with the file's name and no part of the secret
+		_ = h.ss.LogSkillAccess(r.Context(), "secret_acknowledged", row.ID, row.Digest, store.PublisherOperator, "operator", secretFile)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"id": row.ID, "name": row.Name, "version": row.Version, "status": row.Status, "digest": row.Digest})
 	return true
@@ -253,7 +264,7 @@ func (h *SkillsHandler) PublishSkillAgent(w http.ResponseWriter, r *http.Request
 	if ls, err := h.ss.GetLiveSession(r.Context(), sid); err == nil && ls != nil && ls.BoardName != nil {
 		team = *ls.BoardName
 	}
-	h.publish(w, r, data, store.AddSkillInput{Kind: store.PublisherAgent, Agent: agentName, Team: team}) // the log row of the publish is written with the record
+	h.publish(w, r, data, store.AddSkillInput{Kind: store.PublisherAgent, Agent: agentName, Team: team}, false) // the log row of the publish is written with the record
 }
 
 // PublishSkillOperator: POST /api/skills {"zip_base64": ..., "scripts_acked": ...}. Only a person at the dashboard. The Operator's own skill is approved at once; one with scripts or files that cannot be shown
@@ -267,7 +278,7 @@ func (h *SkillsHandler) PublishSkillOperator(w http.ResponseWriter, r *http.Requ
 	if !ok {
 		return
 	}
-	h.publish(w, r, data, store.AddSkillInput{Kind: store.PublisherOperator, ScriptsAcked: req.ScriptsAcked})
+	h.publish(w, r, data, store.AddSkillInput{Kind: store.PublisherOperator, ScriptsAcked: req.ScriptsAcked}, req.AcknowledgeSecret)
 }
 
 // skillFileName is a file's path as one clean word for a reply (the parser already refused control and invisible characters in it).
