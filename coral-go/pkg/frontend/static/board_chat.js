@@ -1,5 +1,7 @@
 import { openTask } from './task_navigation.js';
 import { authorLabel } from './board_author.js';
+import { importOnce } from './import_once.js';
+const { agentLinkHtml } = await importOnce('./agent_link.js'); // an agent's name is one shared helper everywhere (#12168)
 /* Moved out of render.js as it was (#3795): no behaviour change. */
 import { formatHourMinute } from './format.js';
 import { morphHtml } from './dom_morph.js';
@@ -383,7 +385,7 @@ function _renderBoardPanelMessages(msgsEl, scrollToBottom) {
             ${parts.toggle}
             <div class="mb-message-header">
                 ${checkbox}
-                <span class="mb-agent-name">${m.icon ? escapeHtml(m.icon) + ' ' : ''}${escapeHtml(authorLabel(m, agent, _activeBoardChat || ''))}</span>
+                <span class="mb-agent-name">${m.icon ? escapeHtml(m.icon) + ' ' : ''}${agentLinkHtml(agent, { board: _activeBoardChat || '', text: authorLabel(m, agent, _activeBoardChat || '') })}</span>
                 ${externalMessageBadge(m)}${hubUserBadge(m)}${askBadge(m)}
                 <span class="mb-message-time">${_formatTime(m.created_at)}</span>
             </div>

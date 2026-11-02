@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 const here = dirname(fileURLToPath(import.meta.url)), statics = join(here, '..', '..', 'coral-go', 'pkg', 'frontend', 'static');
 const sites = JSON.parse(readFileSync(join(here, 'agent_name_sites.json'), 'utf8'));
 const problems = [];
-const uses = f => { const src = readFileSync(join(statics, f), 'utf8'); return /(from|importOnce\() ?'\.\/agent_link\.js'/.test(src) && /\b(agentLink|linkAvatar)\(/.test(src); };
+const uses = f => { const src = readFileSync(join(statics, f), 'utf8'); return /(from|importOnce\() ?'\.\/agent_link\.js'/.test(src) && /\b(agentLink|agentLinkHtml|linkAvatar)\(/.test(src); };
 for (const { file, what } of sites.converted) {
     if (!existsSync(join(statics, file))) { problems.push(`${file} is listed as converted and does not exist`); continue; }
     if (!uses(file)) problems.push(`${file}: ${what} must draw an agent's name through agent_link.js (agentLink / linkAvatar), and no longer does`);

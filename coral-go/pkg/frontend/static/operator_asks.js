@@ -3,6 +3,7 @@
  * on one line, and opens whole in a dialog with a Reply box. The reply is the board post the dashboard already makes (POST /api/board/{board}/messages as the Operator, with the asker's @name, and reply_to
  * for an ask): it answers the ask, ends a wait, and tells the asker by the post itself. The text is the agent's, so it is written out through markHidden (strict) before it is drawn, then cut. */
 import { markHidden } from './visible_marks.js';
+import { importOnce } from './import_once.js';
 import { OPERATOR_ID } from './utils.js';
 import { state } from './state.js';
 import { showToast } from './notifications.js';
@@ -119,7 +120,7 @@ export function openAskDialog(a, onDone, runners = {}) {
     const dlg = document.createElement('dialog');
     dlg.className = 'modal-content dlg-form inbox-ask-dialog'; // the shared dialog rule sizes it (--dlg-max, dlg-form), not a width of its own
     dlg.setAttribute('aria-labelledby', 'inbox-ask-title');
-    const title = document.createElement('h2'); title.id = 'inbox-ask-title'; title.textContent = `${a.asker} asks you`;
+    const title = document.createElement('h2'); title.id = 'inbox-ask-title'; title.textContent = `${a.asker} asks you`; importOnce('./agent_link.js').then(m => { if (title.isConnected) title.replaceChildren(m.agentLink(a.asker, { board: a.board }), ' asks you'); }).catch(() => {}); // the asker's name opens its chat (#12168)
     const sub = document.createElement('p'); sub.className = 'inbox-ask-sub'; sub.textContent = `On the ${a.board_label || a.board} board${a.kind === 'wait' ? ', waiting for your reply' : ''}.`;
     const whole = document.createElement('pre'); whole.className = 'inbox-ask-text'; whole.tabIndex = 0; whole.setAttribute('role', 'region'); whole.setAttribute('aria-label', 'The question');
     whole.textContent = askWhole(a) + (a.cut ? '\n… (cut: the board has the rest)' : '');
