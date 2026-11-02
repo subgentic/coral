@@ -43,6 +43,9 @@ type HealthNudges struct {
 	// limit says whether a live agent is stopped by a usage limit; nothing is typed to one (#9267). nil: nothing is.
 	limit func(ctx context.Context, a AgentInfo) (resets time.Duration, blocked bool)
 
+	// goalDoneQuiet reads the quiet period a goal whose tasks are all done waits for before it is the Operator's item (goal_done_quiet_minutes, #12161); nil: 15 minutes.
+	goalDoneQuiet func(ctx context.Context) time.Duration
+
 	Interval   time.Duration
 	TeamBudget int // automatic actions per board per hour
 	// The rules' thresholds and switches are each team's health settings (board.HealthSettings).
@@ -85,6 +88,11 @@ func NewHealthNudges(bs *board.Store, ts *store.TaskStore, rt AgentRuntime, disc
 		return err
 	}
 	return h
+}
+
+// SetGoalDoneQuiet tells the nudges where to read the quiet period of a goal that looks done (the setting goal_done_quiet_minutes, #12161): the notice to its driver says that many minutes.
+func (h *HealthNudges) SetGoalDoneQuiet(fn func(ctx context.Context) time.Duration) {
+	h.goalDoneQuiet = fn
 }
 
 // Run applies the rules every Interval until ctx is done.

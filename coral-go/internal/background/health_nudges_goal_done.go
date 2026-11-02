@@ -13,19 +13,28 @@ import (
 // or the Orchestrator when the goal has none, is told once so the next tasks can be added.
 const ruleGoalDoneNudge = "goal-done-nudge"
 
-// goalDoneNudgeWindow is the quiet period the notice names: the board's own default (routes.goalDoneQuiet); the setting goal_done_quiet_minutes may change what the Operator sees, never what this says to an agent
-// beyond the 15 minutes it was told when the rule was made, so the text is one fixed line.
-const goalDoneNudgeWindow = 15 * time.Minute
-
-// goalDoneNudgeText is the notice: a fixed template with the goal's number only (Security's rule 1 of the health nudges: no title, no name is typed).
-func goalDoneNudgeText(goalID int64) string {
-	return fmt.Sprintf("[Coral] Goal #%d's tasks are all done. Add the next tasks within 15 minutes, or it goes to the Operator as done: coral-board task add \"...\" --goal %d", goalID, goalID)
+// goalDoneNudgeText is the notice: a fixed template with the goal's number and the quiet period's minutes (a number the setting goal_done_quiet_minutes gave, never text): no title, no name is typed (Security's rule 1
+// of the health nudges).
+func goalDoneNudgeText(goalID int64, minutes int) string {
+	return fmt.Sprintf("[Coral] Goal #%d's tasks are all done. Add the next tasks within %d minutes, or it goes to the Operator as done: coral-board task add \"...\" --goal %d", goalID, minutes, goalID)
 }
 
-// nudgeGoalDone tells the driver (else the Orchestrator) of each active goal whose tasks became all done in the last goalDoneNudgeWindow, once for each all-done state (the key carries the goal's task total: more
+// quiet is the quiet period the notice names: the setting's, 15 minutes when it is not read.
+func (h *HealthNudges) quiet(ctx context.Context) time.Duration {
+	if h.goalDoneQuiet != nil {
+		return h.goalDoneQuiet(ctx)
+	}
+	return 15 * time.Minute
+}
+
+// nudgeGoalDone tells the driver (else the Orchestrator) of each active goal whose tasks became all done inside the quiet period, once for each all-done state (the key carries the goal's task total: more
 // tasks, all done again, is a new state). Not when the goal has an open task, nobody running can be told, or the window is over (the goal is the Operator's then).
 func (h *HealthNudges) nudgeGoalDone(ctx context.Context, project string, bySession map[string]AgentInfo, hs board.HealthSettings) {
 	now := h.now()
+	window := h.quiet(ctx)
+	if window <= 0 {
+		return // no quiet period: a goal that looks done is the Operator's at once, and there is no time to tell a driver
+	}
 	page, err := h.store.GoalPage(ctx, project, board.GoalListQuery{States: []string{board.GoalActive}, Limit: 100})
 	if err != nil || len(page.Goals) == 0 {
 		return
@@ -41,7 +50,7 @@ func (h *HealthNudges) nudgeGoalDone(ctx context.Context, project string, bySess
 			continue
 		}
 		doneAt, err := time.Parse(time.RFC3339Nano, *g.LooksDoneAt)
-		if err != nil || now.Sub(doneAt) >= goalDoneNudgeWindow || now.Before(doneAt.Add(-time.Minute)) {
+		if err != nil || now.Sub(doneAt) >= window || now.Before(doneAt.Add(-time.Minute)) {
 			continue
 		}
 		key := fmt.Sprintf("%d|%d", g.ID, g.Rollup.Total)
@@ -72,7 +81,7 @@ func (h *HealthNudges) nudgeGoalDone(ctx context.Context, project string, bySess
 		if !r.take(ctx, ruleGoalDoneNudge, who, time.Minute) {
 			continue
 		}
-		if sendUnlessBlocked(ctx, h.limit, h.deliver, a, fmt.Sprintf("health-goal-done:%s:%d", project, g.ID), goalDoneNudgeText(g.ID)) != nil {
+		if sendUnlessBlocked(ctx, h.limit, h.deliver, a, fmt.Sprintf("health-goal-done:%s:%d", project, g.ID), goalDoneNudgeText(g.ID, int(window/time.Minute))) != nil {
 			continue
 		}
 		_ = h.store.RecordHealthAction(ctx, project, ruleGoalDoneNudge+"-goal", key, now)

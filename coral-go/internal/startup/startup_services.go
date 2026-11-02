@@ -300,6 +300,13 @@ func startBoardServices(ctx context.Context, cfg *config.Config, srv *server.Ser
 		safeGo(ctx, "board_health_monitor", func() { healthMonitor.Run(ctx) })
 		// Coral acts on the mechanical items itself (#4175): claim and status nudges.
 		healthNudges := background.NewHealthNudges(srv.BoardStore(), taskStore, agentRT, discoverFn)
+		healthNudges.SetGoalDoneQuiet(func(ctx context.Context) time.Duration { // the goal that looks done is told to its driver for the minutes the Operator's setting gives (#12161)
+			st, err := sessStore.GetSettings(ctx)
+			if err != nil {
+				return 15 * time.Minute
+			}
+			return time.Duration(setreg.Int(st, setreg.GoalDoneQuietMinutes)) * time.Minute
+		})
 		safeGo(ctx, "health_nudges", func() { healthNudges.Run(ctx) })
 	}
 
