@@ -44,14 +44,14 @@ const OPERATOR_TEXT = '@Operator TEST ITEM, safe to answer any way: this is a te
             assert.ok(Math.abs(d.cx) <= 2 && Math.abs(d.cy) <= 30, at + 'the dialog opens centered like the other modals: ' + JSON.stringify({ cx: d.cx, cy: d.cy }));
             assert.ok(d.sendRight, at + 'Send reply is on the right of Close');
             await shot('ask-item-' + w);
-            await ev(`document.querySelector('dialog.inbox-ask-dialog button.btn:not(.btn-primary)').click(); true`);
+            await ev(`document.querySelector('dialog.inbox-ask-dialog .inbox-ask-buttons .btn:not(.btn-primary)').click(); true`);
             await waitFor(`!document.querySelector('dialog.inbox-ask-dialog')`, at + 'Close closes it', 4000);
             // a one-line question is its own title, with no body
             await ev(`document.querySelector('button[aria-label="Answer the question of Dev"]').click(); true`);
             await waitFor(`document.querySelector('dialog.inbox-ask-dialog[open]')`, at + 'the second opens', 4000);
             const s = await ev(`(() => { const d = document.querySelector('dialog.inbox-ask-dialog'); return { title: d.querySelector('h2').textContent, body: !!d.querySelector('.inbox-ask-text'), meta: d.querySelector('.inbox-ask-sub').textContent }; })()`);
             assert.ok(s.title === 'may I delete the old table?' && !s.body && /^From Dev \u00b7 Sprout team \u00b7 /.test(s.meta), at + 'a one-line question is its own title, no body: ' + JSON.stringify(s));
-            await ev(`document.querySelector('dialog.inbox-ask-dialog button.btn:not(.btn-primary)').click(); true`);
+            await ev(`document.querySelector('dialog.inbox-ask-dialog .inbox-ask-buttons .btn:not(.btn-primary)').click(); true`);
         }
     } finally { await client.close(); }
     console.log('ask_item_browser: ok');
