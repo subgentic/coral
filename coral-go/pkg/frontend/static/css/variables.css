@@ -92,6 +92,7 @@
 
     /* Diff */
     --diff-view-alpha: 0.24; /* how strong the file viewer's added and removed blocks are (the light theme softens them) */
+    --diff-token-filter: brightness(1.4); --diff-line-text: #dfe3ea; /* text on an added or removed line is lifted off its band: AA (4.5:1) for the syntax colours and the plain text (#12523) */
     --diff-add-bg:    rgba(74, 186, 96, 0.15);
     --diff-add-color: #4aba60;
     --diff-del-bg:    rgba(224, 85, 69, 0.15);
@@ -338,6 +339,7 @@
 
     /* Diff */
     --diff-view-alpha: 0.14;
+    --diff-token-filter: brightness(0.8); --diff-line-text: inherit;
     --diff-add-bg:    rgba(26, 127, 55, 0.12);
     --diff-add-color: #1a7f37;
     --diff-del-bg:    rgba(207, 34, 46, 0.12);
