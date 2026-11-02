@@ -139,6 +139,9 @@ func (in Installer) Install(ctx context.Context, t Target, arch Arch) (string, e
 		run = in.runHelper
 	}
 	sum, err := run(ctx, tag, asset, dir)
+	if errors.Is(err, errNoVerifier) { // said plainly, so a person who built the hub alone knows what to put beside it (#12216)
+		return "", fail("install", "This Coral has no release verifier (coral-update) next to it, so nothing was installed.")
+	}
 	if err != nil || !hexRe.MatchString(sum) {
 		return "", fail("install", "The release could not be verified, so nothing was installed.")
 	}
@@ -338,13 +341,16 @@ func checkLocalPackage(file string) (int64, error) {
 	return total, nil
 }
 
+// errNoVerifier is the verifier program (coral-update) missing: a hub that was built or installed without it (a development build, a copy of the binary alone) has nothing to check a release with (#12216).
+var errNoVerifier = errors.New("no verifier")
+
 // runHelper runs `coral-update verify-package` by its absolute path with a minimal environment and a timeout, and reads its JSON answer. Anything but "verified" with a SHA-256 is a refusal.
 func (in Installer) runHelper(ctx context.Context, tag, asset, dir string) (string, error) {
 	if in.Helper == "" || !filepath.IsAbs(in.Helper) {
-		return "", errors.New("no verifier")
+		return "", errNoVerifier
 	}
 	if st, err := os.Stat(in.Helper); err != nil || !st.Mode().IsRegular() {
-		return "", errors.New("no verifier")
+		return "", errNoVerifier
 	}
 	ctx, cancel := context.WithTimeout(ctx, 6*time.Minute)
 	defer cancel()
