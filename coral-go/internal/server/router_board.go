@@ -10,6 +10,7 @@ import (
 	"github.com/subgentic/coral/internal/proxy"
 	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/server/routes"
+	setreg "github.com/subgentic/coral/internal/settings"
 	"github.com/subgentic/coral/internal/store"
 )
 
@@ -55,6 +56,13 @@ func (s *Server) configureBoardHandlers(h *routeHandlers) (*routes.BoardHandler,
 	boardHandler.SetBoardChatFlagsClearer(sessStore.DeleteBoardChatFlags)
 	boardHandler.SetAllowlistFlag(routes.AllowlistEnabled(sessStore))
 	boardHandler.SetChiefBoard(s.chiefBoardID)
+	boardHandler.SetChiefFronts(func(ctx context.Context) string {
+		st, err := sessStore.GetSettings(ctx)
+		if err != nil {
+			return ""
+		}
+		return setreg.Text(st, "chief_fronts")
+	})
 	boardHandler.SetGoalDoneHidden(func(ctx context.Context) []string {
 		st, err := sessStore.GetSettings(ctx)
 		if err != nil {

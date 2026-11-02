@@ -79,6 +79,8 @@ type BoardHandler struct {
 	allowlistFlag func(ctx context.Context) bool
 	// chiefBoard reads the board the Operator recorded as Chief's team (chief_team, #11508); nil or "": none.
 	chiefBoard func(ctx context.Context) string
+	// chiefFronts reads the team the Operator named in Settings > Chief (chief_fronts: a board's id or its name); nil or "": none (#12411).
+	chiefFronts func(ctx context.Context) string
 	// goalDoneHidden reads the goals hidden from Needs you (goal_done_hidden, #11825); nil: none.
 	goalDoneHidden func(ctx context.Context) []string
 	// goalDoneRead reads the goals the Operator opened in Needs you (goal_done_read, #11983); nil: none.
