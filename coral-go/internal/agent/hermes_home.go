@@ -18,6 +18,7 @@ import (
 
 	"github.com/subgentic/coral/internal/diskguard"
 	"github.com/subgentic/coral/internal/fsreplace"
+	"github.com/subgentic/coral/internal/logsafe"
 	"github.com/subgentic/coral/internal/safefs"
 )
 
@@ -453,7 +454,7 @@ func SweepHermesHomes(dataDir string, isLive func(sessionID string) bool, minAge
 				continue
 			}
 			if rerr := os.RemoveAll(home); rerr != nil {
-				slog.Warn("hermes: an unused home was not removed", "home", name, "error", rerr)
+				slog.Warn("hermes: an unused home was not removed", "home", logsafe.Path(home), "error", logsafe.Path(rerr.Error()))
 				continue
 			}
 			removed++

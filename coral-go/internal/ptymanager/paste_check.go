@@ -398,6 +398,9 @@ func hermesPlaceholderBox(styled string) bool {
 	if !ok || len(box) != 1 {
 		return false
 	}
+	if strings.Contains(squeeze(box[0].text), pastePlaceholder) {
+		return false // a paste's marker says only that something was pasted, not what: a person's own paste looks the same, whatever its styling (as suggestionOnly)
+	}
 	m := inputBoxRe.FindStringSubmatchIndex(box[0].text)
 	if m == nil {
 		return false

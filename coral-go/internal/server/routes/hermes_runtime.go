@@ -15,6 +15,7 @@ import (
 	at "github.com/subgentic/coral/internal/agenttypes"
 	"github.com/subgentic/coral/internal/hermesdb"
 	"github.com/subgentic/coral/internal/jsonl"
+	"github.com/subgentic/coral/internal/logsafe"
 	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/safefs"
@@ -266,7 +267,7 @@ func (h *SessionsHandler) removeHermesHome(agentType, team, sessionID string) {
 		return
 	}
 	if err := agent.RemoveHermesHome(h.cfg.CoralDir(), team, sessionID); err != nil {
-		slog.Warn("hermes: the agent's home was not removed", "session", sessionID, "error", err)
+		slog.Warn("hermes: the agent's home was not removed", "session", sessionID, "error", logsafe.Path(err.Error()))
 	}
 }
 

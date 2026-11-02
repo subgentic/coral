@@ -35,20 +35,22 @@ func TestHermesPlaceholderByItsStyling(t *testing.T) {
 		screen string
 		want   bool
 	}{
-		"the real empty box, a hint no list knows (another locale)": {hermesScreen(true, "\x1b[38;5;230m❯ "+italic136+"Frag irgendetwas oder tippe / für Befehle…\x1b[0m"), true},
-		"the real empty box, an English hint":                       {hermesScreen(true, "\x1b[38;5;230m❯ "+italic136+"What changed in this repo recently?\x1b[0m"), true},
-		"the real box with typed text":                              {hermesScreen(true, "\x1b[38;5;230m❯ \x1b[39mmy draft text"), false},
-		"typed text that is the hint's words, normal weight":        {hermesScreen(true, "\x1b[38;5;230m❯ \x1b[39mWhat changed in this repo recently?"), false},
-		"italic and colour but not Hermes's screen (no welcome)":    {hermesScreen(false, "\x1b[38;5;230m❯ "+italic136+"Frag irgendetwas\x1b[0m"), false},
-		"the hint followed by a person's normal-weight words":       {hermesScreen(true, "\x1b[38;5;230m❯ "+italic136+"Frag irgendetwas\x1b[0m und meine Frage"), false},
-		"a person's text first, then italic":                        {hermesScreen(true, "\x1b[38;5;230m❯ \x1b[39mmeine Frage "+italic136+"Frag irgendetwas\x1b[0m"), false},
-		"italic with the default colour":                            {hermesScreen(true, "\x1b[38;5;230m❯ \x1b[39m\x1b[3mFrag irgendetwas\x1b[0m"), false},
-		"italic in two different colours":                           {hermesScreen(true, "\x1b[38;5;230m❯ "+italic136+"Frag \x1b[38;5;200mirgendetwas\x1b[0m"), false},
-		"a box of two lines":                                        {hermesScreen(true, "\x1b[38;5;230m❯ "+italic136+"Frag irgendetwas\x1b[0m", italic136+"und noch eine Zeile\x1b[0m"), false},
-		"a long line":                                               {hermesScreen(true, "\x1b[38;5;230m❯ "+italic136+strings.Repeat("wort ", 30)+"\x1b[0m"), false},
-		"an empty box":                                              {hermesScreen(true, "\x1b[38;5;230m❯ "), false},
-		"no box at all":                                             {hermesWelcome + "just text\n", false},
-		"italic reset with 23 before the rest":                      {hermesScreen(true, "\x1b[38;5;230m❯ \x1b[3m\x1b[38;5;136mFrag\x1b[23m irgendetwas\x1b[0m"), false},
+		"the real empty box, a hint no list knows (another locale)":         {hermesScreen(true, "\x1b[38;5;230m❯ "+italic136+"Frag irgendetwas oder tippe / für Befehle…\x1b[0m"), true},
+		"the real empty box, an English hint":                               {hermesScreen(true, "\x1b[38;5;230m❯ "+italic136+"What changed in this repo recently?\x1b[0m"), true},
+		"the real box with typed text":                                      {hermesScreen(true, "\x1b[38;5;230m❯ \x1b[39mmy draft text"), false},
+		"typed text that is the hint's words, normal weight":                {hermesScreen(true, "\x1b[38;5;230m❯ \x1b[39mWhat changed in this repo recently?"), false},
+		"italic and colour but not Hermes's screen (no welcome)":            {hermesScreen(false, "\x1b[38;5;230m❯ "+italic136+"Frag irgendetwas\x1b[0m"), false},
+		"the hint followed by a person's normal-weight words":               {hermesScreen(true, "\x1b[38;5;230m❯ "+italic136+"Frag irgendetwas\x1b[0m und meine Frage"), false},
+		"a person's text first, then italic":                                {hermesScreen(true, "\x1b[38;5;230m❯ \x1b[39mmeine Frage "+italic136+"Frag irgendetwas\x1b[0m"), false},
+		"italic with the default colour":                                    {hermesScreen(true, "\x1b[38;5;230m❯ \x1b[39m\x1b[3mFrag irgendetwas\x1b[0m"), false},
+		"italic in two different colours":                                   {hermesScreen(true, "\x1b[38;5;230m❯ "+italic136+"Frag \x1b[38;5;200mirgendetwas\x1b[0m"), false},
+		"a box of two lines":                                                {hermesScreen(true, "\x1b[38;5;230m❯ "+italic136+"Frag irgendetwas\x1b[0m", italic136+"und noch eine Zeile\x1b[0m"), false},
+		"a long line":                                                       {hermesScreen(true, "\x1b[38;5;230m❯ "+italic136+strings.Repeat("wort ", 30)+"\x1b[0m"), false},
+		"a paste marker drawn in italic and the colour (Security's SHOULD)": {hermesScreen(true, "\x1b[38;5;230m❯ "+italic136+"[Pasted text #1 +42 lines]\x1b[0m"), false},
+		"a paste marker with a hint's colours, another label":               {hermesScreen(true, "\x1b[38;5;230m❯ "+italic136+"[Pasted ~4 lines]\x1b[0m"), false},
+		"an empty box":                         {hermesScreen(true, "\x1b[38;5;230m❯ "), false},
+		"no box at all":                        {hermesWelcome + "just text\n", false},
+		"italic reset with 23 before the rest": {hermesScreen(true, "\x1b[38;5;230m❯ \x1b[3m\x1b[38;5;136mFrag\x1b[23m irgendetwas\x1b[0m"), false},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
