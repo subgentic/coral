@@ -131,7 +131,11 @@
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) { .preview-toolbar .ac-toggle:not([hidden]) { min-height: 44px; min-width: 44px; } } /* a touch target (the rule above is more specific than the phone's own) */
 
 /* "Who can read this" (artifact_readers.js): a small disclosure under the viewer's header and in an Artifacts row's details. */
-.artifact-viewer-from { flex: none; padding: 0 16px 8px; font-size: var(--fs-sm); color: var(--text-secondary); overflow-wrap: anywhere; }
+.artifact-viewer-from { flex: none; padding: 0 16px 6px; font-size: var(--fs-sm); color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; } /* one cut line: a tap shows all of it (#12224) */
+.artifact-viewer-from.is-open { white-space: normal; overflow-wrap: anywhere; }
+.artifact-viewer-sandbox { cursor: pointer; border: 0; color: var(--text-secondary); font: inherit; font-size: var(--fs-sm); }
+.artifact-viewer-sandbox[hidden], .artifact-linked-notice[hidden] { display: none; }
+.artifact-viewer-sandbox .material-icons { font-size: 1rem; margin-right: 2px; }
 .artifact-viewer-from[hidden] { display: none; }
 .artifact-viewer-readers { flex: none; padding: 0 16px; }
 .artifact-viewer-readers[hidden] { display: none; }

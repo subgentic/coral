@@ -14,6 +14,7 @@ import { trapTab } from './dialog_focus.js';
 import { visibleName } from './artifact_names.js';
 import { importOnce } from './import_once.js';
 import { pushOverlay, popOverlay } from './overlay_history.js';
+import { browserLocal } from './safe_storage.js';
 const { readersAllowed, readersBlock } = await importOnce('./artifact_readers.js'); // lazy: its failure is retried
 const { privateBlock } = await importOnce('./artifact_private.js'); // the owner's Private switch, beside it (#11457)
 const { makeDetails } = await importOnce('./details_disclosure.js'); // "Who can read this" behind the one Details button (#7775)
@@ -75,6 +76,15 @@ function _build() {
     </div>`;
     _details = makeDetails({ panel: d.querySelector('.artifact-viewer-readers') });
     _details.button.classList.add('menu-item'); _details.button.setAttribute('role', 'menuitem'); d.querySelector('.artifact-viewer-menu').append(_details.button); // Details is in the ⋯ menu: the content is straight under the one header row (#12223)
+    // the HTML preview's banner is said once; after that a "Sandboxed" chip in the header says it, and a tap shows or hides the banner (#12224)
+    const chip = document.createElement('button'); chip.type = 'button'; chip.className = 'chip artifact-viewer-sandbox'; chip.hidden = true; chip.setAttribute('aria-expanded', 'false');
+    chip.innerHTML = '<span class="material-icons" aria-hidden="true">shield</span>Sandboxed';
+    d.querySelector('.artifact-viewer-chips').append(chip);
+    chip.addEventListener('click', () => { const note = d.querySelector('.artifact-linked-notice'); if (!note) return; note.hidden = !note.hidden; chip.setAttribute('aria-expanded', String(!note.hidden)); });
+    // the line under the header (who sent it, what they ask) is one cut line; a tap, Enter or Space shows all of it
+    const fromEl = d.querySelector('.artifact-viewer-from'); fromEl.tabIndex = 0; fromEl.setAttribute('role', 'button'); fromEl.setAttribute('aria-expanded', 'false');
+    const flipFrom = () => { const on = !fromEl.classList.contains('is-open'); fromEl.classList.toggle('is-open', on); fromEl.setAttribute('aria-expanded', String(on)); };
+    fromEl.addEventListener('click', flipFrom); fromEl.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flipFrom(); } });
     const more = d.querySelector('.artifact-viewer-more'), menu = d.querySelector('.artifact-viewer-menu');
     more.addEventListener('click', async (e) => { e.stopPropagation(); (await importOnce('./menu_button.js')).toggleMenu(more); });
     menu.addEventListener('click', async () => { (await importOnce('./menu_button.js')).closeMenus(); }); // a choice closes the menu
@@ -111,6 +121,17 @@ function _build() {
     return d;
 }
 
+/** The sandboxed HTML preview's banner: shown the first time, then the header's Sandboxed chip says it (its tooltip is the explanation, a tap shows or hides the banner). */
+function syncSandbox(d, body) {
+    const note = body.querySelector('.artifact-linked-notice'), chip = d.querySelector('.artifact-viewer-sandbox');
+    chip.hidden = !note;
+    if (!note) return;
+    note.id = 'artifact-sandbox-note'; chip.setAttribute('aria-controls', note.id); chip.title = note.textContent;
+    const seen = browserLocal.get('coral-sandbox-note') === '1';
+    note.hidden = seen; chip.setAttribute('aria-expanded', String(!seen));
+    if (!seen) browserLocal.set('coral-sandbox-note', '1');
+}
+
 /** Open the artifact `hex` (64 lowercase hex). opts: { server, filename, mediaType }. */
 export function openArtifactViewer(hex, opts = {}) {
     hex = String(hex || '').toLowerCase();
@@ -125,7 +146,7 @@ export function openArtifactViewer(hex, opts = {}) {
     const url = serverUrl(artifactPath(hex), opts.server);
     const title = d.querySelector('.artifact-viewer-title');
     title.textContent = visibleName(opts.filename) || 'Artifact'; // the uploader's text, without what hides or reorders it (Security on #220)
-    const fromLine = d.querySelector('.artifact-viewer-from'); fromLine.textContent = visibleName(opts.from) || ''; fromLine.hidden = !fromLine.textContent; // who uploaded a file opened for review (#11456), as text
+    const fromLine = d.querySelector('.artifact-viewer-from'); fromLine.textContent = visibleName(opts.from) || ''; fromLine.hidden = !fromLine.textContent; fromLine.title = fromLine.textContent; fromLine.classList.remove('is-open'); fromLine.setAttribute('aria-expanded', 'false'); d.querySelector('.artifact-viewer-sandbox').hidden = true; // who uploaded a file opened for review (#11456), as text
     // The goal this file serves, a link back to it in the opened view (#12025): one click closes the viewer and opens the goal's page. None for a file with no goal (or one opened from where its goal is not known).
     const goalLine = d.querySelector('.artifact-viewer-goal');
     goalLine.replaceChildren(); goalLine.hidden = true;
@@ -196,7 +217,7 @@ export function openArtifactViewer(hex, opts = {}) {
             dl.href = target.url; dl.setAttribute('download', target.name);
             dl.onclick = isCloud() ? (e) => { e.preventDefault(); if (dl.getAttribute('aria-disabled') === 'true') return; downloadArtifact(target.url, sanitizeDownloadName(target.name)).catch(err => { title.textContent = err.message; }); } : null;
         },
-    })).then(() => { if (gen !== _gen) return; d.classList.toggle('is-image', !!body.querySelector('.image-panes')); if (!textShown) _comments.docWhole(); }, () => {}); // a picture opens taller (css), not as a strip of its own height
+    })).then(() => { if (gen !== _gen) return; syncSandbox(d, body); d.classList.toggle('is-image', !!body.querySelector('.image-panes')); if (!textShown) _comments.docWhole(); }, () => {}); // a picture opens taller (css), not as a strip of its own height
     return true;
 }
 
