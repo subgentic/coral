@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -244,9 +245,10 @@ func TestScanAliasReturnsEveryHostOfAJumpPathAndNothingElse(t *testing.T) {
 	}
 }
 
-// The jump hops of a ProxyJump alias are run by ssh from the config, not from our argv: the scan gives them the same safety through a temporary config (-F, which ssh hands to each hop). The safety lines
-// come FIRST (ssh keeps the first value), forwarding is off for the hops, the owner's config is included after them, and the file is gone afterwards.
-func TestScanAliasGivesTheJumpHopsTheScanSafetyThroughATemporaryConfig(t *testing.T) {
+// The jump hops of a ProxyJump alias are run by ssh from the config, not from our argv: the scan gives them the safety lines (no forwarding, batch mode, no connection sharing) through a temporary
+// config (-F, which ssh hands to each hop), BEFORE the owner's own. It gives them NO host-key lines (#12031): a hop is checked as the owner's config says, against the owner's known_hosts, so the scan
+// never accepts a hop's key. The owner's config is included after the safety lines and the file is gone afterwards.
+func TestScanAliasGivesTheJumpHopsTheScanSafetyAndNoHostKeyRelaxation(t *testing.T) {
 	ed, _ := blobFor("ssh-ed25519", 3)
 	dir := t.TempDir()
 	copyTo := filepath.Join(dir, "config.copy")
@@ -258,26 +260,19 @@ func TestScanAliasGivesTheJumpHopsTheScanSafetyThroughATemporaryConfig(t *testin
 	}
 	b, _ := os.ReadFile(copyTo)
 	cfg := string(b)
-	tmpKnown := ""
-	for _, l := range strings.Split(cfg, "\n") {
-		if strings.HasPrefix(strings.TrimSpace(l), "UserKnownHostsFile ") {
-			tmpKnown = strings.Trim(strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(l), "UserKnownHostsFile ")), `"`)
-		}
-	}
-	if !strings.Contains(tmpKnown, "coral-hostkey-") || strings.Contains(tmpKnown, ".ssh") {
-		t.Errorf("the hops' known_hosts is not the scan's temporary one: %q\n%s", tmpKnown, cfg)
-	}
-	for _, want := range []string{"Host *\n", "StrictHostKeyChecking no", "GlobalKnownHostsFile ", "HashKnownHosts no", "BatchMode yes", "ForwardAgent no", "ForwardX11 no", "ClearAllForwardings yes", "PermitLocalCommand no",
+	for _, want := range []string{"Host *\n", "BatchMode yes", "UpdateHostKeys no", "ForwardAgent no", "ForwardX11 no", "ClearAllForwardings yes", "PermitLocalCommand no",
 		"GSSAPIAuthentication no", "GSSAPIDelegateCredentials no", "ControlMaster no", "ControlPath none", "ControlPersist no", `Include "/home/user/my ssh/config"`} {
 		if !strings.Contains(cfg, want) {
 			t.Errorf("the temporary config lacks %q:\n%s", want, cfg)
 		}
 	}
+	for _, banned := range []string{"StrictHostKeyChecking", "UserKnownHostsFile", "GlobalKnownHostsFile", "HashKnownHosts", "CheckHostIP", "IdentityAgent", "PreferredAuthentications"} {
+		if strings.Contains(cfg, banned) {
+			t.Errorf("the temporary config must not touch %q for the hops (a hop is checked as the owner's config says, and signs in as it says):\n%s", banned, cfg)
+		}
+	}
 	if i, j := strings.Index(cfg, "ForwardAgent no"), strings.Index(cfg, "Include"); i < 0 || j < 0 || i > j {
 		t.Errorf("the owner's config must come after the safety lines (ssh keeps the first value):\n%s", cfg)
-	}
-	if strings.Contains(cfg, "IdentityAgent") || strings.Contains(cfg, "PreferredAuthentications") {
-		t.Errorf("the hops must be able to sign in as the owner's config says (a jump opens a channel only for someone who did):\n%s", cfg)
 	}
 	p, _ := os.ReadFile(seen)
 	if _, err := os.Stat(string(p)); err == nil {
@@ -286,5 +281,136 @@ func TestScanAliasGivesTheJumpHopsTheScanSafetyThroughATemporaryConfig(t *testin
 	// a config path that could break out of the quotes is refused before ssh is started
 	if _, err := (Runner{SSH: ssh, Config: "/x\"\nProxyCommand evil"}).ScanAlias(context.Background(), tg); !errors.Is(err, ErrBadTarget) {
 		t.Errorf("a config path with a quote and a newline: %v", err)
+	}
+}
+
+// #12031 (Security's point 2): a scan that stops on a host key it was not allowed to accept is a HopKeyError, not "no key stored".
+func TestScanAliasStopsOnAJumpHostKeyItMayNotAccept(t *testing.T) {
+	ssh := newStandIn(t, "ssh", standCfg{Stderr: "Host key verification failed.\n", Exit: 255})
+	tg, _ := FromAlias("inner")
+	_, err := Runner{SSH: ssh}.ScanAlias(context.Background(), tg)
+	var he *HopKeyError
+	if !errors.As(err, &he) || !errors.Is(err, ErrHostKeyScan) {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+// #12031: with a two-hop block, the hops the owner has not pinned are the ones named; a hop whose key is in the file its own block names is not. ssh -G and ssh-keygen -F are the real ones.
+func TestHopKeyErrorNamesTheHopsTheOwnerHasNotPinned(t *testing.T) {
+	sshBin, err := exec.LookPath("ssh")
+	if err != nil {
+		t.Skip("no ssh on this computer")
+	}
+	keygen, err := exec.LookPath("ssh-keygen")
+	if err != nil {
+		t.Skip("no ssh-keygen on this computer")
+	}
+	dir := t.TempDir()
+	key := filepath.Join(dir, "k")
+	if out, err := exec.Command(keygen, "-q", "-t", "ed25519", "-N", "", "-f", key).CombinedOutput(); err != nil {
+		t.Fatalf("ssh-keygen: %v %s", err, out)
+	}
+	pub, _ := os.ReadFile(key + ".pub")
+	f := strings.Fields(string(pub))
+	known := filepath.Join(dir, "known_hosts")
+	if err := os.WriteFile(known, []byte("[jump1.example.com]:2200 "+f[0]+" "+f[1]+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg := filepath.Join(dir, "config")
+	body := "Host inner\n  HostName inner.example.com\n  ProxyJump ops@jump1.example.com:2200,jump2\n" +
+		"Host jump1.example.com\n  UserKnownHostsFile " + known + "\n" +
+		"Host jump2\n  HostName 10.0.0.2\n  UserKnownHostsFile " + known + "\n"
+	if err := os.WriteFile(cfg, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	tg, _ := FromAlias("inner")
+	he, ok := (Runner{}).hopKeyError(context.Background(), sshBin, cfg, tg).(*HopKeyError)
+	if !ok {
+		t.Fatal("not a HopKeyError")
+	}
+	if strings.Join(he.Hops, ",") != "ops@jump1.example.com:2200,jump2" || strings.Join(he.Unknown, ",") != "jump2" {
+		t.Errorf("hops %v, unknown %v", he.Hops, he.Unknown)
+	}
+}
+
+// #12031 (Security's SHOULD on #12027): the confirmed key is written under the name ssh itself looks it up by: HostKeyAlias when the block has one, else the HostName (not the alias), in the
+// [host]:port form for a port other than 22. For each such block the name is read from ssh -G, Trust writes the key under it, and ssh-keygen -F (which reads known_hosts as ssh does) finds it.
+func TestTrustedKeyIsFoundUnderTheNameSshUsesForTheHostBlock(t *testing.T) {
+	sshBin, err := exec.LookPath("ssh")
+	if err != nil {
+		t.Skip("no ssh on this computer")
+	}
+	keygen, err := exec.LookPath("ssh-keygen")
+	if err != nil {
+		t.Skip("no ssh-keygen on this computer")
+	}
+	dir := t.TempDir()
+	keyFile := filepath.Join(dir, "k")
+	if out, err := exec.Command(keygen, "-q", "-t", "ed25519", "-N", "", "-f", keyFile).CombinedOutput(); err != nil {
+		t.Fatalf("ssh-keygen: %v %s", err, out)
+	}
+	pub, _ := os.ReadFile(keyFile + ".pub")
+	f := strings.Fields(string(pub))
+	cfg := filepath.Join(dir, "config")
+	blocks := "Host plain\n  HostName real.example.com\n" +
+		"Host ported\n  HostName real.example.com\n  Port 2200\n" +
+		"Host aliased\n  HostName real.example.com\n  Port 2200\n  HostKeyAlias vault\n" +
+		"Host coder.ws\n  ProxyCommand /bin/true\n  UserKnownHostsFile /dev/null\n  StrictHostKeyChecking no\n"
+	if err := os.WriteFile(cfg, []byte(blocks), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for alias, want := range map[string]string{"plain": "real.example.com", "ported": "[real.example.com]:2200", "aliased": "vault", "coder.ws": "coder.ws"} {
+		tg, _ := FromAlias(alias)
+		got := effectiveSSH(t, sshBin, cfg, Runner{KnownHosts: filepath.Join(dir, "none")}.baseArgv(tg), tg.Destination())
+		name := got["hostname"]
+		if p := got["port"]; p != "" && p != "22" {
+			name = KnownHostName(got["hostname"], atoiOr(p, 22))
+		}
+		if got["hostkeyalias"] != "" {
+			name = got["hostkeyalias"]
+		}
+		if name != want {
+			t.Fatalf("%s: ssh's name for the host is %q, expected %q (ssh -G: %v)", alias, name, want, got)
+		}
+		known := filepath.Join(dir, "known_"+alias)
+		if err := Trust(known, HostKey{Host: name, Type: f[0], Blob: f[1]}); err != nil {
+			t.Fatalf("%s: Trust: %v", alias, err)
+		}
+		if out, err := exec.Command(keygen, "-F", name, "-f", known).CombinedOutput(); err != nil || !strings.Contains(string(out), f[1]) {
+			t.Errorf("%s: ssh-keygen -F %q does not find the key Trust wrote: %v %s", alias, name, err, out)
+		}
+	}
+}
+
+func atoiOr(s string, def int) int {
+	n, err := strconv.Atoi(s)
+	if err != nil {
+		return def
+	}
+	return n
+}
+
+// #12031 (Security's SHOULD): read back with ssh -G, the scan's config leaves a hop's UpdateHostKeys off even where the owner's block turns it on: the scan changes no known_hosts of the owner.
+func TestScanConfigNeverLetsAHopUpdateTheOwnersKnownHosts(t *testing.T) {
+	sshBin, err := exec.LookPath("ssh")
+	if err != nil {
+		t.Skip("no ssh on this computer")
+	}
+	dir := t.TempDir()
+	owner := filepath.Join(dir, "owner")
+	if err := os.WriteFile(owner, []byte("Host hop\n  HostName hop.example.com\n  UpdateHostKeys yes\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfgText, err := scanConfig(owner)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := filepath.Join(dir, "scan")
+	if err := os.WriteFile(cfg, []byte(cfgText), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got := effectiveSSH(t, sshBin, cfg, nil, "hop")
+	if got["updatehostkeys"] != "false" {
+		t.Errorf("updatehostkeys = %q, want false (the owner's block won)", got["updatehostkeys"])
 	}
 }

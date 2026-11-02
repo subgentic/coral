@@ -79,9 +79,14 @@ type Installer struct {
 }
 
 // ErrInstall is every refusal of the install: the sentence is for the owner, fixed, with no text from the far computer or the network in it.
-type ErrInstall struct{ Step, Msg string }
+type ErrInstall struct {
+	Step, Msg string
+	// Cause is what ssh said (a *ConnectError, say), for the log only: Msg is the one sentence the person sees.
+	Cause error
+}
 
 func (e *ErrInstall) Error() string { return e.Step + ": " + e.Msg }
+func (e *ErrInstall) Unwrap() error { return e.Cause }
 
 func (in Installer) say(step, state, detail string) {
 	if in.Progress != nil {
@@ -223,10 +228,16 @@ func parseKB(s string) (int64, bool) {
 }
 
 func connectErr(err error) error {
-	if errors.Is(err, ErrHostKey) || errors.Is(err, ErrHostKeyChanged) {
-		return fail("install", "The host key no longer matches.")
+	e := &ErrInstall{Step: "install", Msg: "Could not connect, or a command on the other computer failed.", Cause: err}
+	switch {
+	case errors.Is(err, ErrHostKey) || errors.Is(err, ErrHostKeyChanged):
+		e.Msg = "The host key no longer matches."
+	default:
+		if sentence := ConnectSentence(err); sentence != "Could not connect." {
+			e.Msg = sentence
+		}
 	}
-	return fail("install", "Could not connect, or a command on the other computer failed.")
+	return e
 }
 
 // checkMemberNames refuses a member name that is absolute, has a ".." element, a backslash or a control character, is empty, or is far too long; and a list that is empty or too long.

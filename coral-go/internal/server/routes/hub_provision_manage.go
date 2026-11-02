@@ -110,7 +110,7 @@ func (pr *Provisioner) identity(ctx context.Context, p *provisionPlan, row *stor
 	p.setStep("identity", stepRunning, "")
 	res, err := pr.runner.Run(ctx, p.Target, sshprov.CmdReadInstanceID)
 	if err != nil {
-		pr.fail(p, "identity", "Could not connect.")
+		pr.failConnect(p, "identity", err)
 		return false
 	}
 	if id := strings.TrimSpace(res.Stdout); res.ExitCode != 0 || !instanceRe.MatchString(id) || id != row.InstanceID {

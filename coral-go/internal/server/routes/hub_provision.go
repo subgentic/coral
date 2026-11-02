@@ -355,12 +355,12 @@ func (pr *Provisioner) Connect(w http.ResponseWriter, r *http.Request) {
 		p.mu.Unlock()
 		p.setStep("connect", stepOK, "Connected; the host key is already known.")
 	case errors.Is(err, sshprov.ErrHostKeyChanged):
-		pr.fail(p, "connect", "The host key has changed since you last connected. This may be a different computer. Check it, then fix known_hosts yourself.")
+		pr.fail(p, "connect", "The host key has changed since you confirmed it. This may be a different computer. If you expected it, remove this computer's line from ssh_known_hosts in Coral's data folder, then run Set up again.")
 	case errors.Is(err, sshprov.ErrHostKey):
 		keys, kerr := pr.scan(ctx, p.Target)
 		if kerr != nil {
 			slog.Info("[provision] host key scan failed", "plan", p.ID, "error", kerr.Error())
-			pr.fail(p, "connect", "Could not read the host's key.")
+			pr.fail(p, "connect", scanSentence(kerr))
 			break
 		}
 		p.mu.Lock()
@@ -368,8 +368,7 @@ func (pr *Provisioner) Connect(w http.ResponseWriter, r *http.Request) {
 		p.mu.Unlock()
 		p.setStep("connect", stepPending, "Confirm the host key below.")
 	default:
-		slog.Info("[provision] connect failed", "plan", p.ID, "error", err.Error())
-		pr.fail(p, "connect", "Could not connect.")
+		pr.failConnect(p, "connect", err)
 	}
 	writeJSON(w, http.StatusOK, p.view())
 }
@@ -515,6 +514,37 @@ func (p *provisionPlan) moveFrom(from1, from2, next string) (string, bool) {
 	return prev, true
 }
 
+// scanSentence is the fixed sentence for a host-key scan that failed: a jump host whose key the owner has not pinned is named (the hop's text is validated as a host, never markup).
+func scanSentence(err error) string {
+	var he *sshprov.HopKeyError
+	if errors.As(err, &he) {
+		which := he.Unknown
+		if len(which) == 0 {
+			which = he.Hops
+		}
+		if len(which) > 0 {
+			return "A jump host on the way (" + strings.Join(which, ", ") + ") is not in your known_hosts, or its key has changed. Connect through it once with ssh in a terminal, then set up again."
+		}
+		return "A jump host on the way is not in your known_hosts, or its key has changed. Connect through it once with ssh in a terminal, then set up again."
+	}
+	return "Could not read the host's key."
+}
+
+// failConnect fails step with a sentence that says why ssh could not connect or sign in, and logs the kind and the cleaned start of ssh's own message (#12027: every failure said "Could not connect." and
+// logged nothing). The person sees a fixed sentence per kind, never ssh's text.
+func (pr *Provisioner) failConnect(p *provisionPlan, step string, err error) {
+	var ce *sshprov.ConnectError
+	kind, detail := sshprov.KindOther, ""
+	if errors.As(err, &ce) {
+		kind, detail = ce.Kind, ce.Stderr
+	}
+	slog.Info("[provision] could not reach the computer", "plan", p.ID, "step", step, "kind", string(kind), "ssh", detail, "error", err.Error())
+	pr.fail(p, step, connectSentence(err))
+}
+
+// connectSentence is the fixed sentence for a failed ssh run.
+func connectSentence(err error) string { return sshprov.ConnectSentence(err) }
+
 // detectSteps is the first real step of the run: the system and tmux. The install steps follow in later commits; until they exist the run says so and stops, and registers nothing.
 func (pr *Provisioner) detectSteps(ctx context.Context, p *provisionPlan) {
 	arch, ok := pr.detect(ctx, p)
@@ -529,7 +559,7 @@ func (pr *Provisioner) detect(ctx context.Context, p *provisionPlan) (sshprov.Ar
 	p.setStep("detect", stepRunning, "")
 	res, err := pr.runner.Run(ctx, p.Target, sshprov.CmdUname)
 	if err != nil {
-		pr.fail(p, "detect", "Could not connect.")
+		pr.failConnect(p, "detect", err)
 		return "", false
 	}
 	sys := strings.TrimSpace(res.Stdout)
@@ -539,7 +569,7 @@ func (pr *Provisioner) detect(ctx context.Context, p *provisionPlan) (sshprov.Ar
 	}
 	tm, err := pr.runner.Run(ctx, p.Target, sshprov.CmdHasTmux)
 	if err != nil {
-		pr.fail(p, "detect", "Could not connect.")
+		pr.failConnect(p, "detect", err)
 		return "", false
 	}
 	if tm.ExitCode != 0 {
@@ -562,7 +592,12 @@ func (pr *Provisioner) setupSteps(ctx context.Context, p *provisionPlan, arch ss
 		if errors.As(err, &ie) {
 			msg = ie.Msg // a fixed sentence of the installer's, never text from the far side or the network
 		}
-		slog.Info("[provision] install failed", "plan", p.ID, "step", "install")
+		kind, detail := sshprov.KindOther, ""
+		var ce *sshprov.ConnectError
+		if errors.As(err, &ce) {
+			kind, detail = ce.Kind, ce.Stderr
+		}
+		slog.Info("[provision] install failed", "plan", p.ID, "step", "install", "kind", string(kind), "ssh", detail)
 		pr.fail(p, "install", msg)
 		return
 	}

@@ -10,8 +10,10 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/subgentic/coral/internal/executil"
+	"github.com/subgentic/coral/internal/secrets"
 )
 
 // Command is one of the CLOSED set of things the hub may run on the remote. There is no way to run a command that is not in this list: a Command names a fixed template, and its arguments are
@@ -145,6 +147,8 @@ type Runner struct {
 	Timeout time.Duration
 	// KeyScan is the ssh-keyscan program of the host-key step; empty means "ssh-keyscan" from the PATH.
 	KeyScan string
+	// KnownHosts is the file host keys are checked in; empty means DefaultKnownHostsPath().
+	KnownHosts string
 	// Config is the owner's ssh config that the alias scan includes (ScanAlias); empty means DefaultConfigPath().
 	Config string
 }
@@ -164,10 +168,129 @@ var ErrHostKeyChanged = errors.New("sshprov: the host key has changed")
 // ErrConnect is a failure to connect or sign in (ssh exit 255) other than the host key.
 var ErrConnect = errors.New("sshprov: could not connect")
 
+// ConnectKind is why ssh could not connect or sign in, read from what ssh printed (exit 255). The Operator is shown a fixed sentence for the kind, never the text itself (it came from the network
+// or the far side); the capped, cleaned text goes to the hub's log (#12027).
+type ConnectKind string
+
+const (
+	KindOther   ConnectKind = "other"
+	KindAuth    ConnectKind = "auth"    // Permission denied: the key or agent was not accepted
+	KindTimeout ConnectKind = "timeout" // the connection or the command ran out of time
+	KindRefused ConnectKind = "refused" // nothing listens on that address and port
+	KindName    ConnectKind = "name"    // the name did not resolve
+	KindRoute   ConnectKind = "route"   // no route, or the network is unreachable
+	KindClosed  ConnectKind = "closed"  // the far side closed the connection during sign-in
+)
+
+// ConnectError is ErrConnect with its kind and the cleaned start of ssh's own message (for the log only). errors.Is(err, ErrConnect) holds.
+type ConnectError struct {
+	Kind   ConnectKind
+	Stderr string
+}
+
+func (e *ConnectError) Error() string        { return "sshprov: could not connect: " + string(e.Kind) }
+func (e *ConnectError) Is(target error) bool { return target == ErrConnect }
+
+// classifyConnect reads ssh's stderr for the kind of failure.
+func classifyConnect(stderr string) ConnectKind {
+	l := strings.ToLower(stderr)
+	switch {
+	case strings.Contains(l, "permission denied"), strings.Contains(l, "too many authentication failures"):
+		return KindAuth
+	case strings.Contains(l, "timed out"):
+		return KindTimeout
+	case strings.Contains(l, "connection refused"):
+		return KindRefused
+	case strings.Contains(l, "could not resolve hostname"), strings.Contains(l, "name or service not known"), strings.Contains(l, "nodename nor servname"):
+		return KindName
+	case strings.Contains(l, "no route to host"), strings.Contains(l, "network is unreachable"):
+		return KindRoute
+	case strings.Contains(l, "connection closed by"), strings.Contains(l, "connection reset"), strings.Contains(l, "kex_exchange_identification"):
+		return KindClosed
+	}
+	return KindOther
+}
+
+// ConnectSentence is the fixed sentence for a failed ssh run: the person sees it, never ssh's own text.
+func ConnectSentence(err error) string {
+	switch {
+	case errors.Is(err, ErrHostKeyChanged):
+		return "The host key has changed since you confirmed it. This may be a different computer. If you expected it, remove this computer's line from ssh_known_hosts in Coral's data folder, then run Set up again."
+	case errors.Is(err, ErrHostKey):
+		return "The hub does not have this computer's host key under the name ssh uses for it. Run Set up again and confirm the key it shows, or check the host name."
+	}
+	var ce *ConnectError
+	if errors.As(err, &ce) {
+		switch ce.Kind {
+		case KindAuth:
+			return "The computer refused the sign-in: this computer's SSH key or agent is not accepted there."
+		case KindTimeout:
+			return "The connection timed out."
+		case KindRefused:
+			return "The computer refused the connection. Is SSH running on that port?"
+		case KindName:
+			return "That host name could not be found."
+		case KindRoute:
+			return "There is no route to that computer."
+		case KindClosed:
+			return "The computer closed the connection while signing in."
+		}
+	}
+	return "Could not connect."
+}
+
+// cleanStderr is the start of ssh's message for the log: control characters out, spaces folded, at most 300 characters.
+func cleanStderr(s string) string {
+	s = strings.Map(func(r rune) rune {
+		if r == '\n' || r == '\r' || r == '\t' {
+			return ' '
+		}
+		if r < 0x20 || r == 0x7f {
+			return -1
+		}
+		return r
+	}, s)
+	s = strings.Join(strings.Fields(s), " ")
+	// A ProxyCommand prints its own program's messages on ssh's stderr (a URL with a token, a session id): the text goes through the same redaction as session excerpts before it is kept, and a
+	// redactor that refuses keeps nothing.
+	red, err := secrets.Redactor().Text([]byte(s))
+	if err != nil {
+		return "(not shown: it could not be checked for secrets)"
+	}
+	s = string(red)
+	if utf8.RuneCountInString(s) > 300 {
+		s = string([]rune(s)[:300]) + "…"
+	}
+	return s
+}
+
 // sshOptions are on every ssh the hub starts: no prompt, no unknown host key, no forwarding of the hub user's agent or display, no command from the config.
 // ClearAllForwardings does not stop -W, which is the one forward the stream target asks for.
 var sshOptions = []string{"-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=yes", "-o", "ConnectTimeout=10", "-o", "ClearAllForwardings=yes", "-o", "RequestTTY=no", "-o", "LogLevel=ERROR",
 	"-o", "ForwardAgent=no", "-o", "ForwardX11=no", "-o", "PermitLocalCommand=no", "-o", "RemoteCommand=none"}
+
+// hostFileArgs make the host-key check the hub's own whatever the owner's ssh config says (#12027): a command-line -o wins over the config, so a host block with StrictHostKeyChecking=no and
+// UserKnownHostsFile=/dev/null (Coder's) can neither turn the check off nor send it to a file that never holds the key the owner confirmed. No system-wide known_hosts, no key updates.
+func (r Runner) hostFileArgs() []string {
+	p := r.KnownHosts
+	if p == "" {
+		p = DefaultKnownHostsPath()
+	}
+	if p == "" {
+		return nil
+	}
+	if strings.ContainsAny(p, " \t") {
+		p = `"` + p + `"`
+	}
+	return []string{"-o", "UserKnownHostsFile=" + p, "-o", "GlobalKnownHostsFile=/dev/null", "-o", "UpdateHostKeys=no"}
+}
+
+// baseArgv is the options every hub ssh to t starts with: the fixed ones, the host-key file, then the target's own.
+func (r Runner) baseArgv(t Target) []string {
+	argv := append([]string{}, sshOptions...)
+	argv = append(argv, r.hostFileArgs()...)
+	return append(argv, t.Args()...)
+}
 
 const maxOutput = 64 << 10
 
@@ -222,8 +345,7 @@ func (r Runner) RunInput(ctx context.Context, t Target, input io.Reader, c Comma
 	if ssh == "" {
 		ssh = "ssh"
 	}
-	argv := append([]string{}, sshOptions...)
-	argv = append(argv, t.Args()...)
+	argv := r.baseArgv(t)
 	argv = append(argv, "--", t.Destination(), "sh -c "+shQuote(text))
 	cmd := executil.Command(ctx, ssh, argv...)
 	var out, errOut capped
@@ -244,12 +366,13 @@ func (r Runner) RunInput(ctx context.Context, t Target, input io.Reader, c Comma
 			if strings.Contains(errOut.b.String(), "Host key verification failed") {
 				return res, ErrHostKey
 			}
-			return res, ErrConnect
+			se := errOut.b.String()
+			return res, &ConnectError{Kind: classifyConnect(se), Stderr: cleanStderr(se)}
 		}
 		return res, nil // the command ran and exited non-zero: the caller reads ExitCode (tmux absent is not an error)
 	}
 	if ctx.Err() != nil {
-		return res, fmt.Errorf("%w: timed out", ErrConnect)
+		return res, &ConnectError{Kind: KindTimeout, Stderr: cleanStderr(errOut.b.String())}
 	}
 	return res, runErr
 }

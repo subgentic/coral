@@ -28,6 +28,7 @@ import (
 	"github.com/subgentic/coral/internal/secrets"
 	"github.com/subgentic/coral/internal/server/routes"
 	"github.com/subgentic/coral/internal/serverproof"
+	"github.com/subgentic/coral/internal/sshprov"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/internal/terminalinput"
 	"github.com/subgentic/coral/pkg/hubowner"
@@ -112,7 +113,8 @@ func (s *Server) useMiddleware(r *chi.Mux) {
 	r.Use(routes.RequestMetrics(s.db))
 	// Identity phase 1 (#3387): who each request is from; mismatches logged, never refused.
 	s.identity = routes.NewIdentityObserver(s.db, s.boardStore, s.keyStore.HasValidSession)
-	s.identity.SetHubOwnerDir(s.cfg.CoralDir(), routes.ProcessStart) // the self-hosted hub's owner stamp (#11378): verified against a secret only a human act writes
+	sshprov.UseOwnKnownHosts(filepath.Join(s.cfg.CoralDir(), "ssh_known_hosts")) // the hub's ssh checks, and a confirmed host key is written, in its own file: no host block can point the check elsewhere or turn it off (#12027)
+	s.identity.SetHubOwnerDir(s.cfg.CoralDir(), routes.ProcessStart)             // the self-hosted hub's owner stamp (#11378): verified against a secret only a human act writes
 	// In every mode a bare local caller needs a credential (#3421 v2): the API key or a
 	// command-line signature (checked once here, then marked for the cloud routes).
 	s.identity.SetVerifiers(s.keyStore.HasValidKey, func(r *http.Request) (*http.Request, bool) {
