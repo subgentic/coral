@@ -80,7 +80,7 @@ const B = 'goal-done-' + Date.now().toString(36);
         await waitFor(`!!document.querySelector('.goal-view, [data-goal-view], #goal-view') || /goals|goal/i.test(location.hash + location.pathname)`, 'the goal opened', 10000);
         await openNeeds();
         await waitFor(`/looks done/.test(document.querySelector('${T}')?.textContent || '')`, 'the opened item is still listed', 20000);
-        await waitFor(`Number((document.getElementById('nav-tab-hub-inbox-badge') || {}).textContent || 0) === ${unreadBadge - 1}`, 'and out of the Inbox number', 10000);
+        await waitFor(`Number((document.getElementById('nav-tab-hub-inbox-badge') || {}).textContent || 0) === ${unreadBadge - 1}`, 'and out of the Inbox number', 10000.catch(async e => { await dumpDbg('goal_done after-open unread=' + unreadBadge); throw e; });
         assert.equal((await doneRows()).length, 1, 'listed once');
         assert.ok(await ev(`[...document.querySelectorAll('${T} tbody tr')].find(tr => /looks done/.test(tr.textContent)).classList.contains('dt-read')`), 'the opened row is drawn read (needsUnread, QA #11983)');
         assert.equal(await ev(`(document.querySelector('${T} .session-group-count') || {}).textContent`), '0', 'the heading counts what the badge counts: nothing unread (needsUnread)');
