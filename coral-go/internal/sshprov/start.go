@@ -63,10 +63,13 @@ func SetStopTimingForTest(wait, poll time.Duration) (restore func()) {
 // ErrNotStopped is a Coral that is still there after a stop (a session, or a process of this user running it), or one that could not be checked.
 var ErrNotStopped = errors.New("sshprov: Coral did not stop, or that could not be checked")
 
-// StopAndConfirm ends the coral-server tmux session (matched by its exact name: a far user's "coral-server-notes" is never touched) and then CONFIRMS it: no session by that name and no process of this user running a Coral from the install folder
+// StopAndConfirm ends the Coral the recorded PID names (CmdStopDaemon) and the coral-server tmux session of an earlier set-up (matched by its exact name: a far user's "coral-server-notes" is never touched) and then CONFIRMS it: no session by that name and no process of this user running a Coral from the install folder
 // (not the port: another user's Coral may hold 8420). It returns nil only on that confirmation; a caller does not delete files or restart on anything else.
 func (r Runner) StopAndConfirm(ctx context.Context, t Target) error {
-	if _, err := r.Run(ctx, t, CmdStopTmux); err != nil {
+	if _, err := r.Run(ctx, t, CmdStopDaemon); err != nil {
+		return err
+	}
+	if _, err := r.Run(ctx, t, CmdStopTmux); err != nil { // a Coral set up before the daemon start lives in this session
 		return err
 	}
 	deadline := time.Now().Add(stopWait)
@@ -110,14 +113,14 @@ func (r Runner) InstallOwnerSecret(ctx context.Context, t Target, version, remot
 // user's would fail to bind and the hub would talk to the first user's with the second's key.
 var ErrPortInUse = errors.New("sshprov: port 8420 is already in use on that computer")
 
-// StartTmux starts the installed Coral of version in a tmux session called coral-server, once: a session that exists is left as it is. It refuses (ErrPortInUse) when something else holds port 8420.
-func (r Runner) StartTmux(ctx context.Context, t Target, version string) error {
+// Start starts the installed Coral of version as a detached process (CmdStartDaemon), once: one that is already running is left as it is. It refuses (ErrPortInUse) when something else holds port 8420.
+func (r Runner) Start(ctx context.Context, t Target, version string) error {
 	if chk, err := r.Run(ctx, t, CmdCheckPort); err != nil {
 		return err
 	} else if chk.ExitCode == 2 {
 		return ErrPortInUse
 	}
-	res, err := r.Run(ctx, t, CmdStartTmux, version)
+	res, err := r.Run(ctx, t, CmdStartDaemon, version)
 	if err != nil {
 		return err
 	}

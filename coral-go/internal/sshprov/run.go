@@ -37,9 +37,11 @@ const (
 	CmdTarList
 	// CmdUnpack unpacks that package into <install>/<version>/root and records its SHA-256 in <install>/<version>/package.sha256; arg 0 is the version.
 	CmdUnpack
-	// CmdStartTmux starts the installed Coral of version arg 0 in a tmux session named coral-server, listening on loopback only, with its data under the install folder; nothing is done if the session exists.
-	// Its standard input is /dev/null: a tmux pane is a terminal, and a Coral with a terminal asks "Enable remote access? [y/N]" before it listens and waits for an answer nobody gives (the setup then timed out waiting for its API key).
-	CmdStartTmux
+	// CmdStartDaemon starts the installed Coral of version arg 0 as a detached process (setsid, nohup, no terminal), listening on loopback only, with its data under the install folder: its PID in <install>/coral.pid
+	// (written by the process itself, which is the one that execs Coral) and its output appended to <install>/coral.log. Nothing is done when the recorded PID is a Coral of this install that is alive. It asks
+	// for `--backend tmux` when tmux is installed (agents then survive a restart of Coral) and `--backend pty` when it is not (they end with Coral).
+	// Its standard input is /dev/null: a Coral with a terminal asks "Enable remote access? [y/N]" before it listens and waits for an answer nobody gives (the setup then timed out waiting for its API key).
+	CmdStartDaemon
 	// CmdEnsureInstanceID makes the provisioner's instance id file (32 hex digits, once) and prints it.
 	CmdEnsureInstanceID
 	// CmdReadAPIKey prints the API key of the Coral of version arg 0 (its data folder under the install folder); it fails until that Coral has started once.
@@ -48,6 +50,9 @@ const (
 	CmdAcceptTerms
 	// CmdStopTmux ends the coral-server tmux session (the Coral in it); nothing is done if there is none.
 	CmdStopTmux
+	// CmdStopDaemon ends the Coral the recorded PID names, when that PID is alive and its command line is a Coral from the install folder (aliveTest): a SIGTERM, nothing else, and nothing when there is no
+	// such process. A Coral that was started in the tmux session of an earlier set-up is ended by CmdStopTmux.
+	CmdStopDaemon
 	// CmdRemoveInstalls deletes the installed releases (the numbered folders) under the install folder and keeps the data, the instance id and the key.
 	CmdRemoveInstalls
 	// CmdRemoveAll deletes the whole install folder: releases, data (the key, the history), the instance id.
@@ -71,6 +76,10 @@ const (
 	// 2 when something does (another user's Coral, or any program), 3 when it cannot tell (the start then goes ahead as it always did).
 	CmdCheckPort
 )
+
+// aliveTest is true (exit 0) when <install>/coral.pid names a live process of this user whose command line is a Coral from the install folder: the daemon a start left. A recycled PID of another program fails the
+// command-line test, so it is never taken for Coral (and never signalled).
+const aliveTest = "{ [ -s \"$HOME/" + InstallDir + "/coral.pid\" ] && ps -p \"$(cat \"$HOME/" + InstallDir + "/coral.pid\")\" -o args= 2>/dev/null | grep -F -- \"$HOME/" + InstallDir + "/\" | grep -Eq '/root/coral( |$)'; }"
 
 // InstallDir is where everything the provisioner puts on the remote lives, under the remote user's home. Never outside it.
 const InstallDir = ".coral-server"
@@ -101,17 +110,19 @@ var specs = map[Command]spec{
 	CmdMkVersionDir:   {template: "umask 077 && mkdir -p \"$HOME/" + InstallDir + "/%[1]s\" && chmod 700 \"$HOME/" + InstallDir + "\" \"$HOME/" + InstallDir + "/%[1]s\"", args: []*regexp.Regexp{versionRe}},
 	CmdReceive:        {template: "umask 077 && cat > \"$HOME/" + InstallDir + "/%s/package.tar.gz\"", args: []*regexp.Regexp{versionRe}, timeout: 15 * time.Minute},
 	CmdTarList:        {template: "cd \"$HOME/" + InstallDir + "/%s\" && tar -tzf package.tar.gz", args: []*regexp.Regexp{versionRe}, timeout: 2 * time.Minute},
-	CmdStartTmux: {template: "umask 077 && mkdir -p \"$HOME/" + InstallDir + "/data\" && { tmux has-session -t =coral-server 2>/dev/null || tmux new-session -d -s coral-server " +
-		"\"exec \\\"$HOME/" + InstallDir + "/%[1]s/root/coral\\\" --host 127.0.0.1 --port 8420 --no-browser --cloud-url off --backend tmux --home \\\"$HOME/" + InstallDir + "/data\\\" </dev/null\"; }", args: []*regexp.Regexp{versionRe}},
+	CmdStartDaemon: {template: "umask 077 && mkdir -p \"$HOME/" + InstallDir + "/data\" && { " + aliveTest + " || { b=pty; command -v tmux >/dev/null 2>&1 && b=tmux; s=; command -v setsid >/dev/null 2>&1 && s=setsid; " +
+		"P=\"$HOME/" + InstallDir + "/coral.pid\" C=\"$HOME/" + InstallDir + "/%[1]s/root/coral\" B=$b H=\"$HOME/" + InstallDir + "/data\" " +
+		"nohup $s sh -c 'echo $$ > \"$P\"; exec \"$C\" --host 127.0.0.1 --port 8420 --no-browser --cloud-url off --backend \"$B\" --home \"$H\"' </dev/null >>\"$HOME/" + InstallDir + "/coral.log\" 2>&1 & }; }", args: []*regexp.Regexp{versionRe}},
 	CmdEnsureInstanceID: {template: "umask 077 && mkdir -p \"$HOME/" + InstallDir + "\" && f=\"$HOME/" + InstallDir + "/instance-id\" && { [ -s \"$f\" ] || head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \\n' > \"$f\"; } && cat \"$f\""},
 	CmdReadAPIKey:       {template: "\"$HOME/" + InstallDir + "/%s/root/coral\" api-key --home \"$HOME/" + InstallDir + "/data\" 2>/dev/null", args: []*regexp.Regexp{versionRe}},
 	CmdAcceptTerms:      {template: "\"$HOME/" + InstallDir + "/%s/root/coral\" accept-terms", args: []*regexp.Regexp{versionRe}},
+	CmdStopDaemon:       {template: aliveTest + " && kill \"$(cat \"$HOME/" + InstallDir + "/coral.pid\")\" 2>/dev/null; true"},
 	CmdStopTmux:         {template: "tmux kill-session -t =coral-server 2>/dev/null; true"},
 	CmdRemoveInstalls:   {template: "cd \"$HOME/" + InstallDir + "\" 2>/dev/null && for d in [0-9]*; do [ -d \"$d\" ] && rm -rf -- \"$d\"; done; true"},
 	CmdRemoveAll:        {template: "[ -n \"$HOME\" ] && rm -rf \"$HOME/" + InstallDir + "\""},
 	CmdCheckStopped: {template: "if tmux has-session -t =coral-server 2>/dev/null; then exit 1; fi; out=$(ps -u \"$(id -u)\" -o args= 2>/dev/null) || exit 3; " +
 		"if printf '%%s\\n' \"$out\" | grep -F -- \"$HOME/" + InstallDir + "/\" | grep -Eq '/root/coral( |$)'; then exit 2; fi; exit 0"},
-	CmdCheckPort: {template: "if tmux has-session -t =coral-server 2>/dev/null; then exit 0; fi; [ -r /proc/net/tcp ] || exit 3; " +
+	CmdCheckPort: {template: "if tmux has-session -t =coral-server 2>/dev/null; then exit 0; fi; if " + aliveTest + "; then exit 0; fi; [ -r /proc/net/tcp ] || exit 3; " +
 		"if grep -Eqs '^ *[0-9]+: [0-9A-Fa-f]+:20E4 [0-9A-Fa-f:]+ 0A ' /proc/net/tcp /proc/net/tcp6; then exit 2; fi; exit 0"},
 	CmdInstallOwnerSecret: {template: "\"$HOME/" + InstallDir + "/%s/root/coral\" hub-owner-secret --home \"$HOME/" + InstallDir + "/data\"", args: []*regexp.Regexp{versionRe}},
 	CmdFreeKB:             {template: "df -Pk \"$HOME\" | awk 'NR==2 {print $4}'"},

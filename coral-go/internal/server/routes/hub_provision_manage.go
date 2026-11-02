@@ -28,7 +28,7 @@ func manageSteps(kind string) []provisionStep {
 	}
 	switch kind {
 	case kindUpgrade:
-		return []provisionStep{s("connect", "Connect over SSH and check the host key"), s("identity", "Check it is the computer that was set up"), s("detect", "Check the system and tmux"),
+		return []provisionStep{s("connect", "Connect over SSH and check the host key"), s("identity", "Check it is the computer that was set up"), s("detect", "Check the system"),
 			s("install", "Download, verify and install this hub's release"), s("restart", "Restart Coral on the new release"), s("verify", "Check that it answers")}
 	case kindStop:
 		return []provisionStep{s("connect", "Connect over SSH and check the host key"), s("identity", "Check it is the computer that was set up"), s("stop", "Stop Coral")}
@@ -65,7 +65,7 @@ func (pr *Provisioner) planManage(w http.ResponseWriter, r *http.Request, req pl
 		errBadRequest(w, "this server's SSH target is not valid")
 		return
 	}
-	p := &provisionPlan{ID: newPlanID(), Target: t, ServerID: row.ID, Label: row.Label, Mode: "tmux", Kind: req.Action, Delete: req.DeleteData, phase: phasePlanned, created: time.Now(), steps: manageSteps(req.Action)}
+	p := &provisionPlan{ID: newPlanID(), Target: t, ServerID: row.ID, Label: row.Label, Mode: "daemon", Kind: req.Action, Delete: req.DeleteData, phase: phasePlanned, created: time.Now(), steps: manageSteps(req.Action)}
 	pr.mu.Lock()
 	pr.expireLocked()
 	for _, o := range pr.plans {
@@ -224,7 +224,7 @@ func (pr *Provisioner) upgradeSteps(ctx context.Context, p *provisionPlan) {
 			return
 		}
 	}
-	if err := pr.runner.StartTmux(ctx, p.Target, pr.version); err != nil {
+	if err := pr.runner.Start(ctx, p.Target, pr.version); err != nil {
 		if errors.Is(err, sshprov.ErrPortInUse) {
 			pr.fail(p, "restart", portInUseSentence)
 			return

@@ -161,7 +161,38 @@ func runFar(f farCfg, text string) int {
 			return 1
 		}
 		return 0
-	case has("command -v tmux"), has("systemctl --user"):
+	case has("nohup ") && has("coral.pid"): // CmdStartDaemon (#12217): a detached Coral, its PID in coral.pid, its output in coral.log; one that is alive is left as it is
+		_ = os.MkdirAll(filepath.Join(install, "data"), 0o700)
+		if f.flag("session") {
+			return 0
+		}
+		for _, must := range []string{`--host 127.0.0.1 --port 8420 --no-browser --cloud-url off --backend "$B" --home "$H"`, `</dev/null`, `coral.log`, `exec "$C"`} {
+			if !has(must) {
+				fmt.Fprintln(os.Stderr, "the daemon start lacks", must)
+				return 2
+			}
+		}
+		appendLine(f.TmuxLog, "daemon-start")
+		f.setFlag("session", true)
+		backend := "tmux"
+		if f.flag("notmux") {
+			backend = "pty"
+		}
+		appendLine(f.ArgsLog, "--host 127.0.0.1 --port 8420 --no-browser --cloud-url off --backend "+backend+" --home "+filepath.Join(install, "data"))
+		_ = os.WriteFile(filepath.Join(filepath.Dir(f.Home), "started"), []byte(fmt.Sprint(time.Now().UnixNano())), 0o600) // the command gave Coral </dev/null, so it gets going
+		return 0
+	case has(`kill "$(cat`): // CmdStopDaemon: only the PID that is a Coral of the install (the command's own test) is signalled
+		appendLine(f.TmuxLog, "kill-daemon")
+		if !f.flag("stuck") {
+			f.setFlag("session", false)
+		}
+		return 0
+	case has("command -v tmux"):
+		if f.flag("notmux") {
+			return 1
+		}
+		return 0
+	case has("systemctl --user"):
 		return 0
 	case has(`ps -u "$(id -u)"`): // the check after a stop: the session, then THIS user's own Coral process (the flag listening), never the port
 		switch {

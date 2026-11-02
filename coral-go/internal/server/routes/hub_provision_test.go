@@ -250,14 +250,13 @@ func TestProvisionRefusesAChangedHostKeyAndNeverOffersIt(t *testing.T) {
 	assert.True(t, os.IsNotExist(err))
 }
 
-func TestProvisionDetectStopsOnAnUnsupportedSystemOrNoTmux(t *testing.T) {
+func TestProvisionDetectStopsOnAnUnsupportedSystem(t *testing.T) {
 	for name, c := range map[string]struct {
 		uname string
 		tmux  bool
 		want  string
 	}{
-		"macos":  {"Darwin arm64", true, "not supported"},
-		"notmux": {"Linux x86_64", false, "tmux is not installed"},
+		"macos": {"Darwin arm64", true, "not supported"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			pe := newProvEnv(t, "known", c.uname, c.tmux)
@@ -270,6 +269,29 @@ func TestProvisionDetectStopsOnAnUnsupportedSystemOrNoTmux(t *testing.T) {
 			failed := pe.waitPhase(t, plan, "failed")
 			assert.Contains(t, failed["error"], c.want)
 		})
+	}
+}
+
+// Without tmux the set-up goes on (#12217: Coral is started as a background process) and the check step says plainly what that costs.
+func TestProvisionDetectWithoutTmuxGoesOnAndSaysWhatItCosts(t *testing.T) {
+	for tmux, want := range map[bool]string{false: "no tmux: agents on that computer will end when Coral restarts or is upgraded", true: "tmux found: agents there survive a restart of Coral"} {
+		pe := newProvEnv(t, "known", "Linux x86_64", tmux)
+		_, v := pe.do("POST", "/api/servers/provision/plan", map[string]any{"target": "user@box.example.com"})
+		plan := v["plan"].(string)
+		_, v = pe.do("POST", "/api/servers/provision/"+plan+"/connect", nil)
+		require.Equal(t, "connected", v["phase"], "%v", v)
+		code, _ := pe.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{"accept_terms": true, "terms_sha256": terms.EULADigest()})
+		require.Equal(t, 202, code)
+		got := pe.waitPhase(t, plan, "done")
+		var detect map[string]any
+		for _, st := range got["steps"].([]any) {
+			if m := st.(map[string]any); m["name"] == "detect" {
+				detect = m
+			}
+		}
+		require.NotNil(t, detect, "%v", got)
+		assert.Equal(t, "ok", detect["state"], "tmux=%v: %v", tmux, detect)
+		assert.Contains(t, detect["detail"], want)
 	}
 }
 

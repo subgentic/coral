@@ -232,7 +232,7 @@ func (pr *Provisioner) expireLocked() {
 type planRequest struct {
 	Target string `json:"target"` // user@host[:port]
 	Alias  string `json:"alias"`  // a Host name of the owner's SSH config
-	Mode   string `json:"mode"`   // "tmux" (the only one so far)
+	Mode   string `json:"mode"`   // "daemon" (the only one: a detached process); "tmux" is the name an earlier plan used and is taken as the same
 	Label  string `json:"label"`
 	// ServerID and Action manage a server that is already registered and was set up over SSH: "upgrade", "stop" or "remove" (DeleteData with remove). The target is the registry's, never the request's.
 	ServerID   string `json:"server_id"`
@@ -280,8 +280,8 @@ func (pr *Provisioner) Plan(w http.ResponseWriter, r *http.Request) {
 		errBadRequest(w, "that is not a valid SSH target")
 		return
 	}
-	if req.Mode != "" && req.Mode != "tmux" {
-		errBadRequest(w, "only tmux is available so far")
+	if req.Mode != "" && req.Mode != "daemon" && req.Mode != "tmux" {
+		errBadRequest(w, "only a background process is available so far")
 		return
 	}
 	id := serverIDFor(t)
@@ -304,7 +304,7 @@ func (pr *Provisioner) Plan(w http.ResponseWriter, r *http.Request) {
 		errBadRequest(w, "the label is too long or has a control character")
 		return
 	}
-	p := &provisionPlan{ID: newPlanID(), Target: t, ServerID: id, Label: label, Mode: "tmux", phase: phasePlanned, created: time.Now(), steps: planSteps()}
+	p := &provisionPlan{ID: newPlanID(), Target: t, ServerID: id, Label: label, Mode: "daemon", phase: phasePlanned, created: time.Now(), steps: planSteps()}
 	pr.mu.Lock()
 	pr.expireLocked()
 	if len(pr.plans) >= provisionMaxPlans {
@@ -320,9 +320,9 @@ func (pr *Provisioner) Plan(w http.ResponseWriter, r *http.Request) {
 func planSteps() []provisionStep {
 	return []provisionStep{
 		{Name: "connect", Title: "Connect over SSH and check the host key", State: stepPending},
-		{Name: "detect", Title: "Check the system and tmux", State: stepPending},
+		{Name: "detect", Title: "Check the system", State: stepPending},
 		{Name: "install", Title: "Download, verify and install Coral", State: stepPending},
-		{Name: "start", Title: "Start Coral in tmux, listening on loopback only", State: stepPending},
+		{Name: "start", Title: "Start Coral in the background, listening on loopback only", State: stepPending},
 		{Name: "register", Title: "Connect it to this hub", State: stepPending},
 	}
 }
@@ -542,14 +542,14 @@ func (pr *Provisioner) detect(ctx context.Context, p *provisionPlan) (sshprov.Ar
 		pr.fail(p, "detect", "Could not connect.")
 		return "", false
 	}
-	if tm.ExitCode != 0 {
-		pr.fail(p, "detect", "tmux is not installed on that computer.")
-		return "", false
-	}
 	p.mu.Lock()
 	p.system = knownSystem(sys)
 	p.mu.Unlock()
-	p.setStep("detect", stepOK, sys+", tmux found.")
+	if tm.ExitCode != 0 { // tmux is optional (#12217): Coral starts as a background process either way, and says plainly what no tmux costs
+		p.setStep("detect", stepOK, sys+", no tmux: agents on that computer will end when Coral restarts or is upgraded.")
+	} else {
+		p.setStep("detect", stepOK, sys+", tmux found: agents there survive a restart of Coral.")
+	}
 	arch, _ := sshprov.ArchOf(sys)
 	return arch, true
 }
@@ -583,12 +583,12 @@ func (pr *Provisioner) setupSteps(ctx context.Context, p *provisionPlan, arch ss
 
 // finish starts the installed Coral, reads what the hub needs and registers it. Every sentence is fixed: the key is held in a local variable, never in a log, an error, a step or the plan.
 func (pr *Provisioner) finish(ctx context.Context, p *provisionPlan) error {
-	p.setStep("start", stepRunning, "Starting Coral in tmux, listening on this computer's loopback only.")
+	p.setStep("start", stepRunning, "Starting Coral in the background, listening on this computer's loopback only.")
 	instanceID, key, err := pr.startRemote(ctx, p)
 	if err != nil {
 		return err
 	}
-	p.setStep("start", stepOK, "Coral is running in the tmux session coral-server.")
+	p.setStep("start", stepOK, "Coral is running in the background (its log is ~/.coral-server/coral.log).")
 
 	p.setStep("register", stepRunning, "Connecting it to this hub over SSH.")
 	rs := &store.RemoteServer{ID: p.ServerID, SSHTarget: p.Target.Stored(), RemotePort: sshprov.RemotePort}
@@ -642,7 +642,7 @@ func (pr *Provisioner) realStartRemote(ctx context.Context, p *provisionPlan) (s
 		}
 		slog.Info("[provision] terms acceptance recorded for a setup", "plan", p.ID, "version", license.EULAVersion, "by", setupAcceptanceLabel(), "at", time.Now().UTC().Format(time.RFC3339))
 	}
-	if err := pr.runner.StartTmux(ctx, p.Target, pr.version); err != nil {
+	if err := pr.runner.Start(ctx, p.Target, pr.version); err != nil {
 		if errors.Is(err, sshprov.ErrPortInUse) {
 			return "", "", fail(portInUseSentence)
 		}

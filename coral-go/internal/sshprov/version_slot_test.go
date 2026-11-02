@@ -11,7 +11,7 @@ func TestVersionSlotRefusesAnythingButAVersion(t *testing.T) {
 	bad := []string{
 		`1.2.3"; rm -rf ~; "`, "$(id)", "`id`", "1.2.3\n", "1.2.3 ", " 1.2.3", "x1.2.3", "1.2.3/../x", "../1.2.3", "1.2.3-a/b", "1.2.3'x", "", "1.2", "latest", "12345.1.1",
 	}
-	for _, c := range []Command{CmdMkVersionDir, CmdReceive, CmdTarList, CmdUnpack, CmdStartTmux, CmdReadAPIKey, CmdAcceptTerms, CmdReadInstalledSum} {
+	for _, c := range []Command{CmdMkVersionDir, CmdReceive, CmdTarList, CmdUnpack, CmdStartDaemon, CmdReadAPIKey, CmdAcceptTerms, CmdReadInstalledSum} {
 		for _, v := range bad {
 			if _, err := remoteText(c, v); !errors.Is(err, ErrNotAllowed) {
 				t.Errorf("command %d accepted the version %q (err %v)", c, v, err)

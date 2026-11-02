@@ -32,7 +32,7 @@ const sayError = (r, fallback) => (r.data && (r.data.error || r.data.message)) |
 
 /** What each kind of plan is called and does, in the words the person confirms. */
 const KINDS = {
-    setup: { title: 'Set up a computer over SSH', go: 'Set up', intro: 'This hub will connect to that computer with your SSH access, install the Coral release this hub runs under your home folder, and start it in tmux, listening on that computer only. Nothing is opened to the network.' },
+    setup: { title: 'Set up a computer over SSH', go: 'Set up', intro: 'This hub will connect to that computer with your SSH access, install the Coral release this hub runs under your home folder, and start it as a background process, listening on that computer only. Nothing is opened to the network. With tmux there, its agents survive a restart of Coral; without tmux they end when Coral restarts or is upgraded.' },
     upgrade: { title: 'Upgrade Coral on that computer', go: 'Upgrade', intro: 'This hub will install the Coral release it runs on that computer and restart Coral there. A Coral that already runs this release is left alone.' },
     stop: { title: 'Stop Coral on that computer', go: 'Stop Coral', intro: 'This stops Coral on that computer. Its files stay, and the computer stays in this hub\'s list.' },
     remove: { title: 'Remove Coral from that computer', go: 'Remove', intro: 'This stops Coral on that computer, deletes what was installed there, and removes the computer from this hub.' },
