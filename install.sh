@@ -24,6 +24,7 @@
 # It never uses sudo. If the folder is not yours to write, it says so: choose another with --dir, or run it
 # as the user who should own the install.
 #
+# macOS: Coral.app must be signed by Coral's Developer ID team (33UR27T84L); anything else stops the install.
 # For testing, CORAL_INSTALL_BASE_URL replaces https://github.com/subgentic/coral/releases (https:// or file://).
 
 set -euo pipefail
@@ -34,6 +35,7 @@ INSTALLER_VERSION="2"
 PROGRAMS=(coral launch-coral coral-board coral-agent coral-hook-agentic-state coral-hook-message-check coral-hook-session-start coral-hook-task-sync coral-update)
 REPO="subgentic/coral"
 BASE_URL="${CORAL_INSTALL_BASE_URL:-https://github.com/${REPO}/releases}"
+CORAL_TEAM_ID="33UR27T84L" # the Apple Developer ID team that signs Coral.app (what `codesign -dvv` prints as TeamIdentifier on a release)
 MSI_URL="https://github.com/${REPO}/releases/latest/download/Coral-x64.msi"
 
 say() { printf '%s\n' "$*"; }
@@ -138,7 +140,10 @@ main() {
     note "Coral for $os${arch:+ ($arch)}: $asset, $which"
     say "    from $RELEASE_BASE/$asset"
     say "    checked against $RELEASE_BASE/SHA256SUMS.txt"
-    if [ "$os" = macos ]; then say "    installs Coral.app in $target"; else say "    installs the programs in $target"; fi
+    if [ "$os" = macos ]; then
+        say "    installs Coral.app in $target"
+        if [ -n "$(pinned_team)" ]; then say "    Coral.app must be signed by Coral's Developer ID team ($(pinned_team))"; fi
+    else say "    installs the programs in $target"; fi
     if [ "$dry" = 1 ]; then
         say "Dry run: nothing was downloaded or changed."
         return 0
@@ -239,14 +244,31 @@ finish_linux() {
     say "Install and sign in to an agent CLI (Claude Code, Codex, Antigravity or Pi) first: Coral runs them, it does not install them."
 }
 
-# The app's own code signature, before it is put in place: a file fetched with curl has no quarantine mark, so Gatekeeper would never look at it. An unsigned build is said so and allowed.
+# The app's own code signature, before it is put in place: a file fetched with curl has no quarantine mark, so Gatekeeper would never look at it.
+# Coral's releases are Developer-ID signed (tools/RELEASE-SIGNING.md), so from Coral's own release location the signing team must be Coral's: a different team, an empty one or no signature stops the install (#12508).
+# From another location (CORAL_INSTALL_BASE_URL, a test) no team is pinned unless CORAL_INSTALL_TEAM_ID names one; an unsigned app is then said so and allowed.
+pinned_team() {
+    if [ -n "${CORAL_INSTALL_TEAM_ID:-}" ]; then printf '%s' "$CORAL_INSTALL_TEAM_ID"
+    elif [ -z "${CORAL_INSTALL_BASE_URL:-}" ]; then printf '%s' "$CORAL_TEAM_ID"; fi
+}
+
 check_app_signature() {
-    local app="$1" out team
-    if ! have codesign; then warn "codesign is not available: the app's code signature was not checked."; return 0; fi
+    local app="$1" out team expected
+    expected="$(pinned_team)"
+    if ! have codesign; then
+        [ -z "$expected" ] || die "codesign is not available, so the app's signing team cannot be checked: not installing."
+        warn "codesign is not available: the app's code signature was not checked."; return 0
+    fi
     if out="$(codesign --verify --deep --strict "$app" 2>&1)"; then
         team="$(codesign -dvv "$app" 2>&1 | sed -n 's/^TeamIdentifier=//p' | head -n1)"
-        say "    code signature ok (Coral.app, signing team ${team:-unknown})"
+        if [ -n "$expected" ]; then
+            [ "$team" = "$expected" ] || die "Coral.app is signed by team '${team:-none}', not Coral's ($expected): this is not an official build. Not installing."
+            say "    code signature ok (Coral.app, signing team $team, Coral's)"
+        else
+            say "    code signature ok (Coral.app, signing team ${team:-unknown})"
+        fi
     elif [[ "$out" == *"not signed at all"* ]]; then
+        [ -z "$expected" ] || die "Coral.app is not code-signed, but Coral's releases are: this is not an official build. Not installing."
         say "    This Coral.app is not code-signed (an unsigned build): only the checksum vouches for it."
     else
         die "the code signature of Coral.app is not valid ($out): not installing."

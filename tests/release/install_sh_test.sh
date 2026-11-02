@@ -9,6 +9,10 @@ tmp="$(mktemp -d "${TMPDIR:-/tmp}/install-sh-test.XXXXXX")"
 trap 'chmod -R u+w "$tmp" 2>/dev/null; rm -rf "$tmp"' EXIT
 export HOME="$tmp/home"; mkdir -p "$HOME"
 unset CORAL_LINK_DIR
+# A real cosign on the PATH would check the fixture's stand-in bundle and fail it: the "checksum only" cases need none, and the cosign cases bring a stub. Drop every PATH folder that holds one.
+clean_path=""; IFS=: read -ra path_dirs <<<"$PATH"
+for d in "${path_dirs[@]}"; do [ -e "$d/cosign" ] || clean_path="${clean_path:+$clean_path:}$d"; done
+export PATH="$clean_path"
 fails=0
 fail() { echo "FAIL: $*"; fails=$((fails + 1)); }
 ok() { echo "ok: $*"; }
@@ -47,6 +51,7 @@ want_progs="$(grep -vE '^[[:space:]]*(#|$)' "$root/tests/release/commands.txt" |
 have_progs="$(grep -E '^PROGRAMS=\(' "$script" | sed -E 's/^PROGRAMS=\((.*)\)$/\1/' | tr ' ' '\n' | grep . | sort | tr '\n' ' ')"
 [ "$want_progs" = "$have_progs" ] && ok "install.sh's PROGRAMS equal commands.txt" || fail "PROGRAMS differ from commands.txt: [$have_progs] vs [$want_progs]"
 
+grep -qE '^CORAL_TEAM_ID="33UR27T84L"' "$script" && ok "install.sh pins Coral's Developer ID team" || fail "the pinned team is not 33UR27T84L"
 # --- flags ---------------------------------------------------------------------------------------------
 run bash "$script" --version; [ "$rc" = 0 ] && [[ "$output" == "Coral installer "* ]] && ok "--version prints the installer's version" || fail "--version: $rc $output"
 run bash "$script" --help; [ "$rc" = 0 ] && [[ "$output" == *"--dry-run"* ]] && ok "--help lists the options" || fail "--help: $rc"
@@ -59,6 +64,14 @@ CORAL_INSTALL_BASE_URL=http://example.invalid/x run bash "$script" --dry-run; [ 
 dest="$tmp/dry/bin"
 CORAL_INSTALL_OS=Linux CORAL_INSTALL_ARCH=x86_64 run bash "$script" --dry-run --dir "$dest"
 if [ "$rc" = 0 ] && [[ "$output" == *"coral-linux-amd64.tar.gz"* ]] && [[ "$output" == *"Dry run"* ]] && [ ! -e "$dest" ] && [ -z "$(ls -A "$HOME")" ]; then ok "--dry-run names the package and changes nothing"; else fail "dry run: $rc $output"; fi
+
+# --- the signing-team pin shows in the plan: pinned from Coral's own release location, not from another one ----------
+CORAL_INSTALL_OS=Darwin CORAL_INSTALL_ARCH=arm64 CORAL_INSTALL_BASE_URL= run bash "$script" --dry-run
+[[ "$output" == *"must be signed by Coral's Developer ID team (33UR27T84L)"* ]] && ok "the default release location pins Coral's team" || fail "default pin not shown: $output"
+CORAL_INSTALL_OS=Darwin CORAL_INSTALL_ARCH=arm64 run bash "$script" --dry-run
+[[ "$output" != *"must be signed by"* ]] && ok "a custom location pins no team" || fail "custom location pinned: $output"
+CORAL_INSTALL_OS=Darwin CORAL_INSTALL_ARCH=arm64 CORAL_INSTALL_TEAM_ID=ABCDE12345 run bash "$script" --dry-run
+[[ "$output" == *"(ABCDE12345)"* ]] && ok "CORAL_INSTALL_TEAM_ID names the team to pin" || fail "named team not shown: $output"
 
 # --- Windows and odd systems ---------------------------------------------------------------------------
 CORAL_INSTALL_OS=MINGW64_NT run bash "$script" --dry-run; [ "$rc" = 1 ] && [[ "$output" == *".msi"* ]] && ok "Windows is told to use the .msi" || fail "windows: $rc $output"
@@ -168,6 +181,14 @@ if [ "$(uname -s)" = Darwin ]; then
     printf '#!/bin/sh\necho "a sealed resource is missing or invalid" >&2; exit 1\n' >"$stub/codesign"
     PATH="$stub:$PATH" run bash "$script" --dir "$tmp/Apps-bad" --no-cli; [ "$rc" != 0 ] && [[ "$output" == *"code signature of Coral.app is not valid"* ]] && [ ! -e "$tmp/Apps-bad/Coral.app" ] && ok "macOS: an invalid signature stops the install" || fail "invalid sig: $rc $output"
     rm -f "$stub/codesign"
+    # The pin (#12508): with Coral's team named, a different team, an empty one and no signature stop the install; the right one goes on.
+    printf '#!/bin/sh\ncase "$1" in --verify) exit 0 ;; -dvv) echo "TeamIdentifier=ABCDE12345" >&2 ;; esac\n' >"$stub/codesign"; chmod 755 "$stub/codesign"
+    CORAL_INSTALL_TEAM_ID=ABCDE12345 PATH="$stub:$PATH" run bash "$script" --dir "$tmp/Apps-pin-ok" --no-cli; [ "$rc" = 0 ] && [[ "$output" == *"Coral's)"* ]] && ok "macOS pin: Coral's team goes on" || fail "pin ok: $rc $output"
+    CORAL_INSTALL_TEAM_ID=ZZZZZ99999 PATH="$stub:$PATH" run bash "$script" --dir "$tmp/Apps-pin-other" --no-cli; [ "$rc" != 0 ] && [[ "$output" == *"not Coral's (ZZZZZ99999)"* ]] && [ ! -e "$tmp/Apps-pin-other/Coral.app" ] && ok "macOS pin: a different team stops the install" || fail "pin other: $rc $output"
+    printf '#!/bin/sh\ncase "$1" in --verify) exit 0 ;; esac\n' >"$stub/codesign"; chmod 755 "$stub/codesign" # valid, but no team printed
+    CORAL_INSTALL_TEAM_ID=ABCDE12345 PATH="$stub:$PATH" run bash "$script" --dir "$tmp/Apps-pin-empty" --no-cli; [ "$rc" != 0 ] && [[ "$output" == *"signed by team 'none'"* ]] && ok "macOS pin: an empty team stops the install" || fail "pin empty: $rc $output"
+    rm -f "$stub/codesign"
+    CORAL_INSTALL_TEAM_ID=ABCDE12345 run bash "$script" --dir "$tmp/Apps-pin-unsigned" --no-cli; [ "$rc" != 0 ] && [[ "$output" == *"not code-signed, but Coral's releases are"* ]] && [ ! -e "$tmp/Apps-pin-unsigned/Coral.app" ] && ok "macOS pin: an unsigned app stops the install" || fail "pin unsigned: $rc $output"
     [ -z "$(hdiutil info | grep "$tmp" || true)" ] && ok "macOS: the disk image is detached" || fail "the DMG is still mounted"
 else
     echo "skip: the macOS install runs on a Mac only"
