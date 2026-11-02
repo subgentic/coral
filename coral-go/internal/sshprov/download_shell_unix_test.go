@@ -60,7 +60,7 @@ func TestDownloadCommandInARealShell(t *testing.T) {
 		t.Errorf("the package was not kept: %v", err)
 	}
 	argv, _ := os.ReadFile(argvLog)
-	for _, want := range []string{"--proto =https", "--proto-redir =https", "--tlsv1.2", "--max-redirs 3", "--max-filesize 314572800", "--retry 2", "--speed-limit 20480", "--speed-time 30", "--max-time 540", "https://github.com/subgentic/coral/releases/download/v2.0.10/coral-linux-amd64-2.0.10.tar.gz"} {
+	for _, want := range []string{"--proto =https", "--proto-redir =https", "--tlsv1.2", "--max-redirs 3", "--max-filesize 314572800", "--retry 2", "--retry-max-time 120", "--speed-limit 20480", "--speed-time 30", "--max-time 540", "https://github.com/subgentic/coral/releases/download/v2.0.10/coral-linux-amd64-2.0.10.tar.gz"} {
 		if !strings.Contains(string(argv), want) {
 			t.Errorf("curl was run without %q: %s", want, argv)
 		}

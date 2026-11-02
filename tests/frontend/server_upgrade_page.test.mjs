@@ -17,6 +17,19 @@ assert.equal(compareVersions('2.0.34', '2.0.34-beta'), 1, 'a release is newer th
 assert.equal(compareVersions('v2.0.34', '2.0.34'), 0);
 assert.equal(compareVersions('2.0.9', '2.0.10'), -1, 'numbers, not text');
 assert.equal(compareVersions('', '2.0.34'), null, 'an unknown version is not older or newer');
+// dotted pre-releases are compared identifier by identifier, as Go's semverorder does (QA, #12271)
+assert.equal(compareVersions('2.0.34-rc.10', '2.0.34-rc.2'), 1, 'rc.10 is newer than rc.2');
+assert.equal(compareVersions('2.0.34-rc.2', '2.0.34-rc.10'), -1);
+assert.equal(compareVersions('2.0.34-rc.1', '2.0.34-rc.1.1'), -1, 'a shorter list is older');
+assert.equal(compareVersions('2.0.34-1', '2.0.34-beta'), -1, 'numbers are below words');
+assert.equal(compareVersions('2.0.34-alpha', '2.0.34-beta'), -1);
+assert.equal(compareVersions('2.0.34-rc1', '2.0.34'), -1, 'a release is above its pre-release');
+const { backendChoice } = await importUi('server_ssh_setup');
+assert.equal(backendChoice('tmux', false), 'pty', 'tmux chosen, then the computer has none: back to pty');
+assert.equal(backendChoice('tmux', true), 'tmux');
+assert.equal(backendChoice('tmux', undefined), 'tmux', 'not known yet: the choice stays');
+assert.equal(backendChoice('pty', false), 'pty');
+assert.equal(backendChoice('', undefined), 'pty');
 assert.equal(compareVersions('not a version', '2.0.34'), null);
 
 const options = { hosts: ['build-box'], acceptance_label: 'hub-owner@my-mac', records_acceptance: true };

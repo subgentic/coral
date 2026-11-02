@@ -31,6 +31,9 @@ async function api(method, path, body) {
 
 const sayError = (r, fallback) => (r.data && (r.data.error || r.data.message)) || fallback;
 
+/** The backend to show chosen (#12271): the person's choice, except tmux where the computer turned out not to have it, which goes back to pty (the default). Exported for the test. */
+export const backendChoice = (current, tmux) => (tmux === false && current === 'tmux' ? 'pty' : (current === 'tmux' ? 'tmux' : 'pty'));
+
 /** What each kind of plan is called and does, in the words the person confirms. */
 const KINDS = {
     setup: { title: 'Set up a computer over SSH', go: 'Set up', intro: 'This hub will connect to that computer with your SSH access, check the release this hub runs (its signature), have that computer download and verify it under your home folder, and start it as a background process, listening on that computer only. Nothing is opened to the network.' },
@@ -232,7 +235,7 @@ export function mountSshSetup(host, { mode = 'setup', server = null, action = nu
     /** How agents run on that computer (#12233): the two choices side by side with what each costs, as Settings > Terminal backend says it. pty is the default. */
     function drawBackend(root) {
         const p = st.plan, noTmux = p.tmux === false;
-        if (noTmux && st.backend === 'tmux') st.backend = 'pty';
+        st.backend = backendChoice(st.backend, p.tmux);
         const box = el('fieldset', 'ssh-backend');
         box.append(el('legend', 'ssh-subhead', 'How agents run on that computer'));
         const opt = (value, title, text, note, off) => { // off: the choice is closed (with the note saying why); a note alone only says something
