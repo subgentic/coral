@@ -159,6 +159,7 @@ func (h *BoardHandler) NeedsYou(w http.ResponseWriter, r *http.Request) {
 	}
 	now := time.Now().UTC()
 	for _, p := range projects {
+		h.keepExpiredOperatorQuestions(ctx, p.Project) // a wait that ran out is an ask from now on (#11919)
 		if asks, err := h.bs.OpenAsksOf(ctx, p.Project, board.OperatorName, now); err != nil {
 			unread = appendOnce(unread, "questions")
 		} else {
