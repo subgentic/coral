@@ -20,6 +20,9 @@ const { coralReady } = require('./helpers/wait');
                 () => ({ question: 'Which colour?', ask_id: 'a1', options: [{ n: 1, label: 'Red', action: 'select' }, { n: 2, label: 'Blue', action: 'select' }, { n: 3, label: 'Type something.', action: 'text' }, { n: 4, label: 'Chat about this', action: 'chat' }] }),
                 () => ({ question: 'Which size?', ask_id: 'a2', options: [{ n: 1, label: 'Small', action: 'select' }, { n: 2, label: 'Large', action: 'select' }, { n: 3, label: 'Type something.', action: 'text' }, { n: 4, label: 'Chat about this', action: 'chat' }] }),
                 () => ({ question: 'Ready to submit your answers?', ask_id: 'a3', options: [{ n: 1, label: 'Submit answers', action: 'select' }, { n: 2, label: 'Cancel', action: 'select' }], review: [{ question: 'Which colour?', answer: window.__answers.split(' · ')[0] }, { question: 'Which size?\\u202e', answer: window.__answers.split(' · ')[1] }] }),
+                // #11997 (QA): a review step whose FIRST option is Cancel (then Edit, then Submit answers): only the option that says Submit is the button, whatever its number; and one with no Submit at all has no button
+                () => ({ question: 'Ready to submit your answers?', ask_id: 'a5', options: [{ n: 1, label: 'Cancel', action: 'select' }, { n: 2, label: 'Edit answers', action: 'select' }, { n: 3, label: 'Submit answers', action: 'select' }], review: [{ question: 'Which colour?', answer: 'Red' }] }),
+                () => ({ question: 'Ready to submit your answers?', ask_id: 'a6', options: [{ n: 1, label: 'Cancel', action: 'select' }, { n: 2, label: 'Edit answers', action: 'select' }], review: [{ question: 'Which colour?', answer: 'Red' }] }),
             ];
             const real = window.fetch; window.fetch = (u, o = {}) => { const url = String(u), m = (o.method || 'GET').toUpperCase(), json = (b, s = 200) => Promise.resolve(new Response(JSON.stringify(b), { status: s, headers: { 'content-type': 'application/json' } }));
                 if (m === 'POST' && /\\/answer-prompt$/.test(url)) { const body = JSON.parse(o.body); window.__posts.push(body); const was = window.__step; if (window.__step < 2) { window.__step++; return json({ code: 'answer_sent_prompt_open', error: 'The answer was sent, but the agent prompt is still open. Check the terminal.' }, 409); } return json({ answered: body.label, ok: true }); }
@@ -71,6 +74,18 @@ const { coralReady } = require('./helpers/wait');
         await ev(`[...window.__cell.querySelectorAll('button.inbox-answer')].find(b => b.textContent === 'Submit answers').click(); true`);
         await waitFor(`/That question changed/.test(document.body.textContent)`, 'a review that changed after character 80 is said', 6000);
         assert.equal(await ev(`window.__posts.length`), before2, 'nothing was sent for it');
+        // #11997 (QA's SHOULD): Cancel or Edit first in the review step is never drawn as Submit
+        await ev(`window.__step = 3; true`); await draw();
+        await waitFor(`!!window.__cell.querySelector('.inbox-answer-step')`, 'the review with Cancel first is drawn', 6000);
+        assert.deepEqual(await buttons(), ['Submit answers'], 'only the option that says Submit is a button, though Cancel is first');
+        const nBefore = await ev(`window.__posts.length`);
+        await ev(`window.__step = 3; [...window.__cell.querySelectorAll('button.inbox-answer')].find(b => b.textContent === 'Submit answers').click(); true`);
+        await waitFor(`window.__posts.length === ${nBefore} + 1`, 'the Submit is sent', 6000);
+        const sent3 = await ev(`window.__posts.at(-1)`);
+        assert.deepEqual([sent3.n, sent3.label], [3, 'Submit answers'], 'it sends the number of the Submit option, not the first option: ' + JSON.stringify(sent3));
+        await ev(`window.__step = 4; true`); await draw();
+        await new Promise(r => setTimeout(r, 400)); // sleep-ok: the row has read the screen; nothing is to be drawn
+        assert.equal(await ev(`window.__cell.querySelectorAll('button.inbox-answer').length`), 0, 'a review step with no Submit option has no button: Cancel and Edit are never taken for it');
         console.log('PASS a multi-question dialog is answered from the Inbox row to its end: next question, Submit with its words, a changed review refused');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
