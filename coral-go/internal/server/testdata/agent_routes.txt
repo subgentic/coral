@@ -514,3 +514,8 @@ b GET /api/board/{project}/proposals
 b GET /api/proposals
 b POST /api/board/{project}/proposals/{id}/approve
 b POST /api/board/{project}/proposals/{id}/reject
+b GET /api/skills
+b GET /api/skills/{id}
+b POST /api/skills/{id}/approve
+b POST /api/skills/{id}/reject
+b DELETE /api/skills/{id}

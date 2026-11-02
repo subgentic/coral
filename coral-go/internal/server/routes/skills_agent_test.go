@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -45,16 +46,26 @@ func newSkillsEnv(t *testing.T) *skillsEnv {
 	r.Get("/api/agent/skills", h.ListSkills)
 	r.Get("/api/agent/skills/search", h.SearchSkills)
 	r.Get("/api/agent/skills/{id}", h.GetSkill)
+	r.Get("/api/skills", h.ListSkillsOperator)
+	r.Get("/api/skills/{id}", h.GetSkillOperator)
+	r.Post("/api/skills/{id}/approve", h.ApproveSkill)
+	r.Post("/api/skills/{id}/reject", h.RejectSkill)
+	r.Delete("/api/skills/{id}", h.RemoveSkill)
 	return &skillsEnv{t: t, h: h, ss: store.NewSessionStore(db), router: r, dir: dir}
 }
 
 func zipOf(t *testing.T, files map[string]string) []byte {
 	var buf bytes.Buffer
 	w := zip.NewWriter(&buf)
-	for name, body := range files {
+	names := make([]string, 0, len(files))
+	for name := range files {
+		names = append(names, name)
+	}
+	sort.Strings(names) // the same files make the same bytes, so the same digest
+	for _, name := range names {
 		fw, err := w.Create(name)
 		require.NoError(t, err)
-		_, _ = fw.Write([]byte(body))
+		_, _ = fw.Write([]byte(files[name]))
 	}
 	require.NoError(t, w.Close())
 	return buf.Bytes()
@@ -278,4 +289,10 @@ func TestTheRateLimitIsPerSessionNotPerName(t *testing.T) {
 		actors[l.Actor] = true
 	}
 	assert.Equal(t, map[string]bool{"Dev": true}, actors, "both sessions are logged under the same agent name")
+}
+
+func mustParse(t *testing.T, files map[string]string) *skills.Skill {
+	sk, err := skills.Parse(zipOf(t, files))
+	require.NoError(t, err)
+	return sk
 }

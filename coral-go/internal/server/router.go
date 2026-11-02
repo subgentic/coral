@@ -438,6 +438,12 @@ func (s *Server) registerSessions(r *chi.Mux, h *routeHandlers) {
 	r.Get("/api/agent/skills", skillsHandler.ListSkills)
 	r.Get("/api/agent/skills/search", skillsHandler.SearchSkills)
 	r.Get("/api/agent/skills/{id}", skillsHandler.GetSkill)
+	// The Skills Store, the Operator's side (#12022): the list, the approval view and the decisions; only a person decides.
+	r.Get("/api/skills", skillsHandler.ListSkillsOperator)
+	r.Get("/api/skills/{id}", skillsHandler.GetSkillOperator)
+	r.Post("/api/skills/{id}/approve", skillsHandler.ApproveSkill)
+	r.Post("/api/skills/{id}/reject", skillsHandler.RejectSkill)
+	r.Delete("/api/skills/{id}", skillsHandler.RemoveSkill)
 	r.Get("/api/agent/history/search", sessHandler.SearchAgentHistory)
 	r.Get("/api/agent/board/search", sessHandler.SearchAgentBoard)
 	r.Get("/api/agent/history/context", sessHandler.GetAgentHistoryContext)

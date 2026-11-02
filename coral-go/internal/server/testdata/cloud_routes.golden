@@ -27,6 +27,7 @@ DELETE /api/sessions/live/{name}/held/{id} interact
 DELETE /api/sessions/live/{name}/notes/{noteID} interact
 DELETE /api/sessions/live/{name}/tasks/{taskID} interact
 DELETE /api/shared-images/{id} never
+DELETE /api/skills/{id} never
 DELETE /api/system/debug-input-log never
 DELETE /api/tags/{tagID} never
 DELETE /api/teams/detail/{name} never
@@ -189,6 +190,8 @@ GET /api/sessions/{sessionID}/status view
 GET /api/settings never
 GET /api/settings/default-prompts view
 GET /api/settings/prompt-inspection launch
+GET /api/skills never
+GET /api/skills/{id} never
 GET /api/spec.json never
 GET /api/system/api-key never
 GET /api/system/artifact-store never
@@ -414,6 +417,8 @@ POST /api/sessions/live/{sessionID}/sleep launch
 POST /api/sessions/live/{sessionID}/unarchive interact
 POST /api/sessions/live/{sessionID}/wake launch
 POST /api/sessions/record-agents never
+POST /api/skills/{id}/approve never
+POST /api/skills/{id}/reject never
 POST /api/system/api-key/regenerate never
 POST /api/system/auto-wake/dismiss never
 POST /api/system/login-token never
