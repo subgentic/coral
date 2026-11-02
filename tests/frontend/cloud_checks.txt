@@ -295,3 +295,4 @@ node server_upgrade_page.test.mjs
 node hub_hooks.test.mjs
 node chat_announce_words.test.mjs
 node hermes_permission_flags.test.mjs
+node no_ignore_word.test.mjs
