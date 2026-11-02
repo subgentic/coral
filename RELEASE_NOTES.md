@@ -1,5 +1,44 @@
 # Release Notes
 
+## v2.0.29 — Hermes as an agent type, Markdown that opens rendered, trusting a team's folder, and the Beta pass fixes
+
+### Changes
+
+#### What you will notice first
+
+- **Hermes is an agent type**: New agent offers Hermes, launched as `hermes chat` with nothing the agent is told on the command line (no prompt or protocol in `ps`); Bypass permissions maps to `--yolo`; the model is typed or a custom model (Hermes has no list Coral can ask for) and its reasoning level is none, minimal, low, medium, high, xhigh, max or ultra. A team's Hermes home is prepared on its first launch: one Hermes home for each team under Coral's data folder (your own `~/.hermes` is only read), the first-run telemetry question answered "No thanks", and the hook installed only when its tool cannot be changed by anyone else (otherwise the agent's state comes from the screen alone). Your own Hermes settings, approval settings included, are carried into the team's home as they are (approvals you turned off in your own Hermes are off there). the agent is told its role and the board protocol by a first message typed after its welcome line, the chat reads the linked session's rows, and Stop is Ctrl-C only while a turn is going on.
+- **Open in new tab shows Markdown rendered, safe by construction**: every character of the source is escaped and only headings, paragraphs, emphasis, code, lists, quotes, rules and links (http, https, mailto) are written, in a sandbox with no script; a file over 256 KiB or not UTF-8 stays plain source, and one run of text over 64 KiB is shown as escaped source. Through Coral Hub a file on another computer now opens in a tab for text; a remote PDF or Markdown still downloads.
+- **A new team can trust its folder**: a folder Coral makes shows "Coral will start these agents in this folder and trust it for them"; an existing folder shows a "Trust this folder: its settings and tools can run" switch, off by default, whose help names the path. Coral trusts the folder for Claude and Codex before any agent starts, and an existing folder only with your tick; never home or a parent of it, a root, a hidden folder under home, or a direct child of home it did not make; outside home, nothing under /tmp or /Users/Shared, nothing within two levels of a disk root, and no folder that group or others can write; and only for a launch from your own dashboard (an agent, the Hub or the CLI is ignored). Antigravity agents have no setting Coral can set, so their card stays. A trusted folder is said on the team's board. Claude rewrites `.claude.json` itself, so a write during a running session can lose that session's last update.
+- **The first-run password dialog has no way past it**: no "skip" line, no Not now, and Escape stays; a Not now an earlier version stored is ignored. The dialog opened on purpose from Settings > Security or the sign-in bar keeps Cancel and Escape. A failed save says what failed, offers Retry and where to go ("If this keeps failing, run `coral reset-password` in a terminal on this computer"). The create-a-password page says why a password is needed and offers no way around it, and New team's folder field is named "Folder for this team".
+- **Needs you columns open whole**: the name column starts wide and every column is whole (a width kept from 2.0.27 left the name at 250 px with names cut and Blocks at 9 px). The pills say how many rows they list when read ones are among them ("For review 0 of 4"); the unread count stays the badge's.
+- **Needs you on a phone is tighter**: rows are as tall as their content (70 to 90 px, was 111 to 129) with the wait on the name line; a question shows two lines; a goal or task proposal leads with who proposed it, is selectable by long press, and Goals counts the goals waiting for approval.
+- **One search per Inbox tab**: the top search is not shown above a tab with a search box of its own (on a computer, in a phone's top bar and through Coral Hub).
+- **The alerts link and tab title**: while the tab is in the background its title carries the Inbox's total (a question that arrived while you were away stays counted); Needs you carries a quiet "Turn on alerts" line while this browser could turn alerts on and has not; the alerts offer comes back once, after the first thing that needs you has waited 5 minutes.
+- **Open on a permission row shows the agent's card over the Inbox** (what it asks, what it wants to run), and the card never puts the keyboard on an answer.
+- **A goal says who has it**: the goal page names who has the goal and Create goal says when the Orchestrator was told. A goal made by anyone but the Orchestrator tells the Orchestrator once (a proposed goal when it becomes active), and the goal keeps when. A goal the Orchestrator made says so.
+- **Proposals say the team's name**, not its board id, in the dialog and the Inbox row.
+- **The Needs you row says "· version N" and "N earlier versions"** from the artifacts list, with no request per row.
+- **Smaller**: New agent step 3 has a line under Thinking ("More thinking is slower and costs more. Default lets the agent choose.") and "Refresh models" is named on a desktop; chat unread numbers and dots count only agents Coral launched and board history; a comment says whether an agent has it, at rest; after Request changes the file is not marked read when it is opened again or redrawn, so it stays counted until the agent answers; a question says which team it is on by the team's name, not an internal id; after Changes requested, Approve says what it does.
+
+#### Agents and the chat
+
+- **Words for agents**: what the person asked to see (a goal's "for my review", screenshots or a QA report) is for the person, so tag it for review; a decision only listed in a message or document has not been asked; the Orchestrator is also told to make a task for anything a goal names for your review, with its output tagged for review, before the goal is called done; the Deny notice says it is final and not to upload the file again in any wording unless the operator asks.
+- **Hermes**: a first message that is never typed leaves a notice in the agent's feed; the interrupt notice is the real one from Hermes v0.22.5.
+
+#### Known issues
+
+- **Windows: in-app update does not work from 2.0.0 through 2.0.6.** If you're on one of those, download and install the MSI by hand; from 2.0.7 on, in-app update works.
+- **macOS: a Coral of 2.0.5 or earlier cannot install updates in-app; install 2.0.6 or later by hand once.**
+- **OpenCode agents are tested on macOS and Linux; OpenCode on Windows is not yet tested end to end.**
+- Setting up a computer over SSH is supported from a macOS or Linux hub, and is not yet tested from a Windows hub.
+- **Hermes** is tested through its hooks and state files; a pasted multi-line first message accepted by its TUI is not yet proven on a real Hermes, and Windows installs no Hermes hook.
+
+#### For developers and releases
+
+- **The static budget rises to 6,002,944 bytes** (+48 KiB), the operator's standing approval for the size test alone; this release's tree ships 5,955,824 bytes.
+- The tunnel table's `GET /api/artifacts/{hex}` takes `open=1` (alone or beside `v=2`) through `tools/gen_route_queries.py`.
+- Census and test changes: the Hermes write-open and its census entries, `jsonl/parse_hermes.go` in the timestamp writers, `hermes` in the custom-model families, a trusted-folder test that no longer depends on TMPDIR, the startup golden unchanged (the trust and tab-title listeners register lazily), and the Inbox suites follow the new rows.
+
 ## v2.0.28 — Chief's own settings screen, a goal that looks done, and Open in new tab that opens
 
 ### Changes
