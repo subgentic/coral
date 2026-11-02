@@ -2,7 +2,7 @@
   "id": "/",
   "name": "Coral",
   "short_name": "Coral",
-  "description": "The inbox for your agents, and an agentic IDE built for AI-first development.",
+  "description": "The Inbox for your agents: a question, a permission or a file to review lands in one place, on your laptop or your phone.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
