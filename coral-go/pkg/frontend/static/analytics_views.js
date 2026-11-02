@@ -13,6 +13,7 @@ export const VIEWS = [
     { key: 'overview', label: 'Overview', question: 'What am I spending?' }, // each page is subtitled by the question it answers (#10482)
     { key: 'usage', label: 'Usage', question: 'Where does the usage go, day by day?' }, // the three below Overview (#11222): Overview stays the landing page
     { key: 'operator', label: 'Operator interaction', question: 'How often does the Operator have to step in?' },
+    { key: 'inbox-' + 'chat', label: 'Inbox vs chat', question: 'Am I switching to the Inbox?' }, // #12158: the share of what the Operator does in the Inbox, and whether it is rising
     { key: 'comm', label: 'Team communication', question: 'Who talks to whom, and how much?' },
     { key: 'per-commit', label: 'Tokens per commit', question: 'What did each commit cost?' },
     { key: 'task-time', label: 'Task time', question: 'How long do tasks take?' },

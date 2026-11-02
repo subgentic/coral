@@ -68,6 +68,6 @@
 @media (prefers-reduced-motion: no-preference) { .atab-rank-fill { transition: width .15s; } }
 
 /* The three tabs carry their own period; the page's Last 24 hours control and its line under the title belong to Overview and the views that use it. */
-#cost-dashboard-view:is([data-view="usage"], [data-view="operator"], [data-view="comm"]) :is(#cost-time-range, #cost-range-line) { display: none; }
+#cost-dashboard-view:is([data-view="usage"], [data-view="operator"], [data-view="inbox-chat"], [data-view="comm"]) :is(#cost-time-range, #cost-range-line) { display: none; }
 .atab-drill { align-self: flex-start; }
 .atab-trend { display: flex; flex-direction: column; gap: 8px; }

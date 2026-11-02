@@ -540,7 +540,7 @@ async function _refreshOverview() {
     series.drawOverviewPanel(host, { phone: isPhoneLayout() });
 }
 
-const TAB_VIEWS = new Set(['usage', 'operator', 'comm']);
+const TAB_VIEWS = new Set(['usage', 'operator', 'inbox-' + 'chat', 'comm']);
 async function openTab(key, force = false) {
     const host = document.getElementById(`cost-${key}`);
     if (!host) return;

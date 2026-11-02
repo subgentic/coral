@@ -196,6 +196,7 @@ node polls_ask_fresh.test.mjs
 node analytics_task_read.test.mjs
 node analytics_efficiency.test.mjs
 node analytics_tabs.test.mjs
+node inbox_vs_chat_model.test.mjs
 node operator_activity_filters.test.mjs
 node analytics_tabs_realistic.test.mjs
 node artifact_sort_words.test.mjs

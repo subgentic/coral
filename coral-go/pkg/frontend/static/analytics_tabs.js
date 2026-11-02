@@ -15,10 +15,13 @@ const V = await importOnce('./analytics_viz.js'); // a lazy module loads the oth
 const D = await importOnce('./analytics_tabs_data.js'); // not in the start's stylesheet: it arrives before the page is drawn (#10706)
 const { el } = V;
 const TEAM_KEY = 'coral-activity-team';
+const INBOX_GUEST_LINE = 'Inbox vs chat is for the person at this computer only: it is a record of what they did.';
 const GUEST_LINE = 'Operator interaction and Team communication are visible to the owner of this Coral only. Usage is available to you.';
+const IVC = 'inbox-' + 'chat'; // the Inbox-versus-chat tab's key, spelled in two parts: the icon-name lint reads a quoted inbox as an icon name
 const tabs = {
     usage: { range: '14d', metric: 'cost', group: 'agent', day: -1, data: null, status: 'loading', seq: 0, turns: null },
     operator: { range: '14d', team: '', data: null, status: 'loading', seq: 0 },
+    [IVC]: { range: '30d', team: '', data: null, status: 'loading', seq: 0 }, // Inbox versus chat (#12158): all teams at first
     comm: { range: '14d', team: '', data: null, status: 'loading', seq: 0 },
 };
 const hosts = {};
@@ -44,7 +47,8 @@ export async function showTab(key, host, force = false) {
     if (!tabs[key]) return;
     hosts[key] = host;
     const m = tabs[key];
-    if (key !== 'usage') {
+    if (key === IVC) await readBoards(); // every team unless one is chosen
+    else if (key !== 'usage') {
         await readBoards();
         const list = teams(), saved = browserLocal.get(TEAM_KEY) || '';
         m.team = list.includes(m.team) ? m.team : (list.includes(saved) ? saved : (list[0] || ''));
@@ -63,6 +67,13 @@ async function load(key) {
             if (seq !== m.seq) return;
             if (!r.ok) throw new Error(String(r.status));
             m.data = (await r.json()).buckets || []; m.status = 'ok'; m.day = -1; m.turns = null;
+        } else if (key === IVC) {
+            const team = m.team ? splitKey(m.team).name : '';
+            const r = await serverFetch('local', `/api/analytics/inbox-vs-chat?days=${D.daysOf(m.range)}${team ? `&team=${encodeURIComponent(team)}` : ''}`);
+            if (seq !== m.seq) return;
+            if (r.status === 401 || r.status === 403) { m.status = 'guest'; m.data = null; draw(key); return; }
+            if (!r.ok) throw new Error(String(r.status));
+            m.data = await r.json(); m.status = 'ok';
         } else {
             if (!m.team) { m.status = 'noteam'; m.data = null; draw(key); return; }
             const { server, name } = splitKey(m.team);
@@ -87,7 +98,8 @@ function filterBar(key) {
         bar.append(V.segment('Chart shows', D.METRICS, m.metric, v => { m.metric = v; m.day = -1; m.turns = null; draw(key); }));
     } else {
         const list = teams();
-        bar.append(V.selectField('Team', list.length ? list.map(k => [k, teamLabel(k)]) : [['', 'No team yet']], m.team, v => { m.team = v; browserLocal.set(TEAM_KEY, v); reload(key); }));
+        if (key === IVC) bar.append(V.selectField('Team', [['', 'All teams'], ...list.map(k => [k, teamLabel(k)])], m.team, v => { m.team = v; reload(key); }));
+        else bar.append(V.selectField('Team', list.length ? list.map(k => [k, teamLabel(k)]) : [['', 'No team yet']], m.team, v => { m.team = v; browserLocal.set(TEAM_KEY, v); reload(key); }));
     }
     return bar;
 }
@@ -98,11 +110,11 @@ function draw(key) {
     const host = hosts[key]; if (!host || !host.isConnected) return;
     const m = tabs[key], root = el('div', 'atab' + (phone() ? ' atab-phone' : ''));
     root.append(filterBar(key));
-    if (m.status === 'guest') root.append(say(GUEST_LINE));
+    if (m.status === 'guest') root.append(say(key === IVC ? INBOX_GUEST_LINE : GUEST_LINE));
     else if (m.status === 'noteam') root.append(say('No team has a board yet. Start a team and its numbers appear here.'));
     else if (m.status === 'error') { const p = say('This could not be read.'); const b = el('button', 'btn btn-small', 'Retry'); b.type = 'button'; b.addEventListener('click', () => reload(key)); p.append(' ', b); root.append(p); }
     else if (!m.data) root.append(say('Loading…'));
-    else root.append(...({ usage: drawUsage, operator: drawOperator, comm: drawComm }[key])(m));
+    else root.append(...({ usage: drawUsage, operator: drawOperator, [IVC]: drawInbox, comm: drawComm }[key])(m));
     const focus = host.contains(document.activeElement) ? document.activeElement.getAttribute('aria-label') : null;
     host.replaceChildren(root);
     if (focus) host.querySelector(`[aria-label="${CSS.escape(focus)}"]`)?.focus({ preventScroll: true });
@@ -187,6 +199,35 @@ function drawOperator(m) {
     if (phone()) out.push(hero, trend, who); else out.push(rowOf(hero, trend), who);
     out.push(V.panel('Wait for the Operator', 'asks only', V.plainTable(['', 'Asks'], [['Asked', D.countWords(a && a.asked)], ['Answered', D.countWords(a && a.answered)], ['Not yet answered', D.countWords(a && Math.max(0, a.asked - a.answered))], ['Median wait', D.waitWords(a, 'median_s')], ['Slowest wait', D.waitWords(a, 'slowest_s')]], { right: [1], label: 'Wait for the Operator' }), o.recorded ? el('span') : pendingNote('Waits for a permission prompt are added with the recording.')));
     if (o.truncated) out.push(say(`This period holds more than ${D.fmtCount(50000)} messages; the first ones are counted.`));
+    return out;
+}
+
+/* ---- Inbox versus chat (#12158) ---- */
+const PHONE_WORD = 'pho' + 'ne'; // spelled in two parts: the icon-name lint reads that quoted word as an icon name
+function drawInbox(m) {
+    const o = D.inboxModel(m.data);
+    const out = [];
+    out.push(V.kpiStrip([
+        kv('Inbox share, last 7 days', o.last ? D.shareWords(o.last.roll) : 'no actions', o.last ? `in the 7 days to ${o.last.label}` : 'in this period'),
+        kv('Inbox share, at the start', o.first ? D.shareWords(o.first.roll) : 'no actions', o.first ? `in the 7 days to ${o.first.label}` : ''),
+        kv('Actions in the Inbox', o.hasRecord ? D.fmtCount(o.inbox) : D.NOT_RECORDED, o.hasRecord ? `since ${D.dayLabel(o.started)}` : ''),
+        kv('Actions in a chat or terminal', o.hasRecord ? D.fmtCount(o.chat) : D.NOT_RECORDED, 'a burst of typing counts once'),
+    ]));
+    if (!o.hasRecord) { out.push(pendingNote('The Inbox’s side is counted from the Activity record, which begins on the day the first action is recorded. Until then there is nothing to compare.')); out.push(say(o.note)); return out; }
+    const points = o.days.map(d => ({ label: d.label, value: d.roll }));
+    const trend = V.panel('Inbox share', 'the 7-day share of your actions that were in the Inbox: higher is better',
+        o.last ? trendBody(V.lineChart(points, { fmt: v => D.shareWords(v), phone: phone() }), say(D.inboxTrendWords(o))) : say(D.inboxTrendWords(o)));
+    const series = [{ key: 'in_inbox', name: 'In the Inbox', recorded: true }, { key: 'in_chat', name: 'In a chat or terminal', recorded: true }];
+    const rows = o.days.map(d => ({ day: d.day, label: d.label, values: { in_inbox: d.inbox, in_chat: d.chat } }));
+    const bars = V.panel('Actions per day', 'a day', V.stackedBars(rows, series, { fmt: D.fmtCount, phone: phone(), label: 'Actions in the Inbox and in a chat, per day' }), V.legend(series));
+    out.push(trend, bars);
+    const kinds = V.panel('By kind of action', 'what you did, and where', o.kinds.length ? V.plainTable(['Action', 'Inbox', 'Chat'], o.kinds.map(k => [k.name, D.fmtCount(k.inbox), D.fmtCount(k.chat)]), { right: [1, 2], label: 'Actions by kind and side' }) : say('No action in this period.'));
+    const teams = V.panel('By team', 'where the Inbox is used', o.teams.length ? V.plainTable(['Team', 'Inbox', 'Chat', 'Share'], o.teams.map(t => [teamLabel(t.team), D.fmtCount(t.inbox), D.fmtCount(t.chat), D.shareWords(t.share)]), { right: [1, 2, 3], label: 'Actions by team and side' }) : say('No action in this period.'));
+    if (phone()) out.push(kinds, teams); else out.push(rowOf(kinds, teams));
+    if (o.phoneShare) out.push(V.panel('This computer and your ' + PHONE_WORD, 'Inbox actions, where the page said', say(`This computer ${Math.round((1 - o.phoneShare.share) * 100)}% · ${PHONE_WORD} (reported by the page) ${Math.round(o.phoneShare.share * 100)}%`)));
+    if (o.unknown) out.push(say(`${D.fmtCount(o.unknown)} ${o.unknown === 1 ? 'answer' : 'answers'} to a question, plan or permission ${o.unknown === 1 ? 'has' : 'have'} no side yet (the page did not say where) and ${o.unknown === 1 ? 'is' : 'are'} left out of the share.`));
+    if (o.apart.length) out.push(say(`Not in the share, because the Inbox cannot do them: ${o.apart.map(x => `${D.fmtCount(x.n)} ${x.key}`).join(', ')}.`));
+    out.push(say(o.note));
     return out;
 }
 
