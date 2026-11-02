@@ -76,9 +76,13 @@ func TestAGoalCarriesThePicturesTheOperatorAdded(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, code)
 	_, err := h.bs.Subscribe(context.Background(), "empty", "Lead", "Orchestrator", "", nil, "all")
 	require.NoError(t, err)
+	// A team with no agent still keeps the person's picture (#12176): as the person's own, with no agent's session.
 	code, out = upload("/api/board/empty/goal-images", "image/png", shadePNG(t, 14))
-	assert.Equal(t, http.StatusConflict, code)
-	assert.Equal(t, "no_team", out["code"])
+	require.Equal(t, http.StatusCreated, code, "%v", out)
+	rec, ok = readUploadRecord(coralDir, personPictureSession, out["hex"].(string))
+	require.True(t, ok, "kept with the person's own session")
+	assert.Equal(t, sourceGoalImage, rec.Source)
+	assert.Equal(t, "owner", rec.UploadedBy)
 
 	// The create names them; the goal carries them in the order sent, in the create answer, the read and the list.
 	code, g := call("POST", "/api/board/alpha/goals", map[string]any{"title": "With pictures", "outcome": "See the pictures", "done_when": "done", "subscriber_id": "Operator", "images": []string{p2, p1}})

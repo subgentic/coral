@@ -223,3 +223,28 @@ func TestAFifthPictureOnACommentIsRefused(t *testing.T) {
 	assert.Equal(t, http.StatusCreated, code, "four are taken: %v", out)
 	assert.Len(t, out["images"], 4)
 }
+
+// #12176: a marked-up picture is kept whatever the file belongs to. A file of an agent that is on no team cannot have a series of versions (a version belongs to a team), so the marked picture is stored on its own as the
+// person's picture, with the file's agent, instead of being refused and the comment going out with the plain one.
+func TestAMarkedUpPictureOnAFileOfAnAgentWithNoTeamIsKeptOnItsOwn(t *testing.T) {
+	rig := newImageRig(t)
+	uploaderLookup = func(ctx context.Context, sid string) (string, string, string) { return "", "Dev", "Developer" } // the agent is on no board
+	code, out := rig.upload(cmtAsOwner, "image/png", "", shadePNG(t, 90))
+	require.Equal(t, http.StatusCreated, code, "%v", out)
+	v1 := out["hex"].(string)
+	code, out = rig.upload(cmtAsOwner, "image/png", "?version_of="+v1, shadePNG(t, 91))
+	require.Equal(t, http.StatusCreated, code, "the marked picture is kept: %v", out)
+	marked := out["hex"].(string)
+	assert.NotEqual(t, v1, marked)
+	assert.Nil(t, out["series_id"], "no team, so no series of versions")
+	rec, ok := readUploadRecord(rig.h.cfg.CoralDir(), rig.session, marked)
+	require.True(t, ok, "kept with the file's agent")
+	assert.Equal(t, sourceCommentImage, rec.Source)
+	assert.Equal(t, "owner", rec.UploadedBy)
+	// and the comment names it, so the picture the person marked is the one that is sent
+	code, c := rig.comment(cmtAsOwner, map[string]any{"body": "see the marks", "anchor": anchorOf("the lock"), "board": "team-a", "images": []string{marked}})
+	require.Equal(t, http.StatusCreated, code, "%v", c)
+	imgs, _ := c["images"].([]any)
+	require.Len(t, imgs, 1)
+	assert.Equal(t, marked, imgs[0].(map[string]any)["hex"])
+}
