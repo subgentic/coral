@@ -94,6 +94,10 @@ const BASE = require('./test_base').BASE;
                 msgs.push({ id: i, project: 'beta', subscriber_id: queue ? Q : 'Lead Developer', is_system: queue, job_title: queue ? '' : 'Lead Developer',
                     content: queue ? '[Task #' + i + ' claimed by QA] t' : 'human ' + i, created_at: new Date(Date.UTC(2026, 9, 14, 8, 0, i)).toISOString() });
             }
+            // #12349: a Coral notice (postNotice posts it as the same sender, "[Coral] ...") is a notice, not 'A task updated': it ends the run before it and stands as its own row, then a new run starts
+            msgs.push({ id: 31, project: 'beta', subscriber_id: Q, is_system: true, content: '[Task #31 claimed by QA] u', created_at: new Date(Date.UTC(2026, 9, 14, 8, 1, 1)).toISOString() });
+            msgs.push({ id: 32, project: 'beta', subscriber_id: Q, is_system: true, content: '[Coral] Coral did not trust the folder /work/beta: it has no .git. The agents will ask about it in their own terminals; answer there.', created_at: new Date(Date.UTC(2026, 9, 14, 8, 1, 2)).toISOString() });
+            msgs.push({ id: 33, project: 'beta', subscriber_id: Q, is_system: true, content: '[Task #33 claimed by QA] v', created_at: new Date(Date.UTC(2026, 9, 14, 8, 1, 3)).toISOString() });
             window.fetch = async (url, opts) => {
                 const u = String(url);
                 if (u.includes('/api/board/beta/messages/all')) {
@@ -120,10 +124,12 @@ const BASE = require('./test_base').BASE;
         const panel = await ev(`(() => { const p = document.getElementById('board-panel-msgs');
             return { runs: p.querySelectorAll('.mb-queue-run').length, bubbles: p.querySelectorAll('.mb-message').length,
                      humans: [...p.querySelectorAll('.mb-message-body')].map(b => b.textContent.trim()),
-                     firstRun: p.querySelector('.mb-queue-label').textContent }; })()`);
-        assert.equal(panel.bubbles, 6, 'only the 6 human messages are full messages');
-        assert.equal(panel.runs, 6, 'each run of 4 task-queue lines between them is one row');
-        assert.deepEqual(panel.humans, ['human 5', 'human 10', 'human 15', 'human 20', 'human 25', 'human 30']);
+                     firstRun: p.querySelector('.mb-queue-label').textContent, lastRuns: [...p.querySelectorAll('.mb-queue-label')].slice(-2).map(e => e.textContent).join(' | ') }; })()`);
+        assert.equal(panel.bubbles, 7, 'the 6 human messages and the Coral notice are full messages');
+        assert.equal(panel.runs, 8, 'each run of 4 task-queue lines between them is one row, and the notice splits the last two lines into two runs');
+        assert.deepEqual(panel.humans.slice(0, 6), ['human 5', 'human 10', 'human 15', 'human 20', 'human 25', 'human 30']);
+        assert.match(panel.humans[6] || '', /^\[?Coral\]? Coral did not trust the folder/, 'the notice is shown as itself: ' + JSON.stringify(panel.humans[6]));
+        assert.ok(!/updated/i.test(panel.lastRuns || ''), 'and no row says a task was updated: ' + panel.lastRuns);
         assert.match(panel.firstRun, /claimed|created|finished|in review|took/); assert.ok(!/task updates|coral-board/.test(panel.firstRun), 'the row is in words: ' + panel.firstRun);
         console.log('   ✓ 24 task-queue lines are 6 rows; the 6 human messages stand out');
         console.log('PASS board task-queue lines are collapsed');

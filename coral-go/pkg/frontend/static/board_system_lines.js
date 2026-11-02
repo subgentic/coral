@@ -16,7 +16,8 @@ import { browserLocal } from './safe_storage.js';
  function isTaskQueueMessage(m) {
     if (!m) return false;
     // The server sets is_system for its own posts (#3387); a name alone is never trusted.
-    return m.is_system === true && m.subscriber_id === TASK_QUEUE_SENDER;
+    if (m.is_system !== true || m.subscriber_id !== TASK_QUEUE_SENDER) return false;
+    return !/^(@\S+\s+)*\[Coral\]\s/.test(String(m.content || '')); // a Coral notice (postNotice posts it as the same sender: 'Coral did not trust the folder ...') is a notice, not 'A task updated' (#12349)
 }
 
 /** Splits messages into items: {kind:'msg', m} or {kind:'queue', key, msgs} for each run
