@@ -35,7 +35,7 @@ const B = 'goal-done-' + Date.now().toString(36);
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         assert.ok((await api('POST', '/subscribe', { subscriber_id: 'Boss', job_title: 'Orchestrator', session_name: 'boss-' + B })).status < 300);
-        await root('PUT', '/api/settings', { goal_done_hidden: '[]', goal_done_quiet_minutes: '' }); // the default quiet period (15 minutes, #12161) first
+        await root('PUT', '/api/settings', { goal_done_hidden: '[]', goal_done_read: '[]', goal_done_quiet_minutes: '' }); // the default quiet period (15 minutes, #12161) first; read and hidden cleared here, not left to whatever ran before (v2.0.35 gate)
         const mk = async (title, doneWhen) => { const g = await api('POST', '/goals', { subscriber_id: 'Operator', title, done_when: doneWhen }); assert.equal(g.status, 201); return g.json.id || g.json.goal.id; };
         const gid = await mk('Ship the pilot', 'it is shipped');
         await task(gid, true);
@@ -57,6 +57,7 @@ const B = 'goal-done-' + Date.now().toString(36);
         assert.match(rows[0].text, /Done when: it is shipped/);
         assert.deepEqual(rows[0].buttons.filter(b => /^(Close goal|Not yet|Ignore)$/.test(b)), ['Close goal', 'Not yet', 'Ignore']);
         const badge = async () => Number(await ev(`(document.getElementById('nav-tab-hub-inbox-badge') || {}).textContent || 0`));
+        await waitFor(`Number((document.getElementById('nav-tab-hub-inbox-badge') || {}).textContent || 0) >= 1`, 'the item is in the Inbox number', 15000); // the badge is drawn after the list: read at once on the runner it was 0 (v2.0.35 gate)
         const withItem = await badge(); assert.ok(withItem >= 1, 'the item is in the Inbox number: ' + withItem);
         const asked = await root('GET', '/api/needs-you?limit=50');
         assert.ok(asked.json.items.some(i => i.kind === 'goal_done' && i.id === `goal_done:${B}:${gid}`), 'the phone-push read has it too');
@@ -73,6 +74,7 @@ const B = 'goal-done-' + Date.now().toString(36);
         await waitFor(`/looks done/.test(document.querySelector('${T}')?.textContent || '')`, 'the item is back after a task was added and finished', 20000);
 
         // #11983: opening the item reads it: it stays listed and stops counting, in the Inbox number, the badge and /api/needs-you; a task done since has a new total, and it is unread again
+        await waitFor(`Number((document.getElementById('nav-tab-hub-inbox-badge') || {}).textContent || 0) >= 1`, 'the badge counts the item before it is read', 15000); // the badge is drawn after the list on a slow machine: read at once it was 0, and 'one less' could never be reached (v2.0.35 gate)
         const unreadBadge = await badge();
         await ev(`[...document.querySelectorAll('${T} tbody tr')].find(tr => /looks done/.test(tr.textContent)).querySelector('.inbox-review-name').click(); true`);
         await waitFor(`!!document.querySelector('.goal-view, [data-goal-view], #goal-view') || /goals|goal/i.test(location.hash + location.pathname)`, 'the goal opened', 10000);

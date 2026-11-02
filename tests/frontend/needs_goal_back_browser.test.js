@@ -25,7 +25,7 @@ const B = 'needs-goal-back-' + Date.now().toString(36);
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         assert.ok((await api('POST', '/subscribe', { subscriber_id: 'Boss', job_title: 'Orchestrator', session_name: 'boss-' + B })).status < 300);
-        await root('PUT', '/api/settings', { goal_done_hidden: '[]', goal_done_quiet_minutes: '0' });
+        await root('PUT', '/api/settings', { goal_done_hidden: '[]', goal_done_read: '[]', goal_done_quiet_minutes: '0' });
         const TITLES = ['Ship the pilot', 'Ship the second', ...Array.from({ length: 7 }, (_, i) => 'Ship extra ' + (i + 1))];
         for (const title of TITLES) {
             const g = await api('POST', '/goals', { subscriber_id: 'Operator', title, done_when: 'it is shipped' }); assert.equal(g.status, 201); const gid = g.json.id || g.json.goal.id;
@@ -65,7 +65,14 @@ const B = 'needs-goal-back-' + Date.now().toString(36);
             const target = await ev(`(() => { const rows = [...document.querySelectorAll('${T} tbody tr')].filter(tr => /looks done/.test(tr.textContent)); const tr = rows[rows.length - 2], sc = ${SCROLLER}; tr.scrollIntoView({ block: 'center' }); return { text: tr.querySelector('.inbox-review-name')?.textContent || '', top: sc.scrollTop, scrollable: sc.scrollHeight > sc.clientHeight + 2, rows: rows.length }; })()`);
             assert.ok(target.scrollable && target.top > 100, at + 'the list scrolls in this window: ' + JSON.stringify(target));
             await new Promise(r => setTimeout(r, 300)); // sleep-ok: the scroll settles
-            const pos = await ev(`(() => { const el = [...document.querySelectorAll('${T} tbody tr')].filter(tr => /looks done/.test(tr.textContent)).slice(-2)[0].querySelector('.inbox-review-name'), r = el.getBoundingClientRect(); return { x: r.left + Math.min(r.width / 2, 20), y: r.top + r.height / 2, top: ${SCROLLER}.scrollTop }; })()`);
+            // The list can be redrawn once more after it first appears (the goals' own refresh lands late on a slow machine) and a redraw puts it back near the top, so the row is found again, scrolled to and checked to be under the point before the click, up to five times (v2.0.35 gate: on the runner the first point was below the 420 px window, the click landed on the page and nothing opened)
+            let pos = null;
+            for (let attempt = 0; attempt < 5 && !(pos && pos.hit); attempt++) {
+                await ev(`(() => { const rows = [...document.querySelectorAll('${T} tbody tr')].filter(tr => /looks done/.test(tr.textContent)); rows[rows.length - 2].scrollIntoView({ block: 'center' }); return true; })()`);
+                await new Promise(r => setTimeout(r, 400)); // sleep-ok: the scroll settles, and a late redraw lands before the point is measured
+                pos = await ev(`(() => { const row = [...document.querySelectorAll('${T} tbody tr')].filter(tr => /looks done/.test(tr.textContent)).slice(-2)[0], el = row.querySelector('.inbox-review-name'), r = el.getBoundingClientRect(), x = r.left + Math.min(r.width / 2, 20), y = r.top + r.height / 2, at = document.elementFromPoint(x, y); return { x, y, top: ${SCROLLER}.scrollTop, hit: !!at && row.contains(at) }; })()`);
+            }
+            assert.ok(pos && pos.hit, at + 'the row is under the point where the click will land: ' + JSON.stringify(pos));
             for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) await client.Input.dispatchMouseEvent({ type, x: pos.x, y: pos.y, button: type === 'mouseMoved' ? 'none' : 'left', buttons: type === 'mousePressed' ? 1 : 0, clickCount: type === 'mouseMoved' ? 0 : 1 });
             await waitFor(`!!document.querySelector('.goals-open')`, at + 'the goal opened by a real click', 10000);
             await ev(`history.back(); true`);
