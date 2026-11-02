@@ -46,7 +46,7 @@ func TestMain(m *testing.M) {
 	os.Setenv("CORAL_BOARD_SEARCH_INDEX", "off")
 	cleanupTemp := testtemp.Use() // a private temp, home and data folder for this package (#356)
 	bundleSource = memoBundleSource(bundleSource)
-	stopMem := testmem.Start("internal/server", testmem.LimitMB(testmem.DefaultLimitMB)) // a run over 1.5 GB is stopped, not left to push the machine out of memory (#12062)
+	stopMem := testmem.Start("internal/server", testmem.LimitMB(testmem.DefaultLimitMB)) // a run over 2 GB is stopped, not left to push the machine out of memory (#12062)
 	code := m.Run()
 	if peak := stopMem(); peak > 0 {
 		fmt.Fprintf(os.Stderr, "internal/server: peak held memory %d MiB\n", peak)
