@@ -40,21 +40,23 @@ func (d *DB) HasUserSettings(ctx context.Context) (bool, error) {
 	return n == 1, err
 }
 
-// HasActiveSessionOlderThan reports whether a live session was created before t. A created_at that cannot be read as a time does not count.
-func (d *DB) HasActiveSessionOlderThan(ctx context.Context, t time.Time) (bool, error) {
+// OldestActiveSession is when the oldest active live session was created; false when there is none. A created_at that cannot be read as a time is ignored.
+func (d *DB) OldestActiveSession(ctx context.Context) (time.Time, bool, error) {
 	var rows []string
 	if err := d.SelectContext(ctx, &rows, `SELECT created_at FROM live_sessions WHERE status = 'active'`); err != nil {
-		return false, err
+		return time.Time{}, false, err
 	}
+	var oldest time.Time
+	found := false
 	for _, r := range rows {
 		for _, layout := range []string{ISOFormat, time.RFC3339Nano, "2006-01-02 15:04:05"} {
 			if at, err := time.Parse(layout, r); err == nil {
-				if at.Before(t) {
-					return true, nil
+				if !found || at.Before(oldest) {
+					oldest, found = at, true
 				}
 				break
 			}
 		}
 	}
-	return false, nil
+	return oldest, found, nil
 }
