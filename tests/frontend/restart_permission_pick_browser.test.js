@@ -21,10 +21,13 @@ const { coralReady } = require('./helpers/wait');
             await window.showLaunchModal(); window.hideLaunchModal();
             return true; })()`);
         const settled = () => waitFor(`document.getElementById('restart-acf').dataset.acfDefaults !== 'pending'`, 'the form default model has arrived', 8000);
-        const run = async (storedMode, pick) => {
-            const session = { name: 'ag', display_name: 'Agent', session_id: 'sid-r', type: 'live', agent_type: 'claude', model: 'claude-opus-4', prompt: 'p', permission_mode: storedMode, tmux_session: 'ag' };
+        const run = async (storedMode, pick, liveOnly = false) => {
+            const session = { name: 'ag', display_name: 'Agent', session_id: 'sid-r', type: 'live', agent_type: 'claude', model: 'claude-opus-4', prompt: 'p', tmux_session: 'ag' };
+            if (liveOnly) session.live_permission_mode = storedMode; else session.permission_mode = storedMode; // an agent whose row has only the CLI's own report (a hook) opens on it too
             const n = await ev(`window.__reqs.length`);
-            await ev(`T.state.currentSession = ${JSON.stringify(session)}; window.restartSession(); true`);
+            await ev(`T.state.liveSessions = [${JSON.stringify(session)}]; window.selectLiveSession('ag', 'claude', 'sid-r', 'local'); true`); // the real selection path: it is what puts the agent's mode on the page's session
+            await waitFor(`T.state.currentSession && T.state.currentSession.session_id === 'sid-r'`, 'the agent is selected');
+            await ev(`window.restartSession(); true`);
             await waitFor(`getComputedStyle(document.getElementById('restart-modal')).display !== 'none' && !!document.querySelector('#restart-acf .acf-permission-mode')`, 'the restart dialog');
             await settled();
             const opened = await ev(`document.querySelector('#restart-acf .acf-permission-mode').value`);
@@ -41,6 +44,9 @@ const { coralReady } = require('./helpers/wait');
         const toBypass = await run('default', 'bypassPermissions');
         assert.equal(toBypass.opened, 'default');
         assert.equal(toBypass.body.permission_mode, 'bypassPermissions', 'Default to Bypass sends Bypass');
+        const liveToDefault = await run('bypassPermissions', 'default', true);
+        assert.equal(liveToDefault.opened, 'bypassPermissions', 'a row with only the live mode opens on it');
+        assert.equal(liveToDefault.body.permission_mode, 'default', 'Bypass to Default is sent when the mode came from the live report');
     } finally { await client.close(); }
     console.log('restart_permission_pick_browser: ok');
 })().catch(e => { console.error(e && e.message || e); process.exit(1); });

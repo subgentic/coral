@@ -45,7 +45,7 @@ async function showRestartModal() {
                 thinkingActual: s.thinking_actual || '', // what it last ran at: a note under Thinking when that differs (#5105)
                 prompt: s.prompt || '',
                 capabilities: s.capabilities || null,
-                autoPermissions: s.permission_mode || true, // the form opens on the mode the agent runs in, not the saved default: a restart that does not touch the select keeps it (#12481)
+                autoPermissions: s.live_permission_mode || s.permission_mode || true, // the form opens on the mode the agent runs in, not the saved default: a restart that does not touch the select keeps it (#12481)
             },
         });
     }
