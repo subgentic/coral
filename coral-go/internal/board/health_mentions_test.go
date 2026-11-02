@@ -47,3 +47,45 @@ func TestNameHasEdgePunctuation(t *testing.T) {
 		assert.Equal(t, want, NameHasEdgePunctuation(name), name)
 	}
 }
+
+// #12352 (coral-hub's report): "no mention has reached X" flagged a member whose name has a shorter member's name as its start (A = "Security Reviewer", B = "Security Reviewer Distributed Systems": every
+// "@Security Reviewer" flagged B). Each @ is resolved to the longest member name it fully matches, as delivery does; a start of a name counts as an address only when no member's whole name matches there.
+func TestMentionGapResolvesAMentionToTheLongestMemberNameItFullyMatches(t *testing.T) {
+	members := []string{"Security Reviewer", "Security Reviewer Distributed Systems", "Security", "Backend Dev"}
+	gap := func(name string, posts ...RecentPost) int {
+		n, _ := MentionGapAmong(name, "", members, posts)
+		return n
+	}
+	// the reported case: A's full name, a few times, from others: nobody else is flagged for it
+	posts := []RecentPost{
+		post("Orchestrator", "@Security Reviewer please read #12", 5*time.Minute),
+		post("QA", "@Security Reviewer: and this", 20*time.Minute),
+		post("Orchestrator", "@Security Reviewer ping", 2*time.Minute),
+	}
+	assert.Zero(t, gap("Security Reviewer Distributed Systems", posts...), "B is not flagged for mentions of A")
+	assert.Zero(t, gap("Security", posts...), "nor 'Security', whose whole name is a start of A's: the mention is A's")
+	assert.Zero(t, gap("Security Reviewer", posts...), "A was reached")
+
+	// B's own full name is B's, and not A's or Security's
+	b := []RecentPost{post("QA", "@Security Reviewer Distributed Systems go", time.Minute)}
+	assert.Zero(t, gap("Security Reviewer Distributed Systems", b...))
+	assert.Zero(t, gap("Security Reviewer", b...), "longest wins: not a try for A either")
+
+	// longest wins also for "reached": the longer member's mention does not stand in for a mention of the shorter one, so a real partial address of A stays a gap beside it
+	both := []RecentPost{post("QA", "@Secur look at this", 4*time.Minute), post("QA", "@Security Reviewer Distributed Systems go", time.Minute)}
+	assert.Equal(t, 1, gap("Security Reviewer", both...), "B's mention did not reach A, so the '@Secur' try stands")
+	assert.Zero(t, gap("Security Reviewer Distributed Systems", both...), "B was reached")
+
+	// a start of a name that no member's whole name matches is still a gap, as before
+	partial := []RecentPost{post("Orchestrator", "@Backen look at this", 3*time.Minute), post("QA", "@Backen again", 8*time.Minute)}
+	assert.Equal(t, 2, gap("Backend Dev", partial...))
+	n, oldest := MentionGapAmong("Backend Dev", "", members, partial)
+	assert.Equal(t, 2, n)
+	assert.Equal(t, partial[1].At, oldest)
+	// a proper mention in the window still means it reached
+	assert.Zero(t, gap("Backend Dev", append(partial, post("QA", "@Backend Dev ok", time.Minute))...))
+	// with no other member's name known it is MentionGap
+	n, _ = MentionGapAmong("Backend Dev", "", nil, partial)
+	m, _ := MentionGap("Backend Dev", "", partial)
+	assert.Equal(t, m, n)
+}

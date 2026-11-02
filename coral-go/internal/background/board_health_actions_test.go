@@ -162,3 +162,28 @@ func TestWaitReasonIsCleanedAgentText(t *testing.T) {
 	assert.NotContains(t, waitReason(board.RegisteredWait{WaitType: "message", Reason: "token ghp_A1b2C3d4E5A1b2C3d4E5A1b2C3d4E5F6g7H8 end"}), "ghp_A1b2", "redacted")
 	assert.Empty(t, waitReason(board.RegisteredWait{WaitType: "message", Reason: "  \n "}))
 }
+
+// #12352 (coral-hub's report, the same here with 'Hermes Agent Tester' and 'Hermes Agent Investigation'): a member whose name starts with a shorter member's name is not flagged for mentions of the shorter one; each @ goes
+// to the longest member name it fully matches. The three names share a start, as the report's do.
+func TestActionListAMentionOfAShorterMemberIsNotAGapForAMemberWhoseNameStartsWithIt(t *testing.T) {
+	h := newCheckHarness(t)
+	ctx := context.Background()
+	h.member("Orchestrator", "Orchestrator", 1, 0)
+	h.member("Security Reviewer", "Security", 2, 0)
+	h.member("Security Reviewer Distributed Systems", "Distributed Security", 3, 0)
+	h.member("Hermes Agent Investigation", "Hermes Investigator", 4, 0)
+	h.member("Hermes Agent Tester", "Hermes Tester", 5, 0)
+	for _, text := range []string{"@Security Reviewer please read #12", "@Security Reviewer: and this", "@Hermes Agent Investigation look", "@Hermes Agent Investigation again"} {
+		_, err := h.s.PostMessage(ctx, "team", "Orchestrator", text, nil)
+		require.NoError(t, err)
+	}
+	out := h.check()
+	assert.NotContains(t, out, "Security Reviewer Distributed Systems: no mention has reached it", "the longer name is not flagged for the shorter one's mentions")
+	assert.NotContains(t, out, "Hermes Agent Tester: no mention has reached it")
+	// a start no member's whole name matches is still a gap
+	_, err := h.s.PostMessage(ctx, "team", "Orchestrator", "@Distributed look at this", nil)
+	require.NoError(t, err)
+	_, err = h.s.PostMessage(ctx, "team", "Orchestrator", "@Distributed again", nil)
+	require.NoError(t, err)
+	assert.Contains(t, h.check(), "no mention has reached it", "a real prefix with no full name behind it is still reported")
+}
