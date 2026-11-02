@@ -517,3 +517,42 @@ func TestAMessageThatOnlyLinksReviewedFilesIsReadOnceTheyAreOpenedDecidedOrRepla
 	assert.Equal(t, 2, rows, "a file with no review tag: its message is a question as before")
 	assert.Equal(t, 2, n)
 }
+
+// Security's two SHOULDs on #12096: a message with answer buttons is never hidden (the Operator can only answer it from its row), and one whose other text asks something (a question mark, or a word an ask uses) is a
+// question, not a pointer to a file.
+func TestAMessageWithButtonsOrAQuestionAroundTheLinkIsNeverHiddenAsAFileLink(t *testing.T) {
+	e := newReviewEnv(t, true)
+	ctx := context.Background()
+	e.tag(t, `["approved"]`) // the file was reviewed and decided: a bare link message to it is read
+	post := func(text string) *board.Message {
+		q, err := e.h.bs.PostMessage(ctx, "alpha", "Alice", "@Operator "+text, nil)
+		require.NoError(t, err)
+		require.NoError(t, e.h.bs.RecordAsk(ctx, "alpha", q, []string{"Operator"}))
+		return q
+	}
+	counts := func() (int, int) {
+		code, out := readNeedsYou(t, e.h, "", asPerson)
+		require.Equal(t, http.StatusOK, code, out)
+		acode, rows, _ := readOperatorAsks(t, e.h, asPerson)
+		require.Equal(t, http.StatusOK, acode)
+		return int(out["count"].(float64)), len(rows)
+	}
+	link := "coral://artifacts/" + e.id
+	post("design doc v2 is in your Inbox: " + link)
+	n, rows := counts()
+	assert.Equal(t, 0, n, "a bare link to a decided file is read")
+	assert.Equal(t, 0, rows)
+	withButtons := post("Yes or no: " + link)
+	require.NoError(t, e.h.bs.RecordAskButtons(ctx, "alpha", withButtons.ID, []board.AskButton{{Label: "Yes", Action: "reply"}, {Label: "No", Action: "reply"}}, time.Now()))
+	n, rows = counts()
+	assert.Equal(t, 1, n, "a question with answer buttons stays, though it only links a decided file")
+	assert.Equal(t, 1, rows)
+	post("Deploy to prod now? " + link)
+	n, rows = counts()
+	assert.Equal(t, 2, n, "a short question with a question mark stays")
+	assert.Equal(t, 2, rows)
+	post("please approve " + link)
+	n, rows = counts()
+	assert.Equal(t, 3, n, "an ask word keeps it a question")
+	assert.Equal(t, 3, rows)
+}
