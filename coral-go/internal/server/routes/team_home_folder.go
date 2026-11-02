@@ -107,3 +107,15 @@ func (h *SessionsHandler) teamHomeFolder(ctx context.Context, ls *store.LiveSess
 	}
 	return real
 }
+
+// folderOfLive is the folder a restart or a resume of a live agent starts in when no team home folder says otherwise: the folder its session worked in while that still
+// exists, else the one its terminal is in. The terminal's is where it happens to be now, and a terminal recovered after a crash is at the home folder (#10813): taking it
+// first started coral-hub's Security Reviewer in ~ though its session worked in ~/Software/coral-hub (#12057).
+func folderOfLive(stored *store.LiveSession, panePath string) string {
+	if stored != nil && stored.WorkingDir != "" {
+		if info, err := os.Stat(stored.WorkingDir); err == nil && info.IsDir() {
+			return stored.WorkingDir
+		}
+	}
+	return panePath
+}
