@@ -33,7 +33,7 @@ const { coralReady } = require('./helpers/wait');
             assert.equal(await ev(`document.querySelector('#artifact-viewer .av-next').getAttribute('aria-disabled')`), 'true', `${at}: no newer version`);
             assert.equal(await q('#artifact-viewer .av-compare'), 'Compare with v2');
             assert.equal(await ev(vis('#artifact-viewer .av-notice')), false, `${at}: the newest has no "newer" line`);
-            if (mobile) assert.deepEqual(await ev(`[...document.querySelectorAll('#artifact-viewer .av-bar .btn')].filter(b => b.getBoundingClientRect().height < 43.5).length`), 0, `${at}: 44 px targets`);
+            if (mobile) assert.deepEqual(await ev(`[...document.querySelectorAll('#artifact-viewer .av-bar .btn')].filter(b => b.getClientRects().length && b.getBoundingClientRect().height < 43.5).length`), 0, `${at}: 44 px targets (the shown ones: Compare is in the closed list)`);
 
             console.log(`${at}: the list is a listbox, newest first, the shown one selected; keys and Escape`);
             await ev(`document.querySelector('#artifact-viewer .av-current').click(); true`);
@@ -105,9 +105,9 @@ const { coralReady } = require('./helpers/wait');
             assert.equal(await ev(`document.querySelectorAll('#artifact-viewer .av-col').length`), 2);
             assert.equal(await ev(`document.querySelector('#artifact-viewer .av-view-split').getAttribute('aria-pressed')`), 'true');
             assert.match(await q('#artifact-viewer .av-live'), /^Changes since v2: 1 added, 1 removed/, `${at}: switching the view is not said again as a new compare`);
-            await ev(`document.querySelector('#artifact-viewer .av-compare').click(); true`);
+            await ev(`document.querySelector('#artifact-viewer .av-current').click(); document.querySelector('#artifact-viewer .av-compare').focus(); document.querySelector('#artifact-viewer .av-compare').click(); true`); // the chip opens the list, Compare is in it; the keyboard was on Compare
             await waitFor(`document.querySelector('#artifact-viewer .artifact-viewer-body').textContent.includes('More menu') && !document.querySelector('#artifact-viewer .av-heading')`, `${at}: back to the version`, 6000);
-            assert.equal(await ev(`document.activeElement.classList.contains('av-compare')`), true, `${at}: the keyboard is on Compare`);
+            assert.equal(await ev(`document.activeElement.classList.contains('av-current')`), true, `${at}: the keyboard is on the version chip (Compare is in its list, which closes, #12223)`);
             if (mobile) assert.equal(await ev(`document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1`), true, `${at}: no sideways scroll`);
             await ev(`document.querySelector('#artifact-viewer .artifact-viewer-close').click(); true`);
         }

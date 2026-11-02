@@ -151,7 +151,7 @@ const { coralReady } = require('./helpers/wait');
                 assert.deepEqual(await ev(`[...(${row('Review file 01.txt')}).querySelectorAll('.inbox-review-actions button:not(.dt-star):not(.inbox-bookmark):not(.menu-item)')].map(b=>(b.getAttribute('aria-label')||b.textContent).trim())`),['Approve: Review file 01.txt','Request changes: Review file 01.txt','More actions for Review file 01.txt'],'a read row has Approve, Changes and More (Mark unread is in it) at these widths (#11552)');
                 if(width===1280){
                     await ev(`(${row('Review file 01.txt')}).querySelector('.inbox-review-name').click();true`);
-                    await waitFor(`!!document.querySelector('.artifact-review:not([hidden]) .artifact-review-approve:not([hidden])')`,'the viewer shows Approve for a pending review',8000);
+                    await waitFor(`!!document.querySelector('.artifact-review-approve:not([hidden])')`,'the viewer shows Approve for a pending review',8000);
                     assert.match(await ev(`document.querySelector('.artifact-review-state').textContent`),/Waiting for your review/);
                     await ev(`document.querySelector('.artifact-review-changes').click();true`);
                     await waitFor(`document.activeElement&&document.activeElement.id==='artifact-review-text'`,'the change request box has the focus',4000);
@@ -194,8 +194,8 @@ const { coralReady } = require('./helpers/wait');
                     await new Promise(r=>setTimeout(r,800)); // sleep-ok: the version bar's own reload settles
                     assert.equal(await ev(`document.querySelector('.artifact-viewer-title').textContent`),'Review file 01.txt · version 2','the viewer title adds the version after the name (#11890)');
                     await waitFor(`/^Approved .+/.test(document.querySelector('.artifact-review-state')?.textContent||'')`,'the head of a two-version approved artifact says Approved with its time',8000);
-                    const vis = await ev(`(() => { const b = document.querySelector('.artifact-review'), r = b.getBoundingClientRect(), cs = getComputedStyle(b); return { h: Math.round(r.height), w: Math.round(r.width), display: cs.display, hidden: b.hidden, parent: b.parentElement.className, prev: b.previousElementSibling?.className, next: b.nextElementSibling?.className }; })()`);
-                    assert.ok(vis.h > 0 && vis.w > 0 && vis.display !== 'none', 'the review bar of a two-version artifact is on the screen: ' + JSON.stringify(vis));
+                    const vis = await ev(`(() => { const b = document.querySelector('.artifact-review-state'), r = b.getBoundingClientRect(), cs = getComputedStyle(b); return { h: Math.round(r.height), w: Math.round(r.width), display: cs.display, hidden: b.hidden, parent: b.parentElement.className, prev: b.previousElementSibling?.className, next: b.nextElementSibling?.className }; })()`);
+                    assert.ok(vis.h > 0 && vis.w > 0 && vis.display !== 'none', 'the review status of a two-version artifact is on the header row (#12223): ' + JSON.stringify(vis));
                     await ev(`document.querySelector('.artifact-viewer-close').click();window.__twoVersions=false;true`);
                 }
                 assert.deepEqual(await ev(`window.__decisions.filter(d=>d.decision==='approve').map(d=>d.id)`),[width===1280?(0x62).toString(16).padStart(64,'0'):(1).toString(16).padStart(64,'0')],'one approve was sent: the failed press and the second one are not two');
