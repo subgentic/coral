@@ -11,31 +11,63 @@ import (
 // CommentReply is one thread the owner started that an agent has replied in since the owner last opened it: the thread (its first comment), the artifact and board it is on, the agent that replied last, when,
 // and how many replies are unseen.
 type CommentReply struct {
-	RootID     int64  `db:"root_id"`
-	ArtifactID string `db:"artifact_id"`
-	Board      string `db:"board"`
-	Agent      string `db:"agent"`
-	At         string `db:"at"`
-	Count      int    `db:"n"`
+	RootID     int64
+	ArtifactID string
+	Board      string
+	Agent      string
+	At         string
+	Count      int
 }
 
 // UnseenAgentReplies lists the owner's threads with agent replies newer than the owner's last opening of them, one row per thread, by artifact and thread. A reply by anyone else, a deleted reply, a thread a hub viewer
-// or an agent started, and a deleted thread are not news for the Operator.
+// or an agent started, and a deleted thread are not news for the Operator. The times are compared here, as times: the comments' created_at is RFC 3339 text of varying length, which SQL must not order or compare.
 func (s *SessionStore) UnseenAgentReplies(ctx context.Context) ([]CommentReply, error) {
-	var out []CommentReply
-	err := s.reader().SelectContext(ctx, &out, `
-		SELECT c.id AS root_id, c.artifact_id AS artifact_id, c.board AS board,
-		       (SELECT r2.author_name FROM artifact_comments r2 WHERE r2.parent_id = c.id AND r2.author_kind = 'agent' AND r2.deleted_at IS NULL ORDER BY r2.created_at DESC, r2.id DESC LIMIT 1) AS agent,
-		       MAX(r.created_at) AS at, COUNT(*) AS n
+	var rows []struct {
+		ID         int64   `db:"id"`
+		RootID     int64   `db:"root_id"`
+		ArtifactID string  `db:"artifact_id"`
+		Board      string  `db:"board"`
+		Agent      string  `db:"agent"`
+		At         string  `db:"at"`
+		SeenAt     *string `db:"seen_at"`
+	}
+	err := s.reader().SelectContext(ctx, &rows, `
+		SELECT r.id AS id, c.id AS root_id, c.artifact_id AS artifact_id, c.board AS board, r.author_name AS agent, r.created_at AS at, s.seen_at AS seen_at
 		FROM artifact_comments r
 		JOIN artifact_comments c ON c.id = r.parent_id
 		LEFT JOIN artifact_comment_seen s ON s.comment_id = c.id
 		WHERE r.author_kind = 'agent' AND r.deleted_at IS NULL
 		  AND c.author_kind = 'owner' AND c.parent_id IS NULL AND c.deleted_at IS NULL
-		  AND (s.seen_at IS NULL OR r.created_at > s.seen_at)
-		GROUP BY c.id
-		ORDER BY c.artifact_id, c.id`)
-	return out, err
+		ORDER BY c.artifact_id, c.id, r.id`)
+	if err != nil {
+		return nil, err
+	}
+	var out []CommentReply
+	byRoot := map[int64]int{} // root id -> its index in out
+	newest := map[int64]time.Time{}
+	for _, r := range rows {
+		at, err := time.Parse(time.RFC3339Nano, r.At)
+		if err != nil {
+			continue
+		}
+		if r.SeenAt != nil {
+			if seen, err := time.Parse(time.RFC3339Nano, *r.SeenAt); err == nil && !at.After(seen) {
+				continue // opened since
+			}
+		}
+		i, ok := byRoot[r.RootID]
+		if !ok {
+			i = len(out)
+			byRoot[r.RootID] = i
+			out = append(out, CommentReply{RootID: r.RootID, ArtifactID: r.ArtifactID, Board: r.Board})
+		}
+		out[i].Count++
+		if t, seen := newest[r.RootID]; !seen || !at.Before(t) { // the newest reply names the thread (a tie goes to the later one)
+			newest[r.RootID] = at
+			out[i].Agent, out[i].At = r.Agent, r.At
+		}
+	}
+	return out, nil
 }
 
 // MarkThreadsSeen records that the owner opened the threads of an artifact: every thread the owner started on it is seen as of now.

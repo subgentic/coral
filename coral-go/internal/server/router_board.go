@@ -59,6 +59,17 @@ func (s *Server) configureBoardHandlers(h *routeHandlers) (*routes.BoardHandler,
 		}
 		return routes.GoalDoneHiddenFrom(st)
 	})
+	boardHandler.SetCommentNews(func(ctx context.Context) (map[string]int, error) { // replies agents left in the Operator's comment threads that they have not opened, per file (#12026)
+		replies, err := sessStore.UnseenAgentReplies(ctx)
+		if err != nil {
+			return nil, err
+		}
+		news := map[string]int{}
+		for _, rp := range replies {
+			news[rp.ArtifactID] += rp.Count
+		}
+		return news, nil
+	})
 	artifactNudger := routes.NewClaudeArtifactNudger(sessStore, s.terminal)
 	boardHandler.SetArtifactNudger(artifactNudger)
 	sessHandler.SetArtifactNudger(artifactNudger)

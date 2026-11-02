@@ -78,6 +78,8 @@ type BoardHandler struct {
 	chiefBoard func(ctx context.Context) string
 	// goalDoneHidden reads the goals hidden from Needs you (goal_done_hidden, #11825); nil: none.
 	goalDoneHidden func(ctx context.Context) []string
+	// commentNews says, per artifact id, how many replies agents left in the Operator's comment threads that the Operator has not opened (#12026); nil: none.
+	commentNews func(ctx context.Context) (map[string]int, error)
 	// listEdits limits how often one owner session edits a board's list (#5508).
 	listEdits editLimiter
 	// hubSwitches limits Coral Hub's requests to turn a team's cross-team switches on or off (#5572); hubCrossTeamLock reads the local lock.

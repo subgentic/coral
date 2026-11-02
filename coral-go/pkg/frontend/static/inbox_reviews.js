@@ -2,6 +2,7 @@
  * After the Inbox first opens, keep its badge updated on other tabs without eager startup reads. */
 import { fetchProjects } from './board_fetch.js';
 import { boardFetch, keyLabel, splitKey } from './server_base.js';
+import { importOnce } from './import_once.js';
 
 let items = [], saved = [], errors = [], pending = null, lastRead = 0, revision = 0, changed = () => {};
 let activated = false;
@@ -31,7 +32,7 @@ export const reviewItems = () => {
 /** A review artifact the operator has opened carries the 'read' tag (#9277): it stays in Needs you, shown as read, but it is not counted (the Inbox badge, the Needs you count). Opening it again, or marking it unread, is the same tags route. */
 /** The files the Operator saved for later (#11641): tagged 'saved', out of Needs you and its counts, listed at the top of Saved with their decisions still there. */
 export const savedFiles = () => saved;
-export const isRead = a => !!(a.tags && a.tags.includes('read'));
+export const isRead = a => !!(a.tags && a.tags.includes('read')) && !(a.new_comments > 0); // a read file whose Operator-started thread has agent replies not yet opened is unread again, counted once as itself (#12026)
 export const unreadReviewItems = () => reviewItems().filter(a => !isRead(a));
 export const reviewErrors = () => errors;
 export function onReviewsChanged(fn) { changed = fn; }
@@ -158,7 +159,14 @@ export function markOpenedRead(hex) {
     const p = (async () => {
         if (!activated) await refreshReviews(true); else if (pending) await pending;
         const row = items.find(a => a.hex.toLowerCase() === hex && !isRead(a) && !(a.tags || []).includes('changes requested')); // a file the Operator asked changes of waits on the agent: the viewer and the preview redraw it after the request, and that is not reading it again (#11860); it stays counted until the agent answers
-        if (row) await setReviewRead(row, true);
+        if (row) {
+            if (row.new_comments > 0) { // opening the file is opening its thread: the server marks the Operator's threads seen when the comments are read (#12026), so the row is read, and the count follows
+                const { listComments } = await importOnce('./artifact_comments_api.js');
+                await listComments(row.hex, splitKey(row.team).server, splitKey(row.team).name).catch(() => {}); // a failed read leaves the marker: it clears at the next open
+                row.new_comments = 0; revision++; changed();
+            }
+            await setReviewRead(row, true);
+        }
     })().finally(() => reading.delete(hex));
     reading.set(hex, p);
     return p;
