@@ -248,3 +248,25 @@ func TestTheDatabaseIsOpenedWithAnUntrustedSchema(t *testing.T) {
 	assert.Equal(t, 0, trusted)
 	assert.Equal(t, 1, queryOnly)
 }
+
+// #12041: the first user turn of a home's database, whatever the session ids in it: the oldest user row with a time, an inactive row left out.
+func TestFirstUserTurnAt(t *testing.T) {
+	r := newRig(t, fullSchema)
+	d := open(t, r.home)
+	_, ok, err := d.FirstUserTurnAt(context.Background())
+	require.NoError(t, err)
+	assert.False(t, ok, "no rows: no turn")
+
+	r.exec(t, `INSERT INTO messages (session_id, role, content, timestamp) VALUES (?, 'assistant', 'hello', 100)`, idA)
+	_, ok, _ = d.FirstUserTurnAt(context.Background())
+	assert.False(t, ok, "an assistant row is not a user turn")
+	r.exec(t, `INSERT INTO messages (session_id, role, content, timestamp, active) VALUES (?, 'user', 'dropped', 150, 0)`, idA)
+	_, ok, _ = d.FirstUserTurnAt(context.Background())
+	assert.False(t, ok, "a row Hermes dropped from the conversation is not one")
+	r.exec(t, `INSERT INTO messages (session_id, role, content, timestamp) VALUES (?, 'user', 'later', 300)`, idB)
+	r.exec(t, `INSERT INTO messages (session_id, role, content, timestamp) VALUES (?, 'user', 'first', 200)`, idA)
+	at, ok, err := d.FirstUserTurnAt(context.Background())
+	require.NoError(t, err)
+	assert.True(t, ok)
+	assert.Equal(t, float64(200), at, "the oldest, across the sessions in the file")
+}

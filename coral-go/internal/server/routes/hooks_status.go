@@ -34,10 +34,6 @@ func (h *SessionsHandler) noteLaunchedHooks(ctx context.Context, sessionID, agen
 		h.piLaunchedAt.Store(sessionID, time.Now())
 		return
 	}
-	if agentType == at.Hermes && sessionID != "" {
-		h.hermesLaunchedAt.Store(sessionID, time.Now()) // its hooks are shell hooks in its team's config.yaml: a launch proves nothing, only an event does (#12041)
-		return
-	}
 	if agentType != at.Claude || sessionID == "" || h.ss == nil {
 		return
 	}
@@ -268,38 +264,37 @@ func (h *SessionsHandler) piHooksInactive(sessions []store.LiveSession, now time
 	return out
 }
 
-// hermesHooksGrace is how long a Hermes agent may go with no event at all after its launch before it is listed as not active: its hooks fire from its first turn (on_session_start is the first turn only), and its
-// team's home is prepared on first use (about a minute) before its welcome line and the first message Coral types.
-const hermesHooksGrace = 5 * time.Minute
+// hermesHooksGrace is how long a Hermes agent's hooks have to report after its first user turn before it is listed as not active: Hermes sends no hook event until its first turn (about 80 s on a home used for the
+// first time, the tester), so a launch, a welcome line or a silent minute proves nothing; a turn that is two minutes old with no hook event of the agent's does.
+const hermesHooksGrace = 2 * time.Minute
 
-// hermesHooksInactive lists the running Hermes agents Coral started in this server run that have recorded no event of any kind within hermesHooksGrace of the launch (#12041): the hook tool is refused or
-// missing, the team's config.yaml was changed, or Hermes's events changed. It lists nothing it cannot be sure of (an agent started before this server run has no launch time), and it only says so on the agent's
-// row (a quiet chip): the agent's state is never changed by it.
+// hermesHooksInactive lists the running Hermes agents whose own state.db shows a user turn at least hermesHooksGrace old and that have recorded no hook event at all (#12041): the hook tool is refused or missing,
+// the team's config.yaml was changed, or Hermes's events changed. An agent with no turn yet is never listed (it is healthy and quiet), nor is one it cannot read (no link, no database, an unknown layout), a sleeping
+// one or another type. The list only says so on the agent's row (a quiet chip): the agent's state is never changed by it.
 func (h *SessionsHandler) hermesHooksInactive(ctx context.Context, sessions []store.LiveSession, now time.Time) []hooksAgent {
 	out := []hooksAgent{}
-	var late []store.LiveSession
+	var cands []store.LiveSession
 	var ids []string
 	for _, ls := range sessions {
 		if ls.AgentType != at.Hermes || ls.IsSleeping == 1 || ls.IsArchived == 1 || ls.IsJob == 1 {
 			continue
 		}
-		v, ok := h.hermesLaunchedAt.Load(ls.SessionID)
-		launched, _ := v.(time.Time)
-		if !ok || now.Sub(launched) < hermesHooksGrace {
-			continue
-		}
-		late = append(late, ls)
+		cands = append(cands, ls)
 		ids = append(ids, ls.SessionID)
 	}
-	if len(late) == 0 || h.ts == nil {
+	if len(cands) == 0 || h.ts == nil {
 		return out
 	}
-	heard, err := h.ts.SessionsWithAnyEvent(ctx, ids)
+	heard, err := h.ts.SessionsHeardFrom(ctx, ids)
 	if err != nil {
 		return out // it cannot tell: it lists nothing
 	}
-	for _, ls := range late {
+	for _, ls := range cands {
 		if heard[ls.SessionID] {
+			continue
+		}
+		turn, ok := h.hermesFirstUserTurn(ctx, ls.SessionID, ptr.Value(ls.BoardName))
+		if !ok || now.Sub(turn) < hermesHooksGrace {
 			continue
 		}
 		name := ptr.Value(ls.DisplayName)

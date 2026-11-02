@@ -429,3 +429,26 @@ func (h *SessionsHandler) hermesModel(sessionID string) string {
 	hermesModelCache.Unlock()
 	return model
 }
+
+// hermesFirstUserTurn is when the oldest user message in the agent's own Hermes home was written, from its state.db (read only): false when it cannot be told (no database, a layout Coral does not read, no user turn
+// yet). It does not need the link to a Hermes session id (a hook makes that, and an agent whose hooks never ran has none): the home is the agent's alone. The first user turn is what Coral typed (the board
+// protocol), so it is the moment Hermes's hooks are due.
+func (h *SessionsHandler) hermesFirstUserTurn(ctx context.Context, sessionID, team string) (time.Time, bool) {
+	if h.cfg == nil || !transcriptlink.IsSessionID(sessionID) {
+		return time.Time{}, false
+	}
+	home := agent.HermesAgentHome(h.cfg.CoralDir(), team, sessionID)
+	if home == "" {
+		return time.Time{}, false
+	}
+	db, err := hermesdb.Open(home)
+	if err != nil {
+		return time.Time{}, false
+	}
+	defer db.Close()
+	at, ok, err := db.FirstUserTurnAt(ctx)
+	if err != nil || !ok {
+		return time.Time{}, false
+	}
+	return time.Unix(int64(at), 0), true
+}
