@@ -76,3 +76,17 @@ func TestAnAgentThatMovedOnFromItsWaitIsStillInItsTurn(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 0, r.pass(t).IsSleeping, "a tool call a minute after the wait was registered is not the wait: awake")
 }
+
+// An unreadable store is never "parked": the kill that follows cannot be undone, so a wait that cannot be read keeps the agent awake (QA, #12335). GetActiveWait answers (nil, nil) for a read that
+// failed, and the rule must treat that as no wait, in the pass as well as on its own.
+func TestAnUnreadableWaitStoreLeavesTheAgentAwake(t *testing.T) {
+	r := newQuietSleepRig(t)
+	_, err := r.h.bs.RegisterWait(r.ctx, "autosleep", "dev", r.name, "message", "", "waiting for a message", 10*time.Hour)
+	require.NoError(t, err)
+	_, err = r.h.ts.InsertAgentEvent(r.ctx, &store.AgentEvent{AgentName: "dev", SessionID: &r.sid, EventType: "tool_use"})
+	require.NoError(t, err)
+	assert.True(t, r.h.parkedInWait(r.ctx, "autosleep", "dev", time.Now()), "readable: parked")
+	require.NoError(t, r.h.bs.Close())
+	assert.False(t, r.h.parkedInWait(r.ctx, "autosleep", "dev", time.Now()), "unreadable: not parked")
+	assert.Equal(t, 0, r.pass(t).IsSleeping, "and the pass leaves the agent awake")
+}
