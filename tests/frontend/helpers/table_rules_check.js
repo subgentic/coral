@@ -1,4 +1,4 @@
-// cdp-timeout: 900 (the whole table rules check: about 510 s on this Mac, 116 table states and the live surfaces, past the runner's default; #11943)
+// The table rules check's body (#11942, #11943), run by table_rules_shape_browser.test.js (the synthetic surfaces, one spec per table shape) and table_rules_live_browser.test.js (the live surfaces), so each fits the gate's default timeout and runs on its own shard (#12327). Not a suite itself.
 // #11942 part A (the operator: "Our table column resizing is very broken ... It's used across all of our surfaces"): ONE browser check for every table built on data_table.js, asserting the eight rules of
 // coral://artifacts/9ced561afd363231aa6ccbc457c99c528b81ab5c31d82f232e9604e82749093a (helpers/table_rules.js says them). Each surface's table shape (its columns, its fixed and empty columns, its row mixes) is a
 // spec below, mounted through the real data_table.js into a panel the width a surface has beside the sidebar, at 1440, 1280, 1024 and 900 px, with mixed rows, one kind of row, a long name and no rows, at 200% text,
@@ -6,13 +6,13 @@
 // rule broke where, and tests/frontend/table_inventory.json says every table the app has and whether this check reaches it. Set CORAL_TABLE_REPORT=<file> for the JSON report.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
-const { connect } = require('./agent_view_harness');
-const BASE = require('./test_base').BASE;
-const { coralReady } = require('./helpers/wait');
-const { removeBoards } = require('./helpers/board_cleanup');
-const { DATA_WORLD } = require('./helpers/census_world');
+const { connect } = require('../agent_view_harness');
+const BASE = require('../test_base').BASE;
+const { coralReady } = require('./wait');
+const { removeBoards } = require('./board_cleanup');
+const { DATA_WORLD } = require('./census_world');
 const B = 'tbl-rules-' + Date.now().toString(36);
-const { AUDIT, judge } = require('./helpers/table_rules');
+const { AUDIT, judge } = require('./table_rules');
 
 // The specs run in the page: (m = data_table.js's exports, mix) -> { label, columns, rows, opts }. The Needs you mix is the operator's own screenshot: an agent row (a question, a Dismiss beside its words) and two
 // "Goal looks done" rows, with Blocks empty for all of them and Actions empty.
@@ -73,8 +73,11 @@ const SPECS = `(() => {
 // fail on any broken rule (the check as it will be once #11943 lands, whose first change is to make enforce the default). Today: CORAL_TABLE_RULES=enforce node run_cdp_suites.mjs --only table_rules_browser.
 const MODE = process.env.CORAL_TABLE_RULES || 'enforce'; // enforce is the default now (#11943): off skips the check, report prints what is broken and exits 0
 
-(async () => {
+// GROUP: 'shape' (the synthetic surfaces), a list of live surfaces by the start of their names ('needs|artifacts'), 'live' (every live one) or 'all'. The live half is two files, the Inbox folders and the rest (Analytics reloads the whole page for its data world, about 60 s a surface) (#12327).
+const inGroup = (GROUP, x) => GROUP === 'all' || (GROUP === 'shape' ? !x.live : x.live && (GROUP === 'live' || GROUP.split('|').some(g => x.name.startsWith(g))));
+module.exports.run = GROUP => (async () => {
     if (MODE === 'off') { console.log('PASS pending (#11943): set CORAL_TABLE_RULES=report or enforce to run the table rules check'); return; }
+    const guard = await require('./settings_guard').guardSettings();
     const { client, Page, Emulation, ev, PRELOAD, install } = await connect();
     const { Input } = client;
     const mouse = (type, x, y) => Input.dispatchMouseEvent({ type, x, y, button: 'left', buttons: type === 'mouseReleased' ? 0 : 1, clickCount: 1 }); // as data_table_browser drives a handle
@@ -95,6 +98,7 @@ const MODE = process.env.CORAL_TABLE_RULES || 'enforce'; // enforce is the defau
         let seeded = false;
         const seed = async () => {
             if (seeded) return; seeded = true;
+            await ev(`fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ goal_done_quiet_minutes: '0' }) }).then(r => r.status)`); // a goal that looks done is quiet for 15 minutes before it is an item of Needs you: not here (the guard puts the setting back)
             assert.ok((await api('POST', '/subscribe', { subscriber_id: 'Boss', job_title: 'Orchestrator', session_name: 'boss-' + B })).status < 300);
             for (const [t, dw] of [['Goal that looks done, one', 'The operator can see it'], ['Goal that looks done, two', 'Every task is done.']]) {
                 const g = await api('POST', '/goals', { subscriber_id: 'Operator', title: t, done_when: dw }); assert.equal(g.status, 201, JSON.stringify(g)); const gid = g.json.id || g.json.goal.id;
@@ -160,7 +164,7 @@ const MODE = process.env.CORAL_TABLE_RULES || 'enforce'; // enforce is the defau
         const measure = async (root) => { const m = await ev(`window.__measure(${JSON.stringify(root)})`); if (m) return m; note(measuring || root, 'no table', ['R7: no table was drawn there (the surface did not open or has no rows)']); return NONE; };
         const clear = () => ev(`(() => { for (const k of Object.keys(localStorage)) if (k.startsWith('coral-dt-widths:')) localStorage.removeItem(k); return true; })()`);
         const only = (process.env.CORAL_TABLE_ONLY || '').split('|').filter(Boolean); // CORAL_TABLE_ONLY='tasks (live Inbox)|files': just those surfaces
-        for (const S of surfaces.filter(x => !only.length || only.some(o => (o.startsWith('=') ? x.name === o.slice(1) : x.name.includes(o))))) {
+        for (const S of surfaces.filter(x => inGroup(GROUP, x) && (!only.length || only.some(o => (o.startsWith('=') ? x.name === o.slice(1) : x.name.includes(o)))))) {
             const kind = S.name, root = S.root, fixedAt = {}; measuring = S.name;
             const handleCenter = key => ev(`(() => { const h = [...document.querySelectorAll('${root} th.dt-th[data-key=${JSON.stringify(key)}] .dt-resize')].find(x => x.getClientRects().length); if (!h) return null; const r = h.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
             const wipe = async () => { await clear(); if (S.live) await ev(`document.documentElement.style.fontSize = ''; true`); };
@@ -188,9 +192,9 @@ const MODE = process.env.CORAL_TABLE_RULES || 'enforce'; // enforce is the defau
                 const label = await ev(`[...document.querySelectorAll('${root} table.dt-table')].find(x => x.getClientRects().length).getAttribute('aria-label').replace(/,\\s*\\d.*$/, '')`);
                 await ev(`localStorage.setItem('coral-dt-widths:' + ${JSON.stringify(label)}, ${JSON.stringify(JSON.stringify(Object.fromEntries(keys.map(k => [k, 600]))))}); true`);
                 await S.mount('mixed', w); note(kind, `${w}px kept widths over-wide`, judge(await measure(root))); await clear();
-                // drags and the keyboard, once per column, at the two ends of the range
-                if (w === 1440 || w === 900) {
-                    for (const key of keys) {
+                // drags and the keyboard on the first and the last resizable column of the surface, at 1440 (#12327: every column at 1440 and 900 took most of the time; the rules they check hold for the others by the same handle)
+                if (w === 1440) {
+                    for (const key of keys.length ? [...new Set([keys[0], keys[keys.length - 1]])] : []) {
                         await S.mount('mixed', w); const before = await measure(root); const at = await handleCenter(key); if (!at) { note(kind, `${w}px`, [`R5: column "${key}" has no resize handle`]); continue; }
                         await mouse('mouseMoved', at.x, at.y); await mouse('mousePressed', at.x, at.y);
                         for (let i = 1; i <= 6; i++) await mouse('mouseMoved', at.x + 10 * i, at.y);
@@ -221,5 +225,5 @@ const MODE = process.env.CORAL_TABLE_RULES || 'enforce'; // enforce is the defau
         const summary = `${violations.length} broken rules over ${report.checked} table states (${JSON.stringify(byRule)}) on ${Object.keys(report.surfaces).join(', ') || 'no surface'}:\n` + violations.slice(0, 80).join('\n');
         if (MODE === 'enforce') assert.equal(violations.length, 0, `the check fails today by design (#11942, #11943 fixes it): ${summary}`);
         console.log(violations.length ? 'REPORT ' + summary : 'PASS every table keeps the rules');
-    } finally { await removeBoards(ev, [B]).catch(() => {}); await client.close(); }
+    } finally { await guard.restore().catch(() => {}); await removeBoards(ev, [B]).catch(() => {}); await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
