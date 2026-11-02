@@ -499,3 +499,28 @@ func ForgetHostKey(ctx context.Context, path, name string) error {
 	}
 	return nil
 }
+
+// SavedHostKeys are the keys the file at path holds for name, each with its SHA-256 fingerprint as ssh prints it: what is about to be forgotten, shown to the owner so they can set it beside the key the computer
+// presents next. A file that is not there, or a name it does not hold, is none.
+func SavedHostKeys(ctx context.Context, path, name string) ([]HostKey, error) {
+	if path == "" {
+		return nil, nil
+	}
+	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	found, err := existingKeys(ctx, path, name)
+	if err != nil {
+		return nil, err
+	}
+	keys := make([]HostKey, 0, len(found))
+	for _, k := range found {
+		raw, derr := base64.StdEncoding.DecodeString(k[1])
+		if derr != nil {
+			continue
+		}
+		sum := sha256.Sum256(raw)
+		keys = append(keys, HostKey{Host: name, Type: k[0], Blob: k[1], Fingerprint: "SHA256:" + base64.RawStdEncoding.EncodeToString(sum[:])})
+	}
+	return keys, nil
+}

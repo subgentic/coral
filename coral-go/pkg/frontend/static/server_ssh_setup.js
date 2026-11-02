@@ -218,6 +218,7 @@ export function mountSshSetup(host, { mode = 'setup', server = null, action = nu
         if (kind() === REMOVE) fact('Data', p.delete_data ? 'Deleted too: the key, the history and the install folder.' : 'Kept: the data, the key and the instance id stay on that computer.');
         root.append(el('p', 'ssh-intro', words().intro), dl, el('h5', 'ssh-subhead', 'What will happen'), stepList(p.steps));
         root.append(el('p', 'ssh-help', 'Nothing has connected yet. The next press connects, and checks the host key.'));
+        if ((p.forgotten_keys || []).length) { const old = el('p', 'ssh-help'); old.append('The key Coral had saved for this computer, now forgotten: '); for (const k of p.forgotten_keys) old.append(el('code', 'ssh-key-fp', `${k.type} ${k.fingerprint} `)); old.append('The next step shows the key the computer has now, to set beside it.'); root.append(old); }
         const bar = el('div', 'servers-form-actions');
         bar.append(button('Cancel', '', cancelPlan), button(st.busy ? 'Connecting...' : 'Connect', 'btn-primary', connect, st.busy));
         root.append(bar);
@@ -229,6 +230,7 @@ export function mountSshSetup(host, { mode = 'setup', server = null, action = nu
         const keys = p.host_keys || [];
         if (keys.length) {
             root.append(el('h5', 'ssh-subhead', 'Check the host key'));
+            if ((p.forgotten_keys || []).length) { const was = el('p', 'ssh-help'); was.append('Before (forgotten): '); for (const k of p.forgotten_keys) was.append(el('code', 'ssh-key-fp', `${k.type} ${k.fingerprint} `)); was.append(' Now, below, is what the computer presents. If they differ you must be sure why.'); root.append(was); }
             root.append(el('p', 'ssh-help', 'This computer has not been connected to from here before. Compare these fingerprints with the ones the computer shows (ssh-keygen -lf on its host key). If you cannot tell, stop here.'));
             const ul = el('ul', 'ssh-keys');
             for (const k of keys) {

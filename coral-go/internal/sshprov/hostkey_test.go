@@ -502,3 +502,39 @@ func TestHostKeyNameIsTheNameSshUses(t *testing.T) {
 		t.Logf("a config that is not there answers %q (ssh's own default)", got)
 	}
 }
+
+// #12056 (Security's SHOULD): what is about to be forgotten is read first, with the fingerprint ssh itself prints, so the owner can set it beside the key the computer presents next.
+func TestSavedHostKeysCarryTheFingerprintSshPrints(t *testing.T) {
+	keygen, err := exec.LookPath("ssh-keygen")
+	if err != nil {
+		t.Skip("no ssh-keygen on this computer")
+	}
+	dir := t.TempDir()
+	key := filepath.Join(dir, "k")
+	if out, err := exec.Command(keygen, "-q", "-t", "ed25519", "-N", "", "-f", key).CombinedOutput(); err != nil {
+		t.Fatalf("ssh-keygen: %v %s", err, out)
+	}
+	pub, _ := os.ReadFile(key + ".pub")
+	f := strings.Fields(string(pub))
+	known := filepath.Join(dir, "known")
+	if err := os.WriteFile(known, []byte("box.example.com "+f[0]+" "+f[1]+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	want, err := exec.Command(keygen, "-lf", key+".pub").Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := SavedHostKeys(context.Background(), known, "box.example.com")
+	if err != nil || len(got) != 1 {
+		t.Fatalf("SavedHostKeys = %+v, %v", got, err)
+	}
+	if !strings.Contains(string(want), got[0].Fingerprint) || got[0].Type != "ssh-ed25519" || got[0].Host != "box.example.com" {
+		t.Errorf("fingerprint %q is not ssh's %q", got[0].Fingerprint, want)
+	}
+	if none, err := SavedHostKeys(context.Background(), known, "other.example.com"); err != nil || len(none) != 0 {
+		t.Errorf("a host the file does not hold has none: %+v %v", none, err)
+	}
+	if none, err := SavedHostKeys(context.Background(), filepath.Join(dir, "missing"), "box.example.com"); err != nil || len(none) != 0 {
+		t.Errorf("a file that is not there has none: %+v %v", none, err)
+	}
+}

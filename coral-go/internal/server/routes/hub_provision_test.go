@@ -748,6 +748,15 @@ func TestProvisionForgetKeyRemovesTheSavedKeyAndStartsOver(t *testing.T) {
 	assert.Equal(t, "planned", v["phase"], "back at the start: the next connect shows what it finds")
 	assert.NotContains(t, v, "key_changed")
 	assert.NotContains(t, v, "error")
+	forgotten, _ := v["forgotten_keys"].([]any)
+	require.Len(t, forgotten, 1, "the key that was forgotten is shown, so the owner can set it beside the new one")
+	assert.Equal(t, "box.example.com", forgotten[0].(map[string]any)["host"])
+	assert.Equal(t, "ssh-ed25519", forgotten[0].(map[string]any)["type"])
+	assert.Regexp(t, `^SHA256:[A-Za-z0-9+/]{43}$`, forgotten[0].(map[string]any)["fingerprint"])
+	assert.NotContains(t, forgotten[0], "blob", "the fingerprint, never the key")
+	_, again := pe.do("GET", "/api/servers/provision/"+plan, nil)
+	assert.NotContains(t, again, "key_changed", "the status read after the reset no longer says the key changed")
+	assert.Equal(t, "planned", again["phase"])
 	left, _ = os.ReadFile(pe.known)
 	assert.NotContains(t, string(left), "box.example.com", "this computer's saved key is gone")
 	assert.Contains(t, string(left), "other.example.com", "no other host's key is touched")
@@ -756,4 +765,23 @@ func TestProvisionForgetKeyRemovesTheSavedKeyAndStartsOver(t *testing.T) {
 	// nothing was trusted: the file holds no key for the host
 	code, _ = pe.do("POST", "/api/servers/provision/"+plan+"/forget-key", nil)
 	assert.Equal(t, 409, code, "and there is nothing left to forget on a setup that is not failed")
+}
+
+// #12056 (QA's pin): a failure that is not a changed host key (the computer refused the connection) offers no forgetting: the route answers 409 and the saved key is left as it is.
+func TestProvisionForgetKeyIsRefusedForAFailureThatIsNotAChangedKey(t *testing.T) {
+	pe := newProvEnv(t, "gone", "Linux x86_64", true)
+	require.NoError(t, os.WriteFile(filepath.Join(pe.dir, "stderr"), []byte("ssh: connect to host box port 22: Connection refused\n"), 0o600))
+	_, v := pe.do("POST", "/api/servers/provision/plan", map[string]any{"target": "user@box.example.com"})
+	plan := v["plan"].(string)
+	_, v = pe.do("POST", "/api/servers/provision/"+plan+"/connect", nil)
+	require.Equal(t, "connected", v["phase"]) // the first uname answers: the failure comes at the next step
+	code, _ := pe.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{})
+	require.Equal(t, 202, code)
+	failed := pe.waitPhase(t, plan, "failed")
+	assert.NotContains(t, failed, "key_changed", "a refused connection is not a changed key")
+	require.NoError(t, os.WriteFile(pe.known, []byte("box.example.com ssh-ed25519 AAAA\n"), 0o600))
+	code, _ = pe.do("POST", "/api/servers/provision/"+plan+"/forget-key", nil)
+	assert.Equal(t, 409, code)
+	left, _ := os.ReadFile(pe.known)
+	assert.Contains(t, string(left), "box.example.com", "nothing was removed")
 }

@@ -28,7 +28,7 @@ function hub({ keys = [], failConnect = false, keyChanged = false, kind = 'setup
             if (failConnect) return json({ plan: 'p1', kind: planKind, phase: 'failed', error: 'Could not connect.', steps: steps({ connect: 'failed' }) });
             return json({ plan: 'p1', target: 'user@box.example.com:22', server_id: 'ssh-box', label: 'Build box', kind: planKind, phase: keys.length ? 'needs_keys' : 'connected', host_keys: keys, system: 'Linux x86_64', steps: steps() });
         }
-        if (url === '/api/servers/provision/p1/forget-key') return json({ plan: 'p1', target: 'user@box.example.com:22', server_id: 'ssh-box', label: 'Build box', kind: planKind, phase: 'planned', steps: steps() });
+        if (url === '/api/servers/provision/p1/forget-key') return json({ plan: 'p1', target: 'user@box.example.com:22', server_id: 'ssh-box', label: 'Build box', kind: planKind, phase: 'planned', forgotten_keys: [{ host: 'box.example.com', type: 'ssh-ed25519', fingerprint: 'SHA256:oldoldold<img src=x onerror=alert(1)>' }], steps: steps() });
         if (url === '/api/servers/provision/p1/run') {
             runBody = body;
             return json({ plan: 'p1', kind: planKind, phase: 'running', steps: steps({ connect: 'ok' }) }, 202);
@@ -195,6 +195,8 @@ function fresh() { const host = doc.createElement('div'); doc.body.append(host);
     const forget = calls.find(c => c.path.endsWith('/forget-key'));
     assert.equal(forget.method, 'POST');
     assert.equal(forget.body, null, 'nothing is sent with it: no host, no key');
+    assert.match(host.textContent, /now forgotten: ssh-ed25519 SHA256:oldoldold/, 'the forgotten key is shown, to set beside the new one');
+    assert.equal(host.querySelector('img'), null, 'a fingerprint from the hub became markup');
     assert.equal(btn(host, 'Set up'), undefined, 'nothing was trusted by forgetting');
     assert.equal(host.querySelector('[role="alert"]'), null);
     // a failure that is not a changed key has no such button

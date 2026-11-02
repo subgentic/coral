@@ -95,7 +95,8 @@ type provisionPlan struct {
 	created    time.Time
 	cancel     context.CancelFunc
 	failure    string
-	keyChanged bool // the failure was a host key that no longer matches: the owner may forget the saved one (#12056)
+	keyChanged bool           // the failure was a host key that no longer matches: the owner may forget the saved one (#12056)
+	forgotten  []provisionKey // the key the owner had Coral forget: shown beside the one the computer presents now, so the two can be compared
 }
 
 const (
@@ -135,6 +136,9 @@ func (p *provisionPlan) view() map[string]any {
 	}
 	if p.keyChanged && p.phase == phaseFailed {
 		v["key_changed"] = true
+	}
+	if len(p.forgotten) > 0 {
+		v["forgotten_keys"] = append([]provisionKey(nil), p.forgotten...)
 	}
 	return v
 }
@@ -844,6 +848,7 @@ func (pr *Provisioner) ForgetKey(w http.ResponseWriter, r *http.Request) {
 		errBadRequest(w, "the name this computer's key is kept under could not be worked out: remove its line from ssh_known_hosts in Coral's data folder")
 		return
 	}
+	saved, _ := sshprov.SavedHostKeys(r.Context(), pr.known(), name) // what is about to go, for the owner to compare with what the computer presents next
 	if err := sshprov.ForgetHostKey(r.Context(), pr.known(), name); err != nil {
 		slog.Info("[provision] could not forget a host key", "plan", p.ID, "error", err.Error())
 		errInternalServer(w, "could not remove the saved host key")
@@ -852,6 +857,10 @@ func (pr *Provisioner) ForgetKey(w http.ResponseWriter, r *http.Request) {
 	slog.Info("[provision] the owner forgot a host key", "plan", p.ID, "host", name) // the host is a name the owner typed or their own ssh config names, never a key
 	p.mu.Lock()
 	p.phase, p.keyChanged, p.failure, p.keys = phasePlanned, false, "", nil
+	p.forgotten = p.forgotten[:0]
+	for _, k := range saved {
+		p.forgotten = append(p.forgotten, provisionKey{Host: k.Host, Type: k.Type, Fingerprint: k.Fingerprint})
+	}
 	p.steps = planSteps()
 	p.mu.Unlock()
 	writeJSON(w, http.StatusOK, p.view())
