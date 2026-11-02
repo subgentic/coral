@@ -87,6 +87,12 @@ func (h *SystemHandler) untrustedLocation(ctx context.Context, p string) string 
 }
 
 // untrustedLocationOf is untrustedLocation for a caller with the config and the sessions store but no SystemHandler (a launch, restart or wake looking for a CLI in the common install places, #353).
+// The reasons a found CLI is not used, as a launch words them: the page reads them back (static/cli_refused_words.js), and tests/frontend/fixtures/cli_refusal_sentences.json holds one copy of each that both sides test against (#12364).
+const (
+	refusedInDataFolder = "in Coral's data folder"
+	refusedInTempFolder = "in a temporary folder"
+)
+
 func untrustedLocationOf(ctx context.Context, cfg *config.Config, ss *store.SessionStore, p string) string {
 	real := realOrSelf(p)
 	inside := func(dir string) bool {
@@ -97,11 +103,11 @@ func untrustedLocationOf(ctx context.Context, cfg *config.Config, ss *store.Sess
 		return within(d, real) || within(dir, p)
 	}
 	if cfg != nil && inside(cfg.CoralDir()) {
-		return "in Coral's data folder"
+		return refusedInDataFolder
 	}
 	for _, tmp := range cliTempDirs() {
 		if inside(tmp) {
-			return "in a temporary folder"
+			return refusedInTempFolder
 		}
 	}
 	if standardInstallPlace(p) {

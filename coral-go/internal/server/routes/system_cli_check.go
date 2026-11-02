@@ -147,10 +147,10 @@ func (h *SystemHandler) CLICheck(w http.ResponseWriter, r *http.Request) {
 				delete(result, "install_command") // installing it again would not fix this
 				delete(result, "install_url")
 				result["refused"] = refused.Refused
-				result["install_note"] = fmt.Sprintf("Found but not used: %s is %s, so a launch refuses it. Install it somewhere else, or set its path in Settings > CLI paths (the setting %s).", agent.TildePath(refused.RefusedPath), refused.Refused, agent.CLIPathSettingKey(agentType))
+				result["install_note"] = cliRefusedNote(agent.TildePath(refused.RefusedPath), refused.Refused, agent.CLIPathSettingKey(agentType))
 				if cloud.Tunneled(r) {
 					result["refused"] = "in a folder a launch refuses" // the reason names an agent and its folder: not through Coral Hub (Security's SHOULD)
-					result["install_note"] = fmt.Sprintf("Found but not used: it is in a folder a launch refuses (an agent's working folder, a temporary folder or Coral's data folder). Install it somewhere else, or set its path in Settings > CLI paths (the setting %s).", agent.CLIPathSettingKey(agentType))
+					result["install_note"] = cliRefusedNoteTunneled(agent.CLIPathSettingKey(agentType))
 				}
 			}
 			if dir, bad := agent.UntrustedMountDir(binaryPath); bad { // the CLI-paths row says why, before a launch (#340)
@@ -391,4 +391,14 @@ func configuredCLIRunnable(p, agentType string) error {
 		return err
 	}
 	return agent.CheckNotRealGemini(agentType, resolved) // the gemini type runs agy (#5901)
+}
+
+// cliRefusedNote is the note of a CLI that was found and not used: where it is, why a launch refuses it, and what to do. The page's launch dialog reads it back (static/cli_refused_words.js).
+func cliRefusedNote(tildePath, reason, settingKey string) string {
+	return fmt.Sprintf("Found but not used: %s is %s, so a launch refuses it. Install it somewhere else, or set its path in Settings > CLI paths (the setting %s).", tildePath, reason, settingKey)
+}
+
+// cliRefusedNoteTunneled is the same note through the Coral Hub, with no agent and no folder named (Security's SHOULD).
+func cliRefusedNoteTunneled(settingKey string) string {
+	return fmt.Sprintf("Found but not used: it is in a folder a launch refuses (an agent's working folder, a temporary folder or Coral's data folder). Install it somewhere else, or set its path in Settings > CLI paths (the setting %s).", settingKey)
 }

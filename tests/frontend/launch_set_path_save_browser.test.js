@@ -29,6 +29,7 @@ const { coralReady } = require('./helpers/wait');
             const tile = () => ev(`(() => ({ missing: !!document.querySelector('#launch-agent-pick .provider-missing [data-type="claude"]'), card: !!document.querySelector('#launch-agent-pick .provider-card[data-type="claude"]:not(.is-missing)') }))()`); // Claude is a card with a radio, or an entry under Not installed (#11235)
             const modelNote = () => ev(`(() => { const n = document.querySelector('#launch-step-agent .acf-model-note, #launch-step-agent [id$="model-note"]'); return n ? n.textContent.trim() : null; })()`);
             check(/not installed, or not where Settings/.test(await modelNote() || ''), `the Model line says the CLI is not found before the fix: ${JSON.stringify(await modelNote())}`);
+            await waitFor(`!!document.querySelector('#launch-agent-pick .provider-missing [data-type="claude"], #launch-agent-pick .provider-card[data-type="claude"]')`, `${w}: Claude is drawn in the agent list`, 10000); // the list is drawn when the CLI checks answer (and its module has loaded): read at once it was not there yet (#12364)
             const t0 = await tile();
             check(t0.missing && !t0.card, `Claude is under Not installed before the fix: ${JSON.stringify(t0)}`);
             await ev(`document.querySelector('#launch-step-agent [data-blocks-launch] .cli-set-path').click(); true`);

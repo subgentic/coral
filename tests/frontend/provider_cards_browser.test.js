@@ -1,7 +1,7 @@
 // The provider cards of New Agent's Agent step (#11235, the Operator's pick, Option B), at 1440 and 390 px (and 320), in the light and dark themes:
 //  - each installed provider is a radio card saying "Installed" ("Installed · default <model>" when a default model is saved); the open card, and only it, holds its Model (with its refresh) and Thinking;
 //  - Thinking offers only the levels that provider has, or says "<Provider> has no thinking levels, so there is nothing to set.";
-//  - a provider that is not installed is under "Not installed" with an Install link and no radio;
+//  - a provider that is not installed is under "Not installed or not used" with an Install link and no radio;
 //  - nothing says "optional" in the step; the focus ring is for the keyboard (:focus-visible), so a card chosen by the mouse shows only the open state;
 //  - the keyboard: the arrow keys move between the cards, Tab goes into the open card's controls;
 //  - a phone: the Thinking strip wraps inside the card (a select under 360 px), every target is 44 px, and Launch stays on the screen.
@@ -57,7 +57,7 @@ const { install: installNA, N, stubModels } = require('./helpers/new_agent');
             check(d.cards[0].hasModel && d.cards[0].hasRefresh && d.cards[0].hasThinking, `${tag}: the open card holds Model, its refresh and Thinking: ${JSON.stringify(d.cards[0])}`);
             check(JSON.stringify(d.cards[0].levels) === JSON.stringify(['Default', 'Low', 'Medium', 'High']), `${tag}: Claude's Thinking offers its levels: ${JSON.stringify(d.cards[0].levels)}`);
             check(d.cards.slice(1).every(c => !c.hasModel && !c.hasThinking), `${tag}: a closed card holds no Model or Thinking`);
-            check(d.heading === 'Not installed' && d.missing.length === 1 && d.missing[0].name === 'Antigravity' && !d.missing[0].radio && /^Install Antigravity$/.test(d.missing[0].link), `${tag}: Antigravity is under Not installed with an Install link and no radio: ${JSON.stringify([d.heading, d.missing])}`);
+            check(d.heading === 'Not installed or not used' && d.missing.length === 1 && d.missing[0].name === 'Antigravity' && !d.missing[0].radio && /^Install Antigravity$/.test(d.missing[0].link), `${tag}: Antigravity is under Not installed with an Install link and no radio: ${JSON.stringify([d.heading, d.missing])}`);
             check(d.optional === 0, `${tag}: nothing in the step says optional (${d.optional})`);
             // the muted text inside the open card holds 4.5:1 (it was 4.4 on a grey fill in the light theme)
             const lows = await ev(`(() => { const cv = document.createElement('canvas').getContext('2d'); const rgba = c => { cv.clearRect(0, 0, 1, 1); cv.fillStyle = '#000'; cv.fillStyle = c; cv.fillRect(0, 0, 1, 1); const d = cv.getImageData(0, 0, 1, 1).data; return [d[0], d[1], d[2], d[3] / 255]; };
@@ -127,8 +127,8 @@ const { install: installNA, N, stubModels } = require('./helpers/new_agent');
         await open(1440, 900, false, 'dark', [], false, undefined, ['agy']);
         d = await ev(READ);
         check(!d.cards.some(c => c.type === 'agy' || c.name === 'Antigravity'), `refused: Antigravity is not a radio card: ${JSON.stringify(d.cards.map(c => c.name))}`);
-        const refusedRow = await ev(`(() => { const r = [...document.querySelectorAll('#launch-agent-pick .provider-missing .provider-card')].find(c => /Antigravity/.test(c.textContent)); return r ? { status: (r.querySelector('.provider-status') || {}).textContent || '', why: (r.querySelector('.provider-refused') || {}).textContent || '', link: !!r.querySelector('a.provider-install'), radio: !!r.querySelector('input') } : null; })()`);
-        check(refusedRow && refusedRow.status === 'Found but not used' && /refuses it/.test(refusedRow.why) && /cli_path_agy/.test(refusedRow.why) && !refusedRow.link && !refusedRow.radio, `refused: the row says found but not used, with the reason and the setting, and no Install link: ${JSON.stringify(refusedRow)}`);
+        const refusedRow = await ev(`(() => { const r = [...document.querySelectorAll('#launch-agent-pick .provider-missing .provider-card')].find(c => /Antigravity/.test(c.textContent)); return r ? { chip: (r.querySelector('.provider-chip') || {}).textContent || '', line: (r.querySelector('.provider-why-line') || {}).textContent || '', steps: (r.querySelector('.provider-why') || {}).textContent || '', action: (r.querySelector('.provider-action button') || {}).textContent || '', link: !!r.querySelector('a.provider-install'), radio: !!r.querySelector('input') } : null; })()`);
+        check(refusedRow && refusedRow.chip === 'Not used' && /^Not used: .* is (inside .*'s working folder|in a folder a launch refuses)/.test(refusedRow.line) && /cli_path_agy|CLI paths/.test(refusedRow.steps) && refusedRow.action === 'Choose a path' && !refusedRow.link && !refusedRow.radio, `refused (#12364): a chip 'Not used', one short line, the steps behind Why?, a Choose a path action and no Install link: ${JSON.stringify(refusedRow)}`);
         // before a check answers, a provider says Checking…, never Installed
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev); await installNA(ev);
         await stubModels(ev);

@@ -33,13 +33,24 @@
 .provider-card-body .seg-group { display: none; }
 .provider-card-body select.seg-source { display: block; width: 100%; max-width: none; min-height: var(--control-touch-height, 44px); }
 .provider-card-body .acf-model-select { width: 100%; min-width: 0; }
-/* a missing agent is one quiet line under the panel: the word, its name, Install (no card) */
-.provider-missing { display: flex; flex-wrap: wrap; align-items: center; gap: 0 14px; margin: 8px 0 0; padding: 0 4px; color: var(--text-secondary); font-size: var(--fs-sm); }
-.provider-missing-title { margin: 0; font-size: inherit; font-weight: var(--fw-regular); color: inherit; text-transform: none; letter-spacing: 0; }
-.provider-missing-entry { display: inline-flex; flex-wrap: nowrap; gap: 8px; min-height: var(--control-touch-height, 44px); margin: 0; padding: 0; border: 0; background: none; }
-.provider-missing .provider-mark { display: none; }
-.provider-missing .provider-name { color: var(--text-primary); font-weight: var(--fw-medium); }
-.provider-missing .provider-install { margin-left: 0; min-height: var(--control-touch-height, 44px); } /* still a 44 px target */
+/* The agents this computer cannot use yet: one list, one row per CLI, three aligned columns (name, status chip, action) on a grid the rows share (subgrid); a phone puts the action under the name and chip (#12364) */
+.provider-missing { display: block; margin: 12px 0 0; padding: 0 4px; color: var(--text-secondary); font-size: var(--fs-sm); }
+.provider-missing-title { margin: 0 0 4px; font-size: inherit; font-weight: var(--fw-regular); color: inherit; text-transform: none; letter-spacing: 0; }
+.provider-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: max-content max-content minmax(0, 1fr); column-gap: 16px; }
+.provider-entry { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: center; margin: 0; padding: 4px 0; border: 0; border-top: 1px solid var(--border-light, var(--border)); background: none; border-radius: 0; min-width: 0; }
+.provider-entry:first-child { border-top: 0; }
+.provider-entry .provider-mark { display: none; }
+.provider-entry .provider-name { color: var(--text-primary); font-weight: var(--fw-medium); }
+.provider-chip { justify-self: start; white-space: nowrap; color: var(--text-secondary); }
+.provider-entry.is-refused .provider-chip { color: var(--warning, var(--text-primary)); border-color: currentColor; }
+.provider-action { justify-self: end; display: inline-flex; align-items: center; min-width: 0; }
+.provider-entry .provider-install { margin-left: 0; min-height: var(--control-touch-height, 44px); } /* still a 44 px target */
+.provider-entry .provider-choose { min-height: var(--control-touch-height, 44px); }
+.provider-why-line { grid-column: 1 / -1; margin: 0; overflow-wrap: anywhere; }
+.provider-why { grid-column: 1 / -1; margin: 0 0 4px; }
+.provider-why summary { cursor: pointer; color: var(--link-text); min-height: var(--control-touch-height, 44px); display: flex; align-items: center; }
+.provider-steps { margin: 4px 0 4px 20px; padding: 0; }
+@media (max-width: 520px) { .provider-list { grid-template-columns: minmax(0, 1fr) max-content; } .provider-action { grid-column: 1 / -1; justify-self: start; } }
 /* the phone's strip: a 44 px chevron button at its edge while there is more to the right; it only scrolls (the Inbox's strip does the same) */
 .provider-tabs-wrap { position: relative; }
 .provider-strip-edge { position: absolute; z-index: 2; right: 0; top: 0; width: var(--control-touch-height, 44px); min-width: var(--control-touch-height, 44px); height: var(--control-touch-height, 44px); padding: 0; background: linear-gradient(to right, transparent, var(--bg-secondary, var(--bg-primary)) 40%); border: 0; cursor: pointer; }

@@ -9,6 +9,7 @@ import { modelName } from './model_labels.js';
 import { copyText } from './utils.js';
 import { loadStyles } from './lazy_styles.js';
 import { el } from './dom_el.js';
+const { buildMissingList } = await importOnce('./cli_missing_list.js'); // the list of agents this computer cannot use yet (#12364)
 
 await loadStyles('provider_cards.css'); // the cards' rules are not in the start's stylesheet: they arrive before the first card is drawn (#11403)
 const { _getDefaultModels } = await importOnce('./launch_models.js');
@@ -165,20 +166,14 @@ export async function buildProviderCards({ group, form, server, implicitDefault 
         const more = () => { edge.hidden = !(strip.scrollLeft + strip.clientWidth < strip.scrollWidth - 2); };
         strip.addEventListener('scroll', more, { passive: true }); new ResizeObserver(more).observe(strip);
         wrap.append(strip, edge); group.append(wrap, panel); more();
-        if (missing.length) {
-            const sec = el('div', 'provider-missing'); sec.setAttribute('role', 'group');
-            const h = el('h5', 'group-head provider-missing-title', 'Not installed'); h.id = `${group.id}-missing`; sec.setAttribute('aria-labelledby', h.id);
-            sec.append(h);
-            for (const [type, label] of missing) {
-                const row = el('div', 'provider-card provider-missing-entry is-missing'); row.dataset.type = type;
-                const mark = el('span', 'provider-mark', MARKS[type] || label[0]); mark.setAttribute('aria-hidden', 'true');
-                const info = CLI_INSTALL_INSTRUCTIONS[type] || {};
-                const refused = state.get(type).refused;
-                if (refused) { const why = el('span', 'provider-status', 'Found but not used'); row.append(mark, el('span', 'provider-name', label), why, el('span', 'sv-hint provider-refused', refused)); sec.append(row); cards.set(type, row); continue; } // installed where a launch refuses it: the words, not an Install link
-                const a = el('a', 'provider-install', `Install ${label}`); a.href = state.get(type).url || info.url || '#'; a.target = '_blank'; a.rel = 'noopener noreferrer';
-                row.append(mark, el('span', 'provider-name', label), a);
-                sec.append(row); cards.set(type, row);
-            }
+        if (missing.length) { // the agents this computer cannot use yet: one list, aligned columns (#12364)
+            const chooseHandler = async type => { // Settings > Agents with the CLI paths open and that CLI's field in it, as the launch dialog's Set path does
+                await window.showSettingsModal?.('agents');
+                const paths = document.getElementById('settings-cli-paths'); if (paths) paths.open = true;
+                const input = document.getElementById(`settings-cli-path-${({ agy: 'agy', antigravity: 'agy', gemini: 'agy' })[type] || type}`); if (input) { input.scrollIntoView({ block: 'center' }); input.focus(); }
+            };
+            const sec = buildMissingList({ idPrefix: group.id, rows: missing.map(([type, label]) => ({ type, label, mark: MARKS[type] || label[0], refused: state.get(type).refused, url: state.get(type).url || (CLI_INSTALL_INSTRUCTIONS[type] || {}).url || '' })), onChoosePath: chooseHandler });
+            for (const li of sec.querySelectorAll('li[data-type]')) cards.set(li.dataset.type, li);
             group.append(sec);
         }
         for (const [type] of TYPES) { // an agent this computer's OS does not offer is no card and no option: one line says why

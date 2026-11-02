@@ -1,0 +1,71 @@
+{
+ "_why": "One copy of the sentences the server answers for a CLI found and not used (system_cli_check.go cliRefusedNote and cliRefusedNoteTunneled, system_bounds.go's reasons and workingFolderReason) and of what the page reads out of each (static/cli_refused_words.js refusedWords, and the line cli_missing_list.js draws). The Go test builds each 'go' entry and must get 'note' exactly; the page test must get 'expect' and 'line'. A wording change on either side fails one of them (#12364).",
+ "cases": [
+  {
+   "name": "an agent's working folder",
+   "go": "agent",
+   "path": "~/.local/bin/agy",
+   "agent": "Security Reviewer",
+   "note": "Found but not used: ~/.local/bin/agy is in an agent's working folder: the agent \"Security Reviewer\" works in ~. Archive that agent (an asleep one counts too) or restart it in a project folder, then check again, so a launch refuses it. Install it somewhere else, or set its path in Settings > CLI paths (the setting cli_path_agy).",
+   "expect": {
+    "path": "~/.local/bin/agy",
+    "kind": "agent",
+    "agent": "Security Reviewer",
+    "folder": "~"
+   },
+   "line": "Not used: ~/.local/bin/agy is inside Security Reviewer's working folder (~)."
+  },
+  {
+   "name": "a temporary folder",
+   "go": "temp",
+   "path": "/tmp/x/agy",
+   "note": "Found but not used: /tmp/x/agy is in a temporary folder, so a launch refuses it. Install it somewhere else, or set its path in Settings > CLI paths (the setting cli_path_agy).",
+   "expect": {
+    "path": "/tmp/x/agy",
+    "kind": "temp",
+    "agent": "",
+    "folder": ""
+   },
+   "line": "Not used: /tmp/x/agy is in a temporary folder."
+  },
+  {
+   "name": "Coral's data folder",
+   "go": "data",
+   "path": "~/.coral/bin/agy",
+   "note": "Found but not used: ~/.coral/bin/agy is in Coral's data folder, so a launch refuses it. Install it somewhere else, or set its path in Settings > CLI paths (the setting cli_path_agy).",
+   "expect": {
+    "path": "~/.coral/bin/agy",
+    "kind": "data",
+    "agent": "",
+    "folder": ""
+   },
+   "line": "Not used: ~/.coral/bin/agy is in Coral's data folder."
+  },
+  {
+   "name": "through the Coral Hub (nothing named)",
+   "go": "tunneled",
+   "path": "",
+   "note": "Found but not used: it is in a folder a launch refuses (an agent's working folder, a temporary folder or Coral's data folder). Install it somewhere else, or set its path in Settings > CLI paths (the setting cli_path_agy).",
+   "expect": {
+    "path": "",
+    "kind": "other",
+    "agent": "",
+    "folder": ""
+   },
+   "line": "Not used: It is in a folder a launch refuses."
+  },
+  {
+   "name": "an unknown wording (page only)",
+   "go": "",
+   "path": "",
+   "note": "Found but not used: something no version has said before.",
+   "expect": {
+    "path": "",
+    "kind": "other",
+    "agent": "",
+    "folder": ""
+   },
+   "line": "Not used: It is in a folder a launch refuses."
+  }
+ ]
+}
