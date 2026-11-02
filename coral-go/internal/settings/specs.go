@@ -171,6 +171,7 @@ func init() {
 	register(Spec{Key: "chief_avatar_letter", Kind: KindText, MaxLen: 8, Apply: ApplyLive, Doc: "The one letter on Chief's avatar; empty is the first letter of its name."})
 	register(Spec{Key: "chief_fronts", Kind: KindText, MaxLen: 80, Apply: ApplyLive, Doc: "The team Chief fronts, as the Operator names it."})
 	register(Spec{Key: ChiefActions, Kind: KindEnum, Values: []string{ChiefAsksFirst, ChiefActs}, Default: ChiefAsksFirst, Apply: ApplyLive, Doc: "What Chief may do without asking: ask_first (Default permission mode, the default) or act (Accept edits; a shell command still asks). Applies when Chief restarts."})
+	register(whole(GoalDoneQuietMinutes, "15", 0, 1440, ReadClamp, ApplyLive, "Minutes a goal whose tasks are all done waits after its latest task is completed before it is a 'Goal looks done' item of Needs you: time for its driver to add the next tasks; 0 is none."))
 	register(Spec{Key: GoalDoneRead, Kind: KindText, Apply: ApplyLive, MaxLen: 16384, Doc: "The goals the Operator has opened in Needs you (listed, not counted): a JSON list of team|goal|tasks|updated_at entries, the all-done total and the goal's last change each was opened at."})
 	register(Spec{Key: GoalDoneHidden, Kind: KindText, Apply: ApplyLive, MaxLen: 8192, Doc: "The goals hidden from Needs you with Not yet or Ignore: a JSON list of team|goal|tasks (or team|goal|*) entries."})
 	boolOff("home_editions_hidden", ApplyClient, "Hide the editions card on Home.")

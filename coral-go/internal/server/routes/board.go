@@ -29,8 +29,11 @@ func taskClaimNudge(taskID int64) string {
 
 // BoardHandler handles message board HTTP endpoints.
 type BoardHandler struct {
-	proposalNow func() time.Time // a test's clock for the proposal sweeps (expiry and stuck claims); nil is time.Now
-	selfTaskMu  sync.Mutex       // makes the one-per-title check and the creation of a self task one step (#11247)
+	goalDoneNow func() time.Time // the clock of the "Goal looks done" quiet period (#12161); nil is time.Now
+	// goalDoneQuiet reads the quiet period (goal_done_quiet_minutes, #12161); nil: 15 minutes.
+	goalDoneQuietFn func(ctx context.Context) time.Duration
+	proposalNow     func() time.Time // a test's clock for the proposal sweeps (expiry and stuck claims); nil is time.Now
+	selfTaskMu      sync.Mutex       // makes the one-per-title check and the creation of a self task one step (#11247)
 	// goalReqWake is when each target board had its Orchestrators last woken for a goal request (#7361): one wake per few minutes, with the count, so a loop cannot make a paid turn per request.
 	goalReqWake sync.Map
 	// goalLinks limits the Hub service's reads of GET /api/goal-links per asker (#7411).

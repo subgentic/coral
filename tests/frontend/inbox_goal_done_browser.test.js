@@ -35,13 +35,20 @@ const B = 'goal-done-' + Date.now().toString(36);
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         assert.ok((await api('POST', '/subscribe', { subscriber_id: 'Boss', job_title: 'Orchestrator', session_name: 'boss-' + B })).status < 300);
-        await root('PUT', '/api/settings', { goal_done_hidden: '[]' });
+        await root('PUT', '/api/settings', { goal_done_hidden: '[]', goal_done_quiet_minutes: '' }); // the default quiet period (15 minutes, #12161) first
         const mk = async (title, doneWhen) => { const g = await api('POST', '/goals', { subscriber_id: 'Operator', title, done_when: doneWhen }); assert.equal(g.status, 201); return g.json.id || g.json.goal.id; };
         const gid = await mk('Ship the pilot', 'it is shipped');
         await task(gid, true);
         const openGoal = await mk('Still going', 'later'); await task(openGoal, true); await task(openGoal, false);
         await mk('No tasks yet', '');
 
+        // #12161 (the Operator): its tasks are all done, but the last one was finished moments ago: the driver has 15 minutes to add the next tasks, so it is not the Operator's item yet: not in the list, and not in
+        // /api/needs-you (the count and the phone push). A suite does not wait 15 minutes: the setting goal_done_quiet_minutes says 0, and the goal is there at once.
+        await openNeeds();
+        await require('./helpers/wait').settle(ev, 600, 300);
+        assert.equal((await doneRows()).length, 0, 'inside its quiet period the goal is not an item of Needs you');
+        assert.ok(!(await root('GET', '/api/needs-you?limit=50')).json.items.some(i => i.id === `goal_done:${B}:${gid}`), 'nor in /api/needs-you');
+        await root('PUT', '/api/settings', { goal_done_quiet_minutes: '0' });
         await openNeeds();
         await waitFor(`/looks done/.test(document.querySelector('${T}')?.textContent || '')`, 'the goal item', 20000);
         let rows = await doneRows();
@@ -107,7 +114,7 @@ const B = 'goal-done-' + Date.now().toString(36);
         // #12029 (the Mobile Beta Tester): on a phone the row has its title; a long press selects it, and the bar offers Mark read / Mark unread and Ignore (a phone's Needs you row has no buttons: tap opens, long press selects)
         {
             const gid2 = await mk('Customers sign up without help', 'Ten customers sign up with no support message'); await task(gid2, true);
-            await root('PUT', '/api/settings', { goal_done_hidden: '[]', goal_done_read: '[]' });
+            await root('PUT', '/api/settings', { goal_done_hidden: '[]', goal_done_read: '[]', goal_done_quiet_minutes: '0' });
             await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
             await Emulation.setTouchEmulationEnabled({ enabled: true });
             await openNeeds();

@@ -25,6 +25,7 @@ func TestNeedsYouHasOneItemForAGoalWhoseTasksAreAllDone(t *testing.T) {
 	require.NoError(t, err0)
 	hidden := []string{}
 	h.SetGoalDoneHidden(func(context.Context) []string { return hidden })
+	h.goalDoneNow = quietPassed // the 15 quiet minutes after the last task are over (#12161)
 	goal := func(title string, in board.GoalInput) *board.Goal {
 		in.Title, in.CreatedBy = title, "Lead"
 		g, err := bs.CreateGoal(ctx, "team", in)
@@ -106,6 +107,7 @@ func TestAGoalDoneItemTheOperatorOpenedIsNotCounted(t *testing.T) {
 	require.NoError(t, err0)
 	var readList, hidden []string
 	h.SetGoalDoneHidden(func(context.Context) []string { return hidden })
+	h.goalDoneNow = quietPassed
 	h.SetGoalDoneRead(func(context.Context) []string { return readList })
 	g, err := bs.CreateGoal(ctx, "team", board.GoalInput{Title: "Ship the export", CreatedBy: "Lead"})
 	require.NoError(t, err)
@@ -210,6 +212,7 @@ func TestAReadGoalDoneItemCountsAgainWhileItsThreadHasNews(t *testing.T) {
 	readList := []string{fmt.Sprintf("team|%d|%d|%s", cur.ID, cur.Rollup.Total, cur.UpdatedAt)}
 	news := map[string]int{}
 	h.SetGoalDoneRead(func(context.Context) []string { return readList })
+	h.goalDoneNow = quietPassed
 	h.SetCommentNews(func(context.Context) (map[string]int, error) { return news, nil })
 	items := func() []map[string]any {
 		req := asPerson(httptest.NewRequest(http.MethodGet, "/api/needs-you", nil))
@@ -233,4 +236,74 @@ func TestAReadGoalDoneItemCountsAgainWhileItsThreadHasNews(t *testing.T) {
 	assert.Equal(t, fmt.Sprintf("goal_done:team:%d", g.ID), got[0]["id"], "the same row")
 	delete(news, goalSubject("team", g.ID)) // the Operator opened the thread
 	assert.Empty(t, items(), "read once more")
+}
+
+// quietPassed is the clock of a test that does not care about the quiet period: well after any task it made.
+func quietPassed() time.Time { return time.Now().Add(time.Hour) }
+
+// #12161 (the Operator: "perhaps just a 15 minute period after the most recent task is completed, before sending it to my inbox"): a goal whose tasks are all done is a "Goal looks done" item of Needs you only once
+// the latest task completion is at least 15 minutes old: a goal whose exploration is done but whose next tasks are not filed yet is not put in front of the Operator at once. A task added in the window cancels it
+// (the goal has an open task), and finishing that one starts the quiet period again from its completion.
+func TestAGoalLooksDoneToTheOperatorOnlyAfterFifteenQuietMinutes(t *testing.T) {
+	h, bs := operatorAsksRig(t)
+	ctx := context.Background()
+	_, err0 := bs.PostMessage(ctx, "team", "Lead", "hello", nil)
+	require.NoError(t, err0)
+	g, err := bs.CreateGoal(ctx, "team", board.GoalInput{Title: "Explore the options", CreatedBy: "Lead"})
+	require.NoError(t, err)
+	finish := func() {
+		tk, err := bs.CreateTaskWithOpts(ctx, "team", "t", "", "medium", "Lead", &board.CreateTaskOpts{GoalID: &g.ID})
+		require.NoError(t, err)
+		_, err = bs.ClaimTask(ctx, "team", "Dev", tk.ID)
+		require.NoError(t, err)
+		_, err = bs.CompleteTask(ctx, "team", tk.ID, "Dev", nil)
+		require.NoError(t, err)
+	}
+	later := func(d time.Duration) { h.goalDoneNow = func() time.Time { return time.Now().Add(d) } }
+	count := func() int {
+		code, out := readNeedsYou(t, h, "", asPerson)
+		require.Equal(t, http.StatusOK, code, out)
+		n := 0
+		for _, it := range needsYouItems(out) {
+			if it["kind"] == "goal_done" {
+				n++
+			}
+		}
+		assert.EqualValues(t, n, out["counts"].(map[string]any)["goal_done"], "counted once each")
+		return n
+	}
+
+	finish() // every task done, now
+	later(0)
+	assert.Zero(t, count(), "just finished: the driver has the first minutes")
+	later(14 * time.Minute)
+	assert.Zero(t, count(), "14 minutes after the last task: still not the Operator's")
+	later(16 * time.Minute)
+	assert.Equal(t, 1, count(), "16 minutes after the last task: the item")
+
+	// a task added in the window cancels it; finishing it starts the quiet period again from its completion
+	tk, err := bs.CreateTaskWithOpts(ctx, "team", "next", "", "medium", "Lead", &board.CreateTaskOpts{GoalID: &g.ID})
+	require.NoError(t, err)
+	later(16 * time.Minute)
+	assert.Zero(t, count(), "a task was added: the goal has an open task")
+	_, err = bs.ClaimTask(ctx, "team", "Dev", tk.ID)
+	require.NoError(t, err)
+	_, err = bs.CompleteTask(ctx, "team", tk.ID, "Dev", nil)
+	require.NoError(t, err)
+	later(14 * time.Minute)
+	assert.Zero(t, count(), "its completion starts the 15 minutes again")
+	later(16 * time.Minute)
+	assert.Equal(t, 1, count())
+
+	// the period is the Operator's setting (goal_done_quiet_minutes): none, or longer
+	h.SetGoalDoneQuiet(func(context.Context) time.Duration { return 0 })
+	later(0)
+	assert.Equal(t, 1, count(), "0 minutes: at once")
+	h.SetGoalDoneQuiet(func(context.Context) time.Duration { return 30 * time.Minute })
+	later(20 * time.Minute)
+	assert.Zero(t, count(), "30 minutes: not yet at 20")
+	later(31 * time.Minute)
+	assert.Equal(t, 1, count())
+	assert.Equal(t, 30*time.Minute, GoalDoneQuietFrom(map[string]string{"goal_done_quiet_minutes": "30"}))
+	assert.Equal(t, 15*time.Minute, GoalDoneQuietFrom(map[string]string{}), "unset: 15")
 }

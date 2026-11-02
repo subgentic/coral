@@ -5,6 +5,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/subgentic/coral/internal/proxy"
 	"github.com/subgentic/coral/internal/ptymanager"
@@ -58,6 +59,13 @@ func (s *Server) configureBoardHandlers(h *routeHandlers) (*routes.BoardHandler,
 			return nil
 		}
 		return routes.GoalDoneHiddenFrom(st)
+	})
+	boardHandler.SetGoalDoneQuiet(func(ctx context.Context) time.Duration {
+		st, err := sessStore.GetSettings(ctx)
+		if err != nil {
+			return 15 * time.Minute
+		}
+		return routes.GoalDoneQuietFrom(st)
 	})
 	boardHandler.SetGoalDoneRead(func(ctx context.Context) []string {
 		st, err := sessStore.GetSettings(ctx)

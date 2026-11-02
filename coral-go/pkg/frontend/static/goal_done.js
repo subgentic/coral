@@ -24,10 +24,33 @@ export function hiddenList(settings = state.settings) {
     try { const v = JSON.parse(String((settings || {})[SETTING] || '[]')); return Array.isArray(v) ? v.filter(x => typeof x === 'string').slice(-MAX) : []; } catch { return []; }
 }
 
-/** The goals that look done and are not hidden. teamOf(g) is the team's own id on this computer, or '' for a goal that is not on it. */
-export function doneGoals(goals, teamOf, settings = state.settings) {
+/** How long a goal whose tasks are all done waits after its latest task completion before it is the Operator's item (#12161): goal_done_quiet_minutes, 15 by default, as the server reads it. */
+export function quietMs(settings = state.settings) {
+    const raw = String((settings || {}).goal_done_quiet_minutes ?? '').trim(), n = Number(raw);
+    return raw !== '' && Number.isInteger(n) && n >= 0 && n <= 1440 ? n * 60000 : 15 * 60000;
+}
+/** When the quiet period of a goal that looks done is over, in ms since the epoch: its latest task completion (looks_done_at, #12081) plus the period; 0 when the server sent no completion time (an older one: not held back). */
+export function quietEndsAt(g, settings = state.settings) {
+    const t = Date.parse(g && g.looks_done_at);
+    return Number.isFinite(t) ? t + quietMs(settings) : 0;
+}
+
+/** The goals that look done and are not hidden, once their quiet period is over. teamOf(g) is the team's own id on this computer, or '' for a goal that is not on it. */
+export function doneGoals(goals, teamOf, settings = state.settings, now = Date.now()) {
     const hidden = new Set(hiddenList(settings));
-    return (goals || []).filter(g => { const team = teamOf(g); return team && readyToClose(g) && !hidden.has(keyOf(team, g)) && !hidden.has(starOf(team, g)); });
+    return (goals || []).filter(g => { const team = teamOf(g); return team && readyToClose(g) && now >= quietEndsAt(g, settings) && !hidden.has(keyOf(team, g)) && !hidden.has(starOf(team, g)); });
+}
+
+/** Milliseconds until the next goal that is all done and not hidden leaves its quiet period (so the page draws it then), or null when none is waiting. */
+export function nextQuietEnd(goals, teamOf, settings = state.settings, now = Date.now()) {
+    const hidden = new Set(hiddenList(settings));
+    let next = null;
+    for (const g of goals || []) {
+        const team = teamOf(g), end = quietEndsAt(g, settings);
+        if (!team || !readyToClose(g) || end <= now || hidden.has(keyOf(team, g)) || hidden.has(starOf(team, g))) continue;
+        next = next === null ? end - now : Math.min(next, end - now);
+    }
+    return next;
 }
 
 async function save(list, setting = SETTING) {

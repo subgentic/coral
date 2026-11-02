@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"strconv"
+	"time"
 
 	"github.com/subgentic/coral/internal/board"
 	setreg "github.com/subgentic/coral/internal/settings"
@@ -45,6 +46,22 @@ func goalDoneListFrom(st map[string]string, key string) []string {
 	return list
 }
 
+// goalDoneQuiet is how long a goal whose tasks are all done waits before it is the Operator's "Goal looks done" item (#12161): the Operator's "perhaps just a 15 minute period after the most recent task is completed,
+// before sending it to my inbox". A goal whose exploration is done but whose next tasks are not filed yet is the driver's for those minutes; a task added in them cancels the item.
+const goalDoneQuiet = 15 * time.Minute
+
+// goalDoneQuietOver says the goal's latest task completion (looks_done_at, board.Goal.LooksDoneAt) is at least goalDoneQuiet old at now. A goal with no completion time (a read that has none) is not held back.
+func goalDoneQuietOver(g board.Goal, now time.Time, quiet time.Duration) bool {
+	if g.LooksDoneAt == nil || *g.LooksDoneAt == "" {
+		return true
+	}
+	at, err := time.Parse(time.RFC3339Nano, *g.LooksDoneAt)
+	if err != nil {
+		return true
+	}
+	return now.Sub(at) >= quiet
+}
+
 // goalDoneKey is the entry Not yet writes for a goal at its all-done total.
 func goalDoneKey(team string, id int64, total int) string {
 	return team + "|" + strconv.FormatInt(id, 10) + "|" + strconv.Itoa(total)
@@ -59,6 +76,7 @@ func goalDoneReadKey(team string, id int64, total int, updatedAt string) string 
 // goalDoneItems is the board's active goals whose tasks are all done (at least one task, none open, the state exactly active: the rule the goal screen's all-done box used), as items of Needs you, less the
 // ones the Operator hid. One item per goal; a goal that closes, gets a task, or is blocked is no longer one.
 func (h *BoardHandler) goalDoneItems(ctx context.Context, project string, hidden, read map[string]bool, news map[string]int) ([]NeedsYouItem, error) {
+	quiet := h.goalDoneQuietFor(ctx)
 	var items []NeedsYouItem
 	cursor := ""
 	for {
@@ -68,7 +86,7 @@ func (h *BoardHandler) goalDoneItems(ctx context.Context, project string, hidden
 		}
 		for _, g := range page.Goals {
 			r := g.Rollup
-			if g.State != board.GoalActive || r.Total == 0 || r.Done != r.Total {
+			if g.State != board.GoalActive || r.Total == 0 || r.Done != r.Total || !goalDoneQuietOver(g, h.goalDoneClock()(), quiet) {
 				continue
 			}
 			if hidden[goalDoneKey(project, g.ID, r.Total)] || hidden[project+"|"+strconv.FormatInt(g.ID, 10)+"|*"] {
@@ -84,6 +102,31 @@ func (h *BoardHandler) goalDoneItems(ctx context.Context, project string, hidden
 		}
 		cursor = page.NextCursor
 	}
+}
+
+// SetGoalDoneQuiet tells the board where to read the quiet period (setting goal_done_quiet_minutes, #12161). nil: goalDoneQuiet (15 minutes).
+func (h *BoardHandler) SetGoalDoneQuiet(fn func(ctx context.Context) time.Duration) {
+	h.goalDoneQuietFn = fn
+}
+
+// GoalDoneQuietFrom reads the period out of the saved settings: minutes, 0 to 1440, 15 when unset or unreadable.
+func GoalDoneQuietFrom(st map[string]string) time.Duration {
+	return time.Duration(setreg.Int(st, setreg.GoalDoneQuietMinutes)) * time.Minute
+}
+
+func (h *BoardHandler) goalDoneQuietFor(ctx context.Context) time.Duration {
+	if h.goalDoneQuietFn != nil {
+		return h.goalDoneQuietFn(ctx)
+	}
+	return goalDoneQuiet
+}
+
+// goalDoneClock is the handler's clock for the quiet period.
+func (h *BoardHandler) goalDoneClock() func() time.Time {
+	if h.goalDoneNow != nil {
+		return h.goalDoneNow
+	}
+	return time.Now
 }
 
 // goalDoneHiddenSet is the saved list as a set, read on every request.

@@ -3,7 +3,7 @@ import { keepMenuOnScreen } from './menu_fit.js';
 import { needsYou, askedRow } from './asked_before_restart.js';
 import { unrecordedItem, recordAllAgents } from './waiting.js';
 import { welcomeRows, runWelcome, dismissWelcome, hideAllWelcome } from './welcome_items.js';
-import { doneGoals, hideGoalDone, setGoalDoneCount, isGoalDoneRead, markGoalDoneRead, markGoalDoneUnread, SETTING as GOAL_DONE_SETTING } from './goal_done.js';
+import { doneGoals, nextQuietEnd, quietEndsAt, hideGoalDone, setGoalDoneCount, isGoalDoneRead, markGoalDoneRead, markGoalDoneUnread, SETTING as GOAL_DONE_SETTING } from './goal_done.js';
 /* The dashboard's own Inbox on the shared sidebar (#7472), loaded the first time the Inbox tab is shown (inbox_tab.js keeps the badge and the counts, which are always there).
  *
  * Three groups, the hub's /inbox order: Needs you (the agents waiting for input, from the live list the dashboard already holds), Tasks (the open tasks assigned to the Operator) and Saved (the
@@ -144,7 +144,7 @@ const runRows = () => failedUnread().map(r => ({ autorun: r, session_id: `automa
 const proposalRows = () => proposalItems().map(p => ({ proposal: p, session_id: p.rowKey, display_name: markedText(p.proposer), board_project: splitKey(p.board_id).name, board_label: markedText(p.board_label || ''), server: LOCAL_SERVER, waiting_kind: 'proposal', waiting_summary: proposalSummary(p), waiting_since: p.created_at }));
 /** An active goal whose tasks are all done (#11825): ONE row of Needs you, "Goal #N looks done: <title>" with its Done-when line; Close goal, Not yet and Ignore. This computer's goals only. */
 const goalTeamHere = g => { const k = splitKey(g.board_id); return k.server === LOCAL_SERVER ? k.name : ''; };
-const goalDoneRows = () => doneGoals(goals, goalTeamHere).map(g => ({ goalDone: g, session_id: `goal_done:${goalTeamHere(g)}:${g.id}`, display_name: `Goal #${g.id}`, board_project: goalTeamHere(g), server: LOCAL_SERVER, waiting_kind: 'goal_done', waiting_summary: (g.done_when || g.doneWhen) ? `Done when: ${markedText(g.done_when || g.doneWhen)}` : 'Every task is done.', waiting_since: g.looks_done_at || g.updated_at })); // since its last task was completed (#12081), not since the goal was made or edited
+const goalDoneRows = () => doneGoals(goals, goalTeamHere).map(g => ({ goalDone: g, session_id: `goal_done:${goalTeamHere(g)}:${g.id}`, display_name: `Goal #${g.id}`, board_project: goalTeamHere(g), server: LOCAL_SERVER, waiting_kind: 'goal_done', waiting_summary: (g.done_when || g.doneWhen) ? `Done when: ${markedText(g.done_when || g.doneWhen)}` : 'Every task is done.', waiting_since: quietEndsAt(g) ? new Date(quietEndsAt(g)).toISOString() : (g.looks_done_at || g.updated_at) })); // since the row appeared: its last task's completion (#12081) plus the quiet period (#12161), not since the goal was made or edited
 const goalDoneLine = g => `Goal #${g.id} looks done: ${markedText(g.title)}`;
 /** A question an agent asked the Operator (post --ask, wait --operator, #11417): a row of Needs you, opened whole in a dialog with a Reply box. */
 const askRows = () => operatorAsks().map(a => ({ operatorAsk: a, session_id: askKey(a), display_name: a.asker, board_project: a.board, server: '', waiting_kind: 'ask', waiting_summary: askLine(a), waiting_since: a.at }));
@@ -366,7 +366,13 @@ function runActions(run) {
 }
 
 /** The tab's badge counts the goal items too: told after every read of the goals and of what was hidden (#11825). */
-function syncGoalDoneCount() { setGoalDoneCount(goalDoneRows().filter(needsUnread).length); updateInboxTab(); }
+let quietTimer = 0;
+function syncGoalDoneCount() {
+    setGoalDoneCount(goalDoneRows().filter(needsUnread).length); updateInboxTab();
+    clearTimeout(quietTimer); // a goal still in its quiet period (#12161) is drawn when the period ends, with no refresh needed
+    const due = nextQuietEnd(goals, goalTeamHere);
+    if (due !== null) quietTimer = setTimeout(() => { syncGoalDoneCount(); renderInboxNav(true); }, Math.min(due, 2 ** 31 - 1) + 250);
+}
 /** The goal's page, from its item; with close the Close dialog is opened on it, set to Done, once the page is up (#11825). */
 let closeAfterOpen = null;
 function openGoalDone(g, close = false) {

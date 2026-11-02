@@ -33,6 +33,7 @@ func TestAGoalWithNewCommentsSaysSoToTheOperatorAlone(t *testing.T) {
 	_, err = bs.CompleteTask(ctx, "team", tk.ID, "Dev", nil)
 	require.NoError(t, err)
 	news := map[string]int{}
+	h.goalDoneNow = quietPassed
 	h.SetCommentNews(func(context.Context) (map[string]int, error) { return news, nil })
 
 	person := chi.NewRouter()
