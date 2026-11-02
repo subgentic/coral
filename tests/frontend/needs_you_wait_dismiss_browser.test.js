@@ -1,6 +1,7 @@
 // #11946 (the Operator's bug): an agent's Needs you row stayed after its questions were answered and offered no way to dismiss it. Every waiting-agent row has a Dismiss now: a permission, question or plan on an awake
-// agent clears Coral's record of the wait (the server, as before); any other request (an input prompt, a sign-in) and an agent's request from before it went to sleep is hidden on this page for that request
-// only (the agent's next request comes back), and nothing is sent to the agent. Hidden rows leave the list and the count. 1280 px, isolated dev server; the agents are rows of the page's live list.
+// agent clears Coral's record of the wait; any other request (an input prompt, a sign-in) is hidden by the machine for that request only (the row says wait_ignored, so the page, the tab and the phone push agree;
+// the agent's next request comes back); an agent's request from before it went to sleep is hidden in this browser; nothing is sent to the agent either way. Hidden rows leave the list and the count. 1280 px,
+// isolated dev server; the agents are rows of the page's live list and the machine's answers are stubbed (its rules are pinned in dismiss_wait_test.go).
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
@@ -13,7 +14,8 @@ const BASE = require('./test_base').BASE;
         await Page.navigate({ url: BASE }); await Page.loadEventFired(); await install();
         await ev(`localStorage.removeItem('coral-asked-dismissed'); localStorage.removeItem('coral-waits-ignored'); localStorage.removeItem('coral-inbox-needs-filters'); window.__posts = [];
             const real = window.fetch; window.fetch = (u, o = {}) => { const url = String(u), m = (o.method || 'GET').toUpperCase();
-                if (m === 'POST' && /\\/dismiss-wait$/.test(url)) { window.__posts.push({ url, body: JSON.parse(o.body) }); return Promise.resolve(new Response(JSON.stringify({ ok: true, dismissed: true }), { headers: { 'content-type': 'application/json' } })); }
+                if (m === 'POST' && /\\/dismiss-wait$/.test(url)) { const body = JSON.parse(o.body); window.__posts.push({ url, body }); const row = window.T.state.liveSessions.find(s => s.session_id === body.session_id), hide = row && row.waiting_kind !== 'permission'; if (hide) row.wait_ignored = true; return Promise.resolve(new Response(JSON.stringify(hide ? { ok: true, dismissed: true, hidden: true } : { ok: true, dismissed: true }), { headers: { 'content-type': 'application/json' } })); }
+                if (m === 'GET' && /\\/api\\/sessions\\/live$/.test(url)) return Promise.resolve(new Response(JSON.stringify(window.T.state.liveSessions), { headers: { 'content-type': 'application/json' } })); // the list the page reads again after a Dismiss: the rows it has, with what the machine says
                 return real(u, o); }; true`);
         const SINCE = '2026-11-02T01:00:00Z';
         await ev(`(() => {
@@ -40,9 +42,9 @@ const BASE = require('./test_base').BASE;
         assert.equal(await waiting(), 3, 'and out of the count');
         await ev(`window.T.render.renderLiveSessions(window.T.state.liveSessions); true`);
         assert.equal(await waiting(), 3, 'it stays hidden when the list is drawn again');
-        assert.deepEqual(await ev(`window.__posts`), [], 'nothing was sent to the machine for a request it cannot clear');
+        assert.deepEqual(await ev(`window.__posts.map(p => p.body)`), [{ session_id: 'inputter-id', agent_type: 'claude' }], 'the machine was asked to hide it (ids only), nothing else');
         // the agent asks something new: that request is its own
-        await ev(`Object.assign(window.T.state.liveSessions.find(s => s.session_id === 'inputter-id'), { waiting_since: '2026-11-02T02:00:00Z', waiting_summary: 'Needs input: and the size?' }); true`);
+        await ev(`Object.assign(window.T.state.liveSessions.find(s => s.session_id === 'inputter-id'), { waiting_since: '2026-11-02T02:00:00Z', waiting_summary: 'Needs input: and the size?', wait_ignored: false }); true`); // the machine names the request: a new one is not the hidden one
         assert.equal(await waiting(), 4, 'a later request of the same agent is not hidden by it');
         // a sign-in, and a request asked before the agent went to sleep
         await ev(`(${rowOf('Sign in to continue')}).querySelector('.inbox-dismiss').click(); true`);
@@ -50,11 +52,11 @@ const BASE = require('./test_base').BASE;
         await ev(`(${rowOf('Wants to know: which font')}).querySelector('.inbox-dismiss').click(); true`);
         await waitFor(`!(${rowOf('Wants to know: which font')})`, 'the asked-before row is gone', 6000);
         assert.equal(await waiting(), 2, 'both are out of the count');
-        assert.deepEqual(await ev(`window.__posts`), [], 'still nothing sent');
+        assert.deepEqual(await ev(`window.__posts.map(p => p.body.session_id)`), ['inputter-id', 'signer-id'], 'the sleeping agent\'s request is hidden in this browser: nothing was asked of the machine for it');
         // a permission on an awake agent still clears Coral's record of the wait
         await ev(`(${rowOf('Wants to run: npm test')}).querySelector('.inbox-dismiss').click(); true`);
-        await waitFor(`window.__posts.length === 1`, 'the permission Dismiss goes to the machine', 6000);
-        assert.deepEqual(await ev(`window.__posts.map(p => p.body)`), [{ session_id: 'permit-id', agent_type: 'claude' }]);
+        await waitFor(`window.__posts.length === 3`, 'the permission Dismiss goes to the machine', 6000);
+        assert.deepEqual(await ev(`window.__posts.slice(-1).map(p => p.body)`), [{ session_id: 'permit-id', agent_type: 'claude' }]);
         console.log('PASS every waiting-agent row has a Dismiss: the server clears a permission, question or plan; any other request, and one asked before sleep, is hidden for that request only');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
