@@ -51,6 +51,13 @@ func machineUsage(w io.Writer) {
 	fmt.Fprintln(w, "         [--max-mode view|interact|launch (default view)] [--coral-version VERSION [--coral-sha256-amd64 HEX --coral-sha256-arm64 HEX]] [--allow-ssh-from ADDRESS] [--yes]")
 }
 
+// machineLaunchEnvVar turns `coral machine` on. It is OFF by default: with it unset `coral machine` is not a command at all (no dispatch, not in the help), so nothing in this build can reach a cloud
+// provider until the person who runs it says so (#9934 slice 1b).
+const machineLaunchEnvVar = "CORAL_MACHINE_LAUNCH"
+
+// machineLaunchEnabled is whether `coral machine` exists in this run.
+func machineLaunchEnabled() bool { return config.Truthy(os.Getenv(machineLaunchEnvVar)) }
+
 func runMachine(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) > 0 && (args[0] == "list" || args[0] == "delete" || args[0] == "prune" || args[0] == "egress-files") {
 		return runMachineManage(args[0], args[1:], stdin, stdout, stderr)
