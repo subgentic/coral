@@ -1,6 +1,6 @@
 // A new goal's pictures against the REAL isolated server (#11650 + #11653): the New goal form's picker and Create meeting the real goal-images route, the goal store and the goal page. A team with an agent session
 // is made through the board API; a picture goes through the form's real file input and is stored on the team; Create names it in `images`; the goal reads back with it through the API, the page draws it under the
-// Description from the artifact URL, and it is still there after a reload. The route's refusals (the bytes decide the type, text as a picture, a team with no agent, a picture another team's goal did not get) are
+// Description from the artifact URL, and it is still there after a reload. The route's refusals (the bytes decide the type, text as a picture, a team with no agent keeps the picture as the person's own, a picture another team's goal did not get) are
 // checked directly. Drives Chrome over CDP through agent_view_harness.js.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -65,12 +65,14 @@ const DATA = process.env.CORAL_TEST_DATA_DIR || '';
         check('a PNG sent as a JPEG is refused: image_type_mismatch', mism.status === 415 && mism.body.code === 'image_type_mismatch', JSON.stringify(mism));
         const text = await rawUpload(B, Buffer.from('not a picture').toString('base64'), 'image/png');
         check('text sent as a PNG is refused: image_type', text.status === 415 && text.body.code === 'image_type', JSON.stringify(text));
-        const none = await rawUpload(EMPTY, PNG, 'image/png');
-        check('a team with no agent session has nowhere to keep it: no_team', none.status === 409 && none.body.code === 'no_team', JSON.stringify(none));
-        const gone = await rawUpload('no-such-team-' + Date.now().toString(36), PNG, 'image/png');
-        check('a team that does not exist is a 404', gone.status === 404, JSON.stringify(gone));
+        // a picture uploaded for team B is not one team EMPTY's goal can name: asked BEFORE EMPTY has had the same bytes uploaded for it (a team with no agent keeps them now, below)
         const stolen = await api('POST', `/api/board/${EMPTY}/goals`, { subscriber_id: 'Operator', title: 'Borrowed', images: [pic] });
         check('a picture uploaded for another team\'s goal cannot be named: 400', stolen.status === 400, JSON.stringify(stolen));
+        // a team with no agent keeps a goal's picture as the person's own instead of refusing it (#12176, Beta Tester #12163)
+        const none = await rawUpload(EMPTY, PNG, 'image/png');
+        check('a team with no agent session keeps the picture as the person\'s own: 201 with its artifact URI', none.status === 201 && /^coral:\/\/artifacts\/[0-9a-f]{64}$/.test(none.body.uri || '') && none.body.content_type === 'image/png', JSON.stringify(none));
+        const gone = await rawUpload('no-such-team-' + Date.now().toString(36), PNG, 'image/png');
+        check('a team that does not exist is a 404', gone.status === 404, JSON.stringify(gone));
         console.log(results.every(Boolean) ? 'PASS goal pictures against the real route' : 'FAIL goal pictures against the real route');
         if (!results.every(Boolean)) process.exitCode = 1;
     } finally { await removeBoards(ev, [B, EMPTY]).catch(() => {}); await client.close(); }
