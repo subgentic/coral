@@ -42,7 +42,7 @@ function chipView(s, server) {
     const sw = s.model_switch;
     const lvl = s.thinking_actual ? levelName(s.thinking_actual) : (s.thinking ? levelName(s.thinking) : '');
     const view = { model: { text: base, state: '' }, thinking: { text: lvl || 'Default', state: !s.thinking_actual && s.thinking ? 'requested' : '' }, note: '' };
-    if (view.thinking.state === 'requested') view.note = 'The level it was started with: the agent has not confirmed one yet.';
+    if (view.thinking.state === 'requested') view.note = `Thinking ${view.thinking.text} was set when it started; the agent has not confirmed it yet.`; // names the setting: on a phone the chip it describes is not drawn (#12465)
     if (sw && sw.state === 'pending') {
         // The chip(s) the switch concerns say "Switching to …"; the other keeps saying what runs.
         const toModel = sw.model ? modelLabel(s.agent_type, sw.model, server).replace(/^[^·]*· /, '') : '';

@@ -5,6 +5,7 @@ import { serverFetch, sessionServer } from './server_base.js';
 import { loadLiveSessions } from './api.js';
 import { showToast } from './utils.js';
 import { askedBefore, dismissAsked } from './asked_before_restart.js';
+import { openAgent } from './agent_live.js';
 
 /** Whether the Dismiss is drawn for an agent's open request: every waiting agent has one (#11946). The machine clears a permission, question or plan in its record of the wait; any other request (an input prompt, a
  *  dialog, an elicitation, a sign-in) it keeps as hidden, per agent and request, until the agent asks something new; a request made before the agent slept is hidden in this browser. Nothing is sent to the agent. */
@@ -24,11 +25,17 @@ export function dismissButton(className, session) {
     return b;
 }
 
+/** What a Dismiss says (#12465): it clears Coral's record and sends nothing, so an agent that is still waiting (Hermes on a prompt in its terminal) keeps waiting there with no way to answer from Coral once the card is gone: the
+ *  notice says so and offers the agent. */
+function saidDismiss(text, session) {
+    showToast(`${text} If it is still waiting, it waits in its terminal.`, false, 30000, { action: { label: 'Open agent', onClick: () => openAgent(session) } });
+}
+
 /** Clears the wait of a session and says so; the live list is read again so the card and the row go. */
 export async function dismissWait(session, button) {
     if (isAsked(session)) { // asked before the agent went to sleep: hidden in this browser, for that request only
         dismissAsked(session);
-        showToast('Hidden until the agent asks something new. Nothing was sent to the agent.', false, 4000);
+        saidDismiss('Hidden until the agent asks something new. Nothing was sent to the agent.', session);
         return;
     }
     if (button) button.disabled = true;
@@ -44,7 +51,7 @@ export async function dismissWait(session, button) {
         }
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const said = await resp.json().catch(() => ({}));
-        showToast(said.hidden ? 'Hidden until the agent asks something new. Nothing was sent to the agent.' : said.dismissed ? 'Dismissed. Nothing was sent to the agent.' : 'It was not waiting any more.', false, 4000); // hidden: a request the machine cannot clear, kept as hidden on the machine (#11946)
+        if (said.hidden || said.dismissed) saidDismiss(said.hidden ? 'Hidden until the agent asks something new. Nothing was sent to the agent.' : 'Dismissed. Nothing was sent to the agent.', session); else showToast('It was not waiting any more.', false, 4000); // hidden: a request the machine cannot clear, kept as hidden on the machine (#11946)
         await loadLiveSessions();
     } catch {
         if (button) button.disabled = false;

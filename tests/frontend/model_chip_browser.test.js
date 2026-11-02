@@ -115,8 +115,11 @@ const { coralReady } = require('./helpers/wait');
             c = await chip(); th = await chip('thinking');
             assert.equal(th.state, 'requested');
             assert.equal(th.italic, 'italic', 'requested is italic');
+            // #12465: the note names the setting, not 'the level': on a phone the chip it describes is not drawn, and the note under the composer must stand alone
+            const reqNote = await ev(`document.getElementById('model-chip-note').textContent.trim()`);
+            assert.equal(reqNote, 'Thinking Low was set when it started; the agent has not confirmed it yet.', 'the requested-level note says which setting and does not point at a chip: ' + reqNote);
             assert.equal(c.state, '', 'the model chip is not marked: the model is the one it runs');
-            assert.match(th.note, /started with/);
+            assert.match(th.note, /set when it started/); // the note names the setting (#12465)
             for (const [n, why] of [['ch-sleep', 'sleeping'], ['ch-term', 'a terminal']]) {
                 await select(n);
                 await waitFor(`document.getElementById('model-chip-bar').hidden`, `no chip for ${why}`, 4000);

@@ -31,6 +31,10 @@ const { coralReady } = require('./helpers/wait');
             if (mobile) assert.ok(card.h >= 44 || card.w >= 44, `${w}: a phone target: ${JSON.stringify(card)}`);
             await ev(`document.querySelector('#dw-host [data-on-click="dismiss-wait"]').click(); true`);
             await waitFor(`window.__posts.some(p => /\\/dismiss-wait$/.test(p.url))`, `${w}: the card's Dismiss posts`, 8000);
+            // #12465: the notice says the agent may still be waiting in its terminal and offers it (Hermes on a prompt keeps waiting there once the card is gone)
+            await waitFor(`!!document.querySelector('#notices .toast .toast-action')`, `${w}: the Dismiss notice offers the agent`, 6000).catch(e => { throw e; });
+            const dn = await ev(`(() => { const t = document.querySelector('#notices .toast'); return { text: t.textContent.replace(/\\s+/g, ' ').trim(), action: (t.querySelector('.toast-action') || {}).textContent || '' }; })()`);
+            assert.ok(/Nothing was sent to the agent/.test(dn.text) && /still waiting, it waits in its terminal/.test(dn.text) && dn.action === 'Open agent', `${w}: the notice says it may still wait in its terminal and offers Open agent: ` + JSON.stringify(dn));
             // the Inbox row's cell
             await ev(`import((window.__coralStatic || '/static/') + 'inbox_answer.js').then(m => { window.__cell = m.answerCell(window.__row); document.body.append(window.__cell); return true; })`);
             await waitFor(`!!document.querySelector('.inbox-answers .inbox-dismiss')`, `${w}: the row offers Dismiss`, 8000);
