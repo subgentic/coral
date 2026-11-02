@@ -48,6 +48,18 @@ const OPERATOR_TEXT = '@Operator TEST ITEM, safe to answer any way: this is a te
             await waitFor(`window.__posts.length === 1`, at + 'the reply is posted', 6000);
             const post = await ev(`window.__posts[0].body.content`);
             assert.ok(/^@Orchestrator see the screenshot\n\ncoral:\/\/artifacts\/1{64}$/.test(post), at + 'the reply names the picture by its artifact link after the words: ' + JSON.stringify(post));
+            // a real pasted screenshot (#12173, the Orchestrator): a large PNG with transparent margins, as a window capture or a retina screenshot is, comes from the clipboard (a paste event with the file, no text) and previews as itself, not as a black box
+            await ev(`document.querySelector('button[aria-label="Answer the question of Dev"]').click(); true`);
+            await waitFor(`!!document.querySelector('dialog.inbox-ask-dialog .inbox-ask-box') && !!document.querySelector('dialog.inbox-ask-dialog .ac-add-image')`, at + 'the second question opens with its tray', 6000);
+            await ev(`(async () => { const c = document.createElement('canvas'); c.width = 2400; c.height = 1600; const g = c.getContext('2d'); g.clearRect(0, 0, 2400, 1600); g.fillStyle = '#1d3557'; g.fillRect(120, 120, 2160, 1360); g.fillStyle = '#f1faee'; g.fillRect(200, 220, 1200, 90); g.fillStyle = '#e63946'; g.fillRect(200, 400, 900, 500); g.fillStyle = 'rgba(69, 123, 157, 0.55)'; g.fillRect(1000, 600, 1100, 700);
+                const blob = await new Promise(r => c.toBlob(r, 'image/png')); const dt = new DataTransfer(); dt.items.add(new File([blob], 'Screenshot 2026-11-02 at 6.45.12 AM.png', { type: 'image/png' }));
+                document.querySelector('dialog.inbox-ask-dialog .inbox-ask-box').dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true })); return true; })()`);
+            await waitFor(`!!document.querySelector('dialog.inbox-ask-dialog .ac-thumb-ready')`, at + 'the pasted screenshot is stored and shows as a thumbnail', 10000);
+            const real = await ev(`(async () => { const img = document.querySelector('dialog.inbox-ask-dialog .ac-thumb-img'); await img.decode().catch(() => {}); const c = document.createElement('canvas'); c.width = 64; c.height = 64; const g = c.getContext('2d'); g.fillStyle = getComputedStyle(img).backgroundColor; g.fillRect(0, 0, 64, 64); g.drawImage(img, 0, 0, 64, 64); const d = g.getImageData(0, 0, 64, 64).data; let bright = 0, colour = 0; for (let i = 0; i < d.length; i += 4) { const l = 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]; if (l > 60) bright++; if (Math.max(d[i], d[i + 1], d[i + 2]) - Math.min(d[i], d[i + 1], d[i + 2]) > 60) colour++; } return { loaded: img.naturalWidth > 0, w: img.naturalWidth, brightShare: Math.round(100 * bright / 4096), colourShare: Math.round(100 * colour / 4096), uploads: window.__uploads.length, type: window.__uploads[window.__uploads.length - 1].type }; })()`);
+            assert.ok(real.loaded && real.w === 2400 && real.uploads === 2 && real.type === 'image/png', at + 'the pasted PNG is uploaded as it is and previews (2400 px wide): ' + JSON.stringify(real));
+            assert.ok(real.brightShare >= 8 && real.colourShare >= 8, at + 'the preview shows the screenshot, not a black box: ' + JSON.stringify(real));
+            await shot('ask-reply-pasted-' + w);
+            await ev(`document.querySelector('dialog.inbox-ask-dialog .inbox-ask-buttons .btn:not(.btn-primary)').click(); true`);
         }
     } finally { await client.close(); }
     console.log('ask_reply_image_browser: ok');
