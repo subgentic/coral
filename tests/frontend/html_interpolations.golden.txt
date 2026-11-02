@@ -295,14 +295,17 @@
 1	registered_server_view.js	bar
 1	registered_server_view.js	cls
 1	registered_server_view.js	factHtml('Agents', escHtml(agentsText(agents)))
-1	registered_server_view.js	factHtml('Coral', `${escHtml(version ? `Coral ${version}` : 'Not known yet')}${badge ? ' ' + badge : ''}`)
+1	registered_server_view.js	factHtml('Coral', `${escHtml(version ? `Coral ${version}` : 'Not known yet')}${s.transport === 'ssh' && versio
 1	registered_server_view.js	factHtml('Last seen', escHtml(contact))
 1	registered_server_view.js	factHtml('URL', escHtml(s.url || ''))
 1	registered_server_view.js	formHtml()
+1	registered_server_view.js	label
 1	registered_server_view.js	m.cls
 1	registered_server_view.js	online
+1	registered_server_view.js	s.transport === 'ssh' ? `${upgradeControl(s, version, busy)} <button type="button" class="btn" data-action="ss
 1	registered_server_view.js	statusPill(status)
 1	registered_server_view.js	title
+1	registered_server_view.js	upgradeControl(s, version, busy)
 1	registered_server_view.js	value
 1	registered_server_view.js	warningHtml(s)
 1	render.js	LAUNCH_CARDS.map(phoneCard).join('\n')

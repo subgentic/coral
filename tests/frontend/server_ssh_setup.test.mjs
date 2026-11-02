@@ -83,7 +83,7 @@ function fresh() { const host = doc.createElement('div'); doc.body.append(host);
 
     btn(host, 'Set up').click();
     await until(() => runBody, 'the run');
-    assert.deepEqual(runBody, { accept_keys: true }, 'only the key confirmation is sent: no key, and no terms (the hub makes the acceptance from its own)');
+    assert.deepEqual(runBody, { accept_keys: true, backend: 'pty' }, 'only the key confirmation and the backend choice (pty by default) are sent: no key, and no terms (the hub makes the acceptance from its own)');
     await until(() => host.textContent.includes('Done. The computer is in your list.'), 'the progress to finish');
     assert.ok(changed >= 1, 'the server list was not told');
     btn(host, 'Close').click();
@@ -107,7 +107,7 @@ function fresh() { const host = doc.createElement('div'); doc.body.append(host);
     assert.equal(btn(host, 'Set up').disabled, false);
     btn(host, 'Set up').click();
     await until(() => runBody, 'the run');
-    assert.deepEqual(runBody, {}, 'no terms are sent: the hub makes the acceptance');
+    assert.deepEqual(runBody, { backend: 'pty' }, 'no terms are sent: the hub makes the acceptance (only the backend choice)');
 }
 
 // ── a failure says the hub's fixed sentence, and nothing is run ──────────────────────────────────
@@ -167,8 +167,7 @@ function fresh() { const host = doc.createElement('div'); doc.body.append(host);
     await until(() => btn(host, 'Connect'), 'the plan');
     btn(host, 'Connect').click();
     await until(() => btn(host, 'Upgrade'), 'the confirm');
-    assert.match(host.textContent, /even over a newer one/);
-    assert.match(host.textContent, /downgrade/);
+    assert.match(host.textContent, /If it fails after Coral was stopped, Coral on that computer stays stopped/); // a newer computer is the downgrade page's (server_upgrade_page.test.mjs)
     assert.match(host.textContent, /stays stopped/);
     assert.equal(host.querySelector('.ssh-terms'), null, 'an upgrade shows no terms either');
     assert.ok(host.querySelector('.ssh-consent'), 'but says what the computer records');
