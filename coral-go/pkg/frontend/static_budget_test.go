@@ -32,7 +32,8 @@ const (
 	// 5.68 MiB (5,953,792 bytes) since the operator approved it (Nov 1, 2026, 15:05Z, coral://artifacts/0b2f182284b0fb6dc6de28f22134c2afbff5ff936ded4b2fbbcab3e0926f0130): 46.25 KiB more, for the goal pictures (the picture routes' page, #11650, #11651, #11653),
 	// the Hub start address (#11809) and the one-item Needs you link (#11797), after the v2.0.24 budget work cut 12.5 KB (#11760) and v2.0.26 left 28 bytes of room.
 	// 5.72 MiB (6,002,944 bytes) since the operator's standing approval to raise this limit whenever approved work needs it (Nov 1, 2026, 23:19Z; this test only, the start-CSS cap and the page_weight baselines still need a question): 48 KiB more; the v2.0.29 tree is within 1.5 KB of 5,953,792 with the Inbox, Hermes and password-dialog work queued behind it.
-	staticBudget = 6_002_944
+	// 5.84 MiB (6,127,616 bytes) under the same standing approval (Nov 2, 2026, the v2.0.35 batch; this test only, not the start-CSS cap): 121.75 KiB more, for the Skills Store and its tab, the Activity folder, Hermes in the pickers, auto-sleep's settings and the question stack (tree at the batch's first build: 6,078,185 bytes).
+	staticBudget = 6_127_616
 	// fileBudget is the most one embedded file may hold (the CodeMirror bundle, the largest, is ~1 MB).
 	fileBudget = 1536 << 10
 )

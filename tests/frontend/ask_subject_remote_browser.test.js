@@ -22,7 +22,7 @@ const { coralReady } = require('./helpers/wait');
             await ev(`document.querySelector('button[aria-label="Answer the question of Orchestrator"]').click(); true`);
             await waitFor(`!!document.querySelector('dialog.inbox-ask-dialog[open]')`, at + 'the dialog opens', 4000);
             const d = await ev(`(() => { const p = document.querySelector('dialog.inbox-ask-dialog .inbox-ask-subjects'); return { text: p.textContent, buttons: [...p.querySelectorAll('button, a')].map(b => ({ kind: b.dataset.kind, h: Math.round(b.getBoundingClientRect().height) })) }; })()`);
-            assert.ok(!/[‮​\u0007]/.test(d.text) && /Ship.*beta/.test(d.text) && /Fix the login.* page/.test(d.text) && d.text.length > 'About Goal #7: Ship the beta · Task #12: Fix the login page (named by Orchestrator)'.length, at + 'hidden characters in the titles are written out, none are in the line: ' + JSON.stringify(d.text));
+            assert.ok(!/[\u202e\u200b\u0007]/.test(d.text) && /Ship.*beta/.test(d.text) && /Fix the login.* page/.test(d.text) && d.text.length > 'About Goal #7: Ship the beta · Task #12: Fix the login page (named by Orchestrator)'.length, at + 'hidden characters in the titles are written out, none are in the line: ' + JSON.stringify(d.text));
             if (remote) assert.deepEqual(d.buttons, [], at + 'a question from another computer shows the goal and the task as words, with no link (their numbers are that computer\'s): ' + JSON.stringify(d));
             else {
                 assert.deepEqual(d.buttons.map(b => b.kind), ['goal', 'task'], at + 'a question from this computer has its two links: ' + JSON.stringify(d));

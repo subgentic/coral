@@ -111,7 +111,7 @@ func TestAHermesClarifyCountsAsAQuestionAndACommandApprovalSaysWhatItRuns(t *tes
 // The tester's browser pass on #12170: a command with U+200B inside a path got all four buttons, because the card is built from the screen and the terminal drops that character, while the chat's step row (Hermes's own
 // stored tool call) shows it. The stored command of the call is judged by the same rule as every other CLI's: Reject only, and the note names the character.
 func TestAHermesApprovalWhoseStoredCommandHidesACharacterOffersRejectOnly(t *testing.T) {
-	const zero = "​"
+	const zero = "\u200b"
 	parse := func() promptScreen {
 		s, ok := parsePromptScreen(hermesScreen(t, "a1_approval_short"))
 		require.True(t, ok)
@@ -166,11 +166,11 @@ func TestTheStoredCommandOfAHermesAgentIsReadFromItsOwnSessionOnly(t *testing.T)
 		_, err := w.Exec(`INSERT INTO messages (session_id, role, content, tool_calls, timestamp) VALUES (?, 'assistant', '', ?, 1788000000)`, session, string(calls))
 		require.NoError(t, err)
 	}
-	call(hid, "rm -rf /home/tester/dan​gerdir")
+	call(hid, "rm -rf /home/tester/dan\u200bgerdir")
 	call(other, "THE OTHER SESSION'S COMMAND")
 	assert.Empty(t, handler.hermesStoredCommand(context.Background(), sid), "no link yet: nothing is read")
 	require.NoError(t, transcriptlink.BindHermes(handler.cfg.CoralDir(), sid, hid))
-	assert.Equal(t, "rm -rf /home/tester/dan​gerdir", handler.hermesStoredCommand(context.Background(), sid), "the bound session's newest call, with its hidden character")
+	assert.Equal(t, "rm -rf /home/tester/dan\u200bgerdir", handler.hermesStoredCommand(context.Background(), sid), "the bound session's newest call, with its hidden character")
 }
 
 // QA's SHOULD on #12170: a box with no command rows is not a prompt, so an empty card never offers Allow buttons for nothing.
@@ -221,7 +221,7 @@ func hermesCutScreen(shown string) string {
 }
 
 func TestAHermesCommandCutOnItsScreenIsJudgedByTheStoredCommandOrRefused(t *testing.T) {
-	const zero = "​"
+	const zero = "\u200b"
 	shown := "rm -rf /home/tester/dangerdir/" + strings.Repeat("over_the_cap_segment_001_", 7) // about 200 characters, as Hermes shows
 	parse := func() promptScreen {
 		s, ok := parsePromptScreen(hermesCutScreen(shown))
