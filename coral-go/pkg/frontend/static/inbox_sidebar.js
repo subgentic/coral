@@ -608,7 +608,7 @@ async function refreshGoals() {
         const r = await fetch('/api/settings');
         if (r.ok) { const saved = (await r.json()).settings || {}; state.settings = { ...(state.settings || {}), [GOAL_DONE_SETTING]: saved[GOAL_DONE_SETTING] || '' }; }
     } catch { /* the list this page has stays */ }
-    await loadPendingSkills(); // the skills that wait for the Operator are items of Needs you too (#12139)
+    if (!nativeInbox()) await loadPendingSkills(); // the skills that wait for the Operator are items of Needs you too (#12139); the Hub has no such route, so its Inbox does not ask (the Hub census, #12260)
     syncGoalDoneCount();
     renderInboxNav(true);
 }
