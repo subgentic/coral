@@ -380,6 +380,17 @@ func TestNeedsYouAFileWithNewCommentsIsUnreadAgainAsTheSameRow(t *testing.T) {
 	require.Len(t, items, 1)
 	assert.Equal(t, "review:alpha:"+e.id, items[0]["id"])
 	assert.EqualValues(t, 1, items[0]["new_comments"])
+	// #12097 (Security's INFO): the page reads ONE list, the one tagged "for review", and it already holds the decided files that have news, so the page makes no second request per team
+	forReview := func() []any {
+		resp, err := http.Get(psrv.URL + "/api/board/alpha/artifacts?tag=for%20review")
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		var out map[string]any
+		require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
+		got, _ := out["artifacts"].([]any)
+		return got
+	}
+	assert.Len(t, forReview(), 1, "the approved file with news is in the for-review list")
 	resp, err := http.Get(psrv.URL + "/api/board/alpha/artifacts?tag=new%20comments")
 	require.NoError(t, err)
 	var tagged map[string]any
@@ -389,17 +400,22 @@ func TestNeedsYouAFileWithNewCommentsIsUnreadAgainAsTheSameRow(t *testing.T) {
 	e.tag(t, `["denied"]`)
 	n, _ = count()
 	assert.Equal(t, 1, n, "a denied one too")
+	assert.Len(t, forReview(), 1)
 	e.tag(t, `["ignored"]`)
 	n, _ = count()
 	assert.Zero(t, n, "an ignored file stays out: the Operator chose not to see it")
+	assert.Empty(t, forReview(), "and out of the for-review list")
 	e.tag(t, `["approved", "saved"]`)
 	n, _ = count()
 	assert.Zero(t, n, "a saved file is not counted")
+	assert.Empty(t, forReview())
 	e.tag(t, `["approved", "superseded"]`)
 	n, _ = count()
 	assert.Zero(t, n, "a file with a newer version is not the one to look at")
+	assert.Empty(t, forReview())
 	delete(news, e.id)
 	e.tag(t, `["approved"]`)
+	assert.Empty(t, forReview(), "an approved file with no news is not in the for-review list")
 	resp, err = http.Get(psrv.URL + "/api/board/alpha/artifacts?tag=new%20comments")
 	require.NoError(t, err)
 	tagged = map[string]any{}
