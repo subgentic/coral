@@ -96,7 +96,7 @@ ENUM = {
     'GET /api/token-usage/summary': {'include': ['totals']},
     # The prerequisite check (#4579, Launch tier): type is one of the agent types the handler knows (an UNKNOWN type answers found:true, so
     # it must never pass), source only the recheck word. A Go test keeps the types equal to agent.agentCLIs.
-    'GET /api/system/cli-check': {'type': ['claude', 'agy', 'antigravity', 'gemini', 'codex', 'pi'], 'source': ['cli_recheck']},
+    'GET /api/system/cli-check': {'type': ['claude', 'agy', 'antigravity', 'gemini', 'codex', 'pi', 'opencode', 'hermes'], 'source': ['cli_recheck']},
 }
 
 src = {f: open(f, encoding='utf-8').read() for f in glob.glob(ROOT + '/routes/*.go') if not f.endswith('_test.go')}
