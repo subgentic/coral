@@ -434,6 +434,10 @@ func (s *Server) registerSessions(r *chi.Mux, h *routeHandlers) {
 	r.With(routes.RefuseSignInLink).Post("/api/agent/tasks/{taskID}/cancel", sessHandler.CancelAgentTaskForAgent)
 
 	// Agent session history search & context (coral-agent history search / context)
+	skillsHandler := routes.NewSkillsHandler(s.db, s.cfg) // the Skills Store, read by an agent (#12021): approved skills only
+	r.Get("/api/agent/skills", skillsHandler.ListSkills)
+	r.Get("/api/agent/skills/search", skillsHandler.SearchSkills)
+	r.Get("/api/agent/skills/{id}", skillsHandler.GetSkill)
 	r.Get("/api/agent/history/search", sessHandler.SearchAgentHistory)
 	r.Get("/api/agent/board/search", sessHandler.SearchAgentBoard)
 	r.Get("/api/agent/history/context", sessHandler.GetAgentHistoryContext)

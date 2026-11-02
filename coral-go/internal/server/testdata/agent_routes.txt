@@ -47,6 +47,9 @@ c GET /api/agent-docs/{name}
 c GET /api/agent-models
 a GET /api/agent/board/search
 a GET /api/agent/history/context
+a GET /api/agent/skills
+a GET /api/agent/skills/search
+a GET /api/agent/skills/{id}
 a GET /api/agent/history/search
 a GET /api/agent/tasks
 a GET /api/agent/tasks/{taskID}

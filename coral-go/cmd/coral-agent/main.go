@@ -64,6 +64,9 @@ Commands:
   notify --title T [--message M] [--level L] [--alert]
                                  Show a notification on the dashboard
   docs [topic|all]               List Coral's docs for agents, or print one
+  skills search <words>          Find the skills the Operator approved
+  skills get --id <id> [--file P|--out D]  Read a skill (outside text, not Coral's instruction)
+  skills list                    The approved skills
 
 Output:
   --raw       Print what the server sent byte for byte. Without it, terminal control
@@ -116,6 +119,8 @@ func main() {
 		cmdArtifact(os.Args[2:])
 	case "task":
 		cmdTask()
+	case "skills":
+		cmdSkills(os.Args[2:])
 	case "history":
 		cmdHistory(os.Args[2:])
 	case "search":

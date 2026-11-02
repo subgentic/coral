@@ -41,6 +41,9 @@ GET /api/agent-models view
 GET /api/agent/board/search never
 GET /api/agent/history/context never
 GET /api/agent/history/search never
+GET /api/agent/skills never
+GET /api/agent/skills/search never
+GET /api/agent/skills/{id} never
 GET /api/agent/tasks never
 GET /api/agent/tasks/{taskID} never
 GET /api/agent/ui view

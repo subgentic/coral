@@ -202,6 +202,15 @@ func (h *SkillsHandler) GetSkill(w http.ResponseWriter, r *http.Request) {
 	}
 	detail := "skill"
 	w.Header().Set("Cache-Control", "no-store")
+	if r.URL.Query().Get("all") == "1" { // every file that can be shown as text, in one answer (for --out: a skill of many files stays inside the per-minute limit)
+		contents := make(map[string]string, len(sk.Content))
+		for p, b := range sk.Content {
+			contents[p] = string(b)
+		}
+		_ = h.ss.LogSkillAccess(r.Context(), "get", row.ID, row.Digest, kind, name, "all")
+		writeJSON(w, http.StatusOK, map[string]any{"frame": skillFrame(row), "skill": summaryOf(*row), "digest": row.Digest, "files": sk.Files, "contents": contents})
+		return
+	}
 	if p := r.URL.Query().Get("file"); p != "" {
 		content, found := sk.Content[p]
 		if !found {
