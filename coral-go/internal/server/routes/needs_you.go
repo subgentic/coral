@@ -200,9 +200,9 @@ func (h *BoardHandler) NeedsYou(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	hiddenGoals := h.goalDoneHiddenSet(ctx)
+	hiddenGoals, readGoals := h.goalDoneHiddenSet(ctx), h.goalDoneReadSet(ctx)
 	for _, p := range projects {
-		if gi, err := h.goalDoneItems(ctx, p.Project, hiddenGoals); err != nil {
+		if gi, err := h.goalDoneItems(ctx, p.Project, hiddenGoals, readGoals); err != nil {
 			unread = appendOnce(unread, "goals")
 		} else {
 			items = append(items, gi...)

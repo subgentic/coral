@@ -65,6 +65,22 @@ const B = 'goal-done-' + Date.now().toString(36);
         await openNeeds();
         await waitFor(`/looks done/.test(document.querySelector('${T}')?.textContent || '')`, 'the item is back after a task was added and finished', 20000);
 
+        // #11983: opening the item reads it: it stays listed and stops counting, in the Inbox number, the badge and /api/needs-you; a task done since has a new total, and it is unread again
+        const unreadBadge = await badge();
+        await ev(`[...document.querySelectorAll('${T} tbody tr')].find(tr => /looks done/.test(tr.textContent)).querySelector('.inbox-review-name').click(); true`);
+        await waitFor(`!!document.querySelector('.goal-view, [data-goal-view], #goal-view') || /goals|goal/i.test(location.hash + location.pathname)`, 'the goal opened', 10000);
+        await openNeeds();
+        await waitFor(`/looks done/.test(document.querySelector('${T}')?.textContent || '')`, 'the opened item is still listed', 20000);
+        await waitFor(`Number((document.getElementById('nav-tab-hub-inbox-badge') || {}).textContent || 0) === ${unreadBadge - 1}`, 'and out of the Inbox number', 10000);
+        assert.equal((await doneRows()).length, 1, 'listed once');
+        const readSaved = JSON.parse((await root('GET', '/api/settings')).json.settings.goal_done_read);
+        assert.deepEqual(readSaved, [`${B}|${gid}|2`], 'kept on the machine at the total it was opened at');
+        assert.ok(!(await root('GET', '/api/needs-you?limit=50')).json.items.some(i => i.id === `goal_done:${B}:${gid}`), 'the phone push and /api/needs-you do not count it either');
+        await task(gid, true);
+        await openNeeds();
+        await waitFor(`Number((document.getElementById('nav-tab-hub-inbox-badge') || {}).textContent || 0) === ${unreadBadge}`, 'unread again after another task was finished', 20000);
+        assert.ok((await root('GET', '/api/needs-you?limit=50')).json.items.some(i => i.id === `goal_done:${B}:${gid}`), 'and in /api/needs-you again');
+
         // Ignore with Undo
         await ev(`[...document.querySelectorAll('${T} tbody tr')].find(tr => /looks done/.test(tr.textContent)).querySelector('button[aria-label^="Ignore"]').click(); true`);
         await waitFor(`!/looks done/.test(document.querySelector('${T}')?.textContent || '')`, 'the item gone after Ignore', 8000);

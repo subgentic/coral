@@ -301,3 +301,6 @@ func ChiefPermissionMode(m map[string]string) string {
 
 // GoalDoneHidden is the setting that lists the goals the Operator hid from Needs you with Not yet or Ignore (#11825).
 const GoalDoneHidden = "goal_done_hidden"
+
+// GoalDoneRead is the setting that lists the "Goal looks done" items the Operator has opened (#11983): listed in Needs you, not counted, as a read file is.
+const GoalDoneRead = "goal_done_read"

@@ -3,7 +3,7 @@ import { keepMenuOnScreen } from './menu_fit.js';
 import { needsYou, askedRow } from './asked_before_restart.js';
 import { unrecordedItem, recordAllAgents } from './waiting.js';
 import { welcomeRows, runWelcome, dismissWelcome, hideAllWelcome } from './welcome_items.js';
-import { doneGoals, hideGoalDone, setGoalDoneCount, SETTING as GOAL_DONE_SETTING } from './goal_done.js';
+import { doneGoals, hideGoalDone, setGoalDoneCount, isGoalDoneRead, markGoalDoneRead, markGoalDoneUnread, SETTING as GOAL_DONE_SETTING } from './goal_done.js';
 /* The dashboard's own Inbox on the shared sidebar (#7472), loaded the first time the Inbox tab is shown (inbox_tab.js keeps the badge and the counts, which are always there).
  *
  * Three groups, the hub's /inbox order: Needs you (the agents waiting for input, from the live list the dashboard already holds), Tasks (the open tasks assigned to the Operator) and Saved (the
@@ -124,7 +124,7 @@ const questionOf = s => (s.review && s.review.review_question ? markHidden(s.rev
 /** What a review row says under its name: the question first (what the person is to decide), then who uploaded it and their team (the name stays beside it, Security's condition on #11555). */
 const subOf = (s, withTeam) => [s.review ? questionOf(s) : '', fromOf(s, withTeam)].filter(Boolean).join(' \u00b7 ');
 /** Whether a Needs you row is unread (#11668): everything that counts in the badge is; a read review and the welcome items (listed, not alarms) are not. */
-const needsUnread = s => !(s.welcome || (s.review && isRead(s.review)));
+const needsUnread = s => !(s.welcome || (s.review && isRead(s.review)) || (s.goalDone && isGoalDoneRead(goalTeamHere(s.goalDone), s.goalDone))); // a read file and an opened goal item are listed, not counted (#11983)
 /** A wide screen with a real pointer shows a row's actions on its hover or focus, and the waiting time where they are the rest of the time (#11669, the operator's Gmail shot); a touch screen and a phone keep the buttons drawn. */
 const hoverRows = () => !isPhoneLayout() && matchMedia('(hover: hover) and (pointer: fine) and (min-width: 768px)').matches;
 const hoverWrap = (s, box) => { if (!box || !hoverRows()) return box; const wrap = DT.el('div', 'inbox-actions-hover'), when = waitingText(s.waiting_since); wrap.append(box); if (when) wrap.append(DT.el('span', 'inbox-row-when', when)); return wrap; };
@@ -356,10 +356,11 @@ function runActions(run) {
 }
 
 /** The tab's badge counts the goal items too: told after every read of the goals and of what was hidden (#11825). */
-function syncGoalDoneCount() { setGoalDoneCount(goalDoneRows().length); updateInboxTab(); }
+function syncGoalDoneCount() { setGoalDoneCount(goalDoneRows().filter(needsUnread).length); updateInboxTab(); }
 /** The goal's page, from its item; with close the Close dialog is opened on it, set to Done, once the page is up (#11825). */
 let closeAfterOpen = null;
 function openGoalDone(g, close = false) {
+    markGoalDoneRead(goalTeamHere(g), g).then(() => { syncGoalDoneCount(); renderInboxNav(true); }).catch(error => sayLive(`Not marked read: ${error && error.message ? error.message : 'try again'}.`)); // opening it is reading it (#11983)
     closeAfterOpen = close ? { team: g.board_id, id: g.id } : null;
     quietFocus($('inbox-view'));
     goalOpener = { team: g.board_id, id: g.id };
@@ -382,8 +383,14 @@ function goalDoneActions(g) {
     };
     const btn = (label, aria, cls, run) => { const b = DT.el('button', `btn btn-small ${cls}`, label); b.type = 'button'; b.setAttribute('aria-label', aria); b.addEventListener('click', e => { e.stopPropagation(); run(); }); return b; };
     box.append(btn('Close goal', `Close goal ${g.id}: ${title}`, 'btn-primary inbox-main-action', () => openGoalDone(g, true)), btn('Not yet', `Not yet for goal ${g.id}: ${title}`, '', () => hide('not-yet', 'Hidden until a task is added')));
-    if (isPhoneLayout()) box.append(moreMenu([{ label: 'Ignore', title: 'Take it out of Needs you; nobody is told', run: () => hide('ignore', 'Ignored') }], title));
+    const menu = [];
+    if (isPhoneLayout()) menu.push({ label: 'Ignore', title: 'Take it out of Needs you; nobody is told', run: () => hide('ignore', 'Ignored') });
     else box.append(btn('Ignore', `Ignore goal ${g.id}: ${title}`, 'btn-quiet', () => hide('ignore', 'Ignored')));
+    if (isGoalDoneRead(team, g)) { // opened: listed, not counted, as a read file is (#11983)
+        box.classList.add('inbox-review-actions-read');
+        menu.push({ label: 'Mark unread', title: 'Count it in Needs you again', run: async () => { try { await markGoalDoneUnread(team, g); said(`Goal ${g.id} is back in Needs you.`); } catch (e) { said(`Not saved: ${e && e.message ? e.message : 'try again'}.`); } syncGoalDoneCount(); renderInboxNav(true); } });
+    }
+    if (menu.length) box.append(moreMenu(menu, title));
     return box;
 }
 
@@ -574,7 +581,7 @@ const savedCounts = () => saved.savedView().totals;
 /** The number beside a folder. Needs you counts what the Inbox badge counts (an alarm: an agent, a review, a run, a proposal, a question); the welcome items are listed but are not alarms, so they are not in either (#11622). */
 /** The goals agents proposed that wait for the Operator (a row in Needs you): the Goals folder counts them, it said 0 while one waited (#11894). */
 const goalProposals = () => pendingProposals().filter(p => p.kind === 'goal');
-const countOf = key => key === 'needs' ? waitingSessions().length + unreadReviewItems().length + failedUnread().length + pendingProposals().length + goalDoneRows().length + operatorAsks().length + recordRows().length : key === 'tasks' ? taskRows().length : key === 'goals' ? goals.length + goalProposals().length : key === 'artifacts' ? IA.artifactCount() ?? undefined : key === 'saved' ? savedCounts().open + savedFiles().length : undefined;
+const countOf = key => key === 'needs' ? waitingSessions().length + unreadReviewItems().length + failedUnread().length + pendingProposals().length + goalDoneRows().filter(needsUnread).length + operatorAsks().length + recordRows().length : key === 'tasks' ? taskRows().length : key === 'goals' ? goals.length + goalProposals().length : key === 'artifacts' ? IA.artifactCount() ?? undefined : key === 'saved' ? savedCounts().open + savedFiles().length : undefined;
 /** The folders of the Inbox (#7785, the mailbox mock): one view list, a name and a count each. Needs you, Tasks and Saved open their table in the centre; */
 const FOLDER_ICONS = { needs: 'notifications', tasks: 'checklist', goals: 'flag', saved: 'saved-bookmark', artifacts: 'inventory_2',
     chats: 'chat_bubble_outline', [BOARDS_FOLDER]: 'forum', 'chats-notes': 'edit_note', 'chats-starred': 'star', 'chats-active': 'bolt', 'chats-archived': 'folder' }; // UI/UX's existing subset choices (#8866); tagged folders keep their colour dot

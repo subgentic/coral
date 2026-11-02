@@ -59,6 +59,13 @@ func (s *Server) configureBoardHandlers(h *routeHandlers) (*routes.BoardHandler,
 		}
 		return routes.GoalDoneHiddenFrom(st)
 	})
+	boardHandler.SetGoalDoneRead(func(ctx context.Context) []string {
+		st, err := sessStore.GetSettings(ctx)
+		if err != nil {
+			return nil
+		}
+		return routes.GoalDoneReadFrom(st)
+	})
 	artifactNudger := routes.NewClaudeArtifactNudger(sessStore, s.terminal)
 	boardHandler.SetArtifactNudger(artifactNudger)
 	sessHandler.SetArtifactNudger(artifactNudger)

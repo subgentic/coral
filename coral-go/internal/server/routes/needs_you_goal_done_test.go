@@ -91,3 +91,69 @@ func TestNeedsYouHasOneItemForAGoalWhoseTasksAreAllDone(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, read(), "gone when the goal closes")
 }
+
+// #11983 (the Operator): a "Goal looks done" item the Operator has opened is read, as a file is: it is not counted, so the count, the tab badge, the phone push and /api/needs-you say one number. The saved list is
+// goal_done_read, "<team>|<goal>|<tasks>" (the all-done total it was opened at); a goal that gets another task done has a new total, so it is unread again.
+func TestAGoalDoneItemTheOperatorOpenedIsNotCounted(t *testing.T) {
+	h, bs := operatorAsksRig(t)
+	ctx := context.Background()
+	_, err0 := bs.PostMessage(ctx, "team", "Lead", "hello", nil)
+	require.NoError(t, err0)
+	var readList, hidden []string
+	h.SetGoalDoneHidden(func(context.Context) []string { return hidden })
+	h.SetGoalDoneRead(func(context.Context) []string { return readList })
+	g, err := bs.CreateGoal(ctx, "team", board.GoalInput{Title: "Ship the export", CreatedBy: "Lead"})
+	require.NoError(t, err)
+	finish := func() {
+		tk, err := bs.CreateTaskWithOpts(ctx, "team", "t", "", "medium", "Lead", &board.CreateTaskOpts{GoalID: &g.ID})
+		require.NoError(t, err)
+		_, err = bs.ClaimTask(ctx, "team", "Dev", tk.ID)
+		require.NoError(t, err)
+		_, err = bs.CompleteTask(ctx, "team", tk.ID, "Dev", nil)
+		require.NoError(t, err)
+	}
+	count := func() (int, int) {
+		code, out := readNeedsYou(t, h, "", asPerson)
+		require.Equal(t, http.StatusOK, code, out)
+		goals := 0
+		for _, it := range needsYouItems(out) {
+			if it["kind"] == "goal_done" {
+				goals++
+			}
+		}
+		assert.EqualValues(t, goals, out["counts"].(map[string]any)["goal_done"])
+		return goals, int(out["count"].(float64))
+	}
+	finish()
+	finish()
+	n, all := count()
+	assert.Equal(t, 1, n)
+	assert.Equal(t, 1, all)
+
+	readList = []string{fmt.Sprintf("team|%d|2", g.ID)}
+	n, all = count()
+	assert.Zero(t, n, "opened at its total: read, not counted")
+	assert.Zero(t, all, "and not in the one count")
+
+	finish() // another task done: the goal's state changed again
+	n, all = count()
+	assert.Equal(t, 1, n, "a goal whose state changes again is unread again")
+	assert.Equal(t, 1, all)
+
+	for name, entry := range map[string]string{"another team's": fmt.Sprintf("other|%d|3", g.ID), "another goal's": fmt.Sprintf("team|%d|3", g.ID+1), "another total": fmt.Sprintf("team|%d|2", g.ID), "not exactly the key": fmt.Sprintf("team|%d|3 ", g.ID), "an Ignore star is not a read": fmt.Sprintf("team|%d|*", g.ID)} {
+		readList = []string{entry}
+		n, _ = count()
+		if name == "an Ignore star is not a read" {
+			assert.Equal(t, 1, n, name)
+		} else {
+			assert.Equal(t, 1, n, "an entry that is %s marks nothing read", name)
+		}
+	}
+	readList = []string{fmt.Sprintf("team|%d|3", g.ID)}
+	n, _ = count()
+	assert.Zero(t, n)
+	hidden = []string{fmt.Sprintf("team|%d|*", g.ID)}
+	readList = nil
+	n, _ = count()
+	assert.Zero(t, n, "Ignore still hides it, read or not")
+}

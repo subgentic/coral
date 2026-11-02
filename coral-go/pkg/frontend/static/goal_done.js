@@ -30,10 +30,30 @@ export function doneGoals(goals, teamOf, settings = state.settings) {
     return (goals || []).filter(g => { const team = teamOf(g); return team && readyToClose(g) && !hidden.has(keyOf(team, g)) && !hidden.has(starOf(team, g)); });
 }
 
-async function save(list) {
-    const r = await fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ [SETTING]: JSON.stringify(list.slice(-MAX)) }) });
+async function save(list, setting = SETTING) {
+    const r = await fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ [setting]: JSON.stringify(list.slice(-MAX)) }) });
     if (!r.ok) throw new Error(`could not save it (HTTP ${r.status})`);
-    state.settings = { ...(state.settings || {}), [SETTING]: JSON.stringify(list.slice(-MAX)) };
+    state.settings = { ...(state.settings || {}), [setting]: JSON.stringify(list.slice(-MAX)) };
+}
+
+/* Opening a goal's item reads it (#11983, the Operator): it stays listed and stops counting, as an opened file does, so the Inbox number, the tab badge, the phone push and /api/needs-you say one number. It is kept in
+ * goal_done_read as "<team>|<goal>|<tasks>", the all-done total it was opened at: a goal that gets another task done has a new total and is unread again. */
+export const READ_SETTING = 'goal_done_read';
+export function readList(settings = state.settings) {
+    try { const v = JSON.parse(String((settings || {})[READ_SETTING] || '[]')); return Array.isArray(v) ? v.filter(x => typeof x === 'string').slice(-MAX) : []; } catch { return []; }
+}
+/** Whether the Operator has opened this goal's item at its present total. */
+export const isGoalDoneRead = (team, g, settings = state.settings) => readList(settings).includes(keyOf(team, g));
+/** Marks the goal's item read (nothing is written when it already is). */
+export async function markGoalDoneRead(team, g) {
+    if (isGoalDoneRead(team, g)) return;
+    await save([...readList(), keyOf(team, g)], READ_SETTING);
+}
+/** Counts the goal's item again. */
+export async function markGoalDoneUnread(team, g) {
+    const entry = keyOf(team, g);
+    if (!readList().includes(entry)) return;
+    await save(readList().filter(e => e !== entry), READ_SETTING);
 }
 
 /** Hides a goal's item: mode 'not-yet' (until a task is added) or 'ignore'. Resolves to a function that puts it back. */
