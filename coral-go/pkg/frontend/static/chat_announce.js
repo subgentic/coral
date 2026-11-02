@@ -4,8 +4,10 @@ const QUIET_MS = 2500;
 const pending = new Map(); // session_id -> { who, text }
 let timer = 0, flip = false;
 
-const words = (t, max = 120) => {
-    const s = String(t || '').replace(/[`*_#>]/g, '').replace(/\s+/g, ' ').trim();
+// The text as the agent wrote it, less the Markdown marks a screen reader would speak: backticks, asterisks, a heading's # and a quote's > at the start of a line, and an underscore that wraps a word as emphasis (_this_, __this__).
+// An underscore inside a word is the word's own (HERMES_TEST_REPLY, snake_case, __init__ is emphasis only when a space or the edge is on both sides) and stays (#12426: it was announced as HERMESTESTREPLY).
+export const words = (t, max = 120) => {
+    const s = String(t || '').replace(/[`*]/g, '').replace(/^[#>]+\s*/gm, '').replace(/(^|[\s(])_{1,2}(?=\S)([^\s_](?:[^_]*[^\s_])?)_{1,2}(?=$|[\s).,;:!?])/g, '$1$2').replace(/\s+/g, ' ').trim();
     if (s.length <= max) return s;
     const cut = s.lastIndexOf(' ', max);
     return s.slice(0, cut > max / 2 ? cut : max) + '…';

@@ -293,3 +293,4 @@ node table_inventory.test.mjs
 node agent_name_census.test.mjs
 node server_upgrade_page.test.mjs
 node hub_hooks.test.mjs
+node chat_announce_words.test.mjs
