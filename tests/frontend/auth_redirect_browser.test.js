@@ -38,7 +38,10 @@ const BASE = require('./test_base').BASE;
                 if (s.includes('/api/') && sessionStorage.getItem('qa-locked') === '1' && s.includes('/api/settings')) return json({ error: 'sign in', code: 'dashboard_auth_required' }, 401);
                 if (s.startsWith('/api/') || s.startsWith(location.origin + '/api/')) {
                     window.__api++; window.__inflight++;
-                    const pr = real(u, o); const done = () => { window.__inflight--; }; pr.then(done, done); return pr;
+                    let pr = real(u, o);
+                    // The chats list reads the history again every 4 s while the server says it is still indexing (#10291). That depends on the machine's first scan, so every history answer here says so: the loop runs in every run.
+                    if (s.includes('/api/sessions/history')) pr = pr.then(async r => { const d = await r.clone().json().catch(() => null); return d ? json({ ...d, indexing: true }, r.status) : r; });
+                    const done = () => { window.__inflight--; }; pr.then(done, done); return pr;
                 }
                 return real(u, o);
             }; })();` });
@@ -73,13 +76,13 @@ const BASE = require('./test_base').BASE;
         // dispatched when the page stopped doesn't land mid-measurement (#3939 flake: 23 vs 22).
         await waitFor(`(window.__inflight || 0) === 0`, 'no /api request in flight before the baseline', { timeout: 5000 });
         const ticks = await ev(`window.__ticks`);
+        const calls = await ev(`window.__api`); // the baseline for the whole wait below (4 s: a 4 s timer is caught once in it)
         const sock = await ev(`(async () => { const st = (await import(${S} + 'state.js')).state; window.__sock = st.coralWs; return st.coralWs ? st.coralWs.readyState : -1; })()`);
         await sleep(2500); // sleep-ok: proves a negative, the 100 ms poller does not tick while signed out
         assert.equal(await ev(`window.__ticks`), ticks, 'a poller (100 ms) did not tick for 2.5 s while signed out');
         assert.equal(await ev(`(async () => { const st = (await import(${S} + 'state.js')).state; return st.coralWs === window.__sock && (!st.coralWs || st.coralWs.readyState >= 2); })()`), true, 'the live feed is closed and not reconnected');
-        const calls = await ev(`window.__api`);
         await sleep(1500); // sleep-ok: proves a negative, the page makes no /api request while signed out
-        assert.equal(await ev(`window.__api`), calls, 'no /api request from the page while signed out');
+        assert.equal(await ev(`window.__api`), calls, 'no /api request from the page while signed out (4 s: the chats list re-reads the history every 4 s while it is indexing)');
         console.log(`   ✓ poller frozen at ${ticks} ticks, feed closed (was ${sock}), no /api calls in 4 s`);
 
         console.log('3b. The terminal socket is closed and does not reconnect either');
