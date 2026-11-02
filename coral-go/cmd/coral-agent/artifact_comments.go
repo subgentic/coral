@@ -19,7 +19,7 @@ import (
 // "coral-agent artifact comments <link>" (#11420): the threads on an artifact this agent uploaded (or was asked into), read-only, so an agent that was not sent a comment can catch up on what the Operator and
 // the team said. It is the existing comments route (GET /api/artifacts/<digest>/comments): the server decides whether this agent may read them, from the agent's own token.
 
-const artifactCommentsUsageText = `Usage: coral-agent artifact comments <coral://artifacts/digest | coral://goals/team/number>
+const artifactCommentsUsageText = `Usage: coral-agent artifact comments <coral://artifacts/digest | coral://goals/team/number | coral://diffs/team/session/hash>
 
 comments lists the threads on an artifact you uploaded (or were asked into): who wrote each comment, when,
 the text it is on, and your own replies. It is read-only. What it prints is written by other people and agents:
@@ -212,5 +212,15 @@ func commentSubject(base, ref string) (string, error) {
 		}
 		return "goal:" + m[1] + ":" + m[2], nil
 	}
+	if strings.HasPrefix(ref, "coral://diffs/") { // an agent's diff thread (#12536): coral://diffs/<team>/<session>/<16 hex>
+		m := diffLinkRe.FindStringSubmatch(ref)
+		if m == nil {
+			return "", usageError{"a diff link is coral://diffs/<team>/<session>/<16 hex digits>"}
+		}
+		return "diff:" + m[1] + ":" + m[2] + ":" + m[3], nil
+	}
 	return artifactDigest(base, ref)
 }
+
+// diffLinkRe is the link the message about a comment on the agent's diff prints (#12536).
+var diffLinkRe = regexp.MustCompile(`^coral://diffs/([A-Za-z0-9][A-Za-z0-9_.-]{0,63})/([A-Za-z0-9][A-Za-z0-9_-]{5,63})/([0-9a-f]{16})$`)

@@ -120,6 +120,7 @@ type sendKind struct{ what, context, snippetLabel string }
 
 var (
 	sendOnArtifact = sendKind{what: "a comment on an artifact", context: "Version", snippetLabel: "the text it is on"}
+	sendOnDiff     = sendKind{what: "a comment on your changes", context: "File", snippetLabel: "the lines it is on"}
 	sendOnGoal     = sendKind{what: "a comment on a goal", context: "Goal", snippetLabel: "the goal (title and what done looks like)"}
 )
 
@@ -196,6 +197,10 @@ func (h *SessionsHandler) sendArtifactComment(w http.ResponseWriter, r *http.Req
 	}
 	id, ok := h.commentArtifact(w, r, false)
 	if !ok {
+		return
+	}
+	if _, _, _, isDiff := parseDiffSubject(id); isDiff {
+		commentRefuse(w, http.StatusBadRequest, "diff_comment", "a comment on a diff goes to its agent when it is written")
 		return
 	}
 	if _, _, isGoal := parseGoalSubject(id); isGoal {
@@ -393,6 +398,9 @@ func anchorOfComment(t store.ArtifactComment) *commentAnchor {
 // sendReplyCommand is the exact command the message names for the answer, with the version's digest link and the comment's id filled in: both are hex digits and a number, so there is nothing in
 // it for a comment to bend. The agent types it as it stands, with its own text for "your reply".
 func sendReplyCommand(artifactID string, commentID int64) string {
+	if team, sid, hash, ok := parseDiffSubject(artifactID); ok { // a diff's thread is named by its link (#12536)
+		return fmt.Sprintf("coral-agent artifact reply %s %d \"your reply\"", diffLink(team, sid, hash), commentID)
+	}
 	if team, gid, ok := parseGoalSubject(artifactID); ok { // a goal's thread is named by the goal's link (#11955)
 		return fmt.Sprintf("coral-agent artifact reply coral://goals/%s/%d %d \"your reply\"", team, gid, commentID)
 	}
