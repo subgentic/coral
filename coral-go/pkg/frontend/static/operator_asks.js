@@ -162,7 +162,9 @@ export function openAskDialog(a, onDone, runners = {}) {
     const parts = askParts(a);
     const title = document.createElement('h2'); title.id = 'inbox-ask-title'; title.textContent = parts.title;
     const sub = document.createElement('p'); sub.className = 'inbox-ask-sub';
-    sub.textContent = [`From ${markHidden(a.asker, { strict: true })}`, (/\bteam$/i.test(a.board_label || a.board) ? (a.board_label || a.board) : `${a.board_label || a.board} team`), whenText(a.at)].filter(Boolean).join(' \u00b7 ') + (a.kind === 'wait' ? ', waiting for your reply' : '');
+    const who = markHidden(a.asker, { strict: true }), rest = [(/\bteam$/i.test(a.board_label || a.board) ? (a.board_label || a.board) : `${a.board_label || a.board} team`), whenText(a.at)].filter(Boolean).join(' \u00b7 ') + (a.kind === 'wait' ? ', waiting for your reply' : '');
+    sub.textContent = `From ${who} \u00b7 ${rest}`;
+    importOnce('./agent_link.js').then(m => { if (sub.isConnected) sub.replaceChildren('From ', m.agentLink(who, { board: a.board }), ` \u00b7 ${rest}`); }); // the asker's name opens that agent's chat, as everywhere else (#12168); the line is plain text until the helper is there
     const subjects = askSubjects(a), links = document.createElement('p'); links.className = 'inbox-ask-subjects'; links.hidden = !subjects.length; if (subjects.length) loadStyles('pictures.css'); // its links are drawn by the lazy picture rules // the goal and task it is about, each a link that opens it in the Inbox
     if (subjects.length) links.append(document.createTextNode('About ')); // the asker names them: the line says so (Security's INFO on #12164)
     subjects.forEach((x, i) => {

@@ -55,7 +55,7 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
         };
         return true; })()`;
     // a box's place once it has stayed the same for five frames (a sheet that slides in): waits for the movement to end instead of sleeping a fixed time; gives up after 300 frames and lets the check that follows say where it was
-    const settled = sel => ev(`new Promise(res => { let last = '', n = 0, tries = 0; const tick = () => { const e = document.querySelector(${JSON.stringify(sel)}); const r = e ? e.getBoundingClientRect() : null; const k = r ? [r.top, r.bottom, r.left, r.right].map(Math.round).join() : ''; n = k && k === last ? n + 1 : 0; last = k; if (n >= 5 || ++tries > 300) return res(k); requestAnimationFrame(tick); }; tick(); })`);
+    const settled = sel => ev(`new Promise(res => { let last = '', n = 0, tries = 0; const tick = () => { const e = document.querySelector(${JSON.stringify(sel)}); const r = e ? e.getBoundingClientRect() : null; const k = r ? [r.top, r.bottom, r.left, r.right].map(Math.round).join() : ''; n = k && k === last ? n + 1 : 0; last = k; if (n >= 5 || ++tries > 300) return res(k); requestAnimationFrame(tick); }; tick(); })`); // raf-ok: bounded to 300 tries, and the suite's own page is visible while it runs (be-12288's settle)
     const rect = sel => ev(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; const r = e.getBoundingClientRect(); return { l: Math.round(r.left), t: Math.round(r.top), r: Math.round(r.right), b: Math.round(r.bottom), w: Math.round(r.width), h: Math.round(r.height) }; })()`);
     const open = async (extra) => {
         await ev(STUB);

@@ -16,6 +16,7 @@ const prose = x => /:\/\//.test(x) || (/\s/.test(x) && (/[A-Z]/.test(x) || /[.!?
 const KEEP = [
     ['capture.js', 'capture poll: server not reachable'],            // a console line, not on screen
     ['mobile_connect.js', 'running server'],                          // this Coral's own process
+    ['server_ssh_setup.js', '~/.coral-server'],                       // the install folder's own name, a path (#12263)
     ['prerequisites.js', 'The server returned an invalid response'],  // this Coral's own answer
     ['settings_machine.js', 'this server build'],                     // this Coral's build
     ['task_detail_html.js', 'unless the server enables them'],        // this Coral

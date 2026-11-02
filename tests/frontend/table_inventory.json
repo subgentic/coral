@@ -74,6 +74,12 @@
    "covered_by": "files"
   },
   {
+   "file": "inbox_activity.js",
+   "calls": 1,
+   "surface": "Inbox: Activity (what the Operator decided)",
+   "covered_by": "activity"
+  },
+  {
    "file": "inbox_sidebar.js",
    "calls": 4,
    "surface": "Inbox: Saved, Needs you, Tasks, Goals",
@@ -108,6 +114,12 @@
    "calls": 1,
    "surface": "Coral Hub: Servers",
    "covered_by": "servers (live hub)"
+  },
+  {
+   "file": "skills_tab.js",
+   "calls": 2,
+   "surface": "Skills: the list, and a skill's files",
+   "covered_by": "skills"
   },
   {
    "file": "task_list.js",
