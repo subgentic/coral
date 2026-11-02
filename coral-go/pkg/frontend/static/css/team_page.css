@@ -296,7 +296,7 @@
 .inbox-folder-toolbar .list-bar-search-row.gt-toolbar > .team-tb-select { display: none; }
 .inbox-folder-toolbar .inbox-pill-field { display: none; }
 .inbox-folder-toolbar .inbox-pill-field .team-tb-select { display: block; max-width: none; }
-.inbox-folder-head { display: flex; align-items: baseline; gap: var(--space-md, 8px); flex: 0 1 auto; min-width: 0; max-width: 40%; margin-right: 4px; }
+.inbox-folder-head { display: flex; align-items: baseline; gap: var(--space-md, 8px); flex: 0 0 auto; min-width: 0; max-width: 40%; margin-right: 4px; } /* the title keeps its width (up to 40% of the row): the search box and the chips give way, not "Needs you" cut to "Nee…" (#12149) */
 .inbox-folder-head h2 { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-2xl); font-weight: var(--fw-title); line-height: var(--lh-label); color: var(--text-primary); }
 .inbox-folder-head h2:focus { outline: none; }
 .inbox-folder-head h2:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm, 2px); }
