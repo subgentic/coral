@@ -45,7 +45,8 @@ async function showRestartModal() {
                 thinkingActual: s.thinking_actual || '', // what it last ran at: a note under Thinking when that differs (#5105)
                 prompt: s.prompt || '',
                 capabilities: s.capabilities || null,
-                autoPermissions: s.live_permission_mode || s.permission_mode || true, // the form opens on the mode the agent runs in, not the saved default: a restart that does not touch the select keeps it (#12481)
+                autoPermissions: s.permission_mode || s.live_permission_mode || true, // the form opens on the mode a restart will use (the stored one; the CLI's own report when none is stored): one that does not touch the select keeps it (#12481)
+                liveMode: s.live_permission_mode || '', // when it differs, a note beside the select says what the agent runs in now
             },
         });
     }

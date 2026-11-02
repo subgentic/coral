@@ -21,9 +21,10 @@ const { coralReady } = require('./helpers/wait');
             await window.showLaunchModal(); window.hideLaunchModal();
             return true; })()`);
         const settled = () => waitFor(`document.getElementById('restart-acf').dataset.acfDefaults !== 'pending'`, 'the form default model has arrived', 8000);
-        const run = async (storedMode, pick, liveOnly = false) => {
+        const run = async (storedMode, pick, liveOnly = false, live = '') => {
             const session = { name: 'ag', display_name: 'Agent', session_id: 'sid-r', type: 'live', agent_type: 'claude', model: 'claude-opus-4', prompt: 'p', tmux_session: 'ag' };
-            if (liveOnly) session.live_permission_mode = storedMode; else session.permission_mode = storedMode; // an agent whose row has only the CLI's own report (a hook) opens on it too
+            if (liveOnly) session.live_permission_mode = storedMode; else session.permission_mode = storedMode;
+            if (live) session.live_permission_mode = live; // an agent whose row has only the CLI's own report (a hook) opens on it too
             const n = await ev(`window.__reqs.length`);
             await ev(`T.state.liveSessions = [${JSON.stringify(session)}]; window.selectLiveSession('ag', 'claude', 'sid-r', 'local'); true`); // the real selection path: it is what puts the agent's mode on the page's session
             await waitFor(`T.state.currentSession && T.state.currentSession.session_id === 'sid-r'`, 'the agent is selected');
@@ -34,7 +35,7 @@ const { coralReady } = require('./helpers/wait');
             if (pick) await ev(`(() => { const e = document.querySelector('#restart-acf .acf-permission-mode'); e.value = ${JSON.stringify(pick)}; e.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
             await ev(`(document.querySelector('#restart-modal [data-on-click="m-confirm-restart"]')).click(); true`);
             await waitFor(`window.__reqs.length > ${n}`, 'the restart request', 8000);
-            return { opened, body: await ev(`window.__reqs[${n}]`) };
+            return { opened, note: await ev(`(document.querySelector('#restart-acf .acf-mode-live') || {}).textContent || ''`), body: await ev(`window.__reqs[${n}]`) };
         };
         const bypassUntouched = await run('bypassPermissions', null);
         assert.equal(bypassUntouched.opened, 'bypassPermissions', 'the dialog opens on the mode the agent runs in, not the saved default');
@@ -47,6 +48,12 @@ const { coralReady } = require('./helpers/wait');
         const liveToDefault = await run('bypassPermissions', 'default', true);
         assert.equal(liveToDefault.opened, 'bypassPermissions', 'a row with only the live mode opens on it');
         assert.equal(liveToDefault.body.permission_mode, 'default', 'Bypass to Default is sent when the mode came from the live report');
+        const both = await run('default', null, false, 'plan');
+        assert.equal(both.opened, 'default', 'stored and live differ: the dialog opens on the mode a restart will use (the stored one)');
+        assert.equal(both.note, 'Running in Plan now; restarting uses Default unless you pick.', 'and says what the agent runs in now');
+        assert.equal(both.body.permission_mode, undefined, 'untouched: no mode is sent');
+        const same = await run('plan', null, false, 'plan');
+        assert.equal(same.note, '', 'no note when the two agree');
     } finally { await client.close(); }
     console.log('restart_permission_pick_browser: ok');
 })().catch(e => { console.error(e && e.message || e); process.exit(1); });
