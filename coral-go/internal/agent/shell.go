@@ -300,6 +300,21 @@ func windowsCommonDirs(appData, localAppData string) []string {
 	return dirs
 }
 
+// systemCandidates are binary in each of the named system folders that CommonSystemBinDirs still lists (the order of the names is kept).
+func systemCandidates(binary string, dirs ...string) []string {
+	listed := map[string]bool{}
+	for _, d := range CommonSystemBinDirs() {
+		listed[d] = true
+	}
+	var out []string
+	for _, d := range dirs {
+		if listed[d] {
+			out = append(out, d+"/"+binary)
+		}
+	}
+	return out
+}
+
 // FindCLIInCommonPaths searches common install locations for a CLI binary.
 // Returns the full path if found, empty string if not.
 func FindCLIInCommonPaths(binary string) string {
@@ -309,6 +324,18 @@ func FindCLIInCommonPaths(binary string) string {
 		}
 	}
 	return ""
+}
+
+// CommonSystemBinDirs are the folders outside home where a system or package-manager install puts a CLI, per OS. A variable so a test owns them: a machine that has a CLI in one (a CI runner's
+// /usr/local/bin) must not change what a test of "nothing is installed" sees (#12423).
+var CommonSystemBinDirs = func() []string {
+	switch runtime.GOOS {
+	case "darwin":
+		return []string{"/usr/local/bin", "/opt/homebrew/bin"}
+	case "linux":
+		return []string{"/usr/local/bin", "/snap/bin"}
+	}
+	return nil
 }
 
 // CommonPlaceCandidates are the fixed places a CLI of this name may be installed, in the order they are tried (never resolved, never a walk: a path is the link itself, so the file an updater
@@ -323,11 +350,8 @@ func CommonPlaceCandidates(binary string) []string {
 
 	switch runtime.GOOS {
 	case "darwin":
-		candidates = []string{
-			"/usr/local/bin/" + binary,
-			"/opt/homebrew/bin/" + binary,
-			filepath.Join(home, ".local", "bin", binary),
-		}
+		candidates = systemCandidates(binary, "/usr/local/bin", "/opt/homebrew/bin")
+		candidates = append(candidates, filepath.Join(home, ".local", "bin", binary))
 		// nvm installs
 		nvmDir := filepath.Join(home, ".nvm", "versions", "node")
 		if entries, err := filepath.Glob(filepath.Join(nvmDir, "*", "bin", binary)); err == nil {
@@ -339,11 +363,9 @@ func CommonPlaceCandidates(binary string) []string {
 			candidates = append(candidates, entries...)
 		}
 	case "linux":
-		candidates = []string{
-			"/usr/local/bin/" + binary,
-			filepath.Join(home, ".local", "bin", binary),
-			"/snap/bin/" + binary,
-		}
+		candidates = systemCandidates(binary, "/usr/local/bin")
+		candidates = append(candidates, filepath.Join(home, ".local", "bin", binary))
+		candidates = append(candidates, systemCandidates(binary, "/snap/bin")...)
 		nvmDir := filepath.Join(home, ".nvm", "versions", "node")
 		if entries, err := filepath.Glob(filepath.Join(nvmDir, "*", "bin", binary)); err == nil {
 			candidates = append(candidates, entries...)

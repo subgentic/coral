@@ -40,6 +40,9 @@ func newNativeRig(t *testing.T) *nativeRig {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = os.RemoveAll(home) }) // this folder only, by its exact name
 	t.Setenv("HOME", home)
+	prevSys := agent.CommonSystemBinDirs // the machine's own install places (a runner's /usr/local/bin) are not these tests': they own every place a CLI could be found (#12423)
+	agent.CommonSystemBinDirs = func() []string { return nil }
+	t.Cleanup(func() { agent.CommonSystemBinDirs = prevSys })
 	prev := cliTempDirs
 	cliTempDirs = func() []string { return nil } // the test's folders are in a temp folder; the screens below are for the working folder alone
 	t.Cleanup(func() { cliTempDirs = prev })
