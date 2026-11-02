@@ -63,7 +63,7 @@ func TestScreenStopsSleepOnlyReadsTheFooter(t *testing.T) {
 	assert.Equal(t, "", ScreenStopsSleep(ctx, f, "claude-x", "claude", "x", false), "the agent's own words have no middle dot: not a footer")
 	f.show("✱ Crunched for 24s · done 5:56 AM · 1 shell still running\n\n" + box)
 	assert.Equal(t, SleepStopBackground, ScreenStopsSleep(ctx, f, "claude-x", "claude", "x", false), "the footer says so")
-	assert.Equal(t, "· done 5:56 AM · 1 shell", BackgroundMarker("✱ Crunched for 24s · done 5:56 AM · 1 shell still running\n\n"+box))
+	assert.Equal(t, "✱ Crunched for 24s · done 5:56 AM · 1 shell", BackgroundMarker("✱ Crunched for 24s · done 5:56 AM · 1 shell still running\n\n"+box))
 }
 
 // The footer is anchored on the input box, not on a count of lines (Security, #12335): notices under the box that push the status line past any fixed window do not hide it, and history above never counts.
@@ -80,7 +80,18 @@ func TestScreenStopsSleepFooterIsAnchoredOnTheBox(t *testing.T) {
 	assert.Equal(t, "", ScreenStopsSleep(ctx, f, "claude-x", "claude", "x", false), "history above the line over the box never counts")
 	f.show("✱ Crunched for 24s · done 5:56 AM\n\n" + rule + "❯ \n──[]── manual mode on · ? for shortcuts ──\n")
 	assert.Equal(t, "", ScreenStopsSleep(ctx, f, "claude-x", "claude", "x", false), "Beta Tester's parked worker: nothing running")
-	assert.Equal(t, "· 1 shell", BackgroundMarker("✻ x · 1 shell still running\n"+rule+"❯ \n"+rule), "the marker is the footer's own words")
+	assert.Equal(t, "✻ x · 1 shell", BackgroundMarker("✻ x · 1 shell still running\n"+rule+"❯ \n"+rule), "the marker is the footer line up to its words")
 	long := BackgroundMarker("x\n" + rule + "❯ \n" + rule + "· " + strings.Repeat("é", 70) + " still running")
 	assert.True(t, utf8.ValidString(long) && len([]rune(long)) <= 60, "a long marker is cut on a character boundary: %q", long)
+}
+
+// With a box to anchor on, the words alone count: a footer whose separator is a bullet or a pipe still keeps the agent awake; without a box they need the middle dot (the Orchestrator, #12335).
+func TestScreenStopsSleepWordsAloneCountInTheAnchoredFooter(t *testing.T) {
+	ctx := context.Background()
+	f := &fakeAgent{}
+	rule := "──────────────────────────────────────────────────────────────────────\n"
+	f.show("✻ Cogitated for 4s | done 5:38 PM | 1 shell still running\n\n" + rule + "❯ \n" + rule + "  bypass permissions on\n")
+	assert.Equal(t, SleepStopBackground, ScreenStopsSleep(ctx, f, "claude-x", "claude", "x", false), "a pipe for a separator: still a shell running")
+	f.show("  bypass permissions on | 1 shell\n")
+	assert.Equal(t, "", ScreenStopsSleep(ctx, f, "claude-x", "claude", "x", false), "no box and no dot: not a footer line")
 }
