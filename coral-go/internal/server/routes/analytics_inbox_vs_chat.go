@@ -38,12 +38,16 @@ func (h *InboxVsChatHandler) clock() time.Time {
 
 // Read answers the read.
 func (h *InboxVsChatHandler) Read(w http.ResponseWriter, r *http.Request) {
-	if cloud.Tunneled(r) || r.Header.Get(tunnel.ViaHeader) != "" {
-		commentRefuse(w, http.StatusForbidden, "not_through_hub", "the Inbox-versus-chat counts are on this computer only")
+	if !operatorOnly(w, r) { // at this computer, the person; through Coral Hub, the account this computer is linked to and nobody else (refuseNonOwner)
 		return
 	}
-	if !operatorOnly(w, r) {
-		return
+	if cloud.Tunneled(r) || r.Header.Get(tunnel.ViaHeader) != "" {
+		if hubOwnerRequest(r).team {
+			// On a team's computer each owner may read only their own rows, and the touches carry no actor: the counts of one owner cannot be told from another's. So nothing is shown through the Hub there
+			// (fail closed), until the touches carry an actor.
+			commentRefuse(w, http.StatusForbidden, "not_for_teams", "on a team's computer these counts are not shown through Coral Hub")
+			return
+		}
 	}
 	q := r.URL.Query()
 	team := q.Get("team")

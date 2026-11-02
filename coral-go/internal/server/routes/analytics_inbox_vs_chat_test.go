@@ -90,19 +90,49 @@ func TestTheInboxVsChatReadCutsDaysToNinetyAndRefusesWhatIsNotValid(t *testing.T
 	}
 }
 
-func TestTheInboxVsChatReadIsThePersonsAloneAndThisComputers(t *testing.T) {
+func TestTheInboxVsChatReadIsThePersonsAndThroughTheHubTheOwnersAloneAndNeverATeamsComputer(t *testing.T) {
 	withLabel(t, "hub-user-1234abcd", nil)
 	rig := newCmtRig(t)
 	notPerson := ivcServer(t, rig, false) // an agent token or a script
 	code, _ := getIVC(t, notPerson.URL, "", nil)
 	assert.Equal(t, http.StatusForbidden, code)
 	srv := ivcServer(t, rig, true)
+	// through the Hub on a personal computer the owner reads it (read only) and nobody else does
+	code, out := getIVC(t, srv.URL, "", map[string]string{tunnel.ViaHeader: cloud.ViaSecret(), tunnel.HubRoleHeader: "owner", tunnel.HubUserHeader: "hub-user-1234abcd"})
+	require.Equal(t, http.StatusOK, code, out)
+	assert.NotNil(t, out["counts"])
 	for name, hdr := range map[string]map[string]string{
-		"a Hub stamp":     {tunnel.ViaHeader: cloud.ViaSecret(), tunnel.HubUserHeader: "someone"},
-		"the Hub's owner": {tunnel.ViaHeader: cloud.ViaSecret(), tunnel.HubRoleHeader: "owner", tunnel.HubUserHeader: "hub-user-1234abcd"},
-		"a forged stamp":  {tunnel.ViaHeader: "not-the-secret", tunnel.HubRoleHeader: "owner", tunnel.HubUserHeader: "hub-user-1234abcd"},
+		"a Hub stamp, no owner marker": {tunnel.ViaHeader: cloud.ViaSecret(), tunnel.HubUserHeader: "someone"},
+		"another account's marker":     {tunnel.ViaHeader: cloud.ViaSecret(), tunnel.HubRoleHeader: "owner", tunnel.HubUserHeader: "hub-user-9999ffff"},
+		"a forged stamp":               {tunnel.ViaHeader: "not-the-secret", tunnel.HubRoleHeader: "owner", tunnel.HubUserHeader: "hub-user-1234abcd"},
 	} {
 		code, _ := getIVC(t, srv.URL, "", hdr)
 		assert.Equal(t, http.StatusForbidden, code, name)
 	}
+}
+
+// On a computer enrolled to a Hub team each owner may read only their own rows, and the touches carry no actor: the counts of one owner cannot be told from another's, so nothing is shown through the Hub there.
+func TestTheInboxVsChatReadIsRefusedThroughTheHubOnATeamsComputerEvenToItsOwners(t *testing.T) {
+	withRecord(t, tunnel.OwnerKindTeam, teamOrgA, nil)
+	withLabel(t, "", nil)
+	rig := newCmtRig(t)
+	srv := ivcServer(t, rig, true)
+	flat := func(h http.Header) map[string]string {
+		m := map[string]string{}
+		for k := range h {
+			m[k] = h.Get(k)
+		}
+		return m
+	}
+	for _, role := range []string{"admin", "owner", "member"} {
+		code, out := getIVC(t, srv.URL, "", flat(teamStamp(teamOrgA, role, teamUIDA, teamUser)))
+		assert.Equal(t, http.StatusForbidden, code, role)
+		assert.NotContains(t, out, "counts", role+": nothing of the counts is in a refusal")
+		if role != "member" {
+			assert.Equal(t, "not_for_teams", out["code"], role)
+		}
+	}
+	// the person at the team's own computer still reads it
+	code, _ := getIVC(t, srv.URL, "", nil)
+	assert.Equal(t, http.StatusOK, code)
 }

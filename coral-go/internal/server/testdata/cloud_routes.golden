@@ -50,7 +50,7 @@ GET /api/agent/ui/{id}/events view
 GET /api/agents/models launch
 GET /api/analytics/activity launch
 GET /api/analytics/efficiency never
-GET /api/analytics/inbox-vs-chat never
+GET /api/analytics/inbox-vs-chat view
 GET /api/artifacts view
 GET /api/artifacts/resolve view
 GET /api/artifacts/series/{series_id} view

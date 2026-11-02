@@ -3,6 +3,7 @@ GET /api/agent-models redact
 GET /api/agent/ui redact
 GET /api/agent/ui/{uiid}/content redact
 GET /api/agent/ui/{uiid}/events redact
+GET /api/analytics/inbox-vs-chat redact
 GET /api/artifacts redact
 GET /api/artifacts/resolve redact
 GET /api/artifacts/series/{series} redact

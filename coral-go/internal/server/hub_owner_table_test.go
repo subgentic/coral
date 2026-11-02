@@ -120,6 +120,7 @@ func TestTheOwnerRoutesOfTheTableAreTheReviewedSet(t *testing.T) {
 		"GET /api/operator-asks":                        "owner-only", // the questions agents asked the Operator, for Needs you (#11417)
 		"GET /api/needs-you":                            "owner-only", // what is waiting for the Operator, for the Hub's phone push (#11596)
 		"GET /api/activity":                             "owner-only", // the record of what the Operator did in Needs you, read only (#12070)
+		"GET /api/analytics/inbox-vs-chat":              "owner-only", // the Inbox-versus-chat counts, read only (#12158)
 		"GET /api/board/{project}/orchestrator-grant":   "owner-only", // the grant to a board's orchestrator (#11432)
 		"PUT /api/board/{project}/orchestrator-grant":   "owner-only",
 		"GET /api/board/{project}/lifecycle-log":        "owner-only",

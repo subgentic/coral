@@ -151,6 +151,7 @@ var ownerRefusals = map[string]string{
 	tunnel.OwnerRouteKey("GET", "/api/operator-asks"):                                               textOperatorAsksOwnerOnly,
 	tunnel.OwnerRouteKey("GET", "/api/needs-you"):                                                   textNeedsYouOwnerOnly,
 	tunnel.OwnerRouteKey("GET", "/api/activity"):                                                    textActivityRecordOwnerOnly,
+	tunnel.OwnerRouteKey("GET", "/api/analytics/inbox-vs-chat"):                                     textInboxVsChatOwnerOnly,
 	tunnel.OwnerRouteKey("GET", "/api/board/{project}/orchestrator-grant"):                          textOrchGrantOwnerOnly,
 	tunnel.OwnerRouteKey("PUT", "/api/board/{project}/orchestrator-grant"):                          textOrchGrantOwnerOnly,
 	tunnel.OwnerRouteKey("GET", "/api/board/{project}/lifecycle-log"):                               textOrchGrantOwnerOnly,
@@ -161,6 +162,7 @@ var ownerRefusals = map[string]string{
 }
 
 const textNoticesOwnerOnly = "through Coral Hub pausing an agent's notices is for the account this computer is linked to only (#11387)"
+const textInboxVsChatOwnerOnly = "through Coral Hub the counts of what the Operator did in the Inbox and in a chat are for the account this computer is linked to only (#12158)"
 const textActivityRecordOwnerOnly = "through Coral Hub the record of what the Operator did in Needs you is for the account this computer is linked to only (#12070)"
 const textNeedsYouOwnerOnly = "through Coral Hub what is waiting for the Operator is for the account this computer is linked to only (#11596)"
 const textOperatorAsksOwnerOnly = "through Coral Hub the questions asked of the Operator are for the account this computer is linked to only (#11417)"

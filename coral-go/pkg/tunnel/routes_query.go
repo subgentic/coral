@@ -15,6 +15,7 @@ var routeQueries = map[string]string{
 	"GET /api/agent/ui/{}/events":                 "after,session_id",
 	"GET /api/agents/models":                      "type",
 	"GET /api/analytics/activity":                 "range,team",
+	"GET /api/analytics/inbox-vs-chat":            "days,team",
 	"GET /api/artifacts":                          "board,cursor,limit,starred",
 	"GET /api/artifacts/resolve":                  "link",
 	"GET /api/artifacts/{}":                       "open=1,v=2",

@@ -215,7 +215,8 @@ func (s *Server) registerBoardTaskRoutes(r chi.Router, boardHandler *routes.Boar
 	// the Analytics tabs Operator interaction and Team communication (#11222): counts from the board, the Hub owner only
 	activityHandler := routes.NewActivityHandler(s.boardStore)
 	r.Get("/api/analytics/activity", activityHandler.Activity)
-	r.Get("/api/analytics/inbox-vs-chat", routes.NewInboxVsChatHandler(s.boardStore, store.NewSessionStore(s.db)).Read) // the Operator's Inbox-versus-chat counts (#12158): counts only, theirs alone, this computer only
+	inboxVsChatHandler := routes.NewInboxVsChatHandler(s.boardStore, store.NewSessionStore(s.db))
+	r.Get("/api/analytics/inbox-vs-chat", inboxVsChatHandler.Read) // the Operator's Inbox-versus-chat counts (#12158): counts only, theirs alone, through the Hub the owner of a personal computer only
 	// Goals (#7087): board text, written by the Operator or an orchestrator, readable like tasks.
 	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/goals", boardHandler.CreateGoal)
 	r.Post("/api/board/{project}/goal-images", boardHandler.UploadGoalImage) // the Operator's picture for a new goal's description (#11650)
