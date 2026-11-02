@@ -38,6 +38,8 @@ const { coralReady } = require('./helpers/wait');
             await feed({ coral_token_problem: TOKEN, board_unread: 2 });
             v = await view();
             check(`${tag}: unread team messages say theirs first, the token line is not shown over them`, v.text === '2 team messages have not reached this agent yet' && v.list, JSON.stringify(v));
+            await feed({ coral_token_problem: 'x'.repeat(300) });
+            check(`${tag}: a sentence over 200 characters is cut at 200`, (await view()).text === 'x'.repeat(200), JSON.stringify((await view()).text.length));
             await feed({ coral_token_problem: { not: 'text' } });
             check(`${tag}: a payload that is not text says nothing`, !(await view()).shown);
             await feed({ board_unread: 2 });
