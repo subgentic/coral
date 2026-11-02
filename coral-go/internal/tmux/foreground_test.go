@@ -315,3 +315,21 @@ func TestShellTreeDrawsNamesAndStatesOnly(t *testing.T) {
 	}
 	assert.True(t, strings.HasSuffix(shellTree(many, 1), " ..."), "a wide tree is cut")
 }
+
+// Security's MUST on #12222: the drawing holds base names only, capped, with control characters, braces and spaces dropped, and a path from macOS's ps is cut to its last element.
+func TestShellTreeNamesAreBaseNamesAndCleaned(t *testing.T) {
+	assert.Equal(t, "claude", treeName("/Users/jane/Projects/secret-client/bin/claude"))
+	assert.Equal(t, "node", treeName("node"))
+	assert.Equal(t, "bash", treeName("-bash"[1:]))
+	assert.Equal(t, "ab", treeName("a{b}\x1b\n \t"), "braces, controls and spaces are dropped")
+	assert.Equal(t, "?", treeName("/"), "nothing left")
+	assert.Equal(t, "?", treeName("{}"))
+	long := treeName(strings.Repeat("x", 200))
+	assert.Len(t, long, 24, "capped")
+	assert.Equal(t, "Ss+", treeStat("Ss+"))
+	assert.Equal(t, "S", treeStat("S\n{x}"))
+	tab := &procTable{byPID: map[int]procEntry{1: {stat: "Ss", comm: "/Users/jane/work/proj/bash"}, 2: {ppid: 1, stat: "S+", comm: "/home/jane/.local/bin/my{tool}"}}, children: map[int][]int{1: {2}}}
+	tree := shellTree(tab, 1)
+	assert.Equal(t, "bash(Ss){mytool(S+)}", tree)
+	assert.NotContains(t, tree, "jane")
+}

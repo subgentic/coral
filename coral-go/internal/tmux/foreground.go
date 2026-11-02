@@ -120,6 +120,42 @@ func (c *Client) ShellTree(ctx context.Context, agentName, agentType, sessionID 
 	return ShellTreeOf(pid), nil
 }
 
+// treeName is a process's name as the log line draws it (#12222, Security): the base name only (on macOS ps gives the executable's full path, which can hold the person's folders), at most 24 characters,
+// with control characters, braces, parentheses and spaces dropped so the line cannot be made to look like something else.
+func treeName(comm string) string {
+	if i := strings.LastIndexAny(comm, `/\\`); i >= 0 {
+		comm = comm[i+1:]
+	}
+	var b strings.Builder
+	for _, r := range comm {
+		if b.Len() >= 24 {
+			break
+		}
+		if r < 0x21 || r == 0x7f || r > 0x7e || strings.ContainsRune("{}()", r) {
+			continue
+		}
+		b.WriteRune(r)
+	}
+	if b.Len() == 0 {
+		return "?"
+	}
+	return b.String()
+}
+
+// treeStat is a process's state letters as drawn: letters, digits and the few signs ps uses ('+', '<', 's', 'l'), at most 8.
+func treeStat(stat string) string {
+	var b strings.Builder
+	for _, r := range stat {
+		if b.Len() >= 8 {
+			break
+		}
+		if r >= 'A' && r <= 'Z' || r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == '+' || r == '<' {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
 func shellTree(t *procTable, pid int) string {
 	if _, ok := t.byPID[pid]; !ok {
 		return ""
@@ -137,7 +173,7 @@ func shellTree(t *procTable, pid int) string {
 		if n > 16 {
 			return
 		}
-		fmt.Fprintf(&b, "%s(%s)", e.comm, e.stat)
+		fmt.Fprintf(&b, "%s(%s)", treeName(e.comm), treeStat(e.stat))
 		if kids := t.children[pid]; len(kids) > 0 && depth < nestedShellDepth {
 			b.WriteString("{")
 			for i, c := range kids {
