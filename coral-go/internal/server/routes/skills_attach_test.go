@@ -72,7 +72,20 @@ func newLaunchEnv(t *testing.T) *launchEnv {
 	return &launchEnv{h: NewSessionsHandler(db, cfg, nil, terminal, nil), ss: ss, terminal: terminal, t: t}
 }
 
-var promptFileRe = regexp.MustCompile(`cat '([^']+coral_prompt_[^']+)'`)
+// The launch's prompt file as the agent's shell reads it: `cat '<file>'` in bash, zsh and sh, and Get-Content ... -LiteralPath '<file>' in PowerShell (Windows, #12429).
+var promptFileRe = regexp.MustCompile(`(?:cat|-LiteralPath) '([^']+coral_prompt_[^']+)'`)
+
+func TestPromptFileReReadsTheFileInBothShells(t *testing.T) {
+	for name, cmd := range map[string]string{
+		"bash":       `claude "$(cat '/tmp/coral_prompt_ab12.txt')"`,
+		"powershell": `claude "$(Get-Content -Raw -Encoding UTF8 -LiteralPath 'C:\Users\x\AppData\Local\Temp\coral_prompt_ab12.txt')"`,
+	} {
+		m := promptFileRe.FindStringSubmatch(cmd)
+		if assert.NotNil(t, m, name) {
+			assert.Contains(t, m[1], "coral_prompt_ab12.txt", name)
+		}
+	}
+}
 
 // prompts are the launch prompts the commands read from their temporary files.
 func (e *launchEnv) prompts() []string {

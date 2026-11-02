@@ -208,7 +208,7 @@ func TestDeviationCSkipsWaitsOnTheRecipientAndOnTheOperatorEvenWithHistory(t *te
 	d.answered("Waiter", "operator", "", 5*time.Minute)
 	d.wait(2, "Dev", "message", "Orchestrator")
 	d.wait(3, "Waiter", "operator", "")
-	_, err := d.raw.ExecContext(ctx, `UPDATE board_waits SET created_at=? WHERE status='active'`, ts(time.Now().Add(-20*time.Minute)))
+	_, err := d.raw.ExecContext(ctx, `UPDATE board_waits SET created_at=? WHERE status='active'`, ts(d.now.Add(-21*time.Minute))) // from the harness's own clock (a minute ahead of the wall clock when it was made): the wait is 21 min whatever the time between, not 20 when a slow machine let a second pass (Windows, #12429)
 	require.NoError(t, err)
 	out := d.check()
 	assert.Contains(t, out, "Dev has waited 21 min on YOU", "the wait on the recipient is its own line")
