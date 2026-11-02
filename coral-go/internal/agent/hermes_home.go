@@ -413,3 +413,54 @@ func writeHermesFirstMessage(dataDir string, params LaunchParams) error {
 	}
 	return writeHomeFile(dir, filepath.Base(path), []byte(text))
 }
+
+// SweepHermesHomes removes the homes no session reaches (#11949): every folder in a team's folder under hermes-homes whose name is not a session id isLive says is
+// live or sleeping, and whose own time is older than minAge. A home is made before its session's record is written, so a younger one may belong to a launch in progress. Each home holds a copy of the person's .env,
+// so one that nothing reaches (a launch that failed after the home was made, a crash, a record deleted by hand) is not kept. A link is never followed or removed: not at hermes-homes, at a team's folder, or in place of a home. A failure to
+// remove one entry is logged and does not stop the rest. It returns how many entries it removed.
+func SweepHermesHomes(dataDir string, isLive func(sessionID string) bool, minAge time.Duration, now time.Time) int {
+	if dataDir == "" {
+		return 0
+	}
+	root := filepath.Join(dataDir, hermesHomesFolder)
+	removed := 0
+	for _, team := range plainFolders(root) {
+		for _, home := range plainFolders(team) {
+			name := filepath.Base(home)
+			fi, err := os.Lstat(home)
+			if err != nil || !fi.IsDir() { // gone since it was listed, or put back as a link
+				continue
+			}
+			if isLive(name) || now.Sub(fi.ModTime()) < minAge {
+				continue
+			}
+			if rerr := os.RemoveAll(home); rerr != nil {
+				slog.Warn("hermes: an unused home was not removed", "home", name, "error", rerr)
+				continue
+			}
+			removed++
+		}
+	}
+	if removed > 0 {
+		slog.Info("hermes: removed homes no session reaches", "count", removed)
+	}
+	return removed
+}
+
+// plainFolders are the folders directly under dir that are plain folders (not links), full paths; none when dir is not a plain folder itself.
+func plainFolders(dir string) []string {
+	if fi, err := os.Lstat(dir); err != nil || !fi.IsDir() {
+		return nil
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil
+	}
+	var out []string
+	for _, e := range entries {
+		if e.Type().IsDir() { // DirEntry's type is the entry's own: a link is not a folder here
+			out = append(out, filepath.Join(dir, e.Name()))
+		}
+	}
+	return out
+}
