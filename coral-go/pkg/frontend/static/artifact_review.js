@@ -70,14 +70,28 @@ const settled = row => importOnce('./inbox_reviews.js').then(m => { m.settleRevi
 const fromWords = out => (out.delivered && out.asleep ? `${out.to} is asleep: it will see this when it wakes.` : out.delivered ? `${out.to} was told.` : out.reason === 'no_uploader' ? 'No agent is recorded for it, so nobody was told.' : '');
 
 /** Deny a review row (#11552): a final no, the agent is told it was declined, with the reason if there is one. Resolves the server's answer. */
-export async function denyRow(team, row, reason) { const out = await decide(team, row, 'deny', reason); settled(row); return out; }
+/** What a row action does to the file's other versions (#11937): a row stands for the whole file (the newest, with the older ones as "earlier versions"), so the action goes to every version, not only the newest: otherwise the version
+ *  before it comes up as the row. `run(version)` is the same decision for one older version; resolves { done, failed }. */
+async function onEarlier(row, run) {
+    const m = await importOnce('./inbox_reviews.js').catch(() => null);
+    let done = 0, failed = 0;
+    if (m) for (const e of m.earlierVersions(row)) { try { await run(e); done++; } catch { failed++; } }
+    return { done, failed };
+}
+
+export async function denyRow(team, row, reason) {
+    const out = await decide(team, row, 'deny', reason);
+    const m = await importOnce('./inbox_reviews.js').catch(() => null);
+    if (m) out.earlier = await settleEarlierVersions(m, row).catch(() => ({ settled: 0, failed: 0 })); // the older versions leave Needs you with it, quietly: the agent is told once, about the newest
+    settled(row); return out;
+}
 /** Ignore a review row: out of Needs you with no verdict and nobody told; the file stays where it is. Unignore puts it back as it was. */
-export async function ignoreRow(team, row) { const out = await decide(team, row, 'ignore'); settled(row); return out; }
+export async function ignoreRow(team, row) { const out = await decide(team, row, 'ignore'); out.earlier = await onEarlier(row, e => decide(e.team, e, 'ignore')); settled(row); return out; }
 export async function unignoreRow(team, row) { const out = await decide(team, row, 'unignore'); importOnce('./inbox_reviews.js').then(m => m.refreshReviews(true)).catch(() => {}); return out; }
 
 /** Save for later (#11641): out of Needs you and its counts, kept in Saved with its decisions; nobody is told. Move to Needs you (unsave) puts it back as it was. */
-export async function saveRow(team, row) { const out = await decide(team, row, 'save'); settled(row); return out; }
-export async function unsaveRow(team, row) { const out = await decide(team, row, 'unsave'); importOnce('./inbox_reviews.js').then(m => m.refreshReviews(true)).catch(() => {}); return out; }
+export async function saveRow(team, row) { const out = await decide(team, row, 'save'); out.earlier = await onEarlier(row, e => decide(e.team, e, 'save')); settled(row); return out; }
+export async function unsaveRow(team, row) { const out = await decide(team, row, 'unsave'); out.earlier = await onEarlier(row, e => decide(e.team, e, 'unsave')); importOnce('./inbox_reviews.js').then(m => m.refreshReviews(true)).catch(() => {}); return out; }
 export function saySaved(team, row) {
     showToast(`Saved for later: ${shown(row.name)}`, false, undefined, { action: { label: 'Undo', onClick: () => unsaveRow(team, row).then(() => announceNotice(`${shown(row.name)} is back in Needs you.`)).catch(e => showToast(e.message)) } });
     announceNotice(`Saved for later: ${shown(row.name)}. Undo is in the notice.`);
