@@ -115,13 +115,13 @@ func openWithDriver(ctx context.Context, dbPath, key string, schemaDone bool) (*
 	}
 
 	if !schemaDone {
-		if err := d.ensureSchema(ctx); err != nil {
+		if err := timedOpenStep(dbPath, "ensureSchema", func() error { return d.ensureSchema(ctx) }); err != nil {
 			db.Close()
 			return nil, fmt.Errorf("ensure schema: %w", err)
 		}
 	}
-	scrubRemoteURLCredentials(ctx, d)
-	if err := d.initAgentTaskEngine(ctx); err != nil {
+	_ = timedOpenStep(dbPath, "scrubRemoteURLCredentials", func() error { scrubRemoteURLCredentials(ctx, d); return nil })
+	if err := timedOpenStep(dbPath, "initAgentTaskEngine", func() error { return d.initAgentTaskEngine(ctx) }); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("initialize personal task workflows: %w", err)
 	}
