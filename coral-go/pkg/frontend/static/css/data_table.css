@@ -565,7 +565,9 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 .inbox-answers { display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .inbox-answers .inbox-answer { max-width: 100%; height: auto; min-height: 32px; white-space: normal; text-align: left; overflow-wrap: anywhere; } /* a long choice wraps its words inside its column, never clipped at the cell's edge (#11728) */
 .inbox-answered { color: var(--text-secondary); }
-.inbox-answer-step { color: var(--text-secondary); font-size: .85em; flex: 1 1 100%; } /* which question these choices are for, or what Submit will send (#11981) */
+.inbox-answer-step { color: var(--text-secondary); font-size: .85em; flex: 1 1 100%; }
+.inbox-answer-step-line + .inbox-answer-step-line::before { content: ' \00b7 '; } /* a wide row runs the pairs on one line, separated by a dot; a phone puts each on its own line (below) */
+@media (max-width: 768px) { .inbox-answer-step-line { display: block; } .inbox-answer-step-line + .inbox-answer-step-line::before { content: none; } } /* which question these choices are for, or what Submit will send (#11981) */
 .inbox-only-reject { color: var(--text-secondary); font-size: .85em; flex: 1 1 100%; } /* a request that can only be rejected (#11399): said in words, on its own line under the No */
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) { .inbox-answers .inbox-answer { flex: 1 1 0; min-height: var(--control-touch-height, 44px); min-width: var(--control-touch-height, 44px); } }
 .dt-mail-cell:has(> .inbox-answers) { flex-wrap: wrap; }

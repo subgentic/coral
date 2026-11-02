@@ -43,11 +43,16 @@ async function readAsk(s) {
     if ((po.review || []).length) { // the last step of a multi-question dialog, "Ready to submit your answers?": the row can take it, since a Submit sends only what the person already chose (#11981)
         const submit = (po.options || []).find(o => (o.action || 'select') === 'select' && /^submit\b/i.test(String(o.label || '')) && Number.isInteger(Number(o.n)));
         const full = po.review.map(r => `${stepClean(r.question)}: ${stepClean(r.answer)}`).join(' · '), drawn = po.review.map(r => `${stepCut(stepClean(r.question))}: ${stepCut(stepClean(r.answer))}`).join(' · ');
-        return submit && !onlyReject ? { ask: String(po.ask_id || ''), picks: [submit], onlyReject, step: `Submit these answers? ${drawn}`, stepFull: `Submit these answers? ${full}` } : none; // exactly what the screen shows now, every question with its answer: the click compares the UNCUT text, a field cut for drawing wears an ellipsis and the hover is the whole line (#11997, Security)
+        const lines = ['Submit these answers?', ...po.review.map(r => `${stepCut(stepClean(r.question))}: ${stepCut(stepClean(r.answer))}`)];
+        return submit && !onlyReject ? { ask: String(po.ask_id || ''), picks: [submit], onlyReject, step: `Submit these answers? ${drawn}`, stepFull: `Submit these answers? ${full}`, lines } : none; // exactly what the screen shows now, every question with its answer: the click compares the UNCUT text, a field cut for drawing wears an ellipsis and the hover is the whole line (#11997, Security)
     }
     const permission = (po.options || []).some(o => PERMISSION_WORDS.test(String(o.label || ''))); // a permission card: only a plain Yes or No is a button; a question's own choices (Red, Blue) are
     const picks = (po.options || []).filter(o => (o.action || 'select') === 'select' && o.label && Number.isInteger(Number(o.n)) && plainlyOneTime(String(o.label), permission) && (!onlyReject || REJECT_FORM.test(wholeLabel(String(o.label)))));
-    return picks.length >= 1 && picks.length <= MAX_CHOICES ? { ask: String(po.ask_id || ''), picks, onlyReject, question: stepClean(po.question).slice(0, 120) } : none;
+    // A question's choice the filter holds back (a lasting one, or one with a word like "Switch to", "from", "all") is left to Open as before, and the row says so: a partial list must not read as the whole list (the Mobile
+    // Beta Tester's phone check, #11981).
+    const selectable = (po.options || []).filter(o => (o.action || 'select') === 'select' && o.label && Number.isInteger(Number(o.n)));
+    const held = !permission && !onlyReject && picks.length < selectable.length;
+    return picks.length >= 1 && picks.length <= MAX_CHOICES ? { ask: String(po.ask_id || ''), picks, onlyReject, held, question: stepClean(po.question).slice(0, 120) } : none;
 }
 
 const askKey = s => `${sessionServer(s)}:${s.session_id}:${s.waiting_since || ''}`;
@@ -99,10 +104,11 @@ async function answer(s, o, ask, cell, step = '') { // step: the whole review te
 function fill(s, cell, withDismiss = true) {
     const key = askKey(s);
     if (!read.has(key)) read.set(key, readAsk(s).catch(() => ({ ask: '', picks: [], onlyReject: false })));
-    return read.get(key).then(({ ask, picks, onlyReject, step, stepFull, question, later }) => {
+    return read.get(key).then(({ ask, picks, onlyReject, held, step, stepFull, question, later, lines }) => {
         cell.replaceChildren();
-        const words = step || (later ? question : ''); // the row's own words are the first question's: a later step says which question these choices are for
-        if (words) { const t = document.createElement('span'); t.className = 'inbox-answer-step'; t.textContent = words.length > 240 ? `${words.slice(0, 239)}…` : words; if (stepFull && stepFull !== words) t.title = stepFull; else if (words.length > 240) t.title = words; cell.append(t); } // text only; a cut line (a field or the whole) says so and keeps the uncut text as its hover
+        const said = norm => String(norm || '').replace(/[?\s]+$/, '');
+        const words = step || (question && (later || !said(s.waiting_summary).includes(said(question))) ? question : ''); // the question is named when the row's own words do not carry it (a later step's never does)
+        if (lines && lines.length) { const t = document.createElement('span'); t.className = 'inbox-answer-step'; if (stepFull && stepFull !== words) t.title = stepFull; lines.forEach(l => { const ln = document.createElement('span'); ln.className = 'inbox-answer-step-line'; ln.textContent = l.length > 240 ? `${l.slice(0, 239)}…` : l; t.append(ln, ' '); }); cell.append(t); } else if (words) { const t = document.createElement('span'); t.className = 'inbox-answer-step'; t.textContent = words.length > 240 ? `${words.slice(0, 239)}…` : words; if (stepFull && stepFull !== words) t.title = stepFull; else if (words.length > 240) t.title = words; cell.append(t); } // text only; a cut line (a field or the whole) says so and keeps the uncut text as its hover; the review's lines have a space between them: one run of words for a screen reader
         for (const o of picks) {
             const b = document.createElement('button');
             b.type = 'button'; b.className = 'btn btn-small inbox-answer'; b.textContent = o.label;
@@ -112,6 +118,7 @@ function fill(s, cell, withDismiss = true) {
             b.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); });
             cell.append(b);
         }
+        if (held) { const more = document.createElement('span'); more.className = 'inbox-only-reject'; more.textContent = 'More choices: open the agent.'; cell.append(more); } // some of the question's choices are left to Open: said, so these do not read as all of them
         if (onlyReject) { // said in words, set as text: the full request is under Open
             const note = document.createElement('span');
             note.className = 'inbox-only-reject';
