@@ -337,3 +337,21 @@ func TestOnlyPendingAndApprovedCountTowardTheCap(t *testing.T) {
 	_, _, err := addSkill(ctx, ss, AddSkillInput{Skill: skillOf("one-more", "d", "b"), Digest: dg(9100), Kind: PublisherOperator})
 	assert.ErrorIs(t, err, ErrTooManySkills)
 }
+
+// #12021 (Security's SHOULD): the Operator's refusal is remembered in its own table: ten thousand searches that trim the access log do not make the store forget it.
+func TestARefusalOutlivesTheAccessLogTrim(t *testing.T) {
+	ctx, ss, db := skillStore(t)
+	row, _, err := addSkill(ctx, ss, AddSkillInput{Skill: skillOf("bad", "d", "b"), Digest: dg(950), Kind: PublisherAgent, Agent: "Dev", Team: "alpha"})
+	require.NoError(t, err)
+	require.NoError(t, ss.RejectSkill(ctx, row.ID))
+	for i := 0; i < skillsLogRows+100; i++ { // what a flood of searches writes
+		_, err := db.ExecContext(ctx, `INSERT INTO skills_log (at, event, skill_id, digest, actor_kind, actor, detail) VALUES (?, 'search', '', '', 'agent', 'Dev', 'hits=0')`, now())
+		require.NoError(t, err)
+	}
+	require.NoError(t, ss.LogSkillAccess(ctx, "search", "", "", PublisherAgent, "Dev", "hits=0")) // the trim runs
+	var rejects int
+	require.NoError(t, db.GetContext(ctx, &rejects, `SELECT COUNT(*) FROM skills_log WHERE event = 'reject'`))
+	require.Zero(t, rejects, "the reject row of the access log is gone")
+	_, _, err = addSkill(ctx, ss, AddSkillInput{Skill: skillOf("bad", "d", "b"), Digest: dg(950), Kind: PublisherAgent, Agent: "Dev", Team: "alpha"})
+	assert.ErrorIs(t, err, ErrSkillRefusedBefore, "the bytes are still refused")
+}

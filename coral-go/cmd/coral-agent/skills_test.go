@@ -113,3 +113,15 @@ func TestWriteSkillFilesStaysInsideItsFolderAndOverwritesNothing(t *testing.T) {
 	b, _ := os.ReadFile(filepath.Join(dir, "mine.txt"))
 	assert.Equal(t, "keep", string(b))
 }
+
+// #12021 (Security's SHOULD): --out writes nothing that Windows would take for a device or a data stream, even from a server that sends such a name.
+func TestWriteSkillFilesRefusesNamesUnsafeOnWindows(t *testing.T) {
+	for _, bad := range []string{"refs/a:b", "CON.txt", "refs/nul", "x/COM1.md", "a/b.", "a/b ", "q?.md", "a|b", "refs/lpt3.txt"} {
+		dir := filepath.Join(t.TempDir(), "s")
+		_, err := writeSkillFiles(dir, map[string]string{bad: "x"})
+		assert.Error(t, err, bad)
+	}
+	dir := filepath.Join(t.TempDir(), "ok")
+	_, err := writeSkillFiles(dir, map[string]string{"refs/console.md": "x", "SKILL.md": "y"})
+	assert.NoError(t, err, "'console' is not a device name")
+}

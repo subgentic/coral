@@ -60,6 +60,7 @@ func (h *SkillsHandler) allow(caller string) bool {
 
 // who is the caller and the name it is logged under; false when the answer is written.
 func (h *SkillsHandler) who(w http.ResponseWriter, r *http.Request) (kind, name string, ok bool) {
+	bucket := ""
 	sid, ok := callerSession(w, r, "", true, nil)
 	if !ok {
 		return "", "", false
@@ -67,13 +68,17 @@ func (h *SkillsHandler) who(w http.ResponseWriter, r *http.Request) (kind, name 
 	kind, name = store.PublisherOperator, "operator"
 	if _, isAgent := VerifiedSession(r.Context()); isAgent {
 		kind, name = store.PublisherAgent, sid
+		bucket = "agent:" + sid // the limit is per session, not per name: two agents with one name have a bucket each
 		if names, err := h.ss.GetAgentNames(r.Context(), []string{sid}); err == nil {
 			if n, found := names[sid]; found && n[0] != "" {
 				name = n[0]
 			}
 		}
 	}
-	if !h.allow(kind + ":" + name) {
+	if bucket == "" {
+		bucket = kind + ":" + name
+	}
+	if !h.allow(bucket) {
 		writeError(w, http.StatusTooManyRequests, "rate_limited", "too many skill requests: at most 60 a minute")
 		return "", "", false
 	}
@@ -138,12 +143,18 @@ func (h *SkillsHandler) ListSkills(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"skills": out})
 }
 
+// skillObjectPath is where a skill's zip is kept: in the Skills Store's own folder, which no artifact route lists or serves, so a pending skill is seen by nobody but the Operator (through the store's
+// own routes) and the Skills Store never shows an artifact the team's other agents can download (Security's requirement for slices c and e).
+func (h *SkillsHandler) skillObjectPath(digest string) string {
+	return filepath.Join(h.cfg.CoralDir(), "skills", "objects", digest)
+}
+
 // readSkillZip reads the skill's zip from the artifact store without following a link, and refuses bytes that are not the digest that was approved.
 func (h *SkillsHandler) readSkillZip(digest string) ([]byte, error) {
 	if len(digest) != 64 || strings.Trim(digest, "0123456789abcdef") != "" {
 		return nil, errors.New("not a skill digest")
 	}
-	f, err := secfile.OpenNoFollow(filepath.Join(h.cfg.CoralDir(), "artifacts", "objects", digest), os.O_RDONLY, 0)
+	f, err := secfile.OpenNoFollow(h.skillObjectPath(digest), os.O_RDONLY, 0)
 	if err != nil {
 		return nil, err
 	}

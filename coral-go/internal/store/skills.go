@@ -166,7 +166,7 @@ func (s *SessionStore) AddSkill(ctx context.Context, in AddSkillInput) (*SkillRo
 			}
 			// What the Operator rejected or removed does not come back through an agent as a new pending item each time: the log remembers the digest. The Operator can still publish it.
 			var refused int
-			if err := tx.GetContext(ctx, &refused, `SELECT COUNT(*) FROM skills_log WHERE digest = ? AND event IN ('reject', 'remove')`, in.Digest); err != nil {
+			if err := tx.GetContext(ctx, &refused, `SELECT COUNT(*) FROM skills_refused WHERE digest = ?`, in.Digest); err != nil {
 				return err
 			}
 			if refused > 0 {
@@ -273,6 +273,9 @@ func (s *SessionStore) RejectSkill(ctx context.Context, id string) error {
 		if _, err := tx.ExecContext(ctx, `UPDATE skills SET status = ?, decided_at = ? WHERE id = ?`, SkillRejected, now(), id); err != nil {
 			return err
 		}
+		if _, err := tx.ExecContext(ctx, `INSERT OR REPLACE INTO skills_refused (digest, at, event) VALUES (?, ?, 'reject')`, row.Digest, now()); err != nil {
+			return err
+		}
 		return logSkill(ctx, tx, "reject", id, row.Digest, PublisherOperator, "")
 	})
 }
@@ -291,6 +294,9 @@ func (s *SessionStore) RemoveSkill(ctx context.Context, id string) error {
 			return err
 		}
 		if _, err := tx.ExecContext(ctx, `UPDATE skills SET status = ?, description = '', metadata_json = '{}', files_json = '[]', decided_at = ? WHERE id = ?`, SkillRemoved, now(), id); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `INSERT OR REPLACE INTO skills_refused (digest, at, event) VALUES (?, ?, 'remove')`, row.Digest, now()); err != nil {
 			return err
 		}
 		return logSkill(ctx, tx, "remove", id, row.Digest, PublisherOperator, "")

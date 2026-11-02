@@ -24,7 +24,7 @@ var reviewedFileOpens = map[string]string{
 	"artifact_prune_diffs.go:SessionsHandler.shrinkDiffs:ReadFile":        "server data folder; object names match objectNameRe",
 	"artifact_prune_scan.go:recordTime:ReadFile":                          "server data folder (a sidecar the server wrote)",
 	"artifact_prune_scan.go:scanKnowledgeReferences:Open":                 "server data folder (agent_knowledge), regular files only",
-	"skills_agent.go:SkillsHandler.readSkillZip:OpenNoFollow":             "the stored zip of an APPROVED skill: the name is the row's digest (64 lower-case hex, checked before the path is made) in the server's objects folder, opened once without following a link, regular file, 5 MiB cap, and the bytes must hash to that digest (#12021)",
+	"skills_agent.go:SkillsHandler.readSkillZip:OpenNoFollow":             "the stored zip of an APPROVED skill: the name is the row's digest (64 lower-case hex, checked before the path is made) in the Skills Store's own objects folder (skills/objects, not the artifact store), opened once without following a link, regular file, 5 MiB cap, and the bytes must hash to that digest (#12021)",
 	"artifacts_read.go:SessionsHandler.openArtifactForRead:ReadFile":      "{id} is 64 lower-case hex (checked), in the server's objects folder",
 	"artifact_series.go:readSeriesIndex:OpenNoFollow":                     "artifacts/series/<id>.json in the store: the id is 32 lowercase hex (seriesIDRe) before the path is made, never read through a link, 64 KiB cap, and the records win over it anyway (#6357)",
 	"artifacts_read.go:SessionsHandler.openArtifactForRead:OpenNoFollow":  "the same object, opened once without following a link to serve it and stat its size (#4443)",

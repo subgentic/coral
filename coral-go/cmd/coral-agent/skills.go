@@ -14,6 +14,7 @@ import (
 
 	"github.com/subgentic/coral/internal/clierr"
 	"github.com/subgentic/coral/internal/clihelp"
+	"github.com/subgentic/coral/internal/skills"
 )
 
 const skillsUsageText = `coral-agent skills - find and read the skills the Operator approved (Agent Skills folders)
@@ -289,6 +290,11 @@ func writeSkillFiles(dir string, contents map[string]string) (int, error) {
 	}
 	sort.Strings(paths)
 	for _, p := range paths {
+		for _, part := range strings.Split(p, "/") {
+			if skills.UnsafeNamePart(part) || part == "" || part == "." || part == ".." {
+				return 0, fmt.Errorf("the skill has a file name that is not safe to write here: %q", p)
+			}
+		}
 		target := filepath.Join(root, filepath.FromSlash(p))
 		if rel, err := filepath.Rel(root, target); err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || filepath.IsAbs(p) || strings.Contains(p, "..") {
 			return 0, fmt.Errorf("the skill has a path that leaves the folder: %q", p)

@@ -151,6 +151,9 @@ func Parse(data []byte) (*Skill, error) {
 			if strings.HasPrefix(part, ".") {
 				return nil, invalid("a hidden file or folder is not allowed: %q", clip(name))
 			}
+			if UnsafeNamePart(part) {
+				return nil, invalid("a file name that Windows would treat as a device, a stream or an invalid name is not allowed: %q", clip(name))
+			}
 		}
 		if f.Mode()&(fs.ModeSymlink|fs.ModeDevice|fs.ModeNamedPipe|fs.ModeSocket|fs.ModeCharDevice|fs.ModeIrregular) != 0 {
 			return nil, invalid("a link or special file is not allowed: %q", clip(name))
@@ -274,6 +277,15 @@ func AgentMayPublish(sk *Skill) bool {
 		}
 	}
 	return true
+}
+
+// windowsDevice is a name Windows opens as a device whatever its extension.
+var windowsDevice = regexp.MustCompile(`(?i)^(con|prn|aux|nul|com[0-9]|lpt[0-9])(\.|$)`)
+
+// UnsafeNamePart reports a path component that is unsafe to write on Windows (and odd everywhere): the characters ':' (an alternate data stream there), '<', '>', '"', '|', '?' and '*', a device name
+// (CON, NUL, COM1 ... with or without an extension), and a trailing dot or space. Parse refuses them, and a reader that writes files checks again.
+func UnsafeNamePart(part string) bool {
+	return strings.ContainsAny(part, ":<>\"|?*") || windowsDevice.MatchString(part) || strings.HasSuffix(part, ".") || strings.HasSuffix(part, " ")
 }
 
 func clip(s string) string {

@@ -260,3 +260,14 @@ func TestParseRefusesNamesThatAreNotNormalised(t *testing.T) {
 	_, err = Parse(makeZip(t, zf{name: "SKILL.md", body: goodMD}, zf{name: "references/caf\u00e9.md", body: "a"}, zf{name: "references/cafe\u0301.md", body: "b"}))
 	assert.Error(t, err, "both together: refused")
 }
+
+// #12021 (Security's SHOULD): names Windows treats as devices, streams or invalid are refused in Parse, so every reader that writes files is safe on every system.
+func TestParseRefusesNamesUnsafeOnWindows(t *testing.T) {
+	for _, bad := range []string{"refs/a:b.md", "CON.txt", "refs/nul", "x/COM1.md", "aux.md", "a/b.", "a/b ", "q?.md", "a|b.md", "a<b.md", `a"b.md`, "a*.md", "refs/LPT9.txt"} {
+		_, err := Parse(makeZip(t, zf{name: "SKILL.md", body: goodMD}, zf{name: bad, body: "x"}))
+		require.Error(t, err, bad)
+		assert.ErrorContains(t, err, "Windows", bad)
+	}
+	_, err := Parse(makeZip(t, zf{name: "SKILL.md", body: goodMD}, zf{name: "refs/console.md", body: "x"}, zf{name: "refs/com.md", body: "x"}, zf{name: "refs/null-notes.md", body: "x"}))
+	assert.NoError(t, err, "names that only start like a device name are fine")
+}

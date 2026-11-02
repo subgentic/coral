@@ -194,6 +194,14 @@ CREATE INDEX IF NOT EXISTS idx_skills_status ON skills(status);
 CREATE VIRTUAL TABLE IF NOT EXISTS skills_fts
 	USING fts5(skill_id UNINDEXED, name, description, tags, body, tokenize='porter');
 
+-- What the Operator rejected or removed, by the zip's digest: an agent cannot publish those bytes again. Its own table, not the access log, which is trimmed to 10,000 rows and could not be
+-- made to forget it by searching.
+CREATE TABLE IF NOT EXISTS skills_refused (
+	digest TEXT PRIMARY KEY,
+	at     TEXT NOT NULL,
+	event  TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS skills_log (
 	id         INTEGER PRIMARY KEY AUTOINCREMENT,
 	at         TEXT NOT NULL,
