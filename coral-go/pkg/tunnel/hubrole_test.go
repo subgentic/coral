@@ -45,7 +45,7 @@ func TestStampRoleOnlyForAnOwnerStreamOnAnUpdateRoute(t *testing.T) {
 	}{
 		{"owner on the relaunch", "owner", http.MethodPost, "/api/system/update/relaunch", nil, "owner", user},
 		{"owner on the status", "owner", http.MethodGet, "/api/system/update", nil, "owner", user},
-		{"owner elsewhere", "owner", http.MethodGet, "/api/sessions/live", nil, "", ""},
+		{"owner elsewhere", "owner", http.MethodGet, "/api/sessions/live/x/info", nil, "", ""}, // a route that is not an owner route (the list itself became one, #12377)
 		{"owner on a board write", "owner", http.MethodPost, "/api/board/t/tasks/12/complete", nil, "", ""},
 		// The routes that can start a new board carry the marker (#11627): without it the machine could never tell the owner from a guest there.
 		{"owner on a message", "owner", http.MethodPost, "/api/board/t/messages", nil, "owner", user},

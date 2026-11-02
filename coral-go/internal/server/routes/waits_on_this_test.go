@@ -112,6 +112,10 @@ func TestWaitsOnThisThroughTheHubIsTheAuthenticOwnersAlone(t *testing.T) {
 	_, err = h.bs.CreateTaskWithOpts(ctx, "other-team", "Waits", "", "critical", "Orchestrator", &board.CreateTaskOpts{BlockedBy: []board.TaskDep{{TaskID: mine.ID, BoardID: "team"}}})
 	require.NoError(t, err)
 	withLabel(t, ownerLabel, nil)
+	// the root cause of #12377: the handler asks who the owner is by the stamp, and the connector stamps only the routes of the table. The live list must be one, or the owner never reaches this code with the stamp.
+	assert.True(t, tunnel.IsOwnerRoute(http.MethodGet, "/api/sessions/live"), "the connector stamps the live list: without it no Hub dashboard ever gets waits_on_this")
+	_, liveMode := tunnel.OwnerRoute(http.MethodGet, "/api/sessions/live")
+	assert.False(t, liveMode.Refuses(), "and nobody is refused the list")
 	sh := &SessionsHandler{bs: h.bs}
 	for _, c := range []struct {
 		name   string
