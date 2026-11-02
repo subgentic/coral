@@ -3,6 +3,7 @@
 1	agent_config_form.js	autoPermissionsHTML
 1	agent_config_form.js	body
 1	agent_config_form.js	flagsInput
+1	agent_config_form.js	liveNote
 1	agent_config_form.js	modelPickerHtml()
 1	agent_config_form.js	nameHTML
 1	agent_config_form.js	permEditorHTML(false)
