@@ -149,6 +149,9 @@ type CLINotFoundError struct {
 	RefusedPath string
 }
 
+// TildePath is tildePath for the routes' answers.
+func TildePath(p string) string { return tildePath(p) }
+
 // tildePath writes a path under the user's home folder as ~/...: the answer names places, not the user's name.
 func tildePath(p string) string {
 	if home, _ := os.UserHomeDir(); home != "" && (p == home || strings.HasPrefix(p, home+string(filepath.Separator))) {
