@@ -9,7 +9,7 @@ let activated = false;
 const vkey = a => (a.session_id || a.produced_by) ? JSON.stringify([a.team, a.session_id, a.produced_by, a.name]) : a.reviewKey; // a JSON array: no name or id can run into the next field
 const byAge = (a, b) => String(a.created_at).localeCompare(String(b.created_at)) || a.reviewKey.localeCompare(b.reviewKey);
 /** The versions older than `row`, still for review. */
-export const earlierVersions = row => { const key = row.reviewKey || `${row.team}:${row.id}`, me = items.find(a => a.reviewKey === key) || row; return items.filter(a => a.reviewKey !== key && vkey(a) === vkey(me) && byAge(a, me) < 0); };
+export const earlierVersions = row => { const key = row.reviewKey || `${row.team}:${row.id}`, pool = saved.some(a => a.reviewKey === key) ? saved : items, me = pool.find(a => a.reviewKey === key) || row; return pool.filter(a => a.reviewKey !== key && vkey(a) === vkey(me) && byAge(a, me) < 0); }; // in the list the row is in: Needs you's, or Saved's (#11937)
 // Worked out once per change, not once per call (#11633): this is asked for by the badge, the folder count, the pills, the rows and the labels on every update, and the old way compared every item with every other
 // (a JSON key built for each pair): with a few hundred files for review one call took a tenth of a second, a few dozen calls a redraw, and an Approve (which redraws three times) froze the Inbox for seconds.
 // The list is rebuilt when `items` is replaced or `revision` moves (a tag written in place, a row settled), and shared between callers in between.
@@ -30,7 +30,13 @@ export const reviewItems = () => {
 };
 /** A review artifact the operator has opened carries the 'read' tag (#9277): it stays in Needs you, shown as read, but it is not counted (the Inbox badge, the Needs you count). Opening it again, or marking it unread, is the same tags route. */
 /** The files the Operator saved for later (#11641): tagged 'saved', out of Needs you and its counts, listed at the top of Saved with their decisions still there. */
-export const savedFiles = () => saved;
+let savedFor = null, savedRev = -1, savedView = [];
+/** The saved files, one row per file like Needs you (#11937): the newest version, with the older saved ones as `earlier`. */
+export const savedFiles = () => {
+    if (savedFor === saved && savedRev === revision) return savedView;
+    savedView = collapseVersions(saved); savedFor = saved; savedRev = revision;
+    return savedView;
+};
 export const isRead = a => !!(a.tags && a.tags.includes('read'));
 export const unreadReviewItems = () => reviewItems().filter(a => !isRead(a));
 export const reviewErrors = () => errors;
