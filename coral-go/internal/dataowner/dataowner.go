@@ -9,7 +9,8 @@
 //     holds the same id, this is a whole-folder copy made next to the live one: FOREIGN;
 //   - file and row present and different, or only one of them: FOREIGN;
 //   - neither: a first start (no live sessions in the database): the id is made, OWNED. A database with live sessions and no id is an old install upgrading in place only if the folder is lived
-//     in (messageboard.db has messages, api_key is older than a minute, and there is more in the folder than the databases and tokens): then the id is made, OWNED. Otherwise FOREIGN.
+//     in (the database shows use: the board has messages, or a user_settings row exists, or a live session is older than a day; and api_key is older than a minute; and there is more in the folder
+//     than the databases and tokens): then the id is made, OWNED. Otherwise FOREIGN.
 //
 // Anything that cannot be read or written is FOREIGN. FOREIGN never stops Coral from starting; it only withholds what acts on the agents.
 package dataowner
@@ -44,6 +45,7 @@ const (
 	ReasonCopy       = "another folder with the same id still exists"
 	ReasonBare       = "the database lists agents but this folder is not an established Coral folder"
 	ReasonUnreadable = "the id could not be read or written"
+	ReasonNotLocal   = "the id file names a path that is not a local folder"
 )
 
 // Notice is the one dashboard notice and log sentence of a FOREIGN start. It is a fixed string.
@@ -52,12 +54,14 @@ const Notice = "This database was not made in this data folder, so no agent is w
 
 // Probe is what Verify reads and writes. Every field is required.
 type Probe struct {
-	Dir              string                                // the data folder
-	Marker           func(context.Context) (string, error) // the id in the database; "" when there is none
-	SetMarker        func(context.Context, string) error   // store the id in the database
-	LiveSessions     func(context.Context) (int, error)    // how many live sessions the database lists
-	BoardHasMessages func(context.Context) (bool, error)   // whether messageboard.db has any message
-	Now              func() time.Time                      // the clock (time.Now when nil)
+	Dir              string                                         // the data folder
+	Marker           func(context.Context) (string, error)          // the id in the database; "" when there is none
+	SetMarker        func(context.Context, string) error            // store the id in the database
+	LiveSessions     func(context.Context) (int, error)             // how many live sessions the database lists
+	BoardHasMessages func(context.Context) (bool, error)            // whether messageboard.db has any message
+	HasSettings      func(context.Context) (bool, error)            // whether sessions.db has a user_settings row (nil: no)
+	OldLiveSession   func(context.Context, time.Time) (bool, error) // whether a live session was created before the given time (nil: no)
+	Now              func() time.Time                               // the clock (time.Now when nil)
 }
 
 // Verdict is the result of Verify.
@@ -82,15 +86,21 @@ func Verify(ctx context.Context, p Probe) Verdict {
 	haveFile, haveRow := fileErr == nil, rowID != ""
 	switch {
 	case haveFile && haveRow && fileID == rowID:
-		if fileAt != "" && !sameFolder(fileAt, p.Dir) {
-			if exists, carries := otherFolderHoldsID(fileAt, fileID); exists && carries {
-				return Verdict{Foreign: true, Reason: ReasonCopy, Detail: clean(fileAt)}
+		if fileAt != "" && !sameText(fileAt, p.Dir) {
+			// the path comes from the folder: one that is not a local absolute path is not read at all (no stat, no link resolution), and is "cannot tell", which is the safe side
+			if !isLocalAbsolute(fileAt) {
+				return Verdict{Foreign: true, Reason: ReasonNotLocal, Detail: clean(fileAt)}
 			}
-			// the old folder is gone: a move or a restore. Rewrite the path.
-			if err := writeFile(p.Dir, fileID); err != nil {
-				return Verdict{Foreign: true, Reason: ReasonUnreadable}
+			if !sameFolder(fileAt, p.Dir) {
+				if exists, carries := otherFolderHoldsID(fileAt, fileID); exists && carries {
+					return Verdict{Foreign: true, Reason: ReasonCopy, Detail: clean(fileAt)}
+				}
+				// the old folder is gone: a move or a restore. Rewrite the path.
+				if err := writeFile(p.Dir, fileID); err != nil {
+					return Verdict{Foreign: true, Reason: ReasonUnreadable}
+				}
+				return Verdict{Made: true}
 			}
-			return Verdict{Made: true}
 		}
 		return Verdict{}
 	case haveFile && haveRow:
@@ -134,11 +144,11 @@ func Adopt(ctx context.Context, p Probe) error {
 	return p.SetMarker(ctx, id)
 }
 
-// livedIn is the strict rule for an old install with no id yet: ALL of messageboard.db has messages, api_key predates now by more than a minute, and the folder holds something besides the databases
-// and the tokens.
+// livedIn is the strict rule for an old install with no id yet: ALL of the database shows use (usedBefore), api_key predates now by more than a minute, and the folder holds something besides the
+// databases and the tokens.
 func livedIn(ctx context.Context, p Probe, now time.Time) (bool, error) {
-	has, err := p.BoardHasMessages(ctx)
-	if err != nil || !has {
+	used, err := usedBefore(ctx, p, now)
+	if err != nil || !used {
 		return false, err
 	}
 	fi, err := os.Lstat(filepath.Join(p.Dir, "api_key"))
@@ -166,10 +176,74 @@ func livedIn(ctx context.Context, p Probe, now time.Time) (bool, error) {
 	return false, nil
 }
 
+// usedBefore is the database's own proof that the install was used before this upgrade: the board has a message, or sessions.db has a user_settings row, or a live session is more than a day old.
+// An install with agents but no board messages is therefore not mistaken for a copy.
+func usedBefore(ctx context.Context, p Probe, now time.Time) (bool, error) {
+	if p.BoardHasMessages != nil {
+		if has, err := p.BoardHasMessages(ctx); err != nil || has {
+			return has, err
+		}
+	}
+	if p.HasSettings != nil {
+		if has, err := p.HasSettings(ctx); err != nil || has {
+			return has, err
+		}
+	}
+	if p.OldLiveSession != nil {
+		return p.OldLiveSession(ctx, now.Add(-24*time.Hour))
+	}
+	return false, nil
+}
+
+// The file-system calls this package makes on a path: variables so that a test can prove which paths are touched.
+var (
+	statPath  = os.Stat
+	lstatPath = os.Lstat
+	evalLinks = filepath.EvalSymlinks
+)
+
+// isLocalAbsolute reports whether p is an absolute path on a local drive (or, off Windows, an absolute path): not a UNC or device path (two leading separators, which covers the extended and device
+// prefixes), not a scheme, not a drive-relative or rooted-without-drive path, not an alternate stream, no control characters. Nothing is looked up on disk to decide.
+func isLocalAbsolute(p string) bool {
+	if p == "" {
+		return false
+	}
+	for _, r := range p {
+		if unicode.IsControl(r) {
+			return false
+		}
+	}
+	sep := func(b byte) bool { return b == '/' || b == 0x5c }
+	if len(p) >= 2 && sep(p[0]) && sep(p[1]) {
+		return false
+	}
+	if runtime.GOOS == "windows" {
+		letter := len(p) >= 1 && (p[0] >= 'a' && p[0] <= 'z' || p[0] >= 'A' && p[0] <= 'Z')
+		if len(p) < 3 || !letter || p[1] != ':' || !sep(p[2]) {
+			return false
+		}
+		return !strings.Contains(p[2:], ":")
+	}
+	return p[0] == '/' && !strings.Contains(p, "://")
+}
+
+// sameText compares two paths as text only (cleaned, and case-folded on Windows): no file-system call. The folder Coral started with is compared this way first, so a data folder that is itself
+// given as a network path still recognises its own id file.
+func sameText(a, b string) bool {
+	a, b = filepath.Clean(a), filepath.Clean(b)
+	if abs, err := filepath.Abs(b); err == nil {
+		b = abs
+	}
+	if runtime.GOOS == "windows" {
+		return strings.EqualFold(a, b)
+	}
+	return a == b
+}
+
 // readFile reads the id file: at most maxFile bytes, 32 hex digits on the first line and an optional "made at <path>" second line. A malformed file is an error (FOREIGN).
 func readFile(dir string) (id, madeAt string, err error) {
 	path := filepath.Join(dir, FileName)
-	if fi, err := os.Lstat(path); err != nil { // a link is refused, as the writer does not follow one (a not-exist error stays one: no file)
+	if fi, err := lstatPath(path); err != nil { // a link is refused, as the writer does not follow one (a not-exist error stays one: no file)
 		return "", "", err
 	} else if !fi.Mode().IsRegular() {
 		return "", "", fmt.Errorf("the id file is not a regular file")
@@ -242,7 +316,7 @@ func writeFile(dir, id string) error {
 
 // otherFolderHoldsID reports whether the folder path exists (an error reading it other than "does not exist" counts as existing, the safe side) and whether it holds an id file with the same id.
 func otherFolderHoldsID(path, id string) (exists, carries bool) {
-	if _, err := os.Stat(path); err != nil {
+	if _, err := statPath(path); err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			return false, false
 		}
@@ -255,7 +329,7 @@ func otherFolderHoldsID(path, id string) (exists, carries bool) {
 // sameFolder compares two folders with links resolved and, on Windows, case folded. A path that cannot be resolved is compared as given.
 func sameFolder(a, b string) bool {
 	norm := func(p string) string {
-		if r, err := filepath.EvalSymlinks(p); err == nil {
+		if r, err := evalLinks(p); err == nil {
 			p = r
 		}
 		if abs, err := filepath.Abs(p); err == nil {
@@ -290,7 +364,9 @@ func clean(s string) string {
 // LogLine is the one log line of a FOREIGN start.
 func LogLine(v Verdict) string {
 	line := "[data-dir] " + Notice + " Why: " + v.Reason + "."
-	if v.Detail != "" {
+	if v.Detail != "" && v.Reason == ReasonNotLocal {
+		line += " The path in the id file is " + v.Detail + "."
+	} else if v.Detail != "" {
 		line += " A folder with the same id exists at " + v.Detail + "."
 	}
 	return line
