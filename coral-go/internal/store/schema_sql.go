@@ -20,7 +20,8 @@ CREATE TABLE IF NOT EXISTS auto_sleep_state (
 	session_id TEXT PRIMARY KEY,
 	off        INTEGER NOT NULL DEFAULT 0,
 	slept_at   INTEGER,
-	woken_at   INTEGER
+	woken_at   INTEGER,
+	first_turn_logged INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS session_meta (

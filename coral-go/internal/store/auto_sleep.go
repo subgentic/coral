@@ -16,17 +16,19 @@ type AutoSleepState struct {
 	Off     bool
 	SleptAt int64
 	WokenAt int64
+	// FirstTurnLogged: the first turn after the last auto-wake was measured and logged (#12111).
+	FirstTurnLogged bool
 }
 
 // AutoSleepStateOf reads it; an agent with no row has the zero state (auto-sleep on, nothing recorded).
 func (s *SessionStore) AutoSleepStateOf(ctx context.Context, sessionID string) (AutoSleepState, error) {
-	var off int
+	var off, logged int
 	var slept, woken sql.NullInt64
-	err := s.db.QueryRowContext(ctx, `SELECT off, slept_at, woken_at FROM auto_sleep_state WHERE session_id = ?`, sessionID).Scan(&off, &slept, &woken)
+	err := s.db.QueryRowContext(ctx, `SELECT off, slept_at, woken_at, first_turn_logged FROM auto_sleep_state WHERE session_id = ?`, sessionID).Scan(&off, &slept, &woken, &logged)
 	if errors.Is(err, sql.ErrNoRows) {
 		return AutoSleepState{}, nil
 	}
-	return AutoSleepState{Off: off == 1, SleptAt: slept.Int64, WokenAt: woken.Int64}, err
+	return AutoSleepState{Off: off == 1, SleptAt: slept.Int64, WokenAt: woken.Int64, FirstTurnLogged: logged == 1}, err
 }
 
 // SetAutoSleepOff sets the Operator's opt-out for one agent.
@@ -61,12 +63,18 @@ func (s *SessionStore) SetSessionAutoSleeping(ctx context.Context, sessionID str
 
 // NoteAutoWoken records that a delivery woke an auto-asleep agent (the thrash guard's second clock).
 func (s *SessionStore) NoteAutoWoken(ctx context.Context, sessionID string, at time.Time) error {
-	_, err := s.db.ExecContext(ctx, `UPDATE auto_sleep_state SET woken_at = ? WHERE session_id = ?`, at.Unix(), sessionID)
+	_, err := s.db.ExecContext(ctx, `UPDATE auto_sleep_state SET woken_at = ?, first_turn_logged = 0 WHERE session_id = ?`, at.Unix(), sessionID)
 	return err
 }
 
 // ClearAutoSleepClocks forgets both clocks: a person's Sleep or Wake is theirs and resets the guard. The opt-out stays.
 func (s *SessionStore) ClearAutoSleepClocks(ctx context.Context, sessionID string) error {
-	_, err := s.db.ExecContext(ctx, `UPDATE auto_sleep_state SET slept_at = NULL, woken_at = NULL WHERE session_id = ?`, sessionID)
+	_, err := s.db.ExecContext(ctx, `UPDATE auto_sleep_state SET slept_at = NULL, woken_at = NULL, first_turn_logged = 0 WHERE session_id = ?`, sessionID)
+	return err
+}
+
+// MarkAutoFirstTurnLogged records that the first turn after the last auto-wake was measured, so it is logged once.
+func (s *SessionStore) MarkAutoFirstTurnLogged(ctx context.Context, sessionID string) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE auto_sleep_state SET first_turn_logged = 1 WHERE session_id = ?`, sessionID)
 	return err
 }

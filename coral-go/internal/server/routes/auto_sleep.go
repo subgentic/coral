@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"log/slog"
 	"strings"
 	"sync"
@@ -248,6 +249,34 @@ func (h *SessionsHandler) autoSleepOne(ctx context.Context, ls *store.LiveSessio
 	if err := h.terminal.KillSessionOnly(ctx, ls.AgentName, ls.AgentType, ls.SessionID); err != nil {
 		slog.Warn("auto_sleep: the terminal was not killed", "session_id", ls.SessionID, "error", err)
 	}
+	h.noteFirstAutoSleep(ctx, ls, idle)
 	slog.Info("auto_sleep", "session_id", ls.SessionID, "agent_type", ls.AgentType, "idle_minutes", int(idle/time.Minute), "memory_freed_bytes", rss)
 	h.kickWS()
+}
+
+// autoSleepNoticeSeen is the setting that remembers the one-time line was shown (Security, #12111: the default is on for every agent, so the first time one is put to sleep the Operator is told
+// once, on that agent's board, what happened and where the switches are). It is written by Coral only.
+const autoSleepNoticeSeen = "auto_sleep_notice_seen"
+
+// noteFirstAutoSleep posts the one-time line on the agent's board the first time Coral auto-sleeps any agent.
+func (h *SessionsHandler) noteFirstAutoSleep(ctx context.Context, ls *store.LiveSession, idle time.Duration) {
+	settings, err := h.ss.GetSettings(ctx)
+	if err != nil || settings[autoSleepNoticeSeen] == "true" {
+		return
+	}
+	if err := h.ss.SetSetting(ctx, autoSleepNoticeSeen, "true"); err != nil {
+		return // not marked: it would say it again every time
+	}
+	project := ptr.Value(ls.BoardName)
+	if h.bs == nil || project == "" {
+		return
+	}
+	name := h.noticeName(ctx, *ls)
+	if name == "" {
+		name = "An agent"
+	}
+	text := fmt.Sprintf("Coral put %s to sleep after %d minutes without activity. Any message, task or review for it wakes it with its conversation. Turn this off for one agent on its page, or for all agents in Settings (auto_sleep).", name, int(idle/time.Minute))
+	if _, err := h.bs.PostSystemMessage(ctx, project, board.CoralSender, text, nil); err != nil {
+		slog.Warn("auto_sleep: the first-time line was not posted", "error", err)
+	}
 }

@@ -3,6 +3,7 @@ package routes
 import (
 	"context"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -130,4 +131,27 @@ func TestAutoSleepPassLeavesAwakeWhatItMust(t *testing.T) {
 			assert.Equal(t, 0, ls.IsSleeping, name)
 		})
 	}
+}
+
+// The first auto-sleep ever says so once on the agent's board, and says where the switches are; the second says nothing.
+func TestFirstAutoSleepTellsTheBoardOnce(t *testing.T) {
+	told := func(r *sleepRig) int {
+		msgs, err := r.h.bs.ListMessages(r.ctx, "autosleep", 100, 0, 0)
+		require.NoError(t, err)
+		n := 0
+		for _, m := range msgs {
+			if strings.Contains(m.Content, "to sleep after") && strings.Contains(m.Content, "auto_sleep") {
+				n++
+			}
+		}
+		return n
+	}
+	r := newSleepRig(t)
+	assert.Equal(t, 0, told(r))
+	require.Equal(t, 1, r.pass(t).IsSleeping)
+	assert.Equal(t, 1, told(r), "the first auto-sleep tells the board once")
+	// the same agent wakes and sleeps again (past its guard): no second line
+	require.True(t, r.h.WakeIdleForDelivery(r.ctx, r.sid))
+	require.Equal(t, 1, r.passAfter(t, 5*time.Hour).IsSleeping)
+	assert.Equal(t, 1, told(r), "never twice")
 }

@@ -402,6 +402,7 @@ func (p *TokenPoller) pollClaudeSession(ctx context.Context, ls *store.LiveSessi
 
 		recs = append(recs, record)
 		priced = append(priced, model)
+		p.noteFirstTurnAfterAutoWake(ctx, ls.SessionID, call.Timestamp, call.CacheWriteTokens, call.CacheReadTokens, call.InputTokens)
 	}
 	for i, err := range p.usageStore.RecordUsageBatch(ctx, recs) {
 		if err != nil {
@@ -663,4 +664,20 @@ func estimateCost(model string, inputTokens, outputTokens, cacheReadTokens, cach
 		CacheWriteTokens: cacheWriteTokens,
 	})
 	return breakdown.TotalCostUSD
+}
+
+// noteFirstTurnAfterAutoWake logs, once, what the first turn after an auto-wake cost in cache (#12111): the tokens written to the cache (the miss a sleep cost: the prompt cache had expired
+// before the sleep, so this is the price the wake adds over staying awake), the tokens read, and the uncached input. Counters only: no text. A session that was not auto-woken costs one
+// primary-key read per poll that had a new call.
+func (p *TokenPoller) noteFirstTurnAfterAutoWake(ctx context.Context, sessionID, timestamp string, cacheWrite, cacheRead, input int) {
+	st, err := p.sessionStore.AutoSleepStateOf(ctx, sessionID)
+	if err != nil || st.WokenAt == 0 || st.FirstTurnLogged {
+		return
+	}
+	at, err := time.Parse(time.RFC3339, timestamp)
+	if err != nil || at.Unix() < st.WokenAt {
+		return
+	}
+	p.logger.Info("auto_wake_first_turn", "session_id", sessionID, "cache_write_tokens", cacheWrite, "cache_read_tokens", cacheRead, "input_tokens", input, "seconds_after_wake", at.Unix()-st.WokenAt)
+	_ = p.sessionStore.MarkAutoFirstTurnLogged(ctx, sessionID)
 }
