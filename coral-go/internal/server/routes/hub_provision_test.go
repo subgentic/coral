@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -111,6 +112,7 @@ exit 0
 	r.Post("/api/servers/provision/{plan}/run", pr.Run)
 	r.Get("/api/servers/provision/options", pr.Options)
 	r.Get("/api/servers/provision/{plan}", pr.Status)
+	r.Post("/api/servers/provision/{plan}/forget-key", pr.ForgetKey)
 	r.Delete("/api/servers/provision/{plan}", pr.Cancel)
 	pe.e, pe.p, pe.dir, pe.router, pe.known, pe.sshLog, pe.keyBlob = e, pr, dir, r, known, log, b64
 	return pe
@@ -710,4 +712,76 @@ func TestScanSentenceNamesTheJumpHostsTheOwnerHasNotPinned(t *testing.T) {
 	assert.Contains(t, scanSentence(&sshprov.HopKeyError{Hops: []string{"a", "b"}}), "(a, b) is not in your known_hosts", "when it cannot be told which, the whole chain is named")
 	assert.Contains(t, scanSentence(&sshprov.HopKeyError{}), "A jump host on the way is not in your known_hosts")
 	assert.Equal(t, "Could not read the host's key.", scanSentence(sshprov.ErrHostKeyScan))
+}
+
+// #12056: a setup that stopped on a changed host key offers Forget this host key: only a person, only for that failure, it removes the hub's own saved key for that computer (and no other), puts the setup back at the
+// start, and accepts nothing: the next connect scans and the owner confirms.
+func TestProvisionForgetKeyRemovesTheSavedKeyAndStartsOver(t *testing.T) {
+	keygen, err := exec.LookPath("ssh-keygen")
+	if err != nil {
+		t.Skip("no ssh-keygen on this computer")
+	}
+	pe := newProvEnv(t, "changed", "Linux x86_64", true)
+	gen := func() []string {
+		key := filepath.Join(t.TempDir(), "k")
+		out, gerr := exec.Command(keygen, "-q", "-t", "ed25519", "-N", "", "-f", key).CombinedOutput()
+		require.NoError(t, gerr, string(out))
+		pub, _ := os.ReadFile(key + ".pub")
+		return strings.Fields(string(pub))
+	}
+	a, b := gen(), gen()
+	require.NoError(t, os.WriteFile(pe.known, []byte("box.example.com "+a[0]+" "+a[1]+"\nother.example.com "+b[0]+" "+b[1]+"\n"), 0o600))
+	_, v := pe.do("POST", "/api/servers/provision/plan", map[string]any{"target": "user@box.example.com"})
+	plan := v["plan"].(string)
+	code, v := pe.do("POST", "/api/servers/provision/"+plan+"/forget-key", nil)
+	assert.Equal(t, 409, code, "nothing has failed yet")
+	_, v = pe.do("POST", "/api/servers/provision/"+plan+"/connect", nil)
+	require.Equal(t, "failed", v["phase"])
+	assert.Equal(t, true, v["key_changed"], "the page is told it may offer the button")
+	code, _ = pe.send(false, "POST", "/api/servers/provision/"+plan+"/forget-key", nil)
+	assert.Equal(t, 403, code, "only a person at the dashboard")
+	left, _ := os.ReadFile(pe.known)
+	assert.Contains(t, string(left), "box.example.com", "refused: nothing removed")
+
+	code, v = pe.do("POST", "/api/servers/provision/"+plan+"/forget-key", nil)
+	require.Equal(t, 200, code, "%v", v)
+	assert.Equal(t, "planned", v["phase"], "back at the start: the next connect shows what it finds")
+	assert.NotContains(t, v, "key_changed")
+	assert.NotContains(t, v, "error")
+	forgotten, _ := v["forgotten_keys"].([]any)
+	require.Len(t, forgotten, 1, "the key that was forgotten is shown, so the owner can set it beside the new one")
+	assert.Equal(t, "box.example.com", forgotten[0].(map[string]any)["host"])
+	assert.Equal(t, "ssh-ed25519", forgotten[0].(map[string]any)["type"])
+	assert.Regexp(t, `^SHA256:[A-Za-z0-9+/]{43}$`, forgotten[0].(map[string]any)["fingerprint"])
+	assert.NotContains(t, forgotten[0], "blob", "the fingerprint, never the key")
+	_, again := pe.do("GET", "/api/servers/provision/"+plan, nil)
+	assert.NotContains(t, again, "key_changed", "the status read after the reset no longer says the key changed")
+	assert.Equal(t, "planned", again["phase"])
+	left, _ = os.ReadFile(pe.known)
+	assert.NotContains(t, string(left), "box.example.com", "this computer's saved key is gone")
+	assert.Contains(t, string(left), "other.example.com", "no other host's key is touched")
+	_, err = os.Stat(pe.known + ".old")
+	assert.NoError(t, err, "ssh-keygen keeps the file as it was")
+	// nothing was trusted: the file holds no key for the host
+	code, _ = pe.do("POST", "/api/servers/provision/"+plan+"/forget-key", nil)
+	assert.Equal(t, 409, code, "and there is nothing left to forget on a setup that is not failed")
+}
+
+// #12056 (QA's pin): a failure that is not a changed host key (the computer refused the connection) offers no forgetting: the route answers 409 and the saved key is left as it is.
+func TestProvisionForgetKeyIsRefusedForAFailureThatIsNotAChangedKey(t *testing.T) {
+	pe := newProvEnv(t, "gone", "Linux x86_64", true)
+	require.NoError(t, os.WriteFile(filepath.Join(pe.dir, "stderr"), []byte("ssh: connect to host box port 22: Connection refused\n"), 0o600))
+	_, v := pe.do("POST", "/api/servers/provision/plan", map[string]any{"target": "user@box.example.com"})
+	plan := v["plan"].(string)
+	_, v = pe.do("POST", "/api/servers/provision/"+plan+"/connect", nil)
+	require.Equal(t, "connected", v["phase"]) // the first uname answers: the failure comes at the next step
+	code, _ := pe.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{})
+	require.Equal(t, 202, code)
+	failed := pe.waitPhase(t, plan, "failed")
+	assert.NotContains(t, failed, "key_changed", "a refused connection is not a changed key")
+	require.NoError(t, os.WriteFile(pe.known, []byte("box.example.com ssh-ed25519 AAAA\n"), 0o600))
+	code, _ = pe.do("POST", "/api/servers/provision/"+plan+"/forget-key", nil)
+	assert.Equal(t, 409, code)
+	left, _ := os.ReadFile(pe.known)
+	assert.Contains(t, string(left), "box.example.com", "nothing was removed")
 }

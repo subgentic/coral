@@ -238,14 +238,15 @@ var operatorOnlyRoutes = map[string]string{
 	"POST /api/servers/{id}/test":         "test a remote server",
 	"POST /api/servers/{id}/owner-secret": "set up Approve through this hub for a computer added by URL",
 	// #11370: setting a server up over SSH runs commands on another computer with the hub user's SSH access.
-	"GET /api/servers/provision/options":         "read what the server setup dialog shows",
-	"POST /api/servers/provision/plan":           "plan setting up a server over SSH",
-	"POST /api/servers/provision/{plan}/connect": "connect to a computer to set a server up",
-	"POST /api/servers/provision/{plan}/run":     "set a server up over SSH",
-	"GET /api/servers/provision/{plan}":          "read how a server setup is going",
-	"DELETE /api/servers/provision/{plan}":       "cancel a server setup",
-	"POST /api/board/remotes":                    "subscribe to a remote board",
-	"DELETE /api/board/remotes":                  "unsubscribe from a remote board",
+	"GET /api/servers/provision/options":            "read what the server setup dialog shows",
+	"POST /api/servers/provision/plan":              "plan setting up a server over SSH",
+	"POST /api/servers/provision/{plan}/connect":    "connect to a computer to set a server up",
+	"POST /api/servers/provision/{plan}/forget-key": "forget the saved host key of a computer whose key changed",
+	"POST /api/servers/provision/{plan}/run":        "set a server up over SSH",
+	"GET /api/servers/provision/{plan}":             "read how a server setup is going",
+	"DELETE /api/servers/provision/{plan}":          "cancel a server setup",
+	"POST /api/board/remotes":                       "subscribe to a remote board",
+	"DELETE /api/board/remotes":                     "unsubscribe from a remote board",
 	// #4297 (Security's #4295, SHOULD 6 and INFO 2): no agent tool reads the registry or the remote
 	// boards (grep of coral-board, coral-agent and the hooks found none), so reading them is the
 	// Operator's too.
@@ -388,7 +389,7 @@ var operatorOnlyRoutes = map[string]string{
 // lets them be absent otherwise.
 var hubModeRoutes = map[string]bool{
 	"GET /api/servers": true, "POST /api/servers": true, "PATCH /api/servers/{id}": true, "DELETE /api/servers/{id}": true, "POST /api/servers/{id}/test": true, "POST /api/servers/{id}/owner-secret": true,
-	"GET /api/servers/provision/options": true, "POST /api/servers/provision/plan": true, "POST /api/servers/provision/{plan}/connect": true, "POST /api/servers/provision/{plan}/run": true,
+	"GET /api/servers/provision/options": true, "POST /api/servers/provision/plan": true, "POST /api/servers/provision/{plan}/connect": true, "POST /api/servers/provision/{plan}/forget-key": true, "POST /api/servers/provision/{plan}/run": true,
 	"GET /api/servers/provision/{plan}": true, "DELETE /api/servers/provision/{plan}": true,
 	"CONNECT /api/remote/{server}/*": true,
 	"DELETE /api/remote/{server}/*":  true,

@@ -11,7 +11,7 @@ const options = { hosts: ['build-box', 'second'], acceptance_label: 'hub-owner@m
 const steps = (states = {}) => ['connect', 'detect', 'install', 'start', 'register'].map(n => ({ name: n, title: `Step ${n}`, state: states[n] || 'pending', detail: n === 'detect' && states.detect === 'ok' ? 'Linux x86_64, tmux found.' : '' }));
 
 let calls, polls, planKind, runBody;
-function hub({ keys = [], failConnect = false, kind = 'setup' } = {}) {
+function hub({ keys = [], failConnect = false, keyChanged = false, kind = 'setup' } = {}) {
     calls = []; polls = 0; runBody = null;
     globalThis.fetch = async (url, init = {}) => {
         const method = init.method || 'GET';
@@ -24,9 +24,11 @@ function hub({ keys = [], failConnect = false, kind = 'setup' } = {}) {
             return json({ plan: 'p1', target: body.target || 'build-box (from your SSH config)', server_id: body.server_id || 'ssh-box', label: 'Build box', kind: planKind, phase: 'planned', steps: steps(), delete_data: !!body.delete_data }, 201);
         }
         if (url === '/api/servers/provision/p1/connect') {
+            if (keyChanged) return json({ plan: 'p1', kind: planKind, phase: 'failed', error: 'The host key has changed since you confirmed it. This may be a different computer.', key_changed: true, steps: steps({ connect: 'failed' }) });
             if (failConnect) return json({ plan: 'p1', kind: planKind, phase: 'failed', error: 'Could not connect.', steps: steps({ connect: 'failed' }) });
             return json({ plan: 'p1', target: 'user@box.example.com:22', server_id: 'ssh-box', label: 'Build box', kind: planKind, phase: keys.length ? 'needs_keys' : 'connected', host_keys: keys, system: 'Linux x86_64', steps: steps() });
         }
+        if (url === '/api/servers/provision/p1/forget-key') return json({ plan: 'p1', target: 'user@box.example.com:22', server_id: 'ssh-box', label: 'Build box', kind: planKind, phase: 'planned', forgotten_keys: [{ host: 'box.example.com', type: 'ssh-ed25519', fingerprint: 'SHA256:oldoldold<img src=x onerror=alert(1)>' }], steps: steps() });
         if (url === '/api/servers/provision/p1/run') {
             runBody = body;
             return json({ plan: 'p1', kind: planKind, phase: 'running', steps: steps({ connect: 'ok' }) }, 202);
@@ -175,6 +177,40 @@ function fresh() { const host = doc.createElement('div'); doc.body.append(host);
     assert.deepEqual(runBody, {}, 'no terms are sent: the hub makes the acceptance');
 }
 
+// ── a changed host key offers Forget this host key, which asks the hub, then starts over and trusts nothing ─────
+{
+    hub({ keyChanged: true });
+    const host = fresh();
+    mountSshSetup(host, { mode: 'setup', pollMs: 5 });
+    await until(() => $(host, '#ssh-host'), 'the form');
+    $(host, '#ssh-host').value = 'user@box.example.com'; $(host, '#ssh-host').dispatchEvent(new dom.window.Event('input'));
+    $(host, 'form').dispatchEvent(new dom.window.Event('submit', { cancelable: true }));
+    await until(() => btn(host, 'Connect'), 'the plan');
+    btn(host, 'Connect').click();
+    await until(() => btn(host, 'Forget this host key'), 'the Forget button on a changed key');
+    assert.match(host.textContent, /If you did not expect it, do not: it may be a different computer/, 'the warning is on the page');
+    assert.equal(calls.some(c => c.path.endsWith('/forget-key')), false, 'nothing is forgotten until the person presses it');
+    btn(host, 'Forget this host key').click();
+    await until(() => btn(host, 'Connect'), 'the setup back at the start');
+    const forget = calls.find(c => c.path.endsWith('/forget-key'));
+    assert.equal(forget.method, 'POST');
+    assert.equal(forget.body, null, 'nothing is sent with it: no host, no key');
+    assert.match(host.textContent, /now forgotten: ssh-ed25519 SHA256:oldoldold/, 'the forgotten key is shown, to set beside the new one');
+    assert.equal(host.querySelector('img'), null, 'a fingerprint from the hub became markup');
+    assert.equal(btn(host, 'Set up'), undefined, 'nothing was trusted by forgetting');
+    assert.equal(host.querySelector('[role="alert"]'), null);
+    // a failure that is not a changed key has no such button
+    hub({ failConnect: true });
+    const other = fresh();
+    mountSshSetup(other, { mode: 'setup', pollMs: 5 });
+    await until(() => $(other, '#ssh-host'), 'the form');
+    $(other, '#ssh-host').value = 'user@box.example.com'; $(other, '#ssh-host').dispatchEvent(new dom.window.Event('input'));
+    $(other, 'form').dispatchEvent(new dom.window.Event('submit', { cancelable: true }));
+    await until(() => btn(other, 'Connect'), 'the plan');
+    btn(other, 'Connect').click();
+    await until(() => other.querySelector('[role="alert"]'), 'the failure');
+    assert.equal(btn(other, 'Forget this host key'), undefined, 'only a changed key offers it');
+}
 // ── cancel asks the hub to drop the plan ─────────────────────────────────────────────────────────
 {
     hub();
