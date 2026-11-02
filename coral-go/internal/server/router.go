@@ -547,6 +547,11 @@ func (s *Server) registerCloud(r *chi.Mux) {
 		touchPrune := background.NewOperatorTouchPrune(s.boardStore)
 		s.goBackground(func(ctx context.Context) { _ = touchPrune.Run(ctx) }) // touches older than 90 days (#11225)
 	}
+	// the Activity record is trimmed to a year or 50,000 rows, daily, with the count logged (#12069)
+	if s.boardStore != nil {
+		activityTrim := background.NewActivityTrim(s.boardStore)
+		s.goBackground(func(ctx context.Context) { _ = activityTrim.Run(ctx) })
+	}
 	// a park whose end passed gives its task the slot back: settled for the reads that do not settle it themselves (#11659)
 	if s.boardStore != nil {
 		parkSweep := background.NewParkSweep(s.boardStore)

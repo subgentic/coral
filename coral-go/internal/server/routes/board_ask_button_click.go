@@ -105,6 +105,7 @@ func (h *BoardHandler) ClaimAskButton(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	out := map[string]any{"ok": true, "id": claimed.ID, "ask_id": askID, "label": claimed.Label, "action": claimed.Action, "arg": claimed.Arg}
+	h.recordActivity(r, board.ActAnswer, "question", strconv.FormatInt(askID, 10), project, "", claimed.Label) // the option the Operator chose (text an agent wrote: cleaned, redacted and cut)
 	if claimed.Action != board.ActionReply {
 		writeJSON(w, http.StatusOK, out)
 		return

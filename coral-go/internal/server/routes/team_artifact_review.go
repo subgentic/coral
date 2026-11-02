@@ -125,6 +125,11 @@ func (h *BoardHandler) ReviewArtifact(w http.ResponseWriter, r *http.Request) {
 		errNotFound(w, "this team has no such artifact")
 		return
 	}
+	note := ""
+	if state == board.ReviewDenied {
+		note = body.Reason
+	}
+	r = r.WithContext(board.WithActivity(r.Context(), activityMetaFor(r, item.Name, note))) // the Activity record: the decision and its row are one transaction (#12069)
 	change, tags, err := h.bs.DecideArtifactReview(r.Context(), project, id, state, time.Now())
 	switch {
 	case err == board.ErrNotForReview:
@@ -202,10 +207,12 @@ func (h *BoardHandler) postReviewNotice(ctx context.Context, project, msg string
 
 // ignoreArtifact is Ignore and Unignore (#11552): the Operator takes a review out of Needs you with no verdict, or puts it back. Nothing is posted and nobody is told, in either direction.
 func (h *BoardHandler) ignoreArtifact(w http.ResponseWriter, r *http.Request, project, id string, ignore bool) {
-	if _, ok := h.teamManagedArtifact(r.Context(), project, id); !ok {
+	item, ok := h.teamManagedArtifact(r.Context(), project, id)
+	if !ok {
 		errNotFound(w, "this team has no such artifact")
 		return
 	}
+	r = r.WithContext(board.WithActivity(r.Context(), activityMetaFor(r, item.Name, "")))
 	change, tags, err := h.bs.IgnoreArtifactReview(r.Context(), project, id, ignore)
 	switch {
 	case err == board.ErrNotForReview:
@@ -220,10 +227,12 @@ func (h *BoardHandler) ignoreArtifact(w http.ResponseWriter, r *http.Request, pr
 
 // saveArtifact is Save for later and Move to Needs you (#11641): the Operator puts a file for review aside, or back. It stays for review (the decisions still work on it); nothing is posted and nobody is told.
 func (h *BoardHandler) saveArtifact(w http.ResponseWriter, r *http.Request, project, id string, save bool) {
-	if _, ok := h.teamManagedArtifact(r.Context(), project, id); !ok {
+	item, ok := h.teamManagedArtifact(r.Context(), project, id)
+	if !ok {
 		errNotFound(w, "this team has no such artifact")
 		return
 	}
+	r = r.WithContext(board.WithActivity(r.Context(), activityMetaFor(r, item.Name, "")))
 	change, tags, err := h.bs.SaveArtifactReview(r.Context(), project, id, save)
 	switch {
 	case err == board.ErrNotForReview:
