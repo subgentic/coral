@@ -245,7 +245,9 @@ export function toggleTeamSleep(boardName, action) {
     const doIt = async () => {
         try {
             const resp = await teamFetch(boardName, n => `/api/sessions/live/team/${encodeURIComponent(n)}/${action}`, { method: 'POST' });
-            const data = await resp.json();
+            const data = await resp.json().catch(() => ({}));
+            // The route answers 200 with ok: false when it did nothing (no sessions on that board): that is a refusal to say, not a team that is awake (#12417: Sleep Team "did nothing" and said nothing).
+            if (!resp.ok || data.ok === false) { showToast(data.error || data.message || `Could not ${action} the team (HTTP ${resp.status})`, true); return; }
             const sleeping = !!data.sleeping;
             for (const s of state.liveSessions) {
                 // Team wake leaves archived agents asleep (#3030).
