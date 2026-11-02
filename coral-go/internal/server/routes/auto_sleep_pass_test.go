@@ -25,6 +25,8 @@ type autoSleepTerm struct {
 	*mockSessionTerminal
 	screen string
 	killed []string // the session ids whose terminal was killed without ending the session
+	// draftOnceAsleep: once this session's row is asleep, the screen shows a draft (a person typed between the verdict's look and the sleep).
+	draftOnceAsleep func() bool
 }
 
 func (a *autoSleepTerm) KillSessionOnly(ctx context.Context, name, agentType, sessionID string) error {
@@ -33,6 +35,9 @@ func (a *autoSleepTerm) KillSessionOnly(ctx context.Context, name, agentType, se
 }
 
 func (a *autoSleepTerm) AgentScreen(context.Context, string, string, string) (string, error) {
+	if a.draftOnceAsleep != nil && a.draftOnceAsleep() {
+		return draftBoxScreen, nil
+	}
 	return a.screen, nil
 }
 func (a *autoSleepTerm) PanePID(context.Context, string, string, string) (int, error) {
@@ -154,4 +159,25 @@ func TestFirstAutoSleepTellsTheBoardOnce(t *testing.T) {
 	require.True(t, r.h.WakeIdleForDelivery(r.ctx, r.sid))
 	require.Equal(t, 1, r.passAfter(t, 5*time.Hour).IsSleeping)
 	assert.Equal(t, 1, told(r), "never twice")
+}
+
+// Text typed after the verdict's look is not lost (QA's SHOULD 1): the screen is read again right before the terminal is ended, and a draft undoes the sleep: the row is awake as it was, nothing was
+// killed, and the thrash guard has no sleep to count from.
+func TestAutoSleepAbortsWhenADraftAppearsBeforeTheKill(t *testing.T) {
+	r := newSleepRig(t)
+	r.term.draftOnceAsleep = func() bool {
+		ls, err := r.ss.GetLiveSession(r.ctx, r.sid)
+		return err == nil && ls != nil && ls.IsSleeping == 1
+	}
+	ls := r.pass(t)
+	assert.Equal(t, 0, ls.IsSleeping, "a draft appeared between the look and the kill: awake")
+	assert.Nil(t, ls.SleepReason)
+	assert.Empty(t, r.term.killed, "nothing was killed")
+	st, _ := r.ss.AutoSleepStateOf(r.ctx, r.sid)
+	assert.Zero(t, st.SleptAt, "the sleep did not happen: no clock")
+	// and once the draft is gone the next pass puts it to sleep
+	r.term.draftOnceAsleep = nil
+	ls = r.pass(t)
+	assert.Equal(t, 1, ls.IsSleeping)
+	assert.Equal(t, []string{r.sid}, r.term.killed)
 }

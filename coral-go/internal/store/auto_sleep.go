@@ -96,3 +96,20 @@ func (s *SessionStore) AutoSleepOffSessions(ctx context.Context) (map[string]boo
 	}
 	return out, rows.Err()
 }
+
+// UndoAutoSleeping puts an agent that was just auto-slept back as it was, when the last look before its terminal was ended found text in its box: awake, no reason, and the sleep clock forgotten
+// (the sleep did not happen, so the thrash guard has nothing to count from). Only a row that is asleep for the reason idle is touched.
+func (s *SessionStore) UndoAutoSleeping(ctx context.Context, sessionID string) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx, `UPDATE live_sessions SET is_sleeping = 0, sleep_reason = NULL WHERE session_id = ? AND is_sleeping = 1 AND sleep_reason = ?`, sessionID, SleepReasonIdle); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE auto_sleep_state SET slept_at = NULL, woken_at = NULL, first_turn_logged = 0 WHERE session_id = ?`, sessionID); err != nil {
+		return err
+	}
+	return tx.Commit()
+}

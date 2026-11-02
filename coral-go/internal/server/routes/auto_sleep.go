@@ -244,6 +244,17 @@ func (h *SessionsHandler) autoSleepOne(ctx context.Context, ls *store.LiveSessio
 		}
 		return
 	}
+	// The screen is read again right before anything is ended (QA's SHOULD 1): text typed since the verdict's look would be lost with the terminal. A draft, a dialog, a background run or a
+	// screen that cannot be read undoes the sleep: the row is awake again as it was, nothing was killed.
+	name := naming.SessionName(ls.AgentType, ls.SessionID)
+	if why := ptymanager.ScreenStopsSleep(ctx, h.terminal, name, ls.AgentType, ls.SessionID); why != "" {
+		if err := h.ss.UndoAutoSleeping(ctx, ls.SessionID); err != nil {
+			slog.Warn("auto_sleep: the sleep was not undone", "session_id", ls.SessionID, "error", err)
+		}
+		slog.Info("auto_sleep aborted", "session_id", ls.SessionID, "reason", "screen_changed")
+		h.kickWS()
+		return
+	}
 	h.modelSwitches.end(ls.SessionID, "The agent was put to sleep before the change was confirmed.")
 	h.stopOpencode(ls.SessionID)
 	if err := h.terminal.KillSessionOnly(ctx, ls.AgentName, ls.AgentType, ls.SessionID); err != nil {

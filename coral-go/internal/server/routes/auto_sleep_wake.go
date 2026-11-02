@@ -59,6 +59,17 @@ func (h *SessionsHandler) WakeIdleFor(ctx context.Context, sessionID string, fro
 	if ls.IsArchived != 0 || sleepReason(*ls) != store.SleepReasonIdle {
 		return false
 	}
+	start := time.Now()
+	ctx, cancel := lifecycleCtx(ctx) // a wake runs to its end whatever asked for it (#5171)
+	defer cancel()
+	dir := ls.WorkingDir
+	if tdir := h.teamHomeFolder(ctx, ls); tdir != "" {
+		dir = tdir
+	}
+	if info, serr := os.Stat(dir); serr != nil || !info.IsDir() { // checked first: a wake that cannot start does not use one of the board's ten (QA's SHOULD 2)
+		h.autoWakeFailed(ctx, ls, store.StartFailureFolderGone, nil)
+		return false
+	}
 	if !fromPerson && !takeBoardWakeSlot(ptr.Value(ls.BoardName), time.Now()) {
 		noteWakeHeld(ptr.Value(ls.BoardName), time.Now())
 		return false
@@ -68,17 +79,6 @@ func (h *SessionsHandler) WakeIdleFor(ctx context.Context, sessionID string, fro
 		return false
 	}
 	defer release()
-	start := time.Now()
-	ctx, cancel := lifecycleCtx(ctx) // a wake runs to its end whatever asked for it (#5171)
-	defer cancel()
-	dir := ls.WorkingDir
-	if tdir := h.teamHomeFolder(ctx, ls); tdir != "" {
-		dir = tdir
-	}
-	if info, serr := os.Stat(dir); serr != nil || !info.IsDir() {
-		h.autoWakeFailed(ctx, ls, store.StartFailureFolderGone, nil)
-		return false
-	}
 	if err := h.wakeExistingSession(ctx, ls); err != nil {
 		h.autoWakeFailed(ctx, ls, store.StartFailureWakeFailed, err)
 		return false

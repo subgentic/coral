@@ -196,3 +196,19 @@ func TestPaceWakeStartsWakesApart(t *testing.T) {
 		assert.GreaterOrEqual(t, starts[i].Sub(starts[i-1]), 25*time.Millisecond, "wake %d started too soon after the one before", i)
 	}
 }
+
+// A wake that cannot start (the folder is gone) does not use one of the board's ten (QA's SHOULD 2).
+func TestAGoneFolderDoesNotUseABoardWakeSlot(t *testing.T) {
+	r := newSleepRig(t)
+	autoWakeSlots.Lock()
+	autoWakeSlots.m["autosleep"] = nil
+	autoWakeSlots.Unlock()
+	_, err := r.h.db.DB.ExecContext(r.ctx, `UPDATE live_sessions SET working_dir = ? WHERE session_id = ?`, t.TempDir()+"/deleted", r.sid)
+	require.NoError(t, err)
+	r.autoSleep(t)
+	assert.False(t, r.h.WakeIdleForDelivery(r.ctx, r.sid))
+	autoWakeSlots.Lock()
+	used := len(autoWakeSlots.m["autosleep"])
+	autoWakeSlots.Unlock()
+	assert.Equal(t, 0, used, "no slot was taken for a wake that could not start")
+}
