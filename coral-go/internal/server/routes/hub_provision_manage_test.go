@@ -44,9 +44,11 @@ func newManageEnv(t *testing.T) *manageEnv {
 	}
 	require.NoError(t, os.WriteFile(filepath.Join(home, ".coral-server", "instance-id"), []byte(provInstance+"\n"), 0o600))
 	require.NoError(t, os.WriteFile(filepath.Join(home, ".coral-server", "data", "api_key"), []byte(provKey+"\n"), 0o600))
+	// the daemon start (#12217) goes through nohup: it is answered here by a note in the same log, "new-session", and starts nothing (the stand-in for a start the test asks about)
+	require.NoError(t, os.WriteFile(filepath.Join(bin, "nohup"), []byte("#!/bin/sh\necho \"new-session daemon\" >> '"+tmuxLog+"'\nexit 0\n"), 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(bin, "tmux"), []byte("#!/bin/sh\necho \"$@\" >> '"+tmuxLog+"'\n[ \"$1\" = has-session ] && exit 1\nexit 0\n"), 0o755))
 	// the checks read ps and /proc/net/tcp, which a Mac has not or answers otherwise: they are answered here (a file named stuck means Coral will not stop; nothing holds 8420)
-	script := "#!/bin/sh\nfor a in \"$@\"; do last=\"$a\"; done\ncase \"$last\" in *\"uname -sm\"*) echo 'Linux x86_64'; exit 0;; *\"command -v tmux\"*) exit 0;; *\"ps -u\"*) [ -e '" + filepath.Join(pe.dir, "stuck") + "' ] && exit 1; exit 0;; *\"/proc/net/tcp\"*) [ -e '" + filepath.Join(pe.dir, "portheld") + "' ] && exit 2; exit 0;; esac\nHOME='" + home + "'; export HOME\nPATH='" + bin + ":'\"$PATH\"; export PATH\neval \"$last\"\n"
+	script := "#!/bin/sh\nfor a in \"$@\"; do last=\"$a\"; done\ncase \"$last\" in *\"uname -sm\"*) echo 'Linux x86_64'; exit 0;; \"command -v tmux >/dev/null 2>&1\") exit 0;; *\"ps -u\"*) [ -e '" + filepath.Join(pe.dir, "stuck") + "' ] && exit 1; exit 0;; *\"/proc/net/tcp\"*) [ -e '" + filepath.Join(pe.dir, "portheld") + "' ] && exit 2; exit 0;; esac\nHOME='" + home + "'; export HOME\nPATH='" + bin + ":'\"$PATH\"; export PATH\neval \"$last\"\n"
 	require.NoError(t, os.WriteFile(filepath.Join(pe.dir, "ssh"), []byte(script), 0o700))
 	pe.p.runner = sshprov.Runner{SSH: filepath.Join(pe.dir, "ssh")}
 	pe.p.version = "2.0.10"
@@ -71,6 +73,17 @@ func newManageEnv(t *testing.T) *manageEnv {
 	}
 	pe.p.SetOnRemoved(func(id string) { me.mu.Lock(); me.removed = append(me.removed, id); me.mu.Unlock() })
 	return me
+}
+
+// sawStart is whether the daemon start has been seen in the log: the start is a background process (#12217), so its note in the log may land a moment after the command returned.
+func (me *manageEnv) sawStart() bool {
+	for i := 0; i < 60; i++ {
+		if b, _ := os.ReadFile(me.tmuxLog); strings.Contains(string(b), "new-session") {
+			return true
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	return false
 }
 
 func (me *manageEnv) plan(t *testing.T, action string, extra map[string]any) (int, map[string]any) {
@@ -210,7 +223,7 @@ func TestManageUpgradeInstallsRestartsAndChecksTheNewVersion(t *testing.T) {
 	me.p.checkHealth = func(context.Context, *store.RemoteServer, string) RemoteHealth {
 		me.mu.Lock()
 		defer me.mu.Unlock()
-		if b, _ := os.ReadFile(me.tmuxLog); strings.Contains(string(b), "new-session") {
+		if me.sawStart() {
 			return RemoteHealth{Status: store.RemoteStatusOnline, Version: want}
 		}
 		return RemoteHealth{Status: store.RemoteStatusOnline, Version: "0.0.1"}
@@ -282,7 +295,7 @@ func TestManageUpgradeGivesAnOlderComputerItsOwnerSecretOnceAndNeverRotatesIt(t 
 	me := newManageEnv(t)
 	want := config.ReportedVersion()
 	me.p.checkHealth = func(context.Context, *store.RemoteServer, string) RemoteHealth {
-		if b, _ := os.ReadFile(me.tmuxLog); strings.Contains(string(b), "new-session") {
+		if me.sawStart() {
 			return RemoteHealth{Status: store.RemoteStatusOnline, Version: want}
 		}
 		return RemoteHealth{Status: store.RemoteStatusOnline, Version: "0.0.1"}
