@@ -21,6 +21,9 @@
     document.addEventListener('DOMContentLoaded', paintBar);
     new MutationObserver(paintBar).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 })();
+/* The icon font in, the icons take the room of their glyph (#12442). Until then each icon is a 1em box (css/fonts.css, #12354: its word would take the room of a word and the page would move when the
+   font arrives); a font that never arrives leaves the box. A glyph wider than 1em (auto_awesome at 200% text) is clipped by the box, so once the font is in the box is not applied. */
+document.addEventListener('DOMContentLoaded', () => { try { if (document.fonts && document.fonts.load) document.fonts.load('1em "Material Icons"').then(f => { if (f && f.length) document.documentElement.classList.add('icons-in'); }, () => {}); } catch (_) { /* no font API: the box stays */ } }); // after the stylesheet that declares the face: before it the load finds no face
 /* The static prefix this page loaded from (/static/ or a versioned /static/b/<build>/).
    Scripts and tools that import app modules from outside the module graph (tests,
    devtools) import from here, so they share the page's module instances. */
