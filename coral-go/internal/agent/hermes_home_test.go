@@ -17,6 +17,10 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// hermesHooksRefused is whether this system installs no Hermes hook at all: hermesToolTrusted refuses on Windows, where Hermes has not been tried with Coral (#11715). The tests of what is written into a home
+// expect the hooks everywhere else, and no hook, with the person's own removed, here (#12427).
+func hermesHooksRefused() bool { return runtime.GOOS == "windows" }
+
 // treeSum is a hash of every path, mode, size, mtime and content under dir: the person's home must be exactly as it was.
 func treeSum(t *testing.T, dir string) [32]byte {
 	t.Helper()
@@ -95,6 +99,11 @@ func TestPrepareHermesHomeSeedsFromThePersonAndNeverWritesThere(t *testing.T) {
 	assert.Equal(t, map[string]any{"backend": "local"}, cfg["terminal"])
 	assert.NotContains(t, cfg, "hooks_auto_accept")
 	hooks, _ := cfg["hooks"].(map[string]any)
+	if hermesHooksRefused() { // Hermes on Windows has not been tried with Coral (#11715): hermesToolTrusted refuses there, so no Coral hook is installed, and the person's own is gone all the same (#12427)
+		assert.Empty(t, hooks, "no hook is installed here")
+		assert.NotContains(t, readAll(t, filepath.Join(home, "config.yaml")), "own-hook", "the person's own hook is not carried")
+		return
+	}
 	require.Len(t, hooks, len(hermesHookEvents), "Coral's events and no other (the person's outbound hook is gone)")
 	for _, ev := range hermesHookEvents {
 		entries, _ := hooks[ev].([]any)
@@ -120,6 +129,11 @@ func TestHermesAllowlistHoldsOnlyCoralsEntriesWithTheToolsRealMtime(t *testing.T
 	require.NoError(t, err)
 	var list hermesAllowlist
 	require.NoError(t, json.Unmarshal(b, &list))
+	if hermesHooksRefused() { // no hook is installed where Hermes has not been tried with Coral (#11715), so the allowlist holds no entry and none of the person's (#12427)
+		assert.Empty(t, list.Approvals)
+		assert.NotContains(t, string(b), "own-hook", "the person's approval is not carried")
+		return
+	}
 	require.Len(t, list.Approvals, len(hermesHookEvents))
 	cfg := readYAML(t, filepath.Join(home, "config.yaml"))
 	for i, ev := range hermesHookEvents {
@@ -227,7 +241,11 @@ func TestAnExistingConfigIsKeptAndTheHooksAreRestored(t *testing.T) {
 	cfg = readYAML(t, cfgPath)
 	assert.Equal(t, "chosen/here", cfg["model"])
 	assert.NotContains(t, readAll(t, cfgPath), "evil.sh")
-	assert.Len(t, cfg["hooks"], len(hermesHookEvents))
+	if hermesHooksRefused() { // no hook is installed here (#11715, #12427): the person's pre_llm_call hook is gone and nothing of Coral's is put back
+		assert.NotContains(t, cfg, "hooks")
+	} else {
+		assert.Len(t, cfg["hooks"], len(hermesHookEvents))
+	}
 
 	t.Setenv("CORAL_HOOK_DIR", t.TempDir()) // no hook tool there
 	_, err = PrepareHermesHome(r.data, "t", testSID, r.person, time.Now())
