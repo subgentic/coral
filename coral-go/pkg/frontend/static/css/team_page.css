@@ -344,10 +344,11 @@
 .inbox-review-item { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .inbox-review-item > :not(.inbox-review-name) { flex: none; }
 .inbox-review-item > .inbox-review-name { flex: 0 1 auto; min-width: 0; } /* the name and, once it is opened, its 'read' tag (#9277) */
-.inbox-ask-dialog { color: var(--text-primary); } /* the size, border and ground are the shared dialog rule's */
+dialog.inbox-ask-dialog { position: fixed; inset: 0; margin: auto; height: fit-content; max-height: 90dvh; overflow: auto; color: var(--text-primary); } /* the size, border and ground are the shared dialog rule's; centred as the other dialogs are: the base reset gives every dialog margin 0, which pinned it to the top left (#11999, again) */
+dialog.inbox-ask-dialog:not([open]) { display: none; }
 .inbox-ask-dialog h2 { margin: 0 0 4px; font-size: var(--fs-lg, 1.1rem); }
 .inbox-ask-sub { margin: 0 0 12px; color: var(--text-muted); }
-.inbox-ask-text { margin: 0 0 12px; max-height: 14rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--font-mono, monospace); background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 8px 10px; }
+.inbox-ask-text { margin: 0 0 12px; max-height: 14rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-family: inherit; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 8px 10px; }
 .inbox-ask-label { display: block; margin-bottom: 8px; }
 .inbox-ask-box { display: block; width: 100%; box-sizing: border-box; margin-top: 4px; }
 .inbox-ask-error { min-height: 1.2em; margin: 0 0 8px; color: var(--danger); }

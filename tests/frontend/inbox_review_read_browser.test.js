@@ -14,7 +14,8 @@ const { coralReady } = require('./helpers/wait');
     const row = name => `[...document.querySelectorAll('#group-table-view tbody tr')].find(r=>r.textContent.includes(${JSON.stringify(name)}))`;
     const badge = () => ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`);
     const navCount = () => ev(`(() => { const e = [...document.querySelectorAll('.view-list-item, [data-view-key="needs"], #inbox-nav [data-key="needs"]')].find(x => /Needs you/.test(x.textContent)); return e ? e.textContent.replace(/Needs you/, '').trim() : null; })()`);
-    const click = (name, label) => ev(`[...(${row(name)}).querySelectorAll('button')].find(b=>b.textContent.trim()===${JSON.stringify(label)}||(b.getAttribute('aria-label')||'').startsWith(${JSON.stringify(label)})).click();true`);
+    const YES = "(()=>{const m=document.getElementById('confirm-modal');if(m&&getComputedStyle(m).display!=='none')document.getElementById('confirm-modal-yes').click();return true})()"; // an unopened file asks 'Approve without opening?' (#11999)
+    const click = (name, label) => ev(`[...(${row(name)}).querySelectorAll('button')].find(b=>b.textContent.trim()===${JSON.stringify(label)}||(b.getAttribute('aria-label')||'').startsWith(${JSON.stringify(label)})).click();${label==='Approve'?YES:'true'}`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({source:PRELOAD});
         for (const width of [1280,390]) {

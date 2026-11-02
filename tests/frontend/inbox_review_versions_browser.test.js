@@ -8,6 +8,7 @@ const BASE = require('./test_base').BASE;
 const { coralReady } = require('./helpers/wait');
 const { removeBoards } = require('./helpers/board_cleanup');
 
+const YES = "(()=>{const m=document.getElementById('confirm-modal');if(m&&getComputedStyle(m).display!=='none')document.getElementById('confirm-modal-yes').click();return true})()"; // an unopened file asks 'Approve without opening?' (#11999)
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const failures = [];
@@ -53,7 +54,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             check(await ev(`(() => { const c = [...document.querySelectorAll('.view-list-item')].filter(r => /Needs you$/.test((r.querySelector('.view-list-label') || {}).textContent || '')).map(r => (r.querySelector('.view-list-count') || {}).textContent); return c.length > 0 && c.every(x => x === '6'); })()`) || mobile, at + 'the Needs you folder counts six, not nine');
             await shot(`inbox-review-versions-${w}`);
             // Approve the newest version of design.md: one review, for the newest; the three before it are settled by the tags route, with the other tags kept
-            await ev(`[...document.querySelectorAll('${T} tbody tr')].find(tr => tr.querySelector('[data-review-artifact="${hex(4)}"]')).querySelector('button[aria-label^="Approve"]').click(); true`);
+            await ev(`[...document.querySelectorAll('${T} tbody tr')].find(tr => tr.querySelector('[data-review-artifact="${hex(4)}"]')).querySelector('button[aria-label^="Approve"]').click(); ${YES}`);
             await waitFor(`window.__rv.calls.filter(c => c.route === 'tags').length >= 3`, at + 'the earlier versions are settled', 10000).catch(() => {});
             const calls = await ev(`window.__rv.calls`);
             const reviews = calls.filter(c => c.route === 'review'), tagsCalls = calls.filter(c => c.route === 'tags');
@@ -68,7 +69,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             // one of the writes fails: the newest is approved, the person is told, and that version stays (it is the newest left)
             await ev(`(() => { const st = window.__rv; for (const a of st.items) if (a.name === 'design.md' && a.session_id === 's1') a.tags = ['for review', 'internal']; st.calls = []; st.failTags = '${hex(2)}'; return import(${S} + 'inbox_reviews.js').then(m => m.refreshReviews(true)).then(() => true); })()`);
             await waitFor(`document.querySelectorAll('${T} tbody tr').length === 6`, at + 'the versions are back for the second case', 10000);
-            await ev(`[...document.querySelectorAll('${T} tbody tr')].find(tr => tr.querySelector('[data-review-artifact="${hex(4)}"]')).querySelector('button[aria-label^="Approve"]').click(); true`);
+            await ev(`[...document.querySelectorAll('${T} tbody tr')].find(tr => tr.querySelector('[data-review-artifact="${hex(4)}"]')).querySelector('button[aria-label^="Approve"]').click(); ${YES}`);
             await waitFor(`/could not be cleared/.test(document.body.innerText)`, at + 'the person is told an earlier version could not be cleared', 10000).catch(() => {});
             await ev(`import(${S} + 'inbox_reviews.js').then(m => m.refreshReviews(true)).then(() => true)`); await ev(`new Promise(r => setTimeout(r, 600))`); // sleep-ok: the list is read again
             rows = await rowsOf();
