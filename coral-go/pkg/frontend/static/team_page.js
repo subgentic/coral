@@ -17,7 +17,7 @@ import { setPreviewSession } from './preview_pane.js';
 import { renderLiveSessions } from './render.js';
 import { watchScrollCue } from './scroll_cue.js';
 import { isPhoneLayout } from './phone_layout.js';
-import { revealSideways } from './reveal_sideways.js';
+const { revealInStrip } = await importOnce('./strip_reveal.js'); // a part of the team page's group: loaded with it
 const { closeDetailPane } = await importOnce('./detail_pane.js'); // a lazy module loads the others it needs through importOnce, so a failed load is retried
 const { el } = await importOnce('./team_table.js');
 const { quietFocus } = await importOnce('./quiet_focus.js');
@@ -263,7 +263,7 @@ function drawCounts() {
     }
     // the counts widen the tabs: when one changed, the selected tab is brought wholly into view again (its own count arrives after it was scrolled to, #8149), then the edges are drawn
     // a count arrives on a poll: the strip moves sideways, a page scrolled down stays (#12357)
-    queueMicrotask(() => { if (widened) revealSideways($(`team-tab-${S.tab}`)); drawTabEdges(); });
+    queueMicrotask(() => { if (widened) revealInStrip($('team-tabs'), $(`team-tab-${S.tab}`)); drawTabEdges(); });
 }
 
 /** The counts on the tabs and the header's status: three light reads, repeated while the page is on screen.
@@ -324,7 +324,7 @@ function markTab(tab) {
     syncTabStop();
     $('team-panel-item').hidden = true;
     syncTabsMore();
-    $(`team-tab-${tab}`)?.scrollIntoView({ inline: 'nearest', block: 'nearest' }); // the selected tab is in view inside the strip (on load and on change); the fade's room is the strip's scroll padding
+    revealInStrip($('team-tabs'), $(`team-tab-${tab}`)); // the selected tab is whole inside the strip, and no tab is cut at its left (on load and on change)
     drawTabEdges();
 }
 
