@@ -222,6 +222,8 @@ write_files:
       #!/bin/sh
       # The end of the bootstrap window: no SSH any more, and nothing left that could open it again (a reboot, a cloud-init re-run, a snapshot restore). Safe to run twice.
       # sshd is stopped AND masked, port 22 is closed, the host keys and the launch key are deleted, and so are cloud-init's own copies of the user-data (the provider keeps its copy: the key in it is dead).
+      # First of all the done file goes, so coral-finish.path (PathExists) cannot start this oneshot again when it exits: a long agent install would never trip the unit's start limit, and a failed agent must not re-trigger it.
+      rm -f /run/coral/bootstrap.d/done
       systemctl disable --now ssh.socket ssh.service sshd.service 2>/dev/null || true
       systemctl mask ssh.socket ssh.service sshd.service 2>/dev/null || true
       ufw --force delete allow 22/tcp >/dev/null 2>&1 || true
@@ -237,7 +239,11 @@ write_files:
       systemctl enable coral.service 2>/dev/null || true
       # after Coral is up and has redeemed its credential: the agent CLIs (slow, and not needed to enroll)
       rc=0
-      if systemctl is-active --quiet coral.service; then /usr/local/sbin/coral-machine-agents || rc=1; fi
+      # The agents run once per boot: the marker is written BEFORE they start, so a second start of this unit (the timer, a retrigger) never installs them again, and a failed agent is not retried.
+      if [ ! -e /run/coral/agents-started ] && systemctl is-active --quiet coral.service; then
+        touch /run/coral/agents-started
+        /usr/local/sbin/coral-machine-agents || rc=1
+      fi
       exit $rc
   - path: /usr/local/sbin/coral-machine-agents
     owner: root:root

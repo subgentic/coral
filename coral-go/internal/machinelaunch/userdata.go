@@ -406,6 +406,8 @@ func finishScript(withAgents bool) string {
 	p("#!/bin/sh")
 	p("# The end of the bootstrap window: no SSH any more, and nothing left that could open it again (a reboot, a cloud-init re-run, a snapshot restore). Safe to run twice.")
 	p("# sshd is stopped AND masked, port 22 is closed, the host keys and the launch key are deleted, and so are cloud-init's own copies of the user-data (the provider keeps its copy: the key in it is dead).")
+	p("# First of all the done file goes, so coral-finish.path (PathExists) cannot start this oneshot again when it exits: a long agent install would never trip the unit's start limit, and a failed agent must not re-trigger it.")
+	p("rm -f /run/coral/bootstrap.d/done")
 	p("systemctl disable --now ssh.socket ssh.service sshd.service 2>/dev/null || true")
 	p("systemctl mask ssh.socket ssh.service sshd.service 2>/dev/null || true")
 	p("ufw --force delete allow 22/tcp >/dev/null 2>&1 || true")
@@ -422,7 +424,11 @@ func finishScript(withAgents bool) string {
 	if withAgents {
 		p("# after Coral is up and has redeemed its credential: the agent CLIs (slow, and not needed to enroll)")
 		p("rc=0")
-		p("if systemctl is-active --quiet coral.service; then /usr/local/sbin/coral-machine-agents || rc=1; fi")
+		p("# The agents run once per boot: the marker is written BEFORE they start, so a second start of this unit (the timer, a retrigger) never installs them again, and a failed agent is not retried.")
+		p("if [ ! -e /run/coral/agents-started ] && systemctl is-active --quiet coral.service; then")
+		p("  touch /run/coral/agents-started")
+		p("  /usr/local/sbin/coral-machine-agents || rc=1")
+		p("fi")
 		p("exit $rc") // the machine is enrolled and SSH is closed by now: a failed agent makes this unit FAIL (named in the journal by coral-machine-agents), never a silent success
 		return s.String()
 	}

@@ -150,7 +150,7 @@ func TestUserDataSaysWhatItMustAlwaysSay(t *testing.T) {
 	assert.Contains(t, got, "NoNewPrivileges=true")
 	// pinned agents, from the table; agy as coral and only because it was asked for unpinned
 	// the agent CLIs come after SSH is closed and Coral is up, from the finish step, and only if Coral is active
-	assert.Contains(t, finish, "if systemctl is-active --quiet coral.service; then /usr/local/sbin/coral-machine-agents || rc=1; fi")
+	assert.Contains(t, finish, "/usr/local/sbin/coral-machine-agents || rc=1")
 	assert.Less(t, strings.Index(finish, "systemctl mask"), strings.Index(finish, "coral-machine-agents"), "SSH is closed before the slow installs")
 	assert.NotContains(t, setupOf(t, doc), "npm", "nothing slow before the redeem")
 	assert.NotContains(t, setupOf(t, doc), "antigravity")
@@ -415,7 +415,9 @@ func TestAgentsScriptNeverRunsNpmAsRoot(t *testing.T) {
 			assert.Contains(t, l, "--cache /opt/coral-agents/.npm-cache")
 		}
 	}
-	assert.Contains(t, script, "ln -sf /opt/coral-agents/bin/claude /usr/local/bin/claude")
+	assert.Contains(t, script, "ln -s -T /opt/coral-agents/bin/claude /usr/local/bin/claude", "the link is made without -f")
+	assert.NotContains(t, script, "ln -sf", "never with -f: a collision can fail, never replace")
+	assert.Less(t, strings.Index(script, "test ! -e /usr/local/bin/claude && test ! -L /usr/local/bin/claude"), strings.Index(script, "ln -s -T /opt/coral-agents/bin/claude"), "only after nothing is found at the name")
 	assert.Contains(t, script, "test -x /opt/coral-agents/bin/codex")
 }
 
@@ -566,4 +568,27 @@ func TestValidateAgentBinary(t *testing.T) {
 		_, err := resolveAgents([]string{entry})
 		assert.NoError(t, err, entry)
 	}
+}
+
+// The finish unit cannot loop (coral-go Security's SHOULD on 6c): coral-finish.path fires on PathExists of the done file, so the finish script removes that file FIRST, before anything slow; and the agents run once per boot,
+// guarded by a marker written before they start, so a failed agent is not retried by a second start.
+func TestFinishScriptRemovesTheDoneFileFirstAndRunsAgentsOnce(t *testing.T) {
+	commands := func(script string) []string {
+		var cmds []string
+		for _, l := range strings.Split(script, "\n") {
+			if l != "" && !strings.HasPrefix(l, "#") {
+				cmds = append(cmds, l)
+			}
+		}
+		return cmds
+	}
+	script := finishScript(true)
+	require.NotEmpty(t, commands(script))
+	assert.Equal(t, "rm -f /run/coral/bootstrap.d/done", commands(script)[0], "the done file goes before any other command")
+	assert.Equal(t, "rm -f /run/coral/bootstrap.d/done", commands(finishScript(false))[0])
+	assert.Contains(t, finishPathUnit(), "PathExists=/run/coral/bootstrap.d/done", "this is the file the path unit watches")
+	assert.Less(t, strings.Index(script, "rm -f /run/coral/bootstrap.d/done"), strings.Index(script, "/usr/local/sbin/coral-machine-agents"), "and before the slow agent install")
+	assert.Less(t, strings.Index(script, "touch /run/coral/agents-started"), strings.Index(script, "/usr/local/sbin/coral-machine-agents"), "the marker is written before the agents start")
+	assert.Contains(t, script, "[ ! -e /run/coral/agents-started ]", "and a second start does not run them again")
+	assert.NotContains(t, finishScript(false), "agents-started", "no agents, no marker")
 }
