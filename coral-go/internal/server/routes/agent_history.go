@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/subgentic/coral/internal/agent"
+	at "github.com/subgentic/coral/internal/agenttypes"
 	"github.com/subgentic/coral/internal/secrets"
 	"github.com/subgentic/coral/pkg/redact"
 	"net/http"
@@ -494,6 +495,10 @@ func (h *SessionsHandler) loadSessionMessages(ctx context.Context, item store.Se
 	agentType := item.AgentType
 	if agentType == "" {
 		agentType = "claude"
+	}
+
+	if agentType == at.Hermes { // no transcript file: its conversation is rows of the state.db in the agent's own Hermes home (#12040)
+		return h.hermesHistoryMessages(ctx, item)
 	}
 
 	if item.IsCurrent || item.LiveRead {

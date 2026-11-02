@@ -354,3 +354,21 @@ const (
 	hermesRestartNote   = "A restarted Hermes agent starts a new conversation: the old one is deleted with its Hermes home (Hermes keeps no other copy). Wake keeps it."
 	hermesResumeRefusal = "A Hermes agent keeps its conversation in its own Hermes home, so it cannot be resumed by its Hermes id into another agent. Wake the same agent to continue its conversation."
 )
+
+// hermesHistoryMessages is a Hermes agent's conversation for the history search and its context (#12040, goal #192 slice D): the messages of the Hermes session its hooks bound to this Coral session, read from the
+// agent's OWN home's state.db, read-only and capped (hermesdb: MaxMessages rows, each text cut), in the chat's own shape (jsonl.ParseHermesMessages), so an agent finds its own earlier words as a Pi agent does.
+// Only the live (or sleeping) agent's: a Kill, a restart and a resume remove the home with the conversation, so an earlier session in a lineage has nothing to read, and says so. With no conversation recorded
+// yet the answer says that, in Hermes's words, rather than an error.
+func (h *SessionsHandler) hermesHistoryMessages(ctx context.Context, item store.SessionLineageItem) ([]map[string]any, string, error) {
+	if !item.IsCurrent && !item.LiveRead {
+		return nil, "an earlier Hermes session's conversation was removed with its Hermes home: Hermes keeps no other copy", nil
+	}
+	if item.SessionID == "" || h.cfg == nil || transcriptlink.HermesSession(h.cfg.CoralDir(), item.SessionID) == "" {
+		return nil, "Hermes has not recorded a conversation for this agent yet", nil
+	}
+	messages := h.hermesTranscriptRows(ctx, item.SessionID, hermesdb.MaxMessages).All(ctx)
+	if len(messages) == 0 {
+		return nil, "Hermes has not recorded a conversation for this agent yet", nil
+	}
+	return messages, "", nil
+}

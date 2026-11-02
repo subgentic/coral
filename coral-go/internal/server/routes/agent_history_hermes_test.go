@@ -43,7 +43,7 @@ func TestAgentHistorySearch_HermesFindsItsOwnWords(t *testing.T) {
 	}
 	var out AgentHistorySearchResponse
 	require.Equal(t, http.StatusOK, get("/api/agent/history/search?session_id="+sid+"&query=FIXTURE-ASSISTANT-2", &out))
-	assert.Equal(t, "complete", out.Status, "the Hermes conversation is available: %+v", out.Sessions)
+	assert.Equal(t, "complete", out.Status, "the Hermes conversation is available: %+v", out.SessionsSearched)
 	require.Equal(t, 1, out.TotalMatches)
 	assert.Equal(t, "assistant", out.Results[0].Role)
 	assert.Contains(t, out.Results[0].Excerpt, "FIXTURE-ASSISTANT-2 use ls")
@@ -83,8 +83,8 @@ func TestAgentHistorySearch_HermesWithNoConversationSaysSo(t *testing.T) {
 	var out AgentHistorySearchResponse
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
 	assert.Equal(t, "unavailable", out.Status)
-	require.NotEmpty(t, out.Sessions)
-	assert.Contains(t, out.Sessions[0].Error, "Hermes", "said in Hermes's words")
+	require.NotEmpty(t, out.SessionsSearched)
+	assert.Contains(t, out.SessionsSearched[0].Error, "Hermes", "said in Hermes's words")
 }
 
 // A teammate's home is never read for this agent: the same Hermes id in another agent's state.db finds nothing.
@@ -107,4 +107,14 @@ func TestAgentHistorySearch_HermesNeverReadsATeammatesHome(t *testing.T) {
 	var out AgentHistorySearchResponse
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
 	assert.Zero(t, out.TotalMatches)
+}
+
+// An earlier session of a Hermes agent (a restart or a resume gave it a new session and removed the old home) has nothing to read, and says why: Hermes keeps no other copy.
+func TestHermesHistoryOfAnEarlierSessionSaysItsHomeWasRemoved(t *testing.T) {
+	env := setupAgentHistoryTestEnv(t)
+	env.handler.cfg.UseCoralDir(t.TempDir())
+	msgs, why, err := env.handler.hermesHistoryMessages(context.Background(), store.SessionLineageItem{SessionID: "9b8a7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c75", AgentType: at.Hermes, IsCurrent: false})
+	require.NoError(t, err)
+	assert.Empty(t, msgs)
+	assert.Contains(t, why, "removed with its Hermes home")
 }

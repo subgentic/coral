@@ -17,6 +17,7 @@ func ParseHermesMessages(rows []hermesdb.Message) []map[string]any {
 	names := map[string]string{}
 	var out []map[string]any
 	for _, m := range rows {
+		m = validHermesRow(m)
 		ts := hermesTime(m.At)
 		switch m.Role {
 		case "user":
@@ -121,4 +122,17 @@ func hermesToolResult(m hermesdb.Message, ts string, names map[string]string) ma
 		failed = res.ExitCode != nil && *res.ExitCode != 0
 	}
 	return map[string]any{"type": "tool_result", "timestamp": ts, "content": truncateContent(content), "tool_name": name, "tool_use_id": m.ToolCallID, "is_error": failed}
+}
+
+// validHermesRow is a row with every text valid UTF-8: the rows are raw SQLite text written by an agent CLI, which no JSON decoder has cleaned (a Pi line has), and a byte that is not text would reach the chat, the
+// search and the excerpts as it is (the fuzz target found it, #12040). Invalid bytes become U+FFFD.
+func validHermesRow(m hermesdb.Message) hermesdb.Message {
+	const bad = "\uFFFD"
+	m.Role = strings.ToValidUTF8(m.Role, bad)
+	m.Content = strings.ToValidUTF8(m.Content, bad)
+	m.ToolCalls = strings.ToValidUTF8(m.ToolCalls, bad)
+	m.ToolName = strings.ToValidUTF8(m.ToolName, bad)
+	m.ToolCallID = strings.ToValidUTF8(m.ToolCallID, bad)
+	m.FinishReason = strings.ToValidUTF8(m.FinishReason, bad)
+	return m
 }
