@@ -3,7 +3,7 @@ import { keepMenuOnScreen } from './menu_fit.js';
 import { needsYou, askedRow } from './asked_before_restart.js';
 import { unrecordedItem, recordAllAgents } from './waiting.js';
 import { welcomeRows, runWelcome, dismissWelcome, hideAllWelcome } from './welcome_items.js';
-import { loadPendingSkills, skillRows, skillLine, skillCount, openSkill } from './needs_skills.js';
+import { loadPendingSkills, skillRows, skillLine, skillName, skillCount, openSkill } from './needs_skills.js';
 import { doneGoals, hideGoalDone, setGoalDoneCount, SETTING as GOAL_DONE_SETTING } from './goal_done.js';
 /* The dashboard's own Inbox on the shared sidebar (#7472), loaded the first time the Inbox tab is shown (inbox_tab.js keeps the badge and the counts, which are always there).
  *
@@ -372,7 +372,7 @@ function openGoalDone(g, close = false) {
 /** A "Goal looks done" item's actions (#11825): Close goal (the goal's Close dialog, set to Done), Not yet (hidden until a task is added) and Ignore (hidden for good, Undo in the notice); on a phone Ignore is in the menu. */
 /** A skill waiting for approval has one action: Review opens it in the Skills tab, where the files are read before anything is approved. */
 function skillActions(r) {
-    const box = DT.el('div', 'inbox-review-actions'), b = DT.el('button', 'btn btn-small', 'Review'); b.type = 'button'; b.setAttribute('aria-label', `Review the skill ${r.name}`);
+    const box = DT.el('div', 'inbox-review-actions'), b = DT.el('button', 'btn btn-small', 'Review'); b.type = 'button'; b.setAttribute('aria-label', `Review the skill ${skillName(r)}`);
     b.addEventListener('click', e => { e.stopPropagation(); openSkill(r); });
     box.append(b); return box;
 }

@@ -8,6 +8,8 @@ const { coralReady } = require('./helpers/wait');
 const PENDING = [
     { id: '2'.repeat(32), name: 'db-review', version: 1, digest: 'b'.repeat(64), description: 'Checks a SQL migration.', status: 'pending', has_scripts: false, not_reviewable: false, publisher_kind: 'agent', publisher_agent: 'Backend Dev', publisher_team: 'alpha', created_at: '2026-11-02T09:00:00Z' },
     { id: '3'.repeat(32), name: 'pdf-forms', version: 2, digest: 'c'.repeat(64), description: 'Fill PDF forms.', status: 'pending', has_scripts: false, not_reviewable: false, publisher_kind: 'agent', publisher_agent: 'Dev', publisher_team: 'beta', created_at: '2026-11-02T08:00:00Z' },
+    // words an agent chose: a control character, zero-width ones and a reordering override, in the skill's name and in the publisher's agent and team (#12260, QA's SHOULD on #12104)
+    { id: '4'.repeat(32), name: 'clean\u0007-up\u200b-skill\u202e', version: 1, digest: 'd'.repeat(64), description: 'Tidy.', status: 'pending', has_scripts: false, not_reviewable: false, publisher_kind: 'agent', publisher_agent: 'Evil\u200d Agent\u0000\u2066', publisher_team: 'te\u202eam\u200b', created_at: '2026-11-02T07:00:00Z' },
 ];
 
 (async () => {
@@ -29,6 +31,14 @@ const PENDING = [
         const text = await ev(`document.getElementById('group-table-view').innerText`);
         assert.match(text, /Skill to approve: pdf-forms version 2/);
         assert.match(text, /Published by Backend Dev · alpha/, 'who published it, from the session');
+        // a name or a publisher with a control, zero-width or reordering character comes out clean: none of those characters is in what is drawn (they are dropped or written out, never passed to the page)
+        const row = await ev(`(() => { const r = Array.from(document.querySelectorAll('#group-table-view tr.dt-row')).find(x => /clean/.test(x.textContent)); return r ? { text: r.textContent, html: r.innerHTML, title: r.getAttribute('aria-label') || '' } : null; })()`);
+        assert.ok(row, 'the row of the skill with hostile characters is there');
+        const bad = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u2069\ufeff]/;
+        assert.equal(bad.test(row.text), false, 'no control, zero-width or reordering character in the row text: ' + JSON.stringify(row.text));
+        assert.equal(bad.test(row.html), false, 'nor in the row markup: ' + JSON.stringify((row.html.match(/.{0,60}[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u2069\ufeff].{0,30}/g) || []).slice(0, 3)));
+        assert.match(row.text, /Skill to approve: clean/, 'the words that are words are there');
+        assert.match(row.text, /Evil/, 'the publisher is there');
         assert.match(await ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`), /^[2-9]\d*$/, 'the Inbox tab counts them');
         assert.match(await ev(`Array.from(document.querySelectorAll('#group-table-view button')).map(b => b.textContent.trim()).join('|')`), /Review/, 'a Review button on the row');
         // Review opens the Skills tab at that skill
