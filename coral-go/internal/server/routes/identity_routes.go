@@ -49,6 +49,7 @@ var operatorOnlyRoutes = map[string]string{
 	"GET /api/operator-asks":                            "read the questions agents asked the Operator (their text)",
 	"GET /api/needs-you":                                "read what is waiting for the Operator (one cleaned line each)",
 	"GET /api/activity":                                 "read the Activity record of what the Operator did in Needs you (#12069)",
+	"GET /api/analytics/inbox-vs-chat":                  "read how much the Operator did in the Inbox and how much in a chat (counts only, #12158)",
 	"GET /api/chief":                                    "read which agent the Operator recorded as Chief (#11470)",
 	"GET /api/board/{project}/orchestrator-grant":       "read what a board's orchestrator may do",
 	"PUT /api/board/{project}/orchestrator-grant":       "change what a board's orchestrator may do (wake, sleep and start agents)",

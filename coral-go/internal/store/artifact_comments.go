@@ -272,3 +272,25 @@ func (s *SessionStore) CountArtifactCommentsBy(ctx context.Context, issuer, subj
 	err := s.db.GetContext(ctx, &n, `SELECT COUNT(*) FROM artifact_comments WHERE author_issuer = ? AND author_subject = ? AND created_at >= ?`, issuer, subject, since.UTC().Format(time.RFC3339))
 	return n, err
 }
+
+// OwnerCommentCount is how many comments the Operator wrote on one day, on one team's files and goals (counts only: the comment's text is never read).
+type OwnerCommentCount struct {
+	Day   string `db:"day"`
+	Board string `db:"board"`
+	N     int    `db:"n"`
+}
+
+// OwnerCommentCounts counts the Operator's own comments (the owner kind, replies included, deleted ones not) written in [since, until), by UTC day and team, optionally of one team: for the Inbox-versus-chat
+// tab (#12158). It reads no body, no author and no id: a day, a team and a number.
+func (s *SessionStore) OwnerCommentCounts(ctx context.Context, since, until, team string) ([]OwnerCommentCount, error) {
+	q := `SELECT substr(created_at, 1, 10) AS day, board, COUNT(*) AS n FROM artifact_comments WHERE author_kind = 'owner' AND deleted_at IS NULL AND created_at >= ? AND created_at < ?`
+	args := []any{since, until}
+	if team != "" {
+		q += ` AND board = ?`
+		args = append(args, team)
+	}
+	q += ` GROUP BY day, board ORDER BY day LIMIT 20000`
+	out := []OwnerCommentCount{}
+	err := s.reader().SelectContext(ctx, &out, q, args...)
+	return out, err
+}
