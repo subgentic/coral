@@ -178,3 +178,19 @@ func TestAutoSleepLogsTheFooterThatSaidBackground(t *testing.T) {
 	assert.Contains(t, buf.String(), "reason=background_running")
 	assert.Contains(t, buf.String(), "1 shell", "the marker is in the line: "+buf.String())
 }
+
+// The wait's own command is an event at the wait's time (its tool_use): it is not "something after the wait", and the turn that backgrounded it then ended with a stop. That worker sleeps (QA's SHOULD,
+// #12335: without this the v2.0.34 bug, every parked worker kept awake, could come back unnoticed).
+func TestAWorkerWhoseLastToolIsItsOwnWaitCommandSleeps(t *testing.T) {
+	const oneShell = "✻ Cogitated for 4s · done 5:38 PM · 1 shell still running\n\n──────────────────────────────────────────────────────────────────────\n❯ \n──────────────────────────────────────────────────────────────────────\n  ⏵⏵ bypass permissions on · 1 shell · ↓ to manage\n"
+	r := newSleepRig(t)
+	r.term.screen = oneShell
+	at := func(d time.Duration) string { return time.Now().Add(d).UTC().Format(time.RFC3339Nano) }
+	_, err := r.h.ts.InsertAgentEvent(r.ctx, &store.AgentEvent{AgentName: "dev", SessionID: &r.sid, EventType: "tool_use", CreatedAt: at(-time.Second)}) // `coral-board wait`, just before it registered
+	require.NoError(t, err)
+	_, err = r.h.bs.RegisterWait(r.ctx, "autosleep", "dev", r.name, "message", "", "waiting for a message", 10*time.Hour)
+	require.NoError(t, err)
+	_, err = r.h.ts.InsertAgentEvent(r.ctx, &store.AgentEvent{AgentName: "dev", SessionID: &r.sid, EventType: "stop", CreatedAt: at(20 * time.Second)})
+	require.NoError(t, err)
+	assert.Equal(t, 1, r.pass(t).IsSleeping, "the tool at the wait's own time is the wait's command, not a job: asleep")
+}

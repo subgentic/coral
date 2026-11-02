@@ -44,7 +44,7 @@ var (
 	backgroundWords   = `(?:\bstill running\b|\b\d+ (?:shells?|monitors?|background (?:tasks?|commands?))\b)`
 	backgroundRunning = regexp.MustCompile(`(?i)[^\n]*?` + backgroundWords)  // in the footer zone anchored on the box: the words alone (a separator that changed must not hide a job)
 	backgroundDotted  = regexp.MustCompile(`(?i)·[^\n]*?` + backgroundWords) // on a screen with no box to anchor on: the words after the footer's middle dot
-	backgroundCount   = regexp.MustCompile(`(?i)\b(\d+) (?:shells?|monitors?|background (?:tasks?|commands?))\b`)
+	backgroundCount   = regexp.MustCompile(`(?i)\b(\d+) (shell|monitor|background task|background command)s?\b`)
 )
 
 // footerOf is the footer of the screen, anchored on the input box (Security, #12335): the one non-blank line above the box's top border (where "· done 5:38 PM · 1 shell still running" is) and every
@@ -106,7 +106,7 @@ func BackgroundMarker(screen string) string {
 // onlyOneBackground: the footer names exactly one background item, however many times it says so ("· 1 shell still running" and "· 1 shell ·" are the same one). A footer with no count, or any count
 // above one, is not it.
 func onlyOneBackground(screen string) bool {
-	found := false
+	kinds := map[string]bool{} // a shell and a monitor are two items, whatever number each says
 	lines, anchored := footerOf(screen)
 	for _, l := range lines {
 		if !anchored && !strings.Contains(l, "·") {
@@ -116,10 +116,10 @@ func onlyOneBackground(screen string) bool {
 			if c[1] != "1" {
 				return false
 			}
-			found = true
+			kinds[strings.ToLower(c[2])] = true
 		}
 	}
-	return found
+	return len(kinds) == 1
 }
 
 // PanePIDer is implemented by the session terminals that can name the process an agent's terminal started, the root of its process tree (#12111): auto-sleep reads the tree's use of

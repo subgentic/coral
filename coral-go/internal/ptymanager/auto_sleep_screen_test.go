@@ -95,3 +95,19 @@ func TestScreenStopsSleepWordsAloneCountInTheAnchoredFooter(t *testing.T) {
 	f.show("  bypass permissions on | 1 shell\n")
 	assert.Equal(t, "", ScreenStopsSleep(ctx, f, "claude-x", "claude", "x", false), "no box and no dot: not a footer line")
 }
+
+// The one-shell rule counts every item in the footer zone, whatever the separator (the Orchestrator, Security, #12335).
+func TestScreenStopsSleepOwnWaitWithOtherSeparators(t *testing.T) {
+	ctx := context.Background()
+	f := &fakeAgent{}
+	rule := "──────────────────────────────────────────────────────────────────────\n"
+	box := rule + "❯ \n" + rule
+	f.show("✻ Cogitated for 4s | done 5:38 PM | 1 shell still running\n\n" + box + "  bypass permissions on | 1 shell\n")
+	assert.Equal(t, "", ScreenStopsSleep(ctx, f, "claude-x", "claude", "x", true), "a pipe separator and one shell: it is the wait")
+	f.show("✻ Cogitated for 4s | done 5:38 PM | 2 shells still running\n\n" + box + "  bypass permissions on | 2 shells\n")
+	assert.Equal(t, SleepStopBackground, ScreenStopsSleep(ctx, f, "claude-x", "claude", "x", true), "a pipe separator and two shells: not only the wait")
+	f.show("✻ Cogitated for 4s done 5:38 PM 2 shells\n\n" + box + "  bypass permissions on\n")
+	assert.Equal(t, SleepStopBackground, ScreenStopsSleep(ctx, f, "claude-x", "claude", "x", true), "a count of 2 with no separator at all: not only the wait")
+	f.show("✻ Cogitated for 4s | done 5:38 PM | 1 shell\n\n" + box + "  bypass permissions on | 1 monitor\n")
+	assert.Equal(t, SleepStopBackground, ScreenStopsSleep(ctx, f, "claude-x", "claude", "x", true), "a shell above and a monitor below are two items, each saying 1: not only the wait")
+}
