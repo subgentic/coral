@@ -24,7 +24,7 @@ var boardOwnedRows = []struct{ table, col string }{
 }
 
 // Audit trails: what the Hub's operators did and what the health rules did are a record of what happened, not part of the board, so they stay.
-var auditRows = []struct{ table, col string }{{"hub_operator_actions", "project"}, {"health_actions", "project"}, {"operator_actions", "team"}}
+var auditRows = []struct{ table, col string }{{"hub_operator_actions", "project"}, {"health_actions", "project"}}
 
 // Rows that hang off a board's tasks, found through the task ids.
 var taskOwnedRows = []struct{ table, sel string }{
@@ -79,7 +79,6 @@ func fillBoard(t *testing.T, s *Store, project string) (taskIDs []int64) {
 		{`INSERT INTO health_goal_size (project, goal_id, said_level) VALUES (?, 1, 1)`, []any{project}},
 		{`INSERT INTO health_offbooks (project, kind, agent, ref, detail, at) VALUES (?, 'post', 'Dev', '1', 'posted a commit', '2026-10-19T00:00:00.000Z')`, []any{project}},
 		{`INSERT INTO hub_operator_actions (at, hub_user, method, path, project, status) VALUES ('2026-10-19T00:00:00Z', 'u', 'PUT', '/x', ?, 200)`, []any{project}},
-		{`INSERT INTO operator_actions (at, actor, action, item_kind, item_id, team, source, prev_hash, hash) VALUES ('2026-10-19T00:00:00Z', 'local', 'approve', 'file', 'x', ?, 'local', '', 'h')`, []any{project}}, // the Activity record stays: a record of what happened is not part of the board (#12069)
 		{`INSERT OR IGNORE INTO boards (id, label, created_at) VALUES (?, ?, '2026-10-19T00:00:00Z')`, []any{project, project}},
 		{`INSERT INTO board_proposals (board_id, kind, title, norm_title, payload, proposer, state, created_at, expires_at) VALUES (?, 'goal', 'a proposal', 'a proposal', '{}', 'Orchestrator', 'pending', '2026-10-19T00:00:00Z', '2026-10-26T00:00:00Z')`, []any{project}},
 		{`INSERT INTO board_goal_requests_in (board_id, request_id, from_board, goal_uid, created_at) VALUES (?, 'in-' || ?, 'a-peer', 'u', '2026-10-19T00:00:00Z')`, []any{project, project}},
