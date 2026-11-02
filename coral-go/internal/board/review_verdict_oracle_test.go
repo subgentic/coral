@@ -1,6 +1,7 @@
 package board
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -53,6 +54,9 @@ func TestReviewVerdictAgreesWithBefore4599(t *testing.T) {
 		for seed := int64(1); seed <= 60; seed++ {
 			t.Run(fmt.Sprint(seed), func(t *testing.T) {
 				t.Parallel()
+				// Opening a store (its schema statements) contends inside the SQLite driver: past about 8 at a time the seeds only wait on each other (60 seeds: 76 s at 8, 93 s with all cores).
+				verdictSeeds <- struct{}{}
+				defer func() { <-verdictSeeds }()
 				runVerdictOracle(t, seed)
 			})
 		}
@@ -61,6 +65,30 @@ func TestReviewVerdictAgreesWithBefore4599(t *testing.T) {
 	for outcome, floor := range verdictOutcomes {
 		require.GreaterOrEqual(t, verdictSeen[outcome], floor, "%q went (almost) unexercised", outcome)
 	}
+}
+
+// verdictSeeds bounds how many seeds run at once.
+var verdictSeeds = make(chan struct{}, 8)
+
+// snapshotVerdictBoard copies the open store s (its file at pathA) to pathB as a consistent snapshot: the write-ahead log is checkpointed and truncated first (no reader or writer may hold it: the
+// checkpoint reports busy otherwise), and the test proves the copy instead of assuming it: the log is empty, and the copy is byte for byte the file, which did not change while it was copied.
+func snapshotVerdictBoard(t *testing.T, s *Store, pathA, pathB string) {
+	t.Helper()
+	var busy, logFrames, checkpointed int
+	require.NoError(t, s.db.QueryRow("PRAGMA wal_checkpoint(TRUNCATE)").Scan(&busy, &logFrames, &checkpointed))
+	require.Equal(t, 0, busy, "the checkpoint was blocked: a writer or reader was active during the snapshot")
+	if fi, err := os.Stat(pathA + "-wal"); err == nil {
+		require.Zero(t, fi.Size(), "the write-ahead log still holds pages after the checkpoint: the file alone is not the board")
+	}
+	before, err := os.ReadFile(pathA)
+	require.NoError(t, err)
+	copyVerdictBoard(t, pathA, pathB)
+	copied, err := os.ReadFile(pathB)
+	require.NoError(t, err)
+	after, err := os.ReadFile(pathA)
+	require.NoError(t, err)
+	require.True(t, bytes.Equal(before, copied), "the copy is not the file as it was checkpointed")
+	require.True(t, bytes.Equal(before, after), "the file changed while it was copied")
 }
 
 func copyVerdictBoard(t *testing.T, from, to string) {
@@ -237,19 +265,14 @@ func runVerdictOracle(t *testing.T, seed int64) {
 			note = "why"
 		}
 
-		require.NoError(t, s.Close())
-		copyVerdictBoard(t, pathA, pathB)
+		// A stays open from step to step (it was closed and opened twice a step, the schema statements of each open being most of this test's time); B is a fresh store on a snapshot of A.
+		snapshotVerdictBoard(t, s, pathA, pathB)
 		var results [2]string
-		for i, p := range []string{pathA, pathB} {
-			st, err := NewStoreWithKey(p, "")
-			require.NoError(t, err)
-			if i == 0 {
-				results[i] = verdictResult(st.reviewVerdictBefore4599(ctx, "team", id, actor, note, approve, round))
-			} else {
-				results[i] = verdictResult(st.reviewVerdict(ctx, "team", id, actor, note, approve, round))
-			}
-			require.NoError(t, st.Close())
-		}
+		results[0] = verdictResult(s.reviewVerdictBefore4599(ctx, "team", id, actor, note, approve, round))
+		st, err := NewStoreWithKey(pathB, "")
+		require.NoError(t, err)
+		results[1] = verdictResult(st.reviewVerdict(ctx, "team", id, actor, note, approve, round))
+		require.NoError(t, st.Close())
 		require.Equal(t, results[0], results[1], "step %d: the verdict", step)
 		require.Equal(t, dumpVerdictBoard(t, pathA), dumpVerdictBoard(t, pathB), "step %d: the databases after it", step)
 		r := results[1]
@@ -267,8 +290,6 @@ func runVerdictOracle(t *testing.T, seed int64) {
 		default:
 			seenVerdict("approved, round still open")
 		}
-		s, err = NewStoreWithKey(pathA, "")
-		require.NoError(t, err)
 	}
 	require.NoError(t, s.Close())
 }
