@@ -124,6 +124,9 @@ func (h *SessionsHandler) Restart(w http.ResponseWriter, r *http.Request) {
 		h.touch(r, plan.stored.SessionID, board.TouchRestart)
 	}
 	out := map[string]any{"ok": true, "session_id": plan.newSessionID, "session_name": plan.newSessionName}
+	if plan.agentType == at.Hermes {
+		out["conversation_note"] = hermesRestartNote
+	}
 	if plan.modeNotRecorded {
 		out["mode_note"] = "Its mode was not recorded: restarted in Default"
 	}

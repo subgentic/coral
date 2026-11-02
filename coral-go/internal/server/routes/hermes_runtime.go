@@ -346,3 +346,10 @@ func (h *SessionsHandler) hermesLastMessage(sessionID string) (jsonl.LastMessage
 	hermesLastCache.Unlock()
 	return msg, ok
 }
+
+// What a Hermes agent's conversation does and does not survive (#11956): it lives in a Hermes home of that agent alone (agent.HermesAgentHome), and Hermes keeps no other copy. A wake keeps the home, so the
+// conversation continues; a restart gives the agent a new session id and so a new home, and the old one is deleted with its conversation. A conversation cannot be resumed by its Hermes id into another agent.
+const (
+	hermesRestartNote   = "A restarted Hermes agent starts a new conversation: the old one is deleted with its Hermes home (Hermes keeps no other copy). Wake keeps it."
+	hermesResumeRefusal = "A Hermes agent keeps its conversation in its own Hermes home, so it cannot be resumed by its Hermes id into another agent. Wake the same agent to continue its conversation."
+)

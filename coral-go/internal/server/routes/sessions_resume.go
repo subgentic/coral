@@ -91,6 +91,9 @@ func (h *SessionsHandler) resumeResolve(ctx context.Context, name string, body *
 	if !agent.IsResumeID(agentType, body.SessionID) {
 		return nil, func(w http.ResponseWriter) { errBadRequest(w, "session_id is not a valid resume id") } // #3582: it goes into file paths
 	}
+	if agentType == at.Hermes {
+		return nil, func(w http.ResponseWriter) { errBadRequest(w, hermesResumeRefusal) }
+	}
 	if !agent.GetAgent(agentType).SupportsResume() {
 		return nil, func(w http.ResponseWriter) { errBadRequest(w, fmt.Sprintf("Resume not supported for %s", agentType)) }
 	}

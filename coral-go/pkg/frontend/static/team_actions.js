@@ -10,7 +10,7 @@ import { showToast, escapeHtml } from './utils.js';
 import { updateSettingList, upsertByName, parseList } from './settings_lists.js';
 import { _passesFilters } from './list_filter_match.js';
 import { killCount } from './agent_actions.js';
-import { WHAT_STAYS_KILL, WHAT_STAYS_KILL_MANY } from './agent_words.js';
+import { whatStaysKill } from './agent_words.js';
 import { showPromptModal } from './prompt_modals.js';
 import { worktreeConfirmWords } from './worktree_words.js';
 import { showWorktreeNotice } from './worktree_notice.js';
@@ -37,7 +37,7 @@ export async function killGroup(groupName) {
 
     showConfirmModal(
         "Kill all agents",
-        `Kill ${killCount(groupSessions.length).agents} in "${groupName.startsWith('wf:') ? groupName.slice(3) : keyLabel(groupName)}"? ${groupSessions.length === 1 ? `It stops now. ${WHAT_STAYS_KILL}` : `They stop now. ${WHAT_STAYS_KILL_MANY}`} ${killCount(groupSessions.length).note}`,
+        `Kill ${killCount(groupSessions.length).agents} in "${groupName.startsWith('wf:') ? groupName.slice(3) : keyLabel(groupName)}"? ${groupSessions.length === 1 ? 'It' : 'They'} stop${groupSessions.length === 1 ? 's' : ''} now. ${whatStaysKill(groupSessions)} ${killCount(groupSessions.length).note}`,
         async () => {
             for (const s of groupSessions) {
                 try {
@@ -67,7 +67,7 @@ export async function killBoard(boardName) {
 
     showConfirmModal(
         "Kill team",
-        `Kill ${killCount(boardSessions.length).agents} in "${keyLabel(boardName)}"? ${boardSessions.length === 1 ? `It stops now. ${WHAT_STAYS_KILL}` : `They stop now. ${WHAT_STAYS_KILL_MANY}`} ${_teamWorktreeSentence(boardSessions)}${killCount(boardSessions.length).note}`,
+        `Kill ${killCount(boardSessions.length).agents} in "${keyLabel(boardName)}"? ${boardSessions.length === 1 ? 'It' : 'They'} stop${boardSessions.length === 1 ? 's' : ''} now. ${whatStaysKill(boardSessions)} ${_teamWorktreeSentence(boardSessions)}${killCount(boardSessions.length).note}`,
         async () => {
             // The whole team through the team route, so the team is marked stopped as an API kill does (its worktree is then not "in use" in the kept-worktrees list); its one answer carries the worktree.
             let worktree = null;
