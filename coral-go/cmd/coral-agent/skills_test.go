@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -12,6 +13,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/skills"
 )
 
 func captureStdout(t *testing.T, fn func()) string {
@@ -124,4 +127,70 @@ func TestWriteSkillFilesRefusesNamesUnsafeOnWindows(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "ok")
 	_, err := writeSkillFiles(dir, map[string]string{"refs/console.md": "x", "SKILL.md": "y"})
 	assert.NoError(t, err, "'console' is not a device name")
+}
+
+func writeSkillFolder(t *testing.T) string {
+	dir := filepath.Join(t.TempDir(), "my-skill")
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "references"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte("---\nname: my-skill\ndescription: Does a thing.\n---\n# Body\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "references", "guide.md"), []byte("guide"), 0o644))
+	return dir
+}
+
+func TestZipSkillFolderMakesAZipTheServerParsesAndRefusesLinks(t *testing.T) {
+	dir := writeSkillFolder(t)
+	data, err := zipSkillFolder(dir)
+	require.NoError(t, err)
+	sk, err := skills.Parse(data)
+	require.NoError(t, err, "the zip is one the store's own parser accepts, SKILL.md at its top")
+	assert.Equal(t, "my-skill", sk.Name)
+	assert.True(t, skills.AgentMayPublish(sk))
+
+	if runtime.GOOS != "windows" {
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "run.txt"), []byte("plain text"), 0o755))
+		data, err = zipSkillFolder(dir)
+		require.NoError(t, err)
+		sk, err = skills.Parse(data)
+		require.NoError(t, err)
+		assert.Equal(t, 1, sk.Scripts(), "an executable file is a script, so an agent's publish is refused by the server")
+		require.NoError(t, os.Remove(filepath.Join(dir, "run.txt")))
+
+		require.NoError(t, os.Symlink("/etc/passwd", filepath.Join(dir, "references", "link.md")))
+		_, err = zipSkillFolder(dir)
+		assert.ErrorContains(t, err, "is a link", "a link is refused before anything is sent")
+		require.NoError(t, os.Remove(filepath.Join(dir, "references", "link.md")))
+	}
+	_, err = zipSkillFolder(filepath.Join(dir, "SKILL.md"))
+	assert.ErrorContains(t, err, "not a folder")
+	_, err = zipSkillFolder(filepath.Join(t.TempDir(), "missing"))
+	assert.Error(t, err)
+}
+
+func TestCLISkillsPublishSendsTheZipAndSaysItWaits(t *testing.T) {
+	var got struct {
+		Zip string `json:"zip_base64"`
+	}
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "POST" && r.URL.Path == "/api/agent/skills" {
+			_ = json.NewDecoder(r.Body).Decode(&got)
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{"id": "abc", "name": "my-skill", "version": 1, "status": "pending", "digest": "d"})
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	t.Cleanup(ts.Close)
+	orig := serverURL
+	serverURL = ts.URL
+	t.Cleanup(func() { serverURL = orig })
+	t.Setenv("TMUX", "")
+	t.Setenv("CORAL_SESSION_NAME", "claude-00000000-0000-4000-8000-0000000000a1")
+	out := captureStdout(t, func() { cmdSkills([]string{"publish", writeSkillFolder(t)}) })
+	assert.Contains(t, out, "Published my-skill version 1 (id abc): pending")
+	assert.Contains(t, out, "waits for the Operator's approval")
+	raw, err := base64.StdEncoding.DecodeString(got.Zip)
+	require.NoError(t, err)
+	sk, err := skills.Parse(raw)
+	require.NoError(t, err)
+	assert.Equal(t, "my-skill", sk.Name)
 }

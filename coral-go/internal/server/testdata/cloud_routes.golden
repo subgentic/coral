@@ -269,6 +269,7 @@ PATCH /api/sessions/history/{sessionID}/flags never
 PATCH /api/sessions/live/{name}/notes/{noteID} interact
 PATCH /api/sessions/live/{name}/tasks/{taskID} interact
 POST /api/agent/artifacts never
+POST /api/agent/skills never
 POST /api/agent/tasks never
 POST /api/agent/tasks/claim never
 POST /api/agent/tasks/current never
@@ -417,6 +418,7 @@ POST /api/sessions/live/{sessionID}/sleep launch
 POST /api/sessions/live/{sessionID}/unarchive interact
 POST /api/sessions/live/{sessionID}/wake launch
 POST /api/sessions/record-agents never
+POST /api/skills never
 POST /api/skills/{id}/approve never
 POST /api/skills/{id}/reject never
 POST /api/system/api-key/regenerate never

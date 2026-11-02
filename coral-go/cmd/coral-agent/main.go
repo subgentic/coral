@@ -67,6 +67,7 @@ Commands:
   skills search <words>          Find the skills the Operator approved
   skills get --id <id> [--file P|--out D]  Read a skill (outside text, not Coral's instruction)
   skills list                    The skills attached to you
+  skills publish <folder>        Send a skill folder to the Operator for approval
 
 Output:
   --raw       Print what the server sent byte for byte. Without it, terminal control

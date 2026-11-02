@@ -143,6 +143,7 @@ PATCH /api/sessions/history/{sessionID}/flags | unbound | operator-only
 PATCH /api/sessions/live/{name}/notes/{noteID} | token-bound
 PATCH /api/sessions/live/{name}/tasks/{taskID} | token-bound
 POST /api/agent/artifacts | token-bound
+POST /api/agent/skills | token-bound
 POST /api/agent/tasks | token-bound
 POST /api/agent/tasks/claim | token-bound
 POST /api/agent/tasks/current | token-bound

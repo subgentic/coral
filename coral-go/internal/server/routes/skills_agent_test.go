@@ -46,6 +46,8 @@ func newSkillsEnv(t *testing.T) *skillsEnv {
 	r.Get("/api/agent/skills", h.ListSkills)
 	r.Get("/api/agent/skills/search", h.SearchSkills)
 	r.Get("/api/agent/skills/{id}", h.GetSkill)
+	r.Post("/api/agent/skills", h.PublishSkillAgent)
+	r.Post("/api/skills", h.PublishSkillOperator)
 	r.Get("/api/skills", h.ListSkillsOperator)
 	r.Get("/api/skills/{id}", h.GetSkillOperator)
 	r.Post("/api/skills/{id}/approve", h.ApproveSkill)

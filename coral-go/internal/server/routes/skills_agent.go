@@ -27,9 +27,10 @@ type SkillsHandler struct {
 	ss  *store.SessionStore
 	cfg *config.Config
 
-	mu      sync.Mutex
-	recent  map[string][]time.Time // per caller: the times of its requests in the last minute
-	nowFunc func() time.Time
+	mu        sync.Mutex
+	recent    map[string][]time.Time // per caller: the times of its requests in the last minute
+	published map[string][]time.Time // per agent session: the times it published in the last hour
+	nowFunc   func() time.Time
 }
 
 // NewSkillsHandler returns the Skills Store's agent routes.

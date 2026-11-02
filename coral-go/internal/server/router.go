@@ -437,9 +437,11 @@ func (s *Server) registerSessions(r *chi.Mux, h *routeHandlers) {
 	skillsHandler := routes.NewSkillsHandler(s.db, s.cfg) // the Skills Store, read by an agent (#12021): approved skills only
 	r.Get("/api/agent/skills", skillsHandler.ListSkills)
 	r.Get("/api/agent/skills/search", skillsHandler.SearchSkills)
+	r.Post("/api/agent/skills", skillsHandler.PublishSkillAgent)
 	r.Get("/api/agent/skills/{id}", skillsHandler.GetSkill)
 	// The Skills Store, the Operator's side (#12022): the list, the approval view and the decisions; only a person decides.
 	r.Get("/api/skills", skillsHandler.ListSkillsOperator)
+	r.Post("/api/skills", skillsHandler.PublishSkillOperator)
 	r.Get("/api/skills/{id}", skillsHandler.GetSkillOperator)
 	r.Post("/api/skills/{id}/approve", skillsHandler.ApproveSkill)
 	r.Post("/api/skills/{id}/reject", skillsHandler.RejectSkill)
