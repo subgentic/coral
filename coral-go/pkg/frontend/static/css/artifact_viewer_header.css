@@ -85,3 +85,6 @@
     .av-col { border-right: 0; border-bottom: 1px solid var(--border); padding: 0 0 8px; }
     .av-compare { padding: 8px 12px; }
 }
+/* Mark up (#12367): a button beside Comments on a computer, an item of the ⋯ menu on a phone, for a picture */
+@media (min-width: 769px) { .artifact-viewer-markup-item { display: none; } }
+@media (max-width: 768px) { .artifact-viewer-markup { display: none; } }

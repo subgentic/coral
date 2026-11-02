@@ -65,10 +65,11 @@ function _build() {
         <div class="artifact-viewer-header">
             <h2 id="artifact-viewer-title" class="artifact-viewer-title"></h2>
             <span class="artifact-viewer-chips"></span>
-            <span class="artifact-viewer-actions"></span>
+            <span class="artifact-viewer-actions"><button type="button" class="btn artifact-viewer-markup" hidden>Mark up</button></span>
             <span class="artifact-viewer-morewrap">
                 <button type="button" class="btn btn-icon artifact-viewer-more" aria-haspopup="menu" aria-expanded="false" aria-controls="artifact-viewer-menu" aria-label="More actions" title="More actions">\u22ef</button>
                 <div class="menu artifact-viewer-menu" id="artifact-viewer-menu" role="menu" aria-label="More actions" hidden>
+                    <button type="button" class="menu-item artifact-viewer-markup-item" role="menuitem" hidden>Mark up</button>
                     <a class="menu-item artifact-viewer-newtab" role="menuitem" target="_blank" rel="noopener noreferrer" hidden>Open in new tab</a>
                     <a class="menu-item artifact-viewer-download" role="menuitem" rel="noopener noreferrer" download>Download</a>
                 </div>
@@ -94,6 +95,22 @@ function _build() {
     const more = d.querySelector('.artifact-viewer-more'), menu = d.querySelector('.artifact-viewer-menu');
     more.addEventListener('click', async (e) => { e.stopPropagation(); (await importOnce('./menu_button.js')).toggleMenu(more); });
     menu.addEventListener('click', async () => { (await importOnce('./menu_button.js')).closeMenus(); }); // a choice closes the menu
+    // Mark up (#12367, the operator: "I don't see any way to markup the image in the window"): for a picture, the comment composer's drawing tool opens on the file's own image, and Done starts a comment on the file with the marked copy attached; the file itself is not changed
+    const markUp = async () => {
+        const gen = _gen, img = d.querySelector('.artifact-viewer-body .image-panes img');
+        const say = async (text) => (await importOnce('./notifications.js')).showToast(text, true);
+        if (!img || !img.src) return;
+        try {
+            const blob = await (await fetch(img.src)).blob();
+            if (!['image/png', 'image/jpeg', 'image/webp'].includes(String(blob.type).toLowerCase())) { say('Only PNG, JPEG and WebP pictures can be marked up.'); return; }
+            const { openMarkup } = await importOnce('./image_markup.js');
+            const out = await openMarkup(blob);
+            if (!out || gen !== _gen || d.hidden) return; // Cancel, or Done with no marks, or the viewer moved on
+            const base = (visibleName(_lastOpts.filename) || 'picture').replace(/\.[^.]*$/, '').replace(/[^\w .-]/g, '').trim() || 'picture';
+            if (!(await _comments.composeWithPicture(out, `${base}-marked.png`))) say('You can read the comments on this file but not write them.');
+        } catch { say('The markup editor could not be opened.'); }
+    };
+    d.querySelector('.artifact-viewer-markup').addEventListener('click', markUp); d.querySelector('.artifact-viewer-markup-item').addEventListener('click', markUp);
     d.addEventListener('click', (e) => { if (e.target === d) closeArtifactViewer(); });
     d.querySelector('.artifact-viewer-close').addEventListener('click', closeArtifactViewer);
     // A Coral artifact linked inside the shown file opens here too (the strict renderer keeps
@@ -162,7 +179,7 @@ export function openArtifactViewer(hex, opts = {}) {
     const url = serverUrl(artifactPath(hex), opts.server);
     const title = d.querySelector('.artifact-viewer-title');
     title.textContent = visibleName(opts.filename) || 'Artifact'; // the uploader's text, without what hides or reorders it (Security on #220)
-    const fromLine = d.querySelector('.artifact-viewer-from'); fromLine.textContent = visibleName(opts.from) || ''; fromLine.hidden = !fromLine.textContent; fromLine.title = fromLine.textContent; fromLine.classList.remove('is-open'); fromLine.setAttribute('aria-expanded', 'false'); d.querySelector('.artifact-viewer-sandbox').hidden = true; // who uploaded a file opened for review (#11456), as text
+    const fromLine = d.querySelector('.artifact-viewer-from'); fromLine.textContent = visibleName(opts.from) || ''; fromLine.hidden = !fromLine.textContent; fromLine.title = fromLine.textContent; fromLine.classList.remove('is-open'); fromLine.setAttribute('aria-expanded', 'false'); d.querySelector('.artifact-viewer-sandbox').hidden = true; d.querySelector('.artifact-viewer-markup').hidden = d.querySelector('.artifact-viewer-markup-item').hidden = true; // who uploaded a file opened for review (#11456), as text
     // The goal this file serves, a link back to it in the opened view (#12025): one click closes the viewer and opens the goal's page. None for a file with no goal (or one opened from where its goal is not known).
     const goalLine = d.querySelector('.artifact-viewer-goal');
     goalLine.replaceChildren(); goalLine.hidden = true;
@@ -233,7 +250,7 @@ export function openArtifactViewer(hex, opts = {}) {
             dl.href = target.url; dl.setAttribute('download', target.name);
             dl.onclick = isCloud() ? (e) => { e.preventDefault(); if (dl.getAttribute('aria-disabled') === 'true') return; downloadArtifact(target.url, sanitizeDownloadName(target.name)).catch(err => { title.textContent = err.message; }); } : null;
         },
-    })).then(() => { if (gen !== _gen) return; syncSandbox(d, body); d.classList.toggle('is-image', !!body.querySelector('.image-panes')); if (!textShown) _comments.docWhole(); }, () => {}); // a picture opens taller (css), not as a strip of its own height
+    })).then(() => { if (gen !== _gen) return; syncSandbox(d, body); d.classList.toggle('is-image', !!body.querySelector('.image-panes')); d.querySelector('.artifact-viewer-markup').hidden = d.querySelector('.artifact-viewer-markup-item').hidden = !body.querySelector('.image-panes'); if (!textShown) _comments.docWhole(); }, () => {}); // a picture opens taller (css), not as a strip of its own height
     return true;
 }
 

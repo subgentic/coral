@@ -417,6 +417,15 @@ export function attachComments(dialog, body, host, opts = {}) {
         open(hex, server, board, series = false) { st.series = !!series; region(false); { const hl = window.CSS && CSS.highlights; if (hl) { hl.delete('ac-comment'); hl.delete('ac-active'); } } forget(); st.hex = hex; st.server = server || contextServer(); st.board = board; st.data = null; st.active = null; st.composing = null; st.error = ''; st.text = false; st.whole = false; st.gone = false; st.filter = 'open'; st.visibilitySet = false; render(); setSheet(false); },
         /** The document was drawn: `text` says whether it is text the comments apply to. */
         /** The document drawn is not text the comments can point into (HTML in its frame, a picture, a PDF, a table, a video, a download): the panel is there for a comment on the whole document. */
+        /** Mark up in the viewer (#12367): the marked copy of the picture on show starts a comment on the whole file, in the tray with the text box ready, and the panel (a phone's sheet) opens on it. Resolves false when this person cannot comment here. */
+        async composeWithPicture(blob, name) {
+            if (!st.hex || !st.data || !st.data.canComment || st.data.locked) return false;
+            if (!st.composing || st.composing.editId) st.composing = { anchor: { whole: true } }; // a comment already being written keeps its words and takes the picture too
+            st.error = ''; setSheet(true); render();
+            const cm = st.composing; panel.querySelector('.ac-input')?.focus();
+            if (cm.tray) cm.tray.add([new File([blob], name || 'marked-picture.png', { type: blob.type })]);
+            return true;
+        },
         docWhole() { st.source = ''; st.text = false; st.whole = true; refresh(); },
         docRendered(source, text) { st.source = source || ''; st.text = !!text; if (!st.text) { render(); return; } region(true); refresh(); },
         close() { hover(null); setSheet(false); region(false); forget(); st.ranges.clear(); st.hex = null; st.data = null; clearTimeout(selTimer); selBtn.hidden = true; const hl = window.CSS && CSS.highlights; if (hl) { hl.delete('ac-comment'); hl.delete('ac-active'); } render(); },
