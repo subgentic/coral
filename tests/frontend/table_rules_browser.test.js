@@ -146,7 +146,14 @@ const MODE = process.env.CORAL_TABLE_RULES || 'off';
             for (const w of [1440, 1280, 1024, 900]) {
                 await size(w); await clear();
                 for (const mix of S.mixes) {
-                    await S.mount(mix, w); const m = await measure(root); report.checked++;
+                    await S.mount(mix, w); report.checked++;
+                    if (mix === 'empty') { // no rows draw the empty state and no table: right here, with no handle and no scroll (R7 stays for the live surfaces and the other mixes)
+                        const e = await ev(`(() => { const b = [...document.querySelectorAll(${JSON.stringify(root + ' .dt-box')})].find(x => x.getClientRects().length > 0); return b ? { empty: !!b.querySelector('.empty-state'), table: !!b.querySelector('table.dt-table'), handles: b.querySelectorAll('.dt-resize').length, over: b.scrollWidth - b.clientWidth } : null; })()`);
+                        if (!e) note(kind, `${w}px empty`, ['R7: the empty mix drew no box']);
+                        else { if (!e.empty) note(kind, `${w}px empty`, ['R7: the empty mix has no empty state']); if (e.table || e.handles) note(kind, `${w}px empty`, ['R7: the empty mix still draws a table or resize handles']); if (e.over > 1) note(kind, `${w}px empty`, [`R7: the empty mix scrolls sideways by ${e.over}px`]); }
+                        continue;
+                    }
+                    const m = await measure(root);
                     note(kind, `${w}px ${mix}`, judge(m));
                     if (w === 1440 && mix === 'mixed') (report.samples ||= {})[kind] = { buttons: m.buttons, actionKeys: m.actionKeys, cols: m.cols.map(c => `${c.key}:${c.w}${c.empty ? ':empty' : ''}${c.unused ? ':unused' : ''}`) }; // what the auditor saw, for whoever reads the report
                     if (mix === 'mixed' && !m.folded) fixedAt[w] = Object.fromEntries(m.cols.filter(c => !c.handle && !c.check && !c.grow).map(c => [c.key, c.w]));
