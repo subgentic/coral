@@ -200,6 +200,7 @@ type RelaunchUpdater interface {
 
 // UpdateRelaunchHandler serves the two routes.
 type UpdateRelaunchHandler struct {
+	nonceRead func([]byte) (int, error) // the source of a token's nonce: crypto/rand when nil; a test sets it (#12094)
 	// Enabled is the off flag: false answers both routes 404.
 	Enabled func() bool
 	Updater RelaunchUpdater
@@ -405,7 +406,11 @@ func ackMAC(key []byte, p ackPayload, label string) []byte {
 
 func (h *UpdateRelaunchHandler) issue(key []byte, id callerIdentity, digest string) (string, error) {
 	n := make([]byte, 16)
-	if _, err := rand.Read(n); err != nil {
+	read := rand.Read
+	if h.nonceRead != nil { // a test pins the nonce so a token is the same every run (#12094)
+		read = h.nonceRead
+	}
+	if _, err := read(n); err != nil {
 		return "", err
 	}
 	p := ackPayload{Nonce: hex.EncodeToString(n), Exp: h.now().Add(ackTTL).Unix(), Digest: digest}
