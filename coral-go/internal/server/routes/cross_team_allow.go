@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -36,6 +37,26 @@ func (h *BoardHandler) SetAllowlistFlag(fn func(ctx context.Context) bool) { h.a
 
 // SetChiefBoard tells the handler how to read the board the Operator recorded as Chief's team (#11508), whose messages to another team may be labelled "Chief".
 func (h *BoardHandler) SetChiefBoard(fn func(ctx context.Context) string) { h.chiefBoard = fn }
+
+// SetChiefFronts tells the handler how to read the team the Operator named as the one Chief fronts (chief_fronts, #12411).
+func (h *BoardHandler) SetChiefFronts(fn func(ctx context.Context) string) { h.chiefFronts = fn }
+
+// frontedByChief reports whether the team (a board's id) is the one the Operator named in Settings > Chief, written as its id or as its name (its label, exact, as the dashboard shows it).
+func (h *BoardHandler) frontedByChief(ctx context.Context, team string) bool {
+	if h.chiefFronts == nil || h.bs == nil {
+		return false
+	}
+	named := strings.TrimSpace(h.chiefFronts(ctx))
+	if named == "" {
+		return false
+	}
+	if named == team {
+		return true
+	}
+	// A name counts only when exactly one board has it (Security's SHOULD on #12411): with two teams of one name, Chief's scope is not widened to whichever the name happens to reach.
+	with, err := h.bs.BoardsLabelled(ctx, named)
+	return err == nil && len(with) == 1 && with[0].ID == team
+}
 
 // chiefBoardNow is the recorded Chief board, "" when not wired.
 func (h *BoardHandler) chiefBoardNow(ctx context.Context) string {

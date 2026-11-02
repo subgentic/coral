@@ -146,3 +146,49 @@ func TestChiefIsToldOfAnAnswerThroughTheButtonRoute(t *testing.T) {
 	require.Contains(t, got[0], `The Operator answered question on team "clk".`)
 	require.NotContains(t, got[0], "Hold", "the chosen option is not in it")
 }
+
+// The team the Operator named in Settings > Chief ("Team it fronts") is one Chief hears about even when that team's own list of allowed senders does not hold Chief's board: the list is not what makes a team
+// Chief's (the Operator's choice is), and while the allowlist is off a Chief that messages the team needs no entry (#12411, Mobile Beta Tester's walk of v2.0.35).
+func TestChiefHearsDecisionsOnTheTeamTheOperatorNamedWithoutAnAllowedSenderEntry(t *testing.T) {
+	e := newCrossTeamEnv(t)
+	ctx := context.Background()
+	e.h.SetChiefBoard(func(context.Context) string { return "alpha" })
+
+	// Nothing named and no entry: nothing (the old rule).
+	e.h.tellChief(ctx, board.ActApprove, "file", "beta", "plan.md", "")
+	require.Empty(t, chiefNotices(t, e, "alpha"))
+
+	// Named by the board's id.
+	e.h.SetChiefFronts(func(context.Context) string { return "beta" })
+	e.h.tellChief(ctx, board.ActApprove, "file", "beta", "plan.md", "QA")
+	got := chiefNotices(t, e, "alpha")
+	require.Len(t, got, 1)
+	require.Contains(t, got[0], `The Operator approved file "plan.md" on team "beta". QA was told.`)
+
+	// Another team than the one named: nothing, entry or not.
+	e.h.tellChief(ctx, board.ActApprove, "file", "gamma", "plan.md", "")
+	require.Len(t, chiefNotices(t, e, "alpha"), 1)
+
+	// Named by the board's label (as the dashboard shows it), the way Settings saves it.
+	nb, err := e.h.bs.CreateBoard(ctx, "Northwind", "Operator")
+	require.NoError(t, err)
+	_, err = e.h.bs.Subscribe(ctx, nb.ID, "Orchestrator", "Orchestrator", "tmux-"+nb.ID, nil, "mentions") // a board in use: an empty row never counts
+	require.NoError(t, err)
+	e.h.SetChiefFronts(func(context.Context) string { return "Northwind" })
+	e.h.tellChief(ctx, board.ActDeny, "file", nb.ID, "plan.md", "")
+	got = chiefNotices(t, e, "alpha")
+	require.Len(t, got, 2)
+	require.Contains(t, got[1], "The Operator declined file")
+
+	// Two boards with that name: the name reaches neither (the id still does).
+	twin, err := e.h.bs.CreateBoard(ctx, "Northwind", "Operator")
+	require.NoError(t, err)
+	_, err = e.h.bs.Subscribe(ctx, twin.ID, "Orchestrator", "Orchestrator", "tmux-"+twin.ID, nil, "mentions")
+	require.NoError(t, err)
+	e.h.tellChief(ctx, board.ActDeny, "file", nb.ID, "plan.md", "")
+	e.h.tellChief(ctx, board.ActDeny, "file", twin.ID, "plan.md", "")
+	require.Len(t, chiefNotices(t, e, "alpha"), 2, "a name two boards have names neither")
+	e.h.SetChiefFronts(func(context.Context) string { return twin.ID })
+	e.h.tellChief(ctx, board.ActDeny, "file", twin.ID, "plan.md", "")
+	require.Len(t, chiefNotices(t, e, "alpha"), 3, "the board's id still names it")
+}
