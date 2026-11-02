@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/subgentic/coral/pkg/tunnel"
@@ -34,6 +35,22 @@ type Options struct {
 	// an error body is identical for a server that does not exist and one the caller
 	// does not own.
 	HideServerID bool
+	// UploadStallTimeout shortens how long an upload may go without the target
+	// consuming a body byte. Zero or negative is the default (30 s); anything else is held
+	// between 100 ms and the default, so no caller can lengthen the bound. Production
+	// leaves it unset.
+	UploadStallTimeout time.Duration
+}
+
+// minUploadStallTimeout is the floor of UploadStallTimeout.
+const minUploadStallTimeout = 100 * time.Millisecond
+
+// stallTimeout is the effective upload stall bound.
+func (o Options) stallTimeout() time.Duration {
+	if o.UploadStallTimeout <= 0 {
+		return defaultUploadStallTimeout
+	}
+	return min(max(o.UploadStallTimeout, minUploadStallTimeout), defaultUploadStallTimeout)
 }
 
 // NewWithOptions is New with explicit options.

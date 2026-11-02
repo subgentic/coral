@@ -144,7 +144,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) proxyHTTP(w http.ResponseWriter, r *http.Request, id string, t Target, dec, raw string) {
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
-	deadlines := &proxyDeadlines{cancel: cancel, abortBody: func() {
+	deadlines := &proxyDeadlines{stall: h.opts.stallTimeout(), cancel: cancel, abortBody: func() {
 		cancel()
 		// Context cancellation stops the upstream; a read deadline also releases
 		// a transport goroutine blocked reading the browser's request body.
@@ -253,8 +253,8 @@ func (h *Handler) proxyHTTP(w http.ResponseWriter, r *http.Request, id string, t
 }
 
 const (
-	uploadStallTimeout = 30 * time.Second
-	uploadTimeout      = 10 * time.Minute
+	defaultUploadStallTimeout = 30 * time.Second
+	uploadTimeout             = 10 * time.Minute
 )
 
 // proxyDeadlines bounds the upload separately from waiting for response headers.
@@ -264,6 +264,7 @@ const (
 // All transitions, including timeout callbacks, serialize with handler cleanup.
 type proxyDeadlines struct {
 	mu                                 sync.Mutex
+	stall                              time.Duration // the idle bound, from Options.UploadStallTimeout
 	cancel                             context.CancelFunc
 	abortBody                          func()
 	header, idle, total                *time.Timer
@@ -277,7 +278,7 @@ func (d *proxyDeadlines) startBody() {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	d.lastProgress = time.Now()
-	d.idle = time.AfterFunc(uploadStallTimeout, func() { d.expireBody(true) })
+	d.idle = time.AfterFunc(d.stall, func() { d.expireBody(true) })
 	d.total = time.AfterFunc(uploadTimeout, func() { d.expireBody(false) })
 }
 
@@ -290,7 +291,7 @@ func (d *proxyDeadlines) expireBody(idle bool) {
 	if idle {
 		// A read may have made progress as this callback was starting. Check
 		// the current idle deadline instead of trusting a stale timer firing.
-		if left := uploadStallTimeout - time.Since(d.lastProgress); left > 0 {
+		if left := d.stall - time.Since(d.lastProgress); left > 0 {
 			d.idle.Reset(left)
 			return
 		}
