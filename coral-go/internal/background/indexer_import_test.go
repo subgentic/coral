@@ -158,10 +158,45 @@ func TestTurningTheImportOffKeepsTheChatOfADeletedCoralAgent(t *testing.T) {
 	ctx, ss, _, idx := importFixture(t)
 	require.NoError(t, ss.ImportEarlierChats(ctx))
 	require.NoError(t, idx.RunOnce(ctx)) // "mine" is indexed with its agent's name while the agent is live
-	require.NoError(t, ss.UnregisterLiveSession(ctx, "mine"))
+	// A deleted agent has no live_sessions row at all (UnregisterLiveSession only marks a stopped one inactive, and the row stays: with it the live-owner half of notStartedByCoral would hide the recorded-name half, #12261).
+	_, err := ss.DB().ExecContext(ctx, `DELETE FROM live_sessions WHERE session_id = ?`, "mine")
+	require.NoError(t, err)
+	var rows int
+	require.NoError(t, ss.DB().GetContext(ctx, &rows, `SELECT COUNT(*) FROM live_sessions WHERE session_id = 'mine'`))
+	require.Zero(t, rows, "the agent's row is gone: only the name recorded while it was live says Coral started the chat")
 	n, err := ss.ListedNotStarted(ctx)
 	require.NoError(t, err)
 	require.Equal(t, 2, n, "the deleted agent's chat is not one Coral did not start")
 	require.NoError(t, ss.SetHistoryImport(ctx, false))
 	require.ElementsMatch(t, []string{"mine.jsonl"}, indexedIDs(t, ss))
+}
+
+// #12261 (QA's SHOULD on #11990): the other half of notStartedByCoral. A chat listed with no recorded agent name whose agent is live now (the agent was registered after the pass that listed it) is not one
+// Coral did not start either: Off never holds it back. With the name half alone, this chat would be counted and dropped.
+func TestTurningTheImportOffKeepsTheChatOfALiveAgentWithNoRecordedName(t *testing.T) {
+	ctx := context.Background()
+	db, err := store.OpenWithKey(ctx, filepath.Join(t.TempDir(), "sessions.db"), "")
+	require.NoError(t, err)
+	t.Cleanup(func() { db.Close() })
+	ss := store.NewSessionStore(db)
+	fs := &fakeScanner{sessions: []agent.IndexedSession{
+		{SessionID: "late", SourceType: "claude", SourceFile: "/h/late.jsonl", MessageCount: 2, FileMtime: 1, FTSBody: "late body"},
+		{SessionID: "old-claude", SourceType: "claude", SourceFile: "/h/old.jsonl", MessageCount: 2, FileMtime: 2, FTSBody: "private old text"},
+	}}
+	idx := NewSessionIndexer(ss, []agent.HistoryScanner{fs}, time.Hour, 0)
+	require.NoError(t, ss.ImportEarlierChats(ctx))
+	require.NoError(t, idx.RunOnce(ctx)) // both listed, neither with an agent name: no live agent owned them
+	var names int
+	require.NoError(t, ss.DB().GetContext(ctx, &names, `SELECT COUNT(*) FROM session_index WHERE COALESCE(agent_name, '') <> ''`))
+	require.Zero(t, names, "no name was recorded for either")
+	n, err := ss.ListedNotStarted(ctx)
+	require.NoError(t, err)
+	require.Equal(t, 2, n, "with no live owner, both are chats Coral did not start")
+
+	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: "late", AgentType: "claude", AgentName: "dev", WorkingDir: "/repo"}))
+	n, err = ss.ListedNotStarted(ctx)
+	require.NoError(t, err)
+	require.Equal(t, 1, n, "a live agent owns \"late\" now: only the old chat is one Coral did not start")
+	require.NoError(t, ss.SetHistoryImport(ctx, false))
+	require.ElementsMatch(t, []string{"late.jsonl"}, indexedIDs(t, ss), "Off holds back the chat nobody owns and keeps the live agent's")
 }
