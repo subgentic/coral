@@ -297,7 +297,7 @@ function needsBulkActions() {
                 else throw new Error('that one cannot be ignored');
             });
             asks.refreshOperatorAsks(true); syncGoalDoneCount(); done();
-            tell(words('Ignored', r, rows.length), `${words('Ignored', r, rows.length)}.${undo.length ? ' Undo is in the notice.' : ''}`, undo.length ? { action: { label: 'Undo', onClick: () => Promise.allSettled(undo.map(f => f())).then(() => { asks.refreshOperatorAsks(true); refreshReviews(true); tell('Back in Needs you'); }) } } : undefined);
+            tell(words('Ignored', r, rows.length), `${words('Ignored', r, rows.length)}.${undo.length ? ' Undo is in the notice.' : ''}`, undo.length ? { action: { label: 'Undo', onClick: async () => { for (const f of undo) { try { await f(); } catch { /* it stays ignored */ } } asks.refreshOperatorAsks(true); refreshReviews(true); syncGoalDoneCount(); renderInboxNav(true); tell('Back in Needs you'); } } } : undefined); // one after the other: goals share one hidden list that each undo rewrites (#12328)
         } },
         { label: 'Close goal', more: true, disabled: rows => !(rows.length === 1 && rows[0].goalDone), run: rows => { done(); openGoalDone(rows[0].goalDone, true); } }, // a goal that looks done: its two answers are in the bar's menu on a phone, where the row has no buttons; a ninth icon made the bar wider than a 360 px toolbar (#12328)
         { label: 'Not yet', more: true, disabled: rows => !(rows.length > 0 && rows.every(s => s.goalDone)), run: async rows => {
