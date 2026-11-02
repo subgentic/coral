@@ -60,6 +60,7 @@ async function settleEarlierVersions(m, row) {
 /** Approve a review row of Needs you (or the viewer): it is decided, the Inbox list follows. Resolves the server's answer ({delivered, to, reason}). */
 export async function approveRow(team, row, note = '') { // note (#11888): one short comment that goes to the agent in the approval's one notice; the approval is final
     const out = await decide(team, row, 'approve', undefined, String(note || '').replace(/\s+/g, ' ').trim());
+    document.dispatchEvent(new CustomEvent('coral:review-approved', { detail: { team, id: row.id, at: out.review?.at || new Date().toISOString() } })); // an open viewer of this file says Approved at once, whoever approved it (the Inbox row, the viewer, a note)
     const m = await importOnce('./inbox_reviews.js').catch(() => null);
     if (m) { out.earlier = await settleEarlierVersions(m, row).catch(() => ({ settled: 0, failed: 0 })); m.settleReview(row); m.refreshReviews(true).catch(() => {}); } // the versions before the approved one are settled with it (#11533)
     return out;
@@ -206,6 +207,7 @@ export function attachReview(d, { reload }) {
     const openForm = (on) => { form.hidden = !on; bar.hidden = !cur || (slotted && !on); changes.setAttribute('aria-expanded', String(on)); if (on) { error.textContent = ''; text.focus(); } };
     changes.addEventListener('click', () => openForm(form.hidden));
     $('.artifact-review-cancel').addEventListener('click', () => { openForm(false); changes.focus(); });
+    document.addEventListener('coral:review-approved', e => { if (cur && cur.team === e.detail.team && cur.row.id === e.detail.id && cur.state !== 'approved') show({ ...cur, state: 'approved', at: e.detail.at }); });
     approve.addEventListener('click', async () => {
         if (!cur) return;
         approve.disabled = true;
