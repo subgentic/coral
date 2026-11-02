@@ -103,7 +103,7 @@ export function healthFields(ctx) {
         { ...minutes('held_notice_after_min', 'After', 'minutes held', 'held_notice_on'), visibleWhen: () => ctx.hasHeld() },
         { key: 'health_dialogs', type: 'heading', label: 'Dialogs nobody answers', help: 'Works whether or not the health check is on.', visibleWhen: v => v.dialog_timeout_on !== undefined },
         { key: 'dialog_timeout_on', type: 'toggle', label: 'Close a dialog nobody answered', visibleWhen: v => v.dialog_timeout_on !== undefined,
-            help: 'When an agent’s permission, plan or question dialog has waited past the limit, and nobody is at its terminal, Coral closes it the safe way (No, or Esc; never Yes) and tells the agent to ask the Operator on the board, so its other work goes on. Off by default.' },
+            help: 'When an agent’s permission, plan or question dialog has waited past the limit, and nobody is at its terminal, Coral closes it the safe way (No, or Esc; never Yes) and tells the agent to ask the Operator on the board, so its other work goes on. A person typing in their own terminal window, outside Coral, is not seen as present. Off by default.' },
         { key: 'dialog_timeout_after_min', type: 'number', label: 'After', unit: 'minutes waiting', help: '10 minutes to 1 day', min: D_LO, max: D_HI, integer: true, compact: true, disabledWhen: v => !v.dialog_timeout_on, visibleWhen: v => v.dialog_timeout_on !== undefined },
         { key: 'mention_renudge_on', type: 'toggle', label: 'Remind the orchestrator of an unanswered mention', help: 'A message that @mentions the orchestrator and has had no reply gets a reminder.' },
         minutes('mention_renudge_after_min', 'Remind the orchestrator after', 'minutes', 'mention_renudge_on'),
