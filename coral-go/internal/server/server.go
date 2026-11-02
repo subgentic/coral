@@ -589,6 +589,7 @@ var DashboardPagePaths = []string{
 	"/analytics", "/analytics/*",
 	"/docs", "/docs/*",
 	"/servers", "/servers/*",
+	"/skills", "/skills/*", // the Skills tab and one skill's approval view (/skills/<id>): the client router parses them, so a reload must serve the shell (#12078)
 }
 
 // noCacheHandler wraps an http.Handler to set Cache-Control headers that force

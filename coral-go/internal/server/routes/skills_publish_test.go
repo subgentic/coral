@@ -337,3 +337,31 @@ func TestTwoPublishesOfTheSameBytesAtOnceBothSucceedAndTheLimitMapsAreTrimmed(t 
 	assert.NotContains(t, e.h.published, "session-that-leaves", "a session that stopped publishing leaves nothing behind")
 	assert.NotContains(t, e.h.recent, "agent:session-that-leaves")
 }
+
+// The sign-in link census (#12261): a skill whose file holds a sign-in link (login_token=) is refused whoever publishes it, naming the file, and no byte is kept; a file without one is unaffected.
+func TestASkillThatHoldsASignInLinkIsRefusedNamingTheFile(t *testing.T) {
+	e := newSkillsEnv(t)
+	link := "http://127.0.0.1:8420/auth?login_token=abcdef0123456789"
+	for name, files := range map[string]map[string]string{
+		"a reference file": {"SKILL.md": skillMD, "references/open.md": "open " + link},
+		"SKILL.md itself":  {"SKILL.md": skillMD + "\nsign in at " + link + "\n"},
+		"url-encoded":      {"SKILL.md": skillMD, "data/x.txt": "http://h/?login_token%3Dabcdef0123456789"},
+	} {
+		e.freshHour()
+		code, out := e.call("POST", "/api/agent/skills", zipBody(t, files, false), "agent")
+		assert.Equal(t, 400, code, name)
+		assert.Equal(t, "sign_in_link", out["code"], name)
+		assert.NotContains(t, fmt.Sprint(out), "abcdef0123456789", name+": the reply never carries the link")
+		_, err := os.Stat(e.objectPath(files))
+		assert.True(t, os.IsNotExist(err), name+": no byte was kept")
+		code, out = e.call("POST", "/api/skills", zipBody(t, files, false), "operator")
+		assert.Equal(t, 400, code, name+": the Operator's own too")
+		assert.Equal(t, "sign_in_link", out["code"], name)
+	}
+	e.freshHour()
+	_, out := e.call("POST", "/api/agent/skills", zipBody(t, map[string]string{"SKILL.md": skillMD, "references/ok.md": "no link here"}, false), "agent")
+	assert.NotEqual(t, "sign_in_link", out["code"], "a skill with no link is not refused for one")
+	rows, err := e.ss.ListSkills(context.Background(), "")
+	require.NoError(t, err)
+	assert.Len(t, rows, 1, "only the clean one was recorded")
+}

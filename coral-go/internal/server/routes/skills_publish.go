@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"github.com/subgentic/coral/internal/httputil"
 	"io"
 	"net/http"
 	"os"
@@ -179,11 +180,31 @@ func heldSecret(sk *skills.Skill) (file string, err error) {
 	return "", nil
 }
 
+// fileWithSignInLink names the first file of a skill whose text holds a sign-in link (the same test the board's posts use), "" when none does.
+func fileWithSignInLink(sk *skills.Skill) string {
+	paths := make([]string, 0, len(sk.Content))
+	for p := range sk.Content {
+		paths = append(paths, p)
+	}
+	sort.Strings(paths)
+	for _, p := range paths {
+		if hasSignInLink(string(sk.Content[p])) {
+			return p
+		}
+	}
+	return ""
+}
+
 // publish parses, keeps and records one skill; false when the answer was written.
 func (h *SkillsHandler) publish(w http.ResponseWriter, r *http.Request, data []byte, in store.AddSkillInput, acknowledgeSecret bool) (row *store.SkillRow, secretAcked string, ok bool) {
 	sk, err := skills.Parse(data)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_skill", strings.TrimPrefix(err.Error(), skills.ErrInvalid.Error()+": "))
+		return nil, "", false
+	}
+	// A skill's text is stored, shown and read by agents: a file that carries a sign-in link (login_token=) is refused whoever publishes it, naming the file, before a byte is kept (the sign-in link census).
+	if f := fileWithSignInLink(sk); f != "" {
+		writeError(w, http.StatusBadRequest, "sign_in_link", "a file holds a sign-in link: remove it from "+skillFileName(f)+" and publish again")
 		return nil, "", false
 	}
 	// Everything is checked for secrets before a byte is kept; the reply names the file, never the secret. An agent's skill with one is refused. The Operator's own is warned once: the same publish with
@@ -250,7 +271,7 @@ func (h *SkillsHandler) PublishSkillAgent(w http.ResponseWriter, r *http.Request
 		return
 	}
 	if !h.allowPublish(sid) {
-		writeError(w, http.StatusTooManyRequests, "rate_limited", "at most 5 skills an hour")
+		httputil.WriteActionLimit(w, 0, "rate_limited", "at most 5 skills an hour") // a per-action limit, marked so the dashboard does not take it for an overloaded server
 		return
 	}
 	data, _, ok := readPublished(w, r)
