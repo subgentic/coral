@@ -344,14 +344,14 @@
 .inbox-review-item { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .inbox-review-item > :not(.inbox-review-name) { flex: none; }
 .inbox-review-item > .inbox-review-name { flex: 0 1 auto; min-width: 0; } /* the name and, once it is opened, its 'read' tag (#9277) */
-.inbox-ask-dialog { color: var(--text-primary); } /* the size, border and ground are the shared dialog rule's */
+.inbox-ask-dialog { position: fixed; inset: 0; margin: auto; height: fit-content; max-height: 90vh; color: var(--text-primary); } /* the size, border and ground are the shared dialog rule's */
 .inbox-ask-dialog h2 { margin: 0 0 4px; font-size: var(--fs-lg, 1.1rem); }
 .inbox-ask-sub { margin: 0 0 12px; color: var(--text-muted); }
 .inbox-ask-text { margin: 0 0 12px; max-height: 18rem; overflow: auto; overflow-wrap: anywhere; }
 .inbox-ask-label { display: block; margin-bottom: 8px; }
 .inbox-ask-box { display: block; width: 100%; box-sizing: border-box; margin-top: 4px; }
 .inbox-ask-error { min-height: 1.2em; margin: 0 0 8px; color: var(--danger); }
-.inbox-ask-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+.inbox-ask-buttons { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
 .inbox-ask-buttons .btn { min-height: 44px; }
 .inbox-ask-offers { margin: 0 0 12px; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-md, 8px); background: var(--bg-secondary); }
 .inbox-ask-offers-head { margin: 0 0 8px; color: var(--text-muted); }
