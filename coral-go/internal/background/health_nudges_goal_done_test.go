@@ -56,7 +56,7 @@ func TestAGoalWhoseTasksAreAllDoneTellsItsDriverOnce(t *testing.T) {
 	require.Len(t, orch, 1, "a goal with no driver is the Orchestrator's to hear")
 	assert.Contains(t, orch[0], fmt.Sprintf("Goal #%d", orphan.ID))
 	assert.Contains(t, orch[0], "[Coral]", "a typed notice opens with [Coral]")
-	assert.Contains(t, orch[0], "15 minutes")
+	assert.Contains(t, orch[0], "within 15 minutes", "the setting's number, 15 by default")
 	assert.Contains(t, orch[0], "Operator", "it says where the goal goes")
 	assert.NotContains(t, orch[0], "Owned by nobody", "no goal title is typed")
 
@@ -90,4 +90,40 @@ func TestAGoalWhoseTasksAreAllDoneTellsItsDriverOnce(t *testing.T) {
 	n.run(30 * time.Minute)
 	assert.Len(t, n.sentTo("Lead"), 1, "nothing after the window")
 	assert.Len(t, n.sentTo("Dev"), 2)
+}
+
+// The notice says the minutes of the Operator's setting (goal_done_quiet_minutes), as a number only; with the setting at 0 there is no quiet period and nothing to tell.
+func TestTheGoalDoneNudgeSaysTheSettingsMinutes(t *testing.T) {
+	n := newNudgeHarness(t, "")
+	ctx := context.Background()
+	const devSID = "11111111-0000-4000-8000-000000000021"
+	n.agent("Dev", devSID)
+	minutes := 40
+	n.h.SetGoalDoneQuiet(func(context.Context) time.Duration { return time.Duration(minutes) * time.Minute })
+	g, err := n.bs.CreateGoal(ctx, "team", board.GoalInput{Title: "Explore", Driver: "Dev", CreatedBy: "Dev"})
+	require.NoError(t, err)
+	tk, err := n.bs.CreateTaskWithOpts(ctx, "team", "step", "", "medium", "Dev", &board.CreateTaskOpts{GoalID: &g.ID})
+	require.NoError(t, err)
+	_, err = n.bs.ClaimTask(ctx, "team", "Dev", tk.ID)
+	require.NoError(t, err)
+	_, err = n.bs.CompleteTask(ctx, "team", tk.ID, "Dev", nil)
+	require.NoError(t, err)
+	n.now = time.Now().UTC()
+	n.run(time.Minute)
+	got := n.sentTo("Dev")
+	require.Len(t, got, 1)
+	assert.Contains(t, got[0], "within 40 minutes")
+	assert.NotContains(t, got[0], "15 minutes")
+
+	// at 0 there is nothing to tell (the goal is the Operator's at once)
+	minutes = 0
+	tk2, err := n.bs.CreateTaskWithOpts(ctx, "team", "more", "", "medium", "Dev", &board.CreateTaskOpts{GoalID: &g.ID})
+	require.NoError(t, err)
+	_, err = n.bs.ClaimTask(ctx, "team", "Dev", tk2.ID)
+	require.NoError(t, err)
+	_, err = n.bs.CompleteTask(ctx, "team", tk2.ID, "Dev", nil)
+	require.NoError(t, err)
+	n.now = time.Now().UTC().Add(5 * time.Minute)
+	n.run(0)
+	assert.Len(t, n.sentTo("Dev"), 1, "no quiet period, no notice")
 }

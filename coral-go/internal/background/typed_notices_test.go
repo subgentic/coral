@@ -28,7 +28,7 @@ func TestTypedNoticeCensus(t *testing.T) {
 		typedcensus.C("claim nudge", claimNudgeText(12), claimNudgeText(12)),
 		typedcensus.C("status nudge", statusNudgeText(12, 30), statusNudgeText(12, 30)),
 		typedcensus.C("task reminder", taskReminderText(12, at), taskReminderText(12, at)),
-		typedcensus.C("goal done nudge", goalDoneNudgeText(12), goalDoneNudgeText(12)), // a fixed template with the goal's number only (#12161)
+		typedcensus.C("goal done nudge", goalDoneNudgeText(12, 15), goalDoneNudgeText(12, 15)), // a fixed template with the goal's number only (#12161)
 		typedcensus.C("team health check", typedHealthCheck("Since 08:00: 2 tasks completed. Waiting: Backend Dev on #12."), typedHealthCheck(composed)),
 		typedcensus.C("team health check, roster form", typedHealthCheck("[Coral health check] 08:00Z · 3 agents"), typedHealthCheck("[Coral health check] 08:00Z · "+h)),
 		typedcensus.C("health line to a member", typedHealthLine("you have 2 tasks off the books"), typedHealthLine(h)),
