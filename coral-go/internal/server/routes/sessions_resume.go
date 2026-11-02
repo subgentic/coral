@@ -131,7 +131,8 @@ func (h *SessionsHandler) resumeResolve(ctx context.Context, name string, body *
 	pane, _ := h.terminal.FindSession(ctx, name, agentType, targetSID)
 	switch {
 	case pane != nil:
-		p.pane, p.workdir = pane, pane.CurrentPath
+		// the folder the session worked in, not where its terminal is now (#12057)
+		p.pane, p.workdir = pane, folderOfLive(ls, pane.CurrentPath)
 	case ls.WorkingDir != "":
 		p.fresh, p.workdir = ls, ls.WorkingDir
 	default:

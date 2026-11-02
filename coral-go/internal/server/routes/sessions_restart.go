@@ -247,7 +247,8 @@ func (h *SessionsHandler) restartResolve(ctx context.Context, name string, req r
 	if err != nil || pane == nil {
 		return nil, func(w http.ResponseWriter) { errNotFound(w, "Pane not found") }
 	}
-	p.pane, p.workdir = pane, pane.CurrentPath
+	// the folder the session worked in, not where its terminal is now (#12057)
+	p.pane, p.workdir = pane, folderOfLive(p.stored, pane.CurrentPath)
 	if dir := h.teamHomeFolder(ctx, p.stored); dir != "" { // not the folder its terminal happens to be in: after a crash that is where the terminal was recovered (#10813, #10815)
 		p.workdir = dir
 	}
