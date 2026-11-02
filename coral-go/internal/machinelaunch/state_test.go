@@ -49,7 +49,10 @@ func TestStateFileIsPrivateAndHoldsIdsOnly(t *testing.T) {
 	for _, e := range entries {
 		names = append(names, e.Name())
 	}
-	assert.ElementsMatch(t, []string{"machines.json", "machines.json.lock"}, names, "the file and its lock, and no temporary file is left behind")
+	assert.Contains(t, names, "machines.json")
+	for _, n := range names { // the lock file is left behind on Unix and removed on Windows: either is fine, a temporary file is not
+		assert.Contains(t, []string{"machines.json", "machines.json.lock"}, n, "no temporary file is left behind")
+	}
 }
 
 // Nothing that is not an id goes in, however it got there.
