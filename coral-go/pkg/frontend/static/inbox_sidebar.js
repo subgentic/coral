@@ -981,8 +981,8 @@ registerGroupSource('hub-inbox', {
                         go({ ...folderRoute, id: g.board_id, item: g.id });
                     },
                     oneLine: true, sortBar: false,
-                    mail: g => ({ lead: { icon: 'flag', square: true, name: g.state }, title: g.title, team: goalTeam(g), snippet: [g.new_comments > 0 ? 'New comments' : '', g.outcome || g.state].filter(Boolean).join(' \u00b7 '), state: GW.stateWord(g), time: DT.timeCell(g.updated_at).textContent }), // a phone's row (#9583): a flag, the goal, its outcome, when it moved
-                    columns: GC.goalColumns({ teamOf: goalTeam }, ['state', 'goal', 'team', 'progress', 'updated']).flatMap(c => c.key === 'team' ? [...serverColumns().map(x => ({ ...x, width: '8rem', dropAt: 52 })), c] : [c]) }).el };
+                    mail: g => ({ lead: { icon: 'flag', square: true, name: g.state }, title: g.title, team: goalTeam(g), ask: [g.new_comments > 0 ? 'New comments' : '', g.outcome || ''].filter(Boolean).join(' \u00b7 '), state: GW.stateWord(g), time: `${GW.stateWord(g)}${GW.allTasksOf(g.rollup) ? ` \u00b7 ${(g.rollup || {}).done || 0}/${GW.allTasksOf(g.rollup)}` : ''}` }), // a phone's row (#9583): a flag, the goal, its outcome, when it moved
+                    columns: GC.goalColumns({ teamOf: goalTeam }, ['state', 'goal', 'team', 'progress', 'updated']).flatMap(c => c.key === 'team' ? [...serverColumns().map(x => ({ ...x, width: '8rem', dropAt: 52 })), c] : [c]) }); if (phone) setTimeout(mountBar, 0); return table.el; } };
         }
         if (key === 'artifacts') return IA.artifactsSpec();
         if (key === 'activity') return AC.spec(activityFilters, { file: r => importOnce('./artifact_viewer.js').then(m => m.openArtifactViewer(r.version, { filename: r.title || 'file', board: r.team })), goal: r => go({ ...folderRoute, id: r.team, item: Number(r.item_id) }) });

@@ -8,7 +8,6 @@ import { importOnce } from './import_once.js';
 import { OPERATOR_ID, renderMarkdownStrict } from './utils.js';
 import { whenText } from './when_text.js';
 import { state } from './state.js';
-import { importOnce } from './import_once.js';
 import { loadStyles } from './lazy_styles.js';
 import { showToast } from './notifications.js';
 import { isCloud, isLocalServer } from './server_base.js';

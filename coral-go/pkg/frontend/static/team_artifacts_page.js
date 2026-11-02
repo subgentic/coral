@@ -8,12 +8,9 @@ import { boardFetch, serverUrl, isCloud, splitKey, keyLabel, isBoardAnswer, isBo
 import { whenText } from './when_text.js';
 import { pollEvery } from './overload.js';
 import { importOnce } from './import_once.js';
-<<<<<<< HEAD
 import { nameSpan } from './agent_live.js';
-=======
 import { loadStyles } from './lazy_styles.js';
 await loadStyles('phone_lists.css'); // the phone form of a team list (#12230); not at start (page_weight)
->>>>>>> e4cc81143
 import { browserLocal } from './safe_storage.js';
 import { renderArtifact } from './artifact_preview.js';
 import { showToast } from './utils.js';
