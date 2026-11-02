@@ -377,3 +377,49 @@ func (s *SessionStore) SearchSkills(ctx context.Context, words string, limit int
 		WHERE skills_fts MATCH ? AND s.status = ? ORDER BY bm25(skills_fts, 0.0, 4.0, 10.0, 3.0, 1.0), s.version DESC LIMIT ?`, m, SkillApproved, limit)
 	return hits, err
 }
+
+// The access log is kept 90 days and at most 10,000 rows (the bounds of the search access log).
+const (
+	skillsLogDays = 90
+	skillsLogRows = 10000
+)
+
+// LogSkillAccess records that actor (an agent, or the Operator) searched, listed or read a skill. A search names how many results it had, never the words searched.
+func (s *SessionStore) LogSkillAccess(ctx context.Context, event, skillID, digest, actorKind, actor, detail string) error {
+	return s.db.WithTx(ctx, func(tx *sqlx.Tx) error {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO skills_log (at, event, skill_id, digest, actor_kind, actor, detail) VALUES (?, ?, ?, ?, ?, ?, ?)`, now(), event, skillID, digest, actorKind, actor, detail); err != nil {
+			return err
+		}
+		cutoff := time.Now().UTC().AddDate(0, 0, -skillsLogDays).Format(time.RFC3339)
+		_, err := tx.ExecContext(ctx, `DELETE FROM skills_log WHERE at < ? OR id <= (SELECT MAX(id) FROM skills_log) - ?`, cutoff, skillsLogRows)
+		return err
+	})
+}
+
+// SkillLogEntry is one row of the access log.
+type SkillLogEntry struct {
+	At        string `db:"at" json:"at"`
+	Event     string `db:"event" json:"event"`
+	SkillID   string `db:"skill_id" json:"skill_id"`
+	Digest    string `db:"digest" json:"digest"`
+	ActorKind string `db:"actor_kind" json:"actor_kind"`
+	Actor     string `db:"actor" json:"actor"`
+	Detail    string `db:"detail" json:"detail"`
+}
+
+// SkillLog is the newest limit rows of the log, newest first.
+func (s *SessionStore) SkillLog(ctx context.Context, limit int) ([]SkillLogEntry, error) {
+	if limit <= 0 || limit > 500 {
+		limit = 500
+	}
+	var rows []SkillLogEntry
+	err := s.reader().SelectContext(ctx, &rows, `SELECT at, event, skill_id, digest, actor_kind, actor, detail FROM skills_log ORDER BY id DESC LIMIT ?`, limit)
+	return rows, err
+}
+
+// ListApprovedSkills is the newest approved version of each skill, by name.
+func (s *SessionStore) ListApprovedSkills(ctx context.Context) ([]SkillRow, error) {
+	var rows []SkillRow
+	err := s.reader().SelectContext(ctx, &rows, `SELECT * FROM skills s WHERE status = ? AND version = (SELECT MAX(version) FROM skills WHERE name = s.name AND status = ?) ORDER BY name`, SkillApproved, SkillApproved)
+	return rows, err
+}

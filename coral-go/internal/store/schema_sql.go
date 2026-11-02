@@ -201,8 +201,11 @@ CREATE TABLE IF NOT EXISTS skills_log (
 	skill_id   TEXT NOT NULL,
 	digest     TEXT NOT NULL,
 	actor_kind TEXT NOT NULL,
-	actor      TEXT NOT NULL DEFAULT ''
+	actor      TEXT NOT NULL DEFAULT '',
+	detail     TEXT NOT NULL DEFAULT ''
 );
+
+CREATE INDEX IF NOT EXISTS idx_skills_log_at ON skills_log(at);
 
 CREATE TABLE IF NOT EXISTS summarizer_queue (
 	session_id   TEXT PRIMARY KEY,

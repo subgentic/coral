@@ -78,6 +78,8 @@ type Skill struct {
 	Metadata      map[string]string
 	Body          string // SKILL.md after its front matter
 	Files         []File
+	// Content is the bytes of each instructions, script and text file by path (not the files that cannot be shown as text): what get serves and the approval view shows.
+	Content map[string][]byte
 }
 
 // Tags is metadata.tags split at commas.
@@ -179,7 +181,7 @@ func Parse(data []byte) (*Skill, error) {
 		}
 	}
 	var total int64
-	sk := &Skill{Digest: hex.EncodeToString(whole[:])}
+	sk := &Skill{Digest: hex.EncodeToString(whole[:]), Content: map[string][]byte{}}
 	var skillMD []byte
 	sort.Slice(entries, func(i, j int) bool { return entries[i].name < entries[j].name })
 	for _, e := range entries {
@@ -217,6 +219,9 @@ func Parse(data []byte) (*Skill, error) {
 			file.Kind = KindText
 		default:
 			file.Kind = KindNotReviewable
+		}
+		if file.Kind != KindNotReviewable {
+			sk.Content[rel] = b
 		}
 		sk.Files = append(sk.Files, file)
 	}
