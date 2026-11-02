@@ -73,11 +73,13 @@ export async function checkAgentCLI(type, element, {force = false, command = '',
     if (type === 'terminal') { element.style.display = 'none'; return; }
     const recheck = () => checkAgentCLI(type, element, {force:true,command,url,note,server});
     const show = data => {
-        document.dispatchEvent(new CustomEvent('cli-checked', { detail: { type, found: data.found === true } })); // the agent tiles follow it (launch_agent_pick.js, #10161)
+        document.dispatchEvent(new CustomEvent('cli-checked', { detail: { type, found: data.found === true, refused: typeof data.refused === 'string' && data.refused ? String(data.install_note || '') : '' } })); // the agent tiles follow it (launch_agent_pick.js, #10161)
         if (data.found && (data.status === 'probe_failed' || data.status === 'timeout')) {
             renderCLI(element, `${type} CLI found, but version check ${data.status === 'timeout' ? 'timed out' : 'failed'}.`, recheck); blocksLaunch(element, false); return;
         }
         if (data.found) { element.style.display = 'none'; blocksLaunch(element, false); return; }
+        // Found, and a launch would refuse it (an agent works in its folder, #12053): not plainly installed, and installing it again would not fix it; the note says why and the setting to use.
+        if (data.refused && typeof data.install_note === 'string') { blocksLaunch(element, true); renderCLI(element, `${type} CLI found but not used.`, recheck, {note:data.install_note, pathType: type}); return; }
         // A configured path that cannot be run (#4354): say so, not that the CLI is missing (it is never swapped for the one on PATH).
         if (data.configured && data.message) { renderCLI(element, `${type}: ${data.message}`, recheck, {pathType: type}); blocksLaunch(element, true); return; }
         blocksLaunch(element, true);

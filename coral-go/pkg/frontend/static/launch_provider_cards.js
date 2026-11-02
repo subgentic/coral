@@ -32,7 +32,7 @@ async function probe(server, type) {
         const r = await serverFetch(server, `/api/system/cli-check?type=${encodeURIComponent(type)}`);
         if (!r.ok) return { found: null };
         const d = await r.json();
-        return { found: typeof d.found === 'boolean' ? d.found : null, url: d.install_url || '' };
+        return { found: typeof d.found === 'boolean' ? d.found : null, url: d.install_url || '', refused: d.found === false && d.refused && typeof d.install_note === 'string' ? d.install_note : '' }; // refused: found but a launch would not use it (#12053)
     } catch { return { found: null }; }
 }
 
@@ -97,7 +97,7 @@ export async function buildProviderCards({ group, form, server, implicitDefault 
         return box;
     }
 
-    const statusOf = type => { const s = state.get(type); if (s.found === null) return ''; const d = defaults[type]; return d ? `Installed · default ${modelName(type, d, server)}` : 'Installed'; };
+    const statusOf = type => { const s = state.get(type); if (s.found === null) return 'Checking\u2026'; /* not known yet, or the check did not answer: never 'Installed' (#12053) */ const d = defaults[type]; return d ? `Installed · default ${modelName(type, d, server)}` : 'Installed'; };
     const noThinking = (card, label) => { const body = bodies.get(card.dataset.type), p = body && body.querySelector('.provider-no-thinking'); if (!p) return; const wrap = thinkingWrap(), known = Array.isArray(form._thinkingLevels); p.hidden = !(card.classList.contains('is-open') && known && wrap && wrap.hidden); p.textContent = `${label} has no thinking levels, so there is nothing to set.`; };
 
     /** Moving a row blurs what has the focus inside it (the Model field's add form, its select): the provider checks answer late, redraw the cards and move the rows, and Escape then went to the page and not to the form. The focus goes back to what had it. */
@@ -171,6 +171,8 @@ export async function buildProviderCards({ group, form, server, implicitDefault 
                 const row = el('div', 'provider-card provider-missing-entry is-missing'); row.dataset.type = type;
                 const mark = el('span', 'provider-mark', MARKS[type] || label[0]); mark.setAttribute('aria-hidden', 'true');
                 const info = CLI_INSTALL_INSTRUCTIONS[type] || {};
+                const refused = state.get(type).refused;
+                if (refused) { const why = el('span', 'provider-status', 'Found but not used'); row.append(mark, el('span', 'provider-name', label), why, el('span', 'sv-hint provider-refused', refused)); sec.append(row); cards.set(type, row); continue; } // installed where a launch refuses it: the words, not an Install link
                 const a = el('a', 'provider-install', `Install ${label}`); a.href = state.get(type).url || info.url || '#'; a.target = '_blank'; a.rel = 'noopener noreferrer';
                 row.append(mark, el('span', 'provider-name', label), a);
                 sec.append(row); cards.set(type, row);
@@ -203,7 +205,7 @@ export async function buildProviderCards({ group, form, server, implicitDefault 
     const onChecked = e => {
         if (!group.isConnected) { document.removeEventListener('cli-checked', onChecked); return; }
         const type = ALIAS[e.detail.type] || e.detail.type; if (!state.has(type)) return;
-        state.set(type, { found: !!e.detail.found, url: state.get(type).url });
+        state.set(type, { found: !!e.detail.found, url: state.get(type).url, refused: e.detail.refused || '' });
         if (!group.contains(document.activeElement)) draw();
     };
     document.addEventListener('cli-checked', onChecked);

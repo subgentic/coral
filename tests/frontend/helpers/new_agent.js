@@ -64,9 +64,9 @@ const stubModels = ev => ev(`(() => { for (const k of Object.keys(localStorage))
     return true; })()`).then(() => stubCliChecks(ev));
 // Every provider's CLI is found (the page asks GET /api/system/cli-check?type=<provider>): the provider cards (#11235) draw a card with a radio only for a provider this computer has, and an isolated test server has few CLIs.
 // `missing` names the ones to answer as not installed.
-const stubCliChecks = (ev, missing = []) => ev(`(() => { const R = window.fetch, missing = ${JSON.stringify(missing)};
+const stubCliChecks = (ev, missing = [], refused = []) => ev(`(() => { const R = window.fetch, missing = ${JSON.stringify(missing)}, refused = ${JSON.stringify(refused)}; // refused: found, but a launch would not use it (#12053)
     window.fetch = (u, o = {}) => { const url = new URL(String(u), location.origin);
-        if (url.pathname === '/api/system/cli-check') { const t = url.searchParams.get('type') || 'claude', found = !missing.includes(t); return Promise.resolve(new Response(JSON.stringify(found ? { agent_type: t, found: true, status: 'available', probe: 'ok' } : { agent_type: t, found: false, status: 'missing', install_url: 'https://example.invalid/install/' + t }), { status: 200, headers: { 'content-type': 'application/json' } })); }
+        if (url.pathname === '/api/system/cli-check') { const t = url.searchParams.get('type') || 'claude', found = !missing.includes(t) && !refused.includes(t); if (refused.includes(t)) return Promise.resolve(new Response(JSON.stringify({ agent_type: t, found: false, status: 'missing', refused: "in an agent's working folder", install_note: 'Found but not used: ~/.local/bin/agy is in an agent\\'s working folder, so a launch refuses it. Install it somewhere else, or set its path in Settings > CLI paths (the setting cli_path_' + t + ').' }), { status: 200, headers: { 'content-type': 'application/json' } })); return Promise.resolve(new Response(JSON.stringify(found ? { agent_type: t, found: true, status: 'available', probe: 'ok' } : { agent_type: t, found: false, status: 'missing', install_url: 'https://example.invalid/install/' + t }), { status: 200, headers: { 'content-type': 'application/json' } })); }
         return R(u, o); };
     return true; })()`);
 module.exports = { stubModels, stubCliChecks, SOURCE, install, N, openNewAgent, stepLine, scenarios };
