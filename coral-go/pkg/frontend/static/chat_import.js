@@ -16,6 +16,12 @@ export function importEmpty(redraw) {
     const from = Object.keys(offer.sources || {}).map(k => NAMES[k] || k).join(', ');
     return { hint: `${offer.found} earlier ${offer.found === 1 ? 'chat was' : 'chats were'} found on this computer (${from}). They are not listed until you import them.`, action: { label: `Import ${offer.found} earlier ${offer.found === 1 ? 'chat' : 'chats'} from ${from}`, run: () => importEarlier(redraw) } };
 }
+/** One line above a list that has chats, while earlier ones wait: a function that builds it, or null. */
+export function importBanner(redraw) {
+    const e = importEmpty(redraw);
+    if (!e.action) return null;
+    return () => { const row = document.createElement('div'); row.className = 'chat-import-line'; const t = document.createElement('span'); t.textContent = e.hint; const b = document.createElement('button'); b.type = 'button'; b.className = 'btn btn-small'; b.textContent = e.action.label; b.addEventListener('click', () => { b.disabled = true; e.action.run(); }); row.append(t, ' ', b); return row; };
+}
 export async function importEarlier(redraw) {
     try { const r = await historyFetch('/api/history-import', { method: 'POST' }); if (!r || !r.ok) throw new Error('not imported'); offer = null; } catch { (await importOnce('./utils.js')).showToast?.('The chats could not be imported', true); return false; }
     redraw?.();

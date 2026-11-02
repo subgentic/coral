@@ -43,6 +43,9 @@ func TestAFreshCoralListsOnlyTheChatsItStarted(t *testing.T) {
 	ctx, ss, _, idx := importFixture(t)
 	require.NoError(t, idx.RunOnce(ctx))
 	require.ElementsMatch(t, []string{"mine.jsonl"}, indexedIDs(t, ss))
+	settings, err := ss.GetSettings(ctx)
+	require.NoError(t, err)
+	require.NotContains(t, settings, "history_import", "a first pass writes no setting: only the person's choice is recorded")
 	var texts int
 	require.NoError(t, ss.DB().GetContext(ctx, &texts, `SELECT COUNT(*) FROM session_fts WHERE session_fts MATCH 'private'`))
 	require.Zero(t, texts, "the text of a chat Coral did not start is not stored")

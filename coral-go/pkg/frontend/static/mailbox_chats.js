@@ -134,7 +134,7 @@ export async function loadChatCounts(redraw) {
         for (const d of replies) for (const [key, value] of Object.entries(d.by_agent_type || {})) counts.by_agent_type[key] = (counts.by_agent_type[key] || 0) + value;
         dropStaleLists();
     } catch { /* the folders keep their last counts */ }
-    await CI.loadImportOffer();
+    CI.loadImportOffer().then(() => redraw?.()); // not awaited: the unread numbers below must not wait for it
     if (Date.now() - lastRecount >= RECOUNT_MS && (unread === null || inboxShows())) await loadUnread(); // the first read at start (and a start read that failed is tried again only after a minute, not at every counts read); then at most one a minute, and only while the Inbox shows: an open or a flag updates the numbers in memory (chatOpened, setChatFlag), no request
     redraw?.();
     return counts;
@@ -300,6 +300,10 @@ function chatFolderSpec(key, ctx) {
 /** The table spec of a chat folder. The Starred folder has a second part, its starred artifacts (#10258): unfiltered only (a search or Filters narrow the chats, and the artifacts part is the whole folder's). */
 export function chatsSpec(key, ctx) {
     const spec = chatFolderSpec(key, ctx);
+    if (spec && key === 'chats' && spec.rows.length && !(ctx.query || '').trim() && !Object.keys(ctx.params || {}).length) { // the offer stays reachable above a list that has chats (#11970); an empty list says it in its own words
+        const banner = CI.importBanner(() => { for (const ms of [0, 4000, 10000]) setTimeout(() => { resetChatLists(); loadChatCounts(ctx.redraw); }, ms); }), listNode = spec.node;
+        if (banner) return { ...spec, node: () => { const wrap = DT.el('div', 'inbox-chats-import'); wrap.append(banner(), listNode()); return wrap; } };
+    }
     if (!spec || key !== 'chats-starred' || (ctx.query || '').trim() || Object.keys(ctx.params || {}).length) return spec;
     SA.ensureStarredArtifacts(() => { ctx.redraw?.(); ctx.nav?.(); }); // the page and the folder's number beside it
     const chatsNode = spec.node;

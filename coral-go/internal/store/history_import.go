@@ -24,8 +24,9 @@ type UnimportedChat struct {
 	SessionID  string  `db:"session_id"`
 }
 
-// DecideHistoryImport returns whether found chats are indexed. The choice is made once, on the first pass of a data directory: an install that already has indexed
-// chats keeps listing them (nothing disappears for a current user), a fresh one starts off. Later calls return what was recorded.
+// DecideHistoryImport returns whether found chats are indexed. Only the person's choice is ever written (Import, or Off in Settings): with none recorded, an install that already lists a chat
+// Coral did not start (an index row with no agent name) keeps listing them, so nothing disappears for a current user, and a fresh one is off. A fresh Coral indexes only its own agents' chats,
+// which carry their agent's name, so it stays off until the person chooses; nothing is written on the way, so a first pass leaves the settings as they were.
 func (s *SessionStore) DecideHistoryImport(ctx context.Context) (bool, error) {
 	settings, err := s.GetSettings(ctx)
 	if err != nil {
@@ -35,17 +36,10 @@ func (s *SessionStore) DecideHistoryImport(ctx context.Context) (bool, error) {
 		return v == HistoryImportOn, nil
 	}
 	var n int
-	if err := s.reader().GetContext(ctx, &n, `SELECT COUNT(*) FROM session_index`); err != nil {
+	if err := s.reader().GetContext(ctx, &n, `SELECT COUNT(*) FROM session_index WHERE COALESCE(agent_name, '') = ''`); err != nil {
 		return false, err
 	}
-	v := HistoryImportOff
-	if n > 0 {
-		v = HistoryImportOn
-	}
-	if err := s.SetSetting(ctx, historyImportKey, v); err != nil {
-		return false, err
-	}
-	return v == HistoryImportOn, nil
+	return n > 0, nil
 }
 
 // ImportEarlierChats records the person's choice and forgets what was held back, so the next pass reads those files and indexes them.

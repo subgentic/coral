@@ -18,7 +18,7 @@ const BASE = require('./test_base').BASE;
                 if (url.pathname === '/api/history-import') { if ((o.method || 'GET') === 'POST') { window.__posts++; window.__imported = true; return json({ ok: true }); }
                     return json(window.__imported ? { imported: true, found: 0, sources: {}, ready: true } : { imported: false, found: 40, sources: { claude: 31, codex: 9 }, ready: true }); }
                 if (url.pathname === '/api/sessions/history/counts') return json({ all: 0, group: 0, notes: 0, active: 0, starred: 0, archived: 0, by_agent_type: {}, tags: [] });
-                if (url.pathname === '/api/sessions/history') return json({ sessions: [], total: 0, page: 1, page_size: 50 });
+                if (url.pathname === '/api/sessions/history') return json({ sessions: window.__rows || [], total: (window.__rows || []).length, page: 1, page_size: 50 });
                 return Promise.resolve(new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } })); };
             return true; })()`);
         const empty = () => ev(`import((window.__coralStatic || '/static/') + 'mailbox_chats.js').then(m => { const e = m.chatsSpec('chats', { query: '', params: {}, redraw() {}, after() {} }).empty; return { line: e.line, hint: e.hint || '', label: e.action ? e.action.label : '' }; })`);
@@ -31,6 +31,14 @@ const BASE = require('./test_base').BASE;
         await settle(300);
         assert.equal(await ev('window.__posts'), 1, 'the button imports once');
         assert.equal((await empty()).label, '', 'the offer goes once imported');
+        // A list that HAS chats keeps the offer reachable: a line above it with the same words and button (the person's own agents' chats are listed at once on a new Coral).
+        await ev(`window.__imported = false; window.__posts = 0; window.__rows = [{ session_id: 'mine-1', type: 'agent', title: 'My chat', source_type: 'claude', agent_name: 'dev', last_timestamp: new Date().toISOString(), message_count: 2 }]; true`);
+        const banner = () => ev(`import((window.__coralStatic || '/static/') + 'mailbox_chats.js').then(async m => { await m.loadChatCounts(); const sp = m.chatsSpec('chats', { query: '', params: {}, redraw() {}, after() {} }); const n = sp.rows.length ? sp.node() : null; const b = n && n.querySelector('.chat-import-line'); return { rows: sp.rows.length, text: b ? b.textContent : '' }; })`);
+        await ev(`import((window.__coralStatic || '/static/') + 'mailbox_chats.js').then(m => { m.resetChatLists(); return true; })`);
+        await banner(); await settle(800);
+        const withRows = await banner();
+        assert.equal(withRows.rows, 1, JSON.stringify(withRows));
+        assert.match(withRows.text, /^40 earlier chats were found on this computer \(Claude Code, Codex\)\..*Import 40 earlier chats from Claude Code, Codex$/, withRows.text);
         console.log('PASS the empty All chats offers the import and the button imports once');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
