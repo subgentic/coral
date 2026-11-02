@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -111,4 +112,29 @@ func TestWakeTokenCheckLeavesASleepingAgentAlone(t *testing.T) {
 	require.NoError(t, ss.SetSessionSleeping(ctx, sid, true))
 	h.checkWakeToken(sid, "claude", live0)
 	assert.Equal(t, "", listed("coral_token_problem"))
+}
+
+// A restart inside the 15 seconds mints a token of its own: the check of the wake before it is dropped, so it does not call that token a replacement (Security's SHOULD).
+func TestWakeTokenCheckIsDroppedWhenTheAgentIsStartedAgain(t *testing.T) {
+	h, ss, sid, _, listed := tokenRig(t)
+	ctx := context.Background()
+	t.Cleanup(func() { forgetTokenProblem(sid); wakeTokenCheckAfter = 15 * time.Second })
+	wakeTokenCheckAfter = 80 * time.Millisecond
+	_, err := h.db.MintSessionToken(ctx, sid, naming.SessionName("claude", sid))
+	require.NoError(t, err)
+	ls, err := ss.GetLiveSession(ctx, sid)
+	require.NoError(t, err)
+	h.watchWakeToken(ls)                                                        // the wake's watch, started after its line was typed
+	_, err = h.db.MintSessionToken(ctx, sid, naming.SessionName("claude", sid)) // a restart: its own launch line and token
+	require.NoError(t, err)
+	h.noteStartSucceeded(ctx, sid) // and the restart says it started
+	time.Sleep(300 * time.Millisecond)
+	assert.Equal(t, "", listed("coral_token_problem"), "the restart's token is not a replacement of the wake's")
+
+	// without a start in between, the same replacement is reported
+	h.watchWakeToken(ls)
+	_, err = h.db.MintSessionToken(ctx, sid, naming.SessionName("claude", sid))
+	require.NoError(t, err)
+	time.Sleep(300 * time.Millisecond)
+	assert.Equal(t, tokenProblemSentence, listed("coral_token_problem"))
 }

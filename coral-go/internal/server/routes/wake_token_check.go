@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/subgentic/coral/internal/agent"
@@ -45,8 +46,20 @@ func tokenProblemOf(sessionID string) string {
 	return ""
 }
 
-// forgetTokenProblem ends the note: the agent was started again with a token of its own.
-func forgetTokenProblem(sessionID string) { tokenProblems.Delete(sessionID) }
+// tokenWatchGen counts the starts of each session: a check made for one start is dropped when another start came before it ran (a restart within the 15 seconds mints a token of its own, and the
+// check would call it a replacement).
+var tokenWatchGen sync.Map // session id -> *atomic.Uint64
+
+func tokenWatchGenOf(sessionID string) *atomic.Uint64 {
+	g, _ := tokenWatchGen.LoadOrStore(sessionID, &atomic.Uint64{})
+	return g.(*atomic.Uint64)
+}
+
+// forgetTokenProblem ends the note: the agent was started again with a token of its own. It also ends the check of the start before.
+func forgetTokenProblem(sessionID string) {
+	tokenProblems.Delete(sessionID)
+	tokenWatchGenOf(sessionID).Add(1)
+}
 
 // watchWakeToken notes the live token now (just after the launch line was typed) and checks it again after wakeTokenCheckAfter.
 func (h *SessionsHandler) watchWakeToken(ls *store.LiveSession) {
@@ -59,7 +72,13 @@ func (h *SessionsHandler) watchWakeToken(ls *store.LiveSession) {
 	}
 	forgetTokenProblem(ls.SessionID)
 	sid, agentType := ls.SessionID, ls.AgentType
-	time.AfterFunc(wakeTokenCheckAfter, func() { h.checkWakeToken(sid, agentType, live0) })
+	gen := tokenWatchGenOf(sid).Load()
+	time.AfterFunc(wakeTokenCheckAfter, func() {
+		if tokenWatchGenOf(sid).Load() != gen {
+			return // the agent was started again since: that start has its own check
+		}
+		h.checkWakeToken(sid, agentType, live0)
+	})
 }
 
 // checkWakeToken is the check itself, and says why when it finds a problem.
