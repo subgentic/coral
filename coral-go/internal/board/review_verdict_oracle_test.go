@@ -260,7 +260,7 @@ func runVerdictOracle(t *testing.T, seed int64) {
 			actor = workers[rng.Intn(len(workers))]
 		}
 		approve := rng.Intn(3) != 0
-		note := []string{"", "ok", "not yet: tests fail", "ok", "", strings.Repeat("x", 4100)}[rng.Intn(6)]
+		note := []string{"", "ok", "not yet: tests fail", "ok", "", strings.Repeat("x", 4097)}[rng.Intn(6)] // 4097: one over the limit of 4096, so a limit moved by one or more shows
 		if !approve && note == "" {
 			note = "why"
 		}
