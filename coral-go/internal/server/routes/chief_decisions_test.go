@@ -59,6 +59,7 @@ func TestChiefHearsDecisionsOnTheTeamItFronts(t *testing.T) {
 	// An action that is not a decision, and a team Chief does not front, say nothing.
 	n := len(chiefNotices(t, e, "alpha"))
 	e.h.tellChief(ctx, board.ActMarkRead, "proposal", "beta", "Ship it", "")
+	e.h.tellChief(ctx, board.ActUndone, "file", "beta", "Ship it", "") // a rolled-back decision is never announced
 	e.h.tellChief(ctx, board.ActApprove, "proposal", "alpha", "Ship it", "") // Chief's own team
 	_, err = e.h.bs.UpdateBoardSettings(ctx, "beta", board.BoardSettingsUpdate{CrossTeamAllowed: &[]board.AllowedSender{}})
 	require.NoError(t, err)

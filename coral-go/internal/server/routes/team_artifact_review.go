@@ -167,7 +167,9 @@ func (h *BoardHandler) ReviewArtifact(w http.ResponseWriter, r *http.Request) {
 			title = cleanAgentName(s.JobTitle)
 		}
 	}
+	decision := map[string]string{board.ReviewApproved: board.ActApprove, board.ReviewDenied: board.ActDeny}[state]
 	if title == "" {
+		h.tellChief(context.WithoutCancel(r.Context()), decision, "file", project, item.Name, "") // decided with no one to tell: Chief still hears it
 		out["reason"] = "no_uploader"
 		writeJSON(w, http.StatusOK, out)
 		return
@@ -188,7 +190,7 @@ func (h *BoardHandler) ReviewArtifact(w http.ResponseWriter, r *http.Request) {
 	if h.notifyFn != nil {
 		h.notifyFn(project)
 	}
-	h.tellChief(context.WithoutCancel(r.Context()), map[string]string{board.ReviewApproved: board.ActApprove, board.ReviewDenied: board.ActDeny}[state], "file", project, item.Name, title)
+	h.tellChief(context.WithoutCancel(r.Context()), decision, "file", project, item.Name, title) // after the agent was told: a decision rolled back above (the undone row) never reaches Chief
 	slog.Info("[artifact review] decided", "surface", "local", "decision", state, "artifact", id, "agent", title, "board", project)
 	out["delivered"], out["to"] = true, title
 	if h.sessionAsleep != nil && item.SessionID != nil && h.sessionAsleep(r.Context(), *item.SessionID) { // asleep, ended, archived or gone: the message is unread when it wakes, and the answer (and the toast) say so
