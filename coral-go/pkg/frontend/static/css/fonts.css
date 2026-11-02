@@ -15,6 +15,6 @@
 }
 .material-icons, .ic-close::before, .ic-delete::before { /* the two CSS-drawn icons (#11564) are the same glyph font */
     font-family: 'Material Icons'; font-weight: normal; font-style: normal; font-size: 1.5rem; line-height: 1;
-    letter-spacing: normal; text-transform: none; display: inline-block; white-space: nowrap; word-wrap: normal;
+    letter-spacing: normal; text-transform: none; display: inline-block; width: 1em; height: 1em; overflow: hidden; white-space: nowrap; word-wrap: normal;
     direction: ltr; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; font-feature-settings: 'liga';
 }

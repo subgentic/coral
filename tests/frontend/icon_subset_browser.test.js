@@ -27,7 +27,8 @@ const NAMES = fs.readFileSync(path.join(__dirname, 'fixtures', 'material-icons.n
             const out = {};
             for (const n of names) { const s = document.createElement('span'); s.className = 'material-icons'; s.style.fontSize = '24px'; s.textContent = n; box.appendChild(s); out[n] = s; }
             document.body.appendChild(box);
-            const w = Object.fromEntries(Object.entries(out).map(([n, s]) => [n, s.getBoundingClientRect().width]));
+            const text = e => { const r = document.createRange(); r.selectNodeContents(e); return r.getBoundingClientRect().width; }; // the text's own width: the icon's box is 1em wide whatever it draws (#12354)
+            const w = Object.fromEntries(Object.entries(out).map(([n, s]) => [n, text(s)]));
             box.remove(); return w; })()`);
         const wide = Object.entries(probe).filter(([n, w]) => n !== 'flight_takeoff' && w > 36).map(([n, w]) => `${n}=${Math.round(w)}`);
         assert.deepEqual(wide, [], 'every icon in the subset renders as one glyph (24 px), not as text: ' + wide.join(', '));
