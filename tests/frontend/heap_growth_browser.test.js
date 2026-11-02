@@ -181,7 +181,10 @@ async function httpJson(method, path, body) {
         const grew = (a, b) => b - a;
         // bounds per round after the warm-up (a leak of a node, a listener or a few KB a round shows over the rounds; caches that are bounded do not)
         assert.ok(grew(base.heapMB, end.heapMB) <= 3 + 0.05 * per, `the heap after GC grew ${grew(base.heapMB, end.heapMB).toFixed(1)} MB over ${per} rounds (bound ${(3 + 0.05 * per).toFixed(1)}): ${row(base)} -> ${row(end)}`);
-        assert.ok(grew(base.nodes, end.nodes) <= 100 + per / 2, `DOM nodes grew ${grew(base.nodes, end.nodes)} over ${per} rounds`);
+        // The node count of one sample moves a few hundred up and down between samples (a render that has just run, a card still being removed: Windows' windows-latest runner showed 10983, 11164, 11038, 11148, 11389 in a row,
+        // with nothing growing, #12266), so the end is the median of the last five samples: a leak is a climb through all of them, and the median climbs with it.
+        const tailNodes = series.slice(-5).map(x => x.nodes).sort((x, y) => x - y)[Math.floor(Math.min(5, series.length) / 2)];
+        assert.ok(grew(base.nodes, tailNodes) <= 100 + per / 2, `DOM nodes grew ${grew(base.nodes, tailNodes)} over ${per} rounds (the median of the last five samples; the last one was ${end.nodes})`);
         assert.ok(grew(base.listeners, end.listeners) <= 40 + per / 5, `event listeners grew ${grew(base.listeners, end.listeners)} over ${per} rounds`);
         assert.ok(grew(base.documents, end.documents) <= 3, `documents grew ${grew(base.documents, end.documents)} (detached frames or windows)`);
         console.log(`PASS heap growth: ${per} rounds after a ${WARM}-round warm-up: heap ${grew(base.heapMB, end.heapMB).toFixed(1)} MB, nodes ${grew(base.nodes, end.nodes)}, listeners ${grew(base.listeners, end.listeners)}`);

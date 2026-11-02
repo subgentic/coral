@@ -227,15 +227,35 @@ func TrustClaude(cfg, path string) (bool, error) {
 	return true, nil
 }
 
+// codexTableKey is the folder as the key of a [projects.<key>] table in Codex's config.toml. A path with a quote or a control character is refused everywhere. A backslash is refused except on Windows, where it
+// is the separator of every path: there the key is a TOML literal string ('C:\Users\x'), which takes no escapes, so nothing in the path can end it early; a path with a single quote is then refused too (#12266).
+func codexTableKey(path string, windows bool) (string, error) {
+	unsafe := errors.New("the folder's name has a character that cannot be written safely in Codex's settings")
+	for _, r := range path {
+		if r == '"' || r < 0x20 || r == 0x7f {
+			return "", unsafe
+		}
+		if r == '\\' && !windows {
+			return "", unsafe
+		}
+		if r == '\'' && windows {
+			return "", unsafe
+		}
+	}
+	if windows && strings.ContainsRune(path, '\\') {
+		return "'" + path + "'", nil
+	}
+	return "\"" + path + "\"", nil
+}
+
 // TrustCodex appends [projects."<path>"] trust_level = "trusted" to Codex's config.toml at cfg and reports whether it wrote anything. Nothing that was there is touched: the table is appended to the text,
 // and only after the file with it appended parses as TOML again with the one entry (an inline projects table, a projects that is not a table, or a file that does not parse leave the card, since an invalid
 // config.toml stops Codex). A path with a quote, backslash or control character is refused; a table for the same folder in any spelling (a trailing slash) or an answer other than trusted is left alone. An absent
 // file is made, 0600, with the table.
 func TrustCodex(cfg, path string) (bool, error) {
-	for _, r := range path {
-		if r == '"' || r == '\\' || r < 0x20 || r == 0x7f {
-			return false, errors.New("the folder's name has a character that cannot be written safely in Codex's settings")
-		}
+	key, err := codexTableKey(path, runtime.GOOS == "windows")
+	if err != nil {
+		return false, err
 	}
 	existing, mode := []byte(nil), os.FileMode(0o600)
 	if b, m, err := readConfig(cfg); err == nil {
@@ -264,7 +284,7 @@ func TrustCodex(cfg, path string) (bool, error) {
 			return false, ErrDeclined
 		}
 	}
-	add := fmt.Sprintf("[projects.\"%s\"]\ntrust_level = \"trusted\"\n", path)
+	add := fmt.Sprintf("[projects.%s]\ntrust_level = \"trusted\"\n", key)
 	text := append([]byte(nil), existing...)
 	if len(text) > 0 && !bytes.HasSuffix(text, []byte("\n")) {
 		text = append(text, '\n')

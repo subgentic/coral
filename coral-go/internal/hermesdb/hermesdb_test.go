@@ -155,7 +155,7 @@ func TestOpenIsReadOnlyAndCreatesNothing(t *testing.T) {
 
 	r := newRig(t, fullSchema)
 	r.msg(t, idA, "user", "x")
-	require.NoError(t, r.writer.QueryRow(`PRAGMA wal_checkpoint(TRUNCATE)`).Err())
+	r.exec(t, `PRAGMA wal_checkpoint(TRUNCATE)`) // not QueryRow(...).Err(): that leaves the rows open, and the one connection of the writer is then never released, so Windows cannot delete state.db at the end (#12266)
 	sum := func() [32]byte {
 		b, err := os.ReadFile(filepath.Join(r.home, "state.db"))
 		require.NoError(t, err)

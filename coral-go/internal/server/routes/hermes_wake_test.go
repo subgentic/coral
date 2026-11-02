@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -30,7 +31,11 @@ func TestWakeOfAHermesAgentResumesItsRecordedConversation(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			bin := t.TempDir()
-			require.NoError(t, os.WriteFile(filepath.Join(bin, "hermes"), []byte("#!/bin/sh\n"), 0o755))
+			fake := "hermes"
+			if runtime.GOOS == "windows" {
+				fake += ".cmd" // Windows finds a program only by a PATHEXT name, so an extensionless script is "not found" (#12266)
+			}
+			require.NoError(t, os.WriteFile(filepath.Join(bin, fake), []byte("#!/bin/sh\n"), 0o755))
 			t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
 			_, h, term, ss := setupSessionsTestServer(t)
 			ctx := context.Background()

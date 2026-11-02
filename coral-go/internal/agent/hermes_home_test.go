@@ -112,7 +112,7 @@ func TestHermesAllowlistHoldsOnlyCoralsEntriesWithTheToolsRealMtime(t *testing.T
 	r := hermesRig(t)
 	seedPerson(t, r)
 	mt := time.Date(2026, 10, 1, 8, 30, 15, 123456000, time.UTC)
-	require.NoError(t, os.Chtimes(filepath.Join(r.tools, "coral-hook-agentic-state"), mt, mt))
+	require.NoError(t, os.Chtimes(hookToolFile(r.tools), mt, mt))
 	now := time.Date(2026, 11, 1, 18, 17, 30, 694103000, time.UTC)
 	home, err := PrepareHermesHome(r.data, "t", testSID, r.person, now)
 	require.NoError(t, err)
@@ -332,9 +332,9 @@ func TestTheHookIsInstalledOnlyWhenNobodyElseCanChangeTheTool(t *testing.T) {
 	assert.Equal(t, len(hermesHookEvents), hooksOf(r), "a tool only its owner can change")
 
 	// the tool itself writable by everyone
-	require.NoError(t, os.Chmod(filepath.Join(r.tools, "coral-hook-agentic-state"), 0o777))
+	require.NoError(t, os.Chmod(hookToolFile(r.tools), 0o777))
 	assert.Zero(t, hooksOf(r))
-	require.NoError(t, os.Chmod(filepath.Join(r.tools, "coral-hook-agentic-state"), 0o755))
+	require.NoError(t, os.Chmod(hookToolFile(r.tools), 0o755))
 	assert.Equal(t, len(hermesHookEvents), hooksOf(r))
 
 	// the folder it is in writable by others (a file there could be replaced)
@@ -347,8 +347,8 @@ func TestTheHookIsInstalledOnlyWhenNobodyElseCanChangeTheTool(t *testing.T) {
 	elsewhere := filepath.Join(t.TempDir(), "real-tool")
 	require.NoError(t, os.WriteFile(elsewhere, []byte("#!/bin/sh\n"), 0o777))
 	require.NoError(t, os.Chmod(elsewhere, 0o777))
-	require.NoError(t, os.Remove(filepath.Join(r2.tools, "coral-hook-agentic-state")))
-	require.NoError(t, os.Symlink(elsewhere, filepath.Join(r2.tools, "coral-hook-agentic-state")))
+	require.NoError(t, os.Remove(hookToolFile(r2.tools)))
+	require.NoError(t, os.Symlink(elsewhere, hookToolFile(r2.tools)))
 	assert.Zero(t, hooksOf(r2))
 }
 

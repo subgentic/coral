@@ -97,6 +97,42 @@ func writeJSON(t *testing.T, p string, v string) {
 	require.NoError(t, os.WriteFile(p, []byte(v), 0o600))
 }
 
+// jsonString is s as a JSON string literal: a Windows path holds backslashes, which JSON needs written twice (#12266).
+func jsonString(t *testing.T, s string) string {
+	t.Helper()
+	b, err := json.Marshal(s)
+	require.NoError(t, err)
+	return string(b)
+}
+
+// tomlKey is the folder as TrustCodex writes the key of its table on this system (#12266).
+func tomlKey(t *testing.T, p string) string {
+	t.Helper()
+	k, err := codexTableKey(p, runtime.GOOS == "windows")
+	require.NoError(t, err)
+	return k
+}
+
+// codexTableKey writes a Windows path as a literal string and refuses what cannot be written safely, whichever system the test runs on (#12266).
+func TestCodexTableKeyIsAQuotedKeyAndWindowsPathsAreLiteralStrings(t *testing.T) {
+	k, err := codexTableKey("/home/jane/Coral/team-one", false)
+	require.NoError(t, err)
+	assert.Equal(t, `"/home/jane/Coral/team-one"`, k)
+	k, err = codexTableKey(`C:\Users\jane\Coral\team-one`, true)
+	require.NoError(t, err)
+	assert.Equal(t, `'C:\Users\jane\Coral\team-one'`, k, "no escape in a literal string: the path is as it is")
+	var parsed map[string]any
+	require.NoError(t, toml.Unmarshal([]byte("[projects."+k+"]\ntrust_level = \"trusted\"\n"), &parsed))
+	assert.Contains(t, parsed["projects"], `C:\Users\jane\Coral\team-one`)
+	for _, bad := range []struct {
+		p       string
+		windows bool
+	}{{`/a\b`, false}, {`/a"b`, false}, {`C:\a"b`, true}, {`C:\it's`, true}, {"C:\\a\tb", true}, {"/a\nb", false}, {"/a\x7fb", true}} {
+		_, err := codexTableKey(bad.p, bad.windows)
+		assert.Error(t, err, "%q windows=%v", bad.p, bad.windows)
+	}
+}
+
 func readMap(t *testing.T, p string) map[string]any {
 	t.Helper()
 	b, err := os.ReadFile(p)
@@ -109,7 +145,7 @@ func readMap(t *testing.T, p string) map[string]any {
 func TestTrustClaudeSetsTheOneEntryAndChangesNothingElse(t *testing.T) {
 	r := newRig(t)
 	cfg := filepath.Join(r.home, ".claude.json")
-	writeJSON(t, cfg, `{"userID":"abc","numStartups":12345678901234567,"oauthAccount":{"emailAddress":"a@b.c","note":"<tag> & more"},"projects":{"/other":{"hasTrustDialogAccepted":false,"allowedTools":["Bash"]},"`+r.work+`":{"lastCost":1.5}}}`)
+	writeJSON(t, cfg, `{"userID":"abc","numStartups":12345678901234567,"oauthAccount":{"emailAddress":"a@b.c","note":"<tag> & more"},"projects":{"/other":{"hasTrustDialogAccepted":false,"allowedTools":["Bash"]},`+jsonString(t, r.work)+`:{"lastCost":1.5}}}`)
 	if runtime.GOOS != "windows" {
 		require.NoError(t, os.Chmod(cfg, 0o640))
 	}
@@ -147,7 +183,7 @@ func TestTrustClaudeCreatesTheEntryWhereThereIsNoProjectsAndLeavesADecisionAlone
 	assert.Equal(t, map[string]any{r.work: map[string]any{"hasTrustDialogAccepted": true}}, readMap(t, cfg)["projects"])
 
 	// a path the person turned trust down for stays turned down
-	writeJSON(t, cfg, `{"projects":{"`+r.work+`":{"hasTrustDialogAccepted":false}}}`)
+	writeJSON(t, cfg, `{"projects":{`+jsonString(t, r.work)+`:{"hasTrustDialogAccepted":false}}}`)
 	before, _ := os.ReadFile(cfg)
 	changed, err = TrustClaude(cfg, r.work)
 	assert.ErrorIs(t, err, ErrDeclined)
@@ -210,7 +246,7 @@ func TestTrustCodexAppendsOneTableAndNeverOverridesOrBreaksTheFile(t *testing.T)
 	assert.True(t, changed)
 
 	// an explicit untrusted stays
-	require.NoError(t, os.WriteFile(cfg, []byte("[projects.\""+r.work+"\"]\ntrust_level = \"untrusted\"\n"), 0o600))
+	require.NoError(t, os.WriteFile(cfg, []byte("[projects."+tomlKey(t, r.work)+"]\ntrust_level = \"untrusted\"\n"), 0o600))
 	before, _ := os.ReadFile(cfg)
 	_, err = TrustCodex(cfg, r.work)
 	assert.ErrorIs(t, err, ErrDeclined)
@@ -233,7 +269,11 @@ func TestTrustCodexLeavesTheCardWhenAppendingWouldBreakTheFileOrTheNameIsUnsafe(
 		got, _ := os.ReadFile(cfg)
 		assert.Equal(t, body, string(got), name+": untouched")
 	}
-	for _, bad := range []string{`/a"b`, `/a\b`, "/a\tb", "/a\nb", "/a\x7fb"} {
+	bads := []string{`/a"b`, "/a\tb", "/a\nb", "/a\x7fb"}
+	if runtime.GOOS != "windows" {
+		bads = append(bads, `/a\b`) // a backslash is a separator on Windows: its path is written as a literal string (codexTableKey)
+	}
+	for _, bad := range bads {
 		require.NoError(t, os.WriteFile(cfg, []byte("model = \"x\"\n"), 0o600))
 		_, err := TrustCodex(cfg, bad)
 		assert.Error(t, err, "%q", bad)
@@ -241,7 +281,7 @@ func TestTrustCodexLeavesTheCardWhenAppendingWouldBreakTheFileOrTheNameIsUnsafe(
 		assert.Equal(t, "model = \"x\"\n", string(got))
 	}
 	// the same path written another way (a trailing slash) is already there: not added twice
-	require.NoError(t, os.WriteFile(cfg, []byte("[projects.\""+r.work+"/\"]\ntrust_level = \"trusted\"\n"), 0o600))
+	require.NoError(t, os.WriteFile(cfg, []byte("[projects."+tomlKey(t, r.work+"/")+"]\ntrust_level = \"trusted\"\n"), 0o600))
 	changed, err := TrustCodex(cfg, r.work)
 	require.NoError(t, err)
 	assert.False(t, changed)
