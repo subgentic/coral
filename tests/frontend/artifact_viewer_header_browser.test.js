@@ -24,7 +24,7 @@ const { coralReady } = require('./helpers/wait');
                 if (/\\/api\\/board\\/team-a\\/artifacts\\?tag=for%20review/.test(url)) return Promise.resolve(new Response(JSON.stringify({ artifacts: [{ id: '${H3}', name: 'release-plan.md', tags: ['for review'], produced_by: 'Writer A', media_type: 'text/markdown', size: 12000, created_at: new Date().toISOString() }], has_more: false }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
                 if (/\\/api\\/board\\/team-a\\/artifacts\\?tag=(approved|reviewed)/.test(url)) return Promise.resolve(new Response(JSON.stringify({ artifacts: [], has_more: false }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
                 return orig(u, o); }; return true; })()`);
-            await ev(`import(${S} + 'artifact_viewer.js').then(v => v.openArtifactViewer('${H3}', { filename: 'release-plan.md', board: 'team-a', from: 'Writer A · team-a' })).then(() => true)`);
+            await ev(`import(${S} + 'artifact_viewer.js').then(v => v.openArtifactViewer('${H3}', { filename: 'release-plan-for-the-whole-company-spring-launch-final.md', board: 'team-a', from: 'Writer A · team-a' })).then(() => true)`);
             await waitFor(`!!document.querySelector('.artifact-review-approve:not([hidden])') && !!document.querySelector('.av-current')`, `${w}: the viewer shows its review and versions`, 12000);
             const g = await ev(`(() => { const d = document.querySelector('.artifact-viewer-content'), head = d.querySelector('.artifact-viewer-header'), body = d.querySelector('.artifact-viewer-body'), r = e => e && e.getBoundingClientRect(), top = e => { const b = r(e); return b && b.width ? Math.round(b.top + b.height / 2) : null; };
                 const q = s => d.querySelector(s), inHead = e => !!e && head.contains(e), vis = e => !!e && !!e.getClientRects().length;
@@ -49,6 +49,9 @@ const { coralReady } = require('./helpers/wait');
             // the version list holds Compare
             await ev(`document.querySelector('.av-current').click(); true`);
             await waitFor(`!!document.querySelector('.av-list:not([hidden])')`, `${w}: the version list opens`, 4000);
+            const pop = await ev(`(() => { const p = document.querySelector('.av-pop').getBoundingClientRect(), d = document.querySelector('.artifact-viewer-content').getBoundingClientRect(), hit = document.elementFromPoint(p.right - 4, p.top + 12); return { left: Math.round(p.left - d.left), right: Math.round(d.right - p.right), width: Math.round(p.width), hitInside: !!hit && !!hit.closest('.av-pop') }; })()`);
+            assert.ok(pop.left >= 0 && pop.right >= 0 && pop.hitInside, `${w}: the version list is inside the dialog (its right edge is not cut off, with a long file name): ` + JSON.stringify(pop));
+            if (w === 390) assert.ok(pop.width > 300, `${w}: on a phone the version list is as wide as the dialog allows: ` + JSON.stringify(pop));
             assert.ok(await ev(`!!document.querySelector('.av-compare') && document.querySelector('.av-compare').getClientRects().length > 0 && document.querySelector('.av-compare').textContent.includes('Compare with v2')`), `${w}: Compare with v2 is in the version list`);
             await ev(`document.querySelector('.av-current').click(); document.querySelector('.artifact-viewer-close').click(); true`);
         }
