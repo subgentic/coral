@@ -26,7 +26,9 @@ const TEAM = `qa-taskcount-${Date.now() % 100000}`;
             await openTeam(ev, waitFor, TEAM); await settle(500);
             await ev(`(() => { const t = window.__tp.tabs().find(x => window.__tp.tabLabel(x) === 'Tasks'); t.click(); return true; })()`);
             await waitFor(`!!window.__tp.table() && window.__tp.rows().length > 0`, at + 'the tasks table', 10000);
-            await settle(1500); // the counts poll comes after the list: the tab must keep the list's number
+            // the page's own counts read (the poll, which reads the server's strict open count) comes after the list: it is run now, and the tab must keep the list's number
+            await ev(`document.dispatchEvent(new CustomEvent('coral:team-sleep-changed', { detail: { team: ${JSON.stringify(TEAM)} } })); true`);
+            await settle(2500);
             const r = await ev(`(() => { const tab = window.__tp.tabs().find(x => window.__tp.tabLabel(x) === 'Tasks'); const n = s => Number((String(s).match(/(\\d[\\d,]*)\\s*$/) || [])[1]);
                 const open = window.__tp.chips(/Show tasks that are/).find(c => /^Open\\b/.test(c.name)); return { tab: n(window.__tp.find('[role=tab]', /^Tasks\\b/) ? window.__tp.find('[role=tab]', /^Tasks\\b/).textContent : tab.textContent), open: open ? n(open.name) : null, chips: window.__tp.chips(/Show tasks that are/).map(c => c.name) }; })()`);
             assert.ok(r.open != null && Number.isFinite(r.tab), at + 'both counts are there: ' + JSON.stringify(r));

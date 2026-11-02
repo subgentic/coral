@@ -41,6 +41,7 @@ const { coralReady } = require('./helpers/wait');
                 const p = await probe(mount);
                 assert.ok(p.head && p.add && p.close, at + 'Add task and Close goal are in the header row: ' + JSON.stringify(p));
                 assert.equal(p.bar, false, at + 'there is no bar at the bottom of the page');
+                assert.equal(await ev(`!!document.querySelector('${mount} .goal-head-actions .goals-not-yet')`), false, at + 'a goal with an open task has no Not yet: its item is not in Needs you (#12248)');
                 assert.ok(p.order && p.primary, at + 'Add task first, Close goal the primary after it: ' + JSON.stringify(p));
                 assert.equal(p.label, `Close goal: ${TITLE}`, at + 'Close goal is still named for its goal');
                 assert.ok(p.closeRight >= p.headRight - 2 && p.closeRight <= p.vw, at + 'the buttons end at the right edge of the header: ' + JSON.stringify(p));
@@ -50,7 +51,7 @@ const { coralReady } = require('./helpers/wait');
                 await shot(`goal-head-${width}-${mount.slice(1)}`);
             }
         }
-        // every task done: no all-done box (it said "All N tasks are done ... Is that true?" with Close as done / Not yet, #11824); Close goal stays in the header
+        // every task done: no all-done box (it said "All N tasks are done ... Is that true?" with Close as done / Not yet, #11824); Close goal stays in the header, and Not yet is beside it (#12248)
         const all = await ev(`fetch('/api/board/${board}/tasks').then(r => r.json())`), taskId = ((Array.isArray(all) ? all : all.tasks || []).find(t => t.title === 'One task') || {}).id;
         assert.ok(taskId, 'the task is found');
         assert.ok((await api('POST', `/api/board/${board}/tasks/claim`, { subscriber_id: 'orch', task_id: taskId })).status < 300);
@@ -59,8 +60,9 @@ const { coralReady } = require('./helpers/wait');
             await Emulation.setDeviceMetricsOverride({ width, height: 900, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await load(`/inbox/goals/${board}/${id}`);
             await waitFor(`!!document.querySelector('#inbox-page .goal-head-actions .goals-close') && /^1 of/.test(document.querySelector('#inbox-page .goals-progress').textContent.trim())`, 'the goal page with its task done', 15000);
-            const strip = await ev(`(() => { const p = document.querySelector('#inbox-page'); return { box: !!p.querySelector('.goals-alldone, [aria-label="All tasks done"]'), words: /Is that true|Close as done|Not yet/.test(p.textContent) }; })()`);
-            assert.deepEqual(strip, { box: false, words: false }, `${width} px: a goal with all its tasks done has no all-done box: ${JSON.stringify(strip)}`);
+            const strip = await ev(`(() => { const p = document.querySelector('#inbox-page'); return { box: !!p.querySelector('.goals-alldone, [aria-label="All tasks done"]'), words: /Is that true|Close as done/.test(p.textContent), notYet: [...p.querySelectorAll('.goal-head-actions .goals-not-yet')].map(b => b.textContent.trim()) }; })()`);
+            // the old all-done box stays gone; the header now offers Not yet beside Close goal, as the goal's item in Needs you does (#12248)
+            assert.deepEqual(strip, { box: false, words: false, notYet: ['Not yet'] }, `${width} px: a goal with all its tasks done has no all-done box, and Not yet is in the header: ${JSON.stringify(strip)}`);
             await shot(`goal-head-alldone-${width}`);
         }
         // a closed goal: Reopen takes Close goal's place
