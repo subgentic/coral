@@ -1,5 +1,81 @@
 # Release Notes
 
+## v2.0.35 — A Skills Store, the Activity record, a compact file viewer, questions as Needs you items, Set up and Upgrade on a far computer, and Windows safety
+
+### Changes
+
+#### What you will notice first
+
+- **Skills Store** (experimental): a **Skills** tab to import, review and approve skills; a skill waiting for approval is an item in Needs you with the files you have not opened; agents publish and search skills through `coral-agent`; approved skills appear in **New agent** and **New team**. A skill's name and publisher are shown with hidden characters written out. Your own skill is warned once about a secret in it, and the warning is logged.
+- **Activity record**: an **Activity** folder in the Inbox lists what you did in Needs you (decisions, notes, Skills approvals) in a table with search, team, action and since; each row is chained to the one before, and the page says when a row was edited, removed or cut off outside Coral. Through Coral Hub it is the Hub owner's own rows only. After this upgrade an install that has agents but no board messages may need `coral --adopt-data-dir` once; see Known issues.
+- **A compact file viewer**: the viewer's controls are one header row (name, the version chip with ‹ › and Compare, status, Approve, Request changes and the ⋯ menu with Approve with a note, Open in new tab, Download, Details); on a phone it is two thin rows; Comments are closed until you open them and stay as you left them; the HTML preview says "Sandboxed" once, in the header. A decision on a replaced version says a newer version replaced it and keeps what you typed; the viewer says Approved at once.
+- **A question to you is an item, like a review**: it opens with a short subject as the title, who asked and when, its words rendered (not their Markdown marks), "Goal #N · Task #N" when it names them, centred, with Send reply on the right. A reply can carry pictures (Add image, paste, tiles, Mark up). A message that only links reviewed files is read once those files are decided.
+- **One way to show an agent's name** everywhere (tables, Needs you, tasks, goals): click it to open the chat. A name clicked inside a dialog or the viewer that holds typed words asks "Leave this dialog?" first.
+- **Hermes approvals and questions from the screen** (experimental): a dangerous-command approval shows its command and Allow / Deny, a clarify shows its question and options; a command Hermes cut is judged by the stored one or Reject only. Hermes is a card in the launch dialog and the Inbox's By CLI; the H and O letters are back on the pickers; a Hermes that stopped in its first-use setup says so; Hermes starts are spaced 15 seconds apart and a refused gateway is marked with a fixed reason.
+- **Set up a server, and Upgrade**: the far computer downloads the release package itself and checks the hub's pinned SHA-256 (with a stall guard and a retry; the copy over ssh is the fallback); Set up takes a backend (pty by default, tmux when installed) and an upgrade keeps it and says whether agents survive; one shared SSH session per far computer; Forgetting a host key closes it; a finished plan no longer blocks the next one and Remove can also delete the data; the upgrade page orders versions by identifiers and refuses a downgrade unless allowed; `coral.log` is rotated at 10 MiB.
+- **The Goal looks done item has its own link; Not yet on a goal's page**; the Tasks tab says what its list says; Settings > Chief shows the team's name; Chief hears the Operator's decisions on the team it fronts and a file sent back with changes.
+- **The shared phone form of the team page's lists** (Goals, Tasks, Artifacts); Back from a goal opened off Needs you keeps the list's scroll and the row's focus; an agent row's open menu stays open and keeps the keyboard on its item when the live list redraws; Themes: Cancel after Preview puts the page back on its own base and colours.
+- **Hermes history search and context**: a Hermes agent finds its own earlier words in history search and context.
+- **Needs you reads the server's one for-review list**, so the list, the badge and the phone push agree; a file with changes requested shows only when it has new comments.
+- **Hidden-request records are cleaned up** (a request hidden with Dismiss no longer lingers once the agent moves on).
+- **Auto-sleep sleeps real teams' agents**: in v2.0.34 an agent parked in `coral-board wait` counted as busy and never slept. Now a wait on the board no longer keeps it awake (the wake that ends it still wakes the agent); a shell plus a monitor is two items and keeps it awake; the status footer is read from the input box, not from history or from the agent's own words; and the verdict log line says why an agent stays awake. A sleeping team's Agents table follows at once, Wake Team is in both menus, and the board says it is asleep.
+- **Goal looks done on a phone**: Close goal and Not yet are reachable at 390 px; the auto-sleep idle field no longer silently saves 15 when a smaller value is typed.
+- **A downgrade is refused for a hub or computer whose version carries build metadata** (for example `+relaunchfixture` or a commit): the upgrade page and the route compare the release part and show only safe characters of the rest.
+- **Cloud machine launch**: experimental, off by default (`CORAL_MACHINE_LAUNCH`), for the Operator's own account.
+- **Windows safety**: automated input goes into a terminal only where the agent alone reads it (no console-reader races); a database is tied to the data folder that made it, so a Coral started on a copy of another's data folder wakes, recovers and types nothing (`coral --adopt-data-dir` takes it over on purpose); Windows can trust a folder for Codex (a path becomes a literal TOML key).
+
+#### Known issues
+
+- **Windows: in-app update does not work from 2.0.0 through 2.0.6.** If you're on one of those, download and install the MSI by hand; from 2.0.7 on, in-app update works.
+- **macOS: a Coral of 2.0.5 or earlier cannot install updates in-app; install 2.0.6 or later by hand once.**
+- **OpenCode agents are tested on macOS and Linux; OpenCode on Windows is not yet tested end to end.**
+- **Hermes agents are still experimental**: Windows installs no Hermes hook, and another locale's input hint is recognised only by its styling and only while Hermes's welcome line is on screen.
+- **After this upgrade, an install that has agents but no board messages and no earlier use the data folder can prove may be treated as a copy**: agents are not woken and the notice says why; run `coral --adopt-data-dir` once to take the folder over.
+- The Skills Store and Activity record are new: the first real use of the Hub's Activity owner route is its proof.
+- Setting up a computer over SSH is supported from a macOS or Linux hub, and is not yet tested from a Windows hub.
+
+#### For Coral Hub
+
+- **Routes (from `release-diff`, `release-diff-12331`)**:
+
+  `release-diff` (v2.0.34 to this release):
+
+  #### Tunnel routes
+
+  Added, reachable through the tunnel (1)
+
+  - `GET /api/activity`: view, owner-only
+
+  Added, never reachable (the Hub has nothing to do) (11)
+
+  - `DELETE /api/skills/{id}`: never
+  - `GET /api/agent/skills`: never
+  - `GET /api/agent/skills/search`: never
+  - `GET /api/agent/skills/{id}`: never
+  - `GET /api/analytics/inbox-vs-chat`: never
+  - `GET /api/skills`: never
+  - `GET /api/skills/{id}`: never
+  - `POST /api/agent/skills`: never
+  - `POST /api/skills`: never
+  - `POST /api/skills/{id}/approve`: never
+  - `POST /api/skills/{id}/reject`: never
+
+  #### Board settings keys
+
+  No key was added, removed or changed.
+
+- **`/api/needs-you`**: a new item kind `skill` and a new `counts.skill`; question items carry what was asked, goal and task as before plus a preview bounded at the server; no field removed.
+- **Needs you**: #12097 changes no route; the page now follows the same `needsYouFile` rule the server does (coral-hub already follows it).
+- **Ready signals and hooks (#12124, goal #196 step 1)**: `window.__coralReady` and `data-coral-hook` are a supported surface: five required parts and two optional (`inboxListDrawn`, `hubFrameLoaded`) that the main promise never waits for; 28 hooks, 6 attributes. The first real Hub script run is the proof for the hooks.
+- **Settings and framed paths**: the Skills Store and Activity add no setting a guest can write; no token kind is added; no framed path changed.
+- **Set up / Upgrade (`hub_provision`, `sshprov`)**: the far computer downloads the release and checks the hub's SHA-256; a hub with no release verifier says so; backend choice (pty, tmux, keep) on the daemon start.
+
+#### For developers and releases
+
+- The static budget is 6,127,616 bytes; the start CSS stays under its cap (the viewer's header rules, the question dialog's pictures, the multi-question step line and the provider chips load from lazy sheets).
+- `table_rules_browser` declares a 900 s timeout and is to be split (#12327); `restart_provider_chips_browser`, `ask_leave_dialog_browser`, `needs_opener_spent_browser` and `escape_overlays_browser` are new suites; the windows-tests reds of v2.0.33 (Hermes rigs, foldertrust, hermesdb, heap_growth) are fixed in tests, two product lines in `foldertrust.go`.
+- Census entries: the join census, the Launch census (one gate for what launches, resumes or ends an agent) and the write-route reasons carry the new routes; invisible characters in tests are escapes.
+
 ## v2.0.34 — Idle agents sleep by themselves, a goal that looks done, comments that bring a file back to Needs you, and Hermes in New agent
 
 ### Changes
