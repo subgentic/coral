@@ -296,6 +296,11 @@ func (c *Client) agentShellPID(ctx context.Context, agentName, agentType, sessio
 	return pid, nil
 }
 
+// AgentPanePID is the pid of the agent's pane's shell, the root of its process tree (#12111, auto-sleep reads the tree's use of the CPU from it).
+func (c *Client) AgentPanePID(ctx context.Context, agentName, agentType, sessionID string) (int, error) {
+	return c.agentShellPID(ctx, agentName, agentType, sessionID)
+}
+
 // foregroundIsShell says whether the program in the foreground of the pane is a plain shell (pane_current_command).
 // An unreadable answer is not a shell.
 func (c *Client) foregroundIsShell(ctx context.Context, target string) bool {

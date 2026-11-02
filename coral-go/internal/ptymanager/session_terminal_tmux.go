@@ -163,3 +163,8 @@ func (t *TmuxSessionTerminal) FindTarget(ctx context.Context, name, agentType, s
 func (t *TmuxSessionTerminal) AttachCommand(sessionName string) string {
 	return t.client.AttachCommand(sessionName)
 }
+
+// PanePID is the pid of the agent's pane's shell (PanePIDer).
+func (t *TmuxSessionTerminal) PanePID(ctx context.Context, name, agentType, sessionID string) (int, error) {
+	return t.client.AgentPanePID(ctx, name, agentType, sessionID)
+}

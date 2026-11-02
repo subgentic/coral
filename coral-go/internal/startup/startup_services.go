@@ -203,6 +203,9 @@ func startIndexingServices(ctx context.Context, cfg *config.Config, srv *server.
 	// An artifact comment relayed to an agent that it only answered on the board gets one reminder to answer in the thread (#11722).
 	safeGo(ctx, "comment_reply_nudges", func() { srv.RunCommentReplyNudges(ctx) })
 
+	// An agent idle past the Operator's minutes is put to sleep, and any delivery wakes it (#12111, Settings > auto_sleep).
+	safeGo(ctx, "auto_sleep", func() { srv.RunAutoSleep(ctx) })
+
 	// Git poller. Its cadence is a user setting, re-read before every wait, so
 	// someone on a repository where scanning is slow can stretch it out or
 	// turn it off without restarting.
