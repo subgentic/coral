@@ -29,21 +29,25 @@ const { coralReady } = require('./helpers/wait');
                     return real(u, o); }; })(); true`);
         };
 
-        console.log('1. Tab reaches the Details button in the artifact viewer and wraps around the controls');
+        console.log('1. Tab wraps around the artifact viewer\'s controls; Details (in the ⋯ menu, #12223) leaves Who can read this as text, not a stop');
         await start(1280, 900, false);
         await ev(`import((window.__coralStatic || '/static/') + 'artifact_viewer.js').then(m => m.openArtifactViewer('${'a'.repeat(64)}', {})); localStorage.removeItem('coral-details-open'); true`);
-        await waitFor(`!!document.querySelector('.artifact-viewer .details-toggle:not([hidden])')`, 'the Details button (#7775: the readers are behind it)');
-        await ev(`document.querySelector('.artifact-viewer .details-toggle').click(); true`);
+        await waitFor(`!!document.querySelector('.artifact-viewer .artifact-viewer-more') && !!document.querySelector('.artifact-viewer .details-toggle:not([hidden])')`, 'the ⋯ menu with Details (#7775: the readers are behind it)');
+        await ev(`document.querySelector('.artifact-viewer .artifact-viewer-more').click(); document.querySelector('.artifact-viewer .details-toggle').click(); true`);
         await waitFor(`!!document.querySelector('.artifact-readers .artifact-readers-head') && document.querySelector('.artifact-readers .artifact-readers-head').getClientRects().length > 0`, 'Who can read this, shown by Details');
-        await ev(`document.querySelector('.artifact-viewer-close').focus(); true`);
-        await key('Tab', 'Tab', 9);
-        assert.equal(await active(), 'button.details-toggle', 'Tab from Close wraps to the first control, Details: Who can read this is text, not a stop (#7796)');
-        await key('Tab', 'Tab', 9);
-        assert.equal(await active(), 'a.btn', 'then Download');
-        await key('Tab', 'Tab', 9, 8); // Shift+Tab goes back to Details
-        assert.equal(await active(), 'button.details-toggle');
+        await ev(`(document.querySelector('.artifact-viewer-menu').hidden ? 0 : document.querySelector('.artifact-viewer-more').click()); document.querySelector('.artifact-viewer-close').focus(); true`);
+        const stops = [];
+        for (let i = 0; i < 12; i++) {
+            await key('Tab', 'Tab', 9);
+            const here = await ev(`(() => { const a = document.activeElement; return { id: a.tagName.toLowerCase() + '.' + String(a.className || '').split(' ')[0], inReaders: !!a.closest('.artifact-readers'), inViewer: !!a.closest('.artifact-viewer'), isClose: a.classList.contains('artifact-viewer-close') }; })()`);
+            stops.push(here);
+            if (here.isClose) break;
+        }
+        assert.ok(stops.length > 1 && stops[stops.length - 1].isClose, 'Tab goes through the viewer\'s controls and comes back to Close, a trap that wraps: ' + JSON.stringify(stops));
+        assert.ok(stops.every(x => x.inViewer && !x.inReaders), 'Who can read this is text, not a stop (#7796), and focus never leaves the viewer: ' + JSON.stringify(stops));
+        await key('Tab', 'Tab', 9); // wraps to the first control
         await key('Tab', 'Tab', 9, 8); // Shift+Tab from the first control goes to the last, Close
-        assert.equal(await active(), 'button.btn', 'Shift+Tab from the first control wraps to the last, Close');
+        assert.equal((await ev(`document.activeElement.classList.contains('artifact-viewer-close')`)), true, 'Shift+Tab from the first control wraps to the last, Close');
         await ev(`document.querySelector('.artifact-viewer-close')?.click(); true`);
 
         console.log('2. Messaging at 200% text on a phone: the primary button wraps');
