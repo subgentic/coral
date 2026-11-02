@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/ptr"
 	"github.com/subgentic/coral/internal/ptymanager"
@@ -29,6 +30,13 @@ var autoWakeLocks sync.Map // session id -> *sync.Mutex
 // woken, and says so on its page and its board. A wake that fails leaves a plain sleeping row (reason cleared) with the failure marked, so the health check's "asleep with tasks" and the
 // refused-start item apply to it, and it does not look available for ever.
 func (h *SessionsHandler) WakeIdleForDelivery(ctx context.Context, sessionID string) bool {
+	return h.WakeIdleFor(ctx, sessionID, false)
+}
+
+// WakeIdleFor is WakeIdleForDelivery with who asked: a person's own Send is exempt from the board's hourly cap (the Operator typed to that agent), everything else counts against it (Security,
+// #12111): an agent that can assign tasks cannot wake every sleeper on its board, once each per idle period, without limit. A wake refused for the cap leaves the delivery where it was (unread,
+// queued) and logs one counter line; at most two wakes run at once and they start two seconds apart.
+func (h *SessionsHandler) WakeIdleFor(ctx context.Context, sessionID string, fromPerson bool) bool {
 	ls, err := h.ss.GetLiveSession(ctx, sessionID)
 	if err != nil || ls == nil {
 		return false
@@ -51,6 +59,15 @@ func (h *SessionsHandler) WakeIdleForDelivery(ctx context.Context, sessionID str
 	if ls.IsArchived != 0 || sleepReason(*ls) != store.SleepReasonIdle {
 		return false
 	}
+	if !fromPerson && !takeBoardWakeSlot(ptr.Value(ls.BoardName), time.Now()) {
+		noteWakeHeld(ptr.Value(ls.BoardName), time.Now())
+		return false
+	}
+	release, ok := paceWake(ctx)
+	if !ok {
+		return false
+	}
+	defer release()
 	start := time.Now()
 	ctx, cancel := lifecycleCtx(ctx) // a wake runs to its end whatever asked for it (#5171)
 	defer cancel()
@@ -87,7 +104,7 @@ func (h *SessionsHandler) autoWakeFailed(ctx context.Context, ls *store.LiveSess
 		return
 	}
 	if title := h.noticeName(ctx, *ls); title != "" {
-		_, _ = h.bs.PostSystemMessage(ctx, ptr.Value(ls.BoardName), "Coral", "@"+title+" "+startFailureSentence(ls.AgentType, code), nil)
+		_, _ = h.bs.PostSystemMessage(ctx, ptr.Value(ls.BoardName), board.CoralSender, "@"+title+" "+startFailureSentence(ls.AgentType, code), nil)
 	}
 	h.kickWS()
 }
@@ -111,4 +128,77 @@ func (h *SessionsHandler) waitForInputBox(ctx context.Context, name, agentType, 
 		}
 	}
 	return false
+}
+
+// autoWakeBoardCap is the most agents one board's deliveries wake in an hour (Security, #12111).
+const autoWakeBoardCap = 10
+
+// deliveryWakeGap is how far apart two wakes start; a var so a test need not wait.
+var deliveryWakeGap = 2 * time.Second
+
+var (
+	autoWakeSlots = struct {
+		sync.Mutex
+		m map[string][]time.Time
+	}{m: map[string][]time.Time{}}
+	autoWakeHeldLogged = struct {
+		sync.Mutex
+		m map[string]time.Time
+	}{m: map[string]time.Time{}}
+	autoWakeSem  = make(chan struct{}, 2) // at most two wakes at once
+	autoWakePace struct {
+		sync.Mutex
+		last time.Time
+	}
+)
+
+// takeBoardWakeSlot counts one wake against the board's sliding hour; false at the cap.
+func takeBoardWakeSlot(board string, now time.Time) bool {
+	autoWakeSlots.Lock()
+	defer autoWakeSlots.Unlock()
+	kept := autoWakeSlots.m[board][:0]
+	for _, t := range autoWakeSlots.m[board] {
+		if now.Sub(t) < time.Hour {
+			kept = append(kept, t)
+		}
+	}
+	if len(kept) >= autoWakeBoardCap {
+		autoWakeSlots.m[board] = kept
+		return false
+	}
+	autoWakeSlots.m[board] = append(kept, now)
+	return true
+}
+
+// noteWakeHeld logs a wake refused for the cap, once per board per ten minutes: a pass that asks again and again does not fill the log.
+func noteWakeHeld(board string, now time.Time) {
+	autoWakeHeldLogged.Lock()
+	defer autoWakeHeldLogged.Unlock()
+	if last, ok := autoWakeHeldLogged.m[board]; ok && now.Sub(last) < 10*time.Minute {
+		return
+	}
+	autoWakeHeldLogged.m[board] = now
+	slog.Warn("auto_wake held: the board's hourly cap", "cap", autoWakeBoardCap)
+}
+
+// paceWake waits for one of the two wake places and for the gap since the last wake started; release gives the place back. false when ctx ended first.
+func paceWake(ctx context.Context) (release func(), ok bool) {
+	select {
+	case autoWakeSem <- struct{}{}:
+	case <-ctx.Done():
+		return nil, false
+	}
+	autoWakePace.Lock()
+	wait := deliveryWakeGap - time.Since(autoWakePace.last)
+	autoWakePace.last = time.Now().Add(max(wait, 0))
+	autoWakePace.Unlock()
+	if wait > 0 {
+		select {
+		case <-time.After(wait):
+		case <-ctx.Done():
+			<-autoWakeSem
+			return nil, false
+		}
+	}
+	return func() { <-autoWakeSem }, true
 }

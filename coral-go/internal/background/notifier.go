@@ -705,10 +705,6 @@ func (n *BoardNotifier) agentSleeping(ctx context.Context, sessionID string) boo
 	return n.sleepingFn != nil && sessionID != "" && n.sleepingFn(ctx, sessionID)
 }
 
-// autoWakeBoardCap is the most agents one board's messages wake in an hour (Security, #12111): a loop of mentions cannot wake and keep waking every sleeper. The messages stay unread and
-// are delivered when the agents next wake.
-const autoWakeBoardCap = 10
-
 // wakeAutoAsleep wakes the auto-asleep agents something directed is waiting for, one at a time; once an agent is up the pass that follows nudges it like any awake agent. Only a directed
 // item wakes (a mention, a reply, an assigned task): a broadcast to everyone does not.
 func (n *BoardNotifier) wakeAutoAsleep(ctx context.Context, boards map[string]bool) {
@@ -719,38 +715,12 @@ func (n *BoardNotifier) wakeAutoAsleep(ctx context.Context, boards map[string]bo
 	if err != nil || len(needs) == 0 {
 		return
 	}
-	now := time.Now()
 	for _, need := range needs {
 		if ctx.Err() != nil {
 			return
-		}
-		if !n.takeAutoWakeSlot(need.Project, now) {
-			n.logger.Warn("auto-wake held: the board's hourly cap", "board", need.Project, "cap", autoWakeBoardCap)
-			continue
 		}
 		if n.autoWakeFn(ctx, need.SessionID) {
 			n.NotifyBoard(need.Project) // the agent is up: the next pass nudges it
 		}
 	}
-}
-
-// takeAutoWakeSlot counts one wake against the board's hour; false at the cap.
-func (n *BoardNotifier) takeAutoWakeSlot(project string, now time.Time) bool {
-	n.notifiedMu.Lock()
-	defer n.notifiedMu.Unlock()
-	if n.autoWakes == nil {
-		n.autoWakes = map[string][]time.Time{}
-	}
-	kept := n.autoWakes[project][:0]
-	for _, t := range n.autoWakes[project] {
-		if now.Sub(t) < time.Hour {
-			kept = append(kept, t)
-		}
-	}
-	if len(kept) >= autoWakeBoardCap {
-		n.autoWakes[project] = kept
-		return false
-	}
-	n.autoWakes[project] = append(kept, now)
-	return true
 }

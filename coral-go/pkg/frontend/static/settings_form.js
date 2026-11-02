@@ -68,6 +68,10 @@ export function readSettingsForm() {
     const nudgeClaudeArtifacts = document.getElementById("settings-nudge-claude-artifacts")?.checked ?? settingBool(state.settings?.nudge_claude_artifacts || undefined, true);
     const boardHealthMonitor = document.getElementById("settings-board-health-monitor")?.checked ?? settingBool(state.settings?.board_health_monitor || undefined, true);
     const autoResume = document.getElementById("settings-auto-resume")?.checked ?? settingBool(state.settings?.auto_resume_after_api_error || undefined, false);
+    const autoSleep = document.getElementById("settings-auto-sleep")?.checked ?? settingBool(state.settings?.auto_sleep || undefined, true);
+    // Whole minutes inside the server's range (#12111): what is typed outside it is sent as the nearest end, never as text.
+    const autoSleepRaw = Number.parseInt(document.getElementById("settings-auto-sleep-minutes")?.value ?? state.settings?.auto_sleep_idle_minutes ?? "60", 10);
+    const autoSleepMinutes = String(Number.isFinite(autoSleepRaw) ? Math.min(1440, Math.max(15, autoSleepRaw)) : 60);
     const autoGoals = document.getElementById("settings-auto-goals")?.checked ?? settingBool(state.settings?.auto_goals || undefined, true);
     // When CORAL_DEBUG_INPUT/--debug-input force the log on, the checkbox is shown checked and
     // disabled: keep the saved setting rather than saving that forced state (#3256).
@@ -118,6 +122,8 @@ export function readSettingsForm() {
         nudge_claude_artifacts: nudgeClaudeArtifacts,
         board_health_monitor: boardHealthMonitor,
         auto_resume_after_api_error: autoResume,
+        auto_sleep: autoSleep,
+        auto_sleep_idle_minutes: autoSleepMinutes,
         auto_goals: autoGoals,
         ...artifactStoreMaxSetting(),
         ...receivedMaxSetting(),

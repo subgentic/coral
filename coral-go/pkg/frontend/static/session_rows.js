@@ -181,6 +181,10 @@ ${_archiveItem}            <button class="menu-item overflow-menu-item" data-on-
                 ${SVGO.o0}<path d="M12 3a6 6 0 1 0 0 10 5 5 0 0 1 0-10z"/></svg>
                 Sleep
             </button>
+            <button class="menu-item overflow-menu-item" data-on-click="agent-auto-sleep" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}" data-mode="${escapeAttr(s.auto_sleep_off ? 'on' : 'off')}">
+                ${SVGO.o0}<path d="M12 3a6 6 0 1 0 0 10 5 5 0 0 1 0-10z"/><path d="M3 3l10 10"/></svg>
+                ${s.auto_sleep_off ? 'Allow auto-sleep' : "Don't auto-sleep"}
+            </button>
 ${_archiveItem}
             ${autoAcceptMenuItem(s)}
             ${!instructionsOffered(s, isCloud()) ? '' : `<button class="menu-item overflow-menu-item" data-on-click="agent-instructions" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}" title="What this agent is told each time it starts; saved now, used at its next restart">

@@ -189,7 +189,7 @@ func (h *SessionsHandler) claimedTaskOf(ctx context.Context, project, member str
 		return true
 	}
 	for _, t := range tasks {
-		if t.AssignedTo != nil && board.SameIdentity(*t.AssignedTo, member) && (t.Status == "in_progress" || t.Status == "review") {
+		if t.AssignedTo != nil && board.SameIdentity(*t.AssignedTo, member) && (t.Status == "in_progress" || t.Status == "review" || t.Status == "pending") {
 			return true
 		}
 	}

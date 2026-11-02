@@ -228,6 +228,13 @@ func (h *SessionsHandler) liveSessionRows(r *http.Request, trace *phaseTrace, fu
 	h.addSessionGoals(r.Context(), sessions)
 	h.addWaitsOnThis(r, sessions)
 	h.addTeamHealth(r, sessions)
+	if off, err := h.ss.AutoSleepOffSessions(r.Context()); err == nil && len(off) > 0 { // the Operator's per-agent opt-out (#12111), for the menu's wording
+		for _, row := range sessions {
+			if sid, _ := row["session_id"].(string); off[sid] {
+				row["auto_sleep_off"] = true
+			}
+		}
+	}
 	return archivedLast(sessions), nil
 }
 

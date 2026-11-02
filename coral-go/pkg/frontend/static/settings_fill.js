@@ -97,6 +97,11 @@ export async function _fillMachineSettings(s) {
         const autoResume = document.getElementById('settings-auto-resume');
         // Off unless the Operator turned it on (#3613).
         if (autoResume) autoResume.checked = settingBool(s.auto_resume_after_api_error || undefined, false);
+        const autoSleep = document.getElementById('settings-auto-sleep');
+        // On unless the Operator turned it off (#12111); the minutes are a whole number from 15 to 1440, else 60.
+        if (autoSleep) autoSleep.checked = settingBool(s.auto_sleep || undefined, true);
+        const autoSleepMinutes = document.getElementById('settings-auto-sleep-minutes');
+        if (autoSleepMinutes) autoSleepMinutes.value = /^\d+$/.test(String(s.auto_sleep_idle_minutes || '')) && +s.auto_sleep_idle_minutes >= 15 && +s.auto_sleep_idle_minutes <= 1440 ? String(+s.auto_sleep_idle_minutes) : '60';
         const autoGoals = document.getElementById('settings-auto-goals');
         // On unless the Operator turned it off (#4204).
         if (autoGoals) autoGoals.checked = settingBool(s.auto_goals || undefined, true);

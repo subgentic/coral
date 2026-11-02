@@ -1,7 +1,11 @@
 package routes
 
 import (
+	"context"
+	"fmt"
+	"sort"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -132,4 +136,63 @@ func TestAutoAsleepNeedsAreDirectedOnly(t *testing.T) {
 	ns, err = r3.h.bs.AutoAsleepNeeds(r3.ctx, nil)
 	require.NoError(t, err)
 	assert.Empty(t, ns, "a person's Sleep is never woken by the board")
+}
+
+// Eleven task assignments to eleven sleepers on one board wake ten (Security, #12111): the board's hourly cap is inside the wake, so every path counts. The person's own Send is exempt.
+func TestWakeIdleForDeliveryHoldsTheBoardsHourlyCap(t *testing.T) {
+	old := deliveryWakeGap
+	deliveryWakeGap = 0
+	t.Cleanup(func() { deliveryWakeGap = old })
+	r := newSleepRig(t)
+	autoWakeSlots.Lock()
+	autoWakeSlots.m["autosleep"] = nil // other tests of this package may have used the board's name
+	autoWakeSlots.Unlock()
+	team := "autosleep"
+	sids := []string{r.sid}
+	for i := 0; i < 10; i++ {
+		sid := fmt.Sprintf("00000000-0000-4000-8000-%012d", 500+i)
+		require.NoError(t, r.ss.RegisterLiveSession(r.ctx, &store.LiveSession{SessionID: sid, AgentName: fmt.Sprintf("dev%d", i), AgentType: "claude", BoardName: &team, WorkingDir: "/tmp"}))
+		sids = append(sids, sid)
+	}
+	for _, sid := range sids {
+		require.NoError(t, r.ss.SetSessionAutoSleeping(r.ctx, sid, time.Now()))
+	}
+	woken := 0
+	for _, sid := range sids {
+		if r.h.WakeIdleForDelivery(r.ctx, sid) {
+			woken++
+		}
+	}
+	assert.Equal(t, 10, woken, "eleven sleepers, ten wakes in the hour")
+	last, _ := r.ss.GetLiveSession(r.ctx, sids[10])
+	assert.Equal(t, 1, last.IsSleeping, "the eleventh stays asleep: its delivery waits")
+	assert.True(t, r.h.WakeIdleFor(r.ctx, sids[10], true), "the person's own Send is not held by the cap")
+}
+
+// At most two wakes run at once and they start apart.
+func TestPaceWakeStartsWakesApart(t *testing.T) {
+	old := deliveryWakeGap
+	deliveryWakeGap = 30 * time.Millisecond
+	t.Cleanup(func() { deliveryWakeGap = old })
+	var starts []time.Time
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	for i := 0; i < 4; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			release, ok := paceWake(context.Background())
+			require.True(t, ok)
+			mu.Lock()
+			starts = append(starts, time.Now())
+			mu.Unlock()
+			time.Sleep(5 * time.Millisecond)
+			release()
+		}()
+	}
+	wg.Wait()
+	sort.Slice(starts, func(i, j int) bool { return starts[i].Before(starts[j]) })
+	for i := 1; i < len(starts); i++ {
+		assert.GreaterOrEqual(t, starts[i].Sub(starts[i-1]), 25*time.Millisecond, "wake %d started too soon after the one before", i)
+	}
 }

@@ -41,7 +41,7 @@ func (h *SessionsHandler) Send(w http.ResponseWriter, r *http.Request) {
 	}
 	// An auto-asleep agent is woken first and the text then goes to it as to an awake one (#12111); a manual sleeper still answers "session is sleeping".
 	if body.SessionID != "" {
-		h.WakeIdleForDelivery(r.Context(), body.SessionID)
+		h.WakeIdleFor(r.Context(), body.SessionID, humanInputCaller(r))
 	}
 	// Input always names its exact target (session_id + agent_type). A bare name
 	// would reach whatever tmux pane has it, sleeping or archived agents included.

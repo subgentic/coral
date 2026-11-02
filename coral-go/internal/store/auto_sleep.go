@@ -78,3 +78,21 @@ func (s *SessionStore) MarkAutoFirstTurnLogged(ctx context.Context, sessionID st
 	_, err := s.db.ExecContext(ctx, `UPDATE auto_sleep_state SET first_turn_logged = 1 WHERE session_id = ?`, sessionID)
 	return err
 }
+
+// AutoSleepOffSessions is the set of sessions the Operator opted out of auto-sleep, for the live list's menu wording.
+func (s *SessionStore) AutoSleepOffSessions(ctx context.Context) (map[string]bool, error) {
+	rows, err := s.reader().QueryContext(ctx, `SELECT session_id FROM auto_sleep_state WHERE off = 1`) // a reader: the live list never waits for the writer
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]bool{}
+	for rows.Next() {
+		var sid string
+		if err := rows.Scan(&sid); err != nil {
+			return nil, err
+		}
+		out[sid] = true
+	}
+	return out, rows.Err()
+}
