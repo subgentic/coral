@@ -296,12 +296,13 @@
 .inbox-folder-toolbar .list-bar-search-row.gt-toolbar > .team-tb-select { display: none; }
 .inbox-folder-toolbar .inbox-pill-field { display: none; }
 .inbox-folder-toolbar .inbox-pill-field .team-tb-select { display: block; max-width: none; }
-.inbox-folder-head { display: flex; align-items: baseline; gap: var(--space-md, 8px); flex: 0 1 auto; min-width: 0; max-width: 40%; margin-right: 4px; }
+.inbox-folder-head { display: flex; align-items: baseline; gap: var(--space-md, 8px); flex: 0 0 auto; min-width: 0; max-width: 40%; margin-right: 4px; } /* the title never gives: the chips scroll sideways first (#12455: it read 'Nee…' beside them) */
+.inbox-folder-toolbar .team-tb-pills::-webkit-scrollbar { display: none; }
 .inbox-folder-head h2 { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-2xl); font-weight: var(--fw-title); line-height: var(--lh-label); color: var(--text-primary); }
 .inbox-folder-head h2:focus { outline: none; }
 .inbox-folder-head h2:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm, 2px); }
 .inbox-folder-head .session-group-count { flex: none; font-weight: var(--fw-strong); }
-.inbox-folder-toolbar .list-bar-search-row.gt-toolbar > .team-tb-pills { flex: 0 0 auto; }
+.inbox-folder-toolbar .list-bar-search-row.gt-toolbar > .team-tb-pills { flex: 0 1 auto; min-width: 0; overflow-x: auto; scrollbar-width: none; } /* the chips scroll sideways when the title, the field and the icon leave them too little (#12455) */
 .inbox-folder-toolbar .list-bar-search-row.gt-toolbar > .list-bar-search-wrap { flex: 0 1 16rem; } /* the search box is capped so the chip beside the pills has the rest of the row (#9078) */
 .inbox-folder-toolbar .list-bar-menu-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px; align-items: start; }
 .inbox-folder-toolbar .list-bar-menu :is(.list-bar-field, .list-bar-sort) { flex-direction: column; align-items: stretch; flex-wrap: nowrap; gap: 4px; } /* a field's label above its box, two fields a line (UI/UX on #8681): the panel is two or three lines tall, not one per field */
