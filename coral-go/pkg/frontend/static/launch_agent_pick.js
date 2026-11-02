@@ -3,6 +3,8 @@
  * reacts to that select (the missing-CLI line, the model list, the permission mode) still does. When nothing was ever chosen as the default and Claude is missing while another agent is installed, that one is selected. */
 import { serverFetch, normServer, LOCAL_SERVER } from './server_base.js';
 import { importOnce } from './import_once.js';
+import { loadStyles } from './lazy_styles.js';
+await loadStyles('provider_cards.css'); // the Restart picker's rows wrap in this sheet, not the start's (#12253)
 const { markOf } = await importOnce('./agent_marks.js');
 
 const TYPES = [['claude', 'Claude'], ['codex', 'Codex'], ['agy', 'Antigravity'], ['pi', 'Pi'], ['opencode', 'OpenCode'], ['hermes', 'Hermes']];
