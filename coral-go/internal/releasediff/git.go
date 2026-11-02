@@ -2,17 +2,19 @@ package releasediff
 
 import (
 	"bytes"
+	"context"
 	"fmt"
-	"os/exec"
 	"slices"
 	"strings"
+
+	"github.com/subgentic/coral/internal/gitutil"
 )
 
 // Reader reads the files of one ref of a repository with git; it runs nothing of the ref.
 type Reader struct{ Repo, Ref string }
 
 func (r Reader) git(args ...string) ([]byte, error) {
-	cmd := exec.Command("git", append([]string{"-C", r.Repo}, args...)...)
+	cmd := gitutil.Command(context.Background(), r.Repo, args...) // a repository's own config can name commands for git to run: every git Coral starts goes through gitutil.Command
 	var out, errb bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &errb
 	if err := cmd.Run(); err != nil {

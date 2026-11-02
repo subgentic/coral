@@ -310,3 +310,20 @@ func TestPackageChangesReadsARealRepositoryFromAnyDirectory(t *testing.T) {
 	_, err := PackageChanges(repo, "old", "no-such-tag")
 	assert.Error(t, err)
 }
+
+// Every git the tool starts goes through gitutil.Command (#12419, the repository's own config can name commands for git to run): a git that records its calls shows the command-running config turned off, and the repository's directory is still the one given.
+func TestGitIsStartedWithTheRepositoryCommandsTurnedOff(t *testing.T) {
+	bin, log := t.TempDir(), filepath.Join(t.TempDir(), "calls")
+	require.NoError(t, os.WriteFile(filepath.Join(bin, "git"), []byte("#!/bin/sh\necho \"$@\" >> "+log+"\nexit 1\n"), 0o755))
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	repo := t.TempDir()
+	_, err := Reader{Repo: repo, Ref: "v1"}.File("coral-go/x")
+	require.Error(t, err)
+	b, err := os.ReadFile(log)
+	require.NoError(t, err)
+	calls := string(b)
+	assert.Contains(t, calls, "core.fsmonitor=false")
+	assert.Contains(t, calls, "core.hooksPath=")
+	assert.Contains(t, calls, "-C "+repo)
+	assert.Contains(t, calls, "show")
+}
