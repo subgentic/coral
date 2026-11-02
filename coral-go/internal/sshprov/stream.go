@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"log"
 	"net"
 	"net/http"
 	"net/url"
@@ -37,9 +38,9 @@ type StreamTarget struct {
 	slots                chan struct{} // one per ssh process alive: the cap on streams
 	ownerID, ownerSecret string        // the hub's owner stamp for this remote (#11378), set by WithOwnerStamp
 	mu                   sync.Mutex
-	failed               time.Time  // when a dial last failed: dials are refused for streamBackoff after it
-	lastActive           time.Time  // when a stream of this computer last started or ended: the shared ssh session is up for controlPersist seconds after
-	warmMu               sync.Mutex // one cold dial at a time makes the shared session (see warm)
+	failed               time.Time     // when a dial last failed: dials are refused for streamBackoff after it
+	lastActive           time.Time     // when a stream of this computer last started or ended: the shared ssh session is up for controlPersist seconds after
+	warmCh               chan struct{} // holds one token: the cold dial that makes the shared session has it (see warm); a channel so a waiting dial can stop with its context
 }
 
 // streamCap bounds the ssh processes one target keeps (the dashboard, the poller and the feed each hold a few); streamBackoff is how long dials are refused after one failed, so a dead host or a
@@ -59,6 +60,8 @@ const (
 var (
 	ErrStreamBusy    = errors.New("sshprov: too many connections to this server")
 	ErrStreamBackoff = errors.New("sshprov: the last connection failed; waiting a moment")
+	// ErrStreamUnreachable is what a failed warm-up says: one fixed sentence, whatever ssh said (its own text, which can name a host or a key file, goes to the log and not to a client).
+	ErrStreamUnreachable = errors.New("sshprov: could not connect to this computer")
 )
 
 // liveStreams are the stream targets that have not been closed: CloseShared reaches the idle streams of every one that names the computer whose host key was forgotten (#12475).
@@ -94,7 +97,7 @@ func NewStreamTarget(r Runner, t Target, port int, apiKey string) (*StreamTarget
 	if t.Alias != "" && !aliasRe.MatchString(t.Alias) {
 		return nil, ErrBadTarget
 	}
-	s := &StreamTarget{r: r, target: t, port: port, apiKey: apiKey, slots: make(chan struct{}, streamCap)}
+	s := &StreamTarget{r: r, target: t, port: port, apiKey: apiKey, slots: make(chan struct{}, streamCap), warmCh: make(chan struct{}, 1)}
 	liveStreams.mu.Lock()
 	liveStreams.m[s] = struct{}{}
 	liveStreams.mu.Unlock()
@@ -222,8 +225,12 @@ func (s *StreamTarget) warm(ctx context.Context) error {
 	if !s.cold() {
 		return nil
 	}
-	s.warmMu.Lock()
-	defer s.warmMu.Unlock()
+	select {
+	case s.warmCh <- struct{}{}:
+		defer func() { <-s.warmCh }()
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 	if !s.cold() {
 		return nil // another dial made the session while this one waited
 	}
@@ -235,7 +242,8 @@ func (s *StreamTarget) warm(ctx context.Context) error {
 	}
 	if _, err := s.r.Run(ctx, s.target, CmdUname); err != nil {
 		s.noteFailure()
-		return err
+		log.Printf("sshprov: the shared session to %s could not be made: %v", s.target.Destination(), err)
+		return ErrStreamUnreachable
 	}
 	s.touch()
 	return nil

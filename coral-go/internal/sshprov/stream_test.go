@@ -546,3 +546,34 @@ func TestForgettingAHostKeyClosesTheIdleStreamsOfThatComputerOnly(t *testing.T) 
 		t.Error("another computer's streams were closed too")
 	}
 }
+
+// Security's INFOs on #12477: the warm-up's failure reaches a client as a fixed sentence (ssh's own text stays in the log), and a dial waiting for the one that makes the session stops when its context ends.
+func TestStreamWarmUpFailureIsAFixedSentenceNotSSHsText(t *testing.T) {
+	useTestControlDir(t)
+	ssh := newStandIn(t, "ssh", standCfg{Stderr: "ssh: connect to host secret-host.internal port 22: Connection refused\n", Exit: 255})
+	tg, _ := ParseTarget("user@box.example.com")
+	st, _ := NewStreamTarget(Runner{SSH: ssh}, tg, 8420, streamKey)
+	_, err := st.dial(context.Background())
+	if !errors.Is(err, ErrStreamUnreachable) {
+		t.Fatalf("a computer that refuses: %v", err)
+	}
+	if strings.Contains(err.Error(), "secret-host") || strings.Contains(err.Error(), "refused") {
+		t.Errorf("ssh's own text reached the dial error: %q", err)
+	}
+}
+
+func TestStreamDialWaitingForTheSessionStopsWhenItsContextEnds(t *testing.T) {
+	useTestControlDir(t)
+	slow := newStandIn(t, "ssh", standCfg{HoldSecs: 5})
+	tg, _ := ParseTarget("user@box.example.com")
+	st, _ := NewStreamTarget(Runner{SSH: slow}, tg, 8420, streamKey)
+	go st.dial(context.Background()) // makes the session: its command takes 5 s here
+	time.Sleep(300 * time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
+	defer cancel()
+	t0 := time.Now()
+	_, err := st.dial(ctx)
+	if !errors.Is(err, context.DeadlineExceeded) || time.Since(t0) > time.Second {
+		t.Errorf("a dial waiting for the session ended with %v after %v; it should stop when its own context does", err, time.Since(t0))
+	}
+}
