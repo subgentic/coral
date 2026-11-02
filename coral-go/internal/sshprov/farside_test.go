@@ -136,6 +136,31 @@ func runFar(f farCfg, text string) int {
 		}
 		fmt.Println(out)
 		return 0
+	case has("command -v curl >/dev/null"): // CmdDownload (#12217): the far computer fetches the package from the release URL itself and checks the SHA-256 the hub gave. The "network" is the file pkg.bin above Home.
+		if f.Mode == "nocurl" {
+			return 6
+		}
+		if vdir == "" || !strings.Contains(text, "--proto '=https'") || !strings.Contains(text, "--proto-redir '=https'") || !strings.Contains(text, "https://github.com/subgentic/coral/releases/download/v") {
+			return 2
+		}
+		if f.Mode == "dlfail" {
+			return 4
+		}
+		b, err := os.ReadFile(filepath.Join(filepath.Dir(f.Home), "pkg.bin"))
+		if err != nil {
+			return 4
+		}
+		if f.Mode == "corrupt" && len(b) > 100 {
+			b = b[:100]
+		}
+		sum := sha256.Sum256(b)
+		if m := regexp.MustCompile(`= '([0-9a-f]{64})'`).FindStringSubmatch(text); m == nil || m[1] != hex.EncodeToString(sum[:]) {
+			return 5 // a package that is not the expected one is deleted and never kept
+		}
+		if err := os.WriteFile(filepath.Join(vdir, "package.tar.gz"), b, 0o600); err != nil {
+			return 1
+		}
+		return 0
 	case has("command -v tmux"), has("systemctl --user"):
 		return 0
 	case has(`ps -u "$(id -u)"`): // the check after a stop: the session, then THIS user's own Coral process (the flag listening), never the port

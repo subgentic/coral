@@ -63,6 +63,10 @@ const (
 	CmdFreeKB
 	// CmdReadInstalledSum prints that recorded SHA-256, if the release is installed; arg 0 is the version.
 	CmdReadInstalledSum
+	// CmdDownload downloads the release package for the far computer's own platform from the release URL, into <install>/<version>/package.tar.gz, and checks its SHA-256 against the one the hub gives (from its
+	// own verified SHA256SUMS): args are the version, the architecture and the expected SHA-256. https only (redirects too, at most three), 300 MiB at most. Exit 6: no curl; 4: the download failed; 5: the hash
+	// is not the expected one (the file is deleted, nothing is unpacked).
+	CmdDownload
 	// CmdCheckPort is the check before a start: exit 0 when this user's coral-server session exists (a start leaves it as it is) or nothing listens on port 8420 (read from /proc/net/tcp and tcp6, Linux),
 	// 2 when something does (another user's Coral, or any program), 3 when it cannot tell (the start then goes ahead as it always did).
 	CmdCheckPort
@@ -81,6 +85,10 @@ type spec struct {
 
 // versionRe is a release version as the hub names it: numbers and an optional suffix, never a path.
 var versionRe = regexp.MustCompile(`^[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,4}(-[A-Za-z0-9.]{1,32})?$`)
+
+var archRe = regexp.MustCompile(`^(amd64|arm64)$`)
+
+var sha256Re = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
 var relPathRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,63}(/[A-Za-z0-9][A-Za-z0-9._-]{0,63}){0,3}$`)
 
@@ -110,6 +118,11 @@ var specs = map[Command]spec{
 	// The recorded sum goes FIRST: a re-unpack that is interrupted leaves no sum next to a half-written root, so the next run does not say "already installed". It is written last.
 	CmdUnpack: {template: "umask 077 && cd \"$HOME/" + InstallDir + "/%[1]s\" && rm -f package.sha256 && rm -rf root && mkdir root && tar -xzf package.tar.gz --no-same-owner -C root && " +
 		"{ sha256sum package.tar.gz 2>/dev/null || shasum -a 256 package.tar.gz; } | cut -d' ' -f1 > package.sha256", args: []*regexp.Regexp{versionRe}, timeout: 5 * time.Minute},
+	CmdDownload: {template: "command -v curl >/dev/null 2>&1 || exit 6; umask 077 && cd \"$HOME/" + InstallDir + "/%[1]s\" && rm -f package.tar.gz && " +
+		"{ curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --max-redirs 3 --max-filesize 314572800 --connect-timeout 20 -o package.tar.gz " +
+		"\"https://github.com/subgentic/coral/releases/download/v%[1]s/coral-linux-%[2]s-%[1]s.tar.gz\" || { rm -f package.tar.gz; exit 4; }; } && " +
+		"got=$({ sha256sum package.tar.gz 2>/dev/null || shasum -a 256 package.tar.gz; } | cut -d' ' -f1) && { [ \"$got\" = '%[3]s' ] || { rm -f package.tar.gz; exit 5; }; }",
+		args: []*regexp.Regexp{versionRe, archRe, sha256Re}, timeout: 10 * time.Minute},
 	CmdReadInstalledSum: {template: "cat \"$HOME/" + InstallDir + "/%s/package.sha256\" 2>/dev/null", args: []*regexp.Regexp{versionRe}},
 }
 

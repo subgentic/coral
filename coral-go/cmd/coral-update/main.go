@@ -1,4 +1,4 @@
-// coral-update is Coral's updater program (#5231, #5292). Its argv is fixed, with ONE exception (#11370): "verify-package --tag --asset --dir", which a self-hosted hub runs to verify a release it
+// coral-update is Coral's updater program (#5231, #5292). Its argv is fixed, with TWO exceptions (#11370, #12217): "verify-package --tag --asset --dir" and "verify-sums" (the same options, the folder holding only the sums and their bundle), which a self-hosted hub runs to verify a release it
 // downloaded before it installs that release on another computer over SSH (verify_package.go). That command is never built from a request: the hub passes its own running version as the tag,
 // a fixed per-architecture asset name and a fresh 0700 temp folder, by this program's absolute path, with a minimal environment and a timeout. Otherwise: "check" finds the newest promoted release, has the verifier approve
 // it and stages the package; "apply" is not built yet. It prints one JSON object on stdout, for display only, and takes no URL, version, path, hash
@@ -103,6 +103,9 @@ func run(args []string, getenv func(string) string, stdout io.Writer) int {
 	// verify-package checks a release the self-hosted hub downloaded (#11370); see verify_package.go. It has its own arguments and is not gated by the update switches.
 	if len(args) > 0 && args[0] == "verify-package" {
 		return runVerifyPackage(args[1:], stdout)
+	}
+	if len(args) > 0 && args[0] == "verify-sums" { // the same check with no package: the signed hash a far computer must see after it downloads the release itself (#12217)
+		return runVerifySums(args[1:], stdout)
 	}
 	// status only reads the updater's own files: no network, and it answers when the feature is off.
 	if (len(args) == 1 && args[0] == "status") || (len(args) == 2 && args[0] == "status" && args[1] == "--json") {

@@ -68,7 +68,7 @@ type Installer struct {
 	Version string
 	// Helper is the ABSOLUTE path of coral-update (verify-package), the only program that links the Sigstore verifier. Empty or missing refuses the install.
 	Helper string
-	// Download fetches url into the file at dst (created new, 0600), at most max bytes. Nil uses the hardened downloader.
+	// Download fetches the SIGNED SUMS and their bundle (not the package: the far computer downloads that, #12217) into the file at dst (created new, 0600), at most max bytes. Nil uses the hardened downloader.
 	Download func(ctx context.Context, url, dst string, max int64) error
 	// RunHelper runs the verifier. Nil runs Helper with a minimal environment and a timeout.
 	RunHelper func(ctx context.Context, tag, asset, dir string) (sha string, err error)
@@ -121,14 +121,14 @@ func (in Installer) Install(ctx context.Context, t Target, arch Arch) (string, e
 	for _, f := range []struct {
 		name string
 		max  int64
-	}{{sumsName, maxSums}, {sumsBundleName, maxBundle}, {asset, maxPackage}} {
+	}{{sumsName, maxSums}, {sumsBundleName, maxBundle}} { // the hub fetches only the signed sums: the far computer downloads the package itself (#12217)
 		in.say("install", "running", "Downloading "+f.name+".")
 		if err := dl(ctx, releaseBase+tag+"/"+f.name, filepath.Join(dir, f.name), f.max); err != nil {
 			return "", fail("install", "Could not download "+f.name+" from GitHub.")
 		}
 	}
 
-	in.say("install", "running", "Checking the release signature and the package hash on this computer.")
+	in.say("install", "running", "Checking the release signature on this computer.")
 	run := in.RunHelper
 	if run == nil {
 		run = in.runHelper
@@ -136,14 +136,6 @@ func (in Installer) Install(ctx context.Context, t Target, arch Arch) (string, e
 	sum, err := run(ctx, tag, asset, dir)
 	if err != nil || !hexRe.MatchString(sum) {
 		return "", fail("install", "The release could not be verified, so nothing was installed.")
-	}
-	unpacked, err := checkLocalPackage(filepath.Join(dir, asset))
-	if err != nil {
-		return "", fail("install", "The package holds paths that are not allowed, so nothing was installed.")
-	}
-	pkgSize := int64(0)
-	if st, err := os.Stat(filepath.Join(dir, asset)); err == nil {
-		pkgSize = st.Size()
 	}
 
 	// Already installed? (a re-run)
@@ -155,7 +147,7 @@ func (in Installer) Install(ctx context.Context, t Target, arch Arch) (string, e
 	}
 
 	// Room for the package and what it unpacks to, and a margin, before anything is copied.
-	need := (pkgSize+unpacked)/1024 + diskMarginKB
+	need := int64(remoteNeedKB)
 	fr, err := in.Runner.Run(ctx, t, CmdFreeKB)
 	if err != nil {
 		return "", connectErr(err)
@@ -167,13 +159,17 @@ func (in Installer) Install(ctx context.Context, t Target, arch Arch) (string, e
 	if _, err := in.Runner.Run(ctx, t, CmdMkVersionDir, in.Version); err != nil {
 		return "", connectErr(err)
 	}
-	f, err := os.Open(filepath.Join(dir, asset))
-	if err != nil {
-		return "", fail("install", "Could not read the package.")
-	}
-	defer f.Close()
-	if r, err := in.Runner.RunInput(ctx, t, f, CmdReceive, in.Version); err != nil || r.ExitCode != 0 {
+	in.say("install", "running", "The other computer is downloading "+asset+" and checking its SHA-256 against the verified one.")
+	if r, err := in.Runner.Run(ctx, t, CmdDownload, in.Version, string(arch), sum); err != nil {
 		return "", connectErr(err)
+	} else if r.ExitCode != 0 {
+		switch r.ExitCode {
+		case dlNoCurl:
+			return "", fail("install", "The other computer has no curl, so it cannot download the release, and nothing was installed.")
+		case dlMismatch:
+			return "", fail("install", "The package the other computer downloaded is not the one that was verified, so nothing was unpacked.")
+		}
+		return "", fail("install", "The other computer could not download the release from GitHub, so nothing was installed.")
 	}
 
 	// (d) the far side hashes what it received with sha256sum, and the hub compares.
@@ -203,8 +199,16 @@ func (in Installer) Install(ctx context.Context, t Target, arch Arch) (string, e
 	return sum, nil
 }
 
-// diskMarginKB is the free space kept beyond the package and its unpacked size (100 MiB).
-const diskMarginKB = 100 << 10
+// remoteNeedKB is the free space asked of the far computer before it downloads: the package (under maxPackage) and what it unpacks to, with a margin (the hub no longer holds the package, so it cannot
+// add the real sizes up; 640 MiB).
+const remoteNeedKB = 640 << 10
+
+// The exit codes of CmdDownload.
+const (
+	dlFailed   = 4 // curl failed (no network, a refused host, a redirect off https, a package over the size limit)
+	dlMismatch = 5 // the package it got does not have the SHA-256 the hub gave; it is deleted
+	dlNoCurl   = 6 // no curl on the far computer
+)
 
 // parseKB reads the one number df printed: digits only, at most 15.
 func parseKB(s string) (int64, bool) {
@@ -333,7 +337,7 @@ func (in Installer) runHelper(ctx context.Context, tag, asset, dir string) (stri
 	}
 	ctx, cancel := context.WithTimeout(ctx, 6*time.Minute)
 	defer cancel()
-	cmd := executil.Command(ctx, in.Helper, "verify-package", "--tag", tag, "--asset", asset, "--dir", dir)
+	cmd := executil.Command(ctx, in.Helper, "verify-sums", "--tag", tag, "--asset", asset, "--dir", dir)
 	cmd.Env = helperEnv()
 	var out capped
 	cmd.Stdout, cmd.Stdin = &out, nil

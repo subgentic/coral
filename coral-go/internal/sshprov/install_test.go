@@ -81,6 +81,9 @@ type installEnv struct {
 func newInstallEnv(t *testing.T, pkg []byte, mode string) (*installEnv, string, string) {
 	ssh, home, log := farSide(t, mode)
 	e := &installEnv{pkg: pkg}
+	if err := os.WriteFile(filepath.Join(filepath.Dir(home), "pkg.bin"), pkg, 0o600); err != nil { // what the far computer's "download" gets
+		t.Fatal(err)
+	}
 	e.in = Installer{
 		Runner:  Runner{SSH: ssh},
 		Version: "2.0.10",
@@ -92,11 +95,10 @@ func newInstallEnv(t *testing.T, pkg []byte, mode string) (*installEnv, string, 
 			if !strings.HasPrefix(url, "https://github.com/subgentic/coral/releases/download/v2.0.10/") {
 				t.Errorf("download url %s", url)
 			}
-			content := []byte("x")
 			if strings.HasSuffix(url, ".tar.gz") {
-				content = e.pkg
+				t.Errorf("the hub downloaded the package: %s (the far computer does that, #12217)", url)
 			}
-			return os.WriteFile(dst, content, 0o600)
+			return os.WriteFile(dst, []byte("x"), 0o600)
 		},
 		RunHelper: func(_ context.Context, tag, asset, dir string) (string, error) {
 			e.mu.Lock()
@@ -107,6 +109,9 @@ func newInstallEnv(t *testing.T, pkg []byte, mode string) (*installEnv, string, 
 			}
 			if st, err := os.Stat(dir); err != nil || permsApply() && st.Mode().Perm() != 0o700 {
 				t.Errorf("the download folder is not 0700: %v %v", st, err)
+			}
+			if _, err := os.Stat(filepath.Join(dir, asset)); err == nil {
+				t.Errorf("the verifier was given a package: only the signed sums and their bundle belong in the folder")
 			}
 			return sha(e.pkg), nil
 		},
@@ -141,11 +146,15 @@ func TestInstallPutsTheVerifiedPackageOnTheFarSideAndIsIdempotent(t *testing.T) 
 	if b, _ := os.ReadFile(filepath.Join(root, "package.sha256")); strings.TrimSpace(string(b)) != sha(pkg) {
 		t.Errorf("recorded sum = %q", b)
 	}
-	if e.dls != 3 || e.helps != 1 {
+	if e.dls != 2 || e.helps != 1 {
 		t.Errorf("downloads %d, helper runs %d", e.dls, e.helps)
 	}
 
-	// a re-run downloads and verifies again (cheap) but does not copy or unpack
+	// the far computer downloaded the package for its own platform, pinned to the verified SHA-256, and nothing was copied from the hub
+	if l, _ := os.ReadFile(log); !strings.Contains(string(l), "coral-linux-amd64-2.0.10.tar.gz") || !strings.Contains(string(l), "= '"+sha(pkg)+"'") || strings.Contains(string(l), "cat >") {
+		t.Errorf("the far side was not told to download and check the package:\n%s", l)
+	}
+	// a re-run downloads and verifies the sums again (cheap) but does not download the package again or unpack
 	before, _ := os.ReadFile(log)
 	e.steps = nil
 	if _, err := e.in.Install(context.Background(), tg, ArchAMD64); err != nil {
@@ -153,8 +162,8 @@ func TestInstallPutsTheVerifiedPackageOnTheFarSideAndIsIdempotent(t *testing.T) 
 	}
 	after, _ := os.ReadFile(log)
 	added := strings.TrimPrefix(string(after), string(before))
-	if strings.Contains(added, "cat >") || strings.Contains(added, "tar -xzf") {
-		t.Errorf("a re-run copied or unpacked again:\n%s", added)
+	if strings.Contains(added, "curl ") || strings.Contains(added, "tar -xzf") {
+		t.Errorf("a re-run downloaded or unpacked again:\n%s", added)
 	}
 	if !strings.Contains(strings.Join(e.steps, "|"), "Already installed") {
 		t.Errorf("steps: %v", e.steps)
@@ -224,30 +233,42 @@ func TestInstallRefusesBeforeTouchingTheFarSide(t *testing.T) {
 	_ = log
 }
 
-func TestInstallRefusesAPackageWithBadPathsLocally(t *testing.T) {
+// The package is pinned to the signed SHA-256, so the hub no longer reads it (#12217); the far computer still lists its members and the hub refuses names that are not plain relative paths before anything is unpacked.
+func TestInstallRefusesAPackageWithBadPathsFromTheListing(t *testing.T) {
 	tg, _ := ParseTarget("user@box.example.com")
 	for name, members := range map[string][]member{
 		"dotdot":         {{name: "../evil", body: "x"}},
 		"nested dotdot":  {{name: "a/../../evil", body: "x"}},
 		"absolute":       {{name: "/etc/evil", body: "x"}},
-		"hard link":      {{name: "h", typ: tar.TypeLink, link: "coral"}},
-		"fifo":           {{name: "f", typ: tar.TypeFifo}},
-		"link escapes":   {{name: "l", typ: tar.TypeSymlink, link: "../../etc/passwd"}},
-		"link with ..":   {{name: "sub/y", typ: tar.TypeSymlink, link: ".."}},
-		"through a link": {{name: "sub", typ: tar.TypeSymlink, link: "real"}, {name: "sub/evil", body: "x"}},
-		"deep through":   {{name: "a/b", typ: tar.TypeSymlink, link: "c"}, {name: "a/b/c/d/evil", body: "x"}},
-		"absolute link":  {{name: "l", typ: tar.TypeSymlink, link: "/etc/passwd"}},
 		"backslash name": {{name: "a\\b", body: "x"}},
 		"empty":          {},
 	} {
 		pkg := makeTarGz(t, members)
-		e, _, log := newInstallEnv(t, pkg, "")
+		e, home, _ := newInstallEnv(t, pkg, "")
 		_, err := e.in.Install(context.Background(), tg, ArchAMD64)
 		if err == nil || !strings.Contains(err.Error(), "paths that are not allowed") {
 			t.Errorf("%s: %v", name, err)
 		}
-		if _, serr := os.Stat(log); serr == nil {
-			t.Errorf("%s: ssh was started", name)
+		if _, serr := os.Stat(filepath.Join(home, ".coral-server", "2.0.10", "root")); serr == nil {
+			t.Errorf("%s: unpacked", name)
+		}
+	}
+}
+
+// The far computer's own failures to download are named in fixed sentences, and nothing is unpacked.
+func TestInstallSaysWhyTheFarComputerCouldNotDownload(t *testing.T) {
+	tg, _ := ParseTarget("user@box.example.com")
+	for mode, want := range map[string]string{
+		"nocurl": "has no curl",
+		"dlfail": "could not download the release from GitHub",
+	} {
+		e, home, _ := newInstallEnv(t, goodTar(t), mode)
+		_, err := e.in.Install(context.Background(), tg, ArchAMD64)
+		if err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("%s: %v", mode, err)
+		}
+		if _, serr := os.Stat(filepath.Join(home, ".coral-server", "2.0.10", "root")); serr == nil {
+			t.Errorf("%s: unpacked", mode)
 		}
 	}
 }
@@ -259,6 +280,9 @@ func TestInstallRefusesAPackageThatChangedOnTheWayAndUnpacksNothing(t *testing.T
 	_, err := e.in.Install(context.Background(), tg, ArchAMD64)
 	if err == nil || !strings.Contains(err.Error(), "is not the one that was verified") {
 		t.Fatalf("err = %v", err)
+	}
+	if _, serr := os.Stat(filepath.Join(home, ".coral-server", "2.0.10", "package.tar.gz")); serr == nil {
+		t.Error("a package with the wrong hash was kept")
 	}
 	if _, serr := os.Stat(filepath.Join(home, ".coral-server", "2.0.10", "root")); serr == nil {
 		t.Error("a package that failed the far-side hash was unpacked")

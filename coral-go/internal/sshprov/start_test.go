@@ -348,7 +348,7 @@ func TestStopCheckReadsOnlyThisUsersProcessesAndPortCheckOnlyThePort(t *testing.
 
 // No command's text may carry a formatting verb that did not get its argument ("%!s(MISSING)", "%!(EXTRA ...)"): the stop check once did and so always said "stopped" (#11429, QA Engineer's MUST).
 func TestNoRemoteCommandTextHasAFormattingError(t *testing.T) {
-	samples := []string{"2.0.10", "a/b.tgz"}
+	samples := []string{"2.0.10", "a/b.tgz", "amd64", strings.Repeat("a", 64)}
 	for c, s := range specs {
 		args := make([]string, len(s.args))
 		for i, re := range s.args {
