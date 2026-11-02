@@ -2,6 +2,8 @@ package routes
 
 import (
 	"context"
+	"encoding/json"
+	"net/http"
 	"testing"
 	"time"
 
@@ -56,4 +58,29 @@ func TestAllAutoAsleepBoardIsNotAnAsleepBoard(t *testing.T) {
 	names, err := ss.GetSleepingBoardNames(ctx)
 	require.NoError(t, err)
 	assert.NotContains(t, names, team, "every agent auto-asleep: the board stays unpaused, so a message can wake them")
+}
+
+// The live list says auto_asleep for an agent put to sleep for being idle, and not for a person's Sleep.
+func TestLiveListSaysAutoAsleep(t *testing.T) {
+	server, _, _, ss := setupSessionsTestServer(t)
+	ctx := context.Background()
+	for sid, idle := range map[string]bool{"00000000-0000-4000-8000-0000000000a1": true, "00000000-0000-4000-8000-0000000000a2": false} {
+		require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid, AgentName: "a-" + sid[len(sid)-2:], AgentType: "claude", WorkingDir: "/tmp"}))
+		if idle {
+			require.NoError(t, ss.SetSessionAutoSleeping(ctx, sid, time.Now()))
+		} else {
+			require.NoError(t, ss.SetSessionSleeping(ctx, sid, true))
+		}
+	}
+	resp, err := http.Get(server.URL + "/api/sessions/live")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	var rows []map[string]any
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&rows))
+	got := map[string]any{}
+	for _, r := range rows {
+		got[r["session_id"].(string)] = r["auto_asleep"]
+	}
+	assert.Equal(t, true, got["00000000-0000-4000-8000-0000000000a1"])
+	assert.Equal(t, false, got["00000000-0000-4000-8000-0000000000a2"])
 }

@@ -458,6 +458,9 @@ func (h *SessionsHandler) notifyTaskCreated(ctx context.Context, name, sessionID
 		}
 	}
 	prompt := claimPrompt(t)
+	if sessionID != "" {
+		h.WakeIdleForDelivery(ctx, sessionID) // a task for an auto-asleep agent wakes it first (#12111)
+	}
 	// Through the automated-input gate: held while the agent waits on a prompt (#3431).
 	if err := deliverAutomated(ctx, h.terminal, name, agentType, sessionID, prompt, "task notification"); err != nil {
 		return "", err.Error()

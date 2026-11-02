@@ -90,6 +90,10 @@ func TestTheOwnerTableAgreesWithTheHandWrittenListItReplaced(t *testing.T) {
 			if m == http.MethodPost && strings.HasPrefix(p, "/api/sessions/live/") && strings.HasSuffix(p, "/dismiss-wait") {
 				continue
 			}
+			// The owner's switch of one agent's auto-sleep (#12111) is new: the old list never had it.
+			if m == http.MethodPost && strings.HasPrefix(p, "/api/sessions/live/") && strings.HasSuffix(p, "/auto-sleep") {
+				continue
+			}
 			// The owner's read of one team's cross-team state (#5636) is new: the old list never had it.
 			if m == http.MethodGet && strings.HasSuffix(p, "/cross-team/settings") {
 				continue

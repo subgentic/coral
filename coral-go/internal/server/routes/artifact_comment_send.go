@@ -291,6 +291,9 @@ func (h *SessionsHandler) sendArtifactComment(w http.ResponseWriter, r *http.Req
 		if sub != nil {
 			ls, live = bySession[sub.SessionName]
 		}
+		if live && ls.IsSleeping == 1 && sleepReason(ls) == store.SleepReasonIdle && h.WakeIdleForDelivery(r.Context(), ls.SessionID) {
+			ls.IsSleeping = 0 // an auto-asleep agent was woken for the comment (#12111)
+		}
 		switch {
 		case sub == nil:
 			res.State = "not_on_board"
