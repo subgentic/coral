@@ -50,7 +50,7 @@ const { install: installNA, stubModels } = require('./helpers/new_agent');
             let d = await geo();
             assert.ok(d.tabs.length >= 3 && d.onName, at + 'one tab per agent this computer has: ' + JSON.stringify(d));
             assert.ok(new Set(d.tabsTop).size === 1 && d.tabH >= 40 && d.joined, at + 'the tabs are one row, 40 px or more, and the open one joins its panel: ' + JSON.stringify(d));
-            assert.ok(d.missingCards === 1 && d.missingLines <= 56, at + 'a missing agent is one quiet line, not a card: ' + JSON.stringify({ c: d.missingCards, h: d.missingLines }));
+            assert.ok(d.missingCards === 1 && d.missingLines <= 96, at + 'a missing agent is one row of the list (its heading and one 44 px row), not a card: ' + JSON.stringify({ c: d.missingCards, h: d.missingLines }));
             // every tab in turn: Thinking is a select, never a strip of buttons; Model and Thinking are aligned
             for (const type of ['claude', 'pi']) {
                 await ev(`document.querySelector('${G} input[value="${type}"]').click(); true`); await settle(500);
