@@ -8,6 +8,8 @@ const tasksOf = r => ['active', 'blocked', 'queued', 'done'].reduce((n, k) => n 
 const openOf = r => tasksOf(r) - Math.max(0, Number((r || {}).done) || 0);
 const readyToClose = g => String((g && g.state) || '').toLowerCase() === 'active' && tasksOf(g && g.rollup) > 0 && openOf(g && g.rollup) === 0;
 const allTasksOf = tasksOf;
+/** Whether a goal looks done (an active goal whose tasks are all done): the goal's page offers Not yet for it, as its item in Needs you does (#12248). */
+export const looksDone = readyToClose;
 
 let counted = 0;
 /** How many goal items Needs you holds, as the Inbox sidebar last worked it out: the tab's badge adds it to its count (the sidebar is loaded after the Inbox is first opened). */

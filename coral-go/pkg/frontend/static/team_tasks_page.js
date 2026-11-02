@@ -88,7 +88,9 @@ export async function loadTasks() {
         model.totalDone = Number.isFinite(json.total_completed) ? json.total_completed : null;
         model.failed = '';
         await refreshGoalTitles(project).catch(() => {});
-        hooks.onCount?.(model.totalOpen != null ? model.totalOpen : model.rows.filter(t => bucket(t) !== 'done').length);
+        const shownOpen = TF.isQuery(model.filters) ? (model.totalOpen != null ? model.totalOpen : model.rows.filter(t => bucket(t) !== 'done').length) : counts().open; // the tab says what the list's Open says (#12248)
+        state.teamTasksOpen = { team: String(project || ''), n: shownOpen }; // what the tab says too: the page's counts poll reads it (#12248)
+        hooks.onCount?.(shownOpen);
     } catch (e) {
         if (project !== model.project) return;
         model.failed = `Tasks could not be read${e && e.message ? `: ${e.message}` : ''}`;
