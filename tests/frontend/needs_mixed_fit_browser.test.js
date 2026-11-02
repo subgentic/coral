@@ -57,6 +57,7 @@ const STUB = `(() => {
             const r = await ev(`(() => { const box = document.querySelector('${T} .dt-box') || document.querySelector('${T}'), table = box.querySelector('table'), b = box.getBoundingClientRect(), w = e => Math.round(e.getBoundingClientRect().width), vis = e => e && e.getClientRects().length > 0;
                 const act = table.querySelector('thead th[data-key=review]'), wait = table.querySelector('thead th[data-key=waiting]'), item = table.querySelector('thead th[data-key=agent]');
                 return { width: ${width}, box: Math.round(b.width), table: w(table), scrolls: box.scrollWidth > box.clientWidth + 1, item: w(item), actionsIn: vis(act) && act.getBoundingClientRect().right <= b.right + 1, waitingIn: !vis(wait) || wait.getBoundingClientRect().right <= b.right + 1, shown: [...table.querySelectorAll('thead th')].filter(vis).map(t => t.dataset.key) }; })()`);
+            await shot('mixed-' + width);
             check(!r.scrolls && r.table <= r.box + 2, 'agents, proposals and a question in one table fit the panel at ' + width + ' px, no sideways scroll: ' + JSON.stringify(r));
             check(r.actionsIn && r.waitingIn, 'Actions (and Waiting when it is shown) stay inside the panel, at ' + width + ' px: ' + JSON.stringify(r));
             check(r.item >= 100, 'the Item column keeps room at ' + width + ' px: ' + JSON.stringify(r));

@@ -533,6 +533,8 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 .dt-box:not(.dt-folded) .dt-table :is(th, td)[data-dt-min] { min-width: var(--dt-min); }
 .dt-box:not(.dt-folded) .dt-table :is(th, td)[data-dt-max] { max-width: var(--dt-max); }
 .dt-box:not(.dt-folded) .dt-table :is(th, td)[data-dt-w] { width: var(--dt-w); }
+.dt-box.dt-measure:not(.dt-folded) .dt-table :is(th, td)[data-dt-w] { width: auto; } /* applyWidths measures each column at the width its content needs (#11943): none of the declared widths */
+.dt-box.dt-measure:not(.dt-folded) .dt-table :is(th, td)[data-dt-max] { max-width: var(--dt-nat-max, var(--dt-max)); }
 
 /* The star on an artifact row (#9834): the filled one is always there, the empty one only while the row is hovered or has the keyboard, and not at all on touch (the star is in the item). */
 .dt-star { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; margin-inline-start: 6px; padding: 0; border: 0; border-radius: var(--radius-sm); background: none; color: var(--table-secondary-color); cursor: pointer; vertical-align: middle; }

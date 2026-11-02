@@ -3,7 +3,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
-const { coralReady } = require('./helpers/wait');
+const { coralReady, framesJs } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -151,7 +151,7 @@ const { coralReady } = require('./helpers/wait');
         const KEY = 'coral-dt-widths:Fixture';
         await ev(`localStorage.removeItem(${JSON.stringify(KEY)}); true`);
         await mount();
-        const W = key => ev(`Math.round(document.querySelector('#dt-host th[data-key="${key}"]').getBoundingClientRect().width)`);
+        const W = async key => { await ev(framesJs(3)); return ev(`Math.round(document.querySelector('#dt-host th[data-key="${key}"]').getBoundingClientRect().width)`); }; // three frames first: a table lays its columns out on the frame after it is in the page
         const handle = key => ev(`(() => { const r = document.querySelector('#dt-host th[data-key="${key}"] .dt-resize').getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()`);
         const mouse = (type, x, y) => client.Input.dispatchMouseEvent({ type, x, y, button: 'left', buttons: type === 'mouseReleased' ? 0 : 1, clickCount: 1 });
         const drag = async (key, dx) => { const h = await handle(key); await mouse('mouseMoved', h.x, h.y); await mouse('mousePressed', h.x, h.y); for (let i = 1; i <= 4; i++) await mouse('mouseMoved', h.x + Math.round(dx * i / 4), h.y); await mouse('mouseReleased', h.x + dx, h.y); };
@@ -173,7 +173,7 @@ const { coralReady } = require('./helpers/wait');
         await ev(`document.activeElement.blur(); true`);
         const hb = await handle('who'); await mouse('mouseMoved', hb.x, hb.y); await mouse('mousePressed', hb.x, hb.y); await mouse('mouseReleased', hb.x, hb.y);
         assert.equal(await ev(`localStorage.getItem(${JSON.stringify(KEY)})`), null, 'a press with no move keeps nothing');
-        assert.equal(await ev(`!document.querySelector('#dt-host .dt-box').classList.contains('dt-sized')`), true, 'and nothing is sized: nothing changed');
+        // (every table is sized in pixels now, #11943: the class dt-sized is always there; what matters is that a press with no move kept nothing, asserted above)
         assert.equal(await ev(`document.querySelector('#dt-host th[data-key="who"]').getAttribute('aria-sort')`), 'none', 'and does not sort');
         await drag('who', 70);
         const w1 = { name: await W('name'), who: await W('who'), n: await W('n') };
@@ -207,7 +207,7 @@ const { coralReady } = require('./helpers/wait');
         await ev(`document.querySelector('#dt-host th[data-key="who"] .dt-resize').dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); true`);
         assert.ok(Math.abs((await W('who')) - fit) <= 2, 'a second double click on a fitted column changes nothing: ' + fit + ' vs ' + await W('who'));
         await ev(`localStorage.removeItem(${JSON.stringify(KEY)}); true`); await mount();
-        assert.ok(Math.abs((await W('who')) - w0.who) <= 3 && !(await ev(`document.querySelector('#dt-host .dt-box').classList.contains('dt-sized')`)), 'with nothing kept the columns are as they were');
+        assert.ok(Math.abs((await W('who')) - w0.who) <= 3 , 'with nothing kept the columns are as they were');
         // folded: no handles
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
         await mount(); await waitFor(`document.querySelector('#dt-host .dt-box').classList.contains('dt-folded')`, 'folded');

@@ -5,7 +5,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
-const { coralReady } = require('./helpers/wait');
+const { coralReady, framesJs } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -17,7 +17,7 @@ const { coralReady } = require('./helpers/wait');
         'name in the middle (Inbox Tasks)': ['state', 'name', 'team', 'updated'],
         'no flexible column (Inbox Needs you)': ['name', 'state', 'team', 'updated'], // every column has a width the first time one is dragged
     };
-    const mount = (shape, noGrow, narrow) => ev(`(async () => { const DT = await import(${MOD} + 'data_table.js'); document.getElementById('dt-host')?.remove(); localStorage.removeItem('coral-dt-widths:Shape');
+    const mountRaw = (shape, noGrow, narrow) => ev(`(async () => { const DT = await import(${MOD} + 'data_table.js'); document.getElementById('dt-host')?.remove(); localStorage.removeItem('coral-dt-widths:Shape');
         const host = document.createElement('div'); host.id = 'dt-host'; host.style.cssText = ${narrow ? "'position:fixed;top:60px;left:20px;width:520px;bottom:20px;overflow:auto;background:var(--bg-primary);z-index:9999'" : "'position:fixed;inset:60px 20px 20px 20px;overflow:auto;background:var(--bg-primary);z-index:9999'"}; document.body.append(host);
         const rows = [{ id: 1, name: 'Fix the flaky test', state: 'Queued', team: 'alpha', progress: '2 of 4', updated: '3 min ago' }, { id: 2, name: 'Review the shared table', state: 'In progress', team: 'alpha', progress: '1 of 4', updated: '5 min ago' }];
         const def = { name: { key: 'name', label: 'Name', primary: true, width: ${noGrow ? 'undefined' : "'grow'"}, sort: true, field: 'name', cell: r => DT.primaryButton(r.name, 'Open ' + r.name) } };
@@ -25,6 +25,7 @@ const { coralReady } = require('./helpers/wait');
         if (${narrow ? 'true' : 'false'}) def.team.drop = 1; // a column the narrow box drops: its <col> must go with it, or every width after it lands on the wrong column (#10443)
         const t = DT.dataTable({ label: 'Shape', columns: ${JSON.stringify(shape)}.map(k => def[k]), rows, rowKey: r => 'r' + r.id, open: () => {}, rowName: r => r.name, state: DT.tableState() });
         host.append(t.bar, t.selectButton, t.el); return true; })()`);
+    const mount = async (...a) => { await mountRaw(...a); await ev(framesJs(4)); }; // the table lays its columns out on the frame after it is in the page
     const widths = () => ev(`(() => { const b = document.querySelector('#dt-host .dt-box'); return { cols: Object.fromEntries([...b.querySelectorAll('thead th')].filter(t => t.getBoundingClientRect().width > 0).map(t => [t.dataset.key || 'check', Math.round(t.getBoundingClientRect().width)])), sw: b.scrollWidth, cw: b.clientWidth, table: Math.round(b.querySelector('table').getBoundingClientRect().width) }; })()`);
     const handle = key => ev(`(() => { const r = document.querySelector('#dt-host th[data-key="${key}"] .dt-resize').getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()`);
     const mouse = (type, x, y) => client.Input.dispatchMouseEvent({ type, x, y, button: 'left', buttons: type === 'mouseReleased' ? 0 : 1, clickCount: 1 });
@@ -49,7 +50,7 @@ const { coralReady } = require('./helpers/wait');
                 await mount(shape, name.startsWith('no flexible')); const before = await widths();
                 await press(key, k, 3); const after = await widths(), d = moved(before, after);
                 const lastKey = shape[shape.length - 1], others = Object.keys(d).filter(kk => kk !== key && kk !== 'name' && kk !== lastKey);
-                check(`${name}: ${k} x3 on the ${key} separator changes only ${key}${key === 'name' && k === 'ArrowRight' ? ' (or nothing: the table fits its box, so the name has no room to grow, #11835)' : ''}`, others.length === 0 && (Object.keys(d).includes(key) || (key === 'name' && k === 'ArrowRight' && Object.keys(d).length === 0)), JSON.stringify(d));
+                check(`${name}: ${k} x3 on the ${key} separator changes only ${key}${key === 'name' && k === 'ArrowRight' ? ' (or nothing: the name is the elastic column, and a column at the width of its header cannot shrink, #11943)' : ''}`, others.length === 0 && (Object.keys(d).includes(key) || (Object.keys(d).length === 0 && (key === 'name' || k === 'ArrowLeft'))), JSON.stringify(d));
             }
             // the Operator's #10443: the last column's right edge dragged left (and by keys) fills to the box's edge: the table is not short of its box, no scrollbar over empty space, the last column holds the room
             for (const how of ['drag', 'keys']) {
