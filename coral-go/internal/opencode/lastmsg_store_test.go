@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/linktest"
 	"github.com/subgentic/coral/internal/secfile/secfiletest"
 )
 
@@ -80,7 +81,7 @@ func TestARecordThatIsNotOneIsNotRead(t *testing.T) {
 	// a link planted at the record is not followed to another file
 	target := filepath.Join(dir, "elsewhere")
 	require.NoError(t, os.WriteFile(target, []byte(`{"role":"user","text":"from another file"}`), 0o600))
-	require.NoError(t, os.Symlink(target, filepath.Join(lastDir(dir), "linked")))
+	linktest.Symlink(t, target, filepath.Join(lastDir(dir), "linked")) // the checks above have run; where no link can be made, only this one skips
 	_, ok := PersistedLast(dir, "linked")
 	assert.False(t, ok, "never read through a link")
 }
