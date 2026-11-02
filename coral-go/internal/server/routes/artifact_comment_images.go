@@ -24,6 +24,7 @@ import (
 
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/httputil"
+	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/safefs"
 )
 
@@ -86,7 +87,7 @@ var commentImageTypes = map[string]string{"image/png": ".png", "image/jpeg": ".j
 
 // personPictureSession holds a picture of the person's that no agent's team can: the Operator's own, so that a marked picture, or a goal's picture on a team with no agent, is kept (#12176). It is not an agent's
 // session (no session of Coral's has this id), so the picture is listed as the person's and no agent is named for it.
-const personPictureSession = "00000000-0000-4000-8000-0000000000a1"
+const personPictureSession = naming.PersonPictureSessionID
 
 // commentImageTeam finds the session whose team the picture is stored for: a session that uploaded the commented artifact (so the picture is listed in that team's Artifacts and an agent of the team can read
 // it), and that session's board (the query's board names it when the session is gone, and picks among several teams that hold the artifact).

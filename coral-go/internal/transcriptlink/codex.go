@@ -16,6 +16,7 @@ import (
 
 	at "github.com/subgentic/coral/internal/agenttypes"
 	"github.com/subgentic/coral/internal/fsreplace"
+	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/safefs"
 )
 
@@ -142,6 +143,9 @@ func rolloutPath(p, threadID string) string {
 // the native session metadata before persisting it, and replace atomically so
 // readers never observe a partially written mapping.
 func BindCodex(sessionID, threadID string) error {
+	if naming.IsReservedSessionID(sessionID) {
+		return fmt.Errorf("that Coral session id is reserved")
+	}
 	if !uuid.MatchString(sessionID) || !uuid.MatchString(threadID) {
 		return fmt.Errorf("Coral session and Codex thread IDs must be UUIDs")
 	}

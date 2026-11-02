@@ -8,6 +8,7 @@ import (
 
 	"github.com/subgentic/coral/internal/fsreplace"
 	"github.com/subgentic/coral/internal/hermesdb"
+	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/safefs"
 )
 
@@ -45,6 +46,9 @@ func HermesSession(dataDir, sessionID string) string {
 
 // BindHermes records which Hermes session a Coral session is, from the session_id of Hermes's own hook payload.
 func BindHermes(dataDir, sessionID, hermesID string) error {
+	if naming.IsReservedSessionID(sessionID) {
+		return fmt.Errorf("that Coral session id is reserved")
+	}
 	if dataDir == "" {
 		return fmt.Errorf("no Coral data folder")
 	}
