@@ -2,7 +2,6 @@ package routes
 
 import (
 	"context"
-	"log/slog"
 
 	"github.com/subgentic/coral/internal/board"
 )
@@ -22,7 +21,7 @@ var chiefDecisionVerbs = map[string]string{
 
 // tellChief posts one short notice to Chief's board when the Operator decides something on a team Chief fronts (#12171): Chief's board is on that team's list of allowed senders, so Chief is
 // already the way the Operator reaches it. Only the verb, the kind, the item's cleaned title, the team's name and who was told are in it: never a file's content, an answer's text or a reason.
-// Best effort: a notice that cannot be posted is logged and never blocks the decision. who may be empty.
+// Best effort: a notice that cannot be posted never blocks the decision. who may be empty.
 func (h *BoardHandler) tellChief(ctx context.Context, action, kind, team, title, who string) {
 	verb, ok := chiefDecisionVerbs[action]
 	if !ok || h.bs == nil {
@@ -49,10 +48,7 @@ func (h *BoardHandler) tellChief(ctx context.Context, action, kind, team, title,
 		text += " " + w + " was told."
 	}
 	text += " (A decision notice from Coral: tell the Operator in one or two plain lines.)"
-	if _, err := h.bs.PostSystemDefusedMessage(ctx, chief, chiefDecisionSender, text, nil); err != nil {
-		slog.Warn("[chief] decision notice not posted", "board", chief, "error", err)
-		return
-	}
+	h.postNotice(ctx, chief, text, chiefDecisionSender) // every quoted part went through noticeText above; postNotice is the one place that posts defused text
 	if h.notifyFn != nil {
 		h.notifyFn(chief)
 	}
