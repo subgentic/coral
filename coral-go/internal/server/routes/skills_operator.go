@@ -1,8 +1,10 @@
 package routes
 
 import (
+	"context"
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
@@ -211,4 +213,17 @@ func (h *SkillsHandler) RemoveSkill(w http.ResponseWriter, r *http.Request) {
 		h.releaseSkillZip(r, row.Digest)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+// NeedsYouItems are the skills waiting for the Operator, one Needs you item each: who published it (the session's agent), the team, and the skill and its version as one cleaned line.
+func (h *SkillsHandler) NeedsYouItems(ctx context.Context) ([]NeedsYouItem, error) {
+	rows, err := h.ss.ListSkills(ctx, store.SkillPending)
+	if err != nil {
+		return nil, err
+	}
+	items := make([]NeedsYouItem, 0, len(rows))
+	for _, r := range rows {
+		items = append(items, NeedsYouItem{Kind: "skill", From: needsYouLine(r.PublisherAgent), Line: needsYouLine("Skill to approve: " + r.Name + " version " + strconv.Itoa(r.Version)), Team: r.PublisherTeam, ID: "skill:" + r.ID, At: needsYouTime(r.CreatedAt)})
+	}
+	return items, nil
 }

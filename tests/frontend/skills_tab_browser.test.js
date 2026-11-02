@@ -33,6 +33,8 @@ const DETAIL = { skill: ROWS[1], files: [
                 window.__calls.push(m + ' ' + p + url.search + (o.body ? ' ' + o.body : ''));
                 if (p === '/api/skills' && m === 'GET') { const st = url.searchParams.get('status'); return json({ skills: st ? rows.filter(r => r.status === st) : rows }); }
                 if (p === '/api/skills/${ROWS[1].id}' && m === 'GET') return json(detail);
+                if (p === '/api/skills/${ROWS[2].id}' && m === 'GET') return json({ skill: rows[2], files: [{ path: 'SKILL.md', size: 90, kind: 'instructions', sha256: '9'.repeat(64) }], contents: { 'SKILL.md': '# PDF forms' }, warnings: [], hosts: [] });
+                if (p === '/api/skills/${ROWS[2].id}/approve') return json({ ok: true });
                 if (p === '/api/skills/${ROWS[1].id}/approve') { if (!window.__changed) { window.__changed = true; return json({ error: 'changed', code: 'skill_changed' }, 409); } return json({ ok: true }); }
                 if (m === 'POST' && p.endsWith('/reject')) return json({ ok: true });
                 return json({ error: 'not found' }, 404); };
@@ -80,6 +82,24 @@ const DETAIL = { skill: ROWS[1], files: [
         assert.deepEqual(sent[1], { digest: D2, scripts_acked: true });
         await waitFor(`document.querySelectorAll('#skills-view tr.dt-row').length === 3 && !document.querySelector('#skills-view .skills-banner')`, 'back to the list after the approval', 6000);
         assert.match(await ev(`location.pathname`), /^\/skills\/?$/, 'the address follows the page');
-        console.log('PASS the Skills tab: list, badge, approval view, second step, changed skill');
+        // a script-free skill: no second step, and scripts_acked goes as false
+        await ev(`document.querySelector('#skills-view tr.dt-row[data-key="${ROWS[2].id}"]').click(); true`);
+        await waitFor(`document.querySelector('#skills-view .skills-banner')`, 'the script-free skill\'s view', 6000);
+        assert.equal(await ev(`!!document.querySelector('#skills-view .skills-ack')`), false, 'no second step without scripts');
+        await ev(`Array.from(document.querySelectorAll('#skills-view .skills-actions button')).find(b => /^Approv/.test(b.textContent)).click(); true`);
+        await waitFor(`window.__calls.filter(c => c.includes('/${ROWS[2].id}/approve')).length === 1`, 'the script-free approval sent', 6000);
+        const sentFree = await ev(`JSON.parse(window.__calls.find(c => c.includes('/${ROWS[2].id}/approve')).slice(window.__calls.find(c => c.includes('/${ROWS[2].id}/approve')).indexOf('{')))`);
+        assert.deepEqual(sentFree, { digest: 'c'.repeat(64), scripts_acked: false }, 'a skill with nothing to acknowledge sends scripts_acked false');
+        await waitFor(`document.querySelectorAll('#skills-view tr.dt-row').length === 3`, 'back to the list', 6000);
+        // 390 px: the page and its table fit a phone (no sideways scroll), the list opens a skill and the approval view fits too
+        await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
+        await ev(`window.switchNavTab('skills'); true`);
+        await waitFor(`document.querySelectorAll('#skills-view tr.dt-row').length === 3`, 'the list on a phone', 8000);
+        assert.equal(await ev(`document.documentElement.scrollWidth <= window.innerWidth + 1 && document.getElementById('skills-view').scrollWidth <= document.getElementById('skills-view').clientWidth + 1`), true, 'no sideways scroll at 390 px');
+        await ev(`document.querySelector('#skills-view tr.dt-row[data-key="${ROWS[1].id}"]').click(); true`);
+        await waitFor(`document.querySelector('#skills-view .skills-banner')`, 'the approval view on a phone', 6000);
+        assert.equal(await ev(`document.documentElement.scrollWidth <= window.innerWidth + 1`), true, 'the approval view fits 390 px');
+        assert.equal(await ev(`(() => { const b = Array.from(document.querySelectorAll('#skills-view .skills-actions button')).find(x => /^Approv/.test(x.textContent)); const r = b.getBoundingClientRect(); return r.right <= window.innerWidth && r.width >= 40; })()`), true, 'the Approve button is on screen');
+        console.log('PASS the Skills tab: list, badge, approval view, second step, changed skill, script-free approval, 390 px');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
