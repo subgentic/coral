@@ -145,6 +145,9 @@ func (h *BoardHandler) ReviewArtifact(w http.ResponseWriter, r *http.Request) {
 	reviews, _ := h.bs.ArtifactReviews(r.Context(), project)
 	out := map[string]any{"id": id, "state": state, "changed": change.Changed, "tags": tags, "review": reviews[id], "delivered": false}
 	if (state != board.ReviewApproved && state != board.ReviewDenied) || !change.Changed {
+		if state == board.ReviewChangesRequested && change.Changed { // no message goes to the agent from here, but Chief hears the Operator's decision (#12171)
+			h.tellChief(context.WithoutCancel(r.Context()), board.ActChanges, "file", project, item.Name, "")
+		}
 		writeJSON(w, http.StatusOK, out)
 		return
 	}
