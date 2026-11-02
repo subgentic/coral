@@ -6,7 +6,7 @@ export function fillSavedFiles(host, files, { DT, reviewActions, openReview, sho
     const table = DT.dataTable({ label: `Files for review, ${files.length}`, compact: true, rows: files, rowKey: a => a.reviewKey, rowName: a => shown(a),
         open: a => openReview(a),
         columns: [
-            { key: 'name', label: 'File', primary: true, width: 'grow', line: 1, cell: a => { const n = (a.earlier || []).length; if (!n) return shown(a); const wrap = DT.el('span', 'inbox-review-item'); wrap.append(shown(a), DT.el('span', 'inbox-review-earlier', `${n} earlier version${n === 1 ? '' : 's'}`)); return wrap; }, subtitle: a => subtitleOf(a) }, // one row per file: the newest, with its older saved versions (#11937)
+            { key: 'name', label: 'File', primary: true, width: 'grow', line: 1, cell: a => { const n = (a.earlier || []).length; if (!n && !(a.new_comments > 0)) return shown(a); const wrap = DT.el('span', 'inbox-review-item'); wrap.append(shown(a)); if (n) wrap.append(DT.el('span', 'inbox-review-earlier', `${n} earlier version${n === 1 ? '' : 's'}`)); if (a.new_comments > 0) wrap.append(DT.tag('New comments')); return wrap; }, subtitle: a => subtitleOf(a) }, // one row per file: the newest, with its older saved versions (#11937)
             { key: 'actions', label: 'Actions', hideLabel: true, fixed: true, align: 'end', width: '26rem', line: 1, cell: a => reviewActions(a, true) },
         ] }).el;
     host.replaceChildren(title, table);

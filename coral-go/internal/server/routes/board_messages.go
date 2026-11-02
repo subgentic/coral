@@ -127,6 +127,28 @@ func (h *BoardHandler) PostMessage(w http.ResponseWriter, r *http.Request) {
 		}
 		asked = to
 	}
+	if derr == nil && (body.AskGoal != 0 || body.AskTask != 0) {
+		if !body.Ask {
+			errBadRequest(w, "--goal and --task on a post name what a question is about: use them with --ask")
+			return
+		}
+		if body.AskGoal < 0 || body.AskTask < 0 {
+			errBadRequest(w, "goal and task are whole numbers")
+			return
+		}
+		if body.AskGoal > 0 {
+			if g, gerr := h.bs.GetGoal(r.Context(), project, body.AskGoal); gerr != nil || g == nil {
+				errBadRequest(w, fmt.Sprintf("goal %d is not a goal of this team", body.AskGoal))
+				return
+			}
+		}
+		if body.AskTask > 0 {
+			if tk, terr := h.bs.GetTask(r.Context(), project, body.AskTask); terr != nil || tk == nil {
+				errBadRequest(w, fmt.Sprintf("task %d is not a task of this team", body.AskTask))
+				return
+			}
+		}
+	}
 	var buttons []board.AskButton
 	if derr == nil && len(body.Buttons) > 0 {
 		var ok bool
@@ -153,6 +175,8 @@ func (h *BoardHandler) PostMessage(w http.ResponseWriter, r *http.Request) {
 		if to, err := h.bs.AskTargets(r.Context(), project, msg.SubscriberID, msg.Content); err == nil {
 			if err := h.bs.RecordAsk(r.Context(), project, msg, to); err != nil {
 				slog.Warn("board ask not recorded", "board", project, "message", msg.ID, "error", err)
+			} else {
+				h.recordAskSubject(r.Context(), project, msg, body.AskGoal, body.AskTask)
 			}
 			if len(buttons) > 0 {
 				if err := h.bs.RecordAskButtons(r.Context(), project, msg.ID, buttons, time.Now()); err != nil {
@@ -197,6 +221,9 @@ type postMessageBody struct {
 	// no mention is added (the person reads the task's page), the sender is the one the request proves, exactly as for any post.
 	// Ask makes the post a question to the members it @mentions (#7794), open until each has answered; ReplyTo makes it an answer to that message of the board.
 	Ask bool `json:"ask,omitempty"`
+	// AskGoal and AskTask say which goal and which task a question is about (#12164): both must be of this board, and only a question (Ask) takes them. An agent with exactly one claimed task attaches it, and its goal, when it says neither.
+	AskGoal int64 `json:"ask_goal,omitempty"`
+	AskTask int64 `json:"ask_task,omitempty"`
 	// Guide makes the ask a question to a guide of this team (#11457): the guide's hub label, which must be in the team's roster. Only an agent's own post, and only with Ask.
 	Guide string `json:"guide,omitempty"`
 	// Buttons declares up to three buttons on a question to @Operator (#11643): each "Label=action[:arg]" from a closed list, checked by the server, shown to the Operator, run by nobody until they click.

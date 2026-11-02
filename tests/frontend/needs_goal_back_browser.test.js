@@ -25,7 +25,7 @@ const B = 'needs-goal-back-' + Date.now().toString(36);
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         assert.ok((await api('POST', '/subscribe', { subscriber_id: 'Boss', job_title: 'Orchestrator', session_name: 'boss-' + B })).status < 300);
-        await root('PUT', '/api/settings', { goal_done_hidden: '[]' });
+        await root('PUT', '/api/settings', { goal_done_hidden: '[]', goal_done_quiet_minutes: '0' });
         for (const title of ['Ship the pilot', 'Ship the second']) {
             const g = await api('POST', '/goals', { subscriber_id: 'Operator', title, done_when: 'it is shipped' }); assert.equal(g.status, 201); const gid = g.json.id || g.json.goal.id;
             const t = await api('POST', '/tasks', { subscriber_id: 'Operator', title: 'Task', goal_id: gid, assigned_to: 'Boss', created_by: 'Operator', priority: 'medium' }); const tid = t.json.id || t.json.task.id;

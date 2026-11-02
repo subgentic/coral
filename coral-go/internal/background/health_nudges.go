@@ -137,6 +137,9 @@ func (h *HealthNudges) RunOnce(ctx context.Context) {
 		if hs.AskReminder.On {
 			h.remindAsks(ctx, p.Project, bySession, hs) // a question's reminder does not wait for the team's check to be on (#7794)
 		}
+		if hs.On {
+			h.nudgeGoalDone(ctx, p.Project, bySession, hs) // a goal whose tasks are all done tells its driver, once, before it goes to the Operator (#12161)
+		}
 	}
 }
 

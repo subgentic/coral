@@ -5,6 +5,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/subgentic/coral/internal/proxy"
 	"github.com/subgentic/coral/internal/ptymanager"
@@ -58,6 +59,31 @@ func (s *Server) configureBoardHandlers(h *routeHandlers) (*routes.BoardHandler,
 			return nil
 		}
 		return routes.GoalDoneHiddenFrom(st)
+	})
+	boardHandler.SetGoalDoneQuiet(func(ctx context.Context) time.Duration {
+		st, err := sessStore.GetSettings(ctx)
+		if err != nil {
+			return 15 * time.Minute
+		}
+		return routes.GoalDoneQuietFrom(st)
+	})
+	boardHandler.SetGoalDoneRead(func(ctx context.Context) []string {
+		st, err := sessStore.GetSettings(ctx)
+		if err != nil {
+			return nil
+		}
+		return routes.GoalDoneReadFrom(st)
+	})
+	boardHandler.SetCommentNews(func(ctx context.Context) (map[string]int, error) { // replies agents left in the Operator's comment threads that they have not opened, per file (#12026)
+		replies, err := sessStore.UnseenAgentReplies(ctx)
+		if err != nil {
+			return nil, err
+		}
+		news := map[string]int{}
+		for _, rp := range replies {
+			news[rp.ArtifactID] += rp.Count
+		}
+		return news, nil
 	})
 	artifactNudger := routes.NewClaudeArtifactNudger(sessStore, s.terminal)
 	boardHandler.SetArtifactNudger(artifactNudger)
