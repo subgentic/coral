@@ -161,6 +161,13 @@ CREATE TABLE IF NOT EXISTS chat_flags (
     archived INTEGER NOT NULL DEFAULT 0 CHECK (archived IN (0,1))
 );
 
+-- A request of an agent that the Operator hid from Needs you with Dismiss (#11946): one row per agent, naming the request (when it began); a different request is not hidden by it.
+CREATE TABLE IF NOT EXISTS agent_wait_ignored (
+    session_id  TEXT PRIMARY KEY,
+    request_key TEXT NOT NULL,
+    ignored_at  TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS session_index (
 	session_id      TEXT PRIMARY KEY,
 	source_type     TEXT NOT NULL,

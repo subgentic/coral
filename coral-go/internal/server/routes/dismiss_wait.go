@@ -41,13 +41,21 @@ func (h *SessionsHandler) DismissWait(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "dismissed": false})
 		return
 	}
+	sid := body.SessionID
 	switch st.WaitingKind {
 	case "permission", "question", "plan":
 	default:
-		errConflict(w, "Only a permission, question or plan can be dismissed here.")
+		// A request the machine cannot clear (an input prompt, an elicitation, a sign-in): the Operator hides it from Needs you instead, and the hiding is kept here, per agent and request, so the row, the
+		// count and /api/needs-you agree (#11946). The agent's own state is untouched and nothing is sent to it; its next request is its own.
+		if err := h.ss.SetWaitIgnored(r.Context(), sid, waitRequestKey(st)); err != nil {
+			slog.Warn("could not record the Operator's hiding of a wait", "session_id", sid, "error", err)
+			errInternalServer(w, "Could not dismiss it. Try again.")
+			return
+		}
+		h.kickFeedForRequestChange(sid, "request_resolved")
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "dismissed": true, "hidden": true})
 		return
 	}
-	sid := body.SessionID
 	detail := `{"dismissed":true}`
 	ev := &store.AgentEvent{AgentName: ls.AgentName, SessionID: &sid, EventType: "request_resolved", Summary: "The Operator dismissed the wait", DetailJSON: &detail}
 	if _, err := h.ts.InsertAgentEvent(r.Context(), ev); err != nil {

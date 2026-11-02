@@ -90,6 +90,9 @@ func needsYouAgentItems(rows []map[string]any, now time.Time) []NeedsYouItem {
 		if gone, _ := row["archived"].(bool); gone {
 			continue
 		}
+		if hid, _ := row["wait_ignored"].(bool); hid {
+			continue // the Operator hid this request (#11946): not in what waits for them, so the count and the phone push agree with the page
+		}
 		sid, _ := row["session_id"].(string)
 		name, _ := row["display_name"].(string)
 		if name == "" {

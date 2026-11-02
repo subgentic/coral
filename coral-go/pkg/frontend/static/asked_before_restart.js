@@ -23,18 +23,8 @@ export function dismissAsked(s) {
     document.dispatchEvent(new CustomEvent('coral:asked-dismissed', { detail: { sessionId: s.session_id } }));
 }
 
-const IGNORED_KEY = 'coral-waits-ignored';
-const readIgnored = () => { try { return JSON.parse(browserLocal.get(IGNORED_KEY) || '{}') || {}; } catch { return {}; } };
-/** What identifies one request of an agent: when it began, else its words, else its kind: a new request is a new key. */
-export const waitKey = s => String((s && (s.waiting_since || s.waiting_summary || s.waiting_kind)) || '');
-/** Whether the Operator hid this agent's open request from Needs you (#11946): kept per agent and request in this browser, so the agent's next request is shown. */
-export const waitIgnored = s => !!(s && s.session_id) && readIgnored()[s.session_id] === waitKey(s);
-/** Hide this agent's open request from Needs you and its count; nothing is sent to the agent and its own state is not touched. It comes back with the agent's next request. */
-export function ignoreWait(s) {
-    if (!s || !s.session_id) return;
-    try { const all = readIgnored(); all[s.session_id] = waitKey(s); const keys = Object.keys(all); if (keys.length > 200) for (const k of keys.slice(0, keys.length - 200)) delete all[k]; browserLocal.set(IGNORED_KEY, JSON.stringify(all)); } catch { /* it stays until the page is reloaded */ }
-    document.dispatchEvent(new CustomEvent('coral:asked-dismissed', { detail: { sessionId: s.session_id } }));
-}
+/** Whether the Operator hid this agent's open request from Needs you (#11946): the machine keeps it, per agent and request (the row says wait_ignored), so the page, the tab's number and the phone push agree; the agent's next request is not hidden by it. */
+export const waitIgnored = s => !!(s && s.wait_ignored);
 
 /** Does Needs you list this agent: it waits for its person (and the person has not hidden that request), or it asked something before Coral restarted. */
 export const needsYou = s => (needsInputAttention(s) && !waitIgnored(s)) || !!askedBefore(s);
