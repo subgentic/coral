@@ -387,3 +387,23 @@ func TestManageUpgradeRefusesADowngradeUnlessAllowed(t *testing.T) {
 	assert.Equal(t, "", cleanVersionText("2.0.33 <script>"))
 	assert.Equal(t, "2.0.33", cleanVersionText("2.0.33"))
 }
+
+// Before the person presses Upgrade the page is told whether that computer's agents survive the restart (#12233): the backend recorded there, or tmux where it is installed and nothing was recorded (a
+// server set up before the choice existed).
+func TestManageUpgradePlanSaysWhetherTheAgentsSurviveTheRestart(t *testing.T) {
+	for name, c := range map[string]struct {
+		recorded string
+		want     bool
+	}{"pty recorded": {"pty", false}, "tmux recorded": {"tmux", true}, "nothing recorded, tmux installed": {"", true}} {
+		me := newManageEnv(t)
+		if c.recorded != "" {
+			require.NoError(t, os.WriteFile(filepath.Join(me.home, ".coral-server", "backend"), []byte(c.recorded), 0o600))
+		}
+		_, v := me.plan(t, "upgrade", nil)
+		plan := v["plan"].(string)
+		assert.NotContains(t, v, "agents_survive", name+": not known before it connects")
+		_, v = me.do("POST", "/api/servers/provision/"+plan+"/connect", nil)
+		require.Equal(t, "connected", v["phase"], "%s: %v", name, v)
+		assert.Equal(t, c.want, v["agents_survive"], name)
+	}
+}

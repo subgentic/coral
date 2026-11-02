@@ -75,6 +75,8 @@ const (
 	// own verified SHA256SUMS): args are the version, the architecture and the expected SHA-256. https only (redirects too, at most three), 300 MiB at most. Exit 6: no curl; 4: the download failed; 5: the hash
 	// is not the expected one (the file is deleted, nothing is unpacked).
 	CmdDownload
+	// CmdReadBackend prints the backend the far Coral was last started with ("pty" or "tmux", from <install>/backend); nothing when there is no such file (a server set up before the choice existed).
+	CmdReadBackend
 	// CmdCheckPort is the check before a start: exit 0 when this user's coral-server session exists (a start leaves it as it is) or nothing listens on port 8420 (read from /proc/net/tcp and tcp6, Linux),
 	// 2 when something does (another user's Coral, or any program), 3 when it cannot tell (the start then goes ahead as it always did).
 	CmdCheckPort
@@ -142,6 +144,7 @@ var specs = map[Command]spec{
 		"\"https://github.com/subgentic/coral/releases/download/v%[1]s/coral-linux-%[2]s-%[1]s.tar.gz\" || { rm -f package.tar.gz; exit 4; }; } && " +
 		"got=$({ sha256sum package.tar.gz 2>/dev/null || shasum -a 256 package.tar.gz; } | cut -d' ' -f1) && { [ \"$got\" = '%[3]s' ] || { rm -f package.tar.gz; exit 5; }; }",
 		args: []*regexp.Regexp{versionRe, archRe, sha256Re}, timeout: 10 * time.Minute},
+	CmdReadBackend:      {template: "cat \"$HOME/" + InstallDir + "/backend\" 2>/dev/null"},
 	CmdReadInstalledSum: {template: "cat \"$HOME/" + InstallDir + "/%s/package.sha256\" 2>/dev/null", args: []*regexp.Regexp{versionRe}},
 }
 

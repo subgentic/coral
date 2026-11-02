@@ -258,7 +258,7 @@ func (pr *Provisioner) upgradeSteps(ctx context.Context, p *provisionPlan) {
 			return
 		}
 	}
-	if err := pr.runner.Start(ctx, p.Target, pr.version); err != nil {
+	if err := pr.runner.Start(ctx, p.Target, pr.version, sshprov.BackendKeep); err != nil {
 		if errors.Is(err, sshprov.ErrPortInUse) {
 			pr.fail(p, "restart", portInUseSentence)
 			return
