@@ -199,6 +199,28 @@ func TestNeedsYouCountsOnlyUnreadFilesForReview(t *testing.T) {
 	assert.Equal(t, 0, n, "a denied file is not waiting")
 }
 
+// #11985 (the operator): after Request changes a file LEAVES Needs you (it is the agent's turn; nothing waits on the person), so /api/needs-you, its count and the phone push do not list it; it stays tagged for
+// review with "changes requested" so it is findable in Artifacts and the goal. The agent's next version is a NEW unread item that counts.
+func TestNeedsYouDoesNotListAFileWhoseChangesWereRequested(t *testing.T) {
+	e := newReviewEnv(t, true)
+	e.tag(t, `["for review"]`)
+	count := func() int {
+		req := asPerson(httptest.NewRequest(http.MethodGet, "/api/needs-you", nil))
+		w := httptest.NewRecorder()
+		e.h.NeedsYou(w, req)
+		var out map[string]any
+		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+		_ = json.Unmarshal(w.Body.Bytes(), &out)
+		return int(out["count"].(float64))
+	}
+	require.Equal(t, 1, count(), "waiting for the Operator's review")
+	code, _ := e.decide(t, `{"decision":"changes"}`)
+	require.Equal(t, http.StatusOK, code)
+	assert.Equal(t, 0, count(), "after Request changes the file is the agent's turn: not listed, not counted")
+	e.tag(t, `["for review", "changes requested"]`)
+	assert.Equal(t, 0, count(), "still tagged for review with the changes requested, and still not waiting on the Operator")
+}
+
 // Security's SHOULD on #11596: a line is agent text that goes to a phone through the Hub, so a secret in it is redacted before it is cut, in a question, a proposal's title and a file's name alike.
 func TestNeedsYouRedactsSecretsInEveryLineBeforeTheCut(t *testing.T) {
 	h, bs := operatorAsksRig(t)

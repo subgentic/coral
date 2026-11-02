@@ -275,6 +275,22 @@ func (h *SessionsHandler) uploadAgentArtifact(w http.ResponseWriter, r *http.Req
 			}
 		}
 	}
+	if plan != nil && h.bs != nil && !hasTag(tags, tagForReview) { // a version of a file whose changes the Operator asked for comes back for review even when the agent forgot --tag: under the rule that such a file leaves Needs you, it would otherwise vanish without a trace (#11985)
+		if teamBoard, _, _ := uploaderOf(sid); teamBoard != "" && teamBoard == plan.board {
+			if byTag, terr := h.bs.ArtifactTags(r.Context(), teamBoard); terr == nil {
+				for _, m := range plan.rows {
+					if m.Digest != hexID && m.Board == teamBoard && hasTag(byTag[m.Digest], board.ReviewChangesRequested) {
+						if added, aerr := h.bs.AddArtifactTags(r.Context(), teamBoard, hexID, []string{tagForReview}); aerr == nil {
+							tags = added
+						} else {
+							slog.Warn("[artifacts] the next version of a file with changes requested was not tagged for review", "digest", hexID, "error", aerr)
+						}
+						break
+					}
+				}
+			}
+		}
+	}
 	if plan != nil && h.bs != nil && hasTag(tags, "for review") { // a new version of the series for review: the older versions' reviews are closed, this one is the pending one (#136588)
 		if teamBoard, _, _ := uploaderOf(sid); teamBoard != "" && teamBoard == plan.board {
 			for _, m := range plan.rows { // the versions before this one, read under the series lock (a new series: the artifact it is a version of); the series index does not hold them yet
