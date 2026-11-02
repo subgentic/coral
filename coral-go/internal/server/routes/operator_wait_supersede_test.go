@@ -1,7 +1,10 @@
 package routes
 
 import (
+	"errors"
+
 	"context"
+	"github.com/subgentic/coral/internal/board"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -207,5 +210,61 @@ func TestNeedsYouKeepsAQuestionWhoseWaitRanOut(t *testing.T) {
 	for i := 0; i < 2; i++ {
 		_, out := readNeedsYou(t, h, "", asPerson)
 		assert.EqualValues(t, 1, out["count"], "read %d: one question, kept once", i+1)
+	}
+}
+
+// #11919, Security's SHOULD: keeping an expired question that fails (the board could not take the ask) gives its claim back, so the next read tries again: the question is not lost to one failed write.
+func TestAKeepThatFailsGivesTheExpiredQuestionBackToBeKeptLater(t *testing.T) {
+	h, bs := operatorAsksRig(t)
+	ctx := context.Background()
+	_, err := bs.Subscribe(ctx, "team", "Lead", "Orchestrator", "claude-lead", nil, "all")
+	require.NoError(t, err)
+	req := httptest.NewRequest(http.MethodPost, "/api/board/team/waits", strings.NewReader(`{"subscriber_id":"Lead","wait_type":"operator","reason":"Decision 5: merge?","timeout":"1s"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	h.RegisterWait(w, dropAt2(asPerson(req), map[string]string{"project": "team"}))
+	require.Equal(t, http.StatusCreated, w.Code)
+	time.Sleep(2200 * time.Millisecond) // sleep-ok: a real one-second timeout running out
+	failing := true
+	h.keepQuestion = func(ctx context.Context, project string, old *board.RegisteredWait) error {
+		if failing {
+			return errors.New("the board could not take it")
+		}
+		return h.postKeptQuestion(ctx, project, old)
+	}
+	_, rows, _ := readOperatorAsks(t, h, asPerson)
+	assert.Empty(t, rows, "the write failed: nothing is listed yet")
+	failing = false
+	_, rows, _ = readOperatorAsks(t, h, asPerson)
+	assert.Len(t, rows, 1, "the next read tries again and keeps it: the failed one did not use up the claim")
+}
+
+// #11919, Security's INFO: a wait that has run out but that nobody has noticed yet is cancelled by the agent's next wait (RegisterWait cancels expired-and-unnoticed ones too) or by it getting back to work, and the
+// question went with it. It is kept before anything cancels it.
+func TestAnExpiredQuestionNobodyNoticedYetSurvivesTheNextWaitAndTheAgentWorking(t *testing.T) {
+	for _, how := range []string{"another wait", "working again"} {
+		t.Run(how, func(t *testing.T) {
+			h, bs := operatorAsksRig(t)
+			ctx := context.Background()
+			_, err := bs.Subscribe(ctx, "team", "Lead", "Orchestrator", "claude-lead", nil, "all")
+			require.NoError(t, err)
+			post := func(body string) {
+				req := httptest.NewRequest(http.MethodPost, "/api/board/team/waits", strings.NewReader(body))
+				req.Header.Set("Content-Type", "application/json")
+				w := httptest.NewRecorder()
+				h.RegisterWait(w, dropAt2(asPerson(req), map[string]string{"project": "team"}))
+				require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+			}
+			post(`{"subscriber_id":"Lead","wait_type":"operator","reason":"Decision 7: go?","timeout":"1s"}`)
+			time.Sleep(2200 * time.Millisecond) // sleep-ok: a real one-second timeout running out, and nobody reads the waits
+			if how == "another wait" {
+				post(`{"subscriber_id":"Lead","wait_type":"message","target_id":"Dev","reason":"on Dev"}`)
+			} else {
+				h.endOwnWaits(ctx, "team", "Lead")
+			}
+			_, rows, _ := readOperatorAsks(t, h, asPerson)
+			require.Len(t, rows, 1, "the question that ran out is still in Needs you")
+			assert.Contains(t, rows[0]["text"], "Decision 7: go?")
+		})
 	}
 }
