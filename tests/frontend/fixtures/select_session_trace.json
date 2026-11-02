@@ -4,85 +4,85 @@
   "awake agent, chat view": [
    {
     "step": "select a1",
-    "sha256": "afdde6017837929e8951fc3296a04793979271e8bdb4e11cd95848627db721a1"
+    "sha256": "2abf40ab76c228cec068d204360d6fab09a3769c71b61e7ca9d7ee8ac89d109f"
    }
   ],
   "awake agent, terminal view": [
    {
     "step": "select a1",
-    "sha256": "0976fb2e79925c4f4bf02e3e364ddf704fbe25d9186b9178ce3fe348ae9c0ff6"
+    "sha256": "afacb8356ae0b4104b9501682f0692e3a18507599b92d9fcd53a7d18a4d50d1b"
    }
   ],
   "sleeping agent": [
    {
     "step": "select s1",
-    "sha256": "01bf15e0303c098281efb4ab3e06c14a14d0449d3011bb13e6bf0990f486232b"
+    "sha256": "3689f72fb83da8bfa9de1591603de33b11498f3dc2a54a9f9e8f675317a292e0"
    }
   ],
   "archived agent": [
    {
     "step": "select r1",
-    "sha256": "c7701c9db1ad8ec9251b58dbda36701855f4e2d9dcf81a6dca294100b0b9de8f"
+    "sha256": "ca6644f1c72ee9df424de863decde20cfa46deb3b0c8e3a701088eca68b993ec"
    }
   ],
   "terminal-type agent": [
    {
     "step": "select t1",
-    "sha256": "22e38b9b25842653addaab5d5c9d1dd9a02d4e04b5680ce7ecdf934aaf382e4b"
+    "sha256": "50ee0dc975a095633f1721c9c7ee86df6bd163250347c63d3f0d8d0cdf9b16c0"
    }
   ],
   "board agent, no saved tab": [
    {
     "step": "select b1",
-    "sha256": "a938f309ab00700853ae24bf617019753ecacb3b699174e74a014e40d5d44050"
+    "sha256": "7d63bbc11524725d36c3460e889a57a9c45e4f50bbe65ea2d9e2318064168bbf"
    }
   ],
   "board agent, saved tab files": [
    {
     "step": "select b1",
-    "sha256": "a938f309ab00700853ae24bf617019753ecacb3b699174e74a014e40d5d44050"
+    "sha256": "7d63bbc11524725d36c3460e889a57a9c45e4f50bbe65ea2d9e2318064168bbf"
    }
   ],
   "no-board agent, saved tab board": [
    {
     "step": "select a1",
-    "sha256": "afdde6017837929e8951fc3296a04793979271e8bdb4e11cd95848627db721a1"
+    "sha256": "2abf40ab76c228cec068d204360d6fab09a3769c71b61e7ca9d7ee8ac89d109f"
    }
   ],
   "switching with a draft": [
    {
     "step": "select a1",
-    "sha256": "afdde6017837929e8951fc3296a04793979271e8bdb4e11cd95848627db721a1"
+    "sha256": "2abf40ab76c228cec068d204360d6fab09a3769c71b61e7ca9d7ee8ac89d109f"
    },
    {
     "step": "type a draft",
-    "sha256": "ddb1b7740f07b0e584da3383e507684227a66beef25be5941caa059241a6f2e3"
+    "sha256": "63765b7647718d1c46043935ebc2b9e91de9def4ce58144df991b41d77f4d635"
    },
    {
     "step": "select a2",
-    "sha256": "53d3775b46193b21b2e04421d72b39fdebcfc484c22d94b16163e300fef9d9da"
+    "sha256": "7845efb26e3276539e717da34d5b0be9f4db2e60403dd61781e6a6d628cede67"
    },
    {
     "step": "back to a1",
-    "sha256": "c735834b8ab3e6bc5ee995dd76f361d448f38c73ea79ea0e4a9f2bdf99edc18e"
+    "sha256": "0a5c884d5cb7272998c7a8bd8be36d36a15439c7e0512fd336110a64fc9f1ce9"
    }
   ],
   "remote agent on a hub": [
    {
     "step": "select x1",
-    "sha256": "6a99a53a0a3f5b7528ff29ba6726320da6cbe43ee268ac6b2cab2969405a6b5b"
+    "sha256": "13402aad491dde043dddb3f4fb8c2e0009074a707e02111c017fe8ac4f57af21"
    }
   ],
   "selection by id only": [
    {
     "step": "select a1 without a server",
-    "sha256": "970889709e438c7880f49be67ccd054062182f0ac1de71bc9a11c148050dd98c"
+    "sha256": "afb3e88a69840ca37b52194fe26ab37046fadc1860869ca27da47d9d0db9f56c"
    }
   ],
   "leaving a team view that agrees": [
    {
     "step": "select a1",
-    "sha256": "afdde6017837929e8951fc3296a04793979271e8bdb4e11cd95848627db721a1"
+    "sha256": "2abf40ab76c228cec068d204360d6fab09a3769c71b61e7ca9d7ee8ac89d109f"
    }
   ],
   "leaving a team view that declines": [
@@ -94,7 +94,7 @@
   "three quick switches": [
    {
     "step": "select a1, a2, a3 without waiting",
-    "sha256": "657163321928c8e3a1672e263662c39ffd59ee5945d13a8880263c15495d5ccf"
+    "sha256": "a706fe5a2021fffd0f05a2cac131b99765c23a8c412bc539529ec2a72851906f"
    }
   ]
  },
