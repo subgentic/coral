@@ -4,6 +4,7 @@
    paging). One popstate listener shows the route of the entry the user went back or forward to.
    Paths come from routes.js (parse/build); old hash links are read once at startup and replaced. */
 
+import { setServedAddress } from './served_address.js';
 import { isPhoneLayout } from './phone_layout.js';
 import { browserLocal } from './safe_storage.js';
 import { parse, build, fromLegacyHash, normalize, chatsQuery } from './routes.js';
@@ -37,6 +38,7 @@ function write(route, replace, from, keep) { // keep: the address stays as serve
         const f = from || kept;
         history.replaceState({ coralRoute: route, prev, ...(f ? { from: f } : {}) }, '', url);
     } else {
+        setServedAddress(''); // the person moved on: the address on screen is theirs now
         history.pushState({ coralRoute: route, prev: here, ...(from ? { from: String(from) } : {}) }, '', url); // from: the title of the goal or task this was opened from, so its Back says where it goes (#8861)
     }
     current = route;
@@ -112,6 +114,7 @@ function markStartTab(r) {
 export function startNav() {
     if (started) return current;
     started = true;
+    setServedAddress(location.pathname + location.search + location.hash); // what the person opened, for a sign-in that must bring them back to it (#12406)
     let route = startRoute(), restored = false, keep = false;
     // The bare start (the address "/", no query; /agents typed on purpose is the list) reopens the place the person left (#10057); a link, a phone (its Home is the Agents list) or a place that is gone is shown as it is.
     if (isHome(route) && (location.pathname === '/' || location.pathname === '') && !location.search && (!location.hash || location.hash === '#') && !isPhoneLayout()) {
@@ -123,6 +126,7 @@ export function startNav() {
     markStartTab(route);
     if (kept && isHome(route)) lastPlace(kept); // the start itself is not the person choosing Home: a phone's Home start (or a link's) leaves the place for the next wide start
     window.addEventListener('popstate', () => {
+        setServedAddress('');
         // The URL is the truth: the route is parsed from the location every time, never taken
         // from history.state, which may come from an older Coral, a restored session or a
         // tampered entry (Security; an old-shape state would otherwise read as a different view).
