@@ -1,0 +1,155 @@
+{
+ "comment": "#11942: every dataTable()/tasksTable() call site in static/*.js, by file, with the surface it draws and what table_rules_browser covers it with (a synthetic spec of the same shape, or the live surface). A new call site is added here, with its elastic column declared in a spec, or table_inventory.test.mjs fails.",
+ "tables": [
+  {
+   "file": "analytics_agent.js",
+   "calls": 1,
+   "surface": "Analytics: Biggest turns",
+   "covered_by": "analytics (live: agent)"
+  },
+  {
+   "file": "analytics_efficiency.js",
+   "calls": 2,
+   "surface": "Analytics: Tokens per commit, task time",
+   "covered_by": "analytics (live: agent)"
+  },
+  {
+   "file": "analytics_spend.js",
+   "calls": 2,
+   "surface": "Analytics: Who spends, Task time by agent",
+   "covered_by": "analytics (live: agent)"
+  },
+  {
+   "file": "analytics_viz.js",
+   "calls": 1,
+   "surface": "Analytics: visual tables",
+   "covered_by": "analytics (live: provider)"
+  },
+  {
+   "file": "artifact_table.js",
+   "calls": 1,
+   "surface": "Artifacts list (Inbox, team)",
+   "covered_by": "artifacts (live Inbox)"
+  },
+  {
+   "file": "automations.js",
+   "calls": 4,
+   "surface": "Automations: jobs, workflows, runs, steps",
+   "covered_by": "tasks"
+  },
+  {
+   "file": "cost_dashboard.js",
+   "calls": 2,
+   "surface": "Cost dashboard tables",
+   "covered_by": "analytics (live: calls)"
+  },
+  {
+   "file": "csv_table.js",
+   "calls": 1,
+   "surface": "A CSV file in the preview",
+   "covered_by": "settings"
+  },
+  {
+   "file": "docs.js",
+   "calls": 1,
+   "surface": "Docs list",
+   "covered_by": "files"
+  },
+  {
+   "file": "goal_view.js",
+   "calls": 1,
+   "surface": "Goal page: its tasks (tasksTable)",
+   "covered_by": "tasks (live Inbox)"
+  },
+  {
+   "file": "goals_view.js",
+   "calls": 1,
+   "surface": "Goals list",
+   "covered_by": "goals (live Inbox)"
+  },
+  {
+   "file": "history_list.js",
+   "calls": 1,
+   "surface": "Chats history list",
+   "covered_by": "files"
+  },
+  {
+   "file": "inbox_sidebar.js",
+   "calls": 4,
+   "surface": "Inbox: Saved, Needs you, Tasks, Goals",
+   "covered_by": "needs (live, the operator's mix)"
+  },
+  {
+   "file": "mailbox_chats.js",
+   "calls": 1,
+   "surface": "Board: chats",
+   "covered_by": "files"
+  },
+  {
+   "file": "mailbox_starred_artifacts.js",
+   "calls": 1,
+   "surface": "Starred artifacts",
+   "covered_by": "artifacts (live Inbox)"
+  },
+  {
+   "file": "saved_files.js",
+   "calls": 1,
+   "surface": "Files for review (dock)",
+   "covered_by": "files"
+  },
+  {
+   "file": "scheduler.js",
+   "calls": 1,
+   "surface": "Automations: job runs",
+   "covered_by": "tasks"
+  },
+  {
+   "file": "server_table.js",
+   "calls": 1,
+   "surface": "Coral Hub: Servers",
+   "covered_by": "servers"
+  },
+  {
+   "file": "task_list.js",
+   "calls": 1,
+   "surface": "Agent tasks (tasksTable)",
+   "covered_by": "tasks (live Inbox)"
+  },
+  {
+   "file": "tasks_view.js",
+   "calls": 1,
+   "surface": "The one Tasks view (tasksTable)",
+   "covered_by": "tasks (live Inbox)"
+  },
+  {
+   "file": "team_agents_page.js",
+   "calls": 1,
+   "surface": "Team page: agents",
+   "covered_by": "tasks"
+  },
+  {
+   "file": "team_knowledge_page.js",
+   "calls": 1,
+   "surface": "Team page: knowledge",
+   "covered_by": "files"
+  },
+  {
+   "file": "team_tasks_page.js",
+   "calls": 2,
+   "surface": "Team page: tasks, follow-ups (tasksTable)",
+   "covered_by": "tasks (live Inbox)"
+  },
+  {
+   "file": "token_usage_ui.js",
+   "calls": 1,
+   "surface": "Token usage by member",
+   "covered_by": "analytics (live: agent)"
+  },
+  {
+   "file": "workflows.js",
+   "calls": 2,
+   "surface": "Workflows: steps, runs",
+   "covered_by": "tasks"
+  }
+ ]
+}
