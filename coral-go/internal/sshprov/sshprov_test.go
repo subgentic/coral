@@ -376,3 +376,22 @@ func TestCleanStderrMasksSecretsAndCutsOnACharacter(t *testing.T) {
 		t.Errorf("the cut is on a character and at most 300 of them: %d runes, valid=%v", utf8.RuneCountInString(long), utf8.ValidString(long))
 	}
 }
+
+// #12031 (QA's SHOULD): the stream ssh (-W, the one forward the hub allows) carries the same host-file arguments as the runner: the hub's own file, no system known_hosts, no key updates.
+func TestStreamSshPinsTheHubsHostKeyFileAndItsOneForward(t *testing.T) {
+	tg, _ := ParseTarget("user@box.example.com:2222")
+	known := filepath.Join(t.TempDir(), "ssh_known_hosts")
+	st, err := NewStreamTarget(Runner{KnownHosts: known}, tg, 8420, "k")
+	if err != nil {
+		t.Fatal(err)
+	}
+	joined := " " + strings.Join(st.argv(), " ") + " "
+	for _, want := range []string{"UserKnownHostsFile=" + known, "GlobalKnownHostsFile=/dev/null", "UpdateHostKeys=no", "StrictHostKeyChecking=yes", "ClearAllForwardings=yes", "-W 127.0.0.1:8420", "-p 2222"} {
+		if !strings.Contains(joined, " "+want+" ") {
+			t.Errorf("the stream's argv lacks %q: %s", want, joined)
+		}
+	}
+	if i, j := strings.Index(joined, "UserKnownHostsFile="), strings.Index(joined, " -- "); i < 0 || j < 0 || i > j {
+		t.Errorf("the host-file arguments must come before the target's own and the --: %s", joined)
+	}
+}

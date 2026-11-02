@@ -217,7 +217,7 @@ func ConnectSentence(err error) string {
 	case errors.Is(err, ErrHostKeyChanged):
 		return "The host key has changed since you last connected. This may be a different computer. Check it, then fix known_hosts yourself."
 	case errors.Is(err, ErrHostKey):
-		return "The host key is not in known_hosts under the name ssh uses for this computer. Connect to it once with ssh in a terminal, or check the setup's host name."
+		return "The hub does not have this computer's host key under the name ssh uses for it. Run Set up again and confirm the key it shows, or check the host name."
 	}
 	var ce *ConnectError
 	if errors.As(err, &ce) {

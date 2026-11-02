@@ -680,7 +680,7 @@ func TestProvisionStartStepNamesPort8420WhenAnotherHoldsIt(t *testing.T) {
 // #12027: the connect step passed and the next ssh fails: the setup says why (a fixed sentence per kind) instead of "Could not connect.", and the hub's log has the kind and ssh's own words.
 func TestProvisionDetectSaysWhySshFailedAfterTheConnectStepPassed(t *testing.T) {
 	for name, c := range map[string]struct{ stderr, want string }{
-		"host key not found under that name": {"Host key verification failed.\n", "host key is not in known_hosts"},
+		"host key not found under that name": {"Host key verification failed.\n", "does not have this computer's host key"},
 		"sign-in refused":                    {"user@box: Permission denied (publickey).\n", "refused the sign-in"},
 		"timed out":                          {"ssh: connect to host box port 22: Connection timed out\n", "timed out"},
 		"refused":                            {"ssh: connect to host box port 22: Connection refused\n", "refused the connection"},
