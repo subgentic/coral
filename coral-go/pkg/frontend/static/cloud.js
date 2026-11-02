@@ -5,6 +5,7 @@
  * data) and registers its own listeners, so it works under a CSP without
  * 'unsafe-inline'. */
 
+import { returnAddress } from './served_address.js';
 import { importOnce } from './import_once.js';
 import { state } from './state.js';
 import { isCloud, nativeInbox } from './server_base.js';
@@ -57,8 +58,8 @@ export function loadSession(force = false) {
 
 /** Where the sign-in page sends the user back to afterwards (same-origin path only). */
 export function signInUrl() {
-    const here = location.pathname + location.search;
-    return '/signin' + (here && here !== '/' ? '?next=' + encodeURIComponent(here) : '');
+    const here = returnAddress(location, { hash: false }); // a deep link the app has since shortened (/agents/@server/session/files -> /agents/@server/session) comes back whole (#12432)
+    return '/signin' + (here && here !== '/' && here.startsWith('/') && !here.startsWith('//') ? '?next=' + encodeURIComponent(here) : '');
 }
 
 const SAFE = new Set(['GET', 'HEAD', 'OPTIONS']);
