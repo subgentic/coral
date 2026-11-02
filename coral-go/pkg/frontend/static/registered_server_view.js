@@ -29,12 +29,27 @@ let _confirmDelete = null;
 let _open = null;         // the id whose page is open (a server's page: facts, and Test, Edit and Remove in its pinned bar), null for the table
 let _focusNext = null;    // 'back' | 'row': where the focus goes after the next draw (opening a page, coming back)
 let _busy = new Set();    // ids (or '*') with a request in flight
+let _plans = new Map();   // server id -> the stop, upgrade or uninstall the hub is running or has just finished for it ({ plan, kind, phase }); read from the hub, so a refresh or another tab finds it too (#12372)
 let _loadError = '';
 let _formError = '';
 let _draft = null;        // non-secret field values kept across a failed submit
 let _host = null;         // the Servers tab body (#3070); there is no separate dialog
 let _ssh = null;          // the set-up-over-SSH flow (#11370) while it is open: { mode: 'setup' } or { mode: 'manage', server, action, deleteData }; its own module draws into #servers-ssh-host
 let _sshView = null;      // what that module returned ({ unmount })
+
+const PLAN_WORDS = { stop: ['Stopping Coral', 'Stop finished', 'Stop did not finish'], upgrade: ['Upgrading Coral', 'Upgrade finished', 'Upgrade did not finish'], remove: ['Uninstalling Coral', 'Uninstall finished', 'Uninstall did not finish'] };
+/** What the hub is doing to this computer, in words: "Stopping Coral", or how the last one ended; '' when it has no setup running or finished. */
+const planWord = s => { const p = _plans.get(s.id); const w = p && PLAN_WORDS[p.kind]; return w ? w[p.phase === 'done' ? 1 : p.phase === 'failed' ? 2 : 0] : ''; };
+/** Read the hub's running and just-finished setups for its computers: one request, and a redraw only when something changed. A hub with no such route (a Coral that is not a hub, an older one) has none. */
+async function readPlans() {
+    let rows = [];
+    try { const r = await fetch('/api/servers/provision'); if (r.ok) rows = (await r.json()).plans || []; } catch { /* none */ }
+    const next = new Map(rows.map(p => [p.server_id, p]));
+    const sig = m => JSON.stringify([...m.values()].map(p => [p.plan, p.phase]));
+    if (sig(next) === sig(_plans)) return;
+    _plans = next;
+    if (!_ssh) render();
+}
 
 let load;
 export const serverView = {
@@ -51,7 +66,7 @@ export const serverView = {
         const v = document.getElementById('servers-view'); if (v) v.classList.remove('servers-view-page');
     },
     canRefresh: () => _editing === null && !_ssh && !_busy.size,
-    accept: rows => { _servers = rows; _loadError = ''; },
+    accept: rows => { _servers = rows; _loadError = ''; readPlans(); },
     fail: error => { _loadError = error === HUB_FEATURES_OFF ? '' : error; }, // a Coral that is not a hub has no list of remote computers (404): that is not an error to show a new person, the page says "No remote computers yet" (#11400)
     render,
 };
@@ -145,7 +160,7 @@ function serversTable(local, remotes) {
         columns: [ // one line a row (Goal #79, UI/UX's order #9679): Server, Tags, Status, Agents, Needs you, Last seen, Version; a narrow list drops Version, then Tags and Last seen, then Agents (dropAt, #8931); Needs you and the name's warning never go; under 16 rem (a phone at 200% text) Status leaves and its dot moves before the name
             { key: 'server', label: 'Computer', primary: true, width: 'grow', sort: true, sortValue: s => (s.label || s.id || '').toLowerCase(), cell: s => serverCell(s, live(s)), title: s => s.label || s.id },
             { key: 'tags', label: 'Tags', width: '11rem', dropAt: 36, cell: tagsCell },
-            { key: 'status', label: 'Status', width: '8rem', dropAt: 16, sort: true, sortValue: s => statusMeta(live(s).status || s.status).label, cell: s => statusDotWord(live(s).status || s.status) },
+            { key: 'status', label: 'Status', width: '8rem', dropAt: 16, sort: true, sortValue: s => statusMeta(live(s).status || s.status).label, cell: s => { const w = statusDotWord(live(s).status || s.status), note = planWord(s); if (note) w.append(DT.el('span', 'servers-setup-note', ` \u00b7 ${note}`)); return w; } },
             { key: 'agents', label: 'Agents', width: '5rem', dropAt: 28, tone: 'tertiary', align: 'end', sort: 'number', sortValue: s => serverAgentCount(live(s)), cell: s => { const n = serverAgentCount(live(s)); return n ? String(n) : ''; } }, // the count alone under its header, nothing at zero (UI/UX #9679)
             { key: 'needs', label: 'Needs you', width: '6rem', align: 'end', sort: 'number', firstDir: 'desc', sortValue: needsCount, cell: s => { const n = needsCount(s); if (!n) return ''; const e = DT.el('span', 'servers-needs', String(n)); e.title = `${n} agent${n === 1 ? '' : 's'} waiting for you`; return e; } },
             { key: 'seen', label: 'Last seen', width: '6rem', dropAt: 36, tone: 'tertiary', sort: 'date', firstDir: 'desc', sortValue: s => seenValue(s, live(s)), cell: s => seenWords(s, live(s)) },
@@ -189,12 +204,14 @@ function pageHtml(s) {
         : raw ? `<div class="servers-row-error" role="status">${escHtml(raw)}</div>` : '';
     // An online server's status is live from the feed; 'last contact' (refreshed about once a minute) is shown only once it is not online (#3152).
     const contact = status !== 'online' ? formatLastSeen(s.last_seen) : '';
+    const plan = _plans.get(s.id), running = !!plan && plan.phase === 'running';
+    const setup = plan && planWord(s) ? `<div class="servers-row-hint servers-setup-state" role="status"><span>${escHtml(planWord(s))}.</span> <button type="button" class="btn" data-action="ssh-resume" data-id="${escHtml(s.id)}">${running ? 'Show progress' : 'Show result'}</button>${running ? '' : ` <button type="button" class="btn" data-action="ssh-dismiss" data-id="${escHtml(s.id)}">Dismiss</button>`}</div>` : '';
     const bar = confirming
         ? `<button type="button" class="btn" data-action="delete-cancel">Cancel</button>
            <button type="button" class="btn btn-danger" data-action="delete-confirm" data-id="${escHtml(s.id)}">Confirm remove</button>`
         : `<button type="button" class="btn" data-action="test" data-id="${escHtml(s.id)}"${busy ? ' disabled aria-busy="true"' : ''}>${busy ? 'Testing...' : 'Test'}</button>
            <button type="button" class="btn" data-action="edit" data-id="${escHtml(s.id)}"${busy ? ' disabled' : ''}>Edit</button>
-           ${s.transport === 'ssh' ? `${upgradeControl(s, version, busy)}
+           ${s.transport === 'ssh' && !running ? `${upgradeControl(s, version, busy)}
            <button type="button" class="btn" data-action="ssh-stop" data-id="${escHtml(s.id)}"${busy ? ' disabled' : ''}>Stop Coral</button>
            <button type="button" class="btn btn-danger" data-action="ssh-remove" data-id="${escHtml(s.id)}"${busy ? ' disabled' : ''}>Uninstall</button>` : ''}
            ${s.transport !== 'ssh' ? `<button type="button" class="btn" data-action="owner-secret" data-id="${escHtml(s.id)}"${busy ? ' disabled' : ''}>${s.owner_stamp ? 'Change the Approve secret' : 'Approve through this hub'}</button>` : ''}
@@ -212,6 +229,7 @@ function pageHtml(s) {
         ${warningHtml(s)}
         ${below ? `<div class="servers-row-hint server-below-minimum">${escHtml(below)}</div>` : ''}
         ${attention}
+        ${setup}
         <div class="item-bar servers-page-bar">${bar}</div>
     </section>`;
 }
@@ -343,6 +361,19 @@ async function onClick(e) {
         return render();
     }
     if (action === 'ssh-setup') { _ssh = { mode: 'setup' }; return render(); }
+    if (action === 'ssh-resume') { // the flow, opened again on the plan the hub has for this computer
+        const s = _servers.find(x => x.id === id), p = _plans.get(id);
+        if (!s || !p) return;
+        _ssh = { mode: 'manage', server: { id: s.id, label: s.label }, action: p.kind, resume: p.plan };
+        return render();
+    }
+    if (action === 'ssh-dismiss') {
+        const p = _plans.get(id);
+        if (!p) return;
+        _plans.delete(id);
+        fetch(`/api/servers/provision/${encodeURIComponent(p.plan)}`, { method: 'DELETE' }).catch(() => {});
+        return render();
+    }
     if (action === 'ssh-back') { closeSsh(); _focusNext = 'row'; return render(); }
     if (action === 'ssh-upgrade' || action === 'ssh-stop' || action === 'ssh-remove') {
         const s = _servers.find(x => x.id === id);

@@ -776,6 +776,7 @@ func (s *Server) registerSystem(r *chi.Mux, h *routeHandlers) {
 		// Set a Coral server up on another computer over SSH (#11370): hub mode only, the Operator's.
 		prov := routes.NewProvisioner(rsHandler.Store())
 		r.Get("/api/servers/provision/options", prov.Options)
+		r.Get("/api/servers/provision", prov.List)
 		r.Post("/api/servers/provision/plan", prov.Plan)
 		r.Post("/api/servers/provision/{plan}/connect", prov.Connect)
 		r.Post("/api/servers/provision/{plan}/run", prov.Run)

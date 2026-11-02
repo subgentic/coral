@@ -473,3 +473,30 @@ func TestManageRemoveWithDataRefusesAFolderThatIsALinkOrNotOurs(t *testing.T) {
 		})
 	}
 }
+
+// A page that was left, refreshed or opened in another tab finds the setup its computer has (#12372): the list names the plans that are running or just finished, by computer, and nothing else.
+func TestProvisionListFindsTheManagePlanOfAComputerOnceItRuns(t *testing.T) {
+	me := newManageEnv(t)
+	list := func() []any {
+		code, v := me.do("GET", "/api/servers/provision", nil)
+		require.Equal(t, 200, code, "%v", v)
+		return v["plans"].([]any)
+	}
+	assert.Empty(t, list(), "nothing yet")
+	_, v := me.plan(t, "stop", nil)
+	plan := v["plan"].(string)
+	assert.Empty(t, list(), "a plan that is only shown is not listed: nothing is happening to that computer")
+	me.connectAndRun(t, plan, map[string]any{}, 202)
+	me.waitPhase(t, plan, "done")
+	rows := list()
+	require.Len(t, rows, 1, "a finished plan is listed until it is dismissed or expires")
+	row := rows[0].(map[string]any)
+	assert.Equal(t, plan, row["plan"])
+	assert.Equal(t, "ssh-box", row["server_id"])
+	assert.Equal(t, "stop", row["kind"])
+	assert.Equal(t, "done", row["phase"])
+	assert.NotContains(t, row, "steps", "a short row: the plan itself has the steps")
+	code, _ := me.do("DELETE", "/api/servers/provision/"+plan, nil)
+	require.Equal(t, 200, code)
+	assert.Empty(t, list(), "dismissed")
+}

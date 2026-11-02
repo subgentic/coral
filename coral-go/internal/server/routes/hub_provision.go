@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -811,6 +812,31 @@ func (pr *Provisioner) Status(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, p.view())
+}
+
+// List handles GET /api/servers/provision: the plans that manage a registered computer (a stop, an upgrade, an uninstall) and are running or just finished, one short row each, so a page that was left, refreshed or opened in another tab finds the one its computer has (#12372). A plan that is only planned or waiting for the owner's keys is not listed: nothing is happening to that computer yet. The full plan is GET /api/servers/provision/{plan}.
+func (pr *Provisioner) List(w http.ResponseWriter, r *http.Request) {
+	pr.mu.Lock()
+	pr.expireLocked()
+	plans := make([]*provisionPlan, 0, len(pr.plans))
+	for _, p := range pr.plans {
+		plans = append(plans, p)
+	}
+	pr.mu.Unlock()
+	rows := make([]map[string]any, 0, len(plans))
+	for _, p := range plans {
+		p.mu.Lock()
+		ok := p.ServerID != "" && (p.phase == phaseRunning || p.phase == phaseDone || p.phase == phaseFailed)
+		row := map[string]any{"plan": p.ID, "server_id": p.ServerID, "kind": p.kind(), "phase": p.phase}
+		created := p.created
+		p.mu.Unlock()
+		if ok {
+			row["started"] = created.UTC().Format(time.RFC3339)
+			rows = append(rows, row)
+		}
+	}
+	sort.Slice(rows, func(i, j int) bool { return rows[i]["started"].(string) < rows[j]["started"].(string) })
+	writeJSON(w, http.StatusOK, map[string]any{"plans": rows})
 }
 
 // Cancel handles DELETE /api/servers/provision/{plan}.

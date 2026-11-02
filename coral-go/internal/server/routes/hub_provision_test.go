@@ -112,6 +112,7 @@ exit 0
 	r.Post("/api/servers/provision/{plan}/connect", pr.Connect)
 	r.Post("/api/servers/provision/{plan}/run", pr.Run)
 	r.Get("/api/servers/provision/options", pr.Options)
+	r.Get("/api/servers/provision", pr.List)
 	r.Get("/api/servers/provision/{plan}", pr.Status)
 	r.Post("/api/servers/provision/{plan}/forget-key", pr.ForgetKey)
 	r.Delete("/api/servers/provision/{plan}", pr.Cancel)

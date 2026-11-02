@@ -49,7 +49,7 @@ const [SETUP, UPGRADE, STOP, REMOVE] = Object.keys(KINDS);
  * Mount the flow into `host`. mode 'setup' starts from a host; mode 'manage' acts on `server` (a registered server set up over SSH) with `action` (upgrade, stop or remove).
  * onClose() is called when the person leaves it; onChanged() when the server list changed (a server was added or removed, or upgraded). Returns { unmount }.
  */
-export function mountSshSetup(host, { mode = 'setup', server = null, action = null, deleteData = false, pollMs = POLL_MS, onClose = () => {}, onChanged = () => {} } = {}) {
+export function mountSshSetup(host, { mode = 'setup', server = null, action = null, deleteData = false, resume = '', pollMs = POLL_MS, onClose = () => {}, onChanged = () => {} } = {}) {
     const st = { step: 'loading', options: null, plan: null, error: '', busy: false, keysOk: false, typed: '', backend: 'pty', allowDowngrade: false, timer: null, dead: false, form: { host: '', picked: '', label: '' } };
 
     const kind = () => (st.plan ? st.plan.kind : mode === 'manage' ? action : 'setup');
@@ -78,6 +78,15 @@ export function mountSshSetup(host, { mode = 'setup', server = null, action = nu
         if (st.dead) return;
         if (!o.ok) { st.error = sayError(o, 'Could not read the setup options.'); st.step = 'failed'; return draw(); }
         st.options = o.data;
+        if (resume) { // a stop, upgrade or uninstall that was left while it ran (#12372): the hub still has the plan, so this shows where it is and goes on watching it
+            const r = await api('GET', `/api/servers/provision/${encodeURIComponent(resume)}`);
+            if (st.dead) return;
+            if (!apply(r, 'That setup is no longer on the hub.')) { st.step = 'failed'; return draw(); }
+            st.step = st.plan.phase === 'done' ? 'done' : st.plan.phase === 'failed' ? 'failed' : 'running';
+            draw();
+            if (st.step === 'running') poll();
+            return;
+        }
         if (mode === 'manage') {
             const body = { server_id: server.id, action };
             if (action === REMOVE) body.delete_data = !!deleteData;
