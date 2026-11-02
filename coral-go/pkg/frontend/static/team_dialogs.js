@@ -794,6 +794,10 @@ async function launchTeam() {
             const launched = result.agents || result.launched || [];
             const failed = launched.filter(a => a.error);
             if (failed.length > 0) showTeamLaunchFailures(failed, launched.length - failed.length, showSettingsModal);
+            // What the person ticked and Coral did not do (a shared folder such as /tmp is refused by design): said in the server's own words, so the agents' trust cards are not a surprise (#12338)
+            const tf = result.trust_folder;
+            if (tf && typeof tf.refused === 'string' && tf.refused) showToast(`Trust this folder was not applied: ${tf.refused}`, true);
+            else if (tf && tf.failed && typeof tf.failed === 'object') { const types = Object.keys(tf.failed).sort(); if (types.length) showToast(`Trust this folder was not applied for ${types.join(', ')}: ${types.map(k => String(tf.failed[k])).join('; ')}`, true); }
             if (launched.length - failed.length > 0) {
                 const wtNote = result.worktree_path ? ` in worktree ${result.worktree_path}` : '';
                 showToast(`Launched team: ${launched.length - failed.length} agents on "${boardName}"${_onServerSuffix(server)}${wtNote}`);

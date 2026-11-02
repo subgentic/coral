@@ -72,6 +72,7 @@ func (h *SessionsHandler) trustTeamFolder(r *http.Request, body launchTeamReques
 	resolved, err := foldertrust.Check(workdir, home, basis)
 	if err != nil {
 		reply["refused"] = err.Error()
+		h.sayTrustNotDone(r, body, workdir, "", err.Error()) // asked for and not done: the board says why (#12338)
 		return reply
 	}
 	reply["path"] = resolved
@@ -79,6 +80,7 @@ func (h *SessionsHandler) trustTeamFolder(r *http.Request, body launchTeamReques
 	seen := map[string]bool{}
 	trusted := []string{}
 	not := map[string]string{}
+	failed := map[string]string{} // the agent types Coral tried to trust the folder for and could not: said on the board
 	for _, typ := range types {
 		if typ == "" {
 			typ = "claude"
@@ -101,6 +103,7 @@ func (h *SessionsHandler) trustTeamFolder(r *http.Request, body launchTeamReques
 		}
 		if werr != nil {
 			not[typ] = werr.Error()
+			failed[typ] = werr.Error()
 			continue
 		}
 		trusted = append(trusted, typ)
@@ -117,8 +120,43 @@ func (h *SessionsHandler) trustTeamFolder(r *http.Request, body launchTeamReques
 		bh.postNotice(ctx, body.BoardName, fmt.Sprintf("[Coral] Coral trusted the folder %s for %s, so its settings and tools run with no question. Turn it off in the agent's own settings if you did not mean it.", quoteNotice(bh.noticeText(ctx, body.BoardName, resolved)), strings.Join(trusted, ", ")))
 	}
 
+	if len(failed) > 0 {
+		types := make([]string, 0, len(failed))
+		for typ := range failed {
+			types = append(types, typ)
+		}
+		sort.Strings(types)
+		reasons := make([]string, 0, len(types))
+		for _, typ := range types {
+			reasons = append(reasons, typ+": "+failed[typ])
+		}
+		h.sayTrustNotDone(r, body, workdir, strings.Join(types, ", "), strings.Join(reasons, "; "))
+	}
+	if len(failed) > 0 {
+		reply["failed"] = failed // the types it tried and could not, apart from "not" (which also holds the types that have no setting to set): the page says these
+	}
 	if len(not) > 0 {
 		reply["not"] = not
 	}
 	return reply
+}
+
+// sayTrustNotDone posts one line on the team's board when trusting the folder was asked for (the tick, or a folder the launch made) and Coral did not: without it the agents stop at their CLIs' trust cards and nobody
+// is told why (#12338: a folder in /tmp, a shared place, was refused by design and nothing said so). The folder and the reason are text that came from outside the notice's own words, so they are cleaned, made unable to
+// mention anyone and quoted (noticeText, quoteNotice), and the line is posted as it stands (postNotice, the census of stored text). Nothing is posted for a caller that is not the person's own dashboard.
+func (h *SessionsHandler) sayTrustNotDone(r *http.Request, body launchTeamRequest, workdir, forTypes, reason string) {
+	if body.BoardName == "" || h.bs == nil {
+		return
+	}
+	bh := h.boardHandler
+	if bh == nil {
+		bh = NewBoardHandler(h.bs)
+	}
+	ctx := r.Context()
+	who := ""
+	if forTypes != "" {
+		who = " for " + forTypes
+	}
+	bh.postNotice(ctx, body.BoardName, fmt.Sprintf("[Coral] Coral did not trust the folder %s%s: %s. The agents will ask about it in their own terminals; answer there, or choose a folder Coral can trust.",
+		quoteNotice(bh.noticeText(ctx, body.BoardName, workdir)), who, quoteNotice(bh.noticeText(ctx, body.BoardName, reason))))
 }
