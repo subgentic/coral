@@ -151,12 +151,18 @@ const { coralReady } = require('./helpers/wait');
                     assert.match(await ev(`document.querySelector('.artifact-review-state').textContent`),/waiting for a new version from .*Approving now approves this version as it is/,'and the state says what is waited for');
                     assert.equal(await ev(`window.__decisions.filter(d=>d.decision==='changes').length`),1,'two taps sent one request');
                     assert.equal(await ev(`window.__comments.filter(c=>c.body).length`),1,'and made one comment');
-                    assert.ok(await ev(`!!(${row('Review file 01.txt')})`),'a row with changes requested stays in Needs you');
-                    // #11860 (Beta #8): the viewer reloads itself after the request, and that reload is not a new opening: the file is not marked read again, so it counts and shows unread
+                    // #11985 (the operator): after Request changes the file LEAVES Needs you (it is the agent's turn; nothing waits on the person) and its count; the agent's next version comes back as a NEW item, unread and counted
+                    const needsCount = () => ev(`Number(document.querySelector('#inbox-nav-list .view-list-item[data-key="needs"] .view-list-count')?.textContent || 0)`);
+                    await waitFor(`!(${row('Review file 01.txt')})`,'after Request changes the file leaves Needs you',8000);
+                    // #11860 (Beta #8): the viewer reloads itself after the request, and that reload is not a new opening: the file is not marked read again
                     await require('./helpers/wait').settle(ev, 400, 300);
                     assert.equal(await ev(`window.__reviewItems.find(a=>a.id==='${(1).toString(16).padStart(64,'0')}').tags.includes('read')`),false,'Request changes leaves the file unread: the viewer reloading does not read it again: ' + await ev(`JSON.stringify(window.__reviewWrites)`));
-                    assert.equal(await ev(`/, unread/.test((${row('Review file 01.txt')}).textContent)`),true,'and its row says unread');
+                    const gone = await needsCount();
                     await ev(`document.querySelector('.artifact-viewer-close').click();true`);
+                    await ev(`(() => { const v1 = window.__reviewItems.find(a=>a.id==='${(1).toString(16).padStart(64,'0')}'); window.__reviewItems.push({ ...v1, id: (0x62).toString(16).padStart(64,'0'), uri: 'coral://artifacts/' + (0x62).toString(16).padStart(64,'0'), tags: ['for review','internal'], created_at: new Date(Date.parse(v1.created_at) + 1000).toISOString() }); return import((window.__coralStatic||'/static/')+'inbox_reviews.js').then(m => m.refreshReviews(true)).then(() => true); })()`);
+                    await waitFor(`!!(${row('Review file 01.txt')})`,'the agent\'s next version comes back as a new Needs you item',8000);
+                    assert.equal(await ev(`/, unread/.test((${row('Review file 01.txt')}).textContent)`),true,'the new version is unread');
+                    assert.equal(await needsCount(),gone + 1,'and counted: the Needs you number goes up by one');
                 }
                 await ev(`window.__reviewFail=true;[...(${row('Review file 01.txt')}).querySelectorAll('button')].find(b=>(b.getAttribute('aria-label')||'').startsWith('Approve')).click();true`);
                 await waitFor(`document.body.textContent.includes('Review save failed')`,'failed save is visible');
@@ -164,12 +170,12 @@ const { coralReady } = require('./helpers/wait');
                 await ev(`window.__reviewFail=false;[...(${row('Review file 01.txt')}).querySelectorAll('button')].find(b=>(b.getAttribute('aria-label')||'').startsWith('Approve')).click();true`);
                 await waitFor(`!(${row('Review file 01.txt')})`,'approved row removed');
                 if(width===1280){ // Mobile Beta Tester (live): the approved artifact's viewer says Approved with the time (it showed only the tag chip)
-                    await ev(`import((window.__coralStatic||'/static/')+'artifact_viewer.js').then(m=>m.openArtifactViewer('${(1).toString(16).padStart(64,'0')}',{filename:'Review file 01.txt',board:'${team}',server:undefined}));true`);
+                    await ev(`import((window.__coralStatic||'/static/')+'artifact_viewer.js').then(m=>m.openArtifactViewer('${(0x62).toString(16).padStart(64,'0')}',{filename:'Review file 01.txt',board:'${team}',server:undefined}));true`);
                     await waitFor(`/^Approved .+/.test(document.querySelector('.artifact-review-state')?.textContent||'')`,'the viewer of an approved artifact says Approved with its time',8000);
                     assert.equal(await ev(`document.querySelector('.artifact-review-approve').hidden&&document.querySelector('.artifact-review-changes').hidden`),true,'and offers no Approve');
                     await ev(`document.querySelector('.artifact-viewer-close').click();true`);
                     // the same for the newest of two versions (Mobile Beta Tester, live: the head of a two-version artifact had the versions bar and no approval line)
-                    await ev(`window.__twoVersions=true;import((window.__coralStatic||'/static/')+'artifact_viewer.js').then(m=>m.openArtifactViewer('${(1).toString(16).padStart(64,'0')}',{filename:'Review file 01.txt',board:'${team}',server:undefined}));true`);
+                    await ev(`window.__twoVersions=true;import((window.__coralStatic||'/static/')+'artifact_viewer.js').then(m=>m.openArtifactViewer('${(0x62).toString(16).padStart(64,'0')}',{filename:'Review file 01.txt',board:'${team}',server:undefined}));true`);
                     await waitFor(`!!document.querySelector('.artifact-viewer .av-compare, .artifact-viewer .av-current')`,'the versions bar of a two-version artifact',8000);
                     await new Promise(r=>setTimeout(r,800)); // sleep-ok: the version bar's own reload settles
                     assert.equal(await ev(`document.querySelector('.artifact-viewer-title').textContent`),'Review file 01.txt · version 2','the viewer title adds the version after the name (#11890)');
@@ -178,7 +184,7 @@ const { coralReady } = require('./helpers/wait');
                     assert.ok(vis.h > 0 && vis.w > 0 && vis.display !== 'none', 'the review bar of a two-version artifact is on the screen: ' + JSON.stringify(vis));
                     await ev(`document.querySelector('.artifact-viewer-close').click();window.__twoVersions=false;true`);
                 }
-                assert.deepEqual(await ev(`window.__decisions.filter(d=>d.decision==='approve').map(d=>d.id)`),[(1).toString(16).padStart(64,'0')],'one approve was sent: the failed press and the second one are not two');
+                assert.deepEqual(await ev(`window.__decisions.filter(d=>d.decision==='approve').map(d=>d.id)`),[width===1280?(0x62).toString(16).padStart(64,'0'):(1).toString(16).padStart(64,'0')],'one approve was sent: the failed press and the second one are not two');
                 assert.equal(await ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`),'9+');
                 assert.match(await ev(`document.getElementById('nav-tab-hub-inbox').getAttribute('aria-label')`),/^Inbox, 12 /,'twelve left: the pill says 9+, the name says 12');
                 assert.ok(await ev(`!!(${row('Review file 11.txt')})`),'overflow promotes next artifact');

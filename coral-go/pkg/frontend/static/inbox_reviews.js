@@ -58,7 +58,7 @@ async function readTeam(team) {
         if (!r.ok) throw new Error('Could not read review artifacts');
         const data = await r.json();
         for (const a of data.artifacts || []) {
-            if (!a.tags?.includes('for review') || a.tags.includes('saved') || !a.available || seen.has(a.id)) continue; // a saved file stays tagged for review (its decisions work) but is not in Needs you (#11641)
+            if (!a.tags?.includes('for review') || a.tags.includes('saved') || a.tags.includes('changes requested') || !a.available || seen.has(a.id)) continue; // changes requested: the agent's turn, so the file leaves Needs you and its counts; its next version comes back as a new item (#11985). Artifacts and the goal still show it as changes requested // a saved file stays tagged for review (its decisions work) but is not in Needs you (#11641)
             const hex = /(?:sha256:|coral:\/\/artifacts\/)?([a-f0-9]{64})$/i.exec(a.uri || a.digest || a.id || '')?.[1];
             if (!hex) continue;
             seen.add(a.id); rows.push({ ...a, team, hex, reviewKey: `${team}:${a.id}` });
