@@ -22,9 +22,9 @@ const SPECS = `(() => {
   const kinds = {
     needs: (m, mix) => ({ label: 'Needs you, 3', columns: [
         { key: 'item', label: 'Item', primary: true, width: 'grow', sort: true, cell: r => m.primaryButton(r.item) },
-        { key: 'why', label: 'Waiting for', cell: r => { const s = document.createElement('span'); s.textContent = r.why; if (r.dismiss) { const d = document.createElement('button'); d.type = 'button'; d.className = 'btn btn-small inbox-dismiss'; d.textContent = 'Dismiss'; s.append(d); } return s; } }, // the operator's Dismiss, drawn inside Waiting for
+        { key: 'why', label: 'Waiting for', cell: r => r.why }, // the operator's Dismiss is in the Actions column now (#11943), as the live Needs you draws it
         { key: 'cli', label: 'CLI', sort: true, cell: r => (r.cli ? m.tag(r.cli) : '') }, { key: 'folder', label: 'Folder', sort: true, field: 'folder' }, { key: 'team', label: 'Team', sort: true, field: 'team' },
-        { key: 'blocks', label: 'Blocks', cell: () => document.createElement('span') }, { key: 'actions', label: 'Actions', fixed: true, width: '11rem', cell: r => (r.act ? m.link(r.act, () => {}) : '') } ],
+        { key: 'blocks', label: 'Blocks', cell: () => document.createElement('span') }, { key: 'actions', label: 'Actions', fixed: true, width: '11rem', cell: r => { if (r.dismiss) { const d = document.createElement('button'); d.type = 'button'; d.className = 'btn btn-small inbox-dismiss'; d.textContent = 'Dismiss'; return d; } return r.act ? m.link(r.act, () => {}) : ''; } } ],
       rows: mix === 'empty' ? [] : mix === 'one' ? [1, 2, 3].map(i => ({ id: i, item: 'Goal #' + (180 + i) + ' looks done', why: 'Done when: Every task is done.', team: 'coral-hub', act: 'Close goal' }))
         : [{ id: 1, item: mix === 'long' ? long : 'Orchestrator', why: 'Wants to know: None of the above', cli: 'Claude', folder: 'coral-hub', team: 'coral-hub-team', dismiss: true }, { id: 2, item: 'Goal #187 looks done', why: 'Done when: The operator can see it', team: 'coral-hub' }, { id: 3, item: 'Goal #184 looks done', why: 'Every task is done.', team: 'coral-hub' }] }),
     tasks: (m, mix) => ({ label: 'Tasks, 4', columns: [ { key: 'state', label: 'State', cell: r => m.chip(r.state, 'goal-state-' + r.state) }, { key: 'title', label: 'Task', primary: true, width: 'grow', sort: true, field: 'title' },
