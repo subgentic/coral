@@ -187,3 +187,20 @@ func TestActionListAMentionOfAShorterMemberIsNotAGapForAMemberWhoseNameStartsWit
 	require.NoError(t, err)
 	assert.Contains(t, h.check(), "no mention has reached it", "a real prefix with no full name behind it is still reported")
 }
+
+// QA's pin on #12352: the roster builds the team's names from every member's id AND job title. The shorter name here is only a job title ("Hermes Agent", the title of "Lead One"), so a member whose id starts with it is
+// not flagged for mentions of that title only if the titles are in the list the check resolves each mention against.
+func TestActionListAMentionOfAMembersJobTitleIsNotAGapForAMemberWhoseNameStartsWithIt(t *testing.T) {
+	h := newCheckHarness(t)
+	ctx := context.Background()
+	h.member("Orchestrator", "Orchestrator", 1, 0)
+	h.member("Lead One", "Hermes Agent", 2, 0)
+	h.member("Hermes Agent Tester", "Tester", 3, 0)
+	for _, text := range []string{"@Hermes Agent please look at #12", "@Hermes Agent: and this"} {
+		_, err := h.s.PostMessage(ctx, "team", "Orchestrator", text, nil)
+		require.NoError(t, err)
+	}
+	out := h.check()
+	assert.NotContains(t, out, "Hermes Agent Tester: no mention has reached it", "the mention is Lead One's by its job title")
+	assert.NotContains(t, out, "Lead One: no mention has reached it", "and Lead One was reached")
+}
