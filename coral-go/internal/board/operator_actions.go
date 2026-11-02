@@ -2,6 +2,7 @@ package board
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
@@ -28,6 +29,10 @@ const (
 	ActivityNoteCap = 200
 	// activityTextCap bounds an item's title (text an agent wrote).
 	activityTextCap = 120
+	// ActivityMaxLimit is the most rows one read returns (a larger limit is cut to it); the answer says whether more exist.
+	ActivityMaxLimit = 200
+	// activityTimeFormat is a row's time: UTC with milliseconds, fixed width, so it sorts as text and a merge of several computers' records can order by (time, id).
+	activityTimeFormat = "2006-01-02T15:04:05.000Z"
 )
 
 // The actions that are recorded.
@@ -109,6 +114,17 @@ func (s *Store) ensureOperatorActionsSchema(ctx context.Context) error {
 	if _, err := s.db.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_operator_actions_team ON operator_actions(team, id)`); err != nil {
 		return err
 	}
+	// this record's own id, made once and never derived from anything else (not the telemetry id): the Hub pairs it with a row's id, which is unique only within one computer's record
+	if _, err := s.db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS operator_actions_record (one INTEGER PRIMARY KEY CHECK (one = 1), record_id TEXT NOT NULL)`); err != nil {
+		return err
+	}
+	var rid [16]byte
+	if _, err := rand.Read(rid[:]); err != nil {
+		return err
+	}
+	if _, err := s.db.ExecContext(ctx, `INSERT OR IGNORE INTO operator_actions_record (one, record_id) VALUES (1, ?)`, hex.EncodeToString(rid[:])); err != nil {
+		return err
+	}
 	// the head: the id and hash of the newest row ever added (so rows cut off the end show), and the id and previous hash of the oldest kept row (the anchor: rows cut off the front show), which only a trim moves
 	_, err := s.db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS operator_actions_head (
 		one       INTEGER PRIMARY KEY CHECK (one = 1),
@@ -176,7 +192,7 @@ func appendActivity(ctx context.Context, q activityExec, now time.Time, m Activi
 	if m.Hint == "phone" {
 		hint = "phone"
 	}
-	a := OperatorAction{At: now.UTC().Format(time.RFC3339), Actor: m.Actor, Action: action, ItemKind: kind, ItemID: item, Version: version, Team: team, Source: source, Hint: hint,
+	a := OperatorAction{At: now.UTC().Format(activityTimeFormat), Actor: m.Actor, Action: action, ItemKind: kind, ItemID: item, Version: version, Team: team, Source: source, Hint: hint,
 		Title: activityText(m.Title, activityTextCap), Note: activityText(m.Note, ActivityNoteCap), PrevHash: head.LastHash}
 	if a.Actor == "" {
 		a.Actor = "local"
@@ -302,12 +318,27 @@ func (s *Store) VerifyActivity(ctx context.Context) (ActivityCheck, error) {
 // ActivityFilter narrows a list.
 type ActivityFilter struct {
 	Team, Action string
-	BeforeID     int64 // rows older than this id (the next page)
+	BeforeID     int64  // rows older than this id (the next page)
+	BeforeAt     string // with BeforeID: rows older than this (time, id), the cursor a merge of several computers' records pages by
 	Limit        int
+}
+
+// ActivityRecordID is this computer's record's own id (see operator_actions_record).
+func (s *Store) ActivityRecordID(ctx context.Context) (string, error) {
+	var id string
+	err := s.reader().GetContext(ctx, &id, `SELECT record_id FROM operator_actions_record WHERE one = 1`)
+	return id, err
 }
 
 // ListActivity is the newest rows first, a page at a time.
 func (s *Store) ListActivity(ctx context.Context, f ActivityFilter) ([]OperatorAction, error) {
+	rows, _, err := s.ActivityPage(ctx, f)
+	return rows, err
+}
+
+// ActivityPage is ListActivity and whether more rows exist past the page (it reads one more than the limit). The limit is at most ActivityMaxLimit and 50 when not given; the order is (time, id) newest
+// first, and a cursor (BeforeAt with BeforeID) pages by that pair.
+func (s *Store) ActivityPage(ctx context.Context, f ActivityFilter) ([]OperatorAction, bool, error) {
 	q := `SELECT id, at, actor, action, item_kind, item_id, version, team, source, hint, title, note FROM operator_actions WHERE 1 = 1`
 	var args []any
 	if f.Team != "" {
@@ -318,18 +349,31 @@ func (s *Store) ListActivity(ctx context.Context, f ActivityFilter) ([]OperatorA
 		q += ` AND action = ?`
 		args = append(args, f.Action)
 	}
-	if f.BeforeID > 0 {
+	switch {
+	case f.BeforeID > 0 && f.BeforeAt != "":
+		q += ` AND (at < ? OR (at = ? AND id < ?))`
+		args = append(args, f.BeforeAt, f.BeforeAt, f.BeforeID)
+	case f.BeforeID > 0:
 		q += ` AND id < ?`
 		args = append(args, f.BeforeID)
 	}
-	if f.Limit <= 0 || f.Limit > 200 {
+	if f.Limit <= 0 {
 		f.Limit = 50
 	}
-	q += ` ORDER BY id DESC LIMIT ?`
-	args = append(args, f.Limit)
+	if f.Limit > ActivityMaxLimit {
+		f.Limit = ActivityMaxLimit
+	}
+	q += ` ORDER BY at DESC, id DESC LIMIT ?`
+	args = append(args, f.Limit+1)
 	out := []OperatorAction{}
-	err := s.db.SelectContext(ctx, &out, q, args...)
-	return out, err
+	if err := s.db.SelectContext(ctx, &out, q, args...); err != nil {
+		return nil, false, err
+	}
+	more := len(out) > f.Limit
+	if more {
+		out = out[:f.Limit]
+	}
+	return out, more, nil
 }
 
 // TrimActivity removes rows older than ActivityMaxAge, then the oldest beyond ActivityMaxRows, and answers how many went (the caller logs the number: no content, so a gap is explained). Only the oldest
@@ -342,7 +386,7 @@ func (s *Store) TrimActivity(ctx context.Context, now time.Time) (int, error) {
 		return 0, err
 	}
 	defer tx.Rollback()
-	cut := now.Add(-ActivityMaxAge).UTC().Format(time.RFC3339)
+	cut := now.Add(-ActivityMaxAge).UTC().Format(activityTimeFormat)
 	res, err := tx.ExecContext(ctx, `DELETE FROM operator_actions WHERE at < ? AND id <= COALESCE((SELECT MAX(id) FROM operator_actions WHERE at < ?), 0)`, cut, cut)
 	if err != nil {
 		return 0, err

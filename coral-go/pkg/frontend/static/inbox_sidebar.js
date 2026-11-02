@@ -95,7 +95,7 @@ const GROUPS = nativeInbox() ? [{ key: 'needs', label: 'Needs you', frame: HUB_F
     { key: 'goals', label: 'Goals', search: 'Search goals', short: 'Search' }, // the open goals of every team the person runs (GET /api/goals): the team page's goal row plus a Team column (#7776)
     { key: 'artifacts', label: 'Artifacts', search: 'Search artifacts', short: 'Search' }, // every team's artifacts (GET /api/team-artifacts): the team page's list plus a Team filter (Goal #62)
     { key: 'saved', label: 'Saved', search: 'Search saved messages', short: 'Search' }, // the box beside Display options and Expand is narrow: its placeholder is the short words, its name the whole ones
-    { key: 'activity', label: 'Activity', search: 'Search activity', short: 'Search' }, // what you did in Needs you (GET /api/activity): this computer's record, so a Hub-served Inbox has no such folder (#12070)
+    { key: 'activity', label: 'Activity', search: 'Search activity', short: 'Search' }, // what you did in Needs you (GET /api/activity, the owner's alone, read only; #12070)
 ];
 const GROUP_KEY = 'coral.inbox.tab'; // the group last on screen, kept in this browser
 let tasks = [];

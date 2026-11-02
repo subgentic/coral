@@ -73,6 +73,14 @@ const HEX = 'c'.repeat(64);
         await waitFor(`!!document.getElementById('artifact-viewer')`, 'the viewer', 10000);
         console.log('   ✓');
 
+        console.log('4b. Through the Hub a non-owner is refused: the page says who can see the record');
+        await load();
+        await ev(`(() => { const real = window.fetch; window.fetch = (u, o) => String(u).startsWith('/api/activity') ? Promise.resolve(new Response(JSON.stringify({ error: 'through Coral Hub the record is for the account this computer is linked to only', code: 'owner_only' }), { status: 403, headers: { 'Content-Type': 'application/json' } })) : real(u, o); return true; })()`);
+        await openFolder(false);
+        await waitFor(`/Only the account this computer is linked to can see the Activity record\\./.test(document.getElementById('group-table-view').textContent)`, 'the owner-only line', 10000);
+        assert.doesNotMatch(await ev(`document.getElementById('group-table-view').textContent`), /could not be read/);
+        console.log('   \u2713');
+
         console.log('5. A row edited outside Coral: the page says so');
         sqliteExec(path.join(DATA, 'messageboard.db'), `UPDATE operator_actions SET action = 'deny' WHERE id = (SELECT MIN(id) FROM operator_actions);`);
         await load();

@@ -12,7 +12,7 @@ await loadStyles('inbox_activity.css'); // the folder's rules load with the fold
 
 const PAGE = 200;
 const PHONE_HINT = 'pho' + 'ne'; // the record's hint word, spelled in two parts: the icon-name lint reads that quoted word as an icon name
-let rows = [], check = null, loaded = false, loading = null, more = false, failed = false;
+let rows = [], check = null, loaded = false, loading = null, more = false, failed = false, denied = false;
 const state = DT.tableState();
 let onChange = () => {};
 
@@ -43,8 +43,8 @@ export function refresh(done, { next = false } = {}) {
             rows = next ? [...rows, ...got.filter(g => !rows.some(r => r.id === g.id))] : got;
             if (!next) check = d.check || null;
             more = got.length === PAGE;
-            failed = false;
-        } catch { failed = true; }
+            failed = false; denied = false;
+        } catch (e) { failed = true; denied = e && e.status === 403; } // 403: through Coral Hub the record is the owner's alone
         loaded = true;
     })().finally(() => { loading = null; onChange(); });
     return loading;
@@ -61,9 +61,9 @@ export function spec(f, open) {
     const list = filtered(f);
     const opens = r => (r.item_kind === 'file' && r.version) || (r.item_kind === 'goal' && /^\d+$/.test(r.item_id));
     return { title: 'Activity', noun: ['action', 'actions'], rows: list,
-        empty: { line: !loaded || loading ? 'Reading the record…' : failed ? 'The record could not be read.' : AF.isFiltered(f) ? 'No action matches the search and filters.' : 'Nothing yet.',
+        empty: { line: !loaded || loading ? 'Reading the record…' : failed ? (denied ? 'Only the account this computer is linked to can see the Activity record.' : 'The record could not be read.') : AF.isFiltered(f) ? 'No action matches the search and filters.' : 'Nothing yet.',
             hint: loaded && !failed && !AF.isFiltered(f) ? 'Each time you approve, ask for changes, deny, ignore or answer something in Needs you, a line is added here.' : undefined },
-        signature: JSON.stringify([list.map(r => r.id), check, loaded, failed, more]),
+        signature: JSON.stringify([list.map(r => r.id), check, loaded, failed, denied, more]),
         node: () => {
             const wrap = DT.el('div', 'activity-folder');
             const words = checkWords(check);

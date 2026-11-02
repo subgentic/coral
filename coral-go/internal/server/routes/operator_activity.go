@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/cloud"
@@ -50,7 +51,8 @@ func activityActor(id callerIdentity) string {
 	return "hub:unknown"
 }
 
-// GET /api/activity?team=&action=&before=&limit= : the record, newest first, a page at a time, and whether its chain is whole (checked on the first page).
+// GET /api/activity?team=&action=&before=&limit= : the record, newest first, a page at a time, and whether its chain is whole (checked on the first page). Read only; the Operator's alone, at this computer or through
+// Coral Hub as the Hub OWNER (#12070: the tunnel's table lists it as an owner route; nobody else gets it).
 func (h *BoardHandler) ListActivity(w http.ResponseWriter, r *http.Request) {
 	if cloud.Tunneled(r) || r.Header.Get(tunnel.ViaHeader) != "" {
 		commentRefuse(w, http.StatusForbidden, "not_through_hub", "the Activity record is on this computer only")
@@ -78,20 +80,32 @@ func (h *BoardHandler) ListActivity(w http.ResponseWriter, r *http.Request) {
 		}
 		f.BeforeID = n
 	}
+	if v := q.Get("before_at"); v != "" { // the cursor's time, with before: the page after the row (before_at, before)
+		if _, err := time.Parse(time.RFC3339Nano, v); err != nil || f.BeforeID == 0 {
+			errBadRequest(w, "before_at is a UTC time and goes with before")
+			return
+		}
+		f.BeforeAt = v
+	}
 	if v := q.Get("limit"); v != "" {
 		n, err := strconv.Atoi(v)
 		if err != nil || n <= 0 {
 			errBadRequest(w, "invalid limit")
 			return
 		}
-		f.Limit = n
+		f.Limit = n // more than board.ActivityMaxLimit is cut to it
 	}
-	rows, err := h.bs.ListActivity(r.Context(), f)
+	rows, more, err := h.bs.ActivityPage(r.Context(), f)
 	if err != nil {
 		errInternalServer(w, "could not read the record")
 		return
 	}
-	out := map[string]any{"actions": rows}
+	recordID, err := h.bs.ActivityRecordID(r.Context())
+	if err != nil {
+		errInternalServer(w, "could not read the record")
+		return
+	}
+	out := map[string]any{"actions": rows, "more": more, "record_id": recordID, "limit_max": board.ActivityMaxLimit}
 	if f.BeforeID == 0 {
 		chk, err := h.bs.VerifyActivity(r.Context())
 		if err != nil {
@@ -101,7 +115,8 @@ func (h *BoardHandler) ListActivity(w http.ResponseWriter, r *http.Request) {
 		out["check"] = chk
 	}
 	if len(rows) > 0 {
-		out["next_before"] = rows[len(rows)-1].ID
+		last := rows[len(rows)-1]
+		out["next_before"], out["next_before_at"] = last.ID, last.At
 	}
 	writeJSON(w, http.StatusOK, out)
 }

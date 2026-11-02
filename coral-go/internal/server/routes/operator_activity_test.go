@@ -115,6 +115,7 @@ func TestTheHintIsPhoneOrNothingAndIgnoreAndSaveAreRecorded(t *testing.T) {
 }
 
 func TestTheRecordIsTheOperatorsAloneAndNeverThroughTheHub(t *testing.T) {
+	withLabel(t, "hub-user-1234abcd", nil) // the machine is enrolled as that account's: its owner stamp passes the owner check
 	e := newReviewEnv(t, true)
 	e.tag(t, `["for review"]`)
 	e.approve(t)
@@ -125,15 +126,59 @@ func TestTheRecordIsTheOperatorsAloneAndNeverThroughTheHub(t *testing.T) {
 	for name, hdr := range map[string]map[string]string{
 		"a Hub stamp":  {tunnel.ViaHeader: cloud.ViaSecret(), tunnel.HubUserHeader: "someone"},
 		"a forged one": {tunnel.ViaHeader: "not-the-secret", tunnel.HubUserHeader: "someone"},
+		// the Hub's OWNER: the account this computer is linked to passes the owner check on every owner route, and still does not get the record through the Hub (the explicit refusal in ListActivity; it is
+		// not in the tunnel's table either, but each of the two must hold alone)
+		"the Hub's owner": {tunnel.ViaHeader: cloud.ViaSecret(), tunnel.HubRoleHeader: "owner", tunnel.HubUserHeader: "hub-user-1234abcd"},
 	} {
 		code, _ := getActivity(t, act.URL, "", hdr)
 		assert.Equal(t, http.StatusForbidden, code, name)
 	}
-	for _, bad := range []string{"?action=bogus", "?before=-1", "?before=x", "?limit=0", "?team=../x"} {
+	for _, bad := range []string{"?action=bogus", "?before=-1", "?before=x", "?limit=0", "?team=../x", "?before_at=2026-11-02T10:00:00Z", "?before=5&before_at=yesterday"} {
 		code, _ := getActivity(t, act.URL, bad, nil)
 		assert.Equal(t, http.StatusBadRequest, code, bad)
 	}
-	assert.NotEmpty(t, fmt.Sprint(tunnel.ViaHeader))
+}
+
+// coral-hub merges one owner's records from several computers (#12070): a row's id is unique per record and the answer names the record, times are UTC with milliseconds and paging is by (time, id), the limit's
+// maximum and whether more exist are in the answer, and the check is the machine's own.
+func TestTheAnswerIsMadeForAHubThatMergesSeveralComputers(t *testing.T) {
+	e := newReviewEnv(t, true)
+	act := e.activityServer(t, true)
+	meta := board.ActivityMeta{Actor: "local", Source: "local"}
+	for i := 0; i < 5; i++ {
+		require.NoError(t, e.h.bs.RecordActivity(context.Background(), meta, board.ActSave, "file", fmt.Sprintf("item-%d", i), "", "alpha"))
+	}
+	code, out := getActivity(t, act.URL, "?limit=2", nil)
+	require.Equal(t, http.StatusOK, code, out)
+	rows := out["actions"].([]any)
+	require.Len(t, rows, 2)
+	assert.Equal(t, true, out["more"], "more exist past this page")
+	assert.Equal(t, float64(board.ActivityMaxLimit), out["limit_max"])
+	rid, _ := out["record_id"].(string)
+	assert.Len(t, rid, 32, "the record's own random id")
+	first := rows[0].(map[string]any)
+	assert.Regexp(t, `^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$`, first["at"], "UTC with milliseconds")
+	assert.Equal(t, "item-4", first["item_id"], "newest first")
+	assert.NotNil(t, out["check"], "the first page carries the machine's check")
+	// the next page by (time, id)
+	next := fmt.Sprintf("?limit=2&before=%d&before_at=%s", int64(out["next_before"].(float64)), out["next_before_at"])
+	code, out2 := getActivity(t, act.URL, next, nil)
+	require.Equal(t, http.StatusOK, code, out2)
+	rows2 := out2["actions"].([]any)
+	require.Len(t, rows2, 2)
+	assert.Equal(t, "item-2", rows2[0].(map[string]any)["item_id"])
+	assert.Equal(t, rid, out2["record_id"], "the same record")
+	assert.Nil(t, out2["check"], "not repeated on later pages")
+	code, out3 := getActivity(t, act.URL, fmt.Sprintf("?limit=2&before=%d&before_at=%s", int64(out2["next_before"].(float64)), out2["next_before_at"]), nil)
+	require.Equal(t, http.StatusOK, code)
+	assert.Equal(t, false, out3["more"], "the last page says so")
+	assert.Len(t, out3["actions"], 1)
+	// a limit past the maximum is cut to it, and no row carries a hash
+	_, big := getActivity(t, act.URL, "?limit=100000", nil)
+	assert.LessOrEqual(t, len(big["actions"].([]any)), board.ActivityMaxLimit)
+	raw, _ := json.Marshal(big)
+	assert.NotContains(t, string(raw), "prev_hash")
+	assert.NotContains(t, string(raw), `"hash"`)
 }
 
 func TestTheActorLabelIsTheStableIdOrAHashNeverTheNameOrTheEmail(t *testing.T) {
