@@ -67,9 +67,12 @@ func newSleepRig(t *testing.T) *sleepRig {
 }
 
 // two passes a minute apart, two hours after the agent's last event: the first takes the process baseline, the second may sleep it
-func (r *sleepRig) pass(t *testing.T) *store.LiveSession {
+func (r *sleepRig) pass(t *testing.T) *store.LiveSession { return r.passAfter(t, 2*time.Hour) }
+
+// passAfter is pass for a look `after` the agent's last event.
+func (r *sleepRig) passAfter(t *testing.T, after time.Duration) *store.LiveSession {
 	t.Helper()
-	at := time.Now().Add(2 * time.Hour)
+	at := time.Now().Add(after)
 	r.h.autoSleepPass(r.ctx, at)
 	r.h.autoSleepPass(r.ctx, at.Add(time.Minute))
 	ls, err := r.ss.GetLiveSession(r.ctx, r.sid)

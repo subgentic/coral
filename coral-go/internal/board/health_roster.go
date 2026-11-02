@@ -187,3 +187,53 @@ func (s *Store) MentionedBy(ctx context.Context, project, name, title string, si
 	}
 	return time.Time{}, nil
 }
+
+// AutoAsleepNeed is an auto-asleep agent (#12111) that something directed is waiting for: a mention of it, a reply to its post, or a task assigned to it that is not started.
+type AutoAsleepNeed struct {
+	Project, SubscriberID, SessionID string
+}
+
+// AutoAsleepNeeds lists the auto-asleep agents on boards (every board when nil) with something directed at them: a message that mentions the agent by name or title (UnreadTags counts those
+// and the asks and replies among them), or a task assigned to it. A broadcast that names no one, "@all" included, wakes no one (Security). Nothing is read for a board with no auto-asleep agent.
+func (s *Store) AutoAsleepNeeds(ctx context.Context, boards map[string]bool) ([]AutoAsleepNeed, error) {
+	if s.sessionsDB == nil {
+		return nil, nil
+	}
+	var projects []string
+	if err := s.reader().SelectContext(ctx, &projects, `SELECT DISTINCT project FROM board_subscribers WHERE is_active = 1`); err != nil {
+		return nil, err
+	}
+	var out []AutoAsleepNeed
+	for _, project := range projects {
+		if boards != nil && !boards[project] {
+			continue
+		}
+		auto, err := s.AutoAsleepSubscribers(ctx, project)
+		if err != nil || len(auto) == 0 {
+			continue
+		}
+		subs, err := s.ListSubscribers(ctx, project)
+		if err != nil {
+			continue
+		}
+		tasks, _ := s.ListTasks(ctx, project)
+		for _, sub := range subs {
+			if !auto[sub.SubscriberID] || sub.SessionName == "" {
+				continue
+			}
+			need := false
+			if tags, err := s.UnreadTags(ctx, project, sub.SubscriberID); err == nil && tags.Total > 0 { // a message that mentions this agent by name or title, a question to it or a reply to its post: not a broadcast that names no one
+				need = true
+			}
+			for _, t := range tasks {
+				if t.Status == "pending" && t.AssignedTo != nil && SameIdentity(*t.AssignedTo, sub.SubscriberID) {
+					need = true
+				}
+			}
+			if need {
+				out = append(out, AutoAsleepNeed{Project: project, SubscriberID: sub.SubscriberID, SessionID: naming.SessionIDFromName(sub.SessionName)})
+			}
+		}
+	}
+	return out, nil
+}

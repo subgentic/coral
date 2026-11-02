@@ -605,6 +605,8 @@ const (
 	StartFailureCLIMissing     = "cli_missing"         // the CLI is on neither PATH nor a common place
 	StartFailureUntrustedMount = "cli_untrusted_mount" // Windows will not open a folder on PATH or the CLI's own (#340)
 	StartFailureCLIPath        = "cli_path_unusable"   // the configured Settings > CLI paths entry can't be run (#115)
+	StartFailureFolderGone     = "folder_gone"         // an auto-asleep agent's folder is gone: it is not woken (#12111)
+	StartFailureWakeFailed     = "wake_failed"         // a delivery's wake of an auto-asleep agent did not start it (#12111)
 )
 
 // SleepReasonCoralStopped: the agent was running when a pty Coral stopped (cleanly, or a crash

@@ -274,6 +274,7 @@ func startBoardServices(ctx context.Context, cfg *config.Config, srv *server.Ser
 			ls, err := sessStore.GetLiveSession(ctx, sessionID)
 			return err == nil && ls != nil && ls.IsSleeping == 1
 		})
+		boardNotifier.SetAutoWakeFn(srv.WakeIdleForDelivery)          // a mention, reply or assigned task wakes an auto-asleep agent (#12111)
 		boardNotifier.SetLiftSleepPauseFn(bh.LiftSleepPauseSeenAwake) // a board sleep paused, with an awake agent on it, is resumed by the notifier (#11182)
 		bh.SetNotifyFn(boardNotifier.NotifyBoard)
 	}

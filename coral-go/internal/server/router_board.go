@@ -46,6 +46,7 @@ func (s *Server) configureBoardHandlers(h *routeHandlers) (*routes.BoardHandler,
 	boardHandler.SetLiveSessionLookup(routes.LiveSessionLookup(store.NewSessionStore(s.db)))
 	boardHandler.SetSessionAsleepLookup(routes.SessionAsleepLookup(store.NewSessionStore(s.db)))
 	boardHandler.SetNeedsYouAgents(sessHandler.NeedsYouAgents)
+	boardHandler.SetIdleWaker(sessHandler.WakeIdleForDelivery) // any typed delivery to an auto-asleep agent wakes it first (#12111)
 	boardHandler.SetSessionThinkingLookup(routes.SessionThinkingLookup(store.NewSessionStore(s.db)))
 	boardHandler.SetTaskArtifactWriter(s.cfg.CoralDir(), sessHandler.PersistTaskChanges)
 	sessStore := store.NewSessionStore(s.db)
