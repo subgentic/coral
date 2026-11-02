@@ -10,12 +10,9 @@ import (
 // tagRe is a release tag as release.yml is run for: v, three numbers, and an optional suffix (-dev, -beta, -rc1, -forDropbox).
 var tagRe = regexp.MustCompile(`^v[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,4}(-[A-Za-z0-9.]{1,32})?$`)
 
-// ReleaseFiles verifies a release package that was downloaded WITHOUT the updater's promote manifest (#11370: the self-hosted hub installs the release it runs itself onto another computer, over SSH):
-// the release's SHA256SUMS.txt against its Sigstore bundle for the release signer of exactly this tag (the same pinned identity and repository id as the updater, never a pattern), the sums file's
-// entry for asset, and the package's own hash against it. It returns the package's SHA-256 (lower-case hex) for the later re-check on the far computer.
-//
-// It has no promote manifest, so none of the updater's rollout rules apply (no "newer than installed", no revocation): the caller names the version, and it is the release the hub itself runs.
-func ReleaseFiles(v BundleVerifier, pins Pins, tag string, sums, sumsBundle []byte, asset string, pkg io.Reader, maxPackage int64) (string, error) {
+// ReleaseSums is the first half of ReleaseFiles: the sums file is checked against the release signer of exactly this tag, and the signed SHA-256 of asset is returned, with no package read. A
+// self-hosted hub uses it to pin the hash a far computer must see after it downloads the package itself (#12217).
+func ReleaseSums(v BundleVerifier, pins Pins, tag string, sums, sumsBundle []byte, asset string) (string, error) {
 	if !tagRe.MatchString(tag) {
 		return "", fail(StageSumsFormat, "%q is not a release tag", tag)
 	}
@@ -32,6 +29,19 @@ func ReleaseFiles(v BundleVerifier, pins Pins, tag string, sums, sumsBundle []by
 	want, ok := entries[asset]
 	if !ok {
 		return "", fail(StageAssetMissing, "%s is not in the signed sums file", asset)
+	}
+	return want, nil
+}
+
+// ReleaseFiles verifies a release package that was downloaded WITHOUT the updater's promote manifest (#11370: the self-hosted hub installs the release it runs itself onto another computer, over SSH):
+// the release's SHA256SUMS.txt against its Sigstore bundle for the release signer of exactly this tag (the same pinned identity and repository id as the updater, never a pattern), the sums file's
+// entry for asset, and the package's own hash against it. It returns the package's SHA-256 (lower-case hex) for the later re-check on the far computer.
+//
+// It has no promote manifest, so none of the updater's rollout rules apply (no "newer than installed", no revocation): the caller names the version, and it is the release the hub itself runs.
+func ReleaseFiles(v BundleVerifier, pins Pins, tag string, sums, sumsBundle []byte, asset string, pkg io.Reader, maxPackage int64) (string, error) {
+	want, err := ReleaseSums(v, pins, tag, sums, sumsBundle, asset)
+	if err != nil {
+		return "", err
 	}
 	h := sha256.New()
 	n, err := io.Copy(h, io.LimitReader(pkg, maxPackage+1))

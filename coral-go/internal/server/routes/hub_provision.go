@@ -86,9 +86,20 @@ type provisionPlan struct {
 	Mode     string
 	Kind     string // "" or "setup": a new server; "upgrade", "stop", "remove": one already registered (#11370)
 	Delete   bool   // remove: also delete the data (the key, the history, the instance id)
-	phase    string
-	steps    []provisionStep
-	keys     []sshprov.HostKey // held here: what is trusted is THIS, never a key from a request
+	// remoteVersion is the Coral version that computer answered with when an upgrade was planned ("" when it did not answer); allowDowngrade is the person's choice, sent with the run, to install this hub's
+	// older release over a newer one (#12217).
+	remoteVersion  string
+	allowDowngrade bool
+	// backend is the terminal backend the person chose for a set up ("pty" when they said nothing, or "tmux"), sent with the run (#12233); tmux is what the connect step found out about that computer:
+	// "yes", "no", or "" before it was asked. An upgrade keeps the backend the computer was started with.
+	backend string
+	tmux    string
+	// agentsSurvive is, for an upgrade, whether the agents on that computer survive the restart: it runs with tmux (the backend recorded there, or tmux where it is installed and none was recorded). "" before
+	// it was read, then "yes" or "no".
+	agentsSurvive string
+	phase         string
+	steps         []provisionStep
+	keys          []sshprov.HostKey // held here: what is trusted is THIS, never a key from a request
 	// acceptance is what the far Coral is given on stdin: this hub's own terms version and digest and who. It is made by the server from the hub's own marker, never from the request; nil on a tier that skips the EULA.
 	acceptance []byte
 	system     string
@@ -125,6 +136,18 @@ func (p *provisionPlan) view() map[string]any {
 	if p.Kind == kindRemove {
 		v["delete_data"] = p.Delete
 	}
+	if p.kind() == kindSetup {
+		v["backend"] = p.backendOrDefault()
+		if p.tmux != "" {
+			v["tmux"] = p.tmux == "yes" // whether that computer has tmux, so the page can say which choices are open
+		}
+	}
+	if p.Kind == kindUpgrade && p.agentsSurvive != "" {
+		v["agents_survive"] = p.agentsSurvive == "yes"
+	}
+	if p.Kind == kindUpgrade { // the versions side by side, and whether this would be a downgrade, so the page can say so before anything runs
+		v["hub_version"], v["remote_version"], v["downgrade"] = config.ReportedVersion(), p.remoteVersion, remoteIsNewer(p.remoteVersion, config.ReportedVersion())
+	}
 	if len(keys) > 0 && p.phase == phaseKeys {
 		v["host_keys"] = keys
 	}
@@ -141,6 +164,14 @@ func (p *provisionPlan) view() map[string]any {
 		v["forgotten_keys"] = append([]provisionKey(nil), p.forgotten...)
 	}
 	return v
+}
+
+// backendOrDefault is the backend of a set up: tmux only when the person chose it.
+func (p *provisionPlan) backendOrDefault() string {
+	if p.backend == sshprov.BackendTmux {
+		return sshprov.BackendTmux
+	}
+	return sshprov.BackendPTY
 }
 
 func (p *provisionPlan) setStep(name, state, detail string) {
@@ -240,7 +271,7 @@ func (pr *Provisioner) expireLocked() {
 type planRequest struct {
 	Target string `json:"target"` // user@host[:port]
 	Alias  string `json:"alias"`  // a Host name of the owner's SSH config
-	Mode   string `json:"mode"`   // "tmux" (the only one so far)
+	Mode   string `json:"mode"`   // "daemon" (the only one: a detached process); "tmux" is the name an earlier plan used and is taken as the same
 	Label  string `json:"label"`
 	// ServerID and Action manage a server that is already registered and was set up over SSH: "upgrade", "stop" or "remove" (DeleteData with remove). The target is the registry's, never the request's.
 	ServerID   string `json:"server_id"`
@@ -288,8 +319,8 @@ func (pr *Provisioner) Plan(w http.ResponseWriter, r *http.Request) {
 		errBadRequest(w, "that is not a valid SSH target")
 		return
 	}
-	if req.Mode != "" && req.Mode != "tmux" {
-		errBadRequest(w, "only tmux is available so far")
+	if req.Mode != "" && req.Mode != "daemon" && req.Mode != "tmux" {
+		errBadRequest(w, "only a background process is available so far")
 		return
 	}
 	id := serverIDFor(t)
@@ -312,7 +343,7 @@ func (pr *Provisioner) Plan(w http.ResponseWriter, r *http.Request) {
 		errBadRequest(w, "the label is too long or has a control character")
 		return
 	}
-	p := &provisionPlan{ID: newPlanID(), Target: t, ServerID: id, Label: label, Mode: "tmux", phase: phasePlanned, created: time.Now(), steps: planSteps()}
+	p := &provisionPlan{ID: newPlanID(), Target: t, ServerID: id, Label: label, Mode: "daemon", phase: phasePlanned, created: time.Now(), steps: planSteps()}
 	pr.mu.Lock()
 	pr.expireLocked()
 	if len(pr.plans) >= provisionMaxPlans {
@@ -328,9 +359,9 @@ func (pr *Provisioner) Plan(w http.ResponseWriter, r *http.Request) {
 func planSteps() []provisionStep {
 	return []provisionStep{
 		{Name: "connect", Title: "Connect over SSH and check the host key", State: stepPending},
-		{Name: "detect", Title: "Check the system and tmux", State: stepPending},
+		{Name: "detect", Title: "Check the system", State: stepPending},
 		{Name: "install", Title: "Download, verify and install Coral", State: stepPending},
-		{Name: "start", Title: "Start Coral in tmux, listening on loopback only", State: stepPending},
+		{Name: "start", Title: "Start Coral in the background, listening on loopback only", State: stepPending},
 		{Name: "register", Title: "Connect it to this hub", State: stepPending},
 	}
 }
@@ -358,9 +389,25 @@ func (pr *Provisioner) Connect(w http.ResponseWriter, r *http.Request) {
 	res, err := pr.runner.Run(ctx, p.Target, sshprov.CmdUname)
 	switch {
 	case err == nil:
+		tm, terr := pr.runner.Run(ctx, p.Target, sshprov.CmdHasTmux) // what the page needs to say which backends are open; a failure here only leaves it unknown
 		p.mu.Lock()
 		p.phase, p.keys, p.system = phaseConnected, nil, knownSystem(res.Stdout)
+		if terr == nil {
+			p.tmux = map[bool]string{true: "yes", false: "no"}[tm.ExitCode == 0]
+		}
 		p.mu.Unlock()
+		if p.Kind == kindUpgrade && terr == nil { // what a restart for the upgrade does to that computer's agents, said before the person presses Upgrade
+			rb, berr := pr.runner.Run(ctx, p.Target, sshprov.CmdReadBackend)
+			if berr == nil {
+				b := strings.TrimSpace(rb.Stdout)
+				if b != sshprov.BackendPTY && b != sshprov.BackendTmux {
+					b = map[bool]string{true: sshprov.BackendTmux, false: sshprov.BackendPTY}[tm.ExitCode == 0] // no record: it was set up in tmux, and keeps tmux where it is installed
+				}
+				p.mu.Lock()
+				p.agentsSurvive = map[bool]string{true: "yes", false: "no"}[b == sshprov.BackendTmux]
+				p.mu.Unlock()
+			}
+		}
 		p.setStep("connect", stepOK, "Connected; the host key is already known.")
 	case errors.Is(err, sshprov.ErrHostKeyChanged):
 		p.mu.Lock()
@@ -410,6 +457,10 @@ type runRequest struct {
 	TermsSHA256 string `json:"terms_sha256"`
 	// Confirm is the server's id, typed by the person, for a remove.
 	Confirm string `json:"confirm"`
+	// Backend is the terminal backend of a set up: "pty" (the default: agents end when Coral restarts or is upgraded) or "tmux" (they survive; the computer must have tmux). Ignored for other plans.
+	Backend string `json:"backend"`
+	// AllowDowngrade lets an upgrade install this hub's release over a NEWER one on that computer; without it that is refused before anything is changed (#12217).
+	AllowDowngrade bool `json:"allow_downgrade"`
 }
 
 // Run handles POST /api/servers/provision/{plan}/run. A setup or an upgrade carries the acceptance this hub's own EULA marker holds (the person accepted when they opened Coral; the far computer records it as
@@ -428,6 +479,10 @@ func (pr *Provisioner) Run(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, 1024)
 	if err := decodeJSON(r, &req); err != nil {
 		errBadRequest(w, "invalid request body")
+		return
+	}
+	if req.Backend != "" && req.Backend != sshprov.BackendPTY && req.Backend != sshprov.BackendTmux {
+		errBadRequest(w, "the backend is pty or tmux")
 		return
 	}
 	// A setup and an upgrade put Coral on the computer and record this hub's acceptance of the terms there. Stop and remove do not touch the terms. On a tier that requires the EULA the marker must hold the
@@ -464,6 +519,12 @@ func (pr *Provisioner) Run(w http.ResponseWriter, r *http.Request) {
 		p.mu.Unlock()
 		errConflict(w, "this setup is not ready to run, or is already running")
 		return
+	}
+	if p.Kind == kindUpgrade {
+		p.allowDowngrade = req.AllowDowngrade
+	}
+	if p.kind() == kindSetup && req.Backend == sshprov.BackendTmux {
+		p.backend = sshprov.BackendTmux
 	}
 	p.mu.Unlock()
 	if len(keys) > 0 {
@@ -588,14 +649,26 @@ func (pr *Provisioner) detect(ctx context.Context, p *provisionPlan) (sshprov.Ar
 		pr.failConnect(p, "detect", err)
 		return "", false
 	}
-	if tm.ExitCode != 0 {
-		pr.fail(p, "detect", "tmux is not installed on that computer.")
-		return "", false
-	}
 	p.mu.Lock()
 	p.system = knownSystem(sys)
 	p.mu.Unlock()
-	p.setStep("detect", stepOK, sys+", tmux found.")
+	hasTmux := tm.ExitCode == 0
+	p.mu.Lock()
+	p.tmux = map[bool]string{true: "yes", false: "no"}[hasTmux]
+	p.mu.Unlock()
+	switch {
+	case p.kind() != kindSetup: // an upgrade starts the new release the way the old one was started
+		p.setStep("detect", stepOK, sys+".")
+	case p.backendOrDefault() == sshprov.BackendTmux && !hasTmux:
+		pr.fail(p, "detect", "tmux was chosen, but it is not installed on that computer. Choose the background process (pty), or install tmux there and set up again.")
+		return "", false
+	case p.backendOrDefault() == sshprov.BackendTmux:
+		p.setStep("detect", stepOK, sys+", tmux found: its agents survive a restart of Coral.")
+	case hasTmux:
+		p.setStep("detect", stepOK, sys+". Coral will run in the background with the pty backend: its agents end when Coral restarts or is upgraded. tmux is installed there; choose it to keep agents running.")
+	default:
+		p.setStep("detect", stepOK, sys+". Coral will run in the background with the pty backend: its agents end when Coral restarts or is upgraded.")
+	}
 	arch, _ := sshprov.ArchOf(sys)
 	return arch, true
 }
@@ -634,12 +707,12 @@ func (pr *Provisioner) setupSteps(ctx context.Context, p *provisionPlan, arch ss
 
 // finish starts the installed Coral, reads what the hub needs and registers it. Every sentence is fixed: the key is held in a local variable, never in a log, an error, a step or the plan.
 func (pr *Provisioner) finish(ctx context.Context, p *provisionPlan) error {
-	p.setStep("start", stepRunning, "Starting Coral in tmux, listening on this computer's loopback only.")
+	p.setStep("start", stepRunning, "Starting Coral in the background, listening on this computer's loopback only.")
 	instanceID, key, err := pr.startRemote(ctx, p)
 	if err != nil {
 		return err
 	}
-	p.setStep("start", stepOK, "Coral is running in the tmux session coral-server.")
+	p.setStep("start", stepOK, "Coral is running in the background (its log is ~/.coral-server/coral.log).")
 
 	p.setStep("register", stepRunning, "Connecting it to this hub over SSH.")
 	rs := &store.RemoteServer{ID: p.ServerID, SSHTarget: p.Target.Stored(), RemotePort: sshprov.RemotePort}
@@ -693,9 +766,12 @@ func (pr *Provisioner) realStartRemote(ctx context.Context, p *provisionPlan) (s
 		}
 		slog.Info("[provision] terms acceptance recorded for a setup", "plan", p.ID, "version", license.EULAVersion, "by", setupAcceptanceLabel(), "at", time.Now().UTC().Format(time.RFC3339))
 	}
-	if err := pr.runner.StartTmux(ctx, p.Target, pr.version); err != nil {
+	if err := pr.runner.Start(ctx, p.Target, pr.version, p.backendOrDefault()); err != nil {
 		if errors.Is(err, sshprov.ErrPortInUse) {
 			return "", "", fail(portInUseSentence)
+		}
+		if errors.Is(err, sshprov.ErrNoTmux) {
+			return "", "", fail("tmux is not installed on that computer.")
 		}
 		return "", "", fail("Could not start Coral on that computer.")
 	}
@@ -854,6 +930,7 @@ func (pr *Provisioner) ForgetKey(w http.ResponseWriter, r *http.Request) {
 		errInternalServer(w, "could not remove the saved host key")
 		return
 	}
+	pr.runner.CloseShared(r.Context(), p.Target)                                     // a session made under the key that was just forgotten is not used again (#12221)
 	slog.Info("[provision] the owner forgot a host key", "plan", p.ID, "host", name) // the host is a name the owner typed or their own ssh config names, never a key
 	p.mu.Lock()
 	p.phase, p.keyChanged, p.failure, p.keys = phasePlanned, false, "", nil

@@ -159,7 +159,7 @@ function drawDetail() {
 
 /** The files whose text this view can show and the Operator has not had on screen yet (SKILL.md is on screen at first). The ones that cannot be shown are the second step's. */
 const unopenedFiles = d => (d.files || []).filter(f => (d.contents || {})[f.path] != null && !open.opened.has(f.path));
-const confirmOrSay = (title, text, fn, opts) => { if (typeof window.showConfirmModal === 'function') window.showConfirmModal(title, text, fn, undefined, opts); else showToast('The confirm box is not available, so nothing was done. Reload the page and try again.', true); };
+const confirmOrSay = (title, text, fn, opts) => { if (typeof window.showConfirmModal === 'function') window.showConfirmModal(title, text, fn, undefined, { label: opts.label, danger: opts.danger === true }); else showToast('The confirm box is not available, so nothing was done. Reload the page and try again.', true); };
 
 function drawApproval(s, risky) {
     const wrap = el('div', 'skills-section');

@@ -113,3 +113,38 @@ func TestVerifyPackageFailsWhenTheTrustedRootCannotLoad(t *testing.T) {
 	assert.Contains(t, out.String(), "trusted_root")
 	assert.NotContains(t, out.String(), "offline", "the cause is not echoed")
 }
+
+// verify-sums (#12217): the same signer check with no package in the folder; the output is the SIGNED hash of the asset, which a far computer must see after it downloads the package itself.
+func runVerifySumsCmd(t *testing.T, args ...string) (int, verifyOutput) {
+	t.Helper()
+	old := verifierFor
+	verifierFor = func(context.Context) (verify.BundleVerifier, string, error) { return &stubVerifier{}, "embedded", nil }
+	defer func() { verifierFor = old }()
+	var out bytes.Buffer
+	code := run(append([]string{"verify-sums"}, args...), func(string) string { return "" }, &out)
+	var o verifyOutput
+	require.NoError(t, json.Unmarshal(out.Bytes(), &o), out.String())
+	return code, o
+}
+
+func TestVerifySumsReturnsTheSignedHashWithNoPackage(t *testing.T) {
+	asset := "coral-linux-amd64-2.0.10.tar.gz"
+	dir := packageDir(t, []byte("package"), asset)
+	require.NoError(t, os.Remove(filepath.Join(dir, asset)))
+	code, o := runVerifySumsCmd(t, "--tag", "v2.0.10", "--asset", asset, "--dir", dir)
+	require.Equal(t, 0, code, "%+v", o)
+	sum := sha256.Sum256([]byte("package"))
+	assert.Equal(t, "verified", o.Result)
+	assert.Equal(t, hex.EncodeToString(sum[:]), o.SHA256)
+
+	forged := packageDir(t, []byte("package"), asset)
+	require.NoError(t, os.WriteFile(filepath.Join(forged, "SHA256SUMS.txt.sigstore.json"), []byte("forged"), 0o600))
+	code, o = runVerifySumsCmd(t, "--tag", "v2.0.10", "--asset", asset, "--dir", forged)
+	assert.Equal(t, 1, code)
+	assert.Equal(t, verify.StageSumsSignature, o.FailedStage, "a sums file that is not the release's is refused, and no hash is given")
+	assert.Empty(t, o.SHA256)
+
+	code, o = runVerifySumsCmd(t, "--tag", "v2.0.10", "--asset", "coral-linux-arm64-2.0.10.tar.gz", "--dir", dir)
+	assert.Equal(t, 1, code)
+	assert.Equal(t, verify.StageAssetMissing, o.FailedStage, "an asset the signed sums do not name has no hash")
+}

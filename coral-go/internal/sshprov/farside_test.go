@@ -136,7 +136,80 @@ func runFar(f farCfg, text string) int {
 		}
 		fmt.Println(out)
 		return 0
-	case has("command -v tmux"), has("systemctl --user"):
+	case has("command -v curl >/dev/null"): // CmdDownload (#12217): the far computer fetches the package from the release URL itself and checks the SHA-256 the hub gave. The "network" is the file pkg.bin above Home.
+		if f.Mode == "nocurl" {
+			return 6
+		}
+		if vdir == "" || !strings.Contains(text, "--proto '=https'") || !strings.Contains(text, "--proto-redir '=https'") || !strings.Contains(text, "https://github.com/subgentic/coral/releases/download/v") {
+			return 2
+		}
+		if f.Mode == "dlfail" {
+			return 4
+		}
+		b, err := os.ReadFile(filepath.Join(filepath.Dir(f.Home), "pkg.bin"))
+		if err != nil {
+			return 4
+		}
+		if f.Mode == "corrupt" && len(b) > 100 {
+			b = b[:100]
+		}
+		sum := sha256.Sum256(b)
+		if m := regexp.MustCompile(`= '([0-9a-f]{64})'`).FindStringSubmatch(text); m == nil || m[1] != hex.EncodeToString(sum[:]) {
+			return 5 // a package that is not the expected one is deleted and never kept
+		}
+		if err := os.WriteFile(filepath.Join(vdir, "package.tar.gz"), b, 0o600); err != nil {
+			return 1
+		}
+		return 0
+	case has("nohup ") && has("coral.pid"): // CmdStartDaemon (#12217): a detached Coral, its PID in coral.pid, its output in coral.log; one that is alive is left as it is
+		_ = os.MkdirAll(filepath.Join(install, "data"), 0o700)
+		if f.flag("session") {
+			return 0
+		}
+		for _, must := range []string{`--host 127.0.0.1 --port 8420 --no-browser --cloud-url off --backend "$B" --home "$H"`, `</dev/null`, `coral.log`, `exec "$C"`} {
+			if !has(must) {
+				fmt.Fprintln(os.Stderr, "the daemon start lacks", must)
+				return 2
+			}
+		}
+		bm := regexp.MustCompile(`b=(pty|tmux|keep); `).FindStringSubmatch(text)
+		if bm == nil {
+			fmt.Fprintln(os.Stderr, "the daemon start names no backend")
+			return 2
+		}
+		backend := bm[1]
+		bfile := filepath.Join(install, "backend")
+		if backend == "keep" { // the file, else tmux when it is there (a server set up before the choice existed)
+			b, _ := os.ReadFile(bfile)
+			backend = strings.TrimSpace(string(b))
+			if backend != "pty" && backend != "tmux" {
+				backend = "tmux"
+				if f.flag("notmux") {
+					backend = "pty"
+				}
+			}
+		}
+		if backend == "tmux" && f.flag("notmux") {
+			return 7
+		}
+		_ = os.WriteFile(bfile, []byte(backend), 0o600)
+		appendLine(f.TmuxLog, "daemon-start")
+		f.setFlag("session", true)
+		appendLine(f.ArgsLog, "--host 127.0.0.1 --port 8420 --no-browser --cloud-url off --backend "+backend+" --home "+filepath.Join(install, "data"))
+		_ = os.WriteFile(filepath.Join(filepath.Dir(f.Home), "started"), []byte(fmt.Sprint(time.Now().UnixNano())), 0o600) // the command gave Coral </dev/null, so it gets going
+		return 0
+	case has(`kill "$(cat`): // CmdStopDaemon: only the PID that is a Coral of the install (the command's own test) is signalled
+		appendLine(f.TmuxLog, "kill-daemon")
+		if !f.flag("stuck") {
+			f.setFlag("session", false)
+		}
+		return 0
+	case has("command -v tmux"):
+		if f.flag("notmux") {
+			return 1
+		}
+		return 0
+	case has("systemctl --user"):
 		return 0
 	case has(`ps -u "$(id -u)"`): // the check after a stop: the session, then THIS user's own Coral process (the flag listening), never the port
 		switch {

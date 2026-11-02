@@ -47,7 +47,13 @@ var verifierFor = func(ctx context.Context) (verify.BundleVerifier, string, erro
 	return verify.Sigstore{Trust: trust}, string(source), nil
 }
 
-func runVerifyPackage(args []string, stdout io.Writer) int {
+func runVerifyPackage(args []string, stdout io.Writer) int { return verifyRelease(args, stdout, true) }
+
+// runVerifySums is verify-package without the package (#12217): the folder holds SHA256SUMS.txt and its bundle only, and the output's sha256 is the asset's hash in the SIGNED sums, which the far
+// computer must see after it downloads the package. "verified" here says nothing about any package.
+func runVerifySums(args []string, stdout io.Writer) int { return verifyRelease(args, stdout, false) }
+
+func verifyRelease(args []string, stdout io.Writer, withPackage bool) int {
 	fail := func(stageName, reason string) int {
 		print2(stdout, verifyOutput{Result: "failed", FailedStage: stageName, Reason: reason})
 		return 1
@@ -90,16 +96,25 @@ func runVerifyPackage(args []string, stdout io.Writer) int {
 	if err != nil {
 		return fail("sums_signature", "the signature bundle could not be read")
 	}
-	pkg, err := stage.OpenPlain(filepath.Join(dir, asset))
-	if err != nil {
-		return fail("package", "the package could not be read")
+	var pkg io.Reader
+	if withPackage {
+		f, err := stage.OpenPlain(filepath.Join(dir, asset))
+		if err != nil {
+			return fail("package", "the package could not be read")
+		}
+		defer f.Close()
+		pkg = f
 	}
-	defer pkg.Close()
 	v, source, err := verifierFor(ctx)
 	if err != nil {
 		return fail("trusted_root", "the Sigstore trusted root could not be loaded")
 	}
-	sum, err := verify.ReleaseFiles(v, verify.DefaultPins(), tag, sums, bundle, asset, pkg, verifyPackageMax)
+	var sum string
+	if withPackage {
+		sum, err = verify.ReleaseFiles(v, verify.DefaultPins(), tag, sums, bundle, asset, pkg, verifyPackageMax)
+	} else {
+		sum, err = verify.ReleaseSums(v, verify.DefaultPins(), tag, sums, bundle, asset)
+	}
 	if err != nil {
 		var f *verify.Failure
 		if errors.As(err, &f) {

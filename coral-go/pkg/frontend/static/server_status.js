@@ -400,3 +400,22 @@ export function formatLastSeen(ts, now = Date.now()) {
 export function isValidServerId(id) {
     return /^[a-z0-9-]{1,32}$/.test(id) && id !== LOCAL_SERVER;
 }
+
+/* Which of two Coral versions is newer (#12233): the numbers first, a release before its own pre-release (2.0.34 is newer than 2.0.34-beta), then the pre-release's words. compareVersions returns -1, 0 or 1, and
+ * null when either is not a plain version (so a page never says "newer" or "older" about something it cannot read). The same order the hub uses in Go (internal/semverorder). */
+const VERSION_RE = /^v?(\d{1,4})\.(\d{1,4})\.(\d{1,4})(?:-([0-9A-Za-z.]{1,32}))?$/;
+
+export function parseVersion(v) {
+    const m = VERSION_RE.exec(String(v == null ? '' : v).trim());
+    return m ? { nums: [Number(m[1]), Number(m[2]), Number(m[3])], pre: m[4] || '' } : null;
+}
+
+export function compareVersions(a, b) {
+    const x = parseVersion(a), y = parseVersion(b);
+    if (!x || !y) return null;
+    for (let i = 0; i < 3; i++) if (x.nums[i] !== y.nums[i]) return x.nums[i] < y.nums[i] ? -1 : 1;
+    if (x.pre === y.pre) return 0;
+    if (!x.pre) return 1;
+    if (!y.pre) return -1;
+    return x.pre < y.pre ? -1 : 1;
+}

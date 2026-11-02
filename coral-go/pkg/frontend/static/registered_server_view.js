@@ -17,7 +17,7 @@ import { HUB_FEATURES_OFF } from './server_status.js';
 import { mountSettingsView } from './settings_view.js'; // the add and edit form (a startup module)
 import {
     statusMeta, escHtml, describeServerError, formatLastSeen, isValidServerId,
-    serverVersion, serverAgentCount, updateBadgeHtml, belowMinimumText,
+    serverVersion, serverAgentCount, updateBadgeHtml, belowMinimumText, compareVersions,
 } from './server_status.js';
 import { syncServersBar, serverVisible, serversFiltered } from './server_search.js'; // this module is in the startup graph (app.js imports it), so its search box is imported directly
 
@@ -160,6 +160,15 @@ function factHtml(label, value) {
     return value ? `<div class="servers-fact"><dt>${escHtml(label)}</dt><dd>${value}</dd></div>` : '';
 }
 
+/** The Upgrade control of a computer set up over SSH (#12233): "Upgrade to v<this hub's>" when it runs an older Coral, "Downgrade to v..." when it runs a newer one (the page then asks to allow it), "Up to date" when
+ *  it runs this hub's release, and plain "Upgrade" when either version is not known. */
+function upgradeControl(s, remoteVersion, busy) {
+    const hub = state.localVersion, order = compareVersions(remoteVersion, hub);
+    if (order === 0) return '<span class="servers-uptodate" role="note">Up to date</span>';
+    const label = order === null ? 'Upgrade' : `${order > 0 ? 'Downgrade' : 'Upgrade'} to v${escHtml(hub)}`;
+    return `<button type="button" class="btn${order < 0 ? ' btn-primary' : ''}" data-action="ssh-upgrade" data-id="${escHtml(s.id)}"${busy ? ' disabled' : ''}>${label}</button>`;
+}
+
 /** A server's page: its facts, what to do about a problem, and Test, Edit and Remove in a bar pinned at its foot (Remove the danger button, the primary last). */
 function pageHtml(s) {
     const live = liveOf(s);
@@ -185,7 +194,7 @@ function pageHtml(s) {
            <button type="button" class="btn btn-danger" data-action="delete-confirm" data-id="${escHtml(s.id)}">Confirm remove</button>`
         : `<button type="button" class="btn" data-action="test" data-id="${escHtml(s.id)}"${busy ? ' disabled aria-busy="true"' : ''}>${busy ? 'Testing...' : 'Test'}</button>
            <button type="button" class="btn" data-action="edit" data-id="${escHtml(s.id)}"${busy ? ' disabled' : ''}>Edit</button>
-           ${s.transport === 'ssh' ? `<button type="button" class="btn" data-action="ssh-upgrade" data-id="${escHtml(s.id)}"${busy ? ' disabled' : ''}>Upgrade</button>
+           ${s.transport === 'ssh' ? `${upgradeControl(s, version, busy)}
            <button type="button" class="btn" data-action="ssh-stop" data-id="${escHtml(s.id)}"${busy ? ' disabled' : ''}>Stop Coral</button>
            <button type="button" class="btn btn-danger" data-action="ssh-remove" data-id="${escHtml(s.id)}"${busy ? ' disabled' : ''}>Uninstall</button>` : ''}
            ${s.transport !== 'ssh' ? `<button type="button" class="btn" data-action="owner-secret" data-id="${escHtml(s.id)}"${busy ? ' disabled' : ''}>${s.owner_stamp ? 'Change the Approve secret' : 'Approve through this hub'}</button>` : ''}
@@ -196,7 +205,7 @@ function pageHtml(s) {
         <p class="item-meta">${statusPill(status)}</p>
         <dl class="facts servers-facts">
             ${factHtml('URL', escHtml(s.url || ''))}
-            ${factHtml('Coral', `${escHtml(version ? `Coral ${version}` : 'Not known yet')}${badge ? ' ' + badge : ''}`)}
+            ${factHtml('Coral', `${escHtml(version ? `Coral ${version}` : 'Not known yet')}${s.transport === 'ssh' && version && state.localVersion && compareVersions(version, state.localVersion) !== 0 ? escHtml(` (this hub runs ${state.localVersion})`) : ''}${badge ? ' ' + badge : ''}`)}
             ${factHtml('Agents', escHtml(agentsText(agents)))}
             ${factHtml('Last seen', escHtml(contact))}
         </dl>

@@ -256,14 +256,13 @@ func TestProvisionRefusesAChangedHostKeyAndNeverOffersIt(t *testing.T) {
 	assert.True(t, os.IsNotExist(err))
 }
 
-func TestProvisionDetectStopsOnAnUnsupportedSystemOrNoTmux(t *testing.T) {
+func TestProvisionDetectStopsOnAnUnsupportedSystem(t *testing.T) {
 	for name, c := range map[string]struct {
 		uname string
 		tmux  bool
 		want  string
 	}{
-		"macos":  {"Darwin arm64", true, "not supported"},
-		"notmux": {"Linux x86_64", false, "tmux is not installed"},
+		"macos": {"Darwin arm64", true, "not supported"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			pe := newProvEnv(t, "known", c.uname, c.tmux)
@@ -277,6 +276,59 @@ func TestProvisionDetectStopsOnAnUnsupportedSystemOrNoTmux(t *testing.T) {
 			assert.Contains(t, failed["error"], c.want)
 		})
 	}
+}
+
+// The backend is the person's choice (#12233): pty by default (agents end when Coral restarts or is upgraded), tmux when chosen and installed there; tmux chosen where it is not installed stops at the check,
+// before anything is installed. The connect step tells the page whether the computer has tmux.
+func TestProvisionBackendChoice(t *testing.T) {
+	for name, c := range map[string]struct {
+		tmux    bool
+		backend string
+		phase   string
+		want    string
+	}{
+		"default, no tmux":    {false, "", "done", "pty backend: its agents end when Coral restarts or is upgraded."},
+		"default, tmux there": {true, "", "done", "tmux is installed there; choose it to keep agents running."},
+		"pty chosen":          {true, "pty", "done", "pty backend"},
+		"tmux chosen":         {true, "tmux", "done", "tmux found: its agents survive a restart of Coral."},
+		"tmux chosen, none":   {false, "tmux", "failed", "tmux was chosen, but it is not installed on that computer."},
+	} {
+		t.Run(name, func(t *testing.T) {
+			pe := newProvEnv(t, "known", "Linux x86_64", c.tmux)
+			_, v := pe.do("POST", "/api/servers/provision/plan", map[string]any{"target": "user@box.example.com"})
+			plan := v["plan"].(string)
+			assert.Equal(t, "pty", v["backend"], "the default")
+			_, v = pe.do("POST", "/api/servers/provision/"+plan+"/connect", nil)
+			require.Equal(t, "connected", v["phase"], "%v", v)
+			assert.Equal(t, c.tmux, v["tmux"], "the page is told whether that computer has tmux")
+			body := map[string]any{"accept_terms": true, "terms_sha256": terms.EULADigest()}
+			if c.backend != "" {
+				body["backend"] = c.backend
+			}
+			code, _ := pe.do("POST", "/api/servers/provision/"+plan+"/run", body)
+			require.Equal(t, 202, code)
+			got := pe.waitPhase(t, plan, c.phase)
+			var detect map[string]any
+			for _, st := range got["steps"].([]any) {
+				if m := st.(map[string]any); m["name"] == "detect" {
+					detect = m
+				}
+			}
+			require.NotNil(t, detect, "%v", got)
+			if c.phase == "done" {
+				assert.Equal(t, "ok", detect["state"], "%v", detect)
+				assert.Contains(t, detect["detail"], c.want)
+			} else {
+				assert.Contains(t, got["error"], c.want)
+			}
+		})
+	}
+	pe := newProvEnv(t, "known", "Linux x86_64", true)
+	_, v := pe.do("POST", "/api/servers/provision/plan", map[string]any{"target": "user@box.example.com"})
+	plan := v["plan"].(string)
+	pe.do("POST", "/api/servers/provision/"+plan+"/connect", nil)
+	code, _ := pe.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{"backend": "screen"})
+	assert.Equal(t, 400, code, "only pty or tmux")
 }
 
 func TestProvisionLimitsPlansAndCancels(t *testing.T) {
@@ -744,8 +796,15 @@ func TestProvisionForgetKeyRemovesTheSavedKeyAndStartsOver(t *testing.T) {
 	left, _ := os.ReadFile(pe.known)
 	assert.Contains(t, string(left), "box.example.com", "refused: nothing removed")
 
+	// sharing on: the forget also asks the shared session to that computer to exit, so it is not used again under the key that was forgotten (#12221)
+	ctl := sshprov.UseControlDir(filepath.Join(t.TempDir(), "c"))
+	require.NotEmpty(t, ctl)
+	t.Cleanup(func() { sshprov.UseControlDir(""); _ = os.RemoveAll(ctl) })
+	before, _ := os.ReadFile(pe.sshLog)
 	code, v = pe.do("POST", "/api/servers/provision/"+plan+"/forget-key", nil)
 	require.Equal(t, 200, code, "%v", v)
+	after, _ := os.ReadFile(pe.sshLog)
+	assert.Contains(t, strings.TrimPrefix(string(after), string(before)), "-O\nexit\n", "the shared session was closed")
 	assert.Equal(t, "planned", v["phase"], "back at the start: the next connect shows what it finds")
 	assert.NotContains(t, v, "key_changed")
 	assert.NotContains(t, v, "error")

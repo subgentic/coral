@@ -310,7 +310,7 @@ func TestSSHDocker(t *testing.T) {
 			if os.Getenv("SSHDOCKER_REAL_CORAL") != "1" { // the real Coral sat blocked for minutes in these containers (a separate question): the stop and port cases below use a stand-in
 				return
 			}
-			if err := f.r.StartTmux(ctx, tg, dkVersion); err != nil {
+			if err := f.r.Start(ctx, tg, dkVersion, BackendTmux); err != nil {
 				t.Fatalf("StartTmux: %v", err)
 			}
 			started[u.name] = true
@@ -394,7 +394,7 @@ func TestSSHDocker(t *testing.T) {
 			out, _ := f.exec("root", "far", "awk 'NR>1 && $2 ~ /:20E4$/ && $4==\"0A\" {print $2}' /proc/net/tcp")
 			return strings.TrimSpace(out) != ""
 		}
-		if err := f.r.StartTmux(ctx, alice, ver); err != nil {
+		if err := f.r.Start(ctx, alice, ver, BackendTmux); err != nil {
 			t.Fatalf("alice's start: %v", err)
 		}
 		deadline := time.Now().Add(15 * time.Second)
@@ -405,7 +405,7 @@ func TestSSHDocker(t *testing.T) {
 			t.Fatal("the stand-in did not listen on 8420")
 		}
 		// bob: refused, and nothing of bob's was started
-		if err := f.r.StartTmux(ctx, bob, ver); !errors.Is(err, ErrPortInUse) {
+		if err := f.r.Start(ctx, bob, ver, BackendTmux); !errors.Is(err, ErrPortInUse) {
 			t.Errorf("bob's start with alice's Coral on 8420 should be ErrPortInUse, got %v", err)
 		}
 		if out, _ := f.exec("bob", "far", "tmux has-session -t =coral-server 2>&1 && echo alive"); strings.Contains(out, "alive") {
@@ -428,7 +428,7 @@ func TestSSHDocker(t *testing.T) {
 			t.Errorf("8420 is still held after alice's confirmed stop")
 		}
 		// and now bob can start his own
-		if err := f.r.StartTmux(ctx, bob, ver); err != nil {
+		if err := f.r.Start(ctx, bob, ver, BackendTmux); err != nil {
 			t.Errorf("bob's start after alice stopped: %v", err)
 		}
 		_ = f.r.StopAndConfirm(ctx, bob)

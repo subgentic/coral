@@ -165,6 +165,7 @@ func (s *StreamTarget) noteFailure() {
 func (s *StreamTarget) argv() []string {
 	argv := append([]string{}, sshOptions...)
 	argv = append(argv, s.r.hostFileArgs()...)
+	argv = append(argv, controlArgs()...)
 	argv = append(argv, "-o", "ServerAliveInterval=15", "-o", "ServerAliveCountMax=3", "-W", "127.0.0.1:"+strconv.Itoa(s.port))
 	argv = append(argv, s.target.Args()...)
 	return append(argv, "--", s.target.Destination())

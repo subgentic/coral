@@ -6,6 +6,7 @@
  * far computer records is the person's own (made when they opened Coral), made by the hub from its own marker. Nothing here is a secret: the remote's API key is read and kept by the hub and never reaches this page. */
 
 import { loadStyles } from './lazy_styles.js';
+import { compareVersions } from './server_status.js';
 
 await loadStyles('ssh_setup.css'); // the page's rules are not in the start's stylesheet: they arrive before it is drawn (#11403)
 
@@ -32,8 +33,8 @@ const sayError = (r, fallback) => (r.data && (r.data.error || r.data.message)) |
 
 /** What each kind of plan is called and does, in the words the person confirms. */
 const KINDS = {
-    setup: { title: 'Set up a computer over SSH', go: 'Set up', intro: 'This hub will connect to that computer with your SSH access, install the Coral release this hub runs under your home folder, and start it in tmux, listening on that computer only. Nothing is opened to the network.' },
-    upgrade: { title: 'Upgrade Coral on that computer', go: 'Upgrade', intro: 'This hub will install the Coral release it runs on that computer and restart Coral there. A Coral that already runs this release is left alone.' },
+    setup: { title: 'Set up a computer over SSH', go: 'Set up', intro: 'This hub will connect to that computer with your SSH access, check the release this hub runs (its signature), have that computer download and verify it under your home folder, and start it as a background process, listening on that computer only. Nothing is opened to the network.' },
+    upgrade: { title: 'Upgrade Coral on that computer', go: 'Upgrade', intro: 'This hub will have that computer download and verify the release this hub runs, stop Coral there, start the new one and check it answers. The data, the key and the instance id are kept. A Coral that already runs this release is left alone.' },
     stop: { title: 'Stop Coral on that computer', go: 'Stop Coral', intro: 'This stops Coral on that computer. Its files stay, and the computer stays in this hub\'s list.' },
     remove: { title: 'Remove Coral from that computer', go: 'Remove', intro: 'This stops Coral on that computer, deletes what was installed there, and removes the computer from this hub.' },
 };
@@ -46,7 +47,7 @@ const [SETUP, UPGRADE, STOP, REMOVE] = Object.keys(KINDS);
  * onClose() is called when the person leaves it; onChanged() when the server list changed (a server was added or removed, or upgraded). Returns { unmount }.
  */
 export function mountSshSetup(host, { mode = 'setup', server = null, action = null, deleteData = false, pollMs = POLL_MS, onClose = () => {}, onChanged = () => {} } = {}) {
-    const st = { step: 'loading', options: null, plan: null, error: '', busy: false, keysOk: false, typed: '', timer: null, dead: false, form: { host: '', picked: '', label: '' } };
+    const st = { step: 'loading', options: null, plan: null, error: '', busy: false, keysOk: false, typed: '', backend: 'pty', allowDowngrade: false, timer: null, dead: false, form: { host: '', picked: '', label: '' } };
 
     const kind = () => (st.plan ? st.plan.kind : mode === 'manage' ? action : 'setup');
     const words = () => KINDS[kind()] || KINDS.setup;
@@ -121,6 +122,8 @@ export function mountSshSetup(host, { mode = 'setup', server = null, action = nu
         const body = {};
         if (st.plan.host_keys && st.plan.host_keys.length) body.accept_keys = true;
         if (kind() === REMOVE) body.confirm = st.typed.trim();
+        if (kind() === SETUP) body.backend = st.backend === 'tmux' ? 'tmux' : 'pty';
+        if (kind() === UPGRADE && downgrade()) body.allow_downgrade = !!st.allowDowngrade;
         const r = await api('POST', `/api/servers/provision/${encodeURIComponent(st.plan.plan)}/run`, body);
         if (st.dead) return;
         if (!apply(r, 'Could not start.')) return draw();
@@ -209,12 +212,44 @@ export function mountSshSetup(host, { mode = 'setup', server = null, action = nu
         (f.picked ? form.querySelector('#ssh-picked') : inp).focus?.();
     }
 
+    // The versions of an upgrade (#12233): this computer's, as it answered when the plan was made, and this hub's; null when the computer did not answer. downgrade() is whether installing this hub's release
+    // would put an older Coral over a newer one; same() whether the computer already runs it.
+    const versions = () => (kind() === UPGRADE && st.plan ? { remote: st.plan.remote_version || '', hub: st.plan.hub_version || '' } : null);
+    const downgrade = () => { const v = versions(); return !!(v && (st.plan.downgrade === true || compareVersions(v.remote, v.hub) === 1)); };
+    const same = () => { const v = versions(); return !!(v && v.remote && compareVersions(v.remote, v.hub) === 0); };
+
+    /** How agents run on that computer (#12233): the two choices side by side with what each costs, as Settings > Terminal backend says it. pty is the default. */
+    function drawBackend(root) {
+        const p = st.plan, noTmux = p.tmux === false;
+        if (noTmux && st.backend === 'tmux') st.backend = 'pty';
+        const box = el('fieldset', 'ssh-backend');
+        box.append(el('legend', 'ssh-subhead', 'How agents run on that computer'));
+        const opt = (value, title, text, note, off) => { // off: the choice is closed (with the note saying why); a note alone only says something
+            const label = el('label', 'ssh-backend-opt' + (off ? ' ssh-backend-off' : ''));
+            const r = el('input', 'check'); r.type = 'radio'; r.name = 'ssh-backend'; r.value = value; r.id = `ssh-backend-${value}`;
+            r.checked = st.backend === value; r.disabled = !!off;
+            r.addEventListener('change', () => { if (r.checked) st.backend = value; });
+            const body = el('span', 'ssh-backend-text'); body.append(el('strong', '', title), el('span', '', text));
+            if (note) body.append(el('em', '', note));
+            label.append(r, body);
+            return label;
+        };
+        const grid = el('div', 'ssh-backend-grid');
+        grid.append(
+            opt('pty', 'Background process (pty), the default', 'Coral holds each terminal itself, so there is no shared socket for one agent to use against another. The price: agents end whenever Coral restarts, upgrades or crashes (Coral puts them to sleep first when it stops cleanly).'),
+            opt('tmux', 'Keep agents running when Coral restarts (tmux)', 'Agents keep running when Coral restarts, upgrades or crashes, and Coral picks them up again. Coral keeps its terminals in tmux, whose socket sits in its data folder on that computer: any agent, and any other program running as that user, can find it and read or type into other agents\' terminals.',
+                noTmux ? 'tmux is not installed on that computer.' : (p.tmux === undefined ? 'Checked when you press Set up.' : ''), noTmux));
+        box.append(grid);
+        root.append(box);
+    }
+
     function drawPlan(root) {
         const p = st.plan;
         const dl = el('dl', 'facts servers-facts');
         const fact = (k, v) => { const d = el('div', 'servers-fact'); d.append(el('dt', '', k), el('dd', '', v)); dl.append(d); };
         fact('Computer', p.target);
         fact('Name in this hub', `${p.label} (${p.server_id})`);
+        if (versions()) { fact('This computer runs', p.remote_version ? `Coral ${p.remote_version}` : 'Not known (it did not answer)'); fact('This hub runs', `Coral ${p.hub_version}`); }
         if (kind() === REMOVE) fact('Data', p.delete_data ? 'Deleted too: the key, the history and the install folder.' : 'Kept: the data, the key and the instance id stay on that computer.');
         root.append(el('p', 'ssh-intro', words().intro), dl, el('h5', 'ssh-subhead', 'What will happen'), stepList(p.steps));
         root.append(el('p', 'ssh-help', 'Nothing has connected yet. The next press connects, and checks the host key.'));
@@ -245,8 +280,24 @@ export function mountSshSetup(host, { mode = 'setup', server = null, action = nu
             row.append(cb, el('span', '', ' These fingerprints are the computer I mean to set up.'));
             root.append(row);
         }
+        if (kind() === SETUP) drawBackend(root);
         if (kind() === UPGRADE) {
-            root.append(el('p', 'ssh-note', 'An upgrade installs the version this hub runs, even over a newer one on that computer (that is a downgrade). If it fails after Coral was stopped, Coral on that computer stays stopped.'));
+            const v = versions();
+            const dl = el('dl', 'facts servers-facts');
+            for (const [k, val] of [['This computer runs', v.remote ? `Coral ${v.remote}` : 'Not known (it did not answer)'], ['This hub runs', `Coral ${v.hub}`]]) { const d = el('div', 'servers-fact'); d.append(el('dt', '', k), el('dd', '', val)); dl.append(d); }
+            root.append(dl);
+            if (same()) root.append(el('p', 'ssh-note ssh-uptodate', `Up to date: that computer already runs Coral ${v.hub}. There is nothing to do.`));
+            else if (downgrade()) {
+                const n = el('div', 'servers-form-error ssh-downgrade', `That computer runs a newer Coral than this hub (${v.remote}, this hub runs ${v.hub}). Nothing is changed unless you allow a downgrade.`); n.setAttribute('role', 'note');
+                root.append(n);
+                const row = el('label', 'ssh-check');
+                const cb = el('input', 'check'); cb.type = 'checkbox'; cb.id = 'ssh-allow-downgrade'; cb.checked = st.allowDowngrade;
+                cb.addEventListener('change', () => { st.allowDowngrade = cb.checked; draw(); });
+                row.append(cb, el('span', '', ` Allow a downgrade to ${v.hub} (the data stays; a newer Coral's data may not open in an older one).`));
+                root.append(row);
+            }
+            if (p.agents_survive === false && !same()) root.append(el('p', 'ssh-note ssh-agents-end', 'Its agents end when Coral restarts for this upgrade: Coral there runs with the pty backend, not tmux. Coral puts them to sleep first when it stops cleanly.'));
+            root.append(el('p', 'ssh-help', 'If it fails after Coral was stopped, Coral on that computer stays stopped.'));
         }
         if (kind() === REMOVE || kind() === STOP) {
             root.append(el('p', 'ssh-note', kind() === REMOVE
@@ -266,7 +317,8 @@ export function mountSshSetup(host, { mode = 'setup', server = null, action = nu
             typedOk = st.typed.trim() === p.server_id;
         }
         const bar = el('div', 'servers-form-actions');
-        const go = button(st.busy ? 'Working...' : words().go, kind() === REMOVE ? 'btn-danger' : 'btn-primary', run, st.busy || (keys.length > 0 && !st.keysOk) || !typedOk);
+        const upLabel = kind() === UPGRADE && versions() && versions().hub ? `${downgrade() ? 'Downgrade' : 'Upgrade'} to v${versions().hub}` : words().go;
+        const go = button(st.busy ? 'Working...' : upLabel, kind() === REMOVE ? 'btn-danger' : 'btn-primary', run, st.busy || (keys.length > 0 && !st.keysOk) || !typedOk || (kind() === UPGRADE && (same() || (downgrade() && !st.allowDowngrade))));
         go.dataset.sshGo = '1';
         bar.append(button('Cancel', '', cancelPlan), go);
         root.append(bar);
