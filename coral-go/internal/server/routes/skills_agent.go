@@ -140,6 +140,9 @@ func (h *SkillsHandler) ListSkills(w http.ResponseWriter, r *http.Request) {
 
 // readSkillZip reads the skill's zip from the artifact store without following a link, and refuses bytes that are not the digest that was approved.
 func (h *SkillsHandler) readSkillZip(digest string) ([]byte, error) {
+	if len(digest) != 64 || strings.Trim(digest, "0123456789abcdef") != "" {
+		return nil, errors.New("not a skill digest")
+	}
 	f, err := secfile.OpenNoFollow(filepath.Join(h.cfg.CoralDir(), "artifacts", "objects", digest), os.O_RDONLY, 0)
 	if err != nil {
 		return nil, err

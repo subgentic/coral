@@ -18,6 +18,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"golang.org/x/text/unicode/norm"
 	"gopkg.in/yaml.v3"
 )
 
@@ -137,6 +138,9 @@ func Parse(data []byte) (*Skill, error) {
 		name := f.Name
 		if strings.ContainsAny(name, "\\\x00") || strings.HasPrefix(name, "/") || hasControl(name) || !utf8.ValidString(name) {
 			return nil, invalid("a file name is not allowed: %q", clip(name))
+		}
+		if !norm.NFC.IsNormalString(name) { // café composed and café decomposed look the same and collide on a normalising file system
+			return nil, invalid("a file name is not in normalised (NFC) form: %q", clip(name))
 		}
 		isDir := strings.HasSuffix(name, "/")
 		clean := path.Clean(strings.TrimSuffix(name, "/"))

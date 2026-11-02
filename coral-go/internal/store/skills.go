@@ -56,6 +56,8 @@ var (
 	ErrSkillDigest = errors.New("store: the skill is not the one that was reviewed")
 	// ErrSkillState: the skill is not in a state the action applies to.
 	ErrSkillState = errors.New("store: the skill is not waiting for a decision")
+	// ErrSkillRefusedBefore: the Operator already rejected or removed these exact bytes; an agent cannot publish them again.
+	ErrSkillRefusedBefore = errors.New("store: the Operator already rejected or removed this skill")
 	// ErrBadSkill: a digest or publisher that is not valid.
 	ErrBadSkill = errors.New("store: not a valid skill record")
 )
@@ -147,7 +149,7 @@ func (s *SessionStore) AddSkill(ctx context.Context, in AddSkillInput) (*SkillRo
 			return err
 		}
 		var total, pendingAll, pendingAgent int
-		if err := tx.GetContext(ctx, &total, `SELECT COUNT(*) FROM skills WHERE status <> ?`, SkillRemoved); err != nil {
+		if err := tx.GetContext(ctx, &total, `SELECT COUNT(*) FROM skills WHERE status IN (?, ?)`, SkillPending, SkillApproved); err != nil {
 			return err
 		}
 		if total >= MaxSkills {
@@ -159,8 +161,16 @@ func (s *SessionStore) AddSkill(ctx context.Context, in AddSkillInput) (*SkillRo
 			if err := tx.GetContext(ctx, &pendingAll, `SELECT COUNT(*) FROM skills WHERE status = ?`, SkillPending); err != nil {
 				return err
 			}
-			if err := tx.GetContext(ctx, &pendingAgent, `SELECT COUNT(*) FROM skills WHERE status = ? AND publisher_kind = ? AND publisher_agent = ?`, SkillPending, PublisherAgent, in.Agent); err != nil {
+			if err := tx.GetContext(ctx, &pendingAgent, `SELECT COUNT(*) FROM skills WHERE status = ? AND publisher_kind = ? AND publisher_agent = ? AND publisher_team = ?`, SkillPending, PublisherAgent, in.Agent, in.Team); err != nil {
 				return err
+			}
+			// What the Operator rejected or removed does not come back through an agent as a new pending item each time: the log remembers the digest. The Operator can still publish it.
+			var refused int
+			if err := tx.GetContext(ctx, &refused, `SELECT COUNT(*) FROM skills_log WHERE digest = ? AND event IN ('reject', 'remove')`, in.Digest); err != nil {
+				return err
+			}
+			if refused > 0 {
+				return ErrSkillRefusedBefore
 			}
 			if pendingAll >= MaxPendingPerComputer || pendingAgent >= MaxPendingPerAgent {
 				return ErrPendingCap

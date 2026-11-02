@@ -278,3 +278,62 @@ func TestAnAgentsSkillHoldsOnlyDocumentsAndData(t *testing.T) {
 	_, _, err = addSkill(ctx, ss, AddSkillInput{Skill: skillOf("operators", "d", "b", file("tool")), Digest: dg(930), Kind: PublisherOperator})
 	assert.NoError(t, err)
 }
+
+// #12021 (Security's SHOULD on slice a): what the Operator rejected or removed does not come back through an agent, whatever name it is given; the Operator can still publish it.
+func TestAnAgentCannotRepublishWhatTheOperatorRejectedOrRemoved(t *testing.T) {
+	ctx, ss, _ := skillStore(t)
+	in := func(name string, d int, kind string) AddSkillInput {
+		return AddSkillInput{Skill: skillOf(name, "d", "b"), Digest: dg(d), Kind: kind, Agent: "Dev", Team: "alpha"}
+	}
+	row, _, err := addSkill(ctx, ss, in("first", 600, PublisherAgent))
+	require.NoError(t, err)
+	require.NoError(t, ss.RejectSkill(ctx, row.ID))
+	_, _, err = addSkill(ctx, ss, in("first", 600, PublisherAgent))
+	assert.ErrorIs(t, err, ErrSkillRefusedBefore, "rejected bytes: not as a new pending item")
+	_, _, err = addSkill(ctx, ss, in("renamed", 600, PublisherAgent))
+	assert.ErrorIs(t, err, ErrSkillRefusedBefore, "the digest is what is remembered, not the name")
+	_, _, err = addSkill(ctx, ss, in("other-agent", 600, PublisherAgent))
+	assert.ErrorIs(t, err, ErrSkillRefusedBefore)
+
+	op, _, err := addSkill(ctx, ss, in("second", 601, PublisherOperator))
+	require.NoError(t, err)
+	require.NoError(t, ss.RemoveSkill(ctx, op.ID))
+	_, _, err = addSkill(ctx, ss, in("second", 601, PublisherAgent))
+	assert.ErrorIs(t, err, ErrSkillRefusedBefore, "removed bytes too")
+	again, created, err := addSkill(ctx, ss, in("first", 600, PublisherOperator))
+	require.NoError(t, err, "the Operator can publish what they once rejected")
+	assert.True(t, created)
+	assert.Equal(t, SkillApproved, again.Status)
+}
+
+// #12021 (Security's SHOULD): the pending cap is per team and agent: two agents with the same name on different teams do not share it.
+func TestThePendingCapIsPerTeamAndAgent(t *testing.T) {
+	ctx, ss, _ := skillStore(t)
+	for i := 0; i < MaxPendingPerAgent; i++ {
+		_, _, err := addSkill(ctx, ss, AddSkillInput{Skill: skillOf(fmt.Sprintf("alpha-%d", i), "d", "b"), Digest: dg(700 + i), Kind: PublisherAgent, Agent: "Dev", Team: "alpha"})
+		require.NoError(t, err)
+	}
+	_, _, err := addSkill(ctx, ss, AddSkillInput{Skill: skillOf("alpha-extra", "d", "b"), Digest: dg(720), Kind: PublisherAgent, Agent: "Dev", Team: "alpha"})
+	assert.ErrorIs(t, err, ErrPendingCap)
+	_, _, err = addSkill(ctx, ss, AddSkillInput{Skill: skillOf("beta-first", "d", "b"), Digest: dg(721), Kind: PublisherAgent, Agent: "Dev", Team: "beta"})
+	assert.NoError(t, err, "a Dev of another team has its own five")
+}
+
+// #12021 (QA's SHOULD): only pending and approved skills count toward the 500: rejected and removed ones are not in the way.
+func TestOnlyPendingAndApprovedCountTowardTheCap(t *testing.T) {
+	ctx, ss, db := skillStore(t)
+	for i := 0; i < MaxSkills; i++ {
+		status := "approved"
+		if i < 3 {
+			status = []string{"rejected", "removed", "rejected"}[i]
+		}
+		_, err := db.ExecContext(ctx, `INSERT INTO skills (id, name, version, digest, status, publisher_kind, created_at) VALUES (?, ?, 1, ?, ?, 'operator', 'now')`, fmt.Sprintf("id%d", i), fmt.Sprintf("s%d", i), dg(8000+i), status)
+		require.NoError(t, err)
+	}
+	for i := 0; i < 3; i++ {
+		_, _, err := addSkill(ctx, ss, AddSkillInput{Skill: skillOf(fmt.Sprintf("fits-%d", i), "d", "b"), Digest: dg(9000 + i), Kind: PublisherOperator})
+		require.NoError(t, err, "the three that were rejected or removed leave room for three")
+	}
+	_, _, err := addSkill(ctx, ss, AddSkillInput{Skill: skillOf("one-more", "d", "b"), Digest: dg(9100), Kind: PublisherOperator})
+	assert.ErrorIs(t, err, ErrTooManySkills)
+}

@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io/fs"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -222,4 +223,40 @@ func TestAgentMayPublishOnlyDocumentsAndData(t *testing.T) {
 		require.NoError(t, err, name)
 		assert.False(t, AgentMayPublish(sk), name)
 	}
+}
+
+// #12021 (QA's SHOULD on slice a): a high-ratio zip is stopped by the per-file limit as the bytes are read, not after they are all held: parsing a file that inflates to 256 MiB allocates a few MiB
+// at most. Without the LimitReader the same archive is refused too, but only after ReadAll has held every byte, which this pins.
+func TestParseDoesNotHoldWhatAHighRatioZipInflatesTo(t *testing.T) {
+	var buf bytes.Buffer
+	w := zip.NewWriter(&buf)
+	_, err := w.Create("SKILL.md")
+	require.NoError(t, err)
+	fw, err := w.Create("references/bomb.txt")
+	require.NoError(t, err)
+	zeros := make([]byte, 1<<20)
+	for i := 0; i < 256; i++ {
+		_, err := fw.Write(zeros)
+		require.NoError(t, err)
+	}
+	require.NoError(t, w.Close())
+	require.Less(t, buf.Len(), MaxZipBytes, "the archive itself is small")
+	var before, after runtime.MemStats
+	runtime.GC()
+	runtime.ReadMemStats(&before)
+	_, err = Parse(buf.Bytes())
+	runtime.ReadMemStats(&after)
+	require.ErrorIs(t, err, ErrInvalid)
+	assert.Less(t, after.TotalAlloc-before.TotalAlloc, uint64(32<<20), "the inflated bytes were never all held")
+}
+
+// #12021 (QA's SHOULD): names must be in NFC form: caf\u00e9 composed and caf\u00e9 decomposed are two files that look the same and collide on a normalising file system.
+func TestParseRefusesNamesThatAreNotNormalised(t *testing.T) {
+	_, err := Parse(makeZip(t, zf{name: "SKILL.md", body: goodMD}, zf{name: "references/caf\u00e9.md", body: "composed"}))
+	require.NoError(t, err, "NFC is fine")
+	_, err = Parse(makeZip(t, zf{name: "SKILL.md", body: goodMD}, zf{name: "references/cafe\u0301.md", body: "decomposed"}))
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "NFC")
+	_, err = Parse(makeZip(t, zf{name: "SKILL.md", body: goodMD}, zf{name: "references/caf\u00e9.md", body: "a"}, zf{name: "references/cafe\u0301.md", body: "b"}))
+	assert.Error(t, err, "both together: refused")
 }
