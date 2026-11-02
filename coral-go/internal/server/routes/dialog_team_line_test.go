@@ -135,3 +135,16 @@ func TestTheTeamIsToldWhenADialogWasLeftAloneOverUnsentText(t *testing.T) {
 	assert.NotContains(t, lines[0], "not sent yet")
 	assert.Empty(t, r.keys())
 }
+
+// An agent the dialog watch knows on no board is looked up on none: the line asks the team nothing (no subscription lookup with an empty board name) and posts nothing.
+func TestAnAgentOnNoBoardGetsNoLineAndAsksNoTeam(t *testing.T) {
+	r := newTimeoutRig(t, "claude", "permission", claudeScreen(t, "permission_menu"))
+	r.onTeam() // the agent IS on the team "team" and has a task there ...
+	r.agent.board = ""
+	// ... but the watch has it on no board
+	w, ok := r.h.dialogWorkOf(context.Background(), r.agent)
+	assert.False(t, ok)
+	assert.Zero(t, w.task)
+	r.h.dialogWaitingTeamLine(context.Background(), r.agent, board.DefaultHealthSettings(), r.t0.Add(30*time.Minute))
+	assert.Empty(t, r.teamLines())
+}
