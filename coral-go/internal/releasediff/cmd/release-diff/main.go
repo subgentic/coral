@@ -59,5 +59,11 @@ func run(repo, oldRef, newRef string) error {
 	}
 	fmt.Println()
 	releasediff.WritePackages(os.Stdout, pcs, oldRef, newRef)
+	dcs, err := releasediff.DependencyChanges(repo, oldRef, newRef)
+	if err != nil {
+		return fmt.Errorf("the Hub's imports: %w", err)
+	}
+	fmt.Println()
+	releasediff.WriteDependencies(os.Stdout, dcs, oldRef, newRef)
 	return nil
 }
