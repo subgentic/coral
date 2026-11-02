@@ -296,7 +296,7 @@ export function mountSshSetup(host, { mode = 'setup', server = null, action = nu
                 row.append(cb, el('span', '', ` Allow a downgrade to ${v.hub} (the data stays; a newer Coral's data may not open in an older one).`));
                 root.append(row);
             }
-            if (p.agents_survive === false && !same()) root.append(el('p', 'ssh-note ssh-agents-end', 'Its agents end when Coral restarts for this upgrade: that computer runs Coral without tmux. Coral puts them to sleep first when it stops cleanly.'));
+            if (p.agents_survive === false && !same()) root.append(el('p', 'ssh-note ssh-agents-end', 'Its agents end when Coral restarts for this upgrade: Coral there runs with the pty backend, not tmux. Coral puts them to sleep first when it stops cleanly.'));
             root.append(el('p', 'ssh-help', 'If it fails after Coral was stopped, Coral on that computer stays stopped.'));
         }
         if (kind() === REMOVE || kind() === STOP) {

@@ -61,7 +61,7 @@ async function toReady(host, mode, extra) {
     assert.ok(/This computer runs\s*Coral 2\.0\.33/.test(text) && /This hub runs\s*Coral 2\.0\.34/.test(text), 'both versions: ' + text);
     assert.equal(host.querySelector('[data-ssh-go]').textContent.trim(), 'Upgrade to v2.0.34');
     assert.equal(host.querySelector('[data-ssh-go]').disabled, false);
-    assert.ok(host.querySelector('.ssh-agents-end'), 'a computer without tmux is warned before the upgrade');
+    assert.ok(/runs with the pty backend, not tmux/.test(host.querySelector('.ssh-agents-end')?.textContent || ''), 'a pty computer is warned before the upgrade, in words that are true whether or not tmux is installed there');
     assert.equal(host.querySelector('#ssh-allow-downgrade'), null);
     host.querySelector('[data-ssh-go]').click();
     await until(() => runBody, 'the run');
