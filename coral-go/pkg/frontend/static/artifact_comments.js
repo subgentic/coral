@@ -248,7 +248,8 @@ export function attachComments(dialog, body, host, opts = {}) {
         return ul;
     }
     function card({ c, replies }) {
-        const li = el('li', 'ac-card' + (st.active === c.id ? ' ac-active' : '') + (c.resolved ? ' ac-resolved' : '')); li.dataset.id = String(c.id); li.setAttribute('aria-label', `Comment by ${c.authorName || c.authorId || 'unknown'}`); li.setAttribute('role', 'group');
+        // ac-composing: a card with its reply box open keeps its actions row when the box loses the focus, so nothing under it moves between a press and its release (#12301)
+        const li = el('li', 'ac-card' + (st.active === c.id ? ' ac-active' : '') + (c.resolved ? ' ac-resolved' : '') + (st.composing && st.composing.parentId === c.id ? ' ac-composing' : '')); li.dataset.id = String(c.id); li.setAttribute('aria-label', `Comment by ${c.authorName || c.authorId || 'unknown'}`); li.setAttribute('role', 'group');
         const a = c.anchor || {};
         const q = el('blockquote', 'ac-quote' + (st.orphan.has(c.id) ? ' ac-orphan' : ''), a.whole ? (opts.words?.quote || 'The whole document') : a.quote || '');
         li.append(q);

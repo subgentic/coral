@@ -52,7 +52,7 @@
    not "(hover: hover)": a desktop browser with no pointing device reports (hover: none) (GitHub's headless Chrome), as session.css explains for the branch boxes. */
 @media not all and (pointer: coarse) {
     /* At rest the row takes no room (it left a gap of about 24 px under each comment): it is still in the tab order, and focus on a button inside it opens it again. */
-    .ac-card:not(:hover):not(:focus-within):not(.ac-active) .ac-actions { opacity: 0; max-height: 0; min-height: 0; overflow: hidden; margin: 0; }
+    .ac-card:not(:hover):not(:focus-within):not(.ac-active):not(.ac-composing) .ac-actions { opacity: 0; max-height: 0; min-height: 0; overflow: hidden; margin: 0; }
 }
 .ac-act, .ac-jump, .ac-whole, .ac-lock, .ac-cancel, .ac-send { font-size: var(--fs-sm, 0.8125rem); }
 .ac-act, .ac-jump { background: none; border: 0; color: var(--text-secondary); padding: 2px 6px; cursor: pointer; }
