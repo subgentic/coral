@@ -6,6 +6,7 @@ import { markHidden } from './visible_marks.js';
 import { OPERATOR_ID, renderMarkdownStrict } from './utils.js';
 import { whenText } from './when_text.js';
 import { state } from './state.js';
+import { importOnce } from './import_once.js';
 import { showToast } from './notifications.js';
 import { isCloud, isLocalServer } from './server_base.js';
 
@@ -149,12 +150,15 @@ export function openAskDialog(a, onDone, runners = {}) {
     whole.hidden = !parts.body && !a.cut; // a short question is its title
     const label = document.createElement('label'); label.className = 'inbox-ask-label'; label.textContent = 'Your reply';
     const box = document.createElement('textarea'); box.className = 'field inbox-ask-box'; box.rows = 4; box.maxLength = 8000; label.append(box);
+    const pics = document.createElement('div'); pics.className = 'inbox-ask-pics'; // pictures for the reply (#12173): the comment composer's tray, loaded with the dialog
     const err = document.createElement('p'); err.className = 'inbox-ask-error'; err.setAttribute('role', 'alert');
     const row = document.createElement('div'); row.className = 'inbox-ask-buttons';
     const send = document.createElement('button'); send.type = 'button'; send.className = 'btn btn-primary'; send.textContent = 'Send reply';
     const close = document.createElement('button'); close.type = 'button'; close.className = 'btn'; close.textContent = 'Close';
     row.append(close, send); // Close on the left, Send reply on the right (as the other dialogs)
-    const finish = () => { dlg.close(); dlg.remove(); if (onDone) onDone(); };
+    let tray = null;
+    const finish = () => { if (tray) tray.destroy(); dlg.close(); dlg.remove(); if (onDone) onDone(); };
+    const sync = () => { send.disabled = !!tray && (tray.busy() || tray.failed()); }; // Send waits for a picture going up, and for a failed one to be taken out
     const offers = fromAnotherComputer(a) ? [] : buttonsOf(a); // a question from another computer through the Hub keeps the plain Reply and Close
     let offered = null;
     if (offers.length) { // what the asker offered: one tap per choice, each with what it does
@@ -191,13 +195,22 @@ export function openAskDialog(a, onDone, runners = {}) {
         }
         offered.append(head, list);
     }
-    dlg.append(title, sub, ...(whole.hidden ? [] : [whole]), ...(offered ? [offered] : []), label, err, row);
+    dlg.append(title, sub, ...(whole.hidden ? [] : [whole]), ...(offered ? [offered] : []), label, pics, err, row);
+    if (!fromAnotherComputer(a)) { // the picture is stored on the question's own team, as a goal's pictures are
+        Promise.all([importOnce('./artifact_comment_images.js'), importOnce('./artifact_comments_api.js')]).then(([m, api]) => {
+            if (!dlg.isConnected) return;
+            tray = m.createImageTray({ upload: (blob, versionOf) => api.uploadCommentImage(null, undefined, blob, versionOf, a.board) });
+            tray.attach(dlg, box); tray.listen(sync);
+            pics.append(tray.picker(), tray.hint(), tray.node);
+        }).catch(() => { /* a reply needs no picture: the dialog works without the button */ });
+    }
     close.addEventListener('click', finish);
     dlg.addEventListener('cancel', e => { e.preventDefault(); finish(); });
     send.addEventListener('click', async () => {
         err.textContent = ''; send.disabled = true;
-        try { await replyToAsk(a, box.value); finish(); }
-        catch (e) { err.textContent = e.message || 'Not sent.'; send.disabled = false; box.focus(); } // the text stays
+        const links = tray ? tray.hexes().map(h => `coral://artifacts/${h}`) : []; // each picture is named by its artifact link, which the board and the agents read
+        try { await replyToAsk(a, [box.value.trim(), links.join('\n')].filter(Boolean).join('\n\n')); finish(); }
+        catch (e) { err.textContent = e.message || 'Not sent.'; sync(); box.focus(); } // the text stays
     });
     document.body.append(dlg);
     dlg.showModal();
