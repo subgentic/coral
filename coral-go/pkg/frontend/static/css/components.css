@@ -3953,7 +3953,7 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 #launch-agent-pick .launch-agent-opt:has(input[value="codex"])::before, .acf-provider-label .seg-btn[data-value="codex"]::before, .agent-type-mark[data-agent-type="codex"]::before { content: "X"; }
 #launch-agent-pick .launch-agent-opt:has(input[value="agy"])::before, .acf-provider-label .seg-btn[data-value="agy"]::before, .agent-type-mark[data-agent-type="agy"]::before { content: "A"; }
 #launch-agent-pick .launch-agent-opt:has(input[value="pi"])::before, .acf-provider-label .seg-btn[data-value="pi"]::before, .agent-type-mark[data-agent-type="pi"]::before { content: "P"; }
-.agent-type-mark[data-agent-type="hermes"]::before { content: "H"; } .agent-type-mark[data-agent-type="opencode"]::before { content: "O"; } /* the Inbox folder rows (#12169); the launch cards draw theirs in JS */
+#launch-agent-pick .launch-agent-opt[data-mark]::before, .acf-provider-label .seg-btn[data-mark]::before, .agent-type-mark[data-mark]::before { content: attr(data-mark); } /* OpenCode and Hermes: the letter is on the chip (agent_marks.js, #12169) */
 .agent-type-mark::before { margin-right: 0; color: inherit; }
 .acf-provider-label .seg-btn[data-value="terminal"]::before { content: "T"; }
 .launch-persona-row .persona-files > summary::after { content: ""; margin-left: 8px; border: 4px solid transparent; border-top-color: currentColor; border-bottom-width: 0; } /* the menu's caret */

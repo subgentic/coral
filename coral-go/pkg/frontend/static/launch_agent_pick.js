@@ -2,6 +2,8 @@
  * folder, the ones this computer has first, the others marked "not installed". It is a second view of the form's own agent select (the select stays in More options, and the two follow each other), so everything that
  * reacts to that select (the missing-CLI line, the model list, the permission mode) still does. When nothing was ever chosen as the default and Claude is missing while another agent is installed, that one is selected. */
 import { serverFetch, normServer, LOCAL_SERVER } from './server_base.js';
+import { importOnce } from './import_once.js';
+const { markOf } = await importOnce('./agent_marks.js');
 
 const TYPES = [['claude', 'Claude'], ['codex', 'Codex'], ['agy', 'Antigravity'], ['pi', 'Pi'], ['opencode', 'OpenCode'], ['hermes', 'Hermes']];
 const ALIAS = { gemini: 'agy', antigravity: 'agy' };
@@ -39,6 +41,7 @@ export async function buildAgentPick({ group, form, server, implicitDefault }) {
     for (const [type, label] of TYPES) {
         const wrap = document.createElement('label');
         wrap.className = 'launch-agent-opt';
+        if (markOf(type)) wrap.setAttribute('data-mark', markOf(type)); // OpenCode's and Hermes's letter (#12169)
         const input = document.createElement('input');
         input.type = 'radio';
         input.name = group.id ? `${group.id}-radios` : 'launch-agent-pick'; // one name per group: two groups in the document (New Agent's, Restart's) must not share a radio set

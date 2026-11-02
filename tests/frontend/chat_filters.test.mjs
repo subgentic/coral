@@ -34,8 +34,10 @@ assert.deepEqual(CF.chips({ ...CF.EMPTY, tagId: '99' }).map(c => c.label), ['Tag
 assert.ok(CF.CLIS.some(c => c[0] === 'hermes' && c[1] === 'Hermes'), 'Hermes is in the Inbox\'s CLI list (#12169)');
 assert.ok(CF.CLIS.some(c => c[0] === 'opencode' && c[1] === 'OpenCode'), 'and so is OpenCode, which had been left out too');
 assert.equal(CF.clean({ ...CF.EMPTY, cli: 'hermes' }).cli, 'hermes', 'and a filter by it is kept');
-assert.match(fs.readFileSync(STATIC + 'css/components.css', 'utf8'), /\.agent-type-mark\[data-agent-type="hermes"\]::before \{ content: "H"; \}/, 'its folder row has the H mark, as the other four have their letters');
-assert.match(fs.readFileSync(STATIC + 'css/components.css', 'utf8'), /\.agent-type-mark\[data-agent-type="opencode"\]::before \{ content: "O"; \}/, 'and OpenCode its O');
+const CSS = fs.readFileSync(STATIC + 'css/components.css', 'utf8');
+assert.ok(CSS.includes('.agent-type-mark[data-mark]::before { content: attr(data-mark); }'), 'one rule draws the letter on a chip that carries one (the folder rows, the picker radios, the provider segments)');
+const { markOf } = await import('../../coral-go/pkg/frontend/static/agent_marks.js');
+assert.equal(markOf('hermes'), 'H', 'Hermes has its H'); assert.equal(markOf('opencode'), 'O', 'and OpenCode its O'); assert.equal(markOf('claude'), '', 'the others have their own CSS rule');
 assert.deepEqual(CF.without({ ...CF.EMPTY, from: '2026-10-01', to: '2026-10-20', cli: 'pi' }, 'dates'), { ...CF.EMPTY, cli: 'pi' }, 'the dates are one chip');
 assert.equal(CF.isFiltered({ ...CF.EMPTY, tagId: '7' }), true); assert.equal(CF.isFiltered(CF.EMPTY), false);
 

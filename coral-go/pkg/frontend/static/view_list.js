@@ -7,6 +7,8 @@
  *   sections: [{ title?, items: [{ key, label, count?, unread?, total?, alert?, dot?, icon?, soon? }] }]      unread: the number is the unread count (its name says "3 unread", its tooltip "N in all" from total)      onPick(key) is not called for a disabled item; a section's title is also the select's group label
  *   update(root, { sections, current })               -> draws the same element again with new counts or another current view; the keyboard stays on the item it was on */
 import { loadStyles } from './lazy_styles.js';
+import { importOnce } from './import_once.js';
+const { markOf } = await importOnce('./agent_marks.js');
 await loadStyles('view_list.css'); // the list's rules are not in the start's stylesheet: they arrive with the first screen that draws one (#10706)
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = String(text); return e; };
 const HEX = /^#[0-9a-f]{3,8}$/i;
@@ -16,7 +18,7 @@ function folderIcon(name) {
     if (!name) return null;
     const icon = el('span', 'view-list-icon top-bar-icon'); icon.dataset.icon = name; icon.setAttribute('aria-hidden', 'true');
     if (name.startsWith('cli:')) {
-        icon.classList.add('agent-type-mark'); icon.dataset.agentType = name.slice(4);
+        icon.classList.add('agent-type-mark'); icon.dataset.agentType = name.slice(4); if (markOf(name.slice(4))) icon.setAttribute('data-mark', markOf(name.slice(4))); // OpenCode's and Hermes's letter (#12169)
     } else if (name === 'saved-bookmark') {
         const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
         for (const [key, value] of Object.entries({ viewBox: '0 0 16 16', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.5', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true' })) svg.setAttribute(key, value);
