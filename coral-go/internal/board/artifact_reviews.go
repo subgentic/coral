@@ -76,6 +76,8 @@ type ReviewChange struct {
 // review row is not waiting for a decision: ErrNotForReview (an object already "reviewed" by the old Mark reviewed counts as settled, and is refused the same way).
 func (s *Store) DecideArtifactReview(ctx context.Context, boardID, hex, state string, now time.Time) (ReviewChange, []string, error) {
 	ch := ReviewChange{board: boardID, hex: hex}
+	s.activityMu.Lock() // the chain's row is written in this transaction: one writer at a time
+	defer s.activityMu.Unlock()
 	tx, err := s.db.BeginTxx(ctx, nil)
 	if err != nil {
 		return ch, nil, err
@@ -163,6 +165,7 @@ func (s *Store) DecideArtifactReview(ctx context.Context, boardID, hex, state st
 		ON CONFLICT(board_id, hex) DO UPDATE SET state = excluded.state, at = excluded.at`, boardID, hex, state, now.UTC().Format(time.RFC3339)); err != nil {
 		return ch, nil, err
 	}
+	s.noteActivity(ctx, tx, now, map[string]string{ReviewApproved: ActApprove, ReviewChangesRequested: ActChanges, ReviewDenied: ActDeny}[state], "file", hex, hex, boardID) // the decision and its row are one transaction
 	if err := tx.Commit(); err != nil {
 		return ch, nil, err
 	}
@@ -204,7 +207,13 @@ func (s *Store) UndoArtifactReview(ctx context.Context, ch ReviewChange) error {
 	if err != nil {
 		return err
 	}
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	if m, ok := activityOf(ctx); ok { // the decision was rolled back (the agent could not be told): the record says so, as one more row
+		_ = s.RecordActivity(ctx, m, ActUndone, "file", ch.hex, ch.hex, ch.board)
+	}
+	return nil
 }
 
 // ReviewSuperseded is the state of a review whose artifact has a newer version in its series that is for review itself.
@@ -252,6 +261,8 @@ func (s *Store) SupersedeArtifactReview(ctx context.Context, boardID, hex string
 // ErrNotForReview.
 func (s *Store) IgnoreArtifactReview(ctx context.Context, boardID, hex string, ignore bool) (ReviewChange, []string, error) {
 	ch := ReviewChange{board: boardID, hex: hex}
+	s.activityMu.Lock() // the chain's row is written in this transaction: one writer at a time
+	defer s.activityMu.Unlock()
 	tx, err := s.db.BeginTxx(ctx, nil)
 	if err != nil {
 		return ch, nil, err
@@ -291,6 +302,7 @@ func (s *Store) IgnoreArtifactReview(ctx context.Context, boardID, hex string, i
 	if err := tx.SelectContext(ctx, &tags, `SELECT tag FROM artifact_tags WHERE board_id = ? AND hex = ? ORDER BY tag`, boardID, hex); err != nil {
 		return ch, nil, err
 	}
+	s.noteActivity(ctx, tx, time.Now(), map[bool]string{true: ActIgnore, false: ActUnignore}[ignore], "file", hex, hex, boardID)
 	if err := tx.Commit(); err != nil {
 		return ch, nil, err
 	}
@@ -303,6 +315,8 @@ func (s *Store) IgnoreArtifactReview(ctx context.Context, boardID, hex string, i
 // review is ErrNotForReview.
 func (s *Store) SaveArtifactReview(ctx context.Context, boardID, hex string, save bool) (ReviewChange, []string, error) {
 	ch := ReviewChange{board: boardID, hex: hex}
+	s.activityMu.Lock() // the chain's row is written in this transaction: one writer at a time
+	defer s.activityMu.Unlock()
 	tx, err := s.db.BeginTxx(ctx, nil)
 	if err != nil {
 		return ch, nil, err
@@ -336,6 +350,7 @@ func (s *Store) SaveArtifactReview(ctx context.Context, boardID, hex string, sav
 	if err := tx.SelectContext(ctx, &tags, `SELECT tag FROM artifact_tags WHERE board_id = ? AND hex = ? ORDER BY tag`, boardID, hex); err != nil {
 		return ch, nil, err
 	}
+	s.noteActivity(ctx, tx, time.Now(), map[bool]string{true: ActSave, false: ActUnsave}[save], "file", hex, hex, boardID)
 	if err := tx.Commit(); err != nil {
 		return ch, nil, err
 	}

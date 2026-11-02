@@ -147,6 +147,7 @@ func (s *Server) registerBoardMessageRoutes(r chi.Router, boardHandler *routes.B
 	r.Post("/api/board/{project}/clashes", boardHandler.FileClash)                                             // #11457, S6: an agent files two people's different directions; Coral asks the Operator to decide
 	r.Get("/api/board/{project}/guide-asks", boardHandler.GuideAsks)                                           // #11457: the questions put to a guide (the guide's own label, from the connector's stamp)
 	r.Get("/api/operator-asks", boardHandler.OperatorAsks)                                                     // the questions agents asked the Operator (post --ask, wait --operator), for Needs you (#11417)
+	r.Get("/api/activity", boardHandler.ListActivity)                                                          // the Activity record of what the Operator did in Needs you (#12069): the Operator's alone, local, never through the Hub (not in the tunnel table)
 	r.Get("/api/needs-you", boardHandler.NeedsYou)                                                             // what waits for the Operator, in one read, for the Hub's phone push (#11596): the owner's alone
 	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/asks/{messageID}/close", boardHandler.CloseAsk) // close a question answered elsewhere (ask close, #11417)
 	r.Post("/api/board/{project}/asks/{messageID}/buttons/{buttonID}/claim", boardHandler.ClaimAskButton)      // the Operator's click on a button an agent declared on a question: claims it once, answers with the stored action (#11643)
