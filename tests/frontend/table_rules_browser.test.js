@@ -54,7 +54,7 @@ const SPECS = `(() => {
     return true;
   };
   window.__audit = ${AUDIT};
-  window.__measure = (root) => window.__audit(document.querySelector((root || '#zz-host') + ' .dt-box'));
+  window.__measure = (root) => { const b = document.querySelector((root || '#zz-host') + ' .dt-box'); return b ? window.__audit(b) : null; };
   return true;
 })()`;
 
@@ -90,20 +90,38 @@ const MODE = process.env.CORAL_TABLE_RULES || 'enforce'; // enforce is the defau
                 const task = await api('POST', '/tasks', { subscriber_id: 'Operator', title: 'Task', goal_id: gid, assigned_to: 'Boss', created_by: 'Operator', priority: 'medium' }); const tid = task.json.id || task.json.task.id;
                 await api('POST', '/tasks/claim', { subscriber_id: 'Boss', task_id: tid }); await api('POST', `/tasks/${tid}/complete`, { subscriber_id: 'Boss', message: 'done', outcome: 'success' });
             }
+            const g3 = await api('POST', '/goals', { subscriber_id: 'Operator', title: 'A goal with a long title that goes on past any sensible column width, with words and words', done_when: 'It is all done' }); const gid3 = g3.json.id || g3.json.goal.id;
+            for (const t of ['Write the design note', 'Fix the login page on the phone and then check it on the tablet as well as the desktop', 'Review the release plan', 'Ship it']) assert.ok((await api('POST', '/tasks', { subscriber_id: 'Operator', title: t, goal_id: gid3, assigned_to: 'Operator', created_by: 'Operator', priority: t === 'Ship it' ? 'high' : 'medium' })).status < 300, 'a task assigned to the Operator'); // the Inbox's Tasks folder lists the Operator's own
         };
-        surfaces.push({ name: 'needs (live Inbox)', root: '#group-table-view', mixes: ['mixed'], live: true, phoneW: 390, mount: async (mix, w) => {
+        // The live Inbox surfaces, through the real app: the board's own API for goals and tasks, stubs for what needs an agent session (the waiting agent, the question, the proposal, a file for review that tasks wait on).
+        const openLive = async (w, folder, stubs) => {
             await seed(); await size(w, w < 600);
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev); await ev(SPECS); // the page is new: the auditor goes in again
-            await ev(`(() => { window.__asks = [{ board: '${B}', kind: 'ask', id: 71, asker: 'Orchestrator', text: 'None of the above: which port should the test server use?', at: new Date().toISOString() }];
-                const original = window.fetch.bind(window); window.fetch = (u, o = {}) => (String(u) === '/api/operator-asks' ? Promise.resolve(new Response(JSON.stringify(window.__asks), { status: 200, headers: { 'Content-Type': 'application/json' } })) : original(u, o)); return true; })()`);
+            if (stubs) await ev(`(() => { ${stubs} return true; })()`);
             await ev(`localStorage.removeItem('coral.inbox.tab'); window.switchNavTab('hub-inbox'); true`);
-            await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
-            for (let i = 0; i < 60 && !(await ev(`/looks done/.test(document.querySelector('#group-table-view')?.textContent || '')`)); i++) await settle(250);
-            await settle(300); return true; } });
-        const measure = (root) => ev(`window.__measure(${JSON.stringify(root)})`);
+            await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m => m.selectInboxTab('${folder}')).then(() => true)`);
+        };
+        const rowsOn = async (min, text) => { for (let i = 0; i < 80; i++) { const n = await ev(`(() => { const t = document.querySelector('#group-table-view'); return t && ${text ? `new RegExp(${JSON.stringify(text)}).test(t.textContent)` : 'true'} ? t.querySelectorAll('tbody tr.dt-row').length : 0; })()`); if (n >= min) break; await settle(250); } await settle(300); return true; };
+        // The operator's own mix of 2026-11-02: an agent that wants to know something (its CLI, folder and team, a Dismiss), the Orchestrator's question, two "Goal looks done" rows, a proposal, and a file for review that tasks wait on (the Blocks column).
+        const NEEDS_STUBS = `window.__asks = [{ board: '${B}', kind: 'ask', id: 71, asker: 'Orchestrator', text: 'None of the above: which port should the test server use?', at: new Date().toISOString() }];
+            const original = window.fetch.bind(window), json = b => Promise.resolve(new Response(JSON.stringify(b), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+            window.fetch = (u, o = {}) => { const url = String(u), x = new URL(url, location.origin);
+                if (url === '/api/operator-asks') return json(window.__asks);
+                if (x.pathname === '/api/proposals') return json({ proposals: [{ id: 11, board_id: '${B}', kind: 'task', title: 'Fix the login page on the phone', proposer: 'Backend Dev', state: 'pending', created_at: new Date(Date.now() - 600000).toISOString(), payload: { title: 'Fix the login page on the phone', body: 'It fails on Safari.' } }] });
+                if (x.pathname === '/api/board/${B}/artifacts' && (!x.searchParams.has('tag') || x.searchParams.get('tag') === 'for review')) return json({ project: '${B}', artifacts: [{ id: 'a'.repeat(64), name: 'Release plan for the operator to read.md', media_type: 'text/markdown', size: 400, created_at: new Date(Date.now() - 3600000).toISOString(), tags: ['for review'], available: true, uri: 'coral://artifacts/' + 'a'.repeat(64), produced_by: 'Review Writer', session_id: 'rw-1', task_id: 5, waits_on_this: { count: 2, top_title: 'Fix the login page', priority: 'high' } }], has_more: false });
+                return original(u, o); };
+            window.__m.add('Orchestrator', 'O', 1, { sleeping: false, board_project: '${B}', session_id: 'orch-w-id' });
+            window.__qaState.liveSessions = window.__qaState.liveSessions.map(s => s.session_id === 'orch-w-id' ? { ...s, agent_type: 'claude', board_job_title: 'Orchestrator', working_dir: '/work/coral-hub', waiting_for_input: true, waiting_kind: 'needs_input', waiting_summary: 'Wants to know: None of the above', waiting_since: new Date(Date.now() - 40 * 60000).toISOString() } : s); `;
+        surfaces.push({ name: 'needs (live, the operator\'s mix)', root: '#group-table-view', mixes: ['mixed'], live: true, phoneW: 390, mount: async (mix, w) => { await openLive(w, 'needs', NEEDS_STUBS); await rowsOn(4, 'looks done'); return true; } });
+        surfaces.push({ name: 'tasks (live Inbox)', root: '#group-table-view', mixes: ['mixed'], live: true, phoneW: 390, mount: async (mix, w) => { await openLive(w, 'tasks'); await rowsOn(3); return true; } });
+        surfaces.push({ name: 'goals (live Inbox)', root: '#group-table-view', mixes: ['mixed'], live: true, phoneW: 390, mount: async (mix, w) => { await openLive(w, 'goals'); await rowsOn(3); return true; } });
+        const NONE = { folded: true, panelW: 0, tableW: 0, boxOver: 0, tableOver: 0, pageOver: 0, vw: 0, rows: 0, cols: [] };
+        let measuring = '';
+        const measure = async (root) => { const m = await ev(`window.__measure(${JSON.stringify(root)})`); if (m) return m; note(measuring || root, 'no table', ['R7: no table was drawn there (the surface did not open or has no rows)']); return NONE; };
         const clear = () => ev(`(() => { for (const k of Object.keys(localStorage)) if (k.startsWith('coral-dt-widths:')) localStorage.removeItem(k); return true; })()`);
-        for (const S of surfaces) {
-            const kind = S.name, root = S.root, fixedAt = {};
+        const only = (process.env.CORAL_TABLE_ONLY || '').split('|').filter(Boolean); // CORAL_TABLE_ONLY='tasks (live Inbox)|files': just those surfaces
+        for (const S of surfaces.filter(x => !only.length || only.some(o => x.name.includes(o)))) {
+            const kind = S.name, root = S.root, fixedAt = {}; measuring = S.name;
             const handleCenter = key => ev(`(() => { const h = document.querySelector('${root} th.dt-th[data-key=${JSON.stringify(key)}] .dt-resize'); if (!h) return null; const r = h.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
             const wipe = async () => { await clear(); if (S.live) await ev(`document.documentElement.style.fontSize = ''; true`); };
             for (const w of [1440, 1280, 1024, 900]) {
@@ -117,6 +135,7 @@ const MODE = process.env.CORAL_TABLE_RULES || 'enforce'; // enforce is the defau
                 await ev(`document.documentElement.style.fontSize = '32px'; true`); await S.mount('mixed', w); note(kind, `${w}px 200% text`, judge(await measure(root))); await ev(`document.documentElement.style.fontSize = ''; true`);
                 // widths kept from a wider window or an earlier visit: every resizable column kept at 600 px
                 await S.mount('mixed', w); const base = await measure(root);
+                if (!base.cols.length) { await clear(); continue; } // no table to resize here: the finding is already noted
                 const keys = base.cols.filter(c => c.handle && !c.grow && !c.check).map(c => c.key);
                 const label = await ev(`document.querySelector('${root} table.dt-table').getAttribute('aria-label').replace(/,\\s*\\d.*$/, '')`);
                 await ev(`localStorage.setItem('coral-dt-widths:' + ${JSON.stringify(label)}, ${JSON.stringify(JSON.stringify(Object.fromEntries(keys.map(k => [k, 600]))))}); true`);
