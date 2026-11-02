@@ -51,6 +51,7 @@ func (h *SessionsHandler) wakeExistingSession(ctx context.Context, ls *store.Liv
 			h.noteLaunchedHooks(ctx, ls.SessionID, ls.AgentType)
 			h.noteStartSucceeded(ctx, ls.SessionID)          // the launch line was typed now: the safety net's window starts here, and no start failure stands (#353)
 			_ = h.ss.StampSessionSettings(ctx, ls.SessionID) // the CLI now runs with the stored model and level: turns the transcript recorded before are older than them (#6225)
+			h.watchWakeToken(ls)                             // a few seconds on, did the agent get its token, and is it still the live one (#12291)
 		}
 	}()
 	plan, err := h.prepareWake(ctx, ls)

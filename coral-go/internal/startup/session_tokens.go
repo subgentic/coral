@@ -75,6 +75,7 @@ func setupSessionTokens(db *store.DB, coralDir string) {
 		return f.Name()
 	}
 	agent.SessionTokenFileRemover = files.remove
+	agent.SessionTokenFileFor = files.get
 }
 
 // tokenFiles are the token file each session was last given. A new token revokes the
@@ -96,6 +97,12 @@ func (t *tokenFiles) put(sessionID, path string) {
 	if prev != "" && prev != path {
 		_ = os.Remove(prev)
 	}
+}
+
+func (t *tokenFiles) get(sessionID string) string {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.paths[sessionID]
 }
 
 func (t *tokenFiles) remove(sessionID string) {

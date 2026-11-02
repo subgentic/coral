@@ -31,6 +31,17 @@ const { coralReady } = require('./helpers/wait');
             await feed({});
             let v = await view();
             check(`${tag}: nothing waits and nothing was skipped: no line, no buttons, no row chip`, !v.shown && !v.list && !v.send && v.row === null && v.role === 'status', JSON.stringify(v));
+            const TOKEN = 'Its Coral token was not accepted after it woke, so its coral-board calls will be refused. Restart it from Coral.'; // #12291: the server's line for a woken agent whose token was not accepted
+            await feed({ coral_token_problem: TOKEN });
+            v = await view();
+            check(`${tag}: a woken agent whose Coral token was not accepted: the line says so, with no Options and no Send now (nothing waits)`, v.shown && v.text === TOKEN && !v.list && !v.send, JSON.stringify(v));
+            await feed({ coral_token_problem: TOKEN, board_unread: 2 });
+            v = await view();
+            check(`${tag}: unread team messages say theirs first, the token line is not shown over them`, v.text === '2 team messages have not reached this agent yet' && v.list, JSON.stringify(v));
+            await feed({ coral_token_problem: 'x'.repeat(300) });
+            check(`${tag}: a sentence over 200 characters is cut at 200`, (await view()).text === 'x'.repeat(200), JSON.stringify((await view()).text.length));
+            await feed({ coral_token_problem: { not: 'text' } });
+            check(`${tag}: a payload that is not text says nothing`, !(await view()).shown);
             await feed({ board_unread: 2 });
             v = await view();
             check(`${tag}: two unread: one plain line and one control (Options); Send now and Show terminal are behind it, not in the first look`, v.shown && v.text === '2 team messages have not reached this agent yet' && v.list && !v.send && !v.terminal && v.row === null, JSON.stringify(v));

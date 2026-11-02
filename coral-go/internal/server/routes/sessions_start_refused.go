@@ -107,5 +107,6 @@ func (h *SessionsHandler) noteStartSucceeded(ctx context.Context, sessionID stri
 		return
 	}
 	_ = h.ss.StampLaunch(ctx, sessionID)
+	forgetTokenProblem(sessionID) // a start has a token of its own (#12291)
 	_ = h.ss.SetStartFailure(ctx, sessionID, "")
 }
