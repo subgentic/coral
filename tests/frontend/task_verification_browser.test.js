@@ -94,10 +94,13 @@ const ADD = `(() => {
         await ev(`window.toggleAgenticPanel(true); document.getElementById('agentic-tab-tasks').click(); true`);
         await waitFor(`document.querySelectorAll('#board-task-list .board-task-item').length === 8`, 'the phone rows', 8000);
         assert.ok((await rows()).every(r => r.mark === null), 'no verification icon in phone rows');
-        const phone = await ev(`(() => { const dock = document.getElementById('agentic-state').getBoundingClientRect();
+        const measure = () => ev(`(() => { const dock = document.getElementById('agentic-state').getBoundingClientRect();
             const over = [...document.querySelectorAll('#board-task-list .board-task-item')].filter(b => b.getBoundingClientRect().right > dock.right + 1 || b.getBoundingClientRect().left < dock.left - 1).length;
             const r0 = document.querySelector('#board-task-list .board-task-item').getBoundingClientRect(), box = document.querySelector('#board-task-list .dt-box');
             return { over, page: document.documentElement.scrollWidth - document.documentElement.clientWidth, dock: [Math.round(dock.left), Math.round(dock.right)], row: [Math.round(r0.left), Math.round(r0.right)], box: box && [box.scrollWidth, box.clientWidth], kids: [...document.querySelector('#board-task-list .board-task-item').children].map(c => c.dataset.key + ':' + Math.round(c.getBoundingClientRect().width)) }; })()`);
+        // The dock was laid out for the desktop and the phone's width arrives a frame or two later (the observer re-fits the columns when the box is visible and sized again): read until it has settled, the way a person looks at it, not in the frame the panel opens in (macOS was a frame slower than the runner and read the desktop's widths, #12379)
+        let phone = await measure();
+        for (let i = 0; i < 20 && (phone.over !== 0 || phone.page > 0); i++) { await sleep(150); phone = await measure(); } // sleep-ok: a bounded wait for the layout to settle after the panel opens at a new width
         assert.equal(phone.over, 0, 'no row is cut off: ' + JSON.stringify(phone));
         assert.ok(phone.page <= 0, 'no sideways scroll: ' + JSON.stringify(phone));
         await shot('verify-list-phone');
