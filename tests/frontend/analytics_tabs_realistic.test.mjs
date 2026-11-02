@@ -25,8 +25,8 @@ const need = Object.fromEntries(o.agents.map(g => [g.name, g.toOperator]));
 for (const [name, n] of Object.entries(e.to_operator)) check('@mentions of the Operator by ' + name, n, need[name] || 0);
 check('Touches (all kinds): the recording is on and the seed made no touch, so only the posts count', e.operator_posts, o.touches);
 const tr = D.autonomyTrend(o.days), days = a.days;
-const want = days.slice(6).map((_, k) => { const w = days.slice(k, k + 7), tasks = w.reduce((n, d) => n + d.tasks_done, 0), t = w.reduce((n, d) => n + d.operator, 0); return tasks > 0 ? t / tasks : null; });
-check('Autonomy: touches per task done over 7 days, a point a day', want, tr.points.map(p => p.value));
+const want = days.slice(6).map((_, k) => { const w = days.slice(k, k + 7), tasks = w.reduce((n, d) => n + d.tasks_done, 0), t = w.reduce((n, d) => n + d.operator, 0); return t > 0 ? tasks / t : null; });
+check('Autonomy: tasks done per touch over 7 days, a point a day', want, tr.points.map(p => p.value));
 
 // ---- Team communication
 const c = D.commModel(a);

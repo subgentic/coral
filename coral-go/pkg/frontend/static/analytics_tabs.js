@@ -3,6 +3,7 @@
  * GET /api/analytics/activity?team=&range= (counts only, never text), which is the Hub owner's: a guest's read is refused and the page says so in one line. A number the read does not carry yet (the
  * Operator's typed messages, answers, wakes and restarts; per-task message counts) is drawn as "not recorded yet", never as zero. Lazy: cost_dashboard.js loads this when one of the three is opened.
  * Everything is built with the DOM and textContent: names are written by agents. */
+import { plural } from './format.js';
 import { state } from './state.js';
 import { isPhoneLayout } from './phone_layout.js';
 import { isCloud, serverFetch, spendTeamKeys, splitKey, noteBoardLabels, identityKey } from './server_base.js';
@@ -180,9 +181,11 @@ function drawOperator(m) {
     const who = V.panel('Who needs the Operator', 'asks and @mentions of the Operator',
         o.agents.length ? V.rankedBars(o.agents.slice(0, 8).map((g, i) => ({ name: g.name, value: g.need, i, text: `${g.asks} ${g.asks === 1 ? 'ask' : 'asks'} · ${g.toOperator} @${g.toOperator === 1 ? 'mention' : 'mentions'}` }))) : say('No agent asked or @mentioned the Operator in this period.'));
     const tr = D.autonomyTrend(o.days);
-    const trend = V.panel('Autonomy', 'touches per task done, over 7 days', !o.recorded ? pendingNote('The trend needs every kind of touch. It appears when they are recorded.')
+    const trend = V.panel('Autonomy', 'tasks done per touch, over 7 days', !o.recorded ? pendingNote('The trend needs every kind of touch. It appears when they are recorded.')
         : !tr.enough ? say('The trend needs at least 8 days with a task done in them. Choose a longer period.')
-        : trendBody(V.lineChart(tr.points, { fmt: (v) => v.toFixed(1), phone: phone() }), say(`${tr.last.value.toFixed(1)} touches per task done in the 7 days to ${tr.last.label}, against ${tr.first.value.toFixed(1)} in the 7 days to ${tr.first.label}. Fewer is more autonomy.`)));
+        : trendBody(V.lineChart(tr.points, { fmt: D.perTouchWords, phone: phone() }), say(tr.latest && tr.latest.untouched
+            ? `No touches at all in the 7 days to ${tr.latest.label}: ${plural(tr.latest.tasks, 'task')} done. Before that, ${D.perTouchWords(tr.last.value)} tasks done per touch in the 7 days to ${tr.last.label}. More is more autonomy.`
+            : `${D.perTouchWords(tr.last.value)} tasks done per touch in the 7 days to ${tr.last.label}, against ${D.perTouchWords(tr.first.value)} in the 7 days to ${tr.first.label}. More is more autonomy.`)));
 
     if (phone()) out.push(hero, trend, who); else out.push(rowOf(hero, trend), who);
     out.push(V.panel('Wait for the Operator', 'asks only', V.plainTable(['', 'Asks'], [['Asked', D.countWords(a && a.asked)], ['Answered', D.countWords(a && a.answered)], ['Not yet answered', D.countWords(a && Math.max(0, a.asked - a.answered))], ['Median wait', D.waitWords(a, 'median_s')], ['Slowest wait', D.waitWords(a, 'slowest_s')]], { right: [1], label: 'Wait for the Operator' }), o.recorded ? el('span') : pendingNote('Waits for a permission prompt are added with the recording.')));
