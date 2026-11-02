@@ -3,6 +3,7 @@ package routes
 import (
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -135,13 +136,13 @@ func isPathWordByte(c byte) bool {
 
 // waitingSince is when the agent's own request to the user began (State.WaitingSince, from the event that raised it), as a UTC time; null when it waits for nothing, only on Coral's held notice, a sign-in or a launch prompt, or the
 // start is not known. The Inbox says how long an agent has waited from it (#6981). A plain time, not the agent's words: it is not in the fields a viewer who can only look is denied.
-// waitRequestKey names an agent's open request: when it began (to the nanosecond when the state has it), else its words and kind. A new request has another key, so what the Operator hid is not hidden again (#11946).
+// waitRequestKey names an agent's open request: when it began (the state's start time in nanoseconds), else its words and kind. A new request has another key, so what the Operator hid is not hidden again (#11946).
 func waitRequestKey(s sessionstate.State) string {
 	if !s.NeedsInput {
 		return ""
 	}
 	if !s.WaitingSince.IsZero() {
-		return s.WaitingSince.UTC().Format(time.RFC3339Nano)
+		return strconv.FormatInt(s.WaitingSince.UnixNano(), 10) // an identifier, not a stored time: compared for equality only
 	}
 	return s.WaitingKind + "|" + s.WaitingSummary
 }
