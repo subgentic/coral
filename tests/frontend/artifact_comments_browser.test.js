@@ -54,6 +54,8 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
             return real(u, o);
         };
         return true; })()`;
+    // a box's place once it has stayed the same for five frames (a sheet that slides in): waits for the movement to end instead of sleeping a fixed time; gives up after 300 frames and lets the check that follows say where it was
+    const settled = sel => ev(`new Promise(res => { let last = '', n = 0, tries = 0; const tick = () => { const e = document.querySelector(${JSON.stringify(sel)}); const r = e ? e.getBoundingClientRect() : null; const k = r ? [r.top, r.bottom, r.left, r.right].map(Math.round).join() : ''; n = k && k === last ? n + 1 : 0; last = k; if (n >= 5 || ++tries > 300) return res(k); requestAnimationFrame(tick); }; tick(); })`);
     const rect = sel => ev(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; const r = e.getBoundingClientRect(); return { l: Math.round(r.left), t: Math.round(r.top), r: Math.round(r.right), b: Math.round(r.bottom), w: Math.round(r.width), h: Math.round(r.height) }; })()`);
     const open = async (extra) => {
         await ev(STUB);
@@ -146,10 +148,9 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
                 look.entries === 2 && look.avatars.join() === 'O,HU' && look.avatarHidden && /^author,kind,dot,time$/.test(look.metaOrder) && /minutes? ago$/.test(look.time) && look.resolveIn && look.replyLast && look.quoteFirst && look.group === 'group' && /Comment by Operator/.test(look.label), JSON.stringify(look));
             check(`${at}: a thin line joins the avatars down a thread (2 px, on every entry but the last)`, look.line === '2px', JSON.stringify(look.line));
             // the card and its highlight light each other while the pointer is on either
-            await ev(`document.querySelector('.ac-card[data-id="1"]').dispatchEvent(new PointerEvent('pointerenter')); true`);
-            check(`${at}: the pointer on a card lights it and its text (ac-hover)`, await ev(`document.querySelector('.ac-card[data-id="1"]').classList.contains('ac-hover') && !!CSS.highlights.get('ac-hover')`));
-            await ev(`document.querySelector('.ac-card[data-id="1"]').dispatchEvent(new PointerEvent('pointerleave')); true`);
-            check(`${at}: and leaving puts both out`, await ev(`!document.querySelector('.ac-card.ac-hover') && !CSS.highlights.get('ac-hover')`));
+            // the event and what it did are read in ONE evaluation: a redraw of the panel from a request still in flight (it makes the cards again, without the class) cannot fall between them
+            check(`${at}: the pointer on a card lights it and its text (ac-hover)`, await ev(`(() => { const c = document.querySelector('.ac-card[data-id="1"]'); c.dispatchEvent(new PointerEvent('pointerenter')); return c.classList.contains('ac-hover') && !!CSS.highlights.get('ac-hover'); })()`));
+            check(`${at}: and leaving puts both out`, await ev(`(() => { document.querySelector('.ac-card[data-id="1"]').dispatchEvent(new PointerEvent('pointerleave')); return !document.querySelector('.ac-card.ac-hover') && !CSS.highlights.get('ac-hover'); })()`));
             // Edit and Delete show on hover, on a current card and on focus (they are real buttons: the keyboard reaches them and focus shows them)
             await ev(`(() => { const a = document.querySelector('.ac-card[data-id="4"]'); a.classList.remove('ac-active'); return true; })()`);
             const vis = await ev(`(() => { const a = document.querySelector('.ac-card[data-id="4"] .ac-actions'); return getComputedStyle(a).opacity; })()`);
@@ -275,7 +276,7 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
             const p0 = await rect('.ac-panel');
             check(`${at}: the sheet starts shut, below the screen (top ${p0.t} >= 844)`, p0.t >= 844);
             await ev(`document.querySelector('.ac-toggle').click(); true`);
-            await new Promise(r => setTimeout(r, 400)); // sleep-ok: the sheet slides in over 200 ms
+            await settled('.ac-panel'); // the sheet slides in: measured once it has stopped moving, not after a guess at how long that takes
             await shot(`comments-390-open-${theme}`);
             const p1 = await rect('.ac-panel');
             check(`${at}: the sheet opens inside the screen (${p1.t}..${p1.b} of 844), its content scrolls, nothing sideways`, p1.b <= 844 + 1 && p1.t > 100 && (await ev(`document.documentElement.scrollWidth - document.documentElement.clientWidth`)) === 0, JSON.stringify(p1));
@@ -286,7 +287,7 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
             await waitFor(`!document.querySelector('.ac-selbtn').hidden`, 'the Comment button by the selection', 3000);
             await click('.ac-selbtn');
             await waitFor(`!!document.querySelector('.ac-composer .ac-input')`, 'the composer', 3000);
-            await new Promise(r => setTimeout(r, 400)); // sleep-ok: the sheet slides in
+            await settled('.ac-composer'); // the sheet slides in with it
             const cmp = await rect('.ac-composer');
             check(`${at}: Comment on a selection opens the sheet on the composer (inside the screen: ${cmp.t}..${cmp.b})`, cmp.b <= 845 && cmp.t >= 0);
             await shot(`comments-phone-${theme}`);
