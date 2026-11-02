@@ -134,12 +134,24 @@ const { removeBoards } = require('./helpers/board_cleanup');
         sent = await go();
         assert.equal(sent.trust_folder, true);
         await waitFor(`[...document.querySelectorAll('.toast-message')].some(t => /Trust this folder was not applied: a folder in a shared place/.test(t.textContent))`, 'the refusal said in a toast');
-        await ev(`window.__trustAnswer = { path: '/home/p/Code/app', trusted: ['codex'], failed: { claude: 'the agent\\'s settings file is not there yet' }, not: { claude: 'the agent\\'s settings file is not there yet' } }; window.hideLaunchModal(); true`);
+        // #12532: no settings file yet is a first-time user, not an error: plain guidance that says what it means and what to do from the chat (no terminal), and not a red toast
+        await ev(`window.__trustAnswer = { path: '/home/p/Code/app', trusted: ['codex'], no_settings: ['claude'], not: { claude: 'the agent\\'s settings file is not there yet' } }; window.hideLaunchModal(); true`);
         await open(); await setDir('/home/p/Code/app', false);
         await ev(`document.getElementById('launch-team-trust').click(); true`);
         await go();
-        await waitFor(`[...document.querySelectorAll('.toast-message')].some(t => /Trust this folder was not applied for claude: the agent's settings file is not there yet/.test(t.textContent))`, 'a failure for one agent type said in a toast');
+        await waitFor(`[...document.querySelectorAll('.toast-message')].some(t => /Claude has no settings file on this computer yet/.test(t.textContent))`, 'the first-time guidance in a toast');
+        const guide = await ev(`(() => { const t = [...document.querySelectorAll('.toast')].find(x => /has no settings file/.test(x.textContent)); return t ? { error: t.classList.contains('error'), text: t.textContent } : null; })()`);
+        assert.equal(guide.error, false, 'guidance, not an error toast');
+        assert.match(guide.text, /normal/, 'it says this is normal');
+        assert.match(guide.text, /agent's chat/, 'it says what to do, from the chat');
+        assert.doesNotMatch(guide.text, /terminal|was not applied/i, 'no terminal to go to, and not worded as a failure');
+        await ev(`window.__trustAnswer = { path: '/home/p/Code/app', trusted: ['codex'], failed: { claude: 'the agent\\'s settings file is a link' }, not: { claude: 'the agent\\'s settings file is a link' } }; window.hideLaunchModal(); true`);
+
+        await open(); await setDir('/home/p/Code/app', false);
+        await ev(`document.getElementById('launch-team-trust').click(); true`);
+        await go();
+        await waitFor(`[...document.querySelectorAll('.toast-message')].some(t => /Trust this folder was not applied for claude: the agent's settings file is a link/.test(t.textContent))`, 'a real failure for one agent type is still said in a toast');
         await ev(`window.__trustAnswer = null; window.hideLaunchModal(); true`);
-    } finally { await removeBoards(ev, Array.from({ length: 12 }, (_, i) => 'trust-' + (i + 1))); await client.close(); }
+    } finally { await removeBoards(ev, Array.from({ length: 13 }, (_, i) => 'trust-' + (i + 1))); await client.close(); }
     console.log('team_trust_folder_browser: ok');
 })().catch(e => { console.error(e); process.exit(1); });

@@ -199,20 +199,25 @@ func TestWhenTheClaudeFileIsNotThereTheCardStaysAndTheReplySaysSo(t *testing.T) 
 	tf := trustOf(t, out)
 	assert.Equal(t, []any{"codex"}, tf["trusted"])
 	assert.Contains(t, tf["not"].(map[string]any), "claude")
-	assert.Contains(t, tf["failed"].(map[string]any), "claude", "tried and could not: the page says it (agy, which has no setting, is in 'not' only)")
-	assert.NotContains(t, tf["failed"].(map[string]any), "agy")
+	assert.Contains(t, tf["not"].(map[string]any), "claude")
+	// #12532: a first-time Claude has no settings file, which is normal and not an error: the reply says so apart from "failed" (a real failure), and the page shows guidance, not a red error.
+	assert.Equal(t, []any{"claude"}, tf["no_settings"], "no settings file yet is its own answer")
+	assert.NotContains(t, tf, "failed", "and not a failure")
 	_, err := os.Stat(r.claude)
 	assert.True(t, os.IsNotExist(err), "the file is not made")
 	var said []string
 	msgs, err := r.h.bs.ListMessages(context.Background(), out["board"].(string), 100, 0, 0)
 	require.NoError(t, err)
 	for _, m := range msgs {
-		if strings.Contains(m.Content, "did not trust") {
+		if strings.Contains(m.Content, "no settings file") {
 			said = append(said, m.Content)
 		}
 	}
 	require.Len(t, said, 1, "the board says it too: %v", said)
-	assert.Contains(t, said[0], "for claude")
+	assert.Contains(t, said[0], "Claude has no settings file", "plain words, what it means")
+	assert.Contains(t, said[0], "chat", "what to do, from the chat: a phone has no terminal")
+	assert.NotContains(t, said[0], "terminals", "no terminal to go to")
+	assert.NotContains(t, said[0], "did not trust", "not worded as an error")
 }
 
 // A team that works in a worktree starts in a folder made from existing code: the folder the launch made does not count for it, and only the person's tick does.
