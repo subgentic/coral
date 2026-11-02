@@ -267,8 +267,8 @@ exit 0
 --- stdout
 Usage: coral-agent artifact upload <file> [--name NAME] [--media-type TYPE] [--new-version-of <link>] [--task N | --no-task] [--tag WORD]... [--question TEXT]
        coral-agent artifact download <coral://artifacts/digest> [--output FILE] [--force]
-       coral-agent artifact reply <coral://artifacts/digest> <comment-id> <text | ->
-       coral-agent artifact comments <coral://artifacts/digest>
+       coral-agent artifact reply <coral://artifacts/digest | coral://goals/team/number> <comment-id> <text | ->
+       coral-agent artifact comments <coral://artifacts/digest | coral://goals/team/number>
 Run coral-agent artifact upload --help, artifact download --help, artifact reply --help or artifact comments --help for one of them.
 --- stderr
 === coral-agent help docs
@@ -436,8 +436,8 @@ exit 1
 --- stderr
 Usage: coral-agent artifact upload <file> [--name NAME] [--media-type TYPE] [--new-version-of <link>] [--task N | --no-task] [--tag WORD]... [--question TEXT]
        coral-agent artifact download <coral://artifacts/digest> [--output FILE] [--force]
-       coral-agent artifact reply <coral://artifacts/digest> <comment-id> <text | ->
-       coral-agent artifact comments <coral://artifacts/digest>
+       coral-agent artifact reply <coral://artifacts/digest | coral://goals/team/number> <comment-id> <text | ->
+       coral-agent artifact comments <coral://artifacts/digest | coral://goals/team/number>
 Run coral-agent artifact upload --help, artifact download --help, artifact reply --help or artifact comments --help for one of them.
 === coral-agent docs --bogus
 exit 0

@@ -310,6 +310,8 @@ var operatorOnlyRoutes = map[string]string{
 	"POST /api/skills/{id}/reject":                       "reject a skill",
 	"DELETE /api/skills/{id}":                            "remove a skill",
 	"GET /api/sessions/history/counts":                   "read every chat folder count",
+	"GET /api/history-import":                            "read how many earlier chats wait for an import",
+	"POST /api/history-import":                           "import the earlier chats on this computer",
 	"PATCH /api/sessions/history/{sessionID}/flags":      "change a chat mailbox flag",
 	"GET /api/sessions/history":                          "list every session's history",
 	"GET /api/sessions/history/search":                   "search every session's history",

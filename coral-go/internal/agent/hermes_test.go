@@ -57,7 +57,7 @@ func TestHermesResumeIDIsOnlyTheRealForm(t *testing.T) {
 func TestHermesLaunchLine(t *testing.T) {
 	hermesRig(t)
 	ag := GetAgent(at.Hermes)
-	cmd, err := ag.LaunchCommand(LaunchParams{SessionID: "s1", ResumeSessionID: hermesID, Prompt: "SECRET-PROMPT", ProtocolPath: "/nope"})
+	cmd, err := ag.LaunchCommand(LaunchParams{SessionID: testSID, ResumeSessionID: hermesID, Prompt: "SECRET-PROMPT", ProtocolPath: "/nope"})
 	require.NoError(t, err)
 	assert.Contains(t, cmd, "hermes chat --resume "+hermesID)
 	assert.NotContains(t, cmd, "SECRET-PROMPT", "no prompt on the line")
@@ -67,7 +67,7 @@ func TestHermesLaunchLine(t *testing.T) {
 
 	// a resume id that is not the form is ignored: a fresh session
 	for _, bad := range []string{"d7b90358", "--yolo", "latest", "local-x"} {
-		cmd, err = ag.LaunchCommand(LaunchParams{SessionID: "s1", ResumeSessionID: bad})
+		cmd, err = ag.LaunchCommand(LaunchParams{SessionID: testSID, ResumeSessionID: bad})
 		require.NoError(t, err)
 		assert.NotContains(t, cmd, "--resume", bad)
 		assert.NotContains(t, cmd, "--yolo", bad)
@@ -82,13 +82,13 @@ func TestHermesFlags(t *testing.T) {
 		assert.Empty(t, PermissionFlagsForAgent(at.Hermes, m), m)
 	}
 	ag := GetAgent(at.Hermes)
-	cmd, err := ag.LaunchCommand(LaunchParams{SessionID: "s1", Flags: append(PermissionFlagsForAgent(at.Hermes, "bypassPermissions"), "--yolo", "-m", "some-model", "--reasoning", "high")})
+	cmd, err := ag.LaunchCommand(LaunchParams{SessionID: testSID, Flags: append(PermissionFlagsForAgent(at.Hermes, "bypassPermissions"), "--yolo", "-m", "some-model", "--reasoning", "high")})
 	require.NoError(t, err)
 	assert.Equal(t, 1, strings.Count(cmd, "--yolo"))
 	assert.Contains(t, cmd, "-m some-model")
 	assert.Contains(t, cmd, "--reasoning high")
 
-	cmd, err = ag.LaunchCommand(LaunchParams{SessionID: "s1", Flags: []string{
+	cmd, err = ag.LaunchCommand(LaunchParams{SessionID: testSID, Flags: []string{
 		"--resume", "latest", "-c", "-q", "do it", "--accept-hooks", "--in", "/etc", "--source", "x", "--permission-mode", "bypassPermissions",
 		"--dangerously-skip-permissions", "--sandbox", "danger-full-access", "--approval-mode=yolo", "--ignore-rules", "-Q", "--model", "m",
 	}})
@@ -109,7 +109,7 @@ func TestHermesYoloCountsAsSkipping(t *testing.T) {
 // The hook tool names the agent by the folder it works in (Hermes runs hooks in its own install folder): the launch line sets it.
 func TestTheLaunchLineSetsTheWorkdirTheHooksNameTheAgentBy(t *testing.T) {
 	hermesRig(t)
-	cmd, err := GetAgent(at.Hermes).LaunchCommand(LaunchParams{SessionID: "s1", BoardName: "t", WorkingDir: "/work/dev"})
+	cmd, err := GetAgent(at.Hermes).LaunchCommand(LaunchParams{SessionID: testSID, BoardName: "t", WorkingDir: "/work/dev"})
 	require.NoError(t, err)
 	assert.Contains(t, cmd, "CORAL_HERMES_WORKDIR='/work/dev'")
 }
@@ -131,11 +131,11 @@ func TestTheFirstLaunchInATeamsHomePreparesItVisiblyAndOnce(t *testing.T) {
 	}
 	r := hermesRig(t)
 	line := func() string {
-		cmd, err := GetAgent(at.Hermes).LaunchCommand(LaunchParams{SessionID: "s1", BoardName: "team-a", CoralDir: r.data})
+		cmd, err := GetAgent(at.Hermes).LaunchCommand(LaunchParams{SessionID: testSID, BoardName: "team-a", CoralDir: r.data})
 		require.NoError(t, err)
 		return cmd
 	}
-	home := HermesTeamHome(r.data, "team-a")
+	home := HermesAgentHome(r.data, "team-a", testSID)
 	first := line()
 	assert.Contains(t, first, "Preparing Hermes for this team")
 	assert.Contains(t, first, "hermes hooks list")
@@ -150,7 +150,7 @@ func TestTheFirstLaunchInATeamsHomePreparesItVisiblyAndOnce(t *testing.T) {
 	assert.Contains(t, second, "hermes chat")
 
 	// another team's home is its own
-	cmd, err := GetAgent(at.Hermes).LaunchCommand(LaunchParams{SessionID: "s2", BoardName: "team-b", CoralDir: r.data})
+	cmd, err := GetAgent(at.Hermes).LaunchCommand(LaunchParams{SessionID: testSID, BoardName: "team-b", CoralDir: r.data})
 	require.NoError(t, err)
 	assert.Contains(t, cmd, "Preparing Hermes for this team")
 }
@@ -170,7 +170,7 @@ func TestWhatTheAgentIsToldIsAFileNotTheLine(t *testing.T) {
 	assert.NotContains(t, cmd, "message board")
 
 	path := HermesFirstMessagePath(r.data, "team-a", sid)
-	assert.Equal(t, filepath.Join(HermesTeamHome(r.data, "team-a"), "first-messages", sid+".txt"), path)
+	assert.Equal(t, filepath.Join(HermesAgentHome(r.data, "team-a", sid), "first-messages", sid+".txt"), path)
 	fi, err := os.Stat(path)
 	require.NoError(t, err)
 	assert.Equal(t, os.FileMode(0o600), fi.Mode().Perm())

@@ -17,6 +17,26 @@ export const WHAT_STAYS_KILL = "Its chat stays in History.";
 /** The same for a team or a folder of agents killed together, and what a reset leaves alone (#10371: the confirms said terminate and context, and not what stays). */
 export const WHAT_STAYS_KILL_MANY = "Their chats stay in History.";
 export const WHAT_STAYS_RESET = "The old chats stay in History and your files are not touched.";
+/** A Hermes agent keeps its conversation in a Hermes home of its own, deleted with the agent, and Hermes keeps no other copy: a kill or a reset must not promise History for it (#11956). */
+const isHermes = s => !!s && s.agent_type === 'hermes';
+const NO_OTHER_COPY = 'Hermes keeps no other copy';
+
+/** What a kill leaves alone, for the agents it ends (sessions: the rows). */
+export function whatStaysKill(sessions) {
+    const rows = sessions || [];
+    const hermes = rows.filter(isHermes).length;
+    if (!hermes) return rows.length === 1 ? WHAT_STAYS_KILL : WHAT_STAYS_KILL_MANY;
+    if (rows.length === 1) return `Its conversation is deleted with it: ${NO_OTHER_COPY}.`;
+    if (hermes === rows.length) return `Their conversations are deleted with them: ${NO_OTHER_COPY}.`;
+    return `${WHAT_STAYS_KILL_MANY} Except the ${hermes} Hermes agent${hermes === 1 ? '' : 's'}: ${hermes === 1 ? 'its conversation is' : 'their conversations are'} deleted with ${hermes === 1 ? 'it' : 'them'} (${NO_OTHER_COPY}).`;
+}
+
+/** What a reset leaves alone, for the agents it restarts. */
+export function whatStaysReset(sessions) {
+    if (!(sessions || []).some(isHermes)) return WHAT_STAYS_RESET;
+    return `${WHAT_STAYS_RESET} A Hermes agent's old conversation is the exception: it is deleted (${NO_OTHER_COPY}).`;
+}
+
 /** What a sleep stops, and what it leaves alone (#10785: the dialog named the folder and said nothing of either). */
 export const WHAT_STAYS_SLEEP = 'It stops running; its chat and files stay, and Wake brings it back.';
 /** What an archive leaves alone, and the way back. */

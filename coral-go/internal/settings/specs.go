@@ -53,6 +53,7 @@ const (
 	DefaultPromptWorker      = "default_prompt_worker"
 	ArtifactStoreMaxBytes    = "artifact_store_max_bytes"
 	ArtifactStoreAutoRaised  = "artifact_store_auto_raised"
+	HistoryImport            = "history_import"
 	ReceivedArtifactsMax     = "received_artifacts_max_bytes"
 	ReceivedCapNoticeAck     = "received_cap_notice_ack"
 	ArtifactRetentionDays    = "artifact_retention_days"
@@ -243,6 +244,7 @@ func init() {
 
 	// Coral's own.
 	coral(TerminalDefaultNotice, "Whether the one line \"Agents now stop when you quit Coral\" is owed (pending) or was shown and dismissed (seen) or is not owed (none): set once, by Coral, at the first start on the built-in terminal default of an install that ran on the old tmux default (#6064).")
+	coral(HistoryImport, "Whether the chats Coral did not start (the Claude Code, Codex and other history already on this computer) are listed: 1 once the person chose Import, 0 once they chose to stop listing them; absent until they choose (#11970, #11990).")
 	coral(ArtifactCommentsOwnerID, "The random id the owner's artifact comments are stored under.")
 	coral(ArtifactRetentionEnable, "When Coral saw the retention days change.")
 	coral(ArtifactStoreAutoRaised, "The cap was raised automatically.")

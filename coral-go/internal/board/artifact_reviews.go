@@ -9,7 +9,7 @@ import (
 )
 
 // The Operator's review of a team's artifact (#136584): an artifact tagged "for review" is approved, or has changes requested, and the state has a time. The tags carry the state the lists filter on (the
-// row leaves Needs you when "for review" is replaced by "approved"; "changes requested" is added and the row stays); this table holds when, so the viewer can say "Approved 10:42". A review belongs to a team's
+// row leaves Needs you when "for review" is replaced by "approved"; "changes requested" is added, "for review" stays and the row leaves Needs you: it is the agent's turn, and its next version is a new item, #11985); this table holds when, so the viewer can say "Approved 10:42". A review belongs to a team's
 // use of a stored object, as the tags do.
 
 const (
@@ -72,7 +72,7 @@ type ReviewChange struct {
 }
 
 // DecideArtifactReview records the Operator's decision for the object on the board, in one transaction. approve takes "for review", "read" and "changes requested" off and puts "approved" on, which is what takes the
-// row out of Needs you; changes keeps "for review" and puts "changes requested" on. A second approve (or a second request of the same changes) changes nothing. An object with no "for review" tag and no
+// row out of Needs you; changes keeps "for review" and puts "changes requested" on (the file then waits on the agent: /api/needs-you and the page do not list it, #11985). A second approve (or a second request of the same changes) changes nothing. An object with no "for review" tag and no
 // review row is not waiting for a decision: ErrNotForReview (an object already "reviewed" by the old Mark reviewed counts as settled, and is refused the same way).
 func (s *Store) DecideArtifactReview(ctx context.Context, boardID, hex, state string, now time.Time) (ReviewChange, []string, error) {
 	ch := ReviewChange{board: boardID, hex: hex}
@@ -133,7 +133,7 @@ func (s *Store) DecideArtifactReview(ctx context.Context, boardID, hex, state st
 		next[tagForReview] = true
 		next[ReviewChangesRequested] = true
 		delete(next, tagRead)  // it is something to read again: the agent changes it
-		delete(next, tagSaved) // and it is back in Needs you as changes requested
+		delete(next, tagSaved) // and it is not saved for later: it waits on the agent, not on the Operator (#11985)
 	case ReviewDenied:
 		delete(next, tagForReview)
 		delete(next, tagRead)

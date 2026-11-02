@@ -151,6 +151,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         const list = threads();
         const head = el('div', 'ac-head');
         const h = el('h3', 'ac-title', 'Comments'); h.append(el('span', 'ac-count', String(openCount())));
+        opts.onCount?.(openCount()); // a goal's Comments tab says how many are open (#11955)
         head.append(h);
         // Resolved threads are out of the way, as in Docs: one toggle brings them back (and only while there are any).
         const nResolved = list.filter(t => t.c.resolved && !t.c.deleted).length;
@@ -184,11 +185,11 @@ export function attachComments(dialog, body, host, opts = {}) {
             d.addEventListener('toggle', () => { st.groupOpen[g] = d.open; });
             li.append(d); wrap.append(li);
         }
-        if (!shownAll.length) wrap.append(el('p', 'empty-state empty-state-tight', st.text ? 'No open comments. Select some text to add one.' : 'No open comments. Use the button below to comment on the whole document.'));
+        if (!shownAll.length) wrap.append(el('p', 'empty-state empty-state-tight', st.text ? 'No open comments. Select some text to add one.' : opts.words?.empty || 'No open comments. Use the button below to comment on the whole document.'));
         panel.append(wrap);
         if (st.composing && st.composing.anchor) panel.append(composer());
         else if (d.canComment && !d.locked) {
-            const whole = btn('ac-whole', 'Comment on the whole document'); whole.addEventListener('click', () => { st.composing = { anchor: { whole: true } }; st.error = ''; render(); panel.querySelector('.ac-input')?.focus(); });
+            const whole = btn('ac-whole', opts.words?.whole || 'Comment on the whole document'); whole.addEventListener('click', () => { st.composing = { anchor: { whole: true } }; st.error = ''; render(); panel.querySelector('.ac-input')?.focus(); });
             panel.append(whole);
         }
         const act = panel.querySelector('.ac-card.ac-active'); if (act && st.scrollCard) { st.scrollCard = false; act.scrollIntoView({ block: 'nearest', behavior: scrollBehavior() }); }
@@ -248,7 +249,7 @@ export function attachComments(dialog, body, host, opts = {}) {
     function card({ c, replies }) {
         const li = el('li', 'ac-card' + (st.active === c.id ? ' ac-active' : '') + (c.resolved ? ' ac-resolved' : '')); li.dataset.id = String(c.id); li.setAttribute('aria-label', `Comment by ${c.authorName || c.authorId || 'unknown'}`); li.setAttribute('role', 'group');
         const a = c.anchor || {};
-        const q = el('blockquote', 'ac-quote' + (st.orphan.has(c.id) ? ' ac-orphan' : ''), a.whole ? 'The whole document' : a.quote || '');
+        const q = el('blockquote', 'ac-quote' + (st.orphan.has(c.id) ? ' ac-orphan' : ''), a.whole ? (opts.words?.quote || 'The whole document') : a.quote || '');
         li.append(q);
         li.append(entry(c, true));
         for (const r of replies) li.append(entry(r, false));

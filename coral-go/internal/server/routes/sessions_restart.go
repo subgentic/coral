@@ -124,6 +124,9 @@ func (h *SessionsHandler) Restart(w http.ResponseWriter, r *http.Request) {
 		h.touch(r, plan.stored.SessionID, board.TouchRestart)
 	}
 	out := map[string]any{"ok": true, "session_id": plan.newSessionID, "session_name": plan.newSessionName}
+	if plan.agentType == at.Hermes {
+		out["conversation_note"] = hermesRestartNote
+	}
 	if plan.modeNotRecorded {
 		out["mode_note"] = "Its mode was not recorded: restarted in Default"
 	}
@@ -635,6 +638,7 @@ func (h *SessionsHandler) restartRecord(ctx context.Context, p *restartPlan) {
 			return ptr.NonEmpty(p.permMode) // the mode it restarted in is recorded, so the next restart knows it (#10297)
 		}(),
 	})
+	h.removeReplacedHermesHome(p.stored, p.board, p.req.SessionID) // the agent has a new session id, so a home of its own: the old one is no longer anyone's
 	if p.chiefMode != "" {
 		h.ss.SetSetting(ctx, "chief_session", p.newSessionID) // Chief is still the recorded agent after its restart: the next restart finds it
 	}

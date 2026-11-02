@@ -1,5 +1,5 @@
 /* The Operator's review of an artifact a team tagged "for review" (#136584, #136588), in the artifact viewer: Approve (the row leaves Needs you, the uploading agent is told) and Request changes (a comment
- * on the whole document, sent to the uploader through the comments' own Send to agent, and the row stays in Needs you as "changes requested"). The state is read from the team's artifact list (its tags and,
+ * on the whole document, sent to the uploader through the comments' own Send to agent, and the file leaves Needs you: it is the agent's turn, and its next version comes back as a new item). The state is read from the team's artifact list (its tags and,
  * once decided, the time); the buttons show only for a pending one; through Coral Hub the owner has both: the change-request send is the owner's too (#11354). */
 import { boardFetch, identityKey, decisionNeedsPerson } from './server_base.js';
 import { showToast, announceNotice } from './notifications.js';

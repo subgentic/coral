@@ -212,7 +212,7 @@ func ownBox(box string, memo typedMemo, now time.Time) bool {
 func (in AutomatedInput) styledSuggestionOnly(ctx context.Context, agentType, sessionID string) bool {
 	if ss, ok := in.Term.(StyledScreenReader); ok {
 		if styled, err := ss.AgentScreenStyled(ctx, in.Name, agentType, sessionID); err == nil {
-			return suggestionOnly(styled)
+			return suggestionOnly(styled) || (agentType == "hermes" && hermesPlaceholderBox(styled)) // Hermes's hint in any language, by its styling (#11967)
 		}
 	}
 	return false

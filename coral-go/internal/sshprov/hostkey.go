@@ -9,6 +9,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"path/filepath"
@@ -118,14 +119,30 @@ func (r Runner) Scan(ctx context.Context, host string, port int) (HostKey, error
 	return pick, nil
 }
 
-// DefaultKnownHostsPath is the hub user's ~/.ssh/known_hosts, the file the system ssh reads.
+// ownKnownHosts, when set (UseOwnKnownHosts), is the one file the hub's ssh checks and Trust writes.
+var ownKnownHosts string
+
+// UseOwnKnownHosts makes the hub check and record host keys in path instead of the user's ~/.ssh/known_hosts.
+func UseOwnKnownHosts(path string) { ownKnownHosts = path }
+
+// DefaultKnownHostsPath is the file the hub's ssh checks host keys in and Trust writes to: the hub's own (UseOwnKnownHosts) or else the hub user's ~/.ssh/known_hosts.
 func DefaultKnownHostsPath() string {
+	if ownKnownHosts != "" {
+		return ownKnownHosts
+	}
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return ""
 	}
 	return filepath.Join(home, ".ssh", "known_hosts")
 }
+
+// HopKeyError is a scan that stopped because a jump host's key is not in the owner's known_hosts (or no longer matches it): the scan never accepts a hop's key, the owner connects through it once
+// with ssh in a terminal. Hops are the jump hosts of the alias, as the owner wrote them in their config, and Unknown the ones whose key is not found (all of them when that cannot be told).
+type HopKeyError struct{ Hops, Unknown []string }
+
+func (e *HopKeyError) Error() string        { return "sshprov: a jump host's key is not in known_hosts" }
+func (e *HopKeyError) Is(target error) bool { return target == ErrHostKeyScan }
 
 // ErrKeyConflict means known_hosts already names the host with a different key of the same type: that is a changed key, never something to overwrite.
 var ErrKeyConflict = errors.New("sshprov: known_hosts already has a different key for this host")
@@ -236,7 +253,7 @@ func (r Runner) ScanAlias(ctx context.Context, t Target) ([]HostKey, error) {
 	if userCfg == "" {
 		userCfg = DefaultConfigPath()
 	}
-	cfg, err := scanConfig(tmp, userCfg)
+	cfg, err := scanConfig(userCfg)
 	if err != nil {
 		return nil, err
 	}
@@ -255,6 +272,9 @@ func (r Runner) ScanAlias(ctx context.Context, t Target) ([]HostKey, error) {
 	cmd.Stdout, cmd.Stderr, cmd.Stdin, cmd.Env = &out, &errOut, nil, minimalEnv()
 	_ = cmd.Run() // a refusal to sign in is the expected end; what matters is what was stored
 	data, err := os.ReadFile(tmp)
+	if err != nil && (strings.Contains(errOut.b.String(), "Host key verification failed") || strings.Contains(errOut.b.String(), "REMOTE HOST IDENTIFICATION HAS CHANGED")) {
+		return nil, r.hopKeyError(ctx, ssh, cfgPath, t)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("%w: no key was stored", ErrHostKeyScan)
 	}
@@ -296,18 +316,91 @@ func (r Runner) ScanAlias(ctx context.Context, t Target) ([]HostKey, error) {
 	return keys, nil
 }
 
+// hopKeyError names the jump hosts of t (ssh -G on the scan's config says them) and the ones whose key the owner's known_hosts does not hold, so the sentence can say which.
+func (r Runner) hopKeyError(ctx context.Context, sshBin, cfgPath string, t Target) error {
+	e := &HopKeyError{}
+	g := func(dest string, port ...string) map[string]string {
+		cctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
+		argv := []string{"-G", "-F", cfgPath}
+		for _, p := range port {
+			argv = append(argv, "-p", p)
+		}
+		cmd := executil.Command(cctx, sshBin, append(argv, "--", dest)...)
+		var out capped
+		cmd.Stdout, cmd.Stderr, cmd.Env = &out, io.Discard, minimalEnv()
+		_ = cmd.Run()
+		got := map[string]string{}
+		for _, l := range strings.Split(out.b.String(), "\n") {
+			if k, v, ok := strings.Cut(l, " "); ok {
+				got[k] = strings.Trim(v, `"`)
+			}
+		}
+		return got
+	}
+	for _, hop := range strings.Split(g(t.Destination())["proxyjump"], ",") {
+		hop = strings.TrimSpace(hop)
+		if hop != "" && hop != "none" && hopRe.MatchString(hop) {
+			e.Hops = append(e.Hops, hop)
+		}
+	}
+	for _, hop := range e.Hops {
+		dest := hop
+		if i := strings.LastIndex(dest, "@"); i >= 0 {
+			dest = dest[i+1:]
+		}
+		var eff map[string]string
+		if h, p, ok := strings.Cut(dest, ":"); ok && !strings.HasPrefix(dest, "[") {
+			eff = g(h, p) // host:port as ProxyJump writes it
+		} else {
+			eff = g(dest)
+		}
+		name := eff["hostname"]
+		if p := eff["port"]; p != "" && p != "22" {
+			name = "[" + eff["hostname"] + "]:" + p
+		}
+		if a := eff["hostkeyalias"]; a != "" {
+			name = a
+		}
+		known := false
+		for _, f := range strings.Fields(eff["userknownhostsfile"]) {
+			if strings.Contains(f, "..") { // the owner's own config names these files; one that climbs is not looked up
+				continue
+			}
+			if strings.HasPrefix(f, "~/") {
+				if home, err := os.UserHomeDir(); err == nil {
+					f = filepath.Join(home, f[2:])
+				}
+			}
+			if keys, err := existingKeys(ctx, f, name); err == nil && len(keys) > 0 {
+				known = true
+				break
+			}
+		}
+		if !known {
+			e.Unknown = append(e.Unknown, hop)
+		}
+	}
+	return e
+}
+
+// hopRe is a ProxyJump entry as ssh -G prints it: [user@]host[:port], nothing a sentence could carry as markup.
+var hopRe = regexp.MustCompile(`^([a-z_][a-z0-9_-]{0,31}@)?[A-Za-z0-9\[][A-Za-z0-9.:\[\]-]{0,253}$`)
+
 // scanConfig is the temporary ssh config of the alias scan (see ScanAlias): the safety lines first (ssh keeps the first value of an option), then the owner's own config.
-func scanConfig(knownHosts, userConfig string) (string, error) {
-	for _, p := range []string{knownHosts, userConfig} {
+func scanConfig(userConfig string) (string, error) {
+	for _, p := range []string{userConfig} {
 		if p == "" || strings.ContainsAny(p, "\"\r\n\x00") {
 			return "", errors.Join(ErrHostKeyScan, ErrBadTarget)
 		}
 	}
 	var b strings.Builder
 	b.WriteString("# Coral's host key scan: these lines come first, so they win over the owner's.\nHost *\n")
+	// The host-key lines are NOT here: a ProxyJump hop is checked as the owner's own config says, against the owner's own known_hosts (#12031: a hop's key is never accepted by the scan, the
+	// owner has already pinned the hops they use, and an unknown or changed hop stops the scan with HopKeyError). Only the last host is scanned, with the options of ScanAlias's own argv, which
+	// ssh does not hand to a hop.
 	for _, l := range []string{
-		"StrictHostKeyChecking no", "UserKnownHostsFile \"" + filepath.ToSlash(knownHosts) + "\"", "GlobalKnownHostsFile " + os.DevNull,
-		"HashKnownHosts no", "CheckHostIP no", "BatchMode yes",
+		"BatchMode yes", "UpdateHostKeys no", // the scan must not append keys a verified hop offers to the owner's own known_hosts
 		"ForwardAgent no", "ForwardX11 no", "ForwardX11Trusted no", "ClearAllForwardings yes", "PermitLocalCommand no", "RemoteCommand none",
 		// no Kerberos sign-in to an unverified hop and no delegating of the owner's tickets to it, and no connection sharing: a multiplexed master of the owner's would carry a hop through the
 		// owner's own, already verified, connection (so the key would never be stored), and a master started here must not outlive the scan

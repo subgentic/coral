@@ -386,3 +386,23 @@ func mustCustom(t *testing.T, h *SystemHandler) []agentmodels.Custom {
 	require.NoError(t, err)
 	return c
 }
+
+// #11936 (the tester's run): GET /api/agent-models had no hermes key. Hermes has no list Coral can ask for, so its entry is empty, and an operator's custom Hermes models follow in it.
+func TestAgentModelsHasAHermesEntry(t *testing.T) {
+	h := customRig(t)
+	get := func() map[string][]string {
+		rec := httptest.NewRecorder()
+		h.GetAgentModels(rec, httptest.NewRequest(http.MethodGet, "/api/agent-models", nil))
+		var out map[string][]string
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &out))
+		return out
+	}
+	got, ok := get()["hermes"]
+	require.True(t, ok, "the key is there")
+	assert.NotNil(t, got)
+	assert.Empty(t, got, "no curated models")
+
+	code, out := putCustom(t, h, `{"models":[{"family":"hermes","value":"acme/house-model","display_name":"House","efforts":[]}]}`)
+	require.Equal(t, http.StatusOK, code, out)
+	assert.Equal(t, []string{"acme/house-model"}, get()["hermes"])
+}

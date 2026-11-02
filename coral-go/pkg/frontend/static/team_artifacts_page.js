@@ -470,7 +470,7 @@ export function createArtifactsList({ inbox = false } = {}) {
         }
         const note = hex ? `Star puts it in your Starred list.${hex && local() ? ' Keep stops Coral\u2019s cleanup from deleting the file.' : ''}` : ''; // the two buttons are not the same thing, and their names are close (#10539)
         const editor = hex ? Tags.tagEditor({ project: inbox ? item.board_id : model.project, hex, tags: item.tags, editable: local(), offer: teamTags, onChange: tags => retag(hex, tags) }) : null; // a stored file's tags (#8594)
-        const reviewText = hex ? Tags.reviewWords(item.tags, item.review) : ''; // the review's state in words, with the time of an approval, above the tags (#136584)
+        const reviewText = hex ? Tags.reviewWords(item.tags, item.review, item.produced_by) : ''; // the review's state in words, with the time of an approval, above the tags (#136584)
         let head = editor;
         if (editor && reviewText) {
             head = document.createElement('div'); head.className = 'artifact-sheet-head';

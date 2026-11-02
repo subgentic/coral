@@ -28,6 +28,7 @@ import (
 	"github.com/subgentic/coral/internal/secrets"
 	"github.com/subgentic/coral/internal/server/routes"
 	"github.com/subgentic/coral/internal/serverproof"
+	"github.com/subgentic/coral/internal/sshprov"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/internal/terminalinput"
 	"github.com/subgentic/coral/pkg/hubowner"
@@ -112,7 +113,8 @@ func (s *Server) useMiddleware(r *chi.Mux) {
 	r.Use(routes.RequestMetrics(s.db))
 	// Identity phase 1 (#3387): who each request is from; mismatches logged, never refused.
 	s.identity = routes.NewIdentityObserver(s.db, s.boardStore, s.keyStore.HasValidSession)
-	s.identity.SetHubOwnerDir(s.cfg.CoralDir(), routes.ProcessStart) // the self-hosted hub's owner stamp (#11378): verified against a secret only a human act writes
+	sshprov.UseOwnKnownHosts(filepath.Join(s.cfg.CoralDir(), "ssh_known_hosts")) // the hub's ssh checks, and a confirmed host key is written, in its own file: no host block can point the check elsewhere or turn it off (#12027)
+	s.identity.SetHubOwnerDir(s.cfg.CoralDir(), routes.ProcessStart)             // the self-hosted hub's owner stamp (#11378): verified against a secret only a human act writes
 	// In every mode a bare local caller needs a credential (#3421 v2): the API key or a
 	// command-line signature (checked once here, then marked for the cloud routes).
 	s.identity.SetVerifiers(s.keyStore.HasValidKey, func(r *http.Request) (*http.Request, bool) {
@@ -540,6 +542,20 @@ func (s *Server) registerCloud(r *chi.Mux) {
 	s.goBackground(upd.RunBackgroundChecks)                            // returns at once while the feature is off
 	upd.Idle, upd.InFlight, upd.LastPerson, upd.Work = s.sessHandler.UpdateIdleReason, ptymanager.AutomatedInputInFlight, terminalinput.LastPersonInput, background.BusyWork
 	s.goBackground(upd.RunAutoInstall) // install a verified update once Coral has been idle (#11170); returns at once without an updater
+	// Hermes homes no session record reaches (a failed launch, a crash) hold a copy of the person's .env: swept a minute after start, then daily (#11949)
+	hermesSessions := store.NewSessionStore(s.db)
+	hermesSweep := background.NewHermesHomeSweep(s.cfg.CoralDir(), func(ctx context.Context) (map[string]bool, error) {
+		all, err := hermesSessions.GetAllLiveSessions(ctx)
+		if err != nil {
+			return nil, err
+		}
+		ids := make(map[string]bool, len(all))
+		for _, ls := range all {
+			ids[ls.SessionID] = true
+		}
+		return ids, nil
+	})
+	s.goBackground(func(ctx context.Context) { _ = hermesSweep.Run(ctx) })
 	if s.boardStore != nil {
 		touchPrune := background.NewOperatorTouchPrune(s.boardStore)
 		s.goBackground(func(ctx context.Context) { _ = touchPrune.Run(ctx) }) // touches older than 90 days (#11225)
@@ -661,6 +677,8 @@ func (s *Server) registerSystem(r *chi.Mux, h *routeHandlers) {
 	r.Get("/api/sessions/history", histHandler.ListSessions)
 	r.Get("/api/sessions/history/search", histHandler.SearchChats)
 	r.Get("/api/sessions/history/counts", histHandler.ChatCounts)
+	r.Get("/api/history-import", histHandler.HistoryImportStatus)
+	r.Post("/api/history-import", histHandler.ImportEarlierChats)
 	r.Patch("/api/sessions/history/{sessionID}/flags", histHandler.SetChatFlags)
 	r.Get("/api/sessions/history/{sessionID}", histHandler.GetSessionDetail)
 	r.Get("/api/sessions/history/{sessionID}/agent-notes", histHandler.GetSessionAgentNotes)

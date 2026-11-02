@@ -216,7 +216,8 @@ const inboxTasksState = DT.tableState();
 const needsState = DT.tableState();
 
 export async function openReview(row, extra = {}) {
-    const { openArtifactViewer } = await importOnce('./artifact_viewer.js');
+    const { openArtifactViewer } = await importOnce('./artifact_viewer.js', 'the file viewer').catch(() => ({})); // a failed load is said (importOnce's toast) and the next click tries again: a page left open across an update must not have rows that do nothing (#11963)
+    if (!openArtifactViewer) return;
     openArtifactViewer(row.hex, { server: splitKey(row.team).server, filename: row.name, mediaType: row.media_type, board: splitKey(row.team).name, goal: row.goal_id && row.goal_title ? String(row.goal_title) : '', task: row.task_id ? String(row.task_title || `Task #${row.task_id}`) : '', from: subOf({ review: row, board_project: splitKey(row.team).name, server: splitKey(row.team).server }, true), ...extra }); // the newest version itself: a diff only when Compare is pressed (#11628)
     markOpenedRead(row.hex).catch(error => sayLive(error.message)); // opening is reading it: the 'read' tag, so it stops counting everywhere (#9277); the viewer does the same for any for-review artifact, once; a failed save is said, and the item keeps counting
 }
@@ -365,8 +366,7 @@ let closeAfterOpen = null;
 function openGoalDone(g, close = false) {
     closeAfterOpen = close ? { team: g.board_id, id: g.id } : null;
     quietFocus($('inbox-view'));
-    goalOpener = { team: g.board_id, id: g.id };
-    note(folderRoute);
+    itemOpeners.set('needs', { key: document.activeElement?.closest?.('tr[data-key]')?.dataset.key || '', scroll: $('group-table-view')?.scrollTop || 0 }); // Back returns to Needs you as it was (its place), not to the Goals tab (#11950)
     go({ ...folderRoute, id: g.board_id, item: g.id });
 }
 /** A "Goal looks done" item's actions (#11825): Close goal (the goal's Close dialog, set to Done), Not yet (hidden until a task is added) and Ignore (hidden for good, Undo in the notice); on a phone Ignore is in the menu. */

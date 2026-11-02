@@ -193,7 +193,7 @@ func (h *BoardHandler) NeedsYou(w http.ResponseWriter, r *http.Request) {
 			seen := map[string]bool{}
 			dir := h.artifactObjectDir()
 			for _, f := range files {
-				if seen[f.ID] || !hasTag(f.Tags, "for review") || hasTag(f.Tags, "read") || hasTag(f.Tags, "saved") {
+				if seen[f.ID] || !hasTag(f.Tags, "for review") || hasTag(f.Tags, "read") || hasTag(f.Tags, "saved") || hasTag(f.Tags, "changes requested") { // changes requested: the agent's turn, nothing waits on the Operator (#11985)
 					continue // by tags first: only a row that could count is checked against the stored file
 				}
 				enrichTeamArtifact(&f, dir)

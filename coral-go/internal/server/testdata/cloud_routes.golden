@@ -130,6 +130,7 @@ GET /api/goal-links never
 GET /api/goals view
 GET /api/goals/metrics view
 GET /api/health view
+GET /api/history-import never
 GET /api/needs-you view
 GET /api/operator-asks view
 GET /api/pinned-folders view
@@ -364,6 +365,7 @@ POST /api/cloud/owner-label/arm never
 POST /api/cloud/redeem never
 POST /api/cloud/rekey never
 POST /api/folder-tags/{folderName} never
+POST /api/history-import never
 POST /api/hub-auto-accept launch
 POST /api/indexer/refresh never
 POST /api/notifications never

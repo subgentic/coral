@@ -170,6 +170,21 @@ func (idx *SessionIndexer) RunOnce(ctx context.Context) error {
 		return err
 	}
 
+	// A fresh Coral lists only the chats of agents it launched until the person imports the rest (#11970): what was held back on an earlier pass is skipped like an indexed file.
+	importAll, err := idx.store.DecideHistoryImport(ctx)
+	if err != nil {
+		return err
+	}
+	if !importAll {
+		held, err := idx.store.UnimportedMtimes(ctx)
+		if err != nil {
+			return err
+		}
+		for f, m := range held {
+			knownMtimes[f] = m
+		}
+	}
+
 	var indexed int
 
 	// Collect all sessions from all scanners first
@@ -198,6 +213,13 @@ func (idx *SessionIndexer) RunOnce(ctx context.Context) error {
 		}
 	}
 	agentNames, _ := idx.store.GetAgentNames(ctx, sessionIDs)
+	if !importAll {
+		kept, err := idx.holdBackUnstarted(ctx, allSessions, agentNames)
+		if err != nil {
+			return err
+		}
+		allSessions = kept
+	}
 
 	// The search text is written in batches: a delete of a session's old text scans the whole search table, so one delete for a batch
 	// of sessions is one scan instead of one for each (#4669). If a batch fails its sessions are written one by one, to find the one.
@@ -349,4 +371,34 @@ func (bs *BatchSummarizer) Run(ctx context.Context) error {
 			}
 		}
 	}
+}
+
+// holdBackUnstarted drops the chats Coral did not start: a session that is neither a live agent's nor already indexed (a chat that was listed stays listed when its agent is gone).
+// What is dropped is recorded without its text, so the Import button can say how many were found and a later pass does not read the files again. Exclusion marks pass through.
+func (idx *SessionIndexer) holdBackUnstarted(ctx context.Context, sessions []agent.IndexedSession, agentNames map[string][2]string) ([]agent.IndexedSession, error) {
+	ids := make([]string, 0, len(sessions))
+	for _, s := range sessions {
+		if !s.Excluded {
+			if _, ok := agentNames[s.SessionID]; !ok {
+				ids = append(ids, s.SessionID)
+			}
+		}
+	}
+	already, err := idx.store.IndexedSessionIDs(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	kept := make([]agent.IndexedSession, 0, len(sessions))
+	var held []store.UnimportedChat
+	for _, s := range sessions {
+		if _, ok := agentNames[s.SessionID]; ok || s.Excluded || already[s.SessionID] {
+			kept = append(kept, s)
+			continue
+		}
+		held = append(held, store.UnimportedChat{SourceType: s.SourceType, SourceFile: s.SourceFile, FileMtime: s.FileMtime, SessionID: s.SessionID})
+	}
+	if err := idx.store.NoteUnimported(ctx, held); err != nil {
+		return nil, err
+	}
+	return kept, nil
 }

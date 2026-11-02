@@ -62,7 +62,7 @@ func newHermesChatRig(t *testing.T) hermesChatRig {
 	}
 	team := "team-a"
 	require.NoError(t, ss.RegisterLiveSession(context.Background(), &store.LiveSession{SessionID: r.sid, AgentType: "hermes", AgentName: "hermes-agent", WorkingDir: "/tmp/test", BoardName: &team}))
-	r.teamState = writeHermesState(t, agent.HermesTeamHome(r.dataDir, team))
+	r.teamState = writeHermesState(t, agent.HermesAgentHome(r.dataDir, team, r.sid))
 	return r
 }
 
@@ -101,8 +101,18 @@ func TestHermesChatReadsTheLinkedSessionOfTheTeamsHome(t *testing.T) {
 // Another team's home is never read: the session's team decides the home, so the same Hermes id in a different team's state.db shows nothing.
 func TestHermesChatNeverReadsAnotherTeamsHome(t *testing.T) {
 	r := newHermesChatRig(t)
-	other := writeHermesState(t, agent.HermesTeamHome(r.dataDir, "team-b"))
+	other := writeHermesState(t, agent.HermesAgentHome(r.dataDir, "team-b", r.sid))
 	addHermesMsg(t, other, r.hermesID, "user", "TEAM B SECRET")
+	require.NoError(t, transcriptlink.BindHermes(r.dataDir, r.sid, r.hermesID))
+	msgs, total := r.chat(t)
+	assert.Zero(t, total, "%v", msgs)
+}
+
+// #11936: each agent has a home of its own, so a teammate's state.db is never read for this agent, even with the same Hermes id in it.
+func TestHermesChatNeverReadsATeammatesHome(t *testing.T) {
+	r := newHermesChatRig(t)
+	mate := writeHermesState(t, agent.HermesAgentHome(r.dataDir, "team-a", "00000000-0000-0000-0000-00000000e11c"))
+	addHermesMsg(t, mate, r.hermesID, "user", "TEAMMATE SECRET")
 	require.NoError(t, transcriptlink.BindHermes(r.dataDir, r.sid, r.hermesID))
 	msgs, total := r.chat(t)
 	assert.Zero(t, total, "%v", msgs)
@@ -118,7 +128,7 @@ func TestHermesChatWithNoStateDBOrABrokenOneIsEmptyNotAnError(t *testing.T) {
 	out := chatReply(t, server.URL+"/api/sessions/live/hermes-b", url.Values{"session_id": {sid}, "agent_type": {"hermes"}})
 	assert.EqualValues(t, 0, out["total"], "no state.db yet")
 	// a layout Coral does not read
-	home := agent.HermesTeamHome(handler.cfg.CoralDir(), team)
+	home := agent.HermesAgentHome(handler.cfg.CoralDir(), team, sid)
 	w := writeHermesStateWith(t, home, `CREATE TABLE other (x INTEGER);`)
 	_ = w
 	out = chatReply(t, server.URL+"/api/sessions/live/hermes-b", url.Values{"session_id": {sid}, "agent_type": {"hermes"}})
