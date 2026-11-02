@@ -10,6 +10,7 @@ import (
 	"net"
 	"regexp"
 	"time"
+	"unicode/utf8"
 )
 
 // Options is what one launch is asked to make.
@@ -226,7 +227,7 @@ func Launch(ctx context.Context, o Options, d Deps) (*Result, error) {
 	label := o.Name
 	own := ""
 	if boot.Label != "" && boot.Label != o.Name {
-		own = fmt.Sprintf(" (the machine itself reports the name %q: that is its own claim, not what this launch minted)", boot.Label)
+		own = fmt.Sprintf(" (the machine itself reports the name %q: that is its own claim, not what this launch minted)", clipLabel(boot.Label))
 	}
 	var closeErr error
 	if net != nil { // the credential is delivered, so nothing is allowed in at the cloud firewall (the machine closes its own SSH too)
@@ -287,6 +288,18 @@ func retryAfter(o Options) time.Duration {
 		return o.RetryListAfter
 	}
 	return defaultSweepWait
+}
+
+// maxClaimedLabel is the most of a machine's own claimed name that is printed.
+const maxClaimedLabel = 80
+
+// clipLabel cuts a name the machine reported to maxClaimedLabel characters, on a character boundary, and adds an ellipsis when it cut: the machine's status answer may be up to 64 KB and none of it should fill the terminal.
+func clipLabel(s string) string {
+	if utf8.RuneCountInString(s) <= maxClaimedLabel {
+		return s
+	}
+	r := []rune(s)
+	return string(r[:maxClaimedLabel]) + "…"
 }
 
 // sshFromWords is the address SSH is open to, for the confirm.

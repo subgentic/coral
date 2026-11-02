@@ -15,6 +15,7 @@ import (
 	"sync"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -804,5 +805,49 @@ func TestLaunchTellsThePersonTheMintedNameNotTheMachinesClaim(t *testing.T) {
 	}
 	if strings.Contains(out2.String(), "its own claim") {
 		t.Fatalf("the same name is not a claim: %s", out2.String())
+	}
+}
+
+// The machine's claimed name is cut to 80 characters on a character boundary with an ellipsis (coral-go Security's SHOULD on 6h): a 10 KB label does not fill the terminal and a multi-byte character is never split.
+func TestLaunchClipsTheMachinesClaimedName(t *testing.T) {
+	baseline := func() int { // the same launch with a short claimed name: what the rest of the output weighs
+		p, h := &stubProvider{}, &stubHub{}
+		o, d, out, srv := setupWith(t, p, h)
+		srv.status = "State:     connected\nServer:    x\n"
+		if _, err := Launch(context.Background(), o, d); err != nil {
+			t.Fatal(err)
+		}
+		return out.Len()
+	}()
+	for name, label := range map[string]string{
+		"ascii":     strings.Repeat("a", 10*1024),
+		"multibyte": strings.Repeat("é", 10*1024),
+		"wide":      strings.Repeat("日", 200),
+	} {
+		p, h := &stubProvider{}, &stubHub{}
+		o, d, out, srv := setupWith(t, p, h)
+		srv.status = "State:     connected\nServer:    " + label + "\n"
+		if _, err := Launch(context.Background(), o, d); err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		text := out.String()
+		if grew := len(text) - baseline; grew > 600 {
+			t.Errorf("%s: the output grew by %d bytes: the claim was not cut", name, grew)
+		}
+		if !strings.Contains(text, "…") {
+			t.Errorf("%s: no ellipsis: %.200s", name, text)
+		}
+		if !utf8.ValidString(text) {
+			t.Errorf("%s: a character was split", name)
+		}
+	}
+	if got := clipLabel(strings.Repeat("b", 80)); got != strings.Repeat("b", 80) {
+		t.Errorf("exactly 80 is not cut: %q", got)
+	}
+	if got := clipLabel(strings.Repeat("b", 81)); got != strings.Repeat("b", 80)+"…" {
+		t.Errorf("81 is cut to 80 and an ellipsis: %q", got)
+	}
+	if got := clipLabel("short"); got != "short" {
+		t.Errorf("a short name is unchanged: %q", got)
 	}
 }
