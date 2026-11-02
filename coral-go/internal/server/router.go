@@ -31,6 +31,7 @@ import (
 	"github.com/subgentic/coral/internal/sshprov"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/internal/terminalinput"
+	"github.com/subgentic/coral/internal/tmux"
 	"github.com/subgentic/coral/pkg/hubowner"
 )
 
@@ -257,6 +258,11 @@ func (s *Server) newRouteHandlers() *routeHandlers {
 		s.touches = touches
 		terminalinput.SetPersonSink(touches.TypedTo)
 	}
+	// The CLI path a session was launched with, kept with the session so a wrapper script that is the CLI is still recognised after a restart (#408).
+	cliStore := store.NewSessionStore(s.db)
+	tmux.SetLaunchCLIStore(
+		func(session, cli string) { _ = cliStore.SetLaunchCLI(context.Background(), session, cli) },
+		func(session string) string { return cliStore.LaunchCLI(context.Background(), session) })
 	// Coral's own data folder (wherever --home or CORAL_DATA_DIR put it) is never served by Browse or a file read (#4531).
 	routes.ProtectDataDir(s.cfg.CoralDir())
 	sysHandler := routes.NewSystemHandler(s.db, s.cfg)

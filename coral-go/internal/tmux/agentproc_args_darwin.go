@@ -19,3 +19,21 @@ func ProgramArgs(pid int) []string {
 	}
 	return strings.Fields(string(out))
 }
+
+// ProgramCwd is a process's working directory, from lsof (macOS has no /proc), "" when it cannot be read. Used to make a relative script argument (`./stub.sh`) absolute.
+func ProgramCwd(pid int) string {
+	out, err := executil.Output(resolveTimeout, "lsof", "-a", "-d", "cwd", "-Fn", "-p", strconv.Itoa(pid))
+	if err != nil || len(out) > 64*1024 {
+		return ""
+	}
+	dir, count := "", 0
+	for _, line := range strings.Split(string(out), "\n") {
+		if strings.HasPrefix(line, "n") {
+			dir, count = strings.TrimSpace(line[1:]), count+1
+		}
+	}
+	if count != 1 {
+		return "" // not exactly one name field: no answer, so no match
+	}
+	return dir
+}

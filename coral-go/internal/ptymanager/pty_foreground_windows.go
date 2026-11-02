@@ -29,7 +29,7 @@ func (p *windowsPTY) ShellIdle() (idle bool, shell string, err error) {
 	if !isShellImage(image) {
 		return false, shell, nil
 	}
-	busy, other, err := shellTree(pid)
+	busy, other, err := shellTree(pid, p.agent.launcherCheck())
 	if err != nil {
 		return false, shell, err
 	}
@@ -54,7 +54,7 @@ func (p *windowsPTY) OtherShell() (string, error) {
 	if !isShellImage(image) {
 		return "", nil
 	}
-	busy, other, err := shellTree(pid)
+	busy, other, err := shellTree(pid, p.agent.launcherCheck())
 	if err != nil || busy {
 		return "", err
 	}

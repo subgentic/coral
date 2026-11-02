@@ -77,6 +77,7 @@ func (t *TmuxSessionTerminal) SendQuietLaunchToTarget(ctx context.Context, o ter
 	ForgetSession(target) // as SendToTarget
 	err := t.client.SendQuietLaunchToTarget(ctx, o, target, command)
 	if err == nil {
+		tmux.NoteLaunchCLI(sessionOfTarget(target), LaunchCLIOf(ctx))   // for a wrapper script that is the CLI (#408)
 		t.client.AdoptAgentAfterLaunch(sessionOfTarget(target), target) // the agent's process is recorded when it appears (#389)
 	}
 	return err
@@ -86,6 +87,7 @@ func (t *TmuxSessionTerminal) SendToTarget(ctx context.Context, o terminalinput.
 	ForgetSession(target) // what Coral remembers of the old process is not true of a new one
 	err := t.client.SendKeysToTarget(ctx, o, target, command)
 	if err == nil {
+		tmux.NoteLaunchCLI(sessionOfTarget(target), LaunchCLIOf(ctx))   // for a wrapper script that is the CLI (#408)
 		t.client.AdoptAgentAfterLaunch(sessionOfTarget(target), target) // the agent's process is recorded when it appears (#389)
 	}
 	return err
