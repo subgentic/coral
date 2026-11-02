@@ -165,3 +165,16 @@ func TestAWaitIsTheOneShellOnlyWhileNothingRanAfterIt(t *testing.T) {
 		})
 	}
 }
+
+// A background marker is in the log with the footer text that said so, so a verdict that keeps an agent awake can be checked against its screen (#12335).
+func TestAutoSleepLogsTheFooterThatSaidBackground(t *testing.T) {
+	var buf bytes.Buffer
+	old := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo})))
+	t.Cleanup(func() { slog.SetDefault(old) })
+	r := newSleepRig(t)
+	r.term.screen = "✻ Cogitated for 4s · done 5:38 PM · 1 shell still running\n\n──────────────────────────────────────────────────────────────────────\n❯ \n──────────────────────────────────────────────────────────────────────\n  ⏵⏵ bypass permissions on · 1 shell · ↓ to manage\n"
+	r.pass(t)
+	assert.Contains(t, buf.String(), "reason=background_running")
+	assert.Contains(t, buf.String(), "1 shell", "the marker is in the line: "+buf.String())
+}

@@ -36,28 +36,29 @@ const (
 
 // autoSleepInput is everything the decision reads about one agent.
 type autoSleepInput struct {
-	Now         time.Time
-	On          bool
-	IdleFor     time.Duration // the Operator's minutes
-	Asleep      bool
-	Archived    bool
-	Terminal    bool // a plain terminal, no agent
-	Job         bool
-	Orch, Chief bool
-	OptedOut    bool
-	SleptAt     time.Time // the last auto-sleep, zero if none
-	WokenAt     time.Time // the wake that followed it, zero if none
-	InTurn      bool
-	NeedsInput  bool
-	LastActive  time.Time // the latest event or end of turn; the launch time when there is none
-	ClaimedTask bool
-	ReviewOwed  bool
-	OperatorAsk bool
-	Dialog      bool
-	Background  bool // a background shell or monitor the footer names
-	Draft       bool // a draft in the input box, or a screen that could not be read
-	ProcBusy    bool // the agent's process tree used CPU since the last look
-	ProcUnknown bool // its process tree could not be read, or is over the bound: never quiet
+	Now              time.Time
+	On               bool
+	IdleFor          time.Duration // the Operator's minutes
+	Asleep           bool
+	Archived         bool
+	Terminal         bool // a plain terminal, no agent
+	Job              bool
+	Orch, Chief      bool
+	OptedOut         bool
+	SleptAt          time.Time // the last auto-sleep, zero if none
+	WokenAt          time.Time // the wake that followed it, zero if none
+	InTurn           bool
+	NeedsInput       bool
+	LastActive       time.Time // the latest event or end of turn; the launch time when there is none
+	ClaimedTask      bool
+	ReviewOwed       bool
+	OperatorAsk      bool
+	Dialog           bool
+	Background       bool   // a background shell or monitor the footer names
+	BackgroundMarker string // the footer text that said so, for the log only
+	Draft            bool   // a draft in the input box, or a screen that could not be read
+	ProcBusy         bool   // the agent's process tree used CPU since the last look
+	ProcUnknown      bool   // its process tree could not be read, or is over the bound: never quiet
 }
 
 // autoSleepVerdict is "" when the agent may be put to sleep now, else the first reason it may not.

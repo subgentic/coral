@@ -42,12 +42,16 @@ var autoSleepLastWhy = struct {
 }{m: map[string]string{}}
 
 // noteAutoSleepWhy logs a session's reason at Info when it differs from the last look's. Reasons are counters, never text from the agent.
-func noteAutoSleepWhy(sessionID, agentType, why string) {
+func noteAutoSleepWhy(sessionID, agentType, why, detail string) {
 	autoSleepLastWhy.Lock()
 	prev, had := autoSleepLastWhy.m[sessionID]
 	autoSleepLastWhy.m[sessionID] = why
 	autoSleepLastWhy.Unlock()
 	if !had || prev != why {
+		if detail != "" {
+			slog.Info("auto_sleep verdict", "session_id", sessionID, "agent", agentType, "reason", why, "marker", detail)
+			return
+		}
 		slog.Info("auto_sleep verdict", "session_id", sessionID, "agent", agentType, "reason", why)
 	}
 }
@@ -99,10 +103,10 @@ func (h *SessionsHandler) autoSleepPass(ctx context.Context, now time.Time) {
 		in, rss := h.autoSleepInputOf(ctx, ls, settings, idle, now)
 		why := autoSleepVerdict(in)
 		if why != "" {
-			noteAutoSleepWhy(ls.SessionID, ls.AgentType, why)
+			noteAutoSleepWhy(ls.SessionID, ls.AgentType, why, in.BackgroundMarker)
 			continue
 		}
-		noteAutoSleepWhy(ls.SessionID, ls.AgentType, "sleep")
+		noteAutoSleepWhy(ls.SessionID, ls.AgentType, "sleep", "")
 		h.autoSleepOne(ctx, ls, idle, rss, now)
 	}
 	autoSleepSamples.Lock() // the samples of agents that are gone are dropped
@@ -182,6 +186,11 @@ func (h *SessionsHandler) autoSleepInputOf(ctx context.Context, ls *store.LiveSe
 		in.Dialog = true
 	case ptymanager.SleepStopBackground:
 		in.Background = true
+		if rd, ok := h.terminal.(ptymanager.ScreenReader); ok { // the footer text that said so, for the log (a run's counter, cut at 60 characters)
+			if screen, err := rd.AgentScreen(ctx, name, ls.AgentType, ls.SessionID); err == nil {
+				in.BackgroundMarker = ptymanager.BackgroundMarker(screen)
+			}
+		}
 	default:
 		in.Draft = true
 	}

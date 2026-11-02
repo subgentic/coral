@@ -49,3 +49,18 @@ func TestScreenStopsSleepOwnWaitIsTheOneBackgroundShell(t *testing.T) {
 	f.show(strings.ReplaceAll(strings.ReplaceAll(claudeIdleWithShell, "1 shell still running", "something still running"), "· 1 shell ·", "·"))
 	assert.Equal(t, SleepStopBackground, ScreenStopsSleep(ctx, f, "claude-x", "claude", "x", true), "'still running' with no count is not known to be the wait")
 }
+
+// Only the footer counts (#12335, Beta Tester's parked workers: no marker on the screen, background_running anyway): an earlier turn's line far up the pane and the agent's own words are not a shell running now.
+func TestScreenStopsSleepOnlyReadsTheFooter(t *testing.T) {
+	ctx := context.Background()
+	f := &fakeAgent{}
+	box := "──────────────────────────────────────────────────────────────────────\n❯ \n──────────────────────────────────────────────────────────────────────\n  ⏵⏵ manual mode on · ? for shortcuts\n"
+	old := "✻ Cogitated for 4s · done 5:38 PM · 1 shell still running\n" + strings.Repeat("text of a later turn\n", 12)
+	f.show(old + "✱ Crunched for 24s · done 5:56 AM\n\n" + box)
+	assert.Equal(t, "", ScreenStopsSleep(ctx, f, "claude-x", "claude", "x", false), "a marker twelve lines up, in an earlier turn, is not a shell running now")
+	f.show("I set a wait; the old shell is still running somewhere, 2 shells ago.\n✱ Crunched for 24s · done 5:56 AM\n\n" + box)
+	assert.Equal(t, "", ScreenStopsSleep(ctx, f, "claude-x", "claude", "x", false), "the agent's own words have no middle dot: not a footer")
+	f.show("✱ Crunched for 24s · done 5:56 AM · 1 shell still running\n\n" + box)
+	assert.Equal(t, SleepStopBackground, ScreenStopsSleep(ctx, f, "claude-x", "claude", "x", false), "the footer says so")
+	assert.Equal(t, "· done 5:56 AM · 1 shell", BackgroundMarker("✱ Crunched for 24s · done 5:56 AM · 1 shell still running\n\n"+box))
+}

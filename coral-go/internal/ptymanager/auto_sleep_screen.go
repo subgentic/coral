@@ -3,6 +3,7 @@ package ptymanager
 import (
 	"context"
 	"regexp"
+	"strings"
 )
 
 // What stops an auto-sleep on the agent's screen (#12111, Security): killing the terminal loses what is in it.
@@ -20,7 +21,7 @@ func ScreenStopsSleep(ctx context.Context, term any, name, agentType, sessionID 
 		return SleepStopDraft
 	}
 	if r, ok := term.(ScreenReader); ok {
-		if screen, err := r.AgentScreen(ctx, name, agentType, sessionID); err == nil && backgroundRunning.MatchString(screen) && !(ownWait && onlyOneBackground(screen)) {
+		if screen, err := r.AgentScreen(ctx, name, agentType, sessionID); err == nil && BackgroundMarker(screen) != "" && !(ownWait && onlyOneBackground(screen)) {
 			return SleepStopBackground
 		}
 	}
@@ -34,25 +35,59 @@ func ScreenStopsSleep(ctx context.Context, term any, name, agentType, sessionID 
 	return ""
 }
 
-// backgroundRunning: the footer words of a CLI with something running in the background after its turn ended ("1 shell still running", "· 1 shell ·", "1 monitor still running").
-var backgroundRunning = regexp.MustCompile(`(?i)still running|\b\d+ (?:shells?|monitors?|background (?:tasks?|commands?))\b`)
+// The footer of a CLI with something running in the background after its turn ended: "· done 5:38 PM · 1 shell still running" above the box and "· 1 shell ·" in the status line under it (#12111).
+// Only those lines count (#12335): the pane read has 40 lines of history, and a count or "still running" in an earlier turn's line or in the agent's own words is not a thing running now (v2.0.34:
+// parked workers whose screen showed no marker read background_running). A footer line has the middle dot, and is among the last footerLines lines of the screen.
+const footerLines = 8
 
-// backgroundCount matches the numbers the footer gives ("1 shell", "2 monitors").
-var backgroundCount = regexp.MustCompile(`(?i)\b(\d+) (?:shells?|monitors?|background (?:tasks?|commands?))\b`)
+var (
+	backgroundRunning = regexp.MustCompile(`(?i)·[^\n]*?(?:\bstill running\b|\b\d+ (?:shells?|monitors?|background (?:tasks?|commands?))\b)`)
+	backgroundCount   = regexp.MustCompile(`(?i)\b(\d+) (?:shells?|monitors?|background (?:tasks?|commands?))\b`)
+)
+
+// footerOf is the last footerLines non-blank lines of the screen.
+func footerOf(screen string) []string {
+	var lines []string
+	for _, l := range strings.Split(screen, "\n") {
+		if strings.TrimSpace(l) != "" {
+			lines = append(lines, l)
+		}
+	}
+	if len(lines) > footerLines {
+		lines = lines[len(lines)-footerLines:]
+	}
+	return lines
+}
+
+// BackgroundMarker is the footer text that says something runs in the background (cut at 60 characters), "" when none does. It is a counter's worth of the screen, for the log.
+func BackgroundMarker(screen string) string {
+	for _, l := range footerOf(screen) {
+		if m := backgroundRunning.FindString(l); m != "" {
+			if len(m) > 60 {
+				m = m[:60]
+			}
+			return strings.TrimSpace(m)
+		}
+	}
+	return ""
+}
 
 // onlyOneBackground: the footer names exactly one background item, however many times it says so ("· 1 shell still running" and "· 1 shell ·" are the same one). A footer with no count, or any count
 // above one, is not it.
 func onlyOneBackground(screen string) bool {
-	counts := backgroundCount.FindAllStringSubmatch(screen, -1)
-	if len(counts) == 0 {
-		return false
-	}
-	for _, c := range counts {
-		if c[1] != "1" {
-			return false
+	found := false
+	for _, l := range footerOf(screen) {
+		if !strings.Contains(l, "·") {
+			continue
+		}
+		for _, c := range backgroundCount.FindAllStringSubmatch(l, -1) {
+			if c[1] != "1" {
+				return false
+			}
+			found = true
 		}
 	}
-	return true
+	return found
 }
 
 // PanePIDer is implemented by the session terminals that can name the process an agent's terminal started, the root of its process tree (#12111): auto-sleep reads the tree's use of
