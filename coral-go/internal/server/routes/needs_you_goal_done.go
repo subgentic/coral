@@ -37,7 +37,7 @@ func goalDoneKey(team string, id int64, total int) string {
 
 // goalDoneItems is the board's active goals whose tasks are all done (at least one task, none open, the state exactly active: the rule the goal screen's all-done box used), as items of Needs you, less the
 // ones the Operator hid. One item per goal; a goal that closes, gets a task, or is blocked is no longer one.
-func (h *BoardHandler) goalDoneItems(ctx context.Context, project string, hidden map[string]bool) ([]NeedsYouItem, error) {
+func (h *BoardHandler) goalDoneItems(ctx context.Context, project string, hidden map[string]bool, news map[string]int) ([]NeedsYouItem, error) {
 	var items []NeedsYouItem
 	cursor := ""
 	for {
@@ -53,7 +53,7 @@ func (h *BoardHandler) goalDoneItems(ctx context.Context, project string, hidden
 			if hidden[goalDoneKey(project, g.ID, r.Total)] || hidden[project+"|"+strconv.FormatInt(g.ID, 10)+"|*"] {
 				continue
 			}
-			items = append(items, NeedsYouItem{Kind: "goal_done", Line: needsYouLine("Goal #" + strconv.FormatInt(g.ID, 10) + " looks done: " + g.Title), Team: project, ID: "goal_done:" + project + ":" + strconv.FormatInt(g.ID, 10), At: needsYouTime(g.UpdatedAt)})
+			items = append(items, NeedsYouItem{Kind: "goal_done", Line: needsYouLine("Goal #" + strconv.FormatInt(g.ID, 10) + " looks done: " + g.Title), Team: project, ID: "goal_done:" + project + ":" + strconv.FormatInt(g.ID, 10), At: needsYouTime(g.UpdatedAt), NewComments: news[goalSubject(project, g.ID)]})
 		}
 		if page.NextCursor == "" {
 			return items, nil

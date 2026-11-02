@@ -203,8 +203,12 @@ func (h *BoardHandler) NeedsYou(w http.ResponseWriter, r *http.Request) {
 	}
 
 	hiddenGoals := h.goalDoneHiddenSet(ctx)
+	var goalNews map[string]int // replies agents left in the Operator's threads on a goal, unseen (#12073): the goal's item carries the count
+	if h.commentNews != nil {
+		goalNews, _ = h.commentNews(ctx)
+	}
 	for _, p := range projects {
-		if gi, err := h.goalDoneItems(ctx, p.Project, hiddenGoals); err != nil {
+		if gi, err := h.goalDoneItems(ctx, p.Project, hiddenGoals, goalNews); err != nil {
 			unread = appendOnce(unread, "goals")
 		} else {
 			items = append(items, gi...)

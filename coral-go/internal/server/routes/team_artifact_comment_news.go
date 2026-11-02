@@ -3,6 +3,8 @@ package routes
 import (
 	"context"
 	"net/http"
+
+	"github.com/subgentic/coral/internal/board"
 )
 
 // tagNewComments is the word the list answers as a tag for the rows that have unseen agent replies (#12026); no file is stored with it.
@@ -40,5 +42,21 @@ func (h *BoardHandler) attachNewComments(r *http.Request, items []teamArtifact) 
 	}
 	for i := range items {
 		items[i].NewComments = news[items[i].ID]
+	}
+}
+
+// attachGoalNews puts NewComments on goals whose comment threads (the subject key goal:<team>:<id>, goalSubject) have unseen agent replies (#12073). The Operator's alone, as a file's: an agent's or a guest's read has none.
+func (h *BoardHandler) attachGoalNews(r *http.Request, goals ...*board.Goal) {
+	if h.commentNews == nil || len(goals) == 0 || !operatorOrKeyCaller(r) {
+		return
+	}
+	news, err := h.commentNews(r.Context())
+	if err != nil || len(news) == 0 {
+		return
+	}
+	for _, g := range goals {
+		if g != nil {
+			g.NewComments = news[goalSubject(g.BoardID, g.ID)]
+		}
 	}
 }
