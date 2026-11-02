@@ -46,6 +46,9 @@ func ImportedDirs(files map[string][]byte, module string) ([]string, error) {
 				return nil, fmt.Errorf("%s: import %s: %w", n, im.Path.Value, err)
 			}
 			if rest, ok := strings.CutPrefix(path, module+"/"); ok {
+				if !plainDir(rest) {
+					return nil, fmt.Errorf("%s: import %q is not a plain package path of the module", n, path)
+				}
 				seen[ModuleRoot+rest] = true
 			}
 		}
@@ -56,6 +59,20 @@ func ImportedDirs(files map[string][]byte, module string) ([]string, error) {
 	}
 	sort.Strings(out)
 	return out, nil
+}
+
+// plainDir is whether the rest of an import path, after the module's own prefix, is a plain relative directory: segments that are not empty and not "..", with no glob character and no colon, so that
+// it cannot widen a git pathspec or name anything outside coral-go/ when it is given to ls-tree, show and the diff (go build rejects such a path, but this reads files without building them).
+func plainDir(rest string) bool {
+	if rest == "" || strings.ContainsAny(rest, "*?[:\\") {
+		return false
+	}
+	for _, seg := range strings.Split(rest, "/") {
+		if seg == "" || seg == ".." || seg == "." {
+			return false
+		}
+	}
+	return true
 }
 
 // ModuleRoot is the module's directory in the repository.

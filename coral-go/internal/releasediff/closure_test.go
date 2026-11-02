@@ -30,6 +30,26 @@ func TestOnlyTheModulesOwnImportsAreFollowed(t *testing.T) {
 	assert.Contains(t, err.Error(), "bad.go")
 }
 
+// An import path whose rest could widen a pathspec or leave coral-go/ is refused, not followed: Security's hardening on #12344.
+func TestAnImportPathThatIsNotAPlainDirectoryIsRefused(t *testing.T) {
+	const m = "github.com/subgentic/coral"
+	for _, rest := range []string{"internal/../../etc", "..", "internal//safego", "internal/", "internal/*", "internal/safe?o", "internal/[a]", "internal:x", "internal/./safego"} {
+		src := "package x\nimport _ \"" + m + "/" + rest + "\"\n"
+		_, err := ImportedDirs(map[string][]byte{"a.go": []byte(src)}, m)
+		require.Error(t, err, rest)
+		assert.Contains(t, err.Error(), "not a plain package path", rest)
+	}
+	_, err := ImportedDirs(map[string][]byte{"a.go": []byte("package x\nimport _ `" + m + "/internal\\x`\n")}, m) // a raw string: one backslash in the path
+	require.Error(t, err, "a backslash")
+	assert.Contains(t, err.Error(), "not a plain package path")
+	got, err := ImportedDirs(map[string][]byte{"a.go": []byte("package x\nimport _ \"" + m + "/pkg/redact/betterleaks\"\nimport _ \"" + m + "/internal/safe-go_2\"\n")}, m)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"coral-go/internal/safe-go_2", "coral-go/pkg/redact/betterleaks"}, got, "a nested package and ordinary punctuation are fine")
+	got, err = ImportedDirs(map[string][]byte{"a.go": []byte("package x\nimport _ \"github.com/other/mod/../x\"\n")}, m)
+	require.NoError(t, err, "an import of another module is not ours to check")
+	assert.Empty(t, got)
+}
+
 func TestTheClosureFollowsImportsThroughEachOtherOnceWithWhoFoundThem(t *testing.T) {
 	graph := map[string][]string{
 		"r1": {"a", "b"}, "r2": {"b"}, "a": {"c", "r1"}, "b": {"c"}, "c": {}, // r1 -> a -> r1 is a cycle
