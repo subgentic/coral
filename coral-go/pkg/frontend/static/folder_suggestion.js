@@ -48,6 +48,12 @@ export function offerSuggestion(input, line, name, { afterCoralMade = false } = 
     showLine(input, line, true);
 }
 
+/** The folder said with ~ for the home folder on macOS and Linux; on Windows, where ~ is not a convention, as the field holds it (C:\\Users\\name\\Coral\\team): the operator's rule (#11865, v2.0.29's Windows red). */
+export function tildeFolder(root, value) {
+    const r = String(root || '').replace(/\/+$/, '');
+    return r && !r.includes('\\') && String(value).startsWith(r + '/') ? '~' + String(value).slice(r.length) : String(value);
+}
+
 /** Keep the line true as the person edits: it goes as soon as the field is anything but the suggestion. */
 export function syncSuggestionLine(input, line) { showLine(input, line, usesSuggestion(input)); }
 
@@ -55,8 +61,8 @@ function showLine(input, line, on) {
     if (!line) return;
     if (line.hidden === on) line.hidden = !on;
     if (on && line.dataset.pathHint) { // New team: the suggested folder with ~ for the home folder, so the user name is not the first thing read; the whole path is the tooltip (#11865)
-        const v = input.value.trim(), root = String(input.dataset.coralRoot || '').replace(/\/+$/, ''), hint = line.dataset.hint ||= line.textContent;
-        line.textContent = `${root && v.startsWith(root + '/') ? '~' + v.slice(root.length) : v}. ${hint}`; line.title = v;
+        const v = input.value.trim(), hint = line.dataset.hint ||= line.textContent;
+        line.textContent = `${tildeFolder(input.dataset.coralRoot, v)}. ${hint}`; line.title = v;
     }
     const ids = (input.getAttribute('aria-describedby') || '').split(/\s+/).filter(x => x && x !== line.id);
     if (on) ids.push(line.id);
