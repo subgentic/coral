@@ -236,9 +236,9 @@ func cleanup(p Provider, id string, out io.Writer) string {
 	}
 }
 
-// newLaunchTag is the tag only this launch's instance carries ("coral-launch-" and 12 hex digits): what a clean-up after a failed Create finds it by, never its name.
+// newLaunchTag is the tag only this launch's instance carries ("coral-launch-" and 32 hex digits, 128 random bits): what a clean-up after a failed Create finds it by, never its name.
 func newLaunchTag() (string, error) {
-	var b [6]byte
+	var b [16]byte // 128 bits (Security ruling, #9934): a sweep after a timed-out create deletes by this tag
 	if _, err := rand.Read(b[:]); err != nil {
 		return "", fmt.Errorf("could not make a launch tag: %w", err)
 	}

@@ -58,6 +58,26 @@ const machineLaunchEnvVar = "CORAL_MACHINE_LAUNCH"
 // machineLaunchEnabled is whether `coral machine` exists in this run.
 func machineLaunchEnabled() bool { return config.Truthy(os.Getenv(machineLaunchEnvVar)) }
 
+// canConfirmLookup is whether a person is at a terminal who can see, and so confirm, that the SSH source address will be looked up at a third-party service: standard input is a terminal and neither secret is read from it. A test replaces it.
+var canConfirmLookup = func(stdin io.Reader, tokenFile, keyFile string) bool {
+	f, ok := stdin.(*os.File)
+	return ok && isTerminal(f) && tokenFile != "-" && keyFile != "-"
+}
+
+// confirmOtherHub asks, at a terminal, whether the Hub key may be sent to a Hub that is not this build's. No terminal, or anything but yes, is no; --yes does not answer it. A test replaces it.
+var confirmOtherHub = askOtherHub
+
+func askOtherHub(stdin io.Reader, stdout io.Writer, hubURL, tokenFile, keyFile string) bool {
+	f, ok := stdin.(*os.File)
+	if !ok || !isTerminal(f) || tokenFile == "-" || keyFile == "-" {
+		return false
+	}
+	fmt.Fprintf(stdout, "Send the Hub key to %s? [y/N] ", hubURL)
+	line, _ := bufio.NewReader(stdin).ReadString('\n')
+	a := strings.ToLower(strings.TrimSpace(line))
+	return a == "y" || a == "yes"
+}
+
 func runMachine(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) > 0 && (args[0] == "list" || args[0] == "delete" || args[0] == "prune" || args[0] == "egress-files") {
 		return runMachineManage(args[0], args[1:], stdin, stdout, stderr)
@@ -205,6 +225,9 @@ func runMachine(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			sent = "the Hub key and the destroy credential are"
 		}
 		fmt.Fprintf(stderr, "coral machine launch: warning: %s is not this build's Coral Hub (%s): %s sent there.\n", *hubURL, config.TierDefaultCloudURL, sent)
+		if !confirmOtherHub(stdin, stdout, *hubURL, *tokenFile, *keyFile) { // a warning is not enough: --yes does not answer this one (coral-go's Security, #9934 slice 2)
+			return fail("%s is not this build's Coral Hub and was not confirmed: nothing was sent. Run it at a terminal and answer yes, or leave out --hub-url", *hubURL)
+		}
 	}
 	hub := newMachineHub(*hubURL, key, destroyKey)
 
@@ -212,6 +235,9 @@ func runMachine(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	defer stop()
 	source, lookup := *sshFrom, ""
 	if source == "" {
+		if !canConfirmLookup(stdin, *tokenFile, *keyFile) { // the lookup tells a third party this computer's address: with no terminal to see and confirm that, the person names the address (Security, #9934)
+			return fail("no terminal to confirm the address lookup, so SSH's source address is needed: pass --allow-ssh-from ADDRESS")
+		}
 		var derr error
 		if source, derr = detectSSHSource(ctx); derr != nil {
 			return fail("%v", derr)

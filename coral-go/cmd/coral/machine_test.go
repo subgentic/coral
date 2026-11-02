@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"github.com/subgentic/coral/internal/config"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -100,7 +101,9 @@ func machineFixture(t *testing.T) (tokenFile, keyFile string, p *machineStubProv
 		t.Fatal(err)
 	}
 	p, h = &machineStubProvider{}, &machineStubHub{}
-	oldP, oldH, oldU, oldB, oldD := newMachineProvider, newMachineHub, machineUserData, newMachineBootstrap, detectSSHSource
+	oldP, oldH, oldU, oldB, oldD, oldC, oldO := newMachineProvider, newMachineHub, machineUserData, newMachineBootstrap, detectSSHSource, canConfirmLookup, confirmOtherHub
+	confirmOtherHub = func(io.Reader, io.Writer, string, string, string) bool { return true } // the real one has its own test
+	canConfirmLookup = func(io.Reader, string, string) bool { return true }                   // the lookup itself is stubbed below; the no-terminal refusal has its own test
 	machineBoot = &machineStubBoot{}
 	newMachineBootstrap = func() machinelaunch.Bootstrapper { return machineBoot }
 	detectSSHSource = func(context.Context) (string, error) { return "203.0.113.5", nil }
@@ -116,7 +119,7 @@ func machineFixture(t *testing.T) (tokenFile, keyFile string, p *machineStubProv
 		return "#cloud-config\n# " + sshFrom + " " + maxMode + " " + version + " " + strings.Join(agents, ",") + " " + digests.AMD64 + "\n", nil
 	}
 	t.Cleanup(func() {
-		newMachineProvider, newMachineHub, machineUserData, newMachineBootstrap, detectSSHSource = oldP, oldH, oldU, oldB, oldD
+		newMachineProvider, newMachineHub, machineUserData, newMachineBootstrap, detectSSHSource, canConfirmLookup, confirmOtherHub = oldP, oldH, oldU, oldB, oldD, oldC, oldO
 	})
 	return
 }
@@ -396,5 +399,39 @@ func TestMachineLaunchNeedsAnSSHSourceItCanFind(t *testing.T) {
 	code := runMachine([]string{"launch", "--provider", "digitalocean", "--token-file", tf, "--hub-key-file", kf, "--hub-url", "https://hub.example", "--coral-version", "2.0.3", "--yes"}, strings.NewReader(""), &out, &errb)
 	if code != 2 || !strings.Contains(errb.String(), "--allow-ssh-from") || len(p.calls) != 0 || len(h.labels) != 0 {
 		t.Fatalf("exit %d: %s, calls %v", code, errb.String(), p.calls)
+	}
+}
+
+// With no terminal and no --allow-ssh-from the address is never looked up, even with --yes: the lookup tells a third party this computer's address, and nobody is there to see it (Security, #9934).
+func TestMachineLaunchWithoutATerminalRefusesTheLookup(t *testing.T) {
+	tf, kf, p, h := machineFixture(t)
+	canConfirmLookup = func(io.Reader, string, string) bool { return false }
+	detectSSHSource = func(context.Context) (string, error) {
+		t.Fatal("the lookup was made with no terminal to confirm it")
+		return "", nil
+	}
+	var out, errb bytes.Buffer
+	code := runMachine([]string{"launch", "--provider", "digitalocean", "--token-file", tf, "--hub-key-file", kf, "--hub-url", "https://hub.example", "--coral-version", "2.0.3", "--yes"}, strings.NewReader(""), &out, &errb)
+	if code != 2 || !strings.Contains(errb.String(), "--allow-ssh-from") || len(p.calls) != 0 || len(h.labels) != 0 {
+		t.Fatalf("exit %d: %s, calls %v", code, errb.String(), p.calls)
+	}
+	// with the address named, no terminal is needed and the lookup is still not made
+	code = runMachine([]string{"launch", "--provider", "digitalocean", "--token-file", tf, "--hub-key-file", kf, "--hub-url", "https://hub.example", "--coral-version", "2.0.3", "--allow-ssh-from", "203.0.113.5", "--yes"}, strings.NewReader(""), &out, &errb)
+	if code != 0 {
+		t.Fatalf("exit %d: %s / %s", code, out.String(), errb.String())
+	}
+}
+
+// A Hub that is not this build's gets the Hub key only after a yes at a terminal: --yes and a missing terminal both refuse, before any call.
+func TestMachineLaunchOtherHubNeedsAYesAtATerminal(t *testing.T) {
+	tf, kf, p, h := machineFixture(t)
+	confirmOtherHub = askOtherHub
+	var out, errb bytes.Buffer
+	code := runMachine([]string{"launch", "--provider", "digitalocean", "--token-file", tf, "--hub-key-file", kf, "--hub-url", "https://hub.example", "--coral-version", "2.0.3", "--yes"}, strings.NewReader("y\n"), &out, &errb)
+	if code == 0 || !strings.Contains(errb.String(), "was not confirmed") || len(p.calls) != 0 || len(h.labels) != 0 {
+		t.Fatalf("exit %d: %s, calls %v", code, errb.String(), p.calls)
+	}
+	if askOtherHub(strings.NewReader("y\n"), &out, "https://hub.example", tf, kf) || askOtherHub(strings.NewReader("yes\n"), &out, "https://hub.example", "-", kf) {
+		t.Fatal("a non-terminal input, or a secret read from it, answered the question")
 	}
 }

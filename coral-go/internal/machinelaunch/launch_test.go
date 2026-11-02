@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -747,5 +748,17 @@ func TestLaunchConfirmSaysTheSSHAddressLookup(t *testing.T) {
 		if got := strings.Contains(summary, "looked up at api.ipify.org"); got != want {
 			t.Errorf("lookup %q: summary %s", lookup, summary)
 		}
+	}
+}
+
+// The launch tag is 128 random bits, fresh each time (Security's ruling, #9934).
+func TestNewLaunchTagIs128BitsAndFresh(t *testing.T) {
+	seen := map[string]bool{}
+	for i := 0; i < 50; i++ {
+		tag, err := newLaunchTag()
+		if err != nil || !regexp.MustCompile(`^coral-launch-[0-9a-f]{32}$`).MatchString(tag) || seen[tag] {
+			t.Fatalf("tag %q, %v (seen before: %v)", tag, err, seen[tag])
+		}
+		seen[tag] = true
 	}
 }
