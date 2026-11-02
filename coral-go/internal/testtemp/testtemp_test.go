@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -33,6 +34,13 @@ func TestUsePointsTheTempFolderAtANewFolderAndRemovesIt(t *testing.T) {
 	assert.Equal(t, filepath.Join(root, "home"), os.Getenv("HOME"))
 	assert.Equal(t, filepath.Join(root, "home"), os.Getenv("USERPROFILE"))
 	assert.Equal(t, filepath.Join(root, "coral-data"), os.Getenv("CORAL_DATA_DIR"))
+	if runtime.GOOS == "windows" { // PowerShell writes its module cache beside the working folder when the profile has no AppData\Local: a launched test agent left a Microsoft folder in its checkout
+		for _, sub := range []string{"Local", "Roaming"} {
+			fi, err := os.Stat(filepath.Join(root, "home", "AppData", sub))
+			require.NoError(t, err, sub)
+			assert.True(t, fi.IsDir(), sub)
+		}
+	}
 	home, err := os.UserHomeDir()
 	require.NoError(t, err)
 	assert.Equal(t, filepath.Join(root, "home"), home, "no test reaches the person's real home or ~/.coral")

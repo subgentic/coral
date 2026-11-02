@@ -259,3 +259,10 @@ func nowUTC() string {
 // ── Tasks ───────────────────────────────────────────────────────────
 
 // ── Task Dependencies ────────────────────────────────────────────
+
+// HasMessages reports whether the board database holds any message (an established install has; a fresh folder does not).
+func (s *Store) HasMessages(ctx context.Context) (bool, error) {
+	var has bool
+	err := s.reader().GetContext(ctx, &has, `SELECT EXISTS(SELECT 1 FROM board_messages)`)
+	return has, err
+}

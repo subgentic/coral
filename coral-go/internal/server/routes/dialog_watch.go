@@ -8,6 +8,7 @@ import (
 
 	at "github.com/subgentic/coral/internal/agenttypes"
 	"github.com/subgentic/coral/internal/ptr"
+	"github.com/subgentic/coral/internal/ptymanager"
 )
 
 // An agent at a dialog (#11437, the server half of #11430): an agent can sit for hours on a screen that waits for the person (a folder-trust question, a login choice, a permission menu that its hooks
@@ -97,6 +98,9 @@ func (h *SessionsHandler) forgetDialog(sessionID string) { h.dialogs.forget(sess
 // RunDialogWatch runs a pass every dialogEvery until ctx ends.
 func (h *SessionsHandler) RunDialogWatch(ctx context.Context) {
 	if h.ss == nil || h.terminal == nil {
+		return
+	}
+	if ptymanager.Foreign() { // a Coral on a copy of another's database does not read or decide from the agents' screens (internal/dataowner)
 		return
 	}
 	t := time.NewTicker(dialogEvery)
