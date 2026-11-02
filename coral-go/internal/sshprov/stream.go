@@ -37,7 +37,9 @@ type StreamTarget struct {
 	slots                chan struct{} // one per ssh process alive: the cap on streams
 	ownerID, ownerSecret string        // the hub's owner stamp for this remote (#11378), set by WithOwnerStamp
 	mu                   sync.Mutex
-	failed               time.Time // when a dial last failed: dials are refused for streamBackoff after it
+	failed               time.Time  // when a dial last failed: dials are refused for streamBackoff after it
+	lastActive           time.Time  // when a stream of this computer last started or ended: the shared ssh session is up for controlPersist seconds after
+	warmMu               sync.Mutex // one cold dial at a time makes the shared session (see warm)
 }
 
 // streamCap bounds the ssh processes one target keeps (the dashboard, the poller and the feed each hold a few); streamBackoff is how long dials are refused after one failed, so a dead host or a
@@ -49,6 +51,8 @@ const (
 	// `ssh -W` costs a few round trips (measured on a 94 ms hop: bursts of 3 to 9 s with a pool of 4, 0.1 to 0.9 s with 12, #12446). The cap leaves room for the long-lived sockets (a terminal, the feed).
 	streamIdle    = 10
 	streamIdleFor = 5 * time.Minute
+	// coldAfter: with no stream alive for this long the shared session has (nearly) expired (it ends controlPersist = 60 s after its last use), so the next stream would find none.
+	coldAfter = 45 * time.Second
 )
 
 // ErrStreamBusy and ErrStreamBackoff are the two ways a dial is refused before ssh is started.
@@ -143,6 +147,9 @@ func (s *StreamTarget) dial(ctx context.Context) (net.Conn, error) {
 	if recent {
 		return nil, ErrStreamBackoff
 	}
+	if err := s.warm(ctx); err != nil {
+		return nil, err
+	}
 	select {
 	case s.slots <- struct{}{}:
 	default:
@@ -154,9 +161,53 @@ func (s *StreamTarget) dial(ctx context.Context) (net.Conn, error) {
 		s.noteFailure()
 		return nil, err
 	}
-	conn.release = func() { <-s.slots }
+	s.touch()
+	conn.release = func() { <-s.slots; s.touch() }
 	conn.onFail = s.noteFailure
 	return conn, nil
+}
+
+// touch notes that a stream of this computer started or ended: the shared session is in use or was a moment ago.
+func (s *StreamTarget) touch() {
+	s.mu.Lock()
+	s.lastActive = time.Now()
+	s.mu.Unlock()
+}
+
+// cold is whether the computer has no shared session to ride: sharing is on, no stream is alive and none was for coldAfter.
+func (s *StreamTarget) cold() bool {
+	if len(controlArgs()) == 0 || len(s.slots) > 0 {
+		return false
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.lastActive.IsZero() || time.Since(s.lastActive) > coldAfter
+}
+
+// warm makes the shared session for a cold computer with one cheap command (CmdUname), alone: a switch after a pause is a burst of about 7 streams, and with no session to ride each did its own handshake at once
+// (1 to 3 s on a 94 ms hop, and one failure started the backoff for all). The other dials of the burst wait here; when the command is done they ride its session. A command that fails is the one failure: the
+// dials that waited meet the backoff and start no ssh of their own.
+func (s *StreamTarget) warm(ctx context.Context) error {
+	if !s.cold() {
+		return nil
+	}
+	s.warmMu.Lock()
+	defer s.warmMu.Unlock()
+	if !s.cold() {
+		return nil // another dial made the session while this one waited
+	}
+	s.mu.Lock()
+	recent := !s.failed.IsZero() && time.Since(s.failed) < streamBackoff
+	s.mu.Unlock()
+	if recent {
+		return ErrStreamBackoff
+	}
+	if _, err := s.r.Run(ctx, s.target, CmdUname); err != nil {
+		s.noteFailure()
+		return err
+	}
+	s.touch()
+	return nil
 }
 
 func (s *StreamTarget) noteFailure() {

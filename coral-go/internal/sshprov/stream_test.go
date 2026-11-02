@@ -394,3 +394,95 @@ func TestStreamGivesTheSlotBackWhenTheProcessEndsByItself(t *testing.T) {
 		t.Errorf("%d slot(s) still held after the process ended on its own", n)
 	}
 }
+
+// The first switch after the shared ssh session expired (60 s idle) started about 7 `ssh -W` at once with no session to share: each did its own handshake and one could fail, which started the 3 s backoff (#12446,
+// 4a; measured on a 94 ms hop: 1 to 3 s). A computer with no live stream and none for 45 s now gets one cheap command first, alone, that makes the session; the streams of the burst then ride it.
+func useTestControlDir(t *testing.T) {
+	t.Helper()
+	if UseControlDir(filepath.Join(t.TempDir(), "ssh_control")) == "" {
+		t.Skip("no shared-session folder on this system")
+	}
+	t.Cleanup(func() { controlDir.Store("") })
+}
+
+func TestStreamColdComputerMakesItsSharedSessionOnceBeforeTheBurstOpensItsStreams(t *testing.T) {
+	useTestControlDir(t)
+	remote := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(100 * time.Millisecond)
+		io.WriteString(w, "ok")
+	}))
+	defer remote.Close()
+	ssh, log := fakeSSHW(t)
+	tg, _ := ParseTarget("user@box.example.com")
+	st, err := NewStreamTarget(Runner{SSH: ssh}, tg, portOf(t, remote), streamKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	burst := func() {
+		var wg sync.WaitGroup
+		for i := 0; i < 7; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				req, _ := http.NewRequest("GET", "http://x.invalid/api/x", nil)
+				resp, err := st.RoundTrip(req)
+				if err != nil {
+					t.Error(err)
+					return
+				}
+				io.Copy(io.Discard, resp.Body)
+				resp.Body.Close()
+			}()
+		}
+		wg.Wait()
+	}
+	burst()
+	got := string(mustRead(t, log))
+	warm, firstW := strings.Index(got, "uname"), strings.Index(got, "-W\n")
+	if warm < 0 || firstW < 0 || warm > firstW {
+		t.Errorf("the cold computer's first ssh must be the one command that makes the shared session, before any stream (uname at %d, first -W at %d):\n%s", warm, firstW, got)
+	}
+	if n := strings.Count(got, "uname"); n != 1 {
+		t.Errorf("the session was made %d times by one burst", n)
+	}
+	before := strings.Count(got, "uname")
+	burst() // the streams are idle in the pool and the session is in use: not cold
+	if n := strings.Count(string(mustRead(t, log)), "uname"); n != before {
+		t.Errorf("a warm computer made the session again (%d commands)", n)
+	}
+}
+
+// One failed first attempt is one failure: the burst's other dials wait for it and then meet the backoff, rather than each starting an ssh of their own.
+func TestStreamColdComputerThatCannotBeReachedStartsOneSSHForTheWholeBurst(t *testing.T) {
+	useTestControlDir(t)
+	log := filepath.Join(t.TempDir(), "argv")
+	ssh := newStandIn(t, "ssh", standCfg{Stderr: "Connection refused\n", Exit: 255, Log: log})
+	tg, _ := ParseTarget("user@box.example.com")
+	st, _ := NewStreamTarget(Runner{SSH: ssh}, tg, 8420, streamKey)
+	var wg sync.WaitGroup
+	for i := 0; i < 7; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if c, err := st.dial(context.Background()); err == nil {
+				c.Close()
+				t.Error("a dial to a computer that refuses succeeded")
+			}
+		}()
+	}
+	wg.Wait()
+	b := mustRead(t, log)
+	if n := strings.Count(string(b), "--\nuser@box.example.com\n"); n != 1 {
+		t.Errorf("%d ssh processes were started for one burst to a computer that refuses: the first failure should end the others' dials:\n%s", n, b)
+	}
+}
+
+func mustRead(t *testing.T, p string) []byte {
+	t.Helper()
+	b, err := os.ReadFile(p)
+	if err != nil && !os.IsNotExist(err) {
+		t.Fatal(err)
+	}
+	return b
+}
