@@ -61,7 +61,7 @@ const { coralReady } = require('./helpers/wait');
                 await ev(`localStorage.setItem('coral-inbox-needs-filters', JSON.stringify({ sort: 'oldest' }));window.switchNavTab('hub-inbox');true`); // read oldest first: with newest first a list over the page's 12 rows shows File 01 last, behind "more" (#11552)
                 await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.selectInboxTab('needs')).then(()=>true)`);
                 await waitFor(`!!(${row('Review file 01.txt')})`,'for-review artifact in Needs you',15000);
-                assert.equal(await ev(`(${row('Review file 03.txt')}).querySelector('.inbox-review-version').textContent`),' · version 3','the Needs you row adds the version after the name, from the list (#11890): the name is the agent\'s, Coral numbers the versions');
+                assert.equal(await ev(`(${row('Review file 03.txt')}).querySelector('.inbox-review-version').textContent`),'version 3','the Needs you row adds the version after the name, from the list (#11890; the dot before it is drawn by CSS, #12019): the name is the agent\'s, Coral numbers the versions');
                 assert.equal(await ev(`(${row('Review file 03.txt')}).querySelector('.inbox-review-earlier')?.textContent||''`),'2 earlier versions','and says how many came before it, though none of them is still waiting');
                 assert.equal(await ev(`(${row('Review file 01.txt')}).querySelector('.inbox-review-version').hidden`),true,'a file with one version says nothing');
                 assert.deepEqual(await ev(`window.__versionCalls`),[],'no row asks the server for its version: 13 files, 0 requests (#11890)');

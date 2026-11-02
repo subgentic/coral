@@ -517,8 +517,11 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 .inbox-review-item { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
 .inbox-review-from { flex: none; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--fw-strong); }
 .inbox-review-from::after { content: " \00b7"; font-weight: var(--fw-regular); color: var(--text-muted); }
+.inbox-review-meta { flex: none; display: inline-flex; gap: 0 4px; white-space: nowrap; color: var(--text-muted); font-weight: var(--fw-regular); } /* "version 2 · 1 earlier version": one unit, never split or started with a dot (#12019) */
+.inbox-review-meta[hidden] { display: none; }
 .inbox-review-earlier { flex: none; color: var(--text-muted); font-weight: var(--fw-regular); white-space: nowrap; }
-.inbox-review-earlier::before { content: "\00b7  "; }
+.inbox-review-version:not([hidden]) + .inbox-review-earlier::before { content: "\00b7  "; }
+@media (min-width: 600px) { .inbox-review-meta::before { content: "\00b7"; } }
 .inbox-needs-results .dt-row.dt-read .inbox-review-from { font-weight: var(--fw-regular); }
 /* The phone's cell is narrow: the line wraps so "2 earlier versions" is not cut off (#11776). */
 .dt-folded .inbox-review-item { flex-wrap: wrap; }
