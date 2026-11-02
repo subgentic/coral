@@ -3,6 +3,7 @@
  * on one line, and opens whole in a dialog with a Reply box. The reply is the board post the dashboard already makes (POST /api/board/{board}/messages as the Operator, with the asker's @name, and reply_to
  * for an ask): it answers the ask, ends a wait, and tells the asker by the post itself. The text is the agent's, so it is written out through markHidden (strict) before it is drawn, then cut. */
 import { markHidden } from './visible_marks.js';
+import { isHiddenAsk } from './ask_filter.js';
 import { OPERATOR_ID } from './utils.js';
 import { state } from './state.js';
 import { showToast } from './notifications.js';
@@ -11,8 +12,8 @@ import { isCloud, isLocalServer } from './server_base.js';
 const FRESH_MS = 15000, LINE_MAX = 140;
 let asks = [], pending = null, lastRead = 0;
 const listeners = new Set();
-/** The open questions, oldest first. */
-export const operatorAsks = () => asks;
+/** The open questions, oldest first (without one that only links a file for review). */
+export const operatorAsks = () => asks.filter(a => !isHiddenAsk(a));
 /** Called after a read that changed the list. Returns the way to stop. */
 export const onOperatorAsksChanged = fn => { listeners.add(fn); return () => listeners.delete(fn); };
 const fire = () => { for (const f of listeners) f(); };
