@@ -349,7 +349,7 @@ func (h *BoardHandler) makeFromProposal(ctx context.Context, project string, p *
 		if err := json.Unmarshal([]byte(p.Payload), &g); err != nil {
 			return 0, "", errors.New("the proposal's goal could not be read")
 		}
-		goal, err := h.bs.CreateGoalApproved(ctx, project, p.ID, board.GoalInput{Title: pick(g.Title, title), Outcome: pick(g.Outcome, outcome), DoneWhen: pick(g.DoneWhen, doneWhen), State: g.State, Driver: g.Driver, CreatedBy: g.CreatedBy})
+		goal, err := h.bs.CreateGoalApproved(ctx, project, p.ID, board.GoalInput{Title: pick(g.Title, title), Outcome: pick(g.Outcome, outcome), DoneWhen: pick(g.DoneWhen, doneWhen), State: board.GoalActive, Driver: g.Driver, CreatedBy: g.CreatedBy}) // the Operator's approval is what makes it active, whatever state it was proposed in (#12028)
 		if err != nil {
 			return 0, "", err
 		}

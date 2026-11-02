@@ -534,3 +534,26 @@ func TestProposalRowsCarryTheTeamsNameBesideItsBoardID(t *testing.T) {
 	_, has := byTitle["From a board with no row"]["board_label"]
 	assert.False(t, has, "a board with no name of its own carries none: the page then says the id")
 }
+
+// #12028 (the Mobile Beta Tester): the card says "Approved: it is now goal #N", and the goal stayed `proposed` when the agent had proposed it in that state (the payload's state was used as it was), so it never
+// became "Goal looks done" and acted as not started. Approving a goal proposal is what makes it active, whatever state it was proposed in.
+func TestApprovingAGoalProposalMakesTheGoalActive(t *testing.T) {
+	for name, state := range map[string]any{"proposed by the agent": "proposed", "no state said": nil, "active said": "active"} {
+		t.Run(name, func(t *testing.T) {
+			e := newProposalEnv(t)
+			e.settings(t, board.BoardSettingsUpdate{GoalsNeedApproval: boolp(true)})
+			body := map[string]any{"title": "Ship the beta", "outcome": "People use it", "subscriber_id": "Orchestrator"}
+			if state != nil {
+				body["state"] = state
+			}
+			code, out := e.call(t, "", "POST", "/api/board/team/goals", body)
+			require.Equal(t, http.StatusAccepted, code, out)
+			id := int64(out["proposal_id"].(float64))
+			code, ok := e.call(t, "person", "POST", "/api/board/team/proposals/"+itoa(id)+"/approve", nil)
+			require.Equal(t, http.StatusOK, code, ok)
+			goals := e.goals(t)
+			require.Len(t, goals, 1)
+			assert.Equal(t, "active", goals[0]["state"], "approved: active")
+		})
+	}
+}
