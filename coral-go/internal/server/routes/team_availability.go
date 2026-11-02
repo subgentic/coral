@@ -316,7 +316,7 @@ func (h *SessionsHandler) offlineSubscriberStatus(snap *boardStatusSnapshot, nam
 		a.Reason = "Remote agent availability is not observed locally"
 	}
 	a.Tasks = append(a.Tasks, boardTasksAssignedTo(snap.tasks, sub.SubscriberID)...)
-	if wait := snap.waitsBySubscriber[sub.SubscriberID]; wait != nil {
+	if wait := snap.waitsBySubscriber[sub.SubscriberID]; wait != nil && wait.SessionName == "" { // a wait made from a Coral session whose session is gone (Kill All, a crash) is not an agent that needs a person: it is offline (#12081); one made with no session of Coral's is an agent of its own, still waiting
 		a.WaitingOn = wait
 		a.Availability = "waiting"
 		a.Reason = waitingReason(wait)
