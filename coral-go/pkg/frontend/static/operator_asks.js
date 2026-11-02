@@ -8,6 +8,7 @@ import { OPERATOR_ID, renderMarkdownStrict } from './utils.js';
 import { whenText } from './when_text.js';
 import { state } from './state.js';
 import { importOnce } from './import_once.js';
+import { loadStyles } from './lazy_styles.js';
 import { showToast } from './notifications.js';
 import { isCloud, isLocalServer } from './server_base.js';
 
@@ -140,6 +141,16 @@ export function askParts(a) {
     return { title: `${(at > 40 ? cut.slice(0, at) : cut).replace(/[*_`]/g, '').replace(/[\s,;:.-]+$/, '')}\u2026`, body: clean };
 }
 
+/** The goal and the task a question was asked about (#12194, #12164): [{ kind, id, title }], the goal first; empty when the asker named neither. */
+export function askSubjects(a) {
+    const out = [];
+    if (a && Number(a.goal_id) > 0) out.push({ kind: 'goal', id: Number(a.goal_id), title: markHidden(a.goal_title || '', { strict: true }) });
+    if (a && Number(a.task_id) > 0) out.push({ kind: 'task', id: Number(a.task_id), title: markHidden(a.task_title || '', { strict: true }) });
+    return out;
+}
+/** "Goal #7 · Task #12", the short words of a question's subjects (a Needs you row's marker). */
+export const askSubjectWords = a => askSubjects(a).map(x => `${x.kind === 'goal' ? 'Goal' : 'Task'} #${x.id}`).join(' \u00b7 ');
+
 /** The question whole, with a Reply box: a modal dialog (focus kept inside it, Escape closes it). */
 export function openAskDialog(a, onDone, runners = {}) {
     const dlg = document.createElement('dialog');
@@ -149,6 +160,15 @@ export function openAskDialog(a, onDone, runners = {}) {
     const title = document.createElement('h2'); title.id = 'inbox-ask-title'; title.textContent = parts.title;
     const sub = document.createElement('p'); sub.className = 'inbox-ask-sub';
     sub.textContent = [`From ${markHidden(a.asker, { strict: true })}`, (/\bteam$/i.test(a.board_label || a.board) ? (a.board_label || a.board) : `${a.board_label || a.board} team`), whenText(a.at)].filter(Boolean).join(' \u00b7 ') + (a.kind === 'wait' ? ', waiting for your reply' : '');
+    const subjects = askSubjects(a), links = document.createElement('p'); links.className = 'inbox-ask-subjects'; links.hidden = !subjects.length; if (subjects.length) loadStyles('pictures.css'); // its links are drawn by the lazy picture rules // the goal and task it is about, each a link that opens it in the Inbox
+    subjects.forEach((x, i) => {
+        if (i) links.append(document.createTextNode(' \u00b7 '));
+        const word = `${x.kind === 'goal' ? 'Goal' : 'Task'} #${x.id}${x.title ? `: ${x.title.length > 60 ? `${x.title.slice(0, 59).trimEnd()}\u2026` : x.title}` : ''}`;
+        if (fromAnotherComputer(a) || !runners[x.kind]) { links.append(document.createTextNode(word)); return; } // from another computer the ids are that computer's: shown, not opened
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'btn btn-quiet btn-small inbox-ask-subject'; b.textContent = word; b.dataset.kind = x.kind; b.title = `Open ${x.kind} #${x.id}`;
+        b.addEventListener('click', () => { finish(); runners[x.kind](a, String(x.id)); });
+        links.append(b);
+    });
     const whole = document.createElement('div'); whole.className = 'inbox-ask-text prose'; whole.tabIndex = 0; whole.setAttribute('role', 'region'); whole.setAttribute('aria-label', 'The question');
     whole.innerHTML = renderMarkdownStrict(parts.body + (a.cut ? '\n\n\u2026 (cut: the board has the rest)' : '')); // raw HTML in the words is written out as text; links keep the page's link policy
     whole.hidden = !parts.body && !a.cut; // a short question is its title
@@ -200,7 +220,7 @@ export function openAskDialog(a, onDone, runners = {}) {
         offered.append(head, list);
     }
     const foot = document.createElement('div'); foot.className = 'inbox-ask-foot'; const addSlot = document.createElement('span'); foot.append(addSlot, row); // Add image on the left, Close and Send reply on the right: one row of buttons
-    dlg.append(title, sub, ...(whole.hidden ? [] : [whole]), ...(offered ? [offered] : []), label, pics, err, foot);
+    dlg.append(title, sub, ...(links.hidden ? [] : [links]), ...(whole.hidden ? [] : [whole]), ...(offered ? [offered] : []), label, pics, err, foot);
     if (!fromAnotherComputer(a)) { // the picture is stored on the question's own team, as a goal's pictures are
         Promise.all([importOnce('./artifact_comment_images.js'), importOnce('./artifact_comments_api.js')]).then(([m, api]) => {
             if (!dlg.isConnected) return;
