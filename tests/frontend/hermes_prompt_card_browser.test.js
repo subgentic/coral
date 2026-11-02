@@ -27,19 +27,19 @@ const CLARIFY = { kind: 'question', question: 'Which colour should the report us
             // the stand-in terminal: the chat reply of the Hermes agent carries whichever prompt is open
             await ev(`(() => {
                 const inner = window.__innerFetch || (window.__innerFetch = window.fetch);
-                window.__screen = null;
+                window.__screen = null; window.__pending = null;
                 window.fetch = (url, opts = {}) => {
                     if (/\\/api\\/sessions\\/live\\/hermes-q[^/?]*\\/chat\\?/.test(String(url))) return inner(url, opts).then(async r => { const d = await r.clone().json().catch(() => null); if (!d) return r;
-                        d.pending = null; if (window.__screen) d.prompt_options = window.__screen; return new Response(JSON.stringify(d), { status: r.status, headers: { 'content-type': 'application/json' } }); });
+                        d.pending = window.__pending || null; if (window.__screen) d.prompt_options = window.__screen; return new Response(JSON.stringify(d), { status: r.status, headers: { 'content-type': 'application/json' } }); });
                     return inner(url, opts);
                 };
                 return true; })()`);
             await ev(`window.__m.add('hermes-q', 'H', 0, { sleeping: false, agent_type: 'hermes' }); true`);
             await sleep(600); // sleep-ok: the first live list renders from several answers; no single completion event
-            const open = async (screen, summary) => {
-                await ev(`window.__screen = ${JSON.stringify(screen)}; import(${S} + 'state.js').then(st => { const row = st.state.liveSessions.find(s => s.session_id === 'hermes-q-id' || s.name === 'hermes-q'); Object.assign(row, { waiting_for_input: true, waiting_kind: 'permission', waiting_summary: ${JSON.stringify(summary)} }); return true; })`);
+            const open = async (screen, summary, pending) => {
+                await ev(`window.__pending = ${JSON.stringify(pending || null)}; window.__screen = ${JSON.stringify(screen)}; import(${S} + 'state.js').then(st => { const row = st.state.liveSessions.find(s => s.session_id === 'hermes-q-id' || s.name === 'hermes-q'); Object.assign(row, { waiting_for_input: true, waiting_kind: 'permission', waiting_summary: ${JSON.stringify(summary)} }); return true; })`);
                 await ev(`window.selectLiveSession('hermes-q', 'hermes', 'hermes-q-id', 'local'); true`);
-                await waitFor(`!!document.querySelector('#live-history-messages .chat-needs-input .cni-answer')`, `${tag}: the card with its answers`, 8000);
+                await waitFor(`!!document.querySelector('#live-history-messages .chat-needs-input .cni-answer, #live-history-messages .chat-needs-input .cni-kicker')`, `${tag}: the card`, 8000);
                 return ev(`(() => { const c = document.querySelector('#live-history-messages .chat-needs-input'); return { kicker: c.querySelector('.cni-kicker').textContent, text: c.textContent.replace(/\\s+/g, ' '), answers: [...c.querySelectorAll('.cni-answer-label')].map(x => x.textContent), target: (c.querySelector('.cni-target') || {}).textContent || '' }; })()`);
             };
 
@@ -52,6 +52,10 @@ const CLARIFY = { kind: 'question', question: 'Which colour should the report us
             check(`${tag}: a clarify is headed Question, not Permission needed`, /^Question$/.test(q.kicker), q.kicker);
             check(`${tag}: it shows the question and its options`, /Which colour should the report use\?/.test(q.text) && JSON.stringify(q.answers) === JSON.stringify(['blue (Recommended)', 'green', 'red']), JSON.stringify(q.answers));
             check(`${tag}: and no "Allow clarify?"`, !/Allow /.test(q.text), q.text.slice(0, 160));
+
+            // a clarify with no options to choose from (the answer is typed in the terminal): the card still says what is asked
+            const f = await open({ options: [] }, 'Wants to know: What name should the report have?', { tool_name: 'clarify', input: {} });
+            check(`${tag}: a clarify with no options is headed Question and shows its question`, /^Question$/.test(f.kicker) && /What name should the report have\?/.test(f.text), f.text.slice(0, 160));
         }
     } finally { /* the harness closes the browser */ }
     const failed = results.filter(r => !r).length;

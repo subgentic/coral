@@ -1,12 +1,19 @@
 package routes
 
 import (
+	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/agent"
+	"github.com/subgentic/coral/internal/store"
+	"github.com/subgentic/coral/internal/transcriptlink"
 )
 
 // #12170: Hermes's approval and clarify prompts, read from the tester's captures of Hermes v0.22.5 (the prompt left open; the pane is 120 columns).
@@ -99,4 +106,69 @@ func TestAHermesClarifyCountsAsAQuestionAndACommandApprovalSaysWhatItRuns(t *tes
 
 	st = derive("Welcome to Hermes Agent!\n❯ \n") // no box: the hook's words stand
 	assert.Equal(t, "permission", st.WaitingKind)
+}
+
+// The tester's browser pass on #12170: a command with U+200B inside a path got all four buttons, because the card is built from the screen and the terminal drops that character, while the chat's step row (Hermes's own
+// stored tool call) shows it. The stored command of the call is judged by the same rule as every other CLI's: Reject only, and the note names the character.
+func TestAHermesApprovalWhoseStoredCommandHidesACharacterOffersRejectOnly(t *testing.T) {
+	const zero = "​"
+	parse := func() promptScreen {
+		s, ok := parsePromptScreen(hermesScreen(t, "a1_approval_short"))
+		require.True(t, ok)
+		return s
+	}
+	rows := func(cmd string) []map[string]any {
+		return []map[string]any{{"type": "assistant", "tool_uses": []map[string]any{{"name": "terminal", "command": "echo older"}}}, {"type": "assistant", "tool_uses": []map[string]any{{"name": "terminal", "command": cmd}}}}
+	}
+
+	s := parse()
+	require.False(t, s.OnlyReject, "the screen alone shows nothing hidden")
+	before := s.AskID
+	stored := hermesCommandOf(rows("rm -rf /home/tester/dan" + zero + "gerdir"))
+	assert.Equal(t, "rm -rf /home/tester/dan"+zero+"gerdir", stored, "the newest call's command")
+	applyHermesCommand(&s, stored)
+	assert.True(t, s.OnlyReject, "an invisible character: Deny only")
+	assert.NotEmpty(t, s.Note)
+	assert.Contains(t, strings.ToLower(s.Target), "dan<u+200b>gerdir", "the card shows the character written out where it is, not hidden")
+	assert.NotContains(t, s.Target, zero)
+	assert.NotEqual(t, before, s.AskID, "the ask is the stored command's, so an answer drawn for the other cannot answer this one")
+
+	// the same command with nothing hidden changes nothing
+	clean := parse()
+	applyHermesCommand(&clean, hermesCommandOf(rows("rm -rf /home/tester/dangerdir")))
+	assert.False(t, clean.OnlyReject)
+	assert.Equal(t, "rm -rf /home/tester/dangerdir", clean.Target)
+
+	// another call's command (or none stored) is not this approval's: the screen stands
+	other := parse()
+	applyHermesCommand(&other, "ls "+zero+"/tmp")
+	assert.False(t, other.OnlyReject, "a different command is not judged for this one")
+	applyHermesCommand(&other, "")
+	assert.False(t, other.OnlyReject)
+
+	// a clarify is not a command
+	q, ok := parsePromptScreen(hermesScreen(t, "b_clarify3"))
+	require.True(t, ok)
+	applyHermesCommand(&q, "x"+zero)
+	assert.False(t, q.OnlyReject)
+}
+
+// The wiring: the handler reads the stored command of the agent's newest tool call from its own team's state.db, by the Hermes session its hooks bound (hermesTranscriptRows), and nothing of another session's.
+func TestTheStoredCommandOfAHermesAgentIsReadFromItsOwnSessionOnly(t *testing.T) {
+	_, handler, _, ss := setupSessionsTestServer(t)
+	sid, team := "00000000-0000-0000-0000-00000000e11d", "team-a"
+	hid, other := "local-"+strings.Repeat("c5", 32), "local-"+strings.Repeat("d5", 32)
+	require.NoError(t, ss.RegisterLiveSession(context.Background(), &store.LiveSession{SessionID: sid, AgentType: "hermes", AgentName: "hermes-c", WorkingDir: "/tmp/test", BoardName: &team}))
+	w := writeHermesState(t, agent.HermesAgentHome(handler.cfg.CoralDir(), team, sid))
+	call := func(session, cmd string) {
+		args, _ := json.Marshal(map[string]string{"command": cmd})
+		calls, _ := json.Marshal([]map[string]any{{"id": "c1", "type": "function", "function": map[string]any{"name": "terminal", "arguments": string(args)}}})
+		_, err := w.Exec(`INSERT INTO messages (session_id, role, content, tool_calls, timestamp) VALUES (?, 'assistant', '', ?, 1788000000)`, session, string(calls))
+		require.NoError(t, err)
+	}
+	call(hid, "rm -rf /home/tester/dan​gerdir")
+	call(other, "THE OTHER SESSION'S COMMAND")
+	assert.Empty(t, handler.hermesStoredCommand(context.Background(), sid), "no link yet: nothing is read")
+	require.NoError(t, transcriptlink.BindHermes(handler.cfg.CoralDir(), sid, hid))
+	assert.Equal(t, "rm -rf /home/tester/dan​gerdir", handler.hermesStoredCommand(context.Background(), sid), "the bound session's newest call, with its hidden character")
 }

@@ -588,6 +588,9 @@ func (h *SessionsHandler) readPromptScreenText(ctx context.Context, name, agentT
 	s, ok := parsePromptScreen(text)
 	if ok {
 		markApprovalKinds(agentType, text, &s)
+		if agentType == at.Hermes && s.Kind == promptKindApproval {
+			applyHermesCommand(&s, h.hermesStoredCommand(ctx, sessionID)) // the screen drops a hidden character; Hermes's stored call has it (#12170)
+		}
 	}
 	return s, ok, text, nil
 }

@@ -1,11 +1,14 @@
 package routes
 
 import (
+	"context"
 	"regexp"
 	"strings"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/subgentic/coral/internal/clitext"
+	"github.com/subgentic/coral/internal/permreview"
 )
 
 // Hermes's two prompts (#12170, goal #192): a dangerous-command approval and a clarify question. Hermes draws each in a box (a rounded border and "│ row │" lines) over its input row, with a footer line under it
@@ -215,4 +218,52 @@ func cutRunes(s string, n int) string {
 		return string(r[:n])
 	}
 	return s
+}
+
+// hermesCommandOf is the command of the newest tool call that has one in a Hermes chat's rows (oldest first), "" when none: the command as Hermes stored it, which the screen cannot show (the terminal drops a zero-width
+// character, so a command that hides what it does reads as a plain one there).
+func hermesCommandOf(rows []map[string]any) string {
+	for i := len(rows) - 1; i >= 0; i-- {
+		uses, _ := rows[i]["tool_uses"].([]map[string]any)
+		for j := len(uses) - 1; j >= 0; j-- {
+			if cmd, _ := uses[j]["command"].(string); strings.TrimSpace(cmd) != "" {
+				return cmd
+			}
+		}
+	}
+	return ""
+}
+
+// foldCommand is s without its white space and its invisible and format characters, so a command and the same command as a terminal draws it compare equal.
+func foldCommand(s string) string {
+	return strings.Map(func(r rune) rune {
+		if unicode.IsSpace(r) || unicode.Is(unicode.Cf, r) || unicode.IsControl(r) {
+			return -1
+		}
+		return r
+	}, s)
+}
+
+// applyHermesCommand judges a Hermes approval by the command Hermes itself holds (the tool call in its state.db, as the chat shows it) when that is the command on the screen: the screen is the box's text, which drops what
+// the terminal does not draw, so an invisible, format or reordering character is in the stored command and not on the screen. The same rule as every CLI then applies (permreview): such a command offers Reject only and
+// the note names the character. A stored command that is not the screen's (another call, nothing stored) changes nothing: the screen's own text stands.
+func applyHermesCommand(s *promptScreen, stored string) {
+	if s.Kind != promptKindApproval || stored == "" || foldCommand(stored) != foldCommand(s.context) {
+		return
+	}
+	rv := permreview.Of(stored)
+	s.context = stored
+	s.Target = rv.Shown
+	if !rv.Allowed() {
+		s.OnlyReject, s.Note = true, rv.Note()
+	}
+	s.AskID = askID(*s)
+}
+
+// hermesStoredCommand reads the command of the agent's newest tool call from its Hermes session (few rows: the call is the last thing it did).
+func (h *SessionsHandler) hermesStoredCommand(ctx context.Context, sessionID string) string {
+	if sessionID == "" {
+		return ""
+	}
+	return hermesCommandOf(h.hermesTranscriptRows(ctx, sessionID, 12).Window)
 }
