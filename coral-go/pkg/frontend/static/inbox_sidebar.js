@@ -1191,7 +1191,7 @@ export async function showInbox({ folder = '', quiet = false } = {}) {
     if (document.body.getAttribute('data-nav-tab') !== 'hub-inbox') return; // the module arrived after the person had moved on (a notification's click, a chosen agent): its table must not cover that
     noteFolder(group);
     openGroupTable('hub-inbox', group); // a phone too: the table has the folders' select on top
-    const came = folder && group === 'needs' && itemOpeners.get('needs'), tbl = $('group-table-view'); if (came && tbl) putBack(tbl, came); // Back from a goal opened off Needs you: the list's place and the row's focus (#11950, #11964)
+    const came = folder && group === 'needs' && itemOpeners.get('needs'), tbl = $('group-table-view'); if (came && tbl) { itemOpeners.delete('needs'); putBack(tbl, came); } // Back from a goal opened off Needs you: the list's place and the row's focus (#11950, #11964); the note is spent once used, so a later fresh open of Needs you does not jump back to it (#12319)
     markReady('inboxListDrawn'); // window.__coralReady (#12124)
 }
 
@@ -1212,7 +1212,7 @@ export async function openInboxGroup(name) {
     const route = routeForFolder(name); if (route) note(route);
     if (name === 'goals') restoreGoalList();
     const opener = itemOpeners.get(name), table = $('group-table-view');
-    if (opener && table) putBack(table, opener);
+    if (opener && table) { itemOpeners.delete(name); putBack(table, opener); } // spent once used (#12319)
 }
 
 /** The list a person came back to is drawn (and redrawn) after the route, so its rows may not be there yet and a draw can put the scroll back to the top: for about a second keep its place and the row's focus where they were, until
