@@ -134,6 +134,30 @@ func Prune(ctx context.Context, o PruneOptions, d ManageDeps) (*PruneReport, err
 		if alive[r.Name] || r.Created.IsZero() || r.Created.After(cutoff) {
 			continue
 		}
+		// "Gone" is not "missing from the tag-filtered list": a droplet that lost its tag, or sits past the page limit, would look gone and lose its firewall. For a record with a droplet id only a DIRECT read of that id that
+		// answers not found counts; any other answer, or no way to read, leaves the record and its network alone and says so (Security, #9934). A record with no id (its create never answered) is left alone while
+		// the list shows a machine with its launch tag.
+		if r.DropletID != "" {
+			g, canGet := d.Provider.(Getter)
+			if !canGet {
+				fmt.Fprintf(d.Out, "The record %s names droplet %s, which is not in the list; %s cannot read it directly, so it is not treated as gone and was left alone.\n", r.Name, r.DropletID, d.Provider.Name())
+				continue
+			}
+			gctx, gcancel := context.WithTimeout(ctx, sweepCallTimeout)
+			_, gerr := g.Get(gctx, r.DropletID)
+			gcancel()
+			if !errors.Is(gerr, ErrNotFound) {
+				why := "it still exists at the provider (it may have lost its tag)"
+				if gerr != nil {
+					why = "a direct read of it failed (" + gerr.Error() + ")"
+				}
+				fmt.Fprintf(d.Out, "The record %s names droplet %s, which is not in the list, but %s: it was left alone, with its firewall and network.\n", r.Name, r.DropletID, why)
+				continue
+			}
+		} else if r.LaunchTag != "" && slices.ContainsFunc(all, func(in Instance) bool { return slices.Contains(in.Tags, r.LaunchTag) }) {
+			fmt.Fprintf(d.Out, "The record %s has no droplet id but a machine carries its launch tag %s: it was left alone.\n", r.Name, r.LaunchTag)
+			continue
+		}
 		if r.VPCID != "" && slices.ContainsFunc(all, func(in Instance) bool { return in.VPCID == r.VPCID }) { // by this fresh read the network still has a member: it stays
 			fmt.Fprintf(d.Out, "The private network %s of the record %s still has an instance in it: it was left alone.\n", r.VPCID, r.Name)
 			continue

@@ -717,3 +717,57 @@ func TestDeleteDoesNotTreatAMissingListEntryAsGone(t *testing.T) {
 
 // yesConfirm answers a delete's confirm with yes: the tests that are not about the prompt.
 func yesConfirm(string) (bool, error) { return true, nil }
+
+// Record-based prune decides "gone" only from a direct read of the recorded id that says not found: a droplet that lost its tag (hidden from the tag list, still readable) is NOT pruned and its firewall stays; a failed direct
+// read does not count; a list cut at the page limit refuses the whole prune (Security's SHOULD on 5b).
+func TestPruneDoesNotTreatAMissingTagAsGone(t *testing.T) {
+	for name, setup := range map[string]func(f *fakeCloud){
+		"lost its tag": func(f *fakeCloud) {
+			in := f.drops["77"]
+			in.Tags = []string{"coral-launch-0123456789abcdef0123456789abcdef"}
+			f.drops["77"] = in
+			f.hidden = map[string]bool{"77": true}
+		},
+		"direct read fails": func(f *fakeCloud) { f.hidden = map[string]bool{"77": true}; f.failOn["Get:77"] = errors.New("down") },
+	} {
+		f := newFake()
+		st := stateAt(t)
+		r := record("m1", f)
+		r.Created = time.Now().Add(-200 * time.Hour)
+		require.NoError(t, st.Put(r))
+		setup(f)
+		var out bytes.Buffer
+		d := ManageDeps{Provider: f, State: st, Out: &out, Tune: quick(), Confirm: func(string) (bool, error) { return true, nil }}
+		rep, err := Prune(t.Context(), PruneOptions{OlderThan: 24 * time.Hour}, d)
+		require.NoError(t, err, name)
+		assert.Empty(t, rep.Removed, name)
+		assert.Len(t, f.fws, 1, "%s: the firewall stays", name)
+		assert.Len(t, f.vpcs, 1, "%s: and the network", name)
+		_, ok := st.Get("m1")
+		assert.True(t, ok, "%s: and the record", name)
+		assert.Contains(t, out.String(), "left alone", name)
+	}
+	// a truly gone droplet (the direct read says not found) is pruned with its network
+	f := newFake()
+	st := stateAt(t)
+	r := record("m1", f)
+	r.Created = time.Now().Add(-200 * time.Hour)
+	require.NoError(t, st.Put(r))
+	delete(f.drops, "77")
+	d := ManageDeps{Provider: f, State: st, Out: &bytes.Buffer{}, Tune: quick(), Confirm: func(string) (bool, error) { return true, nil }}
+	rep, err := Prune(t.Context(), PruneOptions{OlderThan: 24 * time.Hour}, d)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"m1"}, rep.Removed)
+	assert.Empty(t, f.fws)
+	// a list cut at the page limit refuses the prune: nothing is taken from a partial list
+	f2 := newFake()
+	st2 := stateAt(t)
+	r2 := record("m1", f2)
+	r2.Created = time.Now().Add(-200 * time.Hour)
+	require.NoError(t, st2.Put(r2))
+	delete(f2.drops, "77")
+	f2.listTrunc = true
+	_, err = Prune(t.Context(), PruneOptions{OlderThan: 24 * time.Hour}, ManageDeps{Provider: f2, State: st2, Out: &bytes.Buffer{}, Tune: quick(), Confirm: func(string) (bool, error) { return true, nil }})
+	require.ErrorIs(t, err, ErrListTruncated)
+	assert.Len(t, f2.fws, 1)
+}
