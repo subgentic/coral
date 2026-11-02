@@ -9,20 +9,22 @@ const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { coralReady } = require('./helpers/wait');
 const { removeBoards } = require('./helpers/board_cleanup');
+const { DATA_WORLD } = require('./helpers/census_world');
 const B = 'tbl-rules-' + Date.now().toString(36);
 const { AUDIT, judge } = require('./helpers/table_rules');
 
 // The specs run in the page: (m = data_table.js's exports, mix) -> { label, columns, rows, opts }. The Needs you mix is the operator's own screenshot: an agent row (a question, a Dismiss beside its words) and two
 // "Goal looks done" rows, with Blocks empty for all of them and Actions empty.
+// (the Blocks cells of the needs shape are empty elements, the screenshot's empty Blocks column; its Dismiss is drawn inside Waiting for)
 const SPECS = `(() => {
   const long = 'A very long item name that goes on and on past any sensible column width, with words '.repeat(2);
   const when = n => new Date(Date.now() - n * 60000).toISOString();
   const kinds = {
     needs: (m, mix) => ({ label: 'Needs you, 3', columns: [
         { key: 'item', label: 'Item', primary: true, width: 'grow', sort: true, cell: r => m.primaryButton(r.item) },
-        { key: 'why', label: 'Waiting for', cell: r => { const s = document.createElement('span'); s.textContent = r.why; if (r.dismiss) s.append(m.link('Dismiss', () => {})); return s; } },
+        { key: 'why', label: 'Waiting for', cell: r => { const s = document.createElement('span'); s.textContent = r.why; if (r.dismiss) { const d = document.createElement('button'); d.type = 'button'; d.className = 'btn btn-small inbox-dismiss'; d.textContent = 'Dismiss'; s.append(d); } return s; } }, // the operator's Dismiss, drawn inside Waiting for
         { key: 'cli', label: 'CLI', sort: true, cell: r => (r.cli ? m.tag(r.cli) : '') }, { key: 'folder', label: 'Folder', sort: true, field: 'folder' }, { key: 'team', label: 'Team', sort: true, field: 'team' },
-        { key: 'blocks', label: 'Blocks', field: 'blocks' }, { key: 'actions', label: 'Actions', fixed: true, width: '11rem', cell: r => (r.act ? m.link(r.act, () => {}) : '') } ],
+        { key: 'blocks', label: 'Blocks', cell: () => document.createElement('span') }, { key: 'actions', label: 'Actions', fixed: true, width: '11rem', cell: r => (r.act ? m.link(r.act, () => {}) : '') } ],
       rows: mix === 'empty' ? [] : mix === 'one' ? [1, 2, 3].map(i => ({ id: i, item: 'Goal #' + (180 + i) + ' looks done', why: 'Done when: Every task is done.', team: 'coral-hub', act: 'Close goal' }))
         : [{ id: 1, item: mix === 'long' ? long : 'Orchestrator', why: 'Wants to know: None of the above', cli: 'Claude', folder: 'coral-hub', team: 'coral-hub-team', dismiss: true }, { id: 2, item: 'Goal #187 looks done', why: 'Done when: The operator can see it', team: 'coral-hub' }, { id: 3, item: 'Goal #184 looks done', why: 'Every task is done.', team: 'coral-hub' }] }),
     tasks: (m, mix) => ({ label: 'Tasks, 4', columns: [ { key: 'state', label: 'State', cell: r => m.chip(r.state, 'goal-state-' + r.state) }, { key: 'title', label: 'Task', primary: true, width: 'grow', sort: true, field: 'title' },
@@ -54,7 +56,7 @@ const SPECS = `(() => {
     return true;
   };
   window.__audit = ${AUDIT};
-  window.__measure = (root) => { const b = document.querySelector((root || '#zz-host') + ' .dt-box'); return b ? window.__audit(b) : null; };
+  window.__measure = (root) => { const b = [...document.querySelectorAll((root || '#zz-host') + ' .dt-box')].find(x => x.getClientRects().length > 0 && x.querySelector('table.dt-table')); return b ? window.__audit(b) : null; };
   return true;
 })()`;
 
@@ -113,6 +115,23 @@ const MODE = process.env.CORAL_TABLE_RULES || 'off';
             window.__m.add('Orchestrator', 'O', 1, { sleeping: false, board_project: '${B}', session_id: 'orch-w-id' });
             window.__qaState.liveSessions = window.__qaState.liveSessions.map(s => s.session_id === 'orch-w-id' ? { ...s, agent_type: 'claude', board_job_title: 'Orchestrator', working_dir: '/work/coral-hub', waiting_for_input: true, waiting_kind: 'needs_input', waiting_summary: 'Wants to know: None of the above', waiting_since: new Date(Date.now() - 40 * 60000).toISOString() } : s); `;
         surfaces.push({ name: 'needs (live, the operator\'s mix)', root: '#group-table-view', mixes: ['mixed'], live: true, phoneW: 390, mount: async (mix, w) => { await openLive(w, 'needs', NEEDS_STUBS); await rowsOn(4, 'looks done'); return true; } });
+        // The Inbox's Artifacts folder, the operator's file rows (as inbox_artifacts_browser stubs the merged team list), with a long name among them.
+        const ART_STUBS = `const real = window.fetch; const at = m => new Date(Date.now() - m * 60000).toISOString();
+            const A = [['beta-notes.txt', 'text/plain', 'beta', 5], ['alpha-report.md', 'text/markdown', 'alpha', 20], ['beta-data.json', 'application/json', 'beta', 40], ['a-very-long-file-name-that-goes-on-and-on-past-any-sensible-column-width-in-the-list.md', 'text/markdown', 'alpha', 60], ['alpha-chart.png', 'image/png', 'alpha', 90], ['alpha-plan.md', 'text/markdown', 'alpha', 120]]
+              .map(([name, mt, board, m], i) => ({ id: String(i + 1).padStart(64, '0'), name, media_type: mt, size: 1000 * (i + 1), created_at: at(m), task_id: 6 + i, task_title: 'Task ' + (6 + i), source: 'task', uri: 'coral://artifacts/' + String(i + 1).padStart(64, '0'), available: true, inline: false, reference_count: 1, board_id: board, team: board, starred: i === 1 }));
+            const json = (b, status = 200) => Promise.resolve(new Response(JSON.stringify(b), { status, headers: { 'content-type': 'application/json' } }));
+            window.fetch = (u, o = {}) => { const url = new URL(String(u), location.origin), p = url.pathname, m = (o.method || 'GET').toUpperCase();
+                if (p === '/api/team-artifacts' && m === 'GET') return json({ artifacts: A, limit: 100, offset: 0, has_more: false, truncated: false, total: A.length, all: A.length, teams: [{ board_id: 'alpha', team: 'alpha', all: 4 }, { board_id: 'beta', team: 'beta', all: 2 }] });
+                if (p === '/api/system/artifact-store/kept') return json({ kept: [] });
+                return real(u, o); };`;
+        surfaces.push({ name: 'artifacts (live Inbox)', root: '#group-table-view', mixes: ['mixed'], live: true, phoneW: 390, mount: async (mix, w) => { await openLive(w, 'artifacts', ART_STUBS); await rowsOn(4); return true; } });
+        // Analytics through the real tab with the census data world (the stubs of its usage routes), a few of its seven tables: who spends, by provider and the tool and API calls.
+        for (const view of ['agent', 'provider', 'calls']) surfaces.push({ name: `analytics (live: ${view})`, root: '#cost-dashboard-view', mixes: ['mixed'], live: true, phoneW: 390, mount: async (mix, w) => {
+            await size(w, w < 600); const { identifier } = await Page.addScriptToEvaluateOnNewDocument({ source: DATA_WORLD });
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev); await Page.removeScriptToEvaluateOnNewDocument({ identifier }); await ev(SPECS);
+            await ev(`window.switchNavTab('tokens'); true`); await settle(1500);
+            if (view === 'calls') { await ev(`(() => { if (!document.querySelector('#cost-nav-list .row-btn[data-view="calls"]')) document.querySelector('#cost-nav-list [data-on-click="analytics-advanced"]')?.click(); return true; })()`); await settle(300); }
+            await ev(`(() => { const g = ({ provider: 'Provider', agent: 'Agent' })[${JSON.stringify(view)}]; const b = g ? [...document.querySelectorAll('#cost-group-bar .eff-seg-btn')].find(x => x.textContent === g) : document.querySelector('#cost-nav-list .row-btn[data-view="${view}"]'); if (b) b.click(); return !!b; })()`); await settle(900); return true; } }); // a grouping is Overview's Group by
         surfaces.push({ name: 'tasks (live Inbox)', root: '#group-table-view', mixes: ['mixed'], live: true, phoneW: 390, mount: async (mix, w) => { await openLive(w, 'tasks'); await rowsOn(3); return true; } });
         surfaces.push({ name: 'goals (live Inbox)', root: '#group-table-view', mixes: ['mixed'], live: true, phoneW: 390, mount: async (mix, w) => { await openLive(w, 'goals'); await rowsOn(3); return true; } });
         const NONE = { folded: true, panelW: 0, tableW: 0, boxOver: 0, tableOver: 0, pageOver: 0, vw: 0, rows: 0, cols: [] };
@@ -120,16 +139,17 @@ const MODE = process.env.CORAL_TABLE_RULES || 'off';
         const measure = async (root) => { const m = await ev(`window.__measure(${JSON.stringify(root)})`); if (m) return m; note(measuring || root, 'no table', ['R7: no table was drawn there (the surface did not open or has no rows)']); return NONE; };
         const clear = () => ev(`(() => { for (const k of Object.keys(localStorage)) if (k.startsWith('coral-dt-widths:')) localStorage.removeItem(k); return true; })()`);
         const only = (process.env.CORAL_TABLE_ONLY || '').split('|').filter(Boolean); // CORAL_TABLE_ONLY='tasks (live Inbox)|files': just those surfaces
-        for (const S of surfaces.filter(x => !only.length || only.some(o => x.name.includes(o)))) {
+        for (const S of surfaces.filter(x => !only.length || only.some(o => (o.startsWith('=') ? x.name === o.slice(1) : x.name.includes(o))))) {
             const kind = S.name, root = S.root, fixedAt = {}; measuring = S.name;
-            const handleCenter = key => ev(`(() => { const h = document.querySelector('${root} th.dt-th[data-key=${JSON.stringify(key)}] .dt-resize'); if (!h) return null; const r = h.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+            const handleCenter = key => ev(`(() => { const h = [...document.querySelectorAll('${root} th.dt-th[data-key=${JSON.stringify(key)}] .dt-resize')].find(x => x.getClientRects().length); if (!h) return null; const r = h.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
             const wipe = async () => { await clear(); if (S.live) await ev(`document.documentElement.style.fontSize = ''; true`); };
             for (const w of [1440, 1280, 1024, 900]) {
                 await size(w); await clear();
                 for (const mix of S.mixes) {
                     await S.mount(mix, w); const m = await measure(root); report.checked++;
                     note(kind, `${w}px ${mix}`, judge(m));
-                    if (mix === 'mixed' && !m.folded) fixedAt[w] = m.cols.filter(c => !c.handle && !c.check && !c.grow).map(c => `${c.key}:${c.w}`).join(',');
+                    if (w === 1440 && mix === 'mixed') (report.samples ||= {})[kind] = { buttons: m.buttons, actionKeys: m.actionKeys, cols: m.cols.map(c => `${c.key}:${c.w}${c.empty ? ':empty' : ''}${c.unused ? ':unused' : ''}`) }; // what the auditor saw, for whoever reads the report
+                    if (mix === 'mixed' && !m.folded) fixedAt[w] = Object.fromEntries(m.cols.filter(c => !c.handle && !c.check && !c.grow).map(c => [c.key, c.w]));
                 }
                 // 200% text
                 await ev(`document.documentElement.style.fontSize = '32px'; true`); await S.mount('mixed', w); note(kind, `${w}px 200% text`, judge(await measure(root))); await ev(`document.documentElement.style.fontSize = ''; true`);
@@ -137,7 +157,7 @@ const MODE = process.env.CORAL_TABLE_RULES || 'off';
                 await S.mount('mixed', w); const base = await measure(root);
                 if (!base.cols.length) { await clear(); continue; } // no table to resize here: the finding is already noted
                 const keys = base.cols.filter(c => c.handle && !c.grow && !c.check).map(c => c.key);
-                const label = await ev(`document.querySelector('${root} table.dt-table').getAttribute('aria-label').replace(/,\\s*\\d.*$/, '')`);
+                const label = await ev(`[...document.querySelectorAll('${root} table.dt-table')].find(x => x.getClientRects().length).getAttribute('aria-label').replace(/,\\s*\\d.*$/, '')`);
                 await ev(`localStorage.setItem('coral-dt-widths:' + ${JSON.stringify(label)}, ${JSON.stringify(JSON.stringify(Object.fromEntries(keys.map(k => [k, 600]))))}); true`);
                 await S.mount('mixed', w); note(kind, `${w}px kept widths over-wide`, judge(await measure(root))); await clear();
                 // drags and the keyboard, once per column, at the two ends of the range
@@ -155,7 +175,7 @@ const MODE = process.env.CORAL_TABLE_RULES || 'off';
                         note(kind, `${w}px after a drag`, judge(after)); await clear();
                         // the keyboard: Right three times (16px each)
                         await S.mount('mixed', w); const kb = await measure(root);
-                        await ev(`(() => { const h = document.querySelector('${root} th.dt-th[data-key=${JSON.stringify(key)}] .dt-resize'); h.focus(); return true; })()`);
+                        await ev(`(() => { const h = [...document.querySelectorAll('${root} th.dt-th[data-key=${JSON.stringify(key)}] .dt-resize')].find(x => x.getClientRects().length); h.focus(); return true; })()`);
                         for (let i = 0; i < 3; i++) { await Input.dispatchKeyEvent({ type: 'rawKeyDown', key: 'ArrowRight', code: 'ArrowRight', windowsVirtualKeyCode: 39 }); await Input.dispatchKeyEvent({ type: 'keyUp', key: 'ArrowRight', code: 'ArrowRight', windowsVirtualKeyCode: 39 }); }
                         await settle(150); const ka = await measure(root); const kd = ka.cols.find(c => c.key === key).w - kb.cols.find(c => c.key === key).w;
                         const kgrow = kb.cols.find(c => c.grow); if (kd < 40 && !(kgrow && ka.cols.find(c => c.grow).w <= 124)) note(kind, `${w}px keyboard`, [`R5: Right x3 on "${key}" widened it by ${kd}px (three steps are 48)`]);
@@ -163,7 +183,7 @@ const MODE = process.env.CORAL_TABLE_RULES || 'off';
                     }
                 }
             }
-            const widths = Object.values(fixedAt); if (new Set(widths).size > 1) note(kind, 'all widths', [`R4: the fixed columns changed width with the window: ${JSON.stringify(fixedAt)}`]);
+            for (const k of new Set(Object.values(fixedAt).flatMap(o => Object.keys(o)))) { const ws = Object.values(fixedAt).map(o => o[k]).filter(x => x != null); if (ws.length > 1 && Math.max(...ws) - Math.min(...ws) > 1) note(kind, 'all widths', [`R4: the fixed column "${k}" changed width with the window: ${JSON.stringify(Object.fromEntries(Object.entries(fixedAt).map(([w2, o]) => [w2, o[k]])))}`]); } // a column that drops at a narrow width is rule 1's, not a change of width
             // a phone
             await size(390, true); await clear(); await S.mount('mixed', 390); note(kind, '390px', judge(await measure(root), { phone: true }));
         }

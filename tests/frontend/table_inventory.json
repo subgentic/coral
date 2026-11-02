@@ -5,31 +5,31 @@
    "file": "analytics_agent.js",
    "calls": 1,
    "surface": "Analytics: Biggest turns",
-   "covered_by": "analytics"
+   "covered_by": "analytics (live: agent)"
   },
   {
    "file": "analytics_efficiency.js",
    "calls": 2,
    "surface": "Analytics: Tokens per commit, task time",
-   "covered_by": "analytics"
+   "covered_by": "analytics (live: agent)"
   },
   {
    "file": "analytics_spend.js",
    "calls": 2,
    "surface": "Analytics: Who spends, Task time by agent",
-   "covered_by": "analytics"
+   "covered_by": "analytics (live: agent)"
   },
   {
    "file": "analytics_viz.js",
    "calls": 1,
    "surface": "Analytics: visual tables",
-   "covered_by": "analytics"
+   "covered_by": "analytics (live: provider)"
   },
   {
    "file": "artifact_table.js",
    "calls": 1,
    "surface": "Artifacts list (Inbox, team)",
-   "covered_by": "files"
+   "covered_by": "artifacts (live Inbox)"
   },
   {
    "file": "automations.js",
@@ -41,7 +41,7 @@
    "file": "cost_dashboard.js",
    "calls": 2,
    "surface": "Cost dashboard tables",
-   "covered_by": "analytics"
+   "covered_by": "analytics (live: calls)"
   },
   {
    "file": "csv_table.js",
@@ -89,7 +89,7 @@
    "file": "mailbox_starred_artifacts.js",
    "calls": 1,
    "surface": "Starred artifacts",
-   "covered_by": "files"
+   "covered_by": "artifacts (live Inbox)"
   },
   {
    "file": "saved_files.js",
@@ -143,7 +143,7 @@
    "file": "token_usage_ui.js",
    "calls": 1,
    "surface": "Token usage by member",
-   "covered_by": "analytics"
+   "covered_by": "analytics (live: agent)"
   },
   {
    "file": "workflows.js",

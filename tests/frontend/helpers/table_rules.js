@@ -8,6 +8,8 @@
 //   R6 kept widths: widths saved from an earlier visit never make the table overflow.
 //   R7 the same for every row mix (the caller runs the mixes) and at 200% text.
 //   R8 a phone (under 600 px): folded rows, no handles, no sideways scroll.
+//   R9 a row's action buttons sit in the Actions column only, never inside another column (the operator's Dismiss inside Waiting for).
+// folded below means the header row is not drawn (the class dt-fold-column names the mode, not the state)
 const AUDIT = `(box) => {
   const vis = e => !!e && e.getClientRects().length > 0 && e.getBoundingClientRect().width > 0;
   const ths = [...box.querySelectorAll('thead th.dt-th')];
@@ -21,7 +23,9 @@ const AUDIT = `(box) => {
   }).filter(c => c.w > 0);
   const b = box.getBoundingClientRect(), tb = box.querySelector('table.dt-table'), tr = tb ? tb.getBoundingClientRect() : b;
   const sc = document.scrollingElement;
-  return { folded: /dt-fold-(column|labeled)/.test(box.className), panelW: Math.round(b.width), tableW: Math.round(tr.width), boxOver: box.scrollWidth - box.clientWidth, tableOver: Math.round(tr.right - b.right), pageOver: sc.scrollWidth - innerWidth, vw: innerWidth, rows: box.querySelectorAll('tbody tr.dt-row').length, cols };
+  const buttons = [...box.querySelectorAll('tbody tr.dt-row td button, tbody tr.dt-row td a.btn')].filter(x => !x.classList.contains('dt-primary') && !x.classList.contains('dt-link') && !x.classList.contains('dt-star') && !x.closest('.dt-check-hit') && x.getClientRects().length > 0 && x.closest('td'))
+    .map(x => ({ key: x.closest('td').dataset.key || '', text: (x.getAttribute('aria-label') || x.textContent).replace(/\\s+/g, ' ').trim().slice(0, 40) }));
+  return { buttons, actionKeys: cols.filter(c => c.key === 'actions' || /^actions?$/i.test(c.label)).map(c => c.key), folded: !box.querySelector('thead') || box.querySelector('thead').getClientRects().length === 0 || /dt-folded/.test(box.className), panelW: Math.round(b.width), tableW: Math.round(tr.width), boxOver: box.scrollWidth - box.clientWidth, tableOver: Math.round(tr.right - b.right), pageOver: sc.scrollWidth - innerWidth, vw: innerWidth, rows: box.querySelectorAll('tbody tr.dt-row').length, cols };
 }`;
 
 /** Judge one measurement (what AUDIT returned) against R1 to R3 and R8; returns the violations as sentences. */
@@ -36,6 +40,7 @@ function judge(m, { phone = false, scrollByDesign = false } = {}) {
     if (m.pageOver > 1) v.push(`R1: the page scrolls sideways by ${m.pageOver}px`);
     if (!scrollByDesign && m.boxOver > 1) v.push(`R1: the table box scrolls sideways by ${m.boxOver}px`);
     if (m.tableOver > 1) v.push(`R1: the table is ${m.tableOver}px wider than its panel`);
+    if (!m.folded) for (const b of m.buttons || []) if (!(m.actionKeys || []).includes(b.key)) v.push(`R9: the button "${b.text}" sits in the "${b.key}" column, not in Actions`);
     if (!m.folded) {
         const grows = m.cols.filter(c => c.grow);
         if (grows.length !== 1) v.push(`R2: ${grows.length} elastic columns (${grows.map(c => c.key).join(',') || 'none'}); exactly one is the rule`);
