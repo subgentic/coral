@@ -24,6 +24,21 @@ const { coralReady, framesJs } = require('./helpers/wait');
         const opts = await ev(`[...document.querySelectorAll('#theme-load-select option')].map(o => o.textContent.trim())`);
         check(opts.includes('Dark') && opts.includes('Light'), 'Load lists the built-in Dark and Light: ' + JSON.stringify(opts));
         check(await ev(`document.getElementById('theme-save-base').value`) === 'dark', 'on a dark page Based on starts on Dark');
+        // Preview, then Cancel (or Escape): the page goes back to its own base and colours (#12307, Beta Tester's SHOULD on #12113); it stayed on the previewed theme until a reload
+        for (const how of ['Cancel', 'Escape']) {
+            await ev(`(() => { const s = document.getElementById('theme-save-base'); s.value = 'light'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+            await waitFor(`document.querySelector('#theme-configurator-modal .theme-color-text[data-var="${bgVar}"]').value !== ${JSON.stringify(darkBg)}`, `${how}: the colours take the Light values`, 6000).catch(() => {});
+            await ev(`document.querySelector('[data-on-click="theme-preview"]').click(); true`);
+            await waitFor(`document.documentElement.getAttribute('data-theme') === 'light'`, `${how}: Preview makes the page light`, 4000).catch(() => {});
+            if (how === 'Cancel') await ev(`document.querySelector('[data-on-click="theme-close"]').click(); true`);
+            else await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); true`);
+            await waitFor(`document.getElementById('theme-configurator-modal').style.display === 'none'`, `${how}: the configurator closes`, 4000).catch(() => {});
+            await ev(framesJs(2));
+            check(await ev(`document.documentElement.getAttribute('data-theme')`) === 'dark', `${how} after Preview puts the page back on its own base (it said ${await ev(`document.documentElement.getAttribute('data-theme')`)})`);
+            const bgAfter = await ev(`getComputedStyle(document.documentElement).getPropertyValue(${JSON.stringify(bgVar)}).trim()`);
+            check(bgAfter.toLowerCase() === darkBg.toLowerCase(), `${how} after Preview puts the colours back: ${bgAfter} vs ${darkBg}`);
+            await open(); await waitFor(`document.getElementById('theme-configurator-modal').style.display === 'flex' && document.getElementById('theme-save-base').value === 'dark' && document.querySelector('#theme-configurator-modal .theme-color-text[data-var="${bgVar}"]').value.toLowerCase() === ${JSON.stringify(darkBg.toLowerCase())}`, `${how}: the editor opens again on the page's own base and colours`, 8000);
+        }
         // Based on: Light gives the untouched colours the Light values
         await ev(`(() => { const s = document.getElementById('theme-save-base'); s.value = 'light'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
         await waitFor(`document.querySelector('#theme-configurator-modal .theme-color-text[data-var="${bgVar}"]').value !== ${JSON.stringify(darkBg)}`, 'the colours take the Light values', 6000).catch(() => {});
