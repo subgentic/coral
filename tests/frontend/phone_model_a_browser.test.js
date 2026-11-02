@@ -53,8 +53,9 @@ const { coralReady } = require('./helpers/wait');
             // the open tab is kept in view: the LAST folder (with fifteen tabs it opened off screen, QA Reviewer 2) is brought into the strip when it is chosen
             const last = await ev(`(() => { const t = [...document.querySelectorAll('#group-table-view .view-list-nav .view-list-item')].filter(b => !b.disabled); const b = t[t.length - 1]; b.scrollIntoView({ inline: 'nearest', block: 'nearest' }); b.click(); return b.dataset.key; })()`);
             await waitFor(`document.querySelector('#group-table-view .view-list-item[data-key="${last}"]')?.getAttribute('aria-current') === 'true'`, `${tag}: the last folder opens`, 8000);
-            await new Promise(r => setTimeout(r, 400)); // sleep-ok: the strip re-centres over a frame or two after the folder's page is drawn
-            const inView = await ev(`(() => { const nav = document.querySelector('#group-table-view .view-list-nav'), nr = nav.getBoundingClientRect(), c = nav.querySelector('.view-list-item[aria-current="true"]').getBoundingClientRect(); return c.left >= nr.left - 1 && c.right <= nr.right + 1; })()`);
+            const inViewJs = `(() => { const nav = document.querySelector('#group-table-view .view-list-nav'), nr = nav.getBoundingClientRect(), c = nav.querySelector('.view-list-item[aria-current="true"]').getBoundingClientRect(); return c.left >= nr.left - 1 && c.right <= nr.right + 1; })()`;
+            await waitFor(inViewJs, `${tag}: the strip re-centres on the open folder (a slow runner takes longer than a fixed sleep)`, 8000).catch(() => {}); // the strip scrolls over frames after the folder's page is drawn: wait for the state, then assert it
+            const inView = await ev(inViewJs);
             assert.ok(inView, `${tag}: the open folder is inside the strip, however far along it is`);
             assert.equal(await ev(`document.documentElement.scrollWidth <= innerWidth`), true, `${tag}: the Inbox does not scroll sideways`);
             // Automations: Jobs / Workflows
