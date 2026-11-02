@@ -188,7 +188,7 @@ module.exports.run = GROUP => (async () => {
                 // widths kept from a wider window or an earlier visit: every resizable column kept at 600 px
                 await S.mount('mixed', w); const base = await measure(root);
                 if (!base.cols.length) { await clear(); continue; } // no table to resize here: the finding is already noted
-                const keys = base.cols.filter(c => c.handle && !c.grow && !c.check).map(c => c.key);
+                const keys = []; for (const c of base.cols.filter(c => c.handle && !c.grow && !c.check)) if (await handleCenter(c.key)) keys.push(c.key); // the handles on show: the last column has none (#12409)
                 const label = await ev(`[...document.querySelectorAll('${root} table.dt-table')].find(x => x.getClientRects().length).getAttribute('aria-label').replace(/,\\s*\\d.*$/, '')`);
                 await ev(`localStorage.setItem('coral-dt-widths:' + ${JSON.stringify(label)}, ${JSON.stringify(JSON.stringify(Object.fromEntries(keys.map(k => [k, 600]))))}); true`);
                 await S.mount('mixed', w); note(kind, `${w}px kept widths over-wide`, judge(await measure(root))); await clear();
@@ -200,17 +200,19 @@ module.exports.run = GROUP => (async () => {
                         for (let i = 1; i <= 6; i++) await mouse('mouseMoved', at.x + 10 * i, at.y);
                         await mouse('mouseReleased', at.x + 60, at.y); await settle(150);
                         const after = await measure(root); const b = Object.fromEntries(before.cols.map(c => [c.key, c.w])), a = Object.fromEntries(after.cols.map(c => [c.key, c.w]));
-                        const grow = before.cols.find(c => c.grow), dx = a[key] - b[key];
-                        const floorHit = grow && a[grow.key] <= 124;
-                        if (Math.abs(dx - 60) > 3 && !floorHit) note(kind, `${w}px drag`, [`R5: dragging "${key}" by 60px moved it by ${dx}px`]);
-                        for (const c of before.cols) { if (c.key === key) continue; const d = a[c.key] - b[c.key]; if (grow && c.key === grow.key) { if (!floorHit && Math.abs(d + dx) > 3) note(kind, `${w}px drag`, [`R5: dragging "${key}" by ${dx}px took ${-d}px from the elastic column "${c.key}"`]); } else if (Math.abs(d) > 1) note(kind, `${w}px drag`, [`R5: dragging "${key}" changed column "${c.key}" by ${d}px (only the elastic column gives room)`]); }
+                        const order = before.cols.map(c => c.key), at2 = order.indexOf(key), dx = a[key] - b[key]; // the edge goes where the pointer goes (#12409): the column gains what the drag asks, the columns on its right lose exactly that, the ones on its left stay
+                        const right = order.slice(at2 + 1), lost = right.reduce((n, k) => n + (b[k] - a[k]), 0), left = order.slice(0, at2);
+                        if (dx < 0 || dx > 63) note(kind, `${w}px drag`, [`R5: dragging "${key}" by 60px moved its edge by ${dx}px`]);
+                        else if (Math.abs(dx - 60) > 3 && Math.abs(lost - dx) > 3) note(kind, `${w}px drag`, [`R5: dragging "${key}" by 60px moved it by ${dx}px, and not because the columns on its right ran out of room (they gave ${lost}px)`]);
+                        if (Math.abs(lost - dx) > 3) note(kind, `${w}px drag`, [`R5: dragging "${key}" by ${dx}px took ${lost}px from the columns on its right (the table must keep its width)`]);
+                        for (const k of left) if (Math.abs(a[k] - b[k]) > 1) note(kind, `${w}px drag`, [`R5: dragging "${key}" changed column "${k}" on its left by ${a[k] - b[k]}px (only the columns on its right give room)`]);
                         note(kind, `${w}px after a drag`, judge(after)); await clear();
                         // the keyboard: Right three times (16px each)
                         await S.mount('mixed', w); const kb = await measure(root);
                         await ev(`(() => { const h = [...document.querySelectorAll('${root} th.dt-th[data-key=${JSON.stringify(key)}] .dt-resize')].find(x => x.getClientRects().length); h.focus(); return true; })()`);
                         for (let i = 0; i < 3; i++) { await Input.dispatchKeyEvent({ type: 'rawKeyDown', key: 'ArrowRight', code: 'ArrowRight', windowsVirtualKeyCode: 39 }); await Input.dispatchKeyEvent({ type: 'keyUp', key: 'ArrowRight', code: 'ArrowRight', windowsVirtualKeyCode: 39 }); }
                         await settle(150); const ka = await measure(root); const kd = ka.cols.find(c => c.key === key).w - kb.cols.find(c => c.key === key).w;
-                        const kgrow = kb.cols.find(c => c.grow); if (kd < 40 && !(kgrow && ka.cols.find(c => c.grow).w <= 124)) note(kind, `${w}px keyboard`, [`R5: Right x3 on "${key}" widened it by ${kd}px (three steps are 48)`]);
+                        const kb2 = Object.fromEntries(kb.cols.map(c => [c.key, c.w])), ka2 = Object.fromEntries(ka.cols.map(c => [c.key, c.w])), korder = kb.cols.map(c => c.key), kright = korder.slice(korder.indexOf(key) + 1), klost = kright.reduce((n, k) => n + (kb2[k] - (ka2[k] || 0)), 0); if (kd < 40 && Math.abs(klost - kd) > 3) note(kind, `${w}px keyboard`, [`R5: Right x3 on "${key}" widened it by ${kd}px (three steps are 48) and the columns on its right gave ${klost}px, so it did not stop at their floor`]);
                         await clear();
                     }
                 }

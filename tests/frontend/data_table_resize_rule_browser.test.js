@@ -1,4 +1,4 @@
-// A column separator changes ONLY the column to its left (the Operator's rule, #9228). The other columns keep their widths; what the column gives or takes comes from the flexible name column, or, with
+// A column separator is an edge that goes where the pointer goes (#12409; it was "changes ONLY the column to its left", the Operator's rule #9228, which a column on the right of the name column could not follow: its edge did not move). With
 // no flexible column left, the table is as wide as its columns (it scrolls inside its box when that is wider than the box) and never ends short of the box's edge: the last column that can be resized fills what the others leave (#10443). Mouse and keyboard, on a table shaped
 // like Inbox Goals (the name column first) and like Inbox Tasks and the team Tasks tab (the name column in the middle), at 1280. The failing case: the flexible column's own separator dragged left used to hand its width
 // to every other column (a fixed table at 100% spreads what is left over all of them). Drives Chrome over CDP against the isolated dev server; a fixture table mounted in the dashboard's own page.
@@ -38,34 +38,32 @@ const { coralReady, framesJs } = require('./helpers/wait');
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
         await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
+        // (#12409, the new rule) A column separator is an edge that goes where the pointer goes: the column on its left takes the width and the columns on its right give it, the nearest first, each down to its floor; a drag the other way
+        // hands the room to the nearest on the right. The columns on the LEFT of the edge never move, the table keeps its width (never short of its box, never scrolling), the last column has no handle (its edge is the table's),
+        // and the elastic name column, wherever it is, only ever takes what the others leave.
+        const edges = w => { let x = 0; const out = {}; for (const [k, v] of Object.entries(w.cols)) { x += v; out[k] = x; } return out; };
         for (const [name, shape] of Object.entries(SHAPES)) {
-            const keys = shape.filter(k => k !== 'name' || true);
-            for (const key of shape) for (const dx of [60, -60, 300]) {
-                await mount(shape, name.startsWith('no flexible')); const before = await widths();
-                await drag(key, dx); const after = await widths(), d = moved(before, after);
-                const lastKey = shape[shape.length - 1], others = Object.keys(d).filter(k => k !== key && k !== 'name' && k !== lastKey);
-                check(`${name}: dragging ${key} by ${dx} changes only ${key}${key === 'name' ? '' : ' (and the name column gives or takes the room)'}`, others.length === 0 && (key === 'name' ? true : Math.abs(d[key] || 0) > 0 || dx < 0), JSON.stringify(d));
+            const lastKey = shape[shape.length - 1], noGrow = name.startsWith('no flexible');
+            await mount(shape, noGrow);
+            check(`${name}: the last column (${lastKey}) has no resize handle, every other column has one`, await ev(`(() => { const hs = k => { const h = document.querySelector('#dt-host th[data-key="' + k + '"] .dt-resize'); return !!h && !h.hidden && h.getClientRects().length > 0; }; return ${JSON.stringify(shape)}.every(k => hs(k) === (k !== ${JSON.stringify(lastKey)})); })()`));
+            for (const key of shape.filter(k => k !== lastKey)) for (const dx of [-60, 60]) {
+                await mount(shape, noGrow); const before = await widths();
+                await drag(key, dx); const after = await widths(), eb = edges(before), ea = edges(after), moveBy = ea[key] - eb[key];
+                const idx = Object.keys(before.cols).indexOf(key), leftMoved = Object.keys(before.cols).slice(0, idx).filter(k => Math.abs(after.cols[k] - before.cols[k]) > 1 && !(k === 'name'));
+                check(`${name}: dragging the ${key} edge by ${dx} moves it that way (it moved ${moveBy}; it may stop at a floor, never go the other way)`, Math.abs(moveBy - dx) <= 3 || (Math.abs(moveBy) < Math.abs(dx) && Math.sign(moveBy) !== -Math.sign(dx)), JSON.stringify({ moved: moved(before, after) }));
+                check(`${name}: dragging the ${key} edge leaves the columns on its left alone (the name column, if it is there, may be one of them only when it is the key itself)`, leftMoved.length === 0, JSON.stringify(leftMoved));
+                check(`${name}: dragging the ${key} edge keeps the table whole: as wide as its box, nothing scrolls`, after.table >= after.cw - 1 && after.sw <= after.cw + 1, JSON.stringify({ table: after.table, cw: after.cw, sw: after.sw }));
             }
-            for (const [key, k] of [[shape[1], 'ArrowRight'], [shape[2], 'ArrowLeft'], ['name', 'ArrowLeft']]) {
-                await mount(shape, name.startsWith('no flexible')); const before = await widths();
-                await press(key, k, 3); const after = await widths(), d = moved(before, after);
-                const lastKey = shape[shape.length - 1], others = Object.keys(d).filter(kk => kk !== key && kk !== 'name' && kk !== lastKey);
-                check(`${name}: ${k} x3 on the ${key} separator changes only ${key}${key === 'name' && k === 'ArrowRight' ? ' (or nothing: the name is the elastic column, and a column at the width of its header cannot shrink, #11943)' : ''}`, others.length === 0 && (Object.keys(d).includes(key) || (Object.keys(d).length === 0 && (key === 'name' || k === 'ArrowLeft'))), JSON.stringify(d));
+            for (const [key, k] of [[shape[0], 'ArrowRight'], [shape[1], 'ArrowRight'], [shape[0], 'ArrowLeft']].filter(([kk]) => kk !== lastKey)) {
+                await mount(shape, noGrow); const before = await widths(); await press(key, k, 3); const after = await widths(), moveBy = edges(after)[key] - edges(before)[key];
+                check(`${name}: ${k} x3 on the ${key} separator moves its edge ${k === 'ArrowRight' ? 'right' : 'left'} (or nothing at a floor): ${moveBy}`, k === 'ArrowRight' ? moveBy >= 0 : moveBy <= 0, JSON.stringify(moved(before, after)));
             }
-            // the Operator's #10443: the last column's right edge dragged left (and by keys) fills to the box's edge: the table is not short of its box, no scrollbar over empty space, the last column holds the room
-            for (const how of ['drag', 'keys']) {
-                await mount(shape, name.startsWith('no flexible')); const lastKey = shape[shape.length - 1];
-                if (how === 'drag') await drag(lastKey, -300); else await press(lastKey, 'ArrowLeft', 12);
-                const w = await widths(), edge = await ev(`(() => { const b = document.querySelector('#dt-host .dt-box'), th = b.querySelector('th[data-key="${lastKey}"]'); return { box: Math.round(b.getBoundingClientRect().right - parseFloat(getComputedStyle(b).borderRightWidth || 0)), last: Math.round(th.getBoundingClientRect().right), left: b.scrollLeft }; })()`);
-                check(`${name}: the last column (${lastKey}), ${how === 'drag' ? 'dragged left' : 'narrowed by keys'}, still fills to the box's edge: no short table, no scrollbar`, w.table >= w.cw - 1 && w.sw <= w.cw + 1 && Math.abs(edge.box - edge.last) <= 2 && edge.left === 0, JSON.stringify({ table: w.table, cw: w.cw, sw: w.sw, ...edge }));
-            }
-            if (name.startsWith('no flexible')) { // the Operator's Needs you: a narrow box drops a column; dragging the last column then moves it alone, the others keep the widths they show
-                await mount(shape, true, true); const before = await widths();
-                await drag('updated', -60); const after = await widths(), d = moved(before, after);
-                check(`${name}, a column dropped by the narrow box: dragging the last column moves it and not the others (the colgroup keeps its slots)`, Object.keys(d).every(k => k === 'updated') && Object.keys(before.cols).length < 5, JSON.stringify({ d, shown: Object.keys(before.cols) }));
-            }
-            await mount(shape, name.startsWith('no flexible')); const w0 = await widths(); await drag('name', 200); const w1 = await widths();
-            check(`${name}: the name column widened past the box: the table still fits its box (no scrolling) and the others keep their widths (#11835)`, w1.sw <= w1.cw + 1 && Object.keys(moved(w0, w1)).every(k => k === 'name'), JSON.stringify({ sw: w1.sw, cw: w1.cw, moved: moved(w0, w1) }));
+            // the Operator's #10443 still holds: after the edge before the last column is dragged far right (the last column narrows to its floor) the table fills to the box's edge: no short table, no scrollbar over empty space
+            await mount(shape, noGrow); await drag(shape[shape.length - 2], 400); const w = await widths();
+            check(`${name}: the edge before the last column dragged far right still fills to the box's edge: no short table, no scrollbar`, w.table >= w.cw - 1 && w.sw <= w.cw + 1, JSON.stringify({ table: w.table, cw: w.cw, sw: w.sw }));
+            // Reset column widths takes every kept width back
+            await mount(shape, noGrow); const w0 = await widths(); await drag(shape[0], -60);
+            check(`${name}: a Reset column widths button is offered after a drag and gives back the widths nobody dragged`, await (async () => { const btn = await ev(`!!document.querySelector('#dt-host .cols-reset-btn:not([hidden])')`); if (!btn) return false; await ev(`document.querySelector('#dt-host .cols-reset-btn').click(); true`); await ev(framesJs(6)); const w2 = await widths(); return Object.keys(w0.cols).every(k => Math.abs(w2.cols[k] - w0.cols[k]) <= 1); })());
         }
     } finally { await client.close(); }
     if (results.some(r => !r)) { console.error(`${results.filter(r => !r).length} of ${results.length} failed`); process.exit(1); }
