@@ -70,21 +70,14 @@ async function readTeam(team) {
         if (!r.ok) throw new Error('Could not read review artifacts');
         const data = await r.json();
         for (const a of data.artifacts || []) {
-            if (!a.tags?.includes('for review') || a.tags.includes('saved') || a.tags.includes('changes requested') || !a.available || seen.has(a.id)) continue; // changes requested: the agent's turn, so the file leaves Needs you and its counts; its next version comes back as a new item (#11985). Artifacts and the goal still show it as changes requested // a saved file stays tagged for review (its decisions work) but is not in Needs you (#11641)
+            const decidedWithNews = a.new_comments > 0 && (a.tags?.includes('approved') || a.tags?.includes('denied')) && !a.tags.includes('for review'); // a file the Operator decided that agents replied about in their thread: the server puts it in this list (#12097), marked and counted once
+            if (!(a.tags?.includes('for review') || decidedWithNews) || a.tags.includes('saved') || a.tags.includes('ignored') || a.tags.includes('superseded') || (a.tags.includes('changes requested') && !(a.new_comments > 0)) || !a.available || seen.has(a.id)) continue; // changes requested without news is the agent's turn (needsYouFile's rule, #11985, #12026); // changes requested: the agent's turn, so the file leaves Needs you and its counts; its next version comes back as a new item (#11985). Artifacts and the goal still show it as changes requested // a saved file stays tagged for review (its decisions work) but is not in Needs you (#11641)
             const hex = /(?:sha256:|coral:\/\/artifacts\/)?([a-f0-9]{64})$/i.exec(a.uri || a.digest || a.id || '')?.[1];
             if (!hex) continue;
             seen.add(a.id); rows.push({ ...a, team, hex, reviewKey: `${team}:${a.id}` });
         }
         if (!data.has_more || !(data.artifacts || []).length) break;
     }
-    try { // a file the Operator already decided (approved, denied) that agents have replied about in their thread comes back as its own row, marked "New comments" (#12026)
-        const r = await boardFetch(team, '/artifacts?tag=new%20comments&limit=200');
-        if (r.ok) for (const a of (await r.json()).artifacts || []) {
-            if (!(a.new_comments > 0) || seen.has(a.id) || !a.available || !(a.tags?.includes('approved') || a.tags?.includes('denied')) || a.tags.includes('saved') || a.tags.includes('ignored') || a.tags.includes('superseded')) continue;
-            const hex = /(?:sha256:|coral:\/\/artifacts\/)?([a-f0-9]{64})$/i.exec(a.uri || a.digest || a.id || '')?.[1];
-            if (hex) { seen.add(a.id); rows.push({ ...a, team, hex, reviewKey: `${team}:${a.id}` }); }
-        }
-    } catch { /* the rows for review are still read: news is an addition */ }
     return rows;
 }
 /** The files for review on one goal of one team that nobody decided (one row per file, as Needs you has them): a goal page asks only its own team, not every team (#11913). */

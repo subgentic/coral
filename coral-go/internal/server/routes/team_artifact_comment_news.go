@@ -25,6 +25,12 @@ func needsYouFile(tags []string, news int) bool {
 	return news > 0 && (hasTag(tags, "approved") || hasTag(tags, "denied"))
 }
 
+// decidedWithNews says a file the Operator already decided (approved or denied) is back in Needs you for news in its comment thread, in needsYouFile's own words: it waits for the Operator although it is not tagged
+// for review. The list answers the tag "for review" with these rows too, so the Inbox reads one list for what waits (#12097).
+func decidedWithNews(tags []string, news int) bool {
+	return !hasTag(tags, "for review") && needsYouFile(tags, news)
+}
+
 // SetCommentNews tells the board where to read the unseen agent replies in the Operator's comment threads, per artifact id (#12026). nil: none.
 func (h *BoardHandler) SetCommentNews(fn func(ctx context.Context) (map[string]int, error)) {
 	h.commentNews = fn
