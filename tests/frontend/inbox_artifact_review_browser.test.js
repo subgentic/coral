@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const YES = "(()=>{const m=document.getElementById('confirm-modal');if(m&&getComputedStyle(m).display!=='none')document.getElementById('confirm-modal-yes').click();return true})()"; // an unopened file asks 'Approve without opening?' (#11999)
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
@@ -164,10 +165,10 @@ const { coralReady } = require('./helpers/wait');
                     assert.equal(await ev(`/, unread/.test((${row('Review file 01.txt')}).textContent)`),true,'the new version is unread');
                     assert.equal(await needsCount(),gone + 1,'and counted: the Needs you number goes up by one');
                 }
-                await ev(`window.__reviewFail=true;[...(${row('Review file 01.txt')}).querySelectorAll('button')].find(b=>(b.getAttribute('aria-label')||'').startsWith('Approve')).click();true`);
+                await ev(`window.__reviewFail=true;[...(${row('Review file 01.txt')}).querySelectorAll('button')].find(b=>(b.getAttribute('aria-label')||'').startsWith('Approve')).click();${YES}`);
                 await waitFor(`document.body.textContent.includes('Review save failed')`,'failed save is visible');
                 assert.ok(await ev(`!!(${row('Review file 01.txt')})`),'failed save keeps row');
-                await ev(`window.__reviewFail=false;[...(${row('Review file 01.txt')}).querySelectorAll('button')].find(b=>(b.getAttribute('aria-label')||'').startsWith('Approve')).click();true`);
+                await ev(`window.__reviewFail=false;[...(${row('Review file 01.txt')}).querySelectorAll('button')].find(b=>(b.getAttribute('aria-label')||'').startsWith('Approve')).click();${YES}`);
                 await waitFor(`!(${row('Review file 01.txt')})`,'approved row removed');
                 if(width===1280){ // Mobile Beta Tester (live): the approved artifact's viewer says Approved with the time (it showed only the tag chip)
                     await ev(`import((window.__coralStatic||'/static/')+'artifact_viewer.js').then(m=>m.openArtifactViewer('${(0x62).toString(16).padStart(64,'0')}',{filename:'Review file 01.txt',board:'${team}',server:undefined}));true`);

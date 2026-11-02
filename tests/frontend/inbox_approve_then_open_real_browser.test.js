@@ -59,6 +59,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
                     check(!!q, at + `${word} ${n}: the button could be reached`); if (!q) return;
                     for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) await client.Input.dispatchMouseEvent({ type, x: q.x, y: q.y, button: type === 'mouseMoved' ? 'none' : 'left', buttons: type === 'mousePressed' ? 1 : 0, clickCount: type === 'mouseMoved' ? 0 : 1 }); // a real press, as a person's
                 }
+                if (word === 'Approve') await ev(`(()=>{const m=document.getElementById('confirm-modal');if(m&&getComputedStyle(m).display!=='none')document.getElementById('confirm-modal-yes').click();return true})()`); // an unopened file asks 'Approve without opening?' (#11999): these rows were never opened, and the person approves
             };
             // A point to click on `el` (JS that finds it): scrolled into view at once (no smooth scroll to wait for), then read again until the pointer's target there really is the element, because a click on a
             // point the page has not scrolled to yet (or that a redraw moved) lands on nothing (#11680: that was the whole flake; the Approve never reached the server).

@@ -19,6 +19,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
     const SCROLLER = `(() => { for (let e = document.querySelector('${T} tbody'); e; e = e.parentElement) { const o = getComputedStyle(e).overflowY; if ((o === 'auto' || o === 'scroll') && e.scrollHeight > e.clientHeight + 1) return e; } return document.scrollingElement; })()`;
     const state = () => ev(`(() => { const s = ${SCROLLER}, rows = [...document.querySelectorAll('${T} tbody tr')], a = document.activeElement, tr = a && a.closest ? a.closest('tr') : null;
         return { top: Math.round(s.scrollTop), names: rows.map(r => (r.textContent.match(/plan-\\d+\\.md/) || [''])[0]), focusRow: tr ? (tr.textContent.match(/plan-\\d+\\.md/) || [''])[0] : '', focusTag: a ? a.tagName : '', inView: (n) => 0 }; })()`);
+    const YES = `(()=>{const m=document.getElementById('confirm-modal');if(m&&getComputedStyle(m).display!=='none')document.getElementById('confirm-modal-yes').click();return true})()`; // an unopened file asks 'Approve without opening?' (#11999); these rows were never opened
     const approve = n => ev(`(() => { const b = document.querySelector('${T} button[aria-label="Approve: ${name(n)}"]'); b.closest('tr').scrollIntoView({ block: 'center' }); return true; })()`); // the row, not its button: a phone's buttons are out of sight (#11671)
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: `localStorage.setItem('coral-inbox-needs-filters', JSON.stringify({ sort: 'oldest' }));` }); // the Inbox's list is read before a test can set its order: oldest first, set before the page loads (newest first is the default, #11552)
@@ -46,7 +47,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             // approve a row in the middle of the list
             await approve(20); await ev(framesJs(3));
             const before = await state();
-            await ev(`document.querySelector('${T} button[aria-label="Approve: ${name(20)}"]').click(); true`);
+            await ev(`document.querySelector('${T} button[aria-label="Approve: ${name(20)}"]').click(); ${YES}`);
             await waitFor(`!document.querySelector('${T} button[aria-label="Approve: ${name(20)}"]')`, at + 'the approved row leaves the list', 8000).catch(() => {});
             await ev(framesJs(6));
             const after = await state();
@@ -56,7 +57,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
 
             // the last row: the focus goes to the one before it
             await approve(N); await ev(framesJs(3));
-            await ev(`document.querySelector('${T} button[aria-label="Approve: ${name(N)}"]').click(); true`);
+            await ev(`document.querySelector('${T} button[aria-label="Approve: ${name(N)}"]').click(); ${YES}`);
             await waitFor(`!document.querySelector('${T} button[aria-label="Approve: ${name(N)}"]')`, at + 'the last row leaves the list', 8000).catch(() => {});
             await ev(framesJs(6));
             const last = await state();

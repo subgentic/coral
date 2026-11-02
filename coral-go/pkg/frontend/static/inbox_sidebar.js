@@ -26,6 +26,7 @@ import { showView } from './utils.js';
 import { registerActions, textOf } from './actions.js';
 import { tableMarkup, registerGroupSource, refreshGroupTable, openGroupTable, foldWayBack } from './sidebar_groups.js';
 import { isPhoneLayout } from './phone_layout.js';
+import { showConfirmModal } from './confirm_dialog.js';
 import { browserLocal } from './safe_storage.js';
 import { resolveSessionIdentity, sessionStateInfo } from './session_state.js';
 import { pollEvery } from './overload.js';
@@ -293,6 +294,7 @@ export function reviewActions(row, inSaved = false) { // inSaved (#11641, #11799
     const word = (text, name, cls, run) => { const b = DT.el('button', `btn btn-small ${cls}`.trim(), text); b.type = 'button'; b.setAttribute('data-slot', text.toLowerCase()); b.setAttribute('aria-label', `${name}: ${file}`); b.addEventListener('click', () => run(b)); if (text === 'Approve') b.classList.add('inbox-main-action'); return b; }; // a button's place is its column (data-slot): the same x on every row (#11630)
     const approve = b => { b.disabled = true; errorText.textContent = ''; const settle = keepPlace(b); // replaces Mark reviewed (#136584): it clears the row, marks the review approved and tells the agent that uploaded it
         return importOnce('./artifact_review.js').then(async ({ approveRow, sayApproved }) => { sayApproved(row.name, await approveRow(row.team, row)); sayLive(`Approved ${file}.`); await settle(); }).catch(error => failed(b, error)); };
+    const approveUnopened = b => showConfirmModal('Approve without opening?', `${file} has not been opened. Approve it without reading it?`, () => approve(b), () => openReview(row), { label: 'Approve', cancelLabel: 'Open it first', danger: false }); // a stray click on the hover button approved a report unread (#11999, the operator): an unread file asks first; Open it first (or Escape) opens it
     const approveNote = b => { const settle = keepPlace(b); return importOnce('./artifact_review.js').then(({ openApproveNoteDialog }) => openApproveNoteDialog(row.team, row, async () => { sayLive(`Approved ${file} with a note.`); await settle(); })).catch(error => failed(b, error)); }; // #11888: approved with one short comment for the agent, not shown again
     const deny = b => { const settle = keepPlace(b); return importOnce('./artifact_review.js').then(({ openDenyDialog }) => openDenyDialog(row.team, row, async () => { sayLive(`Denied ${file}.`); await settle(); })).catch(error => failed(b, error)); };
     const ignore = b => { b.disabled = true; errorText.textContent = ''; const settle = keepPlace(b);
@@ -307,7 +309,7 @@ export function reviewActions(row, inSaved = false) { // inSaved (#11641, #11799
     if (bookmark) { const mark = DT.el('button', 'btn btn-quiet btn-icon inbox-bookmark'); mark.type = 'button'; mark.setAttribute('data-slot', 'save'); mark.setAttribute('aria-label', `Save for later: ${file}`); mark.title = 'Save for later'; mark.append(bookmarkIcon()); mark.addEventListener('click', () => save(mark)); box.append(mark); }
     const menu = [];
     if (!decisionNeedsPerson(splitKey(row.team).server)) { // through Coral Hub a guest cannot decide
-        box.append(word('Approve', 'Approve', 'btn-primary', approve), word('Changes', 'Request changes', '', () => openReview(row, { requestChanges: true })));
+        box.append(word('Approve', 'Approve', 'btn-primary', b => (isRead(row) ? approve(b) : approveUnopened(b))), word('Changes', 'Request changes', '', () => openReview(row, { requestChanges: true })));
         box.lastChild.title = 'Request changes';
         menu.push({ label: 'Approve with a note', title: 'Approve it with one short comment for the agent; it is not shown again', run: approveNote });
         if (compact) menu.push({ label: 'Deny', title: 'A final no: the agent is told', run: deny }, { label: 'Ignore', title: 'Take it out of Needs you; nobody is told', run: ignore });
