@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/netip"
 	"os"
+	"sync"
 	"time"
 	"unsafe"
 
@@ -62,21 +63,50 @@ func procInfo(call, pid, flavor int, arg uint64, buf []byte) (int, error) {
 // mySockets calls visit with the two ends of every TCP socket of this user's processes, until visit returns true (a test seam: the real list is libproc's).
 var mySockets = libprocSockets
 
+// A scan reads every descriptor of every process of the user, and any caller of the loopback address can make Coral ask (the sign-in page, the sign-in link). So scans are bounded (#12542,
+// Security): at most one every scanGap for the whole process, its answer shared by every caller that asks meanwhile, and one caller at a time (the rest queue behind it). A socket the last
+// scan did not show may be a connection made since, so a miss waits out the gap and scans again: asking often costs a wait, never a wrong refusal.
+var (
+	scanGap  = 100 * time.Millisecond
+	scanMu   sync.Mutex
+	scanAt   time.Time
+	scanSeen map[[2]netip.AddrPort]struct{}
+)
+
+// mySocketEnds says whether a socket of this user's has the ends (client, server) and whether one has (server, client): this process's own end of the connection.
+func mySocketEnds(client, server netip.AddrPort) (found, own bool, err error) {
+	scanMu.Lock()
+	defer scanMu.Unlock()
+	look := func() (bool, bool) {
+		_, f := scanSeen[[2]netip.AddrPort{client, server}]
+		_, o := scanSeen[[2]netip.AddrPort{server, client}]
+		return f, o
+	}
+	if scanSeen != nil && time.Since(scanAt) < scanGap {
+		if f, o := look(); f {
+			return f, o, nil
+		}
+		time.Sleep(scanGap - time.Since(scanAt)) // a miss: the connection may be newer than the scan
+	}
+	seen := map[[2]netip.AddrPort]struct{}{}
+	err = mySockets(func(local, remote netip.AddrPort) bool {
+		seen[[2]netip.AddrPort{unmap(local), unmap(remote)}] = struct{}{}
+		return false
+	})
+	if err != nil {
+		return false, false, err
+	}
+	scanSeen, scanAt = seen, time.Now()
+	f, o := look()
+	return f, o, nil
+}
+
 // ownedByMyProcess reports whether a process of this user holds the socket whose local end is client and whose remote end is server. Only this user's processes are asked (the kernel
 // answers for no others), so a client that is another user's, or is nobody's, is not found: ErrNotFound, refused as another user's, as before. If the server's own end of the connection
 // is not seen either, libproc cannot be trusted to have shown the sockets at all (a layout this build does not read): the layout answer, never "not found".
 func ownedByMyProcess(client, server netip.AddrPort) (bool, error) {
-	found, sawOwn := false, false
-	if err := mySockets(func(local, remote netip.AddrPort) bool {
-		local, remote = unmap(local), unmap(remote)
-		if local == client && remote == server {
-			found = true
-		}
-		if local == server && remote == client {
-			sawOwn = true
-		}
-		return found
-	}); err != nil {
+	found, sawOwn, err := mySocketEnds(client, server)
+	if err != nil {
 		return false, err
 	}
 	if found {

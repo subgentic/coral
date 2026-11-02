@@ -7,6 +7,9 @@ import (
 	"net/netip"
 	"os"
 	"os/exec"
+	"strconv"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -39,7 +42,8 @@ func TestOwnedByMyProcessFindsARealClientSocket(t *testing.T) {
 
 	// the server's own end seen but not the client's: another user's (or nobody's) client, refused as before
 	real := mySockets
-	defer func() { mySockets = real }()
+	defer func() { mySockets = real; forgetScan() }()
+	forgetScan()
 	mySockets = func(visit func(local, remote netip.AddrPort) bool) error {
 		visit(server, client) // only the server's own end is this user's
 		return nil
@@ -49,6 +53,7 @@ func TestOwnedByMyProcessFindsARealClientSocket(t *testing.T) {
 	assert.NotErrorIs(t, err, ErrLayout)
 
 	// nothing of the connection seen at all, not even the server's end: libproc did not show the sockets
+	forgetScan()
 	mySockets = func(visit func(local, remote netip.AddrPort) bool) error { return nil }
 	_, err = ownedByMyProcess(client, server)
 	assert.ErrorIs(t, err, ErrLayout)
@@ -80,4 +85,68 @@ func TestOwnerIsMeForAClientInAnotherProcess(t *testing.T) {
 	mine, err := ownerIsMe(client, server, time.Time{})
 	require.NoError(t, err, "the client's socket is found whoever signed this binary")
 	assert.True(t, mine, "a client of this user's in another process is this user's")
+}
+
+// forgetScan drops the shared snapshot, for a test that changes what a scan shows.
+func forgetScan() {
+	scanMu.Lock()
+	scanSeen = nil
+	scanMu.Unlock()
+}
+
+// #12542 (Security SHOULD 4): asking often costs a wait, never a pile of scans. Many connections asking at once share scans, at most one per gap; a connection made after the last scan is found
+// by the next one (a miss waits out the gap and scans again) and not refused.
+func TestScansAreBoundedAndSharedAndANewConnectionIsStillFound(t *testing.T) {
+	real, gap := mySockets, scanGap
+	defer func() { mySockets, scanGap = real, gap; forgetScan() }()
+	scanGap = 60 * time.Millisecond
+	forgetScan()
+	server := netip.MustParseAddrPort("127.0.0.1:8420")
+	var scans atomic.Int32
+	var live sync.Map // client addr -> bool: the sockets that exist now
+	mySockets = func(visit func(local, remote netip.AddrPort) bool) error {
+		scans.Add(1)
+		live.Range(func(k, _ any) bool {
+			c := k.(netip.AddrPort)
+			return !visit(c, server) && !visit(server, c) // both ends, as the table has them
+		})
+		return nil
+	}
+	first := netip.MustParseAddrPort("127.0.0.1:50001")
+	live.Store(first, true)
+
+	start := time.Now()
+	var wg sync.WaitGroup
+	for i := 0; i < 40; i++ { // 40 callers at once, all for a socket that exists
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			mine, err := ownedByMyProcess(first, server)
+			assert.NoError(t, err)
+			assert.True(t, mine)
+		}()
+	}
+	wg.Wait()
+	assert.Equal(t, int32(1), scans.Load(), "40 callers for one socket: one scan")
+
+	// a connection made after that scan: found, by waiting out the gap and scanning once more
+	second := netip.MustParseAddrPort("127.0.0.1:50002")
+	live.Store(second, true)
+	mine, err := ownedByMyProcess(second, server)
+	require.NoError(t, err)
+	assert.True(t, mine, "a connection newer than the last scan is not refused")
+	assert.Equal(t, int32(2), scans.Load())
+
+	// a flood of callers for sockets that are not there: bounded by the gap, not by how many ask
+	for i := 0; i < 30; i++ {
+		wg.Add(1)
+		go func(port int) {
+			defer wg.Done()
+			_, err := ownedByMyProcess(netip.MustParseAddrPort("127.0.0.1:"+strconv.Itoa(port)), server)
+			assert.ErrorIs(t, err, ErrLayout, "no socket of this connection seen: the layout answer")
+		}(60000 + i)
+	}
+	wg.Wait()
+	elapsed := time.Since(start)
+	assert.LessOrEqual(t, int(scans.Load()), 2+int(elapsed/scanGap)+1, "scans are at most one per gap however many ask (%d scans in %v)", scans.Load(), elapsed)
 }
