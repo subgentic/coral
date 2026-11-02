@@ -2,7 +2,7 @@
    sentence for that code in start_failure_text ("failed to start: the Codex CLI was not found. Set Settings > CLI paths > Codex to its codex.exe."). The page picks nothing itself: it writes that
    sentence as text (textContent, never markup), after the agent's own name, so the server and the page cannot say different things. */
 
-const REASONS = new Set(['cli_missing', 'cli_untrusted_mount', 'cli_path_unusable']);
+const REASONS = new Set(['cli_missing', 'cli_untrusted_mount', 'cli_path_unusable', 'hermes_gateway_refused']);
 const FALLBACK = 'failed to start: its CLI is missing or can’t be run.';
 
 /** True for a sleeping, not archived agent whose start was refused for its CLI. */

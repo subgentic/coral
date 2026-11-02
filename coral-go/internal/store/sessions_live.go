@@ -602,9 +602,10 @@ const SleepReasonAgentExited = "agent_exited"
 // Why the last start of an agent was refused (#353), in the field start_failure and never in the sleep reason: an agent Coral stopped (coral_stopped) still auto-wakes at the next
 // start once the CLI is fixed. The dashboard says "Failed to start" and the reason's sentence; a wake clears it.
 const (
-	StartFailureCLIMissing     = "cli_missing"         // the CLI is on neither PATH nor a common place
-	StartFailureUntrustedMount = "cli_untrusted_mount" // Windows will not open a folder on PATH or the CLI's own (#340)
-	StartFailureCLIPath        = "cli_path_unusable"   // the configured Settings > CLI paths entry can't be run (#115)
+	StartFailureCLIMissing     = "cli_missing"            // the CLI is on neither PATH nor a common place
+	StartFailureUntrustedMount = "cli_untrusted_mount"    // Windows will not open a folder on PATH or the CLI's own (#340)
+	StartFailureCLIPath        = "cli_path_unusable"      // the configured Settings > CLI paths entry can't be run (#115)
+	StartFailureHermesGateway  = "hermes_gateway_refused" // Hermes's own gateway start was refused (another gateway held the host's lock) and its CLI exited (#12052)
 )
 
 // SleepReasonCoralStopped: the agent was running when a pty Coral stopped (cleanly, or a crash

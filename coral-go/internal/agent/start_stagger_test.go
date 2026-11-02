@@ -105,3 +105,26 @@ func TestReserveStartReturnsTheWaitWithoutSleeping(t *testing.T) {
 	SetStartStagger(false)
 	assert.Zero(t, ReserveStart("codex"), "off: nothing waits")
 }
+
+// #12052 (the Hermes tester's run, three agents at once): Hermes runs a gateway per home and refuses to start one while it believes another owns the host ("Another gateway already owns this host", status 75) when
+// two start in the same moment: one of three dropped to a plain shell. Hermes starts are spaced HermesStartGap apart, as Codex's are, and the others are not.
+func TestHermesStartsAreSpacedAndOthersAreNot(t *testing.T) {
+	withStagger(t, time.Hour)
+	first, _, hadFirst, ok := reserve("hermes")
+	require.True(t, ok, "Hermes is staggered")
+	assert.False(t, hadFirst)
+	second, prev, hadSecond, ok := reserve("hermes")
+	require.True(t, ok)
+	assert.True(t, hadSecond)
+	assert.Equal(t, first, prev)
+	assert.GreaterOrEqual(t, second.Sub(first), HermesStartGap, "the second Hermes start waits for its slot")
+	third, _, _, _ := reserve("hermes")
+	assert.GreaterOrEqual(t, third.Sub(second), HermesStartGap)
+	for _, other := range []string{"claude", "gemini", "pi", "opencode", "agy"} {
+		_, _, _, ok := reserve(other)
+		assert.False(t, ok, other+" is not staggered")
+	}
+	codexSlot, _, _, ok := reserve("codex")
+	require.True(t, ok)
+	assert.Less(t, codexSlot.Sub(first), time.Minute, "Codex keeps its own gap, not Hermes's")
+}

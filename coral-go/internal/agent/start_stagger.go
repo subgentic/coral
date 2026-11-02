@@ -13,6 +13,21 @@ import (
 // initialisation and migration: one exited with a "duplicate" error (code 1) before it did anything (Codex Test's #6828). A variable so tests need not wait.
 var SharedHomeStartGap = 4 * time.Second
 
+// HermesStartGap is how far apart two Hermes starts are put (#12052). Hermes runs a gateway for each home and, when two start in the same moment, refuses one ("Another gateway already owns this host: owner unknown
+// (its record is gone)", exit 75): in the tester's run one of three agents launched together dropped to a plain shell with no first message. A gateway takes 10 to 25 s to be up, so the starts are put this far apart.
+const HermesStartGap = 15 * time.Second
+
+// startGap is the spacing an agent type's starts need: zero for the agents that need none.
+func startGap(agentType string) time.Duration {
+	switch agentType {
+	case at.Codex:
+		return SharedHomeStartGap
+	case at.Hermes:
+		return HermesStartGap
+	}
+	return 0
+}
+
 // staggerOn is set by the server at startup (SetStartStagger): off, as in tests and any other caller, nothing waits.
 var staggerOn atomic.Bool
 
@@ -26,7 +41,8 @@ var startSlots = struct {
 
 // reserve takes agentType's next start slot: the time it may start at, and what to put back if the start is cancelled. ok is false when nothing is staggered (off, another agent, no gap).
 func reserve(agentType string) (slot, prev time.Time, had, ok bool) {
-	if !staggerOn.Load() || agentType != at.Codex || SharedHomeStartGap <= 0 {
+	gap := startGap(agentType)
+	if !staggerOn.Load() || gap <= 0 {
 		return time.Time{}, time.Time{}, false, false
 	}
 	startSlots.mu.Lock()
@@ -34,7 +50,7 @@ func reserve(agentType string) (slot, prev time.Time, had, ok bool) {
 	slot = time.Now()
 	prev, had = startSlots.last[agentType]
 	if had {
-		if next := prev.Add(SharedHomeStartGap); next.After(slot) {
+		if next := prev.Add(gap); next.After(slot) {
 			slot = next
 		}
 	}
@@ -54,7 +70,7 @@ func ReserveStart(agentType string) time.Duration {
 
 // StaggerStart waits for agentType's next free start slot (at least SharedHomeStartGap after the previous one) and returns when it is reached, or with the context's error when ctx ends first, in which case
 // the slot is given back if nobody has reserved a later one. The scheduler's runs use it (a run's own goroutine may wait); a launch request uses ReserveStart. Only agents whose CLI initialises a shared state
-// database at start are staggered (Codex); the others return at once (#6848).
+// database at start (Codex) or a gateway per home (Hermes) are staggered; the others return at once (#6848, #12052).
 func StaggerStart(ctx context.Context, agentType string) error {
 	slot, prev, had, ok := reserve(agentType)
 	if !ok {
