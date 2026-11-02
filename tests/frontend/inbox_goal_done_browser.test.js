@@ -12,6 +12,7 @@ const B = 'goal-done-' + Date.now().toString(36);
 (async () => {
     const guard = await guardSettings();
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
+    const dumpDbg = async tag => { try { console.log('DBG ' + tag + ' ' + JSON.stringify(await ev(`(async () => { const st = (await import((window.__coralStatic || '/static/') + 'state.js')).state; const gj = async p => { try { const r = await fetch(p); return await r.json(); } catch (e) { return String(e); } }; const needs = await gj('/api/needs-you?limit=50'); const goals = await gj('/api/goals'); return { now: Date.now(), iso: new Date().toISOString(), tz: Intl.DateTimeFormat().resolvedOptions().timeZone, stateQuiet: (st.settings || {}).goal_done_quiet_minutes, stateRead: (st.settings || {}).goal_done_read, stateHidden: (st.settings || {}).goal_done_hidden, apiSettings: ((await gj('/api/settings')).settings || {}), needsGoalDone: (needs.items || []).filter(i => i.kind === 'goal_done'), goalsTop: Array.isArray(goals) ? goals.slice(0, 6).map(g => ({ id: g.id, board: g.board_id || g.board, looks_done_at: g.looks_done_at, status: g.status })) : goals, badge: (document.getElementById('nav-tab-hub-inbox-badge') || {}).textContent, path: location.pathname }; })()`))); } catch (e) { console.log('DBG dump failed ' + e.message); } };
     const api = (method, path, body) => ev(`fetch('/api/board/${B}' + ${JSON.stringify(path)}, { method: ${JSON.stringify(method)}, headers: { 'Content-Type': 'application/json' }, body: ${body ? JSON.stringify(JSON.stringify(body)) : 'undefined'} }).then(async r => ({ status: r.status, json: await r.json().catch(() => ({})) }))`);
     const root = (method, path, body) => ev(`fetch(${JSON.stringify(path)}, { method: ${JSON.stringify(method)}, headers: { 'Content-Type': 'application/json' }, body: ${body ? JSON.stringify(JSON.stringify(body)) : 'undefined'} }).then(async r => ({ status: r.status, json: await r.json().catch(() => ({})) }))`);
     const T = '#group-table-view';
@@ -57,7 +58,8 @@ const B = 'goal-done-' + Date.now().toString(36);
         assert.match(rows[0].text, /Done when: it is shipped/);
         assert.deepEqual(rows[0].buttons.filter(b => /^(Close goal|Not yet|Ignore)$/.test(b)), ['Close goal', 'Not yet', 'Ignore']);
         const badge = async () => Number(await ev(`(document.getElementById('nav-tab-hub-inbox-badge') || {}).textContent || 0`));
-        const withItem = await badge(); assert.ok(withItem >= 1, 'the item is in the Inbox number: ' + withItem);
+        const withItem = await badge(); if (!(withItem >= 1)) await dumpDbg('goal_done badge=' + withItem);
+        assert.ok(withItem >= 1, 'the item is in the Inbox number: ' + withItem);
         const asked = await root('GET', '/api/needs-you?limit=50');
         assert.ok(asked.json.items.some(i => i.kind === 'goal_done' && i.id === `goal_done:${B}:${gid}`), 'the phone-push read has it too');
 

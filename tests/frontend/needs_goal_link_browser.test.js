@@ -12,6 +12,7 @@ const B = 'goal-link-' + Date.now().toString(36);
 (async () => {
     const guard = await guardSettings();
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
+    const dumpDbg = async tag => { try { console.log('DBG ' + tag + ' ' + JSON.stringify(await ev(`(async () => { const st = (await import((window.__coralStatic || '/static/') + 'state.js')).state; const gj = async p => { try { const r = await fetch(p); return await r.json(); } catch (e) { return String(e); } }; const needs = await gj('/api/needs-you?limit=50'); const goals = await gj('/api/goals'); return { now: Date.now(), iso: new Date().toISOString(), tz: Intl.DateTimeFormat().resolvedOptions().timeZone, stateQuiet: (st.settings || {}).goal_done_quiet_minutes, stateRead: (st.settings || {}).goal_done_read, stateHidden: (st.settings || {}).goal_done_hidden, apiSettings: ((await gj('/api/settings')).settings || {}), needsGoalDone: (needs.items || []).filter(i => i.kind === 'goal_done'), goalsTop: Array.isArray(goals) ? goals.slice(0, 6).map(g => ({ id: g.id, board: g.board_id || g.board, looks_done_at: g.looks_done_at, status: g.status })) : goals, badge: (document.getElementById('nav-tab-hub-inbox-badge') || {}).textContent, path: location.pathname }; })()`))); } catch (e) { console.log('DBG dump failed ' + e.message); } };
     const S = `(window.__coralStatic || '/static/')`;
     const api = (method, path, body) => ev(`fetch('/api/board/${B}' + ${JSON.stringify(path)}, { method: ${JSON.stringify(method)}, headers: { 'Content-Type': 'application/json' }, body: ${body ? JSON.stringify(JSON.stringify(body)) : 'undefined'} }).then(async r => ({ status: r.status, json: await r.json().catch(() => ({})) }))`);
     const task = async (gid, finish) => {
@@ -43,6 +44,7 @@ const B = 'goal-link-' + Date.now().toString(36);
             await ev(`fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ goal_done_hidden: '[]', goal_done_read: '[]', goal_done_quiet_minutes: '0' }) }).then(r => r.status)`);
             await visit(`/inbox/needs/goal/${B}/${done}`);
             await waitFor(`location.pathname === '/inbox/goals/${B}/${done}' || /Ship the pilot/.test(document.querySelector('.goals-open')?.textContent || '')`, at + 'the goal opens on its own page', 15000);
+            if (!/Ship the pilot/.test(await ev(`document.querySelector('.goals-open')?.textContent || ''`))) await dumpDbg('goal_link ' + at + ' open=' + (await ev(`(document.querySelector('.goals-open')?.textContent || '').slice(0, 200)`)));
             assert.ok(/Ship the pilot/.test(await ev(`document.querySelector('.goals-open')?.textContent || ''`)), at + 'it is the goal the link names');
             assert.equal(await ev(`!!document.querySelector('dialog.goals-close-dialog[open]')`), false, at + 'the Close dialog is not opened for you');
             // the goal's page offers Not yet as its item does (#12248): it hides the item until a task is added, and the button goes
