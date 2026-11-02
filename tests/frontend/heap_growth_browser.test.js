@@ -2,7 +2,7 @@
 // a burst of feed diffs and a full update now and then, scroll the chat, open and shut the Display panel, open and shut a dialog — for many rounds. After the first
 // rounds (caches fill, the page warms) the heap after a forced GC, the DOM nodes, the event listeners and the documents may not keep growing: each is compared with
 // its value after the warm-up and must stay under a bound. HEAP_CYCLES=n runs longer (the hour on epoch is HEAP_CYCLES=3000 or so), HEAP_OUT=file writes the numbers as
-// JSON, HEAP_FETCHES=file counts the page's fetches by URL and whether the body was read, HEAP_LEAK_SELFTEST=1 adds a deliberate leak (a listener and three nodes a round) that the bounds must catch, HEAP_SNAPSHOT_DIR=dir takes a heap snapshot after the warm-up and at the end (for the retainer paths of what grew).
+// JSON, HEAP_FETCHES=file counts the page's fetches by URL and whether the body was read, HEAP_LEAK_SELFTEST=1 adds a deliberate leak (two listeners and six nodes a round, about twice what the bounds allow) that the suite must catch on every run (#12445; =nodes or =listeners leaks only that, to show each bound alone catches its own), HEAP_SNAPSHOT_DIR=dir takes a heap snapshot after the warm-up and at the end (for the retainer paths of what grew).
 // Part 2 (#5050): every round also opens three real terminals in turn (each an xterm and a /ws/terminal socket) and goes back to the chat, resizes the window, opens the
 // team page Board tab and posts to it, and pages History. HEAP_TERMINAL=0 leaves that part out.
 // Drives Chrome over CDP through agent_view_harness.js against the isolated dev server.
@@ -119,7 +119,7 @@ async function httpJson(method, path, body) {
         const round = async n => {
             mark(`round ${n}: select`); await select('hg-' + (n % AGENTS));
             if (process.env.HEAP_STALL_TEST && n === 3 && !process.env.HEAP_RETRIED) await ev(`new Promise(() => {})`); // the retry's own test: a step that never finishes
-            if (process.env.HEAP_LEAK_SELFTEST) await ev(`(() => { document.addEventListener('hg-leak', () => document.body); for (let i = 0; i < 3; i++) (window.__leak = window.__leak || []).push(document.body.appendChild(document.createElement('i'))); return true; })()`);
+            if (process.env.HEAP_LEAK_SELFTEST) await ev(`(() => { if (${JSON.stringify(process.env.HEAP_LEAK_SELFTEST)} !== 'nodes') for (let k = 0; k < 2; k++) document.addEventListener('hg-leak', () => document.body); if (${JSON.stringify(process.env.HEAP_LEAK_SELFTEST)} !== 'listeners') for (let i = 0; i < 6; i++) (window.__leak = window.__leak || []).push(document.body.appendChild(document.createElement('i'))); return true; })()`);
             mark(`round ${n}: feed diffs and a full update`);
             await ev(`(async () => { const rnd = i => 'hg-' + ((i * 7 + ${n}) % ${AGENTS}) + '-id';
                 for (let i = 0; i < 10; i++) { const a = window.__m.agents[rnd(i)]; T.ws.handleCoralMessage({ type: 'coral_diff', changed: [{ ...window.__m.entry(a), summary: 'step ' + ${n} + '.' + i, working: i % 2 === 0, staleness_seconds: i }] }); }
