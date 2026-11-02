@@ -51,6 +51,21 @@ const HEX = 'c'.repeat(64);
         assert.match(await ev(`document.querySelector('#group-table-view tbody tr').textContent`), /Second importer goal/, 'newest first');
         console.log('   ✓');
 
+        console.log('1b. The On column keeps its floor at every width: From and Team go before it shrinks (R2 of the table rules)');
+        const widths = {};
+        for (const w of [1440, 1280, 1024, 900]) {
+            await Emulation.setDeviceMetricsOverride({ width: w, height: 900, deviceScaleFactor: 1, mobile: false });
+            await new Promise(r => setTimeout(r, 900)); // sleep-ok: the table follows its box
+            widths[w] = await ev(`(() => { const b = document.querySelector('#group-table-view .dt-primary'); const td = b && b.closest('td'); const box = document.querySelector('#group-table-view .dt-box'); return { on: td ? Math.round(td.getBoundingClientRect().width) : 0, scrolls: box ? box.scrollWidth > box.clientWidth + 1 : null, cols: [...document.querySelectorAll('#group-table-view thead th')].filter(t => t.getClientRects().length > 0).map(t => t.textContent.replace(/[\u2195\u2191\u2193]/g, '').trim()).filter(Boolean) }; })()`);
+        }
+        const bad = Object.entries(widths).filter(([, z]) => z.on < 120 || z.scrolls !== false);
+        assert.deepEqual(bad, [], `the On column is at least 120 px wide and nothing scrolls sideways, at each width: ${JSON.stringify(widths)}`);
+        const dropOrder = ['From', 'Team', 'When', 'You did'];
+        const shown = w => widths[w].cols; // (not monotonic across widths: at 900 the sidebar folds away and the table has more room)
+        for (const w of [1440, 1280, 1024, 900]) { const gone = dropOrder.filter(c => !shown(w).includes(c)); const expect = dropOrder.slice(0, gone.length); assert.deepEqual(gone, expect, `${w}: columns go in the order From, Team, When, You did ${JSON.stringify(widths[w])}`); assert.ok(shown(w).includes('On'), `${w}: On is always there`); }
+        await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
+        console.log('   \u2713');
+
         console.log('2. The sidebar search narrows the rows');
         await ev(`import((window.__coralStatic || '/static/') + 'inbox_sidebar.js').then(m => m.filterInbox('first')).then(() => true)`);
         await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 1`, 'one row', 8000);

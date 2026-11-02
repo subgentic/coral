@@ -71,12 +71,12 @@ export function spec(f, open) {
             const t = DT.dataTable({ label: `Activity, ${list.length}`, rows: list, rowKey: r => r.id, state, rowName: r => `${actionWord(r)} ${itemWords(r)}`, oneLine: true, sortBar: false,
                 open: r => { if (r.item_kind === 'file' && r.version) open.file(r); else if (r.item_kind === 'goal') open.goal(r); },
                 mail: r => ({ lead: { icon: 'checklist', square: true, name: actionWord(r) }, title: itemWords(r), team: teamOf(r), snippet: r.note || fromWords(r), state: actionWord(r), time: DT.timeCell(r.at).textContent }),
-                columns: [
+                columns: [ // narrowing drops From (62 rem), then Team (52), then When (36), then You did (16): the data table's own thresholds, so the On column (the item) never shrinks (the table rules' R2)
                     { key: 'action', label: 'You did', sort: true, sortValue: actionWord, line: 2, width: '12rem', dropAt: 16, cell: r => { const w = DT.el('span', 'activity-did', actionWord(r)); if (r.note) w.append(DT.el('span', 'activity-note', ` “${r.note}”`)); return w; } },
                     { key: 'item', label: 'On', primary: true, width: 'grow', sort: true, sortValue: itemWords, line: 1, cell: r => (opens(r) ? DT.primaryButton(itemWords(r), `Open ${itemWords(r)}`) : DT.el('span', 'activity-item', itemWords(r))) },
-                    { key: 'team', label: 'Team', sort: true, sortValue: teamOf, line: 2, width: '9rem', dropAt: 36, cell: teamOf },
-                    { key: 'from', label: 'From', sort: true, sortValue: fromWords, line: 2, tone: 'tertiary', width: '11rem', dropAt: 44, cell: fromWords },
-                    { key: 'when', label: 'When', sort: 'date', sortValue: r => r.at, firstDir: 'desc', line: 0, tone: 'tertiary', align: 'end', width: '7rem', dropAt: 52, cell: r => DT.timeCell(r.at) },
+                    { key: 'team', label: 'Team', sort: true, sortValue: teamOf, line: 2, width: '9rem', dropAt: 52, cell: teamOf },
+                    { key: 'from', label: 'From', sort: true, sortValue: fromWords, line: 2, tone: 'tertiary', width: '11rem', dropAt: 62, cell: fromWords },
+                    { key: 'when', label: 'When', sort: 'date', sortValue: r => r.at, firstDir: 'desc', line: 0, tone: 'tertiary', align: 'end', width: '7rem', dropAt: 36, cell: r => DT.timeCell(r.at) },
                 ] });
             wrap.append(t.el);
             if (more) { const b = DT.el('button', 'btn btn-small activity-more', 'Show older actions'); b.type = 'button'; b.addEventListener('click', () => refresh(null, { next: true })); wrap.append(b); }
