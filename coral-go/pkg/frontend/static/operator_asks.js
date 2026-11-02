@@ -4,6 +4,7 @@
  * for an ask): it answers the ask, ends a wait, and tells the asker by the post itself. The text is the agent's, so it is written out through markHidden (strict) before it is drawn, then cut. */
 import { markHidden } from './visible_marks.js';
 import { isHiddenAsk } from './ask_filter.js';
+import { importOnce } from './import_once.js';
 import { OPERATOR_ID, renderMarkdownStrict } from './utils.js';
 import { whenText } from './when_text.js';
 import { state } from './state.js';

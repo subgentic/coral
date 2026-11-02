@@ -288,3 +288,4 @@ node title_repeats_census.test.mjs
 node sw_register_push_exempt.test.mjs
 node iframe_no_title_census.test.mjs
 node table_inventory.test.mjs
+node agent_name_census.test.mjs

@@ -16,6 +16,7 @@
  * Folded (the table's own box narrower than foldAt rem, 40 by default; 'fit' measures the unfolded columns; also at 200% text): fold 'column' is the two-line row (line 1 and line 2 cells), fold 'labeled' is the name, then "label value" lines
  * (the Analytics tables); scroll: a table of many columns scrolls sideways inside its box, shaded where more is to come, rather than being cut off; the header row is hidden and a "Sort by" select takes its place. Everything is built with the DOM and textContent: titles and names are written by agents. */
 import { importOnce } from './import_once.js';
+import { markAgent } from './agent_live.js';
 import { whenText, shortWhen } from './when_text.js';
 import { browserLocal } from './safe_storage.js';
 
@@ -56,14 +57,15 @@ export function avatar(name, text) {
     const n = String(name || '').trim();
     if (!n) { w.textContent = text || ''; return w; }
     const a = el('span', 'dt-avatar', [...n][0].toUpperCase()); a.setAttribute('aria-hidden', 'true'); a.style.background = `var(--avatar-${(hash(n.toLowerCase()) % 8) + 1})`;
-    w.append(a, el('span', 'dt-person-name', text || n)); // text: what is said beside the circle when it is more than the name ("Done by Dev")
+    const nm = el('span', 'dt-person-name', text || n); w.append(a, nm); // text: what is said beside the circle when it is more than the name ("Done by Dev")
+    if (markAgent(a, n)) markAgent(nm, n); // a running agent's circle and name open its chat (#12197)
     return w;
 }
 /** People as a row of circles and nothing else (the Tasks table's Assigned to, #8492): the person responsible first, one solid circle; then reviewers as smaller outlined circles, at most two, then "+N". The whole cell is one image named by label
  *  ("Done by Dev, reviewed by QA"), which is also its hover text, so the column is as narrow as its circles. people = [{ name, review? }]. */
 export function avatars(people, label) {
     const w = el('span', 'dt-person dt-avatars'); w.setAttribute('role', 'img'); w.setAttribute('aria-label', label); w.title = label;
-    const circle = (name, cls) => { const n = String(name || '').trim(); const a = el('span', `dt-avatar${cls}`, [...n][0].toUpperCase()); a.setAttribute('aria-hidden', 'true'); a.style.setProperty('--dt-avatar-bg', `var(--avatar-${(hash(n.toLowerCase()) % 8) + 1})`); return a; };
+    const circle = (name, cls) => { const n = String(name || '').trim(); const a = el('span', `dt-avatar${cls}`, [...n][0].toUpperCase()); a.setAttribute('aria-hidden', 'true'); markAgent(a, n); a.style.setProperty('--dt-avatar-bg', `var(--avatar-${(hash(n.toLowerCase()) % 8) + 1})`); return a; };
     const named = people.filter(p => p && String(p.name || '').trim());
     for (const p of named.filter(x => !x.review)) w.append(circle(p.name, ''));
     const reviewers = named.filter(x => x.review);

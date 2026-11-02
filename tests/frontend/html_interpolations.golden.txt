@@ -11,6 +11,7 @@
 1	agent_config_form.js	title
 1	agent_config_form.js	topHTML
 1	agent_config_form.js	uid
+2	agent_link.js	c
 1	artifact_item.js	renderMarkdownStrict(content)
 1	artifact_preview.js	rows
 1	artifact_viewer.js	renderMarkdownStrict(content)
@@ -23,6 +24,7 @@
 1	board_attachments.js	body
 1	board_attachments.js	chips
 1	board_chat.js	_formatTime(m.created_at)
+1	board_chat.js	agentLinkHtml(agent, { board: _activeBoardChat || '', text: authorLabel(m, agent, _activeBoardChat || '') })
 1	board_chat.js	alignClass
 1	board_chat.js	askBadge(m)
 1	board_chat.js	boardMessageColorStyle(color)
@@ -462,6 +464,9 @@
 1	task_detail_html.js	_formatTokenCount(task.output_tokens)
 1	task_detail_html.js	_messageWithFiles(task.completion_message, task.workflow?.artifacts)
 1	task_detail_html.js	_verifyLine(task)
+1	task_detail_html.js	agentNameHtml(completedBy, { board: task.board_id || task.project || '' })
+1	task_detail_html.js	agentNameHtml(task.assigned_to, { board: task.board_id || task.project || '' })
+1	task_detail_html.js	agentNameHtml(task.created_by, { board: task.board_id || task.project || '' })
 1	task_detail_html.js	amendments.length ? `<details class="task-amendment-history"><summary>Changed since task creation</summary>${a
 1	task_detail_html.js	amendments.map(amendment => { const previous = amendment.previous_snapshot || {}; const effective = amendment.
 1	task_detail_html.js	boardPrefix

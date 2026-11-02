@@ -6,6 +6,7 @@ import { OPERATOR_ID, copyText, showToast } from './utils.js';
 import { whenText } from './when_text.js';
 import { toTaskPage, toGoal, errorOf } from './goals_adapter.js';
 import { importOnce } from './import_once.js';
+const { agentLink } = await importOnce('./agent_link.js'); // an agent's name is one shared helper (#12182)
 import { foldWayBack } from './way_back.js';
 import * as W from './goal_words.js';
 import { onGoalsSeq } from './goals_feed.js';
@@ -143,7 +144,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         row.append(h); // the title is in the header row: a phone puts the back beside it and the link and actions under (team_page.css), as on the task page
         foldWayBack(main, '.goals-back', '.goals-detail-title');
         const line = el('div', 'goals-detail-line'); line.append(stateChip(g));
-        const meta = W.driverLine(g.driver, whenText(g.updatedAt)); if (meta) line.append(el('span', 'goal-card-meta', meta));
+        const meta = W.driverLine(g.driver, whenText(g.updatedAt)); if (meta) { const m = el('span', 'goal-card-meta'); const d = String(g.driver || '').trim(); if (d) { m.append('Driver: ', agentLink(d, { board: model.project }), meta.slice(`Driver: ${d}`.length)); } else m.textContent = meta; line.append(m); } // the driver opens its chat (#12182)
         // A small quiet button at the end of the detail line (#11004, Goal #153): copies one line to paste to an agent, which then runs `coral-board goal brief` to read the goal's open tasks and artifacts
         const copyBtn = btn('btn btn-small goal-copy-agent', 'Copy for an agent', () => { copyText(W.agentBriefLine(g)).then(ok => showToast(ok ? 'Copied: paste it to an agent' : 'Could not copy', !ok)); });
         copyBtn.title = 'Copies a line to paste to an agent: it runs coral-board goal brief for this goal';

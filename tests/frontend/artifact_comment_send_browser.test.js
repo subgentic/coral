@@ -54,6 +54,7 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
         await ev(STUB);
         if (noAsks) await ev(`window.__cs[0].asks = []; true`);
         if (you) await ev(`window.__you = ${JSON.stringify(you)}; true`);
+        await ev(`import(${S} + 'state.js').then(m => { m.state.liveSessions = [{ session_id: 'sess-qa', name: 'qa-agent', agent_type: 'claude', board_subscriber_id: 'QA Engineer', board_project: ${JSON.stringify(board || '')} }]; window.__opened = null; window.selectLiveSession = (...a) => { window.__opened = a; }; return true; })`); // QA Engineer is running; Reviewer and Docs Writer are not (#12168)
         await ev(`(async () => { const v = await import(${S} + 'artifact_viewer.js'); v.openArtifactViewer(${JSON.stringify(HEX)}, { filename: 'plan.md', ${board ? `board: '${board}'` : ''} }); return true; })()`);
         await waitFor(`!!document.querySelector('#artifact-viewer .artifact-viewer-markdown')`, 'the document', 8000);
         await waitFor(`document.querySelectorAll('.ac-card').length >= 1`, 'the threads', 8000);
@@ -83,8 +84,22 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
             await open('ask-team');
             check(`${tag}: an open thread of the owner shows "Send to agent"; a reply and a resolved thread do not`, (await ev(`!!${sendBtn(1)}`)) && !(await ev(`!!${sendBtn(3)}`)) && !(await ev(`!!document.querySelector('.ac-card[data-id="1"] .ac-reply .ac-ask-open')`)));
             // does the agent have it? said beside the link (#11861): nothing sent yet says so
-            check(`${tag}: a comment an agent was asked into says who has it, beside Send to agent (#11861)`, (await ev(`document.querySelector('.ac-card[data-id="1"] .ac-ask-status')?.textContent || ''`)) === 'Sent to reviewer (already asked, 2 replies so far, seen by reviewer, reminded)', await ev(`document.querySelector('.ac-card[data-id="1"] .ac-ask-status')?.textContent || ''`));
+            check(`${tag}: a comment an agent was asked into says who has it, beside Send to agent (#11861)`, (await ev(`document.querySelector('.ac-card[data-id="1"] .ac-ask-status')?.textContent || ''`)) === 'Sent to Reviewer (already asked, 2 replies so far, seen by Reviewer, reminded)', await ev(`document.querySelector('.ac-card[data-id="1"] .ac-ask-status')?.textContent || ''`));
+            // an agent's name is as written and opens its chat (#12168, the operator): the reply author and its circle for a running agent; a gone agent is plain text with a tooltip
+            const who = await ev(`(() => { const e = document.querySelector('.ac-entry[data-id="2"]'), a = e.querySelector('.ac-author'), c = e.querySelector('.ac-avatar'), g = document.querySelector('.ac-card[data-id="1"] .ac-ask-status .agent-name'); return { tag: a.tagName, text: a.textContent, label: a.getAttribute('aria-label'), circle: c.classList.contains('agent-link-avatar'), gone: g ? { tag: g.tagName, text: g.textContent, title: g.title } : null }; })()`);
+            check(`${tag}: a running agent's name is a button as written: ` + JSON.stringify(who), who.tag === 'BUTTON' && who.text === 'QA Engineer' && /^Open QA Engineer$/.test(who.label) && who.circle);
+            check(`${tag}: (precondition) the viewer is open when the name is clicked`, await ev("(() => { const v = document.querySelector('#artifact-viewer'); return !!v && !v.hidden; })()"));
+            await ev(`document.querySelector('.ac-entry[data-id="2"] .ac-author').click(); true`);
+            check(`${tag}: the name opens that agent's chat`, JSON.stringify(await ev('window.__opened && window.__opened.slice(0, 3)')) === JSON.stringify(['qa-agent', 'claude', 'sess-qa']));
+            check(`${tag}: the file viewer the thread sat in is closed, so the chat is not opened behind it (#12168)`, await ev("(() => { const v = document.querySelector('#artifact-viewer'); return !v || v.hidden; })()"));
+            await open('ask-team'); // the viewer was closed by the name's click; open it again for the circle
+            await waitFor(`!!document.querySelector('.ac-entry[data-id="2"] .ac-avatar')`, 'the reply drawn again', 8000);
+            await ev(`window.__opened = null; document.querySelector('.ac-entry[data-id="2"] .ac-avatar').click(); true`);
+            check(`${tag}: so does its circle`, !!(await ev('window.__opened')));
+            check(`${tag}: an agent that is not running is plain text with a tooltip, in the case it was written: ` + JSON.stringify(who.gone), !!who.gone && who.gone.tag === 'SPAN' && who.gone.text === 'Reviewer' && /not running/.test(who.gone.title));
             // the resolved thread is not drawn until "Show resolved": the check above passed for want of a card (#8366: removing the resolved test from canAsk survived)
+            await open('ask-team'); // the circle's click closed the viewer too
+            await waitFor(`!!document.querySelector('.ac-showresolved')`, 'Show resolved', 8000);
             await ev(`document.querySelector('.ac-showresolved').click(); true`);
             check(`${tag}: with the resolved threads shown, the resolved one is on the page and has no "Send to agent"`, (await ev(`!!document.querySelector('.ac-card[data-id="3"]')`)) && !(await ev(`!!${sendBtn(3)}`)));
             await ev(`document.querySelector('.ac-showresolved').click(); true`);

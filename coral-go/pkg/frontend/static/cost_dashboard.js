@@ -3,6 +3,7 @@ import { openTask } from './task_navigation.js';
 
 import { showView, escapeHtml, escapeAttr } from './utils.js';
 import { state } from './state.js';
+import { nameSpan } from './agent_live.js';
 import { emptyState } from './dom_write.js';
 import { pollEvery } from './overload.js';
 import { keyLabel, noteBoardLabels } from './server_base.js';
@@ -265,7 +266,7 @@ async function _refreshCallMetrics(period, hours) {
         el.append(dataTable({ label: 'Tool and API calls', fold: 'labeled', scroll: true, state: st, rows, rowKey: r => `${r.operation}|${r.call_type}|${r.agent_name}|${r.board_name}`, ...phoneOneLine([
             { key: 'operation', label: 'Operation', sort: true, tone: 'primary', field: 'operation' },
             { key: 'call_type', label: 'Type', sort: true, field: 'call_type' },
-            { key: 'agent', label: 'Agent', sort: true, sortValue: r => r.agent_name || '', cell: r => dash(r.agent_name) },
+            { key: 'agent', label: 'Agent', sort: true, sortValue: r => r.agent_name || '', cell: r => (r.agent_name ? nameSpan(r.agent_name, { board: r.board_name || '' }) : dash(r.agent_name)) },
             { key: 'team', label: 'Team', sort: true, sortValue: r => r.board_name || '', cell: r => dash(r.board_name) },
             _numCol('calls', 'Calls', r => r.calls || 0, String, { foldFirst: true }),
             _numCol('errors', 'Errors', r => r.errors || 0, String, { foldFirst: true }),

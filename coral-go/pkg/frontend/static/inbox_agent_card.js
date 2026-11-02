@@ -4,6 +4,7 @@
  * "don't ask again") are here, unlike on a row (inbox_answer.js leaves those to Open, which is this). A request that can only be rejected (only_reject) offers the No form alone. A card with no one choice to take (a
  * multi-select, a review step, a text answer) says so and has Open agent. Everything the agent or the CLI wrote is set as text. */
 import { serverFetch, sessionServer } from './server_base.js';
+import { importOnce } from './import_once.js';
 import { showToast } from './utils.js';
 import { blockedReason } from './hub_access.js';
 import { resolveSessionIdentity } from './session_state.js';
@@ -31,7 +32,7 @@ const openAgent = s => { window.switchNavTab?.('agents'); Promise.resolve(window
 export function openAgentCard(s) {
     const who = resolveSessionIdentity(s);
     const dlg = el('dialog', 'modal-content dlg-form inbox-ask-dialog'); dlg.setAttribute('aria-labelledby', 'inbox-card-title');
-    const title = el('h2', null, `${who} asks you`); title.id = 'inbox-card-title';
+    const title = el('h2', null, `${who} asks you`); title.id = 'inbox-card-title'; importOnce('./agent_link.js').then(m => { if (title.isConnected) title.replaceChildren(m.agentLink(who, { board: s.board_project, session: s.session_id }), ' asks you'); }).catch(() => {}); // (#12168)
     const sub = el('p', 'inbox-ask-sub', 'Waiting for a permission. Nothing is sent until you choose.');
     const body = el('div', 'inbox-card-body'); body.setAttribute('aria-live', 'polite');
     const err = el('p', 'inbox-ask-error'); err.setAttribute('role', 'alert');

@@ -1,4 +1,5 @@
 import { importOnce } from './import_once.js';
+import { agentNameHtml } from './agent_live.js';
 import { formatCost } from './format.js';
 const { reviewPoolInfo } = await importOnce('./review_pool.js');
 const { linkedHtml } = await importOnce('./artifact_refs.js'); // lazy: its failure is retried
@@ -148,14 +149,14 @@ function _taskFieldsHtml(task) {
     html += `<div class="task-detail-fields">
         <div class="task-detail-field">
             <span class="task-detail-label">Assigned To</span>
-            <span class="task-detail-value">${escapeHtml(assignee)}</span>
+            <span class="task-detail-value">${agentNameHtml(task.assigned_to, { board: task.board_id || task.project || '' })}</span>
         </div>${task.goal_id ? `<div class="task-detail-field">
             <span class="task-detail-label">Goal</span>
             <span class="task-detail-value"><button type="button" class="task-goal-link" id="task-detail-goal-open" data-on-click="task-goal-open" data-goal-id="${Number(task.goal_id)}">Goal #${Number(task.goal_id)}</button></span>
         </div>` : ''}
         <div class="task-detail-field">
             <span class="task-detail-label">Created By</span>
-            <span class="task-detail-value">${escapeHtml(createdBy)}</span>
+            <span class="task-detail-value">${agentNameHtml(task.created_by, { board: task.board_id || task.project || '' })}</span>
         </div>
         <div class="task-detail-field">
             <span class="task-detail-label">Created</span>
@@ -178,7 +179,7 @@ function _taskFieldsHtml(task) {
     if (completedBy) {
         html += `<div class="task-detail-field">
             <span class="task-detail-label">${task.status === 'skipped' ? 'Cancelled By' : 'Completed By'}</span>
-            <span class="task-detail-value">${escapeHtml(completedBy)}</span>
+            <span class="task-detail-value">${agentNameHtml(completedBy, { board: task.board_id || task.project || '' })}</span>
         </div>`;
     }
     if (task.completion_message) {
