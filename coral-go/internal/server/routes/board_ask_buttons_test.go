@@ -175,3 +175,25 @@ func TestAWakeButtonAcceptsMemberNamesWithAColonASlashOrSpaces(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, status)
 	assert.NotContains(t, out["error"], "did you mean", "a name of only punctuation gets no suggestion")
 }
+
+// The help's post --ask "@Operator ..." on a board the Operator never joined: accepted, with its buttons, and listed for the Operator.
+func TestAnAskToTheOperatorIsAcceptedOnABoardTheyNeverJoined(t *testing.T) {
+	server, h := setupBoardTestServer(t)
+	base := server.URL + "/api/board/nooperator"
+	for _, who := range []string{"Lead", "Dev"} {
+		postJSON(t, base+"/subscribe", map[string]string{"subscriber_id": who, "job_title": who}).Body.Close()
+	}
+	for _, p := range []map[string]any{
+		{"subscriber_id": "Lead", "content": "@Operator Ship the release?", "ask": true},
+		{"subscriber_id": "Lead", "content": "@Operator Ship the docs?", "ask": true, "buttons": []string{"Yes=reply"}},
+	} {
+		resp := postJSON(t, base+"/messages", p)
+		var out map[string]any
+		_ = json.NewDecoder(resp.Body).Decode(&out)
+		resp.Body.Close()
+		require.Equal(t, http.StatusOK, resp.StatusCode, "%v", out)
+	}
+	code, rows, _ := readOperatorAsks(t, h, asPerson)
+	require.Equal(t, http.StatusOK, code)
+	assert.Len(t, rows, 2, "both questions are in the Operator's list")
+}
