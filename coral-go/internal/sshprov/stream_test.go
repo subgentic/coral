@@ -274,3 +274,72 @@ func TestStreamArgvHasKeepAlive(t *testing.T) {
 		}
 	}
 }
+
+// The Operator's slow switching through a self-hosted hub over SSH (#12446): a switch is a burst of about 7 requests, and every connection of the burst is one `ssh -W` process. An idle pool of 4 dropped 3 of
+// them after each burst and started 3 again at the next, a few seconds each on a real hop (measured: bursts of 3 to 9 s with a pool of 4, 0.1 to 0.9 s with 12). The pool is as big as a switch, so after the
+// first burst the next ones start no process.
+func TestStreamPoolKeepsAnAgentSwitchsConnectionsSoTheNextSwitchStartsNoSSH(t *testing.T) {
+	remote := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(300 * time.Millisecond) // longer than starting the seven streams: the requests of a burst are really at once
+		io.WriteString(w, "ok")
+	}))
+	defer remote.Close()
+	ssh, log := fakeSSHW(t)
+	tg, _ := ParseTarget("user@box.example.com")
+	st, err := NewStreamTarget(Runner{SSH: ssh}, tg, portOf(t, remote), streamKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	burst := func() {
+		var wg sync.WaitGroup
+		for i := 0; i < 7; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				req, _ := http.NewRequest("GET", "http://x.invalid/api/x", nil)
+				resp, err := st.RoundTrip(req)
+				if err != nil {
+					t.Error(err)
+					return
+				}
+				io.Copy(io.Discard, resp.Body)
+				resp.Body.Close()
+			}()
+		}
+		wg.Wait()
+	}
+	for i := 0; i < 5; i++ {
+		burst()
+		time.Sleep(150 * time.Millisecond) // the previous burst's closed streams are gone
+	}
+	b, _ := os.ReadFile(log)
+	if n := strings.Count(string(b), "-W\n127.0.0.1:"); n > 8 {
+		t.Errorf("5 bursts of 7 started %d ssh processes: the first burst needs 7 and the others should reuse them (a pool of 4 starts some more each time)", n)
+	}
+}
+
+// A closed stream gives its slot back at once, not when its process has been collected: a switch closes a terminal socket and opens a new one in the same moment, and the burst after it must not meet
+// "too many connections" (measured: bursts of 7 straight after bursts of 7 did).
+func TestStreamGivesTheSlotBackWhenTheConnectionIsClosed(t *testing.T) {
+	hold := newStandIn(t, "ssh", standCfg{HoldSecs: 30})
+	tg, _ := ParseTarget("user@box.example.com")
+	st, _ := NewStreamTarget(Runner{SSH: hold}, tg, 8420, streamKey)
+	var conns []net.Conn
+	for i := 0; i < streamCap; i++ {
+		c, err := st.dial(context.Background())
+		if err != nil {
+			t.Fatalf("dial %d: %v", i, err)
+		}
+		conns = append(conns, c)
+	}
+	conns[0].Close()
+	c, err := st.dial(context.Background())
+	if err != nil {
+		t.Fatalf("the slot of a closed stream was not free at once: %v", err)
+	}
+	conns = append(conns[1:], c)
+	for _, c := range conns {
+		c.Close()
+	}
+}

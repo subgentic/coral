@@ -43,8 +43,12 @@ type StreamTarget struct {
 // streamCap bounds the ssh processes one target keeps (the dashboard, the poller and the feed each hold a few); streamBackoff is how long dials are refused after one failed, so a dead host or a
 // refused key is not hit again for every request of every poll.
 const (
-	streamCap     = 12
+	streamCap     = 24
 	streamBackoff = 3 * time.Second
+	// streamIdle is how many idle streams the pool keeps for the next request, and streamIdleFor how long: a switch of agents is a burst of about 7 requests, and each one that has to start its own
+	// `ssh -W` costs a few round trips (measured on a 94 ms hop: bursts of 3 to 9 s with a pool of 4, 0.1 to 0.9 s with 12, #12446). The cap leaves room for the long-lived sockets (a terminal, the feed).
+	streamIdle    = 10
+	streamIdleFor = 5 * time.Minute
 )
 
 // ErrStreamBusy and ErrStreamBackoff are the two ways a dial is refused before ssh is started.
@@ -74,8 +78,8 @@ func (s *StreamTarget) transport() *http.Transport {
 		s.tr = &http.Transport{
 			Proxy:               nil,
 			DialContext:         func(ctx context.Context, _, _ string) (net.Conn, error) { return s.dial(ctx) },
-			MaxIdleConnsPerHost: 4,
-			IdleConnTimeout:     time.Minute,
+			MaxIdleConnsPerHost: streamIdle,
+			IdleConnTimeout:     streamIdleFor,
 			DisableCompression:  true,
 		}
 	})
@@ -199,7 +203,8 @@ type sshConn struct {
 	out     io.ReadCloser
 	closing atomic.Bool
 	reaped  sync.Once
-	release func() // gives the stream's slot back, once the process is gone
+	freed   sync.Once
+	release func() // gives the stream's slot back: when the connection is closed (the process is being killed) or the process ends, whichever is first
 	onFail  func() // ssh could not connect (exit 255 before we closed it)
 }
 
@@ -207,12 +212,19 @@ type sshConn struct {
 func (c *sshConn) reap() {
 	c.reaped.Do(func() {
 		err := c.cmd.Wait()
-		if c.release != nil {
-			c.release()
-		}
+		c.giveBack()
 		var ee interface{ ExitCode() int }
 		if err != nil && !c.closing.Load() && errors.As(err, &ee) && ee.ExitCode() == 255 && c.onFail != nil {
 			c.onFail()
+		}
+	})
+}
+
+// giveBack frees the stream's slot, once.
+func (c *sshConn) giveBack() {
+	c.freed.Do(func() {
+		if c.release != nil {
+			c.release()
 		}
 	})
 }
@@ -231,6 +243,7 @@ func (c *sshConn) Close() error {
 	if c.cmd.Process != nil {
 		c.cmd.Process.Kill()
 	}
+	c.giveBack() // a switch closes a socket and opens the next in the same moment: the slot is free now, the process is collected right after
 	safego.Go("ssh stream reap", c.reap)
 	return nil
 }
