@@ -96,3 +96,27 @@ func TestAForeignCoralTypesNoAutomatedText(t *testing.T) {
 	require.NoError(t, deliverAutomated(ctx, h.terminal, "claude-"+id, "claude", id, "[Coral] a board message", "board message"))
 	assert.NotEmpty(t, term.sentCommands(), "the same send goes through once the Coral is not foreign")
 }
+
+// The auto-sleep pass (v2.0.34) ends a terminal and the idle wake starts one: a Coral on a copy of another's database does neither, and the same database in its own folder does both, so the
+// tests prove the gate and not a broken rig.
+func TestAForeignCoralPutsNoAgentToSleepAndWakesNone(t *testing.T) {
+	r := newSleepRig(t)
+	autoWakeSlots.Lock()
+	autoWakeSlots.m["autosleep"] = nil // other tests of this package may have used the board's name
+	autoWakeSlots.Unlock()
+	foreignForTest(t)
+	ls := r.pass(t)
+	assert.Equal(t, 0, ls.IsSleeping, "idle for two hours, and still awake")
+	assert.Empty(t, r.term.killed, "no terminal ended")
+
+	r.autoSleep(t)
+	assert.False(t, r.h.WakeIdleForDelivery(r.ctx, r.sid), "a delivery wakes no one")
+	ls, err := r.ss.GetLiveSession(r.ctx, r.sid)
+	require.NoError(t, err)
+	assert.Equal(t, 1, ls.IsSleeping, "still asleep")
+	st, _ := r.ss.AutoSleepStateOf(r.ctx, r.sid)
+	assert.Zero(t, st.WokenAt, "not on the thrash guard's clock")
+
+	ptymanager.SetForeign(false)
+	assert.True(t, r.h.WakeIdleForDelivery(r.ctx, r.sid), "the same agent in its own folder is woken")
+}

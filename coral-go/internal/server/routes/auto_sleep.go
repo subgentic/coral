@@ -56,6 +56,9 @@ func (h *SessionsHandler) RunAutoSleep(ctx context.Context) {
 
 // autoSleepPass is one look at every awake agent.
 func (h *SessionsHandler) autoSleepPass(ctx context.Context, now time.Time) {
+	if ptymanager.Foreign() { // a Coral on a copy of another's database puts no agent to sleep: it would end the real agents' terminals (internal/dataowner)
+		return
+	}
 	settings, err := h.ss.GetSettings(ctx)
 	if err != nil || !setreg.Bool(settings, setreg.AutoSleep) {
 		return

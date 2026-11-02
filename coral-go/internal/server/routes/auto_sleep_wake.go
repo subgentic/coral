@@ -47,6 +47,9 @@ func (h *SessionsHandler) WakeIdleFor(ctx context.Context, sessionID string, fro
 	if ls.IsArchived != 0 || sleepReason(*ls) != store.SleepReasonIdle {
 		return false
 	}
+	if ptymanager.Foreign() { // a Coral on a copy of another's database wakes no one (internal/dataowner)
+		return false
+	}
 	mu, _ := autoWakeLocks.LoadOrStore(sessionID, &sync.Mutex{})
 	mu.(*sync.Mutex).Lock()
 	defer mu.(*sync.Mutex).Unlock()
