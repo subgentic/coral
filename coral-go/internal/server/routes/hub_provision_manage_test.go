@@ -395,6 +395,11 @@ func TestManageUpgradeRefusesADowngradeUnlessAllowed(t *testing.T) {
 	assert.False(t, remoteIsNewer("2.0.35+relaunchfixture", "2.0.35"), "the same release with metadata is not newer")
 	assert.Equal(t, "2.0.35+relaunchfixture", cleanVersionText("2.0.35+relaunchfixture"), "a plain release with build metadata is shown as it is")
 	assert.Equal(t, "", cleanVersionText("2.0.35+<b>"))
+	// what follows the plus is semver's [0-9A-Za-z.-] and nothing else, and not empty: a zero-width space, an escape, a bidi override or a second plus does not reach the page (Security's SHOULD)
+	for _, bad := range []string{"2.0.35+a\u200bb", "2.0.35+a\x1b[31m", "2.0.35+a\u202eb", "2.0.35+a+b", "2.0.35+", "2.0.35+a_b"} {
+		assert.Equal(t, "", cleanVersionText(bad), "%q", bad)
+	}
+	assert.Equal(t, "2.0.35+abc1234.dirty-1", cleanVersionText("2.0.35+abc1234.dirty-1"))
 	assert.Equal(t, "", cleanVersionText("2.0.33 <script>"))
 	assert.Equal(t, "2.0.33", cleanVersionText("2.0.33"))
 }

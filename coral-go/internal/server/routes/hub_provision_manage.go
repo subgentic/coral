@@ -97,8 +97,14 @@ func (pr *Provisioner) planManage(w http.ResponseWriter, r *http.Request, req pl
 	writeJSON(w, http.StatusCreated, p.view())
 }
 
+// buildMetadata is what semver allows after a version's plus.
+var buildMetadata = regexp.MustCompile(`^[0-9A-Za-z.-]+$`)
+
 // cleanVersionText is a version string a far computer answered with, kept only when it is a plain release version (it is shown on the page): anything else is "".
 func cleanVersionText(v string) string {
+	if i := strings.IndexByte(v, '+'); i >= 0 && !buildMetadata.MatchString(v[i+1:]) {
+		return "" // what follows the plus is semver's characters only, never empty: the far computer chose these bytes
+	}
 	if _, ok := semverorder.Parse(withoutBuild(v)); ok && len(v) <= 40 && !strings.ContainsAny(v, " \t\r\n<>&\"'") {
 		return v
 	}
