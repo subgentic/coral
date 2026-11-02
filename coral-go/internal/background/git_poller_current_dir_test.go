@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/linktest"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/internal/store/storetest"
 )
@@ -93,7 +94,7 @@ func TestAFolderSwappedForALinkToAnotherRepoIsNotReadAtTheNextPoll(t *testing.T)
 	assert.Equal(t, "feat-a", branch(), "approved: its own worktree")
 
 	require.NoError(t, os.RemoveAll(wt))
-	require.NoError(t, os.Symlink(other, wt)) // the folder is now a link to another repository
+	linktest.Symlink(t, other, wt) // the folder is now a link to another repository (skips where this account can't make a symbolic link)
 	require.NoError(t, p.PollOnce(context.Background()))
 	assert.Equal(t, "main", branch(), "the swap is not read: the launch folder is")
 
