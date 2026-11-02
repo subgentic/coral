@@ -775,3 +775,34 @@ func TestNewLaunchTagIs128BitsAndFresh(t *testing.T) {
 		seen[tag] = true
 	}
 }
+
+// The name to look for is the one this launch minted, not the label the machine reports (Security's F3, #9934): a machine that reports another name is shown as its own claim and the minted name stays the instruction.
+func TestLaunchTellsThePersonTheMintedNameNotTheMachinesClaim(t *testing.T) {
+	p, h := &stubProvider{}, &stubHub{}
+	o, d, out, srv := setupWith(t, p, h)
+	srv.status = "State:     connected\nServer:    some-other-machine\n"
+	_, err := Launch(context.Background(), o, d)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := out.String()
+	if !strings.Contains(text, `find "coral-1" and press Keep`) {
+		t.Fatalf("the instruction names what this launch minted: %s", text)
+	}
+	if !strings.Contains(text, "its own claim") || !strings.Contains(text, `"some-other-machine"`) {
+		t.Fatalf("the machine's own claim is shown, marked: %s", text)
+	}
+	if strings.Contains(text, `find "some-other-machine"`) {
+		t.Fatalf("the machine's claim became the instruction: %s", text)
+	}
+	// a machine that reports the same name adds nothing
+	p2, h2 := &stubProvider{}, &stubHub{}
+	o2, d2, out2, srv2 := setupWith(t, p2, h2)
+	srv2.status = "State:     connected\nServer:    coral-1\n"
+	if _, err := Launch(context.Background(), o2, d2); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out2.String(), "its own claim") {
+		t.Fatalf("the same name is not a claim: %s", out2.String())
+	}
+}

@@ -221,9 +221,12 @@ func Launch(ctx context.Context, o Options, d Deps) (*Result, error) {
 			return nil, fmt.Errorf("the machine did not take its credential: %w%s", err, note)
 		}
 	}
-	label := boot.Label
-	if label == "" {
-		label = o.Name
+	// The name to look for at the Hub is the one THIS launch minted the credential under, never the one the machine reports about itself (a compromised machine could name another pending machine). The machine's own
+	// claim is shown only when it differs, marked as the machine's own.
+	label := o.Name
+	own := ""
+	if boot.Label != "" && boot.Label != o.Name {
+		own = fmt.Sprintf(" (the machine itself reports the name %q: that is its own claim, not what this launch minted)", boot.Label)
 	}
 	var closeErr error
 	if net != nil { // the credential is delivered, so nothing is allowed in at the cloud firewall (the machine closes its own SSH too)
@@ -235,9 +238,9 @@ func Launch(ctx context.Context, o Options, d Deps) (*Result, error) {
 		cancel()
 	}
 	if boot.State == "connected" {
-		fmt.Fprintf(d.Out, "Launched %s at %s; its Coral is connected to Coral Hub. It is pending there: open %s, find %q and press Keep to approve it.\n", running.Name, running.IPv4, o.HubURL, label)
+		fmt.Fprintf(d.Out, "Launched %s at %s; its Coral is connected to Coral Hub. It is pending there: open %s, find %q and press Keep to approve it.%s\n", running.Name, running.IPv4, o.HubURL, label, own)
 	} else { // only "connecting": the machine has not confirmed that it reached the Hub, and this says so rather than "Launched"
-		fmt.Fprintf(d.Out, "The machine %s at %s reported connecting to Coral Hub, and has not confirmed it yet. Open %s and look for %q: if it is pending there, press Keep to approve it; if it does not show up in a few minutes, delete the machine.\n", running.Name, running.IPv4, o.HubURL, label)
+		fmt.Fprintf(d.Out, "The machine %s at %s reported connecting to Coral Hub, and has not confirmed it yet. Open %s and look for %q: if it is pending there, press Keep to approve it; if it does not show up in a few minutes, delete the machine.%s\n", running.Name, running.IPv4, o.HubURL, label, own)
 	}
 	res := &Result{Instance: running, Enrollment: boot}
 	if closeErr != nil { // SSH is still open at the firewall: a launch that opened SSH and cannot say it closed it did not finish (Security's ruling v). The record keeps firewall_open, so `coral machine delete` tries again and nothing says clean.
