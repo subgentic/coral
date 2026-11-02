@@ -9,7 +9,6 @@ import (
 	"io"
 	"net"
 	"regexp"
-	"slices"
 	"time"
 )
 
@@ -26,7 +25,7 @@ type Options struct {
 	// SSHFromLookup is where SSHFrom was looked up when the person did not give it ("api.ipify.org"); "" when they gave it. The confirm says so: the lookup tells that service this computer's address.
 	SSHFromLookup string
 	Wait          time.Duration
-	// RetryListAfter is how long a launch whose create timed out waits before it looks once more for a machine it may have made (a provider's list can lag the create); 0 is 5 seconds.
+	// RetryListAfter is how long a launch whose create timed out waits before it looks once more for a machine it may have made (a provider's list can lag the create); 0 is 60 seconds.
 	RetryListAfter time.Duration
 }
 
@@ -49,7 +48,9 @@ type Deps struct {
 	State *State
 	// Confirm shows the summary and asks; nil means no one can be asked, so only Options.Yes goes on.
 	Confirm func(summary string) (bool, error)
-	Out     io.Writer
+	// Interrupt is closed (or sent on) when the person interrupts a SECOND time: it ends the sweep's wait at once. nil never fires.
+	Interrupt <-chan struct{}
+	Out       io.Writer
 }
 
 // Revoker revokes the credential minted for a machine's label (and the identity enrolled from it, if it was redeemed).
@@ -153,12 +154,16 @@ func Launch(ctx context.Context, o Options, d Deps) (*Result, error) {
 		spec.VPCID = net.VPC.ID
 		ls.set(func(r *Record) { r.VPCID, r.FirewallID = net.VPC.ID, net.Firewall.ID }, d.Out)
 	}
+	want := sweepWant{Name: o.Name, Region: o.Region, Size: o.Size, Since: time.Now()}
 	inst, err := p.Create(ctx, spec)
 	userData, spec.UserData = "", "" // not kept past the call
 	if err != nil {
 		// A create that failed on the way (transport error, timeout, Ctrl-C) may still have made the machine: one with this launch's tag and name is deleted, then its network.
-		note := cleanupAfterFailedCreate(p, launchTag, d.Out, err, retryAfter(o))
-		return nil, fmt.Errorf("could not create the machine: %w%s%s", err, note, teardownNetworkOnly(p, net, ls, d.Out))
+		note, clean := sweepAfterFailedCreate(p, launchTag, want, err, retryAfter(o), d.Interrupt, d.Out)
+		if clean {
+			note += teardownNetworkOnly(p, net, ls, d.Out)
+		}
+		return nil, fmt.Errorf("could not create the machine: %w%s", err, note)
 	}
 	ls.set(func(r *Record) { r.DropletID = inst.ID }, d.Out)
 	fmt.Fprintf(d.Out, "Created %s (%s); waiting for it to run ...\n", inst.Name, inst.ID)
@@ -245,56 +250,18 @@ func newLaunchTag() (string, error) {
 	return "coral-launch-" + hex.EncodeToString(b[:]), nil
 }
 
-// cleanupAfterFailedCreate deletes an instance a failed Create may have made: only one that carries this launch's own tag (and the tool's), by its id, never one matched by name. A provider that cannot list says nothing.
-func cleanupAfterFailedCreate(p Provider, launchTag string, out io.Writer, createErr error, retryAfter time.Duration) string {
-	l, ok := p.(Lister)
-	if !ok {
-		return ""
-	}
-	note, found, listed := deleteTagged(l, p, launchTag, out)
-	// A create that timed out or was cancelled may still be under way at the provider: it can land after the first look (the list lags the create). Once more, a few seconds later, before giving up.
-	if listed && !found && (isTimeout(createErr) || errors.Is(createErr, context.Canceled)) {
-		time.Sleep(retryAfter)
-		var found2, listed2 bool
-		note, found2, listed2 = deleteTagged(l, p, launchTag, out)
-		if listed2 && !found2 { // still nothing: say where to look, because it may yet appear
-			fmt.Fprintf(out, "No machine for this launch showed up at %s yet, but it may still be being made: in a minute or two look for one tagged %s there; it costs money while it exists.\n", p.Name(), launchTag)
-			note += fmt.Sprintf("; no machine showed up yet, but it may still be made: look for tag %s at %s in a minute or two", launchTag, p.Name())
-		}
-	}
-	return note
-}
-
-// retryAfter is the wait before the second look.
-func retryAfter(o Options) time.Duration {
-	if o.RetryListAfter > 0 {
-		return o.RetryListAfter
-	}
-	return 5 * time.Second
-}
-
 // isTimeout reports whether err is a deadline or a network timeout.
 func isTimeout(err error) bool {
 	var ne net.Error
 	return errors.Is(err, context.DeadlineExceeded) || (errors.As(err, &ne) && ne.Timeout())
 }
 
-// deleteTagged lists once and deletes by id every instance with this launch's tag and the tool's. listed is false when the list itself failed (and the person is told where to look).
-func deleteTagged(l Lister, p Provider, launchTag string, out io.Writer) (note string, found, listed bool) {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	all, err := l.List(ctx)
-	if err != nil {
-		fmt.Fprintf(out, "Could not check whether %s made a machine for this launch: look for one tagged %s at %s, it costs money while it exists.\n", p.Name(), launchTag, p.Name())
-		return fmt.Sprintf("; could not check whether a machine was made: look for tag %s at %s", launchTag, p.Name()), false, false
+// retryAfter is the wait between the sweep's two looks.
+func retryAfter(o Options) time.Duration {
+	if o.RetryListAfter > 0 {
+		return o.RetryListAfter
 	}
-	for _, in := range all {
-		if slices.Contains(in.Tags, launchTag) && slices.Contains(in.Tags, Tag) {
-			found = true
-			note += cleanup(p, in.ID, out)
-		}
-	}
-	return note, found, true
+	return defaultSweepWait
 }
 
 // sshFromWords is the address SSH is open to, for the confirm.

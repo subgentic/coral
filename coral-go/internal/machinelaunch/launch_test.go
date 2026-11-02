@@ -493,7 +493,7 @@ func TestLaunchUserDataFailureCreatesAndMintsNothing(t *testing.T) {
 }
 
 func TestLaunchFailedCreateDeletesOnlyTheInstanceCarryingThisLaunchsTag(t *testing.T) {
-	base := &stubProvider{createErr: errors.New("connection reset")}
+	base := &stubProvider{createErr: io.ErrUnexpectedEOF} // cut off with no answer: the one kind of failure that may have landed
 	p := listingProvider{base}
 	base.listed = nil // filled once the launch's tag is known: the stub's Create saw the spec
 	h := &stubHub{}
@@ -515,15 +515,16 @@ type tagEchoProvider struct{ listingProvider }
 func (t *tagEchoProvider) List(context.Context) ([]Instance, error) {
 	t.stubProvider.calls = append(t.stubProvider.calls, "list")
 	tag := t.stubProvider.spec.Tags[1]
+	mine := t.stubProvider.spec
 	return []Instance{
-		{ID: "mine", Name: "coral-1", Tags: []string{Tag, tag}},
+		{ID: "mine", Name: "coral-1", Region: mine.Region, Size: mine.Size, Created: time.Now(), Tags: []string{Tag, tag}},
 		{ID: "same-name", Name: "coral-1", Tags: []string{Tag}},
 		{ID: "other-launch", Name: "x", Tags: []string{Tag, "coral-launch-aaaaaaaaaaaa"}},
 	}, nil
 }
 
 func TestLaunchFailedCreateWithAListFailureSaysWhereToLook(t *testing.T) {
-	base := &stubProvider{createErr: errors.New("timeout")}
+	base := &stubProvider{createErr: context.DeadlineExceeded}
 	base.listErr = errors.New("down")
 	o, d, out := setup(base, &stubHub{})
 	d.Provider = listingProvider{base}
@@ -562,7 +563,7 @@ func (l *laggingProvider) List(context.Context) ([]Instance, error) {
 	if l.lists == 1 {
 		return nil, nil
 	}
-	return []Instance{{ID: "late", Name: "coral-1", Tags: []string{Tag, l.spec.Tags[1]}}}, nil
+	return []Instance{{ID: "late", Name: "coral-1", Region: l.spec.Region, Size: l.spec.Size, Created: time.Now(), Tags: []string{Tag, l.spec.Tags[1]}}}, nil
 }
 
 func TestLaunchTimedOutCreateLooksOnceMoreAndDeletesTheLateMachine(t *testing.T) {
@@ -576,12 +577,12 @@ func TestLaunchTimedOutCreateLooksOnceMoreAndDeletesTheLateMachine(t *testing.T)
 	}
 }
 
-func TestLaunchCreateFailureThatIsNotATimeoutListsOnlyOnce(t *testing.T) {
-	base := &stubProvider{createErr: errors.New("422 unprocessable")}
+func TestLaunchCreateFailureThatIsAnAnswerNeverSweeps(t *testing.T) {
+	base := &stubProvider{createErr: &APIError{Provider: "stubcloud", Op: "create", Status: 422}}
 	l := &laggingProvider{stubProvider: base}
 	o, d, _ := setup(base, &stubHub{})
 	d.Provider, o.RetryListAfter = l, time.Millisecond
-	if _, err := Launch(context.Background(), o, d); err == nil || l.lists != 1 {
+	if _, err := Launch(context.Background(), o, d); err == nil || l.lists != 0 { // an answer from the provider never sweeps
 		t.Fatalf("lists %d, err %v", l.lists, err)
 	}
 }
@@ -603,7 +604,7 @@ func TestLaunchTimedOutCreateThatStillFindsNothingSaysWhereToLook(t *testing.T) 
 	o, d, out := setup(base, &stubHub{})
 	d.Provider, o.RetryListAfter = l, time.Millisecond
 	_, err := Launch(context.Background(), o, d)
-	if err == nil || l.lists != 2 || !strings.Contains(err.Error(), "look for tag coral-launch-") || !strings.Contains(out.String(), "costs money") {
+	if err == nil || l.lists != 2 || !strings.Contains(err.Error(), "for a machine tagged coral-launch-") || !strings.Contains(out.String(), "costs money") {
 		t.Fatalf("lists %d, err %v, out %s", l.lists, err, out.String())
 	}
 }

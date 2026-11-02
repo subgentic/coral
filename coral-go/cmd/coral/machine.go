@@ -78,6 +78,32 @@ func askOtherHub(stdin io.Reader, stdout io.Writer, hubURL, tokenFile, keyFile s
 	return a == "y" || a == "yes"
 }
 
+// secondInterrupt returns a channel that is closed when the person interrupts AGAIN after ctx was cancelled by the first interrupt (a Ctrl-C or SIGTERM). Without it a second Ctrl-C would kill the launch where it stands.
+func secondInterrupt(ctx context.Context, finished <-chan struct{}) <-chan struct{} {
+	second := make(chan struct{})
+	go func() {
+		select {
+		case <-ctx.Done():
+		case <-finished:
+			return
+		}
+		select {
+		case <-finished: // ctx ended because the launch did (stop ran), not because of a Ctrl-C: nothing to catch
+			return
+		default:
+		}
+		sigs := make(chan os.Signal, 1)
+		signal.Notify(sigs, os.Interrupt, syscall.SIGTERM)
+		defer signal.Stop(sigs)
+		select {
+		case <-sigs:
+			close(second)
+		case <-finished:
+		}
+	}()
+	return second
+}
+
 func runMachine(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) > 0 && (args[0] == "list" || args[0] == "delete" || args[0] == "prune" || args[0] == "egress-files") {
 		return runMachineManage(args[0], args[1:], stdin, stdout, stderr)
@@ -233,6 +259,9 @@ func runMachine(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	finished := make(chan struct{})
+	defer close(finished)
+	second := secondInterrupt(ctx, finished) // the first Ctrl-C cancels ctx; a SECOND one ends the sweep's wait at once (Security, #9934)
 	source, lookup := *sshFrom, ""
 	if source == "" {
 		if !canConfirmLookup(stdin, *tokenFile, *keyFile) { // the lookup tells a third party this computer's address: with no terminal to see and confirm that, the person names the address (Security, #9934)
@@ -245,7 +274,7 @@ func runMachine(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		lookup = publicIPHost()
 	}
 	deps := machinelaunch.Deps{
-		Provider: p, Hub: hub, Out: stdout, Bootstrap: newMachineBootstrap(), Isolate: true, State: launchState, // every launch makes its own VPC and firewall and keeps its ids (#10918)
+		Provider: p, Hub: hub, Out: stdout, Interrupt: second, Bootstrap: newMachineBootstrap(), Isolate: true, State: launchState, // every launch makes its own VPC and firewall and keeps its ids (#10918)
 		UserData: func(keys *machinelaunch.BootKeys) (string, error) {
 			return machineUserData(keys, source, *maxMode, version, digests, *hubURL, agentList)
 		},
