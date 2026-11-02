@@ -308,7 +308,13 @@ func runFar(f farCfg, text string) int {
 			}
 		}
 		return 0
-	case has(`rm -rf "$HOME/` + InstallDir + `"`):
+	case has(`rm -rf -- "$d"`): // CmdRemoveAll, with its guard: not a link, and a Coral's (the instance id file, no link); sshprov's own test runs the real template in a shell
+		if fi, err := os.Lstat(install); err == nil {
+			id, ierr := os.Lstat(filepath.Join(install, "instance-id"))
+			if fi.Mode()&os.ModeSymlink != 0 || !fi.IsDir() || ierr != nil || !id.Mode().IsRegular() {
+				return 7
+			}
+		}
 		_ = os.RemoveAll(install)
 		return 0
 	case has("package.tar.gz\"") && has("cat >"):

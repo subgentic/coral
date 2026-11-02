@@ -58,7 +58,7 @@ const (
 	CmdStopDaemon
 	// CmdRemoveInstalls deletes the installed releases (the numbered folders) under the install folder and keeps the data, the instance id and the key.
 	CmdRemoveInstalls
-	// CmdRemoveAll deletes the whole install folder: releases, data (the key, the history), the instance id.
+	// CmdRemoveAll deletes the whole install folder: releases, data (the key, the history), the instance id. Only a folder that is a Coral's and no link (exit 7 otherwise, nothing deleted).
 	CmdRemoveAll
 	// CmdCheckStopped is the check after a stop: exit 0 only when there is no tmux session named exactly coral-server and no process of THIS user is running a Coral from the install folder (read from ps);
 	// 1 for a session, 2 for such a process, 3 when it cannot tell (no ps -u): all of them are "not confirmed". It is the user's own process that counts, never the port: another user of the same computer
@@ -129,7 +129,9 @@ var specs = map[Command]spec{
 	CmdStopDaemon:       {template: aliveTest + " && kill \"$(cat \"$HOME/" + InstallDir + "/coral.pid\")\" 2>/dev/null; true"},
 	CmdStopTmux:         {template: "tmux kill-session -t =coral-server 2>/dev/null; true"},
 	CmdRemoveInstalls:   {template: "cd \"$HOME/" + InstallDir + "\" 2>/dev/null && for d in [0-9]*; do [ -d \"$d\" ] && rm -rf -- \"$d\"; done; true"},
-	CmdRemoveAll:        {template: "[ -n \"$HOME\" ] && rm -rf \"$HOME/" + InstallDir + "\""},
+	// Never a link, never a folder that is not a Coral's (it has the instance id file this hub's setup made, and that file is no link): exit 7 for those, nothing deleted; exit 0 when there is nothing to delete (#12263).
+	CmdRemoveAll: {template: "[ -n \"$HOME\" ] || exit 1; d=\"$HOME/" + InstallDir + "\"; if [ ! -e \"$d\" ] && [ ! -L \"$d\" ]; then exit 0; fi; " +
+		"if [ -L \"$d\" ] || [ ! -d \"$d\" ] || [ -L \"$d/instance-id\" ] || [ ! -f \"$d/instance-id\" ]; then exit 7; fi; rm -rf -- \"$d\""},
 	CmdCheckStopped: {template: "if tmux has-session -t =coral-server 2>/dev/null; then exit 1; fi; out=$(ps -u \"$(id -u)\" -o args= 2>/dev/null) || exit 3; " +
 		"if printf '%%s\\n' \"$out\" | grep -F -- \"$HOME/" + InstallDir + "/\" | grep -Eq '/root/coral( |$)'; then exit 2; fi; exit 0"},
 	CmdCheckPort: {template: "if tmux has-session -t =coral-server 2>/dev/null; then exit 0; fi; if " + aliveTest + "; then exit 0; fi; [ -r /proc/net/tcp ] || exit 3; " +

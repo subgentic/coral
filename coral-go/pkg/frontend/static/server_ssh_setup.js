@@ -99,6 +99,17 @@ export function mountSshSetup(host, { mode = 'setup', server = null, action = nu
         draw();
     }
 
+    // Remove's choice of what happens to the data (#12263): the plan the person confirms says it (delete_data), so changing the choice makes a new plan before anything connects, and the old one is dropped.
+    async function replanRemove(deleteData) {
+        const old = st.plan && st.plan.plan;
+        st.busy = true; st.error = ''; draw();
+        if (old) { try { await api('DELETE', `/api/servers/provision/${encodeURIComponent(old)}`); } catch { /* it expires */ } }
+        const r = await api('POST', '/api/servers/provision/plan', { server_id: server.id, action: REMOVE, delete_data: !!deleteData });
+        if (st.dead) return;
+        if (!apply(r, 'Could not plan that.')) st.step = 'failed';
+        draw();
+    }
+
     async function connect() {
         st.busy = true; st.error = ''; draw();
         const r = await api('POST', `/api/servers/provision/${encodeURIComponent(st.plan.plan)}/connect`);
@@ -252,6 +263,14 @@ export function mountSshSetup(host, { mode = 'setup', server = null, action = nu
         if (versions()) { fact('This computer runs', p.remote_version ? `Coral ${p.remote_version}` : 'Not known (it did not answer)'); fact('This hub runs', `Coral ${p.hub_version}`); }
         if (kind() === REMOVE) fact('Data', p.delete_data ? 'Deleted too: the key, the history and the install folder.' : 'Kept: the data, the key and the instance id stay on that computer.');
         root.append(el('p', 'ssh-intro', words().intro), dl, el('h5', 'ssh-subhead', 'What will happen'), stepList(p.steps));
+        if (kind() === REMOVE) {
+            const row = el('label', 'ssh-check');
+            const cb = el('input', 'check'); cb.type = 'checkbox'; cb.id = 'ssh-delete-data'; cb.checked = !!p.delete_data; cb.disabled = st.busy;
+            cb.addEventListener('change', () => replanRemove(cb.checked));
+            row.append(cb, el('span', '', ' Also delete its data on that computer.'));
+            root.append(row);
+            if (p.delete_data) root.append(el('p', 'ssh-note ssh-delete-warning', 'This deletes the whole Coral folder on that computer (~/.coral-server): its key, its history and its instance id. It cannot be undone. Only a Coral folder that is not a link is deleted; anything else is left alone and the removal stops.'));
+        }
         root.append(el('p', 'ssh-help', 'Nothing has connected yet. The next press connects, and checks the host key.'));
         if ((p.forgotten_keys || []).length) { const old = el('p', 'ssh-help'); old.append('The key Coral had saved for this computer, now forgotten: '); for (const k of p.forgotten_keys) old.append(el('code', 'ssh-key-fp', `${k.type} ${k.fingerprint} `)); old.append('The next step shows the key the computer has now, to set beside it.'); root.append(old); }
         const bar = el('div', 'servers-form-actions');
