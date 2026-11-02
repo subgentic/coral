@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { coralReady } = require('./helpers/wait');
+const { osNeutralCli } = require('./helpers/os_neutral_cli');
 
 const BUDGET = { chooser: 52, /* the title "New agent or project" (#7064) and the four description lines the type cards say again (#9253, the Operator): 10 + 9 + 10 + 11 words */ folder: 32, /* the 28 words of the folder step and the one way to a team from it, 'Start a team instead' (#11289) */ persona: 81, agent: 72 /* the provider cards (#11235): each installed one says 'Installed', and 'Installed · default <name>' only when a default is saved (five providers with OpenCode: 78 words with 'default model' on each, 63 without; v2.0.10), and a missing one is a name and an Install link under 'Not installed' (the mockup's stated cost: most information) */ }; // the three New Agent steps as the design words them (#7391): measured at 1280 px (the phone shows fewer). Step 1's 30 includes the 10-word "Next: the persona, then model and permissions. All have defaults." line (UI/UX cut it from 20), the step header, the screen-reader reason for Next and the Recent: label
 
@@ -23,6 +24,7 @@ const BUDGET = { chooser: 52, /* the title "New agent or project" (#7064) and th
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
             await coralReady(ev);
             await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'launch_server.js'); localStorage.removeItem(m.recentDirsKey('local')); return true; })()`); // an earlier suite's folders would add the Recent: row to the count
+            await osNeutralCli(ev); // a Windows server says Hermes is not offered and the dialog adds a line: the budget is the other servers' (#12398)
             await ev(`(async () => { await window.showLaunchModal(); return true; })()`);
             await waitFor(`getComputedStyle(document.getElementById('launch-step-chooser')).display !== 'none'`, `${tag}: the chooser`, 8000);
             let n = await words();
