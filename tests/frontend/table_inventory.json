@@ -107,7 +107,7 @@
    "file": "server_table.js",
    "calls": 1,
    "surface": "Coral Hub: Servers",
-   "covered_by": "servers"
+   "covered_by": "servers (live hub)"
   },
   {
    "file": "task_list.js",

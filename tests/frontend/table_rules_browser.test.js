@@ -132,6 +132,18 @@ const MODE = process.env.CORAL_TABLE_RULES || 'off';
             await ev(`window.switchNavTab('tokens'); true`); await settle(1500);
             if (view === 'calls') { await ev(`(() => { if (!document.querySelector('#cost-nav-list .row-btn[data-view="calls"]')) document.querySelector('#cost-nav-list [data-on-click="analytics-advanced"]')?.click(); return true; })()`); await settle(300); }
             await ev(`(() => { const g = ({ provider: 'Provider', agent: 'Agent' })[${JSON.stringify(view)}]; const b = g ? [...document.querySelectorAll('#cost-group-bar .eff-seg-btn')].find(x => x.textContent === g) : document.querySelector('#cost-nav-list .row-btn[data-view="${view}"]'); if (b) b.click(); return !!b; })()`); await settle(900); return true; } }); // a grouping is Overview's Group by
+        // Servers of a self-hosted Hub (servers_page_browser's world): the registry through the real tab, three computers (one this one, one unreachable with a warning), an agent waiting on one of them.
+        const HUB_WORLD = `(() => { const R = window.fetch; window.__list = [{ id: 'local', label: 'studio-mac', local: true, status: 'online' }, { id: 'epoch', label: 'epoch', url: 'https://epoch.example.net:8420', status: 'online', version: '2.0.30' }, { id: 'lan', label: 'LAN box', url: 'http://192.168.1.50:8420', status: 'unreachable', last_error: 'dial tcp: i/o timeout', allow_private: true, warning: 'the key crosses the network unencrypted; use https or a tunnel', last_seen: '2026-10-13T00:00:00Z' }];
+            window.fetch = (u, o = {}) => { const p = new URL(String(u), location.origin).pathname, m = (o.method || 'GET').toUpperCase(), json = b => Promise.resolve(new Response(JSON.stringify(b), { status: 200, headers: { 'content-type': 'application/json' } }));
+                if (p === '/api/health') return json({ status: 'ok', hub: true, version: '1.4.75' });
+                if (p === '/api/servers' && m === 'GET') return json(window.__list);
+                return R(u, o); }; })();`;
+        surfaces.push({ name: 'servers (live hub)', root: 'body', mixes: ['mixed'], live: true, phoneW: 390, mount: async (mix, w) => {
+            await size(w, w < 600); const { identifier } = await Page.addScriptToEvaluateOnNewDocument({ source: HUB_WORLD });
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev); await Page.removeScriptToEvaluateOnNewDocument({ identifier }); await ev(SPECS);
+            await ev(`(async () => { const s = await import((window.__coralStatic || '/static/') + 'state.js'); s.state.hub = true; s.state.servers = window.__list; s.state.liveSessions = [{ session_id: 'w1', name: 'waiter', agent_type: 'claude', server: 'lan', waiting_for_input: true }]; window.switchNavTab('servers'); return true; })()`);
+            for (let i = 0; i < 60 && !(await ev(`!!document.querySelector('#server-row-lan')`)); i++) await settle(250);
+            return true; } });
         surfaces.push({ name: 'tasks (live Inbox)', root: '#group-table-view', mixes: ['mixed'], live: true, phoneW: 390, mount: async (mix, w) => { await openLive(w, 'tasks'); await rowsOn(3); return true; } });
         surfaces.push({ name: 'goals (live Inbox)', root: '#group-table-view', mixes: ['mixed'], live: true, phoneW: 390, mount: async (mix, w) => { await openLive(w, 'goals'); await rowsOn(3); return true; } });
         const NONE = { folded: true, panelW: 0, tableW: 0, boxOver: 0, tableOver: 0, pageOver: 0, vw: 0, rows: 0, cols: [] };
