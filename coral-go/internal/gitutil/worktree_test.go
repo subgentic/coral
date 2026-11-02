@@ -28,11 +28,12 @@ func TestRemoveWorktree(t *testing.T) {
 	add := func() { gitIn(t, repo, "worktree", "add", "-b", "coral-team/team", "--", wt, "master") }
 
 	add()
+	require.True(t, hasWorktreeNamed(t, repo, "team"), "the check below sees a registered worktree")
 	got, err := RemoveWorktree(ctx, repo, wt, "coral-team/team")
 	require.NoError(t, err)
 	assert.Equal(t, WorktreeOutcome{State: "removed", Path: wt, Branch: "coral-team/team"}, got)
 	assert.NoDirExists(t, wt)
-	assert.NotContains(t, gitIn(t, repo, "worktree", "list"), "team")
+	assert.False(t, hasWorktreeNamed(t, repo, "team"), "no worktree folder named team is registered")
 	assert.Empty(t, gitIn(t, repo, "branch", "--list", "coral-team/team"), "nothing on the branch: it goes")
 
 	// the repository given as the folder that is none: found from the worktree
@@ -65,7 +66,7 @@ func TestRemoveWorktree(t *testing.T) {
 	got, err = RemoveWorktree(ctx, repo, wt, "")
 	require.NoError(t, err)
 	assert.Equal(t, "removed", got.State)
-	assert.NotContains(t, gitIn(t, repo, "worktree", "list"), "team")
+	assert.False(t, hasWorktreeNamed(t, repo, "team"), "no worktree folder named team is registered")
 
 	// something that is no worktree of any repository is said, in one line
 	_, err = RemoveWorktree(ctx, "", t.TempDir(), "")
@@ -160,7 +161,7 @@ func TestAddTeamWorktreeFailedCheckoutLeavesNoBranch(t *testing.T) {
 	_, err := AddTeamWorktree(ctx, repo, filepath.Join(t.TempDir(), "team"), "coral-team/broken", "master")
 	require.Error(t, err)
 	assert.Empty(t, gitIn(t, repo, "branch", "--list", "coral-team/broken"), "no branch is left behind")
-	assert.NotContains(t, gitIn(t, repo, "worktree", "list"), "team")
+	assert.False(t, hasWorktreeNamed(t, repo, "team"), "no worktree folder named team is registered")
 }
 
 // A base that exists only on the remote starts from the remote's branch.
@@ -215,4 +216,16 @@ func TestRemoveWorktreeNeverTouchesARepositoryThatDoesNotListTheFolder(t *testin
 	require.NoError(t, err)
 	assert.Equal(t, "removed", out.State)
 	assert.NoDirExists(t, listed)
+}
+
+// hasWorktreeNamed: a worktree of repo whose folder is called name is registered (git worktree list --porcelain). It looks at each worktree's own folder name, so a temporary folder whose path
+// happens to contain the name (D:\coral-team-cache\...) does not count.
+func hasWorktreeNamed(t *testing.T, repo, name string) bool {
+	t.Helper()
+	for _, line := range strings.Split(gitIn(t, repo, "worktree", "list", "--porcelain"), "\n") {
+		if p, ok := strings.CutPrefix(strings.TrimSpace(line), "worktree "); ok && filepath.Base(filepath.FromSlash(p)) == name {
+			return true
+		}
+	}
+	return false
 }

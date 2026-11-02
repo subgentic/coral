@@ -145,6 +145,7 @@ func TestBranchMissingLeavesOutCoralsOwnBranches(t *testing.T) {
 	var missing *BranchMissingError
 	require.ErrorAs(t, err, &missing)
 	assert.Equal(t, []string{"develop", "master"}, missing.Branches)
-	assert.NotContains(t, err.Error(), "coral-team")
-	assert.NotContains(t, err.Error(), "job-run")
+	// the branch names themselves, not "coral-team": the message names the folder, whose temporary path can contain that word (D:\coral-team-cache\...)
+	assert.NotContains(t, err.Error(), "coral-team/b-abc123")
+	assert.NotContains(t, err.Error(), "coral/job-run-12")
 }
