@@ -35,7 +35,7 @@ export function createComposer({ st, render, run, ownHex }) {
             if (!text && !pictures.length) { st.error = 'Write something first.'; err.textContent = st.error; err.hidden = false; return; }
             send.disabled = true;
             if (editOf) run(() => api.editComment(ownHex(editOf), st.server, editOf.id, text), 'Comment saved');
-            else run(async () => { const c = await api.createComment(cm.hex || st.hex, st.server, { body: text, anchor: cm.anchor, parentId: cm.parentId, board: st.board, images: pictures }); if (tray) tray.destroy(); st.active = c.id; st.scrollCard = true; }, cm.parentId != null ? 'Reply posted' : 'Comment posted');
+            else run(async () => { const c = await api.createComment(cm.hex || st.hex, st.server, { body: text, anchor: cm.anchor, parentId: cm.parentId, board: st.board, images: pictures }); if (tray) tray.destroy(); st.active = c.id; st.scrollCard = true; return c.sentTo; }, cm.parentId != null ? 'Reply posted' : 'Comment posted');
         });
         ta.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); cancel.click(); } else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) box.requestSubmit(); });
         return box;

@@ -93,10 +93,8 @@ func TestTheOperatorsCommentOnAForReviewUploadReachesTheUploaderOnce(t *testing.
 	assert.Contains(t, msgs[1].Content, fmt.Sprintf("%s %d \"your reply\"", cmtDoc, cid), "the reply command names the thread's first comment")
 }
 
-func TestACommentThatIsNotOnAForReviewUploadOfAnAgentSendsNothing(t *testing.T) {
+func TestACommentOnAnArtifactNoAgentUploadedOnThisBoardSendsNothing(t *testing.T) {
 	cases := map[string]func(rig *cmtRig){
-		"the artifact is not for review": func(rig *cmtRig) { rig.tag("final") },
-		"no tag at all":                  func(rig *cmtRig) {},
 		"no agent uploaded it": func(rig *cmtRig) {
 			rig.tag("for review")
 			require.NoError(rig.t, os.RemoveAll(uploadsDir(rig.h.cfg.CoralDir(), sendSid(1))))
@@ -308,4 +306,66 @@ func TestOperatorCommentSaysOnlyTheOwnerIsTheOperator(t *testing.T) {
 	} {
 		assert.Equal(t, tc.want, rig.h.operatorComment(tc.r, tc.c), name)
 	}
+}
+
+// #12203: the owner's comment reaches the file's uploader whatever its tag says (a research file or a design note is not "for review", and the Operator still expects an answer).
+func TestTheOperatorsCommentOnAnUploadThatIsNotForReviewReachesTheUploader(t *testing.T) {
+	for name, setup := range map[string]func(rig *cmtRig){"no tag at all": func(rig *cmtRig) {}, "another tag": func(rig *cmtRig) { rig.tag("final") }} {
+		t.Run(name, func(t *testing.T) {
+			rig := newCmtRig(t)
+			rig.agent(1, "Dev", false)
+			rig.uploadedBy(1, "team-a")
+			setup(rig)
+			code, out := rig.commentAs(cmtAsOwner, nil)
+			require.Equal(t, http.StatusCreated, code, fmt.Sprint(out))
+			assert.Equal(t, "Dev", out["sent_to"])
+			require.Len(t, rig.operatorMessages(), 1)
+			_, found, _ := rig.ss.GetArtifactAsk(context.Background(), int64(out["id"].(float64)), sendSid(1))
+			assert.True(t, found, "the ask that lets the agent answer in the thread")
+		})
+	}
+}
+
+// #12203: the owner's reply in a thread reaches the agents already in it (asked by hand or by the first comment), each once, and no other agent.
+func TestTheOperatorsReplyInAThreadReachesTheAgentsAlreadyInIt(t *testing.T) {
+	rig := newCmtRig(t)
+	rig.agent(1, "Dev", false)
+	rig.agent(2, "QA", false)
+	rig.agent(3, "Ops", false)
+	rig.uploadedBy(1, "team-a")
+	code, root := rig.commentAs(cmtAsOwner, map[string]any{"notify_agent": false})
+	require.Equal(t, http.StatusCreated, code, fmt.Sprint(root))
+	cid := int64(root["id"].(float64))
+	require.Empty(t, rig.operatorMessages(), "the first comment was kept from the agents")
+	code, out := rig.send(cid, "Dev", "QA")
+	require.Equal(t, http.StatusOK, code, fmt.Sprint(out))
+	before := len(rig.operatorMessages())
+
+	code, rep := rig.do("POST", cp(cmtDoc), cmtAsOwner, map[string]any{"body": "Provide some options we could use as hooks.", "parent_id": cid, "board": "team-a"})
+	require.Equal(t, http.StatusCreated, code, fmt.Sprint(rep))
+	assert.Contains(t, []any{"Dev, QA", "QA, Dev"}, rep["sent_to"], "the answer says who it went to")
+	msgs := rig.operatorMessages()
+	require.Len(t, msgs, before+2, "one message to each agent in the thread")
+	var text string
+	for _, m := range msgs[before:] {
+		text += m.Content
+		assert.Contains(t, m.Content, "Provide some options we could use as hooks.")
+		assert.NotContains(t, m.Content, "@Ops ")
+	}
+	assert.Contains(t, text, "@Dev ")
+	assert.Contains(t, text, "@QA ")
+}
+
+// A reply in a thread nobody was asked into goes to the uploader, as a first comment does.
+func TestTheOperatorsReplyInAThreadNobodyIsInGoesToTheUploader(t *testing.T) {
+	rig := newCmtRig(t)
+	rig.agent(1, "Dev", false)
+	rig.agent(2, "QA", false)
+	rig.uploadedBy(1, "team-a")
+	_, root := rig.commentAs(cmtAsOwner, map[string]any{"notify_agent": false})
+	cid := int64(root["id"].(float64))
+	code, rep := rig.do("POST", cp(cmtDoc), cmtAsOwner, map[string]any{"body": "did you get my comment?", "parent_id": cid, "board": "team-a"})
+	require.Equal(t, http.StatusCreated, code, fmt.Sprint(rep))
+	assert.Equal(t, "Dev", rep["sent_to"])
+	require.Len(t, rig.operatorMessages(), 1)
 }

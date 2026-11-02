@@ -39,7 +39,7 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
                 const can = c => ({ reply: me === 'owner' && !window.__locked && c.parent_id == null, edit: mine(c) && !window.__locked, delete: mine(c), resolve: me === 'owner' && !window.__locked && c.parent_id == null });
                 if (method === 'GET') return json({ comments: window.__cs.filter(c => !c.deleted_at || window.__cs.some(r => r.parent_id === c.id && !r.deleted_at)).map(c => ({ ...c, deleted: !!c.deleted_at, body: c.deleted_at ? '' : c.body, mine: mine(c), can: can(c) })), locked: window.__locked, you: { kind: me === 'owner' ? 'owner' : 'hub', name: me === 'owner' ? 'Operator' : 'hub-user-3f2a', can_comment: me === 'owner' && !window.__locked, reason: me === 'owner' ? '' : 'Your Coral Hub access is view only.', can_lock: me === 'owner' }, limits: { body: 8192, quote: 2048, comments: 500 } });
                 if (me !== 'owner' && sub !== '') return json({ error: 'Your Coral Hub access is view only.' }, 403);
-                if (method === 'POST' && sub === '') { const b = JSON.parse(o.body); const c = { id: window.__next++, parent_id: b.parent_id == null ? null : b.parent_id, anchor: b.anchor, body: b.body, author: { kind: 'owner', issuer: 'local', subject: 'Operator' }, created_at: new Date().toISOString() }; window.__cs.push(c); return json({ ...c, can: can(c) }, 201); }
+                if (method === 'POST' && sub === '') { const b = JSON.parse(o.body); const c = { id: window.__next++, parent_id: b.parent_id == null ? null : b.parent_id, anchor: b.anchor, body: b.body, author: { kind: 'owner', issuer: 'local', subject: 'Operator' }, created_at: new Date().toISOString() }; window.__cs.push(c); return json({ ...c, can: can(c), ...(b.parent_id != null ? { sent_to: 'Dev, QA' } : {}) }, 201); }
                 const m = /^\\/(\\d+)(\\/(resolve|reopen))?$/.exec(sub); const c = m && window.__cs.find(x => x.id === Number(m[1]));
                 if (m && c) {
                     if (method === 'PATCH') { c.body = JSON.parse(o.body).body; c.edited_at = new Date().toISOString(); return json({ ...c, can: can(c) }); }
@@ -174,6 +174,7 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
             await ev(`(() => { const t = document.querySelector('.ac-composer .ac-input'); t.value = 'Thanks'; t.dispatchEvent(new Event('input')); document.querySelector('.ac-composer').requestSubmit(); return true; })()`);
             await waitFor(`[...document.querySelectorAll('.ac-reply')].some(c => /Thanks/.test(c.textContent))`, 'the reply', 5000);
             const rc = (await ev(`window.__calls.filter(c => c.method === 'POST').pop()`)).body;
+            check(`${at}: the owner's reply says who it was sent to (#12203)`, await ev(`[...document.querySelectorAll('.toast-message')].some(t => t.textContent === 'Sent to Dev, QA')`));
             check(`${at}: a reply is posted with its thread's id and no anchor of its own`, rc.parent_id === 1 && !('anchor' in rc), JSON.stringify(rc));
             // edit own
             await ev(`${topAct(1, 'Edit')}.click(); true`);

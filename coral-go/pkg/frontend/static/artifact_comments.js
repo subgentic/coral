@@ -285,7 +285,7 @@ export function attachComments(dialog, body, host, opts = {}) {
     async function run(fn, said) {
         if (st.busy) return;
         st.busy = true;
-        try { await fn(); st.error = ''; st.composing = null; await refresh(); if (said) announce(said); }
+        try { const sentTo = await fn(); st.error = ''; st.composing = null; await refresh(); if (said) announce(said + (typeof sentTo === 'string' && sentTo ? `. Sent to ${sentTo}` : '')); if (typeof sentTo === 'string' && sentTo) showToast(`Sent to ${sentTo}`, false); } // the owner's comment reaches the agent on its own (#12203): the person sees who got it
         catch (e) { st.error = e.message || 'The change was refused.'; showToast(st.error, true); render(); }
         finally { st.busy = false; }
     }
