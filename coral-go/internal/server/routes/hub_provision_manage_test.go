@@ -500,3 +500,28 @@ func TestProvisionListFindsTheManagePlanOfAComputerOnceItRuns(t *testing.T) {
 	require.Equal(t, 200, code)
 	assert.Empty(t, list(), "dismissed")
 }
+
+// QA's shapes of the list (#12372): a first-time Set up plan has no registered computer and is not listed, a failed plan is (its page says "did not finish"), two plans come in the order they started, and a plan past its
+// lifetime is gone.
+func TestProvisionListShapes(t *testing.T) {
+	me := newManageEnv(t)
+	now := time.Now()
+	add := func(id, serverID, kind, phase string, started time.Time) {
+		me.p.mu.Lock()
+		defer me.p.mu.Unlock()
+		me.p.plans[id] = &provisionPlan{ID: id, ServerID: serverID, Kind: kind, phase: phase, created: started}
+	}
+	add("setup", "", kindSetup, phaseRunning, now.Add(-time.Minute))        // no computer registered yet
+	add("later", "ssh-box", kindStop, phaseFailed, now.Add(-2*time.Minute)) // started after "earlier"
+	add("earlier", "ssh-two", kindUpgrade, phaseRunning, now.Add(-3*time.Minute))
+	add("stale", "ssh-box", kindRemove, phaseDone, now.Add(-provisionTTL-time.Minute))
+	add("shown", "ssh-box", kindStop, phasePlanned, now)
+	code, v := me.do("GET", "/api/servers/provision", nil)
+	require.Equal(t, 200, code, "%v", v)
+	var got []string
+	for _, r := range v["plans"].([]any) {
+		row := r.(map[string]any)
+		got = append(got, row["plan"].(string)+":"+row["phase"].(string))
+	}
+	assert.Equal(t, []string{"earlier:running", "later:failed"}, got, "a failed plan is listed, the two are in start order, and the setup, the stale and the only-shown plans are not")
+}
