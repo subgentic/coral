@@ -122,7 +122,21 @@ async function applySettingsEffects({ themeSaved, theme, customTheme, fitPaneWid
     }
 }
 
+/** The idle minutes before auto-sleep are 15 to 1440 (#12111). A value outside that is said and not saved: it used to be sent as the nearest end, so 5 became 15 without a word (#12328). Returns true when it is fine. */
+async function idleMinutesOk() {
+    const idle = document.getElementById('settings-auto-sleep-minutes'), text = idle ? idle.value.trim() : '';
+    if (!idle || text === '') return true;
+    const n = Number(text);
+    if (Number.isInteger(n) && n >= 15 && n <= 1440) { idle.removeAttribute('aria-invalid'); return true; }
+    idle.setAttribute('aria-invalid', 'true');
+    const group = idle.closest('[data-group]')?.dataset.group; if (group) { try { (await importOnce('./settings_nav.js')).openSettingsGroup(group); } catch { /* the toast says it */ } } // the section it sits in, so the field is there to fix
+    idle.focus();
+    showToast(`Idle time is 15 to 1440 minutes, so ${text} was not saved. Enter a whole number in that range.`, true);
+    return false;
+}
+
 export async function applySettings() {
+    if (!(await idleMinutesOk())) return;
     const form = readSettingsForm();
     browserLocal.set("coral-update-check-enabled", form.checkUpdates ? "true" : "false");
     const oldGitDiffMode = state.settings?.git_diff_mode || 'previous_commit';

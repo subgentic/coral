@@ -57,10 +57,16 @@ const BASE = require('./test_base').BASE;
     const sent = await ev(`window.__settingsPut[0]`);
     assert.equal(sent.auto_sleep, false, 'saved as off');
     assert.equal(sent.auto_sleep_idle_minutes, '90', 'saved as 90');
-    await ev(`(async()=>{document.getElementById('settings-auto-sleep-minutes').value='5';await Promise.resolve(window.applySettings())})()`);
-    assert.equal(await ev(`window.__settingsPut[1].auto_sleep_idle_minutes`), '15', 'below the range is sent as 15');
-    await ev(`(async()=>{document.getElementById('settings-auto-sleep-minutes').value='99999';await Promise.resolve(window.applySettings())})()`);
-    assert.equal(await ev(`window.__settingsPut[2].auto_sleep_idle_minutes`), '1440', 'above the range is sent as 1440');
+    // Outside the range is said and not saved (#12328; it was sent as the nearest end, so 5 became 15 silently): no request, the field marked
+    for (const bad of ['5', '99999', '14', '1441']) {
+      const before = await ev(`window.__settingsPut.length`);
+      await ev(`(async()=>{document.getElementById('settings-auto-sleep-minutes').value=${JSON.stringify(bad)};await Promise.resolve(window.applySettings())})()`);
+      assert.equal(await ev(`window.__settingsPut.length`), before, `${bad} is refused: no request`);
+      assert.equal(await ev(`document.getElementById('settings-auto-sleep-minutes').getAttribute('aria-invalid')`), 'true', `${bad} marks the field`);
+    }
+    await ev(`(async()=>{document.getElementById('settings-auto-sleep-minutes').value='15';await Promise.resolve(window.applySettings())})()`);
+    assert.equal(await ev(`window.__settingsPut[window.__settingsPut.length - 1].auto_sleep_idle_minutes`), '15', '15 is saved as 15');
+    assert.equal(await ev(`document.getElementById('settings-auto-sleep-minutes').getAttribute('aria-invalid')`), null, 'and the mark is gone');
 
     // The real dialog has both, with their words.
     await Page.navigate({ url: BASE }); await Page.loadEventFired();
