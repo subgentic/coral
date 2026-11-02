@@ -30,6 +30,7 @@ func TestAKickedIndexerListsANewCodexConversationWithoutWaitingForTheInterval(t 
 	t.Cleanup(func() { db.Close() })
 	ss := store.NewSessionStore(db)
 	idx := NewSessionIndexer(ss, []agent.HistoryScanner{&agent.CodexAgent{}}, time.Hour, 0)
+	require.NoError(t, idx.store.ImportEarlierChats(ctx)) // these chats are not Coral's own: the person has imported them (#11970)
 	done := make(chan struct{})
 	go func() { defer close(done); idx.Run(ctx) }()
 	t.Cleanup(func() { cancel(); <-done })

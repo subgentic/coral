@@ -39,6 +39,7 @@ func TestIndexerPassWritesEverySessionInBatches(t *testing.T) {
 	}
 	fs.sessions[10].FTSBody = "" // no text: no search row
 	idx := NewSessionIndexer(ss, []agent.HistoryScanner{fs}, time.Hour, 0)
+	require.NoError(t, idx.store.ImportEarlierChats(ctx)) // these chats are not Coral's own: the person has imported them (#11970)
 	require.Greater(t, n, 2*indexerFTSBatch)
 	require.NoError(t, idx.RunOnce(ctx))
 	count := func(q string, args ...any) int {
