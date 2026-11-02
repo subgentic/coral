@@ -89,3 +89,33 @@ func TestMentionGapResolvesAMentionToTheLongestMemberNameItFullyMatches(t *testi
 	m, _ := MentionGap("Backend Dev", "", partial)
 	assert.Equal(t, m, n)
 }
+
+// QA's three pins on #12352: where a name ends. A mention is a whole name only when the next character does not continue a word (a letter, a digit, "_" or "-"), and a member is also reached by its job title.
+func TestMentionGapNameBoundariesAndJobTitles(t *testing.T) {
+	members := []string{"Alice", "Bob Builder", "Dev One", "Developer", "Developer Operations", "Ops"}
+	try := post("QA", "@Ali take a look", 5*time.Minute) // a real partial address of Alice: a gap until a proper mention comes
+	gapOf := func(name, title string, posts ...RecentPost) int {
+		n, _ := MentionGapAmong(name, title, members, posts)
+		return n
+	}
+	assert.Equal(t, 1, gapOf("Alice", "", try), "the partial alone is a gap")
+
+	// '@Alice2' is another word (a digit continues it), not a mention of Alice: it does not clear the gap
+	assert.Equal(t, 1, gapOf("Alice", "", try, post("QA", "@Alice2 hello", time.Minute)), "a digit continues the word")
+	// nor does a hyphen
+	assert.Equal(t, 1, gapOf("Alice", "", try, post("QA", "@Alice-Bob hello", time.Minute)), "a hyphen continues the word")
+	assert.Equal(t, 1, gapOf("Alice", "", try, post("QA", "@Alice_2 hello", time.Minute)), "so does an underscore")
+	// punctuation, a space or the end of the text ends the name: those are mentions
+	for _, ok := range []string{"@Alice, hello", "@Alice: hello", "@Alice hello", "@Alice", "@Alice."} {
+		assert.Zero(t, gapOf("Alice", "", try, post("QA", ok, time.Minute)), ok)
+	}
+
+	// a member is reached by its job title: "Dev One" (title "Developer") by "@Developer", which is not "Developer Operations"' whole name
+	devTry := post("QA", "@Dev look at this", 5*time.Minute)
+	assert.Equal(t, 1, gapOf("Dev One", "Developer", devTry), "the partial alone is a gap")
+	assert.Zero(t, gapOf("Dev One", "Developer", devTry, post("QA", "@Developer please read #12", time.Minute)), "reached by its job title")
+	assert.Equal(t, 1, gapOf("Dev One", "", devTry, post("QA", "@Developer please read #12", time.Minute)), "without the title the same mention is not its own")
+	// and the longer member whose id starts with that title is its own: "@Developer Operations" is not a mention of "Dev One" by its title
+	assert.Equal(t, 1, gapOf("Dev One", "Developer", devTry, post("QA", "@Developer Operations deploy", time.Minute)), "longest wins over the title")
+	assert.Zero(t, gapOf("Developer Operations", "Ops", post("QA", "@Developer Operations deploy", time.Minute)), "it reached Developer Operations")
+}
