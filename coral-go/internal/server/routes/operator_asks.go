@@ -39,6 +39,11 @@ type operatorAskRow struct {
 	At         string `json:"at"`
 	// Buttons the asker declared on a question (#11643), in order, with their state (pending, used); the Operator's click claims one through the claim route.
 	Buttons []board.AskButton `json:"buttons,omitempty"`
+	// GoalID and TaskID are the goal and the task the question is about (#12164), checked to be of its team when it was posted, with their titles cleaned and cut; absent for none.
+	GoalID    int64  `json:"goal_id,omitempty"`
+	TaskID    int64  `json:"task_id,omitempty"`
+	GoalTitle string `json:"goal_title,omitempty"`
+	TaskTitle string `json:"task_title,omitempty"`
 }
 
 // OperatorAsks answers GET /api/operator-asks.
@@ -68,9 +73,11 @@ func (h *BoardHandler) OperatorAsks(w http.ResponseWriter, r *http.Request) {
 			ids = append(ids, a.MessageID)
 		}
 		withButtons, _ := h.bs.AskButtonsOf(ctx, p.Project, ids)
+		subjects, links := h.askSubjects(ctx, p.Project, ids) // the goal and task each question is about (#12164)
 		for _, a := range asks {
 			text, cut := operatorAskText(a.Content)
-			rows = append(rows, operatorAskRow{Board: p.Project, BoardLabel: clitext.CleanName(p.BoardLabel), Kind: "ask", ID: a.MessageID, Asker: clitext.CleanName(a.Asker), Text: text, Cut: cut, At: a.At.UTC().Format(time.RFC3339), Buttons: withButtons[a.MessageID]})
+			rows = append(rows, operatorAskRow{Board: p.Project, BoardLabel: clitext.CleanName(p.BoardLabel), Kind: "ask", ID: a.MessageID, Asker: clitext.CleanName(a.Asker), Text: text, Cut: cut, At: a.At.UTC().Format(time.RFC3339), Buttons: withButtons[a.MessageID],
+				GoalID: subjects[a.MessageID].GoalID, TaskID: subjects[a.MessageID].TaskID, GoalTitle: links.goalTitle(ctx, subjects[a.MessageID].GoalID), TaskTitle: links.taskTitle(ctx, subjects[a.MessageID].TaskID)})
 		}
 		waits, err := h.bs.ListOperatorQuestions(ctx, p.Project)
 		if err != nil {

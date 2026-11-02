@@ -2,6 +2,7 @@
  * After the Inbox first opens, keep its badge updated on other tabs without eager startup reads. */
 import { fetchProjects } from './board_fetch.js';
 import { boardFetch, keyLabel, splitKey } from './server_base.js';
+import { importOnce } from './import_once.js';
 
 let items = [], saved = [], errors = [], pending = null, lastRead = 0, revision = 0, changed = () => {};
 let activated = false;
@@ -37,7 +38,7 @@ export const savedFiles = () => {
     savedView = collapseVersions(saved); savedFor = saved; savedRev = revision;
     return savedView;
 };
-export const isRead = a => !!(a.tags && a.tags.includes('read'));
+export const isRead = a => !!(a.tags && a.tags.includes('read')) && !(a.new_comments > 0); // a read file whose Operator-started thread has agent replies not yet opened is unread again, counted once as itself (#12026)
 export const unreadReviewItems = () => reviewItems().filter(a => !isRead(a));
 export const reviewErrors = () => errors;
 export function onReviewsChanged(fn) { changed = fn; }
@@ -71,6 +72,14 @@ async function readTeam(team) {
         }
         if (!data.has_more || !(data.artifacts || []).length) break;
     }
+    try { // a file the Operator already decided (approved, denied) that agents have replied about in their thread comes back as its own row, marked "New comments" (#12026)
+        const r = await boardFetch(team, '/artifacts?tag=new%20comments&limit=200');
+        if (r.ok) for (const a of (await r.json()).artifacts || []) {
+            if (!(a.new_comments > 0) || seen.has(a.id) || !a.available || !(a.tags?.includes('approved') || a.tags?.includes('denied')) || a.tags.includes('saved') || a.tags.includes('ignored') || a.tags.includes('superseded')) continue;
+            const hex = /(?:sha256:|coral:\/\/artifacts\/)?([a-f0-9]{64})$/i.exec(a.uri || a.digest || a.id || '')?.[1];
+            if (hex) { seen.add(a.id); rows.push({ ...a, team, hex, reviewKey: `${team}:${a.id}` }); }
+        }
+    } catch { /* the rows for review are still read: news is an addition */ }
     return rows;
 }
 /** The files for review on one goal of one team that nobody decided (one row per file, as Needs you has them): a goal page asks only its own team, not every team (#11913). */
@@ -164,7 +173,16 @@ export function markOpenedRead(hex) {
     const p = (async () => {
         if (!activated) await refreshReviews(true); else if (pending) await pending;
         const row = items.find(a => a.hex.toLowerCase() === hex && !isRead(a) && !(a.tags || []).includes('changes requested')); // a file the Operator asked changes of waits on the agent: the viewer and the preview redraw it after the request, and that is not reading it again (#11860); it stays counted until the agent answers
-        if (row) await setReviewRead(row, true);
+        if (row) {
+            if (row.new_comments > 0) { // opening the file is opening its thread: the server marks the Operator's threads seen when the comments are read (#12026), so the row is read, and the count follows
+                const { listComments } = await importOnce('./artifact_comments_api.js');
+                let seen = true;
+                await listComments(row.hex, splitKey(row.team).server, splitKey(row.team).name).catch(() => { seen = false; });
+                if (seen) { row.new_comments = 0; revision++; changed(); } // only a read that went through marks them seen on the server: a failed one leaves the marker, and it clears at the next open (Security's SHOULD on #12026)
+                else if (!row.tags?.includes('for review')) return; // a decided file is in Needs you only for its news: with the news still unseen its row stays (the tag write below would drop it)
+            }
+            await setReviewRead(row, true);
+        }
     })().finally(() => reading.delete(hex));
     reading.set(hex, p);
     return p;

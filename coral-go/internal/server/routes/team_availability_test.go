@@ -488,3 +488,27 @@ func TestAvailabilityTaskNamesWhatItWaitsOn(t *testing.T) {
 	require.Equal(t, []availabilityBlocker{{BoardID: "coral-hub", ID: other.ID}}, byID[across.ID].WaitingOnElsewhere, "it is named with its board")
 	require.Empty(t, byID[waiting.ID].WaitingOnElsewhere, "a blocker on this board is not elsewhere")
 }
+
+// #12081: after Kill All the team header still said "1 needs attention" with no agent left: the Orchestrator's registered wait outlived its session, and a subscriber with a wait and no session counted as waiting.
+func TestAWaitWhoseSessionIsGoneIsOfflineNotWaiting(t *testing.T) {
+	_, h, _, _ := setupSessionsTestServer(t)
+	ctx := context.Background()
+	team := "killed-team"
+	_, err := h.bs.Subscribe(ctx, team, "Boss", "Orchestrator", "claude-gone-session", nil, "all")
+	require.NoError(t, err)
+	_, err = h.bs.RegisterWait(ctx, team, "Boss", "claude-gone-session", "message", "Operator", "waiting for the answer", 10*time.Minute)
+	require.NoError(t, err)
+	router := chi.NewRouter()
+	router.Get("/api/teams/detail/{name}/availability", h.TeamAvailability)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, httptest.NewRequest("GET", "/api/teams/detail/killed-team/availability", nil))
+	require.Equal(t, 200, w.Code)
+	var result struct {
+		Agents  []availableAgent `json:"agents"`
+		Summary map[string]int   `json:"summary"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &result))
+	require.Len(t, result.Agents, 1)
+	require.Equal(t, "offline", result.Agents[0].Availability, "its session is gone: nobody is there to need anything")
+	require.Equal(t, 0, result.Summary["waiting"])
+}

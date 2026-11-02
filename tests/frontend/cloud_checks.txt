@@ -267,6 +267,7 @@ node agent_instructions_offer.test.mjs
 node info_mcp_servers.test.mjs
 node agent_words.test.mjs
 node restart_conversation_note.test.mjs
+node goal_done_quiet.test.mjs
 node goal_age.test.mjs
 node mobile_words.test.mjs
 node cli_verify_words.test.mjs

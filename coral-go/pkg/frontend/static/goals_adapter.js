@@ -18,6 +18,7 @@ export function toGoal(g) {
         images: Array.isArray(g && g.images) ? g.images.map(i => ({ hex: text(i && i.hex), name: text(i && i.name) })).filter(i => /^[0-9a-f]{64}$/.test(i.hex)) : [], // the pictures the goal was made with, in the order sent (#11653)
         updatedAt: text(g && (g.updated_at ?? g.updatedAt)),
         madeByOrchestrator: !!(g && g.made_by_orchestrator), // the team's Orchestrator wrote this goal itself (#11887)
+        newComments: count(g && g.new_comments), // agents replied in the Operator's comment threads on this goal and they have not opened them (#12073)
         toldAt: text(g && g.orchestrator_told_at), // when the team's Orchestrator was told this goal was made (#11866); '' when nobody was
         rollup: { done: count(r.done), active: count(r.active), blocked: count(r.blocked), queued: count(r.queued) },
     };

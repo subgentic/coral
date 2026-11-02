@@ -313,6 +313,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
             const b = btn('tab goal-tab', null, () => { if (model.tab === key) return; model.tab = key; closePreview(false); drawPage(); root.querySelector(`#goal-tab-${key}`)?.focus({ preventScroll: true }); });
             b.id = `goal-tab-${key}`; b.setAttribute('role', 'tab'); b.setAttribute('aria-selected', String(model.tab === key)); b.setAttribute('aria-controls', 'goal-list'); b.tabIndex = model.tab === key ? 0 : -1;
             b.append(el('span', 'goal-tab-label', label), el('span', 'tab-count goal-tab-count', n == null ? '' : ` ${n}`));
+            if (key === 'comments' && g.newComments > 0) { const mark = el('span', 'chip chip-tag goal-tab-news', 'New'); mark.setAttribute('aria-label', 'New comments'); b.append(mark); } // agents replied in the Operator's thread and it is not opened (#12073): opening the tab reads the list, which marks it seen
             b.addEventListener('keydown', e => { if (!['ArrowRight', 'ArrowLeft', 'Home', 'End'].includes(e.key)) return; e.preventDefault(); const i = tabs.findIndex(t => t[0] === key), next = (e.key === 'Home' ? tabs[0] : e.key === 'End' ? tabs[tabs.length - 1] : tabs[(i + (e.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length])[0]; model.tab = next; closePreview(false); drawPage(); root.querySelector(`#goal-tab-${next}`)?.focus({ preventScroll: true }); });
             strip.append(b);
         }

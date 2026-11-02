@@ -104,6 +104,9 @@ func (s *Store) GoalPage(ctx context.Context, board string, q GoalListQuery) (*G
 	for i := range goals {
 		goals[i].Rollup = rollups[goals[i].ID]
 	}
+	if err := s.fillLooksDone(ctx, goals); err != nil {
+		return nil, err
+	}
 	if err := s.fillGoalImages(ctx, goals); err != nil {
 		return nil, err
 	}
@@ -215,6 +218,9 @@ func (s *Store) AllGoalsPage(ctx context.Context, q AllGoalsQuery) (*GoalPage, e
 	}
 	for i := range goals {
 		goals[i].Rollup = rollups[goals[i].ID]
+	}
+	if err := s.fillLooksDone(ctx, goals); err != nil {
+		return nil, err
 	}
 	if err := s.fillGoalImages(ctx, goals); err != nil {
 		return nil, err

@@ -190,8 +190,27 @@ func cmdPost() {
 		clierr.Exit1()
 	}
 
+	// On a question --goal and --task say what it is about (#12164): checked here for a whole number, by the server for this team. Anywhere else --goal is for --assign and --task answers a task.
+	var askGoal, askTask int64
+	if ask && assignArg == "" && guideArg == "" {
+		for _, v := range []struct {
+			name, val string
+			into      *int64
+		}{{"--goal", goalArg, &askGoal}, {"--task", taskArg, &askTask}} {
+			if v.val == "" {
+				continue
+			}
+			n, convErr := strconv.ParseInt(v.val, 10, 64)
+			if convErr != nil || n <= 0 {
+				fmt.Fprintf(os.Stderr, "Error: %s needs a number (got %q): post --ask [--goal N] [--task N] \"@Operator ...\"\n", v.name, v.val)
+				os.Exit(2)
+			}
+			*v.into = n
+		}
+		goalArg, taskArg = "", "" // they are the question's subject now, not an assignment's goal nor an answer on a task
+	}
 	if assignArg == "" && (goalArg != "" || titleArg != "" || priorityArg != "") {
-		fmt.Fprintln(os.Stderr, "Error: --goal, --title and --priority are for --assign: post --assign \"Name\" [--goal N] [--title T] [--priority P] \"text\"")
+		fmt.Fprintln(os.Stderr, "Error: --goal, --title and --priority are for --assign: post --assign \"Name\" [--goal N] [--title T] [--priority P] \"text\" (on a question, --goal N says what it is about: post --ask --goal N \"@Operator ...\")")
 		os.Exit(2)
 	}
 	if guideArg != "" && !ask {
@@ -248,6 +267,12 @@ func cmdPost() {
 	}
 
 	body := map[string]any{"subscriber_id": subscriberID, "content": message}
+	if askGoal > 0 {
+		body["ask_goal"] = askGoal
+	}
+	if askTask > 0 {
+		body["ask_task"] = askTask
+	}
 	if ask {
 		body["ask"] = true // a question to the members it @mentions, open until each has answered (#7794)
 	}

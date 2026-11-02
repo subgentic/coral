@@ -301,3 +301,9 @@ func ChiefPermissionMode(m map[string]string) string {
 
 // GoalDoneHidden is the setting that lists the goals the Operator hid from Needs you with Not yet or Ignore (#11825).
 const GoalDoneHidden = "goal_done_hidden"
+
+// GoalDoneRead is the setting that lists the "Goal looks done" items the Operator has opened (#11983): listed in Needs you, not counted, as a read file is.
+const GoalDoneRead = "goal_done_read"
+
+// GoalDoneQuietMinutes is the setting for how long a goal whose tasks are all done waits after its latest task completion before it is the Operator's "Goal looks done" item (#12161): 15 by default, 0 for none.
+const GoalDoneQuietMinutes = "goal_done_quiet_minutes"

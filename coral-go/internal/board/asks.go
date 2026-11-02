@@ -54,6 +54,12 @@ func (s *Store) ensureAsksSchema(ctx context.Context) error {
 			reply_to   INTEGER NOT NULL
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_board_replies_to ON board_replies(project, reply_to)`,
+		`CREATE TABLE IF NOT EXISTS board_ask_subjects (
+			message_id INTEGER PRIMARY KEY,
+			project    TEXT NOT NULL,
+			goal_id    INTEGER NOT NULL DEFAULT 0,
+			task_id    INTEGER NOT NULL DEFAULT 0
+		)`,
 		`CREATE TABLE IF NOT EXISTS board_ask_closed (
 			message_id INTEGER PRIMARY KEY,
 			project    TEXT NOT NULL,
@@ -140,6 +146,71 @@ func (s *Store) RecordAsk(ctx context.Context, project string, msg *Message, ask
 	b, _ := json.Marshal(asked)
 	_, err := s.db.ExecContext(ctx, `INSERT OR REPLACE INTO board_asks (message_id, project, asker, asked, created_at) VALUES (?, ?, ?, ?, ?)`, msg.ID, project, msg.SubscriberID, string(b), msg.CreatedAt)
 	return err
+}
+
+// AskSubject is the goal and the task a question is about (#12164): 0 for none.
+type AskSubject struct {
+	GoalID int64
+	TaskID int64
+}
+
+// RecordAskSubject keeps the goal and the task a question (a message recorded with RecordAsk) is about. The caller has checked that both are of the board; nothing is kept for a message that is not a question of
+// this board, nor for two zeros.
+func (s *Store) RecordAskSubject(ctx context.Context, project string, messageID, goalID, taskID int64) error {
+	if goalID <= 0 && taskID <= 0 {
+		return nil
+	}
+	_, err := s.db.ExecContext(ctx, `INSERT OR REPLACE INTO board_ask_subjects (message_id, project, goal_id, task_id)
+		SELECT message_id, project, ?, ? FROM board_asks WHERE message_id = ? AND project = ?`, max(goalID, 0), max(taskID, 0), messageID, project)
+	return err
+}
+
+// ClaimedTaskOf is the one task member has claimed and is working on (in progress) on the board, and the goal it belongs to (0 for none): the default subject of a question the member asks (#12164). ok is false when
+// the member has no such task or more than one, so nothing is guessed.
+func (s *Store) ClaimedTaskOf(ctx context.Context, project, member string) (taskID, goalID int64, ok bool, err error) {
+	var rows []struct {
+		ID     int64  `db:"id"`
+		GoalID *int64 `db:"goal_id"`
+	}
+	if err = s.reader().SelectContext(ctx, &rows, `SELECT id, goal_id FROM board_tasks WHERE board_id = ? AND assigned_to = ? COLLATE NOCASE AND status = 'in_progress' LIMIT 2`, project, member); err != nil {
+		return 0, 0, false, err
+	}
+	if len(rows) != 1 {
+		return 0, 0, false, nil
+	}
+	if rows[0].GoalID != nil {
+		goalID = *rows[0].GoalID
+	}
+	return rows[0].ID, goalID, true, nil
+}
+
+// AskSubjectsOf reads the subjects of the questions with these message ids on the board: a question that has none is not in the answer.
+func (s *Store) AskSubjectsOf(ctx context.Context, project string, ids []int64) (map[int64]AskSubject, error) {
+	out := map[int64]AskSubject{}
+	if len(ids) == 0 {
+		return out, nil
+	}
+	args := []any{project}
+	in := ""
+	for i, id := range ids {
+		if i > 0 {
+			in += ","
+		}
+		in += "?"
+		args = append(args, id)
+	}
+	var rows []struct {
+		MessageID int64 `db:"message_id"`
+		GoalID    int64 `db:"goal_id"`
+		TaskID    int64 `db:"task_id"`
+	}
+	if err := s.reader().SelectContext(ctx, &rows, `SELECT message_id, goal_id, task_id FROM board_ask_subjects WHERE project = ? AND message_id IN (`+in+`)`, args...); err != nil {
+		return nil, err
+	}
+	for _, r := range rows {
+		out[r.MessageID] = AskSubject{GoalID: r.GoalID, TaskID: r.TaskID}
+	}
+	return out, nil
 }
 
 // RecordReply links the posted message as a reply to another.
