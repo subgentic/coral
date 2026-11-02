@@ -86,9 +86,13 @@ type provisionPlan struct {
 	Mode     string
 	Kind     string // "" or "setup": a new server; "upgrade", "stop", "remove": one already registered (#11370)
 	Delete   bool   // remove: also delete the data (the key, the history, the instance id)
-	phase    string
-	steps    []provisionStep
-	keys     []sshprov.HostKey // held here: what is trusted is THIS, never a key from a request
+	// remoteVersion is the Coral version that computer answered with when an upgrade was planned ("" when it did not answer); allowDowngrade is the person's choice, sent with the run, to install this hub's
+	// older release over a newer one (#12217).
+	remoteVersion  string
+	allowDowngrade bool
+	phase          string
+	steps          []provisionStep
+	keys           []sshprov.HostKey // held here: what is trusted is THIS, never a key from a request
 	// acceptance is what the far Coral is given on stdin: this hub's own terms version and digest and who. It is made by the server from the hub's own marker, never from the request; nil on a tier that skips the EULA.
 	acceptance []byte
 	system     string
@@ -122,6 +126,9 @@ func (p *provisionPlan) view() map[string]any {
 	v := map[string]any{"plan": p.ID, "target": p.Target.String(), "server_id": p.ServerID, "label": p.Label, "mode": p.Mode, "kind": p.kind(), "phase": p.phase, "steps": steps}
 	if p.Kind == kindRemove {
 		v["delete_data"] = p.Delete
+	}
+	if p.Kind == kindUpgrade { // the versions side by side, and whether this would be a downgrade, so the page can say so before anything runs
+		v["hub_version"], v["remote_version"], v["downgrade"] = config.ReportedVersion(), p.remoteVersion, remoteIsNewer(p.remoteVersion, config.ReportedVersion())
 	}
 	if len(keys) > 0 && p.phase == phaseKeys {
 		v["host_keys"] = keys
@@ -400,6 +407,8 @@ type runRequest struct {
 	TermsSHA256 string `json:"terms_sha256"`
 	// Confirm is the server's id, typed by the person, for a remove.
 	Confirm string `json:"confirm"`
+	// AllowDowngrade lets an upgrade install this hub's release over a NEWER one on that computer; without it that is refused before anything is changed (#12217).
+	AllowDowngrade bool `json:"allow_downgrade"`
 }
 
 // Run handles POST /api/servers/provision/{plan}/run. A setup or an upgrade carries the acceptance this hub's own EULA marker holds (the person accepted when they opened Coral; the far computer records it as
@@ -454,6 +463,9 @@ func (pr *Provisioner) Run(w http.ResponseWriter, r *http.Request) {
 		p.mu.Unlock()
 		errConflict(w, "this setup is not ready to run, or is already running")
 		return
+	}
+	if p.Kind == kindUpgrade {
+		p.allowDowngrade = req.AllowDowngrade
 	}
 	p.mu.Unlock()
 	if len(keys) > 0 {

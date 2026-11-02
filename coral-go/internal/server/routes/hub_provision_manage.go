@@ -11,6 +11,7 @@ import (
 
 	"github.com/subgentic/coral/internal/config"
 	"github.com/subgentic/coral/internal/httputil"
+	"github.com/subgentic/coral/internal/semverorder"
 	"github.com/subgentic/coral/internal/sshprov"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/pkg/hubowner"
@@ -82,7 +83,33 @@ func (pr *Provisioner) planManage(w http.ResponseWriter, r *http.Request, req pl
 	}
 	pr.plans[p.ID] = p
 	pr.mu.Unlock()
+	if req.Action == kindUpgrade { // what that computer runs now, for the page to show beside this hub's own; best effort, and the run reads it again before it decides anything
+		if key, kerr := pr.store.DecryptedKey(r.Context(), row.ID); kerr == nil {
+			hctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+			if h := pr.checkHealth(hctx, row, key); h.Status == store.RemoteStatusOnline {
+				p.mu.Lock()
+				p.remoteVersion = cleanVersionText(h.Version)
+				p.mu.Unlock()
+			}
+			cancel()
+		}
+	}
 	writeJSON(w, http.StatusCreated, p.view())
+}
+
+// cleanVersionText is a version string a far computer answered with, kept only when it is a plain release version (it is shown on the page): anything else is "".
+func cleanVersionText(v string) string {
+	if _, ok := semverorder.Parse(v); ok && len(v) <= 40 && !strings.ContainsAny(v, " \t\r\n<>&\"'") {
+		return v
+	}
+	return ""
+}
+
+// remoteIsNewer is whether the computer's version is newer than the hub's: both must be readable versions, else it is not known to be (a computer that did not answer is not refused).
+func remoteIsNewer(remote, hub string) bool {
+	r, ok1 := semverorder.Parse(remote)
+	h, ok2 := semverorder.Parse(hub)
+	return ok1 && ok2 && semverorder.Compare(r, h) > 0
 }
 
 // runPlan is what a run does after the host keys are settled, by the kind of plan.
@@ -202,6 +229,13 @@ func (pr *Provisioner) upgradeSteps(ctx context.Context, p *provisionPlan) {
 			p.setStep(s, stepSkipped, "Already running this hub's release.")
 		}
 		pr.done(p)
+		return
+	}
+	p.mu.Lock()
+	allow := p.allowDowngrade
+	p.mu.Unlock()
+	if h := pr.checkHealth(ctx, row, key); h.Status == store.RemoteStatusOnline && remoteIsNewer(h.Version, want) && !allow {
+		pr.fail(p, "install", "That computer runs a newer Coral than this hub ("+cleanVersionText(h.Version)+", this hub runs "+want+"). Nothing was changed. To install this hub's release over it anyway, choose to allow a downgrade.")
 		return
 	}
 	if err := pr.install(ctx, p, arch); err != nil {

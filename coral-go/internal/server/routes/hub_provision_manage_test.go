@@ -56,7 +56,7 @@ func newManageEnv(t *testing.T) *manageEnv {
 	require.NoError(t, os.MkdirAll(farCoral, 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(farCoral, "coral"), []byte("#!/bin/sh\ncat >/dev/null\nexit 0\n"), 0o755)) // accept-terms reads its stdin
 
-	me := &manageEnv{provEnv: pe, home: home, tmuxLog: tmuxLog, version: "0.0.1"}
+	me := &manageEnv{provEnv: pe, home: home, tmuxLog: tmuxLog, version: "0.0.0-a"}
 	_, err := pe.e.h.store.AddSSH(context.Background(), "ssh-box", "Build box", "user@box.example.com:22", 8420, provInstance, provKey)
 	require.NoError(t, err)
 	pe.p.install = func(_ context.Context, p *provisionPlan, _ sshprov.Arch) error {
@@ -77,6 +77,9 @@ func newManageEnv(t *testing.T) *manageEnv {
 
 // sawStart is whether the daemon start has been seen in the log: the start is a background process (#12217), so its note in the log may land a moment after the command returned.
 func (me *manageEnv) sawStart() bool {
+	if b, _ := os.ReadFile(me.tmuxLog); !strings.Contains(string(b), "kill-session") {
+		return false // nothing was stopped yet, so no start is coming: no waiting
+	}
 	for i := 0; i < 60; i++ {
 		if b, _ := os.ReadFile(me.tmuxLog); strings.Contains(string(b), "new-session") {
 			return true
@@ -226,7 +229,7 @@ func TestManageUpgradeInstallsRestartsAndChecksTheNewVersion(t *testing.T) {
 		if me.sawStart() {
 			return RemoteHealth{Status: store.RemoteStatusOnline, Version: want}
 		}
-		return RemoteHealth{Status: store.RemoteStatusOnline, Version: "0.0.1"}
+		return RemoteHealth{Status: store.RemoteStatusOnline, Version: "0.0.0-a"}
 	}
 	code, _ = me.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{"accept_terms": true, "terms_sha256": terms.EULADigest()})
 	require.Equal(t, 202, code)
@@ -298,7 +301,7 @@ func TestManageUpgradeGivesAnOlderComputerItsOwnerSecretOnceAndNeverRotatesIt(t 
 		if me.sawStart() {
 			return RemoteHealth{Status: store.RemoteStatusOnline, Version: want}
 		}
-		return RemoteHealth{Status: store.RemoteStatusOnline, Version: "0.0.1"}
+		return RemoteHealth{Status: store.RemoteStatusOnline, Version: "0.0.0-a"}
 	}
 	run := func() {
 		_, v := me.plan(t, "upgrade", nil)
@@ -336,4 +339,51 @@ func TestManageUpgradeNamesPort8420WhenAnotherHoldsItAndStartsNothing(t *testing
 	assert.Contains(t, string(b), "kill-session", "this user's Coral was stopped first")
 	assert.NotContains(t, string(b), "new-session", "and nothing was started over the other user's Coral")
 	assert.True(t, farHas(filepath.Join(me.home, ".coral-server", "data", "api_key")), "the data was not touched")
+}
+
+// An upgrade shows the computer's version beside this hub's (#12217) and refuses to put this hub's OLDER release over a newer one unless the person allows it; nothing is stopped or installed by the refusal.
+func TestManageUpgradeRefusesADowngradeUnlessAllowed(t *testing.T) {
+	me := newManageEnv(t)
+	hub := config.ReportedVersion()
+	me.p.eula = func() (bool, bool) { return true, true }
+	newer := "99.0.0"
+	me.p.checkHealth = func(context.Context, *store.RemoteServer, string) RemoteHealth {
+		me.mu.Lock()
+		defer me.mu.Unlock()
+		if me.sawStart() {
+			return RemoteHealth{Status: store.RemoteStatusOnline, Version: hub}
+		}
+		return RemoteHealth{Status: store.RemoteStatusOnline, Version: newer}
+	}
+	code, v := me.plan(t, "upgrade", nil)
+	require.Equal(t, 201, code, "%v", v)
+	assert.Equal(t, hub, v["hub_version"])
+	assert.Equal(t, newer, v["remote_version"], "the computer's version is on the plan, before anything runs")
+	assert.Equal(t, true, v["downgrade"])
+	plan := v["plan"].(string)
+	me.connectAndRun(t, plan, map[string]any{}, 202)
+	failed := me.waitPhase(t, plan, "failed")
+	assert.Contains(t, failed["error"], "newer Coral than this hub (99.0.0")
+	assert.Zero(t, me.installs, "nothing was installed")
+	if b, _ := os.ReadFile(me.tmuxLog); strings.Contains(string(b), "kill-session") || strings.Contains(string(b), "new-session") {
+		t.Errorf("a refused downgrade stopped or started Coral:\n%s", b)
+	}
+
+	// allowed by the person, in the run request: it goes ahead
+	code, _ = me.do("DELETE", "/api/servers/provision/"+plan, nil)
+	require.Equal(t, 200, code)
+	code, v = me.plan(t, "upgrade", nil)
+	require.Equal(t, 201, code, "%v", v)
+	plan = v["plan"].(string)
+	me.connectAndRun(t, plan, map[string]any{"allow_downgrade": true}, 202)
+	me.waitPhase(t, plan, "done")
+	assert.Equal(t, 1, me.installs)
+
+	// the flag means nothing on a plan that is not an upgrade, and an unreadable or equal version is not a downgrade
+	assert.False(t, remoteIsNewer("", hub))
+	assert.False(t, remoteIsNewer(hub, hub))
+	assert.False(t, remoteIsNewer("not a version", hub))
+	assert.True(t, remoteIsNewer("99.0.0", "2.0.33"))
+	assert.Equal(t, "", cleanVersionText("2.0.33 <script>"))
+	assert.Equal(t, "2.0.33", cleanVersionText("2.0.33"))
 }

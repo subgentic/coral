@@ -61,8 +61,16 @@ func TestDaemonCommandsInARealShell(t *testing.T) {
 		}
 	})
 
+	// a log over 10 MiB is moved aside at a start, so it never grows without bound
+	big := filepath.Join(home, InstallDir, "coral.log")
+	if err := os.WriteFile(big, make([]byte, 11<<20), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	if code := run(CmdStartDaemon, "2.0.10"); code != 0 {
 		t.Fatalf("start exited %d", code)
+	}
+	if st, err := os.Stat(big + ".1"); err != nil || st.Size() != 11<<20 {
+		t.Errorf("the large log was not moved aside: %v %v", st, err)
 	}
 	pid := pidOf()
 	if !alive(pid) {
