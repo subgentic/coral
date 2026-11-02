@@ -72,7 +72,7 @@ func (d *deviationHarness) running(agent string, ago time.Duration) int64 {
 	require.NoError(d.t, err)
 	_, err = d.s.ClaimTask(ctx, "team", agent, task.ID)
 	require.NoError(d.t, err)
-	_, err = d.raw.ExecContext(ctx, `UPDATE board_tasks SET claimed_at=? WHERE id=?`, ts(time.Now().Add(-ago)), task.ID)
+	_, err = d.raw.ExecContext(ctx, `UPDATE board_tasks SET claimed_at=? WHERE id=?`, ts(d.now.Add(-ago-time.Minute)), task.ID) // against the monitor's clock, as the check reads it (#12030): the harness's clock is a minute ahead of the wall's, and the wall's moves while the test runs
 	require.NoError(d.t, err)
 	return task.ID
 }
@@ -118,7 +118,7 @@ func TestDeviationBSilenceOnATaskPastItsUsualGap(t *testing.T) {
 	for _, ago := range []int{55, 50, 45} { // a post every five minutes, then nothing for 45 minutes
 		p, err := d.s.PostMessage(ctx, "team", "Dev", fmt.Sprintf("progress on #%d", id), nil)
 		require.NoError(t, err)
-		_, err = d.raw.ExecContext(ctx, `UPDATE board_messages SET created_at=? WHERE id=?`, ts(time.Now().Add(-time.Duration(ago)*time.Minute)), p.ID)
+		_, err = d.raw.ExecContext(ctx, `UPDATE board_messages SET created_at=? WHERE id=?`, ts(d.now.Add(-time.Duration(ago+1)*time.Minute)), p.ID) // the monitor's clock, not the wall's (#12030)
 		require.NoError(t, err)
 	}
 	out := d.check()
@@ -142,7 +142,8 @@ func TestDeviationCWaitPastThePairsUsualAnswer(t *testing.T) {
 	}
 	d.wait(3, "Dev", "message", "Security Reviewer")
 	d.wait(4, "Waiter", "operator", "")
-	_, err := d.raw.ExecContext(ctx, `UPDATE board_waits SET created_at=? WHERE status='active'`, ts(time.Now().Add(-20*time.Minute)))
+	// the wait is measured against the monitor's own clock (d.now), not the wall clock: the check reads d.now, and a back-dating from time.Now() moves with every millisecond the test takes and with the second the stamp is cut to (#12030)
+	_, err := d.raw.ExecContext(ctx, `UPDATE board_waits SET created_at=? WHERE status='active'`, ts(d.now.Add(-21*time.Minute)))
 	require.NoError(t, err)
 	out := d.check()
 	assert.Contains(t, out, "Dev: has waited 21 min on Security Reviewer; an answer usually takes 5 min (median of 3 earlier waits)")
