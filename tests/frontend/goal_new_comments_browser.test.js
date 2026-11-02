@@ -39,6 +39,8 @@ const { coralReady } = require('./helpers/wait');
                 await waitFor(`!!(${rowOf('Goal with news')})&&!!(${rowOf('Goal without news')})&&!!(${rowOf('Read goal with news')})&&!!(${rowOf('Read goal without news')})`, 'the four goals look done in Needs you', 20000);
                 assert.ok(await tagOn('Goal with news'), 'the goal looks done row says New comments');
                 assert.ok(!(await tagOn('Goal without news')), 'the other has none');
+                const titleDrawn = await ev(`(() => { const tr = ${rowOf('Goal with news')}; const t = [...tr.querySelectorAll('*')].find(e => e.children.length === 0 && /looks done: Goal with news/.test(e.textContent)); if (!t) return { error: 'no title' }; t.scrollIntoView({ block: 'center' }); const b = t.getBoundingClientRect(), hit = document.elementFromPoint(b.left + Math.min(20, b.width / 2), b.top + b.height / 2); return { w: Math.round(b.width), h: Math.round(b.height), onTop: !!hit && (hit === t || t.contains(hit)) }; })()`);
+                assert.ok(titleDrawn.w > 40 && titleDrawn.h >= 10 && titleDrawn.onTop, 'the title is drawn beside its marker (not clipped by the phone margin rule): ' + JSON.stringify(titleDrawn));
                 assert.equal(await ev(`[...document.querySelectorAll('${T} tbody tr')].filter(r => /Goal #1 /.test(r.textContent)).length`), 1, 'the same row, not a second item');
                 assert.ok(await tagOn('Read goal with news'), 'a goal opened before, with news since, says New comments');
                 assert.ok(!(await tagOn('Read goal without news')), 'a read goal with no news carries none');
