@@ -111,3 +111,19 @@ func TestScreenStopsSleepOwnWaitWithOtherSeparators(t *testing.T) {
 	f.show("✻ Cogitated for 4s | done 5:38 PM | 1 shell\n\n" + box + "  bypass permissions on | 1 monitor\n")
 	assert.Equal(t, SleepStopBackground, ScreenStopsSleep(ctx, f, "claude-x", "claude", "x", true), "a shell above and a monitor below are two items, each saying 1: not only the wait")
 }
+
+// QA's two SHOULDs (#12350): the no-box fallback is the last 15 lines, and the input box's own contents are not footer.
+func TestScreenStopsSleepFallbackWindowAndTheBoxContents(t *testing.T) {
+	ctx := context.Background()
+	f := &fakeAgent{}
+	rule := "──────────────────────────────────────────────────────────────────────\n"
+	// no box on the screen: a dotted marker 20 lines up is outside the last 15 lines, one 10 lines up is inside
+	f.show("old · done 5:38 PM · 1 shell still running\n" + strings.Repeat("history\n", 19) + "tail\n")
+	assert.Equal(t, "", ScreenStopsSleep(ctx, f, "claude-x", "claude", "x", false), "a marker 20 lines up on an unboxed screen is history")
+	f.show("old · done 5:38 PM · 1 shell still running\n" + strings.Repeat("history\n", 9) + "tail\n")
+	assert.Equal(t, SleepStopBackground, ScreenStopsSleep(ctx, f, "claude-x", "claude", "x", false), "one 10 lines up is in the last 15")
+	// a box on the screen: what is typed inside it is a draft, not footer, so it is the draft check that answers, never the shell count
+	f.show("✻ Cogitated for 4s · done 5:38 PM\n\n" + rule + "❯ 2 shells still running\n" + rule + "  bypass permissions on\n")
+	assert.Equal(t, SleepStopDraft, ScreenStopsSleep(ctx, f, "claude-x", "claude", "x", false), "text inside the box is a draft")
+	assert.Equal(t, "", BackgroundMarker("✻ Cogitated for 4s · done 5:38 PM\n\n"+rule+"❯ 2 shells still running\n"+rule+"  bypass permissions on\n"), "and is not a marker")
+}
