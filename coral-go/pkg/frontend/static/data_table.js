@@ -543,7 +543,7 @@ export function dataTable(cfg) {
         const chosen = () => [...st.selected].map(k => st.rowCache.get(k)).filter(Boolean);
         const press = (a, i) => async () => {
             if (a.choose) { st.choices = await a.choose.options(); st.confirming = i; drawBar(); bar.querySelector(a.danger ? '.dt-bar-keep' : '.dt-bar-choice')?.focus(); return; } // an action that needs a value (a person, a priority) asks for it here
-            if (a.danger || a.askWhen?.(chosen().length)) { st.confirming = i; drawBar(); bar.querySelector('.dt-bar-keep')?.focus(); return; } // askWhen(n): an action that asks only for some selections (Approve of several files), in the same Keep / confirm step, not red
+            if (a.danger || a.askWhen?.(chosen().length, chosen())) { st.confirming = i; drawBar(); bar.querySelector('.dt-bar-keep')?.focus(); return; } // askWhen(n, rows): an action that asks only for some selections (Approve of several files), in the same Keep / confirm step, not red
             a.run(chosen(), new Set(st.selected));
         };
         const more = [];
@@ -571,13 +571,13 @@ export function dataTable(cfg) {
                 if (text) { text.type = 'text'; text.setAttribute('aria-label', a.choose.text.label); text.placeholder = a.choose.text.label; text.maxLength = a.choose.text.maxLength || 300; text.required = true; }
                 const apply = button(`btn btn-small dt-bar-apply${a.danger ? ' dt-danger' : ''}`, a.danger ? a.label : 'Apply', () => { if (text && !text.value.trim()) { text.reportValidity(); return; } const v = pick.value; st.confirming = -1; st.choices = null; a.run(chosen(), new Set(st.selected), v, text?.value.trim()); });
                 if (text) { apply.disabled = true; text.addEventListener('input', () => { apply.disabled = !text.value.trim(); }); }
-                const ask = typeof a.confirm === 'function' ? a.confirm(n) : a.confirm || `${a.label}:`;
+                const ask = typeof a.confirm === 'function' ? a.confirm(n, chosen()) : a.confirm || `${a.label}:`;
                 const step = el('div', 'dt-bar-step');
                 step.append(el('span', 'dt-bar-confirm', ask), pick); if (text) step.append(text);
                 step.append(button('btn btn-small dt-bar-keep', 'Keep', () => { st.confirming = -1; st.choices = null; drawBar(); }), apply);
                 bar.append(step);
             } else {
-                const ask = el('span', 'dt-bar-confirm', typeof a.confirm === 'function' ? a.confirm(n) : (a.confirm || `${a.label}?`)); ask.setAttribute('role', 'alert');
+                const ask = el('span', 'dt-bar-confirm', typeof a.confirm === 'function' ? a.confirm(n, chosen()) : (a.confirm || `${a.label}?`)); ask.setAttribute('role', 'alert');
                 bar.append(ask, button('btn btn-small dt-bar-keep', 'Keep', () => { st.confirming = -1; drawBar(); }), button(`btn btn-small${a.danger ? ' dt-danger' : ''}`, a.label, () => { st.confirming = -1; a.run(chosen(), new Set(st.selected)); }));
             }
         }
