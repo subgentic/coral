@@ -99,16 +99,24 @@ func (pr *Provisioner) planManage(w http.ResponseWriter, r *http.Request, req pl
 
 // cleanVersionText is a version string a far computer answered with, kept only when it is a plain release version (it is shown on the page): anything else is "".
 func cleanVersionText(v string) string {
-	if _, ok := semverorder.Parse(v); ok && len(v) <= 40 && !strings.ContainsAny(v, " \t\r\n<>&\"'") {
+	if _, ok := semverorder.Parse(withoutBuild(v)); ok && len(v) <= 40 && !strings.ContainsAny(v, " \t\r\n<>&\"'") {
 		return v
 	}
 	return ""
 }
 
+// withoutBuild drops semver build metadata ("2.0.35+relaunchfixture", "...+abc1234"): it does not change which release a version is, and left on it made a hub or a computer that carries it unreadable, so a downgrade was not refused.
+func withoutBuild(v string) string {
+	if i := strings.IndexByte(v, '+'); i >= 0 {
+		return v[:i]
+	}
+	return v
+}
+
 // remoteIsNewer is whether the computer's version is newer than the hub's: both must be readable versions, else it is not known to be (a computer that did not answer is not refused).
 func remoteIsNewer(remote, hub string) bool {
-	r, ok1 := semverorder.Parse(remote)
-	h, ok2 := semverorder.Parse(hub)
+	r, ok1 := semverorder.Parse(withoutBuild(remote))
+	h, ok2 := semverorder.Parse(withoutBuild(hub))
 	return ok1 && ok2 && semverorder.Compare(r, h) > 0
 }
 

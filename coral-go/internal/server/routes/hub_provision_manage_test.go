@@ -389,6 +389,12 @@ func TestManageUpgradeRefusesADowngradeUnlessAllowed(t *testing.T) {
 	assert.False(t, remoteIsNewer(hub, hub))
 	assert.False(t, remoteIsNewer("not a version", hub))
 	assert.True(t, remoteIsNewer("99.0.0", "2.0.33"))
+	// build metadata ("+relaunchfixture", a commit) does not change which release it is (semver ignores it): a hub or a computer carrying it is still compared, so a downgrade is still refused (v2.0.35's go-tests, relaunchfixture build)
+	assert.True(t, remoteIsNewer("99.0.0", "2.0.35+relaunchfixture"), "a hub with a build flavor still sees a newer computer")
+	assert.True(t, remoteIsNewer("99.0.0+relaunchfixture", "2.0.35"), "and a computer with one")
+	assert.False(t, remoteIsNewer("2.0.35+relaunchfixture", "2.0.35"), "the same release with metadata is not newer")
+	assert.Equal(t, "2.0.35+relaunchfixture", cleanVersionText("2.0.35+relaunchfixture"), "a plain release with build metadata is shown as it is")
+	assert.Equal(t, "", cleanVersionText("2.0.35+<b>"))
 	assert.Equal(t, "", cleanVersionText("2.0.33 <script>"))
 	assert.Equal(t, "2.0.33", cleanVersionText("2.0.33"))
 }
