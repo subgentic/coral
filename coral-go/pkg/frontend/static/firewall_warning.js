@@ -4,6 +4,7 @@
 
 import { browserLocal } from './safe_storage.js';
 import { fetchSystemStatus } from './system_status.js';
+import { mountSettingsView } from './settings_view.js';
 
 const DISMISSED_KEY = 'coral-firewall-warning-dismissed';
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
@@ -64,25 +65,22 @@ export function firewallDetails(message, { open = false } = {}) {
     return details;
 }
 
-/** The Settings row, made when there is a warning to show (so a machine without one has no row at all, and the dialog's default markup is as before). */
-function ensureRow() {
-    let row = document.getElementById('settings-firewall-row');
-    if (row) return row;
+/** A Settings > Security row of its own, drawn by settings_view after the sign-in row; id names the row, field is its one settings_view field. */
+function securityRow(id, field) {
     const anchor = document.getElementById('settings-security');
     if (!anchor) return null;
-    row = el('div', 'settings-row');
-    row.id = 'settings-firewall-row';
-    const dt = el('dt', 'toggle-dt');
-    dt.append(el('span', null, 'Windows Firewall'), el('span', 'toggle-desc', 'A rule that lets other computers reach Coral on every port.'));
-    const dd = el('dd');
-    const body = el('div', 'settings-hint');
-    body.id = 'settings-firewall-status';
-    body.setAttribute('role', 'status');
-    body.dataset.state = 'warn';
-    dd.append(body);
-    row.append(dt, dd);
+    const row = el('div'); row.id = id;
     anchor.after(row);
+    mountSettingsView(row, { mode: 'settings', saveBar: false, fields: [field] });
     return row;
+}
+
+/** The Settings row, made when there is a warning to show (so a machine without one has no row at all, and the dialog's default markup is as before). */
+function ensureRow() {
+    return document.getElementById('settings-firewall-row') || securityRow('settings-firewall-row', {
+        key: 'firewall_warning', type: 'custom', id: 'settings-firewall-status', label: 'Windows Firewall', help: 'A rule that lets other computers reach Coral on every port.',
+        render: slot => { slot.classList.add('settings-hint'); slot.setAttribute('role', 'status'); slot.dataset.state = 'warn'; },
+    });
 }
 
 /** Settings: what Coral did to make its data folder private (#295), there until it is acknowledged here or by dismissing its toast. */
@@ -92,17 +90,17 @@ export async function renderSecurityNoticeRow() {
     document.getElementById('settings-security-notice-row')?.remove();
     const anchor = document.getElementById('settings-security');
     if (!message || !anchor) return;
-    const row = el('div', 'settings-row'); row.id = 'settings-security-notice-row';
-    const dt = el('dt', 'toggle-dt'); dt.append(el('span', null, 'Data folder made private'));
-    const dd = el('dd');
-    const ok = el('button', 'btn btn-small', "I've read this"); ok.type = 'button';
-    ok.addEventListener('click', () => {
-        fetch('/api/system/security-notice/ack', { method: 'POST' }).catch(() => {});
-        row.remove(); document.getElementById('security-notice-toast')?.remove();
+    const row = securityRow('settings-security-notice-row', {
+        key: 'security_notice', type: 'custom', label: 'Data folder made private',
+        render: slot => {
+            const ok = el('button', 'btn btn-small', "I've read this"); ok.type = 'button';
+            ok.addEventListener('click', () => {
+                fetch('/api/system/security-notice/ack', { method: 'POST' }).catch(() => {});
+                row.remove(); document.getElementById('security-notice-toast')?.remove();
+            });
+            slot.append(el('p', 'settings-hint', message), ok);
+        },
     });
-    dd.append(el('p', 'settings-hint', message), ok);
-    row.append(dt, dd);
-    anchor.after(row);
 }
 
 /** Settings: the row for the warning, there while the warning is, so the toast can be dismissed for good. */
