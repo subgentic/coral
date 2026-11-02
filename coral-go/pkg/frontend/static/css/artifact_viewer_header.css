@@ -18,6 +18,7 @@
 .artifact-viewer-header { position: relative; } /* the version list hangs from the header row, so it is as wide as the dialog allows and never past its edge (#12223 review) */
 .artifact-viewer-chips .av-pop { left: 0; right: auto; max-width: 100%; }
 @media (max-width: 768px) {
+    .artifact-viewer-chips .av-bar { flex-wrap: wrap; max-width: 100%; } /* at 200% text the version buttons wrap instead of running off the screen */
     .artifact-viewer-chips .av-pop { left: 8px; right: 8px; min-width: 0; max-width: none; }
     /* two thin rows: the name and the ⋯ button, then the chips (version, status, Comments); Approve and Request changes are in the bar at the bottom (#12226) */
     .artifact-viewer-header { flex-wrap: wrap; align-items: center; row-gap: 2px; }
@@ -30,4 +31,57 @@
     .artifact-viewer-foot .artifact-review-approve, .artifact-viewer-foot .artifact-review-changes { flex: 1 1 0; min-height: 44px; }
     .artifact-review { flex: 0 1 auto; min-height: 0; max-height: max(120px, calc(var(--visual-viewport-height, 100dvh) - 260px)); overflow-y: auto; } /* the change-request form scrolls inside what the keyboard leaves, so Send is reachable (#12226 review) */
     .artifact-viewer-foot .artifact-review-approve[hidden], .artifact-viewer-foot .artifact-review-changes[hidden] { display: none; }
+}
+/* the version bar, its list and the compare view (moved from the start CSS: only the viewer draws them, #12223) */
+/* Versions of an artifact (#6472, layout A): the bar under the title, its list, the compare view; and the comment groups of a later version. */
+.av-bar { position: relative; flex-wrap: wrap; } /* a .pane-head .pane-head-bar (layout.css) that wraps */
+.av-bar[hidden] { display: none; }
+.av-bar .btn { margin: 0; padding-block: 0; min-height: var(--control-compact-height, 32px); display: inline-flex; align-items: center; justify-content: center; }
+.av-icon { min-width: 32px; padding: 0 8px; }
+.av-bar [aria-disabled="true"] { opacity: .45; cursor: default; }
+.av-current { font-weight: var(--fw-strong); }
+.av-notice { flex: 1 0 100%; margin: 0; } /* where it sits: the look is .notice's */
+.av-link { background: none; border: 0; padding: 0; font: inherit; color: var(--accent); text-decoration: underline; cursor: pointer; }
+.av-pop { position: absolute; z-index: 6; top: calc(100% + 4px); left: 0; min-width: 340px; max-width: calc(100% - 16px); max-height: 50vh; overflow-y: auto; margin: 0; padding: 6px; list-style: none; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-md); box-shadow: var(--shadow-md);  display: flex; flex-direction: column; gap: 6px; } /* the version chip's popover: Compare, the newer-version line and the list (#12223) */
+.av-pop[hidden] { display: none; }
+.av-list { margin: 0; padding: 0; list-style: none; }
+.av-option { display: flex; align-items: center; gap: 10px; min-height: 36px; padding: 4px 8px; border-radius: var(--radius-sm); font-size: var(--fs-md); cursor: pointer; }
+.av-option:hover, .av-option:focus-visible { background: var(--bg-tertiary); outline: none; }
+.av-option:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); }
+.av-option[aria-selected="true"] { background: var(--bg-tertiary); box-shadow: inset 3px 0 0 var(--accent); font-weight: var(--fw-strong); }
+.av-option[aria-selected="true"]:focus-visible { box-shadow: inset 3px 0 0 var(--accent), inset 0 0 0 2px var(--accent); }
+.av-who { color: var(--text-secondary); font-weight: var(--fw-regular); }
+.av-size { margin-left: auto; color: var(--text-muted); font-weight: var(--fw-regular); white-space: nowrap; }
+.av-compare { padding: 12px 20px; }
+.av-heading { margin: 0 0 8px; font-size: var(--fs-lg, 1rem); }
+.av-heading:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm); }
+.av-modebar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.av-count { margin: 0; flex: 1 1 auto; color: var(--text-secondary); font-size: var(--fs-md); }
+.av-seg { flex-wrap: wrap; }
+.av-seg .btn { white-space: normal; }
+.av-line { padding: 2px 8px 2px 11px; margin: 4px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.av-line ins, .av-line del { text-decoration: none; }
+.av-add { background: color-mix(in srgb, var(--success) 18%, transparent); border-left: 3px solid var(--success); padding-left: 8px; }
+.av-add ins::before { content: '+ '; color: var(--success); }
+.av-del { background: color-mix(in srgb, var(--error) 16%, transparent); border-left: 3px solid var(--error); padding-left: 8px; }
+.av-del del { text-decoration: line-through; }
+.av-del del::before { content: '− '; text-decoration: none; display: inline-block; color: var(--error); }
+.av-gap { margin: 6px 0; padding: 0 11px; color: var(--text-muted); font-size: var(--fs-sm, .8125rem); }
+.av-note { color: var(--text-secondary); }
+.av-split { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+.av-col { min-width: 0; padding: 0 12px; border-right: 1px solid var(--border); }
+.av-col:last-child { border-right: 0; }
+.av-colhead { margin: 0 0 6px; font-size: var(--fs-sm, .8125rem); color: var(--text-secondary); }
+/* comparing: the comments are of the version, not of the changes */
+.artifact-viewer.av-comparing .ac-panel, .artifact-viewer.av-comparing .ac-toggle { display: none !important; }
+.artifact-viewer.av-keep-wide .artifact-viewer-content { width: min(1240px, 96vw); }
+@media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
+    .artifact-viewer.av-keep-wide .artifact-viewer-content { width: 100vw; max-height: 100%; height: 100%; border-radius: 0; }
+    .av-bar .btn, .av-icon { min-height: var(--control-touch-height, 44px); }
+    .av-icon { min-width: var(--control-touch-height, 44px); }
+    .av-pop { min-width: 0; left: 8px; right: 8px; }
+    .av-option { min-height: var(--control-touch-height, 44px); flex-wrap: wrap; }
+    .av-split { grid-template-columns: 1fr; }
+    .av-col { border-right: 0; border-bottom: 1px solid var(--border); padding: 0 0 8px; }
+    .av-compare { padding: 8px 12px; }
 }
