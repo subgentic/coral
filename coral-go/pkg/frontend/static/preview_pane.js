@@ -428,12 +428,13 @@ async function _render(tab) {
         if (hex && tab.options && tab.options.tagging) { // the file's tags in the head (#8594): chips with an x and Add tag, as in the team page's sheet
             try { const { tagEditor, reviewWords } = await importOnce('./artifact_tags.js'); if (current()) { const bar = document.getElementById('preview-toolbar'); const words = reviewWords(tab.options.tagging.tags, tab.options.tagging.review); if (words && bar) { const line = document.createElement('span'); line.className = 'artifact-review-line'; line.dataset.tabId = String(tab.id); line.setAttribute('role', 'status'); line.textContent = words; bar.append(line); } const editor = tagEditor({ ...tab.options.tagging, hex }); editor.dataset.tabId = String(tab.id); bar?.append(editor); } } catch (e) { console.error('[coral] tags', e); }
         }
+        const { linkArtifactRefsIn } = await importOnce('./artifact_refs.js'); // a coral://artifacts/<hex> in a Markdown file is a link that opens that file, on the file's own computer (#12386, as the viewer's: #12361, #12373)
         await renderArtifact(body, tab.filepath, tab.options, {
             signal: tab.abort.signal,
             isStale: () => !current(),
             // An artifact is a file an agent wrote: its Markdown uses the strict renderer (raw HTML shown as text, #3540).
-            renderContent: (el, content, path) => {
-                if (getLangFromPath(path) === 'markdown') (el.innerHTML = `<div class="prose preview-pane-markdown">${renderMarkdownStrict(content)}</div>`, highlightCodeIn(el), keepFragmentsInside(el));
+            renderContent: (el, content, path, server) => {
+                if (getLangFromPath(path) === 'markdown') (el.innerHTML = `<div class="prose preview-pane-markdown">${renderMarkdownStrict(content)}</div>`, highlightCodeIn(el), keepFragmentsInside(el), linkArtifactRefsIn(el, { asWritten: true, server }));
                 else _renderContentView(el, content, path, 0, false);
                 if (comments && current()) comments.docRendered(content, true); // text the comments apply to (#5311)
             },
