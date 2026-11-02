@@ -17,17 +17,19 @@ import (
 
 // fakeCloud is a provider in memory: instances, VPCs, firewalls and keys, a log of every call in order, and failures on demand. No test here calls a real provider.
 type fakeCloud struct {
-	mu       sync.Mutex
-	calls    []string
-	drops    map[string]Instance // by id
-	vpcs     map[string]VPC
-	fws      map[string]Firewall
-	order    *[]string        // when set, every call is also logged here, to be read beside another recorder (the Hub's revoke)
-	failOn   map[string]error // "DeleteFirewall:fw-1" -> error (once, then it works)
-	vpcBusy  int              // DeleteVPC answers ErrInUse this many times first
-	nextID   int
-	hourly   float64
-	priceErr error
+	mu        sync.Mutex
+	calls     []string
+	drops     map[string]Instance // by id
+	vpcs      map[string]VPC
+	fws       map[string]Firewall
+	order     *[]string        // when set, every call is also logged here, to be read beside another recorder (the Hub's revoke)
+	failOn    map[string]error // "DeleteFirewall:fw-1" -> error (once, then it works)
+	vpcBusy   int              // DeleteVPC answers ErrInUse this many times first
+	nextID    int
+	hourly    float64
+	priceErr  error
+	hidden    map[string]bool // ids the tag-filtered List does not show (a droplet that lost its tag, or sits past the page limit) but Get still reads
+	listTrunc bool            // List answers what it has with ErrListTruncated
 }
 
 func newFake() *fakeCloud {
@@ -37,6 +39,7 @@ func newFake() *fakeCloud {
 var (
 	_ Provider      = (*fakeCloud)(nil)
 	_ Lister        = (*fakeCloud)(nil)
+	_ Getter        = (*fakeCloud)(nil)
 	_ Network       = (*fakeCloud)(nil)
 	_ NetworkLister = (*fakeCloud)(nil)
 )
@@ -109,9 +112,28 @@ func (f *fakeCloud) List(context.Context) ([]Instance, error) {
 	defer f.mu.Unlock()
 	var out []Instance
 	for _, in := range f.drops {
-		out = append(out, in)
+		if !f.hidden[in.ID] {
+			out = append(out, in)
+		}
+	}
+	if f.listTrunc {
+		return out, ErrListTruncated
 	}
 	return out, nil
+}
+
+// Get reads one instance by id, hidden or not: not found when it is really gone.
+func (f *fakeCloud) Get(_ context.Context, id string) (Instance, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if err := f.fail("Get:" + id); err != nil {
+		return Instance{}, err
+	}
+	in, ok := f.drops[id]
+	if !ok {
+		return Instance{}, ErrNotFound
+	}
+	return in, nil
 }
 func (f *fakeCloud) CreateVPC(_ context.Context, name, region string) (VPC, error) {
 	f.mu.Lock()
@@ -294,7 +316,7 @@ func TestDeleteRevokesTheHubIdentityBeforeItDestroysAnything(t *testing.T) {
 	var order []string
 	f.order = &order
 	rev := &fakeRevoker{log: &order}
-	rep, err := Delete(t.Context(), "m1", ManageDeps{Provider: f, Revoker: rev, State: st, Out: &bytes.Buffer{}, Tune: quick()})
+	rep, err := Delete(t.Context(), "m1", ManageDeps{Confirm: yesConfirm, Provider: f, Revoker: rev, State: st, Out: &bytes.Buffer{}, Tune: quick()})
 	require.NoError(t, err)
 	assert.True(t, rep.Revoked)
 	assert.Equal(t, []string{"Revoke:5b6c0f2e-0000-4000-8000-000000000001", "Delete:77", "DeleteFirewall:fw-2", "DeleteVPC:vpc-1"}, order,
@@ -314,7 +336,7 @@ func TestDeleteStopsWhenTheRevokeFailsUnlessTheyChooseToGoOn(t *testing.T) {
 	require.NoError(t, st.Put(record("m1", f)))
 	rev := &fakeRevoker{err: &IdentityRevokeError{Kind: RevokeNotConfigured, Status: 503}}
 	var out bytes.Buffer
-	rep, err := Delete(t.Context(), "m1", ManageDeps{Provider: f, Revoker: rev, State: st, Out: &out, Tune: quick()})
+	rep, err := Delete(t.Context(), "m1", ManageDeps{Confirm: yesConfirm, Provider: f, Revoker: rev, State: st, Out: &out, Tune: quick()})
 	require.ErrorIs(t, err, ErrRevokeFailed)
 	assert.Contains(t, err.Error(), "NOT revoked")
 	assert.Empty(t, f.calls, "nothing was destroyed")
@@ -322,7 +344,7 @@ func TestDeleteStopsWhenTheRevokeFailsUnlessTheyChooseToGoOn(t *testing.T) {
 	_, ok := st.Get("m1")
 	assert.True(t, ok, "the record stays")
 
-	rep, err = Delete(t.Context(), "m1", ManageDeps{Provider: f, Revoker: rev, State: st, Out: &out, Tune: quick(), ContinueIfRevokeFails: true})
+	rep, err = Delete(t.Context(), "m1", ManageDeps{Confirm: yesConfirm, Provider: f, Revoker: rev, State: st, Out: &out, Tune: quick(), ContinueIfRevokeFails: true})
 	require.NoError(t, err)
 	assert.False(t, rep.Revoked)
 	assert.Contains(t, rep.RevokeNote, "NOT revoked", "and it says so")
@@ -335,14 +357,14 @@ func TestDeleteGoesOnWhenTheHubDoesNotKnowTheCredentialAndSaysWhenItWasNotAsked(
 	f := newFake()
 	st := stateAt(t)
 	require.NoError(t, st.Put(record("m1", f)))
-	rep, err := Delete(t.Context(), "m1", ManageDeps{Provider: f, Revoker: &fakeRevoker{err: &IdentityRevokeError{Kind: RevokeNotFound, Status: 404}}, State: st, Out: &bytes.Buffer{}, Tune: quick()})
+	rep, err := Delete(t.Context(), "m1", ManageDeps{Confirm: yesConfirm, Provider: f, Revoker: &fakeRevoker{err: &IdentityRevokeError{Kind: RevokeNotFound, Status: 404}}, State: st, Out: &bytes.Buffer{}, Tune: quick()})
 	require.NoError(t, err)
 	assert.Contains(t, strings.ToLower(rep.RevokeNote), "not revoked")
 
 	f2 := newFake()
 	st2 := stateAt(t)
 	require.NoError(t, st2.Put(record("m2", f2)))
-	rep, err = Delete(t.Context(), "m2", ManageDeps{Provider: f2, State: st2, Out: &bytes.Buffer{}, Tune: quick()})
+	rep, err = Delete(t.Context(), "m2", ManageDeps{Confirm: yesConfirm, Provider: f2, State: st2, Out: &bytes.Buffer{}, Tune: quick()})
 	require.NoError(t, err)
 	assert.Contains(t, rep.RevokeNote, "--hub-destroy-file", "no destroy credential given: said plainly")
 	assert.False(t, rep.Revoked)
@@ -355,7 +377,7 @@ func TestDeleteCanBeRunAgainAndTheStateFileKeepsWhatIsLeft(t *testing.T) {
 	r := record("m1", f)
 	require.NoError(t, st.Put(r))
 	f.failOn["DeleteFirewall:"+r.FirewallID] = errors.New("provider hiccup")
-	rep, err := Delete(t.Context(), "m1", ManageDeps{Provider: f, State: st, Out: &bytes.Buffer{}, Tune: quick()})
+	rep, err := Delete(t.Context(), "m1", ManageDeps{Confirm: yesConfirm, Provider: f, State: st, Out: &bytes.Buffer{}, Tune: quick()})
 	require.Error(t, err)
 	assert.Equal(t, r.FirewallID, rep.Remaining.FirewallID)
 	got, ok := st.Get("m1")
@@ -369,12 +391,12 @@ func TestDeleteCanBeRunAgainAndTheStateFileKeepsWhatIsLeft(t *testing.T) {
 	assert.Equal(t, got, g2, "on disk too")
 
 	f.calls = nil
-	_, err = Delete(t.Context(), "m1", ManageDeps{Provider: f, State: st, Out: &bytes.Buffer{}, Tune: quick()})
+	_, err = Delete(t.Context(), "m1", ManageDeps{Confirm: yesConfirm, Provider: f, State: st, Out: &bytes.Buffer{}, Tune: quick()})
 	require.NoError(t, err)
 	assert.Equal(t, []string{"DeleteFirewall:" + r.FirewallID}, f.calls, "only what was left is tried")
 	_, ok = st.Get("m1")
 	assert.False(t, ok)
-	_, err = Delete(t.Context(), "m1", ManageDeps{Provider: f, State: st, Out: &bytes.Buffer{}, Tune: quick()})
+	_, err = Delete(t.Context(), "m1", ManageDeps{Confirm: yesConfirm, Provider: f, State: st, Out: &bytes.Buffer{}, Tune: quick()})
 	assert.Error(t, err, "a machine that is gone entirely is said so, not made up")
 }
 
@@ -385,7 +407,7 @@ func TestDeleteOfAMachineTheStateFileLostNeedsTheTypedID(t *testing.T) {
 	record("m9", f)
 	st := stateAt(t) // empty
 	var out bytes.Buffer
-	d := ManageDeps{Provider: f, State: st, Out: &out, Tune: quick()}
+	d := ManageDeps{Provider: f, State: st, Out: &out, Tune: quick(), Confirm: yesConfirm}
 	_, err := Delete(t.Context(), "m9", d)
 	require.ErrorIs(t, err, ErrNeedTypedID)
 	assert.Contains(t, out.String(), "id 77", "the candidate is listed")
@@ -440,7 +462,7 @@ func TestDeleteRereadsTheDropletAndRefusesAMismatch(t *testing.T) {
 		f.order = &order
 		rev := &fakeRevoker{log: &order}
 		var out bytes.Buffer
-		_, err := Delete(t.Context(), "m1", ManageDeps{Provider: f, Revoker: rev, State: st, Out: &out, Tune: quick()})
+		_, err := Delete(t.Context(), "m1", ManageDeps{Confirm: yesConfirm, Provider: f, Revoker: rev, State: st, Out: &out, Tune: quick()})
 		require.ErrorIs(t, err, ErrDropletMismatch, name)
 		assert.Empty(t, order, "%s: nothing was revoked or deleted", name)
 		assert.Contains(t, f.drops, "77", name)
@@ -458,7 +480,7 @@ func TestDeleteFindsALateDropletByTheRecordsLaunchTag(t *testing.T) {
 	r.DropletID = ""
 	require.NoError(t, st.Put(r))
 	var out bytes.Buffer
-	d := ManageDeps{Provider: f, State: st, Out: &out, Tune: quick()}
+	d := ManageDeps{Provider: f, State: st, Out: &out, Tune: quick(), Confirm: yesConfirm}
 	f.drops["88"] = Instance{ID: "88", Name: "m1", Tags: []string{Tag, r.LaunchTag}}
 	delete(f.drops, "77")
 	_, err := Delete(t.Context(), "m1", d)
@@ -482,7 +504,7 @@ func TestDeleteOfADropletAlreadyGoneStillRemovesTheNetwork(t *testing.T) {
 	st := stateAt(t)
 	require.NoError(t, st.Put(record("m1", f)))
 	delete(f.drops, "77")
-	_, err := Delete(t.Context(), "m1", ManageDeps{Provider: f, State: st, Out: &bytes.Buffer{}, Tune: quick()})
+	_, err := Delete(t.Context(), "m1", ManageDeps{Confirm: yesConfirm, Provider: f, State: st, Out: &bytes.Buffer{}, Tune: quick()})
 	require.NoError(t, err)
 	assert.Empty(t, f.vpcs)
 	assert.Empty(t, f.fws)
@@ -556,7 +578,9 @@ func TestPruneNeverTakesAnInstanceTheStateFileDoesNotKnow(t *testing.T) {
 	assert.Error(t, err, "an age is required")
 }
 
-func TestPruneTakesStaleRecordsAndOrphanNetworksOnlyAsAsked(t *testing.T) {
+// A network is an id, not a name (Security's ruling, #9934): a prune removes a network only with the RECORD that names its id, when a fresh read shows nothing in it. One that matches the tool's name but has no record is
+// untouched and only listed; a recorded network that still has an instance in it stays.
+func TestPruneRemovesOnlyRecordedNetworksAndOnlyEmptyOnes(t *testing.T) {
 	f := newFake()
 	st := stateAt(t)
 	stale := goodRecord("stale")
@@ -564,19 +588,132 @@ func TestPruneTakesStaleRecordsAndOrphanNetworksOnlyAsAsked(t *testing.T) {
 	stale.DropletID = "gone"
 	f.vpcs[stale.VPCID], f.fws[stale.FirewallID] = VPC{ID: stale.VPCID, Name: VPCName("stale")}, Firewall{ID: stale.FirewallID, Name: FirewallName("stale")}
 	require.NoError(t, st.Put(stale))
+	// a second network with the SAME name as the recorded one but another id, and no record: another computer's
+	f.vpcs["vpc-twin"], f.fws["fw-twin"] = VPC{ID: "vpc-twin", Name: VPCName("stale")}, Firewall{ID: "fw-twin", Name: FirewallName("stale")}
 	f.vpcs["vpc-lone"] = VPC{ID: "vpc-lone", Name: VPCName("lonely")}
 	f.vpcs["vpc-team"] = VPC{ID: "vpc-team", Name: "the-teams-own"}
-	d := ManageDeps{Provider: f, State: st, Out: &bytes.Buffer{}, Tune: quick(), Confirm: func(string) (bool, error) { return true, nil }}
+	var out bytes.Buffer
+	d := ManageDeps{Provider: f, State: st, Out: &out, Tune: quick(), Confirm: func(string) (bool, error) { return true, nil }}
 	rep, err := Prune(t.Context(), PruneOptions{OlderThan: 24 * time.Hour}, d)
 	require.NoError(t, err)
-	assert.Equal(t, []string{"stale"}, rep.Removed, "a record whose instance is gone, with its leftover network")
+	assert.Equal(t, []string{"stale"}, rep.Removed, "a record whose instance is gone, with its recorded network")
 	_, ok := st.Get("stale")
 	assert.False(t, ok)
-	assert.Contains(t, f.vpcs, "vpc-lone", "an orphan network is not taken unless asked: it has no age")
-
-	rep, err = Prune(t.Context(), PruneOptions{OlderThan: 24 * time.Hour, IncludeNetworks: true}, d)
-	require.NoError(t, err)
-	assert.Equal(t, []string{"lonely"}, rep.Removed)
-	assert.NotContains(t, f.vpcs, "vpc-lone")
+	assert.NotContains(t, f.vpcs, stale.VPCID)
+	assert.NotContains(t, f.fws, stale.FirewallID)
+	assert.Contains(t, f.vpcs, "vpc-twin", "a network with the same name and no record is untouched")
+	assert.Contains(t, f.fws, "fw-twin")
+	assert.Contains(t, f.vpcs, "vpc-lone")
 	assert.Contains(t, f.vpcs, "vpc-team", "a VPC without this tool's name is never touched")
+
+	// listed, never removed
+	vpcs, fws, err := ListUnknownNetworks(t.Context(), d)
+	require.NoError(t, err)
+	var ids []string
+	for _, v := range vpcs {
+		ids = append(ids, v.ID)
+	}
+	assert.ElementsMatch(t, []string{"vpc-twin", "vpc-lone"}, ids)
+	require.Len(t, fws, 1)
+	assert.Equal(t, "fw-twin", fws[0].ID)
 }
+
+func TestPruneKeepsARecordedNetworkThatStillHasAnInstance(t *testing.T) {
+	f := newFake()
+	st := stateAt(t)
+	stale := goodRecord("stale")
+	stale.Created = time.Now().Add(-200 * time.Hour)
+	stale.DropletID = "gone"
+	f.vpcs[stale.VPCID], f.fws[stale.FirewallID] = VPC{ID: stale.VPCID, Name: VPCName("stale")}, Firewall{ID: stale.FirewallID, Name: FirewallName("stale")}
+	f.drops["500"] = Instance{ID: "500", Name: "member", Tags: []string{Tag}, VPCID: stale.VPCID, Created: time.Now().Add(-1 * time.Hour)}
+	require.NoError(t, st.Put(stale))
+	var out bytes.Buffer
+	d := ManageDeps{Provider: f, State: st, Out: &out, Tune: quick(), Confirm: func(string) (bool, error) { return true, nil }}
+	rep, err := Prune(t.Context(), PruneOptions{OlderThan: 24 * time.Hour}, d)
+	require.NoError(t, err)
+	assert.Empty(t, rep.Removed)
+	assert.Contains(t, f.vpcs, stale.VPCID, "it has a member by the fresh read")
+	assert.Contains(t, f.fws, stale.FirewallID)
+	_, ok := st.Get("stale")
+	assert.True(t, ok, "and the record stays")
+	assert.Contains(t, out.String(), "still has an instance")
+}
+
+// The confirm is built from what was READ, and a read that does not match refuses before any prompt (Security's ruling, #9934).
+func TestDeleteConfirmShowsWhatWasReadAndAMismatchNeverPrompts(t *testing.T) {
+	f := newFake()
+	st := stateAt(t)
+	require.NoError(t, st.Put(record("m1", f)))
+	var asked []string
+	d := ManageDeps{Provider: f, State: st, Out: &bytes.Buffer{}, Tune: quick(), Confirm: func(s string) (bool, error) { asked = append(asked, s); return true, nil }}
+	in := f.drops["77"]
+	in.Region, in.Size = "nyc3", "s-8vcpu-16gb"
+	f.drops["77"] = in
+	_, err := Delete(t.Context(), "m1", d)
+	require.NoError(t, err)
+	require.Len(t, asked, 1)
+	for _, want := range []string{"id 77", "name m1", "region nyc3", "launch tag coral-launch-0123456789abcdef0123456789abcdef", "s-8vcpu-16gb", "made "} {
+		assert.Contains(t, asked[0], want, "the prompt shows the read values")
+	}
+
+	f2 := newFake()
+	st2 := stateAt(t)
+	require.NoError(t, st2.Put(record("m1", f2)))
+	changed := f2.drops["77"]
+	changed.Region = "sfo3" // the droplet now differs from the record
+	f2.drops["77"] = changed
+	asked = nil
+	d2 := ManageDeps{Provider: f2, State: st2, Out: &bytes.Buffer{}, Tune: quick(), Confirm: func(s string) (bool, error) { asked = append(asked, s); return true, nil }}
+	_, err = Delete(t.Context(), "m1", d2)
+	require.ErrorIs(t, err, ErrDropletMismatch)
+	assert.Empty(t, asked, "refused before the prompt")
+	assert.Contains(t, f2.drops, "77")
+
+	d2.Confirm = func(string) (bool, error) { return false, nil }
+	f3 := newFake()
+	st3 := stateAt(t)
+	require.NoError(t, st3.Put(record("m1", f3)))
+	d2.Provider, d2.State = f3, st3
+	_, err = Delete(t.Context(), "m1", d2)
+	assert.ErrorIs(t, err, ErrDeleteDeclined)
+	assert.Contains(t, f3.drops, "77", "declined: nothing deleted")
+}
+
+// A droplet missing from the tag-filtered list is NOT proof it is gone: only a direct read that says not found is. A droplet that lost its tag is refused; a list cut at the page limit refuses; a direct read that fails refuses.
+func TestDeleteDoesNotTreatAMissingListEntryAsGone(t *testing.T) {
+	for name, setup := range map[string]func(f *fakeCloud){
+		"lost its tag, hidden from the list": func(f *fakeCloud) {
+			in := f.drops["77"]
+			in.Tags = []string{"coral-launch-0123456789abcdef0123456789abcdef"}
+			f.drops["77"] = in
+			f.hidden = map[string]bool{"77": true}
+		},
+		"list cut at the page limit": func(f *fakeCloud) { f.listTrunc = true },
+		"direct read fails":          func(f *fakeCloud) { f.hidden = map[string]bool{"77": true}; f.failOn["Get:77"] = errors.New("down") },
+	} {
+		f := newFake()
+		st := stateAt(t)
+		require.NoError(t, st.Put(record("m1", f)))
+		setup(f)
+		f.calls = nil
+		_, err := Delete(t.Context(), "m1", ManageDeps{Provider: f, State: st, Out: &bytes.Buffer{}, Tune: quick(), Confirm: func(string) (bool, error) { return true, nil }})
+		require.Error(t, err, name)
+		assert.Empty(t, f.calls, "%s: nothing was deleted", name)
+		assert.Len(t, f.fws, 1, "%s: the firewall stays", name)
+		assert.Len(t, f.vpcs, 1, name)
+		_, ok := st.Get("m1")
+		assert.True(t, ok, "%s: the record stays", name)
+	}
+	// a direct read that says not found IS gone: the delete goes on to the firewall and the VPC
+	f := newFake()
+	st := stateAt(t)
+	require.NoError(t, st.Put(record("m1", f)))
+	delete(f.drops, "77")
+	_, err := Delete(t.Context(), "m1", ManageDeps{Provider: f, State: st, Out: &bytes.Buffer{}, Tune: quick(), Confirm: func(string) (bool, error) { return true, nil }})
+	require.NoError(t, err)
+	assert.Empty(t, f.fws)
+	assert.Empty(t, f.vpcs)
+}
+
+// yesConfirm answers a delete's confirm with yes: the tests that are not about the prompt.
+func yesConfirm(string) (bool, error) { return true, nil }

@@ -37,7 +37,7 @@ func machineManageUsage(w io.Writer) {
 	fmt.Fprintln(w, "usage: coral machine list   --provider digitalocean --token-file <path|-> [--unknown] [--state-file PATH]   (--unknown only lists: it deletes nothing)")
 	fmt.Fprintln(w, "       coral machine delete NAME --provider digitalocean --token-file <path|-> [--hub-destroy-file <path|->] [--hub-url https://app.coralhub.dev]")
 	fmt.Fprintln(w, "         [--id INSTANCE_ID (needed when the state file does not know the machine)] [--continue-if-revoke-fails] [--state-file PATH] [--yes]")
-	fmt.Fprintln(w, "       coral machine prune --older-than 24h|7d --provider digitalocean --token-file <path|-> [--include-networks] [--state-file PATH] [--yes]")
+	fmt.Fprintln(w, "       coral machine prune --older-than 24h|7d --provider digitalocean --token-file <path|-> [--state-file PATH] [--yes]")
 	fmt.Fprintln(w, "       coral machine egress-files --dir DIR   (writes the machine's egress-block files, for tools/machine-egress-check.sh)")
 }
 
@@ -88,7 +88,7 @@ func runMachineManage(sub string, args []string, stdin io.Reader, stdout, stderr
 	statePath := fs.String("state-file", "", "the state file the launches write (default: machines.json in Coral's data folder)")
 	yes := fs.Bool("yes", false, "go on without asking")
 	var destroyFile, hubURL *string
-	var continueRevoke, includeNetworks, listUnknown *bool
+	var continueRevoke, listUnknown *bool
 	var olderThan, typedID *string
 	switch sub {
 	case "list":
@@ -100,7 +100,6 @@ func runMachineManage(sub string, args []string, stdin io.Reader, stdout, stderr
 		continueRevoke = fs.Bool("continue-if-revoke-fails", false, "destroy the machine even if its Hub identity could not be revoked (it is still said, and it still has to be removed in Coral Hub)")
 	case "prune":
 		olderThan = fs.String("older-than", "", "how old an instance must be to count as an orphan: 90m, 24h or 7d (required)")
-		includeNetworks = fs.Bool("include-networks", false, "also take private networks and firewalls with this tool's names that have no instance and no record (they carry no age)")
 	}
 	// flags and the machine name may come in either order: the name is the one argument that is not a flag
 	var name string
@@ -178,7 +177,7 @@ func runMachineManage(sub string, args []string, stdin io.Reader, stdout, stderr
 		d.ContinueIfRevokeFails = *continueRevoke
 	}
 	if *yes {
-		d.Confirm = func(string) (bool, error) { return true, nil }
+		d.Confirm = func(summary string) (bool, error) { fmt.Fprintln(stdout, summary); return true, nil } // --yes answers the question, it does not hide what was read
 	} else if f, ok := stdin.(*os.File); ok && isTerminal(f) && *tokenFile != "-" && (destroyFile == nil || *destroyFile != "-") {
 		d.Confirm = func(summary string) (bool, error) {
 			fmt.Fprintln(stdout, summary)
@@ -207,6 +206,16 @@ func runMachineManage(sub string, args []string, stdin io.Reader, stdout, stderr
 			odd, err := machinelaunch.ListUnknown(ctx, d)
 			if err != nil {
 				return finish(err)
+			}
+			vpcs, fws, nerr := machinelaunch.ListUnknownNetworks(ctx, d)
+			if nerr != nil {
+				return finish(nerr)
+			}
+			for _, v := range vpcs {
+				fmt.Fprintf(stdout, "Private network id %s, name %s, region %s: this tool's name, no record in this state file; left alone, remove it by hand if it is yours.\n", v.ID, v.Name, orDash(v.Region))
+			}
+			for _, f := range fws {
+				fmt.Fprintf(stdout, "Firewall id %s, name %s: this tool's name, no record in this state file; left alone, remove it by hand if it is yours.\n", f.ID, f.Name)
 			}
 			if len(odd) == 0 {
 				fmt.Fprintln(stdout, "Every machine with this tool's tag is in this state file.")
@@ -260,31 +269,12 @@ func runMachineManage(sub string, args []string, stdin io.Reader, stdout, stderr
 		_ = tw.Flush()
 		return 0
 	case "delete":
-		if _, known := st.Get(name); !known && d.TypedID == "" { // not in the state file and no typed id: Delete lists the candidates and refuses; there is nothing to confirm
-			_, err := machinelaunch.Delete(ctx, name, d)
-			return finish(err)
-		}
-		if d.Confirm == nil {
-			return fail("no one can be asked to confirm: pass --yes to go on without asking")
-		}
-		summary := fmt.Sprintf("Delete machine %q at %s: its instance, firewall and private network, and the state file's record. It cannot be undone.", name, p.Name())
-		if rec, ok := st.Get(name); !ok {
-			summary += " The state file does not know it: only the instance with the id you typed is deleted (not its firewall or network)."
-		} else if rec.CredentialID != "" && revoker != nil {
-			summary += " Its Coral Hub identity is revoked first."
-		}
-		if revoker == nil {
-			summary += " No destroy credential was given (--hub-destroy-file): its Coral Hub identity is NOT revoked, and has to be removed in Coral Hub."
-		}
-		ok, err := d.Confirm(summary)
-		if err != nil {
-			return finish(err)
-		}
-		if !ok {
+		// Delete re-reads the droplet first, refuses a mismatch, shows the confirm built from what it READ, and only then revokes and deletes (Security's ruling, #9934).
+		rep, err := machinelaunch.Delete(ctx, name, d)
+		if errors.Is(err, machinelaunch.ErrDeleteDeclined) {
 			fmt.Fprintln(stderr, "coral machine delete: not confirmed: nothing was deleted")
 			return 1
 		}
-		rep, err := machinelaunch.Delete(ctx, name, d)
 		if err == nil {
 			fmt.Fprintf(stdout, "Deleted %s.\n", rep.Name)
 		}
@@ -293,7 +283,7 @@ func runMachineManage(sub string, args []string, stdin io.Reader, stdout, stderr
 		if d.Confirm == nil {
 			return fail("no one can be asked to confirm: pass --yes to go on without asking")
 		}
-		rep, err := machinelaunch.Prune(ctx, machinelaunch.PruneOptions{OlderThan: age, IncludeNetworks: *includeNetworks}, d)
+		rep, err := machinelaunch.Prune(ctx, machinelaunch.PruneOptions{OlderThan: age}, d)
 		if err == nil && rep != nil && len(rep.Removed) > 0 {
 			fmt.Fprintf(stdout, "Removed: %s.\n", strings.Join(rep.Removed, ", "))
 		}

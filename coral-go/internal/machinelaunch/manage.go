@@ -213,23 +213,53 @@ func Delete(ctx context.Context, name string, d ManageDeps) (*DeleteReport, erro
 	}
 	rep := &DeleteReport{Name: name}
 	rec, inState := d.State.Get(name)
+	var read *Instance // what the provider says the droplet is, read just now: the confirm shows THIS, not the record
 	if inState {
 		var err error
-		if rec, err = verifyRecordedDroplet(ctx, rec, d); err != nil { // re-read tag, name and launch tag before anything is revoked or deleted
+		if rec, read, err = verifyRecordedDroplet(ctx, rec, d); err != nil { // re-read tag, name, region and launch tag before any prompt, revoke or delete
 			return rep, err
 		}
 	} else {
 		var err error
-		if rec, err = typedIDRecord(ctx, name, d); err != nil {
+		if rec, read, err = typedIDRecord(ctx, name, d); err != nil {
 			return rep, err
 		}
 		rep.Reconstruct = true // the instance came from the provider, by the id the person typed
-		fmt.Fprintf(d.Out, "Only the instance is removed: its firewall and private network (%s, %s), if they exist, are NOT touched; remove them by hand.\n", FirewallName(name), VPCName(name))
 	}
 	if rec.DropletID == "" && rec.VPCID == "" && rec.FirewallID == "" {
 		return nil, fmt.Errorf("no machine named %q (not in the state file, and %s has none with this tool's tag)", name, d.Provider.Name())
 	}
 	rep.Found = true
+	if d.Confirm == nil {
+		return rep, errors.New("no one can be asked to confirm: pass --yes to go on without asking")
+	}
+	summary := fmt.Sprintf("Delete machine %q at %s.", name, d.Provider.Name())
+	if read != nil {
+		summary += " The provider says the instance with id " + read.ID + " is: " + describeInstance(*read) + "; size " + read.Size + "; it is deleted by that id."
+	} else {
+		summary += " The provider no longer has its instance."
+	}
+	if inState {
+		summary += " Then its firewall and private network, and the state file's record, are removed. It cannot be undone."
+		if rec.CredentialID != "" && d.Revoker != nil {
+			summary += " Its Coral Hub identity is revoked first."
+		}
+	} else {
+		summary += " Only that instance is deleted (not its firewall or private network)."
+	}
+	if d.Revoker == nil {
+		summary += " No destroy credential was given (--hub-destroy-file): its Coral Hub identity is NOT revoked, and has to be removed in Coral Hub."
+	}
+	ok, cerr := d.Confirm(summary)
+	if cerr != nil {
+		return rep, cerr
+	}
+	if !ok {
+		return rep, ErrDeleteDeclined
+	}
+	if !inState {
+		fmt.Fprintf(d.Out, "Only the instance is removed: its firewall and private network (%s, %s), if they exist, are NOT touched; remove them by hand.\n", FirewallName(name), VPCName(name))
+	}
 
 	switch {
 	case d.Revoker == nil:
@@ -317,18 +347,21 @@ func listAll(ctx context.Context, p Provider) ([]Instance, error) {
 // ErrDropletMismatch is a machine whose id is in the record but whose tag, name or launch tag at the provider is not what the record says: nothing is deleted.
 var ErrDropletMismatch = errors.New("the machine at the provider is not the one the record says")
 
+// ErrDeleteDeclined is a person who said no at the delete's confirm, which shows what was read.
+var ErrDeleteDeclined = errors.New("not confirmed: nothing was deleted")
+
 // ErrNeedTypedID is a delete for a machine the state file does not know: the person types the id.
 var ErrNeedTypedID = errors.New("the state file does not know this machine")
 
 // verifyRecordedDroplet re-reads the recorded droplet before anything is deleted (Security's rulings, #9934): it must still carry this tool's tag, the record's name AND the record's launch tag. A record with no droplet
 // id (the create timed out before an id came back) finds a late droplet by the record's launch tag, and only a single one that matches. A droplet the provider no longer has is already gone.
-func verifyRecordedDroplet(ctx context.Context, rec Record, d ManageDeps) (Record, error) {
+func verifyRecordedDroplet(ctx context.Context, rec Record, d ManageDeps) (Record, *Instance, error) {
 	if rec.DropletID == "" && rec.LaunchTag == "" {
-		return rec, nil
+		return rec, nil, nil
 	}
 	all, err := listAll(ctx, d.Provider)
 	if err != nil {
-		return rec, err
+		return rec, nil, err
 	}
 	if rec.DropletID == "" { // a late droplet: found by the record's own launch tag
 		var found []Instance
@@ -339,36 +372,53 @@ func verifyRecordedDroplet(ctx context.Context, rec Record, d ManageDeps) (Recor
 		}
 		switch len(found) {
 		case 0:
-			return rec, nil
+			return rec, nil, nil
 		case 1:
 			rec.DropletID = found[0].ID
 		default:
 			for _, in := range found {
 				fmt.Fprintf(d.Out, "Carries this launch's tag %s: %s.\n", rec.LaunchTag, describeInstance(in))
 			}
-			return rec, fmt.Errorf("%w: %d machines carry the launch tag %s, so none was deleted: check by hand", ErrDropletMismatch, len(found), rec.LaunchTag)
+			return rec, nil, fmt.Errorf("%w: %d machines carry the launch tag %s, so none was deleted: check by hand", ErrDropletMismatch, len(found), rec.LaunchTag)
 		}
+	}
+	check := func(in Instance) (Record, *Instance, error) {
+		if !slices.Contains(in.Tags, Tag) || in.Name != rec.Name || (rec.Region != "" && in.Region != rec.Region) || (rec.LaunchTag != "" && !slices.Contains(in.Tags, rec.LaunchTag)) {
+			fmt.Fprintf(d.Out, "At %s that id is: %s. The record says name %s, region %s, launch tag %s.\n", d.Provider.Name(), describeInstance(in), rec.Name, orNone(rec.Region), orNone(rec.LaunchTag))
+			return rec, nil, fmt.Errorf("%w: id %s was not deleted; check by hand", ErrDropletMismatch, rec.DropletID)
+		}
+		read := in
+		return rec, &read, nil
 	}
 	for _, in := range all {
-		if in.ID != rec.DropletID {
-			continue
+		if in.ID == rec.DropletID {
+			return check(in)
 		}
-		if !slices.Contains(in.Tags, Tag) || in.Name != rec.Name || (rec.LaunchTag != "" && !slices.Contains(in.Tags, rec.LaunchTag)) {
-			fmt.Fprintf(d.Out, "At %s that id is: %s. The record says name %s, launch tag %s.\n", d.Provider.Name(), describeInstance(in), rec.Name, orNone(rec.LaunchTag))
-			return rec, fmt.Errorf("%w: id %s was not deleted; check by hand", ErrDropletMismatch, rec.DropletID)
-		}
-		return rec, nil
 	}
-	rec.DropletID = "" // not at the provider any more: already gone
-	return rec, nil
+	// Not in the tag-filtered list: that is NOT proof it is gone (it may have lost its tag). Only a direct read of the id that is "not found" is.
+	g, ok := d.Provider.(Getter)
+	if !ok {
+		return rec, nil, fmt.Errorf("%w: id %s is not in the list and %s cannot read it directly, so it is not treated as gone: check by hand", ErrDropletMismatch, rec.DropletID, d.Provider.Name())
+	}
+	gctx, gcancel := context.WithTimeout(ctx, sweepCallTimeout)
+	defer gcancel()
+	in, err := g.Get(gctx, rec.DropletID)
+	switch {
+	case errors.Is(err, ErrNotFound):
+		rec.DropletID = "" // the provider answered not found for that id: already gone
+		return rec, nil, nil
+	case err != nil:
+		return rec, nil, fmt.Errorf("%w: id %s is not in the list and a direct read of it failed (%v), so it is not treated as gone: check by hand", ErrDropletMismatch, rec.DropletID, err)
+	}
+	return check(in) // it exists and the list did not show it (it lost its tag?): judged like any other read
 }
 
 // typedIDRecord is the delete of a machine the state file does not know (Security's ruling ii): it lists the instances with this tool's tag and the name, shows them, and goes on ONLY with the one id the person typed. No id,
 // an id that is not in the list, or a name that more than one machine carries: nothing is deleted. Only the instance is removed; its network, if any, is left (it cannot be told from another machine's by name alone).
-func typedIDRecord(ctx context.Context, name string, d ManageDeps) (Record, error) {
+func typedIDRecord(ctx context.Context, name string, d ManageDeps) (Record, *Instance, error) {
 	all, err := listAll(ctx, d.Provider)
 	if err != nil {
-		return Record{}, err
+		return Record{}, nil, err
 	}
 	var cands []Instance
 	for _, in := range all {
@@ -377,21 +427,22 @@ func typedIDRecord(ctx context.Context, name string, d ManageDeps) (Record, erro
 		}
 	}
 	if len(cands) == 0 {
-		return Record{}, fmt.Errorf("no machine named %q (not in the state file, and %s has none with this tool's tag)", name, d.Provider.Name())
+		return Record{}, nil, fmt.Errorf("no machine named %q (not in the state file, and %s has none with this tool's tag)", name, d.Provider.Name())
 	}
 	for _, in := range cands {
 		fmt.Fprintf(d.Out, "At %s with this tool's tag and the name %s: %s.\n", d.Provider.Name(), name, describeInstance(in))
 	}
 	if d.TypedID == "" {
-		return Record{}, fmt.Errorf("%w: nothing was deleted. To delete one of the machines listed, copy its id and run the same command with --id <id>", ErrNeedTypedID)
+		return Record{}, nil, fmt.Errorf("%w: nothing was deleted. To delete one of the machines listed, copy its id and run the same command with --id <id>", ErrNeedTypedID)
 	}
 	if len(cands) > 1 {
-		return Record{}, fmt.Errorf("%d machines carry the name %q, so nothing was deleted: check by hand at %s", len(cands), name, d.Provider.Name())
+		return Record{}, nil, fmt.Errorf("%d machines carry the name %q, so nothing was deleted: check by hand at %s", len(cands), name, d.Provider.Name())
 	}
 	if cands[0].ID != d.TypedID {
-		return Record{}, fmt.Errorf("the id %q is not the machine listed above (%s), so nothing was deleted", d.TypedID, cands[0].ID)
+		return Record{}, nil, fmt.Errorf("the id %q is not the machine listed above (%s), so nothing was deleted", d.TypedID, cands[0].ID)
 	}
-	return Record{Name: name, Provider: d.Provider.Name(), Region: cands[0].Region, DropletID: cands[0].ID}, nil
+	read := cands[0]
+	return Record{Name: name, Provider: d.Provider.Name(), Region: read.Region, DropletID: read.ID}, &read, nil
 }
 
 // ListUnknown is the read-only list of instances with this tool's tag that this state file does not know (by name or by launch tag): what another computer's launches, or a lost state file, look like. It deletes nothing.
@@ -416,4 +467,38 @@ func ListUnknown(ctx context.Context, d ManageDeps) ([]Instance, error) {
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out, nil
+}
+
+// ListUnknownNetworks is the read-only list of private networks and firewalls with this tool's name whose id this state file has no record of: by name alone they could be another computer's, so they are listed and never
+// removed by a prune. A provider that cannot list networks answers nothing.
+func ListUnknownNetworks(ctx context.Context, d ManageDeps) ([]VPC, []Firewall, error) {
+	nl, ok := d.Provider.(NetworkLister)
+	if !ok {
+		return nil, nil, nil
+	}
+	recV, recF := map[string]bool{}, map[string]bool{}
+	for _, r := range d.State.Records() {
+		recV[r.VPCID], recF[r.FirewallID] = true, true
+	}
+	vpcs, err := nl.ListVPCs(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not list the private networks: %w", err)
+	}
+	fws, err := nl.ListFirewalls(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not list the firewalls: %w", err)
+	}
+	var ov []VPC
+	var of []Firewall
+	for _, v := range vpcs {
+		if strings.HasPrefix(v.Name, VPCPrefix) && !recV[v.ID] {
+			ov = append(ov, v)
+		}
+	}
+	for _, f := range fws {
+		if strings.HasPrefix(f.Name, FirewallPrefix) && !recF[f.ID] {
+			of = append(of, f)
+		}
+	}
+	return ov, of, nil
 }

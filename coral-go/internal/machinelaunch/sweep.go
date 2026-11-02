@@ -72,14 +72,14 @@ func sweepAfterFailedCreate(p Provider, tag string, want sweepWant, createErr er
 	if !ok {
 		return sweepByHand(out, p, tag, want.Name, "this provider cannot list what the launch may have made"), false
 	}
-	kind, note := sweepOnce(l, p, tag, want, out)
+	kind, note := sweepOnce(l, p, tag, want, interrupt, out)
 	if kind == sweepNone { // the list can lag the create: once more, after a bounded wait that a second Ctrl-C cuts short
 		select {
 		case <-time.After(wait):
 		case <-interrupt:
 			return sweepByHand(out, p, tag, want.Name, "interrupted a second time"), false
 		}
-		kind, note = sweepOnce(l, p, tag, want, out)
+		kind, note = sweepOnce(l, p, tag, want, interrupt, out)
 	}
 	switch kind {
 	case sweepDeleted:
@@ -105,7 +105,7 @@ func capitalise(s string) string {
 }
 
 // sweepOnce lists once, and deletes the one machine by its id only if everything matches.
-func sweepOnce(l Lister, p Provider, tag string, want sweepWant, out io.Writer) (sweepKind, string) {
+func sweepOnce(l Lister, p Provider, tag string, want sweepWant, interrupt <-chan struct{}, out io.Writer) (sweepKind, string) {
 	ctx, cancel := context.WithTimeout(context.Background(), sweepCallTimeout)
 	all, err := l.List(ctx)
 	cancel()
@@ -140,7 +140,11 @@ func sweepOnce(l Lister, p Provider, tag string, want sweepWant, out io.Writer) 
 		// A provider may still list a droplet for a few seconds after a delete answered: up to sweepConfirmReads reads, a few seconds apart, each bounded. A failed read ends it as not confirmed.
 		for i := 0; i < sweepConfirmReads; i++ {
 			if i > 0 {
-				time.Sleep(sweepConfirmEvery)
+				select {
+				case <-time.After(sweepConfirmEvery):
+				case <-interrupt: // a second Ctrl-C ends the wait: not confirmed, said by hand
+					return sweepRefused, sweepByHand(out, p, tag, want.Name, fmt.Sprintf("interrupted before machine %s was confirmed gone", in.ID))
+				}
 			}
 			rctx, rcancel := context.WithTimeout(context.Background(), sweepCallTimeout)
 			after, lerr := l.List(rctx)

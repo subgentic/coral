@@ -312,3 +312,13 @@ func TestErrorMessagesAreCleanedAndTheTokenIsRemovedFromEveryOne(t *testing.T) {
 	require.Error(t, err)
 	assert.NotContains(t, err.Error(), testToken)
 }
+
+// A list that runs past the page limit says so: what came back is not everything, so nothing may treat a missing droplet as gone.
+func TestListSaysWhenItWasCutAtThePageLimit(t *testing.T) {
+	s, d := newStub(t, func(w http.ResponseWriter, r *http.Request, _ []byte) {
+		writeJSON(w, 200, map[string]any{"droplets": []map[string]any{}, "links": map[string]any{"pages": map[string]any{"next": "https://api/x?page=next"}}})
+	})
+	_, err := d.List(t.Context())
+	assert.ErrorIs(t, err, ErrListTruncated)
+	assert.Len(t, s.requests, maxPages)
+}

@@ -400,6 +400,9 @@ func (d *DigitalOcean) Delete(ctx context.Context, id string) error {
 }
 
 // List returns the droplets tagged Tag (the ones this tool made).
+// Get reads one droplet by its id (GET /droplets/{id}); a droplet the provider does not have is ErrNotFound.
+func (d *DigitalOcean) Get(ctx context.Context, id string) (Instance, error) { return d.get(ctx, id) }
+
 func (d *DigitalOcean) List(ctx context.Context) ([]Instance, error) {
 	var all []Instance
 	for page := 1; page <= maxPages; page++ {
@@ -418,6 +421,9 @@ func (d *DigitalOcean) List(ctx context.Context) ([]Instance, error) {
 		}
 		if out.Links.Pages.Next == "" {
 			break
+		}
+		if page == maxPages { // more pages exist than are read: what is returned is not everything
+			return all, ErrListTruncated
 		}
 	}
 	return all, nil

@@ -78,10 +78,17 @@ type Lister interface {
 	List(ctx context.Context) ([]Instance, error)
 }
 
+// Getter is implemented by a provider that can read ONE instance by its id: a delete uses it to tell a droplet that is really gone (not found) from one a tag-filtered list simply does not show.
+type Getter interface {
+	Get(ctx context.Context, id string) (Instance, error)
+}
+
 // Errors a provider answers with, to be told apart with errors.Is.
 var (
 	ErrNotFound     = errors.New("not found")
 	ErrUnauthorized = errors.New("the provider refused the token")
+	// ErrListTruncated is a list that was cut at the provider's page limit: what came back is not everything, so nothing may be taken from it as proof that a machine is gone.
+	ErrListTruncated = errors.New("the list was cut at the page limit")
 )
 
 // APIError is a provider's own refusal or failure: the HTTP status and the provider's short message (never the token: a provider that echoes it back has it removed before it gets here).

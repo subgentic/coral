@@ -342,3 +342,19 @@ func TestSweepConfirmingReadsOutlastABriefLag(t *testing.T) {
 		t.Fatalf("a lag longer than the bound is not confirmed: clean %v, lists %d", clean, p.lists)
 	}
 }
+
+// A second Ctrl-C ends the confirming reads' wait: not confirmed, said by hand with the tag.
+func TestSweepConfirmWaitEndsOnASecondInterrupt(t *testing.T) {
+	old := sweepConfirmEvery
+	sweepConfirmEvery = time.Hour
+	defer func() { sweepConfirmEvery = old }()
+	p, want, out := sweepFixture([]Instance{mineAt(sweepTag)})
+	p.staysListed = true
+	stop := make(chan struct{})
+	close(stop)
+	start := time.Now()
+	note, clean := sweepAfterFailedCreate(p, sweepTag, want, context.DeadlineExceeded, time.Millisecond, stop, out)
+	if time.Since(start) > 5*time.Second || clean || !strings.Contains(note, "interrupted") || !strings.Contains(note, sweepTag) {
+		t.Fatalf("clean %v, took %s, note %q", clean, time.Since(start), note)
+	}
+}

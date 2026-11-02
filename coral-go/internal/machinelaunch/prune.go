@@ -90,18 +90,16 @@ type PruneReport struct {
 // PruneOptions choose what a prune may take.
 type PruneOptions struct {
 	OlderThan time.Duration // how old an instance or a record must be (required)
-	// IncludeNetworks also takes a VPC or firewall with this tool's names that has no instance and no record.
-	IncludeNetworks bool
 }
 
 // Prune finds what a crashed or forgotten launch left, by this tool's tag and names, and removes it after ONE confirmation that lists it all:
 //   - NEVER an instance the state file does not know, however old: a tag proves this tool made it, not that THIS state file did (a second computer's launch looks the same). Those are only counted and said: `coral machine list --unknown` shows them and `coral machine delete NAME --id ID` takes one the person types;
 //   - a state record at least olderThan old whose instance the provider no longer has (its leftover network is removed, the record dropped);
-//   - with includeNetworks, a VPC or firewall with the tool's name prefix whose machine has no instance and no record (these carry no age, so they are only taken when you say so).
+//   - a network is removed only with the record that names its id, after a fresh read shows nothing in it; one with this tool's name and no record is never removed (`coral machine list --unknown` lists them).
 //
 // Nothing the person did not launch with this tool is touched: everything is matched by the tool's tag and names. A prune cannot revoke a Hub identity (it has no credential id for an orphan): say so.
 func Prune(ctx context.Context, o PruneOptions, d ManageDeps) (*PruneReport, error) {
-	olderThan, includeNetworks := o.OlderThan, o.IncludeNetworks
+	olderThan := o.OlderThan
 	if olderThan <= 0 {
 		return nil, errors.New("--older-than is needed: how old a machine must be before it is an orphan")
 	}
@@ -120,29 +118,6 @@ func Prune(ctx context.Context, o PruneOptions, d ManageDeps) (*PruneReport, err
 			alive[in.Name] = true
 		}
 	}
-	var vpcs []VPC
-	var fws []Firewall
-	if nl, ok := d.Provider.(NetworkLister); ok {
-		if vpcs, err = nl.ListVPCs(ctx); err != nil {
-			return nil, fmt.Errorf("could not list the private networks: %w", err)
-		}
-		if fws, err = nl.ListFirewalls(ctx); err != nil {
-			return nil, fmt.Errorf("could not list the firewalls: %w", err)
-		}
-	}
-	netIDs := func(name string) (vpc, fw string) {
-		for _, v := range vpcs {
-			if v.Name == VPCName(name) {
-				vpc = v.ID
-			}
-		}
-		for _, f := range fws {
-			if f.Name == FirewallName(name) {
-				fw = f.ID
-			}
-		}
-		return
-	}
 	var items []PruneItem
 	unknown := 0
 	taken := map[string]bool{}
@@ -159,38 +134,14 @@ func Prune(ctx context.Context, o PruneOptions, d ManageDeps) (*PruneReport, err
 		if alive[r.Name] || r.Created.IsZero() || r.Created.After(cutoff) {
 			continue
 		}
+		if r.VPCID != "" && slices.ContainsFunc(all, func(in Instance) bool { return in.VPCID == r.VPCID }) { // by this fresh read the network still has a member: it stays
+			fmt.Fprintf(d.Out, "The private network %s of the record %s still has an instance in it: it was left alone.\n", r.VPCID, r.Name)
+			continue
+		}
 		ids := r.IDs()
 		ids.DropletID = "" // the provider no longer has it
 		items = append(items, PruneItem{Name: r.Name, Why: "a record whose instance is gone", IDs: ids, Record: true})
 		taken[r.Name] = true
-	}
-	if includeNetworks {
-		names := map[string]bool{}
-		for _, v := range vpcs {
-			if strings.HasPrefix(v.Name, VPCPrefix) { // the lister filters too; a network without this tool's name is never taken, whoever lists it
-				names[strings.TrimPrefix(v.Name, VPCPrefix)] = true
-			}
-		}
-		for _, f := range fws {
-			if strings.HasPrefix(f.Name, FirewallPrefix) {
-				names[strings.TrimPrefix(f.Name, FirewallPrefix)] = true
-			}
-		}
-		var sorted []string
-		for n := range names {
-			sorted = append(sorted, n)
-		}
-		sort.Strings(sorted)
-		for _, n := range sorted {
-			if taken[n] || alive[n] {
-				continue
-			}
-			if _, known := d.State.Get(n); known {
-				continue
-			}
-			vpc, fw := netIDs(n)
-			items = append(items, PruneItem{Name: n, Why: "a private network or firewall with no instance and no record", IDs: IDs{VPCID: vpc, FirewallID: fw}})
-		}
 	}
 	rep := &PruneReport{Items: items}
 	if unknown > 0 {

@@ -26,7 +26,15 @@ type manageProvider struct {
 }
 
 func (m *manageProvider) List(context.Context) ([]machinelaunch.Instance, error) { return m.drops, nil }
-func (m *manageProvider) ListVPCs(context.Context) ([]machinelaunch.VPC, error)  { return m.vpcs, nil }
+func (m *manageProvider) Get(_ context.Context, id string) (machinelaunch.Instance, error) {
+	for _, d := range m.drops {
+		if d.ID == id {
+			return d, nil
+		}
+	}
+	return machinelaunch.Instance{}, machinelaunch.ErrNotFound
+}
+func (m *manageProvider) ListVPCs(context.Context) ([]machinelaunch.VPC, error) { return m.vpcs, nil }
 func (m *manageProvider) ListFirewalls(context.Context) ([]machinelaunch.Firewall, error) {
 	return m.fws, nil
 }
