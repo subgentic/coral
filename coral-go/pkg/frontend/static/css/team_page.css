@@ -456,7 +456,7 @@ dialog.inbox-deny-dialog { position: fixed; inset: 0; margin: auto; height: fit-
     .team-page-head { align-content: center; row-gap: 0; grid-template-columns: 44px minmax(0, 1fr) 44px; grid-template-rows: auto auto; align-items: center; padding: 0 4px; min-height: 56px; gap: 0 4px; border-bottom: 1px solid var(--border); }
     .team-bar-back { display: grid; grid-column: 1; grid-row: 1 / span 2; place-items: center; width: var(--control-touch-height, 44px); height: var(--control-touch-height, 44px); padding: 0; border: 0; border-radius: 22px; background: none; color: var(--text-primary); cursor: pointer; }
     .team-page-title { grid-column: 2; grid-row: 1; font-size: var(--fs-xl); font-weight: var(--fw-strong); line-height: var(--lh-label); }
-    .team-page-status { display: block; min-width: 0; grid-column: 2; grid-row: 2; font-size: var(--fs-md); color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .team-page-status { display: block; min-width: 0; grid-column: 2; grid-row: 2; font-size: var(--fs-md); color: var(--text-secondary); overflow-wrap: anywhere; } /* it wraps: '2 of 3 waiting for first signal. A signal is an agent's first message.' was cut with an ellipsis (#12534) */
     .team-page-no-team .team-bar-back { display: none; } /* a team that is not there: the page says so and has its own Back to Agents button */
     .team-page-no-team .team-page-head { grid-template-columns: minmax(0, 1fr); padding-inline: 16px; }
     .team-page-no-team .team-page-title { grid-column: 1; }
