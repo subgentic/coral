@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/subgentic/coral/internal/safego"
 )
 
 // DefaultLimitMB is the most a package's test binary may hold, in MiB. CORAL_TEST_MAX_MB changes it for one run (0 turns the guard off).
@@ -47,6 +49,7 @@ func Start(pkg string, limitMB int) (stop func() (peakMB int)) {
 	peak := uint64(0)
 	done, finished := make(chan struct{}), make(chan struct{})
 	go func() {
+		defer safego.Recover("testmem") // a panic in the watch is logged, not a crash of the test binary (the safego census, #12390)
 		defer close(finished)
 		t := time.NewTicker(250 * time.Millisecond)
 		defer t.Stop()
