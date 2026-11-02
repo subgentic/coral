@@ -61,6 +61,7 @@ function _build() {
             <a class="btn artifact-viewer-download" rel="noopener noreferrer" download>Download</a>
         </div>
         <div class="artifact-viewer-from" hidden></div>
+        <div class="artifact-viewer-goal" hidden></div>
         <div class="artifact-viewer-readers" hidden></div>
         <div class="artifact-viewer-main"><div class="artifact-viewer-body"></div></div>
         <div class="modal-actions modal-footer artifact-viewer-foot"><button type="button" class="btn artifact-viewer-close">Close</button></div>
@@ -115,6 +116,23 @@ export function openArtifactViewer(hex, opts = {}) {
     const title = d.querySelector('.artifact-viewer-title');
     title.textContent = visibleName(opts.filename) || 'Artifact'; // the uploader's text, without what hides or reorders it (Security on #220)
     const fromLine = d.querySelector('.artifact-viewer-from'); fromLine.textContent = visibleName(opts.from) || ''; fromLine.hidden = !fromLine.textContent; // who uploaded a file opened for review (#11456), as text
+    // The goal this file serves, a link back to it in the opened view (#12025): one click closes the viewer and opens the goal's page. None for a file with no goal (or one opened from where its goal is not known).
+    const goalLine = d.querySelector('.artifact-viewer-goal');
+    goalLine.replaceChildren(); goalLine.hidden = true;
+    goalLine.style.cssText = 'flex:none;padding:0 16px 8px;font-size:var(--fs-sm);color:var(--text-secondary);overflow-wrap:anywhere'; // in script, not the start CSS: that file is at its cap
+    if (opts.goal && opts.goalId && opts.goalTeam) {
+        const link = document.createElement('button'); link.type = 'button'; link.className = 'dt-link';
+        link.style.cssText = 'white-space:normal;text-decoration:underline;text-align:left' + (window.matchMedia('(max-width: 768px)').matches ? ';min-height:44px;padding:0 4px' : '');
+        link.textContent = markHidden(opts.goal, { strict: true });
+        const team = String(opts.goalTeam), goalId = String(opts.goalId);
+        link.addEventListener('click', async () => {
+            // a phone's viewer has its own history entry: closing it goes Back, and that lands after the click: the goal's page is opened once it has, or the Back would undo it
+            const settled = _overlay ? new Promise(res => { window.addEventListener('popstate', () => res(), { once: true }); setTimeout(res, 600); }) : Promise.resolve();
+            closeArtifactViewer(); await settled;
+            importOnce('./nav.js').then(n => n.go({ view: 'inbox-goals', sub: 'goals', id: team, item: goalId })).catch(() => {});
+        });
+        goalLine.append('Goal: ', link); goalLine.hidden = false;
+    }
     const dl = d.querySelector('.artifact-viewer-download');
     const newTab = d.querySelector('.artifact-viewer-newtab');
     newTab.hidden = true; newTab.removeAttribute('href'); // its address comes with the kind (typeKnown): a manifest's own bytes are a list, not what to open
