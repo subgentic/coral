@@ -327,7 +327,7 @@ func TestShellTreeNamesAreBaseNamesAndCleaned(t *testing.T) {
 	long := treeName(strings.Repeat("x", 200))
 	assert.Len(t, long, 24, "capped")
 	assert.Equal(t, "Ss+", treeStat("Ss+"))
-	assert.Equal(t, "S", treeStat("S\n{x}"))
+	assert.Equal(t, "S", treeStat("S\n{} "))
 	tab := &procTable{byPID: map[int]procEntry{1: {stat: "Ss", comm: "/Users/jane/work/proj/bash"}, 2: {ppid: 1, stat: "S+", comm: "/home/jane/.local/bin/my{tool}"}}, children: map[int][]int{1: {2}}}
 	tree := shellTree(tab, 1)
 	assert.Equal(t, "bash(Ss){mytool(S+)}", tree)
