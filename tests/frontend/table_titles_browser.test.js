@@ -32,7 +32,8 @@ const { coralReady } = require('./helpers/wait');
                 await Page.navigate({ url: BASE + `/team/${B}/${tab}` }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
                 await waitFor(`document.querySelectorAll('#${panel} .dt-primary').length >= 2`, `${tab}: rows`, 20000);
                 const sizes = await titles(`#${panel} .dt-primary`);
-                assert.ok(sizes.length >= 2 && sizes.every(s => s === '13px 400'), at + `${tab}: every title is 13px 400: ` + sizes.join(', '));
+                const want = mobile ? '16px 400' : '13px 400'; // a phone's team Tasks and Artifacts lists are the shared phone form (#12230): mail rows, whose title is the Inbox's 16 px
+                assert.ok(sizes.length >= 2 && sizes.every(s => s === want), at + `${tab}: every title is ${want}: ` + sizes.join(', '));
                 for (const t of ['dark', 'light']) { await theme(t); await new Promise(r => setTimeout(r, 450)); await shot(`table-titles-${tab}-${t}-${w}`); } // sleep-ok: the theme's colour transition settles
             }
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');

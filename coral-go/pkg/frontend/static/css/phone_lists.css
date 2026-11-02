@@ -1,0 +1,12 @@
+/* The phone form of a team list (#12230, the operator: "the shared phone form"): rows edge to edge like the chat (no bordered card), one toolbar line (the search, the filter folded into one icon, a compact +), no Select button and no row checkboxes (a long press selects). Goals and Tasks use it. Lazy: loaded with their pages. */
+@media (max-width: 760px) {
+    .goals-bleed { margin-inline: -16px; } /* the table's own mail rows drop the card (data_table.css); this takes the page's side gutter off them */
+    .phone-list-bar { flex-wrap: nowrap; gap: 8px; }
+    .phone-list-bar .list-bar-search-wrap { flex: 1 1 auto; min-width: 0; }
+    .phone-list-bar .team-tb-pills { display: none; }
+    .phone-list-bar .team-tb-select { display: block; flex: none; width: 44px; min-width: 44px; padding: 0; text-indent: 120%; overflow: hidden; white-space: nowrap; background: var(--bg-secondary) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23999'%3E%3Cpath d='M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z'/%3E%3C/svg%3E") center / 22px no-repeat; appearance: none; -webkit-appearance: none; } /* the label is pushed out of the box, still the select's own text (contrast, screen readers) */
+    .phone-list-bar .team-tb-select option { color: var(--text-primary); background: var(--bg-primary); }
+    .goals-table-page .goals-require { display: flex; align-items: center; gap: 4px; margin: 4px 0 0; font-size: var(--fs-sm); color: var(--text-muted); white-space: nowrap; }
+    .goals-table-page .goals-note-icon { font-size: var(--fs-lg, 1.1rem); }
+    .phone-list-bar .goals-new { flex: none; width: 44px; min-width: 44px; padding: 0; }
+}

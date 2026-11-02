@@ -40,14 +40,11 @@ const B = 'goal-ready-' + Date.now().toString(36);
             assert.ok(done && long && open, `${w}: the goals are listed: ${JSON.stringify(rows)}`);
             for (const r of rows) assert.equal(r.chips, 0, `${w}: no Close goal button on a row (closing is on the goal's page): ${JSON.stringify(r)}`);
             assert.ok(!/Close goal/.test(rows.map(r => r.text).join(' ')), `${w}: no row says Close goal`);
-            if (mobile) {
-                assert.equal(done.sub, '2 done', `${w}: a finished goal says its tasks: ${JSON.stringify(done)}`);
-                assert.equal(open.sub, '0 done · 1 left', `${w}: an open goal says done and left: ${JSON.stringify(open)}`);
-                assert.equal(long.sub, '1 done', `${w}: ${JSON.stringify(long)}`);
-                assert.ok(w <= 320 ? long.lines >= 2 : long.lines === 2 && !long.clipped, // a 320 px phone is held to two lines with an ellipsis
-                     `${w}${big ? ' at 200% text' : ''}: a long title gets two lines, not one cut line: ${JSON.stringify(long)}`);
-                assert.equal(long.clamp, '2', `${w}: a title is held to two lines`);
-                assert.equal(done.lines, 1, `${w}: a short title stays on one line`);
+            if (mobile) { // the shared phone form (#12230): a two-line row (the goal, its outcome), the state and the task count (done/all) at the right; a long title is one cut line
+                assert.match(done.text, /2\/2/, `${w}: a finished goal says its tasks, done of all: ${JSON.stringify(done)}`);
+                assert.match(open.text, /0\/1/, `${w}: an open goal says done of all: ${JSON.stringify(open)}`);
+                assert.match(long.text, /1\/1/, `${w}: ${JSON.stringify(long)}`);
+                assert.ok(rows.every(r => /(Active|Done|Blocked|Proposed|Dropped)/.test(r.text)), `${w}: every row says its state: ${JSON.stringify(rows.map(r => r.text))}`);
             } else {
                 assert.equal(done.sub, null, `${w}: a computer has the Tasks column, so no second line: ${JSON.stringify(done)}`);
                 assert.ok(done.progress, `${w}: the Tasks column is shown`);

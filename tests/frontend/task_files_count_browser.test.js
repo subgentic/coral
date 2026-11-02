@@ -39,6 +39,12 @@ const SHARED = 'coral://artifacts/' + 'c'.repeat(64);
 
             console.log(`${at}the count on the rows that have artifacts`);
             const rows = await ev(`[...document.querySelectorAll('#team-panel-tasks tbody tr')].map(r => { const b = r.querySelector('button.dt-files'); return { title: r.querySelector('.dt-primary').textContent, files: b ? { text: b.textContent.replace('description', '').trim(), name: b.getAttribute('aria-label'), icon: b.querySelector('.material-icons').getAttribute('aria-hidden') } : null }; })`);
+            if (mobile) { // a phone's task row is the shared phone form (#12230): two lines, the state at the right, no file count on the row (it is on the task's page)
+                const shown = await ev(`[...document.querySelectorAll('#team-panel-tasks button.dt-files')].some(b => b.getClientRects().length > 0)`);
+                assert.equal(shown, false, at + 'a phone row does not draw the file count');
+                await shot(`task-files-${w}`);
+                continue;
+            }
             const by = Object.fromEntries(rows.map(r => [r.title, r.files]));
             assert.deepEqual(by['Write the report'], { text: '2 files', name: '2 artifacts, open', icon: 'true' }, at + JSON.stringify(rows));
             assert.deepEqual(by['Draw the diagram'], { text: '1 file', name: '1 artifact, open', icon: 'true' });

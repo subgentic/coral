@@ -44,14 +44,14 @@ const { coralReady } = require('./helpers/wait');
         await ev(`window.openTeamPage(${JSON.stringify(B)},{tab:'artifacts'});true`);
         const P='#team-panel-artifacts';
         await waitFor(`${q(P+' tbody')}?.children.length===3`,'artifact rows',15000);
-        await ev(`${q(P+' .dt-select-toggle')}.click();true`);
-        assert.ok(await ev(`${q(P+' .dt-select-toggle')}.getBoundingClientRect().height>=44`),'phone Select is a touch target');
-        await ev(`(()=>{const cs=[...document.querySelectorAll('${P} tbody .dt-check input:not(:disabled)')];cs[0].click();cs[1].focus();return true;})()`);
-        await client.Input.dispatchKeyEvent({type:'keyDown',key:' ',code:'Space',windowsVirtualKeyCode:32});
-        await client.Input.dispatchKeyEvent({type:'keyUp',key:' ',code:'Space',windowsVirtualKeyCode:32});
+        // a phone selects by a long press (#12230: the shared phone form has no Select button and no checkboxes); a key then adds the second file
+        { const at1 = await ev(`(()=>{const r=document.querySelector('${P} tbody tr .dt-mail-title, ${P} tbody tr .dt-primary').getBoundingClientRect();return {x:Math.round(r.left+r.width/2),y:Math.round(r.top+r.height/2)};})()`);
+          const tt = type => client.Input.dispatchTouchEvent({ type, touchPoints: type === 'touchEnd' ? [] : [{ x: at1.x, y: at1.y, id: 1 }] });
+          await tt('touchStart'); await new Promise(r => setTimeout(r, 700)); await tt('touchEnd'); } // sleep-ok: a long press is a held finger
+        await waitFor(`/1 selected/.test(((document.querySelector('${P} .dt-bar'))||{}).textContent||'')`,'a long press selects the first file',5000);
+        { const at2 = await ev(`(()=>{const ok=[...document.querySelectorAll('${P} tbody tr')].filter(tr=>tr.querySelector('.dt-check input:not(:disabled)'));const r=ok[1].querySelector('.dt-mail-lead').getBoundingClientRect(); /* the row's circle: a tap adds it while selecting */return {x:Math.round(r.left+r.width/2),y:Math.round(r.top+r.height/2)};})()`);
+          for (const type of ['touchStart', 'touchEnd']) { await client.Input.dispatchTouchEvent({ type, touchPoints: type === 'touchEnd' ? [] : [{ x: at2.x, y: at2.y, id: 1 }] }); await new Promise(r => setTimeout(r, 60)); } } // sleep-ok: a tap while selecting adds the row
         assert.equal(await ev(`${q(P+' .dt-bar-count')}.textContent`),'2 selected','unverified excluded');
-        const phoneLayout = await ev(`(()=>{const p=${q(P)},r=s=>p.querySelector(s).getBoundingClientRect(),c=getComputedStyle(p.querySelector('input:focus'));return {search:r('.list-bar-search').top,toggle:r('.dt-select-toggle').top,bar:r('.dt-bar').top,offset:parseFloat(c.outlineOffset)};})()`);
-        assert.ok(Math.abs(phoneLayout.search-phoneLayout.toggle)<2 && phoneLayout.bar>phoneLayout.toggle+40 && phoneLayout.offset<=0,JSON.stringify(phoneLayout));
         await ev(`(async()=>{const n=await import((window.__coralStatic||'/static/')+'notifications.js');n.showToast('Closed 2 goals',false,60000);return true;})()`);
         await waitFor(`document.getElementById('notices').getBoundingClientRect().top>=document.getElementById('local-auth-banner').getBoundingClientRect().bottom+7`,'toast below sign-in banner');
         await ev(`document.getElementById('local-auth-banner').hidden=true;true`);

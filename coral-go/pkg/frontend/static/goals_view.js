@@ -18,6 +18,7 @@ const GC = await importOnce('./goal_columns.js');
 import * as W from './goal_words.js';
 const GOAL_DESCRIPTION_MAX = 2000; // the server's cap on a goal's outcome (MaxGoalOutcome)
 const { mountGoal } = await importOnce('./goal_view.js');
+await loadStyles('phone_lists.css'); // the phone form of a team list: edge-to-edge rows, a one-line toolbar (#12230); not at start (page_weight)
 await loadStyles('pictures.css'); // the picture rules load with this module, before anything draws (page_weight: not at start)
 let detail = null, detailHost = null, detailId = 0;
 function clearDetail() { detail?.dispose(); detail = null; detailHost = null; detailId = 0; }
@@ -125,6 +126,9 @@ function goalBulkActions() {
         } }];
 }
 
+/** A compact icon button with its name (a phone's New goal). */
+function iconBtn(cls, icon, name, run) { const b = btn(`btn btn-primary btn-icon ${cls}`, '', run); const i = el('span', 'material-icons', icon); i.setAttribute('aria-hidden', 'true'); b.append(i); b.setAttribute('aria-label', name); b.title = name; return b; }
+
 function drawTableRaw(col) {
     col.replaceChildren();
     const counts = W.filterCounts(model.goals);
@@ -133,10 +137,15 @@ function drawTableRaw(col) {
         id: 'goals-search', label: 'Search goals', placeholder: 'Search goals', value: model.goalSearch,
         onSearch: text => { model.goalSearch = text; drawList(); },
         pills: { label: 'Show goals that are', current: model.filter, items: W.FILTERS.map(f => ({ key: f, label: W.filterLabel(f), count: counts[f] })), onPick: f => { model.filter = f; say(W.filterAnnouncement(f, counts[f])); drawList(); } },
-        action: btn('btn btn-primary goals-new', 'New goal', () => openCreate()),
+        action: PHONE.matches ? iconBtn('goals-new', 'add', 'New goal', () => openCreate()) : btn('btn btn-primary goals-new', 'New goal', () => openCreate()), // a phone: a compact + beside the search (#12230)
     });
+    if (PHONE.matches) toolbar.classList.add('phone-list-bar');
     col.append(toolbar);
-    if (model.requireGoal) col.append(Object.assign(el('p', 'goals-note goals-require'), { textContent: W.requireGoalNote }));
+    if (model.requireGoal) { // a phone: one quiet line, the whole sentence on its tap-and-hold (#12230); elsewhere the sentence
+        const note = el('p', 'goals-note goals-require');
+        if (PHONE.matches) { const i = el('span', 'material-icons goals-note-icon', 'info'); i.setAttribute('aria-hidden', 'true'); note.append(i, ' Goal required here'); note.setAttribute('title', W.requireGoalNote); /* the whole sentence on the quiet line's tooltip; the line shows only "Goal required here" */ } else note.textContent = W.requireGoalNote;
+        col.append(note);
+    }
     if (state.hubConnected || window.__goalsHub) col.append(el('p', 'goals-note', W.otherBoardsNote));
     if (model.failed) {
         const f = el('div', 'goals-failed'); f.setAttribute('role', 'alert');
@@ -158,13 +167,14 @@ function drawTableRaw(col) {
     const rows = shown.concat(model.noGoalOpen > 0 && (model.filter === 'all' || model.filter === DEFAULT_FILTER) ? [{ id: 'no-goal', title: W.noGoalRowText(model.noGoalOpen), noGoal: true }] : []);
     const table = DT.dataTable({
         label: `Goals, ${shown.length}`, rows, rowKey: g => g.id, state: goalsTableState, rowName: g => g.title,
-        selectable: { contextKey: model.project, canSelect: g => !g.noGoal && W.isOpenGoal(g), actions: goalBulkActions(), onChange: keys => Toolbar.mountSelection(toolbar, keys.size ? table.bar : null) },
+        selectable: { contextKey: model.project, canSelect: g => !g.noGoal && W.isOpenGoal(g), actions: goalBulkActions(), onChange: keys => Toolbar.mountSelection(toolbar, keys.size ? table.bar : null), ...(PHONE.matches ? { longPress: true, iconBar: true, clearLabel: 'Cancel' } : {}) }, // a phone: a long press selects, as in Needs you; no checkboxes and no Select button (#12230)
         onSort: () => drawList(), // keep the no-goal navigation row last in either direction
         open: g => g.noGoal ? window.openTeamPage?.(model.project, { tab: 'tasks', noGoal: true }) : openGoal(g.id, true),
-        columns: GC.goalColumns({ progressLabel: 'Tasks' }, ['goal', 'state', 'progress', 'updated']), oneLine: true, sortBar: false,
+        columns: GC.goalColumns({ progressLabel: 'Tasks' }, ['goal', 'state', 'progress', 'updated']), oneLine: true, sortBar: false, bare: PHONE.matches, // a phone: no card around the rows (#12230)
+        ...(PHONE.matches ? { mail: g => (g.noGoal ? { lead: { icon: 'checklist', square: true, name: 'Tasks with no goal' }, title: g.title, snippet: '', state: '', time: '' } : { lead: { icon: 'flag', square: true, name: W.stateWord(g) }, title: g.title, ask: g.outcome || '', state: W.stateWord(g), time: `${W.stateWord(g)}${totalOf(g.rollup) ? ` \u00b7 ${doneOf(g.rollup)}/${totalOf(g.rollup)}` : ''}` }) } : {}), // a phone's row, like the Inbox's Goals: a flag, the goal, its outcome, when it moved
     });
-    col.append(table.el); Toolbar.mountSelection(toolbar, goalsTableState.selected.size ? table.bar : null);
-    if (PHONE.matches) toolbar.querySelector('.goals-new')?.before(table.selectButton);
+    if (PHONE.matches) { const bleed = el('div', 'goals-bleed'); bleed.append(table.el); col.append(bleed); } else col.append(table.el); // a phone: the rows run to the screen's edges (goals_phone.css)
+    Toolbar.mountSelection(toolbar, goalsTableState.selected.size ? table.bar : null);
 }
 
 function drawGoalPageRaw(col) {

@@ -42,7 +42,7 @@ const BASE = require('./test_base').BASE;
    await shot('review-pool');
    await ev(`(async()=>{const m=await import((window.__coralStatic||'/static/')+'team_tasks_page.js');const host=document.getElementById('review-ui');host.replaceChildren();delete host.dataset.built;await m.showTasks(host,'review-ui');const select=host.querySelector('select[aria-label="Show tasks that are"]');select.value='needs_review';select.dispatchEvent(new Event('change',{bubbles:true}));return true;})()`);
    await waitFor(`document.querySelectorAll('#review-ui tbody .dt-row').length===2`,'Needs review contains pool and assigned reviews only');
-   const names=await ev(`[...document.querySelectorAll('#review-ui tbody .dt-primary')].map(x=>x.textContent)`);assert.ok(names.includes('Pool review')&&names.includes('Assigned review'));assert.ok(!names.includes('Still held'));
+   const names=await ev(`[...document.querySelectorAll('#review-ui tbody .dt-primary, #review-ui .dt-mail-title')].map(x=>x.textContent)`);assert.ok(names.includes('Pool review')&&names.includes('Assigned review'));assert.ok(!names.includes('Still held'));
    assert.equal(await ev(`document.getElementById('review-ui').scrollWidth>innerWidth+1`),false,'phone fits');
    await shot('needs-review');
   }
