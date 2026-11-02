@@ -122,7 +122,22 @@ async function applySettingsEffects({ themeSaved, theme, customTheme, fitPaneWid
     }
 }
 
+/** The idle minutes before auto-sleep are 15 to 1440 (#12111). A value outside that is said and not saved: it used to be sent as the nearest end, so 5 became 15 without a word (#12328). Returns true when it is fine. */
+async function idleMinutesOk() {
+    const idle = document.getElementById('settings-auto-sleep-minutes'), text = idle ? idle.value.trim() : '';
+    if (!idle || (text === '' && !(idle.validity && idle.validity.badInput))) return true; // a number box shows '' for letters typed into it (badInput): that is not 'left empty'
+    const n = /^[0-9]+$/.test(text) ? Number(text) : NaN; // digits only: '1e3' and '0x20' are numbers to Number() but not what was meant, and would be sent raw
+    if (Number.isInteger(n) && n >= 15 && n <= 1440) { idle.removeAttribute('aria-invalid'); return true; }
+    idle.setAttribute('aria-invalid', 'true');
+    const group = idle.closest('[data-group]')?.dataset.group; if (group) { try { (await importOnce('./settings_nav.js')).openSettingsGroup(group); } catch { /* the toast says it */ } } // the section it sits in, so the field is there to fix
+    idle.focus();
+    const notNumber = !/[0-9]/.test(text); // letters typed in a number box read as '' (badInput): say it was not a number, not nothing
+    showToast(notNumber ? 'That was not a number. Idle time is 15 to 1440 minutes: enter a whole number in that range.' : `Idle time is 15 to 1440 minutes, so ${text} was not saved. Enter a whole number in that range.`, true);
+    return false;
+}
+
 export async function applySettings() {
+    if (!(await idleMinutesOk())) return;
     const form = readSettingsForm();
     browserLocal.set("coral-update-check-enabled", form.checkUpdates ? "true" : "false");
     const oldGitDiffMode = state.settings?.git_diff_mode || 'previous_commit';

@@ -299,6 +299,12 @@ function needsBulkActions() {
             asks.refreshOperatorAsks(true); syncGoalDoneCount(); done();
             tell(words('Ignored', r, rows.length), `${words('Ignored', r, rows.length)}.${undo.length ? ' Undo is in the notice.' : ''}`, undo.length ? { action: { label: 'Undo', onClick: () => Promise.allSettled(undo.map(f => f())).then(() => { asks.refreshOperatorAsks(true); refreshReviews(true); tell('Back in Needs you'); }) } } : undefined);
         } },
+        { label: 'Close goal', more: true, disabled: rows => !(rows.length === 1 && rows[0].goalDone), run: rows => { done(); openGoalDone(rows[0].goalDone, true); } }, // a goal that looks done: its two answers are in the bar's menu on a phone, where the row has no buttons; a ninth icon made the bar wider than a 360 px toolbar (#12328)
+        { label: 'Not yet', more: true, disabled: rows => !(rows.length > 0 && rows.every(s => s.goalDone)), run: async rows => {
+            const undo = [], r = await each(rows, async s => { undo.push(await hideGoalDone(goalTeamHere(s.goalDone), s.goalDone, 'not-yet')); });
+            syncGoalDoneCount(); done();
+            tell(words('Hidden until a task is added:', r, rows.length), `${words('Hidden until a task is added:', r, rows.length)}.${undo.length ? ' Undo is in the notice.' : ''}`, undo.length ? { action: { label: 'Undo', onClick: async () => { for (const f of undo) { try { await f(); } catch { /* it stays hidden */ } } syncGoalDoneCount(); renderInboxNav(true); } } } : undefined); // one after the other: each undo rewrites the hidden list, and two at once keep only the last write (#12328)
+        } },
         { label: 'Save for later', icon: bookmarkIcon, disabled: rows => !reviews(rows), run: async rows => { const { saveRow } = await importOnce('./artifact_review.js'); const r = await each(rows, s => saveRow(s.review.team, s.review)); done(); tell(words('Saved', r, rows.length)); } },
         { label: 'Changes', more: true, disabled: rows => !(rows.length === 1 && reviews(rows)), run: rows => { done(); openReview(rows[0].review, { requestChanges: true }); } }, // a change request is words for one file: with several selected it is off,
         { label: 'Mark read', more: true, disabled: rows => !markable(rows) || rows.every(readOf), run: async rows => { const r = await each(rows.filter(s => !readOf(s)), s => setReadOf(s, true)); syncGoalDoneCount(); done(); tell(words('Marked read', r, r.ok + r.bad.length)); } },
