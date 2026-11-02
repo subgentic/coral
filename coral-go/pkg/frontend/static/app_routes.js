@@ -91,7 +91,7 @@ function registerRouteHandlers() {
 
     for (const sub of ['goals', 'tasks', 'boards']) route('inbox-' + sub, async r => {
         await liveListReady;
-        switchNavTab('hub-inbox', { fromHistory: true });
+        switchNavTab('hub-inbox', { fromHistory: true, folder: folderForSub(sub) }); // the folder is asked for by name, as /inbox/<folder> does: with something waiting the Inbox opens on Needs you first, and the address went back to /inbox/needs on a reload (#12408)
         const m = await importOnce('./inbox_sidebar.js');
         if (currentRoute()?.view !== r.view || currentRoute()?.id !== r.id || currentRoute()?.item !== r.item) return;
         if (r.id && sub === 'goals') await m.openInboxGoal(r.id, r.item);
