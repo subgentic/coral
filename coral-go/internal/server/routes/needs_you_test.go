@@ -221,6 +221,38 @@ func TestNeedsYouDoesNotListAFileWhoseChangesWereRequested(t *testing.T) {
 	assert.Equal(t, 0, count(), "still tagged for review with the changes requested, and still not waiting on the Operator")
 }
 
+// #11998 (Beta pass 2): a goal's design doc showed twice in Needs you, once as a question with a raw coral:// link and once as the file. A question that only links a file the same team lists as a file for review is
+// that file, not a second item, and the count agrees; a question with words of its own that mentions the file stays, and so does one that links a file not listed.
+func TestNeedsYouListsAFileOnceNotAgainAsAQuestionThatOnlyLinksIt(t *testing.T) {
+	e := newReviewEnv(t, true)
+	e.tag(t, `["for review"]`)
+	ctx := context.Background()
+	ask := func(text string) {
+		q, err := e.h.bs.PostMessage(ctx, "alpha", "Alice", "@Operator "+text, nil)
+		require.NoError(t, err)
+		require.NoError(t, e.h.bs.RecordAsk(ctx, "alpha", q, []string{"Operator"}))
+	}
+	read := func() (int, []map[string]any) {
+		code, out := readNeedsYou(t, e.h, "", asPerson)
+		require.Equal(t, http.StatusOK, code, out)
+		return int(out["count"].(float64)), needsYouItems(out)
+	}
+	n, items := read()
+	require.Equal(t, 1, n, "the file alone")
+	require.Equal(t, "review", items[0]["kind"])
+	ask("The design doc: coral://artifacts/" + e.id)
+	n, items = read()
+	assert.Equal(t, 1, n, "a message that only links the file is not a second item")
+	require.Len(t, items, 1)
+	assert.Equal(t, "review", items[0]["kind"], "the file is the item")
+	ask("Should we ship this on Friday or wait for the next release? Please read coral://artifacts/" + e.id + " first.")
+	n, _ = read()
+	assert.Equal(t, 2, n, "a question with words of its own stays")
+	ask("The other doc: coral://artifacts/" + strings.Repeat("ab", 32))
+	n, _ = read()
+	assert.Equal(t, 3, n, "a link to a file the team does not list for review is a question as before")
+}
+
 // Security's SHOULD on #11596: a line is agent text that goes to a phone through the Hub, so a secret in it is redacted before it is cut, in a question, a proposal's title and a file's name alike.
 func TestNeedsYouRedactsSecretsInEveryLineBeforeTheCut(t *testing.T) {
 	h, bs := operatorAsksRig(t)

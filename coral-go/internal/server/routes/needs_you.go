@@ -2,10 +2,12 @@ package routes
 
 import (
 	"net/http"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/subgentic/coral/internal/board"
@@ -159,11 +161,15 @@ func (h *BoardHandler) NeedsYou(w http.ResponseWriter, r *http.Request) {
 	}
 	now := time.Now().UTC()
 	for _, p := range projects {
-		h.keepExpiredOperatorQuestions(ctx, p.Project) // a wait that ran out is an ask from now on (#11919)
+		start, questionLinks, reviewFiles := len(items), map[int]string{}, map[string]bool{} // a question that only links a file the same team lists as a file for review is that file, not a second item (#11998)
+		h.keepExpiredOperatorQuestions(ctx, p.Project)                                       // a wait that ran out is an ask from now on (#11919)
 		if asks, err := h.bs.OpenAsksOf(ctx, p.Project, board.OperatorName, now); err != nil {
 			unread = appendOnce(unread, "questions")
 		} else {
 			for _, a := range asks {
+				if hex := onlyFileLink(a.Content); hex != "" {
+					questionLinks[len(items)] = hex
+				}
 				items = append(items, NeedsYouItem{Kind: "question", From: needsYouLine(a.Asker), Line: needsYouLine(a.Content), Team: p.Project, ID: "question:" + p.Project + ":" + strconv.FormatInt(a.MessageID, 10), At: needsYouTime(a.At.UTC().Format(time.RFC3339Nano))})
 			}
 		}
@@ -195,8 +201,19 @@ func (h *BoardHandler) NeedsYou(w http.ResponseWriter, r *http.Request) {
 					continue
 				}
 				seen[f.ID] = true
+				reviewFiles[strings.ToLower(artifactStoreID(f))] = true
 				items = append(items, NeedsYouItem{Kind: "review", Line: needsYouLine(f.Name), Team: p.Project, ID: "review:" + p.Project + ":" + f.ID, At: needsYouTime(f.CreatedAt)})
 			}
+		}
+		if len(questionLinks) > 0 { // drop the questions of this team that only link a file it lists as a file for review
+			kept := items[:start]
+			for i := start; i < len(items); i++ {
+				if hex, ok := questionLinks[i]; ok && reviewFiles[hex] {
+					continue
+				}
+				kept = append(kept, items[i])
+			}
+			items = kept
 		}
 	}
 
@@ -310,3 +327,24 @@ func needsYouBefore(a, b NeedsYouItem) bool {
 
 // needsYouCursorOf is the cursor that points at an item: its time and its id.
 func needsYouCursorOf(it NeedsYouItem) string { return it.At + "|" + it.ID }
+
+var needsYouFileLink = regexp.MustCompile(`(?i)coral://artifacts/([0-9a-f]{64})`)
+
+// onlyFileLink is the artifact id a message is only a link to: one coral://artifacts/<id> and at most a few words of its own (40 letters or digits), else "" (#11998).
+func onlyFileLink(text string) string {
+	m := needsYouFileLink.FindAllStringSubmatch(text, -1)
+	if len(m) != 1 {
+		return ""
+	}
+	rest := needsYouFileLink.ReplaceAllString(text, "")
+	n := 0
+	for _, r := range rest {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			n++
+		}
+	}
+	if n > 40 {
+		return ""
+	}
+	return strings.ToLower(m[0][1])
+}

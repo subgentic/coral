@@ -33,6 +33,7 @@ const { coralReady } = require('./helpers/wait');
                     const original=window.fetch, json=(body,status=200)=>Promise.resolve(new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json'}}));
                     window.fetch=(url,opts={})=>{
                         const u=new URL(String(url),location.origin);
+                        if(u.pathname==='/api/operator-asks')return json(window.__asks||[]);
                         if(u.pathname==='/api/board/${team}/artifacts'){
                             const items=window.__reviewItems.filter(a=>!u.searchParams.has('tag')||a.tags.includes(u.searchParams.get('tag'))),offset=Number(u.searchParams.get('offset')||0),limit=Number(u.searchParams.get('limit')||100);
                             return json({project:'${team}',artifacts:items.slice(offset,offset+limit),has_more:offset+limit<items.length});
@@ -66,6 +67,18 @@ const { coralReady } = require('./helpers/wait');
                 assert.equal(await ev(`(${row('Review file 03.txt')}).querySelector('.inbox-review-earlier')?.textContent||''`),'2 earlier versions','and says how many came before it, though none of them is still waiting');
                 assert.equal(await ev(`(${row('Review file 01.txt')}).querySelector('.inbox-review-version').hidden`),true,'a file with one version says nothing');
                 assert.deepEqual(await ev(`window.__versionCalls`),[],'no row asks the server for its version: 13 files, 0 requests (#11890)');
+                // #11998 (Beta pass 2): a message that only links a file is not a second item: the file shows once, as the file; a question with words of its own stays
+                if(width===1280){
+                    const hex3=(3).toString(16).padStart(64,'0'), before=await ev(`document.querySelectorAll('#group-table-view tbody tr').length`);
+                    await ev(`window.__asks=[{board:'${team}',kind:'ask',id:81,asker:'Review Writer',text:'The design doc: coral://artifacts/${hex3}',at:new Date().toISOString()}];import((window.__coralStatic||'/static/')+'operator_asks.js').then(m=>m.refreshOperatorAsks(true)).then(()=>true)`);
+                    await new Promise(r=>setTimeout(r,500)); // sleep-ok: the list redraws after the read
+                    assert.equal(await ev(`document.querySelectorAll('#group-table-view tbody tr').length`),before,'a message that only links a file adds no second row: the file is the item');
+                    assert.equal(await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].filter(r=>/design doc: coral:/.test(r.textContent)).length`),0,'and no row shows the raw coral:// link');
+                    await ev(`window.__asks=[{board:'${team}',kind:'ask',id:82,asker:'Review Writer',text:'Should we ship this on Friday or wait for the next release? Please read coral://artifacts/${hex3} first.',at:new Date().toISOString()}];import((window.__coralStatic||'/static/')+'operator_asks.js').then(m=>m.refreshOperatorAsks(true)).then(()=>true)`);
+                    await new Promise(r=>setTimeout(r,500)); // sleep-ok: the list redraws after the read
+                    assert.equal(await ev(`document.querySelectorAll('#group-table-view tbody tr').length`),before+1,'a question with words of its own that links the file is still a question');
+                    await ev(`window.__asks=[];import((window.__coralStatic||'/static/')+'operator_asks.js').then(m=>m.refreshOperatorAsks(true)).then(()=>true)`);
+                }
                 assert.equal(await ev(`${rows}.length`),12,'ten from Writer A and two from Writer B');
                 assert.match(await ev(`document.getElementById('group-table-view').textContent`),/1 more/,'overflow remains discoverable');
                 assert.equal(await ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`),'9+','all pending artifacts count: the pill reads 9+ past nine (#9821)');

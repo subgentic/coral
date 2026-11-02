@@ -2,6 +2,7 @@
  * After the Inbox first opens, keep its badge updated on other tabs without eager startup reads. */
 import { fetchProjects } from './board_fetch.js';
 import { boardFetch, keyLabel, splitKey } from './server_base.js';
+import { hideAsksWhen } from './ask_filter.js';
 
 let items = [], saved = [], errors = [], pending = null, lastRead = 0, revision = 0, changed = () => {};
 let activated = false;
@@ -28,6 +29,10 @@ export const reviewItems = () => {
     viewFor = items; viewRev = revision;
     return view;
 };
+/** The one file a message is only a link to: `coral://artifacts/<hex>` with at most a few words of its own, else ''. */
+const FILE_LINK = /coral:\/\/artifacts\/([0-9a-f]{64})/gi;
+export const onlyFileLink = text => { const m = [...String(text || '').matchAll(FILE_LINK)]; return m.length === 1 && String(text).replace(FILE_LINK, '').replace(/[\s\p{P}]+/gu, '').length <= 40 ? m[0][1].toLowerCase() : ''; };
+hideAsksWhen(a => { const hex = onlyFileLink(a.text); return !!hex && items.some(r => r.hex.toLowerCase() === hex); }); // the file is in Needs you once, as the file (#11998)
 /** A review artifact the operator has opened carries the 'read' tag (#9277): it stays in Needs you, shown as read, but it is not counted (the Inbox badge, the Needs you count). Opening it again, or marking it unread, is the same tags route. */
 /** The files the Operator saved for later (#11641): tagged 'saved', out of Needs you and its counts, listed at the top of Saved with their decisions still there. */
 let savedFor = null, savedRev = -1, savedView = [];
