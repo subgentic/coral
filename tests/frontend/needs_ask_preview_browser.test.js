@@ -33,6 +33,9 @@ const OPERATOR_TEXT = '@Operator TEST ITEM, safe to answer any way: this is a te
             assert.ok(!/\*\*|\]\(|^\s*-\s|`/.test(lead.name + ' ' + lead.sub), at + 'no Markdown marks on the row (' + JSON.stringify(lead.name.slice(0, 60)) + ' / ' + JSON.stringify(lead.sub.slice(0, 120)) + ')');
             assert.ok(/changes nothing/.test(lead.sub), at + 'the second line reads the words: ' + lead.sub.slice(0, 160));
         }
+        // a row's preview is bounded (Hermes Agent Investigation's review of #12152): adversarial Markdown marks in 20 KB of text used to take 250 ms a row; the text is cut to 500 characters before the marks are dropped
+        const timing = await ev(`(async () => { const m = await import(${S} + 'operator_asks.js'); const text = '**a _b \\u0060c [d](e ~~f '.repeat(1000).slice(0, 20000); const a = { board: 't', kind: 'ask', id: 1, asker: 'x', text }; const t0 = performance.now(); const line = m.askLine(a), plain = m.askPlain(a); const ms = performance.now() - t0; return { len: text.length, ms, line: line.length, plain: plain.length }; })()`);
+        assert.ok(timing.len === 20000 && timing.ms < 10 && timing.plain <= 500, 'a 20 KB hostile question previews in under 10 ms (it took ' + timing.ms.toFixed(1) + ' ms): ' + JSON.stringify(timing));
     } finally { await client.close(); }
     console.log('needs_ask_preview_browser: ok');
 })().catch(e => { console.error(e); process.exit(1); });
