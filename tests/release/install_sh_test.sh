@@ -190,6 +190,36 @@ if [ "$(uname -s)" = Darwin ]; then
     rm -f "$stub/codesign"
     CORAL_INSTALL_TEAM_ID=ABCDE12345 run bash "$script" --dir "$tmp/Apps-pin-unsigned" --no-cli; [ "$rc" != 0 ] && [[ "$output" == *"not code-signed, but Coral's releases are"* ]] && [ ! -e "$tmp/Apps-pin-unsigned/Coral.app" ] && ok "macOS pin: an unsigned app stops the install" || fail "pin unsigned: $rc $output"
     [ -z "$(hdiutil info | grep "$tmp" || true)" ] && ok "macOS: the disk image is detached" || fail "the DMG is still mounted"
+
+    # Real signatures (#12508, Security's SHOULD): the printed team is only text a certificate can carry, so a pinned install checks the signing requirement. An ad-hoc signed app, and one signed with a
+    # certificate made here whose subject OU is Coral's team id, both print what a release would and both must be refused. (A temp keychain, named on the codesign line only: the search list is not changed.)
+    team=33UR27T84L; fx="$tmp/fx"; mkdir -p "$fx"
+    kc="$fx/fake.keychain-db"; before_list="$(security list-keychains -d user)"
+    mk_signed_release() { # mk_signed_release <name> <codesign identity args...>: a release folder whose Coral.app is signed as given
+        local n="$1"; shift
+        local app="$fx/$n/Coral.app"; mkdir -p "$app/Contents/MacOS" "$fx/$n-rel/latest/download"
+        printf '#!/bin/sh\necho app\n' >"$app/Contents/MacOS/coral"; chmod 755 "$app/Contents/MacOS/coral"
+        printf '<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict><key>CFBundleExecutable</key><string>coral</string><key>CFBundleIdentifier</key><string>test.fake.%s</string><key>CFBundlePackageType</key><string>APPL</string></dict></plist>' "$n" >"$app/Contents/Info.plist"
+        codesign --force --deep "$@" "$app" >/dev/null 2>&1 || return 1
+        hdiutil create -quiet -srcfolder "$fx/$n" -volname Coral -format UDZO "$fx/$n-rel/latest/download/Coral.dmg" || return 1
+        sums "$fx/$n-rel/latest/download"
+    }
+    ident_ok=0
+    if openssl req -x509 -newkey rsa:2048 -nodes -days 2 -subj "/CN=Fake Coral Dev/OU=$team/O=Test" -keyout "$fx/k.pem" -out "$fx/c.pem" \
+            -addext "keyUsage=critical,digitalSignature" -addext "extendedKeyUsage=critical,codeSigning" >/dev/null 2>&1 \
+        && openssl pkcs12 -export -inkey "$fx/k.pem" -in "$fx/c.pem" -out "$fx/c.p12" -passout pass:pw >/dev/null 2>&1 \
+        && security create-keychain -p pw "$kc" >/dev/null 2>&1 && security unlock-keychain -p pw "$kc" \
+        && security import "$fx/c.p12" -k "$kc" -P pw -T /usr/bin/codesign >/dev/null 2>&1 \
+        && security set-key-partition-list -S apple-tool:,apple: -s -k pw "$kc" >/dev/null 2>&1; then ident_ok=1; fi
+    if mk_signed_release adhoc -s - && CORAL_INSTALL_BASE_URL="file://$fx/adhoc-rel" CORAL_INSTALL_TEAM_ID=$team run bash "$script" --dir "$tmp/Apps-adhoc" --no-cli; then
+        [ "$rc" != 0 ] && [ ! -e "$tmp/Apps-adhoc/Coral.app" ] && ok "macOS pin, real signature: an ad-hoc signed app is refused" || fail "ad-hoc app installed: $rc $output"
+    else fail "could not make the ad-hoc signed fixture"; fi
+    if [ "$ident_ok" = 1 ] && mk_signed_release forged -s "Fake Coral Dev" --keychain "$kc"; then
+        CORAL_INSTALL_BASE_URL="file://$fx/forged-rel" CORAL_INSTALL_TEAM_ID=$team run bash "$script" --dir "$tmp/Apps-forged" --no-cli
+        if [ "$rc" != 0 ] && [ ! -e "$tmp/Apps-forged/Coral.app" ]; then ok "macOS pin, real signature: a self-made certificate carrying Coral's team id as its OU is refused"; else fail "forged-OU app: rc $rc $output"; fi
+    else echo "skip: could not make a certificate and keychain here for the forged-OU case"; fi
+    security delete-keychain "$kc" >/dev/null 2>&1 || true
+    [ "$(security list-keychains -d user)" = "$before_list" ] && ok "the keychain search list is unchanged" || fail "the keychain search list changed"
 else
     echo "skip: the macOS install runs on a Mac only"
 fi

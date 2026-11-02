@@ -262,8 +262,13 @@ check_app_signature() {
     if out="$(codesign --verify --deep --strict "$app" 2>&1)"; then
         team="$(codesign -dvv "$app" 2>&1 | sed -n 's/^TeamIdentifier=//p' | head -n1)"
         if [ -n "$expected" ]; then
+            # The printed team is text; the requirement is what is checked: Apple's chain, a Developer ID Application certificate, and this team as its subject's OU. A certificate made by anyone else, an
+            # ad-hoc signature or another Apple identity type does not satisfy it, whatever it prints.
+            local req="anchor apple generic and certificate 1[field.1.2.840.113635.100.6.2.6] and certificate leaf[field.1.2.840.113635.100.6.1.13] and certificate leaf[subject.OU] = \"$expected\""
+            codesign --verify --deep --strict -R="$req" "$app" >/dev/null 2>&1 \
+                || die "Coral.app is not signed by Coral's Developer ID team ($expected; it says '${team:-none}'): this is not an official build. Not installing."
             [ "$team" = "$expected" ] || die "Coral.app is signed by team '${team:-none}', not Coral's ($expected): this is not an official build. Not installing."
-            say "    code signature ok (Coral.app, signing team $team, Coral's)"
+            say "    code signature ok (Coral.app, Developer ID team $team, Coral's)"
         else
             say "    code signature ok (Coral.app, signing team ${team:-unknown})"
         fi
