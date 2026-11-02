@@ -24,6 +24,11 @@ assert.ok(!decodeURIComponent(signInUrl()).includes('#'), 'no # in next=');
 setServedAddress('//evil.example/agents/x');
 at('/');
 assert.equal(signInUrl(), '/signin', 'a protocol-relative address is never used; the bare start sends no next');
+// the same-origin guard in signInUrl is reached: a served address that starts with // and sits below an on-screen path that starts with // would be returned by the rule, and only the guard refuses it (QA Engineer's SHOULD)
+setServedAddress('//evil.example/agents/x');
+at('//evil.example');
+assert.equal(new URL(location.href).pathname, '//evil.example', 'precondition: the on-screen path starts with //');
+assert.equal(signInUrl(), '/signin', 'a // address is refused by the guard, whatever the rule returned');
 setServedAddress('/inbox/goals');
 at('/agents');
 assert.equal(signInUrl(), '/signin?next=' + encodeURIComponent('/agents'), 'an unrelated served address is not used');
