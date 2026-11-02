@@ -246,6 +246,7 @@ func (s *Store) deleteProject(ctx context.Context, project string, onlyIfUnused 
 		{"DELETE FROM board_lifecycle_log WHERE project = ?", 1},
 		{"DELETE FROM board_ask_closed WHERE project = ?", 1},    // a question closed by hand goes with its board (#11417)
 		{"DELETE FROM board_ask_buttons WHERE project = ?", 1},   // and the buttons an agent declared on a question (#11643)
+		{"DELETE FROM board_ask_subjects WHERE project = ?", 1},  // and the goal and task a question named (#12164)
 		{"DELETE FROM artifact_tags WHERE board_id = ?", 1},      // a board made again under the name inherits none of its tags
 		{"DELETE FROM artifact_questions WHERE board_id = ?", 1}, // nor its review questions
 		{"DELETE FROM artifact_reviews WHERE board_id = ?", 1},   // nor the decisions on its artifacts (#136584)

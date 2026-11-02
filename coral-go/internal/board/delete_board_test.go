@@ -17,7 +17,7 @@ var boardOwnedRows = []struct{ table, col string }{
 	{"board_workflow_presets", "board_id"}, {"health_counters", "project"}, {"health_items", "project"}, {"health_offbooks", "project"}, {"health_goal_size", "project"}, {"boards", "id"},
 	{"board_proposals", "board_id"}, {"board_goals", "board_id"}, {"board_goal_meta", "board_id"}, {"board_goal_images", "board_id"}, {"board_goal_events", "board_id"}, {"board_settings_log", "board_id"}, // the goals tables were missing from this census until #7355
 	{"board_goal_requests_in", "board_id"}, {"board_goal_requests_out", "board_id"}, // #7361: a goal request goes with either of its two boards
-	{"board_asks", "project"}, {"board_replies", "project"}, {"board_ask_closed", "project"}, {"board_ask_buttons", "project"}, {"board_orch_grant", "project"}, {"board_clashes", "project"}, {"board_lifecycle_log", "project"}, // #7794: a question and the link of a reply go with their board
+	{"board_asks", "project"}, {"board_replies", "project"}, {"board_ask_closed", "project"}, {"board_ask_buttons", "project"}, {"board_ask_subjects", "project"}, {"board_orch_grant", "project"}, {"board_clashes", "project"}, {"board_lifecycle_log", "project"}, // #7794: a question and the link of a reply go with their board
 	{"artifact_tags", "board_id"},      // #8583: a team's tags of its artifacts
 	{"artifact_reviews", "board_id"},   // #136584: when the Operator decided a review of a team's artifact
 	{"artifact_questions", "board_id"}, // #11555: what an upload for review asks the Operator
@@ -49,6 +49,7 @@ func fillBoard(t *testing.T, s *Store, project string) (taskIDs []int64) {
 	require.NoError(t, s.RecordReply(ctx, project, hello.ID, hello.ID))
 	require.NoError(t, s.CloseAsk(ctx, project, hello.ID, "Dev", "answered in chat"))                                                                             // a question closed by hand goes with its board (#11417)
 	require.NoError(t, s.RecordAskButtons(ctx, project, hello.ID, []AskButton{{Label: "Yes", Action: ActionReply}}, time.Now()))                                  // the buttons an agent declared on it go too (#11643)
+	require.NoError(t, s.RecordAskSubject(ctx, project, hello.ID, 1, 2))                                                                                          // what a question is about goes with its board (#12164)
 	require.NoError(t, s.SetOrchGrant(ctx, OrchGrant{Project: project, Enabled: true, SeatSession: "seat-1", MaxPerHour: 5, MaxLive: 4, IdleMin: 5}, "Operator")) // #11432
 	_, err = s.ReserveLifecycle(ctx, project, LifecycleWake, "Orchestrator", "Dev", nil)
 	require.NoError(t, err)
