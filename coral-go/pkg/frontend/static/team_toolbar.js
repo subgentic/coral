@@ -7,6 +7,7 @@
  *   build({ label, placeholder, value, onSearch, pills, action })  -> the row element (a search field, the pills, the action)
  *   adopt(row, { pills, chips, action })                           -> puts the pills, the chips of the filters that are on and the action into a list bar's `.list-bar-search-row`
  *   pills: { label, items: [{ key, label, count }], current, onPick(key) }                                       */
+import { revealSideways } from './reveal_sideways.js';
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = String(text); return e; };
 
 /** The pills of a tab as one group of buttons, and the same choice as a compact select (shown instead of the group when the line is narrow). */
@@ -31,14 +32,6 @@ function chipButton(c) {
     const b = el('button', 'goals-chip team-tb-chip', `${c.label} \u00d7`); b.type = 'button'; b.setAttribute('aria-label', c.aria || `Remove the ${c.label} filter`); b.title = c.aria || `Remove the ${c.label} filter`; b.setAttribute('aria-pressed', 'true');
     b.addEventListener('click', c.onRemove);
     return b;
-}
-
-/** The pressed pill in view in its own row, and nothing else scrolled: scrollIntoView moves every ancestor, so a list scrolled down was pulled back to its bar on every draw (#12354). */
-function revealSideways(chip) {
-    if (!chip) return;
-    const kept = []; for (let e = chip.parentElement; e; e = e.parentElement) kept.push([e, e.scrollTop]);
-    chip.scrollIntoView({ inline: 'nearest', block: 'nearest' });
-    for (const [e, top] of kept) if (e.scrollTop !== top) e.scrollTop = top;
 }
 
 /** Put the pills and the action into a list bar's search row: [search][pills or select][Filters][More][action]. Called on every draw: what an earlier draw put there goes first. */
