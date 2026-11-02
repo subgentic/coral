@@ -48,6 +48,7 @@ func newFollowRig(t *testing.T, launchIsGit bool) *followRig {
 	_, handler, terminal, ss := setupSessionsTestServer(t)
 	router := chi.NewRouter()
 	router.Get("/api/sessions/live/{name}/files", handler.Files)
+	router.Get("/api/sessions/live/{name}/diff", handler.Diff)
 	router.Post("/api/sessions/live/{name}/files/refresh", handler.RefreshFiles)
 	router.Get("/api/sessions/live/{name}/file-content", handler.GetFileContent)
 	router.Put("/api/sessions/live/{name}/file-content", handler.SaveFileContent)

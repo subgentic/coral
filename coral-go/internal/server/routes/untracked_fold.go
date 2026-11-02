@@ -63,26 +63,9 @@ func listUntracked(workdir string, run func(args ...string) ([]byte, error)) ([]
 			items = append(items, untrackedItem{Path: p})
 			continue
 		}
-		inside, err := run("--literal-pathspecs", "ls-files", "--others", "--exclude-standard", "-z", "--", p)
+		files, total, exact, err := measureFolder(workdir, p, run)
 		if err != nil {
 			return nil, err
-		}
-		var files []string
-		for _, f := range bytes.Split(inside, []byte{0}) {
-			if len(f) > 0 {
-				files = append(files, string(f))
-			}
-		}
-		var total int64
-		exact := true
-		for i, f := range files {
-			if i >= foldStatMax {
-				exact = false
-				break
-			}
-			if fi, err := os.Lstat(filepath.Join(workdir, f)); err == nil && fi.Mode().IsRegular() { // a link is never followed
-				total += fi.Size()
-			}
 		}
 		if len(files) <= foldFilesOver && total <= foldBytesOver && exact {
 			for _, f := range files {
@@ -93,4 +76,29 @@ func listUntracked(workdir string, run func(args ...string) ([]byte, error)) ([]
 		items = append(items, untrackedItem{Path: p, Folded: true, Files: len(files), Bytes: total, BytesExact: exact})
 	}
 	return items, nil
+}
+
+// measureFolder lists the untracked files in the folder dir (a path ending in "/"; a name, never a pattern), their number and their size. A link is not followed for its size. exact is false when more than
+// foldStatMax files were seen: the count is still exact, the size is "at least".
+func measureFolder(workdir, dir string, run func(args ...string) ([]byte, error)) (files []string, total int64, exact bool, err error) {
+	inside, err := run("--literal-pathspecs", "ls-files", "--others", "--exclude-standard", "-z", "--", dir)
+	if err != nil {
+		return nil, 0, false, err
+	}
+	for _, f := range bytes.Split(inside, []byte{0}) {
+		if len(f) > 0 {
+			files = append(files, string(f))
+		}
+	}
+	exact = true
+	for i, f := range files {
+		if i >= foldStatMax {
+			exact = false
+			break
+		}
+		if fi, lerr := os.Lstat(filepath.Join(workdir, f)); lerr == nil && fi.Mode().IsRegular() { // a link is never followed
+			total += fi.Size()
+		}
+	}
+	return files, total, exact, nil
 }
