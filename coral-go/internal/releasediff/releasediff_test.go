@@ -216,16 +216,24 @@ func TestFilesBelongToTheHubPackageThatHoldsThem(t *testing.T) {
 		{Path: "coral-go/pkg/tunnel/routes.go", Added: 1},
 		{Path: "coral-go/pkg/tunnel/testdata/view_redaction.golden", Added: 1},
 		{Path: "coral-go/pkg/tunnelish/x.go", Added: 1}, // another package whose name starts the same
+		{Path: "coral-go/agent_docs/auth.md", Added: 1},
+		{Path: "coral-go/agent_docs/sub/deep.md", Added: 1}, // the docs are the files of that directory itself
+		{Path: "coral-go/agent_docs/notes.txt", Added: 1},   // and only the .md ones
+		{Path: "coral-go/pkg/frontend/static/nav.js", Added: 2},
 		{Path: "coral-go/internal/board/x.go", Added: 1},
 	})
-	require.Len(t, pcs, len(HubPackages))
+	require.Len(t, pcs, len(HubPaths))
+	want := map[string]int{"coral-go/pkg/tunnel": 2, "coral-go/agent_docs": 1, "coral-go/pkg/frontend": 1}
 	for _, pc := range pcs {
-		if pc.Package == "coral-go/pkg/tunnel" {
-			require.Len(t, pc.Files, 2)
-		} else {
-			assert.Empty(t, pc.Files, pc.Package)
-		}
+		assert.Len(t, pc.Files, want[pc.Package], pc.Package)
 	}
+	assert.NotContains(t, func() []string {
+		var n []string
+		for _, h := range HubPaths {
+			n = append(n, h.Path)
+		}
+		return n
+	}(), "coral-go/pkg/secretbox", "no other Hub package imports secretbox (coral-hub's rule for keeping it)")
 }
 
 func TestThePackagesReportSplitsCodeTestsAndTheRest(t *testing.T) {
@@ -234,15 +242,22 @@ func TestThePackagesReportSplitsCodeTestsAndTheRest(t *testing.T) {
 		{Path: "coral-go/pkg/hubproxy/handler.go", Added: 6, Deleted: 5},
 		{Path: "coral-go/pkg/hubproxy/handler_test.go", Added: 40},
 		{Path: "coral-go/pkg/hubproxy/testdata/x.golden", Added: 2, Deleted: 1},
+		{Path: "coral-go/pkg/frontend/static/nav.js", Added: 7, Deleted: 1},
+		{Path: "coral-go/pkg/frontend/static/css/nav.css", Added: 3},
+		{Path: "coral-go/pkg/frontend/frontend_test.go", Added: 9},
+		{Path: "coral-go/agent_docs/auth.md", Added: 4, Deleted: 4},
 	}), "v1", "v2")
 	out := sb.String()
-	assert.Contains(t, out, "### Packages Coral Hub compiles in, v1 to v2")
+	assert.Contains(t, out, "### What Coral Hub compiles in or embeds, v1 to v2")
 	assert.Contains(t, out, "`pkg/hubproxy`: 1 file of Go code changed (+6, -5)")
 	assert.Contains(t, out, "- `coral-go/pkg/hubproxy/handler.go`: +6, -5")
 	assert.Contains(t, out, "- test files, not compiled by the Hub: 1 file (+40, -0)")
 	assert.Contains(t, out, "- other files (data, docs), not compiled by the Hub: 1 file (+2, -1)")
 	assert.NotContains(t, out, "handler_test.go", "test files are counted, not listed")
-	assert.Contains(t, out, "Unchanged: `pkg/hubowner`, `pkg/redact`, `pkg/secretbox`, `pkg/tunnel`.")
+	assert.Contains(t, out, "`pkg/frontend`: 2 files the Hub embeds changed (+10, -1)", "an embedded path lists every non-test file, the css too")
+	assert.Contains(t, out, "- `coral-go/pkg/frontend/static/css/nav.css`: +3, -0")
+	assert.Contains(t, out, "`agent_docs`: 1 file the Hub embeds changed (+4, -4)")
+	assert.Contains(t, out, "Unchanged: `pkg/hubowner`, `pkg/redact`, `pkg/tunnel`.")
 	sb.Reset()
 	WritePackages(&sb, GroupByPackage(nil), "v1", "v1")
 	assert.Contains(t, sb.String(), "No file changed in any of them")
@@ -264,13 +279,19 @@ func TestPackageChangesReadsARealRepositoryFromAnyDirectory(t *testing.T) {
 	run("init", "-q")
 	put("coral-go/pkg/hubproxy/handler.go", "package hubproxy\n")
 	put("coral-go/pkg/redact/redact.go", "package redact\n")
+	put("coral-go/agent_docs/auth.md", "a\n")
+	put("coral-go/agent_docs/sub/deep.md", "a\n")
+	put("coral-go/pkg/frontend/static/nav.js", "a\n")
 	put("coral-go/internal/board/x.go", "package board\n")
 	run("add", "-A")
 	run("commit", "-q", "-m", "old")
 	run("tag", "old")
 	put("coral-go/pkg/hubproxy/handler.go", "package hubproxy\n\nconst UploadStallTimeout = 1\n")
 	put("coral-go/pkg/hubproxy/handler_test.go", "package hubproxy\n")
-	put("coral-go/internal/board/x.go", "package board\n\nvar X = 1\n") // not a Hub package
+	put("coral-go/agent_docs/auth.md", "b\n")
+	put("coral-go/agent_docs/sub/deep.md", "b\n") // below the docs' directory: not one of the Hub's docs
+	put("coral-go/pkg/frontend/static/nav.js", "b\n")
+	put("coral-go/internal/board/x.go", "package board\n\nvar X = 1\n") // not a Hub path
 	run("add", "-A")
 	run("commit", "-q", "-m", "new")
 	run("tag", "new")
@@ -284,7 +305,7 @@ func TestPackageChangesReadsARealRepositoryFromAnyDirectory(t *testing.T) {
 				got = append(got, f.Path)
 			}
 		}
-		assert.Equal(t, []string{"coral-go/pkg/hubproxy/handler.go", "coral-go/pkg/hubproxy/handler_test.go"}, got, "from "+dir+": a Hub package's files only, with paths from the root")
+		assert.Equal(t, []string{"coral-go/pkg/hubproxy/handler.go", "coral-go/pkg/hubproxy/handler_test.go", "coral-go/pkg/frontend/static/nav.js", "coral-go/agent_docs/auth.md"}, got, "from "+dir+" (in the order of HubPaths): a Hub path's files only (the docs of the directory itself), with paths from the root")
 	}
 	_, err := PackageChanges(repo, "old", "no-such-tag")
 	assert.Error(t, err)

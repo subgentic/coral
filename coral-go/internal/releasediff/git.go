@@ -68,11 +68,11 @@ func Resolve(repo, ref string) (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
-// PackageChanges is the files of HubPackages that differ between two refs, read with `git diff --numstat --no-renames -z` (read only: nothing of either ref is run). A rename shows as a delete and an add.
+// PackageChanges is the files of HubPaths that differ between two refs, read with `git diff --numstat --no-renames -z` (read only: nothing of either ref is run). A rename shows as a delete and an add.
 func PackageChanges(repo, oldRef, newRef string) ([]PackageChange, error) {
 	args := []string{"diff", "--numstat", "--no-renames", "-z", oldRef, newRef, "--"}
-	for _, p := range HubPackages {
-		args = append(args, ":(top)"+p) // from the root of the repository, whatever directory -repo names (git's pathspecs are relative to it)
+	for _, h := range HubPaths {
+		args = append(args, h.pathspec()) // from the root of the repository, whatever directory -repo names (git's pathspecs are relative to it)
 	}
 	out, err := Reader{Repo: repo}.git(args...)
 	if err != nil {

@@ -8,15 +8,43 @@ import (
 	"strings"
 )
 
-// HubPackages are the packages Coral Hub compiles in (it imports them from this repository), so a change to their code is a change to the Hub's own binary, whatever the route table says (#12341:
-// v2.0.35 changed pkg/hubproxy's UploadStallTimeout and the note did not name it). The list is fixed and written here, in one place; coral-hub confirms it, and a package that joins the Hub's
-// imports is added to it.
-var HubPackages = []string{
-	"coral-go/pkg/hubproxy",
-	"coral-go/pkg/hubowner",
-	"coral-go/pkg/redact",
-	"coral-go/pkg/secretbox",
-	"coral-go/pkg/tunnel",
+// HubPath is one place in this repository that Coral Hub takes into its own binary: a Go package it compiles, or files it embeds (the shell's templates, scripts and styles, the agent docs).
+type HubPath struct {
+	Path     string // a directory, from the root of the repository
+	Suffix   string // only the files of that directory itself that end so (the docs: ".md"); empty is the whole tree below it
+	Embedded bool   // the Hub embeds the non-test files as they are, rather than compiling Go from them
+}
+
+// HubPaths is what Coral Hub compiles in or embeds (#12341: v2.0.35 changed pkg/hubproxy's UploadStallTimeout and the note did not name it). The list is fixed and written here, in one place; coral-hub
+// confirmed it (pkg/frontend and the agent docs added at its asking, secretbox out: no other Hub package imports it, only internal/store does), and a path that joins the Hub's imports is added to it.
+// Note that a package also compiles in the internal/ packages it imports (hubproxy: httputil, safego; hubowner: fsreplace, secfile; tunnel: safego): they are not listed here.
+var HubPaths = []HubPath{
+	{Path: "coral-go/pkg/hubproxy"},
+	{Path: "coral-go/pkg/hubowner"},
+	{Path: "coral-go/pkg/redact"},
+	{Path: "coral-go/pkg/tunnel"},
+	{Path: "coral-go/pkg/frontend", Embedded: true},
+	{Path: "coral-go/agent_docs", Suffix: ".md", Embedded: true},
+}
+
+// pathspec is the git pathspec of the path, from the root of the repository whatever directory git runs in.
+func (h HubPath) pathspec() string {
+	if h.Suffix != "" {
+		return ":(top,glob)" + h.Path + "/*" + h.Suffix
+	}
+	return ":(top)" + h.Path
+}
+
+// holds is whether a changed file is one of the path's.
+func (h HubPath) holds(file string) bool {
+	rest, ok := strings.CutPrefix(file, h.Path+"/")
+	if !ok {
+		return false
+	}
+	if h.Suffix != "" {
+		return !strings.Contains(rest, "/") && strings.HasSuffix(rest, h.Suffix)
+	}
+	return true
 }
 
 // FileChange is one file that differs between two refs, with the lines added and deleted (Binary: git does not count a binary file's lines).
@@ -37,10 +65,11 @@ func (f FileChange) Kind() string {
 	return "other"
 }
 
-// PackageChange is one package's changed files, in path order.
+// PackageChange is one Hub path's changed files, in path order.
 type PackageChange struct {
-	Package string
-	Files   []FileChange
+	Package  string
+	Embedded bool
+	Files    []FileChange
 }
 
 // ParseNumstat reads `git diff --numstat --no-renames -z` output: "added TAB deleted TAB path NUL" for each file ("-" for both counts is a binary file).
@@ -71,14 +100,14 @@ func ParseNumstat(b []byte) ([]FileChange, error) {
 	return out, nil
 }
 
-// GroupByPackage puts each changed file under the package of HubPackages whose directory holds it (a file in a sub-directory belongs to the package above it), in the order of HubPackages. A package
-// with no change is still in the result, with no files, so the report can say it did not change.
+// GroupByPackage puts each changed file under the path of HubPaths that holds it (a file in a sub-directory belongs to the package above it), in the order of HubPaths. A path with no change is still in
+// the result, with no files, so the report can say it did not change.
 func GroupByPackage(files []FileChange) []PackageChange {
-	out := make([]PackageChange, len(HubPackages))
-	for i, p := range HubPackages {
-		out[i].Package = p
+	out := make([]PackageChange, len(HubPaths))
+	for i, h := range HubPaths {
+		out[i].Package, out[i].Embedded = h.Path, h.Embedded
 		for _, f := range files {
-			if strings.HasPrefix(f.Path, p+"/") {
+			if h.holds(f.Path) {
 				out[i].Files = append(out[i].Files, f)
 			}
 		}
@@ -100,10 +129,10 @@ func fileWord(n int) string {
 	return fmt.Sprintf("%d files", n)
 }
 
-// WritePackages writes the Hub-compiled packages' changes as Markdown for the note: for each package that changed, the Go files the Hub compiles with their lines added and deleted, then one line
+// WritePackages writes the changes to what the Hub compiles in or embeds, as Markdown for the note: for each path that changed, the Go files it compiles (for an embedded path, every file it embeds) with their lines added and deleted, then one line
 // for its test files and one for everything else (counts only: the Hub does not compile them); then the packages that did not change.
 func WritePackages(w io.Writer, pcs []PackageChange, oldRef, newRef string) {
-	fmt.Fprintf(w, "### Packages Coral Hub compiles in, %s to %s\n", oldRef, newRef)
+	fmt.Fprintf(w, "### What Coral Hub compiles in or embeds, %s to %s\n", oldRef, newRef)
 	var same []string
 	for _, pc := range pcs {
 		short := strings.TrimPrefix(pc.Package, "coral-go/")
@@ -113,17 +142,21 @@ func WritePackages(w io.Writer, pcs []PackageChange, oldRef, newRef string) {
 		}
 		var code, test, other []FileChange
 		for _, f := range pc.Files {
-			switch f.Kind() {
-			case "code":
-				code = append(code, f)
-			case "test":
+			switch k := f.Kind(); {
+			case k == "test":
 				test = append(test, f)
+			case k == "code" || pc.Embedded: // an embedded path's templates, scripts, styles and docs are what the Hub ships as they are
+				code = append(code, f)
 			default:
 				other = append(other, f)
 			}
 		}
 		a, d := totals(code)
-		fmt.Fprintf(w, "\n`%s`: %s of Go code changed (+%d, -%d)\n\n", short, fileWord(len(code)), a, d)
+		what := "of Go code"
+		if pc.Embedded {
+			what = "the Hub embeds"
+		}
+		fmt.Fprintf(w, "\n`%s`: %s %s changed (+%d, -%d)\n\n", short, fileWord(len(code)), what, a, d)
 		for _, f := range code {
 			fmt.Fprintf(w, "- `%s`: +%d, -%d\n", f.Path, f.Added, f.Deleted)
 		}
