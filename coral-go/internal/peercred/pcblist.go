@@ -41,6 +41,10 @@ var (
 // errAmbiguous: two sockets with the client's addresses and different users.
 var errAmbiguous = errors.New("peercred: the connection's socket has more than one owner")
 
+// errHidden: the table is readable but does not show other processes' sockets to this process (macOS 27, a process signed the usual way, #12529). It wraps ErrLayout, so a caller with no other
+// way to find the client's socket answers as for a layout it does not know; the macOS owner check tries libproc first.
+var errHidden = errors.New("peercred: the table does not show other processes' sockets to this process")
+
 // parsePCBList finds the uid of the socket whose local address is client and
 // remote address is server. le is the host byte order (a test seam).
 func parsePCBList(b []byte, client, server netip.AddrPort, le bool) (int, error) {
@@ -100,7 +104,7 @@ func parsePCBList(b []byte, client, server netip.AddrPort, le bool) (int, error)
 			// macOS 27 shows a process signed the usual way (the published releases) none of the sockets, or only its own (#12529): the server's end of this very connection is in the table
 			// and the client's is not, which a table that shows everyone's sockets cannot do (the client's was made first). That is the OS hiding the table from this process, not a
 			// connection with no row.
-			return -1, fmt.Errorf("%w: the table does not show other processes' sockets to this process", ErrLayout)
+			return -1, fmt.Errorf("%w: %w", ErrLayout, errHidden)
 		}
 		return -1, ErrNotFound
 	}
