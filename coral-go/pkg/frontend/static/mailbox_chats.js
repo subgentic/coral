@@ -22,7 +22,7 @@ const SA = await importOnce('./mailbox_starred_artifacts.js'); // the Starred fo
 
 const PAGE = 50;
 export const CHAT_KEY = /^chats(-|$)/;
-const CLIS = [['claude', 'Claude'], ['codex', 'Codex'], ['agy', 'Antigravity'], ['pi', 'Pi'], ['hermes', 'Hermes']];
+const CLIS = [['claude', 'Claude'], ['codex', 'Codex'], ['agy', 'Antigravity'], ['pi', 'Pi'], ['opencode', 'OpenCode'], ['hermes', 'Hermes']];
 const FOLDERS = [
     { key: 'chats', label: 'All chats', params: { type: 'agent' }, count: 'all' }, // the agents' chats: the boards' have their own folder
     { key: 'chats-group', label: 'Board history', params: { type: 'group' }, count: 'group' },

@@ -32,8 +32,10 @@ assert.deepEqual(CF.chips({ ...CF.EMPTY, from: '2026-10-01' }).map(c => c.label)
 assert.deepEqual(CF.chips({ ...CF.EMPTY, to: '2026-10-20' }).map(c => c.label), ['Until 2026-10-20']);
 assert.deepEqual(CF.chips({ ...CF.EMPTY, tagId: '99' }).map(c => c.label), ['Tag: Tag'], 'a tag it does not know reads Tag');
 assert.ok(CF.CLIS.some(c => c[0] === 'hermes' && c[1] === 'Hermes'), 'Hermes is in the Inbox\'s CLI list (#12169)');
+assert.ok(CF.CLIS.some(c => c[0] === 'opencode' && c[1] === 'OpenCode'), 'and so is OpenCode, which had been left out too');
 assert.equal(CF.clean({ ...CF.EMPTY, cli: 'hermes' }).cli, 'hermes', 'and a filter by it is kept');
 assert.match(fs.readFileSync(STATIC + 'css/components.css', 'utf8'), /\.agent-type-mark\[data-agent-type="hermes"\]::before \{ content: "H"; \}/, 'its folder row has the H mark, as the other four have their letters');
+assert.match(fs.readFileSync(STATIC + 'css/components.css', 'utf8'), /\.agent-type-mark\[data-agent-type="opencode"\]::before \{ content: "O"; \}/, 'and OpenCode its O');
 assert.deepEqual(CF.without({ ...CF.EMPTY, from: '2026-10-01', to: '2026-10-20', cli: 'pi' }, 'dates'), { ...CF.EMPTY, cli: 'pi' }, 'the dates are one chip');
 assert.equal(CF.isFiltered({ ...CF.EMPTY, tagId: '7' }), true); assert.equal(CF.isFiltered(CF.EMPTY), false);
 
