@@ -22,7 +22,7 @@ type command struct {
 // commands lists coral's commands in the order its help shows them.
 func commands() []command {
 	u := defaultCoralURL()
-	return []command{
+	all := []command{
 		{"open", "sign in to the dashboard: opens it in your browser (--print: just print the one-time link)", func() []string {
 			return []string{"coral open [--print] [--path /page] [--url " + u + "] [--home DIR]"}
 		}},
@@ -45,6 +45,14 @@ func commands() []command {
 				"coral cloud disconnect [--url " + u + "] [--home DIR]",
 			}
 		}},
+		{"machine", "make a cloud machine that runs Coral and joins Coral Hub (a pending machine you approve there)", func() []string {
+			return []string{
+				"coral machine launch --provider digitalocean --token-file <path|-> --hub-key-file <path|-> [--name N] [--region R] [--size S] [--agents claude@VERSION,...] [--max-mode launch] [--yes]",
+				"coral machine list --provider digitalocean --token-file <path|-> [--unknown]",
+				"coral machine delete NAME --provider digitalocean --token-file <path|-> [--id INSTANCE_ID] [--hub-destroy-file <path|->] [--yes]",
+				"coral machine prune --older-than 7d --provider digitalocean --token-file <path|-> [--yes]",
+			}
+		}},
 		{"auto-accept", "turn auto-accept off for every agent at once", func() []string {
 			return []string{"coral auto-accept off --all [--url " + u + "]"}
 		}},
@@ -63,6 +71,16 @@ func commands() []command {
 		{"version", "print the version (also --version, -v)", func() []string { return []string{"coral version"} }},
 		{"help", "this help, or a command's: coral help <command>", func() []string { return []string{"coral help [command]"} }},
 	}
+	if machineLaunchEnabled() {
+		return all
+	}
+	var shown []command // `coral machine` is off unless CORAL_MACHINE_LAUNCH=1: not listed, and `coral help machine` does not find it
+	for _, c := range all {
+		if c.name != "machine" {
+			shown = append(shown, c)
+		}
+	}
+	return shown
 }
 
 func findCommand(name string) (command, bool) {

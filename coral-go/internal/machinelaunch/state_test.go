@@ -1,0 +1,232 @@
+package machinelaunch
+
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func goodRecord(name string) Record {
+	return Record{Name: name, Provider: "digitalocean", Region: "nyc3", LaunchTag: "coral-launch-0123456789abcdef0123456789abcdef", DropletID: "4242", VPCID: vpcUUID, FirewallID: fwUUID, CredentialID: "5b6c0f2e-0000-4000-8000-000000000001", Created: time.Date(2026, 10, 29, 10, 0, 0, 0, time.UTC)}
+}
+
+// The file is 0600 in a 0700 folder, holds ids, and survives a reopen.
+func TestStateFileIsPrivateAndHoldsIdsOnly(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "coral", "machines.json")
+	s, err := OpenState(path)
+	require.NoError(t, err)
+	require.NoError(t, s.Put(goodRecord("m1")))
+	require.NoError(t, s.Put(goodRecord("m2")))
+	if runtime.GOOS != "windows" {
+		fi, err := os.Stat(path)
+		require.NoError(t, err)
+		assert.Equal(t, os.FileMode(0o600), fi.Mode().Perm(), "the file is 0600")
+		di, err := os.Stat(filepath.Dir(path))
+		require.NoError(t, err)
+		assert.Equal(t, os.FileMode(0o700), di.Mode().Perm(), "its folder is 0700")
+	}
+	b, err := os.ReadFile(path)
+	require.NoError(t, err)
+	for _, secret := range []string{"dop_v1_", "chb_", "chd_", "chk_", "ssh-", "BEGIN", "token", "password", "address", "ip"} {
+		assert.NotContains(t, string(b), secret, "no secret and no address: ids only")
+	}
+	again, err := OpenState(path)
+	require.NoError(t, err)
+	assert.Equal(t, []Record{goodRecord("m1"), goodRecord("m2")}, again.Records())
+	r, ok := again.Get("m2")
+	require.True(t, ok)
+	assert.Equal(t, "4242", r.DropletID)
+	entries, _ := os.ReadDir(filepath.Dir(path))
+	var names []string
+	for _, e := range entries {
+		names = append(names, e.Name())
+	}
+	assert.ElementsMatch(t, []string{"machines.json", "machines.json.lock"}, names, "the file and its lock, and no temporary file is left behind")
+}
+
+// Nothing that is not an id goes in, however it got there.
+func TestStateFileRefusesAnythingThatIsNotAnId(t *testing.T) {
+	s, err := OpenState(filepath.Join(t.TempDir(), "machines.json"))
+	require.NoError(t, err)
+	for field, mutate := range map[string]func(*Record){
+		"a provider token as an id":     func(r *Record) { r.DropletID = "dop_v1_abcdef0123456789" },
+		"a bootstrap credential":        func(r *Record) { r.CredentialID = "chb_0123456789abcdef" },
+		"a destroy credential":          func(r *Record) { r.CredentialID = "chd_0123456789abcdef" },
+		"a Hub key":                     func(r *Record) { r.CredentialID = "chk_0123" },
+		"a private key":                 func(r *Record) { r.FirewallID = "-----BEGIN OPENSSH PRIVATE KEY-----" },
+		"an id with a slash":            func(r *Record) { r.VPCID = "a/b" },
+		"an id with a space":            func(r *Record) { r.FirewallID = "a b" },
+		"a name that is not a hostname": func(r *Record) { r.Name = "Not A Host" },
+		"a launch tag of another shape": func(r *Record) { r.LaunchTag = "mine" },
+		"a very long id":                func(r *Record) { r.DropletID = strings.Repeat("1", 200) },
+	} {
+		r := goodRecord("m1")
+		mutate(&r)
+		assert.Error(t, s.Put(r), field)
+	}
+	assert.Empty(t, s.Records())
+	_, err = os.Stat(s.path)
+	assert.True(t, os.IsNotExist(err), "a refused record writes no file")
+}
+
+// A file this tool did not write is not trusted: a looser mode, a symlink, a field it does not know, a secret in it, a version it does not read.
+func TestStateFileRefusesAFileItDoesNotTrust(t *testing.T) {
+	dir := t.TempDir()
+	write := func(name, body string, mode os.FileMode) string {
+		p := filepath.Join(dir, name)
+		require.NoError(t, os.WriteFile(p, []byte(body), mode))
+		require.NoError(t, os.Chmod(p, mode))
+		return p
+	}
+	good := `{"version":1,"machines":[{"name":"m1","provider":"digitalocean","region":"nyc3","launch_tag":"coral-launch-0123456789abcdef0123456789abcdef","droplet_id":"1","created":"2026-10-29T10:00:00Z"}]}`
+	_, err := OpenState(write("ok.json", good, 0o600))
+	require.NoError(t, err)
+
+	cases := map[string]string{
+		"an unknown field (a secret added by hand)": strings.Replace(good, `"droplet_id":"1"`, `"droplet_id":"1","token":"dop_v1_x"`, 1),
+		"a secret in an id":                         strings.Replace(good, `"droplet_id":"1"`, `"droplet_id":"dop_v1_0123"`, 1),
+		"another version":                           strings.Replace(good, `"version":1`, `"version":2`, 1),
+		"not json":                                  "machines: []",
+	}
+	for name, body := range cases {
+		_, err := OpenState(write(strings.ReplaceAll(name, " ", "_")+".json", body, 0o600))
+		require.Error(t, err, name)
+		assert.ErrorIs(t, err, ErrUnsafeStateFile, name)
+		assert.NotContains(t, err.Error(), "dop_v1_0123", "the refusal does not echo it")
+	}
+	if runtime.GOOS != "windows" {
+		_, err = OpenState(write("loose.json", good, 0o644))
+		assert.ErrorIs(t, err, ErrUnsafeStateFile, "readable by others")
+		link := filepath.Join(dir, "link.json")
+		require.NoError(t, os.Symlink(filepath.Join(dir, "ok.json"), link))
+		_, err = OpenState(link)
+		assert.ErrorIs(t, err, ErrUnsafeStateFile, "a symlink is not followed")
+	}
+}
+
+func TestStatePutReplacesAndRemoveIsIdempotent(t *testing.T) {
+	s, err := OpenState(filepath.Join(t.TempDir(), "machines.json"))
+	require.NoError(t, err)
+	r := goodRecord("m1")
+	require.NoError(t, s.Put(r))
+	r.FirewallID = ""
+	require.NoError(t, s.Put(r))
+	got, _ := s.Get("m1")
+	assert.Empty(t, got.FirewallID, "a step done is written down: the next delete skips it")
+	require.NoError(t, s.Remove("m1"))
+	require.NoError(t, s.Remove("m1"), "removing what is gone is fine")
+	_, ok := s.Get("m1")
+	assert.False(t, ok)
+	again, err := OpenState(s.path)
+	require.NoError(t, err)
+	assert.Empty(t, again.Records())
+}
+
+// Two launches at once cannot drop each other's record (#10944): each opens the file on its own (so each starts from the same stale copy), and every Put reads the file again under the lock.
+func TestStateFileSurvivesTwoLaunchesAtOnce(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "machines.json")
+	const launches, each = 4, 15
+	var wg sync.WaitGroup
+	for l := 0; l < launches; l++ {
+		st, err := OpenState(path) // every launch opens the (empty) file before any has written
+		require.NoError(t, err)
+		wg.Add(1)
+		go func(l int, st *State) {
+			defer wg.Done()
+			for i := 0; i < each; i++ {
+				assert.NoError(t, st.Put(goodRecord(fmt.Sprintf("m%d-%d", l, i))))
+			}
+		}(l, st)
+	}
+	wg.Wait()
+	again, err := OpenState(path)
+	require.NoError(t, err)
+	assert.Len(t, again.Records(), launches*each, "every record of every launch is in the file")
+
+	// and a removal by one launch does not bring back, or take away, what another wrote
+	a, _ := OpenState(path)
+	b, _ := OpenState(path)
+	require.NoError(t, a.Remove("m0-0"))
+	require.NoError(t, b.Put(goodRecord("late")))
+	final, err := OpenState(path)
+	require.NoError(t, err)
+	_, hasRemoved := final.Get("m0-0")
+	_, hasLate := final.Get("late")
+	assert.False(t, hasRemoved)
+	assert.True(t, hasLate)
+	assert.Len(t, final.Records(), launches*each)
+}
+
+// A record of a REAL launch validates: its tag is whatever newLaunchTag makes (the 12-hex test fixtures once hid that the state file refused 32 hex), and the older 12-digit tag stays readable.
+func TestRecordOfARealLaunchValidates(t *testing.T) {
+	for i := 0; i < 20; i++ {
+		tag, err := newLaunchTag()
+		if err != nil {
+			t.Fatal(err)
+		}
+		r := goodRecord("m1")
+		r.LaunchTag = tag
+		if err := r.Validate(); err != nil {
+			t.Fatalf("a record with the tag %s: %v", tag, err)
+		}
+	}
+	r := goodRecord("m1")
+	r.LaunchTag = "coral-launch-0123456789ab"
+	if err := r.Validate(); err != nil {
+		t.Fatalf("the older 12-digit tag is still readable: %v", err)
+	}
+	for _, bad := range []string{"", "coral-launch-", "coral-launch-0123456789a", "coral-launch-0123456789abc", "coral-launch-0123456789abcdef0123456789abcde", "coral-launch-0123456789ABCDEF0123456789ABCDEF", "launch-0123456789abcdef0123456789abcdef"} {
+		r.LaunchTag = bad
+		if err := r.Validate(); err == nil {
+			t.Errorf("%q was accepted", bad)
+		}
+	}
+}
+
+// PutNew is put-if-absent under the lock: two launches of one name at once, each with its own handle on the same file, give exactly one winner and the winner's record stays; PutNew never replaces.
+func TestPutNewAdmitsExactlyOneOfTwoRacingLaunches(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "machines.json")
+	a, err := OpenState(path)
+	require.NoError(t, err)
+	b, err := OpenState(path)
+	require.NoError(t, err)
+	ra, rb := goodRecord("same"), goodRecord("same")
+	ra.DropletID, rb.DropletID = "1111", "2222"
+	var wg sync.WaitGroup
+	errs := make([]error, 2)
+	wg.Add(2)
+	go func() { defer wg.Done(); errs[0] = a.PutNew(ra) }()
+	go func() { defer wg.Done(); errs[1] = b.PutNew(rb) }()
+	wg.Wait()
+	wins := 0
+	for _, e := range errs {
+		if e == nil {
+			wins++
+		} else {
+			assert.ErrorIs(t, e, ErrRecordExists)
+		}
+	}
+	require.Equal(t, 1, wins, "exactly one proceeds")
+	fresh, err := OpenState(path)
+	require.NoError(t, err)
+	got, ok := fresh.Get("same")
+	require.True(t, ok)
+	winner := ra
+	if errs[1] == nil {
+		winner = rb
+	}
+	assert.Equal(t, winner, got, "the winner's ids stay recorded")
+	// a later PutNew of the name is refused, and Put (the launch's own later writes) still replaces
+	assert.ErrorIs(t, fresh.PutNew(goodRecord("same")), ErrRecordExists)
+	updated := winner
+	updated.FirewallID = "fw-9"
+	require.NoError(t, fresh.Put(updated))
+}

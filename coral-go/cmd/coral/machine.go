@@ -1,0 +1,325 @@
+package main
+
+import (
+	"bufio"
+	"context"
+	"crypto/rand"
+	"encoding/hex"
+	"errors"
+	"flag"
+	"fmt"
+	"io"
+	"os"
+	"os/signal"
+	"regexp"
+	"strings"
+	"syscall"
+
+	"github.com/subgentic/coral/internal/config"
+	"github.com/subgentic/coral/internal/machinelaunch"
+)
+
+// coral machine launch --provider digitalocean --token-file F --hub-key-file K [--name N] [--region R] [--size S] [--agents claude@x,codex@y] [--max-mode launch] [--coral-version V] [--yes]
+//
+// Makes a cloud machine that runs Coral and joins Coral Hub (#9974, the joint note with coral-hub). The provider token and the Coral Hub automation key each come from a file only (mode 0600; "-" reads
+// standard input, for one of them): never from the command line or the environment, never printed, never sent anywhere but its own service, and the instance is told only a one-time credential that expires
+// in five minutes. The machine joins Coral Hub as a pending machine: you approve it there. A machine made by a launch that fails or is interrupted is deleted again.
+//
+// Exit codes: 0 launched, 1 not launched (declined, or the provider or the Hub refused, or the machine did not come up), 2 a usage problem or a secret file that is not safe to read, 130 interrupted.
+var (
+	newMachineProvider = func(name, token string) (machinelaunch.Provider, error) {
+		if name == "digitalocean" {
+			return machinelaunch.NewDigitalOcean(token)
+		}
+		return nil, fmt.Errorf("unknown provider %q: digitalocean is the one this version knows", name)
+	}
+	newMachineHub = func(baseURL, key, destroyKey string) machinelaunch.Minter {
+		return &machinelaunch.HubClient{BaseURL: baseURL, Key: key, DestroyKey: destroyKey}
+	}
+)
+
+var agentEntry = regexp.MustCompile(`^((claude|codex|pi)@[A-Za-z0-9._-]{1,40}|agy@sha256:[0-9a-f]{64})$`)
+
+type listFlag []string
+
+func (l *listFlag) String() string     { return strings.Join(*l, ",") }
+func (l *listFlag) Set(v string) error { *l = append(*l, v); return nil }
+
+func machineUsage(w io.Writer) {
+	fmt.Fprintln(w, "usage: coral machine launch --provider digitalocean --token-file <path|-> --hub-key-file <path|-> [--hub-destroy-file <path|->] [--hub-url https://app.coralhub.dev]")
+	fmt.Fprintln(w, "         [--name NAME] [--region nyc3] [--size s-2vcpu-4gb] [--image SLUG] [--ssh-key ID]... [--agents claude@VERSION,codex@VERSION,pi@VERSION,agy@sha256:HEX]")
+	fmt.Fprintln(w, "         [--max-mode view|interact|launch (default view)] [--coral-version VERSION [--coral-sha256-amd64 HEX --coral-sha256-arm64 HEX]] [--allow-ssh-from ADDRESS] [--yes]")
+}
+
+// machineLaunchEnvVar turns `coral machine` on. It is OFF by default: with it unset `coral machine` is not a command at all (no dispatch, not in the help), so nothing in this build can reach a cloud
+// provider until the person who runs it says so (#9934 slice 1b).
+const machineLaunchEnvVar = "CORAL_MACHINE_LAUNCH"
+
+// machineLaunchEnabled is whether `coral machine` exists in this run.
+func machineLaunchEnabled() bool { return config.Truthy(os.Getenv(machineLaunchEnvVar)) }
+
+// canConfirmLookup is whether a person is at a terminal who can see, and so confirm, that the SSH source address will be looked up at a third-party service: standard input is a terminal and neither secret is read from it. A test replaces it.
+var canConfirmLookup = func(stdin io.Reader, tokenFile, keyFile string) bool {
+	f, ok := stdin.(*os.File)
+	return ok && isTerminal(f) && tokenFile != "-" && keyFile != "-"
+}
+
+// confirmOtherHub asks, at a terminal, whether the Hub key may be sent to a Hub that is not this build's. No terminal, or anything but yes, is no; --yes does not answer it. A test replaces it.
+var confirmOtherHub = askOtherHub
+
+func askOtherHub(stdin io.Reader, stdout io.Writer, hubURL, tokenFile, keyFile string) bool {
+	f, ok := stdin.(*os.File)
+	if !ok || !isTerminal(f) || tokenFile == "-" || keyFile == "-" {
+		return false
+	}
+	fmt.Fprintf(stdout, "Send the Hub key to %s? [y/N] ", hubURL)
+	line, _ := bufio.NewReader(stdin).ReadString('\n')
+	a := strings.ToLower(strings.TrimSpace(line))
+	return a == "y" || a == "yes"
+}
+
+// secondInterrupt returns a channel that is closed when the person interrupts AGAIN after ctx was cancelled by the first interrupt (a Ctrl-C or SIGTERM). Without it a second Ctrl-C would kill the launch where it stands.
+func secondInterrupt(ctx context.Context, finished <-chan struct{}) <-chan struct{} {
+	second := make(chan struct{})
+	go func() {
+		select {
+		case <-ctx.Done():
+		case <-finished:
+			return
+		}
+		select {
+		case <-finished: // ctx ended because the launch did (stop ran), not because of a Ctrl-C: nothing to catch
+			return
+		default:
+		}
+		sigs := make(chan os.Signal, 1)
+		signal.Notify(sigs, os.Interrupt, syscall.SIGTERM)
+		defer signal.Stop(sigs)
+		select {
+		case <-sigs:
+			close(second)
+		case <-finished:
+		}
+	}()
+	return second
+}
+
+// npmAgentsIn is whether any agent named is installed through npm (everything but Antigravity's installer, which is pinned by its SHA-256).
+func npmAgentsIn(entries []string) bool {
+	for _, e := range entries {
+		name, _, _ := strings.Cut(e, "@")
+		if name != "agy" && name != "antigravity" {
+			return true
+		}
+	}
+	return false
+}
+
+func runMachine(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	if len(args) > 0 && (args[0] == "list" || args[0] == "delete" || args[0] == "forget" || args[0] == "prune" || args[0] == "egress-files") {
+		return runMachineManage(args[0], args[1:], stdin, stdout, stderr)
+	}
+	if len(args) == 0 || args[0] != "launch" {
+		machineUsage(stderr)
+		machineManageUsage(stderr)
+		return 2
+	}
+	fs := flag.NewFlagSet("coral machine launch", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	provider := fs.String("provider", "", "the cloud provider: digitalocean")
+	tokenFile := fs.String("token-file", "", "file with the provider's API token (mode 0600), or - for standard input")
+	keyFile := fs.String("hub-key-file", "", "file with your Coral Hub automation key (chk_..., mode 0600), or - for standard input")
+	destroyFile := fs.String("hub-destroy-file", "", "file with the automation key's destroy credential (chd_..., mode 0600), made with the key: lets a launch that fails after the credential was minted revoke it (optional; without it a failed launch tells you to revoke in Coral Hub)")
+	hubURL := fs.String("hub-url", config.TierDefaultCloudURL, "the Coral Hub origin (https)")
+	name := fs.String("name", "", "the machine's name (default coral- and six random characters)")
+	region := fs.String("region", "nyc3", "the provider's region slug")
+	size := fs.String("size", "s-2vcpu-4gb", "the provider's size slug")
+	image := fs.String("image", "", "the provider's image slug (default: the provider's Ubuntu LTS)")
+	agents := fs.String("agents", "", "agent CLIs to install: claude, codex and pi, each pinned as NAME@VERSION; agy (Antigravity) only as agy@sha256:HEX, the SHA-256 of the installer script you checked")
+	maxMode := fs.String("max-mode", "view", "the most Coral Hub may do on the machine: view (the default), interact or launch: interact and launch are asked for explicitly")
+	coralVersion := fs.String("coral-version", "", "the Coral release to install (default: this binary's version)")
+	yes := fs.Bool("yes", false, "go on without asking (the price is still printed)")
+	sha256AMD64 := fs.String("coral-sha256-amd64", "", "the SHA-256 of the release's linux-amd64 tarball, for a --coral-version this build has no pinned digest for (from a SHA256SUMS you checked)")
+	sha256ARM64 := fs.String("coral-sha256-arm64", "", "the SHA-256 of the release's linux-arm64 tarball, as --coral-sha256-amd64")
+	statePath := fs.String("state-file", "", "where the launch keeps the ids of what it made, for `coral machine delete` (default: machines.json in Coral's data folder; ids only, mode 0600)")
+	sshFrom := fs.String("allow-ssh-from", "", "the address (or CIDR) the machine's SSH accepts while the launch sets it up (default: this computer's public address, found over HTTPS)")
+	var sshKeys listFlag
+	fs.Var(&sshKeys, "ssh-key", "a provider ssh key id or fingerprint to install (repeatable); none by default")
+	if err := fs.Parse(args[1:]); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return 0
+		}
+		machineUsage(stderr)
+		return 2
+	}
+	fail := func(format string, a ...any) int {
+		fmt.Fprintf(stderr, "coral machine launch: "+format+"\n", a...)
+		return 2
+	}
+	if fs.NArg() != 0 {
+		return fail("unexpected argument %q", fs.Arg(0))
+	}
+	if *provider == "" || *tokenFile == "" || *keyFile == "" {
+		machineUsage(stderr)
+		return 2
+	}
+	stdinReaders := 0
+	for _, f := range []string{*tokenFile, *keyFile, *destroyFile} {
+		if f == "-" {
+			stdinReaders++
+		}
+	}
+	if stdinReaders > 1 {
+		return fail("only one of --token-file, --hub-key-file and --hub-destroy-file can read standard input")
+	}
+	if *hubURL == "" {
+		return fail("this build has no default Coral Hub: pass --hub-url")
+	}
+	if *maxMode != "view" && *maxMode != "interact" && *maxMode != "launch" {
+		return fail("--max-mode must be view, interact or launch")
+	}
+	version := *coralVersion
+	if version == "" {
+		version = config.Version
+	}
+	if version == "" {
+		return fail("this is a development build: say which Coral release to install with --coral-version")
+	}
+	var agentList []string
+	if *agents != "" {
+		for _, a := range strings.Split(*agents, ",") {
+			a = strings.TrimSpace(a)
+			if !agentEntry.MatchString(a) {
+				return fail("--agents entry %q is not claude@VERSION, codex@VERSION, pi@VERSION or agy@sha256:HEX (nothing is installed unpinned)", a)
+			}
+			agentList = append(agentList, a)
+		}
+	}
+	digests, ok := machinelaunch.PinnedReleaseDigests(version)
+	if *sha256AMD64 != "" || *sha256ARM64 != "" {
+		digests, ok = machinelaunch.ReleaseDigests{AMD64: *sha256AMD64, ARM64: *sha256ARM64}, true // the person's own, from a list they checked: used instead of a pinned one
+	}
+	if !ok {
+		return fail("this build has no pinned digest for Coral %s: pass --coral-sha256-amd64 and --coral-sha256-arm64, the two Linux lines of that release's SHA256SUMS.txt (check the file first), or launch a version this build pins", version)
+	}
+	if err := digests.Valid(); err != nil {
+		return fail("--coral-sha256-amd64 and --coral-sha256-arm64: %v", err)
+	}
+	checkKeys, err := machinelaunch.NewBootKeys()
+	if err != nil {
+		return fail("%v", err)
+	}
+	sshFromSet := false
+	fs.Visit(func(f *flag.Flag) { sshFromSet = sshFromSet || f.Name == "allow-ssh-from" }) // present but empty is a refusal, not "look it up" (coral-go's QA and Security)
+	checkSource := "203.0.113.1"                                                           // documentation address: only the other flags are being checked
+	if sshFromSet {
+		v, verr := machinelaunch.ValidSSHSource(*sshFrom) // refused before any secret is read or any call is made
+		if verr != nil {
+			return fail("--allow-ssh-from: %v", verr)
+		}
+		checkSource, *sshFrom = v, v
+	}
+	if npmAgentsIn(agentList) { // said in plain words, to the person, before any secret is read or any call is made (Security's condition on the operator-only cut, #9934)
+		fmt.Fprintln(stderr, "coral machine launch: note: the npm agent packages are installed by exact version from "+machinelaunch.NPMRegistry+" with install scripts OFF, by a non-root user; their CONTENT is NOT yet hash-verified (a lockfile with pinned hashes comes before any other account may launch).")
+	}
+	_, err = machineUserData(checkKeys, checkSource, *maxMode, version, digests, *hubURL, agentList) // the flags are checked by the builder before any secret is read or any call is made
+	checkKeys.Destroy()
+	if err != nil {
+		return fail("%v", err)
+	}
+	defaultState := *statePath == ""
+	if defaultState {
+		*statePath = defaultMachineStatePath()
+	}
+	tightenStateFolder(*statePath, defaultState, stderr)
+	launchState, err := machinelaunch.OpenState(*statePath)
+	if err != nil {
+		return fail("%v", err)
+	}
+	machine := *name
+	if machine == "" {
+		var b [3]byte
+		_, _ = rand.Read(b[:])
+		machine = "coral-" + hex.EncodeToString(b[:])
+	}
+
+	token, err := machinelaunch.ReadSecretFile(*tokenFile, stdin)
+	if err != nil {
+		return fail("the provider token: %v", err)
+	}
+	key, err := machinelaunch.ReadSecretFile(*keyFile, stdin)
+	if err != nil {
+		return fail("the Coral Hub key: %v", err)
+	}
+	destroyKey := ""
+	if *destroyFile != "" {
+		if destroyKey, err = machinelaunch.ReadSecretFile(*destroyFile, stdin); err != nil {
+			return fail("the Coral Hub destroy credential: %v", err)
+		}
+	}
+	p, err := newMachineProvider(*provider, token)
+	if err != nil {
+		return fail("%v", err)
+	}
+	if *hubURL != config.TierDefaultCloudURL {
+		sent := "the Hub key is"
+		if destroyKey != "" {
+			sent = "the Hub key and the destroy credential are"
+		}
+		fmt.Fprintf(stderr, "coral machine launch: warning: %s is not this build's Coral Hub (%s): %s sent there.\n", *hubURL, config.TierDefaultCloudURL, sent)
+		if !confirmOtherHub(stdin, stdout, *hubURL, *tokenFile, *keyFile) { // a warning is not enough: --yes does not answer this one (coral-go's Security, #9934 slice 2)
+			return fail("%s is not this build's Coral Hub and was not confirmed: nothing was sent. Run it at a terminal and answer yes, or leave out --hub-url", *hubURL)
+		}
+	}
+	hub := newMachineHub(*hubURL, key, destroyKey)
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	finished := make(chan struct{})
+	defer close(finished)
+	second := secondInterrupt(ctx, finished) // the first Ctrl-C cancels ctx; a SECOND one ends the sweep's wait at once (Security, #9934)
+	source, lookup := *sshFrom, ""
+	if source == "" {
+		if !canConfirmLookup(stdin, *tokenFile, *keyFile) { // the lookup tells a third party this computer's address: with no terminal to see and confirm that, the person names the address (Security, #9934)
+			return fail("no terminal to confirm the address lookup, so SSH's source address is needed: pass --allow-ssh-from ADDRESS")
+		}
+		fmt.Fprintf(stderr, "Asking %s for this computer's address ...\n", publicIPHost()) // said before the request, so --yes is not silent about it (coral-go's Security)
+		var derr error
+		if source, derr = detectSSHSource(ctx); derr != nil {
+			return fail("%v", derr)
+		}
+		lookup = publicIPHost()
+	}
+	deps := machinelaunch.Deps{
+		Provider: p, Hub: hub, Out: stdout, Interrupt: second, Bootstrap: newMachineBootstrap(), Isolate: true, State: launchState, // every launch makes its own VPC and firewall and keeps its ids (#10918)
+		UserData: func(keys *machinelaunch.BootKeys) (string, error) {
+			return machineUserData(keys, source, *maxMode, version, digests, *hubURL, agentList)
+		},
+	}
+	if f, ok := stdin.(*os.File); ok && isTerminal(f) && *tokenFile != "-" && *keyFile != "-" {
+		deps.Confirm = func(summary string) (bool, error) {
+			fmt.Fprintln(stdout, summary)
+			fmt.Fprint(stdout, "Create it? [y/N] ")
+			line, _ := bufio.NewReader(stdin).ReadString('\n')
+			a := strings.ToLower(strings.TrimSpace(line))
+			return a == "y" || a == "yes", nil
+		}
+	}
+
+	_, err = machinelaunch.Launch(ctx, machinelaunch.Options{
+		Name: machine, Region: *region, Size: *size, Image: *image, SSHKeys: sshKeys, Yes: *yes, HubURL: *hubURL, SSHFrom: source, SSHFromLookup: lookup,
+	}, deps)
+	switch {
+	case err == nil:
+		if len(agentList) > 0 {
+			fmt.Fprintln(stdout, "The agent CLIs install after this message says it launched, on the machine. If one is missing, run: journalctl -u coral-finish on the machine (an agent that needs its install script fails its version check, because install scripts are off, and is removed).")
+		}
+		return 0
+	case ctx.Err() != nil:
+		fmt.Fprintln(stderr, "coral machine launch: interrupted:", err)
+		return 130
+	default:
+		fmt.Fprintln(stderr, "coral machine launch:", err)
+		return 1
+	}
+}
