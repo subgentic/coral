@@ -1,3 +1,4 @@
+// cdp-timeout: 900 (the whole table rules check: about 510 s on this Mac, 116 table states and the live surfaces, past the runner's default; #11943)
 // #11942 part A (the operator: "Our table column resizing is very broken ... It's used across all of our surfaces"): ONE browser check for every table built on data_table.js, asserting the eight rules of
 // coral://artifacts/9ced561afd363231aa6ccbc457c99c528b81ab5c31d82f232e9604e82749093a (helpers/table_rules.js says them). Each surface's table shape (its columns, its fixed and empty columns, its row mixes) is a
 // spec below, mounted through the real data_table.js into a panel the width a surface has beside the sidebar, at 1440, 1280, 1024 and 900 px, with mixed rows, one kind of row, a long name and no rows, at 200% text,
@@ -22,9 +23,9 @@ const SPECS = `(() => {
   const kinds = {
     needs: (m, mix) => ({ label: 'Needs you, 3', columns: [
         { key: 'item', label: 'Item', primary: true, width: 'grow', sort: true, cell: r => m.primaryButton(r.item) },
-        { key: 'why', label: 'Waiting for', cell: r => { const s = document.createElement('span'); s.textContent = r.why; if (r.dismiss) { const d = document.createElement('button'); d.type = 'button'; d.className = 'btn btn-small inbox-dismiss'; d.textContent = 'Dismiss'; s.append(d); } return s; } }, // the operator's Dismiss, drawn inside Waiting for
+        { key: 'why', label: 'Waiting for', cell: r => r.why }, // the operator's Dismiss is in the Actions column now (#11943), as the live Needs you draws it
         { key: 'cli', label: 'CLI', sort: true, cell: r => (r.cli ? m.tag(r.cli) : '') }, { key: 'folder', label: 'Folder', sort: true, field: 'folder' }, { key: 'team', label: 'Team', sort: true, field: 'team' },
-        { key: 'blocks', label: 'Blocks', cell: () => document.createElement('span') }, { key: 'actions', label: 'Actions', fixed: true, width: '11rem', cell: r => (r.act ? m.link(r.act, () => {}) : '') } ],
+        { key: 'blocks', label: 'Blocks', cell: () => document.createElement('span') }, { key: 'actions', label: 'Actions', fixed: true, width: '11rem', cell: r => { if (r.dismiss) { const d = document.createElement('button'); d.type = 'button'; d.className = 'btn btn-small inbox-dismiss'; d.textContent = 'Dismiss'; return d; } return r.act ? m.link(r.act, () => {}) : ''; } } ],
       rows: mix === 'empty' ? [] : mix === 'one' ? [1, 2, 3].map(i => ({ id: i, item: 'Goal #' + (180 + i) + ' looks done', why: 'Done when: Every task is done.', team: 'coral-hub', act: 'Close goal' }))
         : [{ id: 1, item: mix === 'long' ? long : 'Orchestrator', why: 'Wants to know: None of the above', cli: 'Claude', folder: 'coral-hub', team: 'coral-hub-team', dismiss: true }, { id: 2, item: 'Goal #187 looks done', why: 'Done when: The operator can see it', team: 'coral-hub' }, { id: 3, item: 'Goal #184 looks done', why: 'Every task is done.', team: 'coral-hub' }] }),
     tasks: (m, mix) => ({ label: 'Tasks, 4', columns: [ { key: 'state', label: 'State', cell: r => m.chip(r.state, 'goal-state-' + r.state) }, { key: 'title', label: 'Task', primary: true, width: 'grow', sort: true, field: 'title' },
@@ -41,6 +42,9 @@ const SPECS = `(() => {
       rows: mix === 'empty' ? [] : [1, 2, 3].map(i => ({ id: i, name: mix === 'long' && i === 1 ? long : 'remote-computer-' + i, status: ['active', 'blocked', 'done'][i % 3], seen: when(i * 7), ver: 'v2.0.' + (20 + i) })) }),
     analytics: (m, mix) => ({ label: 'Who spends, 3', fold: 'labeled', scroll: true, columns: [ { key: 'who', label: 'Agent', primary: true, width: 'grow', field: 'who' }, ...['Sessions', 'Input tokens', 'Output tokens', 'Cache tokens', 'Cost', 'Cost per task'].map(l => ({ key: l, label: l, field: l, align: 'end', sort: 'number' })) ],
       rows: mix === 'empty' ? [] : [1, 2, 3].map(i => ({ id: i, who: mix === 'long' && i === 1 ? long : 'Agent ' + i, Sessions: 3 * i, 'Input tokens': '1.2M', 'Output tokens': '160.8K', 'Cache tokens': '67.3M', Cost: '$' + 40 * i, 'Cost per task': '$' + 2 * i })) }),
+    activity: (m, mix) => ({ label: 'Activity, 3', columns: [ { key: 'action', label: 'You did', sort: true, field: 'action' }, { key: 'item', label: 'On', primary: true, width: 'grow', sort: true, cell: r => m.primaryButton(r.item) },
+        { key: 'team', label: 'Team', sort: true, field: 'team' }, { key: 'from', label: 'From', sort: true, field: 'from' }, { key: 'at', label: 'When', sort: 'date', fixed: true, width: '7rem', cell: r => m.timeCell(r.at) } ],
+      rows: mix === 'empty' ? [] : [1, 2, 3].map(i => ({ id: i, action: ['Approved', 'Asked for changes', 'Denied'][i % 3], item: mix === 'long' && i === 1 ? long : 'plan-' + i + '.md', team: 'coral-go-team', from: mix === 'one' ? 'this computer' : ['this computer', 'Coral Hub', 'this computer, phone (reported by the page)'][i % 3], at: when(i * 9) })) }),
     settings: (m, mix) => ({ label: 'Settings keys, 3', columns: [ { key: 'name', label: 'Setting', primary: true, width: 'grow', sort: true, field: 'name' }, { key: 'value', label: 'Value', field: 'value' } ],
       rows: mix === 'empty' ? [] : [1, 2, 3].map(i => ({ id: i, name: mix === 'long' && i === 1 ? long : 'setting_' + i, value: 'value ' + i })) }),
   };
@@ -62,7 +66,7 @@ const SPECS = `(() => {
 
 // CORAL_TABLE_RULES: unset = the check is pending and does not run (the release gate stays green while #11943 makes data_table.js keep the rules); report = run it and print what is broken, exit 0; enforce = run it and
 // fail on any broken rule (the check as it will be once #11943 lands, whose first change is to make enforce the default). Today: CORAL_TABLE_RULES=enforce node run_cdp_suites.mjs --only table_rules_browser.
-const MODE = process.env.CORAL_TABLE_RULES || 'off';
+const MODE = process.env.CORAL_TABLE_RULES || 'enforce'; // enforce is the default now (#11943): off skips the check, report prints what is broken and exits 0
 
 (async () => {
     if (MODE === 'off') { console.log('PASS pending (#11943): set CORAL_TABLE_RULES=report or enforce to run the table rules check'); return; }

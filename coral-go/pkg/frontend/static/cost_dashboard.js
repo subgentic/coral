@@ -503,7 +503,7 @@ function _swatched(view, cell) {
         const inner = cell(r);
         if (!series.swatchColor(view, SERIES_VIEWS[view].key(r))) return inner;
         const wrap = document.createElement('span'); wrap.className = 'cost-lead';
-        const b = document.createElement('button'); b.type = 'button'; b.className = 'cost-toggle'; b.setAttribute('aria-label', `Show ${SERIES_VIEWS[view].name(r)}'s line`);
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'cost-toggle'; b.dataset.displayControl = 'chart-line'; /* a chart legend toggle in the name cell, not a row action: the table rules check (R9) reads this */ b.setAttribute('aria-label', `Show ${SERIES_VIEWS[view].name(r)}'s line`);
         b.append(document.createElement('i')); b.firstChild.className = 'cost-swatch'; b.firstChild.setAttribute('aria-hidden', 'true');
         b.addEventListener('click', () => _toggle(view, r));
         _paintSwatch(b, view, r);
@@ -563,7 +563,7 @@ function _drawTable(container, table, columns, rows, empty, extra) {
     if (!st.sort) st.sort = { key: 'cost_usd', dir: 'desc' };
     _drawn[table] = { container, columns, rows, empty, extra, phone: isPhoneLayout() };
     if (!rows.length) { emptyState(container, empty || noDataWords(_period()), 'empty-state'); return; }
-    const t = dataTable({ label: TABLE_TITLES[table], rowKey: r => rows.indexOf(r), state: st, fold: 'labeled', scroll: true, ...phoneOneLine(columns, ['cost_usd'], PHONE_LEAD[table]), rows, ...extra }); // a phone: one line a row, the name and Cost (#8982)
+    const t = dataTable({ label: TABLE_TITLES[table], rowKey: r => rows.indexOf(r), state: st, fold: 'labeled', scroll: true, ...phoneOneLine(columns.map((c, i) => (i > 1 && c.key !== 'details' && c.drop == null ? { ...c, drop: 100 - i } : c)), ['cost_usd'], PHONE_LEAD[table]), rows, ...extra }); // the table fits its panel (#11943): the last columns go first, never the first two or Details; a phone: one line a row, the name and Cost (#8982)
     container.replaceChildren(t.el);
     if (SERIES_VIEWS[table]) _drawSeries(table); // the line under the chart compares its total with these rows
 }

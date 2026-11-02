@@ -173,7 +173,7 @@ export function matrix(names, cells, { phone = false } = {}) {
 
 /** A table, drawn by the shared data table (data_table.js): rows is an array of arrays of text; `right` lists the right-aligned (numeric) column indexes. It scrolls in its own box and says so; a phone row is 44 px. */
 export function plainTable(head, rows, { right = [], label = 'Table' } = {}) {
-    const columns = head.map((h, i) => ({ key: 'c' + i, label: h || '\u00a0', numeric: right.includes(i), tone: i === 0 ? 'primary' : undefined, cell: r => r['c' + i] }));
+    const columns = head.map((h, i) => ({ key: 'c' + i, label: h || '\u00a0', numeric: right.includes(i), tone: i === 0 ? 'primary' : undefined, ...(i > 1 && h !== 'Details' ? { drop: 100 - i } : {}), cell: r => r['c' + i] })); // the table fits its panel (#11943): the last columns go first, never the first two or the Details link
     const t = dataTable({ label, rowKey: r => r.__i, state: tableState(), fold: 'labeled', scroll: true, columns, rows: rows.map((r, n) => Object.fromEntries([['__i', n], ...r.map((c, i) => ['c' + i, c])])) });
     const frame = el('div', 'atab-tframe'), hint = el('p', 'atab-hint', 'Scroll sideways for more columns.');
     hint.hidden = true; // shown only when the table really overflows (a phone stacks it into rows: nothing to scroll)

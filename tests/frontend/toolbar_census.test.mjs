@@ -21,7 +21,11 @@ export const TOOLBARS = {
     'theme-save-bar': 'the theme save row',
 };
 export const NOT_A_TOOLBAR = {
+<<<<<<< HEAD
     'av-bar': 'the version chip on the file viewer\'s one header row (artifact-comments.css, #12223): the previous and next buttons around the chip, not a row of its own',
+=======
+    'cols-hidden-bar': 'the one quiet line over a table that says how many columns it left out to fit (data_table_hidden.css, #11943): a label and a menu, not a row of controls',
+>>>>>>> 2c4d0fd5c
     'agent-ui-expanded-bar': 'the expanded agent page\'s own frame', 'availability-toolbar': 'a status header', 'chat-find-bar': 'the in-chat find box', 'docs-toolbar': 'the docs page header', 'dt-bar': 'the table\'s selection step bar',
     'gt-toolbar': 'the goals page header', 'hooks-bar': 'a settings row of buttons', 'item-bar': 'the item page\'s footer actions',
     'list-bar-bar': 'the list bar\'s own wrapper (its rows are the toolbar)', 'mb-select-bar': 'the message board selection bar', 'model-chip-bar': 'the composer\'s model chips',

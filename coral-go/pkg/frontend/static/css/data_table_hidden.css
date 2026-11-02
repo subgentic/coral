@@ -1,0 +1,5 @@
+/* The control that says which columns were left out to fit the panel (#11943). Lazy: loaded by data_table.js the first time a table hides one (not at start: page_weight css). */
+/* the columns left out to fit the panel (#11943): a quiet line over the header, the way back for each */
+.cols-hidden-bar { position: relative; display: flex; justify-content: flex-end; padding: 2px var(--table-pad-x); font-size: var(--table-tertiary-size); }
+.cols-hidden-bar[hidden], .cols-hidden-menu[hidden] { display: none; }
+.cols-hidden-menu { position: absolute; top: 100%; right: var(--table-pad-x); z-index: 5; min-width: 10rem; }
