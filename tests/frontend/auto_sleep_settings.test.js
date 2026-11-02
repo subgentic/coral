@@ -58,8 +58,9 @@ const BASE = require('./test_base').BASE;
     assert.equal(sent.auto_sleep, false, 'saved as off');
     assert.equal(sent.auto_sleep_idle_minutes, '90', 'saved as 90');
     // Outside the range is said and not saved (#12328; it was sent as the nearest end, so 5 became 15 silently): no request, the field marked
-    for (const bad of ['5', '99999', '14', '1441']) {
+    for (const bad of ['5', '99999', '14', '1441', '1e3', '0x20']) {
       const before = await ev(`window.__settingsPut.length`);
+      await ev(`document.getElementById('settings-auto-sleep-minutes').type = ${JSON.stringify(/^[0-9]+$/.test(bad) ? 'number' : 'text')}`); // a number box would drop '0x20' to '' before the check sees it; the check must hold either way
       await ev(`(async()=>{document.getElementById('settings-auto-sleep-minutes').value=${JSON.stringify(bad)};await Promise.resolve(window.applySettings())})()`);
       assert.equal(await ev(`window.__settingsPut.length`), before, `${bad} is refused: no request`);
       assert.equal(await ev(`document.getElementById('settings-auto-sleep-minutes').getAttribute('aria-invalid')`), 'true', `${bad} marks the field`);
