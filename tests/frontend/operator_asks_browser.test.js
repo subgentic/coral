@@ -45,7 +45,7 @@ const LONG = 'Which of the two \u202edesigns do we ship? ' + 'We have weighed th
             // opens whole
             await ev(`document.querySelector('button[aria-label="Answer the question of Lead"]').click(); true`);
             await waitFor(`document.querySelector('dialog.inbox-ask-dialog[open]')`, at + 'the dialog opens', 4000);
-            const dlg = await ev(`(() => { const d = document.querySelector('dialog.inbox-ask-dialog'); const r = d.getBoundingClientRect(); const btns = [...d.querySelectorAll('button')].map(b => Math.round(b.getBoundingClientRect().height));
+            const dlg = await ev(`(() => { const d = document.querySelector('dialog.inbox-ask-dialog'); const r = d.getBoundingClientRect(); const btns = [...d.querySelectorAll('.inbox-ask-buttons button, .inbox-ask-offer button')].map(b => Math.round(b.getBoundingClientRect().height));
                 return { whole: d.querySelector('.inbox-ask-text').textContent, title: d.querySelector('h2').textContent, fits: r.left >= 0 && r.right <= innerWidth + 1, btns, focus: document.activeElement && document.activeElement.className }; })()`);
             assert.ok(dlg.title.startsWith('Which of the two') && dlg.title.endsWith('\u2026') && dlg.title.length <= 82, at + 'the title is a short subject of the question (an item, #12143): ' + dlg.title);
             assert.ok(dlg.whole.includes('Reply with 1 or 2.') && dlg.whole.includes('<U+202E>evil') && !dlg.whole.includes('\u202e'), at + 'the whole question, marked: ' + dlg.whole.slice(-60));

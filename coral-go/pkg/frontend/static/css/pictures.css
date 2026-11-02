@@ -29,6 +29,13 @@
 .artifact-review-form .ac-picker { align-self: flex-start; }
 .artifact-review-form .ac-thumbs { display: flex; flex-wrap: wrap; gap: 12px; }
 .artifact-review-form .ac-thumb { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
-.inbox-ask-pics { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin: 0 0 8px; } /* the pictures of a reply to a question (#12173) */
+.inbox-ask-pics { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; margin: 0 0 6px; } /* the pictures of a reply to a question (#12173): small tiles */
 .inbox-ask-pics .ac-images { width: 100%; }
-.inbox-ask-pics .btn { margin: 0; min-height: 44px; }
+.inbox-ask-pics .ac-thumb { display: grid; grid-template-columns: 64px auto; align-items: start; width: auto; gap: 4px 8px; } /* the picture, with Mark up and Remove beside it */
+.inbox-ask-pics .ac-thumb-img { width: 64px; height: 64px; grid-row: 1 / span 3; }
+.inbox-ask-pics .ac-thumb-state { grid-column: 2; }
+.inbox-ask-pics .ac-picker, .inbox-ask-foot .ac-picker { margin: 0; }
+.inbox-ask-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.inbox-ask-foot .btn { margin: 0; min-height: 44px; }
+.inbox-ask-pics .btn { margin: 0; }
+@media (pointer: coarse) { .inbox-ask-pics .btn { min-height: 44px; } }
