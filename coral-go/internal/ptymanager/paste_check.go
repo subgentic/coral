@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/subgentic/coral/internal/naming"
 )
@@ -325,28 +326,9 @@ type StyledScreenReader interface {
 // ghost text) means it is someone else's text. A faint cell is only ever Claude's
 // own rendering: what is typed or pasted into the box is never drawn faint.
 func suggestionOnly(styled string) bool {
-	lines := styledLines(styled)
-	for len(lines) > 0 && strings.TrimSpace(lines[len(lines)-1].text) == "" {
-		lines = lines[:len(lines)-1]
-	}
-	if len(lines) > boxScanLines {
-		lines = lines[len(lines)-boxScanLines:]
-	}
-	texts := make([]string, len(lines))
-	for i, l := range lines {
-		texts[i] = l.text
-	}
-	start := boxStartLine(texts)
-	if start < 0 {
+	box, ok := styledInputBox(styled)
+	if !ok {
 		return false
-	}
-	box := []styledLine{lines[start]}
-	for _, l := range lines[start+1:] {
-		t := strings.TrimSpace(l.text)
-		if t == "" || strings.HasPrefix(t, "─") || strings.HasPrefix(t, "╰") || strings.HasPrefix(t, "━") {
-			break
-		}
-		box = append(box, l)
 	}
 	if strings.Contains(squeeze(box[0].text)+squeeze(joinText(box[1:])), pastePlaceholder) {
 		return false // a paste placeholder is never a suggestion
@@ -370,10 +352,76 @@ func suggestionOnly(styled string) bool {
 	return faint > 0
 }
 
+// styledInputBox is the input box of a styled screen: its first line (the one with the marker) and the lines that continue it, as the plain-text reader finds them. ok is false with no box on screen.
+func styledInputBox(styled string) (box []styledLine, ok bool) {
+	lines := styledLines(styled)
+	for len(lines) > 0 && strings.TrimSpace(lines[len(lines)-1].text) == "" {
+		lines = lines[:len(lines)-1]
+	}
+	if len(lines) > boxScanLines {
+		lines = lines[len(lines)-boxScanLines:]
+	}
+	texts := make([]string, len(lines))
+	for i, l := range lines {
+		texts[i] = l.text
+	}
+	start := boxStartLine(texts)
+	if start < 0 {
+		return nil, false
+	}
+	box = []styledLine{lines[start]}
+	for _, l := range lines[start+1:] {
+		t := strings.TrimSpace(l.text)
+		if t == "" || strings.HasPrefix(t, "─") || strings.HasPrefix(t, "╰") || strings.HasPrefix(t, "━") {
+			break
+		}
+		box = append(box, l)
+	}
+	return box, true
+}
+
+// hermesWelcomeLine is the line Hermes shows when it is ready (routes' hermesWelcome says the same).
+const hermesWelcomeLine = "Welcome to Hermes Agent!"
+
+// hermesPlaceholderMaxRunes bounds a hint: the longest English one is 52 characters.
+const hermesPlaceholderMaxRunes = 120
+
+// hermesPlaceholderBox reports whether the input box of a styled Hermes screen holds only its placeholder, in whatever language (#11967). The tester's captures of a real Hermes: an empty box is the marker and then
+// the hint in italic and a colour; typed text is drawn in the default colour, never italic. The styling only adds a way to say "placeholder" (the exact list stays), and every condition must hold, or the box is a
+// draft: the screen shows Hermes's own welcome line; the box is one line, under hermesPlaceholderMaxRunes; and every cell after the marker is italic, in one and the same explicit colour (so a single normal-weight
+// character, the person's words before or after the hint, makes it a draft).
+func hermesPlaceholderBox(styled string) bool {
+	if !strings.Contains(joinText(styledLines(styled)), hermesWelcomeLine) {
+		return false
+	}
+	box, ok := styledInputBox(styled)
+	if !ok || len(box) != 1 {
+		return false
+	}
+	m := inputBoxRe.FindStringSubmatchIndex(box[0].text)
+	if m == nil {
+		return false
+	}
+	cells, fg := 0, ""
+	for _, c := range box[0].cells {
+		if c.at < m[1] || unicode.IsSpace(c.r) {
+			continue
+		}
+		if !c.italic || c.fg == "" || (fg != "" && c.fg != fg) {
+			return false
+		}
+		fg = c.fg
+		cells++
+	}
+	return cells > 0 && utf8.RuneCountInString(box[0].text[m[1]:]) <= hermesPlaceholderMaxRunes
+}
+
 type styledCell struct {
-	r     rune
-	faint bool
-	at    int // byte offset in the line's text
+	r      rune
+	faint  bool
+	italic bool   // SGR 3 (Hermes draws its hints so, #11967)
+	fg     string // the foreground colour as set ("5;136", "2;r;g;b", "31"), "" for the default
+	at     int    // byte offset in the line's text
 }
 
 type styledLine struct {
@@ -395,7 +443,7 @@ func styledLines(s string) []styledLine {
 	var out []styledLine
 	var cur styledLine
 	var text strings.Builder
-	faint := false
+	st := sgrStyle{}
 	rs := []rune(strings.ReplaceAll(s, "\r", ""))
 	for i := 0; i < len(rs); i++ {
 		r := rs[i]
@@ -410,7 +458,7 @@ func styledLines(s string) []styledLine {
 				j++
 			}
 			if j < len(rs) && rs[j] == 'm' {
-				faint = sgrFaint(string(rs[i+2:j]), faint)
+				st = st.apply(string(rs[i+2 : j]))
 			}
 			i = j
 		case r == 0x1b && i+1 < len(rs) && rs[i+1] == ']': // OSC, to BEL or ST
@@ -429,7 +477,7 @@ func styledLines(s string) []styledLine {
 			if r == '\u00a0' {
 				r = ' '
 			}
-			cur.cells = append(cur.cells, styledCell{r: r, faint: faint, at: text.Len()})
+			cur.cells = append(cur.cells, styledCell{r: r, faint: st.faint, italic: st.italic, fg: st.fg, at: text.Len()})
 			text.WriteRune(r)
 		}
 	}
@@ -437,8 +485,14 @@ func styledLines(s string) []styledLine {
 	return append(out, cur)
 }
 
-// sgrFaint applies one SGR sequence's parameters to the faint attribute.
-func sgrFaint(params string, faint bool) bool {
+// sgrStyle is the attributes of the cell being drawn that Coral reads: faint (SGR 2), italic (SGR 3) and the foreground colour.
+type sgrStyle struct {
+	faint, italic bool
+	fg            string
+}
+
+// apply returns the style after one SGR sequence's parameters.
+func (st sgrStyle) apply(params string) sgrStyle {
 	ps := strings.Split(params, ";")
 	for i := 0; i < len(ps); i++ {
 		p := ps[i]
@@ -446,19 +500,40 @@ func sgrFaint(params string, faint bool) bool {
 			continue
 		}
 		switch p {
-		case "", "0", "22":
-			faint = false
+		case "", "0":
+			st = sgrStyle{}
+		case "22":
+			st.faint = false
 		case "2":
-			faint = true
+			st.faint = true
+		case "3":
+			st.italic = true
+		case "23":
+			st.italic = false
+		case "39":
+			st.fg = ""
+		case "30", "31", "32", "33", "34", "35", "36", "37", "90", "91", "92", "93", "94", "95", "96", "97":
+			st.fg = p
 		case "38", "48", "58": // a colour: 5;n or 2;r;g;b
 			if i+1 < len(ps) && ps[i+1] == "5" {
+				if p == "38" && i+2 < len(ps) {
+					st.fg = "5;" + ps[i+2]
+				}
 				i += 2
 			} else if i+1 < len(ps) && ps[i+1] == "2" {
+				if p == "38" && i+4 < len(ps) {
+					st.fg = "2;" + ps[i+2] + ";" + ps[i+3] + ";" + ps[i+4]
+				}
 				i += 4
 			}
 		}
 	}
-	return faint
+	return st
+}
+
+// sgrFaint applies one SGR sequence's parameters to the faint attribute.
+func sgrFaint(params string, faint bool) bool {
+	return sgrStyle{faint: faint}.apply(params).faint
 }
 
 // BracketedPasteFromLog reads an agent's bracketed paste mode from its pane's output
