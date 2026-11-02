@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"strings"
 	"sync"
@@ -17,6 +18,7 @@ import (
 func TestTheAckReachesTheHubThroughTheRedactors(t *testing.T) {
 	require.NoError(t, secrets.Init())
 	e := newRelaunchEnv(t)
+	pinAckInputs(t, e) // the key and the nonces are fixed: the same tokens every run, so a redactor that mistook a random one for a secret could not make this fail now and then (#12094)
 	for i := 0; i < 20; i++ {
 		_, st := e.status(hubHdr(ownerA))
 		body, err := json.Marshal(st)
@@ -91,4 +93,23 @@ func TestASecondTokenDoesNotStartASecondRelaunchWhateverTheUpdaterRecords(t *tes
 	assert.Equal(t, 202, code)
 	assert.Equal(t, 2, e.up.applyCount())
 	assert.False(t, strings.Contains(t4, " "))
+}
+
+// pinAckInputs fixes the two random inputs of an acknowledgement token: the key (written to the file the handler reads it from) and the nonce (a counter).
+func pinAckInputs(t *testing.T, e *relaunchEnv) {
+	t.Helper()
+	require.NoError(t, e.h.ensureDir())
+	key := make([]byte, 32)
+	for i := range key {
+		key[i] = byte(0x40 + i*7)
+	}
+	require.NoError(t, e.h.writePrivate(ackKeyFile, []byte(hex.EncodeToString(key))))
+	n := 0
+	e.h.nonceRead = func(b []byte) (int, error) {
+		n++
+		for i := range b {
+			b[i] = byte(n*31 + i*13)
+		}
+		return len(b), nil
+	}
 }

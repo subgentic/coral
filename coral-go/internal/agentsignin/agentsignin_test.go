@@ -132,14 +132,15 @@ func TestClaudeStatusIsReadFromTheCLIsOwnAnswer(t *testing.T) {
 		if mode == "hang" {
 			checkTimeout = 300 * time.Millisecond
 		}
-		start := time.Now()
-		defer func(mode string) {
-			if mode == "hang" {
-				assert.Less(t, time.Since(start), 3*time.Second)
-			}
-		}(mode)
 		bin := standInBin(t, mode)
-		assert.Equal(t, want, Check(context.Background(), "claude", bin), mode)
+		start := time.Now()
+		got := Check(context.Background(), "claude", bin)
+		if mode == "hang" {
+			// measured around the call itself (it used to be measured when the whole test ended, so every later mode and a slow machine counted against it), and against what it proves: a check that
+			// waited on the stand-in, which hangs far longer, would take more than this; it ends at its own 300 ms timeout (#12094)
+			assert.Less(t, time.Since(start), 15*time.Second, "the check ends at its own timeout, not when the stand-in does")
+		}
+		assert.Equal(t, want, got, mode)
 	}
 }
 
