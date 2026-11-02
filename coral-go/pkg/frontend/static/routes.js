@@ -132,7 +132,7 @@ export function parse(pathname, search = '') {
         }
         case INBOX:
             if (rest.length === 1 && (rest[0] === 'needs' || rest[0] === 'saved' || rest[0] === 'artifacts')) return { view: 'inbox-folder', folder: rest[0] };
-            if (rest[0] === 'needs' && (rest[1] === 'review' || rest[1] === 'ask')) { // one item of Needs you, for a link from a notification (#11797): /inbox/needs/<review|ask>/[@<server>/]<team>/<file id | question id>
+            if (rest[0] === 'needs' && (rest[1] === 'review' || rest[1] === 'ask' || rest[1] === 'goal')) { // one item of Needs you, for a link from a notification (#11797): /inbox/needs/<review|ask|goal>/[@<server>/]<team>/<file id | question id | goal id>
                 const kind = rest[1]; rest.splice(0, 2);
                 const t = take();
                 if (t.bad || rest.length !== 2) return null;
