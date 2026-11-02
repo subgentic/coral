@@ -692,7 +692,7 @@ func (s *SessionStore) GetSleepingBoardNames(ctx context.Context) ([]string, err
 	var names []string
 	err := s.reader().SelectContext(ctx, &names,
 		`SELECT board_name FROM live_sessions WHERE board_name IS NOT NULL AND status = 'active'
-		 GROUP BY board_name HAVING COUNT(*) = SUM(CASE WHEN is_sleeping = 1 THEN 1 ELSE 0 END)`)
+		 GROUP BY board_name HAVING COUNT(*) = SUM(CASE WHEN is_sleeping = 1 AND COALESCE(sleep_reason, '') != 'idle' THEN 1 ELSE 0 END)`) // an auto-asleep agent keeps its board awake: a pause would hold the delivery that wakes it (#12111)
 	if err != nil {
 		return nil, err
 	}

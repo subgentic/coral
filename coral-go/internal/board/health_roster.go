@@ -15,6 +15,16 @@ import (
 // SleepingSubscribers is the set of subscriber ids on project whose session is asleep (an archived session is asleep too: the
 // store sets is_sleeping with is_archived). Empty when the sessions database is not attached.
 func (s *Store) SleepingSubscribers(ctx context.Context, project string) (map[string]bool, error) {
+	return s.asleepSubscribers(ctx, project, false)
+}
+
+// AutoAsleepSubscribers is the set of subscriber ids on project whose session Coral put to sleep for being idle (#12111): auto-asleep, shown as available, and woken by any delivery. They are
+// not in SleepingSubscribers: a person's Sleep is a decision to leave the agent alone, an auto-sleep is not.
+func (s *Store) AutoAsleepSubscribers(ctx context.Context, project string) (map[string]bool, error) {
+	return s.asleepSubscribers(ctx, project, true)
+}
+
+func (s *Store) asleepSubscribers(ctx context.Context, project string, idle bool) (map[string]bool, error) {
 	out := map[string]bool{}
 	if s.sessionsDB == nil {
 		return out, nil
@@ -45,7 +55,11 @@ func (s *Store) SleepingSubscribers(ctx context.Context, project string) (map[st
 			args[i] = id
 		}
 		var asleep []string
-		if err := s.sessionsDB.SelectContext(ctx, &asleep, `SELECT session_id FROM live_sessions WHERE is_sleeping = 1 AND session_id IN (`+placeholders(len(chunk))+`)`, args...); err != nil {
+		cmp := "!="
+		if idle {
+			cmp = "="
+		}
+		if err := s.sessionsDB.SelectContext(ctx, &asleep, `SELECT session_id FROM live_sessions WHERE is_sleeping = 1 AND COALESCE(sleep_reason, '') `+cmp+` 'idle' AND session_id IN (`+placeholders(len(chunk))+`)`, args...); err != nil {
 			return nil, err
 		}
 		for _, id := range asleep {

@@ -42,6 +42,8 @@ const (
 	AutoResumeAfterAPIError  = "auto_resume_after_api_error"
 	AutoWakeAfterRestart     = "auto_wake_after_restart"
 	AutoWakeCap              = "auto_wake_cap"
+	AutoSleep                = "auto_sleep"
+	AutoSleepIdleMinutes     = "auto_sleep_idle_minutes"
 	NudgeClaudeArtifacts     = "nudge_claude_artifacts"
 	BoardAutoAttach          = "board_auto_attach"
 	CrossTeamAllowlist       = "cross_team_allowlist"
@@ -152,6 +154,10 @@ func init() {
 	ownCheck(AutoWakeAfterRestart)
 	register(whole(AutoWakeCap, "8", 1, 50, ReadDefault, ApplyLive, "Most agents woken after a restart."))
 	ownCheck(AutoWakeCap)
+	boolOn(AutoSleep, ApplyLive, "Put an agent to sleep after it has been idle for a while; any message to it wakes it (#12111).")
+	ownCheck(AutoSleep)
+	register(whole(AutoSleepIdleMinutes, "60", 15, 1440, ReadDefault, ApplyLive, "Minutes an agent is idle before it is put to sleep."))
+	ownCheck(AutoSleepIdleMinutes)
 	boolOff(RequireAuthOnLoopback, ApplyLive, "Ask for a credential on this computer too.")
 	ownCheck(RequireAuthOnLoopback)
 

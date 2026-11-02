@@ -492,6 +492,10 @@ func classifyAvailability(a *availableAgent, s store.LiveSession, online, subscr
 		// Never a candidate for work: tasks cannot be assigned to an archived agent.
 		a.Availability = "archived"
 		a.Reason = "Agent is archived; unarchive it before assigning work"
+	case s.IsSleeping != 0 && sleepReason(s) == store.SleepReasonIdle && subscribed: // put to sleep for being idle: a task or a message wakes it (#12111)
+		a.Availability = "available"
+		a.Available = true
+		a.Reason = "Agent is auto-asleep: a task or a message wakes it"
 	case s.IsSleeping != 0:
 		a.Availability = "sleeping"
 		a.Reason = "Agent is sleeping"

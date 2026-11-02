@@ -82,6 +82,7 @@ type rosterInputs struct {
 func (m *BoardHealthMonitor) buildRoster(ctx context.Context, in rosterInputs) (*teamhealth.Roster, int) {
 	r := &teamhealth.Roster{Recipient: teamhealth.Name(in.recipient.SubscriberID), Counts: map[string]int{}}
 	sleeping, _ := m.store.SleepingSubscribers(ctx, in.project)
+	autoAsleep, _ := m.store.AutoAsleepSubscribers(ctx, in.project) // available: nothing to flag, a task or message wakes it (#12111)
 	taskByID := map[int64]board.Task{}
 	for _, t := range in.tasks {
 		taskByID[t.ID] = t
@@ -108,6 +109,8 @@ func (m *BoardHealthMonitor) buildRoster(ctx context.Context, in rosterInputs) (
 		case sleeping[sub.SubscriberID]:
 			r.Counts[teamhealth.StateAsleep]++
 			r.SleeperBroadcasts += in.sleepers[sub.SubscriberID].tags.Broadcasts() // what is for a sleeper is an item (sleeperItems); the rest is only counted (#11803)
+		case autoAsleep[sub.SubscriberID]:
+			r.Counts[teamhealth.StateAvailable]++
 		case !live:
 			r.Counts[teamhealth.StateOffline]++
 		default:

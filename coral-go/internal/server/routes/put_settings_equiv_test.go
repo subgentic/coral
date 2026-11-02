@@ -120,6 +120,11 @@ func (h *SystemHandler) putSettingsBefore4599(w http.ResponseWriter, r *http.Req
 		errBadRequest(w, err.Error())
 		return
 	}
+	// Auto-sleep (#12111): a boolean, and whole minutes from 15 to 1440.
+	if err := validateAutoSleepSettings(body); err != nil {
+		errBadRequest(w, err.Error())
+		return
+	}
 	// Resume agents stopped by an API error (#3613): a boolean.
 	if err := validateAutoResumeSetting(body); err != nil {
 		errBadRequest(w, err.Error())

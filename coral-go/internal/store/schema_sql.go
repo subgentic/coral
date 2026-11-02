@@ -16,6 +16,13 @@ CREATE TABLE IF NOT EXISTS agent_ui_events (
 );
 CREATE INDEX IF NOT EXISTS idx_agent_ui_events ON agent_ui_events(session_id,panel_id,id);
 
+CREATE TABLE IF NOT EXISTS auto_sleep_state (
+	session_id TEXT PRIMARY KEY,
+	off        INTEGER NOT NULL DEFAULT 0,
+	slept_at   INTEGER,
+	woken_at   INTEGER
+);
+
 CREATE TABLE IF NOT EXISTS session_meta (
 	session_id   TEXT PRIMARY KEY,
 	notes_md     TEXT DEFAULT '',

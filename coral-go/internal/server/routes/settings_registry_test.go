@@ -80,7 +80,7 @@ var settingRows = map[string]struct{ good, bad string }{
 	"group_order":                 {`"[]"`, `"x"`},
 }
 
-var validatedElsewhere = []string{"agent_priority", "auto_goals", "auto_resume_after_api_error", "auto_wake_after_restart", "auto_wake_cap",
+var validatedElsewhere = []string{"agent_priority", "auto_goals", "auto_resume_after_api_error", "auto_wake_after_restart", "auto_wake_cap", "auto_sleep", "auto_sleep_idle_minutes",
 	"require_auth_on_loopback", "artifact_store_max_bytes", "artifact_retention_days", "artifact_retention_kinds",
 	"received_artifacts_max_bytes", "received_cap_notice_ack",
 	"hub_limit_global", "hub_limit_long", "hub_limit_search"}
