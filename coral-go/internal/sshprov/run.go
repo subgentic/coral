@@ -140,7 +140,7 @@ var specs = map[Command]spec{
 	CmdUnpack: {template: "umask 077 && cd \"$HOME/" + InstallDir + "/%[1]s\" && rm -f package.sha256 && rm -rf root && mkdir root && tar -xzf package.tar.gz --no-same-owner -C root && " +
 		"{ sha256sum package.tar.gz 2>/dev/null || shasum -a 256 package.tar.gz; } | cut -d' ' -f1 > package.sha256", args: []*regexp.Regexp{versionRe}, timeout: 5 * time.Minute},
 	CmdDownload: {template: "command -v curl >/dev/null 2>&1 || exit 6; umask 077 && cd \"$HOME/" + InstallDir + "/%[1]s\" && rm -f package.tar.gz && " +
-		"{ curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --max-redirs 3 --max-filesize 314572800 --connect-timeout 20 -o package.tar.gz " +
+		"{ curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --max-redirs 3 --max-filesize 314572800 --connect-timeout 20 --retry 2 --retry-delay 3 --speed-limit 20480 --speed-time 30 --max-time 540 -o package.tar.gz " +
 		"\"https://github.com/subgentic/coral/releases/download/v%[1]s/coral-linux-%[2]s-%[1]s.tar.gz\" || { rm -f package.tar.gz; exit 4; }; } && " +
 		"got=$({ sha256sum package.tar.gz 2>/dev/null || shasum -a 256 package.tar.gz; } | cut -d' ' -f1) && { [ \"$got\" = '%[3]s' ] || { rm -f package.tar.gz; exit 5; }; }",
 		args: []*regexp.Regexp{versionRe, archRe, sha256Re}, timeout: 10 * time.Minute},
