@@ -267,6 +267,7 @@ func runMachine(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		if !canConfirmLookup(stdin, *tokenFile, *keyFile) { // the lookup tells a third party this computer's address: with no terminal to see and confirm that, the person names the address (Security, #9934)
 			return fail("no terminal to confirm the address lookup, so SSH's source address is needed: pass --allow-ssh-from ADDRESS")
 		}
+		fmt.Fprintf(stderr, "Asking %s for this computer's address ...\n", publicIPHost()) // said before the request, so --yes is not silent about it (coral-go's Security)
 		var derr error
 		if source, derr = detectSSHSource(ctx); derr != nil {
 			return fail("%v", derr)

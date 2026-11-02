@@ -269,7 +269,7 @@ func sshFromWords(v string) string {
 	if v == "" {
 		return "the address of this computer"
 	}
-	return v
+	return SSHRule(v) // the rule exactly: address, prefix and how many addresses it opens
 }
 
 // sshLookupWords says where the SSH address came from when the person did not give it.

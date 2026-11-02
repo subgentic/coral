@@ -47,36 +47,15 @@ var (
 // lookupBodyMax is the most the answer may be (an address is at most 45 bytes): a longer body is refused, not cut.
 const lookupBodyMax = 64
 
-// reservedLookupPrefixes are address ranges that are never this computer's public address, over and above what net/netip names (private, loopback, link-local, multicast, unspecified).
-var reservedLookupPrefixes = func() []netip.Prefix {
-	var out []netip.Prefix
-	for _, p := range []string{
-		"0.0.0.0/8", "100.64.0.0/10", "192.0.0.0/24", "192.0.2.0/24", "198.18.0.0/15", "198.51.100.0/24", "203.0.113.0/24", "240.0.0.0/4",
-		"64:ff9b::/96", "100::/64", "2001::/32", "2001:db8::/32", "2002::/16",
-	} {
-		out = append(out, netip.MustParsePrefix(p))
-	}
-	return out
-}()
-
 // parsePublicLookupAnswer is what the lookup's answer must be: ONE public IPv4 or IPv6 literal and nothing else (no CIDR, no zone, no port, no private, loopback, link-local, multicast, unspecified or reserved address). It
 // returns the address in its canonical form, to be used as a single-address rule, never a range (Security's ruling, #9934).
 func parsePublicLookupAnswer(body string) (string, error) {
 	bad := fmt.Errorf("the lookup answered with something that is not one public address: pass --allow-ssh-from ADDRESS")
 	a, err := netip.ParseAddr(strings.TrimSpace(body))
-	if err != nil || a.Zone() != "" {
+	if err != nil || a.Zone() != "" || !machinelaunch.IsPublicSource(a) {
 		return "", bad
 	}
-	a = a.Unmap()
-	if a.IsPrivate() || a.IsLoopback() || a.IsLinkLocalUnicast() || a.IsLinkLocalMulticast() || a.IsInterfaceLocalMulticast() || a.IsMulticast() || a.IsUnspecified() || !a.IsGlobalUnicast() {
-		return "", bad
-	}
-	for _, p := range reservedLookupPrefixes {
-		if p.Contains(a) {
-			return "", bad
-		}
-	}
-	return a.String(), nil
+	return a.Unmap().String(), nil
 }
 
 // detectSSHSource is the address SSH on the machine should accept: this computer's, asked of a third-party service over HTTPS (certificate checks as usual, no redirect, a short timeout, a size cap). Any failure or odd

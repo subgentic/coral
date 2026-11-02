@@ -221,7 +221,7 @@ func TestCreateNetworkMakesTheVPCThenTheFirewallWithTheLaunchTag(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{"CreateVPC:coral-vpc-m1", "CreateFirewall:coral-fw-m1:ssh=203.0.113.7/32"}, f.calls, "the VPC first, then the firewall that allows SSH from the one address")
 	assert.Equal(t, "coral-launch-0123456789ab", n.Firewall.Tag)
-	assert.Contains(t, out.String(), "SSH is open to 203.0.113.7/32 only")
+	assert.Contains(t, out.String(), "SSH is open to 203.0.113.7/32 (1 address) only")
 }
 
 func TestCreateNetworkRemovesTheVPCWhenTheFirewallFails(t *testing.T) {

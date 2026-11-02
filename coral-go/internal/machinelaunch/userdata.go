@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/ed25519"
 	"fmt"
-	"net"
 	"regexp"
 	"strings"
 
@@ -258,9 +257,6 @@ func BuildUserData(spec UserDataSpec) (string, error) {
 // clientKeyOptions limits the launch key to a session: nothing forwarded, nothing tunnelled (Security's condition E on #10917).
 const clientKeyOptions = "no-port-forwarding,no-agent-forwarding,no-X11-forwarding"
 
-// ValidSSHSource checks an address for SSH to be opened to (one IP or CIDR, never every address) and returns it canonical: for the command to refuse a bad --allow-ssh-from before anything is read or made.
-func ValidSSHSource(v string) (string, error) { return canonicalSSHSource(v) }
-
 // canonicalHostKey checks the host key pair is one ed25519 OpenSSH private key with no passphrase and the public line of that same key, and returns the PEM and the canonical public line.
 func canonicalHostKey(privPEM, pubLine string) (string, string, error) {
 	if strings.TrimSpace(privPEM) == "" || strings.TrimSpace(pubLine) == "" {
@@ -288,28 +284,6 @@ func canonicalHostKey(privPEM, pubLine string) (string, string, error) {
 		return "", "", fmt.Errorf("the launch's SSH host public key is not the public half of its private key")
 	}
 	return string(marshalHostKey(priv)), strings.TrimSpace(string(ssh.MarshalAuthorizedKey(signerPub))), nil
-}
-
-// canonicalSSHSource checks the address SSH may be reached from is one IP or one CIDR (never "any", and nothing that could be shell) and returns it in its canonical form.
-func canonicalSSHSource(v string) (string, error) {
-	v = strings.TrimSpace(v)
-	if v == "" {
-		return "", fmt.Errorf("the address the launcher reaches SSH from is needed (--allow-ssh-from)")
-	}
-	if ip := net.ParseIP(v); ip != nil {
-		if ip.IsUnspecified() {
-			return "", fmt.Errorf("the SSH source address is not an address")
-		}
-		return ip.String(), nil
-	}
-	ip, n, err := net.ParseCIDR(v)
-	if err != nil || ip.IsUnspecified() {
-		return "", fmt.Errorf("the SSH source %q is not an IP address or a CIDR", v)
-	}
-	if ones, _ := n.Mask.Size(); ones == 0 {
-		return "", fmt.Errorf("the SSH source %q would be every address", v)
-	}
-	return n.String(), nil
 }
 
 // canonicalClientKey checks the launch's SSH public key is one ed25519 key and nothing else (no options, no second line, no comment to carry anything) and returns it in its one canonical form.

@@ -229,7 +229,7 @@ func TestMachineLaunchBuildsTheRealUserDataWithNoCredential(t *testing.T) {
 	var out, errb bytes.Buffer
 	pin := "agy@sha256:" + strings.Repeat("ab", 32)
 	code := runMachine([]string{"launch", "--provider", "digitalocean", "--token-file", tf, "--hub-key-file", kf, "--hub-url", "https://hub.example", "--coral-version", "2.0.3",
-		"--agents", "claude@2.1.0," + pin, "--allow-ssh-from", "198.51.100.7", "--yes"}, strings.NewReader(""), &out, &errb)
+		"--agents", "claude@2.1.0," + pin, "--allow-ssh-from", "9.9.9.9", "--yes"}, strings.NewReader(""), &out, &errb)
 	if code != 0 {
 		t.Fatalf("exit %d: %s / %s", code, out.String(), errb.String())
 	}
@@ -244,7 +244,7 @@ func TestMachineLaunchBuildsTheRealUserDataWithNoCredential(t *testing.T) {
 			t.Fatalf("the user-data holds %s", secret)
 		}
 	}
-	if !strings.Contains(p.spec.UserData, "from, '198.51.100.7', to, any, port, '22'") || !strings.Contains(p.spec.UserData, "ssh-ed25519 ") {
+	if !strings.Contains(p.spec.UserData, "from, '9.9.9.9', to, any, port, '22'") || !strings.Contains(p.spec.UserData, "ssh-ed25519 ") {
 		t.Fatalf("the user-data names the SSH source and carries the login key:\n%s", p.spec.UserData)
 	}
 	if !strings.Contains(out.String(), "single-use SSH host key") {
@@ -369,7 +369,7 @@ func TestMachineLaunchSaysWhereTheSSHAddressCameFrom(t *testing.T) {
 	}
 	out.Reset()
 	errb.Reset()
-	if code := runMachine(append(append([]string{}, base...), "--allow-ssh-from", "198.51.100.7"), strings.NewReader(""), &out, &errb); code != 0 || strings.Contains(out.String(), "looked up") {
+	if code := runMachine(append(append([]string{}, base...), "--allow-ssh-from", "9.9.9.9"), strings.NewReader(""), &out, &errb); code != 0 || strings.Contains(out.String(), "looked up") {
 		t.Fatalf("exit %d: %s / %s", code, out.String(), errb.String())
 	}
 }
@@ -377,7 +377,7 @@ func TestMachineLaunchSaysWhereTheSSHAddressCameFrom(t *testing.T) {
 // --allow-ssh-from is checked before anything is read or made: an address that is every address, or not an address, is refused.
 func TestMachineLaunchRefusesABadSSHSourceBeforeAnyCall(t *testing.T) {
 	tf, kf, p, h := machineFixture(t)
-	for _, bad := range []string{"0.0.0.0", "0.0.0.0/0", "example.com", "1.2.3.4; reboot"} {
+	for _, bad := range []string{"0.0.0.0", "0.0.0.0/0", "::/0", "example.com", "1.2.3.4; reboot", "9.9.9.0/23", "9.9.9.5/24", "9.9.9.1,9.9.9.2", "9.9.9.1 9.9.9.2", "10.0.0.0/24", "127.0.0.1", "192.168.1.1", "", "2606:4700::/47"} {
 		var out, errb bytes.Buffer
 		code := runMachine([]string{"launch", "--provider", "digitalocean", "--token-file", tf, "--hub-key-file", kf, "--hub-url", "https://hub.example", "--coral-version", "2.0.3", "--allow-ssh-from", bad, "--yes"}, strings.NewReader(""), &out, &errb)
 		if code != 2 {
@@ -416,7 +416,7 @@ func TestMachineLaunchWithoutATerminalRefusesTheLookup(t *testing.T) {
 		t.Fatalf("exit %d: %s, calls %v", code, errb.String(), p.calls)
 	}
 	// with the address named, no terminal is needed and the lookup is still not made
-	code = runMachine([]string{"launch", "--provider", "digitalocean", "--token-file", tf, "--hub-key-file", kf, "--hub-url", "https://hub.example", "--coral-version", "2.0.3", "--allow-ssh-from", "203.0.113.5", "--yes"}, strings.NewReader(""), &out, &errb)
+	code = runMachine([]string{"launch", "--provider", "digitalocean", "--token-file", tf, "--hub-key-file", kf, "--hub-url", "https://hub.example", "--coral-version", "2.0.3", "--allow-ssh-from", "9.9.9.9", "--yes"}, strings.NewReader(""), &out, &errb)
 	if code != 0 {
 		t.Fatalf("exit %d: %s / %s", code, out.String(), errb.String())
 	}

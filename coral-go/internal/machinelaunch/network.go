@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/netip"
-	"strings"
 )
 
 // Network isolation (#10918, coral-hub's request 2): each launch makes its own VPC and its own cloud firewall, and removes them again with the machine. The firewall lets SSH in from the one address
@@ -66,29 +64,14 @@ const (
 func VPCName(machine string) string      { return VPCPrefix + machine }
 func FirewallName(machine string) string { return FirewallPrefix + machine }
 
-// firewallSource checks an address the cloud firewall opens SSH to: the same one-address-or-prefix check the user-data builder makes (ValidSSHSource, which returns it canonical), and not a loopback,
-// multicast or unspecified address, which could never be the one the credential is delivered from.
+// firewallSource checks an address the cloud firewall opens SSH to: the same strict one-address-or-range check as the user-data (canonicalSSHSource), so the firewall can never be wider than the floor, even if a caller skipped
+// the command's check.
 func firewallSource(s string) (string, error) {
-	c, err := ValidSSHSource(s)
+	c, err := canonicalSSHSource(s)
 	if err != nil {
 		return "", err
 	}
-	var p netip.Prefix
-	if strings.Contains(c, "/") {
-		p, err = netip.ParsePrefix(c)
-	} else {
-		var a netip.Addr
-		if a, err = netip.ParseAddr(c); err == nil {
-			p = netip.PrefixFrom(a, a.BitLen())
-		}
-	}
-	if err != nil {
-		return "", fmt.Errorf("%q is not an address or a prefix", s)
-	}
-	if p.Bits() == 0 {
-		return "", fmt.Errorf("%q is every address: SSH is opened to one address, not to the world", s)
-	}
-	if a := p.Addr(); a.IsLoopback() || a.IsUnspecified() || a.IsMulticast() {
+	if p, _ := parseSSHSource(c); p.Addr().IsLoopback() || p.Addr().IsMulticast() {
 		return "", fmt.Errorf("%q cannot be the address the credential is delivered from", s)
 	}
 	return c, nil
