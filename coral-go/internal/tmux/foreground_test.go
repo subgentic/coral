@@ -295,3 +295,23 @@ func TestAgentShellIdleANestedBashIsABarePrompt(t *testing.T) {
 	assert.Equal(t, "bash", nested)
 	require.NoError(t, c.SendRawKeys(ctx, terminalinput.Unclassified, name, []string{"C-c"}, "claude", sid))
 }
+
+// The refusal's log line draws what is below the pane's shell, names and states only (#12222): a shell started below the pane's shell, with the program under it, shows as such; a pid that is not there is "".
+func TestShellTreeDrawsNamesAndStatesOnly(t *testing.T) {
+	tab := &procTable{byPID: map[int]procEntry{
+		100: {ppid: 1, stat: "Ss", comm: "bash"},
+		101: {ppid: 100, stat: "S+", comm: "bash"},
+		102: {ppid: 101, stat: "Sl+", comm: "node"},
+		103: {ppid: 100, stat: "S", comm: "sleep"},
+	}, children: map[int][]int{100: {101, 103}, 101: {102}}}
+	assert.Equal(t, "bash(Ss){bash(S+){node(Sl+)} sleep(S)}", shellTree(tab, 100))
+	assert.Equal(t, "", shellTree(tab, 999), "a pid that is not there")
+	loop := &procTable{byPID: map[int]procEntry{5: {ppid: 6, stat: "S", comm: "a"}, 6: {ppid: 5, stat: "S", comm: "b"}}, children: map[int][]int{5: {6}, 6: {5}}}
+	assert.NotPanics(t, func() { _ = shellTree(loop, 5) }, "a loop is walked once")
+	many := &procTable{byPID: map[int]procEntry{1: {comm: "sh", stat: "S"}}, children: map[int][]int{}}
+	for i := 2; i < 40; i++ {
+		many.byPID[i] = procEntry{ppid: 1, comm: "x", stat: "S"}
+		many.children[1] = append(many.children[1], i)
+	}
+	assert.True(t, strings.HasSuffix(shellTree(many, 1), " ..."), "a wide tree is cut")
+}

@@ -2,6 +2,7 @@ package ptymanager
 
 import (
 	"context"
+	"log/slog"
 
 	at "github.com/subgentic/coral/internal/agenttypes"
 	"github.com/subgentic/coral/internal/logparse"
@@ -112,6 +113,7 @@ func AgentExitedForLaunch(ctx context.Context, term any, name, agentType, sessio
 		return false, fg, ""
 	}
 	if sh := UnknownShell(ctx, term, name, agentType, sessionID); sh != "" {
+		slog.Info("[terminal] a launch line was refused: a shell of unknown contents is in the terminal", "session", name, "shell", sh, "tree", shellTreeOf(ctx, term, name, agentType, sessionID)) // the process names and states only, so the next one can be told apart (#12222)
 		return false, sh, UnknownShellRefusal(sh)
 	}
 	return true, fg, ""
@@ -124,4 +126,34 @@ func (t *TmuxSessionTerminal) AgentUnknownShell(ctx context.Context, name, agent
 		return "", false
 	}
 	return sh, true
+}
+
+// ShellTreeReporter is implemented by terminals that can draw what is running below an agent's shell, for the log (tmux.ShellTreeOf).
+type ShellTreeReporter interface {
+	AgentShellTree(ctx context.Context, name, agentType, sessionID string) string
+}
+
+func shellTreeOf(ctx context.Context, term any, name, agentType, sessionID string) string {
+	if c, ok := term.(ShellTreeReporter); ok {
+		return c.AgentShellTree(ctx, name, agentType, sessionID)
+	}
+	return ""
+}
+
+// AgentShellTree implements ShellTreeReporter for tmux.
+func (t *TmuxSessionTerminal) AgentShellTree(ctx context.Context, name, agentType, sessionID string) string {
+	tree, err := t.client.ShellTree(ctx, name, agentType, sessionID)
+	if err != nil {
+		return ""
+	}
+	return tree
+}
+
+// AgentShellTree implements ShellTreeReporter for the PTY backend.
+func (p *PTYSessionTerminal) AgentShellTree(_ context.Context, name, _, sessionID string) string {
+	key, err := p.keyFor(name, sessionID)
+	if err != nil {
+		return ""
+	}
+	return p.backend.ShellTree(key)
 }
