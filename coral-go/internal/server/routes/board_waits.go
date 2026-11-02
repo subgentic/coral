@@ -327,8 +327,10 @@ func (h *BoardHandler) postKeptQuestion(ctx context.Context, project string, old
 // askQuestionText is an ask's question without the @Operator it opens with and without the "earlier question" frame this file adds: what two asks are compared by (a whole question, never a part of one).
 func askQuestionText(content string) string {
 	t := strings.TrimSpace(content)
-	t = strings.TrimSpace(strings.TrimPrefix(t, "@"+board.OperatorName))
-	t = strings.TrimSpace(strings.TrimPrefix(t, "(an earlier question, still open)"))
+	if i := strings.Index(strings.ToLower(t), "@"+strings.ToLower(board.OperatorName)); i >= 0 {
+		t = t[i+len("@"+board.OperatorName):] // what follows the @Operator: a teammate named before it is not part of the question
+	}
+	t = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(t), "(an earlier question, still open)"))
 	return strings.TrimSpace(t)
 }
 

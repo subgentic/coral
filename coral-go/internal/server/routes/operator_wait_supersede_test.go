@@ -268,3 +268,27 @@ func TestAnExpiredQuestionNobodyNoticedYetSurvivesTheNextWaitAndTheAgentWorking(
 		})
 	}
 }
+
+// #11930 (4): an agent's ask often names a teammate first ("@Dev @Operator should we ship?"). It is the same question as the wait's "should we ship?": equality looks at what follows the @Operator, so it is not kept twice.
+func TestAnAskThatNamesATeammateFirstIsTheSameQuestionAsTheWait(t *testing.T) {
+	h, bs := operatorAsksRig(t)
+	ctx := context.Background()
+	_, err := bs.Subscribe(ctx, "team", "Lead", "Orchestrator", "claude-lead", nil, "all")
+	require.NoError(t, err)
+	_, err = bs.Subscribe(ctx, "team", "Dev", "Developer", "claude-dev", nil, "all")
+	require.NoError(t, err)
+	q, err := bs.PostMessage(ctx, "team", "Lead", "@Dev @Operator should we ship?", nil)
+	require.NoError(t, err)
+	require.NoError(t, bs.RecordAsk(ctx, "team", q, []string{"Operator"}))
+	post := func(body string) {
+		req := httptest.NewRequest(http.MethodPost, "/api/board/team/waits", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		h.RegisterWait(w, dropAt2(asPerson(req), map[string]string{"project": "team"}))
+		require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+	}
+	post(`{"subscriber_id":"Lead","wait_type":"operator","reason":"should we ship?"}`)
+	post(`{"subscriber_id":"Lead","wait_type":"message","target_id":"Dev","reason":"on Dev"}`)
+	_, rows, _ := readOperatorAsks(t, h, asPerson)
+	assert.Len(t, rows, 1, "the ask that named Dev first is the question: no copy was kept")
+}
