@@ -243,6 +243,7 @@ var writeRoutesWithoutTheGuard = map[string]string{
 	"POST /api/sessions/live/wake-all":                                     "a control: no text is kept",
 	"POST /api/sessions/live/{name}/answer-prompt":                         "input typed into an agent's terminal: it goes to the agent, not kept for others to read",
 	"POST /api/sessions/live/{name}/dismiss-wait":                          "ids only (session_id, agent_type): no text is kept",
+	"POST /api/sessions/live/{name}/auto-sleep":                            "ids and one boolean (session_id, agent_type, off): no text is kept (#12111)",
 	"POST /api/sessions/live/{name}/attach":                                "a control: no text is kept",
 	"POST /api/sessions/live/{name}/auto-accept/disable":                   "a control: no text is kept",
 	"POST /api/sessions/live/{name}/auto-accept/enable":                    "a control: no text is kept",

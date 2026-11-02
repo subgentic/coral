@@ -24,6 +24,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/consoletest"
 	"github.com/subgentic/coral/internal/httputil"
 	"github.com/subgentic/coral/internal/license"
 	"github.com/subgentic/coral/internal/safego"
@@ -724,7 +725,7 @@ func TestProvisionForgetKeyRemovesTheSavedKeyAndStartsOver(t *testing.T) {
 	pe := newProvEnv(t, "changed", "Linux x86_64", true)
 	gen := func() []string {
 		key := filepath.Join(t.TempDir(), "k")
-		out, gerr := exec.Command(keygen, "-q", "-t", "ed25519", "-N", "", "-f", key).CombinedOutput()
+		out, gerr := consoletest.HiddenCommand(keygen, "-q", "-t", "ed25519", "-N", "", "-f", key).CombinedOutput()
 		require.NoError(t, gerr, string(out))
 		pub, _ := os.ReadFile(key + ".pub")
 		return strings.Fields(string(pub))

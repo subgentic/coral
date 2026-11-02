@@ -36,7 +36,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
         await waitFor(`!![...document.querySelectorAll('${T} tbody tr')].find(r => r.textContent.includes('Review file.txt'))`, 'the review row', 15000);
         await ev(`[...document.querySelectorAll('${T} tbody tr')].find(r => r.textContent.includes('Review file.txt')).querySelector('.inbox-review-name').click(); true`);
-        await waitFor(`!!document.querySelector('.artifact-review:not([hidden]) .artifact-review-changes:not([hidden])')`, 'Request changes in the viewer', 8000);
+        await waitFor(`!!document.querySelector('.artifact-review-changes:not([hidden])')`, 'Request changes in the viewer', 8000);
         await ev(`document.querySelector('.artifact-review-changes').click(); true`);
         await waitFor(`!document.querySelector('.artifact-review-form').hidden`, 'the form', 4000);
         const form = await ev(`(() => { const f = document.querySelector('.artifact-review-form'); return { add: !!f.querySelector('.ac-add-image'), hint: (f.querySelector('.ac-images-hint') || {}).textContent || '', tray: !!f.querySelector('.ac-images') }; })()`);
