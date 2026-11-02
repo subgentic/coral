@@ -70,7 +70,7 @@ func (pr *Provisioner) planManage(w http.ResponseWriter, r *http.Request, req pl
 	pr.mu.Lock()
 	pr.expireLocked()
 	for _, o := range pr.plans {
-		if o.ServerID == row.ID {
+		if o.ServerID == row.ID && !o.finished() { // a plan that is Done holds nothing: the next one starts at once (#12263)
 			pr.mu.Unlock()
 			errConflict(w, "something is already in progress for that server")
 			return
@@ -124,6 +124,16 @@ func (pr *Provisioner) runPlan(ctx context.Context, p *provisionPlan) {
 	case kindRemove:
 		pr.removeSteps(ctx, p)
 	}
+}
+
+// removeRefusedExit is CmdRemoveAll's exit when the folder is a link or not a Coral's (sshprov): nothing was deleted.
+const removeRefusedExit = 7
+
+// finished is whether the plan has reached Done: it no longer holds its server's lock.
+func (p *provisionPlan) finished() bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.phase == phaseDone
 }
 
 func (pr *Provisioner) done(p *provisionPlan) {
@@ -187,7 +197,12 @@ func (pr *Provisioner) removeSteps(ctx context.Context, p *provisionPlan) {
 	if p.Delete {
 		cmd, detail = sshprov.CmdRemoveAll, "Everything under ~/"+sshprov.InstallDir+" is deleted, including the data."
 	}
-	if r, err := pr.runner.Run(ctx, p.Target, cmd); err != nil || r.ExitCode != 0 {
+	r, err := pr.runner.Run(ctx, p.Target, cmd)
+	if err == nil && r.ExitCode == removeRefusedExit {
+		pr.fail(p, "remove", "The install folder on that computer is a link, or is not a Coral install folder, so nothing was deleted. Look at it there.")
+		return
+	}
+	if err != nil || r.ExitCode != 0 {
 		pr.fail(p, "remove", "Could not delete the files on that computer.")
 		return
 	}

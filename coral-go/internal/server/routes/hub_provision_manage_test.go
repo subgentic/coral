@@ -2,6 +2,7 @@ package routes
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -405,5 +406,55 @@ func TestManageUpgradePlanSaysWhetherTheAgentsSurviveTheRestart(t *testing.T) {
 		_, v = me.do("POST", "/api/servers/provision/"+plan+"/connect", nil)
 		require.Equal(t, "connected", v["phase"], "%s: %v", name, v)
 		assert.Equal(t, c.want, v["agents_survive"], name)
+	}
+}
+
+// #12263: a plan that is Done holds nothing: the next Upgrade, Stop or Remove for that server starts at once, with no hub restart and no Close. One that is still going holds the server (409).
+func TestAFinishedPlanDoesNotHoldTheServersLock(t *testing.T) {
+	me := newManageEnv(t)
+	_, v := me.plan(t, "stop", nil)
+	first := v["plan"].(string)
+	code, _ := me.plan(t, "upgrade", nil)
+	assert.Equal(t, 409, code, "a plan that has not run holds the server")
+	me.connectAndRun(t, first, map[string]any{}, 202)
+	me.waitPhase(t, first, "done")
+	code, v = me.plan(t, "upgrade", nil)
+	require.Equal(t, 201, code, "a Done plan is not in the way: %v", v)
+	assert.Equal(t, "upgrade", v["kind"])
+	code, _ = me.plan(t, "stop", nil)
+	assert.Equal(t, 409, code, "and the new one holds it in its turn")
+}
+
+// #12263 (Security): deleting the data never removes a link or a folder that is not a Coral's: the step fails in its own words, nothing is deleted, and the server stays on the hub's list.
+func TestManageRemoveWithDataRefusesAFolderThatIsALinkOrNotOurs(t *testing.T) {
+	for name, c := range map[string]struct {
+		setup func(me *manageEnv) string
+		said  string
+	}{
+		"a link": {func(me *manageEnv) string {
+			install := filepath.Join(me.home, ".coral-server")
+			target := filepath.Join(me.home, "elsewhere")
+			require.NoError(t, os.Rename(install, target))
+			require.NoError(t, os.Symlink(target, install))
+			return filepath.Join(target, "data", "api_key")
+		}, "nothing was deleted"},
+		// with no instance id the identity check stops the plan before anything is stopped or deleted; the guard in the command itself is sshprov's own test
+		"a folder with no instance id": {func(me *manageEnv) string {
+			require.NoError(t, os.Remove(filepath.Join(me.home, ".coral-server", "instance-id")))
+			return filepath.Join(me.home, ".coral-server", "data", "api_key")
+		}, "nothing was changed"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			me := newManageEnv(t)
+			kept := c.setup(me)
+			_, v := me.plan(t, "remove", map[string]any{"delete_data": true})
+			plan := v["plan"].(string)
+			me.connectAndRun(t, plan, map[string]any{"confirm": "ssh-box"}, 202)
+			failed := me.waitPhase(t, plan, "failed")
+			assert.Contains(t, fmt.Sprint(failed["steps"]), c.said, "its own words, not the CLI's")
+			assert.True(t, farHas(kept), "the data is still there")
+			_, err := me.e.h.store.Get(context.Background(), "ssh-box")
+			assert.NoError(t, err, "and the server is still on the list")
+		})
 	}
 }

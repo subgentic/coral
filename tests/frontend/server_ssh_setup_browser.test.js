@@ -100,6 +100,15 @@ const HUB = `(() => {
             await shot(`ssh-page-${label}`);
             await ev(`document.querySelector('[data-action="ssh-remove"]').click(); true`);
             await waitFor(`!!${btn('Connect')}`, 'the remove plan', 8000);
+            // what happens to the data is a choice on the plan (#12263): kept by default, and deleted only when ticked
+            check(`${label}: Remove offers "also delete its data", unticked, and the plan keeps it`, await ev(`(() => { const c = document.getElementById('ssh-delete-data'); return !!c && c.checked === false && !document.querySelector('.ssh-delete-warning') && /Kept/.test(document.querySelector('.servers-facts').textContent) && !window.__hub.plans.at(-1).delete_data; })()`));
+            const plansBefore = await ev(`window.__hub.plans.length`);
+            await ev(`document.getElementById('ssh-delete-data').click(); true`);
+            await waitFor(`window.__hub.plans.length === ${plansBefore} + 1 && !!document.querySelector('.ssh-delete-warning')`, 'the plan with the data deleted', 8000);
+            check(`${label}: ticking it makes a new plan that says the data goes, and the page says what is deleted`, await ev(`window.__hub.plans.at(-1).delete_data === true && /Deleted too/.test(document.querySelector('.servers-facts').textContent) && document.getElementById('ssh-delete-data').checked === true && /cannot be undone/.test(document.querySelector('.ssh-delete-warning').textContent)`));
+            await ev(`document.getElementById('ssh-delete-data').click(); true`);
+            await waitFor(`window.__hub.plans.length === ${plansBefore} + 2 && !document.querySelector('.ssh-delete-warning')`, 'the plan with the data kept again', 8000);
+            check(`${label}: unticking it keeps the data again`, await ev(`!window.__hub.plans.at(-1).delete_data && /Kept/.test(document.querySelector('.servers-facts').textContent)`));
             await ev(`${btn('Connect')}.click(); true`);
             await waitFor(`!!document.getElementById('ssh-typed')`, 'the remove confirm', 8000); await settle(200);
             check(`${label}: Remove is disabled until the name is typed, and no terms are shown`, await ev(`${btn('Remove')}.disabled === true && !document.querySelector('.ssh-terms')`));
