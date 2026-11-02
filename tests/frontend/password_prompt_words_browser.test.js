@@ -27,6 +27,12 @@ const { coralReady } = require('./helpers/wait');
             if (mobile) assert.ok(d.buttons.every(b => b.h >= 44), `${w}: 44 px targets: ${JSON.stringify(d.buttons)}`);
             await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); true`);
             assert.equal(await ev(`!!document.getElementById('set-password-modal')`), true, `${w}: Escape does not close it`);
+            for (const focusSel of ['#set-password-new', '#set-password-save', 'body']) {
+                await ev(`(${JSON.stringify(focusSel)} === 'body' ? document.activeElement?.blur() : document.querySelector(${JSON.stringify(focusSel)}).focus()); true`);
+                await client.Input.dispatchKeyEvent({ type: 'rawKeyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }); await client.Input.dispatchKeyEvent({ type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
+                await new Promise(r => setTimeout(r, 300)); // sleep-ok: a close, if there were one, runs within a frame or two
+                assert.deepEqual(await ev(`(() => { const m = document.getElementById('set-password-modal'); return m ? { there: true, display: getComputedStyle(m).display, vis: m.getClientRects().length > 0 } : { there: false }; })()`), { there: true, display: 'flex', vis: true }, `${w} real Escape with focus on ${focusSel}`);
+            }
         }
         console.log('PASS the first-run password dialog: plain words, no way past it, one primary action');
     } finally { await client.close(); }
