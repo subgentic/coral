@@ -8,7 +8,7 @@
 //   R6 kept widths: widths saved from an earlier visit never make the table overflow.
 //   R7 the same for every row mix (the caller runs the mixes) and at 200% text.
 //   R8 a phone (under 600 px): folded rows, no handles, no sideways scroll.
-//   R9 a row's action buttons sit in the Actions column only, never inside another column (the operator's Dismiss inside Waiting for); a control marked data-display-control (a chart legend's line toggle) is not a row action.
+//   R9 a row's action buttons sit in the Actions column only, never inside another column (the operator's Dismiss inside Waiting for); a control marked data-display-control (a chart legend's line toggle) and an agent's name link (.agent-link) are not row actions.
 // folded below means the header row is not drawn (the class dt-fold-column names the mode, not the state), or the table is a one-line table (dt-one-line: the phone form of a table with no folded second line, #11943)
 const AUDIT = `(box) => {
   const vis = e => !!e && e.getClientRects().length > 0 && e.getBoundingClientRect().width > 0;
@@ -23,7 +23,7 @@ const AUDIT = `(box) => {
   }).filter(c => c.w > 0);
   const b = box.getBoundingClientRect(), tb = box.querySelector('table.dt-table'), tr = tb ? tb.getBoundingClientRect() : b;
   const sc = document.scrollingElement;
-  const buttons = [...box.querySelectorAll('tbody tr.dt-row td button, tbody tr.dt-row td a.btn')].filter(x => !x.closest('[data-display-control]') /* a display control (a chart legend's line toggle) is not a row action */ && !x.classList.contains('dt-primary') && !x.classList.contains('dt-link') && !x.classList.contains('dt-star') && !x.closest('.dt-check-hit') && x.getClientRects().length > 0 && x.closest('td'))
+  const buttons = [...box.querySelectorAll('tbody tr.dt-row td button, tbody tr.dt-row td a.btn')].filter(x => !x.closest('[data-display-control]') /* a display control (a chart legend's line toggle) is not a row action */ && !x.classList.contains('agent-link') /* an agent's name opens that agent's chat: navigation, like the row's own link, not a row action (#12168) */ && !x.classList.contains('dt-primary') && !x.classList.contains('dt-link') && !x.classList.contains('dt-star') && !x.closest('.dt-check-hit') && x.getClientRects().length > 0 && x.closest('td'))
     .map(x => ({ key: x.closest('td').dataset.key || '', text: (x.getAttribute('aria-label') || x.textContent).replace(/\\s+/g, ' ').trim().slice(0, 40) }));
   return { buttons, actionKeys: cols.filter(c => c.key === 'actions' || /^actions?$/i.test(c.label)).map(c => c.key), folded: !box.querySelector('thead') || box.querySelector('thead').getClientRects().length === 0 || /dt-folded|dt-one-line/.test(box.className), panelW: Math.round(b.width), tableW: Math.round(tr.width), boxOver: box.scrollWidth - box.clientWidth, tableOver: Math.round(tr.right - b.right), pageOver: sc.scrollWidth - innerWidth, vw: innerWidth, rows: box.querySelectorAll('tbody tr.dt-row').length, cols };
 }`;
