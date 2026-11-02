@@ -232,17 +232,20 @@ func (h *SessionsHandler) parkedWait(ctx context.Context, ls *store.LiveSession,
 	if err != nil {
 		return false
 	}
-	events, err := h.ts.GetSessionStateEvents(ctx, []string{ls.SessionID})
+	events, err := h.ts.ListAgentEvents(ctx, "", 500, &ls.SessionID) // newest first, the whole history and not the state's last turn: the wait's turn has ended by now
 	if err != nil {
 		return false
 	}
-	for _, ev := range events[ls.SessionID] {
-		if ev.EventType != "tool_use" && ev.EventType != "prompt_submit" {
-			continue
-		}
+	for _, ev := range events {
 		at, err := time.Parse(time.RFC3339Nano, ev.CreatedAt)
-		if err != nil || at.After(made.Add(waitCommandSlack)) {
-			return false // unreadable or later: it did something after it started waiting
+		if err != nil {
+			return false
+		}
+		if !at.After(made.Add(waitCommandSlack)) {
+			break // as old as the wait: the rest is before it
+		}
+		if ev.EventType == "tool_use" || ev.EventType == "prompt_submit" {
+			return false // it did something after it started waiting
 		}
 	}
 	return true

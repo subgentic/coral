@@ -154,8 +154,13 @@ func TestAWaitIsTheOneShellOnlyWhileNothingRanAfterIt(t *testing.T) {
 			r.term.screen = oneShell
 			_, err := r.h.bs.RegisterWait(r.ctx, "autosleep", "dev", r.name, "message", "", "waiting for a message", 10*time.Hour)
 			require.NoError(t, err)
-			_, err = r.h.ts.InsertAgentEvent(r.ctx, &store.AgentEvent{AgentName: "dev", SessionID: &r.sid, EventType: tc.later, CreatedAt: time.Now().Add(time.Minute).UTC().Format(time.RFC3339Nano)})
+			at := func(d time.Duration) string { return time.Now().Add(d).UTC().Format(time.RFC3339Nano) }
+			_, err = r.h.ts.InsertAgentEvent(r.ctx, &store.AgentEvent{AgentName: "dev", SessionID: &r.sid, EventType: tc.later, CreatedAt: at(time.Minute)})
 			require.NoError(t, err)
+			if tc.later != "stop" { // the job's turn ended too, so the last event is a stop and only the footer is left to decide
+				_, err = r.h.ts.InsertAgentEvent(r.ctx, &store.AgentEvent{AgentName: "dev", SessionID: &r.sid, EventType: "stop", CreatedAt: at(2 * time.Minute)})
+				require.NoError(t, err)
+			}
 			assert.Equal(t, tc.asleep, r.pass(t).IsSleeping, name)
 		})
 	}
