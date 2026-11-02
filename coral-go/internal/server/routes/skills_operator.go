@@ -180,9 +180,13 @@ func (h *SkillsHandler) RejectSkill(w http.ResponseWriter, r *http.Request) {
 		errNotFound(w, "no such skill")
 		return
 	}
+	row, _ := h.ss.GetSkill(r.Context(), id)
 	if err := h.ss.RejectSkill(r.Context(), id); err != nil {
 		skillDecisionError(w, err)
 		return
+	}
+	if row != nil {
+		h.releaseSkillZip(r, row.Digest)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
@@ -198,9 +202,13 @@ func (h *SkillsHandler) RemoveSkill(w http.ResponseWriter, r *http.Request) {
 		errNotFound(w, "no such skill")
 		return
 	}
+	row, _ := h.ss.GetSkill(r.Context(), id)
 	if err := h.ss.RemoveSkill(r.Context(), id); err != nil {
 		skillDecisionError(w, err)
 		return
+	}
+	if row != nil {
+		h.releaseSkillZip(r, row.Digest)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }

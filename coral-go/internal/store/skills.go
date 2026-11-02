@@ -484,3 +484,10 @@ func (s *SessionStore) AttachedSkills(ctx context.Context, sessionID string) ([]
 		FROM skills_attached a LEFT JOIN skills k ON k.id = a.skill_id WHERE a.session_id = ? ORDER BY a.name`, SkillApproved, SkillApproved, sessionID)
 	return rows, err
 }
+
+// SkillDigestInUse reports whether a pending or approved skill still points at digest: the bytes of a rejected or removed one may be deleted, those of one in use may not.
+func (s *SessionStore) SkillDigestInUse(ctx context.Context, digest string) (bool, error) {
+	var n int
+	err := s.reader().GetContext(ctx, &n, `SELECT COUNT(*) FROM skills WHERE digest = ? AND status IN (?, ?)`, digest, SkillPending, SkillApproved)
+	return n > 0, err
+}

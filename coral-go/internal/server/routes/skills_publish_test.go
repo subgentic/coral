@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -211,4 +213,104 @@ func TestTheSkillsFolderIsNotFollowedAndDamagedBytesAreNotReplaced(t *testing.T)
 	assert.Equal(t, 500, code, "bytes under the digest that are not the zip are never replaced")
 	b, _ := os.ReadFile(e.objectPath(files))
 	assert.Equal(t, "not the zip", string(b))
+}
+
+// #12024 (Security's SHOULD): what an agent publishes is checked for secrets before a byte is kept; the reply names the file, never the secret, and the Operator's own skill is not held to it.
+func TestAnAgentsSkillThatHoldsASecretIsRefusedNamingTheFile(t *testing.T) {
+	e := newSkillsEnv(t)
+	token := "ghp_" + strings.Repeat("a1B2c3D4e5", 4)
+	for name, files := range map[string]map[string]string{
+		"a reference file": {"SKILL.md": skillMD, "references/deploy.md": "deploy with token " + token},
+		"SKILL.md itself":  {"SKILL.md": skillMD + "\nAuthorization: Bearer " + token + "\n"},
+		"an env text":      {"SKILL.md": skillMD, "data/config.json": `{"api_key": "` + token + `"}`},
+	} {
+		e.freshHour()
+		code, out := e.call("POST", "/api/agent/skills", zipBody(t, files, false), "agent")
+		assert.Equal(t, 422, code, name)
+		assert.Equal(t, "holds_secret", out["code"], name)
+		assert.NotContains(t, fmt.Sprint(out), token, name+": the reply never carries the secret")
+		assert.NotContains(t, fmt.Sprint(out), strings.Repeat("a1B2c3D4e5", 2), name)
+		_, err := os.Stat(e.objectPath(files))
+		assert.True(t, os.IsNotExist(err), name+": no byte was kept")
+	}
+	e.freshHour()
+	_, out := e.call("POST", "/api/agent/skills", zipBody(t, map[string]string{"SKILL.md": skillMD, "references/deploy.md": "token " + token}, false), "agent")
+	assert.Contains(t, fmt.Sprint(out["error"]), "references/deploy.md", "the file is named")
+	rows, err := e.ss.ListSkills(context.Background(), "")
+	require.NoError(t, err)
+	assert.Empty(t, rows, "nothing was recorded")
+	code, _ := e.call("POST", "/api/skills", zipBody(t, map[string]string{"SKILL.md": skillMD, "references/deploy.md": "token " + token}, false), "operator")
+	assert.Equal(t, 200, code, "the Operator's own skill is theirs to publish")
+}
+
+// #12024 (Security's SHOULD): the bytes of a rejected or removed skill are deleted; the refusal memory is the digest, which stays.
+func TestRejectingOrRemovingASkillDeletesItsBytes(t *testing.T) {
+	e := newSkillsEnv(t)
+	rej := map[string]string{"SKILL.md": skillMD}
+	_, out := e.call("POST", "/api/agent/skills", zipBody(t, rej, false), "agent")
+	rejID := out["id"].(string)
+	_, err := os.Stat(e.objectPath(rej))
+	require.NoError(t, err, "kept while it waits")
+	code, _ := e.call("POST", "/api/skills/"+rejID+"/reject", "", "operator")
+	require.Equal(t, 200, code)
+	_, err = os.Stat(e.objectPath(rej))
+	assert.True(t, os.IsNotExist(err), "rejected: the bytes are gone")
+	e.freshHour()
+	code, out = e.call("POST", "/api/agent/skills", zipBody(t, rej, false), "agent")
+	assert.Equal(t, 409, code)
+	assert.Equal(t, "refused_before", out["code"], "the digest is still remembered")
+
+	rem := map[string]string{"SKILL.md": scriptedMD}
+	_, out = e.call("POST", "/api/skills", zipBody(t, rem, false), "operator")
+	remID := out["id"].(string)
+	_, err = os.Stat(e.objectPath(rem))
+	require.NoError(t, err)
+	code, _ = e.call("DELETE", "/api/skills/"+remID, "", "operator")
+	require.Equal(t, 200, code)
+	_, err = os.Stat(e.objectPath(rem))
+	assert.True(t, os.IsNotExist(err), "removed: the bytes are gone")
+	// the Operator can publish the removed bytes again: a new version, kept again
+	code, _ = e.call("POST", "/api/skills", zipBody(t, rem, false), "operator")
+	assert.Equal(t, 200, code)
+	_, err = os.Stat(e.objectPath(rem))
+	assert.NoError(t, err)
+}
+
+// #12024 (Security's INFO): two publishes of the same new bytes at once both succeed with the same record, and the limit maps forget a caller that stopped.
+func TestTwoPublishesOfTheSameBytesAtOnceBothSucceedAndTheLimitMapsAreTrimmed(t *testing.T) {
+	e := newSkillsEnv(t)
+	body := zipBody(t, map[string]string{"SKILL.md": skillMD, "references/pg.md": strings.Repeat("text ", 20000)}, false)
+	ids := make(chan string, 8)
+	var wg sync.WaitGroup
+	for i := 0; i < 8; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			code, out := e.call("POST", "/api/skills", body, "operator")
+			if code == 200 {
+				ids <- out["id"].(string)
+			} else {
+				ids <- fmt.Sprint("status ", code)
+			}
+		}()
+	}
+	wg.Wait()
+	close(ids)
+	seen := map[string]bool{}
+	for id := range ids {
+		seen[id] = true
+	}
+	assert.Len(t, seen, 1, "one record, and no 500 'damaged' for the one that came second: %v", seen)
+
+	now := time.Now()
+	e.h.nowFunc = func() time.Time { return now }
+	require.True(t, e.h.allowPublish("session-that-leaves"))
+	require.True(t, e.h.allow("agent:session-that-leaves"))
+	now = now.Add(2 * time.Hour)
+	require.True(t, e.h.allowPublish("another"))
+	require.True(t, e.h.allow("operator:operator"))
+	e.h.mu.Lock()
+	defer e.h.mu.Unlock()
+	assert.NotContains(t, e.h.published, "session-that-leaves", "a session that stopped publishing leaves nothing behind")
+	assert.NotContains(t, e.h.recent, "agent:session-that-leaves")
 }

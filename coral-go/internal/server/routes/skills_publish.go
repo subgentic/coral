@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
@@ -9,10 +10,12 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/subgentic/coral/internal/safefs"
+	"github.com/subgentic/coral/internal/secrets"
 	"github.com/subgentic/coral/internal/skills"
 	"github.com/subgentic/coral/internal/store"
 )
@@ -39,6 +42,11 @@ func (h *SkillsHandler) allowPublish(session string) bool {
 		h.published = map[string][]time.Time{}
 	}
 	now := h.nowFunc()
+	for k, ts := range h.published { // a session that stopped publishing leaves nothing behind
+		if len(ts) == 0 || now.Sub(ts[len(ts)-1]) >= time.Hour {
+			delete(h.published, k)
+		}
+	}
 	keep := h.published[session][:0]
 	for _, t := range h.published[session] {
 		if now.Sub(t) < time.Hour {
@@ -100,6 +108,8 @@ func (h *SkillsHandler) skillsRoot() (*safefs.Root, error) {
 // saveSkillZip keeps the zip under its digest, 0600, created new and never replaced: bytes already there must be the same bytes, or the store is damaged and nothing is written. created says whether this call
 // made the file. A reader checks the digest on every read, so a write cut short is never served.
 func (h *SkillsHandler) saveSkillZip(digest string, data []byte) (created bool, err error) {
+	h.zipMu.Lock() // two publishes of the same new bytes at once: the second reads a finished file, not a half-written one
+	defer h.zipMu.Unlock()
 	root, err := h.skillsRoot()
 	if err != nil {
 		return false, err
@@ -130,10 +140,40 @@ func (h *SkillsHandler) saveSkillZip(digest string, data []byte) (created bool, 
 }
 
 func (h *SkillsHandler) dropSkillZip(digest string) {
+	h.zipMu.Lock()
+	defer h.zipMu.Unlock()
 	if root, err := h.skillsRoot(); err == nil {
 		defer root.Close()
 		_ = root.Remove("skills/objects/" + digest)
 	}
+}
+
+// releaseSkillZip deletes the bytes of a skill the Operator rejected or removed, unless another record still points at the same digest: the digest stays in skills_refused, which is all the refusal needs, and the
+// bytes (possibly a secret) do not stay for ever.
+func (h *SkillsHandler) releaseSkillZip(r *http.Request, digest string) {
+	if inUse, err := h.ss.SkillDigestInUse(r.Context(), digest); err == nil && !inUse {
+		h.dropSkillZip(digest)
+	}
+}
+
+// heldSecret names the first file of an agent's skill that holds what the redactor finds (a key, a token, a password): the same redaction as session excerpts. A redactor that cannot check refuses the publish.
+func heldSecret(sk *skills.Skill) (file string, err error) {
+	red := secrets.Redactor()
+	paths := make([]string, 0, len(sk.Content))
+	for p := range sk.Content {
+		paths = append(paths, p)
+	}
+	sort.Strings(paths)
+	for _, p := range paths {
+		out, rerr := red.Text(sk.Content[p])
+		if rerr != nil {
+			return "", rerr
+		}
+		if !bytes.Equal(out, sk.Content[p]) {
+			return p, nil
+		}
+	}
+	return "", nil
 }
 
 // publish parses, keeps and records one skill; false when the answer was written.
@@ -142,6 +182,17 @@ func (h *SkillsHandler) publish(w http.ResponseWriter, r *http.Request, data []b
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_skill", strings.TrimPrefix(err.Error(), skills.ErrInvalid.Error()+": "))
 		return false
+	}
+	if in.Kind == store.PublisherAgent { // what an agent sends is checked for secrets before a byte is kept; the reply names the file, never the secret
+		file, rerr := heldSecret(sk)
+		if rerr != nil {
+			writeError(w, http.StatusServiceUnavailable, "cannot_check", "the skill could not be checked for secrets: try again")
+			return false
+		}
+		if file != "" {
+			writeError(w, http.StatusUnprocessableEntity, "holds_secret", "a file holds what looks like a key, token or password: remove it from "+skillFileName(file)+" and publish again")
+			return false
+		}
 	}
 	in.Skill, in.Digest = sk, sk.Digest
 	created, err := h.saveSkillZip(sk.Digest, data)
@@ -218,3 +269,6 @@ func (h *SkillsHandler) PublishSkillOperator(w http.ResponseWriter, r *http.Requ
 	}
 	h.publish(w, r, data, store.AddSkillInput{Kind: store.PublisherOperator, ScriptsAcked: req.ScriptsAcked})
 }
+
+// skillFileName is a file's path as one clean word for a reply (the parser already refused control and invisible characters in it).
+func skillFileName(p string) string { return "'" + strings.ReplaceAll(p, "'", "") + "'" }

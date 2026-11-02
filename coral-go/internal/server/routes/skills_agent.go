@@ -30,6 +30,7 @@ type SkillsHandler struct {
 	mu        sync.Mutex
 	recent    map[string][]time.Time // per caller: the times of its requests in the last minute
 	published map[string][]time.Time // per agent session: the times it published in the last hour
+	zipMu     sync.Mutex             // one write of the Skills Store's folder at a time
 	nowFunc   func() time.Time
 }
 
@@ -45,6 +46,11 @@ func (h *SkillsHandler) allow(caller string) bool {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	now := h.nowFunc()
+	for k, ts := range h.recent { // a caller that stopped asking leaves nothing behind
+		if len(ts) == 0 || now.Sub(ts[len(ts)-1]) >= time.Minute {
+			delete(h.recent, k)
+		}
+	}
 	keep := h.recent[caller][:0]
 	for _, t := range h.recent[caller] {
 		if now.Sub(t) < time.Minute {
