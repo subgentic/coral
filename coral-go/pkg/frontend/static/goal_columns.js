@@ -3,7 +3,7 @@
  * Rows: {id, title, outcome?, state, rollup:{done,active,blocked,queued}, updatedAt|updated_at, board?|project?}.
  * ctx: teamOf(goal) optionally supplies the displayed team; openTeam(goal) optionally makes it a link;
  * progressLabel optionally renames Progress (the team page calls it Tasks). noGoal rows are navigation only.
- * The columns are for a one-line table (oneLine: true): the narrow container drops Team and Progress, then State, and Updated last (a time stays, #11943); the title keeps the row.
+ * The columns are for a one-line table (oneLine: true): the narrow container drops Progress, then Team, then State, and Updated last (a time stays, #11943); the title keeps the row.
  * The caller supplies rowKey/open/state to dataTable; team-scoped numeric ids must be qualified in the mailbox. */
 import { importOnce } from './import_once.js';
 import * as W from './goal_words.js';
@@ -24,7 +24,7 @@ export function goalColumns(ctx = {}, keys = ['state', 'goal', 'team', 'progress
                 w.append(b, DT.el('span', 'goals-row-tasks', left ? `${done(g)} done \u00b7 ${left} left` : `${done(g)} done`)); return w; } }, // closing is on the goal's own page, not a button here (#11549, the operator)
         team: { key: 'team', label: 'Team', sort: true, sortValue: team, line: 2, width: '9rem', dropAt: 36,
             cell: g => ctx.openTeam ? DT.link(team(g), () => ctx.openTeam(g)) : team(g) },
-        progress: { key: 'progress', label: ctx.progressLabel || 'Progress', sort: 'number', sortValue: g => total(g) ? done(g) / total(g) : 0, line: 2, tone: 'tertiary', width: '8rem', dropAt: 36,
+        progress: { key: 'progress', label: ctx.progressLabel || 'Progress', sort: 'number', sortValue: g => total(g) ? done(g) / total(g) : 0, line: 2, tone: 'tertiary', width: '8rem', dropAt: 52,
             cell: g => g.noGoal ? '' : DT.progressCell(done(g), total(g)) },
         updated: { key: 'updated', label: 'Updated', sort: 'date', sortValue: stamp, firstDir: 'desc', line: 0, tone: 'tertiary', align: 'end', width: '7rem', dropAt: 28,
             cell: g => g.noGoal ? '' : DT.timeCell(stamp(g)) },
