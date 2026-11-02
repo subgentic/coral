@@ -502,7 +502,7 @@ function _swatched(view, cell) {
         const inner = cell(r);
         if (!series.swatchColor(view, SERIES_VIEWS[view].key(r))) return inner;
         const wrap = document.createElement('span'); wrap.className = 'cost-lead';
-        const b = document.createElement('button'); b.type = 'button'; b.className = 'cost-toggle'; b.setAttribute('aria-label', `Show ${SERIES_VIEWS[view].name(r)}'s line`);
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'cost-toggle'; b.dataset.displayControl = 'chart-line'; /* a chart legend toggle in the name cell, not a row action: the table rules check (R9) reads this */ b.setAttribute('aria-label', `Show ${SERIES_VIEWS[view].name(r)}'s line`);
         b.append(document.createElement('i')); b.firstChild.className = 'cost-swatch'; b.firstChild.setAttribute('aria-hidden', 'true');
         b.addEventListener('click', () => _toggle(view, r));
         _paintSwatch(b, view, r);
