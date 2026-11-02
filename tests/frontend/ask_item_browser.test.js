@@ -8,6 +8,7 @@ const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { coralReady } = require('./helpers/wait');
 
+const HOSTILE = '@Operator look at this: <img src=x onerror="window.__pwned=1"> and <script>window.__pwned=2</script>\n\nA second paragraph, with <b onmouseover="window.__pwned=3">bold</b> html.';
 const OPERATOR_TEXT = '@Operator TEST ITEM, safe to answer any way: this is a test request so you can reproduce the disappearing-inbox issue.\n\nAnswering or approving it **changes nothing** on the team. Please note what else, if anything, disappears from your Inbox when you answer it:\n\n- the row in Needs you\n- the badge\n\nDetails: [the board](https://example.com/board).';
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -20,7 +21,7 @@ const OPERATOR_TEXT = '@Operator TEST ITEM, safe to answer any way: this is a te
             await coralReady(ev);
             const at = `${w}: `;
             // the server's list, and the posts the page makes
-            await ev(`(() => { window.__asks = [{ board: 'coral-hub', board_label: 'coral-hub', kind: 'ask', id: 41, asker: 'Orchestrator', text: ${JSON.stringify(OPERATOR_TEXT)}, at: new Date(Date.now() - 7 * 60000).toISOString() }, { board: 'team', board_label: 'Sprout', kind: 'ask', id: 42, asker: 'Dev', text: '@Operator may I delete the old table?', at: new Date(Date.now() - 3600000).toISOString() }];
+            await ev(`(() => { window.__asks = [{ board: 'coral-hub', board_label: 'coral-hub', kind: 'ask', id: 41, asker: 'Orchestrator', text: ${JSON.stringify(OPERATOR_TEXT)}, at: new Date(Date.now() - 7 * 60000).toISOString() }, { board: 'team', board_label: 'Sprout', kind: 'ask', id: 42, asker: 'Dev', text: '@Operator may I delete the old table?', at: new Date(Date.now() - 3600000).toISOString() }, { board: 'team', board_label: 'Sprout', kind: 'ask', id: 43, asker: 'QA', text: ${JSON.stringify(HOSTILE)}, at: new Date(Date.now() - 7200000).toISOString() }];
                 window.__posts = []; window.__failPost = false; const orig = window.fetch.bind(window);
                 window.fetch = (u, o) => { const url = String(u); const json = (b, status = 200) => Promise.resolve(new Response(JSON.stringify(b), { status, headers: { 'Content-Type': 'application/json' } }));
                     if (url === '/api/operator-asks') return json(window.__asks);
@@ -28,7 +29,7 @@ const OPERATOR_TEXT = '@Operator TEST ITEM, safe to answer any way: this is a te
                         window.__asks = window.__asks.filter(a => !(body.content.startsWith('@' + a.asker + ' ') && (a.kind === 'wait' || body.reply_to === a.id))); return json({ id: 99 }); }
                     return orig(u, o); }; return true; })()`);
             await ev(`window.switchNavTab('hub-inbox'); true`);
-            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 2`, at + 'two rows of Needs you', 10000);
+            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 3`, at + 'three rows of Needs you', 10000);
             const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
             // the long question
             await ev(`document.querySelector('button[aria-label="Answer the question of Orchestrator"]').click(); true`);
@@ -51,6 +52,13 @@ const OPERATOR_TEXT = '@Operator TEST ITEM, safe to answer any way: this is a te
             await waitFor(`document.querySelector('dialog.inbox-ask-dialog[open]')`, at + 'the second opens', 4000);
             const s = await ev(`(() => { const d = document.querySelector('dialog.inbox-ask-dialog'); return { title: d.querySelector('h2').textContent, body: !!d.querySelector('.inbox-ask-text'), meta: d.querySelector('.inbox-ask-sub').textContent }; })()`);
             assert.ok(s.title === 'may I delete the old table?' && !s.body && /^From Dev \u00b7 Sprout team \u00b7 /.test(s.meta), at + 'a one-line question is its own title, no body: ' + JSON.stringify(s));
+            await ev(`document.querySelector('dialog.inbox-ask-dialog .inbox-ask-buttons .btn:not(.btn-primary)').click(); true`);
+            // HTML in a question is written out as text, never run: no <img onerror>, <script> or handler writes to window (the strict Markdown rendering stays pinned)
+            await ev(`document.querySelector('button[aria-label="Answer the question of QA"]').click(); true`);
+            await waitFor(`document.querySelector('dialog.inbox-ask-dialog[open]')`, at + 'the hostile question opens', 4000);
+            await ev(`new Promise(r => setTimeout(r, 300))`); // sleep-ok: an image that fails to load fires its handler within a few frames; this waits for it
+            const hostile = await ev(`(() => { const d = document.querySelector('dialog.inbox-ask-dialog'); return { pwned: typeof window.__pwned, live: d.querySelectorAll('img, script, [onerror], [onmouseover]').length, text: d.textContent }; })()`);
+            assert.ok(hostile.pwned === 'undefined' && hostile.live === 0 && hostile.text.includes('<img src=x onerror='), at + 'an <img onerror>, a <script> and an event handler in a question write nothing to window and draw nothing: ' + JSON.stringify({ pwned: hostile.pwned, live: hostile.live }));
             await ev(`document.querySelector('dialog.inbox-ask-dialog .inbox-ask-buttons .btn:not(.btn-primary)').click(); true`);
         }
     } finally { await client.close(); }
