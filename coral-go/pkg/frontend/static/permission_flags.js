@@ -86,6 +86,7 @@ export function _getPermissionFlagsForAgentMode(agentType, mode) {
     const permMode = mode || defaultPermissionMode(state.settings, agentType);
     if (!permMode || permMode === 'default' || agentType === 'pi' || agentType === 'terminal') return '';
     if (agentType === 'claude') return `--permission-mode ${permMode}`;
+    if (agentType === 'hermes') return permMode === 'bypassPermissions' ? '--yolo' : ''; // Hermes has one switch, and only Bypass is it: the server's PermissionFlagsForAgent says the same; without this a Bypass launch or restart sent no flag and ran in Default (#12464)
     if (agentType === 'agy' || agentType === 'antigravity' || agentType === 'gemini') {
         if (permMode === 'plan') return '--mode plan';
         if (permMode === 'acceptEdits') return '--mode accept-edits';
