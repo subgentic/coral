@@ -21,7 +21,6 @@ const (
 	skipNotIdleLong    = "not_idle_long_enough"
 	skipClaimedTask    = "claimed_task"
 	skipReview         = "review_assigned"
-	skipWait           = "board_wait"
 	skipOperatorAsk    = "operator_ask"
 	skipDialog         = "dialog_open"
 	skipBackground     = "background_running"
@@ -53,7 +52,6 @@ type autoSleepInput struct {
 	LastActive  time.Time // the latest event or end of turn; the launch time when there is none
 	ClaimedTask bool
 	ReviewOwed  bool
-	ActiveWait  bool
 	OperatorAsk bool
 	Dialog      bool
 	Background  bool // a background shell or monitor the footer names
@@ -93,8 +91,6 @@ func autoSleepVerdict(in autoSleepInput) string {
 		return skipClaimedTask
 	case in.ReviewOwed:
 		return skipReview
-	case in.ActiveWait:
-		return skipWait
 	case in.OperatorAsk:
 		return skipOperatorAsk
 	case in.Dialog:
