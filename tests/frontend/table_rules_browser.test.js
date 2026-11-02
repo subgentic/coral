@@ -1,0 +1,158 @@
+// #11942 part A (the operator: "Our table column resizing is very broken ... It's used across all of our surfaces"): ONE browser check for every table built on data_table.js, asserting the eight rules of
+// coral://artifacts/9ced561afd363231aa6ccbc457c99c528b81ab5c31d82f232e9604e82749093a (helpers/table_rules.js says them). Each surface's table shape (its columns, its fixed and empty columns, its row mixes) is a
+// spec below, mounted through the real data_table.js into a panel the width a surface has beside the sidebar, at 1440, 1280, 1024 and 900 px, with mixed rows, one kind of row, a long name and no rows, at 200% text,
+// with widths kept over-wide in storage, with a drag and a keyboard resize of every resizable column, and at 390 px. It FAILS TODAY BY DESIGN (#11943 makes data_table.js keep the rules); the report says which
+// rule broke where, and tests/frontend/table_inventory.json says every table the app has and whether this check reaches it. Set CORAL_TABLE_REPORT=<file> for the JSON report.
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const { connect } = require('./agent_view_harness');
+const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
+const { removeBoards } = require('./helpers/board_cleanup');
+const B = 'tbl-rules-' + Date.now().toString(36);
+const { AUDIT, judge } = require('./helpers/table_rules');
+
+// The specs run in the page: (m = data_table.js's exports, mix) -> { label, columns, rows, opts }. The Needs you mix is the operator's own screenshot: an agent row (a question, a Dismiss beside its words) and two
+// "Goal looks done" rows, with Blocks empty for all of them and Actions empty.
+const SPECS = `(() => {
+  const long = 'A very long item name that goes on and on past any sensible column width, with words '.repeat(2);
+  const when = n => new Date(Date.now() - n * 60000).toISOString();
+  const kinds = {
+    needs: (m, mix) => ({ label: 'Needs you, 3', columns: [
+        { key: 'item', label: 'Item', primary: true, width: 'grow', sort: true, cell: r => m.primaryButton(r.item) },
+        { key: 'why', label: 'Waiting for', cell: r => { const s = document.createElement('span'); s.textContent = r.why; if (r.dismiss) s.append(m.link('Dismiss', () => {})); return s; } },
+        { key: 'cli', label: 'CLI', sort: true, cell: r => (r.cli ? m.tag(r.cli) : '') }, { key: 'folder', label: 'Folder', sort: true, field: 'folder' }, { key: 'team', label: 'Team', sort: true, field: 'team' },
+        { key: 'blocks', label: 'Blocks', field: 'blocks' }, { key: 'actions', label: 'Actions', fixed: true, width: '11rem', cell: r => (r.act ? m.link(r.act, () => {}) : '') } ],
+      rows: mix === 'empty' ? [] : mix === 'one' ? [1, 2, 3].map(i => ({ id: i, item: 'Goal #' + (180 + i) + ' looks done', why: 'Done when: Every task is done.', team: 'coral-hub', act: 'Close goal' }))
+        : [{ id: 1, item: mix === 'long' ? long : 'Orchestrator', why: 'Wants to know: None of the above', cli: 'Claude', folder: 'coral-hub', team: 'coral-hub-team', dismiss: true }, { id: 2, item: 'Goal #187 looks done', why: 'Done when: The operator can see it', team: 'coral-hub' }, { id: 3, item: 'Goal #184 looks done', why: 'Every task is done.', team: 'coral-hub' }] }),
+    tasks: (m, mix) => ({ label: 'Tasks, 4', columns: [ { key: 'state', label: 'State', cell: r => m.chip(r.state, 'goal-state-' + r.state) }, { key: 'title', label: 'Task', primary: true, width: 'grow', sort: true, field: 'title' },
+        { key: 'goal', label: 'Goal', field: 'goal' }, { key: 'who', label: 'Assigned to', sort: true, cell: r => m.avatar(r.who) }, { key: 'upd', label: 'Updated', sort: 'date', fixed: true, width: '9rem', cell: r => m.timeCell(r.upd) } ],
+      rows: mix === 'empty' ? [] : [1, 2, 3, 4].map(i => ({ id: i, state: ['working', 'done', 'blocked', 'queued'][i % 4], title: mix === 'long' && i === 1 ? long : 'Task ' + i + ' of the sprint', goal: mix === 'one' ? '' : 'Goal ' + i, who: ['Backend Dev', 'UI/UX', '', 'QA Reviewer 2'][i % 4], upd: when(i * 40) })) }),
+    goals: (m, mix) => ({ label: 'Goals, 3', columns: [ { key: 'goal', label: 'Goal', primary: true, width: 'grow', sort: true, field: 'goal' }, { key: 'state', label: 'State', cell: r => m.chip(r.state, 'goal-state-' + r.state) },
+        { key: 'driver', label: 'Driver', field: 'driver' }, { key: 'progress', label: 'Progress', cell: r => m.progress ? m.progress(r.p, 'x') : document.createTextNode(r.p + ' of 10') }, { key: 'upd', label: 'Updated', fixed: true, width: '9rem', cell: r => m.timeCell(r.upd) } ],
+      rows: mix === 'empty' ? [] : [1, 2, 3].map(i => ({ id: i, goal: mix === 'long' && i === 1 ? long : 'Goal number ' + i, state: ['active', 'blocked', 'done'][i % 3], driver: mix === 'one' ? '' : 'Orchestrator', p: i * 3, upd: when(i * 90) })) }),
+    files: (m, mix) => ({ label: 'Files for review, 3', columns: [ { key: 'name', label: 'Name', primary: true, width: 'grow', sort: true, cell: r => m.primaryButton(r.name) }, { key: 'type', label: 'Type', cell: r => m.tag(r.type) },
+        { key: 'size', label: 'Size', sort: 'number', field: 'size', align: 'end' }, { key: 'from', label: 'From', sort: true, cell: r => m.avatar(r.from) }, { key: 'at', label: 'Uploaded', fixed: true, width: '9rem', cell: r => m.timeCell(r.at) } ],
+      rows: mix === 'empty' ? [] : [1, 2, 3].map(i => ({ id: i, name: mix === 'long' && i === 1 ? long + '.md' : 'design-note-' + i + '.md', type: 'Markdown', size: i * 12 + ' KB', from: mix === 'one' ? 'UX/UX Engineer' : ['QA Engineer', 'Backend Dev', 'UI/UX'][i % 3], at: when(i * 10) })) }),
+    servers: (m, mix) => ({ label: 'Computers, 3', columns: [ { key: 'name', label: 'Computer', primary: true, width: 'grow', sort: true, field: 'name' }, { key: 'status', label: 'Status', cell: r => m.chip(r.status, 'goal-state-' + r.status) },
+        { key: 'seen', label: 'Last seen', cell: r => m.timeCell(r.seen) }, { key: 'ver', label: 'Version', field: 'ver' }, { key: 'act', label: 'Actions', fixed: true, width: '10rem', cell: r => m.link('Open', () => {}) } ],
+      rows: mix === 'empty' ? [] : [1, 2, 3].map(i => ({ id: i, name: mix === 'long' && i === 1 ? long : 'remote-computer-' + i, status: ['active', 'blocked', 'done'][i % 3], seen: when(i * 7), ver: 'v2.0.' + (20 + i) })) }),
+    analytics: (m, mix) => ({ label: 'Who spends, 3', fold: 'labeled', scroll: true, columns: [ { key: 'who', label: 'Agent', primary: true, width: 'grow', field: 'who' }, ...['Sessions', 'Input tokens', 'Output tokens', 'Cache tokens', 'Cost', 'Cost per task'].map(l => ({ key: l, label: l, field: l, align: 'end', sort: 'number' })) ],
+      rows: mix === 'empty' ? [] : [1, 2, 3].map(i => ({ id: i, who: mix === 'long' && i === 1 ? long : 'Agent ' + i, Sessions: 3 * i, 'Input tokens': '1.2M', 'Output tokens': '160.8K', 'Cache tokens': '67.3M', Cost: '$' + 40 * i, 'Cost per task': '$' + 2 * i })) }),
+    settings: (m, mix) => ({ label: 'Settings keys, 3', columns: [ { key: 'name', label: 'Setting', primary: true, width: 'grow', sort: true, field: 'name' }, { key: 'value', label: 'Value', field: 'value' } ],
+      rows: mix === 'empty' ? [] : [1, 2, 3].map(i => ({ id: i, name: mix === 'long' && i === 1 ? long : 'setting_' + i, value: 'value ' + i })) }),
+  };
+  window.__tableKinds = Object.keys(kinds);
+  window.__mount = async (kind, mix, panelW) => {
+    const m = await import((window.__coralStatic || '/static/') + 'data_table.js');
+    document.getElementById('zz-host')?.remove();
+    const host = document.createElement('div'); host.id = 'zz-host'; host.style.cssText = 'position:fixed;left:0;top:60px;background:var(--bg-primary);width:' + panelW + 'px;z-index:9999';
+    document.body.append(host);
+    const s = kinds[kind](m, mix);
+    const t = m.dataTable({ label: s.label, columns: s.columns, rows: s.rows, rowKey: r => r.id, fold: s.fold, scroll: s.scroll, empty: 'Nothing here' });
+    host.append(t.el); await new Promise(r => setTimeout(r, 260)); // sleep-ok: the table lays out over a frame or two
+    return true;
+  };
+  window.__audit = ${AUDIT};
+  window.__measure = (root) => window.__audit(document.querySelector((root || '#zz-host') + ' .dt-box'));
+  return true;
+})()`;
+
+// CORAL_TABLE_RULES: unset = the check is pending and does not run (the release gate stays green while #11943 makes data_table.js keep the rules); report = run it and print what is broken, exit 0; enforce = run it and
+// fail on any broken rule (the check as it will be once #11943 lands, whose first change is to make enforce the default). Today: CORAL_TABLE_RULES=enforce node run_cdp_suites.mjs --only table_rules_browser.
+const MODE = process.env.CORAL_TABLE_RULES || 'off';
+
+(async () => {
+    if (MODE === 'off') { console.log('PASS pending (#11943): set CORAL_TABLE_RULES=report or enforce to run the table rules check'); return; }
+    const { client, Page, Emulation, ev, PRELOAD, install } = await connect();
+    const { Input } = client;
+    const mouse = (type, x, y) => Input.dispatchMouseEvent({ type, x, y, button: 'left', buttons: type === 'mouseReleased' ? 0 : 1, clickCount: 1 }); // as data_table_browser drives a handle
+    const violations = [], seen = new Set(), report = { surfaces: {}, checked: 0 };
+    const note = (surface, ctx, list) => { for (const v of list) { const k = `${surface}|${v}`; report.surfaces[surface] ||= {}; const rule = v.slice(0, 2); report.surfaces[surface][rule] = (report.surfaces[surface][rule] || 0) + 1; if (!seen.has(k)) { seen.add(k); violations.push(`${surface} [${ctx}] ${v}`); } } };
+    const settle = ms => new Promise(r => setTimeout(r, ms)); // sleep-ok: the table lays out over a frame or two
+    const size = async (w, mobile = false) => { await Emulation.setDeviceMetricsOverride({ width: w, height: 900, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile }); await settle(200); };
+    const panelOf = w => Math.max(320, w - 320); // beside the sidebar and its margins
+    try {
+        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        await size(1440);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
+        await ev(SPECS);
+        const kinds = await ev(`window.__tableKinds`);
+        const api = (method, path, bodyObj) => ev(`fetch('/api/board/${B}' + ${JSON.stringify(path)}, { method: ${JSON.stringify(method)}, headers: { 'Content-Type': 'application/json' }, body: ${bodyObj ? JSON.stringify(JSON.stringify(bodyObj)) : 'undefined'} }).then(async r => ({ status: r.status, json: await r.json().catch(() => ({})) }))`);
+        const surfaces = kinds.map(kind => ({ name: kind, root: '#zz-host', mixes: ['mixed', 'one', 'long', 'empty'], phoneW: 390 - 16, mount: (mix, w) => ev(`window.__mount(${JSON.stringify(kind)}, ${JSON.stringify(mix)}, ${panelOf(w)})`) }));
+        // The real Needs you (the operator's screenshot, 2026-11-02): an Orchestrator's question, two "Goal looks done" rows and a file for review, through the real Inbox with the board's own API for the goals.
+        let seeded = false;
+        const seed = async () => {
+            if (seeded) return; seeded = true;
+            assert.ok((await api('POST', '/subscribe', { subscriber_id: 'Boss', job_title: 'Orchestrator', session_name: 'boss-' + B })).status < 300);
+            for (const [t, dw] of [['Goal that looks done, one', 'The operator can see it'], ['Goal that looks done, two', 'Every task is done.']]) {
+                const g = await api('POST', '/goals', { subscriber_id: 'Operator', title: t, done_when: dw }); assert.equal(g.status, 201, JSON.stringify(g)); const gid = g.json.id || g.json.goal.id;
+                const task = await api('POST', '/tasks', { subscriber_id: 'Operator', title: 'Task', goal_id: gid, assigned_to: 'Boss', created_by: 'Operator', priority: 'medium' }); const tid = task.json.id || task.json.task.id;
+                await api('POST', '/tasks/claim', { subscriber_id: 'Boss', task_id: tid }); await api('POST', `/tasks/${tid}/complete`, { subscriber_id: 'Boss', message: 'done', outcome: 'success' });
+            }
+        };
+        surfaces.push({ name: 'needs (live Inbox)', root: '#group-table-view', mixes: ['mixed'], live: true, phoneW: 390, mount: async (mix, w) => {
+            await seed(); await size(w, w < 600);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev); await ev(SPECS); // the page is new: the auditor goes in again
+            await ev(`(() => { window.__asks = [{ board: '${B}', kind: 'ask', id: 71, asker: 'Orchestrator', text: 'None of the above: which port should the test server use?', at: new Date().toISOString() }];
+                const original = window.fetch.bind(window); window.fetch = (u, o = {}) => (String(u) === '/api/operator-asks' ? Promise.resolve(new Response(JSON.stringify(window.__asks), { status: 200, headers: { 'Content-Type': 'application/json' } })) : original(u, o)); return true; })()`);
+            await ev(`localStorage.removeItem('coral.inbox.tab'); window.switchNavTab('hub-inbox'); true`);
+            await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
+            for (let i = 0; i < 60 && !(await ev(`/looks done/.test(document.querySelector('#group-table-view')?.textContent || '')`)); i++) await settle(250);
+            await settle(300); return true; } });
+        const measure = (root) => ev(`window.__measure(${JSON.stringify(root)})`);
+        const clear = () => ev(`(() => { for (const k of Object.keys(localStorage)) if (k.startsWith('coral-dt-widths:')) localStorage.removeItem(k); return true; })()`);
+        for (const S of surfaces) {
+            const kind = S.name, root = S.root, fixedAt = {};
+            const handleCenter = key => ev(`(() => { const h = document.querySelector('${root} th.dt-th[data-key=${JSON.stringify(key)}] .dt-resize'); if (!h) return null; const r = h.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+            const wipe = async () => { await clear(); if (S.live) await ev(`document.documentElement.style.fontSize = ''; true`); };
+            for (const w of [1440, 1280, 1024, 900]) {
+                await size(w); await clear();
+                for (const mix of S.mixes) {
+                    await S.mount(mix, w); const m = await measure(root); report.checked++;
+                    note(kind, `${w}px ${mix}`, judge(m));
+                    if (mix === 'mixed' && !m.folded) fixedAt[w] = m.cols.filter(c => !c.handle && !c.check && !c.grow).map(c => `${c.key}:${c.w}`).join(',');
+                }
+                // 200% text
+                await ev(`document.documentElement.style.fontSize = '32px'; true`); await S.mount('mixed', w); note(kind, `${w}px 200% text`, judge(await measure(root))); await ev(`document.documentElement.style.fontSize = ''; true`);
+                // widths kept from a wider window or an earlier visit: every resizable column kept at 600 px
+                await S.mount('mixed', w); const base = await measure(root);
+                const keys = base.cols.filter(c => c.handle && !c.grow && !c.check).map(c => c.key);
+                const label = await ev(`document.querySelector('${root} table.dt-table').getAttribute('aria-label').replace(/,\\s*\\d.*$/, '')`);
+                await ev(`localStorage.setItem('coral-dt-widths:' + ${JSON.stringify(label)}, ${JSON.stringify(JSON.stringify(Object.fromEntries(keys.map(k => [k, 600]))))}); true`);
+                await S.mount('mixed', w); note(kind, `${w}px kept widths over-wide`, judge(await measure(root))); await clear();
+                // drags and the keyboard, once per column, at the two ends of the range
+                if (w === 1440 || w === 900) {
+                    for (const key of keys) {
+                        await S.mount('mixed', w); const before = await measure(root); const at = await handleCenter(key); if (!at) { note(kind, `${w}px`, [`R5: column "${key}" has no resize handle`]); continue; }
+                        await mouse('mouseMoved', at.x, at.y); await mouse('mousePressed', at.x, at.y);
+                        for (let i = 1; i <= 6; i++) await mouse('mouseMoved', at.x + 10 * i, at.y);
+                        await mouse('mouseReleased', at.x + 60, at.y); await settle(150);
+                        const after = await measure(root); const b = Object.fromEntries(before.cols.map(c => [c.key, c.w])), a = Object.fromEntries(after.cols.map(c => [c.key, c.w]));
+                        const grow = before.cols.find(c => c.grow), dx = a[key] - b[key];
+                        const floorHit = grow && a[grow.key] <= 124;
+                        if (Math.abs(dx - 60) > 3 && !floorHit) note(kind, `${w}px drag`, [`R5: dragging "${key}" by 60px moved it by ${dx}px`]);
+                        for (const c of before.cols) { if (c.key === key) continue; const d = a[c.key] - b[c.key]; if (grow && c.key === grow.key) { if (!floorHit && Math.abs(d + dx) > 3) note(kind, `${w}px drag`, [`R5: dragging "${key}" by ${dx}px took ${-d}px from the elastic column "${c.key}"`]); } else if (Math.abs(d) > 1) note(kind, `${w}px drag`, [`R5: dragging "${key}" changed column "${c.key}" by ${d}px (only the elastic column gives room)`]); }
+                        note(kind, `${w}px after a drag`, judge(after)); await clear();
+                        // the keyboard: Right three times (16px each)
+                        await S.mount('mixed', w); const kb = await measure(root);
+                        await ev(`(() => { const h = document.querySelector('${root} th.dt-th[data-key=${JSON.stringify(key)}] .dt-resize'); h.focus(); return true; })()`);
+                        for (let i = 0; i < 3; i++) { await Input.dispatchKeyEvent({ type: 'rawKeyDown', key: 'ArrowRight', code: 'ArrowRight', windowsVirtualKeyCode: 39 }); await Input.dispatchKeyEvent({ type: 'keyUp', key: 'ArrowRight', code: 'ArrowRight', windowsVirtualKeyCode: 39 }); }
+                        await settle(150); const ka = await measure(root); const kd = ka.cols.find(c => c.key === key).w - kb.cols.find(c => c.key === key).w;
+                        const kgrow = kb.cols.find(c => c.grow); if (kd < 40 && !(kgrow && ka.cols.find(c => c.grow).w <= 124)) note(kind, `${w}px keyboard`, [`R5: Right x3 on "${key}" widened it by ${kd}px (three steps are 48)`]);
+                        await clear();
+                    }
+                }
+            }
+            const widths = Object.values(fixedAt); if (new Set(widths).size > 1) note(kind, 'all widths', [`R4: the fixed columns changed width with the window: ${JSON.stringify(fixedAt)}`]);
+            // a phone
+            await size(390, true); await clear(); await S.mount('mixed', 390); note(kind, '390px', judge(await measure(root), { phone: true }));
+        }
+        report.violations = violations;
+        if (process.env.CORAL_TABLE_REPORT) fs.writeFileSync(process.env.CORAL_TABLE_REPORT, JSON.stringify(report, null, 1));
+        const byRule = {}; for (const v of violations) { const r = v.match(/\] (R\d)/)?.[1] || '?'; byRule[r] = (byRule[r] || 0) + 1; }
+        const summary = `${violations.length} broken rules over ${report.checked} table states (${JSON.stringify(byRule)}) on ${Object.keys(report.surfaces).join(', ') || 'no surface'}:\n` + violations.slice(0, 80).join('\n');
+        if (MODE === 'enforce') assert.equal(violations.length, 0, `the check fails today by design (#11942, #11943 fixes it): ${summary}`);
+        console.log(violations.length ? 'REPORT ' + summary : 'PASS every table keeps the rules');
+    } finally { await removeBoards(ev, [B]).catch(() => {}); await client.close(); }
+})().catch(e => { console.error(e); process.exit(1); });
