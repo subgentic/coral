@@ -151,3 +151,16 @@ func TestTurningTheImportOffHoldsEarlierChatsBackAgain(t *testing.T) {
 	require.NoError(t, idx.RunOnce(ctx))
 	require.Len(t, indexedIDs(t, ss), 3)
 }
+
+// #11990 (Security's SHOULD): a chat of an agent Coral launched stays listed after Off even when the agent is gone, and is not counted as one Coral did not start.
+func TestTurningTheImportOffKeepsTheChatOfADeletedCoralAgent(t *testing.T) {
+	ctx, ss, _, idx := importFixture(t)
+	require.NoError(t, ss.ImportEarlierChats(ctx))
+	require.NoError(t, idx.RunOnce(ctx)) // "mine" is indexed with its agent's name while the agent is live
+	require.NoError(t, ss.UnregisterLiveSession(ctx, "mine"))
+	n, err := ss.ListedNotStarted(ctx)
+	require.NoError(t, err)
+	require.Equal(t, 2, n, "the deleted agent's chat is not one Coral did not start")
+	require.NoError(t, ss.SetHistoryImport(ctx, false))
+	require.ElementsMatch(t, []string{"mine.jsonl"}, indexedIDs(t, ss))
+}
