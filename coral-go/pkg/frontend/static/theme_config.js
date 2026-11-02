@@ -9,6 +9,7 @@ import { isCloud } from './server_base.js';
 
 let variableGroups = {};   // { groupName: { cssVar: label, ... }, ... }
 let currentEdits = {};     // { cssVar: colorValue, ... }
+let pageBefore = null;      // { theme, style }: the page's own base and colours when the configurator opened, for Cancel to put back (a Preview changes the page itself, #12307)
 let savedThemes = [];      // [{ name, description, base }, ...]
 let lastBase = 'dark';     // the base the editor's colours were last taken from (the Based on list; the page's own base when the dialog opens)
 
@@ -46,13 +47,27 @@ export async function showThemeConfigurator() {
         }
     }
 
+    pageBefore = { theme: document.documentElement.getAttribute('data-theme'), style: document.documentElement.getAttribute('style') };
     renderModal();
     lastBase = pageBase();
     document.getElementById('theme-save-base').value = lastBase; // a light page starts on Light: a theme saved from it is a light one
-    document.getElementById('theme-configurator-modal').style.display = 'flex';
+    const modal = document.getElementById('theme-configurator-modal');
+    if (!modal._previewGuard) { // however it closes (Cancel, Escape, a backdrop click: the page-wide rules hide it with display:none), a preview that was not saved is undone
+        modal._previewGuard = new MutationObserver(() => { if (modal.style.display === 'none' && pageBefore) hideThemeConfigurator(); });
+        modal._previewGuard.observe(modal, { attributes: true, attributeFilter: ['style'] });
+    }
+    modal.style.display = 'flex';
 }
 
-export function hideThemeConfigurator() {
+/** Close the configurator. Unless the theme was saved (keep), the page goes back to the base and colours it had when the configurator opened: a Preview or a Load had changed the page itself. */
+export function hideThemeConfigurator({ keep = false } = {}) {
+    if (!keep && pageBefore) {
+        const root = document.documentElement;
+        if (pageBefore.theme === null) root.removeAttribute('data-theme'); else root.setAttribute('data-theme', pageBefore.theme);
+        if (pageBefore.style === null) root.removeAttribute('style'); else root.setAttribute('style', pageBefore.style);
+        updateTerminalTheme();
+    }
+    pageBefore = null;
     document.getElementById('theme-configurator-modal').style.display = 'none';
 }
 
@@ -203,7 +218,7 @@ function resetThemeToDefaults() {
         document.documentElement.setAttribute('data-theme', base === 'light' ? 'light' : 'dark');
         applyVariablesToDom(currentEdits);
         showToast(`Theme "${name}" saved and applied`);
-        hideThemeConfigurator();
+        hideThemeConfigurator({ keep: true });
     } catch (e) {
         showToast('Failed to save theme', true);
     }
