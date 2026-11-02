@@ -530,6 +530,7 @@
 1	template_browser.js	btnLabel
 1	template_browser.js	meta.length ? `<div class="template-preview-meta">${meta.map(m => escapeHtml(m)).join(' &middot; ')}</div>` : 
 1	template_browser.js	meta.map(m => escapeHtml(m)).join(' &middot; ')
+1	theme_config.js	builtIn
 1	theme_config.js	groups
 1	theme_config.js	rows
 1	theme_config.js	themeOptions

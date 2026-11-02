@@ -873,6 +873,7 @@ const leakReport = []; // the suites that left the shared server state changed (
 const ALLOWED_SETTING_ROWS = {
   'goal_comments_real_browser.test.js': ['artifact_comments_owner_id'], // the install's comment identity, made by the first comment anyone writes on this computer
   'goal_new_comments_browser.test.js': ['goal_done_hidden', 'goal_done_read'], // the Operator's read and hidden lists of finished goals, saved for the first time by this suite and put back to empty at its end (#12073)
+  'theme_configurator_light_browser.test.js': ['custom_theme'], // it saves a theme and applies it: the setting row is first written there
   'chief_setup_browser.test.js': ['chief_actions', 'chief_avatar', 'chief_avatar_letter', 'chief_fronts', 'chief_name', 'chief_page', 'chief_session', 'chief_team'],
 };
 const allowedSettingLeak = (test, l) => { const m = /^setting (\S+) added /.exec(l); return !!m && (ALLOWED_SETTING_ROWS[test] || []).includes(m[1]); };
