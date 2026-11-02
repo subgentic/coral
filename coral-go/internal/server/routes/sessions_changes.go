@@ -173,12 +173,21 @@ func (h *SessionsHandler) generateChangesDiff(ctx context.Context, workdir strin
 	// A normal git diff omits untracked files. Render each as a new-file patch (not for the last commit alone).
 	var untracked []byte
 	if gitutil.IncludesWorkingTree(diffMode) {
-		if untracked, err = gitutil.Command(ctx, workdir, "ls-files", "--others", "--exclude-standard", "-z").Output(); err != nil {
+		// --directory: an untracked folder is one entry ("dir/"), as git status and the changed-files list show it, not one per file in it (#12524: a sync tool's trace folder is hundreds of files). Every ignore
+		// rule still holds (--exclude-standard), and an untracked file in a folder that has tracked files is still listed on its own.
+		if untracked, err = gitutil.Command(ctx, workdir, "ls-files", "--others", "--exclude-standard", "--directory", "-z").Output(); err != nil {
 			return nil, err
 		}
 	}
 	for _, rawPath := range bytes.Split(untracked, []byte{0}) {
 		if len(rawPath) == 0 {
+			continue
+		}
+		if rawPath[len(rawPath)-1] == '/' { // a folder: one note line (git apply skips it), no file diffs
+			if len(diff) > 0 && diff[len(diff)-1] != '\n' {
+				diff = append(diff, '\n')
+			}
+			diff = append(diff, diffNote("new folder %q: untracked, shown as one entry as git status shows it", string(rawPath))...)
 			continue
 		}
 		cmd := gitutil.Command(ctx, workdir, "diff", "--no-index", "--binary", "--", os.DevNull, string(rawPath))
