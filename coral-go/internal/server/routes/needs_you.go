@@ -35,6 +35,11 @@ type NeedsYouItem struct {
 	Team string `json:"team"`
 	ID   string `json:"id"`
 	At   string `json:"at"`
+	// GoalID and TaskID: on a question, the goal and the task it is about (#12164), with their titles cleaned and cut; absent for none.
+	GoalID    int64  `json:"goal_id,omitempty"`
+	TaskID    int64  `json:"task_id,omitempty"`
+	GoalTitle string `json:"goal_title,omitempty"`
+	TaskTitle string `json:"task_title,omitempty"`
 	// NewComments: on a review item, how many replies agents left in the Operator's comment threads on the file since the Operator opened them (#12026). The file's row is unread again and counted once, as itself.
 	NewComments int `json:"new_comments,omitempty"`
 }
@@ -165,8 +170,15 @@ func (h *BoardHandler) NeedsYou(w http.ResponseWriter, r *http.Request) {
 		if asks, err := h.bs.OpenAsksOf(ctx, p.Project, board.OperatorName, now); err != nil {
 			unread = appendOnce(unread, "questions")
 		} else {
+			askIDs := make([]int64, 0, len(asks))
 			for _, a := range asks {
-				items = append(items, NeedsYouItem{Kind: "question", From: needsYouLine(a.Asker), Line: needsYouLine(a.Content), Team: p.Project, ID: "question:" + p.Project + ":" + strconv.FormatInt(a.MessageID, 10), At: needsYouTime(a.At.UTC().Format(time.RFC3339Nano))})
+				askIDs = append(askIDs, a.MessageID)
+			}
+			subjects, links := h.askSubjects(ctx, p.Project, askIDs)
+			for _, a := range asks {
+				sj := subjects[a.MessageID]
+				items = append(items, NeedsYouItem{Kind: "question", From: needsYouLine(a.Asker), Line: needsYouLine(a.Content), Team: p.Project, ID: "question:" + p.Project + ":" + strconv.FormatInt(a.MessageID, 10), At: needsYouTime(a.At.UTC().Format(time.RFC3339Nano)),
+					GoalID: sj.GoalID, TaskID: sj.TaskID, GoalTitle: needsYouLine(links.goalTitle(ctx, sj.GoalID)), TaskTitle: needsYouLine(links.taskTitle(ctx, sj.TaskID))})
 			}
 		}
 		if waits, err := h.bs.ListOperatorQuestions(ctx, p.Project); err != nil {
