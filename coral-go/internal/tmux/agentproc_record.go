@@ -43,8 +43,8 @@ func (e *NeedsAcknowledgementError) Is(target error) bool { return target == Err
 var ErrNoCandidate = errors.New("there is no single foreground program in the agent's terminal")
 
 // candidateOf is the single foreground program below the pane's shell, or the reason there is none.
-func candidateOf(t *procTable, shell int) (Candidate, string) {
-	progs, deep := programsBelowUnder(t, shell)
+func candidateOf(t *procTable, shell int, agent ...func(pid int) bool) (Candidate, string) {
+	progs, deep := programsBelowUnder(t, shell, agent...)
 	switch {
 	case deep:
 		return Candidate{}, "the terminal's shells are nested too deep to read"
@@ -58,8 +58,8 @@ func candidateOf(t *procTable, shell int) (Candidate, string) {
 }
 
 // recordCandidate records want as the session's agent when it is still exactly the one foreground program.
-func recordCandidate(t *procTable, shell int, session string, want AgentProc, acknowledged, imageKnown bool) (Candidate, error) {
-	got, why := candidateOf(t, shell)
+func recordCandidate(t *procTable, shell int, session string, want AgentProc, acknowledged, imageKnown bool, agent ...func(pid int) bool) (Candidate, error) {
+	got, why := candidateOf(t, shell, agent...)
 	if why != "" {
 		return Candidate{}, fmt.Errorf("%w: %s", ErrNoCandidate, why)
 	}
@@ -86,7 +86,7 @@ func recordCandidate(t *procTable, shell int, session string, want AgentProc, ac
 }
 
 // AgentCandidate is the one foreground program of the agent's pane (why says why not, when there is not exactly one).
-func (c *Client) AgentCandidate(ctx context.Context, agentName, agentType, sessionID string) (Candidate, string, error) {
+func (c *Client) AgentCandidate(ctx context.Context, agentName, agentType, sessionID, cliPath string) (Candidate, string, error) {
 	shell, err := c.agentShellPID(ctx, agentName, agentType, sessionID)
 	if err != nil {
 		return Candidate{}, "", err
@@ -95,12 +95,12 @@ func (c *Client) AgentCandidate(ctx context.Context, agentName, agentType, sessi
 	if err != nil {
 		return Candidate{}, "", fmt.Errorf("read process table: %w", err)
 	}
-	cand, why := candidateOf(procs, shell)
+	cand, why := candidateOf(procs, shell, wrapperIsCLI(cliPath))
 	return cand, why, nil
 }
 
 // RecordAgent records want as the pane's agent process, in memory and in the tmux session (so a Coral restart re-checks it).
-func (c *Client) RecordAgent(ctx context.Context, agentName, agentType, sessionID string, want AgentProc, acknowledged bool) (Candidate, error) {
+func (c *Client) RecordAgent(ctx context.Context, agentName, agentType, sessionID string, want AgentProc, acknowledged bool, cliPath string) (Candidate, error) {
 	shell, err := c.agentShellPID(ctx, agentName, agentType, sessionID)
 	if err != nil {
 		return Candidate{}, err
@@ -109,7 +109,7 @@ func (c *Client) RecordAgent(ctx context.Context, agentName, agentType, sessionI
 	if err != nil {
 		return Candidate{}, fmt.Errorf("read process table: %w", err)
 	}
-	got, err := recordCandidate(procs, shell, agentName, want, acknowledged, ProgramImage(want.PID) != "")
+	got, err := recordCandidate(procs, shell, agentName, want, acknowledged, ProgramImage(want.PID) != "", wrapperIsCLI(cliPath))
 	if err != nil {
 		return Candidate{}, err
 	}
@@ -119,21 +119,21 @@ func (c *Client) RecordAgent(ctx context.Context, agentName, agentType, sessionI
 }
 
 // CandidateForShell and RecordAgentForShell are the same for a pseudo-terminal whose shell pid is known (the Unix PTY backend): nothing is kept beyond memory.
-func CandidateForShell(shell int) (Candidate, string, error) {
+func CandidateForShell(shell int, cliPath string) (Candidate, string, error) {
 	procs, err := readProcTableFresh()
 	if err != nil {
 		return Candidate{}, "", fmt.Errorf("read process table: %w", err)
 	}
-	cand, why := candidateOf(procs, shell)
+	cand, why := candidateOf(procs, shell, wrapperIsCLI(cliPath))
 	return cand, why, nil
 }
 
-func RecordAgentForShell(session string, shell int, want AgentProc, acknowledged bool) (Candidate, error) {
+func RecordAgentForShell(session string, shell int, want AgentProc, acknowledged bool, cliPath string) (Candidate, error) {
 	procs, err := readProcTableFresh()
 	if err != nil {
 		return Candidate{}, fmt.Errorf("read process table: %w", err)
 	}
-	got, err := recordCandidate(procs, shell, session, want, acknowledged, ProgramImage(want.PID) != "")
+	got, err := recordCandidate(procs, shell, session, want, acknowledged, ProgramImage(want.PID) != "", wrapperIsCLI(cliPath))
 	if err == nil {
 		slog.Info("recorded the agent's process by the Operator's request", "session", session, "pid", got.PID, "program", got.Program)
 	}

@@ -163,6 +163,11 @@ func (s *SessionStore) UnregisterLiveSession(ctx context.Context, sessionID stri
 		if err := revokeSessionTokensTx(ctx, tx, sessionID); err != nil {
 			return err
 		}
+		// The terminal session is over: so is the CLI path kept for it (#408). Its name is the agent type and the session id; a later session with the same name keeps its own at launch.
+		if _, err := tx.ExecContext(ctx,
+			"DELETE FROM session_launch_cli WHERE session_name IN (SELECT agent_type || '-' || session_id FROM live_sessions WHERE session_id = ?)", sessionID); err != nil {
+			return err
+		}
 		_, err := tx.ExecContext(ctx,
 			"UPDATE live_sessions SET status = 'inactive', stopped_at = ? WHERE session_id = ?",
 			nowUTC(), sessionID)
@@ -421,6 +426,9 @@ func (s *SessionStore) ReplaceLiveSession(ctx context.Context, oldSessionID stri
 		// The new row starts without auto-accept (a new agent run).
 		if err := clearAutoAcceptTx(ctx, tx, oldSessionID, AutoAcceptAgentRestarted, false); err != nil {
 			return err
+		}
+		if _, err := tx.ExecContext(ctx, "DELETE FROM session_launch_cli WHERE session_name IN (SELECT agent_type || '-' || session_id FROM live_sessions WHERE session_id = ?)", oldSessionID); err != nil {
+			return err // the replaced session's terminal is over: so is the CLI path kept for it (#408)
 		}
 		if _, err := tx.ExecContext(ctx, "UPDATE live_sessions SET status = 'inactive', stopped_at = ? WHERE session_id = ?", nowUTC(), oldSessionID); err != nil {
 			return err
@@ -734,6 +742,7 @@ func (s *SessionStore) CleanupOrphanedSleeping(ctx context.Context) (int, error)
 		return 0, err
 	}
 	n, _ := result.RowsAffected()
+	s.PruneLaunchCLI(ctx)
 	return int(n), nil
 }
 

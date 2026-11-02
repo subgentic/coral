@@ -37,7 +37,10 @@ func IsShellCommand(name string) bool {
 // wrapper script (which shows as 'bash' or 'sh') from looking exited. Unix only:
 // it reads the process table from ps, one snapshot shared by the checks of every
 // agent made within procTableTTL (#3728: three ps/pgrep runs per agent every 30 s).
-func ShellIdle(pid int) (idle bool, shell string, err error) {
+//
+// agent, when given, is wrapperIsCLI for the session's resolved CLI: a foreground shell that runs exactly that file is the agent (ShellRunning), not a nested shell (#408). It is never a
+// test on the shell's name or on "a script argument": a person's `sh other.sh` stays a nested shell.
+func ShellIdle(pid int, agent ...func(pid int) bool) (idle bool, shell string, err error) {
 	if pid <= 0 {
 		return false, "", fmt.Errorf("no shell pid")
 	}
@@ -61,7 +64,7 @@ func ShellIdle(pid int) (idle bool, shell string, err error) {
 	if !IsShellCommand(shell) {
 		return false, shell, nil // the terminal's process is the agent itself (it was exec'd)
 	}
-	state, _ := classifyShell(procs, pid)
+	state, _ := classifyShell(procs, pid, agent...)
 	// Three answers (Security on #387/#388): ShellRunning is the agent (a foreground non-shell program that is a direct child of the pane's shell); ShellBare is a prompt with nothing
 	// in it; ShellNested is a shell a person started, whatever runs under it. For ShellIdle both of the last two are "not the agent": nothing is typed as a notice. The launch-line
 	// paths tell them apart (NestedShell): a bare prompt gets its launch line, a nested shell is "a shell of unknown contents" and gets none.
@@ -83,11 +86,11 @@ func (c *Client) NestedShell(ctx context.Context, agentName, agentType, sessionI
 	if err != nil {
 		return "", err
 	}
-	return NestedShellOf(pid)
+	return NestedShellOf(pid, WrapperCheckFor(agentName))
 }
 
 // NestedShellOf is NestedShell for a shell pid (also the Unix pseudo-terminal's).
-func NestedShellOf(pid int) (string, error) {
+func NestedShellOf(pid int, agent ...func(pid int) bool) (string, error) {
 	procs, err := readProcTable()
 	if err != nil {
 		return "", fmt.Errorf("read process %d: %w", pid, err)
@@ -95,7 +98,7 @@ func NestedShellOf(pid int) (string, error) {
 	if _, ok := procs.byPID[pid]; !ok || !IsShellCommand(procs.byPID[pid].comm) {
 		return "", nil
 	}
-	if state, nested := classifyShell(procs, pid); state == ShellNested {
+	if state, nested := classifyShell(procs, pid, agent...); state == ShellNested {
 		return nested, nil
 	}
 	return "", nil
@@ -107,10 +110,11 @@ const nestedShellDepth = 8
 // classifyShell tells what is in the foreground of the shell pid. A foreground non-shell DIRECT child is the agent (ShellRunning), whatever else there is. Otherwise any shell reached
 // through shells alone (never through a program: an agent's own bash tool is below the agent) that the terminal is in, at its prompt ('+') or running a command (a foreground program
 // below it), is ShellNested, whatever runs under it. A background job, or a shell with neither, is not in the foreground and is nothing.
-func classifyShell(t *procTable, pid int) (ShellState, string) {
+func classifyShell(t *procTable, pid int, agent ...func(pid int) bool) (ShellState, string) {
+	isAgent := firstAgent(agent)
 	for _, c := range t.children[pid] {
 		e := t.byPID[c]
-		if !IsShellCommand(e.comm) && strings.Contains(e.stat, "+") {
+		if strings.Contains(e.stat, "+") && (!IsShellCommand(e.comm) || (isAgent != nil && isAgent(c))) { // (a shell is the agent only when it runs exactly the resolved CLI, #408)
 			return ShellRunning, ""
 		}
 	}
@@ -277,7 +281,7 @@ func (c *Client) AgentShellIdle(ctx context.Context, agentName, agentType, sessi
 	if err != nil {
 		return false, "", err
 	}
-	return ShellIdle(pid)
+	return ShellIdle(pid, WrapperCheckFor(agentName))
 }
 
 // agentShellPID is the pid of the agent's pane's shell: from the shared pane list when it has the pane (#3847), else from tmux.

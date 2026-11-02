@@ -16,4 +16,6 @@ const (
 	ReasonGone        = "the agent's process has ended"
 	ReasonBackground  = "the agent is not in the terminal's foreground"
 	ReasonForeground  = "the terminal's foreground program is not the agent"
+	// ReasonChildReads: a program the agent started reads the terminal (its standard input is the console), so typed keys may reach it rather than the agent.
+	ReasonChildReads = "a program the agent started reads the terminal"
 )
