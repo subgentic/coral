@@ -12,8 +12,7 @@ import (
 )
 
 // #12365 (the Operator: "we shouldn't prevent ~/.local from being referenced; it's too confusing", with Security's answer on #353): a CLI in a standard install root, judged on both the typed and the resolved path,
-// is never refused because an agent works in a folder that contains it. Anywhere else a CLI inside a live agent's working folder or a git working tree is still refused; the temp-folder, data-folder and
-// runnable/owner checks stay.
+// is never refused because an agent works in a folder that contains it. Anywhere else a CLI inside a live agent's working folder is still refused; the temp-folder, data-folder and runnable/owner checks stay.
 
 func (r *nativeRig) program(p string, mode os.FileMode) string {
 	r.t.Helper()
@@ -51,7 +50,7 @@ func TestACLIInAStandardInstallFolderIsNotRefusedBecauseAnAgentWorksInTheHomeFol
 	assert.Empty(t, r.screen(r.program(filepath.Join(prefix, "bin", "agy"), 0o755)), "the npm global prefix")
 }
 
-func TestACLIInAProjectOrAnywhereElseIsStillRefusedInAnAgentsFolderAndInAGitTree(t *testing.T) {
+func TestACLIInAProjectOrAnywhereElseIsStillRefusedInAnAgentsFolder(t *testing.T) {
 	r := newNativeRig(t)
 	proj := filepath.Join(r.home, "proj")
 	agy := r.program(filepath.Join(proj, "bin", "agy"), 0o755)
@@ -67,23 +66,12 @@ func TestACLIInAProjectOrAnywhereElseIsStillRefusedInAnAgentsFolderAndInAGitTree
 	assert.Contains(t, r2.screen(r2.program(filepath.Join(r2.home, ".localx", "bin", "agy"), 0o755)), "in an agent's working folder", ".localx is not .local")
 	assert.Contains(t, r2.screen(r2.program(filepath.Join(r2.home, "bins", "agy"), 0o755)), "in an agent's working folder", "bins is not bin")
 
-	// no agent works there, but the CLI is inside a git working tree: refused
+	// the git-tree refusal the first version of this change had was dropped (the Orchestrator's decision: it would newly refuse a project's node_modules/.bin, a nix or direnv shell, a CLI built in its own checkout):
+	// with no agent working there, a CLI inside a repository is used
 	r3 := newNativeRig(t)
 	repo := filepath.Join(r3.home, "code", "tools")
 	require.NoError(t, os.MkdirAll(filepath.Join(repo, ".git"), 0o755))
-	inRepo := r3.program(filepath.Join(repo, "bin", "agy"), 0o755)
-	assert.Contains(t, r3.screen(inRepo), "git working tree")
-	// a worktree's .git is a file
-	wt := filepath.Join(r3.home, "code", "wt")
-	require.NoError(t, os.MkdirAll(wt, 0o755))
-	require.NoError(t, os.WriteFile(filepath.Join(wt, ".git"), []byte("gitdir: /x\n"), 0o644))
-	assert.Contains(t, r3.screen(r3.program(filepath.Join(wt, "agy"), 0o755)), "git working tree")
-	// the same program with no .git above it and no agent: fine (a tool folder that is not a repo)
-	assert.Empty(t, r3.screen(r3.program(filepath.Join(r3.home, "tools", "agy"), 0o755)))
-	// the home folder being a git tree itself (a dotfiles repo) does not make everything under it one
-	require.NoError(t, os.MkdirAll(filepath.Join(r3.home, ".git"), 0o755))
-	assert.Empty(t, r3.screen(r3.program(filepath.Join(r3.home, "tools2", "agy"), 0o755)), "home's own .git is not a project")
-	assert.Empty(t, r3.screen(r3.program(filepath.Join(r3.home, ".local", "bin", "agy"), 0o755)), "and ~/.local/bin is a standard root first")
+	assert.Empty(t, r3.screen(r3.program(filepath.Join(repo, "bin", "agy"), 0o755)), "no git rule: no agent works there")
 }
 
 func TestAStandardRootsFileStillHasToBeTheUsersAndNotWritableByOthers(t *testing.T) {
@@ -119,4 +107,86 @@ func TestAnAgentWorkingInsideAStandardInstallFolderDoesNotRefuseItsCLIsEither(t 
 			assert.Empty(t, r.screen(r.link))
 		})
 	}
+}
+
+// Security's SHOULDs on #12365: a root that comes from the environment must not be as wide as the home folder (npm's documented "prefix=~" setting), and the folder-chain check is skipped only for the three fixed
+// system roots.
+func TestAnEnvironmentRootAsWideAsTheHomeFolderIsNotARoot(t *testing.T) {
+	for _, env := range []string{"NPM_CONFIG_PREFIX", "PNPM_HOME", "VOLTA_HOME", "BUN_INSTALL", "CARGO_HOME"} {
+		t.Run(env, func(t *testing.T) {
+			r := newNativeRig(t)
+			r.agentIn("aaaaaaaa-0000-4000-8000-000000000021", filepath.Join(r.home, "proj"))
+			agy := r.program(filepath.Join(r.home, "proj", "bin", "agy"), 0o755)
+			for name, v := range map[string]string{"the home folder": r.home, "a folder above it": filepath.Dir(r.home), "the filesystem root": string(filepath.Separator)} {
+				t.Setenv(env, v)
+				assert.Contains(t, r.screen(agy), "in an agent's working folder", env+"="+name+" does not make ~/proj/bin a standard root")
+			}
+		})
+	}
+}
+
+func TestTheNpmPrefixAddsItsBinAndLibFoldersNotItself(t *testing.T) {
+	r := newNativeRig(t)
+	r.agentIn("aaaaaaaa-0000-4000-8000-000000000022", r.home)
+	prefix := filepath.Join(r.home, "tools", "npm")
+	t.Setenv("NPM_CONFIG_PREFIX", prefix)
+	assert.Empty(t, r.screen(r.program(filepath.Join(prefix, "bin", "agy"), 0o755)), "<prefix>/bin")
+	assert.Empty(t, r.screen(r.program(filepath.Join(prefix, "lib", "node_modules", "pi", "bin", "pi"), 0o755)), "<prefix>/lib")
+	assert.Contains(t, r.screen(r.program(filepath.Join(prefix, "other", "agy"), 0o755)), "in an agent's working folder", "what is in the prefix but is not where npm puts programs")
+	assert.Contains(t, r.screen(r.program(filepath.Join(prefix, "agy"), 0o755)), "in an agent's working folder", "the prefix folder itself")
+}
+
+func TestOnlyTheThreeFixedSystemRootsSkipTheFolderChainCheck(t *testing.T) {
+	assert.True(t, systemRoot("/usr/local"))
+	assert.True(t, systemRoot("/opt/homebrew"))
+	assert.True(t, systemRoot("/home/linuxbrew/.linuxbrew"))
+	for _, not := range []string{"/srv/npm", "/usr/local/x", "/opt/homebrew/bin", "/usr", "/opt"} {
+		assert.False(t, systemRoot(not), not)
+	}
+	// an environment root OUTSIDE home gets the chain check: a folder on the way that others can write refuses it
+	r := newNativeRig(t)
+	outside := t.TempDir() // not under the rig's home
+	prefix := filepath.Join(outside, "npm")
+	t.Setenv("NPM_CONFIG_PREFIX", prefix)
+	r.agentIn("aaaaaaaa-0000-4000-8000-000000000023", outside)
+	agy := r.program(filepath.Join(prefix, "bin", "agy"), 0o755)
+	require.NoError(t, os.Chmod(prefix, 0o755))
+	assert.Empty(t, r.screen(agy), "folders on the way are the user's and not writable by others")
+	require.NoError(t, os.Chmod(filepath.Join(prefix, "bin"), 0o775))
+	assert.Contains(t, r.screen(agy), "in an agent's working folder", "a group-writable bin folder under an environment root outside home")
+}
+
+// QA's SHOULD 1 on #12365: the folder-chain check under home is pinned for BOTH ends. A group-writable ~/.local refuses the typed path (the link in ~/.local/bin) whatever it points at, and a group-writable root that
+// only the RESOLVED path is in (here ~/.npm-global) refuses it even though the typed path's own chain is fine.
+func TestAGroupWritableRootRefusesTheTypedPathAndTheResolvedPath(t *testing.T) {
+	newRig := func(t *testing.T) (r *nativeRig, link, target string) {
+		r = newNativeRig(t)
+		r.agentIn("aaaaaaaa-0000-4000-8000-000000000024", r.home)
+		target = r.program(filepath.Join(r.home, ".npm-global", "lib", "node_modules", "pi", "bin", "pi"), 0o755)
+		link = filepath.Join(r.home, ".local", "bin", "pi")
+		require.NoError(t, os.MkdirAll(filepath.Dir(link), 0o755))
+		require.NoError(t, os.Symlink(target, link))
+		return r, link, target
+	}
+	t.Run("untouched it passes, typed and resolved", func(t *testing.T) {
+		r, link, target := newRig(t)
+		assert.Empty(t, r.screen(link))
+		assert.Empty(t, r.screen(target))
+	})
+	t.Run("a group-writable ~/.local refuses the typed path", func(t *testing.T) {
+		r, link, _ := newRig(t)
+		require.NoError(t, os.Chmod(filepath.Join(r.home, ".local"), 0o775))
+		assert.Contains(t, r.screen(link), "in an agent's working folder", "the typed link's own chain is not private")
+	})
+	t.Run("a group-writable ~/.npm-global refuses the resolved path, and so the typed link that leads there", func(t *testing.T) {
+		r, link, target := newRig(t)
+		require.NoError(t, os.Chmod(filepath.Join(r.home, ".npm-global"), 0o775))
+		assert.Contains(t, r.screen(target), "in an agent's working folder", "the resolved path's chain")
+		assert.Contains(t, r.screen(link), "in an agent's working folder", "the typed path is in a fine root, but where it resolves is not")
+	})
+	t.Run("a group-writable folder in the middle of the resolved path", func(t *testing.T) {
+		r, link, _ := newRig(t)
+		require.NoError(t, os.Chmod(filepath.Join(r.home, ".npm-global", "lib"), 0o775))
+		assert.Contains(t, r.screen(link), "in an agent's working folder")
+	})
 }

@@ -105,13 +105,7 @@ func untrustedLocationOf(ctx context.Context, cfg *config.Config, ss *store.Sess
 		}
 	}
 	if standardInstallPlace(p) {
-		return "" // a CLI in a standard install root is not refused for an agent's working folder or a git tree (#12365): see cli_standard_install.go
-	}
-	if tree := gitTreeOf(real); tree != "" {
-		return "in a git working tree (" + displayFolder(tree) + "): a program there can be replaced by what the repository holds"
-	}
-	if tree := gitTreeOf(p); tree != "" && tree != gitTreeOf(real) {
-		return "in a git working tree (" + displayFolder(tree) + "): a program there can be replaced by what the repository holds"
+		return "" // a CLI in a standard install root is not refused for an agent's working folder (#12365): see cli_standard_install.go
 	}
 	if ss != nil {
 		if live, err := ss.GetAllLiveSessions(ctx); err == nil {
@@ -129,14 +123,6 @@ func untrustedLocationOf(ctx context.Context, cfg *config.Config, ss *store.Sess
 		}
 	}
 	return ""
-}
-
-// displayFolder writes a folder with the home folder as "~" (the refusal is shown to the person).
-func displayFolder(folder string) string {
-	if home, _ := os.UserHomeDir(); home != "" && (folder == home || strings.HasPrefix(folder, home+string(filepath.Separator))) {
-		return "~" + folder[len(home):]
-	}
-	return folder
 }
 
 // homeOrAbove says dir is the user's home folder or a folder above it.
