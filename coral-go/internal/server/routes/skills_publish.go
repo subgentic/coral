@@ -202,6 +202,11 @@ func (h *SkillsHandler) publish(w http.ResponseWriter, r *http.Request, data []b
 		writeError(w, http.StatusBadRequest, "invalid_skill", strings.TrimPrefix(err.Error(), skills.ErrInvalid.Error()+": "))
 		return nil, "", false
 	}
+	// The names of Coral's own example skills are Coral's (#12463): an agent's skill under one would sit beside the example and read as it.
+	if in.Kind == store.PublisherAgent && skills.IsStarterName(sk.Name) {
+		writeError(w, http.StatusConflict, "reserved_name", "that name belongs to an example skill that ships with Coral: publish under another name")
+		return nil, "", false
+	}
 	// A skill's text is stored, shown and read by agents: a file that carries a sign-in link (login_token=) is refused whoever publishes it, naming the file, before a byte is kept (the sign-in link census).
 	if f := fileWithSignInLink(sk); f != "" {
 		writeError(w, http.StatusBadRequest, "sign_in_link", "a file holds a sign-in link: remove it from "+skillFileName(f)+" and publish again")

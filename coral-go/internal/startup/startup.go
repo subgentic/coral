@@ -363,6 +363,7 @@ func Start(ctx context.Context, cfg *config.Config, opts Options) (*RunningServe
 	if !ownership.Foreign { // a Coral on a copy of another's database recovers and restores nothing
 		reconcileOrphanedSessions(ctx, db, agentRT, ptyRun)
 		reconcileOrphanedTeams(ctx, db)
+		srv.SeedStarterSkills(ctx) // the example skills Coral ships (#12463)
 
 		// Restore board pause state AFTER reconciliation so it reflects
 		// the final sleeping state (including recovered sessions).

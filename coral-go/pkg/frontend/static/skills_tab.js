@@ -15,7 +15,7 @@ const tableState = DT.tableState();
 let rows = [], showStatus = '', loadError = '', open = null /* { id, data, error, busy, acked, fileShown, opened: Set of the files shown } */;
 
 const host = () => document.getElementById('skills-view');
-const publisher = r => (r.publisher_kind === 'operator' ? 'Operator' : `${r.publisher_agent}${r.publisher_team ? ' · ' + r.publisher_team : ''}`);
+const publisher = r => (r.publisher_kind === 'operator' ? 'Operator' : r.publisher_kind === 'coral' ? 'Coral (example)' : `${r.publisher_agent}${r.publisher_team ? ' · ' + r.publisher_team : ''}`);
 const kb = n => (n >= 1024 ? `${(n / 1024).toFixed(1)} KB` : `${n} B`);
 const short = h => String(h || '').slice(0, 12);
 const button = (cls, text, onClick) => { const b = el('button', cls, text); b.type = 'button'; b.addEventListener('click', onClick); return b; };
@@ -153,6 +153,7 @@ function drawDetail() {
         page.append(sec);
     }
     if (s.status === 'pending') page.append(drawApproval(s, risky));
+    else if (s.publisher_kind === 'coral') page.append(el('p', 'skills-note', 'An example from Coral. It stays here, and Coral refreshes it when its text changes.')); // never removed (#12463)
     else page.append(drawRemove(s));
     return page;
 }

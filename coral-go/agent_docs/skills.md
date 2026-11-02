@@ -2,6 +2,10 @@
 
 A skill is an Agent Skills folder (`SKILL.md` and optional `scripts/`, `references/`, `assets/`) that the Operator approved. Coral keeps them; you find and read them with `coral-agent skills`.
 
+## Coral's example skills
+
+Coral ships three skills of its own, approved and published by "Coral (example)": `creating-coral-skills` (how to write a skill), `working-in-a-coral-team` (the board, tasks, files for review, asking and waiting) and `creating-a-coral-automation` (designing a workflow and a scheduled job for the Operator to create). They are Markdown only, are put in the store on every start, and are refreshed when Coral's text changes (a new version; an agent pinned to the old one keeps it). They cannot be removed. A skill of the same name that a person or an agent published is left alone.
+
 ## Find and read one
 
 ```sh

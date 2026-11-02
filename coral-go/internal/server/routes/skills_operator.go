@@ -121,6 +121,8 @@ func skillDecisionError(w http.ResponseWriter, err error) {
 		errConflict(w, "this skill is not waiting for a decision")
 	case errors.Is(err, store.ErrSkillDigest):
 		writeError(w, http.StatusConflict, "skill_changed", "this is not the skill that was reviewed: open it again")
+	case errors.Is(err, store.ErrStarterSkill):
+		writeError(w, http.StatusConflict, "starter_skill", "this is one of Coral's example skills: it stays")
 	case errors.Is(err, store.ErrNeedScriptsAck):
 		writeError(w, http.StatusConflict, "scripts_not_acknowledged", "review the scripts and files that cannot be shown as text, and confirm them first")
 	default:

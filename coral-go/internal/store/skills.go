@@ -28,6 +28,7 @@ const (
 const (
 	PublisherOperator = "operator"
 	PublisherAgent    = "agent"
+	PublisherCoral    = "coral" // the starter skills Coral ships as examples (#12463): approved at once, Markdown only, never deleted
 )
 
 // The caps of the Skills Store.
@@ -58,6 +59,8 @@ var (
 	ErrSkillState = errors.New("store: the skill is not waiting for a decision")
 	// ErrSkillRefusedBefore: the Operator already rejected or removed these exact bytes; an agent cannot publish them again.
 	ErrSkillRefusedBefore = errors.New("store: the Operator already rejected or removed this skill")
+	// ErrStarterSkill: one of the example skills Coral ships, which stay.
+	ErrStarterSkill = errors.New("store: this is one of Coral's example skills; it stays")
 	// ErrBadSkill: a digest or publisher that is not valid.
 	ErrBadSkill = errors.New("store: not a valid skill record")
 )
@@ -121,7 +124,7 @@ func now() string { return time.Now().UTC().Format(time.RFC3339) }
 // returns the row that is there. Caps: 500 skills on a computer, 5 waiting per agent, 20 waiting in all.
 func (s *SessionStore) AddSkill(ctx context.Context, in AddSkillInput) (*SkillRow, bool, error) {
 	sk := in.Skill
-	if sk == nil || !skillDigestRe.MatchString(in.Digest) || (in.Kind != PublisherOperator && in.Kind != PublisherAgent) || (in.Kind == PublisherAgent && in.Agent == "") {
+	if sk == nil || !skillDigestRe.MatchString(in.Digest) || (in.Kind != PublisherOperator && in.Kind != PublisherAgent && in.Kind != PublisherCoral) || (in.Kind == PublisherAgent && in.Agent == "") {
 		return nil, false, ErrBadSkill
 	}
 	if sk.Digest != in.Digest { // the text that is indexed must be the bytes the digest names
@@ -129,6 +132,9 @@ func (s *SessionStore) AddSkill(ctx context.Context, in AddSkillInput) (*SkillRo
 	}
 	risky := sk.Scripts() > 0 || sk.NotReviewable() > 0
 	if in.Kind == PublisherAgent && (risky || !skills.AgentMayPublish(sk)) {
+		return nil, false, ErrAgentScripts
+	}
+	if in.Kind == PublisherCoral && (risky || !skills.AgentMayPublish(sk)) { // the examples hold only SKILL.md and document or data files, as an agent's skill does
 		return nil, false, ErrAgentScripts
 	}
 	if in.Kind == PublisherOperator && risky && !in.ScriptsAcked {
@@ -289,6 +295,9 @@ func (s *SessionStore) RemoveSkill(ctx context.Context, id string) error {
 				return ErrSkillNotFound
 			}
 			return err
+		}
+		if row.PublisherKind == PublisherCoral {
+			return ErrStarterSkill
 		}
 		if _, err := tx.ExecContext(ctx, `DELETE FROM skills_fts WHERE skill_id = ?`, id); err != nil {
 			return err
