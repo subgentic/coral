@@ -24,28 +24,28 @@
     {
       "file": "inbox_agent_card.js",
       "what": "an agent's permission card title: '<agent> asks you'"
-    }
-  ],
-  "pending": [
-    {
-      "file": "goal_view.js",
-      "what": "goal comments' authors, a goal's driver and the agents on its tasks"
     },
     {
-      "file": "inbox_reviews.js",
-      "what": "a file's uploader on a review row and in the viewer title line"
+      "file": "goal_view.js",
+      "what": "a goal's driver on the goal page"
     },
     {
       "file": "inbox_proposals.js",
       "what": "the proposer of a proposal"
     },
     {
-      "file": "task_list.js",
-      "what": "task tables: owner (Assigned to) and reviewers"
+      "file": "team_tasks_page.js",
+      "what": "'Waiting for <assignee> to pick it up' on a team's task page"
+    }
+  ],
+  "pending": [
+    {
+      "file": "inbox_reviews.js",
+      "what": "a file's uploader on a review row and in the viewer title line"
     },
     {
-      "file": "team_tasks_page.js",
-      "what": "a team's task page: assignee and creator"
+      "file": "task_list.js",
+      "what": "task tables: owner and reviewers are circles drawn by data_table.js (avatars/personButton), at start: they need the helper in the table, not here"
     },
     {
       "file": "task_detail.js",
@@ -53,7 +53,7 @@
     },
     {
       "file": "team_agents_page.js",
-      "what": "the team's Agents tab"
+      "what": "the Agents tab's rows: the name is the row's own button (DT.avatar + primaryButton)"
     },
     {
       "file": "cost_dashboard.js",

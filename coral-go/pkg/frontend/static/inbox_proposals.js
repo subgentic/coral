@@ -2,6 +2,7 @@
  * goal or task exactly as proposed; Edit and approve changes its words first; Reject says no, with a reason the proposer is told once. Everything the agents wrote is set as text (textContent, a field's value),
  * never as HTML. The Operator's alone: the machine answers a guest or a grantee 403, and then there are no rows. An expired proposal stays in the list, marked, until the Operator dismisses it here. */
 import { importOnce } from './import_once.js';
+const { agentLink } = await importOnce('./agent_link.js');
 import { showToast } from './utils.js';
 import { loadStyles } from './lazy_styles.js';
 const { markHidden } = await importOnce('./visible_marks.js'); // lazy: its failure is retried
@@ -67,7 +68,7 @@ export function openProposalDialog(p, mode = 'view') {
     const facts = proposalFacts(p), pay = p.payload && typeof p.payload === 'object' ? p.payload : {};
     const d = el('dialog', 'modal-content dlg-form proposal-dialog'); d.id = 'proposal-dialog'; d.setAttribute('aria-labelledby', 'proposal-dialog-title');
     const h = el('h2', null, `${kindWord(p) === 'goal' ? 'A goal' : 'A task'} waiting for your approval`); h.id = 'proposal-dialog-title';
-    const who = el('p', 'proposal-who', `${markedText(p.proposer)} proposed it for ${p.board_label ? markedText(p.board_label) : p.board_id}.${p.goal_proposal_id ? ' It is for a goal that is also waiting: approve that goal first.' : ''}`);
+    const who = el('p', 'proposal-who'); who.append(agentLink(p.proposer, { board: p.board_id }), ` proposed it for ${p.board_label ? markedText(p.board_label) : p.board_id}.${p.goal_proposal_id ? ' It is for a goal that is also waiting: approve that goal first.' : ''}`); // the proposer's name opens its chat (#12182)
     const inputs = []; // [field, the raw words]: a field shows the words marked until Edit opens them, then the raw words
     let editing = mode === 'edit';
     const field = (label, value, tall) => { const l = el('label', 'proposal-field'); l.append(el('span', null, label)); const i = el(tall ? 'textarea' : 'input', 'field'); if (tall) i.rows = 4; i.value = editing ? value : markedBlock(value); i.readOnly = !editing; inputs.push([i, value]); l.append(i); return [l, i]; }; // the words are read first: they are changed only after Edit and approve
