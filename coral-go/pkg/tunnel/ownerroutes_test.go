@@ -90,6 +90,10 @@ func TestTheOwnerTableAgreesWithTheHandWrittenListItReplaced(t *testing.T) {
 			if m == http.MethodPost && strings.HasPrefix(p, "/api/sessions/live/") && strings.HasSuffix(p, "/dismiss-wait") {
 				continue
 			}
+			// The live list is an OwnerSees route since #12377 (the owner's rows carry waits_on_this): the old list never had it.
+			if m == http.MethodGet && p == "/api/sessions/live" {
+				continue
+			}
 			// The owner's switch of one agent's auto-sleep (#12111) is new: the old list never had it.
 			if m == http.MethodPost && strings.HasPrefix(p, "/api/sessions/live/") && strings.HasSuffix(p, "/auto-sleep") {
 				continue
@@ -258,4 +262,24 @@ func TestTheRealConnectorStampsEveryOwnerRouteOfTheTableAndNothingElse(t *testin
 	}
 	assert.Empty(t, got[len(got)-2].role, "not an owner route")
 	assert.Empty(t, got[len(got)-1].role, "a write route that is not an owner route")
+}
+
+// #12377 (coral-hub's question): waits_on_this (what an agent's work blocks, #11455) never reached a Hub dashboard because GET /api/sessions/live was not an owner route, so the connector never stamped the owner marker on
+// it and the machine could not tell the owner from a viewer. The list is an OwnerSees route: everyone still gets the list (nobody is refused, no owner label is required to read it), the stamped owner also gets the owner-only fields.
+func TestTheLiveSessionListIsAnOwnerSeesRouteAndNothingAroundItChanged(t *testing.T) {
+	pattern, mode := OwnerRoute(http.MethodGet, "/api/sessions/live")
+	assert.Equal(t, "/api/sessions/live", pattern)
+	assert.Equal(t, OwnerSees, mode, "stamped, and the handler decides what a non-owner gets")
+	assert.True(t, IsOwnerRoute(http.MethodGet, "/api/sessions/live"), "so the connector stamps it")
+	assert.False(t, mode.Refuses(), "a viewer or grantee still gets the list")
+	assert.False(t, mode.RefusesLocal(), "and so does this computer's own dashboard")
+	assert.Equal(t, TierView, Classify(http.MethodGet, "/api/sessions/live", ""), "it is still a view read")
+	// the routes beside it are untouched: one agent's pages, its chat and the rest of the list's family are not owner routes
+	for _, p := range []string{"/api/sessions/live/claude-x", "/api/sessions/live/claude-x/chat", "/api/sessions/live/claude-x/poll", "/api/sessions/live/claude-x/info", "/api/sessions/live/claude-x/capture"} {
+		assert.False(t, IsOwnerRoute(http.MethodGet, p), p)
+	}
+	// only the read: nothing else on the exact path is an owner route
+	for _, m := range []string{http.MethodPost, http.MethodPut, http.MethodDelete, http.MethodPatch} {
+		assert.False(t, IsOwnerRoute(m, "/api/sessions/live"), m)
+	}
 }

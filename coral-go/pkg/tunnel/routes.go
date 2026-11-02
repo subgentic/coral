@@ -148,7 +148,6 @@ var routeTable = cat(
 	// ── view: reads ─────────────────────────────────────────────────────
 	rules(http.MethodGet, TierView,
 		"/api/health", "/ws/coral", "/ws/terminal/{name}",
-		"/api/sessions/live",
 		"/api/sessions/live/{name}",
 		"/api/sessions/live/{name}/capture",
 		"/api/sessions/live/{name}/poll",
@@ -328,6 +327,9 @@ var routeTable = cat(
 	// What a viewer sees of a board's settings is the machine's to decide (the health setup is the owner's, #5307): the marker is stamped, the handler gives a non-owner less.
 	// The update status (#5280) shows the owner more, with the label optional for a machine linked before it was recorded.
 	owner(OwnerSees, rules(http.MethodGet, TierView, "/api/board/{project}/settings")),
+	// The live session list (#12377, coral-hub's question): everyone who may view still gets the list, and the stamped owner also gets what is the owner's alone on its rows (waits_on_this, #11455: task titles of every board).
+	// Without the marker the connector never stamped this route, so the machine could not tell the owner from a viewer and the field never reached a Hub dashboard. The handler decides per field; nothing is refused here.
+	owner(OwnerSees, rules(http.MethodGet, TierView, "/api/sessions/live")),
 	// The routes that can start a NEW board (#11627, Security's #11636): the owner marker is stamped so the machine can tell the owner from a guest, a grantee or a guide, and refuses everyone else a name no board has (403 owner_only,
 	// refuseNewBoardName). The handler decides, so a guest still posts, subscribes and writes on a board that exists. Interact, as before.
 	owner(OwnerSees,

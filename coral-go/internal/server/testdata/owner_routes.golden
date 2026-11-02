@@ -31,6 +31,7 @@ GET /api/proposals view owner-only
 GET /api/saved view owner-only
 GET /api/saved/{id}/message view owner-only
 GET /api/session-artifacts view owner-only
+GET /api/sessions/live view owner-sees
 GET /api/settings/prompt-inspection launch owner-only
 GET /api/system/update view owner-update
 GET /api/team-artifacts view owner-only

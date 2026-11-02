@@ -120,7 +120,7 @@ func TestStampTeamOnlyACompleteStampOnAnOwnerRoute(t *testing.T) {
 		{"admin on an artifact read", nil, http.MethodGet, "/api/artifacts/" + hexID, nil, true},
 		{"admin on the artifact list", nil, http.MethodGet, "/api/artifacts", nil, true},
 		{"a member's stamp is carried; the server refuses it", func(h *Header) { h.HubTeamRole = "member" }, http.MethodGet, "/api/artifacts", nil, true},
-		{"not an owner route", nil, http.MethodGet, "/api/sessions/live", nil, false},
+		{"not an owner route", nil, http.MethodGet, "/api/sessions/live/x/info", nil, false},
 		{"a board write", nil, http.MethodPost, "/api/board/t/tasks/12/complete", nil, false},
 		{"a message (it can start a board, #11627)", nil, http.MethodPost, "/api/board/t/messages", nil, true},
 		{"no org", func(h *Header) { h.HubOrg = "" }, http.MethodGet, "/api/artifacts", nil, false},
@@ -272,7 +272,7 @@ func TestStampTeamReplacesPreloadedHeaders(t *testing.T) {
 		h    Header
 		path string
 	}{
-		"another route":        {full, "/api/sessions/live"},
+		"another route":        {full, "/api/sessions/live/x/info"}, // not an owner route (the live list itself became one, #12377)
 		"no org on the stream": {Header{Kind: KindHTTP, HubUser: teamUser, HubTeamRole: "admin", HubUserID: teamUID}, "/api/artifacts"},
 		"no id on the stream":  {Header{Kind: KindHTTP, HubUser: teamUser, HubOrg: teamOrg, HubTeamRole: "admin"}, "/api/artifacts"},
 	} {
