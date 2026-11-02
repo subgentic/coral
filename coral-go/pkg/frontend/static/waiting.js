@@ -51,6 +51,12 @@ export function waitingText(row) {
     return noticesPaused(row) ? PAUSED_LINE : '';
 }
 
+/** The server's line for a woken agent whose Coral token was not accepted (#12291), bounded; '' when there is none. Text only. */
+export function tokenProblemText(row) {
+    if (!row || row.sleeping || typeof row.coral_token_problem !== 'string') return '';
+    return row.coral_token_problem.trim().slice(0, 200);
+}
+
 /** What is said after a Send now, from the server's answer. */
 export function sendNowToast(r) {
     if (r && r.nothing_waiting) return 'No unread team messages wait for this agent.';
@@ -64,11 +70,12 @@ export function sendNowToast(r) {
 export function syncWaitingNotice(row) {
     const el = document.getElementById('composer-waiting-notice');
     if (!el) return;
-    const text = waitingText(row), on = text !== '';
+    const waits = waitingText(row), token = waits === '' ? tokenProblemText(row) : '', text = waits || token, on = text !== ''; // the token line stands in only when nothing waits (#12291)
     const t = document.getElementById('composer-waiting-text');
     if (t && t.textContent !== text) t.textContent = text;
     if (el.classList.contains('composer-waiting-empty') === on) el.classList.toggle('composer-waiting-empty', !on);
-    for (const b of el.querySelectorAll('button')) if (b.hidden === on) b.hidden = !on;
+    const buttons = on && token === ''; // the token line has no list or actions of its own
+    for (const b of el.querySelectorAll('button')) if (b.hidden === buttons) b.hidden = !buttons;
     const send = document.getElementById('composer-waiting-send');
     const canSend = on && waitingCount(row) > 0;
     if (send && send.hidden === canSend) send.hidden = !canSend;
@@ -79,7 +86,7 @@ export function syncWaitingNotice(row) {
     }
     const help = document.getElementById('composer-waiting-record-help');
     if (help && help.hidden === paused) help.hidden = !paused;
-    if (!on) closeList();
+    if (!on || token) closeList();
 }
 
 function closeList() {
