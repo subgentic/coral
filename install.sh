@@ -17,6 +17,7 @@
 #   --release <x.y.z>  install that release instead of the latest (for example 2.0.36)
 #   --dir <path>       install into <path> (macOS: the folder for Coral.app; Linux: the folder for the programs)
 #   --no-cli           macOS: do not link the command-line tools into ~/.local/bin
+#   --require-signature  stop unless cosign checks the signature (without cosign the default is: checksum only)
 #   --version          print this installer's version
 #   -h, --help         this text
 #
@@ -27,7 +28,10 @@
 
 set -euo pipefail
 
-INSTALLER_VERSION="1"
+INSTALLER_VERSION="2"
+# The programs a Coral package holds (tests/release/commands.txt; install_sh_test.sh keeps the two equal). A Linux tarball with any other name is refused:
+# the folder it goes in is usually early on PATH, and an extra file there could shadow a system command.
+PROGRAMS=(coral launch-coral coral-board coral-agent coral-hook-agentic-state coral-hook-message-check coral-hook-session-start coral-hook-task-sync coral-update)
 REPO="subgentic/coral"
 BASE_URL="${CORAL_INSTALL_BASE_URL:-https://github.com/${REPO}/releases}"
 MSI_URL="https://github.com/${REPO}/releases/latest/download/Coral-x64.msi"
@@ -53,6 +57,7 @@ Options:
   --release <x.y.z>  install that release instead of the latest (for example 2.0.36)
   --dir <path>       install into <path> (macOS: the folder for Coral.app; Linux: the folder for the programs)
   --no-cli           macOS: do not link the command-line tools into ~/.local/bin
+  --require-signature  stop unless cosign checks the signature (without cosign the default is: checksum only)
   --version          print this installer's version
   -h, --help         this text
 USAGE
@@ -84,13 +89,14 @@ fetch() {
 }
 
 main() {
-    local dry=0 release="" dir="" cli=1
+    local dry=0 release="" dir="" cli=1 need_sig=0
     while [ $# -gt 0 ]; do
         case "$1" in
             --dry-run) dry=1; shift ;;
             --release) [ $# -ge 2 ] && [ -n "$2" ] || die "--release needs a version, for example --release 2.0.36"; release="$2"; shift 2 ;;
             --dir) [ $# -ge 2 ] && [ -n "$2" ] || die "--dir needs a folder"; dir="$2"; shift 2 ;;
             --no-cli) cli=0; shift ;;
+            --require-signature) need_sig=1; shift ;;
             --version) say "Coral installer $INSTALLER_VERSION"; return 0 ;;
             -h|--help) usage; return 0 ;;
             *) printf 'Unknown option: %s (try --help)\n' "$1" >&2; return 2 ;;
@@ -160,14 +166,16 @@ main() {
     got="$(sha256_of "$WORK/$asset")"
     [ "$got" = "$want" ] || die "the checksum of $asset does not match SHA256SUMS.txt (got $got, want $want). It may be damaged or not an official build: not installing."
     say "    checksum ok ($asset)"
-    verify_signature
+    verify_signature "$need_sig"
 
     if [ "$os" = macos ]; then install_macos "$target" "$cli"; else install_linux "$target" "$arch"; fi
 }
 
 # The signature on SHA256SUMS.txt, when cosign can check it (the README's "Verify your download" command).
 verify_signature() {
+    local need="$1"
     if ! have cosign; then
+        [ "$need" = 0 ] || die "--require-signature was given but cosign is not installed: install cosign (https://docs.sigstore.dev/cosign/system_config/installation/) and run this again. Not installing."
         say "    Checksum-verified only: cosign is not installed, so the signature on SHA256SUMS.txt was not checked."
         say "    (The checksum guards against a damaged download. To prove the release came from Coral's release workflow, install cosign and run this again.)"
         return 0
@@ -186,7 +194,7 @@ verify_signature() {
 }
 
 install_linux() {
-    local target="$1" arch="$2" listing name kind line
+    local target="$1" arch="$2" listing name kind line f base
     mkdir -p "$WORK/unpack"
     # A name that leaves the folder, an absolute name, a link or a device is refused before anything is unpacked.
     listing="$(tar -tvzf "$WORK/coral-linux-$arch.tar.gz" 2>/dev/null)" || die "the tarball cannot be read."
@@ -198,10 +206,16 @@ install_linux() {
         case "$name" in /*|..|../*|*/..|*/../*) die "the tarball holds an unsafe path ($name): not installing." ;; esac
     done < <(tar -tzf "$WORK/coral-linux-$arch.tar.gz")
     tar -xzf "$WORK/coral-linux-$arch.tar.gz" -C "$WORK/unpack" || die "the tarball could not be unpacked."
+    local p known
+    for f in "$WORK"/unpack/* "$WORK"/unpack/.[!.]*; do
+        [ -e "$f" ] || continue
+        base="$(basename "$f")"; known=0
+        for p in "${PROGRAMS[@]}"; do [ "$base" != "$p" ] || known=1; done
+        [ "$known" = 1 ] || die "the tarball holds '$base', which is not one of Coral's programs: not installing."
+    done
     [ -x "$WORK/unpack/coral" ] || die "the tarball holds no 'coral' program: not installing."
     if [ -n "$(find "$WORK/unpack" -mindepth 1 -type d -print -quit)" ]; then die "the tarball holds folders, which this installer does not expect: not installing."; fi
     note "Installing in $target"
-    local f base
     for f in "$WORK"/unpack/*; do
         base="$(basename "$f")"
         if ! { cp "$f" "$target/.$base.new.$$" && chmod 0755 "$target/.$base.new.$$" && mv -f "$target/.$base.new.$$" "$target/$base"; }; then
@@ -223,6 +237,20 @@ finish_linux() {
     say "Install and sign in to an agent CLI (Claude Code, Codex, Antigravity or Pi) first: Coral runs them, it does not install them."
 }
 
+# The app's own code signature, before it is put in place: a file fetched with curl has no quarantine mark, so Gatekeeper would never look at it. An unsigned build is said so and allowed.
+check_app_signature() {
+    local app="$1" out team
+    if ! have codesign; then warn "codesign is not available: the app's code signature was not checked."; return 0; fi
+    if out="$(codesign --verify --deep --strict "$app" 2>&1)"; then
+        team="$(codesign -dvv "$app" 2>&1 | sed -n 's/^TeamIdentifier=//p' | head -n1)"
+        say "    code signature ok (Coral.app, signing team ${team:-unknown})"
+    elif [[ "$out" == *"not signed at all"* ]]; then
+        say "    This Coral.app is not code-signed (an unsigned build): only the checksum vouches for it."
+    else
+        die "the code signature of Coral.app is not valid ($out): not installing."
+    fi
+}
+
 install_macos() {
     local target="$1" cli="$2" mount app dest
     mount="$WORK/mount"; mkdir -p "$mount"
@@ -230,6 +258,7 @@ install_macos() {
     MOUNT="$mount"
     app="$mount/Coral.app"
     [ -d "$app" ] || die "the disk image holds no Coral.app: not installing."
+    check_app_signature "$app"
     dest="$target/Coral.app"
     if pgrep -f "$dest/Contents/MacOS" >/dev/null 2>&1; then warn "Coral is running from $dest: quit it after this, then open it again to use the new version."; fi
     note "Installing in $target"

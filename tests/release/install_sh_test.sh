@@ -40,6 +40,11 @@ mkdir -p "$rel/download"; cp -R "$rel/latest/download" "$rel/download/v9.9.9"
 export CORAL_INSTALL_BASE_URL="file://$rel"
 run() { local out; out="$("$@" 2>&1)" && rc=0 || rc=$?; output="$out"; }
 
+# --- the program list is the shipped one (tests/release/commands.txt) ---------------------------------------------
+want_progs="$(grep -vE '^[[:space:]]*(#|$)' "$root/tests/release/commands.txt" | sort | tr '\n' ' ')"
+have_progs="$(grep -E '^PROGRAMS=\(' "$script" | sed -E 's/^PROGRAMS=\((.*)\)$/\1/' | tr ' ' '\n' | grep . | sort | tr '\n' ' ')"
+[ "$want_progs" = "$have_progs" ] && ok "install.sh's PROGRAMS equal commands.txt" || fail "PROGRAMS differ from commands.txt: [$have_progs] vs [$want_progs]"
+
 # --- flags ---------------------------------------------------------------------------------------------
 run bash "$script" --version; [ "$rc" = 0 ] && [[ "$output" == "Coral installer "* ]] && ok "--version prints the installer's version" || fail "--version: $rc $output"
 run bash "$script" --help; [ "$rc" = 0 ] && [[ "$output" == *"--dry-run"* ]] && ok "--help lists the options" || fail "--help: $rc"
@@ -89,15 +94,17 @@ with tarfile.open(sys.argv[1],'w:gz') as t:
 PY
         ;;
         link) ln -s /etc/passwd "$d/w/passwd"; tar czf "$d/latest/download/coral-linux-amd64.tar.gz" -C "$d/w" . ;;
+        extra) printf '#!/bin/sh\n' >"$d/w/ls"; chmod 755 "$d/w/ls"; tar czf "$d/latest/download/coral-linux-amd64.tar.gz" -C "$d/w" . ;;
         nocoral) rm "$d/w/coral"; printf x >"$d/w/other"; tar czf "$d/latest/download/coral-linux-amd64.tar.gz" -C "$d/w" . ;;
     esac
     printf '%s  coral-linux-amd64.tar.gz\n' "$(sha "$d/latest/download/coral-linux-amd64.tar.gz")" >"$d/latest/download/SHA256SUMS.txt"
     echo "$d"
 }
-for how in traverse link nocoral; do
+for how in traverse link nocoral extra; do
     d="$(mk_evil "$how" "$how")"
     CORAL_INSTALL_BASE_URL="file://$d" lx --dir "$tmp/evil-out-$how"
     want_msg=""; [ "$how" != traverse ] || want_msg="unsafe path" # the installer's own refusal, not only tar's
+    [ "$how" != extra ] || want_msg="not one of Coral's programs"
     if [ "$rc" != 0 ] && [[ "$output" == *"$want_msg"* ]] && [ -z "$(ls -A "$tmp/evil-out-$how")" ] && [ ! -e "$tmp/evil-out-$how/../escaped" ] && [ ! -e "$tmp/escaped" ]; then ok "a $how tarball is refused and nothing is installed"; else fail "$how tarball: $rc $output"; fi
 done
 
@@ -107,6 +114,13 @@ printf '#!/bin/sh\nexit 0\n' >"$stub/cosign"; chmod 755 "$stub/cosign"
 PATH="$stub:$PATH" lx --dir "$tmp/cs-ok"; [ "$rc" = 0 ] && [[ "$output" == *"signature ok"* ]] || fail "cosign ok: $rc $output"
 printf '#!/bin/sh\nexit 1\n' >"$stub/cosign"
 PATH="$stub:$PATH" lx --dir "$tmp/cs-bad"; [ "$rc" != 0 ] && [[ "$output" == *"did not verify"* ]] && [ -z "$(ls -A "$tmp/cs-bad")" ] && ok "cosign: a good signature is reported; a bad one stops the install" || fail "cosign bad: $rc $output"
+
+# --- --require-signature: without cosign it stops; with a good cosign it goes on ----------------------------------
+lx --dir "$tmp/rs-no" --require-signature
+if [ "$rc" != 0 ] && [[ "$output" == *"--require-signature was given but cosign is not installed"* ]] && [ -z "$(ls -A "$tmp/rs-no")" ]; then ok "--require-signature without cosign stops and installs nothing"; else fail "require-signature no cosign: $rc $output"; fi
+printf '#!/bin/sh\nexit 0\n' >"$stub/cosign"
+PATH="$stub:$PATH" lx --dir "$tmp/rs-yes" --require-signature; [ "$rc" = 0 ] && [[ "$output" == *"signature ok"* ]] && ok "--require-signature with cosign installs" || fail "require-signature with cosign: $rc $output"
+rm -f "$stub/cosign"
 
 # --- never sudo: a folder that is not writable is said so -------------------------------------------------
 ro="$tmp/ro"; mkdir -p "$ro"; chmod 555 "$ro"
@@ -121,6 +135,13 @@ if [ "$(uname -s)" = Darwin ]; then
     if [ "$rc" = 0 ] && [ -x "$apps/Coral.app/Contents/MacOS/coral" ] && [ -L "$HOME/.local/bin/coral" ] && [ ! -e "$HOME/Applications" ]; then ok "macOS: Coral.app installed in the folder given, CLI linked in the temp HOME, ~/Applications untouched"; else fail "macos install: $rc $output"; fi
     printf stale >"$apps/Coral.app/old-file"
     run bash "$script" --dir "$apps" --no-cli; [ "$rc" = 0 ] && [ ! -e "$apps/Coral.app/old-file" ] && ok "macOS: a second run replaces the app" || fail "macos reinstall: $rc $output"
+    # The app's code signature: unsigned says so and installs; signed names the team; an invalid one stops (a stub codesign stands in).
+    run bash "$script" --dir "$tmp/Apps-unsigned" --no-cli; [ "$rc" = 0 ] && [[ "$output" == *"not code-signed"* ]] && ok "macOS: an unsigned app is said so in one line and installs" || fail "unsigned: $rc $output"
+    printf '#!/bin/sh\ncase "$1" in --verify) exit 0 ;; -dvv) echo "TeamIdentifier=ABCDE12345" >&2 ;; esac\n' >"$stub/codesign"; chmod 755 "$stub/codesign"
+    PATH="$stub:$PATH" run bash "$script" --dir "$tmp/Apps-signed" --no-cli; [ "$rc" = 0 ] && [[ "$output" == *"signing team ABCDE12345"* ]] && ok "macOS: a signed app prints its signing team" || fail "signed: $rc $output"
+    printf '#!/bin/sh\necho "a sealed resource is missing or invalid" >&2; exit 1\n' >"$stub/codesign"
+    PATH="$stub:$PATH" run bash "$script" --dir "$tmp/Apps-bad" --no-cli; [ "$rc" != 0 ] && [[ "$output" == *"code signature of Coral.app is not valid"* ]] && [ ! -e "$tmp/Apps-bad/Coral.app" ] && ok "macOS: an invalid signature stops the install" || fail "invalid sig: $rc $output"
+    rm -f "$stub/codesign"
     [ -z "$(hdiutil info | grep "$tmp" || true)" ] && ok "macOS: the disk image is detached" || fail "the DMG is still mounted"
 else
     echo "skip: the macOS install runs on a Mac only"
