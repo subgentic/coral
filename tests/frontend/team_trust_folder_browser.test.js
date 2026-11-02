@@ -15,7 +15,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await ev(`(async () => { window.__teamLaunches = [];
             const real = window.fetch; const json = (b, status = 200) => Promise.resolve(new Response(JSON.stringify(b), { status, headers: { 'content-type': 'application/json' } }));
             window.fetch = (u, o = {}) => { const p = new URL(String(u), location.href), m = o.method || 'GET';
-                if (p.pathname === '/api/sessions/launch-team' && m === 'POST') { window.__teamLaunches.push(JSON.parse(o.body)); return json({ agents: [{ name: 'A', session_id: 's' }] }); }
+                if (p.pathname === '/api/sessions/launch-team' && m === 'POST') { window.__teamLaunches.push(JSON.parse(o.body)); return json({ agents: [{ name: 'A', session_id: 's' }], ...(window.__trustAnswer ? { trust_folder: window.__trustAnswer } : {}) }); }
                 if (p.pathname === '/api/filesystem/list') { window.__listed = (window.__listed || 0) + 1; return p.searchParams.get('path') === '/home/p/Coral/exists' && !window.__hideExists ? json({ entries: [] }) : json({ error: 'not found' }, 404); }
                 if (p.pathname === '/api/board/projects') return json([]);
                 return real(u, o); };
@@ -122,6 +122,21 @@ const { removeBoards } = require('./helpers/board_cleanup');
         assert.equal(await visible('launch-team-trust'), false);
         sent = await go();
         assert.equal(sent.trust_folder, undefined, 'a tick for another folder is not sent'); assert.equal(sent.create_dir, true);
+
+        // #12338: what the person ticked and Coral did not do is said, in the server's own words, when the launch answers (a folder in /tmp is refused by design; nothing said so)
+        console.log('A tick the server refused is said after the launch');
+        await open(); await setDir('/home/p/Code/app', false);
+        await ev(`document.getElementById('launch-team-trust').click(); true`);
+        await ev(`window.__trustAnswer = { path: '/home/p/Code/app', trusted: [], refused: 'a folder in a shared place (/private/tmp) is never trusted: anyone on the computer can write into it' }; true`);
+        sent = await go();
+        assert.equal(sent.trust_folder, true);
+        await waitFor(`[...document.querySelectorAll('.toast-message')].some(t => /Trust this folder was not applied: a folder in a shared place/.test(t.textContent))`, 'the refusal said in a toast');
+        await ev(`window.__trustAnswer = { path: '/home/p/Code/app', trusted: ['codex'], failed: { claude: 'the agent\\'s settings file is not there yet' }, not: { claude: 'the agent\\'s settings file is not there yet' } }; window.hideLaunchModal(); true`);
+        await open(); await setDir('/home/p/Code/app', false);
+        await ev(`document.getElementById('launch-team-trust').click(); true`);
+        await go();
+        await waitFor(`[...document.querySelectorAll('.toast-message')].some(t => /Trust this folder was not applied for claude: the agent's settings file is not there yet/.test(t.textContent))`, 'a failure for one agent type said in a toast');
+        await ev(`window.__trustAnswer = null; window.hideLaunchModal(); true`);
     } finally { await removeBoards(ev, Array.from({ length: 12 }, (_, i) => 'trust-' + (i + 1))); await client.close(); }
     console.log('team_trust_folder_browser: ok');
 })().catch(e => { console.error(e); process.exit(1); });

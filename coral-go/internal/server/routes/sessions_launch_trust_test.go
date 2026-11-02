@@ -199,8 +199,20 @@ func TestWhenTheClaudeFileIsNotThereTheCardStaysAndTheReplySaysSo(t *testing.T) 
 	tf := trustOf(t, out)
 	assert.Equal(t, []any{"codex"}, tf["trusted"])
 	assert.Contains(t, tf["not"].(map[string]any), "claude")
+	assert.Contains(t, tf["failed"].(map[string]any), "claude", "tried and could not: the page says it (agy, which has no setting, is in 'not' only)")
+	assert.NotContains(t, tf["failed"].(map[string]any), "agy")
 	_, err := os.Stat(r.claude)
 	assert.True(t, os.IsNotExist(err), "the file is not made")
+	var said []string
+	msgs, err := r.h.bs.ListMessages(context.Background(), out["board"].(string), 100, 0, 0)
+	require.NoError(t, err)
+	for _, m := range msgs {
+		if strings.Contains(m.Content, "did not trust") {
+			said = append(said, m.Content)
+		}
+	}
+	require.Len(t, said, 1, "the board says it too: %v", said)
+	assert.Contains(t, said[0], "for claude")
 }
 
 // A team that works in a worktree starts in a folder made from existing code: the folder the launch made does not count for it, and only the person's tick does.
@@ -244,4 +256,51 @@ func TestTheBoardNoticeCannotMentionAnyoneThroughTheFolderName(t *testing.T) {
 	require.Len(t, notices, 1, "%v", notices)
 	assert.NotContains(t, notices[0], "@all", "the broadcast mention is broken")
 	assert.Contains(t, notices[0], "x ", "the name is still there")
+}
+
+// #12338 (the Beta Tester's New team with Trust this folder ticked on a folder in /tmp): Check had refused it (a shared place is never trusted, by design) and neither the page nor the board said so, so the agents
+// stopped at Claude's trust card with no word of why. The cause was not the link: the folder a link names is what is checked and trusted, which this pins.
+func TestATickedFolderTypedThroughALinkIsTrustedAtTheFolderItNames(t *testing.T) {
+	r := newTrustRig(t)
+	real := mustMkdir(t, filepath.Join(r.home, "Code", "real", "app"))
+	link := filepath.Join(r.home, "Code", "link")
+	require.NoError(t, os.Symlink(filepath.Join(r.home, "Code", "real"), link))
+	typed := filepath.Join(link, "app")
+	out := r.launch(t, typed, false, true, asCaller(callerDashCookie))
+	tf := trustOf(t, out)
+	assert.Equal(t, real, tf["path"], "the reply names the folder the agents' CLIs will ask about")
+	assert.ElementsMatch(t, []any{"claude", "codex"}, tf["trusted"].([]any))
+	assert.True(t, r.claudeTrusts(t, real), "Claude asks about the folder the link names")
+	assert.True(t, r.codexTrusts(t, real))
+	assert.False(t, r.claudeTrusts(t, typed), "the path as typed, through the link, is not an entry of its own")
+}
+
+// What the person ticked and Coral did not do is said on the team's board, in Coral's own words (the folder and the reason as quoted text), once, so the Operator knows why the agents ask.
+func TestATickedFolderCoralDidNotTrustIsSaidOnTheBoard(t *testing.T) {
+	r := newTrustRig(t)
+	dash := asCaller(callerDashCookie)
+	out := r.launch(t, r.home, false, true, dash) // the home folder: never trusted
+	require.NotEmpty(t, trustOf(t, out)["refused"])
+	var said []string
+	msgs, err := r.h.bs.ListMessages(context.Background(), out["board"].(string), 100, 0, 0)
+	require.NoError(t, err)
+	for _, m := range msgs {
+		if strings.Contains(m.Content, "did not trust") {
+			said = append(said, m.Content)
+		}
+	}
+	require.Len(t, said, 1, "%v", said)
+	assert.Contains(t, said[0], "home folder", "the reason Coral gave is in it")
+	assert.Contains(t, said[0], "The agents will ask", "and what that means for the agents")
+	for _, m := range msgs {
+		assert.NotContains(t, m.Content, "Coral trusted the folder", "no 'trusted' line for a folder that was not")
+	}
+
+	// nothing was ticked: nothing was asked, so nothing is said
+	existing := mustMkdir(t, filepath.Join(r.home, "Code", "app2"))
+	out = r.launch(t, existing, false, false, dash)
+	msgs, _ = r.h.bs.ListMessages(context.Background(), out["board"].(string), 100, 0, 0)
+	for _, m := range msgs {
+		assert.NotContains(t, m.Content, "did not trust")
+	}
 }
