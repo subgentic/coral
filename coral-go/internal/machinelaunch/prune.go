@@ -20,6 +20,7 @@ type ListRow struct {
 	Age       time.Duration // 0 when the provider did not say
 	HourlyUSD float64       // 0 when the price could not be read
 	InState   bool          // the state file has its ids (so delete finds the network too)
+	SSHOpen   bool          // the state file says SSH is still open at this machine's cloud firewall
 	Gone      bool          // the state file has it and the provider does not
 }
 
@@ -58,12 +59,13 @@ func List(ctx context.Context, d ManageDeps) ([]ListRow, error) {
 		if !in.Created.IsZero() {
 			row.Age = d.now().Sub(in.Created)
 		}
-		_, row.InState = d.State.Get(in.Name)
+		rec, known := d.State.Get(in.Name)
+		row.InState, row.SSHOpen = known, known && rec.FirewallOpen
 		rows = append(rows, row)
 	}
 	for _, r := range d.State.Records() {
 		if !seen[r.Name] {
-			rows = append(rows, ListRow{Name: r.Name, ID: r.DropletID, Region: r.Region, InState: true, Gone: true})
+			rows = append(rows, ListRow{Name: r.Name, ID: r.DropletID, Region: r.Region, InState: true, Gone: true, SSHOpen: r.FirewallOpen})
 		}
 	}
 	sort.Slice(rows, func(i, j int) bool { return rows[i].Name < rows[j].Name })

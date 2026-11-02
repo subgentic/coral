@@ -152,7 +152,7 @@ func Launch(ctx context.Context, o Options, d Deps) (*Result, error) {
 			return nil, err
 		}
 		spec.VPCID = net.VPC.ID
-		ls.set(func(r *Record) { r.VPCID, r.FirewallID = net.VPC.ID, net.Firewall.ID }, d.Out)
+		ls.set(func(r *Record) { r.VPCID, r.FirewallID, r.FirewallOpen = net.VPC.ID, net.Firewall.ID, true }, d.Out)
 	}
 	want := sweepWant{Name: o.Name, Region: o.Region, Size: o.Size, Since: time.Now()}
 	inst, err := p.Create(ctx, spec)
@@ -210,11 +210,11 @@ func Launch(ctx context.Context, o Options, d Deps) (*Result, error) {
 	if label == "" {
 		label = o.Name
 	}
-	if net != nil { // closeDoor: the credential is delivered, so nothing is allowed in at the cloud firewall (the machine closes its own SSH too)
+	var closeErr error
+	if net != nil { // the credential is delivered, so nothing is allowed in at the cloud firewall (the machine closes its own SSH too)
 		cctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		if err := CloseDoor(cctx, p, net.Firewall); err != nil {
-			fmt.Fprintf(d.Out, "WARNING: could not close the cloud firewall's SSH rule (%v): the machine closes SSH itself, but close the rule yourself at %s or delete the machine with `coral machine delete %s`.\n", err, p.Name(), o.Name)
-		} else {
+		if closeErr = CloseDoor(cctx, p, net.Firewall); closeErr == nil {
+			ls.set(func(r *Record) { r.FirewallOpen = false }, d.Out)
 			fmt.Fprintln(d.Out, "Closed the cloud firewall: nothing is allowed in.")
 		}
 		cancel()
@@ -224,7 +224,14 @@ func Launch(ctx context.Context, o Options, d Deps) (*Result, error) {
 	} else { // only "connecting": the machine has not confirmed that it reached the Hub, and this says so rather than "Launched"
 		fmt.Fprintf(d.Out, "The machine %s at %s reported connecting to Coral Hub, and has not confirmed it yet. Open %s and look for %q: if it is pending there, press Keep to approve it; if it does not show up in a few minutes, delete the machine.\n", running.Name, running.IPv4, o.HubURL, label)
 	}
-	return &Result{Instance: running, Enrollment: boot}, nil
+	res := &Result{Instance: running, Enrollment: boot}
+	if closeErr != nil { // SSH is still open at the firewall: a launch that opened SSH and cannot say it closed it did not finish (Security's ruling v). The record keeps firewall_open, so `coral machine delete` tries again and nothing says clean.
+		fw := net.Firewall.ID
+		fmt.Fprintf(d.Out, "SSH IS STILL OPEN to %s on firewall %s at %s: %v\nClose it now: coral machine delete %s --provider %s --token-file <the token file> (it removes the machine and this firewall), or remove the inbound rule of firewall %s at %s yourself.\n",
+			SSHRule(o.SSHFrom), fw, p.Name(), closeErr, o.Name, p.Name(), fw, p.Name())
+		return res, fmt.Errorf("the launch did not finish: SSH is still open to %s on firewall %s (%w); run `coral machine delete %s` to close it", SSHRule(o.SSHFrom), fw, closeErr, o.Name)
+	}
+	return res, nil
 }
 
 // cleanup deletes the instance a failed launch made, on its own short deadline (the caller's context may be the thing that ended), and says how that went in a sentence for the error.

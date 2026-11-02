@@ -219,6 +219,9 @@ func runMachineManage(sub string, args []string, stdin io.Reader, stdout, stderr
 			if r.InState {
 				rec = "ids kept"
 			}
+			if r.SSHOpen {
+				rec += "; SSH IS OPEN at its firewall: coral machine delete " + r.Name
+			}
 			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", r.Name, orDash(r.ID), orDash(state), orDash(r.Region), orDash(r.Size), machinelaunch.AgeText(r.Age), price, rec)
 		}
 		_ = tw.Flush()

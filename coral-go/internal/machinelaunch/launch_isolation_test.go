@@ -165,16 +165,37 @@ func TestLaunchRefusesAProviderThatCannotIsolate(t *testing.T) {
 	assert.Empty(t, h.labels, "and nothing was minted")
 }
 
-// A firewall that will not close is a warning, not a failure: the machine closes its own SSH, and the person is told what to do.
-func TestLaunchWarnsWhenTheFirewallWillNotClose(t *testing.T) {
+// A firewall that will not close is a FAILURE (Security's ruling v, #9934): the launch ends in an error (a non-zero exit), says loudly that SSH is still open, to what, on which firewall, and the one command to close it,
+// and the record keeps firewall_open so the next `coral machine delete` tries again.
+func TestLaunchFailsWhenTheFirewallWillNotCloseAndKeepsTheRecordOpen(t *testing.T) {
 	p, h := newIso(), &stubHub{}
 	p.cloud.failOn["CloseFirewall"] = errors.New("provider hiccup")
-	o, d, _, out := isoSetup(t, p, h)
+	o, d, st, out := isoSetup(t, p, h)
+	res, err := Launch(t.Context(), o, d)
+	require.Error(t, err, "a launch that opened SSH and cannot say it closed it did not finish")
+	require.NotNil(t, res, "the machine exists and is reported, with the error")
+	assert.Contains(t, out.String(), "SSH IS STILL OPEN")
+	assert.Contains(t, out.String(), "firewall fw-2")
+	assert.Contains(t, out.String(), "coral machine delete coral-1")
+	assert.Contains(t, err.Error(), "SSH is still open")
+	assert.Contains(t, err.Error(), "fw-2")
+	assert.NotContains(t, out.String(), "Closed the cloud firewall")
+	rec, ok := st.Get("coral-1")
+	require.True(t, ok, "the record stays")
+	assert.True(t, rec.FirewallOpen, "and says the firewall is open")
+	assert.Equal(t, "fw-2", rec.FirewallID)
+}
+
+// A firewall that closed leaves the record saying so, and the launch succeeds.
+func TestLaunchClosedFirewallClearsTheOpenFlag(t *testing.T) {
+	p, h := newIso(), &stubHub{}
+	o, d, st, _ := isoSetup(t, p, h)
 	res, err := Launch(t.Context(), o, d)
 	require.NoError(t, err)
 	require.NotNil(t, res)
-	assert.Contains(t, out.String(), "WARNING: could not close the cloud firewall")
-	assert.Contains(t, out.String(), "coral machine delete coral-1")
+	rec, ok := st.Get("coral-1")
+	require.True(t, ok)
+	assert.False(t, rec.FirewallOpen)
 }
 
 // midBoot is a bootstrap that mints and then looks at the state file before it returns: what a crash right after the mint would leave.
