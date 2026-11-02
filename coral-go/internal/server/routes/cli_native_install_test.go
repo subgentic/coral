@@ -195,13 +195,19 @@ func TestTheDataFolderAndTheTempFolderAreStillRefusedAndTheRefusalNamesTheAgent(
 func TestTheNotFoundAnswerSaysWhatItRefusedAndWhereItLooked(t *testing.T) {
 	r := newNativeRig(t)
 	t.Setenv("PATH", t.TempDir())
-	// a claude that is refused (an agent works in ~/.local, below home) and nothing else: the answer names it and the places
-	r.agentIn("aaaaaaaa-0000-4000-8000-000000000006", filepath.Join(r.home, ".local"))
+	// a claude that is refused and nothing else: the answer names it and the places. ~/.local/bin is a standard install root since #12365 (never refused for an agent's folder), so the rig's own link is taken away and the
+	// one that is refused is the older installer's ~/.claude/local/claude, which is no standard root, with an agent working in ~/.claude (#12420)
+	require.NoError(t, os.Remove(r.link))
+	require.NoError(t, os.Remove(r.version))
+	old := filepath.Join(r.home, ".claude", "local", "claude")
+	require.NoError(t, os.MkdirAll(filepath.Dir(old), 0o755))
+	require.NoError(t, os.WriteFile(old, []byte("#!/bin/sh\nexit 0\n"), 0o755))
+	r.agentIn("aaaaaaaa-0000-4000-8000-000000000006", filepath.Join(r.home, ".claude"))
 	_, err := agent.LaunchCLIScreened(nil, "claude", r.screen)
 	var nf *agent.CLINotFoundError
 	require.ErrorAs(t, err, &nf)
 	msg := nf.Error()
-	assert.Contains(t, msg, "Coral found ~/.local/bin/claude and did not use it: it is in an agent's working folder")
+	assert.Contains(t, msg, "Coral found ~/.claude/local/claude and did not use it: it is in an agent's working folder")
 	assert.Contains(t, msg, "~/.local/bin/claude", "the places it looked")
 	assert.Contains(t, msg, "~/.claude/local/claude")
 	assert.Contains(t, msg, "the PATH it runs with")
