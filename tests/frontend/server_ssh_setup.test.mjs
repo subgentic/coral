@@ -242,4 +242,23 @@ function fresh() { const host = doc.createElement('div'); doc.body.append(host);
     await until(() => host.querySelector('[role="alert"]'), 'the sentence');
     assert.match(host.textContent, /no such setup|no longer on the hub/);
 }
+// QA's two shapes of the resume (#12372): a plan that already ended opens on its result and is not polled again, a failed one on its failure, and a running one goes on being polled until it ends
+for (const [phase, word] of [['done', /Done/], ['failed', /did not|could not|Could not|failed/i]]) {
+    hub(); planKind = 'stop'; let gets = 0;
+    globalThis.fetch = async (url, init = {}) => {
+        const json = (d, status = 200) => new Response(JSON.stringify(d), { status, headers: { 'Content-Type': 'application/json' } });
+        if (url === '/api/servers/provision/options') return json(options);
+        if (url === '/api/servers/provision/p1' && (init.method || 'GET') === 'GET') { gets++; return json({ plan: 'p1', kind: 'stop', phase, error: phase === 'failed' ? 'Could not stop Coral on that computer.' : '', steps: steps({ connect: 'ok', detect: phase === 'done' ? 'ok' : 'failed' }) }); }
+        return json({}, 404);
+    };
+    const host = fresh();
+    mountSshSetup(host, { mode: 'manage', server: { id: 'ssh-box', label: 'Build box' }, action: 'stop', resume: 'p1', pollMs: 5 });
+    await until(() => btn(host, 'Close'), `the ${phase} plan opens on its result`);
+    assert.match(host.textContent, word, `${phase}: the result is on the screen`);
+    const seen = gets;
+    await tick(60);
+    assert.equal(gets, seen, `${phase}: an ended plan is read once and not polled again`);
+    assert.equal(seen, 1);
+}
+
 console.log('server_ssh_setup: ok');
