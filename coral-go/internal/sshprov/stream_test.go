@@ -343,3 +343,54 @@ func TestStreamGivesTheSlotBackWhenTheConnectionIsClosed(t *testing.T) {
 		c.Close()
 	}
 }
+
+// QA's pins on the pool's numbers (#12469): the cap, the idle pool and how long it is kept, and the slot of a stream whose process ends by itself.
+func TestStreamCapIs24AndThe25thDialIsRefused(t *testing.T) {
+	hold := newStandIn(t, "ssh", standCfg{HoldSecs: 30})
+	tg, _ := ParseTarget("user@box.example.com")
+	st, _ := NewStreamTarget(Runner{SSH: hold}, tg, 8420, streamKey)
+	var conns []net.Conn
+	defer func() {
+		for _, c := range conns {
+			c.Close()
+		}
+	}()
+	for i := 0; i < 24; i++ {
+		c, err := st.dial(context.Background())
+		if err != nil {
+			t.Fatalf("dial %d of 24: %v", i+1, err)
+		}
+		conns = append(conns, c)
+	}
+	if _, err := st.dial(context.Background()); !errors.Is(err, ErrStreamBusy) {
+		t.Errorf("the 25th dial: %v", err)
+	}
+}
+
+func TestStreamPoolKeepsTenIdleStreamsForFiveMinutes(t *testing.T) {
+	tg, _ := ParseTarget("user@box.example.com")
+	st, _ := NewStreamTarget(Runner{SSH: "ssh"}, tg, 8420, streamKey)
+	tr := st.transport()
+	if tr.MaxIdleConnsPerHost != 10 || tr.IdleConnTimeout != 5*time.Minute {
+		t.Errorf("the pool keeps %d idle streams for %v; a switch is a burst of about 7 and the pool should hold it between switches (10 for 5 minutes)", tr.MaxIdleConnsPerHost, tr.IdleConnTimeout)
+	}
+}
+
+// A stream whose ssh ends by itself (the far side hung up) is read to its end and gives its slot back without anyone closing it: the reap path frees it too, not only Close.
+func TestStreamGivesTheSlotBackWhenTheProcessEndsByItself(t *testing.T) {
+	quick := newStandIn(t, "ssh", standCfg{})
+	tg, _ := ParseTarget("user@box.example.com")
+	st, _ := NewStreamTarget(Runner{SSH: quick}, tg, 8420, streamKey)
+	c, err := st.dial(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	io.ReadAll(c) // the stand-in exits at once: the read ends, and the reap collects it
+	deadline := time.Now().Add(5 * time.Second)
+	for len(st.slots) != 0 && time.Now().Before(deadline) {
+		time.Sleep(20 * time.Millisecond)
+	}
+	if n := len(st.slots); n != 0 {
+		t.Errorf("%d slot(s) still held after the process ended on its own", n)
+	}
+}
