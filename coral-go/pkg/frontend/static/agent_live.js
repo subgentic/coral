@@ -19,7 +19,26 @@ const closeOverlays = () => {
     document.querySelector('#artifact-viewer:not([hidden]) [data-dialog-close], #artifact-viewer:not([hidden]) .artifact-viewer-close')?.click();
     for (const d of document.querySelectorAll('dialog[open]')) { try { d.close(); } catch { /* already closing */ } }
 };
-export const openAgent = s => { closeOverlays(); window.switchNavTab?.('agents'); Promise.resolve(window.selectLiveSession?.(s.name, s.agent_type, s.session_id || '', sessionServer(s))).catch(() => {}); };
+// Words typed into a dialog that is about to close (a question's reply box): closing it would drop them, so the person is asked first (#12299).
+const typedInOverlay = () => [...document.querySelectorAll('dialog[open], #artifact-viewer:not([hidden])')].some(d => [...d.querySelectorAll('textarea, input[type=text], input[type=search], input:not([type])')].some(f => !f.readOnly && !f.disabled && f.value.trim() && f.value !== f.defaultValue));
+// The question is its own native dialog, shown modally, so it stacks in front of the dialog the name sat in (the shared confirm is a div, which a native modal covers).
+const askLeave = go => {
+    const d = document.createElement('dialog'); d.className = 'modal-content dlg-flow agent-leave-ask'; d.setAttribute('aria-labelledby', 'agent-leave-title');
+    const h = document.createElement('h2'); h.id = 'agent-leave-title'; h.textContent = 'Leave this dialog?';
+    const p = document.createElement('p'); p.textContent = 'What you typed here is not sent and will be lost.';
+    const row = document.createElement('div'); row.className = 'modal-actions';
+    const stay = document.createElement('button'); stay.type = 'button'; stay.className = 'btn'; stay.textContent = 'Cancel'; stay.dataset.dialogClose = '';
+    const yes = document.createElement('button'); yes.type = 'button'; yes.className = 'btn btn-primary'; yes.textContent = 'Open chat'; yes.dataset.agentLeaveYes = '';
+    row.append(stay, yes); d.append(h, p, row);
+    stay.addEventListener('click', () => d.close());
+    yes.addEventListener('click', () => { d.close(); go(); });
+    d.addEventListener('close', () => d.remove());
+    document.body.append(d); d.showModal(); stay.focus();
+};
+export const openAgent = s => {
+    const go = () => { closeOverlays(); window.switchNavTab?.('agents'); Promise.resolve(window.selectLiveSession?.(s.name, s.agent_type, s.session_id || '', sessionServer(s))).catch(() => {}); };
+    if (typedInOverlay()) askLeave(go); else go();
+};
 
 // One delegated click for every link and circle that carries data-agent-link, DOM or HTML: in the capture phase and stopped, so a row or card the name sits in does not also open its own page.
 document.addEventListener('click', e => {
