@@ -70,7 +70,7 @@ export function attachComments(dialog, body, host, opts = {}) {
     const toggle = btn('ac-toggle', 'Comments', 'Comments: show the comments'); toggle.hidden = true; toggle.setAttribute('aria-expanded', 'false');
     toggle.setAttribute('aria-controls', panel.id);
     const selBtn = btn('ac-selbtn', 'Add comment', 'Add comment on the selected text'); selBtn.hidden = true;
-    host.append(panel); if (!opts.toggleHost) dialog.querySelector('.artifact-viewer-header')?.insertBefore(toggle, dialog.querySelector('.artifact-viewer-download'));
+    host.append(panel); if (!opts.toggleHost) (dialog.querySelector('.artifact-viewer-actions') || dialog.querySelector('.artifact-viewer-header'))?.prepend(toggle);
     dialog.append(selBtn);
     // A live region for what the panel does (a comment posted, resolved, the one stepped to): outside the panel, which is out of the accessibility tree while the phone's sheet is shut.
     const live = el('div', 'ac-live'); live.setAttribute('role', 'status'); live.setAttribute('aria-live', 'polite'); live.setAttribute('aria-atomic', 'true');

@@ -15,6 +15,9 @@ import { visibleName } from './artifact_names.js';
 import { importOnce } from './import_once.js';
 import { pushOverlay, popOverlay } from './overlay_history.js';
 import { setDialogHide } from './modal_chrome.js';
+import { loadStyles } from './lazy_styles.js';
+
+await loadStyles('artifact_viewer_header.css'); // the one-row header's rules load with the viewer, not at start (page_weight)
 const { readersAllowed, readersBlock } = await importOnce('./artifact_readers.js'); // lazy: its failure is retried
 const { privateBlock } = await importOnce('./artifact_private.js'); // the owner's Private switch, beside it (#11457)
 const { makeDetails } = await importOnce('./details_disclosure.js'); // "Who can read this" behind the one Details button (#7775)
@@ -58,8 +61,15 @@ function _build() {
     d.innerHTML = `<div class="modal-content dlg-flow artifact-viewer-content">
         <div class="artifact-viewer-header">
             <h2 id="artifact-viewer-title" class="artifact-viewer-title"></h2>
-            <a class="btn artifact-viewer-newtab" target="_blank" rel="noopener noreferrer" hidden>Open in new tab</a>
-            <a class="btn artifact-viewer-download" rel="noopener noreferrer" download>Download</a>
+            <span class="artifact-viewer-chips"></span>
+            <span class="artifact-viewer-actions"></span>
+            <span class="artifact-viewer-morewrap">
+                <button type="button" class="btn btn-icon artifact-viewer-more" aria-haspopup="menu" aria-expanded="false" aria-controls="artifact-viewer-menu" aria-label="More actions" title="More actions">\u22ef</button>
+                <div class="menu artifact-viewer-menu" id="artifact-viewer-menu" role="menu" aria-label="More actions" hidden>
+                    <a class="menu-item artifact-viewer-newtab" role="menuitem" target="_blank" rel="noopener noreferrer" hidden>Open in new tab</a>
+                    <a class="menu-item artifact-viewer-download" role="menuitem" rel="noopener noreferrer" download>Download</a>
+                </div>
+            </span>
         </div>
         <div class="artifact-viewer-from" hidden></div>
         <div class="artifact-viewer-goal" hidden></div>
@@ -68,7 +78,10 @@ function _build() {
         <div class="modal-actions modal-footer artifact-viewer-foot"><button type="button" class="btn artifact-viewer-close">Close</button></div>
     </div>`;
     _details = makeDetails({ panel: d.querySelector('.artifact-viewer-readers') });
-    d.querySelector('.artifact-viewer-title').after(_details.button); // between the name and Download: the content is straight under the header
+    _details.button.classList.add('menu-item'); _details.button.setAttribute('role', 'menuitem'); d.querySelector('.artifact-viewer-menu').append(_details.button); // Details is in the ⋯ menu: the content is straight under the one header row (#12223)
+    const more = d.querySelector('.artifact-viewer-more'), menu = d.querySelector('.artifact-viewer-menu');
+    more.addEventListener('click', async (e) => { e.stopPropagation(); (await importOnce('./menu_button.js')).toggleMenu(more); });
+    menu.addEventListener('click', async () => { (await importOnce('./menu_button.js')).closeMenus(); }); // a choice closes the menu
     d.addEventListener('click', (e) => { if (e.target === d) closeArtifactViewer(); });
     d.querySelector('.artifact-viewer-close').addEventListener('click', closeArtifactViewer);
     // A Coral artifact linked inside the shown file opens here too (the strict renderer keeps

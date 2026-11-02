@@ -26,7 +26,7 @@ const { coralReady } = require('./helpers/wait');
             ready: `!!document.querySelector('#team-settings-workspace .settings-tab[data-section=messaging]')`, then: `document.querySelector('#team-settings-workspace .settings-tab[data-section=messaging]').click(); true`, ready2: `!!document.querySelector('.xt-primary') && !!document.querySelector('.xt-links')`,
             page: true, isOpen: `!!document.querySelector('#team-settings-workspace')` },
         'Artifact viewer': { root: '.artifact-viewer', open: `import((window.__coralStatic || '/static/') + 'artifact_viewer.js').then(m => m.openArtifactViewer('${HEX}', {})); true`,
-            ready: `!!document.querySelector('.artifact-viewer .details-toggle:not([hidden])')`, then: `const t = document.querySelector('.artifact-viewer .details-toggle'); if (t.getAttribute('aria-expanded') !== 'true') t.click(); true`, ready2: `!!document.querySelector('.artifact-readers .artifact-readers-head') && document.querySelector('.artifact-readers .artifact-readers-head').getClientRects().length > 0`,
+            ready: `!!document.querySelector('.artifact-viewer .artifact-viewer-more') && !!document.querySelector('.artifact-viewer .details-toggle:not([hidden])')`, then: `{ const m = document.querySelector('.artifact-viewer-menu'); if (m.hidden) document.querySelector('.artifact-viewer-more').click(); } const t = document.querySelector('.artifact-viewer .details-toggle'); if (t.getAttribute('aria-expanded') !== 'true') t.click(); if (!document.querySelector('.artifact-viewer-menu').hidden) document.querySelector('.artifact-viewer-more').click(); document.querySelector('.artifact-viewer-close').focus(); true`, after: `{ const m = document.querySelector('.artifact-viewer-menu'); if (m.hidden) document.querySelector('.artifact-viewer-more').click(); } true`, /* Details is in the ⋯ menu (#12223): open it for the controls to be seen */ ready2: `!!document.querySelector('.artifact-readers .artifact-readers-head') && document.querySelector('.artifact-readers .artifact-readers-head').getClientRects().length > 0`,
             isOpen: `!!document.querySelector('.artifact-viewer') && !document.querySelector('.artifact-viewer').hidden`, closeBtn: `document.querySelector('.artifact-viewer-close')` },
         'Settings': { root: '#settings-modal', open: `(async () => { await window.showSettingsModal('network'); return true; })()`, ready: `getComputedStyle(document.getElementById('settings-modal')).display !== 'none' && !!document.getElementById('settings-cloud-hub-cross-team')`,
             isOpen: `getComputedStyle(document.getElementById('settings-modal')).display !== 'none'`, closeBtn: `document.getElementById('settings-cancel-btn')` },
@@ -45,7 +45,7 @@ const { coralReady } = require('./helpers/wait');
                 return real(u, o); };
             const t = document.createElement('button'); t.id = 'opener'; t.textContent = 'opener'; t.style.cssText = 'position:fixed;left:4px;bottom:4px;z-index:1'; document.body.append(t); })(); true`);
     };
-    const show = async (s) => { await ev(s.open); await waitFor(s.ready, 'the surface', 15000); if (s.then) { await ev(s.then); await waitFor(s.ready2, 'its content', 15000); } };
+    const show = async (s, menuOpen = false) => { await ev(s.open); await waitFor(s.ready, 'the surface', 15000); if (s.then) { await ev(s.then); await waitFor(s.ready2, 'its content', 15000);  if (s.after && menuOpen) await ev(s.after); if (s.after && !menuOpen && await ev(`!document.querySelector('.artifact-viewer-menu').hidden`)) { await key('Escape', 'Escape', 27); await waitFor(`document.querySelector('.artifact-viewer-menu').hidden`, 'the ⋯ menu closes on Escape, the dialog stays', 4000); } } };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await client.Emulation.setFocusEmulationEnabled({ enabled: true }); // :focus-visible and a ring need a focused page
@@ -54,7 +54,7 @@ const { coralReady } = require('./helpers/wait');
 
         console.log('1. A focus ring on every focusable control, proved, light and dark');
         for (const theme of ['dark', 'light']) for (const [name, s] of Object.entries(SURFACES)) {
-            await fresh(); await setTheme(ev, theme); await show(s);
+            await fresh(); await setTheme(ev, theme); await show(s, true);
             const n = await ev(`[...document.querySelector('${s.root}').querySelectorAll('${FOCUSABLE}')].filter(e => e.checkVisibility({ checkVisibilityCSS: true, contentVisibilityAuto: true }) && e.getClientRects().length).map((e, i) => { e.setAttribute('data-ring-probe', i); return i; }).length`);
             assert.ok(n >= 3, `${name}: its controls were found (${n})`);
             const r = await auditRegion(ev, [s.root], { focus: Array.from({ length: n }, (_, i) => `[data-ring-probe="${i}"]`) });
@@ -76,7 +76,7 @@ const { coralReady } = require('./helpers/wait');
 
         console.log('4. 390 px with a mouse: 44px close buttons and Details button');
         await fresh(390, 844, true);
-        await show(SURFACES['Artifact viewer']);
+        await show(SURFACES['Artifact viewer'], true);
         const c2 = await ev(`(() => { const q = s => { const r = document.querySelector(s).getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; }; return { close: q('.artifact-viewer-close'), details: q('.artifact-viewer .details-toggle') }; })()`);
         assert.ok(c2.close[0] >= 44 && c2.close[1] >= 44, 'the viewer\'s close button is 44px: ' + c2.close); assert.ok(c2.details[0] >= 44 && c2.details[1] >= 44, 'the Details button is a 44px target: ' + c2.details);
 

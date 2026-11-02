@@ -116,21 +116,23 @@ const BUNDLE = { exists: true, team_name: TEAM, created_at: '2026-10-25T05:00:00
             await S.run(`${label}: the artifact viewer has the content straight under the header and "Who can read this" behind Details`, async () => {
                 await ev(`localStorage.removeItem('coral-details-open'); (async () => { const m = await import((window.__coralStatic || '/static/') + 'artifact_viewer.js'); m.openArtifactViewer(${JSON.stringify(HEX)}, { filename: 'Design review.txt' }); })(); true`);
                 await waitFor(`!!document.querySelector('#artifact-viewer .details-toggle:not([hidden])') && /The design review text\\./.test(document.querySelector('#artifact-viewer .artifact-viewer-body').textContent)`, 'the viewer with its content and Details', 10000);
+                const openMore = async () => { if (await ev(`document.querySelector('#artifact-viewer .artifact-viewer-menu').hidden`)) { await ev(`document.querySelector('#artifact-viewer .artifact-viewer-more').click(); true`); await settle(150); } }; // Details is in the ⋯ menu (#12223)
                 const g = await geometry('#artifact-viewer .artifact-viewer-header', '#artifact-viewer .artifact-viewer-body'); assert.ok(g && g.gap >= 0 && g.gap <= 16, `the content's top is within 16 px of the header's bottom: ${JSON.stringify(g)}`);
                 assert.equal(await ev(`document.querySelector('#artifact-viewer .artifact-viewer-readers').hidden`), true, 'closed to begin with');
                 if (mobile) {
                     for (const touch of [true, false]) {
-                        await Emulation.setTouchEmulationEnabled({ enabled: touch }); await settle(150);
+                        await Emulation.setTouchEmulationEnabled({ enabled: touch }); await settle(150); await openMore();
                         const sz = await ev(`(() => { const r = document.querySelector('#artifact-viewer .details-toggle').getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; })()`);
                         assert.ok(sz[0] >= 44 && sz[1] >= 44, `${touch ? 'touch' : 'mouse'}: the viewer's Details button is 44 px: ${JSON.stringify(sz)}`);
                     }
                     await Emulation.setTouchEmulationEnabled({ enabled: true });
                 }
-                await ev(`${toggle('#artifact-viewer')}.focus(); true`); await key('Enter', 'Enter', 13, '\r'); await settle(200);
+                await openMore(); await ev(`${toggle('#artifact-viewer')}.focus(); true`); await key('Enter', 'Enter', 13, '\r'); await settle(200);
                 assert.equal(await ev(`document.querySelector('#artifact-viewer .artifact-viewer-readers').hidden`), false, 'Enter opens it');
                 assert.ok(await ev(`window.__na.text(document.querySelector('#artifact-viewer .artifact-viewer-readers')).includes('Who can read this')`), 'Who can read this is inside');
                 await waitFor(`document.querySelectorAll('#artifact-viewer .artifact-readers-body p').length >= 3`, 'the readers answer in the viewer', 8000);
                 assertWraps(await wrapOf('#artifact-viewer'), `${label} viewer`);
+                await openMore(); await ev(`${toggle('#artifact-viewer')}.focus(); true`);
                 await key(' ', 'Space', 32, ' '); await settle(200);
                 assert.equal(await ev(`document.querySelector('#artifact-viewer .artifact-viewer-readers').hidden`), true, 'Space closes it');
                 await ev(`document.querySelector('#artifact-viewer .artifact-viewer-close').click(); true`);

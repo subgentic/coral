@@ -60,6 +60,7 @@ async function settleEarlierVersions(m, row) {
 /** Approve a review row of Needs you (or the viewer): it is decided, the Inbox list follows. Resolves the server's answer ({delivered, to, reason}). */
 export async function approveRow(team, row, note = '') { // note (#11888): one short comment that goes to the agent in the approval's one notice; the approval is final
     const out = await decide(team, row, 'approve', undefined, String(note || '').replace(/\s+/g, ' ').trim());
+    document.dispatchEvent(new CustomEvent('coral:review-approved', { detail: { team, id: row.id, at: out.review?.at || new Date().toISOString() } })); // an open viewer of this file says Approved at once, whoever approved it (the Inbox row, the viewer, a note)
     const m = await importOnce('./inbox_reviews.js').catch(() => null);
     if (m) { out.earlier = await settleEarlierVersions(m, row).catch(() => ({ settled: 0, failed: 0 })); m.settleReview(row); m.refreshReviews(true).catch(() => {}); } // the versions before the approved one are settled with it (#11533)
     return out;
@@ -169,20 +170,22 @@ export function sayApproved(rawName, out) {
 export function attachReview(d, { reload }) {
     const bar = document.createElement('div');
     bar.className = 'artifact-review'; bar.hidden = true;
-    bar.innerHTML = `<span class="artifact-review-state" role="status"></span>
-        <button type="button" class="btn btn-primary artifact-review-approve">Approve</button>
-        <button type="button" class="btn artifact-review-note">Approve with a note</button>
-        <button type="button" class="btn artifact-review-changes" aria-expanded="false">Request changes</button>
-        <form class="artifact-review-form" hidden>
+    bar.innerHTML = `<form class="artifact-review-form" hidden>
             <label for="artifact-review-text">What should change?</label>
             <textarea id="artifact-review-text" rows="3" maxlength="2000" placeholder="This goes to the agent that uploaded it, as a change request in the comments."></textarea>
             <span class="artifact-review-error" role="alert"></span>
             <button type="submit" class="btn btn-primary">Send request</button>
             <button type="button" class="btn artifact-review-cancel">Cancel</button>
         </form>`;
-    (d.querySelector('.artifact-viewer-from') || d.querySelector('.artifact-viewer-header')).after(bar); // after who sent it, which sits under the name (#11456)
+    (d.querySelector('.artifact-viewer-from') || d.querySelector('.artifact-viewer-header')).after(bar); // the change-request form, after who sent it, which sits under the name (#11456)
+    // the review's controls are on the viewer's one header row (#12223): its status beside the version chip, Approve and Request changes at the right, Approve with a note in the ⋯ menu
+    const mk = (tag, cls, text, attrs = {}) => { const e = document.createElement(tag); e.className = cls; if (text) e.textContent = text; for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); if (tag === 'button') e.type = 'button'; return e; };
+    const stateEl = mk('span', 'chip artifact-review-state', '', { role: 'status' }), approve = mk('button', 'btn btn-primary artifact-review-approve', 'Approve'), changes = mk('button', 'btn artifact-review-changes', 'Request changes', { 'aria-expanded': 'false' });
+    const approveNote = mk('button', 'menu-item artifact-review-note', 'Approve with a note', { role: 'menuitem' });
+    const slotted = !!d.querySelector('.artifact-viewer-chips'); // the controls are on the header row; without it (a bare viewer) they stay in this bar
+    stateEl.hidden = approve.hidden = changes.hidden = approveNote.hidden = true;
+    (d.querySelector('.artifact-viewer-chips') || bar).append(stateEl); (d.querySelector('.artifact-viewer-actions') || bar).append(approve, changes); (d.querySelector('.artifact-viewer-menu') || bar).prepend(approveNote);
     const $ = s => bar.querySelector(s);
-    const stateEl = $('.artifact-review-state'), approve = $('.artifact-review-approve'), changes = $('.artifact-review-changes'), approveNote = $('.artifact-review-note');
     const form = $('.artifact-review-form'), text = $('#artifact-review-text'), error = $('.artifact-review-error');
     let cur = null, gen = 0, sending = false, done = false;
     const submitBtn = form.querySelector('button[type=submit]');
@@ -197,11 +200,14 @@ export function attachReview(d, { reload }) {
         approve.hidden = changes.hidden = approveNote.hidden = !pending;
         approve.textContent = s && s.state === 'changes' ? 'Approve anyway' : 'Approve'; // changes were asked for: Approve is still the Operator's, and says it approves this version as it is
         if (!pending) form.hidden = true;
+        bar.hidden = !s || (slotted && form.hidden); // on the header row the strip under it is the change-request form: there only while it is open
         stateEl.textContent = !s ? '' : s.state === 'approved' ? `Approved${s.at ? ' ' + timeWords(s.at) : ''}` : s.state === 'reviewed' ? 'Reviewed' : s.state === 'changes' ? `Changes requested${s.row.produced_by ? `: waiting for a new version from ${shown(s.row.produced_by)}` : ''}. Approving now approves this version as it is.` : waiting && !pending ? 'Waiting for your review. Approve it on that computer\'s own dashboard.' : 'Waiting for your review';
+        stateEl.hidden = !stateEl.textContent; // no status, no chip
     };
-    const openForm = (on) => { form.hidden = !on; changes.setAttribute('aria-expanded', String(on)); if (on) { error.textContent = ''; text.focus(); } };
+    const openForm = (on) => { form.hidden = !on; bar.hidden = !cur || (slotted && !on); changes.setAttribute('aria-expanded', String(on)); if (on) { error.textContent = ''; text.focus(); } };
     changes.addEventListener('click', () => openForm(form.hidden));
     $('.artifact-review-cancel').addEventListener('click', () => { openForm(false); changes.focus(); });
+    document.addEventListener('coral:review-approved', e => { if (cur && cur.team === e.detail.team && cur.row.id === e.detail.id && cur.state !== 'approved') show({ ...cur, state: 'approved', at: e.detail.at }); });
     approve.addEventListener('click', async () => {
         if (!cur) return;
         approve.disabled = true;

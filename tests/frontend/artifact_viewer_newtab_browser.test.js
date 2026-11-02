@@ -53,6 +53,7 @@ const PNG = png(120, 80);
             await ev(`import(${S}+'artifact_viewer.js').then(m => m.openArtifactViewer(${JSON.stringify(IMG_HEX)}, { filename: 'screen.png', mediaType: 'image/png' }))`);
             await waitFor(`(() => { const i = document.querySelector('#artifact-viewer .image-pane-frame img'); return !!i && i.complete && i.naturalWidth > 0; })()`, 'the picture');
             await waitFor(`document.getElementById('artifact-viewer').classList.contains('is-image')`, 'the viewer to know it holds a picture');
+            await ev(`document.querySelector('#artifact-viewer .artifact-viewer-more').click(); true`); await waitFor(`!document.querySelector('#artifact-viewer .artifact-viewer-menu').hidden`, 'the more menu'); // Open in new tab is in the ⋯ menu (#12223)
             const v = await ev(`(() => { const d = document.getElementById('artifact-viewer'), n = d.querySelector('.artifact-viewer-newtab'), dl = d.querySelector('.artifact-viewer-download'), b = d.querySelector('.artifact-viewer-body').getBoundingClientRect(), r = n.getBoundingClientRect();
                 return { text: n.textContent.trim(), hidden: n.hidden, shown: r.width > 0 && r.height > 0, href: n.getAttribute('href'), dl: dl.getAttribute('href'), target: n.target, rel: n.rel, bodyH: b.height, vh: innerHeight, touch: r.height }; })()`);
             assert.equal(v.text, 'Open in new tab', `${tag}: the link says what it does`);

@@ -28,7 +28,7 @@ const ONE = 'a'.repeat(64), MANY = 'b'.repeat(64), PNG = 'c'.repeat(64), TXT = '
             };
             return true;
         })()`);
-        const dl = () => ev(`(() => { const a = document.querySelector('.artifact-viewer-download'); return { href: a.getAttribute('href'), name: a.getAttribute('download'), hidden: a.hidden || a.getClientRects().length === 0 }; })()`);
+        const dl = () => ev(`(() => { const a = document.querySelector('.artifact-viewer-download'); return { href: a.getAttribute('href'), name: a.getAttribute('download'), hidden: a.hidden }; })()`); // Download is in the ⋯ menu now (#12223): whether it is offered is its hidden attribute, not whether the closed menu draws it
         const open = async (hex, name, ready) => { await ev(`import(${S} + 'artifact_viewer.js').then(m => m.openArtifactViewer('${hex}', { filename: ${JSON.stringify(name)} })).then(() => true)`); await waitFor(ready, 'the viewer rendered ' + name, 10000); };
 
         // until the manifest is fetched and parsed nobody knows it is one: the Download has no address then, so an early click cannot save the .json (#9941)

@@ -129,7 +129,7 @@ module.exports = part => (async () => {
                 await tap('#artifact-viewer .av-current');
             }, { min: 5, expect: `getComputedStyle(document.querySelector('#artifact-viewer .av-list')).display !== 'none'` });
             await sc('artifact versions: compare', async () => {
-                await ev(`document.querySelector('#artifact-viewer .av-list .av-option[aria-selected=true]').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); true`);
+                if (await ev(`document.querySelector('#artifact-viewer .av-pop').hidden`)) await tap('#artifact-viewer .av-current'); // Compare is in the chip's list (#12223): open it, then tap Compare
                 await tap('#artifact-viewer .av-compare');
                 await waitFor(`!!document.querySelector('#artifact-viewer .av-heading')`, 'the compare view', 10000);
             }, { min: 5, expect: `!!document.querySelector('#artifact-viewer .av-heading')` });

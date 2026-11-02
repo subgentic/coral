@@ -165,11 +165,11 @@
 .av-icon { min-width: 32px; padding: 0 8px; }
 .av-bar [aria-disabled="true"] { opacity: .45; cursor: default; }
 .av-current { font-weight: var(--fw-strong); }
-.av-spacer { flex: 1; }
 .av-notice { flex: 1 0 100%; margin: 0; } /* where it sits: the look is .notice's */
 .av-link { background: none; border: 0; padding: 0; font: inherit; color: var(--accent); text-decoration: underline; cursor: pointer; }
-.av-list { position: absolute; z-index: 6; top: calc(100% + 4px); left: 8px; min-width: 340px; max-width: calc(100% - 16px); max-height: 50vh; overflow-y: auto; margin: 0; padding: 6px; list-style: none; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-md); box-shadow: var(--shadow-md); }
-.av-list[hidden] { display: none; }
+.av-pop { position: absolute; z-index: 6; top: calc(100% + 4px); left: 0; min-width: 340px; max-width: calc(100% - 16px); max-height: 50vh; overflow-y: auto; margin: 0; padding: 6px; list-style: none; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-md); box-shadow: var(--shadow-md);  display: flex; flex-direction: column; gap: 6px; } /* the version chip's popover: Compare, the newer-version line and the list (#12223) */
+.av-pop[hidden] { display: none; }
+.av-list { margin: 0; padding: 0; list-style: none; }
 .av-option { display: flex; align-items: center; gap: 10px; min-height: 36px; padding: 4px 8px; border-radius: var(--radius-sm); font-size: var(--fs-md); cursor: pointer; }
 .av-option:hover, .av-option:focus-visible { background: var(--bg-tertiary); outline: none; }
 .av-option:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); }
@@ -212,7 +212,7 @@
     .artifact-viewer.av-keep-wide .artifact-viewer-content { width: 100vw; max-height: 100%; height: 100%; border-radius: 0; }
     .av-bar .btn, .av-icon { min-height: var(--control-touch-height, 44px); }
     .av-icon { min-width: var(--control-touch-height, 44px); }
-    .av-list { min-width: 0; left: 8px; right: 8px; }
+    .av-pop { min-width: 0; left: 8px; right: 8px; }
     .av-option { min-height: var(--control-touch-height, 44px); flex-wrap: wrap; }
     .av-split { grid-template-columns: 1fr; }
     .av-col { border-right: 0; border-bottom: 1px solid var(--border); padding: 0 0 8px; }
@@ -222,7 +222,6 @@
 
 /* The review bar of the artifact viewer (#136584): Approve and Request changes under the header, with the state in words and the change request's small form. */
 .artifact-review { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 16px; border-bottom: 1px solid var(--border); }
-.artifact-review-state { flex: 1 1 auto; color: var(--text-secondary); }
 .artifact-review-form { flex: 1 1 100%; display: flex; flex-direction: column; gap: 6px; }
 .artifact-review-form textarea { width: 100%; min-height: 4.5em; resize: vertical; }
 .artifact-review-form[hidden], .artifact-review[hidden] { display: none; }

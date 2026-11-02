@@ -56,7 +56,7 @@ export function attachVersions(dialog, hooks) {
     const live = el('div', 'sr-only av-live'); live.setAttribute('role', 'status'); live.setAttribute('aria-live', 'polite'); live.setAttribute('aria-atomic', 'true');
     let flip = false;
     const say = (msg) => { flip = !flip; live.textContent = msg + (flip ? '' : ' '); };
-    dialog.querySelector('.artifact-viewer-header').after(bar);
+    (dialog.querySelector('.artifact-viewer-chips') || dialog.querySelector('.artifact-viewer-header')).append(bar); // the version chip is on the header's one row (#12223)
     dialog.append(live);
     const st = { hex: null, server: undefined, rows: null, listOpen: false, comparing: false, view: 'changes', gen: 0, abort: null };
     const cur = () => st.rows ? st.rows.findIndex(r => r.digest === st.hex) : -1;
@@ -75,7 +75,7 @@ export function attachVersions(dialog, hooks) {
     function setList(open) {
         st.listOpen = open;
         bar.querySelector('.av-current')?.setAttribute('aria-expanded', String(open));
-        const list = bar.querySelector('.av-list'); if (list) list.hidden = !open;
+        const pop = bar.querySelector('.av-pop'); if (pop) pop.hidden = !open;
     }
     function closeList(focusButton) {
         if (!st.listOpen) return;
@@ -108,23 +108,24 @@ export function attachVersions(dialog, hooks) {
         prev.addEventListener('click', () => stepTo(-1));
         const next = btn('av-next av-icon', '▶', 'Next version'); next.setAttribute('aria-disabled', String(latest));
         next.addEventListener('click', () => stepTo(1));
-        const current = btn('av-current', `v${row.version} of ${total} ▾`, `Version: v${row.version} of ${total}${latest ? ', newest' : ''}`);
+        const current = btn('av-current', `v${row.version} of ${total}${st.comparing ? ' · comparing' : ''} ▾`, `Version: v${row.version} of ${total}${latest ? ', newest' : ''}`);
         current.setAttribute('aria-haspopup', 'listbox'); current.setAttribute('aria-expanded', String(st.listOpen)); current.setAttribute('aria-controls', 'av-list');
         current.addEventListener('click', () => { setList(!st.listOpen); if (st.listOpen) focusOption(); });
         current.addEventListener('keydown', (e) => { if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); if (!st.listOpen) setList(true); focusOption(); } else if (e.key === 'Escape' && st.listOpen) { e.preventDefault(); e.stopPropagation(); closeList(true); } });
-        bar.append(prev, current, next, el('span', 'av-spacer'));
+        bar.append(prev, current, next);
+        const pop = el('div', 'av-pop'); pop.hidden = !st.listOpen; // Compare, the newer-version line and the list: opened by the chip
         if (i > 0) {
             const cmp = btn('av-compare', st.comparing ? `Back to v${row.version}` : `Compare with v${rows[i - 1].version}`);
             cmp.setAttribute('aria-pressed', String(st.comparing));
-            cmp.addEventListener('click', () => (st.comparing ? leaveCompare() : startCompare()));
-            bar.append(cmp);
+            cmp.addEventListener('click', () => { st.listOpen = false; (st.comparing ? leaveCompare() : startCompare()); }); // the list closes on Compare; the keyboard stays on the chip
+            pop.append(cmp);
         }
         if (!latest) {
             const note = el('p', 'av-notice notice notice-info'); note.append(`v${rows[total - 1].version} is newer. `);
             const open = el('button', 'av-link', 'Open the latest'); open.type = 'button'; open.addEventListener('click', () => choose(rows[total - 1]));
-            note.append(open); bar.append(note);
+            note.append(open); pop.append(note);
         }
-        const list = el('ul', 'av-list'); list.id = 'av-list'; list.setAttribute('role', 'listbox'); list.setAttribute('aria-label', 'All versions'); list.hidden = !st.listOpen;
+        const list = el('ul', 'av-list'); list.id = 'av-list'; list.setAttribute('role', 'listbox'); list.setAttribute('aria-label', 'All versions');
         for (const r of rows.slice().reverse()) {
             const w = whenOf(r.at);
             // the shown version is the list's one Tab stop; the arrow keys move between the rest (a roving tabindex)
@@ -136,8 +137,8 @@ export function attachVersions(dialog, hooks) {
             list.append(li);
         }
         list.addEventListener('keydown', onListKey);
-        bar.append(list);
-        if (keepFocus) bar.querySelector('.' + keepFocus)?.focus();
+        pop.append(list); bar.append(pop);
+        if (keepFocus) { bar.querySelector('.' + keepFocus)?.focus(); if (!bar.contains(document.activeElement)) bar.querySelector('.av-current')?.focus(); } // Compare is in the popover, closed after it is pressed: the keyboard stays on the chip that opened it
     }
     const options = () => [...bar.querySelectorAll('.av-option')];
     function focusOption() {
@@ -242,7 +243,7 @@ export function attachVersions(dialog, hooks) {
         hooks.reload(); // the version is drawn again, with its comments
         if (st.sheetWas) hooks.setSheet(true);
         st.sheetWas = false;
-        bar.querySelector('.av-compare')?.focus();
+        const back = bar.querySelector('.av-compare'); (back && back.getClientRects().length ? back : bar.querySelector('.av-current'))?.focus(); // the list is closed: the keyboard is on the chip
     }
 
     return {
