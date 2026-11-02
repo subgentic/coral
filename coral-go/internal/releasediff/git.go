@@ -1,0 +1,66 @@
+package releasediff
+
+import (
+	"bytes"
+	"fmt"
+	"os/exec"
+	"strings"
+)
+
+// Reader reads the files of one ref of a repository with git; it runs nothing of the ref.
+type Reader struct{ Repo, Ref string }
+
+func (r Reader) git(args ...string) ([]byte, error) {
+	cmd := exec.Command("git", append([]string{"-C", r.Repo}, args...)...)
+	var out, errb bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &out, &errb
+	if err := cmd.Run(); err != nil {
+		return nil, fmt.Errorf("git %s: %w: %s", strings.Join(args, " "), err, strings.TrimSpace(errb.String()))
+	}
+	return out.Bytes(), nil
+}
+
+// File is the content of path at the ref.
+func (r Reader) File(path string) ([]byte, error) { return r.git("show", r.Ref+":"+path) }
+
+// Routes reads the route census of the ref.
+func (r Reader) Routes() (Entries, error) {
+	cloud, err := r.File(CloudRoutesPath)
+	if err != nil {
+		return nil, err
+	}
+	owner, err := r.File(OwnerRoutesPath)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRoutes(cloud, owner)
+}
+
+// Settings reads the board settings keys of the ref from the Go files of internal/board (test files left out).
+func (r Reader) Settings() (Entries, error) {
+	list, err := r.git("ls-tree", "--name-only", r.Ref, BoardDir)
+	if err != nil {
+		return nil, err
+	}
+	files := map[string][]byte{}
+	for _, p := range strings.Fields(string(list)) {
+		if !strings.HasSuffix(p, ".go") || strings.HasSuffix(p, "_test.go") {
+			continue
+		}
+		b, err := r.File(p)
+		if err != nil {
+			return nil, err
+		}
+		files[p] = b
+	}
+	return ParseSettings(files)
+}
+
+// Resolve checks that a ref names a commit, so a typo is one clear line and not a failed read of a file.
+func Resolve(repo, ref string) (string, error) {
+	out, err := Reader{Repo: repo}.git("rev-parse", "--verify", "--quiet", ref+"^{commit}")
+	if err != nil {
+		return "", fmt.Errorf("%q is not a commit, tag or branch of %s", ref, repo)
+	}
+	return strings.TrimSpace(string(out)), nil
+}
