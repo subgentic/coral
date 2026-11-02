@@ -99,6 +99,8 @@ type provisionPlan struct {
 	created    time.Time
 	cancel     context.CancelFunc
 	failure    string
+	keyChanged bool           // the failure was a host key that no longer matches: the owner may forget the saved one (#12056)
+	forgotten  []provisionKey // the key the owner had Coral forget: shown beside the one the computer presents now, so the two can be compared
 }
 
 const (
@@ -138,6 +140,12 @@ func (p *provisionPlan) view() map[string]any {
 	}
 	if p.failure != "" {
 		v["error"] = p.failure
+	}
+	if p.keyChanged && p.phase == phaseFailed {
+		v["key_changed"] = true
+	}
+	if len(p.forgotten) > 0 {
+		v["forgotten_keys"] = append([]provisionKey(nil), p.forgotten...)
 	}
 	return v
 }
@@ -362,6 +370,9 @@ func (pr *Provisioner) Connect(w http.ResponseWriter, r *http.Request) {
 		p.mu.Unlock()
 		p.setStep("connect", stepOK, "Connected; the host key is already known.")
 	case errors.Is(err, sshprov.ErrHostKeyChanged):
+		p.mu.Lock()
+		p.keyChanged = true
+		p.mu.Unlock()
 		pr.fail(p, "connect", "The host key has changed since you confirmed it. This may be a different computer. If you expected it, remove this computer's line from ssh_known_hosts in Coral's data folder, then run Set up again.")
 	case errors.Is(err, sshprov.ErrHostKey):
 		keys, kerr := pr.scan(ctx, p.Target)
@@ -549,6 +560,11 @@ func (pr *Provisioner) failConnect(p *provisionPlan, step string, err error) {
 	kind, detail := sshprov.KindOther, ""
 	if errors.As(err, &ce) {
 		kind, detail = ce.Kind, ce.Stderr
+	}
+	if errors.Is(err, sshprov.ErrHostKeyChanged) {
+		p.mu.Lock()
+		p.keyChanged = true
+		p.mu.Unlock()
 	}
 	slog.Info("[provision] could not reach the computer", "plan", p.ID, "step", step, "kind", string(kind), "ssh", detail, "error", err.Error())
 	pr.fail(p, step, connectSentence(err))
@@ -818,4 +834,46 @@ func (pr *Provisioner) failPanicked(p *provisionPlan) {
 		}
 	}
 	p.phase, p.failure = phaseFailed, "Something went wrong inside this hub, so the setup stopped. Nothing more was done."
+}
+
+// ForgetKey handles POST /api/servers/provision/{plan}/forget-key: the owner's answer to a host key that changed. Only a person at the dashboard. It removes the key the hub's OWN ssh_known_hosts holds for this computer
+// (never the person's ~/.ssh/known_hosts, and no other host), then puts the setup back at the start so the next connect scans the computer again and shows its current key to confirm: the key is never accepted here.
+func (pr *Provisioner) ForgetKey(w http.ResponseWriter, r *http.Request) {
+	if !humanInputCaller(r) {
+		provisionPersonOnly(w)
+		return
+	}
+	p := pr.plan(chi.URLParam(r, "plan"))
+	if p == nil {
+		errNotFound(w, "no such setup")
+		return
+	}
+	p.mu.Lock()
+	ok := p.phase == phaseFailed && p.keyChanged
+	p.mu.Unlock()
+	if !ok {
+		errConflict(w, "this setup did not stop on a changed host key")
+		return
+	}
+	name := pr.runner.HostKeyName(r.Context(), p.Target)
+	if name == "" {
+		errBadRequest(w, "the name this computer's key is kept under could not be worked out: remove its line from ssh_known_hosts in Coral's data folder")
+		return
+	}
+	saved, _ := sshprov.SavedHostKeys(r.Context(), pr.known(), name) // what is about to go, for the owner to compare with what the computer presents next
+	if err := sshprov.ForgetHostKey(r.Context(), pr.known(), name); err != nil {
+		slog.Info("[provision] could not forget a host key", "plan", p.ID, "error", err.Error())
+		errInternalServer(w, "could not remove the saved host key")
+		return
+	}
+	slog.Info("[provision] the owner forgot a host key", "plan", p.ID, "host", name) // the host is a name the owner typed or their own ssh config names, never a key
+	p.mu.Lock()
+	p.phase, p.keyChanged, p.failure, p.keys = phasePlanned, false, "", nil
+	p.forgotten = p.forgotten[:0]
+	for _, k := range saved {
+		p.forgotten = append(p.forgotten, provisionKey{Host: k.Host, Type: k.Type, Fingerprint: k.Fingerprint})
+	}
+	p.steps = planSteps()
+	p.mu.Unlock()
+	writeJSON(w, http.StatusOK, p.view())
 }
