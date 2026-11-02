@@ -65,6 +65,11 @@ func RemoveHermesHome(dataDir, team, sessionID string) error {
 	if home == "" {
 		return nil
 	}
+	for _, dir := range []string{filepath.Join(dataDir, hermesHomesFolder), HermesTeamHome(dataDir, team)} { // os.RemoveAll follows a link in a parent: each is checked first, as on the way in
+		if fi, err := os.Lstat(dir); err == nil && fi.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("hermes: %s is a link: the agent's home was not removed", filepath.Base(dir))
+		}
+	}
 	if _, err := os.Lstat(home); err != nil {
 		return nil
 	}

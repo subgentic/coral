@@ -475,3 +475,27 @@ func TestRemovingAnAgentHome(t *testing.T) {
 	_, err = os.Stat(filepath.Join(keep, "f"))
 	assert.NoError(t, err, "the link's target is untouched")
 }
+
+// Security's SHOULD on #11936: os.RemoveAll follows a link in a PARENT of the home, so a link in place of the team's folder (or of hermes-homes) must stop a removal, and what it points at stays.
+func TestRemovingAnAgentHomeRefusesALinkedParent(t *testing.T) {
+	for _, level := range []string{"hermes-homes", "team"} {
+		t.Run(level, func(t *testing.T) {
+			r := hermesRig(t)
+			keep := t.TempDir()
+			victim := filepath.Join(keep, testSID)
+			if level == "team" {
+				require.NoError(t, os.MkdirAll(filepath.Join(r.data, hermesHomesFolder), 0o700))
+				require.NoError(t, os.Symlink(keep, HermesTeamHome(r.data, "t")))
+			} else {
+				require.NoError(t, os.MkdirAll(filepath.Join(keep, filepath.Base(HermesTeamHome(r.data, "t"))), 0o700))
+				victim = filepath.Join(keep, filepath.Base(HermesTeamHome(r.data, "t")), testSID)
+				require.NoError(t, os.Symlink(keep, filepath.Join(r.data, hermesHomesFolder)))
+			}
+			require.NoError(t, os.MkdirAll(victim, 0o700))
+			require.NoError(t, os.WriteFile(filepath.Join(victim, "state.db"), []byte("keep"), 0o600))
+			assert.Error(t, RemoveHermesHome(r.data, "t", testSID))
+			_, err := os.Stat(filepath.Join(victim, "state.db"))
+			assert.NoError(t, err, "nothing was removed through the link")
+		})
+	}
+}
