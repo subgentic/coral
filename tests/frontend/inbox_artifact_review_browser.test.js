@@ -107,7 +107,7 @@ const { coralReady } = require('./helpers/wait');
                         assert.ok(withAgent.includes('cli') && withAgent.includes('review'), '1280: an agent row and the review rows together: CLI is drawn again and Actions stays: ' + JSON.stringify(withAgent));
                         // the table fits its panel (#11943): when the room is short Folder is the first to go (then Answer, then CLI), and a quiet control says so and brings it back
                         if (!withAgent.includes('folder')) {
-                            const said = await ev(`(() => { const b = document.querySelector('#group-table-view .dt-hidden-btn'); return b && !b.closest('.dt-hidden-bar').hidden ? b.getAttribute('aria-label') : ''; })()`);
+                            const said = await ev(`(() => { const b = document.querySelector('#group-table-view .cols-hidden-btn'); return b && !b.closest('.cols-hidden-bar').hidden ? b.getAttribute('aria-label') : ''; })()`);
                             assert.ok(/Folder/.test(said), '1280: Folder is hidden to fit the panel and the control names it: ' + said);
                         }
                         await ev(`(async () => { const { state } = await import((window.__coralStatic || '/static/') + 'state.js'), m = await import((window.__coralStatic || '/static/') + 'inbox_tab.js'); state.liveSessions = []; m.updateInboxTab(); return true; })()`);
