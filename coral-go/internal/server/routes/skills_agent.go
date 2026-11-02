@@ -123,20 +123,50 @@ func (h *SkillsHandler) SearchSkills(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"skills": out})
 }
 
-// ListSkills: GET /api/agent/skills. The newest approved version of each skill (what is attached to an agent is a later slice).
+// ListSkills: GET /api/agent/skills. An agent gets the skills attached to it, each pinned to the version it was launched with, and a newer approved version as an update to offer (never swapped in under it);
+// the Operator gets the newest approved version of each skill. Search finds the rest.
 func (h *SkillsHandler) ListSkills(w http.ResponseWriter, r *http.Request) {
 	kind, name, ok := h.who(w, r)
 	if !ok {
 		return
 	}
-	rows, err := h.ss.ListApprovedSkills(r.Context())
-	if err != nil {
-		errInternalServer(w, "could not list the skills")
-		return
+	type attachedLine struct {
+		skillSummary
+		Status          string `json:"status,omitempty"`
+		UpdateAvailable *struct {
+			ID      string `json:"id"`
+			Version int    `json:"version"`
+		} `json:"update_available,omitempty"`
 	}
-	out := make([]skillSummary, 0, len(rows))
-	for _, x := range rows {
-		out = append(out, summaryOf(x))
+	out := []attachedLine{}
+	if so, isAgent := VerifiedSession(r.Context()); isAgent {
+		attached, err := h.ss.AttachedSkills(r.Context(), so.SessionID)
+		if err != nil {
+			errInternalServer(w, "could not list the skills")
+			return
+		}
+		for _, a := range attached {
+			line := attachedLine{skillSummary: skillSummary{ID: a.SkillID, Name: a.Name, Version: a.Version, Description: a.Description}}
+			if a.Status == store.SkillRemoved {
+				line.Status = "removed"
+			}
+			if a.LatestVersion > a.Version {
+				line.UpdateAvailable = &struct {
+					ID      string `json:"id"`
+					Version int    `json:"version"`
+				}{ID: a.LatestID, Version: a.LatestVersion}
+			}
+			out = append(out, line)
+		}
+	} else {
+		rows, err := h.ss.ListApprovedSkills(r.Context())
+		if err != nil {
+			errInternalServer(w, "could not list the skills")
+			return
+		}
+		for _, x := range rows {
+			out = append(out, attachedLine{skillSummary: summaryOf(x)})
+		}
 	}
 	_ = h.ss.LogSkillAccess(r.Context(), "list", "", "", kind, name, fmt.Sprintf("count=%d", len(out)))
 	w.Header().Set("Cache-Control", "no-store")

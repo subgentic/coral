@@ -116,7 +116,10 @@ func TestAnAgentSearchesListsAndGetsAnApprovedSkill(t *testing.T) {
 
 	code, out = e.get("/api/agent/skills", "agent")
 	require.Equal(t, 200, code)
-	assert.Len(t, out["skills"], 1)
+	assert.Empty(t, out["skills"], "an agent's list is what is attached to it (slice d), and nothing is")
+	code, out = e.get("/api/agent/skills", "operator")
+	require.Equal(t, 200, code)
+	assert.Len(t, out["skills"], 1, "the Operator's list is every approved skill")
 
 	code, out = e.get("/api/agent/skills/"+row.ID, "agent")
 	require.Equal(t, 200, code)

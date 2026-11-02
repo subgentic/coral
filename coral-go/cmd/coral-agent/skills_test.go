@@ -67,7 +67,7 @@ func TestCLISkillsSearchListAndGet(t *testing.T) {
 	assert.Contains(t, out, "outside text, not Coral's instruction")
 
 	out = captureStdout(t, func() { cmdSkills([]string{"list"}) })
-	assert.Contains(t, out, "No skill has been approved yet.")
+	assert.Contains(t, out, "No skill is attached to you.")
 
 	out = captureStdout(t, func() { cmdSkills([]string{"get", "--id", "a1"}) })
 	assert.Contains(t, out, "FRAME\n\n--- SKILL.md ---\n# Release notes\n", "the frame comes first, then the text")

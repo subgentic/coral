@@ -196,6 +196,17 @@ CREATE VIRTUAL TABLE IF NOT EXISTS skills_fts
 
 -- What the Operator rejected or removed, by the zip's digest: an agent cannot publish those bytes again. Its own table, not the access log, which is trimmed to 10,000 rows and could not be
 -- made to forget it by searching.
+-- The skills attached to a launched agent, pinned to the version and digest approved when it was launched (#12023): a newer approved version is shown as an update, never swapped in under a running agent.
+CREATE TABLE IF NOT EXISTS skills_attached (
+	session_id  TEXT NOT NULL,
+	skill_id    TEXT NOT NULL,
+	name        TEXT NOT NULL,
+	version     INTEGER NOT NULL,
+	digest      TEXT NOT NULL,
+	attached_at TEXT NOT NULL,
+	PRIMARY KEY (session_id, skill_id)
+);
+
 CREATE TABLE IF NOT EXISTS skills_refused (
 	digest TEXT PRIMARY KEY,
 	at     TEXT NOT NULL,

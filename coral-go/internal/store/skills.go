@@ -439,3 +439,40 @@ func (s *SessionStore) ListApprovedSkills(ctx context.Context) ([]SkillRow, erro
 	err := s.reader().SelectContext(ctx, &rows, `SELECT * FROM skills s WHERE status = ? AND version = (SELECT MAX(version) FROM skills WHERE name = s.name AND status = ?) ORDER BY name`, SkillApproved, SkillApproved)
 	return rows, err
 }
+
+// AttachSkills records the skills a launched agent was told about, pinned to the versions and digests approved at the launch.
+func (s *SessionStore) AttachSkills(ctx context.Context, sessionID string, rows []SkillRow) error {
+	if sessionID == "" || len(rows) == 0 {
+		return nil
+	}
+	return s.db.WithTx(ctx, func(tx *sqlx.Tx) error {
+		for _, r := range rows {
+			if _, err := tx.ExecContext(ctx, `INSERT OR REPLACE INTO skills_attached (session_id, skill_id, name, version, digest, attached_at) VALUES (?, ?, ?, ?, ?, ?)`, sessionID, r.ID, r.Name, r.Version, r.Digest, now()); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+// AttachedSkill is a skill attached to an agent with what became of it since.
+type AttachedSkill struct {
+	SkillID       string `db:"skill_id" json:"id"`
+	Name          string `db:"name" json:"name"`
+	Version       int    `db:"version" json:"version"`
+	Digest        string `db:"digest" json:"digest"`
+	Status        string `db:"status" json:"status"` // of the pinned version: approved, or removed when the Operator removed it
+	Description   string `db:"description" json:"description"`
+	LatestID      string `db:"latest_id" json:"-"`
+	LatestVersion int    `db:"latest_version" json:"-"`
+}
+
+// AttachedSkills are the skills attached to a session, by name, each with the newest approved version of its name: a newer one is an update to offer, never one that replaces the pinned version.
+func (s *SessionStore) AttachedSkills(ctx context.Context, sessionID string) ([]AttachedSkill, error) {
+	var rows []AttachedSkill
+	err := s.reader().SelectContext(ctx, &rows, `SELECT a.skill_id, a.name, a.version, a.digest, COALESCE(k.status, 'removed') AS status, COALESCE(k.description, '') AS description,
+		COALESCE((SELECT id FROM skills WHERE name = a.name AND status = ? ORDER BY version DESC LIMIT 1), '') AS latest_id,
+		COALESCE((SELECT MAX(version) FROM skills WHERE name = a.name AND status = ?), 0) AS latest_version
+		FROM skills_attached a LEFT JOIN skills k ON k.id = a.skill_id WHERE a.session_id = ? ORDER BY a.name`, SkillApproved, SkillApproved, sessionID)
+	return rows, err
+}

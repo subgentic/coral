@@ -41,6 +41,8 @@ type launchTeamAgent struct {
 	MCPServers   json.RawMessage        `json:"mcpServers"` // refused: not supported (#3644)
 	Hooks        map[string]interface{} `json:"hooks"`
 	Knowledge    string                 `json:"knowledge"`
+	// Skills are approved skills this member is told about besides the team's (#12023): ids from the Skills Store.
+	Skills []string `json:"skills"`
 	// PermissionMode names Default and nothing else (#10362): a member whose form says Default sends no flag, which is the same request as "nothing chosen" (the saved default, or Auto); this says it.
 	PermissionMode string `json:"permission_mode"`
 	// ReviewsOnly and ReviewAreas (#8957): the member takes review tasks only, and which areas it reviews (empty: every area). Applied when the member subscribes to the team's board.
@@ -50,20 +52,22 @@ type launchTeamAgent struct {
 
 // launchTeamRequest is a team launch's body.
 type launchTeamRequest struct {
-	BoardName          string            `json:"board_name"`
-	BoardID            string            `json:"board_id"`  // relaunch on this board (#3536)
-	NewBoard           bool              `json:"new_board"` // create another board even if the name exists
-	WorkingDir         string            `json:"working_dir"`
-	CreateDir          bool              `json:"create_dir"` // the folder is the suggested <home>/Coral/<name>: make it (#11258)
-	AgentType          string            `json:"agent_type"`
-	Flags              []string          `json:"flags"`
-	BoardServer        string            `json:"board_server"`
-	Backend            string            `json:"backend"`
-	BoardType          string            `json:"board_type"`
-	Worktree           bool              `json:"worktree"`
-	BaseBranch         string            `json:"base_branch"`
-	Agents             []launchTeamAgent `json:"agents"`
-	TeamKnowledgeIndex string            `json:"team_knowledge_index"`
+	BoardName   string            `json:"board_name"`
+	BoardID     string            `json:"board_id"`  // relaunch on this board (#3536)
+	NewBoard    bool              `json:"new_board"` // create another board even if the name exists
+	WorkingDir  string            `json:"working_dir"`
+	CreateDir   bool              `json:"create_dir"` // the folder is the suggested <home>/Coral/<name>: make it (#11258)
+	AgentType   string            `json:"agent_type"`
+	Flags       []string          `json:"flags"`
+	BoardServer string            `json:"board_server"`
+	Backend     string            `json:"backend"`
+	BoardType   string            `json:"board_type"`
+	Worktree    bool              `json:"worktree"`
+	BaseBranch  string            `json:"base_branch"`
+	Agents      []launchTeamAgent `json:"agents"`
+	// Skills are approved skills every member is told about (#12023): ids from the Skills Store.
+	Skills             []string `json:"skills"`
+	TeamKnowledgeIndex string   `json:"team_knowledge_index"`
 	// HealthMonitor true turns the team's health check on (#4962). The check is off for a new team; false or absent leaves the team's
 	// setting as it is, so a relaunch never turns off a check the operator turned on.
 	HealthMonitor *bool `json:"health_monitor"`
@@ -102,6 +106,17 @@ func (h *SessionsHandler) LaunchTeam(w http.ResponseWriter, r *http.Request) {
 	}
 	if h.refuseAgentLaunchOverLimit(w, r, len(body.Agents)) {
 		return
+	}
+	// Every skill the launch names is checked before anything is written: approved ones only, the same refusal for a pending, removed or unknown one.
+	for i, ids := range append([][]string{body.Skills}, memberSkills(body.Agents)...) {
+		if _, serr := h.resolveSkillIDs(r.Context(), ids); serr != nil {
+			who := "the team"
+			if i > 0 {
+				who = fmt.Sprintf("agent %q", body.Agents[i-1].Name)
+			}
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": who + ": " + serr.Error(), "field": "skills"})
+			return
+		}
 	}
 	for _, a := range body.Agents {
 		if mcpGiven(a.MCPServers) {
@@ -651,9 +666,10 @@ func (h *SessionsHandler) launchTeamMember(ctx context.Context, body launchTeamR
 		agentFlags = append(agentFlags, modelArgs...)
 	}
 	effectiveThinking := defaultThinkingFromSettings(userSettings, agentType, def.Thinking)
+	skillRows, _ := h.resolveSkillIDs(ctx, unionSkillIDs(body.Skills, def.Skills)) // checked before the launch started; one that changed since is simply not told
 	result, err := h.launchSession(ctx, launchSpec{
 		WorkDir: workingDir, AgentType: agentType, DisplayName: def.Name, Flags: agentFlags,
-		Prompt:    InjectKnowledgeIntoPrompt(h.cfg.CoralDir(), body.BoardName, def.Name, def.Prompt),
+		Prompt:    withSkillNote(InjectKnowledgeIntoPrompt(h.cfg.CoralDir(), body.BoardName, def.Name, def.Prompt), launchSkillNote(skillRows)),
 		BoardName: body.BoardName, BoardServer: body.BoardServer, Backend: body.Backend, BoardType: body.BoardType,
 		Model: effectiveModel, Thinking: effectiveThinking, Capabilities: def.Capabilities, Tools: def.Tools, Hooks: def.Hooks,
 		// The member's flags carry the mode as the expanded flags of its type (--sandbox workspace-write -a never for Codex's auto), which PermissionModeFromFlags does not read
@@ -666,6 +682,9 @@ func (h *SessionsHandler) launchTeamMember(ctx context.Context, body launchTeamR
 		return map[string]any{"name": def.Name, "error": launchErrText(ctx, err)}, classifyLaunchError(err)
 	}
 	sessionID := result["session_id"].(string)
+	if err := h.ss.AttachSkills(ctx, sessionID, skillRows); err != nil {
+		log.Printf("[launch-team] the skills attached to %q were not saved: %v", def.Name, err)
+	}
 	if worktreePath != "" {
 		h.ss.UpdateWorktreeInfo(ctx, sessionID, worktreePath, body.WorkingDir)
 	}
@@ -747,4 +766,13 @@ func explicitDefaultMemberMode(requested, fromTeamFlags string, memberFlags []st
 		return fromTeamFlags
 	}
 	return explicitDefaultMode(requested, memberFlags)
+}
+
+// memberSkills is each member's own skill ids, in the members' order.
+func memberSkills(agents []launchTeamAgent) [][]string {
+	out := make([][]string, len(agents))
+	for i, a := range agents {
+		out[i] = a.Skills
+	}
+	return out
 }

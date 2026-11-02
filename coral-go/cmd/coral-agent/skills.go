@@ -21,7 +21,7 @@ const skillsUsageText = `coral-agent skills - find and read the skills the Opera
 
 Commands:
   skills search <words> [--json]       Search the approved skills (description first, then name, tags, text)
-  skills list [--json]                 The newest approved version of each skill
+  skills list [--json]                 The skills attached to you, each pinned to the version you were started with (a newer approved version is offered, never swapped in)
   skills get --id <id> [flags]         Read one skill: its SKILL.md and the list of its files
 
 Flags for 'skills get':
@@ -56,12 +56,17 @@ func cmdSkills(args []string) {
 }
 
 type skillLine struct {
-	ID            string `json:"id"`
-	Name          string `json:"name"`
-	Version       int    `json:"version"`
-	Description   string `json:"description"`
-	HasScripts    bool   `json:"has_scripts"`
-	NotReviewable bool   `json:"not_reviewable"`
+	ID              string `json:"id"`
+	Name            string `json:"name"`
+	Version         int    `json:"version"`
+	Description     string `json:"description"`
+	HasScripts      bool   `json:"has_scripts"`
+	NotReviewable   bool   `json:"not_reviewable"`
+	Status          string `json:"status"`
+	UpdateAvailable *struct {
+		ID      string `json:"id"`
+		Version int    `json:"version"`
+	} `json:"update_available"`
 }
 
 func skillsCall(path string) []byte {
@@ -105,6 +110,12 @@ func printSkillLines(data []byte, none string) {
 		}
 		if s.NotReviewable {
 			flags += " [has files not shown as text]"
+		}
+		if s.Status == "removed" {
+			flags += " [removed by the Operator]"
+		}
+		if s.UpdateAvailable != nil {
+			flags += fmt.Sprintf(" [a newer version is approved: v%d, id %s]", s.UpdateAvailable.Version, s.UpdateAvailable.ID)
 		}
 		fmt.Printf("%s  %s v%d%s\n    %s\n", s.ID, s.Name, s.Version, flags, oneLine(s.Description))
 	}
@@ -161,7 +172,7 @@ func cmdSkillsList(args []string) {
 		printRaw(data)
 		return
 	}
-	printSkillLines(data, "No skill has been approved yet.")
+	printSkillLines(data, "No skill is attached to you. Find one with: coral-agent skills search <words>")
 }
 
 func cmdSkillsGet(args []string) {
