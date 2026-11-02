@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"regexp"
 	"sort"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -267,4 +269,29 @@ func TestAutoWakeSendsNoStartingPromptAndAManualWakeDoes(t *testing.T) {
 		require.NotEmpty(t, files, "a manual wake passes its first message: %v", r.term.sent)
 		assert.Contains(t, strings.Join(files, "\n"), first, "the first prompt is sent as before")
 	})
+}
+
+// A launch that starts a NEW conversation has none to lean on, so it keeps its first message even on an auto-wake (QA's SHOULD, #12358): Codex with no saved session is started without a resume id.
+func TestAutoWakeOfALaunchThatDoesNotResumeKeepsItsFirstMessage(t *testing.T) {
+	r := newSleepRig(t)
+	truePath, lerr := exec.LookPath("true")
+	if lerr != nil {
+		t.Skip("no true(1) to stand in for the Codex CLI")
+	}
+	require.NoError(t, r.ss.SetSetting(r.ctx, "cli_path_codex", truePath))
+	cx := uuid.NewString()
+	team := "autosleep"
+	require.NoError(t, r.ss.RegisterLiveSession(r.ctx, &store.LiveSession{SessionID: cx, AgentName: "cx", AgentType: "codex", BoardName: &team, WorkingDir: t.TempDir()}))
+	ls, err := r.ss.GetLiveSession(r.ctx, cx)
+	require.NoError(t, err)
+	plan, err := r.h.prepareWake(r.ctx, ls, true)
+	require.NoError(t, err)
+	assert.Empty(t, plan.params.ResumeSessionID, "a Codex agent with no saved conversation is started anew")
+	assert.False(t, plan.params.NoStartPrompt, "so it keeps its first message")
+	claude, err := r.ss.GetLiveSession(r.ctx, r.sid)
+	require.NoError(t, err)
+	plan, err = r.h.prepareWake(r.ctx, claude, true)
+	require.NoError(t, err)
+	assert.NotEmpty(t, plan.params.ResumeSessionID)
+	assert.True(t, plan.params.NoStartPrompt, "a resumed Claude conversation goes without")
 }
