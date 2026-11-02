@@ -22,7 +22,7 @@ const SKILLS = [
             window.__reqs = [];
             const real = window.fetch; const json = (b, status = 200) => Promise.resolve(new Response(JSON.stringify(b), { status, headers: { 'content-type': 'application/json' } }));
             window.fetch = (u, o = {}) => { const p = new URL(String(u), location.href), m = o.method || 'GET';
-                if (p.pathname === '/api/skills' && p.searchParams.get('status') === 'approved') return json({ skills: ${JSON.stringify(SKILLS)} });
+                if (p.pathname === '/api/skills' && p.searchParams.get('status') === 'approved') return json({ skills: window.__skillsList || ${JSON.stringify(SKILLS)} });
                 if (m === 'POST' && /^\\/api\\/sessions\\/(launch|launch-team)$/.test(p.pathname)) {
                     window.__reqs.push({ path: p.pathname, body: JSON.parse(o.body) });
                     return p.pathname === '/api/sessions/launch-team' ? json({ agents: [{ name: 'A', session_id: 's' }] }) : json({ session_name: 'launched-1', session_id: 'sid-1' });
@@ -81,6 +81,34 @@ const SKILLS = [
         await ev(`import((window.__coralStatic || '/static/') + 'launch_skills.js').then(m => m.mountLaunchSkills('launch-skills', false))`);
         assert.equal(await ev(`document.getElementById('launch-skills-row').hidden`), true);
         assert.deepEqual(await ev(`import((window.__coralStatic || '/static/') + 'launch_skills.js').then(m => m.launchSkillIds('launch-skills'))`), []);
+        // The most that can be ticked is ten (the server's limit for one launch): an eleventh is refused, and nothing past ten is sent (#12260, QA's SHOULD on #12104)
+        const MANY = Array.from({ length: 12 }, (_, i) => ({ id: String(i + 1).padStart(2, '0').repeat(16), name: 'skill-' + String(i + 1).padStart(2, '0'), version: 1, description: 'Skill number ' + (i + 1) + '.', status: 'approved', has_scripts: false, not_reviewable: false }));
+        await ev(`window.__skillsList = ${JSON.stringify(MANY)}; import((window.__coralStatic || '/static/') + 'launch_skills.js').then(m => m.mountLaunchSkills('launch-skills', true))`);
+        await waitFor(`document.querySelectorAll('#launch-skills-host .skills-pick').length === 12 && !document.getElementById('launch-skills-row').hidden`, 'twelve skills listed', 8000);
+        await ev(`document.getElementById('launch-modal')?.removeAttribute('data-member'); true`);
+        const boxes = () => ev(`Array.from(document.querySelectorAll('#launch-skills-host input[type=checkbox]')).map(b => ({ checked: b.checked, disabled: b.disabled }))`);
+        const ids = () => ev(`import((window.__coralStatic || '/static/') + 'launch_skills.js').then(m => m.launchSkillIds('launch-skills'))`);
+        for (let i = 0; i < 10; i++) assert.equal(await tick('launch-skills-host', MANY[i].id), true, 'skill ' + (i + 1) + ' ticks');
+        let state = await boxes();
+        assert.equal(state.filter(b => b.checked).length, 10, 'ten are ticked');
+        assert.deepEqual(state.slice(10), [{ checked: false, disabled: true }, { checked: false, disabled: true }], 'the eleventh and twelfth cannot be ticked once ten are');
+        assert.equal(await tick('launch-skills-host', MANY[10].id), false, 'a click on the eleventh does not tick it');
+        assert.equal((await ids()).length, 10, 'and ten ids are what would be sent, never eleven');
+        assert.match(await ev(`document.querySelector('#launch-skills-host .skills-note').textContent`), /^10 skills:/);
+        await ev(`document.querySelector('#launch-skills-host input[type=checkbox][value="${MANY[0].id}"]').click(); true`); // one is unticked: room again
+        assert.equal((await boxes()).slice(10).every(b => !b.disabled), true, 'unticking one makes room for another');
+        assert.equal(await tick('launch-skills-host', MANY[10].id), true, 'and the eleventh then ticks');
+        assert.equal((await ids()).length, 10, 'still ten');
+
+        // What a skill says about itself is words, never markup: a name and a description that hold tags are drawn as the characters they are (#12260, QA's SHOULD on #12104)
+        const HOSTILE = [{ id: 'aa'.repeat(16), name: '<img src=x onerror="window.__pwned=1">', version: 1, description: '<b>bold</b> <script>window.__pwned=2<\/script> &amp; <a href="javascript:window.__pwned=3">link</a>', status: 'approved', has_scripts: false, not_reviewable: false }];
+        await ev(`window.__pwned = undefined; window.__skillsList = ${JSON.stringify(HOSTILE)}; import((window.__coralStatic || '/static/') + 'launch_skills.js').then(m => m.mountLaunchSkills('launch-skills', true))`);
+        await waitFor(`document.querySelectorAll('#launch-skills-host .skills-pick').length === 1`, 'the hostile skill listed', 8000);
+        const shown = (await rowsOf('launch-skills-host'))[0];
+        assert.ok(shown.includes('<img src=x onerror="window.__pwned=1">'), 'the name is shown as the characters it is: ' + shown);
+        assert.ok(shown.includes('<b>bold</b>') && shown.includes('<script>window.__pwned=2</script>') && shown.includes('&amp;'), 'so is the description: ' + shown);
+        assert.equal(await ev(`document.querySelectorAll('#launch-skills-host .skills-pick img, #launch-skills-host .skills-pick b, #launch-skills-host .skills-pick script, #launch-skills-host .skills-pick a').length`), 0, 'no tag of theirs became an element');
+        assert.equal(await ev(`typeof window.__pwned`), 'undefined', 'and nothing ran');
         console.log('PASS Skills in New agent and New team');
     } finally { await removeBoards(ev, ['alpha-team']); await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
