@@ -343,3 +343,298 @@ func TestStreamGivesTheSlotBackWhenTheConnectionIsClosed(t *testing.T) {
 		c.Close()
 	}
 }
+
+// QA's pins on the pool's numbers (#12469): the cap, the idle pool and how long it is kept, and the slot of a stream whose process ends by itself.
+func TestStreamCapIs24AndThe25thDialIsRefused(t *testing.T) {
+	hold := newStandIn(t, "ssh", standCfg{HoldSecs: 30})
+	tg, _ := ParseTarget("user@box.example.com")
+	st, _ := NewStreamTarget(Runner{SSH: hold}, tg, 8420, streamKey)
+	var conns []net.Conn
+	defer func() {
+		for _, c := range conns {
+			c.Close()
+		}
+	}()
+	for i := 0; i < 24; i++ {
+		c, err := st.dial(context.Background())
+		if err != nil {
+			t.Fatalf("dial %d of 24: %v", i+1, err)
+		}
+		conns = append(conns, c)
+	}
+	if _, err := st.dial(context.Background()); !errors.Is(err, ErrStreamBusy) {
+		t.Errorf("the 25th dial: %v", err)
+	}
+}
+
+func TestStreamPoolKeepsTenIdleStreamsForFiveMinutes(t *testing.T) {
+	tg, _ := ParseTarget("user@box.example.com")
+	st, _ := NewStreamTarget(Runner{SSH: "ssh"}, tg, 8420, streamKey)
+	tr := st.transport()
+	if tr.MaxIdleConnsPerHost != 10 || tr.IdleConnTimeout != 5*time.Minute {
+		t.Errorf("the pool keeps %d idle streams for %v; a switch is a burst of about 7 and the pool should hold it between switches (10 for 5 minutes)", tr.MaxIdleConnsPerHost, tr.IdleConnTimeout)
+	}
+}
+
+// A stream whose ssh ends by itself (the far side hung up) is read to its end and gives its slot back without anyone closing it: the reap path frees it too, not only Close.
+func TestStreamGivesTheSlotBackWhenTheProcessEndsByItself(t *testing.T) {
+	quick := newStandIn(t, "ssh", standCfg{})
+	tg, _ := ParseTarget("user@box.example.com")
+	st, _ := NewStreamTarget(Runner{SSH: quick}, tg, 8420, streamKey)
+	c, err := st.dial(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	io.ReadAll(c) // the stand-in exits at once: the read ends, and the reap collects it
+	deadline := time.Now().Add(5 * time.Second)
+	for len(st.slots) != 0 && time.Now().Before(deadline) {
+		time.Sleep(20 * time.Millisecond)
+	}
+	if n := len(st.slots); n != 0 {
+		t.Errorf("%d slot(s) still held after the process ended on its own", n)
+	}
+}
+
+// The first switch after the shared ssh session expired (60 s idle) started about 7 `ssh -W` at once with no session to share: each did its own handshake and one could fail, which started the 3 s backoff (#12446,
+// 4a; measured on a 94 ms hop: 1 to 3 s). A computer with no live stream and none for 45 s now gets one cheap command first, alone, that makes the session; the streams of the burst then ride it.
+func useTestControlDir(t *testing.T) {
+	t.Helper()
+	if UseControlDir(filepath.Join(t.TempDir(), "ssh_control")) == "" {
+		t.Skip("no shared-session folder on this system")
+	}
+	t.Cleanup(func() { controlDir.Store("") })
+}
+
+func TestStreamColdComputerMakesItsSharedSessionOnceBeforeTheBurstOpensItsStreams(t *testing.T) {
+	useTestControlDir(t)
+	remote := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(100 * time.Millisecond)
+		io.WriteString(w, "ok")
+	}))
+	defer remote.Close()
+	ssh, log := fakeSSHW(t)
+	tg, _ := ParseTarget("user@box.example.com")
+	st, err := NewStreamTarget(Runner{SSH: ssh}, tg, portOf(t, remote), streamKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	burst := func() {
+		var wg sync.WaitGroup
+		for i := 0; i < 7; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				req, _ := http.NewRequest("GET", "http://x.invalid/api/x", nil)
+				resp, err := st.RoundTrip(req)
+				if err != nil {
+					t.Error(err)
+					return
+				}
+				io.Copy(io.Discard, resp.Body)
+				resp.Body.Close()
+			}()
+		}
+		wg.Wait()
+	}
+	burst()
+	got := string(mustRead(t, log))
+	warm, firstW := strings.Index(got, "uname"), strings.Index(got, "-W\n")
+	if warm < 0 || firstW < 0 || warm > firstW {
+		t.Errorf("the cold computer's first ssh must be the one command that makes the shared session, before any stream (uname at %d, first -W at %d):\n%s", warm, firstW, got)
+	}
+	if n := strings.Count(got, "uname"); n != 1 {
+		t.Errorf("the session was made %d times by one burst", n)
+	}
+	before := strings.Count(got, "uname")
+	burst() // the streams are idle in the pool and the session is in use: not cold
+	if n := strings.Count(string(mustRead(t, log)), "uname"); n != before {
+		t.Errorf("a warm computer made the session again (%d commands)", n)
+	}
+}
+
+// One failed first attempt is one failure: the burst's other dials wait for it and then meet the backoff, rather than each starting an ssh of their own.
+func TestStreamColdComputerThatCannotBeReachedStartsOneSSHForTheWholeBurst(t *testing.T) {
+	useTestControlDir(t)
+	log := filepath.Join(t.TempDir(), "argv")
+	ssh := newStandIn(t, "ssh", standCfg{Stderr: "Connection refused\n", Exit: 255, Log: log})
+	tg, _ := ParseTarget("user@box.example.com")
+	st, _ := NewStreamTarget(Runner{SSH: ssh}, tg, 8420, streamKey)
+	var wg sync.WaitGroup
+	for i := 0; i < 7; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if c, err := st.dial(context.Background()); err == nil {
+				c.Close()
+				t.Error("a dial to a computer that refuses succeeded")
+			}
+		}()
+	}
+	wg.Wait()
+	b := mustRead(t, log)
+	if n := strings.Count(string(b), "--\nuser@box.example.com\n"); n != 1 {
+		t.Errorf("%d ssh processes were started for one burst to a computer that refuses: the first failure should end the others' dials:\n%s", n, b)
+	}
+}
+
+func mustRead(t *testing.T, p string) []byte {
+	t.Helper()
+	b, err := os.ReadFile(p)
+	if err != nil && !os.IsNotExist(err) {
+		t.Fatal(err)
+	}
+	return b
+}
+
+// #12475 (Security's INFO on #12446): with sharing off, forgetting a host key closed no session, and the idle `ssh -W` streams the pool keeps (made under the key just forgotten) lived their five minutes. CloseShared
+// now ends the idle streams of every stream target of that computer, and only that computer's.
+func TestForgettingAHostKeyClosesTheIdleStreamsOfThatComputerOnly(t *testing.T) {
+	remote := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(200 * time.Millisecond)
+		io.WriteString(w, "ok")
+	}))
+	defer remote.Close()
+	ssh, _ := fakeSSHW(t)
+	mk := func(dest string) *StreamTarget {
+		tg, _ := ParseTarget(dest)
+		st, err := NewStreamTarget(Runner{SSH: ssh}, tg, portOf(t, remote), streamKey)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(st.Close)
+		return st
+	}
+	burst := func(st *StreamTarget) {
+		var wg sync.WaitGroup
+		for i := 0; i < 4; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				req, _ := http.NewRequest("GET", "http://x.invalid/api/x", nil)
+				resp, err := st.RoundTrip(req)
+				if err != nil {
+					t.Error(err)
+					return
+				}
+				io.Copy(io.Discard, resp.Body)
+				resp.Body.Close()
+			}()
+		}
+		wg.Wait()
+	}
+	a, b := mk("user@a.example.com"), mk("user@b.example.com")
+	burst(a)
+	burst(b)
+	time.Sleep(100 * time.Millisecond)
+	if len(a.slots) == 0 || len(b.slots) == 0 {
+		t.Fatalf("the pools keep idle streams after a burst: a %d, b %d", len(a.slots), len(b.slots))
+	}
+	if len(controlArgs()) != 0 {
+		t.Fatal("this test is about sharing being off")
+	}
+	tg, _ := ParseTarget("user@a.example.com")
+	Runner{SSH: ssh}.CloseShared(context.Background(), tg)
+	deadline := time.Now().Add(3 * time.Second)
+	for len(a.slots) != 0 && time.Now().Before(deadline) {
+		time.Sleep(20 * time.Millisecond)
+	}
+	if n := len(a.slots); n != 0 {
+		t.Errorf("a's idle streams are still open after its host key was forgotten: %d", n)
+	}
+	if len(b.slots) == 0 {
+		t.Error("another computer's streams were closed too")
+	}
+}
+
+// Security's INFOs on #12477: the warm-up's failure reaches a client as a fixed sentence (ssh's own text stays in the log), and a dial waiting for the one that makes the session stops when its context ends.
+func TestStreamWarmUpFailureIsAFixedSentenceNotSSHsText(t *testing.T) {
+	useTestControlDir(t)
+	ssh := newStandIn(t, "ssh", standCfg{Stderr: "ssh: connect to host secret-host.internal port 22: Connection refused\n", Exit: 255})
+	tg, _ := ParseTarget("user@box.example.com")
+	st, _ := NewStreamTarget(Runner{SSH: ssh}, tg, 8420, streamKey)
+	_, err := st.dial(context.Background())
+	if !errors.Is(err, ErrStreamUnreachable) {
+		t.Fatalf("a computer that refuses: %v", err)
+	}
+	if strings.Contains(err.Error(), "secret-host") || strings.Contains(err.Error(), "refused") {
+		t.Errorf("ssh's own text reached the dial error: %q", err)
+	}
+}
+
+func TestStreamDialWaitingForTheSessionStopsWhenItsContextEnds(t *testing.T) {
+	useTestControlDir(t)
+	slow := newStandIn(t, "ssh", standCfg{HoldSecs: 5})
+	tg, _ := ParseTarget("user@box.example.com")
+	st, _ := NewStreamTarget(Runner{SSH: slow}, tg, 8420, streamKey)
+	go st.dial(context.Background()) // makes the session: its command takes 5 s here
+	time.Sleep(300 * time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
+	defer cancel()
+	t0 := time.Now()
+	_, err := st.dial(ctx)
+	if !errors.Is(err, context.DeadlineExceeded) || time.Since(t0) > time.Second {
+		t.Errorf("a dial waiting for the session ended with %v after %v; it should stop when its own context does", err, time.Since(t0))
+	}
+}
+
+// QA's pins on the cold rule (#12477): a computer is cold only with no stream alive and none for 45 s. Each case is one dial of a target whose last activity is set, and whether the one `uname` command ran.
+func TestStreamColdRuleNeedsNoLiveStreamAndFortyFiveSecondsOfQuiet(t *testing.T) {
+	useTestControlDir(t)
+	for _, c := range []struct {
+		name  string
+		ago   time.Duration // time since the last stream started or ended; 0 = never
+		alive bool
+		warm  bool
+	}{
+		{"never used", 0, false, true},
+		{"active 10 s ago", 10 * time.Second, false, false},
+		{"active 44 s ago", 44 * time.Second, false, false},
+		{"active 50 s ago", 50 * time.Second, false, true},
+		{"a stream is alive, however long ago the last one started", 5 * time.Minute, true, false},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			ssh, log := fakeSSHW(t)
+			remote := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { io.WriteString(w, "ok") }))
+			defer remote.Close()
+			tg, _ := ParseTarget("user@box.example.com")
+			st, _ := NewStreamTarget(Runner{SSH: ssh}, tg, portOf(t, remote), streamKey)
+			defer st.Close()
+			if c.ago > 0 {
+				st.mu.Lock()
+				st.lastActive = time.Now().Add(-c.ago)
+				st.mu.Unlock()
+			}
+			if c.alive {
+				st.slots <- struct{}{} // a stream is alive
+			}
+			conn, err := st.dial(context.Background())
+			if err != nil {
+				t.Fatal(err)
+			}
+			conn.Close()
+			if got := strings.Contains(string(mustRead(t, log)), "uname"); got != c.warm {
+				t.Errorf("the session command ran: %v, want %v", got, c.warm)
+			}
+		})
+	}
+}
+
+// A closed stream target is no longer one a forgotten host key reaches: it leaves the registry (no slow leak of closed targets).
+func TestClosingAStreamTargetTakesItOutOfTheRegistry(t *testing.T) {
+	tg, _ := ParseTarget("user@box.example.com")
+	st, _ := NewStreamTarget(Runner{SSH: "ssh"}, tg, 8420, streamKey)
+	liveStreams.mu.Lock()
+	_, in := liveStreams.m[st]
+	liveStreams.mu.Unlock()
+	if !in {
+		t.Fatal("a new target is in the registry")
+	}
+	st.Close()
+	liveStreams.mu.Lock()
+	_, in = liveStreams.m[st]
+	liveStreams.mu.Unlock()
+	if in {
+		t.Error("a closed target is still in the registry")
+	}
+}
