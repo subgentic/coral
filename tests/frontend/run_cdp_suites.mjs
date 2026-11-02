@@ -677,26 +677,46 @@ async function clearOrigin(shard) {
   // Every call below is bounded: a Chrome whose storage service has wedged never answers Storage.clearDataForOrigin, and with no limit here the runner waited on it for ever (the
   // per-attempt timeout starts after this), with no suite ever started and nothing printed (#5757). A call that does not answer in 20 s is reported and the suite goes on.
   const bounded = (p, what) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error(`${what} did not answer in 20 s`)), 20000))]);
+  // CDP_STEP_TIMES: how long each step took, in ms (stepLog below writes it with the rest of the suite's timings).
+  const steps = {}; let at = Date.now();
+  const mark = k => { const now = Date.now(); steps[k] = now - at; at = now; };
+  shard._clearSteps = steps;
   try {
     const version = await (await fetch(`http://127.0.0.1:${shard.env.CDP_PORT}/json/version`, { signal: AbortSignal.timeout(5000) })).json();
+    mark('version');
     client = await CDP({ target: version.webSocketDebuggerUrl, local: true });
+    mark('connect');
     // The fresh tab is created first, so Chrome always has a page open.
     const { targetId } = await bounded(client.send('Target.createTarget', { url: 'about:blank' }), 'Target.createTarget');
+    mark('createTarget');
     const { targetInfos } = await bounded(client.send('Target.getTargets'), 'Target.getTargets');
+    mark('getTargets');
     for (const t of targetInfos) {
       if (t.type === 'page' && t.targetId !== targetId) await bounded(client.send('Target.closeTarget', { targetId: t.targetId }), 'Target.closeTarget').catch(() => {});
     }
+    mark('closePages');
     // Chrome answers 'Internal error' to this on the browser target, so it is sent through a page session
     // (the fresh tab: the call clears the named origin, not the page's own).
     const { sessionId } = await bounded(client.send('Target.attachToTarget', { targetId, flatten: true }), 'Target.attachToTarget');
+    mark('attach');
     await bounded(client.send('Storage.clearDataForOrigin', { origin: shard.env.CORAL_TEST_URL, storageTypes: 'all' }, sessionId), 'Storage.clearDataForOrigin');
+    mark('clearData');
     await bounded(client.send('Target.detachFromTarget', { sessionId }), 'Target.detachFromTarget');
+    mark('detach');
   } catch (e) {
+    steps.error = e.message.slice(0, 120);
     console.log(`  [runner] could not clear browser storage on shard ${shard.n}: ${e.message}`);
   } finally {
     try { if (client) await client.close(); } catch { /* closed */ }
+    mark('close');
   }
 }
+
+// CDP_STEP_TIMES=<file>: one JSON line per suite attempt with where the time between suites goes (#415): the shard
+// health check, each clearOrigin step, the shared-state snapshot, spawn to the suite's first output, the suite itself, and
+// the work after it exits. Off unless set; a write that fails is ignored.
+const STEP_TIMES = process.env.CDP_STEP_TIMES || '';
+const stepLog = o => { if (STEP_TIMES) { try { fs.appendFileSync(STEP_TIMES, JSON.stringify(o) + '\n'); } catch { /* measurement only */ } } };
 
 // runAttempt runs one suite once in its own process group, with the hard per-attempt timeout.
 // signIn gives a strict shard's fresh tab the dashboard's sign-in cookie, as a person gets it: a single-use
@@ -785,7 +805,9 @@ async function captureTimeoutEvidence(shard, suite) {
 }
 
 async function runAttempt(t, shard) {
+  const tStart = Date.now();
   await clearOrigin(shard);
+  const tCleared = Date.now();
   if (shard.strict) {
     try { await signIn(shard); } catch (e) {
       return { status: 'fail', code: 'sign-in', secs: '0.0', shard: shard.n, log: shard.log, out: `[runner] strict shard: could not sign the browser in: ${e.message}` };
@@ -800,18 +822,23 @@ async function runAttempt(t, shard) {
     const p = spawn('node', ['--require', path.join(here, 'helpers', 'keep_page_visible.js'), t], { cwd: here, env: shard.env, detached: DETACH });
     track(p);
     let out = ''; p.stdout.on('data', d => out += d); p.stderr.on('data', d => out += d);
+    let firstOut = 0; const sawOutput = () => { if (!firstOut) firstOut = Date.now(); };
+    p.stdout.once('data', sawOutput); p.stderr.once('data', sawOutput);
     let timedOut = false;
     const timer = setTimeout(async () => { timedOut = true; try { await Promise.race([captureTimeoutEvidence(shard, t), sleep(45000)]); } catch { /* the capture never keeps the kill from happening, and never holds it more than 45 s */ } killTree(p); }, limitS * 1000);
     let closed = false;
     p.on('close', () => { closed = true; });
     p.on('error', e => { clearTimeout(timer); untrack(p); resolve({ status: 'fail', code: 'spawn', secs: '0.0', shard: shard.n, log: shard.log, out: `[runner] could not start the suite: ${e.message}` }); });
     p.on('exit', async code => {
+      const tExit = Date.now();
       clearTimeout(timer);
       const secs = ((Date.now() - started) / 1000).toFixed(1);
       // Anything the suite left running in its process group (a helper it spawned) goes with it; then give
       // the output pipes a moment to drain, without waiting on a straggler that kept stdout open.
       killTree(p); untrack(p);
+      const tKilled = Date.now();
       for (const end = Date.now() + 2000; !closed && Date.now() < end; await sleep(50)) { /* drain */ }
+      const tDrained = Date.now();
       const status = timedOut ? 'timeout' : code === 0 ? 'pass' : 'fail';
       // What the suite left in the server's shared state (#4830): reported, and the settings put back so the next suite starts from what this one found.
       let leaks = [], restored = 0, cleaned = null, rows = [];
@@ -833,6 +860,9 @@ async function runAttempt(t, shard) {
           }
         } catch (e) { leaks = [`could not read the shared state after the suite: ${e.message.split('\n')[0]}`]; }
       }
+      stepLog({ suite: t, shard: shard.n, status, health: shard._healthMs ?? null, clear: tCleared - tStart, clearSteps: shard._clearSteps || null,
+        snapshot: started - tCleared, toFirstOutput: firstOut ? firstOut - started : null, run: tExit - started, after: Date.now() - tExit,
+        afterSteps: { kill: tKilled - tExit, drain: tDrained - tKilled, state: Date.now() - tDrained }, healthSteps: shard._healthSteps || null });
       resolve({ status, code: timedOut ? 'timeout' : code, secs, shard: shard.n, log: shard.log, leaks, rows, restored, cleaned, out: timedOut ? `${out}\n[runner] TIMEOUT: killed after ${limitS}s` : out });
     });
   });
@@ -842,8 +872,11 @@ async function runAttempt(t, shard) {
 // a suite closed (Browser.close) can still be shutting down when the next suite starts.
 async function healthy(sh) {
   const ok = async url => { try { return (await fetch(url, { signal: AbortSignal.timeout(3000) })).status < 500; } catch { return false; } };
+  const h0 = Date.now();
   const chromeOk = alive(sh.chrome) && await ok(`http://127.0.0.1:${sh.env.CDP_PORT}/json/version`);
+  const h1 = Date.now();
   const coralOk = alive(sh.coral) && await ok(`${sh.env.CORAL_TEST_URL}/api/health`);
+  sh._healthSteps = { chrome: h1 - h0, coral: Date.now() - h1 }; // CDP_STEP_TIMES
   return chromeOk && coralOk ? '' : !chromeOk ? 'its Chrome is gone' : 'its Coral server is gone';
 }
 
@@ -851,7 +884,9 @@ async function healthy(sh) {
 // after a timeout, or before a retry.
 async function ensureShard(i, force) {
   const sh = shardsUp[i];
+  const h0 = Date.now();
   const problem = force || await healthy(sh);
+  if (sh) sh._healthMs = Date.now() - h0; // CDP_STEP_TIMES
   if (!problem) return sh;
   const why = problem;
   await stopShard(sh);
