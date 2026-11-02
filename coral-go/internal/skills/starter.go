@@ -54,3 +54,17 @@ func StarterZips() ([]StarterZip, error) {
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out, nil
 }
+
+// IsStarterName says a skill name is one of the examples Coral ships: an agent may not publish a skill under it (#12463).
+func IsStarterName(name string) bool {
+	dirs, err := fs.ReadDir(starterFS, "starter")
+	if err != nil {
+		return false
+	}
+	for _, d := range dirs {
+		if d.IsDir() && d.Name() == name {
+			return true
+		}
+	}
+	return false
+}

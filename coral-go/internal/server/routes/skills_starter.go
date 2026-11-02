@@ -42,6 +42,9 @@ func (h *SkillsHandler) SeedStarterSkills(ctx context.Context) {
 			if r.Name != sk.Name {
 				continue
 			}
+			if r.Status == store.SkillRejected {
+				continue // a refused row (made before the name was reserved) does not hold the name
+			}
 			if r.PublisherKind != store.PublisherCoral {
 				taken = true // a person's or an agent's skill of this name: theirs
 			} else if r.Status == store.SkillApproved && r.Digest == sk.Digest {

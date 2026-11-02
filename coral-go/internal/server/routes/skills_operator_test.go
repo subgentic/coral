@@ -250,3 +250,51 @@ func TestAStarterSkillOfANameAPersonAlreadyPublishedIsNotTouchedAndTheChangedTex
 	require.NoError(t, err)
 	assert.Equal(t, newest.Digest, latest.Digest)
 }
+
+// Security's SHOULDs on #12463. An example skill's get frame says it ships with Coral and not that the Operator approved it; an agent may not publish under one of the example names (a fixed error, a skill
+// of its own name still goes in); and a rejected row of an example's name (an agent's, from before the name was reserved) does not keep the example out of the store.
+func TestAnExampleSkillsFrameSaysItShipsWithCoral(t *testing.T) {
+	e := newSkillsEnv(t)
+	e.h.SeedStarterSkills(context.Background())
+	rows, err := e.ss.ListSkills(context.Background(), "")
+	require.NoError(t, err)
+	require.Len(t, rows, 3)
+	code, out := e.get("/api/agent/skills/"+rows[0].ID, "agent")
+	require.Equal(t, 200, code)
+	assert.Contains(t, out["frame"], "An example skill that ships with Coral")
+	assert.NotContains(t, out["frame"], "the Operator approved")
+	assert.Contains(t, out["frame"], "not Coral's instruction")
+}
+
+func TestAnAgentCannotPublishUnderAnExampleSkillsName(t *testing.T) {
+	e := newSkillsEnv(t)
+	try := func(name string) (int, string) {
+		md := "---\nname: " + name + "\ndescription: Mine.\n---\n# Mine\n"
+		rec := httptest.NewRecorder()
+		_, _, ok := e.h.publish(rec, httptest.NewRequest("POST", "/api/agent/skills", nil), zipOf(t, map[string]string{"SKILL.md": md}), store.AddSkillInput{Kind: store.PublisherAgent, Agent: "A", Team: "t"}, false)
+		out := map[string]any{}
+		_ = json.Unmarshal(rec.Body.Bytes(), &out)
+		code, _ := out["code"].(string)
+		assert.Equal(t, ok, rec.Code == 200)
+		return rec.Code, code
+	}
+	for _, n := range []string{"creating-coral-skills", "working-in-a-coral-team", "creating-a-coral-automation"} {
+		status, code := try(n)
+		assert.Equal(t, 409, status, n)
+		assert.Equal(t, "reserved_name", code, n)
+	}
+	status, _ := try("release-notes")
+	assert.Equal(t, 200, status, "an agent's skill of its own name still goes in")
+}
+
+func TestARejectedRowOfAnExampleNameDoesNotKeepTheExampleOut(t *testing.T) {
+	e := newSkillsEnv(t)
+	ctx := context.Background()
+	old := "---\nname: creating-coral-skills\ndescription: An agent's, from before.\n---\n# Old\n"
+	row, _ := e.publish(map[string]string{"SKILL.md": old}, store.PublisherAgent)
+	require.NoError(t, e.ss.RejectSkill(ctx, row.ID))
+	e.h.SeedStarterSkills(ctx)
+	got, err := e.ss.LatestApprovedSkill(ctx, "creating-coral-skills")
+	require.NoError(t, err)
+	assert.Equal(t, store.PublisherCoral, got.PublisherKind)
+}
