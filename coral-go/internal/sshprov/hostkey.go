@@ -364,6 +364,9 @@ func (r Runner) hopKeyError(ctx context.Context, sshBin, cfgPath string, t Targe
 		}
 		known := false
 		for _, f := range strings.Fields(eff["userknownhostsfile"]) {
+			if strings.Contains(f, "..") { // the owner's own config names these files; one that climbs is not looked up
+				continue
+			}
 			if strings.HasPrefix(f, "~/") {
 				if home, err := os.UserHomeDir(); err == nil {
 					f = filepath.Join(home, f[2:])
