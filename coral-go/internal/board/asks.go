@@ -226,7 +226,7 @@ type askRow struct {
 	CreatedAt string `db:"created_at"`
 }
 
-// answeredBy reports whether member has answered the question: a post of theirs after it that is a reply to it (reply_to), or @mentions the asker. Neither read has a cap: the reply is one EXISTS
+// answeredBy reports whether member has answered the question: a post of theirs after it that is a reply to it (reply_to), or @mentions the asker (a post that replies to another message answers only that one: #12490). Neither read has a cap: the reply is one EXISTS
 // query, and the mention reads the member's posts that contain the asker's name in pages until one really tags the asker, however many posts the member made before answering (#7845).
 func (s *Store) answeredBy(ctx context.Context, project string, a askRow, member string, subs map[string]Subscriber) (bool, error) {
 	var replied bool
@@ -248,7 +248,8 @@ func (s *Store) answeredBy(ctx context.Context, project string, a askRow, member
 		if err := s.reader().SelectContext(ctx, &posts, `SELECT id, content FROM board_messages
 			WHERE project = ? AND id > ? AND subscriber_id = ? AND COALESCE(is_system, 0) = 0
 			  AND (instr(lower(content), lower('@' || ?)) > 0 OR (? != '' AND instr(lower(content), lower('@' || ?)) > 0))
-			ORDER BY id LIMIT 200`, project, last, member, a.Asker, title, title); err != nil {
+			  AND NOT EXISTS (SELECT 1 FROM board_replies r WHERE r.message_id = board_messages.id AND r.reply_to != ?)
+			ORDER BY id LIMIT 200`, project, last, member, a.Asker, title, title, a.MessageID); err != nil {
 			return false, err
 		}
 		for _, p := range posts {

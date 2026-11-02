@@ -177,3 +177,21 @@ func TestAnAnswerAfterManyPostsStillClosesTheQuestion(t *testing.T) {
 	assert.True(t, askOf(t, s, ctx, byReply.ID).Answered, "a reply after 450 posts closes it")
 	assert.True(t, askOf(t, s, ctx, byMention.ID).Answered, "so does a mention of the asker")
 }
+
+// #12490: a reply to one question (--reply-to N) closes only N. Its @mention of the asker is how the reply reaches them, not an answer to every other question they have open.
+func TestAReplyToOneQuestionClosesOnlyThatQuestion(t *testing.T) {
+	s, ctx := askBoard(t)
+	q1 := askPost(t, s, ctx, "Lead", "@Dev A first question?", true, 0)
+	q2 := askPost(t, s, ctx, "Lead", "@Dev A second question?", true, 0)
+	q3 := askPost(t, s, ctx, "Lead", "@Dev A third question?", true, 0)
+
+	askPost(t, s, ctx, "Dev A", "@Lead its the self-hosted hub", false, q2.ID)
+	assert.Empty(t, askOf(t, s, ctx, q2.ID).Open, "the question it replies to is closed")
+	assert.Equal(t, []string{"Dev A"}, askOf(t, s, ctx, q1.ID).Open, "a reply to another question does not close the first")
+	assert.Equal(t, []string{"Dev A"}, askOf(t, s, ctx, q3.ID).Open, "nor the third")
+
+	// a plain @mention of the asker, with no reply_to, still answers (the natural reply)
+	askPost(t, s, ctx, "Dev A", "@Lead answering the rest", false, 0)
+	assert.Empty(t, askOf(t, s, ctx, q1.ID).Open)
+	assert.Empty(t, askOf(t, s, ctx, q3.ID).Open)
+}
