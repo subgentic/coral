@@ -11,6 +11,20 @@ assert.equal(authUrlFor({ pathname: '/', search: '?view=team', hash: '#chat/abc'
 assert.equal(authUrlFor({ pathname: '//evil.example/x', search: '', hash: '' }), '/auth?return_to=%2F', 'never a protocol-relative return');
 assert.equal(authUrlFor({ pathname: '', search: '', hash: '' }), '/auth?return_to=%2F');
 
+// #12406: the address the page was opened at is the one to come back to, until the person moves on; never a protocol-relative one
+const { setServedAddress } = await importUi('served_address');
+setServedAddress('/agents/abcd1234/files');
+assert.equal(authUrlFor({ pathname: '/agents', search: '', hash: '' }), '/auth?return_to=%2Fagents%2Fabcd1234%2Ffiles', 'the address as served, not the one the app rewrote');
+assert.equal(authUrlFor({ pathname: '/chats', search: '?q=other', hash: '' }), '/auth?return_to=%2Fchats%3Fq%3Dother', 'a rewrite that is not a shortening (here a dropped fragment of the same page) keeps the canonical address') ;
+setServedAddress('/chats?q=other#top');
+assert.equal(authUrlFor({ pathname: '/chats', search: '?q=other', hash: '' }), '/auth?return_to=%2Fchats%3Fq%3Dother', 'the same page: the address on screen');
+setServedAddress('//evil.example/x');
+assert.equal(authUrlFor({ pathname: '/agents', search: '', hash: '' }), '/auth?return_to=%2Fagents', 'a protocol-relative served address is never returned to');
+setServedAddress('//evil.example/agents/x');
+assert.equal(authUrlFor({ pathname: '', search: '', hash: '' }), '/auth?return_to=%2F', 'nor one below the root: a protocol-relative return is refused');
+setServedAddress('');
+assert.equal(authUrlFor({ pathname: '/inbox/goals', search: '', hash: '' }), '/auth?return_to=%2Finbox%2Fgoals', 'once the person has moved on, the page they are on');
+
 assert.equal(isSignedOut401(JSON.stringify({ error: 'Coral is locked: ...', code: 'dashboard_auth_required' })), true, 'strict mode: signed out');
 assert.equal(isSignedOut401('Unauthorized\n'), true, "the auth middleware's plain 401 (API-key sign-in)");
 assert.equal(isSignedOut401(''), true, 'no body: treated as signed out');
