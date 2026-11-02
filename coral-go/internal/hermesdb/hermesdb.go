@@ -216,6 +216,23 @@ func (d *DB) Session(ctx context.Context, id string) (s Session, ok bool, err er
 	return s, true, nil
 }
 
+// FirstUserTurnAt is when the oldest user message in this database was written (epoch seconds); ok is false when there is none, or none with a time. It asks of every session in the file, not one id: the
+// database is one agent's own home, and the link from the agent to a Hermes session id is made by a hook, so an agent whose hooks never ran has none (an inactive row is left out, as Messages leaves it).
+func (d *DB) FirstUserTurnAt(ctx context.Context) (at float64, ok bool, err error) {
+	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
+	defer cancel()
+	active := ""
+	if d.cols["messages"]["active"] {
+		active = " AND COALESCE(active, 1) <> 0"
+	}
+	var ts sql.NullFloat64
+	q := "SELECT MIN(timestamp) FROM messages WHERE role = 'user' AND timestamp > 0" + active
+	if err := d.db.QueryRowContext(ctx, q).Scan(&ts); err != nil {
+		return 0, false, err
+	}
+	return ts.Float64, ts.Valid, nil
+}
+
 // Messages reads the newest limit rows (at most MaxMessages) of session id with an id above afterID, oldest first. Only rows of that session: the query names it, and a row whose own session_id differs is
 // never returned. A row Hermes marked inactive (active = 0, a turn it dropped from the conversation) is left out when the table has the column.
 func (d *DB) Messages(ctx context.Context, id string, afterID int64, limit int) ([]Message, error) {

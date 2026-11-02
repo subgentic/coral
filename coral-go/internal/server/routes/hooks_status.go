@@ -121,7 +121,7 @@ func (h *SessionsHandler) HooksStatus(w http.ResponseWriter, r *http.Request) {
 		}
 		return agents[i].Name < agents[j].Name
 	})
-	writeJSON(w, http.StatusOK, map[string]any{"current": agent.ClaudeHooksRev, "agents": agents, "missing": h.agentsWithoutHooks(ctx, sessions), "pi_inactive": h.piHooksInactive(sessions, time.Now())})
+	writeJSON(w, http.StatusOK, map[string]any{"current": agent.ClaudeHooksRev, "agents": agents, "missing": h.agentsWithoutHooks(ctx, sessions), "pi_inactive": h.piHooksInactive(sessions, time.Now()), "hermes_inactive": h.hermesHooksInactive(ctx, sessions, time.Now())})
 }
 
 // agentsWithoutHooks lists the running agents, of any type, whose hook programs are gone from the folder they were started with (#6089): the app was replaced or moved while they ran. The
@@ -253,6 +253,49 @@ func (h *SessionsHandler) piHooksInactive(sessions []store.LiveSession, now time
 			if n, _ := rev.(int); n >= agent.PiExtensionRev {
 				continue
 			}
+		}
+		name := ptr.Value(ls.DisplayName)
+		if name == "" {
+			name = ls.AgentName
+		}
+		out = append(out, hooksAgent{SessionID: ls.SessionID, Name: name, Team: ptr.Value(ls.BoardName), Status: "inactive"})
+	}
+	sort.SliceStable(out, func(i, j int) bool { return out[i].SessionID < out[j].SessionID })
+	return out
+}
+
+// hermesHooksGrace is how long a Hermes agent's hooks have to report after its first user turn before it is listed as not active: Hermes sends no hook event until its first turn (about 80 s on a home used for the
+// first time, the tester), so a launch, a welcome line or a silent minute proves nothing; a turn that is two minutes old with no hook event of the agent's does.
+const hermesHooksGrace = 2 * time.Minute
+
+// hermesHooksInactive lists the running Hermes agents whose own state.db shows a user turn at least hermesHooksGrace old and that have recorded no hook event at all (#12041): the hook tool is refused or missing,
+// the team's config.yaml was changed, or Hermes's events changed. An agent with no turn yet is never listed (it is healthy and quiet), nor is one it cannot read (no link, no database, an unknown layout), a sleeping
+// one or another type. The list only says so on the agent's row (a quiet chip): the agent's state is never changed by it.
+func (h *SessionsHandler) hermesHooksInactive(ctx context.Context, sessions []store.LiveSession, now time.Time) []hooksAgent {
+	out := []hooksAgent{}
+	var cands []store.LiveSession
+	var ids []string
+	for _, ls := range sessions {
+		if ls.AgentType != at.Hermes || ls.IsSleeping == 1 || ls.IsArchived == 1 || ls.IsJob == 1 {
+			continue
+		}
+		cands = append(cands, ls)
+		ids = append(ids, ls.SessionID)
+	}
+	if len(cands) == 0 || h.ts == nil {
+		return out
+	}
+	heard, err := h.ts.SessionsHeardFrom(ctx, ids)
+	if err != nil {
+		return out // it cannot tell: it lists nothing
+	}
+	for _, ls := range cands {
+		if heard[ls.SessionID] {
+			continue
+		}
+		turn, ok := h.hermesFirstUserTurn(ctx, ls.SessionID, ptr.Value(ls.BoardName))
+		if !ok || now.Sub(turn) < hermesHooksGrace {
+			continue
 		}
 		name := ptr.Value(ls.DisplayName)
 		if name == "" {

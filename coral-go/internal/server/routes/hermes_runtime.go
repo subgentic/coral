@@ -354,3 +354,88 @@ const (
 	hermesRestartNote   = "A restarted Hermes agent starts a new conversation: the old one is deleted with its Hermes home (Hermes keeps no other copy). Wake keeps it."
 	hermesResumeRefusal = "A Hermes agent keeps its conversation in its own Hermes home, so it cannot be resumed by its Hermes id into another agent. Wake the same agent to continue its conversation."
 )
+
+// hermesModelMax is the longest model name shown on a chip (hermesdb.ModelNameMax).
+const hermesModelMax = hermesdb.ModelNameMax
+
+// hermesModelOK reports whether text from the model column can be shown as a model name (hermesdb.ModelNameOK, the rule the usage rows share). Anything else (a control or escape character, a space run, a long
+// text) is not a model name, and the chip keeps the model the agent was launched with.
+func hermesModelOK(s string) bool { return hermesdb.ModelNameOK(s) }
+
+type hermesModelEntry struct {
+	stamp string
+	model string
+}
+
+// hermesModelCache remembers each Hermes session's model with the state of its database it was read at (as hermesLastCache does), so the list and the chat open the database only when Hermes wrote to it.
+var hermesModelCache = struct {
+	sync.Mutex
+	m map[string]hermesModelEntry
+}{m: map[string]hermesModelEntry{}}
+
+// hermesModel is the model a Hermes session runs, from the session's row in the agent's own state.db (#12039): "" when it is not known (no link yet, no database, a layout Coral does not read, a value that is
+// not a model name). Hermes writes no transcript file, so the chip had only the launch's model. The state.db records no reasoning level that Coral reads, so a level is never reported from here.
+func (h *SessionsHandler) hermesModel(sessionID string) string {
+	if h.cfg == nil || h.ss == nil || !transcriptlink.IsSessionID(sessionID) {
+		return ""
+	}
+	dataDir := h.cfg.CoralDir()
+	hermesID := transcriptlink.HermesSession(dataDir, sessionID)
+	if hermesID == "" {
+		return ""
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	team := ""
+	if ls, err := h.ss.GetLiveSession(ctx, sessionID); err == nil && ls != nil && ls.BoardName != nil {
+		team = *ls.BoardName
+	}
+	home := agent.HermesAgentHome(dataDir, team, sessionID)
+	if home == "" {
+		return ""
+	}
+	stamp := hermesStamp(home) + "#" + hermesID
+	hermesModelCache.Lock()
+	e, hit := hermesModelCache.m[sessionID]
+	hermesModelCache.Unlock()
+	if hit && e.stamp == stamp {
+		return e.model
+	}
+	model := ""
+	if db, err := hermesdb.Open(home); err == nil {
+		if s, ok, err := db.Session(ctx, hermesID); err == nil && ok && hermesModelOK(s.Model) {
+			model = s.Model
+		}
+		db.Close()
+	}
+	hermesModelCache.Lock()
+	if len(hermesModelCache.m) >= hermesLastCacheMax {
+		hermesModelCache.m = map[string]hermesModelEntry{}
+	}
+	hermesModelCache.m[sessionID] = hermesModelEntry{stamp: stamp, model: model}
+	hermesModelCache.Unlock()
+	return model
+}
+
+// hermesFirstUserTurn is when the oldest user message in the agent's own Hermes home was written, from its state.db (read only): false when it cannot be told (no database, a layout Coral does not read, no user turn
+// yet). It does not need the link to a Hermes session id (a hook makes that, and an agent whose hooks never ran has none): the home is the agent's alone. The first user turn is what Coral typed (the board
+// protocol), so it is the moment Hermes's hooks are due.
+func (h *SessionsHandler) hermesFirstUserTurn(ctx context.Context, sessionID, team string) (time.Time, bool) {
+	if h.cfg == nil || !transcriptlink.IsSessionID(sessionID) {
+		return time.Time{}, false
+	}
+	home := agent.HermesAgentHome(h.cfg.CoralDir(), team, sessionID)
+	if home == "" {
+		return time.Time{}, false
+	}
+	db, err := hermesdb.Open(home)
+	if err != nil {
+		return time.Time{}, false
+	}
+	defer db.Close()
+	at, ok, err := db.FirstUserTurnAt(ctx)
+	if err != nil || !ok {
+		return time.Time{}, false
+	}
+	return time.Unix(int64(at), 0), true
+}

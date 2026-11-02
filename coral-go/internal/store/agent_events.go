@@ -240,6 +240,28 @@ func (s *TaskStore) SessionsWithAnyEvent(ctx context.Context, sessionIDs []strin
 	return out, nil
 }
 
+// SessionsHeardFrom is the sessions among sessionIDs that have recorded an event their agent's own hooks sent: any event but the notices Coral itself writes into an agent's feed (agent_notice). A
+// Hermes agent's hooks are heard from when one of these exists (#12041); SessionsWithAnyEvent counts the notices too.
+func (s *TaskStore) SessionsHeardFrom(ctx context.Context, sessionIDs []string) (map[string]bool, error) {
+	out := map[string]bool{}
+	if len(sessionIDs) == 0 {
+		return out, nil
+	}
+	ids, err := sessionIDsJSON(sessionIDs)
+	if err != nil {
+		return nil, err
+	}
+	var rows []string
+	if err := s.reader().SelectContext(ctx, &rows,
+		`SELECT s.value FROM json_each(?) s WHERE EXISTS (SELECT 1 FROM agent_events e WHERE e.session_id = s.value AND e.event_type <> 'agent_notice')`, ids); err != nil {
+		return nil, err
+	}
+	for _, id := range rows {
+		out[id] = true
+	}
+	return out, nil
+}
+
 // GetLatestEventTypes returns the latest (event_type, summary) per session (excluding status/goal/confidence).
 func (s *TaskStore) GetLatestEventTypes(ctx context.Context, sessionIDs []string) (map[string][2]string, error) {
 	if len(sessionIDs) == 0 {
