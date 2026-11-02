@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -19,6 +20,8 @@ type rig struct {
 	row      string
 	sessions int
 	messages bool
+	settings bool // sessions.db has a user_settings row
+	oldLive  bool // a live session is more than a day old
 	rowErr   error
 }
 
@@ -31,6 +34,8 @@ func (r *rig) probe() Probe {
 		SetMarker:        func(_ context.Context, id string) error { r.row = id; return nil },
 		LiveSessions:     func(context.Context) (int, error) { return r.sessions, nil },
 		BoardHasMessages: func(context.Context) (bool, error) { return r.messages, nil },
+		HasSettings:      func(context.Context) (bool, error) { return r.settings, nil },
+		OldLiveSession:   func(context.Context, time.Time) (bool, error) { return r.oldLive, nil },
 		Now:              time.Now,
 	}
 }
@@ -101,10 +106,10 @@ func TestAnOldInstallUpgradingInPlaceAdoptsOnlyWhenEveryConditionHolds(t *testin
 	assert.True(t, v.Made)
 
 	for name, break1 := range map[string]func(*rig){
-		"no messages on the board":      func(r *rig) { r.messages = false },
-		"api_key younger than a minute": func(r *rig) { now := time.Now(); _ = os.Chtimes(filepath.Join(r.dir, "api_key"), now, now) },
-		"no api_key":                    func(r *rig) { _ = os.Remove(filepath.Join(r.dir, "api_key")) },
-		"nothing else in the folder":    func(r *rig) { _ = os.Remove(filepath.Join(r.dir, "app.log")) },
+		"no sign of earlier use in the database": func(r *rig) { r.messages = false },
+		"api_key younger than a minute":          func(r *rig) { now := time.Now(); _ = os.Chtimes(filepath.Join(r.dir, "api_key"), now, now) },
+		"no api_key":                             func(r *rig) { _ = os.Remove(filepath.Join(r.dir, "api_key")) },
+		"nothing else in the folder":             func(r *rig) { _ = os.Remove(filepath.Join(r.dir, "app.log")) },
 		"api_key is a directory, not a file": func(r *rig) {
 			_ = os.Remove(filepath.Join(r.dir, "api_key"))
 			_ = os.Mkdir(filepath.Join(r.dir, "api_key"), 0o755)
@@ -238,4 +243,115 @@ func TestALinkWhereTheIdFileShouldBeIsRefused(t *testing.T) {
 	v := r.verify()
 	assert.True(t, v.Foreign)
 	assert.Equal(t, ReasonUnreadable, v.Reason)
+}
+
+// An install with agents but no board message is not mistaken for a copy after the upgrade: a user_settings row, or a live session older than a day, is a second proof of earlier use.
+func TestAnInstallWithAgentsButNoBoardMessagesIsOwnedWhenItShowsEarlierUseElsewhere(t *testing.T) {
+	for name, set := range map[string]func(*rig){
+		"a user_settings row":             func(r *rig) { r.settings = true },
+		"a live session older than a day": func(r *rig) { r.oldLive = true },
+		"both":                            func(r *rig) { r.settings, r.oldLive = true, true },
+	} {
+		r := newRig(t)
+		r.sessions = 5
+		r.establish()
+		r.messages = false
+		set(r)
+		v := r.verify()
+		assert.False(t, v.Foreign, name)
+		assert.True(t, v.Made, name)
+	}
+
+	none := newRig(t)
+	none.sessions = 5
+	none.establish()
+	none.messages = false
+	v := none.verify()
+	assert.True(t, v.Foreign, "no board message, no setting, no old session")
+	assert.Equal(t, ReasonBare, v.Reason)
+
+	// the folder rules still apply: a database that shows earlier use, copied into a bare folder, is foreign
+	bare := newRig(t)
+	bare.sessions, bare.settings, bare.oldLive, bare.messages = 5, true, true, true
+	bare.put("sessions.db", "x")
+	assert.True(t, bare.verify().Foreign)
+}
+
+func TestTheOldSessionIsAskedForWithACutoffOneDayBack(t *testing.T) {
+	r := newRig(t)
+	r.sessions = 1
+	r.establish()
+	r.messages = false
+	var cutoff time.Time
+	p := r.probe()
+	p.OldLiveSession = func(_ context.Context, t time.Time) (bool, error) { cutoff = t; return true, nil }
+	now := time.Now()
+	require.False(t, Verify(context.Background(), p).Foreign)
+	assert.WithinDuration(t, now.Add(-24*time.Hour), cutoff, time.Minute)
+}
+
+// A made-at path that is not local is not read: no stat, no link resolution, no open (a network path would make Windows connect out).
+func TestAMadeAtPathThatIsNotLocalIsNotRead(t *testing.T) {
+	bad := []string{
+		`\\127.0.0.1\x\y`,
+		`\\?\C:\x`,
+		`\\?\UNC\127.0.0.1\x\y`,
+		`\\.\pipe\x`,
+		`//127.0.0.1/x/y`,
+		`file:///C:/x`,
+		`https://127.0.0.1/x`,
+		`C:x`,
+		`\x\y`,
+		`relative\folder`,
+	}
+	if runtime.GOOS == "windows" {
+		bad = append(bad, `C:\x:stream`)
+	}
+	var touched []string
+	oldStat, oldLstat, oldEval := statPath, lstatPath, evalLinks
+	t.Cleanup(func() { statPath, lstatPath, evalLinks = oldStat, oldLstat, oldEval })
+	statPath = func(p string) (os.FileInfo, error) { touched = append(touched, p); return oldStat(p) }
+	lstatPath = func(p string) (os.FileInfo, error) { touched = append(touched, p); return oldLstat(p) }
+	evalLinks = func(p string) (string, error) { touched = append(touched, p); return oldEval(p) }
+
+	for _, path := range bad {
+		touched = nil
+		r := newRig(t)
+		require.False(t, r.verify().Foreign) // makes the id in both places
+		require.NoError(t, os.WriteFile(filepath.Join(r.dir, FileName), []byte(r.row+"\nmade at "+path+"\n"), 0o600))
+		touched = nil
+		v := r.verify()
+		assert.True(t, v.Foreign, path)
+		assert.Equal(t, ReasonNotLocal, v.Reason, path)
+		for _, got := range touched {
+			assert.NotContains(t, got, "127.0.0.1", "%s: the path in the id file was looked up", path)
+			assert.NotEqual(t, path, got, "%s: the path in the id file was looked up", path)
+		}
+	}
+}
+
+func TestWhichPathsAreLocalAndAbsolute(t *testing.T) {
+	assert.False(t, isLocalAbsolute(""))
+	assert.False(t, isLocalAbsolute("relative"))
+	assert.False(t, isLocalAbsolute("/x\u0007y"))
+	assert.False(t, isLocalAbsolute(`\\127.0.0.1\x\y`))
+	assert.False(t, isLocalAbsolute("//host/share"))
+	assert.False(t, isLocalAbsolute("file:///x"))
+	if runtime.GOOS == "windows" {
+		assert.True(t, isLocalAbsolute(`C:\Users\x`))
+		assert.True(t, isLocalAbsolute(`d:/coral`))
+		assert.False(t, isLocalAbsolute(`\Users\x`))
+		assert.False(t, isLocalAbsolute(`C:Users`))
+		assert.False(t, isLocalAbsolute(`\\?\C:\x`))
+	} else {
+		assert.True(t, isLocalAbsolute("/home/x"))
+	}
+}
+
+// A data folder given as a network path still recognises its own id file: the comparison with the folder Coral started with is text only.
+func TestAFolderRecognisesItsOwnPathWithoutLookingItUp(t *testing.T) {
+	dir := t.TempDir()
+	assert.True(t, sameText(dir, dir))
+	assert.True(t, sameText(dir+string(filepath.Separator), dir))
+	assert.False(t, sameText(dir, filepath.Join(dir, "other")))
 }
