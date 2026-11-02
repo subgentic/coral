@@ -295,3 +295,53 @@ func TestAgentShellIdleANestedBashIsABarePrompt(t *testing.T) {
 	assert.Equal(t, "bash", nested)
 	require.NoError(t, c.SendRawKeys(ctx, terminalinput.Unclassified, name, []string{"C-c"}, "claude", sid))
 }
+
+// The refusal's log line draws what is below the pane's shell, names and states only (#12222): a shell started below the pane's shell, with the program under it, shows as such; a pid that is not there is "".
+func TestShellTreeDrawsNamesAndStatesOnly(t *testing.T) {
+	tab := &procTable{byPID: map[int]procEntry{
+		100: {ppid: 1, stat: "Ss", comm: "bash"},
+		101: {ppid: 100, stat: "S+", comm: "bash"},
+		102: {ppid: 101, stat: "Sl+", comm: "node"},
+		103: {ppid: 100, stat: "S", comm: "sleep"},
+	}, children: map[int][]int{100: {101, 103}, 101: {102}}}
+	assert.Equal(t, "bash(Ss){bash(S+){node(Sl+)} sleep(S)}", shellTree(tab, 100))
+	assert.Equal(t, "", shellTree(tab, 999), "a pid that is not there")
+	loop := &procTable{byPID: map[int]procEntry{5: {ppid: 6, stat: "S", comm: "a"}, 6: {ppid: 5, stat: "S", comm: "b"}}, children: map[int][]int{5: {6}, 6: {5}}}
+	assert.NotPanics(t, func() { _ = shellTree(loop, 5) }, "a loop is walked once")
+	many := &procTable{byPID: map[int]procEntry{1: {comm: "sh", stat: "S"}}, children: map[int][]int{}}
+	for i := 2; i < 40; i++ {
+		many.byPID[i] = procEntry{ppid: 1, comm: "x", stat: "S"}
+		many.children[1] = append(many.children[1], i)
+	}
+	assert.True(t, strings.HasSuffix(shellTree(many, 1), " ..."), "a wide tree is cut")
+}
+
+// Security's MUST on #12222: the drawing holds base names only, capped, with control characters, braces and spaces dropped, and a path from macOS's ps is cut to its last element.
+func TestShellTreeNamesAreBaseNamesAndCleaned(t *testing.T) {
+	assert.Equal(t, "claude", treeName("/Users/jane/Projects/secret-client/bin/claude"))
+	assert.Equal(t, "node", treeName("node"))
+	assert.Equal(t, "bash", treeName("-bash"[1:]))
+	assert.Equal(t, "ab", treeName("a{b}\x1b\n \t"), "braces, controls and spaces are dropped")
+	assert.Equal(t, "?", treeName("/"), "nothing left")
+	assert.Equal(t, "?", treeName("{}"))
+	long := treeName(strings.Repeat("x", 200))
+	assert.Len(t, long, 24, "capped")
+	assert.Equal(t, "Ss+", treeStat("Ss+"))
+	assert.Equal(t, "S", treeStat("S\n{} "))
+	tab := &procTable{byPID: map[int]procEntry{1: {stat: "Ss", comm: "/Users/jane/work/proj/bash"}, 2: {ppid: 1, stat: "S+", comm: "/home/jane/.local/bin/my{tool}"}}, children: map[int][]int{1: {2}}}
+	tree := shellTree(tab, 1)
+	assert.Equal(t, "bash(Ss){mytool(S+)}", tree)
+	assert.NotContains(t, tree, "jane")
+}
+
+// QA's SHOULD on #12222: a hostile state in a process entry is cleaned in the drawn tree too (a control character, braces and parentheses never reach the line).
+func TestShellTreeCleansAHostileState(t *testing.T) {
+	tab := &procTable{byPID: map[int]procEntry{
+		1: {stat: "Ss", comm: "bash"},
+		2: {ppid: 1, stat: "S\x1b{x}(y)\n+", comm: "node"},
+	}, children: map[int][]int{1: {2}}}
+	tree := shellTree(tab, 1)
+	assert.Equal(t, "bash(Ss){node(Sxy+)}", tree)
+	assert.NotContains(t, tree, "\x1b")
+	assert.Equal(t, 1, strings.Count(tree, "{"), "only the tree's own brace")
+}

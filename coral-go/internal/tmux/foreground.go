@@ -101,6 +101,97 @@ func NestedShellOf(pid int) (string, error) {
 	return "", nil
 }
 
+// ShellTreeOf is a one-line picture of what is below a pane's shell pid, for the log when a launch line is refused (#12222): each process's name and state, nested in braces, never its arguments. It is
+// bounded (depth and count) and "" when the process table cannot be read or the pid is not there.
+func ShellTreeOf(pid int) string {
+	procs, err := readProcTable()
+	if err != nil {
+		return ""
+	}
+	return shellTree(procs, pid)
+}
+
+// ShellTree is ShellTreeOf for an agent's pane.
+func (c *Client) ShellTree(ctx context.Context, agentName, agentType, sessionID string) (string, error) {
+	pid, err := c.agentShellPID(ctx, agentName, agentType, sessionID)
+	if err != nil {
+		return "", err
+	}
+	return ShellTreeOf(pid), nil
+}
+
+// treeName is a process's name as the log line draws it (#12222, Security): the base name only (on macOS ps gives the executable's full path, which can hold the person's folders), at most 24 characters,
+// with control characters, braces, parentheses and spaces dropped so the line cannot be made to look like something else.
+func treeName(comm string) string {
+	if i := strings.LastIndexAny(comm, `/\\`); i >= 0 {
+		comm = comm[i+1:]
+	}
+	var b strings.Builder
+	for _, r := range comm {
+		if b.Len() >= 24 {
+			break
+		}
+		if r < 0x21 || r == 0x7f || r > 0x7e || strings.ContainsRune("{}()", r) {
+			continue
+		}
+		b.WriteRune(r)
+	}
+	if b.Len() == 0 {
+		return "?"
+	}
+	return b.String()
+}
+
+// treeStat is a process's state letters as drawn: letters, digits and the few signs ps uses ('+', '<', 's', 'l'), at most 8.
+func treeStat(stat string) string {
+	var b strings.Builder
+	for _, r := range stat {
+		if b.Len() >= 8 {
+			break
+		}
+		if r >= 'A' && r <= 'Z' || r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == '+' || r == '<' {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
+func shellTree(t *procTable, pid int) string {
+	if _, ok := t.byPID[pid]; !ok {
+		return ""
+	}
+	var b strings.Builder
+	n := 0
+	var walk func(pid, depth int, seen map[int]bool)
+	walk = func(pid, depth int, seen map[int]bool) {
+		e := t.byPID[pid]
+		if seen[pid] {
+			return
+		}
+		seen[pid] = true
+		n++
+		if n > 16 {
+			return
+		}
+		fmt.Fprintf(&b, "%s(%s)", treeName(e.comm), treeStat(e.stat))
+		if kids := t.children[pid]; len(kids) > 0 && depth < nestedShellDepth {
+			b.WriteString("{")
+			for i, c := range kids {
+				if i > 0 {
+					b.WriteString(" ")
+				}
+				walk(c, depth+1, seen)
+			}
+			b.WriteString("}")
+		}
+	}
+	walk(pid, 0, map[int]bool{})
+	if n > 16 {
+		b.WriteString(" ...")
+	}
+	return b.String()
+}
+
 // nestedShellDepth bounds the walk below the pane's shell (a shell inside a shell inside ...). A deeper tree is not walked to the end and counts as a nested shell.
 const nestedShellDepth = 8
 

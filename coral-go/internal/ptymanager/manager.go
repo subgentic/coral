@@ -632,6 +632,20 @@ func (m *PTYBackend) OtherShell(name string) (shell string, ok bool) {
 	return sh, true
 }
 
+// ShellTree is a one-line picture of what is below the session's shell (process names and states only), for the log when a launch line is refused (#12222); "" when it cannot be drawn.
+func (m *PTYBackend) ShellTree(name string) string {
+	m.mu.RLock()
+	s, found := m.sessions[name]
+	m.mu.RUnlock()
+	if !found || !s.isRunning() {
+		return ""
+	}
+	if sp, can := s.proc.(shellPIDReporter); can {
+		return tmux.ShellTreeOf(sp.ShellPID())
+	}
+	return ""
+}
+
 // ShellIdle reports whether a session's own shell is idle, with nothing running
 // in it: the agent CLI has exited (#3219). ok is false when the session is gone
 // or the platform cannot tell.
