@@ -289,6 +289,9 @@ function acfAutoPermissionsHtml(container, opts, { showAutoPermissions, agentTyp
         const permModeVal = autoPermsVal
             ? (typeof autoPermsVal === 'string' ? autoPermsVal : (_permissionModeFromFlags(flagsVal) || defaultMode))
             : 'default';
+        const modeWords = { default: 'Default', plan: 'Plan', acceptEdits: 'Accept edits', auto: 'Auto', bypassPermissions: 'Bypass permissions', dontAsk: "Don't ask" };
+        const live = typeof v.liveMode === 'string' && modeWords[v.liveMode] && v.liveMode !== permModeVal ? v.liveMode : ''; // the agent runs in one mode and a restart uses another (the stored one): say so (#12481)
+        const liveNote = live ? `<span class="settings-hint acf-mode-live" role="status">Running in ${escapeHtml(modeWords[live])} now; restarting uses ${escapeHtml(modeWords[permModeVal] || permModeVal)} unless you pick.</span>` : '';
         const permModeDesc = permissionDescription(v.agentType, permModeVal); // per CLI: Auto has safety checks on Claude only (#10000)
         autoPermissionsHTML = `
             <label>Permission mode
@@ -302,6 +305,7 @@ function acfAutoPermissionsHtml(container, opts, { showAutoPermissions, agentTyp
                 </select>
                 <span class="settings-hint perm-mode-desc">${escapeHtml(permModeDesc)}</span>
                 <span class="settings-hint acf-mode-override" role="status" hidden></span>
+                ${liveNote}
             </label>`;
     }
     return autoPermissionsHTML;

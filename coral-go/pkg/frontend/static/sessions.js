@@ -103,6 +103,7 @@ function _enterAgent(name, agentType, sessionId, srv) {
         thinking: agentData?.thinking || "", // the level it is set to: the Restart form shows it and keeps it (#5070)
         thinking_actual: agentData?.thinking_actual || "", // what its transcript shows it running at: the Restart form says so when that is not the level above (#5105)
         capabilities: agentData?.capabilities || null,
+        permission_mode: agentData?.permission_mode || "", live_permission_mode: agentData?.live_permission_mode || "", // the mode it runs in, as its row has it: the Restart form opens on it (#12481)
         board_project: agentData?.board_project || null,
         board_job_title: agentData?.board_job_title || null,
         board_subscriber_id: agentData?.board_subscriber_id || null,
