@@ -21,6 +21,13 @@ export const agentChoices = rows => (Array.isArray(rows) ? rows : []).filter(r =
 /** What the three settings that record Chief's agent become: the session and the team it is on (both, or neither when none is picked). */
 export const agentSettings = (sessionId, choices) => { const c = choices.find(x => x.value === sessionId); return c ? { chief_session: c.value, chief_team: c.team } : { chief_session: '', chief_team: '' }; };
 
+/** True when the picked agent is on the team Chief is set to front: Coral tells Chief of the Operator's decisions on other teams only, so Chief would hear none of that team's (#12497). */
+export const agentIsOnFrontedTeam = (sessionId, fronts, choices, teamNames) => {
+    const c = choices.find(x => x.value === sessionId), f = String(fronts || '').trim();
+    if (!c || !f) return false;
+    return c.team === f || teamNames.get(c.team) === f;
+};
+
 export async function mountChiefSetup(host) {
     host.replaceChildren();
     const [stored, live, projects] = await Promise.all([json('/api/settings'), json('/api/sessions/live'), json('/api/board/projects')]);
@@ -75,11 +82,12 @@ export async function mountChiefSetup(host) {
             { key: 'chief_name', type: 'text', label: 'Name', default: '', placeholder: 'Chief', help: `What /chief and its chat call it (at most ${NAME_MAX} characters). Empty keeps the agent’s own name.`, validate: v => ([...String(v || '')].length > NAME_MAX ? `At most ${NAME_MAX} characters.` : '') },
             { key: 'chief_avatar', type: 'custom', label: 'Avatar colour', help: 'One of eight colours.', render: swatches },
             { key: 'chief_avatar_letter', type: 'text', label: 'Avatar letter', default: '', placeholder: 'The name’s first letter', help: 'One letter or digit on the avatar.', validate: v => ([...String(v || '').trim()].length > 1 ? 'One letter or digit.' : '') },
-            { key: 'chief_agent', type: 'select', label: 'Which agent', default: '', options: [{ value: '', label: choices.length ? 'No agent picked' : 'No agent is running' }, ...choices.map(c => ({ value: c.value, label: c.label }))], help: 'The running agent that is Chief. Start it on its own team first (a team of one).' },
+            { key: 'chief_agent', type: 'select', label: 'Which agent', default: '', options: [{ value: '', label: choices.length ? 'No agent picked' : 'No agent is running' }, ...choices.map(c => ({ value: c.value, label: c.label }))], help: 'The running agent that is Chief. Start it on its own team first (a team of one): Chief hears your decisions on the team it fronts only when it is on another team.',
+              validate: (v, values) => (agentIsOnFrontedTeam(v, values.chief_fronts, choices, teamNames) ? 'This agent is on the team it would front, so Chief would hear none of that team’s decisions. Pick an agent on another team, or another team to front.' : '') },
             { key: 'chief_model', type: 'custom', label: 'Its model', render: slot => { slot.append(modelRow); drawModel(); } },
             { key: 'chief_actions', type: 'select', label: "Chief's actions", default: 'ask_first', options: ACTIONS, help: 'Ask first: Chief asks before each action. Act: Chief edits without asking, and a shell command still asks. Applies when Chief restarts.' },
-            { key: 'chief_fronts', type: 'select', label: 'Team it fronts', default: '', options: [{ value: '', label: 'No team chosen' }, ...teams], help: 'The team whose agents Chief takes your requests to.' },
-            { key: 'chief_page', type: 'toggle', label: 'Serve the Chief page', default: false, help: 'Turns on /chief, the page for your phone.' },
+            { key: 'chief_fronts', type: 'select', label: 'Team it fronts', default: '', options: [{ value: '', label: 'No team chosen' }, ...teams], help: 'The team whose agents Chief takes your requests to. It must be a team other than the one Chief is on.' },
+            { key: 'chief_page', type: 'toggle', label: 'Serve the Chief page', default: false, help: 'Turns on /chief, the page for your phone.', helpOf: () => (view && view.values().chief_page ? 'Turns on /chief, the page for your phone.' : 'Off: Chief stays off, whatever else you save here, until this is on and saved. Turn it on to use /chief.') },
         ],
         load: async () => {
             const again = await json('/api/settings'), st = again && again.settings ? again.settings : settings;
@@ -96,7 +104,7 @@ export async function mountChiefSetup(host) {
             return {};
         },
     });
-    const redraw = () => { drawPreview(); drawModel(); };
+    const redraw = () => { drawPreview(); drawModel(); view.refresh?.(); }; // refresh re-reads a help sentence that follows the choice (the page toggle's)
     form.addEventListener('input', redraw); form.addEventListener('change', redraw); form.addEventListener('sv-saved', redraw);
     host.dataset.ready = '';
     view.ready.then(() => { redraw(); host.dataset.ready = '1'; }, () => { redraw(); host.dataset.ready = '1'; });

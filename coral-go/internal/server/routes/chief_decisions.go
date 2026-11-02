@@ -47,7 +47,11 @@ func (h *BoardHandler) tellChief(ctx context.Context, action, kind, team, title,
 	if t := h.noticeText(ctx, chief, title); t != "" {
 		text += " " + quoteNotice(t)
 	}
-	text += " on team " + quoteNotice(h.noticeText(ctx, chief, team)) + "."
+	name := team
+	if l := h.bs.BoardLabel(ctx, team); l != "" {
+		name = l // the team as the Operator knows it (#12497), its id only when it has no name
+	}
+	text += " on team " + quoteNotice(h.noticeText(ctx, chief, name)) + "."
 	if w := h.noticeText(ctx, chief, who); w != "" {
 		text += " " + w + " was told."
 	}
