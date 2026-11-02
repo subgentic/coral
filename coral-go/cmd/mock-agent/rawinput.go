@@ -61,6 +61,8 @@ type inputBox struct {
 	// notify, when set, hears the menu open ("permission_request") and close ("permission_answered", "permission_dismissed"): the run loop turns them into the hook events Claude Code runs for a tool's
 	// permission prompt, so Coral sees an agent waiting for a person (#8245), not only a menu on its screen.
 	notify func(kind string)
+	// dlg: the scripted dialogs (MOCK_DIALOG <name>, dialogs.go); while one is open it takes the keys.
+	dlg *dialogs
 }
 
 // busyTurn is a turn MOCK_BUSY keeps open, the way Claude Code is while it works (#10672): a line typed meanwhile is queued and goes in when the turn ends (it does not end it), and an Escape, the dashboard's Stop,
@@ -209,6 +211,10 @@ func (b *inputBox) feed(data []byte, submit func(string)) {
 			(bytes.HasPrefix(pasteStart, rest) || bytes.HasPrefix(pasteEnd, rest)):
 			b.pending = append([]byte(nil), rest...) // a marker cut by the read: finish it next time
 			return
+		}
+		if n := b.dlg.feed(rest); n > 0 {
+			i += n
+			continue
 		}
 		c := rest[0]
 		i++
@@ -407,6 +413,7 @@ func runRawInput(dir, sessionID, settingsFile string, turn func(string)) {
 			}
 		}
 	}
+	box.dlg = newDialogs(dir, name, func(event string, extra map[string]any) { events <- func() { hooks.fire(event, extra) } })
 	drawBox(box)
 	buf := make([]byte, 64*1024)
 	for {
@@ -414,7 +421,7 @@ func runRawInput(dir, sessionID, settingsFile string, turn func(string)) {
 		if n > 0 {
 			_, _ = f.Write(buf[:n])
 			box.feed(buf[:n], submit)
-			if !box.promptOpen && !box.deaf {
+			if !box.promptOpen && !box.deaf && !box.dlg.isOpen() {
 				drawBox(box) // a redraw would hide the open menu under the box line
 			}
 		}
