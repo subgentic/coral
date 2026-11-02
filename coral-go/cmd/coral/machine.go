@@ -17,6 +17,7 @@ import (
 
 	"github.com/subgentic/coral/internal/config"
 	"github.com/subgentic/coral/internal/machinelaunch"
+	"github.com/subgentic/coral/internal/safego"
 )
 
 // coral machine launch --provider digitalocean --token-file F --hub-key-file K [--name N] [--region R] [--size S] [--agents claude@x,codex@y] [--max-mode launch] [--coral-version V] [--yes]
@@ -82,6 +83,7 @@ func askOtherHub(stdin io.Reader, stdout io.Writer, hubURL, tokenFile, keyFile s
 func secondInterrupt(ctx context.Context, finished <-chan struct{}) <-chan struct{} {
 	second := make(chan struct{})
 	go func() {
+		defer safego.Recover("coral machine: second interrupt")
 		select {
 		case <-ctx.Done():
 		case <-finished:
