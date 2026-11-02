@@ -318,6 +318,7 @@ func (s *Store) VerifyActivity(ctx context.Context) (ActivityCheck, error) {
 // ActivityFilter narrows a list.
 type ActivityFilter struct {
 	Team, Action string
+	Actor        string // only this actor's rows (a team's owner reads their own rows alone: the Operator's choice, #12070)
 	BeforeID     int64  // rows older than this id (the next page)
 	BeforeAt     string // with BeforeID: rows older than this (time, id), the cursor a merge of several computers' records pages by
 	Limit        int
@@ -348,6 +349,10 @@ func (s *Store) ActivityPage(ctx context.Context, f ActivityFilter) ([]OperatorA
 	if f.Action != "" {
 		q += ` AND action = ?`
 		args = append(args, f.Action)
+	}
+	if f.Actor != "" {
+		q += ` AND actor = ?`
+		args = append(args, f.Actor)
 	}
 	switch {
 	case f.BeforeID > 0 && f.BeforeAt != "":
@@ -430,4 +435,11 @@ func (s *Store) noteActivity(ctx context.Context, tx *sqlx.Tx, now time.Time, ac
 	if err := s.recordInTx(ctx, tx, now, action, kind, item, version, team); err != nil {
 		slog.Warn("[activity] row not recorded", "action", action, "error", err)
 	}
+}
+
+// CountActivityBy is how many rows one actor has in the record.
+func (s *Store) CountActivityBy(ctx context.Context, actor string) (int, error) {
+	var n int
+	err := s.reader().GetContext(ctx, &n, `SELECT COUNT(*) FROM operator_actions WHERE actor = ?`, actor)
+	return n, err
 }

@@ -13,8 +13,8 @@ import (
 	"github.com/subgentic/coral/pkg/tunnel"
 )
 
-// The Activity record's routes and what feeds it (#12069). The record is the Operator's alone and local: GET /api/activity is not in the tunnel's table (so the Hub never reaches it), an agent has no route to
-// it, and it is not in history search or the feed.
+// The Activity record's routes and what feeds it (#12069). The record is the Operator's alone: GET /api/activity is read only, an owner route in the tunnel's table (the Hub OWNER reads it, #12070), an agent
+// has no route to it, and it is not in history search or the feed.
 
 // activityMetaFor is who acted and from where, taken from the verified request and never from the body: local, or a Hub account by its stable id (an opaque label, never an email or a name). hint is what the
 // page said about itself (X-Coral-Client: phone), kept only as "phone" and shown as reported by the page. note is the Operator's own words, redacted and cut here; if the redactor refuses the action is
@@ -54,11 +54,7 @@ func activityActor(id callerIdentity) string {
 // GET /api/activity?team=&action=&before=&limit= : the record, newest first, a page at a time, and whether its chain is whole (checked on the first page). Read only; the Operator's alone, at this computer or through
 // Coral Hub as the Hub OWNER (#12070: the tunnel's table lists it as an owner route; nobody else gets it).
 func (h *BoardHandler) ListActivity(w http.ResponseWriter, r *http.Request) {
-	if cloud.Tunneled(r) || r.Header.Get(tunnel.ViaHeader) != "" {
-		commentRefuse(w, http.StatusForbidden, "not_through_hub", "the Activity record is on this computer only")
-		return
-	}
-	if !operatorOnly(w, r) {
+	if !operatorOnly(w, r) { // at this computer, the person; through Coral Hub, the account this computer is linked to and nobody else (refuseNonOwner): a guest, a grantee or a viewer is refused owner_only
 		return
 	}
 	q := r.URL.Query()
@@ -72,6 +68,15 @@ func (h *BoardHandler) ListActivity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	f := board.ActivityFilter{Team: team, Action: action}
+	// On a computer enrolled to a Coral Hub team each owner reads only the rows where they are the actor (by their stable id), the Operator's choice (#12070): the computer's own person, at the computer, reads all
+	// of them, and so does the one owner of a personal machine. What the record says of the others is not in the answer: not their rows, not their count, not the id of a row that broke.
+	scoped := ""
+	if cloud.Tunneled(r) || r.Header.Get(tunnel.ViaHeader) != "" {
+		if id := hubOwnerRequest(r); id.team {
+			scoped = activityActor(id)
+			f.Actor = scoped
+		}
+	}
 	if v := q.Get("before"); v != "" {
 		n, err := strconv.ParseInt(v, 10, 64)
 		if err != nil || n <= 0 {
@@ -111,6 +116,14 @@ func (h *BoardHandler) ListActivity(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			errInternalServer(w, "could not check the record")
 			return
+		}
+		if scoped != "" { // the chain is checked whole; what a team's owner is told of it is theirs alone
+			n, err := h.bs.CountActivityBy(r.Context(), scoped)
+			if err != nil {
+				errInternalServer(w, "could not check the record")
+				return
+			}
+			chk.Rows, chk.FirstBad = n, 0
 		}
 		out["check"] = chk
 	}

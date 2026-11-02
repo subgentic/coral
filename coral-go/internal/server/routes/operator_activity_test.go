@@ -7,10 +7,12 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -114,7 +116,7 @@ func TestTheHintIsPhoneOrNothingAndIgnoreAndSaveAreRecorded(t *testing.T) {
 	assert.Empty(t, out["actions"])
 }
 
-func TestTheRecordIsTheOperatorsAloneAndNeverThroughTheHub(t *testing.T) {
+func TestTheRecordIsTheOperatorsAloneAndThroughTheHubTheOwnersAlone(t *testing.T) {
 	withLabel(t, "hub-user-1234abcd", nil) // the machine is enrolled as that account's: its owner stamp passes the owner check
 	e := newReviewEnv(t, true)
 	e.tag(t, `["for review"]`)
@@ -123,12 +125,16 @@ func TestTheRecordIsTheOperatorsAloneAndNeverThroughTheHub(t *testing.T) {
 	code, _ := getActivity(t, notPerson.URL, "", nil)
 	assert.Equal(t, http.StatusForbidden, code)
 	act := e.activityServer(t, true)
+	// through the Hub the owner reads it (read only: the route is a GET and nothing else is routed); nobody else does
+	owner := map[string]string{tunnel.ViaHeader: cloud.ViaSecret(), tunnel.HubRoleHeader: "owner", tunnel.HubUserHeader: "hub-user-1234abcd"}
+	code, out := getActivity(t, act.URL, "", owner)
+	require.Equal(t, http.StatusOK, code, out)
+	assert.Len(t, out["actions"], 1)
 	for name, hdr := range map[string]map[string]string{
-		"a Hub stamp":  {tunnel.ViaHeader: cloud.ViaSecret(), tunnel.HubUserHeader: "someone"},
-		"a forged one": {tunnel.ViaHeader: "not-the-secret", tunnel.HubUserHeader: "someone"},
-		// the Hub's OWNER: the account this computer is linked to passes the owner check on every owner route, and still does not get the record through the Hub (the explicit refusal in ListActivity; it is
-		// not in the tunnel's table either, but each of the two must hold alone)
-		"the Hub's owner": {tunnel.ViaHeader: cloud.ViaSecret(), tunnel.HubRoleHeader: "owner", tunnel.HubUserHeader: "hub-user-1234abcd"},
+		"a Hub viewer with no marker":    {tunnel.ViaHeader: cloud.ViaSecret(), tunnel.HubUserHeader: "someone"},
+		"a Hub grantee":                  {tunnel.ViaHeader: cloud.ViaSecret(), tunnel.HubRoleHeader: "grantee", tunnel.HubUserHeader: "hub-user-9999ffff"},
+		"another account's owner marker": {tunnel.ViaHeader: cloud.ViaSecret(), tunnel.HubRoleHeader: "owner", tunnel.HubUserHeader: "hub-user-9999ffff"},
+		"a forged stamp":                 {tunnel.ViaHeader: "not-the-secret", tunnel.HubRoleHeader: "owner", tunnel.HubUserHeader: "hub-user-1234abcd"},
 	} {
 		code, _ := getActivity(t, act.URL, "", hdr)
 		assert.Equal(t, http.StatusForbidden, code, name)
@@ -179,6 +185,24 @@ func TestTheAnswerIsMadeForAHubThatMergesSeveralComputers(t *testing.T) {
 	raw, _ := json.Marshal(big)
 	assert.NotContains(t, string(raw), "prev_hash")
 	assert.NotContains(t, string(raw), `"hash"`)
+}
+
+// docs/activity-api.md gives coral-hub the exact function of a personal computer's Hub actor label with these vectors; a change to either side fails here (#12070): "hub:" and the first 12 lower-case hex digits
+// of the SHA-256 of the stamped label's bytes as sent, with no trimming, case folding or normalization.
+func TestAPersonalComputersHubActorLabelMatchesTheVectorsInTheAPINote(t *testing.T) {
+	vectors := map[string]string{
+		"hub-user-1234abcd": "90328ec01809",
+		"hub-user-9999ffff": "1802bdf6841b",
+		"hub-user-0000aaaa": "0c74ded601b3",
+		"Hub-User-1234ABCD": "e7c28f167ef5", // not folded: the label is taken as it was sent
+	}
+	note, err := os.ReadFile("../../../docs/activity-api.md")
+	require.NoError(t, err)
+	for label, want := range vectors {
+		assert.Equal(t, "hub:"+want, activityActor(callerIdentity{owner: true, pseudo: label}), label)
+		assert.Contains(t, string(note), "`"+label+"`", "the note names the vector's label")
+		assert.Contains(t, string(note), "`hub:"+want+"`", "the note names the vector's value for "+label)
+	}
 }
 
 func TestTheActorLabelIsTheStableIdOrAHashNeverTheNameOrTheEmail(t *testing.T) {
@@ -272,4 +296,99 @@ func TestAGoalTheOperatorClosesIsRecordedAndOneAnAgentClosesIsNot(t *testing.T) 
 	assert.Equal(t, "goal", rows[0].ItemKind)
 	assert.Equal(t, "Operator closes this", rows[0].Title)
 	assert.Equal(t, "done: not needed any more", rows[0].Note)
+}
+
+// The operator's rule for coral-hub (#12070): users on a team see only what they were approved to view. On a team's machine the owners are the recorded organisation's owner and admin roles (the personal marker is
+// not read there); a member who has been granted the computer, another organisation's people and a stamp that is not complete do not read the record.
+func TestOnATeamsMachineAMemberGrantedTheComputerStillCannotReadTheRecord(t *testing.T) {
+	withRecord(t, tunnel.OwnerKindTeam, teamOrgA, nil)
+	withLabel(t, "", nil)
+	e := newReviewEnv(t, true)
+	act := e.activityServer(t, true)
+	flat := func(h http.Header) map[string]string {
+		m := map[string]string{}
+		for k := range h {
+			m[k] = h.Get(k)
+		}
+		return m
+	}
+	marked := func(h http.Header) http.Header { h.Set(tunnel.HubRoleHeader, tunnel.HubRoleOwner); return h }
+	for name, tc := range map[string]struct {
+		hdr  http.Header
+		want int
+	}{
+		"an admin of the recorded organisation":                            {teamStamp(teamOrgA, "admin", teamUIDA, teamUser), http.StatusOK},
+		"an owner role of the recorded organisation":                       {teamStamp(teamOrgA, "owner", teamUIDA, teamUser), http.StatusOK},
+		"a member granted the computer":                                    {teamStamp(teamOrgA, "member", teamUIDA, teamUser), http.StatusForbidden},
+		"a member, even with the personal owner marker":                    {marked(teamStamp(teamOrgA, "member", teamUIDA, teamUser)), http.StatusForbidden},
+		"another organisation's admin, even with the owner marker":         {marked(teamStamp(teamOrgB, "admin", teamUIDB, teamUser)), http.StatusForbidden},
+		"an admin whose stamp has no stable id (not complete)":             {teamStamp(teamOrgA, "admin", "", teamUser), http.StatusForbidden},
+		"an admin with only the label, never keyed on it (no hub-uid- id)": {teamStamp(teamOrgA, "admin", "", teamUser), http.StatusForbidden},
+		"an admin with a stable id and no label":                           {teamStamp(teamOrgA, "admin", teamUIDA, ""), http.StatusForbidden},
+		"an admin with an id that is not a hub-uid- id":                    {teamStamp(teamOrgA, "admin", "hub-user-1234abcd", teamUser), http.StatusForbidden},
+		"a forged connector stamp": {func() http.Header {
+			h := teamStamp(teamOrgA, "admin", teamUIDA, teamUser)
+			h.Set(tunnel.ViaHeader, "forged")
+			return h
+		}(), http.StatusForbidden},
+	} {
+		code, out := getActivity(t, act.URL, "", flat(tc.hdr))
+		assert.Equal(t, tc.want, code, name)
+		if tc.want == http.StatusForbidden {
+			assert.NotContains(t, out, "actions", name+": nothing of the record is in a refusal")
+		}
+	}
+}
+
+// "Own rows only" (the Operator's choice, #12070): on a computer enrolled to a Coral Hub team each owner sees the rows where they are the actor and nobody else's, the count in the check is their own and a break is
+// said without the id of a row that is not theirs; the person at the computer sees everything.
+func TestOnATeamsMachineEachOwnerSeesOnlyTheirOwnRowsAndTheLocalPersonSeesAll(t *testing.T) {
+	withRecord(t, tunnel.OwnerKindTeam, teamOrgA, nil)
+	withLabel(t, "", nil)
+	e := newReviewEnv(t, true)
+	act := e.activityServer(t, true)
+	ctx := context.Background()
+	for _, r := range []struct{ actor, source, item string }{{"hub:" + teamUIDA, "hub", "a-1"}, {"hub:" + teamUIDB, "hub", "b-1"}, {"hub:" + teamUIDA, "hub", "a-2"}, {"local", "local", "local-1"}, {"hub:" + teamUIDB, "hub", "b-2"}} {
+		require.NoError(t, e.h.bs.RecordActivity(ctx, board.ActivityMeta{Actor: r.actor, Source: r.source}, board.ActSave, "file", r.item, "", "alpha"))
+	}
+	owner := func(uid string) map[string]string {
+		h := teamStamp(teamOrgA, "admin", uid, teamUser)
+		m := map[string]string{}
+		for k := range h {
+			m[k] = h.Get(k)
+		}
+		return m
+	}
+	items := func(out map[string]any) []string {
+		var ids []string
+		for _, r := range out["actions"].([]any) {
+			ids = append(ids, r.(map[string]any)["item_id"].(string))
+		}
+		return ids
+	}
+	code, a := getActivity(t, act.URL, "", owner(teamUIDA))
+	require.Equal(t, http.StatusOK, code, a)
+	assert.Equal(t, []string{"a-2", "a-1"}, items(a), "the first owner reads their own rows alone, newest first")
+	assert.Equal(t, float64(2), a["check"].(map[string]any)["rows"], "and the check counts theirs")
+	code, b := getActivity(t, act.URL, "", owner(teamUIDB))
+	require.Equal(t, http.StatusOK, code, b)
+	assert.Equal(t, []string{"b-2", "b-1"}, items(b), "the second reads theirs")
+	raw, _ := json.Marshal([]any{a, b})
+	assert.NotContains(t, string(raw), "local-1", "nobody on the Hub reads the person at the computer's row")
+	// the person at the computer: no Hub in the request
+	code, all := getActivity(t, act.URL, "", nil)
+	require.Equal(t, http.StatusOK, code)
+	assert.Len(t, items(all), 5, "the local person reads every row")
+	assert.Equal(t, float64(5), all["check"].(map[string]any)["rows"])
+	// a break is said, but not as the id of a row that is not theirs
+	outside, err := sqlx.Open("sqlite", lastBoardTestDBPath) // another owner's row edited outside Coral, by another program
+	require.NoError(t, err)
+	defer outside.Close()
+	_, err = outside.ExecContext(ctx, `UPDATE operator_actions SET action = 'deny' WHERE item_id = 'b-1'`)
+	require.NoError(t, err)
+	_, a2 := getActivity(t, act.URL, "", owner(teamUIDA))
+	chk := a2["check"].(map[string]any)
+	assert.Equal(t, false, chk["intact"], "the record is not intact")
+	assert.NotContains(t, chk, "first_bad", "and the first bad row's id is not told to someone who does not own it")
+	assert.Equal(t, float64(2), chk["rows"])
 }

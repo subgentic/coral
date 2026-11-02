@@ -144,6 +144,7 @@ func TestHubSweepNoHomeInAnyViewRoute(t *testing.T) {
 		"/api/board/{project}/proposals": true, "/api/proposals": true, // what agents asked to add is the owner's alone through the hub (#11389)
 		"/api/operator-asks": true, // the questions agents asked the Operator are the owner's alone (#11417)
 		"/api/needs-you":     true, // what is waiting for the Operator is the owner's alone (#11596)
+		"/api/activity":      true, // the record of what the Operator did in Needs you, read only, the owner's alone (#12070)
 		"/api/chief":         true, // which agent the Operator recorded as Chief is the owner's alone through the hub (#11470)
 		"/api/board/{project}/orchestrator-grant": true, "/api/board/{project}/lifecycle-log": true, "/api/board/{project}/guide-roster": true, "/api/artifacts/{id}/private": true, // the grant to a board's orchestrator and its log are the owner's alone (#11432)
 		"/api/custom-models": true} // the custom models are the owner's alone through the hub (#5996)
