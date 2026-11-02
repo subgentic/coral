@@ -701,3 +701,11 @@ func TestProvisionDetectSaysWhySshFailedAfterTheConnectStepPassed(t *testing.T) 
 		})
 	}
 }
+
+// #12031: a scan that stopped on a jump host's key says which hop (a validated host, never markup), and any other scan failure keeps the old sentence.
+func TestScanSentenceNamesTheJumpHostsTheOwnerHasNotPinned(t *testing.T) {
+	assert.Contains(t, scanSentence(&sshprov.HopKeyError{Hops: []string{"a", "ops@b:2200"}, Unknown: []string{"ops@b:2200"}}), "(ops@b:2200) is not in your known_hosts")
+	assert.Contains(t, scanSentence(&sshprov.HopKeyError{Hops: []string{"a", "b"}}), "(a, b) is not in your known_hosts", "when it cannot be told which, the whole chain is named")
+	assert.Contains(t, scanSentence(&sshprov.HopKeyError{}), "A jump host on the way is not in your known_hosts")
+	assert.Equal(t, "Could not read the host's key.", scanSentence(sshprov.ErrHostKeyScan))
+}

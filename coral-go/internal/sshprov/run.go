@@ -10,8 +10,10 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/subgentic/coral/internal/executil"
+	"github.com/subgentic/coral/internal/secrets"
 )
 
 // Command is one of the CLOSED set of things the hub may run on the remote. There is no way to run a command that is not in this list: a Command names a fixed template, and its arguments are
@@ -249,8 +251,15 @@ func cleanStderr(s string) string {
 		return r
 	}, s)
 	s = strings.Join(strings.Fields(s), " ")
-	if len(s) > 300 {
-		s = s[:300] + "…"
+	// A ProxyCommand prints its own program's messages on ssh's stderr (a URL with a token, a session id): the text goes through the same redaction as session excerpts before it is kept, and a
+	// redactor that refuses keeps nothing.
+	red, err := secrets.Redactor().Text([]byte(s))
+	if err != nil {
+		return "(not shown: it could not be checked for secrets)"
+	}
+	s = string(red)
+	if utf8.RuneCountInString(s) > 300 {
+		s = string([]rune(s)[:300]) + "…"
 	}
 	return s
 }

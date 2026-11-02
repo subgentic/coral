@@ -360,7 +360,7 @@ func (pr *Provisioner) Connect(w http.ResponseWriter, r *http.Request) {
 		keys, kerr := pr.scan(ctx, p.Target)
 		if kerr != nil {
 			slog.Info("[provision] host key scan failed", "plan", p.ID, "error", kerr.Error())
-			pr.fail(p, "connect", "Could not read the host's key.")
+			pr.fail(p, "connect", scanSentence(kerr))
 			break
 		}
 		p.mu.Lock()
@@ -512,6 +512,22 @@ func (p *provisionPlan) moveFrom(from1, from2, next string) (string, bool) {
 	prev := p.phase
 	p.phase = next
 	return prev, true
+}
+
+// scanSentence is the fixed sentence for a host-key scan that failed: a jump host whose key the owner has not pinned is named (the hop's text is validated as a host, never markup).
+func scanSentence(err error) string {
+	var he *sshprov.HopKeyError
+	if errors.As(err, &he) {
+		which := he.Unknown
+		if len(which) == 0 {
+			which = he.Hops
+		}
+		if len(which) > 0 {
+			return "A jump host on the way (" + strings.Join(which, ", ") + ") is not in your known_hosts, or its key has changed. Connect through it once with ssh in a terminal, then set up again."
+		}
+		return "A jump host on the way is not in your known_hosts, or its key has changed. Connect through it once with ssh in a terminal, then set up again."
+	}
+	return "Could not read the host's key."
 }
 
 // failConnect fails step with a sentence that says why ssh could not connect or sign in, and logs the kind and the cleaned start of ssh's own message (#12027: every failure said "Could not connect." and

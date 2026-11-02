@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
 func TestParseTargetAccepts(t *testing.T) {
@@ -357,5 +358,21 @@ func TestScanAliasArgvOffersNoCredentialAndForwardsNothing(t *testing.T) {
 	}
 	if !strings.Contains(joined, " -F ") || !strings.Contains(joined, "UserKnownHostsFile=") {
 		t.Errorf("the scan uses its own config and its own known_hosts: %s", joined)
+	}
+}
+
+// #12031 (Security's SHOULD on #12027): the kept ssh text is redacted like a session excerpt: a ProxyCommand's token or bearer string on stderr is masked, and the cut is on a character boundary.
+func TestCleanStderrMasksSecretsAndCutsOnACharacter(t *testing.T) {
+	token := "ghp_" + strings.Repeat("a1B2c3D4e5", 4)
+	got := cleanStderr("coder: open https://coder.example.com/login?x=1\nAuthorization: Bearer " + token + "\ntoken=" + token + "\n")
+	if strings.Contains(got, token) || strings.Contains(got, strings.Repeat("a1B2c3D4e5", 3)) {
+		t.Errorf("a secret is in the kept text: %q", got)
+	}
+	if !strings.Contains(got, "coder.example.com") {
+		t.Errorf("the rest is kept: %q", got)
+	}
+	long := cleanStderr(strings.Repeat("é", 400))
+	if !utf8.ValidString(long) || utf8.RuneCountInString(long) > 301 {
+		t.Errorf("the cut is on a character and at most 300 of them: %d runes, valid=%v", utf8.RuneCountInString(long), utf8.ValidString(long))
 	}
 }
