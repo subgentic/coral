@@ -124,5 +124,13 @@ async function toReady(host, mode, extra) {
     await until(() => runBody, 'the run');
     assert.equal(runBody.backend, 'pty');
 }
+{
+    // tmux not known yet (the host key is still to be confirmed): the choice is open, with a note
+    hub({ kind: 'setup' });
+    const host = fresh();
+    await toReady(host, 'setup');
+    assert.equal(host.querySelector('#ssh-backend-tmux').disabled, false, 'tmux stays open while it is not known');
+    assert.ok(/Checked when you press Set up/.test(host.querySelector('.ssh-backend').textContent));
+}
 console.log('server_upgrade_page: ok');
 process.exit(0);

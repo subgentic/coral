@@ -224,13 +224,13 @@ export function mountSshSetup(host, { mode = 'setup', server = null, action = nu
         if (noTmux && st.backend === 'tmux') st.backend = 'pty';
         const box = el('fieldset', 'ssh-backend');
         box.append(el('legend', 'ssh-subhead', 'How agents run on that computer'));
-        const opt = (value, title, text, disabledWhy) => {
-            const label = el('label', 'ssh-backend-opt' + (disabledWhy ? ' ssh-backend-off' : ''));
+        const opt = (value, title, text, note, off) => { // off: the choice is closed (with the note saying why); a note alone only says something
+            const label = el('label', 'ssh-backend-opt' + (off ? ' ssh-backend-off' : ''));
             const r = el('input', 'check'); r.type = 'radio'; r.name = 'ssh-backend'; r.value = value; r.id = `ssh-backend-${value}`;
-            r.checked = st.backend === value; r.disabled = !!disabledWhy;
+            r.checked = st.backend === value; r.disabled = !!off;
             r.addEventListener('change', () => { if (r.checked) st.backend = value; });
             const body = el('span', 'ssh-backend-text'); body.append(el('strong', '', title), el('span', '', text));
-            if (disabledWhy) body.append(el('em', '', disabledWhy));
+            if (note) body.append(el('em', '', note));
             label.append(r, body);
             return label;
         };
@@ -238,7 +238,7 @@ export function mountSshSetup(host, { mode = 'setup', server = null, action = nu
         grid.append(
             opt('pty', 'Background process (pty), the default', 'Coral holds each terminal itself, so there is no shared socket for one agent to use against another. The price: agents end whenever Coral restarts, upgrades or crashes (Coral puts them to sleep first when it stops cleanly).'),
             opt('tmux', 'Keep agents running when Coral restarts (tmux)', 'Agents keep running when Coral restarts, upgrades or crashes, and Coral picks them up again. Coral keeps its terminals in tmux, whose socket sits in its data folder on that computer: any agent, and any other program running as that user, can find it and read or type into other agents\' terminals.',
-                noTmux ? 'tmux is not installed on that computer.' : (p.tmux === undefined ? 'Checked when you press Set up.' : '')));
+                noTmux ? 'tmux is not installed on that computer.' : (p.tmux === undefined ? 'Checked when you press Set up.' : ''), noTmux));
         box.append(grid);
         root.append(box);
     }
