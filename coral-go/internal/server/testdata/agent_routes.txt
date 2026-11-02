@@ -132,6 +132,7 @@ b GET /api/goals
 b GET /api/goals/metrics
 c GET /api/health
 b GET /api/operator-asks
+b GET /api/history-import
 b GET /api/needs-you
 c GET /api/pinned-folders
 b GET /api/saved
@@ -357,6 +358,7 @@ b POST /api/cloud/owner-label/arm
 b POST /api/cloud/redeem
 b POST /api/cloud/rekey
 b POST /api/folder-tags/{folderName}
+b POST /api/history-import
 b POST /api/hub-auto-accept
 b POST /api/indexer/refresh
 a POST /api/notifications

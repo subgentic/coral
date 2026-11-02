@@ -61,6 +61,7 @@ func TestIndexerListsAndSearchesAnOpencodeAgentsChatThroughItsServer(t *testing.
 	defer db.Close()
 	fake := newFakeOpencode()
 	idx := NewSessionIndexer(store.NewSessionStore(db), nil, time.Hour, 0)
+	require.NoError(t, idx.store.ImportEarlierChats(ctx)) // these chats are not Coral's own: the person has imported them (#11970)
 	idx.AddLiveSource(NewOpencodeHistory(fake))
 	require.NoError(t, idx.RunOnce(ctx))
 
