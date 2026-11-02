@@ -28,15 +28,18 @@ export function plainMarkdown(text) {
         .replace(/`([^`]+)`/g, '$1').replace(/(\*\*|__)(?=\S)(.+?)(?<=\S)\1/g, '$2').replace(/~~(?=\S)(.+?)(?<=\S)~~/g, '$1')
         .replace(/(^|[\s(])\*(?=\S)(.+?)(?<=\S)\*(?=[\s).,;:!?]|$)/g, '$1$2').replace(/(^|[\s(])_(?=\S)(.+?)(?<=\S)_(?=[\s).,;:!?]|$)/g, '$1$2')).join('\n');
 }
+/** A row only previews: the text is cut to this many characters BEFORE the Markdown marks are dropped (that pass is quadratic on adversarial text: 20 KB took 250 ms a row, #12152), and the marks are written after. */
+const PREVIEW_IN = 500;
+const previewText = a => markHidden(String((a && a.text) == null ? '' : a.text).slice(0, PREVIEW_IN), { strict: true });
 /** A question as one line of a row: hidden characters written out, Markdown marks dropped, white space collapsed, cut after marking so a mark is never split. */
 export function askLine(a) {
-    const one = plainMarkdown(markHidden(a && a.text, { strict: true })).replace(/\s+/g, ' ').trim();
+    const one = plainMarkdown(previewText(a)).replace(/\s+/g, ' ').trim();
     return one.length > LINE_MAX ? `${one.slice(0, LINE_MAX - 1).trimEnd()}…` : one;
 }
 /** The whole question, hidden characters written out, line breaks kept. */
 export const askWhole = a => markHidden(a && a.text, { strict: true });
 /** The whole question as plain text (a row's second line): the same words, line breaks kept, without the Markdown marks. */
-export const askPlain = a => plainMarkdown(askWhole(a));
+export const askPlain = a => plainMarkdown(previewText(a));
 /** A stable id of one question among the rows. */
 export const askKey = a => `operator-ask:${a.board}:${a.kind}:${a.id}`;
 
@@ -157,6 +160,7 @@ export function openAskDialog(a, onDone, runners = {}) {
     const sub = document.createElement('p'); sub.className = 'inbox-ask-sub';
     sub.textContent = [`From ${markHidden(a.asker, { strict: true })}`, (/\bteam$/i.test(a.board_label || a.board) ? (a.board_label || a.board) : `${a.board_label || a.board} team`), whenText(a.at)].filter(Boolean).join(' \u00b7 ') + (a.kind === 'wait' ? ', waiting for your reply' : '');
     const subjects = askSubjects(a), links = document.createElement('p'); links.className = 'inbox-ask-subjects'; links.hidden = !subjects.length; if (subjects.length) loadStyles('pictures.css'); // its links are drawn by the lazy picture rules // the goal and task it is about, each a link that opens it in the Inbox
+    if (subjects.length) links.append(document.createTextNode('About ')); // the asker names them: the line says so (Security's INFO on #12164)
     subjects.forEach((x, i) => {
         if (i) links.append(document.createTextNode(' \u00b7 '));
         const word = `${x.kind === 'goal' ? 'Goal' : 'Task'} #${x.id}${x.title ? `: ${x.title.length > 60 ? `${x.title.slice(0, 59).trimEnd()}\u2026` : x.title}` : ''}`;
@@ -165,6 +169,7 @@ export function openAskDialog(a, onDone, runners = {}) {
         b.addEventListener('click', () => { finish(); runners[x.kind](a, String(x.id)); });
         links.append(b);
     });
+    if (subjects.length) links.append(document.createTextNode(` (named by ${markHidden(a.asker, { strict: true })})`));
     const whole = document.createElement('div'); whole.className = 'inbox-ask-text prose'; whole.tabIndex = 0; whole.setAttribute('role', 'region'); whole.setAttribute('aria-label', 'The question');
     whole.innerHTML = renderMarkdownStrict(parts.body + (a.cut ? '\n\n\u2026 (cut: the board has the rest)' : '')); // raw HTML in the words is written out as text; links keep the page's link policy
     whole.hidden = !parts.body && !a.cut; // a short question is its title
