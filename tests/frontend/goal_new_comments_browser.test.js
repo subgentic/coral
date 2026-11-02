@@ -57,5 +57,9 @@ const { coralReady } = require('./helpers/wait');
             } catch (error) { failures.push(width + ': ' + error.message); console.error(failures.at(-1)); }
         }
         assert.equal(failures.length, 0, failures.join('\n'));
-    } finally { await removeBoards(ev, [team]).catch(() => {}); await client.close(); }
+    } finally {
+        // the two settings this suite saved go back to empty lists (a setting row cannot be deleted: the runner lists them as rows this suite may add, ALLOWED_SETTING_ROWS)
+        await ev(`fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ goal_done_read: '[]', goal_done_hidden: '[]' }) }).then(r => r.ok)`).catch(() => {});
+        await removeBoards(ev, [team]).catch(() => {}); await client.close();
+    }
 })().catch(error => { console.error(error); process.exitCode = 1; });
