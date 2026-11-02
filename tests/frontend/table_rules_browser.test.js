@@ -1,3 +1,4 @@
+// cdp-timeout: 900 (the whole table rules check: about 510 s on this Mac, 116 table states and the live surfaces, past the runner's default; #11943)
 // #11942 part A (the operator: "Our table column resizing is very broken ... It's used across all of our surfaces"): ONE browser check for every table built on data_table.js, asserting the eight rules of
 // coral://artifacts/9ced561afd363231aa6ccbc457c99c528b81ab5c31d82f232e9604e82749093a (helpers/table_rules.js says them). Each surface's table shape (its columns, its fixed and empty columns, its row mixes) is a
 // spec below, mounted through the real data_table.js into a panel the width a surface has beside the sidebar, at 1440, 1280, 1024 and 900 px, with mixed rows, one kind of row, a long name and no rows, at 200% text,
