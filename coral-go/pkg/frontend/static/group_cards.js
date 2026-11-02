@@ -30,8 +30,8 @@ function _renderTeamCard(boardName, boardSessions) {
         const sleepLabel = boardIsSleeping ? 'Wake Team' : 'Sleep Team';
         const sleepAction = boardIsSleeping ? 'wake' : 'sleep';
         const bKebab = `<div class="sidebar-kebab-wrapper group-kebab">
-            <button class="btn btn-quiet btn-icon btn-xs sidebar-kebab-btn group-kebab-btn" data-on-click="kebab-toggle" title="Group actions" aria-label="More actions for ${escapeAttr(keyLabel(boardName))}" aria-haspopup="menu" aria-expanded="false" aria-controls="${escapeAttr(kebabId('team', boardName))}">${MORE_DOTS_SVG}</button>
-            <div class="menu sidebar-kebab-menu" id="${escapeAttr(kebabId('team', boardName))}" style="display:none" role="menu" aria-label="Actions for ${escapeAttr(keyLabel(boardName))}">
+            <button class="btn btn-quiet btn-icon btn-xs sidebar-kebab-btn group-kebab-btn" data-coral-hook="sidebar-kebab-button" data-on-click="kebab-toggle" title="Group actions" aria-label="More actions for ${escapeAttr(keyLabel(boardName))}" aria-haspopup="menu" aria-expanded="false" aria-controls="${escapeAttr(kebabId('team', boardName))}">${MORE_DOTS_SVG}</button>
+            <div class="menu sidebar-kebab-menu" data-coral-hook="sidebar-kebab-menu" id="${escapeAttr(kebabId('team', boardName))}" style="display:none" role="menu" aria-label="Actions for ${escapeAttr(keyLabel(boardName))}">
                 <button class="menu-item overflow-menu-item" data-on-click="team-working-mode" data-board="${escapeAttr(boardName)}"><span class="material-icons" style="font-size:var(--fs-lg);vertical-align:-2px" aria-hidden="true">settings</span> Team settings</button>
                 ${teamLinkOffered(splitKey(boardName).server) ? `<button class="menu-item overflow-menu-item" data-on-click="team-link" data-board="${escapeAttr(boardName)}"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 9.5l3-3"/><path d="M7 4.5l1-1a2.5 2.5 0 013.5 3.5l-1 1"/><path d="M9 11.5l-1 1A2.5 2.5 0 014.5 9l1-1"/></svg> Link team...</button>` : ''}
                 <button class="menu-item overflow-menu-item" data-on-click="team-add-agent" data-board="${escapeAttr(boardName)}" data-dir="${escapeAttr(boardWorkDir)}">
@@ -115,8 +115,8 @@ function _renderWorkflowCard(wfName, wfSessions) {
         const wfRunId = wfSessions[0]?.workflow_run_id || '';
         const wfSubline = `<div class="board-card-subline"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/></svg> Workflow · ${wfSessions.length} agent${wfSessions.length !== 1 ? 's' : ''}${wfRunId ? ' · Run #' + wfRunId : ''}</div>`;
         const wfKebab = `<div class="sidebar-kebab-wrapper group-kebab">
-            <button class="btn btn-quiet btn-icon btn-xs sidebar-kebab-btn group-kebab-btn" data-on-click="kebab-toggle" title="Workflow actions" aria-label="More actions for ${escapeAttr(wfName)}" aria-haspopup="menu" aria-expanded="false" aria-controls="${escapeAttr(kebabId('workflow', wfName))}">${MORE_DOTS_SVG}</button>
-            <div class="menu sidebar-kebab-menu" id="${escapeAttr(kebabId('workflow', wfName))}" style="display:none" role="menu" aria-label="Actions for ${escapeAttr(wfName)}">
+            <button class="btn btn-quiet btn-icon btn-xs sidebar-kebab-btn group-kebab-btn" data-coral-hook="sidebar-kebab-button" data-on-click="kebab-toggle" title="Workflow actions" aria-label="More actions for ${escapeAttr(wfName)}" aria-haspopup="menu" aria-expanded="false" aria-controls="${escapeAttr(kebabId('workflow', wfName))}">${MORE_DOTS_SVG}</button>
+            <div class="menu sidebar-kebab-menu" data-coral-hook="sidebar-kebab-menu" id="${escapeAttr(kebabId('workflow', wfName))}" style="display:none" role="menu" aria-label="Actions for ${escapeAttr(wfName)}">
                 ${wfRunId ? `<button class="menu-item overflow-menu-item" data-on-click="wf-run-open" data-run-id="${Number(wfRunId)}">
                     ${SVGO.o1}<path d="M2 8h12M10 4l4 4-4 4"/></svg>
                     View Run
@@ -152,8 +152,8 @@ function _renderFolderGroup(groupName, groupSessions) {
         const collapsed = _isGroupCollapsed(groupName);
         const groupDirRaw = sorted[0]?.working_directory || pinPathForKey(groupName);
         const groupKebab = `<div class="sidebar-kebab-wrapper group-kebab">
-            <button class="btn btn-quiet btn-icon btn-xs sidebar-kebab-btn group-kebab-btn" data-on-click="kebab-toggle" title="Group actions" aria-label="More actions for ${escapeAttr(groupName)}" aria-haspopup="menu" aria-expanded="false" aria-controls="${escapeAttr(kebabId('folder', groupName))}">${MORE_DOTS_SVG}</button>
-            <div class="menu sidebar-kebab-menu" id="${escapeAttr(kebabId('folder', groupName))}" style="display:none" role="menu" aria-label="Actions for ${escapeAttr(groupName)}">
+            <button class="btn btn-quiet btn-icon btn-xs sidebar-kebab-btn group-kebab-btn" data-coral-hook="sidebar-kebab-button" data-on-click="kebab-toggle" title="Group actions" aria-label="More actions for ${escapeAttr(groupName)}" aria-haspopup="menu" aria-expanded="false" aria-controls="${escapeAttr(kebabId('folder', groupName))}">${MORE_DOTS_SVG}</button>
+            <div class="menu sidebar-kebab-menu" data-coral-hook="sidebar-kebab-menu" id="${escapeAttr(kebabId('folder', groupName))}" style="display:none" role="menu" aria-label="Actions for ${escapeAttr(groupName)}">
                 <button class="menu-item overflow-menu-item" data-on-click="folder-launch-default" data-dir="${escapeAttr(groupDirRaw)}" data-server="${escapeAttr(splitKey(groupName).server)}">
                     ${SVGO.o1}<line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>
                     <span class="menu-item-text">Add Agent<span class="menu-item-hint">Starts your default agent now</span></span>
@@ -199,8 +199,8 @@ function _renderFolderFirstGroup(groupName, groupSessions) {
         const collapsed = _isGroupCollapsed(groupName);
         const groupDirRaw = sorted[0]?.working_directory || pinPathForKey(groupName);
         const groupKebab = `<div class="sidebar-kebab-wrapper group-kebab">
-            <button class="btn btn-quiet btn-icon btn-xs sidebar-kebab-btn group-kebab-btn" data-on-click="kebab-toggle" title="Group actions" aria-label="More actions for ${escapeAttr(groupName)}" aria-haspopup="menu" aria-expanded="false" aria-controls="${escapeAttr(kebabId('folder', groupName))}">${MORE_DOTS_SVG}</button>
-            <div class="menu sidebar-kebab-menu" id="${escapeAttr(kebabId('folder', groupName))}" style="display:none" role="menu" aria-label="Actions for ${escapeAttr(groupName)}">
+            <button class="btn btn-quiet btn-icon btn-xs sidebar-kebab-btn group-kebab-btn" data-coral-hook="sidebar-kebab-button" data-on-click="kebab-toggle" title="Group actions" aria-label="More actions for ${escapeAttr(groupName)}" aria-haspopup="menu" aria-expanded="false" aria-controls="${escapeAttr(kebabId('folder', groupName))}">${MORE_DOTS_SVG}</button>
+            <div class="menu sidebar-kebab-menu" data-coral-hook="sidebar-kebab-menu" id="${escapeAttr(kebabId('folder', groupName))}" style="display:none" role="menu" aria-label="Actions for ${escapeAttr(groupName)}">
                 <button class="menu-item overflow-menu-item" data-on-click="folder-launch-default" data-dir="${escapeAttr(groupDirRaw)}" data-server="${escapeAttr(splitKey(groupName).server)}">
                     ${SVGO.o1}<line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>
                     <span class="menu-item-text">Add Agent<span class="menu-item-hint">Starts your default agent now</span></span>
@@ -258,8 +258,8 @@ function _renderFolderFirstGroup(groupName, groupSessions) {
                 const sleepLabel = boardIsSleeping ? 'Wake Team' : 'Sleep Team';
                 const sleepAction = boardIsSleeping ? 'wake' : 'sleep';
                 const bKebab = `<div class="sidebar-kebab-wrapper group-kebab">
-                    <button class="btn btn-quiet btn-icon btn-xs sidebar-kebab-btn group-kebab-btn" data-on-click="kebab-toggle" title="Group actions" aria-label="More actions for ${escapeAttr(keyLabel(boardName))}" aria-haspopup="menu" aria-expanded="false" aria-controls="${escapeAttr(kebabId('team', boardName))}">${MORE_DOTS_SVG}</button>
-                    <div class="menu sidebar-kebab-menu" id="${escapeAttr(kebabId('team', boardName))}" style="display:none" role="menu" aria-label="Actions for ${escapeAttr(keyLabel(boardName))}">
+                    <button class="btn btn-quiet btn-icon btn-xs sidebar-kebab-btn group-kebab-btn" data-coral-hook="sidebar-kebab-button" data-on-click="kebab-toggle" title="Group actions" aria-label="More actions for ${escapeAttr(keyLabel(boardName))}" aria-haspopup="menu" aria-expanded="false" aria-controls="${escapeAttr(kebabId('team', boardName))}">${MORE_DOTS_SVG}</button>
+                    <div class="menu sidebar-kebab-menu" data-coral-hook="sidebar-kebab-menu" id="${escapeAttr(kebabId('team', boardName))}" style="display:none" role="menu" aria-label="Actions for ${escapeAttr(keyLabel(boardName))}">
                 <button class="menu-item overflow-menu-item" data-on-click="team-working-mode" data-board="${escapeAttr(boardName)}"><span class="material-icons" style="font-size:var(--fs-lg);vertical-align:-2px" aria-hidden="true">settings</span> Team settings</button>
                 ${teamLinkOffered(splitKey(boardName).server) ? `<button class="menu-item overflow-menu-item" data-on-click="team-link" data-board="${escapeAttr(boardName)}"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 9.5l3-3"/><path d="M7 4.5l1-1a2.5 2.5 0 013.5 3.5l-1 1"/><path d="M9 11.5l-1 1A2.5 2.5 0 014.5 9l1-1"/></svg> Link team...</button>` : ''}
                         <button class="menu-item overflow-menu-item" data-on-click="team-add-agent" data-board="${escapeAttr(boardName)}" data-dir="${escapeAttr(boardWorkDir)}">

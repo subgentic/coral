@@ -300,8 +300,8 @@ export function _renderSessionItem(s, groupName, isCompact, collapsed, teamDefau
     rememberRowMenu(s, kebabMenuContent);
     const rowMenuId = kebabId('agent', rowMenuKey(s.session_id, sessionServer(s), s.name));
     const kebabMenu = `<div class="sidebar-kebab-wrapper">
-        <button class="btn btn-quiet btn-icon btn-xs sidebar-kebab-btn" data-on-click="kebab-toggle" title="More actions" aria-label="More actions for ${escapeAttr(identity)}" aria-haspopup="menu" aria-expanded="false" aria-controls="${escapeAttr(rowMenuId)}">${MORE_DOTS_SVG}</button>
-        <div class="menu sidebar-kebab-menu" id="${escapeAttr(rowMenuId)}" style="display:none" data-lazy-menu="1" role="menu" aria-label="Actions for ${escapeAttr(identity)}"></div>
+        <button class="btn btn-quiet btn-icon btn-xs sidebar-kebab-btn" data-coral-hook="sidebar-kebab-button" data-on-click="kebab-toggle" title="More actions" aria-label="More actions for ${escapeAttr(identity)}" aria-haspopup="menu" aria-expanded="false" aria-controls="${escapeAttr(rowMenuId)}">${MORE_DOTS_SVG}</button>
+        <div class="menu sidebar-kebab-menu" data-coral-hook="sidebar-kebab-menu" id="${escapeAttr(rowMenuId)}" style="display:none" data-lazy-menu="1" role="menu" aria-label="Actions for ${escapeAttr(identity)}"></div>
     </div>`;
     const compactClass = isCompact ? ' session-compact' : '';
     const collapsedClass = collapsed ? ' group-collapsed' : '';

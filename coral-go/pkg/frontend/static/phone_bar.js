@@ -9,7 +9,7 @@ export function buildPhoneBar({ pill = null, id = '', menuId = '' } = {}) {
     const bar = el('div', 'phone-bar'); if (id) bar.id = id;
     const menu = el('button', 'btn btn-quiet btn-icon phone-menu-btn', '<span class="material-icons" aria-hidden="true">menu</span>');
     menu.type = 'button'; menu.setAttribute('data-on-click', 'm-top-menu'); menu.setAttribute('data-hamburger', ''); menu.setAttribute('aria-haspopup', 'menu'); menu.setAttribute('aria-expanded', 'false'); menu.setAttribute('aria-controls', 'nav-more-menu'); menu.setAttribute('aria-label', 'Menu');
-    if (menuId) menu.id = menuId;
+    menu.setAttribute('data-coral-hook', 'phone-menu-button'); if (menuId) menu.id = menuId;
     let mid = pill;
     if (!mid) { mid = el('h1', 'phone-bar-title'); }
     mid.classList.add('phone-bar-pill');

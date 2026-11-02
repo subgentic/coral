@@ -35,7 +35,7 @@ function draw(root, { sections, current }) {
         const group = select ? (sec.title ? document.createElement('optgroup') : select) : null;
         if (group && sec.title) group.label = sec.title;
         for (const it of sec.items) {
-            const b = el('button', 'view-list-item list-row vl-tab'); /* vl-tab: the phone's tab strip draws the same buttons as tabs (view_list.css) */ b.type = 'button'; b.dataset.key = it.key;
+            const b = el('button', 'view-list-item list-row vl-tab'); b.dataset.coralHook = 'view-list-item'; /* vl-tab: the phone's tab strip draws the same buttons as tabs (view_list.css) */ b.type = 'button'; b.dataset.key = it.key;
             const lab = el('span', 'view-list-label');
             const icon = folderIcon(it.icon);
             if (icon) { b.classList.add('view-list-with-icon'); lab.append(icon); }
@@ -92,7 +92,7 @@ function wireKeys(nav) {
 
 /** The drawer (a phone's, with `drawer`): a button that names the current view opens the column as a panel over the page, 86 percent of the width, a scrim behind it; a view, the scrim and Escape close it, and the focus goes back to the button; Tab stays inside the open panel. */
 function wireDrawer(root, nav) {
-    const trigger = el('button', 'view-list-trigger'); trigger.type = 'button'; trigger.setAttribute('aria-expanded', 'false');
+    const trigger = el('button', 'view-list-trigger'); trigger.dataset.coralHook = 'view-list-trigger'; trigger.type = 'button'; trigger.setAttribute('aria-expanded', 'false');
     const scrim = el('div', 'view-list-scrim'); scrim.setAttribute('aria-hidden', 'true');
     nav.id = `${root.dataset.viewList}-drawer`; trigger.setAttribute('aria-controls', nav.id);
     const open = () => { root.classList.add('view-list-open'); trigger.setAttribute('aria-expanded', 'true'); (nav.querySelector('.view-list-item[tabindex="0"]') || nav.querySelector('.view-list-item'))?.focus(); };

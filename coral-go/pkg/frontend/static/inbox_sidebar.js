@@ -28,6 +28,7 @@ import { registerActions, textOf } from './actions.js';
 import { tableMarkup, registerGroupSource, refreshGroupTable, openGroupTable, foldWayBack } from './sidebar_groups.js';
 import { isPhoneLayout } from './phone_layout.js';
 import { showConfirmModal } from './confirm_dialog.js';
+import { markReady } from './ready.js';
 import { browserLocal } from './safe_storage.js';
 import { resolveSessionIdentity, sessionStateInfo } from './session_state.js';
 import { pollEvery } from './overload.js';
@@ -1189,6 +1190,7 @@ export async function showInbox({ folder = '', quiet = false } = {}) {
     if (document.body.getAttribute('data-nav-tab') !== 'hub-inbox') return; // the module arrived after the person had moved on (a notification's click, a chosen agent): its table must not cover that
     noteFolder(group);
     openGroupTable('hub-inbox', group); // a phone too: the table has the folders' select on top
+    markReady('inboxListDrawn'); // window.__coralReady (#12124)
 }
 
 /** The group the Inbox opens on the next time it is shown, with nothing drawn (the Saved button names it before it switches to the tab, so the last group is not on screen first). */
@@ -1204,6 +1206,7 @@ export async function openInboxGroup(name) {
     setGroup(name);
     noteFolder(name);
     openGroupTable('hub-inbox', name);
+    markReady('inboxListDrawn');
     const route = routeForFolder(name); if (route) note(route);
     if (name === 'goals') restoreGoalList();
     const opener = itemOpeners.get(name), table = $('group-table-view');

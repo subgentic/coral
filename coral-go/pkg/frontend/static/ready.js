@@ -1,5 +1,6 @@
 /* Readiness signals for tests and tools (#3118). The app reports milestones;
- * nothing here polls or changes behaviour.
+ * nothing here polls or changes behaviour. This is a SUPPORTED SURFACE (Coral Hub's scripts and any outside tool may rely on it): the names below, the ordering
+ * guarantees under "Guarantees" and the document agent_docs/ready-signals.md are kept, and a change to one is a line in the release notes (#12124).
  *
  *   window.__coralReady                    a Promise: resolves once the first live list
  *                                          has rendered, the page start's live-list answers
@@ -25,10 +26,19 @@
  *                                          is already true. Names need not be unique:
  *                                          pass the session_id to be exact.
  *
+ * Two more parts are optional: they are in `parts` and can be waited for with startup(...), but the main promise never waits for them (a Coral with no Inbox
+ * page, or no Hub frame, would never resolve): 'inboxListDrawn' (the Inbox's first folder list is drawn, the native Inbox) and 'hubFrameLoaded' (the Hub's
+ * own framed Inbox page fired its load event). startup() with no names waits for the five required parts only.
+ *
+ * Guarantees: (1) the page's delegated event handlers (data-on-click and the other actions of actions.js) are bound before 'liveListLoaded' is marked, so a
+ * control clicked right after it works; (2) the main promise resolves once, after all five required parts, and a part never goes back to false; (3) a part
+ * name is never reused for another milestone. Pinned by tests/frontend/ready_signals_browser.test.js.
+ *
  * Matching window events: 'coral:ready', 'coral:live-list-rendered' {count},
  * 'coral:agent-view-ready' {name, sessionId, mode}. */
 
 const _parts = { liveList: false, liveListLoaded: false, feed: false, history: false, settings: false };
+const _optional = { inboxListDrawn: false, hubFrameLoaded: false }; // in `parts` and startup(...), never part of the main promise
 let _resolveReady;
 const ready = new Promise(r => { _resolveReady = r; });
 let _isReady = false;
@@ -44,13 +54,19 @@ function emit(type, detail) {
     try { window.dispatchEvent(new CustomEvent(type, { detail })); } catch { /* never break the app */ }
 }
 
-/** Mark one startup part done ('liveList' | 'liveListLoaded' | 'feed' | 'history' | 'settings'). */
+const done = p => (p in _optional ? _optional[p] : _parts[p]);
+function settleWaiters() {
+    for (let i = _partWaiters.length - 1; i >= 0; i--) {
+        if (_partWaiters[i].parts.every(done)) _partWaiters.splice(i, 1)[0].resolve();
+    }
+}
+
+/** Mark one startup part done ('liveList' | 'liveListLoaded' | 'feed' | 'history' | 'settings', or the optional 'inboxListDrawn' | 'hubFrameLoaded'). */
 export function markReady(part) {
+    if (part in _optional) { if (!_optional[part]) { _optional[part] = true; settleWaiters(); } return; }
     if (!(part in _parts) || _parts[part]) return;
     _parts[part] = true;
-    for (let i = _partWaiters.length - 1; i >= 0; i--) {
-        if (_partWaiters[i].parts.every(p => _parts[p])) _partWaiters.splice(i, 1)[0].resolve();
-    }
+    settleWaiters();
     if (!_isReady && Object.values(_parts).every(Boolean)) {
         _isReady = true;
         _resolveReady();
@@ -87,10 +103,10 @@ ready.agentSelected = (id) => (_view.settled && _isView(id))
     : new Promise(resolve => _agentWaiters.push({ id, resolve }));
 ready.startup = (...parts) => {
     const want = parts.length ? parts : Object.keys(_parts);
-    const unknown = want.filter(p => !(p in _parts));
+    const unknown = want.filter(p => !(p in _parts) && !(p in _optional));
     if (unknown.length) return Promise.reject(new Error(`unknown startup part: ${unknown.join(', ')}`));
-    return want.every(p => _parts[p]) ? Promise.resolve() : new Promise(resolve => _partWaiters.push({ parts: want, resolve }));
+    return want.every(done) ? Promise.resolve() : new Promise(resolve => _partWaiters.push({ parts: want, resolve }));
 };
-Object.defineProperty(ready, 'parts', { get: () => ({ ..._parts }), enumerable: true });
+Object.defineProperty(ready, 'parts', { get: () => ({ ..._parts, ..._optional }), enumerable: true });
 
 window.__coralReady = ready;

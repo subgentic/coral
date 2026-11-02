@@ -484,7 +484,7 @@ export function renderQuickActions() {
         <div class="toolbar-group toolbar-group-nav">
             ${navButtons}
             <div class="toolbar-send-split">
-                <button class="btn btn-primary btn-small btn-nav btn-send" data-on-click="cmd-send" data-tooltip="Sends the text from the input box below to the terminal" aria-label="Send command">${SVGO.o3}<line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+                <button class="btn btn-primary btn-small btn-nav btn-send" data-coral-hook="send-button" data-on-click="cmd-send" data-tooltip="Sends the text from the input box below to the terminal" aria-label="Send command">${SVGO.o3}<line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
                 <button class="btn btn-primary btn-icon btn-small btn-nav btn-send-dropdown" data-on-click="cmd-send-menu" aria-label="Send options" title="Send options" aria-haspopup="menu" aria-expanded="false">
                     <svg width="8" height="8" viewBox="0 0 16 16" fill="currentColor"><path d="M4 6l4 4 4-4z"/></svg>
                 </button>

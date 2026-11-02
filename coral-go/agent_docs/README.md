@@ -21,6 +21,7 @@ Run `coral-agent docs` to list the topics, `coral-agent docs <topic>` to read on
 - [Quickstart](quickstart.md) — Install, launch your first agent, and get a committed change
 - [Worked Demos](worked-demos.md) — Three multi-agent scenarios run end to end, with real output
 - [Using the Dashboard](using-the-dashboard.md) — Task-oriented: model and thinking level and the chat-bar chip, Cost by thinking level, the team health monitor, the agent list's Display panel, the sectioned dialogs, image thumbnails
+- [Hooks for tools that drive Coral's page](ui-hooks.md) — `window.__coralReady` (its parts and ordering guarantees) and `data-coral-hook`, for Coral Hub's scripts and other tools
 - [Troubleshooting](troubleshooting.md) — Observed failure modes and their causes, profiling, isolated test servers
 
 ### Automation
