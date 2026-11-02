@@ -34,6 +34,9 @@ type restartRequest struct {
 	Model        *string             `json:"model"`
 	Thinking     *string             `json:"thinking"` // the thinking level to restart with: nil keeps the stored one, "" clears it (#4969)
 	Capabilities *agent.Capabilities `json:"capabilities"`
+	// PermissionMode is the mode the person picked in the restart dialog: it wins over the stored mode and the stored permission flags (#12481; before, the pick travelled only as a flag in extra_flags, which is
+	// stripped, so Default to Bypass gave no flag and Bypass to Default kept the stored one). nil or "" is a restart that asks for nothing (Restart same settings): the stored mode stands.
+	PermissionMode *string `json:"permission_mode"`
 }
 
 // restartPlan is a restart worked out before anything is touched: the agent, where it runs, its new identity and
@@ -62,6 +65,7 @@ type restartPlan struct {
 	capsJSON, toolsJSON                                       *string
 	tools                                                     []string
 	permMode                                                  string
+	pickedMode                                                bool   // the dialog named the mode: it replaces the stored one and the stored permission flags
 	modeNotRecorded                                           bool   // the stored agent had no mode: it restarts in Default and the answer says so
 	chiefMode                                                 string // set when the restarted agent is the recorded Chief: the mode its chief_actions setting names (#11798)
 }
@@ -205,6 +209,13 @@ func (h *SessionsHandler) restartResolve(ctx context.Context, name string, req r
 			return nil, func(w http.ResponseWriter) { writeModelRefused(w, refused) }
 		}
 		return nil, func(w http.ResponseWriter) { errBadRequest(w, err.Error()) }
+	}
+	if req.PermissionMode != nil {
+		if m := strings.TrimSpace(*req.PermissionMode); m != "" && !agent.ValidPermissionMode(m) {
+			return nil, func(w http.ResponseWriter) {
+				writeError(w, http.StatusBadRequest, "", "permission_mode must be default, plan, acceptEdits, auto, bypassPermissions or dontAsk")
+			}
+		}
 	}
 	if req.Thinking != nil && !agentmodels.ValidThinking(p.agentType, strings.TrimSpace(*req.Thinking)) {
 		msg := errInvalidThinking(p.agentType)
@@ -361,11 +372,16 @@ func (p *restartPlan) restartSettings() {
 			p.modeNotRecorded = p.stored != nil
 		}
 	}
+	if p.req.PermissionMode != nil && p.chiefMode == "" { // Chief's mode is its setting's, whatever the dialog says
+		if picked := strings.TrimSpace(*p.req.PermissionMode); picked != "" {
+			p.permMode, p.pickedMode, p.modeNotRecorded = agent.PermissionModeForCLI(p.agentType, picked), true, false
+		}
+	}
 	if p.chiefMode != "" {
 		p.permMode = p.chiefMode
 	}
 	cleanFlags := restartFlags(storedFlags, p.model, p.req.ExtraFlags)
-	if carried, _ := agent.SplitPermissionFlags(storedFlags); p.chiefMode == "" && p.caps.IsEmpty() && len(carried) > 0 {
+	if carried, _ := agent.SplitPermissionFlags(storedFlags); p.chiefMode == "" && !p.pickedMode && p.caps.IsEmpty() && len(carried) > 0 {
 		cleanFlags = append(cleanFlags, carried...) // what the agent was started with, as it was (#6423)
 	} else if p.caps.IsEmpty() && p.permMode != "" && p.permMode != "default" {
 		cleanFlags = append(cleanFlags, agent.PermissionFlagsForAgent(p.agentType, p.permMode)...)
@@ -632,6 +648,9 @@ func (h *SessionsHandler) restartRecord(ctx context.Context, p *restartPlan) {
 		PermissionMode: func() *string {
 			if p.chiefMode != "" {
 				return &p.chiefMode // Chief's mode is its setting's, not the stored one (#11798)
+			}
+			if p.pickedMode {
+				return ptr.NonEmpty(p.permMode) // the person's pick is the mode it restarted in, and the next restart's (#12481)
 			}
 			if p.stored != nil && p.stored.PermissionMode != nil && *p.stored.PermissionMode != "" {
 				return p.stored.PermissionMode
