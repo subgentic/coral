@@ -87,6 +87,14 @@ func cliInfoFor(goos, agentType string) *CLIInfo {
 	return &info
 }
 
+// UnsupportedReason is the one line a picker shows in place of an agent type that is not offered on the OS goos, or "" when it is offered: Hermes on Windows (#12038) has not been tried with Coral.
+func UnsupportedReason(goos, agentType string) string {
+	if goos == "windows" && agentType == at.Hermes {
+		return "Hermes isn't offered on Windows yet: it has not been tried with Coral there."
+	}
+	return ""
+}
+
 // CLIPathSettingKey returns the settings key for the agent's custom CLI path.
 func CLIPathSettingKey(agentType string) string {
 	return setreg.CLIPathPrefix + agentType

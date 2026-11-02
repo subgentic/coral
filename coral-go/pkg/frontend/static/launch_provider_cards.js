@@ -14,9 +14,9 @@ await loadStyles('provider_cards.css'); // the cards' rules are not in the start
 const { _getDefaultModels } = await importOnce('./launch_models.js');
 const { CLI_INSTALL_INSTRUCTIONS } = await importOnce('./cli_check.js');
 
-const TYPES = [['claude', 'Claude'], ['codex', 'Codex'], ['agy', 'Antigravity'], ['pi', 'Pi'], ['opencode', 'OpenCode']];
+const TYPES = [['claude', 'Claude'], ['codex', 'Codex'], ['agy', 'Antigravity'], ['pi', 'Pi'], ['opencode', 'OpenCode'], ['hermes', 'Hermes']];
 const ALIAS = { gemini: 'agy', antigravity: 'agy' };
-const MARKS = { claude: 'C', codex: 'X', agy: 'A', pi: 'P', opencode: 'O' }; // the badge letters of the mockup: Codex is X, Antigravity A, so no two badges are the same
+const MARKS = { claude: 'C', codex: 'X', agy: 'A', pi: 'P', opencode: 'O', hermes: 'H' }; // the badge letters of the mockup: Codex is X, Antigravity A, so no two badges are the same
 const PROBE_MS = 1500;
 // The sign-in command the server gives for OpenCode (agent.OpencodeLoginCommand): the four XDG folders exported, then `opencode auth login`, on one line. A person is asked to paste it into a terminal, so only exactly that
 // shape is shown or copied, and only from this computer's own Coral (a remote server or Coral Hub could name any command): anything else gets a sentence instead (#11364, Security).
@@ -32,6 +32,7 @@ async function probe(server, type) {
         const r = await serverFetch(server, `/api/system/cli-check?type=${encodeURIComponent(type)}`);
         if (!r.ok) return { found: null };
         const d = await r.json();
+        if (d.supported === false) return { found: false, url: '', why: typeof d.message === 'string' ? d.message.slice(0, 200) : 'Not offered on this computer.' }; // the server's OS does not offer it (Hermes on Windows, #12038)
         return { found: typeof d.found === 'boolean' ? d.found : null, url: d.install_url || '' };
     } catch { return { found: null }; }
 }
@@ -141,7 +142,7 @@ export async function buildProviderCards({ group, form, server, implicitDefault 
         for (const row of [modelRow, thinkingRow]) if (row) hold.append(row); // out of the cards before they are replaced
         group.replaceChildren(hold);
         cards.clear(); bodies.clear();
-        const installed = TYPES.filter(([t]) => state.get(t).found !== false), missing = TYPES.filter(([t]) => state.get(t).found === false);
+        const offered = TYPES.filter(([t]) => !state.get(t).why), installed = offered.filter(([t]) => state.get(t).found !== false), missing = offered.filter(([t]) => state.get(t).found === false);
         const strip = el('div', 'provider-tabs'), panel = el('div', 'provider-panel'); // folder tabs across the top, one per agent; the open tab joins its panel, which holds that agent's Model and Thinking
         for (const [type, label] of installed) {
             const head = el('label', 'provider-card provider-card-head'); head.dataset.type = type;
@@ -177,6 +178,11 @@ export async function buildProviderCards({ group, form, server, implicitDefault 
             }
             group.append(sec);
         }
+        for (const [type] of TYPES) { // an agent this computer's OS does not offer is no card and no option: one line says why
+            const why = state.get(type).why; if (!why) continue;
+            select.querySelector(`option[value="${type}"]`)?.remove();
+            const line = el('p', 'provider-unsupported sv-hint', why); line.dataset.type = type; group.append(line);
+        }
         sync();
         renderSignin();
     }
@@ -203,7 +209,7 @@ export async function buildProviderCards({ group, form, server, implicitDefault 
     const onChecked = e => {
         if (!group.isConnected) { document.removeEventListener('cli-checked', onChecked); return; }
         const type = ALIAS[e.detail.type] || e.detail.type; if (!state.has(type)) return;
-        state.set(type, { found: !!e.detail.found, url: state.get(type).url });
+        state.set(type, { found: !!e.detail.found, url: state.get(type).url, why: state.get(type).why });
         if (!group.contains(document.activeElement)) draw();
     };
     document.addEventListener('cli-checked', onChecked);

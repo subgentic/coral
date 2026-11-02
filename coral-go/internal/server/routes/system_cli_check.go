@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -24,6 +25,9 @@ import (
 	"github.com/subgentic/coral/internal/tmux"
 	"github.com/subgentic/coral/internal/tracking"
 )
+
+// cliGOOS is the OS this server runs on, a variable so a test can answer as another.
+var cliGOOS = runtime.GOOS
 
 // CLICheck verifies whether a CLI tool is installed and returns its version.
 // GET /api/system/cli-check?type=claude  (check by agent type)
@@ -49,6 +53,10 @@ func (h *SystemHandler) CLICheck(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if why := agent.UnsupportedReason(cliGOOS, agentType); why != "" && binaryPath == "" { // not offered on this server's OS: the picker hides it and says why (#12038)
+		writeJSON(w, http.StatusOK, map[string]any{"found": false, "supported": false, "message": why, "agent_type": agentType})
+		return
+	}
 	var installCmd, installURL, installNote string
 	if binaryPath == "" {
 		info := agent.GetCLIInfo(agentType)

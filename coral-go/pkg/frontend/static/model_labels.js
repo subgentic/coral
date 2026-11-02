@@ -5,7 +5,7 @@ import { browserLocal } from './safe_storage.js';
 
 const LOCAL_SERVER = 'local'; // server_base.js's LOCAL_SERVER; not imported so this file stays pure
 
-const TYPE_NAMES = { claude: 'Claude', codex: 'Codex', gemini: 'Gemini', agy: 'Antigravity', antigravity: 'Antigravity', pi: 'Pi', opencode: 'OpenCode' };
+const TYPE_NAMES = { claude: 'Claude', codex: 'Codex', gemini: 'Gemini', agy: 'Antigravity', antigravity: 'Antigravity', pi: 'Pi', opencode: 'OpenCode', hermes: 'Hermes' };
 
 const MODELS_CACHE_PREFIX = 'coral-models:v1:';
 
