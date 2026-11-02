@@ -146,6 +146,8 @@ type SessionsHandler struct {
 	hooksRev sync.Map
 	// piLaunchedAt is when Coral started each Pi agent in this server run (session id → time.Time): the Pi extension's handshake is its first hook event, so a Pi agent with none a minute after its launch is listed as not active (hooks_status.go, #11107).
 	piLaunchedAt sync.Map
+	// hermesLaunchedAt is when Coral started each Hermes agent in this server run (session id → time.Time): its hooks are silent until its first turn, so one with no event of any kind well after its launch is listed as not active (#12041).
+	hermesLaunchedAt sync.Map
 	// liveModes is the permission mode each Claude session's CLI reported with its latest hook event (session id → one of the six words, live_permission_mode.go). In memory: until a session's
 	// next event after a restart it is unknown and the dashboard reads the CLI's mode line instead.
 	liveModes sync.Map

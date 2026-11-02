@@ -150,7 +150,7 @@ func startBackgroundServices(ctx context.Context, db *store.DB, cfg *config.Conf
 
 	startAgentServices(ctx, db, srv, agentRT, sessStore, taskStore)
 
-	startUsageServices(ctx, db, sessStore)
+	startUsageServices(ctx, db, cfg.CoralDir(), sessStore)
 
 	startMaintenanceServices(ctx, db, cfg, srv, sessStore, taskStore)
 
@@ -335,7 +335,7 @@ func startAgentServices(ctx context.Context, db *store.DB, srv *server.Server, a
 }
 
 // startUsageServices starts the token poller and the retention and aggregation of call metrics and token usage.
-func startUsageServices(ctx context.Context, db *store.DB, sessStore *store.SessionStore) {
+func startUsageServices(ctx context.Context, db *store.DB, coralDir string, sessStore *store.SessionStore) {
 	// Token poller — extracts token usage from Codex/Claude transcripts for cost tracking
 	tokenUsageStore := store.NewTokenUsageStore(db)
 	// Reprice rows recorded before provider aliases (Codex/Antigravity model
@@ -345,6 +345,7 @@ func startUsageServices(ctx context.Context, db *store.DB, sessStore *store.Sess
 	})
 	tokenPoller := background.NewTokenPoller(sessStore, tokenUsageStore, 30*time.Second)
 	tokenPoller.SetSubagentStore(store.NewSubagentStore(db))
+	tokenPoller.SetHermesDataDir(coralDir) // a Hermes agent's tokens are read from the state.db of its own home (#12041)
 	safeGo(ctx, "token_poller", func() { tokenPoller.Run(ctx) })
 
 	// Call metrics retention: keeps call_metrics to the retention window

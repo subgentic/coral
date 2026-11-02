@@ -34,6 +34,10 @@ func (h *SessionsHandler) noteLaunchedHooks(ctx context.Context, sessionID, agen
 		h.piLaunchedAt.Store(sessionID, time.Now())
 		return
 	}
+	if agentType == at.Hermes && sessionID != "" {
+		h.hermesLaunchedAt.Store(sessionID, time.Now()) // its hooks are shell hooks in its team's config.yaml: a launch proves nothing, only an event does (#12041)
+		return
+	}
 	if agentType != at.Claude || sessionID == "" || h.ss == nil {
 		return
 	}
@@ -121,7 +125,7 @@ func (h *SessionsHandler) HooksStatus(w http.ResponseWriter, r *http.Request) {
 		}
 		return agents[i].Name < agents[j].Name
 	})
-	writeJSON(w, http.StatusOK, map[string]any{"current": agent.ClaudeHooksRev, "agents": agents, "missing": h.agentsWithoutHooks(ctx, sessions), "pi_inactive": h.piHooksInactive(sessions, time.Now())})
+	writeJSON(w, http.StatusOK, map[string]any{"current": agent.ClaudeHooksRev, "agents": agents, "missing": h.agentsWithoutHooks(ctx, sessions), "pi_inactive": h.piHooksInactive(sessions, time.Now()), "hermes_inactive": h.hermesHooksInactive(ctx, sessions, time.Now())})
 }
 
 // agentsWithoutHooks lists the running agents, of any type, whose hook programs are gone from the folder they were started with (#6089): the app was replaced or moved while they ran. The
@@ -253,6 +257,50 @@ func (h *SessionsHandler) piHooksInactive(sessions []store.LiveSession, now time
 			if n, _ := rev.(int); n >= agent.PiExtensionRev {
 				continue
 			}
+		}
+		name := ptr.Value(ls.DisplayName)
+		if name == "" {
+			name = ls.AgentName
+		}
+		out = append(out, hooksAgent{SessionID: ls.SessionID, Name: name, Team: ptr.Value(ls.BoardName), Status: "inactive"})
+	}
+	sort.SliceStable(out, func(i, j int) bool { return out[i].SessionID < out[j].SessionID })
+	return out
+}
+
+// hermesHooksGrace is how long a Hermes agent may go with no event at all after its launch before it is listed as not active: its hooks fire from its first turn (on_session_start is the first turn only), and its
+// team's home is prepared on first use (about a minute) before its welcome line and the first message Coral types.
+const hermesHooksGrace = 5 * time.Minute
+
+// hermesHooksInactive lists the running Hermes agents Coral started in this server run that have recorded no event of any kind within hermesHooksGrace of the launch (#12041): the hook tool is refused or
+// missing, the team's config.yaml was changed, or Hermes's events changed. It lists nothing it cannot be sure of (an agent started before this server run has no launch time), and it only says so on the agent's
+// row (a quiet chip): the agent's state is never changed by it.
+func (h *SessionsHandler) hermesHooksInactive(ctx context.Context, sessions []store.LiveSession, now time.Time) []hooksAgent {
+	out := []hooksAgent{}
+	var late []store.LiveSession
+	var ids []string
+	for _, ls := range sessions {
+		if ls.AgentType != at.Hermes || ls.IsSleeping == 1 || ls.IsArchived == 1 || ls.IsJob == 1 {
+			continue
+		}
+		v, ok := h.hermesLaunchedAt.Load(ls.SessionID)
+		launched, _ := v.(time.Time)
+		if !ok || now.Sub(launched) < hermesHooksGrace {
+			continue
+		}
+		late = append(late, ls)
+		ids = append(ids, ls.SessionID)
+	}
+	if len(late) == 0 || h.ts == nil {
+		return out
+	}
+	heard, err := h.ts.SessionsWithAnyEvent(ctx, ids)
+	if err != nil {
+		return out // it cannot tell: it lists nothing
+	}
+	for _, ls := range late {
+		if heard[ls.SessionID] {
+			continue
 		}
 		name := ptr.Value(ls.DisplayName)
 		if name == "" {

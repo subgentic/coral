@@ -418,7 +418,7 @@ export async function watchHooksStatus() {
         const st = await hooksStatus();
         showHooksBanner(st);
         setHooksMissing(st.missing); // the agents whose hook programs are gone are flagged on their rows (#6089)
-        setPiHooksInactive(st.pi_inactive); // a Pi agent whose extension never reported (#11107)
+        setPiHooksInactive([...(st.pi_inactive || []), ...(st.hermes_inactive || [])]); // a Pi agent whose extension, or a Hermes agent whose hooks, never reported (#11107, #12041)
     } catch { /* not shown */ }
     if (!_hooksTimer) _hooksTimer = pollEvery(watchHooksStatus, 60000); // an app replaced while Coral runs is seen within a minute
 }

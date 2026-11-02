@@ -23,6 +23,11 @@ func (p *TokenPoller) pruneEnded(live []store.LiveSession) {
 	for _, ls := range live {
 		keep[ls.SessionID] = true
 	}
+	for id := range p.hermesStamps {
+		if !keep[id] {
+			delete(p.hermesStamps, id)
+		}
+	}
 	for id := range p.sessionPaths {
 		if !keep[id] {
 			delete(p.sessionPaths, id)

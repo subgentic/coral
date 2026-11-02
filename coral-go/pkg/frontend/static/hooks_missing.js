@@ -15,7 +15,9 @@ export function hooksMissingChip(s) {
  *  still read from Pi's session files, so nothing about it is held back. */
 export function piHooksChip(s) {
     if (!s || !state.piHooksInactive || !state.piHooksInactive.has(s.session_id)) return '';
-    const why = "Coral's hooks have not reported from this Pi agent, so its state comes from Pi's session files and may lag a little. Restart the agent to start them.";
+    const why = s.agent_type === 'hermes'
+        ? "Coral's hooks have not reported from this Hermes agent, so its working and idle state may lag. Restart the agent to start them."
+        : "Coral's hooks have not reported from this Pi agent, so its state comes from Pi's session files and may lag a little. Restart the agent to start them.";
     return `<span class="chip hooks-inactive-chip" role="img" aria-label="${escapeAttr("Hooks not active. " + why)}" title="${escapeAttr(why)}">Hooks not active</span>`;
 }
 
