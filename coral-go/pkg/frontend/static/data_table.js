@@ -203,7 +203,7 @@ export function dataTable(cfg) {
     // the columns left out to fit the panel are never silently gone (#11943): a quiet control says how many, lists them and brings one back (it then keeps its place and the others give way by the same rules)
     let hiddenSeq = 0;
     const hiddenBar = el('div', 'cols-hidden-bar'); hiddenBar.hidden = true;
-    const hiddenId = `dt-cols-hidden-${++hiddenSeq}-${Math.random().toString(36).slice(2, 7)}`;
+    const hiddenId = `dt-cols-hidden-${++hiddenSeq}`; // a counter, not a random suffix: the markup is the same on every draw (task_list_golden)
     const hiddenMenu = el('div', 'menu cols-hidden-menu'); hiddenMenu.id = `${hiddenId}-menu`; hiddenMenu.hidden = true; hiddenMenu.setAttribute('role', 'menu'); hiddenMenu.setAttribute('aria-label', 'Hidden columns');
     const hiddenBtn = button('btn btn-quiet btn-small cols-hidden-btn', '', async (e) => { e.stopPropagation(); (await importOnce('./menu_button.js')).toggleMenu(hiddenBtn); });
     hiddenBtn.id = hiddenId; hiddenBtn.setAttribute('aria-haspopup', 'menu'); hiddenBtn.setAttribute('aria-expanded', 'false'); hiddenBtn.setAttribute('aria-controls', hiddenMenu.id);
@@ -284,7 +284,7 @@ export function dataTable(cfg) {
         const squeezeFlex = () => { let over = total() - avail; for (const c of flex) { if (over <= 0) break; const give = Math.min(over, base[c.key] - (c === prim ? hardOf(c) : minOf(c))); if (give > 0) { base[c.key] -= give; over -= give; } } }; // and the flexible ones, down to their own floor
         while (total() > avail) { const next = active.filter(c => c !== prim && c.drop && !st.pinned?.has(c.key)).sort((x, y) => x.drop - y.drop)[0]; if (!next) break; active = active.filter(c => c !== next); dropped.add(next.key); } // the optional columns go, the lowest priority first
         squeezeOthers(); squeezeFlex();
-        for (let guard = 0; total() > avail && guard < 24; guard++) { const next = [...active].reverse().find(c => c !== prim && !isFlex(c) && !fixedW(c) && !st.pinned?.has(c.key)); if (!next) break; active = active.filter(c => c !== next); dropped.add(next.key); } // a table with no priorities of its own and still too wide at its header widths: the last columns go, rightmost first, before anything scrolls (#11943)
+        for (let guard = 0; !cfg.keepColumns && total() > avail && guard < 24; guard++) { const next = [...active].reverse().find(c => c !== prim && !isFlex(c) && !fixedW(c) && !st.pinned?.has(c.key)); if (!next) break; active = active.filter(c => c !== next); dropped.add(next.key); } // a table with no priorities of its own and still too wide at its header widths: the last columns go, rightmost first, before anything scrolls (#11943); a table whose columns are all data (cfg.keepColumns: a CSV) keeps every column and scrolls in its box (csv_viewer, the v2.0.35 gate)
         // what the person widened (a drag, a key, a width kept from an earlier visit) is applied to the columns that stayed: the elastic column pays first, then the others; nothing more is dropped because of it
         for (const c of active) { const k = st.widths[c.key]; if (!k) continue; if (!isFlex(c)) { if (!fixedW(c)) w[c.key] = Math.min(MAX_W, Math.max(minOf(c), k)); } else if (c !== prim) base[c.key] = Math.max(base[c.key], k); }
         if (prim && st.widths[prim.key]) base[prim.key] = Math.max(base[prim.key], Math.min(st.widths[prim.key], MAX_W));

@@ -79,7 +79,7 @@ const G1 = 'Explore goals with two teams', G2 = 'Plan the release notes';
                 const id = await ev(`[...document.querySelectorAll('#tk-goal option')].find(o => o.textContent.startsWith(${JSON.stringify(G1)})).value`);
                 await pick('tk-goal', id);
                 await waitFor(`document.querySelectorAll('${panel} .dt-primary').length === 3`, 'only the three tasks of the goal', 8000);
-                assert.deepEqual((await rows()).map(r => r.replace(/^#\d+\s*/, '')).sort(), ['Add the goal filter', 'Check the Settings dialog', 'Review the filter']);
+                { const got = (await rows()).map(r => r.replace(/^#\d+\s*/, '')).sort(), want = ['Add the goal filter', 'Check the Settings dialog', 'Review the filter']; assert.equal(got.length, 3); want.forEach((w, i) => assert.ok(got[i].startsWith(w), `the goal's tasks: ${JSON.stringify(got)}`)); } // a phone's row also says its state and who has it in the same button (#12230)
                 assert.deepEqual(await chips(), [`Goal: ${G1} ×`]);
                 if (mobile) { // a phone's row has no room for the chips (#9078): the Filters control says how many are on, and the chip is still in the list
                     const said = await ev(`[...document.querySelectorAll('${panel} .list-bar-toggle, ${panel} .list-bar-filter-btn')].some(b => /1 on|Filters \\(1\\)/.test((b.getAttribute('aria-label') || '') + ' ' + b.textContent))`);

@@ -55,7 +55,7 @@ const BUNDLE = { exists: true, team_name: TEAM, created_at: '2026-10-25T05:00:00
             await open(w, h, mobile);
             await S.run(`${label}: an artifact's pane has the content straight under the header, and Details closed (no facts table, no "Who can read this" on show)`, async () => {
                 await goTab(ev, settle, 'Artifacts'); await waitFor(`!!window.__tp.rows() && window.__tp.rows().length >= 1`, 'the artifact row', 10000);
-                await ev(`[...window.__tp.table().querySelectorAll('button')].find(x => /Design review/.test(window.__na.name(x))).click(); true`);
+                await ev(`[...window.__tp.table().querySelectorAll('button')].find(x => /^(?!Select).*Design review/.test(window.__na.name(x))).click(); true`);
                 await waitFor(`!!window.__tp.pane() && /The design review text\\./.test(window.__na.text(window.__tp.pane()))`, 'the content in the pane', 10000);
                 await waitFor(`!!document.querySelector('#detail-pane .details-toggle:not([hidden])')`, 'the Details button');
                 const g = await geometry('#detail-pane .detail-head', '#detail-pane .detail-doc'); assert.ok(g && g.gap >= 0 && g.gap <= 16, `the content's top is within 16 px of the header's bottom: ${JSON.stringify(g)}`);
@@ -93,7 +93,7 @@ const BUNDLE = { exists: true, team_name: TEAM, created_at: '2026-10-25T05:00:00
                 await key(' ', 'Space', 32, ' '); await settle(200);
                 assert.equal(await ev(`document.querySelector('#detail-pane .detail-details').hidden`), false, 'and opens it');
                 await ev(`document.querySelector('#detail-pane .detail-close').click(); true`); await settle(200);
-                await ev(`[...window.__tp.table().querySelectorAll('button')].find(x => /Design review/.test(window.__na.name(x))).click(); true`);
+                await ev(`[...window.__tp.table().querySelectorAll('button')].find(x => /^(?!Select).*Design review/.test(window.__na.name(x))).click(); true`);
                 await waitFor(`!!document.querySelector('#detail-pane .details-toggle:not([hidden])')`, 'the Details button again');
                 assert.equal(await ev(`${toggle('#detail-pane')}.getAttribute('aria-expanded')`), 'true', 'it stays open for the next one: remembered for the viewer');
                 await ev(`${toggle('#detail-pane')}.click(); true`); await settle(100);

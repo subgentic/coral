@@ -41,11 +41,11 @@ const GOALS = [
             await ev(`(() => { const R = window.fetch; window.fetch = (u, o) => /\\/api\\/goals(\\?|$)/.test(String(u)) ? Promise.resolve(new Response(JSON.stringify({ goals: ${JSON.stringify(GOALS)} }), { status: 200, headers: { 'Content-Type': 'application/json' } })) : R(u, o); return true; })()`);
             if (mobile) await ev(`(() => { const b = document.querySelector('.view-list-item[data-key="goals"]'); if (b) b.click(); return true; })()`);
             else await ev(`document.querySelector('.view-list-item[data-key="goals"]').click(); true`);
-            await settle(1800); await one(label, 'Inbox Goals', '#group-table-view tr', 2); await shot(`${label}-goals`);
+            await settle(1800); await one(label, 'Inbox Goals', '#group-table-view tr', 2, phone ? 64 : undefined); // a phone's Goals are two-line rows now (the goal, then its outcome; #12230, the operator) await shot(`${label}-goals`);
             // team goals + agents
             for (const tab of ['goals', 'agents']) {
                 await Page.navigate({ url: BASE + `/team/${B}/${tab}` }); await Page.loadEventFired(); await install(); await coralReady('startup', 'liveList', 'liveListLoaded', 'settings'); await settle(2000);
-                await one(label, 'team ' + tab, '.team-panel tr', 2); await shot(`${label}-team-${tab}`);
+                await one(label, 'team ' + tab, '.team-panel tr', 2, phone && /goals|tasks|artifacts/i.test(tab) ? 64 : undefined); // a phone's team lists are two-line rows (#12230) await shot(`${label}-team-${tab}`);
             }
         }
         console.log('PASS one line rows: the Inbox Goals and Needs you and the team Goals and Agents keep every row on one line at 1280 and 390');

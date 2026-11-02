@@ -14,7 +14,7 @@ import { isHub } from './server_base.js';
 import { MENU_KEYS, menuMove } from './menu_keys.js';
 
 const ICONS = { agents: 'smart_toy', history: 'chat_bubble_outline', workflows: 'account_tree', jobs: 'schedule', automations: 'schedule', tokens: 'insights',
-    docs: 'menu_book', servers: 'dns', 'hub-inbox': 'notifications', board: 'forum', artifacts: 'inventory_2' };
+    docs: 'menu_book', skills: 'auto_awesome', servers: 'dns', 'hub-inbox': 'notifications', board: 'forum', artifacts: 'inventory_2' };
 
 const tabsEl = () => document.querySelector('.top-nav-tabs');
 const isPhone = () => window.matchMedia(PHONE_QUERY).matches;

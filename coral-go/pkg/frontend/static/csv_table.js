@@ -76,7 +76,7 @@ export function renderCsvTable(body, content, opts = {}) {
         else if (rows.length < totalData || parsed.cut) line = `Showing ${n(rows.length)} of ${n(totalData)}${more} rows${sizeNote}.`;
         else line = plural(data.length, 'row') + '.';
         status.textContent = line + colNote;
-        const t = DT.dataTable({ label: opts.name || 'Table', columns, rows, rowKey: r => r.i, fold: 'none', scroll: true, state, empty: { line: q ? 'No row has that text.' : 'No rows below the header.' } });
+        const t = DT.dataTable({ label: opts.name || 'Table', columns, rows, rowKey: r => r.i, fold: 'none', scroll: true, keepColumns: true, state, empty: { line: q ? 'No row has that text.' : 'No rows below the header.' } });
         t.el.style.maxHeight = 'min(70vh, 40rem)'; // the table's own box scrolls both ways, so its header sticks to the top of it and the page never scrolls sideways
         scroll.replaceChildren(t.el);
     }
