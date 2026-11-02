@@ -197,7 +197,16 @@ export function dataTable(cfg) {
     const thead = el('thead'); thead.setAttribute('role', 'rowgroup'); const tbody = el('tbody'); tbody.setAttribute('role', 'rowgroup');
     const colgroup = el('colgroup');
     table.append(colgroup, thead, tbody);
-    box.append(sortBar, table);
+    // the columns left out to fit the panel are never silently gone (#11943): a quiet control says how many, lists them and brings one back (it then keeps its place and the others give way by the same rules)
+    const hiddenBar = el('div', 'dt-hidden-bar'); hiddenBar.hidden = true;
+    const hiddenMenu = el('div', 'dt-hidden-menu'); hiddenMenu.setAttribute('role', 'menu'); hiddenMenu.hidden = true;
+    const hiddenBtn = button('dt-hidden-btn', '', () => { if (hiddenMenu.hidden) openHidden(); else closeHidden(); }); hiddenBtn.setAttribute('aria-haspopup', 'menu'); hiddenBtn.setAttribute('aria-expanded', 'false');
+    hiddenBar.append(hiddenBtn, hiddenMenu);
+    const outside = (e) => { if (!hiddenBar.contains(e.target)) closeHidden(); };
+    function closeHidden() { hiddenMenu.hidden = true; hiddenBtn.setAttribute('aria-expanded', 'false'); document.removeEventListener('pointerdown', outside, true); }
+    function openHidden() { hiddenMenu.hidden = false; hiddenBtn.setAttribute('aria-expanded', 'true'); document.addEventListener('pointerdown', outside, true); hiddenMenu.querySelector('button')?.focus(); }
+    hiddenMenu.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); closeHidden(); hiddenBtn.focus(); } });
+    box.append(sortBar, hiddenBar, table);
 
     // ── column widths (#7949): a handle on each header's right edge; the widths are kept per list in this browser ──
     const MIN_W = 64, MAX_W = 2000, STEP = 16;
@@ -227,8 +236,16 @@ export function dataTable(cfg) {
         return Math.max(wOf(c), Math.floor(box.clientWidth - rest));
     }
     /** Every column's width is decided here, in one place (#11943, the operator's table rules, design note 9ced561a): the table always fits its box; ONE column (the primary, or the one that grows) is elastic and takes what the others leave; a column is never narrower than its whole header; a kept width is fitted to the box it meets; Time and Actions (fixed, in rem) keep their width. The columns have the width their content needs (at most their own max), a kept width wins; when they do not fit, the optional ones go by priority (`drop`, lowest first), then the others are squeezed, last first, down to their header, and only then does the table scroll. A phone's folded rows are laid out by CSS: nothing here. */
+    function syncHidden(dropped) {
+        const gone = columns.filter(c => dropped.has(c.key));
+        hiddenBar.hidden = !gone.length;
+        if (!gone.length) { closeHidden(); return; }
+        const word = `${gone.length} column${gone.length === 1 ? '' : 's'} hidden`; hiddenBtn.textContent = word; hiddenBtn.setAttribute('aria-label', `${word}: ${gone.map(c => c.label || c.key).join(', ')}. Show one`);
+        hiddenMenu.replaceChildren(...gone.map(c => { const b = button('dt-hidden-item', `Show ${c.label || c.key}`, () => { (st.pinned ||= new Set()).add(c.key); closeHidden(); applyWidths(); hiddenBtn.focus(); }); b.setAttribute('role', 'menuitem'); return b; }));
+    }
     let L0 = null; // the last layout: the box's width, what each column got and the room the elastic column has left (setWidth reads it)
     function measureNatural(live) { // the table is laid out at its natural width for a moment (auto layout, as wide as its content, none of the sizes below): each head is as wide as its widest cell, its own max or its head needs
+        for (const n of box.querySelectorAll('.dt-col-tight')) n.classList.remove('dt-col-tight'); // every column is shown while it is measured: a hidden column measures 0 and the next layout would not drop it, then would (it flip-flopped)
         colgroup.replaceChildren(); table.style.tableLayout = 'auto'; table.style.width = 'max-content'; box.classList.remove('dt-sized'); box.style.removeProperty('--dt-sized-min'); box.classList.add('dt-measure'); // (the sizes of a laid-out table, --dt-sized-min among them, are off while it is measured, so the natural width is the same every time)
         const out = {};
         for (const c of live) { const th = thead.querySelector(`th.dt-th[data-key="${attrEsc(c.key)}"]`); out[c.key] = th && th.getClientRects().length ? Math.ceil(th.getBoundingClientRect().width) : 0; }
@@ -236,7 +253,12 @@ export function dataTable(cfg) {
         return out;
     }
     function applyWidths() {
-        if (cfg.oneLine || cfg.layout === 'fixed' || mailOn() || box.classList.contains('dt-folded') || !box.clientWidth) return;
+        if (cfg.oneLine || cfg.layout === 'fixed') return;
+        if (mailOn() || box.classList.contains('dt-folded')) { // a folded (phone) row is laid out by CSS: what the unfolded table left on it goes, or the folded rows keep its pixel width (#11943)
+            if (L0) { L0 = null; colgroup.replaceChildren(); table.style.tableLayout = ''; table.style.width = ''; box.classList.remove('dt-sized'); box.style.removeProperty('--dt-sized-min'); tightKeys = new Set(); for (const n of box.querySelectorAll('.dt-col-tight')) n.classList.remove('dt-col-tight'); syncHidden(new Set()); }
+            return;
+        }
+        if (!box.clientWidth) return;
         const avail = box.clientWidth, rem = remPx(), live = columns.filter(c => !emptyKeys.has(c.key)), prim = live.find(c => c.primary || c.width === 'grow');
         const nat = measureNatural(live);
         const chkTh = sel ? thead.querySelector('th.dt-check') : null, chk = chkTh && chkTh.getClientRects().length ? Math.round(chkTh.getBoundingClientRect().width) : 0;
@@ -250,11 +272,11 @@ export function dataTable(cfg) {
         const pref = {}, hardOf = c => Math.max(ITEM_MIN, minOf(c));
         for (const c of flex) { base[c.key] = baseOf(c); if (c === prim) { pref[c.key] = base[c.key]; if (Object.keys(st.widths).length) base[c.key] = hardOf(c); } } // once a width is kept (a drag), the elastic column counts at its hard floor while columns are dropped and squeezed: its preferred room is only what is left; before that it holds its characters, and optional columns drop to give it room
         const total = () => chk + active.reduce((n, c) => n + (isFlex(c) ? base[c.key] : w[c.key]), 0);
-        while (total() > avail) { const next = active.filter(c => c !== prim && c.drop).sort((x, y) => x.drop - y.drop)[0]; if (!next) break; active = active.filter(c => c !== next); dropped.add(next.key); } // the optional columns go, the lowest priority first
+        while (total() > avail) { const next = active.filter(c => c !== prim && c.drop && !st.pinned?.has(c.key)).sort((x, y) => x.drop - y.drop)[0]; if (!next) break; active = active.filter(c => c !== next); dropped.add(next.key); } // the optional columns go, the lowest priority first
         let over = total() - avail;
         for (const c of [...active].reverse()) { if (over <= 0) break; if (isFlex(c) || fixedW(c)) continue; const give = Math.min(over, w[c.key] - minOf(c)); if (give > 0) { w[c.key] -= give; over -= give; } } // then the others give room, down to their whole header
         for (const c of flex) { if (over <= 0) break; const give = Math.min(over, base[c.key] - (c === prim ? Math.max(ITEM_MIN, minOf(c)) : minOf(c))); if (give > 0) { base[c.key] -= give; over -= give; } } // and last the flexible ones, down to their own floor
-        for (let guard = 0; total() > avail && guard < 24; guard++) { const next = [...active].reverse().find(c => c !== prim && !isFlex(c) && !fixedW(c)); if (!next) break; active = active.filter(c => c !== next); dropped.add(next.key); } // a table with no priorities of its own and still too wide at its header widths: the last columns go, rightmost first, before anything scrolls (#11943)
+        for (let guard = 0; total() > avail && guard < 24; guard++) { const next = [...active].reverse().find(c => c !== prim && !isFlex(c) && !fixedW(c) && !st.pinned?.has(c.key)); if (!next) break; active = active.filter(c => c !== next); dropped.add(next.key); } // a table with no priorities of its own and still too wide at its header widths: the last columns go, rightmost first, before anything scrolls (#11943)
         const others = active.reduce((n, c) => n + (isFlex(c) ? 0 : w[c.key]), chk);
         if (prim) base[prim.key] = Math.max(hardOf(prim), Math.min(pref[prim.key], avail - others - flex.filter(c => c !== prim && active.includes(c)).reduce((n, c) => n + base[c.key], 0)));
         const set = new Set(flex.filter(c => active.includes(c))); let free = avail - others;
@@ -266,6 +288,7 @@ export function dataTable(cfg) {
         { const sum = [...set].reduce((n, c) => n + (c.share || 1), 0); for (const c of set) w[c.key] = Math.max(base[c.key], Math.round(free * (c.share || 1) / sum)); }
         const floor = prim ? base[prim.key] : 0;
         tightKeys = dropped;
+        syncHidden(dropped);
         for (const c of columns) for (const n of box.querySelectorAll(`th.dt-th[data-key="${attrEsc(c.key)}"], td.dt-td[data-key="${attrEsc(c.key)}"]`)) n.classList.toggle('dt-col-tight', dropped.has(c.key));
         colgroup.replaceChildren();
         if (sel) { const k = el('col'); k.style.width = chkTh ? `${chk}px` : 'var(--table-check-w)'; colgroup.append(k); }

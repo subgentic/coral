@@ -595,3 +595,13 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 } /* the Actions column is the last, at the row's right edge: its buttons end there (#11552) */
 .dt-table td:has(.inbox-row-more) { overflow: visible; text-overflow: clip; } /* the cell of a row's three dots shows its menu: a cell clips what it holds (#11552) */
 #group-table-view[data-group="hub-inbox:needs"] .dt-row-open, #group-table-view[data-group="hub-inbox:needs"] .dt-row-open td { -webkit-user-select: none; user-select: none; } /* a row of Needs you that opens on a click is not text to select (the other lists keep their names copyable): a selection across its cells shows as blue bars between them, and a web view takes a click on a selection for the start of a drag of it, so the row stops opening (#11584) */
+
+/* the columns left out to fit the panel (#11943): a quiet line over the header, the way back for each */
+.dt-hidden-bar { position: relative; display: flex; justify-content: flex-end; padding: 2px var(--table-pad-x); font-size: var(--table-tertiary-size); }
+.dt-hidden-bar[hidden], .dt-hidden-menu[hidden] { display: none; }
+.dt-hidden-btn { background: none; border: 0; padding: 2px 4px; font: inherit; color: var(--table-tertiary-color); cursor: pointer; text-decoration: underline dotted; }
+.dt-hidden-btn:hover, .dt-hidden-btn:focus-visible { color: var(--table-primary-color); }
+.dt-hidden-menu { position: absolute; top: 100%; right: var(--table-pad-x); z-index: 5; display: flex; flex-direction: column; min-width: 10rem; padding: 4px; background: var(--table-surface, var(--bg-secondary)); border: 1px solid var(--table-border); border-radius: var(--table-control-radius, 6px); box-shadow: 0 4px 12px rgba(0, 0, 0, .25); }
+.dt-hidden-item { background: none; border: 0; padding: 6px 10px; text-align: left; font: inherit; font-size: var(--table-secondary-size); color: var(--table-primary-color); cursor: pointer; border-radius: 4px; }
+.dt-hidden-item:hover, .dt-hidden-item:focus-visible { background: var(--table-hover); }
+.dt-box.dt-folded .dt-hidden-bar { display: none; }

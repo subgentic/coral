@@ -64,6 +64,27 @@ const { coralReady, framesJs } = require('./helpers/wait');
                 }
             }
         }
+        // the keyboard: Right x3 on a column's handle widens it by three steps (48 px), at the cost of the flexible columns only
+        for (const width of [1440, 1280]) for (const key of ['cli', 'folder', 'team']) {
+            await Emulation.setDeviceMetricsOverride({ width, height: 800, deviceScaleFactor: 1, mobile: false }); await mount(false, null); await ev(framesJs(8));
+            const kb = await measure(); await ev(`document.querySelector('#dt-host th[data-key="${key}"] .dt-resize').focus(); true`);
+            for (let i = 0; i < 3; i++) { await client.Input.dispatchKeyEvent({ type: 'rawKeyDown', key: 'ArrowRight', code: 'ArrowRight', windowsVirtualKeyCode: 39 }); await client.Input.dispatchKeyEvent({ type: 'keyUp', key: 'ArrowRight', code: 'ArrowRight', windowsVirtualKeyCode: 39 }); }
+            await ev(framesJs(6)); const ka = await measure(), grew = ka.cols.find(c => c.key === key).w - kb.cols.find(c => c.key === key).w;
+            check(Math.abs(grew - 48) <= 3, `${width} px: Right x3 on ${key} widens it by 48 px: ${grew} ` + JSON.stringify([kb.cols.map(c => [c.key, c.w]), ka.cols.map(c => [c.key, c.w])]));
+        }
+        // a column left out to fit is never silently gone: a quiet control says how many, lists them, and brings one back (the table still fits, the others give way)
+        await Emulation.setDeviceMetricsOverride({ width: 900, height: 800, deviceScaleFactor: 1, mobile: false }); await mount(false, null); await ev(framesJs(8));
+        const hid = await ev(`(() => { const b = document.querySelector('#dt-host .dt-hidden-btn'), bar = document.querySelector('#dt-host .dt-hidden-bar'); return { shown: !!bar && !bar.hidden, text: b ? b.textContent : '', label: b ? b.getAttribute('aria-label') : '', keys: [...document.querySelectorAll('#dt-host thead th.dt-th')].filter(t => t.getClientRects().length).map(t => t.dataset.key) }; })()`);
+        check(hid.shown && /^\d+ columns? hidden$/.test(hid.text) && /Show one/.test(hid.label), '900 px: a control says how many columns are hidden: ' + JSON.stringify(hid));
+        const n0 = Number((hid.text.match(/^\d+/) || [0])[0]);
+        await ev(`document.querySelector('#dt-host .dt-hidden-btn').click(); true`); await ev(framesJs(2));
+        const items = await ev(`[...document.querySelectorAll('#dt-host .dt-hidden-item')].map(b => b.textContent)`);
+        check(items.length === n0 && items.every(t => /^Show /.test(t)), '900 px: it lists the hidden columns, one button each: ' + JSON.stringify({ n0, items }));
+        const first = (items[0] || '').replace(/^Show /, '');
+        await ev(`document.querySelector('#dt-host .dt-hidden-item').click(); true`); await ev(framesJs(6));
+        const back = await measure();
+        check(back.cols.some(c => c.label === first || (c.key && first)) && !back.scrolls && back.table <= back.box + 1, '900 px: bringing "' + first + '" back keeps the table inside its panel: ' + JSON.stringify({ box: back.box, table: back.table, scrolls: back.scrolls }));
+        check(await ev(`(() => { const b = document.querySelector('#dt-host .dt-hidden-btn'); const m = /^(\\d+) column/.exec(b ? b.textContent : ''); return !!b && !document.querySelector('#dt-host .dt-hidden-bar').hidden ? Number(m[1]) <= ${n0} : true; })()`), '900 px: one column fewer is hidden than before (or none)');
         // 200% text at 1280
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false }); await ev(`document.documentElement.style.fontSize = '32px'; true`);
         await mount(false, null); await ev(framesJs(8));

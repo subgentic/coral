@@ -3,7 +3,7 @@
  * Rows: {id, title, outcome?, state, rollup:{done,active,blocked,queued}, updatedAt|updated_at, board?|project?}.
  * ctx: teamOf(goal) optionally supplies the displayed team; openTeam(goal) optionally makes it a link;
  * progressLabel optionally renames Progress (the team page calls it Tasks). noGoal rows are navigation only.
- * The columns are for a one-line table (oneLine: true): the narrow container drops Updated, then Team and Progress, then State; the title keeps the row.
+ * The columns are for a one-line table (oneLine: true): the narrow container drops Team and Progress, then State, and Updated last (a time stays, #11943); the title keeps the row.
  * The caller supplies rowKey/open/state to dataTable; team-scoped numeric ids must be qualified in the mailbox. */
 import { importOnce } from './import_once.js';
 import * as W from './goal_words.js';
@@ -26,7 +26,7 @@ export function goalColumns(ctx = {}, keys = ['state', 'goal', 'team', 'progress
             cell: g => ctx.openTeam ? DT.link(team(g), () => ctx.openTeam(g)) : team(g) },
         progress: { key: 'progress', label: ctx.progressLabel || 'Progress', sort: 'number', sortValue: g => total(g) ? done(g) / total(g) : 0, line: 2, tone: 'tertiary', width: '8rem', dropAt: 36,
             cell: g => g.noGoal ? '' : DT.progressCell(done(g), total(g)) },
-        updated: { key: 'updated', label: 'Updated', sort: 'date', sortValue: stamp, firstDir: 'desc', line: 0, tone: 'tertiary', align: 'end', width: '7rem', dropAt: 52,
+        updated: { key: 'updated', label: 'Updated', sort: 'date', sortValue: stamp, firstDir: 'desc', line: 0, tone: 'tertiary', align: 'end', width: '7rem', dropAt: 28,
             cell: g => g.noGoal ? '' : DT.timeCell(stamp(g)) },
     };
     return keys.map(key => all[key]);
