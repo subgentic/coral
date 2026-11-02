@@ -6,6 +6,7 @@ import { serverFetch, normServer, LOCAL_SERVER } from './server_base.js';
 const TYPES = [['claude', 'Claude'], ['codex', 'Codex'], ['agy', 'Antigravity'], ['pi', 'Pi'], ['opencode', 'OpenCode'], ['hermes', 'Hermes']];
 const ALIAS = { gemini: 'agy', antigravity: 'agy' };
 const PROBE_MS = 1500; // a CLI that is slow to answer is "unknown": it keeps its place and is not marked
+const LATE_PROBE_MS = 6000; // how long the start waits for those, when Claude is missing and nothing else is known to be installed (#12169)
 
 /** What the server says of that agent's CLI: found is true, false, or null when it could not say; why is the server's one line when the agent is not offered on its OS (Hermes on Windows, #12038). */
 async function probe(server, type) {
@@ -53,7 +54,8 @@ export async function buildAgentPick({ group, form, server, implicitDefault }) {
     sync();
     group.hidden = false;
     form.classList.add('has-agent-pick'); // the group is the one place that names the agent: the form's own select stays (hidden by css) and follows it (#6407)
-    const res = await Promise.all(TYPES.map(([t]) => Promise.race([probe(server, t), new Promise(r => setTimeout(() => r({ found: null }), PROBE_MS))])));
+    const probes = TYPES.map(([t]) => probe(server, t));
+    const res = await Promise.all(probes.map(p => Promise.race([p, new Promise(r => setTimeout(() => r({ found: null }), PROBE_MS))])));
     if (group._pickToken !== token || !group.isConnected) return; // another New Agent opened meanwhile
     const found = res.map(r => r.found);
     TYPES.forEach(([type, label], i) => { // an agent this computer's OS does not offer is not a choice: no radio, no option in the select, and one line says why
@@ -71,6 +73,15 @@ export async function buildAgentPick({ group, form, server, implicitDefault }) {
     if (!chosen && implicitDefault && (ALIAS[select.value] || select.value) === 'claude' && found[0] === false) {
         const first = order.find(i => found[i] === true);
         if (first !== undefined) { select.value = TYPES[first][0]; select.dispatchEvent(new Event('change', { bubbles: true })); chosen = false; }
+    }
+    // Claude is missing and nothing was chosen, but an agent has not answered yet (the check runs "<cli> --version", which Hermes, a Python program, takes seconds to do): wait for it a while longer before giving up
+    // on finding one to start on (#12169). The radios are already drawn and usable; this only moves the start, and not once a person has chosen or is on the group.
+    if (!chosen && implicitDefault && (ALIAS[select.value] || select.value) === 'claude' && found[0] === false && !order.some(i => found[i] === true) && res.some(r => r.found === null)) {
+        const late = await Promise.race([Promise.all(probes), new Promise(r => setTimeout(() => r(null), LATE_PROBE_MS))]);
+        if (late && group._pickToken === token && group.isConnected && !chosen) {
+            const first = order.find(i => late[i].found === true);
+            if (first !== undefined) { select.value = TYPES[first][0]; select.dispatchEvent(new Event('change', { bubbles: true })); chosen = false; }
+        }
     }
     sync();
     group.dataset.probed = '1';

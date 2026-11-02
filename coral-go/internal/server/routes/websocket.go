@@ -968,7 +968,7 @@ const (
 // Terminal sessions are excluded: they are a shell, they never emit agent
 // events, and sitting at a prompt is what they are for.
 func agentNeverStarted(agentType, latestEvent string, stalenessSeconds, sessionAgeSeconds float64) bool {
-	if agentType == at.Terminal {
+	if agentType == at.Terminal || agentType == at.Hermes { // Hermes sends no hook event until its first turn: its silence is a ready agent waiting for a message, not one that did not start (#12169)
 		return false
 	}
 	if latestEvent != "" {
@@ -985,7 +985,7 @@ func agentNeverStarted(agentType, latestEvent string, stalenessSeconds, sessionA
 // never true for a terminal, a sleeping or an archived session, and no longer once the row says the agent has not started (notStarted: silent for 25 s, "Check terminal"): the composer
 // does not go on saying "Starting" under a row that says to look at the terminal (#9948).
 func agentStarting(agentType, latestEvent string, sessionAgeSeconds float64, sleeping, archived, notStarted bool) bool {
-	if agentType == at.Terminal || sleeping || archived || latestEvent != "" || notStarted {
+	if agentType == at.Terminal || agentType == at.Hermes || sleeping || archived || latestEvent != "" || notStarted { // Hermes: no hook event until its first turn, so it is never "Starting" for want of one (#12169)
 		return false
 	}
 	return sessionAgeSeconds > 0 && sessionAgeSeconds <= notStartedWindowSeconds

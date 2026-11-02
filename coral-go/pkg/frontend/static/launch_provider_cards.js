@@ -18,6 +18,7 @@ const TYPES = [['claude', 'Claude'], ['codex', 'Codex'], ['agy', 'Antigravity'],
 const ALIAS = { gemini: 'agy', antigravity: 'agy' };
 const MARKS = { claude: 'C', codex: 'X', agy: 'A', pi: 'P', opencode: 'O', hermes: 'H' }; // the badge letters of the mockup: Codex is X, Antigravity A, so no two badges are the same
 const PROBE_MS = 1500;
+const LATE_PROBE_MS = 6000; // how long the start waits for a provider that has not answered, when Claude is missing and none is known to be installed (#12169)
 // The sign-in command the server gives for OpenCode (agent.OpencodeLoginCommand): the four XDG folders exported, then `opencode auth login`, on one line. A person is asked to paste it into a terminal, so only exactly that
 // shape is shown or copied, and only from this computer's own Coral (a remote server or Coral Hub could name any command): anything else gets a sentence instead (#11364, Security).
 // No control character in a value, and in PowerShell a quote may appear only DOUBLED, whichever of its four quote characters it is (' and the curly ones U+2018 to U+201B all end a string there): psquote on the server doubles every one.
@@ -193,13 +194,24 @@ export async function buildProviderCards({ group, form, server, implicitDefault 
     draw();
     form.classList.add('has-agent-pick'); // the group is the one place that names the provider: the form's own select stays (hidden by css) and follows it (#6407)
     _getDefaultModels(server).then(d => { if (group._pickToken !== gen) return; defaults = d || {}; paintStatus(); }).catch(() => {});
-    const found = await Promise.all(TYPES.map(([t]) => Promise.race([probe(server, t), new Promise(r => setTimeout(() => r({ found: null }), PROBE_MS))])));
+    const probes = TYPES.map(([t]) => probe(server, t));
+    const found = await Promise.all(probes.map(p => Promise.race([p, new Promise(r => setTimeout(() => r({ found: null }), PROBE_MS))])));
     if (group._pickToken !== gen || !group.isConnected) return; // another New Agent opened meanwhile
     TYPES.forEach(([t], i) => state.set(t, found[i]));
     // nothing was ever chosen and the built-in default is not here: start on the first provider that is
     if (!chosen && implicitDefault && typeNow() === 'claude' && found[0].found === false) {
         const first = TYPES.findIndex((_, i) => found[i].found === true);
         if (first >= 0) { select.value = TYPES[first][0]; select.dispatchEvent(new Event('change', { bubbles: true })); chosen = false; }
+    }
+    // Claude is missing and nothing was chosen, but a provider has not answered yet (the check runs "<cli> --version", which Hermes, a Python program, takes seconds to do): wait for it a while longer before
+    // giving up on finding one to start on (#12169). The cards are already drawn and usable; this only moves the start, and not once a person has chosen.
+    if (!chosen && implicitDefault && typeNow() === 'claude' && found[0].found === false && !found.some(f => f.found === true) && found.some(f => f.found === null)) {
+        const late = await Promise.race([Promise.all(probes), new Promise(r => setTimeout(() => r(null), LATE_PROBE_MS))]);
+        if (late && group._pickToken === gen && group.isConnected && !chosen) {
+            TYPES.forEach(([t], i) => state.set(t, late[i]));
+            const first = TYPES.findIndex((_, i) => late[i].found === true);
+            if (first >= 0) { select.value = TYPES[first][0]; select.dispatchEvent(new Event('change', { bubbles: true })); chosen = false; }
+        }
     }
     if (!group.contains(document.activeElement) || !chosen) draw(); // moving a card would drop the keyboard from it: only when nobody is on the group
     else paintStatus();

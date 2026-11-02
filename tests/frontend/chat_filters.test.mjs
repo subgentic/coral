@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import { STATIC } from './helpers/jsdom_env.mjs';
 // chat_filters.js: the Inbox chat folders' filters: what is kept, the fields each folder has, the history parameters they become, the chips (#8603).
 import assert from 'node:assert/strict';
 
@@ -29,6 +31,9 @@ assert.deepEqual(CF.chips({ ...CF.EMPTY, q: 'x' }), [], 'the search box shows th
 assert.deepEqual(CF.chips({ ...CF.EMPTY, from: '2026-10-01' }).map(c => c.label), ['From 2026-10-01']);
 assert.deepEqual(CF.chips({ ...CF.EMPTY, to: '2026-10-20' }).map(c => c.label), ['Until 2026-10-20']);
 assert.deepEqual(CF.chips({ ...CF.EMPTY, tagId: '99' }).map(c => c.label), ['Tag: Tag'], 'a tag it does not know reads Tag');
+assert.ok(CF.CLIS.some(c => c[0] === 'hermes' && c[1] === 'Hermes'), 'Hermes is in the Inbox\'s CLI list (#12169)');
+assert.equal(CF.clean({ ...CF.EMPTY, cli: 'hermes' }).cli, 'hermes', 'and a filter by it is kept');
+assert.match(fs.readFileSync(STATIC + 'css/components.css', 'utf8'), /\.agent-type-mark\[data-agent-type="hermes"\]::before \{ content: "H"; \}/, 'its folder row has the H mark, as the other four have their letters');
 assert.deepEqual(CF.without({ ...CF.EMPTY, from: '2026-10-01', to: '2026-10-20', cli: 'pi' }, 'dates'), { ...CF.EMPTY, cli: 'pi' }, 'the dates are one chip');
 assert.equal(CF.isFiltered({ ...CF.EMPTY, tagId: '7' }), true); assert.equal(CF.isFiltered(CF.EMPTY), false);
 

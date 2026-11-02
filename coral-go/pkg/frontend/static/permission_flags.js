@@ -32,11 +32,14 @@ export const PERMISSION_MODE_DESCRIPTIONS = {
 const GENERIC_AUTO_DESCRIPTION = 'Everything; safety checks on Claude only.';
 const NO_CHECKS_DESCRIPTION = 'Everything, with no prompts and no safety checks.';
 export const PI_NO_PERMISSIONS = 'Pi has no permission prompts: it always acts on its own.';
+const HERMES_DEFAULT_DESCRIPTION = 'Asks before a dangerous command (its own menu).';
+const HERMES_BYPASS_DESCRIPTION = 'Hermes runs every command with no prompt (--yolo): isolated containers and VMs only.';
 const SKIPS_ALL_PROMPTS = ['', 'auto', 'dontAsk', 'bypassPermissions'];
 /** What a permission mode allows for this CLI, in words; with no CLI (Settings' own select, which is for all of them) the generic description. */
 export function permissionDescription(type, value) {
     const t = String(type || '').toLowerCase(), v = value || '';
     if (t === 'pi') return PI_NO_PERMISSIONS;
+    if (t === 'hermes') return v === 'bypassPermissions' ? HERMES_BYPASS_DESCRIPTION : HERMES_DEFAULT_DESCRIPTION;
     if ((t === 'agy' || t === 'antigravity' || t === 'gemini') && SKIPS_ALL_PROMPTS.includes(v)) return NO_CHECKS_DESCRIPTION;
     if (t === 'codex' && CODEX_NETWORK_MODES.includes(v)) return CODEX_AUTO_DESCRIPTION;
     if (t === 'codex' && v === 'default') return CODEX_DEFAULT_DESCRIPTION;
@@ -55,7 +58,7 @@ const WORKERS_REFUSED = { plan: 'Claude agents cannot start workers in this mode
 const WORKERS_REFUSED_ANY = 'Agents cannot start workers in this mode.';
 
 // A CLI offers only the modes it has (#10381): Codex has no Accept edits (its sandbox and approval pair for it is Codex's own default, which Default is) and no Don't ask (it is Auto's launch), so its list is Default, Plan, Auto and Bypass permissions.
-const MODES_A_CLI_LACKS = { codex: ['acceptEdits', 'dontAsk'] };
+const MODES_A_CLI_LACKS = { codex: ['acceptEdits', 'dontAsk'], hermes: ['acceptEdits', 'plan', 'auto', 'dontAsk'] }; // Hermes has one switch: it asks before a dangerous command, or --yolo (Bypass) does not (agent.PermissionFlagsForAgent, #12169)
 export function modeOffered(type, value) { return !(MODES_A_CLI_LACKS[String(type || '').toLowerCase()] || []).includes(value); }
 /** Hides the modes the CLI lacks; a pick that is one of them (the type was changed to this CLI) falls to Default. */
 function offerModesFor(selectEl, type) {
