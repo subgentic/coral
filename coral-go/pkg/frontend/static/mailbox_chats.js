@@ -10,6 +10,7 @@ import { serverFetch, isCloud, nativeInbox, sessionServer, identityKey, keyLabel
  * Text of a chat (its title, the agent's name, a tag) is written by an agent or a person: it is only ever textContent. */
 import { importOnce } from './import_once.js';
 import { state } from './state.js';
+import { isSignedOut } from './overload.js';
 import { manyTeams, teamOfChat } from './team_names.js';
 const DT = await importOnce('./data_table.js');
 const IR = await importOnce('./inbox_read.js'); // which chats and boards the person has opened since they changed (#9687)
@@ -181,7 +182,7 @@ async function readMore(key, folder, q, extra, redraw) {
         }
     } catch (e) { L.refresh = false; L.error = e.message || 'Chats could not be read'; L.done = true; }
     L.busy = false; redraw();
-    if (L.indexing) setTimeout(() => { L.refresh = true; L.done = false; redraw(); }, 4000); // interval-ok: while the history is still being read for the first time the list is read again every few seconds, and the flag ends it (#10291)
+    if (L.indexing) setTimeout(() => { if (isSignedOut()) return; /* a signed-out page makes no /api request (#12439) */ L.refresh = true; L.done = false; redraw(); }, 4000); // interval-ok: while the history is still being read for the first time the list is read again every few seconds, and the flag ends it (#10291)
 }
 /** Forget what was read (a chat was starred or archived): the folders are read again from their first page. */
 /** Forget the kept lists: all of them, or only a folder's (a search sent on Enter reads that folder again, though the same words were read before: the Hub-served Inbox, #9574). The key is `sources|folder|words|filters`. */
