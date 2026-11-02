@@ -61,6 +61,9 @@ var pinnedSites = map[string]string{
 	// the background resumes of a session
 	"agent_exit.go SessionsHandler.autoResume": gated + ": the resume after an agent exit asks first",
 	"auto_wake.go SessionsHandler.autoWakeOne": gated + ": only reached from AutoWakeAfterRestart, which returns at once in a foreign Coral",
+	// auto-sleep (#12111): it ends a terminal by itself and a delivery wakes an agent by itself, so a foreign Coral does neither
+	"auto_sleep.go SessionsHandler.autoSleepOne":     gated + ": only reached from autoSleepPass, which RunAutoSleep runs and which asks the gate first; it asks too",
+	"auto_sleep_wake.go SessionsHandler.WakeIdleFor": gated + ": an automated wake (a delivery's) asks first; a person's own Send is a person's action",
 }
 
 // gatedEntries are the loop entries and functions that must ask the gate in their own body.
@@ -71,6 +74,10 @@ var gatedEntries = []string{
 	"workflow_steps.go WorkflowRunner.executeAgentInteractive",
 	"agent_exit.go SessionsHandler.autoResume",
 	"auto_wake.go SessionsHandler.AutoWakeAfterRestart",
+	"auto_sleep.go SessionsHandler.RunAutoSleep",
+	"auto_sleep.go SessionsHandler.autoSleepPass",
+	"auto_sleep.go SessionsHandler.autoSleepOne",
+	"auto_sleep_wake.go SessionsHandler.WakeIdleFor",
 	"dialog_watch.go SessionsHandler.RunDialogWatch",
 	"auto_accept.go AutoAcceptor.Run",
 }

@@ -42,6 +42,10 @@ type cpuSample struct {
 
 // RunAutoSleep blocks until ctx is done, putting idle agents to sleep once a minute.
 func (h *SessionsHandler) RunAutoSleep(ctx context.Context) {
+	if ptymanager.Foreign() { // a Coral on a copy of another's database puts no agent to sleep: it would kill the REAL Coral's terminals (internal/dataowner)
+		slog.Info("auto_sleep: this Coral does not own its data folder, so it puts no agent to sleep")
+		return
+	}
 	t := time.NewTicker(autoSleepEvery)
 	defer t.Stop()
 	for {
@@ -56,6 +60,9 @@ func (h *SessionsHandler) RunAutoSleep(ctx context.Context) {
 
 // autoSleepPass is one look at every awake agent.
 func (h *SessionsHandler) autoSleepPass(ctx context.Context, now time.Time) {
+	if ptymanager.Foreign() { // the pass reads agents' screens and process trees and ends terminals: none of it in a Coral on a copy of another's database
+		return
+	}
 	settings, err := h.ss.GetSettings(ctx)
 	if err != nil || !setreg.Bool(settings, setreg.AutoSleep) {
 		return
@@ -238,6 +245,9 @@ func (h *SessionsHandler) operatorWaitsOn(ctx context.Context, project, member s
 // autoSleepOne puts one agent to sleep: the row first (asleep, reason idle, the clock, in one write), then the terminal. A crash between the two leaves a sleeping row, which a wake
 // starts again; the reverse would leave a live row with no terminal.
 func (h *SessionsHandler) autoSleepOne(ctx context.Context, ls *store.LiveSession, idle time.Duration, rss uint64, now time.Time) {
+	if ptymanager.Foreign() { // it kills a terminal: never in a foreign Coral, whatever called it
+		return
+	}
 	if err := h.ss.SetSessionAutoSleeping(ctx, ls.SessionID, now); err != nil {
 		if !errors.Is(err, sql.ErrNoRows) { // not awake any more: a person's Sleep came first, and that is not an error
 			slog.Warn("auto_sleep failed", "session_id", ls.SessionID, "error", err)
