@@ -346,6 +346,47 @@ func TestNeedsYouAFileWithNewCommentsIsUnreadAgainAsTheSameRow(t *testing.T) {
 	assert.Zero(t, n, "opened again: read")
 	assert.Nil(t, rows()[0]["new_comments"])
 
+	// #12026 (the Orchestrator's decision): a file the Operator already DECIDED (approved, or denied) comes back to Needs you as its own row when an agent replies in their thread, marked and counted once; an ignored or
+	// saved one does not. The list answers the tag "new comments" with the rows that have news, whatever else they are tagged.
+	e.tag(t, `["approved"]`)
+	n, _ = count()
+	assert.Zero(t, n, "an approved file is not in Needs you")
+	news[e.id] = 1
+	n, out = count()
+	assert.Equal(t, 1, n, "an approved file the agent replied about comes back, once")
+	items = needsYouItems(out)
+	require.Len(t, items, 1)
+	assert.Equal(t, "review:alpha:"+e.id, items[0]["id"])
+	assert.EqualValues(t, 1, items[0]["new_comments"])
+	resp, err := http.Get(psrv.URL + "/api/board/alpha/artifacts?tag=new%20comments")
+	require.NoError(t, err)
+	var tagged map[string]any
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&tagged))
+	resp.Body.Close()
+	require.Len(t, tagged["artifacts"], 1, "the list has the row for the tag new comments")
+	e.tag(t, `["denied"]`)
+	n, _ = count()
+	assert.Equal(t, 1, n, "a denied one too")
+	e.tag(t, `["ignored"]`)
+	n, _ = count()
+	assert.Zero(t, n, "an ignored file stays out: the Operator chose not to see it")
+	e.tag(t, `["approved", "saved"]`)
+	n, _ = count()
+	assert.Zero(t, n, "a saved file is not counted")
+	e.tag(t, `["approved", "superseded"]`)
+	n, _ = count()
+	assert.Zero(t, n, "a file with a newer version is not the one to look at")
+	delete(news, e.id)
+	e.tag(t, `["approved"]`)
+	resp, err = http.Get(psrv.URL + "/api/board/alpha/artifacts?tag=new%20comments")
+	require.NoError(t, err)
+	tagged = map[string]any{}
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&tagged))
+	resp.Body.Close()
+	assert.Empty(t, tagged["artifacts"], "no news: no row for the tag")
+	n, _ = count()
+	assert.Zero(t, n, "and an approved file with no news is not in Needs you")
+
 	news["ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"] = 5
 	n, _ = count()
 	assert.Zero(t, n, "news on another file is not this file's")

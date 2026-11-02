@@ -66,6 +66,14 @@ async function readTeam(team) {
         }
         if (!data.has_more || !(data.artifacts || []).length) break;
     }
+    try { // a file the Operator already decided (approved, denied) that agents have replied about in their thread comes back as its own row, marked "New comments" (#12026)
+        const r = await boardFetch(team, '/artifacts?tag=new%20comments&limit=200');
+        if (r.ok) for (const a of (await r.json()).artifacts || []) {
+            if (!(a.new_comments > 0) || seen.has(a.id) || !a.available || !(a.tags?.includes('approved') || a.tags?.includes('denied')) || a.tags.includes('saved') || a.tags.includes('ignored') || a.tags.includes('superseded')) continue;
+            const hex = /(?:sha256:|coral:\/\/artifacts\/)?([a-f0-9]{64})$/i.exec(a.uri || a.digest || a.id || '')?.[1];
+            if (hex) { seen.add(a.id); rows.push({ ...a, team, hex, reviewKey: `${team}:${a.id}` }); }
+        }
+    } catch { /* the rows for review are still read: news is an addition */ }
     return rows;
 }
 /** The files for review on one goal of one team that nobody decided (one row per file, as Needs you has them): a goal page asks only its own team, not every team (#11913). */
@@ -162,8 +170,10 @@ export function markOpenedRead(hex) {
         if (row) {
             if (row.new_comments > 0) { // opening the file is opening its thread: the server marks the Operator's threads seen when the comments are read (#12026), so the row is read, and the count follows
                 const { listComments } = await importOnce('./artifact_comments_api.js');
-                await listComments(row.hex, splitKey(row.team).server, splitKey(row.team).name).catch(() => {}); // a failed read leaves the marker: it clears at the next open
-                row.new_comments = 0; revision++; changed();
+                let seen = true;
+                await listComments(row.hex, splitKey(row.team).server, splitKey(row.team).name).catch(() => { seen = false; });
+                if (seen) { row.new_comments = 0; revision++; changed(); } // only a read that went through marks them seen on the server: a failed one leaves the marker, and it clears at the next open (Security's SHOULD on #12026)
+                else if (!row.tags?.includes('for review')) return; // a decided file is in Needs you only for its news: with the news still unseen its row stays (the tag write below would drop it)
             }
             await setReviewRead(row, true);
         }

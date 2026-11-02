@@ -6,7 +6,7 @@ export function fillSavedFiles(host, files, { DT, reviewActions, openReview, sho
     const table = DT.dataTable({ label: `Files for review, ${files.length}`, compact: true, rows: files, rowKey: a => a.reviewKey, rowName: a => shown(a),
         open: a => openReview(a),
         columns: [
-            { key: 'name', label: 'File', primary: true, width: 'grow', line: 1, cell: a => shown(a), subtitle: a => subtitleOf(a) },
+            { key: 'name', label: 'File', primary: true, width: 'grow', line: 1, cell: a => { const name = shown(a); if (!(a.new_comments > 0)) return name; const w = DT.el('span', 'inbox-review-item'); w.append(name, DT.tag('New comments')); return w; }, subtitle: a => subtitleOf(a) },
             { key: 'actions', label: 'Actions', hideLabel: true, fixed: true, align: 'end', width: '26rem', line: 1, cell: a => reviewActions(a, true) },
         ] }).el;
     host.replaceChildren(title, table);

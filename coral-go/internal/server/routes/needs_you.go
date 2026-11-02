@@ -189,8 +189,8 @@ func (h *BoardHandler) NeedsYou(w http.ResponseWriter, r *http.Request) {
 			seen := map[string]bool{}
 			dir := h.artifactObjectDir()
 			for _, f := range files {
-				if seen[f.ID] || !hasTag(f.Tags, "for review") || (hasTag(f.Tags, "read") && f.NewComments == 0) || hasTag(f.Tags, "saved") {
-					continue // by tags first: only a row that could count is checked against the stored file; a read file counts again while its thread has replies the Operator has not opened (#12026)
+				if seen[f.ID] || !needsYouFile(f.Tags, f.NewComments) {
+					continue // by tags first: only a row that could count is checked against the stored file
 				}
 				enrichTeamArtifact(&f, dir)
 				if !f.Available {

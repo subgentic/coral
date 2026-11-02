@@ -5,6 +5,21 @@ import (
 	"net/http"
 )
 
+// tagNewComments is the word the list answers as a tag for the rows that have unseen agent replies (#12026); no file is stored with it.
+const tagNewComments = "new comments"
+
+// needsYouFile says whether a file waits for the Operator: one tagged for review counts until they open it (read), and again while agents have replied in their comment thread and they have not opened it; a file they
+// already decided (approved or denied) is out of Needs you until such a reply brings it back as its own row, marked and counted once (#12026). Saved, ignored and superseded files are never counted.
+func needsYouFile(tags []string, news int) bool {
+	if hasTag(tags, "saved") || hasTag(tags, "ignored") || hasTag(tags, "superseded") {
+		return false
+	}
+	if hasTag(tags, "for review") {
+		return !hasTag(tags, "read") || news > 0
+	}
+	return news > 0 && (hasTag(tags, "approved") || hasTag(tags, "denied"))
+}
+
 // SetCommentNews tells the board where to read the unseen agent replies in the Operator's comment threads, per artifact id (#12026). nil: none.
 func (h *BoardHandler) SetCommentNews(fn func(ctx context.Context) (map[string]int, error)) {
 	h.commentNews = fn
