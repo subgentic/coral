@@ -217,13 +217,35 @@ func (h *SessionsHandler) autoSleepProcess(ctx context.Context, ls *store.LiveSe
 	return cpu-prev.cpu > autoSleepBusyCPU, false, rss
 }
 
-// parkedWait: the agent has a board wait registered, so one background shell on its screen is that wait's own command.
+// parkedWait: the agent has a board wait registered and has run nothing since (a tool or a new prompt after it), so one background shell on its screen is that wait's own command (Security, #12335:
+// an agent that interrupted its wait and started a dev server or a long test has a later tool event, and keeps its shell protected). The turn's own end after the wait is not activity. Unreadable:
+// not parked. Residual: a job started BEFORE the wait, with the wait run in the foreground, would read as the one shell; real teams run the wait in the background, so the footer counts two then.
 func (h *SessionsHandler) parkedWait(ctx context.Context, ls *store.LiveSession, sub *board.Subscriber) bool {
-	if h.bs == nil || sub == nil {
+	if h.bs == nil || h.ts == nil || sub == nil {
 		return false
 	}
 	w, err := h.bs.GetActiveWait(ctx, ptr.Value(ls.BoardName), sub.SubscriberID)
-	return err == nil && w != nil
+	if err != nil || w == nil {
+		return false
+	}
+	made, err := time.Parse(time.RFC3339, w.CreatedAt)
+	if err != nil {
+		return false
+	}
+	events, err := h.ts.GetSessionStateEvents(ctx, []string{ls.SessionID})
+	if err != nil {
+		return false
+	}
+	for _, ev := range events[ls.SessionID] {
+		if ev.EventType != "tool_use" && ev.EventType != "prompt_submit" {
+			continue
+		}
+		at, err := time.Parse(time.RFC3339Nano, ev.CreatedAt)
+		if err != nil || at.After(made.Add(waitCommandSlack)) {
+			return false // unreadable or later: it did something after it started waiting
+		}
+	}
+	return true
 }
 
 // autoSleepSub is the agent's board subscription (nil when it has none).

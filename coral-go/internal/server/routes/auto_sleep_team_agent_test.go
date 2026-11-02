@@ -136,3 +136,27 @@ func TestAWorkerWhoseOnlyBackgroundShellIsItsWaitSleeps(t *testing.T) {
 		})
 	}
 }
+
+// Security (#12335): the wait is the one shell only while nothing ran after it. A tool a minute after the wait was registered is a job the agent started (a dev server): it keeps its shell; the turn's own
+// end after the wait does not.
+func TestAWaitIsTheOneShellOnlyWhileNothingRanAfterIt(t *testing.T) {
+	const oneShell = "✻ Cogitated for 4s · done 5:38 PM · 1 shell still running\n\n──────────────────────────────────────────────────────────────────────\n❯ \n──────────────────────────────────────────────────────────────────────\n  ⏵⏵ bypass permissions on · 1 shell · ↓ to manage\n"
+	for name, tc := range map[string]struct {
+		later  string
+		asleep int
+	}{
+		"the turn ends after the wait": {"stop", 1},
+		"a tool runs after the wait":   {"tool_use", 0},
+		"a new prompt after the wait":  {"prompt_submit", 0},
+	} {
+		t.Run(name, func(t *testing.T) {
+			r := newSleepRig(t)
+			r.term.screen = oneShell
+			_, err := r.h.bs.RegisterWait(r.ctx, "autosleep", "dev", r.name, "message", "", "waiting for a message", 10*time.Hour)
+			require.NoError(t, err)
+			_, err = r.h.ts.InsertAgentEvent(r.ctx, &store.AgentEvent{AgentName: "dev", SessionID: &r.sid, EventType: tc.later, CreatedAt: time.Now().Add(time.Minute).UTC().Format(time.RFC3339Nano)})
+			require.NoError(t, err)
+			assert.Equal(t, tc.asleep, r.pass(t).IsSleeping, name)
+		})
+	}
+}
