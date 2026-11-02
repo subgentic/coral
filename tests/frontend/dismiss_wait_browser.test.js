@@ -46,9 +46,9 @@ const { coralReady } = require('./helpers/wait');
             await ev(`import((window.__coralStatic || '/static/') + 'dismiss_wait.js').then(m => m.dismissWait(window.__row, null)).then(() => true)`);
             await waitFor(`/linked to can dismiss it/.test(document.body.textContent)`, `${w}: a guest is told only the linked account can dismiss`, 8000);
             await ev(`document.querySelectorAll('#notices .toast').forEach(t => t.remove()); true`);
-            // a sign-in is not dismissed here
+            // a sign-in is not CLEARED on the machine (#11352); the row can still be hidden on this page for that request (#11946): see needs_you_wait_dismiss_browser
             await ev(`window.__row.waiting_kind = 'login'; document.querySelector('.inbox-answers')?.remove(); import((window.__coralStatic || '/static/') + 'inbox_answer.js').then(m => { window.__cell = m.answerCell(window.__row); return true; })`);
-            assert.equal(await ev(`window.__cell === '' || !window.__cell.querySelector?.('.inbox-dismiss')`), true, `${w}: no Dismiss for a sign-in`);
+            assert.equal(await ev(`!!window.__cell && !!window.__cell.querySelector?.('.inbox-dismiss')`), true, `${w}: a sign-in's row has a Dismiss too: it hides the row here and clears nothing on the machine (#11946)`);
             await ev(`document.getElementById('dw-host').remove(); true`);
         }
         console.log('PASS Dismiss on the card and the Inbox row');
