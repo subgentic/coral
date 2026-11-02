@@ -259,6 +259,16 @@ func (p *PTYSessionTerminal) ReadoptAgent(_ context.Context, name, _, sessionID 
 	}
 }
 
+// AgentTextRefused implements TextTargetChecker for the PTY backend.
+func (p *PTYSessionTerminal) AgentTextRefused(_ context.Context, name, _, sessionID string) (bool, string) {
+	key, err := p.keyFor(name, sessionID)
+	if err != nil {
+		return false, "" // gone: the send itself fails
+	}
+	refused, why, _ := p.backend.AgentTextRefused(key)
+	return refused, why
+}
+
 // AgentNoticeTarget implements NoticeTargetChecker for the PTY backend (#389).
 func (p *PTYSessionTerminal) AgentNoticeTarget(_ context.Context, name, _, sessionID string) (ok, wait bool, why string, known bool) {
 	key, err := p.keyFor(name, sessionID)

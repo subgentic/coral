@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -21,6 +22,8 @@ func init() { registerWatchStopper(StopWinAgentWatches) }
 // liveProcs is the Windows process table as a procSource: one snapshot of who is whose child, and each process's image and creation time read through its handle when asked.
 type liveProcs struct {
 	kids map[int][]int
+	// deadline bounds the standard-input probes of one walk (stdinWalkBudget): a probe not answered by then counts as a reader, and the caller goes on.
+	deadline time.Time
 }
 
 func newLiveProcs() (*liveProcs, error) {
@@ -29,7 +32,7 @@ func newLiveProcs() (*liveProcs, error) {
 		return nil, err
 	}
 	defer windows.CloseHandle(snap)
-	l := &liveProcs{kids: map[int][]int{}}
+	l := &liveProcs{kids: map[int][]int{}, deadline: time.Now().Add(stdinWalkBudget)}
 	var e windows.ProcessEntry32
 	e.Size = uint32(unsafe.Sizeof(e))
 	if err := windows.Process32First(snap, &e); err != nil {
@@ -107,7 +110,13 @@ func (p *windowsPTY) NoticeVerdict() (tmux.NoticeVerdict, error) {
 	if err != nil {
 		return tmux.NoticeVerdict{}, err
 	}
-	return p.agent.verdict(src, root), nil
+	v := p.agent.verdict(src, root)
+	if v.Reason == tmux.ReasonChildReads { // a refusal for a program below the agent is looked at once more, in a fresh snapshot, before it stands (Security's #6911 point 5)
+		if again, err := newLiveProcs(); err == nil {
+			v = p.agent.verdict(again, root)
+		}
+	}
+	return v, nil
 }
 
 // AgentCandidate is the single program in the terminal, shown to the Operator before "record as agent" (#391). Start is the creation time as a decimal string; Image is the program's path.
@@ -188,3 +197,24 @@ func (l *liveProcs) commandLine(pid int) (string, bool) {
 const processCommandLineInformation = 60
 
 var procNtQueryInformationProcess = windows.NewLazySystemDLL("ntdll.dll").NewProc("NtQueryInformationProcess")
+
+// TextRefused says text must not be typed into this terminal now (decideWinText): its shell is cmd, the agent started a cmd, or a program below the agent reads the terminal. Read afresh
+// on every call: nothing of it is kept from one send to the next.
+func (p *windowsPTY) TextRefused() (bool, string, error) {
+	root := p.cpty.Pid()
+	if root <= 0 {
+		return false, "", fmt.Errorf("no shell pid")
+	}
+	src, err := newLiveProcs()
+	if err != nil {
+		return false, "", err
+	}
+	rec, adopted, _ := p.agent.snapshot()
+	refused, why := decideWinText(src, root, rec, adopted)
+	if refused && why == tmux.ReasonChildReads { // once more, in a fresh snapshot, before it stands (Security's #6911 point 5)
+		if again, err := newLiveProcs(); err == nil {
+			refused, why = decideWinText(again, root, rec, adopted)
+		}
+	}
+	return refused, why, nil
+}

@@ -42,6 +42,69 @@ type procSource interface {
 	info(pid int) winProc
 	// commandLine is a process's command line, only to be compared (isLauncherCommandLine) and dropped; ok is false when it cannot be read (or is longer than launcherCmdMaxLine).
 	commandLine(pid int) (cmdline string, ok bool)
+	// stdin is what a process's standard input is: the console, something else, not readable, or gone. start is its creation time as the walk saw it: a pid that names another
+	// process now is gone.
+	stdin(pid int, start int64) stdinKind
+}
+
+// stdinKind is what a process's standard input handle is (read from the process's own parameters, never guessed from its name).
+type stdinKind int
+
+const (
+	stdinUnreadable stdinKind = iota // could not be told: counted as reading the console (fail closed)
+	stdinNotConsole                  // a pipe, a file, the NUL device, or no standard input
+	stdinConsole                     // the console device: the program can read what is typed into the terminal
+	stdinGone                        // the process has ended (or its pid names a newer process): it reads nothing, and the walk goes on below it
+)
+
+// consoleHelpers are programs a CLI starts with the console as their standard input that are known not to read it. A name here counts only when the handle test says console AND the
+// program's direct parent is the agent itself; anything else that reads the console stops automated keys. Empty until the counts of real sessions show which helpers need it.
+var consoleHelpers = map[string]bool{}
+
+// consoleReaderBelow is a program below the agent process rec, at any depth, whose standard input is the console or cannot be read: keys typed into the terminal may reach it rather than
+// the agent. Windows has no foreground job: every program attached to the console with the console as its input can take what is typed, so the agent being the only program below the
+// terminal's root (decideWinNotice) is not enough once the agent starts one. A walk that hits its bound counts as one.
+//
+// What is left: the walk is a moment before the key is typed (the callers read it inside the agent's lock, right before each key and again before a notice's text), so a program the agent
+// starts in that moment is not seen; and a program whose standard input is a pipe or a file can still open the console itself (CONIN$) later.
+func consoleReaderBelow(src procSource, rec winProc) (winProc, bool) {
+	type node struct {
+		pid, depth int
+		start      int64
+	}
+	seen := map[int]bool{rec.pid: true}
+	queue := []node{{rec.pid, 0, rec.start}}
+	for len(queue) > 0 {
+		n := queue[0]
+		queue = queue[1:]
+		for _, c := range src.children(n.pid) {
+			if seen[c] {
+				continue
+			}
+			seen[c] = true
+			p := src.info(c)
+			if p.known && p.start < n.start {
+				continue // an earlier owner's process: this pid was reused
+			}
+			if p.kind == kindConsoleHost {
+				continue // the console itself, not a program that reads it
+			}
+			if n.depth+1 >= maxWinWalkDepth {
+				return p, true
+			}
+			switch src.stdin(c, p.start) {
+			case stdinNotConsole, stdinGone: // a hook the agent ran that ended between the snapshot and its probe is not a reader (QA's #6908)
+			case stdinConsole:
+				if !(n.pid == rec.pid && p.known && consoleHelpers[p.name]) {
+					return p, true
+				}
+			default:
+				return p, true
+			}
+			queue = append(queue, node{c, n.depth + 1, p.start})
+		}
+	}
+	return winProc{}, false
 }
 
 const maxWinWalkDepth = 16
@@ -253,7 +316,39 @@ func decideWinNotice(src procSource, root int, rec winProc) tmux.NoticeVerdict {
 			return tmux.NoticeVerdict{Reason: tmux.ReasonForeground}
 		}
 	}
+	if _, reads := consoleReaderBelow(src, rec); reads {
+		return tmux.NoticeVerdict{Reason: tmux.ReasonChildReads}
+	}
 	return tmux.NoticeVerdict{OK: true}
+}
+
+// The reasons text is refused (decideWinText).
+const (
+	reasonCmdShell   = "the terminal's own shell is cmd, which runs a program from the current folder before PATH"
+	reasonUnreadable = "the terminal's processes could not be read"
+)
+
+// decideWinText is whether text (a notice and its Enter) may not be typed at all: the terminal's own shell (root) is cmd, or cannot be read; or the recorded agent, when there is one
+// (recorded), has a program below it that reads the terminal (consoleReaderBelow: a cmd with the console as its input is one). A cmd below the agent with a pipe as its input (an npx or
+// .cmd shim running an MCP server) is not refused: it cannot take typed text. Before the agent is recorded (a launch moments ago) only the shell is asked.
+func decideWinText(src procSource, root int, rec winProc, recorded bool) (bool, string) {
+	r := src.info(root)
+	if !r.known {
+		return true, reasonUnreadable
+	}
+	if r.name == "cmd" {
+		return true, reasonCmdShell
+	}
+	if !recorded {
+		return false, ""
+	}
+	if cur := src.info(rec.pid); !cur.known || cur.start != rec.start {
+		return false, "" // the agent has ended: NoticeBlocked says so, and refuses
+	}
+	if _, reads := consoleReaderBelow(src, rec); reads {
+		return true, tmux.ReasonChildReads
+	}
+	return false, ""
 }
 
 // winNoticeVerdict is the whole answer for a session: waiting while the record is being made, nothing recorded, or decideWinNotice.
