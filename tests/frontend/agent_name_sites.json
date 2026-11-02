@@ -1,0 +1,22 @@
+{
+  "about": "Where Coral shows an agent's name and whether the shared helper (static/agent_link.js: the name as written, a button to its chat when it runs, plain text with a tooltip when it is gone) draws it (#12168, the operator: 'make that a common thing throughout Coral'). agent_name_census.test.mjs fails when a converted site stops using the helper, and when a pending site starts using it without being moved here. A site is a file and what in it names an agent.",
+  "converted": [
+    { "file": "artifact_comments.js", "what": "the author name and avatar of an agent's comment or reply (files)" },
+    { "file": "artifact_comment_ask.js", "what": "the 'Sent to <agent> (...)' line under a comment, names as written" }
+  ],
+  "pending": [
+    { "file": "goal_view.js", "what": "goal comments' authors, a goal's driver and the agents on its tasks" },
+    { "file": "operator_asks.js", "what": "the question view: '<asker> asks you'" },
+    { "file": "inbox_sidebar.js", "what": "Needs you rows: 'From <agent>' (inbox-review-from), the agent rows' name button, proposals' proposer" },
+    { "file": "inbox_reviews.js", "what": "a file's uploader on a review row and in the viewer title line" },
+    { "file": "inbox_proposals.js", "what": "the proposer of a proposal" },
+    { "file": "board_chat.js", "what": "board messages' authors and the Board tab" },
+    { "file": "task_list.js", "what": "task tables: owner (Assigned to) and reviewers" },
+    { "file": "team_tasks_page.js", "what": "a team's task page: assignee and creator" },
+    { "file": "task_detail.js", "what": "a task's page: assigned to, created by, reviewers" },
+    { "file": "team_agents_page.js", "what": "the team's Agents tab" },
+    { "file": "cost_dashboard.js", "what": "Analytics tables: By agent, tool and API calls" },
+    { "file": "notifications.js", "what": "toasts and notices that name an agent" },
+    { "file": "team_artifacts_page.js", "what": "a file's 'produced by' in Artifacts" }
+  ]
+}

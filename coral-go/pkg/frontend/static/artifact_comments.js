@@ -13,6 +13,7 @@ const { createComposer } = await importOnce('./artifact_comment_composer.js');
 const { createHighlights } = await importOnce('./artifact_comment_highlights.js');
 import { showToast } from './utils.js';
 import { scrollBehavior } from './motion.js';
+const { agentLink, linkAvatar } = await importOnce('./agent_link.js'); // lazy, like the rest of the thread (#12168)
 import { pushOverlay, popOverlay } from './overlay_history.js';
 import { state } from './state.js';
 import { boardKeyName, sessionTeamKey, contextServer } from './server_base.js';
@@ -201,10 +202,10 @@ export function attachComments(dialog, body, host, opts = {}) {
     // when the card is hovered or has focus, always on a touch screen.
     function entry(c, top) {
         const e = el('div', 'ac-entry' + (top ? '' : ' ac-reply')); e.dataset.id = String(c.id);
-        e.append(avatar(c));
+        const av = avatar(c); e.append(c.authorKind === 'agent' ? linkAvatar(av, c.authorName || c.authorId, { board: st.board }) : av); // an agent's circle and name open its chat (#12168)
         const main = el('div', 'ac-entry-main');
         const m = el('div', 'ac-meta');
-        m.append(el('span', 'ac-author', c.authorName || c.authorId || 'unknown'));
+        m.append(c.authorKind === 'agent' ? agentLink(c.authorName || c.authorId, { board: st.board, cls: 'ac-author' }) : el('span', 'ac-author', c.authorName || c.authorId || 'unknown'));
         if (KIND[c.authorKind]) m.append(el('span', 'ac-kind', KIND[c.authorKind]));
         const dot = el('span', 'ac-dot', '·'); dot.setAttribute('aria-hidden', 'true'); m.append(dot);
         const time = el('span', 'ac-time', ago(c.createdAt)); time.title = c.createdAt; m.append(time);
@@ -231,7 +232,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         if (!c.deleted && c.images && c.images.length && !editing(c)) main.append(pictures(c));
         if (top && c.fromVersion != null && groupOf(c) !== 'main') main.append(el('p', 'ac-from ac-from-note', groupOf(c) === 'look' ? `From v${c.fromVersion}. The quote is in this version more than once, so it is not pinned to either.` : `On v${c.fromVersion}. Its text is not in this version.`));
         main.append(actions(c, top));
-        if (top && canAsk(c)) main.append(el('p', 'ac-note ac-ask-status', statusWords(c.id))); // does the agent have it? said at rest, under the comment: the actions row is hidden until hover
+        if (top && canAsk(c)) { const sp = el('p', 'ac-note ac-ask-status'); fillStatus(sp, c.id); main.append(sp); } // does the agent have it? said at rest, under the comment: the actions row is hidden until hover
         e.append(main);
         return e;
     }
@@ -279,7 +280,7 @@ export function attachComments(dialog, body, host, opts = {}) {
     }
     const act = (text, label, fn) => { if (typeof label === 'function') { fn = label; label = ''; } const b = btn('ac-act', text, label); b.addEventListener('click', fn); return b; };
 
-    const { canAsk, openAsk, askBlock, askedNow, statusWords } = createAsk({ st, panel, render, announce, refresh, ownHex });
+    const { canAsk, openAsk, askBlock, askedNow, fillStatus } = createAsk({ st, panel, render, announce, refresh, ownHex });
     function confirmThen(msg, fn) { if (window.showConfirmModal) window.showConfirmModal('Delete comment', msg, fn, undefined, { label: 'Delete comment', danger: true }); else fn(); }
     async function run(fn, said) {
         if (st.busy) return;
