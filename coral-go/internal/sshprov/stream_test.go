@@ -394,3 +394,63 @@ func TestStreamGivesTheSlotBackWhenTheProcessEndsByItself(t *testing.T) {
 		t.Errorf("%d slot(s) still held after the process ended on its own", n)
 	}
 }
+
+// #12475 (Security's INFO on #12446): with sharing off, forgetting a host key closed no session, and the idle `ssh -W` streams the pool keeps (made under the key just forgotten) lived their five minutes. CloseShared
+// now ends the idle streams of every stream target of that computer, and only that computer's.
+func TestForgettingAHostKeyClosesTheIdleStreamsOfThatComputerOnly(t *testing.T) {
+	remote := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(200 * time.Millisecond)
+		io.WriteString(w, "ok")
+	}))
+	defer remote.Close()
+	ssh, _ := fakeSSHW(t)
+	mk := func(dest string) *StreamTarget {
+		tg, _ := ParseTarget(dest)
+		st, err := NewStreamTarget(Runner{SSH: ssh}, tg, portOf(t, remote), streamKey)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(st.Close)
+		return st
+	}
+	burst := func(st *StreamTarget) {
+		var wg sync.WaitGroup
+		for i := 0; i < 4; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				req, _ := http.NewRequest("GET", "http://x.invalid/api/x", nil)
+				resp, err := st.RoundTrip(req)
+				if err != nil {
+					t.Error(err)
+					return
+				}
+				io.Copy(io.Discard, resp.Body)
+				resp.Body.Close()
+			}()
+		}
+		wg.Wait()
+	}
+	a, b := mk("user@a.example.com"), mk("user@b.example.com")
+	burst(a)
+	burst(b)
+	time.Sleep(100 * time.Millisecond)
+	if len(a.slots) == 0 || len(b.slots) == 0 {
+		t.Fatalf("the pools keep idle streams after a burst: a %d, b %d", len(a.slots), len(b.slots))
+	}
+	if len(controlArgs()) != 0 {
+		t.Fatal("this test is about sharing being off")
+	}
+	tg, _ := ParseTarget("user@a.example.com")
+	Runner{SSH: ssh}.CloseShared(context.Background(), tg)
+	deadline := time.Now().Add(3 * time.Second)
+	for len(a.slots) != 0 && time.Now().Before(deadline) {
+		time.Sleep(20 * time.Millisecond)
+	}
+	if n := len(a.slots); n != 0 {
+		t.Errorf("a's idle streams are still open after its host key was forgotten: %d", n)
+	}
+	if len(b.slots) == 0 {
+		t.Error("another computer's streams were closed too")
+	}
+}
