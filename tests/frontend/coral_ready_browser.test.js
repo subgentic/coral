@@ -53,7 +53,7 @@ const BASE = require('./test_base').BASE;
         assert.equal(await ev(`window.__coralReady instanceof Promise`), true, '__coralReady is a Promise');
         await ev(`Promise.race([window.__coralReady.then(() => 'ok'), new Promise((_, no) => setTimeout(() => no(new Error('__coralReady did not resolve in 10 s')), 10000))])`);
         assert.equal(await ev(`window.__readyEvents.filter(e => e[0] === 'coral:ready').length`), 1, 'coral:ready fires once');
-        assert.deepEqual(await ev(`window.__coralReady.parts`), { liveList: true, liveListLoaded: true, feed: true, history: true, settings: true }, 'parts snapshot');
+        assert.deepEqual(await ev(`window.__coralReady.parts`), { liveList: true, liveListLoaded: true, feed: true, history: true, settings: true, inboxListDrawn: false, hubFrameLoaded: false }, 'parts snapshot (the two optional parts are in it and false until the Inbox list or the Hub frame is drawn, #12124)');
         assert.equal(await ev(`(() => { const p = window.__coralReady.parts; p.feed = false; return window.__coralReady.parts.feed; })()`), true, 'parts is a copy');
         assert.equal(await ev(`window.__coralReady.startup('liveList', 'history', 'settings').then(() => 'ok')`), 'ok', 'startup(...parts) for a subset');
         assert.match(await ev(`window.__coralReady.startup('bogus').then(() => 'ok', e => e.message)`), /unknown startup part: bogus/);

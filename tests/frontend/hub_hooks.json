@@ -1,0 +1,280 @@
+{
+  "about": "What Coral Hub's scripts rely on in Coral's UI (the Hub's list hub-selectors-and-wording.txt version 2, board messages 149509, 149511 and 149513, checked in as a manifest, #12124). Each hook is an element carrying data-coral-hook=\"<hook>\" where Coral builds it, plus the older class or id the Hub's scripts use today. hub_hooks.test.mjs fails when a hook, its older selector, a listed id/attribute/key, a word or a ready part disappears: a rename needs a line in the release notes (\"For Coral Hub\") and a change here.",
+  "hooks": [
+    {
+      "hook": "nav-tab-hub-inbox",
+      "legacy": "id=\"nav-tab-hub-inbox\"",
+      "files": [
+        "templates/index.html"
+      ]
+    },
+    {
+      "hook": "nav-tab-agents",
+      "legacy": "id=\"nav-tab-agents\"",
+      "files": [
+        "templates/index.html"
+      ]
+    },
+    {
+      "hook": "nav-tab-history",
+      "legacy": "id=\"nav-tab-history\"",
+      "files": [
+        "templates/index.html"
+      ]
+    },
+    {
+      "hook": "nav-tab-automations",
+      "legacy": "id=\"nav-tab-automations\"",
+      "files": [
+        "templates/index.html"
+      ]
+    },
+    {
+      "hook": "nav-tab-tokens",
+      "legacy": "id=\"nav-tab-tokens\"",
+      "files": [
+        "templates/index.html"
+      ]
+    },
+    {
+      "hook": "nav-tab-servers",
+      "legacy": "id=\"nav-tab-servers\"",
+      "files": [
+        "templates/index.html"
+      ]
+    },
+    {
+      "hook": "nav-tab-docs",
+      "legacy": "id=\"nav-tab-docs\"",
+      "files": [
+        "templates/index.html"
+      ]
+    },
+    {
+      "hook": "nav-tab-artifacts",
+      "legacy": "id=\"nav-tab-artifacts\"",
+      "files": [
+        "templates/index.html"
+      ]
+    },
+    {
+      "hook": "nav-tab-board",
+      "legacy": "id=\"nav-tab-board\"",
+      "files": [
+        "templates/index.html"
+      ]
+    },
+    {
+      "hook": "top-nav-tabs",
+      "legacy": "top-nav-tabs",
+      "files": [
+        "templates/index.html"
+      ]
+    },
+    {
+      "hook": "top-bar",
+      "legacy": "class=\"top-bar\"",
+      "files": [
+        "templates/index.html"
+      ]
+    },
+    {
+      "hook": "sidebar",
+      "legacy": "class=\"sidebar\"",
+      "files": [
+        "templates/includes/sidebar.html"
+      ]
+    },
+    {
+      "hook": "inbox-nav-list",
+      "legacy": "id=\"inbox-nav-list\"",
+      "files": [
+        "templates/includes/sidebar.html"
+      ]
+    },
+    {
+      "hook": "agentic-state",
+      "legacy": "id=\"agentic-state\"",
+      "files": [
+        "templates/includes/right_dock.html"
+      ]
+    },
+    {
+      "hook": "live-view-switch",
+      "legacy": "id=\"live-view-switch\"",
+      "files": [
+        "templates/includes/views/live_session.html"
+      ]
+    },
+    {
+      "hook": "phone-nav-slot",
+      "legacy": "phone-nav-slot",
+      "files": [
+        "templates/index.html"
+      ]
+    },
+    {
+      "hook": "phone-menu-button",
+      "legacy": "phone-menu-btn",
+      "files": [
+        "static/phone_bar.js"
+      ]
+    },
+    {
+      "hook": "account-button",
+      "legacy": "cloud-account-btn",
+      "files": [
+        "static/cloud.js"
+      ]
+    },
+    {
+      "hook": "account-menu",
+      "legacy": "cloud-account-menu",
+      "files": [
+        "static/cloud.js"
+      ]
+    },
+    {
+      "hook": "inbox-frame",
+      "legacy": "inbox-frame",
+      "files": [
+        "static/inbox_tab.js"
+      ]
+    },
+    {
+      "hook": "send-button",
+      "legacy": "btn-send",
+      "files": [
+        "static/controls.js"
+      ]
+    },
+    {
+      "hook": "sidebar-kebab-button",
+      "legacy": "sidebar-kebab-btn",
+      "files": [
+        "static/session_rows.js",
+        "static/group_cards.js"
+      ]
+    },
+    {
+      "hook": "sidebar-kebab-menu",
+      "legacy": "sidebar-kebab-menu",
+      "files": [
+        "static/session_rows.js",
+        "static/group_cards.js"
+      ]
+    },
+    {
+      "hook": "agent-ui-card",
+      "legacy": "agent-ui-card",
+      "files": [
+        "static/agent_ui.js"
+      ]
+    },
+    {
+      "hook": "agent-ui-expand",
+      "legacy": "Expand panel",
+      "files": [
+        "static/agent_ui.js"
+      ]
+    },
+    {
+      "hook": "agent-ui-dismiss",
+      "legacy": "agent-ui-dismiss",
+      "files": [
+        "static/agent_ui.js"
+      ]
+    },
+    {
+      "hook": "view-list-item",
+      "legacy": "view-list-item",
+      "files": [
+        "static/view_list.js"
+      ]
+    },
+    {
+      "hook": "view-list-trigger",
+      "legacy": "view-list-trigger",
+      "files": [
+        "static/view_list.js"
+      ]
+    }
+  ],
+  "attributes": [
+    {
+      "what": "[data-view-list] (the attribute is the hook)",
+      "token": "dataset.viewList",
+      "files": [
+        "static/view_list.js"
+      ]
+    },
+    {
+      "what": "[data-nav-tab] on body",
+      "token": "data-nav-tab",
+      "files": [
+        "static/app_navigation.js"
+      ]
+    },
+    {
+      "what": ".phone-nav-slot[data-phone-nav]",
+      "token": "data-phone-nav=",
+      "files": [
+        "templates/index.html"
+      ]
+    },
+    {
+      "what": "[aria-label^=\"More actions for\"]",
+      "token": "More actions for",
+      "files": [
+        "static/session_rows.js",
+        "static/group_cards.js"
+      ]
+    },
+    {
+      "what": "button.btn-send[aria-label=\"Send command\"]",
+      "token": "Send command",
+      "files": [
+        "static/controls.js"
+      ]
+    },
+    {
+      "what": "#sidebar .sidebar-pane[data-pane=\"agents\"]",
+      "token": "data-pane=\"agents\"",
+      "files": [
+        "templates/includes/sidebar.html"
+      ]
+    }
+  ],
+  "storageKeys": [
+    {
+      "key": "coral-last-place",
+      "files": [
+        "static/nav.js"
+      ]
+    }
+  ],
+  "wording": [
+    "Needs you",
+    "Tasks",
+    "Saved for later",
+    "Chats",
+    "Inbox page",
+    "Agents page",
+    "Computers",
+    "Account",
+    "Sign out",
+    "Wake Team",
+    "Plus Jakarta Sans",
+    "Menu",
+    "Loading panel"
+  ],
+  "readyParts": [
+    "liveList",
+    "liveListLoaded",
+    "feed",
+    "history",
+    "settings",
+    "inboxListDrawn",
+    "hubFrameLoaded"
+  ]
+}

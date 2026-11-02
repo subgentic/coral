@@ -162,7 +162,7 @@ export async function refreshAgentUI() {
             if (mounted.get(panel.id)?.revision === panel.revision) continue;
             const previous = mounted.get(panel.id);
             previous?.close?.(); previous?.panel?.detach(); previous?.card.remove();
-            const card = document.createElement('section'); card.className = 'agent-ui-card';
+            const card = document.createElement('section'); card.className = 'agent-ui-card'; card.dataset.coralHook = 'agent-ui-card';
             const header = document.createElement('header');
             const title = document.createElement('strong'); title.textContent = `${panel.title} · v${panel.revision}`;
             const metric = document.createElement('span'); metric.className = 'agent-ui-event-count';
@@ -174,11 +174,11 @@ export async function refreshAgentUI() {
             label.textContent = 'agent-authored panel'; label.title = 'This content was written by the agent and runs in a restricted frame. Coral never asks for a password or a key in a panel.';
             title.append(' ', label);
             const expand = document.createElement('button'); expand.innerHTML = '<span class="material-icons" aria-hidden="true">open_in_full</span>'; expand.title = 'Expand panel';
-            expand.setAttribute('aria-label', 'Expand panel');
+            expand.setAttribute('aria-label', 'Expand panel'); expand.dataset.coralHook = 'agent-ui-expand';
             const popout = document.createElement('button'); popout.innerHTML = '<span class="material-icons" aria-hidden="true">open_in_new</span>'; popout.title = 'Open in new tab';
             popout.setAttribute('aria-label', 'Open panel in new tab');
             const dismiss = document.createElement('button'); dismiss.innerHTML = '<span class="material-icons" aria-hidden="true">close</span>'; dismiss.title = 'Close panel';
-            dismiss.className = 'agent-ui-dismiss'; dismiss.title = 'Close panel';
+            dismiss.className = 'agent-ui-dismiss'; dismiss.dataset.coralHook = 'agent-ui-dismiss'; dismiss.title = 'Close panel';
             dismiss.setAttribute('aria-label', `Close panel: ${panel.title}`);
             const remove = document.createElement('button'); remove.innerHTML = '<span class="material-icons" aria-hidden="true">delete</span>'; remove.title = 'Delete panel';
             remove.className = 'agent-ui-delete'; remove.setAttribute('aria-label', `Delete panel: ${panel.title}`);

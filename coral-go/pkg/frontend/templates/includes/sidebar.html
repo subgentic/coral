@@ -1,6 +1,6 @@
 {{ define "includes/sidebar.html" }}
         <!-- Left Sidebar -->
-        <aside class="sidebar" aria-label="Agents">
+        <aside class="sidebar" aria-label="Agents" data-coral-hook="sidebar">
             <!-- Collapsed icon rail: expand button, one avatar per agent, new agent -->
             <div class="sidebar-rail" id="sidebar-rail">
                 <button class="btn btn-quiet btn-icon btn-small sidebar-rail-btn" type="button" data-on-click="sidebar-rail-toggle" title="Expand sidebar" aria-label="Expand sidebar">
@@ -69,7 +69,7 @@
                 {{ template "includes/sidebar_header" "hub-inbox" }}
                 <section class="sidebar-section" data-section="hub-inbox">
                     <div class="sidebar-section-body">
-                        <div id="inbox-nav-list"></div>
+                        <div id="inbox-nav-list" data-coral-hook="inbox-nav-list"></div>
                     </div>
                 </section>
             </div>

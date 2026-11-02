@@ -16,6 +16,7 @@ import { goalDoneCount } from './goal_done.js';
 import { operatorAsks, refreshOperatorAsks, onOperatorAsksChanged } from './operator_asks.js';
 import { isCloud, nativeInbox, sessionServer } from './server_base.js';
 import { importOnce } from './import_once.js';
+import { markReady } from './ready.js';
 import { resolveSessionIdentity, sessionStateInfo, askWords } from './session_state.js';
 import './safe_markdown.js'; // the shared Inbox renderer's wrapper: the lazy Inbox modules import it, and a lazy module imports only what loads at startup (import_hygiene)
 
@@ -144,9 +145,11 @@ export function showInboxTabContent({ folder = '', quiet = false } = {}) {
     const frame = document.createElement('iframe');
     frame.id = 'inbox-frame';
     frame.className = 'inbox-frame';
+    frame.dataset.coralHook = 'inbox-frame';
     frame.setAttribute('aria-label', 'Inbox'); // a title would be a tooltip over the content
     frame.setAttribute('referrerpolicy', 'no-referrer');
     frame.setAttribute('allow', ''); // no camera, microphone, geolocation or other powerful features
+    frame.addEventListener('load', () => markReady('hubFrameLoaded'), { once: true }); // window.__coralReady (#12124)
     frame.setAttribute('src', INBOX_URL);
     view.append(frame);
 }

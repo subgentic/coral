@@ -187,7 +187,7 @@ function buildAccountMenu(email) {
     // The hub's own pages, on this origin (the dashboard is served by the hub): plain links, same tab. Until the account answers (and for an older Hub, or a failed read) the entries are Account (coral-go#1) and Saved for later (the hub's roll-up of every machine's saved messages, #4596).
     const defaults = [navLink(ACCOUNT_NAV.account), navLink(ACCOUNT_NAV.saved)];
     const signOutBtn = h('button', { type: 'button', className: 'menu-item overflow-menu-item', role: 'menuitem', text: 'Sign out', onclick: signOut });
-    const menu = h('div', { className: 'menu cloud-account-menu', id: 'cloud-account-menu', hidden: true, role: 'menu' },
+    const menu = h('div', { className: 'menu cloud-account-menu', id: 'cloud-account-menu', 'data-coral-hook': 'account-menu', hidden: true, role: 'menu' },
         h('div', { className: 'cloud-account-email', text: email, title: email }),
         h('button', { type: 'button', className: 'menu-item overflow-menu-item', role: 'menuitem', text: 'Computers', onclick: () => { setOpen(false); importOnce('./servers.js', 'the computer list').then(m => m.showServersModal(), () => {}); } }),
         ...defaults, signOutBtn,
@@ -199,7 +199,7 @@ function buildAccountMenu(email) {
         else if (focus && menu.contains(document.activeElement)) btn.focus(); // closed from inside: back to the button
     };
     const btn = h('button', {
-        type: 'button', className: 'btn btn-quiet btn-icon btn-small top-bar-btn cloud-account-btn', title: email, 'aria-label': 'Account menu', 'aria-haspopup': 'menu', 'aria-expanded': 'false',
+        type: 'button', className: 'btn btn-quiet btn-icon btn-small top-bar-btn cloud-account-btn', 'data-coral-hook': 'account-button', title: email, 'aria-label': 'Account menu', 'aria-haspopup': 'menu', 'aria-expanded': 'false',
         onclick: e => { e.stopPropagation(); setOpen(menu.hidden); },
     }, h('span', { className: 'material-icons top-bar-icon', 'aria-hidden': 'true', text: 'account_circle' }));
     document.addEventListener('click', () => setOpen(false, false));
