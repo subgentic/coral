@@ -12,7 +12,7 @@ const { pathToFileURL } = require('url');
     const m = await import(pathToFileURL(path.join(dir, 'server_base.js')).href);
     assert.strictEqual(m.isCloud(), true);
     const NEVER = '/api/cloud-unavailable';
-    for (const type of ['claude', 'agy', 'antigravity', 'gemini', 'codex', 'pi']) {
+    for (const type of ['claude', 'agy', 'antigravity', 'gemini', 'codex', 'pi', 'opencode', 'hermes']) { // every agent type with a CLI (the Go test TestCLICheckTypesAreTheAgentCLITypes keeps the server's list equal to the agents'): taking hermes out of CLI_CHECK_TYPES fails here
         assert.strictEqual(m.serverUrl(`/api/system/cli-check?type=${type}`, 'ws1'), `/api/remote/ws1/api/system/cli-check?type=${type}`, type);
         assert.strictEqual(m.serverUrl(`/api/system/cli-check?type=${type}&source=cli_recheck`, 'ws1'), `/api/remote/ws1/api/system/cli-check?type=${type}&source=cli_recheck`, type + ' recheck');
     }

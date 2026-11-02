@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 
 	at "github.com/subgentic/coral/internal/agenttypes"
@@ -66,6 +67,16 @@ var agentCLIs = map[string]CLIInfo{
 	at.Opencode: {Binary: "opencode", InstallCommand: "npm install -g opencode-ai", InstallURL: "https://opencode.ai"},
 	at.Hermes:   {Binary: "hermes", InstallCommand: hermesInstallCommand, InstallURL: "https://hermes-agent.nousresearch.com", InstallNote: hermesInstallNote},
 	at.Pi:       {Binary: "pi", InstallCommand: "npm install -g --ignore-scripts @earendil-works/pi-coding-agent", InstallURL: "https://pi.dev"},
+}
+
+// CLITypes is every agent type that has a CLI to check, sorted (the types the Hub's cli-check allowlist must carry, #12137).
+func CLITypes() []string {
+	out := make([]string, 0, len(agentCLIs))
+	for t := range agentCLIs {
+		out = append(out, t)
+	}
+	sort.Strings(out)
+	return out
 }
 
 // GetCLIInfo returns CLI info for an agent type, or nil if unknown.

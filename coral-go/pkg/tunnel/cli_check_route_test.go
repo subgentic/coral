@@ -3,10 +3,13 @@ package tunnel
 import (
 	"net/http"
 	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/agent"
 )
 
 // GET /api/system/cli-check is a Launch route (#4579): it runs "<cli> --version" on the computer. Only type (an exact agent type) and
@@ -68,4 +71,17 @@ func TestCLICheckNeedsTheLaunchMode(t *testing.T) {
 	require.ErrorAs(t, err, &se)
 	assert.Equal(t, CodePathNotAllowed, se.Code)
 	assert.Equal(t, 1, calls)
+}
+
+// The Hub's cli-check types are the types the server can check, and no others (#12137: opencode was missed once, and removing hermes from the list stayed green): every agent type with a CLI
+// is let through at Launch, and the `type` values the generated table names are all agent types.
+func TestCLICheckTypesAreTheAgentCLITypes(t *testing.T) {
+	for _, typ := range agent.CLITypes() {
+		assert.Equal(t, TierLaunch, Classify("GET", "/api/system/cli-check", "type="+typ), "the Hub does not carry the CLI check of agent type %q: add it to tools/gen_route_queries.py and regenerate", typ)
+	}
+	spec := routeQueries["GET /api/system/cli-check"]
+	_, after, found := strings.Cut(spec, "type=")
+	require.True(t, found, spec)
+	listed := strings.Split(after, "|")
+	assert.ElementsMatch(t, agent.CLITypes(), listed, "the table's type values and the agent CLI types differ")
 }
