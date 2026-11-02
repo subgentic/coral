@@ -577,3 +577,64 @@ func TestStreamDialWaitingForTheSessionStopsWhenItsContextEnds(t *testing.T) {
 		t.Errorf("a dial waiting for the session ended with %v after %v; it should stop when its own context does", err, time.Since(t0))
 	}
 }
+
+// QA's pins on the cold rule (#12477): a computer is cold only with no stream alive and none for 45 s. Each case is one dial of a target whose last activity is set, and whether the one `uname` command ran.
+func TestStreamColdRuleNeedsNoLiveStreamAndFortyFiveSecondsOfQuiet(t *testing.T) {
+	useTestControlDir(t)
+	for _, c := range []struct {
+		name  string
+		ago   time.Duration // time since the last stream started or ended; 0 = never
+		alive bool
+		warm  bool
+	}{
+		{"never used", 0, false, true},
+		{"active 10 s ago", 10 * time.Second, false, false},
+		{"active 44 s ago", 44 * time.Second, false, false},
+		{"active 50 s ago", 50 * time.Second, false, true},
+		{"a stream is alive, however long ago the last one started", 5 * time.Minute, true, false},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			ssh, log := fakeSSHW(t)
+			remote := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { io.WriteString(w, "ok") }))
+			defer remote.Close()
+			tg, _ := ParseTarget("user@box.example.com")
+			st, _ := NewStreamTarget(Runner{SSH: ssh}, tg, portOf(t, remote), streamKey)
+			defer st.Close()
+			if c.ago > 0 {
+				st.mu.Lock()
+				st.lastActive = time.Now().Add(-c.ago)
+				st.mu.Unlock()
+			}
+			if c.alive {
+				st.slots <- struct{}{} // a stream is alive
+			}
+			conn, err := st.dial(context.Background())
+			if err != nil {
+				t.Fatal(err)
+			}
+			conn.Close()
+			if got := strings.Contains(string(mustRead(t, log)), "uname"); got != c.warm {
+				t.Errorf("the session command ran: %v, want %v", got, c.warm)
+			}
+		})
+	}
+}
+
+// A closed stream target is no longer one a forgotten host key reaches: it leaves the registry (no slow leak of closed targets).
+func TestClosingAStreamTargetTakesItOutOfTheRegistry(t *testing.T) {
+	tg, _ := ParseTarget("user@box.example.com")
+	st, _ := NewStreamTarget(Runner{SSH: "ssh"}, tg, 8420, streamKey)
+	liveStreams.mu.Lock()
+	_, in := liveStreams.m[st]
+	liveStreams.mu.Unlock()
+	if !in {
+		t.Fatal("a new target is in the registry")
+	}
+	st.Close()
+	liveStreams.mu.Lock()
+	_, in = liveStreams.m[st]
+	liveStreams.mu.Unlock()
+	if in {
+		t.Error("a closed target is still in the registry")
+	}
+}
