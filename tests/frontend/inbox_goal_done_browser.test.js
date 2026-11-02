@@ -73,6 +73,7 @@ const B = 'goal-done-' + Date.now().toString(36);
         await waitFor(`/looks done/.test(document.querySelector('${T}')?.textContent || '')`, 'the item is back after a task was added and finished', 20000);
 
         // #11983: opening the item reads it: it stays listed and stops counting, in the Inbox number, the badge and /api/needs-you; a task done since has a new total, and it is unread again
+        await require('./helpers/wait').settle(ev, 600, 300);
         const unreadBadge = await badge();
         await ev(`[...document.querySelectorAll('${T} tbody tr')].find(tr => /looks done/.test(tr.textContent)).querySelector('.inbox-review-name').click(); true`);
         await waitFor(`!!document.querySelector('.goal-view, [data-goal-view], #goal-view') || /goals|goal/i.test(location.hash + location.pathname)`, 'the goal opened', 10000);

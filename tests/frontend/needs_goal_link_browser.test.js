@@ -43,7 +43,7 @@ const B = 'goal-link-' + Date.now().toString(36);
             await ev(`fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ goal_done_hidden: '[]', goal_done_read: '[]', goal_done_quiet_minutes: '0' }) }).then(r => r.status)`);
             await visit(`/inbox/needs/goal/${B}/${done}`);
             await waitFor(`location.pathname === '/inbox/goals/${B}/${done}' || /Ship the pilot/.test(document.querySelector('.goals-open')?.textContent || '')`, at + 'the goal opens on its own page', 15000);
-            assert.ok(/Ship the pilot/.test(await ev(`document.querySelector('.goals-open')?.textContent || ''`)), at + 'it is the goal the link names');
+            await waitFor(`/Ship the pilot/.test(document.querySelector('.goals-open')?.textContent || '')`, at + 'it is the goal the link names', 8000); // the page is up when its path is, its words a moment later (a slower machine read them first, #10832)
             assert.equal(await ev(`!!document.querySelector('dialog.goals-close-dialog[open]')`), false, at + 'the Close dialog is not opened for you');
             // the goal's page offers Not yet as its item does (#12248): it hides the item until a task is added, and the button goes
             await waitFor(`!!document.querySelector('.goal-head-actions .goals-not-yet')`, at + 'a goal that looks done has Not yet on its page', 8000);
