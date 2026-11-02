@@ -27,7 +27,7 @@ const B = 'goal-link-' + Date.now().toString(36);
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         assert.ok((await api('POST', '/subscribe', { subscriber_id: 'Boss', job_title: 'Orchestrator', session_name: 'boss-' + B })).status < 300);
-        await ev(`fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ goal_done_hidden: '[]', goal_done_quiet_minutes: '0' }) }).then(r => r.status)`);
+        await ev(`fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ goal_done_hidden: '[]', goal_done_read: '[]', goal_done_quiet_minutes: '0' }) }).then(r => r.status)`);
         const done = await mk('Ship the pilot'); await task(done, true);
         const open = await mk('Still going'); await task(open, true); await task(open, false);
         // the address and the route are one thing both ways
@@ -40,7 +40,7 @@ const B = 'goal-link-' + Date.now().toString(36);
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             const visit = async path => { await Page.navigate({ url: BASE + path }); await Page.loadEventFired(); await install(); await coralReady(ev); };
             const toast = () => waitFor(`[...document.querySelectorAll('.toast')].some(t => /That goal is not waiting for you any more/.test(t.textContent))`, at + 'a toast says the goal is not waiting', 12000);
-            await ev(`fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ goal_done_hidden: '[]', goal_done_quiet_minutes: '0' }) }).then(r => r.status)`);
+            await ev(`fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ goal_done_hidden: '[]', goal_done_read: '[]', goal_done_quiet_minutes: '0' }) }).then(r => r.status)`);
             await visit(`/inbox/needs/goal/${B}/${done}`);
             await waitFor(`location.pathname === '/inbox/goals/${B}/${done}' || /Ship the pilot/.test(document.querySelector('.goals-open')?.textContent || '')`, at + 'the goal opens on its own page', 15000);
             assert.ok(/Ship the pilot/.test(await ev(`document.querySelector('.goals-open')?.textContent || ''`)), at + 'it is the goal the link names');
