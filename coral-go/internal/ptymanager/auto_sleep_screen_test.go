@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -63,4 +64,23 @@ func TestScreenStopsSleepOnlyReadsTheFooter(t *testing.T) {
 	f.show("✱ Crunched for 24s · done 5:56 AM · 1 shell still running\n\n" + box)
 	assert.Equal(t, SleepStopBackground, ScreenStopsSleep(ctx, f, "claude-x", "claude", "x", false), "the footer says so")
 	assert.Equal(t, "· done 5:56 AM · 1 shell", BackgroundMarker("✱ Crunched for 24s · done 5:56 AM · 1 shell still running\n\n"+box))
+}
+
+// The footer is anchored on the input box, not on a count of lines (Security, #12335): notices under the box that push the status line past any fixed window do not hide it, and history above never counts.
+func TestScreenStopsSleepFooterIsAnchoredOnTheBox(t *testing.T) {
+	ctx := context.Background()
+	f := &fakeAgent{}
+	rule := "──────────────────────────────────────────────────────────────────────\n"
+	notices := strings.Repeat("  ✔ a notice under the box\n", 14)
+	f.show("✻ Cogitated for 4s · done 5:38 PM\n\n" + rule + "❯ \n" + rule + "  ⏵⏵ bypass permissions on · 1 shell · ↓ to manage\n" + notices)
+	assert.Equal(t, SleepStopBackground, ScreenStopsSleep(ctx, f, "claude-x", "claude", "x", false), "the status line is the first line under the box: fourteen notices after it do not hide it")
+	f.show("✻ Cogitated for 4s · done 5:38 PM · 1 shell still running\n\n" + rule + "❯ \n" + rule + "  ⏵⏵ bypass permissions on\n" + notices)
+	assert.Equal(t, SleepStopBackground, ScreenStopsSleep(ctx, f, "claude-x", "claude", "x", false), "the line above the box counts however long the footer is")
+	f.show("✻ Cogitated for 4s · 1 shell still running\n" + strings.Repeat("text\n", 3) + "✻ Cogitated for 5s · done 5:40 PM\n\n" + rule + "❯ \n" + rule + "  ⏵⏵ bypass permissions on\n")
+	assert.Equal(t, "", ScreenStopsSleep(ctx, f, "claude-x", "claude", "x", false), "history above the line over the box never counts")
+	f.show("✱ Crunched for 24s · done 5:56 AM\n\n" + rule + "❯ \n──[]── manual mode on · ? for shortcuts ──\n")
+	assert.Equal(t, "", ScreenStopsSleep(ctx, f, "claude-x", "claude", "x", false), "Beta Tester's parked worker: nothing running")
+	assert.Equal(t, "· 1 shell", BackgroundMarker("✻ x · 1 shell still running\n"+rule+"❯ \n"+rule), "the marker is the footer's own words")
+	long := BackgroundMarker("x\n" + rule + "❯ \n" + rule + "· " + strings.Repeat("é", 70) + " still running")
+	assert.True(t, utf8.ValidString(long) && len([]rune(long)) <= 60, "a long marker is cut on a character boundary: %q", long)
 }
