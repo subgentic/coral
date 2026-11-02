@@ -17,6 +17,7 @@ import { setPreviewSession } from './preview_pane.js';
 import { renderLiveSessions } from './render.js';
 import { watchScrollCue } from './scroll_cue.js';
 import { isPhoneLayout } from './phone_layout.js';
+import { revealSideways } from './reveal_sideways.js';
 const { closeDetailPane } = await importOnce('./detail_pane.js'); // a lazy module loads the others it needs through importOnce, so a failed load is retried
 const { el } = await importOnce('./team_table.js');
 const { quietFocus } = await importOnce('./quiet_focus.js');
@@ -261,7 +262,8 @@ function drawCounts() {
         label.textContent = text ? `${LABEL[t]} ` : LABEL[t];
     }
     // the counts widen the tabs: when one changed, the selected tab is brought wholly into view again (its own count arrives after it was scrolled to, #8149), then the edges are drawn
-    queueMicrotask(() => { if (widened) $(`team-tab-${S.tab}`)?.scrollIntoView({ inline: 'nearest', block: 'nearest' }); drawTabEdges(); });
+    // a count arrives on a poll: the strip moves sideways, a page scrolled down stays (#12357)
+    queueMicrotask(() => { if (widened) revealSideways($(`team-tab-${S.tab}`)); drawTabEdges(); });
 }
 
 /** The counts on the tabs and the header's status: three light reads, repeated while the page is on screen.

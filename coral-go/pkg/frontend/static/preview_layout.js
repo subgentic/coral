@@ -5,6 +5,7 @@ import { fitTerminal } from './xterm_renderer.js';
 import { trapTab } from './dialog_focus.js';
 import { pushOverlay, popOverlay } from './overlay_history.js';
 import { browserLocal } from './safe_storage.js';
+import { revealSideways } from './reveal_sideways.js';
 
 export function createPreviewLayout({ getTabs, isTaskPreview, getLastOpenedPath, _onToolbarClick }) {
 
@@ -224,7 +225,7 @@ export function createPreviewLayout({ getTabs, isTaskPreview, getLastOpenedPath,
     // Reveal after those changes too, not only when moving the pane between columns.
     function revealActiveTab() {
         const tab = document.querySelector('#preview-tabs .preview-tab.active');
-        if (tab?.getClientRects().length) tab.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+        if (tab?.getClientRects().length) revealSideways(tab); // a title arrives late (#8941): the strip moves, nothing above it does (#12357)
     }
 
     /** Move the pane between the side panel (bottom) and its own column, then show it if it has tabs. */
