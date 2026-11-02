@@ -355,25 +355,12 @@ const (
 	hermesResumeRefusal = "A Hermes agent keeps its conversation in its own Hermes home, so it cannot be resumed by its Hermes id into another agent. Wake the same agent to continue its conversation."
 )
 
-// hermesModelMax is the longest model name shown on a chip: a real one ("provider/vendor-model-1.2:tag") is far shorter, and the column is Hermes's own text.
-const hermesModelMax = 120
+// hermesModelMax is the longest model name shown on a chip (hermesdb.ModelNameMax).
+const hermesModelMax = hermesdb.ModelNameMax
 
-// hermesModelOK reports whether text from the model column can be shown as a model name: 1 to hermesModelMax printable characters of the kind model names use. Anything else (a control or escape
-// character, a space run, a long text) is not a model name, and the chip keeps the model the agent was launched with.
-func hermesModelOK(s string) bool {
-	if s == "" || len(s) > hermesModelMax {
-		return false
-	}
-	for _, r := range s {
-		switch {
-		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9':
-		case strings.ContainsRune("._-:/@+", r):
-		default:
-			return false
-		}
-	}
-	return true
-}
+// hermesModelOK reports whether text from the model column can be shown as a model name (hermesdb.ModelNameOK, the rule the usage rows share). Anything else (a control or escape character, a space run, a long
+// text) is not a model name, and the chip keeps the model the agent was launched with.
+func hermesModelOK(s string) bool { return hermesdb.ModelNameOK(s) }
 
 type hermesModelEntry struct {
 	stamp string

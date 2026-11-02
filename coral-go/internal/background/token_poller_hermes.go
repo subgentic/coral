@@ -18,17 +18,12 @@ import (
 // SetHermesDataDir gives the poller the Coral data folder a Hermes agent's own home lives under (agent.HermesAgentHome). Without it Hermes agents are not polled. Must be called before Run.
 func (p *TokenPoller) SetHermesDataDir(dir string) { p.hermesDir = dir }
 
-// hermesRecordModel is the model a Hermes poll is recorded under: the id alone ("provider/vendor-model" is "vendor-model", as Pi's is), "" when the column holds anything that is not a model name (a control
-// character, over maxPiModelLen bytes): it is Hermes's own text.
+// hermesRecordModel is the model a Hermes poll is recorded under: the id alone ("provider/vendor-model" is "vendor-model", as Pi's is), "" when the column holds anything that is not a model name by the rule the chip uses
+// (hermesdb.ModelNameOK: letters, digits and "._-:/@+", at most 120 bytes): it is Hermes's own text, and an agent that writes its own state.db must not put odd text in a usage row (#12314).
 func hermesRecordModel(m string) string {
 	m = strings.TrimSpace(m)
-	if m == "" || len(m) > maxPiModelLen {
+	if !hermesdb.ModelNameOK(m) {
 		return ""
-	}
-	for _, r := range m {
-		if r < 0x20 || r == 0x7f {
-			return ""
-		}
 	}
 	if i := strings.Index(m, "/"); i >= 0 {
 		m = m[i+1:]

@@ -91,3 +91,34 @@ CREATE TABLE messages (id INTEGER PRIMARY KEY AUTOINCREMENT, session_id TEXT, ro
 	in, out = total()
 	assert.Equal(t, []int{1500, 260}, []int{in, out})
 }
+
+// #12314 (Security's SHOULD on #12041): the model a Hermes poll is recorded under passes the SAME allow-list the model chip uses (letters, digits and ._-:/@+, at most 120): the column is Hermes's own text, and an
+// agent that writes its own state.db must not put odd text in a usage row. A value outside it records as empty.
+func TestHermesRecordModelUsesTheChipsAllowList(t *testing.T) {
+	for in, want := range map[string]string{
+		"provider/vendor-model-1.2:tag@x+y": "vendor-model-1.2:tag@x+y",
+		"vendor-model":                      "vendor-model",
+		"  vendor-model  ":                  "vendor-model",
+		"":                                  "",
+	} {
+		assert.Equal(t, want, hermesRecordModel(in), in)
+	}
+	for name, bad := range map[string]string{
+		"a space inside":              "two words",
+		"markup":                      "<b>gpt</b>",
+		"a quote":                     `gpt"4`,
+		"a zero-width character":      "vendor​model",
+		"a bidirectional override":    "vendor‮model",
+		"an escape sequence":          "vendor\x1b[31mmodel",
+		"a newline":                   "vendor\nmodel",
+		"printable but outside":       "vendor model; drop table",
+		"non-ASCII letters":           "modèle-é",
+		"a backslash":                 `vendor\model`,
+		"over 120 bytes":              strings.Repeat("x", 121),
+		"a provider with odd text":    "pro vider/vendor-model",
+		"a vendor part with odd text": "provider/vendor model",
+	} {
+		assert.Empty(t, hermesRecordModel(bad), name)
+	}
+	assert.Equal(t, strings.Repeat("x", 120), hermesRecordModel(strings.Repeat("x", 120)), "exactly the cap is a model")
+}
