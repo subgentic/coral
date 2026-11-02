@@ -25,6 +25,7 @@ const VIEW_IDS = [
     "servers-view",
     "inbox-view",
     "artifacts-view",
+    "skills-view",
 ];
 
 const VIEW_DISPLAY = {
@@ -45,6 +46,7 @@ const VIEW_DISPLAY = {
     "servers-view": "block",
     "inbox-view": "flex",
     "artifacts-view": "flex",
+    "skills-view": "block",
 };
 
 const FULL_WIDTH_VIEWS = new Set([
@@ -53,6 +55,7 @@ const FULL_WIDTH_VIEWS = new Set([
     "servers-view",
     "inbox-view",
     "artifacts-view",
+    "skills-view",
 ]);
 
 let _viewChanges = 0;

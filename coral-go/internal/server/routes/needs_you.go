@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"context"
 	"net/http"
 	"regexp"
 	"sort"
@@ -55,6 +56,11 @@ type needsYouAnswer struct {
 	Items       []NeedsYouItem `json:"items"`
 	NotIncluded []string       `json:"not_included"`
 	Unread      []string       `json:"unread_sources,omitempty"` // a source that could not be read this time: its things are missing from the count, not zero
+}
+
+// SetNeedsYouSkills tells the board how to list the skills that wait for the Operator (the Skills Store owns them). Nil: none.
+func (h *BoardHandler) SetNeedsYouSkills(fn func(ctx context.Context) ([]NeedsYouItem, error)) {
+	h.needsYouSkills = fn
 }
 
 // SetNeedsYouAgents tells the board how to list the agents waiting on the Operator (the live list's rows; the sessions handler owns them).
@@ -231,6 +237,14 @@ func (h *BoardHandler) NeedsYou(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if h.needsYouSkills != nil { // the skills that wait for the Operator's approval (#12139)
+		if rows, err := h.needsYouSkills(ctx); err != nil {
+			unread = appendOnce(unread, "skills")
+		} else {
+			items = append(items, rows...)
+		}
+	}
+
 	hiddenGoals, readGoals := h.goalDoneHiddenSet(ctx), h.goalDoneReadSet(ctx)
 	var goalNews map[string]int // replies agents left in the Operator's threads on a goal, unseen (#12073): the goal's item carries the count, and a read goal with news counts again
 	if h.commentNews != nil {
@@ -244,7 +258,7 @@ func (h *BoardHandler) NeedsYou(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	ans := needsYouAnswer{Count: len(items), Counts: map[string]int{"agent": 0, "question": 0, "wait": 0, "proposal": 0, "review": 0, "goal_done": 0}, Items: []NeedsYouItem{}, NotIncluded: needsYouNotIncluded, Unread: unread}
+	ans := needsYouAnswer{Count: len(items), Counts: map[string]int{"agent": 0, "question": 0, "wait": 0, "proposal": 0, "review": 0, "goal_done": 0, "skill": 0}, Items: []NeedsYouItem{}, NotIncluded: needsYouNotIncluded, Unread: unread}
 	for _, it := range items {
 		ans.Counts[it.Kind]++
 	}

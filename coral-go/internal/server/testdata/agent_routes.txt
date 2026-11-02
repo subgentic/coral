@@ -48,6 +48,10 @@ c GET /api/agent-docs/{name}
 c GET /api/agent-models
 a GET /api/agent/board/search
 a GET /api/agent/history/context
+a GET /api/agent/skills
+a POST /api/agent/skills
+a GET /api/agent/skills/search
+a GET /api/agent/skills/{id}
 a GET /api/agent/history/search
 a GET /api/agent/tasks
 a GET /api/agent/tasks/{taskID}
@@ -517,3 +521,9 @@ b GET /api/board/{project}/proposals
 b GET /api/proposals
 b POST /api/board/{project}/proposals/{id}/approve
 b POST /api/board/{project}/proposals/{id}/reject
+b GET /api/skills
+b POST /api/skills
+b GET /api/skills/{id}
+b POST /api/skills/{id}/approve
+b POST /api/skills/{id}/reject
+b DELETE /api/skills/{id}

@@ -306,6 +306,12 @@ var operatorOnlyRoutes = map[string]string{
 	"PUT /api/teams/detail/{name}/knowledge/{agentName}":              "change a team's knowledge",
 	// Reads across every session, board and team (#5013): an agent reads its own session and board (agentSessionRoutes, checkBoard), and its own
 	// history through /api/agent/history; none of these is called by an agent tool.
+	"POST /api/skills":                                   "publish a skill as the Operator",
+	"GET /api/skills":                                    "list the skills (every status)",
+	"GET /api/skills/{id}":                               "read a skill in full (the approval view)",
+	"POST /api/skills/{id}/approve":                      "approve a skill",
+	"POST /api/skills/{id}/reject":                       "reject a skill",
+	"DELETE /api/skills/{id}":                            "remove a skill",
 	"GET /api/sessions/history/counts":                   "read every chat folder count",
 	"GET /api/history-import":                            "read how many earlier chats wait for an import",
 	"POST /api/history-import":                           "import the earlier chats on this computer",

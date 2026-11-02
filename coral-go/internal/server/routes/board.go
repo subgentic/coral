@@ -122,6 +122,8 @@ type BoardHandler struct {
 	sessionAsleep func(ctx context.Context, sessionID string) bool
 	// needsYouAgents lists the agents waiting on the Operator for GET /api/needs-you (SetNeedsYouAgents). Nil: none.
 	needsYouAgents func(r *http.Request) ([]NeedsYouItem, error)
+	// needsYouSkills lists the skills waiting for approval for GET /api/needs-you (SetNeedsYouSkills). Nil: none.
+	needsYouSkills func(ctx context.Context) ([]NeedsYouItem, error)
 	// uploads caches per-session upload records for the artifact views.
 	uploads uploadDirCache
 	// taskCounts keeps each board's artifact count per task for a few seconds (taskArtifactCounts, #8591).

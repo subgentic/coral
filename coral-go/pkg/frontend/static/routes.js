@@ -158,6 +158,9 @@ export function parse(pathname, search = '') {
         }
         case 'jobs':
             return rest.length ? null : { view: top };
+        case 'skills':
+            if (!rest.length) return { view: 'skills' };
+            return rest.length === 1 && /^[0-9a-f]{32}$/.test(rest[0]) ? { view: 'skills', id: rest[0] } : null;
         case 'automations': {
             if (!rest.length) return { view: 'automations', folder: null };
             if (!AUTOMATION_FOLDERS.includes(rest[0])) return null;
@@ -263,6 +266,8 @@ export function build(r) {
             return r.id ? `/workflows/${r.id}${r.run ? '/runs/' + r.run : ''}` : '/workflows';
         case 'jobs':
             return '/jobs';
+        case 'skills':
+            return r.id && /^[0-9a-f]{32}$/.test(r.id) ? `/skills/${r.id}` : '/skills';
         case 'automations':
             return AUTOMATION_FOLDERS.includes(r.folder) ? `/automations/${r.folder}${r.id ? '/' + r.id + (r.run && r.folder === 'workflows' ? '/runs/' + r.run : '') : ''}` : '/automations';
         case 'analytics': {
@@ -374,6 +379,6 @@ export function inboxFolderPath(key) {
 }
 
 /** The views the Hub does not serve (#9368): Automations and the old Workflows and Jobs addresses that open it. */
-export const HIDDEN_IN_CLOUD = ['automations', 'workflows', 'jobs'];
+export const HIDDEN_IN_CLOUD = ['automations', 'workflows', 'jobs', 'skills'];
 /** Where an address goes when the dashboard is served by the Hub: a hidden view opens the Agents home, any other route is as it was. */
 export const cloudRedirect = (route, cloud) => (cloud && route && HIDDEN_IN_CLOUD.includes(route.view) ? { view: 'agents' } : route);

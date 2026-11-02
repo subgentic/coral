@@ -179,6 +179,66 @@ CREATE INDEX IF NOT EXISTS idx_session_index_last_ts
 CREATE VIRTUAL TABLE IF NOT EXISTS session_fts
 	USING fts5(session_id, body, tokenize='porter');
 
+-- The Skills Store (#12020, goal #191): one row per version of a skill (the zip is an artifact, named here by its digest), its parsed fields, and where it stands with the Operator. A removed skill keeps
+-- a tombstone (no text) so a pinned agent is told it was removed. skills_fts holds only approved skills; skills_log records who published, approved, rejected or removed which digest.
+CREATE TABLE IF NOT EXISTS skills (
+	id              TEXT PRIMARY KEY,
+	name            TEXT NOT NULL,
+	version         INTEGER NOT NULL,
+	digest          TEXT NOT NULL,
+	description     TEXT NOT NULL DEFAULT '',
+	metadata_json   TEXT NOT NULL DEFAULT '{}',
+	files_json      TEXT NOT NULL DEFAULT '[]',
+	has_scripts     INTEGER NOT NULL DEFAULT 0,
+	not_reviewable  INTEGER NOT NULL DEFAULT 0,
+	status          TEXT NOT NULL,
+	publisher_kind  TEXT NOT NULL,
+	publisher_agent TEXT NOT NULL DEFAULT '',
+	publisher_team  TEXT NOT NULL DEFAULT '',
+	scripts_acked   INTEGER NOT NULL DEFAULT 0,
+	created_at      TEXT NOT NULL,
+	decided_at      TEXT NOT NULL DEFAULT '',
+	UNIQUE (name, version),
+	UNIQUE (name, digest)
+);
+
+CREATE INDEX IF NOT EXISTS idx_skills_status ON skills(status);
+
+CREATE VIRTUAL TABLE IF NOT EXISTS skills_fts
+	USING fts5(skill_id UNINDEXED, name, description, tags, body, tokenize='porter');
+
+-- What the Operator rejected or removed, by the zip's digest: an agent cannot publish those bytes again. Its own table, not the access log, which is trimmed to 10,000 rows and could not be
+-- made to forget it by searching.
+-- The skills attached to a launched agent, pinned to the version and digest approved when it was launched (#12023): a newer approved version is shown as an update, never swapped in under a running agent.
+CREATE TABLE IF NOT EXISTS skills_attached (
+	session_id  TEXT NOT NULL,
+	skill_id    TEXT NOT NULL,
+	name        TEXT NOT NULL,
+	version     INTEGER NOT NULL,
+	digest      TEXT NOT NULL,
+	attached_at TEXT NOT NULL,
+	PRIMARY KEY (session_id, skill_id)
+);
+
+CREATE TABLE IF NOT EXISTS skills_refused (
+	digest TEXT PRIMARY KEY,
+	at     TEXT NOT NULL,
+	event  TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS skills_log (
+	id         INTEGER PRIMARY KEY AUTOINCREMENT,
+	at         TEXT NOT NULL,
+	event      TEXT NOT NULL,
+	skill_id   TEXT NOT NULL,
+	digest     TEXT NOT NULL,
+	actor_kind TEXT NOT NULL,
+	actor      TEXT NOT NULL DEFAULT '',
+	detail     TEXT NOT NULL DEFAULT ''
+);
+
+CREATE INDEX IF NOT EXISTS idx_skills_log_at ON skills_log(at);
+
 CREATE TABLE IF NOT EXISTS summarizer_queue (
 	session_id   TEXT PRIMARY KEY,
 	status       TEXT NOT NULL DEFAULT 'pending',

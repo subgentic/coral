@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/subgentic/coral/internal/board"
+	"github.com/subgentic/coral/internal/store"
 )
 
 // #11596: GET /api/needs-you is what waits for the Operator in one read, for the Hub's phone push: waiting agents (the sessions handler's rows, here a seam), questions and waits, proposals, and unread files for
@@ -453,4 +454,29 @@ func TestNeedsYouAFileWithNewCommentsIsUnreadAgainAsTheSameRow(t *testing.T) {
 	news["ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"] = 5
 	n, _ = count()
 	assert.Zero(t, n, "news on another file is not this file's")
+// #12139: a skill waiting for the Operator's approval is one item of GET /api/needs-you (the phone push and the count): who published it from the session, the team, the skill and its version as one cleaned line, a
+// stable id; an approved or rejected skill is not one, and a skills source that cannot be read is named in unread_sources, not counted as none.
+func TestNeedsYouListsTheSkillsWaitingForApproval(t *testing.T) {
+	h, _ := operatorAsksRig(t)
+	e := newSkillsEnv(t)
+	pend, _ := e.publish(map[string]string{"SKILL.md": skillMD}, store.PublisherAgent)
+	e.publish(map[string]string{"SKILL.md": scriptedMD}, store.PublisherOperator) // approved at once: not waiting
+	h.SetNeedsYouSkills(e.h.NeedsYouItems)
+	code, out := readNeedsYou(t, h, "", asPerson)
+	require.Equal(t, http.StatusOK, code, out)
+	assert.EqualValues(t, 1, out["count"])
+	assert.EqualValues(t, 1, out["counts"].(map[string]any)["skill"])
+	items := needsYouItems(out)
+	require.Len(t, items, 1)
+	assert.Equal(t, "skill", items[0]["kind"])
+	assert.Equal(t, "Backend Dev", items[0]["from"], "who published it: the session's agent")
+	assert.Equal(t, "alpha", items[0]["team"])
+	assert.Equal(t, "Skill to approve: release-notes version 1", items[0]["line"])
+	assert.Equal(t, "skill:"+pend.ID, items[0]["id"])
+	require.NoError(t, e.ss.RejectSkill(context.Background(), pend.ID))
+	_, out = readNeedsYou(t, h, "", asPerson)
+	assert.EqualValues(t, 0, out["count"], "a rejected skill no longer waits")
+	h.SetNeedsYouSkills(func(context.Context) ([]NeedsYouItem, error) { return nil, assert.AnError })
+	_, out = readNeedsYou(t, h, "", asPerson)
+	assert.Equal(t, []any{"skills"}, out["unread_sources"], "a source that cannot be read is said, not counted as none")
 }
