@@ -23,6 +23,9 @@ var errNoOwnerTool = errors.New("neither lsof nor ss is installed, so Coral cann
 // listenerIsChild reports whether every process listening on TCP port, on any address, is child or a descendant of it, and there is at least one. An error means the system could not be asked (the caller fails
 // closed).
 func listenerIsChild(ctx context.Context, port, child int) (bool, error) {
+	if child <= 0 { // a started process never has pid 0 or less; a row the table could not name (pid 0) must not match it
+		return false, nil
+	}
 	pids, err := listenerPIDs(ctx, port)
 	if err != nil {
 		return false, err
