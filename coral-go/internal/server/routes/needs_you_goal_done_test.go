@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -93,7 +95,8 @@ func TestNeedsYouHasOneItemForAGoalWhoseTasksAreAllDone(t *testing.T) {
 }
 
 // #11983 (the Operator): a "Goal looks done" item the Operator has opened is read, as a file is: it is not counted, so the count, the tab badge, the phone push and /api/needs-you say one number. The saved list is
-// goal_done_read, "<team>|<goal>|<tasks>" (the all-done total it was opened at); a goal that gets another task done has a new total, so it is unread again.
+// goal_done_read, "<team>|<goal>|<tasks>|<updated_at>" (the all-done total and the goal's last change it was opened at); a goal that gets another task done has a new total, and one that is reopened or edited has a new
+// last change (#12006), so either way it is unread again.
 func TestAGoalDoneItemTheOperatorOpenedIsNotCounted(t *testing.T) {
 	h, bs := operatorAsksRig(t)
 	ctx := context.Background()
@@ -111,6 +114,11 @@ func TestAGoalDoneItemTheOperatorOpenedIsNotCounted(t *testing.T) {
 		require.NoError(t, err)
 		_, err = bs.CompleteTask(ctx, "team", tk.ID, "Dev", nil)
 		require.NoError(t, err)
+	}
+	key := func() string { // the entry the page writes for the goal as it is now
+		cur, err := bs.GetGoal(ctx, "team", g.ID)
+		require.NoError(t, err)
+		return fmt.Sprintf("team|%d|%d|%s", cur.ID, cur.Rollup.Total, cur.UpdatedAt)
 	}
 	count := func() (int, int) {
 		code, out := readNeedsYou(t, h, "", asPerson)
@@ -130,9 +138,9 @@ func TestAGoalDoneItemTheOperatorOpenedIsNotCounted(t *testing.T) {
 	assert.Equal(t, 1, n)
 	assert.Equal(t, 1, all)
 
-	readList = []string{fmt.Sprintf("team|%d|2", g.ID)}
+	readList = []string{key()}
 	n, all = count()
-	assert.Zero(t, n, "opened at its total: read, not counted")
+	assert.Zero(t, n, "opened at its total and last change: read, not counted")
 	assert.Zero(t, all, "and not in the one count")
 
 	finish() // another task done: the goal's state changed again
@@ -140,7 +148,14 @@ func TestAGoalDoneItemTheOperatorOpenedIsNotCounted(t *testing.T) {
 	assert.Equal(t, 1, n, "a goal whose state changes again is unread again")
 	assert.Equal(t, 1, all)
 
-	for name, entry := range map[string]string{"another team's": fmt.Sprintf("other|%d|3", g.ID), "another goal's": fmt.Sprintf("team|%d|3", g.ID+1), "another total": fmt.Sprintf("team|%d|2", g.ID), "not exactly the key": fmt.Sprintf("team|%d|3 ", g.ID), "an Ignore star is not a read": fmt.Sprintf("team|%d|*", g.ID)} {
+	cur := key()
+	parts := strings.Split(cur, "|")
+	with := func(i int, v string) string {
+		p := append([]string(nil), parts...)
+		p[i] = v
+		return strings.Join(p, "|")
+	}
+	for name, entry := range map[string]string{"another team's": with(0, "other"), "another goal's": with(1, fmt.Sprint(g.ID+1)), "another total": with(2, "2"), "another last change": with(3, "2020-01-01T00:00:00Z"), "the old three-part form": strings.Join(parts[:3], "|"), "not exactly the key": cur + " ", "an Ignore star is not a read": fmt.Sprintf("team|%d|*", g.ID)} {
 		readList = []string{entry}
 		n, _ = count()
 		if name == "an Ignore star is not a read" {
@@ -149,9 +164,24 @@ func TestAGoalDoneItemTheOperatorOpenedIsNotCounted(t *testing.T) {
 			assert.Equal(t, 1, n, "an entry that is %s marks nothing read", name)
 		}
 	}
-	readList = []string{fmt.Sprintf("team|%d|3", g.ID)}
+	readList = []string{key()}
 	n, _ = count()
 	assert.Zero(t, n)
+
+	// #12006: closed and reopened, finished with the SAME total: the goal's last change is new, so it is unread again
+	_, _, err = bs.CloseGoal(ctx, "team", g.ID, "all true", board.GoalDone)
+	require.NoError(t, err)
+	n, _ = count()
+	assert.Zero(t, n, "closed: not an item")
+	time.Sleep(1100 * time.Millisecond) // sleep-ok: updated_at has a resolution of a second
+	_, err = bs.UpdateGoal(ctx, "team", g.ID, board.GoalUpdate{State: ptrString(board.GoalActive)})
+	require.NoError(t, err)
+	n, _ = count()
+	assert.Equal(t, 1, n, "reopened with the same total: unread again, as its last change is new")
+	readList = []string{key()}
+	n, _ = count()
+	assert.Zero(t, n, "and opened again, it is read")
+
 	hidden = []string{fmt.Sprintf("team|%d|*", g.ID)}
 	readList = nil
 	n, _ = count()

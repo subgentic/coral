@@ -37,21 +37,23 @@ async function save(list, setting = SETTING) {
 }
 
 /* Opening a goal's item reads it (#11983, the Operator): it stays listed and stops counting, as an opened file does, so the Inbox number, the tab badge, the phone push and /api/needs-you say one number. It is kept in
- * goal_done_read as "<team>|<goal>|<tasks>", the all-done total it was opened at: a goal that gets another task done has a new total and is unread again. */
+ * goal_done_read as "<team>|<goal>|<tasks>|<updated_at>", the all-done total and the goal's last change it was opened at: a goal that gets another task done has a new total, and one that is reopened or edited a new last
+ * change, so either way it is unread again. */
 export const READ_SETTING = 'goal_done_read';
+const readKeyOf = (team, g) => `${keyOf(team, g)}|${g.updated_at || g.updatedAt || ''}`; // the total and the goal's last change: a goal reopened or edited since is unread again (#12006)
 export function readList(settings = state.settings) {
     try { const v = JSON.parse(String((settings || {})[READ_SETTING] || '[]')); return Array.isArray(v) ? v.filter(x => typeof x === 'string').slice(-MAX) : []; } catch { return []; }
 }
 /** Whether the Operator has opened this goal's item at its present total. */
-export const isGoalDoneRead = (team, g, settings = state.settings) => readList(settings).includes(keyOf(team, g));
+export const isGoalDoneRead = (team, g, settings = state.settings) => readList(settings).includes(readKeyOf(team, g));
 /** Marks the goal's item read (nothing is written when it already is). */
 export async function markGoalDoneRead(team, g) {
     if (isGoalDoneRead(team, g)) return;
-    await save([...readList(), keyOf(team, g)], READ_SETTING);
+    await save([...readList(), readKeyOf(team, g)], READ_SETTING);
 }
 /** Counts the goal's item again. */
 export async function markGoalDoneUnread(team, g) {
-    const entry = keyOf(team, g);
+    const entry = readKeyOf(team, g);
     if (!readList().includes(entry)) return;
     await save(readList().filter(e => e !== entry), READ_SETTING);
 }

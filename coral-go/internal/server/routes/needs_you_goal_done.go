@@ -18,7 +18,7 @@ func (h *BoardHandler) SetGoalDoneHidden(fn func(ctx context.Context) []string) 
 	h.goalDoneHidden = fn
 }
 
-// SetGoalDoneRead tells the board where to read the goals the Operator opened in Needs you (setting goal_done_read, #11983): each entry is "<team>|<goal id>|<tasks the goal had>". An opened goal is listed on the
+// SetGoalDoneRead tells the board where to read the goals the Operator opened in Needs you (setting goal_done_read, #11983): each entry is "<team>|<goal id>|<tasks the goal had>|<the goal's updated_at>" (goalDoneReadKey). An opened goal is listed on the
 // page and not counted, as a read file is: it is not an item here, so the count, the tab badge, the phone push and this read say one number. nil: none is read.
 func (h *BoardHandler) SetGoalDoneRead(fn func(ctx context.Context) []string) {
 	h.goalDoneRead = fn
@@ -50,6 +50,12 @@ func goalDoneKey(team string, id int64, total int) string {
 	return team + "|" + strconv.FormatInt(id, 10) + "|" + strconv.Itoa(total)
 }
 
+// goalDoneReadKey is the entry the page writes when the Operator opens a goal's item: the all-done total and the goal's last change (updated_at, which a close, a reopen or an edit moves) it was opened at, so a goal
+// finished again after a reopen, with the same total, is unread again (#12006).
+func goalDoneReadKey(team string, id int64, total int, updatedAt string) string {
+	return goalDoneKey(team, id, total) + "|" + updatedAt
+}
+
 // goalDoneItems is the board's active goals whose tasks are all done (at least one task, none open, the state exactly active: the rule the goal screen's all-done box used), as items of Needs you, less the
 // ones the Operator hid. One item per goal; a goal that closes, gets a task, or is blocked is no longer one.
 func (h *BoardHandler) goalDoneItems(ctx context.Context, project string, hidden, read map[string]bool) ([]NeedsYouItem, error) {
@@ -68,8 +74,8 @@ func (h *BoardHandler) goalDoneItems(ctx context.Context, project string, hidden
 			if hidden[goalDoneKey(project, g.ID, r.Total)] || hidden[project+"|"+strconv.FormatInt(g.ID, 10)+"|*"] {
 				continue
 			}
-			if read[goalDoneKey(project, g.ID, r.Total)] {
-				continue // opened at this total: read, not counted (a task done since has a new total, and the item is back)
+			if read[goalDoneReadKey(project, g.ID, r.Total, g.UpdatedAt)] {
+				continue // opened at this total and last change: read, not counted (a task done since has a new total, a goal reopened or edited a new last change, and the item is back)
 			}
 			items = append(items, NeedsYouItem{Kind: "goal_done", Line: needsYouLine("Goal #" + strconv.FormatInt(g.ID, 10) + " looks done: " + g.Title), Team: project, ID: "goal_done:" + project + ":" + strconv.FormatInt(g.ID, 10), At: needsYouTime(g.UpdatedAt)})
 		}
