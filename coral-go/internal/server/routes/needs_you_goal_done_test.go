@@ -2,8 +2,10 @@ package routes
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -186,4 +188,49 @@ func TestAGoalDoneItemTheOperatorOpenedIsNotCounted(t *testing.T) {
 	readList = nil
 	n, _ = count()
 	assert.Zero(t, n, "Ignore still hides it, read or not")
+}
+
+// #12073 (the Orchestrator: let the read check pass a goal with new_comments through, as the file rule does): a goal item the Operator opened (read, not counted) is counted again while agents have replied in the
+// Operator's thread on it and they have not opened it; opened again, the news is seen and it is read once more.
+func TestAReadGoalDoneItemCountsAgainWhileItsThreadHasNews(t *testing.T) {
+	h, bs := operatorAsksRig(t)
+	ctx := context.Background()
+	_, err0 := bs.PostMessage(ctx, "team", "Lead", "hello", nil)
+	require.NoError(t, err0)
+	g, err := bs.CreateGoal(ctx, "team", board.GoalInput{Title: "Ship the export", CreatedBy: "Lead"})
+	require.NoError(t, err)
+	tk, err := bs.CreateTaskWithOpts(ctx, "team", "t", "", "medium", "Lead", &board.CreateTaskOpts{GoalID: &g.ID})
+	require.NoError(t, err)
+	_, err = bs.ClaimTask(ctx, "team", "Dev", tk.ID)
+	require.NoError(t, err)
+	_, err = bs.CompleteTask(ctx, "team", tk.ID, "Dev", nil)
+	require.NoError(t, err)
+	cur, err := bs.GetGoal(ctx, "team", g.ID)
+	require.NoError(t, err)
+	readList := []string{fmt.Sprintf("team|%d|%d|%s", cur.ID, cur.Rollup.Total, cur.UpdatedAt)}
+	news := map[string]int{}
+	h.SetGoalDoneRead(func(context.Context) []string { return readList })
+	h.SetCommentNews(func(context.Context) (map[string]int, error) { return news, nil })
+	items := func() []map[string]any {
+		req := asPerson(httptest.NewRequest(http.MethodGet, "/api/needs-you", nil))
+		w := httptest.NewRecorder()
+		h.NeedsYou(w, req)
+		var out map[string]any
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &out))
+		var got []map[string]any
+		for _, it := range needsYouItems(out) {
+			if it["kind"] == "goal_done" {
+				got = append(got, it)
+			}
+		}
+		return got
+	}
+	assert.Empty(t, items(), "opened: read, not counted")
+	news[goalSubject("team", g.ID)] = 1
+	got := items()
+	require.Len(t, got, 1, "an agent replied in the Operator's thread on the goal: it counts again, once")
+	assert.EqualValues(t, 1, got[0]["new_comments"])
+	assert.Equal(t, fmt.Sprintf("goal_done:team:%d", g.ID), got[0]["id"], "the same row")
+	delete(news, goalSubject("team", g.ID)) // the Operator opened the thread
+	assert.Empty(t, items(), "read once more")
 }

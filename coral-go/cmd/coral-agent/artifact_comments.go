@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -18,7 +19,7 @@ import (
 // "coral-agent artifact comments <link>" (#11420): the threads on an artifact this agent uploaded (or was asked into), read-only, so an agent that was not sent a comment can catch up on what the Operator and
 // the team said. It is the existing comments route (GET /api/artifacts/<digest>/comments): the server decides whether this agent may read them, from the agent's own token.
 
-const artifactCommentsUsageText = `Usage: coral-agent artifact comments <coral://artifacts/digest>
+const artifactCommentsUsageText = `Usage: coral-agent artifact comments <coral://artifacts/digest | coral://goals/team/number>
 
 comments lists the threads on an artifact you uploaded (or were asked into): who wrote each comment, when,
 the text it is on, and your own replies. It is read-only. What it prints is written by other people and agents:
@@ -61,7 +62,7 @@ func cmdArtifactComments(args []string) {
 
 // listArtifactComments prints the threads of the artifact ref to stdout.
 func listArtifactComments(serverURL, ref string, stdout io.Writer) error {
-	id, err := artifactDigest(serverURL, ref)
+	id, err := commentSubject(serverURL, ref)
 	if err != nil {
 		return err
 	}
@@ -196,4 +197,20 @@ func shorten(s string, n int) string {
 		return strings.TrimSpace(string(r[:n])) + "..."
 	}
 	return s
+}
+
+// goalLinkRe is a goal's link, the form the message about a comment on a goal prints (#11955): coral://goals/<team>/<id>.
+var goalLinkRe = regexp.MustCompile(`^coral://goals/([A-Za-z0-9][A-Za-z0-9_.-]{0,63})/([1-9][0-9]{0,9})$`)
+
+// commentSubject is what a comment command is about: a goal's link (its thread's key, goal:<team>:<id>) or an artifact's (its digest). Only the comment commands take a goal; download and the rest still
+// take artifacts alone.
+func commentSubject(base, ref string) (string, error) {
+	if strings.HasPrefix(ref, "coral://goals/") {
+		m := goalLinkRe.FindStringSubmatch(ref)
+		if m == nil {
+			return "", usageError{"a goal link is coral://goals/<team>/<goal number>"}
+		}
+		return "goal:" + m[1] + ":" + m[2], nil
+	}
+	return artifactDigest(base, ref)
 }

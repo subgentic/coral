@@ -70,6 +70,10 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 		errBadRequest(w, "resume_session_id is not a valid resume id") // #3582: it goes into file paths
 		return
 	}
+	if body.ResumeSessionID != "" && body.AgentType == at.Hermes {
+		errBadRequest(w, hermesResumeRefusal)
+		return
+	}
 	if h.refuseAgentLaunchOverLimit(w, r, 1) {
 		return
 	}

@@ -1,6 +1,6 @@
 // The phone Inbox row's ⋯ menu (#137104): a Needs you row for a wait the Operator may dismiss (a permission, a question or a plan) has a 44 px ⋯ button at its right that opens the one menu, whose first action is
 // Dismiss (Lead's dismiss-wait route, #11352); the row stays one line at 56 px, the button is the row's own control (a press never opens the row), it has a name, opens with a tap or the keyboard, and Escape gives the
-// focus back to it. A row whose wait is not the agent's own kind (a sign-in) has no ⋯, and a desktop keeps its table and its Dismiss button. 390 and 360 px with touch, light and dark; isolated dev server, the Inbox's census world.
+// focus back to it. Every waiting row has a ⋯ (a sign-in's holds Dismiss, #11946), and a desktop keeps its table and its Dismiss button. 390 and 360 px with touch, light and dark; isolated dev server, the Inbox's census world.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { axName } = require('./helpers/ax_tree');
@@ -46,7 +46,8 @@ const AGENTS = [
             }
             const rows = await ev(`[...document.querySelectorAll('${T} tr.dt-mailed')].map(tr => { const b = tr.querySelector('.dt-mail-more-toggle'), r = b && b.getBoundingClientRect(), box = tr.getBoundingClientRect(); return { title: tr.querySelector('.dt-mail-title').textContent, h: Math.round(box.height), more: !!b, w: r ? Math.round(r.width) : 0, bh: r ? Math.round(r.height) : 0, name: b && b.getAttribute('aria-label'), popup: b && b.getAttribute('aria-haspopup'), expanded: b && b.getAttribute('aria-expanded'), inline: !!tr.querySelector('.inbox-dismiss'), sameLine: Math.abs(tr.querySelector('.dt-mail-title').getBoundingClientRect().top - tr.querySelector('.dt-mail-snippet').getBoundingClientRect().top) < 4, inside: !!(b && !b.closest('.dt-mail-open')) }; })`);
             const by = Object.fromEntries(rows.map(x => [x.title, x]));
-            check(at + 'a permission and a question row have a ⋯; a sign-in row has none', by['Agent One']?.more && by['Agent Two']?.more && !by['Agent Three']?.more, JSON.stringify(rows));
+            check(at + 'a permission, a question and a sign-in row all have a ⋯ (every waiting row can be dismissed, #11946)', by['Agent One']?.more && by['Agent Two']?.more && by['Agent Three']?.more, JSON.stringify(rows));
+            check(at + 'a sign-in row\'s ⋯ holds Dismiss and nothing that answers it', await ev(`(() => { const tr = [...document.querySelectorAll('${T} tr.dt-mailed')].find(r => r.querySelector('.dt-mail-title').textContent === 'Agent Three'), items = tr ? [...tr.querySelectorAll('.menu [role=menuitem]')].map(i => i.textContent.trim()) : null; return !!items && items.length === 1 && /^Dismiss/.test(items[0]); })()`));
             check(at + 'the ⋯ is a 44 px target, named for its row, a menu button, closed, and not inside the row button', [by['Agent One'], by['Agent Two']].every(x => x.w >= 44 && x.bh >= 44 && x.popup === 'menu' && x.expanded === 'false' && x.inside && /^More actions for Agent (One|Two)$/.test(x.name)), JSON.stringify(rows));
             check(at + 'every row is still one line at 56 px', rows.every(x => x.h === 56 && x.sameLine), JSON.stringify(rows.map(x => [x.title, x.h, x.sameLine])));
             check(at + 'the inline Dismiss under the line is gone on a phone (the menu holds it)', rows.every(x => !x.inline), JSON.stringify(rows.map(x => [x.title, x.inline])));

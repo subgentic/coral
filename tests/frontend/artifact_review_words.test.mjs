@@ -9,6 +9,7 @@ assert.notEqual(reviewWords(['approved'], { state: 'approved', at }), 'Approved'
 assert.equal(reviewWords(['approved'], undefined), 'Approved', 'an approval with no recorded time says only Approved');
 assert.equal(reviewWords(['for review'], undefined), 'Waiting for your review');
 assert.equal(reviewWords(['for review', 'changes requested'], undefined), 'Changes requested');
+assert.equal(reviewWords(['for review', 'changes requested'], undefined, 'Writer A'), 'Changes requested, waiting for Writer A', 'the agent whose turn it is (#11985)');
 assert.equal(reviewWords(['reviewed'], undefined), 'Reviewed');
 assert.equal(reviewWords(['internal'], undefined), '');
 assert.equal(reviewWords(undefined, undefined), '');

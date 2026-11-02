@@ -35,10 +35,16 @@ func (s *SessionStore) UpsertSessionIndex(ctx context.Context, idx *SessionIndex
 		}
 
 		_, err := tx.ExecContext(ctx,
-			`INSERT OR REPLACE INTO session_index
+			`INSERT INTO session_index
 			 (session_id, source_type, source_file, first_timestamp, last_timestamp,
 			  message_count, display_summary, first_user_message, agent_name, display_name, indexed_at, file_mtime, index_version)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			 ON CONFLICT(session_id) DO UPDATE SET source_type = excluded.source_type, source_file = excluded.source_file, first_timestamp = excluded.first_timestamp,
+			  last_timestamp = excluded.last_timestamp, message_count = excluded.message_count, display_summary = excluded.display_summary, first_user_message = excluded.first_user_message,
+			  -- a name that was recorded stays when the agent is gone: the row says the chat was an agent Coral launched (#11970)
+			  agent_name = CASE WHEN COALESCE(excluded.agent_name, '') <> '' THEN excluded.agent_name ELSE session_index.agent_name END,
+			  display_name = CASE WHEN COALESCE(excluded.agent_name, '') <> '' THEN excluded.display_name ELSE session_index.display_name END,
+			  indexed_at = excluded.indexed_at, file_mtime = excluded.file_mtime, index_version = excluded.index_version`,
 			idx.SessionID, idx.SourceType, idx.SourceFile,
 			idx.FirstTimestamp, idx.LastTimestamp,
 			idx.MessageCount, idx.DisplaySummary, idx.FirstUserMessage,

@@ -35,6 +35,8 @@ type NeedsYouItem struct {
 	Team string `json:"team"`
 	ID   string `json:"id"`
 	At   string `json:"at"`
+	// NewComments: on a review item, how many replies agents left in the Operator's comment threads on the file since the Operator opened them (#12026). The file's row is unread again and counted once, as itself.
+	NewComments int `json:"new_comments,omitempty"`
 }
 
 // needsYouAnswer is the whole answer. Count is every waiting thing. The order of items is (time, id). The first read (no ?after=) gives the newest few, newest first, and the cursor is "<time>|<id>" of the newest item. A poll with ?after=<cursor> gives the items strictly after that place, OLDEST first, up to the limit, and the cursor becomes the last item given: a burst bigger than the limit, and items in one instant, are read in several polls, none skipped and none given twice (a poller reads until a poll is shorter than the limit). A bare time as the cursor is still taken, and includes the items at that time.
@@ -187,7 +189,7 @@ func (h *BoardHandler) NeedsYou(w http.ResponseWriter, r *http.Request) {
 			seen := map[string]bool{}
 			dir := h.artifactObjectDir()
 			for _, f := range files {
-				if seen[f.ID] || !hasTag(f.Tags, "for review") || hasTag(f.Tags, "read") || hasTag(f.Tags, "saved") {
+				if seen[f.ID] || !needsYouFile(f.Tags, f.NewComments) {
 					continue // by tags first: only a row that could count is checked against the stored file
 				}
 				enrichTeamArtifact(&f, dir)
@@ -195,14 +197,18 @@ func (h *BoardHandler) NeedsYou(w http.ResponseWriter, r *http.Request) {
 					continue
 				}
 				seen[f.ID] = true
-				items = append(items, NeedsYouItem{Kind: "review", Line: needsYouLine(f.Name), Team: p.Project, ID: "review:" + p.Project + ":" + f.ID, At: needsYouTime(f.CreatedAt)})
+				items = append(items, NeedsYouItem{Kind: "review", Line: needsYouLine(f.Name), Team: p.Project, ID: "review:" + p.Project + ":" + f.ID, At: needsYouTime(f.CreatedAt), NewComments: f.NewComments})
 			}
 		}
 	}
 
 	hiddenGoals, readGoals := h.goalDoneHiddenSet(ctx), h.goalDoneReadSet(ctx)
+	var goalNews map[string]int // replies agents left in the Operator's threads on a goal, unseen (#12073): the goal's item carries the count, and a read goal with news counts again
+	if h.commentNews != nil {
+		goalNews, _ = h.commentNews(ctx)
+	}
 	for _, p := range projects {
-		if gi, err := h.goalDoneItems(ctx, p.Project, hiddenGoals, readGoals); err != nil {
+		if gi, err := h.goalDoneItems(ctx, p.Project, hiddenGoals, readGoals, goalNews); err != nil {
 			unread = appendOnce(unread, "goals")
 		} else {
 			items = append(items, gi...)

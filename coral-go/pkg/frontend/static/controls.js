@@ -16,7 +16,7 @@ import './agentic_state.js';
 import { addPendingMessage, confirmPendingMessage, removePendingMessage, announceNotSent } from './live_chat.js';
 import { serverFetch, currentServer, serverForSession, sessionServer } from './server_base.js';
 import { resolveSessionIdentity } from './session_state.js';
-import { agentWords, WHAT_STAYS_KILL } from './agent_words.js';
+import { agentWords, whatStaysKill } from './agent_words.js';
 import './sleeping_view.js';
 import { hubBlocked } from './hub_access.js';
 import { loadLiveSessions } from './api.js';
@@ -577,7 +577,7 @@ export async function killSession() {
 
     const cur = state.currentSession;
     const who = agentWords(cur, resolveSessionIdentity(cur)).label; // the agent by its role and team, not the folder it works in (#10139)
-    window.showConfirmModal('Kill session', `Kill ${who}? This will terminate the agent. ${WHAT_STAYS_KILL} ${cur.git_state && cur.git_state.is_worktree ? worktreeConfirmWords(cur.branch) + ' ' : ''}${KILL_LOG_NOTE}`, async () => {
+    window.showConfirmModal('Kill session', `Kill ${who}? This will terminate the agent. ${whatStaysKill([cur])} ${cur.git_state && cur.git_state.is_worktree ? worktreeConfirmWords(cur.branch) + ' ' : ''}${KILL_LOG_NOTE}`, async () => {
         try {
             const killed = state.currentSession;
             const result = await killLiveSession(killed, currentServer());

@@ -17,6 +17,7 @@ import (
 	"github.com/subgentic/coral/internal/ptymanager"
 	setreg "github.com/subgentic/coral/internal/settings"
 	"github.com/subgentic/coral/internal/store"
+	"github.com/subgentic/coral/internal/transcriptlink"
 )
 
 func (h *SessionsHandler) wakeExistingSession(ctx context.Context, ls *store.LiveSession) (err error) {
@@ -165,6 +166,11 @@ func (h *SessionsHandler) prepareWake(ctx context.Context, ls *store.LiveSession
 	if ls.AgentType == at.Codex && !codexSessionSaved(ls.SessionID) {
 		log.Printf("[wake] session=%s: Codex could not find its saved conversation (no link, and no recent rollout carries its marker); starting a new one", sessionName)
 		launchParams.ResumeSessionID = ""
+	}
+	// Hermes resumes only by its own session id, never Coral's (a Coral id is not one, so the launch ignored it and every wake started a new, empty conversation, #11936): the one Coral recorded from the agent's hooks,
+	// "" when there is none (a new session). It is checked for its shape on the way out (transcriptlink.HermesSession) and again at the launch line, where it is one argument.
+	if ls.AgentType == at.Hermes {
+		launchParams.ResumeSessionID = transcriptlink.HermesSession(h.cfg.CoralDir(), ls.SessionID)
 	}
 	return &wakePlan{agentImpl: agentImpl, params: launchParams, backend: backend, sessionName: sessionName, logFile: logFile, boardName: boardName, displayName: displayName}, nil
 }

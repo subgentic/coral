@@ -105,6 +105,11 @@ CREATE TABLE IF NOT EXISTS artifact_comments (
 );
 CREATE INDEX IF NOT EXISTS idx_artifact_comments_artifact ON artifact_comments(artifact_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_artifact_comments_parent ON artifact_comments(parent_id);
+-- When the Operator last opened the threads of an artifact (#12026): one row per thread (its first comment). An agent's reply made after that is "new comments" on the file's row; opening the thread clears it.
+CREATE TABLE IF NOT EXISTS artifact_comment_seen (
+	comment_id INTEGER PRIMARY KEY,
+	seen_at    TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS artifact_comment_locks (
 	scope TEXT NOT NULL,
 	key   TEXT NOT NULL,
@@ -239,6 +244,16 @@ CREATE TABLE IF NOT EXISTS history_exclusions (
  source_file TEXT NOT NULL,
  file_mtime REAL NOT NULL,
  index_version INTEGER NOT NULL,
+ PRIMARY KEY (source_type, source_file)
+);
+
+-- Chats Coral did not start, found on this computer and held back until the person imports them (#11970). Metadata only (where the file is, its mtime, its session id and CLI):
+-- no text is kept, and the file's mtime is here so a pass does not read it again.
+CREATE TABLE IF NOT EXISTS history_unimported (
+ source_type TEXT NOT NULL,
+ source_file TEXT NOT NULL,
+ file_mtime REAL NOT NULL,
+ session_id TEXT NOT NULL,
  PRIMARY KEY (source_type, source_file)
 );
 

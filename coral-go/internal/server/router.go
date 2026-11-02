@@ -527,6 +527,20 @@ func (s *Server) registerCloud(r *chi.Mux) {
 	s.goBackground(upd.RunBackgroundChecks)                            // returns at once while the feature is off
 	upd.Idle, upd.InFlight, upd.LastPerson, upd.Work = s.sessHandler.UpdateIdleReason, ptymanager.AutomatedInputInFlight, terminalinput.LastPersonInput, background.BusyWork
 	s.goBackground(upd.RunAutoInstall) // install a verified update once Coral has been idle (#11170); returns at once without an updater
+	// Hermes homes no session record reaches (a failed launch, a crash) hold a copy of the person's .env: swept a minute after start, then daily (#11949)
+	hermesSessions := store.NewSessionStore(s.db)
+	hermesSweep := background.NewHermesHomeSweep(s.cfg.CoralDir(), func(ctx context.Context) (map[string]bool, error) {
+		all, err := hermesSessions.GetAllLiveSessions(ctx)
+		if err != nil {
+			return nil, err
+		}
+		ids := make(map[string]bool, len(all))
+		for _, ls := range all {
+			ids[ls.SessionID] = true
+		}
+		return ids, nil
+	})
+	s.goBackground(func(ctx context.Context) { _ = hermesSweep.Run(ctx) })
 	if s.boardStore != nil {
 		touchPrune := background.NewOperatorTouchPrune(s.boardStore)
 		s.goBackground(func(ctx context.Context) { _ = touchPrune.Run(ctx) }) // touches older than 90 days (#11225)
@@ -643,6 +657,8 @@ func (s *Server) registerSystem(r *chi.Mux, h *routeHandlers) {
 	r.Get("/api/sessions/history", histHandler.ListSessions)
 	r.Get("/api/sessions/history/search", histHandler.SearchChats)
 	r.Get("/api/sessions/history/counts", histHandler.ChatCounts)
+	r.Get("/api/history-import", histHandler.HistoryImportStatus)
+	r.Post("/api/history-import", histHandler.ImportEarlierChats)
 	r.Patch("/api/sessions/history/{sessionID}/flags", histHandler.SetChatFlags)
 	r.Get("/api/sessions/history/{sessionID}", histHandler.GetSessionDetail)
 	r.Get("/api/sessions/history/{sessionID}/agent-notes", histHandler.GetSessionAgentNotes)

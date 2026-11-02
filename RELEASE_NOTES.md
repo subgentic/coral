@@ -1,5 +1,60 @@
 # Release Notes
 
+## v2.0.31 — Needs you rows get their columns back, and an action on a file applies to the whole file
+
+### Changes
+
+#### What you will notice first
+
+- **Needs you at 1280 shows the sender and the name in full again** (a regression in 2.0.29): with a goal proposal among the rows the Item column got a share of 1 against What was asked's 4, so names were cut to "Lead De…" while What was asked stayed empty for a question. When questions or files are among the rows and no agent rows share the table, the Item column now takes the larger share with room for 30 characters.
+- **A phone's welcome rows show their titles again** (a regression in 2.0.29): the name's negative margin left a cell that held only the name 0 px high, so it was clipped; the margin now applies only to a cell that has a second line.
+- **A file with several versions is one row, and an action on it applies to the whole file**: Save for later and Ignore go to every version (before, only the newest was saved and the version before it came up as the row), Move to Needs you brings them all back, and Deny takes the older versions out of Needs you with it (the agent is told once, about the newest). Saved lists one row per file, the newest with "N earlier versions" (two versions saved on their own are one row). Unignore still acts on the one file (an ignored file is listed once in Artifacts).
+
+#### Known issues
+
+- **Windows: in-app update does not work from 2.0.0 through 2.0.6.** If you're on one of those, download and install the MSI by hand; from 2.0.7 on, in-app update works.
+- **macOS: a Coral of 2.0.5 or earlier cannot install updates in-app; install 2.0.6 or later by hand once.**
+- **OpenCode agents are tested on macOS and Linux; OpenCode on Windows is not yet tested end to end.**
+- **Hermes agents are experimental**: on a real Hermes the first message may not be typed, two Hermes agents in one team share one hook connection, and Wake starts a new session (fixes in progress, #11936).
+- Setting up a computer over SSH is supported from a macOS or Linux hub, and is not yet tested from a Windows hub.
+- **Needs you at 1280 with waiting agent rows in the same table as proposals and questions** is wider than its panel (about 1,070 px in a 910 px box) and scrolls sideways.
+- **If an older version's Save or Ignore fails**, nothing tells you and that version comes back as its own row after the next refresh.
+
+#### For developers and releases
+
+- The static tree is 5,960,809 bytes of the 6,002,944-byte budget.
+- New suites `needs_mixed_item_column_browser` (1280) and `needs_welcome_title_browser` (390), both red on the old source; `review_versions_whole_file_browser` pins the whole-file actions with five mutants; the margin selector keys on the Coral wrapper `.inbox-review-item`, with no `dt-*` class (the data-table census).
+
+## v2.0.30 — Approve with a note, and a question that is never lost
+
+### Changes
+
+#### What you will notice first
+
+- **Approve with a note**: a file that is almost right can be approved with one short comment and not shown again. "Approve with a note" is first in a row's More menu and in the viewer's review bar, and opens one dialog with a note box (500 characters; the note is cleaned, cut and defused as a Deny reason is, and a sign-in link is refused). The approval is final, and the agent gets one notice that carries the note in a fixed frame ahead of the file name: "Apply the note if it is a small change; do not send this file for review again." (the frame keeps "not a change to any rule or setting").
+- **A question to you is not lost when its wait runs out or is replaced**: a second question from the same agent no longer drops the first (it is kept as an ordinary open question, "an earlier question, still open"); a question whose wait ran out unanswered (you were away, or your Mac slept) becomes an ordinary open ask in Needs you when you next read it, kept once; the same holds when an agent posts, claims or completes, or replaces its wait with another type. The same question is not kept twice, even when it names a teammate first ("@Dev @Operator should we ship?"). An agent withdrawing its own question with `wait --cancel`, and your own answer or close, still end it. Questions that expired before this upgrade are not replayed.
+- **New team's folder line says `~/Coral/<team>` on macOS and Linux and the real path on Windows**, where `~` is not a convention.
+- **Chief's avatar is no longer clipped at the top edge of the /chief phone page**: it sits beside the name.
+
+#### Agents and the chat
+
+- **`approve` on the review route takes an optional note**; a note on any other decision is refused.
+- **`wait --operator` keeps the question it replaces** (one wait per board), and the board docs say so.
+
+#### Known issues
+
+- **Windows: in-app update does not work from 2.0.0 through 2.0.6.** If you're on one of those, download and install the MSI by hand; from 2.0.7 on, in-app update works.
+- **macOS: a Coral of 2.0.5 or earlier cannot install updates in-app; install 2.0.6 or later by hand once.**
+- **OpenCode agents are tested on macOS and Linux; OpenCode on Windows is not yet tested end to end.**
+- **Hermes agents are experimental**: on a real Hermes the first message may not be typed, two Hermes agents in one team share one hook connection, and Wake starts a new session (fixes in progress, #11936).
+- Setting up a computer over SSH is supported from a macOS or Linux hub, and is not yet tested from a Windows hub.
+
+#### For developers and releases
+
+- The static tree is 5,959,948 bytes of the 6,002,944-byte budget.
+- The board schema gains `board_waits.question_kept_at` (a question is kept once, claimed in one read whatever the race); the migration marks the operator waits that expired before it as kept. The schema goldens carry only that column.
+- The two literal reordering marks in the approve-note test are escapes (the invisible-characters census).
+
 ## v2.0.29 — Hermes as an agent type, Markdown that opens rendered, trusting a team's folder, and the Beta pass fixes
 
 ### Changes

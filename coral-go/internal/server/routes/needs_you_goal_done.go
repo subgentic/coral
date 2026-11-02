@@ -58,7 +58,7 @@ func goalDoneReadKey(team string, id int64, total int, updatedAt string) string 
 
 // goalDoneItems is the board's active goals whose tasks are all done (at least one task, none open, the state exactly active: the rule the goal screen's all-done box used), as items of Needs you, less the
 // ones the Operator hid. One item per goal; a goal that closes, gets a task, or is blocked is no longer one.
-func (h *BoardHandler) goalDoneItems(ctx context.Context, project string, hidden, read map[string]bool) ([]NeedsYouItem, error) {
+func (h *BoardHandler) goalDoneItems(ctx context.Context, project string, hidden, read map[string]bool, news map[string]int) ([]NeedsYouItem, error) {
 	var items []NeedsYouItem
 	cursor := ""
 	for {
@@ -74,10 +74,10 @@ func (h *BoardHandler) goalDoneItems(ctx context.Context, project string, hidden
 			if hidden[goalDoneKey(project, g.ID, r.Total)] || hidden[project+"|"+strconv.FormatInt(g.ID, 10)+"|*"] {
 				continue
 			}
-			if read[goalDoneReadKey(project, g.ID, r.Total, g.UpdatedAt)] {
+			if read[goalDoneReadKey(project, g.ID, r.Total, g.UpdatedAt)] && news[goalSubject(project, g.ID)] == 0 { // a read goal counts again while agents have replied in the Operator's thread on it and they have not opened it (#12073)
 				continue // opened at this total and last change: read, not counted (a task done since has a new total, a goal reopened or edited a new last change, and the item is back)
 			}
-			items = append(items, NeedsYouItem{Kind: "goal_done", Line: needsYouLine("Goal #" + strconv.FormatInt(g.ID, 10) + " looks done: " + g.Title), Team: project, ID: "goal_done:" + project + ":" + strconv.FormatInt(g.ID, 10), At: needsYouTime(g.UpdatedAt)})
+			items = append(items, NeedsYouItem{Kind: "goal_done", Line: needsYouLine("Goal #" + strconv.FormatInt(g.ID, 10) + " looks done: " + g.Title), Team: project, ID: "goal_done:" + project + ":" + strconv.FormatInt(g.ID, 10), At: needsYouTime(g.UpdatedAt), NewComments: news[goalSubject(project, g.ID)]})
 		}
 		if page.NextCursor == "" {
 			return items, nil

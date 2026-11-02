@@ -66,13 +66,13 @@ const AGENTS = [
             const rights = () => ev(`[...document.querySelectorAll('${T} tr.dt-mailed')].map(tr => ({ title: tr.querySelector('.dt-mail-title').textContent, more: !!tr.querySelector('.dt-mail-more'), gap: !!tr.querySelector('.dt-mail-more-gap'), right: Math.round(tr.getBoundingClientRect().right - tr.querySelector('.dt-mail-time').getBoundingClientRect().right) }))`);
             const signIn = { ...AGENTS[1], name: 'ag-three', session_id: '00000003-0000-4000-8000-000000000003', display_name: 'Agent Three', waiting_kind: 'login', waiting_summary: 'Sign in', board_project: 'team-c' };
             await reseed([AGENTS[0], signIn]);
-            await waitFor(`document.querySelectorAll('${T} tr.dt-mailed').length === 2`, at + 'a ⋯ row and a row without one', 8000);
+            await waitFor(`document.querySelectorAll('${T} tr.dt-mailed').length === 2`, at + 'a permission row and a sign-in row', 8000);
             let al = await rights();
-            assert.ok(al.length === 2 && al.filter(x => x.more).length === 1 && al.filter(x => x.gap).length === 1 && new Set(al.map(x => x.right)).size === 1, at + 'a row without a ⋯ keeps its room, so the times line up: ' + JSON.stringify(al));
+            assert.ok(al.length === 2 && al.every(x => x.more) && !al.some(x => x.gap) && new Set(al.map(x => x.right)).size === 1, at + 'every waiting row has a ⋯ (a sign-in row too: its Dismiss, #11946), so the times line up: ' + JSON.stringify(al));
             await reseed([signIn]);
-            await waitFor(`document.querySelectorAll('${T} tr.dt-mailed').length === 1`, at + 'a list with no ⋯', 8000);
+            await waitFor(`document.querySelectorAll('${T} tr.dt-mailed').length === 1`, at + 'a list of one sign-in row', 8000);
             al = await rights();
-            assert.ok(al.length === 1 && !al[0].more && !al[0].gap && al[0].right <= 16, at + 'a list with no ⋯ reserves nothing: ' + JSON.stringify(al));
+            assert.ok(al.length === 1 && al[0].more && !al[0].gap && al[0].right >= 44, at + 'a lone sign-in row has its ⋯ and the room for it: ' + JSON.stringify(al));
             await reseed(AGENTS);
             await waitFor(`document.querySelectorAll('${T} tr.dt-mailed').length === 2`, at + 'the two waiting agents again', 8000);
             // the marker's `since` is in the future: every seeded task counts as read, so the plain row is measured

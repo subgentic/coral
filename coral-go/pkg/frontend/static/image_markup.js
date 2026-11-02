@@ -63,14 +63,28 @@ export async function openMarkup(blob) {
         const paint = () => { ctx.clearRect(0, 0, pic.w, pic.h); ctx.drawImage(pic.bmp, 0, 0, pic.w, pic.h); for (const s of marks) drawShape(ctx, s, width); if (live) drawShape(ctx, live, width); };
         const sync = () => { undo.disabled = !marks.length; done.disabled = !marks.length; say.textContent = marks.length ? `${marks.length} mark${marks.length === 1 ? '' : 's'}` : ''; paint(); };
         const at = e => { const r = canvas.getBoundingClientRect(); return { x: Math.min(pic.w, Math.max(0, (e.clientX - r.left) * pic.w / r.width)), y: Math.min(pic.h, Math.max(0, (e.clientY - r.top) * pic.h / r.height)) }; };
-        canvas.addEventListener('pointerdown', e => { if (e.button > 0 && e.pointerType !== 'touch') return; e.preventDefault(); canvas.setPointerCapture?.(e.pointerId); live = { tool, pts: [at(e)] }; paint(); });
-        canvas.addEventListener('pointermove', e => { if (!live) return; if (live.tool === 'pen') live.pts.push(at(e)); else live.pts = [live.pts[0], at(e)]; paint(); });
-        const lift = e => { if (!live) return; const s = live; live = null; if (e.type === 'pointerup') { if (s.tool === 'pen' || s.pts.length > 1) marks.push(s); } sync(); };
-        canvas.addEventListener('pointerup', lift); canvas.addEventListener('pointercancel', lift);
+        // A stroke starts first and the pointer's capture is only a help (#11982): an engine may refuse it for a pointer it does not know (setPointerCapture throws), and a stroke that waited on it never began. Move and release are
+        // heard on the window for the length of one stroke, so the stroke follows the pointer off the canvas and ends where it is let go, with or without the capture.
+        const move = e => { if (!live || e.pointerId !== live.id) return; if (live.tool === 'pen') live.pts.push(at(e)); else live.pts = [live.pts[0], at(e)]; paint(); };
+        const lift = e => {
+            if (!live || e.pointerId !== live.id) return;
+            const s = live; live = null;
+            window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', lift); window.removeEventListener('pointercancel', lift);
+            if (e.type === 'pointerup') { if (s.tool === 'pen' || s.pts.length > 1) marks.push(s); }
+            sync();
+        };
+        canvas.addEventListener('pointerdown', e => {
+            if (e.button > 0 && e.pointerType !== 'touch') return;
+            if (live && e.pointerType === 'touch' && e.pointerId !== live.id) return; // a second finger or a palm is not a new stroke; any other press replaces a stroke whose release was lost, so one can never lock drawing out
+            e.preventDefault();
+            live = { tool, pts: [at(e)], id: e.pointerId }; paint();
+            try { canvas.setPointerCapture?.(e.pointerId); } catch { /* the window hears the stroke anyway */ }
+            window.addEventListener('pointermove', move); window.addEventListener('pointerup', lift); window.addEventListener('pointercancel', lift);
+        });
         undo.addEventListener('click', () => { marks.pop(); sync(); });
         dlg.addEventListener('keydown', e => { if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === 'z') { e.preventDefault(); if (marks.length) { marks.pop(); sync(); } } });
         let settled = false;
-        const finish = out => { if (settled) return; settled = true; pic.bmp.close?.(); dlg.close(); dlg.remove(); try { opener?.focus?.({ preventScroll: true }); } catch { /* gone */ } resolve(out); };
+        const finish = out => { if (settled) return; settled = true; live = null; window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', lift); window.removeEventListener('pointercancel', lift); pic.bmp.close?.(); dlg.close(); dlg.remove(); try { opener?.focus?.({ preventScroll: true }); } catch { /* gone */ } resolve(out); };
         cancel.addEventListener('click', () => finish(null));
         dlg.addEventListener('cancel', e => { e.preventDefault(); finish(null); });
         done.addEventListener('click', () => { live = null; paint(); canvas.toBlob(b => finish(b || null), 'image/png'); });

@@ -157,6 +157,12 @@ func adoptAfterLaunch(session string, findShell func(context.Context) (int, erro
 	safego.Go("tmux-adopt-agent", func() { defer watches.Done(); defer cancel(); watchForAgent(ctx, session, findShell, persist, gen) })
 }
 
+// ReadoptAgent starts the watch of a pane for its agent process again, as after a launch line (AdoptAgentAfterLaunch), for a session whose record is gone or was never made.
+func (c *Client) ReadoptAgent(ctx context.Context, agentName, agentType, sessionID string) {
+	session := c.recordKey(ctx, agentName, agentType, sessionID)
+	c.AdoptAgentAfterLaunch(session, session)
+}
+
 // agentOption is the tmux session option the recorded process is kept in, "<pid> <start>".
 //
 // It is NOT authentication. A program inside the pane (or anything the same user runs) can set it, as it can type into the pane itself. What it can do is name one process, and that

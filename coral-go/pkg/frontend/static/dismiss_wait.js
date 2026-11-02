@@ -4,13 +4,16 @@
 import { serverFetch, sessionServer } from './server_base.js';
 import { loadLiveSessions } from './api.js';
 import { showToast } from './utils.js';
+import { askedBefore, dismissAsked, ignoreWait } from './asked_before_restart.js';
 
 const KINDS = new Set(['permission', 'question', 'plan']);
 
-/** Whether the Dismiss is drawn for an agent's open request of this kind. */
+/** Whether the Dismiss is drawn for an agent's open request: every waiting agent has one (#11946). A permission, question or plan on an awake agent is cleared in Coral's record of the wait (the server); every other
+ *  request (an input prompt, a dialog, an elicitation, a sign-in) and a request an agent made before it went to sleep is hidden on this page until the agent asks something new: nothing is sent to the agent either way. */
 export function canDismissWait(session, kind) {
-    return !!(session && session.session_id && KINDS.has(kind));
+    return !!(session && session.session_id && session.agent_type && !session.review && !session.autorun);
 }
+const clearsRecord = (session) => KINDS.has(session.waiting_kind) && !askedBefore(session);
 
 /** The button the card and the row draw: text, a name that says what it does, and what it never does. */
 export function dismissButton(className, session) {
@@ -18,13 +21,18 @@ export function dismissButton(className, session) {
     b.type = 'button';
     b.className = className;
     b.textContent = 'Dismiss';
-    b.title = 'Clear this if the agent is not waiting. Nothing is sent to the agent.';
+    b.title = 'Clear this if the agent is not waiting; if it asks again it comes back. Nothing is sent to the agent.';
     b.dataset.dismissSession = session.session_id;
     return b;
 }
 
 /** Clears the wait of a session and says so; the live list is read again so the card and the row go. */
 export async function dismissWait(session, button) {
+    if (!clearsRecord(session)) { // not a request the machine can clear, or one asked before the agent went to sleep: hidden here, for this request only (#11946)
+        if (askedBefore(session)) dismissAsked(session); else ignoreWait(session);
+        showToast('Hidden until the agent asks something new. Nothing was sent to the agent.', false, 4000);
+        return;
+    }
     if (button) button.disabled = true;
     try {
         const resp = await serverFetch(sessionServer(session), `/api/sessions/live/${encodeURIComponent(session.name)}/dismiss-wait`, {

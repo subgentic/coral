@@ -32,6 +32,9 @@ func (h *SessionsHandler) deliverOperatorComment(r *http.Request, caller comment
 	if !h.operatorComment(r, caller) {
 		return autoDelivery{Reason: "not_owner"}
 	}
+	if team, gid, ok := parseGoalSubject(id); ok { // a goal's comment goes to the goal's owner (#11955)
+		return h.deliverGoalComment(r, caller, c, id, team, gid)
+	}
 	if b == "" || h.bs == nil || h.ss == nil {
 		return autoDelivery{Reason: "not_for_review"}
 	}

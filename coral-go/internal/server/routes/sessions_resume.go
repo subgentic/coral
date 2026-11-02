@@ -91,6 +91,9 @@ func (h *SessionsHandler) resumeResolve(ctx context.Context, name string, body *
 	if !agent.IsResumeID(agentType, body.SessionID) {
 		return nil, func(w http.ResponseWriter) { errBadRequest(w, "session_id is not a valid resume id") } // #3582: it goes into file paths
 	}
+	if agentType == at.Hermes {
+		return nil, func(w http.ResponseWriter) { errBadRequest(w, hermesResumeRefusal) }
+	}
 	if !agent.GetAgent(agentType).SupportsResume() {
 		return nil, func(w http.ResponseWriter) { errBadRequest(w, fmt.Sprintf("Resume not supported for %s", agentType)) }
 	}
@@ -249,6 +252,7 @@ func (h *SessionsHandler) resumeRecord(ctx context.Context, p *restartPlan, resu
 	}
 	oldID := p.req.SessionID
 	h.chatMeta.forget(oldID, p.newSessionID)
+	defer h.removeReplacedHermesHome(p.stored, p.board, oldID) // the agent has a new session id, so a home of its own: the old one is no longer anyone's
 	h.ss.ReplaceLiveSession(ctx, oldID, &store.LiveSession{
 		SessionID:     p.newSessionID,
 		AgentType:     p.agentType,

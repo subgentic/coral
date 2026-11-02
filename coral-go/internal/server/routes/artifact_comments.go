@@ -244,6 +244,9 @@ func (h *SessionsHandler) commentArtifact(w http.ResponseWriter, r *http.Request
 // WHOLE document (#11444: HTML, pictures, PDFs, tables, video, downloads); only a text-like one takes a comment pointing into its text, and the create route says so.
 func (h *SessionsHandler) commentArtifactKind(w http.ResponseWriter, r *http.Request) (id string, textLike, ok bool) {
 	id = chi.URLParam(r, "id")
+	if strings.HasPrefix(id, "goal:") { // a goal's thread (#11955): the same routes, a goal in the place of a file
+		return id, false, h.goalCommentSubject(w, r, id)
+	}
 	if len(id) != 64 || strings.ToLower(id) != id {
 		errBadRequest(w, "invalid artifact id")
 		return "", false, false
@@ -350,6 +353,9 @@ func (h *SessionsHandler) listArtifactComments(w http.ResponseWriter, r *http.Re
 	}
 	if caller.Kind == commentCallerAgent { // the asked agent has read the threads: the owner's thread says "seen by" (#11722)
 		_ = h.ss.MarkAsksSeen(r.Context(), id, caller.Subject, time.Now())
+	}
+	if caller.Kind == commentCallerOwner { // the Operator opened the file's comments: an agent's replies in their threads are seen, and the file's row stops saying "new comments" (#12026)
+		_ = h.ss.MarkThreadsSeen(r.Context(), id, time.Now())
 	}
 	state := r.URL.Query().Get("state")
 	switch state {
@@ -607,6 +613,9 @@ func (h *SessionsHandler) createArtifactComment(w http.ResponseWriter, r *http.R
 		}
 	} else if !readJSONBody(w, r, 3*store.MaxArtifactCommentBody, &in) {
 		return
+	}
+	if team := goalTeamOf(r); team != "" {
+		in.Board = team // a goal comment belongs to the goal's team, whatever the request says (#11955)
 	}
 	if in.Board != "" && !commentBoardRe.MatchString(in.Board) {
 		errBadRequest(w, "invalid board")
