@@ -18,7 +18,12 @@ export function liveAgentOf(name, { board = '', session = '' } = {}) {
     return rows.find(s => !s.archived && String(s.board_subscriber_id || '').trim().toLowerCase() === want && (!team || String(s.board_project || '') === team || String(s.board_project || '') === board)) || null;
 }
 
-const open = s => { window.switchNavTab?.('agents'); Promise.resolve(window.selectLiveSession?.(s.name, s.agent_type, s.session_id || '', sessionServer(s))).catch(() => {}); };
+// The file viewer (a modal div) or a native dialog the name sat in is closed first, so the chat is not opened behind it (#12168).
+const closeOverlays = () => {
+    document.querySelector('#artifact-viewer:not([hidden]) [data-dialog-close], #artifact-viewer:not([hidden]) .artifact-viewer-close')?.click();
+    for (const d of document.querySelectorAll('dialog[open]')) { try { d.close(); } catch { /* already closing */ } }
+};
+const open = s => { closeOverlays(); window.switchNavTab?.('agents'); Promise.resolve(window.selectLiveSession?.(s.name, s.agent_type, s.session_id || '', sessionServer(s))).catch(() => {}); };
 
 // One delegated click for every link and circle this helper draws, DOM or HTML, so markup built as a string (the Board's messages) and nodes behave alike; in the capture phase and stopped, so a row or card the name sits in
 // does not also open its own page.

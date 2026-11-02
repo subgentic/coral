@@ -88,12 +88,18 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
             // an agent's name is as written and opens its chat (#12168, the operator): the reply author and its circle for a running agent; a gone agent is plain text with a tooltip
             const who = await ev(`(() => { const e = document.querySelector('.ac-entry[data-id="2"]'), a = e.querySelector('.ac-author'), c = e.querySelector('.ac-avatar'), g = document.querySelector('.ac-card[data-id="1"] .ac-ask-status .agent-name'); return { tag: a.tagName, text: a.textContent, label: a.getAttribute('aria-label'), circle: c.classList.contains('agent-link-avatar'), gone: g ? { tag: g.tagName, text: g.textContent, title: g.title } : null }; })()`);
             check(`${tag}: a running agent's name is a button as written: ` + JSON.stringify(who), who.tag === 'BUTTON' && who.text === 'QA Engineer' && /^Open QA Engineer$/.test(who.label) && who.circle);
+            check(`${tag}: (precondition) the viewer is open when the name is clicked`, await ev("(() => { const v = document.querySelector('#artifact-viewer'); return !!v && !v.hidden; })()"));
             await ev(`document.querySelector('.ac-entry[data-id="2"] .ac-author').click(); true`);
             check(`${tag}: the name opens that agent's chat`, JSON.stringify(await ev('window.__opened && window.__opened.slice(0, 3)')) === JSON.stringify(['qa-agent', 'claude', 'sess-qa']));
+            check(`${tag}: the file viewer the thread sat in is closed, so the chat is not opened behind it (#12168)`, await ev("(() => { const v = document.querySelector('#artifact-viewer'); return !v || v.hidden; })()"));
+            await open('ask-team'); // the viewer was closed by the name's click; open it again for the circle
+            await waitFor(`!!document.querySelector('.ac-entry[data-id="2"] .ac-avatar')`, 'the reply drawn again', 8000);
             await ev(`window.__opened = null; document.querySelector('.ac-entry[data-id="2"] .ac-avatar').click(); true`);
             check(`${tag}: so does its circle`, !!(await ev('window.__opened')));
             check(`${tag}: an agent that is not running is plain text with a tooltip, in the case it was written: ` + JSON.stringify(who.gone), !!who.gone && who.gone.tag === 'SPAN' && who.gone.text === 'Reviewer' && /not running/.test(who.gone.title));
             // the resolved thread is not drawn until "Show resolved": the check above passed for want of a card (#8366: removing the resolved test from canAsk survived)
+            await open('ask-team'); // the circle's click closed the viewer too
+            await waitFor(`!!document.querySelector('.ac-showresolved')`, 'Show resolved', 8000);
             await ev(`document.querySelector('.ac-showresolved').click(); true`);
             check(`${tag}: with the resolved threads shown, the resolved one is on the page and has no "Send to agent"`, (await ev(`!!document.querySelector('.ac-card[data-id="3"]')`)) && !(await ev(`!!${sendBtn(3)}`)));
             await ev(`document.querySelector('.ac-showresolved').click(); true`);
