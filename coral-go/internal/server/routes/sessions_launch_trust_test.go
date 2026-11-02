@@ -304,3 +304,28 @@ func TestATickedFolderCoralDidNotTrustIsSaidOnTheBoard(t *testing.T) {
 		assert.NotContains(t, m.Content, "did not trust")
 	}
 }
+
+// QA's SHOULD on #12338: the board line for a folder Coral did NOT trust quotes the folder's name as text and cleans it, like the 'trusted' line does: a name with a mention, a control character and a quote can
+// neither mention the Operator nor carry the control character, and the quote cannot end the quoted name early. Removing quoteNotice or noticeText from the line must fail this.
+func TestTheNotTrustedBoardLineQuotesAndCleansTheFolderName(t *testing.T) {
+	r := newTrustRig(t)
+	dir := filepath.Join(r.home, ".hidden", "x @Operator \x07y \"q\" z") // a hidden folder under home: never trusted, so the line is the 'did not trust' one
+	require.NoError(t, os.MkdirAll(dir, 0o755))
+	out := r.launch(t, dir, false, true, asCaller(callerDashCookie))
+	require.NotEmpty(t, trustOf(t, out)["refused"])
+	var line string
+	msgs, err := r.h.bs.ListMessages(context.Background(), out["board"].(string), 100, 0, 0)
+	require.NoError(t, err)
+	for _, m := range msgs {
+		if strings.Contains(m.Content, "did not trust") {
+			require.Empty(t, line, "one line")
+			line = m.Content
+		}
+	}
+	require.NotEmpty(t, line)
+	assert.NotContains(t, line, "@Operator", "the mention is broken: the line cannot notify the Operator")
+	assert.NotContains(t, line, "\x07", "the control character does not reach the board")
+	assert.Contains(t, line, "x ", "the name is still there, cleaned")
+	assert.Contains(t, line, `\"q\"`, "the name's own quotes are escaped inside the quoted name (quoteNotice)")
+	assert.Contains(t, line, `"`+r.home, "the folder opens with a quote: it is quoted as text")
+}
