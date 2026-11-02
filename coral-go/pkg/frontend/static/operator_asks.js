@@ -137,11 +137,29 @@ export async function wakeMember(a, name) {
 /** A question the way a review item reads (#12143, the operator): a short subject for the title (the first line when it is short, else the first words), who asked, on which team and when under it, the words as rendered Markdown with the
  * "@Operator" the asker opened with taken off, and the reply in the item. The body keeps everything the question says: when the first line became the title, the body is the rest; a one-line question has no body. */
 export function askParts(a) {
-    const clean = askWhole(a).replace(/^\s*@Operator\b[:,]?\s*/i, '').trim();
+    const clean = listsOf(askWhole(a).replace(/^\s*@Operator\b[:,]?\s*/i, '').trim());
     const lines = clean.split('\n'), first = (lines[0] || '').trim().replace(/^#{1,6}\s+/, '');
-    if (first.length <= 80) return { title: first.replace(/[*_`]/g, '') || 'A question', body: lines.slice(1).join('\n').trim() };
+    if (first.length <= 80) return { title: first.replace(/[*_`]/g, '').replace(/:+$/, '') || 'A question', body: lines.slice(1).join('\n').trim() };
+    const lead = /^(.{20,80}?):(?=\s|$)/.exec(first); // a long first line that opens with a clause ending in a colon ("... in the console: 1. ..."): that is the title, and the rest is the body (the words are not said twice)
+    if (lead) return { title: lead[1].replace(/[*_`]/g, '').trim(), body: [first.slice(lead[0].length).trim(), ...lines.slice(1)].join('\n').trim() };
     const cut = first.slice(0, 80), at = cut.lastIndexOf(' ');
     return { title: `${(at > 40 ? cut.slice(0, at) : cut).replace(/[*_`]/g, '').replace(/[\s,;:.-]+$/, '')}\u2026`, body: clean };
+}
+
+/** A question written on one line with its steps inline ("... console: 1. Open it. 2. Generate a token. 3. Save it.") is set out as a list: a blank line before the first step and each step on its own line. Only when the
+ * numbers run 1, 2, ... in order (so "version 2.5" or a date is left alone) and the text has no line breaks of its own to go by. */
+export function listsOf(text) {
+    if (/\n/.test(text)) return text;
+    const marks = [];
+    for (let n = 1, from = 0; n < 50; n++) {
+        const m = new RegExp(`(?:^|[\\s])${n}[.)]\\s+(?=\\S)`).exec(text.slice(from));
+        if (!m) break;
+        marks.push(from + m.index + (m[0].length - m[0].trimStart().length)); // where the number starts
+        from = from + m.index + m[0].length;
+    }
+    if (marks.length < 2) return text;
+    const parts = [text.slice(0, marks[0]).trimEnd(), ...marks.map((at, i) => text.slice(at, marks[i + 1] ?? text.length).trim())];
+    return parts[0] ? `${parts[0]}\n\n${parts.slice(1).join('\n')}` : parts.slice(1).join('\n');
 }
 
 /** The goal and the task a question was asked about (#12194, #12164): [{ kind, id, title }], the goal first; empty when the asker named neither. */
