@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -300,4 +301,124 @@ func TestNeedsYouAgentItemsAreTheAwakeWaitingOnes(t *testing.T) {
 	assert.Equal(t, "agent:e", got[1].ID)
 	assert.Equal(t, now.Format(time.RFC3339Nano), got[1].At, "no start time: waiting now")
 	assert.Equal(t, "Wants to run a command", got[0].Line)
+}
+
+// #12026 (the Operator): after the Operator comments on a file, an agent's reply in that thread is NOT a new item: the file's own row says "new comments" (the row's new_comments, the number of unseen replies) and
+// becomes unread again, counted once as that same row, in /api/needs-you (so the phone push) as in the list. Opening the thread clears it (commentNews no longer has the file).
+func TestNeedsYouAFileWithNewCommentsIsUnreadAgainAsTheSameRow(t *testing.T) {
+	e := newReviewEnv(t, true)
+	news := map[string]int{}
+	e.h.SetCommentNews(func(context.Context) (map[string]int, error) { return news, nil })
+	count := func() (int, map[string]any) {
+		req := asPerson(httptest.NewRequest(http.MethodGet, "/api/needs-you", nil))
+		w := httptest.NewRecorder()
+		e.h.NeedsYou(w, req)
+		var out map[string]any
+		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+		_ = json.Unmarshal(w.Body.Bytes(), &out)
+		return int(out["count"].(float64)), out
+	}
+	person := chi.NewRouter() // the Operator's own list: the dashboard's cookie
+	person.Get("/api/board/{project}/artifacts", func(w http.ResponseWriter, req *http.Request) { e.h.ListTeamArtifacts(w, asPerson(req)) })
+	psrv := httptest.NewServer(person)
+	t.Cleanup(psrv.Close)
+	listAs := func(srv string) []map[string]any {
+		resp, err := http.Get(srv + "/api/board/alpha/artifacts")
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		var out map[string]any
+		require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
+		var got []map[string]any
+		for _, a := range out["artifacts"].([]any) {
+			got = append(got, a.(map[string]any))
+		}
+		return got
+	}
+	rows := func() []map[string]any { return listAs(psrv.URL) }
+
+	e.tag(t, `["for review", "read"]`)
+	n, _ := count()
+	require.Equal(t, 0, n, "opened: read, not counted")
+	assert.Nil(t, rows()[0]["new_comments"], "no news, no field")
+
+	news[e.id] = 2
+	n, out := count()
+	assert.Equal(t, 1, n, "an agent replied in the Operator's thread: the read file is unread again, counted once")
+	items := needsYouItems(out)
+	require.Len(t, items, 1, "the same row, not a new item")
+	assert.Equal(t, "review", items[0]["kind"])
+	assert.Equal(t, "review:alpha:"+e.id, items[0]["id"], "the file's own row")
+	assert.EqualValues(t, 2, items[0]["new_comments"])
+	assert.EqualValues(t, 1, out["counts"].(map[string]any)["review"])
+	assert.EqualValues(t, 2, rows()[0]["new_comments"], "and the list says so for the page")
+
+	e.tag(t, `["for review"]`)
+	n, _ = count()
+	assert.Equal(t, 1, n, "an unread file with new comments is still ONE")
+
+	e.tag(t, `["for review", "saved"]`)
+	n, _ = count()
+	assert.Zero(t, n, "a saved file is out of Needs you's count, with or without comments")
+	assert.EqualValues(t, 2, rows()[0]["new_comments"], "but its row still says new comments (Saved, Artifacts)")
+
+	assert.Nil(t, listAs(e.srv.URL)[0]["new_comments"], "a list that is not the Operator's own (an agent, a guest) never has it")
+	e.tag(t, `["for review", "read"]`)
+	delete(news, e.id) // the thread was opened
+	n, _ = count()
+	assert.Zero(t, n, "opened again: read")
+	assert.Nil(t, rows()[0]["new_comments"])
+
+	// #12026 (the Orchestrator's decision): a file the Operator already DECIDED (approved, or denied) comes back to Needs you as its own row when an agent replies in their thread, marked and counted once; an ignored or
+	// saved one does not. The list answers the tag "new comments" with the rows that have news, whatever else they are tagged.
+	e.tag(t, `["approved"]`)
+	n, _ = count()
+	assert.Zero(t, n, "an approved file is not in Needs you")
+	news[e.id] = 1
+	n, out = count()
+	assert.Equal(t, 1, n, "an approved file the agent replied about comes back, once")
+	items = needsYouItems(out)
+	require.Len(t, items, 1)
+	assert.Equal(t, "review:alpha:"+e.id, items[0]["id"])
+	assert.EqualValues(t, 1, items[0]["new_comments"])
+	resp, err := http.Get(psrv.URL + "/api/board/alpha/artifacts?tag=new%20comments")
+	require.NoError(t, err)
+	var tagged map[string]any
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&tagged))
+	resp.Body.Close()
+	require.Len(t, tagged["artifacts"], 1, "the list has the row for the tag new comments")
+	e.tag(t, `["denied"]`)
+	n, _ = count()
+	assert.Equal(t, 1, n, "a denied one too")
+	e.tag(t, `["ignored"]`)
+	n, _ = count()
+	assert.Zero(t, n, "an ignored file stays out: the Operator chose not to see it")
+	e.tag(t, `["approved", "saved"]`)
+	n, _ = count()
+	assert.Zero(t, n, "a saved file is not counted")
+	e.tag(t, `["approved", "superseded"]`)
+	n, _ = count()
+	assert.Zero(t, n, "a file with a newer version is not the one to look at")
+	delete(news, e.id)
+	e.tag(t, `["approved"]`)
+	resp, err = http.Get(psrv.URL + "/api/board/alpha/artifacts?tag=new%20comments")
+	require.NoError(t, err)
+	tagged = map[string]any{}
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&tagged))
+	resp.Body.Close()
+	assert.Empty(t, tagged["artifacts"], "no news: no row for the tag")
+	n, _ = count()
+	assert.Zero(t, n, "and an approved file with no news is not in Needs you")
+
+	// Security's SHOULD on a6b5440ae: a file the Operator asked changes of is the agent's turn, so it is not counted, unless an agent replied in the Operator's thread (that is news): whichever of this and #11985 lands first
+	e.tag(t, `["for review", "changes requested"]`)
+	n, _ = count()
+	assert.Zero(t, n, "changes requested, no news: the agent's turn")
+	news[e.id] = 1
+	n, _ = count()
+	assert.Equal(t, 1, n, "changes requested and the agent replied in the thread: it is back, once")
+	delete(news, e.id)
+
+	news["ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"] = 5
+	n, _ = count()
+	assert.Zero(t, n, "news on another file is not this file's")
 }
