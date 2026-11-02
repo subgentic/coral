@@ -8,7 +8,6 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -229,6 +228,20 @@ func TestTheBoardNoticeQuotesTheFolderName(t *testing.T) {
 	assert.Equal(t, []any{"claude"}, trustOf(t, out)["trusted"], "Codex refuses a name with a quote, Claude does not")
 	notices := r.trustNotices(t, out["board"].(string))
 	require.Len(t, notices, 1, "%v", notices)
-	assert.Contains(t, notices[0], strconv.Quote(dir), "the name is quoted, escapes written out")
+	cleaned := strings.ReplaceAll(dir, "\u202e", "") // noticeText removes a bidi mark
+	assert.Contains(t, notices[0], `"`+strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(cleaned)+`"`, "the name is cleaned and quoted, a quote written as \\\"")
 	assert.NotContains(t, notices[0], "\u202e", "no bidi mark reaches the message")
+}
+
+// The folder's name is stored text: a mention in it does not notify anyone (noticeText defuses it, the census of stored text, #9231).
+func TestTheBoardNoticeCannotMentionAnyoneThroughTheFolderName(t *testing.T) {
+	r := newTrustRig(t)
+	dir := filepath.Join(r.home, "Code", "x @all y")
+	require.NoError(t, os.MkdirAll(dir, 0o755))
+	out := r.launch(t, dir, false, true, asCaller(callerDashCookie))
+	assert.Contains(t, trustOf(t, out)["trusted"], "claude")
+	notices := r.trustNotices(t, out["board"].(string))
+	require.Len(t, notices, 1, "%v", notices)
+	assert.NotContains(t, notices[0], "@all", "the broadcast mention is broken")
+	assert.Contains(t, notices[0], "x ", "the name is still there")
 }
