@@ -333,3 +333,15 @@ func TestShellTreeNamesAreBaseNamesAndCleaned(t *testing.T) {
 	assert.Equal(t, "bash(Ss){mytool(S+)}", tree)
 	assert.NotContains(t, tree, "jane")
 }
+
+// QA's SHOULD on #12222: a hostile state in a process entry is cleaned in the drawn tree too (a control character, braces and parentheses never reach the line).
+func TestShellTreeCleansAHostileState(t *testing.T) {
+	tab := &procTable{byPID: map[int]procEntry{
+		1: {stat: "Ss", comm: "bash"},
+		2: {ppid: 1, stat: "S\x1b{x}(y)\n+", comm: "node"},
+	}, children: map[int][]int{1: {2}}}
+	tree := shellTree(tab, 1)
+	assert.Equal(t, "bash(Ss){node(Sxy+)}", tree)
+	assert.NotContains(t, tree, "\x1b")
+	assert.Equal(t, 1, strings.Count(tree, "{"), "only the tree's own brace")
+}
