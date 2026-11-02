@@ -18,6 +18,7 @@
 import { importOnce } from './import_once.js';
 import { whenText, shortWhen } from './when_text.js';
 import { browserLocal } from './safe_storage.js';
+import { loadStyles } from './lazy_styles.js';
 
 export const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 const button = (cls, text, onClick) => { const b = el('button', cls, text); b.type = 'button'; if (onClick) b.addEventListener('click', onClick); return b; };
@@ -198,14 +199,14 @@ export function dataTable(cfg) {
     const colgroup = el('colgroup');
     table.append(colgroup, thead, tbody);
     // the columns left out to fit the panel are never silently gone (#11943): a quiet control says how many, lists them and brings one back (it then keeps its place and the others give way by the same rules)
-    const hiddenBar = el('div', 'dt-hidden-bar'); hiddenBar.hidden = true;
-    const hiddenMenu = el('div', 'dt-hidden-menu'); hiddenMenu.setAttribute('role', 'menu'); hiddenMenu.hidden = true;
-    const hiddenBtn = button('dt-hidden-btn', '', () => { if (hiddenMenu.hidden) openHidden(); else closeHidden(); }); hiddenBtn.setAttribute('aria-haspopup', 'menu'); hiddenBtn.setAttribute('aria-expanded', 'false');
+    let hiddenSeq = 0;
+    const hiddenBar = el('div', 'cols-hidden-bar'); hiddenBar.hidden = true;
+    const hiddenId = `dt-cols-hidden-${++hiddenSeq}-${Math.random().toString(36).slice(2, 7)}`;
+    const hiddenMenu = el('div', 'menu cols-hidden-menu'); hiddenMenu.id = `${hiddenId}-menu`; hiddenMenu.hidden = true; hiddenMenu.setAttribute('role', 'menu'); hiddenMenu.setAttribute('aria-label', 'Hidden columns');
+    const hiddenBtn = button('btn btn-quiet btn-small cols-hidden-btn', '', async (e) => { e.stopPropagation(); (await importOnce('./menu_button.js')).toggleMenu(hiddenBtn); });
+    hiddenBtn.id = hiddenId; hiddenBtn.setAttribute('aria-haspopup', 'menu'); hiddenBtn.setAttribute('aria-expanded', 'false'); hiddenBtn.setAttribute('aria-controls', hiddenMenu.id);
     hiddenBar.append(hiddenBtn, hiddenMenu);
-    const outside = (e) => { if (!hiddenBar.contains(e.target)) closeHidden(); };
-    function closeHidden() { hiddenMenu.hidden = true; hiddenBtn.setAttribute('aria-expanded', 'false'); document.removeEventListener('pointerdown', outside, true); }
-    function openHidden() { hiddenMenu.hidden = false; hiddenBtn.setAttribute('aria-expanded', 'true'); document.addEventListener('pointerdown', outside, true); hiddenMenu.querySelector('button')?.focus(); }
-    hiddenMenu.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); closeHidden(); hiddenBtn.focus(); } });
+    const closeHidden = () => { if (!hiddenMenu.hidden) importOnce('./menu_button.js').then(m => m.closeMenus()).catch(() => {}); };
     box.append(sortBar, hiddenBar, table);
 
     // ── column widths (#7949): a handle on each header's right edge; the widths are kept per list in this browser ──
@@ -240,8 +241,9 @@ export function dataTable(cfg) {
         const gone = columns.filter(c => dropped.has(c.key));
         hiddenBar.hidden = !gone.length;
         if (!gone.length) { closeHidden(); return; }
+        loadStyles('data_table_hidden.css'); // the control's rules come the first time a column is hidden, not at start
         const word = `${gone.length} column${gone.length === 1 ? '' : 's'} hidden`; hiddenBtn.textContent = word; hiddenBtn.setAttribute('aria-label', `${word}: ${gone.map(c => c.label || c.key).join(', ')}. Show one`);
-        hiddenMenu.replaceChildren(...gone.map(c => { const b = button('dt-hidden-item', `Show ${c.label || c.key}`, () => { (st.pinned ||= new Set()).add(c.key); closeHidden(); applyWidths(); hiddenBtn.focus(); }); b.setAttribute('role', 'menuitem'); return b; }));
+        hiddenMenu.replaceChildren(...gone.map(c => { const b = button('menu-item', `Show ${c.label || c.key}`, async e => { e.stopPropagation(); (st.pinned ||= new Set()).add(c.key); (await importOnce('./menu_button.js')).closeMenus({ restoreFocus: true }); applyWidths(); }); b.setAttribute('role', 'menuitem'); return b; }));
     }
     let L0 = null; // the last layout: the box's width, what each column got and the room the elastic column has left (setWidth reads it)
     function measureNatural(live) { // the table is laid out at its natural width for a moment (auto layout, as wide as its content, none of the sizes below): each head is as wide as its widest cell, its own max or its head needs
@@ -259,7 +261,7 @@ export function dataTable(cfg) {
             return;
         }
         if (!box.clientWidth) return;
-        const avail = box.clientWidth, rem = remPx(), live = columns.filter(c => !emptyKeys.has(c.key)), prim = live.find(c => c.primary || c.width === 'grow');
+        const avail = box.clientWidth, rem = remPx(), live = columns.filter(c => !emptyKeys.has(c.key)), prim = live.find(c => c.primary || c.width === 'grow') || live.find(c => !fixedW(c) && !c.fixed); // a table always has one elastic column: the one it declares, or else its first that is not fixed
         const nat = measureNatural(live);
         const chkTh = sel ? thead.querySelector('th.dt-check') : null, chk = chkTh && chkTh.getClientRects().length ? Math.round(chkTh.getBoundingClientRect().width) : 0;
         // the flexible columns: the elastic one (the primary, or the one that grows) and the others that declare a share; they split what the fixed-size columns leave, by their shares, none below its floor
