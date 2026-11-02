@@ -189,6 +189,8 @@ Rules Coral keeps:
 
 `coral machine launch` makes a cloud machine that runs Coral and joins Coral Hub (DigitalOcean first), from any computer with the `coral` command. It needs no running Coral server.
 
+Getting the machine's credential from the Hub is not yet enabled on app.coralhub.dev; the Hub will say when.
+
 ```sh
 coral machine launch --provider digitalocean --token-file ~/.do-token --hub-key-file ~/.coralhub-key [--hub-destroy-file ~/.coralhub-destroy] \
     --agents claude@VERSION,codex@VERSION [--max-mode view|interact|launch] [--name N] [--region nyc3] [--size s-2vcpu-4gb] [--coral-version V --coral-sha256-amd64 HEX --coral-sha256-arm64 HEX] [--allow-ssh-from ADDRESS] [--yes]
