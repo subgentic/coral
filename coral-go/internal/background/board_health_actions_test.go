@@ -204,3 +204,20 @@ func TestActionListAMentionOfAMembersJobTitleIsNotAGapForAMemberWhoseNameStartsW
 	assert.NotContains(t, out, "Hermes Agent Tester: no mention has reached it", "the mention is Lead One's by its job title")
 	assert.NotContains(t, out, "Lead One: no mention has reached it", "and Lead One was reached")
 }
+
+// The same line the other way round: the LONGER name is another member's job title. A mention of that title is its member's alone, so it does not stand in for a mention of the shorter member ("Security Reviewer"), whose real
+// partial address then stays a gap. With the job titles left out of the names the check resolves against, the longer title would read as a mention of the shorter member and hide the gap.
+func TestActionListAMentionOfALongerJobTitleDoesNotReachTheShorterMember(t *testing.T) {
+	h := newCheckHarness(t)
+	ctx := context.Background()
+	h.member("Orchestrator", "Orchestrator", 1, 0)
+	h.member("Security Reviewer", "Security", 2, 0)
+	h.member("Lead Two", "Security Reviewer Distributed Systems", 3, 0)
+	for _, text := range []string{"@Secur please look at #12", "@Security Reviewer Distributed Systems go ahead"} {
+		_, err := h.s.PostMessage(ctx, "team", "Orchestrator", text, nil)
+		require.NoError(t, err)
+	}
+	out := h.check()
+	assert.Contains(t, out, "Security Reviewer: no mention has reached it", "the longer job title is Lead Two's mention, not the shorter member's: the partial address stays a gap")
+	assert.NotContains(t, out, "Lead Two: no mention has reached it", "and Lead Two was reached by its job title")
+}
