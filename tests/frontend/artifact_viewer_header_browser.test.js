@@ -23,8 +23,9 @@ const { coralReady } = require('./helpers/wait');
             await ev(`(() => { const orig = window.fetch.bind(window); window.fetch = (u, o) => { const url = String(u);
                 if (/\\/api\\/board\\/team-a\\/artifacts\\?tag=for%20review/.test(url)) return Promise.resolve(new Response(JSON.stringify({ artifacts: [{ id: '${H3}', name: 'release-plan.md', tags: ['for review'], produced_by: 'Writer A', media_type: 'text/markdown', size: 12000, created_at: new Date().toISOString() }], has_more: false }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
                 if (/\\/api\\/board\\/team-a\\/artifacts\\?tag=(approved|reviewed)/.test(url)) return Promise.resolve(new Response(JSON.stringify({ artifacts: [], has_more: false }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+                if (/\\/api\\/board\\/team-a\\/artifacts\\/[0-9a-f]{64}\\/review/.test(url) && o && o.method === 'POST') return Promise.resolve(new Response(JSON.stringify({ state: 'approved', changed: true, tags: ['approved'], review: { state: 'approved', at: new Date().toISOString() }, delivered: true, to: 'Writer A' }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
                 return orig(u, o); }; return true; })()`);
-            await ev(`import(${S} + 'artifact_viewer.js').then(v => v.openArtifactViewer('${H3}', { filename: 'release-plan-for-the-whole-company-spring-launch-final.md', board: 'team-a', from: 'Writer A · team-a' })).then(() => true)`);
+            await ev(`import(${S} + 'artifact_viewer.js').then(v => v.openArtifactViewer('${H3}', { filename: 'release-plan-for-the-whole-company-spring-launch-final-draft-reviewed-by-legal-and-the-board-of-directors-and-the-press-office-version-three-of-three.md', board: 'team-a', from: 'Writer A · team-a' })).then(() => true)`);
             await waitFor(`!!document.querySelector('.artifact-review-approve:not([hidden])') && !!document.querySelector('.av-current')`, `${w}: the viewer shows its review and versions`, 12000);
             const g = await ev(`(() => { const d = document.querySelector('.artifact-viewer-content'), head = d.querySelector('.artifact-viewer-header'), body = d.querySelector('.artifact-viewer-body'), r = e => e && e.getBoundingClientRect(), top = e => { const b = r(e); return b && b.width ? Math.round(b.top + b.height / 2) : null; };
                 const q = s => d.querySelector(s), inHead = e => !!e && head.contains(e), vis = e => !!e && !!e.getClientRects().length;
@@ -53,7 +54,26 @@ const { coralReady } = require('./helpers/wait');
             assert.ok(pop.left >= 0 && pop.right >= 0 && pop.hitInside, `${w}: the version list is inside the dialog (its right edge is not cut off, with a long file name): ` + JSON.stringify(pop));
             if (w === 390) assert.ok(pop.width > 300, `${w}: on a phone the version list is as wide as the dialog allows: ` + JSON.stringify(pop));
             assert.ok(await ev(`!!document.querySelector('.av-compare') && document.querySelector('.av-compare').getClientRects().length > 0 && document.querySelector('.av-compare').textContent.includes('Compare with v2')`), `${w}: Compare with v2 is in the version list`);
-            await ev(`document.querySelector('.av-current').click(); document.querySelector('.artifact-viewer-close').click(); true`);
+            await ev(`document.querySelector('.av-current').click(); true`);
+            // Approve: the status chip says Approved at once, and the two buttons go (#12112's leftover: it kept saying "Waiting for your review")
+            assert.match(await ev(`document.querySelector('.artifact-review-state').textContent`), /Waiting for your review/, `${w}: before Approve the status waits for the review`);
+            await ev(`document.querySelector('.artifact-review-approve').click(); true`);
+            await waitFor(`/^Approved/.test(document.querySelector('.artifact-review-state').textContent)`, `${w}: the status chip says Approved after Approve (it said: ` + await ev(`document.querySelector('.artifact-review-state').textContent`) + ')', 4000);
+            assert.ok(await ev(`document.querySelector('.artifact-review-approve').hidden && document.querySelector('.artifact-review-changes').hidden`), `${w}: Approve and Request changes are gone once approved`);
+            await ev(`document.querySelector('.artifact-viewer-close').click(); true`);
+            // the other two ways to approve while the file is open: Approve with a note, and the Inbox row's own Approve (artifact_review.approveRow) (#12112's leftover)
+            for (const how of ['note', 'row']) {
+                await ev(`import(${S} + 'artifact_viewer.js').then(v => v.openArtifactViewer('${H3}', { filename: 'release-plan.md', board: 'team-a' })).then(() => true)`);
+                await waitFor(`!!document.querySelector('.artifact-review-approve:not([hidden])')`, `${w}: reopened, waiting for the review (${how})`, 8000);
+                if (how === 'note') {
+                    await ev(`document.querySelector('.artifact-viewer-more').click(); document.querySelector('.artifact-review-note').click(); true`);
+                    await waitFor(`!!document.querySelector('.inbox-approve-note-confirm')`, `${w}: the note dialog opens`, 4000);
+                    await ev(`document.querySelector('.inbox-approve-note-confirm').click(); true`);
+                } else await ev(`import(${S} + 'artifact_review.js').then(r => import(${S} + 'server_base.js').then(b => r.approveRow(b.identityKey(undefined, 'team-a'), { id: '${H3}', name: 'release-plan.md', team: b.identityKey(undefined, 'team-a') }))).then(() => true)`);
+                await waitFor(`/^Approved/.test(document.querySelector('.artifact-review-state').textContent)`, `${w}: the status chip says Approved after Approve ${how === 'note' ? 'with a note' : 'from the Inbox row'}`, 4000);
+                await ev(`document.querySelector('.artifact-viewer-close').click(); true`);
+            }
+            await ev(`document.querySelector('.artifact-viewer-close').click(); true`);
         }
         console.log('   heights before/after are in the lines above: ' + JSON.stringify(heights));
     } finally { await client.close(); }
