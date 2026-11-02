@@ -57,6 +57,8 @@ const GF = await importOnce('./goal_filters.js'); // the Goals folder's search, 
 const IT = await importOnce('./inbox_toolbar.js'); // the folders' toolbar on the shared list bar
 const NF = await importOnce('./needs_filters.js'); // the Needs you folder's search, pills and Filters (#8604)
 const CF = await importOnce('./chat_filters.js'); // the chat folders' Filters (#8603)
+const AC = await importOnce('./inbox_activity.js'); // the Activity folder (#12070): what the Operator did in Needs you, from the server's record (this computer only)
+const AF = await importOnce('./operator_activity_filters.js'); // its search and Filters
 const IA = await importOnce('./inbox_artifacts.js'); // the Artifacts folder (Goal #62): every team's files in one list
 const { answerCell, rowActions } = await importOnce('./inbox_answer.js'); // the choices of a question or a permission, answered from the row (#10400)
 
@@ -94,6 +96,7 @@ const GROUPS = nativeInbox() ? [{ key: 'needs', label: 'Needs you', frame: HUB_F
     { key: 'goals', label: 'Goals', search: 'Search goals', short: 'Search' }, // the open goals of every team the person runs (GET /api/goals): the team page's goal row plus a Team column (#7776)
     { key: 'artifacts', label: 'Artifacts', search: 'Search artifacts', short: 'Search' }, // every team's artifacts (GET /api/team-artifacts): the team page's list plus a Team filter (Goal #62)
     { key: 'saved', label: 'Saved', search: 'Search saved messages', short: 'Search' }, // the box beside Display options and Expand is narrow: its placeholder is the short words, its name the whole ones
+    { key: 'activity', label: 'Activity', search: 'Search activity', short: 'Search' }, // what you did in Needs you (GET /api/activity, the owner's alone, read only; #12070)
 ];
 const GROUP_KEY = 'coral.inbox.tab'; // the group last on screen, kept in this browser
 let tasks = [];
@@ -101,7 +104,7 @@ let tasks = [];
 const groupMeta = key => GROUPS.find(g => g.key === key) || (CH.CHAT_KEY.test(key) && CH.chatFolder(key) ? { key, label: CH.chatFolder(key).title, search: 'Search chats', short: 'Search' } : null);
 const DEFAULT_GROUP = nativeInbox() ? 'chats' : 'needs';
 let group = (() => { const v = browserLocal.get(GROUP_KEY); return groupMeta(v) ? v : DEFAULT_GROUP; })();
-const queries = { needs: '', tasks: '', goals: '', artifacts: '', saved: '' }; // a chat folder keeps its search as typed under its own key // each group's own search text (lower case; Saved's goes to the server as typed)
+const queries = { needs: '', tasks: '', goals: '', artifacts: '', saved: '', activity: '' }; // a chat folder keeps its search as typed under its own key // each group's own search text (lower case; Saved's goes to the server as typed)
 let goalMount = null, goalOpener = null, goalScroll = 0, itemMount = null;
 const itemOpeners = new Map();
 const folderRoute = { view: 'inbox-goals', sub: 'goals' };
@@ -495,6 +498,7 @@ let goals = []; // the open goals of every team (GET /api/goals): id, board_id, 
 const goalKey = g => `${g.board_id}#${g.id}`;
 const goalTeam = g => teamLabel(g.board_id); // with its computer when a hub has more than one: two teams called alpha are two (#8774)
 let goalFilters = GF.loadFilters(), goalBar = null;
+let activityFilters = AF.loadFilters(), activityBar = null;
 const goalRows = () => GF.ordered(goals.filter(g => GF.matches(g, goalFilters, goalTeam) && serverMatches(g, goalFilters)), goalFilters);
 /** New goal at the right of the Goals toolbar (#11593, the operator): the existing New goal form (goals_view.js, lazy), on the team the Team filter names, else the first; with more than one team the form asks which. */
 function newGoalAction() {
@@ -540,6 +544,30 @@ function inboxGoalsToolbar() {
         action: newGoalAction(),
     });
     return { node, signature: JSON.stringify([goalFilters, teams, drivers, counts, rows.length]) };
+}
+/** The Activity folder's toolbar (#12070): the search, Filters (Team, Action, Since) and the order, on the shared list bar. The Computer field is not offered: the record is this computer's alone. */
+function inboxActivityToolbar() {
+    if (!activityBar) {
+        activityBar = IT.folderToolbar({
+            idp: 'inbox-activity', noun: 'action', searchLabel: 'Search activity',
+            sorts: { values: AF.SORTS, labels: AF.SORT_LABEL, aria: 'Sort activity' },
+            fields: [
+                { type: 'select', key: 'team', id: 'inbox-activity-team', label: 'Team', values: [], labels: {}, any: 'Any team' },
+                { type: 'select', key: 'action', id: 'inbox-activity-action', label: 'Action', values: AF.ACTIONS, labels: AF.ACTION_LABEL, any: 'Any action' },
+                { type: 'date', key: 'from', id: 'inbox-activity-from', label: 'Since' },
+            ],
+            model: { EMPTY: AF.EMPTY, clean: AF.clean, chips: AF.chips, isFiltered: AF.isFiltered, without: AF.without },
+        }, next => {
+            activityFilters = next; AF.saveFilters(next);
+            const input = $('inbox-search'); if (input && group === 'activity') input.value = next.q; // the sidebar's box shows the same words
+            renderInboxNav(true);
+        });
+    }
+    const teams = AC.teams();
+    AF.setTeamNames(new Map(teams.map(t => [t, teamLabel(t)])));
+    const node = activityBar.draw({ filters: activityFilters, options: { team: { values: teams, labels: Object.fromEntries(teams.map(t => [t, teamLabel(t)])) } } });
+    activityBar.bar.showField('server', false);
+    return { node, signature: JSON.stringify([activityFilters, teams, AC.total()]) };
 }
 async function refreshGoals() {
     try {
@@ -602,7 +630,7 @@ const savedCounts = () => saved.savedView().totals;
 const goalProposals = () => pendingProposals().filter(p => p.kind === 'goal');
 const countOf = key => key === 'needs' ? waitingSessions().length + unreadReviewItems().length + failedUnread().length + pendingProposals().length + goalDoneRows().filter(needsUnread).length + operatorAsks().length + recordRows().length : key === 'tasks' ? taskRows().length : key === 'goals' ? goals.length + goalProposals().length : key === 'artifacts' ? IA.artifactCount() ?? undefined : key === 'saved' ? savedCounts().open + savedFiles().length : undefined;
 /** The folders of the Inbox (#7785, the mailbox mock): one view list, a name and a count each. Needs you, Tasks and Saved open their table in the centre; */
-const FOLDER_ICONS = { needs: 'notifications', tasks: 'checklist', goals: 'flag', saved: 'saved-bookmark', artifacts: 'inventory_2',
+const FOLDER_ICONS = { needs: 'notifications', tasks: 'checklist', goals: 'flag', saved: 'saved-bookmark', artifacts: 'inventory_2', activity: 'checklist',
     chats: 'chat_bubble_outline', [BOARDS_FOLDER]: 'forum', 'chats-notes': 'edit_note', 'chats-starred': 'star', 'chats-active': 'bolt', 'chats-archived': 'folder' }; // UI/UX's existing subset choices (#8866); tagged folders keep their colour dot
 /** The phone drawer's Boards group (#9583, UI/UX's spec #9529): each team's board by its name, opening its messages in the Inbox. No unread count: nothing records what was read yet. A desktop's sidebar has the Board history folder only. */
 let boardList = []; // { key: team key, label }
@@ -618,12 +646,12 @@ const BOARD_ITEM = 'board:';
 const boardSection = () => (isPhoneLayout() && boardList.length ? [{ title: 'Boards', items: boardList.map(b => ({ key: BOARD_ITEM + b.key, label: b.label })) }] : []);
 /** What the folder list shows as current: on a phone an open board is its own entry of the Boards group (the folder it belongs to elsewhere is Board history). */
 const navCurrent = () => (isPhoneLayout() && page?.kind === BOARDS_SUB ? BOARD_ITEM + page.project : pageGroup());
-const FOLDER_TIPS = { needs: 'Agents waiting for you: a question, a permission or a review', tasks: 'Tasks assigned to you', goals: 'The open goals of your teams', saved: 'Messages you saved for later', artifacts: 'Files agents shared' }; // one line each (#10074)
+const FOLDER_TIPS = { needs: 'Agents waiting for you: a question, a permission or a review', tasks: 'Tasks assigned to you', goals: 'The open goals of your teams', saved: 'Messages you saved for later', artifacts: 'Files agents shared', activity: 'What you did in Needs you' }; // one line each (#10074)
 const folderSections = () => (nativeInbox() ? [{ title: 'Needs attention', items: GROUPS.filter(g => g.key !== 'artifacts' || !IA.artifactsOwnerOnly()).map(g => ({ key: g.key, label: g.label, count: g.key === 'goals' || g.key === 'artifacts' ? countOf(g.key) : undefined })) }, ...CH.chatSections(), ...boardSection()] : [{ title: 'Needs attention', items: [
     { key: 'needs', label: 'Needs you', count: countOf('needs'), alert: countOf('needs') > 0 }, { key: 'tasks', label: 'Tasks', count: countOf('tasks') },
     { key: 'goals', label: 'Goals', count: countOf('goals') },
     { key: 'saved', label: 'Saved', count: countOf('saved') }] },
-    { title: 'Files', items: [{ key: 'artifacts', label: 'Artifacts', count: countOf('artifacts') }] }, ...CH.chatSections(), ...boardSection()]).map(section => ({ ...section, items: section.items.map(item => ({ ...item, tip: FOLDER_TIPS[item.key], icon: FOLDER_ICONS[item.key] || (item.key.startsWith(BOARD_ITEM) ? 'forum' : undefined) || (item.key.startsWith('chats-cli-') ? `cli:${item.key.slice(10)}` : undefined) })) }));
+    { title: 'Files', items: [{ key: 'artifacts', label: 'Artifacts', count: countOf('artifacts') }] }, { title: 'History', items: [{ key: 'activity', label: 'Activity' }] }, ...CH.chatSections(), ...boardSection()]).map(section => ({ ...section, items: section.items.map(item => ({ ...item, tip: FOLDER_TIPS[item.key], icon: FOLDER_ICONS[item.key] || (item.key.startsWith(BOARD_ITEM) ? 'forum' : undefined) || (item.key.startsWith('chats-cli-') ? `cli:${item.key.slice(10)}` : undefined) })) }));
 let _navKey = null, _folders = null, _poll = 0;
 /** A folder was picked: a page that is open gives way, and the folder's table opens with the keyboard at its heading. */
 function pickFolder(key) {
@@ -824,7 +852,7 @@ function hubFrameTable(key) {
 
 registerGroupSource('hub-inbox', {
     signature: () => JSON.stringify([state.hub, state.servers]),
-    toolbar: key => HUB_FRAMES[key] && nativeInbox() ? null : key === 'needs' ? inboxNeedsToolbar() : key === 'tasks' ? inboxTaskToolbar() : key === 'goals' ? inboxGoalsToolbar() : key === 'saved' ? inboxSavedToolbar() : CH.CHAT_KEY.test(key) ? inboxChatsToolbar(key) : key === 'artifacts' ? IA.artifactsToolbar(() => renderFolderCounts()) : ({ search: { id: 'inbox-search', label: 'Search the Inbox' } }), // the page's toolbar line, the same shape for Needs you, Tasks and Saved (#7723)
+    toolbar: key => HUB_FRAMES[key] && nativeInbox() ? null : key === 'needs' ? inboxNeedsToolbar() : key === 'tasks' ? inboxTaskToolbar() : key === 'goals' ? inboxGoalsToolbar() : key === 'saved' ? inboxSavedToolbar() : key === 'activity' ? inboxActivityToolbar() : CH.CHAT_KEY.test(key) ? inboxChatsToolbar(key) : key === 'artifacts' ? IA.artifactsToolbar(() => renderFolderCounts()) : ({ search: { id: 'inbox-search', label: 'Search the Inbox' } }), // the page's toolbar line, the same shape for Needs you, Tasks and Saved (#7723)
     keys: () => GROUPS.map(g => g.key),
     redraw: () => renderInboxNav(true),
     table: key => {
@@ -930,6 +958,7 @@ registerGroupSource('hub-inbox', {
                     columns: GC.goalColumns({ teamOf: goalTeam }, ['state', 'goal', 'team', 'progress', 'updated']).flatMap(c => c.key === 'team' ? [...serverColumns().map(x => ({ ...x, width: '8rem', dropAt: 52 })), c] : [c]) }).el };
         }
         if (key === 'artifacts') return IA.artifactsSpec();
+        if (key === 'activity') return AC.spec(activityFilters, { file: r => importOnce('./artifact_viewer.js').then(m => m.openArtifactViewer(r.version, { filename: r.title || 'file', board: r.team })), goal: r => go({ ...folderRoute, id: r.team, item: Number(r.item_id) }) });
         if (key === 'saved') return savedListSpec();
         return null;
     },
@@ -944,6 +973,7 @@ function setGroup(key, { auto = false } = {}) {
     if (!groupMeta(key)) key = 'needs';
     const was = group;
     group = key;
+    if (key === 'activity' && was !== 'activity') AC.refresh(() => renderInboxNav(true)); // the record is read when its folder is picked (#12070)
     if (!auto) { _autoFrom = ''; browserLocal.set(GROUP_KEY, key); } // a folder the person chose is the remembered one; Needs you opened for them (auto) is not (#10212)
     const input = $('inbox-search'), g = groupMeta(key);
     if (input) {
@@ -988,6 +1018,7 @@ export function filterInbox(value) {
     if (group === 'tasks') { inboxTasksState.selected.clear(); taskFilters = { ...taskFilters, q: text }; } // a chat search goes to the server as typed
     if (CH.CHAT_KEY.test(group)) { chatFilters.set(group, { ...chatFiltersOf(group), q: text }); if (nativeInbox()) CH.resetChatLists(group); } // the sidebar's box and the page's share the one search (#8603); on a Hub it is sent on Enter, one read of each online computer every time
     if (group === 'needs') { needsFilters = { ...needsFilters, q: text }; NF.saveFilters(needsFilters); } // the sidebar's box and the page's share the one search (#8604)
+    if (group === 'activity') { activityFilters = { ...activityFilters, q: text }; AF.saveFilters(activityFilters); } // the sidebar's box and the page's share the one search (#12070)
     if (group === 'goals') { goalFilters = { ...goalFilters, q: text }; GF.saveFilters(goalFilters); } // the sidebar's box and the page's share the one search (#8596)
     renderInboxNav(true);
 }
@@ -1117,6 +1148,7 @@ export async function showInbox({ folder = '', quiet = false } = {}) {
         refreshProposals(true);
         refreshRuns(true);
         refreshOperatorAsks(true); // the questions agents asked the Operator (#11417)
+        if (group === 'activity') AC.refresh(() => renderInboxNav(true));
         refreshGoals();
         IA.refreshArtifactCount(() => renderFolderCounts());
         saved.loadSaved(); // everything's list (the Inbox is the all scope), read for the table and the count

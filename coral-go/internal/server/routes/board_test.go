@@ -24,10 +24,14 @@ import (
 	"github.com/subgentic/coral/internal/store/storetest"
 )
 
+// lastBoardTestDBPath is the file of the board store setupBoardTestServer made last.
+var lastBoardTestDBPath string
+
 func setupBoardTestServer(t *testing.T) (*httptest.Server, *BoardHandler) {
 	t.Helper()
 
 	dbPath := t.TempDir() + "/board_test.db"
+	lastBoardTestDBPath = dbPath // a test that must change the file as another program could (the Activity record's tamper checks, #12070) opens it itself
 	bs, err := boardtest.Open(dbPath)
 	require.NoError(t, err)
 	t.Cleanup(func() { bs.Close() })

@@ -1,0 +1,7 @@
+/* The Inbox's Activity folder (#12070): the record's own check above the table, and what a row says. */
+.activity-folder { display: flex; flex-direction: column; gap: var(--space-sm); min-width: 0; }
+.activity-check { margin: 0; padding: var(--space-sm) var(--space-md); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text-secondary); font-size: var(--fs-sm); }
+.activity-check-broken { border-color: var(--danger, var(--accent)); color: var(--text-primary); font-weight: var(--fw-strong); }
+.activity-did { font-weight: var(--fw-strong); }
+.activity-note { font-weight: var(--fw-regular); color: var(--text-secondary); }
+.activity-more { align-self: flex-start; }

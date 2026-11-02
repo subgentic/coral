@@ -1,3 +1,4 @@
+GET /api/activity redact
 GET /api/agent-models redact
 GET /api/agent/ui redact
 GET /api/agent/ui/{uiid}/content redact
