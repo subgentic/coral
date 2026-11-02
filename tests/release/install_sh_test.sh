@@ -8,6 +8,7 @@ script="$root/install.sh"
 tmp="$(mktemp -d "${TMPDIR:-/tmp}/install-sh-test.XXXXXX")"
 trap 'chmod -R u+w "$tmp" 2>/dev/null; rm -rf "$tmp"' EXIT
 export HOME="$tmp/home"; mkdir -p "$HOME"
+export CORAL_TELEMETRY_DISABLED=1 # nothing here may send telemetry (the census of CI runners that start a Coral)
 unset CORAL_LINK_DIR
 fails=0
 fail() { echo "FAIL: $*"; fails=$((fails + 1)); }
