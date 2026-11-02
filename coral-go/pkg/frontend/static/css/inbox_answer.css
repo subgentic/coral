@@ -1,0 +1,4 @@
+/* The step line of a multi-question answer in a Needs you row (#11981): which question the choices are for, and what Submit will send. A lazy sheet: inbox_answer.js loads it before it draws a step, so it is not in the start's stylesheet. */
+.inbox-answer-step { color: var(--text-secondary); font-size: .85em; flex: 1 1 100%; }
+.inbox-answer-step-line + .inbox-answer-step-line::before { content: ' \00b7 '; } /* a wide row runs the pairs on one line, separated by a dot; a phone puts each on its own line (below) */
+@media (max-width: 768px) { .inbox-answer-step-line { display: block; } .inbox-answer-step-line + .inbox-answer-step-line::before { content: none; } } /* which question these choices are for, or what Submit will send (#11981) */

@@ -72,7 +72,7 @@ const BASE = require('./test_base').BASE;
       const label = box && document.getElementById(box.getAttribute('aria-labelledby'));
       return box && min ? { checked: box.checked, label: label && label.textContent.trim(), minutes: min.value, min: min.min, max: min.max } : 'missing';
     })()`);
-    assert.deepEqual(row, { checked: true, label: 'Put idle agents to sleep', minutes: '60', min: '15', max: '1440' }, 'the Settings dialog');
+    assert.deepEqual(row, { checked: true, label: 'Auto-sleep', minutes: '60', min: '15', max: '1440' }, 'the Settings dialog');
 
     console.log('PASS auto-sleep settings: on and 60 by default, shown as saved, saved as a boolean and a clamped whole number, validated');
   } finally {
