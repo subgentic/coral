@@ -245,6 +245,8 @@ func TestProvisionRefusesAChangedHostKeyAndNeverOffersIt(t *testing.T) {
 	assert.Equal(t, "failed", v["phase"])
 	assert.Nil(t, v["host_keys"])
 	assert.Contains(t, v["error"], "has changed")
+	assert.Contains(t, v["error"], "ssh_known_hosts in Coral's data folder", "the changed-key sentence names the hub's own file, not the person's")
+	assert.NotContains(t, v["error"], "fix known_hosts yourself")
 	code, _ = pe.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{"accept_terms": true, "terms_sha256": terms.EULADigest(), "accept_keys": true})
 	assert.Equal(t, 409, code)
 	_, err := os.Stat(pe.known)

@@ -355,7 +355,7 @@ func (pr *Provisioner) Connect(w http.ResponseWriter, r *http.Request) {
 		p.mu.Unlock()
 		p.setStep("connect", stepOK, "Connected; the host key is already known.")
 	case errors.Is(err, sshprov.ErrHostKeyChanged):
-		pr.fail(p, "connect", "The host key has changed since you last connected. This may be a different computer. Check it, then fix known_hosts yourself.")
+		pr.fail(p, "connect", "The host key has changed since you confirmed it. This may be a different computer. If you expected it, remove this computer's line from ssh_known_hosts in Coral's data folder, then run Set up again.")
 	case errors.Is(err, sshprov.ErrHostKey):
 		keys, kerr := pr.scan(ctx, p.Target)
 		if kerr != nil {

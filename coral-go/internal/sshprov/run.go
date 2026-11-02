@@ -215,7 +215,7 @@ func classifyConnect(stderr string) ConnectKind {
 func ConnectSentence(err error) string {
 	switch {
 	case errors.Is(err, ErrHostKeyChanged):
-		return "The host key has changed since you last connected. This may be a different computer. Check it, then fix known_hosts yourself."
+		return "The host key has changed since you confirmed it. This may be a different computer. If you expected it, remove this computer's line from ssh_known_hosts in Coral's data folder, then run Set up again."
 	case errors.Is(err, ErrHostKey):
 		return "The hub does not have this computer's host key under the name ssh uses for it. Run Set up again and confirm the key it shows, or check the host name."
 	}
