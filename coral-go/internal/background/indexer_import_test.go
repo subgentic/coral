@@ -120,4 +120,34 @@ func TestAFreshFolderStaysOffAfterItsAgentIsDeletedAndItsFileChanges(t *testing.
 	var recorded string
 	require.NoError(t, ss.DB().GetContext(ctx, &recorded, `SELECT value FROM store_meta WHERE key = 'history_import_default'`))
 	require.Equal(t, "0", recorded)
+
+// #11990: the Settings switch turns the import off again: the chats Coral did not start go back to held (rows and text gone, a star kept), a chat of a live agent stays, a later pass does
+// not list them, and turning it on lists them again.
+func TestTurningTheImportOffHoldsEarlierChatsBackAgain(t *testing.T) {
+	ctx, ss, _, idx := importFixture(t)
+	require.NoError(t, ss.ImportEarlierChats(ctx))
+	require.NoError(t, idx.RunOnce(ctx))
+	require.Len(t, indexedIDs(t, ss), 3)
+	star := true
+	require.NoError(t, ss.UpdateChatFlags(ctx, "old-claude", &star, nil))
+	n, err := ss.ListedNotStarted(ctx)
+	require.NoError(t, err)
+	require.Equal(t, 2, n)
+
+	require.NoError(t, ss.SetHistoryImport(ctx, false))
+	require.ElementsMatch(t, []string{"mine.jsonl"}, indexedIDs(t, ss))
+	var texts int
+	require.NoError(t, ss.DB().GetContext(ctx, &texts, `SELECT COUNT(*) FROM session_fts WHERE session_fts MATCH 'private'`))
+	require.Zero(t, texts)
+	counts, _ := ss.UnimportedCounts(ctx)
+	require.Equal(t, map[string]int{"claude": 1, "codex": 1}, counts)
+	require.NoError(t, idx.RunOnce(ctx))
+	require.ElementsMatch(t, []string{"mine.jsonl"}, indexedIDs(t, ss), "a later pass does not list them")
+	var starred int
+	require.NoError(t, ss.DB().GetContext(ctx, &starred, `SELECT COUNT(*) FROM chat_flags WHERE session_id = 'old-claude' AND starred = 1`))
+	require.Equal(t, 1, starred, "a star stays with the chat id")
+
+	require.NoError(t, ss.SetHistoryImport(ctx, true))
+	require.NoError(t, idx.RunOnce(ctx))
+	require.Len(t, indexedIDs(t, ss), 3)
 }

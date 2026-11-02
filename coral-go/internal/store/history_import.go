@@ -147,3 +147,34 @@ func (s *SessionStore) IndexedSessionIDs(ctx context.Context, ids []string) (map
 	}
 	return out, nil
 }
+
+// ListedNotStarted counts the listed chats Coral did not start: what turning the import off would hold back again.
+func (s *SessionStore) ListedNotStarted(ctx context.Context) (int, error) {
+	var n int
+	err := s.reader().GetContext(ctx, &n, `SELECT COUNT(*) FROM session_index WHERE session_id NOT IN (SELECT session_id FROM live_sessions)`)
+	return n, err
+}
+
+// SetHistoryImport is the person's switch (Settings): on lists every chat found on the computer, off stops listing the ones Coral did not start. Turning it off holds those chats back
+// the way a fresh Coral does: their index rows and search text go, a metadata row stays (so turning it on again reads nothing twice), and a star or archive flag stays with the chat id.
+// A chat of an agent Coral launched is never held back.
+func (s *SessionStore) SetHistoryImport(ctx context.Context, on bool) error {
+	if on {
+		return s.ImportEarlierChats(ctx)
+	}
+	return s.db.WithTx(ctx, func(tx *sqlx.Tx) error {
+		const theirs = `SELECT session_id FROM session_index WHERE session_id NOT IN (SELECT session_id FROM live_sessions)`
+		for _, q := range []string{
+			`INSERT OR REPLACE INTO history_unimported (source_type, source_file, file_mtime, session_id) SELECT source_type, source_file, file_mtime, session_id FROM session_index WHERE session_id IN (` + theirs + `)`,
+			`DELETE FROM session_fts WHERE session_id IN (` + theirs + `)`,
+			`DELETE FROM summarizer_queue WHERE session_id IN (` + theirs + `)`,
+			`DELETE FROM session_index WHERE session_id IN (` + theirs + `)`,
+		} {
+			if _, err := tx.ExecContext(ctx, q); err != nil {
+				return err
+			}
+		}
+		_, err := tx.ExecContext(ctx, `INSERT INTO user_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`, historyImportKey, HistoryImportOff)
+		return err
+	})
+}

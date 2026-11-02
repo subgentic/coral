@@ -1,6 +1,8 @@
 package routes
 
 import (
+	"encoding/json"
+	"io"
 	"net/http"
 )
 
@@ -20,20 +22,35 @@ func (h *HistoryHandler) HistoryImportStatus(w http.ResponseWriter, r *http.Requ
 		errInternalServer(w, "could not count the earlier chats")
 		return
 	}
+	listed, err := h.ss.ListedNotStarted(r.Context())
+	if err != nil {
+		errInternalServer(w, "could not count the listed chats")
+		return
+	}
 	found := 0
 	for _, n := range counts {
 		found += n
 	}
 	w.Header().Set("Cache-Control", "no-store")
-	writeJSON(w, http.StatusOK, map[string]any{"imported": imported, "found": found, "sources": counts, "ready": !h.indexing()})
+	writeJSON(w, http.StatusOK, map[string]any{"imported": imported, "found": found, "listed": listed, "sources": counts, "ready": !h.indexing()})
 }
 
-// ImportEarlierChats: POST /api/history-import. Only the person: it lists every chat of every CLI on this computer.
+// ImportEarlierChats: POST /api/history-import. Only the person: it lists every chat of every CLI on this computer. A body {"imported": false} turns it off again (Settings): the chats Coral
+// did not start are held back, nothing is deleted from disk. No body is the Import button.
 func (h *HistoryHandler) ImportEarlierChats(w http.ResponseWriter, r *http.Request) {
 	if refuseUnlessOperator(w, r, "import earlier chats") {
 		return
 	}
-	if err := h.ss.ImportEarlierChats(r.Context()); err != nil {
+	var body struct {
+		Imported *bool `json:"imported"`
+	}
+	if raw, err := io.ReadAll(io.LimitReader(r.Body, 1<<10)); err == nil && len(raw) > 0 {
+		if json.Unmarshal(raw, &body) != nil {
+			writeError(w, http.StatusBadRequest, "bad_request", "send {\"imported\": true or false}, or nothing")
+			return
+		}
+	}
+	if err := h.ss.SetHistoryImport(r.Context(), body.Imported == nil || *body.Imported); err != nil {
 		errInternalServer(w, "could not import the earlier chats")
 		return
 	}

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
@@ -32,6 +33,13 @@ func TestHistoryImportStatusAndImport(t *testing.T) {
 	r := chi.NewRouter()
 	r.Get("/api/history-import", h.HistoryImportStatus)
 	r.Post("/api/history-import", h.ImportEarlierChats)
+	callBody := func(method, kind, body string) int {
+		req := httptest.NewRequest(method, "/api/history-import", strings.NewReader(body))
+		req = req.WithContext(context.WithValue(req.Context(), callerKindKey{}, kind))
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, req)
+		return rec.Code
+	}
 	call := func(method, kind string, agent bool) (int, map[string]any) {
 		req := httptest.NewRequest(method, "/api/history-import", nil)
 		if kind != "" {
@@ -64,4 +72,11 @@ func TestHistoryImportStatusAndImport(t *testing.T) {
 	_, out = call("GET", callerDashCookie, false)
 	assert.Equal(t, true, out["imported"])
 	assert.EqualValues(t, 0, out["found"])
+
+	// off again (Settings): {"imported": false}; anything else in the body is refused
+	assert.Equal(t, 400, callBody("POST", callerDashCookie, `{"imported":`))
+	assert.Equal(t, 200, callBody("POST", callerDashCookie, `{"imported":false}`))
+	_, out = call("GET", callerDashCookie, false)
+	assert.Equal(t, false, out["imported"])
+	assert.Equal(t, 403, callBody("POST", "", `{"imported":false}`), "no operator, no switch")
 }
