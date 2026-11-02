@@ -30,7 +30,7 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
                 return done();
             }
             if (url.includes('/api/artifacts/${HEX}/comments')) {
-                if (method === 'GET') return json({ comments: window.__cs.map(c => ({ ...c, mine: true, can: can(c) })), locked: false, you: { kind: 'owner', name: 'Operator', can_comment: !window.__viewOnly, can_lock: true }, limits: { body: 8192, quote: 2048, comments: 500 } });
+                if (method === 'GET') { const answer = json({ comments: window.__cs.map(c => ({ ...c, mine: true, can: can(c) })), locked: !!window.__locked, you: { kind: 'owner', name: 'Operator', can_comment: !window.__viewOnly, can_lock: true }, limits: { body: 8192, quote: 2048, comments: 500 } }); return window.__hold ? new Promise(res => { window.__release = () => res(answer); }) : answer; }
                 if (method === 'POST') { const b = JSON.parse(o.body); window.__posts.push(b); const c = { id: window.__next++, parent_id: null, anchor: b.anchor, body: b.body, images: (b.images || []).map((h, i) => ({ hex: h, name: 'picture-' + (i + 1) + '.png', content_type: 'image/png' })), author: { kind: 'owner', issuer: 'local', subject: 'Operator' }, created_at: new Date().toISOString() }; window.__cs.push(c); return json({ ...c, can: can(c) }, 201); }
             }
             if (url.includes('/api/artifacts/${HEX}/versions')) return json([]);
@@ -98,7 +98,20 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
             await waitFor(`!!document.querySelector('#artifact-viewer .image-panes img') && window.__calls_ok !== 0`, at + 'the picture again', 8000); await ev(framesJs(12));
             assert.ok(await ev(`[...document.querySelectorAll('#artifact-viewer .artifact-viewer-markup, #artifact-viewer .artifact-viewer-markup-item')].every(b => b.hidden || b.getClientRects().length === 0)`), at + 'a viewer who can read but not write comments has no Mark up');
             await ev(`window.__viewOnly = false; document.querySelector('#artifact-viewer .artifact-viewer-close').click(); true`);
-            // a text file has no Mark up
+            // fails closed: until the comments answer, Mark up is not there; then it is (#12402)
+            await ev(`document.querySelector('#artifact-viewer .artifact-viewer-close').click(); window.__hold = true; true`);
+            await ev(`(async () => { const v = await import(${S} + 'artifact_viewer.js'); v.openArtifactViewer(${JSON.stringify(HEX)}, { filename: 'screenshot.png', mediaType: 'image/png' }); return true; })()`);
+            await waitFor(`!!document.querySelector('#artifact-viewer .image-panes img') && typeof window.__release === 'function'`, at + 'the picture, comments still pending', 8000); await ev(framesJs(12));
+            assert.ok(await ev(`[...document.querySelectorAll('#artifact-viewer .artifact-viewer-markup, #artifact-viewer .artifact-viewer-markup-item')].every(b => b.hidden || b.getClientRects().length === 0)`), at + 'before the comments answer there is no Mark up (fails closed)');
+            await ev(`window.__hold = false; window.__release(); true`); await ev(framesJs(12));
+            assert.ok(await ev(`[...document.querySelectorAll('#artifact-viewer .artifact-viewer-markup, #artifact-viewer .artifact-viewer-markup-item')].some(b => !b.hidden && b.getClientRects().length > 0)`) || mobile, at + 'once they answer a writer has Mark up'); // (a phone's item is in the closed menu)
+            // a locked file: nobody adds a comment, so no Mark up
+            await ev(`document.querySelector('#artifact-viewer .artifact-viewer-close').click(); window.__locked = true; true`);
+            await ev(`(async () => { const v = await import(${S} + 'artifact_viewer.js'); v.openArtifactViewer(${JSON.stringify(HEX)}, { filename: 'screenshot.png', mediaType: 'image/png' }); return true; })()`);
+            await waitFor(`!!document.querySelector('#artifact-viewer .image-panes img')`, at + 'the picture of a locked file', 8000); await ev(framesJs(12));
+            assert.ok(await ev(`[...document.querySelectorAll('#artifact-viewer .artifact-viewer-markup, #artifact-viewer .artifact-viewer-markup-item')].every(b => b.hidden || b.getClientRects().length === 0)`), at + 'a locked file has no Mark up');
+            await ev(`window.__locked = false; document.querySelector('#artifact-viewer .artifact-viewer-close').click(); true`);
+            // a text file has no Mark up, for a writer too
             await ev(`(async () => { const v = await import(${S} + 'artifact_viewer.js'); v.openArtifactViewer(${JSON.stringify(TXT)}, { filename: 'notes.txt', mediaType: 'text/plain' }); return true; })()`); await ev(framesJs(10));
             assert.ok(await ev(`[...document.querySelectorAll('#artifact-viewer .artifact-viewer-markup, #artifact-viewer .artifact-viewer-markup-item')].every(b => b.hidden)`), at + 'a text file has no Mark up');
             await ev(`document.querySelector('#artifact-viewer .artifact-viewer-close').click(); true`);
