@@ -275,7 +275,7 @@ func (r *SessionReconciler) cliMissing(ctx context.Context, ls store.LiveSession
 // Later the same words on a screen are the agent's own output.
 const hermesRefusalWindow = 30 * time.Minute
 
-// hermesGatewayRefused marks a Hermes agent at its shell whose gateway start Hermes refused (another gateway held the host's lock when two started together, status 75): ended, and failed to start with the
+// hermesGatewayRefused (and, since #12213, a first-use setup that failed) marks a Hermes agent at its shell whose gateway start Hermes refused (another gateway held the host's lock when two started together, status 75): ended, and failed to start with the
 // fixed reason hermes_gateway_refused, so the dashboard says so and Wake tries again, instead of showing a live-looking agent with nothing in it. Only an agent at its shell (the caller checked) launched within
 // hermesRefusalWindow; it only marks: nothing is killed, relaunched or typed. It reports whether it marked the agent.
 func (r *SessionReconciler) hermesGatewayRefused(ctx context.Context, ls store.LiveSession, name string) bool {
@@ -291,18 +291,27 @@ func (r *SessionReconciler) hermesGatewayRefused(ctx context.Context, ls store.L
 		return false
 	}
 	screen, err := sr.AgentScreen(ctx, name, ls.AgentType, ls.SessionID)
-	if err != nil || !agent.HermesGatewayRefusedIn(screen) {
+	if err != nil {
+		return false
+	}
+	code, why := "", ""
+	switch {
+	case agent.HermesGatewayRefusedIn(screen):
+		code, why = store.StartFailureHermesGateway, "Hermes refused to start its gateway (another one held the host); marking the agent ended, failed to start"
+	case agent.HermesSetupFailedIn(screen): // its first-use setup could not finish and the CLI exited (#12213)
+		code, why = store.StartFailureHermesSetup, "Hermes stopped during its first-use setup; marking the agent ended, failed to start"
+	default:
 		return false
 	}
 	if err := r.sessionStore.SetSessionSleepingFor(ctx, ls.SessionID, store.SleepReasonAgentExited); err != nil {
 		r.logger.Error("failed to mark a Hermes agent whose gateway was refused", "session_id", ls.SessionID, "error", err)
 		return false
 	}
-	if err := r.sessionStore.SetStartFailure(ctx, ls.SessionID, store.StartFailureHermesGateway); err != nil {
+	if err := r.sessionStore.SetStartFailure(ctx, ls.SessionID, code); err != nil {
 		r.logger.Error("failed to record why a Hermes agent could not start", "session_id", ls.SessionID, "error", err)
 	}
 	delete(r.exited, ls.SessionID)
 	r.slept = append(r.slept, ls.SessionID)
-	r.logger.Warn("Hermes refused to start its gateway (another one held the host); marking the agent ended, failed to start", "session_id", ls.SessionID, "agent_name", ls.AgentName)
+	r.logger.Warn(why, "session_id", ls.SessionID, "agent_name", ls.AgentName)
 	return true
 }

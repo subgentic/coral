@@ -63,6 +63,8 @@ func startFailureSentence(agentType, code string) string {
 		return "failed to start: Windows will not open the folder the " + cli + " CLI is in. " + fix
 	case store.StartFailureHermesGateway:
 		return "failed to start: Hermes could not start its gateway because another one held the host's lock. Wake the agent to try again."
+	case store.StartFailureHermesSetup:
+		return "failed to start: Hermes stopped during its first-use setup (it could not finish setting up its dependencies, often a network problem). Wake the agent to try again."
 	case store.StartFailureCLIPath:
 		return "failed to start: the " + cli + " CLI path in Settings > CLI paths can't be run. " + fix + " Or clear it."
 	}

@@ -606,6 +606,7 @@ const (
 	StartFailureUntrustedMount = "cli_untrusted_mount"    // Windows will not open a folder on PATH or the CLI's own (#340)
 	StartFailureCLIPath        = "cli_path_unusable"      // the configured Settings > CLI paths entry can't be run (#115)
 	StartFailureHermesGateway  = "hermes_gateway_refused" // Hermes's own gateway start was refused (another gateway held the host's lock) and its CLI exited (#12052)
+	StartFailureHermesSetup    = "hermes_setup_failed"    // Hermes's first-use setup (its dependencies) failed and its CLI exited (#12213)
 )
 
 // SleepReasonCoralStopped: the agent was running when a pty Coral stopped (cleanly, or a crash

@@ -1,0 +1,14 @@
+        cause: Failed to fetch: https://pypi.org/simple/wheel/
+        cause: error sending request for url (https://pypi.org/simple/wheel/)
+        cause: client error (Connect)
+        cause: operation timed out
+hermes: source-update completion failed: venv: uv sync exited 2: error: Failed to build `hermes-agent @ file:///home/tester/coral-data/hermes-homes/d0042882fbf68a90/79e9a053-01db-19b4-4b6c-debb79b658c
+  cause: Failed to resolve requirements from `build-system.requires`
+  cause: No solution found when resolving: `setuptools==83.0.0`, `wheel`
+  cause: Request failed after 3 retries in 46.1s
+  cause: Failed to fetch: https://pypi.org/simple/wheel/
+  cause: error sending request for url (https://pypi.org/simple/wheel/)
+  cause: client error (Connect)
+  cause: operation timed out — retry, or run `hermes pm doctor`; running with the previous dependencies — run `hermes update` to finish it
+hermes: no dependency environment is committed for this install; run `hermes pm repair`
+]0;tester@e2f0d3472937: ~/worktester@e2f0d3472937:~/work$ 
