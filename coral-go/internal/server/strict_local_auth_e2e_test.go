@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/auth"
 	"github.com/subgentic/coral/internal/cliauth"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/internal/store/storetest"
@@ -30,7 +31,10 @@ func strictServer(t *testing.T, strict bool) (*Server, *httptest.Server, string)
 	t.Cleanup(func() { db.Close() })
 	stack := newTermStack(t)
 	srv := newTestServer(t, cfg, db, stack.backend, stack.terminal)
-	ts := httptest.NewServer(srv.Router())
+	// The real server's connection hook (startup_listen.go): it records when each connection was accepted, which the peer check needs to read a Windows socket row that is still settling.
+	ts := httptest.NewUnstartedServer(srv.Router())
+	ts.Config.ConnContext = auth.ConnContext
+	ts.Start()
 	t.Cleanup(ts.Close)
 	t.Cleanup(func() { // terminals a test launched: Windows can't delete a folder one is working in (#3914)
 		for _, s := range stack.backend.ListSessions() {

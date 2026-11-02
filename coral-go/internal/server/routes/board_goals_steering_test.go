@@ -2,7 +2,9 @@ package routes
 
 import (
 	"context"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -20,6 +22,15 @@ func steeringRig(t *testing.T) (call func(method, path string, body any) (int, m
 	call = goalCall(t, server.URL)
 	_, g := call("POST", "/api/board/team/goals", map[string]any{"title": "Ship it", "driver": "Lead", "subscriber_id": "Orchestrator"})
 	gid = int64(g["id"].(float64))
+	// Making the goal tells its driver in a board line posted after the answer (announceGoalDriver): wait for that line, so a test that counts lines counts from after it.
+	require.Eventually(t, func() bool {
+		for _, m := range messagesOf(t, h) {
+			if strings.Contains(m.Content, "you now drive this goal") {
+				return true
+			}
+		}
+		return false
+	}, 10*time.Second, 10*time.Millisecond, "the driver's notice")
 	code, out := call("PATCH", "/api/board/team/goals/"+itoa(gid), map[string]any{"state": "blocked", "blocked_on": "the operator", "subscriber_id": "Orchestrator"})
 	require.Equal(t, 200, code, "%v", out)
 	return call, h, gid
