@@ -311,3 +311,77 @@ func TestNeedsYouAgentItemsAreTheAwakeWaitingOnes(t *testing.T) {
 	assert.Equal(t, now.Format(time.RFC3339Nano), got[1].At, "no start time: waiting now")
 	assert.Equal(t, "Wants to run a command", got[0].Line)
 }
+
+// #12096 (Beta Tester): every design-doc version adds a message ("design doc v5 is in your Inbox: coral://..."), and the older ones stayed after the doc was approved, reaching 9+ on the badge. A message that is only
+// links to files the team has had in a review is read once those files are opened, decided or replaced; a link to a file never in a review stays a question.
+func TestAMessageThatOnlyLinksReviewedFilesIsReadOnceTheyAreOpenedDecidedOrReplaced(t *testing.T) {
+	e := newReviewEnv(t, true)
+	ctx := context.Background()
+	post := func(text string) {
+		q, err := e.h.bs.PostMessage(ctx, "alpha", "Alice", "@Operator "+text, nil)
+		require.NoError(t, err)
+		require.NoError(t, e.h.bs.RecordAsk(ctx, "alpha", q, []string{"Operator"}))
+	}
+	counts := func() (int, int) {
+		code, out := readNeedsYou(t, e.h, "", asPerson)
+		require.Equal(t, http.StatusOK, code, out)
+		acode, rows, _ := readOperatorAsks(t, e.h, asPerson)
+		require.Equal(t, http.StatusOK, acode)
+		return int(out["count"].(float64)), len(rows)
+	}
+	post("design doc v2 is in your Inbox: coral://artifacts/" + e.id)
+	post("a report never in a review: coral://artifacts/" + strings.Repeat("cd", 32))
+	for _, tags := range []string{`["for review"]`, `["for review","read"]`, `["approved"]`, `["changes requested"]`, `["superseded"]`, `["ignored"]`} {
+		e.tag(t, tags)
+		n, rows := counts()
+		assert.Equal(t, 1, rows, "%s: the message about the reviewed file is not a row, the one about an unreviewed file is", tags)
+		want := 1
+		if tags == `["for review"]` {
+			want = 2 // the file itself is the one item, plus the unreviewed link's question
+		}
+		assert.Equal(t, want, n, "%s: Needs you count", tags)
+	}
+	e.tag(t, `[]`)
+	n, rows := counts()
+	assert.Equal(t, 2, rows, "a file with no review tag: its message is a question as before")
+	assert.Equal(t, 2, n)
+}
+
+// Security's two SHOULDs on #12096: a message with answer buttons is never hidden (the Operator can only answer it from its row), and one whose other text asks something (a question mark, or a word an ask uses) is a
+// question, not a pointer to a file.
+func TestAMessageWithButtonsOrAQuestionAroundTheLinkIsNeverHiddenAsAFileLink(t *testing.T) {
+	e := newReviewEnv(t, true)
+	ctx := context.Background()
+	e.tag(t, `["approved"]`) // the file was reviewed and decided: a bare link message to it is read
+	post := func(text string) *board.Message {
+		q, err := e.h.bs.PostMessage(ctx, "alpha", "Alice", "@Operator "+text, nil)
+		require.NoError(t, err)
+		require.NoError(t, e.h.bs.RecordAsk(ctx, "alpha", q, []string{"Operator"}))
+		return q
+	}
+	counts := func() (int, int) {
+		code, out := readNeedsYou(t, e.h, "", asPerson)
+		require.Equal(t, http.StatusOK, code, out)
+		acode, rows, _ := readOperatorAsks(t, e.h, asPerson)
+		require.Equal(t, http.StatusOK, acode)
+		return int(out["count"].(float64)), len(rows)
+	}
+	link := "coral://artifacts/" + e.id
+	post("design doc v2 is in your Inbox: " + link)
+	n, rows := counts()
+	assert.Equal(t, 0, n, "a bare link to a decided file is read")
+	assert.Equal(t, 0, rows)
+	withButtons := post("Yes or no: " + link)
+	require.NoError(t, e.h.bs.RecordAskButtons(ctx, "alpha", withButtons.ID, []board.AskButton{{Label: "Yes", Action: "reply"}, {Label: "No", Action: "reply"}}, time.Now()))
+	n, rows = counts()
+	assert.Equal(t, 1, n, "a question with answer buttons stays, though it only links a decided file")
+	assert.Equal(t, 1, rows)
+	post("Deploy to prod now? " + link)
+	n, rows = counts()
+	assert.Equal(t, 2, n, "a short question with a question mark stays")
+	assert.Equal(t, 2, rows)
+	post("please approve " + link)
+	n, rows = counts()
+	assert.Equal(t, 3, n, "an ask word keeps it a question")
+	assert.Equal(t, 3, rows)
+}

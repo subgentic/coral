@@ -161,14 +161,19 @@ func (h *BoardHandler) NeedsYou(w http.ResponseWriter, r *http.Request) {
 	}
 	now := time.Now().UTC()
 	for _, p := range projects {
-		start, questionLinks, reviewFiles := len(items), map[int]string{}, map[string]bool{} // a question that only links a file the same team lists as a file for review is that file, not a second item (#11998)
-		h.keepExpiredOperatorQuestions(ctx, p.Project)                                       // a wait that ran out is an ask from now on (#11919)
+		start, questionLinks, reviewFiles := len(items), map[int][]string{}, map[string]bool{} // a question that only links files the same team has in a review (for review, opened, decided, superseded) is those files, not a second item (#11998, #12096)
+		h.keepExpiredOperatorQuestions(ctx, p.Project)                                         // a wait that ran out is an ask from now on (#11919)
 		if asks, err := h.bs.OpenAsksOf(ctx, p.Project, board.OperatorName, now); err != nil {
 			unread = appendOnce(unread, "questions")
 		} else {
+			ids := make([]int64, 0, len(asks))
 			for _, a := range asks {
-				if hex := onlyFileLink(a.Content); hex != "" {
-					questionLinks[len(items)] = hex
+				ids = append(ids, a.MessageID)
+			}
+			withButtons, _ := h.bs.AskButtonsOf(ctx, p.Project, ids) // a question with answer buttons is never hidden: the Operator can only answer it from its row (Security's SHOULD, #12096)
+			for _, a := range asks {
+				if hexes := onlyFileLinks(a.Content); len(hexes) > 0 && len(withButtons[a.MessageID]) == 0 {
+					questionLinks[len(items)] = hexes
 				}
 				items = append(items, NeedsYouItem{Kind: "question", From: needsYouLine(a.Asker), Line: needsYouLine(a.Content), Team: p.Project, ID: "question:" + p.Project + ":" + strconv.FormatInt(a.MessageID, 10), At: needsYouTime(a.At.UTC().Format(time.RFC3339Nano))})
 			}
@@ -192,6 +197,9 @@ func (h *BoardHandler) NeedsYou(w http.ResponseWriter, r *http.Request) {
 		} else {
 			seen := map[string]bool{}
 			dir := h.artifactObjectDir()
+			if len(questionLinks) > 0 {
+				reviewFiles = reviewedFileIDs(files)
+			}
 			for _, f := range files {
 				if seen[f.ID] || !hasTag(f.Tags, "for review") || hasTag(f.Tags, "read") || hasTag(f.Tags, "saved") {
 					continue // by tags first: only a row that could count is checked against the stored file
@@ -201,14 +209,13 @@ func (h *BoardHandler) NeedsYou(w http.ResponseWriter, r *http.Request) {
 					continue
 				}
 				seen[f.ID] = true
-				reviewFiles[strings.ToLower(artifactStoreID(f))] = true
 				items = append(items, NeedsYouItem{Kind: "review", Line: needsYouLine(f.Name), Team: p.Project, ID: "review:" + p.Project + ":" + f.ID, At: needsYouTime(f.CreatedAt)})
 			}
 		}
 		if len(questionLinks) > 0 { // drop the questions of this team that only link a file it lists as a file for review
 			kept := items[:start]
 			for i := start; i < len(items); i++ {
-				if hex, ok := questionLinks[i]; ok && reviewFiles[hex] {
+				if hexes, ok := questionLinks[i]; ok && allIn(hexes, reviewFiles) {
 					continue
 				}
 				kept = append(kept, items[i])
@@ -328,15 +335,47 @@ func needsYouBefore(a, b NeedsYouItem) bool {
 // needsYouCursorOf is the cursor that points at an item: its time and its id.
 func needsYouCursorOf(it NeedsYouItem) string { return it.At + "|" + it.ID }
 
+// askWords are the words a short question uses: a message with one of them is a question, not a pointer to a file.
+var askWords = regexp.MustCompile(`(?i)\b(approve|confirm|ok|okay|should|can|could|would|please|decide|choose|which|whether)\b`)
+
 var needsYouFileLink = regexp.MustCompile(`(?i)coral://artifacts/([0-9a-f]{64})`)
 
-// onlyFileLink is the artifact id a message is only a link to: one coral://artifacts/<id> and at most a few words of its own (40 letters or digits), else "" (#11998).
-func onlyFileLink(text string) string {
+// reviewLifecycleTags are the tags a file carries once it is in a review: waiting (for review), opened (read), kept (saved) or decided or replaced (approved, changes requested, denied, ignored, superseded).
+var reviewLifecycleTags = []string{"for review", "read", "saved", "approved", "changes requested", "denied", "ignored", "superseded"}
+
+// reviewedFileIDs is the artifact ids (lower case) of the files that have been in a review, whatever came of it.
+func reviewedFileIDs(files []teamArtifact) map[string]bool {
+	out := map[string]bool{}
+	for _, f := range files {
+		for _, t := range reviewLifecycleTags {
+			if hasTag(f.Tags, t) {
+				out[strings.ToLower(artifactStoreID(f))] = true
+				break
+			}
+		}
+	}
+	return out
+}
+
+func allIn(ids []string, set map[string]bool) bool {
+	for _, id := range ids {
+		if !set[id] {
+			return false
+		}
+	}
+	return len(ids) > 0
+}
+
+// onlyFileLinks are the artifact ids a message is only links to: one or more coral://artifacts/<id> and at most a few words of its own (40 letters or digits), else nil (#11998, #12096: "design doc v5 is in your Inbox: coral://...").
+func onlyFileLinks(text string) []string {
 	m := needsYouFileLink.FindAllStringSubmatch(text, -1)
-	if len(m) != 1 {
-		return ""
+	if len(m) == 0 {
+		return nil
 	}
 	rest := needsYouFileLink.ReplaceAllString(text, "")
+	if strings.Contains(rest, "?") || askWords.MatchString(rest) {
+		return nil // it asks something the file does not say ("Deploy to prod now? coral://..."): it stays a question (Security's SHOULD, #12096)
+	}
 	n := 0
 	for _, r := range rest {
 		if unicode.IsLetter(r) || unicode.IsDigit(r) {
@@ -344,7 +383,11 @@ func onlyFileLink(text string) string {
 		}
 	}
 	if n > 40 {
-		return ""
+		return nil
 	}
-	return strings.ToLower(m[0][1])
+	out := make([]string, len(m))
+	for i := range m {
+		out[i] = strings.ToLower(m[i][1])
+	}
+	return out
 }
