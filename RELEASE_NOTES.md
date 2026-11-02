@@ -1,5 +1,42 @@
 # Release Notes
 
+## v2.0.32 — Comments on a goal, Request changes that hands the turn to the agent, Dismiss on every waiting row, and Hermes fixes from a real run
+
+### Changes
+
+#### What you will notice first
+
+- **Comments on a goal**: the goal page has a third tab, **Comments**, beside Tasks and Artifacts (on a phone too): the same composer as document comments, pictures with Mark up, Resolve and Reopen, and the same thread an asked agent answers into. Goal comments are for the person at this computer and the agents asked into a thread; they are not available through Coral Hub. Your comment goes once to the goal's Driver, else the team's Orchestrator (with a note when the Driver is not a live session), with the goal's title and Done-when line, the comment, the pictures as links, the goal link and `coral-board goal brief`; a later reply of yours notifies again. Agents answer with `coral-agent artifact reply coral://goals/<team>/<id> <comment-id> "..."` (24 hours, 5 replies, 8 KiB, no new threads).
+- **After Request changes, the file leaves Needs you**: nothing waits on you, it is the agent's turn. The file leaves Needs you, its count, the Inbox badge and `/api/needs-you` (so the phone push agrees); it stays findable in Artifacts, where its review line reads "Changes requested, waiting for <agent>". The agent's next version comes back as a new unread item that counts and raises the tab title and alerts, even if the agent forgot `--tag` (a version of such a file is tagged for review, and the older review is closed).
+- **Every waiting-agent row in Needs you has a Dismiss**: a permission, question or plan on an awake agent clears Coral's record of the wait; a request the machine cannot clear (an input prompt, a dialog, a sign-in) is hidden on this computer, per agent and request, so the list, the count and the phone push agree, until the agent asks something new; a request an agent made before it went to sleep is hidden in that browser alone. Nothing is sent to the agent.
+- **Back from a goal opened off Needs you returns to Needs you** (it landed on the Goals tab): the page, its Back link and the browser's Back all go back to the Needs you list, at the place you were.
+- **Mark up no longer depends on the pointer's capture to start a stroke**: an engine that refused the capture left the editor with nothing to draw. The stroke starts first, the capture is only a help, and a stroke follows the pointer off the picture and ends where it is let go. One editor serves a document comment, a goal comment, Request changes and the New goal form.
+- **A file row's click is never silently dead**: the first load of the file viewer says so when it fails ("Could not load the file viewer. Check the connection to Coral, then try again.") and the next click tries again.
+- **A multi-question dialog is answered from the Inbox row to its end**: after the first question the row reads the screen again and shows the next question's choices, saying which question they are for; the last step ("Ready to submit your answers?") gets a "Submit answers" button that says exactly what will be sent, and a submit is sent only while the screen still shows the same review step with the same answers.
+- **Chat import is opt-in** (#11970): history import is a declared setting, off until you choose it.
+- **Hermes, fixes from a real run**: each Hermes agent has its own Hermes home (so each runs its hooks with its own identity), the first message is typed once the welcome line is up (Hermes's rotating input hints, all eleven English ones, are recognised as an empty box, not as a draft; anything else in the box is a draft and nothing is typed over it), Wake resumes with the Hermes id Coral recorded, removing a home waits for the process to end and tries again, and a sweep removes homes no session reaches. Kill and reset dialogs no longer promise History for a Hermes agent (its conversation is deleted with it), and a restarted Hermes agent starts a new conversation (its old Hermes home is removed). A launch or resume by a Hermes id is refused with the reason. Each Hermes agent's home is about 400 MB and a new one needs 2 GB of free disk; a launch under that is refused with the reason.
+
+#### Agents and the chat
+
+- **A goal's thread uses the document comments' routes** with the key `goal:<team>:<id>` (never 64 hex, so no artifact route takes it and the Hub's artifact table never matches it).
+
+#### Known issues
+
+- **Windows: in-app update does not work from 2.0.0 through 2.0.6.** If you're on one of those, download and install the MSI by hand; from 2.0.7 on, in-app update works.
+- **macOS: a Coral of 2.0.5 or earlier cannot install updates in-app; install 2.0.6 or later by hand once.**
+- **OpenCode agents are tested on macOS and Linux; OpenCode on Windows is not yet tested end to end.**
+- **Hermes agents are still experimental**: Windows installs no Hermes hook, and another locale's input hint is recognised only by its styling and only while Hermes's welcome line is on screen; otherwise the first message is not typed and the agent's feed says so.
+- **Mark up in the desktop app's window is not yet confirmed fixed**: it was tested with a real mouse and finger in Chrome; please try it in the app and tell us if it still does not draw.
+- Setting up a computer over SSH is supported from a macOS or Linux hub, and is not yet tested from a Windows hub.
+- **A goal comment's count** shows after the tab is first opened (a goal list row does not show it), and Needs you shows nothing for a goal comment.
+- **Needs you can show a raw `coral://` question** for a file whose review was decided (approved or changes requested) after the link-only question was asked.
+
+#### For developers and releases
+
+- The static tree is 5,968,463 bytes of the 6,002,944-byte budget.
+- The runner's allowlist names the one row the first goal comment makes (`artifact_comments_owner_id`); `coral-agent`'s help golden carries the two new usage lines.
+- New suites include `markup_draws_browser` (real mouse and finger input), `needs_goal_back_browser`, `goal_comments_real_browser` and a soak of the Needs you page (`needs_rows_soak_browser`).
+
 ## v2.0.31 — Needs you rows get their columns back, and an action on a file applies to the whole file
 
 ### Changes
