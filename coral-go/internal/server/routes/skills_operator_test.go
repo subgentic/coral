@@ -298,3 +298,46 @@ func TestARejectedRowOfAnExampleNameDoesNotKeepTheExampleOut(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, store.PublisherCoral, got.PublisherKind)
 }
+
+// Which rows hold an example skill's name (#12489, QA's SHOULDs on #12463). The rule: an approved or pending skill of that name that a person or an agent published is theirs, and no example is made beside
+// it (a pending one waits for the Operator's decision first); a rejected or removed one holds nothing; and the Operator may still import a skill under an example's name (only an agent's publish is refused).
+func TestWhichRowsHoldAnExampleSkillsName(t *testing.T) {
+	const name = "creating-coral-skills"
+	md := "---\nname: " + name + "\ndescription: Someone's own.\n---\n# Theirs\n"
+	exampleCount := func(e *skillsEnv) (n int) {
+		rows, err := e.ss.ListSkills(context.Background(), "")
+		require.NoError(t, err)
+		for _, r := range rows {
+			if r.Name == name && r.PublisherKind == store.PublisherCoral {
+				n++
+			}
+		}
+		return n
+	}
+	t.Run("a pending agent skill of the name holds it until decided", func(t *testing.T) {
+		e := newSkillsEnv(t)
+		row, _ := e.publish(map[string]string{"SKILL.md": md}, store.PublisherAgent)
+		require.Equal(t, store.SkillPending, row.Status)
+		e.h.SeedStarterSkills(context.Background())
+		assert.Equal(t, 0, exampleCount(e), "no example beside a pending skill of the name")
+		require.NoError(t, e.ss.RejectSkill(context.Background(), row.ID))
+		e.h.SeedStarterSkills(context.Background())
+		assert.Equal(t, 1, exampleCount(e), "once it is rejected the example is added")
+	})
+	t.Run("a removed skill of the name holds nothing", func(t *testing.T) {
+		e := newSkillsEnv(t)
+		row, _ := e.publish(map[string]string{"SKILL.md": md}, store.PublisherOperator)
+		require.NoError(t, e.ss.RemoveSkill(context.Background(), row.ID))
+		e.h.SeedStarterSkills(context.Background())
+		assert.Equal(t, 1, exampleCount(e))
+	})
+	t.Run("the Operator may import a skill under the name", func(t *testing.T) {
+		e := newSkillsEnv(t)
+		rec := httptest.NewRecorder()
+		_, _, ok := e.h.publish(rec, httptest.NewRequest("POST", "/api/skills", nil), zipOf(t, map[string]string{"SKILL.md": md}), store.AddSkillInput{Kind: store.PublisherOperator}, false)
+		assert.True(t, ok, rec.Body.String())
+		assert.Equal(t, 200, rec.Code)
+		e.h.SeedStarterSkills(context.Background())
+		assert.Equal(t, 0, exampleCount(e), "and the example is not made beside it")
+	})
+}
