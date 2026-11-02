@@ -1,0 +1,50 @@
+│  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠉⠻⢿⣿⣦⡉⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀  file: patch, read_file, search_files, write_file                                    │
+│  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠘⢷⣦⣈⠛⠃⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀  image_gen: image_generate                                                           │
+│  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⣴⠦⠈⠙⠿⣦⡄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀  (and 7 more toolsets...)                                                            │
+│  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠸⣿⣤⡈⠁⢤⣿⠇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀                                                                                      │
+│  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⠛⠷⠄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀  Available Skills                                                                    │
+│  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣀⠑⢶⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀  autonomous-ai-agents: claude-code, codex, +3 more                                   │
+│  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣿⠁⢰⡆⠈⡿⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀  creative: architecture-diagram, ascii-video, +8 more                                │
+│  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠳⠈⣡⠞⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀  devops: sdlc-review                                                                 │
+│  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀  email: email-inbox-triage, himalaya                                                 │
+│                                  media: gif-search, songsee, youtube-content                                         │
+│  stub-model · Nous Research      note-taking: obsidian                                                               │
+│  /home/tester/work               productivity: airtable, box, +12 more                                               │
+│  Session: 27ddd33a               research: arxiv, competitor-news-monitor, +2 more                                   │
+│                                  social-media: xurl                                                                  │
+│                                  software-development: codebase-inspection, dogfood, +10 more                        │
+│                                  web: blocked-page-recovery                                                          │
+│                                                                                                                      │
+│                                  21 tools · 54 skills · /help for commands                                           │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+Welcome to Hermes Agent! Type your message or /help for commands.
+✦ Tip: If two profiles accidentally share a bot token, the second gateway is blocked with a clear error.
+
+
+
+────────────────────────────────────────
+❯ RUNDANGEROVER raw b
+────────────────────────────────────────
+╭──────────────────────────────────────────────────────────────────╮
+│ ⚠️   Dangerous Command                                            │
+│                                                                  │
+│ rm -rf /home/tester/dangerdir/over_the_cap_segment_001_xxxxxxxxx │
+│ xxxxxxxxxxx/over_the_cap_segment_002_xxxxxxxxxxxxxxxxxxxx/over_t │
+│ he_cap_segment_003_xxxxxxxxxxxxxxxxxxxx/over_the_cap_segment_004 │
+│ … (choose Show full command)                                     │
+│                                                                  │
+│ ❯ 1. Allow once                                                  │
+│   2. Allow for this session                                      │
+│   3. Add to permanent allowlist                                  │
+│   4. Deny                                                        │
+│   5. Show full command                                           │
+│                                                                  │
+│ recursive delete                                                 │
+╰──────────────────────────────────────────────────────────────────╯
+
+  ↑/↓ to select, Enter to confirm  (286s)
+── ⠼ 💻 rm -rf /home/tester/dangerdir/over_the_cap_segment_001_xxxxxxxxxxxxxxxxxxxx/over_the_cap_segment_002_xxxxxxxx...
+⚠ ❯
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ ☤ stub-model · 0/256K · [░░░░░░░░░░] 0% · 36s · ⏱ 15s · ~/work (master)

@@ -270,3 +270,28 @@ func TestAHermesBoxWhoseCommandIsOnlyTheCutMarkerOffersRejectOnly(t *testing.T) 
 		assert.Contains(t, strings.ToLower(s.Note), "cut", name)
 	}
 }
+
+// The tester's raw `tmux capture-pane` of Hermes's real over-the-cap approval box (v0.22.5, 91 columns, Coral's width, and 120): the command cut at about 200 characters on its own row ending "… (choose Show full command)".
+func TestHermesRealOverTheCapBoxIsJudgedByTheStoredCommandOrRefused(t *testing.T) {
+	for _, name := range []string{"d_overcap_91cols", "d_overcap_120cols"} {
+		t.Run(name, func(t *testing.T) {
+			screen := hermesScreen(t, name)
+			s, ok := parsePromptScreen(screen)
+			require.True(t, ok, "the real cut box is a prompt")
+			assert.Equal(t, promptKindApproval, s.Kind)
+			assert.Equal(t, []string{"Allow once", "Allow for this session", "Add to permanent allowlist", "Deny"}, optionLabels(s))
+			require.False(t, s.OnlyReject, "the screen alone shows a short command")
+			assert.Contains(t, s.Target, "choose Show full command")
+			// the stored command starts as the screen's does and is over the cap
+			start := strings.TrimSpace(strings.SplitN(strings.SplitN(s.context, "…", 2)[0], "(choose", 2)[0])
+			require.NotEmpty(t, start)
+			long := start + strings.Repeat("x", 4060)
+			over := s
+			applyHermesCommand(&over, long)
+			assert.True(t, over.OnlyReject, "a stored command over the cap: Deny only")
+			none := s
+			applyHermesCommand(&none, "")
+			assert.True(t, none.OnlyReject, "nothing stored: fails closed")
+		})
+	}
+}
