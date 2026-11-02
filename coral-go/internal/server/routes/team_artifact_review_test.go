@@ -290,3 +290,20 @@ func TestTheListAnswersAnApprovedArtifactWithItsReviewTime(t *testing.T) {
 	require.NotNil(t, row["review"], "with its review: %v", row)
 	assert.NotEmpty(t, row["review"].(map[string]any)["at"], "and the time")
 }
+
+// #12112 (Beta Tester): Request changes on a version a newer one replaced failed with "this artifact is not waiting for a review", never saying a newer version exists.
+func TestAReviewOfAReplacedVersionSaysANewerVersionReplacedIt(t *testing.T) {
+	e := newReviewEnv(t, true)
+	code, out := e.approve(t)
+	require.Equal(t, http.StatusConflict, code, out)
+	assert.Equal(t, "this artifact is not waiting for a review", out["error"], "never reviewed, never replaced: the plain sentence")
+	e.tag(t, `["superseded"]`)
+	for _, decision := range []string{"approve", "changes", "ignore", "save"} {
+		code, out = e.call(t, http.MethodPost, "/api/board/alpha/artifacts/"+e.id+"/review", `{"decision":"`+decision+`"}`)
+		require.Equal(t, http.StatusConflict, code, "%s: %v", decision, out)
+		assert.Equal(t, "not_for_review", out["code"], decision)
+		msg, _ := out["error"].(string)
+		assert.Contains(t, msg, "A newer version replaced this one", "%s: it says why: %v", decision, out)
+		assert.Contains(t, msg, "Open the newest version", "%s: and what to do", decision)
+	}
+}
