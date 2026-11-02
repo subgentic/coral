@@ -262,8 +262,9 @@ function needsBulkActions() {
     const each = async (rows, fn) => { let ok = 0; const bad = []; for (const s of rows) { try { await fn(s); ok++; } catch (e) { bad.push(e && e.message ? e.message : 'not saved'); } } return { ok, bad }; };
     const words = (verb, r, total) => r.bad.length ? `${verb} ${r.ok} of ${total}: ${r.bad[0]}` : `${verb} ${r.ok}`;
     const done = () => { needsTable?.clear(); };
+    const unopened = rows => rows.filter(s => s.review && !isRead(s.review)).length;
     return [
-        { label: 'Approve', icon: () => { const i = DT.el('span', 'material-icons', 'check'); i.setAttribute('aria-hidden', 'true'); return i; }, disabled: rows => !reviews(rows), askWhen: n => n > 1, confirm: n => `Approve ${n} files?`, run: async rows => { const { approveRow } = await importOnce('./artifact_review.js'); const r = await each(rows, s => approveRow(s.review.team, s.review)); done(); tell(words('Approved', r, rows.length)); } },
+        { label: 'Approve', icon: () => { const i = DT.el('span', 'material-icons', 'check'); i.setAttribute('aria-hidden', 'true'); return i; }, disabled: rows => !reviews(rows), askWhen: (n, rows) => n > 1 || unopened(rows) > 0, confirm: (n, rows) => { const m = unopened(rows || []); return n === 1 ? 'Approve this file? It is not opened yet.' : `Approve ${n} files?${m ? ` ${m} of them ${m === 1 ? 'is' : 'are'} not opened yet.` : ''}`; }, /* several files, or one nobody opened (#12059, #11999) */ run: async rows => { const { approveRow } = await importOnce('./artifact_review.js'); const r = await each(rows, s => approveRow(s.review.team, s.review)); done(); tell(words('Approved', r, rows.length)); } },
         { label: 'Ignore', icon: () => { const i = DT.el('span', 'material-icons', 'block'); i.setAttribute('aria-hidden', 'true'); return i; }, disabled: rows => rows.some(s => s.proposal), /* a proposal is approved or rejected, not ignored (selecting one is for later actions) */ run: async rows => {
             const { ignoreRow, unignoreRow } = await importOnce('./artifact_review.js'), asks = await importOnce('./ask_ignore.js'), undo = [];
             const r = await each(rows, async s => {

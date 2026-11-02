@@ -121,11 +121,15 @@ const { coralReady } = require('./helpers/wait');
             assert.equal(await bar(), null, at + 'the selection is over');
             await ev(`[...document.querySelectorAll('.toast')].find(t => /Ignored 2/.test(t.textContent)).querySelectorAll('button').forEach(x => { if (x.textContent.trim() === 'Undo') x.click(); }); true`);
             await waitFor(`window.__calls.some(c => c.ask === 71 && c.undo) && window.__calls.some(c => c.review && c.decision === 'unignore')`, at + 'Undo is one request per item too', 8000);
-            // one file is approved directly, with no question, as a row's own button did
+            // one file that was opened is approved directly; an unopened one asks first
             await waitFor(`!!(${rowOf('Phone review 4.txt')})`, at + 'the fourth file is there', 8000);
             await press('Phone review 4.txt');
             await ev('window.__calls = []; true'); await pressBar('Approve');
-            await waitFor(`window.__calls.some(c => c.review === '${(4).toString(16).padStart(64, '0')}' && c.decision === 'approve')`, at + 'one file: Approve sends at once', 8000);
+            // an unopened file asks first (#12059, #11999): "Approve this file? It is not opened yet."; nothing is sent until it is answered
+            await waitFor(`/Approve this file\\? It is not opened yet\\./.test(document.querySelector('.dt-bar').textContent)`, at + 'one unopened file: Approve asks first', 5000);
+            assert.equal(await ev('window.__calls.length'), 0, at + 'nothing is sent while it asks');
+            await ev(`[...document.querySelectorAll('.dt-bar button')].find(b => !b.classList.contains('dt-bar-keep') && b.textContent.trim() === 'Approve').click(); true`);
+            await waitFor(`window.__calls.some(c => c.review === '${(4).toString(16).padStart(64, '0')}' && c.decision === 'approve')`, at + 'one file: the answer sends it', 8000);
             // two files: Approve both; Cancel leaves with nothing sent
             await waitFor(`!!(${rowOf('Phone review 2.txt')})`, at + 'the rows are back', 8000);
             await press('Phone review 2.txt'); await tap('Phone review 3.txt');
@@ -135,7 +139,7 @@ const { coralReady } = require('./helpers/wait');
             await press('Phone review 2.txt'); await tap('Phone review 3.txt');
             // Approve of several files asks first (Security's SHOULD): "Approve 2 files?", Keep sends nothing, the confirm sends one request per file; one file is approved directly
             await ev('window.__calls = []; true'); await pressBar('Approve');
-            await waitFor(`/Approve 2 files\\?/.test(document.querySelector('.dt-bar').textContent)`, at + 'it asks "Approve 2 files?"', 5000);
+            await waitFor(`/Approve 2 files\\? 2 of them are not opened yet\\./.test(document.querySelector('.dt-bar').textContent)`, at + 'it asks "Approve 2 files? 2 of them are not opened yet."', 5000);
             assert.equal(await ev('window.__calls.length'), 0, at + 'nothing is sent while it asks');
             await ev(`document.querySelector('.dt-bar .dt-bar-keep').click(); true`); await new Promise(r => setTimeout(r, 200)); // sleep-ok: the bar draws again
             assert.equal(await ev('window.__calls.length'), 0, at + 'Keep sends nothing');

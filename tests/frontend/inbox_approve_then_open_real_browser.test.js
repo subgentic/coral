@@ -50,6 +50,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
                     const q = await reveal(`document.querySelector('.dt-bar button[aria-label="Approve"]')`);
                     check(!!q, at + `Approve ${n}: the bar's Approve could be reached`); if (!q) return;
                     for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) await client.Input.dispatchMouseEvent({ type, x: q.x, y: q.y, button: type === 'mouseMoved' ? 'none' : 'left', buttons: type === 'mousePressed' ? 1 : 0, clickCount: type === 'mouseMoved' ? 0 : 1 });
+                    if (await waitFor(`/not opened yet/.test(document.querySelector('.dt-bar')?.textContent || '')`, at + 'the bar asks about an unopened file', 1500).then(() => true, () => false)) await ev(`[...document.querySelectorAll('.dt-bar button')].find(b => !b.classList.contains('dt-bar-keep') && b.textContent.trim() === 'Approve').click(); true`); // (#12059)
                 } else if (mobile && word !== 'Approve') {
                     await ev(`document.querySelector('${T} button[aria-label="More actions for ${n}"]').click(); true`);
                     await waitFor(`document.querySelector('${T} .inbox-row-more-toggle[aria-expanded="true"]')`, at + 'the three dots open', 4000);
