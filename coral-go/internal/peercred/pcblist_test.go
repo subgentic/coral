@@ -183,3 +183,19 @@ func TestAnEmptySocketTableIsTheOSHidingItNotAMissingRow(t *testing.T) {
 	_, err = parsePCBList(pcbList(binary.LittleEndian, pcb{inpIPv4, netip.MustParseAddrPort("127.0.0.1:1111"), server, 501, false}), client, server, true)
 	assert.ErrorIs(t, err, ErrNotFound)
 }
+
+// A table cut off (a short read) after the server's own row is a missing row, never the fallback: the cut may have taken the client's row with it, and a read that failed is not the OS hiding
+// the table. Only a table that was read whole and does not show the client's row is the layout answer (#12529).
+func TestATableCutOffAfterTheServersOwnRowIsStillNoRow(t *testing.T) {
+	client := netip.MustParseAddrPort("127.0.0.1:51234")
+	server := netip.MustParseAddrPort("127.0.0.1:8420")
+	whole := pcbList(binary.LittleEndian, pcb{inpIPv4, server, client, 501, false}, pcb{inpIPv4, netip.MustParseAddrPort("127.0.0.1:40000"), server, 501, false})
+	own := 24 + 104 + 104                                     // the header, the server's own inpcb and its socket item
+	for _, cut := range []int{own + 10, own + 8, own + 103} { // inside the next item, with its length already read
+		_, err := parsePCBList(whole[:cut], client, server, true)
+		assert.ErrorIs(t, err, ErrNotFound, "cut at %d", cut)
+		assert.NotErrorIs(t, err, ErrLayout, "cut at %d", cut)
+	}
+	_, err := parsePCBList(whole, client, server, true)
+	assert.ErrorIs(t, err, ErrLayout, "the same table read whole shows the server's end and not the client's")
+}

@@ -28,7 +28,9 @@ func TestOwnedByMyProcessFindsARealClientSocket(t *testing.T) {
 	c, err := net.Dial("tcp", ln.Addr().String())
 	require.NoError(t, err)
 	defer c.Close()
-	defer func() { (<-accepted).Close() }()
+	srv := <-accepted // the server's end is a descriptor of this process only once Accept has returned
+	require.NotNil(t, srv)
+	defer srv.Close()
 	client := c.LocalAddr().(*net.TCPAddr).AddrPort()
 	server := c.RemoteAddr().(*net.TCPAddr).AddrPort()
 
