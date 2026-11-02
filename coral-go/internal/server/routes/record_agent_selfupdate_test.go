@@ -101,8 +101,10 @@ func TestASelfUpdatedImageThatIsALinkOrAFolderIsNotTheCLI(t *testing.T) {
 	linkedDir := filepath.Join(root, "binLink")
 	dirLink(t, dir, linkedDir)
 	real := touch(t, filepath.Join(dir, "claude.exe.old.6.1234"))
-	// safefs.Resolve refuses a path through a junction or an untrusted mount ("cannot be traversed"), so the CLI given that way is not resolved: no match (condition 5: unreadable fails the other way)
-	assert.False(t, isSelfUpdatedImage(real, filepath.Join(linkedDir, "claude.exe")), "a CLI path through a link: not resolvable here, so no match")
+	if runtime.GOOS == "windows" {
+		// safefs.Resolve refuses a path through a junction or an untrusted mount ("cannot be traversed"), so the CLI given that way is not resolved: no match (condition 5: unreadable fails the other way)
+		assert.False(t, isSelfUpdatedImage(real, filepath.Join(linkedDir, "claude.exe")), "a CLI path through a link: not resolvable here, so no match")
+	}
 }
 
 func TestSameImageTakesTheRenamedBinaryOnlyOnWindows(t *testing.T) {
