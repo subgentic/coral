@@ -194,3 +194,66 @@ func TestAHermesApprovalBoxWithNoCommandIsNotAPrompt(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, "rm -rf x", s.Target)
 }
+
+// Security's MUST on #12170 (confirmed on a real Hermes by the tester): Hermes cuts a long command in its OWN box at about 200 characters and ends it "… (choose Show full command)", so the screen's command never equals
+// the stored one and the over-the-cap and hidden-character rules never fired: a person could allow a 4 KB command having seen its first 200 characters. The stored command is matched by prefix then, and judged; a cut
+// with no stored command to match fails closed to Reject only.
+func hermesCutScreen(shown string) string {
+	const inner = 62
+	var rows []string
+	for rest := shown + "… (choose Show full command)"; rest != ""; {
+		n := len([]rune(rest))
+		if n > inner {
+			n = inner
+		}
+		rows = append(rows, string([]rune(rest)[:n]))
+		rest = string([]rune(rest)[n:])
+	}
+	pad := func(s string) string { return "│ " + s + strings.Repeat(" ", inner-len([]rune(s))) + " │\n" }
+	var b strings.Builder
+	b.WriteString("╭" + strings.Repeat("─", inner+2) + "╮\n" + pad("⚠️   Dangerous Command") + pad(""))
+	for _, r := range rows {
+		b.WriteString(pad(r))
+	}
+	b.WriteString(pad("") + pad("❯ 1. Allow once") + pad("  2. Allow for this session") + pad("  3. Add to permanent allowlist") + pad("  4. Deny") + pad("  5. Show full command") + pad("") + pad("recursive delete"))
+	b.WriteString("╰" + strings.Repeat("─", inner+2) + "╯\n  ↑/↓ to select, Enter to confirm  (292s)\n")
+	return b.String()
+}
+
+func TestAHermesCommandCutOnItsScreenIsJudgedByTheStoredCommandOrRefused(t *testing.T) {
+	const zero = "​"
+	shown := "rm -rf /home/tester/dangerdir/" + strings.Repeat("over_the_cap_segment_001_", 7) // about 200 characters, as Hermes shows
+	parse := func() promptScreen {
+		s, ok := parsePromptScreen(hermesCutScreen(shown))
+		require.True(t, ok, "the cut box is a prompt")
+		return s
+	}
+	rest := strings.Repeat("x", 4060)
+
+	// over the cap: the stored command is longer than a card shows, so only Reject is offered
+	s := parse()
+	require.False(t, s.OnlyReject, "the screen alone is a short, plain command")
+	applyHermesCommand(&s, shown+rest)
+	assert.True(t, s.OnlyReject, "a 4 KB command seen as its first 200 characters: Deny only")
+	assert.NotEmpty(t, s.Note)
+
+	// a hidden character after the cut is in the stored command, not on the screen
+	s = parse()
+	applyHermesCommand(&s, shown+"abc"+zero+"def")
+	assert.True(t, s.OnlyReject, "a character hidden after the cut")
+	assert.Contains(t, strings.ToLower(s.Target), "<u+200b>")
+
+	// a cut with nothing stored, or another call's command, fails closed: the person could not see the rest
+	for name, stored := range map[string]string{"nothing stored": "", "another call's command": "ls /tmp"} {
+		s = parse()
+		applyHermesCommand(&s, stored)
+		assert.True(t, s.OnlyReject, name)
+		assert.Contains(t, strings.ToLower(s.Note), "cut", name)
+	}
+
+	// a short command whose box has the fifth row but no cut marker is as before
+	clean, ok := parsePromptScreen(hermesScreen(t, "a2_approval_long"))
+	require.True(t, ok)
+	applyHermesCommand(&clean, "")
+	assert.False(t, clean.OnlyReject, "no marker: the whole command was on the screen")
+}

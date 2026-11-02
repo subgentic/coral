@@ -37,6 +37,7 @@ var (
 	hermesOptionRe    = regexp.MustCompile(`^\s*([❯>]\s*)?(\d{1,2})\.\s+(.+?)\s*$`)
 	hermesQuestionRe  = regexp.MustCompile(`^\s*▸\s*(.+?)\s*$`)
 	hermesCountRe     = regexp.MustCompile(`^\d+ questions?$`)
+	hermesCutRe       = regexp.MustCompile(`(?i)\s*(?:…|\.\.\.)?\s*\(\s*choose\s+show\s+full\s+command\s*\)\s*$`)
 )
 
 // parseHermesPrompt reads a Hermes approval or clarify box from the bottom of a capture. Not ok for anything else, and for a clarify with no options (the person types the answer in the terminal).
@@ -248,16 +249,34 @@ func foldCommand(s string) string {
 // the terminal does not draw, so an invisible, format or reordering character is in the stored command and not on the screen. The same rule as every CLI then applies (permreview): such a command offers Reject only and
 // the note names the character. A stored command that is not the screen's (another call, nothing stored) changes nothing: the screen's own text stands.
 func applyHermesCommand(s *promptScreen, stored string) {
-	if s.Kind != promptKindApproval || stored == "" || foldCommand(stored) != foldCommand(s.context) {
+	if s.Kind != promptKindApproval {
 		return
 	}
-	rv := permreview.Of(stored)
-	s.context = stored
-	s.Target = rv.Shown
-	if !rv.Allowed() {
-		s.OnlyReject, s.Note = true, rv.Note()
+	judge := func(command string) {
+		rv := permreview.Of(command)
+		s.context = command
+		s.Target = rv.Shown
+		if !rv.Allowed() {
+			s.OnlyReject, s.Note = true, rv.Note()
+		}
+		s.AskID = askID(*s)
 	}
-	s.AskID = askID(*s)
+	// Hermes cuts a long command in its own box (about 200 characters) and ends it "... (choose Show full command)": the screen then holds the start of the command and the person could allow what they saw only in part.
+	// The stored command is matched by its start and judged; a cut with no stored command that starts so cannot be judged, and fails closed.
+	if loc := hermesCutRe.FindStringIndex(s.context); loc != nil {
+		shown := foldCommand(s.context[:loc[0]])
+		if stored != "" && shown != "" && strings.HasPrefix(foldCommand(stored), shown) {
+			judge(stored)
+			return
+		}
+		s.OnlyReject, s.Note = true, "Hermes cut this command short on its screen and Coral could not read the whole of it, so it can only be rejected here: read it in the terminal."
+		s.AskID = askID(*s)
+		return
+	}
+	if stored == "" || foldCommand(stored) != foldCommand(s.context) {
+		return
+	}
+	judge(stored)
 }
 
 // hermesStoredCommand reads the command of the agent's newest tool call from its Hermes session (few rows: the call is the last thing it did).
