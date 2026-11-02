@@ -294,14 +294,21 @@ func boxPlaceholder(box string) bool {
 		strings.HasPrefix(t, "Type your message") || hermesHints[t]
 }
 
-// hermesHints are the hints Hermes v0.22.5 rotates through in its empty input box (seen in a real run, #11936). Each is matched whole: a box that holds one of these and more is a person's text, and a hint
-// not listed here is taken for a draft (nothing is typed over it), never the other way round.
+// hermesHints are the hints Hermes v0.22.5 rotates through in its empty input box: all eleven of the English ones, from Hermes's own locales/en.yaml (key placeholder, p01 to p11; the tester's run on a build with five
+// of them showed "Ask anything, or type / for commands…" as a draft, #11936). Each is matched whole: a box that holds one of these and more is a person's text, and a hint not listed here (another locale's) is taken for
+// a draft, so nothing is typed over it: the first message is then not typed and the agent's feed says so.
 var hermesHints = map[string]bool{
-	"Explain this error and how to fix it":                 true,
-	"Turn these notes into a to-do list":                   true,
-	"Type / to browse commands, or Ctrl+P for the palette": true,
+	"Ask anything, or type / for commands…":                true,
 	"Summarize what's in this folder":                      true,
+	"Draft a reply to the last email in my inbox":          true,
+	"Plan a feature, then build it step by step":           true,
 	"Find and fix a failing test":                          true,
+	"Research this topic and write me a brief":             true,
+	"What changed in this repo recently?":                  true,
+	"Turn these notes into a to-do list":                   true,
+	"Explain this error and how to fix it":                 true,
+	"Set a reminder or schedule a recurring task":          true,
+	"Type / to browse commands, or Ctrl+P for the palette": true,
 }
 
 // StyledScreenReader is implemented by terminals that can show AgentScreen with each
