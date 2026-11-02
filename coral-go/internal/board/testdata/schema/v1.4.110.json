@@ -590,7 +590,7 @@
     },
     {
       "name": "board_waits",
-      "sql": "CREATE TABLE board_waits (\n\t\t\tid             INTEGER PRIMARY KEY AUTOINCREMENT,\n\t\t\tproject        TEXT NOT NULL,\n\t\t\tsubscriber_id  TEXT NOT NULL,\n\t\t\tsession_name   TEXT NOT NULL,\n\t\t\twait_type      TEXT NOT NULL DEFAULT 'message',\n\t\t\ttarget_id      TEXT NOT NULL DEFAULT '',\n\t\t\treason         TEXT NOT NULL DEFAULT '',\n\t\t\tstatus         TEXT NOT NULL DEFAULT 'active'\n\t\t\t\tCHECK (status IN ('active', 'resolved', 'cancelled', 'expired')),\n\t\t\tcreated_at     TEXT NOT NULL,\n\t\t\tresolved_at    TEXT,\n\t\t\texpires_at     TEXT NOT NULL\n\t\t, timeout_notified_at TEXT)",
+      "sql": "CREATE TABLE board_waits (\n\t\t\tid             INTEGER PRIMARY KEY AUTOINCREMENT,\n\t\t\tproject        TEXT NOT NULL,\n\t\t\tsubscriber_id  TEXT NOT NULL,\n\t\t\tsession_name   TEXT NOT NULL,\n\t\t\twait_type      TEXT NOT NULL DEFAULT 'message',\n\t\t\ttarget_id      TEXT NOT NULL DEFAULT '',\n\t\t\treason         TEXT NOT NULL DEFAULT '',\n\t\t\tstatus         TEXT NOT NULL DEFAULT 'active'\n\t\t\t\tCHECK (status IN ('active', 'resolved', 'cancelled', 'expired')),\n\t\t\tcreated_at     TEXT NOT NULL,\n\t\t\tresolved_at    TEXT,\n\t\t\texpires_at     TEXT NOT NULL\n\t\t, timeout_notified_at TEXT, question_kept_at TEXT)",
       "tbl_name": "board_waits",
       "type": "table"
     },
@@ -4796,6 +4796,15 @@
           "dflt_value": null,
           "hidden": 0,
           "name": "timeout_notified_at",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 12,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "question_kept_at",
           "notnull": 0,
           "pk": 0,
           "type": "TEXT"

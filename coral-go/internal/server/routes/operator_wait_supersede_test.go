@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -118,4 +119,93 @@ func TestAQuestionAskedAndWaitedOnIsNotKeptAsASecondCopy(t *testing.T) {
 	h.endOwnWaits(ctx, "team", "Lead")
 	_, rows, _ = readOperatorAsks(t, h, asPerson)
 	assert.Len(t, rows, 1, "the wait ends and the ask is the one question: no second copy is kept")
+}
+
+// #11919, Security's MUST: the commonest way to lose a question is its wait running out (the Operator away two hours, a sleeping Mac): the agent gets a timeout notice and the person got nothing. An operator wait
+// that expires unanswered is kept once as an open ask, read when the Operator's Needs you is read; a question the Operator answered is not.
+func TestAnOperatorQuestionWhoseWaitRanOutIsKeptOnceAsAnAsk(t *testing.T) {
+	h, bs := operatorAsksRig(t)
+	ctx := context.Background()
+	_, err := bs.Subscribe(ctx, "team", "Lead", "Orchestrator", "claude-lead", nil, "all")
+	require.NoError(t, err)
+	_, err = bs.Subscribe(ctx, "team", "Dev", "Developer", "claude-dev", nil, "all")
+	require.NoError(t, err)
+	reg := func(who, reason string) {
+		req := httptest.NewRequest(http.MethodPost, "/api/board/team/waits", strings.NewReader(`{"subscriber_id":"`+who+`","wait_type":"operator","reason":`+jsonString(reason)+`,"timeout":"1s"}`))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		h.RegisterWait(w, dropAt2(asPerson(req), map[string]string{"project": "team"}))
+		require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+	}
+	texts := func() []string {
+		_, rows, _ := readOperatorAsks(t, h, asPerson)
+		var out []string
+		for _, r := range rows {
+			out = append(out, r["kind"].(string)+":"+r["text"].(string))
+		}
+		return out
+	}
+	reg("Lead", "Decision 2: drop the table?")
+	reg("Dev", "Decision 9: rename it?")
+	require.Len(t, texts(), 2, "both waits are listed while they last")
+	time.Sleep(2200 * time.Millisecond) // sleep-ok: a real one-second timeout running out
+	got := texts()
+	require.Len(t, got, 2, "both questions are still in Needs you after their waits ran out: %v", got)
+	for _, g := range got {
+		assert.True(t, strings.HasPrefix(g, "ask:"), "as ordinary asks, not as waits: %v", got)
+	}
+	assert.Len(t, texts(), 2, "read again, nothing is added: the question was kept once")
+
+	// the Operator answers one: it closes like any ask and does not come back
+	_, rows, _ := readOperatorAsks(t, h, asPerson)
+	var first map[string]any
+	for _, r := range rows {
+		if strings.Contains(r["text"].(string), "Decision 2") {
+			first = r
+		}
+	}
+	require.NotNil(t, first)
+	require.NoError(t, bs.CloseAsk(ctx, "team", int64(first["id"].(float64)), "Operator", "answered"))
+	assert.Len(t, texts(), 1, "an answered question is gone")
+	assert.Len(t, texts(), 1, "and stays gone")
+}
+
+// Security's SHOULD: two asks are the same question only when they are equal, never when one is found inside the other: a short "ok?" is not "already asked" because a longer ask of the agent has it in it.
+func TestAShortQuestionIsNotTakenForPartOfALongerAsk(t *testing.T) {
+	h, bs := operatorAsksRig(t)
+	ctx := context.Background()
+	_, err := bs.Subscribe(ctx, "team", "Lead", "Orchestrator", "claude-lead", nil, "all")
+	require.NoError(t, err)
+	q, err := bs.PostMessage(ctx, "team", "Lead", "@Operator should we book the room, ok? it is cheap", nil)
+	require.NoError(t, err)
+	require.NoError(t, bs.RecordAsk(ctx, "team", q, []string{"Operator"}))
+	post := func(body string) {
+		req := httptest.NewRequest(http.MethodPost, "/api/board/team/waits", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		h.RegisterWait(w, dropAt2(asPerson(req), map[string]string{"project": "team"}))
+		require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+	}
+	post(`{"subscriber_id":"Lead","wait_type":"operator","reason":"ok?"}`)
+	post(`{"subscriber_id":"Lead","wait_type":"message","target_id":"Dev","reason":"on Dev"}`)
+	_, rows, _ := readOperatorAsks(t, h, asPerson)
+	assert.Len(t, rows, 2, "the long ask and the kept short question are two")
+}
+
+// The Needs you read (GET /api/needs-you, the phone push) keeps an expired question too, once.
+func TestNeedsYouKeepsAQuestionWhoseWaitRanOut(t *testing.T) {
+	h, bs := operatorAsksRig(t)
+	ctx := context.Background()
+	_, err := bs.Subscribe(ctx, "team", "Lead", "Orchestrator", "claude-lead", nil, "all")
+	require.NoError(t, err)
+	req := httptest.NewRequest(http.MethodPost, "/api/board/team/waits", strings.NewReader(`{"subscriber_id":"Lead","wait_type":"operator","reason":"Decision 3: go?","timeout":"1s"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	h.RegisterWait(w, dropAt2(asPerson(req), map[string]string{"project": "team"}))
+	require.Equal(t, http.StatusCreated, w.Code)
+	time.Sleep(2200 * time.Millisecond) // sleep-ok: a real one-second timeout running out
+	for i := 0; i < 2; i++ {
+		_, out := readNeedsYou(t, h, "", asPerson)
+		assert.EqualValues(t, 1, out["count"], "read %d: one question, kept once", i+1)
+	}
 }
