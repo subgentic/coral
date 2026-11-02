@@ -365,7 +365,13 @@ function _renderLiveSessions(sessions) {
 
     html += _renderArchivedSection(archived);
     html = oneRowStop(html);
+    // A row's open menu stays open across the redraw (#10786, Beta #10775): the list is drawn again every few seconds and the new row's menu starts closed, so a person who looked at the open menu and then clicked Rename clicked what was under it.
+    const menuOpenFor = [...list.querySelectorAll('.sidebar-kebab-menu')].find(m => m.style.display !== 'none')?.closest('.session-group-item[data-session-id]')?.dataset.sessionId || '';
     _applyListHtml(list, html, focusedSid, focusedInMenu);
+    if (menuOpenFor) {
+        const btn = list.querySelector(`.session-group-item[data-session-id="${CSS.escape(menuOpenFor)}"] .sidebar-kebab-btn`);
+        if (btn && btn.nextElementSibling && btn.nextElementSibling.style.display === 'none') window.toggleSidebarKebab?.(btn);
+    }
     syncGroupToggle(); // the header's Collapse / Expand toggle reads the headers just drawn (#4947)
     _refreshTeamBadges(sessions);
 }
