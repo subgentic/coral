@@ -7,6 +7,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/store"
 )
 
 // #9681 (security check on #9679 slice 1): the warning the Servers page shows beside a server's name is the server record's `warning`, and the record has one exactly when its URL is plain http at an
@@ -100,4 +102,15 @@ func TestRemoteServersListWarnsForAStoredRowWithAnUnreadableURL(t *testing.T) {
 	assert.Equal(t, remoteHTTPWarning, warning["legacy"], "an unreadable stored URL fails closed: the warning")
 	assert.Nil(t, warning["tls"])
 	assert.Nil(t, warning["local"])
+}
+
+// A server set up over SSH (#12219) is reached through the owner's SSH session, never a network address, so its ssh:// row has no "key crosses the network unencrypted" warning; the same URL on an http row still does (unknown schemes fail closed), and a key-renew warning is kept.
+func TestAnSSHServerHasNoUnencryptedKeyWarning(t *testing.T) {
+	ssh := &store.RemoteServer{Transport: store.RemoteTransportSSH, URL: "ssh://epoch"}
+	assert.Empty(t, viewRemote(ssh).Warning, "reached over ssh -W to the far loopback")
+	assert.NotEmpty(t, viewRemote(&store.RemoteServer{Transport: store.RemoteTransportHTTP, URL: "ssh://epoch"}).Warning, "an http row with an ssh URL still fails closed")
+	assert.NotEmpty(t, viewRemote(&store.RemoteServer{Transport: store.RemoteTransportHTTP, URL: "http://10.0.0.2:8420"}).Warning, "plain http to another computer still warns")
+	since := "2026-11-01T00:00:00Z"
+	ssh.KeyRenewSince = &since
+	assert.NotEmpty(t, viewRemote(ssh).Warning, "a key that must be renewed is still said")
 }

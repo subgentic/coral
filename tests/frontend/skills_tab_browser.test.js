@@ -68,14 +68,29 @@ const DETAIL = { skill: ROWS[1], files: [
         assert.match(ackText, /scripts\/check\.sh/); assert.match(ackText, /assets\/logo\.png/); assert.ok(ackText.includes('e'.repeat(64)) && ackText.includes('d'.repeat(64)), 'every SHA-256 in full');
         const approve = `Array.from(document.querySelectorAll('#skills-view .skills-actions button')).find(b => /^Approv/.test(b.textContent))`;
         assert.equal(await ev(`${approve}.disabled`), true, 'Approve is off before the files are acknowledged');
+        // the banner counts the files whose text can be shown and have not been on screen (#12142): SKILL.md is, scripts/check.sh is not
+        assert.match(await ev(`document.querySelector('#skills-view .skills-banner').innerText`), /1 file not opened yet/, 'the banner says how many files are not opened');
         await ev(`document.querySelector('#skills-view .skills-ack input[type=checkbox]').click(); true`);
         assert.equal(await ev(`${approve}.disabled`), false);
+        // Approve with a file not opened asks once, naming the count; Cancel sends nothing
+        await ev(`${approve}.click(); true`);
+        await waitFor(`getComputedStyle(document.getElementById('confirm-modal')).display === 'flex' && /1 file has not been opened yet/.test(document.getElementById('confirm-modal-message').textContent)`, 'the approve confirmation names the file not opened', 4000);
+        await ev(`document.querySelector('#confirm-modal .modal-actions .btn:not(#confirm-modal-yes)').click(); true`);
+        assert.equal(await ev(`window.__calls.filter(c => c.includes('/approve')).length`), 0, 'Cancel approves nothing');
+        // opening the file switches the text, and the ticked box survives while the digest is the same
+        await ev(`document.querySelector('#skills-view tr.dt-row[data-key="scripts/check.sh"]').click(); true`);
+        await waitFor(`/Showing scripts\\/check\\.sh/.test(document.querySelector('#skills-view').innerText)`, 'the script is shown', 4000);
+        assert.equal(await ev(`document.querySelector('#skills-view .skills-ack input[type=checkbox]').checked`), true, 'the tick survives a file switch');
+        assert.match(await ev(`document.querySelector('#skills-view .skills-banner').innerText`), /every file that can be shown/, 'the banner counts it opened');
+        assert.equal(await ev(`${approve}.disabled`), false, 'and Approve stays on');
         // the skill changed under the Operator: the approval is refused, and the new view is drawn
         await ev(`${approve}.click(); true`);
         await waitFor(`window.__calls.filter(c => c.startsWith('GET /api/skills/${ROWS[1].id}')).length >= 2`, 'the view read again after skill_changed', 6000);
         await waitFor(`document.querySelector('#skills-view .skills-ack input[type=checkbox]') && !document.querySelector('#skills-view .skills-ack input[type=checkbox]').checked`, 'the second step asked again on the new view', 4000);
         await ev(`document.querySelector('#skills-view .skills-ack input[type=checkbox]').click(); true`);
         await ev(`${approve}.click(); true`);
+        await waitFor(`getComputedStyle(document.getElementById('confirm-modal')).display === 'flex'`, 'the new view has a file not opened again, so it asks', 4000);
+        await ev(`document.getElementById('confirm-modal-yes').click(); true`);
         await waitFor(`window.__calls.filter(c => c.includes('/approve')).length === 2`, 'the second approval sent', 6000);
         const sent = await ev(`window.__calls.filter(c => c.includes('/approve')).map(c => JSON.parse(c.slice(c.indexOf('{'))))`);
         assert.deepEqual(sent[0], { digest: D2, scripts_acked: true }, 'the digest the view held is what is approved');
@@ -86,6 +101,11 @@ const DETAIL = { skill: ROWS[1], files: [
         await ev(`document.querySelector('#skills-view tr.dt-row[data-key="${ROWS[2].id}"]').click(); true`);
         await waitFor(`document.querySelector('#skills-view .skills-banner')`, 'the script-free skill\'s view', 6000);
         assert.equal(await ev(`!!document.querySelector('#skills-view .skills-ack')`), false, 'no second step without scripts');
+        // a confirm box that is missing says so in a toast and does nothing, never a silent click
+        await ev(`window.__scm = window.showConfirmModal; window.showConfirmModal = undefined; Array.from(document.querySelectorAll('#skills-view .skills-actions button')).find(b => /^Reject/.test(b.textContent)).click(); true`);
+        await waitFor(`Array.from(document.querySelectorAll('.toast')).some(t => /confirm box is not available/.test(t.textContent))`, 'a toast says the confirm box is missing', 4000);
+        assert.equal(await ev(`window.__calls.filter(c => c.includes('/reject')).length`), 0, 'and nothing was rejected');
+        await ev(`window.showConfirmModal = window.__scm; true`);
         await ev(`Array.from(document.querySelectorAll('#skills-view .skills-actions button')).find(b => /^Approv/.test(b.textContent)).click(); true`);
         await waitFor(`window.__calls.filter(c => c.includes('/${ROWS[2].id}/approve')).length === 1`, 'the script-free approval sent', 6000);
         const sentFree = await ev(`JSON.parse(window.__calls.find(c => c.includes('/${ROWS[2].id}/approve')).slice(window.__calls.find(c => c.includes('/${ROWS[2].id}/approve')).indexOf('{')))`);

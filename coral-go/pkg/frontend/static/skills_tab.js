@@ -12,7 +12,7 @@ const { el } = DT;
 const STATUS = { pending: ['Pending approval', 'goal-state-task-active'], approved: ['Approved', ''], rejected: ['Rejected', 'team-state-bad'] }; // the tones the other lists pass to chip()
 const FILTERS = [['', 'All'], ['pending', 'Pending approval'], ['approved', 'Approved'], ['rejected', 'Rejected']];
 const tableState = DT.tableState();
-let rows = [], showStatus = '', loadError = '', open = null /* { id, data, error, busy, acked, fileShown } */;
+let rows = [], showStatus = '', loadError = '', open = null /* { id, data, error, busy, acked, fileShown, opened: Set of the files shown } */;
 
 const host = () => document.getElementById('skills-view');
 const publisher = r => (r.publisher_kind === 'operator' ? 'Operator' : `${r.publisher_agent}${r.publisher_team ? ' · ' + r.publisher_team : ''}`);
@@ -38,7 +38,7 @@ async function loadList() {
 }
 
 async function loadOne(id) {
-    open = { id, data: null, error: '', busy: false, acked: false, fileShown: null };
+    open = { id, data: null, error: '', busy: false, acked: false, fileShown: null, opened: new Set() };
     draw();
     try { open.data = await requestJson('GET', `/api/skills/${encodeURIComponent(id)}`); }
     catch (e) { open.error = e.status === 404 ? 'This skill no longer exists.' : (e.message || 'The skill could not be read'); }
@@ -100,9 +100,9 @@ async function importZip(file, scriptsAcked, acknowledgeSecret) {
     } catch (e) {
         const code = e.data && e.data.code;
         if (e.status === 409 && code === 'scripts_not_acknowledged') {
-            window.showConfirmModal?.('This skill has scripts', 'It includes scripts or files that cannot be shown as text, which an agent that has this skill can run with its own permissions. Import it only if you have read them. Import anyway?', () => importZip(file, true, acknowledgeSecret), undefined, { label: 'Import', danger: true });
+            confirmOrSay('This skill has scripts', 'It includes scripts or files that cannot be shown as text, which an agent that has this skill can run with its own permissions. Import it only if you have read them. Import anyway?', () => importZip(file, true, acknowledgeSecret), { label: 'Import', danger: true });
         } else if (e.status === 409 && code === 'holds_secret') {
-            window.showConfirmModal?.('A file holds a secret', `${e.message} Import anyway?`, () => importZip(file, scriptsAcked, true), undefined, { label: 'Import anyway', danger: true });
+            confirmOrSay('A file holds a secret', `${e.message} Import anyway?`, () => importZip(file, scriptsAcked, true), { label: 'Import anyway', danger: true });
         } else showToast(`Couldn't import it: ${e.message}`, true);
     }
 }
@@ -122,9 +122,11 @@ function drawDetail() {
     meta.append(el('span', '', `Published by ${publisher(s)}`), el('span', '', `Digest ${short(s.digest)}`), el('span', '', `${files.length} file${files.length === 1 ? '' : 's'}`));
     page.append(meta, el('p', 'skills-note', s.description));
     if (s.status === 'removed') { page.append(el('p', 'skills-note', 'This skill was removed.')); return page; }
+    let unopenedEl = null;
     if (s.status === 'pending') {
         const b = el('div', 'notice notice-warn skills-banner'); b.append(el('strong', '', 'Read it before you approve it.'));
         b.append(el('span', '', `This skill was published by ${publisher(s)}. Its text is instructions an agent will follow, and approving it puts its description into the instructions of every agent that has it attached. Nothing here is searchable or attachable until you approve.`));
+        unopenedEl = el('p', 'skills-unopened'); b.append(unopenedEl);
         page.append(b);
     }
     // the files: every one, with its size, kind and SHA-256
@@ -137,6 +139,8 @@ function drawDetail() {
         { key: 'sha', label: 'SHA-256', width: '8rem', cell: f => short(f.sha256) },
     ], open: f => { open.fileShown = f.path; draw(); } }).el);
     const shown = open.fileShown && contents[open.fileShown] != null ? open.fileShown : (contents['SKILL.md'] != null ? 'SKILL.md' : null);
+    if (shown) open.opened.add(shown);
+    if (unopenedEl) { const n = unopenedFiles(d).length; unopenedEl.textContent = n ? `${n} file${n === 1 ? '' : 's'} not opened yet.` : 'You have opened every file that can be shown.'; }
     if (shown) { const pre = el('pre', 'skills-file-text'); pre.textContent = contents[shown]; pre.setAttribute('aria-label', `Text of ${shown}`); fileSec.append(el('p', 'skills-note', `Showing ${shown}`), pre); }
     page.append(fileSec);
     // what the scanner found in the scripts
@@ -153,6 +157,10 @@ function drawDetail() {
     return page;
 }
 
+/** The files whose text this view can show and the Operator has not had on screen yet (SKILL.md is on screen at first). The ones that cannot be shown are the second step's. */
+const unopenedFiles = d => (d.files || []).filter(f => (d.contents || {})[f.path] != null && !open.opened.has(f.path));
+const confirmOrSay = (title, text, fn, opts) => { if (typeof window.showConfirmModal === 'function') window.showConfirmModal(title, text, fn, undefined, opts); else showToast('The confirm box is not available, so nothing was done. Reload the page and try again.', true); };
+
 function drawApproval(s, risky) {
     const wrap = el('div', 'skills-section');
     const digest = s.digest; // the one this view held, not one read again
@@ -163,10 +171,10 @@ function drawApproval(s, risky) {
         const ul = el('ul');
         for (const f of risky) { const li = el('li'); li.append(el('code', '', f.path), ` (${f.kind === 'script' ? 'script' : 'not shown as text'}, ${kb(f.size)}, SHA-256 ${f.sha256})`); ul.append(li); }
         ack.append(ul);
-        const label = el('label'); ackBox = el('input'); ackBox.type = 'checkbox'; label.append(ackBox, ' I have read these files');
+        const label = el('label'); ackBox = el('input'); ackBox.type = 'checkbox'; label.append(ackBox, ' I have read these files'); ackBox.checked = open.acked && open.ackedDigest === digest; // kept across a file switch while the digest is the same
         ack.append(label); wrap.append(ack);
     }
-    const approve = button('btn', open.busy ? 'Approving…' : 'Approve', async () => {
+    const doApprove = async () => {
         if (open.busy) return; open.busy = true; syncButtons();
         try {
             await requestJson('POST', `/api/skills/${encodeURIComponent(s.id)}/approve`, { digest, scripts_acked: !!(ackBox && ackBox.checked) });
@@ -176,13 +184,18 @@ function drawApproval(s, risky) {
             if (e.data && e.data.code === 'skill_changed') { showToast('This is not the skill you reviewed: here is the new view.', true); await loadOne(s.id); return; }
             showToast(`Couldn't approve it: ${e.message}`, true); syncButtons();
         }
+    };
+    const approve = button('btn', open.busy ? 'Approving…' : 'Approve', () => {
+        const n = unopenedFiles(open.data).length;
+        if (!n) { doApprove(); return; }
+        confirmOrSay('Approve with files not opened', `${n} file${n === 1 ? ' has' : 's have'} not been opened yet. Approve ${s.name} anyway?`, doApprove, { label: 'Approve' });
     });
-    const reject = button('btn btn-danger', 'Reject', () => window.showConfirmModal?.('Reject this skill', `Reject ${s.name}? Nobody can attach it, and an agent cannot publish these exact bytes again.`, async () => {
+    const reject = button('btn btn-danger', 'Reject', () => confirmOrSay('Reject this skill', `Reject ${s.name}? Nobody can attach it, and an agent cannot publish these exact bytes again.`, async () => {
         try { await requestJson('POST', `/api/skills/${encodeURIComponent(s.id)}/reject`); showToast(`Rejected ${s.name}.`); open = null; await loadList(); draw(); loadSkillsBadge(); }
         catch (e) { showToast(`Couldn't reject it: ${e.message}`, true); }
-    }, undefined, { label: 'Reject', danger: true }));
+    }, { label: 'Reject', danger: true }));
     const syncButtons = () => { approve.disabled = open.busy || (!!ackBox && !ackBox.checked); approve.textContent = open.busy ? 'Approving…' : 'Approve'; };
-    if (ackBox) ackBox.addEventListener('change', syncButtons);
+    if (ackBox) ackBox.addEventListener('change', () => { open.acked = ackBox.checked; open.ackedDigest = digest; syncButtons(); });
     syncButtons();
     const actions = el('div', 'skills-actions'); actions.append(approve, reject);
     wrap.append(actions);
@@ -191,9 +204,9 @@ function drawApproval(s, risky) {
 
 function drawRemove(s) {
     const actions = el('div', 'skills-actions');
-    actions.append(button('btn btn-danger', 'Remove', () => window.showConfirmModal?.('Remove this skill', `Remove ${s.name} version ${s.version}? Agents that have it attached are told it was removed. Nothing is deleted from your computer but the skill's own copy.`, async () => {
+    actions.append(button('btn btn-danger', 'Remove', () => confirmOrSay('Remove this skill', `Remove ${s.name} version ${s.version}? Agents that have it attached are told it was removed. Nothing is deleted from your computer but the skill's own copy.`, async () => {
         try { await requestJson('DELETE', `/api/skills/${encodeURIComponent(s.id)}`); showToast(`Removed ${s.name}.`); open = null; await loadList(); draw(); loadSkillsBadge(); }
         catch (e) { showToast(`Couldn't remove it: ${e.message}`, true); }
-    }, undefined, { label: 'Remove', danger: true })));
+    }, { label: 'Remove', danger: true })));
     return actions;
 }
