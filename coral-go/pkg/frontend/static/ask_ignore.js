@@ -3,6 +3,7 @@
  * and no close route, so only an ask is ignorable. Lazy: the Inbox loads it on the first Ignore. */
 import { showToast, announceNotice } from './notifications.js';
 import { refreshOperatorAsks } from './operator_asks.js';
+import { markHidden } from './visible_marks.js';
 
 const NOTE = 'Dismissed by the operator';
 
@@ -17,8 +18,9 @@ async function close(a, body) {
 export async function ignoreAsk(a, who) {
     await close(a, { note: NOTE });
     refreshOperatorAsks(true);
-    showToast(`Ignored the question of ${who}`, false, undefined, { action: { label: 'Undo', onClick: () => close(a, { undo: true }).then(() => { refreshOperatorAsks(true); announceNotice(`The question of ${who} is back in Needs you.`); }).catch(e => showToast(e.message, true)) } });
-    announceNotice(`Ignored the question of ${who}. Undo is in the notice.`);
+    const flat = markHidden(String(a.text || ''), { strict: true }).replace(/\s+/g, ' ').trim(), what = flat ? `"${flat.length > 48 ? flat.slice(0, 47).trimEnd() + '\u2026' : flat}" from ${who}` : `the question of ${who}`; // which one, since nine ignores said the same line nine times (#12112)
+    showToast(`Ignored ${what}`, false, undefined, { action: { label: 'Undo', onClick: () => close(a, { undo: true }).then(() => { refreshOperatorAsks(true); announceNotice(`The question of ${who} is back in Needs you.`); }).catch(e => showToast(e.message, true)) } });
+    announceNotice(`Ignored ${what}. Undo is in the notice.`);
 }
 
 /** The bulk Ignore of a phone's selection (#11671): the same close route and Undo, with one toast for the whole selection (said by the caller). */

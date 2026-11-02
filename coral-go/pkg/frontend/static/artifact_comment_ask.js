@@ -18,6 +18,9 @@ export function createAsk({ st, panel, render, announce, refresh, ownHex }) {
         for (const [role, words] of askedOf(id)) m.set(role, words);
         return m;
     }
+    /** The line under a comment that says whether an agent has it: at rest, and again as soon as a send answers (#12112: it kept saying "Not sent to an agent yet" beside "Asked just now"). */
+    const statusWords = id => { const asked = [...askedNow(id)]; return asked.length ? 'Sent to ' + asked.map(([role, words]) => `${role} (${words.toLowerCase()})`).join(', ') : 'Not sent to an agent yet'; };
+    const redrawStatus = id => { const p = panel.querySelector(`.ac-card[data-id="${id}"] .ac-ask-status`); if (p) p.textContent = statusWords(id); };
     function askBlock() {
         const k = st.ask;
         return askUi.buildSendBlock({ id: k.id, board: st.board, agents: k.agents, picked: k.picked, asked: askedNow(k.id), results: k.results, busy: k.busy, error: k.error,
@@ -60,8 +63,8 @@ export function createAsk({ st, panel, render, announce, refresh, ownHex }) {
             announce(n ? `Asked ${n} agent${n === 1 ? '' : 's'}. Their replies come into this thread.` : 'Nobody was asked.');
             if (n) for (const ms of [10000, 30000, 90000]) setTimeout(() => { if (hex === st.hex) refresh(); }, ms); // the agents' replies are replies in the thread: fetched a few times while they work
         } else { k.error = res.error || 'The comment was not sent.'; }
-        redrawAsk();
+        redrawAsk(); redrawStatus(k.id);
         panel.querySelector('.ac-ask .ac-cancel')?.focus();
     }
-    return { canAsk, openAsk, askBlock, askedNow };
+    return { canAsk, openAsk, askBlock, askedNow, statusWords };
 }

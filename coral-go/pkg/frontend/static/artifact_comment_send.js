@@ -20,6 +20,10 @@ export const resultWords = (r) => RESULT_WORDS[r.state] || r.reason || 'Not aske
 export const askedWords = (k) => (k.replies > 0 ? `Already asked, ${k.replies} repl${k.replies === 1 ? 'y' : 'ies'} so far` : 'Already asked') + (k.seen ? `, seen by ${k.agent}` : '') + (k.nudged ? ', reminded' : ''); // seen: the agent read the thread; nudged: Coral typed it ONE reminder (#11722)
 
 import { el } from './dom_el.js';
+import { keyLabel } from './server_base.js';
+
+/** The team as a person knows it: its name, or "this team" while only its internal id (b-...) is known (#12112: the panel said "b-e7toicgto5"). */
+export const teamWords = board => { const name = keyLabel(board); return /^b-[a-z0-9]{6,}$/i.test(name) ? 'this team' : name; };
 
 /** Whether an agent of the board's status list can be asked now, and why not: asleep and not running cannot (the server refuses them as well). */
 function askableState(a) {
@@ -46,7 +50,7 @@ export function pickableAgents(list) {
  */
 export function buildSendBlock(x) {
     const box = el('div', 'ac-ask'); box.setAttribute('role', 'group');
-    const title = el('p', 'ac-ask-title', `Send this comment to agents on ${x.board}`); title.id = `ac-ask-title-${x.id}`;
+    const title = el('p', 'ac-ask-title', `Send this comment to agents on ${teamWords(x.board)}`); title.id = `ac-ask-title-${x.id}`;
     box.setAttribute('aria-labelledby', title.id);
     box.append(title);
     box.append(el('p', 'ac-ask-note', 'Each agent you pick gets this comment as a message. They answer in this thread.'));

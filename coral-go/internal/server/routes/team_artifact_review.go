@@ -133,7 +133,7 @@ func (h *BoardHandler) ReviewArtifact(w http.ResponseWriter, r *http.Request) {
 	change, tags, err := h.bs.DecideArtifactReview(r.Context(), project, id, state, time.Now())
 	switch {
 	case err == board.ErrNotForReview:
-		commentRefuse(w, http.StatusConflict, "not_for_review", "this artifact is not waiting for a review")
+		commentRefuse(w, http.StatusConflict, "not_for_review", h.notForReviewWords(r.Context(), project, item))
 		return
 	case errors.Is(err, board.ErrArtifactTag):
 		commentRefuse(w, http.StatusConflict, "too_many_tags", "this artifact already has the most tags it can have: take one off, then decide")
@@ -216,7 +216,7 @@ func (h *BoardHandler) ignoreArtifact(w http.ResponseWriter, r *http.Request, pr
 	change, tags, err := h.bs.IgnoreArtifactReview(r.Context(), project, id, ignore)
 	switch {
 	case err == board.ErrNotForReview:
-		commentRefuse(w, http.StatusConflict, "not_for_review", "this artifact is not waiting for a review")
+		commentRefuse(w, http.StatusConflict, "not_for_review", h.notForReviewWords(r.Context(), project, item))
 		return
 	case err != nil:
 		errInternalServer(w, "could not record that")
@@ -236,11 +236,34 @@ func (h *BoardHandler) saveArtifact(w http.ResponseWriter, r *http.Request, proj
 	change, tags, err := h.bs.SaveArtifactReview(r.Context(), project, id, save)
 	switch {
 	case err == board.ErrNotForReview:
-		commentRefuse(w, http.StatusConflict, "not_for_review", "this artifact is not waiting for a review")
+		commentRefuse(w, http.StatusConflict, "not_for_review", h.notForReviewWords(r.Context(), project, item))
 		return
 	case err != nil:
 		errInternalServer(w, "could not record that")
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"id": id, "changed": change.Changed, "tags": tags, "delivered": false})
+}
+
+// notForReviewWords is why a file is not waiting for a review, in words (#12112): when a newer version replaced it, say so and which, since the person composed their answer on the one they were shown and the others
+// were posted meanwhile. Without a newer version (or without a recorded series) it is the plain sentence.
+func (h *BoardHandler) notForReviewWords(ctx context.Context, project string, item teamArtifact) string {
+	plain := "this artifact is not waiting for a review"
+	if h.coralDir == "" {
+		return plain
+	}
+	sid, n, ok := digestSeriesOnBoard(h.coralDir, artifactStoreID(item), project)
+	if ok {
+		if members := seriesMembers(h.coralDir, sid); len(members) > 0 {
+			if last := members[len(members)-1]; last.N > n {
+				return fmt.Sprintf("A newer version (version %d) replaced this one (version %d), so it is no longer waiting for your review. Open the newest version to decide; what you typed is kept.", last.N, n)
+			}
+		}
+	}
+	tagged := []teamArtifact{item}
+	h.attachArtifactTags(ctx, project, tagged) // the item as the managed lookup returns it carries no tags
+	if hasTag(tagged[0].Tags, "superseded") {
+		return "A newer version replaced this one, so it is no longer waiting for your review. Open the newest version to decide."
+	}
+	return plain
 }
