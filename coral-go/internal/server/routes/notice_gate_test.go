@@ -3,6 +3,7 @@ package routes
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -26,6 +27,10 @@ func TestAutomatedInputBlockedWithholdsFromATerminalThatIsNotRunningTheAgent(t *
 	ctx := context.Background()
 	const name = "claude-6a1b2c3d-4e5f-4061-8a7b-9c0d1e2f3a4d"
 	assert.True(t, automatedInputBlocked(ctx, noticeGateTerm{why: "the terminal's foreground program is not the agent"}, name, "claude", "6a1b2c3d-4e5f-4061-8a7b-9c0d1e2f3a4d", "board message"))
-	assert.True(t, automatedInputBlocked(ctx, noticeGateTerm{wait: true, why: "starting"}, name, "claude", "6a1b2c3d-4e5f-4061-8a7b-9c0d1e2f3a4d", "board message"), "while the record is being made")
+	// A terminal that keeps saying "starting" is held until the hold limit (15 s by default) and then withheld. The hold ends the same way when the caller's context ends, so the test gives it 150 ms: the same
+	// answer (withheld) by the same path, without sleeping the whole default.
+	holdCtx, stop := context.WithTimeout(ctx, 150*time.Millisecond)
+	defer stop()
+	assert.True(t, automatedInputBlocked(holdCtx, noticeGateTerm{wait: true, why: "starting"}, name, "claude", "6a1b2c3d-4e5f-4061-8a7b-9c0d1e2f3a4d", "board message"), "while the record is being made")
 	assert.False(t, automatedInputBlocked(ctx, noticeGateTerm{ok: true}, name, "claude", "6a1b2c3d-4e5f-4061-8a7b-9c0d1e2f3a4d", "board message"), "the recorded agent is the foreground program")
 }
