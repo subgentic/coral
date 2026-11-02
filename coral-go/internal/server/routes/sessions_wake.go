@@ -20,7 +20,21 @@ import (
 	"github.com/subgentic/coral/internal/transcriptlink"
 )
 
+// wakeLocks makes the wakes of one session happen one at a time (#12291): each is a launch line with a token of its own, and a second token revokes the first.
+var wakeLocks sync.Map // session id -> *sync.Mutex
+
 func (h *SessionsHandler) wakeExistingSession(ctx context.Context, ls *store.LiveSession) (err error) {
+	// One wake of a session at a time, and the one that waited finds it awake and does nothing (#12291, the Beta Tester pressed Wake several times after Sleep Team): a second wake of a row it read
+	// while it was still asleep built a second launch line, whose new token revoked the first agent's (every coral-board call answered 401), and typed it into the terminal the first had made.
+	if ls.IsSleeping == 1 {
+		mu, _ := wakeLocks.LoadOrStore(ls.SessionID, &sync.Mutex{})
+		mu.(*sync.Mutex).Lock()
+		defer mu.(*sync.Mutex).Unlock()
+		if cur, gerr := h.ss.GetLiveSession(ctx, ls.SessionID); gerr == nil && cur != nil && cur.IsSleeping == 0 {
+			slog.Info("[wake] the agent was woken while this wake waited: nothing to do", "session_id", ls.SessionID)
+			return nil
+		}
+	}
 	launched := false // the agent CLI was started again: it loaded the current hook set
 	// A team's agents start in the team's home folder, which the Operator may have changed since this one last ran (#10815): the wake uses it and the row follows once it has started.
 	movedTo := ""
