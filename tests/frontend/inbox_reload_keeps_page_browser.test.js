@@ -10,7 +10,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
 (async () => {
     const { client, Page, Emulation, ev, PRELOAD, install } = await connect();
     const S = `(window.__coralStatic || '/static/')`, team = 'reload-' + Date.now().toString(36);
-    const TITLES = { needs: /^Needs (you|attention)/, tasks: /^Tasks/, goals: /^Goals/, saved: /^Saved/, artifacts: /^Artifacts/ };
+    const TITLES = { needs: /^Needs (you|attention)/, tasks: /^Tasks/, goals: /^Goals/, saved: /^Saved/, artifacts: /^Artifacts/, boards: /^Boards?/ }, FOLDER = { boards: 'chats-group' }; // the Boards page's folder has its own key (BOARDS_FOLDER), its address is /inbox/boards
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [w, h, mobile] of [[1280, 800, false], [390, 844, true]]) {
@@ -19,8 +19,8 @@ const { coralReady, framesJs } = require('./helpers/wait');
             const post = (path, body) => ev(`fetch(${JSON.stringify(path)}, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: ${JSON.stringify(JSON.stringify(body))} }).then(r => r.status)`);
             await post(`/api/board/${team}/subscribe`, { subscriber_id: 'Operator', job_title: 'Operator' }); await post(`/api/board/${team}/subscribe`, { subscriber_id: 'Writer', job_title: 'Writer' });
             assert.equal(await post(`/api/board/${team}/messages`, { subscriber_id: 'Writer', content: '@Operator may I go ahead?', ask: true }), 200, 'a question waits in Needs you');
-            for (const tab of ['tasks', 'goals', 'needs', 'saved', 'artifacts']) {
-                await ev(`window.switchNavTab('hub-inbox'); import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab(${JSON.stringify(tab)})).then(() => true)`); await ev(framesJs(12));
+            for (const tab of ['tasks', 'goals', 'boards', 'needs', 'saved', 'artifacts']) {
+                await ev(`window.switchNavTab('hub-inbox'); import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab(${JSON.stringify(FOLDER[tab] || tab)})).then(() => true)`); await ev(framesJs(12));
                 const where = () => ev(`({ path: location.pathname, title: ((document.querySelector('#group-table-view h2, #inbox-page h2') || {}).textContent || '').trim(), side: [...document.querySelectorAll('.sidebar-list-item.active, [aria-current=true]')].map(e => e.textContent.trim()).join(' | ') })`);
                 const before = await where();
                 assert.equal(before.path, `/inbox/${tab}`, `${w}: ${tab} is open: ` + JSON.stringify(before));
