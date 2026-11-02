@@ -29,7 +29,6 @@ func TestAutoSleepVerdictEachRuleAlone(t *testing.T) {
 		skipNotIdleLong:    func(i *autoSleepInput) { i.LastActive = now.Add(-59 * time.Minute) },
 		skipClaimedTask:    func(i *autoSleepInput) { i.ClaimedTask = true },
 		skipReview:         func(i *autoSleepInput) { i.ReviewOwed = true },
-		skipWait:           func(i *autoSleepInput) { i.ActiveWait = true },
 		skipOperatorAsk:    func(i *autoSleepInput) { i.OperatorAsk = true },
 		skipDialog:         func(i *autoSleepInput) { i.Dialog = true },
 		skipBackground:     func(i *autoSleepInput) { i.Background = true },

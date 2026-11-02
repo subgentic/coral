@@ -126,10 +126,6 @@ func TestAutoSleepPassLeavesAwakeWhatItMust(t *testing.T) {
 			_, err = r.h.bs.ClaimTask(r.ctx, "autosleep", "dev")
 			require.NoError(t, err)
 		}},
-		"a board wait": {func(t *testing.T, r *sleepRig) {
-			_, err := r.h.bs.RegisterWait(r.ctx, "autosleep", "dev", r.name, "message", "", "waiting for a message", 10*time.Minute)
-			require.NoError(t, err)
-		}},
 		"the idle minutes not reached": {func(t *testing.T, r *sleepRig) {
 			require.NoError(t, r.ss.SetSetting(r.ctx, "auto_sleep_idle_minutes", "1440"))
 		}},

@@ -123,8 +123,15 @@ func (h *SessionsHandler) autoSleepInputOf(ctx context.Context, ls *store.LiveSe
 	if state.LastStop.After(in.LastActive) {
 		in.LastActive = state.LastStop
 	}
-	if in.LastActive.IsZero() { // an agent that never did anything is idle from its launch
+	// A team agent parked in `coral-board wait` ("Waiting for a message") is inside a tool call that has no end until its message comes, so its last event is a tool and it looks mid-turn for ever. It is idle:
+	// the message, task or commit it waits for is a typed nudge, which wakes it. So an open wait that nobody has touched for the idle minutes is no turn (v2.0.34: no real team agent ever slept).
+	if in.InTurn && sub != nil && !in.LastActive.IsZero() && now.Sub(in.LastActive) >= idle && h.parkedInWait(ctx, ptr.Value(ls.BoardName), sub.SubscriberID) {
+		in.InTurn = false
+	}
+	if in.LastActive.IsZero() { // an agent that never did anything is idle from its launch: launched_at, which NULL says is created_at (a launch makes a row, a wake stamps it, #353)
 		if t, err := time.Parse(time.RFC3339, ptr.Value(ls.LaunchedAt)); err == nil {
+			in.LastActive = t
+		} else if t, err := time.Parse(time.RFC3339, ls.CreatedAt); err == nil {
 			in.LastActive = t
 		}
 	}
@@ -133,7 +140,6 @@ func (h *SessionsHandler) autoSleepInputOf(ctx context.Context, ls *store.LiveSe
 	}
 	if h.bs != nil && sub != nil {
 		project := ptr.Value(ls.BoardName)
-		in.ActiveWait = h.activeWaitOf(ctx, project, sub.SubscriberID)
 		in.ClaimedTask = h.claimedTaskOf(ctx, project, sub.SubscriberID)
 		in.ReviewOwed = h.reviewOwedBy(ctx, project, sub.SubscriberID)
 		in.OperatorAsk = h.operatorWaitsOn(ctx, project, sub.SubscriberID)
@@ -185,9 +191,10 @@ func (h *SessionsHandler) autoSleepProcess(ctx context.Context, ls *store.LiveSe
 	return cpu-prev.cpu > autoSleepBusyCPU, false, rss
 }
 
-func (h *SessionsHandler) activeWaitOf(ctx context.Context, project, member string) bool {
+// parkedInWait: the agent has a registered board wait open (unreadable: not parked, so it stays awake).
+func (h *SessionsHandler) parkedInWait(ctx context.Context, project, member string) bool {
 	w, err := h.bs.GetActiveWait(ctx, project, member)
-	return err != nil || w != nil // unreadable: waiting
+	return err == nil && w != nil
 }
 
 func (h *SessionsHandler) claimedTaskOf(ctx context.Context, project, member string) bool {
