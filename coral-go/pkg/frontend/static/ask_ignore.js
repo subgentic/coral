@@ -1,6 +1,6 @@
-/* Ignore on a question to the Operator (#11552, the approved action set): the question leaves Needs you with nothing said to the agent that asked, and a toast offers Undo. Closing a question is the board's own route
+/* Dismiss on a question to the Operator (#11552, the approved action set): the question leaves Needs you with nothing said to the agent that asked, and a toast offers Undo. Closing a question is the board's own route
  * (POST .../asks/<id>/close) with a fixed note, which is shown with the ask; Undo is the same route with undo:true (the Operator's alone: the asker and every other token are refused). A `wait --operator` has no ask row
- * and no close route, so only an ask is ignorable. Lazy: the Inbox loads it on the first Ignore. */
+ * and no close route, so only an ask is ignorable. Lazy: the Inbox loads it on the first Dismiss. */
 import { showToast, announceNotice } from './notifications.js';
 import { refreshOperatorAsks } from './operator_asks.js';
 import { markHidden } from './visible_marks.js';
@@ -19,11 +19,11 @@ export async function ignoreAsk(a, who) {
     await close(a, { note: NOTE });
     refreshOperatorAsks(true);
     const flat = markHidden(String(a.text || ''), { strict: true }).replace(/\s+/g, ' ').trim(), what = flat ? `"${flat.length > 48 ? flat.slice(0, 47).trimEnd() + '\u2026' : flat}" from ${who}` : `the question of ${who}`; // which one, since nine ignores said the same line nine times (#12112)
-    showToast(`Ignored ${what}`, false, undefined, { action: { label: 'Undo', onClick: () => close(a, { undo: true }).then(() => { refreshOperatorAsks(true); announceNotice(`The question of ${who} is back in Needs you.`); }).catch(e => showToast(e.message, true)) } });
-    announceNotice(`Ignored ${what}. Undo is in the notice.`);
+    showToast(`Dismissed ${what}`, false, undefined, { action: { label: 'Undo', onClick: () => close(a, { undo: true }).then(() => { refreshOperatorAsks(true); announceNotice(`The question of ${who} is back in Needs you.`); }).catch(e => showToast(e.message, true)) } });
+    announceNotice(`Dismissed ${what}. Undo is in the notice.`);
 }
 
-/** The bulk Ignore of a phone's selection (#11671): the same close route and Undo, with one toast for the whole selection (said by the caller). */
+/** The bulk Dismiss of a phone's selection (#11671): the same close route and Undo, with one toast for the whole selection (said by the caller). */
 export const closeAsk = a => close(a, { note: NOTE });
 export const reopenAsk = a => close(a, { undo: true }).then(() => refreshOperatorAsks(true));
 export { refreshOperatorAsks };

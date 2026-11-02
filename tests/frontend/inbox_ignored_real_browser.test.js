@@ -1,4 +1,4 @@
-// An item put away with Ignore can be found again (#11579, QA's INFO on #11576): the Inbox's Artifacts folder has an "Ignored N" pill beside "For review N" when a file is tagged ignored, filtering to those files, and a file's actions
+// An item put away with Dismiss can be found again (#11579, QA's INFO on #11576): the Inbox's Artifacts folder has an "Dismissed N" pill beside "For review N" when a file is tagged ignored, filtering to those files, and a file's actions
 // have Unignore, which puts it back in Needs you as it was (for review again, not ignored). A real board on the isolated dev server, real files uploaded by a stood-in terminal session, the real review route. 1440. Removed again.
 const os = require('node:os');
 const { connect } = require('./agent_view_harness');
@@ -14,7 +14,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
     const api = (method, path, body, headers) => ev(`fetch(${JSON.stringify(path)}, { method: ${JSON.stringify(method)}, headers: ${JSON.stringify(headers || { 'Content-Type': 'application/json' })}, body: ${body === undefined ? 'undefined' : typeof body === 'string' ? JSON.stringify(body) : JSON.stringify(JSON.stringify(body))} }).then(async r => ({ status: r.status, body: await r.json().catch(() => ({})) }))`);
     const S = `(window.__coralStatic || '/static/')`, T = '#group-table-view';
     const tagsOf = async name => ((await api('GET', `/api/board/${B}/artifacts`)).body.artifacts || []).find(a => a.name === name)?.tags;
-    const pills = () => ev(`[...document.querySelectorAll('${T} button')].map(b => (b.textContent || '').trim()).filter(t => /^(All|For review|Ignored) \\d+$/.test(t))`);
+    const pills = () => ev(`[...document.querySelectorAll('${T} button')].map(b => (b.textContent || '').trim()).filter(t => /^(All|For review|Dismissed) \\d+$/.test(t))`);
     let sid = null, sname = null;
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
@@ -32,10 +32,10 @@ const { coralReady, framesJs } = require('./helpers/wait');
 
         await ev(`window.switchNavTab('hub-inbox'); true`);
         await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('artifacts')).then(() => true)`);
-        await waitFor(`[...document.querySelectorAll('${T} button')].some(b => /^Ignored \\d+$/.test((b.textContent || '').trim()))`, 'the Ignored pill', 20000);
-        await waitFor(`JSON.stringify([...document.querySelectorAll('${T} button')].map(b => (b.textContent || '').trim()).filter(t => /^(All|For review|Ignored) \\d+$/.test(t))) === JSON.stringify([${JSON.stringify(ALL)}, 'For review 1', 'Ignored 1'])`, 'the pill counts settle (the All count is read after the Ignored pill appears)', 15000).catch(() => {});
-        check(JSON.stringify(await pills()) === JSON.stringify([ALL, 'For review 1', 'Ignored 1']), 'the pills: All, For review, Ignored with their counts: ' + JSON.stringify(await pills()));
-        await ev(`[...document.querySelectorAll('${T} button')].find(b => /^Ignored \\d+$/.test((b.textContent || '').trim())).click(); true`);
+        await waitFor(`[...document.querySelectorAll('${T} button')].some(b => /^Dismissed \\d+$/.test((b.textContent || '').trim()))`, 'the Dismissed pill', 20000);
+        await waitFor(`JSON.stringify([...document.querySelectorAll('${T} button')].map(b => (b.textContent || '').trim()).filter(t => /^(All|For review|Dismissed) \\d+$/.test(t))) === JSON.stringify([${JSON.stringify(ALL)}, 'For review 1', 'Dismissed 1'])`, 'the pill counts settle (the All count is read after the Dismissed pill appears)', 15000).catch(() => {});
+        check(JSON.stringify(await pills()) === JSON.stringify([ALL, 'For review 1', 'Dismissed 1']), 'the pills: All, For review, Dismissed with their counts: ' + JSON.stringify(await pills()));
+        await ev(`[...document.querySelectorAll('${T} button')].find(b => /^Dismissed \\d+$/.test((b.textContent || '').trim())).click(); true`);
         await waitFor(`document.querySelectorAll('${T} tbody tr').length === 1 && /put-away\\.md/.test(document.querySelector('${T} tbody tr').textContent)`, 'the list is the ignored file alone', 15000);
 
         // the file's actions have Unignore

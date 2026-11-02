@@ -1,5 +1,5 @@
 // "Goal #N looks done" (#11825): an active goal whose tasks are all done is ONE row of Needs you, with its Done-when line, counted in the one Inbox number, and three actions: Close goal (the goal's page with
-// its Close dialog set to Done), Not yet (hidden until a task is added) and Ignore (hidden for good, Undo in the notice). Both are kept on the machine (goal_done_hidden), so /api/needs-you agrees. A goal with
+// its Close dialog set to Done), Not yet (hidden until a task is added) and Dismiss (hidden for good, Undo in the notice). Both are kept on the machine (goal_done_hidden), so /api/needs-you agrees. A goal with
 // an open task, and one with no tasks, are not rows. Real board and settings routes on the isolated dev server; 1280 px.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -55,7 +55,7 @@ const B = 'goal-done-' + Date.now().toString(36);
         assert.equal(rows.length, 1, 'one row: not the goal with an open task, nor the one with no tasks: ' + JSON.stringify(rows));
         assert.match(rows[0].text, new RegExp(`Goal #${gid} looks done: Ship the pilot`));
         assert.match(rows[0].text, /Done when: it is shipped/);
-        assert.deepEqual(rows[0].buttons.filter(b => /^(Close goal|Not yet|Ignore)$/.test(b)), ['Close goal', 'Not yet', 'Ignore']);
+        assert.deepEqual(rows[0].buttons.filter(b => /^(Close goal|Not yet|Dismiss)$/.test(b)), ['Close goal', 'Not yet', 'Dismiss']);
         const badge = async () => Number(await ev(`(document.getElementById('nav-tab-hub-inbox-badge') || {}).textContent || 0`));
         const withItem = await badge(); assert.ok(withItem >= 1, 'the item is in the Inbox number: ' + withItem);
         const asked = await root('GET', '/api/needs-you?limit=50');
@@ -93,10 +93,10 @@ const B = 'goal-done-' + Date.now().toString(36);
         await waitFor(`Number((document.getElementById('nav-tab-hub-inbox-badge') || {}).textContent || 0) === ${unreadBadge}`, 'unread again after another task was finished', 20000);
         assert.ok((await root('GET', '/api/needs-you?limit=50')).json.items.some(i => i.id === `goal_done:${B}:${gid}`), 'and in /api/needs-you again');
 
-        // Ignore with Undo
-        await ev(`[...document.querySelectorAll('${T} tbody tr')].find(tr => /looks done/.test(tr.textContent)).querySelector('button[aria-label^="Ignore"]').click(); true`);
-        await waitFor(`!/looks done/.test(document.querySelector('${T}')?.textContent || '')`, 'the item gone after Ignore', 8000);
-        assert.ok(JSON.parse((await root('GET', '/api/settings')).json.settings.goal_done_hidden).includes(`${B}|${gid}|*`), 'Ignore is kept');
+        // Dismiss with Undo
+        await ev(`[...document.querySelectorAll('${T} tbody tr')].find(tr => /looks done/.test(tr.textContent)).querySelector('button[aria-label^="Dismiss"]').click(); true`);
+        await waitFor(`!/looks done/.test(document.querySelector('${T}')?.textContent || '')`, 'the item gone after Dismiss', 8000);
+        assert.ok(JSON.parse((await root('GET', '/api/settings')).json.settings.goal_done_hidden).includes(`${B}|${gid}|*`), 'Dismiss is kept');
         await waitFor(`!![...document.querySelectorAll('.toast button, [role=status] button, #toast-container button')].find(b => /^Undo$/.test(b.textContent.trim()))`, 'the Undo in the notice', 5000);
         await ev(`[...document.querySelectorAll('.toast button, [role=status] button, #toast-container button')].find(b => /^Undo$/.test(b.textContent.trim())).click(); true`);
         await waitFor(`/looks done/.test(document.querySelector('${T}')?.textContent || '')`, 'Undo brings it back', 8000);
@@ -112,7 +112,7 @@ const B = 'goal-done-' + Date.now().toString(36);
         await require('./helpers/wait').settle(ev, 600, 300); // the goals were read again when the list opened
         assert.equal((await doneRows()).length, 0, 'gone when the goal closes');
         assert.ok(!(await root('GET', '/api/needs-you?limit=50')).json.items.some(i => i.id === `goal_done:${B}:${gid}`), 'and from the phone-push read');
-        // #12029 (the Mobile Beta Tester): on a phone the row has its title; a long press selects it, and the bar offers Mark read / Mark unread and Ignore (a phone's Needs you row has no buttons: tap opens, long press selects)
+        // #12029 (the Mobile Beta Tester): on a phone the row has its title; a long press selects it, and the bar offers Mark read / Mark unread and Dismiss (a phone's Needs you row has no buttons: tap opens, long press selects)
         {
             const gid2 = await mk('Customers sign up without help', 'Ten customers sign up with no support message'); await task(gid2, true);
             await root('PUT', '/api/settings', { goal_done_hidden: '[]', goal_done_read: '[]', goal_done_quiet_minutes: '0' });
@@ -134,7 +134,7 @@ const B = 'goal-done-' + Date.now().toString(36);
             const bar = await ev(`(() => { const b = document.querySelector('.dt-bar'); return b ? { count: (b.querySelector('.dt-bar-count, .team-tb-count') || b).textContent.replace(/\\s+/g, ' ').trim(), actions: [...b.querySelectorAll('button')].map(x => ({ label: (x.getAttribute('aria-label') || x.textContent).trim(), off: x.disabled })) } : null; })()`);
             assert.ok(bar && /1 selected/.test(bar.count), 'a long press selects the goal row: ' + JSON.stringify(bar));
             const act = label => (bar.actions || []).find(a => a.label === label);
-            assert.ok(act('Ignore') && !act('Ignore').off, 'Ignore is on the bar: ' + JSON.stringify(bar.actions));
+            assert.ok(act('Dismiss') && !act('Dismiss').off, 'Dismiss is on the bar: ' + JSON.stringify(bar.actions));
             assert.ok(act('Close goal') && !act('Close goal').off, 'Close goal is in the bar menu of a selected goal that looks done, reachable on a phone (#12328): ' + JSON.stringify(bar.actions));
             await ev(`document.querySelector('.dt-bar [aria-label="More actions"]')?.click(); true`);
             await waitFor(`!![...document.querySelectorAll('.menu-item, [role=menuitem]')].find(b => /^Not yet$/.test(b.textContent.trim()))`, 'Not yet in the bar menu (#12328)', 5000);
@@ -170,19 +170,19 @@ const B = 'goal-done-' + Date.now().toString(36);
             await waitFor(`!![...document.querySelectorAll('.toast button, [role=status] button, #toast-container button')].find(b => /^Undo$/.test(b.textContent.trim()))`, 'the Undo in the notice', 5000);
             await ev(`[...document.querySelectorAll('.toast button, [role=status] button, #toast-container button')].find(b => /^Undo$/.test(b.textContent.trim())).click(); true`); await require('./helpers/wait').settle(ev, 800, 300);
             await waitFor(`[...document.querySelectorAll('${T} tbody tr')].filter(r => /looks done/.test(r.textContent)).length >= 2`, 'Undo brings both back', 10000);
-            // the same for the bar's Ignore: two goals ignored, Undo, both back (each undo rewrites the one hidden list; run at once, one stayed hidden)
+            // the same for the bar's Dismiss: two goals ignored, Undo, both back (each undo rewrites the one hidden list; run at once, one stayed hidden)
             await openNeeds();
-            await waitFor(`[...document.querySelectorAll('${T} tbody tr')].filter(r => /looks done/.test(r.textContent)).length >= 2`, 'the two goals for Ignore', 20000);
+            await waitFor(`[...document.querySelectorAll('${T} tbody tr')].filter(r => /looks done/.test(r.textContent)).length >= 2`, 'the two goals for Dismiss', 20000);
             await holdRow(0);
             { const p = await rowAt(1); await touch('touchStart', p); await touch('touchEnd', p); await new Promise(r => setTimeout(r, 300)); } // sleep-ok: a tap adds a row to the selection
-            await ev(`document.querySelector('.dt-bar [aria-label="Ignore"], .dt-bar button[title="Ignore"]')?.click(); true`);
+            await ev(`document.querySelector('.dt-bar [aria-label="Dismiss"], .dt-bar button[title="Dismiss"]')?.click(); true`);
             await waitFor(`[...document.querySelectorAll('${T} tbody tr')].filter(r => /looks done/.test(r.textContent)).length === 0`, 'both goals ignored', 10000);
             await waitFor(`!![...document.querySelectorAll('.toast button, [role=status] button, #toast-container button')].find(b => /^Undo$/.test(b.textContent.trim()))`, 'the Undo in the notice', 5000);
             await ev(`[...document.querySelectorAll('.toast button, [role=status] button, #toast-container button')].find(b => /^Undo$/.test(b.textContent.trim())).click(); true`);
-            await waitFor(`[...document.querySelectorAll('${T} tbody tr')].filter(r => /looks done/.test(r.textContent)).length >= 2`, 'Undo of Ignore brings both goals back', 10000);
+            await waitFor(`[...document.querySelectorAll('${T} tbody tr')].filter(r => /looks done/.test(r.textContent)).length >= 2`, 'Undo of Dismiss brings both goals back', 10000);
             await Emulation.setTouchEmulationEnabled({ enabled: false });
             await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         }
-        console.log('\nPASS a goal that looks done is one Needs you item: Done-when line, one Inbox number, Close goal, Not yet and Ignore with Undo, kept on the machine');
+        console.log('\nPASS a goal that looks done is one Needs you item: Done-when line, one Inbox number, Close goal, Not yet and Dismiss with Undo, kept on the machine');
     } finally { await guard.restore().catch(() => {}); await removeBoards(ev, [B]).catch(() => {}); await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

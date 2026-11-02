@@ -1,4 +1,4 @@
-// #11937 (the Operator's screenshots): a file with several versions is ONE row in Needs you (the newest, "N earlier versions"), so a row action applies to the whole file: Save for later, Ignore and Deny take every
+// #11937 (the Operator's screenshots): a file with several versions is ONE row in Needs you (the newest, "N earlier versions"), so a row action applies to the whole file: Save for later, Dismiss and Deny take every
 // version out of Needs you together (before, only the newest was saved and the version before it came up as the row), and Move to Needs you brings the file back as one row. Saved lists one row per file too, the
 // newest with "N earlier versions" (two versions saved on their own, as the Operator's list had them, are one row). Board routes stubbed in the page, a three-version file; 1280 px.
 const assert = require('node:assert/strict');
@@ -63,8 +63,8 @@ const id = n => n.toString(16).padStart(64, '0');
         await waitFor(`document.querySelectorAll('#group-table-view [data-review-artifact]').length === 1`, 'back as one row', 8000);
         assert.ok(/2 earlier versions/.test((await needs())[0]), 'with its earlier versions');
 
-        // Ignore: all of them
-        await ev(`window.__decisions.length = 0; [...document.querySelectorAll('#group-table-view tbody tr button')].find(b => /^Ignore: /.test(b.getAttribute('aria-label') || '')).click(); true`);
+        // Dismiss: all of them
+        await ev(`window.__decisions.length = 0; [...document.querySelectorAll('#group-table-view tbody tr button')].find(b => /^Dismiss: /.test(b.getAttribute('aria-label') || '')).click(); true`);
         await waitFor(`window.__decisions.length >= 3`, 'the ignore went to every version', 8000);
         assert.deepEqual((await decisions()).sort(), ['ignore:1', 'ignore:2', 'ignore:3']);
         await refresh();
@@ -86,6 +86,6 @@ const id = n => n.toString(16).padStart(64, '0');
         await waitFor(`document.querySelectorAll('.saved-files tbody tr').length >= 1`, 'the saved files', 8000);
         const legacy = await ev(`[...document.querySelectorAll('.saved-files tbody tr')].map(r => r.textContent.replace(/\\s+/g, ' ').trim())`);
         assert.ok(legacy.length === 1 && /1 earlier version(?!s)/.test(legacy[0]), 'two saved versions are one Saved row with "1 earlier version": ' + JSON.stringify(legacy));
-        console.log('PASS a file with several versions: Save, Ignore and Move to Needs you apply to the whole file; Saved is one row per file');
+        console.log('PASS a file with several versions: Save, Dismiss and Move to Needs you apply to the whole file; Saved is one row per file');
     } finally { await removeBoards(ev, [team]).catch(() => {}); await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

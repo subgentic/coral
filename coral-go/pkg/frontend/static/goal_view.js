@@ -138,7 +138,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         // Add task and Close goal (Reopen for a closed one), at the top right of the page's header
         const acts = el('div', 'goal-head-actions');
         acts.append(btn('btn goals-add-task', 'Add task', () => { (window.showCreateTaskModal || (() => {}))({ project: model.project, goal_id: g.id, onCreated: loadGoals }); }));
-        // A goal that looks done has its item in Needs you with Close goal, Not yet and Ignore; its page offers the first two too (#12248): Not yet hides the item until a task is added
+        // A goal that looks done has its item in Needs you with Close goal, Not yet and Dismiss; its page offers the first two too (#12248): Not yet hides the item until a task is added
         const sp = splitKey(model.project);
         if (looksDone(g) && sp.server === LOCAL_SERVER && !hiddenList().some(e => e === `${sp.name}|${g.id}|${W.allTasksOf(g.rollup)}` || e === `${sp.name}|${g.id}|*`)) {
             const ny = btn('btn goals-not-yet', 'Not yet', async () => {

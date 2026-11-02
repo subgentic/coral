@@ -73,7 +73,7 @@ const STUB = `(() => {
         const sel = await ev(`({ dialog: !!document.querySelector('dialog[open]'), selected: ${rowOf('/Ship the beta/')}.classList.contains('dt-selected'), bar: !!document.querySelector('.dt-select-bar, .dt-bar [class*=selected], .gt-toolbar .dt-bar') })`);
         check(!sel.dialog && sel.selected, 'a long press selects the goal row and opens no card: ' + JSON.stringify(sel));
         const bar = await ev(`[...document.querySelectorAll('.gt-toolbar button, .dt-bar button')].filter(b => b.getClientRects().length).map(b => ({ name: (b.getAttribute('aria-label') || b.title || b.textContent).trim(), off: b.disabled || b.getAttribute('aria-disabled') === 'true' }))`);
-        check(bar.some(b => /^Approve/.test(b.name) && b.off) && bar.some(b => /^Ignore/.test(b.name) && b.off), 'with a proposal selected the bar cannot Approve or Ignore it (they are for files and questions): ' + JSON.stringify(bar));
+        check(bar.some(b => /^Approve/.test(b.name) && b.off) && bar.some(b => /^Dismiss/.test(b.name) && b.off), 'with a proposal selected the bar cannot Approve or Dismiss it (they are for files and questions): ' + JSON.stringify(bar));
         await shot('needs-phone-proposals'); 
     } finally { await client.close(); }
     if (failures.length) { console.error(failures.join('\n')); process.exit(1); }

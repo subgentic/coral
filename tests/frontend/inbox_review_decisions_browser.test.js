@@ -1,6 +1,6 @@
-// Deny and Ignore on a review row of Needs you (#11552, the approved action set): Deny opens "Deny this?" with an optional reason (Cancel sends nothing), sends { decision: 'deny', reason } and the row leaves; Ignore sends { decision: 'ignore' }
+// Deny and Dismiss on a review row of Needs you (#11552, the approved action set): Deny opens "Deny this?" with an optional reason (Cancel sends nothing), sends { decision: 'deny', reason } and the row leaves; Dismiss sends { decision: 'ignore' }
 // and says so with Undo, which sends { decision: 'unignore' } and the row is back; neither posts anything else (no message, no comment: the silent rule); each keeps the person's place (scroll, focus on the next row). 1440 (the four words)
-// and 390 (the phone: Deny and Ignore are in the row's three dots). 30 review rows, the team's artifact list and the review route stubbed in the page, as the Lead's server answers.
+// and 390 (the phone: Deny and Dismiss are in the row's three dots). 30 review rows, the team's artifact list and the review route stubbed in the page, as the Lead's server answers.
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { coralReady, framesJs } = require('./helpers/wait');
@@ -79,18 +79,18 @@ const { removeBoards } = require('./helpers/board_cleanup');
             check(!afterDeny.names.includes(name(10)) && Math.abs(afterDeny.top - before.top) <= 80 && afterDeny.focusRow === name(11), at + 'Deny keeps the place: scroll ' + before.top + ' to ' + afterDeny.top + ', focus on ' + JSON.stringify(afterDeny.focusRow));
             check(await ev(`!![...document.querySelectorAll('.toast')].find(t => /Denied plan-10\\.md/.test(t.textContent))`), at + 'a toast says it was denied');
 
-            // Ignore: sent with no reason, Undo in the toast
+            // Dismiss: sent with no reason, Undo in the toast
             await ev(`window.__calls = []; document.querySelectorAll('.toast').forEach(t => t.remove()); true`);
             await toRow(15); await ev(framesJs(3)); const b2 = await state();
-            await press(15, 'Ignore');
+            await press(15, 'Dismiss');
             await waitFor(`!document.querySelector('${T} button[aria-label="Approve: ${name(15)}"]')`, at + 'the ignored row leaves', 8000).catch(() => {});
             await ev(framesJs(6)); const afterIgnore = await state();
             const ignored = await calls();
             check(ignored.length === 1 && ignored[0].path.endsWith('/review') && ignored[0].body.decision === 'ignore' && !('reason' in ignored[0].body), at + 'one call: ignore, nothing else (no message, no comment): ' + JSON.stringify(ignored));
-            check(!afterIgnore.names.includes(name(15)) && Math.abs(afterIgnore.top - b2.top) <= 80 && afterIgnore.focusRow === name(16), at + 'Ignore keeps the place: scroll ' + b2.top + ' to ' + afterIgnore.top + ', focus on ' + JSON.stringify(afterIgnore.focusRow));
-            const toast = await ev(`(() => { const t = [...document.querySelectorAll('.toast')].find(x => /Ignored: plan-15\\.md/.test(x.textContent)); return t ? { undo: !!([...t.querySelectorAll('button')].find(b => b.textContent.trim() === 'Undo')) } : null; })()`);
-            check(!!toast && toast.undo, at + 'a toast says "Ignored: plan-15.md" with Undo: ' + JSON.stringify(toast));
-            await ev(`[...document.querySelectorAll('.toast')].find(x => /Ignored: plan-15/.test(x.textContent)).querySelectorAll('button').forEach(b => { if (b.textContent.trim() === 'Undo') b.click(); }); true`);
+            check(!afterIgnore.names.includes(name(15)) && Math.abs(afterIgnore.top - b2.top) <= 80 && afterIgnore.focusRow === name(16), at + 'Dismiss keeps the place: scroll ' + b2.top + ' to ' + afterIgnore.top + ', focus on ' + JSON.stringify(afterIgnore.focusRow));
+            const toast = await ev(`(() => { const t = [...document.querySelectorAll('.toast')].find(x => /Dismissed: plan-15\\.md/.test(x.textContent)); return t ? { undo: !!([...t.querySelectorAll('button')].find(b => b.textContent.trim() === 'Undo')) } : null; })()`);
+            check(!!toast && toast.undo, at + 'a toast says "Dismissed: plan-15.md" with Undo: ' + JSON.stringify(toast));
+            await ev(`[...document.querySelectorAll('.toast')].find(x => /Dismissed: plan-15/.test(x.textContent)).querySelectorAll('button').forEach(b => { if (b.textContent.trim() === 'Undo') b.click(); }); true`);
             await waitFor(`!!document.querySelector('${T} button[aria-label="Approve: ${name(15)}"]')`, at + 'Undo brings the row back', 8000).catch(() => {});
             const all = await calls();
             check(all.length === 2 && all[1].body.decision === 'unignore' && all.every(c => c.path.endsWith('/review')), at + 'Undo sends unignore, and every call was the review route: ' + JSON.stringify(all));

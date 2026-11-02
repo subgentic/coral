@@ -86,7 +86,7 @@ export async function denyRow(team, row, reason) {
     if (m) out.earlier = await settleEarlierVersions(m, row).catch(() => ({ settled: 0, failed: 0 })); // the older versions leave Needs you with it, quietly: the agent is told once, about the newest
     settled(row); return out;
 }
-/** Ignore a review row: out of Needs you with no verdict and nobody told; the file stays where it is. Unignore puts it back as it was. */
+/** Dismiss a review row: out of Needs you with no verdict and nobody told; the file stays where it is. Unignore puts it back as it was. */
 export async function ignoreRow(team, row) { const out = await decide(team, row, 'ignore'); out.earlier = await onEarlier(row, e => decide(e.team, e, 'ignore')); settled(row); return out; }
 export async function unignoreRow(team, row) { const out = await decide(team, row, 'unignore'); importOnce('./inbox_reviews.js').then(m => m.refreshReviews(true)).catch(() => {}); return out; }
 
@@ -98,10 +98,10 @@ export function saySaved(team, row) {
     announceNotice(`Saved for later: ${shown(row.name)}. Undo is in the notice.`);
 }
 
-/** Say what an Ignore did: a toast with Undo (30 s, the notices' rule for a toast with an action) and the same words read out politely. */
+/** Say what an Dismiss did: a toast with Undo (30 s, the notices' rule for a toast with an action) and the same words read out politely. */
 export function sayIgnored(team, row) {
-    showToast(`Ignored: ${shown(row.name)}`, false, undefined, { action: { label: 'Undo', onClick: () => unignoreRow(team, row).then(() => announceNotice(`${shown(row.name)} is back in Needs you.`)).catch(e => showToast(e.message)) } });
-    announceNotice(`Ignored: ${shown(row.name)}. Undo is in the notice.`);
+    showToast(`Dismissed: ${shown(row.name)}`, false, undefined, { action: { label: 'Undo', onClick: () => unignoreRow(team, row).then(() => announceNotice(`${shown(row.name)} is back in Needs you.`)).catch(e => showToast(e.message)) } });
+    announceNotice(`Dismissed: ${shown(row.name)}. Undo is in the notice.`);
 }
 export function sayDenied(name, out) { showToast(`Denied ${shown(name)}. ${fromWords(out)}`.trim()); }
 

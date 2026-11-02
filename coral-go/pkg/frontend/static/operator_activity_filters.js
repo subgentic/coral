@@ -6,7 +6,7 @@ import { browserLocal } from './safe_storage.js';
 
 /** What the record holds, in the words the folder says, and the order the Action filter lists them. */
 export const ACTION_LABEL = {
-    approve: 'Approved', changes: 'Asked for changes', deny: 'Denied', ignore: 'Ignored', unignore: 'Put back', save: 'Saved for later', unsave: 'Moved back to Needs you',
+    approve: 'Approved', changes: 'Asked for changes', deny: 'Denied', ignore: 'Dismissed', unignore: 'Put back', save: 'Saved for later', unsave: 'Moved back to Needs you',
     undone: 'Undone (the agent could not be told)', answer: 'Answered', dismiss: 'Dismissed', goal_close: 'Closed a goal', mark_read: 'Marked read',
 };
 export const ACTIONS = Object.keys(ACTION_LABEL);

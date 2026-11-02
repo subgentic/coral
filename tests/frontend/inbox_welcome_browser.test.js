@@ -32,8 +32,8 @@ const { coralReady } = require('./helpers/wait');
             await waitFor(`document.querySelectorAll('#group-table-view .inbox-review-name').length === 5`, `${tag}: five welcome items`, 8000);
             check(JSON.stringify(await titles()) === JSON.stringify(TITLES), `${tag}: the five items in order: ` + JSON.stringify(await titles()));
             const acts = await ev(`[...document.querySelectorAll('#group-table-view .inbox-review-actions')].map(b => [...b.querySelectorAll('button:not(.menu-item):not(.inbox-row-more-toggle)')].map(x => x.textContent))`);
-            const want = mobile ? [['Got it'], ['New agent'], ['New team'], ['Connect'], ['Read it']] : [['Got it'], ['New agent', 'Ignore'], ['New team', 'Ignore'], ['Connect', 'Ignore'], ['Read it', 'Ignore']]; // a phone row has no Ignore button: it is in the three-dot menu, or a swipe (#11642)
-            check(JSON.stringify(acts) === JSON.stringify(want), `${tag}: each item's action, and Ignore on all but the welcome (in the menu on a phone): ` + JSON.stringify(acts));
+            const want = mobile ? [['Got it'], ['New agent'], ['New team'], ['Connect'], ['Read it']] : [['Got it'], ['New agent', 'Dismiss'], ['New team', 'Dismiss'], ['Connect', 'Dismiss'], ['Read it', 'Dismiss']]; // a phone row has no Dismiss button: it is in the three-dot menu, or a swipe (#11642)
+            check(JSON.stringify(acts) === JSON.stringify(want), `${tag}: each item's action, and Dismiss on all but the welcome (in the menu on a phone): ` + JSON.stringify(acts));
             check(await ev(`/optional/.test([...document.querySelectorAll('#group-table-view .inbox-review-name')][3].textContent)`), `${tag}: Connect is marked optional`);
             check(await ev(`!![...document.querySelectorAll('#group-table-view button')].find(b => b.textContent === 'Hide all welcome items')`), `${tag}: one quiet Hide all welcome items`);
             check(await ev(`document.getElementById('nav-tab-hub-inbox-badge').hidden || document.getElementById('nav-tab-hub-inbox-badge').textContent === ''`), `${tag}: the items are not counted in the Inbox badge`);
@@ -56,8 +56,8 @@ const { coralReady } = require('./helpers/wait');
             await ev(`document.getElementById('confirm-modal-yes').click(); true`);
             await waitFor(`!/How agents ask you/.test(document.getElementById('group-table-view').textContent)`, `${tag}: reading it clears the item`, 6000);
             // Dismiss the optional one; the welcome is left, then hidden for good
-            await press('Ignore');
-            await waitFor(`!/Connect a second/.test(document.getElementById('group-table-view').textContent)`, `${tag}: Ignore puts an item away`, 6000);
+            await press('Dismiss');
+            await waitFor(`!/Connect a second/.test(document.getElementById('group-table-view').textContent)`, `${tag}: Dismiss puts an item away`, 6000);
             await waitFor(`/Welcome to Coral/.test(document.getElementById('group-table-view').textContent)`, `${tag}: the welcome is still there`, 6000);
             await press('Hide all welcome items');
             await waitFor(`/Nothing needs you(?!r)/.test(document.getElementById('group-table-view').textContent)`, `${tag}: the empty Needs you says Nothing needs you`, 6000);
