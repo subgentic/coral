@@ -467,15 +467,23 @@ func (h *SessionsHandler) addTranscriptModel(entry map[string]any, sessionID str
 		return
 	}
 	m, t := h.transcriptModel(sessionID), h.transcriptThinking(sessionID)
+	agentType, _ := entry["agent_type"].(string)
+	hermesM := ""
+	if agentType == at.Hermes { // no transcript file: the model is the session's row in the agent's own state.db (#12039)
+		hermesM = h.hermesModel(sessionID)
+	}
 	// What the CLI was last given or confirmed (a /model or /effort Claude took, a wake that started it with the stored ones) is the agent's own until the transcript records a turn written after it (#6225):
 	// the chip no longer says "not confirmed yet" after a confirmed switch, nor after a restart or wake.
-	if stamp, ok := h.ss.SessionSettingsStamp(context.Background(), sessionID); ok && (h.jsonl == nil || h.jsonl.TranscriptTurnAt(sessionID).Before(stamp)) {
+	if stamp, ok := h.ss.SessionSettingsStamp(context.Background(), sessionID); ok && hermesM == "" && (h.jsonl == nil || h.jsonl.TranscriptTurnAt(sessionID).Before(stamp)) {
 		if stored, _ := entry["thinking"].(string); stored != "" {
 			t = stored
 		}
 		if stored, _ := entry["model"].(string); stored != "" {
 			m = stored
 		}
+	}
+	if hermesM != "" {
+		m = hermesM
 	}
 	if t != "" {
 		entry["thinking_actual"] = t // the level the newest turn ran at, as the CLI's own transcript records it (#4969)

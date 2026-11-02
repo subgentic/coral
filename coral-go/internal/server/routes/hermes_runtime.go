@@ -354,3 +354,78 @@ const (
 	hermesRestartNote   = "A restarted Hermes agent starts a new conversation: the old one is deleted with its Hermes home (Hermes keeps no other copy). Wake keeps it."
 	hermesResumeRefusal = "A Hermes agent keeps its conversation in its own Hermes home, so it cannot be resumed by its Hermes id into another agent. Wake the same agent to continue its conversation."
 )
+
+// hermesModelMax is the longest model name shown on a chip: a real one ("provider/vendor-model-1.2:tag") is far shorter, and the column is Hermes's own text.
+const hermesModelMax = 120
+
+// hermesModelOK reports whether text from the model column can be shown as a model name: 1 to hermesModelMax printable characters of the kind model names use. Anything else (a control or escape
+// character, a space run, a long text) is not a model name, and the chip keeps the model the agent was launched with.
+func hermesModelOK(s string) bool {
+	if s == "" || len(s) > hermesModelMax {
+		return false
+	}
+	for _, r := range s {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9':
+		case strings.ContainsRune("._-:/@+", r):
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+type hermesModelEntry struct {
+	stamp string
+	model string
+}
+
+// hermesModelCache remembers each Hermes session's model with the state of its database it was read at (as hermesLastCache does), so the list and the chat open the database only when Hermes wrote to it.
+var hermesModelCache = struct {
+	sync.Mutex
+	m map[string]hermesModelEntry
+}{m: map[string]hermesModelEntry{}}
+
+// hermesModel is the model a Hermes session runs, from the session's row in the agent's own state.db (#12039): "" when it is not known (no link yet, no database, a layout Coral does not read, a value that is
+// not a model name). Hermes writes no transcript file, so the chip had only the launch's model. The state.db records no reasoning level that Coral reads, so a level is never reported from here.
+func (h *SessionsHandler) hermesModel(sessionID string) string {
+	if h.cfg == nil || h.ss == nil || !transcriptlink.IsSessionID(sessionID) {
+		return ""
+	}
+	dataDir := h.cfg.CoralDir()
+	hermesID := transcriptlink.HermesSession(dataDir, sessionID)
+	if hermesID == "" {
+		return ""
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	team := ""
+	if ls, err := h.ss.GetLiveSession(ctx, sessionID); err == nil && ls != nil && ls.BoardName != nil {
+		team = *ls.BoardName
+	}
+	home := agent.HermesAgentHome(dataDir, team, sessionID)
+	if home == "" {
+		return ""
+	}
+	stamp := hermesStamp(home) + "#" + hermesID
+	hermesModelCache.Lock()
+	e, hit := hermesModelCache.m[sessionID]
+	hermesModelCache.Unlock()
+	if hit && e.stamp == stamp {
+		return e.model
+	}
+	model := ""
+	if db, err := hermesdb.Open(home); err == nil {
+		if s, ok, err := db.Session(ctx, hermesID); err == nil && ok && hermesModelOK(s.Model) {
+			model = s.Model
+		}
+		db.Close()
+	}
+	hermesModelCache.Lock()
+	if len(hermesModelCache.m) >= hermesLastCacheMax {
+		hermesModelCache.m = map[string]hermesModelEntry{}
+	}
+	hermesModelCache.m[sessionID] = hermesModelEntry{stamp: stamp, model: model}
+	hermesModelCache.Unlock()
+	return model
+}

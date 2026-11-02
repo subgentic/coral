@@ -193,7 +193,11 @@ func (h *SessionsHandler) SwitchModel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !liveSwitchTypes[agentType] {
-		writeError(w, http.StatusConflict, "needs_restart", "a "+agentType+" agent takes a new model or thinking level when it restarts, not while it runs: restart it with the new choice (POST /api/sessions/live/{name}/restart; its conversation resumes)")
+		after := "its conversation resumes"
+		if agentType == at.Hermes {
+			after = hermesRestartNote // Hermes resumes only inside its own home, which a restart replaces (#11956)
+		}
+		writeError(w, http.StatusConflict, "needs_restart", "a "+agentType+" agent takes a new model or thinking level when it restarts, not while it runs: restart it with the new choice (POST /api/sessions/live/{name}/restart; "+after+")")
 		return
 	}
 	var model string
