@@ -1,5 +1,121 @@
 # Release Notes
 
+## v2.0.36 — Mark up in the file viewer, Needs you row actions with Dismiss, links to files in Markdown, a clear list of CLIs, and a Hub sign-in that brings a deep link back whole
+
+### Changes
+
+#### What you will notice first
+
+- **Mark up in the file viewer**: for a picture the viewer has Mark up beside Comments (an item of the ⋯ menu on a phone); it opens the comment composer's drawing tool on the file's own image, and Done opens a comment on the whole file with the marked copy attached. The file itself is never changed; only PNG, JPEG and WebP can be marked up, and a viewer who cannot comment does not see it.
+- **Needs you row actions, option B, and Dismiss for Ignore**: a review row has one Approve button, Request changes and Save for later as quiet icons named for the file, and the ⋯ menu holds Approve with a note, Dismiss and Deny in text; the word Ignore is gone (the toast says Dismissed, with Undo). On a phone the ⋯ menu opens at its dots and no longer scrolls the page sideways. A row for an agent at a prompt with nothing to answer from here (Claude's "Is this a project you trust?") has **Open agent**, which goes to its chat, beside Dismiss.
+- **A `coral://artifacts/<id>` link in a Markdown file opens that file in the viewer**, in the viewer, the docked preview and the question dialog, also for a file seen from another computer (it opens on that computer).
+- **"Trust this folder" says what it did**: a folder Coral does not trust by design (for example one in /tmp) is said, not silently skipped; the New team dialog says plainly that a typed folder is trusted only when Trust this folder is on; and a Coral notice on the board reads as a notice, not as "A task updated".
+- **New agent's CLIs that cannot be used yet are one clean list** (one row per CLI: name, a short status, the action), the single-CLI banner has the same short line, and a CLI in a standard install root (for example `~/.local/bin`) is not refused for an agent's working folder.
+- **Quit Coral counts only the agents that really stop** and says what keeps running (tmux-backed agents keep running when Coral quits).
+- **An auto-woken agent is started without its first message again**: an auto-asleep agent woken by a delivery is not sent its starting prompt twice.
+- **A stop, upgrade or uninstall that was left while it ran is found again** on the Computers page: the plans that are running or just finished are listed and lead back to their progress or result.
+- **A deep link survives sign-in**: the Hub's sign-in brings a deep link back whole (it never carries a fragment), and a deep link to an agent's tab (for example its Files) comes back with the tab after the sign-in page.
+- **A reload keeps the Inbox page that was open** (Goals, Tasks, Boards), and Back from a goal keeps the list's place.
+- **Sleep Team that the server refuses says so** with the server's own words, instead of "awake"; the mention health check no longer flags a member whose name starts with a shorter member's name.
+- **Fewer jumps on screen**: a list bar's redraw no longer scrolls the list, an icon is a 1em box before its font arrives so the page does not move, and icons keep their box at 200% text.
+- **A phone pass**: a selected goal is not offered the file actions, and the Skills import's secret warning no longer tells a person to "publish again with acknowledge_secret".
+
+#### Known issues
+
+- **Windows: in-app update does not work from 2.0.0 through 2.0.6.** If you're on one of those, download and install the MSI by hand; from 2.0.7 on, in-app update works.
+- **macOS: a Coral of 2.0.5 or earlier cannot install updates in-app; install 2.0.6 or later by hand once.**
+- **OpenCode agents are tested on macOS and Linux; OpenCode on Windows is not yet tested end to end.**
+- **Hermes agents are still experimental**: a composer Send into a Hermes that died in its first-use setup is typed into the plain shell until the next reconciler pass (about 110 seconds), and an agent reply toast drops underscores.
+- **After an upgrade from before 2.0.35, an install that has agents but no board messages may be treated as a copy**: run `coral --adopt-data-dir` once.
+- Setting up a computer over SSH is supported from a macOS or Linux hub, and is not yet tested from a Windows hub.
+
+#### For Coral Hub
+
+- **`release-diff` output** (`go run ./internal/releasediff/cmd/release-diff v2.0.35 <head>`):
+
+  ### Tunnel routes, v2.0.35 to the v2.0.36 head
+
+  Changed (1)
+
+  - `GET /api/sessions/live`: view to view owner-sees
+
+  ### Board settings keys (BoardSettings, HealthSettings included), v2.0.35 to the v2.0.36 head
+
+  No key was added, removed or changed.
+
+  ### What Coral Hub compiles in or embeds, v2.0.35 to the v2.0.36 head
+
+  `pkg/tunnel`: 1 file of Go code changed (+3, -1)
+
+  - `coral-go/pkg/tunnel/routes.go`: +3, -1
+  - test files, not compiled by the Hub: 3 files (+27, -3)
+
+  `pkg/frontend`: 46 files the Hub embeds changed (+335, -132)
+
+  - `coral-go/pkg/frontend/static/analytics_tabs_data.js`: +1, -1
+  - `coral-go/pkg/frontend/static/app_routes.js`: +1, -1
+  - `coral-go/pkg/frontend/static/artifact_comments.js`: +10, -0
+  - `coral-go/pkg/frontend/static/artifact_item.js`: +3, -2
+  - `coral-go/pkg/frontend/static/artifact_preview.js`: +3, -3
+  - `coral-go/pkg/frontend/static/artifact_refs.js`: +8, -8
+  - `coral-go/pkg/frontend/static/artifact_review.js`: +4, -4
+  - `coral-go/pkg/frontend/static/artifact_viewer.js`: +29, -6
+  - `coral-go/pkg/frontend/static/ask_ignore.js`: +5, -5
+  - `coral-go/pkg/frontend/static/board_system_lines.js`: +2, -1
+  - `coral-go/pkg/frontend/static/chat_announce.js`: +4, -2
+  - `coral-go/pkg/frontend/static/cli_missing_list.js`: +48, -0
+  - `coral-go/pkg/frontend/static/cli_refused_words.js`: +11, -0
+  - `coral-go/pkg/frontend/static/cloud.js`: +3, -2
+  - `coral-go/pkg/frontend/static/css/artifact_viewer_header.css`: +3, -0
+  - `coral-go/pkg/frontend/static/css/data_table.css`: +1, -9
+  - `coral-go/pkg/frontend/static/css/fonts.css`: +1, -1
+  - `coral-go/pkg/frontend/static/css/needs_actions.css`: +7, -0
+  - `coral-go/pkg/frontend/static/css/provider_cards.css`: +18, -7
+  - `coral-go/pkg/frontend/static/data_table.js`: +1, -0
+  - `coral-go/pkg/frontend/static/goal_done.js`: +2, -2
+  - `coral-go/pkg/frontend/static/goal_view.js`: +1, -1
+  - `coral-go/pkg/frontend/static/inbox_answer.js`: +8, -0
+  - `coral-go/pkg/frontend/static/inbox_proposals.js`: +1, -1
+  - `coral-go/pkg/frontend/static/inbox_sidebar.js`: +40, -38
+  - `coral-go/pkg/frontend/static/launch_provider_cards.js`: +9, -14
+  - `coral-go/pkg/frontend/static/mailbox_chats.js`: +2, -1
+  - `coral-go/pkg/frontend/static/nav.js`: +4, -0
+  - `coral-go/pkg/frontend/static/operator_activity_filters.js`: +1, -1
+  - `coral-go/pkg/frontend/static/operator_asks.js`: +1, -0
+  - `coral-go/pkg/frontend/static/prerequisites.js`: +5, -1
+  - `coral-go/pkg/frontend/static/preview_layout.js`: +2, -1
+  - `coral-go/pkg/frontend/static/preview_pane.js`: +3, -2
+  - `coral-go/pkg/frontend/static/registered_server_view.js`: +34, -3
+  - `coral-go/pkg/frontend/static/reveal_sideways.js`: +8, -0
+  - `coral-go/pkg/frontend/static/served_address.js`: +15, -0
+  - `coral-go/pkg/frontend/static/server_ssh_setup.js`: +10, -1
+  - `coral-go/pkg/frontend/static/signed_out.js`: +2, -1
+  - `coral-go/pkg/frontend/static/team_actions.js`: +3, -1
+  - `coral-go/pkg/frontend/static/team_artifacts_page.js`: +2, -2
+  - `coral-go/pkg/frontend/static/team_dialogs.js`: +4, -0
+  - `coral-go/pkg/frontend/static/team_form.js`: +4, -2
+  - `coral-go/pkg/frontend/static/team_page.js`: +3, -1
+  - `coral-go/pkg/frontend/static/team_toolbar.js`: +2, -1
+  - `coral-go/pkg/frontend/static/view_list.js`: +1, -1
+  - `coral-go/pkg/frontend/static/welcome_swipe.js`: +5, -5
+
+  Unchanged: `pkg/hubproxy`, `pkg/hubowner`, `pkg/redact`, `agent_docs`.
+
+  ### Coral packages compiled into the Hub through its imports, v2.0.35 to the v2.0.36 head
+
+  Unchanged: `internal/fsreplace`, `internal/httputil`, `internal/logsafe`, `internal/safego`, `internal/secfile`, `internal/secrets`, `pkg/redact/betterleaks`.
+
+- **The live session list is an owner-sees route** (`GET /api/sessions/live`, #12377, coral-hub's question): everyone who may view still gets the list and nobody is refused; the stamped owner also gets `waits_on_this`; no field changed.
+- **Sign-in brings a deep link back whole** (#12406 Coral's own `/auth`, #12432 the Hub's sign-in): one rule, `returnAddress` in `served_address.js` (`next=`/`return_to` is the address the page was opened at when it is below the one on screen and the person has not moved on, else the one on screen); never protocol-relative; the Hub's `next=` never carries a fragment, Coral's own `/auth` keeps it. No route, token or framed path changed.
+- **The SSH stream pool (#12446, switching agents through a self-hosted hub over SSH)**: the pool keeps 10 idle `ssh -W` streams for 5 minutes (was 4 for 1), the cap is 24 (was 12), and a closed stream gives its slot back at once; a switch is a burst of about 7 requests, now about 7 processes per burst (was 9 to 13). No wire or route change.
+- **Ready signals, hooks, tokens, framed paths**: unchanged.
+
+
+#### For developers and releases
+
+- `go run ./internal/releasediff/cmd/release-diff OLD NEW` prints, as Markdown for this section, the tunnel route changes, the board settings keys and the changed files in the packages Coral Hub compiles in.
+- `internal/server`'s tests share one dashboard bundle per process and a 1.5 GB peak guard (`testmem`, default limit 2048 MiB); `table_rules_browser` is split into three suites; census entries for the wake path, the standard-install join and the release-diff package.
+
 ## v2.0.35 — A Skills Store, the Activity record, a compact file viewer, questions as Needs you items, Set up and Upgrade on a far computer, and Windows safety
 
 ### Changes
