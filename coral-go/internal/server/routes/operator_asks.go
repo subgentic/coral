@@ -58,6 +58,7 @@ func (h *BoardHandler) OperatorAsks(w http.ResponseWriter, r *http.Request) {
 	now := time.Now().UTC()
 	rows := []operatorAskRow{}
 	for _, p := range projects {
+		h.keepExpiredOperatorQuestions(ctx, p.Project) // a wait that ran out is an ask from now on (#11919)
 		asks, err := h.bs.OpenAsksOf(ctx, p.Project, "Operator", now)
 		if err != nil {
 			continue

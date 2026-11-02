@@ -290,7 +290,7 @@ func (h *BoardHandler) keepReplacedOperatorQuestion(ctx context.Context, project
 	// The same question is not kept twice: the agent asked it with post --ask too, a re-issued wait carried it already, or the new wait is the same question (a trailing space is not a new question).
 	if asks, err := h.bs.OpenAsksOf(ctx, project, board.OperatorName, time.Now()); err == nil {
 		for _, a := range asks {
-			if strings.EqualFold(a.Asker, old.SubscriberID) && strings.Contains(strings.ToLower(a.Content), strings.ToLower(reason)) {
+			if strings.EqualFold(a.Asker, old.SubscriberID) && strings.EqualFold(askQuestionText(a.Content), reason) {
 				return
 			}
 		}
@@ -305,5 +305,28 @@ func (h *BoardHandler) keepReplacedOperatorQuestion(ctx context.Context, project
 	}
 	if h.notifyFn != nil {
 		h.notifyFn(project)
+	}
+}
+
+// askQuestionText is an ask's question without the @Operator it opens with and without the "earlier question" frame this file adds: what two asks are compared by (a whole question, never a part of one).
+func askQuestionText(content string) string {
+	t := strings.TrimSpace(content)
+	t = strings.TrimSpace(strings.TrimPrefix(t, "@"+board.OperatorName))
+	t = strings.TrimSpace(strings.TrimPrefix(t, "(an earlier question, still open)"))
+	return strings.TrimSpace(t)
+}
+
+// keepExpiredOperatorQuestions keeps, once, the questions whose operator wait ran out unanswered on this board (#11919): read when the Operator's Needs you is read. A question kept by the claim is an ask
+// like any other from then on.
+func (h *BoardHandler) keepExpiredOperatorQuestions(ctx context.Context, project string) {
+	waits, err := h.bs.ExpiredOperatorQuestions(ctx, project)
+	if err != nil {
+		return
+	}
+	for i := range waits {
+		if won, err := h.bs.ClaimExpiredQuestion(ctx, waits[i].ID); err != nil || !won {
+			continue
+		}
+		h.keepReplacedOperatorQuestion(ctx, project, &waits[i])
 	}
 }
