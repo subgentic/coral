@@ -38,6 +38,7 @@ func machineManageUsage(w io.Writer) {
 	fmt.Fprintln(w, "       coral machine delete NAME --provider digitalocean --token-file <path|-> [--hub-destroy-file <path|->] [--hub-url https://app.coralhub.dev]")
 	fmt.Fprintln(w, "         [--id INSTANCE_ID (needed when the state file does not know the machine)] [--continue-if-revoke-fails] [--state-file PATH] [--yes]")
 	fmt.Fprintln(w, "       coral machine forget NAME --unsure --provider digitalocean --token-file <path|-> [--confirm NAME] [--state-file PATH]   (clears one record with no droplet id, at least an hour old)")
+	fmt.Fprintln(w, "         NOTE: the hour is the only guard against a late create landing after the check; if a create may still be under way, wait or check the provider by hand first.")
 	fmt.Fprintln(w, "       coral machine prune --older-than 24h|7d --provider digitalocean --token-file <path|-> [--state-file PATH] [--yes]")
 	fmt.Fprintln(w, "       coral machine egress-files --dir DIR   (writes the machine's egress-block files, for tools/machine-egress-check.sh)")
 }
@@ -94,7 +95,7 @@ func runMachineManage(sub string, args []string, stdin io.Reader, stdout, stderr
 	var unsure *bool
 	switch sub {
 	case "forget":
-		unsure = fs.Bool("unsure", false, "required: clear ONE record with no droplet id (a create that never answered) and remove its firewall and private network")
+		unsure = fs.Bool("unsure", false, "required: clear ONE record with no droplet id (a create that never answered) and remove its firewall and private network. The record must be at least an hour old: that hour is the only guard against a late create landing after the check")
 		confirm = fs.String("confirm", "", "type the record name again to go on; without it nothing is removed")
 	case "list":
 		listUnknown = fs.Bool("unknown", false, "only list the instances with this tool's tag that this state file does not know (a second computer's launches look like that); it deletes nothing")
