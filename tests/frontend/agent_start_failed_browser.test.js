@@ -9,6 +9,8 @@ const WORDS = {
     cli_missing: 'failed to start: the Codex CLI was not found. Set Settings > CLI paths > Codex to its codex.exe.',
     cli_untrusted_mount: 'failed to start: Windows will not open the folder the Codex CLI is in. Set Settings > CLI paths > Codex to its codex.exe.',
     cli_path_unusable: 'failed to start: the Codex CLI path in Settings > CLI paths can\'t be run. Set Settings > CLI paths > Codex to its codex.exe. Or clear it.',
+    hermes_setup_failed: 'failed to start: Hermes stopped during its first-use setup (it could not finish setting up its dependencies, often a network problem). Wake the agent to try again.', // #12213
+    hermes_gateway_refused: "failed to start: Hermes could not start its gateway because another one held the host's lock. Wake the agent to try again.", // #12052: Hermes refused its own gateway start when two started together
 };
 
 (async () => {
@@ -22,6 +24,8 @@ const WORDS = {
             window.__m.add('missing-a', 'M', 3, { sleeping: true, sleep_reason: 'coral_stopped', start_failure: 'cli_missing', start_failure_text: W.cli_missing, agent_type: 'codex' });
             window.__m.add('mount-e', 'U', 3, { sleeping: true, start_failure: 'cli_untrusted_mount', start_failure_text: W.cli_untrusted_mount, agent_type: 'codex' });
             window.__m.add('path-f', 'P', 3, { sleeping: true, start_failure: 'cli_path_unusable', start_failure_text: W.cli_path_unusable, agent_type: 'codex' });
+            window.__m.add('hermes-i', 'I', 3, { sleeping: true, sleep_reason: 'agent_exited', start_failure: 'hermes_gateway_refused', start_failure_text: W.hermes_gateway_refused, agent_type: 'hermes' });
+            window.__m.add('hermes-j', 'J', 3, { sleeping: true, sleep_reason: 'agent_exited', start_failure: 'hermes_setup_failed', start_failure_text: W.hermes_setup_failed, agent_type: 'hermes' });
             window.__m.add('nap-b', 'N', 3, { sleeping: true });
             window.__m.add('ended-c', 'E', 3, { sleeping: true, sleep_reason: 'agent_exited' });
             window.__m.add('evil-d', 'D', 3, { sleeping: true, start_failure: 'cli_missing', start_failure_text: W.cli_missing, agent_type: 'codex', display_name: '<img src=x onerror="window.__pwned=1">' });
@@ -37,7 +41,7 @@ const WORDS = {
         const composer = id => ev(`(async () => { window.selectLiveSession('x', 'codex', '${id}', 'local'); await window.__coralReady.agentSelected('${id}');
             const bar = document.getElementById('sleeping-composer'); const t = document.getElementById('sleeping-composer-text');
             return { shown: !bar.hidden, text: t.textContent, imgs: t.querySelectorAll('img').length, children: t.children.length, restart: !document.getElementById('sleeping-restart-btn').hidden, wake: !document.getElementById('sleeping-wake-btn').hidden }; })()`);
-        for (const [id, reason] of [['missing-a-id', 'cli_missing'], ['mount-e-id', 'cli_untrusted_mount'], ['path-f-id', 'cli_path_unusable']]) {
+        for (const [id, reason] of [['missing-a-id', 'cli_missing'], ['mount-e-id', 'cli_untrusted_mount'], ['path-f-id', 'cli_path_unusable'], ['hermes-i-id', 'hermes_gateway_refused'], ['hermes-j-id', 'hermes_setup_failed']]) {
             const c = await composer(id);
             assert.equal(c.shown, true); assert.equal(c.restart, true, 'Restart is offered'); assert.equal(c.wake, true, 'and Wake, to try again once the setting is fixed');
             assert.ok(c.text.endsWith(WORDS[reason]), `${reason} says its own words: ${c.text}`);

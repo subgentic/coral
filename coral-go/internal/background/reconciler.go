@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/subgentic/coral/internal/agent"
+	at "github.com/subgentic/coral/internal/agenttypes"
 	"github.com/subgentic/coral/internal/ptr"
 	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/store"
@@ -218,7 +219,7 @@ func (r *SessionReconciler) checkExited(ctx context.Context, ls store.LiveSessio
 		delete(r.exited, ls.SessionID)
 		return
 	}
-	if r.cliMissing(ctx, ls, name) {
+	if r.cliMissing(ctx, ls, name) || r.hermesGatewayRefused(ctx, ls, name) {
 		return
 	}
 	if created, err := time.Parse(store.ISOFormat, ls.CreatedAt); err == nil && r.now().Sub(created) < exitedLaunchGrace {
@@ -274,5 +275,50 @@ func (r *SessionReconciler) cliMissing(ctx context.Context, ls store.LiveSession
 	delete(r.exited, ls.SessionID)
 	r.slept = append(r.slept, ls.SessionID)
 	r.logger.Warn("the agent's shell could not find its CLI; marking it ended, failed to start", "session_id", ls.SessionID, "agent_name", ls.AgentName, "agent_type", ls.AgentType)
+	return true
+}
+
+// hermesRefusalWindow is how long after Coral typed a Hermes agent's launch line its own refusal to start a gateway counts as the launch's (#12052): a new home prepares its dependencies for a minute or more first.
+// Later the same words on a screen are the agent's own output.
+const hermesRefusalWindow = 30 * time.Minute
+
+// hermesGatewayRefused (and, since #12213, a first-use setup that failed) marks a Hermes agent at its shell whose gateway start Hermes refused (another gateway held the host's lock when two started together, status 75): ended, and failed to start with the
+// fixed reason hermes_gateway_refused, so the dashboard says so and Wake tries again, instead of showing a live-looking agent with nothing in it. Only an agent at its shell (the caller checked) launched within
+// hermesRefusalWindow; it only marks: nothing is killed, relaunched or typed. It reports whether it marked the agent.
+func (r *SessionReconciler) hermesGatewayRefused(ctx context.Context, ls store.LiveSession, name string) bool {
+	sr, ok := r.runtime.(ptymanager.ScreenReader)
+	if ls.AgentType != at.Hermes || !ok {
+		return false
+	}
+	launched, err := time.Parse(store.ISOFormat, ptr.Value(ls.LaunchedAt))
+	if err != nil {
+		launched, err = time.Parse(store.ISOFormat, ls.CreatedAt)
+	}
+	if err != nil || r.now().Sub(launched) > hermesRefusalWindow {
+		return false
+	}
+	screen, err := sr.AgentScreen(ctx, name, ls.AgentType, ls.SessionID)
+	if err != nil {
+		return false
+	}
+	code, why := "", ""
+	switch {
+	case agent.HermesGatewayRefusedIn(screen):
+		code, why = store.StartFailureHermesGateway, "Hermes refused to start its gateway (another one held the host); marking the agent ended, failed to start"
+	case agent.HermesSetupFailedIn(screen): // its first-use setup could not finish and the CLI exited (#12213)
+		code, why = store.StartFailureHermesSetup, "Hermes stopped during its first-use setup; marking the agent ended, failed to start"
+	default:
+		return false
+	}
+	if err := r.sessionStore.SetSessionSleepingFor(ctx, ls.SessionID, store.SleepReasonAgentExited); err != nil {
+		r.logger.Error("failed to mark a Hermes agent whose gateway was refused", "session_id", ls.SessionID, "error", err)
+		return false
+	}
+	if err := r.sessionStore.SetStartFailure(ctx, ls.SessionID, code); err != nil {
+		r.logger.Error("failed to record why a Hermes agent could not start", "session_id", ls.SessionID, "error", err)
+	}
+	delete(r.exited, ls.SessionID)
+	r.slept = append(r.slept, ls.SessionID)
+	r.logger.Warn(why, "session_id", ls.SessionID, "agent_name", ls.AgentName)
 	return true
 }

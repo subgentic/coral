@@ -249,3 +249,10 @@ func TestAWakeThatTypesItsLaunchLineStampsItsTimeAndClearsTheFailure(t *testing.
 	assert.Nil(t, ls.StartFailure)
 	require.NotNil(t, ls.LaunchedAt, "the wake typed a launch line and stamped its time")
 }
+
+// #12213: a Hermes whose first-use setup failed says so in fixed words, and never quotes what Hermes printed.
+func TestAHermesSetupFailureHasItsOwnFixedSentence(t *testing.T) {
+	s := startFailureSentence("hermes", store.StartFailureHermesSetup)
+	assert.Equal(t, "failed to start: Hermes stopped during its first-use setup (it could not finish setting up its dependencies, often a network problem). Wake the agent to try again.", s)
+	assert.NotEqual(t, s, startFailureSentence("hermes", store.StartFailureHermesGateway), "not the gateway's words")
+}

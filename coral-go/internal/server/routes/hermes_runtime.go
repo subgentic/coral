@@ -187,7 +187,12 @@ func (h *SessionsHandler) deliverHermesFirstMessage(team, target string) {
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), wait)
 		defer cancel()
-		if !h.waitForHermesWelcome(ctx, name, sid) {
+		ready, refused := h.waitForHermesWelcome(ctx, name, sid)
+		if refused { // Hermes refused to start its gateway and left the pane at its shell: nothing will be typed, and no "send it by hand" notice (the agent never started; the reconciler marks it failed to start, #12052)
+			slog.Warn("hermes: the agent's gateway was refused, so its first message was not typed", "session", sid[:8])
+			return
+		}
+		if !ready {
 			// Never typed: Hermes may word its welcome line differently, and the input box is not known to be there, so the text is not sent blind (it could answer a menu). The agent's feed says so instead.
 			slog.Warn("hermes: Hermes was not ready for its first message", "session", sid[:8])
 			h.noteHermesFirstMessageNotTyped(sid)
@@ -204,30 +209,33 @@ func (h *SessionsHandler) deliverHermesFirstMessage(team, target string) {
 // hermesWelcome is the line Hermes v0.22.5 shows when it is ready for a message (the tester's capture): the input box's placeholder rotates, so it is not a marker.
 const hermesWelcome = "Welcome to Hermes Agent!"
 
-// waitForHermesWelcome waits until the agent's screen shows the welcome line, then hermesSettle more, and reports whether it did before ctx ended. A terminal with no screen to read is not waited for (the gate types
+// waitForHermesWelcome waits until the agent's screen shows the welcome line, then hermesSettle more, and reports whether it did before ctx ended; refused says Hermes refused to start its gateway (its own words on the screen, agent.HermesGatewayRefusedIn), which ends the wait at once. A terminal with no screen to read is not waited for (the gate types
 // to such a terminal too). It only reads the screen: nothing is sent because of what is on it.
-func (h *SessionsHandler) waitForHermesWelcome(ctx context.Context, name, sid string) bool {
+func (h *SessionsHandler) waitForHermesWelcome(ctx context.Context, name, sid string) (ready, refused bool) {
 	for {
 		rctx, cancel := context.WithTimeout(ctx, loginScreenTimeout)
 		screen, err := h.agentScreen(rctx, name, at.Hermes, sid, "")
 		cancel()
 		if errors.Is(err, errNoScreen) {
-			return true
+			return true, false
 		}
 		if err == nil && strings.Contains(screen, hermesWelcome) {
 			break
 		}
+		if err == nil && agent.HermesGatewayRefusedIn(screen) {
+			return false, true
+		}
 		select {
 		case <-time.After(500 * time.Millisecond):
 		case <-ctx.Done():
-			return false
+			return false, false
 		}
 	}
 	select {
 	case <-time.After(h.hermesSettle):
-		return true
+		return true, false
 	case <-ctx.Done():
-		return false
+		return false, false
 	}
 }
 

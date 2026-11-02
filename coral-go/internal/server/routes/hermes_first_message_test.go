@@ -247,3 +247,39 @@ func TestAHermesFirstMessageRecordsTheAgentAgainOnceItIsUp(t *testing.T) {
 	assert.Equal(t, 1, term.readopted)
 	assert.Equal(t, []bool{true}, term.atWelcome)
 }
+
+// #12052: a Hermes that refused to start its gateway (another one held the host when two started together) left the pane at its shell: waiting for a welcome line that will never come held the first message's
+// goroutine for fifteen minutes, and the notice that followed said to send the message by hand to an agent that never started. The wait ends at the refusal, nothing is typed, and no such notice is made (the
+// reconciler marks the agent failed to start, with the reason).
+func TestAHermesWhoseGatewayWasRefusedEndsTheFirstMessageWaitWithoutANotice(t *testing.T) {
+	_, h, mock, ss := setupSessionsTestServer(t)
+	term := &loginScreenTerminal{mockSessionTerminal: mock}
+	h.terminal = term
+	h.hermesFirstWait = 20 * time.Second // long: the refusal must end it, not the clock
+	data := h.cfg.CoralDir()
+	ctx := context.Background()
+	sid := "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c6b"
+	name := naming.SessionName("hermes", sid)
+	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid, AgentType: "hermes", AgentName: "repo", WorkingDir: "/tmp/p"}))
+	mock.mu.Lock()
+	mock.sessions[name] = &ptymanager.PaneInfo{SessionName: name, Target: name, CurrentPath: "/tmp/p"}
+	mock.mu.Unlock()
+	writeFirstMessage(t, data, "", sid, "You were automatically joined to message board \"team-a\". Go.")
+	term.set("Error: Gateway could not start: the gateway exited with status 75 before it could serve:\n  ❌ Another gateway already owns this host: owner unknown (its record is gone)\ntester@host:~/work$ \n")
+
+	h.deliverHermesFirstMessage("", name)
+	time.Sleep(1500 * time.Millisecond) // sleep-ok: the wait polls every 500 ms; a refusal ends it within a poll or two, and the notice (if there were one) is written then
+	s := sid
+	evs, err := h.ts.ListAgentEvents(ctx, "repo", 20, &s)
+	require.NoError(t, err)
+	for _, e := range evs {
+		assert.NotEqual(t, "agent_notice", e.EventType, "no 'send it by hand' notice for an agent that never started: %s", e.Summary)
+	}
+	for _, m := range sentTo(mock, name) {
+		assert.NotContains(t, m, "automatically joined", "nothing is typed")
+	}
+	reads := func() int { term.mu.Lock(); defer term.mu.Unlock(); return term.reads }
+	n := reads()
+	time.Sleep(1200 * time.Millisecond) // sleep-ok: two more polls would be seen if the wait were still going
+	assert.Equal(t, n, reads(), "the wait has ended: the screen is not polled any more")
+}
