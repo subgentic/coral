@@ -36,6 +36,9 @@ const { coralReady } = require('./helpers/wait');
         await ev(`document.querySelector('.artifact-viewer .artifact-viewer-more').click(); document.querySelector('.artifact-viewer .details-toggle').click(); true`);
         await waitFor(`!!document.querySelector('.artifact-readers .artifact-readers-head') && document.querySelector('.artifact-readers .artifact-readers-head').getClientRects().length > 0`, 'Who can read this, shown by Details');
         await ev(`(document.querySelector('.artifact-viewer-menu').hidden ? 0 : document.querySelector('.artifact-viewer-more').click()); document.querySelector('.artifact-viewer-close').focus(); true`);
+        // the viewer's header controls arrive as the file and its comments load: Tab from Close wraps to the FIRST control, and with only Close drawn yet that is Close itself (one stop, the flake on a slow runner, v2.0.36 gate: reproduced 1 in 6 under a 4x CPU throttle)
+        await waitFor(`[...document.querySelectorAll('.artifact-viewer button, .artifact-viewer a[href]')].filter(e => !e.disabled && e.getClientRects().length > 0 && !e.closest('[hidden]') && !e.closest('.artifact-readers')).length >= 2`, 'the viewer has its controls drawn: Close and the control before it', 10000);
+        await new Promise(r => setTimeout(r, 300)); // sleep-ok: the header's late controls settle over a frame or two after the first draw
         const stops = [];
         for (let i = 0; i < 12; i++) {
             await key('Tab', 'Tab', 9);
