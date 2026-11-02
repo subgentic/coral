@@ -223,12 +223,22 @@ func TestInstallRefusesBeforeTouchingTheFarSide(t *testing.T) {
 	e, _, _ = newInstallEnv(t, pkg, "")
 	e.in.Helper = ""
 	e.in.RunHelper = nil
-	if _, err := e.in.Install(context.Background(), tg, ArchAMD64); err == nil || !strings.Contains(err.Error(), "could not be verified") {
-		t.Errorf("no verifier at all must refuse: %v", err)
+	want := "This Coral has no release verifier (coral-update) next to it, so nothing was installed."
+	if _, err := e.in.Install(context.Background(), tg, ArchAMD64); err == nil || !strings.Contains(err.Error(), want) {
+		t.Errorf("no verifier at all must refuse, and say why: %v", err)
 	}
 	e.in.Helper = "relative/coral-update"
-	if _, err := e.in.Install(context.Background(), tg, ArchAMD64); err == nil {
-		t.Error("a relative verifier path")
+	if _, err := e.in.Install(context.Background(), tg, ArchAMD64); err == nil || !strings.Contains(err.Error(), want) {
+		t.Errorf("a relative verifier path is no verifier: %v", err)
+	}
+	e.in.Helper = filepath.Join(t.TempDir(), "coral-update") // an absolute path to nothing
+	if _, err := e.in.Install(context.Background(), tg, ArchAMD64); err == nil || !strings.Contains(err.Error(), want) {
+		t.Errorf("a verifier that is not there: %v", err)
+	}
+	// a verifier that is there and fails is a failed verification, not a missing one
+	e.in.RunHelper = func(context.Context, string, string, string) (string, error) { return "", errors.New("signature") }
+	if _, err := e.in.Install(context.Background(), tg, ArchAMD64); err == nil || !strings.Contains(err.Error(), "could not be verified") || strings.Contains(err.Error(), "no release verifier") {
+		t.Errorf("a failed verification keeps its own sentence: %v", err)
 	}
 	_ = log
 }
