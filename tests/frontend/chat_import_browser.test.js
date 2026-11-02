@@ -39,6 +39,11 @@ const BASE = require('./test_base').BASE;
         const withRows = await banner();
         assert.equal(withRows.rows, 1, JSON.stringify(withRows));
         assert.match(withRows.text, /^40 earlier chats were found on this computer \(Claude Code, Codex\)\..*Import 40 earlier chats from Claude Code, Codex$/, withRows.text);
+        // With a search or a filter active the offer is not drawn above the result list (it is the whole folder's, not the search's).
+        const searched = await ev(`import((window.__coralStatic || '/static/') + 'mailbox_chats.js').then(m => { const sp = m.chatsSpec('chats', { query: 'my', params: {}, redraw() {}, after() {} }); const n = sp.rows.length ? sp.node() : null; return { rows: sp.rows.length, banner: !!(n && n.querySelector('.chat-import-line')) }; })`);
+        const filtered = await ev(`import((window.__coralStatic || '/static/') + 'mailbox_chats.js').then(m => { const sp = m.chatsSpec('chats', { query: '', params: { source_types: 'claude' }, redraw() {}, after() {} }); const n = sp.rows.length ? sp.node() : null; return { banner: !!(n && n.querySelector('.chat-import-line')) }; })`);
+        assert.equal(searched.banner, false, 'no offer above a search: ' + JSON.stringify(searched));
+        assert.equal(filtered.banner, false, 'no offer above a filtered list');
         console.log('PASS the empty All chats offers the import and the button imports once');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
