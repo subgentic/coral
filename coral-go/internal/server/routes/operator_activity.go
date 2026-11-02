@@ -118,5 +118,7 @@ func (h *BoardHandler) recordActivity(r *http.Request, action, kind, item, team,
 	if h.bs == nil {
 		return
 	}
-	_ = h.bs.RecordActivity(context.WithoutCancel(r.Context()), activityMetaFor(r, title, note), action, kind, item, "", team)
+	ctx := context.WithoutCancel(r.Context())
+	_ = h.bs.RecordActivity(ctx, activityMetaFor(r, title, note), action, kind, item, "", team)
+	h.tellChief(ctx, action, kind, team, title, "") // the Operator's decision on a team Chief fronts (#12171)
 }
