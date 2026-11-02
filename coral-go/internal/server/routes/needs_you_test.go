@@ -387,6 +387,15 @@ func TestNeedsYouAFileWithNewCommentsIsUnreadAgainAsTheSameRow(t *testing.T) {
 	n, _ = count()
 	assert.Zero(t, n, "and an approved file with no news is not in Needs you")
 
+	// Security's SHOULD on a6b5440ae: a file the Operator asked changes of is the agent's turn, so it is not counted, unless an agent replied in the Operator's thread (that is news): whichever of this and #11985 lands first
+	e.tag(t, `["for review", "changes requested"]`)
+	n, _ = count()
+	assert.Zero(t, n, "changes requested, no news: the agent's turn")
+	news[e.id] = 1
+	n, _ = count()
+	assert.Equal(t, 1, n, "changes requested and the agent replied in the thread: it is back, once")
+	delete(news, e.id)
+
 	news["ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"] = 5
 	n, _ = count()
 	assert.Zero(t, n, "news on another file is not this file's")

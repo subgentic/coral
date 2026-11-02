@@ -15,6 +15,9 @@ func needsYouFile(tags []string, news int) bool {
 		return false
 	}
 	if hasTag(tags, "for review") {
+		if hasTag(tags, "changes requested") {
+			return news > 0 // it is the agent's turn (#11985): only a reply in the Operator's thread, which is news, brings it back
+		}
 		return !hasTag(tags, "read") || news > 0
 	}
 	return news > 0 && (hasTag(tags, "approved") || hasTag(tags, "denied"))
