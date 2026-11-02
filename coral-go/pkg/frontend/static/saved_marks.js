@@ -155,6 +155,7 @@ document.addEventListener('keydown', (e) => {
     const t = e.target instanceof Element ? e.target : document.body;
     if (t.closest('input, textarea, select, [contenteditable="true"], [role="dialog"], [role="menu"], .modal')) return;
     if (!(t === document.body || t.closest('#agentic-state, #inbox-view, #group-table-view, .top-nav-tab'))) return; // the top tab that opened the Inbox keeps the focus until the list is up
+    if ([...document.querySelectorAll('dialog[open], .modal')].some(m => m.getClientRects().length)) return; // a dialog or the file viewer is open over the page: Escape is its, wherever the focus is (#12290: it left the page for /agents and left the viewer open)
     if (document.querySelector('.goal-detail-pane:not([hidden])')) return; // a goal's task or file pane beside its list: Escape closes that first (detail_pane.js), with the focus on its row (#8914)
     if (document.querySelector('#agentic-saved-detail-pane:not([hidden])')) return; // a message's sheet over the dock is one level back (detail_pane.js closes it); the next Escape leaves
     e.preventDefault();

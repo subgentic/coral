@@ -14,6 +14,7 @@ import { trapTab } from './dialog_focus.js';
 import { visibleName } from './artifact_names.js';
 import { importOnce } from './import_once.js';
 import { pushOverlay, popOverlay } from './overlay_history.js';
+import { setDialogHide } from './modal_chrome.js';
 const { readersAllowed, readersBlock } = await importOnce('./artifact_readers.js'); // lazy: its failure is retried
 const { privateBlock } = await importOnce('./artifact_private.js'); // the owner's Private switch, beside it (#11457)
 const { makeDetails } = await importOnce('./details_disclosure.js'); // "Who can read this" behind the one Details button (#7775)
@@ -79,6 +80,7 @@ function _build() {
         e.preventDefault();
         openArtifactViewer(m[1], { server: _server, filename: a.textContent.trim() });
     });
+    setDialogHide(d, () => closeArtifactViewer()); // modal_chrome's Escape (with the focus anywhere on the page) closes it through its own close, not by display:none, which left it open and every later open a no-op (#12290)
     d.addEventListener('keydown', (e) => {
         // Stop here: the page-wide Escape handler (modal_chrome) would also close a modal under the viewer.
         if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeArtifactViewer(); }
@@ -107,6 +109,7 @@ export function openArtifactViewer(hex, opts = {}) {
     if (!HEX_RE.test(hex)) return false;
     const d = _dialog || (_dialog = _build());
     if (d.hidden) _returnFocus = document.activeElement;
+    d.style.display = ''; // display-ok: clears an inline display:none an older page-wide Escape set; the viewer shows and hides with `hidden`
     _abort?.abort();
     _abort = new AbortController();
     const gen = ++_gen;
