@@ -27,7 +27,8 @@ const REJECT_FORM = /^(?:no|deny|reject|cancel)\b/i;
 const wholeLabel = label => label.trim().replace(KEY_HINT, '').replace(/[.!\s]+$/, '');
 const plainlyOneTime = (label, permission) => permission ? ONE_TIME.test(wholeLabel(label)) : !LASTING.test(label) && !SCOPE.test(label); // a question card's own choices (Red, Blue) pass the words that mark a lasting or wide one
 const read = new Map(); // server:session:waiting_since -> the choices, read once per ask
-const stepWords = t => String(t == null ? '' : t).replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2066-\u2069]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80); // the dialog's own words, as one clean line
+const stepClean = t => String(t == null ? '' : t).replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2066-\u2069]/g, ' ').replace(/\s+/g, ' ').trim(); // the dialog's own words, as one clean line, uncut
+const stepCut = t => (t.length > 80 ? `${t.slice(0, 79)}…` : t); // what is drawn: a cut field says so
 
 /** The card's one-time choices and the ask they belong to: { ask, picks, onlyReject } ({ ask: '', picks: [] } when the card cannot be answered by one choice). onlyReject: the request can only be rejected, and picks are then only the No form. */
 async function readAsk(s) {
@@ -41,17 +42,17 @@ async function readAsk(s) {
     if (!po || po.multi) return none;
     if ((po.review || []).length) { // the last step of a multi-question dialog, "Ready to submit your answers?": the row can take it, since a Submit sends only what the person already chose (#11981)
         const submit = (po.options || []).find(o => (o.action || 'select') === 'select' && /^submit\b/i.test(String(o.label || '')) && Number.isInteger(Number(o.n)));
-        const said = po.review.map(r => `${stepWords(r.question)}: ${stepWords(r.answer)}`).join(' · ');
-        return submit && !onlyReject ? { ask: String(po.ask_id || ''), picks: [submit], onlyReject, step: `Submit these answers? ${said}` } : none; // exactly what the screen shows now, every question with its answer (each cut at 80 characters; the whole line is the hover text)
+        const full = po.review.map(r => `${stepClean(r.question)}: ${stepClean(r.answer)}`).join(' · '), drawn = po.review.map(r => `${stepCut(stepClean(r.question))}: ${stepCut(stepClean(r.answer))}`).join(' · ');
+        return submit && !onlyReject ? { ask: String(po.ask_id || ''), picks: [submit], onlyReject, step: `Submit these answers? ${drawn}`, stepFull: `Submit these answers? ${full}` } : none; // exactly what the screen shows now, every question with its answer: the click compares the UNCUT text, a field cut for drawing wears an ellipsis and the hover is the whole line (#11997, Security)
     }
     const permission = (po.options || []).some(o => PERMISSION_WORDS.test(String(o.label || ''))); // a permission card: only a plain Yes or No is a button; a question's own choices (Red, Blue) are
     const picks = (po.options || []).filter(o => (o.action || 'select') === 'select' && o.label && Number.isInteger(Number(o.n)) && plainlyOneTime(String(o.label), permission) && (!onlyReject || REJECT_FORM.test(wholeLabel(String(o.label)))));
-    return picks.length >= 1 && picks.length <= MAX_CHOICES ? { ask: String(po.ask_id || ''), picks, onlyReject, question: stepWords(po.question) } : none;
+    return picks.length >= 1 && picks.length <= MAX_CHOICES ? { ask: String(po.ask_id || ''), picks, onlyReject, question: stepClean(po.question).slice(0, 120) } : none;
 }
 
 const askKey = s => `${sessionServer(s)}:${s.session_id}:${s.waiting_since || ''}`;
 
-async function answer(s, o, ask, cell, step = '') {
+async function answer(s, o, ask, cell, step = '') { // step: the whole review text the row was drawn for ('' for a step with no review)
     const buttons = [...cell.querySelectorAll('button')];
     const had = cell.contains(document.activeElement); // the keyboard is on a choice: it must still be on something when the cell is drawn again or says Answered (#10560)
     const keep = () => { if (had) (cell.querySelector(`.inbox-answer[data-n="${Number(o.n)}"]`) || cell.querySelector('.inbox-answer') || cell.closest('tr')?.querySelector('.dt-primary'))?.focus({ preventScroll: true }); };
@@ -59,7 +60,7 @@ async function answer(s, o, ask, cell, step = '') {
     try {
         if (await hubBlocked(s)) { buttons.forEach(b => { b.disabled = false; }); return; } // a viewer: the reason is said
         const now = await readAsk(s); // the card is read again at the click: a row can be stale
-        if (!ask || now.ask !== ask || (step && now.step !== step) || !now.picks.some(p => Number(p.n) === Number(o.n) && p.label === o.label)) { // a Submit is sent only while the screen still shows the same review step with the same answers (#11981, Security)
+        if (!ask || now.ask !== ask || (step && now.stepFull !== step) || !now.picks.some(p => Number(p.n) === Number(o.n) && p.label === o.label)) { // a Submit is sent only while the screen still shows the same review step with the same answers (#11981, Security)
             read.delete(askKey(s));
             fill(s, cell).then(keep);
             showToast('That question changed; look at it again.', true);
@@ -98,16 +99,16 @@ async function answer(s, o, ask, cell, step = '') {
 function fill(s, cell, withDismiss = true) {
     const key = askKey(s);
     if (!read.has(key)) read.set(key, readAsk(s).catch(() => ({ ask: '', picks: [], onlyReject: false })));
-    return read.get(key).then(({ ask, picks, onlyReject, step, question, later }) => {
+    return read.get(key).then(({ ask, picks, onlyReject, step, stepFull, question, later }) => {
         cell.replaceChildren();
         const words = step || (later ? question : ''); // the row's own words are the first question's: a later step says which question these choices are for
-        if (words) { const t = document.createElement('span'); t.className = 'inbox-answer-step'; t.textContent = words.length > 240 ? `${words.slice(0, 240)}…` : words; if (words.length > 240) t.title = words; cell.append(t); } // text only; a long review keeps its whole line as the hover text
+        if (words) { const t = document.createElement('span'); t.className = 'inbox-answer-step'; t.textContent = words.length > 240 ? `${words.slice(0, 239)}…` : words; if (stepFull && stepFull !== words) t.title = stepFull; else if (words.length > 240) t.title = words; cell.append(t); } // text only; a cut line (a field or the whole) says so and keeps the uncut text as its hover
         for (const o of picks) {
             const b = document.createElement('button');
             b.type = 'button'; b.className = 'btn btn-small inbox-answer'; b.textContent = o.label;
             b.dataset.session = s.session_id; b.dataset.n = String(Number(o.n)); // what finds this choice again after a redraw keeps the keyboard on it (sidebar_groups.js)
             b.setAttribute('aria-label', `Answer ${o.label} for ${resolveSessionIdentity(s)}`);
-            b.addEventListener('click', e => { e.stopPropagation(); answer(s, o, ask, cell, step); });
+            b.addEventListener('click', e => { e.stopPropagation(); answer(s, o, ask, cell, stepFull || ''); });
             b.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); });
             cell.append(b);
         }

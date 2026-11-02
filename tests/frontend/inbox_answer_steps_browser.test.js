@@ -57,6 +57,20 @@ const { coralReady } = require('./helpers/wait');
         const last = await ev(`window.__posts.at(-1)`);
         assert.deepEqual([last.n, last.label, last.ask_id, last.agent_type], [1, 'Submit answers', 'a3', 'claude'], 'one fixed choice of the screen it read: ' + JSON.stringify(last));
         await waitFor(`/Answered: Submit answers/.test(window.__cell.textContent)`, 'the row says Answered', 6000);
+        // #11997 (Security): two reviews that differ only AFTER the 80th character of an answer are different reviews: the click compares the whole uncut text, so nothing is sent; a cut field wears an ellipsis and its
+        // hover is the uncut text
+        const LONG = 'x'.repeat(100);
+        await ev(`window.__step = 2; window.__answers = 'Red · ${LONG}A'; true`);
+        const draw2 = await draw();
+        await waitFor(`!!window.__cell.querySelector('.inbox-answer-step')`, 'the long review is drawn', 6000);
+        const line = await ev(`(() => { const t = window.__cell.querySelector('.inbox-answer-step'); return { text: t.textContent, title: t.title }; })()`);
+        assert.ok(/x{79}…/.test(line.text), 'a cut field wears an ellipsis: ' + line.text);
+        assert.ok(line.title.includes('x'.repeat(100) + 'A'), 'the hover is the uncut text, to its last character: ' + line.title);
+        const before2 = await ev(`window.__posts.length`);
+        await ev(`window.__answers = 'Red · ${LONG}B'; true`); // the same ask id, the same first 80 characters: only the tail differs
+        await ev(`[...window.__cell.querySelectorAll('button.inbox-answer')].find(b => b.textContent === 'Submit answers').click(); true`);
+        await waitFor(`/That question changed/.test(document.body.textContent)`, 'a review that changed after character 80 is said', 6000);
+        assert.equal(await ev(`window.__posts.length`), before2, 'nothing was sent for it');
         console.log('PASS a multi-question dialog is answered from the Inbox row to its end: next question, Submit with its words, a changed review refused');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
