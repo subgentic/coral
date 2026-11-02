@@ -449,6 +449,7 @@ export function dataTable(cfg) {
     function cellOf(c, r, tr) {
         const td = el('td', `dt-td dt-tone-${c.tone || (c.primary ? 'primary' : 'secondary')}${c.numeric || c.align === 'end' ? ' dt-end' : ''}${c.nowrap === false ? ' dt-wrap' : ''}`);
         if (c.width === 'grow') td.classList.add('dt-grow');
+        if (c.lineGrow) td.classList.add('dt-line-grow'); // a second line that takes its whole line in a folded row, without being the table's elastic column (#11943)
         if (c.width === 'content') td.classList.add('dt-content');
         sizeColumn(c, td);
         td.setAttribute('role', 'cell'); td.dataset.label = c.label; td.dataset.key = c.key;
