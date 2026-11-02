@@ -321,6 +321,9 @@ func (h *BoardHandler) postMessageCore(w http.ResponseWriter, r *http.Request, p
 		})
 		return nil, false
 	}
+	if !(strings.EqualFold(strings.TrimSpace(body.As), operatorIdentity) && cloud.Tunneled(r)) && refuseOperatorFormat(w, body.SubscriberID, body.Content) { // the Operator's own text through the Hub is theirs to write (#12517)
+		return nil, false
+	}
 	if body.DryRun {
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "dry_run": true})
 		return nil, false

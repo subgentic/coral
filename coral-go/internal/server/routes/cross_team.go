@@ -536,6 +536,8 @@ func (m *externalMessage) refusal(target string) answer {
 		return func(w http.ResponseWriter) { errBadRequest(w, "from_board and subscriber_id are required") }
 	case m.FromBoard == target:
 		return func(w http.ResponseWriter) { errBadRequest(w, "use a normal board post to message your own board") }
+	case !strings.EqualFold(m.SubscriberID, crossTeamOperatorID) && operatorFormatProblem(m.Content) != "": // a message to the target team's Operator is laid out as one to a local Operator is (#12517)
+		return func(w http.ResponseWriter) { refuseOperatorFormat(w, m.SubscriberID, m.Content) }
 	}
 	return nil
 }
