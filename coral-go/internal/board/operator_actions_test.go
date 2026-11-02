@@ -33,7 +33,7 @@ func (s *Store) forReview(t *testing.T, boardID, hex string) {
 
 func TestEachFileDecisionWritesItsRowInItsOwnTransactionWithTheVersionActedOn(t *testing.T) {
 	s := activityStore(t)
-	ctx := WithActivity(context.Background(), ActivityMeta{Actor: "local", Source: "local", Hint: "phone", Title: "Plan‮.md"})
+	ctx := WithActivity(context.Background(), ActivityMeta{Actor: "local", Source: "local", Hint: "phone", Title: "Plan\u202e.md"})
 	for i, tc := range []struct{ state, want string }{{ReviewApproved, ActApprove}, {ReviewChangesRequested, ActChanges}, {ReviewDenied, ActDeny}} {
 		hex := hexN(i + 1)
 		s.forReview(t, "team-a", hex)
@@ -158,7 +158,7 @@ func TestTheRecordNeverTakesAnActorOrSourceFromAnythingButItsMetaAndCleansItsTex
 	s := activityStore(t)
 	ctx := context.Background()
 	long := strings.Repeat("é", 300)
-	require.NoError(t, s.RecordActivity(ctx, ActivityMeta{Actor: "hub:abc", Source: "hub", Hint: "<script>", Note: "ok​‮done\x07 " + long, Title: long}, ActDeny, "file", hexN(1), hexN(1), "team-a"))
+	require.NoError(t, s.RecordActivity(ctx, ActivityMeta{Actor: "hub:abc", Source: "hub", Hint: "<script>", Note: "ok\u200b\u202edone\x07 " + long, Title: long}, ActDeny, "file", hexN(1), hexN(1), "team-a"))
 	require.NoError(t, s.RecordActivity(ctx, ActivityMeta{Source: "somewhere", Hint: "phone"}, ActSave, "file", hexN(2), hexN(2), "team-a"))
 	rows, _ := s.ListActivity(ctx, ActivityFilter{})
 	require.Len(t, rows, 2)

@@ -28,8 +28,8 @@ const { coralReady } = require('./helpers/wait');
         if (!got.startsWith('Could not wake')) failures.push('and says which wake failed: ' + got);
         const bare = await run(500, {});
         if (!/Could not wake .*\(HTTP 500\)/.test(bare)) failures.push('a refusal with no sentence keeps the status: ' + bare);
-        const markup = await run(422, { error: 'bad <b>path</b>‮', code: 'cli_path_unusable' });
-        if (markup.includes('‮')) failures.push('hidden characters in the sentence are written out: ' + JSON.stringify(markup));
+        const markup = await run(422, { error: 'bad <b>path</b>\u202e', code: 'cli_path_unusable' });
+        if (markup.includes('\u202e')) failures.push('hidden characters in the sentence are written out: ' + JSON.stringify(markup));
     } finally { await client.close(); }
     if (failures.length) { console.error(failures.join('\n')); process.exit(1); }
     console.log('wake_refusal_words_browser: ok');
