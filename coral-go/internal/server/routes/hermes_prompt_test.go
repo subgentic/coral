@@ -257,3 +257,16 @@ func TestAHermesCommandCutOnItsScreenIsJudgedByTheStoredCommandOrRefused(t *test
 	applyHermesCommand(&clean, "")
 	assert.False(t, clean.OnlyReject, "no marker: the whole command was on the screen")
 }
+
+// QA's SHOULD on #12170 (#12277): a box whose command row is only the cut marker shows no command at all, so nothing of a stored command can be said to match it (an empty start is the start of every command):
+// Reject only, never Allow for whatever the last call was.
+func TestAHermesBoxWhoseCommandIsOnlyTheCutMarkerOffersRejectOnly(t *testing.T) {
+	for name, stored := range map[string]string{"a clean stored command": "ls /tmp", "nothing stored": "", "a long stored command": strings.Repeat("x", 4060)} {
+		s, ok := parsePromptScreen(hermesCutScreen(""))
+		require.True(t, ok, name)
+		require.False(t, s.OnlyReject, "the screen alone")
+		applyHermesCommand(&s, stored)
+		assert.True(t, s.OnlyReject, name)
+		assert.Contains(t, strings.ToLower(s.Note), "cut", name)
+	}
+}
