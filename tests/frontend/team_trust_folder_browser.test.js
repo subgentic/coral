@@ -58,11 +58,14 @@ const { removeBoards } = require('./helpers/board_cleanup');
         assert.equal(await ev(`document.getElementById('launch-team-trust').checked`), false, 'off by default');
         assert.match(await ev(`document.getElementById('launch-team-trust').closest('.sv-row').textContent`), /Trust this folder: its settings and tools can run/);
         assert.match(await ev(`document.getElementById('launch-team-trust').closest('.sv-row').textContent`), /\/home\/p\/Code\/app/, 'it names the path');
+        assert.match(await ev(`document.getElementById('launch-team-trust').closest('.sv-row').textContent`), /Coral will not trust \/home\/p\/Code\/app unless this is on/, 'a typed folder says plainly that it is not trusted while the switch is off (#12413)');
         sent = await go();
         assert.equal(sent.trust_folder, undefined, 'unticked: nothing'); assert.equal(sent.create_dir, undefined);
         await ev(`window.hideLaunchModal(); true`);
         await open(); await setDir('/home/p/Code/app', false);
         await ev(`document.getElementById('launch-team-trust').click(); true`);
+        { const t = await ev(`document.getElementById('launch-team-trust').closest('.sv-row').textContent`);
+          assert.doesNotMatch(t, /will not trust/, 'ticked: the "will not trust" sentence is gone'); assert.match(t, /is trusted for the team's agents/, 'ticked: it says it is trusted'); }
         sent = await go();
         assert.equal(sent.trust_folder, true, 'ticked: the request says so');
         await ev(`window.hideLaunchModal(); true`);
