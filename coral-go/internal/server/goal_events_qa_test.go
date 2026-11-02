@@ -34,10 +34,18 @@ type qaEnv struct {
 	stack  termStack
 }
 
+// qaTick is the QA env's feed tick (the coral websocket's poll interval, a test-only setting). The drains are counted in ticks, so a test waits as many ticks as it did at the 1 s
+// tick of newE2EConfig (1.5 ticks to settle, 3 ticks to collect or to see that nothing more comes), in a quarter of the time.
+const qaTick = 250 * time.Millisecond
+
+// ticks is n feed ticks of the QA env.
+func ticks(n float64) time.Duration { return time.Duration(n * float64(qaTick)) }
+
 func newQAEnv(t *testing.T) *qaEnv {
 	dir := t.TempDir()
 	cfg := newE2EConfig(t, dir)
 	cfg.StrictLocalAuth = true
+	cfg.WSPollInterval = qaTick // the feed's tick: every drain below is counted in ticks
 	db, err := storetest.Open(t, cfg.DBPath)
 	require.NoError(t, err)
 	t.Cleanup(func() { db.Close() })
@@ -199,12 +207,12 @@ func TestQA7355ManyChangesInOneTick(t *testing.T) {
 	g := e.goal("team-a", "base")
 	c := e.operator()
 	c.first()
-	c.drain(1500 * time.Millisecond)
+	c.drain(ticks(1.5))
 	for i := 0; i < 20; i++ {
 		_, err := e.srv.boardStore.UpdateGoal(ctx, "team-a", g.ID, board.GoalUpdate{Title: sp(fmt.Sprintf("t%d", i))})
 		require.NoError(t, err)
 	}
-	evs, gaps, _ := c.drain(3 * time.Second)
+	evs, gaps, _ := c.drain(ticks(3))
 	t.Logf("20 changes in a tight loop: %d events, %d gap frames", len(evs), gaps)
 	assert.Len(t, evs, 20)
 	assert.Zero(t, gaps)
@@ -219,14 +227,14 @@ func TestQA7355MoreThanFiftyIsAGap(t *testing.T) {
 	g := e.goal("team-a", "base")
 	c := e.operator()
 	c.first()
-	c.drain(1500 * time.Millisecond)
+	c.drain(ticks(1.5))
 	e.burst(g.ID, 70, 0)
-	evs, gaps, raw := c.drain(3 * time.Second)
+	evs, gaps, raw := c.drain(ticks(3))
 	t.Logf("70 changes: %d events, %d gap frames", len(evs), gaps)
 	// The frames that carried goal events are in every message: under -race on a slow machine this test saw 57 events (#8483), and which frame held the extra seven is what the failure has to say.
 	assert.GreaterOrEqual(t, gaps, 1, "more than a frame can hold says gap; frames: %v", raw)
 	assert.LessOrEqual(t, len(evs), 50, "one frame holds at most 50 events; frames: %v", raw)
-	more, gaps2, raw2 := c.drain(3 * time.Second)
+	more, gaps2, raw2 := c.drain(ticks(3))
 	assert.Empty(t, more, "nothing repeated on later ticks; frames: %v", raw2)
 	assert.Zero(t, gaps2, "no gap repeated on later ticks; frames: %v", raw2)
 }
@@ -237,11 +245,11 @@ func TestQA7355PrunedPastIsAGap(t *testing.T) {
 	g := e.goal("team-a", "base")
 	c := e.operator()
 	c.first()
-	c.drain(1500 * time.Millisecond)
+	c.drain(ticks(1.5))
 	// the eight changes and the prune to 3 are one transaction: no feed tick can see a half-written or an unpruned state (eight separate writes and a prune straddled a tick on a slow runner, and the
 	// tick that saw them all left nothing to prune past: no gap, #7646)
 	e.burstKeep(g.ID, 8, 0, 3)
-	evs, gaps, _ := c.drain(3 * time.Second)
+	evs, gaps, _ := c.drain(ticks(3))
 	t.Logf("after prune to 3: %d events, %d gap frames", len(evs), gaps)
 	assert.GreaterOrEqual(t, gaps, 1, "the window does not reach back to what the connection saw")
 	for _, ev := range evs {
@@ -289,14 +297,14 @@ func TestQA7355TwoBoardsAndAgentScope(t *testing.T) {
 		t.Logf("row %v board_project=%v", m["session_id"], m["board_project"])
 	}
 	nb.first()
-	op.drain(1500 * time.Millisecond)
+	op.drain(ticks(1.5))
 	ag.drain(100 * time.Millisecond)
 	nb.drain(100 * time.Millisecond)
 	_, err = e.srv.boardStore.UpdateGoal(ctx, "team-a", ga.ID, board.GoalUpdate{Title: sp("A2")})
 	require.NoError(t, err)
 	_, err = e.srv.boardStore.UpdateGoal(ctx, "team-b", gb.ID, board.GoalUpdate{Title: sp("B2")})
 	require.NoError(t, err)
-	opEv, opGap, _ := op.drain(3 * time.Second)
+	opEv, opGap, _ := op.drain(ticks(3))
 	t.Logf("operator: %d events, gaps %d: %v", len(opEv), opGap, opEv)
 	boards := map[string]int{}
 	for _, ev := range opEv {
@@ -322,7 +330,7 @@ func TestQA7355NoTextInEvents(t *testing.T) {
 	ctx := context.Background()
 	c := e.operator()
 	c.first()
-	c.drain(1500 * time.Millisecond)
+	c.drain(ticks(1.5))
 	const marker = "QAMARKER-secret-7355"
 	g, err := e.srv.boardStore.CreateGoal(ctx, "team-a", board.GoalInput{Title: marker + "-title", Outcome: marker + "-outcome", DoneWhen: marker + "-done", CreatedBy: "Orchestrator"})
 	require.NoError(t, err)
@@ -330,7 +338,7 @@ func TestQA7355NoTextInEvents(t *testing.T) {
 	require.NoError(t, err)
 	_, _, err = e.srv.boardStore.CloseGoal(ctx, "team-a", g.ID, marker+"-reason", "done")
 	require.NoError(t, err)
-	evs, _, raw := c.drain(3 * time.Second)
+	evs, _, raw := c.drain(ticks(3))
 	require.NotEmpty(t, evs)
 	for _, r := range raw {
 		assert.NotContains(t, r, marker, "no goal text in a frame that carries events")
@@ -363,7 +371,7 @@ func TestQA7355NoOpWriteEmitsNothing(t *testing.T) {
 	require.NoError(t, e.srv.boardStore.SetTaskGoal(ctx, "team-a", tk.ID, &g.ID))
 	c := e.operator()
 	c.first()
-	c.drain(1500 * time.Millisecond)
+	c.drain(ticks(1.5))
 	before := e.count(`SELECT COUNT(*) FROM board_goal_events`)
 	var seq0 int
 	require.NoError(t, e.raw.QueryRow(`SELECT seq FROM board_goal_meta WHERE board_id='team-a'`).Scan(&seq0))
@@ -382,7 +390,7 @@ func TestQA7355NoOpWriteEmitsNothing(t *testing.T) {
 	require.NoError(t, e.raw.QueryRow(`SELECT seq FROM board_goal_meta WHERE board_id='team-a'`).Scan(&seq1))
 	assert.Equal(t, before, after, "no event row")
 	assert.Equal(t, seq0, seq1, "no counter move")
-	evs, gaps, _ := c.drain(3 * time.Second)
+	evs, gaps, _ := c.drain(ticks(3))
 	assert.Empty(t, evs)
 	assert.Zero(t, gaps)
 }
@@ -554,10 +562,10 @@ func TestQA7355RecreatedBoardDoesNotReplayTheOldBoardsEvents(t *testing.T) {
 	t.Logf("rows left for the deleted board: %d", stale)
 	c := e.operator()
 	c.first()
-	c.drain(1500 * time.Millisecond)
+	c.drain(ticks(1.5))
 	g2 := e.goal("team-gone", "new") // the board is made again: counter 1
 	_ = g2
-	evs, gaps, _ := c.drain(3 * time.Second)
+	evs, gaps, _ := c.drain(ticks(3))
 	t.Logf("one new goal on the recreated board: events seen %v, gap frames %d", evs, gaps)
 	assert.Len(t, evs, 1, "one change, one event: stale events of the deleted board must not be replayed")
 }
