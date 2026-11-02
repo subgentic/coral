@@ -554,6 +554,8 @@ values are clamped: times are 5 to 1440 minutes, and nudges are 1 to 5.
 
 The three off-the-books signals use the board's, the hooks' and the upload route's own records, never the screen. Each line names the agent and a fixed phrase (a short SHA or digest, never the agent's words), is said once, and goes out in the orchestrator's next check (five lines at most per check; the rest wait). A switch that is off keeps its signal silent.
 
+A post that waits on the Operator and is not in their Needs you (#12138) is one more line of the check, always on (it has no switch yet), and a nudge to its author. A board post by a member (not Coral's, not the Operator's, not a Coral Hub user's) that @mentions the Operator, or says "operator decides", "needs the operator", "say if you want" or "your call" while naming the Operator, is looked at once it is ten minutes old. It is covered when the author, within those ten minutes, posted an `--ask` to the Operator or a post linking a file of the board tagged "for review"; if not, the check says "posted something that waits on the Operator (message #N, M min ago) with no --ask to them and no "for review" file within 10 minutes: it is not in their Needs you", and the author is told to post the question again with `coral-board post --ask "@Operator ..."`. The line and the nudge carry the message number and its age, never the post's words. It reads board posts only: a chat reply is not read, and a file uploaded "for review" but never linked in a post does not count as covering.
+
 The claim nudge names the agent's highest-priority assigned task. Once that escalates, the
 next one waits until the first is resolved. A snooze already on a task is honored until it ends; there is no longer a way to set one.
 
