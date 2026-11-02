@@ -211,6 +211,8 @@ var (
 	errSendHooksGone   = &errHumanSend{"hooks_unreachable", "Coral can't reach this agent's hooks, so it can't tell whether your message arrived. Check the agent's terminal. To fix this, reopen Coral or restart the agent."}
 	errSendHooksReview = &errHumanSend{"codex_hooks_review_pending", "Answer Codex's question about Coral's hooks above first: your message was not sent. Trust them only if you want them to run outside Codex's sandbox."}
 	errSendBusy        = &errHumanSend{"agent_busy", "Other messages to this agent are still being sent: yours was not sent. Try again in a moment."}
+	// An agent whose CLI has exited and left its pane at a plain shell (Hermes after a first-use setup that failed): the message would be typed into the shell and run as a command (#12425).
+	errSendAgentExited = &errHumanSend{"agent_exited", "The agent has exited and left its terminal at a shell, so your message was not sent. Restart the agent to talk to it."}
 	errSendLeftover    = &errHumanSend{"box_not_empty", "An earlier message is still in the agent's input box, not submitted: yours was not sent. Send that one again, or clear it in its terminal."}
 )
 
@@ -269,6 +271,14 @@ func (h *SessionsHandler) deliverHumanSend(ctx context.Context, name, agentType,
 	}()
 	send := func() error { return h.terminal.SendInput(ctx, terminalinput.Person, name, text, agentType, sessionID) }
 	if !ptymanager.InputBoxKnown(agentType) {
+		// No input box is known for Hermes, so nothing on its screen says the CLI is there: its process does. An agent that exited at a plain shell (Hermes, after a first-use setup that failed) would have the
+		// message typed into the shell as a command ('bash: hello: command not found') and be marked Ended only at the reconciler's next pass (#12425). A shell of unknown contents (one a person started) is not refused.
+		if agentType != at.Hermes { // a custom agent may be a shell on purpose (and OpenCode's chat is not typed): only a CLI that is never a shell is refused at one
+			return send()
+		}
+		if exited, _, _ := ptymanager.AgentExitedForLaunch(ctx, h.terminal, name, agentType, sessionID); exited {
+			return errSendAgentExited
+		}
 		return send()
 	}
 	screen, ok := h.humanScreen(ctx, name, agentType, sessionID)
