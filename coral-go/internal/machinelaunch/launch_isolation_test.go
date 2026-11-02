@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -292,4 +293,88 @@ func TestLaunchTimedOutCreateWithAnUnsureSweepKeepsTheNetwork(t *testing.T) {
 	rec, ok := st.Get("coral-1")
 	require.True(t, ok, "the record stays")
 	assert.True(t, rec.FirewallOpen)
+}
+
+// isoLanded lists the machine the (failed) create made, until it is deleted by id: a provider where the droplet DID land behind a gateway error.
+type isoLanded struct {
+	*isoProvider
+	lists int
+	extra []Instance // more machines carrying the launch's tag
+}
+
+func (l *isoLanded) List(context.Context) ([]Instance, error) {
+	l.lists++
+	s := l.stubProvider.spec
+	all := []Instance{{ID: "d1", Name: s.Name, Region: s.Region, Size: s.Size, Created: time.Now(), Tags: s.Tags}}
+	for _, e := range l.extra {
+		e.Tags = s.Tags // carries this launch's tag too
+		all = append(all, e)
+	}
+	var out []Instance
+	for _, in := range all {
+		if !slices.Contains(l.stubProvider.calls, "delete:"+in.ID) {
+			out = append(out, in)
+		}
+	}
+	return out, nil
+}
+
+// A 502 where the droplet landed: swept by id, and the firewall and VPC come off only after its absence is confirmed. The launch still ends in an error (the create failed).
+func TestLaunchA502ThatLandedIsSweptAndTheNetworkRemovedAfterConfirmation(t *testing.T) {
+	base := newIso()
+	base.stubProvider.createErr = &APIError{Provider: "stubcloud", Op: "create", Status: 502}
+	p := &isoLanded{isoProvider: base}
+	o, d, st, out := isoSetup(t, base, &stubHub{})
+	d.Provider = p
+	o.RetryListAfter = time.Millisecond
+	_, err := Launch(t.Context(), o, d)
+	require.Error(t, err)
+	order := strings.Join(base.order, ",")
+	assert.Contains(t, order, "delete:d1")
+	assert.Less(t, strings.Index(order, "delete:d1"), strings.Index(order, "DeleteFirewall"), "the machine first, then the firewall")
+	assert.Less(t, strings.Index(order, "DeleteFirewall"), strings.Index(order, "DeleteVPC"), "then the VPC")
+	assert.Empty(t, p.cloud.fws)
+	assert.Empty(t, p.cloud.vpcs)
+	assert.Contains(t, out.String(), "Deleted machine d1")
+	_, ok := st.Get("coral-1")
+	assert.False(t, ok, "everything is gone, so is the record")
+}
+
+// A 502 where the list shows two machines with the launch's tag: nothing is deleted, the network stays, the record is open, the launch errors.
+func TestLaunchA502WithTwoMachinesDeletesNothingAndKeepsTheNetwork(t *testing.T) {
+	base := newIso()
+	base.stubProvider.createErr = &APIError{Provider: "stubcloud", Op: "create", Status: 502}
+	p := &isoLanded{isoProvider: base, extra: []Instance{{ID: "d2", Name: "coral-1", Region: "nyc3", Size: "s-1vcpu-1gb", Created: time.Now()}}}
+	o, d, st, out := isoSetup(t, base, &stubHub{})
+	d.Provider = p
+	o.RetryListAfter = time.Millisecond
+	_, err := Launch(t.Context(), o, d)
+	require.Error(t, err)
+	assert.NotContains(t, strings.Join(base.stubProvider.calls, ","), "delete:", "nothing is deleted when two carry the tag")
+	assert.Len(t, p.cloud.fws, 1)
+	assert.Len(t, p.cloud.vpcs, 1)
+	assert.Contains(t, out.String(), "d1")
+	assert.Contains(t, out.String(), "d2")
+	assert.Contains(t, err.Error(), "left in place")
+	rec, ok := st.Get("coral-1")
+	require.True(t, ok)
+	assert.True(t, rec.FirewallOpen)
+}
+
+// A 422 and a 429 prove nothing was created: no list, no sweep, and the firewall and VPC come off cleanly.
+func TestLaunchA4xxNeverSweepsAndRemovesTheNetwork(t *testing.T) {
+	for _, status := range []int{422, 429} {
+		base := newIso()
+		base.stubProvider.createErr = &APIError{Provider: "stubcloud", Op: "create", Status: status}
+		p := &isoLanded{isoProvider: base}
+		o, d, st, _ := isoSetup(t, base, &stubHub{})
+		d.Provider = p
+		_, err := Launch(t.Context(), o, d)
+		require.Error(t, err)
+		assert.Equal(t, 0, p.lists, "HTTP %d never lists", status)
+		assert.Empty(t, p.cloud.fws, "HTTP %d: the firewall comes off", status)
+		assert.Empty(t, p.cloud.vpcs)
+		_, ok := st.Get("coral-1")
+		assert.False(t, ok)
+	}
 }

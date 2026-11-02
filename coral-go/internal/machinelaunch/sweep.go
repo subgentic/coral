@@ -35,10 +35,14 @@ type sweepWant struct {
 	Since              time.Time // when the launch began (just before the create request)
 }
 
-// createMayHaveLanded is whether a failed create is one that may have made the machine anyway: a timeout, a cut-off connection or an interruption, with NO answer from the provider. An answer (any HTTP error) never is.
+// createMayHaveLanded is whether a failed create is one that may have made the machine anyway: a timeout, a cut-off connection or an interruption with NO answer, or a 5xx answer with no droplet id (a gateway can answer
+// after the provider made the machine: Security's correction, #9934). A 4xx proves nothing was created and never sweeps; neither does an auth error.
 func createMayHaveLanded(err error) bool {
 	var api *APIError
-	if err == nil || errors.As(err, &api) || errors.Is(err, ErrUnauthorized) || errors.Is(err, ErrNotFound) {
+	if errors.As(err, &api) {
+		return api.Status >= 500
+	}
+	if err == nil || errors.Is(err, ErrUnauthorized) || errors.Is(err, ErrNotFound) {
 		return false
 	}
 	var ne net.Error
@@ -61,14 +65,14 @@ func sweepAfterFailedCreate(p Provider, tag string, want sweepWant, createErr er
 	}
 	l, ok := p.(Lister)
 	if !ok {
-		return sweepByHand(out, p, tag, "this provider cannot list what the launch may have made"), false
+		return sweepByHand(out, p, tag, want.Name, "this provider cannot list what the launch may have made"), false
 	}
 	kind, note := sweepOnce(l, p, tag, want, out)
 	if kind == sweepNone { // the list can lag the create: once more, after a bounded wait that a second Ctrl-C cuts short
 		select {
 		case <-time.After(wait):
 		case <-interrupt:
-			return sweepByHand(out, p, tag, "interrupted a second time"), false
+			return sweepByHand(out, p, tag, want.Name, "interrupted a second time"), false
 		}
 		kind, note = sweepOnce(l, p, tag, want, out)
 	}
@@ -76,22 +80,28 @@ func sweepAfterFailedCreate(p Provider, tag string, want sweepWant, createErr er
 	case sweepDeleted:
 		return note, true
 	case sweepNone:
-		return sweepByHand(out, p, tag, "no machine for this launch has shown up yet"), false
+		var api *APIError
+		if errors.As(createErr, &api) { // an ANSWER (a 5xx) came and two looks, a wait apart, found no machine: nothing was made, and the launch's network can come off. A create with no answer at all stays unsure (below).
+			fmt.Fprintf(out, "No machine tagged %s showed up at %s in two looks after the %d answer: nothing was made.\n", tag, p.Name(), api.Status)
+			return fmt.Sprintf("; no machine tagged %s showed up at %s after the %d answer: nothing was made", tag, p.Name(), api.Status), true
+		}
+		return sweepByHand(out, p, tag, want.Name, "no machine for this launch has shown up yet"), false
 	}
 	return note, false
 }
 
 // sweepByHand tells the person where to look: the tag value is the line to search for in the provider's console.
-func sweepByHand(out io.Writer, p Provider, tag, why string) string {
-	fmt.Fprintf(out, "%s. Check by hand at %s for a machine tagged %s: it costs money while it exists. The launch's network was left in place.\n", capitalise(why), p.Name(), tag)
-	return fmt.Sprintf("; %s: check by hand at %s for a machine tagged %s (it costs money while it exists; the launch's network was left in place)", why, p.Name(), tag)
+func sweepByHand(out io.Writer, p Provider, tag, name, why string) string {
+	fmt.Fprintf(out, "%s. Check by hand at %s for a machine tagged %s, or run: coral machine delete %s --provider %s --token-file <the token file>. It costs money while it exists. The launch's network was left in place.\n", capitalise(why), p.Name(), tag, name, p.Name())
+	return fmt.Sprintf("; %s: check by hand at %s for a machine tagged %s, or run `coral machine delete %s` (it costs money while it exists; the launch's network was left in place)", why, p.Name(), tag, name)
 }
 
+// capitalise turns a leading a-z into its capital and leaves anything else alone (a digit must not become a control character).
 func capitalise(s string) string {
-	if s == "" {
+	if s == "" || s[0] < 'a' || s[0] > 'z' {
 		return s
 	}
-	return string(s[0]&^0x20) + s[1:]
+	return string(s[0]-'a'+'A') + s[1:]
 }
 
 // sweepOnce lists once, and deletes the one machine by its id only if everything matches.
@@ -100,7 +110,7 @@ func sweepOnce(l Lister, p Provider, tag string, want sweepWant, out io.Writer) 
 	all, err := l.List(ctx)
 	cancel()
 	if err != nil {
-		return sweepRefused, sweepByHand(out, p, tag, "could not list the machines at "+p.Name())
+		return sweepRefused, sweepByHand(out, p, tag, want.Name, "could not list the machines at "+p.Name())
 	}
 	var mine []Instance
 	for _, in := range all {
@@ -115,11 +125,11 @@ func sweepOnce(l Lister, p Provider, tag string, want sweepWant, out io.Writer) 
 		fmt.Fprintf(out, "Found a machine with this launch's tag %s: id %s, name %s, region %s, size %s, made %s.\n", tag, in.ID, in.Name, in.Region, in.Size, in.Created.UTC().Format(time.RFC3339))
 	}
 	if len(mine) != 1 {
-		return sweepRefused, sweepByHand(out, p, tag, fmt.Sprintf("%d machines carry this launch's tag where one was asked for, so none was deleted", len(mine)))
+		return sweepRefused, sweepByHand(out, p, tag, want.Name, fmt.Sprintf("%d machines carry this launch's tag where one was asked for, so none was deleted", len(mine)))
 	}
 	in := mine[0]
 	if in.Name != want.Name || in.Region != want.Region || in.Size != want.Size || in.Created.IsZero() || in.Created.Before(want.Since.Add(-sweepClockSkew)) || in.Created.After(sweepNow().Add(sweepClockSkew)) {
-		return sweepRefused, sweepByHand(out, p, tag, "the machine with this launch's tag is not what the launch asked for, so it was not deleted")
+		return sweepRefused, sweepByHand(out, p, tag, want.Name, "the machine with this launch's tag is not what the launch asked for, so it was not deleted")
 	}
 	dctx, dcancel := context.WithTimeout(context.Background(), sweepCallTimeout)
 	defer dcancel()
@@ -131,7 +141,7 @@ func sweepOnce(l Lister, p Provider, tag string, want sweepWant, out io.Writer) 
 		after, lerr := l.List(rctx)
 		rcancel()
 		if lerr != nil || slices.ContainsFunc(after, func(x Instance) bool { return x.ID == in.ID }) {
-			return sweepRefused, sweepByHand(out, p, tag, fmt.Sprintf("machine %s was deleted but is not confirmed gone", in.ID))
+			return sweepRefused, sweepByHand(out, p, tag, want.Name, fmt.Sprintf("machine %s was deleted but is not confirmed gone", in.ID))
 		}
 		return sweepDeleted, fmt.Sprintf("; deleted machine %s (tag %s) and confirmed it gone", in.ID, tag)
 	default:

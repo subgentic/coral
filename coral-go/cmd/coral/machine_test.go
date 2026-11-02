@@ -435,3 +435,22 @@ func TestMachineLaunchOtherHubNeedsAYesAtATerminal(t *testing.T) {
 		t.Fatal("a non-terminal input, or a secret read from it, answered the question")
 	}
 }
+
+// --allow-ssh-from present but empty is refused (exit 2) before any call, never "look it up": the flag is detected as SET.
+func TestMachineLaunchRefusesAnEmptyAllowSSHFrom(t *testing.T) {
+	tf, kf, p, h := machineFixture(t)
+	for _, form := range [][]string{{"--allow-ssh-from", ""}, {"--allow-ssh-from="}, {"--allow-ssh-from", " "}} {
+		var out, errb bytes.Buffer
+		args := append([]string{"launch", "--provider", "digitalocean", "--token-file", tf, "--hub-key-file", kf, "--hub-url", "https://hub.example", "--coral-version", "2.0.3", "--yes"}, form...)
+		detectSSHSource = func(context.Context) (string, error) {
+			t.Fatal("an empty --allow-ssh-from fell through to the lookup")
+			return "", nil
+		}
+		if code := runMachine(args, strings.NewReader(""), &out, &errb); code != 2 || !strings.Contains(errb.String(), "--allow-ssh-from") {
+			t.Errorf("%q: exit %d: %s", form, code, errb.String())
+		}
+	}
+	if len(p.calls) != 0 || len(h.labels) != 0 {
+		t.Fatalf("a refused flag made calls: %v %v", p.calls, h.labels)
+	}
+}

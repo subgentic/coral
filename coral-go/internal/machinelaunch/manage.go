@@ -42,7 +42,11 @@ func CreateNetwork(ctx context.Context, p Provider, machine, region, launchTag s
 		note := removeVPC(p, vpc.ID, 30*time.Second, 2*time.Second, out)
 		return nil, fmt.Errorf("could not make the machine's firewall: %w%s", err, note)
 	}
-	fmt.Fprintf(out, "Made the machine's private network and firewall (SSH is open to %s only, until the credential is delivered).\n", strings.Join(sshFrom, ", "))
+	rules := make([]string, len(sshFrom))
+	for i, s := range sshFrom {
+		rules[i] = SSHRule(s)
+	}
+	fmt.Fprintf(out, "Made the machine's private network and firewall (SSH is open to %s only, until the credential is delivered).\n", strings.Join(rules, ", "))
 	return &Net{VPC: vpc, Firewall: fw}, nil
 }
 

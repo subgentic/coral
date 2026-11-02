@@ -198,8 +198,10 @@ func runMachine(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if err != nil {
 		return fail("%v", err)
 	}
-	checkSource := "203.0.113.1" // documentation address: only the other flags are being checked
-	if *sshFrom != "" {
+	sshFromSet := false
+	fs.Visit(func(f *flag.Flag) { sshFromSet = sshFromSet || f.Name == "allow-ssh-from" }) // present but empty is a refusal, not "look it up" (coral-go's QA and Security)
+	checkSource := "203.0.113.1"                                                           // documentation address: only the other flags are being checked
+	if sshFromSet {
 		v, verr := machinelaunch.ValidSSHSource(*sshFrom) // refused before any secret is read or any call is made
 		if verr != nil {
 			return fail("--allow-ssh-from: %v", verr)
