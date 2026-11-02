@@ -134,7 +134,7 @@ const B = 'goal-done-' + Date.now().toString(36);
             assert.ok(bar && /1 selected/.test(bar.count), 'a long press selects the goal row: ' + JSON.stringify(bar));
             const act = label => (bar.actions || []).find(a => a.label === label);
             assert.ok(act('Ignore') && !act('Ignore').off, 'Ignore is on the bar: ' + JSON.stringify(bar.actions));
-            assert.ok(act('Close goal') && !act('Close goal').off, 'Close goal is on the bar of a selected goal that looks done, reachable on a phone (#12328): ' + JSON.stringify(bar.actions));
+            assert.ok(act('Close goal') && !act('Close goal').off, 'Close goal is in the bar menu of a selected goal that looks done, reachable on a phone (#12328): ' + JSON.stringify(bar.actions));
             await ev(`document.querySelector('.dt-bar [aria-label="More actions"]')?.click(); true`);
             await waitFor(`!![...document.querySelectorAll('.menu-item, [role=menuitem]')].find(b => /^Not yet$/.test(b.textContent.trim()))`, 'Not yet in the bar menu (#12328)', 5000);
             await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); true`);
@@ -146,6 +146,29 @@ const B = 'goal-done-' + Date.now().toString(36);
             const savedRead = JSON.parse((await root('GET', '/api/settings')).json.settings.goal_done_read);
             assert.equal(savedRead.length, 1, 'Mark read from the bar kept the goal as read: ' + JSON.stringify(savedRead));
             assert.ok(!(await root('GET', '/api/needs-you?limit=50')).json.items.some(i => i.id === `goal_done:${B}:${gid2}`), 'and /api/needs-you no longer counts it');
+            // #12328, pressed and not only listed: Close goal opens the Close dialog set to Done; Not yet hides several goals at once, with Undo in the notice
+            const menuItem = async label => { await ev(`document.querySelector('.dt-bar [aria-label="More actions"]')?.click(); true`); await waitFor(`!![...document.querySelectorAll('.menu-item, [role=menuitem]')].find(b => /^${label}$/.test(b.textContent.trim()))`, label + ' in the bar menu', 5000); await ev(`[...document.querySelectorAll('.menu-item, [role=menuitem]')].find(b => /^${label}$/.test(b.textContent.trim())).click(); true`); await require('./helpers/wait').settle(ev, 600, 300); };
+            const gid3 = await mk('Billing page loads fast', 'The billing page loads in under a second'); await task(gid3, true);
+            await openNeeds();
+            await waitFor(`[...document.querySelectorAll('${T} tbody tr')].filter(r => /looks done/.test(r.textContent)).length >= 2`, 'two goals that look done on a phone', 20000);
+            const rowAt = i => ev(`(() => { const r = [...document.querySelectorAll('${T} tbody tr')].filter(r => /looks done/.test(r.textContent))[${i}]; r.scrollIntoView({ block: 'center' }); const b = r.getBoundingClientRect(); return { x: b.left + b.width * 0.35, y: b.top + b.height * 0.5 }; })()`);
+            const holdRow = async i => { const p = await rowAt(i); await touch('touchStart', p); await new Promise(r => setTimeout(r, 700)); await touch('touchEnd', p); await new Promise(r => setTimeout(r, 300)); }; // sleep-ok: a long press is a held finger
+            await holdRow(0);
+            await menuItem('Close goal');
+            assert.ok(await ev(`!![...document.querySelectorAll('dialog[open], .modal')].find(d => d.getClientRects().length && /Close goal/i.test(d.textContent) && /Done/.test(d.textContent))`), 'Close goal from the bar opens the Close dialog, set to Done');
+            await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); true`); await require('./helpers/wait').settle(ev, 400, 200);
+            await openNeeds();
+            await waitFor(`[...document.querySelectorAll('${T} tbody tr')].filter(r => /looks done/.test(r.textContent)).length >= 2`, 'the two goals again', 20000);
+            await holdRow(0);
+            { const p = await rowAt(1); await touch('touchStart', p); await touch('touchEnd', p); await new Promise(r => setTimeout(r, 300)); } // sleep-ok: a tap adds a row to the selection
+            assert.equal(await ev(`(document.querySelector('.dt-bar .dt-bar-count, .dt-bar') || {}).textContent.replace(/\\s+/g, ' ').match(/2 selected/) ? 2 : 0`), 2, 'two goals selected');
+            assert.equal(await ev(`[...document.querySelectorAll('.dt-bar button')].some(b => (b.getAttribute('aria-label') || b.textContent).trim() === 'Close goal')`), true, 'Close goal is in the bar');
+            await menuItem('Not yet');
+            await waitFor(`[...document.querySelectorAll('${T} tbody tr')].filter(r => /looks done/.test(r.textContent)).length === 0`, 'both goals hidden until a task is added', 10000);
+            assert.equal(JSON.parse((await root('GET', '/api/settings')).json.settings.goal_done_hidden || '[]').length >= 2, true, 'both are hidden on the machine');
+            await waitFor(`!![...document.querySelectorAll('.toast button, [role=status] button, #toast-container button')].find(b => /^Undo$/.test(b.textContent.trim()))`, 'the Undo in the notice', 5000);
+            await ev(`[...document.querySelectorAll('.toast button, [role=status] button, #toast-container button')].find(b => /^Undo$/.test(b.textContent.trim())).click(); true`); await require('./helpers/wait').settle(ev, 800, 300);
+            await waitFor(`[...document.querySelectorAll('${T} tbody tr')].filter(r => /looks done/.test(r.textContent)).length >= 2`, 'Undo brings both back', 10000);
             await Emulation.setTouchEmulationEnabled({ enabled: false });
             await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         }

@@ -131,7 +131,8 @@ async function idleMinutesOk() {
     idle.setAttribute('aria-invalid', 'true');
     const group = idle.closest('[data-group]')?.dataset.group; if (group) { try { (await importOnce('./settings_nav.js')).openSettingsGroup(group); } catch { /* the toast says it */ } } // the section it sits in, so the field is there to fix
     idle.focus();
-    showToast(`Idle time is 15 to 1440 minutes, so ${text} was not saved. Enter a whole number in that range.`, true);
+    const notNumber = !/[0-9]/.test(text); // letters typed in a number box read as '' (badInput): say it was not a number, not nothing
+    showToast(notNumber ? 'That was not a number. Idle time is 15 to 1440 minutes: enter a whole number in that range.' : `Idle time is 15 to 1440 minutes, so ${text} was not saved. Enter a whole number in that range.`, true);
     return false;
 }
 
