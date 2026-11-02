@@ -498,6 +498,7 @@ async function setGitDiffMode(mode) {
 
 // The diffs under the rows (#11350). A row's chevron opens or closes its own; Expand all stacks every file's in the list's order and Collapse all closes them. Done in place: the list is not drawn again.
 const fileOf = path => _currentFiles.find(f => f.filepath === path);
+const scrollerOf = el => { for (let e = el; e; e = e.parentElement) if (/(auto|scroll)/.test(getComputedStyle(e).overflowY) && e.scrollHeight > e.clientHeight + 1) return e; return null; }; // the nearest ancestor that scrolls
 const slotOf = (list, path) => [...list.querySelectorAll('.file-diff')].find(e => e.dataset.filepath === path);
 function showExpanded(list, files) {
     importOnce('./inline_diff.js').then(m => { for (const f of files) if (_expandedFiles.has(f.filepath)) { const slot = slotOf(list, f.filepath); if (slot) m.showFileDiff(slot, f); } }).catch(() => {});
@@ -677,6 +678,12 @@ export async function refreshChangedFiles(quiet = false) { // quiet: the panel's
     const starred = new Set(_getStarredFiles());
     const heldMore = list.contains(document.activeElement) && document.activeElement.classList.contains('file-more-btn') ? document.activeElement.dataset.path : ''; // the list is drawn again on every poll: the row's More button that had the keyboard gets it back (#7652)
     // What the colours mean, said once as the list's own first line, so the header keeps its height when the first file arrives (#10386, Beta; #10054)
+    // The list is drawn again on every poll that moved it, and the reader is in the middle of it (#12520): the open diffs' slots (each holds its editor, with the unchanged-line blocks the person opened) are set aside and put back
+    // into the new rows, and the scroll position is put back, so a refresh does not send them to the top or draw every open diff again from "Loading the changes…".
+    const kept = new Map(); for (const slot of list.querySelectorAll('.file-diff')) if (!slot.hidden && slot.firstChild && _expandedFiles.has(slot.dataset.filepath)) kept.set(slot.dataset.filepath, slot);
+    const scroller = scrollerOf(list), scrolled = scroller ? scroller.scrollTop : 0;
+    let anchor = null; // the file under the top of the view and how far its row is from that top: a file that arrives above it moves the list, not the reader's place
+    if (scroller) { const top = scroller.getBoundingClientRect().top; for (const row of list.querySelectorAll('.file-item')) { const slot = row.nextElementSibling, end = (slot && slot.classList.contains('file-diff') && !slot.hidden ? slot : row).getBoundingClientRect().bottom; if (end > top) { anchor = { path: row.dataset.filepath, at: row.getBoundingClientRect().top - top }; break; } } }
     list.innerHTML = files.map((f, i) => {
         const { dir, name } = splitPath(f.filepath);
         const statusCls = getStatusClass(f.status);
@@ -720,6 +727,12 @@ export async function refreshChangedFiles(quiet = false) { // quiet: the panel's
             <div class="file-action-btns">${copyBtn}${previewBtn}${editBtn}${shareBtn}</div>
         </div>${diffSlot}`;
     }).join('');
+    for (const fresh of list.querySelectorAll('.file-diff')) { const old = kept.get(fresh.dataset.filepath); if (old && !fresh.hidden) { old.id = fresh.id; fresh.replaceWith(old); } }
+    if (scroller && scrolled) {
+        scroller.scrollTop = scrolled;
+        const row = anchor && [...list.querySelectorAll('.file-item')].find(r => r.dataset.filepath === anchor.path);
+        if (row) scroller.scrollTop += (row.getBoundingClientRect().top - scroller.getBoundingClientRect().top) - anchor.at;
+    }
     const allOpen = !plain && files.every(f => _expandedFiles.has(f.filepath)), expandAllText = allOpen ? 'Collapse all' : 'Expand all', expandAllLabel = `${expandAllText} the changes`;
     // Expand all (#11350) is on the list's first line, not in the header: the header keeps its size when the first list arrives (#7671).
     const expandAll = plain ? '' : `<button type="button" class="btn btn-quiet btn-xs files-expand-all" data-on-click="files-expand-all" aria-label="${escapeAttr(expandAllLabel)}">${escapeHtml(expandAllText)}</button>`;
