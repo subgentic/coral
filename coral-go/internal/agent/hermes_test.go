@@ -16,10 +16,19 @@ import (
 // hermesRig points the launch at scratch folders: Coral's data folder, the person's own Hermes home (read only) and a hook tools folder holding a stand-in for the hook tool.
 type hermesRigT struct{ data, person, tools string }
 
+// hookToolFile is where the test's stand-in for Coral's hook tool lives: hookToolPath looks for "<name>.exe" on Windows (#12266).
+func hookToolFile(dir string) string {
+	name := "coral-hook-agentic-state"
+	if runtime.GOOS == "windows" {
+		name += ".exe"
+	}
+	return filepath.Join(dir, name)
+}
+
 func hermesRig(t *testing.T) hermesRigT {
 	t.Helper()
 	r := hermesRigT{data: t.TempDir(), person: t.TempDir(), tools: t.TempDir()}
-	require.NoError(t, os.WriteFile(filepath.Join(r.tools, "coral-hook-agentic-state"), []byte("#!/bin/sh\n"), 0o755))
+	require.NoError(t, os.WriteFile(hookToolFile(r.tools), []byte("#!/bin/sh\n"), 0o755))
 	t.Setenv("CORAL_DATA_DIR", r.data)
 	t.Setenv("HERMES_HOME", r.person)
 	t.Setenv("CORAL_HOOK_DIR", r.tools)
