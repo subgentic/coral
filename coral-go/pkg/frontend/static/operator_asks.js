@@ -199,13 +199,14 @@ export function openAskDialog(a, onDone, runners = {}) {
         }
         offered.append(head, list);
     }
-    dlg.append(title, sub, ...(whole.hidden ? [] : [whole]), ...(offered ? [offered] : []), label, pics, err, row);
+    const foot = document.createElement('div'); foot.className = 'inbox-ask-foot'; const addSlot = document.createElement('span'); foot.append(addSlot, row); // Add image on the left, Close and Send reply on the right: one row of buttons
+    dlg.append(title, sub, ...(whole.hidden ? [] : [whole]), ...(offered ? [offered] : []), label, pics, err, foot);
     if (!fromAnotherComputer(a)) { // the picture is stored on the question's own team, as a goal's pictures are
         Promise.all([importOnce('./artifact_comment_images.js'), importOnce('./artifact_comments_api.js')]).then(([m, api]) => {
             if (!dlg.isConnected) return;
             tray = m.createImageTray({ upload: (blob, versionOf) => api.uploadCommentImage(null, undefined, blob, versionOf, a.board) });
             tray.attach(dlg, box); tray.listen(sync);
-            pics.append(tray.picker(), tray.hint(), tray.node);
+            addSlot.append(tray.picker()); pics.append(tray.hint(), tray.node);
         }).catch(() => { /* a reply needs no picture: the dialog works without the button */ });
     }
     close.addEventListener('click', finish);
