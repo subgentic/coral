@@ -36,36 +36,33 @@
     {
       "file": "team_tasks_page.js",
       "what": "'Waiting for <assignee> to pick it up' on a team's task page"
-    }
-  ],
-  "pending": [
-    {
-      "file": "inbox_reviews.js",
-      "what": "a file's uploader on a review row and in the viewer title line"
     },
     {
-      "file": "task_list.js",
-      "what": "task tables: owner and reviewers are circles drawn by data_table.js (avatars/personButton), at start: they need the helper in the table, not here"
-    },
-    {
-      "file": "task_detail.js",
-      "what": "a task's page: assigned to, created by, reviewers"
-    },
-    {
-      "file": "team_agents_page.js",
-      "what": "the Agents tab's rows: the name is the row's own button (DT.avatar + primaryButton)"
+      "file": "data_table.js",
+      "what": "the people circles and names in every table (task tables' Assigned to and reviewers, the Agents tab): a running agent's circle and name open its chat, through the start-safe agent_live.js"
     },
     {
       "file": "cost_dashboard.js",
-      "what": "Analytics tables: By agent, tool and API calls"
-    },
-    {
-      "file": "notifications.js",
-      "what": "toasts and notices that name an agent"
+      "what": "Analytics' Tool and API calls: the Agent column"
     },
     {
       "file": "team_artifacts_page.js",
-      "what": "a file's 'produced by' in Artifacts"
+      "what": "an artifact's Producer and Sent by"
+    },
+    {
+      "file": "task_detail_html.js",
+      "what": "a task's page: Assigned To, Created By, Completed by"
+    }
+  ],
+  "pending": [],
+  "plain_by_design": [
+    {
+      "file": "notifications.js",
+      "what": "toasts and notices that name an agent ('Approved. Lead was told.', 'Woke X'): a toast is a few seconds of text announced to a screen reader, not a place to navigate from; the name stays plain text and the person's own list of agents is one click away"
+    },
+    {
+      "file": "inbox_reviews.js",
+      "what": "review uploaders: a data module, it draws nothing; the uploader's name is drawn on the Needs you row (inbox_sidebar.js, converted)"
     }
   ]
 }

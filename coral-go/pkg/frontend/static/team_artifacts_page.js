@@ -8,6 +8,7 @@ import { boardFetch, serverUrl, isCloud, splitKey, keyLabel, isBoardAnswer, isBo
 import { whenText } from './when_text.js';
 import { pollEvery } from './overload.js';
 import { importOnce } from './import_once.js';
+import { nameSpan } from './agent_live.js';
 import { browserLocal } from './safe_storage.js';
 import { renderArtifact } from './artifact_preview.js';
 import { showToast } from './utils.js';
@@ -446,9 +447,9 @@ export function createArtifactsList({ inbox = false } = {}) {
         const received = item.source === 'received';
         const facts = [
             ['MIME', un ? '' : item.media_type || 'Unknown'], // the header says the type, the size and when (#7775): nothing here repeats it
-            ...(inbox ? (multipleServers() ? [['Team', item.team || keyLabel(item.board_id)], ['Computer', serverLabel(serverOf(item))]] : [['Team', placeOf(item)]]) : []), ['Task', taskCell(item)], ...(item.goal_id && item.goal_title ? [['Goal', goalCell(item)]] : []), ['Producer', item.produced_by], // the Task fact is the same link as the column: a phone drops the column
+            ...(inbox ? (multipleServers() ? [['Team', item.team || keyLabel(item.board_id)], ['Computer', serverLabel(serverOf(item))]] : [['Team', placeOf(item)]]) : []), ['Task', taskCell(item)], ...(item.goal_id && item.goal_title ? [['Goal', goalCell(item)]] : []), ['Producer', item.produced_by ? nameSpan(item.produced_by, { board: inbox ? item.board_id : model.project }) : item.produced_by], // the Task fact is the same link as the column: a phone drops the column
             ['Status', un ? 'Link not verified: this team has not uploaded this file, so Coral shows no size, type or preview' : ''],
-            ['Sent to', item.source === 'shared' ? item.shared_to : ''], ['Sent by', item.source === 'shared' || received ? item.sent_by : ''],
+            ['Sent to', item.source === 'shared' ? item.shared_to : ''], ['Sent by', (item.source === 'shared' || received) && item.sent_by ? nameSpan(item.sent_by) : ''],
             ['Received from', received ? item.received_from : ''], ['Board (claimed by the sender)', received ? item.from_board : ''],
             ['Also received from', received ? sources(item.also_received_from) : ''], ['Checked', received ? 'Not scanned: this file came from another computer' : ''],
             ['Source', item.source], ['References', item.reference_count],

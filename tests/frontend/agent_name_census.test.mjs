@@ -8,11 +8,12 @@ import { fileURLToPath } from 'node:url';
 const here = dirname(fileURLToPath(import.meta.url)), statics = join(here, '..', '..', 'coral-go', 'pkg', 'frontend', 'static');
 const sites = JSON.parse(readFileSync(join(here, 'agent_name_sites.json'), 'utf8'));
 const problems = [];
-const uses = f => { const src = readFileSync(join(statics, f), 'utf8'); return /(from|importOnce\() ?'\.\/agent_link\.js'/.test(src) && /\b(agentLink|agentLinkHtml|linkAvatar)\(/.test(src); };
+const uses = f => { const src = readFileSync(join(statics, f), 'utf8'); return /(from|importOnce\() ?'\.\/agent_(link|live)\.js'/.test(src) && /\b(agentLink|agentLinkHtml|linkAvatar|markAgent|nameSpan|agentNameHtml)\(/.test(src); };
 for (const { file, what } of sites.converted) {
     if (!existsSync(join(statics, file))) { problems.push(`${file} is listed as converted and does not exist`); continue; }
     if (!uses(file)) problems.push(`${file}: ${what} must draw an agent's name through agent_link.js (agentLink / linkAvatar), and no longer does`);
 }
+for (const { file, reason } of (sites.plain_by_design || [])) { if (!existsSync(join(statics, file))) problems.push(`${file} is listed as plain by design and does not exist`); if (!reason && !sites.plain_by_design.find(x => x.file === file).what) problems.push(`${file}: plain by design needs a reason`); }
 for (const { file } of sites.pending) {
     if (!existsSync(join(statics, file))) { problems.push(`${file} is listed as pending and does not exist: remove it`); continue; }
     if (uses(file)) problems.push(`${file} uses agent_link.js now: move it from "pending" to "converted" in agent_name_sites.json`);

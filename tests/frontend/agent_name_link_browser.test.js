@@ -34,6 +34,16 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await ev(`document.querySelector('${T} .inbox-review-from.agent-link').click(); true`); await ev(framesJs(3));
             check(JSON.stringify(await ev('window.__opened && window.__opened.slice(0, 3)')) === JSON.stringify(['pw-agent', 'claude', 'sess-pw']), at + 'the name opens that agent\'s chat');
             check(!(await ev(`!!document.querySelector('#artifact-viewer[open], #artifact-viewer:not([hidden])') && !!document.querySelector('.artifact-viewer-title')?.textContent`)), at + 'and does not also open the file');
+            // the people circles and names of every table (#12197): a running agent's circle and name open its chat, a gone one is left alone; a name built as markup is escaped
+            const tb = await ev(`(async () => { const DT = await import(${S} + 'data_table.js'), L = await import(${S} + 'agent_live.js'); window.__opened = null;
+                const host = document.createElement('div'); host.id = 'zz-people'; host.append(DT.avatar('Plan Writer'), DT.avatars([{ name: 'Plan Writer' }, { name: 'Gone Agent', review: true }], 'Done by Plan Writer, reviewed by Gone Agent'), DT.avatar('Gone Agent')); document.body.append(host);
+                const circles = [...host.querySelectorAll('.dt-avatar')].map(c => c.dataset.agentLink || ''), nm = host.querySelector('.dt-person-name');
+                const html = L.agentNameHtml('Plan <b>Writer</b>', { board: '${team}' }), gone = L.agentNameHtml('Gone <i>Agent</i>');
+                nm.click(); const first = window.__opened && window.__opened[2]; window.__opened = null; host.querySelector('.dt-avatar').click(); const second = window.__opened && window.__opened[2];
+                return { circles, first, second, goneHtml: gone, html }; })()`);
+            check(JSON.stringify(tb.circles) === JSON.stringify(['sess-pw', 'sess-pw', '', '']), at + 'a running agent\'s circles carry the link, a gone one\'s do not: ' + JSON.stringify(tb.circles));
+            check(tb.first === 'sess-pw' && tb.second === 'sess-pw', at + 'the name and the circle in a table open its chat: ' + JSON.stringify([tb.first, tb.second]));
+            check(/&lt;i&gt;Agent&lt;\/i&gt;/.test(tb.goneHtml) && !/<i>/.test(tb.goneHtml) && !/data-agent-link/.test(tb.goneHtml), at + 'a name built as markup is escaped, and a gone one is not a link: ' + tb.goneHtml);
             await removeBoards(ev, [team]).catch(() => {});
         }
     } finally { await client.close(); }
