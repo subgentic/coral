@@ -288,12 +288,14 @@ func TestSweepAfterA5xxThatLanded(t *testing.T) {
 	}
 }
 
-// A 500 where nothing landed: two empty looks, then the launch's network may come off (an answer came and proved no machine appeared).
-func TestSweepAfter500ThatDidNotLand(t *testing.T) {
-	p, want, out := sweepFixture(nil)
-	note, clean := sweepAfterFailedCreate(p, sweepTag, want, &APIError{Status: 500}, time.Millisecond, nil, out)
-	if !clean || p.lists != 2 || strings.Contains(strings.Join(p.calls, ","), "delete") || !strings.Contains(note, "nothing was made") || !strings.Contains(note, sweepTag) {
-		t.Fatalf("clean %v, lists %d, calls %v, note %q", clean, p.lists, p.calls, note)
+// A 500 where two looks find nothing is UNSURE, like a timeout (Security's amendment, #9934): a gateway can answer before the provider finishes the create, so two empty looks do not prove it never will. The network stays.
+func TestSweepAfter500WithTwoEmptyLooksIsUnsureAndKeepsTheNetwork(t *testing.T) {
+	for _, err := range []error{&APIError{Status: 500}, &APIError{Status: 502}, &APIError{Status: 504}, context.DeadlineExceeded, io.ErrUnexpectedEOF} {
+		p, want, out := sweepFixture(nil)
+		note, clean := sweepAfterFailedCreate(p, sweepTag, want, err, time.Millisecond, nil, out)
+		if clean || p.lists != 2 || strings.Contains(strings.Join(p.calls, ","), "delete") || !strings.Contains(note, "check by hand") || !strings.Contains(note, sweepTag) || !strings.Contains(note, "coral machine delete coral-1") {
+			t.Errorf("%v: clean %v, lists %d, calls %v, note %q", err, clean, p.lists, p.calls, note)
+		}
 	}
 }
 

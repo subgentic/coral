@@ -80,11 +80,6 @@ func sweepAfterFailedCreate(p Provider, tag string, want sweepWant, createErr er
 	case sweepDeleted:
 		return note, true
 	case sweepNone:
-		var api *APIError
-		if errors.As(createErr, &api) { // an ANSWER (a 5xx) came and two looks, a wait apart, found no machine: nothing was made, and the launch's network can come off. A create with no answer at all stays unsure (below).
-			fmt.Fprintf(out, "No machine tagged %s showed up at %s in two looks after the %d answer: nothing was made.\n", tag, p.Name(), api.Status)
-			return fmt.Sprintf("; no machine tagged %s showed up at %s after the %d answer: nothing was made", tag, p.Name(), api.Status), true
-		}
 		return sweepByHand(out, p, tag, want.Name, "no machine for this launch has shown up yet"), false
 	}
 	return note, false

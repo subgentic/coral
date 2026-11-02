@@ -378,3 +378,23 @@ func TestLaunchA4xxNeverSweepsAndRemovesTheNetwork(t *testing.T) {
 		assert.False(t, ok)
 	}
 }
+
+// A 500 and two empty looks is UNSURE like a timeout (Security's amendment): the firewall and VPC stay, their ids and the command are printed, the launch errors, the record is open.
+func TestLaunchA500WithTwoEmptyLooksKeepsTheNetwork(t *testing.T) {
+	base := newIso()
+	base.stubProvider.createErr = &APIError{Provider: "stubcloud", Op: "create", Status: 500}
+	p := &isoLister{isoProvider: base}
+	o, d, st, out := isoSetup(t, base, &stubHub{})
+	d.Provider = p
+	o.RetryListAfter = time.Millisecond
+	_, err := Launch(t.Context(), o, d)
+	require.Error(t, err)
+	assert.Equal(t, 2, p.lists)
+	assert.Len(t, p.cloud.fws, 1)
+	assert.Len(t, p.cloud.vpcs, 1)
+	assert.Contains(t, out.String(), "fw-2")
+	assert.Contains(t, out.String(), "coral machine delete coral-1")
+	rec, ok := st.Get("coral-1")
+	require.True(t, ok)
+	assert.True(t, rec.FirewallOpen)
+}
