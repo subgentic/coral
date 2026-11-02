@@ -82,3 +82,25 @@ func TestAnAgentMayHaveTenAsksWithButtonsOpen(t *testing.T) {
 	status, _ = post(map[string]any{"subscriber_id": "Lead", "content": "@Operator plain question", "ask": true})
 	assert.Equal(t, http.StatusOK, status, "a question with no buttons is not counted")
 }
+
+// The help's post --ask "@Operator ..." on a board the Operator never joined: accepted, with its buttons, and listed for the Operator.
+func TestAnAskToTheOperatorIsAcceptedOnABoardTheyNeverJoined(t *testing.T) {
+	server, h := setupBoardTestServer(t)
+	base := server.URL + "/api/board/nooperator"
+	for _, who := range []string{"Lead", "Dev"} {
+		postJSON(t, base+"/subscribe", map[string]string{"subscriber_id": who, "job_title": who}).Body.Close()
+	}
+	for _, p := range []map[string]any{
+		{"subscriber_id": "Lead", "content": "@Operator Ship the release?", "ask": true},
+		{"subscriber_id": "Lead", "content": "@Operator Ship the docs?", "ask": true, "buttons": []string{"Yes=reply"}},
+	} {
+		resp := postJSON(t, base+"/messages", p)
+		var out map[string]any
+		_ = json.NewDecoder(resp.Body).Decode(&out)
+		resp.Body.Close()
+		require.Equal(t, http.StatusOK, resp.StatusCode, "%v", out)
+	}
+	code, rows, _ := readOperatorAsks(t, h, asPerson)
+	require.Equal(t, http.StatusOK, code)
+	assert.Len(t, rows, 2, "both questions are in the Operator's list")
+}

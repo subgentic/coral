@@ -83,7 +83,8 @@ func (s *Store) ensureAsksSchema(ctx context.Context) error {
 	return nil
 }
 
-// AskTargets are the members a post would ask: every member other than the poster that the text explicitly @mentions. @all names no one in particular and asks nobody.
+// AskTargets are who a post would ask: every member other than the poster that the text explicitly @mentions, and the Operator when it @mentions them, a member of the board or not
+// (the person is asked through Needs you, as a clash already is). @all names no one in particular and asks nobody.
 func (s *Store) AskTargets(ctx context.Context, project, poster, content string) ([]string, error) {
 	subs, err := s.ListSubscribers(ctx, project)
 	if err != nil {
@@ -98,6 +99,9 @@ func (s *Store) AskTargets(ctx context.Context, project, poster, content string)
 		if containsExplicitTag(content, sub.SubscriberID, sub.JobTitle) {
 			out = append(out, sub.SubscriberID)
 		}
+	}
+	if operatorTagRE.MatchString(content) && !SameIdentity(poster, OperatorName) && !hasIdentity(out, OperatorName) {
+		out = append(out, OperatorName)
 	}
 	if len(out) == 0 {
 		return nil, ErrAskNobody
@@ -117,10 +121,20 @@ func (s *Store) NotifiedBy(ctx context.Context, project, poster, content string)
 	if broadcastTagRE.MatchString(content) {
 		out = append(out, "all")
 	}
-	if operatorTagRE.MatchString(content) && !SameIdentity(poster, "Operator") {
-		out = append(out, "Operator")
+	if operatorTagRE.MatchString(content) && !SameIdentity(poster, OperatorName) && !hasIdentity(out, OperatorName) {
+		out = append(out, OperatorName)
 	}
 	return out
+}
+
+// hasIdentity reports whether names holds who (SameIdentity).
+func hasIdentity(names []string, who string) bool {
+	for _, n := range names {
+		if SameIdentity(n, who) {
+			return true
+		}
+	}
+	return false
 }
 
 // CheckReplyTo refuses a reply_to that is no message of the board (and no later than the reply can be: it must exist now).
