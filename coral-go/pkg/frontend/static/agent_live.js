@@ -1,6 +1,7 @@
 /* Which running agent a name belongs to, and the one click that opens its chat (#12197). Small and safe at start (no styles, no top-level await): data_table.js marks its people circles with it at once, and agent_link.js
  * (the lazy helper that draws names as links) builds on it. A name that is not a running agent is left alone. */
 import { state } from './state.js';
+import { importOnce } from './import_once.js';
 import { sessionServer, splitKey } from './server_base.js';
 import { markHidden } from './visible_marks.js';
 import { escapeHtml, escapeAttr } from './utils.js';
@@ -22,8 +23,9 @@ const closeOverlays = () => {
 // Words typed into a dialog that is about to close (a question's reply box): closing it would drop them, so the person is asked first (#12299).
 const typedInOverlay = () => [...document.querySelectorAll('dialog[open], #artifact-viewer:not([hidden])')].some(d => [...d.querySelectorAll('textarea, input[type=text], input[type=search], input:not([type])')].some(f => !f.readOnly && !f.disabled && f.value.trim() && f.value !== f.defaultValue));
 // The question is its own native dialog, shown modally, so it stacks in front of the dialog the name sat in (the shared confirm is a div, which a native modal covers).
-const askLeave = go => {
-    const d = document.createElement('dialog'); d.className = 'modal-content dlg-flow agent-leave-ask'; d.setAttribute('aria-labelledby', 'agent-leave-title');
+const askLeave = async go => {
+    const { loadStyles } = await importOnce('./lazy_styles.js'); await loadStyles('agent_link.css'); // the dialog's few rules are in the lazy sheet, not the start CSS (page_weight)
+    const d = document.createElement('dialog'); d.className = 'dlg-confirm agent-leave-ask'; d.setAttribute('aria-labelledby', 'agent-leave-title');
     const h = document.createElement('h2'); h.id = 'agent-leave-title'; h.textContent = 'Leave this dialog?';
     const p = document.createElement('p'); p.textContent = 'What you typed here is not sent and will be lost.';
     const row = document.createElement('div'); row.className = 'modal-actions';

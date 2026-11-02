@@ -3,3 +3,9 @@
 .agent-link:hover { text-decoration: underline; }
 .agent-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm, 2px); }
 .agent-link-avatar { cursor: pointer; }
+/* "Leave this dialog?" (agent_live.js, #12299): a native confirm, centred with a scrim and sized to its words like the app's other confirms (dlg-confirm sets the width) */
+dialog.agent-leave-ask { margin: auto; box-sizing: border-box; padding: 20px 22px; border: 1px solid var(--border); border-radius: var(--radius-ml); background: var(--bg-secondary); color: var(--text-primary); }
+dialog.agent-leave-ask::backdrop { background: rgba(var(--black-rgb), 0.55); }
+dialog.agent-leave-ask h2 { margin: 0 0 6px; font-size: var(--fs-xl); }
+dialog.agent-leave-ask p { margin: 0 0 18px; line-height: var(--lh-body); color: var(--text-secondary); }
+dialog.agent-leave-ask .modal-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
