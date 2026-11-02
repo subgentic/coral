@@ -89,6 +89,27 @@ export async function loadMessageSearchIndex() {
     }
 }
 
+/** Settings: the chats Coral did not start (#11970, #11990): how many are found or listed, and the one switch, Import or Stop listing. This computer's dashboard only. */
+export async function loadChatImport() {
+    const out = document.getElementById('settings-chat-import-status'), button = document.getElementById('settings-chat-import');
+    if (!out || !button) return;
+    if (isCloud()) { out.hidden = button.hidden = true; return; }
+    try {
+        const d = await requestJson('GET', '/api/history-import');
+        const n = Number(d.found) || 0, listed = Number(d.listed) || 0;
+        out.hidden = button.hidden = false;
+        out.textContent = d.imported ? `Chats Coral did not start (Claude Code, Codex and others on this computer) are listed${listed ? `: ${listed}` : ''}.` : `Chats Coral did not start are not listed${n ? `: ${n} found on this computer` : ''}.`;
+        button.textContent = d.imported ? 'Stop listing chats Coral did not start' : n ? `Import ${n} earlier ${n === 1 ? 'chat' : 'chats'}` : 'List chats Coral did not start';
+        button.onclick = async () => {
+            button.disabled = true;
+            try { await requestJson('POST', '/api/history-import', { imported: !d.imported }); showToast(d.imported ? 'Those chats are no longer listed. Nothing is deleted from this computer.' : 'Importing: the chats appear in a few seconds.'); }
+            catch (e) { showToast(`Couldn't change it: ${e.message}`, true); }
+            button.disabled = false; loadChatImport();
+            importOnce('./mailbox_chats.js').then(m => { m.resetChatLists(); return m.loadChatCounts(); }).catch(() => {});
+        };
+    } catch { out.hidden = button.hidden = true; }
+}
+
 /** Settings: the example job and workflow Coral added (their description starts with "Example"), with a Remove that deletes only those (#10001). Shown only while there are some. */
 export async function loadExamples() {
     const out = document.getElementById('settings-examples-status'), button = document.getElementById('settings-examples-remove');

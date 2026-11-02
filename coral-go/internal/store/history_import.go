@@ -20,6 +20,10 @@ const (
 	HistoryImportOff = "0"
 )
 
+// notStartedByCoral is the test of a listed chat Coral did not start: no agent name was recorded for it (the indexer records one while the agent that owns the session is live, so a chat of an
+// agent Coral launched keeps it after the agent is deleted) and no live agent owns it now (#11990: Off never holds back a chat of an agent Coral started).
+const notStartedByCoral = `COALESCE(agent_name, '') = '' AND session_id NOT IN (SELECT session_id FROM live_sessions)`
+
 // UnimportedChat is a chat Coral found but did not index.
 type UnimportedChat struct {
 	SourceType string  `db:"source_type"`
@@ -146,4 +150,35 @@ func (s *SessionStore) IndexedSessionIDs(ctx context.Context, ids []string) (map
 		}
 	}
 	return out, nil
+}
+
+// ListedNotStarted counts the listed chats Coral did not start: what turning the import off would hold back again.
+func (s *SessionStore) ListedNotStarted(ctx context.Context) (int, error) {
+	var n int
+	err := s.reader().GetContext(ctx, &n, `SELECT COUNT(*) FROM session_index WHERE `+notStartedByCoral)
+	return n, err
+}
+
+// SetHistoryImport is the person's switch (Settings): on lists every chat found on the computer, off stops listing the ones Coral did not start. Turning it off holds those chats back
+// the way a fresh Coral does: their index rows and search text go, a metadata row stays (so turning it on again reads nothing twice), and a star or archive flag stays with the chat id.
+// A chat of an agent Coral launched is never held back, even after the agent is gone.
+func (s *SessionStore) SetHistoryImport(ctx context.Context, on bool) error {
+	if on {
+		return s.ImportEarlierChats(ctx)
+	}
+	return s.db.WithTx(ctx, func(tx *sqlx.Tx) error {
+		const theirs = `SELECT session_id FROM session_index WHERE ` + notStartedByCoral
+		for _, q := range []string{
+			`INSERT OR REPLACE INTO history_unimported (source_type, source_file, file_mtime, session_id) SELECT source_type, source_file, file_mtime, session_id FROM session_index WHERE session_id IN (` + theirs + `)`,
+			`DELETE FROM session_fts WHERE session_id IN (` + theirs + `)`,
+			`DELETE FROM summarizer_queue WHERE session_id IN (` + theirs + `)`,
+			`DELETE FROM session_index WHERE session_id IN (` + theirs + `)`,
+		} {
+			if _, err := tx.ExecContext(ctx, q); err != nil {
+				return err
+			}
+		}
+		_, err := tx.ExecContext(ctx, `INSERT INTO user_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`, historyImportKey, HistoryImportOff)
+		return err
+	})
 }
