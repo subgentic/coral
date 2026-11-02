@@ -4,7 +4,6 @@ import (
 	"context"
 	"io"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -29,7 +28,7 @@ func TestResetPasswordRotatesTheCLIToken(t *testing.T) {
 	stack := newTermStack(t)
 	srv := mustServer(NewWithKey(cfg, db, stack.backend, stack.terminal, ""))
 	t.Cleanup(srv.Close)
-	local := httptest.NewServer(srv.Router())
+	local := localServer(srv.Router())
 	t.Cleanup(local.Close)
 	ctx := context.Background()
 
@@ -81,7 +80,7 @@ func TestOlderCLISignatureIsRefusedWithAnUpdateHint(t *testing.T) {
 	stack := newTermStack(t)
 	srv := mustServer(NewWithKey(cfg, db, stack.backend, stack.terminal, ""))
 	t.Cleanup(srv.Close)
-	local := httptest.NewServer(srv.Router())
+	local := localServer(srv.Router())
 	t.Cleanup(local.Close)
 	tok, err := cloud.ReadCLIToken(cfg.CoralDir())
 	require.NoError(t, err)
