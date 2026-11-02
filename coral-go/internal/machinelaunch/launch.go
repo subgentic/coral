@@ -162,6 +162,9 @@ func Launch(ctx context.Context, o Options, d Deps) (*Result, error) {
 		note, clean := sweepAfterFailedCreate(p, launchTag, want, err, retryAfter(o), d.Interrupt, d.Out)
 		if clean {
 			note += teardownNetworkOnly(p, net, ls, d.Out)
+		} else if net != nil { // the machine may still exist: its firewall and VPC stay, with their ids and the one command that removes them later (Security's ruling, #9934)
+			fmt.Fprintf(d.Out, "The launch's firewall %s and private network %s were left in place, so a machine that appears late is not unfiltered. When the machine is gone, remove them with: coral machine delete %s --provider %s --token-file <the token file>\n", net.Firewall.ID, net.VPC.ID, o.Name, p.Name())
+			note += fmt.Sprintf("; firewall %s and private network %s were left in place: `coral machine delete %s` removes them once the machine is gone", net.Firewall.ID, net.VPC.ID, o.Name)
 		}
 		return nil, fmt.Errorf("could not create the machine: %w%s", err, note)
 	}

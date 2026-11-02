@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -260,4 +261,35 @@ func TestLaunchNeverRecordsAnSSHKeyThePersonGave(t *testing.T) {
 		DeleteSSHKey(context.Context, string) error
 	})
 	assert.False(t, canDeleteKeys, "no provider here can delete an ssh key: delete removes the instance, the firewall and the VPC only")
+}
+
+// isoLister is the isolated stub provider that can list: it never shows the machine, as a provider whose list is unsure does.
+type isoLister struct {
+	*isoProvider
+	lists int
+}
+
+func (l *isoLister) List(context.Context) ([]Instance, error) { l.lists++; return nil, nil }
+
+// A create that timed out and a sweep that cannot find the machine leave the firewall and the VPC in place, with their ids and the command that removes them later, an error, and the record open (Security's ruling, #9934).
+func TestLaunchTimedOutCreateWithAnUnsureSweepKeepsTheNetwork(t *testing.T) {
+	base := newIso()
+	base.stubProvider.createErr = context.DeadlineExceeded
+	p := &isoLister{isoProvider: base}
+	o, d, st, out := isoSetup(t, base, &stubHub{})
+	d.Provider = p
+	o.RetryListAfter = time.Millisecond
+	_, err := Launch(t.Context(), o, d)
+	require.Error(t, err)
+	assert.Equal(t, 2, p.lists, "two looks")
+	assert.Len(t, p.cloud.fws, 1)
+	assert.Len(t, p.cloud.vpcs, 1)
+	assert.NotContains(t, strings.Join(base.order, ","), "DeleteFirewall")
+	assert.NotContains(t, strings.Join(base.order, ","), "DeleteVPC")
+	assert.Contains(t, out.String(), "fw-2")
+	assert.Contains(t, out.String(), "coral machine delete coral-1")
+	assert.Contains(t, err.Error(), "left in place")
+	rec, ok := st.Get("coral-1")
+	require.True(t, ok, "the record stays")
+	assert.True(t, rec.FirewallOpen)
 }

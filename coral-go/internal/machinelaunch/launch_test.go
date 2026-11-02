@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -480,7 +481,18 @@ type listingProvider struct{ *stubProvider }
 
 func (l listingProvider) List(context.Context) ([]Instance, error) {
 	l.calls = append(l.calls, "list")
-	return l.listed, l.listErr
+	return notDeleted(l.calls, l.listed), l.listErr
+}
+
+// notDeleted is what a provider lists after deletes: the machines the calls so far have not deleted by id.
+func notDeleted(calls []string, in []Instance) []Instance {
+	var out []Instance
+	for _, i := range in {
+		if !slices.Contains(calls, "delete:"+i.ID) {
+			out = append(out, i)
+		}
+	}
+	return out
 }
 
 func TestLaunchUserDataFailureCreatesAndMintsNothing(t *testing.T) {
@@ -504,7 +516,7 @@ func TestLaunchFailedCreateDeletesOnlyTheInstanceCarryingThisLaunchsTag(t *testi
 	if err == nil || !strings.Contains(got, "delete:mine") || strings.Contains(got, "delete:same-name") || strings.Contains(got, "delete:other-launch") {
 		t.Fatalf("err %v, calls %s", err, got)
 	}
-	if !strings.Contains(err.Error(), "deleted") || !strings.Contains(out.String(), "was deleted") {
+	if !strings.Contains(err.Error(), "deleted machine mine") || !strings.Contains(out.String(), "Deleted machine mine") {
 		t.Fatalf("the person is told: %v %s", err, out.String())
 	}
 }
@@ -516,11 +528,11 @@ func (t *tagEchoProvider) List(context.Context) ([]Instance, error) {
 	t.stubProvider.calls = append(t.stubProvider.calls, "list")
 	tag := t.stubProvider.spec.Tags[1]
 	mine := t.stubProvider.spec
-	return []Instance{
+	return notDeleted(t.stubProvider.calls, []Instance{
 		{ID: "mine", Name: "coral-1", Region: mine.Region, Size: mine.Size, Created: time.Now(), Tags: []string{Tag, tag}},
 		{ID: "same-name", Name: "coral-1", Tags: []string{Tag}},
 		{ID: "other-launch", Name: "x", Tags: []string{Tag, "coral-launch-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}},
-	}, nil
+	}), nil
 }
 
 func TestLaunchFailedCreateWithAListFailureSaysWhereToLook(t *testing.T) {
@@ -529,7 +541,7 @@ func TestLaunchFailedCreateWithAListFailureSaysWhereToLook(t *testing.T) {
 	o, d, out := setup(base, &stubHub{})
 	d.Provider = listingProvider{base}
 	_, err := Launch(context.Background(), o, d)
-	if err == nil || !strings.Contains(err.Error(), "tag coral-launch-") || !strings.Contains(out.String(), "costs money") {
+	if err == nil || !strings.Contains(err.Error(), "tagged coral-launch-") || !strings.Contains(err.Error(), "costs money") || !strings.Contains(out.String(), "costs money") {
 		t.Fatalf("%v %s", err, out.String())
 	}
 	if strings.Contains(strings.Join(base.calls, ","), "delete") {
@@ -563,7 +575,7 @@ func (l *laggingProvider) List(context.Context) ([]Instance, error) {
 	if l.lists == 1 {
 		return nil, nil
 	}
-	return []Instance{{ID: "late", Name: "coral-1", Region: l.spec.Region, Size: l.spec.Size, Created: time.Now(), Tags: []string{Tag, l.spec.Tags[1]}}}, nil
+	return notDeleted(l.calls, []Instance{{ID: "late", Name: "coral-1", Region: l.spec.Region, Size: l.spec.Size, Created: time.Now(), Tags: []string{Tag, l.spec.Tags[1]}}}), nil
 }
 
 func TestLaunchTimedOutCreateLooksOnceMoreAndDeletesTheLateMachine(t *testing.T) {
@@ -572,7 +584,7 @@ func TestLaunchTimedOutCreateLooksOnceMoreAndDeletesTheLateMachine(t *testing.T)
 	o, d, _ := setup(base, &stubHub{})
 	d.Provider, o.RetryListAfter = l, time.Millisecond
 	_, err := Launch(context.Background(), o, d)
-	if err == nil || l.lists != 2 || !strings.Contains(strings.Join(base.calls, ","), "delete:late") {
+	if err == nil || l.lists != 3 || !strings.Contains(strings.Join(base.calls, ","), "delete:late") { // look, look again (found), confirm gone
 		t.Fatalf("lists %d, err %v, calls %v", l.lists, err, base.calls)
 	}
 }
@@ -593,7 +605,7 @@ func TestLaunchCancelledCreateGetsTheSecondLookToo(t *testing.T) {
 	o, d, _ := setup(base, &stubHub{})
 	d.Provider, o.RetryListAfter = l, time.Millisecond
 	_, err := Launch(context.Background(), o, d)
-	if err == nil || l.lists != 2 || !strings.Contains(strings.Join(base.calls, ","), "delete:late") {
+	if err == nil || l.lists != 3 || !strings.Contains(strings.Join(base.calls, ","), "delete:late") { // look, look again (found), confirm gone
 		t.Fatalf("lists %d, err %v, calls %v", l.lists, err, base.calls)
 	}
 }

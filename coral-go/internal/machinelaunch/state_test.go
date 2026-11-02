@@ -164,3 +164,29 @@ func TestStateFileSurvivesTwoLaunchesAtOnce(t *testing.T) {
 	assert.True(t, hasLate)
 	assert.Len(t, final.Records(), launches*each)
 }
+
+// A record of a REAL launch validates: its tag is whatever newLaunchTag makes (the 12-hex test fixtures once hid that the state file refused 32 hex), and the older 12-digit tag stays readable.
+func TestRecordOfARealLaunchValidates(t *testing.T) {
+	for i := 0; i < 20; i++ {
+		tag, err := newLaunchTag()
+		if err != nil {
+			t.Fatal(err)
+		}
+		r := goodRecord("m1")
+		r.LaunchTag = tag
+		if err := r.Validate(); err != nil {
+			t.Fatalf("a record with the tag %s: %v", tag, err)
+		}
+	}
+	r := goodRecord("m1")
+	r.LaunchTag = "coral-launch-0123456789ab"
+	if err := r.Validate(); err != nil {
+		t.Fatalf("the older 12-digit tag is still readable: %v", err)
+	}
+	for _, bad := range []string{"", "coral-launch-", "coral-launch-0123456789a", "coral-launch-0123456789abc", "coral-launch-0123456789abcdef0123456789abcde", "coral-launch-0123456789ABCDEF0123456789ABCDEF", "launch-0123456789abcdef0123456789abcdef"} {
+		r.LaunchTag = bad
+		if err := r.Validate(); err == nil {
+			t.Errorf("%q was accepted", bad)
+		}
+	}
+}

@@ -19,9 +19,13 @@ import (
 //  4. Two looks at most: one at once, one after a bounded wait. A second Ctrl-C ends it at once with the tag and "check by hand".
 //  5. Each id is printed as it is deleted, with the tag; a failed delete is printed and the launch ends in an error (no retry loop).
 //  6. It uses only the token the launch was given.
+//
+// sweepNow is the clock the made-at bounds are read against; a test replaces it.
+var sweepNow = time.Now
+
 const (
 	sweepCallTimeout = 10 * time.Second // each list and each delete
-	sweepClockSkew   = time.Minute      // the provider's clock against this computer's: a machine made this long before the launch began still counts as not made by it
+	sweepClockSkew   = time.Minute      // the provider's clock against this computer's: made-at may be this much before the launch began or after now, and no more (not the safety control: the tag, name, region, size and count are)
 	defaultSweepWait = 60 * time.Second // between the first look and the second
 )
 
@@ -114,7 +118,7 @@ func sweepOnce(l Lister, p Provider, tag string, want sweepWant, out io.Writer) 
 		return sweepRefused, sweepByHand(out, p, tag, fmt.Sprintf("%d machines carry this launch's tag where one was asked for, so none was deleted", len(mine)))
 	}
 	in := mine[0]
-	if in.Name != want.Name || in.Region != want.Region || in.Size != want.Size || in.Created.IsZero() || !in.Created.After(want.Since.Add(-sweepClockSkew)) {
+	if in.Name != want.Name || in.Region != want.Region || in.Size != want.Size || in.Created.IsZero() || in.Created.Before(want.Since.Add(-sweepClockSkew)) || in.Created.After(sweepNow().Add(sweepClockSkew)) {
 		return sweepRefused, sweepByHand(out, p, tag, "the machine with this launch's tag is not what the launch asked for, so it was not deleted")
 	}
 	dctx, dcancel := context.WithTimeout(context.Background(), sweepCallTimeout)
@@ -122,7 +126,14 @@ func sweepOnce(l Lister, p Provider, tag string, want sweepWant, out io.Writer) 
 	switch err := p.Delete(dctx, in.ID); {
 	case err == nil || errors.Is(err, ErrNotFound):
 		fmt.Fprintf(out, "Deleted machine %s (tag %s).\n", in.ID, tag)
-		return sweepDeleted, fmt.Sprintf("; deleted machine %s (tag %s)", in.ID, tag)
+		// Deleted is not gone until a read says so: the launch's firewall and VPC come off only when this list no longer shows the id (Security's ruling, #9934).
+		rctx, rcancel := context.WithTimeout(context.Background(), sweepCallTimeout)
+		after, lerr := l.List(rctx)
+		rcancel()
+		if lerr != nil || slices.ContainsFunc(after, func(x Instance) bool { return x.ID == in.ID }) {
+			return sweepRefused, sweepByHand(out, p, tag, fmt.Sprintf("machine %s was deleted but is not confirmed gone", in.ID))
+		}
+		return sweepDeleted, fmt.Sprintf("; deleted machine %s (tag %s) and confirmed it gone", in.ID, tag)
 	default:
 		fmt.Fprintf(out, "Could NOT delete machine %s (tag %s): delete it yourself at %s, it costs money while it exists.\n", in.ID, tag, p.Name())
 		return sweepRefused, fmt.Sprintf("; machine %s (tag %s) could NOT be deleted: delete it yourself at %s, it costs money while it exists", in.ID, tag, p.Name())

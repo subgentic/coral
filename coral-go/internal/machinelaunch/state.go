@@ -42,7 +42,7 @@ const stateVersion = 1
 
 var (
 	idShape       = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$`)
-	launchTagRe   = regexp.MustCompile(`^coral-launch-[0-9a-f]{32}$`) // 128 bits (slice 2)
+	launchTagRe   = regexp.MustCompile(`^coral-launch-([0-9a-f]{32}|[0-9a-f]{12})$`) // 128 bits since slice 2; the 12-digit form of the earlier builds stays readable
 	providerShape = regexp.MustCompile(`^[a-z][a-z0-9]{1,19}$`)
 	// A value that starts like a secret this tool handles is never stored (a provider token, the Hub's key, credential and destroy credential).
 	secretPrefixes = []string{"dop_v1_", "do_v1_", "chb_", "chd_", "chk_", "-----BEGIN", "ssh-ed25519", "ssh-rsa", "ecdsa-"}
