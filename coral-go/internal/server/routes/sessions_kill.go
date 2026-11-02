@@ -130,19 +130,26 @@ func (h *SessionsHandler) Kill(w http.ResponseWriter, r *http.Request) {
 	// live, by its own id (#3598).
 	if sessionFound {
 		agent.CleanupTempFiles(body.SessionID)
-		h.removeHermesHome(body.AgentType, boardName, body.SessionID)
+	}
+	// A Hermes agent's home goes after its process is ended, not while it still runs: Hermes writes to its state.db until it exits, and a removal that raced that write left the folder behind (#11936).
+	dropHermesHome := func() {
+		if sessionFound {
+			h.removeHermesHome(body.AgentType, boardName, body.SessionID)
+		}
 	}
 
 	// Sleeping agents have no tmux session (it was terminated when they were
 	// put to sleep). Skip all tmux operations — calling KillSession here
 	// risks the fuzzy FindPane fallback matching a different agent's session.
 	if wasSleeping {
+		dropHermesHome() // no process to wait for
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "changes_artifact": changesArtifact, "changes_artifact_error": artifactError})
 		return
 	}
 
 	// Kill tmux/pty session for awake agents
 	h.terminal.KillSession(r.Context(), name, body.AgentType, body.SessionID)
+	dropHermesHome()
 
 	// Clean up git worktree if this was the last session using it, unless something in it is unsaved (#6701)
 	resp := map[string]any{"ok": true, "changes_artifact": changesArtifact, "changes_artifact_error": artifactError}

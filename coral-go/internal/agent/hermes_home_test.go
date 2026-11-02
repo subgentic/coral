@@ -499,3 +499,31 @@ func TestRemovingAnAgentHomeRefusesALinkedParent(t *testing.T) {
 		})
 	}
 }
+
+// #11936 (the tester's run on a real Hermes): after a Kill the home stayed ("directory not empty"): Hermes re-created state.db in the moment the folder was being removed. A removal that fails is tried again a few
+// times, a moment apart, and only then reported.
+func TestRemovingAnAgentHomeIsTriedAgainWhenItRacesAWrite(t *testing.T) {
+	r := hermesRig(t)
+	home, err := PrepareHermesHome(r.data, "t", testSID, r.person, time.Now())
+	require.NoError(t, err)
+
+	calls := 0
+	flaky := func(p string) error {
+		calls++
+		if calls < 3 {
+			return errors.New("unlinkat: directory not empty")
+		}
+		return os.RemoveAll(p)
+	}
+	require.NoError(t, removeHermesHome(r.data, "t", testSID, flaky, time.Millisecond))
+	assert.Equal(t, 3, calls)
+	_, err = os.Stat(home)
+	assert.True(t, os.IsNotExist(err))
+
+	calls = 0
+	never := func(string) error { calls++; return errors.New("directory not empty") }
+	_, err = PrepareHermesHome(r.data, "t", testSID, r.person, time.Now())
+	require.NoError(t, err)
+	assert.Error(t, removeHermesHome(r.data, "t", testSID, never, time.Millisecond))
+	assert.Equal(t, hermesRemoveTries, calls, "bounded")
+}

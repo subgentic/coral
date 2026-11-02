@@ -58,9 +58,20 @@ func HermesAgentHome(dataDir, team, sessionID string) string {
 // and makes nothing (the team's other agents are not touched).
 const hermesMinFree = 2 << 30
 
+// hermesRemoveTries is how many times a home's removal is tried, hermesRemoveWait apart: a Hermes that is still ending (its last write to state.db) can re-create a file in the moment the folder is removed
+// ("directory not empty", the tester's run on a real Hermes, #11936).
+const (
+	hermesRemoveTries = 5
+	hermesRemoveWait  = 300 * time.Millisecond
+)
+
 // RemoveHermesHome removes an agent's home when the agent is deleted (a restart or a wake keeps it, so the agent's conversation can be resumed). A home that is not there, or an id that is not one, is nothing to do;
-// a link in its place is removed as a link and never followed.
+// a link in its place is removed as a link and never followed, and a link in hermes-homes or the team's folder refuses the removal.
 func RemoveHermesHome(dataDir, team, sessionID string) error {
+	return removeHermesHome(dataDir, team, sessionID, os.RemoveAll, hermesRemoveWait)
+}
+
+func removeHermesHome(dataDir, team, sessionID string, removeAll func(string) error, wait time.Duration) error {
 	home := HermesAgentHome(dataDir, team, sessionID)
 	if home == "" {
 		return nil
@@ -70,10 +81,17 @@ func RemoveHermesHome(dataDir, team, sessionID string) error {
 			return fmt.Errorf("hermes: %s is a link: the agent's home was not removed", filepath.Base(dir))
 		}
 	}
-	if _, err := os.Lstat(home); err != nil {
-		return nil
+	var err error
+	for try := 0; try < hermesRemoveTries; try++ {
+		if _, serr := os.Lstat(home); serr != nil {
+			return nil
+		}
+		if err = removeAll(home); err == nil {
+			return nil
+		}
+		time.Sleep(wait)
 	}
-	return os.RemoveAll(home)
+	return err
 }
 
 // privateDir makes dir (and its parents) 0700 if missing and refuses one that is a link or not a folder.
