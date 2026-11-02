@@ -424,11 +424,15 @@ func finishScript(withAgents bool) string {
 	if withAgents {
 		p("# after Coral is up and has redeemed its credential: the agent CLIs (slow, and not needed to enroll)")
 		p("rc=0")
-		p("# The agents run once per boot: the marker is written BEFORE they start, so a second start of this unit (the timer, a retrigger) never installs them again, and a failed agent is not retried.")
-		p("if [ ! -e /run/coral/agents-started ] && systemctl is-active --quiet coral.service; then")
-		p("  touch /run/coral/agents-started")
+		p("# The agents run ONCE, ever: the marker is on disk (/run is tmpfs and is gone after a reboot) and is written BEFORE they start, so a second start of this unit (the timer after a reboot, a retrigger) never installs")
+		p("# them again, and a failed agent is not retried.")
+		p("if [ ! -e /var/lib/coral-machine/agents-done ] && systemctl is-active --quiet coral.service; then")
+		p("  install -d -m 0700 /var/lib/coral-machine")
+		p("  touch /var/lib/coral-machine/agents-done")
 		p("  /usr/local/sbin/coral-machine-agents || rc=1")
 		p("fi")
+		p("# Nothing may start this unit again: the path and the timer are switched off for good (and stay off after a reboot).")
+		p("systemctl disable --now coral-finish.timer coral-finish.path 2>/dev/null || true")
 		p("exit $rc") // the machine is enrolled and SSH is closed by now: a failed agent makes this unit FAIL (named in the journal by coral-machine-agents), never a silent success
 		return s.String()
 	}
@@ -539,6 +543,10 @@ func agentsScript(agents []agentInstall) string {
 		bin := "/opt/coral-agents/bin/" + a.Binary
 		link := "/usr/local/bin/" + a.Binary
 		p("# %s %s: installed by the coral user, never root, into a folder only it writes; scripts are not run, so the CLI is checked and a CLI that does not start fails LOUDLY and only that agent is lost. The link is made with ln -s -T and only if nothing is at that name: it can fail, never replace.", a.Binary, a.Pinned)
+		p("# An agent that is already installed and runs (its link points at this install) is counted installed and left alone: a second run never cleans up what was good before it.")
+		p("if runuser -u coral -- %s --version >/dev/null 2>&1 && [ \"$(readlink %s 2>/dev/null)\" = %s ]; then", bin, link, bin)
+		p("  echo \"coral-machine-agents: %s is already installed\"", a.Binary)
+		p("else")
 		p("( install -d -m 0755 -o coral -g coral /opt/coral-agents \\")
 		p("  && runuser -u coral -- %s \\", npmAsCoral(a.Command))
 		p("  && test -x %s \\", bin)
@@ -550,6 +558,7 @@ func agentsScript(agents []agentInstall) string {
 		p("  if [ \"$(readlink %s 2>/dev/null)\" = %s ]; then rm -f %s; fi", link, bin, link)
 		p("  rm -f %s; rm -rf /opt/coral-agents/lib/node_modules/%s", bin, a.Package)
 		p("}")
+		p("fi")
 	}
 	p("if [ -n \"$failed\" ]; then echo \"coral-machine-agents: FAILED agents:$failed (each was removed; the machine itself is enrolled)\" >&2; exit 1; fi")
 	return s.String()

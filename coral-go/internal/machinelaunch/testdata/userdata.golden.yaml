@@ -239,11 +239,15 @@ write_files:
       systemctl enable coral.service 2>/dev/null || true
       # after Coral is up and has redeemed its credential: the agent CLIs (slow, and not needed to enroll)
       rc=0
-      # The agents run once per boot: the marker is written BEFORE they start, so a second start of this unit (the timer, a retrigger) never installs them again, and a failed agent is not retried.
-      if [ ! -e /run/coral/agents-started ] && systemctl is-active --quiet coral.service; then
-        touch /run/coral/agents-started
+      # The agents run ONCE, ever: the marker is on disk (/run is tmpfs and is gone after a reboot) and is written BEFORE they start, so a second start of this unit (the timer after a reboot, a retrigger) never installs
+      # them again, and a failed agent is not retried.
+      if [ ! -e /var/lib/coral-machine/agents-done ] && systemctl is-active --quiet coral.service; then
+        install -d -m 0700 /var/lib/coral-machine
+        touch /var/lib/coral-machine/agents-done
         /usr/local/sbin/coral-machine-agents || rc=1
       fi
+      # Nothing may start this unit again: the path and the timer are switched off for good (and stay off after a reboot).
+      systemctl disable --now coral-finish.timer coral-finish.path 2>/dev/null || true
       exit $rc
   - path: /usr/local/sbin/coral-machine-agents
     owner: root:root
@@ -256,6 +260,10 @@ write_files:
       failed=
       DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends nodejs npm || exit 1
       # claude 2.0.0: installed by the coral user, never root, into a folder only it writes; scripts are not run, so the CLI is checked and a CLI that does not start fails LOUDLY and only that agent is lost. The link is made with ln -s -T and only if nothing is at that name: it can fail, never replace.
+      # An agent that is already installed and runs (its link points at this install) is counted installed and left alone: a second run never cleans up what was good before it.
+      if runuser -u coral -- /opt/coral-agents/bin/claude --version >/dev/null 2>&1 && [ "$(readlink /usr/local/bin/claude 2>/dev/null)" = /opt/coral-agents/bin/claude ]; then
+        echo "coral-machine-agents: claude is already installed"
+      else
       ( install -d -m 0755 -o coral -g coral /opt/coral-agents \
         && runuser -u coral -- npm install -g --ignore-scripts --userconfig /dev/null --globalconfig /dev/null --registry https://registry.npmjs.org/ --prefix /opt/coral-agents --cache /opt/coral-agents/.npm-cache @anthropic-ai/claude-code@2.0.0 \
         && test -x /opt/coral-agents/bin/claude \
@@ -267,7 +275,12 @@ write_files:
         if [ "$(readlink /usr/local/bin/claude 2>/dev/null)" = /opt/coral-agents/bin/claude ]; then rm -f /usr/local/bin/claude; fi
         rm -f /opt/coral-agents/bin/claude; rm -rf /opt/coral-agents/lib/node_modules/@anthropic-ai/claude-code
       }
+      fi
       # codex 0.1.0: installed by the coral user, never root, into a folder only it writes; scripts are not run, so the CLI is checked and a CLI that does not start fails LOUDLY and only that agent is lost. The link is made with ln -s -T and only if nothing is at that name: it can fail, never replace.
+      # An agent that is already installed and runs (its link points at this install) is counted installed and left alone: a second run never cleans up what was good before it.
+      if runuser -u coral -- /opt/coral-agents/bin/codex --version >/dev/null 2>&1 && [ "$(readlink /usr/local/bin/codex 2>/dev/null)" = /opt/coral-agents/bin/codex ]; then
+        echo "coral-machine-agents: codex is already installed"
+      else
       ( install -d -m 0755 -o coral -g coral /opt/coral-agents \
         && runuser -u coral -- npm install -g --ignore-scripts --userconfig /dev/null --globalconfig /dev/null --registry https://registry.npmjs.org/ --prefix /opt/coral-agents --cache /opt/coral-agents/.npm-cache @openai/codex@0.1.0 \
         && test -x /opt/coral-agents/bin/codex \
@@ -279,6 +292,7 @@ write_files:
         if [ "$(readlink /usr/local/bin/codex 2>/dev/null)" = /opt/coral-agents/bin/codex ]; then rm -f /usr/local/bin/codex; fi
         rm -f /opt/coral-agents/bin/codex; rm -rf /opt/coral-agents/lib/node_modules/@openai/codex
       }
+      fi
       # agy: the vendor's installer takes no version, so the script is fetched to a file, checked against the SHA-256 it was pinned to, and only then run, as the coral user.
       ( installer=$(mktemp) && { curl -fsSL --proto '=https' --tlsv1.2 -o "$installer" 'https://antigravity.google/cli/install.sh' \
         && echo 'abababababababababababababababababababababababababababababababab  '"$installer" | sha256sum -c - \

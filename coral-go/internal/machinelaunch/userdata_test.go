@@ -458,6 +458,12 @@ type agentsResult struct {
 
 func agentsRun(t *testing.T, entries []string, exits map[string]string, pre map[string]string) agentsResult {
 	t.Helper()
+	return agentsRunIn(t, t.TempDir(), entries, exits, pre)
+}
+
+// agentsRunIn is agentsRun in a folder the caller keeps, so a second run sees what the first left (a reboot's timer, a retrigger).
+func agentsRunIn(t *testing.T, dir string, entries []string, exits map[string]string, pre map[string]string) agentsResult {
+	t.Helper()
 	if runtime.GOOS == "windows" {
 		t.Skip("needs sh")
 	}
@@ -467,7 +473,6 @@ func agentsRun(t *testing.T, entries []string, exits map[string]string, pre map[
 	}
 	agents, err := resolveAgents(entries)
 	require.NoError(t, err)
-	dir := t.TempDir()
 	bin, prefix, localbin := filepath.Join(dir, "bin"), filepath.Join(dir, "agents"), filepath.Join(dir, "localbin")
 	require.NoError(t, os.MkdirAll(bin, 0o755))
 	require.NoError(t, os.MkdirAll(localbin, 0o755))
@@ -484,6 +489,7 @@ func agentsRun(t *testing.T, entries []string, exits map[string]string, pre map[
 case "$last" in *claude-code*) b=claude;; *codex*) b=codex;; *pi-coding*|*pi@*) b=pi;; *) b=other;; esac
 eval "code=\${EXIT_$(echo $b | tr a-z A-Z):-0}"
 mkdir -p "$p/bin" "$p/lib/node_modules/$(echo "$last" | sed 's/@[0-9.]*$//')"
+echo "$b" >> "$p/npm.log"
 printf '#!/bin/sh\nexit %s\n' "$code" > "$p/bin/$b"; chmod 755 "$p/bin/$b"`)
 	stub("ln", `[ "$1" = -s ] && [ "$2" = -T ] || exit 2
 [ -e "$4" ] || [ -L "$4" ] && exit 1
@@ -588,7 +594,46 @@ func TestFinishScriptRemovesTheDoneFileFirstAndRunsAgentsOnce(t *testing.T) {
 	assert.Equal(t, "rm -f /run/coral/bootstrap.d/done", commands(finishScript(false))[0])
 	assert.Contains(t, finishPathUnit(), "PathExists=/run/coral/bootstrap.d/done", "this is the file the path unit watches")
 	assert.Less(t, strings.Index(script, "rm -f /run/coral/bootstrap.d/done"), strings.Index(script, "/usr/local/sbin/coral-machine-agents"), "and before the slow agent install")
-	assert.Less(t, strings.Index(script, "touch /run/coral/agents-started"), strings.Index(script, "/usr/local/sbin/coral-machine-agents"), "the marker is written before the agents start")
-	assert.Contains(t, script, "[ ! -e /run/coral/agents-started ]", "and a second start does not run them again")
-	assert.NotContains(t, finishScript(false), "agents-started", "no agents, no marker")
+	assert.Less(t, strings.Index(script, "touch /var/lib/coral-machine/agents-done"), strings.Index(script, "/usr/local/sbin/coral-machine-agents"), "the marker is written before the agents start")
+	assert.Contains(t, script, "[ ! -e /var/lib/coral-machine/agents-done ]", "and a second start does not run them again")
+	assert.NotContains(t, finishScript(false), "agents-done", "no agents, no marker")
+}
+
+// A second run of the generated agents script (the timer after a reboot, a retrigger) is idempotent: an agent that is installed, runs and is linked is counted installed and skipped: npm is not called again, nothing is
+// removed, the link and the files stay and the run ends zero (coral-go Security's SHOULD on 6e).
+func TestAgentsScriptSecondRunRemovesNothing(t *testing.T) {
+	dir := t.TempDir()
+	entries := []string{"claude@2.0.0", "codex@0.1.0"}
+	first := agentsRunIn(t, dir, entries, nil, nil)
+	require.Zero(t, first.code, first.stderr)
+	logBefore, err := os.ReadFile(filepath.Join(first.prefix, "npm.log"))
+	require.NoError(t, err)
+	target, err := os.Readlink(filepath.Join(first.localbin, "claude"))
+	require.NoError(t, err)
+	second := agentsRunIn(t, dir, entries, nil, nil)
+	assert.Zero(t, second.code, second.stderr)
+	assert.NotContains(t, second.stderr, "FAILED")
+	logAfter, err := os.ReadFile(filepath.Join(second.prefix, "npm.log"))
+	require.NoError(t, err)
+	assert.Equal(t, string(logBefore), string(logAfter), "npm was not called a second time")
+	for _, b := range []string{"claude", "codex"} {
+		assert.True(t, exists(filepath.Join(second.localbin, b)), "%s is still linked", b)
+		assert.True(t, exists(filepath.Join(second.prefix, "bin", b)), "%s is still installed", b)
+	}
+	again, err := os.Readlink(filepath.Join(second.localbin, "claude"))
+	require.NoError(t, err)
+	assert.Equal(t, target, again, "the link is unchanged")
+}
+
+// The finish script switches the path and the timer off for good as its last act and keeps its once-only marker on disk (/run is tmpfs: gone after a reboot, while the timer fires after every boot).
+func TestFinishScriptSwitchesItsTriggersOffAndKeepsTheMarkerOnDisk(t *testing.T) {
+	script := finishScript(true)
+	assert.Contains(t, script, "install -d -m 0700 /var/lib/coral-machine")
+	assert.Contains(t, script, "touch /var/lib/coral-machine/agents-done")
+	assert.NotContains(t, script, "/run/coral/agents-started", "the marker is not on tmpfs")
+	disable := "systemctl disable --now coral-finish.timer coral-finish.path"
+	assert.Contains(t, script, disable)
+	assert.Contains(t, finishScript(false), disable, "with or without agents")
+	assert.Greater(t, strings.Index(script, disable), strings.Index(script, "/usr/local/sbin/coral-machine-agents"), "after the agents")
+	assert.Less(t, strings.Index(script, disable), strings.Index(script, "exit $rc"), "before the exit")
 }
