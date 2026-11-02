@@ -193,6 +193,14 @@ func BuildBoardActionPrompt(boardName, role, basePrompt string, promptOverrides 
 	return actionText
 }
 
+// startMessage is the first message the CLI is started with: the launch prompt and the board's action text, or nothing for a launch that resumes a conversation and was asked to send none (NoStartPrompt).
+func (p LaunchParams) startMessage() string {
+	if p.NoStartPrompt {
+		return ""
+	}
+	return BuildBoardActionPrompt(p.boardPromptName(), p.Role, p.Prompt, p.PromptOverrides, p.BoardType)
+}
+
 // boardPromptName is the name an agent's prompt shows for its board: the label when known,
 // else the board key (#3536).
 func (p LaunchParams) boardPromptName() string {

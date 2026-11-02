@@ -578,10 +578,7 @@ func codexUserFlags(parts, flags []string, bypass, applied bool) ([]string, bool
 // codexActionPrompt is the action prompt's argument, read from a temporary file: the board's action prompt, or the
 // launch prompt itself; "" when there is neither.
 func codexActionPrompt(files *launchFiles, params LaunchParams) string {
-	actionPrompt := BuildBoardActionPrompt(params.boardPromptName(), params.Role, params.Prompt, params.PromptOverrides, params.BoardType)
-	if actionPrompt == "" {
-		actionPrompt = params.Prompt
-	}
+	actionPrompt := params.startMessage()
 	if actionPrompt == "" {
 		return ""
 	}

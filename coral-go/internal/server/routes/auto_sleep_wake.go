@@ -82,7 +82,7 @@ func (h *SessionsHandler) WakeIdleFor(ctx context.Context, sessionID string, fro
 		return false
 	}
 	defer release()
-	if err := h.wakeExistingSession(ctx, ls); err != nil {
+	if err := h.wakeSession(ctx, ls, true); err != nil { // no starting prompt: the delivery that woke it says what to do (#12358)
 		h.autoWakeFailed(ctx, ls, store.StartFailureWakeFailed, err)
 		return false
 	}

@@ -403,10 +403,7 @@ func hermesFirstMessage(params LaunchParams) string {
 	if b := BuildBoardSystemPrompt(params.BoardName, params.Role, "", params.PromptOverrides, params.BoardType); b != "" {
 		sys = append(sys, b)
 	}
-	action := BuildBoardActionPrompt(params.boardPromptName(), params.Role, params.Prompt, params.PromptOverrides, params.BoardType)
-	if action == "" {
-		action = params.Prompt
-	}
+	action := params.startMessage()
 	if len(sys) == 0 && action == "" {
 		return "" // nothing to tell
 	}
