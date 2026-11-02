@@ -172,9 +172,23 @@ func TestChiefHearsDecisionsOnTheTeamTheOperatorNamedWithoutAnAllowedSenderEntry
 	// Named by the board's label (as the dashboard shows it), the way Settings saves it.
 	nb, err := e.h.bs.CreateBoard(ctx, "Northwind", "Operator")
 	require.NoError(t, err)
+	_, err = e.h.bs.Subscribe(ctx, nb.ID, "Orchestrator", "Orchestrator", "tmux-"+nb.ID, nil, "mentions") // a board in use: an empty row never counts
+	require.NoError(t, err)
 	e.h.SetChiefFronts(func(context.Context) string { return "Northwind" })
 	e.h.tellChief(ctx, board.ActDeny, "file", nb.ID, "plan.md", "")
 	got = chiefNotices(t, e, "alpha")
 	require.Len(t, got, 2)
 	require.Contains(t, got[1], "The Operator declined file")
+
+	// Two boards with that name: the name reaches neither (the id still does).
+	twin, err := e.h.bs.CreateBoard(ctx, "Northwind", "Operator")
+	require.NoError(t, err)
+	_, err = e.h.bs.Subscribe(ctx, twin.ID, "Orchestrator", "Orchestrator", "tmux-"+twin.ID, nil, "mentions")
+	require.NoError(t, err)
+	e.h.tellChief(ctx, board.ActDeny, "file", nb.ID, "plan.md", "")
+	e.h.tellChief(ctx, board.ActDeny, "file", twin.ID, "plan.md", "")
+	require.Len(t, chiefNotices(t, e, "alpha"), 2, "a name two boards have names neither")
+	e.h.SetChiefFronts(func(context.Context) string { return twin.ID })
+	e.h.tellChief(ctx, board.ActDeny, "file", twin.ID, "plan.md", "")
+	require.Len(t, chiefNotices(t, e, "alpha"), 3, "the board's id still names it")
 }

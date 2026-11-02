@@ -53,8 +53,9 @@ func (h *BoardHandler) frontedByChief(ctx context.Context, team string) bool {
 	if named == team {
 		return true
 	}
-	b, err := h.bs.GetBoard(ctx, team)
-	return err == nil && b != nil && b.Label != "" && b.Label == named
+	// A name counts only when exactly one board has it (Security's SHOULD on #12411): with two teams of one name, Chief's scope is not widened to whichever the name happens to reach.
+	with, err := h.bs.BoardsLabelled(ctx, named)
+	return err == nil && len(with) == 1 && with[0].ID == team
 }
 
 // chiefBoardNow is the recorded Chief board, "" when not wired.
