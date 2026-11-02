@@ -314,6 +314,7 @@ func (r Runner) hostFileArgs() []string {
 func (r Runner) baseArgv(t Target) []string {
 	argv := append([]string{}, sshOptions...)
 	argv = append(argv, r.hostFileArgs()...)
+	argv = append(argv, controlArgs()...)
 	return append(argv, t.Args()...)
 }
 
