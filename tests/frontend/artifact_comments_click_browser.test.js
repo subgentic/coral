@@ -35,7 +35,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
                 const mid = await ev(`(() => { const e = document.querySelector('.artifact-viewer .agent-link.ac-author'); const b = e.getBoundingClientRect(); const at = document.elementFromPoint(${r.x}, ${r.y}); return { stillThere: !!at && !!at.closest('.agent-link'), movedBy: Math.round(b.top + b.height / 2 - ${r.y}) }; })()`);
                 await Input.dispatchMouseEvent({ type: 'mouseReleased', x: r.x, y: r.y, button: 'left', clickCount: 1 });
                 await frames(10);
-                return { ...mid, clicksSeen: await ev(`window.__clicks`), confirm: await ev(`!!document.getElementById('confirm-modal-yes') && document.getElementById('confirm-modal-yes').getClientRects().length > 0`) };
+                return { ...mid, clicksSeen: await ev(`window.__clicks`), confirm: await ev(`!!document.querySelector('dialog.agent-leave-ask[open]')`) };
             };
             const a = await press(variant === 'scrollThenPress');
             out.push(`${variant} click 1: ${JSON.stringify(a)}`);
