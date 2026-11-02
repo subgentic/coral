@@ -53,11 +53,12 @@ func parsePCBList(b []byte, client, server netip.AddrPort, le bool) (int, error)
 	}
 	off := int(order.Uint32(b))
 	header := off // the list starts and ends with an xinpgen of this length
-	uid, found, pending := -1, false, false
+	uid, found, pending, sawPCB, sawOwn, truncated := -1, false, false, false, false, false
 	for off+8 <= len(b) {
 		n := int(order.Uint32(b[off:]))
 		kind := order.Uint32(b[off+4:])
 		if n < 8 || off+n > len(b) {
+			truncated = true
 			break // a short read
 		}
 		if n == header && off+n == len(b) {
@@ -69,12 +70,16 @@ func parsePCBList(b []byte, client, server netip.AddrPort, le bool) (int, error)
 		item := b[off : off+n]
 		switch kind {
 		case xsoInpcb: // every item is checked: one changed struct changes them all
+			sawPCB = true
 			if !knownInpcbLens[n] {
 				return -1, fmt.Errorf("%w: an inpcb item of %d bytes", ErrLayout, n)
 			}
 			local, ok1 := pcbAddr(item, inpcbLAddr, inpcbLPort)
 			remote, ok2 := pcbAddr(item, inpcbFAddr, inpcbFPort)
 			pending = ok1 && ok2 && local == client && remote == server
+			if ok1 && ok2 && local == server && remote == client {
+				sawOwn = true // this process's own end of the connection
+			}
 		case xsoSocket:
 			if !knownSocketLens[n] {
 				return -1, fmt.Errorf("%w: a socket item of %d bytes", ErrLayout, n)
@@ -91,6 +96,12 @@ func parsePCBList(b []byte, client, server netip.AddrPort, le bool) (int, error)
 		off += (n + 7) &^ 7
 	}
 	if !found {
+		if !truncated && (!sawPCB || sawOwn) {
+			// macOS 27 shows a process signed the usual way (the published releases) none of the sockets, or only its own (#12529): the server's end of this very connection is in the table
+			// and the client's is not, which a table that shows everyone's sockets cannot do (the client's was made first). That is the OS hiding the table from this process, not a
+			// connection with no row.
+			return -1, fmt.Errorf("%w: the table does not show other processes' sockets to this process", ErrLayout)
+		}
 		return -1, ErrNotFound
 	}
 	return uid, nil

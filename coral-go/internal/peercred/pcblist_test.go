@@ -102,9 +102,10 @@ func TestParsePCBList(t *testing.T) {
 		assert.Equal(t, 503, uid)
 	})
 	t.Run("the ends must match the right way round", func(t *testing.T) {
-		b := pcbList(le, pcb{inpIPv4, server, client, 501, false}) // the server's own accepted socket
+		b := pcbList(le, pcb{inpIPv4, server, client, 501, false}, other) // the server's own accepted socket, and one that is neither end
 		_, err := parsePCBList(b, client, server, true)
-		assert.True(t, errors.Is(err, ErrNotFound), "%v", err)
+		assert.False(t, err == nil, "the server's end is not the client's: its owner is never read as the client's")
+		assert.ErrorIs(t, err, ErrLayout, "the server's own end without the client's: the OS shows this process only its own sockets (#12529)")
 	})
 	t.Run("::1 is not 0.0.0.1", func(t *testing.T) {
 		b := pcbList(le, pcb{inpIPv4, netip.MustParseAddrPort("0.0.0.1:51234"), netip.MustParseAddrPort("0.0.0.1:8420"), 501, false})
@@ -159,4 +160,26 @@ func TestParsePCBList(t *testing.T) {
 			assert.ErrorIs(t, err, ErrLayout, name)
 		}
 	})
+}
+
+// #12529: macOS 27 hands a process signed the usual way (Developer ID, hardened runtime: the published releases) an EMPTY pcblist_n, header and trailer only, 48 bytes, with no
+// error, where a linker-signed local build sees every socket. A real table always holds the listener and the client's own connection, so an empty one is the OS hiding the table
+// from this process: the layout answer (the check is unavailable, no local-only powers, the dashboard says so), not "no row for this connection", which refused every sign-in
+// link and every command-line request on a signed release.
+func TestAnEmptySocketTableIsTheOSHidingItNotAMissingRow(t *testing.T) {
+	client := netip.MustParseAddrPort("127.0.0.1:51234")
+	server := netip.MustParseAddrPort("127.0.0.1:8420")
+	empty := pcbList(binary.LittleEndian) // what the kernel sent: a header and a trailer, 48 bytes
+	require.Len(t, empty, 48)
+	_, err := parsePCBList(empty, client, server, true)
+	assert.ErrorIs(t, err, ErrLayout)
+	assert.NotErrorIs(t, err, ErrNotFound)
+
+	// the server's own end of the connection and not the client's is the same answer (a signed process sees only its own sockets)
+	_, err = parsePCBList(pcbList(binary.LittleEndian, pcb{inpIPv4, server, client, 501, false}), client, server, true)
+	assert.ErrorIs(t, err, ErrLayout)
+
+	// a table that has sockets, none of them the client's, is still a missing row
+	_, err = parsePCBList(pcbList(binary.LittleEndian, pcb{inpIPv4, netip.MustParseAddrPort("127.0.0.1:1111"), server, 501, false}), client, server, true)
+	assert.ErrorIs(t, err, ErrNotFound)
 }
