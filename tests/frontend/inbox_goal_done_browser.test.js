@@ -57,14 +57,15 @@ const B = 'goal-done-' + Date.now().toString(36);
         assert.match(rows[0].text, /Done when: it is shipped/);
         assert.deepEqual(rows[0].buttons.filter(b => /^(Close goal|Not yet|Ignore)$/.test(b)), ['Close goal', 'Not yet', 'Ignore']);
         const badge = async () => Number(await ev(`(document.getElementById('nav-tab-hub-inbox-badge') || {}).textContent || 0`));
-        const withItem = await badge(); assert.ok(withItem >= 1, 'the item is in the Inbox number: ' + withItem);
+        const diag = async () => { try { return ' DIAG ' + JSON.stringify(await ev(`(async () => { const s = (await (await fetch('/api/settings')).json()).settings, n = await (await fetch('/api/needs-you?limit=50')).json(); return { now: Date.now(), nowIso: new Date().toISOString(), tz: Intl.DateTimeFormat().resolvedOptions().timeZone, quiet: s.goal_done_quiet_minutes, hidden: s.goal_done_hidden, read: s.goal_done_read, items: (n.items || []).filter(i => /goal_done/.test(i.kind || i.id || '')).map(i => ({ id: i.id, since: i.waiting_since || i.since || i.at })), badge: (document.getElementById('nav-tab-hub-inbox-badge') || {}).textContent, path: location.pathname, rows: [...document.querySelectorAll('tbody tr')].map(tr => tr.textContent.trim().slice(0, 60)).slice(0, 6), goalsOpen: !!document.querySelector('.goals-open'), text: document.body.innerText.slice(0, 200) }; })()`)); } catch (e) { return ' DIAG failed ' + e; } };
+        const withItem = await badge(); assert.ok(withItem >= 1, 'the item is in the Inbox number: ' + withItem + await diag());
         const asked = await root('GET', '/api/needs-you?limit=50');
         assert.ok(asked.json.items.some(i => i.kind === 'goal_done' && i.id === `goal_done:${B}:${gid}`), 'the phone-push read has it too');
 
         // Not yet: gone here and on the machine, until a task is added
         await ev(`[...document.querySelectorAll('${T} tbody tr')].find(tr => /looks done/.test(tr.textContent)).querySelector('button[aria-label^="Not yet"]').click(); true`);
         await waitFor(`!/looks done/.test(document.querySelector('${T}')?.textContent || '')`, 'the item gone after Not yet', 8000);
-        assert.equal(await badge(), withItem - 1, 'and out of the Inbox number');
+        assert.equal(await badge(), withItem - 1, 'and out of the Inbox number' + await diag());
         const saved = (await root('GET', '/api/settings')).json.settings.goal_done_hidden;
         assert.deepEqual(JSON.parse(saved), [`${B}|${gid}|1`], 'kept on the machine at the total it was pressed at');
         assert.ok(!(await root('GET', '/api/needs-you?limit=50')).json.items.some(i => i.id === `goal_done:${B}:${gid}`), 'the phone push does not keep announcing it');

@@ -56,6 +56,7 @@ const B = 'needs-goal-back-' + Date.now().toString(36);
 
         // #11964 (QA2's INFO on #11950): Back to a scrolled Needs you list keeps the row's place and its focus. A short window so the nine rows scroll; a real mouse click on a row far down; Back; the list is scrolled
         // to where it was and the row that was opened is still on screen and holds the focus.
+        const diag = async () => { try { return ' DIAG ' + JSON.stringify(await ev(`(async () => { const s = (await (await fetch('/api/settings')).json()).settings, n = await (await fetch('/api/needs-you?limit=50')).json(); return { now: Date.now(), nowIso: new Date().toISOString(), tz: Intl.DateTimeFormat().resolvedOptions().timeZone, quiet: s.goal_done_quiet_minutes, hidden: s.goal_done_hidden, read: s.goal_done_read, items: (n.items || []).filter(i => /goal_done/.test(i.kind || i.id || '')).map(i => ({ id: i.id, since: i.waiting_since || i.since || i.at })), badge: (document.getElementById('nav-tab-hub-inbox-badge') || {}).textContent, path: location.pathname, rows: [...document.querySelectorAll('tbody tr')].map(tr => tr.textContent.trim().slice(0, 60)).slice(0, 6), goalsOpen: !!document.querySelector('.goals-open'), text: document.body.innerText.slice(0, 200) }; })()`)); } catch (e) { return ' DIAG failed ' + e; } };
         for (const [w, mobile] of [[1280, false], [390, true]]) {
             const at = `${w} px, a scrolled list: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: 420, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
@@ -67,7 +68,7 @@ const B = 'needs-goal-back-' + Date.now().toString(36);
             await new Promise(r => setTimeout(r, 300)); // sleep-ok: the scroll settles
             const pos = await ev(`(() => { const el = [...document.querySelectorAll('${T} tbody tr')].filter(tr => /looks done/.test(tr.textContent)).slice(-2)[0].querySelector('.inbox-review-name'), r = el.getBoundingClientRect(); return { x: r.left + Math.min(r.width / 2, 20), y: r.top + r.height / 2, top: ${SCROLLER}.scrollTop }; })()`);
             for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) await client.Input.dispatchMouseEvent({ type, x: pos.x, y: pos.y, button: type === 'mouseMoved' ? 'none' : 'left', buttons: type === 'mousePressed' ? 1 : 0, clickCount: type === 'mouseMoved' ? 0 : 1 });
-            await waitFor(`!!document.querySelector('.goals-open')`, at + 'the goal opened by a real click', 10000);
+            await waitFor(`!!document.querySelector('.goals-open')`, at + 'the goal opened by a real click', 10000).catch(async e => { e.message += await diag() + ' POS ' + JSON.stringify(pos); throw e; });
             await ev(`history.back(); true`);
             await waitFor(`!document.querySelector('.goals-open') && /looks done/.test(document.querySelector('${T}')?.textContent || '')`, at + 'back on the list', 10000);
             await new Promise(r => setTimeout(r, 600)); // sleep-ok: the folder draws after the route and restores its place
