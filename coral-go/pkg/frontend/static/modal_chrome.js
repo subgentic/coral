@@ -69,6 +69,9 @@ export function bindNativeDialog(dialog, { remove = true } = {}) {
     if (remove) dialog.addEventListener('close', () => dialog.remove());
 }
 
+/** A dialog that stays in the page (built once, shown and hidden) says how it closes: Escape and the backdrop call `hide` instead of setting display:none, which left it half open (#12290). */
+export function setDialogHide(modal, hide, { backdrop = false } = {}) { registered.set(modal, { hide, backdrop }); }
+
 /** Close any dialog the way Escape does (its registered close, else its hide function, else display:none). For a close button wired by an action. */
 export function closeDialog(modal) { if (modal) hideDialog(modal); }
 
