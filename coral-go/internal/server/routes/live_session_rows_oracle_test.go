@@ -59,6 +59,7 @@ func lsrRows(t *testing.T, h *SessionsHandler, old, full bool) string {
 			delete(r, "commit_short")         // new in #11580 (the short commit of a detached checkout, in place of the word HEAD): the old implementation has no such field; detached_commit_test.go pins it
 			delete(r, "notices_waiting")      // new in #11387 (how many notices are held)
 			delete(r, "notices_holding")      // new in #11387 (held only while the person types to the agent)
+			delete(r, "coral_token_problem")  // new in #12291 (a woken agent whose token was not accepted): the old implementation has no such field; wake_token_check_test.go pins it through the list
 			delete(r, "last_message")         // new in #11097 (the newest message of the transcript, for the phone list): the old implementation has no such field; last_message_e2e_test.go pins it through the list
 			delete(r, "current_directory")    // new in #11704 (where the agent is now, when that is another worktree of its repository): the old implementation has no such field; current_directory_row_test.go pins it
 			delete(r, "at_dialog")            // new in #11437 (an agent at a prompt, read from its screen by the dialog watcher): the old implementation has no such field; dialog_watch_test.go pins it through the list

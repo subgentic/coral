@@ -67,6 +67,17 @@ func (db *DB) MintSessionToken(ctx context.Context, sessionID, sessionName strin
 	return token, nil
 }
 
+// LiveSessionTokenCreated is when the session's live (not revoked) token was minted, "" when it has none. A wake compares it before and after the agent started: a different answer means a later
+// launch line replaced the token the agent was started with (#12291).
+func (db *DB) LiveSessionTokenCreated(ctx context.Context, sessionID string) (string, error) {
+	var at string
+	err := db.GetContext(ctx, &at, `SELECT created_at FROM session_tokens WHERE session_id = ? AND revoked_at IS NULL ORDER BY created_at DESC, rowid DESC LIMIT 1`, sessionID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	return at, err
+}
+
 // RevokeAllSessionTokens revokes every live session token, and their proof keys with them: what an agent of an earlier run
 // still holds is refused from now on, and each agent gets a new token when it is next launched. For a start that made the data
 // folder private (config.DataDirMadePrivate). It returns how many it revoked.

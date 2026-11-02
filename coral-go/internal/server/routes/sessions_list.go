@@ -228,6 +228,13 @@ func (h *SessionsHandler) liveSessionRows(r *http.Request, trace *phaseTrace, fu
 	h.addSessionGoals(r.Context(), sessions)
 	h.addWaitsOnThis(r, sessions)
 	h.addTeamHealth(r, sessions)
+	for _, row := range sessions { // a woken agent whose Coral token was not accepted says so on its card (#12291)
+		if sid, _ := row["session_id"].(string); sid != "" {
+			if s := tokenProblemOf(sid); s != "" {
+				row["coral_token_problem"] = s
+			}
+		}
+	}
 	return archivedLast(sessions), nil
 }
 

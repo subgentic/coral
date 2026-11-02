@@ -21,6 +21,10 @@ var SessionTokenMinter func(sessionID, sessionName string) string
 // files go. The server sets it with SessionTokenMinter.
 var SessionTokenFileRemover func(sessionID string)
 
+// SessionTokenFileFor is the path of the token file the session's last launch line was given ("" when none is known). The server sets it with SessionTokenMinter; a wake reads it to see whether the
+// agent's shell took its token (the line reads the file and deletes it, except a Codex agent's, #13).
+var SessionTokenFileFor func(sessionID string) string
+
 // sessionTokenPrefix is the start of a launch line that gives the agent its token
 // (#3387): the shell reads the token from the file into CORAL_SESSION_TOKEN and deletes
 // the file, before the CLI starts. Only the file's path is typed, so the token is never

@@ -27,6 +27,7 @@ var systemPostAllowed = map[string]struct {
 	"routes/agent_exit.go autoResume":                   {1, "a live @title and a constant sentence"},
 	"routes/auto_review.go autoDelegateReview":          {3, "reviewer names through teamhealth.Name, task numbers, fixed words"},
 	"routes/auto_review.go healthBudgetReached":         {1, "a live @orchestrator and a number"},
+	"routes/wake_token_check.go checkWakeToken":         {1, "a live @title and a constant sentence (#12291)"},
 	"routes/auto_wake.go sendAutoWakeNotice":            {1, "a live @title and a constant sentence"},
 	"routes/orchestrator_agents.go sayLifecycle":        {1, "the seat's and the target's names (cleaned, no @, cut at 60) and a fixed sentence: no stored text is quoted (#11432)"},
 	"routes/orchestrator_agents.go tellWoken":           {1, "a live @member of the board (cleaned) and one constant sentence: never any text of the caller's (#11432)"},
