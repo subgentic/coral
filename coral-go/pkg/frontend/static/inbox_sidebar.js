@@ -21,9 +21,9 @@ import { operatorAsks, refreshOperatorAsks, askLine, askPlain, askKey, openAskDi
 import { go, note, backIs, currentRoute } from './nav.js';
 
 import { build, keyRoute, parse as parseRoute, inboxFolderPath, BOARDS_FOLDER, BOARDS_SUB } from './routes.js';
-import { sessionServer, keyLabel, identityKey, splitKey, goalTeamKey, nativeInbox, decisionNeedsPerson, LOCAL_SERVER } from './server_base.js';
+import { sessionServer, keyLabel, identityKey, splitKey, goalTeamKey, nativeInbox, decisionNeedsPerson, LOCAL_SERVER, boardFetch } from './server_base.js';
 import { teamLabel } from './server_status.js';
-import { showView } from './utils.js';
+import { showView, showToast, OPERATOR_ID } from './utils.js';
 import { registerActions, textOf } from './actions.js';
 import { tableMarkup, registerGroupSource, refreshGroupTable, openGroupTable, foldWayBack } from './sidebar_groups.js';
 import { isPhoneLayout } from './phone_layout.js';
@@ -512,6 +512,13 @@ async function refreshTasks() {
 // ── Goals ────────────────────────────────────────────────────────────────
 let goals = []; // the open goals of every team (GET /api/goals): id, board_id, title, outcome, state, rollup, updated_at
 const goalKey = g => `${g.board_id}#${g.id}`;
+/** The phone's bulk action on selected goals of any team: Close as Done or Dropped with a reason, one request per goal on its own team (#12230). */
+const closeGoalsActions = () => [{ label: 'Close goals', danger: true,
+    choose: { label: 'Close as', options: () => [{ value: 'done', label: 'Done' }, { value: 'dropped', label: 'Dropped' }], text: { label: 'Reason for closing', maxLength: 300 } },
+    confirm: n => `Close ${n} goals? Any open tasks stay open.`,
+    run: async (picked, keys, as, reason) => { if (!reason) return; let done = 0, failed = 0;
+        for (const g of picked) { try { const r = await boardFetch(g.board_id, `/goals/${g.id}/close`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: OPERATOR_ID, state: as, reason }) }); if (!r.ok) throw new Error('Close failed'); goalsState.selected.delete(goalKey(g)); done++; } catch { failed++; } }
+        showToast(`Closed ${done} goals${failed ? `; ${failed} failed and remain selected` : ''}`, !!failed); await refreshGoals(); renderInboxNav(true); } }];
 const goalTeam = g => teamLabel(g.board_id); // with its computer when a hub has more than one: two teams called alpha are two (#8774)
 let goalFilters = GF.loadFilters(), goalBar = null;
 let activityFilters = AF.loadFilters(), activityBar = null;
@@ -962,7 +969,8 @@ registerGroupSource('hub-inbox', {
             const waitingGoals = goalProposals().length, waitingNote = waitingGoals ? `${waitingGoals} goal${waitingGoals === 1 ? '' : 's'} an agent proposed ${waitingGoals === 1 ? 'is' : 'are'} waiting for your approval in Needs you.` : '';
             return { title: 'Goals', noun: ['goal', 'goals'], rows, ...(waitingNote ? { note: waitingNote } : {}), empty: { line: GF.isFiltered(goalFilters) ? 'No goal matches the search and filters.' : 'No open goals.', hint: waitingNote || (GF.isFiltered(goalFilters) ? undefined : "A team's Goals tab has New goal; an Orchestrator can propose one too.") },
                 signature: JSON.stringify(rows.map(g => [g.board_id, g.id, g.title, g.outcome, g.state, g.updated_at, g.rollup])),
-                node: () => DT.dataTable({ label: `Goals, ${rows.length}`, rows, rowKey: goalKey, state: goalsState, rowName: g => g.title,
+                node: () => { const phone = isPhoneLayout(), mountBar = () => { const bar = document.querySelector('#group-table-view .gt-toolbar'); if (bar) { Toolbar.mountSelection(bar, goalsState.selected.size ? table.bar : null); bar.querySelectorAll('.dt-select-toggle').forEach(b => b.remove()); } }; const table = DT.dataTable({ label: `Goals, ${rows.length}`, rows, rowKey: goalKey, state: goalsState, rowName: g => g.title,
+                    ...(phone ? { selectable: { contextKey: 'inbox-goals', longPress: true, iconBar: true, clearLabel: 'Cancel', canSelect: g => ['proposed', 'active', 'blocked'].includes(String(g.state || '').toLowerCase()), actions: closeGoalsActions(), onChange: () => mountBar() } } : {}), // a phone: a long press selects, as in Needs you (#12230)
                     open: g => {
                         quietFocus($('inbox-view')); // same pointer-only heading focus rule as the team page
                         goalOpener = { team: g.board_id, id: g.id };

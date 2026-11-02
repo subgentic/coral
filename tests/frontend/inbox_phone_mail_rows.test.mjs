@@ -16,7 +16,7 @@ const calls = [];
 globalThis.fetch = window.fetch = async url => {
     const p = new URL(url, 'https://coral.example').pathname; calls.push(p);
     if (p === '/api/board/projects') return Response.json([{ project: 'beta-team', board_label: 'Beta team' }, { project: 'alpha-team', board_label: 'Alpha team' }]);
-    if (p === '/api/goals') return Response.json({ goals: [{ id: 7, board_id: 'alpha-team', title: 'Ship the Hub', outcome: 'The Hub is live', state: 'active', updated_at: new Date(Date.now() - 3600e3).toISOString(), rollup: { total: 2, done: 1 } }] });
+    if (p === '/api/goals') return Response.json({ goals: [{ id: 7, board_id: 'alpha-team', title: 'Ship the Hub', outcome: 'The Hub is live', state: 'active', updated_at: new Date(Date.now() - 3600e3).toISOString(), rollup: { total: 2, done: 1, active: 1 } }] });
     return Response.json({});
 };
 const settle = ms => new Promise(r => setTimeout(r, ms));
@@ -36,15 +36,15 @@ try {
     const row = document.querySelector('#group-table-view .dt-mailed');
     assert.ok(row, 'Goals is mail rows on a phone');
     assert.equal(row.querySelector('.dt-mail-title').textContent, 'Ship the Hub');
-    assert.equal(row.querySelector('.dt-mail-snippet').textContent, 'The Hub is live');
-    assert.ok(row.querySelector('.dt-mail-time').textContent.length > 0, 'with its time');
+    assert.equal(row.querySelector('.dt-mail-ask').textContent, 'The Hub is live', 'the outcome is the row\'s second line (#12230)');
+    assert.equal(row.querySelector('.dt-mail-time').textContent, 'Active \u00b7 1/2', 'with its state and task count');
     assert.equal(row.querySelector('.dt-mail-avatar').textContent, 'flag');
     // the other two folders carry their rows' spec
     const sidebar = read('static/inbox_sidebar.js'), arts = read('static/team_artifacts_page.js');
     assert.match(sidebar, /mail: f => \(\{ lead: \{ text: f\.title \|\| f\.which, name: f\.title \|\| f\.which \}, title: f\.title \|\| f\.which, medium: true, snippet: f\.snip, time: f\.saved, data: \{ id: String\(f\.id\) \}, tip: multi && f\.serverName \? `\$\{f\.which\} \\u00b7 \$\{f\.serverName\}` : '' \}\)/, 'Saved: who it is from (a name, so medium), the message as its name cuts it, when it was saved, the computer on the hover, and its id on the button (Back finds the row again, #9783)');
     assert.doesNotMatch(sidebar, /dock \? \{\} : \{ mail:/, "the agent dock's Saved tab has the mail row too, the same one as the Inbox page (#9786: it was a table on a phone with a Done button on every row)");
-    assert.match(arts, /\.\.\.\(inbox \? \{ mail: item => \(\{ lead: \{ icon: 'description'/, 'Artifacts of the Inbox: a file glyph, the name, its team and task');
-    assert.ok(!/mail:/.test(arts.slice(0, arts.indexOf('...(inbox ? { mail:'))), 'only the Inbox list, not the team page, agent or goal lists');
+    assert.match(arts, /\.\.\.\(inbox \|\| phoneTeam \? \{ mail: item => \(\{ data: \{ artifactId: itemKey\(item\) \}, lead: \{ icon: 'description'/, 'Artifacts of the Inbox: a file glyph, the name, its team and task');
+    assert.ok(!/mail:/.test(arts.slice(0, arts.indexOf('...(inbox || phoneTeam ? { mail:'))), 'only the Inbox list and a team list on a phone (#12230), not an agent or goal list');
     // a board of the group opens that board's messages in the Inbox (its address), not the Board history folder
     folderButtons().find(b => /^[a-z_]*Alpha team/.test(b.textContent.trim())).click(); await settle(500);
     assert.equal(location.pathname, '/inbox/boards/alpha-team', 'the board opens in the Inbox at its address');

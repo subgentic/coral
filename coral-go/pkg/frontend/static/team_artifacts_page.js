@@ -8,7 +8,12 @@ import { boardFetch, serverUrl, isCloud, splitKey, keyLabel, isBoardAnswer, isBo
 import { whenText } from './when_text.js';
 import { pollEvery } from './overload.js';
 import { importOnce } from './import_once.js';
+<<<<<<< HEAD
 import { nameSpan } from './agent_live.js';
+=======
+import { loadStyles } from './lazy_styles.js';
+await loadStyles('phone_lists.css'); // the phone form of a team list (#12230); not at start (page_weight)
+>>>>>>> e4cc81143
 import { browserLocal } from './safe_storage.js';
 import { renderArtifact } from './artifact_preview.js';
 import { showToast } from './utils.js';
@@ -328,9 +333,11 @@ export function createArtifactsList({ inbox = false } = {}) {
         if (model.items.length || artifactState.selected.size) {
             const by = !model.scope && !inbox ? model.filters.group : ''; // the team's list read by task or goal: a head per group, its files together (an agent's list is not grouped)
             const shown = by ? orderByGroup(model.items, by) : model.items;
+            const phoneTeam = !inbox && !model.scope && matchMedia('(max-width: 760px)').matches; // a team's own list on a phone: the shared phone form (#12230)
+            if (phoneTeam) toolbarRow?.classList.add('phone-list-bar');
             const table = artifactTable({
-                label: `Artifacts, ${model.items.length}`, ...(inbox ? { layout: 'fixed' } : {}), bare: !!model.scope, compact: !!model.scope, fold: model.scope ? 'none' : 'column', foldAt: 40, rows: shown, groupBy: by ? (it) => groupHead(it, by, shown, !model.hasMore) : undefined, rowKey: itemKey, current: detailKey(), sortBar: inbox, state: artifactState, rowName: item => Tags.nameWithTags(readableName(item), item.tags),
-                selectable: model.scope ? null : { contextKey: model.key, canSelect: item => !!linkOf(item)?.preview, actions: artifactBulkActions(), onChange: keys => Toolbar.mountSelection(toolbarRow, keys.size ? table.bar : null) },
+                label: `Artifacts, ${model.items.length}`, ...(inbox ? { layout: 'fixed' } : {}), bare: !!model.scope || phoneTeam, compact: !!model.scope, fold: model.scope ? 'none' : 'column', foldAt: 40, rows: shown, groupBy: by ? (it) => groupHead(it, by, shown, !model.hasMore) : undefined, rowKey: itemKey, current: detailKey(), sortBar: inbox && !phoneTeam, state: artifactState, rowName: item => Tags.nameWithTags(readableName(item), item.tags),
+                selectable: model.scope ? null : { contextKey: model.key, canSelect: item => !!linkOf(item)?.preview, actions: artifactBulkActions(), onChange: keys => Toolbar.mountSelection(toolbarRow, keys.size ? table.bar : null), ...(phoneTeam ? { longPress: true, iconBar: true, clearLabel: 'Cancel' } : {}) },
                 open: (item, tr) => openArtifact(item, tr.querySelector('.dt-primary')),
                 paged: model.hasMore || model.truncated,
                 onPageSort: sort => setFilters({ ...model.filters, sort }),
@@ -342,7 +349,7 @@ export function createArtifactsList({ inbox = false } = {}) {
                     if (origin) note.classList.add(`team-artifact-badge-${isUnverified(item) ? 'unverified' : item.source === 'shared' ? 'shared' : 'received'}`);
                     if (isUnverified(item)) note.classList.add('dt-warning'); return note;
                 },
-                ...(inbox ? { mail: item => ({ lead: { icon: 'description', square: true, name: String(readableName(item)).split('.').pop() }, title: readableName(item), starred: !!item.starred, snippet: [placeOf(item), taskText(item)].filter(Boolean).join(' · '), time: DT.timeCell(item.updated_at || item.created_at).textContent, tip: [multipleServers() ? `${item.team || keyLabel(item.board_id)} \u00b7 ${serverLabel(serverOf(item))}` : placeOf(item), taskText(item)].filter(Boolean).join(' \u00b7 ') }) } : {}), // a phone's row (#9583): its hover names the team and the computer, as the dropped columns did: a file glyph, the name, its team and task, when it changed
+                ...(inbox || phoneTeam ? { mail: item => ({ data: { artifactId: itemKey(item) }, lead: { icon: 'description', square: true, name: String(readableName(item)).split('.').pop() }, title: readableName(item), starred: !!item.starred, snippet: [placeOf(item), taskText(item)].filter(Boolean).join(' · '), time: DT.timeCell(item.updated_at || item.created_at).textContent, tip: [multipleServers() ? `${item.team || keyLabel(item.board_id)} \u00b7 ${serverLabel(serverOf(item))}` : placeOf(item), taskText(item)].filter(Boolean).join(' \u00b7 ') }) } : {}), // a phone's row (#9583): its hover names the team and the computer, as the dropped columns did: a file glyph, the name, its team and task, when it changed
                 updatedWidth: model.scope ? '' : '9rem', // the lists with a Goal column keep "yesterday 3:00 AM" whole (the narrow lists drop nothing here and keep 7.5 rem)
                 tagsDropAt: inbox ? 62 : 0, // the Inbox list is crowded (a team, a task): its Tags go first, before Team and Task
                 afterName: [...(inbox ? (model.filters.team
@@ -357,8 +364,8 @@ export function createArtifactsList({ inbox = false } = {}) {
                     more: model.hasMore ? { label: 'Load more', busy: !!model.controller, run: () => { if (!model.loadingMore) loadArtifacts({ append: true }); } } : null },
             });
             // This table never folds: optional columns disappear as its container narrows.
-            body.append(table.el); Toolbar.mountSelection(toolbarRow, artifactState.selected.size ? table.bar : null);
-            if (!model.scope && matchMedia('(max-width: 760px)').matches) toolbarRow?.append(table.selectButton);
+            if (phoneTeam) { const bleed = document.createElement('div'); bleed.className = 'goals-bleed'; bleed.append(table.el); body.append(bleed); } else body.append(table.el); Toolbar.mountSelection(toolbarRow, artifactState.selected.size ? table.bar : null);
+            if (!model.scope && !phoneTeam && matchMedia('(max-width: 760px)').matches) toolbarRow?.append(table.selectButton); // a team's list on a phone selects by long press, with no Select button
         }
         if (model.truncated) body.append(el('p', 'goals-note', 'Some older artifacts are not included in this list.'));
         if (!model.scope) {

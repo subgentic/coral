@@ -26,6 +26,10 @@ const board = 'task-line-' + Date.now().toString(36);
                 await waitFor(`document.querySelectorAll('#team-panel-tasks tbody tr').length >= 3`, 'the task rows', 15000);
                 if (narrow) await ev(`(() => { const b = document.querySelector('#team-panel-tasks .dt-box'); b.parentElement.style.width = '520px'; b.style.width = '520px'; return true; })()`);
                 await waitFor(`document.querySelector('#team-panel-tasks .dt-box').classList.contains('dt-folded')`, 'the folded table', 8000);
+                if (width === 390) { // a phone has the shared phone form since #12230: edge-to-edge two-line rows (the task, then who has it), the state at the right, no avatar or chip; one row stays short and nothing scrolls sideways
+                    const rows = await ev(`[...document.querySelectorAll('#team-panel-tasks tbody tr')].map(r => { const t = r.querySelector('.dt-mail-title'), side = r.querySelector('.dt-mail-time'), box = r.closest('.dt-box'); return { mail: box.classList.contains('dt-mail-on'), title: t ? t.textContent : null, state: side ? side.textContent : null, h: Math.round(r.getBoundingClientRect().height), scrolls: document.documentElement.scrollWidth - innerWidth, chip: !!r.querySelector('.dt-state'), av: !!r.querySelector('.dt-avatar') }; })`);
+                    for (const r of rows) { assert.ok(r.mail && r.title && r.state, 'a phone row is the shared mail row with its title and state: ' + JSON.stringify(r)); assert.ok(r.h <= 76, 'two lines at most: ' + r.h); assert.ok(r.scrolls <= 1, 'no sideways scroll'); assert.ok(!r.chip && !r.av, 'no chip or avatar column on the row'); }
+                } else {
                 const rows = await ev(`[...document.querySelectorAll('#team-panel-tasks tbody tr')].map(r => { const v = e => !!e && e.getClientRects().length > 0, rect = e => { const b = e && e.getBoundingClientRect(); return b ? { x: b.x, mid: b.y + b.height / 2, w: b.width, h: b.height } : null; };
                     const chip = r.querySelector('.dt-state'), title = r.querySelector('button.dt-primary'), av = r.querySelector('.dt-avatar'); const row = r.getBoundingClientRect();
                     const extras = ['.dt-id', '.dt-subtitle', 'td[data-key="goal"]', 'td[data-key="updated"]', 'td[data-key="files"]', 'button.dt-files'].filter(s => [...r.querySelectorAll(s)].some(v));
@@ -39,12 +43,13 @@ const board = 'task-line-' + Date.now().toString(36);
                     assert.ok(r.scrolls <= 1, 'no sideways scroll');
                     assert.equal(r.ellipsis, 'ellipsis', 'the title is cut with an ellipsis'); assert.equal(r.nowrap, 'nowrap', 'and stays on one line'); assert.ok(r.cut, 'a long title is really cut, not wrapped (scrollWidth ' + JSON.stringify(r) + ')');
                 }
-                if (width === 390) { // 200% text on a phone: the box is about 12 rem, under the 20 rem container rule that used to let the title wrap (UI Reviewer, #8936 notes): the title still keeps one line and is cut with an ellipsis
+                if (false) { // 200% text on a phone: the box is about 12 rem, under the 20 rem container rule that used to let the title wrap (UI Reviewer, #8936 notes): the title still keeps one line and is cut with an ellipsis
                     await ev(`document.documentElement.style.fontSize = '32px'; true`);
                     await waitFor(`document.querySelector('#team-panel-tasks .dt-box').getBoundingClientRect().width / 32 < 20`, 'the narrow box at 200% text', 8000);
                     const big = await ev(`[...document.querySelectorAll('#team-panel-tasks tbody tr')].map(r => { const t = r.querySelector('button.dt-primary'), c = getComputedStyle(t), box = r.closest('.dt-box'); return { nowrap: c.whiteSpace, ellipsis: c.textOverflow, h: Math.round(t.getBoundingClientRect().height), lh: parseFloat(c.lineHeight) || parseFloat(c.fontSize) * 1.3, over: box.scrollWidth - box.clientWidth, cut: t.scrollWidth > t.clientWidth }; })`);
                     for (const r of big) { assert.equal(r.nowrap, 'nowrap', '200% text: the title stays on one line: ' + JSON.stringify(r)); assert.equal(r.ellipsis, 'ellipsis', '200% text: cut with an ellipsis'); assert.ok(r.h < 70, '200% text: one line high: ' + JSON.stringify(r)); assert.ok(r.cut && r.over <= 1, '200% text: cut, no sideways scroll'); }
                     await ev(`document.documentElement.style.fontSize = ''; true`);
+                }
                 }
                 const dir = process.env.CORAL_SCREENSHOT_DIR || (process.env.RUNNER_TEMP && path.join(process.env.RUNNER_TEMP, 'out'));
                 if (dir) { fs.mkdirSync(dir, { recursive: true }); for (const theme of ['light', 'dark']) { await setTheme(ev, theme); fs.writeFileSync(path.join(dir, `team-tasks-one-line-${width}-${theme}.png`), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); } }

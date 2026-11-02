@@ -59,13 +59,13 @@ const { coralReady } = require('./helpers/wait');
         await waitFor(`!!document.getElementById('team-task-title')`, 'the task page from a click on the row', 10000);
         console.log('   ✓');
 
-        console.log('2. Phone: the same table folded to two lines in a 44 px row');
+        console.log('2. Phone: the shared phone form (#12230): edge-to-edge two-line mail rows, the state at the right');
         await load(390, true);
-        await waitFor(`!!document.querySelector('#team-panel-tasks .dt-box').classList.contains('dt-folded')`, 'the table folds on a phone');
-        const p = await ev(`(() => { const rows = [...document.querySelectorAll('#team-panel-tasks .dt-table tbody tr')]; return { head: getComputedStyle(document.querySelector('#team-panel-tasks thead')).display, n: rows.length, h: rows.map(r => Math.round(r.getBoundingClientRect().height)), line1: rows.map(r => r.querySelector('td.dt-line-1').textContent.replace(/\\s+/g, ' ').trim()), chips: rows.map(r => r.querySelector('.dt-state').textContent), prio: rows.filter(r => r.querySelector('td[data-key="priority"]')).length, over: document.documentElement.scrollWidth - innerWidth }; })()`);
+        await waitFor(`!!document.querySelector('#team-panel-tasks .dt-box.dt-mail-on')`, 'the phone form: mail rows');
+        const p = await ev(`(() => { const rows = [...document.querySelectorAll('#team-panel-tasks .dt-table tbody tr')]; return { head: getComputedStyle(document.querySelector('#team-panel-tasks thead')).display, n: rows.length, h: rows.map(r => Math.round(r.getBoundingClientRect().height)), titles: rows.map(r => (r.querySelector('.dt-mail-title') || {}).textContent), states: rows.map(r => (r.querySelector('.dt-mail-time') || {}).textContent), over: document.documentElement.scrollWidth - innerWidth }; })()`);
         assert.equal(p.head, 'none', 'no header row on a phone'); assert.ok(p.n >= 5 && p.h.every(h => h >= 44), 'every row is at least 44 px ' + JSON.stringify(p.h));
-        assert.ok(!p.line1[0].startsWith('#') && p.chips.includes('In progress'), 'line 1 is the title (no number), line 2 the chip ' + JSON.stringify(p));
-        assert.equal(p.prio, 0, 'no Priority cell on a phone row ' + JSON.stringify(p)); assert.ok(p.over <= 1, 'no sideways scroll ' + p.over);
+        assert.ok(p.titles.every(t => t && !t.startsWith('#')) && p.states.includes('In progress'), 'each row is its title (no number) and its state at the right ' + JSON.stringify(p));
+        assert.ok(p.over <= 1, 'no sideways scroll ' + p.over);
         await shot('task-row-phone');
         await ev(`document.querySelector('#team-panel-tasks .dt-primary').click(); true`);
         await waitFor(`!!document.getElementById('team-task-title')`, 'the task page from the phone row', 10000);

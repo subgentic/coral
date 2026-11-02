@@ -12,6 +12,8 @@ const { agentLink } = await importOnce('./agent_link.js'); // an agent's name is
 const TV = await importOnce('./tasks_view.js'); // the one Tasks view: a task list is drawn by tasksTable
 const TB = await importOnce('./task_bulk.js'); // what the selection bar does to the selected tasks
 const Toolbar = await importOnce('./team_toolbar.js'); // the one toolbar of the team tabs (#7717)
+import { loadStyles } from './lazy_styles.js';
+await loadStyles('phone_lists.css'); // the phone form of a team list (#12230); not at start (page_weight)
 import { goalTitle, refreshGoalTitles, readGoal, readGoalChoices, noGoalLabel } from './task_goals.js';
 import { taskStatusWord, statusClass, isParked } from './goal_words.js';
 import { state } from './state.js';
@@ -235,7 +237,9 @@ function draw() {
     const query = TF.isQuery(model.filters), L = model.q, all = rowsNow(), failed = query ? L.error : model.failed;
     const c = counts();
     newTask = newTask || TV.newTaskButton();
+    if (PHONE.matches && !newTask.querySelector('.material-icons')) { newTask.textContent = ''; const i = el('span', 'material-icons', 'add'); i.setAttribute('aria-hidden', 'true'); newTask.append(i); newTask.classList.add('btn-icon'); } // a phone: a compact + with its name (#12230)
     // The one toolbar line (#7717): the list bar's own row holds the search, the state pills (one compact select when they do not fit), the Filters icon and + Task at the right.
+    if (PHONE.matches) bar.node.querySelector('.list-bar-search-row')?.classList.add('phone-list-bar');
     Toolbar.adopt(bar.node.querySelector('.list-bar-search-row'), {
         pills: { label: 'Show tasks that are', current: model.filter, items: FILTERS.map(([key, label]) => ({ key, label, count: c[key] })),
             onPick: key => { model.filter = key; if (key === 'open' || key === 'all') browserLocal.set(HIDE_KEY, key === 'open' ? 'true' : 'false'); say(`${FILTERS.find(f => f[0] === key)[1]}: ${c[key]} tasks`); draw(); } },
@@ -253,12 +257,13 @@ function draw() {
             const e = el('div', 'empty-state empty-state-tight'); e.append(el('p', 'empty-state-line', 'No tasks match this filter.'), btn('btn empty-state-action', 'Show all', () => { model.filter = 'all'; draw(); })); body.append(e);
         } else {
             const row = bar.node.querySelector('.list-bar-search-row');
+            const phone = PHONE.matches;
             const t = TV.tasksTable('team', shown, { ctx: rowCtx(), label: `Tasks, ${shown.length}`, open: (task) => hooks.openTask?.(task), state: model.dt,
-                selectable: { contextKey: model.project, actions: TB.taskBulkActions(model.project, () => { model.dt.selected.clear(); loadTasks(); }), onChange: (keys) => Toolbar.mountSelection(row, keys.size ? t.bar : null) } }); // the selection bar takes the toolbar's line while tasks are selected
+                ...(phone ? { bare: true, sortBar: false, mail: task => ({ lead: { icon: 'checklist', square: true, name: bucket(task) }, title: task.title, ask: [task.assigned_to, task.goal_id ? goalTitle(model.project, task.goal_id) : ''].filter(Boolean).join(' \u00b7 '), state: taskStatusWord(task.status, task.review_requested, isParked(task)), time: taskStatusWord(task.status, task.review_requested, isParked(task)), data: { taskId: String(task.id) } }) } : {}), // a phone: the shared form, edge-to-edge two-line rows (#12230)
+                selectable: { contextKey: model.project, actions: TB.taskBulkActions(model.project, () => { model.dt.selected.clear(); loadTasks(); }), onChange: (keys) => Toolbar.mountSelection(row, keys.size ? t.bar : null), ...(phone ? { longPress: true, iconBar: true, clearLabel: 'Cancel' } : {}) } }); // the selection bar takes the toolbar's line while tasks are selected
             Toolbar.mountSelection(row, model.dt.selected.size ? t.bar : null);
             row.querySelectorAll('.dt-select-toggle').forEach(b => b.remove());
-            if (PHONE.matches) { if (newTask && newTask.parentElement === row) newTask.before(t.selectButton); else row.append(t.selectButton); } // a phone enters Select mode from the toolbar line, before the action that stays last
-            body.append(t.el);
+            if (phone) { const bleed = el('div', 'goals-bleed'); bleed.append(t.el); body.append(bleed); } else body.append(t.el); // a phone: no Select button, a long press selects; the rows run to the screen's edges
         }
         const openLeft = !query && !!model.cursor && model.totalOpen != null && model.rows.filter(t => bucket(t) !== 'done').length < model.totalOpen; // more open tasks than the pages loaded (#9121)
         if (query ? queryHasMore() : (model.cursor && (openLeft || model.filter === 'all' || model.filter === 'done'))) body.append(btn('btn goals-more', model.loadingMore ? 'Loading…' : (query ? 'Load more' : openLeft ? 'Load more open tasks' : 'Load more done tasks'), loadMore));

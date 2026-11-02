@@ -45,13 +45,13 @@ const TABS = [['Goals', { pills: true, filters: false, action: 'New goal' }], ['
                     assert.equal(t.search, true, `${tab}: the search field is there`);
                     assert.equal(t.filters, want.filters, `${tab}: the Filters icon ${want.filters ? 'is' : 'is not'} there`);
                     assert.equal(t.more, !!want.more, `${tab}: More ${want.more ? 'is' : 'is not'} there`);
-                    assert.equal(t.action, want.action || '', `${tab}: the action`);
+                    assert.equal(t.action, mobile && ['Goals', 'Tasks'].includes(tab) ? 'add' : (want.action || ''), `${tab}: the action`); // Goals and Tasks have a compact + on a phone (#12230): its text is the icon's ligature, its name the words
                     if (want.pills) assert.ok(mobile || want.many ? t.select && !t.pills : t.pills && !t.select, `${tab}: ${mobile ? 'a phone has the compact select' : want.many ? 'seven pills with counts need 62 rem: the compact select stands in at 1280 (#9861)' : 'the pills are on the line'} (${JSON.stringify({ pills: t.pills, select: t.select })})`);
                     else assert.ok(!t.pills && !t.select, `${tab}: no pills`);
                     assert.ok(t.last, `${tab}: the action is the last control at the right`);
                     if (tab === 'Goals') { // the tasks that serve no goal are the table's last row, not a line under the toolbar
                         const last = await ev(`(() => { const p = document.querySelector('[role=tabpanel]:not([hidden])'); const rows = [...p.querySelectorAll('tbody tr')]; return { note: !!p.querySelector('p.goals-no-goal'), last: rows.length ? rows[rows.length - 1].textContent.replace(/\\s+/g, ' ').trim() : '' }; })()`);
-                        assert.equal(last.note, false, 'no no-goal line under the toolbar'); assert.match(last.last, /^1 task has no goal/, `the last row of the table says it: ${last.last}`);
+                        assert.equal(last.note, false, 'no no-goal line under the toolbar'); assert.match(last.last, /1 task has no goal/, /* a phone's mail row begins with its icon's ligature text (#12230) */  `the last row of the table says it: ${last.last}`);
                     }
                     if (tab !== 'Artifacts') assert.equal(t.counts, false, `${tab}: no count line under the toolbar`); // (Artifacts' one status line also carries its error and its empty sentence: asked about)
                     assert.ok(t.side <= 0, `${tab}: nothing scrolls sideways (${t.side})`);
