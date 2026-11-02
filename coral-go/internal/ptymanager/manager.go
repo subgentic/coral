@@ -543,6 +543,20 @@ func (m *PTYBackend) AdoptAgent(name string) {
 	}
 }
 
+// ShellPIDOf is the pid of the process a session's pseudo-terminal started, where the terminal reports it (#12111).
+func (m *PTYBackend) ShellPIDOf(name string) (int, bool) {
+	m.mu.RLock()
+	s, found := m.sessions[name]
+	m.mu.RUnlock()
+	if !found || !s.isRunning() {
+		return 0, false
+	}
+	if sp, can := s.proc.(shellPIDReporter); can && sp.ShellPID() > 0 {
+		return sp.ShellPID(), true
+	}
+	return 0, false
+}
+
 // handoffNoter is a session process that keeps the handoff script of its launch (Windows ConPTY, #391).
 type handoffNoter interface{ NoteLaunch(script, cli string) }
 

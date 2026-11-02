@@ -63,6 +63,10 @@ func startFailureSentence(agentType, code string) string {
 		return "failed to start: Windows will not open the folder the " + cli + " CLI is in. " + fix
 	case store.StartFailureCLIPath:
 		return "failed to start: the " + cli + " CLI path in Settings > CLI paths can't be run. " + fix + " Or clear it."
+	case store.StartFailureFolderGone:
+		return "failed to wake: the folder this agent worked in is gone, so it was not started. Restore the folder, or restart the agent in another one."
+	case store.StartFailureWakeFailed:
+		return "failed to wake: a message for this agent could not start it. Wake it from its page, or restart it."
 	}
 	return ""
 }

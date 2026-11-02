@@ -228,6 +228,13 @@ func (h *SessionsHandler) liveSessionRows(r *http.Request, trace *phaseTrace, fu
 	h.addSessionGoals(r.Context(), sessions)
 	h.addWaitsOnThis(r, sessions)
 	h.addTeamHealth(r, sessions)
+	if off, err := h.ss.AutoSleepOffSessions(r.Context()); err == nil && len(off) > 0 { // the Operator's per-agent opt-out (#12111), for the menu's wording
+		for _, row := range sessions {
+			if sid, _ := row["session_id"].(string); off[sid] {
+				row["auto_sleep_off"] = true
+			}
+		}
+	}
 	return archivedLast(sessions), nil
 }
 
@@ -671,7 +678,8 @@ func (h *SessionsHandler) sleepingRows(allLive []store.LiveSession, liveSIDs map
 			"sleeping":              true,
 			"archived":              ls.IsArchived == 1,
 			"sleep_reason":          sleepReason(ls),
-			"start_failure":         ptr.Value(ls.StartFailure), // why the last start was refused (a store.StartFailure code), apart from sleep_reason (#353)
+			"auto_asleep":           sleepReason(ls) == store.SleepReasonIdle, // put to sleep for being idle (#12111): available, and any delivery wakes it
+			"start_failure":         ptr.Value(ls.StartFailure),               // why the last start was refused (a store.StartFailure code), apart from sleep_reason (#353)
 			"start_failure_text":    startFailureSentence(ls.AgentType, ptr.Value(ls.StartFailure)),
 			"first_prompt":          h.sleepingFirstPrompt(ls),
 			"last_message":          h.lastMessageOf(ls.SessionID, ls.WorkingDir, ls.AgentType, false),

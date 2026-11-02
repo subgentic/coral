@@ -59,6 +59,7 @@ POST /api/board/{project}/tasks interact owner-sees
 POST /api/board/{project}/working-mode/presets interact owner-sees
 POST /api/hub-auto-accept launch owner-only-hub
 POST /api/saved interact owner-only
+POST /api/sessions/live/{name}/auto-sleep interact owner-only
 POST /api/sessions/live/{name}/dismiss-wait interact owner-only
 POST /api/sessions/live/{name}/notices/pause interact owner-only
 POST /api/sessions/live/{name}/notices/resume interact owner-only

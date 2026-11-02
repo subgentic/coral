@@ -24,6 +24,8 @@ type BoardNotifier struct {
 	logger       *slog.Logger
 	discoverFn   func(ctx context.Context) ([]AgentInfo, error)
 	isPausedFn   func(project string) bool
+	autoWakeFn   func(ctx context.Context, sessionID string) bool // wakes an auto-asleep agent a directed message or task is waiting for (#12111)
+	autoWakes    map[string][]time.Time                           // per board, when it woke agents: at most autoWakeBoardCap an hour
 	sleepingFn   func(ctx context.Context, sessionID string) bool // whether the session's row says it is sleeping: a Sleep team marks it before it pauses the board, so the lift never acts on a sleeping agent (#11204)
 	liftSleepFn  func(project string, seenAwake time.Time) bool   // lifts a pause that sleep put on the board (not a person's) unless it was made after seenAwake; true when it did (#11182, #11204)
 	pauseLogMu   sync.Mutex
@@ -84,6 +86,11 @@ func NewBoardNotifier(boardStore *board.Store, runtime AgentRuntime, interval ti
 // SetDiscoverFn sets a custom agent discovery function.
 func (n *BoardNotifier) SetDiscoverFn(fn func(ctx context.Context) ([]AgentInfo, error)) {
 	n.discoverFn = fn
+}
+
+// SetAutoWakeFn gives the notifier the way to wake an auto-asleep agent (#12111).
+func (n *BoardNotifier) SetAutoWakeFn(fn func(ctx context.Context, sessionID string) bool) {
+	n.autoWakeFn = fn
 }
 
 // SetSleepingFn gives the notifier the way to ask whether an agent's session row says it is sleeping.
@@ -325,6 +332,8 @@ func (n *BoardNotifier) runPassWith(ctx context.Context, boards map[string]bool,
 		}
 		n.nudgeAgent(ctx, pass, a, sessName)
 	}
+
+	n.wakeAutoAsleep(ctx, boards)
 
 	if onBoards != nil {
 		return nil
@@ -694,4 +703,24 @@ func (n *BoardNotifier) clearPausedNote(project string) {
 // pause time cannot refuse) still never acts for an agent that was put to sleep (QA's #11204 round 2).
 func (n *BoardNotifier) agentSleeping(ctx context.Context, sessionID string) bool {
 	return n.sleepingFn != nil && sessionID != "" && n.sleepingFn(ctx, sessionID)
+}
+
+// wakeAutoAsleep wakes the auto-asleep agents something directed is waiting for, one at a time; once an agent is up the pass that follows nudges it like any awake agent. Only a directed
+// item wakes (a mention, a reply, an assigned task): a broadcast to everyone does not.
+func (n *BoardNotifier) wakeAutoAsleep(ctx context.Context, boards map[string]bool) {
+	if n.autoWakeFn == nil {
+		return
+	}
+	needs, err := n.boardStore.AutoAsleepNeeds(ctx, boards)
+	if err != nil || len(needs) == 0 {
+		return
+	}
+	for _, need := range needs {
+		if ctx.Err() != nil {
+			return
+		}
+		if n.autoWakeFn(ctx, need.SessionID) {
+			n.NotifyBoard(need.Project) // the agent is up: the next pass nudges it
+		}
+	}
 }

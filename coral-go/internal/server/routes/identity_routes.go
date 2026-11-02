@@ -268,6 +268,7 @@ var operatorOnlyRoutes = map[string]string{
 	"POST /api/sessions/live/{name}/keys":                              "send keys to an agent's terminal",
 	"POST /api/sessions/live/{name}/answer-prompt":                     "answer an agent's permission prompt",
 	"POST /api/sessions/live/{name}/dismiss-wait":                      "dismiss an agent's stale wait",
+	"POST /api/sessions/live/{name}/auto-sleep":                        "turn an agent's auto-sleep off or on",
 	// #7554: Send now types the messages held for an agent at once (text into another agent's terminal, as keys does), and the list says who sent them: the Operator's.
 	"GET /api/sessions/live/{name}/waiting":                           "see what waits for an agent",
 	"POST /api/sessions/live/{name}/waiting/send":                     "type an agent's board nudge now",

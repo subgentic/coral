@@ -14,14 +14,15 @@ import (
 
 // Agent states, from what Coral can see (its terminal, its waits, its session record).
 const (
-	StateWorking = "working" // in a turn
-	StateWaiting = "waiting" // parked in coral-board wait
-	StatePrompt  = "prompt"  // stopped at a prompt that needs input
-	StateBlocked = "blocked" // stopped by a usage limit (its quota is used up): nothing to do until it resets (#5229)
-	StateIdle    = "idle"    // awake, in no turn and in no wait
-	StateAsleep  = "asleep"  // its session is asleep
-	StateOffline = "offline" // it has a session but nothing is running
-	StateUnknown = "unknown" // awake, but Coral has no signal of its state (no hook events)
+	StateWorking   = "working"   // in a turn
+	StateWaiting   = "waiting"   // parked in coral-board wait
+	StatePrompt    = "prompt"    // stopped at a prompt that needs input
+	StateBlocked   = "blocked"   // stopped by a usage limit (its quota is used up): nothing to do until it resets (#5229)
+	StateIdle      = "idle"      // awake, in no turn and in no wait
+	StateAsleep    = "asleep"    // its session is asleep
+	StateAvailable = "available" // auto-asleep (#12111): put to sleep for being idle; any delivery wakes it, so it is free for work and nothing to act on
+	StateOffline   = "offline"   // it has a session but nothing is running
+	StateUnknown   = "unknown"   // awake, but Coral has no signal of its state (no hook events)
 )
 
 // WaitEntry is one agent in a wait group.
@@ -111,6 +112,9 @@ func (r *Roster) headerCounts() string {
 	}
 	if n := r.Counts[StateUnknown]; n > 0 {
 		parts = append(parts, fmt.Sprintf("%d of unknown state", n))
+	}
+	if n := r.Counts[StateAvailable]; n > 0 {
+		parts = append(parts, fmt.Sprintf("%d available (auto-asleep)", n))
 	}
 	asleep := fmt.Sprintf("%d asleep", r.Counts[StateAsleep])
 	if r.SleeperBroadcasts > 0 {

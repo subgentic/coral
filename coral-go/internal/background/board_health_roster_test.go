@@ -36,7 +36,7 @@ func (h *checkHarness) sleeping(n int) {
 		db, err := sqlx.Open("sqlite", filepath.Join(h.t.TempDir(), "sessions.db"))
 		require.NoError(h.t, err)
 		h.t.Cleanup(func() { db.Close() })
-		_, err = db.Exec(`CREATE TABLE live_sessions (session_id TEXT PRIMARY KEY, is_sleeping INTEGER NOT NULL DEFAULT 0)`)
+		_, err = db.Exec(`CREATE TABLE live_sessions (session_id TEXT PRIMARY KEY, is_sleeping INTEGER NOT NULL DEFAULT 0, sleep_reason TEXT)`)
 		require.NoError(h.t, err)
 		h.s.SetSessionsDB(db)
 		h.sessions = db

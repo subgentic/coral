@@ -97,6 +97,9 @@ func (h *BoardHandler) sendAutomated(ctx context.Context, project, sessionName, 
 		}
 		return err
 	}
+	if h.idleWaker != nil && !h.idleWaker(ctx, sessionID) { // an auto-asleep agent is woken first and the text waits for it; one that cannot be woken keeps the text unsent, as a sleeper always did (#12111)
+		return errNoticeTarget
+	}
 	return deliverAutomated(ctx, h.terminal, sessionName, agentType, sessionID, board.OneLine(text), "board message")
 }
 

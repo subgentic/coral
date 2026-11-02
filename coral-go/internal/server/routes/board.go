@@ -108,6 +108,8 @@ type BoardHandler struct {
 	// isArchivedSession reports whether a board session (agentType-sessionID) is
 	// an archived agent. Nil means no agent is ever treated as archived.
 	isArchivedSession func(ctx context.Context, sessionName string) bool
+	// idleWaker wakes an auto-asleep agent (sleep_reason idle) before Coral types something to it, and reports whether the agent is awake (#12111); nil: nothing is woken.
+	idleWaker func(ctx context.Context, sessionID string) bool
 	// sessionThinking returns the thinking level a board session is set to, "" when it has none or is not known (#8915).
 	sessionThinking func(ctx context.Context, sessionName string) string
 	// liveSessionType is a live session's agent type by session id (ok false when it has none);
@@ -141,6 +143,11 @@ type BoardHandler struct {
 // Operator (CloudHandler.HubOperatorAllowed).
 func (h *BoardHandler) SetHubOperatorAllowed(fn func(*http.Request) bool) {
 	h.hubOperatorAllowed = fn
+}
+
+// SetIdleWaker gives the board the way to wake an auto-asleep agent for a delivery (#12111).
+func (h *BoardHandler) SetIdleWaker(fn func(ctx context.Context, sessionID string) bool) {
+	h.idleWaker = fn
 }
 
 // SetArchivedSessionLookup tells the board which sessions are archived agents:

@@ -95,6 +95,24 @@ export async function restartSameDirect(name, agentType, sessionId) {
     restartSameSettings();
 }
 
+/** The Operator's per-agent switch for auto-sleep (#12111): mode 'off' keeps the agent awake however long it is idle, 'on' puts it back under the rule. Only Coral's own record changes. */
+export async function setAgentAutoSleep(name, agentType, sessionId, mode) {
+    const off = mode === 'off';
+    const server = serverForSession(name, sessionId);
+    try {
+        const resp = await serverFetch(server, `/api/sessions/live/${encodeURIComponent(name)}/auto-sleep`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ session_id: sessionId, agent_type: agentType, off }) });
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok || !data.ok) { showToast(data.error || 'Could not change auto-sleep', true); return false; }
+        const row = state.liveSessions.find(x => x.session_id === sessionId && sessionServer(x) === server);
+        if (row) { if (off) row.auto_sleep_off = true; else delete row.auto_sleep_off; }
+        redrawLiveList();
+        const who = agentWords(row, row ? resolveSessionIdentity(row) : name).label;
+        showToast(off ? `${who} will stay awake` : `${who} can be put to sleep when idle`);
+        return true;
+    } catch { showToast('Could not change auto-sleep', true); return false; }
+}
+
 export function toggleAgentSleep(name, agentType, sessionId, action) {
     const server = serverForSession(name, sessionId);
     // Resolves true when the server applied the action.

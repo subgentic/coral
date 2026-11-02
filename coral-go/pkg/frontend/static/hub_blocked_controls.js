@@ -19,7 +19,7 @@ import { pollEvery } from './overload.js';
 // stopping, sleeping and waking one agent need Launch, as a team's or every agent's do.
 const INTERACT = new Set(['cmd-send', 'cmd-send-menu', 'send-menu-send', 'send-menu-team', 'send-menu-resend',
     'send-menu-protocol', 'cmd-quick', 'cmd-raw-keys', 'cmd-macro', 'macro-show', 'macro-delete', 'cmd-mode-toggle',
-    'agent-rename', 'agent-icon', 'agent-archive', 'mb-post']);
+    'agent-rename', 'agent-icon', 'agent-archive', 'agent-auto-sleep', 'mb-post']);
 const LAUNCH = new Set(['agent-restart', 'agent-restart-same', 'agent-attach', 'agent-kill', 'agent-sleep', 'team-sleep', 'board-chat-pause', 'mb-pause', 'mb-msg-delete', 'mb-delete-board', 'team-delete',
     'attach-image']); // POST /api/upload writes a file on the host: Launch (#6088)
 // Turning auto-accept on needs Launch, turning it off Interact: the menu item says which by aria-checked.
