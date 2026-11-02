@@ -1,0 +1,276 @@
+#cloud-config
+# A Coral machine, made by `coral machine launch`. It holds NO secret of the person's and no Hub credential: that arrives over SSH, after the launcher has checked this machine's host key.
+# The one inbound port is SSH, for the launch's own key only, until the launcher is done (or 20min have passed).
+users:
+  - name: coral
+    gecos: Coral
+    shell: /bin/bash
+    lock_passwd: true # no password and no sudo
+    ssh_authorized_keys: # the launch's own public key: the only way in, removed when the launcher is done
+      - no-port-forwarding,no-agent-forwarding,no-X11-forwarding ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOpKbGPinFIKvvVQexMuxfmVR3auvr57kkIe6mkURtIs
+ssh_deletekeys: true # the machine's own host keys are replaced by the one this launch pinned
+ssh_genkeytypes: []
+ssh_keys: # the single-use host key pair the launcher pinned: the one secret here, dead once setup finishes (coral-machine-finish)
+  ed25519_private: |
+    -----BEGIN OPENSSH PRIVATE KEY-----
+    b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtz
+    c2gtZWQyNTUxOQAAACD9FyQ4WqDHW2T7eM1gL6HZkf3r92sTxY7XAurINen2GAAA
+    AIgAAAAAAAAAAAAAAAtzc2gtZWQyNTUxOQAAACD9FyQ4WqDHW2T7eM1gL6HZkf3r
+    92sTxY7XAurINen2GAAAAEAJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJ
+    Cf0XJDhaoMdbZPt4zWAvodmR/ev3axPFjtcC6sg16fYYAAAAAAECAwQF
+    -----END OPENSSH PRIVATE KEY-----
+  ed25519_public: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIP0XJDhaoMdbZPt4zWAvodmR/ev3axPFjtcC6sg16fYY
+package_update: true
+packages:
+  - ca-certificates
+  - curl
+  - git
+  - nftables
+  - tmux
+  - ufw
+write_files:
+  - path: /etc/systemd/system/coral.service
+    owner: root:root
+    permissions: '0644'
+    content: |
+      [Unit]
+      Description=Coral
+      After=network-online.target coral-egress.service
+      Wants=network-online.target
+      Requires=coral-egress.service
+
+      [Service]
+      User=coral
+      Group=coral
+      Environment=HOME=/home/coral
+      WorkingDirectory=/home/coral
+      ExecStart=/usr/local/bin/coral --cloud-url https://app.coralhub.dev --cloud-max-mode launch --no-browser --host 127.0.0.1
+      Restart=on-failure
+      RestartSec=10
+      NoNewPrivileges=true
+      PrivateTmp=true
+      ProtectSystem=full
+
+      [Install]
+      WantedBy=multi-user.target
+  - path: /etc/ssh/sshd_config.d/10-coral-bootstrap.conf
+    owner: root:root
+    permissions: '0644'
+    content: |
+      # Coral machine bootstrap: the launcher's one key, as coral, for the length of the launch.
+      HostKey /etc/ssh/ssh_host_ed25519_key
+      PasswordAuthentication no
+      KbdInteractiveAuthentication no
+      PermitRootLogin no
+      PubkeyAuthentication yes
+      AllowUsers coral
+      AllowTcpForwarding no
+      AllowAgentForwarding no
+      X11Forwarding no
+      MaxAuthTries 2
+      LoginGraceTime 30
+  - path: /etc/systemd/system/coral-bootstrap.path
+    owner: root:root
+    permissions: '0644'
+    content: |
+      [Unit]
+      Description=Start Coral when the launcher has delivered its one-time credential
+
+      [Path]
+      PathExists=/run/coral/bootstrap.d/credential
+      Unit=coral.service
+
+      [Install]
+      WantedBy=multi-user.target
+  - path: /etc/systemd/system/coral-finish.path
+    owner: root:root
+    permissions: '0644'
+    content: |
+      [Unit]
+      Description=Close the bootstrap SSH access when the launcher is done
+
+      [Path]
+      PathExists=/run/coral/bootstrap.d/done
+      Unit=coral-finish.service
+
+      [Install]
+      WantedBy=multi-user.target
+  - path: /etc/systemd/system/coral-finish.service
+    owner: root:root
+    permissions: '0644'
+    content: |
+      [Unit]
+      Description=Close the bootstrap SSH access and finish setting up Coral
+
+      [Service]
+      Type=oneshot
+      ExecStart=/usr/local/sbin/coral-machine-finish
+  - path: /etc/systemd/system/coral-finish.timer
+    owner: root:root
+    permissions: '0644'
+    content: |
+      [Unit]
+      Description=Close the bootstrap SSH access if the launcher never finishes
+
+      [Timer]
+      OnActiveSec=20min
+      Unit=coral-finish.service
+
+      [Install]
+      WantedBy=timers.target
+  - path: /etc/coral/egress.nft
+    owner: root:root
+    permissions: '0600'
+    content: |
+      # Coral machine: every non-root user is stopped from the cloud's metadata service and the private ranges (loopback is not listed, so local resolvers keep working).
+      table inet coral_egress
+      delete table inet coral_egress
+      table inet coral_egress {
+      	chain output {
+      		type filter hook output priority -10; policy accept;
+      		meta skuid != 0 ip daddr { 169.254.0.0/16, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 100.64.0.0/10 } counter reject with icmp type admin-prohibited
+      		meta skuid != 0 ip6 daddr { fe80::/10, fc00::/7 } counter reject with icmpv6 type admin-prohibited
+      	}
+      }
+  - path: /etc/systemd/system/coral-egress.service
+    owner: root:root
+    permissions: '0644'
+    content: |
+      [Unit]
+      Description=Coral: block the metadata service and the private ranges for every non-root user
+      DefaultDependencies=no
+      Wants=network-pre.target
+      Before=network-pre.target coral.service
+      After=local-fs.target
+
+      [Service]
+      Type=oneshot
+      RemainAfterExit=yes
+      ExecStart=/usr/sbin/nft -f /etc/coral/egress.nft
+      ExecStartPost=/usr/local/sbin/coral-egress-check rules
+
+      [Install]
+      WantedBy=sysinit.target
+  - path: /etc/systemd/system/coral-egress-resolvers.service
+    owner: root:root
+    permissions: '0644'
+    content: |
+      [Unit]
+      Description=Coral: check the DNS resolvers are outside the blocked ranges
+      Wants=network-online.target
+      After=network-online.target coral-egress.service
+
+      [Service]
+      Type=oneshot
+      ExecStart=/usr/local/sbin/coral-egress-check resolvers
+
+      [Install]
+      WantedBy=multi-user.target
+  - path: /usr/local/sbin/coral-egress-check
+    owner: root:root
+    permissions: '0700'
+    content: |
+      #!/bin/sh
+      set -eu
+      mode="${1:-rules}"
+      case "$mode" in
+      rules)
+        rules=$(/usr/sbin/nft list table inet coral_egress) || { echo "coral-egress: the egress table is not loaded" >&2; exit 1; }
+        [ "$(printf '%s\n' "$rules" | grep -c 'meta skuid != 0')" -ge 2 ] || { echo "coral-egress: the egress rules are not loaded" >&2; exit 1; }
+        ;;
+      resolvers)
+        # a resolver inside a blocked range would make every lookup of a non-root user (Coral's own too) fail: said in the journal, never a failed boot
+        resolvers=$(cat /run/systemd/resolve/resolv.conf /etc/resolv.conf 2>/dev/null | awk '$1 == "nameserver" { print $2 }' | grep -v '^127\.' | sort -u || true)
+        for ns in $resolvers; do
+          case "$ns" in
+            169.254.*|10.*|192.168.*|100.6[4-9].*|100.[7-9][0-9].*|100.1[01][0-9].*|100.12[0-7].*|172.1[6-9].*|172.2[0-9].*|172.3[01].*|fe[89ab]*:*|fc*:*|fd*:*)
+              echo "coral-egress: the DNS resolver $ns is inside a blocked range: lookups of every non-root user would fail" >&2 ;;
+          esac
+        done
+        ;;
+      *) echo "usage: coral-egress-check rules|resolvers" >&2; exit 2 ;;
+      esac
+  - path: /usr/local/sbin/coral-machine-setup
+    owner: root:root
+    permissions: '0700'
+    content: |
+      #!/bin/sh
+      # Installs the Coral release, checked against the digest pinned in the launcher. Stops at the first failure: set -eu.
+      set -eu
+
+      # The Coral release for this machine, verified before it is installed.
+      case "$(uname -m)" in
+        x86_64) arch=amd64; want=1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a ;;
+        aarch64) arch=arm64; want=2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b ;;
+        *) echo "coral-machine-setup: no Coral release for $(uname -m)" >&2; exit 1 ;;
+      esac
+      version=2.0.3
+      tarball=coral-linux-${arch}-${version}.tar.gz
+      base=https://github.com/subgentic/coral/releases/download/v${version}
+      work=$(mktemp -d)
+      trap 'rm -rf "$work"' EXIT
+      cd "$work"
+      curl -fsSL --proto '=https' --tlsv1.2 -o "$tarball" "$base/$tarball"
+      echo "${want}  ${tarball}" | sha256sum -c -
+      tar -xzf "$tarball" -C /usr/local/bin/
+      test -x /usr/local/bin/coral
+  - path: /usr/local/sbin/coral-machine-finish
+    owner: root:root
+    permissions: '0700'
+    content: |
+      #!/bin/sh
+      # The end of the bootstrap window: no SSH any more, and nothing left that could open it again (a reboot, a cloud-init re-run, a snapshot restore). Safe to run twice.
+      # sshd is stopped AND masked, port 22 is closed, the host keys and the launch key are deleted, and so are cloud-init's own copies of the user-data (the provider keeps its copy: the key in it is dead).
+      systemctl disable --now ssh.socket ssh.service sshd.service 2>/dev/null || true
+      systemctl mask ssh.socket ssh.service sshd.service 2>/dev/null || true
+      ufw --force delete allow 22/tcp >/dev/null 2>&1 || true
+      rm -f /home/coral/.ssh/authorized_keys /etc/ssh/ssh_host_*_key /etc/ssh/ssh_host_*_key.pub
+      rm -f /etc/ssh/sshd_config.d/10-coral-bootstrap.conf
+      rm -rf /var/lib/cloud/instance/user-data.txt* /var/lib/cloud/instance/cloud-config.txt /var/lib/cloud/instance/scripts /var/lib/cloud/instance/vendor-data*
+      rm -rf /var/lib/cloud/instances/*/user-data.txt* /var/lib/cloud/instances/*/cloud-config.txt /var/lib/cloud/instances/*/scripts /var/lib/cloud/instances/*/vendor-data*
+      rm -f /var/lib/cloud/seed/nocloud*/user-data /var/lib/cloud/seed/nocloud*/meta-data
+      # cloud-init's pickled copy of the instance data, its instance-data JSON under /run, and the rotated logs hold the user-data too. Not a full cloud-init reset: a reboot would then run the user-data again and open SSH.
+      rm -f /var/lib/cloud/instance/obj.pkl /var/lib/cloud/instances/*/obj.pkl /var/lib/cloud/data/instance-data*.json /run/cloud-init/instance-data*.json /run/cloud-init/combined-cloud-config.json
+      rm -f /var/log/cloud-init.log.* /var/log/cloud-init-output.log.* /var/log/cloud-init*.log.*
+      for f in /var/log/cloud-init.log /var/log/cloud-init-output.log; do [ -f "$f" ] && : > "$f"; done
+      systemctl enable coral.service 2>/dev/null || true
+      # after Coral is up and has redeemed its credential: the agent CLIs (slow, and not needed to enroll)
+      if systemctl is-active --quiet coral.service; then /usr/local/sbin/coral-machine-agents || true; fi
+      exit 0
+  - path: /usr/local/sbin/coral-machine-agents
+    owner: root:root
+    permissions: '0700'
+    content: |
+      #!/bin/sh
+      # Installs the agent CLIs (after Coral is running). Stops at the first failure: set -eu.
+      set -eu
+      DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends nodejs npm
+      # claude 2.0.0
+      npm install -g @anthropic-ai/claude-code@2.0.0
+      # codex 0.1.0
+      npm install -g @openai/codex@0.1.0
+      # agy: the vendor's installer takes no version, so the script is fetched to a file, checked against the SHA-256 it was pinned to, and only then run, as the coral user.
+      installer=$(mktemp)
+      curl -fsSL --proto '=https' --tlsv1.2 -o "$installer" 'https://antigravity.google/cli/install.sh'
+      echo 'abababababababababababababababababababababababababababababababab  '"$installer" | sha256sum -c -
+      chmod 0644 "$installer"
+      runuser -u coral -- bash "$installer"
+      rm -f "$installer"
+runcmd:
+  - [ systemctl, daemon-reload ]
+  - [ systemctl, enable, --now, coral-egress.service ] # the egress block, before anything else: coral.service Requires it, so Coral never starts without it
+  - [ systemctl, enable, --now, --no-block, coral-egress-resolvers.service ] # the resolver check, once the network is online: it only reports
+  - [ ufw, default, deny, incoming ]
+  - [ ufw, default, allow, outgoing ]
+  - [ ufw, allow, from, '203.0.113.9', to, any, port, '22', proto, tcp ] # SSH, for the launcher's address only: closed again by coral-machine-finish
+  - [ ufw, --force, enable ]
+  - |
+    (
+      set -eu
+      /usr/local/sbin/coral-machine-setup
+      install -d -m 0755 -o root -g root /run/coral
+      install -d -m 0700 -o coral -g coral /run/coral/bootstrap.d
+      systemctl daemon-reload
+      systemctl reload ssh || systemctl restart ssh || true
+      systemctl enable --now coral-bootstrap.path coral-finish.path coral-finish.timer
+    )
