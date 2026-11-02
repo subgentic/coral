@@ -66,6 +66,9 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
         await load(`/team/${B}/goals/${G}`);
         await ev(`document.querySelector('#team-panel-goals #goal-tab-comments').click(); true`);
         await waitFor(`document.querySelectorAll('#team-panel-goals .goal-comments .ac-card').length === 1`, 'the thread after a reload', 15000);
+        // #12262: nothing remembered (the Comments choice is stored only by a toggle, and a goal's panel has none), a goal with an open comment opens its panel on a computer: the goal page keeps its own default, not the file viewer's closed one
+        assert.equal(await ev(`localStorage.getItem('coral-artifact-comments-open')`), null, 'nothing is remembered');
+        assert.deepEqual(await ev(`(() => { const p = document.querySelector('#team-panel-goals .goal-comments .ac-panel'); return { open: p.classList.contains('ac-sheet-open'), inert: p.hasAttribute('inert'), wide: p.getBoundingClientRect().width > 100 }; })()`), { open: true, inert: false, wide: true }, 'the goal\'s panel is open when it has an open comment and nothing is remembered');
         console.log('   ✓');
 
         console.log('4. Not an artifact\'s comment, and nothing leaks through the artifact routes');
