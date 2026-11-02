@@ -14,6 +14,9 @@ import { trapTab } from './dialog_focus.js';
 import { visibleName } from './artifact_names.js';
 import { importOnce } from './import_once.js';
 import { pushOverlay, popOverlay } from './overlay_history.js';
+import { loadStyles } from './lazy_styles.js';
+
+await loadStyles('artifact_viewer_header.css'); // the one-row header's rules load with the viewer, not at start (page_weight)
 const { readersAllowed, readersBlock } = await importOnce('./artifact_readers.js'); // lazy: its failure is retried
 const { privateBlock } = await importOnce('./artifact_private.js'); // the owner's Private switch, beside it (#11457)
 const { makeDetails } = await importOnce('./details_disclosure.js'); // "Who can read this" behind the one Details button (#7775)

@@ -233,18 +233,3 @@
 .artifact-private-field { display: flex; gap: 10px; align-items: flex-start; min-height: 44px; }
 .artifact-private-help { color: var(--text-muted); font-size: var(--fs-base); }
 .artifact-private-say { margin: 0; color: var(--text-muted); font-size: var(--fs-base); }
-
-/* The viewer's one header row (#12223, the compact viewer the operator approved): name, the version chip and the review's status, Comments, Approve and Request changes, and a ⋯ menu with the less used. */
-.artifact-viewer-chips, .artifact-viewer-actions, .artifact-viewer-morewrap { display: inline-flex; align-items: center; gap: 8px; flex: none; }
-.artifact-viewer-chips .av-bar { padding: 0; border: 0; background: none; min-height: 0; flex-wrap: nowrap; display: inline-flex; align-items: center; gap: 4px; }
-.artifact-viewer-chips .av-bar[hidden] { display: none; }
-@media (min-width: 769px) and (pointer: fine) { .artifact-viewer-header .btn { min-height: var(--control-compact-height, 32px); padding-block: 0; } } /* a mouse on a computer: compact; a phone or a touch screen keeps its 44 px targets */
-.artifact-viewer-morewrap { position: relative; }
-.artifact-viewer-menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 7; min-width: 13rem; display: flex; flex-direction: column; }
-.artifact-viewer-menu[hidden] { display: none; }
-.artifact-viewer-menu .menu-item { display: flex; align-items: center; justify-content: flex-start; text-align: left; text-decoration: none; color: var(--text-primary); cursor: pointer; }
-.artifact-viewer-menu .menu-item[hidden] { display: none; }
-.artifact-viewer-menu .details-toggle { padding: 6px 12px; color: var(--text-primary); justify-content: flex-start; }
-.artifact-review-state { flex: none; white-space: nowrap; color: var(--text-secondary); font-size: var(--fs-sm); background: var(--bg-tertiary); border-radius: 999px; padding: 2px 10px; }
-.artifact-review-state[hidden] { display: none; }
-@media (max-width: 768px) { .artifact-viewer-chips, .artifact-viewer-actions { flex-wrap: wrap; max-width: 100%; } .artifact-viewer-actions { flex: 1 1 100%; gap: 4px; } .artifact-viewer-actions .btn { padding-inline: 8px; } .artifact-viewer-chips { gap: 4px; } .artifact-review-state { font-size: var(--fs-sm); padding: 2px 6px; } .artifact-viewer-header { row-gap: 4px; } .artifact-viewer-title { order: -1; flex: 1 0 calc(100% - 52px); } .artifact-viewer-morewrap { order: -1; } }
