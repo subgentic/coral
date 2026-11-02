@@ -1,7 +1,10 @@
 package routes
 
 import (
+	"bytes"
 	"context"
+	"log/slog"
+	"strings"
 	"testing"
 	"time"
 
@@ -89,4 +92,22 @@ func TestAnUnreadableWaitStoreLeavesTheAgentAwake(t *testing.T) {
 	require.NoError(t, r.h.bs.Close())
 	assert.False(t, r.h.parkedInWait(r.ctx, "autosleep", "dev", time.Now()), "unreadable: not parked")
 	assert.Equal(t, 0, r.pass(t).IsSleeping, "and the pass leaves the agent awake")
+}
+
+// The reason an agent stays awake is in the log when it changes, at Info (#12335: it was Debug, so a real install's log said nothing about why no agent slept).
+func TestAutoSleepLogsTheReasonOnceWhenItChanges(t *testing.T) {
+	var buf bytes.Buffer
+	old := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo})))
+	t.Cleanup(func() { slog.SetDefault(old) })
+	r := newSleepRig(t)
+	at := time.Now()
+	r.h.autoSleepPass(r.ctx, at)
+	r.h.autoSleepPass(r.ctx, at.Add(time.Minute))
+	assert.Equal(t, 1, strings.Count(buf.String(), "auto_sleep verdict"), "not_idle_long_enough twice: logged once: "+buf.String())
+	assert.Contains(t, buf.String(), "reason=not_idle_long_enough")
+	buf.Reset()
+	r.h.autoSleepPass(r.ctx, at.Add(2*time.Hour))
+	r.h.autoSleepPass(r.ctx, at.Add(2*time.Hour+time.Minute))
+	assert.Contains(t, buf.String(), "reason=process_busy", "the reason changed: logged again")
 }

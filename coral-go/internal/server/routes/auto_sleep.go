@@ -35,6 +35,23 @@ var autoSleepSamples = struct {
 	m map[string]cpuSample
 }{m: map[string]cpuSample{}}
 
+// autoSleepLastWhy is each agent's reason at the last look ("" when it was slept), so a reason is logged when it changes, not every minute (#12335: the v2.0.34 log said nothing for 23 minutes).
+var autoSleepLastWhy = struct {
+	sync.Mutex
+	m map[string]string
+}{m: map[string]string{}}
+
+// noteAutoSleepWhy logs a session's reason at Info when it differs from the last look's. Reasons are counters, never text from the agent.
+func noteAutoSleepWhy(sessionID, agentType, why string) {
+	autoSleepLastWhy.Lock()
+	prev, had := autoSleepLastWhy.m[sessionID]
+	autoSleepLastWhy.m[sessionID] = why
+	autoSleepLastWhy.Unlock()
+	if !had || prev != why {
+		slog.Info("auto_sleep verdict", "session_id", sessionID, "agent", agentType, "reason", why)
+	}
+}
+
 type cpuSample struct {
 	cpu float64
 	at  time.Time
@@ -80,10 +97,12 @@ func (h *SessionsHandler) autoSleepPass(ctx context.Context, now time.Time) {
 		}
 		seen[ls.SessionID] = true
 		in, rss := h.autoSleepInputOf(ctx, ls, settings, idle, now)
-		if why := autoSleepVerdict(in); why != "" {
-			slog.Debug("auto_sleep skipped", "session_id", ls.SessionID, "reason", why)
+		why := autoSleepVerdict(in)
+		if why != "" {
+			noteAutoSleepWhy(ls.SessionID, ls.AgentType, why)
 			continue
 		}
+		noteAutoSleepWhy(ls.SessionID, ls.AgentType, "sleep")
 		h.autoSleepOne(ctx, ls, idle, rss, now)
 	}
 	autoSleepSamples.Lock() // the samples of agents that are gone are dropped
@@ -93,6 +112,13 @@ func (h *SessionsHandler) autoSleepPass(ctx context.Context, now time.Time) {
 		}
 	}
 	autoSleepSamples.Unlock()
+	autoSleepLastWhy.Lock()
+	for sid := range autoSleepLastWhy.m {
+		if !seen[sid] {
+			delete(autoSleepLastWhy.m, sid)
+		}
+	}
+	autoSleepLastWhy.Unlock()
 }
 
 // autoSleepInputOf reads what the verdict needs about one agent, as late and as cheaply as it can: the checks that cost a screen read or a process table read come last, and only for an
