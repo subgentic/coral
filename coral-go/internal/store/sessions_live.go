@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
+	"github.com/subgentic/coral/internal/naming"
 )
 
 // ── Live Sessions ─────────────────────────────────────────────────────
@@ -137,7 +138,13 @@ func (s *SessionStore) CLIVersions(ctx context.Context) (map[string]string, erro
 	return out, nil
 }
 
+// ErrReservedSessionID: the session id (or the one it resumes from) is the one that holds the person's own pictures, which no session may have (#12309).
+var ErrReservedSessionID = errors.New("that session id is reserved")
+
 func (s *SessionStore) RegisterLiveSession(ctx context.Context, ls *LiveSession) error {
+	if naming.IsReservedSessionID(ls.SessionID) || (ls.ResumeFromID != nil && naming.IsReservedSessionID(*ls.ResumeFromID)) {
+		return ErrReservedSessionID
+	}
 	if ls.CreatedAt == "" {
 		ls.CreatedAt = nowUTC()
 	}

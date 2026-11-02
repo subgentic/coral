@@ -54,8 +54,7 @@ func (h *BoardHandler) UploadGoalImage(w http.ResponseWriter, r *http.Request) {
 	}
 	session, ok := h.teamPictureSession(r, project)
 	if !ok {
-		commentRefuse(w, http.StatusConflict, "no_team", "this team has no agent to keep a picture with: add one first")
-		return
+		session = personPictureSession // a team with no agent: the picture is the person's own (#12176)
 	}
 	if !commentImageLimit.allow(goalImageScope(project), commentImageLimitPerMinute, time.Now()) {
 		httputil.WriteActionLimit(w, 60, "rate_limited", "too many pictures in a minute; try again shortly")

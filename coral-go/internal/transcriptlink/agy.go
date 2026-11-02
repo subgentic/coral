@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/subgentic/coral/internal/fsreplace"
+	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/safefs"
 )
 
@@ -72,6 +73,9 @@ func AgyConversation(sessionID string) string {
 // inherited by an agy that a session's agent starts from its shell). A session that already has a link to a conversation that is still there keeps it,
 // unless the new conversation's transcript is marked as this session's own: another agy's hook must not take the link over (#4590's rule for Codex).
 func BindAgy(sessionID, conversationID string) error {
+	if naming.IsReservedSessionID(sessionID) {
+		return fmt.Errorf("that Coral session id is reserved")
+	}
 	if !uuid.MatchString(sessionID) {
 		return fmt.Errorf("the Coral session id must be a UUID")
 	}

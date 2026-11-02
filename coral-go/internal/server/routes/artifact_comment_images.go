@@ -24,6 +24,7 @@ import (
 
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/httputil"
+	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/safefs"
 )
 
@@ -83,6 +84,10 @@ func recentCommentImage(artifactID, hexID string, now time.Time) bool {
 
 // commentImageTypes are the pictures a comment takes, by sniffed type, with the extension a name gets when none is sent.
 var commentImageTypes = map[string]string{"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp"}
+
+// personPictureSession holds a picture of the person's that no agent's team can: the Operator's own, so that a marked picture, or a goal's picture on a team with no agent, is kept (#12176). It is not an agent's
+// session (no session of Coral's has this id), so the picture is listed as the person's and no agent is named for it.
+const personPictureSession = naming.PersonPictureSessionID
 
 // commentImageTeam finds the session whose team the picture is stored for: a session that uploaded the commented artifact (so the picture is listed in that team's Artifacts and an agent of the team can read
 // it), and that session's board (the query's board names it when the session is gone, and picks among several teams that hold the artifact).
@@ -230,13 +235,15 @@ func (h *SessionsHandler) uploadCommentImage(w http.ResponseWriter, r *http.Requ
 	}
 	session, teamBoard, found := h.commentImageTeam(id, wantBoard)
 	if !found {
-		commentRefuse(w, http.StatusConflict, "no_team", "this file has no team to keep a picture with")
-		return
+		session = personPictureSession // no agent holds the file: the picture is the person's own (#12176)
 	}
 	versionOf := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("version_of")))
 	if versionOf != "" && (!objectNameRe.MatchString(versionOf) || !recentCommentImage(id, versionOf, time.Now())) {
 		commentRefuse(w, http.StatusNotFound, "series_not_found", "that is not a picture you just added to this comment")
 		return
+	}
+	if teamBoard == "" {
+		versionOf = "" // a version belongs to a team: with none, the marked picture is kept on its own and the comment still names it (#12176)
 	}
 	pic, ok := receivePicture(w, r, coralDir)
 	if !ok {
