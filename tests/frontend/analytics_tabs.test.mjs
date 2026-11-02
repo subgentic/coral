@@ -46,14 +46,20 @@ assert.equal(D.countWords(null), 'not recorded yet'); assert.equal(D.countWords(
 assert.equal(D.waitWords(null, 'median_s'), 'not recorded yet'); assert.equal(D.waitWords({ asked: 0, answered: 0, median_s: null }, 'median_s'), 'No asks');
 assert.equal(D.waitWords({ asked: 3, answered: 0, median_s: null }, 'median_s'), 'No answer yet'); assert.equal(D.waitWords({ asked: 3, answered: 2, median_s: 120, slowest_s: 300 }, 'slowest_s'), '5 min');
 assert.equal(D.perTaskWords(null, 4), 'not recorded yet'); assert.equal(D.perTaskWords(8, null), 'not recorded yet'); assert.equal(D.perTaskWords(8, 0), 'No tasks done'); assert.equal(D.perTaskWords(9, 3), '3.0');
-// ---- autonomy: touches per task done over a rolling 7 days; a window with no task has a gap, not a 0
+// ---- autonomy: tasks done per Operator touch over a rolling 7 days; MORE is better (#12072). No touch in a window is a marked gap, not an infinite height; touches and no task is a real 0
 const adays = Array.from({ length: 9 }, (_, i) => ({ day: `2026-10-${20 + i}`, label: `Oct ${20 + i}`, tasks: i === 0 || i === 1 ? 0 : 1, values: { posts: 2, typed: 1 } }));
 const tr = D.autonomyTrend(adays);
-assert.equal(tr.points.length, 3, 'one point a day from the 7th'); assert.equal(tr.points[0].value, 21 / 5, '7 days: 21 touches over 5 tasks'); assert.equal(tr.points[2].value, 21 / 7);
-assert.equal(tr.last.label, 'Oct 28'); assert.equal(tr.enough, true);
-const none = D.autonomyTrend(adays.map(d => ({ ...d, tasks: 0 })));
-assert.deepEqual(none.points.map(p => p.value), [null, null, null], 'no task done in the window: a gap, not 0'); assert.equal(none.enough, false);
+assert.equal(tr.points.length, 3, 'one point a day from the 7th'); assert.equal(tr.points[0].value, 5 / 21, '7 days: 5 tasks done over 21 touches'); assert.equal(tr.points[2].value, 7 / 21);
+assert.ok(tr.points[2].value > tr.points[0].value, 'more tasks for the same touches is a higher number: higher is better');
+assert.equal(tr.last.label, 'Oct 28'); assert.equal(tr.enough, true); assert.equal(tr.latest.untouched, false);
+const noTasks = D.autonomyTrend(adays.map(d => ({ ...d, tasks: 0 })));
+assert.deepEqual(noTasks.points.map(p => p.value), [0, 0, 0], 'touches and no task done in the window is a real 0, the worst a window can be'); assert.equal(noTasks.enough, true);
+const quiet = D.autonomyTrend(adays.map(d => ({ ...d, values: { posts: 0, typed: 0 } })));
+assert.deepEqual(quiet.points.map(p => p.value), [null, null, null], 'no touch at all: nothing to divide by, a gap'); assert.equal(quiet.points.every(p => p.untouched), true, 'with tasks done that is the best a window can be, said in words'); assert.equal(quiet.enough, false);
+const idle = D.autonomyTrend(adays.map(d => ({ ...d, tasks: 0, values: { posts: 0, typed: 0 } })));
+assert.equal(idle.points.some(p => p.untouched), false, 'no task and no touch is a gap and not untouched');
 assert.equal(D.autonomyTrend(adays.slice(0, 5)).enough, false, 'under 7 days there is no trend');
+assert.equal(D.perTouchWords(0.238), '0.2'); assert.equal(D.perTouchWords(2.5), '2.5'); assert.equal(D.perTouchWords(12.4), '12', 'whole above ten');
 // ---- team to team: messages plus goal requests, rows ask and columns are asked; no field is "not recorded", an empty list is "none"
 const pg = D.pairGrid([{ from: 'alpha', to: 'beta', messages: 2, requests: 1, accepted: 1 }, { from: 'beta', to: 'alpha', messages: 1, requests: 0, accepted: 0 }, { from: 'alpha', to: 'gamma', messages: 1, requests: 0, accepted: 0 }]);
 assert.deepEqual(pg.names, ['alpha', 'beta', 'gamma']); assert.equal(pg.cells[0][1], 3, 'alpha asked beta 2 messages and 1 request'); assert.equal(pg.cells[1][0], 1); assert.equal(pg.total, 5);
