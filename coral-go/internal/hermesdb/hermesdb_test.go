@@ -7,6 +7,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -269,4 +270,46 @@ func TestFirstUserTurnAt(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, ok)
 	assert.Equal(t, float64(200), at, "the oldest, across the sessions in the file")
+}
+
+// #12040 (QA's SHOULD, and the Orchestrator's rule after the day's memory trouble): a read is bounded in BYTES, not only in rows. A database of many large rows (a tool that printed megabytes, again and again)
+// would have been read whole, 5000 rows of up to several MiB. The newest rows are kept up to MaxBytes of text in all, oldest dropped; one cell of any size is cut inside SQLite, so a huge text is never loaded whole.
+func TestABigDatabaseIsReadWithinTheByteBudgetNewestFirst(t *testing.T) {
+	r := newRig(t, fullSchema)
+	big := strings.Repeat("x", MaxText) // as large as one text is kept
+	const rows = 120                    // 120 MiB of content in all: over the budget several times
+	for i := 0; i < rows; i++ {
+		r.msg(t, idA, "tool", big)
+	}
+	db := open(t, r.home)
+	got, err := db.Messages(context.Background(), idA, 0, 2000)
+	require.NoError(t, err)
+	total := 0
+	for _, m := range got {
+		total += len(m.Content) + len(m.ToolCalls) + len(m.ToolName) + len(m.ToolCallID) + len(m.FinishReason)
+	}
+	assert.LessOrEqual(t, total, MaxBytes, "the text of a read stays within the budget")
+	require.NotEmpty(t, got)
+	assert.Less(t, len(got), rows, "the oldest rows were left out")
+	assert.EqualValues(t, rows, got[len(got)-1].ID, "the newest row is kept")
+	for i := 1; i < len(got); i++ {
+		assert.Greater(t, got[i].ID, got[i-1].ID, "oldest first, as before")
+	}
+}
+
+func TestOneHugeCellIsCutInSQLiteNotLoadedWhole(t *testing.T) {
+	r := newRig(t, fullSchema)
+	r.msg(t, idA, "assistant", strings.Repeat("y", 24<<20)) // 24 MiB in one cell
+	r.msg(t, idA, "user", "after it")
+	db := open(t, r.home)
+	var before, after runtime.MemStats
+	runtime.GC()
+	runtime.ReadMemStats(&before)
+	got, err := db.Messages(context.Background(), idA, 0, 2000)
+	runtime.ReadMemStats(&after)
+	require.NoError(t, err)
+	require.Len(t, got, 2)
+	assert.Less(t, after.TotalAlloc-before.TotalAlloc, uint64(12<<20), "the 24 MiB cell was not loaded whole into this process")
+	assert.LessOrEqual(t, len(got[0].Content), MaxText+8, "the cell is cut to the cap (and its cut mark)")
+	assert.Equal(t, "after it", got[1].Content)
 }

@@ -34,6 +34,9 @@ const (
 	// MaxMessages is the most rows one read returns (the newest); MaxText the most bytes of one text kept (a message, a tool's arguments, a title).
 	MaxMessages = 5000
 	MaxText     = 1 << 20
+	// MaxBytes is the most text (content, tool calls, names and ids) one read returns in all: the newest rows are kept until it is reached and the older ones are left out, so a database of large rows is never read
+	// whole (a tool that printed megabytes, again and again, #12040). One row can be at most a few MiB (each text is cut at MaxText), well inside it.
+	MaxBytes = 16 << 20
 	// queryTimeout bounds one read: a database another process holds locked does not hold a poll of the chat.
 	queryTimeout = 5 * time.Second
 )
@@ -233,8 +236,9 @@ func (d *DB) FirstUserTurnAt(ctx context.Context) (at float64, ok bool, err erro
 	return ts.Float64, ts.Valid, nil
 }
 
-// Messages reads the newest limit rows (at most MaxMessages) of session id with an id above afterID, oldest first. Only rows of that session: the query names it, and a row whose own session_id differs is
-// never returned. A row Hermes marked inactive (active = 0, a turn it dropped from the conversation) is left out when the table has the column.
+// Messages reads the newest limit rows (at most MaxMessages) of session id with an id above afterID, oldest first, and at most MaxBytes of text in all (the newest rows are kept, the older left out). Only rows of
+// that session: the query names it, and a row whose own session_id differs is never returned. A row Hermes marked inactive (active = 0, a turn it dropped from the conversation) is left out when the table has the
+// column. Each text is cut inside SQLite (a few bytes past MaxText, then at a rune boundary here), so one huge cell is never loaded whole.
 func (d *DB) Messages(ctx context.Context, id string, afterID int64, limit int) ([]Message, error) {
 	if !IsSessionID(id) {
 		return nil, ErrBadID
@@ -248,24 +252,36 @@ func (d *DB) Messages(ctx context.Context, id string, afterID int64, limit int) 
 	if d.cols["messages"]["active"] {
 		active = " AND COALESCE(active, 1) <> 0"
 	}
-	q := fmt.Sprintf(`SELECT id, role, content, tool_calls, tool_name, tool_call_id, timestamp, %s FROM
-		(SELECT * FROM messages WHERE session_id = ? AND id > ?%s ORDER BY id DESC LIMIT ?) ORDER BY id ASC`, d.optional("messages", "finish_reason"), active)
+	part := func(col string) string { return fmt.Sprintf("substr(CAST(%s AS BLOB), 1, %d)", col, MaxText+4) } // bytes, not characters: bounded whatever the text is
+	q := fmt.Sprintf(`SELECT id, substr(role, 1, 64), %s, %s, %s, %s, timestamp, %s FROM messages WHERE session_id = ? AND id > ?%s ORDER BY id DESC LIMIT ?`,
+		part("content"), part("tool_calls"), part("tool_name"), part("tool_call_id"), part(d.optional("messages", "finish_reason")), active)
 	rows, err := d.db.QueryContext(ctx, q, id, afterID, limit)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var out []Message
+	var out []Message // newest first while reading
+	bytes := 0
 	for rows.Next() {
 		var m Message
-		var content, calls, name, callID, finish sql.NullString
+		var content, calls, name, callID, finish []byte
 		var ts sql.NullFloat64
 		if err := rows.Scan(&m.ID, &m.Role, &content, &calls, &name, &callID, &ts, &finish); err != nil {
 			return nil, err
 		}
-		m.Content, m.ToolCalls, m.ToolName, m.ToolCallID, m.FinishReason = cut(content.String), cut(calls.String), cut(name.String), cut(callID.String), cut(finish.String)
+		m.Content, m.ToolCalls, m.ToolName, m.ToolCallID, m.FinishReason = cut(string(content)), cut(string(calls)), cut(string(name)), cut(string(callID)), cut(string(finish))
 		m.At = ts.Float64
+		bytes += len(m.Content) + len(m.ToolCalls) + len(m.ToolName) + len(m.ToolCallID) + len(m.FinishReason)
+		if bytes > MaxBytes && len(out) > 0 {
+			break // the older rows do not fit: the newest are what a chat and a search want
+		}
 		out = append(out, m)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	for i, j := 0, len(out)-1; i < j; i, j = i+1, j-1 { // oldest first, as callers read them
+		out[i], out[j] = out[j], out[i]
+	}
+	return out, nil
 }

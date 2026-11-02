@@ -447,3 +447,21 @@ func (h *SessionsHandler) hermesFirstUserTurn(ctx context.Context, sessionID, te
 	}
 	return time.Unix(int64(at), 0), true
 }
+
+// hermesHistoryMessages is a Hermes agent's conversation for the history search and its context (#12040, goal #192 slice D): the messages of the Hermes session its hooks bound to this Coral session, read from the
+// agent's OWN home's state.db, read-only and capped (hermesdb: the newest hermesChatRows rows, within MaxBytes of text in all, each text cut), in the chat's own shape (jsonl.ParseHermesMessages), so an agent finds its own earlier words as a Pi agent does.
+// Only the live (or sleeping) agent's: a Kill, a restart and a resume remove the home with the conversation, so an earlier session in a lineage has nothing to read, and says so. With no conversation recorded
+// yet the answer says that, in Hermes's words, rather than an error.
+func (h *SessionsHandler) hermesHistoryMessages(ctx context.Context, item store.SessionLineageItem) ([]map[string]any, string, error) {
+	if !item.IsCurrent && !item.LiveRead {
+		return nil, "an earlier Hermes session's conversation was removed with its Hermes home: Hermes keeps no other copy", nil
+	}
+	if item.SessionID == "" || h.cfg == nil || transcriptlink.HermesSession(h.cfg.CoralDir(), item.SessionID) == "" {
+		return nil, "Hermes has not recorded a conversation for this agent yet", nil
+	}
+	messages := h.hermesTranscriptRows(ctx, item.SessionID, hermesChatRows).All(ctx) // the chat's own row count (2000), the newest, within hermesdb's byte budget
+	if len(messages) == 0 {
+		return nil, "Hermes has not recorded a conversation for this agent yet", nil
+	}
+	return messages, "", nil
+}
