@@ -111,7 +111,10 @@ export async function wakeMember(a, name) {
     if (!live) throw new Error(`${who} is not running on this computer.`);
     if (!live.sleeping) throw new Error(`${who} is not asleep.`);
     const resp = await fetch(`/api/sessions/live/${encodeURIComponent(live.session_id)}/wake`, { method: 'POST' });
-    if (!resp.ok) throw new Error(`Could not wake ${who} (HTTP ${resp.status}).`);
+    if (!resp.ok) { // the server says why in a sentence (a CLI not installed, a path it cannot run: cli_not_found, cli_path_unusable, cli_untrusted_mount) and what to set: show it, not the status code (#12049)
+        const why = await resp.json().then(b => (b && typeof b.error === 'string' ? b.error.trim() : ''), () => '');
+        throw new Error(why ? `Could not wake ${who}: ${markHidden(why, { strict: true })}` : `Could not wake ${who} (HTTP ${resp.status}).`);
+    }
 }
 
 /** The question whole, with a Reply box: a modal dialog (focus kept inside it, Escape closes it). */
