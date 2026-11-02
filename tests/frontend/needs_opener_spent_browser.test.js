@@ -6,6 +6,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
 const { guardSettings } = require('./helpers/settings_guard');
 const BASE = require('./test_base').BASE;
 const { coralReady } = require('./helpers/wait');
+const { holdScroll, frames } = require('./helpers/scroll_hold');
 const B = 'needs-opener-spent-' + Date.now().toString(36);
 
 (async () => {
@@ -40,22 +41,21 @@ const B = 'needs-opener-spent-' + Date.now().toString(36);
             await openNeeds();
             const SCROLLER = `(() => { const tr = document.querySelector('${T} tbody tr'); for (let e = tr; e; e = e.parentElement) { const o = getComputedStyle(e).overflowY; if ((o === 'auto' || o === 'scroll') && e.scrollHeight > e.clientHeight + 2) return e; } return document.scrollingElement; })()`;
             const rowsOf = `[...document.querySelectorAll('${T} tbody tr')].filter(tr => /looks done/.test(tr.textContent))`;
-            await ev(`(() => { const tr = ${rowsOf}.slice(-2)[0]; tr.scrollIntoView({ block: 'center' }); return true; })()`);
-            await new Promise(r => setTimeout(r, 300)); // sleep-ok: the scroll settles
+            await holdScroll(ev, SCROLLER, `${rowsOf}.slice(-2)[0]`); // the list is scrolled down and holds it (not a fixed sleep, which a redraw in the window beat)
             const pos = await ev(`(() => { const el = ${rowsOf}.slice(-2)[0].querySelector('.inbox-review-name'), r = el.getBoundingClientRect(); return { x: r.left + Math.min(r.width / 2, 20), y: r.top + r.height / 2, top: ${SCROLLER}.scrollTop, name: el.textContent }; })()`);
             assert.ok(pos.top > 100, at + 'the list is scrolled down before the goal is opened: ' + JSON.stringify(pos));
             for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) await client.Input.dispatchMouseEvent({ type, x: pos.x, y: pos.y, button: type === 'mouseMoved' ? 'none' : 'left', buttons: type === 'mousePressed' ? 1 : 0, clickCount: type === 'mouseMoved' ? 0 : 1 });
             await waitFor(`!!document.querySelector('.goals-open')`, at + 'the goal opened by a real click', 10000);
             await ev(`history.back(); true`);
             await waitFor(`!document.querySelector('.goals-open') && /looks done/.test(document.querySelector('${T}')?.textContent || '')`, at + 'back on the list', 10000);
-            await new Promise(r => setTimeout(r, 1800)); // sleep-ok: the restore holds the list's place for about a second, then lets go
+            await frames(ev, 90); // the restore holds the list's place for 60 frames, then lets go
             // the opener is spent: a later fresh open of Needs you (another folder, then Needs you again: what a notification link does) starts at the top, with no row holding the focus
             await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m => m.selectInboxTab('tasks')).then(() => true)`);
-            await new Promise(r => setTimeout(r, 400)); // sleep-ok: the folder draws after the route
+            await frames(ev, 20); // the folder draws after the route
             await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
             await waitFor(`/looks done/.test(document.querySelector('${T}')?.textContent || '')`, at + 'Needs you opened afresh', 15000);
             const seen = [];
-            for (let i = 0; i < 6; i++) { await new Promise(r => setTimeout(r, 200)); seen.push(await ev(`(() => { const a = document.activeElement, tr = a && a.closest && a.closest('tr[data-key]'); return { top: Math.round(${SCROLLER}.scrollTop), focusRow: tr ? (tr.querySelector('.inbox-review-name')?.textContent || tr.dataset.key) : '' }; })()`)); } // sleep-ok: sampling a second of the draw
+            for (let i = 0; i < 6; i++) { await frames(ev, 12); seen.push(await ev(`(() => { const a = document.activeElement, tr = a && a.closest && a.closest('tr[data-key]'); return { top: Math.round(${SCROLLER}.scrollTop), focusRow: tr ? (tr.querySelector('.inbox-review-name')?.textContent || tr.dataset.key) : '' }; })()`)); }
             assert.ok(seen.every(s => s.top <= 40), at + 'a fresh open of Needs you starts at the top, it is not thrown back to the old offset ' + pos.top + ': ' + JSON.stringify(seen));
             assert.ok(seen.every(s => s.focusRow !== pos.name), at + 'and the old row does not take the focus: ' + JSON.stringify(seen));
         }
