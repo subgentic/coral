@@ -67,6 +67,9 @@ func (h *SessionsHandler) applyTranscriptState(input *SessionStateInput, events 
 			kind, atTime := hermesTurnFallback(events, h.hermesScreen(name, agentType, sessionID), time.Now())
 			mergeTranscriptTurnEvent(input, events, kind, atTime)
 		}
+		if n := len(input.Events); n > 0 && input.Events[n-1].Type == "permission_request" { // an open request: the box on the screen says whether it is a command to approve or a question (#12170)
+			hermesRequestFromScreen(&input.Events[n-1], h.hermesScreen(name, agentType, sessionID))
+		}
 	case at.Opencode:
 		// opencode keeps no transcript Coral reads: its server's event stream says a turn is going on, ended, or waits for the person.
 		kind, atTime := h.opencodeTurn(sessionID)

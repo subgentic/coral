@@ -1,0 +1,47 @@
+ry_name_seg… → denied
+
+✗ $ rm -rf /home/tester/dangerdir/a_long_directory_name_segment_1/a_long_directory_name_segment_2/a_long_directory_name_segment_3/a_long_directory_name_segment_4/a_long_directory_name_segment_5/a_long_directory_name_segment_6  21.0s [You denied this command — it did not run.]
+
+────────────────────────────────────────
+☤ Hermes
+
+⚡ New message detected, interrupting...
+HERMES_TEST_REPLY
+────────────────────────────────────────
+
+⚡ Sending after interrupt: 'ASKQ3 third'
+
+─ 24.3s · 7:10 AM
+
+
+────────────────────────────────────────
+❯ ASKQ3 third
+────────────────────────────────────────
+  (tip) Your message interrupted the current run. Use /busy queue to queue messages for the next turn instead, or /busy steer to inject mid-run. This tip only shows once.
+
+? Clarify: Which colour should the report use? → green
+
+❓ Clarify Which colour should the report use?  12.6s
+
+────────────────────────────────────────
+☤ Hermes
+HERMES_TEST_REPLY
+────────────────────────────────────────
+
+─ 14.0s · called 1 tool · 7:11 AM
+
+
+────────────────────────────────────────
+❯ ASKQ0 fourth
+────────────────────────────────────────
+╭─ Hermes Agent needs your input ───────────────────────────────╮                                                       
+│ 1 question                                                    │
+│ ▸ What name should the report have?                           │                                                       
+│   Type your answer in the prompt below, then press Enter.     │                                                       
+╰───────────────────────────────────────────────────────────────╯
+
+  type your answer and press Enter  (3586s)
+── ⠹ ❓ What name should the report have? · 14s ────────────────────────────────────────────────── RUNDANGER short one ─
+✎ ❯ type your answer here and press Enter
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ ☤ stub-model · 10/256K · [░░░░░░░░░░] 0% · ◷ 0.0s · ↑ 179 t/s · 2m · ⏱ 13s · ~/work (master)

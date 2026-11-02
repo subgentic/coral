@@ -71,10 +71,12 @@ type promptReviewItem struct {
 type promptScreen struct {
 	// Title: the dialog's heading, when its top line is one ("Hooks need review" over "2 hooks are new or changed ...", #306).
 	// Question still begins with it; the card shows the title as a heading and the rest of Question under it.
-	Title    string             `json:"title,omitempty"`
-	Question string             `json:"question"`
-	Options  []promptOption     `json:"options"`
-	Review   []promptReviewItem `json:"review,omitempty"`
+	Title    string `json:"title,omitempty"`
+	Question string `json:"question"`
+	// Kind: what the prompt is where the screen says (Hermes: "approval" of a command, "question" of its own), so the card is a question and not a permission for a question (#12170).
+	Kind    string             `json:"kind,omitempty"`
+	Options []promptOption     `json:"options"`
+	Review  []promptReviewItem `json:"review,omitempty"`
 	// Unnumbered: the options carry no numbers (Claude Code's folder-trust and API-key menus at launch,
 	// #4543); n is an option's place in the list, and it is answered with the arrow keys and Enter.
 	Unnumbered bool `json:"unnumbered,omitempty"`
@@ -210,6 +212,9 @@ func cleanPromptScreen(s promptScreen) promptScreen {
 }
 
 func parsePromptScreenRaw(capture string) (promptScreen, bool) {
+	if s, ok := parseHermesPrompt(capture); ok {
+		return s, true
+	}
 	lines := strings.Split(strings.ReplaceAll(capture, "\r", ""), "\n")
 	for len(lines) > 0 && strings.TrimSpace(lines[len(lines)-1]) == "" {
 		lines = lines[:len(lines)-1]
