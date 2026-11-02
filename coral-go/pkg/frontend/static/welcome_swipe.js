@@ -17,7 +17,7 @@ function undo(id) {
     document.dispatchEvent(new CustomEvent('coral:welcome-changed'));
 }
 
-/** Listen for drags of the rows that carry data-welcome-id (a row with a Dismiss) or an Ignore of their own. The listeners sit on the list's persistent outer box (the Inbox's #group-table-view, with its gutter) and are added ONCE: each table build calls this with its new box, which only becomes the one the listeners read (#11765: they were added again per build, and after five folder switches one swipe ignored a file eight times). */
+/** Listen for drags of the rows that carry data-welcome-id (a row with a Dismiss) or a Dismiss of their own. The listeners sit on the list's persistent outer box (the Inbox's #group-table-view, with its gutter) and are added ONCE: each table build calls this with its new box, which only becomes the one the listeners read (#11765: they were added again per build, and after five folder switches one swipe ignored a file eight times). */
 export function attachWelcomeSwipe(host) {
     const scope = host.closest('#group-table-view') || host; // the list's own box and the gutter around it
     scope._swipeHost = host; // the table on screen now
@@ -33,7 +33,7 @@ export function attachWelcomeSwipe(host) {
         if (row && !row.dataset.welcomeId && !row.querySelector('.inbox-review-actions')?._ignore) return; // a row with nothing to ignore is not swiped (#11642)
         if (!row || drag) return;
         drag = { row, id: row.dataset.welcomeId, box: row.querySelector('.inbox-review-actions'), x: e.clientX, y: e.clientY, t: e.timeStamp, dx: 0, on: false, strip: document.createElement('div') };
-        drag.strip.className = 'inbox-swipe-strip'; drag.strip.setAttribute('aria-hidden', 'true'); drag.strip.textContent = 'Ignore';
+        drag.strip.className = 'inbox-swipe-strip'; drag.strip.setAttribute('aria-hidden', 'true'); drag.strip.textContent = 'Dismiss';
     });
     scope.addEventListener('pointermove', e => {
         if (!drag || e.pointerType !== 'touch') return;
@@ -57,11 +57,11 @@ export function attachWelcomeSwipe(host) {
         d.row.addEventListener('click', mute, true); setTimeout(() => d.row.removeEventListener('click', mute, true), 100); // the lift of the finger is not a tap on a button
         if (e.type === 'pointerup' && (-d.dx > wide * COMMIT || (fast > FLICK && -d.dx > FLICK_MIN_PX))) {
             d.strip.remove(); d.row.style.transform = '';
-            if (!d.id) { d.box._ignore(d.row); return; } // a review, a question or a failed run: the row's own Ignore, which says it and offers Undo itself (#11642)
+            if (!d.id) { d.box._ignore(d.row); return; } // a review, a question or a failed run: the row's own Dismiss, which says it and offers Undo itself (#11642)
             const title = (d.row.querySelector('.inbox-welcome-name')?.firstChild?.textContent || 'the item').trim();
             dismissWelcome(d.id);
-            showToast(`Ignored: ${title}`, false, undefined, { action: { label: 'Undo', onClick: () => undo(d.id) } });
-            announceNotice(`Ignored: ${title}. Undo is in the notice.`); // read out politely: the toast is not a live region of its own
+            showToast(`Dismissed: ${title}`, false, undefined, { action: { label: 'Undo', onClick: () => undo(d.id) } });
+            announceNotice(`Dismissed: ${title}. Undo is in the notice.`); // read out politely: the toast is not a live region of its own
         } else back(d.row, d.strip);
     };
     scope.addEventListener('pointerup', end);

@@ -1,5 +1,5 @@
 // Swipe a welcome row away on a phone (#11542, the operator; the mockup is #11536): a left drag past 40% of the row (or a flick) dismisses it and says so with Undo; less than that springs back; a vertical drag is the page's;
-// the visible Ignore button stays and works without a toast; "Welcome to Coral" (no Ignore) is not swipeable; Undo puts the item back and turns the items on again; with reduced motion nothing slides. Real touch gestures
+// the visible Dismiss button stays and works without a toast; "Welcome to Coral" (no Dismiss) is not swipeable; Undo puts the item back and turns the items on again; with reduced motion nothing slides. Real touch gestures
 // (CDP Input) at 390 px, the settings save answered in the page. Drives Chrome through agent_view_harness.js against the isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -34,13 +34,13 @@ const { installGuard, reached } = require('./helpers/silent_dismiss');
         const swipe = async (g, dx, dy = 0, steps = 8, pause = 12) => { const x0 = g.right - 24; await touch('touchStart', x0, g.y); for (let i = 1; i <= steps; i++) { await touch('touchMove', x0 + dx * i / steps, g.y + dy * i / steps); await wait(pause); } return x0 + dx; };
         const AGENT = 'Start your first agent';
 
-        // the rows with an Ignore carry the id; Welcome (Got it, no Ignore) does not
-        check((await geo(AGENT)).id === 'agent' && (await geo('Welcome to Coral')).id === '', 'the rows with an Ignore are swipeable, "Welcome to Coral" is not');
+        // the rows with an Dismiss carry the id; Welcome (Got it, no Dismiss) does not
+        check((await geo(AGENT)).id === 'agent' && (await geo('Welcome to Coral')).id === '', 'the rows with an Dismiss are swipeable, "Welcome to Coral" is not');
 
         // a short drag (a sixth of the row, slow): it follows the finger, then springs back, and nothing is dismissed
         let g = await geo(AGENT), end = await swipe(g, -g.width / 6);
         const mid = await ev(`(() => { const tr = ${rowOf(AGENT)}; return { t: tr.style.transform, strip: !!document.querySelector('.inbox-swipe-strip'), stripText: (document.querySelector('.inbox-swipe-strip') || {}).textContent }; })()`);
-        check(/translateX\(-/.test(mid.t) && mid.strip && mid.stripText === 'Ignore', 'while the finger is down the row follows it and "Ignore" shows behind it: ' + JSON.stringify(mid));
+        check(/translateX\(-/.test(mid.t) && mid.strip && mid.stripText === 'Dismiss', 'while the finger is down the row follows it and "Dismiss" shows behind it: ' + JSON.stringify(mid));
         check(await ev(`(() => { const s = document.querySelector('.inbox-swipe-strip'); const probe = document.createElement('i'); probe.style.color = 'var(--text-primary)'; document.body.append(probe); const want = getComputedStyle(probe).color; probe.remove(); return !!s && getComputedStyle(s).color === want; })()`), 'the word on the strip is in the text colour (contrast), not the error red');
         await touch('touchEnd', end, g.y); await frames(40);
         const back = await geo(AGENT);
@@ -57,22 +57,22 @@ const { installGuard, reached } = require('./helpers/silent_dismiss');
         check(!(await titles()).includes(AGENT) && (await titles()).length === 4, 'a long drag dismisses the row: ' + JSON.stringify(await titles()));
         const puts = await ev(`window.__puts`);
         check(puts.some(p => String(p.inbox_welcome_done || '').split(',').includes('agent')), 'the dismissal is saved like the button\'s: ' + JSON.stringify(puts));
-        const toast = await ev(`(() => { const t = [...document.querySelectorAll('.toast')].find(x => /Ignored: Start your first agent/.test(x.textContent)); return t ? { text: t.textContent.replace(/\\s+/g, ' ').trim(), undo: !!([...t.querySelectorAll('button')].find(b => b.textContent.trim() === 'Undo')), x: 1} : null; })()`);
-        await waitFor(`window.__said.some(t => /Ignored: Start your first agent\\. Undo is in the notice/.test(t))`, 'the announcement is made', 3000).catch(() => {});
-        check(!!toast && toast.undo && (await ev(`window.__said.some(t => /Ignored: Start your first agent\\. Undo is in the notice/.test(t))`)), 'a toast says it, with Undo, and a polite announcement reads it out: ' + JSON.stringify(toast));
+        const toast = await ev(`(() => { const t = [...document.querySelectorAll('.toast')].find(x => /Dismissed: Start your first agent/.test(x.textContent)); return t ? { text: t.textContent.replace(/\\s+/g, ' ').trim(), undo: !!([...t.querySelectorAll('button')].find(b => b.textContent.trim() === 'Undo')), x: 1} : null; })()`);
+        await waitFor(`window.__said.some(t => /Dismissed: Start your first agent\\. Undo is in the notice/.test(t))`, 'the announcement is made', 3000).catch(() => {});
+        check(!!toast && toast.undo && (await ev(`window.__said.some(t => /Dismissed: Start your first agent\\. Undo is in the notice/.test(t))`)), 'a toast says it, with Undo, and a polite announcement reads it out: ' + JSON.stringify(toast));
 
         // Undo puts it back and the items are on
-        await ev(`[...document.querySelectorAll('.toast')].find(x => /Ignored: Start your first agent/.test(x.textContent)).querySelectorAll('button').forEach(b => { if (b.textContent.trim() === 'Undo') b.click(); }); true`);
+        await ev(`[...document.querySelectorAll('.toast')].find(x => /Dismissed: Start your first agent/.test(x.textContent)).querySelectorAll('button').forEach(b => { if (b.textContent.trim() === 'Undo') b.click(); }); true`);
         await waitFor(`[...document.querySelectorAll('#group-table-view .inbox-welcome-name')].some(e => e.firstChild.textContent === ${JSON.stringify(AGENT)})`, 'Undo brings the row back', 6000).catch(() => {});
         const after = await ev(`window.__puts`);
         check((await titles()).includes(AGENT) && after.some(p => p.inbox_welcome === 'on' && !String(p.inbox_welcome_done).split(',').includes('agent')), 'Undo puts the row back and saves it: ' + JSON.stringify(after.slice(-1)));
 
-        // the visible Ignore button is the same dismissal, with no Undo toast
-        await ev(`document.querySelectorAll('.toast').forEach(t => t.remove()); [...${rowOf('Make a team so agents can work together')}.querySelectorAll('button')].find(b => b.textContent.trim() === 'Ignore').click(); true`);
-        await waitFor(`![...document.querySelectorAll('#group-table-view .inbox-welcome-name')].some(e => e.firstChild.textContent === 'Make a team so agents can work together')`, 'the Ignore button dismisses', 6000).catch(() => {});
-        check(!(await titles()).includes('Make a team so agents can work together') && !(await ev(`[...document.querySelectorAll('.toast')].some(t => /Undo/.test(t.textContent))`)), 'the Ignore button still works and offers no Undo');
+        // the visible Dismiss button is the same dismissal, with no Undo toast
+        await ev(`document.querySelectorAll('.toast').forEach(t => t.remove()); [...${rowOf('Make a team so agents can work together')}.querySelectorAll('button')].find(b => b.textContent.trim() === 'Dismiss').click(); true`);
+        await waitFor(`![...document.querySelectorAll('#group-table-view .inbox-welcome-name')].some(e => e.firstChild.textContent === 'Make a team so agents can work together')`, 'the Dismiss button dismisses', 6000).catch(() => {});
+        check(!(await titles()).includes('Make a team so agents can work together') && !(await ev(`[...document.querySelectorAll('.toast')].some(t => /Undo/.test(t.textContent))`)), 'the Dismiss button still works and offers no Undo');
 
-        check(!(await reached(ev)).length, 'the swipe, its Undo and the Ignore button sent nothing to an agent: ' + JSON.stringify(await reached(ev)));
+        check(!(await reached(ev)).length, 'the swipe, its Undo and the Dismiss button sent nothing to an agent: ' + JSON.stringify(await reached(ev)));
 
         // reduced motion: the drag still dismisses, and a short one does not animate back
         await Emulation.setEmulatedMedia({ features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });

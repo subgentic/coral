@@ -46,18 +46,18 @@ const { coralReady } = require('./helpers/wait');
         check(wide.keys[wide.keys.length - 1] === 'review', '1440: the last visible column is Actions: ' + JSON.stringify(wide.keys));
         check(wide.keys.indexOf('waiting') === -1 && wide.keys[wide.keys.length - 1] === 'review', '1440: there is no Waiting column (the waiting time is in the Actions cell until the row is hovered, #11669) and Actions is last: ' + JSON.stringify(wide.keys));
         check(wide.gap >= 0 && wide.gap <= 24, '1440: the last button ends at the cell\'s right edge (gap ' + wide.gap + ' px)');
-        check(JSON.stringify(await labels('Review file 01.txt')) === JSON.stringify(['Save for later: Review file 01.txt', 'Approve: Review file 01.txt', 'Request changes: Review file 01.txt', 'Deny: Review file 01.txt', 'Ignore: Review file 01.txt', 'More actions for Review file 01.txt']), '1440: an unread row has Approve, Changes, Deny, Ignore, in that order, then a More (Approve with a note, #11888), and no Open or refresh icon: ' + JSON.stringify(await labels('Review file 01.txt')));
-        check(JSON.stringify(await labels('Review file 02.txt')) === JSON.stringify(['Save for later: Review file 02.txt', 'Approve: Review file 02.txt', 'Request changes: Review file 02.txt', 'Deny: Review file 02.txt', 'Ignore: Review file 02.txt', 'More actions for Review file 02.txt']), '1440: a read row has the same four and a More (Mark unread is in it): ' + JSON.stringify(await labels('Review file 02.txt')));
+        check(JSON.stringify(await labels('Review file 01.txt')) === JSON.stringify(['Approve: Review file 01.txt', 'Request changes: Review file 01.txt', 'Save for later: Review file 01.txt', 'More actions for Review file 01.txt']), '1440: an unread row has Approve, a Request changes icon, a Save icon, in that order, then a More (Approve with a note, #11888), and no Open or refresh icon: ' + JSON.stringify(await labels('Review file 01.txt')));
+        check(JSON.stringify(await labels('Review file 02.txt')) === JSON.stringify(['Approve: Review file 02.txt', 'Request changes: Review file 02.txt', 'Save for later: Review file 02.txt', 'More actions for Review file 02.txt']), '1440: a read row has the same four and a More (Mark unread is in it): ' + JSON.stringify(await labels('Review file 02.txt')));
         await shot('needs-actions-last-1440');
 
-        // 1280: the table has room for the item, the task link and the goal, not for four words: Approve, Changes and More (Deny, Ignore, Mark unread), like a phone
+        // 1280: the table has room for the item, the task link and the goal, not for four words: Approve, Changes and More (Deny, Dismiss, Mark unread), like a phone
         await load(1280, 900, false);
-        check(JSON.stringify(await labels('Review file 01.txt')) === JSON.stringify(['Save for later: Review file 01.txt', 'Approve: Review file 01.txt', 'Request changes: Review file 01.txt', 'More actions for Review file 01.txt']), '1280: an unread row has Approve, Changes and More: ' + JSON.stringify(await labels('Review file 01.txt')));
+        check(JSON.stringify(await labels('Review file 01.txt')) === JSON.stringify(['Approve: Review file 01.txt', 'Request changes: Review file 01.txt', 'Save for later: Review file 01.txt', 'More actions for Review file 01.txt']), '1280: an unread row has the same, option B at every width: ' + JSON.stringify(await labels('Review file 01.txt')));
         { const fit = await ev(`(() => { const td = ${row('Review file 02.txt')}.querySelector('td[data-key="review"]'), c = td.getBoundingClientRect(), bs = [...td.querySelectorAll('.inbox-review-actions > button, .inbox-row-more-toggle')].map(b => b.getBoundingClientRect()); return { left: Math.round(Math.min(...bs.map(b => b.left)) - c.left), right: Math.round(c.right - Math.max(...bs.map(b => b.right))) }; })()`);
           check(fit.left >= 0 && fit.right >= 0, '1280: the buttons are inside the Actions cell: ' + JSON.stringify(fit)); }
         await shot('needs-actions-last-1280');
 
-        // 390: the phone's row: Approve, Changes and More (Deny, Ignore); its buttons end at the row's right edge
+        // 390: the phone's row: Approve, Changes and More (Deny, Dismiss); its buttons end at the row's right edge
         await load(390, 844, true);
         // #11671: a phone's row carries no visible button (tap opens, long press selects, swipe ignores); its buttons stay in the page, out of sight, for a screen reader and the keyboard
         const phone = await ev(`(() => { const r = ${row('Review file 02.txt')}, cell = r.querySelector('.inbox-review-actions').closest('.dt-td'), c = cell.getBoundingClientRect(); return { n: r.querySelectorAll('.inbox-review-actions button').length, cellW: Math.round(c.width), cellH: Math.round(c.height) }; })()`);
@@ -66,7 +66,7 @@ const { coralReady } = require('./helpers/wait');
         await ev(`${row('Review file 02.txt')}.querySelector('.inbox-row-more-toggle').click(); true`);
         await waitFor(`!!document.querySelector('.inbox-row-more-toggle[aria-expanded="true"]')`, '390: the More menu opens', 4000).catch(() => {});
         const items = await ev(`[...document.querySelectorAll('.dt-mail-menu:not([hidden]) .menu-item')].map(b => b.textContent.trim())`);
-        check(JSON.stringify(items) === JSON.stringify(['Approve with a note', 'Deny', 'Ignore', 'Save for later', 'Mark unread']), '390: the More menu of a read row is Approve with a note, Deny, Ignore, Save for later, Mark unread: ' + JSON.stringify(items));
+        check(JSON.stringify(items) === JSON.stringify(['Approve with a note', 'Dismiss', 'Deny', 'Save for later', 'Mark unread']), '390: the More menu of a read row is Approve with a note, Dismiss, Deny, Save for later, Mark unread: ' + JSON.stringify(items));
         await shot('needs-actions-last-390');
     } finally { await removeBoards(ev, [team]).catch(() => {}); await ev(`localStorage.removeItem('coral-dt-widths:Needs you'); true`).catch(() => {}); await client.close(); }
     if (found.length) { console.error(found.join('\n')); process.exit(1); }

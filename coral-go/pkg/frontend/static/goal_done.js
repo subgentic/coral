@@ -1,6 +1,6 @@
 /* "Goal #N looks done" (#11825): an active goal whose tasks are all done is ONE item of Needs you (it was a box on the goal screen). Close goal opens the goal's Close dialog set to Done; Not yet hides it until a
- * task is added; Ignore hides it for good, with Undo. What is hidden is kept on the machine in the goal_done_hidden setting, a JSON list of "<team>|<goal>|<tasks>" (Not yet, at the all-done total it was pressed at)
- * and "<team>|<goal>|*" (Ignore), so the Hub's phone push and every browser agree. This computer's goals only (the Operator's alone: a goal on another computer is closed there). */
+ * task is added; Dismiss hides it for good, with Undo. What is hidden is kept on the machine in the goal_done_hidden setting, a JSON list of "<team>|<goal>|<tasks>" (Not yet, at the all-done total it was pressed at)
+ * and "<team>|<goal>|*" (Dismiss), so the Hub's phone push and every browser agree. This computer's goals only (the Operator's alone: a goal on another computer is closed there). */
 import { state } from './state.js';
 
 // goal_words.js's rule (readyToClose, allTasksOf), written out here: the Inbox tab's badge imports this file at start, and the goal words are not loaded until a goal is shown.

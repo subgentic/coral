@@ -22,7 +22,7 @@ const { AUDIT, judge } = require('./helpers/table_rules');
         check(judge(real).some(v => /^R9: the button "Dismiss" sits in the "agent" column/.test(v)), 'a real action button in a data column is still caught: ' + JSON.stringify(judge(real)));
         const lookalike = await audit('<button type="button" class="btn btn-small">Open Orchestrator</button>');
         check(judge(lookalike).some(v => /^R9/.test(v)), 'a button that only says "Open Orchestrator" (no agent-link class) is caught: exempted by class, not by words: ' + JSON.stringify(judge(lookalike)));
-        const both = await audit('<button type="button" class="agent-name agent-link">Orchestrator</button> <button type="button" class="btn btn-small">Ignore</button>');
+        const both = await audit('<button type="button" class="agent-name agent-link">Orchestrator</button> <button type="button" class="btn btn-small">Dismiss</button>');
         check(judge(both).filter(v => /^R9/.test(v)).length === 1, 'beside a link, the real action is the one caught: ' + JSON.stringify(judge(both)));
     } finally { await client.close(); }
     if (failures.length) { console.error('FAIL\n' + failures.join('\n')); process.exitCode = 1; } else console.log('PASS R9: an agent link is not a row action; a real action in a data column is');

@@ -1,5 +1,5 @@
 // GET /api/needs-you on a real server (#11596): a stand-in agent that waits on a permission, a question that agent asks the Operator, a proposal-free board and a file the agent tags for review show up in ONE read, as the
-// Inbox counts them, with their lines cleaned and a token redacted; the cursor gives only what is at or after it; Ignore, Approve and Deny take the file out of the count; a script with no person's standing is refused.
+// Inbox counts them, with their lines cleaned and a token redacted; the cursor gives only what is at or after it; Dismiss, Approve and Deny take the file out of the count; a script with no person's standing is refused.
 // No stubs: the runner's isolated server, a stand-in agent with a real session token, the real routes. No page is opened (Chrome is only the runner's).
 const assert = require('node:assert/strict');
 const { launchStandIn } = require('./helpers/stand_in_agent');
@@ -77,7 +77,7 @@ async function httpJson(method, path, body, headers = {}) {
         assert.equal(new Set(ids).size, ids.length, 'none twice: ' + ids);
         assert.equal(ids.length, d.count, 'every waiting thing, in pages of one: ' + ids.length + ' of ' + d.count);
 
-        // Ignore takes it out of the count and Unignore puts it back; Approve and Deny take it out for good
+        // Dismiss takes it out of the count and Unignore puts it back; Approve and Deny take it out for good
         const review1 = async decision => person('POST', `/api/board/${B}/artifacts/${hex}/review`, { decision });
         const countOf = async () => (await needs()).counts.review;
         const before = await countOf();

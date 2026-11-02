@@ -1,5 +1,5 @@
-// The Saved folder's "Files for review" rows have the same actions as a Needs you row (#11799, the operator: they had Approve, Changes and Deny but no Ignore): Approve, Changes, Deny and Ignore in their fixed slots, the three dots with
-// "Move to Needs you"; with a mouse the buttons show at the row's hover (Needs you's rule, #11669), a phone has Deny and Ignore in the dots. Ignore takes the file out of Saved with a toast and Undo, and Undo brings it back
+// The Saved folder's "Files for review" rows have the same actions as a Needs you row (#11799, the operator: they had Approve, Changes and Deny but no Dismiss): Approve, a Request changes icon and the three dots in their fixed slots (Dismiss and Deny are in the dots, #12231), the three dots with
+// "Move to Needs you"; with a mouse the buttons show at the row's hover (Needs you's rule, #11669), a phone has Deny and Dismiss in the dots. Dismiss takes the file out of Saved with a toast and Undo, and Undo brings it back
 // (decisions 'ignore' and 'unignore', nothing else is posted). The server's tags are modelled in the page. 1440 and 390. Drives Chrome over CDP through agent_view_harness.js against the isolated dev server.
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
@@ -44,7 +44,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             if (!mobile) { await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: 5, y: 5 }); await ev(framesJs(3)); }
             // the row's actions: the same set and slots as a Needs you row
             const shape = await ev(`(() => { const box = document.querySelector('.saved-files tbody tr .inbox-review-actions'), names = [...box.querySelectorAll('button')].map(b => (b.getAttribute('data-slot') || b.getAttribute('aria-label'))); return { slots: [...box.children].map(c => c.getAttribute('data-slot')).filter(Boolean), hover: !!box.closest('.inbox-actions-hover'), opacity: Number(getComputedStyle(box).opacity), names }; })()`);
-            check(JSON.stringify(shape.slots) === JSON.stringify(mobile ? ['approve', 'changes', 'dots'] : ['approve', 'changes', 'deny', 'ignore', 'dots']), at + 'the buttons are in Needs you\'s slots: ' + JSON.stringify(shape.slots));
+            check(JSON.stringify(shape.slots) === JSON.stringify(mobile ? ['approve', 'changes', 'dots'] : ['approve', 'changes', 'dots'] /* option B (#12231): Deny and Dismiss are in the dots on every width */), at + 'the buttons are in Needs you\'s slots: ' + JSON.stringify(shape.slots));
             if (!mobile) {
                 check(shape.hover && shape.opacity === 0, at + 'with a mouse the buttons show only at the row\'s hover (Needs you\'s rule): ' + JSON.stringify([shape.hover, shape.opacity]));
                 const at1 = await ev(`(() => { const r = document.querySelector('.saved-files tbody tr').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
@@ -56,17 +56,17 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await ev(`document.querySelector('.saved-files button[aria-label="More actions for plan-1.md"]').click(); true`);
             await waitFor(`!!document.querySelector('.saved-files .menu:not([hidden]) .menu-item')`, at + 'the dots open', 5000);
             const items = await ev(`[...document.querySelectorAll('.saved-files .menu:not([hidden]) .menu-item')].map(x => x.textContent.trim())`);
-            check(JSON.stringify(items) === JSON.stringify(mobile ? ['Approve with a note', 'Deny', 'Ignore', 'Move to Needs you'] : ['Approve with a note', 'Move to Needs you']), at + 'the dots hold: ' + JSON.stringify(items));
+            check(JSON.stringify(items) === JSON.stringify(['Approve with a note', 'Dismiss', 'Deny', 'Move to Needs you']), at + 'the dots hold: ' + JSON.stringify(items));
             await ev(`document.querySelector('.saved-files button[aria-label="More actions for plan-1.md"]').click(); true`); await new Promise(r => setTimeout(r, 250)); // sleep-ok: the menu closes (the same button again)
-            // Ignore: out of Saved, with a toast and Undo
-            if (!mobile) await ev(`document.querySelector('.saved-files button[aria-label="Ignore: plan-1.md"]').click(); true`);
-            else { await ev(`document.querySelector('.saved-files button[aria-label="More actions for plan-1.md"]').click(); true`); await waitFor(`!!document.querySelector('.saved-files .menu-item[aria-label="Ignore: plan-1.md"]')`, at + 'the dots have Ignore', 5000); await ev(`document.querySelector('.saved-files .menu-item[aria-label="Ignore: plan-1.md"]').click(); true`); }
+            // Dismiss: out of Saved, with a toast and Undo
+            if (!mobile) await ev(`document.querySelector('.saved-files button[aria-label="Dismiss: plan-1.md"]').click(); true`);
+            else { await ev(`document.querySelector('.saved-files button[aria-label="More actions for plan-1.md"]').click(); true`); await waitFor(`!!document.querySelector('.saved-files .menu-item[aria-label="Dismiss: plan-1.md"]')`, at + 'the dots have Dismiss', 5000); await ev(`document.querySelector('.saved-files .menu-item[aria-label="Dismiss: plan-1.md"]').click(); true`); }
             await waitFor(`document.querySelectorAll('.saved-files tbody tr').length === 1`, at + 'the ignored file leaves Saved', 8000);
             check(JSON.stringify(await rowsOf()) === JSON.stringify(['plan-2']), at + 'the other stays: ' + JSON.stringify(await rowsOf()));
             let calls = await ev(`window.__calls`);
             check(calls.length === 1 && calls[0].path.endsWith('/review') && calls[0].body.decision === 'ignore', at + 'one decision, "ignore", and nothing else was posted: ' + JSON.stringify(calls));
-            await waitFor(`[...document.querySelectorAll('.toast')].some(t => /Ignored: plan-1\\.md/.test(t.textContent) && [...t.querySelectorAll('button')].some(b => b.textContent.trim() === 'Undo'))`, at + 'a toast says it, with Undo', 8000);
-            await ev(`[...document.querySelectorAll('.toast')].find(t => /Ignored: plan-1\\.md/.test(t.textContent)).querySelectorAll('button').forEach(b => { if (b.textContent.trim() === 'Undo') b.click(); }); true`);
+            await waitFor(`[...document.querySelectorAll('.toast')].some(t => /Dismissed: plan-1\\.md/.test(t.textContent) && [...t.querySelectorAll('button')].some(b => b.textContent.trim() === 'Undo'))`, at + 'a toast says it, with Undo', 8000);
+            await ev(`[...document.querySelectorAll('.toast')].find(t => /Dismissed: plan-1\\.md/.test(t.textContent)).querySelectorAll('button').forEach(b => { if (b.textContent.trim() === 'Undo') b.click(); }); true`);
             await waitFor(`document.querySelectorAll('.saved-files tbody tr').length === 2`, at + 'Undo brings it back to Saved', 8000);
             calls = await ev(`window.__calls`);
             check(calls.length === 2 && calls[1].body.decision === 'unignore', at + 'Undo is one "unignore": ' + JSON.stringify(calls));

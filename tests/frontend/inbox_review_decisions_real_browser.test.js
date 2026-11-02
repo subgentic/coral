@@ -1,5 +1,5 @@
-// Deny, Ignore and Undo on a review row of Needs you against the REAL server (#11552, the walk the stubbed inbox_review_decisions_browser cannot be): real files uploaded by a stood-in terminal session of a real board on the
-// isolated dev server, the real review route. Deny sends one notice to the uploader with the reason and takes the row out (tags: denied); Ignore takes it out with NO new message on the board (tags: ignored, no for review);
+// Deny, Dismiss and Undo on a review row of Needs you against the REAL server (#11552, the walk the stubbed inbox_review_decisions_browser cannot be): real files uploaded by a stood-in terminal session of a real board on the
+// isolated dev server, the real review route. Deny sends one notice to the uploader with the reason and takes the row out (tags: denied); Dismiss takes it out with NO new message on the board (tags: ignored, no for review);
 // Undo (unignore) brings it back as it was (for review, no ignored), again with no message. 1440 (the words) and 390 (the row's three dots). Removed again.
 const os = require('node:os');
 const { connect } = require('./agent_view_harness');
@@ -59,14 +59,14 @@ const { coralReady, framesJs } = require('./helpers/wait');
             check((await messages()).length === before, at + 'the notice goes to the uploader\'s session, not onto the board: ' + (await messages()).length);
             check(JSON.stringify(await tagsOf(names.deny)) === JSON.stringify(['denied']), at + 'its tags are denied only: ' + JSON.stringify(await tagsOf(names.deny)));
 
-            // Ignore: nothing posted, tags ignored (no for review), the row gone; Undo brings it back as it was
+            // Dismiss: nothing posted, tags ignored (no for review), the row gone; Undo brings it back as it was
             const mid = (await messages()).length;
-            await press(names.ignore, 'Ignore');
+            await press(names.ignore, 'Dismiss');
             await waitFor(rowGone(names.ignore), at + 'the ignored row leaves', 15000).catch(() => {});
             const ti = await tagsOf(names.ignore);
-            check(ti && ti.includes('ignored') && !ti.includes('for review'), at + 'Ignore: tags ignored, not for review: ' + JSON.stringify(ti));
-            check((await messages()).length === mid, at + 'Ignore posted nothing to the board');
-            await ev(`[...document.querySelectorAll('.toast')].find(x => x.textContent.includes('Ignored: ${names.ignore}')).querySelectorAll('button').forEach(b => { if (b.textContent.trim() === 'Undo') b.click(); }); true`);
+            check(ti && ti.includes('ignored') && !ti.includes('for review'), at + 'Dismiss: tags ignored, not for review: ' + JSON.stringify(ti));
+            check((await messages()).length === mid, at + 'Dismiss posted nothing to the board');
+            await ev(`[...document.querySelectorAll('.toast')].find(x => x.textContent.includes('Dismissed: ${names.ignore}')).querySelectorAll('button').forEach(b => { if (b.textContent.trim() === 'Undo') b.click(); }); true`);
             await waitFor(rowThere(names.ignore), at + 'Undo brings the ignored row back', 15000).catch(() => {});
             const tu = await tagsOf(names.ignore);
             check(tu && tu.includes('for review') && !tu.includes('ignored'), at + 'Undo: for review again, not ignored: ' + JSON.stringify(tu));

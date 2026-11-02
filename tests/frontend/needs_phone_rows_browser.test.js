@@ -1,5 +1,5 @@
 // #11671 (the operator, Gmail-style rows on a phone; it replaces #11642's per-row button there): a phone's Needs you row carries no button. A tap opens it, a long press selects it (a check appears, a tap adds more),
-// a swipe to the left ignores it (with Undo), and a bar that takes the toolbar's line acts on the selection: Approve, Changes, Ignore, Save for later, Mark read or unread, Cancel, one request per item through the same
+// a swipe to the left ignores it (with Undo), and a bar that takes the toolbar's line acts on the selection: Approve, Changes, Dismiss, Save for later, Mark read or unread, Cancel, one request per item through the same
 // routes as a row's own buttons. A selection that does not fit an action turns it off (a question cannot be approved, Changes is for one file). Welcome, review and question rows at 390 and 360 px, real touch through CDP.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -58,7 +58,7 @@ const { coralReady } = require('./helpers/wait');
             await waitFor(`!!document.querySelector('dialog[open]')`, at + 'a tap opens the question', 6000);
             await ev(`document.querySelector('dialog[open]').dispatchEvent(new Event('cancel', { cancelable: true })); const d = document.querySelector('dialog[open]'); if (d) d.close(); true`); await new Promise(r => setTimeout(r, 300)); // sleep-ok: the dialog closes
             assert.equal(await bar(), null, at + 'no selection bar before a selection');
-            // a swipe like a phone's: a finger from 350 px to 40 px (a driver's drag, a few moves) on a review file and on a welcome item (not the welcome itself, which has no Ignore) ignores it (#11765)
+            // a swipe like a phone's: a finger from 350 px to 40 px (a driver's drag, a few moves) on a review file and on a welcome item (not the welcome itself, which has no Dismiss) ignores it (#11765)
             const drag = async (name, from = 350, to = 40) => { const p = await point(name); const y = p.y; await touch('touchStart', { x: from, y }); for (let i = 1; i <= 5; i++) { await touch('touchMove', { x: from + (to - from) * i / 5, y }); await new Promise(r => setTimeout(r, 16)); } await touch('touchEnd', { x: to, y }); await new Promise(r => setTimeout(r, 500)); }; // sleep-ok: a finger's moves and the row leaving
             // five folder switches, then ONE drag is ONE request and ONE toast (the swipe's listeners are on the page's persistent list box: they were added again with every table build and stacked, QA Reviewer 2's MUST)
             for (let i = 0; i < 5; i++) {
@@ -70,7 +70,7 @@ const { coralReady } = require('./helpers/wait');
             await drag('Phone review 5.txt');
             await waitFor(`window.__calls.some(c => c.review === '${(5).toString(16).padStart(64, '0')}' && c.decision === 'ignore')`, at + 'a drag from 350 to 40 px ignores the review file', 6000);
             assert.equal(await ev(`window.__calls.filter(c => c.review === '${(5).toString(16).padStart(64, '0')}' && c.decision === 'ignore').length`), 1, at + 'after the folder switches one drag is one ignore request');
-            assert.equal(await ev(`[...document.querySelectorAll('.toast')].filter(t => /Ignored: Phone review 5/.test(t.textContent)).length`), 1, at + 'and one toast');
+            assert.equal(await ev(`[...document.querySelectorAll('.toast')].filter(t => /Dismissed: Phone review 5/.test(t.textContent)).length`), 1, at + 'and one toast');
             assert.ok(await ev(`!${rowOf('Phone review 5.txt')}`), at + 'and its row is gone');
             await drag('Connect a second computer or the Hub');
             await waitFor(`(window.__puts || []).some(b => /connect/.test(String(b.inbox_welcome_done || '')))`, at + 'a drag from 350 to 40 px ignores a welcome item (its id is saved as done)', 6000);
@@ -80,7 +80,7 @@ const { coralReady } = require('./helpers/wait');
             { const sel = await selected(); assert.ok(sel.length === 1 && sel[0].includes('Phone review 1.txt'), at + 'a long press selects that row and only it: ' + JSON.stringify(sel)); }
             let b = await bar();
             assert.ok(b && b.count === '1 selected', at + 'the bar says 1 selected: ' + JSON.stringify(b));
-            assert.deepEqual(b.actions.map(a => a.label), ['Cancel', 'Approve', 'Ignore', 'Save for later', 'More actions', 'Close goal', 'Not yet', 'Changes', 'Mark read', 'Mark unread'], at + 'Cancel (X), the icon buttons, then More with Not yet, Changes, Mark read, Mark unread; Close goal and Not yet are for a selected goal that looks done (#12328), so on a file they are off: ' + JSON.stringify(b.actions));
+            assert.deepEqual(b.actions.map(a => a.label), ['Cancel', 'Approve', 'Dismiss', 'Save for later', 'More actions', 'Close goal', 'Not yet', 'Changes', 'Mark read', 'Mark unread'], at + 'Cancel (X), the icon buttons, then More with Not yet, Changes, Mark read, Mark unread; Close goal and Not yet are for a selected goal that looks done (#12328), so on a file they are off: ' + JSON.stringify(b.actions));
             // while rows are selected the toolbar is the bar and nothing else: no sort icon alone on a blank row under it (#11778)
             const tb = await ev(`(() => { const t = document.querySelector('.gt-toolbar'), sel = t.querySelector(':scope > .team-tb-selection').getBoundingClientRect(); const shown = [...t.children].filter(k => k.getClientRects().length && k.getBoundingClientRect().height > 2 && !k.classList.contains('team-tb-selection') && !k.classList.contains('inbox-folder-head')).map(k => String(k.className).slice(0, 30)); return { shown, toolbarH: Math.round(t.getBoundingClientRect().height), barH: Math.round(sel.height) }; })()`);
             assert.ok(tb.shown.length === 0 && tb.toolbarH <= tb.barH + 24, at + 'the toolbar holds the selection bar and no other control (no sort icon on a row of its own): ' + JSON.stringify(tb));
@@ -113,13 +113,13 @@ const { coralReady } = require('./helpers/wait');
             await tap('Which port should the test server use?');
             b = await bar(); assert.equal(b.count, '2 selected', at + 'a tap adds a row (it does not open it): ' + JSON.stringify(b)); assert.equal(await ev(`!document.querySelector('dialog[open]')`), true, at + 'and opens nothing');
             const off = l => b.actions.find(a => a.label === l).off;
-            assert.ok(off('Approve') && off('Changes') && off('Save for later') && !off('Ignore'), at + 'a question cannot be approved, sent back or saved; it can be ignored: ' + JSON.stringify(b.actions));
-            // Ignore both: one request each, one toast with Undo, then Undo puts both back
-            await pressBar('Ignore');
+            assert.ok(off('Approve') && off('Changes') && off('Save for later') && !off('Dismiss'), at + 'a question cannot be approved, sent back or saved; it can be ignored: ' + JSON.stringify(b.actions));
+            // Dismiss both: one request each, one toast with Undo, then Undo puts both back
+            await pressBar('Dismiss');
             await waitFor(`window.__calls.some(c => c.ask === 71 && !c.undo) && window.__calls.some(c => c.review && c.decision === 'ignore')`, at + 'one request per item', 8000);
-            await waitFor(`[...document.querySelectorAll('.toast')].some(t => /Ignored 2/.test(t.textContent) && [...t.querySelectorAll('button')].some(x => x.textContent.trim() === 'Undo'))`, at + 'one toast with Undo', 8000);
+            await waitFor(`[...document.querySelectorAll('.toast')].some(t => /Dismissed 2/.test(t.textContent) && [...t.querySelectorAll('button')].some(x => x.textContent.trim() === 'Undo'))`, at + 'one toast with Undo', 8000);
             assert.equal(await bar(), null, at + 'the selection is over');
-            await ev(`[...document.querySelectorAll('.toast')].find(t => /Ignored 2/.test(t.textContent)).querySelectorAll('button').forEach(x => { if (x.textContent.trim() === 'Undo') x.click(); }); true`);
+            await ev(`[...document.querySelectorAll('.toast')].find(t => /Dismissed 2/.test(t.textContent)).querySelectorAll('button').forEach(x => { if (x.textContent.trim() === 'Undo') x.click(); }); true`);
             await waitFor(`window.__calls.some(c => c.ask === 71 && c.undo) && window.__calls.some(c => c.review && c.decision === 'unignore')`, at + 'Undo is one request per item too', 8000);
             // one file that was opened is approved directly; an unopened one asks first
             await waitFor(`!!(${rowOf('Phone review 4.txt')})`, at + 'the fourth file is there', 8000);
