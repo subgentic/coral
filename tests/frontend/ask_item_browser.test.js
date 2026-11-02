@@ -1,0 +1,56 @@
+// A question to the Operator opens as an item, the way a review item reads (#12143, the operator via coral-hub): a short title (the first line or a short subject), who asked, on which team and when under it, the words as
+// rendered Markdown (emphasis, a list and a link are drawn, not shown as marks) with the "@Operator" the asker opened with taken off, the reply field in the item and Send reply / Close where Approve and Changes sit. It was a
+// "<agent> asks you" modal with the words in a bordered monospace box that started with the raw "@Operator". A one-line question is its own title, with no body. 1280 and 390 px; the route is stubbed (as in
+// operator_asks_browser), a real isolated server serves the page.
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const { connect } = require('./agent_view_harness');
+const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
+
+const OPERATOR_TEXT = '@Operator TEST ITEM, safe to answer any way: this is a test request so you can reproduce the disappearing-inbox issue.\n\nAnswering or approving it **changes nothing** on the team. Please note what else, if anything, disappears from your Inbox when you answer it:\n\n- the row in Needs you\n- the badge\n\nDetails: [the board](https://example.com/board).';
+(async () => {
+    const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
+    const S = `(window.__coralStatic || '/static/')`;
+    try {
+        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        for (const [w, h, mobile] of [[1280, 800, false], [390, 844, true]]) {
+            await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
+            await coralReady(ev);
+            const at = `${w}: `;
+            // the server's list, and the posts the page makes
+            await ev(`(() => { window.__asks = [{ board: 'coral-hub', board_label: 'coral-hub', kind: 'ask', id: 41, asker: 'Orchestrator', text: ${JSON.stringify(OPERATOR_TEXT)}, at: new Date(Date.now() - 7 * 60000).toISOString() }, { board: 'team', board_label: 'Sprout', kind: 'ask', id: 42, asker: 'Dev', text: '@Operator may I delete the old table?', at: new Date(Date.now() - 3600000).toISOString() }];
+                window.__posts = []; window.__failPost = false; const orig = window.fetch.bind(window);
+                window.fetch = (u, o) => { const url = String(u); const json = (b, status = 200) => Promise.resolve(new Response(JSON.stringify(b), { status, headers: { 'Content-Type': 'application/json' } }));
+                    if (url === '/api/operator-asks') return json(window.__asks);
+                    if (/^\\/api\\/board\\/[^/]+\\/messages$/.test(url) && o && o.method === 'POST') { const body = JSON.parse(o.body); window.__posts.push({ url, body }); if (window.__failPost) return json({ error: 'too many messages; retry in 20s' }, 429);
+                        window.__asks = window.__asks.filter(a => !(body.content.startsWith('@' + a.asker + ' ') && (a.kind === 'wait' || body.reply_to === a.id))); return json({ id: 99 }); }
+                    return orig(u, o); }; return true; })()`);
+            await ev(`window.switchNavTab('hub-inbox'); true`);
+            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 2`, at + 'two rows of Needs you', 10000);
+            const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
+            // the long question
+            await ev(`document.querySelector('button[aria-label="Answer the question of Orchestrator"]').click(); true`);
+            await waitFor(`document.querySelector('dialog.inbox-ask-dialog[open]')`, at + 'the dialog opens', 4000);
+            const d = await ev(`(() => { const d = document.querySelector('dialog.inbox-ask-dialog'), body = d.querySelector('.inbox-ask-text'), box = d.querySelector('textarea'), btns = [...d.querySelectorAll('.inbox-ask-buttons button')].map(b => b.textContent), r = d.getBoundingClientRect();
+                return { title: d.querySelector('h2').textContent, meta: d.querySelector('.inbox-ask-sub').textContent, bodyText: body ? body.textContent : '', strong: !!(body && body.querySelector('strong')), items: body ? body.querySelectorAll('li').length : 0, link: body && body.querySelector('a') ? body.querySelector('a').getAttribute('href') : '', mono: body ? getComputedStyle(body).fontFamily : '', pre: !!d.querySelector('pre'), reply: !!box, inItem: !!box && d.contains(box), btns, fits: r.left >= 0 && r.right <= innerWidth + 1, raw: d.textContent.includes('@Operator') }; })()`);
+            assert.ok(d.title.startsWith('TEST ITEM, safe to answer any way') && !d.title.includes('@Operator') && d.title.length <= 82, at + 'the title is the first words, without the @Operator: ' + d.title);
+            assert.ok(/^From Orchestrator \u00b7 coral-hub team \u00b7 7 min ago$/.test(d.meta), at + 'the meta row says who, which team and when: ' + d.meta);
+            assert.ok(d.strong && d.items === 2 && d.link === 'https://example.com/board', at + 'the words are rendered Markdown (emphasis, a list, a link): ' + JSON.stringify({ strong: d.strong, items: d.items, link: d.link }));
+            assert.ok(!d.pre && !/mono/i.test(d.mono) && !d.raw, at + 'not the bordered monospace box, and no raw @Operator anywhere in it: ' + JSON.stringify({ pre: d.pre, mono: d.mono, raw: d.raw }));
+            assert.ok(d.bodyText.includes('Answering or approving it changes nothing') && d.bodyText.includes('the badge'), at + 'the whole question is in the body: ' + d.bodyText.slice(0, 80));
+            assert.ok(d.reply && d.inItem && d.btns.join('|') === 'Send reply|Close' && d.fits, at + 'the reply field is in the item, with Send reply and Close, and it fits: ' + JSON.stringify({ reply: d.reply, btns: d.btns, fits: d.fits }));
+            await shot('ask-item-' + w);
+            await ev(`document.querySelector('dialog.inbox-ask-dialog button.btn:not(.btn-primary)').click(); true`);
+            await waitFor(`!document.querySelector('dialog.inbox-ask-dialog')`, at + 'Close closes it', 4000);
+            // a one-line question is its own title, with no body
+            await ev(`document.querySelector('button[aria-label="Answer the question of Dev"]').click(); true`);
+            await waitFor(`document.querySelector('dialog.inbox-ask-dialog[open]')`, at + 'the second opens', 4000);
+            const s = await ev(`(() => { const d = document.querySelector('dialog.inbox-ask-dialog'); return { title: d.querySelector('h2').textContent, body: !!d.querySelector('.inbox-ask-text'), meta: d.querySelector('.inbox-ask-sub').textContent }; })()`);
+            assert.ok(s.title === 'may I delete the old table?' && !s.body && /^From Dev \u00b7 Sprout team \u00b7 /.test(s.meta), at + 'a one-line question is its own title, no body: ' + JSON.stringify(s));
+            await ev(`document.querySelector('dialog.inbox-ask-dialog button.btn:not(.btn-primary)').click(); true`);
+        }
+    } finally { await client.close(); }
+    console.log('ask_item_browser: ok');
+})().catch(e => { console.error(e); process.exit(1); });

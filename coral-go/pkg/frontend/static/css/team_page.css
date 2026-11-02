@@ -348,7 +348,7 @@ dialog.inbox-ask-dialog { position: fixed; inset: 0; margin: auto; height: fit-c
 dialog.inbox-ask-dialog:not([open]) { display: none; }
 .inbox-ask-dialog h2 { margin: 0 0 4px; font-size: var(--fs-lg, 1.1rem); }
 .inbox-ask-sub { margin: 0 0 12px; color: var(--text-muted); }
-.inbox-ask-text { margin: 0 0 12px; max-height: 14rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-family: inherit; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 8px 10px; }
+.inbox-ask-text { margin: 0 0 12px; max-height: 18rem; overflow: auto; overflow-wrap: anywhere; }
 .inbox-ask-label { display: block; margin-bottom: 8px; }
 .inbox-ask-box { display: block; width: 100%; box-sizing: border-box; margin-top: 4px; }
 .inbox-ask-error { min-height: 1.2em; margin: 0 0 8px; color: var(--danger); }

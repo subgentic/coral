@@ -4,7 +4,8 @@
  * for an ask): it answers the ask, ends a wait, and tells the asker by the post itself. The text is the agent's, so it is written out through markHidden (strict) before it is drawn, then cut. */
 import { markHidden } from './visible_marks.js';
 import { isHiddenAsk } from './ask_filter.js';
-import { OPERATOR_ID } from './utils.js';
+import { OPERATOR_ID, renderMarkdownStrict } from './utils.js';
+import { whenText } from './when_text.js';
 import { state } from './state.js';
 import { showToast } from './notifications.js';
 import { isCloud, isLocalServer } from './server_base.js';
@@ -118,15 +119,28 @@ export async function wakeMember(a, name) {
     }
 }
 
+/** A question the way a review item reads (#12143, the operator): a short subject for the title (the first line when it is short, else the first words), who asked, on which team and when under it, the words as rendered Markdown with the
+ * "@Operator" the asker opened with taken off, and the reply in the item. The body keeps everything the question says: when the first line became the title, the body is the rest; a one-line question has no body. */
+export function askParts(a) {
+    const clean = askWhole(a).replace(/^\s*@Operator\b[:,]?\s*/i, '').trim();
+    const lines = clean.split('\n'), first = (lines[0] || '').trim().replace(/^#{1,6}\s+/, '');
+    if (first.length <= 80) return { title: first.replace(/[*_`]/g, '') || 'A question', body: lines.slice(1).join('\n').trim() };
+    const cut = first.slice(0, 80), at = cut.lastIndexOf(' ');
+    return { title: `${(at > 40 ? cut.slice(0, at) : cut).replace(/[*_`]/g, '').replace(/[\s,;:.-]+$/, '')}\u2026`, body: clean };
+}
+
 /** The question whole, with a Reply box: a modal dialog (focus kept inside it, Escape closes it). */
 export function openAskDialog(a, onDone, runners = {}) {
     const dlg = document.createElement('dialog');
     dlg.className = 'modal-content dlg-form inbox-ask-dialog'; // the shared dialog rule sizes it (--dlg-max, dlg-form), not a width of its own
     dlg.setAttribute('aria-labelledby', 'inbox-ask-title');
-    const title = document.createElement('h2'); title.id = 'inbox-ask-title'; title.textContent = `${a.asker} asks you`;
-    const sub = document.createElement('p'); sub.className = 'inbox-ask-sub'; sub.textContent = `On the ${a.board_label || a.board} board${a.kind === 'wait' ? ', waiting for your reply' : ''}.`;
-    const whole = document.createElement('pre'); whole.className = 'inbox-ask-text'; whole.tabIndex = 0; whole.setAttribute('role', 'region'); whole.setAttribute('aria-label', 'The question');
-    whole.textContent = askWhole(a) + (a.cut ? '\n… (cut: the board has the rest)' : '');
+    const parts = askParts(a);
+    const title = document.createElement('h2'); title.id = 'inbox-ask-title'; title.textContent = parts.title;
+    const sub = document.createElement('p'); sub.className = 'inbox-ask-sub';
+    sub.textContent = [`From ${markHidden(a.asker, { strict: true })}`, (/\bteam$/i.test(a.board_label || a.board) ? (a.board_label || a.board) : `${a.board_label || a.board} team`), whenText(a.at)].filter(Boolean).join(' \u00b7 ') + (a.kind === 'wait' ? ', waiting for your reply' : '');
+    const whole = document.createElement('div'); whole.className = 'inbox-ask-text prose'; whole.tabIndex = 0; whole.setAttribute('role', 'region'); whole.setAttribute('aria-label', 'The question');
+    whole.innerHTML = renderMarkdownStrict(parts.body + (a.cut ? '\n\n\u2026 (cut: the board has the rest)' : '')); // raw HTML in the words is written out as text; links keep the page's link policy
+    whole.hidden = !parts.body && !a.cut; // a short question is its title
     const label = document.createElement('label'); label.className = 'inbox-ask-label'; label.textContent = 'Your reply';
     const box = document.createElement('textarea'); box.className = 'field inbox-ask-box'; box.rows = 4; box.maxLength = 8000; label.append(box);
     const err = document.createElement('p'); err.className = 'inbox-ask-error'; err.setAttribute('role', 'alert');
@@ -171,7 +185,7 @@ export function openAskDialog(a, onDone, runners = {}) {
         }
         offered.append(head, list);
     }
-    dlg.append(title, sub, whole, ...(offered ? [offered] : []), label, err, row);
+    dlg.append(title, sub, ...(whole.hidden ? [] : [whole]), ...(offered ? [offered] : []), label, err, row);
     close.addEventListener('click', finish);
     dlg.addEventListener('cancel', e => { e.preventDefault(); finish(); });
     send.addEventListener('click', async () => {
