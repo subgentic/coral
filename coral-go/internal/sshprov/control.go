@@ -1,6 +1,7 @@
 package sshprov
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -9,6 +10,9 @@ import (
 	"runtime"
 	"strings"
 	"sync/atomic"
+	"time"
+
+	"github.com/subgentic/coral/internal/executil"
 )
 
 // Sharing one SSH connection per far computer (#12221). Every hub ssh used to be a full handshake (0.36 s to a computer a few milliseconds away), and the stream target starts one per connection, so a page
@@ -59,4 +63,22 @@ func controlArgs() []string {
 		return nil
 	}
 	return []string{"-o", "ControlMaster=auto", "-o", "ControlPath=" + filepath.Join(d, "%C"), "-o", fmt.Sprintf("ControlPersist=%d", controlPersist)}
+}
+
+// CloseShared ends the shared session to t, if there is one (`ssh -O exit` with the same options, so it names the same socket): used when a host key is forgotten, so the session that was made under the
+// old key is not used again for up to controlPersist seconds. Best effort, and nothing at all when sharing is off; an answer of "no session" is not an error.
+func (r Runner) CloseShared(ctx context.Context, t Target) {
+	if len(controlArgs()) == 0 {
+		return
+	}
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	ssh := r.SSH
+	if ssh == "" {
+		ssh = "ssh"
+	}
+	argv := append(r.baseArgv(t), "-O", "exit", "--", t.Destination())
+	cmd := executil.Command(ctx, ssh, argv...)
+	cmd.Env = minimalEnv()
+	_ = cmd.Run()
 }

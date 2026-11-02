@@ -779,6 +779,7 @@ func (s *Server) registerSystem(r *chi.Mux, h *routeHandlers) {
 		r.Post("/api/servers/provision/{plan}/connect", prov.Connect)
 		r.Post("/api/servers/provision/{plan}/run", prov.Run)
 		r.Get("/api/servers/provision/{plan}", prov.Status)
+		r.Post("/api/servers/provision/{plan}/forget-key", prov.ForgetKey)
 		r.Delete("/api/servers/provision/{plan}", prov.Cancel)
 		remoteResolver := routes.NewRemoteResolver(rsHandler.Store())
 		routes.MountRemoteProxy(r, remoteResolver)

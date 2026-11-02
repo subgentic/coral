@@ -3,6 +3,7 @@
 package sshprov
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -106,5 +107,35 @@ func TestControlFolderIsCheckedBeforeItIsTrusted(t *testing.T) {
 		t.Errorf("a folder too long for a socket's name: %q", got)
 	} else if got != "" {
 		t.Cleanup(func() { _ = os.RemoveAll(got) })
+	}
+}
+
+// Forgetting a host key closes the shared session to that computer (#12221, Security): ssh -O exit with the same ControlPath and the same pinned options, and nothing at all when sharing is off.
+func TestCloseSharedAsksTheMasterToExitAndOnlyWhenSharing(t *testing.T) {
+	resetControl(t)
+	dir := t.TempDir()
+	log := filepath.Join(dir, "argv.log")
+	fake := filepath.Join(dir, "ssh")
+	if err := os.WriteFile(fake, []byte("#!/bin/sh\necho \"$@\" >> '"+log+"'\nexit 0\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	tg, _ := ParseTarget("user@box.example.com")
+	r := Runner{SSH: fake, KnownHosts: filepath.Join(dir, "kh")}
+	r.CloseShared(context.Background(), tg)
+	if _, err := os.Stat(log); err == nil {
+		t.Fatal("ssh was started with sharing off")
+	}
+	got := UseControlDir(filepath.Join(dir, "c"))
+	if got == "" {
+		t.Fatal("sharing stayed off")
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(got) })
+	r.CloseShared(context.Background(), tg)
+	b, _ := os.ReadFile(log)
+	line := string(b)
+	for _, want := range []string{"-O exit", "ControlPath=" + filepath.Join(got, "%C"), "StrictHostKeyChecking=yes", "UserKnownHostsFile=" + filepath.Join(dir, "kh"), "user@box.example.com"} {
+		if !strings.Contains(line, want) {
+			t.Errorf("the close lacks %q: %s", want, line)
+		}
 	}
 }
