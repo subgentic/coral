@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/subgentic/coral/pkg/tunnel"
@@ -34,9 +35,29 @@ type Options struct {
 	// an error body is identical for a server that does not exist and one the caller
 	// does not own.
 	HideServerID bool
+	// UploadStallTimeout shortens how long an upload may go without the target
+	// consuming a body byte. Zero is the default (30 s). ValidateOptions refuses a
+	// negative value, one under 100 ms and one over the default, so no caller can
+	// lengthen the bound; a Handler built with such a value anyway fails closed (see
+	// NewWithOptions) and, as a second layer, still holds the bound between 100 ms and
+	// the default. Production leaves it unset.
+	UploadStallTimeout time.Duration
 }
 
-// NewWithOptions is New with explicit options.
+// minUploadStallTimeout is the floor of UploadStallTimeout.
+const minUploadStallTimeout = 100 * time.Millisecond
+
+// stallTimeout is the effective upload stall bound. ValidateOptions refuses a value outside the
+// range; this clamp is the second layer for a Handler built with one anyway.
+func (o Options) stallTimeout() time.Duration {
+	if o.UploadStallTimeout <= 0 {
+		return defaultUploadStallTimeout
+	}
+	return min(max(o.UploadStallTimeout, minUploadStallTimeout), defaultUploadStallTimeout)
+}
+
+// NewWithOptions is New with explicit options. Invalid options (ValidateOptions) fail closed: every
+// WebSocket upgrade is refused, and an upload's stall bound is held within its range regardless.
 func NewWithOptions(resolver Resolver, o Options) *Handler {
 	return &Handler{resolver: resolver, opts: o, optErr: ValidateOptions(o)}
 }
@@ -366,10 +387,13 @@ func dispositionParam(cd string) string {
 	return params["filename"]
 }
 
-// ValidateOptions rejects configurations that would weaken the origin check. The cloud
+// ValidateOptions rejects configurations that would weaken the origin check or lengthen the upload stall bound. The cloud
 // hub calls it at startup; a Handler built with invalid options also refuses every
 // WebSocket upgrade (fail closed).
 func ValidateOptions(o Options) error {
+	if t := o.UploadStallTimeout; t < 0 || (t > 0 && t < minUploadStallTimeout) || t > defaultUploadStallTimeout {
+		return errors.New("hubproxy: UploadStallTimeout is zero (the default) or between 100 ms and 30 s")
+	}
 	for _, p := range o.AllowedOrigins {
 		if err := validOriginPattern(p); err != nil {
 			return err
