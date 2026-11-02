@@ -126,6 +126,11 @@ func (h *BoardHandler) PostMessage(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		asked = to
+		for _, who := range to {
+			if strings.EqualFold(who, operatorIdentity) && refuseOperatorFormat(w, body.SubscriberID, clitext.Clean(unescapeLineBreaks(body.Content)), true) {
+				return
+			}
+		}
 	}
 	if derr == nil && (body.AskGoal != 0 || body.AskTask != 0) {
 		if !body.Ask {
@@ -321,7 +326,7 @@ func (h *BoardHandler) postMessageCore(w http.ResponseWriter, r *http.Request, p
 		})
 		return nil, false
 	}
-	if !(strings.EqualFold(strings.TrimSpace(body.As), operatorIdentity) && cloud.Tunneled(r)) && refuseOperatorFormat(w, body.SubscriberID, body.Content) { // the Operator's own text through the Hub is theirs to write (#12517)
+	if refuseOperatorFormat(w, body.SubscriberID, body.Content, startsWithOperator(body.Content)) { // a post that starts with @Operator (an ask to them is checked in PostMessage) (#12517)
 		return nil, false
 	}
 	if body.DryRun {
