@@ -11,7 +11,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
     const team = 'fit-' + Date.now().toString(36);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
-        for (const w of [1280, 1100]) {
+        for (const w of [1440, 1280, 1100]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: 800, deviceScaleFactor: 1, mobile: false });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await ev(`localStorage.clear(); sessionStorage.clear(); true`);
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
@@ -27,6 +27,8 @@ const { coralReady, framesJs } = require('./helpers/wait');
                     if (u.pathname === '/api/board/${team}/artifacts') return json({ project: '${team}', artifacts: window.__reviewItems.filter(a => !u.searchParams.has('tag') || a.tags.includes(u.searchParams.get('tag'))), has_more: false });
                     return original(url, o); };
                 return true; })()`);
+            // a live agent that waits for the person: its row brings the optional CLI and Folder columns (coral-hub's run at 1440 with the sidebar open cut the last action to "Ig")
+            await ev(`window.__m.add('proj1', 'A', 2, { sleeping: false, session_id: 'w-sid', display_name: 'Writer', board_project: '${team}' }); window._coralSetLiveSessions(Object.values(window.__m.agents).map(a => ({ ...window.__m.entry(a), waiting_for_input: true, working_directory: '/Users/someone/Projects/a-folder-with-a-longish-name/and-a-child', agent_type: 'claude' }))); true`);
             await ev(`window.switchNavTab('hub-inbox'); import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length >= 4`, `${w}: the rows`, 12000);
             await ev(framesJs(6));
@@ -36,6 +38,8 @@ const { coralReady, framesJs } = require('./helpers/wait');
             await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('saved')).then(() => import((window.__coralStatic || '/static/') + 'inbox_tab.js')).then(m => m.selectInboxTab('needs')).then(() => true)`);
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length >= 4`, `${w}: the rows again`, 12000); await ev(framesJs(6));
             const g = await ev(`(() => { const box = document.getElementById('group-table-view'), tb = box.querySelector('table'), br = box.getBoundingClientRect(), side = document.getElementById('sidebar') || document.querySelector('.sidebar'); const rows = [...box.querySelectorAll('tbody tr')].map(r => Math.round(r.getBoundingClientRect().right)); const scroller = [box, tb && tb.parentElement].filter(Boolean).find(e => e.scrollWidth > e.clientWidth + 1); return { boxRight: Math.round(br.right), tableRight: tb ? Math.round(tb.getBoundingClientRect().right) : 0, rowsRight: Math.max(...rows), sideShown: !!side && side.getClientRects().length > 0, sideW: side ? Math.round(side.getBoundingClientRect().width) : 0, scrolls: !!scroller, vw: innerWidth, docScroll: document.documentElement.scrollWidth > innerWidth }; })()`);
+            const act = await ev(`(() => [...document.querySelectorAll('#group-table-view tbody tr')].map(r => { const cell = r.querySelector('.inbox-review-actions')?.closest('td'), btns = cell ? [...cell.querySelectorAll('button')].filter(b => b.getClientRects().length) : []; if (!cell || !btns.length) return null; const c = cell.getBoundingClientRect(), last = btns[btns.length - 1].getBoundingClientRect(); const names = btns.map(b => b.scrollWidth > b.clientWidth + 1 ? 'cut:' + b.textContent.trim() : ''); return { cellRight: Math.round(c.right), lastRight: Math.round(last.right), cut: names.filter(Boolean), cols: [...document.querySelectorAll('#group-table-view thead th')].map(t => t.textContent.trim()).join('|') }; }).filter(Boolean))()`);
+            assert.ok(act.length && act.every(x => x.lastRight <= x.cellRight + 1 && !x.cut.length), `${w}: the actions of every row are whole, inside their cell (with ${act[0] && act[0].cols}): ` + JSON.stringify(act.slice(0, 3)));
             assert.ok(g.sideShown, `${w}: the sidebar is open: ` + JSON.stringify(g));
             assert.ok(g.rowsRight <= g.boxRight + 1 && g.tableRight <= g.boxRight + 1 && !g.scrolls && !g.docScroll, `${w}: the rows end inside the table's box and nothing scrolls sideways: ` + JSON.stringify(g));
         }
