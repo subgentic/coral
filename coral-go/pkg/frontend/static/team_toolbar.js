@@ -33,12 +33,20 @@ function chipButton(c) {
     return b;
 }
 
+/** The pressed pill in view in its own row, and nothing else scrolled: scrollIntoView moves every ancestor, so a list scrolled down was pulled back to its bar on every draw (#12354). */
+function revealSideways(chip) {
+    if (!chip) return;
+    const kept = []; for (let e = chip.parentElement; e; e = e.parentElement) kept.push([e, e.scrollTop]);
+    chip.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+    for (const [e, top] of kept) if (e.scrollTop !== top) e.scrollTop = top;
+}
+
 /** Put the pills and the action into a list bar's search row: [search][pills or select][Filters][More][action]. Called on every draw: what an earlier draw put there goes first. */
 export function adopt(row, { pills = null, chips = [], action = null } = {}) {
     for (const old of row.querySelectorAll('.team-tb-pills, .team-tb-select, .team-tb-chip, .team-tb-chips, .team-tb-action')) old.remove();
     row.classList.add('team-toolbar-row');
     const first = row.querySelector('.list-bar-chips-inrow') || row.querySelector('.list-bar-toggle') || row.querySelector('.list-bar-more');
-    if (pills) { const [group, select] = pillElements(pills); for (const e of [group, select]) { if (first) row.insertBefore(e, first); else row.append(e); } group.querySelector('[aria-pressed="true"]')?.scrollIntoView({ inline: 'nearest', block: 'nearest' }); }
+    if (pills) { const [group, select] = pillElements(pills); for (const e of [group, select]) { if (first) row.insertBefore(e, first); else row.append(e); } revealSideways(group.querySelector('[aria-pressed="true"]')); }
     // every filter that is on, one removable chip each (#7782), in the row itself after the pills (ellipsis when they do not fit), so the toolbar never changes height
     row.classList.toggle('team-toolbar-chips', chips.length > 0);
     if (chips.length) { const box = el('div', 'team-tb-chips'); for (const chip of chips) box.append(chipButton(chip)); // the row shows the first (css); "+N" stands for the rest, which the Filters panel lists
