@@ -9,6 +9,7 @@ const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
 const { coralReady } = require('./helpers/wait');
+const { osNeutralCli } = require('./helpers/os_neutral_cli');
 const GOLDEN = path.join(__dirname, 'settings_html_pin.golden.json');
 
 (async () => {
@@ -21,6 +22,7 @@ const GOLDEN = path.join(__dirname, 'settings_html_pin.golden.json');
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
         await coralReady(ev, 'startup', 'liveList', 'settings');
+        await osNeutralCli(ev, null); // the golden was written where Hermes is a CLI this computer does not have; a Windows server says it is not offered (#12398)
         const sub = await ev(`fetch('/api/board/${TEAM}/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'Boss', job_title: 'Orchestrator', session_name: 'boss-${TEAM}' }) }).then(r => r.status)`);
         assert.ok(sub < 300);
 
