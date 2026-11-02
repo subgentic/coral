@@ -259,7 +259,9 @@ export function dataTable(cfg) {
     const cssHides = (c) => !!c.narrowHide && box.clientWidth <= 64 * remPx(); // data_table.css hides a narrowHide column in a box of 64 rem or less: it has no cell then, so it takes no width (its <col> would shift every width after it onto the wrong column)
     function applyWidths() {
         if (cfg.oneLine || cfg.layout === 'fixed') return;
-        if (mailOn() || box.classList.contains('dt-folded')) { // a folded (phone) row is laid out by CSS: what the unfolded table left on it goes, or the folded rows keep its pixel width (#11943)
+        // A folded (phone) row is laid out by CSS: what the unfolded table left on it goes, or the folded rows keep its pixel width (#11943). A box that is not shown (its dock shut, or a layout that hides it) has no room to size
+        // for: the pixel widths of its last layout go too, or a dock opened at a narrower width shows a table as wide as it was before until the next frame (a task row 30 px past the box at 390, #12368).
+        if (mailOn() || box.classList.contains('dt-folded') || !box.clientWidth) {
             if (L0) { L0 = null; colgroup.replaceChildren(); table.style.tableLayout = ''; table.style.width = ''; box.classList.remove('dt-sized'); box.style.removeProperty('--dt-sized-min'); tightKeys = new Set(); for (const n of box.querySelectorAll('.dt-col-tight')) n.classList.remove('dt-col-tight'); syncHidden(new Set()); }
             return;
         }
