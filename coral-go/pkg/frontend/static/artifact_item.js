@@ -5,6 +5,7 @@ import { importOnce } from './import_once.js';
 import { renderMarkdownStrict, highlightCodeIn, escapeHtml } from './utils.js';
 import { visibleName } from './artifact_names.js';
 const { inlineArtifactPath } = await importOnce('./artifact_paths.js');
+const { linkArtifactRefsIn } = await importOnce('./artifact_refs.js'); // a coral://artifacts/<hex> in rendered Markdown is a link (#12361)
 
 export const HEX_RE = /^[a-f0-9]{64}$/;
 const MANAGED_RE = /^(?:coral:\/\/artifacts\/|\/api\/artifacts\/)([a-f0-9]{64})(?:\?v=\d+)?$/i;
@@ -52,7 +53,7 @@ export const taskText = (item) => { const title = visibleName(item.task_title); 
 
 /** The artifact's text: Markdown through the strict renderer (raw HTML shown as text, then the sanitizer), anything else as plain text. */
 export function renderText(host, content, path) {
-    if (/\.(?:md|markdown|mdown)$/i.test(path || '')) { host.innerHTML = `<div class="prose prose-doc preview-pane-markdown artifact-viewer-markdown">${renderMarkdownStrict(content)}</div>`; highlightCodeIn(host); }
+    if (/\.(?:md|markdown|mdown)$/i.test(path || '')) { host.innerHTML = `<div class="prose prose-doc preview-pane-markdown artifact-viewer-markdown">${renderMarkdownStrict(content)}</div>`; highlightCodeIn(host); linkArtifactRefsIn(host, { asWritten: true }); }
     else host.innerHTML = `<pre class="preview-pane-code artifact-viewer-text"><code>${escapeHtml(content)}</code></pre>`;
 }
 

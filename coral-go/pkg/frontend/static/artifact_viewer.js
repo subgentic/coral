@@ -13,6 +13,7 @@ import { downloadArtifact, sanitizeDownloadName } from './artifact_download.js';
 import { trapTab } from './dialog_focus.js';
 import { visibleName } from './artifact_names.js';
 import { importOnce } from './import_once.js';
+const { linkArtifactRefsIn } = await importOnce('./artifact_refs.js'); // a coral://artifacts/<hex> in a rendered Markdown file is a link that opens that file here (#12361)
 import { pushOverlay, popOverlay } from './overlay_history.js';
 import { setDialogHide } from './modal_chrome.js';
 import { browserLocal } from './safe_storage.js';
@@ -46,6 +47,7 @@ let _overlay = 0;        // its entry in overlay_history.js while it is open on 
     if (/\.(?:md|markdown|mdown)$/i.test(path || '')) {
         el.innerHTML = `<div class="prose prose-doc preview-pane-markdown artifact-viewer-markdown">${renderMarkdownStrict(content)}</div>`;
         highlightCodeIn(el);
+        linkArtifactRefsIn(el, { asWritten: true });
     } else {
         el.innerHTML = `<pre class="preview-pane-code artifact-viewer-text"><code>${escapeHtml(content)}</code></pre>`;
     }
