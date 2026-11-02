@@ -100,6 +100,16 @@ func standInAuthorized(r *http.Request) bool {
 }
 
 func runStub() {
+	// Bound to the process that started it: a test run that is killed or times out must not leave a server behind (one ran for two days). A parent that ends re-parents this process, so its parent id changes.
+	go func() {
+		parent := os.Getppid()
+		for {
+			time.Sleep(time.Second)
+			if os.Getppid() != parent {
+				os.Exit(0)
+			}
+		}
+	}()
 	var port string
 	for i, a := range os.Args {
 		if a == "--port" && i+1 < len(os.Args) {
@@ -372,6 +382,7 @@ func TestALeftOverServerOfTheSameAgentIsStoppedByItsExactCommand(t *testing.T) {
 	first, err := Start(context.Background(), cfg, "agent-1")
 	require.NoError(t, err)
 	pid := first.cmd.Process.Pid
+	t.Cleanup(first.Stop) // if the test fails before the second Start stops it, it is stopped here (Stop is safe to repeat)
 	// a Coral that crashed: its record is there, its server is still running; the next Start for the same agent stops it, by that pid
 	second, err := Start(context.Background(), cfg, "agent-1")
 	require.NoError(t, err)
