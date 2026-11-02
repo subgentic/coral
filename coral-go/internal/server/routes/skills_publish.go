@@ -220,7 +220,7 @@ func (h *SkillsHandler) publish(w http.ResponseWriter, r *http.Request, data []b
 			return nil, "", false
 		}
 		if !acknowledgeSecret {
-			writeError(w, http.StatusConflict, "holds_secret", skillFileName(secretFile)+" holds what looks like a key, token or password, and every agent that has this skill would read it. Remove it, or publish again with acknowledge_secret to put it in anyway.")
+			writeError(w, http.StatusConflict, "holds_secret", skillFileName(secretFile)+" holds what looks like a key, token or password, and every agent that has this skill would read it.")
 			return nil, "", false
 		}
 	}

@@ -245,6 +245,8 @@ func TestAnAgentsSkillThatHoldsASecretIsRefusedNamingTheFile(t *testing.T) {
 	assert.Equal(t, 409, code)
 	assert.Equal(t, "holds_secret", out["code"])
 	assert.Contains(t, fmt.Sprint(out["error"]), "references/deploy.md")
+	assert.NotContains(t, fmt.Sprint(out["error"]), "acknowledge_secret", "the import dialog shows this sentence and asks 'Import anyway?': a person has no such parameter to pass (#12418)")
+	assert.NotContains(t, fmt.Sprint(out["error"]), "publish again")
 	assert.NotContains(t, fmt.Sprint(out), token)
 	_, err = os.Stat(e.objectPath(own))
 	assert.True(t, os.IsNotExist(err), "nothing was kept until it is acknowledged")
