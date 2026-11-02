@@ -336,7 +336,7 @@ export function createArtifactsList({ inbox = false } = {}) {
                 details: model.scope ? detailsLink : null,
                 star: item => { const hex = managedHex(item); return hex ? starControl(item, { hex, name: readableName(item) }) : null; },
                 nameBadge: item => {
-                    const origin = originBadge(item), n = item.earlier_versions, badge = origin || (n > 0 ? `${n} earlier version${n > 1 ? 's' : ''}` : ''); if (!badge) return null;
+                    const origin = originBadge(item), n = item.earlier_versions, badge = item.new_comments > 0 ? 'New comments' : origin || (n > 0 ? `${n} earlier version${n > 1 ? 's' : ''}` : ''); if (!badge) return null; // agents replied in the Operator's thread on this file and it is not opened (#12026)
                     const note = DT.tag(badge); note.classList.add('dt-note', 'team-artifact-badge');
                     if (origin) note.classList.add(`team-artifact-badge-${isUnverified(item) ? 'unverified' : item.source === 'shared' ? 'shared' : 'received'}`);
                     if (isUnverified(item)) note.classList.add('dt-warning'); return note;

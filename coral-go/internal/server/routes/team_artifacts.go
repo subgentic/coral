@@ -54,6 +54,9 @@ type teamArtifact struct {
 	Private bool `json:"private,omitempty"`
 	// ReviewQuestion: what the agent that uploaded this file asks the Operator to decide (#11555), cleaned and at most 140 characters: on a row tagged for review, when its upload said (agent text: show it as text).
 	ReviewQuestion string `json:"review_question,omitempty"`
+	// NewComments: how many replies agents have left in the Operator's comment threads on this file since the Operator last opened them (#12026): the file's row says "New comments" and counts as unread again. Absent for none; only the
+	// owner's own list has it.
+	NewComments int `json:"new_comments,omitempty"`
 	// Version and Versions: which version of its series this artifact is and how many the series has (#11890), present only for an artifact in a series of two or more; the Needs you row says "version 2"
 	// from them, with no request of its own. They come from the upload records, the authority (digestSeries, seriesMembers).
 	Version  int `json:"version,omitempty"`
@@ -251,6 +254,7 @@ func (h *BoardHandler) projectArtifactItems(r *http.Request, project, sessionFil
 	}
 	h.linkUploadTasks(r.Context(), project, items)
 	h.attachArtifactTags(r.Context(), project, items)
+	h.attachNewComments(r, items)
 	items = filterReadable(r, h.coralDir, items) // an agent's list holds only what the one read check lets it read, so the totals and the cursor count nothing else (#5577)
 	h.attachArtifactPrivate(r, items)
 	return items, scanTruncated, nil
