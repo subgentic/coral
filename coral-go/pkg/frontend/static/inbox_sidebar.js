@@ -364,8 +364,7 @@ let closeAfterOpen = null;
 function openGoalDone(g, close = false) {
     closeAfterOpen = close ? { team: g.board_id, id: g.id } : null;
     quietFocus($('inbox-view'));
-    goalOpener = { team: g.board_id, id: g.id };
-    note(folderRoute);
+    itemOpeners.set('needs', { key: document.activeElement?.closest?.('tr[data-key]')?.dataset.key || '', scroll: $('group-table-view')?.scrollTop || 0 }); // Back returns to Needs you as it was (its place), not to the Goals tab (#11950)
     go({ ...folderRoute, id: g.board_id, item: g.id });
 }
 /** A "Goal looks done" item's actions (#11825): Close goal (the goal's Close dialog, set to Done), Not yet (hidden until a task is added) and Ignore (hidden for good, Undo in the notice); on a phone Ignore is in the menu. */
