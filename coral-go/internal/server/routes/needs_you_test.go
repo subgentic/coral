@@ -482,3 +482,38 @@ func TestNeedsYouListsTheSkillsWaitingForApproval(t *testing.T) {
 	_, out = readNeedsYou(t, h, "", asPerson)
 	assert.Equal(t, []any{"skills"}, out["unread_sources"], "a source that cannot be read is said, not counted as none")
 }
+
+// #12096 (Beta Tester): every design-doc version adds a message ("design doc v5 is in your Inbox: coral://..."), and the older ones stayed after the doc was approved, reaching 9+ on the badge. A message that is only
+// links to files the team has had in a review is read once those files are opened, decided or replaced; a link to a file never in a review stays a question.
+func TestAMessageThatOnlyLinksReviewedFilesIsReadOnceTheyAreOpenedDecidedOrReplaced(t *testing.T) {
+	e := newReviewEnv(t, true)
+	ctx := context.Background()
+	post := func(text string) {
+		q, err := e.h.bs.PostMessage(ctx, "alpha", "Alice", "@Operator "+text, nil)
+		require.NoError(t, err)
+		require.NoError(t, e.h.bs.RecordAsk(ctx, "alpha", q, []string{"Operator"}))
+	}
+	counts := func() (int, int) {
+		code, out := readNeedsYou(t, e.h, "", asPerson)
+		require.Equal(t, http.StatusOK, code, out)
+		acode, rows, _ := readOperatorAsks(t, e.h, asPerson)
+		require.Equal(t, http.StatusOK, acode)
+		return int(out["count"].(float64)), len(rows)
+	}
+	post("design doc v2 is in your Inbox: coral://artifacts/" + e.id)
+	post("a report never in a review: coral://artifacts/" + strings.Repeat("cd", 32))
+	for _, tags := range []string{`["for review"]`, `["for review","read"]`, `["approved"]`, `["changes requested"]`, `["superseded"]`, `["ignored"]`} {
+		e.tag(t, tags)
+		n, rows := counts()
+		assert.Equal(t, 1, rows, "%s: the message about the reviewed file is not a row, the one about an unreviewed file is", tags)
+		want := 1
+		if tags == `["for review"]` {
+			want = 2 // the file itself is the one item, plus the unreviewed link's question
+		}
+		assert.Equal(t, want, n, "%s: Needs you count", tags)
+	}
+	e.tag(t, `[]`)
+	n, rows := counts()
+	assert.Equal(t, 2, rows, "a file with no review tag: its message is a question as before")
+	assert.Equal(t, 2, n)
+}

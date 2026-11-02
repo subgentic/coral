@@ -74,7 +74,19 @@ func (h *BoardHandler) OperatorAsks(w http.ResponseWriter, r *http.Request) {
 		}
 		withButtons, _ := h.bs.AskButtonsOf(ctx, p.Project, ids)
 		subjects, links := h.askSubjects(ctx, p.Project, ids) // the goal and task each question is about (#12164)
+		var reviewed map[string]bool                          // read once per team, and only when a message of it is only links to files (#12096)
 		for _, a := range asks {
+			if hexes := onlyFileLinks(a.Content); len(hexes) > 0 && len(withButtons[a.MessageID]) == 0 { // a question with answer buttons is never hidden (Security's SHOULD)
+				if reviewed == nil {
+					reviewed = map[string]bool{}
+					if files, _, ferr := h.projectArtifactItems(r, p.Project, ""); ferr == nil {
+						reviewed = reviewedFileIDs(files)
+					}
+				}
+				if allIn(hexes, reviewed) {
+					continue // "design doc v5 is in your Inbox: coral://...": the file is the item; once opened, decided or replaced the message is read
+				}
+			}
 			text, cut := operatorAskText(a.Content)
 			rows = append(rows, operatorAskRow{Board: p.Project, BoardLabel: clitext.CleanName(p.BoardLabel), Kind: "ask", ID: a.MessageID, Asker: clitext.CleanName(a.Asker), Text: text, Cut: cut, At: a.At.UTC().Format(time.RFC3339), Buttons: withButtons[a.MessageID],
 				GoalID: subjects[a.MessageID].GoalID, TaskID: subjects[a.MessageID].TaskID, GoalTitle: links.goalTitle(ctx, subjects[a.MessageID].GoalID), TaskTitle: links.taskTitle(ctx, subjects[a.MessageID].TaskID)})
