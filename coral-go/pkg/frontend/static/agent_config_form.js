@@ -248,7 +248,7 @@ function acfStartValues(container, opts) {
     const promptVal = v.prompt || '';
     const flagsVal = v.flags || '';
     const autoPermsVal = Object.prototype.hasOwnProperty.call(v, 'autoPermissions')
-        ? !!v.autoPermissions
+        ? (typeof v.autoPermissions === 'string' ? v.autoPermissions : !!v.autoPermissions) // a mode's name opens the select on it (Restart: the agent's own mode, #12481)
         : (Object.prototype.hasOwnProperty.call(v, 'flags') ? _hasPermFlag(flagsVal) : true);
 
     // Build permissions summary text
@@ -292,7 +292,7 @@ function acfAutoPermissionsHtml(container, opts, { showAutoPermissions, agentTyp
         const permModeDesc = permissionDescription(v.agentType, permModeVal); // per CLI: Auto has safety checks on Claude only (#10000)
         autoPermissionsHTML = `
             <label>Permission mode
-                <select class="acf-permission-mode" data-on-change="perm-mode-describe">
+                <select class="acf-permission-mode" data-on-change="perm-mode-describe" data-initial="${escapeAttr(permModeVal)}">
                     <option value="default"${permModeVal === 'default' ? ' selected' : ''} title="${escapeAttr(permissionDescription(v.agentType, 'default'))}">Default</option>
                     <option value="plan"${permModeVal === 'plan' ? ' selected' : ''} title="${escapeAttr(permissionDescription(v.agentType, 'plan'))}">Plan</option>
                     <option value="acceptEdits"${permModeVal === 'acceptEdits' ? ' selected' : ''} title="${escapeAttr(permissionDescription(v.agentType, 'acceptEdits'))}">Accept edits</option>

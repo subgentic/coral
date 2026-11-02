@@ -45,6 +45,7 @@ async function showRestartModal() {
                 thinkingActual: s.thinking_actual || '', // what it last ran at: a note under Thinking when that differs (#5105)
                 prompt: s.prompt || '',
                 capabilities: s.capabilities || null,
+                autoPermissions: s.permission_mode || true, // the form opens on the mode the agent runs in, not the saved default: a restart that does not touch the select keeps it (#12481)
             },
         });
     }
@@ -121,6 +122,8 @@ function forgetDraft(session, oldId, newId) {
 
 export async function confirmRestart() {
     const config = window.getAgentConfig ? window.getAgentConfig('restart-acf') : {};
+    const modeSelect = document.querySelector('#restart-acf .acf-permission-mode');
+    if (modeSelect && modeSelect.dataset.initial !== undefined && modeSelect.value !== modeSelect.dataset.initial) config.pickedMode = modeSelect.value; // only a mode the person changed is sent (#12481)
 
     hideRestartModal();
     return runRestart(config);
@@ -148,6 +151,7 @@ async function runRestart(config) {
         if (config.model !== undefined) payload.model = config.model;
         if (config.thinking !== undefined) payload.thinking = config.thinking; // only when chosen: a restart keeps the agent's level otherwise (#4969)
         if (config.capabilities) payload.capabilities = config.capabilities;
+        if (config.pickedMode) payload.permission_mode = config.pickedMode; // the server uses it over the stored mode and flags; an extra flag could not do that, it is stripped (#12481)
         const resp = await serverFetch(currentServer(), `/api/sessions/live/${encodeURIComponent(state.currentSession.name)}/restart`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
