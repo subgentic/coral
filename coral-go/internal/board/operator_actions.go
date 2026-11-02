@@ -109,11 +109,13 @@ func (s *Store) ensureOperatorActionsSchema(ctx context.Context) error {
 	if _, err := s.db.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_operator_actions_team ON operator_actions(team, id)`); err != nil {
 		return err
 	}
-	// the head: the id and hash of the newest row ever added, so rows cut off the end show too (a trim never moves it)
+	// the head: the id and hash of the newest row ever added (so rows cut off the end show), and the id and previous hash of the oldest kept row (the anchor: rows cut off the front show), which only a trim moves
 	_, err := s.db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS operator_actions_head (
 		one       INTEGER PRIMARY KEY CHECK (one = 1),
 		last_id   INTEGER NOT NULL,
-		last_hash TEXT NOT NULL
+		last_hash TEXT NOT NULL,
+		first_id        INTEGER NOT NULL,
+		first_prev_hash TEXT NOT NULL
 	)`)
 	return err
 }
@@ -124,10 +126,10 @@ func activityText(s string, n int) string {
 	space := false
 	for _, r := range s {
 		switch {
+		case unicode.Is(unicode.Cf, r), unicode.Is(unicode.Zl, r), unicode.Is(unicode.Zp, r), unicode.IsControl(r) && !unicode.IsSpace(r):
+			continue // every format character (zero-width, bidi marks and overrides, the tag block), the line and paragraph separators, and control characters are dropped
 		case unicode.IsSpace(r):
 			space = true
-			continue
-		case unicode.IsControl(r), r == 0x200b || r == 0x200c || r == 0x200d || r == 0x2060 || r == 0xfeff, r >= 0x202a && r <= 0x202e, r >= 0x2066 && r <= 0x2069:
 			continue
 		}
 		if space && b.Len() > 0 {
@@ -180,16 +182,29 @@ func appendActivity(ctx context.Context, q activityExec, now time.Time, m Activi
 		a.Actor = "local"
 	}
 	a.Hash = activityHash(a.PrevHash, a)
+	// the row and the head are one step: a failure between them leaves neither (a savepoint inside the caller's transaction), so the chain never shows a break the action did not cause
+	if _, err := q.ExecContext(ctx, `SAVEPOINT activity_row`); err != nil {
+		return err
+	}
+	fail := func(err error) error {
+		_, _ = q.ExecContext(ctx, `ROLLBACK TO activity_row`)
+		_, _ = q.ExecContext(ctx, `RELEASE activity_row`)
+		return err
+	}
 	res, err := q.ExecContext(ctx, `INSERT INTO operator_actions (at, actor, action, item_kind, item_id, version, team, source, hint, title, note, prev_hash, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		a.At, a.Actor, a.Action, a.ItemKind, a.ItemID, a.Version, a.Team, a.Source, a.Hint, a.Title, a.Note, a.PrevHash, a.Hash)
 	if err != nil {
-		return err
+		return fail(err)
 	}
 	id, err := res.LastInsertId()
 	if err != nil {
-		return err
+		return fail(err)
 	}
-	_, err = q.ExecContext(ctx, `INSERT INTO operator_actions_head (one, last_id, last_hash) VALUES (1, ?, ?) ON CONFLICT(one) DO UPDATE SET last_id = excluded.last_id, last_hash = excluded.last_hash`, id, a.Hash)
+	// the anchor is set by the first row ever and moved only by TrimActivity
+	if _, err := q.ExecContext(ctx, `INSERT INTO operator_actions_head (one, last_id, last_hash, first_id, first_prev_hash) VALUES (1, ?, ?, ?, ?) ON CONFLICT(one) DO UPDATE SET last_id = excluded.last_id, last_hash = excluded.last_hash`, id, a.Hash, id, a.PrevHash); err != nil {
+		return fail(err)
+	}
+	_, err = q.ExecContext(ctx, `RELEASE activity_row`)
 	return err
 }
 
@@ -228,47 +243,60 @@ func (s *Store) RecordActivity(ctx context.Context, m ActivityMeta, action, kind
 type ActivityCheck struct {
 	Rows     int    `json:"rows"`
 	Intact   bool   `json:"intact"`
-	FirstBad int64  `json:"first_bad,omitempty"` // the id of the first row that does not match (0 when the break is rows missing from the end)
+	FirstBad int64  `json:"first_bad,omitempty"` // the id of the first row that does not match (0 when the break is rows missing from an end)
 	Reason   string `json:"reason,omitempty"`    // "edited", "removed" or "cut_off"
+	// Note is what the check can and cannot say, kept here so the page and the release text cannot say more than it does: the chain has no secret, so a program that can write the database can re-hash every row
+	// and the head and leave no break.
+	Note string `json:"note"`
 }
 
-// VerifyActivity walks the chain from the oldest kept row and compares the last hash with the head's. The oldest kept row's own previous hash is its anchor (the rows a trim removed are not checked).
+// ActivityCheckNote is the sentence the page shows with the check.
+const ActivityCheckNote = "Edits made outside Coral are shown unless the whole record was rewritten."
+
+// VerifyActivity walks the chain from the oldest kept row, compares that row with the head's anchor (rows cut off the front), and the last row with the head's last (rows cut off the end). The rows a trim
+// removed are not checked: the trim moved the anchor.
 func (s *Store) VerifyActivity(ctx context.Context) (ActivityCheck, error) {
 	rows := []OperatorAction{}
 	if err := s.db.SelectContext(ctx, &rows, `SELECT id, at, actor, action, item_kind, item_id, version, team, source, hint, title, note, prev_hash, hash FROM operator_actions ORDER BY id`); err != nil {
 		return ActivityCheck{}, err
 	}
 	var head struct {
-		LastID   int64  `db:"last_id"`
-		LastHash string `db:"last_hash"`
+		LastID        int64  `db:"last_id"`
+		LastHash      string `db:"last_hash"`
+		FirstID       int64  `db:"first_id"`
+		FirstPrevHash string `db:"first_prev_hash"`
 	}
 	haveHead := true
-	if err := s.db.GetContext(ctx, &head, `SELECT last_id, last_hash FROM operator_actions_head WHERE one = 1`); err != nil {
+	if err := s.db.GetContext(ctx, &head, `SELECT last_id, last_hash, first_id, first_prev_hash FROM operator_actions_head WHERE one = 1`); err != nil {
 		if !errors.Is(err, sql.ErrNoRows) {
 			return ActivityCheck{}, err
 		}
 		haveHead = false
 	}
-	res := ActivityCheck{Rows: len(rows), Intact: true}
+	broken := func(first int64, reason string) (ActivityCheck, error) {
+		return ActivityCheck{Rows: len(rows), FirstBad: first, Reason: reason, Note: ActivityCheckNote}, nil
+	}
 	for i, a := range rows {
 		if activityHash(a.PrevHash, a) != a.Hash {
-			return ActivityCheck{Rows: len(rows), FirstBad: a.ID, Reason: "edited"}, nil
+			return broken(a.ID, "edited")
 		}
 		if i > 0 && a.PrevHash != rows[i-1].Hash {
-			return ActivityCheck{Rows: len(rows), FirstBad: a.ID, Reason: "removed"}, nil
+			return broken(a.ID, "removed")
 		}
 	}
-	if haveHead {
-		switch {
-		case len(rows) == 0 && head.LastID > 0:
-			return ActivityCheck{Rows: 0, Reason: "cut_off"}, nil
-		case len(rows) > 0 && (rows[len(rows)-1].ID != head.LastID || rows[len(rows)-1].Hash != head.LastHash):
-			return ActivityCheck{Rows: len(rows), Reason: "cut_off"}, nil
-		}
-	} else if len(rows) > 0 {
-		return ActivityCheck{Rows: len(rows), Reason: "cut_off"}, nil
+	switch {
+	case !haveHead && len(rows) > 0:
+		return broken(0, "cut_off")
+	case !haveHead:
+		// nothing was ever recorded
+	case len(rows) == 0 && head.FirstID <= head.LastID:
+		return broken(0, "cut_off") // rows were there and are not (a trim leaves the anchor past the last row when it removes them all)
+	case len(rows) > 0 && (rows[0].ID != head.FirstID || rows[0].PrevHash != head.FirstPrevHash):
+		return broken(rows[0].ID, "removed") // the oldest rows were cut off by something other than the trim
+	case len(rows) > 0 && (rows[len(rows)-1].ID != head.LastID || rows[len(rows)-1].Hash != head.LastHash):
+		return broken(0, "cut_off")
 	}
-	return res, nil
+	return ActivityCheck{Rows: len(rows), Intact: true, Note: ActivityCheckNote}, nil
 }
 
 // ActivityFilter narrows a list.
@@ -305,21 +333,48 @@ func (s *Store) ListActivity(ctx context.Context, f ActivityFilter) ([]OperatorA
 }
 
 // TrimActivity removes rows older than ActivityMaxAge, then the oldest beyond ActivityMaxRows, and answers how many went (the caller logs the number: no content, so a gap is explained). Only the oldest
-// rows can go, so the chain from the oldest kept row on is whole; the head is not touched.
+// rows can go, so the chain from the oldest kept row on is whole, and the head's anchor moves to that row (past the last row when all went): nothing else moves it.
 func (s *Store) TrimActivity(ctx context.Context, now time.Time) (int, error) {
 	s.activityMu.Lock()
 	defer s.activityMu.Unlock()
+	tx, err := s.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
 	cut := now.Add(-ActivityMaxAge).UTC().Format(time.RFC3339)
-	res, err := s.db.ExecContext(ctx, `DELETE FROM operator_actions WHERE at < ? AND id <= COALESCE((SELECT MAX(id) FROM operator_actions WHERE at < ?), 0)`, cut, cut)
+	res, err := tx.ExecContext(ctx, `DELETE FROM operator_actions WHERE at < ? AND id <= COALESCE((SELECT MAX(id) FROM operator_actions WHERE at < ?), 0)`, cut, cut)
 	if err != nil {
 		return 0, err
 	}
 	n, _ := res.RowsAffected()
-	res, err = s.db.ExecContext(ctx, `DELETE FROM operator_actions WHERE id <= (SELECT id FROM operator_actions ORDER BY id DESC LIMIT 1 OFFSET ?)`, ActivityMaxRows)
+	res, err = tx.ExecContext(ctx, `DELETE FROM operator_actions WHERE id <= (SELECT id FROM operator_actions ORDER BY id DESC LIMIT 1 OFFSET ?)`, ActivityMaxRows)
 	if err != nil {
-		return int(n), err
+		return 0, err
 	}
 	m, _ := res.RowsAffected()
+	if n+m == 0 {
+		return 0, nil
+	}
+	var first struct {
+		ID       int64  `db:"id"`
+		PrevHash string `db:"prev_hash"`
+	}
+	if err := tx.GetContext(ctx, &first, `SELECT id, prev_hash FROM operator_actions ORDER BY id LIMIT 1`); err == nil {
+		_, err = tx.ExecContext(ctx, `UPDATE operator_actions_head SET first_id = ?, first_prev_hash = ? WHERE one = 1`, first.ID, first.PrevHash)
+		if err != nil {
+			return 0, err
+		}
+	} else if errors.Is(err, sql.ErrNoRows) {
+		if _, err := tx.ExecContext(ctx, `UPDATE operator_actions_head SET first_id = last_id + 1, first_prev_hash = last_hash WHERE one = 1`); err != nil {
+			return 0, err
+		}
+	} else {
+		return 0, err
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, err
+	}
 	return int(n + m), nil
 }
 

@@ -196,3 +196,83 @@ func TestConcurrentActionsKeepOneUnbrokenChain(t *testing.T) {
 	assert.True(t, chk.Intact, "%+v", chk)
 	assert.Equal(t, 12, chk.Rows)
 }
+
+// Security's early read of f18f7eedf (#12069).
+
+func TestRowsCutOffTheFrontShowAsRemovedButATrimDoesNot(t *testing.T) {
+	s := activityStore(t)
+	ctx := context.Background()
+	for i := 0; i < 5; i++ {
+		require.NoError(t, s.RecordActivity(ctx, opMeta, ActApprove, "file", hexN(i), hexN(i), "team-a"))
+	}
+	_, err := s.db.ExecContext(ctx, `DELETE FROM operator_actions WHERE id <= 2`) // a program removes the oldest two: every remaining link is still whole
+	require.NoError(t, err)
+	chk, err := s.VerifyActivity(ctx)
+	require.NoError(t, err)
+	assert.False(t, chk.Intact, "the oldest kept row is not the anchor")
+	assert.Equal(t, "removed", chk.Reason)
+	assert.Equal(t, int64(3), chk.FirstBad)
+}
+
+func TestATrimThatRemovesEverythingLeavesAnIntactRecordThatGoesOn(t *testing.T) {
+	s := activityStore(t)
+	ctx := context.Background()
+	for i := 0; i < 3; i++ {
+		require.NoError(t, s.RecordActivity(ctx, opMeta, ActApprove, "file", hexN(i), hexN(i), "team-a"))
+	}
+	_, err := s.db.ExecContext(ctx, `UPDATE operator_actions SET at = ?`, time.Now().Add(-ActivityMaxAge-time.Hour).UTC().Format(time.RFC3339))
+	require.NoError(t, err)
+	n, err := s.TrimActivity(ctx, time.Now())
+	require.NoError(t, err)
+	assert.Equal(t, 3, n)
+	chk, err := s.VerifyActivity(ctx)
+	require.NoError(t, err)
+	assert.True(t, chk.Intact, "an empty record after a trim is not a cut: %+v", chk)
+	require.NoError(t, s.RecordActivity(ctx, opMeta, ActDeny, "file", hexN(9), hexN(9), "team-a"))
+	chk, err = s.VerifyActivity(ctx)
+	require.NoError(t, err)
+	assert.True(t, chk.Intact, "the next row chains on: %+v", chk)
+	assert.Equal(t, 1, chk.Rows)
+	// and deleting that row afterwards is a cut
+	_, err = s.db.ExecContext(ctx, `DELETE FROM operator_actions`)
+	require.NoError(t, err)
+	chk, _ = s.VerifyActivity(ctx)
+	assert.False(t, chk.Intact)
+}
+
+func TestTheCheckSaysWhatItCannotDo(t *testing.T) {
+	s := activityStore(t)
+	chk, err := s.VerifyActivity(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "Edits made outside Coral are shown unless the whole record was rewritten.", chk.Note)
+	require.NoError(t, s.RecordActivity(context.Background(), opMeta, ActApprove, "file", hexN(1), hexN(1), "team-a"))
+	_, _ = s.db.ExecContext(context.Background(), `UPDATE operator_actions SET action = 'deny'`)
+	chk, _ = s.VerifyActivity(context.Background())
+	assert.False(t, chk.Intact)
+	assert.Equal(t, ActivityCheckNote, chk.Note, "a break carries it too")
+}
+
+func TestARowThatCannotBeCompletedLeavesNoRowAndTheDecisionStands(t *testing.T) {
+	s := activityStore(t)
+	ctx := WithActivity(context.Background(), opMeta)
+	// the head can be read but not written: the row is inserted, then its head update fails
+	_, err := s.db.ExecContext(ctx, `CREATE TRIGGER no_head_writes BEFORE INSERT ON operator_actions_head BEGIN SELECT RAISE(ABORT, 'head is read only'); END`)
+	require.NoError(t, err)
+	hex := hexN(4)
+	s.forReview(t, "team-a", hex)
+	_, _, err = s.DecideArtifactReview(ctx, "team-a", hex, ReviewApproved, time.Now())
+	require.NoError(t, err, "a record that cannot be written never blocks the action")
+	reviews, err := s.ArtifactReviews(context.Background(), "team-a")
+	require.NoError(t, err)
+	assert.Equal(t, ReviewApproved, reviews[hex].State, "the approval stands")
+	var n int
+	require.NoError(t, s.db.GetContext(ctx, &n, `SELECT COUNT(*) FROM operator_actions`))
+	assert.Zero(t, n, "the row went with the failed head: the pair is one step")
+}
+
+func TestEveryFormatSeparatorAndControlCharacterIsStrippedFromText(t *testing.T) {
+	for name, r := range map[string]rune{"left-to-right mark": 0x200e, "right-to-left mark": 0x200f, "arabic letter mark": 0x061c, "line separator": 0x2028, "paragraph separator": 0x2029, "a tag character": 0xe0041, "zero-width space": 0x200b, "override": 0x202e, "bell": 0x07, "soft hyphen": 0xad} {
+		assert.Equal(t, "ab", activityText("a"+string(r)+"b", 50), name)
+	}
+	assert.Equal(t, "a b", activityText("a \t\n  b", 50), "runs of space and line breaks are one space")
+}

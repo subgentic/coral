@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"net/http"
@@ -108,4 +109,13 @@ func (h *BoardHandler) ListActivity(w http.ResponseWriter, r *http.Request) {
 var activityActions = map[string]bool{
 	board.ActApprove: true, board.ActChanges: true, board.ActDeny: true, board.ActIgnore: true, board.ActUnignore: true, board.ActSave: true, board.ActUnsave: true, board.ActUndone: true,
 	board.ActAnswer: true, board.ActDismiss: true, board.ActGoalDone: true, board.ActProposal: true, board.ActMarkRead: true, board.ActGoalReview: true,
+}
+
+// recordActivity adds the row of an Operator action that is not a write in the board database's own transaction (best effort: a crash between the action and its row can lose one row, and a row that cannot
+// be written is logged and never blocks the action). Only the Operator's own actions are recorded: callers check who acted before they call.
+func (h *BoardHandler) recordActivity(r *http.Request, action, kind, item, team, title, note string) {
+	if h.bs == nil {
+		return
+	}
+	_ = h.bs.RecordActivity(context.WithoutCancel(r.Context()), activityMetaFor(r, title, note), action, kind, item, "", team)
 }

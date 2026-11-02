@@ -674,7 +674,7 @@
     },
     {
       "name": "operator_actions_head",
-      "sql": "CREATE TABLE operator_actions_head (\n\t\tone       INTEGER PRIMARY KEY CHECK (one = 1),\n\t\tlast_id   INTEGER NOT NULL,\n\t\tlast_hash TEXT NOT NULL\n\t)",
+      "sql": "CREATE TABLE operator_actions_head (\n\t\tone       INTEGER PRIMARY KEY CHECK (one = 1),\n\t\tlast_id   INTEGER NOT NULL,\n\t\tlast_hash TEXT NOT NULL,\n\t\tfirst_id        INTEGER NOT NULL,\n\t\tfirst_prev_hash TEXT NOT NULL\n\t)",
       "tbl_name": "operator_actions_head",
       "type": "table"
     },
@@ -6259,6 +6259,24 @@
           "dflt_value": null,
           "hidden": 0,
           "name": "last_hash",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 3,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "first_id",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 4,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "first_prev_hash",
           "notnull": 1,
           "pk": 0,
           "type": "TEXT"
