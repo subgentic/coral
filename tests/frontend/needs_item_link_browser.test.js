@@ -22,6 +22,7 @@ const hex = n => n.toString(16).padStart(64, '0');
         const lists = { 'for review': [art(1, ['for review'])], approved: [art(2, ['approved'])], reviewed: [] };
         window.fetch = (url, opts = {}) => { const u = new URL(String(url && url.url || url), location.origin), m = (opts.method || 'GET').toUpperCase();
             if (m === 'GET' && u.pathname === '/api/board/${team}/artifacts') return json({ project: '${team}', artifacts: lists[u.searchParams.get('tag')] || [], has_more: false });
+            if (m === 'GET' && u.pathname === '/api/board/projects') return json([{ project: '${team}', board_id: '${team}', board_label: 'North Wind' }, { project: 'twin-a', board_id: 'twin-a', board_label: 'Twin' }, { project: 'twin-b', board_id: 'twin-b', board_label: 'Twin' }]);
             if (m === 'GET' && u.pathname === '/api/operator-asks') return json([{ board: '${team}', kind: 'ask', id: 41, asker: 'Lead', text: 'Which port should the test server use?', at: at }]);
             if (m === 'GET' && /^\\/api\\/artifacts\\/[0-9a-f]{64}$/.test(u.pathname)) return Promise.resolve(new Response('# Plan', { status: 200, headers: { 'content-type': 'text/markdown' } }));
             if (/^\\/api\\/artifacts\\/[0-9a-f]{64}\\/(versions|meta|readers|comments)/.test(u.pathname)) return Promise.resolve(new Response('{}', { status: 404, headers: { 'content-type': 'application/json' } }));
@@ -48,6 +49,15 @@ const hex = n => n.toString(16).padStart(64, '0');
             check(v.approve && v.changes, at + 'Approve and Request changes are ready: ' + JSON.stringify(v));
             check(/plan-1\.md/.test(String(v.title)), at + 'it is the file the link names: ' + JSON.stringify(v));
             await shot(`needs-item-link-review-${w}`);
+            // the team written by its name, as a person types or a notification carries it (#12412): the link finds the same file; a name no team has, or two teams have, says not found
+            await open(`/inbox/needs/review/${encodeURIComponent('North Wind')}/${hex(0).slice(0, 63)}1`);
+            await waitFor(`!!document.querySelector('.artifact-viewer')`, at + 'a link that names the team by its name opens the file', 12000);
+            await open(`/inbox/needs/review/Nowhere/${hex(0).slice(0, 63)}1`);
+            await toast('That file is not waiting for you any more');
+            check(await ev(`!document.querySelector('.artifact-viewer')`), at + 'a name no team has opens no viewer');
+            await open(`/inbox/needs/review/Twin/${hex(0).slice(0, 63)}1`);
+            await toast('That file is not waiting for you any more');
+            check(await ev(`!document.querySelector('.artifact-viewer')`), at + 'a name two teams have opens no viewer');
             // already decided
             await open(`/inbox/needs/review/${team}/${hex(0).slice(0, 63)}2`);
             await toast('That file is not waiting for you any more');
