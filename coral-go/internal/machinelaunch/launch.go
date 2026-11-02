@@ -86,6 +86,11 @@ func Launch(ctx context.Context, o Options, d Deps) (*Result, error) {
 	if o.Region == "" || o.Size == "" {
 		return nil, errors.New("a region and a size are needed")
 	}
+	if d.State != nil { // a name that is already recorded is refused before the provider is asked anything: the record is keyed by name, and a second launch must never replace the first one's ids
+		if _, ok := d.State.Get(o.Name); ok {
+			return nil, fmt.Errorf("%w: a machine named %q is already recorded: delete it first (coral machine delete %s) or choose another name", ErrRecordExists, o.Name, o.Name)
+		}
+	}
 	wait := o.Wait
 	if wait <= 0 {
 		wait = defaultWait
@@ -145,10 +150,14 @@ func Launch(ctx context.Context, o Options, d Deps) (*Result, error) {
 		return nil, err
 	}
 	ls := newLaunchState(d.State, o, p.Name(), launchTag)
+	if err := ls.reserve(); err != nil { // the name is claimed under the state file's lock before anything is made
+		return nil, err
+	}
 	var net *Net
 	spec := Spec{Name: o.Name, Region: o.Region, Size: o.Size, Image: o.Image, Tags: []string{Tag, launchTag}, UserData: userData, SSHKeys: o.SSHKeys}
 	if d.Isolate { // createNetwork: the machine is made inside its own VPC and firewall, never before them
 		if net, err = CreateNetwork(ctx, p, o.Name, o.Region, launchTag, []string{o.SSHFrom}, d.Out); err != nil {
+			ls.drop() // nothing was made that the record could name: the claimed name is released
 			return nil, err
 		}
 		spec.VPCID = net.VPC.ID
@@ -162,6 +171,9 @@ func Launch(ctx context.Context, o Options, d Deps) (*Result, error) {
 		note, clean := sweepAfterFailedCreate(p, launchTag, want, err, retryAfter(o), d.Interrupt, d.Out)
 		if clean {
 			note += teardownNetworkOnly(p, net, ls, d.Out)
+			if net == nil {
+				ls.drop() // no network and the create is settled (a 4xx, or nothing landed): the claimed name is released
+			}
 		} else if net != nil { // the machine may still exist: its firewall and VPC stay, with their ids and the one command that removes them later (Security's ruling, #9934)
 			fmt.Fprintf(d.Out, "The launch's firewall %s and private network %s were left in place, so a machine that appears late is not unfiltered. When the machine is gone, remove them with: coral machine delete %s --provider %s --token-file <the token file>\n", net.Firewall.ID, net.VPC.ID, o.Name, p.Name())
 			note += fmt.Sprintf("; firewall %s and private network %s were left in place: `coral machine delete %s` removes them once the machine is gone", net.Firewall.ID, net.VPC.ID, o.Name)

@@ -5,6 +5,7 @@ import (
 	"crypto/ed25519"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 
 	"golang.org/x/crypto/ssh"
@@ -74,11 +75,34 @@ var (
 type agentInstall struct {
 	Name    string
 	Binary  string
-	Command string // the npm command to run as root (empty for agy)
+	Command string // the npm install command, rebuilt with the pinned version (empty for agy)
+	Package string // the npm package name without a version (empty for agy): what a failed install removes
 	AsCoral bool   // agy: its installer script, checked against Hash, run as coral
 	Pinned  string // the version, or sha256:<hex> for agy
 	URL     string // agy: the installer's URL, from the table
 	Hash    string // agy: the installer's SHA-256 (64 hex)
+}
+
+// agentBinaryRe is what an agent's program name may be: lower-case letters, digits, hyphen and underscore, starting with a letter, at most 32 long (no slash, dot, dot-dot, leading dash, whitespace or control character).
+var agentBinaryRe = regexp.MustCompile(`^[a-z][a-z0-9_-]{0,31}$`)
+
+// reservedAgentNames are programs the install and the machine itself use: an agent may never be linked over one.
+var reservedAgentNames = []string{
+	"sh", "bash", "dash", "ash", "zsh", "env", "ln", "rm", "cp", "mv", "ls", "cat", "echo", "test", "true", "false", "mkdir", "chmod", "chown", "mktemp", "readlink", "install", "tar", "gzip", "sha256sum", "curl", "wget",
+	"apt", "apt-get", "dpkg", "npm", "node", "npx", "runuser", "su", "sudo", "ssh", "sshd", "systemctl", "ufw", "nft", "uname", "id", "cloud-init", "git", "tmux", "python", "python3", "perl",
+}
+
+// validateAgentBinary refuses a program name that is not plain, is one of Coral's nine programs or is a reserved name: ln -s into /usr/local/bin must never be able to replace a program.
+func validateAgentBinary(b string) error {
+	switch {
+	case !agentBinaryRe.MatchString(b):
+		return fmt.Errorf("the program name %q is not a plain name (a-z, 0-9, hyphen, underscore; starting with a letter; at most 32)", b)
+	case slices.Contains(releasePrograms, b):
+		return fmt.Errorf("the program name %q is one of Coral's own programs", b)
+	case slices.Contains(reservedAgentNames, b):
+		return fmt.Errorf("the program name %q is a program the machine uses", b)
+	}
+	return nil
 }
 
 func resolveAgents(entries []string) ([]agentInstall, error) {
@@ -100,6 +124,9 @@ func resolveAgents(entries []string) ([]agentInstall, error) {
 		}
 		if seen[info.Binary] {
 			return nil, fmt.Errorf("agent %q is listed twice", info.Binary)
+		}
+		if err := validateAgentBinary(info.Binary); err != nil { // the name becomes a link in /usr/local/bin: it can only ever be added, never replace anything
+			return nil, fmt.Errorf("agent %q: %w", name, err)
 		}
 		seen[info.Binary] = true
 		inst := agentInstall{Name: name, Binary: info.Binary, Pinned: ver}
@@ -134,6 +161,7 @@ func resolveAgents(entries []string) ([]agentInstall, error) {
 		}
 		fields[len(fields)-1] = pkg + "@" + ver
 		inst.Command = strings.Join(fields, " ")
+		inst.Package = pkg
 		out = append(out, inst)
 	}
 	return out, nil
@@ -393,7 +421,10 @@ func finishScript(withAgents bool) string {
 	p("systemctl enable coral.service 2>/dev/null || true")
 	if withAgents {
 		p("# after Coral is up and has redeemed its credential: the agent CLIs (slow, and not needed to enroll)")
-		p("if systemctl is-active --quiet coral.service; then /usr/local/sbin/coral-machine-agents || true; fi")
+		p("rc=0")
+		p("if systemctl is-active --quiet coral.service; then /usr/local/sbin/coral-machine-agents || rc=1; fi")
+		p("exit $rc") // the machine is enrolled and SSH is closed by now: a failed agent makes this unit FAIL (named in the journal by coral-machine-agents), never a silent success
+		return s.String()
 	}
 	p("exit 0")
 	return s.String()
@@ -463,9 +494,9 @@ func setupScript(version string, digests ReleaseDigests) string {
 
 // npmAsCoral turns the table's "npm install -g PKG@VER" into one that installs under /opt/coral-agents with its cache there too (the coral user needs no home folder, and nothing is written outside it).
 func npmAsCoral(cmd string) string {
-	// --ignore-scripts is ALWAYS there (Security's ruling, #9934): an install-time script of a package never runs, as anyone. --registry names the official registry over HTTPS, so no ambient npm configuration on the machine
-	// can point the install elsewhere. This is the ONE place an agent's install command is built.
-	return strings.Replace(cmd, "npm install -g", "npm install -g --ignore-scripts --registry "+NPMRegistry+" --prefix /opt/coral-agents --cache /opt/coral-agents/.npm-cache", 1)
+	// --ignore-scripts is ALWAYS there (Security's ruling, #9934): an install-time script of a package never runs, as anyone. --registry names the official registry over HTTPS, and --userconfig and --globalconfig /dev/null keep any npm config file on the
+	// machine (a scoped @scope:registry line included) from pointing the install elsewhere. This is the ONE place an agent's install command is built.
+	return strings.Replace(cmd, "npm install -g", "npm install -g --ignore-scripts --userconfig /dev/null --globalconfig /dev/null --registry "+NPMRegistry+" --prefix /opt/coral-agents --cache /opt/coral-agents/.npm-cache", 1)
 }
 
 // NPMRegistry is the only registry the agents are installed from.
@@ -477,8 +508,10 @@ func agentsScript(agents []agentInstall) string {
 	var s strings.Builder
 	p := func(format string, a ...any) { fmt.Fprintf(&s, format+"\n", a...) }
 	p("#!/bin/sh")
-	p("# Installs the agent CLIs (after Coral is running). Stops at the first failure: set -eu.")
-	p("set -eu")
+	p("# Installs the agent CLIs (after Coral is running). One agent's failure is said and does NOT stop the next one (each is its own && chain: set -e does not act inside a || list); a failed agent is REMOVED, and the")
+	p("# script ends with a loud summary naming each failed agent and a NON-zero exit. A failed agent never turns scripts back on and is never retried with other flags.")
+	p("set -u")
+	p("failed=")
 	needNode := false
 	for _, a := range agents {
 		if !a.AsCoral {
@@ -486,26 +519,32 @@ func agentsScript(agents []agentInstall) string {
 		}
 	}
 	if needNode {
-		p("DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends nodejs npm")
+		p("DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends nodejs npm || exit 1")
 	}
 	for _, a := range agents {
 		if a.AsCoral {
 			p("# %s: the vendor's installer takes no version, so the script is fetched to a file, checked against the SHA-256 it was pinned to, and only then run, as the coral user.", a.Binary)
-			p("installer=$(mktemp)")
-			p("curl -fsSL --proto '=https' --tlsv1.2 -o \"$installer\" '%s'", a.URL)
-			p("echo '%s  '\"$installer\" | sha256sum -c -", a.Hash)
-			p("chmod 0644 \"$installer\"")
-			p("runuser -u coral -- bash \"$installer\"")
-			p("rm -f \"$installer\"")
+			p("( installer=$(mktemp) && { curl -fsSL --proto '=https' --tlsv1.2 -o \"$installer\" '%s' \\", a.URL)
+			p("  && echo '%s  '\"$installer\" | sha256sum -c - \\", a.Hash)
+			p("  && chmod 0644 \"$installer\" \\")
+			p("  && runuser -u coral -- bash \"$installer\"; rc=$?; rm -f \"$installer\"; exit $rc; } ) || { echo \"coral-machine-agents: %s was not installed\" >&2; failed=\"$failed %s\"; }", a.Binary, a.Binary)
 			continue
 		}
-		p("# %s %s: installed by the coral user, never root, into a folder only it writes, and linked into /usr/local/bin; the package's own lifecycle scripts therefore run unprivileged.", a.Binary, a.Pinned)
-		p("install -d -m 0755 -o coral -g coral /opt/coral-agents")
-		p("runuser -u coral -- %s", npmAsCoral(a.Command))
-		p("test -x /opt/coral-agents/bin/%s", a.Binary)
-		p("# Scripts were not run, so the CLI is checked: if it does not start it fails LOUDLY here, and nothing turns scripts back on by itself.")
-		p("runuser -u coral -- /opt/coral-agents/bin/%s --version >/dev/null || { echo \"coral-machine-agents: %s did not start after an install with --ignore-scripts (its --version failed): it may need its install script, which is not run; tell the person who runs the launch\" >&2; exit 1; }", a.Binary, a.Binary)
-		p("ln -sf /opt/coral-agents/bin/%s /usr/local/bin/%s", a.Binary, a.Binary)
+		bin := "/opt/coral-agents/bin/" + a.Binary
+		link := "/usr/local/bin/" + a.Binary
+		p("# %s %s: installed by the coral user, never root, into a folder only it writes; scripts are not run, so the CLI is checked and a CLI that does not start fails LOUDLY and only that agent is lost. The link is made with ln -s -T and only if nothing is at that name: it can fail, never replace.", a.Binary, a.Pinned)
+		p("( install -d -m 0755 -o coral -g coral /opt/coral-agents \\")
+		p("  && runuser -u coral -- %s \\", npmAsCoral(a.Command))
+		p("  && test -x %s \\", bin)
+		p("  && { runuser -u coral -- %s --version >/dev/null || { echo \"coral-machine-agents: %s did not start after an install with --ignore-scripts (its --version failed): it may need its install script, which is NOT run and is not to be enabled by hand: tell the person who runs Coral, so an exception goes through review\" >&2; false; }; } \\", bin, a.Binary)
+		p("  && { test ! -e %s && test ! -L %s || { echo \"coral-machine-agents: %s already exists in /usr/local/bin and is left alone\" >&2; false; }; } \\", link, link, link)
+		p("  && ln -s -T %s %s ) || {", bin, link)
+		p("  echo \"coral-machine-agents: %s was not installed\" >&2; failed=\"$failed %s\"", a.Binary, a.Binary)
+		p("  # remove what this agent left, but only a link that points at this install, never another file at that name")
+		p("  if [ \"$(readlink %s 2>/dev/null)\" = %s ]; then rm -f %s; fi", link, bin, link)
+		p("  rm -f %s; rm -rf /opt/coral-agents/lib/node_modules/%s", bin, a.Package)
+		p("}")
 	}
+	p("if [ -n \"$failed\" ]; then echo \"coral-machine-agents: FAILED agents:$failed (each was removed; the machine itself is enrolled)\" >&2; exit 1; fi")
 	return s.String()
 }

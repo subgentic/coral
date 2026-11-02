@@ -311,6 +311,9 @@ func runMachine(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}, deps)
 	switch {
 	case err == nil:
+		if len(agentList) > 0 {
+			fmt.Fprintln(stdout, "The agent CLIs install after this message says it launched, on the machine. If one is missing, run: journalctl -u coral-finish on the machine (an agent that needs its install script fails its version check, because install scripts are off, and is removed).")
+		}
 		return 0
 	case ctx.Err() != nil:
 		fmt.Fprintln(stderr, "coral machine launch: interrupted:", err)

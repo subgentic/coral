@@ -2,6 +2,7 @@ package machinelaunch
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"time"
@@ -39,6 +40,20 @@ func (s *launchState) set(f func(*Record), out io.Writer) {
 	if err := s.st.Put(s.rec); err != nil {
 		fmt.Fprintf(out, "Could not write the machine's ids to the state file (%v): `coral machine delete %s` will find the machine by its name and tag instead.\n", err, s.rec.Name)
 	}
+}
+
+// reserve claims the machine's name in the state file before anything is made: put-if-absent under the file's lock, so a second launch of the same name is refused and never replaces the first one's record.
+func (s *launchState) reserve() error {
+	if s == nil || s.st == nil {
+		return nil
+	}
+	if err := s.st.PutNew(s.rec); err != nil {
+		if errors.Is(err, ErrRecordExists) {
+			return fmt.Errorf("%w: a machine named %q is already recorded: delete it first (coral machine delete %s) or choose another name", ErrRecordExists, s.rec.Name, s.rec.Name)
+		}
+		return err
+	}
+	return nil
 }
 
 // drop removes the record once nothing is left at the provider.

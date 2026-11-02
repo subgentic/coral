@@ -140,6 +140,11 @@ func readStateFile(path string) (map[string]Record, error) {
 // update changes the file under an exclusive lock on its own lock file: it reads the file again inside the lock (another launch may have written since this State was opened), applies f and writes. Two launches
 // at once cannot drop each other's record (#10944, Security's SHOULD A).
 func (s *State) update(f func(recs map[string]Record)) error {
+	return s.updateIf(func(recs map[string]Record) error { f(recs); return nil })
+}
+
+// updateIf is update where f may refuse: nothing is written when it does.
+func (s *State) updateIf(f func(recs map[string]Record) error) error {
 	if err := os.MkdirAll(filepath.Dir(s.path), 0o700); err != nil {
 		return fmt.Errorf("could not make the folder of the state file: %w", err)
 	}
@@ -152,7 +157,9 @@ func (s *State) update(f func(recs map[string]Record)) error {
 	if err != nil {
 		return err
 	}
-	f(fresh)
+	if err := f(fresh); err != nil {
+		return err
+	}
 	if err := saveStateFile(s.path, fresh); err != nil {
 		return err
 	}
@@ -183,6 +190,23 @@ func (s *State) Get(name string) (Record, bool) {
 }
 
 // Put adds or replaces a machine's record and writes the file.
+// ErrRecordExists is a record whose name is already in the state file.
+var ErrRecordExists = errors.New("a machine with that name is already recorded")
+
+// PutNew adds a record only if the name is not in the file: the check and the write are one step under the file's lock, re-read inside it, so two launches of one name cannot both proceed or replace each other.
+func (s *State) PutNew(r Record) error {
+	if err := r.Validate(); err != nil {
+		return fmt.Errorf("not written to the state file: %w", err)
+	}
+	return s.updateIf(func(recs map[string]Record) error {
+		if _, ok := recs[r.Name]; ok {
+			return fmt.Errorf("%w: %q", ErrRecordExists, r.Name)
+		}
+		recs[r.Name] = r
+		return nil
+	})
+}
+
 func (s *State) Put(r Record) error {
 	if err := r.Validate(); err != nil {
 		return fmt.Errorf("not written to the state file: %w", err)

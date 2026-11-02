@@ -190,3 +190,43 @@ func TestRecordOfARealLaunchValidates(t *testing.T) {
 		}
 	}
 }
+
+// PutNew is put-if-absent under the lock: two launches of one name at once, each with its own handle on the same file, give exactly one winner and the winner's record stays; PutNew never replaces.
+func TestPutNewAdmitsExactlyOneOfTwoRacingLaunches(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "machines.json")
+	a, err := OpenState(path)
+	require.NoError(t, err)
+	b, err := OpenState(path)
+	require.NoError(t, err)
+	ra, rb := goodRecord("same"), goodRecord("same")
+	ra.DropletID, rb.DropletID = "1111", "2222"
+	var wg sync.WaitGroup
+	errs := make([]error, 2)
+	wg.Add(2)
+	go func() { defer wg.Done(); errs[0] = a.PutNew(ra) }()
+	go func() { defer wg.Done(); errs[1] = b.PutNew(rb) }()
+	wg.Wait()
+	wins := 0
+	for _, e := range errs {
+		if e == nil {
+			wins++
+		} else {
+			assert.ErrorIs(t, e, ErrRecordExists)
+		}
+	}
+	require.Equal(t, 1, wins, "exactly one proceeds")
+	fresh, err := OpenState(path)
+	require.NoError(t, err)
+	got, ok := fresh.Get("same")
+	require.True(t, ok)
+	winner := ra
+	if errs[1] == nil {
+		winner = rb
+	}
+	assert.Equal(t, winner, got, "the winner's ids stay recorded")
+	// a later PutNew of the name is refused, and Put (the launch's own later writes) still replaces
+	assert.ErrorIs(t, fresh.PutNew(goodRecord("same")), ErrRecordExists)
+	updated := winner
+	updated.FirewallID = "fw-9"
+	require.NoError(t, fresh.Put(updated))
+}

@@ -398,3 +398,30 @@ func TestLaunchA500WithTwoEmptyLooksKeepsTheNetwork(t *testing.T) {
 	require.True(t, ok)
 	assert.True(t, rec.FirewallOpen)
 }
+
+// A name that is already recorded is refused before the provider is asked anything, and the first record is untouched (Security's F1, #9934).
+func TestLaunchRefusesANameThatIsAlreadyRecorded(t *testing.T) {
+	p, h := newIso(), &stubHub{}
+	o, d, st, _ := isoSetup(t, p, h)
+	first := goodRecord("coral-1")
+	require.NoError(t, st.Put(first))
+	_, err := Launch(t.Context(), o, d)
+	require.ErrorIs(t, err, ErrRecordExists)
+	assert.Contains(t, err.Error(), "coral machine delete coral-1")
+	assert.Empty(t, p.stubProvider.calls, "the provider was not called at all")
+	assert.Empty(t, h.labels, "and nothing was minted")
+	got, ok := st.Get("coral-1")
+	require.True(t, ok)
+	assert.Equal(t, first, got, "the first machine's record is unchanged")
+}
+
+// A claimed name that never got anything made is released: a failed network creation leaves no record behind.
+func TestLaunchReleasesTheNameWhenNothingWasMade(t *testing.T) {
+	p, h := newIso(), &stubHub{}
+	p.cloud.failOn["CreateVPC"] = errors.New("provider hiccup")
+	o, d, st, _ := isoSetup(t, p, h)
+	_, err := Launch(t.Context(), o, d)
+	require.Error(t, err)
+	_, ok := st.Get("coral-1")
+	assert.False(t, ok, "no record is left for a name nothing was made under")
+}
