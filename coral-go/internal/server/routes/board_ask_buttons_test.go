@@ -9,6 +9,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/board"
 )
 
 // Buttons on a question to @Operator (#11643): declared on the post, checked by the server against a closed grammar and against the team, stored, listed for the Operator; run by nobody until they click.
@@ -82,3 +84,31 @@ func TestAnAgentMayHaveTenAsksWithButtonsOpen(t *testing.T) {
 	status, _ = post(map[string]any{"subscriber_id": "Lead", "content": "@Operator plain question", "ask": true})
 	assert.Equal(t, http.StatusOK, status, "a question with no buttons is not counted")
 }
+
+// A wake button names a member as the team lists it: spaces and a number in it are fine (#12600).
+func TestAWakeButtonAcceptsAMemberWhoseNameHasSpacesAndANumber(t *testing.T) {
+	post, _, _, base := buttonRig(t)
+	for _, who := range []string{"QA Reviewer 2", "QA Engineer", "Frontend Dev"} {
+		postJSON(t, base+"/subscribe", map[string]string{"subscriber_id": who, "job_title": who}).Body.Close()
+	}
+	status, out := post(map[string]any{"subscriber_id": "Lead", "content": "@Operator Wake them?", "ask": true,
+		"buttons": []string{"Wake QA Reviewer 2=wake:QA Reviewer 2", "Wake QA Engineer=wake:QA Engineer"}})
+	require.Equal(t, http.StatusOK, status, out)
+	status, out = post(map[string]any{"subscriber_id": "Lead", "content": "@Operator And this one?", "ask": true,
+		"buttons": []string{"Wake Frontend Dev=wake:Frontend Dev", "Wake QA Reviewer 2=wake:QA Reviewer 2"}})
+	require.Equal(t, http.StatusOK, status, out)
+}
+
+// A refused ask is nothing posted, so it is never one of the open asks with buttons (#12600): refusing more often than the cap leaves the agent able to ask.
+func TestARefusedAskWithButtonsIsNotCountedAsOpen(t *testing.T) {
+	post, count, _, _ := buttonRig(t)
+	for i := 0; i < board10(); i++ {
+		status, _ := post(map[string]any{"subscriber_id": "Lead", "content": "@Operator refused", "ask": true, "buttons": []string{"Wake=wake:Nobody"}})
+		require.Equal(t, http.StatusBadRequest, status)
+	}
+	assert.Zero(t, count())
+	status, out := post(map[string]any{"subscriber_id": "Lead", "content": "@Operator now a good one", "ask": true, "buttons": []string{"Wake Dev=wake:Dev"}})
+	assert.Equal(t, http.StatusOK, status, out)
+}
+
+func board10() int { return board.AskButtonsOpenMax + 2 }
