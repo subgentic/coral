@@ -46,6 +46,8 @@ const ATTACK = {
         });
         const reqs = []; const byId = new Map(); const log = [];
         c.Network.requestWillBeSent(e => {
+            // A redirect hop keeps the request's id: the answer that redirected belongs to the request before it (the 303 that follows the button's POST).
+            if (e.redirectResponse && byId.has(e.requestId)) byId.get(e.requestId).status = e.redirectResponse.status;
             if (!e.request.url.startsWith(BASE)) return;
             const r = { url: e.request.url.replace(BASE, '').replace(/login_token=[^&]+/, 'login_token=<redacted>'), method: e.request.method, headers: {} };
             reqs.push(r); byId.set(e.requestId, r);
@@ -108,7 +110,7 @@ const ATTACK = {
             await p.waitFor(`!!document.getElementById('local-open') && document.readyState === 'complete'`, 'the button');
             assert.equal(await p.status(), 401, 'not signed in before');
             await p.ev(`document.getElementById('local-open').click(), true`);
-            await until(() => localOpen(p.reqs).some(r => r.status), 'the answer to the button request');
+            await until(() => localOpen(p.reqs).some(r => r.status), `the answer to the button request: ${JSON.stringify(p.reqs.map(r => [r.method, r.url, r.status]))}`);
             const posts = localOpen(p.reqs);
             assert.equal(posts.length, 1, JSON.stringify(p.reqs.map(r => r.method + ' ' + r.url)));
             const sent = `Origin ${posts[0].headers['origin']}, Sec-Fetch-Site ${posts[0].headers['sec-fetch-site']}, answered ${posts[0].status}`;
@@ -118,6 +120,32 @@ const ATTACK = {
             await p.waitFor(`!location.pathname.startsWith('/auth')`, 'the page to leave /auth', 10000);
             assert.ok((await p.cookies()).length > 0, 'a session cookie is set');
             assert.equal(await p.status(), 200, 'signed in after');
+        });
+        // Security's extra case: with require_auth_on_loopback on, the button is not offered and the route refuses. The setting is changed from the suite's own tab, which
+        // the strict shard signs in (coral open --print), and turned back off whatever happens.
+        await test('with require_auth_on_loopback on, no button and the route refuses', async () => {
+            const { targetInfos } = await browser.Target.getTargets();
+            const mine = targetInfos.find(t => t.type === 'page' && !contexts.includes(t.browserContextId)); // the suite's own tab: not in a context this suite made
+            assert.ok(mine, 'the suite tab');
+            const own = await CDP({ port, target: mine.targetId });
+            pages.push(own);
+            await own.Runtime.enable();
+            const ownEv = async x => (await own.Runtime.evaluate({ expression: x, returnByValue: true, awaitPromise: true })).result.value;
+            const put = v => ownEv(`fetch('${BASE}/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ require_auth_on_loopback: ${v} }) }).then(r => r.status)`);
+            await own.Page.enable(); await own.Page.navigate({ url: BASE + '/' }); await until(async () => (await ownEv('document.readyState')) === 'complete' && (await ownEv('location.origin')) === BASE, 'the suite tab on this server');
+            assert.equal(await put(true), 200, 'the setting was turned on');
+            try {
+                const p = await freshPage();
+                await p.c.Page.navigate({ url: BASE + '/auth' });
+                await p.waitFor(`document.readyState === 'complete' && !!document.body`, '/auth');
+                const shown = await p.ev(`(() => { const b = document.getElementById('local-open'); if (!b) return false; const r = b.getBoundingClientRect(); return r.width > 0 && r.height > 0 && !b.closest('[hidden]'); })()`);
+                assert.equal(shown, false, 'the button is not offered');
+                const st = await p.ev(`fetch('${BASE}/auth/local', { method: 'POST', credentials: 'include' }).then(r => r.status)`);
+                assert.equal(st, 403, 'the route refuses');
+                assert.deepEqual(await p.cookies(), [], 'no cookie');
+            } finally {
+                assert.equal(await put(false), 200, 'the setting was turned back off');
+            }
         });
     } finally {
         for (const c of pages) await c.close().catch(() => {});
