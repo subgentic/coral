@@ -63,25 +63,33 @@ function highlight(name, words) {
     return at < 0 ? [String(name)] : highlightRuns(String(name), new Set([...q].map((_, i) => at + i)));
 }
 
+let _picking = false; // one pick at a time: a second Enter or tap while an attach is on its way does nothing
+const agentKey = s => (s ? `${serverForSession(s.name, s.session_id)}|${s.name || ''}|${s.session_id || ''}` : '');
 async function pick(index) {
     const input = document.getElementById('command-input'), item = list.results[index];
-    if (!input || !item) return;
+    if (!input || !item || _picking) return;
     if (item.note) return; // the Hub's note is not a skill
     if (item.store) { list.hide(); go({ view: 'skills' }); return; }
     const cur = state.currentSession;
     if (!cur || cur.type !== 'live') return;
-    const start = list.start, cursor = input.selectionStart;
+    // what this pick is for, fixed now (UI Reviewer): the agent, and the exact "$words" token with the text before and after it
+    const agent = agentKey(cur), start = list.start, end = input.selectionStart, typed = input.value.slice(start, end);
+    if (!typed.startsWith('$')) return;
+    _picking = true;
     try {
         const r = await serverFetch(serverForSession(cur.name, cur.session_id), `/api/sessions/live/${encodeURIComponent(cur.name)}/skills?session_id=${encodeURIComponent(cur.session_id || '')}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ skill_id: item.id }) });
         const j = await r.json().catch(() => ({}));
         if (!r.ok || typeof j.line !== 'string') throw new Error((j && j.error) || `HTTP ${r.status}`);
-        const text = input.value, end = Math.max(cursor, input.selectionStart);
-        const at = text.slice(start, start + 1) === '$' ? start : -1; // the text may have moved while the attach was on its way: only the same "$" is replaced
-        if (at < 0) { showToast('Skill attached. Its line was not added: the text changed.'); list.hide(); return; }
-        input.value = text.slice(0, start) + j.line + ' ' + text.slice(end);
-        input.selectionStart = input.selectionEnd = start + j.line.length + 1;
-        input.dispatchEvent(new Event('input', { bubbles: true })); // the box grows and the draft is kept
-        input.focus();
+        const box = document.getElementById('command-input'); // the box of whichever agent is open now
+        const text = box ? box.value : '';
+        if (agentKey(state.currentSession) !== agent || !box || text.slice(start, start + typed.length) !== typed) { // another agent, or the "$words" were edited meanwhile: the skill is attached, the text is left as it is
+            showToast('The skill was attached. Its line was not added: the message or the agent changed.'); list.hide(); return;
+        }
+        box.value = text.slice(0, start) + j.line + ' ' + text.slice(start + typed.length); // the text after the token stays whatever the caret did meanwhile
+        box.selectionStart = box.selectionEnd = start + j.line.length + 1;
+        box.dispatchEvent(new Event('input', { bubbles: true })); // the box grows and the draft is kept
+        box.focus();
         list.hide();
     } catch (e) { showToast(`The skill was not attached: ${e && e.message ? e.message : 'try again'}`); }
+    finally { _picking = false; }
 }

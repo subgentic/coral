@@ -11,12 +11,12 @@ const SKILLS = [
     { id: 'b'.repeat(32), name: 'abacus-math', version: 1, description: 'Do sums with care' },
     { id: 'c'.repeat(32), name: 'release-notes', version: 1, description: 'Write the release notes' },
 ];
-const STUB = `(() => { window.__skillSearches = []; window.__skillAttach = []; window.__skillMode = 'some'; const R = window.fetch; const json = (b, s = 200) => Promise.resolve(new Response(JSON.stringify(b), { status: s, headers: { 'Content-Type': 'application/json' } }));
+const STUB = `(() => { window.__skillSearches = []; window.__skillAttach = []; window.__skillMode = 'some'; window.__skillGate = null; const R = window.fetch; const json = (b, s = 200) => Promise.resolve(new Response(JSON.stringify(b), { status: s, headers: { 'Content-Type': 'application/json' } }));
     window.fetch = (u, o) => { const url = new URL(String(u), location.href);
         if (url.pathname === '/api/skills/search') { const q = (url.searchParams.get('q') || '').toLowerCase(); window.__skillSearches.push(q);
             const all = ${JSON.stringify(SKILLS)}; return json({ skills: window.__skillMode === 'none' ? [] : all.filter(s => !q || (s.name + ' ' + s.description).toLowerCase().includes(q)) }); }
         if (/\\/api\\/sessions\\/live\\/[^/]+\\/skills$/.test(url.pathname) && o && o.method === 'POST') { const b = JSON.parse(o.body); window.__skillAttach.push({ path: url.pathname, session_id: url.searchParams.get('session_id'), skill_id: b.skill_id });
-            const s = ${JSON.stringify(SKILLS)}.find(x => x.id === b.skill_id); return json({ ok: true, attached: true, line: 'Use the skill ' + s.name + ' (coral-agent skills get --id ' + s.id + ').' }); }
+            const s = ${JSON.stringify(SKILLS)}.find(x => x.id === b.skill_id); const answer = () => json({ ok: true, attached: true, line: 'Use the skill ' + s.name + ' (coral-agent skills get --id ' + s.id + ').' }); return window.__skillGate ? window.__skillGate.then(answer) : answer(); }
         return R(u, o); }; })();`;
 
 (async () => {
@@ -38,7 +38,7 @@ const STUB = `(() => { window.__skillSearches = []; window.__skillAttach = []; w
             const tag = `${w} px`;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'settings');
-            await ev(`localStorage.setItem('coral-live-view-mode', 'chat'); window.__m.add('sk-a', 'A', 3, { sleeping: false, session_id: 'sk-a-id' }); window.selectLiveSession('sk-a', 'claude', 'sk-a-id', 'local'); true`);
+            await ev(`localStorage.setItem('coral-live-view-mode', 'chat'); window.__m.add('sk-a', 'A', 3, { sleeping: false, session_id: 'sk-a-id' }); window.__m.add('sk-b', 'A', 3, { sleeping: false, session_id: 'sk-b-id' }); window.selectLiveSession('sk-a', 'claude', 'sk-a-id', 'local'); true`);
             await waitFor(`!!document.getElementById('command-input') && !document.getElementById('command-input').disabled && !!document.querySelector('.skill-mention-dropdown')`, `${tag}: the composer and the skills menu`, 8000);
 
             // $ at a word start lists the skills: a name and its one line each
@@ -80,6 +80,37 @@ const STUB = `(() => { window.__skillSearches = []; window.__skillAttach = []; w
             await new Promise(r => setTimeout(r, 500)); // sleep-ok: as above
             check(`${tag}: a $ inside a word opens no menu`, (await menu()) === null);
             check(`${tag}: and nothing was attached`, (await ev(`window.__skillAttach.length`)) === 0);
+
+            // the attach is on its way (held in the page) while the person edits or leaves: what the pick was for is fixed at pick time
+            const hold = () => ev(`window.__skillGate = new Promise(r => { window.__skillRelease = r; }); window.__skillAttach.length = 0; true`);
+            const release = async () => { await ev(`window.__skillRelease(); window.__skillGate = null; true`); await new Promise(r => setTimeout(r, 500)); }; // sleep-ok: the answer's effect on the text has no event to wait for
+            const caret = n => ev(`(() => { const i = document.getElementById('command-input'); i.focus(); i.setSelectionRange(${n}, ${n}); return true; })()`);
+            // 1) the caret moves while pending: the text after the token stays, nothing is eaten
+            await clear(); await type('say $rel'); await waitFor(shown(1), `${tag}: "$rel"`, 4000);
+            await hold();
+            await key('Enter'); await waitFor(`window.__skillAttach.length === 1`, `${tag}: the attach is asked`, 4000);
+            await ev(`(() => { const i = document.getElementById('command-input'); i.value += ' and the tail'; return true; })()`); await caret(await ev(`document.getElementById('command-input').value.length`));
+            await key('Enter'); // a second Enter while it is pending does nothing
+            await release();
+            check(`${tag}: a second pick while one is pending asks once`, (await ev(`window.__skillAttach.length`)) === 1, String(await ev(`window.__skillAttach.length`)));
+            check(`${tag}: a moved caret keeps the text after the token`, /^say Use the skill release-notes \(coral-agent skills get --id c+\)\.  and the tail$/.test(await value()), await value());
+            // 2) the token is edited while pending: the skill is attached, the text is left as it is
+            await clear(); await type('say $rel'); await waitFor(shown(1), `${tag}: "$rel" again`, 4000);
+            await hold(); await key('Enter'); await waitFor(`window.__skillAttach.length === 1`, `${tag}: asked again`, 4000);
+            await ev(`(() => { const i = document.getElementById('command-input'); i.value = 'say $re'; i.setSelectionRange(7, 7); return true; })()`);
+            await release();
+            check(`${tag}: an edited token is not replaced`, (await value()) === 'say $re', await value());
+            // 3) another agent is opened while pending: its box is not written to, and the first agent's text is as it was
+            await clear(); await type('$rel'); await waitFor(shown(1), `${tag}: "$rel" before the switch`, 4000);
+            await hold(); await key('Enter'); await waitFor(`window.__skillAttach.length === 1`, `${tag}: asked before the switch`, 4000);
+            await ev(`window.selectLiveSession('sk-b', 'claude', 'sk-b-id', 'local'); true`);
+            await waitFor(`window.T && window.T.state.currentSession && window.T.state.currentSession.name === 'sk-b'`, `${tag}: the other agent is open`, 4000);
+            await ev(`(() => { const i = document.getElementById('command-input'); i.value = '$rel'; i.setSelectionRange(4, 4); return true; })()`); // the same words in the other agent's box
+            await release();
+            check(`${tag}: the other agent's box is not written to`, (await value()) === '$rel', await value());
+            await ev(`window.selectLiveSession('sk-a', 'claude', 'sk-a-id', 'local'); true`);
+            await waitFor(`window.T && window.T.state.currentSession && window.T.state.currentSession.name === 'sk-a'`, `${tag}: back on the first agent`, 4000);
+            await ev(`(() => { const i = document.getElementById('command-input'); i.value = ''; return true; })()`);
 
             // Escape closes it and leaves the text, and it stays closed while typing on
             await clear(); await type('$ab');
