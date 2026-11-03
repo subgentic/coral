@@ -10,6 +10,7 @@ import { setText, setHidden, setTitle, setHtml, setDisplay, setClassName, setPil
 import { modelName, sessionLevel } from './model_labels.js';
 import { sessionServer } from './server_base.js';
 import { escapeHtml, escapeAttr } from './utils.js';
+import { state } from './state.js';
 
 export function updateSessionStatus(status) {
     const el = document.getElementById("session-status");
@@ -79,18 +80,20 @@ function _syncPhoneDetails() {
 /** The top of Files says where the agent lives, always: its folder and its branch (#11580). Following the agent into a git worktree (#11351), it says only that worktree, name then branch (#12690, the
  *  Operator: one path, the one being followed, not the launch folder as well and a sentence about it), the full path on hover, with a small "following" tag and a quiet icon back to the launch folder;
  *  in the launch folder with the worktree offered, the same line holds an icon to follow it. */
-let _wt = null; // { path, name, branch, followed } from the files list (changed_files.js), or null
-export function setFilesWorktree(wt) {
+let _wt = null, _wtKey = ''; // { path, name, branch, followed } from the files list (changed_files.js) and the agent it was read for, or null
+/** The agent (computer, name, session) a worktree belongs to: the line shows it only while that agent is the open one (#12690, UI Reviewer: it must not carry over to another agent or computer). */
+export const whereKey = s => s ? `${sessionServer(s)}|${s.name || ''}|${s.session_id || ''}` : '';
+export function setFilesWorktree(wt, key) {
     const next = wt && wt.name ? wt : null;
-    if (JSON.stringify(next) === JSON.stringify(_wt)) return;
-    _wt = next; _syncWhere();
+    if (JSON.stringify(next) === JSON.stringify(_wt) && (key || '') === _wtKey) return;
+    _wt = next; _wtKey = key || ''; _syncWhere();
 }
 const _whereBack = '<button type="button" class="btn btn-quiet btn-icon btn-xs files-where-act" data-on-click="worktree-launch" title="Back to launch folder" aria-label="Back to launch folder"><span class="material-icons" aria-hidden="true">arrow_back</span></button>';
 const _whereFollow = name => `<button type="button" class="btn btn-quiet btn-icon btn-xs files-where-act" data-on-click="worktree-follow" title="${escapeAttr('Follow the agent into its worktree ' + name)}" aria-label="${escapeAttr('Follow the agent into its worktree ' + name)}"><span class="material-icons" aria-hidden="true">account_tree</span></button>`;
 function _syncWhere() {
     const el = document.getElementById('files-where');
     if (!el) return;
-    const wt = _wt, followed = !!(wt && wt.followed);
+    const wt = _wt && _wtKey === whereKey(state.currentSession) ? _wt : null, followed = !!(wt && wt.followed);
     const text = followed ? [wt.name, wt.branch || 'detached'].join(' \u00b7 ') : [_shortPath(_details.folder), _details.branch].filter(Boolean).join(' \u00b7 ');
     setHtml(el, `<span class="files-where-text">${escapeHtml(text)}</span>`
         + (followed ? `<span class="files-where-tag">following</span>${_whereBack}` : wt ? _whereFollow(wt.name) : ''));
