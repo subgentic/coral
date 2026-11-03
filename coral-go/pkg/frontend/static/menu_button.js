@@ -58,7 +58,7 @@ export function openMenu(toggle, { focusFirst = true } = {}) {
     closeMenus();
     menu.hidden = false;
     toggle.setAttribute('aria-expanded', 'true');
-    current = { toggle, menu };
+    current = { toggle, menu, scrolled: scrollPositions(toggle) };
     if (menu.classList.contains('dt-mail-menu') || toggle.closest('.dt-box')) {
         current.restore = liftTableMenu(toggle, menu);
         current.observer = new MutationObserver(() => { if (!toggle.isConnected || !menu.isConnected) closeMenus(); });
@@ -106,4 +106,17 @@ document.addEventListener('keydown', e => {
 // An open table menu belongs to its current row and position, never to the next page or a scrolled-away row.
 onViewShown(() => closeMenus());
 window.addEventListener('resize', () => closeMenus());
-document.addEventListener('scroll', e => { if (current && !current.menu.contains(e.target)) closeMenus(); }, true);
+// Where every scrolled ancestor of the toggle (and the page) is, when the menu opens: a scroll event is dispatched a frame after the scroll, so one for a scroll that ended before the menu opened (a click that
+// follows a scrollIntoView, a poll's redraw) arrives with the menu open and nothing moved since. Only a container that moved since the open closes the menu (#12880).
+function scrollPositions(toggle) {
+    const at = new Map(), root = document.scrollingElement;
+    if (root) at.set(root, root.scrollTop);
+    for (let e = toggle.parentElement; e; e = e.parentElement) if (e.scrollHeight > e.clientHeight || e.scrollTop) at.set(e, e.scrollTop);
+    return at;
+}
+document.addEventListener('scroll', e => {
+    if (!current || current.menu.contains(e.target)) return;
+    const el = e.target === document ? document.scrollingElement : e.target;
+    if (el && current.scrolled.get(el) === el.scrollTop) return; // it did not move since the menu opened: the event is for an earlier scroll
+    closeMenus();
+}, true);
