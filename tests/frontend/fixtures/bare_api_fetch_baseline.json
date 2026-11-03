@@ -22,12 +22,12 @@
       "reason": "a guide's roster is the Hub's own route (the guide role is a Hub grant on a board), read by the owner there"
     },
     "job_form.js": {
-      "count": 4,
+      "count": 5,
       "reason": "Automations (scheduled jobs and workflows) run on this computer: the page has no server for them"
     },
     "needs_skills.js": {
       "count": 1,
-      "reason": "to do (#12653): the skills waiting for approval are a computer's; the Needs you row reads them bare, so through the Hub none is listed"
+      "reason": "by design, Hub: not enabled (Skills Store stays on the computer in v1)"
     },
     "operator_asks.js": {
       "count": 2,
@@ -36,6 +36,10 @@
     "received_cap_notice.js": {
       "count": 1,
       "reason": "this computer's own artifact store notice, never asked through the Hub (isCloud returns first)"
+    },
+    "resume_dialog.js": {
+      "count": 1,
+      "reason": "Resume launches a new agent on this computer (the dialog has no launch-computer selector); only its source transcript metadata is read from another computer"
     },
     "scheduler.js": {
       "count": 7,

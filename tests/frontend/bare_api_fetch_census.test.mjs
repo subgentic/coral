@@ -2,6 +2,7 @@
 // data that lives on a computer has to go through serverFetch (or boardFetch) with the server the data is from, which adds /api/remote/<id> for another computer. This census reads every page script for a fetch() whose address is a bare /api path on such data
 // and fails on one it does not know: a new call must take its server, or be added to fixtures/bare_api_fetch_baseline.json with the reason it is this computer's alone (a thing the page only shows for this computer, or the Hub's own).
 // It fails too on an entry whose call is gone, so the list only gets shorter. CORAL_UPDATE_BARE_FETCH=1 rewrites the counts (the reasons are kept). node bare_api_fetch_census.test.mjs
+import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -14,7 +15,9 @@ const baselinePath = path.join(here, 'fixtures', 'bare_api_fetch_baseline.json')
 // first version listed what was, and pinned-folders was missed).
 const OWN = /^\/api\/(account|auth|cloud|health|servers|settings|system(?!\/artifact-store)|themes|tracking|update|webhooks|editions|hub)(\/|\?|$|`|')/;
 const COMPUTER = { test: u => !OWN.test(u) };
-const call = /(?<![A-Za-z0-9_.$])fetch\(\s*(`|')(\/api\/[^`'\s]*)/g;
+const call = /(?<![A-Za-z0-9_.$])fetch\(\s*(?:[^\x22'`(),]*\?\s*)?([\x22'`])(\/api\/[^\x22`'\s]*)/g;
+// Count a conditional fetch once, at its first literal; the call still needs an explicit computer.
+assert.deepEqual([...`fetch("/api/tags"); fetch(edit ? '/api/jobs/1' : '/api/jobs'); fetch(\`/api/notes\`); obj.fetch('/api/no')`.matchAll(call)].map(m => m[2]), ['/api/tags', '/api/jobs/1', '/api/notes']);
 
 const found = {};
 (function walk(d) {
