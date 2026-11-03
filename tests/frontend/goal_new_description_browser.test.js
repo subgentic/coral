@@ -66,9 +66,9 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
             await waitFor(`!!document.querySelector('#team-panel-goals .goals-new')`, at + 'the New goal button', 15000);
             await ev(`document.querySelector('#team-panel-goals .goals-new').click(); true`);
             await waitFor(`!!document.querySelector('.goals-dialog #goal-new-title')`, at + 'the form', 5000);
-            const form = await ev(`(() => { const d = document.querySelector('.goals-dialog'), t = d.querySelector('#goal-new-description'); return { tag: t && t.tagName, label: t && t.closest('label').textContent.trim(), max: t && t.maxLength, rows: t && t.rows, driverHelp: /the agent who looks after it\\.?$/m.test([...d.querySelectorAll('.goals-note')].map(n => n.textContent).join('\\n')), driverHelpId: !!d.querySelector('#goal-new-driver-help'), describedby: d.querySelector('#goal-new-driver').getAttribute('aria-describedby') }; })()`);
-            assert.deepEqual(form, { tag: 'TEXTAREA', label: 'Description (optional)', max: 2000, rows: 4, driverHelp: false, driverHelpId: false, describedby: null }, at + 'the Description field, and the repeated Driver line is gone');
-            assert.match(await ev(`document.querySelector('.goals-dialog #goal-new-driver').closest('label').textContent`), /Driver, the agent who looks after it \(optional\)/, at + 'the Driver field keeps its own label');
+            const form = await ev(`(() => { const d = document.querySelector('.goals-dialog'), t = d.querySelector('#goal-new-description'); return { tag: t && t.tagName, label: t && d.querySelector('label[for="goal-new-description"]').textContent.trim(), max: t && t.maxLength, rows: t && t.rows, driverHelp: /the agent who looks after it\\.?$/m.test([...d.querySelectorAll('.goals-note')].map(n => n.textContent).join('\\n')), driverHelpId: !!d.querySelector('#goal-new-driver-help'), describedby: d.querySelector('#goal-new-driver').getAttribute('aria-describedby') }; })()`);
+            assert.deepEqual(form, { tag: 'TEXTAREA', label: 'What should be true', max: 2000, rows: 10, driverHelp: false, driverHelpId: false, describedby: null }, at + 'the Description field, and the repeated Driver line is gone');
+            assert.match(await ev(`document.querySelector('.goals-dialog #goal-new-driver').closest('label').textContent`), /^Driver/, at + 'the Driver field keeps its own label (a chip in the bar, #12724)');
             await waitFor(`!!document.querySelector('.goals-dialog .ac-picker input')`, at + 'the picture button', 5000);
             assert.equal(await ev(`(() => { const h = document.querySelector('.goals-dialog .ac-images-hint'); return h && h.getClientRects().length > 0 ? h.textContent : null; })()`), 'Pictures are shared with this team\'s agents as they are; nothing is hidden.', at + 'the quiet line about who sees a picture is beside Add image');
 
@@ -104,7 +104,7 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
             await ev(`document.querySelector('.goals-dialog .ac-thumb-failed .ac-thumb-remove').click(); window.__fail = false; true`);
             assert.equal(await ev(`document.querySelector('.goals-dialog button[type=submit]').disabled`), false, at + 'removed, Create is open again');
             assert.equal(await ev(`document.documentElement.scrollWidth - document.documentElement.clientWidth`), 0, at + 'the form does not scroll sideways');
-            if (mobile) assert.deepEqual(await ev(`[...document.querySelectorAll('.goals-dialog button')].filter(b => b.getClientRects().length).map(b => [b.textContent, Math.round(b.getBoundingClientRect().height)]).filter(x => x[1] < 44 && b0(x[0]))`.replace('b0(x[0])', 'x[0] !== "\\u2190"')), [], at + 'the form\'s buttons are 44 px tall');
+            if (mobile) assert.deepEqual(await ev(`[...document.querySelectorAll('.goals-dialog button')].filter(b => b.getClientRects().length && !b.closest('.ac-thumb')).map(b => [b.textContent, Math.round(b.getBoundingClientRect().height)]).filter(x => x[1] < 44 && b0(x[0]))`.replace('b0(x[0])', 'x[0] !== "\\u2190"')), [], at + 'the form\'s buttons are 44 px tall');
 
             // Create: the description is the outcome, the pictures are the stored hexes in order
             await ev(`(() => { const t = document.querySelector('.goals-dialog #goal-new-title'); t.value = 'Fix the lock'; t.dispatchEvent(new Event('input')); document.querySelector('.goals-dialog form').requestSubmit(); return true; })()`);
@@ -120,8 +120,9 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
             await load(`/team/${B}/goals/${G}`, w, h, mobile, G);
             await waitFor(`!!document.querySelector('#team-panel-goals .goals-facts')`, at + 'the goal page', 15000);
             assert.equal(await ev(`[...document.querySelectorAll('#team-panel-goals .goals-facts dt')].map(d => d.textContent).join()`), 'Description,Done when', at + 'the page says Description');
-            assert.equal(await ev(`getComputedStyle(document.querySelector('#team-panel-goals .goals-facts dd')).whiteSpace`), 'pre-line', at + 'and keeps its line breaks');
-            assert.equal(await ev(`document.querySelector('#team-panel-goals .goals-facts dd').textContent`), OUTCOME);
+            assert.equal(await ev(`getComputedStyle(document.querySelector('#team-panel-goals .goals-facts dd')).whiteSpace`), 'pre-line', at + 'the plain words before the render keep their line breaks');
+            await waitFor(`!!document.querySelector('#team-panel-goals .goals-facts dd .goal-md')`, at + 'the description drawn as Markdown-lite (#12724)', 8000);
+            assert.deepEqual(await ev(`[...document.querySelectorAll('#team-panel-goals .goals-facts dd .goal-md p')].map(p => p.textContent)`), OUTCOME.split('\n'), at + 'each line of the description is its own line (the line break is a paragraph break)');
             await ev(`window.dispatchEvent(new Event('focus')); true`); // the page reads its goal again: now through the stub, which adds the pictures
             await waitFor(`document.querySelectorAll('#team-panel-goals .goal-pic-img').length === 2`, at + 'its pictures', 8000);
             await waitFor(`[...document.querySelectorAll('#team-panel-goals .goal-pic-img')].every(i => i.complete && i.naturalWidth > 0)`, at + 'drawn', 8000);

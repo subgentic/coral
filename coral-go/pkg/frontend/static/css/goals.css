@@ -109,3 +109,6 @@
 .goals-row-tasks { display: none; font-size: var(--fs-sm); color: var(--text-muted); font-variant-numeric: tabular-nums; }
 @container (max-width: 36rem) { .goals-title-cell .goals-row-tasks { display: block; } } /* the clamp and the wrap are in data_table.css (the census keeps .dt-* rules there) */
 
+
+.goals-facts dd .goal-md > :first-child { margin-top: 0; } /* the description is Markdown-lite (#12724): its first and last block sit flush in the line */
+.goals-facts dd .goal-md > :last-child { margin-bottom: 0; }
