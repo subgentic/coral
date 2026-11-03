@@ -67,6 +67,47 @@ var allowedEventProps = map[string]bool{
 	"schema_version": true, "run_id": true, "entrypoint": true,
 }
 
+// funnelEventProps are the keys each step of the new-user funnel (#7455, internal/tracking/funnel.go) may carry besides the standard ones and funnelCommonProps: its own closed-list or
+// bounded values. The funnel's steps are sent from a held flush, so which of them reach the sink inside a run's window varies from run to run; each is checked against its own keys (a
+// step may not carry another step's key, and a funnel step not listed here fails on purpose: a new thing sent about a user is added here deliberately, #12797).
+var funnelCommonProps = []string{"backend", "secs_since_install"}
+var funnelEventProps = map[string][]string{
+	"funnel_app_started":           {"source"},
+	"funnel_startup_failed":        {"class"},
+	"funnel_eula_shown":            {"surface"},
+	"funnel_eula_declined":         {"surface"},
+	"funnel_dashboard_open":        {"result"},
+	"funnel_signin_page_shown":     {"page"},
+	"funnel_signin_link_refused":   {"class"},
+	"funnel_dashboard_loaded":      {},
+	"funnel_dashboard_load_failed": {"code"},
+	"funnel_welcome_shown":         {},
+	"funnel_welcome_done":          {"step"},
+	"funnel_cli_detected":          {"tool", "status"},
+	"funnel_launch_dialog_opened":  {},
+	"funnel_launch_clicked":        {"kind", "provider"},
+	"funnel_launch_failed":         {"kind", "provider", "failure_category"},
+	"funnel_agent_first_output":    {"provider", "secs_since_launch"},
+	"funnel_agent_ready":           {"provider", "state", "secs_since_launch"},
+}
+
+// propAllowed says event may carry property k: a standard property, or (for a funnel step) one of its own.
+func propAllowed(event, k string) bool {
+	if allowedEventProps[k] {
+		return true
+	}
+	own, isFunnel := funnelEventProps[event]
+	if !isFunnel {
+		return false
+	}
+	for _, c := range append(append([]string{}, funnelCommonProps...), own...) {
+		if c == k {
+			return true
+		}
+	}
+	return false
+}
+
 func TestTelemetrySinkE2E(t *testing.T) {
 	if testing.Short() {
 		t.Skip("builds and runs a dev coral binary")
@@ -211,7 +252,7 @@ func TestTelemetrySinkE2E(t *testing.T) {
 		assert.NotContains(t, e.props, "internal", "%s has no 'internal' property (there is no internal concept in the repo)", e.event)
 		// Nothing that identifies anyone: only allowlisted keys, and no value holds a local path or the host name.
 		for k, v := range e.props {
-			assert.True(t, allowedEventProps[k], "%s carries property %q, which is not in the allowlist of safe properties", e.event, k)
+			assert.True(t, propAllowed(e.event, k), "%s carries property %q, which is not in the allowlist of safe properties", e.event, k)
 			val := fmt.Sprint(v)
 			for _, secret := range []string{plain.home, plain.iso, hostname} {
 				if len(secret) >= 3 {
