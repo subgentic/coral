@@ -121,6 +121,7 @@ jobs:
           run_check "update_tap_test" bash tests/release/update_tap_test.sh
           run_check "release_cadence_test" bash tests/release/release_cadence_test.sh
           run_check "release_notes_edits_test" bash tests/release/release_notes_edits_test.sh
+          run_check "staple_retry_test" bash tests/release/staple_retry_test.sh
           run_check "notes_commit_test" bash tests/release/notes_commit_test.sh
           run_check "windows_build_census_test" python3 tests/release/windows_build_census_test.py
           run_check "trimpath_census_test" python3 tests/release/trimpath_census_test.py
