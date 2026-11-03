@@ -407,6 +407,13 @@ func (s *Server) MintLoginToken() (string, error) {
 	return s.keyStore.MintLoginToken()
 }
 
+// ServerLost hears that the terminal server went away under running agents: the notice and the recovery (#12592).
+func (s *Server) ServerLost(ctx context.Context, loss background.ServerLoss) {
+	if s.sessHandler != nil {
+		s.sessHandler.ServerLost(ctx, loss)
+	}
+}
+
 // StartMachineHealth samples this machine's health every 15 s for the feeds (#3444): Coral's own
 // process, the agents' process trees (the backend's agent processes), the host, the data folder's
 // disk, and the stall watchdog's probe latencies (wd may be nil: the watchdog is off).
