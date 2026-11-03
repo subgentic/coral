@@ -31,6 +31,7 @@ import (
 	"github.com/subgentic/coral/internal/sshprov"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/internal/terminalinput"
+	"github.com/subgentic/coral/internal/tracking"
 	"github.com/subgentic/coral/pkg/hubowner"
 )
 
@@ -609,6 +610,7 @@ func (s *Server) registerSystem(r *chi.Mux, h *routeHandlers) {
 	r.Get("/api/settings/prompt-inspection", sysHandler.GetPromptInspection)
 	r.Get("/api/agent-models", sysHandler.GetAgentModels)
 	r.Get("/api/system/status", sysHandler.Status)
+	tracking.OnDashboardLoaded(sysHandler.FunnelOnDashboardLoaded) // the funnel's first-load steps (#7455), from the server's own state
 	trackHandler := routes.NewTrackingHandler(s.cfg.CoralDir())
 	r.Post("/api/tracking/event", trackHandler.TrackEvent)
 	r.Get("/api/system/telemetry", trackHandler.TelemetryDisclosure)

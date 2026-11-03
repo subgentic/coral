@@ -89,9 +89,6 @@ func (h *SessionsHandler) Send(w http.ResponseWriter, r *http.Request) {
 		writeTerminalError(w, err)
 		return
 	}
-	// The terminal accepted the input over HTTP: the narrowly labelled
-	// first_prompt_submitted milestone. It says nothing about what the agent did.
-	tracking.TrackOnce(tracking.EventFirstPromptSubmitted, map[string]string{"source": "http_send"})
 	if humanInputCaller(r) { // only a person's message is the funnel's (an agent's tool or a script is automation)
 		h.notePersonMessage(r.Context(), body.SessionID, tracking.MessageViaComposerHTTP, sentAt)
 	}

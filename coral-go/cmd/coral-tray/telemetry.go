@@ -3,6 +3,9 @@ package main
 import (
 	"sync"
 
+	"github.com/subgentic/coral/internal/config"
+	"github.com/subgentic/coral/internal/license"
+
 	"github.com/subgentic/coral/internal/tracking"
 )
 
@@ -16,9 +19,11 @@ func trayTelemetry(send func()) func(on bool) {
 	return func(on bool) {
 		if !on {
 			tracking.SetTelemetryEnabled(false)
+			tracking.DropHeldFunnel() // the funnel's held steps (#7455): analytics is off, so they are deleted, never kept for later
 			return
 		}
 		tracking.SetTelemetryEnabled(true)
 		once.Do(send)
+		tracking.FlushHeldFunnel(!config.EULARequired() || license.IsEULAAccepted()) // sent only once the current Terms are accepted
 	}
 }

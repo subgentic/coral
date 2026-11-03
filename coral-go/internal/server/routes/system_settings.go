@@ -340,6 +340,7 @@ func (h *SystemHandler) saveSettings(ctx context.Context, values map[string]stri
 // applyLiveSettings applies the settings that take effect at once (new WebSocket attaches, agents started from now
 // on, the next request) without a server restart.
 func applyLiveSettings(values map[string]string) {
+	funnelWelcomeSettings(values) // the welcome items a write closed (#7455)
 	for k, s := range values {
 		switch k {
 		case "terminal_replay_bytes":

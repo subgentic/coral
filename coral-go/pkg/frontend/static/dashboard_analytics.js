@@ -68,6 +68,12 @@ export function dashboardFailed(code) {
     emit('dashboard_failed', {code});
 }
 
+/** The funnel's launch dialog step (#7455): the event's name only. The server sends it once per install, with its own properties, and nothing with analytics off. */
+export function reportLaunchDialogOpened() {
+    if (!enabled) return;
+    emit('funnel_launch_dialog_opened');
+}
+
 // Composer intent only: not proof of socket delivery, agent readiness or response.
 export function dashboardPromptRequested() {
     // Let the server own the install milestone so an opted-out or failed

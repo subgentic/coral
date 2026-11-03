@@ -12,7 +12,7 @@ import (
 
 // SchemaVersion identifies the event/property contract. Bump it when an event
 // or property changes meaning so downstream analysis can tell the versions apart.
-const SchemaVersion = 5
+const SchemaVersion = 6
 
 // runID is generated once per server process. It is random, never persisted
 // and unrelated to the install ID, so it can group one run's events without
@@ -170,7 +170,7 @@ var eventSpecs = map[string]map[string]propSpec{
 	EventDashboardActiveDay:     {},
 	EventInstallationActiveWeek: {},
 	EventDashboardFailed:        {"code": enum("sessions_fetch_http", "sessions_fetch_network", "sessions_fetch_invalid", "status_fetch_http", "status_fetch_network", "status_fetch_invalid", "init_failed")},
-	EventFirstPromptSubmitted:   {"source": enum("http_send")},
+	EventFirstPromptSubmitted:   {"source": enum(MessageViaComposerHTTP, MessageViaComposerWS, MessageViaTerminal, MessageViaLaunchPrompt)}, // every way a person's first message goes (#7455; was http_send only)
 	EventPromptSubmitRequested:  {"source": enum("dashboard_composer")},
 
 	EventEULAAccepted:      {"source": enum(EULASourceDialog, EULASourceLegacy, EULASourceHub)},
@@ -251,6 +251,7 @@ type Attempt struct {
 func StartLaunch(kind, provider, backend string, requestedAgents int, resume bool) *Attempt {
 	a := &Attempt{id: uuid.NewString(), kind: kind, provider: provider, backend: backend, requested: requestedAgents, resume: resume, start: time.Now()}
 	TrackEvent(EventLaunchRequested, a.props())
+	TrackFunnelStep(EventFunnelLaunchClicked, map[string]string{"kind": kind, "provider": provider}) // the funnel's first launch (#7455)
 	return a
 }
 
@@ -276,6 +277,9 @@ func (a *Attempt) Finish(outcome, category string, started, failed int) {
 	p["started_agents"] = strconv.Itoa(started)
 	p["failed_agents"] = strconv.Itoa(failed)
 	TrackEvent(EventLaunchResult, p)
+	if outcome == OutcomeFailure && category != "" { // the funnel's first failed launch (#7455): the category only, from the closed list
+		TrackFunnelStep(EventFunnelLaunchFailed, map[string]string{"kind": a.kind, "provider": a.provider, "failure_category": category})
+	}
 }
 
 // ProviderFor maps an agent type to the closed provider enum. A blank type

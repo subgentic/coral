@@ -15,6 +15,7 @@ const { _effectiveServer, _loadServerSettings, _serverSettings, _settingsFor } =
 const { defaultPermissionMode, syncDefaultPermissionMode, _normalizePermFlagsForAgent, _updatePermModeDescription, _hasPermFlag } = await importOnce('./permission_flags.js');
 const { _checkAgentCLI } = await importOnce('./cli_check.js');
 import { checkTmuxForLaunch } from './prerequisites.js';
+import { reportLaunchDialogOpened } from './dashboard_analytics.js';
 import { sectionFocus } from './section_dialog.js';
 import { showTeamAddress } from './team_form.js';
 import { agentForm as folderForm, setAgentNameMode } from './agent_form.js';
@@ -152,6 +153,7 @@ window._selectLaunchType = _selectLaunchType;
  * context). Default is the hub itself with a free choice.
  */
 export function showLaunchModal(server, lock = false) {
+    reportLaunchDialogOpened();
     launch.mode = null;
     launch.addTo = null; // a New Agent dialog is not an Add agent one (#7778)
     launch.member = null; // nor a member's (#7861)

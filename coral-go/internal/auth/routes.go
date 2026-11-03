@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 
 	"github.com/subgentic/coral/internal/httputil"
+	"github.com/subgentic/coral/internal/tracking"
 )
 
 // Routes provides HTTP handlers for authentication endpoints.
@@ -78,8 +79,22 @@ func (ar *Routes) AuthPage(w http.ResponseWriter, r *http.Request) {
 	h.Set("Referrer-Policy", "no-referrer")
 	set, local, strict := ar.PageState(r)
 	signedOut := set && ar.ks.wasSignedOutByOthers(ar.ks.extractSessionCookie(r)) && !ar.signedIn(r) // told why only to the browser whose session another browser ended (#10431)
+	if !ar.signedIn(r) {                                                                             // the funnel (#7455): which page a browser with no session reached; nothing of the request is sent
+		tracking.TrackSigninPageShown(signinPageKind(set, local))
+	}
 	// PeerUnavailable is read after PageState: its attribution of this request is what sets the flag (#12546).
 	w.Write([]byte(AuthPage(PageState{PasswordSet: set, Local: local, Strict: strict, SignedOut: signedOut, Locked: r.URL.Query().Get("locked") == "1", HubSignin: ar.hub.PageState(r), HubURL: ar.hub.HubURL(), PeerUnavailable: peerCheckLost.Load()})))
+}
+
+// signinPageKind is the funnel's name for the page AuthPage serves: sign in with the password, or create one (here, or from another computer with the setup code).
+func signinPageKind(passwordSet, local bool) string {
+	switch {
+	case passwordSet:
+		return tracking.SigninPageSignin
+	case local:
+		return tracking.SigninPageCreate
+	}
+	return tracking.SigninPageSetup
 }
 
 // authPageCSP: scripts only from this server (the page has no inline script), never framed;

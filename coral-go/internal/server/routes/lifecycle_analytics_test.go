@@ -54,9 +54,9 @@ func TestTaskCompletionReportsOutcomeAndSeparateSuccessMilestone(t *testing.T) {
 
 func itoa(n int64) string { b, _ := json.Marshal(n); return string(b) }
 
-// first_prompt_submitted is emitted only when the terminal accepted the
-// input over HTTP /send, once per install, and never carries the prompt.
-func TestFirstPromptSubmittedOnlyAfterTheTerminalAcceptsHTTPSend(t *testing.T) {
+// first_prompt_submitted is emitted only when the terminal accepted a person's
+// message (here over HTTP /send), once per install, and never carries the prompt.
+func TestFirstPromptSubmittedOnlyAfterTheTerminalAcceptsASend(t *testing.T) {
 	sink := captureAnalytics(t)
 	_, handler, terminal, ss := setupSessionsTestServerWithConfig(t, config.Load(t.TempDir()))
 	const sid, noPane, unknown = "00000000-0000-4000-8000-0000000000c1", "00000000-0000-4000-8000-0000000000c2", "00000000-0000-4000-8000-0000000000c3"
@@ -67,6 +67,11 @@ func TestFirstPromptSubmittedOnlyAfterTheTerminalAcceptsHTTPSend(t *testing.T) {
 	terminal.sessions["agent-c1"] = &ptymanager.PaneInfo{SessionName: "agent-c1"}
 	terminal.mu.Unlock()
 	r := chi.NewRouter()
+	r.Use(func(next http.Handler) http.Handler { // a person at the dashboard (the identity observer's verdict): only a person's message is the funnel's
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			next.ServeHTTP(w, req.WithContext(context.WithValue(req.Context(), callerKindKey{}, callerDashCookie)))
+		})
+	})
 	r.Post("/api/sessions/live/{name}/send", handler.Send)
 	srv := httptest.NewServer(r)
 	t.Cleanup(srv.Close)
@@ -83,7 +88,7 @@ func TestFirstPromptSubmittedOnlyAfterTheTerminalAcceptsHTTPSend(t *testing.T) {
 
 	require.Equal(t, 200, send("agent-c1", sid, "secret prompt text"))
 	p := sink.wait(t, tracking.EventFirstPromptSubmitted, 1)[0]
-	assert.Equal(t, "http_send", p["source"])
+	assert.Equal(t, tracking.MessageViaComposerHTTP, p["source"])
 	require.Equal(t, 200, send("agent-c1", sid, "again"))
 	sink.none(t, tracking.EventPromptSubmitRequested)
 	assert.Len(t, sink.named(tracking.EventFirstPromptSubmitted), 1, "once per install")

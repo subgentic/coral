@@ -308,6 +308,7 @@ func launchParamsFor(cfg *config.Config, sessionID, sessionName, protocolPath, d
 func startWebServer(ctx context.Context, cfg *config.Config, instance *startup.Instance) *startup.RunningServer {
 	tracking.SetEntrypoint("launch-coral")
 	tracking.SetCoralDir(cfg.CoralDir())
+	tracking.HoldFunnelStep(tracking.EventFunnelAppStarted, tracking.AppStartLauncher) // the funnel (#7455): sent only after the Terms and with analytics on
 	rs, err := startup.Start(ctx, cfg, startup.Options{
 		Instance: instance,
 		BackendType: func() string {

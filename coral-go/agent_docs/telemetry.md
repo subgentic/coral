@@ -6,7 +6,7 @@ Set `CORAL_TELEMETRY_DISABLED=1` before starting Coral to suppress analytics reg
 
 ## Events
 
-The runtime disclosure is generated from `internal/tracking/events.go`. New funnel events use schema version 3; the update events and `upgrade`'s `from_version` are schema version 4; the new-user funnel events (`eula_accepted`, `dashboard_signed_in`, `first_message_sent`, `first_agent_reply`) are schema version 5.
+The runtime disclosure is generated from `internal/tracking/events.go`. New funnel events use schema version 3; the update events and `upgrade`'s `from_version` are schema version 4; the new-user funnel events (`eula_accepted`, `dashboard_signed_in`, `first_message_sent`, `first_agent_reply`) are schema version 5; the step-by-step funnel (`funnel_*`), the common funnel properties and `first_prompt_submitted`'s wider `source` are schema version 6.
 
 | Event | Meaning | Additional properties |
 |---|---|---|
@@ -25,7 +25,7 @@ The runtime disclosure is generated from `internal/tracking/events.go`. New funn
 | `dashboard_failed` | An observed dashboard initialization or initial-fetch failure | `code` |
 | `dashboard_active_day` | An initialized dashboard was visible during a UTC date | — |
 | `prompt_submit_requested` | First composer submission intent, covering both HTTP and WebSocket paths | `source` |
-| `first_prompt_submitted` | First successful HTTP send accepted by the terminal transport | `source` |
+| `first_prompt_submitted` | Once ever: the first message a person sent to an agent, by any way (the same moment as `first_message_sent`; until schema 6 it counted only the HTTP send). It says a message went, never what it said | `source` (`composer_http`, `composer_ws`, `terminal`, `launch_prompt`) |
 | `eula_accepted` | Once ever, when Coral starts after the Terms of Service were accepted (Coral's terms dialog in the app or in a terminal, the Windows installer's acceptance recorded as this version's, or the Coral Hub confirming this version as the machine enrolled), and only after the saved Usage analytics choice has been read: an opted-out install sends nothing. Never sent before acceptance | `source` (`dialog`, `legacy`, `hub`) |
 | `dashboard_signed_in` | Once ever: the first dashboard sign-in on this computer | `via` (`app`, `link`, `key`, `password`: the kind of sign-in, never the credential) |
 | `first_message_sent` | Once ever: the first message a person sent to an agent, from the dashboard composer over HTTP or the terminal socket, typed in the terminal view, or as a launch prompt. It says a message went, never what it said | `via` (`composer_http`, `composer_ws`, `terminal`, `launch_prompt`) |
@@ -39,11 +39,37 @@ The runtime disclosure is generated from `internal/tracking/events.go`. New funn
 
 Weekly active installs are the distinct `distinct_id`s with `installation_active_week` in a week. `app_opened` alone cannot give that (a Coral that stays up for weeks sends it once, at startup) and `dashboard_active_day` alone cannot either (it needs the dashboard open, so an install driven from the CLI never sends it). `installation_active_week` is deduplicated like `dashboard_active_day`: the week is recorded as sent only after the service accepts the event, under an event UUID that is stable for the install and week, and an opt-out does not use the week up. It carries the standard properties only.
 
-Launch completion does not prove provider authentication, model readiness, or a response. The WebSocket composer currently lacks a transport acknowledgment suitable for the confirmed-send milestone, so `first_prompt_submitted` covers HTTP sends only. `prompt_submit_requested` measures intent, not delivery. `first_agent_reply` (schema 5) is not read from the transcript: the server marks the session when a person's message reaches the agent and counts the first stop event after it. `seconds_to_reply` includes any wait for the person to answer a permission box; a message that waits behind a running turn is measured from the send. A turn that ends in an error is `outcome: error`, so a failed turn is never counted as a reply that worked.
+Launch completion does not prove provider authentication, model readiness, or a response. `first_prompt_submitted` and `first_message_sent` are sent when the agent's terminal accepted a person's message, by any way. `prompt_submit_requested` measures intent, not delivery. `first_agent_reply` (schema 5) is not read from the transcript: the server marks the session when a person's message reaches the agent and counts the first stop event after it. `seconds_to_reply` includes any wait for the person to answer a permission box; a message that waits behind a running turn is measured from the send. A turn that ends in an error is `outcome: error`, so a failed turn is never counted as a reply that worked.
 
 `dashboard_ready` counts page loads, not users. Active-day records are deduplicated for the installation and UTC date, including multiple tabs. The legacy `returned_24h` event measures restarts; use dashboard activity for engagement and retention. An observed failure may precede recovery and a ready event. Missing events alone do not prove abandonment or a crash.
 
 Update telemetry (#5952): the update check itself (an anonymous request to GitHub, cached for an hour and shared by the dashboard, the tray and the server) is not analytics and is not affected by the Usage analytics setting; the two update events are analytics and are covered by it: with it off nothing is sent and nothing is remembered. Versions are release numbers by a strict pattern (digits.digits.digits with an optional short suffix such as `-beta`); a development build's version or any other shape is never sent. Nothing about the update (URLs, paths, errors, package names) is sent. An update that happened outside Coral (a package manager, a downloaded installer) shows only as the next `upgrade`, with `from_version`.
+
+## The step-by-step funnel (schema 6)
+
+One event per step from the first start to a first finished task, each sent at most once per install (`funnel_cli_detected`, `funnel_agent_ready` and `funnel_welcome_done` once per value), so a drop-off can be placed on one step. Every funnel step, and the earlier one-time steps `eula_accepted`, `dashboard_signed_in`, `first_agent_launched`, `first_prompt_submitted`, `first_message_sent`, `first_agent_reply` and `first_task_completed`, also carries `backend` (`pty`, `tmux` or `unknown`) and `secs_since_install` (whole seconds since Coral first opened on this install, up to 30 days). Every value is chosen by Coral from a closed list or is a bounded number: never a path, a name, an address, a prompt, screen text or an error message.
+
+Steps that can come before the Terms are accepted or the analytics setting is read (`funnel_app_started`, `funnel_startup_failed`, `funnel_eula_shown`, `funnel_eula_declined`, `funnel_dashboard_open`) are held on this computer, as the step's value and its time only, in the data folder's `.milestones.json`. They are sent, with the time they happened, once the current Terms are accepted and analytics is on; if analytics is off then, they are deleted, so a later switch-on never sends them. A decline that is never followed by acceptance is never sent.
+
+| Event | Meaning | Additional properties |
+|---|---|---|
+| `funnel_app_started` | The first start of a Coral program on this install (held until consent) | `source` (`cli`, `tray`, `launcher`, `installer_launch`) |
+| `funnel_startup_failed` | The first start that failed, sent at a later good start (held) | `class` (`port_in_use`, `permission_denied`, `other`: from the error's type, never its text) |
+| `funnel_eula_shown` | The Terms were shown (held) | `surface` (`app_dialog`, `terminal`) |
+| `funnel_eula_declined` | The Terms were declined; sent only if they are accepted later (held) | `surface` |
+| `funnel_dashboard_open` | What the first start did about opening the dashboard (held) | `result` (`opened`, `native_window`, `native_window_fallback_browser`, `printed_no_display`, `skipped_no_browser_flag`, `background_start`, `server_not_running`) |
+| `funnel_signin_page_shown` | The sign-in page was served to a browser that was not signed in. Any request for the page counts, a program on this computer or a scan from the network included: it says someone reached the page, not who | `page` (`setup`, `create`, `signin`); nothing of the request |
+| `funnel_signin_link_refused` | A sign-in link was refused | `class` (`used_or_expired`, `other_user`) |
+| `funnel_dashboard_loaded` | The first dashboard page finished loading (sent by the server when the page reports `dashboard_ready`) | — |
+| `funnel_dashboard_load_failed` | The first dashboard page that could not load its agents or status | `code` (a `dashboard_failed` code, or `other`) |
+| `funnel_welcome_shown` | The new-install welcome items were on when the dashboard first loaded | — |
+| `funnel_welcome_done` | A welcome item done, read or dismissed (once per item), or all of them closed | `step` (`welcome`, `agent`, `team`, `connect`, `asks`, `all_closed`) |
+| `funnel_cli_detected` | Which agent tools this computer has installed, found by Coral's own lookup (nothing is run) when the dashboard first loads; once per tool | `tool` (`claude`, `codex`, `gemini`, `pi`), `status` (`found`, `not_found`, `unrunnable`); never a path or a version |
+| `funnel_launch_dialog_opened` | The launch dialog was opened | — |
+| `funnel_launch_clicked` | The first launch of an agent or a team was asked for | `kind`, `provider` |
+| `funnel_launch_failed` | The first launch that failed | `kind`, `provider`, `failure_category` (the `launch_result` list) |
+| `funnel_agent_first_output` | An agent's terminal was first seen to have written something (the dashboard's agent list reads it, on either terminal backend) | `provider` (`claude`, `codex`, `gemini` for the Gemini family's CLI, `pi`, `other`), `secs_since_launch` (0 to 3600) |
+| `funnel_agent_ready` | What a new agent was first seen doing, once per state: ready for a message, or held by a question its tool asks at launch | `provider`, `state` (`ready`, `waiting_trust`, `waiting_signin`, `waiting_other_prompt`, `not_started`, `exited_early`), `secs_since_launch`; never anything on its screen |
 
 ## Prerequisite setup observations
 
@@ -92,7 +118,7 @@ Delivery failures are recorded locally in `<coralDir>/tracking-failures.log`, ca
 
 ## Browser endpoint
 
-`POST /api/tracking/event` accepts only browser-observed events: dashboard readiness/activity/failure, and composer submission intent. Server launch/task events and confirmed-send milestones cannot be submitted through this endpoint.
+`POST /api/tracking/event` accepts only browser-observed events: dashboard readiness/activity/failure, composer submission intent, the update notice and offer, and `funnel_launch_dialog_opened` (whose properties are dropped: the server sends the step with its own). The page's `dashboard_ready` and `dashboard_failed` also make the server send `funnel_dashboard_loaded` and `funnel_dashboard_load_failed`, with a code the server takes from its own list (anything else is `other`), never the page's word as it came. Server launch/task events and confirmed-send milestones cannot be submitted through this endpoint.
 
 For example:
 

@@ -14,6 +14,7 @@ import (
 	"github.com/subgentic/coral/internal/config"
 	"github.com/subgentic/coral/internal/fsreplace"
 	"github.com/subgentic/coral/internal/secfile"
+	"github.com/subgentic/coral/internal/tracking"
 )
 
 // Dashboard login tokens (#3387, identity phase 1). Like Jupyter's: a single-use
@@ -195,6 +196,7 @@ func (ks *KeyStore) handleLoginToken(w http.ResponseWriter, r *http.Request) boo
 				return true
 			}
 			log.Printf("[auth] a sign-in link was opened by another user of this computer, or by a process whose user could not be told: refused (the link still works for you)")
+			tracking.TrackSigninLinkRefused(tracking.LinkOtherUser)
 			writeLinkOtherUser(w)
 			return true
 		case !supported:
@@ -207,6 +209,7 @@ func (ks *KeyStore) handleLoginToken(w http.ResponseWriter, r *http.Request) boo
 		if viaRelay {
 			log.Printf("[auth] a sign-in link opened through WSL's localhost relay was used or expired: refused")
 		}
+		tracking.TrackSigninLinkRefused(tracking.LinkUsedOrExpired)
 		writeLinkUsed(w)
 		return true
 	}

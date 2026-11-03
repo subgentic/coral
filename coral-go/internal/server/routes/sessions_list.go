@@ -474,6 +474,9 @@ func (h *SessionsHandler) agentRow(trace *phaseTrace, agent AgentInfo, lv liveIn
 	}
 	trace.agentDetail("transcript_state", sid, time.Since(transcriptStarted))
 	state := DeriveSessionState(stateInput)
+	if !skipExpensive { // the funnel's agent steps (#7455): read only when the startup screen and sign-in were read too
+		funnelAgentStep(agent.AgentType, lv.createdAt[sid], staleness != nil, staleF, latestEv, stateInput, state)
+	}
 
 	// The goal line is the newest goal event (the goal generator or an
 	// operator edit).

@@ -141,7 +141,11 @@ func TestFunnelEventsHaveNoFreeTextProperty(t *testing.T) {
 		for name, p := range eventSpecs[e] {
 			assert.Contains(t, []propKind{kindEnum, kindInt}, p.kind, "%s.%s", e, name)
 			if p.kind == kindInt {
-				assert.LessOrEqual(t, p.max-p.min, 3600, "%s.%s is bounded", e, name)
+				bound := 3600
+				if name == "secs_since_install" { // the funnel's common property (#7455): whole seconds, up to 30 days
+					bound = installSeconds
+				}
+				assert.LessOrEqual(t, p.max-p.min, bound, "%s.%s is bounded", e, name)
 			}
 			assert.False(t, strings.Contains(strings.ToLower(name), "text") || strings.Contains(strings.ToLower(name), "message") || strings.Contains(strings.ToLower(name), "prompt"), name)
 		}

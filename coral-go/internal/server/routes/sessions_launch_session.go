@@ -509,12 +509,11 @@ func terminalKind(b ptymanager.TerminalBackend) string {
 }
 
 // launchBackendLabel reports the terminal backend for analytics as a closed
-// enum: the requested one when valid, otherwise the one this server runs.
-func (h *SessionsHandler) launchBackendLabel(requested string) string {
-	switch requested {
-	case "tmux", "pty":
-		return requested
-	}
+// enum: the one this server runs, which is the terminal every launch gets. The
+// request's backend is not it: the dashboard sends "tmux" from a hidden field on
+// every launch, and a PTY server launches on PTY whatever it says (launchPath), so
+// labelling by the request reported tmux for PTY launches (#7455).
+func (h *SessionsHandler) launchBackendLabel(_ string) string {
 	switch h.terminal.(type) {
 	case *ptymanager.TmuxSessionTerminal:
 		return "tmux"
