@@ -523,7 +523,7 @@ func (pr *Provisioner) Run(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if req.DataDir != "" && !sshprov.ValidDataDir(req.DataDir) {
-		errBadRequest(w, "the data folder is a plain folder name under the home folder there, such as .coral or my-coral/data")
+		errBadRequest(w, sshprov.DataDirProblem(req.DataDir))
 		return
 	}
 	// A setup and an upgrade put Coral on the computer and record this hub's acceptance of the terms there. Stop and remove do not touch the terms. On a tier that requires the EULA the marker must hold the

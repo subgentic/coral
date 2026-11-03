@@ -114,10 +114,27 @@ const dataDirSeg = `\.?[A-Za-z0-9_][A-Za-z0-9._-]{0,60}`
 var dataDirArgRe = regexp.MustCompile(`^(@keep|` + dataDirSeg + `(/` + dataDirSeg + `){0,4})$`)
 
 // ValidDataDir reports whether d is a data folder a set up may name.
-func ValidDataDir(d string) bool { return d != "@keep" && dataDirArgRe.MatchString(d) }
+func ValidDataDir(d string) bool { return DataDirProblem(d) == "" }
+
+// deniedDataDirs are the first names of folders that hold a person's keys and settings, never a data folder for Coral.
+var deniedDataDirs = []string{".ssh", ".gnupg", ".config"}
+
+// DataDirProblem is why d is not a data folder a set up may name, in a plain sentence, or "" when it is one ("" itself is not: it means the default and is never sent).
+func DataDirProblem(d string) string {
+	if d == "@keep" || !dataDirArgRe.MatchString(d) {
+		return "Use plain folder names such as .coral or my-coral/data: letters, digits, dot, underscore and hyphen, up to five names, with no .. in them."
+	}
+	first := strings.SplitN(d, "/", 2)[0]
+	for _, bad := range deniedDataDirs {
+		if first == bad {
+			return first + " holds your keys or settings on that computer, so Coral will not keep its data there. Choose another folder."
+		}
+	}
+	return ""
+}
 
 // readDataDir sets d to the data folder recorded at the last start (<install>/datadir), or the default when there is none or it is not a plain relative path.
-const readDataDir = "d=$(cat \"$HOME/" + InstallDir + "/datadir\" 2>/dev/null); case \"$d\" in \"\"|/*|*..*) d=" + DefaultDataDir + ";; esac; "
+const readDataDir = "d=$(cat \"$HOME/" + InstallDir + "/datadir\" 2>/dev/null); case \"$d\" in \"\"|/*|*..*|.ssh|.ssh/*|.gnupg|.gnupg/*|.config|.config/*) d=" + DefaultDataDir + ";; esac; "
 
 var backendArgRe = regexp.MustCompile(`^(pty|tmux|keep)$`)
 

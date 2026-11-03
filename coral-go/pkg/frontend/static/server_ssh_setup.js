@@ -35,8 +35,15 @@ const sayError = (r, fallback) => (r.data && (r.data.error || r.data.message)) |
 /** The backend to show chosen (#12271): the person's choice, except tmux where the computer turned out not to have it, which goes back to pty (the default). Exported for the test. */
 /** The data folder as the person typed it, ready to send: relative to the home folder there, no leading ~/ or /, no trailing slash. "" is the default. Exported for the test. */
 export const cleanDataDir = (v) => String(v || '').trim().replace(/^(~\/|\/)+/, '').replace(/\/+$/, '');
-/** Whether it is a folder name the hub accepts (the server checks again): up to five names of letters, digits, dot, underscore and hyphen, none starting with a hyphen or being only dots. */
-export const dataDirOk = (v) => v === '' || /^\.?[A-Za-z0-9_][A-Za-z0-9._-]{0,60}(\/\.?[A-Za-z0-9_][A-Za-z0-9._-]{0,60}){0,4}$/.test(v);
+/** Why a folder is not one the hub accepts (the server checks again), in a plain sentence; '' when it is fine or empty (the default). Up to five names of letters, digits, dot, underscore and hyphen; not the folders of keys and settings. */
+export const dataDirProblem = (v) => {
+    if (v === '') return '';
+    if (!/^\.?[A-Za-z0-9_][A-Za-z0-9._-]{0,60}(\/\.?[A-Za-z0-9_][A-Za-z0-9._-]{0,60}){0,4}$/.test(v)) return 'Use plain folder names such as .coral or my-coral/data: letters, digits, dot, underscore and hyphen, up to five names, with no .. in them.';
+    const first = v.split('/')[0];
+    if (['.ssh', '.gnupg', '.config'].includes(first)) return `${first} holds your keys or settings on that computer, so Coral will not keep its data there. Choose another folder.`;
+    return '';
+};
+export const dataDirOk = (v) => dataDirProblem(v) === '';
 
 export const backendChoice = (current, tmux) => (tmux === false && current === 'tmux' ? 'pty' : (current === 'tmux' ? 'tmux' : 'pty'));
 
@@ -147,11 +154,12 @@ export function mountSshSetup(host, { mode = 'setup', server = null, action = nu
     }
 
     async function run() {
+        if (kind() === SETUP && !dataDirOk(cleanDataDir(st.dataDir))) { st.error = dataDirProblem(cleanDataDir(st.dataDir)); draw(); return; } // never sent without the folder, which would start it in the default one
         st.busy = true; st.error = ''; draw();
         const body = {};
         if (st.plan.host_keys && st.plan.host_keys.length) body.accept_keys = true;
         if (kind() === REMOVE) body.confirm = st.typed.trim();
-        if (kind() === SETUP) { body.backend = st.backend === 'tmux' ? 'tmux' : 'pty'; const d = cleanDataDir(st.dataDir); if (d && dataDirOk(d)) body.data_dir = d; }
+        if (kind() === SETUP) { body.backend = st.backend === 'tmux' ? 'tmux' : 'pty'; const d = cleanDataDir(st.dataDir); if (d) body.data_dir = d; }
         if (kind() === UPGRADE && downgrade()) body.allow_downgrade = !!st.allowDowngrade;
         const r = await api('POST', `/api/servers/provision/${encodeURIComponent(st.plan.plan)}/run`, body);
         if (st.dead) return;
@@ -293,7 +301,8 @@ export function mountSshSetup(host, { mode = 'setup', server = null, action = nu
         const show = () => {
             const d = cleanDataDir(st.dataDir), ok = dataDirOk(d);
             input.setAttribute('aria-invalid', ok ? 'false' : 'true');
-            note.textContent = !ok ? 'Use plain folder names such as .coral or my-coral/data: letters, digits, dot, underscore and hyphen, with no .. in them.'
+            const g = host.querySelector('[data-ssh-go]'); if (g && !st.busy) g.disabled = !ok || g.dataset.sshHold === '1'; // Set up is closed while the folder is not one Coral will use: it never falls back to the default without the person knowing
+            note.textContent = !ok ? dataDirProblem(d) + ' Set up waits until this is fixed.'
                 : (d === '' || d === '.coral-server/data' ? 'The default: a new folder of its own, ~/.coral-server/data. Leave it empty for that.'
                     : `Coral will use ~/${d} there, and create it if it is not there. Make sure no other Coral is running on that folder.`);
         };
@@ -390,6 +399,8 @@ export function mountSshSetup(host, { mode = 'setup', server = null, action = nu
         const upLabel = kind() === UPGRADE && versions() && versions().hub ? `${downgrade() ? 'Downgrade' : 'Upgrade'} to v${versions().hub}` : words().go;
         const go = button(st.busy ? 'Working...' : upLabel, kind() === REMOVE ? 'btn-danger' : 'btn-primary', run, st.busy || (keys.length > 0 && !st.keysOk) || !typedOk || (kind() === UPGRADE && (same() || (downgrade() && !st.allowDowngrade))));
         go.dataset.sshGo = '1';
+        if (kind() === SETUP && !dataDirOk(cleanDataDir(st.dataDir))) go.disabled = true;
+        else if (go.disabled) go.dataset.sshHold = '1'; // closed for another reason (keys not confirmed): typing in the folder field does not open it
         bar.append(button('Cancel', '', cancelPlan), go);
         root.append(bar);
     }

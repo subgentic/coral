@@ -91,9 +91,45 @@ func TestDataFolderNamesAreOnlyPlainRelativeFolders(t *testing.T) {
 			t.Errorf("%q should be allowed", ok)
 		}
 	}
-	for _, bad := range []string{"", "@keep", "..", "../x", "a/../b", "/etc", "~/x", "a b", "a;b", "a/", "-x", ".", "./x", "a//b", "$HOME", "a\nb", "a/b/c/d/e/f"} {
+	for _, bad := range []string{"", "@keep", "..", "../x", "a/../b", "/etc", "~/x", "a b", "a;b", "a/", "-x", ".", "./x", "a//b", "$HOME", "a\nb", "a/b/c/d/e/f", ".ssh", ".ssh/coral", ".gnupg", ".config/x"} {
 		if ValidDataDir(bad) {
 			t.Errorf("%q should be refused", bad)
 		}
 	}
+}
+
+func TestDataFolderProblemsSayWhy(t *testing.T) {
+	if p := DataDirProblem(".ssh"); !strings.Contains(p, "keys or settings") {
+		t.Errorf("%q", p)
+	}
+	if p := DataDirProblem("../x"); !strings.Contains(p, "plain folder names") {
+		t.Errorf("%q", p)
+	}
+	if DataDirProblem(".coral") != "" || DataDirProblem("my.config/x") != "" || DataDirProblem("x/.ssh") != "" {
+		t.Error("only a first name of .ssh, .gnupg or .config is refused")
+	}
+}
+
+// a datadir record naming a folder of keys is not followed at a start
+func TestStartIgnoresARecordedKeysFolder(t *testing.T) {
+	home := t.TempDir()
+	root := filepath.Join(home, InstallDir, "2.0.10", "root")
+	if err := os.MkdirAll(root, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "coral"), []byte("#!/bin/sh\necho \"started $*\"\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	_ = os.WriteFile(filepath.Join(home, InstallDir, "datadir"), []byte(".ssh/x"), 0o600)
+	text, _ := remoteText(CmdStartDaemon, "2.0.10", "pty", "@keep")
+	cmd := exec.Command("sh", "-c", text)
+	cmd.Env = append(os.Environ(), "HOME="+home)
+	_ = cmd.Run()
+	for i := 0; i < 100; i++ {
+		if b, _ := os.ReadFile(filepath.Join(home, InstallDir, "coral.log")); strings.Contains(string(b), "--home "+filepath.Join(home, DefaultDataDir)) {
+			return
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	t.Error("a recorded .ssh folder was followed")
 }
