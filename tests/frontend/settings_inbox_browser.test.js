@@ -70,6 +70,13 @@ const { coralReady } = require('./helpers/wait');
             check(`${tag}: only the person's own choice of every team saves "all" (Include every team)`, (await ev(`import(${S} + 'settings_inbox.js').then(m => m.readInboxSettings({ inbox_included_teams: '["alpha"]' }).inbox_included_teams)`)) === 'all');
             await ev(`document.querySelector('#settings-inbox-teams input[data-team="beta"]').click(); true`);
             check(`${tag}: and a box changed by hand afterwards is a list again`, (await ev(`import(${S} + 'settings_inbox.js').then(m => m.readInboxSettings({ inbox_included_teams: '["alpha"]' }).inbox_included_teams)`)) === '["alpha"]');
+            check(`${tag}: Include every team is still there after a box was changed by hand`, await ev(`!!document.querySelector('#settings-inbox-teams .settings-inbox-every')`));
+            await ev(`document.querySelector('#settings-inbox-teams .settings-inbox-every').click(); true`);
+            check(`${tag}: and takes the person back to every team without reopening Settings`, (await ev(`import(${S} + 'settings_inbox.js').then(m => m.readInboxSettings({ inbox_included_teams: '["alpha"]' }).inbox_included_teams)`)) === 'all');
+            // the change listener is bound once, however often the teams are drawn again
+            await ev(`(() => { const h = document.getElementById('settings-inbox-teams'); window.__changeBinds = 0; const orig = h.addEventListener; h.addEventListener = function (t, ...r) { if (t === 'change') window.__changeBinds++; return orig.call(this, t, ...r); }; return true; })()`);
+            await refill(['alpha', 'beta'], '["alpha"]'); await refill(['alpha', 'beta'], '["alpha"]');
+            check(`${tag}: the teams drawn again twice bind no second change listener`, (await ev(`window.__changeBinds`)) === 0);
             // another computer is managed from here: a failed read of it is a failure of the whole list (never a shorter list that Save would rewrite the choice from); when it answers its teams are drawn
             await ev(`import(${S} + 'state.js').then(m => { m.state.hub = true; m.state.servers = [{ id: 'srv2', name: 'srv2', status: 'online' }]; return true; })`);
             await ev(`window.__remote = 'fail'; true`);

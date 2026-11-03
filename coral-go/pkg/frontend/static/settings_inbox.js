@@ -52,11 +52,14 @@ export async function drawInboxTeams(raw) {
     }
     host.replaceChildren(frag);
     delete host.dataset.everyTeam;
-    host.addEventListener('change', e => { if (e.target && e.target.matches && e.target.matches('input[data-team]')) delete host.dataset.everyTeam; }); // a box changed by hand is a choice of its own: it is no longer "every team"
+    if (!host.dataset.bound) { // bound once, however often the teams are drawn again
+        host.dataset.bound = '1';
+        host.addEventListener('change', e => { if (e.target && e.target.matches && e.target.matches('input[data-team]')) delete host.dataset.everyTeam; }); // a box changed by hand is a choice of its own: it is no longer "every team"
+    }
     if (chosen !== 'all' && projects.length) { // an explicit choice has a way back to "every team", for the teams that are not shown as well
         const b = document.createElement('button');
         b.type = 'button'; b.className = 'btn btn-quiet btn-small settings-inbox-every'; b.textContent = 'Include every team';
-        b.addEventListener('click', () => { host.querySelectorAll('input[data-team]').forEach(x => { x.checked = true; }); host.dataset.everyTeam = '1'; b.remove(); });
+        b.addEventListener('click', () => { host.querySelectorAll('input[data-team]').forEach(x => { x.checked = true; }); host.dataset.everyTeam = '1'; }); // it stays: after a box is changed by hand it is the way back to every team
         host.prepend(b);
     }
 }
