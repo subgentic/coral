@@ -17,6 +17,7 @@ import { initFileSearch } from './changed_files.js';
 import { initFileMention } from './file_mention.js';
 import { initCommandMention } from './command_mention.js';
 import { initSkillMention } from './skill_mention_boot.js';
+import { initSkipLink } from './skip_link.js';
 import { initNotesMd } from './agent_notes.js';
 import { initChatFind } from './chat_find.js';
 import { initSidebarResize, initTaskBarResize, initSidebarCollapse, initAgenticPanelCollapse, initAgenticBlockResize, initAgenticBlockCollapse, initSidebarRail } from './sidebar.js';
@@ -78,6 +79,7 @@ export function wireComposer() {
 
     // /command mention autocomplete
     initCommandMention();
+    initSkipLink(); // the skip-to-message-box link only while the box is shown (#12966)
 
     // $skill mention autocomplete (#12677)
     initSkillMention();
