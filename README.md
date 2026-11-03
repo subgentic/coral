@@ -91,6 +91,12 @@ Running agents is easy. *Knowing when one of them needs you* is the part that go
 
 - **Every chat and every board, searchable.** The Inbox also holds the history of every agent CLI's conversations and each team's message board.
 
+- **Detailed Analytics** Analytics from token spend, cache read/writes broken down by provider, model thinking level, tasks, commits. etc. Coral is able to provide incredibly detailed data across your workloads to help you monitor for drift in your agentic system. Use it to figure out where the bottlenecks are in your agents. 
+
+<img width="100%" alt="Total time for a task by model" src="https://github.com/user-attachments/assets/0554a423-d03c-4a21-bc17-5964ed17ef9f" />
+
+
+
 
 Coral wraps the agent CLIs you already use (Claude Code, Codex, Antigravity, Pi and OpenCode, and Hermes, which is experimental). It calls no AI API itself: your keys, your subscriptions, your tools. It runs as one Go binary on your laptop or a remote box.
 
@@ -194,24 +200,6 @@ The web dashboard shows every agent's live terminal, current status, and message
 - Answer an agent's permission prompt from the dashboard — including from your phone
 - Define teams in JSON, import a skill folder as a team, or generate one from a plain-English description
 - See what it all cost — by model, team, branch, and individual agent
-
-## Features
-
-- **One Inbox** for questions, permissions and files that need you, on a laptop or a phone.
-- **Teams of agents** from different vendors, led by an Orchestrator, on one message board.
-- **Chief**, your own front agent, on its own phone page.
-- **Sleep and wake** an agent or a whole team, and idle agents sleep by themselves.
-- **Scheduled jobs and workflows** that run on a cron schedule.
-- **Detailed Analytics** by agent, team and branch.
-
-<p align="center">
-  <img alt="The Analytics view: token and cost totals, a cumulative spend chart, then cost tables by provider and by model" src="assets/readme/analytics.png" width="100%" />
-  <br>
-  <sub>Analytics: how much Coral is used and what it costs, by model, team, branch and agent. </sub>
-</p>
-
-<img width="100%" alt="Total time for a task by model" src="https://github.com/user-attachments/assets/0554a423-d03c-4a21-bc17-5964ed17ef9f" />
-
 
 ## Documentation
 
