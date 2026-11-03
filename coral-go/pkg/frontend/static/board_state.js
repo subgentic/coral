@@ -8,6 +8,7 @@ export const bs = {
     _loadedProject: null, // board whose initial page is loaded; polls wait for it
     _countedTotal: 0, // the board's total as the rows loaded account for it (see _pollNewMessages)
     _staleRows: false, // a message shown may have been deleted: the latest page is loaded again at the bottom
+    _goneProject: null, // a board the server says was deleted while its page was open: its first-load reply must not draw over "This team was deleted." (#12995)
     pendingMessageId: null,
     _replyTo: null, // { id, name }: the message the composer's text answers (Reply), sent with the post while the text still starts with the name
     _unseen: 0,

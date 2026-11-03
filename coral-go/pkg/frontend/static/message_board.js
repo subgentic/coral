@@ -87,8 +87,11 @@ export function showBoardInPage(project, host, messageId = null) {
     }
     nameComposerForPage(true);
     mountBoardSearch(document.getElementById('mb-tools'), project, SEARCH_HOOKS);
+    if (bs._goneProject && bs._goneProject !== project) bs._goneProject = null;
     subscribeDashboard(project).then(r => { // a team deleted elsewhere is not started again by this page (#12995): stop polling and say so
-        if (r !== 'gone' || bs.currentProject !== project) return;
+        if (r !== 'gone') { if (bs._goneProject === project) bs._goneProject = null; return; } // the board is back (an agent joined it): the page loads it as usual
+        if (bs.currentProject !== project) return;
+        bs._goneProject = project;
         stopBoardPoll();
         const box = document.getElementById('mb-messages');
         if (box) box.textContent = 'This team was deleted.';
