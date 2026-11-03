@@ -10,7 +10,7 @@ import { browserLocal } from './safe_storage.js';
 const KEY = 'coral-details-open';
 let serial = 0;
 
-export function makeDetails({ panel = null, remember = true } = {}) { // remember: false is for a viewer that opens closed every time (#12725): the state is this one disclosure's, not the browser's
+export function makeDetails({ panel = null, remember = true, hide = false } = {}) { // hide: a "Hide details" button at the top right of the open panel (#12786), so closing it is where the person is looking // remember: false is for a viewer that opens closed every time (#12725): the state is this one disclosure's, not the browser's
     const p = panel || document.createElement('div');
     p.classList.add('detail-details');
     if (!p.id) p.id = `details-panel-${++serial}`;
@@ -22,6 +22,8 @@ export function makeDetails({ panel = null, remember = true } = {}) { // remembe
     const count = document.createElement('span'); // how many facts the row of the list leaves out on a narrow box (the Team and the Task): a person knows something is behind the button
     count.className = 'details-toggle-count'; count.hidden = true;
     button.append('Details', count, chevron);
+    let hideBtn = null;
+    if (hide) { hideBtn = document.createElement('button'); hideBtn.type = 'button'; hideBtn.className = 'details-hide'; hideBtn.textContent = 'Hide details'; hideBtn.setAttribute('aria-controls', p.id); p.append(hideBtn); }
     let used = false;
     let shown = [];
     let local = false;
@@ -31,14 +33,16 @@ export function makeDetails({ panel = null, remember = true } = {}) { // remembe
         button.hidden = !used; button.setAttribute('aria-expanded', String(open)); p.hidden = !open;
         if (open) for (const fn of shown) fn();
     };
-    button.addEventListener('click', () => { if (remember) browserLocal.set(KEY, isOpen() ? '0' : '1'); else local = !local; sync(); });
+    const toggle = () => { if (remember) browserLocal.set(KEY, isOpen() ? '0' : '1'); else local = !local; sync(); };
+    button.addEventListener('click', toggle);
+    if (hideBtn) hideBtn.addEventListener('click', () => { toggle(); button.focus(); }); // closed: the keyboard goes back to the button that opens it
     sync();
     return {
         button, panel: p,
         setCount(n) { const k = Number(n) || 0; count.hidden = k < 1; count.textContent = k > 0 ? String(k) : ''; if (k > 0) button.setAttribute('aria-label', `Details, ${k} fact${k === 1 ? '' : 's'} the list row does not show`); else button.removeAttribute('aria-label'); },
         add(node) { p.append(node); used = true; sync(); },
-        remove(node) { node.remove(); used = p.children.length > 0; sync(); },
+        remove(node) { node.remove(); used = p.children.length > (hideBtn ? 1 : 0); sync(); },
         onShown(fn) { shown.push(fn); if (isOpen() && used) fn(); },
-        clear() { p.replaceChildren(); used = false; shown = []; if (!remember) local = false; sync(); }, // a viewer that does not remember opens closed each time
+        clear() { p.replaceChildren(...(hideBtn ? [hideBtn] : [])); used = false; shown = []; if (!remember) local = false; sync(); }, // a viewer that does not remember opens closed each time
     };
 }

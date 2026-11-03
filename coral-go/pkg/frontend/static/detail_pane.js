@@ -63,7 +63,7 @@ export function openDetailPane({ key, title, sub = '', facts = [], body = null, 
     // Replacing keeps the opener the pane was first opened from, so Escape returns to a row that still exists: the newest row is the one chosen.
     current = { key, opener: opener || (replacing ? current.opener : document.activeElement), onClose, abort, gen: mine, aside, hosted: !!host };
     aside.replaceChildren();
-    const more = makeDetails({ remember: false }); // closed each time a document opens in the pane, as the viewer's is (#12725); the facts and the rest: one closed button in the header row, the document straight under the header
+    const more = makeDetails({ remember: false, hide: true }); // closed each time a document opens in the pane, as the viewer's is (#12725); the facts and the rest: one closed button in the header row, the document straight under the header
     const head = el('div', 'pane-head detail-head');
     const text = el('div', 'detail-head-text');
     if (backLabel && (!host || host.classList.contains('inbox-detail-pane') || host.classList.contains('goal-detail-pane'))) { // the phone's way back (the Inbox's pane has its own host, and a way back like the team page's): a text link named for where it goes, on the title's line (#7734); a pane that is not a sheet has the close button

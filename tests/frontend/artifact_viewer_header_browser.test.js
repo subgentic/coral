@@ -25,7 +25,7 @@ const { coralReady } = require('./helpers/wait');
                 if (/\\/api\\/board\\/team-a\\/artifacts\\?tag=(approved|reviewed)/.test(url)) return Promise.resolve(new Response(JSON.stringify({ artifacts: [], has_more: false }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
                 if (/\\/api\\/board\\/team-a\\/artifacts\\/[0-9a-f]{64}\\/review/.test(url) && o && o.method === 'POST') return Promise.resolve(new Response(JSON.stringify({ state: 'approved', changed: true, tags: ['approved'], review: { state: 'approved', at: new Date().toISOString() }, delivered: true, to: 'Writer A' }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
                 return orig(u, o); }; return true; })()`);
-            await ev(`import(${S} + 'artifact_viewer.js').then(v => v.openArtifactViewer('${H3}', { filename: 'release-plan-for-the-whole-company-spring-launch-final-draft-reviewed-by-legal-and-the-board-of-directors-and-the-press-office-version-three-of-three.md', board: 'team-a', from: 'Writer A · team-a' })).then(() => true)`);
+            await ev(`import(${S} + 'artifact_viewer.js').then(v => v.openArtifactViewer('${H3}', { goal: 'Ship it', goalId: 3, goalTeam: 'team-a', task: 'A task', filename: 'release-plan-for-the-whole-company-spring-launch-final-draft-reviewed-by-legal-and-the-board-of-directors-and-the-press-office-version-three-of-three.md', board: 'team-a', from: 'Writer A · team-a' })).then(() => true)`);
             await waitFor(`!!document.querySelector('.artifact-review-approve:not([hidden])') && !!document.querySelector('.av-current')`, `${w}: the viewer shows its review and versions`, 12000);
             const g = await ev(`(() => { const d = document.querySelector('.artifact-viewer-content'), head = d.querySelector('.artifact-viewer-header'), body = d.querySelector('.artifact-viewer-body'), r = e => e && e.getBoundingClientRect(), top = e => { const b = r(e); return b && b.width ? Math.round(b.top + b.height / 2) : null; };
                 const q = s => d.querySelector(s), inHead = e => !!e && head.contains(e), vis = e => !!e && !!e.getClientRects().length;
@@ -42,6 +42,19 @@ const { coralReady } = require('./helpers/wait');
             assert.ok(!g.visibleAtRest.newtab && !g.visibleAtRest.download && !g.visibleAtRest.note && !g.visibleAtRest.compare, `${w}: Open in new tab, Download, Approve with a note and Compare are in menus, not on the row: ` + JSON.stringify(g.visibleAtRest));
             assert.ok(w === 390 ? g.headRows <= 4 : g.headRows === 1, `${w}: the controls are on ${w === 390 ? 'at most four short lines (slice d makes the phone two plus a bottom bar)' : 'one line'}: ${g.headRows}`);
             assert.ok(g.above <= (w === 390 ? 230 : 110), `${w}: the controls above the file take at most ${w === 390 ? 230 : 110} px (they take ${g.above}; before: 168 at 1280 and 379 at 390): the from line and the header`);
+            // opening Details hides none of the header's other buttons, and the open box has its own Hide details at its top right (#12786)
+            const names = () => ev(`[...document.querySelectorAll('.artifact-viewer-header .btn, .artifact-viewer-header button, .artifact-viewer-header .chip')].filter(e => e.getClientRects().length).map(e => (e.className.toString().split(' ').slice(0, 2).join('.') + ':' + (e.textContent || '').trim().slice(0, 10)))`);
+            const rest = await names();
+            await ev(`document.querySelector('#artifact-viewer .details-toggle').click(); true`);
+            await waitFor(`!document.querySelector('#artifact-viewer .artifact-viewer-readers').hidden`, `${w}: Details opens`, 5000);
+            const open = await names();
+            assert.deepEqual(open, rest, `${w}: opening Details hides none of the other header buttons: ` + JSON.stringify([rest, open]));
+            const hb = await ev(`(() => { const p = document.querySelector('#artifact-viewer .artifact-viewer-readers'), b = p.querySelector('.details-hide'), pr = p.getBoundingClientRect(), r = b.getBoundingClientRect(); return { text: b.textContent, right: Math.round(pr.right - r.right), top: Math.round(r.top - pr.top), shown: b.getClientRects().length > 0 }; })()`);
+            assert.ok(hb.shown && hb.text === 'Hide details' && hb.right <= 24 && hb.top <= 12, `${w}: Hide details is at the top right of the box: ` + JSON.stringify(hb));
+            await ev(`document.querySelector('#artifact-viewer .details-hide').click(); true`);
+            const closedAgain = await ev(`({ hidden: document.querySelector('#artifact-viewer .artifact-viewer-readers').hidden, focus: document.activeElement && document.activeElement.classList.contains('details-toggle') })`);
+            assert.deepEqual([closedAgain.hidden, closedAgain.focus], [true, true], `${w}: Hide details closes it and the keyboard goes back to Details`);
+            assert.deepEqual(await names(), rest, `${w}: and the header is as it was`);
             // the ⋯ menu
             await ev(`document.querySelector('.artifact-viewer-more').click(); true`);
             await waitFor(`!!document.querySelector('.artifact-viewer-menu:not([hidden])')`, `${w}: the ⋯ menu opens`, 4000);

@@ -80,7 +80,7 @@ function _build() {
         <div class="artifact-viewer-main"><div class="artifact-viewer-body"></div></div>
         <div class="modal-actions modal-footer artifact-viewer-foot"><button type="button" class="btn artifact-viewer-close">Close</button></div>
     </div>`;
-    _details = makeDetails({ panel: d.querySelector('.artifact-viewer-readers'), remember: false }); // closed on every open of the viewer: one open Details no longer fills the next file's screen (#12725)
+    _details = makeDetails({ panel: d.querySelector('.artifact-viewer-readers'), remember: false, hide: true }); // closed on every open of the viewer: one open Details no longer fills the next file's screen (#12725)
     _details.button.classList.add('artifact-viewer-details'); d.querySelector('.artifact-viewer-morewrap').before(_details.button); // Details is a button in the header row, beside ⋯: where a person looks to close it (#12725) header row (#12223)
     // the HTML preview's banner is said once; after that a "Sandboxed" chip in the header says it, and a tap shows or hides the banner (#12224)
     const chip = document.createElement('button'); chip.type = 'button'; chip.className = 'chip artifact-viewer-sandbox'; chip.hidden = true; chip.setAttribute('aria-expanded', 'false');
