@@ -10,7 +10,8 @@ import { whenText } from './when_text.js';
 import { state } from './state.js';
 import { loadStyles } from './lazy_styles.js';
 import { showToast } from './notifications.js';
-import { isCloud, isLocalServer } from './server_base.js';
+import { isCloud, isLocalServer, serverFetch, LOCAL_SERVER } from './server_base.js';
+import { inboxSources } from './inbox_servers.js';
 
 const FRESH_MS = 15000, LINE_MAX = 140;
 let asks = [], pending = null, lastRead = 0;
@@ -42,16 +43,23 @@ export const askWhole = a => markHidden(a && a.text, { strict: true });
 /** The whole question as plain text (a row's second line): the same words, line breaks kept, without the Markdown marks. */
 export const askPlain = a => plainMarkdown(previewText(a));
 /** A stable id of one question among the rows. */
-export const askKey = a => `operator-ask:${a.board}:${a.kind}:${a.id}`;
+export const askKey = a => `operator-ask:${a.server && !isLocalServer(a.server) ? `${a.server}/` : ''}${a.board}:${a.kind}:${a.id}`; // two computers can each have a team of one name and a question of one number
 
 /** Read the list (at most once in 15 s unless forced; one read at a time). Safe to call after every live update. */
 export function refreshOperatorAsks(force = false) {
     if (pending) return pending;
     if (!force && Date.now() - lastRead < FRESH_MS) return null;
     lastRead = Date.now();
-    pending = fetch('/api/operator-asks').then(r => (r.ok ? r.json() : null)).then(rows => {
-        if (!Array.isArray(rows)) return; // refused or failed: what is drawn stays (a viewer who may not read it has none)
-        const next = rows.filter(a => a && typeof a.board === 'string' && typeof a.asker === 'string' && Number.isFinite(Number(a.id)));
+    // Every computer the page reads (this one, and each registered computer that is online through the Hub; through the Hub itself only those): a bare /api path through the Hub is the Hub's own, which has no questions (#12612, coral-hub #156454).
+    // A row from another computer carries that computer's id, so the dialog and the row know it is not this one's; a computer that cannot be read keeps the rows it had.
+    const sources = inboxSources(), asked = sources.length ? sources : [LOCAL_SERVER];
+    pending = Promise.all(asked.map(server => serverFetch(server === LOCAL_SERVER ? undefined : server, '/api/operator-asks').then(r => (r.ok ? r.json() : null)).then(rows => (Array.isArray(rows) ? rows.map(a => (server === LOCAL_SERVER || !a || typeof a !== 'object' ? a : { ...a, server })) : null), () => null))).then(results => {
+        const next = [];
+        results.forEach((rows, k) => {
+            const server = asked[k];
+            if (rows === null) { next.push(...asks.filter(a => (server === LOCAL_SERVER ? !a.server : a.server === server))); return; } // refused or failed: what is drawn stays (a viewer who may not read it has none)
+            next.push(...rows.filter(a => a && typeof a.board === 'string' && typeof a.asker === 'string' && Number.isFinite(Number(a.id))));
+        });
         if (JSON.stringify(next) === JSON.stringify(asks)) return;
         asks = next;
         fire();
@@ -64,7 +72,7 @@ export async function replyToAsk(a, text) {
     const body = String(text || '').trim();
     if (!body) throw new Error('Write a reply first.');
     const content = `@${a.asker} ${body}`;
-    const resp = await fetch(`/api/board/${encodeURIComponent(a.board)}/messages`, {
+    const resp = await serverFetch(a.server, `/api/board/${encodeURIComponent(a.board)}/messages`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ subscriber_id: OPERATOR_ID, as: 'Operator', content, ...(a.kind === 'ask' ? { reply_to: a.id } : {}) }),
     });
