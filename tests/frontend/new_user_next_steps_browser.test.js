@@ -183,8 +183,8 @@ const TEAM = `qa-next-steps-${Date.now() % 100000}`;
         check(seen.s3 && seen.s3.shown && seen.s3.text === 'Jump to a section' && seen.s3.above && seen.s3.sameLeft && /section$/.test(seen.s3.name || ''), `step 3's picker says Jump to a section above it, its name still ends with section: ${JSON.stringify(seen.s3)}`);
         // (4) plain words
         const root = require('node:path').join(__dirname, '..', '..', 'coral-go', 'pkg', 'frontend', 'static'), read = f => require('node:fs').readFileSync(require('node:path').join(root, f), 'utf8'); // the sources that write the words
-        const t = read('task_create.js'), g = read('goals_view.js'), d = read('team_dialogs.js');
-        const words = { draft: /Hold back as a draft/.test(t) && !/Create as draft/.test(t), order: /Order of work \(advanced\)/.test(t) && !/Workflow and prerequisites/.test(t), start: /Start once the tasks it waits for/.test(t) && !/Proceed when prerequisites/.test(t), driver: /Driver, the agent who looks after it \(optional\)/.test(g), orch: /The Orchestrator plans the work and hands tasks to the others/.test(d) };
+        const t = read('task_create.js'), g = read('goal_editor.js'), d = read('team_dialogs.js'); // the goal form is the New goal screen's editor since #12724 (it was goals_view.js)
+        const words = { draft: /Hold back as a draft/.test(t) && !/Create as draft/.test(t), order: /Order of work \(advanced\)/.test(t) && !/Workflow and prerequisites/.test(t), start: /Start once the tasks it waits for/.test(t) && !/Proceed when prerequisites/.test(t), driver: /chip\('Driver', dr, 'goal-new-driver'\)/.test(g) && !/Driver, the agent who looks after it/.test(g), orch: /The Orchestrator plans the work and hands tasks to the others/.test(d) };
         check(Object.values(words).every(Boolean), `plain words in the task form, the goal form and the members line: ${JSON.stringify(words)}`);
     } finally { await removeBoards(ev, [TEAM]).catch(() => {}); await client.close(); }
     assert.deepEqual(problems, [], 'new-user next steps:\n  ' + problems.join('\n  '));

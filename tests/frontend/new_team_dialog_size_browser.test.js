@@ -25,6 +25,7 @@ const VIEWS = [['1280x800', 1280, 800, false, false], ['390x844', 390, 844, true
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(); await installNT(ev); await stubModels(ev);
             await ev(`document.documentElement.style.fontSize = ${big ? "'32px'" : "''"}; localStorage.setItem('coral-recent-dirs', JSON.stringify(['/work/payments-app'])); true`);
+            await ev(`import((window.__coralStatic || '/static/') + 'state.js').then(m => { m.state.settings = { ...(m.state.settings || {}), launch_in_worktree: 'true' }; return true; })`); // the experimental switch is on (#12746): the worktree option is offered only then, and this suite measures it
             let base = null;
             await S.run(`${label}: New team has the fixed size (desktop 960 wide, min(720, screen - 32) high; phone: a full-height sheet) and the same rectangle on steps 1, 2 (blank and with a template) and 3`, async () => {
                 await openNewTeam(ev, waitFor); await settle(400); base = await t.rect(); assert.ok(base, 'the New team dialog is open');
