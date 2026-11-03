@@ -60,8 +60,9 @@ var pinnedSites = map[string]string{
 	"sessions_wake.go SessionsHandler.startWake":                person + ": wakeExistingSession's own start, below",
 	"sessions_wake.go SessionsHandler.wakeExistingSession":      person + ": the wake handlers' wake; it only forwards to wakeSession, and its background callers (autoResume, autoWakeOne) are gated entries",
 	// the background resumes of a session
-	"agent_exit.go SessionsHandler.autoResume": gated + ": the resume after an agent exit asks first",
-	"auto_wake.go SessionsHandler.autoWakeOne": gated + ": only reached from AutoWakeAfterRestart, which returns at once in a foreign Coral",
+	"agent_exit.go SessionsHandler.autoResume":          gated + ": the resume after an agent exit asks first",
+	"agent_server_lost.go SessionsHandler.recoverAgent": "background: restarts the agents of a tmux server that died, from their own rows in this Coral's database (only one still asleep because its terminal was lost); it runs only from the lost-server path (ServerLost, from the reconciler), never from a request or an agent; not gated on purpose: an upgrade in place owns its folder and a foreign Coral gets a one-click adopt, never silent withholding (Operator, #12592); the 10-minute loop guard is its only brake",
+	"auto_wake.go SessionsHandler.autoWakeOne":          gated + ": only reached from AutoWakeAfterRestart, which returns at once in a foreign Coral",
 	// auto-sleep (#12111): it ends a terminal by itself and a delivery wakes an agent by itself, so a foreign Coral does neither
 	"auto_sleep.go SessionsHandler.autoSleepOne":     gated + ": only reached from autoSleepPass, which RunAutoSleep runs and which asks the gate first; it asks too",
 	"auto_sleep_wake.go SessionsHandler.WakeIdleFor": gated + ": an automated wake (a delivery's) asks first; a person's own Send is a person's action",
