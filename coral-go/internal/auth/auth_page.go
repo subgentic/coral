@@ -60,7 +60,12 @@ func AuthPage(s PageState) string {
 	return b.String()
 }
 
-var authPageTmpl = template.Must(template.New("auth").Parse(`{{define "hubwarn"}}
+var authPageTmpl = template.Must(template.New("auth").Parse(`{{define "localopen"}}{{if .Local}}
+    <form method="post" action="/auth/local" id="local-open-form" class="local-open">
+      <div class="btnrow"><button type="submit" class="btn btn-primary wide" id="local-open">Open Coral on this computer</button></div>
+      <p class="note" id="local-open-note">This browser is on the computer that runs Coral, in the same account, so it can open Coral without a password.</p>
+    </form>
+{{end}}{{end}}{{define "hubwarn"}}
 {{if or (eq .HubSignin "disabled_in_hub") (eq .HubSignin "ready")}}
     <div class="warn" id="hub-disabled" role="status"{{if eq .HubSignin "ready"}} hidden{{end}}><span style="font-size:1rem">&#9432;</span><span><b>Sign in with Coral Hub is off for this computer.</b> Turn on Sign in with Coral Hub for this machine in Coral Hub, then come back.{{if .HubURL}} <a class="link" href="{{.HubURL}}" target="_blank" rel="noopener noreferrer">Open Coral Hub</a>{{end}}</span></div>
 {{end}}
@@ -163,7 +168,7 @@ var authPageTmpl = template.Must(template.New("auth").Parse(`{{define "hubwarn"}
     <h1>Sign in</h1>
     <p class="sub">Enter the password you made for Coral on this computer.</p>
 {{if .SignedOut}}    <p class="note" id="signed-out-why" role="status"><b>You were signed out.</b> Another browser chose Sign out other browsers. Sign in again to continue.</p>
-{{end}}    <div id="err" class="err" role="alert" hidden></div>
+{{end}}{{template "localopen" .}}    <div id="err" class="err" role="alert" hidden></div>
     <div id="lock" class="lock" role="status" hidden><span>&#9202;</span><span><b>Sign-in is paused.</b> Too many wrong passwords. It opens again in <span class="count" id="count">0:00</span>.</span></div>
     <form id="signin-form" autocomplete="on">
       <input type="text" name="username" value="coral" autocomplete="username" hidden aria-hidden="true" readonly tabindex="-1">
@@ -187,7 +192,7 @@ var authPageTmpl = template.Must(template.New("auth").Parse(`{{define "hubwarn"}
   <section id="panel-create" class="panel">
     <h1>Create a password</h1>
     <p class="sub">{{if .Local}}A password keeps other people and other devices out of Coral when it is opened in a web browser.{{else}}Coral has no password yet. Choose one to open it in this browser, with the setup code from the computer that runs Coral.{{end}}</p>
-    <div id="err" class="err" role="alert" hidden></div>
+{{template "localopen" .}}    <div id="err" class="err" role="alert" hidden></div>
     <div id="lock" class="lock" role="status" hidden><span>&#9202;</span><span><b>Setup is paused.</b> Too many wrong attempts. It opens again in <span class="count" id="count">0:00</span>.</span></div>
     <form id="create-form" autocomplete="on">
       <input type="text" name="username" value="coral" autocomplete="username" hidden aria-hidden="true" readonly tabindex="-1">

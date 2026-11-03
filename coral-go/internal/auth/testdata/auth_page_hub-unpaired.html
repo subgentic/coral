@@ -79,6 +79,11 @@
   <section id="panel-signin" class="panel">
     <h1>Sign in</h1>
     <p class="sub">Enter the password you made for Coral on this computer.</p>
+
+    <form method="post" action="/auth/local" id="local-open-form" class="local-open">
+      <div class="btnrow"><button type="submit" class="btn btn-primary wide" id="local-open">Open Coral on this computer</button></div>
+      <p class="note" id="local-open-note">This browser is on the computer that runs Coral, in the same account, so it can open Coral without a password.</p>
+    </form>
     <div id="err" class="err" role="alert" hidden></div>
     <div id="lock" class="lock" role="status" hidden><span>&#9202;</span><span><b>Sign-in is paused.</b> Too many wrong passwords. It opens again in <span class="count" id="count">0:00</span>.</span></div>
     <form id="signin-form" autocomplete="on">
