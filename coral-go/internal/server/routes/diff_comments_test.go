@@ -186,3 +186,72 @@ func TestOneSessionsDiffsHoldAtMostSoManyComments(t *testing.T) {
 	assert.Equal(t, http.StatusConflict, post(sid, "pkg/a.go"), "a third comment on the session's diffs is refused")
 	assert.Equal(t, http.StatusCreated, post(sid2, "pkg/a.go"), "another session has its own room")
 }
+
+func TestLinesTheRedactorCannotCheckAreWithheldAndTheCommentStandsWithItsRange(t *testing.T) {
+	old := diffAnchorRedact
+	diffAnchorRedact = func(string) (string, bool) { return "", false }
+	t.Cleanup(func() { diffAnchorRedact = old })
+	rig := newCmtRig(t)
+	sid := rig.diffRig(1, "Dev", "pkg/a.go")
+	key := diffSubject("team-a", sid, "pkg/a.go")
+	code, out := rig.do("POST", cp(key), cmtAsOwner, map[string]any{"body": "What is this line?", "anchor": diffAnchor("pkg/a.go", map[string]any{"quote": "SECRET-LOOKING-LINES", "prefix": "BEFORE-LINES", "suffix": "AFTER-LINES"})})
+	require.Equal(t, http.StatusCreated, code, fmt.Sprint(out))
+	a := out["anchor"].(map[string]any)
+	assert.Equal(t, true, a["withheld"])
+	assert.Empty(t, a["quote"], "the lines are not kept")
+	assert.Empty(t, a["prefix"])
+	assert.Empty(t, a["suffix"])
+	assert.Equal(t, float64(3), a["start_line"], "the range stands")
+	assert.Equal(t, "pkg/a.go", a["path"])
+	msgs := rig.operatorMessages()
+	require.Len(t, msgs, 1)
+	assert.Contains(t, msgs[0].Content, "the lines are not quoted")
+	for _, w := range []string{"SECRET-LOOKING-LINES", "BEFORE-LINES", "AFTER-LINES"} {
+		assert.NotContains(t, msgs[0].Content, w)
+	}
+	code, list := rig.do("GET", cp(key), cmtAsOwner, nil)
+	require.Equal(t, http.StatusOK, code)
+	assert.NotContains(t, fmt.Sprint(list), "SECRET-LOOKING-LINES")
+}
+
+func TestAPathThatHidesCharactersReachesTheStoreAndTheMessageWrittenOut(t *testing.T) {
+	rig := newCmtRig(t)
+	raw := "pkg/a\u202eb\u200bc.go" // a right-to-left override and a zero-width space
+	sid := rig.diffRig(1, "Dev", raw)
+	key := diffSubject("team-a", sid, raw)
+	code, out := rig.do("POST", cp(key), cmtAsOwner, map[string]any{"body": "Which file is this?", "anchor": diffAnchor(raw, nil)})
+	require.Equal(t, http.StatusCreated, code, fmt.Sprint(out))
+	assert.Equal(t, "pkg/a<U+202E>b<U+200B>c.go", out["anchor"].(map[string]any)["path"], "the kept path is written out")
+	msgs := rig.operatorMessages()
+	require.Len(t, msgs, 1)
+	assert.Contains(t, msgs[0].Content, "pkg/a<U+202E>b<U+200B>c.go")
+	assert.NotContains(t, msgs[0].Content, "\u202e", "no bidi character reaches the agent")
+	assert.NotContains(t, msgs[0].Content, "\u200b", "no zero-width character reaches the agent")
+}
+
+func TestADiffCommentOnASessionThatIsArchivedOrATerminalOrOnAPausedBoardIsRefusedOrKeptUnsent(t *testing.T) {
+	rig := newCmtRig(t)
+	sid := rig.diffRig(1, "Dev", "pkg/a.go")
+	key := diffSubject("team-a", sid, "pkg/a.go")
+	body := map[string]any{"body": "A question", "anchor": diffAnchor("pkg/a.go", nil)}
+
+	rig.h.boardHandler = &BoardHandler{paused: map[string]bool{"team-a": true}}
+	code, out := rig.do("POST", cp(key), cmtAsOwner, body)
+	require.Equal(t, http.StatusCreated, code, fmt.Sprint(out))
+	assert.Empty(t, out["sent_to"], "a paused board is not written to; the comment is kept")
+	assert.Empty(t, rig.operatorMessages())
+	rig.h.boardHandler = nil
+
+	require.NoError(t, rig.ss.SetSessionArchived(context.Background(), sid, true))
+	code, _ = rig.do("POST", cp(key), cmtAsOwner, body)
+	assert.Equal(t, http.StatusNotFound, code, "an archived session takes no comment")
+	code, _ = rig.do("GET", cp(key), cmtAsOwner, nil)
+	assert.Equal(t, http.StatusNotFound, code)
+
+	sidT := sendSid(7)
+	require.NoError(t, rig.ss.RegisterLiveSession(context.Background(), &store.LiveSession{SessionID: sidT, AgentType: "terminal", AgentName: "shell", WorkingDir: t.TempDir(), BoardName: ptrOf("team-a")}))
+	code, _ = rig.do("POST", cp(diffSubject("team-a", sidT, "pkg/a.go")), cmtAsOwner, body)
+	assert.Equal(t, http.StatusNotFound, code, "a terminal has no agent to comment to")
+}
+
+func ptrOf(s string) *string { return &s }

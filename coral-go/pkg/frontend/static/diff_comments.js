@@ -19,12 +19,42 @@ export async function diffSubject(team, sid, path) {
     return `diff:${team}:${sid}:${[...new Uint8Array(sum).slice(0, 8)].map(b => b.toString(16).padStart(2, '0')).join('')}`;
 }
 
+/** The state fields of the merge view's extension, found once when the diff is drawn: one of them holds the view's own chunks ({ fromA, toA, fromB, toB }, offsets in the old and the new text), which is where the removed lines' numbers are read. */
+export function mergeFields(ext) {
+    const out = [];
+    const walk = e => { if (Array.isArray(e)) e.forEach(walk); else if (e && typeof e === 'object' && typeof e.createF === 'function') out.push(e); };
+    walk(ext);
+    return out;
+}
+
+/** The chunks the merge view holds now, or null when they cannot be read. */
+const chunksOf = (view, fields) => {
+    for (const f of fields || []) {
+        let v;
+        try { v = view.state.field(f, false); } catch { continue; }
+        if (Array.isArray(v) && (!v.length || ('fromA' in v[0] && 'fromB' in v[0]))) return v;
+    }
+    return null;
+};
+
+/** The old-side line numbers of the removed rows from..to (indexes into the block) of one removed block: the block sits in the new text where its chunk begins, and the chunk says where it began in the old text, so the numbers are the view's own and nothing is searched for or guessed (a "}" that repeats is named where it was removed). null when the view's chunks cannot be read. */
+function oldLines(block, from, to, view, texts, fields) {
+    const chunks = chunksOf(view, fields);
+    if (!chunks) return null;
+    let pos;
+    try { pos = view.posAtDOM(block, 0); } catch { return null; }
+    const c = chunks.find(k => k.fromB === pos && k.toA > k.fromA) || chunks.find(k => k.fromB <= pos && pos <= k.toB && k.toA > k.fromA);
+    if (!c) return null;
+    const at = texts.original.slice(0, c.fromA).split('\n').length; // the old line the chunk begins on
+    return { start: at + from, end: at + to, lines: texts.original.split('\n') };
+}
+
 const lineCount = t => (t ? t.split('\n').length : 0);
 const clip = (t, n) => (t.length > n ? t.slice(t.length - n) : t);
 const headClip = (t, n) => (t.length > n ? t.slice(0, n) : t);
 
 /** The anchor of the text selected in this file's diff, or null when nothing in it is selected. side is new for lines of the file as it is now and old for lines the diff shows as removed; the line numbers are the file's own on that side. */
-export function selectionAnchor(slot, view, texts, file, base) {
+export function selectionAnchor(slot, view, texts, file, base, fields) {
     const sel = window.getSelection();
     if (!sel || !sel.rangeCount || sel.isCollapsed) return null;
     const node = sel.anchorNode && (sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement);
@@ -32,14 +62,16 @@ export function selectionAnchor(slot, view, texts, file, base) {
     if (!node || !end || !slot.contains(node) || !slot.contains(end)) return null;
     const text = sel.toString();
     if (!text.trim()) return null;
-    const old = !!node.closest('.cm-deletedChunk') || !!end.closest('.cm-deletedChunk');
+    const chunkA = node.closest('.cm-deletedChunk'), chunkB = end.closest('.cm-deletedChunk');
+    if (chunkA !== chunkB) return { tooLong: true, why: 'Select lines on one side' }; // removed and kept lines in one selection have no one set of numbers
+    const old = !!chunkA;
     let startLine, endLine, before, after;
     if (old) {
-        const at = texts.original.indexOf(text);
-        if (at < 0) return null;
-        startLine = lineCount(texts.original.slice(0, at)); endLine = startLine + lineCount(text) - 1;
-        const lines = texts.original.split('\n');
-        before = lines.slice(Math.max(0, startLine - 1 - CONTEXT_LINES), startLine - 1).join('\n'); after = lines.slice(endLine, endLine + CONTEXT_LINES).join('\n');
+        const rows = [...chunkA.querySelectorAll('.cm-deletedLine')], at = el => Math.max(0, rows.indexOf(el.closest('.cm-deletedLine')));
+        const x = at(node), y = at(end), got = oldLines(chunkA, Math.min(x, y), Math.max(x, y), view, texts, fields);
+        if (!got) return null;
+        startLine = got.start; endLine = got.end;
+        before = got.lines.slice(Math.max(0, startLine - 1 - CONTEXT_LINES), startLine - 1).join('\n'); after = got.lines.slice(endLine, endLine + CONTEXT_LINES).join('\n');
     } else {
         let a, b;
         try { a = view.posAtDOM(sel.anchorNode, sel.anchorOffset); b = view.posAtDOM(sel.focusNode, sel.focusOffset); } catch { return null; }
@@ -62,7 +94,7 @@ export const stillThere = (a, texts) => !a || !a.quote || (a.side === 'old' ? te
 const mounted = new WeakMap(); // slot -> its box
 
 /** Put the comments of `file` under its diff in `slot`. view is the editor of the diff, texts its two texts. Does nothing through Coral Hub or when the agent has no team. */
-export async function attachDiffComments(slot, file, view, texts, base = '') {
+export async function attachDiffComments(slot, file, view, texts, base = '', fields = []) {
     const s = state.currentSession, team = s && s.board_project, sid = s && s.session_id;
     if (isCloud() || !team || !sid || !s || s.type !== 'live') return;
     mounted.get(slot)?.destroy();
@@ -77,11 +109,11 @@ export async function attachDiffComments(slot, file, view, texts, base = '') {
     comments.setSheet(true);
     let anchor = null;
     const place = () => {
-        const a = selectionAnchor(slot, view, texts, file, base);
+        const a = selectionAnchor(slot, view, texts, file, base, fields);
         anchor = a && !a.tooLong ? a : null;
         btn.hidden = !a;
         if (!a) return;
-        btn.textContent = a.tooLong ? 'Too many lines' : 'Comment'; btn.disabled = !!a.tooLong; // a selection over the cap says so, and offers nothing
+        btn.textContent = a.tooLong ? (a.why || 'Too many lines') : 'Comment'; btn.disabled = !!a.tooLong; // a selection over the cap says so, and offers nothing
         const r = window.getSelection().getRangeAt(0).getBoundingClientRect(), at = slot.getBoundingClientRect();
         btn.style.top = `${Math.max(0, r.bottom - at.top + 4)}px`; btn.style.left = `${Math.min(Math.max(0, r.left - at.left), Math.max(0, at.width - 96))}px`;
     };

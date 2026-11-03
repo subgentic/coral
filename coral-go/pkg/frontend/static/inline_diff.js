@@ -50,18 +50,19 @@ async function mount(slot, file, { original, content }) {
     body.className = 'file-diff-body';
     slot.replaceChildren(body);
     const host = cmHost(body);
+    const mergeExt = cm.unifiedMergeView({ original: cm.Text.of(original.split('\n')), diffConfig: DIFF_CONFIG, mergeControls: false, collapseUnchanged: { margin: 3, minSize: 4 } });
     const extensions = [
         cm.basicSetup, ...cmTheme(cm), cm.EditorView.lineWrapping,
         cm.EditorView.editable.of(false), cm.EditorState.readOnly.of(true),
         cm.EditorView.theme({ '.cm-scroller': { overflow: 'visible' } }), // the editor takes the height of its hunks: the panel scrolls, not a box inside it
         // collapsed to the changed hunks, as the preview's diff is: the unchanged lines between them are one click each
-        cm.unifiedMergeView({ original: cm.Text.of(original.split('\n')), diffConfig: DIFF_CONFIG, mergeControls: false, collapseUnchanged: { margin: 3, minSize: 4 } }),
+        mergeExt,
     ];
     const langExt = getLangExtension(cm, getLangFromPath(file.filepath));
     if (langExt) extensions.push(langExt);
     const view = new cm.EditorView({ state: cm.EditorState.create({ doc: content, extensions }), parent: host });
     views.set(slot, view);
-    importOnce('./diff_comments.js').then(m => m.attachDiffComments(slot, file, view, { original, content }, compareBase(file))).catch(() => {}); // comments on these lines (#12536); the diff reads fine without them
+    importOnce('./diff_comments.js').then(m => m.attachDiffComments(slot, file, view, { original, content }, compareBase(file), m.mergeFields(mergeExt))).catch(() => {}); // comments on these lines (#12536); the diff reads fine without them
 }
 
 /** The state the diff was made on, for a comment's anchor: the file's status and counts. */

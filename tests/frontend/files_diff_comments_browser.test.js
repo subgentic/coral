@@ -8,17 +8,31 @@ const BASE = require('./test_base').BASE;
 const { coralReady, framesJs } = require('./helpers/wait');
 
 const ORIG = Array.from({ length: 60 }, (_, i) => `func f${i}() int { return ${i} }`);
+// lines that repeat (#12560): a run of three } with distinct lines around it (old lines 46, 47, 48), and one more } at line 6 that a search for the line would find first. The diff removes the last of the three (old line 48).
+ORIG[4] = '    return 4'; ORIG[5] = '}'; ORIG[44] = '    return nil'; ORIG[45] = '}'; ORIG[46] = '}'; ORIG[47] = '}';
 const CUR = ORIG.slice();
 CUR[40] = 'func f40() int { return 4000 } // CHANGED LINE ONE';
 CUR[41] = 'func f41() int { return 4100 } // CHANGED LINE TWO';
 CUR[10] = 'func f10() int { return 1000 }';
+CUR.splice(47, 1); // the last } of the run is removed
 const FILES = { 'e.go': { status: 'modified', original: ORIG.join('\n'), current: CUR.join('\n'), additions: 3, deletions: 3 } };
+// A file found by searching the diff.view's own chunks against a nearest-line search of the old file (the 'repeat' case, #12560): the removed } at old line 10 is the only removed row of its block; a search for the line finds
+// line 2 first, and a search that guesses where it must be (the line it is drawn before, moved by the hunks above) says 7.
+const M_ORIG = ['', '}', '', 'a()', 'end', '}', '}', 'a()', '}', '}'], M_CUR = ['}', '}', 'a()', 'b()', '}', '}', 'a()', '}'];
 const TEAM = 'team-x', SID = 'wp-sess1';
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const problems = [];
     const check = (label, cond, detail) => { if (!cond) problems.push(`${label}${detail !== undefined ? ': ' + detail : ''}`); };
+    // Make a selection and wait for the button that answers it. The editor may draw again after a scroll and drop a selection made in the same moment, as a person's would be, so the selection is made again (up to five times) after the page has settled.
+    const pick = async (tag, js, what) => {
+        for (let i = 0; i < 5; i++) {
+            await ev(js); await ev(framesJs(8));
+            if (await ev(`!document.querySelector('.diff-comment-btn').hidden`)) return true;
+        }
+        problems.push(`${tag}: ${what}`); return false;
+    };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [w, h, mobile] of [[1280, 800, false], [390, 800, true]]) {
@@ -50,8 +64,7 @@ const TEAM = 'team-x', SID = 'wp-sess1';
             check(`${tag}: no comment button before anything is selected`, await ev(`(document.querySelector('.diff-comment-btn') || { hidden: true }).hidden`));
 
             // select the two changed lines in the new side of the diff
-            await ev(`(() => { const lines = [...document.querySelectorAll('#changed-files-list .file-diff[data-filepath="e.go"] .cm-content > .cm-line')]; const a = lines.find(l => /CHANGED LINE ONE/.test(l.textContent)), b = lines.find(l => /CHANGED LINE TWO/.test(l.textContent)); const r = document.createRange(); r.setStart(a.firstChild, 0); const w = document.createTreeWalker(b, NodeFilter.SHOW_TEXT); let tn = null; for (let n; (n = w.nextNode());) tn = n; r.setEnd(tn, tn.length); const s = getSelection(); s.removeAllRanges(); s.addRange(r); document.querySelector('#changed-files-list .file-diff[data-filepath="e.go"]').dispatchEvent(new MouseEvent('mouseup', { bubbles: true })); return true; })()`);
-            await waitFor(`!document.querySelector('.diff-comment-btn').hidden`, `${tag}: the Comment button appears at the selection`, 4000);
+            await pick(tag, `(() => { const lines = [...document.querySelectorAll('#changed-files-list .file-diff[data-filepath="e.go"] .cm-content > .cm-line')]; const a = lines.find(l => /CHANGED LINE ONE/.test(l.textContent)), b = lines.find(l => /CHANGED LINE TWO/.test(l.textContent)); const r = document.createRange(); r.setStart(a.firstChild, 0); const w = document.createTreeWalker(b, NodeFilter.SHOW_TEXT); let tn = null; for (let n; (n = w.nextNode());) tn = n; r.setEnd(tn, tn.length); const s = getSelection(); s.removeAllRanges(); s.addRange(r); document.querySelector('#changed-files-list .file-diff[data-filepath="e.go"]').dispatchEvent(new MouseEvent('mouseup', { bubbles: true })); return true; })()`, `the Comment button appears at the selection`);
             const btnGeo = await ev(`(() => { const b = document.querySelector('.diff-comment-btn').getBoundingClientRect(), s = document.querySelector('#changed-files-list .file-diff[data-filepath="e.go"]').getBoundingClientRect(); return { inSlot: b.left >= s.left - 1 && b.right <= s.right + 1 && b.top >= s.top && b.height >= 28, w: b.width, h: b.height }; })()`);
             check(`${tag}: the button sits inside the diff and is touchable`, btnGeo.inSlot, JSON.stringify(btnGeo));
             await ev(`document.querySelector('.diff-comment-btn').click(); true`);
@@ -70,8 +83,7 @@ const TEAM = 'team-x', SID = 'wp-sess1';
             check(`${tag}: the page does not scroll sideways`, await ev(`document.documentElement.scrollWidth <= innerWidth`));
 
             // lines of the removed block are old-side lines, numbered in the file as it was
-            await ev(`(() => { const d = [...document.querySelectorAll('#changed-files-list .file-diff[data-filepath="e.go"] .cm-deletedChunk')].find(x => /return 40 \\}/.test(x.textContent)); const w = document.createTreeWalker(d, NodeFilter.SHOW_TEXT); let first = null, last = null; for (let n; (n = w.nextNode());) { if (/f40/.test(n.nodeValue) && !first) first = n; last = n; } const r = document.createRange(); r.setStart(first, 0); r.setEnd(first, first.nodeValue.length); const s = getSelection(); s.removeAllRanges(); s.addRange(r); document.querySelector('#changed-files-list .file-diff[data-filepath="e.go"]').dispatchEvent(new MouseEvent('mouseup', { bubbles: true })); return true; })()`);
-            await waitFor(`!document.querySelector('.diff-comment-btn').hidden`, `${tag}: the Comment button appears on removed lines too`, 4000);
+            await pick(tag, `(() => { const d = [...document.querySelectorAll('#changed-files-list .file-diff[data-filepath="e.go"] .cm-deletedChunk')].find(x => /return 40 \\}/.test(x.textContent)); const w = document.createTreeWalker(d, NodeFilter.SHOW_TEXT); let first = null, last = null; for (let n; (n = w.nextNode());) { if (/f40/.test(n.nodeValue) && !first) first = n; last = n; } const r = document.createRange(); r.setStart(first, 0); r.setEnd(first, first.nodeValue.length); const s = getSelection(); s.removeAllRanges(); s.addRange(r); document.querySelector('#changed-files-list .file-diff[data-filepath="e.go"]').dispatchEvent(new MouseEvent('mouseup', { bubbles: true })); return true; })()`, `the Comment button appears on removed lines too`);
             await ev(`document.querySelector('.diff-comment-btn').click(); true`);
             await waitFor(`!!document.querySelector('#changed-files-list .diff-comments .ac-input')`, `${tag}: the composer opens for the removed lines`, 4000);
             await ev(`(() => { const ta = document.querySelector('#changed-files-list .diff-comments .ac-input'); ta.value = 'Was 40 right?'; ta.dispatchEvent(new Event('input', { bubbles: true })); document.querySelector('#changed-files-list .diff-comments .ac-send').click(); return true; })()`);
@@ -79,8 +91,46 @@ const TEAM = 'team-x', SID = 'wp-sess1';
             const old = await ev(`window.__posts[1].anchor`);
             check(`${tag}: removed lines are old-side lines with the file's own numbers`, old.side === 'old' && old.start_line === 41 && old.end_line === 41 && /f40/.test(old.quote), JSON.stringify(old));
 
+            // a removed line that repeats is numbered where the diff removed it (#12560: a search found line 6 first)
+            await pick(tag, `(() => { const d = [...document.querySelectorAll('#changed-files-list .file-diff[data-filepath="e.go"] .cm-deletedChunk')].find(x => [...x.querySelectorAll('.cm-deletedLine')].some(r => r.textContent.trim() === '}')); d.scrollIntoView({ block: 'center' }); const rows = [...d.querySelectorAll('.cm-deletedLine')]; const w = document.createTreeWalker(rows[rows.length - 1], NodeFilter.SHOW_TEXT); const n = w.nextNode(); const r = document.createRange(); r.setStart(n, 0); r.setEnd(n, n.length); const s = getSelection(); s.removeAllRanges(); s.addRange(r); document.querySelector('#changed-files-list .file-diff[data-filepath="e.go"]').dispatchEvent(new MouseEvent('mouseup', { bubbles: true })); return true; })()`, `the Comment button appears on the removed brace`);
+            await ev(`document.querySelector('.diff-comment-btn').click(); true`);
+            await waitFor(`!!document.querySelector('#changed-files-list .diff-comments .ac-input')`, `${tag}: the composer opens for the brace`, 4000);
+            await ev(`(() => { const ta = document.querySelector('#changed-files-list .diff-comments .ac-input'); ta.value = 'Why drop this brace?'; ta.dispatchEvent(new Event('input', { bubbles: true })); document.querySelector('#changed-files-list .diff-comments .ac-send').click(); return true; })()`);
+            await waitFor(`window.__posts.length === 3`, `${tag}: the third comment is sent`, 6000);
+            const brace = await ev(`window.__posts[2].anchor`);
+            check(`${tag}: the removed brace is a line of the run (46 to 48) the diff removed it from, not the first } of the file (6)`, brace.side === 'old' && brace.start_line >= 46 && brace.start_line <= 48 && brace.start_line === brace.end_line, JSON.stringify(brace));
+
+            // a file whose repeated lines fool a search: the diff's own old line is named
+            await ev(`window.__files['m.go'] = { status: 'modified', original: ${JSON.stringify(M_ORIG.join('\n'))}, current: ${JSON.stringify(M_CUR.join('\n'))}, additions: 2, deletions: 7 }; window.refreshChangedFiles(false).then(() => true)`);
+            await waitFor(`document.querySelectorAll('#changed-files-list .file-item').length === 2`, `${tag}: the second changed file`, 8000);
+            await ev(`document.querySelector('#changed-files-list .file-expand-btn[data-path="m.go"]').click(); true`);
+            await waitFor(`!!document.querySelector('#changed-files-list .file-diff[data-filepath="m.go"] .cm-deletedChunk') && !!document.querySelector('#changed-files-list .file-diff[data-filepath="m.go"] .diff-comments .ac-panel')`, `${tag}: m.go's diff with its comments`, 10000);
+            let picked = false;
+            for (let i = 0; i < 5 && !picked; i++) {
+                await ev(`(() => { const slot = document.querySelector('#changed-files-list .file-diff[data-filepath="m.go"]'), d = [...slot.querySelectorAll('.cm-deletedChunk')].find(x => { const r = [...x.querySelectorAll('.cm-deletedLine')]; return r.length === 1 && r[0].textContent.trim() === '}'; }); d.scrollIntoView({ block: 'center' }); const row = d.querySelector('.cm-deletedLine'), w = document.createTreeWalker(row, NodeFilter.SHOW_TEXT), n = w.nextNode(), r = document.createRange(); r.setStart(n, 0); r.setEnd(n, n.length); const s = getSelection(); s.removeAllRanges(); s.addRange(r); slot.dispatchEvent(new MouseEvent('mouseup', { bubbles: true })); return true; })()`);
+                await ev(framesJs(8));
+                picked = await ev(`!document.querySelector('#changed-files-list .file-diff[data-filepath="m.go"] .diff-comment-btn').hidden`);
+            }
+            check(`${tag}: the Comment button appears on the removed row of m.go`, picked);
+            await ev(`document.querySelector('#changed-files-list .file-diff[data-filepath="m.go"] .diff-comment-btn').click(); true`);
+            await waitFor(`!!document.querySelector('#changed-files-list .file-diff[data-filepath="m.go"] .diff-comments .ac-input')`, `${tag}: the composer opens on m.go`, 4000);
+            await ev(`(() => { const ta = document.querySelector('#changed-files-list .file-diff[data-filepath="m.go"] .diff-comments .ac-input'); ta.value = 'Which brace went?'; ta.dispatchEvent(new Event('input', { bubbles: true })); document.querySelector('#changed-files-list .file-diff[data-filepath="m.go"] .diff-comments .ac-send').click(); return true; })()`);
+            await waitFor(`window.__posts.length === 4`, `${tag}: the fourth comment is sent`, 6000);
+            const rep = await ev(`window.__posts[3].anchor`);
+            check(`${tag}: a removed } among repeats is the view's own old line 10, not the first } (2) nor the guess (7)`, rep.path === 'm.go' && rep.side === 'old' && rep.start_line === 10 && rep.end_line === 10, JSON.stringify(rep));
+
+            // selections that cannot be commented on: outside the diff, and across removed and kept lines
+            await ev(`(() => { const r = document.createRange(); const t = document.querySelector('#changed-files-list .file-item[data-filepath="e.go"] .file-name'); r.selectNodeContents(t); const s = getSelection(); s.removeAllRanges(); s.addRange(r); document.querySelector('#changed-files-list .file-diff[data-filepath="e.go"]').dispatchEvent(new MouseEvent('mouseup', { bubbles: true })); return true; })()`);
+            await ev(framesJs(8));
+            check(`${tag}: a selection outside the diff offers no comment`, await ev(`document.querySelector('.diff-comment-btn').hidden`));
+            await pick(tag, `(() => { const slot = document.querySelector('#changed-files-list .file-diff[data-filepath="e.go"]'), d = slot.querySelector('.cm-deletedChunk'), line = [...slot.querySelectorAll('.cm-content > .cm-line')].find(l => /CHANGED LINE ONE/.test(l.textContent)); const r = document.createRange(); r.setStart(d.querySelector('.cm-deletedLine').firstChild || d, 0); const w = document.createTreeWalker(line, NodeFilter.SHOW_TEXT); let tn = null; for (let n; (n = w.nextNode());) tn = n; r.setEnd(tn, tn.length); const s = getSelection(); s.removeAllRanges(); s.addRange(r); slot.dispatchEvent(new MouseEvent('mouseup', { bubbles: true })); return true; })()`, `a selection across removed and kept lines says so`);
+            const across = await ev(`({ text: document.querySelector('.diff-comment-btn').textContent, off: document.querySelector('.diff-comment-btn').disabled })`);
+            check(`${tag}: removed and kept lines in one selection are refused in words`, across.off && /one side/.test(across.text), JSON.stringify(across));
+            await ev(`document.querySelector('.diff-comment-btn').click(); true`);
+            check(`${tag}: pressing the refused button opens no composer`, await ev(`!document.querySelector('#changed-files-list .diff-comments .ac-input')`));
+
             // the lines leave the diff: the thread stays and says outdated
-            await ev(`window.__files['e.go'].current = window.__files['e.go'].original.replace('func f20() int { return 20 }', 'func f20() int { return 2000 }'); window.__files['e.go'].additions = 1; window.__files['e.go'].deletions = 1; window.refreshChangedFiles(false).then(() => true)`);
+            await ev(`delete window.__files['m.go']; window.__files['e.go'].current = window.__files['e.go'].original.replace('func f20() int { return 20 }', 'func f20() int { return 2000 }'); window.__files['e.go'].additions = 1; window.__files['e.go'].deletions = 1; window.refreshChangedFiles(false).then(() => true)`);
             await waitFor(`!!document.querySelector('#changed-files-list .file-diff[data-filepath="e.go"] .diff-comments .ac-card') && /outdated/.test(document.querySelector('#changed-files-list .file-diff[data-filepath="e.go"] .diff-comments .ac-card').textContent)`, `${tag}: the comment says outdated once its lines are gone`, 10000).catch(() => {});
             check(`${tag}: a comment whose lines left the diff is kept and says outdated`, await ev(`/outdated/.test((document.querySelector('#changed-files-list .diff-comments .ac-card') || {}).textContent || '')`));
         }
