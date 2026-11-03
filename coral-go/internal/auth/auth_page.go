@@ -65,7 +65,7 @@ func AuthPage(s PageState) string {
 var authPageTmpl = template.Must(template.New("auth").Parse(`{{define "localopen"}}{{if .LocalOpen}}
     <form method="post" action="/auth/local" id="local-open-form" class="local-open">
       <div class="btnrow"><button type="submit" disabled data-needs-script class="btn btn-primary wide" id="local-open">Open Coral on this computer</button></div>
-      <p class="note" id="local-open-note">This browser is on the computer that runs Coral, in the same account, so it can open Coral from here. Coral then asks you to create a password, which keeps other people and other devices out.</p>
+      <p class="note" id="local-open-note">This browser is on the computer that runs Coral, in the same account, so it can open Coral from here.{{if not .PasswordSet}} Coral then asks you to create a password, which keeps other people and other devices out.{{end}}</p>
     </form>
 {{end}}{{end}}{{define "hubwarn"}}
 {{if or (eq .HubSignin "disabled_in_hub") (eq .HubSignin "ready")}}
