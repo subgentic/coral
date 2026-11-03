@@ -221,19 +221,21 @@ export function openGroupTable(kind, key, { focus = false } = {}) {
 /** The list was drawn: the table on screen follows it (a group that has gone leaves it for the first group, or for the tab's empty page when there is none); and a tab that shows its
  *  empty page (no item open) opens on its first group's table. A phone's list is the page itself, so it keeps it. */
 // A table that asks for it (a source with holdRedraw) is not redrawn while a pointer is held down on it (#12636): a row answered elsewhere, or one that arrived, would move the row under the finger before it lets go.
-// The redraw waits for the pointer to go up (or be cancelled, or the window to lose focus; a hold older than 10 s is taken as lost) and then happens once.
-let heldAt = null, deferredKind = null;
-const holding = () => heldAt !== null && Date.now() - heldAt < 10000;
-function releasePointer() { if (heldAt === null) return; heldAt = null; const k = deferredKind; deferredKind = null; if (k) setTimeout(() => { if (!holding()) refreshGroupTable(k); }, 0); } // after the mouseup and the click of this very press have reached the button that was pressed (a redraw inside pointerup would take it out of the page first)
+// The redraw waits for the pointer to go up (or be cancelled, or the window to lose focus; a hold older than 10 s is taken as lost) and then happens once. A press only holds while the pressed element is still on screen:
+// a click that opens an item page (an artifact viewer is an iframe, so its pointerup never reaches this document) leaves the row hidden, and the redraws that follow must not wait for a release that is not coming.
+let heldAt = null, heldEl = null, deferredKind = null, flushTimer = null;
+const holding = () => heldAt !== null && Date.now() - heldAt < 10000 && !!heldEl && heldEl.isConnected && heldEl.getClientRects().length > 0;
+function flushLater() { if (flushTimer !== null) return; flushTimer = setTimeout(() => { flushTimer = null; if (deferredKind === null) return; if (holding()) { flushLater(); return; } const k = deferredKind; deferredKind = null; refreshGroupTable(k); }, 300); } // a deferred redraw is not lost if the release never arrives
+function releasePointer() { if (heldAt === null) return; heldAt = null; heldEl = null; const k = deferredKind; deferredKind = null; if (k) setTimeout(() => { if (!holding()) refreshGroupTable(k); }, 0); } // after the mouseup and the click of this very press have reached the button that was pressed (a redraw inside pointerup would take it out of the page first)
 if (typeof document !== 'undefined') {
-    document.addEventListener('pointerdown', e => { if (e.target instanceof Element && e.target.closest('#group-table-view')) heldAt = Date.now(); }, true);
+    document.addEventListener('pointerdown', e => { if (e.target instanceof Element && e.target.closest('#group-table-view')) { heldAt = Date.now(); heldEl = e.target; } }, true);
     document.addEventListener('pointerup', releasePointer, true); document.addEventListener('pointercancel', releasePointer, true); window.addEventListener('blur', releasePointer);
 }
 
 export function refreshGroupTable(kind) {
     const src = sources.get(kind);
     if (open && open.kind === kind) {
-        if (src?.holdRedraw && holding()) { deferredKind = kind; return; }
+        if (src?.holdRedraw && holding()) { deferredKind = kind; flushLater(); return; }
         const host = document.getElementById('group-table-view');
         if (!host || host.style.display === 'none') { open = null; return; }
         if (drawTable()) return;

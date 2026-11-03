@@ -50,15 +50,17 @@ export function matches(s, f, ctx, now = Date.now()) {
     return true;
 }
 
-/** Keeps the order a person is looking at (#12636): a row already shown stays where it was, in its old order, and a row that is new (a computer that answered late, a question that just came in)
- *  goes after them, in the order `rows` has them. `memory` is { sig, rank: Map(key -> place) }, kept by the caller; a different `sig` (filters, sort, search changed) or none starts the order afresh.
+/** Keeps the order a person is looking at (#12636): a row already shown stays where it is, in its old order. A row that is new goes after them (a computer that answered late brings rows that would otherwise
+ *  slot in among the ones on screen), except one that sorts above everything on screen: that is the freshest arrival, as in any inbox, and goes on top (the Inbox shows only a few review rows per agent, so a
+ *  new version of a file at the bottom would be hidden). `memory` is { sig, rank: Map(key -> place) }, kept by the caller; a different `sig` (filters, sort, search changed) or none starts the order afresh.
  *  The returned memory is the order of what is returned, so a second call with the same rows gives the same list. */
 export function keepOrder(rows, keyOf, memory, sig) {
     const rank = memory && memory.sig === sig ? memory.rank : new Map();
-    const seen = [], fresh = [];
+    const seen = [], fresh = [], at = new Map(rows.map((r, i) => [keyOf(r), i]));
     for (const r of rows) (rank.has(keyOf(r)) ? seen : fresh).push(r);
     seen.sort((a, b) => rank.get(keyOf(a)) - rank.get(keyOf(b)));
-    const out = [...seen, ...fresh];
+    const first = seen.length ? Math.min(...seen.map(r => at.get(keyOf(r)))) : Infinity;
+    const out = [...fresh.filter(r => at.get(keyOf(r)) < first), ...seen, ...fresh.filter(r => at.get(keyOf(r)) >= first)];
     return { rows: out, memory: { sig, rank: new Map(out.map((r, i) => [keyOf(r), i])) } };
 }
 

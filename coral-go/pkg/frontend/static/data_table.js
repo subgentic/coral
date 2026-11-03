@@ -374,10 +374,10 @@ export function dataTable(cfg) {
         return rows.slice().sort((a, b) => dir * cmp(a, b));
     };
     /** keepOrder (#12636): a list that fills in as computers answer keeps the order the person is looking at under every sort: a row already shown stays where it is, a new row goes after them, and a different
-     *  sort (or cfg.orderKey, the caller's own search and filters) starts the order afresh. The memory is in the table's state, so it survives the redraws. */
+    *  sort (or cfg.orderKey, the caller's own search and filters) starts the order afresh. Only under a header sort: with none, the caller's order stands. The memory is in the table's state, so it survives the redraws. */
     const sortedRows = () => {
         const out = sortedOnly();
-        if (!cfg.keepOrder || !cfg.rowKey) return out;
+        if (!cfg.keepOrder || !cfg.rowKey || !st.sort) { st.shown = null; return out; } // with no header sort the caller's own order stands (the Needs you list keeps it, keepOrder in needs_filters.js)
         const sig = JSON.stringify([st.sort ? [st.sort.key, st.sort.dir] : null, cfg.orderKey || '']), rank = st.shown && st.shown.sig === sig ? st.shown.rank : new Map();
         const seen = [], fresh = [];
         for (const r of out) (rank.has(cfg.rowKey(r)) ? seen : fresh).push(r);

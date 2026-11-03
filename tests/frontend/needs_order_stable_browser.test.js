@@ -31,19 +31,22 @@ const { coralReady, framesJs } = require('./helpers/wait');
             const first = await order();
             assert.deepEqual([...first].sort(), ['Alpha', 'Bravo'], at + 'the two questions are shown: ' + JSON.stringify(first));
 
-            await ev(`window.__asks.push(${JSON.stringify(ask(3, 'Charlie', 1))}); true`); // a computer that answered late, with a question newer than the two shown (the default sort puts the newest first, so before this change it jumped to the top)
+            await ev(`window.__asks.push(${JSON.stringify(ask(3, 'Charlie', 7))}); true`); // a computer that answered late, with a question that would slot in between the two shown (the default sort puts the newest first: Bravo, Charlie, Alpha)
             await refresh();
-            assert.deepEqual(await order(), [...first, 'Charlie'], at + 'the late question goes after the rows on screen, it does not move them');
+            assert.deepEqual(await order(), [...first, 'Charlie'], at + 'the late question goes after the rows on screen, it does not slot in among them');
+            await ev(`window.__asks.push(${JSON.stringify(ask(7, 'Delta', 0.5))}); true`); // a question newer than everything on screen is the freshest arrival: on top, and visible
+            await refresh();
+            assert.deepEqual(await order(), ['Delta', ...first, 'Charlie'], at + 'a question newer than everything shown goes on top');
 
             const gone = first[0]; // one is answered: the rest keep their order
             await ev(`window.__asks = window.__asks.filter(a => a.asker !== ${JSON.stringify(gone)}); true`);
             await refresh();
-            assert.deepEqual(await order(), [first[1], 'Charlie'], at + 'an answered row leaves, the others stay in order');
+            assert.deepEqual(await order(), ['Delta', first[1], 'Charlie'], at + 'an answered row leaves, the others stay in order');
 
             await ev(`(async () => { const m = await import(${S} + 'inbox_tab.js'); m.selectInboxTab('tasks'); await new Promise(r => setTimeout(r, 50)); m.selectInboxTab('needs'); return true; })()`);
-            await ev(`window.__asks.push(${JSON.stringify(ask(4, 'Delta', 0.5))}); true`);
+            await ev(`window.__asks.push(${JSON.stringify(ask(4, 'Echo', 60))}); true`);
             await refresh();
-            assert.deepEqual(await order(), [first[1], 'Charlie', 'Delta'], at + 'switching folders keeps what the person saw too, until a filter changes');
+            assert.deepEqual(await order(), ['Delta', first[1], 'Charlie', 'Echo'], at + 'switching folders keeps what the person saw too, until a filter changes');
 
             // a column sort the person chose is kept the same way: Item ascending, then a late computer's row that sorts first goes after the rows shown (the table used to sort the whole list again)
             await ev(`(() => { const th = document.querySelector('${T} thead th[data-key=agent]'); (th.querySelector('button') || th).click(); return true; })()`);
