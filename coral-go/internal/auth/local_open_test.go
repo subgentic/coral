@@ -159,3 +159,25 @@ func TestOpenCoralOnThisComputerOnlyWhileNoPasswordIsSet(t *testing.T) {
 	assert.True(t, g.ar.LocalOpenOffered(g.req("GET", "/auth", "", "127.0.0.1", nil)), "no file at all: offered")
 	assert.False(t, g.ar.LocalOpenOffered(g.req("GET", "/auth", "", "10.0.0.5", nil)), "never to another computer")
 }
+
+// An Lstat error other than "does not exist" on the password file (access denied on its folder, here through the seam) is not "no password":
+// no button, and the route refuses without making a link.
+func TestALstatErrorOnThePasswordFileIsNotNoPassword(t *testing.T) {
+	g := newPwRig(t)
+	g.ar.SetPeerUser(func(*http.Request) (bool, bool) { return true, true })
+	prev := passwordLstat
+	passwordLstat = func(string) (os.FileInfo, error) {
+		return nil, &os.PathError{Op: "lstat", Path: "password", Err: os.ErrPermission}
+	}
+	t.Cleanup(func() { passwordLstat = prev })
+
+	assert.Equal(t, passwordUnreadable, g.ks.passwordState())
+	assert.False(t, g.ar.LocalOpenOffered(g.req("GET", "/auth", "", "127.0.0.1", nil)), "no button")
+	w, out := g.do(g.ar.LocalOpen, g.req("POST", LocalOpenPath, "", "127.0.0.1", nil))
+	assert.Equal(t, http.StatusForbidden, w.Code, w.Body.String())
+	assert.Equal(t, "password_set", out["code"])
+	g.ks.mu.Lock()
+	made := len(g.ks.loginTokens)
+	g.ks.mu.Unlock()
+	assert.Zero(t, made, "no link was made")
+}
