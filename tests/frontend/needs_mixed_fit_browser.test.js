@@ -74,6 +74,13 @@ const STUB = `(() => {
             check(r.actionsIn && r.waitingIn, 'Actions (and Waiting when it is shown) stay inside the panel, at ' + width + ' px: ' + JSON.stringify(r));
             check(r.item >= 100, 'the Item column keeps room at ' + width + ' px: ' + JSON.stringify(r));
         }
+        // Font metrics differ across CI and macOS. Reserve less room explicitly so
+        // optional columns must yield here too; Team outranks CLI and Folder.
+        await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
+        await ev(`document.querySelector('${T} .dt-box').style.maxWidth='840px';true`);await ev(framesJs(12));
+        const tight=await ev(`(()=>{const b=document.querySelector('${T} .dt-box'),t=b.querySelector('table');return {box:b.clientWidth,table:t.getBoundingClientRect().width,scroll:b.scrollWidth>b.clientWidth+1,shown:[...t.querySelectorAll('thead th')].filter(e=>e.getClientRects().length).map(e=>e.dataset.key)};})()`);
+        check(tight.box<=840&&tight.shown.includes('team')&&!tight.scroll&&tight.table<=tight.box+2,'Team stays visible when optional columns yield at 840px: '+JSON.stringify(tight));
+        await shot('mixed-priority-840');
     } finally { await client.close(); }
     if (failures.length) { console.error(failures.join('\n')); process.exit(1); }
     console.log('needs_mixed_fit_browser: ok');
