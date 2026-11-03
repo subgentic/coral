@@ -158,6 +158,13 @@ func (h *SystemHandler) CLICheck(w http.ResponseWriter, r *http.Request) {
 					result["install_note"] = cliRefusedNoteTunneled(agent.CLIPathSettingKey(agentType))
 				}
 			}
+			if cliShareSkipped(binaryPath) { // a common place on a network share did not answer in time (#464): one fixed sentence, no folder named
+				note := agent.ShareNotAnsweredNote(filepath.Base(binaryPath))
+				if prev, _ := result["install_note"].(string); prev != "" {
+					note = prev + " " + note
+				}
+				result["install_note"] = note
+			}
 			if dir, bad := agent.UntrustedMountDir(binaryPath); bad { // the CLI-paths row says why, before a launch (#340)
 				delete(result, "install_command") // the CLI is installed; npm would not fix a folder Windows will not open
 				delete(result, "install_url")
@@ -314,8 +321,10 @@ var (
 	cliCommonPath = agent.FindCLIInCommonPaths
 	// cliRefreshSavedPath re-reads the Path the system keeps for the person (Windows: the registry), on a person's Check again only.
 	cliRefreshSavedPath = agent.RefreshSavedPath
-	cliProbeTimeout     = 3 * time.Second
-	tmuxProbe           = tmux.IsAvailable
+	// cliShareSkipped: a common place on a network share did not answer in time for this CLI (#464).
+	cliShareSkipped = agent.ShareSkipped
+	cliProbeTimeout = 3 * time.Second
+	tmuxProbe       = tmux.IsAvailable
 )
 
 // Version probe results.

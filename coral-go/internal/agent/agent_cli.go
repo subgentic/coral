@@ -162,6 +162,8 @@ type CLINotFoundError struct {
 	// Refused and RefusedPath: a file that was found in a common place and not used, and why (an agent's working folder, a temp folder): the answer says so rather than "not found".
 	Refused     string
 	RefusedPath string
+	// ShareNotAnswered: a common place on a network share did not answer in time and was skipped (#464): the answer says so in one fixed sentence.
+	ShareNotAnswered bool
 }
 
 // TildePath is tildePath for the routes' answers.
@@ -184,6 +186,9 @@ func (e *CLINotFoundError) Error() string {
 	msg += fmt.Sprintf(". Already installed? Set its path in Settings > CLI paths (the setting %s).", CLIPathSettingKey(e.AgentType))
 	if e.Refused != "" {
 		msg += fmt.Sprintf(" Coral found %s and did not use it: it is %s.", tildePath(e.RefusedPath), e.Refused)
+	}
+	if e.ShareNotAnswered {
+		msg += " " + ShareNotAnsweredNote(e.Binary)
 	}
 	var places []string
 	for _, p := range CommonPlaceCandidates(e.Binary) {
@@ -276,7 +281,7 @@ func LaunchCLIScreened(settings map[string]string, agentType string, screen func
 	if dir, bad := UntrustedMountDir(info.Binary); bad {
 		return "", &CLIUntrustedMountError{AgentType: agentType, Binary: info.Binary, Dir: dir}
 	}
-	return "", &CLINotFoundError{AgentType: agentType, Binary: info.Binary, InstallCommand: info.InstallCommand, InstallURL: info.InstallURL, Refused: found.Refused, RefusedPath: found.RefusedPath}
+	return "", &CLINotFoundError{AgentType: agentType, Binary: info.Binary, InstallCommand: info.InstallCommand, InstallURL: info.InstallURL, Refused: found.Refused, RefusedPath: found.RefusedPath, ShareNotAnswered: ShareSkipped(info.Binary)}
 }
 
 // resolveBinary returns cliPath if non-empty, otherwise the default binary name.

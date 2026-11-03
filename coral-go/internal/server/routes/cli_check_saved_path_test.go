@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/subgentic/coral/internal/agent"
 )
 
 // Only a person's Check again re-reads the saved Path (#457): an ordinary check, the Settings account Check and a check by path do not.
@@ -24,4 +26,23 @@ func TestOnlyCheckAgainReReadsTheSavedPath(t *testing.T) {
 	out := cliCheck(t, h, "type=codex&source=cli_recheck")
 	assert.Equal(t, 1, reads)
 	assert.Equal(t, false, out["found"], "the re-read found nothing here: still not found")
+}
+
+// A common place on a network share that did not answer (#464): the not-found answer adds the one fixed sentence, which names no folder.
+func TestCLICheckSaysAShareDidNotAnswer(t *testing.T) {
+	prevLook, prevCommon, prevSkipped := cliLookPath, cliCommonPath, cliShareSkipped
+	t.Cleanup(func() { cliLookPath, cliCommonPath, cliShareSkipped = prevLook, prevCommon, prevSkipped })
+	cliLookPath = func(string) (string, error) { return "", errors.New("not found") }
+	cliCommonPath = func(string) string { return "" }
+	h := newSystemHandlerForTest(t)
+
+	cliShareSkipped = func(string) bool { return false }
+	out := cliCheck(t, h, "type=codex")
+	note, _ := out["install_note"].(string)
+	assert.NotContains(t, note, "network share")
+
+	cliShareSkipped = func(string) bool { return true }
+	out = cliCheck(t, h, "type=codex")
+	assert.Equal(t, false, out["found"])
+	assert.Contains(t, out["install_note"], agent.ShareNotAnsweredNote("codex"))
 }

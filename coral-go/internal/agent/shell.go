@@ -319,6 +319,9 @@ func systemCandidates(binary string, dirs ...string) []string {
 // Returns the full path if found, empty string if not.
 func FindCLIInCommonPaths(binary string) string {
 	for _, path := range CommonPlaceCandidates(binary) {
+		if !shareAnswers(filepath.Dir(path)) { // as CommonPlaceLookup: a share that did not answer is skipped (#464)
+			continue
+		}
 		if _, err := os.Stat(path); err == nil {
 			return path
 		}
