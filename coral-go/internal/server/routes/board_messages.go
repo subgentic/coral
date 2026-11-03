@@ -17,6 +17,7 @@ import (
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/clitext"
 	"github.com/subgentic/coral/internal/cloud"
+	"github.com/subgentic/coral/internal/tracking"
 	"github.com/subgentic/coral/pkg/tunnel"
 )
 
@@ -193,6 +194,11 @@ func (h *BoardHandler) PostMessage(w http.ResponseWriter, r *http.Request) {
 	if body.ReplyTo > 0 {
 		if err := h.bs.RecordReply(r.Context(), project, msg.ID, body.ReplyTo); err != nil {
 			slog.Warn("board reply not recorded", "board", project, "message", msg.ID, "error", err)
+		}
+		if strings.EqualFold(msg.SubscriberID, board.OperatorName) && humanInputCaller(r) { // the Inbox's numbers (#7512): the Operator answered a question put to them
+			if asked, err := h.bs.GetMessageByID(r.Context(), project, body.ReplyTo); err == nil && asked != nil && asked.Ask != nil {
+				inboxActioned(r, tracking.InboxAsk, "", "answer", inboxTime(asked.CreatedAt))
+			}
 		}
 	}
 	if len(asked) > 0 || body.ReplyTo > 0 {

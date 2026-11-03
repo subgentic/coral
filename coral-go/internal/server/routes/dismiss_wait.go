@@ -7,6 +7,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/subgentic/coral/internal/store"
+	"github.com/subgentic/coral/internal/tracking"
 )
 
 // DismissWait is the Operator's way to clear a wait that is no longer true (#11352): a "Permission needed" card and its Inbox row that stay after the agent went on. It writes a request_resolved
@@ -42,6 +43,7 @@ func (h *SessionsHandler) DismissWait(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	sid := body.SessionID
+	inboxActioned(r, tracking.InboxAgentWait, st.WaitingKind, "dismiss", st.WaitingSince) // the Inbox's numbers (#7512): the wait's kind, never the agent
 	switch st.WaitingKind {
 	case "permission", "question", "plan":
 	default:

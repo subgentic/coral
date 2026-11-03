@@ -20,6 +20,8 @@ var BrowserEvents = map[string]bool{
 	EventUpdateOfferOpened:     true, // its Download link was opened
 	// The funnel (#7455): the launch dialog was opened. The page's properties are dropped: the server sends the step with its own.
 	EventFunnelLaunchDialogOpened: true,
+	// The Inbox was opened (#7512): handled by the route, which takes the name only and sends the server's own counts (TrackInboxOpened).
+	EventInboxOpened: true,
 }
 
 // onDashboardLoaded, when set, runs once per process after the first dashboard page of this run finished loading: the server's own first-load steps
@@ -91,6 +93,8 @@ func TrackBrowserEvent(event string, props map[string]string) {
 		TrackOnce(event, map[string]string{"source": props["source"]})
 	case EventFunnelLaunchDialogOpened:
 		TrackFunnelStep(event, nil)
+	case EventInboxOpened:
+		// only through the route, with the server's own counts: the page's properties never make an event
 	case EventUpdateNoticeShown, EventUpdateOfferOpened:
 		// Only the version and the channel are taken from the page; the source is the dashboard and the method the link, by construction, so the page cannot claim to be the tray.
 		version, channel, ok := updateBrowserProps(props)

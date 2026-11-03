@@ -17,6 +17,7 @@ import (
 	"github.com/subgentic/coral/internal/gitutil"
 	"github.com/subgentic/coral/internal/httputil"
 	"github.com/subgentic/coral/internal/store"
+	"github.com/subgentic/coral/internal/tracking"
 )
 
 // ScheduleHandler handles scheduled jobs API endpoints.
@@ -474,6 +475,7 @@ func (h *ScheduleHandler) MarkRunSeen(w http.ResponseWriter, r *http.Request) {
 		errNotFound(w, "run not found")
 		return
 	}
+	inboxActioned(r, tracking.InboxRun, "", "seen", time.Time{}) // the Inbox's numbers (#7512): a failed run opened or dismissed
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "run_id": runID})
 }
 

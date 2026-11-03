@@ -145,7 +145,6 @@ func (h *BoardHandler) NeedsYou(w http.ResponseWriter, r *http.Request) {
 	if refuseUnlessPerson(w, r, "read what is waiting for them") {
 		return
 	}
-	ctx := r.Context()
 	cur, ok := parseNeedsYouCursor(r.URL.Query().Get("after"))
 	if !ok {
 		errBadRequest(w, "after is a cursor from an earlier answer")
@@ -161,109 +160,11 @@ func (h *BoardHandler) NeedsYou(w http.ResponseWriter, r *http.Request) {
 		limit = min(n, needsYouItemsMax)
 	}
 
-	var items []NeedsYouItem
-	var unread []string
-	if h.needsYouAgents != nil {
-		if rows, err := h.needsYouAgents(r); err != nil {
-			unread = append(unread, "agents")
-		} else {
-			items = append(items, rows...)
-		}
-	}
-	projects, err := h.bs.ListProjects(ctx)
+	items, unread, err := h.needsYouItems(r)
 	if err != nil {
 		errInternalServer(w, "could not read the boards")
 		return
 	}
-	now := time.Now().UTC()
-	for _, p := range projects {
-		start, questionLinks, reviewFiles := len(items), map[int][]string{}, map[string]bool{} // a question that only links files the same team has in a review (for review, opened, decided, superseded) is those files, not a second item (#11998, #12096)
-		h.keepExpiredOperatorQuestions(ctx, p.Project)                                         // a wait that ran out is an ask from now on (#11919)
-		if asks, err := h.bs.OpenAsksOf(ctx, p.Project, board.OperatorName, now); err != nil {
-			unread = appendOnce(unread, "questions")
-		} else {
-			askIDs := make([]int64, 0, len(asks))
-			for _, a := range asks {
-				askIDs = append(askIDs, a.MessageID)
-			}
-			subjects, links := h.askSubjects(ctx, p.Project, askIDs)
-			withButtons, _ := h.bs.AskButtonsOf(ctx, p.Project, askIDs) // a question with answer buttons is never hidden: the Operator can only answer it from its row (Security's SHOULD, #12096)
-			for _, a := range asks {
-				sj := subjects[a.MessageID]
-				if hexes := onlyFileLinks(a.Content); len(hexes) > 0 && len(withButtons[a.MessageID]) == 0 {
-					questionLinks[len(items)] = hexes
-				}
-				items = append(items, NeedsYouItem{Kind: "question", From: needsYouLine(a.Asker), Line: needsYouLine(a.Content), Team: p.Project, ID: "question:" + p.Project + ":" + strconv.FormatInt(a.MessageID, 10), At: needsYouTime(a.At.UTC().Format(time.RFC3339Nano)),
-					GoalID: sj.GoalID, TaskID: sj.TaskID, GoalTitle: needsYouLine(links.goalTitle(ctx, sj.GoalID)), TaskTitle: needsYouLine(links.taskTitle(ctx, sj.TaskID))})
-			}
-		}
-		if waits, err := h.bs.ListOperatorQuestions(ctx, p.Project); err != nil {
-			unread = appendOnce(unread, "questions")
-		} else {
-			for _, q := range waits {
-				items = append(items, NeedsYouItem{Kind: "wait", From: needsYouLine(q.SubscriberID), Line: needsYouLine(q.Reason), Team: p.Project, ID: "wait:" + p.Project + ":" + strconv.FormatInt(q.ID, 10), At: needsYouTime(q.CreatedAt)})
-			}
-		}
-		if props, err := h.bs.ListProposals(ctx, p.Project, board.ProposalPending); err != nil {
-			unread = appendOnce(unread, "proposals")
-		} else {
-			for _, pr := range props {
-				items = append(items, NeedsYouItem{Kind: "proposal", From: needsYouLine(pr.Proposer), Line: needsYouLine(pr.Title), Team: p.Project, ID: "proposal:" + p.Project + ":" + strconv.FormatInt(pr.ID, 10), At: needsYouTime(pr.CreatedAt)})
-			}
-		}
-		if files, _, err := h.projectArtifactItems(r, p.Project, ""); err != nil {
-			unread = appendOnce(unread, "reviews")
-		} else {
-			seen := map[string]bool{}
-			dir := h.artifactObjectDir()
-			if len(questionLinks) > 0 {
-				reviewFiles = reviewedFileIDs(files)
-			}
-			for _, f := range files {
-				if seen[f.ID] || !needsYouFile(f.Tags, f.NewComments) {
-					continue // by tags first: only a row that could count is checked against the stored file
-				}
-				enrichTeamArtifact(&f, dir)
-				if !f.Available {
-					continue
-				}
-				seen[f.ID] = true
-				items = append(items, NeedsYouItem{Kind: "review", Line: needsYouLine(f.Name), Team: p.Project, ID: "review:" + p.Project + ":" + f.ID, At: needsYouTime(f.CreatedAt), NewComments: f.NewComments})
-			}
-		}
-		if len(questionLinks) > 0 { // drop the questions of this team that only link a file it lists as a file for review
-			kept := items[:start]
-			for i := start; i < len(items); i++ {
-				if hexes, ok := questionLinks[i]; ok && allIn(hexes, reviewFiles) {
-					continue
-				}
-				kept = append(kept, items[i])
-			}
-			items = kept
-		}
-	}
-
-	if h.needsYouSkills != nil { // the skills that wait for the Operator's approval (#12139)
-		if rows, err := h.needsYouSkills(ctx); err != nil {
-			unread = appendOnce(unread, "skills")
-		} else {
-			items = append(items, rows...)
-		}
-	}
-
-	hiddenGoals, readGoals := h.goalDoneHiddenSet(ctx), h.goalDoneReadSet(ctx)
-	var goalNews map[string]int // replies agents left in the Operator's threads on a goal, unseen (#12073): the goal's item carries the count, and a read goal with news counts again
-	if h.commentNews != nil {
-		goalNews, _ = h.commentNews(ctx)
-	}
-	for _, p := range projects {
-		if gi, err := h.goalDoneItems(ctx, p.Project, hiddenGoals, readGoals, goalNews); err != nil {
-			unread = appendOnce(unread, "goals")
-		} else {
-			items = append(items, gi...)
-		}
-	}
-
 	ans := needsYouAnswer{Count: len(items), Counts: map[string]int{"agent": 0, "question": 0, "wait": 0, "proposal": 0, "review": 0, "goal_done": 0, "skill": 0}, Items: []NeedsYouItem{}, NotIncluded: needsYouNotIncluded, Unread: unread}
 	for _, it := range items {
 		ans.Counts[it.Kind]++
@@ -421,4 +322,111 @@ func onlyFileLinks(text string) []string {
 		out[i] = strings.ToLower(m[i][1])
 	}
 	return out
+}
+
+// needsYouItems is everything waiting for the Operator that the server can see, and the parts it could not read (unread). r is the person's own request:
+// the agent rows are read as that person sees them. An error is the boards themselves not reading.
+func (h *BoardHandler) needsYouItems(r *http.Request) (items []NeedsYouItem, unread []string, err error) {
+	ctx := r.Context()
+	if h.needsYouAgents != nil {
+		if rows, err := h.needsYouAgents(r); err != nil {
+			unread = append(unread, "agents")
+		} else {
+			items = append(items, rows...)
+		}
+	}
+	projects, err := h.bs.ListProjects(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	now := time.Now().UTC()
+	for _, p := range projects {
+		start, questionLinks, reviewFiles := len(items), map[int][]string{}, map[string]bool{} // a question that only links files the same team has in a review (for review, opened, decided, superseded) is those files, not a second item (#11998, #12096)
+		h.keepExpiredOperatorQuestions(ctx, p.Project)                                         // a wait that ran out is an ask from now on (#11919)
+		if asks, err := h.bs.OpenAsksOf(ctx, p.Project, board.OperatorName, now); err != nil {
+			unread = appendOnce(unread, "questions")
+		} else {
+			askIDs := make([]int64, 0, len(asks))
+			for _, a := range asks {
+				askIDs = append(askIDs, a.MessageID)
+			}
+			subjects, links := h.askSubjects(ctx, p.Project, askIDs)
+			withButtons, _ := h.bs.AskButtonsOf(ctx, p.Project, askIDs) // a question with answer buttons is never hidden: the Operator can only answer it from its row (Security's SHOULD, #12096)
+			for _, a := range asks {
+				sj := subjects[a.MessageID]
+				if hexes := onlyFileLinks(a.Content); len(hexes) > 0 && len(withButtons[a.MessageID]) == 0 {
+					questionLinks[len(items)] = hexes
+				}
+				items = append(items, NeedsYouItem{Kind: "question", From: needsYouLine(a.Asker), Line: needsYouLine(a.Content), Team: p.Project, ID: "question:" + p.Project + ":" + strconv.FormatInt(a.MessageID, 10), At: needsYouTime(a.At.UTC().Format(time.RFC3339Nano)),
+					GoalID: sj.GoalID, TaskID: sj.TaskID, GoalTitle: needsYouLine(links.goalTitle(ctx, sj.GoalID)), TaskTitle: needsYouLine(links.taskTitle(ctx, sj.TaskID))})
+			}
+		}
+		if waits, err := h.bs.ListOperatorQuestions(ctx, p.Project); err != nil {
+			unread = appendOnce(unread, "questions")
+		} else {
+			for _, q := range waits {
+				items = append(items, NeedsYouItem{Kind: "wait", From: needsYouLine(q.SubscriberID), Line: needsYouLine(q.Reason), Team: p.Project, ID: "wait:" + p.Project + ":" + strconv.FormatInt(q.ID, 10), At: needsYouTime(q.CreatedAt)})
+			}
+		}
+		if props, err := h.bs.ListProposals(ctx, p.Project, board.ProposalPending); err != nil {
+			unread = appendOnce(unread, "proposals")
+		} else {
+			for _, pr := range props {
+				items = append(items, NeedsYouItem{Kind: "proposal", From: needsYouLine(pr.Proposer), Line: needsYouLine(pr.Title), Team: p.Project, ID: "proposal:" + p.Project + ":" + strconv.FormatInt(pr.ID, 10), At: needsYouTime(pr.CreatedAt)})
+			}
+		}
+		if files, _, err := h.projectArtifactItems(r, p.Project, ""); err != nil {
+			unread = appendOnce(unread, "reviews")
+		} else {
+			seen := map[string]bool{}
+			dir := h.artifactObjectDir()
+			if len(questionLinks) > 0 {
+				reviewFiles = reviewedFileIDs(files)
+			}
+			for _, f := range files {
+				if seen[f.ID] || !needsYouFile(f.Tags, f.NewComments) {
+					continue // by tags first: only a row that could count is checked against the stored file
+				}
+				enrichTeamArtifact(&f, dir)
+				if !f.Available {
+					continue
+				}
+				seen[f.ID] = true
+				items = append(items, NeedsYouItem{Kind: "review", Line: needsYouLine(f.Name), Team: p.Project, ID: "review:" + p.Project + ":" + f.ID, At: needsYouTime(f.CreatedAt), NewComments: f.NewComments})
+			}
+		}
+		if len(questionLinks) > 0 { // drop the questions of this team that only link a file it lists as a file for review
+			kept := items[:start]
+			for i := start; i < len(items); i++ {
+				if hexes, ok := questionLinks[i]; ok && allIn(hexes, reviewFiles) {
+					continue
+				}
+				kept = append(kept, items[i])
+			}
+			items = kept
+		}
+	}
+
+	if h.needsYouSkills != nil { // the skills that wait for the Operator's approval (#12139)
+		if rows, err := h.needsYouSkills(ctx); err != nil {
+			unread = appendOnce(unread, "skills")
+		} else {
+			items = append(items, rows...)
+		}
+	}
+
+	hiddenGoals, readGoals := h.goalDoneHiddenSet(ctx), h.goalDoneReadSet(ctx)
+	var goalNews map[string]int // replies agents left in the Operator's threads on a goal, unseen (#12073): the goal's item carries the count, and a read goal with news counts again
+	if h.commentNews != nil {
+		goalNews, _ = h.commentNews(ctx)
+	}
+	for _, p := range projects {
+		if gi, err := h.goalDoneItems(ctx, p.Project, hiddenGoals, readGoals, goalNews); err != nil {
+			unread = appendOnce(unread, "goals")
+		} else {
+			items = append(items, gi...)
+		}
+	}
+
+	return items, unread, nil
 }

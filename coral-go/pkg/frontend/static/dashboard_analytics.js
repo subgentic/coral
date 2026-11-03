@@ -74,6 +74,12 @@ export function reportLaunchDialogOpened() {
     emit('funnel_launch_dialog_opened');
 }
 
+/** The Inbox was opened (#7512): the event's name only. The server counts what is waiting itself and sends at most one per day, and nothing with analytics off. */
+export function reportInboxOpened() {
+    if (!enabled) return;
+    emit('inbox_opened');
+}
+
 // Composer intent only: not proof of socket delivery, agent readiness or response.
 export function dashboardPromptRequested() {
     // Let the server own the install milestone so an opted-out or failed

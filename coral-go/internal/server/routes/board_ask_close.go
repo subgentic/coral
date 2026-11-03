@@ -5,11 +5,13 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/clitext"
+	"github.com/subgentic/coral/internal/tracking"
 )
 
 // CloseAsk closes a question the Operator answered somewhere the board did not see (#11417): POST /api/board/{project}/asks/{messageID}/close {subscriber_id, note}. Only the Operator's own reply on the board
@@ -83,6 +85,7 @@ func (h *BoardHandler) CloseAsk(w http.ResponseWriter, r *http.Request) {
 	}
 	if strings.EqualFold(actor, "Operator") && humanInputCaller(r) { // the Operator's own Ignore, not an agent closing its own question
 		h.recordActivity(r, board.ActIgnore, "question", strconv.FormatInt(id, 10), project, "", note)
+		inboxActioned(r, tracking.InboxAsk, "", "dismiss", time.Time{}) // the Inbox's numbers (#7512)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "closed_by": actor})
 }

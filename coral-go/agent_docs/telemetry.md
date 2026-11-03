@@ -71,6 +71,16 @@ Steps that can come before the Terms are accepted or the analytics setting is re
 | `funnel_agent_first_output` | An agent's terminal was first seen to have written something (the dashboard's agent list reads it, on either terminal backend) | `provider` (`claude`, `codex`, `gemini` for the Gemini family's CLI, `pi`, `other`), `secs_since_launch` (0 to 3600) |
 | `funnel_agent_ready` | What a new agent was first seen doing, once per state: ready for a message, or held by a question its tool asks at launch | `provider`, `state` (`ready`, `waiting_trust`, `waiting_signin`, `waiting_other_prompt`, `not_started`, `exited_early`), `secs_since_launch`; never anything on its screen |
 
+## The Inbox (schema 6)
+
+How the Inbox is used, from the server's side: what was waiting when it was opened and what a person did with it. Each value is chosen by Coral from a closed list or is a bounded number; nothing of an item (its id, title or text, or an agent, board, task or file name) is sent. Only a person's own action counts: an agent's tool, a script or a session token sends nothing. At most 50 events per kind and action and 200 inbox events in all are sent per install per UTC day; past that an action is counted (in the data folder's `.inbox_day.json`, counts and a date only) but not sent.
+
+| Event | Meaning | Additional properties |
+|---|---|---|
+| `inbox_opened` | The Inbox was opened, at most once per UTC day. The dashboard names the event and nothing else; the server counts what waits (the needs-you read) | `waiting` (`0`, `1-2`, `3-5`, `6+`) |
+| `inbox_waiting` | With `inbox_opened`: one event per kind of item that was waiting | `kind` (`agent_wait`, `review`, `run`, `proposal`, `goal_done`, `skill`, `ask`, `wait`, `unrecorded`), `waiting` |
+| `inbox_item_actioned` | A person acted on an Inbox item, sent by the handler that did it | `kind`; `sub_kind` (an agent's wait: `permission`, `question`, `plan`, `login`, `other`); `action` (`answer`, `dismiss`, `approve`, `changes`, `deny`, `ignore`, `save`, `unsave`, `seen`, `reject`, `close`, `hide`, `button`, `record`); `surface` (`inbox`, `chat`, `other`: the page's word, mapped through this list); `secs_to_action` (whole seconds from when the item began, by the server's own record, 0 to 7 days; left out when unknown) |
+
 ## Prerequisite setup observations
 
 `prerequisite_check` reports `tmux`, `claude`, or `codex` with a controlled availability status and check source. Repeated identical observations are deduplicated within a server run. Explicit CLI rechecks use `cli_recheck`, the Settings dialog's Claude account Check uses `settings_check`; ordinary checks use `cli_check`, and tmux discovery in server status uses `system_status`. Custom binary paths are not recorded in this event.

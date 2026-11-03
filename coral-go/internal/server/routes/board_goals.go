@@ -10,12 +10,14 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/clitext"
 	"github.com/subgentic/coral/internal/cloud"
+	"github.com/subgentic/coral/internal/tracking"
 )
 
 // Goals on the board (#7087, from #7078's note). A goal is an outcome a board's tasks work toward; the store is internal/board/goals.go. These routes write board text and nothing else: they never
@@ -545,6 +547,9 @@ func (h *BoardHandler) CloseGoal(w http.ResponseWriter, r *http.Request) {
 	h.postGoalLine(r, project, actor, "Goal #"+strconv.FormatInt(g.ID, 10)+" \""+g.Title+"\" is closed as "+g.State+": "+g.ClosedReason+" ("+strconv.Itoa(open)+" "+noun+" left)")
 	if actor == board.OperatorName && humanInputCaller(r) {
 		h.recordActivity(r, board.ActGoalDone, "goal", strconv.FormatInt(g.ID, 10), project, g.Title, g.State+": "+g.ClosedReason)
+		if surfaceOf(r) == "inbox" { // the Inbox's "goal looks done" row closed it (#7512); a goal closed elsewhere is not an Inbox action
+			inboxActioned(r, tracking.InboxGoalDone, "", "close", time.Time{})
+		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"goal": g, "open_tasks": open})
 }
