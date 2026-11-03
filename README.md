@@ -61,30 +61,36 @@ Running agents is easy. *Knowing when one of them needs you* is the part that go
 
 - **Needs you.** Every agent that is waiting for a permission, a question or a decision, and every file an agent asks you to review, in one list. One tap answers it; the agent carries on. The number on the Inbox tab is what is waiting, and you can turn on desktop alerts. While the tab is in the background its title carries the total too.
 
+<img width="100%" alt="Needs You for review and questions" src="https://github.com/user-attachments/assets/2c995cf7-7a5b-4be0-94ad-ee5e3efd4552" />
+
+- **A question to you is an item like a review.** It says who asked and about which goal and task, shows its words rendered, and takes your reply with pictures if you want them; a question whose wait ran out while you were away is kept, not lost.
+  
+- **Comments come back to you.** When an agent answers a comment on a file or a goal, the file is back in Needs you, and the goal page has its own Comments tab.
 
 -  **Review that keeps its history.** Open a file the agent made, read it, **Approve** or **Request changes**. A new version of the same file arrives as the next version with **Compare**, so you see what changed. Comment on the whole document or a passage, and add a picture you have marked up (pen, arrow, box); the agent is told, and the original is kept. A file that is almost right can be **approved with a note**, and a row you do not want to act on can be **dismissed** (with Undo).
 
-  <img width="100%" alt="Needs you review screen with comments" src="https://github.com/user-attachments/assets/2b65a084-f328-4e44-a043-2e67a3ca89e2" />
+<img width="100%" alt="Needs you review screen with comments" src="https://github.com/user-attachments/assets/94020b64-1850-4fd5-ad11-d06db742b398" />
+
   
 - **Goals as high level direction.** Give a team a goal, watch its tasks and files, and **Close goal** when it is true. Coral tells you when files for a goal are still waiting for you before you close it, and an active goal whose tasks are all done shows up in Needs you as "looks done" for you to close.
 
 <img width="1580" height="916" alt="Screenshot 2026-11-02 at 11 01 03 PM" src="https://github.com/user-attachments/assets/e4fe5db5-25b5-4ab1-a28b-8e4bcb106d9f" />
 
-- **A question to you is an item like a review.** It says who asked and about which goal and task, shows its words rendered, and takes your reply with pictures if you want them; a question whose wait ran out while you were away is kept, not lost.
-- **Comments come back to you.** When an agent answers a comment on a file or a goal, the file is back in Needs you, and the goal page has its own Comments tab.
+
 - **A compact file viewer.** The file first, with its controls on one header row (version chip and Compare, Approve, Request changes, a menu for the rest); on a phone, two thin rows.
-<img width="100%" alt="Coral Artifacts" src="https://github.com/user-attachments/assets/b9456452-2b72-43a7-80ef-97845758aadc" />
+
+<img width="100%" alt="Coral Artifacts" src="https://github.com/user-attachments/assets/33d4c866-2577-4481-af31-7e4b4905fc0d" />
+
+
 - **A record of what you decided.** An Activity folder lists your decisions in Needs you, each row chained to the one before it.
 <img width="100%" alt="Activtity History of Decisions" src="https://github.com/user-attachments/assets/0330d913-4d14-4ef6-8bcf-cca513c7ca5e" />
 
+- **Versioned Artifacts** Artifacts are versioned so you can see what the agents have changed between turns
+
+<img alt="Compare: what changed between version 1 and version 2 of a file, the added line marked" src="assets/readme/review-compare.png" width="100%" />
+
 - **Every chat and every board, searchable.** The Inbox also holds the history of every agent CLI's conversations and each team's message board.
 
-
-<p align="center">
-  <img alt="Compare: what changed between version 1 and version 2 of a file, the added line marked" src="assets/readme/review-compare.png" width="100%" />
-  <br>
-  <sub>Compare with the earlier version: what changed, marked. (Sample data.)</sub>
-</p>
 
 Coral wraps the agent CLIs you already use (Claude Code, Codex, Antigravity, Pi and OpenCode, and Hermes, which is experimental). It calls no AI API itself: your keys, your subscriptions, your tools. It runs as one Go binary on your laptop or a remote box.
 
@@ -103,6 +109,7 @@ Behind the Inbox is the part that does the work: a team of agents on one board. 
 </p>
 
 - **Mixed-vendor teams.** Permissions are written once and translated into each CLI's native format, so a read-only QA agent is read-only whether it is Claude or Codex.
+<img width="1580" height="916" alt="Screenshot 2026-11-02 at 11 12 33 PM" src="https://github.com/user-attachments/assets/f85e5e21-a49c-4b58-891b-6a89f151c156" />
 - **Idle agents sleep by themselves.** An agent that has been idle for a while is put to sleep to free memory and wakes when something is sent to it; an agent mid-work stays awake. On by default, with a switch in Settings.
 - **A Skills Store (experimental).** Import a skill, review it, approve it; approved skills appear in New agent and New team, and agents can publish and search skills themselves.
 - **Teams that survive closing the lid.** Sleep a whole team and wake it tomorrow, or after upgrading Coral: every agent resumes its own session.
