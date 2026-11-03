@@ -60,9 +60,10 @@ var pinnedSites = map[string]string{
 	"sessions_wake.go SessionsHandler.startWake":                person + ": wakeExistingSession's own start, below",
 	"sessions_wake.go SessionsHandler.wakeExistingSession":      person + ": the wake handlers' wake; it only forwards to wakeSession, and its background callers are autoResume and autoWakeOne",
 	// the background resumes of a session
-	"agent_exit.go SessionsHandler.autoResume":          background + ": the resume after an agent exit, from the exit watcher",
-	"agent_server_lost.go SessionsHandler.recoverAgent": background + ": restarts the agents of a tmux server that died, from their own rows in this Coral's database (only one still asleep because its terminal was lost); it runs only from the lost-server path (ServerLost, from the reconciler), never from a request or an agent; not gated on purpose: an upgrade in place owns its folder and a foreign Coral gets a one-click adopt, never silent withholding (Operator, #12592); the 10-minute loop guard is its only brake",
-	"auto_wake.go SessionsHandler.autoWakeOne":          background + ": only reached from AutoWakeAfterRestart",
+	"agent_exit.go SessionsHandler.autoResume":            background + ": the resume after an agent exit, from the exit watcher",
+	"agent_server_lost.go SessionsHandler.recoverAgent":   background + ": restarts the agents of a tmux server that died, from their own rows in this Coral's database (only one still asleep because its terminal was lost); it runs only from the lost-server path (ServerLost, from the reconciler), never from a request or an agent; not gated on purpose: an upgrade in place owns its folder and a foreign Coral gets a one-click adopt, never silent withholding (Operator, #12592); the 10-minute loop guard is its only brake",
+	"wake_resume_gone.go SessionsHandler.watchResumeGone": background + ": starts a Claude agent fresh in its own terminal when the agent's own log says its conversation was not found; it is reached only from the success path of a wake (a person's Wake or a gated background wake), a few seconds after that wake, never from a request or an agent (#12714)",
+	"auto_wake.go SessionsHandler.autoWakeOne":            background + ": only reached from AutoWakeAfterRestart",
 	// auto-sleep (#12111): it ends a terminal by itself and a delivery wakes an agent by itself
 	"auto_sleep.go SessionsHandler.autoSleepOne":     background + ": only reached from autoSleepPass, which RunAutoSleep runs",
 	"auto_sleep_wake.go SessionsHandler.WakeIdleFor": background + ": an automated wake (a delivery's); a person's own Send is a person's action",

@@ -73,6 +73,7 @@ func TestAutoWakeOnARealPTYResumesTheConversation(t *testing.T) {
 	require.NoError(t, ss.SetSetting(ctx, "cli_path_claude", stubCLI(t))) // never a real agent in a test
 	stopped := "5c1e0a7d-2b3c-4d5e-8f60-718293a4b5c6"
 	slept := "6d2f1b8e-3c4d-4e6f-9071-8293a4b5c6d7"
+	haveClaudeConversation(t, stopped, slept)
 	for id, reason := range map[string]string{stopped: store.SleepReasonCoralStopped, slept: ""} {
 		require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: id, AgentName: "a", AgentType: "claude", WorkingDir: dataDir}))
 		require.NoError(t, ss.SetSessionSleepingFor(ctx, id, reason))

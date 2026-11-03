@@ -102,7 +102,11 @@ func resolveClaudeTranscript(sessionID, workingDirectory string) string {
 	home, _ := os.UserHomeDir()
 	basePath := os.Getenv("CLAUDE_PROJECTS_DIR")
 	if basePath == "" {
-		basePath = filepath.Join(home, ".claude", "projects")
+		if cfg := os.Getenv("CLAUDE_CONFIG_DIR"); cfg != "" && filepath.IsAbs(cfg) { // Claude files its sessions under its config folder when one is set (#12714)
+			basePath = filepath.Join(cfg, "projects")
+		} else {
+			basePath = filepath.Join(home, ".claude", "projects")
+		}
 	}
 
 	// The folder Claude Code files a session under is the project's real path, with every link in it resolved: a project reached through a symlink (macOS's /tmp is one of /private/tmp) is under the
