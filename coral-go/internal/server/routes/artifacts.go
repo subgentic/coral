@@ -305,6 +305,8 @@ func (h *SessionsHandler) uploadAgentArtifact(w http.ResponseWriter, r *http.Req
 		return
 	}
 	_ = fresh
+	// a task's artifact count is kept for a few seconds: an upload just changed it (#12855)
+	noteArtifactsChanged()
 	h.noteOffBooksUpload(r.Context(), taskID, hexID) // an agent with no task in progress: a line of the orchestrator's check (#7793)
 	// The kind is written only for a file that is NEW on this team's list (#12144, Security's MUST): the same bytes another agent already put there keep what they are, so an agent cannot quiet someone
 	// else's plain file for review by uploading the identical bytes with --kind. The asked kind is then ignored, and the reply says so.

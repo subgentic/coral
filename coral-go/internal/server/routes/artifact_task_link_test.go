@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
@@ -221,4 +222,38 @@ func TestTheTeamListShowsAnUploadsTaskOnlyWhenItIsTheTeamsAndFiltersByIt(t *test
 		code, _, _ = e.get(bad)
 		assert.Equal(t, 400, code, bad)
 	}
+}
+
+// #12855 (stability list row 19): `task show` right after an upload said `artifacts: []`, because the task's count was kept for three seconds. An upload now drops what is kept.
+func TestATasksArtifactCountSeesAnUploadAtOnce(t *testing.T) {
+	l := newLinkRig(t)
+	task := l.task("alpha", "Backend", true)
+	bh := NewBoardHandler(l.h.bs)
+	bh.SetTaskArtifactWriter(l.coralDir, nil)
+	t.Cleanup(bh.WaitBackground)
+	ctx := context.Background()
+	assert.Zero(t, bh.taskArtifactCounts(ctx, "alpha")[task], "nothing uploaded yet (and the empty answer is now kept)")
+	code, out := l.post("s1", "first upload", nil)
+	require.Equal(t, http.StatusCreated, code, out)
+	assert.Equal(t, 1, bh.taskArtifactCounts(ctx, "alpha")[task], "the count is not the kept answer from before the upload")
+	code, out = l.post("s1", "second upload", nil)
+	require.Equal(t, http.StatusCreated, code, out)
+	assert.Equal(t, 2, bh.taskArtifactCounts(ctx, "alpha")[task])
+}
+
+// A race the generation must cover: a count scanned before an upload but stored after it is not used by the next read.
+func TestACountScannedBeforeAnUploadButStoredAfterItIsNotKept(t *testing.T) {
+	l := newLinkRig(t)
+	task := l.task("alpha", "Backend", true)
+	bh := NewBoardHandler(l.h.bs)
+	bh.SetTaskArtifactWriter(l.coralDir, nil)
+	t.Cleanup(bh.WaitBackground)
+	ctx := context.Background()
+	gen := artifactGeneration.Load()
+	stale := map[int64]int{}
+	l.post("s1", "raced", nil)
+	bh.taskCounts.mu.Lock()
+	bh.taskCounts.entries = map[string]taskCountEntry{"alpha": {at: time.Now(), gen: gen, counts: stale}} // what a scan that began before the upload stores
+	bh.taskCounts.mu.Unlock()
+	assert.Equal(t, 1, bh.taskArtifactCounts(ctx, "alpha")[task])
 }
