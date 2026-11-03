@@ -64,6 +64,7 @@ function _build() {
     d.innerHTML = `<div class="modal-content dlg-flow artifact-viewer-content">
         <div class="artifact-viewer-header">
             <h2 id="artifact-viewer-title" class="artifact-viewer-title"></h2>
+            <span class="artifact-viewer-from" hidden></span>
             <span class="artifact-viewer-chips"></span>
             <span class="artifact-viewer-actions"><button type="button" class="btn artifact-viewer-markup" hidden>Mark up</button></span>
             <span class="artifact-viewer-morewrap">
@@ -75,14 +76,12 @@ function _build() {
                 </div>
             </span>
         </div>
-        <div class="artifact-viewer-from" hidden></div>
-        <div class="artifact-viewer-goal" hidden></div>
         <div class="artifact-viewer-readers" hidden></div>
         <div class="artifact-viewer-main"><div class="artifact-viewer-body"></div></div>
         <div class="modal-actions modal-footer artifact-viewer-foot"><button type="button" class="btn artifact-viewer-close">Close</button></div>
     </div>`;
-    _details = makeDetails({ panel: d.querySelector('.artifact-viewer-readers') });
-    _details.button.classList.add('menu-item'); _details.button.setAttribute('role', 'menuitem'); d.querySelector('.artifact-viewer-menu').append(_details.button); // Details is in the ⋯ menu: the content is straight under the one header row (#12223)
+    _details = makeDetails({ panel: d.querySelector('.artifact-viewer-readers'), remember: false }); // closed on every open of the viewer: one open Details no longer fills the next file's screen (#12725)
+    _details.button.classList.add('artifact-viewer-details'); d.querySelector('.artifact-viewer-morewrap').before(_details.button); // Details is a button in the header row, beside ⋯: where a person looks to close it (#12725) header row (#12223)
     // the HTML preview's banner is said once; after that a "Sandboxed" chip in the header says it, and a tap shows or hides the banner (#12224)
     const chip = document.createElement('button'); chip.type = 'button'; chip.className = 'chip artifact-viewer-sandbox'; chip.hidden = true; chip.setAttribute('aria-expanded', 'false');
     chip.textContent = 'Sandboxed'; // words only: the icon font is a subset and has no shield
@@ -184,23 +183,6 @@ export function openArtifactViewer(hex, opts = {}) {
     const title = d.querySelector('.artifact-viewer-title');
     title.textContent = visibleName(opts.filename) || 'Artifact'; // the uploader's text, without what hides or reorders it (Security on #220)
     const fromLine = d.querySelector('.artifact-viewer-from'); fromLine.textContent = visibleName(opts.from) || ''; fromLine.hidden = !fromLine.textContent; fromLine.title = fromLine.textContent; fromLine.classList.remove('is-open'); fromLine.setAttribute('aria-expanded', 'false'); d.querySelector('.artifact-viewer-sandbox').hidden = true; d._markUp.picture(false); d._markUp.write(false); // who uploaded a file opened for review (#11456), as text
-    // The goal this file serves, a link back to it in the opened view (#12025): one click closes the viewer and opens the goal's page. None for a file with no goal (or one opened from where its goal is not known).
-    const goalLine = d.querySelector('.artifact-viewer-goal');
-    goalLine.replaceChildren(); goalLine.hidden = true;
-    goalLine.style.cssText = 'flex:none;padding:0 16px 8px;font-size:var(--fs-sm);color:var(--text-secondary);overflow-wrap:anywhere'; // in script, not the start CSS: that file is at its cap
-    if (opts.goal && opts.goalId && opts.goalTeam) {
-        const link = document.createElement('button'); link.type = 'button'; link.className = 'dt-link';
-        link.style.cssText = 'white-space:normal;text-decoration:underline;text-align:left' + (window.matchMedia('(max-width: 768px)').matches ? ';min-height:44px;padding:0 4px' : '');
-        link.textContent = markHidden(opts.goal, { strict: true });
-        const team = String(opts.goalTeam), goalId = String(opts.goalId);
-        link.addEventListener('click', async () => {
-            // a phone's viewer has its own history entry: closing it goes Back, and that lands after the click: the goal's page is opened once it has, or the Back would undo it
-            const settled = _overlay ? new Promise(res => { window.addEventListener('popstate', () => res(), { once: true }); setTimeout(res, 600); }) : Promise.resolve();
-            closeArtifactViewer(); await settled;
-            importOnce('./nav.js').then(n => n.go({ view: 'inbox-goals', sub: 'goals', id: team, item: goalId })).catch(() => {});
-        });
-        goalLine.append('Goal: ', link); goalLine.hidden = false;
-    }
     const dl = d.querySelector('.artifact-viewer-download');
     const newTab = d.querySelector('.artifact-viewer-newtab');
     newTab.hidden = true; newTab.removeAttribute('href'); // its address comes with the kind (typeKnown): a manifest's own bytes are a list, not what to open
@@ -223,11 +205,23 @@ export function openArtifactViewer(hex, opts = {}) {
     _review.open(hex, { ...opts, board: commentBoard(opts) });
     // "Who can read this", for the Operator (the owner through Coral Hub): drawn only when the machine answers it; anyone else sees nothing.
     _details.clear();
-    if (opts.goal || opts.task) { // a review opened from Needs you says the goal and the task it serves: they are not on the row (#11751)
-        const dl = document.createElement('dl'); dl.className = 'facts detail-facts';
-        for (const [k, v] of [['Goal', opts.goal], ['Task', opts.task]]) if (v) { const dt = document.createElement('dt'), dd = document.createElement('dd'); dt.textContent = k; dd.textContent = markHidden(v, { strict: true }); dl.append(dt, dd); }
-        _details.add(dl);
-    }
+    // The goal and the task the file serves, behind Details as chips in one wrapped row (#12725; #12025, #11751): the goal's chip is the link back to it (one click closes the viewer and opens the goal's page); the viewer's header is one line
+    const chips = document.createElement('div'); chips.className = 'detail-chips';
+    if (opts.goal && opts.goalId && opts.goalTeam) {
+        const wrap = document.createElement('span'); wrap.className = 'artifact-viewer-goal chip detail-chip';
+        const link = document.createElement('button'); link.type = 'button'; link.className = 'dt-link detail-chip-link';
+        link.textContent = markHidden(opts.goal, { strict: true }); wrap.title = link.textContent;
+        const team = String(opts.goalTeam), goalId = String(opts.goalId);
+        link.addEventListener('click', async () => {
+            // a phone's viewer has its own history entry: closing it goes Back, and that lands after the click: the goal's page is opened once it has, or the Back would undo it
+            const settled = _overlay ? new Promise(res => { window.addEventListener('popstate', () => res(), { once: true }); setTimeout(res, 600); }) : Promise.resolve();
+            closeArtifactViewer(); await settled;
+            importOnce('./nav.js').then(n => n.go({ view: 'inbox-goals', sub: 'goals', id: team, item: goalId })).catch(() => {});
+        });
+        wrap.append('Goal: ', link); chips.append(wrap);
+    } else if (opts.goal) { const g = document.createElement('span'); g.className = 'chip detail-chip'; g.textContent = `Goal: ${markHidden(opts.goal, { strict: true })}`; g.title = g.textContent; chips.append(g); }
+    if (opts.task) { const t = document.createElement('span'); t.className = 'chip detail-chip'; t.textContent = `Task: ${markHidden(opts.task, { strict: true })}`; t.title = t.textContent; chips.append(t); }
+    if (chips.children.length) _details.add(chips);
     readersAllowed(hex, opts.server).then(ok => { if (ok && gen === _gen && !d.hidden) { _details.add(readersBlock(hex, opts.server, _details)); _details.add(privateBlock(hex, opts.server, _details)); } }).catch(() => {});
     if (!opts.switched) d.querySelector('.artifact-viewer-close').focus(); // a version chosen from the bar keeps the keyboard on the bar
     let textShown = false; // the strict text view drew it: comments can point into it. Anything else (a frame, a picture, a PDF, a table, a video, a download) takes whole-document comments (#11444).

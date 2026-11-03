@@ -10,7 +10,7 @@ import { browserLocal } from './safe_storage.js';
 const KEY = 'coral-details-open';
 let serial = 0;
 
-export function makeDetails({ panel = null } = {}) {
+export function makeDetails({ panel = null, remember = true } = {}) { // remember: false is for a viewer that opens closed every time (#12725): the state is this one disclosure's, not the browser's
     const p = panel || document.createElement('div');
     p.classList.add('detail-details');
     if (!p.id) p.id = `details-panel-${++serial}`;
@@ -24,13 +24,14 @@ export function makeDetails({ panel = null } = {}) {
     button.append('Details', count, chevron);
     let used = false;
     let shown = [];
-    const isOpen = () => browserLocal.get(KEY) === '1';
+    let local = false;
+    const isOpen = () => (remember ? browserLocal.get(KEY) === '1' : local);
     const sync = () => {
         const open = isOpen() && used;
         button.hidden = !used; button.setAttribute('aria-expanded', String(open)); p.hidden = !open;
         if (open) for (const fn of shown) fn();
     };
-    button.addEventListener('click', () => { browserLocal.set(KEY, isOpen() ? '0' : '1'); sync(); });
+    button.addEventListener('click', () => { if (remember) browserLocal.set(KEY, isOpen() ? '0' : '1'); else local = !local; sync(); });
     sync();
     return {
         button, panel: p,
@@ -38,6 +39,6 @@ export function makeDetails({ panel = null } = {}) {
         add(node) { p.append(node); used = true; sync(); },
         remove(node) { node.remove(); used = p.children.length > 0; sync(); },
         onShown(fn) { shown.push(fn); if (isOpen() && used) fn(); },
-        clear() { p.replaceChildren(); used = false; shown = []; sync(); },
+        clear() { p.replaceChildren(); used = false; shown = []; if (!remember) local = false; sync(); }, // a viewer that does not remember opens closed each time
     };
 }
