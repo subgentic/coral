@@ -18,7 +18,8 @@ import (
 //     sentence (ShareNotAnsweredNote), which names no folder, server or person. The mark expires on its own;
 //   - a late answer is thrown away. Nothing is remembered as found: the candidates are stat'ed again, through the same screens, at the next lookup;
 //   - a folder that answered in time is not probed again for shareAnswered (5 s), so one lookup's candidates in it (claude, claude.exe, .cmd, .bat) cost one probe.
-//     Only "the share answered" is remembered, never a path that was found.
+//     Only "the share answered" is remembered, never a path that was found. The limit this leaves: a share that goes down inside those 5 s is not probed, so
+//     that one lookup's own stat of a candidate can wait until SMB gives up; the next lookup's probe then times out and the folder is skipped for shareQuiet.
 
 var (
 	shareProbeLimit = 2 * time.Second
