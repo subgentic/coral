@@ -31,6 +31,7 @@ const DETAIL = { skill: ROWS[1], files: [
             window.fetch = (u, o = {}) => { const url = new URL(String(u && u.url || u), location.origin); const m = (o.method || 'GET').toUpperCase(); const p = url.pathname;
                 if (!p.startsWith('/api/skills')) return Promise.resolve(new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } }));
                 window.__calls.push(m + ' ' + p + url.search + (o.body ? ' ' + o.body : ''));
+                if (p === '/api/skills' && m === 'POST') return json({ ok: true, id: 'f'.repeat(32), name: 'md-skill', version: 1 });
                 if (p === '/api/skills' && m === 'GET') { const st = url.searchParams.get('status'); return json({ skills: st ? rows.filter(r => r.status === st) : rows }); }
                 if (p === '/api/skills/${ROWS[1].id}' && m === 'GET') return json(detail);
                 if (p === '/api/skills/${ROWS[2].id}' && m === 'GET') return json({ skill: rows[2], files: [{ path: 'SKILL.md', size: 90, kind: 'instructions', sha256: '9'.repeat(64) }], contents: { 'SKILL.md': '# PDF forms' }, warnings: [], hosts: [] });
@@ -44,6 +45,23 @@ const DETAIL = { skill: ROWS[1], files: [
         const heads = await ev(`Array.from(document.querySelectorAll('#skills-view th.dt-th')).map(t => t.textContent.trim())`);
         for (const h of ['Name', 'Published by', 'Version', 'Status', 'Updated']) assert.ok(heads.some(x => x.includes(h)), `column ${h}: ${heads}`);
         assert.equal(await ev(`document.getElementById('skills-view').scrollWidth <= document.getElementById('skills-view').clientWidth + 1`), true, 'no sideways scroll');
+        // #12678: the button says "Import a skill" with a hint, the picker takes .zip and .md, a lone SKILL.md is sent as one, anything else is refused in words and sends nothing
+        const btnText = await ev(`Array.from(document.querySelectorAll('#skills-view .skills-head button')).map(b => b.textContent.trim())`);
+        assert.ok(btnText.includes('Import a skill'), 'the button reads Import a skill, not (.zip): ' + btnText);
+        assert.ok(!btnText.some(t => /\.zip\)/.test(t)), 'no (.zip) in the button');
+        assert.match(await ev(`document.querySelector('#skills-view .skills-hint').textContent`), /\.zip or a SKILL\.md/, 'the hint');
+        const accept = await ev(`document.querySelector('#skills-view input[type=file]').accept`);
+        assert.ok(/\.zip/.test(accept) && /\.md/.test(accept), 'the picker takes .zip and .md: ' + accept);
+        const give = (name, text) => ev(`(() => { const i = document.querySelector('#skills-view input[type=file]'); const dt = new DataTransfer(); dt.items.add(new File([${JSON.stringify(text)}], ${JSON.stringify(name)})); i.files = dt.files; i.dispatchEvent(new Event('change')); return true; })()`);
+        await give('notes.txt', 'plain text');
+        await waitFor(`Array.from(document.querySelectorAll('.toast')).some(t => /is neither/.test(t.textContent))`, 'a .txt is refused in words', 4000);
+        assert.equal(await ev(`window.__calls.filter(c => c.startsWith('POST /api/skills')).length`), 0, 'and nothing was sent');
+        await give('SKILL.md', '---\nname: md-skill\ndescription: One file.\n---\nBody\n');
+        await waitFor(`window.__calls.some(c => c.startsWith('POST /api/skills'))`, 'a lone SKILL.md is sent', 6000);
+        const sentMd = await ev(`JSON.parse(window.__calls.find(c => c.startsWith('POST /api/skills')).replace(/^POST \\/api\\/skills /, ''))`);
+        assert.ok(sentMd.skill_md_base64 && !sentMd.zip_base64, 'as skill_md_base64, not a zip: ' + Object.keys(sentMd));
+        assert.equal(Buffer.from(sentMd.skill_md_base64, 'base64').toString().startsWith('---\nname: md-skill'), true, 'the file text');
+        await waitFor(`Array.from(document.querySelectorAll('.toast')).some(t => /Imported md-skill/.test(t.textContent))`, 'the import says so', 4000);
         await waitFor(`!document.getElementById('nav-tab-skills-badge').hidden && document.getElementById('nav-tab-skills-badge').textContent === '2'`, 'the badge says two wait', 4000);
         const first = () => ev(`document.querySelector('#skills-view tr.dt-row').dataset.key`);
         await ev(`document.querySelector('#skills-view th.dt-th[data-key="name"] button.dt-sort').click(); true`);
