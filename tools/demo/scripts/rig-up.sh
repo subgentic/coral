@@ -1,10 +1,24 @@
 #!/bin/bash
 # Start a fresh isolated demo Coral (no session, mock agents, throwaway data), optionally launch the team, and sign in headless.
 # Needs $DEMO_ROOT/bin (coral, coral-board, coral-agent, mock-agent, coral-hook-*; see README) and Playwright in $DEMO_ROOT.
+# usage: rig-up.sh        start a fresh one;   rig-up.sh stop    stop it (only if the recorded pid is still this demo's own server)
 # NOLAUNCH=1 leaves the team to the take (beat 2 launches it on camera).
 source "$(dirname "${BASH_SOURCE[0]}")/env.sh"
 SEED="$HERE/../seed"
-[ -f "$S/work/server.pid" ] && kill "$(cat "$S/work/server.pid")" 2>/dev/null; sleep 1
+# Stop the demo Coral recorded in work/server.pid, but only if that pid is still this demo's own server (our binary on our port):
+# a pid that was reused by anything else is left alone.
+stop_demo() {
+  local pf="$S/work/server.pid" pid cmd
+  [ -f "$pf" ] || return 0
+  pid=$(cat "$pf")
+  case "$pid" in ''|*[!0-9]*) rm -f "$pf"; return 0 ;; esac
+  cmd=$(ps -p "$pid" -o command= 2>/dev/null)
+  if [ -n "$cmd" ] && [[ "$cmd" == "$S/bin/coral "* ]] && [[ "$cmd" == *"--port $PORT"* ]]; then kill "$pid"; sleep 1
+  elif [ -n "$cmd" ]; then echo "pid $pid is not this demo's Coral; not stopping it" >&2; fi
+  rm -f "$pf"
+}
+if [ "$1" = stop ]; then stop_demo; exit 0; fi
+stop_demo
 mkdir -p "$S/work"; rm -rf "$S/data" "$S/home" "$S/repo" "$S/work/claude-projects" "$S/work/envdump" "$S/work/state.json" "$S/work/launch.json"
 mkdir -p "$S/data" "$S/home" "$S/repo" "$S/work/claude-projects" "$S/work/envdump"
 # the throwaway Go package the agents "work on"

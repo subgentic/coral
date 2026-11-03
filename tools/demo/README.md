@@ -53,7 +53,7 @@ tools/demo/
    ```
    Each beat writes `work/clips/<beat>/*.webm`. A beat that fails closes its clip and prints `FAILED <beat>`.
 6. **Encode**: `tools/demo/scripts/encode.sh` writes `$DEMO_ROOT/out/coral-demo-16x9.mp4` (1:41), `coral-demo-9x16-phone.mp4` (21 s) and `coral-demo-inbox.gif`. Keep the GIF under about 5 MB (the one in the repo is 2.6 MB).
-7. **Stop the demo Coral**: `kill "$(cat $DEMO_ROOT/work/server.pid)"`.
+7. **Stop the demo Coral**: `tools/demo/scripts/rig-up.sh stop` (it stops the server it recorded, and only if that process is still this demo's own server; a reused pid is left alone).
 
 ## Iterating
 
