@@ -317,6 +317,29 @@ function _applyACFPresetFor(containerId, name) {
 
 // Default team: first 3 presets
 
+/** A folder the person typed or browsed to that does not exist yet, inside one that does (#12833): step 1 SAYS Coral creates it when the team is launched, and the launch asks for exactly that (create_new_folder). A folder that exists, a
+ *  name Coral would not make, a parent that is missing, another computer's folder and Coral's own suggestion (which has its own line) get no line and no request: the launch checks them as before. */
+const NEW_FOLDER_NAME = /^[A-Za-z0-9_][A-Za-z0-9._-]{0,63}$/;
+async function _checkNewTeamFolder() {
+    const input = document.getElementById('launch-team-dir'), line = document.getElementById('launch-team-dir-new');
+    if (!input || !line) return;
+    const dir = input.value.trim(), server = _effectiveServer(launch.server);
+    const clear = () => { delete input.dataset.createNew; if (!line.hidden) line.hidden = true; };
+    const m = /^(.*[\\/])([^\\/]+)[\\/]*$/.exec(dir);
+    if (!dir || !m || usesSuggestion(input) || server !== LOCAL_SERVER || input.dataset.dirServer || !NEW_FOLDER_NAME.test(m[2]) || /(^|[\\/])\.\.([\\/]|$)/.test(dir)) { clear(); return; }
+    const parent = m[1].length > 1 ? m[1].replace(/[\\/]+$/, '') : m[1];
+    let exists = true, parentOk = false;
+    try {
+        exists = (await serverFetch(server, `/api/filesystem/list?path=${encodeURIComponent(dir)}`)).ok;
+        if (!exists) parentOk = (await serverFetch(server, `/api/filesystem/list?path=${encodeURIComponent(parent)}`)).ok;
+    } catch { clear(); return; }
+    if (input.value.trim() !== dir) return; // the field changed while it was asked
+    if (exists || !parentOk) { clear(); return; }
+    input.dataset.createNew = dir;
+    line.textContent = `${m[2]} does not exist yet. Coral creates it inside ${parent} when you launch the team.`;
+    line.hidden = false;
+}
+
 /** Worktree option is offered when the working directory is a git repo ON THE TARGET SERVER. */
 async function _checkTeamGitDir() {
     const server = _effectiveServer(launch.server);
@@ -416,8 +439,8 @@ async function _initTeamForm() {
     if (dirInput && !dirInput.dataset.gitWired) {
         dirInput.dataset.gitWired = '1';
         let _gitCheckTimer;
-        dirInput.addEventListener('input', () => { clearTimeout(_gitCheckTimer); _gitCheckTimer = setTimeout(_checkTeamGitDir, 500); });
-        dirInput.addEventListener('change', _checkTeamGitDir);
+        dirInput.addEventListener('input', () => { delete dirInput.dataset.createNew; const nl = document.getElementById('launch-team-dir-new'); if (nl) nl.hidden = true; clearTimeout(_gitCheckTimer); _gitCheckTimer = setTimeout(() => { _checkTeamGitDir(); _checkNewTeamFolder(); }, 500); }); // the line goes the moment the field changes and comes back when the folder is checked
+        dirInput.addEventListener('change', () => { _checkTeamGitDir(); _checkNewTeamFolder(); });
     }
     for (const id of ['team-board-name', 'launch-team-dir']) { // Enter in either is Next (#7407)
         const el = document.getElementById(id);
@@ -771,6 +794,7 @@ async function launchTeam() {
     if (teamSkills.length) payload.skills = teamSkills;
     if (boardServer) payload.board_server = boardServer;
     if (usesSuggestion(document.getElementById('launch-team-dir'))) payload.create_dir = true; // the folder Coral suggested: it makes it now (#11258)
+    else if (document.getElementById('launch-team-dir')?.dataset.createNew === workingDir) payload.create_new_folder = true; // a new folder the person chose, which step 1 said Coral makes (#12833)
     if (!isHub() && trustTicked()) payload.trust_folder = true; // the person ticked: trust this existing folder for the agents (#11889)
     if (settings.working_mode) payload.working_mode = settings.working_mode; // the working mode, its guidance and the Additional instructions (#7407)
     if (settings.health_monitor) payload.health_monitor = true;
