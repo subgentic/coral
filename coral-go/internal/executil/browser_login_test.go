@@ -23,12 +23,12 @@ func TestOpenLoginKeepsTheLinkOutOfTheArgumentList(t *testing.T) {
 	t.Setenv("TEMP", os.Getenv("TMPDIR"))
 	t.Setenv("TMP", os.Getenv("TMPDIR"))
 
-	link := "http://127.0.0.1:8420/?login_token=0123456789abcdef0123456789abcdef&next=%2Fa%3Fb%3D1"
+	link := "http://127.0.0.1:8420/?login_token=test-token-placeholder&next=%2Fa%3Fb%3D1"
 	OpenLogin(link)
 	require.Len(t, started, 1)
 	for _, a := range started[0] {
 		assert.NotContains(t, a, "login_token", "the secret is not in the opener's argument list: %v", started[0])
-		assert.NotContains(t, a, "0123456789abcdef")
+		assert.NotContains(t, a, "test-token-placeholder")
 	}
 	path := started[0][len(started[0])-1]
 	assert.True(t, strings.HasSuffix(path, ".html"), path)
@@ -36,7 +36,7 @@ func TestOpenLoginKeepsTheLinkOutOfTheArgumentList(t *testing.T) {
 	require.NoError(t, err)
 	page := string(b)
 	assert.Contains(t, page, `http-equiv="refresh"`)
-	assert.Contains(t, page, `content="0;url=http://127.0.0.1:8420/?login_token=0123456789abcdef0123456789abcdef&amp;next=%2Fa%3Fb%3D1"`, "the link, escaped for an attribute")
+	assert.Contains(t, page, `content="0;url=http://127.0.0.1:8420/?login_token=test-token-placeholder&amp;next=%2Fa%3Fb%3D1"`, "the link, escaped for an attribute")
 	assert.Contains(t, page, `name="referrer" content="no-referrer"`)
 	if runtime.GOOS != "windows" {
 		fi, err := os.Stat(path)
@@ -119,7 +119,7 @@ func TestOldLoginPagesAreRemovedAndYoungOnesKept(t *testing.T) {
 
 // When the page cannot be written, or the opener fails on it, the link is opened as OpenBrowser always did: the sign-in is never lost to a temp folder.
 func TestOpenLoginFallsBackToTheLinkWhenThePageOrTheOpenerFails(t *testing.T) {
-	link := "http://127.0.0.1:8420/?login_token=0123456789abcdef"
+	link := "http://127.0.0.1:8420/?login_token=test-token-placeholder"
 
 	t.Run("the page cannot be written", func(t *testing.T) {
 		var started [][]string
