@@ -63,6 +63,9 @@ const (
 	passwordIsSet                           // the file holds a valid password
 )
 
+// passwordLstat is os.Lstat, a variable so a test can give it an error a real folder cannot easily make (access denied).
+var passwordLstat = os.Lstat
+
 // passwordState reads the password file's state. Only a file that does not exist is absent; any other error, an empty file or one that does not
 // parse is unreadable.
 func (ks *KeyStore) passwordState() passwordState {
@@ -70,7 +73,7 @@ func (ks *KeyStore) passwordState() passwordState {
 		return passwordUnreadable
 	}
 	dir := ks.dataDir()
-	if _, err := os.Lstat(filepath.Join(dir, PasswordFile)); err != nil {
+	if _, err := passwordLstat(filepath.Join(dir, PasswordFile)); err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			return passwordAbsent
 		}
