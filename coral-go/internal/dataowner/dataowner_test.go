@@ -7,50 +7,26 @@ import (
 	"runtime"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// rig is a data folder and an in-memory "database": the id row, the number of live sessions and whether the board has messages.
+// rig is a data folder and an in-memory "database": the id row.
 type rig struct {
-	t        *testing.T
-	dir      string
-	row      string
-	sessions int
-	messages bool
-	settings bool      // sessions.db has a user_settings row
-	oldest   time.Time // when the oldest active live session was created (zero: sessions are recent, one hour old)
-	rowErr   error
+	t      *testing.T
+	dir    string
+	row    string
+	rowErr error
 }
 
-// newRig reads file times as the modified time, so a test can set them (a real copy cannot): TestACopyThatKeepsTheModifiedTimesLooksNew uses the real birth time.
-func newRig(t *testing.T) *rig {
-	old := FileBirth
-	FileBirth = func(fi os.FileInfo) (time.Time, bool) { return fi.ModTime(), true }
-	t.Cleanup(func() { FileBirth = old })
-	return &rig{t: t, dir: t.TempDir()}
-}
+func newRig(t *testing.T) *rig { return &rig{t: t, dir: t.TempDir()} }
 
 func (r *rig) probe() Probe {
 	return Probe{
-		Dir:              r.dir,
-		Marker:           func(context.Context) (string, error) { return r.row, r.rowErr },
-		SetMarker:        func(_ context.Context, id string) error { r.row = id; return nil },
-		LiveSessions:     func(context.Context) (int, error) { return r.sessions, nil },
-		BoardHasMessages: func(context.Context) (bool, error) { return r.messages, nil },
-		HasSettings:      func(context.Context) (bool, error) { return r.settings, nil },
-		OldestLiveSession: func(context.Context) (time.Time, bool, error) {
-			if r.sessions == 0 {
-				return time.Time{}, false, nil
-			}
-			if r.oldest.IsZero() {
-				return time.Now().Add(-time.Hour), true, nil
-			}
-			return r.oldest, true, nil
-		},
-		Now: time.Now,
+		Dir:       r.dir,
+		Marker:    func(context.Context) (string, error) { return r.row, r.rowErr },
+		SetMarker: func(_ context.Context, id string) error { r.row = id; return nil },
 	}
 }
 
@@ -61,18 +37,6 @@ func (r *rig) put(name, body string) string {
 	p := filepath.Join(r.dir, name)
 	require.NoError(r.t, os.WriteFile(p, []byte(body), 0o600))
 	return p
-}
-
-// establish makes the folder look like an old install: messages, an api_key older than a minute, and more than the databases and tokens.
-func (r *rig) establish() {
-	r.t.Helper()
-	r.messages = true
-	r.put("sessions.db", "x")
-	key := r.put("api_key", "k")
-	old := time.Now().Add(-10 * 24 * time.Hour) // written when Coral was first installed, long before the sessions
-	require.NoError(r.t, os.Chtimes(key, old, old))
-	log := r.put("app.log", "log")
-	require.NoError(r.t, os.Chtimes(log, old, old))
 }
 
 func TestAFirstStartMakesTheIdInBothPlacesAndVerifiesAfterwards(t *testing.T) {
@@ -93,52 +57,12 @@ func TestADatabaseCopiedAloneIsForeign(t *testing.T) {
 	origin := newRig(t)
 	require.False(t, origin.verify().Foreign)
 	copyOf := newRig(t) // an empty folder that gets the origin's database
-	copyOf.row, copyOf.sessions = origin.row, 3
+	copyOf.row = origin.row
 	v := copyOf.verify()
 	assert.True(t, v.Foreign)
 	assert.Equal(t, ReasonRowOnly, v.Reason)
 	_, err := os.Stat(filepath.Join(copyOf.dir, FileName))
 	assert.True(t, os.IsNotExist(err), "a foreign start writes no id file")
-}
-
-func TestAnOldDatabaseDroppedInABareFolderIsForeign(t *testing.T) {
-	r := newRig(t)
-	r.sessions = 5 // the incident: only sessions.db copied, no marker in it yet
-	r.put("sessions.db", "x")
-	v := r.verify()
-	assert.True(t, v.Foreign)
-	assert.Equal(t, ReasonBare, v.Reason)
-	assert.Empty(t, r.row, "nothing is written")
-}
-
-func TestAnOldInstallUpgradingInPlaceAdoptsOnlyWhenEveryConditionHolds(t *testing.T) {
-	// all conditions: adopted
-	r := newRig(t)
-	r.sessions = 5
-	r.establish()
-	v := r.verify()
-	assert.False(t, v.Foreign)
-	assert.True(t, v.Made)
-
-	for name, break1 := range map[string]func(*rig){
-		"no sign of earlier use in the database": func(r *rig) { r.messages = false },
-		"api_key younger than a minute":          func(r *rig) { now := time.Now(); _ = os.Chtimes(filepath.Join(r.dir, "api_key"), now, now) },
-		"no api_key":                             func(r *rig) { _ = os.Remove(filepath.Join(r.dir, "api_key")) },
-		"nothing else in the folder":             func(r *rig) { _ = os.Remove(filepath.Join(r.dir, "app.log")) },
-		"api_key is a directory, not a file": func(r *rig) {
-			_ = os.Remove(filepath.Join(r.dir, "api_key"))
-			_ = os.Mkdir(filepath.Join(r.dir, "api_key"), 0o755)
-		},
-	} {
-		r := newRig(t)
-		r.sessions = 5
-		r.establish()
-		break1(r)
-		v := r.verify()
-		assert.True(t, v.Foreign, name)
-		assert.Equal(t, ReasonBare, v.Reason, name)
-		assert.Empty(t, r.row, name)
-	}
 }
 
 func TestTheFileAndTheRowMustAgree(t *testing.T) {
@@ -243,7 +167,6 @@ func TestTheMadeAtTextIsCleanedAndCappedBeforeItIsShown(t *testing.T) {
 func TestAdoptMakesTheNextStartOwnedAndWakesNothing(t *testing.T) {
 	r := newRig(t)
 	r.row = strings.Repeat("c", 32) // a foreign database
-	r.sessions = 4
 	require.True(t, r.verify().Foreign)
 	require.NoError(t, Adopt(context.Background(), r.probe()))
 	v := r.verify()
@@ -263,87 +186,6 @@ func TestALinkWhereTheIdFileShouldBeIsRefused(t *testing.T) {
 	v := r.verify()
 	assert.True(t, v.Foreign)
 	assert.Equal(t, ReasonUnreadable, v.Reason)
-}
-
-// An install with agents but no board message is not mistaken for a copy after the upgrade: a user_settings row, or a session older than a day, is a second proof of earlier use, when the folder is
-// older than the sessions.
-func TestAnInstallWithAgentsButNoBoardMessagesIsOwnedWhenItShowsEarlierUseElsewhere(t *testing.T) {
-	day2 := time.Now().Add(-48 * time.Hour)
-	for name, set := range map[string]func(*rig){
-		"a user_settings row":             func(r *rig) { r.settings = true },
-		"a live session older than a day": func(r *rig) { r.oldest = day2 },
-		"both":                            func(r *rig) { r.settings, r.oldest = true, day2 },
-	} {
-		r := newRig(t)
-		r.sessions = 5
-		r.establish() // the key and the log are ten days old: older than the sessions
-		r.messages = false
-		set(r)
-		v := r.verify()
-		assert.False(t, v.Foreign, name)
-		assert.True(t, v.Made, name)
-	}
-
-	none := newRig(t)
-	none.sessions = 5
-	none.establish()
-	none.messages = false
-	v := none.verify()
-	assert.True(t, v.Foreign, "no board message, no setting, and the oldest session is under a day old")
-	assert.Equal(t, ReasonBare, v.Reason)
-}
-
-// The incident class: sessions.db alone is copied into another folder. It carries a setting and old sessions; the folder's files are all newer. Started twice (the first start leaves a log and a key
-// that is over a minute old at the second) it stays foreign both times, and nothing is made.
-func TestACopyOfSessionsDbWithSettingsAndOldSessionsStaysForeignWhenStartedTwice(t *testing.T) {
-	r := newRig(t)
-	r.sessions, r.settings, r.messages = 5, true, false
-	r.oldest = time.Now().Add(-30 * 24 * time.Hour)
-	r.put("sessions.db", "x")
-
-	first := r.verify() // no key yet
-	assert.True(t, first.Foreign)
-	assert.Equal(t, ReasonBare, first.Reason)
-
-	// what the first start left behind, aged past a minute
-	aged := time.Now().Add(-5 * time.Minute)
-	key := r.put("api_key", "k")
-	log := r.put("app.log", "log")
-	require.NoError(t, os.Chtimes(key, aged, aged))
-	require.NoError(t, os.Chtimes(log, aged, aged))
-
-	second := r.verify()
-	assert.True(t, second.Foreign, "every file in the new folder is newer than the sessions the copy carries")
-	assert.Equal(t, ReasonBare, second.Reason)
-	assert.Empty(t, r.row, "no id was made")
-	_, err := os.Stat(filepath.Join(r.dir, FileName))
-	assert.True(t, os.IsNotExist(err))
-
-	// the operator's step then still works
-	require.NoError(t, Adopt(context.Background(), r.probe()))
-	assert.False(t, r.verify().Foreign)
-}
-
-// A person who regenerated the api_key in place: the key is new, but an older file of the install is still there. The upgrade is not foreign. With nothing older in the folder it is (the
-// operator's adopt step covers it).
-func TestARegeneratedApiKeyInPlaceDoesNotTurnAnUpgradeForeignWhileAnOlderFileIsThere(t *testing.T) {
-	r := newRig(t)
-	r.sessions, r.settings, r.messages = 5, true, false
-	r.oldest = time.Now().Add(-48 * time.Hour)
-	r.establish()
-	r.messages = false // establish() adds a board message: this test is about the weaker proofs
-	fresh := time.Now().Add(-5 * time.Minute)
-	require.NoError(t, os.Chtimes(filepath.Join(r.dir, "api_key"), fresh, fresh)) // regenerated: newer than the sessions
-	assert.False(t, r.verify().Foreign, "app.log is still ten days old")
-
-	lone := newRig(t)
-	lone.sessions, lone.settings, lone.messages = 5, true, false
-	lone.oldest = time.Now().Add(-48 * time.Hour)
-	lone.establish()
-	lone.messages = false
-	require.NoError(t, os.Chtimes(filepath.Join(lone.dir, "api_key"), fresh, fresh))
-	require.NoError(t, os.Chtimes(filepath.Join(lone.dir, "app.log"), fresh, fresh))
-	assert.True(t, lone.verify().Foreign, "nothing in the folder predates the sessions: the operator adopts")
 }
 
 // A made-at path that is not local is not read: no stat, no link resolution, no open (a network path would make Windows connect out).
@@ -412,34 +254,39 @@ func TestAFolderRecognisesItsOwnPathWithoutLookingItUp(t *testing.T) {
 	assert.False(t, sameText(dir, filepath.Join(dir, "other")))
 }
 
-// Security: many copy tools keep the modified time and give the copy a new creation (or changed) time. With the real file times, files whose modified time is set thirty days back are still new.
-func TestACopyThatKeepsTheModifiedTimesLooksNew(t *testing.T) {
+// #12591: the operator's real folder, v2.0.37's first start. It predates the id: sessions.db with live sessions, a board of messages in messageboard.db (not in sessions.db), an api_key, an app log,
+// and every file's changed time NEWER than the oldest session (macOS gives the changed time where a birth time was wanted). v2.0.37 judged that a copy and withheld everything from every agent. An install with
+// no id and no row is upgrading in place: the id is made and the folder is its own, whatever its files look like.
+func TestAnInstallFromBeforeTheIdUpgradingInPlaceIsOwned(t *testing.T) {
 	r := newRig(t)
-	FileBirth = birthTime // the real times, for this test
-	r.sessions, r.settings, r.messages = 5, true, false
-	r.oldest = time.Now().Add(-20 * 24 * time.Hour)
-	r.put("sessions.db", "x")
-	long := time.Now().Add(-30 * 24 * time.Hour)
-	for _, name := range []string{"api_key", "app.log"} {
-		f := r.put(name, "x")
-		require.NoError(t, os.Chtimes(f, long, long)) // what a copy tool keeps
-	}
-	fi, err := os.Lstat(filepath.Join(r.dir, "api_key"))
-	require.NoError(t, err)
-	born, ok := birthTime(fi)
-	if ok {
-		assert.WithinDuration(t, time.Now(), born, 10*time.Minute, "the creation or changed time is new although the modified time is old")
+	for _, name := range []string{"sessions.db", "messageboard.db", "api_key", "cli-token", "app.log", "tray.log"} {
+		r.put(name, "x") // all just written: nothing in the folder is older than the sessions the database lists
 	}
 	v := r.verify()
-	assert.True(t, v.Foreign, "the files only look old by their modified time")
-	assert.Equal(t, ReasonBare, v.Reason)
+	assert.False(t, v.Foreign, "no id and no row: an install upgrading in place")
+	assert.True(t, v.Made)
+	id, _, err := readFile(r.dir)
+	require.NoError(t, err)
+	assert.Equal(t, r.row, id, "the id is made in the folder and in the database")
+	again := r.verify()
+	assert.False(t, again.Foreign)
+	assert.False(t, again.Made)
 }
 
-func TestATimeThatCannotBeReadDoesNotPredateAnything(t *testing.T) {
-	r := newRig(t)
-	FileBirth = func(os.FileInfo) (time.Time, bool) { return time.Time{}, false }
-	r.sessions, r.settings, r.messages = 5, true, false
-	r.oldest = time.Now().Add(-20 * 24 * time.Hour)
-	r.establish()
-	assert.True(t, r.verify().Foreign)
+// What the id is for stays foreign: a copy of a database that already carries the row (the file is not there, or is another folder's) is not this folder's own.
+func TestACopyOfADatabaseThatCarriesTheIdIsStillForeignWhateverTheFolderHolds(t *testing.T) {
+	origin := newRig(t)
+	require.False(t, origin.verify().Foreign)
+	copyOf := newRig(t)
+	for _, name := range []string{"sessions.db", "messageboard.db", "api_key", "app.log"} {
+		copyOf.put(name, "x")
+	}
+	copyOf.row = origin.row
+	v := copyOf.verify()
+	assert.True(t, v.Foreign)
+	assert.Equal(t, ReasonRowOnly, v.Reason, "a folder full of files is no better than an empty one: the row says it is a copy")
+	other := newRig(t)
+	other.put(FileName, "0123456789abcdef0123456789abcdef")
+	other.row = "fedcba9876543210fedcba9876543210"
+	assert.Equal(t, ReasonDiffer, other.verify().Reason)
 }

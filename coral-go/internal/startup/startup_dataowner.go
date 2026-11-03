@@ -12,18 +12,9 @@ import (
 // dataOwnerProbe is what internal/dataowner reads and writes in this folder and database.
 func dataOwnerProbe(db *store.DB, dir string) dataowner.Probe {
 	return dataowner.Probe{
-		Dir:          filepath.Clean(dir),
-		Marker:       db.DataDirID,
-		SetMarker:    db.SetDataDirID,
-		LiveSessions: db.ActiveSessionCount,
-		BoardHasMessages: func(ctx context.Context) (bool, error) {
-			if db.TaskEngine == nil {
-				return false, nil
-			}
-			return db.TaskEngine.HasMessages(ctx)
-		},
-		HasSettings:       db.HasUserSettings,
-		OldestLiveSession: db.OldestActiveSession,
+		Dir:       filepath.Clean(dir),
+		Marker:    db.DataDirID,
+		SetMarker: db.SetDataDirID,
 	}
 }
 
