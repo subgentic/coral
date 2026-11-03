@@ -28,6 +28,8 @@ const { framesJs, coralReady } = require('./helpers/wait');
         // count the selector calls made on the document itself (an element's own, narrow lookups are fine)
         await ev(`(() => { window.__docSel = []; for (const k of ['querySelector', 'querySelectorAll']) { const orig = Document.prototype[k]; Document.prototype[k] = function (s) { window.__docSel.push(String(s)); return orig.apply(this, arguments); }; } return true; })()`);
         const taken = () => ev(`window.__docSel.splice(0)`);
+        // The top bar's first layout pass (a ResizeObserver's first callback, nav_tabs.js: .top-nav-tabs, .phone-bar-title, ...) comes with the page's first frames. A fast machine has the chat drawn before then, and the pass landed in the middle of the keys (#13070): let the frames come first.
+        await ev(`(async () => { await ${framesJs(3)}; return true; })()`);
         
         console.log('1. Typing: no selector over the whole document per keystroke');
         await ev(`document.getElementById('command-input').focus(); true`); await taken();
