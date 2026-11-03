@@ -1,5 +1,5 @@
 // The Analytics tab Inbox vs chat (#12158, the Operator's approved proposal): the share of what the Operator does that is in the Inbox, and whether it is rising. The read is stubbed with counts (GET
-// /api/analytics/inbox-vs-chat). Pinned: the tab is in the sidebar after Operator interaction; four KPIs; the 7-day share's line and a bar a day; the kinds and teams tables; the answers with no side said and
+// /api/analytics/inbox-vs-chat). Pinned: the tab is in the sidebar after Operator interaction; four KPIs; the share by day (#12991: a dot a day, a gap for a day with no action, the day's counts on hover and tap, the subtitle says daily) and a bar a day; the kinds and teams tables; the answers with no side said and
 // left out; the record's honesty sentence; before the record began a plain sentence and nothing to compare; a refused read says one line; and a phone does not scroll sideways. Isolated dev server.
 const assert = require('node:assert/strict');
 const { coralReady } = require('./helpers/wait');
@@ -46,7 +46,7 @@ const COUNTS = days => ({ days: Array.from({ length: days }, (_, i) => ({ day: d
             assert.match(k[2], /Actions in the Inbox/, JSON.stringify(k)); assert.match(k[3], /Actions in a chat or terminal/, JSON.stringify(k));
             const now = +/(\d+)%/.exec(k[0])[1], then = +/(\d+)%/.exec(k[1])[1];
             assert.ok(now > then, `the share climbs in the sample: ${now}% against ${then}%`);
-            assert.match(await text('#cost-inbox-chat .atab-trend .atab-say'), /of your actions in the 7 days to .* were in the Inbox, against \d+% in the 7 days to .*Higher is more in the Inbox\./);
+            assert.match(await text('#cost-inbox-chat .atab-trend .atab-say'), /of your actions on .* were in the Inbox, against \d+% on .*Higher is more in the Inbox\./);
         });
         await run('a bar a day, the kinds in words, the teams with their share, the unknowns said and left out, the honest sentence', async () => {
             const bars = await ev(`new Set([...document.querySelectorAll('#cost-inbox-chat svg .atab-bar')].map(h => h.getAttribute('x'))).size`);
@@ -58,6 +58,25 @@ const COUNTS = days => ({ days: Array.from({ length: days }, (_, i) => ({ day: d
             assert.match(kinds, /Not in the share, because the Inbox cannot do them: 4 wake, 1 stop\./);
             assert.match(kinds, /This computer 71% · \S+ \(reported by the page\) 29%/);
             assert.ok(kinds.endsWith(NOTE) || kinds.includes(NOTE), 'the record\'s honesty sentence is on the tab');
+        });
+        await run('the share is a point a day: a gap for a day with no action, the counts on hover and on tap, the subtitle says daily', async () => {
+            const gap = dayAgo(3), D = n => dayAgo(n);
+            // seeded relative to now (the analytics time-bomb lesson): 6 days, two with no action, the rest with known counts
+            const days = [{ day: D(5), inbox: 1, chat: 3 }, { day: D(4), inbox: 6, chat: 2 }, { day: gap, inbox: 0, chat: 0 }, { day: D(2), inbox: 3, chat: 1 }, { day: D(1), inbox: 0, chat: 0 }, { day: D(0), inbox: 9, chat: 1 }];
+            const body = JSON.stringify({ days_asked: 30, generated_at: new Date().toISOString(), counts: { ...COUNTS(6), days, record_since: D(5) } });
+            await ev(`window.__ivc.body = ${body}; [...document.querySelectorAll('#cost-inbox-chat select')][0].dispatchEvent(new Event('change', { bubbles: true })); true`);
+            await waitFor(`document.querySelectorAll('#cost-inbox-chat .atab-trend svg .atab-dot').length === 4`, 'a dot for each of the 4 days with actions', 10000);
+            assert.match(await text('#cost-inbox-chat .atab-card:has(.atab-trend) h3'), /Inbox share.*each day/, 'the subtitle says daily');
+            assert.ok(!/7-day share/.test(await text('#cost-inbox-chat .atab-card:has(.atab-trend) h3')), 'no 7-day claim on the chart');
+            assert.equal(await ev(`document.querySelectorAll('#cost-inbox-chat .atab-trend svg path.atab-line')[0].getAttribute('d').split('M').length - 1`), 3, 'the gap days break the line into three pieces');
+            const titles = await ev(`[...document.querySelectorAll('#cost-inbox-chat .atab-trend svg .atab-hit title')].map(t => t.textContent)`);
+            assert.equal(titles.length, 6, 'a hover text for each day');
+            assert.match(titles[0], /25% in the Inbox \(1 of 4 actions\)/); assert.match(titles[2], /: no actions$/); assert.match(titles[5], /90% in the Inbox \(9 of 10 actions\)/);
+            assert.match(await text('#cost-inbox-chat .atab-trend .atab-day-say'), /90% in the Inbox \(9 of 10 actions\)/, 'the latest day is selected at first');
+            await ev(`document.querySelectorAll('#cost-inbox-chat .atab-trend svg .atab-hit')[1].dispatchEvent(new MouseEvent('click', { bubbles: true })); true`);
+            await waitFor(`/75% in the Inbox \\(6 of 8 actions\\)/.test(document.querySelector('#cost-inbox-chat .atab-trend .atab-day-say').textContent)`, 'a tap selects that day', 5000);
+            await ev(`window.__ivc.body = { days_asked: 30, generated_at: new Date().toISOString(), counts: ${JSON.stringify(COUNTS(20))} }; [...document.querySelectorAll('#cost-inbox-chat select')][0].dispatchEvent(new Event('change', { bubbles: true })); true`);
+            await waitFor(`document.querySelectorAll('#cost-inbox-chat .atab-trend svg .atab-dot').length >= 20`, 'back to the 20-day sample', 10000);
         });
         await run('a team chosen asks for that team, and a Hub-refused read says one line', async () => {
             await ev(`window.__reqs.length = 0; true`);

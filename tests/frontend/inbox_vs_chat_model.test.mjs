@@ -18,12 +18,21 @@ assert.equal(m.days[2].roll, 6 / 20, 'the 7-day share runs over the days there a
 assert.equal(m.days[4].roll, 15 / 30);
 assert.equal(m.last.day, '2026-11-10'); assert.equal(m.first.day, '2026-11-06');
 assert.ok(m.last.roll > m.first.roll, 'a share that climbs is a higher number');
+// the chart is one point a day (#12991): the day's own share, a gap for a day with no action
+assert.deepEqual(m.days.map(d => d.share), [0.1, null, 0.5, null, 0.9], 'the points are each day\'s own share, not the 7-day one');
+assert.deepEqual(m.points.map(p => p.value), [0.1, null, 0.5, null, 0.9]);
+assert.deepEqual(m.points.map(p => p.label), ['Nov 6', 'Nov 7', 'Nov 8', 'Nov 9', 'Nov 10']);
+assert.equal(m.lastDay.day, '2026-11-10'); assert.equal(m.firstDay.day, '2026-11-06');
+assert.equal(D.inboxDayWords(m.days[0]), 'Nov 6: 10% in the Inbox (1 of 10 actions)');
+assert.equal(D.inboxDayWords(m.days[1]), 'Nov 7: no actions');
+assert.equal(D.inboxDayWords(m.days[4]), 'Nov 10: 90% in the Inbox (9 of 10 actions)');
+assert.equal(D.inboxDayWords(D.inboxModel(read({ record_since: '2026-11-10', days: [{ day: '2026-11-10', inbox: 1, chat: 0 }] })).days[0]), 'Nov 10: 100% in the Inbox (1 of 1 action)');
 assert.equal(m.inbox, 15); assert.equal(m.chat, 15); assert.equal(m.unknown, 2, 'answers with no side are counted apart and are not in either side');
 assert.equal(m.share, 0.5);
-assert.match(D.inboxTrendWords(m), /^50% of your actions in the 7 days to Nov 10 were in the Inbox, against 10% in the 7 days to Nov 6\. Higher is more in the Inbox\.$/);
+assert.match(D.inboxTrendWords(m), /^90% of your actions on Nov 10 were in the Inbox, against 10% on Nov 6\. Higher is more in the Inbox\.$/);
 
 // a window of one day is said without a comparison
-assert.match(D.inboxTrendWords(D.inboxModel(read({ record_since: '2026-11-10', days: [{ day: '2026-11-10', inbox: 1, chat: 1 }] }))), /^50% of your actions in the 7 days to Nov 10 were in the Inbox\.$/);
+assert.match(D.inboxTrendWords(D.inboxModel(read({ record_since: '2026-11-10', days: [{ day: '2026-11-10', inbox: 1, chat: 1 }] }))), /^50% of your actions on Nov 10 were in the Inbox\.$/);
 
 // kinds, busiest first, in words; teams with their share; where the Inbox's actions were taken; what is apart
 m = D.inboxModel(read({ record_since: '2026-11-01', days: [], inbox: { approve: 4, comment: 2, answer_prompt: 1 }, chat: { typed: 9, answer_prompt: 3 }, teams: [{ team: 'alpha', inbox: 6, chat: 6 }, { team: 'beta', inbox: 1, chat: 0 }], phone: { phone: 1, other: 3 }, apart: { wake: 2, stop: 0 } }));

@@ -174,7 +174,7 @@ const pct = v => `${Math.round(v * 100)}%`;
 export const shareWords = v => (v == null ? 'no actions' : pct(v));
 
 /** What an Inbox-versus-chat read (GET /api/analytics/inbox-vs-chat) becomes: one row per UTC day of the window, from the day the Activity record began (before it the Inbox's side cannot be told apart, so a line
- *  would only say the share was nothing), each with its day's counts, the 7-day share that is the point of the tab (inbox over inbox plus chat, a day with neither is a gap, and the answers whose side the page did not
+ *  would only say the share was nothing), each with its day's counts, the day's own share (inbox over inbox plus chat, a day with neither is a gap, #12991) and the 7-day one the KPIs use, and the answers whose side the page did not
  *  say are left out and counted apart), the kinds of action by side, the teams, and where the Inbox's actions were taken. COUNTS ONLY: the read holds nothing else. */
 export function inboxModel(read) {
     const c = (read && read.counts) || {}, asked = Math.max(1, Number(read && read.days_asked) || 28);
@@ -195,13 +195,14 @@ export function inboxModel(read) {
     const inboxN = days.reduce((n, d) => n + d.inbox, 0), chatN = days.reduce((n, d) => n + d.chat, 0), unknownN = days.reduce((n, d) => n + d.unknown, 0);
     const lastRoll = [...days].reverse().find(d => d.roll != null) || null;
     const firstRoll = days.find(d => d.roll != null) || null;
+    const lastDay = [...days].reverse().find(d => d.share != null) || null, firstDay = days.find(d => d.share != null) || null; // the chart is a point a day (#12991)
     const kinds = [...new Set([...Object.keys(c.inbox || {}), ...Object.keys(c.chat || {})])]
         .map(k => ({ key: k, name: ivcWord(k), inbox: Number((c.inbox || {})[k]) || 0, chat: Number((c.chat || {})[k]) || 0 }))
         .sort((a, b) => (b.inbox + b.chat) - (a.inbox + a.chat) || a.name.localeCompare(b.name));
     const teams = (c.teams || []).map(t => ({ team: t.team, inbox: Number(t.inbox) || 0, chat: Number(t.chat) || 0, share: shareOf(Number(t.inbox) || 0, Number(t.chat) || 0) }));
     const phone = c.phone || {}, phoneN = Number(phone.phone) || 0, otherN = Number(phone.other) || 0;
     const unknownKinds = Object.entries(c.unknown || {}).reduce((n, [, v]) => n + (Number(v) || 0), 0);
-    return { days, started: since, hasRecord: !!since, inbox: inboxN, chat: chatN, unknown: unknownKinds || unknownN, share: shareOf(inboxN, chatN), last: lastRoll, first: firstRoll, kinds, teams,
+    return { days, points: days.map(d => ({ label: d.label, value: d.share })), lastDay, firstDay, started: since, hasRecord: !!since, inbox: inboxN, chat: chatN, unknown: unknownKinds || unknownN, share: shareOf(inboxN, chatN), last: lastRoll, first: firstRoll, kinds, teams,
         apart: Object.entries(c.apart || {}).map(([k, v]) => ({ key: k, n: Number(v) || 0 })).filter(x => x.n > 0), phoneShare: phoneN + otherN > 0 ? { phone: phoneN, other: otherN, share: phoneN / (phoneN + otherN) } : null,
         note: String(c.note || '') };
 }
@@ -209,7 +210,15 @@ export function inboxModel(read) {
 /** The tab's one-sentence reading of the trend, in the words that never claim more than the counts show. */
 export function inboxTrendWords(m) {
     if (!m.hasRecord) return 'The record of what you do in the Inbox has not begun, so there is nothing to compare yet.';
-    if (!m.last) return 'No action in the Inbox or in a chat in this period.';
-    if (!m.first || m.first.day === m.last.day) return `${shareWords(m.last.roll)} of your actions in the 7 days to ${m.last.label} were in the Inbox.`;
-    return `${shareWords(m.last.roll)} of your actions in the 7 days to ${m.last.label} were in the Inbox, against ${shareWords(m.first.roll)} in the 7 days to ${m.first.label}. Higher is more in the Inbox.`;
+    if (!m.lastDay) return 'No action in the Inbox or in a chat in this period.';
+    if (!m.firstDay || m.firstDay.day === m.lastDay.day) return `${shareWords(m.lastDay.share)} of your actions on ${m.lastDay.label} were in the Inbox.`;
+    return `${shareWords(m.lastDay.share)} of your actions on ${m.lastDay.label} were in the Inbox, against ${shareWords(m.firstDay.share)} on ${m.firstDay.label}. Higher is more in the Inbox.`;
+}
+
+/** One day's reading, for the hover, the tap and the day buttons: the share and the counts it is made of; a day with no action says so (a gap in the line, never 0%). */
+export function inboxDayWords(d) {
+    if (!d) return '';
+    if (d.share == null) return `${d.label}: no actions`;
+    const n = d.inbox + d.chat;
+    return `${d.label}: ${shareWords(d.share)} in the Inbox (${d.inbox} of ${n} ${n === 1 ? 'action' : 'actions'})`;
 }

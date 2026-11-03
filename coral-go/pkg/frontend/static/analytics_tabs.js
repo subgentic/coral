@@ -22,7 +22,7 @@ const IVC = 'inbox-' + 'chat'; // the Inbox-versus-chat tab's key, spelled in tw
 const tabs = {
     usage: { range: '14d', metric: 'cost', group: 'agent', day: -1, data: null, status: 'loading', seq: 0, turns: null },
     operator: { range: '14d', team: '', data: null, status: 'loading', seq: 0 },
-    [IVC]: { range: '30d', team: '', data: null, status: 'loading', seq: 0 }, // Inbox versus chat (#12158): all teams at first
+    [IVC]: { range: '30d', team: '', day: -1, data: null, status: 'loading', seq: 0 }, // Inbox versus chat (#12158): all teams at first
     comm: { range: '14d', team: '', data: null, status: 'loading', seq: 0 },
 };
 const hosts = {};
@@ -172,7 +172,7 @@ function turnsTable(t) {
 
 /* ---- Operator interaction ---- */
 function pendingNote(text) { const n = el('p', 'atab-pending'); n.append(el('b', null, 'Not recorded yet. '), document.createTextNode(text)); return n; }
-const trendBody = (chart, line) => { const d = el('div', 'atab-trend'); d.append(chart, line); return d; };
+const trendBody = (...parts) => { const d = el('div', 'atab-trend'); d.append(...parts); return d; };
 const kv = (label, value, note, extra) => ({ label, value, note, pending: value === D.NOT_RECORDED, ...extra });
 function drawOperator(m) {
     const o = D.operatorModel(m.data);
@@ -217,9 +217,11 @@ function drawInbox(m) {
         kv('Actions in a chat or terminal', o.hasRecord ? D.fmtCount(o.chat) : D.NOT_RECORDED, 'a burst of typing counts once'),
     ]));
     if (!o.hasRecord) { out.push(pendingNote('The Inbox’s side is counted from the Activity record, which begins on the day the first action is recorded. Until then there is nothing to compare.')); out.push(say(o.note)); return out; }
-    const points = o.days.map(d => ({ label: d.label, value: d.roll }));
-    const trend = V.panel('Inbox share', 'the 7-day share of your actions that were in the Inbox: higher is better',
-        o.last ? trendBody(V.lineChart(points, { fmt: v => D.shareWords(v), phone: phone() }), say(D.inboxTrendWords(o))) : say(D.inboxTrendWords(o)));
+    const pick = i => { m.day = i; draw(IVC); };
+    if (!(m.day >= 0 && m.day < o.days.length)) m.day = o.lastDay ? o.days.indexOf(o.lastDay) : o.days.length - 1;
+    const dayTexts = o.days.map(D.inboxDayWords);
+    const trend = V.panel('Inbox share', 'each day’s share of your actions that were in the Inbox: higher is better',
+        o.lastDay ? trendBody(V.dayPicker(o.days, m.day, dayTexts, pick), V.lineChart(o.points, { fmt: v => D.shareWords(v), phone: phone(), dots: true, texts: dayTexts, onPick: pick, selected: m.day }), say(D.inboxTrendWords(o))) : say(D.inboxTrendWords(o)));
     const series = [{ key: 'in_inbox', name: 'In the Inbox', recorded: true }, { key: 'in_chat', name: 'In a chat or terminal', recorded: true }];
     const rows = o.days.map(d => ({ day: d.day, label: d.label, values: { in_inbox: d.inbox, in_chat: d.chat } }));
     const bars = V.panel('Actions per day', 'a day', V.stackedBars(rows, series, { fmt: D.fmtCount, phone: phone(), label: 'Actions in the Inbox and in a chat, per day' }), V.legend(series));

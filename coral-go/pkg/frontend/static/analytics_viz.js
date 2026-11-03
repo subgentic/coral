@@ -127,8 +127,9 @@ export function rankedBars(rows) {
     return list;
 }
 
-/** A line over days: points [{label, value}] where a null value leaves a gap in the line; the last point is marked and named. */
-export function lineChart(points, { fmt = String, phone = false } = {}) {
+/** A line over days: points [{label, value}] where a null value leaves a gap in the line; the last point is marked and named. `dots` marks every point (a day alone between two gaps would draw no line at all);
+ *  `texts[i]` is what day i says on hover (a native tooltip), and `onPick` makes a day a tap target that selects it (`selected` marks it) (#12991). */
+export function lineChart(points, { fmt = String, phone = false, dots = false, texts = null, onPick = null, selected = -1 } = {}) {
     const W = 340, H = 176, pl = 40, pb = 30, pt = 12, iw = W - pl - 14, ih = H - pb - pt;
     const vals = points.map(p => p.value).filter(v => v != null), { max, lines } = axisFor(vals, 3), L = Math.max(lines, 1);
     const svg = sv('svg', { viewBox: `0 0 ${W} ${H}`, class: 'atab-svg', 'aria-hidden': 'true', focusable: 'false' });
@@ -139,6 +140,18 @@ export function lineChart(points, { fmt = String, phone = false } = {}) {
     svg.append(sv('path', { d, class: 'atab-line', fill: 'none' }));
     const step = Math.max(1, Math.ceil(n / (phone ? 4 : 6)));
     points.forEach((p, i) => { if (i % step === 0) svg.append(sv('text', { x: (pl + (n > 1 ? iw * i / (n - 1) : iw / 2)).toFixed(1), y: H - 4, 'text-anchor': 'middle', class: 'atab-axis' }, p.label)); });
+    if (dots) xy.forEach(q => { if (q) svg.append(sv('circle', { cx: q[0].toFixed(1), cy: q[1].toFixed(1), r: 3, class: 'atab-dot' })); });
+    if (texts || onPick) {
+        const cw = iw / Math.max(n, 1), cx = i => (n > 1 ? pl + iw * i / (n - 1) : pl + iw / 2);
+        points.forEach((p, i) => {
+            const x = Math.max(pl - 2, cx(i) - cw / 2);
+            if (i === selected) svg.append(sv('rect', { x: (cx(i) - cw / 2).toFixed(1), y: pt, width: cw.toFixed(1), height: ih, rx: 3, class: 'atab-sel' }));
+            const hit = sv('rect', { x: x.toFixed(1), y: pt, width: cw.toFixed(1), height: ih, class: 'atab-hit' });
+            if (texts && texts[i]) hit.append(sv('title', {}, texts[i]));
+            if (onPick) hit.addEventListener('click', () => onPick(i));
+            svg.append(hit);
+        });
+    }
     const last = xy.map((q, i) => q && i).filter(i => i !== null && i !== undefined).at(-1);
     if (last != null) { const e = xy[last]; svg.append(sv('circle', { cx: e[0], cy: e[1], r: 4, class: 'atab-dot' }), sv('text', { x: e[0] - 7, y: e[1] - 9, 'text-anchor': 'end', class: 'atab-end' }, fmt(points[last].value))); }
     return svg;
