@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime"
 	"net"
 	"net/http"
 	"net/url"
@@ -90,7 +91,7 @@ func (h *HubClient) endpoint() (string, error) {
 // ErrHubBootstrapOff: the Hub answered that it does not serve /api/bootstrap (404 or 501): it does not make machine credentials (yet), so a launch cannot finish, and none is started (#12584).
 var ErrHubBootstrapOff = errors.New("Coral Hub does not offer machine credentials yet")
 
-// ErrHubUnrecognised: the Hub's answer to the probe was neither the one a Hub that makes machine credentials gives nor "not served", or there was none. A launch spends money, so an answer it does not
+// ErrHubUnrecognised: the Hub's answer to the probe was neither the readiness answer a Hub that makes machine credentials gives nor "not served", or there was none. A launch spends money, so an answer it does not
 // know stops it before anything is created (#12584).
 var ErrHubUnrecognised = errors.New("Coral Hub did not answer the way a Hub that makes machine credentials does")
 
@@ -99,10 +100,14 @@ type Preflighter interface {
 	Preflight(ctx context.Context) error
 }
 
-// Preflight asks the Hub, before any machine exists, whether it serves machine credentials, so a Hub that does not (app.coralhub.dev until it enables /api/bootstrap) is refused with nothing made at the
-// provider instead of after a billable machine is running (#12584). It makes no credential and sends no key: a POST to the mint's address with no Authorization and an empty object, which a Hub that serves
-// the route answers 401 {"error":"unauthorized"} before it looks at anything else. Only that answer goes on (an allow-list: a launch spends money). 404 and 501 are ErrHubBootstrapOff; any other
-// status, or no answer, is ErrHubUnrecognised. A key or an address that can never work is refused here too.
+// readyPath is the Hub's readiness answer for machine launches (coral-hub, #12588): served only by a Hub that makes machine credentials.
+const readyPath = "/api/bootstrap/ready"
+
+// Preflight asks the Hub, before any machine exists, whether it can make machine credentials, so a Hub that cannot (app.coralhub.dev until it enables /api/bootstrap) is refused with nothing made at the
+// provider instead of after a billable machine is running (#12584). It is coral-hub's own contract (#12588): GET /api/bootstrap/ready over https with NO Authorization (the key is not sent to a probe),
+// redirects not followed, the body read through a size limit. It goes on only for a 200 with a JSON content type and the body {"ready":true}. Anything else is a refusal, because a launch spends money: 404
+// and 501 (the route is not mounted: today's answer) are ErrHubBootstrapOff, every other answer, a body that is not that one and a Hub that cannot be reached are ErrHubUnrecognised. A key or an address that
+// can never work is refused first, before the Hub is asked at all. (A keyless POST to the credentials route was the first probe: it hits the Hub's CSRF check and answers 403 on a live Hub.)
 func (h *HubClient) Preflight(ctx context.Context) error {
 	if !keyShape.MatchString(h.Key) {
 		return errors.New("the Coral Hub key does not look like one (it starts with chk_): check the key file")
@@ -111,18 +116,19 @@ func (h *HubClient) Preflight(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	host := ""
-	if u, err := url.Parse(endpoint); err == nil {
-		host = u.Host
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		return fmt.Errorf("%w (the address could not be read)", ErrHubUnrecognised)
 	}
+	u.Path = readyPath
+	host := u.Host
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader("{}"))
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
 		return fmt.Errorf("%w (the request could not be made)", ErrHubUnrecognised)
 	}
-	req.Header.Set("Content-Type", "application/json") // no Authorization: the key is not sent to a probe
-	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Accept", "application/json") // no Authorization: the key is not sent to a probe
 	req.Header.Set("User-Agent", "coral-machine-launch")
 	client := h.HTTP
 	if client == nil {
@@ -132,21 +138,19 @@ func (h *HubClient) Preflight(ctx context.Context) error {
 	c.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 	resp, err := c.Do(req)
 	if err != nil {
-		return fmt.Errorf("%w (could not reach %s)", ErrHubUnrecognised, host) // the transport error text may hold the URL: dropped
+		return fmt.Errorf("%w (could not reach %s)", ErrHubUnrecognised, host) // the transport error text may hold the address: dropped
 	}
 	defer resp.Body.Close()
-	raw, _ := io.ReadAll(io.LimitReader(resp.Body, maxHubAnswer))
-	var answer struct {
-		Error string `json:"error"`
+	raw, _ := io.ReadAll(io.LimitReader(resp.Body, maxHubAnswer+1))
+	if resp.StatusCode == http.StatusOK && len(raw) <= int(maxHubAnswer) {
+		if mt, _, err := mime.ParseMediaType(resp.Header.Get("Content-Type")); err == nil && mt == "application/json" && string(bytes.TrimSpace(raw)) == `{"ready":true}` {
+			return nil
+		}
 	}
-	_ = json.Unmarshal(raw, &answer)
-	switch {
-	case resp.StatusCode == http.StatusUnauthorized && answer.Error == "unauthorized":
-		return nil
-	case resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusNotImplemented:
-		return fmt.Errorf("%w (it answered HTTP %d for /api/bootstrap/credentials at %s)", ErrHubBootstrapOff, resp.StatusCode, host)
+	if resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusNotImplemented {
+		return fmt.Errorf("%w (it answered HTTP %d for %s at %s)", ErrHubBootstrapOff, resp.StatusCode, readyPath, host)
 	}
-	return fmt.Errorf("%w (it answered HTTP %d for /api/bootstrap/credentials at %s)", ErrHubUnrecognised, resp.StatusCode, host)
+	return fmt.Errorf("%w (it answered HTTP %d for %s at %s)", ErrHubUnrecognised, resp.StatusCode, readyPath, host)
 }
 
 // Mint makes the request described in the joint note: generic adapter, scope digitalocean, the machine's name as the label, ephemeral, 5 minutes.
