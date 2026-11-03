@@ -1,0 +1,38 @@
+/* #12722: one scroll area for the question; the footer stays available while it is read. */
+.inbox-ask-dialog > * { flex-shrink: 0; }
+.inbox-ask-dialog h2 .agent-link { font: inherit; }
+.inbox-ask-sub, .inbox-ask-offers-head, .inbox-ask-label { font-size: var(--fs-md); }
+.inbox-ask-foot { position: sticky; bottom: calc(-1 * var(--space-2xl)); padding: 12px 0; background: var(--bg-secondary); border-top: 1px solid var(--border); }
+@media (max-width: 500px) {
+    .inbox-ask-foot .inbox-ask-buttons { display: contents; }
+    .inbox-ask-foot .inbox-ask-send { flex: 1 0 100%; }
+}
+
+/* A wide question uses the shared flow size: its reader and reply sit side by side.
+   The DOM order and the narrow dialog's single scroll area stay the same. */
+.inbox-ask-reading, .inbox-ask-compose { display: contents; }
+.inbox-ask-reading > *, .inbox-ask-compose > * { flex-shrink: 0; }
+.inbox-ask-offers-hint { margin: 8px 0 0; color: var(--text-muted); font-size: var(--fs-md); }
+@media (max-width: 999px) {
+    dialog.inbox-ask-dialog { width: var(--dlg-w-form); }
+    .inbox-ask-offers-hint { display: none; }
+}
+@media (min-width: 1000px) {
+    dialog.inbox-ask-dialog[open] { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); grid-template-rows: auto auto auto minmax(0, 1fr) auto; column-gap: 24px; height: 85dvh; max-height: 85dvh; overflow: hidden; }
+    .inbox-ask-dialog > :is(h2, .inbox-ask-sub, .inbox-ask-subjects, .inbox-ask-foot) { grid-column: 1 / -1; }
+    .inbox-ask-dialog h2 { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
+    .inbox-ask-dialog h2 .agent-link { display: inline; white-space: normal; overflow: visible; text-overflow: clip; max-width: 100%; }
+    .inbox-ask-reading, .inbox-ask-compose { display: block; grid-row: 4; min-width: 0; min-height: 0; overflow: auto; }
+    .inbox-ask-reading { grid-column: 1; }
+    .inbox-ask-compose { grid-column: 2; }
+    .inbox-ask-dialog .inbox-ask-text { margin-bottom: 0; }
+    .inbox-ask-offers-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr)); }
+    .inbox-ask-offer, .inbox-ask-offer .btn { width: 100%; }
+    .inbox-ask-dialog .inbox-ask-foot { grid-row: 5; position: static; padding-bottom: 0; margin-top: 16px; }
+}
+
+/* Reply attachments stay with their text, before the final dialog actions (#13043). */
+.inbox-ask-attach { display: flex; align-items: flex-start; gap: 8px; width: 100%; min-width: 0; }
+.inbox-ask-attach .ac-picker { flex-shrink: 0; }
+.inbox-ask-attach .ac-images-hint { min-width: 0; flex: 1; }
+.inbox-ask-pics .ac-add-image { width: 44px; min-height: 44px; padding: 0; }
