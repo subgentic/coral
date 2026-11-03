@@ -117,7 +117,7 @@ function drawList() {
     ];
     const shown = rows.filter(r => inFolder(r, folder) && matches(r));
     page.append(DT.dataTable({ label: `${FOLDER_LABEL[folder]}, ${shown.length}`, rows: shown, rowKey: r => r.id, rowName: r => r.name, state: tableState, columns, open: r => loadOne(r.id),
-        ...(matchMedia('(max-width: 767px)').matches ? { bare: true, sortBar: false, mail: r => ({ lead: { icon: 'auto_awesome', square: true, name: r.name }, title: r.name, snippet: r.description, state: (STATUS[r.status] || [r.status])[0], time: DT.timeCell(r.decided_at || r.created_at).textContent, mark: r.status === 'pending' ? 'attention' : undefined }) } : {}), // a phone's rows run edge to edge like the Inbox lists (#12957, the Operator's note on #12997): the shared mail row, no bordered box
+        ...(isPhoneLayout() ? { bare: true, sortBar: false, mail: r => ({ lead: { icon: 'auto_awesome', square: true, name: r.name }, title: r.name, snippet: r.description, state: (STATUS[r.status] || [r.status])[0], time: DT.timeCell(r.decided_at || r.created_at).textContent, mark: r.status === 'pending' ? 'attention' : undefined }) } : {}), // a phone's rows run edge to edge like the Inbox lists (#12957, the Operator's note on #12997): the shared mail row, no bordered box
         empty: { line: showStatus || folder || query ? 'No skill in this list.' : 'No skills yet.', hint: 'Import a skill, or an agent can publish one with coral-agent skills publish.' } }).el);
     return page;
 }
