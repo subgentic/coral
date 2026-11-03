@@ -40,6 +40,9 @@ const (
 // maxDiffCommentsPerSession is the live comments one agent session's diffs hold in all (the store caps one file's key at store.MaxArtifactComments), so one session cannot fill the table (#12536, Security's point 5). A var so a test can lower it.
 var maxDiffCommentsPerSession = 200
 
+// diffAnchorRedact is the redactor the lines of an anchor go through: redactComment, a var so a test can say it is unavailable.
+var diffAnchorRedact = redactComment
+
 // diffSubjectRe is a diff's subject key: diff:<team>:<session id>:<16 hex>, the team as commentBoardRe has it.
 var diffSubjectRe = regexp.MustCompile(`^diff:([A-Za-z0-9][A-Za-z0-9_.-]{0,63}):([A-Za-z0-9][A-Za-z0-9_-]{5,63}):([0-9a-f]{16})$`)
 
@@ -129,6 +132,8 @@ func (h *SessionsHandler) diffCommentSubject(w http.ResponseWriter, r *http.Requ
 		errBadRequest(w, "invalid diff")
 		return false
 	}
+	// Defence in depth (#12560, QA): artifactCommentCaller below already gives a tunnelled request no owner standing, so removing this guard or the caller-kind check after it changes no test; both stay so a change to the
+	// caller rules cannot open a person's source code to the Hub.
 	if cloud.Tunneled(r) {
 		commentRefuse(w, http.StatusForbidden, "owner_only", "comments on a diff are for the person at this computer")
 		return false
@@ -206,7 +211,7 @@ func (h *SessionsHandler) cleanDiffAnchor(r *http.Request, id string, a *comment
 		if *f == "" {
 			continue
 		}
-		out, ok := redactComment(*f)
+		out, ok := diffAnchorRedact(*f)
 		if !ok { // the lines could not be checked for secrets: the range and the path stand, the lines are not kept
 			a.Quote, a.Prefix, a.Suffix, a.Withheld = "", "", "", true
 			return ""

@@ -19,6 +19,46 @@ export async function diffSubject(team, sid, path) {
     return `diff:${team}:${sid}:${[...new Uint8Array(sum).slice(0, 8)].map(b => b.toString(16).padStart(2, '0')).join('')}`;
 }
 
+/** The diff of two files by lines, as the hunks the diff view draws: { oldStart, del, newStart, ins }, the lines in each, 1-based, a hunk sitting before the new line newStart (where its removed lines are drawn). null when the files differ too much to walk cheaply. */
+export function lineHunks(a, b) {
+    let s = 0;
+    while (s < a.length && s < b.length && a[s] === b[s]) s++;
+    let ea = a.length, eb = b.length;
+    while (ea > s && eb > s && a[ea - 1] === b[eb - 1]) { ea--; eb--; }
+    const A = a.slice(s, ea), B = b.slice(s, eb), n = A.length, m = B.length;
+    if (n * m > 4_000_000) return null;
+    const L = Array.from({ length: n + 1 }, () => new Uint32Array(m + 1));
+    for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) L[i][j] = A[i] === B[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+    const hunks = []; let i = 0, j = 0, cur = null;
+    const open = () => cur || (cur = { oldStart: s + i + 1, del: [], newStart: s + j + 1, ins: [] });
+    while (i < n || j < m) {
+        if (i < n && j < m && A[i] === B[j]) { if (cur) { hunks.push(cur); cur = null; } i++; j++; }
+        else if (j < m && (i === n || L[i][j + 1] >= L[i + 1][j])) { open().ins.push(B[j]); j++; }
+        else { open().del.push(A[i]); i++; }
+    }
+    if (cur) hunks.push(cur);
+    return hunks;
+}
+
+/** The old-side line numbers of the removed lines selected in one removed block: the block's own rows are looked up in the old file as one run of lines (a block of two or more lines is found once), and a block that is a line
+ *  repeated elsewhere (a "}") takes the run nearest to where it must be: the line it is drawn before, moved by what the hunks above it added and removed. So it is named where it was removed, not where it first appears. null when the rows are not in the old file. */
+function oldLines(chunk, from, to, view, texts) {
+    const rows = [...chunk.querySelectorAll('.cm-deletedLine')], seq = rows.map(r => r.textContent), old = texts.original.split('\n');
+    if (!rows.length) return null;
+    const runs = [];
+    for (let i = 0; i + seq.length <= old.length; i++) if (seq.every((l, k) => old[i + k] === l)) runs.push(i + 1);
+    if (!runs.length) return null;
+    let at = runs[0];
+    if (runs.length > 1) {
+        let where = 1;
+        try { where = view.state.doc.lineAt(view.posAtDOM(chunk, 0)).number; } catch { /* a block at the end of the file */ }
+        const hunks = lineHunks(old, texts.content.split('\n')) || [];
+        const guess = where + hunks.filter(h => h.newStart < where).reduce((d, h) => d + h.del.length - h.ins.length, 0);
+        at = runs.reduce((x, y) => (Math.abs(y - guess) < Math.abs(x - guess) ? y : x));
+    }
+    return { start: at + from, end: at + to, lines: old };
+}
+
 const lineCount = t => (t ? t.split('\n').length : 0);
 const clip = (t, n) => (t.length > n ? t.slice(t.length - n) : t);
 const headClip = (t, n) => (t.length > n ? t.slice(0, n) : t);
@@ -32,14 +72,16 @@ export function selectionAnchor(slot, view, texts, file, base) {
     if (!node || !end || !slot.contains(node) || !slot.contains(end)) return null;
     const text = sel.toString();
     if (!text.trim()) return null;
-    const old = !!node.closest('.cm-deletedChunk') || !!end.closest('.cm-deletedChunk');
+    const chunkA = node.closest('.cm-deletedChunk'), chunkB = end.closest('.cm-deletedChunk');
+    if (chunkA !== chunkB) return { tooLong: true, why: 'Select lines on one side' }; // removed and kept lines in one selection have no one set of numbers
+    const old = !!chunkA;
     let startLine, endLine, before, after;
     if (old) {
-        const at = texts.original.indexOf(text);
-        if (at < 0) return null;
-        startLine = lineCount(texts.original.slice(0, at)); endLine = startLine + lineCount(text) - 1;
-        const lines = texts.original.split('\n');
-        before = lines.slice(Math.max(0, startLine - 1 - CONTEXT_LINES), startLine - 1).join('\n'); after = lines.slice(endLine, endLine + CONTEXT_LINES).join('\n');
+        const rows = [...chunkA.querySelectorAll('.cm-deletedLine')], at = el => Math.max(0, rows.indexOf(el.closest('.cm-deletedLine')));
+        const x = at(node), y = at(end), got = oldLines(chunkA, Math.min(x, y), Math.max(x, y), view, texts);
+        if (!got) return null;
+        startLine = got.start; endLine = got.end;
+        before = got.lines.slice(Math.max(0, startLine - 1 - CONTEXT_LINES), startLine - 1).join('\n'); after = got.lines.slice(endLine, endLine + CONTEXT_LINES).join('\n');
     } else {
         let a, b;
         try { a = view.posAtDOM(sel.anchorNode, sel.anchorOffset); b = view.posAtDOM(sel.focusNode, sel.focusOffset); } catch { return null; }
@@ -81,7 +123,7 @@ export async function attachDiffComments(slot, file, view, texts, base = '') {
         anchor = a && !a.tooLong ? a : null;
         btn.hidden = !a;
         if (!a) return;
-        btn.textContent = a.tooLong ? 'Too many lines' : 'Comment'; btn.disabled = !!a.tooLong; // a selection over the cap says so, and offers nothing
+        btn.textContent = a.tooLong ? (a.why || 'Too many lines') : 'Comment'; btn.disabled = !!a.tooLong; // a selection over the cap says so, and offers nothing
         const r = window.getSelection().getRangeAt(0).getBoundingClientRect(), at = slot.getBoundingClientRect();
         btn.style.top = `${Math.max(0, r.bottom - at.top + 4)}px`; btn.style.left = `${Math.min(Math.max(0, r.left - at.left), Math.max(0, at.width - 96))}px`;
     };
