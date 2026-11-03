@@ -25,6 +25,11 @@ const (
 
 	ButtonPending = "pending"
 	ButtonUsed    = "used"
+	ButtonClosed  = "closed"  // its question was answered in words, or closed: nothing left to click (#12610)
+	ButtonExpired = "expired" // a wake button nobody clicked for WakeButtonLife
+
+	// WakeButtonLife is how long a wake button stays clickable: a wake is only useful while the agent still needs waking for what was asked.
+	WakeButtonLife = 24 * time.Hour
 
 	ActionOpenNewAgent = "open:new-agent"
 	ActionOpenTask     = "open:task"
@@ -145,11 +150,77 @@ var ErrTooManyButtonAsks = errors.New("too many open questions with buttons: clo
 
 // OpenButtonAsks counts the asker's asks that still have a pending button and are not closed.
 func (s *Store) OpenButtonAsks(ctx context.Context, project, asker string) (int, error) {
+	if err := s.resolveAskButtons(ctx, project, asker, time.Now()); err != nil { // answered or stale questions are not open: resolved first, so a person's reply frees the slot (#12610)
+		return 0, err
+	}
 	var n int
 	err := s.db.GetContext(ctx, &n, `SELECT COUNT(DISTINCT b.message_id) FROM board_ask_buttons b
 		JOIN board_asks a ON a.message_id = b.message_id AND a.project = b.project
 		WHERE b.project = ? AND a.asker = ? AND b.state = ?
 		AND NOT EXISTS (SELECT 1 FROM board_ask_closed c WHERE c.message_id = b.message_id AND c.project = b.project)`, project, asker, ButtonPending)
+	return n, err
+}
+
+// ResolveAskButtons settles the pending buttons of every question on every board that no longer needs a click: its question was closed or the Operator answered it in words, or a wake button is older than
+// WakeButtonLife. It is the one-time clean-up of questions answered before buttons were resolved on an answer (#12610), and safe to run again.
+func (s *Store) ResolveAskButtons(ctx context.Context, now time.Time) error {
+	var projects []string
+	if err := s.db.SelectContext(ctx, &projects, `SELECT DISTINCT project FROM board_ask_buttons WHERE state = ?`, ButtonPending); err != nil {
+		return err
+	}
+	for _, p := range projects {
+		if err := s.resolveAskButtons(ctx, p, "", now); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// resolveAskButtons does that for the questions of one board, those of asker when it is not empty.
+func (s *Store) resolveAskButtons(ctx context.Context, project, asker string, now time.Time) error {
+	q := `SELECT DISTINCT a.message_id, a.asker, a.asked, a.created_at FROM board_ask_buttons b JOIN board_asks a ON a.message_id = b.message_id AND a.project = b.project
+		WHERE b.project = ? AND b.state = ?`
+	args := []any{project, ButtonPending}
+	if asker != "" {
+		q += ` AND a.asker = ?`
+		args = append(args, asker)
+	}
+	var asks []askRow
+	if err := s.db.SelectContext(ctx, &asks, q, args...); err != nil || len(asks) == 0 {
+		return err
+	}
+	subs, err := s.subscriberIndex(ctx, project)
+	if err != nil {
+		return err
+	}
+	for _, a := range asks {
+		closed, err := s.AskIsClosed(ctx, project, a.MessageID)
+		if err != nil {
+			return err
+		}
+		if !closed {
+			if closed, err = s.answeredBy(ctx, project, a, "Operator", subs); err != nil {
+				return err
+			}
+		}
+		if closed {
+			if _, err := s.db.ExecContext(ctx, `UPDATE board_ask_buttons SET state = ? WHERE project = ? AND message_id = ? AND state = ?`, ButtonClosed, project, a.MessageID, ButtonPending); err != nil {
+				return err
+			}
+			continue
+		}
+		if _, err := s.db.ExecContext(ctx, `UPDATE board_ask_buttons SET state = ? WHERE project = ? AND message_id = ? AND state = ? AND action = ? AND created_at < ?`,
+			ButtonExpired, project, a.MessageID, ButtonPending, ActionWake, now.Add(-WakeButtonLife).UTC().Format(time.RFC3339)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// PendingWakeButtons counts the wake buttons of a question that can still be clicked.
+func (s *Store) PendingWakeButtons(ctx context.Context, project string, messageID int64) (int, error) {
+	var n int
+	err := s.db.GetContext(ctx, &n, `SELECT COUNT(*) FROM board_ask_buttons WHERE project = ? AND message_id = ? AND state = ? AND action = ?`, project, messageID, ButtonPending, ActionWake)
 	return n, err
 }
 
@@ -208,7 +279,8 @@ func (s *Store) AskIsClosed(ctx context.Context, project string, messageID int64
 	return n > 0, err
 }
 
-// ClaimAskButton moves a pending button to used in ONE statement: it runs only if the button is pending, no other button of the same question is in use and the question is not closed, and the row count is
+// ClaimAskButton moves a pending button to used in ONE statement: it runs only if the button is pending, no other button of the same question is in use (a wake button is not held up by another wake: an Operator
+// who was offered two wakes can click both, #12610) and the question is not closed, and the row count is
 // checked, so a double click, two tabs or two buttons run one action. It returns the stored button; nothing the caller sent decides what it is.
 func (s *Store) ClaimAskButton(ctx context.Context, project string, messageID, buttonID int64, now time.Time) (AskButton, error) {
 	b, err := s.AskButtonByID(ctx, project, messageID, buttonID)
@@ -222,9 +294,9 @@ func (s *Store) ClaimAskButton(ctx context.Context, project string, messageID, b
 	}
 	res, err := s.db.ExecContext(ctx, `UPDATE board_ask_buttons SET state = ?, used_at = ?
 		WHERE project = ? AND message_id = ? AND id = ? AND state = ?
-		AND NOT EXISTS (SELECT 1 FROM board_ask_buttons o WHERE o.project = ? AND o.message_id = ? AND o.state = ?)
+		AND NOT EXISTS (SELECT 1 FROM board_ask_buttons o WHERE o.project = ? AND o.message_id = ? AND o.state = ? AND NOT (? = ? AND o.action = ?))
 		AND NOT EXISTS (SELECT 1 FROM board_ask_closed c WHERE c.project = ? AND c.message_id = ?)`,
-		ButtonUsed, now.UTC().Format(time.RFC3339), project, messageID, buttonID, ButtonPending, project, messageID, ButtonUsed, project, messageID)
+		ButtonUsed, now.UTC().Format(time.RFC3339), project, messageID, buttonID, ButtonPending, project, messageID, ButtonUsed, b.Action, ActionWake, ActionWake, project, messageID)
 	if err != nil {
 		return b, err
 	}
