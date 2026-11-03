@@ -12,7 +12,7 @@ import { state, sessionKey, saveSessionDraft } from './state.js';
 import { showToast, escapeHtml, escapeAttr, dbg, showView } from './utils.js';
 import { loadHistoryMessages } from './api.js';
 import { HISTORY_PAGE, setHistoryWindow } from './history_pages.js';
-import { normServer, serverForSession, serverFetch, sessionServer, agentPath, identityKey, keyLabel, isCloud } from './server_base.js';
+import { normServer, serverForSession, serverFetch, sessionServer, agentPath, identityKey, keyLabel, isCloud, nativeInbox } from './server_base.js';
 import { updateHeaderContext } from './header_context.js';
 import { stopCaptureRefresh, startCaptureRefresh } from './capture.js';
 import { updateSessionStatus, updateSessionSummary, updateSessionBranch, updateSessionFolder, updateSessionModel, updateWaitingIndicator, updateTokenUsage, updateHistoryTokenUsage, renderHistoryChat, showBoardChatTab, hideBoardChatTab, resolveSessionIdentity, commandPlaceholder, startingPlaceholder, applyTerminalDot } from './render.js';
@@ -439,7 +439,9 @@ async function sayChatFlag(flag, value, cur, entry, m) {
 export async function selectHistorySession(sessionId, locator = null, entry = null) {
     const source = historyServer();
     const fromSource = x => x.session_id === sessionId && (x.server || (isCloud() ? source : 'local')) === source;
-    const route = normalize(historyRoute(sessionId));
+    const current = currentRoute();
+    const folder = current?.view === 'inbox-folder' && current.id === sessionId && current.server === source ? current.folder : state.inboxFolder?.key || 'chats';
+    const route = normalize(historyRoute(sessionId, '', folder));
     if (!route || (isCloud() && !source)) return false;
     markRead(String(sessionId).startsWith('board:') ? 'board' : 'chat', `${source || 'local'}:${sessionId}`, Date.now()); // opened, by the list, an address (/inbox/chats/...), a saved message or a link: read as of now (#9687); the Inbox's list reads the same key
     const generation = ++switchGeneration;
@@ -475,9 +477,19 @@ export async function selectHistorySession(sessionId, locator = null, entry = nu
     const openedEntry = state.historySessionsList.find(fromSource);
     document.getElementById("history-session-title").textContent = historyLabel(openedEntry); // the chat's title; its id is behind Details (#6200)
     const described = describeChat(openedEntry); // the way back to its group's table, and who, when and how long under the title (#7443)
-    setBackLink('history-back', isCloud() ? 'history' : 'hub-inbox', isCloud() ? described.group : (state.inboxFolder || { key: 'chats', label: 'All chats' })); // a local Coral's chat goes back to the Inbox folder it came from
+    const inbox = !isCloud() || nativeInbox();
+    const backGroup = inbox ? { key: folder, label: folder === 'chats-archived' ? 'Archived' : state.inboxFolder?.key === folder ? state.inboxFolder.label : 'All chats' } : described.group;
+    setBackLink('history-back', inbox ? 'hub-inbox' : 'history', backGroup);
+    if (inbox) document.getElementById('history-back')?.setAttribute('data-on-click', 'history-list'); // a local Coral's chat goes back to the Inbox folder it came from
     const phoneBack = document.querySelector('.mobile-history-back'); // the phone's own back control is Chats again for this chat (a job's result chat pointed it at the job for one visit, #10578)
-    if (phoneBack) { phoneBack.textContent = '\u2190 Chats'; phoneBack.setAttribute('data-on-click', 'history-list'); phoneBack.setAttribute('aria-label', 'Back to chats'); delete phoneBack.dataset.jobId; }
+    if (phoneBack) {
+        phoneBack.textContent = `\u2190 ${inbox ? backGroup.label : 'Chats'}`;
+        phoneBack.setAttribute('data-on-click', 'history-list');
+        phoneBack.setAttribute('aria-label', `Back to ${inbox ? backGroup.label : 'chats'}`);
+        phoneBack.dataset.kind = inbox ? 'hub-inbox' : 'history';
+        phoneBack.dataset.group = backGroup?.key || '';
+        delete phoneBack.dataset.jobId;
+    }
     drawChatFlags(openedEntry);
     const metaEl = document.getElementById('history-session-meta');
     if (metaEl) { metaEl.textContent = described.meta; metaEl.hidden = !described.meta; }

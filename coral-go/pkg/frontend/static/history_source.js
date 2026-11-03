@@ -21,11 +21,11 @@ export function setHistorySource(server) {
     return true;
 }
 
-export function historyRoute(id, query = '') {
+export function historyRoute(id, query = '', folder = 'chats') {
     const route = id ? { view: 'chats', id } : { view: 'chats', query };
     const server = historyServer();
     if (server && (isCloud() || server !== 'local')) route.server = server;
-    return nativeInbox() ? inboxRouteFor(route) : route; // the Hub's native Inbox has no Chats address: a chat is the chat on screen in the Inbox (Goal #100, #9549)
+    return nativeInbox() ? { ...inboxRouteFor(route), ...(id ? { folder } : {}) } : route; // the Hub's native Inbox has no Chats address: a chat is the chat on screen in the Inbox (Goal #100, #9549)
 }
 
 /** A Hub with no computer online (yet) has nothing to read history from: an empty answer, not a failure. Its readers show an empty list and log nothing (#11073); every other error stays an error. */
