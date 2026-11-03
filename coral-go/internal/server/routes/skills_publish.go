@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"archive/zip"
 	"bytes"
 	"crypto/sha256"
 	"encoding/base64"
@@ -32,7 +33,9 @@ const publishesPerHour = 5
 const maxPublishBody = (skills.MaxZipBytes*4)/3 + 4096
 
 type publishRequest struct {
-	Zip          string `json:"zip_base64"`
+	Zip string `json:"zip_base64"`
+	// SkillMD is one SKILL.md in base64, instead of a zip (the Operator's import only, #12678): it is wrapped as a one-file zip and goes through exactly the same checks.
+	SkillMD      string `json:"skill_md_base64"`
 	ScriptsAcked bool   `json:"scripts_acked"`
 	// AcknowledgeSecret is the Operator's one confirmation that a file of their own skill holds what looks like a key or token and goes in anyway (logged).
 	AcknowledgeSecret bool `json:"acknowledge_secret"`
@@ -65,17 +68,55 @@ func (h *SkillsHandler) allowPublish(session string) bool {
 	return true
 }
 
-// readPublished reads the zip from the request: JSON with zip_base64, at most maxPublishBody bytes.
-func readPublished(w http.ResponseWriter, r *http.Request) (data []byte, req publishRequest, ok bool) {
+// zipOfSkillMD wraps one SKILL.md as a zip with that one file at its root, stored not compressed, the same bytes for the same text on any Go version (no time stamp): the rest of the import cannot tell it from a zip someone made.
+func zipOfSkillMD(md []byte) ([]byte, error) {
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+	fw, err := zw.CreateHeader(&zip.FileHeader{Name: "SKILL.md", Method: zip.Store})
+	if err != nil {
+		return nil, err
+	}
+	if _, err := fw.Write(md); err != nil {
+		return nil, err
+	}
+	if err := zw.Close(); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+// readPublished reads the skill from the request: JSON with zip_base64 (or, when allowMD, skill_md_base64: one SKILL.md), at most maxPublishBody bytes.
+func readPublished(w http.ResponseWriter, r *http.Request, allowMD bool) (data []byte, req publishRequest, ok bool) {
 	r.Body = http.MaxBytesReader(w, r.Body, maxPublishBody)
 	raw, err := io.ReadAll(r.Body)
 	if err != nil {
 		writeError(w, http.StatusRequestEntityTooLarge, "skill_too_large", "a skill is a zip of at most 5 MiB")
 		return nil, req, false
 	}
-	if json.Unmarshal(raw, &req) != nil || req.Zip == "" {
-		errBadRequest(w, `send {"zip_base64": "<the zip>"}`)
+	if json.Unmarshal(raw, &req) != nil || (req.Zip == "" && !(allowMD && req.SkillMD != "")) || (req.Zip != "" && req.SkillMD != "") {
+		if allowMD {
+			errBadRequest(w, `send {"zip_base64": "<the zip>"} or {"skill_md_base64": "<a SKILL.md>"}`)
+		} else {
+			errBadRequest(w, `send {"zip_base64": "<the zip>"}`)
+		}
 		return nil, req, false
+	}
+	if req.Zip == "" { // one SKILL.md: wrapped as a one-file zip, then every check of a zip applies
+		md, derr := base64.StdEncoding.DecodeString(req.SkillMD)
+		if derr != nil || len(md) == 0 {
+			errBadRequest(w, "skill_md_base64 must be the SKILL.md, in base64")
+			return nil, req, false
+		}
+		if len(md) > skills.MaxZipBytes {
+			writeError(w, http.StatusRequestEntityTooLarge, "skill_too_large", "a skill is at most 5 MiB")
+			return nil, req, false
+		}
+		wrapped, werr := zipOfSkillMD(md)
+		if werr != nil {
+			errInternalServer(w, "could not read the file")
+			return nil, req, false
+		}
+		return wrapped, req, true
 	}
 	data, err = base64.StdEncoding.DecodeString(req.Zip)
 	if err != nil || len(data) == 0 {
@@ -279,7 +320,7 @@ func (h *SkillsHandler) PublishSkillAgent(w http.ResponseWriter, r *http.Request
 		httputil.WriteActionLimit(w, 0, "rate_limited", "at most 5 skills an hour") // a per-action limit, marked so the dashboard does not take it for an overloaded server
 		return
 	}
-	data, _, ok := readPublished(w, r)
+	data, _, ok := readPublished(w, r, false) // an agent publishes a zip
 	if !ok {
 		return
 	}
@@ -302,7 +343,7 @@ func (h *SkillsHandler) PublishSkillOperator(w http.ResponseWriter, r *http.Requ
 		writeError(w, http.StatusForbidden, "operator_only", "only a person at the dashboard publishes a skill")
 		return
 	}
-	data, req, ok := readPublished(w, r)
+	data, req, ok := readPublished(w, r, true) // the Operator may import a lone SKILL.md too (#12678)
 	if !ok {
 		return
 	}
