@@ -198,9 +198,6 @@ const AutoResumeNotice = "Coral resumed you after your CLI stopped on an API err
 // archived or ended meanwhile, the setting was turned off, or a person's wake reset the
 // count (a stale timer).
 func (h *SessionsHandler) autoResume(ctx context.Context, sid string, n int) {
-	if ptymanager.Foreign() { // a Coral on a copy of another's database resumes no one (internal/dataowner)
-		return
-	}
 	settings, _ := h.ss.GetSettings(ctx)
 	if !setreg.Bool(settings, AutoResumeSetting) {
 		return

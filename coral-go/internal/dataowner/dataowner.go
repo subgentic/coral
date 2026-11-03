@@ -1,8 +1,11 @@
 // Package dataowner ties sessions.db to the data folder that made it (task #429, after the duplicate-resume incident of 2026-11-01).
 //
-// A copy of a live sessions.db is not inert: on startup Coral resumes the sessions the database lists, and on a shared tmux server it could type into the REAL agents' panes. So a Coral
-// that cannot show that the database is this folder's own (a FOREIGN Coral) wakes, recovers and types nothing. The tie is a random 128-bit id kept in two places that must agree: a row in
-// sessions.db and the file <data dir>/data_dir_id. A database copied alone has the row and no file. It is a safety rail, not a security boundary: whoever can copy both can forge it.
+// A copy of a live sessions.db is not inert: a second Coral started on it lists the REAL agents. The tie is a random 128-bit id kept in two places that must agree: a row in sessions.db and the file
+// <data dir>/data_dir_id. A database copied alone has the row and no file. It is a safety rail, not a security boundary: whoever can copy both can forge it.
+//
+// What the answer does (#12591, the Operator's rule): NOTHING WAITS ON IT. Coral never blocks on this check, because a check that withholds delivery, wake or sleep from the person's own agents breaks an
+// upgrade, which Coral must never do. When the ids show a copy, one WARN is logged and the dashboard shows a warning with "This is my data folder" (Adopt, through the person's own press); everything
+// else runs as usual. A source census (no_gate_census_test.go) pins that nothing branches on a verdict.
 //
 // Verify decides once per start, before anything acts on live_sessions:
 //   - file and row present and equal: OWNED (a folder moved or restored: the path in the file no longer exists, so it is rewritten). If the path in the file is ANOTHER folder that still exists and
@@ -12,7 +15,7 @@
 //     old its files looked, got it wrong, and left every agent without delivery). Nothing here tells such a folder from a copy of one: a copy of a database that already carries the row is the case the
 //     id is for, and it has the row.
 //
-// Anything that cannot be read or written is FOREIGN. FOREIGN never stops Coral from starting; it only withholds what acts on the agents.
+// Anything that cannot be read or written is FOREIGN, which only warns.
 package dataowner
 
 import (

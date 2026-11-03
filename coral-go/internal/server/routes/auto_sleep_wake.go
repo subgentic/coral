@@ -37,9 +37,6 @@ func (h *SessionsHandler) WakeIdleForDelivery(ctx context.Context, sessionID str
 // #12111): an agent that can assign tasks cannot wake every sleeper on its board, once each per idle period, without limit. A wake refused for the cap leaves the delivery where it was (unread,
 // queued) and logs one counter line; at most two wakes run at once and they start two seconds apart.
 func (h *SessionsHandler) WakeIdleFor(ctx context.Context, sessionID string, fromPerson bool) bool {
-	if !fromPerson && ptymanager.Foreign() { // a delivery's wake starts a CLI by itself: not in a Coral on a copy of another's database; a person's own Send is a person's action (internal/dataowner)
-		return false
-	}
 	ls, err := h.ss.GetLiveSession(ctx, sessionID)
 	if err != nil || ls == nil {
 		return false

@@ -20,7 +20,6 @@ import (
 	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/ptr"
-	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/safefs"
 	setreg "github.com/subgentic/coral/internal/settings"
 	"github.com/subgentic/coral/internal/store"
@@ -251,9 +250,6 @@ func (h *SessionsHandler) notifyAutoWake(msg string) {
 
 // AutoWakeAfterRestart is the pass, once per start, on pty only (startup calls it).
 func (h *SessionsHandler) AutoWakeAfterRestart(ctx context.Context) {
-	if ptymanager.Foreign() { // a Coral on a copy of another's database wakes no one (internal/dataowner)
-		return
-	}
 	if !h.autoWake.sleep(ctx, autoWakeStartDelay) {
 		return
 	}
