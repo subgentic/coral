@@ -377,6 +377,7 @@ var operatorOnlyRoutes = map[string]string{
 	"POST /api/tracking/event":                                  "send a usage event",
 	"POST /api/system/telemetry/acknowledge":                    "acknowledge the telemetry notice",
 	"POST /api/system/auto-wake/dismiss":                        "dismiss the auto-wake notice",
+	"POST /api/system/data-folder/adopt":                        "adopt this data folder after the copy warning (#12591)",
 	"POST /api/cloud/cli-hello":                                 "start a command-line signature",
 	"GET /api/system/proof":                                     "prove to a tool that this is Coral",
 	"POST /api/scheduled/validate-cron":                         "check a schedule",

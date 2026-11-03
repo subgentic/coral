@@ -415,6 +415,7 @@ func (s *Server) registerSessions(r *chi.Mux, h *routeHandlers) {
 	// #3636: the start's wake of the agents running when a pty Coral stopped.
 	r.Get("/api/system/auto-wake", sessHandler.AutoWakeStatus)
 	r.Post("/api/system/auto-wake/dismiss", sessHandler.DismissAutoWake)
+	r.Post("/api/system/data-folder/adopt", sessHandler.AdoptDataFolder) // "This is my data folder" (#12591): the person's alone
 	r.Post("/api/sessions/live/{sessionID}/archive", sessHandler.ArchiveSession)
 	r.Post("/api/sessions/live/{sessionID}/unarchive", sessHandler.UnarchiveSession)
 

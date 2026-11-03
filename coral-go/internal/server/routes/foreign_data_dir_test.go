@@ -49,14 +49,6 @@ func TestTheSameDatabaseInItsOwnFolderWakesThem(t *testing.T) {
 	assert.False(t, sleeping)
 }
 
-func TestNoteForeignDataDirSaysSoOnTheStatusAndTheDashboard(t *testing.T) {
-	r := newWakeRig(t)
-	notes := NewNotificationStore()
-	r.h.SetNotificationStore(notes)
-	r.h.NoteForeignDataDir("a fixed notice")
-	assert.Equal(t, "foreign", r.h.autoWake.snapshot().State)
-}
-
 // A FOREIGN Coral does not read or decide from the agents' screens: the loops that do return at once.
 func TestTheScreenDecidingLoopsDoNotRunInAForeignCoral(t *testing.T) {
 	r := newWakeRig(t)

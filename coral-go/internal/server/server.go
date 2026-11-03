@@ -438,13 +438,6 @@ func (s *Server) RunCommentReplyNudges(ctx context.Context) {
 	s.sessHandler.RunCommentReplyNudges(ctx)
 }
 
-// NoteForeignDataDir tells the dashboard that this Coral does not own its database's data folder (internal/dataowner): nothing is woken or recovered.
-func (s *Server) NoteForeignDataDir(text string) {
-	if s.sessHandler != nil {
-		s.sessHandler.NoteForeignDataDir(text)
-	}
-}
-
 // AutoWakeAfterRestart wakes the agents that were running when this pty Coral last stopped
 // (#3636); startup calls it once, on pty.
 func (s *Server) AutoWakeAfterRestart(ctx context.Context) {

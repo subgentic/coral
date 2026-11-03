@@ -46,9 +46,9 @@ const (
 	ReasonNotLocal   = "the id file names a path that is not a local folder"
 )
 
-// Notice is the one dashboard notice and log sentence of a FOREIGN start. It is a fixed string.
-const Notice = "This database was not made in this data folder, so no agent is woken or recovered at startup and Coral types nothing into any agent terminal by itself. " +
-	"If you deleted the id file by accident, or this is a restore you want to keep, stop Coral and run: coral --adopt-data-dir. Agents can still be woken by hand from the list."
+// Notice is the one dashboard warning and log sentence when the ids show this may be a copy. It is a fixed string. Coral runs as usual: nothing waits on the person's answer (#12591).
+const Notice = "This database carries an id that does not match this data folder, so it may be a copy of another Coral's. Coral is running as usual. " +
+	"If this is your data folder (a restore, or an id file you deleted), press This is my data folder."
 
 // Probe is what Verify reads and writes. Every field is required.
 type Probe struct {
@@ -287,7 +287,7 @@ func clean(s string) string {
 
 // LogLine is the one log line of a FOREIGN start.
 func LogLine(v Verdict) string {
-	line := "[data-dir] " + Notice + " Why: " + v.Reason + "."
+	line := "[data-dir] WARNING: " + Notice + " Why: " + v.Reason + "."
 	if v.Detail != "" && v.Reason == ReasonNotLocal {
 		line += " The path in the id file is " + v.Detail + "."
 	} else if v.Detail != "" {

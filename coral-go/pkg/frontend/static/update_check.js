@@ -123,11 +123,16 @@ export function showFirewallWarning(message) {
     showWarningToast("firewall-warning-toast", "Windows Firewall", message);
 }
 
+/** The ids showed this database may be a copy of another Coral's (#12591): Coral runs as usual, and this warning offers "This is my data folder", which adopts the folder in place. adopt() resolves when it did. */
+export function showDataFolderWarning(message, adopt) {
+    showWarningToast("data-folder-warning-toast", "This data folder", message, { label: "This is my data folder", run: adopt });
+}
+
 export function showDatabaseWarning(message) {
     showWarningToast("database-warning-toast", "Database damage", message);
 }
 
-function showWarningToast(id, heading, message) {
+function showWarningToast(id, heading, message, action) {
     if (!message || document.getElementById(id)) return;
     const toast = document.createElement("div");
     toast.id = id;
@@ -159,6 +164,22 @@ function showWarningToast(id, heading, message) {
     text.className = "security-warning-text";
     text.textContent = message;
     body.append(header, text);
+    if (action) { // one button that answers the warning: it goes when the answer worked, and says so when it did not
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "btn btn-small update-toast-action";
+        btn.textContent = action.label;
+        const fail = document.createElement("p");
+        fail.className = "security-warning-text update-toast-action-error";
+        fail.setAttribute("role", "alert");
+        fail.hidden = true;
+        btn.addEventListener("click", async () => {
+            btn.disabled = true;
+            fail.hidden = true;
+            try { await action.run(); toast.remove(); } catch { btn.disabled = false; fail.textContent = "That did not work. Coral's log says why."; fail.hidden = false; }
+        });
+        body.append(btn, fail);
+    }
     toast.append(body);
     warningStack().appendChild(toast);
     announceNotice(`${heading}: ${message}`, true); // the warning and its details, once, assertively, from the notices' own region: the buttons inside it are not read with it (#6213)

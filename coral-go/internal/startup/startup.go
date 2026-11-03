@@ -17,7 +17,6 @@ import (
 	"github.com/subgentic/coral/internal/auth"
 	"github.com/subgentic/coral/internal/background"
 	"github.com/subgentic/coral/internal/config"
-	"github.com/subgentic/coral/internal/dataowner"
 	"github.com/subgentic/coral/internal/dbcrypt"
 	"github.com/subgentic/coral/internal/license"
 	"github.com/subgentic/coral/internal/logsafe"
@@ -263,12 +262,7 @@ func Start(ctx context.Context, cfg *config.Config, opts Options) (*RunningServe
 	if err := prepareWithDatabase(ctx, db, cfg, opts); err != nil {
 		return closeDB(err)
 	}
-	// Is this database this folder's own? Decided before anything acts on live_sessions (internal/dataowner): a copy of another Coral's database wakes, recovers and types nothing.
-	ownership := verifyDataOwner(ctx, db, cfg.CoralDir())
-	ptymanager.SetForeign(ownership.Foreign)
-	if ownership.Foreign {
-		log.Print(dataowner.LogLine(ownership))
-	}
+	settleDataOwner(ctx, db, cfg.CoralDir())
 	// A start that left its Terms to the Coral Hub (a credential offered, nobody at a terminal) enrolls first: nothing listens or starts until the Hub has confirmed them (#9936).
 	if code, ok := hubTermsFirst(ctx, db, cfg); !ok {
 		_, err := closeDB(errTermsNotConfirmed)
@@ -360,17 +354,13 @@ func Start(ctx context.Context, cfg *config.Config, opts Options) (*RunningServe
 	if ptyRun {
 		cfg.TerminalBackend = "pty" // also when startup fell back to pty (a long socket path)
 	}
-	if !ownership.Foreign { // a Coral on a copy of another's database recovers and restores nothing
-		reconcileOrphanedSessions(ctx, db, agentRT, ptyRun)
-		reconcileOrphanedTeams(ctx, db)
-		srv.SeedStarterSkills(ctx) // the example skills Coral ships (#12463)
+	reconcileOrphanedSessions(ctx, db, agentRT, ptyRun)
+	reconcileOrphanedTeams(ctx, db)
+	srv.SeedStarterSkills(ctx) // the example skills Coral ships (#12463)
 
-		// Restore board pause state AFTER reconciliation so it reflects
-		// the final sleeping state (including recovered sessions).
-		srv.RestoreSleepingBoards()
-	} else {
-		srv.NoteForeignDataDir(dataowner.Notice)
-	}
+	// Restore board pause state AFTER reconciliation so it reflects
+	// the final sleeping state (including recovered sessions).
+	srv.RestoreSleepingBoards()
 
 	var handler http.Handler = srv.Router()
 	if tlsConfig != nil {

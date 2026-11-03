@@ -9,7 +9,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/background"
 	"github.com/subgentic/coral/internal/dataowner"
+	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/internal/store/storetest"
 )
@@ -86,4 +88,74 @@ func TestAnOldDatabaseWithAgentsAndNoIdIsAnInstallUpgradingInPlaceAndIsOwned(t *
 	_, err = os.Stat(filepath.Join(dir, dataowner.FileName))
 	assert.NoError(t, err, "and in the folder")
 	assert.False(t, verifyDataOwner(ctx, db, dir).Foreign, "and the next start verifies")
+}
+
+// #12591, the operator's rule: any folder Coral itself left behind (no id yet) opens on the new build as OWNED with its agents recovered. A folder built by the previous release's start: the database lists
+// live agents, nothing in it carries an id. The new build's start makes the id, withholds nothing, and the recovery that marks the agents Coral stopped (for the auto-wake) runs.
+func TestAFolderTheLastReleaseLeftBehindOpensOwnedWithItsAgentsRecovered(t *testing.T) {
+	ctx := context.Background()
+	db, dir := ownerRig(t)
+	for _, name := range []string{"api_key", "cli-token", "app.log", "tray.log", "messageboard.db"} {
+		require.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte("x"), 0o600))
+	}
+	addAgents(t, db, 3) // the team: awake when the last release stopped
+	t.Cleanup(func() { ptymanager.SetForeign(false); dataowner.ResetCopyWarningForTest() })
+
+	v := settleDataOwner(ctx, db, dir)
+	assert.False(t, v.Foreign, "no id: an upgrade in place")
+	assert.False(t, ptymanager.Foreign(), "nothing is withheld")
+	assert.Empty(t, dataowner.CopyWarning(), "and there is no warning")
+	id, err := db.DataDirID(ctx)
+	require.NoError(t, err)
+	assert.Len(t, id, 32, "the id is made, silently")
+
+	reconcileOrphanedSessions(ctx, db, background.NewPTYRuntime(ptymanager.NewPTYBackend()), true)
+	all, err := store.NewSessionStore(db).GetAllLiveSessions(ctx)
+	require.NoError(t, err)
+	require.Len(t, all, 3)
+	for _, ls := range all {
+		require.NotNil(t, ls.SleepReason, "every agent is recovered for the auto-wake")
+		assert.Equal(t, store.SleepReasonCoralStopped, *ls.SleepReason)
+	}
+}
+
+// A copy (the id's row without the id file) only warns: Coral starts as usual, the warning is there for the dashboard, and the press adopts the folder in place.
+func TestACopyOnlyWarnsAndTheButtonAdoptsItInPlace(t *testing.T) {
+	ctx := context.Background()
+	t.Cleanup(func() { ptymanager.SetForeign(false); dataowner.ResetCopyWarningForTest() })
+	live, liveDir := ownerRig(t)
+	require.False(t, settleDataOwner(ctx, live, liveDir).Foreign)
+	addAgents(t, live, 2)
+	copyPath := filepath.Join(t.TempDir(), "sessions.db")
+	_, err := live.ExecContext(ctx, `VACUUM INTO ?`, copyPath)
+	require.NoError(t, err)
+	copied, err := storetest.Open(t, copyPath)
+	require.NoError(t, err)
+	copyDir := filepath.Dir(copyPath)
+
+	v := settleDataOwner(ctx, copied, copyDir)
+	assert.True(t, v.Foreign, "the ids show a copy")
+	assert.False(t, ptymanager.Foreign(), "and Coral still runs as usual: nothing is withheld")
+	assert.Equal(t, dataowner.Notice, dataowner.CopyWarning(), "the dashboard is told")
+
+	adopted, err := dataowner.AdoptPending(ctx)
+	require.NoError(t, err)
+	assert.True(t, adopted)
+	assert.Empty(t, dataowner.CopyWarning())
+	assert.False(t, verifyDataOwner(ctx, copied, copyDir).Foreign, "the folder is its own now, with no restart")
+}
+
+// Start asks settleDataOwner and never lets the verdict gate recovery: no `ownership.Foreign` branch, no SetForeign(true) in the startup source (#12591).
+func TestStartNeverGatesOnTheDataOwnerVerdict(t *testing.T) {
+	src, err := os.ReadFile("startup.go")
+	require.NoError(t, err)
+	text := string(src)
+	assert.Contains(t, text, "settleDataOwner(ctx, db, cfg.CoralDir())")
+	assert.NotContains(t, text, "ownership.Foreign", "the verdict does not decide whether recovery runs")
+	assert.NotContains(t, text, "SetForeign(true)")
+	assert.NotContains(t, text, "SetForeign(ownership")
+	own, err := os.ReadFile("startup_dataowner.go")
+	require.NoError(t, err)
+	assert.Contains(t, string(own), "ptymanager.SetForeign(false)")
+	assert.NotContains(t, string(own), "SetForeign(v.Foreign)")
 }

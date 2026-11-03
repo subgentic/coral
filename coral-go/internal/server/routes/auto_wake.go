@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/subgentic/coral/internal/dataowner"
 	"log/slog"
 	"math/rand/v2"
 	"net/http"
@@ -248,14 +249,6 @@ func (h *SessionsHandler) notifyAutoWake(msg string) {
 	}
 }
 
-// NoteForeignDataDir records that this Coral does not own its database's data folder: the status says so and the dashboard gets one fixed notice (internal/dataowner).
-func (h *SessionsHandler) NoteForeignDataDir(text string) {
-	h.autoWake.set(func(s *autoWakeStatus) { s.State = "foreign" })
-	if h.notifications != nil {
-		h.notifications.Push(Notification{Title: "This data folder", Message: text, Level: "warning"})
-	}
-}
-
 // AutoWakeAfterRestart is the pass, once per start, on pty only (startup calls it).
 func (h *SessionsHandler) AutoWakeAfterRestart(ctx context.Context) {
 	if ptymanager.Foreign() { // a Coral on a copy of another's database wakes no one (internal/dataowner)
@@ -396,6 +389,23 @@ func (h *SessionsHandler) DismissAutoWake(w http.ResponseWriter, r *http.Request
 	}
 	h.autoWake.set(func(s *autoWakeStatus) { s.Pending, s.State = nil, "done" })
 	writeJSON(w, http.StatusOK, h.autoWake.snapshot())
+}
+
+// AdoptDataFolder: POST /api/system/data-folder/adopt, "This is my data folder" (#12591): the ids showed this database may be a copy, Coral ran as usual, and the person says it is theirs. The folder is
+// adopted in place (a new id in the database's row and in the folder's file, as coral --adopt-data-dir does) and the warning goes. The person's alone, at this computer: an agent's token, the Hub and a
+// request that is not the dashboard's are refused. Nothing waits on this: it only ends the warning.
+func (h *SessionsHandler) AdoptDataFolder(w http.ResponseWriter, r *http.Request) {
+	if cloud.Tunneled(r) || !humanInputCaller(r) {
+		writeError(w, http.StatusForbidden, "operator_only", "only the Operator can answer this")
+		return
+	}
+	adopted, err := dataowner.AdoptPending(r.Context())
+	if err != nil {
+		slog.Warn("[data-dir] adopting this data folder failed", "error", err)
+		writeError(w, http.StatusInternalServerError, "adopt_failed", "could not adopt this data folder: see Coral's log")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"adopted": adopted})
 }
 
 // validateAutoSleepSettings checks the two auto-sleep settings in a settings PUT (#12111, Security): a boolean, and a whole number of minutes from 15 to 1440, parsed here and stored as a plain
