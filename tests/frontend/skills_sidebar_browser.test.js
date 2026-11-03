@@ -60,6 +60,7 @@ const STUB = `(() => { const R = window.fetch; const json = (b, s = 200) => Prom
             await ev(`document.querySelector('#skills-view tr.dt-row').click(); true`);
             await waitFor(`!!document.querySelector('#skills-view .skills-banner')`, `${tag}: the pending skill's notice`, 6000);
             check(`${tag}: the pending skill's notice is there`, /Read it before you approve it/.test(await ev(`document.querySelector('#skills-view .skills-banner').innerText`)));
+            check(`${tag}: the way back says where it goes (the folder that is open)`, (await ev(`document.querySelector('#skills-view .skills-head button').textContent`)) === 'Back to Agent created', await ev(`document.querySelector('#skills-view .skills-head button').textContent`));
             if (!mobile) check(`${tag}: and the sidebar is still there with the folder open`, (await folders('#skills-nav-list')).length === 4);
             // Coral skills, All
             await load('/skills', fs, theme);
