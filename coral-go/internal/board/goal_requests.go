@@ -208,8 +208,7 @@ func requestText(field, s string, max int, multiline bool) (string, error) {
 	return s, nil
 }
 
-// goalRequestClock is the clock the expiry reads (nil: the real one). Only a test sets it, when its board is seeded by counting back from a fixed date: with the real clock such a board's requests expire
-// as the real date moves on (the analytics test of #12925 failed that way on 2026-11-03).
+// goalRequestClock is the clock the expiry reads (nil: the real one). Only a test sets it (goal_requests_clock_test.go, so the setter is not in the production code), to prove the expiry against a clock a year or two ahead (#12927).
 var goalRequestClock atomic.Pointer[func() time.Time]
 
 func goalRequestNow() time.Time {
@@ -217,12 +216,6 @@ func goalRequestNow() time.Time {
 		return (*f)()
 	}
 	return time.Now()
-}
-
-// SetGoalRequestClockForTest makes the request expiry read now instead of the real clock; the returned function puts the real one back.
-func SetGoalRequestClockForTest(now func() time.Time) (restore func()) {
-	goalRequestClock.Store(&now)
-	return func() { goalRequestClock.Store(nil) }
 }
 
 // expireGoalRequests marks the requests older than the TTL that nobody answered, on both sides, as expired.

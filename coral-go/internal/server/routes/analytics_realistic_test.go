@@ -55,10 +55,10 @@ func newLedger() *realisticLedger {
 
 func TestEveryAnalyticsNumberMatchesADirectCountOnARealisticBoard(t *testing.T) {
 	ctx := context.Background()
-	now := time.Date(2026, 10, 30, 12, 0, 0, 0, time.UTC)
-	// The seeded days count back from this fixed date, and the store expires an unanswered goal request after 14 days of ITS clock (board.GoalRequestTTL): on the real clock the requests seeded 10 days back
-	// expired at noon UTC on 2026-11-03 and the accepted replies were refused ("no open request of this board matches that reply", #12925). The expiry reads the seed's clock, so the board is the same on every day.
-	t.Cleanup(board.SetGoalRequestClockForTest(func() time.Time { return now }))
+	// The seeded days count back from noon UTC of the REAL date, not from a fixed one: the store expires an unanswered goal request after 14 days of the real clock (board.GoalRequestTTL), so a board seeded from
+	// a date long past had its requests expired and the accepted replies refused ("no open request of this board matches that reply", #12925; a fixed date is a time bomb for every expiry rule, #12927). Every
+	// number here is relative to this day, and the handler reads it as its clock (h.now), so the board is the same on every day.
+	now := time.Now().UTC().Truncate(24 * time.Hour).Add(12 * time.Hour)
 	const team = "coral-go-team"
 	bs, err := board.NewStoreWithKey(filepath.Join(t.TempDir(), "board.db"), "")
 	require.NoError(t, err)
