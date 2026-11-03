@@ -243,7 +243,7 @@ URL alone does not trigger the offer. `--cloud-connect off` suppresses it;
 
 ## 4. Launch your first agent
 
-Home asks **What do you want to work on?** with **New agent**, **New team** and **Open folder** (elsewhere, **+ New agent**). Choose **New agent**, enter an existing
+Home asks **What do you want to work on?** with **New agent**, **New team** and **New goal** (elsewhere, **+ New agent**; **Open folder** is in the **+ New** chooser and a computer's menu). Choose **New agent**, enter an existing
 project folder on the computer running Coral and choose **Next**. Step 2 is the
 persona (optional); step 3 has the **Agent** tab, where you choose your installed
 CLI, then choose **Launch** (it is available from every step once a folder is set). In **Chat**, type a task and press Enter
