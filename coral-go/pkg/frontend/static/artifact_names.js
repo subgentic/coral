@@ -3,6 +3,8 @@
  * and when there is no name, the link keeps its short id. A name is the uploader's text: it is only ever set as text (never
  * markup), without controls or the characters that reorder or hide text, and cut to a length a link can show. */
 
+import { serverFetch } from './server_base.js';
+
 const names = new Map(); // hex -> the stored name ('' when it has none or can't be read)
 const asked = new Set();
 const MAX_NAME = 80;
@@ -42,11 +44,12 @@ function rememberArtifactName(hex, name) {
 }
 
 /** Ask for the names of these artifacts (each at most once per page) and relabel their links on the page as each answers. */
-export function learnArtifactNames(hexes) {
+export function learnArtifactNames(hexes, server) { // server: the one the text is from (the team's); through the Hub a bare /api path is the Hub's, not that computer's (#12581)
     for (const hex of hexes) {
-        if (asked.has(hex)) continue;
-        asked.add(hex);
-        fetch(`/api/artifacts/${hex}/meta`)
+        const key = `${server || ''}|${hex}`;
+        if (asked.has(key)) continue;
+        asked.add(key);
+        serverFetch(server, `/api/artifacts/${hex}/meta`)
             .then(r => (r.status === 200 ? r.json() : null))
             .then(d => {
                 rememberArtifactName(hex, d && d.name);

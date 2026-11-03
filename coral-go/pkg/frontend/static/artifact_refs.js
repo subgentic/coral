@@ -44,7 +44,7 @@ export function linkedText(text, { server, asWritten = false } = {}) {
     for (const p of splitArtifactRefs(text)) {
         if (p.hex) { frag.append(linkFor(p.hex, server, asWritten ? p.written : '')); seen.add(p.hex); } else frag.append(document.createTextNode(p.text));
     }
-    if (seen.size) learnArtifactNames(seen);
+    if (seen.size) learnArtifactNames(seen, server);
     return frag;
 }
 
@@ -69,14 +69,14 @@ export function linkArtifactRefsIn(root, { server, asWritten = false } = {}) {
 }
 
 /** The text as HTML for a surface that builds strings: the words escaped, each reference an anchor the delegated click below opens. */
-export function linkedHtml(text) {
+export function linkedHtml(text, server) {
     const seen = new Set();
     const html = splitArtifactRefs(text).map(p => {
         if (!p.hex) return escapeHtml(p.text);
         seen.add(p.hex);
         return `<a href="${escapeAttr(serverUrl(artifactPath(p.hex)))}" target="_blank" rel="noopener noreferrer" class="mb-artifact-ref" data-artifact="${escapeAttr(p.hex)}" title="${escapeAttr(`coral://artifacts/${p.hex}`)}">${escapeHtml(artifactLabel(p.hex))}</a>`;
     }).join('');
-    if (seen.size) learnArtifactNames(seen);
+    if (seen.size) learnArtifactNames(seen, server);
     return html;
 }
 

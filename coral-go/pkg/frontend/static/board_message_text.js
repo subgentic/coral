@@ -3,6 +3,7 @@ import { escapeHtml, escapeAttr } from './html_escape.js';
 import { renderMarkdown, _renderMarkdownUncached, FENCED_WITH_LANG } from './markdown.js';
 import { artifactLabel, learnArtifactNames } from './artifact_names.js';
 import { ARTIFACT_REF } from './artifact_refs.js';
+import { state } from './state.js';
 import { isGuidePost, guideText } from './guide_names.js';
 
 /** Board message text with literal "\n" escapes turned into line breaks,
@@ -253,7 +254,7 @@ export function highlightMentionsIn(container) {
 // the rule is artifact_refs.js's, shared by every surface that shows team-written text (#11416): coral://artifacts/ and exactly 64 lowercase hex digits
 
 /** The sanitized HTML with each bare coral://artifacts/<64 hex> made a link. */
-export function linkArtifactRefsHtml(html) {
+export function linkArtifactRefsHtml(html, server = state.currentBoardServer) {
     if (typeof document === 'undefined' || !html || !html.includes('coral://artifacts/')) return html;
     const t = document.createElement('template');
     t.innerHTML = html;
@@ -294,7 +295,7 @@ export function linkArtifactRefsHtml(html) {
         if (at < text.length) frag.append(text.slice(at));
         n.replaceWith(frag);
     }
-    if (seen.size) learnArtifactNames(seen); // the links on the page are relabelled as each name arrives
+    if (seen.size) learnArtifactNames(seen, server); // the links on the page are relabelled as each name arrives
     return changed ? t.innerHTML : html;
 }
 
