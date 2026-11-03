@@ -72,6 +72,7 @@ let leavingSince = 0;
 export function pageIsLeaving(now = Date.now()) { return leavingSince > 0 && now - leavingSince < LEAVING_MS; }
 /** Start noting that the page is being left; installCloudFetch calls it once (a page that is not on the Hub never gets these three listeners). */
 function watchLeaving() {
+    if (!window.addEventListener) return; // a test's stand-in window
     window.addEventListener('beforeunload', () => { leavingSince = Date.now(); });
     window.addEventListener('pagehide', () => { leavingSince = Date.now(); });
     window.addEventListener('pageshow', () => { leavingSince = 0; });
