@@ -29,7 +29,7 @@
 .update-agent-name { font-weight: var(--fw-strong); overflow-wrap: anywhere; }
 .update-agent-state { color: var(--text-secondary); white-space: nowrap; }
 .update-keep, .update-later-note, .update-calm { color: var(--text-secondary); font-size: var(--fs-sm, 0.8125rem); }
-@media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) { .update-confirm { max-width: none; width: 100%; } .update-confirm .modal-actions { flex-direction: column-reverse; } .update-confirm .modal-actions .btn { width: 100%; min-height: 44px; } }
+@media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) { .update-confirm { max-width: none; width: 100%; } .update-confirm .modal-actions { flex-direction: column; } .update-confirm .modal-actions .btn { width: 100%; min-height: 44px; } }
 
 /* Settings > Updates */
 .update-status { display: flex; align-items: flex-start; gap: var(--space-lg, 12px); padding: var(--space-lg, 12px); margin: 0 0 var(--space-lg, 12px); border-radius: var(--radius-lg, 8px); border: 1px solid var(--border); background: var(--bg-secondary); }
