@@ -164,7 +164,7 @@ function runResult(r) {
 }
 
 function workflowStepsTable(steps) {
-    const table = DT.dataTable({ label: 'Workflow steps', rows: steps.map((s, i) => ({ ...s, position: i + 1 })), rowKey: s => s.position, bare: true, sortBar: false, oneLine: true, empty: { line: 'No steps yet.' },
+    const table = DT.dataTable({ label: 'Workflow steps', rows: steps.map((s, i) => ({ ...s, position: i + 1 })), rowKey: s => s.position, bare: true, sortBar: false, oneLine: true, resize: true, empty: { line: 'No steps yet.' },
         columns: [ // one line a row (Goal #79): the command is cut with an ellipsis (whole in its tooltip and the editor), a narrow list drops Type
             { key: 'step', label: 'Step', primary: true, width: '12rem', cell: s => { const cell = DT.el('span'); cell.append(DT.el('span', 'sr-only', `Step ${s.position}: `), document.createTextNode(s.name || `Step ${s.position}`)); return cell; } },
             { key: 'type', label: 'Type', width: '6rem', dropAt: 36, cell: s => DT.tag(s.type || 'shell') },
