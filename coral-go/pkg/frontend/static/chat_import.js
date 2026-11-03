@@ -1,6 +1,8 @@
 /* The chats Coral did not start (#11970): a new Coral lists only its own agents' chats; the Claude Code, Codex... history already on the computer waits for the person to import it (GET and POST /api/history-import). */
 import { isCloud } from './server_base.js';
 import { importOnce } from './import_once.js';
+import { loadStyles } from './lazy_styles.js';
+await loadStyles('chat_import.css');
 const { historyFetch } = await importOnce('./history_source.js');
 const NAMES = { claude: 'Claude Code', codex: 'Codex', agy: 'Antigravity', pi: 'Pi', opencode: 'opencode', gemini: 'Gemini' };
 let offer = null; // { imported, found, sources } while chats wait; null once imported or on a Hub

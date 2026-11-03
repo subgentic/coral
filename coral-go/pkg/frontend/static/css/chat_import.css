@@ -1,0 +1,3 @@
+/* The import offer shares the chat list's available width at large text too. */
+.chat-import-line { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; min-width: 0; margin-bottom: 12px; overflow-wrap: anywhere; }
+.chat-import-line .btn { max-width: 100%; margin: 0; white-space: normal; overflow-wrap: anywhere; text-align: left; }
