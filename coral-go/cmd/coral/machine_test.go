@@ -284,6 +284,11 @@ func TestMachineLaunchPinsTheCoralDigest(t *testing.T) {
 		t.Fatalf("a pinned version uses its pinned digest: exit %d %s / %s", code, errb.String(), p.spec.UserData)
 	}
 	calls := len(p.calls)
+	out.Reset()
+	errb.Reset()
+	if code := runMachine(base("9.9.9"), strings.NewReader(""), &out, &errb); code != 2 || !strings.Contains(errb.String(), "2.0.3") || !strings.Contains(errb.String(), "pins") {
+		t.Fatalf("the refusal names the versions this build pins: exit %d %q", code, errb.String())
+	}
 	for name, args := range map[string][]string{
 		"a version with no pinned digest and none given": base("9.9.9"),
 		"one digest only":          base("9.9.9", "--coral-sha256-amd64", strings.Repeat("ab", 32)),

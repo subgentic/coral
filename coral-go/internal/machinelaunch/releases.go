@@ -3,6 +3,8 @@ package machinelaunch
 import (
 	"fmt"
 	"regexp"
+	"sort"
+	"strings"
 )
 
 // ReleaseDigests are the SHA-256 digests of one Coral release's Linux tarballs, pinned in this CLI (#10919, coral-hub Lead's read of the launch design): the machine checks the tarball it downloads against the digest
@@ -28,6 +30,22 @@ var sha256HexRe = regexp.MustCompile(`^[0-9a-f]{64}$`)
 func PinnedReleaseDigests(version string) (ReleaseDigests, bool) {
 	d, ok := releaseDigests[version]
 	return d, ok
+}
+
+// PinnedVersions is every version this CLI pins, sorted.
+func PinnedVersions() []string {
+	out := make([]string, 0, len(releaseDigests))
+	for v := range releaseDigests {
+		out = append(out, v)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// NoPinnedDigestWords is the refusal for a version with no pinned digest: the way out (the person's own digests, from a SHA256SUMS they checked) and the versions this build does pin. A build cannot pin its
+// own release (the digest does not exist until the release is made), so the newest CLI always meets this for its own version until a later build pins it.
+func NoPinnedDigestWords(version string) string {
+	return fmt.Sprintf("this build has no pinned digest for Coral %s: pass --coral-sha256-amd64 and --coral-sha256-arm64, the two Linux lines of that release's SHA256SUMS.txt (check the file first), or launch a version this build pins (it pins %s)", version, strings.Join(PinnedVersions(), ", "))
 }
 
 // Valid reports whether both digests are 64 lower-case hex digits.

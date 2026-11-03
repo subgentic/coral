@@ -202,7 +202,7 @@ func runMachine(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		digests, ok = machinelaunch.ReleaseDigests{AMD64: *sha256AMD64, ARM64: *sha256ARM64}, true // the person's own, from a list they checked: used instead of a pinned one
 	}
 	if !ok {
-		return fail("this build has no pinned digest for Coral %s: pass --coral-sha256-amd64 and --coral-sha256-arm64, the two Linux lines of that release's SHA256SUMS.txt (check the file first), or launch a version this build pins", version)
+		return fail("%s", machinelaunch.NoPinnedDigestWords(version))
 	}
 	if err := digests.Valid(); err != nil {
 		return fail("--coral-sha256-amd64 and --coral-sha256-arm64: %v", err)
