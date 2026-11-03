@@ -55,6 +55,7 @@ type needsYouAnswer struct {
 	Cursor      string         `json:"cursor"`
 	Items       []NeedsYouItem `json:"items"`
 	NotIncluded []string       `json:"not_included"`
+	Muted       map[string]int `json:"muted,omitempty"`          // files the Operator's settings keep out of the count, by kind (#12144): never in Count, Counts or Items, never pushed
 	Unread      []string       `json:"unread_sources,omitempty"` // a source that could not be read this time: its things are missing from the count, not zero
 }
 
@@ -163,6 +164,7 @@ func (h *BoardHandler) NeedsYou(w http.ResponseWriter, r *http.Request) {
 
 	var items []NeedsYouItem
 	var unread []string
+	muted := map[string]int{} // the files the Operator's settings mute, by kind: counted here and nowhere else (#12144)
 	if h.needsYouAgents != nil {
 		if rows, err := h.needsYouAgents(r); err != nil {
 			unread = append(unread, "agents")
@@ -223,6 +225,10 @@ func (h *BoardHandler) NeedsYou(w http.ResponseWriter, r *http.Request) {
 				if seen[f.ID] || !needsYouFile(f.Tags, f.NewComments) {
 					continue // by tags first: only a row that could count is checked against the stored file
 				}
+				if f.Muted {
+					muted[kindOrFile(f.Kind)]++ // switched off by the Operator's settings (#12144): in its folder, not counted, not pushed
+					continue
+				}
 				enrichTeamArtifact(&f, dir)
 				if !f.Available {
 					continue
@@ -265,6 +271,9 @@ func (h *BoardHandler) NeedsYou(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ans := needsYouAnswer{Count: len(items), Counts: map[string]int{"agent": 0, "question": 0, "wait": 0, "proposal": 0, "review": 0, "goal_done": 0, "skill": 0}, Items: []NeedsYouItem{}, NotIncluded: needsYouNotIncluded, Unread: unread}
+	if len(muted) > 0 {
+		ans.Muted = muted
+	}
 	for _, it := range items {
 		ans.Counts[it.Kind]++
 	}

@@ -46,6 +46,13 @@ const (
 	AutoSleepIdleMinutes     = "auto_sleep_idle_minutes"
 	NudgeClaudeArtifacts     = "nudge_claude_artifacts"
 	LaunchInWorktree         = "launch_in_worktree"
+	InboxKindFile            = "inbox_kind_file"
+	InboxKindDone            = "inbox_kind_done"
+	InboxKindRelease         = "inbox_kind_release"
+	InboxKindDecided         = "inbox_kind_decided"
+	InboxKindDigest          = "inbox_kind_digest"
+	InboxIncludedTeams       = "inbox_included_teams"
+	InboxDigestTime          = "inbox_digest_time"
 	BoardAutoAttach          = "board_auto_attach"
 	CrossTeamAllowlist       = "cross_team_allowlist"
 	TurnEndHandoff           = "turn_end_handoff"
@@ -143,6 +150,14 @@ func init() {
 	boolOff("show_session_summary", ApplyClient, "Show each agent's summary.")
 	boolOn(BoardHealthMonitor, ApplyRestart, "Team health checks for every team.")
 	boolOff(AutoSummarize, ApplyRestart, "Summarise sessions automatically.")
+	// What reaches Needs you (#12144): one switch for each kind of file for review, the teams the switches apply to, and the time of the daily items. Questions and decisions have no switch: they always reach the Operator.
+	boolOn(InboxKindFile, ApplyLive, "Files for review reach Needs you: a file an agent wants read, approved or sent back. Off mutes them (they stay in the team's Artifacts and under the Muted line); questions and decisions are never muted.")
+	boolOn(InboxKindDone, ApplyLive, "Finished requests reach Needs you: 'Done. Does it work for you?' when an operator request is finished.")
+	boolOn(InboxKindRelease, ApplyLive, "Release summaries reach Needs you: one page per release.")
+	boolOn(InboxKindDecided, ApplyLive, "Decisions made on your behalf reach Needs you, once a day.")
+	boolOn(InboxKindDigest, ApplyLive, "The daily digest reaches Needs you.")
+	register(Spec{Key: InboxIncludedTeams, Kind: KindText, Default: "all", Apply: ApplyLive, OwnCheck: true, MaxLen: 64 << 10, Doc: "The teams the Needs you switches apply to: the word all, or a JSON list of team ids. A team that is not on the list has its optional kinds muted; its questions and decisions still reach you."})
+	register(Spec{Key: InboxDigestTime, Kind: KindText, Default: "09:00", Apply: ApplyLive, OwnCheck: true, MaxLen: 5, Doc: "The time of day (HH:MM, 24 hours) the daily items are made."})
 	boolOff(LaunchInWorktree, ApplyLive, "Experimental: offer launching a team into its own git worktree, and accept a team launch that asks for one (#12746). Off by default for every install.")
 	boolOn(NudgeClaudeArtifacts, ApplyLive, "Remind an agent that published a claude.ai artifact to make a Coral artifact instead (once per artifact).")
 	register(Spec{Key: UpdateChannel, Kind: KindEnum, Values: []string{"approved", "agentic"}, Default: "approved", Apply: ApplyLive, Doc: "Which releases the update notice and the tray offer: approved (the release marked latest) or agentic (every published release, approved or not). Notice only: the updater installs approved releases whatever this says (#5557)."})

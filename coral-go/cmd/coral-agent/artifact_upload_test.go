@@ -277,6 +277,34 @@ func TestUploadArtifactSendsEachTagAsAParameter(t *testing.T) {
 	}
 }
 
+// #12144: --kind travels as the kind parameter; no --kind sends none, and the reply is printed as it came.
+func TestUploadArtifactSendsTheKindAsAParameter(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "note.txt")
+	if err := os.WriteFile(file, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var seen []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.URL.Query().Get("kind"))
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"uri":"coral://artifacts/` + strings.Repeat("a", 64) + `","kind":"done"}`))
+	}))
+	defer srv.Close()
+	var out, errOut bytes.Buffer
+	if err := uploadArtifactKind(srv.URL, file, "note.txt", "text/plain", "sess-1", "", "7", []string{"for review"}, "Does it work?", "done", &out, &errOut); err != nil {
+		t.Fatal(err)
+	}
+	if err := uploadArtifactTags(srv.URL, file, "note.txt", "text/plain", "sess-1", "", "", []string{"for review"}, "Does it work?", &out, &errOut); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(seen, "|") != "done|" {
+		t.Errorf("the server saw kinds %q: --kind done, then none", seen)
+	}
+	if !strings.Contains(out.String(), `"kind":"done"`) {
+		t.Errorf("the reply is printed as it came: %q", out.String())
+	}
+}
+
 func TestSplitOptionsKeepsEveryValueOfARepeatedOption(t *testing.T) {
 	opts, err := splitOptions([]string{"report.md", "--tag", "for review", "--tag=internal", "--name", "n", "-tag", "final"}, []string{"name", "tag"}, nil)
 	if err != nil {

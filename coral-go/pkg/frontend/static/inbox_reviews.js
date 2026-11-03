@@ -5,7 +5,7 @@ import { boardFetch, keyLabel, splitKey } from './server_base.js';
 import { hideAsksWhen } from './ask_filter.js';
 import { importOnce } from './import_once.js';
 
-let items = [], saved = [], errors = [], pending = null, lastRead = 0, revision = 0, changed = () => {};
+let items = [], saved = [], muted = [], errors = [], pending = null, lastRead = 0, revision = 0, changed = () => {};
 let activated = false;
 // One row per artifact (#11533): versions (same uploader, team, name) are one item, the newest, with `earlier`.
 const vkey = a => (a.session_id || a.produced_by) ? JSON.stringify([a.team, a.session_id, a.produced_by, a.name]) : a.reviewKey; // a JSON array: no name or id can run into the next field
@@ -45,6 +45,16 @@ export const savedFiles = () => {
 };
 export const isRead = a => !!(a.tags && a.tags.includes('read')) && !(a.new_comments > 0); // a read file whose Operator-started thread has agent replies not yet opened is unread again, counted once as itself (#12026)
 export const unreadReviewItems = () => reviewItems().filter(a => !isRead(a));
+/** The kinds of a file for review, in the words of the quiet Muted line: a count and its noun, singular and plural (#12144). */
+const KIND_NOUNS = [['file', 'file for review', 'files for review'], ['done', 'finished request', 'finished requests'], ['release', 'release summary', 'release summaries'], ['decided', 'decision made for you', 'decisions made for you'], ['digest', 'daily digest', 'daily digests']];
+/** "2 release summaries, 1 finished request": what the Operator's switches keep out, by kind, from the muted rows; '' for none. */
+export function mutedWords(rows) {
+    const by = {};
+    for (const a of rows) by[a.kind || 'file'] = (by[a.kind || 'file'] || 0) + 1;
+    return KIND_NOUNS.filter(([k]) => by[k]).map(([k, one, many]) => `${by[k]} ${by[k] === 1 ? one : many}`).join(', ');
+}
+/** The files the Operator's settings keep out of Needs you (#12144), one row per file like Needs you: in their folder and under the quiet Muted line, never counted. */
+export const mutedReviewItems = () => collapseVersions(muted);
 export const reviewErrors = () => errors;
 export function onReviewsChanged(fn) { changed = fn; }
 
@@ -62,7 +72,7 @@ export function reviewGroups(rows) {
 
 /** Refresh in bounded pages, coalescing feed updates. Failed teams retain their last known rows. */
 /** One team's files tagged for review (not saved, available), every page: the rows the Inbox reads, for one team. */
-async function readTeam(team) {
+async function readTeam(team, mutedOut = null) {
     const rows = [], seen = new Set();
     for (let offset = 0; offset <= 10000; offset += 200) {
         const r = await boardFetch(team, `/artifacts?tag=for%20review&limit=200&offset=${offset}`);
@@ -74,7 +84,9 @@ async function readTeam(team) {
             if (!(a.tags?.includes('for review') || decidedWithNews) || a.tags.includes('saved') || a.tags.includes('ignored') || a.tags.includes('superseded') || (a.tags.includes('changes requested') && !(a.new_comments > 0)) || !a.available || seen.has(a.id)) continue; // changes requested without news is the agent's turn (needsYouFile's rule, #11985, #12026); // changes requested: the agent's turn, so the file leaves Needs you and its counts; its next version comes back as a new item (#11985). Artifacts and the goal still show it as changes requested // a saved file stays tagged for review (its decisions work) but is not in Needs you (#11641)
             const hex = /(?:sha256:|coral:\/\/artifacts\/)?([a-f0-9]{64})$/i.exec(a.uri || a.digest || a.id || '')?.[1];
             if (!hex) continue;
-            seen.add(a.id); rows.push({ ...a, team, hex, reviewKey: `${team}:${a.id}` });
+            seen.add(a.id);
+            if (a.muted === true) { if (mutedOut) mutedOut.push({ ...a, team, hex, reviewKey: `${team}:${a.id}` }); continue; } // the Operator's settings keep this kind (or team) out of Needs you (#12144): not a row, not counted, listed under the Muted line
+            rows.push({ ...a, team, hex, reviewKey: `${team}:${a.id}` });
         }
         if (!data.has_more || !(data.artifacts || []).length) break;
     }
@@ -95,10 +107,10 @@ export function refreshReviews(force = false) {
     lastRead = Date.now();
     pending = (async () => {
         try {
-            const projects = await fetchProjects(), next = [], failed = [], nextSaved = [];
+            const projects = await fetchProjects(), next = [], failed = [], nextSaved = [], nextMuted = [];
             for (const { project: team } of projects) {
                 try {
-                    const rows = await readTeam(team);
+                    const rows = await readTeam(team, nextMuted);
                     next.push(...rows);
                     try { // the saved files of this team: one page, a failure here leaves the others alone
                         const r = await boardFetch(team, '/artifacts?tag=saved&limit=200');
@@ -109,11 +121,12 @@ export function refreshReviews(force = false) {
                     } catch { nextSaved.push(...saved.filter(a => a.team === team)); }
                 } catch {
                     next.push(...items.filter(a => a.team === team));
+                    nextMuted.push(...muted.filter(a => a.team === team));
                     failed.push(`${keyLabel(team)} review artifacts could not be refreshed.`);
                 }
             }
             if (started !== revision) return;
-            items = next.sort(byAge); saved = nextSaved.sort(byAge);
+            items = next.sort(byAge); saved = nextSaved.sort(byAge); muted = nextMuted.sort(byAge);
             errors = failed;
         } catch { errors = ['Review artifacts could not be refreshed.']; }
         changed();
