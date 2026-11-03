@@ -69,6 +69,11 @@ func NewClient(coralDir ...string) *Client {
 	}
 
 	if len(coralDir) > 0 && coralDir[0] != "" {
+		if ti, ok := isBundledBinary(c.TmuxBin); ok { // the server starts from a copy of its own, never from the file an upgrade replaces (#12598)
+			if staged := stageTmux(coralDir[0], c.TmuxBin, ti); staged != "" {
+				c.TmuxBin = staged
+			}
+		}
 		c.SocketPath = filepath.Join(coralDir[0], "tmux.sock")
 	} else if sp := os.Getenv("CORAL_TMUX_SOCKET"); sp != "" {
 		c.SocketPath = sp

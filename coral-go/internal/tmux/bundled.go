@@ -61,6 +61,9 @@ func dirExists(path string) bool {
 
 // isBundledBinary reports whether bin is the bundled tmux.
 func isBundledBinary(bin string) (terminfoDir string, ok bool) {
+	if ti, staged := stagedTerminfo(bin); staged { // Coral's own copy of the bundled tmux (#12598)
+		return ti, true
+	}
 	b, ti := bundledTmux()
 	if b == "" || bin == "" {
 		return "", false
