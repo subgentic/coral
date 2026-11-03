@@ -31,8 +31,9 @@ var formerlyOpenOperatorRoutes = []string{
 	"DELETE /api/upload/{name}",
 	"GET /api/upload/{name}", // #5028: an agent token reads no upload either
 	"POST /api/sessions/live/{name}/open-in-editor",
-	"GET /api/sessions/live/{name}/waiting",       // #7727: refused from the start, with the rest of the table
-	"POST /api/sessions/live/{name}/waiting/send", // #7727
+	"GET /api/sessions/live/{name}/waiting",          // #7727: refused from the start, with the rest of the table
+	"POST /api/sessions/live/{name}/waiting/send",    // #7727
+	"POST /api/sessions/live/{name}/waiting/dismiss", // #12713
 }
 
 // Each is refused to an agent's token, in default and strict mode, with 403 forbidden_for_agent and the route's

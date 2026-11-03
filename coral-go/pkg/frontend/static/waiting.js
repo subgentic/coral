@@ -79,6 +79,8 @@ export function syncWaitingNotice(row) {
     const send = document.getElementById('composer-waiting-send');
     const canSend = on && waitingCount(row) > 0;
     if (send && send.hidden === canSend) send.hidden = !canSend;
+    const dismiss = document.getElementById('composer-waiting-dismiss');
+    if (dismiss && dismiss.hidden === canSend) dismiss.hidden = !canSend;
     const paused = on && noticesPaused(row); // Record as agent and Record for all agents, the Operator's way to end the pause (#391)
     for (const id of ['composer-waiting-record-line', 'composer-waiting-record', 'composer-waiting-record-all']) {
         const b = document.getElementById(id);
@@ -97,6 +99,9 @@ function closeList() {
 
 const url = (s, tail) => `/api/sessions/live/${encodeURIComponent(s.name)}/waiting${tail}`;
 
+const OPEN_ROWS = 3; // the rows shown before Show all
+let _listed = { through: 0, name: '' }; // the newest message the open list showed: what Dismiss marks read, no further (a message that came after stays unread)
+
 function listNode(r) {
     const root = document.createDocumentFragment();
     const k = r && r.skipped;
@@ -108,7 +113,14 @@ function listNode(r) {
     }
     const ms = Array.isArray(r && r.messages) ? r.messages : [];
     if (!ms.length) { const p = document.createElement('p'); p.textContent = 'No unread board messages.'; root.append(p); }
-    for (const m of ms) {
+    const head = document.createElement('p'); // the one-line summary first; the rows are behind it, a few open and the rest behind Show all (#12713)
+    head.className = 'composer-waiting-count';
+    head.textContent = ms.length ? `${ms.length} unread team message${ms.length === 1 ? '' : 's'}, newest first.` : '';
+    if (ms.length) root.append(head);
+    const more = document.createElement('div');
+    more.id = 'composer-waiting-more';
+    more.hidden = true;
+    ms.slice().sort((a, b) => Number(b.id) - Number(a.id)).forEach((m, i) => {
         const d = document.createElement('details');
         const sum = document.createElement('summary');
         const when = document.createElement('time');
@@ -121,7 +133,16 @@ function listNode(r) {
         p.className = 'composer-waiting-body';
         p.textContent = String(m.text || '') + (m.truncated ? ' \u2026' : '');
         d.append(sum, p);
-        root.append(d);
+        (i < OPEN_ROWS ? root : more).append(d);
+    });
+    if (ms.length > OPEN_ROWS) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'cni-link composer-waiting-all';
+        b.textContent = `Show all ${ms.length}`;
+        b.setAttribute('aria-expanded', 'false');
+        b.addEventListener('click', () => { more.hidden = !more.hidden; b.setAttribute('aria-expanded', String(!more.hidden)); b.textContent = more.hidden ? `Show all ${ms.length}` : 'Show fewer'; });
+        root.append(b, more);
     }
     return root;
 }
@@ -133,7 +154,9 @@ async function toggleList() {
     try {
         const resp = await serverFetch(currentServer(), url(s, `?agent_type=${encodeURIComponent(s.agent_type)}&session_id=${encodeURIComponent(s.session_id)}`));
         if (!resp.ok) { showToast(await responseErrorText(resp, currentServer(), `The list could not be read (HTTP ${resp.status}).`)); return; }
-        items.replaceChildren(listNode(await resp.json()));
+        const data = await resp.json();
+        _listed = { through: Math.max(0, ...(Array.isArray(data.messages) ? data.messages : []).map(m => Number(m && m.id) || 0)), name: s.name };
+        items.replaceChildren(listNode(data));
         d.hidden = false;
         b.setAttribute('aria-expanded', 'true');
     } catch (e) {
@@ -142,6 +165,35 @@ async function toggleList() {
 }
 
 let busy = false;
+
+/** What is said after Dismiss, from the server's answer. */
+export function dismissToast(r) {
+    const n = Number(r && r.dismissed) || 0;
+    return n > 0 ? `Marked ${n} team message${n === 1 ? '' : 's'} read for this agent. Nothing was typed into it.` : 'Nothing was left to dismiss.';
+}
+
+/** Dismiss: the listed messages are read for the agent, a person's own action, nothing typed into it (#12713). */
+async function dismissNow() {
+    const s = state.currentSession;
+    if (!s || busy || !_listed.through || _listed.name !== s.name) return;
+    busy = true;
+    try {
+        const resp = await serverFetch(currentServer(), url(s, '/dismiss'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ agent_type: s.agent_type, session_id: s.session_id, through_id: _listed.through }),
+        });
+        if (!resp.ok) { showToast(await responseErrorText(resp, currentServer(), `Not dismissed (HTTP ${resp.status}).`)); return; }
+        const r = await resp.json();
+        showToast(dismissToast(r));
+        s.board_unread = Number(r.unread) || 0; // the row's own number, until the next update says it
+        _listed = { through: 0, name: '' };
+        syncWaitingNotice(s);
+        closeList();
+    } catch (e) {
+        showToast('Not dismissed: ' + (e && e.message ? e.message : 'the server did not answer.'));
+    } finally { busy = false; }
+}
 
 async function sendNow() {
     const s = state.currentSession;
@@ -272,6 +324,7 @@ export async function recordAllAgents() {
 registerActions({
     'waiting-toggle': () => toggleList(),
     'waiting-send-now': () => sendNow(),
+    'waiting-dismiss': () => dismissNow(),
     'agent-record': () => recordAgent(),
     'agent-record-all': () => recordAllAgents(),
 });

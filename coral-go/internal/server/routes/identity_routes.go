@@ -274,6 +274,7 @@ var operatorOnlyRoutes = map[string]string{
 	// #7554: Send now types the messages held for an agent at once (text into another agent's terminal, as keys does), and the list says who sent them: the Operator's.
 	"GET /api/sessions/live/{name}/waiting":                           "see what waits for an agent",
 	"POST /api/sessions/live/{name}/waiting/send":                     "type an agent's board nudge now",
+	"POST /api/sessions/live/{name}/waiting/dismiss":                  "mark an agent's waiting board messages read",
 	"POST /api/sessions/live/{name}/kill":                             "stop an agent",
 	"POST /api/sessions/live/{name}/restart":                          "restart an agent",
 	"POST /api/sessions/live/{name}/model":                            "switch an agent's model or thinking level",

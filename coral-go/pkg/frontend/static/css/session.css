@@ -1706,6 +1706,9 @@ body .terminal-header { flex-wrap: wrap; height: auto; min-height: 36px; row-gap
 .composer-waiting-detail .composer-waiting-why { margin: 0 0 6px; }
 .composer-waiting-detail summary { cursor: pointer; }
 .composer-waiting.composer-waiting-empty { position: absolute; width: 1px; height: 1px; margin: 0; padding: 0; border: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; } /* in the page with nothing to say (a class set by waiting.js, not :has(): that costs every DOM change): out of the layout, still a live region (#6679) */
+.composer-waiting-detail #composer-waiting-items { max-height: min(30vh, 260px); overflow-y: auto; } /* the list never pushes the message box off the screen (#12713) */
+.composer-waiting-count { margin: 0 0 4px; color: var(--text-secondary); }
+.composer-waiting-all { margin: 2px 0 6px; }
 .composer-waiting-body { margin: 2px 0 6px 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .composer-queued-item { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; }
 .composer-queued-text { min-width: 0; overflow-wrap: anywhere; }
