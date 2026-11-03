@@ -273,7 +273,7 @@ const tookOf = (r) => (r.started_at && r.finished_at ? compactDuration((new Date
 function renderRunsTable(page) {
     const { rows: runs, workflowHistory } = page;
     const open = r => withId(r.id, id => window.selectWorkflowRun(id));
-    const table = DT.dataTable({ label: 'Job runs', rows: runs, rowKey: r => r.id, bare: true, sortBar: false, oneLine: true,
+    const table = DT.dataTable({ label: 'Job runs', rows: runs, rowKey: r => r.id, bare: true, sortBar: false, oneLine: true, resize: true,
         footer: runs.length < page.total ? { text: `Showing the newest ${runs.length} of ${page.total} runs`, more: { label: 'Show older runs', busy: page.busy, run: () => readOlderRuns(page) } } : undefined,
         open: workflowHistory ? open : undefined, empty: { line: 'No runs yet.', hint: 'Runs are listed here once the job has run.' },
         columns: [
