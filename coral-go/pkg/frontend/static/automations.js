@@ -283,7 +283,7 @@ function folderTable(key) {
     }
     return { ...base, signature: JSON.stringify([!!firstRun().cards, rows.map(i => [i.wf, i.usedBy, workflowResult(i)])]),
         node: () => DT.dataTable({
-            label: `Workflows, ${rows.length}`, rows, oneLine: true, wrapNames: true, rowKey: i => i.id, rowName: i => i.name, state: stateOf(key), open: i => openRow(key, i),
+            label: `Workflows, ${rows.length}`, rows, oneLine: true, resize: true, wrapNames: true, rowKey: i => i.id, rowName: i => i.name, state: stateOf(key), open: i => openRow(key, i),
             columns: [ // one line a row (Goal #79): the description is the name's tooltip and the page's; a narrow list drops Steps, then Used by (dropAt, #8931)
                 { key: 'workflow', label: 'Workflow', primary: true, width: 'grow', sort: true, sortValue: i => i.name, cell: i => nameButton(i, i.does) },
                 { key: 'steps', label: 'Steps', width: '6rem', dropAt: 36, tone: 'tertiary', sort: 'number', sortValue: i => i.stepCount, cell: stepsWords },
