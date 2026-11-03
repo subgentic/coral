@@ -164,6 +164,8 @@ var operatorOnlyRoutes = map[string]string{
 	"POST /api/board/{project}/asks/{messageID}/buttons/{buttonID}/settle": "use a button an agent put on a question to the Operator",
 	"POST /api/board/{project}/operator-artifacts":                         "share a file with an agent as the Operator",
 	"POST /api/board/{project}/operator-artifacts/message":                 "tell an agent about a file the Operator shared",
+	"POST /api/board/{project}/goals/{goalID}/driver":                      "change who drives a goal",
+	"POST /api/board/{project}/goals/{goalID}/move":                        "give a goal to another team",
 	"POST /api/board/{project}/goal-images":                                "add a picture to a new goal as the Operator",
 	"PUT /api/board/{project}/subscribers/{subscriberID}/review-settings":  "set an agent's Reviews only switch and review areas",
 	"PUT /api/artifacts/{id}/keep":                                         "keep an artifact",
@@ -274,6 +276,7 @@ var operatorOnlyRoutes = map[string]string{
 	// #7554: Send now types the messages held for an agent at once (text into another agent's terminal, as keys does), and the list says who sent them: the Operator's.
 	"GET /api/sessions/live/{name}/waiting":                           "see what waits for an agent",
 	"POST /api/sessions/live/{name}/waiting/send":                     "type an agent's board nudge now",
+	"POST /api/sessions/live/{name}/waiting/dismiss":                  "mark an agent's waiting board messages read",
 	"POST /api/sessions/live/{name}/kill":                             "stop an agent",
 	"POST /api/sessions/live/{name}/restart":                          "restart an agent",
 	"POST /api/sessions/live/{name}/model":                            "switch an agent's model or thinking level",
@@ -309,6 +312,8 @@ var operatorOnlyRoutes = map[string]string{
 	// history through /api/agent/history; none of these is called by an agent tool.
 	"POST /api/skills":                                   "publish a skill as the Operator",
 	"GET /api/skills":                                    "list the skills (every status)",
+	"GET /api/skills/search":                             "search the approved skills for the message menu",
+	"POST /api/sessions/live/{name}/skills":              "attach an approved skill to a running agent",
 	"GET /api/skills/{id}":                               "read a skill in full (the approval view)",
 	"POST /api/skills/{id}/approve":                      "approve a skill",
 	"POST /api/skills/{id}/reject":                       "reject a skill",

@@ -1173,9 +1173,7 @@ body.panel-dragging .agentic-state {
 }
 
 /* Which worktree the list is from (#11351). */
-.files-worktree { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: var(--space-xs) var(--space-md); font-size: var(--fs-sm); color: var(--text-secondary); }
-.files-worktree > span { min-width: 0; overflow-wrap: anywhere; }
-.files-worktree-branch { font-family: var(--font-mono); color: var(--text-muted); }
+.files-stale-note { padding: var(--space-xs) var(--space-md); font-size: var(--fs-sm); color: var(--text-muted); overflow-wrap: anywhere; } /* the list may be out of date: a computer in View mode is not re-checked from here (#12646) */
 /* The diff under a changed file's row (#11350): the row's chevron opens it, Expand all stacks every file's. The preview pane is untouched. */
 .file-expand-btn { flex: none; }
 .file-diff { margin: 0 0 6px 20px; padding-right: 6px; border-left: 2px solid var(--border); min-width: 0; }
@@ -1999,7 +1997,11 @@ body.panel-dragging .agentic-state {
 /* An open file's note when the file changed on disk under unsaved edits (#10334). */
 .preview-disk-note { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 6px 12px; font-size: var(--fs-sm); color: var(--text-secondary); border-bottom: 1px solid var(--border); }
 .files-legend { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: var(--space-xs) var(--space-md); font-size: var(--fs-sm); color: var(--text-muted); } /* the line also holds Expand all (#11350) */
-.files-where { padding: 6px 12px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-sm); color: var(--text-secondary); } /* where the agent lives: its folder and branch, at the top of Files (#11580) */
+.files-where { display: flex; align-items: center; gap: 6px; padding: 6px 12px 0; overflow: hidden; white-space: nowrap; font-size: var(--fs-sm); color: var(--text-secondary); } /* where the agent lives: its folder and branch, at the top of Files (#11580) */
+.files-where-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.files-where-tag { flex: none; color: var(--text-muted); }
+.files-where-act { flex: none; margin: -4px 0; }
+@media (pointer: coarse) { .btn-icon.btn-xs.files-where-act { min-width: var(--control-touch-height); min-height: var(--control-touch-height); margin: -12px -8px -12px 0; } } /* a finger: 44 px, drawn over the line's own height */
 
 /* Text on an added or removed line stands out from its band in both themes (#12523): each syntax colour is lifted (dark) or deepened (light) by a filter, keeping its hue, and the plain text takes a clearer colour. */
 .inline-preview-cm .cm-merge-b .cm-changedLine span,

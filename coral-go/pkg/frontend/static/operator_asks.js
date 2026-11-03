@@ -10,7 +10,8 @@ import { whenText } from './when_text.js';
 import { state } from './state.js';
 import { loadStyles } from './lazy_styles.js';
 import { showToast } from './notifications.js';
-import { isCloud, isLocalServer } from './server_base.js';
+import { isCloud, isLocalServer, serverFetch, LOCAL_SERVER } from './server_base.js';
+import { inboxSources } from './inbox_servers.js';
 
 const FRESH_MS = 15000, LINE_MAX = 140;
 let asks = [], pending = null, lastRead = 0;
@@ -42,16 +43,23 @@ export const askWhole = a => markHidden(a && a.text, { strict: true });
 /** The whole question as plain text (a row's second line): the same words, line breaks kept, without the Markdown marks. */
 export const askPlain = a => plainMarkdown(previewText(a));
 /** A stable id of one question among the rows. */
-export const askKey = a => `operator-ask:${a.board}:${a.kind}:${a.id}`;
+export const askKey = a => `operator-ask:${a.server && !isLocalServer(a.server) ? `${a.server}/` : ''}${a.board}:${a.kind}:${a.id}`; // two computers can each have a team of one name and a question of one number
 
 /** Read the list (at most once in 15 s unless forced; one read at a time). Safe to call after every live update. */
 export function refreshOperatorAsks(force = false) {
     if (pending) return pending;
     if (!force && Date.now() - lastRead < FRESH_MS) return null;
     lastRead = Date.now();
-    pending = fetch('/api/operator-asks').then(r => (r.ok ? r.json() : null)).then(rows => {
-        if (!Array.isArray(rows)) return; // refused or failed: what is drawn stays (a viewer who may not read it has none)
-        const next = rows.filter(a => a && typeof a.board === 'string' && typeof a.asker === 'string' && Number.isFinite(Number(a.id)));
+    // Every computer the page reads (this one, and each registered computer that is online through the Hub; through the Hub itself only those): a bare /api path through the Hub is the Hub's own, which has no questions (#12612, coral-hub #156454).
+    // A row from another computer carries that computer's id, so the dialog and the row know it is not this one's; a computer that cannot be read keeps the rows it had.
+    const sources = inboxSources(), asked = sources.length ? sources : [LOCAL_SERVER];
+    pending = Promise.all(asked.map(server => serverFetch(server === LOCAL_SERVER ? undefined : server, '/api/operator-asks').then(r => (r.ok ? r.json() : null)).then(rows => (Array.isArray(rows) ? rows.map(a => (server === LOCAL_SERVER || !a || typeof a !== 'object' ? a : { ...a, server })) : null), () => null))).then(results => {
+        const next = [];
+        results.forEach((rows, k) => {
+            const server = asked[k];
+            if (rows === null) { next.push(...asks.filter(a => (server === LOCAL_SERVER ? !a.server : a.server === server))); return; } // refused or failed: what is drawn stays (a viewer who may not read it has none)
+            next.push(...rows.filter(a => a && typeof a.board === 'string' && typeof a.asker === 'string' && Number.isFinite(Number(a.id))));
+        });
         if (JSON.stringify(next) === JSON.stringify(asks)) return;
         asks = next;
         fire();
@@ -64,7 +72,7 @@ export async function replyToAsk(a, text) {
     const body = String(text || '').trim();
     if (!body) throw new Error('Write a reply first.');
     const content = `@${a.asker} ${body}`;
-    const resp = await fetch(`/api/board/${encodeURIComponent(a.board)}/messages`, {
+    const resp = await serverFetch(a.server, `/api/board/${encodeURIComponent(a.board)}/messages`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ subscriber_id: OPERATOR_ID, as: 'Operator', content, ...(a.kind === 'ask' ? { reply_to: a.id } : {}) }),
     });
@@ -80,7 +88,7 @@ export async function replyToAsk(a, text) {
 
 // ── Buttons an agent put on a question (#11445, #11643) ─────────────────────────────────────────────────
 // The agent DECLARES up to three buttons; nothing runs until the Operator clicks one here. The label is the agent's text, so it is drawn with textContent after markHidden (strict), and the ACTION is named in
-// our own words beside it, so a label like "Cancel" cannot hide that it wakes an agent. A click claims the button on the server, which answers with the STORED action: the page runs only that, never anything it
+// our own words in its accessible name and tooltip, so a label like "Cancel" cannot hide that it wakes an agent. A click claims the button on the server, which answers with the STORED action: the page runs only that, never anything it
 // holds itself. A reply is run by the server (posted as the Operator, said to be a click, the question closed); open and wake run here through the routes the dashboard already uses, then the page settles.
 
 /** Whether the question came from another computer, or the page is the Hub's (#11757, Security's INFO on #11643): the claim and settle routes are not served through Coral Hub, so a button there would only fail with an error. */
@@ -134,16 +142,10 @@ export async function wakeMember(a, name) {
     }
 }
 
-/** A question the way a review item reads (#12143, the operator): a short subject for the title (the first line when it is short, else the first words), who asked, on which team and when under it, the words as rendered Markdown with the
- * "@Operator" the asker opened with taken off, and the reply in the item. The body keeps everything the question says: when the first line became the title, the body is the rest; a one-line question has no body. */
+/** The dialog names the asker and team; the complete question is shown once in its body (#12722). */
 export function askParts(a) {
-    const clean = listsOf(askWhole(a).replace(/^\s*@Operator\b[:,]?\s*/i, '').trim());
-    const lines = clean.split('\n'), first = (lines[0] || '').trim().replace(/^#{1,6}\s+/, '');
-    if (first.length <= 80) return { title: first.replace(/[*_`]/g, '').replace(/:+$/, '') || 'A question', body: lines.slice(1).join('\n').trim() };
-    const lead = /^(.{20,80}?):(?=\s|$)/.exec(first); // a long first line that opens with a clause ending in a colon ("... in the console: 1. ..."): that is the title, and the rest is the body (the words are not said twice)
-    if (lead) return { title: lead[1].replace(/[*_`]/g, '').trim(), body: [first.slice(lead[0].length).trim(), ...lines.slice(1)].join('\n').trim() };
-    const cut = first.slice(0, 80), at = cut.lastIndexOf(' ');
-    return { title: `${(at > 40 ? cut.slice(0, at) : cut).replace(/[*_`]/g, '').replace(/[\s,;:.-]+$/, '')}\u2026`, body: clean };
+    return { title: `${markHidden(a.asker || 'Agent', { strict: true })} · ${markHidden(a.board_label || a.board || 'Team', { strict: true })}`,
+        body: listsOf(askWhole(a).replace(/^\s*@Operator\b[:,]?\s*/i, '').trim()) };
 }
 
 /** A question written on one line with its steps inline ("... console: 1. Open it. 2. Generate a token. 3. Save it.") is set out as a list: a blank line before the first step and each step on its own line. Only when the
@@ -180,46 +182,49 @@ export function openAskDialog(a, onDone, runners = {}) {
     const parts = askParts(a);
     const title = document.createElement('h2'); title.id = 'inbox-ask-title'; title.textContent = parts.title;
     const sub = document.createElement('p'); sub.className = 'inbox-ask-sub';
-    const who = markHidden(a.asker, { strict: true }), rest = [(/\bteam$/i.test(a.board_label || a.board) ? (a.board_label || a.board) : `${a.board_label || a.board} team`), whenText(a.at)].filter(Boolean).join(' \u00b7 ') + (a.kind === 'wait' ? ', waiting for your reply' : '');
-    sub.textContent = `From ${who} \u00b7 ${rest}`;
-    importOnce('./agent_link.js').then(m => { if (sub.isConnected) sub.replaceChildren('From ', m.agentLink(who, { board: a.board }), ` \u00b7 ${rest}`); }); // the asker's name opens that agent's chat, as everywhere else (#12168); the line is plain text until the helper is there
+    const who = markHidden(a.asker, { strict: true }); // the title and its link use the same visible name
+    sub.textContent = whenText(a.at) + (a.kind === 'wait' ? ', waiting for your reply' : '');
+    importOnce('./agent_link.js').then(m => { if (title.isConnected) title.replaceChildren(m.agentLink(who, { board: a.board }), ` · ${markHidden(a.board_label || a.board || 'Team', { strict: true })}`); }); // the asker still opens their chat
     const subjects = askSubjects(a), links = document.createElement('p'); links.className = 'inbox-ask-subjects'; links.hidden = !subjects.length; if (subjects.length) loadStyles('pictures.css'); // its links are drawn by the lazy picture rules // the goal and task it is about, each a link that opens it in the Inbox
     if (subjects.length) links.append(document.createTextNode('About ')); // the asker names them: the line says so (Security's INFO on #12164)
     subjects.forEach((x, i) => {
         if (i) links.append(document.createTextNode(' \u00b7 '));
-        const word = `${x.kind === 'goal' ? 'Goal' : 'Task'} #${x.id}${x.title ? `: ${x.title.length > 60 ? `${x.title.slice(0, 59).trimEnd()}\u2026` : x.title}` : ''}`;
-        if (fromAnotherComputer(a) || !runners[x.kind]) { links.append(document.createTextNode(word)); return; } // from another computer the ids are that computer's: shown, not opened
-        const b = document.createElement('button'); b.type = 'button'; b.className = 'btn btn-quiet btn-small inbox-ask-subject'; b.textContent = word; b.dataset.kind = x.kind; b.title = `Open ${x.kind} #${x.id}`;
+        const word = `${x.kind === 'goal' ? 'Goal' : 'Task'} #${x.id}`;
+        if (fromAnotherComputer(a) || !runners[x.kind]) { const name = document.createElement('span'); name.textContent = word; name.title = `${word}${x.title ? `: ${x.title}` : ''} (named by ${who})`; links.append(name); return; } // from another computer the ids are that computer's: shown, not opened
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'btn btn-quiet btn-small inbox-ask-subject'; b.textContent = word; b.dataset.kind = x.kind; b.title = `${word}${x.title ? `: ${x.title}` : ''} (named by ${who})`; b.setAttribute('aria-label', b.title);
         b.addEventListener('click', () => { finish(); runners[x.kind](a, String(x.id)); });
         links.append(b);
     });
-    if (subjects.length) links.append(document.createTextNode(` (named by ${markHidden(a.asker, { strict: true })})`));
-    const whole = document.createElement('div'); whole.className = 'inbox-ask-text prose'; whole.tabIndex = 0; whole.setAttribute('role', 'region'); whole.setAttribute('aria-label', 'The question');
+    const whole = document.createElement('div'); whole.className = 'inbox-ask-text prose'; whole.setAttribute('role', 'region'); whole.setAttribute('aria-label', 'The question');
     whole.innerHTML = renderMarkdownStrict(parts.body + (a.cut ? '\n\n\u2026 (cut: the board has the rest)' : '')); // raw HTML in the words is written out as text; links keep the page's link policy
     importOnce('./artifact_refs.js').then(m => { if (whole.isConnected) m.linkArtifactRefsIn(whole, { asWritten: true }); }).catch(() => {}); // a file named in the question opens in the viewer, the words as written (#12361); plain text until the helper is there
-    whole.hidden = !parts.body && !a.cut; // a short question is its title
+    whole.hidden = !parts.body && !a.cut; // an empty question has no body
     const label = document.createElement('label'); label.className = 'inbox-ask-label'; label.textContent = 'Your reply';
-    const box = document.createElement('textarea'); box.className = 'field inbox-ask-box'; box.rows = 4; box.maxLength = 8000; label.append(box);
+    const box = document.createElement('textarea'); box.className = 'field inbox-ask-box'; box.rows = 2; box.placeholder = 'Write a reply…'; box.maxLength = 8000; label.append(box);
+    box.addEventListener('input', () => { box.style.height = 'auto'; box.style.height = `${box.scrollHeight + box.offsetHeight - box.clientHeight}px`; });
     const pics = document.createElement('div'); pics.className = 'inbox-ask-pics'; // pictures for the reply (#12173): the comment composer's tray, loaded with the dialog
     const err = document.createElement('p'); err.className = 'inbox-ask-error'; err.setAttribute('role', 'alert');
     const row = document.createElement('div'); row.className = 'inbox-ask-buttons';
-    const send = document.createElement('button'); send.type = 'button'; send.className = 'btn btn-primary'; send.textContent = 'Send reply';
+    const send = document.createElement('button'); send.type = 'button'; send.className = 'btn btn-primary inbox-ask-send'; send.textContent = 'Send reply';
     const close = document.createElement('button'); close.type = 'button'; close.className = 'btn'; close.textContent = 'Close';
-    row.append(close, send); // Close on the left, Send reply on the right (as the other dialogs)
+    // Dismiss closes a question with no answer and nothing said to the agent, as the row's own Dismiss does (#12599): the same route and the same toast with Undo. A wait has no ask row to close, so it has no Dismiss.
+    const dismiss = document.createElement('button'); dismiss.type = 'button'; dismiss.className = 'btn btn-quiet'; dismiss.textContent = 'Dismiss'; dismiss.title = 'Take it out of Needs you; nobody is told'; dismiss.hidden = a.kind !== 'ask' || fromAnotherComputer(a); // the close route is this computer's: a question from another computer is answered there
+    row.append(close, ...(dismiss.hidden ? [] : [dismiss]), send); // Close on the left, then Dismiss, Send reply on the right (as the other dialogs)
     let tray = null;
     const finish = () => { if (tray) tray.destroy(); dlg.close(); dlg.remove(); if (onDone) onDone(); };
-    const sync = () => { send.disabled = !!tray && (tray.busy() || tray.failed()); }; // Send waits for a picture going up, and for a failed one to be taken out
+    let pictureHint = null;
+    const sync = () => { send.disabled = !!tray && (tray.busy() || tray.failed()); if (pictureHint) pictureHint.hidden = !tray.items().length; }; // Send waits for a picture going up, and for a failed one to be taken out
     const offers = fromAnotherComputer(a) ? [] : buttonsOf(a); // a question from another computer through the Hub keeps the plain Reply and Close
     let offered = null;
     if (offers.length) { // what the asker offered: one tap per choice, each with what it does
         offered = document.createElement('section'); offered.className = 'inbox-ask-offers'; offered.setAttribute('aria-label', `Buttons ${markHidden(a.asker, { strict: true })} offered`);
-        const head = document.createElement('p'); head.className = 'inbox-ask-offers-head'; head.textContent = `${markHidden(a.asker, { strict: true })} offered these. Nothing runs until you tap one.`;
+        const head = document.createElement('p'); head.className = 'inbox-ask-offers-head'; head.textContent = offers.every(b => isReply(b.action)) ? 'Choose a reply, or write your own below.' : 'Choose an action, or write a reply below.';
         const list = document.createElement('div'); list.className = 'inbox-ask-offers-list';
         const choices = [];
         for (const b of offers) {
             const item = document.createElement('div'); item.className = 'inbox-ask-offer';
             const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'btn'; btn.textContent = markHidden(b.label, { strict: true }); btn.dataset.buttonId = String(b.id);
-            const what = document.createElement('span'); what.className = 'inbox-ask-offer-what'; what.textContent = buttonWords(b);
+            const what = document.createElement('span'); what.className = 'inbox-ask-offer-what sr-only'; what.textContent = buttonWords(b);
             btn.setAttribute('aria-label', `${markHidden(b.label, { strict: true })}: ${what.textContent}`); btn.title = what.textContent;
             btn.addEventListener('click', async () => {
                 err.textContent = ''; choices.forEach(c => { c.disabled = true; }); send.disabled = true;
@@ -252,10 +257,18 @@ export function openAskDialog(a, onDone, runners = {}) {
             if (!dlg.isConnected) return;
             tray = m.createImageTray({ upload: (blob, versionOf) => api.uploadCommentImage(null, undefined, blob, versionOf, a.board) });
             tray.attach(dlg, box); tray.listen(sync);
-            addSlot.append(tray.picker()); pics.append(tray.hint(), tray.node);
+            const picker = tray.picker(), add = picker.querySelector('button');
+            add.textContent = ''; const icon = document.createElement('span'); icon.className = 'material-icons'; icon.setAttribute('aria-hidden', 'true'); icon.textContent = 'image'; add.append(icon); add.title = 'Add image';
+            pictureHint = tray.hint(); pictureHint.hidden = true;
+            addSlot.append(picker); pics.append(pictureHint, tray.node);
         }).catch(() => { /* a reply needs no picture: the dialog works without the button */ });
     }
     close.addEventListener('click', finish);
+    dismiss.addEventListener('click', async () => {
+        err.textContent = ''; dismiss.disabled = true; send.disabled = true;
+        try { const m = await importOnce('./ask_ignore.js'); await m.ignoreAsk(a, markHidden(a.asker, { strict: true })); asks = asks.filter(x => askKey(x) !== askKey(a)); fire(); finish(); }
+        catch (e) { err.textContent = e.message || 'Could not dismiss it.'; dismiss.disabled = false; sync(); }
+    });
     dlg.addEventListener('cancel', e => { e.preventDefault(); finish(); });
     send.addEventListener('click', async () => {
         err.textContent = ''; send.disabled = true;

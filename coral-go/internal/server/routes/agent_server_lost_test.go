@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/subgentic/coral/internal/background"
-	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/store"
 )
 
@@ -79,10 +78,9 @@ func TestALostServerLeavesAloneAnAgentThatSleepsForAnotherReasonOrWokeMeanwhile(
 	assert.True(t, sleeping, "a stale timer wakes only an agent still asleep because of the lost terminal")
 }
 
-func TestALostServerWakesAgentsWhetherOrNotThisCoralOwnsTheFolder(t *testing.T) {
+// Recovery has no ownership condition (#12591, #12603): the data-folder check only warns, so nothing but the loop guard decides whether a lost terminal's agents are woken.
+func TestALostServerWakesAgentsWithNoOwnershipCondition(t *testing.T) {
 	r := newExitRig(t)
-	ptymanager.SetForeign(true)
-	t.Cleanup(func() { ptymanager.SetForeign(false) })
 	a := r.lostAgent(1, "Backend Dev")
 
 	r.h.ServerLost(context.Background(), background.ServerLoss{At: lostAt(), PID: 7, SessionIDs: []string{a}})

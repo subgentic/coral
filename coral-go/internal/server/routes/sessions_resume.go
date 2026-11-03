@@ -166,6 +166,11 @@ func (h *SessionsHandler) resumeResolve(ctx context.Context, name string, body *
 	} else {
 		storedFlags := store.UnmarshalFlags(ls.Flags)
 		p.permMode = agent.PermissionModeFromFlags(storedFlags)
+		if p.permMode == "" { // from before modes were recorded: the mode the chat started in, where its transcript has one (#12718); recorded on the resumed row
+			if m := h.transcriptStartMode(ctx, ls, storedFlags); m != "" {
+				p.permMode, p.modeFromTranscript = m, true
+			}
+		}
 	}
 	if ls.Model != nil {
 		p.model = *ls.Model
@@ -272,6 +277,12 @@ func (h *SessionsHandler) resumeRecord(ctx context.Context, p *restartPlan, resu
 		ContextWindow: p.contextWindow,
 		Tools:         store.MarshalCapabilities(p.tools),
 		PermissionMode: func() *string {
+			if p.stored != nil && p.stored.PermissionMode != nil && *p.stored.PermissionMode != "" {
+				return p.stored.PermissionMode
+			}
+			if p.modeFromTranscript {
+				return ptr.NonEmpty(p.permMode) // the mode the chat started in, now recorded: the next start knows it (#12718)
+			}
 			if p.stored != nil {
 				return p.stored.PermissionMode
 			}

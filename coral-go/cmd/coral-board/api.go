@@ -82,11 +82,16 @@ func serverError(status int, result map[string]any) error {
 	}
 	detail, _ := result["message"].(string)
 	if detail == "" {
-		if code, _ := result["code"].(string); code != "" {
-			detail = code
-		} else if e, _ := result["error"].(string); e != "" {
+		code, _ := result["code"].(string)
+		e, _ := result["error"].(string)
+		switch {
+		case e != "" && code != "" && code != e && !strings.HasPrefix(e, code):
+			detail = code + ": " + e // the server's reason with its code: a refusal that said only "bad_buttons" hid what was wrong (#12600)
+		case e != "":
 			detail = e
-		} else {
+		case code != "":
+			detail = code
+		default:
 			detail = http.StatusText(status)
 		}
 	}

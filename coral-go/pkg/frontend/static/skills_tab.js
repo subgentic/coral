@@ -70,9 +70,9 @@ function drawList() {
     for (const [v, label] of FILTERS) { const o = el('option', '', label); o.value = v; sel.append(o); }
     sel.value = showStatus;
     sel.addEventListener('change', async () => { showStatus = sel.value; await loadList(); draw(); });
-    const input = el('input'); input.type = 'file'; input.accept = '.zip,application/zip'; input.hidden = true;
-    input.addEventListener('change', () => { const f = input.files && input.files[0]; input.value = ''; if (f) importZip(f, false, false); });
-    head.append(el('h2', '', 'Skills'), sel, button('btn', 'Import a skill (.zip)', () => input.click()), input);
+    const input = el('input'); input.type = 'file'; input.accept = '.zip,.md,.markdown,application/zip,text/markdown'; input.hidden = true;
+    input.addEventListener('change', () => { const f = input.files && input.files[0]; input.value = ''; if (f) importFile(f, false, false); });
+    head.append(el('h2', '', 'Skills'), sel, button('btn', 'Import a skill', () => input.click()), el('span', 'skills-hint', '.zip or a SKILL.md'), input);
     page.append(head, el('p', 'skills-note', 'Agent Skills: a folder with SKILL.md that agents read when it fits their task. A skill an agent publishes waits here until you approve it; one you import is approved at once.'));
     if (loadError) { const p = el('p', 'skills-error', loadError); p.setAttribute('role', 'alert'); page.append(p); }
     const columns = [
@@ -89,20 +89,25 @@ function drawList() {
     return page;
 }
 
-async function importZip(file, scriptsAcked, acknowledgeSecret) {
-    if (file.size > 5 * 1024 * 1024) { showToast('A skill is a zip of at most 5 MiB.', true); return; }
+/** A skill arrives as a .zip, or as one SKILL.md (any single .md): the server wraps the file as a one-file skill and checks it exactly as it checks a zip. Anything else is refused here, in words. */
+export const skillFileKind = name => { const n = String(name || '').toLowerCase(); return n.endsWith('.zip') ? 'zip' : (n.endsWith('.md') || n.endsWith('.markdown')) ? 'md' : ''; };
+
+async function importFile(file, scriptsAcked, acknowledgeSecret) {
+    const kind = skillFileKind(file.name);
+    if (!kind) { showToast(`A skill is a .zip or a SKILL.md file. "${String(file.name).slice(0, 60)}" is neither.`, true); return; }
+    if (file.size > 5 * 1024 * 1024) { showToast('A skill is at most 5 MiB.', true); return; }
     const bytes = new Uint8Array(await file.arrayBuffer());
     let bin = ''; for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
     try {
-        const d = await requestJson('POST', '/api/skills', { zip_base64: btoa(bin), scripts_acked: scriptsAcked, acknowledge_secret: acknowledgeSecret });
+        const d = await requestJson('POST', '/api/skills', { [kind === 'zip' ? 'zip_base64' : 'skill_md_base64']: btoa(bin), scripts_acked: scriptsAcked, acknowledge_secret: acknowledgeSecret });
         showToast(`Imported ${d.name} (version ${d.version}).`);
         await loadList(); draw(); loadSkillsBadge();
     } catch (e) {
         const code = e.data && e.data.code;
         if (e.status === 409 && code === 'scripts_not_acknowledged') {
-            confirmOrSay('This skill has scripts', 'It includes scripts or files that cannot be shown as text, which an agent that has this skill can run with its own permissions. Import it only if you have read them. Import anyway?', () => importZip(file, true, acknowledgeSecret), { label: 'Import', danger: true });
+            confirmOrSay('This skill has scripts', 'It includes scripts or files that cannot be shown as text, which an agent that has this skill can run with its own permissions. Import it only if you have read them. Import anyway?', () => importFile(file, true, acknowledgeSecret), { label: 'Import', danger: true });
         } else if (e.status === 409 && code === 'holds_secret') {
-            confirmOrSay('A file holds a secret', `${e.message} Import anyway?`, () => importZip(file, scriptsAcked, true), { label: 'Import anyway', danger: true });
+            confirmOrSay('A file holds a secret', `${e.message} Import anyway?`, () => importFile(file, scriptsAcked, true), { label: 'Import anyway', danger: true });
         } else showToast(`Couldn't import it: ${e.message}`, true);
     }
 }

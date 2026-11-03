@@ -2,6 +2,7 @@
  * the menu is role="menu" with role="menuitem" buttons. It opens on a click or ArrowDown with its first item focused; ArrowUp and ArrowDown, Home and End move; Escape closes it and gives the focus back
  * to the button (and is not the dialog's Escape); Tab, a click elsewhere or a choice closes it. It opens below the button, or above it when there is not room below inside the dialog's body: a menu
  * is never cut off by the footer. Only one is open at a time. */
+import { onViewShown } from './view_switch.js';
 import { menuMove } from './menu_keys.js';
 import { keepMenuOnScreen } from './menu_fit.js';
 
@@ -11,12 +12,36 @@ const items = menu => [...menu.querySelectorAll('[role="menuitem"]:not([disabled
 
 export function closeMenus({ restoreFocus = false } = {}) {
     if (!current) return;
-    const { toggle, menu } = current;
+    const { toggle, menu, restore, observer } = current;
     current = null;
+    observer?.disconnect();
+    restore?.();
     menu.hidden = true;
     menu.classList.remove('team-menu-up');
     toggle.setAttribute('aria-expanded', 'false');
     if (restoreFocus) toggle.focus();
+}
+
+/** Table menus stay in the DOM for their row's selectors, but paint in the top layer, outside every clipping ancestor. */
+function liftTableMenu(toggle, menu) {
+    const style = menu.getAttribute('style'), popover = menu.getAttribute('popover');
+    let marker = null;
+    Object.assign(menu.style, { position: 'fixed', inset: 'auto', margin: '0', translate: '', left: '0px', top: '0px', width: 'max-content', minWidth: '0', maxWidth: 'calc(100vw - 16px)', maxHeight: 'calc(100dvh - 16px)', overflowY: 'auto' });
+    if (typeof menu.showPopover === 'function') {
+        menu.setAttribute('popover', 'manual');
+        menu.showPopover();
+    } else {
+        marker = document.createComment('row menu'); menu.before(marker); document.body.append(menu);
+    }
+    const t = toggle.getBoundingClientRect(), r = menu.getBoundingClientRect();
+    menu.style.left = `${Math.max(8, Math.min(t.right - r.width, innerWidth - r.width - 8))}px`;
+    menu.style.top = `${Math.max(8, Math.min(t.bottom + r.height + 4 <= innerHeight - 8 ? t.bottom + 4 : t.top - r.height - 4, innerHeight - r.height - 8))}px`;
+    return () => {
+        if (typeof menu.hidePopover === 'function' && menu.matches(':popover-open')) menu.hidePopover();
+        if (marker) marker.replaceWith(menu);
+        if (popover === null) menu.removeAttribute('popover'); else menu.setAttribute('popover', popover);
+        if (style === null) menu.removeAttribute('style'); else menu.setAttribute('style', style);
+    };
 }
 
 function place(toggle, menu) {
@@ -29,12 +54,16 @@ function place(toggle, menu) {
 
 export function openMenu(toggle, { focusFirst = true } = {}) {
     const menu = document.getElementById(toggle.getAttribute('aria-controls') || '');
-    if (!menu) return;
+    if (!menu || !toggle.isConnected) return;
     closeMenus();
     menu.hidden = false;
     toggle.setAttribute('aria-expanded', 'true');
     current = { toggle, menu };
-    place(toggle, menu);
+    if (menu.classList.contains('dt-mail-menu') || toggle.closest('.dt-box')) {
+        current.restore = liftTableMenu(toggle, menu);
+        current.observer = new MutationObserver(() => { if (!toggle.isConnected || !menu.isConnected) closeMenus(); });
+        current.observer.observe(document.body, { childList: true, subtree: true });
+    } else place(toggle, menu);
     if (focusFirst) items(menu)[0]?.focus();
 }
 
@@ -73,3 +102,8 @@ document.addEventListener('keydown', e => {
     const t = e.target.closest && e.target.closest('[aria-haspopup="menu"][aria-controls]');
     if (t && t.closest('#launch-step-team')) { e.preventDefault(); openMenu(t); }
 });
+
+// An open table menu belongs to its current row and position, never to the next page or a scrolled-away row.
+onViewShown(() => closeMenus());
+window.addEventListener('resize', () => closeMenus());
+document.addEventListener('scroll', e => { if (current && !current.menu.contains(e.target)) closeMenus(); }, true);

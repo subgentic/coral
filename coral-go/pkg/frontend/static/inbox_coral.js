@@ -7,7 +7,7 @@ import { openTask, taskHref } from './task_navigation.js';
 import { cleanArtifactName } from './artifact_names.js';
 import { onAccountForgotten } from './local_store.js';
 import { loadSafeMarkdown } from './vendor_loader.js';
-import { keyLabel, pathId, serverFetch, boardFetch, identityKey, noteBoardLabels, isCloud } from './server_base.js';
+import { keyLabel, splitKey, pathId, serverFetch, boardFetch, identityKey, noteBoardLabels, isCloud } from './server_base.js';
 import { setInboxCount } from './inbox_tab.js'; // the count on the Tasks tab
 const { mountInbox, clearInboxDrafts, INBOX_CONTRACT } = await importOnce('./inbox_panel.js'); // the component (shared with the hub); this file is the one that is Coral's
 
@@ -45,12 +45,12 @@ const ARTIFACT_LOOKUPS_MAX = 20;
 
 /** The link policy for ONE render of `text`: each distinct lowercase 64-hex artifact id in it (at most ARTIFACT_LOOKUPS_MAX, one request each) is asked for at GET /api/artifacts/<hex>/meta, and
  *  only an answer of exactly 200 makes it a link. 403, 404, any other status and a network failure leave it as text; no path is built from text without that 200. Nothing is kept between renders. */
-export async function artifactLinkPolicy(text) {
+export async function artifactLinkPolicy(text, server) { // server: the one the text is from; through the Hub a bare /api path is the Hub's own (#12581)
     const ids = [...new Set([...String(text == null ? '' : text).matchAll(ARTIFACT_LINK_RE)].map(m => m[1]))].slice(0, ARTIFACT_LOOKUPS_MAX);
     const found = new Map(); // hex -> the name it was stored under ('' when none), for the link's text (#297)
     await Promise.all(ids.map(async hex => {
         try {
-            const r = await fetch(`/api/artifacts/${hex}/meta`);
+            const r = await serverFetch(server, `/api/artifacts/${hex}/meta`);
             if (r.status !== 200) return;
             let name = '';
             try { name = cleanArtifactName((await r.json()).name); } catch { /* no body: the short id */ }
@@ -93,7 +93,7 @@ export const coralInboxAdapter = {
     openTask(task) { return openTask(task.project, task.id); },
     linkPolicy: makeLinkPolicy({}), // without a lookup, artifact links stay plain text
     // Before the text is drawn: the renderer is loaded on first use (a failed load leaves the text as plain text, renderSafe's own fallback), then the artifact lookups.
-    async prepareLinks(text) { await loadSafeMarkdown().catch(() => {}); return artifactLinkPolicy(text); },
+    async prepareLinks(text, server, project) { await loadSafeMarkdown().catch(() => {}); return artifactLinkPolicy(text, server || (project ? splitKey(project).server : undefined)); }, // a task opened from a team's page has its team key, not a server field
 };
 
 let _inbox = null;

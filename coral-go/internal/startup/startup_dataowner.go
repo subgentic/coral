@@ -7,7 +7,6 @@ import (
 
 	"github.com/subgentic/coral/internal/config"
 	"github.com/subgentic/coral/internal/dataowner"
-	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/store"
 )
 
@@ -26,12 +25,11 @@ func verifyDataOwner(ctx context.Context, db *store.DB, dir string) dataowner.Ve
 }
 
 // settleDataOwner is the start's answer to "is this database this folder's own?" (internal/dataowner). Coral never blocks on it (#12591: v2.0.37 withheld everything from the operator's own agents after
-// judging their real folder a copy): whatever the verdict, delivery, recovery, auto-wake, auto-sleep and the health check run as usual, so the foreign flag is always cleared. When the ids show a copy (they
+// judging their real folder a copy): whatever the verdict, delivery, recovery, auto-wake, auto-sleep and the health check run as usual, and nothing in Coral branches on it. When the ids show a copy (they
 // differ, or another existing folder holds the same id) one WARN is logged and the dashboard shows a warning with "This is my data folder", which adopts the folder in place; nothing waits on that click. A
 // folder with no id gets its id, silently.
 func settleDataOwner(ctx context.Context, db *store.DB, dir string) dataowner.Verdict {
 	v := verifyDataOwner(ctx, db, dir)
-	ptymanager.SetForeign(false)
 	if v.Foreign {
 		log.Print(dataowner.LogLine(v))
 		dataowner.SetCopyWarning(dataowner.Notice, func(ctx context.Context) error { return AdoptDataDir(ctx, db, dir) })

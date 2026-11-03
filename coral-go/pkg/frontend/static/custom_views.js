@@ -3,27 +3,38 @@
 import { state } from './state.js';
 import { escapeHtml, escapeAttr } from './utils.js';
 import { registerActions, idOf, tokenOf } from './actions.js';
-import { isCloud } from './server_base.js';
+import { isCloud, serverFetch, contextServer } from './server_base.js';
 import { lockFrame, sandboxedDoc } from './sandbox_frame.js';
 import { lockViewFrame, viewDocument, attachViewBridge, API_VIEW_SEES } from './view_sandbox.js';
 import { loadCodeMirror } from './vendor_loader.js';
 import { ensureBuilt } from './lazy_dom.js';
 
+let _viewsServer = null;
+let _loadGeneration = 0;
+let _editorServer = null;
 let _views = [];       // cached views from API
 let _cmEditor = null;  // CodeMirror editor for the view code
 
 /** Load saved views from the API and render tabs. */
 export async function loadCustomViews() {
+    const server = contextServer(), generation = ++_loadGeneration;
+    if (_viewsServer !== server) {
+        _viewsServer = server; _views = [];
+        for (const stop of _detach.values()) stop();
+        _detach.clear(); _approved.clear(); _renderViewTabs();
+    }
+    if (isCloud() && server === 'local') return;
     try {
-        const resp = await fetch('/api/views');
+        const resp = await serverFetch(server, '/api/views');
         // A refusal is not an empty list: the views shown stay until a load succeeds.
         if (!resp.ok) throw new Error(`views: HTTP ${resp.status}`);
         const data = await resp.json();
+        if (generation !== _loadGeneration || server !== contextServer()) return;
         _views = Array.isArray(data) ? data : [];
     } catch (e) {
         console.warn('[coral] custom views could not be loaded', e);
     }
-    _renderViewTabs();
+    if (generation === _loadGeneration && server === contextServer()) _renderViewTabs();
 }
 
 /** Render tab buttons for each saved view. */
@@ -52,7 +63,8 @@ const _approved = new Set();   // ids of API-created views the user chose to run
 const _detach = new Map();     // view id -> function that removes its message bridge
 
 /** Create the iframe for a custom view when its tab is activated. */
-export function activateCustomView(viewId) {
+export async function activateCustomView(viewId) {
+    if (_viewsServer !== contextServer()) await loadCustomViews();
     const panel = document.getElementById(`agentic-panel-custom-view-${viewId}`);
     if (!panel) return;
 
@@ -89,6 +101,7 @@ function _renderGate(panel, view) {
 }
 
 function _mountViewFrame(panel, view) {
+    const server = _viewsServer;
     const iframe = document.createElement('iframe');
     iframe.className = 'custom-view-iframe';
     if (isCloud()) {
@@ -107,7 +120,7 @@ function _mountViewFrame(panel, view) {
             iframe.remove();
             _renderNotice(panel, view, 'This view tried to navigate away from Coral and was stopped.');
         };
-        _detach.set(view.id, attachViewBridge(iframe, { doc: viewDocument(view.html, _viewContext()), tier: view.created_via === 'api' ? 'api' : 'ui', onNavigated: stop }));
+        _detach.set(view.id, attachViewBridge(iframe, { fetchFn: (url, options) => serverFetch(server, url, options), doc: viewDocument(view.html, _viewContext()), tier: view.created_via === 'api' ? 'api' : 'ui', onNavigated: stop }));
         let loads = 0;
         iframe.addEventListener('load', () => { if (++loads > 1) stop(); }); // the host itself must load exactly once
     }
@@ -140,6 +153,7 @@ function _showEditViewModal(viewId) {
     if (isCloud()) return; // views cannot run scripts on the hub, so there is no editor there (saved views are shown read-only)
     const view = _views.find(v => v.id === viewId);
     if (!view) return;
+    _editorServer = _viewsServer;
     const modal = ensureBuilt('custom-view-modal'); // built on first open (#4500)
     document.getElementById('custom-view-modal-title').textContent = 'Edit View: ' + view.name;
     document.getElementById('custom-view-edit-id').value = viewId;
@@ -203,7 +217,7 @@ window._saveView = async function() {
     try {
         const url = editId ? `/api/views/${editId}` : '/api/views';
         const method = editId ? 'PUT' : 'POST';
-        const resp = await fetch(url, {
+        const resp = await serverFetch(_editorServer || contextServer(), url, {
             method,
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name, html }),
@@ -244,9 +258,10 @@ function _showViewContextMenu(event, viewId) {
 };
 
 async function _deleteView(viewId) {
+    const server = _viewsServer;
     window.showConfirmModal?.('Delete custom view', 'Delete this custom view?', async () => {
         try {
-            await fetch(`/api/views/${viewId}`, { method: 'DELETE' });
+            await serverFetch(server, `/api/views/${viewId}`, { method: 'DELETE' });
             await loadCustomViews();
         } catch (e) {
             window.showAlertModal?.('Unable to Delete View', `Failed to delete view: ${e.message}`);

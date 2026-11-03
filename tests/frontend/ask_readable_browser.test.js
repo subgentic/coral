@@ -1,5 +1,5 @@
-// A question reads well in Needs you (#12518, the Operator's screenshot of a long question as one dense block): the asker's line breaks stay, numbered steps are a list (also when the asker wrote them inline on one
-// line), and a long first line that opens with a clause is the title with the rest below, not said twice. 1280 and 390 px; the route is stubbed as in ask_item_browser. Isolated dev server.
+// #12518 / #12722: the complete question preserves line breaks and numbered steps, including
+// inline lists; the title names the asker/team. Desktop and phone, isolated server.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
@@ -31,7 +31,7 @@ const LINES = '@Operator Which hub do we ship to?\nFirst line of detail.\nSecond
             await ev(`document.querySelector('button[aria-label="Answer the question of Orchestrator"]').click(); true`);
             await waitFor(`document.querySelector('dialog.inbox-ask-dialog[open]')`, at + 'the long question opens', 4000);
             const a = await read();
-            assert.equal(a.title, 'Rotating do-r1-write.token, about 5 minutes in the DigitalOcean console', at + 'the clause before the steps is the title: ' + a.title);
+            assert.equal(a.title, 'Orchestrator · coral-hub', at + 'title names the asker and team');
             assert.equal(a.items.length, 5, at + 'five numbered steps are a list: ' + JSON.stringify(a.items));
             assert.ok(a.items[0].startsWith('API, Tokens') && a.items[4].startsWith("Reply 'rotated'"), at + 'in order: ' + JSON.stringify(a.items));
             assert.ok(!a.twice && !a.scrollsSideways && a.fits, at + 'the title is not said again in the body, and nothing runs past the edge: ' + JSON.stringify({ twice: a.twice, side: a.scrollsSideways, fits: a.fits }));
@@ -41,7 +41,7 @@ const LINES = '@Operator Which hub do we ship to?\nFirst line of detail.\nSecond
             await ev(`document.querySelector('button[aria-label="Answer the question of Dev"]').click(); true`);
             await waitFor(`document.querySelector('dialog.inbox-ask-dialog[open]')`, at + 'the lines question opens', 4000);
             const b = await read();
-            assert.equal(b.title, 'Which hub do we ship to?', at + 'the short first line is the title: ' + b.title);
+            assert.equal(b.title, 'Dev · team', at + 'short question is in the body, title names the asker');
             assert.ok(b.pText[0].includes('First line of detail.\nSecond line of detail') && b.pre[0] === 'pre-line', at + "the asker's line break stays: " + JSON.stringify([b.pText[0], b.pre[0]]));
             assert.equal(b.bullets, 2, at + 'a bulleted list is a list');
             await shot('ask-readable-lines-' + w);

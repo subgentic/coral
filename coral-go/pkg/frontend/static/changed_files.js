@@ -13,8 +13,13 @@ import { openPreviewTab, openArtifactTab, setPreviewSession, refreshOpenFiles } 
 import { storeKey, readStars, writeStars } from './local_store.js';
 import { importOnce } from './import_once.js';
 import { serverFetch, serverForSession, sessionServer, currentServer, isCloud, dropBody } from './server_base.js';
+import { cachedServerAccess } from './server_access.js';
 
 let _currentFiles = [];
+const _keyOf = s => s ? `${sessionServer(s)}|${s.name || ''}|${s.session_id || ''}` : ''; // the same key as session_header_updates.js whereKey
+let _wtFor = ''; // the agent _worktree was read for
+const paintWhere = () => { importOnce('./session_header_updates.js').then(m => m.setFilesWorktree(_worktree, _wtFor)).catch(() => {}); };
+const forThisAgent = (k = _keyOf(state.currentSession)) => { if (_wtFor !== k) { _worktree = null; _wtFor = k; paintWhere(); } return k; }; // another agent or computer: nothing of the last one's worktree stays // the one line at the top of Files names the followed worktree (#12690)
 let _worktree = null; // the worktree the agent works in, when it is not its launch folder: { path, name, branch, followed, launch } (#11351)
 const _expandedFiles = new Set(); // the paths whose diff is open under their row (#11350): kept across the list's redraws, and by path so a file that moves in the list keeps it
 let _actionsOpenFor = ''; // the path whose row has its Copy, Preview and Edit open on a phone (#7652): kept across the list's redraws
@@ -271,22 +276,29 @@ export async function loadChangedFiles(agentName, sessionId, quiet = false) { //
     if (state.currentSession && state.currentSession.type === 'live' && filesPanelShowing()) watchFiles();
     if (_filesStale) { _filesStale = false; return refreshChangedFiles(quiet); } // files changed while the panel was not showing: the server's cached list may predate them
     _filesStale = false;
+    const sid = sessionId || (state.currentSession && state.currentSession.session_id);
+    const mine = `${serverForSession(agentName, sid)}|${agentName}|${sid || ''}`; // the agent this read was ASKED for (computer, name, session), not whichever is selected when it answers (#12690, UI Reviewer)
+    const staleRead = () => !!state.currentSession && _keyOf(state.currentSession) !== mine; // an agent is open and it is not the one this read was asked for
+    if (staleRead()) return; // asked for an agent that is no longer the open one
+    forThisAgent(mine);
     try {
         const params = new URLSearchParams();
-        const sid = sessionId || (state.currentSession && state.currentSession.session_id);
         if (sid) { params.set("session_id", sid); params.set("worktree", worktreeMode(sid)); }
         const qs = params.toString() ? `?${params}` : "";
         const resp = await serverFetch(serverForSession(agentName), `/api/sessions/live/${encodeURIComponent(agentName)}/files${qs}`);
         _filesRefused = !resp.ok && await refusedTooLarge(resp);
         if (!resp.ok) { dropBody(resp); throw new Error(`files fetch failed: ${resp.status}`); }
         const data = await resp.json();
+        if (staleRead()) return; // the answer is for an agent that is no longer open
         if (quiet && JSON.stringify(data.files || []) === JSON.stringify(_currentFiles) && JSON.stringify(data.worktree || null) === JSON.stringify(_worktree)) return;
         _currentFiles = data.files || [];
-        _worktree = data.worktree && typeof data.worktree === 'object' ? data.worktree : null;
+        _worktree = data.worktree && typeof data.worktree === 'object' ? data.worktree : null; paintWhere();
         _notGit = data.is_git === false;
         _compareLabel = (data.compare && typeof data.compare.label === 'string') ? data.compare.label : '';
         if (data.diff_mode) _cloudDiffMode = data.diff_mode;
     } catch (e) {
+        if (staleRead()) return;
+        if (_worktree) { _worktree = null; paintWhere(); } // a read that failed: the line does not go on naming a worktree it could not read
         if (quiet) return; // a read that failed in the background leaves the list as it was
         _currentFiles = [];
         _notGit = false;
@@ -332,7 +344,7 @@ function watchFiles() {
     if (_watch) return;
     _watch = setInterval(() => { // interval-ok: only while the Files panel shows for a live agent in a visible tab; it clears itself otherwise
         const cur = state.currentSession;
-        if (!cur || cur.type !== 'live' || document.hidden || isSignedOut() || !filesPanelShowing()) { clearInterval(_watch); _watch = null; return; } // a signed-out page makes no /api request (#12444)
+        if (!cur || cur.type !== 'live' || document.hidden || isSignedOut() || !filesPanelShowing()) { clearInterval(_watch); _watch = null; _refreshBlock = null; return; } // a signed-out page makes no /api request (#12444)
         followRead(true);
     }, watchMs());
 }
@@ -356,11 +368,19 @@ export function followChangedFiles(s) {
     }, FOLLOW_DELAY_MS);
 }
 
+// The Files tab's number has two sources that mean different things (#12683, the Operator: "the number is flashing in and out"): the session feed's changed_file_count, what the agent's own Write and Edit tool
+// calls changed, told on every update and cleared at 0; and the list the panel shows, the files git says differ, drawn every round of the watch. When they disagree (an edit made by hand, a clean repository
+// the agent wrote to) they took turns, once a round. So while the Files panel is showing, the list it shows owns the number and the feed's is not drawn; when it is not showing the feed moves the number,
+// as before. Either way a number is written only when it changes, and the badge is empty only for a count of 0.
+let _listOwner = '';
+const setBadge = (el, text) => { if (el && el.textContent !== text) el.textContent = text; };
+const currentViewId = () => { const cur = state.currentSession; return cur ? String(cur.session_id || cur.name || '') : ''; };
+// the list draws the number: it is the owner of this session's badge from now on (while the panel shows)
+function listCount(el, text) { _listOwner = currentViewId(); setBadge(el, text); }
 export function updateChangedFileCount(count) {
-    const el = document.getElementById('files-bar-count');
-    if (el) {
-        el.textContent = count > 0 ? String(count) : '';
-    }
+    const id = currentViewId();
+    if (id && _listOwner === id && filesPanelShowing()) return; // the list on screen owns the number
+    setBadge(document.getElementById('files-bar-count'), count > 0 ? String(count) : '');
 }
 
 export function copyFilePath(filepath) {
@@ -541,14 +561,7 @@ function toggleAllExpanded() {
     paintExpandAll();
 }
 
-// Which worktree the list is from (#11351): the agent's own, once it works in one, named with its branch and a way back to the folder it was launched in; or the launch folder, with the worktree offered.
-function worktreeNoteHtml() {
-    if (!_worktree || !_worktree.name) return '';
-    const name = escapeHtml(String(_worktree.name)), branch = _worktree.branch ? ` <span class="files-worktree-branch">${escapeHtml(String(_worktree.branch))}</span>` : '';
-    return _worktree.followed
-        ? `<div class="files-worktree" role="status"><span>Following the agent in the worktree <strong>${name}</strong>${branch}</span><button type="button" class="btn btn-quiet btn-xs" data-on-click="worktree-launch">Back to launch folder</button></div>`
-        : `<div class="files-worktree" role="status"><span>The agent is working in the worktree <strong>${name}</strong>${branch}</span><button type="button" class="btn btn-quiet btn-xs" data-on-click="worktree-follow">Follow it</button></div>`;
-}
+// Which worktree the list is from (#11351) is the one line at the top of Files (session_header_updates.js setFilesWorktree, #12690), not a bar in the list.
 
 // The switch between the two: the list is read again from the other folder, and the diffs opened under the rows of the first are closed.
 function switchWorktree(mode) {
@@ -557,7 +570,7 @@ function switchWorktree(mode) {
     setWorktreeMode(s.session_id, mode);
     _expandedFiles.clear();
     _currentFiles = [];
-    _worktree = null;
+    _worktree = null; paintWhere();
     renderChangedFiles();
     refreshChangedFiles();
 }
@@ -567,6 +580,25 @@ function _getGitDiffMode() {
     return (state.settings || {}).git_diff_mode || 'branch_point';
 }
 
+// Through the Coral Hub on a computer in View mode the refresh (a POST, an Interact route) is refused 403 access_mode and leaves an audit row each time (#12646, coral-hub's beta pass): the watch asked about
+// every 2 s for as long as the panel showed. So once the page knows the computer is in View mode (its cached access) or a refresh was refused for the mode, this view stops asking: it reads the cached list
+// (a GET) and says once, quietly, that the list may be out of date. The block ends when the panel stops showing (the watch ends: reopening asks again), for another agent or server, and when the
+// access the page knows allows Interact again. The route stays Interact: no access changes here.
+let _refreshBlock = null; // { key } while this view does not call the refresh
+const refreshViewKey = (agentName, sessionId) => `${currentServer()}|${agentName}|${sessionId || ''}`;
+function staleNoteHtml() {
+    return _refreshBlock ? '<div class="files-stale-note">This computer is in View mode, so Coral does not re-check its files from here: the list may be out of date.</div>' : '';
+}
+// whether this view must not call the refresh now; sets or clears the block from what the page knows. Draws the note once when it first appears.
+function refreshBlockedFor(agentName, sessionId) {
+    const key = refreshViewKey(agentName, sessionId);
+    if (_refreshBlock && _refreshBlock.key !== key) _refreshBlock = null; // another agent or server
+    const access = cachedServerAccess(currentServer());
+    if (_refreshBlock && access && access.mayInteract) { _refreshBlock = null; renderChangedFiles(); } // the mode changed: ask again
+    else if (!_refreshBlock && access && !access.mayInteract) { _refreshBlock = { key }; renderChangedFiles(); }
+    return !!_refreshBlock;
+}
+
 export async function refreshChangedFiles(quiet = false) { // quiet: the panel's own watch (#10485), which draws only when the list moved
     if (!state.currentSession || state.currentSession.type !== 'live') return;
     const btn = quiet ? null : document.querySelector('.refresh-files-btn');
@@ -574,7 +606,14 @@ export async function refreshChangedFiles(quiet = false) { // quiet: the panel's
 
     const agentName = state.currentSession.name;
     const sessionId = state.currentSession.session_id;
+    const mine = forThisAgent();
 
+    if (refreshBlockedFor(agentName, sessionId)) { // View mode: the cached list, no POST (#12646)
+        _filesStale = false;
+        await loadChangedFiles(agentName, sessionId, quiet);
+        if (btn) setTimeout(() => btn.classList.remove('refreshing'), 300);
+        return;
+    }
     try {
         const body = {};
         if (sessionId) body.session_id = sessionId;
@@ -589,9 +628,10 @@ export async function refreshChangedFiles(quiet = false) { // quiet: the panel's
 
         if (resp.ok) {
             const data = await resp.json();
+            if (_keyOf(state.currentSession) !== mine) { if (btn) btn.classList.remove('refreshing'); return; } // the answer is for an agent that is no longer open
             if (quiet && JSON.stringify(data.files || []) === JSON.stringify(_currentFiles) && JSON.stringify(data.worktree || null) === JSON.stringify(_worktree)) return;
             _currentFiles = data.files || [];
-            _worktree = data.worktree && typeof data.worktree === 'object' ? data.worktree : null;
+            _worktree = data.worktree && typeof data.worktree === 'object' ? data.worktree : null; paintWhere();
             _notGit = data.is_git === false;
             _compareLabel = (data.compare && typeof data.compare.label === 'string') ? data.compare.label : '';
             if (data.diff_mode) _cloudDiffMode = data.diff_mode;
@@ -599,10 +639,15 @@ export async function refreshChangedFiles(quiet = false) { // quiet: the panel's
             renderChangedFiles();
             refreshOpenFiles().catch(() => {});
         } else {
-            await loadChangedFiles(agentName, sessionId);
+            if (resp.status === 403) { // refused for the mode (limited by the Hub or by the computer): do not ask again from this view
+                const why = await resp.clone().json().catch(() => null);
+                if (why && (why.limited_by === 'hub' || why.error === 'access_mode' || why.error === 'local_mode') && _keyOf(state.currentSession) === mine) { _refreshBlock = { key: refreshViewKey(agentName, sessionId) }; renderChangedFiles(); } // only while this agent is still the open one: another's refusal draws nothing on the agent now open
+            }
+            _filesStale = false;
+            if (_keyOf(state.currentSession) === mine) await loadChangedFiles(agentName, sessionId); // the answer is for an agent that is no longer open: no read for it (#12690)
         }
     } catch (e) {
-        await loadChangedFiles(agentName, sessionId);
+        if (_keyOf(state.currentSession) === mine) await loadChangedFiles(agentName, sessionId); // another agent was opened meanwhile: no read for this one
     }
 
     if (btn) setTimeout(() => btn.classList.remove('refreshing'), 300);
@@ -619,8 +664,8 @@ export async function refreshChangedFiles(quiet = false) { // quiet: the panel's
     if (_notGit && !plain) {
         const shell = state.currentSession && state.currentSession.agent_type === 'terminal'; // a terminal has no changes to list: no talk of git for a shell (#10077)
         if (titleEl) { titleEl.textContent = shell ? 'No changes to list' : 'Not a git folder'; titleEl._html = ''; }
-        if (countEl) countEl.textContent = '';
-        list.innerHTML = worktreeNoteHtml() + `<div class="empty-state empty-state-tight">${shell ? 'A terminal does not track changed files. Start an agent in this folder to see its changes.' : 'No files changed here this week. Changes show once the folder is a git repository, and an agent can also share a file with you as an artifact.'}</div>`;
+        listCount(countEl, '');
+        list.innerHTML = staleNoteHtml() + `<div class="empty-state empty-state-tight">${shell ? 'A terminal does not track changed files. Start an agent in this folder to see its changes.' : 'No files changed here this week. Changes show once the folder is a git repository, and an agent can also share a file with you as an artifact.'}</div>`;
         return;
     }
 
@@ -630,7 +675,7 @@ export async function refreshChangedFiles(quiet = false) { // quiet: the panel's
     if (plain) {
         const html = `<span class="changed-files-count">${files.length} recent file${files.length !== 1 ? 's' : ''}</span><span class="changed-files-count files-compare-note">Not a git folder: files changed this week</span>`;
         if (titleEl && titleEl._html !== html) { titleEl.innerHTML = html; titleEl._html = html; }
-        if (countEl) countEl.textContent = String(files.length);
+        listCount(countEl, String(files.length));
     }
 
     if (titleEl && !plain) {
@@ -665,12 +710,12 @@ export async function refreshChangedFiles(quiet = false) { // quiet: the panel's
         }
     }
     if (countEl && !plain) {
-        countEl.textContent = files.length > 0 ? String(files.length) : '';
+        listCount(countEl, files.length > 0 ? String(files.length) : '');
     }
 
     if (files.length === 0) {
         // The comparison choice is in the header above, with the count: not drawn a second time under "No changed files" (#5991).
-        list.innerHTML = worktreeNoteHtml() + (_filesRefused
+        list.innerHTML = staleNoteHtml() + (_filesRefused
             ? '<div class="empty-state empty-state-tight">Too many changed files to show through Coral Hub; open the agent on the computer.</div>'
             : `<div class="empty-state empty-state-tight">No changed files</div>`);
         return;
@@ -738,7 +783,7 @@ export async function refreshChangedFiles(quiet = false) { // quiet: the panel's
     const allOpen = !plain && files.every(f => _expandedFiles.has(f.filepath)), expandAllText = allOpen ? 'Collapse all' : 'Expand all', expandAllLabel = `${expandAllText} the changes`;
     // Expand all (#11350) is on the list's first line, not in the header: the header keeps its size when the first list arrives (#7671).
     const expandAll = plain ? '' : `<button type="button" class="btn btn-quiet btn-xs files-expand-all" data-on-click="files-expand-all" aria-label="${escapeAttr(expandAllLabel)}">${escapeHtml(expandAllText)}</button>`;
-    list.insertAdjacentHTML('afterbegin', `${worktreeNoteHtml()}<div class="files-legend"><span>New files are green, deleted ones red, the rest changed.</span>${expandAll}</div>`);
+    list.insertAdjacentHTML('afterbegin', `${staleNoteHtml()}<div class="files-legend"><span>New files are green, deleted ones red, the rest changed.</span>${expandAll}</div>`);
     if (heldMore) [...list.querySelectorAll('.file-more-btn')].find(b => b.dataset.path === heldMore)?.focus({ preventScroll: true });
     paintExpandAll();
     if (!plain && _expandedFiles.size) showExpanded(list, files); // the diffs that were open are drawn again from what was read (#11350)

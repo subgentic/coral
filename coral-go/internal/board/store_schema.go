@@ -5,6 +5,8 @@ package board
 import (
 	"context"
 	"log"
+	"log/slog"
+	"time"
 )
 
 func (s *Store) ensureSchema(ctx context.Context) error {
@@ -78,6 +80,10 @@ func (s *Store) ensureSchema(ctx context.Context) error {
 	}
 	if err := s.ensureAsksSchema(ctx); err != nil {
 		return err
+	}
+	// Buttons of questions the Operator already answered, or that went stale, are resolved once at start; a failure only leaves them to be resolved when their asker next asks (#12610).
+	if err := s.ResolveAskButtons(ctx, time.Now()); err != nil {
+		slog.Warn("board: could not resolve the buttons of answered questions", "err", err)
 	}
 	if err := s.ensureOrchSchema(ctx); err != nil { // the grant to a board's orchestrator and the log of agents' launches, wakes and sleeps (#11432)
 		return err

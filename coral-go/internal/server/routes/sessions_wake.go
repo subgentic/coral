@@ -15,7 +15,6 @@ import (
 	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/ptr"
 	"github.com/subgentic/coral/internal/ptymanager"
-	setreg "github.com/subgentic/coral/internal/settings"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/internal/transcriptlink"
 )
@@ -162,7 +161,17 @@ func (h *SessionsHandler) prepareWake(ctx context.Context, ls *store.LiveSession
 	} else {
 		permMode = agent.PermissionModeFromFlags(flags)
 		if permMode == "" {
-			permMode = setreg.Enum(userSettings, "default_permission_mode")
+			// An agent from before modes were recorded, with no permission flag: the mode its chat was started in where its transcript has one (#12718), else Default, as a restart does (#10297). Never the saved
+			// default: it may be Auto, and an agent started with Bypass woke in it and stopped at every prompt.
+			if m := h.transcriptStartMode(ctx, ls, flags); m != "" {
+				permMode = m
+				if err := h.ss.SetLivePermissionModeIfEmpty(ctx, ls.SessionID, m); err != nil {
+					slog.Warn("[wake] the start mode read from the transcript was not recorded", "session_id", ls.SessionID, "err", err)
+				}
+			} else {
+				permMode = "default"
+				slog.Info("[wake] no permission mode was recorded for this agent: it starts in Default", "session_id", ls.SessionID)
+			}
 		}
 	}
 	// The mode's flags are added only when the stored flags carry no permission flag at all, in any spelling (#6423): a Plan agent started with its own sandbox flags

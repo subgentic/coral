@@ -234,3 +234,22 @@ func TestAClickOfAnUnknownButtonOrAnotherQuestionsButtonIsNotFound(t *testing.T)
 	code, _ = c.call(true, ask+50, ids[0], "claim", `{}`)
 	assert.Equal(t, http.StatusNotFound, code, "a button is claimed only through its own question")
 }
+
+// An Operator who sends two wake requests can click both (#12610): a wake settled done does not close the question while another wake button waits; the last one does.
+func TestAWakeClickDoesNotCloseTheQuestionWhileAnotherWakeButtonWaits(t *testing.T) {
+	c := newClickRig(t)
+	ask, ids := c.ask("Wake Dev=wake:Dev", "Wake Lead=wake:Lead")
+	code, out := c.call(true, ask, ids[0], "claim", `{}`)
+	require.Equal(t, http.StatusOK, code, out)
+	code, out = c.call(true, ask, ids[0], "settle", `{"outcome":"done"}`)
+	require.Equal(t, http.StatusOK, code, out)
+	assert.NotEqual(t, true, out["closed"], "the second wake button is still there")
+	closed, _ := c.bs.AskIsClosed(context.Background(), "clk", ask)
+	assert.False(t, closed)
+
+	code, out = c.call(true, ask, ids[1], "claim", `{}`)
+	require.Equal(t, http.StatusOK, code, "the second wake can be clicked: %v", out)
+	code, out = c.call(true, ask, ids[1], "settle", `{"outcome":"done"}`)
+	require.Equal(t, http.StatusOK, code, out)
+	assert.Equal(t, true, out["closed"], "the last wake settles the question")
+}

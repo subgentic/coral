@@ -1,5 +1,6 @@
 /* Template Browser — browse and import agent/command templates from aitmpl.com */
 
+import { contextServer, serverFetch } from './server_base.js';
 import { escapeHtml, escapeAttr, showToast } from './utils.js';
 import { registerActions } from './actions.js';
 import { registerDialog, closeDialog } from './modal_chrome.js';
@@ -7,12 +8,13 @@ import { importOnce } from './import_once.js';
 
 let _categoriesCache = {};
 
-async function fetchCategories(type) {
-    if (_categoriesCache[type]) return _categoriesCache[type];
+async function fetchCategories(type, server) {
+    const key = JSON.stringify([server, type]);
+    if (_categoriesCache[key]) return _categoriesCache[key];
     try {
-        const resp = await fetch(`/api/templates/${type}`);
+        const resp = await serverFetch(server, `/api/templates/${type}`);
         const data = await resp.json();
-        _categoriesCache[type] = data;
+        _categoriesCache[key] = data;
         return data;
     } catch (e) {
         showToast('Failed to load template categories', true);
@@ -20,9 +22,9 @@ async function fetchCategories(type) {
     }
 }
 
-async function fetchTemplatesInCategory(type, category) {
+async function fetchTemplatesInCategory(type, category, server) {
     try {
-        const resp = await fetch(`/api/templates/${type}/${encodeURIComponent(category)}`);
+        const resp = await serverFetch(server, `/api/templates/${type}/${encodeURIComponent(category)}`);
         return await resp.json();
     } catch (e) {
         showToast('Failed to load templates', true);
@@ -30,9 +32,9 @@ async function fetchTemplatesInCategory(type, category) {
     }
 }
 
-async function fetchTemplate(type, category, name) {
+async function fetchTemplate(type, category, name, server) {
     try {
-        const resp = await fetch(`/api/templates/${type}/${encodeURIComponent(category)}/${encodeURIComponent(name)}`);
+        const resp = await serverFetch(server, `/api/templates/${type}/${encodeURIComponent(category)}/${encodeURIComponent(name)}`);
         return await resp.json();
     } catch (e) {
         showToast('Failed to load template', true);
@@ -46,6 +48,7 @@ async function fetchTemplate(type, category, name) {
  * @param {function} onSelect — called with the full template object when user clicks Use/Add
  */
 export async function showTemplateBrowser(type, onSelect) {
+    const server = contextServer();
     // Loaded here, not at the top of the file: a top-level await would hold this module (and whatever imports it) until the data module has answered.
     const { categoriesOf, templatesOf, categoryName, filterCategories, filterTemplates, templateName, displayName, previewParts } = await importOnce('./template_browser_data.js');
     const existing = document.getElementById('template-browser-modal');
@@ -87,7 +90,7 @@ export async function showTemplateBrowser(type, onSelect) {
     const searchInput = modal.querySelector('.template-browser-search');
 
     // Load categories
-    const rawData = await fetchCategories(type);
+    const rawData = await fetchCategories(type, server);
     const categories = categoriesOf(rawData);
     if (!categories.length) {
         catPanel.innerHTML = '<div class="empty-state empty-state-tight">No categories found</div>';
@@ -117,7 +120,7 @@ export async function showTemplateBrowser(type, onSelect) {
         listPanel.innerHTML = '<div class="template-browser-loading">Loading...</div>';
         previewPanel.innerHTML = '<div class="empty-state empty-state-tight">Select a template to preview</div>';
 
-        const rawTemplates = await fetchTemplatesInCategory(type, catName);
+        const rawTemplates = await fetchTemplatesInCategory(type, catName, server);
         const templates = templatesOf(rawTemplates);
         renderTemplateList(templates);
     }
@@ -144,7 +147,7 @@ export async function showTemplateBrowser(type, onSelect) {
 
     async function selectTemplate(cat, name) {
         previewPanel.innerHTML = '<div class="template-browser-loading">Loading...</div>';
-        const template = await fetchTemplate(type, cat, name);
+        const template = await fetchTemplate(type, cat, name, server);
         if (!template) {
             previewPanel.innerHTML = '<div class="empty-state empty-state-tight">Failed to load template</div>';
             return;

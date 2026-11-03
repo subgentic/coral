@@ -88,10 +88,10 @@ export async function fetchAllLiveChat(live) {
     return { messages };
 }
 
-export async function fetchAllHistory(sessionId) {
+export async function fetchAllHistory(sessionId, server) { // server: the computer the session is on (the board's); a bare path through the Hub is the Hub's own (#12617)
     const messages = [];
     for (let offset = 0; ; offset += EXPORT_CHAT_PAGE) {
-        const resp = await fetch(`/api/sessions/history/${encodeURIComponent(sessionId)}?limit=${EXPORT_CHAT_PAGE}&offset=${offset}`);
+        const resp = await serverFetch(server, `/api/sessions/history/${encodeURIComponent(sessionId)}?limit=${EXPORT_CHAT_PAGE}&offset=${offset}`);
         if (!resp.ok) throw new Error(`history: HTTP ${resp.status}`);
         const data = await resp.json();
         const page = Array.isArray(data.messages) ? data.messages : [];

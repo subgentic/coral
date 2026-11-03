@@ -188,6 +188,12 @@ func (h *BoardHandler) SettleAskButton(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "released": released})
 		return
 	}
+	if b.Action == board.ActionWake { // one of several wakes: the question stays open for the others, and the last one settles it (#12610)
+		if left, err := h.bs.PendingWakeButtons(ctx, project, askID); err == nil && left > 0 {
+			writeJSON(w, http.StatusOK, map[string]any{"ok": true, "closed": false})
+			return
+		}
+	}
 	note := strings.TrimSpace("answered with a button: " + b.Label)
 	if err := h.bs.CloseAsk(ctx, project, askID, "Operator", note); err != nil {
 		writeError(w, http.StatusInternalServerError, "close_failed", "it ran, but the question could not be closed: it stays in Needs you until you close it")

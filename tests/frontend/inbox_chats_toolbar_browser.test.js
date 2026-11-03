@@ -80,6 +80,8 @@ const COUNTS = { all: 2, group: 1, notes: 0, starred: 1, active: 0, archived: 1,
             check(`${label}: a CLI folder has no CLI field: Agent, Tag, From, To`, (await labels()) === 'Agent|Tag|From|To', await labels());
             await openFolder('chats-group', mobile, 'Board history'); await panel();
             check(`${label}: Board history has the dates only`, (await labels()) === 'From|To', await labels());
+            const bg = await ev(`(() => { const q = document.querySelector('.inbox-folder-toolbar .list-bar-search-row input[type=search]'); return q && { name: q.getAttribute('aria-label'), placeholder: q.getAttribute('placeholder') || '' }; })()`);
+            check(`${label}: the Board history search box names boards, not chats (#12664)`, bg && bg.name === 'Search boards' && !/chats/i.test(bg.placeholder), JSON.stringify(bg));
             await setField('inbox-chats-from', '2026-10-05'); await waitFor(`(window.__hist || []).some(p => p.type === 'group' && p.date_from === '2026-10-05')`, 'a board read with the date', 6000);
             check(`${label}: its date is date_from beside type=group`, (await lastRead()).type === 'group' && (await lastRead()).date_from === '2026-10-05', JSON.stringify(await lastRead()));
             await openFolder('chats', mobile, 'All chats'); await panel();

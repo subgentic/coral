@@ -2,6 +2,8 @@
  * shows the filled one; on a phone the row has no control (the star is in the item) and a starred row keeps the glyph, which is not a button there. The glyph is hidden from a screen reader: the row's name
  * ends ", starred". The call is the one the detail pane makes: PUT or DELETE /api/artifacts/<digest>/star (on this computer's store, and the owner's through Coral Hub). */
 import { showToast } from './utils.js';
+import { serverFetch } from './server_base.js';
+import { serverOf } from './inbox_servers.js';
 
 /** One row's star control. item.starred is read and kept; `name` is the artifact's name for the button's words and the failure. onChange(on) runs after the server says yes. */
 export function starControl(item, { hex, name, onChange } = {}) {
@@ -21,7 +23,7 @@ export function starControl(item, { hex, name, onChange } = {}) {
     b.addEventListener('click', async (e) => {
         e.stopPropagation(); // the row opens on a click: the star is not the row
         const on = !item.starred;
-        const r = await fetch(`/api/artifacts/${hex}/star`, { method: on ? 'PUT' : 'DELETE' }).catch(() => null);
+        const r = await serverFetch(serverOf(item), `/api/artifacts/${hex}/star`, { method: on ? 'PUT' : 'DELETE' }).catch(() => null); // on the computer the file is on: a bare path through the Hub is the Hub's own (#12617)
         if (!r || !r.ok) { showToast(`Couldn't ${on ? 'star' : 'unstar'} ${name}.`, true); return; }
         item.starred = on; paint(); onChange?.(on);
         document.dispatchEvent(new CustomEvent('artifact-star-changed')); // the Inbox's Starred folder reads its artifacts again (#10258)

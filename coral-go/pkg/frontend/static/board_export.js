@@ -122,7 +122,7 @@ export async function doExportBoard() {
                 const live = liveSessions.find(s => s.display_name === agent.role);
                 // Live: the chat endpoint (it has working_directory for JSONL resolution); ended:
                 // the history endpoint. Both in pages (#3718).
-                const histData = live ? await fetchAllLiveChat(live) : await fetchAllHistory(agent.sessionId);
+                const histData = live ? await fetchAllLiveChat(live) : await fetchAllHistory(agent.sessionId, boardSrv);
                 if (histData.messages && histData.messages.length) {
                     const parsed = parseAgentHistory(histData.messages, agent.role);
                     entries.push(...parsed);

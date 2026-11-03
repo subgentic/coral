@@ -4,7 +4,7 @@ import { state } from './state.js';
 /* The team page's Artifacts tab (#7453): the team's artifacts as a table (Name, Type, Size, Task, Created) under the search, Filters and Sort bar the old tab had, and the document in the detail pane. The name opens the pane: the preview, every detail the old
  * row's (i) showed, and the actions pinned under it (Open, Download, Copy link, Keep, Delete). The server does the matching: a search covers every artifact, not the loaded page (team_artifact_filters.js is the query). Everything drawn is built with the DOM and
  * textContent: names, task titles and the words about where a file came from are written by agents and other computers. Lazy: team_page.js imports it. */
-import { boardFetch, serverUrl, isCloud, splitKey, keyLabel, isBoardAnswer, isBoardAnswerPending, onBoardLabelsChanged, LOCAL_SERVER } from './server_base.js';
+import { boardFetch, serverFetch, serverUrl, isCloud, splitKey, keyLabel, isBoardAnswer, isBoardAnswerPending, onBoardLabelsChanged, LOCAL_SERVER } from './server_base.js';
 import { whenText } from './when_text.js';
 import { pollEvery } from './overload.js';
 import { importOnce } from './import_once.js';
@@ -99,7 +99,7 @@ export function createArtifactsList({ inbox = false } = {}) {
 
     async function toggleKeep(hex, name, button) {
         const on = button.getAttribute('aria-pressed') !== 'true';
-        const r = await fetch(`/api/artifacts/${hex}/keep`, { method: on ? 'PUT' : 'DELETE' }).catch(() => null);
+        const r = await serverFetch(server(), `/api/artifacts/${hex}/keep`, { method: on ? 'PUT' : 'DELETE' }).catch(() => null); // on this list's own computer (the page's bare /api is the Hub's through the Hub, #12617)
         if (!r || !r.ok) { showToast(`Couldn't ${on ? 'keep' : 'release'} ${name}.`, true); return; }
         if (on) model.kept.add(hex); else model.kept.delete(hex);
         button.setAttribute('aria-pressed', String(on));
@@ -111,7 +111,7 @@ export function createArtifactsList({ inbox = false } = {}) {
     // The star is a bookmark on an artifact (#9819): on this computer's store through the dashboard, and the owner's through Coral Hub, so it is offered for any artifact with a stored object.
     async function toggleStar(hex, name, button, item) {
         const on = button.getAttribute('aria-pressed') !== 'true';
-        const r = await fetch(`/api/artifacts/${hex}/star`, { method: on ? 'PUT' : 'DELETE' }).catch(() => null);
+        const r = await serverFetch(inbox ? serverOf(item) : server(), `/api/artifacts/${hex}/star`, { method: on ? 'PUT' : 'DELETE' }).catch(() => null); // the computer the file is on, not the page's own (#12617)
         if (!r || !r.ok) { showToast(`Couldn't ${on ? 'star' : 'unstar'} ${name}.`, true); return; }
         item.starred = on;
         document.dispatchEvent(new CustomEvent('artifact-star-changed')); // the Inbox's Starred folder reads its artifacts again (#10258)
@@ -126,7 +126,7 @@ export function createArtifactsList({ inbox = false } = {}) {
             `Delete ${name}${size ? ` (${size})` : ''}? It is removed from Coral, and links to it in board posts and task results will show "unavailable". A copy a browser already cached may remain. This can't be undone.`,
             async () => {
                 try {
-                    const r = await fetch(`/api/artifacts/${hex}`, { method: 'DELETE' });
+                    const r = await serverFetch(server(), `/api/artifacts/${hex}`, { method: 'DELETE' });
                     if (r.ok || r.status === 404) {
                         const at = [...(root?.querySelectorAll('tbody tr') || [])].findIndex(tr => tr.dataset.key === hex);
                         forget(hex); deletions?.postMessage({ hex, server: server() });
@@ -148,7 +148,7 @@ export function createArtifactsList({ inbox = false } = {}) {
         model.controller?.abort();
         const gen = ++model.gen, ctrl = model.controller = new AbortController();
         if (!append) { if (!keep || !model.items.length) { model.items = []; model.hasMore = false; model.truncated = false; model.counts = null; } model.cursor = ''; model.loading = !model.items.length; }
-        model.loadingMore = append; model.error = ''; model.notFound = false;
+        model.loadingMore = append; model.error = ''; model.notFound = false; model.waiting = false;
         draw();
         try {
             model.filters.sort = serverArtifactSort(artifactState.sort || undefined);
@@ -180,6 +180,9 @@ export function createArtifactsList({ inbox = false } = {}) {
                 }
                 throw new Error('Unable to load artifacts: unexpected response scope.');
             }
+            if (inbox && data.waiting) { model.waiting = true; return; } // the list of computers has not loaded: the read is not finished, so nothing is said of the artifacts (the page keeps saying it is loading, and the next read asks again)
+            model.partial = inbox && data.expected > data.answered ? { failed: data.failed || [], answered: data.answered, expected: data.expected, all: data.all } : null; // some computers did not answer: the count is of the others, and the page says so (#12672)
+            model.versionless = inbox && Array.isArray(data.versionless) ? data.versionless : []; // computers on an older Coral count every version of a file, not files
             const rows = data.artifacts.filter(a => a && (a.uri || a.id || a.name));
             model.items = append ? model.items.concat(rows) : rows;
             if (!append) model.tagCounts = data.tag_counts && typeof data.tag_counts === 'object' ? data.tag_counts : {}; // the team's tags with how many files carry each (the whole list, not the page)
@@ -237,9 +240,21 @@ export function createArtifactsList({ inbox = false } = {}) {
         document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshQuiet(); });
     }
 
+    // Some computers did not answer, or count versions: one quiet line (not an alert) says which, so the count does not swing unexplained between reads (#12672); Retry reads the folder again.
+    function partialLine() {
+        const line = el('p', 'goals-note team-partial-line');
+        const names = ids => ids.map(serverLabel).join(', ');
+        const parts = [];
+        if (model.partial) parts.push(`${model.partial.all} artifact${model.partial.all === 1 ? '' : 's'} from ${model.partial.answered} of ${model.partial.expected} computers. ${names(model.partial.failed)} could not be read.`);
+        if (model.versionless && model.versionless.length) parts.push(`${names(model.versionless)} counts every version of a file, not files.`);
+        line.append(document.createTextNode(parts.join(' ')));
+        if (model.partial) line.append(' ', btn('btn btn-small team-artifacts-retry team-partial-retry', 'Retry', () => loadArtifacts({ keep: true })));
+        return line;
+    }
+
     function statusLine() {
         if (model.error) return model.error;
-        if (model.loading || pendingBoard) return inbox ? 'Loading artifacts…' : model.scope ? 'Loading agent artifacts…' : 'Loading team artifacts…';
+        if (model.loading || pendingBoard || model.waiting || (inbox && !model.loaded)) return inbox ? 'Loading artifacts…' : model.scope ? 'Loading agent artifacts…' : 'Loading team artifacts…';
         if (!model.items.length) return F.isFiltered(model.filters) ? 'No artifacts match this search.' : model.scope ? 'Nothing shared yet. Files this agent shares appear here.' : hooks.emptyText?.() || 'No artifacts yet. Files your agents share show up here.';
         const c = model.counts;
         return c && c.matched > model.items.length ? `Showing ${model.items.length} of ${c.matched}${model.truncated ? '+' : ''}` : `${model.items.length} artifact${model.items.length === 1 ? '' : 's'}`;
@@ -289,7 +304,7 @@ export function createArtifactsList({ inbox = false } = {}) {
                     if (model.bulkBusy || !local() || rows.some(item => !managedHex(item) || !linkOf(item)?.preview)) return;
                     model.bulkBusy = true; const key = model.key, origin = server(), ok = []; let failed = 0;
                     for (const item of rows) { const hex = managedHex(item); try {
-                        const r = await fetch(`/api/artifacts/${hex}`, { method: 'DELETE' });
+                        const r = await serverFetch(origin, `/api/artifacts/${hex}`, { method: 'DELETE' });
                         if (!r.ok && r.status !== 404) throw new Error('Delete failed');
                         ok.push(itemKey(item)); deletions?.postMessage({ hex, server: origin });
                         if (key === model.key) { model.items = model.items.filter(it => managedHex(it) !== hex || (inbox && serverOf(it) !== LOCAL_SERVER)); if (detailKey() === hex) closeDetailPane(); }
@@ -314,6 +329,7 @@ export function createArtifactsList({ inbox = false } = {}) {
         const status = el('p', counting ? 'sr-only team-count-line' : `goals-note team-count-line${model.error ? ' team-artifacts-error' : !model.loading && !model.items.length ? ' empty-state-line' : ''}`, statusLine());
         status.setAttribute('role', model.error ? 'alert' : 'status');
         body.append(status);
+        if (inbox && !model.error && (model.partial || (model.versionless && model.versionless.length))) body.append(partialLine());
         if (!model.error && !model.loading && !model.items.length && !F.isFiltered(model.filters) && !model.scope) status.append(el('span', 'empty-state-hint', 'An agent shares a file when it finishes a task with one; you can ask an agent to share a file as an artifact.')); // inside the line's own element: one block, the family's gap
         if (model.error && !model.notFound) body.append(btn('btn btn-small team-artifacts-retry', 'Retry', () => {
             // A label timeout needs another board-list read, not only the same artifact answer. Do not await a possibly offline list: the fresh artifact read has its own bounded label wait.
@@ -505,7 +521,7 @@ export function createArtifactsList({ inbox = false } = {}) {
         artifactState = DT.tableState();
         forgetChoices();
         model.controller?.abort();
-        Object.assign(model, { project, scope, key, loaded: false, items: [], hasMore: false, cursor: '', counts: null, tagCounts: {}, truncated: false, loading: false, error: '', loadingMore: false, filters: scope && scope.standalone ? { ...F.EMPTY } : F.load(scope ? `${project}::agent::${scope.session}` : project), kept: new Set() });
+        Object.assign(model, { project, scope, key, loaded: false, waiting: false, partial: null, versionless: [], items: [], hasMore: false, cursor: '', counts: null, tagCounts: {}, truncated: false, loading: false, error: '', loadingMore: false, filters: scope && scope.standalone ? { ...F.EMPTY } : F.load(scope ? `${project}::agent::${scope.session}` : project), kept: new Set() });
         model.filters = { ...model.filters, sort: serverArtifactSort() };
         if (!external) bar = null;
     }

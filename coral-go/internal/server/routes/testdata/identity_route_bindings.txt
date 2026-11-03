@@ -178,6 +178,8 @@ POST /api/board/{project}/goal-requests/{requestID}/accept | board-claims
 POST /api/board/{project}/goal-requests/{requestID}/decline | board-claims
 POST /api/board/{project}/goals | board-claims
 POST /api/board/{project}/goals/{goalID}/close | board-claims
+POST /api/board/{project}/goals/{goalID}/driver | board-claims | operator-only
+POST /api/board/{project}/goals/{goalID}/move | board-claims | operator-only
 POST /api/board/{project}/groups/{groupID}/members | board-claims | operator-only
 POST /api/board/{project}/health/ack | board-claims +token-session
 POST /api/board/{project}/hub-notice | board-claims
@@ -249,10 +251,12 @@ POST /api/sessions/live/{name}/restart | unbound | operator-only
 POST /api/sessions/live/{name}/resume | unbound | operator-only
 POST /api/sessions/live/{name}/send | unbound | operator-only
 POST /api/sessions/live/{name}/share-file | unbound | operator-only
+POST /api/sessions/live/{name}/skills | unbound | operator-only
 POST /api/sessions/live/{name}/tasks | token-bound
 POST /api/sessions/live/{name}/tasks/reorder | token-bound
 POST /api/sessions/live/{name}/token-usage | token-bound
 POST /api/sessions/live/{name}/turn-end | token-session
+POST /api/sessions/live/{name}/waiting/dismiss | token-session | operator-only
 POST /api/sessions/live/{name}/waiting/send | token-session | operator-only
 POST /api/sessions/live/{sessionID}/archive | unbound | operator-only
 POST /api/sessions/live/{sessionID}/record-agent | unbound | operator-only

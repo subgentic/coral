@@ -194,6 +194,7 @@ GET /api/settings never
 GET /api/settings/default-prompts view
 GET /api/settings/prompt-inspection launch
 GET /api/skills never
+GET /api/skills/search never
 GET /api/skills/{id} never
 GET /api/spec.json never
 GET /api/system/api-key never
@@ -318,6 +319,8 @@ POST /api/board/{project}/goal-requests/{requestID}/accept never
 POST /api/board/{project}/goal-requests/{requestID}/decline never
 POST /api/board/{project}/goals interact
 POST /api/board/{project}/goals/{goalID}/close interact
+POST /api/board/{project}/goals/{goalID}/driver never
+POST /api/board/{project}/goals/{goalID}/move never
 POST /api/board/{project}/groups/{groupID}/members never
 POST /api/board/{project}/health/ack never
 POST /api/board/{project}/hub-notice interact
@@ -411,10 +414,12 @@ POST /api/sessions/live/{name}/restart launch
 POST /api/sessions/live/{name}/resume launch
 POST /api/sessions/live/{name}/send interact
 POST /api/sessions/live/{name}/share-file launch
+POST /api/sessions/live/{name}/skills never
 POST /api/sessions/live/{name}/tasks interact
 POST /api/sessions/live/{name}/tasks/reorder never
 POST /api/sessions/live/{name}/token-usage never
 POST /api/sessions/live/{name}/turn-end never
+POST /api/sessions/live/{name}/waiting/dismiss never
 POST /api/sessions/live/{name}/waiting/send never
 POST /api/sessions/live/{sessionID}/archive interact
 POST /api/sessions/live/{sessionID}/record-agent never

@@ -320,6 +320,8 @@ a POST /api/board/{project}/goal-requests/{requestID}/accept
 a POST /api/board/{project}/goal-requests/{requestID}/decline
 a POST /api/board/{project}/goals
 a POST /api/board/{project}/goals/{goalID}/close
+b POST /api/board/{project}/goals/{goalID}/driver
+b POST /api/board/{project}/goals/{goalID}/move
 b POST /api/board/{project}/groups/{groupID}/members
 a POST /api/board/{project}/health/ack
 c POST /api/board/{project}/hub-notice
@@ -405,6 +407,7 @@ a POST /api/sessions/live/{name}/context-window
 a POST /api/sessions/live/{name}/events
 c POST /api/sessions/live/{name}/files/refresh
 b POST /api/sessions/live/{name}/goal
+b POST /api/sessions/live/{name}/waiting/dismiss
 b POST /api/sessions/live/{name}/waiting/send
 b POST /api/sessions/live/{name}/keys
 b POST /api/sessions/live/{name}/kill
@@ -524,6 +527,8 @@ b GET /api/proposals
 b POST /api/board/{project}/proposals/{id}/approve
 b POST /api/board/{project}/proposals/{id}/reject
 b GET /api/skills
+b GET /api/skills/search
+b POST /api/sessions/live/{name}/skills
 b POST /api/skills
 b GET /api/skills/{id}
 b POST /api/skills/{id}/approve

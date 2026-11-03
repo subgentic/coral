@@ -74,7 +74,7 @@ function nameAt(text, name) {
 }
 
 /** Team-written words, escaped, with a coral://artifacts/<hex> in them made a link (#11416). */
-function linked(text) { return linkedHtml(text); }
+function linked(text) { return linkedHtml(text, contextServer()); } // the artifact names are asked of the page's own computer (#12583)
 
 /** A result names the files the task attached (hours.md): each name in the message is a link to its file, the way the Completion artifacts list opens it (#10603, the Beta tester). Plain text stays escaped; the first mention of each name is the link. */
 function _messageWithFiles(message, artifacts) {

@@ -296,3 +296,36 @@ func TestALinePrintedAtOnceAfterTheLaunchIsSeen(t *testing.T) {
 	require.Eventually(t, func() bool { return strings.Contains(g.launchLines(), "--session-id "+goneSID) }, 5*time.Second, 50*time.Millisecond,
 		"the line printed with the launch was this resume's: %q", g.launchLines())
 }
+
+// The fresh start takes the permission mode in #12718's order (Orchestrator on #12714): the agent's own flags, then the mode its transcript started in, else Default; never the saved default. A fresh start has no transcript
+// to read, so it is the flags or Default.
+func TestAFreshStartKeepsItsOwnPermissionFlagsAndNeverTheSavedDefault(t *testing.T) {
+	g := newGoneRig(t)
+	g.sawConversation(t) // no transcript, but Coral once read one: the conversation is gone
+	_, err := g.h.db.ExecContext(context.Background(), "UPDATE live_sessions SET flags = ? WHERE session_id = ?", `["--permission-mode","plan"]`, goneSID)
+	require.NoError(t, err)
+	require.NoError(t, g.ss.SetSetting(context.Background(), "default_permission_mode", "bypassPermissions")) // the saved default must not be what it starts in
+
+	g.wake(t)
+
+	cmds := g.launchLines()
+	assert.Contains(t, cmds, "--session-id "+goneSID, "started fresh")
+	assert.Equal(t, 1, strings.Count(cmds, "--permission-mode"), "its own flag, once: %q", cmds)
+	assert.Contains(t, cmds, "--permission-mode plan", "its own flag wins")
+	assert.NotContains(t, cmds, "bypassPermissions")
+	assert.NotContains(t, cmds, "--dangerously-skip-permissions")
+}
+
+func TestAFreshStartWithNoModeRecordedStartsInDefaultNotTheSavedDefault(t *testing.T) {
+	g := newGoneRig(t)
+	g.sawConversation(t)
+	require.NoError(t, g.ss.SetSetting(context.Background(), "default_permission_mode", "bypassPermissions"))
+
+	g.wake(t)
+
+	cmds := g.launchLines()
+	assert.Contains(t, cmds, "--session-id "+goneSID, "started fresh")
+	assert.Contains(t, cmds, "--permission-mode default", "Default, as an interactive Claude launch says it: %q", cmds)
+	assert.NotContains(t, cmds, "bypassPermissions", "never the saved default")
+	assert.NotContains(t, cmds, "--dangerously-skip-permissions")
+}

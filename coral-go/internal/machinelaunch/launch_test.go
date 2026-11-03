@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"os"
@@ -74,7 +75,15 @@ func (s *stubProvider) Delete(_ context.Context, id string) error {
 type stubHub struct {
 	labels []string
 	err    error
-	onMint func() // called when the credential is minted
+	// preflightErr is what Preflight answers (nil: the Hub serves machine credentials); preflights counts the asks.
+	preflightErr error
+	preflights   int
+	onMint       func() // called when the credential is minted
+}
+
+func (h *stubHub) Preflight(context.Context) error {
+	h.preflights++
+	return h.preflightErr
 }
 
 func (h *stubHub) Mint(_ context.Context, label string) (string, error) {
@@ -849,5 +858,46 @@ func TestLaunchClipsTheMachinesClaimedName(t *testing.T) {
 	}
 	if got := clipLabel("short"); got != "short" {
 		t.Errorf("a short name is unchanged: %q", got)
+	}
+}
+
+// #12584: a Hub that does not serve machine credentials is refused before the provider is asked for anything that costs or creates: no token check, no price, no network, no create, no mint.
+func TestLaunchAsksTheHubFirstAndRefusesBeforeTheProviderCreatesAnything(t *testing.T) {
+	p := &stubProvider{}
+	h := &stubHub{preflightErr: fmt.Errorf("%w (it answered HTTP 404 for /api/bootstrap/credentials at app.coralhub.dev)", ErrHubBootstrapOff)}
+	o, d, out := setup(p, h)
+	_, err := Launch(context.Background(), o, d)
+	if !errors.Is(err, ErrHubBootstrapOff) {
+		t.Fatalf("want ErrHubBootstrapOff, got %v", err)
+	}
+	if !strings.Contains(err.Error(), "nothing was created at") {
+		t.Errorf("the refusal says nothing was created: %v", err)
+	}
+	if len(p.calls) != 0 {
+		t.Errorf("the provider was asked for something before the Hub was: %v", p.calls)
+	}
+	if len(h.labels) != 0 || h.preflights != 1 {
+		t.Errorf("minted %v, asked %d times", h.labels, h.preflights)
+	}
+	if strings.Contains(out.String(), "Create machine") {
+		t.Errorf("the summary was shown for a launch that cannot happen: %q", out.String())
+	}
+	if strings.Contains(err.Error(), launchTestToken) || strings.Contains(err.Error(), launchTestCredential) {
+		t.Errorf("the error holds a secret")
+	}
+
+	// an answer it does not know stops it just the same, with the same promise
+	p3 := &stubProvider{}
+	h3 := &stubHub{preflightErr: fmt.Errorf("%w (it answered HTTP 502 for /api/bootstrap/credentials at app.coralhub.dev)", ErrHubUnrecognised)}
+	o3, d3, _ := setup(p3, h3)
+	if _, err := Launch(context.Background(), o3, d3); !errors.Is(err, ErrHubUnrecognised) || !strings.Contains(err.Error(), "nothing was created at") || len(p3.calls) != 0 {
+		t.Errorf("an unknown answer: %v, provider calls %v", err, p3.calls)
+	}
+	// a Hub that does serve them: the launch goes on to the provider as before
+	p2, h2 := &stubProvider{}, &stubHub{}
+	o2, d2, _ := setup(p2, h2)
+	_, _ = Launch(context.Background(), o2, d2)
+	if h2.preflights != 1 || len(p2.calls) == 0 {
+		t.Errorf("asked %d times, provider calls %v", h2.preflights, p2.calls)
 	}
 }

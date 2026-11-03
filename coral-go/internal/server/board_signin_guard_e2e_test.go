@@ -102,6 +102,8 @@ var signInGuardedRoutes = []string{
 	"POST /api/board/{project}/goals",
 	"PATCH /api/board/{project}/goals/{goalID}",
 	"POST /api/board/{project}/goals/{goalID}/close",
+	"POST /api/board/{project}/goals/{goalID}/driver",
+	"POST /api/board/{project}/goals/{goalID}/move",
 	"POST /api/board/{project}/goal-requests",
 	"POST /api/board/{project}/goal-requests/{requestID}/accept",
 	"POST /api/board/{project}/goal-requests/{requestID}/decline",
@@ -155,6 +157,7 @@ func TestTheBoardRoutesRefuseASignInLinkFromAnyClient(t *testing.T) {
 // writeRoutesWithoutTheGuard are the write routes left without routes.RefuseSignInLink, each with why: their body carries no text a person
 // typed. A new write route under these prefixes fails TestEveryWriteRouteIsGuardedOrSaysWhyNot until it is guarded or listed here.
 var writeRoutesWithoutTheGuard = map[string]string{
+	"POST /api/sessions/live/{name}/skills":                                "the body is one skill id, 32 hex digits, checked in the handler before anything is read; the line the message carries is made by the server from the skill's cleaned name (#12676)",
 	"POST /api/agent/skills":                                               "the body is a zip, base64 in JSON, so a middleware cannot see the text: the handler reads every file after it is unpacked and refuses one that holds a sign-in link (hasSignInLink), before a byte is kept (#12261)",
 	"POST /api/board/{project}/operator-artifacts":                         "the body is the Operator's file, stored as bytes; its name is checked in the handler (hasSignInLink) and the file is never rendered (#11376)",
 	"POST /api/board/{project}/operator-artifacts/message":                 "the body names an agent session and digests this Coral just stored; the message text is made by the server (#11376)",

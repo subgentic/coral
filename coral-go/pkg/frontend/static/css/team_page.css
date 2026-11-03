@@ -257,11 +257,12 @@
 .goal-back-row > .goals-back, .goal-back-row > .phone-title-row { order: 1; }
 .goal-back-row > .goals-back { white-space: nowrap; flex: none; } /* a way back is one line at any text size (it was "←" over "Tasks" at 200%) */
 .goal-back-row > .goal-team-link, .goal-back-row > .goal-head-actions { order: 2; }
-.goal-head-actions { display: flex; gap: 8px; margin-left: auto; }
+.goal-head-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-left: auto; max-width: 100%; } /* Change driver and Move to another team (#12693) join Add task and Close goal: on a phone they wrap onto a second row that still ends at the right edge */
 .goal-team-link + .goal-head-actions { margin-left: 0; }
 @media (min-width: 761px) { .goal-back-row .phone-title-row > .goals-back { order: 1; } .goal-back-row .goals-detail-title { order: 3; flex: 0 0 100%; margin-top: 4px; } } /* a descendant: the folded phone-title-row is display: contents here, so the title is a flex item of the row; on a phone it stays beside the way back */
 @media (max-width: 760px) {
-    .goal-back-row > .phone-title-row { flex: 1 1 100%; }
+    .goal-back-row > .phone-title-row { flex: 1 1 100%; min-width: 0; padding-block: 8px; }
+    .goal-back-row .phone-title-row > .goals-detail-title { white-space: normal; overflow: visible; text-overflow: clip; } /* the goal's title is the page's content: it wraps and is read whole, not cut to one line with dots */
 }
 @media (max-width: 760px) {
     .inbox-goal-page > .view-list { display: block; padding: 12px 16px 0; }
@@ -347,18 +348,19 @@
 .inbox-review-item > .inbox-review-name { flex: 0 1 auto; min-width: 0; } /* the name and, once it is opened, its 'read' tag (#9277) */
 dialog.inbox-ask-dialog { position: fixed; inset: 0; margin: auto; height: fit-content; max-height: 90dvh; overflow: auto; color: var(--text-primary); } /* the size, border and ground are the shared dialog rule's; centred as the other dialogs are: the base reset gives every dialog margin 0, which pinned it to the top left (#11999, again) */
 dialog.inbox-ask-dialog:not([open]) { display: none; }
-.inbox-ask-dialog h2 { margin: 0 0 4px; font-size: var(--fs-lg, 1.1rem); }
+.inbox-ask-dialog h2 { margin: 0 0 4px; font-size: var(--fs-xl, 1.1rem); white-space: normal; overflow-wrap: anywhere; }
 .inbox-ask-sub { margin: 0 0 12px; color: var(--text-muted); }
-.inbox-ask-text { margin: 0 0 12px; max-height: 18rem; overflow: auto; overflow-wrap: anywhere; }
+.inbox-ask-text { margin: 0 0 12px; max-height: none; overflow: visible; overflow-wrap: anywhere; }
 .inbox-ask-text.prose :is(p, li) { white-space: pre-line; } /* the asker's own line breaks stay (#12518); a list is a list */
 .inbox-ask-label { display: block; margin-bottom: 8px; }
-.inbox-ask-box { display: block; width: 100%; box-sizing: border-box; margin-top: 4px; }
-.inbox-ask-error { min-height: 1.2em; margin: 0 0 8px; color: var(--danger); }
+.inbox-ask-box { resize: none; overflow-y: hidden; min-height: 4.5em; display: block; width: 100%; box-sizing: border-box; margin-top: 4px; }
+.inbox-ask-error:empty { display: none; }
+.inbox-ask-error { margin: 0 0 8px; color: var(--danger); }
 .inbox-ask-buttons { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
 .inbox-ask-buttons .btn { min-height: 44px; }
-.inbox-ask-offers { margin: 0 0 12px; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-md, 8px); background: var(--bg-secondary); }
+.inbox-ask-offers { margin: 0 0 20px; }
 .inbox-ask-offers-head { margin: 0 0 8px; color: var(--text-muted); }
-.inbox-ask-offers-list { display: flex; flex-direction: column; gap: 8px; }
+.inbox-ask-offers-list { display: flex; flex-wrap: wrap; gap: 8px; }
 .inbox-ask-offer { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; min-width: 0; }
 .inbox-ask-offer .btn { min-height: 44px; max-width: 100%; overflow-wrap: anywhere; }
 .inbox-ask-offer-what { color: var(--text-muted); min-width: 0; overflow-wrap: anywhere; }
@@ -482,3 +484,15 @@ dialog.inbox-deny-dialog { position: fixed; inset: 0; margin: auto; height: fit-
 .gr-add { display: flex; gap: 8px; flex-wrap: wrap; }
 .gr-add input { flex: 1 1 12rem; min-width: 0; }
 @media (max-width: 600px) { .gr-guide { grid-template-columns: minmax(0, 1fr) auto; } .gr-label { grid-column: 1 / -1; } .gr-guide .btn, .gr-add .btn, .gr-guide input, .gr-add input { min-height: 44px; } }
+
+/* #12722: one scroll area for the question; the footer stays available while it is read. */
+.inbox-ask-dialog > * { flex-shrink: 0; }
+.inbox-ask-dialog h2 .agent-link { font: inherit; }
+.inbox-ask-sub, .inbox-ask-offers-head, .inbox-ask-label { font-size: var(--fs-md); }
+.inbox-ask-foot { position: sticky; bottom: calc(-1 * var(--space-2xl)); padding: 12px 0; background: var(--bg-secondary); border-top: 1px solid var(--border); }
+.inbox-ask-foot > span { margin-right: auto; }
+.inbox-ask-foot .ac-add-image { width: 44px; padding: 0; }
+@media (max-width: 500px) {
+    .inbox-ask-foot .inbox-ask-buttons { display: contents; }
+    .inbox-ask-foot .inbox-ask-send { flex: 1 0 100%; }
+}
