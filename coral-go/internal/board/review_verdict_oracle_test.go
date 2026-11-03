@@ -125,7 +125,12 @@ func dumpVerdictBoard(t *testing.T, path string) []string {
 // verdictResult is a verdict as compared: its fields (the tasks as JSON, their stamps masked) or its refusal.
 func verdictResult(v *ReviewVerdict, err error) string {
 	if err != nil {
-		return "error: " + err.Error()
+		msg := err.Error()
+		// #12869: "has no open review" now says why and what to run next after a colon; the refusal being compared is the sentence before it
+		if i := strings.Index(msg, " has no open review: "); i >= 0 {
+			msg = msg[:i+len(" has no open review")]
+		}
+		return "error: " + msg
 	}
 	b, _ := json.Marshal(v)
 	return maskStamps(string(b))

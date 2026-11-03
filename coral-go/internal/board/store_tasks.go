@@ -872,6 +872,9 @@ func (s *Store) CompleteTask(ctx context.Context, project string, taskID int64, 
 // ErrReviewTaskReassign: a review task is not reassigned; its reviewers are changed on the task under review.
 var ErrReviewTaskReassign = errors.New("a review task cannot be reassigned")
 
+// ErrTaskReassignRefused: the task is in a state that cannot be reassigned (finished, or a candidate under review). The routes answer 409 with the reason, which says what to do instead (#12869).
+var ErrTaskReassignRefused = errors.New("this task cannot be reassigned")
+
 // NotAssigneeError is a refusal to complete a task assigned to someone else: a permission refusal (the routes answer 403), not a malformed request.
 type NotAssigneeError struct{ Msg string }
 
@@ -900,10 +903,30 @@ func (s *Store) ReassignTask(ctx context.Context, project string, taskID int64, 
 	}
 	n, _ := result.RowsAffected()
 	if n == 0 {
-		return nil, fmt.Errorf("task #%d cannot be reassigned (finished, awaiting review, or not found)", taskID)
+		return nil, s.reassignRefusal(ctx, project, taskID)
 	}
 
 	return s.getTaskByID(ctx, project, taskID)
+}
+
+// reassignRefusal says why task taskID could not be reassigned, and what moves it instead (#12869): a task in review is moved by naming reviewers or completing it, never by reassigning it (that would drop its
+// candidate and its reviewers); a finished one is finished; one that is not there is not found.
+func (s *Store) reassignRefusal(ctx context.Context, project string, taskID int64) error {
+	t, err := s.getTaskByID(ctx, project, taskID)
+	if err != nil || t == nil {
+		return fmt.Errorf("task #%d is not on this board", taskID)
+	}
+	holder := ""
+	if t.AssignedTo != nil {
+		holder = *t.AssignedTo
+	}
+	switch t.Status {
+	case "review_pending":
+		return fmt.Errorf("%w: task #%d is in review (held by %s): reassigning would drop its candidate and its reviewers. The orchestrator moves it with: coral-board task review %d --to \"Name\" (name the reviewers), or completes it with: coral-board task complete %d", ErrTaskReassignRefused, taskID, holder, taskID, taskID)
+	case "completed", "skipped", "cancelled", "canceled":
+		return fmt.Errorf("%w: task #%d is %s", ErrTaskReassignRefused, taskID, t.Status)
+	}
+	return fmt.Errorf("%w: task #%d is %s with a candidate under review: its reviewers decide it (coral-board task review %d --to \"Name\" changes them)", ErrTaskReassignRefused, taskID, t.Status, taskID)
 }
 
 // TaskUpdate holds optional fields for updating a task.

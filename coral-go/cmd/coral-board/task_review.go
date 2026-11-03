@@ -205,8 +205,9 @@ func cmdTaskReviewFlow(st *boardState, args []string, action string) {
 		return
 	}
 	var out struct {
-		Completed bool `json:"completed"`
-		Rejected  bool `json:"rejected"`
+		Completed bool   `json:"completed"`
+		Rejected  bool   `json:"rejected"`
+		Note      string `json:"note"`
 		Reviews   []struct {
 			ID         int64   `json:"id"`
 			AssignedTo *string `json:"assigned_to"`
@@ -215,6 +216,9 @@ func cmdTaskReviewFlow(st *boardState, args []string, action string) {
 	_ = json.Unmarshal(data, &out)
 	switch {
 	case action == "review":
+		if out.Note != "" {
+			fmt.Println(out.Note)
+		}
 		for _, r := range out.Reviews {
 			if r.AssignedTo != nil {
 				fmt.Printf("Review task #%d for %s\n", r.ID, *r.AssignedTo)
