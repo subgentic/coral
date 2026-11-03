@@ -4,7 +4,7 @@
 import './model_labels.js';
 import { importOnce, loadedModule } from './import_once.js';
 import { state } from './state.js';
-import { LAUNCH_CARDS } from './launch_cards.js';
+import { LAUNCH_CARDS, goalDesc, refreshGoalCardSoon } from './launch_cards.js';
 import './settings_lists.js';
 import './hub_access.js';
 import { sessionServer, noteBoardLabels, sessionTeamKey } from './server_base.js';
@@ -335,7 +335,7 @@ function _renderLiveSessions(sessions) {
 
     if (!sessions.length && !archived.length && !pinsShown) {
         // Coral Hub with no machine connected: say what to do (the same list is the phone's Agents page), not just that there is nothing
-        list.innerHTML = (!unfilteredCount && hubEmptyListHtml(machineState())) || `<li class="empty-state empty-state-tight empty-plain">${emptyListHtml(unfilteredCount)}</li>${unfilteredCount ? '' : PHONE_WELCOME}`;
+        list.innerHTML = (!unfilteredCount && hubEmptyListHtml(machineState())) || `<li class="empty-state empty-state-tight empty-plain">${emptyListHtml(unfilteredCount)}</li>${unfilteredCount ? '' : phoneWelcome()}`; if (!unfilteredCount) refreshGoalCardSoon();
         fillHubPending(list); // a waiting computer's name, as text (#11463)
         syncGroupToggle(); // no groups drawn: the header toggle goes
         return;
@@ -384,10 +384,10 @@ function _renderLiveSessions(sessions) {
 const PHONE_CARD_ACTION = {
     agent: 'data-on-click="m-show-launch-modal-then-select-launch-type" data-arg="agent"',
     team: 'data-on-click="m-show-launch-modal-then-select-launch-type" data-arg="team"',
-    folder: 'data-on-click="m-show-open-folder-modal"',
+    goal: 'data-on-click="m-new-goal-from-home"',
 };
-const phoneCard = c => `<button type="button" class="empty-launch" ${PHONE_CARD_ACTION[c.key]}><span class="empty-launch-icon material-icons" aria-hidden="true">${c.icon}</span><span class="empty-launch-copy"><strong>${c.label}</strong><span>${c.desc}</span></span><span class="material-icons empty-launch-arrow" aria-hidden="true">arrow_forward</span></button>`;
-const PHONE_WELCOME = `<li class="empty-state empty-welcome"><h2>What do you want to work on?</h2><p>Start one agent in a folder, or a team that works together.</p>
+const phoneCard = c => `<button type="button" class="empty-launch" ${PHONE_CARD_ACTION[c.key]}><span class="empty-launch-icon material-icons" aria-hidden="true">${c.icon}</span><span class="empty-launch-copy"><strong>${c.label}</strong><span${c.key === 'goal' ? ' data-goal-desc' : ''}>${c.key === 'goal' ? goalDesc() : c.desc}</span></span><span class="material-icons empty-launch-arrow" aria-hidden="true">arrow_forward</span></button>`;
+const phoneWelcome = () => `<li class="empty-state empty-welcome"><h2>What do you want to work on?</h2><p>Start one agent in a folder, or a team that works together.</p>
 <div class="empty-launch-list">
 ${LAUNCH_CARDS.map(phoneCard).join('\n')}
 </div></li>`;
