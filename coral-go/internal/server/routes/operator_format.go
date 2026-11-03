@@ -27,16 +27,38 @@ func startsWithOperator(content string) bool {
 	return operatorStartRE.MatchString(strings.TrimSpace(content))
 }
 
-// operatorFormatProblem is why text to the Operator is badly formatted, or "" when it is fine. The caller decides that the text is to the Operator.
-func operatorFormatProblem(content string) string {
-	fenced := false
-	for _, raw := range strings.Split(strings.TrimSpace(content), "\n") {
-		line := strings.TrimSpace(raw)
-		if strings.HasPrefix(line, "```") {
-			fenced = !fenced
+// fenceMarks says, per line, whether it is a fence line of a CLOSED fence (marker) or inside one (inside). A fence that never closes is not a fence: its ``` line is ordinary text and it exempts
+// nothing after it, so one stray ``` cannot turn the check off for the rest of a message (#12579).
+func fenceMarks(lines []string) (marker, inside []bool) {
+	marker, inside = make([]bool, len(lines)), make([]bool, len(lines))
+	for i := 0; i < len(lines); i++ {
+		if !strings.HasPrefix(strings.TrimSpace(lines[i]), "```") {
 			continue
 		}
-		if n := utf8.RuneCountInString(line); n > maxOperatorLine && !fenced && !bareLinkRE.MatchString(line) && !onlyCodeSpan(line) {
+		for j := i + 1; j < len(lines); j++ {
+			if strings.HasPrefix(strings.TrimSpace(lines[j]), "```") {
+				marker[i], marker[j] = true, true
+				for k := i + 1; k < j; k++ {
+					inside[k] = true
+				}
+				i = j
+				break
+			}
+		}
+	}
+	return marker, inside
+}
+
+// operatorFormatProblem is why text to the Operator is badly formatted, or "" when it is fine. The caller decides that the text is to the Operator.
+func operatorFormatProblem(content string) string {
+	lines := strings.Split(strings.TrimSpace(content), "\n")
+	marker, inside := fenceMarks(lines)
+	for i, raw := range lines {
+		line := strings.TrimSpace(raw)
+		if marker[i] {
+			continue
+		}
+		if n := utf8.RuneCountInString(line); n > maxOperatorLine && !inside[i] && !bareLinkRE.MatchString(line) && !onlyCodeSpan(line) {
 			return fmt.Sprintf("a line is %d characters", n)
 		}
 		prev := -1
