@@ -320,6 +320,8 @@ a POST /api/board/{project}/goal-requests/{requestID}/accept
 a POST /api/board/{project}/goal-requests/{requestID}/decline
 a POST /api/board/{project}/goals
 a POST /api/board/{project}/goals/{goalID}/close
+b POST /api/board/{project}/goals/{goalID}/driver
+b POST /api/board/{project}/goals/{goalID}/move
 b POST /api/board/{project}/groups/{groupID}/members
 a POST /api/board/{project}/health/ack
 c POST /api/board/{project}/hub-notice

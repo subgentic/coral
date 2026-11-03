@@ -178,6 +178,8 @@ POST /api/board/{project}/goal-requests/{requestID}/accept | board-claims
 POST /api/board/{project}/goal-requests/{requestID}/decline | board-claims
 POST /api/board/{project}/goals | board-claims
 POST /api/board/{project}/goals/{goalID}/close | board-claims
+POST /api/board/{project}/goals/{goalID}/driver | board-claims | operator-only
+POST /api/board/{project}/goals/{goalID}/move | board-claims | operator-only
 POST /api/board/{project}/groups/{groupID}/members | board-claims | operator-only
 POST /api/board/{project}/health/ack | board-claims +token-session
 POST /api/board/{project}/hub-notice | board-claims
