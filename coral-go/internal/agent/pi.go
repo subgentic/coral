@@ -308,3 +308,21 @@ func guardSlashPrompt(prompt string) string {
 	}
 	return prompt
 }
+
+// PiHasSession says whether the Pi session folder Coral keeps for a Coral session (<data dir>/pi-sessions/<id>, where Pi runs with --session-dir) holds a saved session: a regular .jsonl file in it, never a link. With none there is
+// nothing for --continue to continue (#12778).
+func PiHasSession(coralDir, sessionID string) bool {
+	if coralDir == "" || !IsResumeID(at.Pi, sessionID) {
+		return false
+	}
+	ents, err := os.ReadDir(filepath.Join(coralDir, "pi-sessions", sessionID))
+	if err != nil {
+		return false
+	}
+	for _, e := range ents {
+		if e.Type().IsRegular() && strings.HasSuffix(e.Name(), ".jsonl") {
+			return true
+		}
+	}
+	return false
+}
