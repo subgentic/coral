@@ -20,25 +20,15 @@ var releaseDigests = map[string]ReleaseDigests{
 		AMD64: "77a3abd92470cddd33fd3c66bfe15729f1695d75a340373bd620dfc7290a29da",
 		ARM64: "d09d630ce2608d45368935185f3fb0e57f6cdaf1397eebb66600480c3629d93c",
 	},
-	// 2.0.34: the two Linux lines of the v2.0.34 release's SHA256SUMS.txt, read over HTTPS from the release on 2026-11-03. NOT yet checked against the release's Sigstore bundle (no cosign where this was read): check before relying on them.
+	// 2.0.34: the two Linux lines of the v2.0.34 release's SHA256SUMS.txt, read over HTTPS from the release on 2026-11-03; to be compared with coral-hub DevOps's cosign-verified SHA256SUMS of that tag before this line is relied on (Security, #9934). 2.0.36 and 2.0.37 are NOT in the table until DevOps has verified them: a launch of those says the person passes the digests.
 	"2.0.34": {
 		AMD64: "0d0e25de9f0383bc763ba28565d3652b7d2e7116f8dd46983e281ebdb0557d05",
 		ARM64: "5e738efbc72236ee5b5841822c0234e06e9d5c58f0115caffc44f816769c7895",
 	},
-	// 2.0.35: the two Linux lines of the v2.0.35 release's SHA256SUMS.txt, read over HTTPS from the release on 2026-11-03. NOT yet checked against the release's Sigstore bundle (no cosign where this was read): check before relying on them.
+	// 2.0.35: the two Linux lines of the v2.0.35 release's SHA256SUMS.txt, read over HTTPS from the release on 2026-11-03; to be compared with coral-hub DevOps's cosign-verified SHA256SUMS of that tag before this line is relied on (Security, #9934). 2.0.36 and 2.0.37 are NOT in the table until DevOps has verified them: a launch of those says the person passes the digests.
 	"2.0.35": {
 		AMD64: "79303830561141d39b597d2c322ed0f4d44a721c5e2d3f975012865a2d00ff34",
 		ARM64: "d68073585c7076b52da1f7c1a112df137b9f3b4827ed39ec42e648fe136d3912",
-	},
-	// 2.0.36: the two Linux lines of the v2.0.36 release's SHA256SUMS.txt, read over HTTPS from the release on 2026-11-03. NOT yet checked against the release's Sigstore bundle (no cosign where this was read): check before relying on them.
-	"2.0.36": {
-		AMD64: "3463ac5767445135cdaa3c5b980934e824e84216cf7190162d6bc7dbe48c6650",
-		ARM64: "1b095d26356564d376097cb566dfcc19a07d7c01d9bb75a6598cd399a4c4d60e",
-	},
-	// 2.0.37: the two Linux lines of the v2.0.37 release's SHA256SUMS.txt, read over HTTPS from the release on 2026-11-03. NOT yet checked against the release's Sigstore bundle (no cosign where this was read): check before relying on them.
-	"2.0.37": {
-		AMD64: "f925394e955b36ac93009fdd6d95af52d5797915b4b764c1c05cd2d27cbbf1e0",
-		ARM64: "8d7ed75267925f4606e2e9ca7e3e96c2299985b367aac2eafe0daffc5181e5ec",
 	},
 }
 
