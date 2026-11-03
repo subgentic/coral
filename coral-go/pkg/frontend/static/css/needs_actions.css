@@ -6,5 +6,7 @@
     .inbox-slots > [data-slot="ignore"] { grid-column: 2 / span 2; } .inbox-slots > [data-slot="dots"] { grid-column: 4; justify-self: center; }
 }
 /* A row kind may need more words than the shared Actions width (Close goal, Not yet, Dismiss).
-   Let flex actions wrap inside their cell; the four-slot grids keep their own layout. */
-.inbox-needs-results .inbox-review-actions { flex-wrap: wrap; min-width: 0; max-width: 100%; }
+   Let desktop flex actions wrap inside their cell; preserve the hidden phone actions. */
+@media (min-width: 768px) {
+    .inbox-needs-results .inbox-review-actions { flex-wrap: wrap; min-width: 0; max-width: 100%; }
+}
