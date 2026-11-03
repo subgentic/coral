@@ -21,6 +21,8 @@ const { coralReady } = require('./helpers/wait');
         l = Page.loadEventFired(); await Page.navigate({ url: `${BASE}/board/${B}` }); await l;
         await coralReady(ev);
         await waitFor(`!!document.getElementById('mb-delete-btn')`, 'the team page', 15000);
+        // The board's first page of messages must be on screen before the delete: while it is still loading, showing the tab again reloads the messages (message_board.js: `again` is false until bs._loadedProject is set) and that reply can replace the words below (CI flake, ci/2.0.41 part 1, #12995).
+        await waitFor(`(document.getElementById('mb-messages') || {}).textContent.includes('a board to delete')`, 'the board\'s first messages', 15000);
 
         console.log('1. The board is deleted elsewhere (the API) while the page stays open');
         assert.equal(await call('', { method: 'DELETE' }), 200);
@@ -34,7 +36,7 @@ const { coralReady } = require('./helpers/wait');
             window.clearInterval = id => { window.__cleared.add(id); return C(id); }; }
             window.__after = []; { const R = window.fetch; window.fetch = (u, o) => { if (String(u).includes(${JSON.stringify(api)})) window.__after.push((o && o.method || 'GET') + ' ' + String(u)); return R(u, o); }; }
             import((window.__coralStatic || '/static/') + 'message_board.js').then(m => m.showBoardInPage(${JSON.stringify(B)}, document.getElementById('mb-board').parentElement)).then(() => true)`);
-        await waitFor(`(document.getElementById('mb-messages') || {}).textContent === 'This team was deleted.'`, 'the deleted-team words', 8000);
+        await waitFor(`(document.getElementById('mb-messages') || {}).textContent === 'This team was deleted.'`, 'the deleted-team words', 8000).catch(async e => { throw new Error(`${e.message}; the messages box held: ${JSON.stringify(String(await ev(`(document.getElementById('mb-messages') || {}).textContent`)).slice(0, 200))}`); });
         const seen = await ev(`window.__after.length`);
         await new Promise(r => setTimeout(r, 1500)); // sleep-ok: node-side wait to see that nothing more goes out
         assert.equal(await ev(`window.__after.filter(x => x.startsWith('POST') || x.startsWith('PUT')).length`), 1, 'one subscribe was sent and refused; no write after it');
