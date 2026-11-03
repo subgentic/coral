@@ -266,6 +266,7 @@ var writeRoutesWithoutTheGuard = map[string]string{
 	"POST /api/sessions/live/{name}/share-file":                            "a file's contents (code may quote the parameter): files are warned of on the client, not refused (#232)",
 	"POST /api/sessions/live/{name}/tasks/reorder":                         "ids only",
 	"POST /api/sessions/live/{name}/token-usage":                           "an agent's own hook reporting what its tools did: refusing it would lose the record; it is not posted for others",
+	"POST /api/sessions/live/{name}/waiting/dismiss":                       "a control: it marks the listed board messages read for the agent, no text is kept (#12713)",
 	"POST /api/sessions/live/{name}/waiting/send":                          "input typed into an agent's terminal: it goes to the agent, not kept for others to read",
 	"POST /api/sessions/live/{sessionID}/archive":                          "a control: no text is kept",
 	"POST /api/sessions/live/{sessionID}/refresh-hooks":                    "a control: no text is kept",
