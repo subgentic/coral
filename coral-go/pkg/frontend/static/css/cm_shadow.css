@@ -7,14 +7,14 @@
 
 .cm-merge-b .cm-changedLine,
 .cm-inlineChangedLine {
-    background-color: rgba(var(--fx-green-rgb), var(--diff-view-alpha, 0.24)) !important;
+    background-color: var(--diff-line-add) !important;
 }
 
 .cm-deletedChunk {
-    background-color: rgba(var(--fx-red-rgb), var(--diff-view-alpha, 0.24)) !important;
+    background-color: var(--diff-line-del) !important;
 }
 
-.cm-changedText,
+.cm-merge-b .cm-changedText { background-color: var(--diff-word-add) !important; background-image: none !important; text-decoration: none !important; border-radius: 2px; } /* the words that changed carry GitHub's stronger highlight (#12523) */
 .cm-insertedLine {
     background-color: transparent !important;
     background-image: none !important;
@@ -23,7 +23,7 @@
 }
 
 .cm-deletedChunk .cm-deletedText,
-.cm-merge-b .cm-deletedText,
+.cm-merge-b .cm-deletedText { background-color: var(--diff-word-del) !important; background-image: none !important; text-decoration: none !important; border-radius: 2px; }
 .cm-deletedLine,
 .cm-deletedLine del {
     background-color: transparent !important;

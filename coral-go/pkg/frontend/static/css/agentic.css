@@ -1382,14 +1382,14 @@ body.panel-dragging .agentic-state {
    Used by the preview pane's Diff mode. */
 .inline-preview-cm .cm-merge-b .cm-changedLine,
 .inline-preview-cm .cm-inlineChangedLine {
-    background-color: rgba(var(--fx-green-rgb), var(--diff-view-alpha, 0.24)) !important;
+    background-color: var(--diff-line-add) !important;
 }
 
 .inline-preview-cm .cm-deletedChunk {
-    background-color: rgba(var(--fx-red-rgb), var(--diff-view-alpha, 0.24)) !important;
+    background-color: var(--diff-line-del) !important;
 }
 
-.inline-preview-cm .cm-changedText,
+.inline-preview-cm .cm-merge-b .cm-changedText { background-color: var(--diff-word-add) !important; background-image: none !important; text-decoration: none !important; border-radius: 2px; } /* the words that changed carry GitHub's stronger highlight (#12523) */
 .inline-preview-cm .cm-insertedLine {
     background-color: transparent !important;
     background-image: none !important;
@@ -1398,7 +1398,7 @@ body.panel-dragging .agentic-state {
 }
 
 .inline-preview-cm .cm-deletedChunk .cm-deletedText,
-.inline-preview-cm .cm-merge-b .cm-deletedText,
+.inline-preview-cm .cm-merge-b .cm-deletedText { background-color: var(--diff-word-del) !important; background-image: none !important; text-decoration: none !important; border-radius: 2px; }
 .inline-preview-cm .cm-deletedLine,
 .inline-preview-cm .cm-deletedLine del{
     background-color: transparent !important;

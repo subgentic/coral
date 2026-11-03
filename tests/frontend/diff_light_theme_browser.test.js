@@ -74,7 +74,7 @@ const FILES = `(() => {
         await open('dark');
         const dark = await measure();
         assert.ok(dark.editorLum < 0.1, 'the editor is dark in the dark theme: ' + JSON.stringify(dark));
-        assert.ok(dark.addAlpha >= 0.2 && dark.delAlpha >= 0.2, 'the dark blocks keep their strength: ' + JSON.stringify(dark));
+        assert.ok(dark.addAlpha >= 0.15 && dark.delAlpha >= 0.15, 'the dark blocks are GitHub\'s strength or more (a .15 band, with the stronger highlight on the changed words, #12523): ' + JSON.stringify(dark));
         assert.ok(dark.addContrast >= 4 && dark.delContrast >= 4 && dark.addVsDel, 'and are as readable as they were (unchanged): ' + JSON.stringify(dark));
         console.log('PASS diff viewer follows the theme');
     } finally { await client.close(); }
