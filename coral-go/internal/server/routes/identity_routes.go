@@ -309,6 +309,8 @@ var operatorOnlyRoutes = map[string]string{
 	// history through /api/agent/history; none of these is called by an agent tool.
 	"POST /api/skills":                                   "publish a skill as the Operator",
 	"GET /api/skills":                                    "list the skills (every status)",
+	"GET /api/skills/search":                             "search the approved skills for the message menu",
+	"POST /api/sessions/live/{name}/skills":              "attach an approved skill to a running agent",
 	"GET /api/skills/{id}":                               "read a skill in full (the approval view)",
 	"POST /api/skills/{id}/approve":                      "approve a skill",
 	"POST /api/skills/{id}/reject":                       "reject a skill",
