@@ -296,7 +296,7 @@ for (const [phase, word] of [['done', /Done/], ['failed', /did not|could not|Cou
     assert.equal(cleanDataDir('  ~/.coral/ '), '.coral', 'a typed ~/ and a trailing slash are dropped');
     assert.equal(cleanDataDir('/x/y'), 'x/y');
     for (const ok of ['', '.coral', 'my-coral/data', '.coral-server/data']) assert.equal(dataDirOk(ok), true, ok);
-    for (const bad of ['..', '../x', 'a/../b', 'a..b', 'my..coral/data', 'x/y..', 'a.', 'a b', 'a;b', '-x', '$HOME', 'a//b', 'a/b/c/d/e/f', '.ssh', '.ssh/x', '.gnupg', '.config/coral']) assert.equal(dataDirOk(bad), false, bad);
+    for (const bad of ['..', '../x', 'a/../b', 'a..b', 'my..coral/data', 'x/y..', 'a.', 'a b', 'a;b', '-x', '$HOME', 'a//b', 'a/b/c/d/e/f', '.ssh', '.ssh/x', '.gnupg', '.config/data']) assert.equal(dataDirOk(bad), false, bad);
     assert.match(dataDirProblem('.ssh'), /keys or settings/, 'a folder of keys says why');
     assert.match(dataDirProblem('../x'), /plain folder names/, 'a bad name says why');
     assert.equal(dataDirOk('.ssh-old') && dataDirOk('myconfig/.config'), true, 'only a first name of .ssh, .gnupg or .config is refused');
