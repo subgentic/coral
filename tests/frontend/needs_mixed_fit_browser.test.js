@@ -19,6 +19,7 @@ const STUB = `(() => {
     const R = window.fetch; window.__posts = []; window.__list = ${JSON.stringify(PROPOSALS)}; window.__refuse = null; window.__pwned = 0;
     const json = (b, s = 200) => Promise.resolve(new Response(JSON.stringify(b), { status: s, headers: { 'content-type': 'application/json' } }));
     window.fetch = (u, o = {}) => { const url = new URL(String(u), location.origin), m = (o.method || 'GET').toUpperCase();
+        if (url.pathname === '/api/goals' && m === 'GET') return json({ goals: [{ id: 88, board_id: 'team-a', title: 'Ship the completed release', done_when: 'All checks pass', state: 'active', rollup: { done: 2 }, updated_at: new Date().toISOString() }] });
         if (url.pathname === '/api/proposals' && m === 'GET') return json({ proposals: window.__list.filter(p => ['pending', 'approving', 'expired'].includes(p.state)) });
         const d = url.pathname.match(/^\\/api\\/board\\/([^/]+)\\/proposals\\/(\\d+)\\/(approve|reject)$/);
         if (d && m === 'POST') { const id = Number(d[2]); window.__posts.push({ board: d[1], id, action: d[3], body: JSON.parse(o.body || '{}') });
@@ -52,11 +53,17 @@ const STUB = `(() => {
         const sessions = [1, 2].map(i => ({ name: 'n' + i, session_id: '0000000' + i + '-0000-4000-8000-00000000000' + i, agent_type: 'claude', server: 'local', status: 'idle', display_name: 'Agent ' + i, working_directory: '/repo/n' + i, waiting_for_input: true, waiting_kind: 'permission', waiting_summary: 'Wants to run: go test ./...', waiting_since: new Date(Date.now() - 60000).toISOString() }));
         await ev(`(async () => { const { state } = await import(${S} + 'state.js'); const m = await import(${S} + 'inbox_tab.js'); state.liveSessions = ${JSON.stringify(sessions)}; m.updateInboxTab(); return true; })()`);
         await ev(framesJs(30)); check(await ev(`document.querySelectorAll('${T} tbody tr').length`) >= 6, 'seven rows: ' + await ev(`[...document.querySelectorAll('${T} tbody tr')].map(r => r.textContent.slice(0, 20))`));
-        for (const width of [1280, 1024]) {
+        for (const width of [1800, 1280, 1024]) {
             await Emulation.setDeviceMetricsOverride({ width, height: 800, deviceScaleFactor: 1, mobile: false });  await ev(framesJs(12));
             const r = await ev(`(() => { const box = document.querySelector('${T} .dt-box') || document.querySelector('${T}'), table = box.querySelector('table'), b = box.getBoundingClientRect(), w = e => Math.round(e.getBoundingClientRect().width), vis = e => e && e.getClientRects().length > 0;
                 const act = table.querySelector('thead th[data-key=review]'), wait = table.querySelector('thead th[data-key=waiting]'), item = table.querySelector('thead th[data-key=agent]');
                 return { width: ${width}, box: Math.round(b.width), table: w(table), scrolls: box.scrollWidth > box.clientWidth + 1, item: w(item), actionsIn: vis(act) && act.getBoundingClientRect().right <= b.right + 1, waitingIn: !vis(wait) || wait.getBoundingClientRect().right <= b.right + 1, shown: [...table.querySelectorAll('thead th')].filter(vis).map(t => t.dataset.key) }; })()`);
+            const actions = await ev(`(() => { return [...document.querySelectorAll('${T} tbody tr')].map(row => { const cell = row.querySelector('td[data-key=review]'), box = cell.getBoundingClientRect(); return { text: row.textContent.slice(0, 100), buttons: [...cell.querySelectorAll('button')].filter(b => { const r = b.getBoundingClientRect(); return r.width > 1 && r.height > 1 && !b.closest('[hidden]'); }).map(b => { const r = b.getBoundingClientRect(); return { text: b.textContent, inside: r.left >= box.left - 1 && r.right <= box.right + 1 && r.top >= box.top - 1 && r.bottom <= box.bottom + 1 }; }) }; }); })()`);
+            check(actions.some(a => a.text.includes('looks done')), 'mixed table includes the completed goal');
+            check(actions.some(a => a.text.includes('Agent 1')) && actions.some(a => a.text.includes('Ship the beta')), 'mixed table includes agents and proposals');
+            check(actions.every(a => a.buttons.every(b => b.inside)), 'every visible action button is inside its cell at ' + width + ': ' + JSON.stringify(actions));
+            await ev(`document.querySelector('${T} .inbox-goaldone-actions button').focus(); true`);
+            await ev(framesJs(2));
             await shot('mixed-' + width);
             check(!r.scrolls && r.table <= r.box + 2, 'agents, proposals and a question in one table fit the panel at ' + width + ' px, no sideways scroll: ' + JSON.stringify(r));
             check(r.actionsIn && r.waitingIn, 'Actions (and Waiting when it is shown) stay inside the panel, at ' + width + ' px: ' + JSON.stringify(r));
