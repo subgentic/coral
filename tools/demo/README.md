@@ -16,7 +16,7 @@ tools/demo/
     asagent.sh          run a CLI as one of the mock agents (the names in story.json)
     login.mjs           one-time-link sign-in, saves work/state.json
     lib.mjs             Playwright helpers: one recorded context per beat, caption band, visible cursor
-    take.mjs            the beats: b1 to b7, plus seed (fills the Inbox), drain and perm (not recorded)
+    take.mjs            the beats: b1 to b7, plus seed (fills the Inbox), prompts (themed permission prompts and a question), perm and drain (not recorded)
     setup.mjs           makes the throwaway project and launches the team from story.json
     hubclip.mjs         the closing public-page clip (loads and scrolls a page, signed out, types nothing)
     shot.mjs            a headless screenshot of one dashboard page (for looking, not for the film)
@@ -50,7 +50,7 @@ tools/demo/
 5. **Record the takes**, in order, from `tools/demo/scripts`:
    ```bash
    export PLAYWRIGHT_BROWSERS_PATH="$DEMO_ROOT/pw-browsers"
-   node take.mjs b1 b2 seed b3 b4 b5 drain perm b6 b7
+   node take.mjs b1 b2 seed b3 prompts b4 b5 perm b6 b7
    node hubclip.mjs          # the public page at the end (an outward request: loads coralhub.dev once) ...
    node endcard.mjs          # ... or a plain end card instead (then encode with ENDING=card); a live page can go stale
    ```
@@ -65,7 +65,7 @@ While a beat is recorded, `lib.mjs` scans the page twice a second (visible text,
 ## Iterating
 
 - **Change a caption**: edit the `t.cap("...")` line in the beat in `take.mjs`, then re-record that beat.
-- **Re-record one beat**: beats 1 and 2 need a rig without a team (`NOLAUNCH=1 rig-up.sh`); beats 3 to 7 need the team (run beat 2 first, or `rig-up.sh` without `NOLAUNCH`). Beat 4 uploads documents with fixed names, so start a fresh rig for it; `perm` needs `drain` before it, so the phone shows exactly one prompt.
+- **Re-record one beat**: beats 1 and 2 need a rig without a team (`NOLAUNCH=1 rig-up.sh`); beats 3 to 7 need the team (run beat 2 first, or `rig-up.sh` without `NOLAUNCH`). Beat 4 uploads documents with fixed names, so start a fresh rig for it; `perm` should run once per rig (a second one stacks a second prompt; `drain` answers stale ones).
 - **Change the timing**: the `SP_*` speed-ups at the top of `encode.sh`. The GIF's start (33 s) and length (23.6 s) follow them.
 - **Change the story**: edit `storyboard/plan.json` and `storyboard.html` (hand-written, no tooling needed), then the beats.
 - **Change the example**: edit `story.json` (team, agent names, goal, tasks, Inbox documents, chatter, the live comment) and the files in `seed/` it names; nothing else has to change.

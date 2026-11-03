@@ -1,6 +1,6 @@
 import fs from "node:fs"
 import path from "node:path"
-import { OPEN, chromium, beat, launchTeam, sleep, agent, BASE, S, SEED, PORT, REPO, story } from "./lib.mjs"
+import { OPEN, chromium, beat, launchTeam, sleep, agent, askPermission, askQuestion, BASE, S, SEED, PORT, REPO, story } from "./lib.mjs"
 process.env.CORAL_TELEMETRY_DISABLED = "1" // the demo Coral and everything the takes start send no usage events
 const which = process.argv.slice(2)
 const browser = await chromium.launch({ headless: true })
@@ -38,6 +38,10 @@ const B = {
     const hide = page.locator("text=Hide all welcome items >> visible=true").first(); if (await hide.count()) { await hide.click(); await sleep(1500) }
     await ctx.close(); return "seeded " + inbox.length
   },
+  async prompts() { // not recorded: themed permission prompts and a question from other agents (fired just before the Inbox is shown: an agent's next turn clears its own)
+    for (const p of story.prompts || []) { if (p.kind === "permission") askPermission(p.agent, p.command, p.description); else askQuestion(p.agent, p.header, p.question, p.options); await sleep(1200) }
+    return "prompts " + (story.prompts || []).length
+  },
   async b3() { // create a goal for the team
     const t = await beat(browser, "b3")
     await t.go("/inbox/goals"); await t.cap("Give the team a goal, in plain words.")
@@ -73,7 +77,7 @@ const B = {
     agent(live.agent, "coral-agent", "artifact", "reply", up.uri, id, live.reply)
     await sleep(2000)
     fs.writeFileSync(S + "/work/live.md", fs.readFileSync(S + "/work/live.md", "utf8").replace(live.from, live.to))
-    agent(live.agent, "coral-agent", "artifact", "upload", S + "/work/live.md", "--new-version-of", up.uri, "--tag", "for review", "--question", live.question2)
+    agent(live.agent, "coral-agent", "artifact", "upload", S + "/work/live.md", "--name", live.name, "--new-version-of", up.uri, "--tag", "for review", "--question", live.question2)
     const seen = await t.page.locator(`text=${live.replyFind}`).first().waitFor({ state: "visible", timeout: 7000 }).then(() => true).catch(() => false)
     if (!seen) { // the open dialog does not live-update: close it and open the item again
       await t.click(t.page.getByRole("button", { name: "Close" }).last()); await sleep(1200)
@@ -117,10 +121,11 @@ const B = {
     for (const [label, wait] of [["Agents", 2200], ["Inbox", 1500]]) { await t.click(t.page.locator("text=" + label + " >> visible=true").last()); await sleep(wait) }
     await t.cap("Approve a prompt without leaving the couch.")
     await sleep(1200)
-    await t.click(t.page.locator("button:text-is('Yes') >> visible=true").first()); await sleep(3000)
+    // the Yes of the mock's own prompt (the one that can really be answered), not of the themed prompts the seed step fired
+    await t.click(t.page.getByText("rm -rf build").first().locator("xpath=ancestor::*[.//button[normalize-space()='Yes']][1]//button[normalize-space()='Yes']")); await sleep(3000)
     await t.cap("See what it all cost.")
     await t.click(t.page.locator("text=Analytics >> visible=true").last()); await sleep(3000)
-    for (let i = 0; i < 2; i++) { await t.page.mouse.wheel(0, 300); await sleep(900) }   // the cost cards only: the cost-by-team chart below them names a team by its board id (a product bug, #13044) until that is fixed
+    for (let i = 0; i < 1; i++) { await t.page.mouse.wheel(0, 300); await sleep(1500) }   // the cost cards only: the cost-by-team chart below them names a team by its board id (a product bug, #13044) until that is fixed
     return t.finish()
   },
   async b7() { // zoom back out to the desktop Inbox

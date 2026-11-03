@@ -17,6 +17,9 @@ for n in b1 b2 b3 b4 b5 b6 b7 $LAST; do ARGS+=(-i "$(g $n)"); m=0; [ $n = b6 ] &
 FC+="[v0][v1][v2][v3][v4][v5][v6][v7]concat=n=8:v=1:a=0[out]"
 "$FF" -y -loglevel error "${ARGS[@]}" -filter_complex "$FC" -map "[out]" -c:v libx264 -preset slow -crf 18 -pix_fmt yuv420p -movflags +faststart -an "$O/coral-demo-16x9.mp4"
 "$FF" -y -loglevel error -i "$(g b6)" -vf "fps=30,scale=-2:1920:flags=lanczos,pad=1080:1920:(ow-iw)/2:0:0x0e1116,setsar=1" -c:v libx264 -preset slow -crf 18 -pix_fmt yuv420p -movflags +faststart -an "$O/coral-demo-9x16-phone.mp4"
-# the GIF: the Inbox review (beat 4) of the master; the start and length follow the speed-ups above (33 s in, 23.6 s long)
-"$FF" -y -loglevel error -ss 33 -t 23.6 -i "$O/coral-demo-16x9.mp4" -vf "fps=12,scale=800:-1:flags=lanczos,split[a][b];[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=4" -loop 0 "$O/coral-demo-inbox.gif"
+# the GIF: the Inbox review (beat 4) of the master. Its start is where beat 4 begins in the master (the sped-up lengths of beats 1 to 3), its length beat 4's own.
+dur() { "$FF" -hide_banner -i "$(g $1)" 2>&1 | python3 -I -c "import re,sys;m=re.search(r'Duration: (\d+):(\d+):([\d.]+)',sys.stdin.read());print(int(m[1])*3600+int(m[2])*60+float(m[3]))"; }
+START=$(python3 -I -c "print(sum(float(d)/s for d,s in [('$(dur b1)',$SP_b1),('$(dur b2)',$SP_b2),('$(dur b3)',$SP_b3)]))")
+LEN=$(python3 -I -c "print(float('$(dur b4)')/$SP_b4)")
+"$FF" -y -loglevel error -ss "$START" -t "$LEN" -i "$O/coral-demo-16x9.mp4" -vf "fps=12,scale=800:-1:flags=lanczos,split[a][b];[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=4" -loop 0 "$O/coral-demo-inbox.gif"
 echo "wrote $O: $(ls -la "$O" | awk 'NR>3{print $9" "$5}' | tr '\n' ' ')"
