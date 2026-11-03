@@ -30,8 +30,8 @@ const fs = require('node:fs');
             check(await ev(`document.querySelector('dialog.inbox-ask-dialog .ac-images-hint').getClientRects().length > 0`), width + ' sharing hint appears after image');
             await ev(`document.querySelector('dialog.inbox-ask-dialog .ac-thumb-remove').click(); document.querySelector('dialog.inbox-ask-dialog textarea').value = ''; document.querySelector('dialog.inbox-ask-dialog textarea').dispatchEvent(new Event('input')); document.querySelector('dialog.inbox-ask-dialog').scrollTop = 0; true`);
             if (process.env.CORAL_SCREENSHOT_DIR) { fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR, { recursive: true }); fs.writeFileSync(process.env.CORAL_SCREENSHOT_DIR + '/ask-cleanup-' + width + '.png', Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }
-            const long = await ev(`(() => { const d = document.querySelector('dialog.inbox-ask-dialog'), t = d.querySelector('.inbox-ask-text'); for (let i = 0; i < 50; i++) { const p = document.createElement('p'); p.textContent = 'Another detail of the question, kept visible in the dialog.'; t.append(p); } return { nested: t.scrollHeight > t.clientHeight + 1, scrolls: d.scrollHeight > d.clientHeight + 1 }; })()`);
-            check(!long.nested && long.scrolls, width + ' long question scrolls the dialog, not an inner box');
+            const long = await ev(`(() => { const d = document.querySelector('dialog.inbox-ask-dialog'), t = d.querySelector('.inbox-ask-text'); for (let i = 0; i < 50; i++) { const p = document.createElement('p'); p.textContent = 'Another detail of the question, kept visible in the dialog.'; t.append(p); } return { nested: t.scrollHeight > t.clientHeight + 1, scrolls: (innerWidth >= 1000 ? d.querySelector('.inbox-ask-reading') : d).scrollHeight > (innerWidth >= 1000 ? d.querySelector('.inbox-ask-reading') : d).clientHeight + 1 }; })()`);
+            check(!long.nested && long.scrolls, width + ' long question scrolls the wide reader or narrow dialog, not the question body');
         }
     } finally { await client.close(); }
     if (failures.length) throw new Error(failures.join('\n'));

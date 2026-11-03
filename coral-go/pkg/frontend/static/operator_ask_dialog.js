@@ -10,7 +10,7 @@ const isReply = action => /^reply$/.test(action);
 
 export function openAskDialog(a, onDone, runners = {}) {
     const dlg = document.createElement('dialog');
-    dlg.className = 'modal-content dlg-form inbox-ask-dialog'; // the shared dialog rule sizes it (--dlg-max, dlg-form), not a width of its own
+    dlg.className = 'modal-content dlg-flow inbox-ask-dialog'; // shared flow size on wide screens; narrow CSS keeps the form size and phone sheet
     dlg.setAttribute('aria-labelledby', 'inbox-ask-title');
     const parts = askParts(a);
     const title = document.createElement('h2'); title.id = 'inbox-ask-title'; title.textContent = parts.title;
@@ -82,10 +82,15 @@ export function openAskDialog(a, onDone, runners = {}) {
             });
             choices.push(btn); item.append(btn, what); list.append(item);
         }
-        offered.append(head, list);
+        const hint = document.createElement('p'); hint.className = 'inbox-ask-offers-hint'; hint.textContent = offers.every(b => isReply(b.action)) ? 'Replies are sent as you.' : 'These actions run as you when you choose one.';
+        offered.append(head, list, hint);
     }
     const foot = document.createElement('div'); foot.className = 'inbox-ask-foot'; const addSlot = document.createElement('span'); foot.append(addSlot, row); // Add image on the left, Close and Send reply on the right: one row of buttons
-    dlg.append(title, sub, ...(links.hidden ? [] : [links]), ...(whole.hidden ? [] : [whole]), ...(offered ? [offered] : []), label, pics, err, foot);
+    const reading = document.createElement('div'); reading.className = 'inbox-ask-reading'; reading.tabIndex = -1;
+    if (!whole.hidden) reading.append(whole);
+    const compose = document.createElement('div'); compose.className = 'inbox-ask-compose';
+    compose.append(...(offered ? [offered] : []), label, pics, err);
+    dlg.append(title, sub, ...(links.hidden ? [] : [links]), reading, compose, foot);
     if (!fromAnotherComputer(a)) { // the picture is stored on the question's own team, as a goal's pictures are
         Promise.all([importOnce('./artifact_comment_images.js'), importOnce('./artifact_comments_api.js')]).then(([m, api]) => {
             if (!dlg.isConnected) return;
