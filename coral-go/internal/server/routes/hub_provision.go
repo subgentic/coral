@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -227,6 +228,15 @@ func hubEULAState() (required, accepted bool) { return config.EULARequired(), li
 
 // portInUseSentence is the answer when 8420 on the far computer is held by something that is not this user's Coral (usually another user's: every Coral set up from here listens on 8420).
 const portInUseSentence = "Port 8420 is already in use on that computer, perhaps by another user's Coral, so Coral was not started."
+
+// portInUseSentenceFor names what holds the port when the far computer could say (#12947: an old process was still on 8420). The hub never stops it: the person is given the command.
+func portInUseSentenceFor(err error) string {
+	var pe *sshprov.PortInUseError
+	if errors.As(err, &pe) && pe.Pid > 0 {
+		return fmt.Sprintf("Port 8420 is held by another process on that computer (pid %d, command %s), so Coral was not started. Nothing was stopped: the lines below show how to stop it yourself.", pe.Pid, pe.Command)
+	}
+	return portInUseSentence
+}
 
 // noEULAMarker is the one sentence for a tier that requires the terms when this hub has no acceptance of the current ones (it cannot happen to a person who is using Coral).
 const noEULAMarker = "This hub has not accepted Coral's terms yet, so it cannot record an acceptance on another computer. Open this hub's own window, accept the terms there, and try again."
@@ -782,7 +792,7 @@ func (pr *Provisioner) realStartRemote(ctx context.Context, p *provisionPlan) (s
 	}
 	if err := pr.runner.Start(ctx, p.Target, pr.version, p.backendOrDefault()); err != nil {
 		if errors.Is(err, sshprov.ErrPortInUse) {
-			return "", "", fail(portInUseSentence)
+			return "", "", fail(portInUseSentenceFor(err))
 		}
 		if errors.Is(err, sshprov.ErrNoTmux) {
 			return "", "", fail("tmux is not installed on that computer.")

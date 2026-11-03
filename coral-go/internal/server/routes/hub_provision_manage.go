@@ -292,7 +292,12 @@ func (pr *Provisioner) upgradeSteps(ctx context.Context, p *provisionPlan) {
 		var se *sshprov.StartError
 		switch {
 		case errors.Is(err, sshprov.ErrPortInUse):
-			pr.failRestart(ctx, p, "restart", portInUseSentence, err, restartNote{})
+			note := restartNote{}
+			var pe *sshprov.PortInUseError
+			if errors.As(err, &pe) {
+				note.holderPid = pe.Pid
+			}
+			pr.failRestart(ctx, p, "restart", portInUseSentenceFor(err), err, note)
 		case errors.Is(err, sshprov.ErrNoTmux):
 			pr.failRestart(ctx, p, "restart", "Coral on that computer was set up to run its agents in tmux, but tmux is not installed there now, so the new release was not started. The last lines below start it without tmux.", err, restartNote{noTmux: true})
 		case errors.As(err, &se):

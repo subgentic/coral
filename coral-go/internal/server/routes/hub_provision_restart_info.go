@@ -16,6 +16,7 @@ import (
 // restartNote is what else is known about a failed restart, for the help under it.
 type restartNote struct {
 	noTmux       bool // the start failed because tmux is gone: the help also gives the way to start without it
+	holderPid    int  // the process found on port 8420, when known: the help gives the line that stops it
 	stoppedAgain bool // the release was started but did not answer: it may still be starting, or it stopped again
 }
 
@@ -60,6 +61,10 @@ func (pr *Provisioner) failRestart(ctx context.Context, p *provisionPlan, step, 
 	if errors.As(err, &ns) {
 		attrs = append(attrs, "found", ns.Found) // 1 a tmux session, 2 a process, 3 it could not tell
 	}
+	var pe *sshprov.PortInUseError
+	if errors.As(err, &pe) {
+		attrs = append(attrs, "port_holder_pid", pe.Pid, "port_holder_command", pe.Command)
+	}
 	var ce *sshprov.ConnectError
 	if errors.As(err, &ce) {
 		attrs = append(attrs, "ssh", ce.Stderr)
@@ -91,13 +96,16 @@ func (pr *Provisioner) restartHelp(note restartNote) []string {
 		"# What is running Coral there (a tmux session named coral-server is an earlier set-up; the ps lines are processes of this install, the number is the first column):",
 		"tmux ls",
 		`ps -u "$(id -u)" -o pid,args | grep -F "$HOME/.coral-server/" | grep -v grep`,
-		"# Stop it: that tmux session, and the process the Hub recorded:",
+		"# Stop it: that tmux session, and the process the Hub recorded (check the number against the ps line above first: an old pid file can name another process):",
 		"tmux kill-session -t coral-server",
 		`kill "$(cat ~/.coral-server/coral.pid)"`,
 		"# What Coral printed (there is no log until the Hub has started a release there):",
 		"tail -n 40 ~/.coral-server/coral.log")
 	if note.noTmux {
 		lines = append(lines, "# tmux is not installed there: this forgets that agents ran in tmux (they will end whenever Coral restarts):", "rm ~/.coral-server/backend")
+	}
+	if note.holderPid > 0 {
+		lines = append(lines, "# Port 8420 is held by that process; stop it only if it is not something you need:", fmt.Sprintf("kill %d", note.holderPid))
 	}
 	lines = append(lines,
 		"# Start the release:",

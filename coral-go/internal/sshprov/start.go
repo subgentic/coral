@@ -148,7 +148,9 @@ func (r Runner) Start(ctx context.Context, t Target, version, backend string) er
 	if chk, err := r.Run(ctx, t, CmdCheckPort); err != nil {
 		return err
 	} else if chk.ExitCode == 2 {
-		return ErrPortInUse
+		pe := &PortInUseError{}
+		pe.Pid, pe.Command = r.PortHolder(ctx, t)
+		return pe
 	}
 	res, err := r.Run(ctx, t, CmdStartDaemon, version, backend)
 	if err != nil {
@@ -269,4 +271,30 @@ func (r Runner) ReadAPIKey(ctx context.Context, t Target, version string) (strin
 		case <-time.After(keyPoll):
 		}
 	}
+}
+
+// PortInUseError is ErrPortInUse with what holds the port, when the far computer could say: Pid 0 when it could not (another user's process is not shown to this one, and neither lsof nor ss may be there).
+// Pid is digits and Command a short name of letters, digits and . _ - only; anything else the far side printed is dropped (#12027).
+type PortInUseError struct {
+	Pid     int
+	Command string
+}
+
+func (e *PortInUseError) Error() string        { return ErrPortInUse.Error() }
+func (e *PortInUseError) Is(target error) bool { return target == ErrPortInUse }
+
+var portHolderRe = regexp.MustCompile(`^([0-9]{1,8}) ([A-Za-z0-9._-]{1,40})$`)
+
+// PortHolder is the pid and command name of what listens on port 8420 there, or 0 and "" when that is not known.
+func (r Runner) PortHolder(ctx context.Context, t Target) (int, string) {
+	res, err := r.Run(ctx, t, CmdPortHolder)
+	if err != nil || res.ExitCode != 0 {
+		return 0, ""
+	}
+	m := portHolderRe.FindStringSubmatch(strings.TrimSpace(res.Stdout))
+	if m == nil {
+		return 0, ""
+	}
+	pid, _ := strconv.Atoi(m[1])
+	return pid, m[2]
 }
