@@ -87,7 +87,7 @@ Running agents is easy. *Knowing when one of them needs you* is the part that go
 
 - **Versioned Artifacts** Artifacts are versioned so you can see what the agents have changed between turns
 
-<img alt="Compare: what changed between version 1 and version 2 of a file, the added line marked" src="assets/readme/review-compare.png" width="100%" />
+<img width="100%" alt="What changed between versions" src="https://github.com/user-attachments/assets/895039f1-fc80-440b-bd2f-d758b24f49b9" />
 
 - **Every chat and every board, searchable.** The Inbox also holds the history of every agent CLI's conversations and each team's message board.
 
@@ -109,10 +109,15 @@ Behind the Inbox is the part that does the work: a team of agents on one board. 
 </p>
 
 - **Mixed-vendor teams.** Permissions are written once and translated into each CLI's native format, so a read-only QA agent is read-only whether it is Claude or Codex.
+
 <img width="1580" height="916" alt="Screenshot 2026-11-02 at 11 12 33 PM" src="https://github.com/user-attachments/assets/f85e5e21-a49c-4b58-891b-6a89f151c156" />
+
 - **Idle agents sleep by themselves.** An agent that has been idle for a while is put to sleep to free memory and wakes when something is sent to it; an agent mid-work stays awake. On by default, with a switch in Settings.
+  
 - **A Skills Store (experimental).** Import a skill, review it, approve it; approved skills appear in New agent and New team, and agents can publish and search skills themselves.
+  
 - **Teams that survive closing the lid.** Sleep a whole team and wake it tomorrow, or after upgrading Coral: every agent resumes its own session.
+  
 - **Run it anywhere.** Put Coral on a build server or a spare Mac; open it from any browser, or scan a QR code for a phone client.
 
 Everything else is in the [feature list](#features).
@@ -129,10 +134,6 @@ Download the latest release from [GitHub Releases](https://github.com/subgentic/
 - **Linux**: [`coral-linux-amd64.tar.gz`](https://github.com/subgentic/coral/releases/latest/download/coral-linux-amd64.tar.gz) (x86-64) or [`coral-linux-arm64.tar.gz`](https://github.com/subgentic/coral/releases/latest/download/coral-linux-arm64.tar.gz) (ARM64, e.g. Graviton or Docker on Apple silicon)
 - **Windows**: [`Coral-x64.msi`](https://github.com/subgentic/coral/releases/latest/download/Coral-x64.msi) (installer) or [`Coral-x64-portable.zip`](https://github.com/subgentic/coral/releases/latest/download/Coral-x64-portable.zip). These are currently **not code-signed**, so Windows SmartScreen warns that the publisher is unknown. Verify the file with the attestation check below before you run it.
 
-Each release also keeps its versioned file names (`Coral.v<version>.dmg`, `coral-linux-<arch>-<version>.tar.gz`, `Coral-<version>-x64.msi`, `Coral-<version>-x64-portable.zip`): the same files.
-
-Every release is signed; how to check a download is in the [release notes](https://github.com/subgentic/coral/releases/latest).
-
 ### Install and start
 
 First install and sign in to at least one agent CLI: [Claude Code](https://code.claude.com/docs/en/overview), [Codex](https://github.com/openai/codex), [Antigravity (`agy`)](https://antigravity.google), [Pi](https://pi.dev), [OpenCode](https://opencode.ai), or Hermes (experimental). Coral runs these tools; it does not install or authenticate them.
@@ -148,26 +149,9 @@ First install and sign in to at least one agent CLI: [Claude Code](https://code.
   coral --no-browser
   ```
 
-  Add that `PATH` line to your shell's startup file for later terminals. Agents run in Coral's built-in terminal and stop when you quit Coral. To keep them running after Coral quits, install tmux and choose it in Settings > Terminal, or start with `--backend tmux`. (With tmux, any agent can reach the other agents' terminals through its socket.)
-
-On first launch, review the Terms of Service and accept them if you agree. For a terminal launch, keep the terminal open while Coral runs. Open the local address printed at startup. If the browser shows **Create a password**, enter and confirm a password, then choose **Create password and open Coral**. The app can open a signed-in browser directly; you can also run `coral open` from a terminal on the server.
-
 In the dashboard, choose **New agent** (then **New agent** again in the dialog: "One agent in a folder you choose"), choose the agent in step 1, enter an existing project folder on the computer running Coral (or use **Browse**), and choose **Launch**. In the agent's **Terminal**, answer any folder-trust or sign-in prompt, then send a task from **Chat** with Enter. Choose **New team** instead to start several agents together.
 
 See [Getting started](https://subgentic.github.io/coral/getting-started/) for the full installation and first-agent walkthrough.
-
-### Build from source
-
-Install Git, Make, Go 1.26.10 or later, and a C compiler (on macOS, Xcode Command Line Tools), then:
-
-```bash
-git clone https://github.com/subgentic/coral.git
-cd coral/coral-go
-make build
-./bin/coral --backend pty --no-browser
-```
-
-The build puts the tools in `bin/`. For the commands below, add that directory to your `PATH` or use `./bin/coral` in place of `coral`.
 
 ### Use it from your phone
 
@@ -217,13 +201,16 @@ The web dashboard shows every agent's live terminal, current status, and message
 - **Chief**, your own front agent, on its own phone page.
 - **Sleep and wake** an agent or a whole team, and idle agents sleep by themselves.
 - **Scheduled jobs and workflows** that run on a cron schedule.
-- **Cost** by agent, team and branch.
+- **Detailed Analytics** by agent, team and branch.
 
 <p align="center">
   <img alt="The Analytics view: token and cost totals, a cumulative spend chart, then cost tables by provider and by model" src="assets/readme/analytics.png" width="100%" />
   <br>
-  <sub>Analytics: how much Coral is used and what it costs, by model, team, branch and agent. (Sample data.)</sub>
+  <sub>Analytics: how much Coral is used and what it costs, by model, team, branch and agent. </sub>
 </p>
+
+<img width="100%" alt="Total time for a task by model" src="https://github.com/user-attachments/assets/0554a423-d03c-4a21-bc17-5964ed17ef9f" />
+
 
 ## Documentation
 
@@ -231,9 +218,7 @@ Full documentation at **[subgentic.github.io/coral](https://subgentic.github.io/
 
 ## Contributing
 
-We welcome contributions! Whether it's adding support for new AI agents, improving the dashboard, or fixing bugs — please open an issue or submit a pull request.
-
-Dashboard changes should follow the [Coral UI style guide](coral-go/docs/ui-style-guide.md).
+We welcome contributions in the form of feature requests or bug reports! 
 
 ## License
 
