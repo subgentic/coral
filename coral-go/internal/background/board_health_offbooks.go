@@ -109,7 +109,8 @@ func (m *BoardHealthMonitor) offBooksItems(ctx context.Context, project, orch st
 		m.noteBusyNoTask(ctx, project, orch, subs, bySession, inProgress, time.Duration(hs.BusyNoTask.AfterMin)*time.Minute, now)
 	}
 	m.scanOffBooksPosts(ctx, project, orch, subs, hs.PostNoTask.On, now)
-	m.noteOperatorWaits(ctx, project, orch, subs, bySession, now) // a post that waits on the Operator and is not in their Needs you (#12138)
+	m.noteOperatorWaits(ctx, project, orch, subs, bySession, now)     // a post that waits on the Operator and is not in their Needs you (#12138)
+	m.noteChatOperatorWaits(ctx, project, orch, subs, bySession, now) // and a chat reply that does (#12138 part 2)
 	if hs.GoalSize.On {
 		m.noteGoalSizes(ctx, project, hs.GoalSize.Limit, now)
 	}

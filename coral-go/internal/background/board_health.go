@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/subgentic/coral/internal/board"
+	"github.com/subgentic/coral/internal/jsonl"
 	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/internal/teamhealth"
@@ -38,6 +39,9 @@ type BoardHealthMonitor struct {
 	// paused says whether a board is paused: nothing is nudged on it, and the check says so (#11182); nil: not said.
 	paused func(project string) bool
 
+	// lastMessage is a live agent's newest chat message with text, from its transcript (jsonl.SessionReader.LastMessage); the check reads an agent's last reply for what waits on the Operator (#12138 part 2). A variable so a test says what an agent last said.
+	lastMessage func(sessionID, workingDir, agentType string) (jsonl.LastMessage, bool)
+
 	mu         sync.Mutex
 	lastCheck  map[string]time.Time       // per board: when a check last went out
 	lastEval   map[string]time.Time       // per board: when the check was last looked at (it goes out only when something changed or the heartbeat is due, #11431)
@@ -51,7 +55,8 @@ func NewBoardHealthMonitor(store *board.Store, interval time.Duration) *BoardHea
 	if interval <= 0 {
 		interval = 10 * time.Minute
 	}
-	return &BoardHealthMonitor{store: store, interval: interval, idleAfter: 30 * time.Minute, logger: slog.Default(), now: time.Now, lastCheck: map[string]time.Time{}, lastEval: map[string]time.Time{}, lastPrint: map[string]map[string]bool{}}
+	reader := jsonl.NewSessionReader()
+	return &BoardHealthMonitor{store: store, interval: interval, idleAfter: 30 * time.Minute, logger: slog.Default(), now: time.Now, lastMessage: reader.LastMessage, lastCheck: map[string]time.Time{}, lastEval: map[string]time.Time{}, lastPrint: map[string]map[string]bool{}}
 }
 
 // SetAgents gives the check its view of the agents (hook events, discovery) and the gate to type
