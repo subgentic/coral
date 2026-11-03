@@ -99,3 +99,53 @@ func TestTheOwnerMarksAFileReadThroughTheHubAndNoOneElseCan(t *testing.T) {
 	code, out = put(map[string]string{testDashboardHeader: "1"}, `{"tags":["café"]}`)
 	assert.Equal(t, http.StatusOK, code, "the local route is as it was: %v", out)
 }
+
+// Security's point 3 on #12742: through the Hub the closed rule is for the tags a request ADDS, judged against the list the server holds; a tag the artifact already has is kept whatever its letters (the page writes the whole
+// list back to add "read"), and marking a file read is never refused for the count, while any other addition keeps the five-tag limit.
+func TestThroughTheHubOnlyAddedTagsAreHeldToTheClosedRuleAndReadIsNeverCounted(t *testing.T) {
+	e := newTagEnv(t)
+	id := e.ids["report.md"]
+	withLabel(t, ownerLabel, nil)
+	hub, dash := ownerHeaders(ownerLabel), map[string]string{testDashboardHeader: "1"}
+	put := func(header map[string]string, body string) (int, map[string]any) {
+		t.Helper()
+		req, err := http.NewRequest(http.MethodPut, e.srv.URL+"/api/board/tag-team/artifacts/"+id+"/tags", strings.NewReader(body))
+		require.NoError(t, err)
+		req.Header.Set("Content-Type", "application/json")
+		for k, v := range header {
+			req.Header.Set(k, v)
+		}
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		var out map[string]any
+		_ = json.NewDecoder(resp.Body).Decode(&out)
+		return resp.StatusCode, out
+	}
+	stored := func() []string {
+		all, err := e.h.bs.ArtifactTags(context.Background(), "tag-team")
+		require.NoError(t, err)
+		return all[id]
+	}
+	// the artifact has five tags, one of them with a letter outside a-z (set from this computer's own dashboard, where the local rule holds)
+	code, out := put(dash, `{"tags":["for review","café","a","b","c"]}`)
+	require.Equal(t, http.StatusOK, code, out)
+
+	// marking it read: the page writes the whole list back with "read": six tags and a non-ASCII one that is already there
+	code, out = put(hub, `{"tags":["for review","café","a","b","c","read"]}`)
+	assert.Equal(t, http.StatusOK, code, "a read-only addition is accepted on an artifact that has five, and keeps what was there: %v", out)
+	assert.ElementsMatch(t, []string{"for review", "café", "a", "b", "c", "read"}, stored())
+
+	// removing a tag (the page settling an earlier version drops "for review") adds nothing
+	code, out = put(hub, `{"tags":["café","a","b","c","read"]}`)
+	assert.Equal(t, http.StatusOK, code, "%v", out)
+
+	// any other addition is held to the rule: a new non-ASCII tag, and a sixth tag
+	code, _ = put(hub, `{"tags":["café","a","b","c","read","naïve"]}`)
+	assert.Equal(t, http.StatusBadRequest, code, "a new tag with a letter outside a-z is refused through the Hub")
+	code, _ = put(hub, `{"tags":["café","a","b","c","read","extra"]}`)
+	assert.Equal(t, http.StatusBadRequest, code, "a sixth tag that is not read keeps the five-tag limit")
+	code, _ = put(hub, `{"tags":["café","a","b","c","read","read two"]}`)
+	assert.Equal(t, http.StatusBadRequest, code, "only exactly read is the count's exception")
+	assert.ElementsMatch(t, []string{"café", "a", "b", "c", "read"}, stored(), "the refusals changed nothing")
+}

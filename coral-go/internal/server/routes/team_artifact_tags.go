@@ -144,13 +144,15 @@ func (h *BoardHandler) SetArtifactTags(w http.ResponseWriter, r *http.Request) {
 		errBadRequest(w, "invalid JSON")
 		return
 	}
-	tags, err := board.NormalizeArtifactTags(body.Tags)
+	var tags []string
+	var err error
+	if cloud.Tunneled(r) {
+		tags, err = h.hubArtifactTags(r.Context(), project, id, body.Tags)
+	} else {
+		tags, err = board.NormalizeArtifactTags(body.Tags)
+	}
 	if err != nil {
 		errBadRequest(w, strings.TrimPrefix(err.Error(), board.ErrArtifactTag.Error()+": "))
-		return
-	}
-	if cloud.Tunneled(r) && !asciiArtifactTags(tags) { // through the Hub the body is closed: the local rule (letters, digits, spaces, hyphens, 24 characters, five tags) narrowed to a-z, 0-9, space and hyphen (#12742)
-		errBadRequest(w, "through Coral Hub a tag is 1 to 24 of a-z, 0-9, spaces or hyphens")
 		return
 	}
 	if !h.teamHasManagedArtifact(r.Context(), project, id) {
@@ -230,6 +232,48 @@ func (h *BoardHandler) askerUploaded(session, id string) bool {
 	}
 	_, ok := h.uploadRecordOf(session, id)
 	return ok
+}
+
+// hubArtifactTags is the tags of a write that came through Coral Hub (#12742), checked against the list the server holds, never the client's word for what is there. The local rule (a tag is 1 to 24 letters, digits, spaces
+// or hyphens) holds for every tag; a tag the request ADDS must also be a-z, 0-9, space or hyphen, so the closed body is only for what is new, and a tag the artifact already has is kept whatever its letters (the page writes the
+// whole list back to add "read"). At most five tags, except that a request that adds nothing but "read" (the Operator opening a file) is never refused for the count: an artifact that already has more must still be markable read.
+func (h *BoardHandler) hubArtifactTags(ctx context.Context, project, id string, raw []string) ([]string, error) {
+	out := make([]string, 0, len(raw))
+	seen := map[string]bool{}
+	for _, r := range raw {
+		tag, ok := board.NormalizeArtifactTag(r)
+		if !ok {
+			return nil, fmt.Errorf("%w: %q (1 to %d letters, digits, spaces or hyphens)", board.ErrArtifactTag, r, board.MaxArtifactTagLen)
+		}
+		if !seen[tag] {
+			seen[tag] = true
+			out = append(out, tag)
+		}
+	}
+	stored, err := h.bs.ArtifactTags(ctx, project)
+	if err != nil {
+		return nil, fmt.Errorf("%w: the tags could not be read", board.ErrArtifactTag)
+	}
+	had := map[string]bool{}
+	for _, t := range stored[id] {
+		had[t] = true
+	}
+	onlyRead := true
+	for _, t := range out {
+		if had[t] {
+			continue
+		}
+		if t != "read" {
+			onlyRead = false
+		}
+		if !asciiArtifactTags([]string{t}) {
+			return nil, fmt.Errorf("%w: %q (through Coral Hub a tag you add is 1 to %d of a-z, 0-9, spaces or hyphens)", board.ErrArtifactTag, t, board.MaxArtifactTagLen)
+		}
+	}
+	if len(out) > board.MaxArtifactTags && !onlyRead {
+		return nil, fmt.Errorf("%w: at most %d tags on an artifact", board.ErrArtifactTag, board.MaxArtifactTags)
+	}
+	return out, nil
 }
 
 // asciiArtifactTags says every tag (already normalised: lower case, single spaces) uses only a-z, 0-9, space and hyphen.
