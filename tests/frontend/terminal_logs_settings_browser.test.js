@@ -10,7 +10,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { connect } = require('./agent_view_harness');
-const { coralReady } = require('./helpers/wait');
+const { coralReady, framesJs } = require('./helpers/wait');
 
 const MIB = 1024 ** 2;
 
@@ -24,16 +24,20 @@ const MIB = 1024 ** 2;
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
         await coralReady(ev);
-        await ev(`(() => { const R = window.fetch; window.__posts = []; window.__logs = { files: 31, bytes: ${181 * MIB}, ended: { count: 12, bytes: ${45 * MIB} } }; window.__next = null; window.__down = false;
+        await ev(`(() => { const R = window.fetch; window.__posts = []; window.__logReads = 0; window.__logs = { files: 31, bytes: ${181 * MIB}, ended: { count: 12, bytes: ${45 * MIB} } }; window.__next = null; window.__down = false;
             window.fetch = (u, o = {}) => { const p = new URL(String(u), location.origin).pathname; const m = (o.method || 'GET').toUpperCase(); const json = (b, s = 200) => Promise.resolve(new Response(JSON.stringify(b), { status: s, headers: { 'content-type': 'application/json' } }));
-                if (p === '/api/system/terminal-logs' && m === 'GET') return window.__down ? json({ error: 'x' }, 503) : json(window.__logs);
+                if (p === '/api/system/terminal-logs' && m === 'GET') { window.__logReads++; return window.__down ? json({ error: 'x' }, 503) : json(window.__logs); }
                 if (p === '/api/system/terminal-logs/delete-ended' && m === 'POST') { window.__posts.push(JSON.parse(o.body)); return window.__next(); }
                 return R(u, o); };
             return true; })()`);
         const openSettings = async () => {
-            await waitFor(`(window.hideSettingsModal(), (!document.getElementById('settings-modal') || getComputedStyle(document.getElementById('settings-modal')).display === 'none'))`, 'Settings to close', 6000);
-            await ev(`window.showSettingsModal('cleanup'); true`);
-            await waitFor(`!!document.getElementById('settings-terminal-logs-status') && !/Loading/.test(document.getElementById('settings-terminal-logs-status').textContent)`, 'the terminal logs line', 8000);
+            const reads = await ev('window.__logReads');
+            // Fixture reset: no setting is saved here. A late-filled field can differ from
+            // the prior snapshot; a normal Close would ask to discard it instead of closing.
+            await ev(`(async () => { if (document.getElementById('settings-modal')) await window.hideSettingsModal(true); return true; })()`);
+            await waitFor(`!document.getElementById('settings-modal') || getComputedStyle(document.getElementById('settings-modal')).display === 'none'`, 'Settings to close', 6000);
+            await ev(`(async () => { await window.showSettingsModal('cleanup'); return true; })()`);
+            await waitFor(`window.__logReads > ${reads} && getComputedStyle(document.getElementById('settings-modal')).display !== 'none' && !!document.getElementById('settings-terminal-logs-status') && !/Loading/.test(document.getElementById('settings-terminal-logs-status').textContent)`, 'the fresh terminal logs line in open Settings', 8000);
         };
         const state = () => ev(`(() => { const b = document.getElementById('settings-terminal-logs-delete'); return { text: (document.getElementById('settings-terminal-logs-status')?.textContent ?? ''), role: document.getElementById('settings-terminal-logs-status').getAttribute('role'), hidden: b.hidden, button: b.textContent, label: (document.getElementById('settings-terminal-logs-title') || {}).textContent }; })()`);
         const showRow = () => ev(`(() => { const i = document.getElementById('settings-terminal-logs-status'); let p = i.parentElement; while (p && !(p.scrollHeight > p.clientHeight + 1 && /(auto|scroll)/.test(getComputedStyle(p).overflowY))) p = p.parentElement; if (p) p.scrollTop += i.getBoundingClientRect().top - p.getBoundingClientRect().top - 120; return true; })()`);
@@ -91,7 +95,12 @@ const MIB = 1024 ** 2;
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
         await Emulation.setTouchEmulationEnabled({ enabled: true, maxTouchPoints: 5 });
         await ev(`document.documentElement.style.fontSize = '32px'; true`);
+        // Reproduce late form population after a prior open: its snapshot is now dirty.
+        // This fixture resets the dialog, rather than testing its Discard confirmation.
+        await ev(`(() => { const size = document.getElementById('settings-terminal-font-size'); size.value = size.value === '18' ? '10' : '18'; const show = window.showSettingsModal; window.__settingsReopened = false; window.showSettingsModal = async (...args) => { await show(...args); await ${framesJs(2)}; window.__settingsReopened = true; }; return true; })()`);
+        assert.equal(await ev(`import((window.__coralStatic || '/static/') + 'settings_form.js').then(m => m.unsavedFields())`), true, 'late form population differs from the previous open snapshot');
         await openSettings();
+        assert.equal(await ev(`window.__settingsReopened`), true, 'openSettings awaits the asynchronous open, not the retained status line');
         await sleep(400); // sleep-ok: the font-size layout settles
         await showRow(); await sleep(300); // sleep-ok: the scroll settles
         const fit = await ev(`(() => { const b = document.getElementById('settings-terminal-logs-delete'); const r = b.getBoundingClientRect(); const box = document.querySelector('#settings-modal .modal-content, #settings-modal .modal') || document.getElementById('settings-modal'); const br = box.getBoundingClientRect();
