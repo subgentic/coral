@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/skills"
 	"github.com/subgentic/coral/internal/store"
 )
 
@@ -109,4 +110,31 @@ func TestTheWrappedSkillMDIsStoredNotCompressedSoItsDigestIsStable(t *testing.T)
 	require.Len(t, r1, 1)
 	require.Len(t, r2, 1)
 	assert.Equal(t, r1[0].Digest, r2[0].Digest, "two imports of one text, one digest: %v %v", o1, o2)
+}
+
+// QA's SHOULDs on #12678: the input guards of the lone-file path are pinned, and a file too big for a SKILL.md says so as a file (at exactly 5 MiB it used to say "the zip must be between 1 byte and 5 MiB").
+func TestTheLoneFileInputGuardsAreEachPinned(t *testing.T) {
+	e := newSkillsEnv(t)
+	// both fields, each of them valid: one skill is one thing
+	both, err := json.Marshal(map[string]any{"zip_base64": base64.StdEncoding.EncodeToString(zipOf(t, map[string]string{"SKILL.md": skillMD})), "skill_md_base64": base64.StdEncoding.EncodeToString([]byte(skillMD))})
+	require.NoError(t, err)
+	code, out := e.call("POST", "/api/skills", string(both), "operator")
+	assert.Equal(t, 400, code, "a valid zip and a valid SKILL.md together are refused, not one of them picked: %v", out)
+	list, _ := e.ss.ListSkills(t.Context(), "")
+	assert.Empty(t, list)
+
+	// the file's own size limit: the first byte over it is a file's message, at any size up to and past the zip's cap
+	front := "---\nname: big-one\ndescription: Large.\n---\n"
+	for name, size := range map[string]int{"one over the SKILL.md limit": skills.MaxSkillMDBytes + 1, "exactly the zip's cap": skills.MaxZipBytes, "one over the zip's cap": skills.MaxZipBytes + 1} {
+		md := front + strings.Repeat("x", size-len(front))
+		code, out = e.call("POST", "/api/skills", mdBody(t, md), "operator")
+		assert.Equal(t, 413, code, name)
+		msg, _ := out["error"].(string)
+		assert.Contains(t, msg, "a SKILL.md must be at most", name)
+		assert.NotContains(t, msg, "zip", name+": a file is not a zip")
+	}
+	// at the limit it is a skill
+	md := front + strings.Repeat("x", skills.MaxSkillMDBytes-len(front))
+	code, out = e.call("POST", "/api/skills", mdBody(t, md), "operator")
+	assert.Equal(t, 200, code, "a SKILL.md of exactly the limit imports: %v", out)
 }

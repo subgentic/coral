@@ -31,7 +31,10 @@ const DETAIL = { skill: ROWS[1], files: [
             window.fetch = (u, o = {}) => { const url = new URL(String(u && u.url || u), location.origin); const m = (o.method || 'GET').toUpperCase(); const p = url.pathname;
                 if (!p.startsWith('/api/skills')) return Promise.resolve(new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } }));
                 window.__calls.push(m + ' ' + p + url.search + (o.body ? ' ' + o.body : ''));
-                if (p === '/api/skills' && m === 'POST') return json({ ok: true, id: 'f'.repeat(32), name: 'md-skill', version: 1 });
+                if (p === '/api/skills' && m === 'POST') { const b = JSON.parse(o.body || '{}');
+                    if (window.__need === 'secret' && !b.acknowledge_secret) return json({ error: 'SKILL.md holds a key', code: 'holds_secret' }, 409);
+                    if (window.__need === 'scripts' && !b.scripts_acked) return json({ error: 'scripts', code: 'scripts_not_acknowledged' }, 409);
+                    return json({ ok: true, id: 'f'.repeat(32), name: 'md-skill', version: 1 }); }
                 if (p === '/api/skills' && m === 'GET') { const st = url.searchParams.get('status'); return json({ skills: st ? rows.filter(r => r.status === st) : rows }); }
                 if (p === '/api/skills/${ROWS[1].id}' && m === 'GET') return json(detail);
                 if (p === '/api/skills/${ROWS[2].id}' && m === 'GET') return json({ skill: rows[2], files: [{ path: 'SKILL.md', size: 90, kind: 'instructions', sha256: '9'.repeat(64) }], contents: { 'SKILL.md': '# PDF forms' }, warnings: [], hosts: [] });
@@ -62,6 +65,20 @@ const DETAIL = { skill: ROWS[1], files: [
         assert.ok(sentMd.skill_md_base64 && !sentMd.zip_base64, 'as skill_md_base64, not a zip: ' + Object.keys(sentMd));
         assert.equal(Buffer.from(sentMd.skill_md_base64, 'base64').toString().startsWith('---\nname: md-skill'), true, 'the file text');
         await waitFor(`Array.from(document.querySelectorAll('.toast')).some(t => /Imported md-skill/.test(t.textContent))`, 'the import says so', 4000);
+        // #12695: a warning on a lone SKILL.md is confirmed once and the SAME file is sent again with only that flag set (a secret: acknowledge_secret; scripts: scripts_acked), still as skill_md_base64
+        await ev(`window.__confirmOrig = window.showConfirmModal; window.showConfirmModal = (title, text, fn) => { window.__confirms = (window.__confirms || 0) + 1; fn(); }; true`);
+        for (const [need, flags] of [['secret', { acknowledge_secret: true, scripts_acked: false }], ['scripts', { acknowledge_secret: false, scripts_acked: true }]]) {
+            await ev(`window.__need = ${JSON.stringify(need)}; window.__confirms = 0; window.__calls = window.__calls.filter(c => !c.startsWith('POST /api/skills')); true`);
+            await give('SKILL.md', '---\nname: md-skill\ndescription: One file.\n---\nBody ' + need + '\n');
+            await waitFor(`window.__calls.filter(c => c.startsWith('POST /api/skills')).length === 2`, need + ': refused once, then sent again after the confirm', 6000);
+            assert.equal(await ev(`window.__confirms`), 1, need + ': one confirm');
+            const posts = (await ev(`window.__calls.filter(c => c.startsWith('POST /api/skills'))`)).map(c => JSON.parse(c.replace(/^POST \/api\/skills /, '')));
+            assert.ok(!posts[0].acknowledge_secret && !posts[0].scripts_acked, need + ': the first send carries no acknowledgement');
+            for (const b of posts) assert.ok(b.skill_md_base64 && !b.zip_base64, need + ': always the lone file, never a zip: ' + Object.keys(b));
+            assert.equal(posts[1].acknowledge_secret, flags.acknowledge_secret, need + ': acknowledge_secret on the retry');
+            assert.equal(posts[1].scripts_acked, flags.scripts_acked, need + ': scripts_acked on the retry');
+        }
+        await ev(`window.__need = ''; window.showConfirmModal = window.__confirmOrig; true`);
         await waitFor(`!document.getElementById('nav-tab-skills-badge').hidden && document.getElementById('nav-tab-skills-badge').textContent === '2'`, 'the badge says two wait', 4000);
         const first = () => ev(`document.querySelector('#skills-view tr.dt-row').dataset.key`);
         await ev(`document.querySelector('#skills-view th.dt-th[data-key="name"] button.dt-sort').click(); true`);
