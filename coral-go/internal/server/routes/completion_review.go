@@ -160,6 +160,10 @@ func (h *BoardHandler) DelegateReview(w http.ResponseWriter, r *http.Request) {
 		errTaskGone(w, err)
 		return
 	}
+	if len(reviews) == 0 { // every name was already on the round: nothing was created, and the answer says so instead of an empty success (#12869)
+		writeJSON(w, http.StatusOK, map[string]any{"task": task, "reviews": reviews, "note": fmt.Sprintf("no change: %s already on the review of task #%d (no new review task was created)", strings.Join(body.Reviewers, ", "), id)})
+		return
+	}
 	names := make([]string, 0, len(reviews))
 	for _, rt := range reviews {
 		names = append(names, fmt.Sprintf("%s (#%d)", *rt.AssignedTo, rt.ID))

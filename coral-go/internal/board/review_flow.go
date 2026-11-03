@@ -440,6 +440,10 @@ func checkOpenReview(id int64, status string, w TaskWorkflow) error {
 	switch {
 	case n > 0 && w.ReviewRounds[n-1].Result == "rejected" && status != "review_pending" && status != "completed":
 		return fmt.Errorf("task #%d is back with %s (rejected in round %d): give your verdict when it is resubmitted, and your review task reopens", id, w.OriginalAuthor, w.ReviewRounds[n-1].Round)
+	case status == "review_pending" && n == 0:
+		return fmt.Errorf("task #%d has no open review: it is waiting in review and nobody has been asked to review it yet, so there is nothing to approve or reject. The orchestrator names reviewers with: coral-board task review %d --to \"Name\", or completes it with: coral-board task complete %d", id, id, id)
+	case status == "review_pending" && w.ReviewRounds[n-1].Result != "":
+		return fmt.Errorf("task #%d has no open review: round %d already ended (%s) and it is still waiting in review. The orchestrator opens a new round with: coral-board task review %d --to \"Name\", or completes it with: coral-board task complete %d", id, w.ReviewRounds[n-1].Round, w.ReviewRounds[n-1].Result, id, id)
 	case status != "review_pending" || n == 0 || w.ReviewRounds[n-1].Result != "":
 		return fmt.Errorf("task #%d has no open review", id)
 	}

@@ -304,6 +304,14 @@ func (h *BoardHandler) ReassignTask(w http.ResponseWriter, r *http.Request) {
 			errBadRequest(w, err.Error())
 			return
 		}
+		if errors.Is(err, board.ErrTaskReassignRefused) {
+			errConflict(w, err.Error()) // a state that cannot move this way: the reason says what does (#12869)
+			return
+		}
+		if taskNotOnBoard(err) {
+			errNotFound(w, "Task not found")
+			return
+		}
 		errInternalServer(w, err.Error())
 		return
 	}
