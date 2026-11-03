@@ -1,6 +1,7 @@
 package dataowner
 
 import (
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -104,7 +105,97 @@ func isDataownerSel(x *ast.SelectorExpr, names ...string) bool {
 	return false
 }
 
-// In settleDataOwner the one branch on the verdict logs the WARN and sets the warning, and nothing else: no return, no skipped step, no call that could withhold anything.
+// verdictBranchProblems is what is wrong with settleDataOwner's branch on the verdict: it must be exactly one `if v.Foreign` with no else, and its whole subtree (not only its direct statements: a nested
+// if or switch could hide a return) must be straight-line: only calls to the WARN's log and the warning with its adopter, and no return, goto, break, continue, loop, switch, select, go or defer outside the
+// adopter's own function literal (whose own returns are its own). #12651: a return nested in an inner if used to pass.
+func verdictBranchProblems(fn *ast.FuncDecl) []string {
+	var problems []string
+	branches := 0
+	var walk func(n ast.Node, inLit bool)
+	walk = func(n ast.Node, inLit bool) {
+		ast.Inspect(n, func(m ast.Node) bool {
+			switch y := m.(type) {
+			case *ast.FuncLit: // the adopter: its own returns are its own; everything else in it is still checked
+				walk(y.Body, true)
+				return false
+			case *ast.ReturnStmt:
+				if !inLit {
+					problems = append(problems, "the verdict branch returns")
+				}
+			case *ast.BranchStmt:
+				if !inLit {
+					problems = append(problems, "the verdict branch has a "+y.Tok.String())
+				}
+			case *ast.IfStmt, *ast.SwitchStmt, *ast.TypeSwitchStmt, *ast.SelectStmt, *ast.ForStmt, *ast.RangeStmt, *ast.GoStmt, *ast.DeferStmt:
+				if !inLit {
+					problems = append(problems, fmt.Sprintf("the verdict branch is not straight-line (%T)", y))
+				}
+			case *ast.CallExpr:
+				name := ""
+				switch fx := y.Fun.(type) {
+				case *ast.Ident:
+					name = fx.Name
+				case *ast.SelectorExpr:
+					name = fx.Sel.Name
+				}
+				if name != "" && !allowedInWarn[name] {
+					problems = append(problems, "the verdict branch calls "+name+": only the WARN and the warning belong there")
+				}
+			}
+			return true
+		})
+	}
+	for _, st := range fn.Body.List {
+		ifs, ok := st.(*ast.IfStmt)
+		if !ok {
+			continue
+		}
+		cond, ok := ifs.Cond.(*ast.SelectorExpr)
+		if !ok || cond.Sel.Name != "Foreign" {
+			continue
+		}
+		branches++
+		if ifs.Else != nil {
+			problems = append(problems, "the verdict branch has an else: nothing differs for the other verdicts")
+		}
+		walk(ifs.Body, false)
+	}
+	// a branch on the verdict anywhere else in the function (nested, or in a closure) is another branch
+	total := 0
+	ast.Inspect(fn.Body, func(n ast.Node) bool {
+		if ifs, ok := n.(*ast.IfStmt); ok {
+			if cond, ok := ifs.Cond.(*ast.SelectorExpr); ok && cond.Sel.Name == "Foreign" {
+				total++
+			}
+		}
+		return true
+	})
+	if total != 1 || branches != 1 {
+		problems = append(problems, fmt.Sprintf("exactly one branch on the verdict, at the top level of the function (found %d, %d at the top)", total, branches))
+	}
+	for _, st := range fn.Body.List { // and nothing returns early on the verdict
+		if r, ok := st.(*ast.ReturnStmt); ok && len(r.Results) != 1 {
+			problems = append(problems, "settleDataOwner returns the verdict and nothing else")
+		}
+	}
+	sort.Strings(problems)
+	return problems
+}
+
+func parseSettle(t *testing.T, src string) *ast.FuncDecl {
+	t.Helper()
+	f, err := parser.ParseFile(token.NewFileSet(), "x.go", "package x\n"+src, 0)
+	require.NoError(t, err)
+	for _, d := range f.Decls {
+		if fd, ok := d.(*ast.FuncDecl); ok && fd.Name.Name == "settleDataOwner" {
+			return fd
+		}
+	}
+	t.Fatal("no settleDataOwner in the source")
+	return nil
+}
+
+// In settleDataOwner the one branch on the verdict logs the WARN and sets the warning, and nothing else, all the way down.
 func TestTheOneBranchOnTheVerdictOnlyWarns(t *testing.T) {
 	f := censusFiles(t)[settleFile]
 	require.NotNil(t, f, settleFile)
@@ -115,52 +206,42 @@ func TestTheOneBranchOnTheVerdictOnlyWarns(t *testing.T) {
 		}
 	}
 	require.NotNil(t, fn, "settleDataOwner")
-	branches := 0
-	ast.Inspect(fn.Body, func(n ast.Node) bool {
-		ifs, ok := n.(*ast.IfStmt)
-		if !ok {
-			return true
+	assert.Empty(t, verdictBranchProblems(fn))
+}
+
+// The check sees every way the branch could skip the rest of the start, at any depth (#12651): a return in a nested if or switch, a goto, a loop, an else, a second branch, a call that is not the
+// WARN or the warning; and it lets the real shape pass (the adopter's closure returns its own result).
+func TestTheBranchCheckRejectsEveryWayToSkipTheRest(t *testing.T) {
+	fn := func(body string) string {
+		return "func settleDataOwner(ctx context.Context) dataowner.Verdict {\n\tv := verify(ctx)\n" + body + "\n\treturn v\n}\n"
+	}
+	warn := "log.Print(dataowner.LogLine(v)); dataowner.SetCopyWarning(dataowner.Notice, func(ctx context.Context) error { return AdoptDataDir(ctx) })"
+	cases := map[string]struct{ src, want string }{
+		"the real shape":                 {fn("\tif v.Foreign {\n" + warn + "\n\t}"), ""},
+		"a return":                       {fn("\tif v.Foreign {\n" + warn + "\nreturn v\n\t}"), "returns"},
+		"a return in a nested if":        {fn("\tif v.Foreign {\n" + warn + "\nif ctx.Err() != nil { return v }\n\t}"), "returns"},
+		"a return in a nested switch":    {fn("\tif v.Foreign {\n" + warn + "\nswitch v.Reason { case \"x\": return v }\n\t}"), "returns"},
+		"a return in a nested else":      {fn("\tif v.Foreign {\n" + warn + "\nif a { log.Print(1) } else { return v }\n\t}"), "returns"},
+		"a nested if with only the WARN": {fn("\tif v.Foreign {\n" + warn + "\nif a { log.Print(1) }\n\t}"), "not straight-line"},
+		"a nested switch":                {fn("\tif v.Foreign {\n" + warn + "\nswitch v.Reason { default: }\n\t}"), "not straight-line"},
+		"a loop":                         {fn("\tif v.Foreign {\n" + warn + "\nfor { break }\n\t}"), "not straight-line"},
+		"a goto":                         {fn("\tif v.Foreign {\n" + warn + "\ngoto end\n\t}\nend:"), "goto"},
+		"a panic":                        {fn("\tif v.Foreign {\n" + warn + "\npanic(1)\n\t}"), "calls panic"},
+		"an exit":                        {fn("\tif v.Foreign {\n" + warn + "\nos.Exit(1)\n\t}"), "calls Exit"},
+		"a go statement":                 {fn("\tif v.Foreign {\n" + warn + "\ngo log.Print(1)\n\t}"), "not straight-line"},
+		"a defer":                        {fn("\tif v.Foreign {\n" + warn + "\ndefer log.Print(1)\n\t}"), "not straight-line"},
+		"an else":                        {fn("\tif v.Foreign {\n" + warn + "\n\t} else { log.Print(1) }"), "else"},
+		"another call":                   {fn("\tif v.Foreign {\n" + warn + "\ntime.Sleep(1)\n\t}"), "calls Sleep"},
+		"a second branch":                {fn("\tif v.Foreign {\n" + warn + "\n\t}\n\tif v.Foreign {\n log.Print(1)\n\t}"), "exactly one branch"},
+		"a nested branch on the verdict": {fn("\tif v.Foreign {\n" + warn + "\nif v.Foreign { log.Print(1) }\n\t}"), "exactly one branch"},
+		"control flow inside the adopter closure is its own": {fn("\tif v.Foreign {\n" + warn + "\nf := func() { if a { return } }\n\t}"), ""},
+	}
+	for name, c := range cases {
+		got := strings.Join(verdictBranchProblems(parseSettle(t, c.src)), " | ")
+		if c.want == "" {
+			assert.Empty(t, got, name)
+			continue
 		}
-		cond, ok := ifs.Cond.(*ast.SelectorExpr)
-		if !ok || cond.Sel.Name != "Foreign" {
-			return true
-		}
-		branches++
-		assert.Nil(t, ifs.Else, "no else: nothing differs for the other verdicts")
-		checkCalls := func(body ast.Node) {
-			ast.Inspect(body, func(m ast.Node) bool {
-				switch y := m.(type) {
-				case *ast.FuncLit: // the adopter: its own returns are its own; its calls are still checked
-					return true
-				case *ast.ReturnStmt:
-					_ = y
-				case *ast.CallExpr:
-					name := ""
-					switch fx := y.Fun.(type) {
-					case *ast.Ident:
-						name = fx.Name
-					case *ast.SelectorExpr:
-						name = fx.Sel.Name
-					}
-					if name != "" && !allowedInWarn[name] {
-						t.Errorf("the verdict branch calls %s: only the WARN and the warning belong there", name)
-					}
-				}
-				return true
-			})
-		}
-		checkCalls(ifs.Body)
-		for _, st := range ifs.Body.List { // a return directly in the branch would skip the rest of the start: none
-			if _, isRet := st.(*ast.ReturnStmt); isRet {
-				t.Errorf("the verdict branch must not return")
-			}
-		}
-		return true
-	})
-	assert.Equal(t, 1, branches, "exactly one branch on the verdict")
-	for _, s := range fn.Body.List { // and nothing after it returns early on the verdict
-		if r, ok := s.(*ast.ReturnStmt); ok {
-			assert.Len(t, r.Results, 1, "settleDataOwner returns the verdict and nothing else")
-		}
+		assert.Contains(t, got, c.want, name)
 	}
 }
