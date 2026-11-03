@@ -274,8 +274,8 @@ export function _renderSessionItem(s, groupName, isCompact, collapsed, teamDefau
     // A message the paste gate held (the last automated one Coral did not type, #7727) is a state a person must see: the row's one chip, "Message held", when no attention chip owns it (Needs you wins; the hold stays in the tip and on the page).
     const skipped = s.sleeping || !(Number(s.board_unread) > 0) ? null : skippedOf(s);
     const heldChip = !waitingBadge && skipped ? ` <span class="chip chip-caps session-state-pill neutral session-held-chip" title="${escapeAttr(skipped.why)}">Message held</span>` : '';
-    // A sleeping agent is a row like any other (#10062): its one quiet chip says Sleeping (when no other chip owns the row; titled when Coral stopped it), and Wake is on the row at a hover or the keyboard, named for the agent
-    const sleepChip = s.sleeping && !waitingBadge && !heldChip ? ` <span class="chip chip-caps session-state-pill neutral"${s.sleep_reason === 'coral_stopped' ? ' title="Asleep since Coral restarted"' : ''}>Sleeping</span>` : '';
+    // Terminal-gone sleepers already have their restart chip. A sleeping agent is a row like any other (#10062): its one quiet chip says Sleeping (when no other chip owns the row; titled when Coral stopped it), and Wake is on the row at a hover or the keyboard, named for the agent
+    const sleepChip = s.sleeping && !isGoneAsleep(s) && !waitingBadge && !heldChip ? ` <span class="chip chip-caps session-state-pill neutral"${s.sleep_reason === 'coral_stopped' ? ' title="Asleep since Coral restarted"' : ''}>Sleeping</span>` : '';
     const wakeBtn = s.sleeping && !isStaleSession(s) ? ` <button type="button" class="btn btn-quiet btn-small" data-on-click="agent-sleep" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(s.session_id || '')}" data-mode="wake" aria-label="Wake ${escapeAttr(resolveSessionIdentity(s))}">Wake</button>` : '';
     const ctxHigh = s.context_pct !== null && s.context_pct !== undefined && s.context_pct >= 80;
     const isTerminal = s.agent_type === "terminal";

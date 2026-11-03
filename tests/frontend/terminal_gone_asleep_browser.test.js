@@ -7,24 +7,48 @@
 // Drives Chrome over CDP (chrome-remote-interface) through agent_view_harness.js; run_cdp_suites.mjs
 // finds CDP suites by that name.
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const { coralReady, framesJs } = require('./helpers/wait');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 
 (async () => {
-    const { client, Page, ev, PRELOAD, install } = await connect();
+    const { client, Page, Emulation, ev, PRELOAD, install } = await connect();
     try {
         await Page.enable();
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
-        await Page.navigate({ url: BASE }); await Page.loadEventFired();
+        await Page.navigate({ url: BASE + '/agents' }); await Page.loadEventFired();
         await install();
+        await coralReady(ev);
 
         await ev(`(async () => {
             window.__m.add('gone-a', 'G', 3, { sleeping: true, sleep_reason: 'terminal_gone' });
             window.__m.add('nap-b', 'N', 3, { sleeping: true });
+            window.__m.add('ended-d', 'E', 3, { sleeping: true, sleep_reason: 'agent_exited' });
             window.__m.add('arch-c', 'A', 3, { archived: true, sleep_reason: 'terminal_gone' });
             window.T.render.renderLiveSessions(window.T.state.liveSessions);
             return true;
         })()`);
+        // #12942: keep the restart chip alone for terminal-gone sleepers. Plain and
+        // ended sleepers retain their existing pills; check both sidebar/list layouts.
+        const failures = [];
+        for (const [width, height, mobile] of [[1280, 800, false], [390, 844, true]]) {
+            await Emulation.setDeviceMetricsOverride({ width, height, deviceScaleFactor: 1, mobile });
+            await Emulation.setTouchEmulationEnabled({ enabled: mobile });
+            for (const theme of ['dark', 'light']) {
+                await ev(`document.documentElement.setAttribute('data-theme', '${theme}'); T.render.renderLiveSessions(T.state.liveSessions); true`);
+                await ev(framesJs(2));
+                const chips = await ev(`(() => { const info = id => [...document.querySelectorAll('.session-group-item[data-session-id="' + id + '"] .terminal-gone-chip, .session-group-item[data-session-id="' + id + '"] .session-state-pill')].map(e => e.textContent.trim());
+                    return { gone: info('gone-a-id'), nap: info('nap-b-id'), ended: info('ended-d-id') }; })()`);
+                if (chips.gone.join('|') !== 'Terminal gone') failures.push(`${width} ${theme}: terminal-gone row has duplicate state chips: ${JSON.stringify(chips.gone)}`);
+                assert.deepEqual(chips.nap, ['Sleeping'], 'plain sleeper unchanged');
+                assert.deepEqual(chips.ended, ['Ended', 'Sleeping'], 'ended sleeper unchanged');
+                if (process.env.CORAL_SCREENSHOT_DIR) {
+                    fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR, { recursive: true });
+                    fs.writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/terminal-gone-${width}-${theme}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64'));
+                }
+            }
+        }
         const row = id => `document.querySelector('.session-group-item[data-session-id="${id}"]')`;
         const rows = await ev(`(() => { const r = id => document.querySelector('.session-group-item[data-session-id="' + id + '"]');
             const info = id => { const e = r(id); return e ? { chip: !!e.querySelector('.terminal-gone-chip'), text: e.textContent.replace(/\\s+/g, ' '), aria: e.getAttribute('aria-label') || '' } : null; };
@@ -63,6 +87,7 @@ const BASE = require('./test_base').BASE;
             window.restartDirect = orig; return window.__restarts; })()`);
         assert.deepEqual(restarted, [['gone-a', 'claude', 'gone-a-id']]);
         console.log('   ✓ the chip restarts it');
+        assert.deepEqual(failures, [], 'terminal-gone sleeper has one chip');
         console.log('PASS terminal_gone_asleep_browser');
     } finally {
         await client.close();
