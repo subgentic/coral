@@ -8,6 +8,7 @@ import { toDrivers, createBody, errorOf } from './goals_adapter.js';
 import { importOnce } from './import_once.js';
 import * as W from './goal_words.js';
 import { PHONE_QUERY } from './phone_layout.js';
+const { assess, EXAMPLES, TASKS_MAX } = await importOnce('./goal_guide.js'); // lazy: its failure is retried
 await loadStyles('goal_editor.css'); // not at start (page_weight): the editor's own sheet loads with this module, before anything draws
 const GOAL_DESCRIPTION_MAX = 2000; // the server's cap on a goal's outcome (MaxGoalOutcome)
 
@@ -116,17 +117,46 @@ export function openGoalEditor(opts = {}) {
     });
     const d = el('input'); d.type = 'text'; d.maxLength = 300; d.autocomplete = 'off'; d.id = 'goal-new-done'; d.placeholder = 'What a person can check';
     const doneLab = el('label', 'goal-label'); doneLab.htmlFor = 'goal-new-done'; doneLab.append('Done when ', el('span', 'goal-label-note', '· one thing a person can check (optional)'));
+    const doneChips = el('div', 'goal-done-signs'); doneChips.setAttribute('aria-label', 'What the done-when has'); // under Done when: the checks as small notes
     const pics = el('div', 'goals-pics goal-pics'); let tray = null; // the pictures of the goal: the comment box's tray, loaded when the form opens
     const picLab = el('div', 'goal-label', 'Pictures'); picLab.id = 'goal-pics-label';
     const picRow = el('div', 'goal-pics-row'); picRow.setAttribute('role', 'group'); picRow.setAttribute('aria-labelledby', 'goal-pics-label');
     const err = el('p', 'goals-field-error'); err.setAttribute('role', 'alert');
-    const main = el('div', 'goals-form-body goal-main'); main.append(t, descLab, bar, desc, descCount, el('div', 'goal-gap'), doneLab, d, picLab, pics, err);
+    const main = el('div', 'goals-form-body goal-main'); main.append(t, descLab, bar, desc, descCount, el('div', 'goal-gap'), doneLab, d, doneChips, picLab, pics, err);
 
+    // the Guide rail: the board's rules for how big a goal is, as local checks that follow the words (goal_guide.js; no model, no agent)
+    const guide = el('section', 'goal-card goal-guide'); guide.setAttribute('aria-labelledby', 'goal-guide-title');
+    const gTitle = el('h4', null, 'Guide'); gTitle.id = 'goal-guide-title'; const gNote = el('span', 'goal-guide-note', ' \u00b7 updates as you write'); gTitle.append(gNote);
+    const gSummary = el('p', 'goal-guide-summary'); gSummary.setAttribute('role', 'status'); gSummary.setAttribute('aria-live', 'polite'); // said once, a moment after the words stop
+    const gChecks = el('ul', 'goal-checks');
+    const gSize = el('div', 'goal-size'), gSizeLab = el('div', 'goal-label', 'Likely size'), meter = el('div', 'goal-meter'), fill = el('i'), gSizeWords = el('p', 'goal-size-words');
+    meter.append(fill); gSize.append(gSizeLab, meter, gSizeWords);
+    guide.append(gTitle, gSummary, gChecks, gSize);
+    const examples = el('section', 'goal-card goal-examples'); examples.setAttribute('aria-labelledby', 'goal-examples-title');
+    const exTitle = el('h4', null, 'A good \u201cdone when\u201d'); exTitle.id = 'goal-examples-title';
+    const exList = el('ul', 'goal-example-list');
+    for (const text of EXAMPLES.slice(0, 2)) { const li = el('li'), b = btn('goal-example', `\u201c${text}\u201d`, () => { d.value = text; d.dispatchEvent(new Event('input', { bubbles: true })); d.focus(); }); b.setAttribute('aria-label', `Use this done-when: ${text}`); li.append(b); exList.append(li); }
+    examples.append(exTitle, exList);
+    const rail = el('aside', 'goal-rail'); rail.setAttribute('aria-label', 'Guide'); rail.append(guide, examples);
+    const ICON = { ok: 'check_circle', warn: 'warning', todo: 'info' };
+    let summaryTimer = null;
+    const refresh = () => {
+        const a = assess({ title: t.value, outcome: desc.value, doneWhen: d.value });
+        gChecks.replaceChildren(...a.checks.map(c => { const li = el('li', `goal-check goal-check-${c.state}`), i = el('span', 'material-icons', ICON[c.state]); i.setAttribute('aria-hidden', 'true'); const body = el('div'); body.append(el('b', null, c.title), el('small', null, c.why)); li.append(i, body); li.dataset.check = c.id; return li; }));
+        doneChips.replaceChildren(...a.chips.map(c => el('span', `goal-done-sign goal-done-${c.state}`, c.text)));
+        const share = a.size.steps ? Math.min(a.size.steps / TASKS_MAX, 1) : 0;
+        fill.style.width = `${Math.round(share * 100)}%`; meter.dataset.state = a.size.state; gSizeWords.textContent = a.size.words;
+        meter.setAttribute('role', 'img'); meter.setAttribute('aria-label', a.size.words);
+        clearTimeout(summaryTimer); summaryTimer = setTimeout(() => { gSummary.textContent = a.summary; }, 600);
+        gSummary.dataset.looks = String(a.looks);
+    };
+    for (const f of [t, desc, d]) f.addEventListener('input', refresh);
+    refresh(); gSummary.textContent = 'Nothing to look at';
     const go = btn('btn btn-primary', 'Create goal'); go.type = 'submit';
     const cancel = btn('btn', 'Cancel', () => dlg.close());
     const actions = el('div', 'goals-actions'); actions.append(cancel, go);
     const phone = matchMedia(PHONE_QUERY); // the bar is back and the title on a phone (56 px, as every form screen), the chips are the first line of the body; on a desktop they sit in the bar
-    const place = () => { if (phone.matches) main.prepend(chips); else head.append(chips); };
+    const place = () => { if (phone.matches) { main.prepend(chips); main.append(rail); } else { head.append(chips); form.append(rail); } };
     place(); phone.addEventListener('change', place);
     form.append(head, actions, main);
     dlg.append(form); document.body.append(dlg);
@@ -168,7 +198,7 @@ export function openGoalEditor(opts = {}) {
             if (opts.onCreated) await opts.onCreated(project, told);
         } catch (ex) { err.textContent = `The goal was not created: ${W.errorWords(ex && ex.code, ex && ex.message)}`; go.disabled = false; sync(); }
     });
-    dlg.addEventListener('close', () => { if (tray) tray.destroy(); dlg.remove(); if (opts.onClose) opts.onClose(); });
+    dlg.addEventListener('close', () => { clearTimeout(summaryTimer); if (tray) tray.destroy(); dlg.remove(); if (opts.onClose) opts.onClose(); });
     dlg.showModal(); t.focus();
     return dlg;
 }

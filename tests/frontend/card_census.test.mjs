@@ -12,6 +12,7 @@ const css = path.resolve(here, '../../coral-go/pkg/frontend/static/css');
 
 // the card looks, and the padding kind each takes ('none': the card holds rows that carry their own padding)
 export const CARDS = {
+    'goal-card': 'regular',           // the New goal screen's Guide and examples (#12724)
     'ac-card': 'dense',               // a comment thread
     'tool-card': 'dense',             // a tool call in the chat
     'machine-health-card': 'dense',   // a machine's health row in About
