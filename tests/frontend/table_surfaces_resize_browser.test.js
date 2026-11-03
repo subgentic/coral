@@ -6,13 +6,16 @@ const { CASES } = require('./helpers/column_resize_surfaces');
 const BASE = require('./test_base').BASE;
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
-    const select = '#resize-fixture';
+    let select = '#resize-fixture';
+    const failures = [];
     const widths = () => ev(`Object.fromEntries([...document.querySelectorAll('${select} th[data-key]')].filter(h=>h.getClientRects().length).map(h=>[h.dataset.key,Math.round(h.getBoundingClientRect().width)]))`);
     const sort = () => ev(`JSON.stringify([...document.querySelectorAll('${select} th[aria-sort]')].map(h=>[h.dataset.key,h.getAttribute('aria-sort')]))`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
-        for (const [name, setup] of Object.entries(CASES)) {
-            if (process.env.CORAL_RESIZE_CASE && process.env.CORAL_RESIZE_CASE !== name) continue;
+        for (const [name, entry] of Object.entries(CASES)) {
+            const setup = typeof entry === 'string' ? entry : entry.setup; select = typeof entry === 'string' ? '#resize-fixture' : entry.selector;
+            if (process.env.CORAL_RESIZE_CASE && !process.env.CORAL_RESIZE_CASE.split(',').includes(name)) continue;
+            try {
             const mount = async () => { await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev); await ev(`(async()=>{${setup} return true;})()`); await waitFor(`document.querySelectorAll('${select} tbody tr').length >= 2`, name + ' production rows'); await ev(framesJs(6)); };
             await Emulation.setDeviceMetricsOverride({width:1280,height:800,deviceScaleFactor:1,mobile:false}); await Emulation.setTouchEmulationEnabled({enabled:false});
             await mount();
@@ -25,7 +28,9 @@ const BASE = require('./test_base').BASE;
             assert.ok((await widths())[edge.key]>=restored[edge.key]+14,name+': keyboard changes width');
             await Emulation.setDeviceMetricsOverride({width:390,height:844,deviceScaleFactor:1,mobile:true}); await Emulation.setTouchEmulationEnabled({enabled:true}); await ev(framesJs(6));
             assert.equal(await ev(`[...document.querySelectorAll('${select} .dt-resize')].filter(h=>!h.hidden&&h.getClientRects().length).length`),0,name+': phone has no handles'); assert.ok(await ev(`document.documentElement.scrollWidth<=innerWidth`),name+': phone fits');
-            console.log('PASS resize surface: '+name);
+            console.log('[PASS] resize surface: '+name);
+            } catch (e) { failures.push(name + ': ' + e.message); console.error('[FAIL] resize surface: ' + name + ': ' + e.message); }
         }
+        assert.deepEqual(failures, [], 'production resize contracts');
     } finally { await client.close(); }
 })().catch(e=>{console.error(e);process.exit(1)});

@@ -268,7 +268,7 @@ function folderTable(key) {
     if (key === 'jobs') {
         return { ...base, signature: JSON.stringify([_gone, !!firstRun().cards, rows.map(i => [i.job, lastWords(i.run), nextOf(i.job), runsWords(i)])]),
             node: () => DT.dataTable({
-                label: `Jobs, ${rows.length}`, rows, oneLine: true, wrapNames: true, rowKey: i => i.id, rowName: i => i.name, state: stateOf(key), open: i => openRow(key, i),
+                label: `Jobs, ${rows.length}`, rows, oneLine: true, resize: true, wrapNames: true, rowKey: i => i.id, rowName: i => i.name, state: stateOf(key), open: i => openRow(key, i),
                 columns: [ // one line a row (Goal #79): what the job runs is the name's tooltip and its page's; a narrow list drops Schedule, then Next (dropAt, #8931)
                     { key: 'job', label: 'Job', primary: true, width: 'grow', sort: true, sortValue: i => i.name, cell: i => nameButton(i, runsWords(i)) },
                     { key: 'schedule', label: 'Schedule', width: '12rem', dropAt: 36, sort: true, sortValue: i => scheduleOf(i.job), cell: i => scheduleOf(i.job) },
