@@ -113,7 +113,7 @@ const win = (version, over = {}, relaunch = {}) => ({ enabled: true, relaunch_av
             // the Network and Hub pane draws no switch or sentence for it, and Install update is still there
             await load(view, win('1.4.126', { relaunch_available: false }));
             await ev(`window.__upd.hubAvail = false; true`);
-            pn = await ev(`(async () => { window.showSettingsModal('updates'); const m = await import(${S} + 'update_settings.js'); await m.showUpdatesPane(); const b = document.getElementById('update-pane-body'); const act = b.querySelector('.update-act'); return { text: b.textContent.replace(/\\s+/g, ' ').trim(), auto: !!document.getElementById('settings-update-auto'), act: act ? act.textContent.trim() : null }; })()`);
+            pn = await ev(`(async () => { await window.showSettingsModal('updates'); const m = await import(${S} + 'update_settings.js'); await m.showUpdatesPane(); const b = document.getElementById('update-pane-body'); const act = b.querySelector('.update-act'); return { text: b.textContent.replace(/\\s+/g, ' ').trim(), auto: !!document.getElementById('settings-update-auto'), act: act ? act.textContent.trim() : null }; })()`);
             check(`${tag}: without the Hub's feature Settings > Updates has no Coral Hub row, keeps the automatic switch, and still has Install update (${JSON.stringify({ auto: pn.auto, act: pn.act, hub: /Relaunch from Coral Hub/.test(pn.text) })})`, pn.auto === true && !/Relaunch from Coral Hub|Coral Hub can|Not on Windows/.test(pn.text) && pn.act === 'Install update');
             await ev(`window.hideSettingsModal(); true`);
             for (const [avail, want] of [[false, false], [true, true]]) {
