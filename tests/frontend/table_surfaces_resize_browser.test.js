@@ -23,7 +23,7 @@ const BASE = require('./test_base').BASE;
             assert.ok(edge,name+': movable shared separator'); const before=await widths(), order=await sort();
             for(const [type,x] of [['mouseMoved',edge.x],['mousePressed',edge.x],['mouseMoved',edge.x-24],['mouseReleased',edge.x-24]]) await client.Input.dispatchMouseEvent({type,x,y:edge.y,button:'left',buttons:type==='mouseReleased'?0:1,clickCount:1});
             await ev(framesJs(5)); const moved=await widths(); assert.ok(moved[edge.key]<=before[edge.key]-20,name+': drag changes width'); assert.equal(await sort(),order,name+': drag keeps sort');
-            await mount(); const restored=await widths(); assert.ok(Math.abs(restored[edge.key]-moved[edge.key])<=2,name+': width remembered on reload');
+            await mount(); const restored=await widths(); assert.ok(Math.abs(restored[edge.key]-moved[edge.key])<=2,name+': width remembered on reload '+JSON.stringify({key:edge.key,before,moved,restored}));
             await ev(`document.querySelector('${select} th[data-key="${edge.key}"] .dt-resize').focus(); true`); await client.Input.dispatchKeyEvent({type:'keyDown',key:'ArrowRight'}); await client.Input.dispatchKeyEvent({type:'keyUp',key:'ArrowRight'}); await ev(framesJs(5));
             assert.ok((await widths())[edge.key]>=restored[edge.key]+14,name+': keyboard changes width');
             await Emulation.setDeviceMetricsOverride({width:390,height:844,deviceScaleFactor:1,mobile:true}); await Emulation.setTouchEmulationEnabled({enabled:true}); await ev(framesJs(6));

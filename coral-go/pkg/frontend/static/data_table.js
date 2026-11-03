@@ -221,10 +221,11 @@ export function dataTable(cfg) {
     const wOf = (c) => (st.widths[c.key] ? Math.max(st.widths[c.key], minOf(c)) : 0);
     const ITEM_MIN = 120; // the name column is the one that gives room: it truncates down to this
     const fixedW = (c) => (c.fixed && /rem$/.test(c.width || '') ? c.width : null); // a fixed column (the Actions of a list) has the width it declares: no handle, never frozen or kept, so no other column's resize squeezes its buttons (#9845)
+    const elasticColumn = cols => cols.find(c => c.width === 'grow') || cols.find(c => c.primary) || cols.find(c => !fixedW(c) && !c.fixed);
     function readWidths() {
         try {
             const o = JSON.parse(browserLocal.get(wkey) || 'null') || {}, out = {};
-            for (const c of columns) { const v = Number(o[c.key]); if (!c.fixed && c.width !== 'grow' && !c.primary && Number.isFinite(v) && v >= minOf(c) && v <= MAX_W) out[c.key] = Math.round(v); } // a fixed column is never kept
+            for (const c of columns) { const v = Number(o[c.key]); if (!c.fixed && c !== elasticColumn(columns) && Number.isFinite(v) && v >= minOf(c) && v <= MAX_W) out[c.key] = Math.round(v); } // a fixed column is never kept
             return out;
         } catch { return {}; }
     }
@@ -267,7 +268,7 @@ export function dataTable(cfg) {
             return;
         }
         if (!box.clientWidth) return;
-        const avail = box.clientWidth, rem = remPx(), live = columns.filter(c => !emptyKeys.has(c.key) && !cssHides(c)), prim = live.find(c => c.primary || c.width === 'grow') || live.find(c => !fixedW(c) && !c.fixed); // a table always has one elastic column: the one it declares, or else its first that is not fixed
+        const avail = box.clientWidth, rem = remPx(), live = columns.filter(c => !emptyKeys.has(c.key) && !cssHides(c)), prim = elasticColumn(live); // a table always has one elastic column: the one it declares, or else its first that is not fixed
         for (const n of box.querySelectorAll('.dt-grow-implied')) n.classList.remove('dt-grow', 'dt-grow-implied'); // the elastic column a table did not declare is marked like one it did (dt-grow), until the layout picks it again
         if (prim && prim.width !== 'grow' && !prim.primary) for (const n of box.querySelectorAll(`th.dt-th[data-key="${attrEsc(prim.key)}"], td.dt-td[data-key="${attrEsc(prim.key)}"]`)) if (!n.classList.contains('dt-grow')) n.classList.add('dt-grow', 'dt-grow-implied');
         const nat = measureNatural(live);
