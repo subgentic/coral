@@ -42,7 +42,11 @@ const STUB = `(() => { const R = window.fetch; const json = b => Promise.resolve
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await ev(`try { for (const k of Object.keys(localStorage)) if (k.includes('coral-eff-group')) localStorage.removeItem(k); } catch {} window.switchNavTab('tokens'); true`);
         await waitFor(`!!document.querySelector('#cost-group-bar .eff-seg-btn')`, 'the Analytics page', 10000);
-        const table = sel => ev(`(() => { const t = document.querySelector(${JSON.stringify(sel)} + ' table'); if (!t) return null; const vis = e => e.getClientRects().length > 0; const heads = [...t.querySelectorAll('thead th')].filter(vis).map(h => h.textContent.replace(/[\\u2195\\u2191\\u2193]/g, '').trim());
+        // A table lays its columns out in its first layout pass (data_table.js applyWidths, from a ResizeObserver): until then every column is in it (the By agent table has 12, the Cache read and Cache write ones drop only then; #12764's probe
+        // saw 12 for one frame at 1068 px, then 10), and a read that lands between the rows being added and that pass sees the undropped table. The page never paints that state. `dt-sized` is set when a layout pass has finished.
+        const settled = sel => waitFor(`!!document.querySelector(${JSON.stringify(sel + ' .dt-box.dt-sized')})`, `the ${sel} table laid out`, 8000);
+        const table = async sel => { await settled(sel); return tableRead(sel); };
+        const tableRead = sel => ev(`(() => { const t = document.querySelector(${JSON.stringify(sel)} + ' table'); if (!t) return null; const vis = e => e.getClientRects().length > 0; const heads = [...t.querySelectorAll('thead th')].filter(vis).map(h => h.textContent.replace(/[\\u2195\\u2191\\u2193]/g, '').trim());
             const keys = [...t.querySelectorAll('thead th')].map((h, i) => [i, vis(h), h.textContent.replace(/[\\u2195\\u2191\\u2193]/g, '').trim()]).filter(x => x[1]);
             return { heads, rows: [...t.querySelectorAll('tbody tr')].filter(vis).map(r => keys.map(([i]) => (r.children[i] ? r.children[i].textContent.replace(/\\s+/g, ' ').trim() : ''))) }; })()`);
         // the burn rate is an estimate, said on hover only (UI/UX, #9511): 4 dollars over the 24 hours between the buckets
