@@ -62,6 +62,24 @@ const { coralReady } = require('./helpers/wait');
             check(`${tag}: and no request to make it`, body.working_dir === '/work/existing' && body.create_new_folder === undefined, JSON.stringify(body.create_new_folder));
             await close();
 
+            // QA's SHOULDs: the mark that lets Launch ask is cleared on the first keystroke (before the folder is checked again), and another computer's folder is not offered the line
+            await open('/work/planner-shop');
+            check(`${tag}: before the edit the mark is set`, (await ev(`document.getElementById('launch-team-dir').dataset.createNew`)) === '/work/planner-shop');
+            await ev(`(() => { const e = document.getElementById('launch-team-dir'); e.value = '/work/planner-shopx'; e.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
+            check(`${tag}: the first keystroke clears the mark at once`, (await ev(`document.getElementById('launch-team-dir').dataset.createNew === undefined`)) === true);
+            await close();
+            await ev(`window.showLaunchModal(); window._selectLaunchType('team'); true`);
+            await waitFor(`getComputedStyle(document.getElementById('launch-step-team')).display !== 'none'`, 'the team step', 8000);
+            await ev(`document.getElementById('launch-team-dir').dataset.dirServer = 'srv2'; true`); // the folder is another computer's
+            await fill('team-board-name', 'planner-shop');
+            await fill('launch-team-dir', '/work/planner-shop');
+            await sleep(1100); // sleep-ok: the folder check is debounced; nothing marks "no line will come"
+            check(`${tag}: another computer's folder is not offered the line`, !(await line()).shown && (await ev(`document.getElementById('launch-team-dir').dataset.createNew === undefined`)) === true);
+            body = await launch();
+            check(`${tag}: and Launch makes no request for it`, body.create_new_folder === undefined);
+            await ev(`delete document.getElementById('launch-team-dir').dataset.dirServer; true`);
+            await close();
+
             // what Coral would not make, and where it cannot: no line and no request
             for (const [why, dir] of [['a name with a space', '/work/has space'], ['a missing parent', '/nope/planner-shop'], ['a path with ..', '/work/a/../planner-shop'], ['two new levels', '/work/new/deeper']]) {
                 await open(dir);
