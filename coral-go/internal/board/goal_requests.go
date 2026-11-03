@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"sync/atomic"
 	"time"
 	"unicode/utf8"
 
@@ -207,9 +208,26 @@ func requestText(field, s string, max int, multiline bool) (string, error) {
 	return s, nil
 }
 
+// goalRequestClock is the clock the expiry reads (nil: the real one). Only a test sets it, when its board is seeded by counting back from a fixed date: with the real clock such a board's requests expire
+// as the real date moves on (the analytics test of #12925 failed that way on 2026-11-03).
+var goalRequestClock atomic.Pointer[func() time.Time]
+
+func goalRequestNow() time.Time {
+	if f := goalRequestClock.Load(); f != nil {
+		return (*f)()
+	}
+	return time.Now()
+}
+
+// SetGoalRequestClockForTest makes the request expiry read now instead of the real clock; the returned function puts the real one back.
+func SetGoalRequestClockForTest(now func() time.Time) (restore func()) {
+	goalRequestClock.Store(&now)
+	return func() { goalRequestClock.Store(nil) }
+}
+
 // expireGoalRequests marks the requests older than the TTL that nobody answered, on both sides, as expired.
 func (s *Store) expireGoalRequests(ctx context.Context, q sqlExecer) error {
-	cutoff := time.Now().UTC().Add(-GoalRequestTTL).Format(time.RFC3339)
+	cutoff := goalRequestNow().UTC().Add(-GoalRequestTTL).Format(time.RFC3339)
 	now := nowUTC()
 	if _, err := q.ExecContext(ctx, `UPDATE board_goal_requests_in SET status = 'expired', answered_at = ? WHERE status = 'pending' AND created_at < ?`, now, cutoff); err != nil {
 		return err
