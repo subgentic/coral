@@ -999,7 +999,7 @@ registerGroupSource('hub-inbox', {
                         note(folderRoute);
                         go({ ...folderRoute, id: g.board_id, item: g.id });
                     },
-                    oneLine: true, sortBar: false,
+                    oneLine: true, resize: true, sortBar: false,
                     mail: g => ({ lead: { icon: 'flag', square: true, name: g.state }, title: g.title, team: goalTeam(g), ask: [g.new_comments > 0 ? 'New comments' : '', g.outcome || ''].filter(Boolean).join(' \u00b7 '), state: GW.stateWord(g), time: `${GW.stateWord(g)}${GW.allTasksOf(g.rollup) ? ` \u00b7 ${(g.rollup || {}).done || 0}/${GW.allTasksOf(g.rollup)}` : ''}` }), // a phone's row (#9583): a flag, the goal, its outcome, when it moved
                     columns: GC.goalColumns({ teamOf: goalTeam }, ['state', 'goal', 'team', 'progress', 'updated']).flatMap(c => c.key === 'team' ? [...serverColumns().map(x => ({ ...x, width: '8rem', dropAt: 52 })), c] : [c]) }); if (phone) setTimeout(mountBar, 0); return table.el; } };
         }
