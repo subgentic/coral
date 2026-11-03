@@ -92,7 +92,7 @@ func commitMention(content string) (what string, ok bool) {
 
 // offBooksKinds is what the board's settings leave on.
 func offBooksKinds(hs board.HealthSettings) map[string]bool {
-	return map[string]bool{board.OffBooksBusy: hs.BusyNoTask.On, board.OffBooksPost: hs.PostNoTask.On, board.OffBooksUpload: hs.UploadNoTask.On, board.OffBooksGoalSize: hs.GoalSize.On, board.OffBooksLanding: hs.Landing.On, board.OffBooksRelease: hs.Release.On, board.OffBooksGoalReady: hs.GoalsReady.On, board.OffBooksUnowned: hs.UnownedTasks.On}
+	return map[string]bool{board.OffBooksBusy: hs.BusyNoTask.On, board.OffBooksPost: hs.PostNoTask.On, board.OffBooksUpload: hs.UploadNoTask.On, board.OffBooksGoalSize: hs.GoalSize.On, board.OffBooksLanding: hs.Landing.On, board.OffBooksRelease: hs.Release.On, board.OffBooksGoalReady: hs.GoalsReady.On, board.OffBooksUnowned: hs.UnownedTasks.On, board.OffBooksOperatorWait: true}
 }
 
 // offBooksItems notes what happened off the books since the last check and returns the lines for the check: the occurrences not said yet, of the signals that are on. The ids it
@@ -109,6 +109,7 @@ func (m *BoardHealthMonitor) offBooksItems(ctx context.Context, project, orch st
 		m.noteBusyNoTask(ctx, project, orch, subs, bySession, inProgress, time.Duration(hs.BusyNoTask.AfterMin)*time.Minute, now)
 	}
 	m.scanOffBooksPosts(ctx, project, orch, subs, hs.PostNoTask.On, now)
+	m.noteOperatorWaits(ctx, project, orch, subs, bySession, now) // a post that waits on the Operator and is not in their Needs you (#12138)
 	if hs.GoalSize.On {
 		m.noteGoalSizes(ctx, project, hs.GoalSize.Limit, now)
 	}
@@ -149,8 +150,13 @@ func (m *BoardHealthMonitor) offBooksItems(ctx context.Context, project, orch st
 			continue
 		}
 		at, _ := time.Parse("2006-01-02T15:04:05.000Z", p.At)
-		items = append(items, teamhealth.Item{Rank: 2, Agent: teamhealth.Name(p.Agent), Problem: p.Detail,
-			Evidence: "Seen " + teamhealth.Age(now.Sub(at)) + " ago, off the board's tasks", Suggest: "ask what it is for, or put it on a task"})
+		if p.Kind == board.OffBooksOperatorWait { // an agent's post that waits on the Operator: what to do is to have it put the question in their Needs you
+			items = append(items, teamhealth.Item{Rank: 2, Agent: teamhealth.Name(p.Agent), Problem: p.Detail,
+				Evidence: "Posted " + teamhealth.Age(now.Sub(at)) + " ago", Suggest: "its author was told; if it still waits, have it post the question with --ask to the Operator"})
+		} else {
+			items = append(items, teamhealth.Item{Rank: 2, Agent: teamhealth.Name(p.Agent), Problem: p.Detail,
+				Evidence: "Seen " + teamhealth.Age(now.Sub(at)) + " ago, off the board's tasks", Suggest: "ask what it is for, or put it on a task"})
+		}
 		ids = append(ids, offBooksShown{id: p.ID, needle: teamhealth.Name(p.Agent) + ": " + p.Detail})
 	}
 	if len(dropped) > 0 {

@@ -120,7 +120,7 @@ func dumpBoard(t *testing.T, path string) []string {
 	// The off-the-books scan (#7793) is new work the frozen walk does not do: it marks where it has read the board's posts. That one row, and the (empty here) occurrences table, are not what the oracle compares.
 	kept := out[:0]
 	for _, line := range out {
-		if !strings.Contains(line, "key=health_offbooks_post_cursor") {
+		if !strings.Contains(line, "key=health_offbooks_post_cursor") && !strings.Contains(line, "key=health_operator_wait_cursor") { // the Operator-wait scan (#12138) marks where it has read the board the same way
 			kept = append(kept, line)
 		}
 	}
