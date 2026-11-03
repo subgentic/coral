@@ -112,3 +112,17 @@ func TestARefusedAskWithButtonsIsNotCountedAsOpen(t *testing.T) {
 }
 
 func board10() int { return board.AskButtonsOpenMax + 2 }
+
+// The likeliest reason a wake button was refused (#12600): the question's own text tags the agent to wake, which makes it a question to them as well. It is refused, and the refusal says which name and what to do.
+func TestAWakeQuestionThatTagsTheAgentIsRefusedWithTheCause(t *testing.T) {
+	post, count, _, _ := buttonRig(t)
+	status, out := post(map[string]any{"subscriber_id": "Lead", "content": "@Operator @Dev is asleep: wake them?", "ask": true, "buttons": []string{"Wake Dev=wake:Dev"}})
+	require.Equal(t, http.StatusBadRequest, status, out)
+	msg, _ := out["error"].(string)
+	assert.Contains(t, msg, "@Dev", "names the member the text tags")
+	assert.Contains(t, msg, "without the @", "and what to do")
+	assert.Zero(t, count())
+
+	status, out = post(map[string]any{"subscriber_id": "Lead", "content": "@Operator Dev is asleep: wake them?", "ask": true, "buttons": []string{"Wake Dev=wake:Dev"}})
+	assert.Equal(t, http.StatusOK, status, out)
+}
