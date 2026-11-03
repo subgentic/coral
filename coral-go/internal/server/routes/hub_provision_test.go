@@ -846,3 +846,20 @@ func TestProvisionForgetKeyIsRefusedForAFailureThatIsNotAChangedKey(t *testing.T
 	left, _ := os.ReadFile(pe.known)
 	assert.Contains(t, string(left), "box.example.com", "nothing was removed")
 }
+
+// The data folder of a set up is the person's choice (a Coral set up by hand keeps its data in .coral): a plain relative folder is taken and shown in the plan, anything else is refused before it runs.
+func TestProvisionDataDirChoice(t *testing.T) {
+	pe := newProvEnv(t, "known", "Linux x86_64", true)
+	_, v := pe.do("POST", "/api/servers/provision/plan", map[string]any{"target": "user@box.example.com"})
+	plan := v["plan"].(string)
+	assert.Equal(t, ".coral-server/data", v["data_dir"], "the default")
+	pe.do("POST", "/api/servers/provision/"+plan+"/connect", nil)
+	for _, bad := range []string{"../x", "/etc", "a b", "a;rm -rf x", "~/x", "@keep", "$HOME"} {
+		code, _ := pe.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{"data_dir": bad})
+		assert.Equal(t, 400, code, bad)
+	}
+	code, _ := pe.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{"accept_terms": true, "terms_sha256": terms.EULADigest(), "data_dir": ".coral"})
+	require.Equal(t, 202, code)
+	got := pe.waitPhase(t, plan, "done")
+	assert.Equal(t, ".coral", got["data_dir"], "the plan says where Coral keeps its data")
+}

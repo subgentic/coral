@@ -142,6 +142,17 @@ const (
 // Start starts the installed Coral of version as a detached process (CmdStartDaemon) with the backend named (BackendPTY, BackendTmux or BackendKeep; "" is pty), once: one that is already running is left as it is.
 // It refuses (ErrPortInUse) when something else holds port 8420, and (ErrNoTmux) when tmux is asked for and is not there.
 func (r Runner) Start(ctx context.Context, t Target, version, backend string) error {
+	return r.StartWithDataDir(ctx, t, version, backend, "")
+}
+
+// StartWithDataDir is Start with the data folder Coral keeps its data in, relative to the home folder there (a set up's choice, ValidDataDir). "" keeps the one recorded at the last start, or the default
+// (DefaultDataDir) for a computer with none; the folder is recorded in <install>/datadir so an upgrade and the key reads use it too.
+func (r Runner) StartWithDataDir(ctx context.Context, t Target, version, backend, dataDir string) error {
+	if dataDir == "" {
+		dataDir = "@keep"
+	} else if !ValidDataDir(dataDir) {
+		return ErrNotAllowed
+	}
 	if backend == "" {
 		backend = BackendPTY
 	}
@@ -152,7 +163,7 @@ func (r Runner) Start(ctx context.Context, t Target, version, backend string) er
 		pe.Pid, pe.Command = r.PortHolder(ctx, t)
 		return pe
 	}
-	res, err := r.Run(ctx, t, CmdStartDaemon, version, backend)
+	res, err := r.Run(ctx, t, CmdStartDaemon, version, backend, dataDir)
 	if err != nil {
 		return err
 	}

@@ -97,6 +97,8 @@ type provisionPlan struct {
 	// backend is the terminal backend the person chose for a set up ("pty" when they said nothing, or "tmux"), sent with the run (#12233); tmux is what the connect step found out about that computer:
 	// "yes", "no", or "" before it was asked. An upgrade keeps the backend the computer was started with.
 	backend string
+	// dataDir is the data folder of a set up, relative to the home folder on that computer; "" is the default (~/.coral-server/data). An upgrade keeps the one recorded there.
+	dataDir string
 	tmux    string
 	// agentsSurvive is, for an upgrade, whether the agents on that computer survive the restart: it runs with tmux (the backend recorded there, or tmux where it is installed and none was recorded). "" before
 	// it was read, then "yes" or "no".
@@ -142,6 +144,7 @@ func (p *provisionPlan) view() map[string]any {
 	}
 	if p.kind() == kindSetup {
 		v["backend"] = p.backendOrDefault()
+		v["data_dir"] = p.dataDirOrDefault()
 		if p.tmux != "" {
 			v["tmux"] = p.tmux == "yes" // whether that computer has tmux, so the page can say which choices are open
 		}
@@ -168,6 +171,14 @@ func (p *provisionPlan) view() map[string]any {
 		v["forgotten_keys"] = append([]provisionKey(nil), p.forgotten...)
 	}
 	return v
+}
+
+// dataDirOrDefault is the data folder of a set up: the default unless the person named one.
+func (p *provisionPlan) dataDirOrDefault() string {
+	if p.dataDir != "" {
+		return p.dataDir
+	}
+	return sshprov.DefaultDataDir
 }
 
 // backendOrDefault is the backend of a set up: tmux only when the person chose it.
@@ -483,6 +494,8 @@ type runRequest struct {
 	Confirm string `json:"confirm"`
 	// Backend is the terminal backend of a set up: "pty" (the default: agents end when Coral restarts or is upgraded) or "tmux" (they survive; the computer must have tmux). Ignored for other plans.
 	Backend string `json:"backend"`
+	// DataDir is the folder Coral keeps its data in on that computer, relative to its home folder (a Coral set up by hand keeps its data in ".coral"): "" is the default, ".coral-server/data". Set up only.
+	DataDir string `json:"data_dir"`
 	// AllowDowngrade lets an upgrade install this hub's release over a NEWER one on that computer; without it that is refused before anything is changed (#12217).
 	AllowDowngrade bool `json:"allow_downgrade"`
 }
@@ -507,6 +520,10 @@ func (pr *Provisioner) Run(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.Backend != "" && req.Backend != sshprov.BackendPTY && req.Backend != sshprov.BackendTmux {
 		errBadRequest(w, "the backend is pty or tmux")
+		return
+	}
+	if req.DataDir != "" && !sshprov.ValidDataDir(req.DataDir) {
+		errBadRequest(w, "the data folder is a plain folder name under the home folder there, such as .coral or my-coral/data")
 		return
 	}
 	// A setup and an upgrade put Coral on the computer and record this hub's acceptance of the terms there. Stop and remove do not touch the terms. On a tier that requires the EULA the marker must hold the
@@ -549,6 +566,9 @@ func (pr *Provisioner) Run(w http.ResponseWriter, r *http.Request) {
 	}
 	if p.kind() == kindSetup && req.Backend == sshprov.BackendTmux {
 		p.backend = sshprov.BackendTmux
+	}
+	if p.kind() == kindSetup && req.DataDir != "" && req.DataDir != sshprov.DefaultDataDir {
+		p.dataDir = req.DataDir
 	}
 	p.mu.Unlock()
 	if len(keys) > 0 {
@@ -790,7 +810,7 @@ func (pr *Provisioner) realStartRemote(ctx context.Context, p *provisionPlan) (s
 		}
 		slog.Info("[provision] terms acceptance recorded for a setup", "plan", p.ID, "version", license.EULAVersion, "by", setupAcceptanceLabel(), "at", time.Now().UTC().Format(time.RFC3339))
 	}
-	if err := pr.runner.Start(ctx, p.Target, pr.version, p.backendOrDefault()); err != nil {
+	if err := pr.runner.StartWithDataDir(ctx, p.Target, pr.version, p.backendOrDefault(), p.dataDir); err != nil {
 		if errors.Is(err, sshprov.ErrPortInUse) {
 			return "", "", fail(portInUseSentenceFor(err))
 		}

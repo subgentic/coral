@@ -104,6 +104,21 @@ type spec struct {
 // versionRe is a release version as the hub names it: numbers and an optional suffix, never a path.
 var versionRe = regexp.MustCompile(`^[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,4}(-[A-Za-z0-9.]{1,32})?$`)
 
+// DefaultDataDir is the data folder of a set up that chose nothing, relative to the home folder there. A person can choose another (a Coral set up by hand keeps its data in ".coral").
+const DefaultDataDir = InstallDir + "/data"
+
+// dataDirSeg is one folder name: an optional single leading dot, then a letter, digit or underscore, then letters, digits, dot, underscore or hyphen. So there is no "..", no "." alone and no empty name.
+const dataDirSeg = `\.?[A-Za-z0-9_][A-Za-z0-9._-]{0,60}`
+
+// dataDirArgRe is a data folder as an argument: relative to the home folder, up to five names, or "@keep" (the one recorded at the last start, else the default).
+var dataDirArgRe = regexp.MustCompile(`^(@keep|` + dataDirSeg + `(/` + dataDirSeg + `){0,4})$`)
+
+// ValidDataDir reports whether d is a data folder a set up may name.
+func ValidDataDir(d string) bool { return d != "@keep" && dataDirArgRe.MatchString(d) }
+
+// readDataDir sets d to the data folder recorded at the last start (<install>/datadir), or the default when there is none or it is not a plain relative path.
+const readDataDir = "d=$(cat \"$HOME/" + InstallDir + "/datadir\" 2>/dev/null); case \"$d\" in \"\"|/*|*..*) d=" + DefaultDataDir + ";; esac; "
+
 var backendArgRe = regexp.MustCompile(`^(pty|tmux|keep)$`)
 
 var archRe = regexp.MustCompile(`^(amd64|arm64)$`)
@@ -121,14 +136,15 @@ var specs = map[Command]spec{
 	CmdMkVersionDir:   {template: "umask 077 && mkdir -p \"$HOME/" + InstallDir + "/%[1]s\" && chmod 700 \"$HOME/" + InstallDir + "\" \"$HOME/" + InstallDir + "/%[1]s\"", args: []*regexp.Regexp{versionRe}},
 	CmdReceive:        {template: "umask 077 && cat > \"$HOME/" + InstallDir + "/%s/package.tar.gz\"", args: []*regexp.Regexp{versionRe}, timeout: 15 * time.Minute},
 	CmdTarList:        {template: "cd \"$HOME/" + InstallDir + "/%s\" && tar -tzf package.tar.gz", args: []*regexp.Regexp{versionRe}, timeout: 2 * time.Minute},
-	CmdStartDaemon: {template: "umask 077 && mkdir -p \"$HOME/" + InstallDir + "/data\" && { " + aliveTest + " || { bf=\"$HOME/" + InstallDir + "/backend\"; b=%[2]s; " +
+	CmdStartDaemon: {template: "umask 077 && mkdir -p \"$HOME/" + InstallDir + "\" && { " + aliveTest + " || { bf=\"$HOME/" + InstallDir + "/backend\"; b=%[2]s; " +
+		"d=%[3]s; if [ \"$d\" = @keep ]; then " + readDataDir + "fi; mkdir -p \"$HOME/$d\" && printf %%s \"$d\" > \"$HOME/" + InstallDir + "/datadir\" || exit 1; " +
 		"if [ \"$b\" = keep ]; then b=$(cat \"$bf\" 2>/dev/null); case \"$b\" in pty|tmux) ;; *) if command -v tmux >/dev/null 2>&1; then b=tmux; else b=pty; fi;; esac; fi; " +
 		"if [ \"$b\" = tmux ] && ! command -v tmux >/dev/null 2>&1; then exit 7; fi; printf %%s \"$b\" > \"$bf\"; s=; command -v setsid >/dev/null 2>&1 && s=setsid; " +
 		"l=\"$HOME/" + InstallDir + "/coral.log\"; if [ \"$(wc -c < \"$l\" 2>/dev/null || echo 0)\" -gt 10485760 ]; then mv -f \"$l\" \"$l.1\"; fi; " +
-		"P=\"$HOME/" + InstallDir + "/coral.pid\" C=\"$HOME/" + InstallDir + "/%[1]s/root/coral\" B=$b H=\"$HOME/" + InstallDir + "/data\" " +
-		"nohup $s sh -c 'echo $$ > \"$P\"; exec \"$C\" --host 127.0.0.1 --port 8420 --no-browser --cloud-url off --backend \"$B\" --home \"$H\"' </dev/null >>\"$l\" 2>&1 & }; }", args: []*regexp.Regexp{versionRe, backendArgRe}},
+		"P=\"$HOME/" + InstallDir + "/coral.pid\" C=\"$HOME/" + InstallDir + "/%[1]s/root/coral\" B=$b H=\"$HOME/$d\" " +
+		"nohup $s sh -c 'echo $$ > \"$P\"; exec \"$C\" --host 127.0.0.1 --port 8420 --no-browser --cloud-url off --backend \"$B\" --home \"$H\"' </dev/null >>\"$l\" 2>&1 & }; }", args: []*regexp.Regexp{versionRe, backendArgRe, dataDirArgRe}},
 	CmdEnsureInstanceID: {template: "umask 077 && mkdir -p \"$HOME/" + InstallDir + "\" && f=\"$HOME/" + InstallDir + "/instance-id\" && { [ -s \"$f\" ] || head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \\n' > \"$f\"; } && cat \"$f\""},
-	CmdReadAPIKey:       {template: "\"$HOME/" + InstallDir + "/%s/root/coral\" api-key --home \"$HOME/" + InstallDir + "/data\" 2>/dev/null", args: []*regexp.Regexp{versionRe}},
+	CmdReadAPIKey:       {template: readDataDir + "\"$HOME/" + InstallDir + "/%s/root/coral\" api-key --home \"$HOME/$d\" 2>/dev/null", args: []*regexp.Regexp{versionRe}},
 	CmdAcceptTerms:      {template: "\"$HOME/" + InstallDir + "/%s/root/coral\" accept-terms", args: []*regexp.Regexp{versionRe}},
 	CmdStopDaemon:       {template: aliveTest + " && kill \"$(cat \"$HOME/" + InstallDir + "/coral.pid\")\" 2>/dev/null; true"},
 	CmdStopTmux:         {template: "tmux kill-session -t =coral-server 2>/dev/null; true"},
@@ -142,7 +158,7 @@ var specs = map[Command]spec{
 		"if grep -Eqs '^ *[0-9]+: [0-9A-Fa-f]+:20E4 [0-9A-Fa-f:]+ 0A ' /proc/net/tcp /proc/net/tcp6; then exit 2; fi; exit 0"},
 	CmdPortHolder:         {template: `p=$(lsof -nP -iTCP:8420 -sTCP:LISTEN 2>/dev/null | awk 'NR==2{print $2" "$1}'); if [ -z "$p" ]; then p=$(ss -ltnpH 'sport = :8420' 2>/dev/null | sed -n 's/.*users:(("\([^"]*\)",pid=\([0-9]*\).*/\3 \1/p' | head -1); fi; echo "$p"`},
 	CmdTailLog:            {template: "tail -n 20 \"$HOME/" + InstallDir + "/coral.log\" 2>/dev/null"},
-	CmdInstallOwnerSecret: {template: "\"$HOME/" + InstallDir + "/%s/root/coral\" hub-owner-secret --home \"$HOME/" + InstallDir + "/data\"", args: []*regexp.Regexp{versionRe}},
+	CmdInstallOwnerSecret: {template: readDataDir + "\"$HOME/" + InstallDir + "/%s/root/coral\" hub-owner-secret --home \"$HOME/$d\"", args: []*regexp.Regexp{versionRe}},
 	CmdFreeKB:             {template: "df -Pk \"$HOME\" | awk 'NR==2 {print $4}'"},
 	// The recorded sum goes FIRST: a re-unpack that is interrupted leaves no sum next to a half-written root, so the next run does not say "already installed". It is written last.
 	CmdUnpack: {template: "umask 077 && cd \"$HOME/" + InstallDir + "/%[1]s\" && rm -f package.sha256 && rm -rf root && mkdir root && tar -xzf package.tar.gz --no-same-owner -C root && " +

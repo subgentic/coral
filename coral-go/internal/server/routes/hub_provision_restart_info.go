@@ -109,7 +109,7 @@ func (pr *Provisioner) restartHelp(note restartNote) []string {
 	}
 	lines = append(lines,
 		"# Start the release:",
-		"nohup "+bin+` --host 127.0.0.1 --port 8420 --no-browser --cloud-url off --backend "$(cat ~/.coral-server/backend 2>/dev/null || echo pty)" --home ~/.coral-server/data </dev/null >> ~/.coral-server/coral.log 2>&1 & echo $! > ~/.coral-server/coral.pid`,
+		"nohup "+bin+` --host 127.0.0.1 --port 8420 --no-browser --cloud-url off --backend "$(cat ~/.coral-server/backend 2>/dev/null || echo pty)" --home "$HOME/$(cat ~/.coral-server/datadir 2>/dev/null || echo .coral-server/data)" </dev/null >> ~/.coral-server/coral.log 2>&1 & echo $! > ~/.coral-server/coral.pid`,
 		"# Then choose Upgrade here again: this hub finds the release already running and only checks it.")
 	return lines
 }
