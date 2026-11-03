@@ -120,3 +120,5 @@
 .goal-md > :last-child { margin-bottom: 0; }
 .goal-rail-quiet .goal-preview-card { display: none; }
 .goal-preview-card p { margin: 0 0 10px; font-size: var(--fs-md); color: var(--text-secondary); }
+
+.goal-editor .goal-title:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-xs); } /* the standard ring, on top of the underline (#12966: the underline alone was the only mark) */
