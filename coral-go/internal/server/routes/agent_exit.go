@@ -48,6 +48,8 @@ var autoResumeDelays = []time.Duration{2 * time.Minute, 5 * time.Minute, 15 * ti
 type exitWatch struct {
 	mu      sync.Mutex
 	pending map[string][]string // team ("" = no board) -> the burst's session IDs
+	// lastRecover is when the terminal server's loss was last recovered from (#12592).
+	lastRecover time.Time
 	// after runs f once d has passed (tests replace it).
 	after func(d time.Duration, f func())
 }

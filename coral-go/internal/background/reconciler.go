@@ -11,6 +11,7 @@ import (
 	"github.com/subgentic/coral/internal/ptr"
 	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/store"
+	"github.com/subgentic/coral/internal/tmux"
 )
 
 // reconcileMissThreshold is the number of consecutive reconcile passes an
@@ -44,6 +45,77 @@ type SessionReconciler struct {
 	// for the exit notice (#3613). Unset: nothing is told.
 	onSlept func(ctx context.Context, sessionIDs []string)
 	slept   []string // this pass's
+	// The watch for the terminal server going away (#12592), for a runtime that can be asked (ServerWatcher).
+	onServerLost func(ctx context.Context, loss ServerLoss)
+	serverUp     bool // the server was seen up and has not been reported lost since
+	serverPID    int  // the last pid seen
+}
+
+// ServerWatcher is a runtime with a server process of its own that can be asked whether it is up (tmux).
+type ServerWatcher interface {
+	ServerState(ctx context.Context) tmux.ServerState
+}
+
+// ServerLoss is the terminal server having gone away under agents that were running: when it was found, the last pid seen, and the sessions that were awake.
+type ServerLoss struct {
+	At         time.Time
+	PID        int
+	SessionIDs []string
+}
+
+// SetOnServerLost registers f to hear a lost terminal server, once per loss.
+func (r *SessionReconciler) SetOnServerLost(f func(ctx context.Context, loss ServerLoss)) {
+	r.onServerLost = f
+}
+
+// watchServer reports whether the terminal server that was up on an earlier pass is gone now with agents awake. That is one event, not a miss per agent: it is logged once with the time,
+// the last pid seen and how many sessions were lost, the sessions are put to sleep at once (their terminals cannot come back by waiting) and onServerLost hears it. A server never seen up, or
+// an answer that cannot be told from "gone" (Known false), reports nothing.
+func (r *SessionReconciler) watchServer(ctx context.Context, live []store.LiveSession) bool {
+	w, ok := r.runtime.(ServerWatcher)
+	if !ok {
+		return false
+	}
+	st := w.ServerState(ctx)
+	if !st.Known {
+		return false
+	}
+	if st.Up {
+		r.serverUp, r.serverPID = true, st.PID
+		return false
+	}
+	if !r.serverUp {
+		return false
+	}
+	var ids []string
+	for _, ls := range live {
+		if ls.IsSleeping == 1 {
+			continue
+		}
+		// Read again: a person may have put it to sleep for another reason since the pass began, and that reason is kept.
+		if now, err := r.sessionStore.GetLiveSession(ctx, ls.SessionID); err != nil || now == nil || now.IsSleeping == 1 {
+			continue
+		}
+		ids = append(ids, ls.SessionID)
+	}
+	if len(ids) == 0 {
+		r.serverUp = false // the last agent was ended on purpose: a server with no session exits by itself
+		return false
+	}
+	r.serverUp = false
+	loss := ServerLoss{At: r.now(), PID: r.serverPID, SessionIDs: ids}
+	r.logger.Warn("the terminal server (tmux) is gone: its agents' terminals ended with it",
+		"time", loss.At.Format(time.RFC3339), "last_pid", loss.PID, "lost_sessions", len(ids))
+	for _, sid := range ids {
+		if err := r.sessionStore.SetSessionSleepingFor(ctx, sid, store.SleepReasonTerminalGone); err != nil {
+			r.logger.Error("failed to mark an agent of the lost terminal server as sleeping", "session_id", sid, "error", err)
+		}
+		delete(r.misses, sid)
+	}
+	if r.onServerLost != nil {
+		r.onServerLost(ctx, loss)
+	}
+	return true
 }
 
 // SetOnSlept registers f to hear, once per pass, the agents that pass found dead.
@@ -79,6 +151,10 @@ func (r *SessionReconciler) reconcileOnce(ctx context.Context) {
 	if err != nil {
 		r.logger.Error("failed to read live sessions", "error", err)
 		return
+	}
+
+	if r.watchServer(ctx, liveSessions) {
+		return // one loss was reported for every agent in it: the per-agent pass has nothing to add
 	}
 
 	agents, err := r.runtime.ListAgents(ctx)
