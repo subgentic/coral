@@ -43,14 +43,14 @@ func TestACLIInAFolderTheSavedPathGainedIsFoundAfterCheckAgain(t *testing.T) {
 	assert.Equal(t, 1, reads, "found from what the Check again kept, not by reading again")
 }
 
-// Folders already on this process's PATH, relative entries and repeats are not kept: only what the running Coral is missing.
+// Folders already on this process's PATH, relative entries, repeats and network shares are not kept: only local folders the running Coral is missing.
 func TestRefreshSavedPathKeepsOnlyAbsoluteFoldersThePathLacks(t *testing.T) {
 	home := windowsNativeHome(t)
 	onPath := t.TempDir()
 	t.Setenv("PATH", onPath)
 	gained := filepath.Join(home, "gained")
 	reads := 0
-	savedPathIs(t, &reads, onPath, "  ", `relative\bin`, gained, gained+`\`, filepath.Join(home, "GAINED"))
+	savedPathIs(t, &reads, onPath, "  ", `relative\bin`, gained, gained+`\`, filepath.Join(home, "GAINED"), `\\server\tools\bin`, `\\?\UNC\server\tools`, `//server/tools`)
 
 	assert.Equal(t, 1, RefreshSavedPath())
 	assert.Equal(t, []string{gained}, savedPathDirsFound())

@@ -39,6 +39,9 @@ func RefreshSavedPath() int {
 		if d == "" || !filepath.IsAbs(d) { // a relative entry would be read against Coral's working folder
 			continue
 		}
+		if onNetworkShare(d) { // a \\server\share folder: never searched from a Check again (a drive letter mapped to a share is not told apart)
+			continue
+		}
 		if k := key(d); !have[k] {
 			have[k] = true
 			kept = append(kept, filepath.Clean(d))
@@ -46,6 +49,12 @@ func RefreshSavedPath() int {
 	}
 	savedPathFolders.Store(&kept)
 	return len(kept)
+}
+
+// onNetworkShare reports whether d is on a network share by its spelling: a UNC path (\\server\share\...) or the long form of one (\\?\UNC\...). Any other \\?\ or \\.\
+// device path is treated the same way, as nothing a CLI installer writes to the Path.
+func onNetworkShare(d string) bool {
+	return strings.HasPrefix(d, `\\`) || strings.HasPrefix(d, `//`)
 }
 
 // savedPathDirsFound is what the last RefreshSavedPath kept.
