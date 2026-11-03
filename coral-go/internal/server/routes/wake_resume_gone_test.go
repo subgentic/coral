@@ -262,9 +262,37 @@ func TestTheBackstopIgnoresALineThatWasThereBeforeItsResume(t *testing.T) {
 	ls, err := g.ss.GetLiveSession(context.Background(), goneSID)
 	require.NoError(t, err)
 
-	g.h.watchResumeGone(ls) // the offset is taken now, after the old line
+	g.h.watchResumeGone(ls, logSize(logFile)) // the offset is taken now, after the old line
 
 	time.Sleep(1200 * time.Millisecond) // sleep-ok: the backstop looks at 200 ms
 	assert.Equal(t, before, len(g.term.sentTo(g.name+".0")), "nothing started fresh on an old line")
 	assert.Equal(t, 0, g.notes())
+}
+
+// Orchestrator's line on #12714: the offset is taken before the launch line is typed, so a "No conversation found" the CLI prints the instant it starts (while the launch is still being typed) is this resume's line and is seen.
+func TestALinePrintedAtOnceAfterTheLaunchIsSeen(t *testing.T) {
+	g := newGoneRig(t)
+	writeTranscript(t, os.Getenv("CLAUDE_PROJECTS_DIR"), goneSID)
+	prev := wakeResumeCheckAfter
+	wakeResumeCheckAfter = 300 * time.Millisecond
+	t.Cleanup(func() { wakeResumeCheckAfter = prev })
+	logFile := naming.LogFile(g.h.cfg.LogDir, "claude", goneSID)
+	require.NoError(t, os.MkdirAll(filepath.Dir(logFile), 0o700))
+	first := true
+	g.term.mockSessionTerminal.onSend = func(target string) { // as the launch line is typed, the CLI already prints its line
+		if first {
+			first = false
+			f, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
+			require.NoError(t, err)
+			_, err = f.WriteString("No conversation found with session ID: " + goneSID + "\n")
+			require.NoError(t, err)
+			require.NoError(t, f.Close())
+			g.term.setFG(g.name, "zsh")
+		}
+	}
+
+	g.wake(t)
+
+	require.Eventually(t, func() bool { return strings.Contains(g.launchLines(), "--session-id "+goneSID) }, 5*time.Second, 50*time.Millisecond,
+		"the line printed with the launch was this resume's: %q", g.launchLines())
 }

@@ -42,6 +42,7 @@ func (h *SessionsHandler) wakeSession(ctx context.Context, ls *store.LiveSession
 		}
 	}
 	launched := false                    // the agent CLI was started again: it loaded the current hook set
+	var resumeLogOffset int64            // the agent log's size BEFORE the launch is typed: the backstop reads only what is written after it, a line printed the instant the CLI starts included (#12714)
 	fresh, resumedClaude := false, false // the conversation was gone and a new one started (the board is told once); a Claude resume the backstop watches (#12714)
 	// A team's agents start in the team's home folder, which the Operator may have changed since this one last ran (#10815): the wake uses it and the row follows once it has started.
 	movedTo := ""
@@ -62,7 +63,7 @@ func (h *SessionsHandler) wakeSession(ctx context.Context, ls *store.LiveSession
 			if fresh {
 				h.noteFreshStart(ctx, ls) // said once: the next wake finds the new conversation's transcript
 			} else if resumedClaude {
-				h.watchResumeGone(ls) // the backstop for a transcript that went between the look and Claude's
+				h.watchResumeGone(ls, resumeLogOffset) // the backstop for a transcript that went between the look and Claude's
 			}
 		}
 	}()
@@ -71,6 +72,9 @@ func (h *SessionsHandler) wakeSession(ctx context.Context, ls *store.LiveSession
 		return err
 	}
 	fresh, resumedClaude = plan.freshStart, ls.AgentType == at.Claude && plan.params.ResumeSessionID != ""
+	if resumedClaude {
+		resumeLogOffset = logSize(plan.logFile)
+	}
 	err = h.startWake(ctx, ls, plan, &launched)
 	if err != nil {
 		return err

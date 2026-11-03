@@ -64,14 +64,13 @@ func (h *SessionsHandler) noteFreshStart(ctx context.Context, ls *store.LiveSess
 	}
 }
 
-// watchResumeGone is the backstop: a while after a Claude resume, look at the agent's log for the CLI's own line, and when it is there start the agent fresh in the same terminal (the wake's own path for an exited CLI).
-func (h *SessionsHandler) watchResumeGone(ls *store.LiveSession) {
+// watchResumeGone is the backstop: a while after a Claude resume (offset is the log's size taken before the launch was typed, so only what this resume wrote counts), look at the agent's log for the CLI's own line, and when it is there start the agent fresh in the same terminal (the wake's own path for an exited CLI).
+func (h *SessionsHandler) watchResumeGone(ls *store.LiveSession, offset int64) {
 	if ls.AgentType != at.Claude || h.cfg == nil {
 		return
 	}
 	logFile := naming.LogFile(h.cfg.LogDir, ls.AgentType, ls.SessionID)
 	sid := ls.SessionID
-	offset := logSize(logFile) // only what is written after this resume counts: an older run's line in the same log is not this one's
 	time.AfterFunc(wakeResumeCheckAfter, func() {
 		if !logHasSince(logFile, offset, conversationGoneLine) {
 			return
