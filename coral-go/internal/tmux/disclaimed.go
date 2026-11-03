@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/subgentic/coral/internal/procspawn"
+	"github.com/subgentic/coral/internal/safego"
 )
 
 // startsServer says the tmux command may start the tmux server (no server yet: new-session and start-server do), past the socket arguments.
@@ -53,11 +54,22 @@ func outputDisclaimed(ctx context.Context, bin string, args, env []string) (out 
 	var stdout, stderr bytes.Buffer
 	var wg sync.WaitGroup
 	wg.Add(2)
-	go func() { defer wg.Done(); _, _ = io.Copy(&stdout, outR); outR.Close() }()
-	go func() { defer wg.Done(); _, _ = io.Copy(&stderr, errR); errR.Close() }()
+	go func() {
+		defer safego.Recover("tmux disclaimed stdout copy")
+		defer wg.Done()
+		_, _ = io.Copy(&stdout, outR)
+		outR.Close()
+	}()
+	go func() {
+		defer safego.Recover("tmux disclaimed stderr copy")
+		defer wg.Done()
+		_, _ = io.Copy(&stderr, errR)
+		errR.Close()
+	}()
 	p, _ := os.FindProcess(pid)
 	waited := make(chan struct{})
 	go func() {
+		defer safego.Recover("tmux disclaimed kill on cancel")
 		select {
 		case <-ctx.Done():
 			_ = p.Kill()
