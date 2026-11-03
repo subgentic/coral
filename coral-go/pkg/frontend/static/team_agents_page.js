@@ -185,7 +185,7 @@ function draw() {
             { key: 'provider', label: 'Provider', line: 2, width: '6rem', dropAt: 36, tone: 'tertiary', sort: true, sortValue: providerOf, cell: providerOf },
             ...(searchShown ? [{ key: 'search', label: 'Search', line: 2, width: '12rem', dropAt: 44, tone: 'tertiary', cell: ag => searchChip((model.levels.get(ag.name) || {}).level) || '' }] : []), // a column only while some member is above "own": an empty one was drawn, clipped at the right edge of a phone's table as a stray "…" (#11128)
             { key: 'chat', label: 'Chat', line: 1, width: 'calc(6.25rem + 26px)', cell: chatButton },
-        ], oneLine: true, sortBar: false,
+        ], oneLine: true, resize: true, sortBar: false,
     }).el);
     if (held) { const sel = held.startsWith('row:') ? rowFocusTarget(body, held.slice(4)) : body.querySelector(`.goals-chip[data-filter="${CSS.escape(held.slice(5))}"]`); sel?.focus({ preventScroll: true }); }
 }
