@@ -266,6 +266,14 @@ func newSessionLabel(r *http.Request, method string) string {
 // NewSession signs a browser in: a fresh 256-bit cookie value, its hash kept with the label
 // and an absolute expiry (30 days with keep, else sessionMaxAge).
 func (ks *KeyStore) NewSession(r *http.Request, method string, keep bool) (string, error) {
+	return ks.newSession(r, method, keep, newSessionLabel(r, method))
+}
+
+// LocalSessionLabelPrefix starts the label of a session "Open Coral on this computer" made, as Settings > Sessions shows it (#289).
+const LocalSessionLabelPrefix = "Opened on this computer: "
+
+// newSession is NewSession with the session's label given.
+func (ks *KeyStore) newSession(r *http.Request, method string, keep bool, label string) (string, error) {
 	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {
 		return "", fmt.Errorf("create session token: %w", err)
@@ -279,7 +287,7 @@ func (ks *KeyStore) NewSession(r *http.Request, method string, keep bool) (strin
 	ctx := context.Background()
 	be := ks.backend()
 	if err := be.PutSession(ctx, SessionRecord{
-		IDHash: sessionHash(token), Label: newSessionLabel(r, method), Method: method, Persistent: keep,
+		IDHash: sessionHash(token), Label: label, Method: method, Persistent: keep,
 		CreatedAt: now, LastSeen: now, ExpiresAt: now.Add(life),
 	}); err != nil {
 		return "", fmt.Errorf("save session: %w", err)
@@ -312,8 +320,13 @@ func signInVia(r *http.Request, method string) string {
 // NewSessionRotating is NewSession for a sign-in from a browser that may already hold a session: that one ends here, so a cookie a sign-in
 // replaced (a link, the key form) is not left valid behind it, as the password sign-in does.
 func (ks *KeyStore) NewSessionRotating(r *http.Request, method string, keep bool) (string, error) {
+	return ks.newSessionRotating(r, method, keep, newSessionLabel(r, method))
+}
+
+// newSessionRotating is NewSessionRotating with the session's label given.
+func (ks *KeyStore) newSessionRotating(r *http.Request, method string, keep bool, label string) (string, error) {
 	old := ks.extractSessionCookie(r)
-	token, err := ks.NewSession(r, method, keep)
+	token, err := ks.newSession(r, method, keep, label)
 	if err != nil {
 		return "", err
 	}

@@ -83,7 +83,7 @@ func (ar *Routes) AuthPage(w http.ResponseWriter, r *http.Request) {
 		tracking.TrackSigninPageShown(signinPageKind(set, local))
 	}
 	// PeerUnavailable is read after PageState: its attribution of this request is what sets the flag (#12546).
-	w.Write([]byte(AuthPage(PageState{PasswordSet: set, Local: local, Strict: strict, SignedOut: signedOut, Locked: r.URL.Query().Get("locked") == "1", HubSignin: ar.hub.PageState(r), HubURL: ar.hub.HubURL(), PeerUnavailable: peerCheckLost.Load()})))
+	w.Write([]byte(AuthPage(PageState{PasswordSet: set, Local: local, Strict: strict, SignedOut: signedOut, Locked: r.URL.Query().Get("locked") == "1", HubSignin: ar.hub.PageState(r), HubURL: ar.hub.HubURL(), PeerUnavailable: peerCheckLost.Load(), LocalOpen: ar.LocalOpenOffered(r)})))
 }
 
 // signinPageKind is the funnel's name for the page AuthPage serves: sign in with the password, or create one (here, or from another computer with the setup code).

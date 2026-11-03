@@ -168,6 +168,7 @@ const strictOnly = flag('--strict');
 const STRICT_SUITES = [
   'strict_mode_browser.test.js', 'server_switcher_browser.test.js', 'agent_state.test.js',
   'team_view_consolidation.test.js', 'a11y_dashboard_browser.test.js',
+  'auth_local_open_browser.test.js', // #289: the button turns a browser that is refused (401) into a signed-in one; only a strict server refuses it first
 ];
 // Terminal backend (#6064): the built-in terminal (pty) is Coral's default on macOS and Linux, so the main run starts Coral as a new install does, with no --backend (CORAL_BACKEND overrides it).
 // TMUX_SUITES run afterwards on one shard started with --backend tmux: the suites that drive the tmux server itself (a pane's size, a gone session, the socket), and a cross-check set that must

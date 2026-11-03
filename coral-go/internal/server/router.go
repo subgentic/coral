@@ -170,6 +170,7 @@ func (s *Server) registerAuth(r *chi.Mux) {
 	})
 	r.Get("/auth", authRoutes.AuthPage)
 	r.Post("/auth/key", authRoutes.ValidateKey)
+	r.Post(auth.LocalOpenPath, authRoutes.LocalOpen) // "Open Coral on this computer": this computer, Coral's own account, only
 	r.Post("/auth/logout", authRoutes.Logout)
 	r.Get("/api/system/api-key", authRoutes.GetAPIKey)
 	r.Post("/api/system/api-key/regenerate", authRoutes.RegenerateKey)

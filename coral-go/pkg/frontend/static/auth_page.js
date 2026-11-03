@@ -215,6 +215,23 @@ async function sendKey() {
     fail($('api-key'), $('key-err'), res.data.error || 'Invalid API key.');
 }
 keyForm.addEventListener('submit', e => { e.preventDefault(); sendKey(); });
+// "Open Coral on this computer": POST /auth/local makes a single-use sign-in link and redirects through it; this fetch follows the redirect on this origin,
+// which sets the session cookie, then the page opens Coral. It is a fetch, not the form's own submit: under the page's no-referrer policy a form POST
+// sends Origin "null", which the route refuses; a same-origin fetch sends the page's real Origin, as the password routes' fetches do.
+const localOpenForm = $('local-open-form');
+if (localOpenForm) localOpenForm.addEventListener('submit', async e => {
+    e.preventDefault();
+    const button = $('local-open'), err = $('err');
+    setError(err, '');
+    button.disabled = true;
+    let resp;
+    try { resp = await fetch(localOpenForm.getAttribute('action'), { method: 'POST', credentials: 'same-origin' }); } catch { setError(err, NETWORK); button.disabled = false; return; }
+    if (resp.ok && resp.redirected) { done(); return; }
+    let data = {};
+    try { data = await resp.json(); } catch { /* not JSON */ }
+    setError(err, (data && data.error) || 'Coral could not open here. Sign in with the password, or run coral open on this computer.');
+    button.disabled = false;
+});
 // The submit buttons are in the markup disabled: until the handlers above exist, a click or Enter in a field would be the browser's own submit, a GET that puts the password in the address and the history (#7379).
 for (const b of document.querySelectorAll('button[data-needs-script]')) b.disabled = false;
 const hashParams = new URLSearchParams(window.location.hash.slice(1));
