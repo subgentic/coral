@@ -2,7 +2,7 @@
 import { state } from './state.js';
 import { isSignedOut } from './overload.js';
 import { showToast } from './utils.js';
-import { keyLabel, isCloud } from './server_base.js';
+import { keyLabel, isCloud, serverFetch } from './server_base.js';
 import { importOnce } from './import_once.js';
 import { recordRecentDir } from './browser.js';
 import { loadLiveSessions } from './api.js';
@@ -37,7 +37,7 @@ export async function showResumeModal() {
     let ranMode = "", ranFrom = ""; // the mode it ran in: Coral's own record ("session"), else where the transcript keeps it ("transcript": a hint, #10487)
     let ranIn = "", ranInExists = true; // the folder the session ran in, from its transcript or live row (#10291)
     try {
-        const resp = await fetch(`/api/sessions/history/${encodeURIComponent(sessionId)}/resume-info`);
+        const resp = await serverFetch((state.historySessionsList || []).find(s => s.session_id === sessionId)?.server, `/api/sessions/history/${encodeURIComponent(sessionId)}/resume-info`); // on the computer the session ran on (#12617)
         if (resp.ok) {
             const info = await resp.json();
             if (info.permission_mode) { ranMode = info.permission_mode; ranFrom = info.permission_mode_from || "transcript"; }
