@@ -40,9 +40,9 @@ def repeat_only_jobs():
     return [{"name": "cdp (repeat)", "conclusion": "success"}, {"name": "cdp (${{ matrix.name }})", "conclusion": "skipped"}, {"name": "cdp-gate", "conclusion": "skipped"}]
 
 
-def api(commits, compare, runs, artifacts=None, jobs=None):
+def api(commits, compare, runs, artifacts=None, jobs=None, between=None):
     """commits: sha -> {files, parents}; compare: sha -> status; runs: list of run dicts; artifacts: run id -> list of artifact dicts;
-    jobs: run id -> list of job dicts (default: a full green matrix)"""
+    jobs: run id -> list of job dicts (default: a full green matrix); between: (base, head) -> a compare answer {status, behind_by, files}"""
     def get(path):
         if path.startswith("/actions/runs/") and "/jobs" in path:
             return {"jobs": (jobs or {}).get(int(path.split("/")[3]), full_jobs())}
@@ -53,6 +53,9 @@ def api(commits, compare, runs, artifacts=None, jobs=None):
             return {"files": [{"filename": f} for f in c["files"]], "parents": [{"sha": s} for s in c["parents"]], "commit": {"message": c.get("message", "")}}
         if path.startswith("/compare/main..."):
             return {"status": compare[path.split("...")[1]]}
+        if path.startswith("/compare/"):
+            base, head = path.split("/compare/")[1].split("...")
+            return (between or {}).get((base, head), {"status": "diverged", "behind_by": 1, "files": []})
         if path.startswith("/actions/runs?head_sha="):
             sha = path.split("head_sha=")[1].split("&")[0]
             return {"workflow_runs": [r for r in runs if r["head_sha"] == sha]}
@@ -60,9 +63,9 @@ def api(commits, compare, runs, artifacts=None, jobs=None):
     return get
 
 
-def go(commits, compare, runs, actor="the-pusher", artifacts=None, zips=None, jobs=None):
+def go(commits, compare, runs, actor="the-pusher", artifacts=None, zips=None, jobs=None, between=None):
     lines = []
-    rc = p.provenance(CFG, api(commits, compare, runs, artifacts, jobs), REPO, TAGGED, actor, out=lines.append, get_zip=(lambda i: zips[i]) if zips is not None else None)
+    rc = p.provenance(CFG, api(commits, compare, runs, artifacts, jobs, between), REPO, TAGGED, actor, out=lines.append, get_zip=(lambda i: zips[i]) if zips is not None else None)
     return rc, "\n".join(lines)
 
 
@@ -189,6 +192,47 @@ class T(unittest.TestCase):
         runs = ALL_GREEN + [run("go-tests", TAGGED, conclusion="failure", rid=9, event="workflow_dispatch", branch="main")]
         rc, out = go(self.named(), {TAGGED: "identical"}, runs)
         self.assertEqual(rc, 0, out)
+
+    # ---- the README rule (the Operator, 2026-11-03): a merge that changes only README files needs no new gate ----
+    MERGED = "c" * 40  # the head the README merge made: the single parent of the notes commit
+
+    def readme_case(self, files, status="ahead", behind_by=0, parents=None, count=None):
+        commits = {TAGGED: {"files": ["RELEASE_NOTES.md"], "parents": parents or [self.MERGED], "message": f"release notes: v2.0.39\n\nGated-commit: {GATED}\n"}}
+        between = {(GATED, self.MERGED): {"status": status, "behind_by": behind_by, "files": [{"filename": f} for f in (files if count is None else ["README.md"] * count)]}}
+        return go(commits, {TAGGED: "identical"}, ALL_GREEN, between=between)
+
+    def test_a_readme_only_merge_between_the_gated_commit_and_the_notes_commit_is_judged_on_the_gated_commit(self):
+        rc, out = self.readme_case(["README.md", "assets/readme/review-approve.png"])
+        self.assertEqual(rc, 0, out)
+        self.assertIn(f"gated commit: {GATED} (named by the notes commit's Gated-commit trailer)", out)
+        self.assertIn("| readme-merge | ok | only README files changed between the gated commit", out)
+        self.assertIn("| cdp-gate | success | run 3 |", out)
+
+    def test_a_code_file_between_the_gated_commit_and_its_parent_is_refused(self):
+        for files in (["README.md", "coral-go/internal/x.go"], ["README.md", "assets/other/y.png"], ["README.md.sh"], ["README.md", ".github/workflows/release.yml"]):
+            rc, out = self.readme_case(files)
+            self.assertNotEqual(rc, 0, f"{files}: {out}")
+            self.assertIn("| trailer | refused | Gated-commit names", out)
+
+    def test_a_readme_merge_must_be_ahead_with_nothing_behind_and_a_trustworthy_list(self):
+        for kw in ({"status": "diverged"}, {"status": "behind"}, {"status": "identical"}, {"behind_by": 2}, {"files": []}, {"count": 300}):
+            rc, out = self.readme_case(kw.get("files", ["README.md"]), **{k: v for k, v in kw.items() if k != "files"})
+            self.assertNotEqual(rc, 0, f"{kw}: {out}")
+
+    def test_a_readme_merge_still_needs_one_parent_and_a_notes_only_commit(self):
+        rc, out = self.readme_case(["README.md"], parents=[self.MERGED, "d" * 40])
+        self.assertNotEqual(rc, 0, out)
+        commits = {TAGGED: {"files": ["RELEASE_NOTES.md", "README.md"], "parents": [self.MERGED], "message": f"release notes\n\nGated-commit: {GATED}\n"}}
+        between = {(GATED, self.MERGED): {"status": "ahead", "behind_by": 0, "files": [{"filename": "README.md"}]}}
+        rc, out = go(commits, {TAGGED: "identical"}, ALL_GREEN, between=between)
+        self.assertNotEqual(rc, 0, out)
+
+    def test_a_red_gate_on_the_named_commit_still_fails_a_readme_merge(self):
+        commits = {TAGGED: {"files": ["RELEASE_NOTES.md"], "parents": [self.MERGED], "message": f"release notes\n\nGated-commit: {GATED}\n"}}
+        between = {(GATED, self.MERGED): {"status": "ahead", "behind_by": 0, "files": [{"filename": "README.md"}]}}
+        runs = [run("go-tests", GATED, rid=1), run("go-race", GATED, rid=2), run("cdp-gate", GATED, conclusion="failure", rid=3)]
+        rc, out = go(commits, {TAGGED: "identical"}, runs, between=between)
+        self.assertNotEqual(rc, 0, out)
 
     def test_a_flake_repeat_dispatched_on_the_gated_commit_does_not_replace_its_push_run(self):
         # 156's first stop: a 10x repeat of one suite (a cdp-gate dispatch, red by design for a flaky suite) was newer than the push run and became the one read

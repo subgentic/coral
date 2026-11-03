@@ -131,6 +131,19 @@ def url_of(run):
     return u if re.fullmatch(r"https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/actions/runs/[0-9]+", u) else "(no run link)"
 
 
+def readme_only(name):
+    """A file a README-only change may touch (the Operator's rule, 2026-11-03): README.md and the pictures it shows."""
+    return name == "README.md" or name.startswith("assets/readme/")
+
+
+def readme_only_between(get, base, head):
+    """True when head is ahead of base (base is an ancestor of head, nothing of base's missing from head) and every file changed between them is a README file:
+    a merge of the README edits made on main needs no new gate. The compare API lists at most 300 files: a longer list is never trusted."""
+    c = get(f"/compare/{base}...{head}")
+    files = [f["filename"] for f in c.get("files", [])]
+    return c.get("status") == "ahead" and not c.get("behind_by") and 0 < len(files) < 300 and all(readme_only(f) for f in files)
+
+
 def provenance(cfg, get, repo, sha, actor, out=print, get_zip=None):
     commit = get(f"/commits/{sha}")
     files = [f["filename"] for f in commit.get("files", [])]
@@ -174,14 +187,18 @@ def provenance(cfg, get, repo, sha, actor, out=print, get_zip=None):
         gated, best = sha, {}
     elif named:
         # "Gated-commit: <sha>" (a trailer of the notes commit, written by whoever lands it): the release is judged on THAT commit, by name; runs on any other
-        # commit (the tagged commit's own included) are ignored. It must be the single parent of a notes-only commit, so it cannot name some other code.
-        if len(set(named)) != 1 or files != [NOTES] or len(parents) != 1 or named[0] != parents[0]:
+        # commit (the tagged commit's own included) are ignored. It must be the single parent of a notes-only commit, or an ancestor of that parent with only README files changed in between (the README rule), so it cannot name some other code.
+        readme_merge = (len(set(named)) == 1 and files == [NOTES] and len(parents) == 1 and named[0] != parents[0]
+                        and readme_only_between(get, named[0], parents[0]))
+        if len(set(named)) != 1 or files != [NOTES] or len(parents) != 1 or (named[0] != parents[0] and not readme_merge):
             lines.append(f"| trailer | refused | Gated-commit names {', '.join(sorted(set(named)))[:100]} but the tagged commit is "
                          + ("not a notes-only commit with one parent" if files != [NOTES] or len(parents) != 1 else f"on parent {parents[0][:9]}") + " |")
             ok = False
             gated, best = sha, {}
         else:
             gated, best = named[0], runs_for_named(named[0])
+            if readme_merge:
+                lines.append(f"| readme-merge | ok | only README files changed between the gated commit {named[0][:9]} and its parent {parents[0][:9]}: no new gate |")
     else:
         gated, best = sha, runs_for_named(sha)
         if not any(n in best for n in need) and files == [NOTES] and len(parents) == 1:
