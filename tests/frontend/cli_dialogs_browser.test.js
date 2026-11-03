@@ -5,7 +5,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
-const { coralReady } = require('./helpers/wait');
+const { coralReady, framesJs } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, ev, waitFor, PRELOAD, install } = await connect();
@@ -21,6 +21,7 @@ const { coralReady } = require('./helpers/wait');
             window.fetch = (u, o = {}) => { const url = String(u), p = new URL(url, location.href);
                 if (p.pathname === '/api/sessions/launch' && (o.method || 'GET') === 'POST') { window.__launches.push(JSON.parse(o.body)); return json(window.__launchAnswer.body, window.__launchAnswer.status); }
                 if (p.pathname === '/api/system/cli-check' && p.searchParams.has('binary')) { const type = p.searchParams.get('type'); window.__checks.push(type); const a = window.__checkAnswer(type); return json(a.body, a.status); }
+                if (p.pathname === '/api/settings' && window.__holdPathRefresh) return real(u, o).then(r => new Promise(resolve => { window.__pathRefreshes.push(() => resolve(r)); }));
                 return real(u, o); };
             await window.showLaunchModal(); window.hideLaunchModal();
             return true; })()`);
@@ -31,10 +32,15 @@ const { coralReady } = require('./helpers/wait');
         };
 
         console.log('Settings: Verify All');
-        await ev(`window.showSettingsModal(); true`);
+        // Hold the background refresh so it resolves after the person edits, every run (#12928).
+        await ev(`window.__holdPathRefresh = true; window.__pathRefreshes = []; window.showSettingsModal().then(() => true)`);
         await waitFor(`getComputedStyle(document.getElementById('settings-modal')).display !== 'none'`, 'Settings');
         await ev(`window.__checkAnswer = type => type === 'claude' ? { status: 200, body: { found: true, version: '2.1.0' } } : type === 'codex' ? { status: 200, body: { found: true } } : type === 'agy' ? { status: 200, body: { found: false } } : { status: 403, body: { error: 'not allowed here' } }; true`);
-        await ev(`document.getElementById('settings-cli-path-agy').value = ''; true`); // the runner points every CLI path at the mock agent: agy is cleared so this covers a CLI with no path of its own (#10083)
+        await ev(`{ const input = document.getElementById('settings-cli-path-agy'); input.value = ''; input.dispatchEvent(new Event('input', { bubbles: true })); } true`); // the runner points every CLI path at the mock agent: agy is cleared so this covers a CLI with no path of its own (#10083)
+        await waitFor(`window.__pathRefreshes.length > 0`, 'the saved CLI-path refresh is held');
+        await ev(`window.__holdPathRefresh = false; window.__pathRefreshes.splice(0).forEach(release => release()); true`);
+        await ev(framesJs(2)); // let the older saved-path response reach the field before Verify All
+        assert.equal(await ev(`document.getElementById('settings-cli-path-agy').value`), '', 'a late saved-path refresh preserves the field the person cleared');
         await ev(`window._verifyAllCLIs(); true`);
         await waitFor(`document.getElementById('verify-all-btn').textContent === 'Verify All' && document.getElementById('verify-all-btn').getAttribute('aria-disabled') !== 'true'`, 'Verify All finished');
         const results = await ev(`['claude', 'codex', 'agy', 'pi'].map(t => { const e = document.getElementById('cli-result-' + t); return [e.textContent, e.className.replace('cli-verify-result', '').trim(), e.title]; })`);
@@ -44,7 +50,7 @@ const { coralReady } = require('./helpers/wait');
         assert.equal(await ev(`document.getElementById('cli-result-agy-why').hidden`), true, 'a neutral result has no line under it');
         assert.deepEqual((await ev(`window.__checks.slice().sort()`)), ['agy', 'claude', 'codex', 'pi'], 'each CLI was asked once');
         // a path the person typed that is not there is a mistake: red, with the way out under it (#10083)
-        await ev(`document.getElementById('settings-cli-path-agy').value = '/opt/tools/agy'; window._verifyAllCLIs(); true`);
+        await ev(`{ const input = document.getElementById('settings-cli-path-agy'); input.value = '/opt/tools/agy'; input.dispatchEvent(new Event('input', { bubbles: true })); } window._verifyAllCLIs(); true`);
         await waitFor(`document.getElementById('verify-all-btn').textContent === 'Verify All' && document.getElementById('verify-all-btn').getAttribute('aria-disabled') !== 'true'`, 'Verify All finished again');
         assert.deepEqual(await ev(`(() => { const e = document.getElementById('cli-result-agy'); return [e.textContent, e.className.replace('cli-verify-result', '').trim()]; })()`), ['Not found', 'cli-verify-fail']);
         assert.match(await ev(`document.getElementById('cli-result-agy-why').textContent`), /nothing at that path/i, 'a typed path that is not there says so, under the result');
