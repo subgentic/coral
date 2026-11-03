@@ -799,6 +799,8 @@ async function launchTeam() {
             const tf = result.trust_folder;
             if (tf && typeof tf.refused === 'string' && tf.refused) showToast(`Trust this folder was not applied: ${tf.refused}`, true);
             else if (tf && tf.failed && typeof tf.failed === 'object') { const types = Object.keys(tf.failed).sort(); if (types.length) showToast(`Trust this folder was not applied for ${types.join(', ')}: ${types.map(k => String(tf.failed[k])).join('; ')}`, true); }
+            // A CLI with no settings file yet (a first-time user: it is made when the CLI first runs) is normal, not an error: plain guidance, with no terminal in it (a phone has none) (#12532)
+            if (tf && Array.isArray(tf.no_settings) && tf.no_settings.length) { const who = tf.no_settings.map(t => t.charAt(0).toUpperCase() + t.slice(1)).join(' and '); showToast(`${who} has no settings file on this computer yet, so Coral could not record trust for this folder. That is normal the first time. Each agent asks once: answer Yes on its card in the agent's chat, or in Needs you.`); }
             if (launched.length - failed.length > 0) {
                 const wtNote = result.worktree_path ? ` in worktree ${result.worktree_path}` : '';
                 showToast(`Launched team: ${launched.length - failed.length} agents on "${boardName}"${_onServerSuffix(server)}${wtNote}`);

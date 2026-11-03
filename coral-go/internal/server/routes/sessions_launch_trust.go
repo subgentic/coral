@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -81,6 +82,7 @@ func (h *SessionsHandler) trustTeamFolder(r *http.Request, body launchTeamReques
 	trusted := []string{}
 	not := map[string]string{}
 	failed := map[string]string{} // the agent types Coral tried to trust the folder for and could not: said on the board
+	noSettings := []string{}      // a first-time CLI has no settings file yet: normal, not a failure (#12532), so it is said apart, as guidance
 	for _, typ := range types {
 		if typ == "" {
 			typ = "claude"
@@ -100,6 +102,11 @@ func (h *SessionsHandler) trustTeamFolder(r *http.Request, body launchTeamReques
 				not[typ] = why
 			}
 			continue // the others show no folder-trust card
+		}
+		if errors.Is(werr, foldertrust.ErrNoConfig) {
+			not[typ] = werr.Error()
+			noSettings = append(noSettings, typ)
+			continue
 		}
 		if werr != nil {
 			not[typ] = werr.Error()
@@ -132,6 +139,11 @@ func (h *SessionsHandler) trustTeamFolder(r *http.Request, body launchTeamReques
 		}
 		h.sayTrustNotDone(r, body, workdir, strings.Join(types, ", "), strings.Join(reasons, "; "))
 	}
+	if len(noSettings) > 0 {
+		sort.Strings(noSettings)
+		reply["no_settings"] = noSettings
+		h.sayNoSettings(r, body, workdir, noSettings)
+	}
 	if len(failed) > 0 {
 		reply["failed"] = failed // the types it tried and could not, apart from "not" (which also holds the types that have no setting to set): the page says these
 	}
@@ -139,6 +151,25 @@ func (h *SessionsHandler) trustTeamFolder(r *http.Request, body launchTeamReques
 		reply["not"] = not
 	}
 	return reply
+}
+
+// sayNoSettings posts the plain version for a CLI that has no settings file yet (a first-time user: the file is made when the CLI first runs): what it means and what to do, with no terminal in it (a phone has none).
+// The agent's card is answered in its chat or in Needs you. Only fixed words and the cleaned, quoted folder name are in it.
+func (h *SessionsHandler) sayNoSettings(r *http.Request, body launchTeamRequest, workdir string, types []string) {
+	if body.BoardName == "" || h.bs == nil {
+		return
+	}
+	bh := h.boardHandler
+	if bh == nil {
+		bh = NewBoardHandler(h.bs)
+	}
+	ctx := r.Context()
+	names := make([]string, len(types))
+	for i, t := range types {
+		names[i] = strings.ToUpper(t[:1]) + t[1:]
+	}
+	bh.postNotice(ctx, body.BoardName, fmt.Sprintf("[Coral] %s has no settings file on this computer yet (it makes one the first time it runs), so Coral could not record trust for the folder %s. This is normal, not an error. Each agent asks once whether to trust the folder: answer Yes on its card in the agent's chat, or in Needs you.",
+		strings.Join(names, " and "), quoteNotice(bh.noticeText(ctx, body.BoardName, workdir))))
 }
 
 // sayTrustNotDone posts one line on the team's board when trusting the folder was asked for (the tick, or a folder the launch made) and Coral did not: without it the agents stop at their CLIs' trust cards and nobody
@@ -157,6 +188,6 @@ func (h *SessionsHandler) sayTrustNotDone(r *http.Request, body launchTeamReques
 	if forTypes != "" {
 		who = " for " + forTypes
 	}
-	bh.postNotice(ctx, body.BoardName, fmt.Sprintf("[Coral] Coral did not trust the folder %s%s: %s. The agents will ask about it in their own terminals; answer there, or choose a folder Coral can trust.",
+	bh.postNotice(ctx, body.BoardName, fmt.Sprintf("[Coral] Coral did not trust the folder %s%s: %s. The agents will ask about it: answer on the card in the agent's chat or in Needs you, or choose a folder Coral can trust.",
 		quoteNotice(bh.noticeText(ctx, body.BoardName, workdir)), who, quoteNotice(bh.noticeText(ctx, body.BoardName, reason))))
 }
