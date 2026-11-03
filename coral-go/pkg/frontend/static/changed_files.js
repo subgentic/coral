@@ -368,6 +368,7 @@ function listCount(el, text) { _listOwner = currentViewId(); setBadge(el, text);
 export function updateChangedFileCount(count) {
     const id = currentViewId();
     if (id && _listOwner === id && filesPanelShowing()) return; // the list on screen owns the number
+    _listOwner = ''; // the feed wrote the number (another agent's, or the panel is hidden): no list owns it now, so it is not held on a view it does not belong to
     setBadge(document.getElementById('files-bar-count'), count > 0 ? String(count) : '');
 }
 
