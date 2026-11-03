@@ -1,3 +1,4 @@
+import { loadCustomViews } from './custom_views.js';
 import { historyLabel } from './history_label.js';
 import { showTerminalStatusbar } from './terminal_statusbar.js';
 import { setCommandPlaceholder } from './composer_placeholder.js';
@@ -332,6 +333,7 @@ export async function selectLiveSession(name, agentType, sessionId, server, opts
 
     // Show live view, hide others
     showView("live-session-view");
+    loadCustomViews();
 
     // The agent's page (#3532): a new history entry, or the same one when it is already this
     // agent's (a link, Back, a re-select), keeping its sub-tab. The popout's URL is its identity.

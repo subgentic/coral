@@ -40,6 +40,16 @@ const { coralReady } = require('./helpers/wait');
    const names=await ev(`(async()=>{const {state}=await import(${S}+'state.js'),m=await import(${S}+'chief_look.js'); const names=[];for(const s of ['srv1','srv2','srv1']){state.selectedTeam='@'+s+'/team';names.push((await m.readChief())?.name);}return names;})()`);
    assert.deepEqual(names,['Chief srv1','Chief srv2','Chief srv1']);
   });
+  await check('custom views per computer',async()=>{
+   for(const server of ['srv1','srv2']){
+    await ev(`(async()=>{const {state}=await import(${S}+'state.js');state.selectedTeam='@${server}/team';await (await import(${S}+'custom_views.js')).loadCustomViews();return true;})()`);
+    assert.ok(await ev(`document.getElementById('custom-view-tabs').textContent!==null && !!document.querySelector('#custom-view-tabs [title="View ${server}"]')`),'correct computer view');
+   }
+   await ev(`(async()=>{const {state}=await import(${S}+'state.js');state.selectedTeam='@srv1/team';window.__holdViews='srv1';window.__heldViewRead=(await import(${S}+'custom_views.js')).loadCustomViews();return true;})()`);
+   await waitFor(`typeof window.__releaseViews==='function'`,'held old computer views');
+   await ev(`(async()=>{const {state}=await import(${S}+'state.js');state.selectedTeam='@srv2/team';await (await import(${S}+'custom_views.js')).loadCustomViews();window.__releaseViews();await window.__heldViewRead;return true;})()`);
+   assert.ok(await ev(`!!document.querySelector('#custom-view-tabs [title="View srv2"]') && !document.querySelector('#custom-view-tabs [title="STALE view"]')`),'late old-computer views do not replace the new computer');
+  });
   const calls=await ev('window.__resourceCalls');
   assert.deepEqual(failures,[],'all remote resources are scoped');
   console.log('PASS remote @srv1/team resources and two-computer isolation');

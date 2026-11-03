@@ -17,10 +17,6 @@
       "count": 8,
       "reason": "the Analytics page is this computer's: every one of its cost routes is a bare path, and the page has no computer switch"
     },
-    "custom_views.js": {
-      "count": 2,
-      "reason": "to do (#12653): a computer's own views (the panels agents publish) are listed bare; through the Hub the list is the Hub's"
-    },
     "folder_tags.js": {
       "count": 2,
       "reason": "to do (#12653): folder tags are kept per computer and are written bare; through the Hub they would go to the Hub"
