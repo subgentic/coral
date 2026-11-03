@@ -165,8 +165,8 @@ const contrast = (a, b) => {
             `(() => { const a = document.activeElement; return a ? a.tagName + '#' + a.id + '.' + a.className : null; })()`);
         const rowView = async id => { await openPage(id); const out = await rowViewOf(id); await backToList(); return out; };
         const rowViewOf = id => ev(`(() => { const r = document.getElementById('server-row-${id}'), d = r.querySelector('.cs-detail-cell'); const sel = r.querySelector('.cs-launch select');
-            return { options: [...sel.options].map(o => o.textContent + (o.disabled ? ' (disabled)' : '')), value: sel.value, label: r.querySelector('.cs-launch').firstChild.textContent.trim(), describedBy: sel.getAttribute('aria-describedby'),
-                help: (document.getElementById(sel.getAttribute('aria-describedby')) || {}).textContent || null,
+            return { options: [...sel.options].map(o => o.textContent + (o.disabled ? ' (disabled)' : '')), value: sel.value, label: r.querySelector('.cs-launch').firstChild.textContent.trim(), describedBy: sel.getAttribute('aria-describedby').split(' ')[0], describedByAll: sel.getAttribute('aria-describedby'),
+                help: (document.getElementById(sel.getAttribute('aria-describedby').split(' ')[0]) || {}).textContent || null,
                 effective: [...d.querySelectorAll('.cs-access-effective')].map(n => n.textContent), actions: [...r.querySelectorAll('.cs-actions button')].map(b => b.textContent),
                 inDetails: [...d.querySelectorAll('button:not(.cs-access-info)')].map(b => b.textContent), follow: !!r.querySelector('.cs-follow, .cs-limit'), raise: !!r.querySelector('.cs-raise'), summary: !!d.querySelector('.cs-access'), dialogs: document.querySelectorAll('dialog.cs-confirm').length }; })()`);
         let r = Object.fromEntries((await rows()).map(x => [x.id, x]));

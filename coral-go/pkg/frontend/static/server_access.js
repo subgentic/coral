@@ -11,6 +11,13 @@ export const MODE_INFO = {
     launch: { label: 'Launch', text: 'Also start, stop, sleep, wake and restart agents (one agent or a whole team), browse the computer\'s folders, pause boards, delete board messages and boards, and turn on auto-accept.' },
 };
 
+/** One short line per choice of Hub access (#12878, coral-hub's beta pass: the choices were not explained where they are made): what the choice allows, in a line. MODE_INFO has the whole sentence. */
+export const MODE_SHORT = {
+    view: 'Look at terminals, chats, files and boards. Changes nothing.',
+    interact: 'Also type into running agents and post on boards.',
+    launch: 'Also start, stop and restart agents and browse folders.',
+};
+
 const rank = m => MODES.indexOf(m);
 
 /** The lower of two modes; an unknown or missing local mode does not limit. */

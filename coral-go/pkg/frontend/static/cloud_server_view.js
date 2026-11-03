@@ -27,11 +27,11 @@ import { note } from './nav.js';
 import { sessionServer } from './server_base.js';
 import { needsYou } from './asked_before_restart.js';
 import { refreshPending, pendingRows, pendingCard } from './hub_pending.js';
-const { MODES, MODE_INFO, accessChoice, effectiveMode, launchNote, effectiveNote, invalidateServerAccess, serverAccess } = await importOnce('./server_access.js');
+const { MODES, MODE_INFO, MODE_SHORT, accessChoice, effectiveMode, launchNote, effectiveNote, invalidateServerAccess, serverAccess } = await importOnce('./server_access.js');
 const rank = m => MODES.indexOf(m);
 import { announceNotice } from './notifications.js';
 import { OWNER_LABEL_STEP } from './owner_label.js';
-import { healthDot, healthCard } from './machine_health.js';
+import { healthDot, healthCard, healthStatusText } from './machine_health.js';
 // This module is loaded lazily, so its search box is loaded the same way (a static import of a module not loaded at startup could not be retried: import_hygiene).
 const { syncRelaunchReads, resetRelaunchReads, relaunchBadge } = await importOnce('./relaunch_badge.js'); // the "Updating" badge of a hub relaunch (#5355, behind the update flag)
 const { syncServersBar, serverVisible, serversFiltered } = await importOnce('./server_search.js');
@@ -173,12 +173,14 @@ function accessPicker(s, isBusy, helpId) {
     const choice = accessChoice(s);
     const local = rank(s.local_mode) >= 0 ? s.local_mode : 'view'; // not announced yet: View
     const eff = effectiveOf(s);
+    const lineId = `${helpId}-line`;
     const pick = h('label', { className: 'cs-launch' }, h('span', { className: 'sr-only', text: `Hub access for ${s.label || 'this computer'} ` }),
-        h('select', { disabled: isBusy, value: choice, 'aria-describedby': helpId, onchange: e => setAccess(s, e.target.value) },
-            ['view', 'interact', 'launch'].map(v => h('option', { value: v, selected: v === choice, disabled: rank(v) > rank(local) && v !== choice, text: MODE_INFO[v].label }))));
+        h('select', { disabled: isBusy, value: choice, 'aria-describedby': `${helpId} ${lineId}`, onchange: e => setAccess(s, e.target.value) },
+            ['view', 'interact', 'launch'].map(v => h('option', { value: v, selected: v === choice, disabled: rank(v) > rank(local) && v !== choice, title: MODE_SHORT[v], text: MODE_INFO[v].label }))));
+    const line = h('span', { className: 'cs-access-line', id: lineId, text: MODE_SHORT[choice] || '' }); // what the chosen access allows, in words, under the select (#12878)
     // The select shows the hub's grant, which for a new computer defaults to Launch while the computer itself allows only View: what applies is the lower of the two, so it is said right here, in the table (#11463 F3).
-    if (rank(eff) >= 0 && rank(eff) < rank(choice)) return h('div', { className: 'cs-access-wrap' }, pick, h('span', { className: 'cs-effective', text: `${MODE_INFO[eff].label}: this computer allows ${MODE_INFO[local].label}` }));
-    return pick;
+    if (rank(eff) >= 0 && rank(eff) < rank(choice)) return h('div', { className: 'cs-access-wrap' }, pick, line, h('span', { className: 'cs-effective', text: `${MODE_INFO[eff].label}: this computer allows ${MODE_INFO[local].label}` }));
+    return h('div', { className: 'cs-access-wrap' }, pick, line);
 }
 
 // A click anywhere else closes an open More.
@@ -273,7 +275,8 @@ function serversTable(shown) {
     const live = s => liveOf(s);
     const cellOf = {
         name: s => nameCell(s, live(s), s.online === true),
-        status: s => (s.online === true ? 'Online' : 'Offline'),
+        // The dot beside the name is the computer's health (#3446): when it is not fine the words say so here, beside Online, not only in the dot's tooltip (#12878: an amber dot was unexplained).
+        status: s => { if (s.online !== true) return 'Offline'; const hl = live(s).machine_health; return hl && (hl.status === 'busy' || hl.status === 'stalled') ? `Online, ${healthStatusText(hl)}` : 'Online'; },
         version: s => { const v = serverVersion(live(s)), upd = updateBadge(live(s)), f = document.createDocumentFragment(); f.append(h('span', { text: v ? v : '—' })); if (upd) f.append(' ', upd); return f; },
         agents: s => String(serverAgentCount(live(s))),
         needs: s => { const n = needsCount(s); if (!n) return ''; const e = h('span', { className: 'cs-needs', text: String(n) }); e.title = `${n} agent${n === 1 ? '' : 's'} waiting for you`; return e; },
