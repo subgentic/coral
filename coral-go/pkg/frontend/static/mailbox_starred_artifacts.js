@@ -41,7 +41,7 @@ export function starredArtifactsSection() {
     const h = DT.el('h3', 'group-head group-head-lg', 'Starred artifacts'); section.append(h);
     if (state.error) { const e = DT.el('p', 'empty-state-line', state.error); e.setAttribute('role', 'status'); section.append(e); return section; }
     const table = DT.dataTable({
-        label: `Starred artifacts, ${state.rows.length}`, rows: state.rows, rowKey: r => `${r.server}:${r.id}`, state: tableState, oneLine: true, resize: false, sortBar: false,
+        label: `Starred artifacts, ${state.rows.length}`, rows: state.rows, rowKey: r => `${r.server}:${r.id}`, state: tableState, oneLine: true, resize: true, sortBar: false,
         open: r => importOnce('./artifact_viewer.js').then(m => m.openArtifactViewer(hexOf(r), { server: splitKey(r.board_id).server, filename: visibleName(r.name), mediaType: r.media_type, board: splitKey(r.board_id).name })),
         columns: [
             { key: 'name', label: 'Name', primary: true, width: 'grow', cell: r => { const name = visibleName(r.name); return DT.primaryButton(name || hexOf(r).slice(0, 12), `Open ${name || 'artifact'}`); } }, // the uploader's text (Security on #220)

@@ -9,12 +9,13 @@
  *   detail = { id(row), open(row) -> bool, render(row) -> Node }: a second full-width row under each row (hidden while open(row) is false); the surface's own toggle in a cell opens it (Coral Hub's Servers: health, what applies).
  *   decorate(row, tr, detailTr) and decorateHead(th, column): called each time the rows (or the header) are drawn, for the hooks a surface keeps on them.
  *   cell types: chip(word, cls), avatar(name), avatars(people, label), personButton(name, label), tag(text), timeCell(stamp), link(text, run), primaryButton(text, label)
- *   oneLine: true: keep one row, hide columns with dropAt 62/52/36/28/16 (rem) as the container narrows; never fold.
+ *   oneLine: true: keep one row, hide columns with dropAt 62/52/36/28/16 (rem) as the container narrows; never fold. resize: true opts into shared desktop resizing and remembered widths.
  *   wrapNames: true (with oneLine): in a narrow table the name wraps at its words, to two or three lines, rather than ending in an ellipsis mid-word (the Automations lists).
  *   compact: true: a folded column row is two compact lines (60 px; the name on one line): the Tasks lists and the dock's Artifacts ask for it (#8496); other folded tables keep two-line names and descriptions.
  *   state: tableState(), kept by the caller across redraws: the sort, and the selection (a set of row keys, kept while the rows are filtered or paged, cleared when selectable.contextKey changes).
  * Folded (the table's own box narrower than foldAt rem, 40 by default; 'fit' measures the unfolded columns; also at 200% text): fold 'column' is the two-line row (line 1 and line 2 cells), fold 'labeled' is the name, then "label value" lines
  * (the Analytics tables); scroll: a table of many columns scrolls sideways inside its box, shaded where more is to come, rather than being cut off; the header row is hidden and a "Sort by" select takes its place. Everything is built with the DOM and textContent: titles and names are written by agents. */
+import { isPhoneLayout } from './phone_layout.js';
 import { importOnce } from './import_once.js';
 import { markAgent } from './agent_live.js';
 import { whenText, shortWhen } from './when_text.js';
@@ -170,7 +171,7 @@ const mailCell = (m, label, open, pick, showTeam = false, gap = false) => { // o
 };
 
 export function dataTable(cfg) {
-    if (cfg.oneLine) cfg = { ...cfg, fold: 'none', layout: 'fixed', resize: false };
+    if (cfg.oneLine) cfg = { ...cfg, fold: 'none', layout: 'fixed', resize: cfg.resize === true };
     const st = cfg.state || tableState();
     const columns = cfg.columns, sel = cfg.selectable || null, ctx = cfg.ctx || {};
     const foldKind = cfg.oneLine ? 'none' : cfg.fold || 'column', foldAt = cfg.foldAt || 40;
@@ -220,10 +221,11 @@ export function dataTable(cfg) {
     const wOf = (c) => (st.widths[c.key] ? Math.max(st.widths[c.key], minOf(c)) : 0);
     const ITEM_MIN = 120; // the name column is the one that gives room: it truncates down to this
     const fixedW = (c) => (c.fixed && /rem$/.test(c.width || '') ? c.width : null); // a fixed column (the Actions of a list) has the width it declares: no handle, never frozen or kept, so no other column's resize squeezes its buttons (#9845)
+    const elasticColumn = cols => cols.find(c => c.width === 'grow') || cols.find(c => c.primary) || cols.find(c => !fixedW(c) && !c.fixed);
     function readWidths() {
         try {
             const o = JSON.parse(browserLocal.get(wkey) || 'null') || {}, out = {};
-            for (const c of columns) { const v = Number(o[c.key]); if (!c.fixed && c.width !== 'grow' && !c.primary && Number.isFinite(v) && v >= minOf(c) && v <= MAX_W) out[c.key] = Math.round(v); } // a fixed column is never kept
+            for (const c of columns) { const v = Number(o[c.key]); if (!c.fixed && c !== elasticColumn(columns) && Number.isFinite(v) && v >= minOf(c) && v <= MAX_W) out[c.key] = Math.round(v); } // a fixed column is never kept
             return out;
         } catch { return {}; }
     }
@@ -232,7 +234,7 @@ export function dataTable(cfg) {
     }
     let emptyKeys = new Set(); // the columns no row has anything in (syncEmptyColumns, below)
     let tightKeys = new Set(); // the columns dropped because the box is narrow (applyWidths, below): their <col> is hidden too, or the widths of the colgroup shift onto the wrong columns (#10443)
-    st.widths ||= cfg.oneLine ? {} : readWidths();
+    st.widths ||= cfg.oneLine && !cfg.resize ? {} : readWidths();
     const remPx = () => parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
     /** What the last resizable column takes: its own width, or what the others leave of the box. */
     function fillPx(c, shown) {
@@ -258,15 +260,15 @@ export function dataTable(cfg) {
         box.classList.remove('dt-measure');
         return out;
     }
-    const cssHides = (c) => !!c.narrowHide && box.clientWidth <= 64 * remPx(); // data_table.css hides a narrowHide column in a box of 64 rem or less: it has no cell then, so it takes no width (its <col> would shift every width after it onto the wrong column)
+    const cssHides = (c) => (!!c.narrowHide && box.clientWidth <= 64 * remPx()) || (cfg.oneLine && c.dropAt && box.clientWidth <= c.dropAt * remPx()); // data_table.css hides a narrowHide column in a box of 64 rem or less: it has no cell then, so it takes no width (its <col> would shift every width after it onto the wrong column)
     function applyWidths() {
-        if (cfg.oneLine || cfg.layout === 'fixed') return;
-        if (mailOn() || box.classList.contains('dt-folded')) { // a folded (phone) row is laid out by CSS: what the unfolded table left on it goes, or the folded rows keep its pixel width (#11943)
+        if ((cfg.oneLine || cfg.layout === 'fixed') && cfg.resize !== true) return;
+        if (mailOn() || box.classList.contains('dt-folded') || (cfg.oneLine && isPhoneLayout())) { // a folded (phone) row is laid out by CSS: what the unfolded table left on it goes, or the folded rows keep its pixel width (#11943)
             if (L0) { L0 = null; colgroup.replaceChildren(); table.style.tableLayout = ''; table.style.width = ''; box.classList.remove('dt-sized'); box.style.removeProperty('--dt-sized-min'); tightKeys = new Set(); for (const n of box.querySelectorAll('.dt-col-tight')) n.classList.remove('dt-col-tight'); syncHidden(new Set()); }
             return;
         }
         if (!box.clientWidth) return;
-        const avail = box.clientWidth, rem = remPx(), live = columns.filter(c => !emptyKeys.has(c.key) && !cssHides(c)), prim = live.find(c => c.primary || c.width === 'grow') || live.find(c => !fixedW(c) && !c.fixed); // a table always has one elastic column: the one it declares, or else its first that is not fixed
+        const avail = box.clientWidth, rem = remPx(), live = columns.filter(c => !emptyKeys.has(c.key) && !cssHides(c)), prim = elasticColumn(live); // a table always has one elastic column: the one it declares, or else its first that is not fixed
         for (const n of box.querySelectorAll('.dt-grow-implied')) n.classList.remove('dt-grow', 'dt-grow-implied'); // the elastic column a table did not declare is marked like one it did (dt-grow), until the layout picks it again
         if (prim && prim.width !== 'grow' && !prim.primary) for (const n of box.querySelectorAll(`th.dt-th[data-key="${attrEsc(prim.key)}"], td.dt-td[data-key="${attrEsc(prim.key)}"]`)) if (!n.classList.contains('dt-grow')) n.classList.add('dt-grow', 'dt-grow-implied');
         const nat = measureNatural(live);
@@ -277,7 +279,7 @@ export function dataTable(cfg) {
         const charsOf = c => (c.min ? Math.min(Math.round(c.min * chPx), Math.round(avail * 0.4)) : 0); // the room a column declares in characters (never more than 40% of the box)
         const hardOf = c => Math.max(ITEM_MIN, minOf(c)), pref = {}, base = {};
         const baseOf = c => (c === prim ? Math.max(hardOf(c), charsOf(c)) : Math.max(minOf(c), 96, charsOf(c))); // what a flexible column keeps at least (the name: 120 px, or its characters): no kept width in it, so what drops does not depend on a drag
-        const natW = c => (fixedW(c) ? Math.round(parseFloat(fixedW(c)) * rem) : Math.min(MAX_W, Math.max(minOf(c), nat[c.key] || 0)));
+        const natW = c => (fixedW(c) || (cfg.oneLine && /rem$/.test(c.width || '')) ? Math.round(parseFloat(c.width) * rem) : Math.min(MAX_W, Math.max(minOf(c), nat[c.key] || 0)));
         for (const c of live) { if (!isFlex(c)) w[c.key] = natW(c); }
         let active = live.slice(); const dropped = new Set();
         for (const c of flex) { base[c.key] = baseOf(c); if (c === prim) pref[c.key] = base[c.key]; }

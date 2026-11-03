@@ -68,7 +68,7 @@ export function spec(f, open) {
             const wrap = DT.el('div', 'activity-folder');
             const words = checkWords(check);
             if (words) { const n = DT.el('p', `activity-check${check && !check.intact ? ' activity-check-broken' : ''}`, words); n.setAttribute('role', check && !check.intact ? 'alert' : 'status'); wrap.append(n); }
-            const t = DT.dataTable({ label: `Activity, ${list.length}`, rows: list, rowKey: r => r.id, state, rowName: r => `${actionWord(r)} ${itemWords(r)}`, oneLine: true, sortBar: false,
+            const t = DT.dataTable({ label: `Activity, ${list.length}`, rows: list, rowKey: r => r.id, state, rowName: r => `${actionWord(r)} ${itemWords(r)}`, oneLine: true, resize: true, sortBar: false,
                 open: r => { if (r.item_kind === 'file' && r.version) open.file(r); else if (r.item_kind === 'goal') open.goal(r); },
                 mail: r => ({ lead: { icon: 'checklist', square: true, name: actionWord(r) }, title: itemWords(r), team: teamOf(r), snippet: r.note || fromWords(r), state: actionWord(r), time: DT.timeCell(r.at).textContent }),
                 columns: [ // narrowing drops From (62 rem), then Team (52), then When (36), then You did (16): the data table's own thresholds, so the On column (the item) never shrinks (the table rules' R2)

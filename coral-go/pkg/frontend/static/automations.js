@@ -221,7 +221,7 @@ function recentTable(rows, narrowed) {
         empty: { line: narrowed ? 'No run matches the search and filters.' : 'Nothing has run yet.', hint: narrowed ? '' : 'Every run of a job or workflow shows here, newest first. A dot marks one you have not opened.', ...(narrowed ? {} : firstRun()) },
         signature: JSON.stringify([!!firstRun().cards, rows.map(i => [i.key, i.run.status, AR.isUnread(i), i.name, AR.resultWords(i.run).full])]),
         node: () => DT.dataTable({
-            label: `Recent runs, ${rows.length}`, rows, oneLine: true, rowKey: i => i.key, rowName: i => `${i.name}, ${AR.resultWords(i.run).full}${AR.isUnread(i) ? ', not opened' : ''}`, state: stateOf('recent'), open: openRun,
+            label: `Recent runs, ${rows.length}`, rows, oneLine: true, resize: true, rowKey: i => i.key, rowName: i => `${i.name}, ${AR.resultWords(i.run).full}${AR.isUnread(i) ? ', not opened' : ''}`, state: stateOf('recent'), open: openRun,
             columns: [ // one line a row (Goal #79): a narrow list drops Kind (under 52 rem: the run's name is at least 24 characters, #9856), then When it started and How long it took (dropAt, #8931): the name and the result stay, the name whole
                 { key: 'name', label: 'Run', primary: true, width: 'grow', sort: true, sortValue: i => i.name, cell: i => {
                     const b = nameButton(i, i.kind === 'workflow' ? 'A workflow run' : 'A job run');
@@ -242,7 +242,7 @@ function attentionTable(key, rows, narrowed) {
         empty: { line: narrowed ? `No ${f.noun[0]} matches the search.` : failed ? 'Nothing has failed.' : 'Nothing is running.', hint: narrowed ? '' : failed ? 'A job or workflow whose last run failed shows here.' : 'A job or workflow with a run going shows here.', ...(narrowed ? {} : firstRun()) },
         signature: JSON.stringify([!!firstRun().cards, rows.map(i => [i.kind, i.id, i.name, i.run && i.run.status, i.run && i.run.id, i.kind === 'job' ? nextOf(i.job) : ''])]),
         node: () => DT.dataTable({
-            label: `${f.label}, ${rows.length}`, rows, oneLine: true, rowKey: itemKey, rowName: i => i.name, state: stateOf(key), open: openItem,
+            label: `${f.label}, ${rows.length}`, rows, oneLine: true, resize: true, rowKey: itemKey, rowName: i => i.name, state: stateOf(key), open: openItem,
             columns: [ // one line a row (Goal #79): what it is goes to the name's tooltip, and a narrow list drops Schedule, then Kind, then Next (dropAt, #8931)
                 { key: 'name', label: 'Name', primary: true, width: 'grow', sort: true, sortValue: i => i.name, cell: i => nameButton(i, whatWords(i)) },
                 { key: 'kind', label: 'Kind', width: '7rem', dropAt: 36, sort: true, sortValue: i => KIND_WORD[i.kind], cell: i => DT.tag(KIND_WORD[i.kind]) },
@@ -268,7 +268,7 @@ function folderTable(key) {
     if (key === 'jobs') {
         return { ...base, signature: JSON.stringify([_gone, !!firstRun().cards, rows.map(i => [i.job, lastWords(i.run), nextOf(i.job), runsWords(i)])]),
             node: () => DT.dataTable({
-                label: `Jobs, ${rows.length}`, rows, oneLine: true, wrapNames: true, rowKey: i => i.id, rowName: i => i.name, state: stateOf(key), open: i => openRow(key, i),
+                label: `Jobs, ${rows.length}`, rows, oneLine: true, resize: true, wrapNames: true, rowKey: i => i.id, rowName: i => i.name, state: stateOf(key), open: i => openRow(key, i),
                 columns: [ // one line a row (Goal #79): what the job runs is the name's tooltip and its page's; a narrow list drops Schedule, then Next (dropAt, #8931)
                     { key: 'job', label: 'Job', primary: true, width: 'grow', sort: true, sortValue: i => i.name, cell: i => nameButton(i, runsWords(i)) },
                     { key: 'schedule', label: 'Schedule', width: '12rem', dropAt: 36, sort: true, sortValue: i => scheduleOf(i.job), cell: i => scheduleOf(i.job) },
@@ -283,7 +283,7 @@ function folderTable(key) {
     }
     return { ...base, signature: JSON.stringify([!!firstRun().cards, rows.map(i => [i.wf, i.usedBy, workflowResult(i)])]),
         node: () => DT.dataTable({
-            label: `Workflows, ${rows.length}`, rows, oneLine: true, wrapNames: true, rowKey: i => i.id, rowName: i => i.name, state: stateOf(key), open: i => openRow(key, i),
+            label: `Workflows, ${rows.length}`, rows, oneLine: true, resize: true, wrapNames: true, rowKey: i => i.id, rowName: i => i.name, state: stateOf(key), open: i => openRow(key, i),
             columns: [ // one line a row (Goal #79): the description is the name's tooltip and the page's; a narrow list drops Steps, then Used by (dropAt, #8931)
                 { key: 'workflow', label: 'Workflow', primary: true, width: 'grow', sort: true, sortValue: i => i.name, cell: i => nameButton(i, i.does) },
                 { key: 'steps', label: 'Steps', width: '6rem', dropAt: 36, tone: 'tertiary', sort: 'number', sortValue: i => i.stepCount, cell: stepsWords },
