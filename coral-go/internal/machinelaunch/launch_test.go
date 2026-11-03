@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"os"
@@ -849,5 +850,47 @@ func TestLaunchClipsTheMachinesClaimedName(t *testing.T) {
 	}
 	if got := clipLabel("short"); got != "short" {
 		t.Errorf("a short name is unchanged: %q", got)
+	}
+}
+
+// darkHub is a Hub client whose preflight says the Hub does not answer machine launches (the production Hub's bootstrap routes are dark).
+type darkHub struct {
+	*stubHub
+	err   error
+	asked int
+}
+
+func (h *darkHub) Preflight(context.Context) error { h.asked++; return h.err }
+
+func TestLaunchAgainstAHubThatCannotMintTouchesNoCloudAtAll(t *testing.T) {
+	p := &stubProvider{}
+	h := &darkHub{stubHub: &stubHub{}, err: fmt.Errorf("%w: nothing was created", ErrHubNotReady)}
+	o, d, out := setup(p, h.stubHub)
+	d.Hub = h
+	_, err := Launch(context.Background(), o, d)
+	if !errors.Is(err, ErrHubNotReady) {
+		t.Fatalf("want ErrHubNotReady, got %v", err)
+	}
+	if len(p.calls) != 0 {
+		t.Errorf("the provider was called before the Hub was known to be ready: %v (not even the token check)", p.calls)
+	}
+	if len(h.labels) != 0 || strings.Contains(out.String(), "Create machine") {
+		t.Errorf("nothing may be minted or shown: labels %v out %q", h.labels, out.String())
+	}
+}
+
+func TestLaunchAsksTheHubOnceBeforeTheProviderAndGoesOnWhenItIsReady(t *testing.T) {
+	p := &stubProvider{}
+	h := &darkHub{stubHub: &stubHub{}}
+	o, d, _, _ := setupWith(t, p, h.stubHub)
+	d.Hub = h
+	if _, err := Launch(context.Background(), o, d); err != nil {
+		t.Fatal(err)
+	}
+	if h.asked != 1 {
+		t.Errorf("the preflight ran %d times, want once", h.asked)
+	}
+	if len(p.calls) == 0 || p.calls[0] != "validate" {
+		t.Errorf("provider calls %v: the first must be the token check, after the preflight", p.calls)
 	}
 }

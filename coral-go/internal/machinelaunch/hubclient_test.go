@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -262,5 +263,81 @@ func TestMintKeepsTheHubsExpiryAndAnswerWithoutOneSaysNothingGuessed(t *testing.
 	}
 	if _, ok := h.ExpiresAt("never"); ok {
 		t.Fatal("nothing minted has none")
+	}
+}
+
+// ---- Preflight: before anything billable is made, ask whether this Hub answers machine launches at all (#9934 round 1, item 3) ----
+
+func TestPreflightPassesOnlyWhenTheMintRouteAnswersItsOwnUnauthorizedAndSendsNoKey(t *testing.T) {
+	var method, path, auth, body string
+	h, srv := hubServer(t, func(w http.ResponseWriter, r *http.Request) {
+		method, path, auth = r.Method, r.URL.Path, r.Header.Get("Authorization")
+		b, _ := io.ReadAll(r.Body)
+		body = string(b)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte(`{"error":"unauthorized"}`))
+	})
+	defer srv.Close()
+	h.Key = "chk_" + strings.Repeat("a", 40)
+	h.DestroyKey = "chd_" + strings.Repeat("b", 40)
+	if err := h.Preflight(context.Background()); err != nil {
+		t.Fatalf("a Hub whose mint route answers 401 unauthorized must pass: %v", err)
+	}
+	if method != http.MethodPost || path != "/api/bootstrap/credentials" {
+		t.Errorf("the probe is %s %s, want POST /api/bootstrap/credentials", method, path)
+	}
+	if auth != "" || strings.Contains(body, "chk_") || strings.Contains(body, "chd_") {
+		t.Errorf("the probe must carry no key: Authorization %q body %q", auth, body)
+	}
+}
+
+func TestPreflightRefusesEveryHubThatIsNotTheLiveMintRoute(t *testing.T) {
+	cases := map[string]func(w http.ResponseWriter, r *http.Request){
+		"dark: plain 404": func(w http.ResponseWriter, r *http.Request) { http.NotFound(w, r) },
+		"dark: JSON 404": func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(404)
+			_, _ = w.Write([]byte(`{"error":"not_found"}`))
+		},
+		"method not allowed": func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(405) },
+		"a sign-in page with a 401": func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(401)
+			_, _ = w.Write([]byte("<html>Sign in</html>"))
+		},
+		"401 with another word": func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(401)
+			_, _ = w.Write([]byte(`{"error":"session_expired"}`))
+		},
+		"an HTML 200":           func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte("<html>Add a machine</html>")) },
+		"a redirect to sign-in": func(w http.ResponseWriter, r *http.Request) { http.Redirect(w, r, "/signin", http.StatusFound) },
+		"a server error":        func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(500) },
+		"an empty 401":          func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(401) },
+	}
+	for name, handler := range cases {
+		h, srv := hubServer(t, handler)
+		err := h.Preflight(context.Background())
+		srv.Close()
+		if err == nil {
+			t.Errorf("%s: a Hub that is not the live mint route passed the preflight", name)
+			continue
+		}
+		if !errors.Is(err, ErrHubNotReady) {
+			t.Errorf("%s: %v is not ErrHubNotReady", name, err)
+		}
+		if !strings.Contains(err.Error(), "nothing was created") {
+			t.Errorf("%s: the refusal must say nothing was created: %v", name, err)
+		}
+	}
+}
+
+func TestPreflightSaysWhenTheHubCannotBeReachedAndLeaksNoURLDetail(t *testing.T) {
+	h, srv := hubServer(t, func(w http.ResponseWriter, r *http.Request) {})
+	srv.Close() // nothing listens any more
+	err := h.Preflight(context.Background())
+	if err == nil || !strings.Contains(err.Error(), "could not reach Coral Hub") || !strings.Contains(err.Error(), "nothing was created") {
+		t.Fatalf("an unreachable Hub: %v", err)
+	}
+	if strings.Contains(err.Error(), "127.0.0.1") {
+		t.Errorf("a transport error's address must not be in the message: %v", err)
 	}
 }
