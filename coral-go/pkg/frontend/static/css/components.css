@@ -2748,6 +2748,8 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 
 .prompt-field-header {
     display: flex;
+    flex-wrap: wrap;
+    gap: 4px 8px;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 4px;

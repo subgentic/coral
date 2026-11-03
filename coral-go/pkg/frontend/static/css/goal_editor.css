@@ -36,7 +36,7 @@
 .goal-gap { flex: none; height: 8px; }
 .goal-editor .goals-form-body > input#goal-new-done { min-height: 40px; padding: 8px 12px; border: 1px solid var(--control-border); border-radius: var(--radius-md); background: var(--bg-primary); color: var(--text-primary); font: inherit; font-size: var(--fs-xl); }
 @media (max-width: 767px) {
-    .goal-editor .goals-actions { order: 3; } /* the bar, the writing, then the actions pinned at the bottom (the DOM has the actions second so a desktop's bar can hold them) */
+    .goal-editor .goals-actions { order: 3; flex-wrap: wrap; } /* the bar, the writing, then the actions pinned at the bottom (the DOM has the actions second so a desktop's bar can hold them) */
     .goal-editor .goals-form-head { flex-wrap: wrap; padding-block: 6px; }
     .goal-editor .goals-form-head h3 { flex: 1 1 auto; }
     .goal-scopes { flex: none; }
