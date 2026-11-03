@@ -135,7 +135,7 @@ export function timeLabel(ms, interval) {
 export function drawChart(host, { times, lines, metric, interval, hi, phone, xLabel, when, fmt, log }) {
     const label = xLabel || (i => timeLabel(times[i], interval)), heading = when || label;
     host.replaceChildren();
-    const k = textScale(host), W = Math.max(280, Math.round(host.clientWidth || (phone ? 340 : 880))), B = Math.round(24 * k), H = (phone ? 200 : 250) + B - 24, L = Math.round(52 * k), R = phone ? 12 : Math.round(112 * k), T = 10, pw = W - L - R, ph = H - T - B, N = times.length;
+    const k = textScale(host), W = Math.max(280, Math.round(host.clientWidth || (phone ? 340 : 880))), B = Math.round(24 * k), H = (phone ? 200 : 250) + B - 24, L = Math.round(52 * k), R = phone ? 12 : Math.round(112 * k), T = Math.round(10 * k), pw = W - L - R, ph = H - T - B, N = times.length;
     const m = { ...(METRICS.find(x => x.key === metric) || METRICS[0]), ...(fmt ? { fmt } : {}) };
     const top = Math.max(0, ...lines.flatMap(l => l.plot)), max = log ? 10 ** Math.max(1, Math.ceil(Math.log10(top + 1))) : niceMax(top);
     const x = i => L + (N > 1 ? (i / (N - 1)) * pw : pw / 2), y = log ? (v => T + ph - (Math.log10(1 + Math.max(v, 0)) / Math.log10(1 + max)) * ph) : (v => T + ph - (v / max) * ph);
@@ -306,7 +306,7 @@ export function bucketTotals(buckets) {
 /** The lines stacked, each fill one line (2 px of the surface between fills), the daily or hourly total the height; a crosshair and a tooltip that lists the fills at the time and their total. */
 function drawArea(host, { times, lines, metric, interval, hi, phone }) {
     host.replaceChildren();
-    const k = textScale(host), W = Math.max(280, Math.round(host.clientWidth || (phone ? 340 : 880))), B = Math.round(24 * k), H = (phone ? 190 : 230) + B - 24, L = Math.round(52 * k), R = 12, T = 10, pw = W - L - R, ph = H - T - B, N = times.length;
+    const k = textScale(host), W = Math.max(280, Math.round(host.clientWidth || (phone ? 340 : 880))), B = Math.round(24 * k), H = (phone ? 190 : 230) + B - 24, L = Math.round(52 * k), R = 12, T = Math.round(10 * k), pw = W - L - R, ph = H - T - B, N = times.length;
     const m = METRICS.find(x => x.key === metric) || METRICS[0];
     const sums = times.map((_, i) => lines.reduce((a, l) => a + l.vals[i], 0));
     const max = niceMax(Math.max(0, ...sums));
@@ -377,7 +377,7 @@ export function bucketWindow(startMs, interval) { return { since: new Date(start
  *  (sel). parts = [{ name, color, vals }]. The chart is aria-hidden: whatever it says is also a table or a control beside it. */
 export function drawBars(host, { times, parts, fmt, interval, sel, onPick, phone, xLabel }) {
     host.replaceChildren();
-    const k = textScale(host), W = Math.max(280, Math.round(host.clientWidth || (phone ? 340 : 880))), B = Math.round(22 * k), H = (phone ? 150 : 170) + B - 22, L = Math.round(52 * k), R = 8, T = 10, pw = W - L - R, ph = H - T - B, N = times.length;
+    const k = textScale(host), W = Math.max(280, Math.round(host.clientWidth || (phone ? 340 : 880))), B = Math.round(22 * k), H = (phone ? 150 : 170) + B - 22, L = Math.round(52 * k), R = 8, T = Math.round(10 * k), pw = W - L - R, ph = H - T - B, N = times.length;
     const label = xLabel || (i => timeLabel(times[i], interval));
     const sums = times.map((_, i) => parts.reduce((a, p) => a + p.vals[i], 0));
     const max = niceMax(Math.max(0, ...sums) * 1.05), y = v => T + ph - (v / max) * ph, bw = Math.max(2, pw / Math.max(N, 1) - 2);
