@@ -70,7 +70,8 @@ const SAFE = new Set(['GET', 'HEAD', 'OPTIONS']);
 const LEAVING_MS = 10000;
 let leavingSince = 0;
 export function pageIsLeaving(now = Date.now()) { return leavingSince > 0 && now - leavingSince < LEAVING_MS; }
-if (typeof window !== 'undefined' && window.addEventListener) {
+/** Start noting that the page is being left; installCloudFetch calls it once (a page that is not on the Hub never gets these three listeners). */
+function watchLeaving() {
     window.addEventListener('beforeunload', () => { leavingSince = Date.now(); });
     window.addEventListener('pagehide', () => { leavingSince = Date.now(); });
     window.addEventListener('pageshow', () => { leavingSince = 0; });
@@ -145,6 +146,7 @@ async function sayOutcomeUnknown(resp, url) {
 export function installCloudFetch() {
     if (window.__coralCloudFetch) return;
     window.__coralCloudFetch = true;
+    watchLeaving();
     const orig = window.fetch.bind(window);
     window.fetch = async function (input, init) {
         const method = String((init && init.method) || (input && input.method) || 'GET').toUpperCase();
