@@ -372,7 +372,9 @@ func CommonPlaceCandidates(binary string) []string {
 		}
 	case "windows":
 		exts := []string{"", ".exe", ".cmd", ".bat"}
-		basePaths := windowsCommonDirs(os.Getenv("APPDATA"), os.Getenv("LOCALAPPDATA"))
+		// %USERPROFILE%\.local\bin is where Claude Code's native Windows installer puts claude.exe (the install the CLI check links to), as ~/.local/bin is on macOS and Linux. The
+		// installer adds it to the user's Path, which a Coral that was already running does not see: without it here, Check again kept saying "not found" until Coral restarted.
+		basePaths := append(windowsCommonDirs(os.Getenv("APPDATA"), os.Getenv("LOCALAPPDATA")), filepath.Join(home, ".local", "bin"))
 		for _, base := range basePaths {
 			for _, ext := range exts {
 				candidates = append(candidates, filepath.Join(base, binary+ext))
