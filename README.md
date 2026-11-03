@@ -98,9 +98,10 @@ Coral wraps the agent CLIs you already use (Claude Code, Codex, Antigravity, Pi 
 
 **Chief** is one of your running agents that you make the front door. In Settings > Chief you pick which agent it is, give it a name and an avatar (one of eight colours and a letter), and choose the team it fronts: the team whose agents Chief takes your requests to. Chief has its own page on your phone, `/chief`, with its own chat (you turn the page on in Settings). You decide how much it may do on its own: **Ask first** (the default) asks before each action; **Act** edits without asking, and a shell command still asks; the level applies when Chief restarts. Chief has to be an agent that is already running (on a team of its own, a team of one), and Settings > Chief is on the computer itself, not through Coral Hub.
 
-## A team with an Orchestrator
+## A team of agents with different skills
 
 Behind the Inbox is the part that does the work: a team of agents on one board. An **Orchestrator** plans and delegates; a **Lead Developer** writes the code; a **QA Engineer** checks it. They can be different vendors on the same team (a Claude orchestrator, Codex workers, an Antigravity reviewer), each in its own terminal session and, if you ask, its own git worktree. The team's board holds the messages and a task queue whose dependencies are conditioned on outcomes and artifacts, not just "done".
+
 
 <p align="center">
   <img alt="The message board beside an agent's chat: posts from the Orchestrator and workers" src="https://github.com/user-attachments/assets/86c75256-e09d-459d-a517-73809be8bcf2" width="100%" />
