@@ -3,6 +3,7 @@ package server
 import (
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -104,4 +105,50 @@ func TestSyncedAgentDocsAreEmbeddedGzippedAndServedWithTheSourceBytes(t *testing
 		require.NoError(t, err)
 		assert.Equal(t, string(want), string(got), "%s is served with other bytes than its source", e.Name())
 	}
+}
+
+// #12865 follow-up: the sync clears the output folder before it writes, so a copy made by an older sync (plain .md files), a doc that was renamed or removed, and any stray file are gone after it: the tree a
+// build embeds holds exactly the current docs as .md.gz. Runs the real script on a scratch tree laid out as the repository is (tools/, coral-go/agent_docs, coral-go/pkg/frontend/static/agent_docs).
+func TestTheDocsSyncLeavesOnlyTheCurrentGzippedDocs(t *testing.T) {
+	bash, err := exec.LookPath("bash")
+	if err != nil {
+		t.Skip("no bash to run the sync script")
+	}
+	script, err := os.ReadFile("../../../tools/sync-agent-docs.sh")
+	if err != nil {
+		t.Skip("the script is not beside this module")
+	}
+	root := t.TempDir()
+	must := func(err error) {
+		t.Helper()
+		require.NoError(t, err)
+	}
+	must(os.MkdirAll(filepath.Join(root, "tools"), 0o755))
+	must(os.WriteFile(filepath.Join(root, "tools", "sync-agent-docs.sh"), script, 0o755))
+	src := filepath.Join(root, "coral-go", "agent_docs")
+	dst := filepath.Join(root, "coral-go", "pkg", "frontend", "static", "agent_docs")
+	must(os.MkdirAll(src, 0o755))
+	must(os.MkdirAll(dst, 0o755))
+	must(os.WriteFile(filepath.Join(src, "board.md"), []byte("# board\n"), 0o644))
+	must(os.WriteFile(filepath.Join(src, "teams.md"), []byte("# teams\n"), 0o644))
+	// what an older sync, a renamed doc and a stray file leave behind
+	must(os.WriteFile(filepath.Join(dst, "board.md"), []byte("# old plain copy\n"), 0o644))
+	must(os.WriteFile(filepath.Join(dst, "gone.md"), []byte("# a doc that was removed\n"), 0o644))
+	must(os.WriteFile(filepath.Join(dst, "gone.md.gz"), []byte("not a real gzip"), 0o644))
+	must(os.WriteFile(filepath.Join(dst, "stray.txt"), []byte("x"), 0o644))
+
+	out, err := exec.Command(bash, filepath.Join(root, "tools", "sync-agent-docs.sh")).CombinedOutput()
+	require.NoError(t, err, string(out))
+	entries, err := os.ReadDir(dst)
+	require.NoError(t, err)
+	var names []string
+	for _, e := range entries {
+		names = append(names, e.Name())
+	}
+	assert.Equal(t, []string{"board.md.gz", "teams.md.gz"}, names, "exactly the current docs, gzipped: nothing an earlier sync left")
+	zipped, err := os.ReadFile(filepath.Join(dst, "board.md.gz"))
+	require.NoError(t, err)
+	got, err := fs.ReadFile(newGzDocsFS(fstest.MapFS{"board.md.gz": {Data: zipped}}), "board.md")
+	require.NoError(t, err)
+	assert.Equal(t, "# board\n", string(got))
 }
