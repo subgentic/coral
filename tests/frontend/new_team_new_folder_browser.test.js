@@ -89,7 +89,11 @@ const { coralReady } = require('./helpers/wait');
                 await close();
             }
         }
-    } finally { await client.close(); }
+    } finally {
+        // The wizard's first step creates the team's board ('planner-shop') on the real server as it is filled in, and nothing here launches a team, so it is left with its one subscriber: --fail-on-leak counts it (#12986). Delete it, whatever happened above.
+        try { const r = await fetch(`${BASE}/api/board/planner-shop`, { method: 'DELETE' }); if (r.status >= 300 && r.status !== 404) console.log(`[WARN] could not delete the board planner-shop: ${r.status}`); } catch (e) { console.log(`[WARN] could not delete the board planner-shop: ${e.message}`); }
+        await client.close();
+    }
     if (results.some(r => !r)) { console.error(`${results.filter(r => !r).length} of ${results.length} failed`); process.exit(1); }
     console.log(`\nAll ${results.length} new team folder checks passed`);
 })().catch(e => { console.error(e); process.exit(1); });
