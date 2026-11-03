@@ -38,6 +38,7 @@ export async function loadBoardMessages(project) {
     try {
         const result = await fetchMessages(project, PAGE_SIZE);
         if (bs.currentProject !== project) return;
+        if (bs._goneProject === project) return; // the board was deleted while this page of it was on its way: the words stay (#12995)
         bs._loadedProject = project;
         bs._totalMessages = bs._countedTotal = result.total;
         bs._staleRows = false;
