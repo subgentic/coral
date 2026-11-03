@@ -140,7 +140,7 @@ function _defaultTerminalDir() {
     if (!input || _effectiveServer(launch.server) !== LOCAL_SERVER) return;
     const now = input.value.trim().replace(/[\\/]+$/, ''), root = (input.dataset.coralRoot || '').replace(/[\\/]+$/, '');
     if (now && now !== root) return;
-    const pin = pinnedFolders().find(p => p.exists !== false);
+    const pin = pinnedFolders().find(p => p.exists !== false && (!p.server || p.server === LOCAL_SERVER)); // this computer's pins: a folder on another computer is not a default here
     const dir = _settingsFor(LOCAL_SERVER).default_working_dir || (pin && pin.path) || '';
     if (dir) input.value = dir;
 }

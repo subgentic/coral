@@ -9,8 +9,11 @@ import { fileURLToPath } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(here, '..', '..', 'coral-go', 'pkg', 'frontend', 'static');
 const baselinePath = path.join(here, 'fixtures', 'bare_api_fetch_baseline.json');
-// the data a computer holds: not settings, update, account, analytics or sign-in, which are the page's own server's
-const COMPUTER = /^\/api\/(board|sessions|session-artifacts|artifacts|agents|jobs|tasks|teams|workflows|files|goals|worktrees|filesystem|search-access|operator-asks|chats|notes|saved|activity|system\/artifact-store)(\/|\?|$|`|')/;
+// The page's own server's: the Hub's account and sign-in, the settings and system routes of the machine the page is served from, the connection to a Hub, the server list, the theme and analytics beacon. Everything else under /api is data a
+// computer holds (teams, sessions, files, folders, pins, jobs, workflows, skills, views, token usage), and a call on it has to say which computer: a list of what is NOT a computer's, so a new route is a computer's until it is listed here (#12653: the
+// first version listed what was, and pinned-folders was missed).
+const OWN = /^\/api\/(account|auth|cloud|health|servers|settings|system(?!\/artifact-store)|themes|tracking|update|webhooks|editions|hub)(\/|\?|$|`|')/;
+const COMPUTER = { test: u => !OWN.test(u) };
 const call = /(?<![A-Za-z0-9_.$])fetch\(\s*(`|')(\/api\/[^`'\s]*)/g;
 
 const found = {};
