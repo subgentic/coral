@@ -24,6 +24,11 @@ Chief's screen is in Settings, on this computer only (it is not available throug
    - **Serve the Chief page**: turns on the phone page.
 3. Save. The name and avatar appear at once.
 
+Two things Settings will tell you if you trip over them:
+
+- An agent on the team Chief fronts is refused as Chief: pick one that is on a team of its own, or Chief would hear none of that team's decisions.
+- Save on its own leaves Chief off: the Chief page answers only while **Serve the Chief page** is on and saved.
+
 If your Coral restricts messages between teams (the `cross_team_allowlist` setting, see [cross-team.md](cross-team.md)), the dev team's board must allow Chief's team as a sender before a relay is accepted.
 
 ## The Chief page (`/chief`)
