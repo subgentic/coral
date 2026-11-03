@@ -118,7 +118,12 @@ function draw(key) {
     else root.append(...({ usage: drawUsage, operator: drawOperator, [IVC]: drawInbox, comm: drawComm }[key])(m));
     const focus = host.contains(document.activeElement) ? document.activeElement.getAttribute('aria-label') : null;
     host.replaceChildren(root);
-    if (focus) host.querySelector(`[aria-label="${CSS.escape(focus)}"]`)?.focus({ preventScroll: true });
+    if (focus) {
+        const back = host.querySelector(`[aria-label="${CSS.escape(focus)}"]`);
+        // a button that is now disabled (the first or last day was reached) cannot hold focus: the other button of its row does, so a keyboard user is not sent back to the top of the page
+        const target = back && back.disabled ? [...(back.closest('.atab-days')?.querySelectorAll('button:not(:disabled)') || [])][0] : back;
+        target?.focus({ preventScroll: true });
+    }
 }
 
 /* ---- Usage ---- */
