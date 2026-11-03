@@ -5,9 +5,9 @@ import { importOnce } from './import_once.js';
 const DT = await importOnce('./data_table.js');
 const Tags = await importOnce('./artifact_tags.js');
 const { fileIconHtml } = await importOnce('./file_explorer.js');
-const { readableName, itemKey, sizeText, typeText, isUnverified } = await importOnce('./artifact_item.js');
+const { readableName, itemKey, sizeText, typeText, isUnverified, uploaderText, isOperatorUpload } = await importOnce('./artifact_item.js');
 const SORT_KEY = 'coral-artifact-table-sort';
-const keys = ['name', 'type', 'tags', 'size', 'updated'];
+const keys = ['uploader', 'name', 'type', 'tags', 'size', 'updated'];
 function artifactSort() {
     try { const s = JSON.parse(browserLocal.get(SORT_KEY)); if (keys.includes(s?.key) && ['asc', 'desc'].includes(s.dir)) return s; } catch { /* default */ }
     return { key: 'updated', dir: 'desc' };
@@ -15,13 +15,13 @@ function artifactSort() {
 /** The server's word for a sort (the team lists' sort=): name, type and tags A to Z and _desc, size largest first and size_asc, updated newest and oldest. */
 export function serverArtifactSort(s = artifactSort()) {
     const desc = s.dir === 'desc';
-    if (s.key === 'name' || s.key === 'type' || s.key === 'tags') return desc ? `${s.key}_desc` : s.key;
+    if (s.key === 'uploader' || s.key === 'name' || s.key === 'type' || s.key === 'tags') return desc ? `${s.key}_desc` : s.key;
     if (s.key === 'size') return desc ? 'size' : 'size_asc';
     return s.dir === 'asc' ? 'oldest' : 'newest';
 }
 /** The other way: a server word (the Filters panel's Sort) as the table's sort, so its header marks the same order. */
 export function tableSortOf(word) {
-    const m = /^(name|type|tags)(_desc)?$/.exec(word);
+    const m = /^(uploader|name|type|tags)(_desc)?$/.exec(word);
     if (m) return { key: m[1], dir: m[2] ? 'desc' : 'asc' };
     if (word === 'size' || word === 'size_asc') return { key: 'size', dir: word === 'size' ? 'desc' : 'asc' };
     return { key: 'updated', dir: word === 'oldest' ? 'asc' : 'desc' };
@@ -45,6 +45,7 @@ export function artifactTable(cfg) {
             if (star) wrap.append(star);
             return wrap;
         } },
+        ...(cfg.showUploader ? [{ key: 'uploader', label: 'Uploaded by', width: '9rem', sort: true, sortValue: uploaderText, cell: item => { const text = uploaderText(item) || '—', node = isOperatorUpload(item) ? DT.tag(text) : DT.el('span', '', text); DT.tipIf(node, text, () => node.parentElement.scrollWidth > node.parentElement.clientWidth); return node; } }] : []),
         ...(cfg.afterName || []), // the Inbox's list spans teams and computers: its Team (or Server) column, which drops with the optional ones
         { key: 'type', label: 'Type', width: '6.5rem', dropAt: 36, tone: 'tertiary', sort: true, sortValue: typeText, cell: i => isUnverified(i) ? '—' : DT.tag(typeText(i)) },
         { key: 'tags', label: 'Tags', width: '16rem', dropAt: cfg.tagsDropAt || 52, sort: true, sortValue: i => (i.tags || []).join(', '), cell: i => Tags.rowTags(i.tags) || '—' },
@@ -53,7 +54,7 @@ export function artifactTable(cfg) {
         ...(cfg.details ? [{ key: 'details', label: 'Details', hideLabel: true, width: '3.75rem', cell: cfg.details }] : []),
     ];
     const table = DT.dataTable({ ...cfg, columns, state, oneLine: true, resize: true, sortBar: false,
-        rowKey: cfg.rowKey || itemKey, rowName: i => Tags.nameWithTags(readableName(i), i.tags) + (i.starred ? ', starred' : ''),
+        rowKey: cfg.rowKey || itemKey, rowName: i => Tags.nameWithTags(readableName(i), i.tags) + (i.starred ? ', starred' : '') + (cfg.showUploader ? `, Uploaded by ${uploaderText(i) || 'not recorded'}` : ''),
         ...(cfg.paged ? { onSort: (key, dir) => {
             state.sort = { key, dir };
             browserLocal.set(SORT_KEY, JSON.stringify(state.sort)); cfg.onPageSort?.(serverArtifactSort(state.sort));

@@ -29,7 +29,7 @@ const { loadPanelOpen, savePanelOpen, buildMoreMenu } = await importOnce('./list
 const { isOwnerLabelRefusal, OWNER_LABEL_TEXT } = await importOnce('./owner_label.js');
 const { readersAllowed, readersBlock } = await importOnce('./artifact_readers.js');
 const { privateBlock } = await importOnce('./artifact_private.js'); // the owner's Private switch, beside it (#11457)
-const { HEX_RE, managedHex, itemKey: artifactKey, isUnverified, readableName, sizeText, typeText, createdText, taskText, linkOfItem, renderText, orderByGroup, groupHead } = await importOnce('./artifact_item.js');
+const { HEX_RE, managedHex, itemKey: artifactKey, isUnverified, readableName, sizeText, typeText, createdText, taskText, linkOfItem, renderText, orderByGroup, groupHead, uploaderText, isOperatorUpload } = await importOnce('./artifact_item.js');
 
 const Tags = await importOnce('./artifact_tags.js');
 const { REVIEW, STARTER } = await importOnce('./artifact_tag_rules.js');
@@ -349,6 +349,7 @@ export function createArtifactsList({ inbox = false } = {}) {
             const phoneTeam = !inbox && !model.scope && matchMedia('(max-width: 760px)').matches; // a team's own list on a phone: the shared phone form (#12230)
             if (phoneTeam) toolbarRow?.classList.add('phone-list-bar');
             const table = artifactTable({
+                showUploader: !model.scope,
                 label: `Artifacts, ${model.items.length}`, ...(inbox ? { layout: 'fixed' } : {}), bare: !!model.scope || phoneTeam, compact: !!model.scope, fold: model.scope ? 'none' : 'column', foldAt: 40, rows: shown, groupBy: by ? (it) => groupHead(it, by, shown, !model.hasMore) : undefined, rowKey: itemKey, current: detailKey(), sortBar: inbox && !phoneTeam, state: artifactState, rowName: item => Tags.nameWithTags(readableName(item), item.tags),
                 selectable: model.scope ? null : { contextKey: model.key, canSelect: item => !!linkOf(item)?.preview, actions: artifactBulkActions(), onChange: keys => Toolbar.mountSelection(toolbarRow, keys.size ? table.bar : null), ...(phoneTeam ? { longPress: true, iconBar: true, clearLabel: 'Cancel' } : {}) },
                 open: (item, tr) => openArtifact(item, tr.querySelector('.dt-primary')),
@@ -362,7 +363,7 @@ export function createArtifactsList({ inbox = false } = {}) {
                     if (origin) note.classList.add(`team-artifact-badge-${isUnverified(item) ? 'unverified' : item.source === 'shared' ? 'shared' : 'received'}`);
                     if (isUnverified(item)) note.classList.add('dt-warning'); return note;
                 },
-                ...(inbox || phoneTeam ? { mail: item => ({ data: { artifactId: itemKey(item) }, lead: { icon: 'description', square: true, name: String(readableName(item)).split('.').pop() }, title: readableName(item), starred: !!item.starred, snippet: [placeOf(item), taskText(item)].filter(Boolean).join(' · '), time: DT.timeCell(item.updated_at || item.created_at).textContent, tip: [multipleServers() ? `${item.team || keyLabel(item.board_id)} \u00b7 ${serverLabel(serverOf(item))}` : placeOf(item), taskText(item)].filter(Boolean).join(' \u00b7 ') }) } : {}), // a phone's row (#9583): its hover names the team and the computer, as the dropped columns did: a file glyph, the name, its team and task, when it changed
+                ...(inbox || phoneTeam ? { mail: item => ({ data: { artifactId: itemKey(item) }, lead: { icon: 'description', square: true, name: String(readableName(item)).split('.').pop() }, title: readableName(item), ask: uploaderText(item) || '—', askTag: isOperatorUpload(item), starred: !!item.starred, snippet: [placeOf(item), taskText(item)].filter(Boolean).join(' · '), time: DT.timeCell(item.updated_at || item.created_at).textContent, tip: [`Uploaded by: ${uploaderText(item) || '—'}`, multipleServers() ? `${item.team || keyLabel(item.board_id)} \u00b7 ${serverLabel(serverOf(item))}` : placeOf(item), taskText(item)].filter(Boolean).join(' \u00b7 ') }) } : {}), // a phone's row (#9583): its hover names the team and the computer, as the dropped columns did: a file glyph, the name, its team and task, when it changed
                 updatedWidth: model.scope ? '' : '9rem', // the lists with a Goal column keep "yesterday 3:00 AM" whole (the narrow lists drop nothing here and keep 7.5 rem)
                 tagsDropAt: inbox ? 62 : 0, // the Inbox list is crowded (a team, a task): its Tags go first, before Team and Task
                 afterName: [...(inbox ? (model.filters.team
