@@ -92,6 +92,12 @@ func Launch(ctx context.Context, o Options, d Deps) (*Result, error) {
 			return nil, fmt.Errorf("%w: a machine named %q is already recorded: delete it first (coral machine delete %s) or choose another name", ErrRecordExists, o.Name, o.Name)
 		}
 	}
+	// Before the cloud is touched at all (not even the token check): a Hub that does not take launches must not cost a droplet (#9934 round 1, item 3). A Hub client without a preflight (a test's stub) is not asked.
+	if pf, ok := d.Hub.(Preflighter); ok {
+		if err := pf.Preflight(ctx); err != nil {
+			return nil, err
+		}
+	}
 	wait := o.Wait
 	if wait <= 0 {
 		wait = defaultWait

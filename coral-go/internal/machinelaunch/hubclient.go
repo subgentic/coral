@@ -22,6 +22,14 @@ type Minter interface {
 	Mint(ctx context.Context, label string) (string, error)
 }
 
+// Preflighter is a Hub client that can tell, before anything billable is made, whether the Hub answers machine launches at all.
+type Preflighter interface {
+	Preflight(ctx context.Context) error
+}
+
+// ErrHubNotReady is a Hub that does not take machine launches (its bootstrap routes are off) or that could not be asked. A launch that gets it has created nothing, at the provider or at the Hub.
+var ErrHubNotReady = errors.New("this Coral Hub does not take machine launches")
+
 // HubClient mints machine credentials with the person's Coral Hub automation key (the joint note with coral-hub, #9934): POST /api/bootstrap/credentials with the key as a Bearer token. The key can
 // only mint credentials for its own account and only for the adapters ticked when it was made; it reads and lists nothing. It never follows a redirect (the key must not travel to another host).
 type HubClient struct {
@@ -198,4 +206,41 @@ func (h *HubClient) Revoke(ctx context.Context, label string) error {
 		return ErrNothingToRevoke
 	}
 	return (&HubRevoker{BaseURL: h.BaseURL, DestroyKey: h.DestroyKey, HTTP: h.HTTP, Sleep: h.RevokeSleep}).Revoke(ctx, id)
+}
+
+// Preflight asks the Hub, with NO key and no credential, whether its machine-credential route is live: one POST to the mint route with an empty request. A Hub that has the route on answers it as its own
+// JSON refusal, 401 with the word "unauthorized" (the request carries no key). Anything else (a 404 or 405, a sign-in page, a redirect, a 200, a server error, a refusal in any other word) is a Hub that does
+// not take launches, and the launch stops before it touches the cloud: the production Hub keeps these routes off until the terms are in, and a launch that found out only after the minute-long create would
+// have billed the person for a machine that can never join. It fails closed: a false refusal costs a retry, a false pass costs a droplet. The answer is read only for its status and that one word.
+func (h *HubClient) Preflight(ctx context.Context) error {
+	endpoint, err := h.endpoint()
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader("{}"))
+	if err != nil {
+		return errors.New("could not make the request to Coral Hub")
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", "coral-machine-launch")
+	client := h.HTTP
+	if client == nil {
+		client = &http.Client{Timeout: 30 * time.Second}
+	}
+	c := *client
+	c.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	resp, err := c.Do(req)
+	if err != nil {
+		return fmt.Errorf("%w: could not reach Coral Hub, so nothing was created: check the address and your connection", ErrHubNotReady) // a transport error's text may hold the URL: dropped
+	}
+	defer resp.Body.Close()
+	raw, _ := io.ReadAll(io.LimitReader(resp.Body, maxHubAnswer))
+	var answer struct {
+		Error string `json:"error"`
+	}
+	if resp.StatusCode == http.StatusUnauthorized && json.Unmarshal(raw, &answer) == nil && answer.Error == "unauthorized" {
+		return nil
+	}
+	return fmt.Errorf("%w yet (HTTP %d from its machine-credential route): nothing was created, at your cloud or at Coral Hub. Machine launch needs a Coral Hub with it turned on", ErrHubNotReady, resp.StatusCode)
 }
