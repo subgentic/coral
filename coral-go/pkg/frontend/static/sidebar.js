@@ -324,6 +324,7 @@ const SIDEBAR_PANES = {
     automations: { search: 'Search jobs', action: null }, // Workflows and Jobs as one screen (Goal #74): its folders' toolbars carry the create action
     'hub-inbox': { search: 'Search the Inbox', action: null },
     tokens: { search: 'Search views', action: null }, // Analytics: the tab's name is tokens
+    skills: { search: 'Search skills', action: null }, // the Skills Store: its folders (All, Imported, Agent created, Coral skills) and a search of the table (#12997)
     docs: { search: 'Search docs', action: null },
 };
 

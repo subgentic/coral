@@ -73,6 +73,14 @@
                     </div>
                 </section>
             </div>
+            <div class="sidebar-pane sidebar-pane-fixed" data-pane="skills" hidden>
+                {{ template "includes/sidebar_header" "skills" }}
+                <section class="sidebar-section" data-section="skills">
+                    <div class="sidebar-section-body">
+                        <div id="skills-nav-list"></div><!-- the folders (skills_tab.js): All, Imported, Agent created (with what waits on approval), Coral skills -->
+                    </div>
+                </section>
+            </div>
             <div class="sidebar-pane" data-pane="docs" hidden>
                 {{ template "includes/sidebar_header" "docs" }}
                 <section class="sidebar-section" data-section="docs">
@@ -96,6 +104,7 @@
                         {{ else if eq . "history" }}<input type="search" id="history-search" class="field field-search sidebar-search-input" placeholder="Search" autocomplete="off" aria-label="Search chats">
                         {{ else if eq . "automations" }}<input type="search" id="automations-search" class="field field-search sidebar-search-input" placeholder="Search" autocomplete="off" aria-label="Search jobs" data-on-input="automations-search-filter">
                         {{ else if eq . "tokens" }}<input type="search" id="analytics-search" class="field field-search sidebar-search-input" placeholder="Search" autocomplete="off" aria-label="Search views" data-on-input="analytics-search-filter">
+                        {{ else if eq . "skills" }}<input type="search" id="skills-search" class="field field-search sidebar-search-input" placeholder="Search" autocomplete="off" aria-label="Search skills" data-on-input="skills-search-filter">
                         {{ else if eq . "hub-inbox" }}<input type="search" id="inbox-search" class="field field-search sidebar-search-input" placeholder="Search" autocomplete="off" aria-label="Search the Inbox" data-on-input="inbox-search-filter">
                         {{ else }}<input type="search" id="docs-search" class="field field-search sidebar-search-input" placeholder="Search" autocomplete="off" aria-label="Search docs" data-on-input="docs-search-filter">{{ end }}
                     </div>

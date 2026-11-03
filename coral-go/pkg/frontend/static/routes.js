@@ -30,6 +30,7 @@
  const INT_RE = /^[1-9][0-9]{0,15}$/;
  const HEX_RE = /^[0-9a-f]{64}$/i;
 // The team page's tabs, in order (#7453). /team/<name> with no tab is the first.
+export const SKILL_FOLDERS = ['imported', 'agent-created', 'coral-skills']; // the Skills sidebar's folders besides All (#12997)
 export const TEAM_TABS = ['goals', 'agents', 'tasks', 'artifacts', 'knowledge', 'messages']; // the strip's order, left to right and by the arrow keys (the operator's, #8791): Goals, Agents, Tasks, Artifacts, Knowledge, Board; team settings are a popout (#8853), not a tab
 const TEAM_ITEM_TABS = ['goals', 'tasks', 'messages']; // the tabs with an item: /team/<name>/goals/<id>, /team/<name>/tasks/<id> (pages), /team/<name>/messages/<id> (the Board tab scrolled to that message, #7921)
 // An agent's own tabs (live_session.html #agentic-tab-<id>); the team-scoped ones belong to /team.
@@ -160,6 +161,7 @@ export function parse(pathname, search = '') {
             return rest.length ? null : { view: top };
         case 'skills':
             if (!rest.length) return { view: 'skills' };
+            if (rest.length === 1 && SKILL_FOLDERS.includes(rest[0])) return { view: 'skills', folder: rest[0] }; // /skills/imported, /agent-created, /coral-skills: a folder of the Skills sidebar (#12997)
             return rest.length === 1 && /^[0-9a-f]{32}$/.test(rest[0]) ? { view: 'skills', id: rest[0] } : null;
         case 'automations': {
             if (!rest.length) return { view: 'automations', folder: null };
@@ -267,7 +269,7 @@ export function build(r) {
         case 'jobs':
             return '/jobs';
         case 'skills':
-            return r.id && /^[0-9a-f]{32}$/.test(r.id) ? `/skills/${r.id}` : '/skills';
+            return r.id && /^[0-9a-f]{32}$/.test(r.id) ? `/skills/${r.id}` : SKILL_FOLDERS.includes(r.folder) ? `/skills/${r.folder}` : '/skills';
         case 'automations':
             return AUTOMATION_FOLDERS.includes(r.folder) ? `/automations/${r.folder}${r.id ? '/' + r.id + (r.run && r.folder === 'workflows' ? '/runs/' + r.run : '') : ''}` : '/automations';
         case 'analytics': {

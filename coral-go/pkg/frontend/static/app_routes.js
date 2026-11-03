@@ -66,7 +66,7 @@ function registerRouteHandlers() {
         if (r.terminal) showTerminalView(); // /agents/<session>?view=terminal (coral-hub, #6752): the terminal for this visit; the saved Chat/Terminal choice is left as it was
     });
 
-    route('skills', async r => { switchNavTab('skills', { fromHistory: true, skillId: r.id }); }); // the Skills tab; /skills/<id> opens that skill's view
+    route('skills', async r => { switchNavTab('skills', { fromHistory: true, skillId: r.id, skillFolder: r.folder }); }); // the Skills tab; /skills/<id> opens that skill's view
 
     route('chats', async (r, opts) => {
         if (nativeInbox()) return go(inboxRouteFor(r), { replace: true }); // the Hub's native Inbox has no Chats tab: an old address is the same chat or list in the Inbox, never a not-found page (Goal #100, #9549)
