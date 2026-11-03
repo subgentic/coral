@@ -19,10 +19,10 @@ import (
 
 // #5827: launching Coral.app by hand opens the window; a start nobody asked for stays in the background; launching it again while it runs hands over to the running one.
 func TestOnlyALaunchByAPersonOpensTheWindow(t *testing.T) {
-	assert.True(t, opensWindowAtStart(false, false), "Finder, Dock, Launchpad, Spotlight, open Coral.app")
-	assert.False(t, opensWindowAtStart(true, false), "the relaunch after an update passes --no-browser")
-	assert.False(t, opensWindowAtStart(false, true), "a login item")
-	assert.False(t, opensWindowAtStart(true, true))
+	assert.True(t, opensWindowAtStart(false, false, true), "Finder, Dock, Launchpad, Spotlight, open Coral.app")
+	assert.False(t, opensWindowAtStart(true, false, true), "the relaunch after an update passes --no-browser")
+	assert.False(t, opensWindowAtStart(false, true, true), "a login item, once the window has been shown")
+	assert.False(t, opensWindowAtStart(true, true, true))
 }
 
 func TestASecondStartHandsOverToTheRunningTray(t *testing.T) {

@@ -39,6 +39,7 @@ import (
 	"github.com/subgentic/coral/internal/executil"
 	"github.com/subgentic/coral/internal/loginlink"
 	"github.com/subgentic/coral/internal/logrotate"
+	"github.com/subgentic/coral/internal/windowmark"
 )
 
 var debugMode bool
@@ -73,7 +74,7 @@ func main() {
 	// Cocoa dialog on first launch. If the user declines, the app exits.
 	if !checkAndShowEULA(config.ResolveCoralDir(cfg.dataDir)) {
 		fmt.Fprintln(os.Stderr, "Terms of Service must be accepted to use Coral.")
-		os.Exit(0)
+		os.Exit(windowmark.AppExitTermsDeclined) // the tray, which keeps running, tells the person
 	}
 
 	// Global panic recovery — log the stack trace before crashing
