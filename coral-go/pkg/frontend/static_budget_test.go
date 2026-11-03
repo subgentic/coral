@@ -1,11 +1,15 @@
 package frontend
 
 import (
+	"bytes"
+	"compress/gzip"
 	"fmt"
 	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
+	"sort"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -15,29 +19,17 @@ import (
 // binary until #3854. These checks keep that from coming back.
 
 const (
-	// staticBudget is the most the static tree a release ships may hold: its JS and CSS as the server serves them (minified, comments gone; a release embeds exactly those bytes, tools/strip-static, #6208)
-	// and every other file as it is, with the agent docs `make` syncs into static/agent_docs. It is 5.49 MB today (the source tree is 8.21 MB: comments and indentation are not shipped), so a comment
-	// never moves it and a real asset does. Raise it deliberately, with the reason in the commit, when a real asset needs the room.
-	// 5.25 MiB (5,505,024 bytes) since Goal #61's artifact roll-up; the tree has grown into it, so a feature trims as much as it adds (#10594 and #10623 collapsed the indentation inside templates: 18 KB). About 19 KB of room over what ships
-	// 5.34 MiB (5,603,328 bytes) since the operator's approval (Oct 28, #10690): 96 KiB more, room for #10019's docs pictures, #10049, #10376 and #10558.
-	// 5.41 MiB (5,668,864 bytes) since the operator's approval (Oct 29, #11058's raise): 64 KiB more. The v2.0.6 tree is at 5,592,908 bytes (10,420 free) with the agent search levels UI (the Search chip and the Search access
-	// dialog, #11053: about 7 KB) and the phone chat screen in it, and the queued work (the one-row header, the keyboard fix, the Inbox Goals and Artifacts folders, Board history, #11063's model line: 1.5 KB) is more than that room.
-	// 5.5 MiB (5,767,168 bytes) since the operator's approval (Oct 30, 2026): 96 KiB more, for Analytics (the Usage, Operator interaction and Team communication tabs and the cross-team pairs), the Option B provider cards, the phone navigation slices and the new-user fixes. Data Science's measurement: coral://artifacts/3cdd1b52eb860ae1e45e7aefcb140a8adbcf202451de1eb0685b7a90fe3386f3.
-	// 5.57 MiB (5,840,896 bytes) since the operator raised it on 2026-10-30 for v2.0.10: the v2.0.10 tree ships 5,775,213 bytes (main was 5,702,876), and the limit is that total plus 64 KiB of
-	// headroom, rounded up to whole KiB. The main growth, in source bytes of the static files: the SSH setup dialog 18.0 KB (server_ssh_setup.js, hub-11370), artifact review (Approve and
-	// Request changes) 9.1 KB (artifact_review.js), the CSV and TSV viewer 12.5 KB (csv_table.js and csv_parse.js), the changed-files view and inline diff 12.7 KB (changed_files.js, inline_diff.js),
-	// the provider cards with the OpenCode sign-in notice 9.9 KB (launch_provider_cards.js, launch_signin_notice.js), the phone bar of slice D 4.1 KB (phone_bar.js), Dismiss on a stale
-	// permission card 2.7 KB (dismiss_wait.js) and the first-run folder suggestion 2.7 KB (folder_suggestion.js); css 10 KB across components, agentic, mobile, cost_dashboard and goals.
-	// 5.63 MiB (5,906,432 bytes) since the operator said "You can increase the size" (Oct 31, 2026): 64 KiB more, for phone navigation like Gmail (#11472, #11476: about 1.9 KB encoded) and the guide role screens (#11513: about 6 KB), which the v2.0.13 room (about 2.5 KB) could not hold.
-	// 5.68 MiB (5,953,792 bytes) since the operator approved it (Nov 1, 2026, 15:05Z, coral://artifacts/0b2f182284b0fb6dc6de28f22134c2afbff5ff936ded4b2fbbcab3e0926f0130): 46.25 KiB more, for the goal pictures (the picture routes' page, #11650, #11651, #11653),
-	// the Hub start address (#11809) and the one-item Needs you link (#11797), after the v2.0.24 budget work cut 12.5 KB (#11760) and v2.0.26 left 28 bytes of room.
-	// 5.72 MiB (6,002,944 bytes) since the operator's standing approval to raise this limit whenever approved work needs it (Nov 1, 2026, 23:19Z; this test only, the start-CSS cap and the page_weight baselines still need a question): 48 KiB more; the v2.0.29 tree is within 1.5 KB of 5,953,792 with the Inbox, Hermes and password-dialog work queued behind it.
-	// 5.84 MiB (6,127,616 bytes) under the same standing approval (Nov 2, 2026, the v2.0.35 batch; this test only, not the start-CSS cap): 121.75 KiB more, for the Skills Store and its tab, the Activity folder, Hermes in the pickers, auto-sleep's settings and the question stack (tree at the batch's first build: 6,078,185 bytes).
-	// 5.88 MiB (6,176,768 bytes) under the same standing approval (Nov 3, 2026, the v2.0.40 batch; this test only, not the start-CSS cap): 48 KiB more, for the Needs you order, the diff comments, the Files view's header line, the Chief guide and the other v2.0.40 changes (the tree was 6,128,570 bytes at 223c13e11).
-	// 5.93 MiB (6,225,920 bytes) under the same standing approval (Nov 3, 2026, the v2.0.40 batch, second raise; this test only, not the start-CSS cap): 48 KiB more, for the goal screen, the file viewer's details header, the Needs you count, column resizing and the other v2.0.40 changes (the tree was 6,182,691 bytes against 6,176,768).
-	staticBudget = 6_225_920
+	// staticBudget is the most the static tree a release ships may hold: its JS and CSS as the server serves them (minified, comments gone), every other file as it is, and the agent docs gzipped as
+	// tools/sync-agent-docs.sh embeds them (#12865). Policy (the Operator's standing approval to raise it; this test only, never the start-CSS cap or the page_weight baselines): the budget is the tree
+	// plus 64 KiB, rounded up to a whole KiB, and a raise is this one number in the commit that needs the room, with the reason in the commit message (git log -S staticBudget shows each raise).
+	// The test logs the room left, warns under 32 KiB, and names the ten files that grew most since the checked-in baseline (static_budget_baseline.txt; regenerate it with STATIC_BUDGET_UPDATE=1).
+	// 5,729,280 bytes: the tree after the agent docs went gzipped (5,663,162; it was 6,195,883 with them plain) plus 64 KiB.
+	staticBudget = 5_729_280
 	// fileBudget is the most one embedded file may hold (the CodeMirror bundle, the largest, is ~1 MB).
 	fileBudget = 1536 << 10
+	// budgetWarnRoom is the room under which the test warns, and budgetPolicyRoom the room a raise leaves.
+	budgetWarnRoom   = 32 << 10
+	budgetPolicyRoom = 64 << 10
 )
 
 // unreferencedImages are images nothing in this repository names, kept because something outside it
@@ -49,9 +41,11 @@ var unreferencedImages = map[string]string{
 	"coral-icon-88x88.png": "icon, may be linked by URL from outside the repo (4 KB)",
 }
 
-// shippedStaticBytes is what a release's static tree holds: every embedded file as the server serves it (JS and CSS minified), and the agent docs counted once, from the embedded tree when this
-// checkout has synced them into static/agent_docs and from docsDir (the source the sync copies) when it has not (#10530). It returns the shipped bytes and the source bytes.
-func shippedStaticBytes(fsys fs.FS, docsDir string) (total, source int64, err error) {
+// shippedStaticFiles is what a release's static tree holds, file by file: every embedded file as the server serves it (JS and CSS minified), and the agent docs counted once, from the embedded tree when this
+// checkout has synced them into static/agent_docs (as <name>.md.gz, tools/sync-agent-docs.sh, #12865) and, when it has not (#10530), from docsDir (the source the sync reads) as the gzipped size the sync would
+// write, so a checkout with the docs synced and one without measure the same release to within a few bytes. It returns each file's shipped bytes by path and the source bytes.
+func shippedStaticFiles(fsys fs.FS, docsDir string) (files map[string]int64, source int64, err error) {
+	files = map[string]int64{}
 	synced := false
 	err = fs.WalkDir(fsys, "static", func(p string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() {
@@ -66,28 +60,145 @@ func shippedStaticBytes(fsys fs.FS, docsDir string) (total, source int64, err er
 		}
 		source += int64(len(data))
 		// What a release carries: its JS and CSS are embedded already minified (tools/strip-static, #6208), the bytes the server serves; MinifyAsset is the identity for every other file.
-		total += int64(len(MinifyAsset(strings.TrimPrefix(p, "static/"), data)))
+		files[strings.TrimPrefix(p, "static/")] = int64(len(MinifyAsset(strings.TrimPrefix(p, "static/"), data)))
 		return nil
 	})
 	if err != nil || synced {
-		return total, source, err
+		return files, source, err
 	}
 	entries, rerr := os.ReadDir(docsDir)
 	if rerr != nil {
-		return total, source, nil // no docs folder here: nothing to add
+		return files, source, nil // no docs folder here: nothing to add
 	}
 	for _, e := range entries {
 		if e.IsDir() {
 			continue
 		}
-		info, ierr := e.Info()
+		data, ierr := os.ReadFile(filepath.Join(docsDir, e.Name()))
 		if ierr != nil {
-			return total, source, ierr
+			return files, source, ierr
 		}
-		total += info.Size()
-		source += info.Size()
+		source += int64(len(data))
+		if strings.HasSuffix(e.Name(), ".md") {
+			files["agent_docs/"+e.Name()+".gz"] = gzippedSize(data)
+		} else {
+			files["agent_docs/"+e.Name()] = int64(len(data))
+		}
 	}
-	return total, source, nil
+	return files, source, nil
+}
+
+// gzippedSize is the size of data gzipped at the best level, what tools/sync-agent-docs.sh's gzip -9 -n writes (to within a few bytes).
+func gzippedSize(data []byte) int64 {
+	var buf bytes.Buffer
+	zw, _ := gzip.NewWriterLevel(&buf, gzip.BestCompression)
+	_, _ = zw.Write(data)
+	_ = zw.Close()
+	return int64(buf.Len())
+}
+
+// shippedStaticBytes is the total of shippedStaticFiles, and the source bytes.
+func shippedStaticBytes(fsys fs.FS, docsDir string) (total, source int64, err error) {
+	files, source, err := shippedStaticFiles(fsys, docsDir)
+	for _, n := range files {
+		total += n
+	}
+	return total, source, err
+}
+
+const baselineFile = "static_budget_baseline.txt"
+
+// readBaseline reads the checked-in baseline: one "bytes path" line per shipped file (nothing when there is none).
+func readBaseline(path string) map[string]int64 {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+	out := map[string]int64{}
+	for _, line := range strings.Split(string(b), "\n") {
+		n, p, ok := strings.Cut(strings.TrimSpace(line), " ")
+		if !ok {
+			continue
+		}
+		if v, err := strconv.ParseInt(n, 10, 64); err == nil {
+			out[p] = v
+		}
+	}
+	return out
+}
+
+// formatBaseline is the baseline file of files: largest first, one "bytes path" line each.
+func formatBaseline(files map[string]int64) string {
+	names := make([]string, 0, len(files))
+	for p := range files {
+		names = append(names, p)
+	}
+	sort.Slice(names, func(i, j int) bool {
+		if files[names[i]] != files[names[j]] {
+			return files[names[i]] > files[names[j]]
+		}
+		return names[i] < names[j]
+	})
+	var b strings.Builder
+	for _, p := range names {
+		fmt.Fprintf(&b, "%d %s\n", files[p], p)
+	}
+	return b.String()
+}
+
+// grewMost names the n files that grew most since the baseline (a file the baseline lacks counts as all its bytes), as "+bytes path (was bytes)".
+func grewMost(cur, base map[string]int64, n int) []string {
+	type g struct {
+		p     string
+		delta int64
+	}
+	var all []g
+	for p, v := range cur {
+		if d := v - base[p]; d > 0 {
+			all = append(all, g{p, d})
+		}
+	}
+	sort.Slice(all, func(i, j int) bool {
+		if all[i].delta != all[j].delta {
+			return all[i].delta > all[j].delta
+		}
+		return all[i].p < all[j].p
+	})
+	var out []string
+	for i := 0; i < len(all) && i < n; i++ {
+		was := "new"
+		if v, ok := base[all[i].p]; ok {
+			was = fmt.Sprintf("was %d", v)
+		}
+		out = append(out, fmt.Sprintf("+%d %s (%s)", all[i].delta, all[i].p, was))
+	}
+	return out
+}
+
+// budgetReport says how the tree stands: the lines to log, and whether it is over the budget. It always says the room left; under budgetWarnRoom it warns; over, or under the warning, it names the ten files that
+// grew most since the baseline (when there is one) and the budget a raise would set: the tree plus budgetPolicyRoom, to a whole KiB.
+func budgetReport(cur, base map[string]int64, total, budget int64) (lines []string, over bool) {
+	room := budget - total
+	lines = append(lines, fmt.Sprintf("static tree a release ships: %d bytes (budget %d, room %d)", total, budget, room))
+	if room >= budgetWarnRoom {
+		return lines, false
+	}
+	over = room < 0
+	suggest := (total + budgetPolicyRoom + 1023) / 1024 * 1024
+	if over {
+		lines = append(lines, fmt.Sprintf("OVER the budget by %d bytes: if the room is needed, set staticBudget = %d (the tree plus 64 KiB) in the commit that needs it, with the reason", -room, suggest))
+	} else {
+		lines = append(lines, fmt.Sprintf("WARNING: only %d bytes of room (under %d): the next feature will need staticBudget = %d (the tree plus 64 KiB) or a trim", room, budgetWarnRoom, suggest))
+	}
+	if base != nil {
+		if g := grewMost(cur, base, 10); len(g) > 0 {
+			lines = append(lines, "the files that grew most since "+baselineFile+":")
+			for _, l := range g {
+				lines = append(lines, "  "+l)
+			}
+		}
+	}
+	return lines, over
 }
 
 func TestStaticTreeWithinBudget(t *testing.T) {
@@ -103,14 +214,28 @@ func TestStaticTreeWithinBudget(t *testing.T) {
 	for _, m := range big {
 		t.Error(m)
 	}
-	total, source, err := shippedStaticBytes(Static, filepath.Join("..", "..", "agent_docs"))
+	files, source, err := shippedStaticFiles(Static, filepath.Join("..", "..", "agent_docs"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if total > staticBudget {
-		t.Errorf("the static tree a release ships is %d bytes, over its %d-byte budget (staticBudget): every Coral binary carries it", total, staticBudget)
+	var total int64
+	for _, n := range files {
+		total += n
 	}
-	t.Logf("static tree a release ships: %d bytes (budget %d); its source: %d", total, staticBudget, source)
+	if os.Getenv("STATIC_BUDGET_UPDATE") == "1" {
+		if err := os.WriteFile(baselineFile, []byte(formatBaseline(files)), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		t.Logf("%s rewritten (%d files)", baselineFile, len(files))
+	}
+	lines, over := budgetReport(files, readBaseline(baselineFile), total, staticBudget)
+	for _, l := range lines {
+		t.Log(l)
+	}
+	if over {
+		t.Errorf("the static tree a release ships is %d bytes, over its %d-byte budget (staticBudget): every Coral binary carries it\n%s", total, staticBudget, strings.Join(lines[1:], "\n"))
+	}
+	t.Logf("its source: %d bytes", source)
 }
 
 func isImage(name string) bool {
