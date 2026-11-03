@@ -473,7 +473,7 @@ func (h *SessionsHandler) agentRow(trace *phaseTrace, agent AgentInfo, lv liveIn
 		h.applyTranscriptState(&stateInput, d.stateEvents[sid], agent.AgentType, agent.TmuxSession, sid, agent.WorkingDir)
 	}
 	trace.agentDetail("transcript_state", sid, time.Since(transcriptStarted))
-	state := DeriveSessionState(stateInput)
+	state := h.holdForAutoMode(sid, DeriveSessionState(stateInput), time.Now()) // a permission request that Claude's auto mode may still decide is not yet something that waits for the Operator (#12694)
 
 	// The goal line is the newest goal event (the goal generator or an
 	// operator edit).
