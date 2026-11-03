@@ -132,3 +132,17 @@ func TestACrossTeamMessageToTheOperatorThatIsAWallOfTextIsRefused(t *testing.T) 
 		assert.Zero(t, code, tc[1])
 	}
 }
+
+// #12579 (QA): a closed code fence exempts the lines inside it; a fence that never closes exempts nothing, and the lines after it are checked as ever, so one stray ``` cannot turn the check off for
+// the rest of a message.
+func TestFencedLinesAreExemptOnlyWhenTheFenceCloses(t *testing.T) {
+	long := strings.Repeat("a line of a log that is longer than the limit, ", 8) // over 280, no link, no code span
+	require.Greater(t, len(long), maxOperatorLine)
+
+	assert.Empty(t, operatorFormatProblem("@Operator the output\n```\n"+long+"\n```\nthat is all"), "inside a closed fence: exempt")
+	assert.NotEmpty(t, operatorFormatProblem("@Operator the output\n```\n"+long), "the fence never closes: the line is checked")
+	assert.NotEmpty(t, operatorFormatProblem("@Operator a stray ``` fence\n```\nshort\n"+long), "a fence that never closes does not exempt what follows it")
+	assert.NotEmpty(t, operatorFormatProblem("@Operator the output\n```\nshort\n```\n"+long), "a line after the fence closed is checked")
+	assert.Empty(t, operatorFormatProblem("@Operator two blocks\n```\n"+long+"\n```\nbetween\n```\n"+long+"\n```"), "two closed fences")
+	assert.NotEmpty(t, operatorFormatProblem("@Operator one closed, one not\n```\nshort\n```\nbetween\n```\n"+long), "the second fence never closes")
+}
