@@ -26,8 +26,9 @@ const BASE = require('./test_base').BASE;
             await load(width,theme,font);
             await ev(`window.switchNavTab('hub-inbox');true`); await settled();
             if (width === 390) {
-                const labels = await ev(`(()=>{const nav=document.querySelector('.phone-nav'),n=nav.getBoundingClientRect();return [...nav.querySelectorAll('.phone-nav-slot')].map(s=>{const a=s.getBoundingClientRect(),b=s.querySelector('.phone-nav-label').getBoundingClientRect();return {text:s.textContent.trim(),fit:b.left>=a.left-1&&b.right<=a.right+1&&b.bottom<=n.bottom+1,w:b.width,slot:a.width};});})()`);
+                const labels = await ev(`(()=>{const nav=document.querySelector('.phone-nav'),n=nav.getBoundingClientRect();return [...nav.querySelectorAll('.phone-nav-slot')].map(s=>{const a=s.getBoundingClientRect(),label=s.querySelector('.phone-nav-label'),b=label.getBoundingClientRect(),range=document.createRange();range.selectNodeContents(label);const lines=[...range.getClientRects()];return {text:s.textContent.trim(),fit:b.left>=a.left-1&&b.right<=a.right+1&&b.bottom<=n.bottom+1,wholeLine:lines.length>0&&lines.every(r=>Math.abs(r.top-lines[0].top)<1),fullName:(s.getAttribute('aria-label')||'').includes(label.textContent),w:b.width,slot:a.width};});})()`);
                 check(labels.length === 4 && labels.every(x=>x.fit),at+' nav labels fit their slots',labels);
+                check(labels.every(x=>x.wholeLine&&x.fullName),at+' nav labels stay on one line with full accessible text',labels);
                 await shot(at+'-nav');
             }
             await ev(`window.showDefaultPromptsModal().then(()=>true)`); await settled();
