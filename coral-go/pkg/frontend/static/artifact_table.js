@@ -52,7 +52,7 @@ export function artifactTable(cfg) {
         { key: 'updated', label: 'Updated', width: cfg.updatedWidth || '7.5rem', tone: 'tertiary', sort: 'date', firstDir: 'desc', sortValue: i => i.updated_at || i.created_at, cell: i => DT.timeCell(i.updated_at || i.created_at) },
         ...(cfg.details ? [{ key: 'details', label: 'Details', hideLabel: true, width: '3.75rem', cell: cfg.details }] : []),
     ];
-    const table = DT.dataTable({ ...cfg, columns, state, oneLine: true, resize: false, sortBar: false,
+    const table = DT.dataTable({ ...cfg, columns, state, oneLine: true, resize: true, sortBar: false,
         rowKey: cfg.rowKey || itemKey, rowName: i => Tags.nameWithTags(readableName(i), i.tags) + (i.starred ? ', starred' : ''),
         ...(cfg.paged ? { onSort: (key, dir) => {
             state.sort = { key, dir };
