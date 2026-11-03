@@ -265,7 +265,7 @@ for (const [phase, word] of [['done', /Done/], ['failed', /did not|could not|Cou
 {
     hub(); planKind = 'upgrade';
     const help = ['# To see why, and to start it yourself, sign in to that computer and run these lines.', 'tail -n 40 ~/.coral-server/coral.log', 'kill "$(cat ~/.coral-server/coral.pid)"',
-        'nohup ~/.coral-server/2.0.10/root/coral --host 127.0.0.1 --port 8420 <img src=x onerror=alert(1)> & echo $! > ~/.coral-server/coral.pid', '# Then choose Upgrade here again.'];
+        'start-the-release-line <img src=x onerror=alert(1)> & echo started', '# Then choose Upgrade here again.'];
     globalThis.fetch = async (url, init = {}) => {
         const json = (d, status = 200) => new Response(JSON.stringify(d), { status, headers: { 'Content-Type': 'application/json' } });
         if (url === '/api/servers/provision/options') return json(options);
