@@ -37,7 +37,7 @@ var runningExecutables = func() (map[string]bool, bool) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	b, err := exec.CommandContext(ctx, "ps", "-axo", "comm=").Output() // the full path of each process's executable on macOS
+	b, err := exec.CommandContext(ctx, "ps", "-axwwo", "comm=").Output() // -ww: never cut to the terminal width; the full path of each process's executable on macOS
 	if err != nil {
 		return nil, false
 	}
@@ -80,11 +80,34 @@ func pruneStaged(dir, keep string) {
 		return
 	}
 	for _, c := range copies[stagedKeep:] {
-		if c.path == keep || running[c.path] {
+		if sameFileOrPath(c.path, keep) || inUse(c.path, running) {
 			continue
 		}
 		if err := os.Remove(c.path); err == nil {
 			log.Printf("[tmux] removed an old staged tmux copy: %s", logsafe.Path(c.path))
 		}
 	}
+}
+
+// sameFileOrPath is whether a and b are one file, however each is spelled (a link in the folder's path).
+func sameFileOrPath(a, b string) bool {
+	if a == b {
+		return true
+	}
+	return sameFile(a, b)
+}
+
+// inUse is whether a running process executes the file at path, whatever the spelling: the process list may name it through a link (a data folder under a linked folder, /var for /private/var). Only the processes
+// whose file name is this copy's are compared, by os.SameFile, so the cost is a few stat calls.
+func inUse(path string, running map[string]bool) bool {
+	if running[path] {
+		return true
+	}
+	name := filepath.Base(path)
+	for p := range running {
+		if filepath.Base(p) == name && sameFile(p, path) {
+			return true
+		}
+	}
+	return false
 }

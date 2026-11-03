@@ -124,3 +124,25 @@ func TestTheRealListingOfRunningProgramsFindsThisOne(t *testing.T) {
 	}
 	assert.True(t, found, "the process listing names this test's own executable %s", exe)
 }
+
+// A running process names its executable through a link (the data folder under a linked folder, /var for /private/var): the same file in another spelling is still in use (Security's SHOULD on #12624).
+func TestACopyARunningServerUsesIsKeptWhenThePathsAreSpelledThroughALink(t *testing.T) {
+	dir, c := pruneRig(t)
+	via := filepath.Join(t.TempDir(), "via")
+	require.NoError(t, os.Symlink(dir, via))
+	fakeRunning(t, filepath.Join(via, filepath.Base(c[1]))) // the process list spells it through the link; the folder is pruned by its real name
+
+	pruneStaged(dir, c[4])
+
+	assert.True(t, exists(c[1]), "the same file through a link is the file a server runs from")
+	assert.False(t, exists(c[2]), "an unused old one still goes")
+
+	// And the other way round: the folder reached through the link, the process listed by the real path.
+	dir2, c2 := pruneRig(t)
+	via2 := filepath.Join(t.TempDir(), "via2")
+	require.NoError(t, os.Symlink(dir2, via2))
+	fakeRunning(t, c2[0])
+	pruneStaged(via2, filepath.Join(via2, filepath.Base(c2[4])))
+	assert.True(t, exists(c2[0]))
+	assert.False(t, exists(c2[1]))
+}
