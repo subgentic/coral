@@ -169,8 +169,14 @@ case "$*" in
   *list-panes*) echo "claude-abc|claude-abc:0.0|4242|80|24|/tmp|title" ;;
 esac
 exit 0`)
-	c := NewClient(t.TempDir())
-	require.Equal(t, realPath(t, b.tmuxBin), realPath(t, c.TmuxBin), "NewClient selects the bundled tmux")
+	dataDir := t.TempDir()
+	c := NewClient(dataDir)
+	assert.Equal(t, filepath.Join(dataDir, stagedDir), filepath.Dir(c.TmuxBin), "NewClient selects its own copy of the bundled tmux (#12598)")
+	bundledBytes, err := os.ReadFile(b.tmuxBin)
+	require.NoError(t, err)
+	copyBytes, err := os.ReadFile(c.TmuxBin)
+	require.NoError(t, err)
+	require.Equal(t, bundledBytes, copyBytes, "the copy is the bundled tmux")
 
 	ctx := context.Background()
 	panes, err := c.ListPanes(ctx)
@@ -187,7 +193,7 @@ exit 0`)
 	require.GreaterOrEqual(t, len(lines), 3)
 	for _, line := range lines {
 		parts := strings.Split(line, "|")
-		assert.Equal(t, realPath(t, b.tmuxBin), realPath(t, parts[0]), "the bundled binary ran: %s", line)
+		assert.Equal(t, realPath(t, c.TmuxBin), realPath(t, parts[0]), "the staged copy of the bundled binary ran: %s", line)
 		assert.Equal(t, "TD="+filepath.Clean(b.terminfo), parts[2], line)
 		assert.Equal(t, "BIN="+c.TmuxBin, parts[3], line)
 	}
@@ -255,7 +261,7 @@ func TestProtocolMismatchIsSurfacedAndTheOldServerIsNeverKilled(t *testing.T) {
 	resetIncompat()
 	t.Cleanup(resetIncompat)
 	logFile := filepath.Join(t.TempDir(), "calls.log")
-	b := newFakeBundle(t, `echo "$*" >> `+logFile+`
+	newFakeBundle(t, `echo "$*" >> `+logFile+`
 echo "protocol version mismatch (client 8, server 7)" >&2
 exit 1`)
 	c := NewClient(t.TempDir())
@@ -273,7 +279,7 @@ exit 1`)
 	assert.Contains(t, msg, "Restarting Coral alone does not")
 	assert.Contains(t, msg, "tmux -S <socket> kill-server")
 	assert.Contains(t, msg, c.SocketPath)
-	assert.Contains(t, msg, b.tmuxBin)
+	assert.Contains(t, msg, c.TmuxBin)
 
 	data, _ := os.ReadFile(logFile)
 	assert.NotContains(t, string(data), "kill", "Coral must not kill the old server")
@@ -296,7 +302,7 @@ func TestSessionSurvivesClientRestartThroughBundledTmux(t *testing.T) {
 	ctx := context.Background()
 
 	first := NewClient(dir)
-	require.Equal(t, realPath(t, b.tmuxBin), realPath(t, first.TmuxBin))
+	require.Equal(t, filepath.Join(dir, stagedDir), filepath.Dir(first.TmuxBin), "the copy of the bundled tmux")
 	if out, err := exec.Command(first.TmuxBin, "-S", first.SocketPath, "new-session", "-d", "-s", "smoke", "sleep 30").CombinedOutput(); err != nil {
 		t.Skipf("tmux cannot create sessions here: %v %s", err, out)
 	}
