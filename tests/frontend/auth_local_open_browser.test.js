@@ -143,7 +143,7 @@ const ATTACK = {
                 const p = await freshPage();
                 await p.c.Page.navigate({ url: BASE + '/auth' });
                 await p.waitFor(`!!document.getElementById('local-open') && document.readyState === 'complete'`, 'the button');
-                if ((await p.status()) === 200) { console.log('  skipped here: a server that is not strict lets this browser in already, so there is no 401 for the button to turn into a 200; the strict shard checks it'); return; } // the default-mode run of a STRICT_SUITES suite (#12907)
+                if (process.env.CORAL_TEST_STRICT !== '1') { console.log('  skipped here: only a strict shard (the runner sets CORAL_TEST_STRICT=1 there) gives this browser a 401 to turn into a 200; the strict shard asserts it'); return; } // the default-mode run of a STRICT_SUITES suite (#12907, Security's SHOULD: the skip depends on the shard, not on the answer)
                 assert.equal(await p.status(), 401, 'not signed in before');
                 const promised = await p.ev(`document.getElementById('local-open-note').textContent`); // #12834: the words match what the next screen does
                 assert.ok(/asks you to create a password/i.test(promised) && !/without a password/i.test(promised), 'the note says the password prompt comes next, and promises no way around it: ' + promised);
