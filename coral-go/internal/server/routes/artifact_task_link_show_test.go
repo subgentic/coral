@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -175,4 +176,48 @@ func TestATaskReadRightAfterAnUploadListsItWithTheCacheOn(t *testing.T) {
 	require.Equal(t, http.StatusCreated, code, out)
 
 	assert.Equal(t, []string{"report.md"}, taskArtifactNames(show(id)), "the very next read lists it")
+}
+
+// QA's SHOULD 4 on #12755.
+// A task in review that is PARKED (set aside on purpose, with a reason) is not open work: an unnamed upload does not link to it.
+func TestAParkedReviewIsNotOpenForAnUnnamedUpload(t *testing.T) {
+	l := newLinkRig(t)
+	id := l.task("alpha", "Backend", true)
+	l.setStatus(t, id, "review_pending")
+	db, err := sqlx.Open("sqlite", l.boardDB)
+	require.NoError(t, err)
+	defer db.Close()
+	_, err = db.ExecContext(context.Background(), `UPDATE board_tasks SET parked_reason = 'waiting on the Operator' WHERE id = ?`, id)
+	require.NoError(t, err)
+
+	code, out := l.post("s1", "while parked", nil)
+	require.Equal(t, http.StatusCreated, code, out)
+	assert.NotContains(t, out, "task_id", "a parked review is set aside: not the task an unnamed upload links to")
+	assert.NotContains(t, out, "task_note")
+}
+
+// A file the result names and the kept uploads list both is listed once, whatever the collapse upstream does: the answer's own de-duplication by link.
+func TestAFileLinkedTwiceIsListedOnceInTheTasksAnswer(t *testing.T) {
+	l := newLinkRig(t)
+	id := l.task("alpha", "Backend", true)
+	hexID := strings.Repeat("ab", 32)
+	task, err := l.h.bs.GetTask(context.Background(), "alpha", id)
+	require.NoError(t, err)
+	task.Workflow.Artifacts = []board.TaskArtifact{{Name: "named.md", URI: "coral://artifacts/" + hexID}}
+
+	bh := NewBoardHandler(l.h.bs)
+	bh.SetTaskArtifactWriter(l.coralDir, nil)
+	bh.taskCounts.entries = map[string]taskCountEntry{"alpha": {at: time.Now(), counts: map[int64]int{}, uploads: map[int64][]teamArtifact{
+		id: {{ID: hexID, Name: "same-file.md"}, {ID: hexID, Name: "same-file-again.md"}, {ID: strings.Repeat("cd", 32), Name: "other.md"}}}}}
+	prev := taskCountTTL
+	taskCountTTL = time.Minute
+	t.Cleanup(func() { taskCountTTL = prev })
+
+	bh.addUploadedArtifacts(context.Background(), "alpha", task)
+
+	var uris []string
+	for _, a := range task.Workflow.Artifacts {
+		uris = append(uris, a.URI)
+	}
+	assert.Equal(t, []string{"coral://artifacts/" + hexID, "coral://artifacts/" + strings.Repeat("cd", 32)}, uris, "each link once: the result's, then the one other upload")
 }
