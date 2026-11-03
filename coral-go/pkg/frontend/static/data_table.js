@@ -1,7 +1,7 @@
 /* The one table (#7743): every list or table surface passes what to show, the component owns how it looks and behaves. The operator's rule: a styling change is one token or one rule, so every size and colour here
  * is a --table-* token (css/data_table.css) and no surface styles a row, a cell or a header.
  *
- *   dataTable({ label, columns, rows, rowKey, groupBy(row) -> { key, label }, open, current, state, onSort, layout, fold, foldAt, sortBar, defaultSortLabel, bare, empty, footer, selectable, rowName, quiet, scroll, detail, decorate, decorateHead }) -> { el, bar, selectButton, selection(), clear(), state }
+ *   dataTable({ label, columns, rows, rowKey, keepOrder, orderKey, groupBy(row) -> { key, label }, open, current, state, onSort, layout, fold, foldAt, sortBar, defaultSortLabel, bare, empty, footer, selectable, rowName, quiet, scroll, detail, decorate, decorateHead }) -> { el, bar, selectButton, selection(), clear(), state }
  *   selectable = { contextKey, onChange(keys), longPress (a touch screen selects a row by pressing and holding it), clearLabel (the bar's last button, 'Clear'), iconBar (one line: Cancel as an X, the count, actions with icon() as icon buttons, and those with more: true in a three-dot menu), actions (an action may have askWhen(n) and confirm(n): it asks first only when askWhen says so): [{ label, run(rows, keys, value), danger, confirm, choose: { label, options() -> [{ value, label }] } }] }: a danger action confirms in the bar, a choose action asks for its value there.
  *   Column = { key, label, field | cell(row, ctx), primary, tone: 'primary'|'secondary'|'tertiary', width: 'grow'|'content'|'<n>rem', fixed (with a rem width: that width, no resize handle, never squeezed or kept: a list's Actions, #9845), nowrap, align: 'start'|'end', numeric,
  *              sort: true|'number'|'date'|fn(a, b), sortValue(row), firstDir: 'asc'|'desc', foldFirst, narrowHide, line: 0|1|2, foldLabel, when(row), subtitle(row), subtitleTitle(row), title(row), filter: { label, active(), open(button) }, hideLabel }
@@ -367,11 +367,24 @@ export function dataTable(cfg) {
     }
 
     const sortable = columns.filter(c => c.sort);
-    const sortedRows = () => {
+    const sortedOnly = () => {
         const s = st.sort && columns.find(c => c.key === st.sort.key);
         if (!s || !s.sort || cfg.onSort) return rows;
         const cmp = compareBy(s), dir = st.sort.dir === 'desc' ? -1 : 1;
         return rows.slice().sort((a, b) => dir * cmp(a, b));
+    };
+    /** keepOrder (#12636): a list that fills in as computers answer keeps the order the person is looking at under every sort: a row already shown stays where it is, a new row goes after them, and a different
+     *  sort (or cfg.orderKey, the caller's own search and filters) starts the order afresh. The memory is in the table's state, so it survives the redraws. */
+    const sortedRows = () => {
+        const out = sortedOnly();
+        if (!cfg.keepOrder || !cfg.rowKey) return out;
+        const sig = JSON.stringify([st.sort ? [st.sort.key, st.sort.dir] : null, cfg.orderKey || '']), rank = st.shown && st.shown.sig === sig ? st.shown.rank : new Map();
+        const seen = [], fresh = [];
+        for (const r of out) (rank.has(cfg.rowKey(r)) ? seen : fresh).push(r);
+        seen.sort((a, b) => rank.get(cfg.rowKey(a)) - rank.get(cfg.rowKey(b)));
+        const kept = [...seen, ...fresh];
+        st.shown = { sig, rank: new Map(kept.map((r, i) => [cfg.rowKey(r), i])) };
+        return kept;
     };
 
     // Column sizing (#9846, design note rules 3 to 5), all optional: min and max in characters (ch follows the text size), share (the part of the leftover width a flexible column takes: Item 2, Goal 1), fixed (a column
