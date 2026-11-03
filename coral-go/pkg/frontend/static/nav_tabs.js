@@ -94,7 +94,8 @@ function entry(icon, label, { action, href, onClick } = {}) {
 function menuEntries(viewLabels = new Set(), phoneNav = false) {
     const cloud = document.body.classList.contains('cloud-mode');
     const out = phoneNav ? [] : [entry('home', 'Home', { action: 'm-go-home' })]; // the floating nav's Home is one tap away
-    out.push(entry('settings', 'Settings', { action: 'm-close-top-bar-settings-then-show-settings-modal' }), entry('palette', 'Themes', { action: 'm-close-top-bar-settings-then-show-theme-configurator' }));
+    const settingsEntry = entry('settings', 'Settings', { action: 'm-close-top-bar-settings-then-show-settings-modal' }); settingsEntry.dataset.accountStart = ''; // where the phone's account button takes the drawer (#12634)
+    out.push(settingsEntry, entry('palette', 'Themes', { action: 'm-close-top-bar-settings-then-show-theme-configurator' }));
     if (!cloud) out.push(entry('system_update', 'Check for updates', { action: 'm-close-top-bar-settings-then-check-for-updates' }));
     if ((isHub() || cloud) && !viewLabels.has('Computers')) out.push(entry('dns', 'Computers', { action: 'm-close-top-bar-settings-then-show-servers-modal' })); // not twice: when the Servers view is one of the views above, two entries are named alike
     const account = document.getElementById('cloud-account-menu');
@@ -152,6 +153,11 @@ function openMenu(btn, focusKey = false) { // focusKey: true (opened by Enter or
     else { menu.style.left = 'auto'; menu.style.right = Math.max(8, window.innerWidth - r.right) + 'px'; }
     btn.setAttribute('aria-expanded', 'true');
     _menuFor = btn;
+    if (menu.classList.contains('nav-drawer')) menu.scrollTop = 0; // the drawer is one element kept between openings: each opening starts at the top unless the account button says otherwise
+    if (hamburger && btn.hasAttribute('data-account') && menu.classList.contains('nav-drawer')) { // the phone's account button opens the drawer AT the account entries (Settings, Themes, updates, Computers, the account's pages, Sign out), not at the top with the folders: it is named "Settings and account" (#12634, coral-hub's beta pass)
+        const start = menu.querySelector('[data-account-start]');
+        if (start) { start.scrollIntoView({ block: 'start' }); if (focusKey === true) { start.focus({ preventScroll: true }); return; } }
+    }
     if (focusKey === true) menu.querySelector('.nav-more-item')?.focus(); else if (focusKey) { const it = [...menu.querySelectorAll('.nav-more-item')].filter(x => x.getClientRects().length); it[menuMove(focusKey, it.length, -1)]?.focus(); } // opened by the keyboard (Enter or Space): the focus goes to the first item, as the Settings menu's did; Escape gives it back to the button
 }
 

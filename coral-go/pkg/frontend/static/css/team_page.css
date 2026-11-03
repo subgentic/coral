@@ -261,7 +261,8 @@
 .goal-team-link + .goal-head-actions { margin-left: 0; }
 @media (min-width: 761px) { .goal-back-row .phone-title-row > .goals-back { order: 1; } .goal-back-row .goals-detail-title { order: 3; flex: 0 0 100%; margin-top: 4px; } } /* a descendant: the folded phone-title-row is display: contents here, so the title is a flex item of the row; on a phone it stays beside the way back */
 @media (max-width: 760px) {
-    .goal-back-row > .phone-title-row { flex: 1 1 100%; }
+    .goal-back-row > .phone-title-row { flex: 1 1 100%; min-width: 0; padding-block: 8px; }
+    .goal-back-row .phone-title-row > .goals-detail-title { white-space: normal; overflow: visible; text-overflow: clip; } /* the goal's title is the page's content: it wraps and is read whole, not cut to one line with dots */
 }
 @media (max-width: 760px) {
     .inbox-goal-page > .view-list { display: block; padding: 12px 16px 0; }
