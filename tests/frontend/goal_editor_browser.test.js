@@ -30,6 +30,8 @@ const STUB = `(() => { window.__posts = []; const R = window.fetch; const json =
             await ev(`document.documentElement.style.fontSize = '${fs}px'; true`);
             await ev(`window.__created = []; import((window.__coralStatic || '/static/') + 'goal_editor.js').then(m => { m.openGoalEditor({ project: 'team-a', onCreated: (p, told) => { window.__created.push([p, told]); } }); return true; })`);
             await waitFor(`!!document.querySelector('dialog.goal-editor[open] #goal-new-title') && !document.querySelector('#goal-new-driver').disabled`, `${tag}: the screen and its drivers`, 8000);
+            const driverHint = await ev(`(() => { const c=document.querySelector('#goal-new-driver'), l=c.closest('label'); return { hint:c.getAttribute('aria-description'), tooltip:c.title, chipTooltip:l.title, label:l.querySelector('.goal-scope-lab').textContent }; })()`);
+            check(`${tag}: Driver explains the role without extra visible words`, driverHint.hint === 'The agent who looks after this goal' && driverHint.tooltip === driverHint.hint && driverHint.chipTooltip === driverHint.hint && driverHint.label === 'Driver', JSON.stringify(driverHint));
             const dlg = await box('dialog.goal-editor'), ttl = await ev(`getComputedStyle(document.getElementById('goal-new-title')).fontSize`), out = await box('#goal-new-description');
             const chips = await ev(`[...document.querySelectorAll('.goal-scope')].map(c => c.textContent.replace(/\\s+/g, ' ').trim())`);
             if (!mobile && fs === 16) {
