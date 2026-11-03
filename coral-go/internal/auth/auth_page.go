@@ -156,7 +156,7 @@ var authPageTmpl = template.Must(template.New("auth").Parse(`{{define "hubwarn"}
   <div class="brand"><img src="/static/icon-192.png" alt="" width="44" height="44">Coral</div>
   <div id="live" class="panel" role="status" aria-live="polite"></div>
   <div id="hub-flash" class="err" role="alert" hidden></div>
-{{if .PeerUnavailable}}  <p class="note" id="peer-unavailable" role="status"><b>This Mac does not let Coral check which account opens a sign-in link.</b> A link works for whoever opens it, once and for ten minutes: open it yourself, and do not leave it where others can read it.</p>
+{{if .PeerUnavailable}}  <p class="note" id="peer-unavailable" role="status"><b>This computer does not let Coral check which account opens a sign-in link.</b> A link works for whoever opens it, once and for ten minutes: open it yourself, and do not leave it where others can read it.</p>
 {{end}}{{if .PasswordSet}}
   <section id="panel-signin" class="panel">
     <h1>Sign in</h1>

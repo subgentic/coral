@@ -195,6 +195,10 @@ var peerCheckLost atomic.Bool
 // the flag back, or the tests that run after it in the same process lose those powers.
 func ResetPeerCheckLostForTest() { peerCheckLost.Store(false) }
 
+// PeerCheckLost reports whether Coral cannot tell which account on this computer a loopback connection comes from (the peer check is lost, #12529): the system status carries it to Settings,
+// and the sign-in page says so (#12546). False until a connection has been attributed and answered Unsupported on a system that has a check.
+func PeerCheckLost() bool { return peerCheckLost.Load() }
+
 // PeerCheckWarning is the dashboard's line when the loopback pass can't be per user on this
 // computer although the system could tell users apart (#95 review F3), or "".
 func PeerCheckWarning() string {
