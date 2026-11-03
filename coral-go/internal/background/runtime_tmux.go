@@ -25,6 +25,11 @@ func NewTmuxRuntime(client *tmux.Client) *TmuxRuntime {
 // TagsRuns says agents started on this runtime carry a CORAL_PTY_RUN tag, recorded in live_sessions.run_tag, so a Kill finds the processes they detached (#6141, #6770).
 func (r *TmuxRuntime) TagsRuns() bool { return true }
 
+// ServerState is the state of Coral's own tmux server, for the reconciler's watch for the server going away (#12592).
+func (r *TmuxRuntime) ServerState(ctx context.Context) tmux.ServerState {
+	return r.client.ServerState(ctx)
+}
+
 // Client returns the underlying tmux client for cases that need direct access.
 func (r *TmuxRuntime) Client() *tmux.Client {
 	return r.client
