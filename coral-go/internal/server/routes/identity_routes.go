@@ -164,6 +164,8 @@ var operatorOnlyRoutes = map[string]string{
 	"POST /api/board/{project}/asks/{messageID}/buttons/{buttonID}/settle": "use a button an agent put on a question to the Operator",
 	"POST /api/board/{project}/operator-artifacts":                         "share a file with an agent as the Operator",
 	"POST /api/board/{project}/operator-artifacts/message":                 "tell an agent about a file the Operator shared",
+	"POST /api/board/{project}/goals/{goalID}/driver":                      "change who drives a goal",
+	"POST /api/board/{project}/goals/{goalID}/move":                        "give a goal to another team",
 	"POST /api/board/{project}/goal-images":                                "add a picture to a new goal as the Operator",
 	"PUT /api/board/{project}/subscribers/{subscriberID}/review-settings":  "set an agent's Reviews only switch and review areas",
 	"PUT /api/artifacts/{id}/keep":                                         "keep an artifact",

@@ -102,6 +102,8 @@ var signInGuardedRoutes = []string{
 	"POST /api/board/{project}/goals",
 	"PATCH /api/board/{project}/goals/{goalID}",
 	"POST /api/board/{project}/goals/{goalID}/close",
+	"POST /api/board/{project}/goals/{goalID}/driver",
+	"POST /api/board/{project}/goals/{goalID}/move",
 	"POST /api/board/{project}/goal-requests",
 	"POST /api/board/{project}/goal-requests/{requestID}/accept",
 	"POST /api/board/{project}/goal-requests/{requestID}/decline",
