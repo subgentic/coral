@@ -33,9 +33,11 @@ export function refreshArtifactCount(done) {
         try {
             const hidden = artifactsOwnerOnly();
             const d = await readInboxArtifacts(new URLSearchParams({limit:'1', versions:'newest'}));
+            if (d.waiting) return; // the list of computers has not loaded: nothing was read
             countAt = Date.now();
             let changed = hidden !== artifactsOwnerOnly(); // the folder went (every computer refused)
-            if (Number.isSafeInteger(d.all) && d.all !== count) { count = d.all; changed = true; }
+            const lower = d.expected > d.answered && count !== null && d.all < count; // some computers did not answer: a sum of the others does not take the count down (#12672); the list says which are missing
+            if (Number.isSafeInteger(d.all) && d.all !== count && !lower) { count = d.all; changed = true; }
             if (changed) onCount();
         } catch { /* the count stays as it was */ }
     })().finally(() => { counting = null; });

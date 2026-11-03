@@ -148,7 +148,7 @@ export function createArtifactsList({ inbox = false } = {}) {
         model.controller?.abort();
         const gen = ++model.gen, ctrl = model.controller = new AbortController();
         if (!append) { if (!keep || !model.items.length) { model.items = []; model.hasMore = false; model.truncated = false; model.counts = null; } model.cursor = ''; model.loading = !model.items.length; }
-        model.loadingMore = append; model.error = ''; model.notFound = false;
+        model.loadingMore = append; model.error = ''; model.notFound = false; model.waiting = false;
         draw();
         try {
             model.filters.sort = serverArtifactSort(artifactState.sort || undefined);
@@ -180,6 +180,9 @@ export function createArtifactsList({ inbox = false } = {}) {
                 }
                 throw new Error('Unable to load artifacts: unexpected response scope.');
             }
+            if (inbox && data.waiting) { model.waiting = true; return; } // the list of computers has not loaded: the read is not finished, so nothing is said of the artifacts (the page keeps saying it is loading, and the next read asks again)
+            model.partial = inbox && data.expected > data.answered ? { failed: data.failed || [], answered: data.answered, expected: data.expected, all: data.all } : null; // some computers did not answer: the count is of the others, and the page says so (#12672)
+            model.versionless = inbox && Array.isArray(data.versionless) ? data.versionless : []; // computers on an older Coral count every version of a file, not files
             const rows = data.artifacts.filter(a => a && (a.uri || a.id || a.name));
             model.items = append ? model.items.concat(rows) : rows;
             if (!append) model.tagCounts = data.tag_counts && typeof data.tag_counts === 'object' ? data.tag_counts : {}; // the team's tags with how many files carry each (the whole list, not the page)
@@ -237,9 +240,21 @@ export function createArtifactsList({ inbox = false } = {}) {
         document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshQuiet(); });
     }
 
+    // Some computers did not answer, or count versions: one quiet line (not an alert) says which, so the count does not swing unexplained between reads (#12672); Retry reads the folder again.
+    function partialLine() {
+        const line = el('p', 'goals-note team-partial-line');
+        const names = ids => ids.map(serverLabel).join(', ');
+        const parts = [];
+        if (model.partial) parts.push(`${model.partial.all} artifact${model.partial.all === 1 ? '' : 's'} from ${model.partial.answered} of ${model.partial.expected} computers. ${names(model.partial.failed)} could not be read.`);
+        if (model.versionless && model.versionless.length) parts.push(`${names(model.versionless)} counts every version of a file, not files.`);
+        line.append(document.createTextNode(parts.join(' ')));
+        if (model.partial) line.append(' ', btn('btn btn-small team-artifacts-retry team-partial-retry', 'Retry', () => loadArtifacts({ keep: true })));
+        return line;
+    }
+
     function statusLine() {
         if (model.error) return model.error;
-        if (model.loading || pendingBoard) return inbox ? 'Loading artifacts…' : model.scope ? 'Loading agent artifacts…' : 'Loading team artifacts…';
+        if (model.loading || pendingBoard || model.waiting || (inbox && !model.loaded)) return inbox ? 'Loading artifacts…' : model.scope ? 'Loading agent artifacts…' : 'Loading team artifacts…';
         if (!model.items.length) return F.isFiltered(model.filters) ? 'No artifacts match this search.' : model.scope ? 'Nothing shared yet. Files this agent shares appear here.' : hooks.emptyText?.() || 'No artifacts yet. Files your agents share show up here.';
         const c = model.counts;
         return c && c.matched > model.items.length ? `Showing ${model.items.length} of ${c.matched}${model.truncated ? '+' : ''}` : `${model.items.length} artifact${model.items.length === 1 ? '' : 's'}`;
@@ -314,6 +329,7 @@ export function createArtifactsList({ inbox = false } = {}) {
         const status = el('p', counting ? 'sr-only team-count-line' : `goals-note team-count-line${model.error ? ' team-artifacts-error' : !model.loading && !model.items.length ? ' empty-state-line' : ''}`, statusLine());
         status.setAttribute('role', model.error ? 'alert' : 'status');
         body.append(status);
+        if (inbox && !model.error && (model.partial || (model.versionless && model.versionless.length))) body.append(partialLine());
         if (!model.error && !model.loading && !model.items.length && !F.isFiltered(model.filters) && !model.scope) status.append(el('span', 'empty-state-hint', 'An agent shares a file when it finishes a task with one; you can ask an agent to share a file as an artifact.')); // inside the line's own element: one block, the family's gap
         if (model.error && !model.notFound) body.append(btn('btn btn-small team-artifacts-retry', 'Retry', () => {
             // A label timeout needs another board-list read, not only the same artifact answer. Do not await a possibly offline list: the fresh artifact read has its own bounded label wait.
@@ -505,7 +521,7 @@ export function createArtifactsList({ inbox = false } = {}) {
         artifactState = DT.tableState();
         forgetChoices();
         model.controller?.abort();
-        Object.assign(model, { project, scope, key, loaded: false, items: [], hasMore: false, cursor: '', counts: null, tagCounts: {}, truncated: false, loading: false, error: '', loadingMore: false, filters: scope && scope.standalone ? { ...F.EMPTY } : F.load(scope ? `${project}::agent::${scope.session}` : project), kept: new Set() });
+        Object.assign(model, { project, scope, key, loaded: false, waiting: false, partial: null, versionless: [], items: [], hasMore: false, cursor: '', counts: null, tagCounts: {}, truncated: false, loading: false, error: '', loadingMore: false, filters: scope && scope.standalone ? { ...F.EMPTY } : F.load(scope ? `${project}::agent::${scope.session}` : project), kept: new Set() });
         model.filters = { ...model.filters, sort: serverArtifactSort() };
         if (!external) bar = null;
     }
