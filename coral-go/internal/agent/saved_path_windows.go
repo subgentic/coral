@@ -5,8 +5,22 @@ package agent
 import (
 	"path/filepath"
 
+	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
 )
+
+// isLocalDrive: the root's drive type is fixed, removable, CD-ROM or RAM disk. A mapped share (DRIVE_REMOTE), an unknown type and a root that does not exist are not.
+func isLocalDrive(root string) bool {
+	p, err := windows.UTF16PtrFromString(root)
+	if err != nil {
+		return false
+	}
+	switch windows.GetDriveType(p) {
+	case windows.DRIVE_FIXED, windows.DRIVE_REMOVABLE, windows.DRIVE_CDROM, windows.DRIVE_RAMDISK:
+		return true
+	}
+	return false
+}
 
 // savedPathDirs is the Path Windows gives a new process: the system's (HKLM\...\Session Manager\Environment) then the person's (HKCU\Environment), each expanded when it is
 // REG_EXPAND_SZ. A value that can't be read is left out.

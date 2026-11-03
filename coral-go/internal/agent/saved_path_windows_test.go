@@ -90,3 +90,31 @@ func TestTheSavedPathIsReadFromTheRegistry(t *testing.T) {
 	}
 	assert.True(t, sys, "the system's Path holds System32")
 }
+
+// A drive letter mapped to a network share is not kept either (coral-hub's ask): the drive's type decides, a fake here since no share can be mapped in a test.
+func TestRefreshSavedPathSkipsADriveMappedToAShare(t *testing.T) {
+	home := windowsNativeHome(t)
+	local := filepath.Join(home, "local")
+	prev := localDrive
+	localDrive = func(root string) bool { return root != `Z:\` }
+	t.Cleanup(func() { localDrive = prev })
+	reads := 0
+	savedPathIs(t, &reads, `Z:\tools\bin`, local)
+
+	assert.Equal(t, 1, RefreshSavedPath())
+	assert.Equal(t, []string{local}, savedPathDirsFound())
+}
+
+// The real drive check: this computer's own drive is local, and a drive letter that does not exist is not (fail closed).
+func TestTheDriveCheckSaysLocalOnlyForThisComputersOwnDrives(t *testing.T) {
+	own := filepath.VolumeName(os.TempDir()) + `\`
+	assert.True(t, isLocalDrive(own), own)
+	for c := 'Z'; c >= 'G'; c-- {
+		root := string(c) + `:\`
+		if _, err := os.Stat(root); err != nil {
+			assert.False(t, isLocalDrive(root), "a drive letter with nothing behind it: %s", root)
+			return
+		}
+	}
+	t.Skip("every drive letter from G to Z is in use here")
+}

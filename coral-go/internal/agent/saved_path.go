@@ -39,7 +39,10 @@ func RefreshSavedPath() int {
 		if d == "" || !filepath.IsAbs(d) { // a relative entry would be read against Coral's working folder
 			continue
 		}
-		if onNetworkShare(d) { // a \\server\share folder: never searched from a Check again (a drive letter mapped to a share is not told apart)
+		if onNetworkShare(d) { // a \\server\share folder: never searched from a Check again
+			continue
+		}
+		if vol := filepath.VolumeName(d); len(vol) == 2 && vol[1] == ':' && !localDrive(vol+`\`) { // a drive letter mapped to a share, or one Windows can't tell
 			continue
 		}
 		if k := key(d); !have[k] {
@@ -56,6 +59,10 @@ func RefreshSavedPath() int {
 func onNetworkShare(d string) bool {
 	return strings.HasPrefix(d, `\\`) || strings.HasPrefix(d, `//`)
 }
+
+// localDrive reports whether the drive whose root is given (C:\) is one of this computer's own: not a mapped network share, and not a root Windows can't tell
+// (fail closed). saved_path_windows.go asks GetDriveType, a local call with no network traffic; a variable so a test owns it.
+var localDrive = isLocalDrive
 
 // savedPathDirsFound is what the last RefreshSavedPath kept.
 func savedPathDirsFound() []string {
