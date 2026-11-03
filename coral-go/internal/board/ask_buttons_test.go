@@ -121,3 +121,9 @@ func TestAWakeButtonNamesAnyMemberNameTheBoardAllows(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "is empty", "the refusal says which part and why")
 }
+
+func TestTheNearestValidMemberNameKeepsAClosingBracket(t *testing.T) {
+	for in, want := range map[string]string{"Dev (x):": "Dev (x)", "Dev [2]:": "Dev [2]", "Security Reviewer 2:": "Security Reviewer 2", ": QA.": "QA", "Dev": "Dev", "::": ""} {
+		assert.Equal(t, want, ValidMemberNameNear(in), in)
+	}
+}

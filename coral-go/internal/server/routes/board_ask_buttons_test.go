@@ -167,4 +167,7 @@ func TestAWakeButtonAcceptsMemberNamesWithAColonASlashOrSpaces(t *testing.T) {
 	status, out = post(map[string]any{"subscriber_id": "Lead", "content": "@Operator who?", "ask": true, "buttons": []string{"Wake=wake:Go Backend Developer:"}})
 	assert.Equal(t, http.StatusBadRequest, status)
 	assert.Contains(t, out["error"], `did you mean "Go Backend Developer"?`)
+	status, out = post(map[string]any{"subscriber_id": "Lead", "content": "@Operator who?", "ask": true, "buttons": []string{"Wake=wake:Dev (x):"}}) // a closing bracket is part of a name (#12953)
+	assert.Equal(t, http.StatusBadRequest, status)
+	assert.Contains(t, out["error"], `did you mean "Dev (x)"?`)
 }
