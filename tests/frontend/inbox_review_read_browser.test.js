@@ -82,7 +82,7 @@ const { coralReady } = require('./helpers/wait');
                 // a failed save: the item keeps counting and the reason is said
                 await ev(`window.__tagFail=true;true`);
                 await click('Read me 2.txt','Open'); await waitFor(`document.body.textContent.includes('Review preview text')`,'the preview'); await ev(`document.querySelector('.artifact-viewer-close').click();true`);
-                await waitFor(`document.getElementById('inbox-live') && /Tag save failed/.test(document.body.textContent)||true`,'settle');
+                await waitFor(`Array.from(document.querySelectorAll('.toast')).some(t => /Could not mark the file read: Tag save failed/.test(t.textContent))`,'a refused tag write is said on the page, in a toast, not only in the live region');
                 assert.equal(await badge(),'2','a failed save leaves the item counting');
                 await ev(`window.__tagFail=false;true`);
                 // opened from anywhere (the viewer, a link): a for-review artifact is read, with the tags as the server has them now (a tag added meanwhile is kept); any other artifact is never tagged

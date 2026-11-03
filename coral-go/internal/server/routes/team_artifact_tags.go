@@ -13,6 +13,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/subgentic/coral/internal/board"
+	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/mediatype"
 )
 
@@ -148,6 +149,10 @@ func (h *BoardHandler) SetArtifactTags(w http.ResponseWriter, r *http.Request) {
 		errBadRequest(w, strings.TrimPrefix(err.Error(), board.ErrArtifactTag.Error()+": "))
 		return
 	}
+	if cloud.Tunneled(r) && !asciiArtifactTags(tags) { // through the Hub the body is closed: the local rule (letters, digits, spaces, hyphens, 24 characters, five tags) narrowed to a-z, 0-9, space and hyphen (#12742)
+		errBadRequest(w, "through Coral Hub a tag is 1 to 24 of a-z, 0-9, spaces or hyphens")
+		return
+	}
 	if !h.teamHasManagedArtifact(r.Context(), project, id) {
 		errNotFound(w, "this team has no such artifact")
 		return
@@ -225,4 +230,16 @@ func (h *BoardHandler) askerUploaded(session, id string) bool {
 	}
 	_, ok := h.uploadRecordOf(session, id)
 	return ok
+}
+
+// asciiArtifactTags says every tag (already normalised: lower case, single spaces) uses only a-z, 0-9, space and hyphen.
+func asciiArtifactTags(tags []string) bool {
+	for _, t := range tags {
+		for _, r := range t {
+			if !(r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == ' ' || r == '-') {
+				return false
+			}
+		}
+	}
+	return true
 }

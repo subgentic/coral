@@ -197,7 +197,7 @@ export async function renderArtifact(body, uri, options, ctx) {
 async function _renderArtifactInto(body, uri, options, ctx, source, kind) {
     const { url, externalURL } = source;
     const opened = CORAL_ARTIFACT_URI_RE.exec(uri);
-    if (opened) importOnce('./inbox_reviews.js').then(m => m.markOpenedRead(opened[1])).catch(() => {}); // a for-review artifact opened in a preview is read (#9277); any other is never tagged
+    if (opened) importOnce('./inbox_reviews.js').then(m => m.markOpenedReadVisibly(opened[1])).catch(() => {}); // a for-review artifact opened in a preview is read (#9277); any other is never tagged
     body.innerHTML = '<div class="inline-preview-loading">Loading...</div>';
     if (externalURL) {
         _renderSandboxed(body, { url: externalURL, name: options.filename, isStale: ctx.isStale });
