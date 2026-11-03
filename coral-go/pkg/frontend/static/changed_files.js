@@ -18,7 +18,7 @@ let _currentFiles = [];
 const _keyOf = s => s ? `${sessionServer(s)}|${s.name || ''}|${s.session_id || ''}` : ''; // the same key as session_header_updates.js whereKey
 let _wtFor = ''; // the agent _worktree was read for
 const paintWhere = () => { importOnce('./session_header_updates.js').then(m => m.setFilesWorktree(_worktree, _wtFor)).catch(() => {}); };
-const forThisAgent = () => { const k = _keyOf(state.currentSession); if (_wtFor !== k) { _worktree = null; _wtFor = k; paintWhere(); } return k; }; // another agent or computer: nothing of the last one's worktree stays // the one line at the top of Files names the followed worktree (#12690)
+const forThisAgent = (k = _keyOf(state.currentSession)) => { if (_wtFor !== k) { _worktree = null; _wtFor = k; paintWhere(); } return k; }; // another agent or computer: nothing of the last one's worktree stays // the one line at the top of Files names the followed worktree (#12690)
 let _worktree = null; // the worktree the agent works in, when it is not its launch folder: { path, name, branch, followed, launch } (#11351)
 const _expandedFiles = new Set(); // the paths whose diff is open under their row (#11350): kept across the list's redraws, and by path so a file that moves in the list keeps it
 let _actionsOpenFor = ''; // the path whose row has its Copy, Preview and Edit open on a phone (#7652): kept across the list's redraws
@@ -275,17 +275,20 @@ export async function loadChangedFiles(agentName, sessionId, quiet = false) { //
     if (state.currentSession && state.currentSession.type === 'live' && filesPanelShowing()) watchFiles();
     if (_filesStale) { _filesStale = false; return refreshChangedFiles(quiet); } // files changed while the panel was not showing: the server's cached list may predate them
     _filesStale = false;
-    const mine = forThisAgent();
+    const sid = sessionId || (state.currentSession && state.currentSession.session_id);
+    const mine = `${serverForSession(agentName, sid)}|${agentName}|${sid || ''}`; // the agent this read was ASKED for (computer, name, session), not whichever is selected when it answers (#12690, UI Reviewer)
+    const staleRead = () => !!state.currentSession && _keyOf(state.currentSession) !== mine; // an agent is open and it is not the one this read was asked for
+    if (staleRead()) return; // asked for an agent that is no longer the open one
+    forThisAgent(mine);
     try {
         const params = new URLSearchParams();
-        const sid = sessionId || (state.currentSession && state.currentSession.session_id);
         if (sid) { params.set("session_id", sid); params.set("worktree", worktreeMode(sid)); }
         const qs = params.toString() ? `?${params}` : "";
         const resp = await serverFetch(serverForSession(agentName), `/api/sessions/live/${encodeURIComponent(agentName)}/files${qs}`);
         _filesRefused = !resp.ok && await refusedTooLarge(resp);
         if (!resp.ok) { dropBody(resp); throw new Error(`files fetch failed: ${resp.status}`); }
         const data = await resp.json();
-        if (_keyOf(state.currentSession) !== mine) return; // the answer is for an agent that is no longer open
+        if (staleRead()) return; // the answer is for an agent that is no longer open
         if (quiet && JSON.stringify(data.files || []) === JSON.stringify(_currentFiles) && JSON.stringify(data.worktree || null) === JSON.stringify(_worktree)) return;
         _currentFiles = data.files || [];
         _worktree = data.worktree && typeof data.worktree === 'object' ? data.worktree : null; paintWhere();
@@ -293,7 +296,7 @@ export async function loadChangedFiles(agentName, sessionId, quiet = false) { //
         _compareLabel = (data.compare && typeof data.compare.label === 'string') ? data.compare.label : '';
         if (data.diff_mode) _cloudDiffMode = data.diff_mode;
     } catch (e) {
-        if (_keyOf(state.currentSession) !== mine) return;
+        if (staleRead()) return;
         if (_worktree) { _worktree = null; paintWhere(); } // a read that failed: the line does not go on naming a worktree it could not read
         if (quiet) return; // a read that failed in the background leaves the list as it was
         _currentFiles = [];
@@ -601,11 +604,11 @@ export async function refreshChangedFiles(quiet = false) { // quiet: the panel's
             renderStarredFiles();
             renderChangedFiles();
             refreshOpenFiles().catch(() => {});
-        } else {
+        } else if (_keyOf(state.currentSession) === mine) {
             await loadChangedFiles(agentName, sessionId);
         }
     } catch (e) {
-        await loadChangedFiles(agentName, sessionId);
+        if (_keyOf(state.currentSession) === mine) await loadChangedFiles(agentName, sessionId); // another agent was opened meanwhile: no read for this one
     }
 
     if (btn) setTimeout(() => btn.classList.remove('refreshing'), 300);
