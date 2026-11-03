@@ -73,15 +73,19 @@ func shareAnswers(dir string) bool {
 		p = &shareProbe{done: make(chan struct{})}
 		f.inflight = p
 		go func() {
-			defer safego.Recover("agent/share-probe")
+			defer safego.Recover("agent/share-probe") // runs last: the cleanup below runs first, whether the stat returned or panicked
+			finished, ok := false, false
+			defer func() {
+				shareMu.Lock()
+				p.ok = finished && ok // a probe that died answers no
+				if f.inflight == p {
+					f.inflight = nil // so the next call starts a fresh one, and nobody waits out the limit on a dead probe
+				}
+				shareMu.Unlock()
+				close(p.done)
+			}()
 			_, err := shareStat(dir)
-			shareMu.Lock()
-			p.ok = err == nil
-			if f.inflight == p {
-				f.inflight = nil
-			}
-			shareMu.Unlock()
-			close(p.done)
+			ok, finished = err == nil, true
 		}()
 	}
 	shareMu.Unlock()
