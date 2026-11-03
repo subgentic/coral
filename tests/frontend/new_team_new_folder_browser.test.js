@@ -91,6 +91,9 @@ const { coralReady } = require('./helpers/wait');
         }
     } finally {
         // The wizard's first step creates the team's board ('planner-shop') on the real server as it is filled in, and nothing here launches a team, so it is left with its one subscriber: --fail-on-leak counts it (#12986). Delete it, whatever happened above.
+        // The faked launch leaves the page on the new team's board view, which keeps reading and subscribing to planner-shop every second or two: a delete while it is open is undone by its next poll (#12992, seen under --stress, where
+        // the page's poll lands after the delete). Leave the page first, wait for its last request to end, then delete.
+        try { await Page.navigate({ url: 'about:blank' }); await sleep(400); } catch { /* the page is gone: nothing polls */ } // sleep-ok: the poll's in-flight request answers before the delete
         try { const r = await fetch(`${BASE}/api/board/planner-shop`, { method: 'DELETE' }); if (r.status >= 300 && r.status !== 404) console.log(`[WARN] could not delete the board planner-shop: ${r.status}`); } catch (e) { console.log(`[WARN] could not delete the board planner-shop: ${e.message}`); }
         await client.close();
     }
