@@ -1,5 +1,194 @@
 # Release Notes
 
+## v2.0.38 — Upgrading from v2.0.37 restores your agents, a lost terminal server is recovered, threaded board replies, comments on an agent's diff, and diff colours as GitHub draws them
+
+### Changes
+
+#### What you will notice first
+
+- **Upgrading from v2.0.37 restores your agents**: v2.0.37 could treat an existing Coral folder as a copy of another and stop recovering agents, auto-sleeping and delivering messages. Coral no longer blocks on the data-folder check: a folder with no id (one a release before the id existed left behind, even a copy of a never-restarted one) is an install upgrading in place and is yours, whatever its file dates; only a folder with positive evidence of being a copy (a different id, or another folder holding the same id) is flagged, and then it only warns and an **Adopt** button takes it over in place.
+- **A lost terminal server is logged, told and recovered from**: when Coral's own tmux server goes away while agents are awake, Coral logs a warning, tells the board which agents were lost and restarts the ones that were running (at most once per 10 minutes).
+- **Threaded board replies**: a reply is drawn under the message it answers, on the board and in Needs you, with a "Replying to" strip that sets what it answers from the message you chose.
+- **Comments on an agent's diff**: select lines in a file's inline diff and a Comment button opens the comment composer (pictures, Mark up) on them; the selected lines reach the agent with their line numbers, breaks and indentation. One agent session holds at most 200 live comments.
+- **Diff colours as GitHub draws them**: text on an added or removed line stands out from its band (light and dark themes, AA contrast), and the unchanged lines around a change keep their syntax colours readable.
+- **The changed-files view keeps your place** across its refresh (scroll, open files, opened blocks), and an untracked folder is one entry, as `git status` shows it (a sync tool's trace folder no longer floods the list; only big ones fold).
+- **Messages to the Operator are easy to read**: a post, ask or cross-team message to the Operator that is a wall of text (over 280 characters on one line, or numbered steps run together) is refused with a message that says how to write it: a one-line summary, then one point per line. A question reads well in Needs you: its line breaks stay, lists draw as lists, and a short first line is the title.
+- **Sign-in page**: a sign-in link that did not open Coral now says so correctly ("refused", not "used"), Settings says when Coral cannot check which account opens a sign-in link, and the sign-in link no longer travels in an argument list.
+- **A starting agent's row says Starting, not Idle**; the team header status and the team tab strip fit a phone; "Trust this folder" with no settings file yet is guidance, not an error.
+- **The README's install line reads on a phone**, and the New agent skills list is reachable on a phone.
+- **A pinned `install.sh` install verifies a signing requirement** (Coral.app must be signed by Coral's Developer ID team, checked with Apple's chain), not only the printed team.
+
+#### Known issues
+
+- **Windows: in-app update does not work from 2.0.0 through 2.0.6.** If you're on one of those, download and install the MSI by hand; from 2.0.7 on, in-app update works.
+- **macOS: a Coral of 2.0.5 or earlier cannot install updates in-app; install 2.0.6 or later by hand once.**
+- **OpenCode agents are tested on macOS and Linux; OpenCode on Windows is not yet tested end to end.**
+- **Hermes agents are still experimental.**
+- After an upgrade from before 2.0.35, an install that has agents but no board messages may be treated as a copy: run `coral --adopt-data-dir` once.
+- Setting up a computer over SSH is supported from a macOS or Linux hub, and is not yet tested from a Windows hub.
+
+#### For Coral Hub
+
+- **`release-diff` output** (`go run ./internal/releasediff/cmd/release-diff v2.0.37 <head>`):
+
+  ### Tunnel routes, v2.0.37 to the v2.0.38 head
+
+  Added, never reachable (the Hub has nothing to do) (1)
+
+  - `POST /api/system/data-folder/adopt`: never
+
+  ### Board settings keys (BoardSettings, HealthSettings included), v2.0.37 to the v2.0.38 head
+
+  No key was added, removed or changed.
+
+  ### What Coral Hub compiles in or embeds, v2.0.37 to the v2.0.38 head
+
+  `pkg/frontend`: 31 files the Hub embeds changed (+400, -44)
+
+  - `coral-go/pkg/frontend/static/artifact_comment_highlights.js`: +1, -1
+  - `coral-go/pkg/frontend/static/artifact_comments.js`: +8, -1
+  - `coral-go/pkg/frontend/static/artifact_comments_api.js`: +2, -1
+  - `coral-go/pkg/frontend/static/board_chat.js`: +10, -7
+  - `coral-go/pkg/frontend/static/board_composer.js`: +6, -3
+  - `coral-go/pkg/frontend/static/board_reply_strip.js`: +25, -0
+  - `coral-go/pkg/frontend/static/board_threads.js`: +42, -0
+  - `coral-go/pkg/frontend/static/board_window.js`: +8, -5
+  - `coral-go/pkg/frontend/static/changed_files.js`: +15, -0
+  - `coral-go/pkg/frontend/static/css/agentic.css`: +11, -4
+  - `coral-go/pkg/frontend/static/css/board_table.css`: +5, -0
+  - `coral-go/pkg/frontend/static/css/cm_shadow.css`: +11, -4
+  - `coral-go/pkg/frontend/static/css/diff-comments.css`: +9, -0
+  - `coral-go/pkg/frontend/static/css/skills.css`: +2, -2
+  - `coral-go/pkg/frontend/static/css/team_page.css`: +2, -1
+  - `coral-go/pkg/frontend/static/css/variables.css`: +4, -0
+  - `coral-go/pkg/frontend/static/diff_comments.js`: +134, -0
+  - `coral-go/pkg/frontend/static/inbox_coral.js`: +2, -2
+  - `coral-go/pkg/frontend/static/inbox_panel.js`: +3, -1
+  - `coral-go/pkg/frontend/static/inline_diff.js`: +10, -2
+  - `coral-go/pkg/frontend/static/launch_dialog.js`: +5, -0
+  - `coral-go/pkg/frontend/static/message_board.js`: +1, -1
+  - `coral-go/pkg/frontend/static/operator_asks.js`: +20, -2
+  - `coral-go/pkg/frontend/static/session_state.js`: +2, -0
+  - `coral-go/pkg/frontend/static/settings_dialog.js`: +5, -0
+  - `coral-go/pkg/frontend/static/startup_status.js`: +8, -1
+  - `coral-go/pkg/frontend/static/strip_reveal.js`: +19, -0
+  - `coral-go/pkg/frontend/static/team_dialogs.js`: +2, -0
+  - `coral-go/pkg/frontend/static/team_page.js`: +4, -4
+  - `coral-go/pkg/frontend/static/update_check.js`: +22, -1
+  - `coral-go/pkg/frontend/templates/includes/modals.html`: +2, -1
+
+  `agent_docs`: 2 files the Hub embeds changed (+4, -0)
+
+  - `coral-go/agent_docs/board.md`: +2, -0
+  - `coral-go/agent_docs/hub.md`: +2, -0
+
+  Unchanged: `pkg/hubproxy`, `pkg/hubowner`, `pkg/redact`, `pkg/tunnel`.
+
+  ### Coral packages compiled into the Hub through its imports, v2.0.37 to the v2.0.38 head
+
+  Unchanged: `internal/fsreplace`, `internal/httputil`, `internal/logsafe`, `internal/safego`, `internal/secfile`, `internal/secrets`, `pkg/redact/betterleaks`.
+
+- **The new route** `POST /api/system/data-folder/adopt` is the Operator's alone (the Adopt button), census class b, never reachable through the tunnel.
+- **Board replies are threaded** (`reply_to`): the board and the dock draw a reply under the message it answers; no route changed, the existing post routes carry `reply_to`.
+- **Ready signals, hooks, tokens, framed paths**: unchanged.
+
+
+#### For developers and releases
+
+- Census entries: the untracked-folder size read (`measureFolder`) and the sign-in page (`writeLoginPage`); the libproc attribution queue is capped at 8 callers.
+- `team_goal_task_back_browser` no longer races its loop (6 of 20 runs failed at 4x throttle before).
+
+## v2.0.37 — An installer and a README, starter skills, Restart with changes that keeps the mode you pick, one question closed by one reply, and sign-in that works on a signed macOS release
+
+### Changes
+
+#### What you will notice first
+
+- **Sign-in works on a signed macOS 27 release again**: a published (Developer ID signed) release refused every sign-in link, `coral open` and `coral setup-code` as "no socket row for the connection", so a new user could not sign in; Coral now recognises that layout and signs the person in with the same rules a system without a peer check uses.
+- **An installer and a README**: `install.sh` at the repo root installs Coral on macOS and Linux with one line (it finds the OS and CPU, downloads the latest release, checks its checksum and signature, and on macOS verifies the app's Developer ID team before it puts it in place); the README has a one-line install and a first screen with pictures.
+- **Starter skills in the Skills Store**: three example skills ship with Coral (how to write a skill for Coral, how an agent uses Coral, how to make an automation), shown as published by "Coral (example)"; they are Markdown only, no scripts and no secrets.
+- **Restart with changes keeps the permission mode you pick**, both ways: Default to Bypass gives `--yolo`, Bypass to Default drops it; the dialog opens on the mode a restart will use and a note says when the running mode differs. Hermes Bypass sends `--yolo` from the launch dialog too.
+- **A reply to one question closes only that question**: an @mention of the asker no longer answers all their other open questions.
+- **Inbox column resizing follows your pick** (an edge dragged right widens that column, the ones to its right give room), and the hidden-columns bar has **Reset column widths**.
+- **Switching agents through a self-hosted hub over SSH stays fast**: the first switch after the shared SSH session expired no longer starts about seven connections at once, and Forgetting a host key closes the idle streams too.
+- **A signed-out page makes no requests**: the chats list and the other timer loops stop once the page is signed out.
+- **The Needs you page title stays whole** beside the filter chips, a Needs link by team name opens the item, and the New team skills list fits a phone.
+- **Chief**: the decision notice names the team by its label, and Settings > Chief refuses a "Which agent" that is on the team it fronts.
+- **Hermes**: the requested-level note names the setting; the word "Ignore" can no longer return to the bars (Dismiss is the word).
+
+#### Known issues
+
+- **Windows: in-app update does not work from 2.0.0 through 2.0.6.** If you're on one of those, download and install the MSI by hand; from 2.0.7 on, in-app update works.
+- **macOS: a Coral of 2.0.5 or earlier cannot install updates in-app; install 2.0.6 or later by hand once.**
+- **OpenCode agents are tested on macOS and Linux; OpenCode on Windows is not yet tested end to end.**
+- **Hermes agents are still experimental**; a Hermes that died in its first-use setup is typed into the shell until the next check.
+- After an upgrade from before 2.0.35, an install that has agents but no board messages may be treated as a copy: run `coral --adopt-data-dir` once.
+- `team_goal_task_back_browser` passes only on a retry in the release gate (a test race, #12547); the feature itself works.
+
+#### For Coral Hub
+
+- **`release-diff` output** (`go run ./internal/releasediff/cmd/release-diff v2.0.36 <head>`):
+
+  ### Tunnel routes, v2.0.36 to the v2.0.37 head
+
+  No route was added, removed or changed.
+
+  ### Board settings keys (BoardSettings, HealthSettings included), v2.0.36 to the v2.0.37 head
+
+  No key was added, removed or changed.
+
+  ### What Coral Hub compiles in or embeds, v2.0.36 to the v2.0.37 head
+
+  `pkg/frontend`: 27 files the Hub embeds changed (+128, -39)
+
+  - `coral-go/pkg/frontend/static/agent_config_form.js`: +6, -2
+  - `coral-go/pkg/frontend/static/artifact_comment_ask.js`: +2, -1
+  - `coral-go/pkg/frontend/static/changed_files.js`: +2, -1
+  - `coral-go/pkg/frontend/static/chief_setup.js`: +12, -4
+  - `coral-go/pkg/frontend/static/cloud_connect.js`: +3, -1
+  - `coral-go/pkg/frontend/static/css/skills.css`: +14, -2
+  - `coral-go/pkg/frontend/static/css/team_page.css`: +3, -2
+  - `coral-go/pkg/frontend/static/data_table.js`: +26, -11
+  - `coral-go/pkg/frontend/static/dismiss_wait.js`: +9, -2
+  - `coral-go/pkg/frontend/static/inbox_link.js`: +14, -2
+  - `coral-go/pkg/frontend/static/launch_dialog.js`: +2, -1
+  - `coral-go/pkg/frontend/static/launch_skills.js`: +4, -1
+  - `coral-go/pkg/frontend/static/manifest.json`: +1, -1
+  - `coral-go/pkg/frontend/static/model_chip.js`: +1, -1
+  - `coral-go/pkg/frontend/static/notes.js`: +2, -0
+  - `coral-go/pkg/frontend/static/permission_flags.js`: +1, -0
+  - `coral-go/pkg/frontend/static/popout.js`: +2, -0
+  - `coral-go/pkg/frontend/static/relaunch_badge.js`: +3, -2
+  - `coral-go/pkg/frontend/static/restart_flow.js`: +5, -0
+  - `coral-go/pkg/frontend/static/resume_dialog.js`: +2, -1
+  - `coral-go/pkg/frontend/static/scheduler.js`: +2, -2
+  - `coral-go/pkg/frontend/static/server_ssh_setup.js`: +2, -0
+  - `coral-go/pkg/frontend/static/sessions.js`: +1, -0
+  - `coral-go/pkg/frontend/static/skills_tab.js`: +2, -1
+  - `coral-go/pkg/frontend/static/startup_status.js`: +3, -0
+  - `coral-go/pkg/frontend/static/team_dialogs.js`: +2, -1
+  - `coral-go/pkg/frontend/static/update_settings.js`: +2, -0
+  - test files, not compiled by the Hub: 1 file (+2, -2)
+
+  `agent_docs`: 1 file the Hub embeds changed (+4, -0)
+
+  - `coral-go/agent_docs/skills.md`: +4, -0
+
+  Unchanged: `pkg/hubproxy`, `pkg/hubowner`, `pkg/redact`, `pkg/tunnel`.
+
+  ### Coral packages compiled into the Hub through its imports, v2.0.36 to the v2.0.37 head
+
+  Unchanged: `internal/fsreplace`, `internal/httputil`, `internal/logsafe`, `internal/safego`, `internal/secfile`, `internal/secrets`, `pkg/redact/betterleaks`.
+
+- **Local-client identification (#12529, #12542)**: macOS 27 shows a process signed the usual way (Developer ID, hardened runtime) an empty or own-sockets-only process socket table, so the client's row was never found and every sign-in link, `coral open` and `coral setup-code` of a published release was refused. A table that has the server's end of the connection and not the client's, or no sockets at all, is now the layout answer (the peer check is unavailable: the rules for a system without a peer check apply, no local-only powers, the dashboard's warning) instead of a missing row; both ends of a connection must match for it to count as the client's. No route, token, framed path or tunnel rule changed; the Hub's own sign-in is unchanged.
+- **Ready signals, hooks, tokens**: unchanged.
+
+
+#### For developers and releases
+
+- `install.sh` has its own test (`tests/release/install_sh_test.sh`, a fake release over `file://`; `INSTALL_SH_REAL=1` also runs the real latest release); it passes on a clean PATH, and its macOS section expects no real `cosign` on PATH.
+- The "Ignore" word census, the Windows machine-launch test fixes (`//go:build unix`), and goldens regenerated for the restart dialog, the Chief and column changes.
+
 ## v2.0.36 — Mark up in the file viewer, Needs you row actions with Dismiss, links to files in Markdown, a clear list of CLIs, and a Hub sign-in that brings a deep link back whole
 
 ### Changes
