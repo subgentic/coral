@@ -1,9 +1,10 @@
 /* Settings > Inbox (#12144, the Operator's design v6): what reaches Needs you. A switch for each kind of optional item, the teams the switches apply to, and the time of the daily items. Questions and decisions have no
  * switch and always reach the Operator. The values are the computer's own settings (inbox_kind_*, inbox_included_teams, inbox_digest_time): the page sends what it shows, and the server parses each value again. */
 import { fetchProjects } from './board_fetch.js';
-import { keyLabel } from './server_base.js';
+import { keyLabel, isCloud, serverFetch } from './server_base.js';
 import { settingBool } from './settings_core.js';
 import { mutedReviewItems, mutedWords } from './inbox_reviews.js';
+import { importOnce } from './import_once.js';
 
 export const INBOX_KINDS = [
     { kind: 'file', key: 'inbox_kind_file', id: 'settings-inbox-file', label: 'Files for review', help: 'A file an agent wants you to read, approve or send back.' },
@@ -27,7 +28,21 @@ export async function drawInboxTeams(raw) {
     const host = teamsHost();
     if (!host) return;
     let projects = [];
-    try { projects = (await fetchProjects()).map(p => p.project); } catch { /* none to draw: the list says so */ }
+    try {
+        // fetchProjects reads a refused answer as no teams, so a refusal is checked here first (this computer's own boards): not being able to read them is not an empty list
+        if (!isCloud()) { const r = await serverFetch('local', '/api/board/projects'); if (!r.ok || !Array.isArray(await r.json())) throw new Error('the boards could not be read'); }
+        projects = (await fetchProjects()).map(p => p.project);
+    } catch {
+        // The teams could not be read: that is not an empty list. Say so, with a way to try again; no box is drawn, so Save sends the saved choice as it was (readIncludedTeams) and nothing is lost.
+        const p = document.createElement('p'), b = document.createElement('button');
+        p.className = 'sv-help settings-inbox-teams-failed'; p.setAttribute('role', 'alert');
+        p.append('Your teams could not be loaded, so the choice below cannot be changed now. What you saved stays as it is. ');
+        b.type = 'button'; b.className = 'btn btn-quiet btn-small'; b.textContent = 'Retry';
+        b.addEventListener('click', () => drawInboxTeams(raw));
+        p.append(b);
+        host.replaceChildren(p);
+        return;
+    }
     const chosen = includedTeams(raw);
     const frag = document.createDocumentFragment();
     if (!projects.length) { const p = document.createElement('p'); p.className = 'sv-help'; p.textContent = 'No teams yet. The switches apply to every team.'; frag.append(p); }
@@ -78,5 +93,9 @@ export function drawMutedLine() {
     const week = Date.now() - 7 * 24 * 3600 * 1000;
     const words = mutedWords(mutedReviewItems().filter(a => Date.parse(a.created_at) >= week));
     el.hidden = !words;
-    el.textContent = words ? `Muted in the last 7 days: ${words}. They are in the Artifacts folder.` : '';
+    if (!words) { el.replaceChildren(); return; }
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'btn btn-quiet btn-small'; b.textContent = 'Show them';
+    b.addEventListener('click', () => { if (window.hideSettingsModal) window.hideSettingsModal(); if (window.switchNavTab) window.switchNavTab('hub-inbox'); importOnce('./inbox_tab.js').then(m => m.selectInboxTab('artifacts')).catch(() => {}); }); // the folder they are in
+    el.replaceChildren(`Muted in the last 7 days: ${words}. `, b);
 }
