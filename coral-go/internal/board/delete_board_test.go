@@ -18,9 +18,11 @@ var boardOwnedRows = []struct{ table, col string }{
 	{"board_proposals", "board_id"}, {"board_goals", "board_id"}, {"board_goal_meta", "board_id"}, {"board_goal_images", "board_id"}, {"board_goal_events", "board_id"}, {"board_settings_log", "board_id"}, // the goals tables were missing from this census until #7355
 	{"board_goal_requests_in", "board_id"}, {"board_goal_requests_out", "board_id"}, // #7361: a goal request goes with either of its two boards
 	{"board_asks", "project"}, {"board_replies", "project"}, {"board_ask_closed", "project"}, {"board_ask_buttons", "project"}, {"board_ask_subjects", "project"}, {"board_orch_grant", "project"}, {"board_clashes", "project"}, {"board_lifecycle_log", "project"}, // #7794: a question and the link of a reply go with their board
-	{"artifact_tags", "board_id"},      // #8583: a team's tags of its artifacts
-	{"artifact_reviews", "board_id"},   // #136584: when the Operator decided a review of a team's artifact
-	{"artifact_questions", "board_id"}, // #11555: what an upload for review asks the Operator
+	{"artifact_tags", "board_id"},        // #8583: a team's tags of its artifacts
+	{"artifact_reviews", "board_id"},     // #136584: when the Operator decided a review of a team's artifact
+	{"artifact_questions", "board_id"},   // #11555: what an upload for review asks the Operator
+	{"artifact_kinds", "board_id"},       // #12144: the kind of a file for review
+	{"artifact_task_chains", "board_id"}, // #12144: the latest file for review of a task chain
 }
 
 // Audit trails: what the Hub's operators did and what the health rules did are a record of what happened, not part of the board, so they stay.
@@ -110,6 +112,9 @@ func fillBoard(t *testing.T, s *Store, project string) (taskIDs []int64) {
 	require.NoError(t, s.SetGoalImages(ctx, project, goal.ID, []GoalImage{{Hex: strings.Repeat("b", 64), Name: "shot.png", ContentType: "image/png"}})) // and the pictures of its goal (#11650)
 	_, err = s.SetArtifactQuestion(ctx, project, strings.Repeat("a", 64), "Approve it?", "sess-1", time.Now())                                          // and what its upload asked (#11555)
 	require.NoError(t, err)
+	_, err = s.SetArtifactKind(ctx, project, strings.Repeat("a", 64), KindRelease, "sess-1", time.Now()) // and the kind of its file (#12144)
+	require.NoError(t, err)
+	require.NoError(t, s.SetChainFile(ctx, project, first.ID, strings.Repeat("a", 64), time.Now())) // and the latest file of a task chain (#12144)
 	return []int64{first.ID, second.ID}
 }
 
