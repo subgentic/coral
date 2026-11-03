@@ -1,11 +1,11 @@
 /* Set up a server over SSH (#11370): the steps of the hub's work, the host fingerprints, the terms. Nothing wider than the page at 390 px or 200% text. */
-.ssh-setup { display: flex; flex-direction: column; gap: var(--space-md); }
+.ssh-setup { display: flex; flex-direction: column; gap: var(--space-lg); }
 .ssh-form { display: flex; flex-direction: column; gap: var(--space-sm); }
 .ssh-label { font: var(--dlg-label); }
 .ssh-input { max-width: 100%; }
 .ssh-help, .ssh-note, .ssh-consent, .ssh-intro { margin: 0; color: var(--text-secondary); font-size: var(--fs-base); max-width: 70ch; }
 .ssh-note, .ssh-consent { color: var(--text-primary); }
-.ssh-subhead { margin: var(--space-md) 0 0; font: var(--dlg-section); }
+.ssh-subhead { margin: var(--space-sm) 0 var(--space-xs); font: var(--dlg-section); }
 .ssh-steps, .ssh-keys { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-sm); }
 .ssh-step { display: flex; gap: var(--space-sm); align-items: flex-start; min-width: 0; }
 .ssh-step-glyph { font-size: var(--fs-xl); color: var(--text-secondary); }
@@ -14,9 +14,9 @@
 .ssh-step-body { display: flex; flex-direction: column; min-width: 0; overflow-wrap: anywhere; }
 .ssh-step-state, .ssh-step-detail { color: var(--text-secondary); font-size: var(--fs-sm); }
 .ssh-step-help { margin: var(--space-xs) 0 0; padding: var(--space-sm); background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-md); font-family: var(--font-mono, monospace); font-size: var(--fs-sm); white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; } /* the commands to run by hand under a failed step: wrapped, so a long line needs no sideways scroll, and selectable (#12947) */
-.ssh-key { display: flex; flex-wrap: wrap; gap: var(--space-xs) var(--space-sm); min-width: 0; overflow-wrap: anywhere; }
+.ssh-key { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-xs) var(--space-sm); min-width: 0; overflow-wrap: anywhere; }
 .ssh-key-fp { font-family: var(--font-mono, monospace); font-size: var(--fs-sm); overflow-wrap: anywhere; }
-.ssh-check { display: flex; gap: var(--space-sm); align-items: flex-start; font-size: var(--fs-base); }
+.ssh-check { display: flex; gap: var(--space-sm); align-items: center; font-size: var(--fs-base); }
 .ssh-done { margin: 0; font: var(--dlg-section); }
 .ssh-backend { border: 0; padding: 0; margin: 0; min-width: 0; }
 .ssh-backend-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-sm); }
@@ -30,8 +30,12 @@
 .servers-uptodate { align-self: center; color: var(--success); font-size: var(--fs-base); }
 @media (max-width: 640px) { .ssh-backend-grid { grid-template-columns: 1fr; } }
 
-.ssh-datadir { border: 0; padding: 0; margin: var(--space-md) 0 0; min-width: 0; }
+/* Clearer dialog (#12971): the groups of the connected step (host key, how agents run, data folder, terms) are set apart with room between them, a heading sits close to its own group, and the data folder uses the shared field and label. */
+.ssh-backend > legend, .ssh-datadir > legend { padding: 0; margin: 0 0 var(--space-sm); }
+.ssh-datadir { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; flex-direction: column; gap: var(--space-sm); }
+.ssh-datadir .form-label { margin: 0; }
 .ssh-datadir-row { display: flex; flex-wrap: wrap; gap: var(--space-sm); align-items: center; }
-.ssh-datadir-label { color: var(--text-secondary); font-size: var(--fs-base); }
-.ssh-datadir-row input { flex: 1 1 14rem; min-width: 0; font-family: var(--font-mono, monospace); }
-.ssh-datadir-row input[aria-invalid="true"] { border-color: var(--danger); }
+.ssh-datadir-row .field { flex: 1 1 16rem; min-width: 0; font-family: var(--font-mono, monospace); }
+.ssh-datadir-bad { color: var(--error-text, var(--error)); }
+.ssh-setup .ssh-help { color: var(--text-primary); } /* the help under a field is what the person reads to decide: full text colour, not the dim one */
+.ssh-backend, .ssh-datadir { margin-top: var(--space-md); }

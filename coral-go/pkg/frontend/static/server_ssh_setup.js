@@ -292,15 +292,16 @@ export function mountSshSetup(host, { mode = 'setup', server = null, action = nu
     function drawDataDir(root) {
         const box = el('fieldset', 'ssh-datadir');
         box.append(el('legend', 'ssh-subhead', 'Where Coral keeps its data on that computer'));
+        const lab = el('label', 'form-label', 'Folder under its home folder'); lab.htmlFor = 'ssh-datadir-input';
         const row = el('div', 'ssh-datadir-row');
-        const lab = el('label', 'ssh-datadir-label', 'Folder under its home folder'); lab.htmlFor = 'ssh-datadir-input';
-        const input = el('input', 'input'); input.type = 'text'; input.id = 'ssh-datadir-input'; input.value = st.dataDir;
+        const input = el('input', 'field'); input.type = 'text'; input.id = 'ssh-datadir-input'; input.value = st.dataDir;
         input.placeholder = '.coral-server/data'; input.autocomplete = 'off'; input.spellcheck = false; input.disabled = st.busy;
         input.setAttribute('aria-describedby', 'ssh-datadir-note');
-        const note = el('p', 'ssh-note', ''); note.id = 'ssh-datadir-note'; note.setAttribute('role', 'status');
+        const note = el('p', 'ssh-help', ''); note.id = 'ssh-datadir-note'; note.setAttribute('role', 'status');
         const show = () => {
             const d = cleanDataDir(st.dataDir), ok = dataDirOk(d);
             input.setAttribute('aria-invalid', ok ? 'false' : 'true');
+            note.classList.toggle('ssh-datadir-bad', !ok);
             const g = host.querySelector('[data-ssh-go]'); if (g && !st.busy) g.disabled = !ok || g.dataset.sshHold === '1'; // Set up is closed while the folder is not one Coral will use: it never falls back to the default without the person knowing
             note.textContent = !ok ? dataDirProblem(d) + ' Set up waits until this is fixed.'
                 : (d === '' || d === '.coral-server/data' ? 'The default: a new folder of its own, ~/.coral-server/data. Leave it empty for that.'
@@ -308,8 +309,8 @@ export function mountSshSetup(host, { mode = 'setup', server = null, action = nu
         };
         input.addEventListener('input', () => { st.dataDir = input.value; show(); });
         const mine = button('Use .coral (a Coral set up by hand)', '', () => { st.dataDir = '.coral'; input.value = '.coral'; show(); }, st.busy);
-        row.append(lab, input, mine);
-        box.append(row, note);
+        row.append(input, mine);
+        box.append(lab, row, note);
         root.append(box);
         show();
     }
