@@ -343,17 +343,17 @@ func TestTwoPublishesOfTheSameBytesAtOnceBothSucceedAndTheLimitMapsAreTrimmed(t 
 // The sign-in link census (#12261): a skill whose file holds a sign-in link (login_token=) is refused whoever publishes it, naming the file, and no byte is kept; a file without one is unaffected.
 func TestASkillThatHoldsASignInLinkIsRefusedNamingTheFile(t *testing.T) {
 	e := newSkillsEnv(t)
-	link := "http://127.0.0.1:8420/auth?login_token=abcdef0123456789"
+	link := "http://127.0.0.1:8420/auth?login_token=test-token-placeholder"
 	for name, files := range map[string]map[string]string{
 		"a reference file": {"SKILL.md": skillMD, "references/open.md": "open " + link},
 		"SKILL.md itself":  {"SKILL.md": skillMD + "\nsign in at " + link + "\n"},
-		"url-encoded":      {"SKILL.md": skillMD, "data/x.txt": "http://h/?login_token%3Dabcdef0123456789"},
+		"url-encoded":      {"SKILL.md": skillMD, "data/x.txt": "http://h/?login_token%3Dtest-token-placeholder"},
 	} {
 		e.freshHour()
 		code, out := e.call("POST", "/api/agent/skills", zipBody(t, files, false), "agent")
 		assert.Equal(t, 400, code, name)
 		assert.Equal(t, "sign_in_link", out["code"], name)
-		assert.NotContains(t, fmt.Sprint(out), "abcdef0123456789", name+": the reply never carries the link")
+		assert.NotContains(t, fmt.Sprint(out), "test-token-placeholder", name+": the reply never carries the link")
 		_, err := os.Stat(e.objectPath(files))
 		assert.True(t, os.IsNotExist(err), name+": no byte was kept")
 		code, out = e.call("POST", "/api/skills", zipBody(t, files, false), "operator")
