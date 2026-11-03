@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -17,7 +18,7 @@ import (
 	"time"
 
 	"github.com/subgentic/coral/internal/config"
-	"github.com/subgentic/coral/internal/startup/locktest"
+	"github.com/subgentic/coral/internal/executil"
 	"github.com/subgentic/coral/internal/tracking"
 )
 
@@ -73,6 +74,22 @@ func freePort(t *testing.T) int {
 	}
 	defer ln.Close()
 	return ln.Addr().(*net.TCPAddr).Port
+}
+
+// buildDevTray builds this program with the dev tag (the test sink is only in dev builds), with the platform's executable suffix.
+func buildDevTray(t *testing.T) (string, bool) {
+	t.Helper()
+	bin := filepath.Join(t.TempDir(), "coral-tray-test")
+	if runtime.GOOS == "windows" {
+		bin += ".exe"
+	}
+	cmd := exec.Command("go", "build", "-tags", "dev", "-o", bin, ".")
+	executil.HideWindow(cmd)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Logf("not built here: %v: %s", err, out)
+		return "", false
+	}
+	return bin, true
 }
 
 // startChild runs the tray's server child of bin on its own data folder, with the test sink and the given extra environment, and returns once it says it serves.
@@ -155,7 +172,7 @@ func TestTheTrayServerChildSendsTheServersEvents(t *testing.T) {
 	if testing.Short() {
 		t.Skip("builds and runs the program")
 	}
-	bin, ok := locktest.Build(t, ".")
+	bin, ok := buildDevTray(t)
 	if !ok {
 		t.Skip("coral-tray cannot be built here (it needs its platform libraries)")
 	}
