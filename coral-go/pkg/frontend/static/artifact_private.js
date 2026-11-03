@@ -11,7 +11,6 @@ export function privateBlock(hex, server, details) {
     const block = document.createElement('section');
     block.className = 'artifact-private';
     if (!HEX_RE.test(String(hex || ''))) return block;
-    const head = document.createElement('h3'); head.className = 'artifact-private-head'; head.textContent = 'Guides';
     const label = document.createElement('label'); label.className = 'artifact-private-field';
     const box = document.createElement('input'); box.type = 'checkbox'; box.disabled = true;
     const words = document.createElement('span');
@@ -20,7 +19,8 @@ export function privateBlock(hex, server, details) {
     words.append(title, document.createElement('br'), help);
     label.append(box, ' ', words);
     const say = document.createElement('p'); say.className = 'artifact-private-say'; say.setAttribute('role', 'status');
-    block.append(head, label, say);
+    label.title = help.textContent; // the help is the tooltip and the small line: the row stays one line
+    block.append(label, say);
     let loaded = false;
     const load = async () => {
         if (loaded) return;

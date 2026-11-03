@@ -74,13 +74,13 @@ const BUNDLE = { exists: true, team_name: TEAM, created_at: '2026-10-25T05:00:00
                 }
                 await shot(`artifact-details-closed-${w}`);
             });
-            await S.run(`${label}: Details opens and closes by keyboard (Enter, Space), shows the facts and "Who can read this", repeats nothing the header says, and stays open for the next artifact`, async () => {
+            await S.run(`${label}: Details opens and closes by keyboard (Enter, Space), shows the facts and "Who can read this", repeats nothing the header says, and the next artifact opens with it closed (#12725: it was remembered for the browser, and one open Details kept every header expanded)`, async () => {
                 await ev(`${toggle('#detail-pane')}.focus(); true`);
                 await key('Enter', 'Enter', 13, '\r'); await settle(200);
                 let s = await ev(`(() => { const t = ${toggle('#detail-pane')}, p = document.querySelector('#detail-pane .detail-details'); return { expanded: t.getAttribute('aria-expanded'), hidden: p.hidden, text: window.__na.text(p), focus: document.activeElement === t }; })()`);
                 assert.deepEqual([s.expanded, s.hidden, s.focus], ['true', false, true], 'Enter opens it and the focus stays on the button');
-                assert.ok(/MIME\s*text\/plain/.test(s.text) && /Task/.test(s.text) && /Producer\s*Worker A/.test(s.text), 'the facts: ' + s.text.slice(0, 200));
-                assert.ok(!/(^|\s)(Type|Size|Created)\s/.test(s.text.replace(/MIME/, '')), 'nothing repeats the header (type, size, time): ' + s.text.slice(0, 200));
+                assert.ok(/MIME:?\s*text\/plain/.test(s.text) && /Task/.test(s.text) && /Producer:?\s*Worker A/.test(s.text), 'the facts: ' + s.text.slice(0, 200));
+                assert.ok(!/(^|\s)(Type|Size|Created):?\s/.test(s.text.replace(/MIME/, '')), 'nothing repeats the header (type, size, time): ' + s.text.slice(0, 200));
                 await waitFor(`!!document.querySelector('#detail-pane .detail-details .artifact-readers')`, 'Who can read this inside Details', 8000);
                 assert.equal(await ev(`window.__na.text(document.querySelector('#detail-pane .detail-details')).includes('Who can read this')`), true, 'Who can read this is in the same panel');
                 assert.deepEqual(await ev(`(() => { const r = document.querySelector('#detail-pane .detail-details .artifact-readers'); return { tag: r.tagName, nested: r.querySelectorAll('details, summary').length, body: r.querySelector('.artifact-readers-body').textContent.length > 0 }; })()`), { tag: 'SECTION', nested: 0, body: true }, 'Who can read this is shown directly: its answer is there, no second disclosure inside the first (#7796)');
@@ -95,7 +95,7 @@ const BUNDLE = { exists: true, team_name: TEAM, created_at: '2026-10-25T05:00:00
                 await ev(`document.querySelector('#detail-pane .detail-close').click(); true`); await settle(200);
                 await ev(`[...window.__tp.table().querySelectorAll('button')].find(x => /^(?!Select).*Design review/.test(window.__na.name(x))).click(); true`);
                 await waitFor(`!!document.querySelector('#detail-pane .details-toggle:not([hidden])')`, 'the Details button again');
-                assert.equal(await ev(`${toggle('#detail-pane')}.getAttribute('aria-expanded')`), 'true', 'it stays open for the next one: remembered for the viewer');
+                assert.equal(await ev(`${toggle('#detail-pane')}.getAttribute('aria-expanded')`), 'false', 'the next one opens with it closed: Details is not remembered (#12725)');
                 await ev(`${toggle('#detail-pane')}.click(); true`); await settle(100);
                 await ev(`document.querySelector('#detail-pane .detail-close').click(); true`);
             });

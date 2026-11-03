@@ -131,9 +131,19 @@
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) { .preview-toolbar .ac-toggle:not([hidden]) { min-height: 44px; min-width: 44px; } } /* a touch target (the rule above is more specific than the phone's own) */
 
 /* "Who can read this" (artifact_readers.js): a small disclosure under the viewer's header and in an Artifacts row's details. */
-.artifact-viewer-from { flex: none; padding: 0 16px 6px; font-size: var(--fs-sm); color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+.artifact-viewer-from { flex: 1 1 0; min-width: 0; padding: 0; font-size: var(--fs-sm); color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; } /* who sent it and what they ask: in the header row after the name, one line, a tap shows all of it (#12725) */
+@media (max-width: 767px) { .artifact-viewer-header .artifact-viewer-from { flex: 1 1 100%; order: 9; } } /* a phone's row has no room beside the name: its own line under it, still part of the header */
 .artifact-viewer-from[hidden] { display: none; }
 .artifact-viewer-readers { flex: none; padding: 0 16px; }
+.artifact-viewer-readers.detail-details, .detail-pane .detail-details { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 4px 16px; padding-block: 8px; max-height: 25vh; } /* Details open, at most a quarter of the window and scrolling inside itself (the file keeps the rest): the chips on top, then who can read this and the Guides switch side by side where they fit, stacked tight where they do not (#12725) */
+.detail-details[hidden] { display: none; }
+.detail-details > .detail-chips, .detail-details > .detail-facts { flex: 1 1 100%; min-width: 0; max-width: 100%; margin: 0; } /* a long goal or task cuts inside the panel with an ellipsis (its whole words in the title), never a sideways scroll */
+.detail-details > .artifact-readers { flex: 1 1 11rem; min-width: 0; margin: 0; }
+.detail-details > .artifact-private { flex: 0 1 12.5rem; min-width: 0; padding-top: 0; }
+.detail-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 6px; } /* the goal and the task behind Details: chips in one wrapped row, each one line, the whole words in its title (#12725) */
+.detail-chip { display: inline-block; max-width: 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: top; }
+.detail-chip .detail-chip-link { padding: 0; min-height: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+@media (pointer: coarse) { .detail-chips > .artifact-viewer-goal { min-height: var(--control-touch-height, 44px); display: inline-flex; align-items: center; } } /* open, Details is at most a quarter of the window and scrolls inside itself: the file keeps the rest (#12725) */
 .artifact-viewer-readers[hidden] { display: none; }
 .artifact-readers { font-size: var(--fs-sm, 0.8125rem); margin: 8px 0 0; }
 .artifact-readers-head { margin: 0; font-size: var(--fs-sm, 0.8125rem); font-weight: var(--fw-strong); color: var(--text-secondary); } /* shown directly inside Details (#7796): a small heading, not a second disclosure */
@@ -177,7 +187,8 @@
 
 /* Details > Guides: the Private switch (#11457) */
 .artifact-private { display: grid; gap: 6px; padding-top: 10px; }
-.artifact-private-head { margin: 0; font-size: var(--fs-base); color: var(--text-muted); font-weight: var(--fw-medium); }
-.artifact-private-field { display: flex; gap: 10px; align-items: flex-start; min-height: 44px; }
-.artifact-private-help { color: var(--text-muted); font-size: var(--fs-base); }
+.artifact-private .artifact-private-field { display: flex; flex-direction: row; gap: 10px; align-items: flex-start; min-height: 44px; margin: 0; } /* a label is a block elsewhere in a dialog and put the tick above its words (#12725) */
+.artifact-private .artifact-private-field > input[type=checkbox] { width: auto; flex: none; margin: 3px 0 0; } /* the tick sits beside its words, not stretched over a line of its own by the dialog's input rule (#12725) */
+.artifact-private-title { font-size: var(--fs-sm, 0.8125rem); }
+.artifact-private-help { color: var(--text-muted); font-size: var(--fs-sm, 0.8125rem); }
 .artifact-private-say { margin: 0; color: var(--text-muted); font-size: var(--fs-base); }

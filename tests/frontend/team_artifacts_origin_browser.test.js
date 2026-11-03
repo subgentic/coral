@@ -97,18 +97,18 @@ const SHOTS = process.env.CORAL_SCREENSHOT_DIR;
         const sh = await sheetOf('Test report.txt');
         assert.ok(sh.actions.includes('Open') && sh.actions.includes('Download'), 'it opens: ' + sh.actions);
         const shText = sh.facts.join('|');
-        assert.doesNotMatch(shText, /Producer/); assert.match(shText, /DT:Sent to\|DD:homelab\/qa/); assert.match(shText, /DT:Sent by\|DD:Orchestrator/);
+        assert.doesNotMatch(shText, /Producer/); assert.match(shText, /SPAN:Sent to: homelab\/qa/); assert.match(shText, /SPAN:Sent by: Orchestrator/);
         assert.equal(await ev(`${rowOf('Their logs.txt')}.querySelector('.team-artifact-badge').textContent`), 'From homelab (ab12cd34)');
         const rc = await sheetOf('Their logs.txt');
         assert.ok(rc.actions.includes('Open'));
         const rcText = rc.facts.join('|');
         assert.doesNotMatch(rcText, /Producer/);
-        assert.match(rcText, /DT:Board \(claimed by the sender\)\|DD:platform/); assert.match(rcText, /DT:Checked\|DD:Not scanned/); assert.match(rcText, /DT:Sent by\|DD:Orchestrator \(platform\)/);
+        assert.match(rcText, /SPAN:Board \(claimed by the sender\): platform/); assert.match(rcText, /SPAN:Checked: Not scanned/); assert.match(rcText, /SPAN:Sent by: Orchestrator \(platform\)/);
         // A file received again from other Corals lists each later sender on a line of its own, worded as the first
         // source is, after the Board line (#4454 item 3).
-        const at = rc.facts.indexOf('DT:Also received from'), board = rc.facts.indexOf('DT:Board (claimed by the sender)');
+        const at = rc.facts.findIndex(f => f.startsWith('SPAN:Also received from')), board = rc.facts.findIndex(f => f.startsWith('SPAN:Board (claimed by the sender)'));
         assert.ok(at > 0 && at > board, 'Also received from comes after the Board line: ' + JSON.stringify(rc.facts));
-        assert.deepEqual(rc.facts.slice(at + 1, at + 2), ['DD:laptop (cd34ef56), board platform (claimed by the sender)\noffice-mac-studio (12ab34cd), board design-review-board (claimed by the sender)\ncloud-runner-17 (99aa88bb), board ops (claimed by the sender)']);
+        assert.equal(rc.facts[at], 'SPAN:Also received from: laptop (cd34ef56), board platform (claimed by the sender)\noffice-mac-studio (12ab34cd), board design-review-board (claimed by the sender)\ncloud-runner-17 (99aa88bb), board ops (claimed by the sender)');
 
         assert.equal(await ev(`${rowOf('Their logs (cited).txt')}.querySelector('.team-artifact-badge').textContent`), 'Received file', 'a task result citing a received file is labelled');
         assert.ok((await sheetOf('Their logs (cited).txt')).actions.includes('Open'), 'and still opens');

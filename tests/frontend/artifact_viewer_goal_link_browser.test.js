@@ -40,6 +40,9 @@ const id = n => n.toString(16).padStart(64, '0');
             await ev(`(${rowOf('With goal.md')}).querySelector('.dt-primary, .inbox-review-name').click(); true`);
             await waitFor(`!!document.querySelector('.artifact-viewer:not([hidden])')`, at + 'the viewer opens', 8000);
             await waitFor(`!!document.querySelector('.artifact-viewer-goal:not([hidden]) a, .artifact-viewer-goal:not([hidden]) button')`, at + 'the goal link is in the opened view', 5000);
+            assert.equal(await ev(`(() => { const b = document.querySelector('.artifact-viewer-goal'); return !b || b.getClientRects().length === 0; })()`), true, at + 'closed, the header is one line: the goal is behind Details (#12725)');
+            await ev(`document.querySelector('#artifact-viewer .details-toggle').click(); true`); // the goal is a chip behind Details (#12725)
+            await waitFor(`document.querySelector('.artifact-viewer-goal') && document.querySelector('.artifact-viewer-goal').getClientRects().length > 0`, at + 'Details shows the goal chip', 5000);
             const link = await ev(`(() => { const box = document.querySelector('.artifact-viewer-goal'), l = box.querySelector('a, button'); const r = l.getBoundingClientRect(); return { text: l.textContent.trim(), box: box.textContent.replace(/\\s+/g, ' ').trim(), w: Math.round(r.width), h: Math.round(r.height), inView: r.top >= 0 && r.bottom <= innerHeight }; })()`);
             assert.equal(link.text, 'Ship the pilot', at + 'the link is the goal\'s title: ' + JSON.stringify(link));
             assert.match(link.box, /^Goal\b/, at + 'the line names it a goal: ' + link.box);
