@@ -54,6 +54,10 @@ type teamArtifact struct {
 	Private bool `json:"private,omitempty"`
 	// ReviewQuestion: what the agent that uploaded this file asks the Operator to decide (#11555), cleaned and at most 140 characters: on a row tagged for review, when its upload said (agent text: show it as text).
 	ReviewQuestion string `json:"review_question,omitempty"`
+	// Kind and Muted (#12144, the Operator's choice of what reaches Needs you): the kind of a file for review (done, release, decided or digest; absent for a plain file) and whether the Operator's settings mute it (its
+	// kind is switched off or its team is not included): a muted file is in its folder and under the Muted line, and is not counted, badged or pushed. Only in the Operator's own read.
+	Kind  string `json:"kind,omitempty"`
+	Muted bool   `json:"muted,omitempty"`
 	// NewComments: how many replies agents have left in the Operator's comment threads on this file since the Operator last opened them (#12026): the file's row says "New comments" and counts as unread again. Absent for none; only the
 	// owner's own list has it.
 	NewComments int `json:"new_comments,omitempty"`
@@ -255,6 +259,7 @@ func (h *BoardHandler) projectArtifactItems(r *http.Request, project, sessionFil
 	h.linkUploadTasks(r.Context(), project, items)
 	h.attachArtifactTags(r.Context(), project, items)
 	h.attachNewComments(r, items)
+	h.attachArtifactKinds(r, project, items)
 	items = filterReadable(r, h.coralDir, items) // an agent's list holds only what the one read check lets it read, so the totals and the cursor count nothing else (#5577)
 	h.attachArtifactPrivate(r, items)
 	return items, scanTruncated, nil

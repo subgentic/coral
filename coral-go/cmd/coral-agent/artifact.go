@@ -20,13 +20,13 @@ import (
 	"github.com/subgentic/coral/internal/mediatype"
 )
 
-const artifactUsageText = `Usage: coral-agent artifact upload <file> [--name NAME] [--media-type TYPE] [--new-version-of <link>] [--task N | --no-task] [--tag WORD]... [--question TEXT]
+const artifactUsageText = `Usage: coral-agent artifact upload <file> [--name NAME] [--media-type TYPE] [--new-version-of <link>] [--task N | --no-task] [--tag WORD]... [--question TEXT] [--kind done|release|decided]
        coral-agent artifact download <coral://artifacts/digest> [--output FILE] [--force]
        coral-agent artifact reply <coral://artifacts/digest | coral://goals/team/number | coral://diffs/team/session/hash> <comment-id> <text | ->
        coral-agent artifact comments <coral://artifacts/digest | coral://goals/team/number | coral://diffs/team/session/hash>
 Run coral-agent artifact upload --help, artifact download --help, artifact reply --help or artifact comments --help for one of them.`
 
-const artifactUploadUsageText = `Usage: coral-agent artifact upload <file> [--name NAME] [--media-type TYPE] [--new-version-of <link>] [--task N | --no-task] [--tag WORD]... [--question TEXT]
+const artifactUploadUsageText = `Usage: coral-agent artifact upload <file> [--name NAME] [--media-type TYPE] [--new-version-of <link>] [--task N | --no-task] [--tag WORD]... [--question TEXT] [--kind done|release|decided]
 
 An upload is linked to the task you have in progress (the reply says task_id, and this prints
 "Linked to task #N"); the task's page and the team's Artifacts tab then list it. --task N links it to
@@ -47,6 +47,11 @@ scratch files "internal"; a file for other agents or for yourself (logs, patches
 --question "Approve this phone layout for the Goals list?"). Needs you shows it above the file; without one the tag is refused and
 nothing is stored. Test screenshots, logs and walk evidence are not for review: upload them without the tag and link them in your post.
 The tag is also refused for a file Needs you cannot show inline (it shows Markdown, HTML, an image, a PDF, a CSV or TSV table and other text).
+
+--kind says what a file for review is, so the Operator can choose what reaches Needs you; no --kind is a plain file, which cannot be muted. Coral checks the fact for a kind, not your word:
+done needs --task N of an OPERATOR task assigned to you (the file that says it is finished); release needs --task N of the task titled exactly Release vX.Y.Z assigned to you;
+decided is accepted only from the team's Orchestrator; a digest is written only by Coral. Anything else is refused in words. The kind belongs to the file's series: a new version
+carries the same kind (or none, and then has it), never another. A question you need answered is never a kind: ask it with coral-board post --ask or wait --operator.
 
 Upload long reports, logs, diffs and evidence instead of pasting them into posts.
 Link the returned coral://artifacts/<digest> in a short board post: a one-line
@@ -122,7 +127,7 @@ func cmdArtifact(args []string) {
 		fmt.Fprintln(os.Stderr, artifactUsageText)
 		clierr.Exit1()
 	}
-	opts, err := splitOptions(args[1:], []string{"name", "media-type", "new-version-of", "task", "tag", "question"}, []string{"no-task"})
+	opts, err := splitOptions(args[1:], []string{"name", "media-type", "new-version-of", "task", "tag", "question", "kind"}, []string{"no-task"})
 	if err != nil || len(opts.Positional) != 1 {
 		if err == nil {
 			err = fmt.Errorf("upload needs exactly one file")
@@ -151,7 +156,7 @@ func cmdArtifact(args []string) {
 	}
 	name = mediatype.EnsureExtension(name, file)
 	mediaType := mediatype.Resolve(opts.Values["media-type"], file, name)
-	if err := uploadArtifactTags(serverURL, file, name, mediaType, resolveSessionID(), opts.Values["new-version-of"], task, opts.All["tag"], opts.Values["question"], os.Stdout, os.Stderr); err != nil {
+	if err := uploadArtifactKind(serverURL, file, name, mediaType, resolveSessionID(), opts.Values["new-version-of"], task, opts.All["tag"], opts.Values["question"], opts.Values["kind"], os.Stdout, os.Stderr); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		clierr.Exit1()
 	}
@@ -167,6 +172,11 @@ func uploadArtifact(serverURL, file, name, mediaType, sid, newVersionOf, task st
 
 // uploadArtifactTags is uploadArtifact with the tags asked for the file (#8583), each sent as a tag parameter.
 func uploadArtifactTags(serverURL, file, name, mediaType, sid, newVersionOf, task string, tags []string, question string, stdout, stderr io.Writer) error {
+	return uploadArtifactKind(serverURL, file, name, mediaType, sid, newVersionOf, task, tags, question, "", stdout, stderr)
+}
+
+// uploadArtifactKind is uploadArtifactTags with the kind of a file for review (#12144), sent as the kind parameter; the server checks the fact for it.
+func uploadArtifactKind(serverURL, file, name, mediaType, sid, newVersionOf, task string, tags []string, question, kind string, stdout, stderr io.Writer) error {
 	if err := refuseSignInLinkIn("an artifact name, tag or question", append([]string{name, question}, tags...)...); err != nil {
 		return err
 	}
@@ -177,7 +187,7 @@ func uploadArtifactTags(serverURL, file, name, mediaType, sid, newVersionOf, tas
 		return err
 	}
 	defer f.Close()
-	req, err := http.NewRequest(http.MethodPost, serverURL+"/api/agent/artifacts?session_id="+url.QueryEscape(sid)+tagQuery(tags)+questionQuery(question), f)
+	req, err := http.NewRequest(http.MethodPost, serverURL+"/api/agent/artifacts?session_id="+url.QueryEscape(sid)+tagQuery(tags)+questionQuery(question)+kindQuery(kind), f)
 	if err != nil {
 		return err
 	}
@@ -328,6 +338,14 @@ func questionQuery(q string) string {
 		return ""
 	}
 	return "&question=" + url.QueryEscape(q)
+}
+
+// kindQuery is the kind parameter of an upload for review (#12144): "&kind=<word>", or nothing.
+func kindQuery(k string) string {
+	if strings.TrimSpace(k) == "" {
+		return ""
+	}
+	return "&kind=" + url.QueryEscape(strings.TrimSpace(k))
 }
 
 // tagQuery is the tag parameters of an upload: "&tag=<word>" for each.

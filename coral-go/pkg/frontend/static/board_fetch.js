@@ -33,6 +33,28 @@ export async function fetchProjects() {
     return [...local, ...lists.flat()];
 }
 
+/** fetchProjects for a choice that is saved over the whole list (#12144): every source that contributes (this computer's own boards, and each online computer it manages, in a hub or in the cloud) is checked, and one
+ *  that cannot be read is an ERROR, not an empty list. fetchProjects turns a refusal into no teams, which is right for drawing a list and wrong for rewriting a saved choice from it. */
+export async function fetchProjectsChecked() {
+    const out = [];
+    if (!isCloud()) {
+        const resp = await serverFetch('local', '/api/board/projects'); // this computer's own boards
+        const data = resp.ok ? await resp.json() : null;
+        if (!Array.isArray(data)) throw new Error('this computer\'s boards could not be read');
+        noteBoardLabels(data, 'project');
+        out.push(...data);
+    }
+    const remotes = !state.hub ? [] : (state.servers || []).filter(s => s.id !== 'local' && s.status === 'online');
+    for (const srv of remotes) {
+        const r = await serverFetch(srv.id, '/api/board/projects');
+        const rows = r.ok ? await r.json() : null;
+        if (!Array.isArray(rows)) throw new Error('the boards of another computer could not be read');
+        noteBoardLabels(rows, 'project', srv.id);
+        out.push(...rows.map(p => ({ ...p, project: identityKey(srv.id, p.project), server: srv.id })));
+    }
+    return out;
+}
+
 // page is {before_id} or {after_id} (none: the latest page). A reply reports
 // before_count, the messages older than the page.
 export async function fetchMessages(project, limit = PAGE_SIZE, page = {}) {

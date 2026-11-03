@@ -130,6 +130,10 @@ func (h *SystemHandler) putSettingsBefore4599(w http.ResponseWriter, r *http.Req
 		errBadRequest(w, err.Error())
 		return
 	}
+	if err := validateInboxSettings(body); err != nil {
+		errBadRequest(w, err.Error())
+		return
+	}
 	// agent_priority is "low" or "normal" (#3437); anything else was stored and silently
 	// taken as low (#3470). Checked before anything is saved; the stored value is normalised.
 	if v, ok := body[agentprio.SettingKey]; ok {

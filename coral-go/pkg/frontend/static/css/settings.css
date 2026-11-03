@@ -39,3 +39,10 @@
 /* round 2 (UI/UX's #7405 notes) */
 [data-quiet-focus] :focus-visible { outline: 0 !important; box-shadow: none !important; } /* a dialog opened by a pointer: no ring on what the script focused (quiet_focus.js; the ring comes with the first key) */
 #settings-modal .settings-pane-title { margin-bottom: 8px; }
+
+/* Settings > Inbox, the included teams (#12783): each box and its name on one row, the whole row the target (44 px on a phone). The pane's own block labels (components.css) would stack the box over its name, so these are as specific. */
+#settings-modal .settings-pane .settings-inbox-teams { display: flex; flex-direction: column; gap: 2px; margin: 4px 0 8px; }
+#settings-modal .settings-pane .settings-inbox-team { display: flex; flex-direction: row; align-items: center; gap: 10px; min-height: 36px; margin: 0; padding: 2px 0; cursor: pointer; }
+#settings-modal .settings-pane .settings-inbox-team input[type="checkbox"] { flex: 0 0 auto; width: 18px; height: 18px; margin: 0; }
+#settings-modal .settings-pane #settings-inbox-muted .btn, #settings-modal .settings-pane .settings-inbox-teams-failed .btn, #settings-modal .settings-pane .settings-inbox-every { margin: 0 0 0 4px; } /* a small button beside its sentence, not indented by the sidebars' margin */
+@media (max-width: 700px) { #settings-modal .settings-pane .settings-inbox-team { min-height: 44px; } }

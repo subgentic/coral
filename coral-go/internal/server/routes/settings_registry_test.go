@@ -47,6 +47,11 @@ var settingRows = map[string]struct{ good, bad string }{
 	"auto_summarize":              {`"1"`, `"nope"`},
 	"nudge_claude_artifacts":      {`"off"`, `"nope"`},
 	"launch_in_worktree":          {`"off"`, `"nope"`},
+	"inbox_kind_file":             {`"off"`, `"nope"`},
+	"inbox_kind_done":             {`"off"`, `"nope"`},
+	"inbox_kind_release":          {`"off"`, `"nope"`},
+	"inbox_kind_decided":          {`"off"`, `"nope"`},
+	"inbox_kind_digest":           {`"off"`, `"nope"`},
 	"refuse_pattern_kill":         {`"off"`, `"nope"`},
 	"update_auto_install":         {`"off"`, `"nope"`},
 	"turn_end_handoff":            {`"off"`, `"later"`},
@@ -86,7 +91,7 @@ var settingRows = map[string]struct{ good, bad string }{
 var validatedElsewhere = []string{"agent_priority", "auto_goals", "auto_resume_after_api_error", "auto_wake_after_restart", "auto_wake_cap", "auto_sleep", "auto_sleep_idle_minutes",
 	"require_auth_on_loopback", "artifact_store_max_bytes", "artifact_retention_days", "artifact_retention_kinds",
 	"received_artifacts_max_bytes", "received_cap_notice_ack",
-	"hub_limit_global", "hub_limit_long", "hub_limit_search"}
+	"hub_limit_global", "hub_limit_long", "hub_limit_search", "inbox_included_teams", "inbox_digest_time"}
 
 // #4432 (Security's #4431 SHOULD 3, INFO 2 and 3): every key PUT /api/settings knows has a row here, a value it
 // accepts is stored, one it refuses is a 400 that saves nothing of the request; unknown keys, keys in another case,

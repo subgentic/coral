@@ -40,6 +40,7 @@ type BoardHandler struct {
 	goalLinks goalLinksLimiter
 	// artifactNudge reminds an agent whose own post links a claude.ai artifact (#6583); nil: never.
 	artifactNudge                 *ClaudeArtifactNudger
+	inboxSettings                 func(ctx context.Context) (map[string]string, error) // the settings the Needs you switches read (#12144); nil: every kind on, every team included
 	bs                            *board.Store
 	terminal                      ptymanager.SessionTerminal
 	mu                            sync.RWMutex

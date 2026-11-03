@@ -8,6 +8,7 @@ import { settingBool, changedSettings, defaultThemeChoice } from './settings_cor
 const { databaseEncryptionChanged } = await importOnce('./settings_machine.js'); // lazy like this file: a lazy module is loaded through importOnce (import_hygiene)
 const { retentionSettings, receivedMaxSetting, artifactStoreMaxSetting } = await importOnce('./settings_storage.js'); // lazy like this file: a lazy module is loaded through importOnce (import_hygiene)
 const { dropUnfilledCLIPaths, editedCLIPathKeys } = await importOnce('./settings_fill.js'); // lazy like settings_dialog.js: a lazy module is loaded through importOnce (import_hygiene)
+const { readInboxSettings } = await importOnce('./settings_inbox.js'); // what reaches Needs you (#12144): lazy the same way
 const { settingsAtOpen, formAtOpen, payloadAtOpen } = await importOnce('./settings_snapshots.js'); // lazy like settings_dialog.js: a lazy module is loaded through importOnce (import_hygiene)
 
 /** The "Unsaved changes" note in Settings' footer (UI audit #5589, finding 27): shown while the form differs from what it held when it finished opening (or was last saved), or a database encryption or terminal backend or wake choice is pending. The baseline is the form's own payload, not the saved settings: a new install has no saved settings, so everything would differ. Changes to the custom models and the update switches are saved too but are not counted here. */
@@ -121,6 +122,7 @@ export function readSettingsForm() {
         telemetry_enabled: telemetryEnabled,
         board_auto_attach: boardAutoAttach,
         launch_in_worktree: launchInWorktree,
+        ...readInboxSettings(state.settings),
         nudge_claude_artifacts: nudgeClaudeArtifacts,
         board_health_monitor: boardHealthMonitor,
         auto_resume_after_api_error: autoResume,

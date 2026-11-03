@@ -229,22 +229,69 @@ func (h *SessionsHandler) uploadAgentArtifact(w http.ResponseWriter, r *http.Req
 		reviewQuestion = q
 	}
 
+	// The kind of a file for review (#12144): checked against the task rows and the roster before a byte is stored; no --kind is a plain file.
+	kind, kindRefused := h.uploadKindFor(r.Context(), r, taskID, hasTag(board.CleanArtifactTags(r.URL.Query()["tag"]), tagForReview))
+	if kindRefused != "" {
+		writeError(w, http.StatusBadRequest, "kind_refused", kindRefused)
+		return
+	}
+
 	// A new version of an artifact (#6357): worked out under the series lock, which is held until the object, its record and the index are written (the series lock first, the digest's after).
 	var plan *seriesPlan
 	var stamp *seriesStamp
-	if ref := strings.TrimSpace(r.Header.Get(seriesHeader)); ref != "" {
+	ref := strings.TrimSpace(r.Header.Get(seriesHeader))
+	var chainRoot int64 // the root of this upload's task chain, when it is for review (#12144)
+	autoChain := false  // the version was joined by the server, not asked for: anything that stops the join starts a new series instead of refusing the upload
+	chainBoard, _, _ := uploaderOf(sid)
+	if forReviewUpload := hasTag(board.CleanArtifactTags(r.URL.Query()["tag"]), tagForReview); forReviewUpload && taskID > 0 && h.bs != nil && chainBoard != "" {
+		chainRoot = h.bs.RootTask(r.Context(), chainBoard, taskID)
+		if ref == "" { // one file per task chain: the chain's file that is still open for review gets this one as its next version, with no --new-version-of from the agent
+			if prev := h.bs.ChainFile(r.Context(), chainBoard, chainRoot); prev != "" && h.chainFileOpen(r.Context(), chainBoard, prev) {
+				ref, autoChain = "coral://artifacts/"+prev, true
+			}
+		}
+	}
+	if ref != "" {
 		callerBoard, _, _ := uploaderOf(sid)
 		var perr error
-		if plan, perr = planNewVersion(coralDir, ref, callerBoard, hexID); perr != nil {
+		plan, perr = planNewVersion(coralDir, ref, callerBoard, hexID)
+		switch {
+		case perr != nil && autoChain:
+			plan = nil // the chain's file cannot take it (another team's, an older bytes match, ...): a new series, never a refused upload
+		case perr != nil:
 			h.answerSeriesRefusal(w, coralDir, hexID, perr)
 			return
+		case h.bs != nil: // the kind belongs to the series (#12144): a version carries the series' kind or none, never a new one
+			seriesKind := ""
+			if kinds, kerr := h.bs.ArtifactKindsOf(r.Context(), callerBoard); kerr == nil {
+				for _, m := range plan.rows {
+					if k := kinds[m.Digest]; m.Board == callerBoard && k != "" {
+						seriesKind = k
+						break
+					}
+				}
+			}
+			k2, refusedKind := seriesKindFor(seriesKind, kind)
+			switch {
+			case refusedKind == "":
+				kind = k2
+			case autoChain:
+				plan.unlock()
+				plan = nil // the chain's file is another kind: this one is its own series
+			default:
+				plan.unlock()
+				writeError(w, http.StatusBadRequest, "kind_refused", refusedKind)
+				return
+			}
 		}
-		defer plan.unlock()
-		if plan.same != nil { // the bytes are the newest version: nothing is added, and that version is the answer (exit 0)
-			h.answerExistingVersion(w, coralDir, plan, *plan.same)
-			return
+		if plan != nil {
+			defer plan.unlock()
+			if plan.same != nil { // the bytes are the newest version: nothing is added, and that version is the answer (exit 0)
+				h.answerExistingVersion(w, coralDir, plan, *plan.same)
+				return
+			}
+			stamp = &plan.stamp
 		}
-		stamp = &plan.stamp
 	}
 	meta, fresh, err := storeArtifactFile(coralDir, sid, name, mediaType, tmpPath, hexID, size, stamp, taskID)
 	if errors.Is(err, errStoreFull) {
@@ -259,12 +306,41 @@ func (h *SessionsHandler) uploadAgentArtifact(w http.ResponseWriter, r *http.Req
 	}
 	_ = fresh
 	h.noteOffBooksUpload(r.Context(), taskID, hexID) // an agent with no task in progress: a line of the orchestrator's check (#7793)
+	// The kind is written only for a file that is NEW on this team's list (#12144, Security's MUST): the same bytes another agent already put there keep what they are, so an agent cannot quiet someone
+	// else's plain file for review by uploading the identical bytes with --kind. The asked kind is then ignored, and the reply says so.
+	kindIgnored := false
+	if kind != "" && h.bs != nil {
+		if teamBoard, _, _ := uploaderOf(sid); teamBoard != "" {
+			onList := false
+			if pre, perr := h.bs.ArtifactTags(r.Context(), teamBoard); perr != nil || len(pre[hexID]) > 0 {
+				onList = true // already tagged on this board, or not readable: never written on a guess
+			}
+			if k, kerr := h.bs.ArtifactKind(r.Context(), teamBoard, hexID); kerr != nil || k != board.KindFile {
+				onList = true
+			}
+			if onList {
+				kind, kindIgnored = "", true
+			}
+		}
+	}
 	var tags []string
 	if asked := board.CleanArtifactTags(r.URL.Query()["tag"]); len(asked) > 0 { // --tag (#8583): the team's tags of this object, added to what it already has
 		if teamBoard, _, _ := uploaderOf(sid); teamBoard != "" && h.bs != nil {
 			var terr error
 			if tags, terr = h.bs.AddArtifactTags(r.Context(), teamBoard, hexID, asked); terr != nil {
 				slog.Warn("[artifacts] the tags of an upload were not recorded", "digest", hexID, "error", terr)
+			}
+		}
+	}
+	if chainRoot > 0 && h.bs != nil && hasTag(tags, tagForReview) { // the chain's latest file for review: the next upload for the chain becomes its next version while it is still open
+		if err := h.bs.SetChainFile(r.Context(), chainBoard, chainRoot, hexID, time.Now()); err != nil {
+			slog.Warn("[artifacts] the task chain's file was not recorded", "digest", hexID, "error", err)
+		}
+	}
+	if kind != "" && h.bs != nil { // the checked kind of this file, written once (the same bytes uploaded again cannot change it)
+		if teamBoard, _, _ := uploaderOf(sid); teamBoard != "" {
+			if _, kerr := h.bs.SetArtifactKind(r.Context(), teamBoard, hexID, kind, sid, time.Now()); kerr != nil {
+				slog.Warn("[artifacts] the kind of an upload for review was not recorded", "digest", hexID, "error", kerr)
 			}
 		}
 	}
@@ -317,6 +393,12 @@ func (h *SessionsHandler) uploadAgentArtifact(w http.ResponseWriter, r *http.Req
 	}
 	if len(tags) > 0 {
 		reply["tags"] = tags
+	}
+	if kind != "" {
+		reply["kind"] = kind
+	}
+	if kindIgnored {
+		reply["kind_ignored"] = "this file is already on the team's list: it keeps what it is"
 	}
 	if plan == nil {
 		// Bytes that are already a version of their own board's series say so (#6495): a script that uploaded v1 again needs not read the series back. Only the uploading board's own series

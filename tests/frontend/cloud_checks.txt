@@ -304,3 +304,4 @@ node inbox_artifacts_loading.test.mjs
 node files_refresh_403_other_agent.test.mjs
 node skill_filter.test.mjs
 node goal_guide.test.mjs
+node inbox_teams_checked.test.mjs

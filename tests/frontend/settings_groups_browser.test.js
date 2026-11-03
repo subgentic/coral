@@ -1,5 +1,5 @@
 // Settings is a wide dialog with its groups down the left, one pane at a time, and every explanation behind an (i) button (#4566).
-// Checks: the 9 groups and where each control lives, the tab list's roles and arrow keys, the last group remembered, an (i) button
+// Checks: the 10 groups and where each control lives, the tab list's roles and arrow keys, the last group remembered, an (i) button
 // that opens its text in place (aria-expanded, named, hidden by default), and the narrow layout (a selector instead of the list, rows
 // stacked, 44 px targets) on a phone and at 200% text with a mouse. Drives Chrome over CDP through agent_view_harness.js against an
 // isolated dev server; run_cdp_suites.mjs finds it by name.
@@ -40,7 +40,7 @@ const GROUPS = {
         assert.deepEqual(await shownGroup(), ['cleanup'], 'the group asked for is the one shown');
         await waitFor(`document.activeElement && document.activeElement.id === 'settings-tab-cleanup'`, "focus on the open group's tab, not the first tab");
         const tabs = await ev(`[...document.querySelectorAll('#settings-tabs [role=tab]')].map(t => ({ id: t.id, name: t.querySelector('.settings-tab-name').textContent.trim(), sel: t.getAttribute('aria-selected'), ctl: t.getAttribute('aria-controls'), ti: t.tabIndex }))`);
-        assert.deepEqual(tabs.map(t => t.name), ['General', 'Agents', 'Terminal', 'Notifications', 'Files and Git', 'Storage and cleanup', 'Network and Hub', 'Chief', 'Security and privacy']);
+        assert.deepEqual(tabs.map(t => t.name), ['General', 'Agents', 'Terminal', 'Notifications', 'Inbox', 'Files and Git', 'Storage and cleanup', 'Network and Hub', 'Chief', 'Security and privacy']);
         assert.deepEqual(tabs.filter(t => t.sel === 'true').map(t => t.id), ['settings-tab-cleanup'], 'one tab selected');
         assert.deepEqual(tabs.filter(t => t.ti === 0).map(t => t.id), ['settings-tab-cleanup'], 'only the selected tab is in the Tab order');
         for (const [g, ids] of Object.entries(GROUPS)) {
@@ -48,8 +48,8 @@ const GROUPS = {
             assert.deepEqual(where, ids.map(() => g), `${g}: every control sits in its pane ${JSON.stringify(where)}`);
         }
         const names = await ev(`[...document.querySelectorAll('#settings-modal .settings-pane')].map(p => document.getElementById(p.getAttribute('aria-labelledby')) ? p.dataset.group : 'unlabelled:' + p.dataset.group)`);
-        assert.equal(names.length, 9); assert.ok(names.every(n => !n.startsWith('unlabelled')), 'each pane is named by its tab: ' + names);
-        console.log('   ✓ 9 groups, controls where they belong');
+        assert.equal(names.length, 10); assert.ok(names.every(n => !n.startsWith('unlabelled')), 'each pane is named by its tab: ' + names);
+        console.log('   ✓ 10 groups, controls where they belong');
 
         console.log('2. The tab list: click, arrow keys, Home and End; the last group is remembered');
         await ev(`document.getElementById('settings-tab-terminal').click(); true`);

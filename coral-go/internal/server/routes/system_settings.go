@@ -87,6 +87,7 @@ func (h *SystemHandler) PutSettings(w http.ResponseWriter, r *http.Request) {
 		validateAutoWakeSettings,  // the auto-wake setting and cap (#3636): a boolean, and a whole number from 1 to 50
 		validateAutoSleepSettings, // the auto-sleep switch and its idle minutes (#12111): a boolean, and a whole number from 15 to 1440
 		validateAutoResumeSetting, // resume agents stopped by an API error (#3613): a boolean
+		validateInboxSettings,     // what reaches Needs you (#12144): the kind switches, the included teams and the time of the daily items
 	} {
 		if err := check(body); err != nil {
 			errBadRequest(w, err.Error())

@@ -35,7 +35,7 @@ var needsYouKindToInbox = map[string]string{
 
 // InboxOpenedCounts is what is waiting for the person who opened the Inbox, by kind, as the server sees it (needs-you): counts only.
 func (h *BoardHandler) InboxOpenedCounts(r *http.Request) map[string]int {
-	items, _, err := h.needsYouItems(r)
+	items, _, _, err := h.needsYouItems(r)
 	if err != nil {
 		return nil
 	}
