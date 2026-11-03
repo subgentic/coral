@@ -11,15 +11,24 @@ import (
 
 	"github.com/subgentic/coral/internal/background"
 	"github.com/subgentic/coral/internal/ptymanager"
+	"github.com/subgentic/coral/internal/store"
 )
+
+// lostAgent is an agent the reconciler put to sleep because its terminal was gone.
+func (r *exitRig) lostAgent(n int, title string) string {
+	r.t.Helper()
+	id := r.agent(n, title, "")
+	require.NoError(r.t, r.ss.SetSessionSleepingFor(context.Background(), id, store.SleepReasonTerminalGone))
+	return id
+}
 
 func lostAt() time.Time { return time.Date(2026, 11, 2, 18, 23, 30, 0, time.Local) }
 
 func TestALostTerminalServerIsToldAndItsAgentsAreWokenOneByOne(t *testing.T) {
 	r := newExitRig(t)
 	ctx := context.Background()
-	a := r.agent(1, "Backend Dev", "")
-	b := r.agent(2, "QA Engineer", "")
+	a := r.lostAgent(1, "Backend Dev")
+	b := r.lostAgent(2, "QA Engineer")
 
 	r.h.ServerLost(ctx, background.ServerLoss{At: lostAt(), PID: 4242, SessionIDs: []string{a, b}})
 
@@ -45,27 +54,51 @@ func TestALostTerminalServerIsToldAndItsAgentsAreWokenOneByOne(t *testing.T) {
 	}
 }
 
-func TestALostTerminalServerWakesNobodyForACoralThatDoesNotOwnTheFolder(t *testing.T) {
+func TestALostServerLeavesAloneAnAgentThatSleepsForAnotherReasonOrWokeMeanwhile(t *testing.T) {
+	r := newExitRig(t)
+	ctx := context.Background()
+	gone := r.lostAgent(1, "Backend Dev")
+	parked := r.agent(2, "QA Engineer", "") // asleep, but not because of the terminal
+	require.NoError(t, r.ss.SetSessionSleepingFor(ctx, parked, store.SleepReasonCoralStopped))
+	woken := r.lostAgent(3, "Lead Developer")
+	require.NoError(t, r.ss.SetSessionSleeping(ctx, woken, false)) // a person woke it after the report
+
+	r.h.ServerLost(ctx, background.ServerLoss{At: lostAt(), PID: 7, SessionIDs: []string{gone, parked, woken}})
+
+	notes := r.dashboard()
+	require.Len(t, notes, 1)
+	assert.Contains(t, notes[0].Message, "1 agent lost its terminal", "only the agent that is asleep because of the lost terminal is counted")
+	assert.NotContains(t, strings.Join(r.notices(), "\n"), "QA Engineer")
+	timers := r.takeTimers()
+	require.Len(t, timers, 1)
+
+	// Its sleep reason changes before its turn comes: the wake does nothing.
+	require.NoError(t, r.ss.SetSessionSleepingFor(ctx, gone, store.SleepReasonCoralStopped))
+	timers[0].f()
+	sleeping, _ := r.asleep(gone)
+	assert.True(t, sleeping, "a stale timer wakes only an agent still asleep because of the lost terminal")
+}
+
+func TestALostServerWakesAgentsWhetherOrNotThisCoralOwnsTheFolder(t *testing.T) {
 	r := newExitRig(t)
 	ptymanager.SetForeign(true)
 	t.Cleanup(func() { ptymanager.SetForeign(false) })
-	a := r.agent(1, "Backend Dev", "")
+	a := r.lostAgent(1, "Backend Dev")
 
 	r.h.ServerLost(context.Background(), background.ServerLoss{At: lostAt(), PID: 7, SessionIDs: []string{a}})
 
-	assert.Empty(t, r.takeTimers(), "a Coral on a copy of another's folder must not start terminals")
-	notes := r.dashboard()
-	require.Len(t, notes, 1)
-	assert.Contains(t, notes[0].Message, "does not own this data folder")
-	assert.Contains(t, notes[0].Message, "1 agent lost its terminal")
+	timers := r.takeTimers()
+	require.Len(t, timers, 1, "the Operator's rule: only the loop guard is a reason not to wake")
+	timers[0].f()
 	sleeping, _ := r.asleep(a)
-	assert.True(t, sleeping)
+	assert.False(t, sleeping)
+	assert.NotContains(t, r.dashboard()[0].Message, "own this data folder")
 }
 
 func TestAServerThatKeepsDyingIsNotRestartedIntoALoop(t *testing.T) {
 	r := newExitRig(t)
 	ctx := context.Background()
-	a := r.agent(1, "Backend Dev", "")
+	a := r.lostAgent(1, "Backend Dev")
 	loss := background.ServerLoss{At: lostAt(), PID: 7, SessionIDs: []string{a}}
 
 	r.h.ServerLost(ctx, loss)
