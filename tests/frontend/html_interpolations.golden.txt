@@ -312,11 +312,11 @@
 1	registered_server_view.js	warningHtml(s)
 1	render.js	LAUNCH_CARDS.map(phoneCard).join('\n')
 1	render.js	PHONE_CARD_ACTION[c.key]
-1	render.js	c.desc
 1	render.js	c.icon
+1	render.js	c.key === 'goal' ? goalDesc() : c.desc
 1	render.js	c.label
 1	render.js	emptyListHtml(unfilteredCount)
-1	render.js	unfilteredCount ? '' : PHONE_WELCOME
+1	render.js	unfilteredCount ? '' : phoneWelcome()
 1	sandbox_frame.js	DOC_CSP
 1	sandbox_frame.js	content
 2	saved_marks.js	BOOKMARK_SVG
