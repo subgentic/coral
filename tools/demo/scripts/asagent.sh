@@ -1,6 +1,6 @@
 #!/bin/bash
-# Run a CLI as one of the demo's mock agents (Orchestrator, Developer or Reviewer), against the demo Coral only.
-# usage: DEMO_ROOT=... asagent.sh Developer coral-board post "..."
+# Run a CLI as one of the demo's mock agents (a name from story.json), against the demo Coral only.
+# usage: DEMO_ROOT=... asagent.sh Backend coral-board post "..."
 source "$(dirname "${BASH_SOURCE[0]}")/env.sh"
 NAME="$1"; shift
 SID=$(python3 -I -c "import json,sys;d=json.load(open(sys.argv[1]));print(next(a['session_id'] for a in d['agents'] if a['name']==sys.argv[2]))" "$S/work/launch.json" "$NAME") || exit 1

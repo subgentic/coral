@@ -1,0 +1,14 @@
+package forecast
+
+import "math"
+
+// FeelsLike returns the wind-chill temperature in degrees Celsius: the air
+// temperature adjusted for wind, when it is cold (10 C or below) and windy (over 4.8 km/h).
+func FeelsLike(tempC, windKmh float64) float64 {
+	if tempC > 10 || windKmh <= 4.8 {
+		return tempC
+	}
+	v := math.Pow(windKmh, 0.16)
+	chill := 13.12 + 0.6215*tempC - 11.37*v + 0.3965*tempC*v
+	return math.Round(chill*10) / 10
+}

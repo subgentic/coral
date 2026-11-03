@@ -1,8 +1,8 @@
 # Coral demo film: sources and how to rebuild it
 
-The demo film (a team launches, a goal is created, a document is reviewed from the Inbox, an agent's diff, the phone) is recorded **headless from a real, throwaway Coral**, driven by scripts, then encoded with ffmpeg. Everything needed to re-record or change it is here. The videos themselves are not in git (only the small GIF, in `assets/demo/`).
+The demo film (a team of five agents launches on a small weather dashboard called Skyline, a goal is created, a busy Inbox, a document is reviewed and answered, an agent's diff, the phone) is recorded **headless from a real, throwaway Coral**, driven by scripts, then encoded with ffmpeg. Everything needed to re-record or change it is here. The videos themselves are not in git (only the small GIF, in `assets/demo/`).
 
-**It is staged, and says so.** The agents are scripted mock agents (`coral-go/cmd/mock-agent`) named Orchestrator, Developer and Reviewer; the board posts, review documents, the agent's reply and its new version are sent by script with Coral's own commands; the diff is a real uncommitted change in a throwaway Go repo; the cost figures are the mock agents' sample usage. Slow waits are sped up in the encode. Do not present it as a recording of real vendor agents.
+**It is staged, and says so.** The agents are scripted mock agents (`coral-go/cmd/mock-agent`) named in story.json (Orchestrator, Backend, Frontend, Designer, Reviewer); the board posts, review documents, the agent's reply and its new version are sent by script with Coral's own commands; the diff is a real uncommitted change in a throwaway Go repo; the cost figures are the mock agents' sample usage. Slow waits are sped up in the encode. Do not present it as a recording of real vendor agents.
 
 ## What is where
 
@@ -13,15 +13,17 @@ tools/demo/
     env.sh              DEMO_ROOT and port, sourced by the others
     rig-up.sh           start a fresh isolated demo Coral, make the throwaway repo, sign in headless
     denv.sh             run a command against the demo Coral only (clean env, own HOME and data)
-    asagent.sh          run a CLI as one of the mock agents (Orchestrator, Developer, Reviewer)
+    asagent.sh          run a CLI as one of the mock agents (the names in story.json)
     login.mjs           one-time-link sign-in, saves work/state.json
     lib.mjs             Playwright helpers: one recorded context per beat, caption band, visible cursor
-    take.mjs            the beats: b1 to b7, plus drain and perm (not recorded)
+    take.mjs            the beats: b1 to b7, plus seed (fills the Inbox), drain and perm (not recorded)
+    setup.mjs           makes the throwaway project and launches the team from story.json
     hubclip.mjs         the closing public-page clip (loads and scrolls a page, signed out, types nothing)
     shot.mjs            a headless screenshot of one dashboard page (for looking, not for the film)
     encode.sh           clips to the 16:9 master, the 9:16 phone cut and the GIF
-  seed/                 the review documents and the code change the agents "make"
-  storyboard/           plan.json and storyboard.html: the approved plan (captions, beats, what is staged)
+  story.json            the example the film tells: team, agents, goal, tasks, the Inbox documents, the board chatter, the live comment, the code change
+  seed/                 the documents and the code change those refer to
+  storyboard/           plan.json and storyboard.html: the approved v1 plan (captions, beats, what is staged); it tells the first example (a "slug" package), the beats are the same
 ```
 
 ## Rebuild from a clean checkout
@@ -48,7 +50,7 @@ tools/demo/
 5. **Record the takes**, in order, from `tools/demo/scripts`:
    ```bash
    export PLAYWRIGHT_BROWSERS_PATH="$DEMO_ROOT/pw-browsers"
-   node take.mjs b1 b2 b3 b4 b5 drain perm b6 b7
+   node take.mjs b1 b2 seed b3 b4 b5 drain perm b6 b7
    node hubclip.mjs          # the public page at the end (an outward request: loads coralhub.dev once) ...
    node endcard.mjs          # ... or a plain end card instead (then encode with ENDING=card); a live page can go stale
    ```
@@ -66,7 +68,8 @@ While a beat is recorded, `lib.mjs` scans the page twice a second (visible text,
 - **Re-record one beat**: beats 1 and 2 need a rig without a team (`NOLAUNCH=1 rig-up.sh`); beats 3 to 7 need the team (run beat 2 first, or `rig-up.sh` without `NOLAUNCH`). Beat 4 uploads documents with fixed names, so start a fresh rig for it; `perm` needs `drain` before it, so the phone shows exactly one prompt.
 - **Change the timing**: the `SP_*` speed-ups at the top of `encode.sh`. The GIF's start (33 s) and length (23.6 s) follow them.
 - **Change the story**: edit `storyboard/plan.json` and `storyboard.html` (hand-written, no tooling needed), then the beats.
-- **Seed text**: `seed/*.md` and the `.new` code files. Use sample names and text only: no real names, paths, tokens or spend on screen.
+- **Change the example**: edit `story.json` (team, agent names, goal, tasks, Inbox documents, chatter, the live comment) and the files in `seed/` it names; nothing else has to change.
+- **Seed text**: `seed/*` and the `.new` code files. Use sample names and text only: no real names, paths, tokens or spend on screen.
 
 ## Things to know
 

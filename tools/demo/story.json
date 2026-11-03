@@ -1,0 +1,46 @@
+{
+  "team": "skyline",
+  "agents": ["Orchestrator", "Backend", "Frontend", "Designer", "Reviewer"],
+  "repo": {
+    "commitMessage": "Start the forecast package",
+    "initial": {
+      "go.mod": "module example.com/skyline\n\ngo 1.22\n",
+      "forecast.go": "package forecast\n\n// FeelsLike returns the temperature as it feels.\nfunc FeelsLike(tempC, windKmh float64) float64 { return tempC }\n"
+    },
+    "change": { "forecast.go": "seed/forecast.go.new", "forecast_test.go": "seed/forecast_test.go.new" }
+  },
+  "diffAgent": "Backend",
+  "permAgent": "Backend",
+  "goal": {
+    "title": "Skyline shows a five-day forecast for any city",
+    "done": "Search a city and see five days of highs, lows and a feels-like figure"
+  },
+  "tasks": ["Add the wind-chill figure", "Build the five-day forecast cards", "Add city search with country names", "Review the forecast code"],
+  "inbox": [
+    { "agent": "Orchestrator", "file": "release-checklist.md", "name": "skyline-release-checklist.md", "question": "Ship the beta on Friday, or wait for the units switch?" },
+    { "agent": "Backend", "file": "accuracy.csv", "name": "skyline-accuracy.csv", "question": "Forecast error averages 2.1 C: good enough for the beta?" },
+    { "agent": "Frontend", "file": "city-search.md", "name": "skyline-city-search.md", "question": "Search by city name only, or by postcode too?" },
+    { "agent": "Backend", "file": "forecast-api.md", "name": "skyline-forecast-api.md", "question": "Return only Celsius, or Fahrenheit as well?" },
+    { "agent": "Reviewer", "file": "test-plan.md", "name": "skyline-test-plan.md", "question": "Is this test plan enough for the first beta?" }
+  ],
+  "chatter": [
+    ["Orchestrator", "@Backend the forecast contract is up for review; please add the wind-chill figure next."],
+    ["Backend", "@Orchestrator on it. I will start with the unit tests."],
+    ["Designer", "@Frontend the day cards are ready in the mockup: icon, high, low, wind."],
+    ["Frontend", "@Designer thanks. I will wire the search box to the cards today."],
+    ["Reviewer", "@Backend the accuracy report looks fine; two cities are above 2 C."],
+    ["Orchestrator", "@Reviewer please look at the wind-chill change as soon as it lands."]
+  ],
+  "live": {
+    "agent": "Designer",
+    "file": "theme-note.md",
+    "name": "skyline-theme-note.md",
+    "question": "Dark or light by default?",
+    "comment": "Dark by default, with a light switch.",
+    "reply": "Agreed: dark by default, light on request. I updated the note.",
+    "replyFind": "dark by default, light on request",
+    "from": "Should Skyline open in a dark theme or a light one?",
+    "to": "Decision: Skyline opens dark, with a light switch.",
+    "question2": "Approve the updated theme note?"
+  }
+}

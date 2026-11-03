@@ -1,9 +1,8 @@
-# Slug package: test plan
+# Skyline: test plan
 
-Slug lowercases its input and joins words with dashes.
+- Unit tests for the wind-chill figure: cold and windy, cold and calm, warm.
+- A contract test for `GET /forecast` with a stubbed weather source.
+- A smoke test that loads the dashboard and finds five day cards.
 
-## Open question
-Should Slug drop punctuation, or turn it into dashes?
-
-## Proposal
-Drop punctuation, keep letters and digits, collapse repeated dashes, trim the ends.
+## Question
+Is this enough for the first beta?

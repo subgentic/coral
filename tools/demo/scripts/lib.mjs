@@ -11,18 +11,21 @@ if (!process.env.DEMO_ROOT) throw new Error("set DEMO_ROOT to a scratch folder")
 export const S = path.resolve(process.env.DEMO_ROOT)
 if (S === "/" || S === process.env.HOME || !fs.existsSync(S + "/.coral-demo-root")) throw new Error("refusing DEMO_ROOT " + S + ": make a folder for the demo and touch .coral-demo-root in it (see the README)")
 export const REPO = S + "/home/projects/demo-app"
+import { readFileSync } from "node:fs"
+export const story = JSON.parse(readFileSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../story.json"), "utf8"))   // the example the film tells: team, agents, goal, documents, code change
 export const PORT = process.env.DEMO_PORT || "8471"
 if (PORT === "8420") throw new Error("refusing port 8420")
 const require = createRequire(S + "/package.json")
 export const { chromium } = require("playwright")
 export const BASE = "http://127.0.0.1:" + PORT
-export const KEY = fs.readFileSync(S + "/work/key", "utf8").trim()
+const keyFile = S + "/work/key"
+export const key = () => fs.readFileSync(keyFile, "utf8").trim()   // read when needed: rig-up writes it after the project is made
 export const OPEN = []
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 export const agent = (name, ...args) => execFileSync(HERE + "/asagent.sh", [name, ...args], { encoding: "utf8" })
 export async function launchTeam() {
-  const r = await fetch(BASE + "/api/sessions/launch-team", { method: "POST", headers: { Authorization: "Bearer " + KEY, "Content-Type": "application/json" },
-    body: JSON.stringify({ board_name: "slug-team", working_dir: REPO, agents: ["Orchestrator", "Developer", "Reviewer"].map((n) => ({ agent_type: "claude", name: n, prompt: "Sample agent." })) }) })
+  const r = await fetch(BASE + "/api/sessions/launch-team", { method: "POST", headers: { Authorization: "Bearer " + key(), "Content-Type": "application/json" },
+    body: JSON.stringify({ board_name: story.team, working_dir: REPO, agents: story.agents.map((n) => ({ agent_type: "claude", name: n, prompt: "Sample agent." })) }) })
   const j = await r.json(); fs.writeFileSync(S + "/work/launch.json", JSON.stringify(j)); return j
 }
 // one recorded context per beat; a caption band and a visible cursor are injected into every page
@@ -31,7 +34,7 @@ export async function beat(browser, name, { w = 1600, h = 900, mobile = false } 
   fs.rmSync(dir, { recursive: true, force: true })
   const ctx = await browser.newContext({ storageState: S + "/work/state.json", viewport: { width: w, height: h }, deviceScaleFactor: 1, isMobile: mobile, hasTouch: mobile,
     recordVideo: { dir, size: { width: w, height: h } } })
-  // Leak check: while a beat runs, the page is scanned twice a second (visible text, titles, aria-labels, placeholders) for anything that
+  // Leak check: while a beat runs, the page is scanned twice a second (text that is in the frame, titles, aria-labels, placeholders) for anything that
   // would give away the machine it was made on or an internal id: the host's home folder, the scratch folder, an agent scratchpad, a session id, a board id (b- and 8 or more letters or digits), a long hex digest, a coral:// link.
   const real = (p) => { try { return fs.realpathSync(p) } catch { return p } }
   const needles = [...new Set([os.homedir(), real(os.homedir()), "/claude-501/", "scratchpad", "/private/var/folders"].filter((x) => x && x.length >= 4))]
@@ -39,10 +42,18 @@ export async function beat(browser, name, { w = 1600, h = 900, mobile = false } 
   await ctx.addInitScript((src) => {
     window.__leaks = []
     const re = new RegExp(src.join("|") + "|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|\\bb-[a-z0-9]{8,}\\b|\\b[0-9a-f]{32,}\\b|coral://", "i")   // session ids, board ids (b-xxxxxxxx), digests and artifact links
+    // only what is inside the frame counts: a text node with a box that meets the viewport, and elements shown there (a message scrolled out of view is not on camera)
+    const onScreen = (r) => r.width > 0 && r.height > 0 && r.bottom > 0 && r.right > 0 && r.top < innerHeight && r.left < innerWidth
     const scan = () => {
-      const bits = [document.body ? document.body.innerText : ""]
-      for (const el of document.querySelectorAll("[title],[aria-label],[placeholder],[alt]")) bits.push(el.title, el.getAttribute("aria-label"), el.getAttribute("placeholder"), el.getAttribute("alt"))
-      const m = re.exec(bits.filter(Boolean).join("\n")); if (m && !window.__leaks.includes(m[0])) window.__leaks.push(m[0])
+      if (!document.body) return
+      const bits = [], range = document.createRange(), walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT)
+      for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+        if (!n.nodeValue.trim() || !n.parentElement || (n.parentElement.checkVisibility && !n.parentElement.checkVisibility())) continue
+        range.selectNodeContents(n); if ([...range.getClientRects()].some(onScreen)) bits.push(n.nodeValue)
+      }
+      for (const el of document.querySelectorAll("[title],[aria-label],[placeholder],[alt]")) if (onScreen(el.getBoundingClientRect())) bits.push(el.title, el.getAttribute("aria-label"), el.getAttribute("placeholder"), el.getAttribute("alt"))
+      const txt = bits.filter(Boolean).join("\n"), m = re.exec(txt)
+      if (m) { const hit = m[0] + "  [in: " + txt.slice(Math.max(0, m.index - 50), m.index + m[0].length + 50).replace(/\s+/g, " ") + "]"; if (!window.__leaks.some((x) => x.startsWith(m[0]))) window.__leaks.push(hit) }
     }
     setInterval(scan, 500)
   }, needleSrc)

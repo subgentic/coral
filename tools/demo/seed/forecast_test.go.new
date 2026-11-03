@@ -1,0 +1,17 @@
+package forecast
+
+import "testing"
+
+func TestFeelsLike(t *testing.T) {
+	cases := []struct{ temp, wind, want float64 }{
+		{-5, 20, -11.6},
+		{5, 30, 0.1},
+		{5, 3, 5},
+		{18, 40, 18},
+	}
+	for _, c := range cases {
+		if got := FeelsLike(c.temp, c.wind); got != c.want {
+			t.Errorf("FeelsLike(%v, %v) = %v, want %v", c.temp, c.wind, got, c.want)
+		}
+	}
+}
