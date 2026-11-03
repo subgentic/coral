@@ -357,11 +357,19 @@ export function followChangedFiles(s) {
     }, FOLLOW_DELAY_MS);
 }
 
+// The Files tab's number has two sources that mean different things (#12683, the Operator: "the number is flashing in and out"): the session feed's changed_file_count, what the agent's own Write and Edit tool
+// calls changed, told on every update and cleared at 0; and the list the panel shows, the files git says differ, drawn every round of the watch. When they disagree (an edit made by hand, a clean repository
+// the agent wrote to) they took turns, once a round. So while the Files panel is showing, the list it shows owns the number and the feed's is not drawn; when it is not showing the feed moves the number,
+// as before. Either way a number is written only when it changes, and the badge is empty only for a count of 0.
+let _listOwner = '';
+const setBadge = (el, text) => { if (el && el.textContent !== text) el.textContent = text; };
+const currentViewId = () => { const cur = state.currentSession; return cur ? String(cur.session_id || cur.name || '') : ''; };
+// the list draws the number: it is the owner of this session's badge from now on (while the panel shows)
+function listCount(el, text) { _listOwner = currentViewId(); setBadge(el, text); }
 export function updateChangedFileCount(count) {
-    const el = document.getElementById('files-bar-count');
-    if (el) {
-        el.textContent = count > 0 ? String(count) : '';
-    }
+    const id = currentViewId();
+    if (id && _listOwner === id && filesPanelShowing()) return; // the list on screen owns the number
+    setBadge(document.getElementById('files-bar-count'), count > 0 ? String(count) : '');
 }
 
 export function copyFilePath(filepath) {
@@ -651,7 +659,7 @@ export async function refreshChangedFiles(quiet = false) { // quiet: the panel's
     if (_notGit && !plain) {
         const shell = state.currentSession && state.currentSession.agent_type === 'terminal'; // a terminal has no changes to list: no talk of git for a shell (#10077)
         if (titleEl) { titleEl.textContent = shell ? 'No changes to list' : 'Not a git folder'; titleEl._html = ''; }
-        if (countEl) countEl.textContent = '';
+        listCount(countEl, '');
         list.innerHTML = worktreeNoteHtml() + `<div class="empty-state empty-state-tight">${shell ? 'A terminal does not track changed files. Start an agent in this folder to see its changes.' : 'No files changed here this week. Changes show once the folder is a git repository, and an agent can also share a file with you as an artifact.'}</div>`;
         return;
     }
@@ -662,7 +670,7 @@ export async function refreshChangedFiles(quiet = false) { // quiet: the panel's
     if (plain) {
         const html = `<span class="changed-files-count">${files.length} recent file${files.length !== 1 ? 's' : ''}</span><span class="changed-files-count files-compare-note">Not a git folder: files changed this week</span>`;
         if (titleEl && titleEl._html !== html) { titleEl.innerHTML = html; titleEl._html = html; }
-        if (countEl) countEl.textContent = String(files.length);
+        listCount(countEl, String(files.length));
     }
 
     if (titleEl && !plain) {
@@ -697,7 +705,7 @@ export async function refreshChangedFiles(quiet = false) { // quiet: the panel's
         }
     }
     if (countEl && !plain) {
-        countEl.textContent = files.length > 0 ? String(files.length) : '';
+        listCount(countEl, files.length > 0 ? String(files.length) : '');
     }
 
     if (files.length === 0) {
