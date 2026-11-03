@@ -2,6 +2,7 @@
  * the chief_name, chief_avatar, chief_avatar_letter and chief_fronts settings and gives them cleaned through GET /api/chief. This module draws the avatar, reads the look and puts it on the /chief page: the header's
  * name and avatar, the page title, and (by the --chief-color and --chief-letter variables chief.css reads) the avatar beside each of Chief's chat bubbles. Everything is set as text, never as HTML. Lazy: only /chief
  * and Settings > Chief load it. */
+import { serverFetch, contextServer } from './server_base.js';
 import { loadStyles } from './lazy_styles.js';
 await loadStyles('chief.css');
 
@@ -31,17 +32,19 @@ export function avatarNode(look, fallbackName = '') {
     return a;
 }
 
-let cached = null;
+const cached = new Map();
 /** What the machine says about Chief, once per page load; null when it cannot be read (the page then keeps the agent's own name). */
 export function readChief(force = false) {
-    if (!cached || force) cached = fetch('/api/chief', { credentials: 'same-origin', cache: 'no-store' }).then(r => (r.ok ? r.json() : null)).then(j => (j && j.enabled ? lookOf(j) : null)).catch(() => null);
-    return cached;
+    const server = contextServer();
+    if (!cached.has(server) || force) cached.set(server, serverFetch(server, '/api/chief', { credentials: 'same-origin', cache: 'no-store' }).then(r => (r.ok ? r.json() : null)).then(j => (j && j.enabled ? lookOf(j) : null)).catch(() => null));
+    return cached.get(server);
 }
 
 /** The /chief page's face: the header shows the avatar and the chosen name (the agent's own name when none is chosen), the page title follows, and the chat's avatar variables are set. */
 export async function showChiefFace(label, identity) {
+    const server = contextServer();
     const look = await readChief();
-    if (!look || !label || !label.isConnected) return;
+    if (server !== contextServer() || !look || !label || !label.isConnected) return;
     const name = look.name || identity;
     label.textContent = name;
     let head = document.getElementById('chief-avatar-head');

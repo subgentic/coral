@@ -13,10 +13,6 @@
       "count": 1,
       "reason": "this computer's own board list: the remote computers' lists are read next to it with serverFetch"
     },
-    "chief_look.js": {
-      "count": 1,
-      "reason": "to do (#12653): Chief's own look is read from this computer's /api/chief; through the Hub it is the Hub's, to check with the Chief page's owner"
-    },
     "cost_dashboard.js": {
       "count": 8,
       "reason": "the Analytics page is this computer's: every one of its cost routes is a bare path, and the page has no computer switch"
