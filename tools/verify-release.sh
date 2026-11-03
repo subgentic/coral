@@ -37,6 +37,9 @@
 # built it, also from that table, unless --repo is given), --prev TAG (default: the release before this one
 # of the same kind), --no-prev, --keep, --out DIR (use an empty folder you name; implies --keep),
 # --local DIR (check assets already in DIR instead of downloading: for a re-check, or to see a tampered copy fail),
+# --allow-unstapled (#12721: honour the release run's OWN unstapled marker: the run artifact coral-macos-unstapled, written by release.yml only when Apple
+# accepted a build but its ticket could not be stapled. The stapler row of exactly the artifact the marker names (app, dmg) is a SKIP with that reason; it has no
+# effect without the marker, so it cannot turn a real red green; finish-release.sh always passes it),
 # --require-cosign (the cosign row FAILS instead of SKIPping when cosign is missing or there is no bundle to check),
 # --published (download the assets from the published release, as a user would: each counts as a download; use it
 # when the release run's artifacts have expired or you can't read the repo's Actions).
@@ -48,12 +51,13 @@ export CORAL_TELEMETRY_DISABLED=1
 usage() { sed -n '2,/^set -u/p' "$0" | sed '$d' | sed 's/^# \{0,1\}//'; exit 2; }
 . "$(dirname "$0")/release-homes.sh"
 . "$(dirname "$0")/release-notes-edits.sh"
-TAG=""; REPO="$(release_home_current)"; REPO_GIVEN=0; PREV=""; NOPREV=0; KEEP=0; OUT=""; LOCAL=""; PUBLISHED=0; REQUIRE_COSIGN=0; STAGE=approved
+TAG=""; REPO="$(release_home_current)"; REPO_GIVEN=0; PREV=""; NOPREV=0; KEEP=0; OUT=""; LOCAL=""; PUBLISHED=0; REQUIRE_COSIGN=0; ALLOW_UNSTAPLED=0; STAGE=approved
 while [ $# -gt 0 ]; do
   case "$1" in
     --repo) REPO="${2:?}"; REPO_GIVEN=1; shift 2 ;;
     --published) PUBLISHED=1; shift ;;
     --require-cosign) REQUIRE_COSIGN=1; shift ;;
+    --allow-unstapled) ALLOW_UNSTAPLED=1; shift ;;
     --stage) STAGE="${2:?}"; shift 2 ;;
     --prev) PREV="${2:?}"; shift 2 ;;
     --no-prev) NOPREV=1; shift ;;
@@ -366,8 +370,17 @@ if [ -n "$dmgfile" ]; then
         if out="$(spctl -a -t open --context context:primary-signature -v "$dmgfile" 2>&1)"; then pass dmg "spctl on the DMG" "$(tail -1 <<<"$out" | cut -c1-70)"
         else fail dmg "spctl on the DMG" "$(tail -1 <<<"$out" | cut -c1-100)"; fi
         if command -v xcrun >/dev/null 2>&1; then
+          # --allow-unstapled: the release run's own marker names the artifacts that shipped unstapled (app, dmg); empty when it has none
+          UNSTAPLED_ITEMS=""
+          mkdir -p "$WORK/unstapled"
+          if [ "$ALLOW_UNSTAPLED" = 1 ] && [ -z "$LOCAL" ] && run_artifacts "$TAG" "$WORK/unstapled" coral-macos-unstapled 2>/dev/null && [ -f "$WORK/unstapled/unstapled.txt" ]; then
+            UNSTAPLED_ITEMS=" $(tr '\n' ' ' <"$WORK/unstapled/unstapled.txt") "
+          fi
           for target in "$dmgfile" "$app"; do
-            if out="$(xcrun stapler validate "$target" 2>&1)"; then pass dmg "stapler: $(basename "$target")" "ticket stapled and valid"
+            item=app; [ "$target" = "$dmgfile" ] && item=dmg
+            if [[ "$UNSTAPLED_ITEMS" == *" $item "* ]]; then
+              skip dmg "stapler: $(basename "$target")" "shipped unstapled on purpose: the release run's marker (coral-macos-unstapled) names it; Apple accepted it, Gatekeeper checks the ticket online"
+            elif out="$(xcrun stapler validate "$target" 2>&1)"; then pass dmg "stapler: $(basename "$target")" "ticket stapled and valid"
             else fail dmg "stapler: $(basename "$target")" "$(tail -1 <<<"$out" | cut -c1-100)"; fi
           done
         else skip dmg "stapler" "xcrun is not available"; fi

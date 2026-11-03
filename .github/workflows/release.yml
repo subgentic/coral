@@ -763,7 +763,7 @@ jobs:
           grep -q "status: Accepted" dist/notarize-app.log || { echo "::error::Apple's notary service did not accept Coral.app"; exit 1; }
           # The staple needs Apple's ticket service; it is tried 5 times, 2 minutes apart (#12721), then the build goes on unstapled.
           source tests/release/staple_retry.sh
-          staple_retry dist/Coral.app || unstapled "Coral.app"
+          staple_retry dist/Coral.app || unstapled UNSTAPLED_APP "Coral.app"
           rm -f dist/Coral-notarize.zip dist/notarize-app.log
 
       - name: Create DMG
@@ -809,15 +809,15 @@ jobs:
             --password "$APPLE_APP_PASSWORD" --output-format json | python3 -c "import sys,json; print(json.load(sys.stdin)['status'])")
           [ "$STATUS" = "Accepted" ] || { echo "::error::Apple's notary service answered '$STATUS' for $DMG_NAME"; exit 1; }
           source tests/release/staple_retry.sh
-          staple_retry "dist/$DMG_NAME" || unstapled "$DMG_NAME"
+          staple_retry "dist/$DMG_NAME" || unstapled UNSTAPLED_DMG "$DMG_NAME"
 
       - name: Verify signed, notarized release
         run: |
           set -euo pipefail
           codesign --verify --strict --verbose=2 "dist/$DMG_NAME"
-          # An unstapled build (UNSTAPLED=1, set only after Apple said Accepted) has no ticket to validate, and spctl would ask the same
-          # Apple service that was unreachable: those checks run for a stapled build only.
-          if [ "${UNSTAPLED:-}" != 1 ]; then
+          # An unstapled artifact (UNSTAPLED_DMG or UNSTAPLED_APP, set only after Apple said Accepted) has no ticket to validate, and spctl
+          # would ask the same Apple service that was unreachable: those checks are skipped for that artifact only.
+          if [ "${UNSTAPLED_DMG:-}" != 1 ]; then
             spctl -a -t open --context context:primary-signature -vv "dist/$DMG_NAME"
             xcrun stapler validate "dist/$DMG_NAME"
           fi
@@ -825,7 +825,7 @@ jobs:
           mkdir -p "$MNT"
           hdiutil attach -readonly -nobrowse -noautoopen -mountpoint "$MNT" "dist/$DMG_NAME"
           codesign --verify --deep --strict --verbose=2 "$MNT/Coral.app"
-          if [ "${UNSTAPLED:-}" != 1 ]; then
+          if [ "${UNSTAPLED_APP:-}" != 1 ]; then
             spctl -a -t exec -vv "$MNT/Coral.app"
             xcrun stapler validate "$MNT/Coral.app"
           fi
@@ -846,6 +846,15 @@ jobs:
         with:
           name: coral-macos-dmg
           path: dist/${{ env.DMG_NAME }}
+
+      # Written only when a staple was given up on (tests/release/staple_retry.sh): one word per unstapled artifact, app or dmg. verify-release.sh
+      # --allow-unstapled reads it from this run and skips the ticket checks for those artifacts only.
+      - name: Upload the unstapled marker
+        if: ${{ hashFiles('dist/unstapled.txt') != '' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coral-macos-unstapled
+          path: dist/unstapled.txt
 
   # ── Create GitHub Release with all assets ──────────────────────
   release:
