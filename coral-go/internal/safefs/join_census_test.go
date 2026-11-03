@@ -33,6 +33,12 @@ type joinEntry struct {
 
 // joinSites is "file<TAB>function" -> its joins, by file relative to coral-go.
 var joinSites = map[string]joinEntry{
+	"internal/agent/pi.go\tPiHasSession":                                                     {1, joinID, "the session id is a canonical UUID (IsResumeID for Pi) before the folder pi-sessions/<id> under the data folder is read; the entries it lists are only tested for a regular .jsonl name (#12778)"},
+	"internal/auth/local_open.go\tKeyStore.passwordState":                                    {1, joinOwn, "the constant PasswordFile name under the key store's own data folder; only Lstat'd, never opened"},
+	"internal/tracking/inbox.go\tloadInboxDay":                                               {1, joinOwn, "the constant inboxDayFileName under Coral's own data folder (resolveCoralDir); read as a small JSON, never from a name anyone supplies"},
+	"internal/tracking/inbox.go\tsaveInboxDay":                                               {1, joinOwn, "the constant inboxDayFileName under Coral's own data folder; written without following a link (secfile.WriteFileNoFollow)"},
+	"internal/windowmark/windowmark.go\tEverShown":                                           {1, joinOwn, "the constant ShownFileName under the data folder the caller gave; Lstat'd only, and only a regular file counts"},
+	"internal/windowmark/windowmark.go\tNoteShown":                                           {1, joinOwn, "the constant ShownFileName under the data folder the caller gave; created without following a link (secfile.OpenNoFollow)"},
 	"cmd/coral-agent/skills.go\twriteSkillFiles":                                             {1, joinContained, "each part of a skill file path is checked (skills.UnsafeNamePart, not empty, not . or ..) and the joined target is compared with the folder with filepath.Rel before anything is written there"},
 	"cmd/coral-update/verify_package.go\tverifyRelease":                                      {2, joinOwn, "coral-update verify-package: the folder is an absolute, cleaned path the caller gave on its own command line, the file names are the constants SHA256SUMS and its bundle or the asset name matched by verifyAssetRe, and every file is opened with stage.OpenPlain; no agent text"},
 	"internal/background/token_poller_hermes.go\thermesStateStamp":                           {1, joinOwn, "the two constant names state.db and state.db-wal under a Hermes home Coral made itself, read with Lstat"},

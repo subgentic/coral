@@ -56,7 +56,7 @@ func TestAMarkdownFileThatIsNotASkillIsRefusedWithTheReasonAndKeepsNothing(t *te
 		"no front matter":     "# Just notes\nNo front matter here.\n",
 		"no description":      "---\nname: only-name\n---\nBody\n",
 		"no name":             "---\ndescription: Only a description.\n---\nBody\n",
-		"a hidden character":  "---\nname: tricky\ndescription: Looks fine‮.\n---\nBody\n",
+		"a hidden character":  "---\nname: tricky\ndescription: Looks fine\u202e.\n---\nBody\n",
 		"a key inside":        "---\nname: leaky\ndescription: Holds a key.\n---\nAKIAIOSFODNN7EXAMPLE and ghp_abcdefghijklmnopqrstuvwxyz0123456789 are in here.\n",
 		"over the size limit": "---\nname: huge\ndescription: Too big.\n---\n" + strings.Repeat("x", 6<<20),
 	} {

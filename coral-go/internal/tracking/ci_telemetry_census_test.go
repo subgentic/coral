@@ -89,6 +89,7 @@ var notAStarter = map[string]string{
 	"tests/release/verify_encrypted_bundle.sh":   "runs the from-source (keyless) bundle's --encryption-self-test, which carries no PostHog key and sends nothing",
 	"tests/release/verify_encrypted_bundle.ps1":  "Windows counterpart: runs the from-source (keyless) bundle's --encryption-self-test, which carries no PostHog key and sends nothing",
 	"tests/release/resolve_release_test.sh":      "unit-tests resolve_release.sh; no Coral",
+	"tests/release/pin_release_digests_test.sh":  "unit-tests tools/pin-release-digests.sh with stand-in gh and cosign programs; 'subgentic/coral' is only the repository name in its fixtures (it matches startsCoral), no Coral starts",
 	"tests/release/gate_check_test.py":           "unit-tests the required-check logic with fake run lists; the repository name subgentic/coral is only a string, no Coral starts",
 	"tests/release/release_provenance_test.py":   "unit-tests the release provenance record with fake run lists; the repository name subgentic/coral is only a string, no Coral starts",
 	"tests/release/verify_buildinfo_test.py":     "unit-tests verify_buildinfo.sh with fake build-info texts; subgentic/coral and coral-board are only strings in them, no Coral starts",
