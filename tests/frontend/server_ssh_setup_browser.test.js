@@ -93,9 +93,19 @@ const HUB = `(() => {
             await typeDir(''); const ok = await dirStyle();
             check(`${label}: a valid data folder is not in the error colour`, !ok.wordOk && !ok.edgeOk && ok.invalid === 'false', JSON.stringify(ok));
             if (label === '390') { // the phone: the folder field and the footer scrolled into view, in the light theme, and at 200% text
+                // scrolled as far down as it goes, Cancel and Set up are both on screen and above the bottom tab bar (UI Reviewer: the captures at 200% did not show them)
+                const atBottom = async tag => {
+                    await ev(`(() => { for (let e = ${btn('Cancel')}; e; e = e.parentElement) if (e.scrollHeight > e.clientHeight + 1) e.scrollTop = e.scrollHeight; document.scrollingElement.scrollTop = document.scrollingElement.scrollHeight; return true; })()`); await settle(300);
+                    const r = await ev(`(() => { const rect = e => { const b = e.getBoundingClientRect(); return { top: Math.round(b.top), bottom: Math.round(b.bottom), left: Math.round(b.left), right: Math.round(b.right) }; };
+                        const nav = document.getElementById('phone-nav'), n = nav && getComputedStyle(nav).display !== 'none' ? rect(nav) : null; return { cancel: rect(${btn('Cancel')}), setup: rect(${btn('Set up')}), nav: n, vh: innerHeight }; })()`);
+                    const floor = r.nav ? r.nav.top : r.vh;
+                    check(`${label} ${tag}: scrolled to the end, Cancel and Set up are on screen above the bottom tab bar`, r.cancel.top >= 0 && r.setup.top >= 0 && r.cancel.bottom <= floor && r.setup.bottom <= floor, JSON.stringify(r));
+                    if (process.env.CORAL_SCREENSHOT_DIR) { fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR, { recursive: true }); fs.appendFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/rects.txt`, `${label} ${tag} ${JSON.stringify(r)}\n`); } // the rectangles beside the shot
+                    await shot(`ssh-bottom-${tag}`);
+                };
                 const scrolls = async tag => {
+                    await atBottom(tag);
                     await ev(`document.getElementById('ssh-datadir-input').scrollIntoView({ block: 'center' }); true`); await settle(200); await shot(`ssh-datadir-field-${tag}`);
-                    await ev(`${btn('Cancel')}.scrollIntoView({ block: 'end' }); true`); await settle(200); await shot(`ssh-footer-${tag}`);
                     check(`${label} ${tag}: the page does not widen`, await ev(`${noOverflow}`));
                 };
                 await scrolls('dark');
