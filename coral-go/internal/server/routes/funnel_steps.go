@@ -8,6 +8,7 @@ import (
 	"github.com/subgentic/coral/internal/agent"
 	at "github.com/subgentic/coral/internal/agenttypes"
 	"github.com/subgentic/coral/internal/ptymanager"
+	setreg "github.com/subgentic/coral/internal/settings"
 	"github.com/subgentic/coral/internal/tracking"
 )
 
@@ -30,7 +31,7 @@ func (h *SystemHandler) FunnelOnDashboardLoaded() {
 	for _, c := range funnelCLITools {
 		tracking.TrackCLIDetected(c.tool, funnelCLIStatus(settings, c.agentType))
 	}
-	if settings != nil && settings["inbox_welcome"] == "on" {
+	if settings != nil && setreg.Enum(settings, "inbox_welcome") == "on" {
 		tracking.TrackWelcomeShown()
 	}
 }
@@ -65,12 +66,12 @@ func funnelCLIStatus(settings map[string]string, agentType string) string {
 // funnelWelcomeSettings reports the welcome items a settings write closed: each id in inbox_welcome_done (checked against the fixed ids by the tracking package),
 // and all of them when inbox_welcome goes off.
 func funnelWelcomeSettings(values map[string]string) {
-	if done, ok := values["inbox_welcome_done"]; ok {
-		for _, id := range strings.Split(done, ",") {
+	if setreg.Has(values, "inbox_welcome_done") {
+		for _, id := range strings.Split(setreg.Raw(values, "inbox_welcome_done"), ",") { // the saved list as written: each id is checked against the fixed ids by the tracking package
 			tracking.TrackWelcomeDone(strings.TrimSpace(id))
 		}
 	}
-	if values["inbox_welcome"] == "off" {
+	if setreg.Raw(values, "inbox_welcome") == "off" { // as written in this write: an unrecognized word is not "off" (Enum would give the default)
 		tracking.TrackWelcomeDone(tracking.WelcomeAllClosed)
 	}
 }
