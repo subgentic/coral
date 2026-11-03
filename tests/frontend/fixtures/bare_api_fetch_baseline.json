@@ -1,0 +1,65 @@
+{
+  "about": "Bare fetch() calls of /api paths on data a computer holds, each with why it is this computer alone (#12617). A call not here must go through serverFetch with its server. Only ever shorter.",
+  "files": {
+    "board_export.js": {
+      "count": 1,
+      "reason": "the live list is the merged list of every computer ({sessions, servers}); the code below it keeps this board's server"
+    },
+    "board_fetch.js": {
+      "count": 1,
+      "reason": "this computer's own board list: the remote computers' lists are read next to it with serverFetch"
+    },
+    "cost_dashboard.js": {
+      "count": 1,
+      "reason": "the Analytics page is this computer's: every one of its cost routes is a bare path, and the page has no computer switch"
+    },
+    "guide_names.js": {
+      "count": 1,
+      "reason": "a guide's roster is the Hub's own route (the guide role is a Hub grant on a board), read by the owner there"
+    },
+    "job_form.js": {
+      "count": 1,
+      "reason": "Automations (scheduled jobs and workflows) run on this computer: the page has no server for them"
+    },
+    "operator_asks.js": {
+      "count": 2,
+      "reason": "waking a member is offered only on a question of this computer (fromAnotherComputer hides its buttons)"
+    },
+    "received_cap_notice.js": {
+      "count": 1,
+      "reason": "this computer's own artifact store notice, never asked through the Hub (isCloud returns first)"
+    },
+    "scheduler.js": {
+      "count": 2,
+      "reason": "Automations (scheduled jobs and workflows) run on this computer: the page has no server for them"
+    },
+    "search_access.js": {
+      "count": 1,
+      "reason": "Settings > Security of this computer: the Hub's dialog is read-only and reads its own record"
+    },
+    "team_artifacts_page.js": {
+      "count": 1,
+      "reason": "the Keep list is this computer's own store (/api/system/artifact-store/kept): asked only when local() is true (not through the Hub, not for another computer)"
+    },
+    "team_form.js": {
+      "count": 1,
+      "reason": "a hint under the folder field (the line stays when the answer is unknown): the server that launches the team decides"
+    },
+    "team_wizard.js": {
+      "count": 2,
+      "reason": "generating a team runs the CLI on this computer"
+    },
+    "terminal_backend.js": {
+      "count": 2,
+      "reason": "the auto-wake and hooks banners list this computer's own agents (read from /api/system/auto-wake and /hooks-status)"
+    },
+    "workflow_agent.js": {
+      "count": 2,
+      "reason": "authoring a workflow launches an agent on this computer"
+    },
+    "worktrees_panel.js": {
+      "count": 2,
+      "reason": "the worktrees panel lists this computer's folders; removing is not offered through the Hub (canRemove is !isCloud)"
+    }
+  }
+}
