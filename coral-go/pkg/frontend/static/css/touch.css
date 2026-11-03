@@ -218,3 +218,17 @@ svg[width="48"][height="48"] { width: 3rem; height: 3rem; }
     .sd-step-header { padding: 8px 20px 6px; }
     .sd-step-header .sd-sub { margin-top: 0; }
 }
+
+/* A landscape phone (844x390, 915x412: wider than 767, so the max-width phone rules do not match) is a coarse pointer all the same (#12983, the keyboard audit's landscape pass): the sizes the portrait
+   phone gets from (max-width: 767px) come from the pointer here. Written once, for every page that needs them: the team page's header and toolbar, the Settings dialog's pane list, the agent list's kebab,
+   the Messages and Analytics filter buttons. A mouse keeps the desktop sizes. */
+@media (pointer: coarse) {
+    .team-page-actions .btn, .goals-pinbar .btn,
+    .team-panel .team-tb-chip, .team-panel .goals-chip.team-tb-chip,
+    .team-panel .list-bar-search, .team-panel .team-tb-select, .team-panel .team-tb-action, .team-panel .list-bar-toggle, .team-panel .list-bar-more-btn,
+    #settings-modal .settings-tab, #settings-modal .settings-nav button {
+        min-height: var(--control-touch-height, 44px);
+    }
+    .team-panel .list-bar-toggle, .team-panel .list-bar-more-btn, .goals-chip.mb-pill, .eff-seg-btn { min-width: var(--control-touch-height, 44px); }
+    .session-list .sidebar-kebab-btn, .group-kebab .sidebar-kebab-btn { width: var(--control-touch-height, 44px); min-width: var(--control-touch-height, 44px); height: var(--control-touch-height, 44px); min-height: var(--control-touch-height, 44px); margin-block: 0; }
+}
