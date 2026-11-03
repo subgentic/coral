@@ -433,7 +433,7 @@ func TestRetiringAGuardianDoesNotHoldTheClientsLock(t *testing.T) {
 	if err := c.Start(); err != nil {
 		t.Fatal(err)
 	}
-	h := &guardianHandle{cmd: c, in: in, done: make(chan struct{}), started: time.Now()}
+	h := &guardianHandle{cmd: &guardianProc{Process: c.Process, wait: c.Wait}, in: in, done: make(chan struct{}), started: time.Now()}
 	go func() { c.Wait(); close(h.done) }()
 	t.Cleanup(func() { c.Process.Kill() })
 	time.Sleep(300 * time.Millisecond) // perl has installed its SIGTERM handler
