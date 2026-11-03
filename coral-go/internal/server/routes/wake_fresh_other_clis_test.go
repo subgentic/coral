@@ -41,6 +41,13 @@ func TestPiWakeWithNoSavedSessionStartsFresh(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, plan.freshStart, "an empty session folder is still nothing to continue")
 
+	// only a regular .jsonl file is a saved session: a link named *.jsonl (it could point anywhere) and a regular file of another name are not
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "notes.txt"), []byte("x"), 0o600))
+	require.NoError(t, os.Symlink(filepath.Join(dir, "notes.txt"), filepath.Join(dir, "link.jsonl")))
+	plan, err = r.h.prepareWake(r.ctx, ls, true)
+	require.NoError(t, err)
+	assert.True(t, plan.freshStart, "a symlink named .jsonl and a non-.jsonl file are no saved session")
+
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "s.jsonl"), []byte("{}\n"), 0o600))
 	plan, err = r.h.prepareWake(r.ctx, ls, true)
 	require.NoError(t, err)
