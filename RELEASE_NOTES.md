@@ -1,5 +1,237 @@
 # Release Notes
 
+## v2.0.40 — Choose what reaches Needs you, a New goal screen, a $ menu of skills, resizable tables, and agents that survive a window program quitting
+
+### Changes
+
+#### What you will notice first
+
+- **Choose what reaches Needs you** (Settings > Inbox): you pick which kinds of file for review reach Needs you and for which teams; what you muted is not lost, a quiet **Muted** line says how many files wait (also on the first view when only muted files exist), and a team list that cannot be loaded says so with Retry. The sidebar number agrees with the list ("Needs you 0" over a table of items is fixed).
+- **A New goal screen**: New goal opens a near-full-screen sheet with the text, pictures (paste, drop or pick), a Guide rail that checks the board's rules for how big a goal is while you write, and a Preview; the goal page shows its description as Markdown-lite and a Markdown checklist is real read-only checkboxes. The Operator can change a goal's driver and give a goal to another team from its page.
+- **A `$` menu of skills in the composer**: typing `$` at a word start lists the approved skills (name and one line each, the words after it search, the last word as a prefix), and a pick attaches that skill to the agent; the Skills Store imports a .zip or one SKILL.md file.
+- **Tables you can resize**: a column edge can be dragged on every table (Needs you, Chats, Goals, Agents, Artifacts, Activity, Computers, Automations and the others); at 1280 px Needs you keeps Team and Waiting whole, and a table in a box that is not shown drops its saved pixel widths.
+- **Needs you reads right**: a question names its team, the Waiting for column is gone, the list keeps the order you are looking at when a computer answers late and does not redraw under a held pointer, a new version of a file comes back as a new item, an Open button on a question never settles it, and Dismiss in a question's reply dialog closes it with no answer.
+- **An agent whose conversation is gone starts fresh** instead of leaving a bare shell (Claude; Pi, Antigravity and OpenCode with nothing to resume start fresh with their role), an agent with no recorded mode wakes in the mode its chat started in, and Auto mode gets its chance before a permission prompt reaches you.
+- **Questions with buttons**: several wake buttons can each be clicked, only a reply to a question resolves its buttons (one post can no longer clear every question), and a wake button for a member whose name starts a line ("UI Reviewer: ...") is accepted.
+- **Through Coral Hub**: Needs you, pinned folders, Keep, Star and Delete on the team page, custom views, Chief's appearance and folder tags go to the computer the data is on, not to this one; marking a file read through the Hub works; the Hub's Files refresh in View mode stops asking for what it cannot have; and the phone's account button opens the drawer at the account entries.
+- **The file viewer's Details** is a button (closed on every open) with a Hide details control; a file an agent uploads for a task shows on that task; a task's artifact count sees an upload at once.
+- **A health check for a post that waits on you and is not in your Needs you** (a member's @mention of the Operator, or an agent's chat reply that waits on you).
+- **A team in a git worktree** is experimental and off by default; a new folder you typed is trusted only when you tick Trust; and a new folder you chose is made at launch.
+- **macOS: a GUI program of Coral.app can no longer take down the tmux server and every agent.** Coral's tmux server and its pty guardian are now started as their own responsible process (see Known issues for what macOS may now ask).
+- **The sign-in page** has **Open Coral on this computer** for a browser on the computer that runs Coral, only while no password is set; a session opened that way is labelled in Settings > Sessions.
+- **Smaller, lighter start**: the agent docs ship gzipped (the shipped tree is 532 KB smaller), and Settings, table sizing, replies and mentions load when their views need them.
+- **Phone and landscape**: a landscape phone gets the list strip and the phone bar, the last card scrolls clear of + New, a goal's title wraps and is read whole, and enlarged text keeps navigation and form actions in their layout.
+- **Windows**: the CLI search looks in `%USERPROFILE%\.local\bin` (where Claude Code's native installer puts `claude.exe`), Check again re-reads the saved Path so a CLI installed after Coral started is found, and a Path entry on a network share is skipped or probed with a 2 s limit.
+- **Machine launch** (experimental): `coral machine launch` asks the Hub whether it can make machine credentials before it creates anything, and the CLI pins the digests of v2.0.39.
+- **Usage events** (the Operator's choice, counts and closed values only, never a path, a name or text): the new-user funnel is recorded step by step, with `first_prompt_submitted` for every way a message goes (it no longer carries `source=http_send`), and the Inbox reports `inbox_opened`, `inbox_waiting` and `inbox_item_actioned` for a person's own actions, capped per day; the tray and the app report the new funnel steps only after the Terms are accepted, and an offline first start keeps its count. `CORAL_TELEMETRY_DISABLED=1` turns all of it off.
+
+#### Known issues
+
+- **macOS: the tmux change (#12836) can make macOS ask once more, only after tmux restarts (a full restart of your agents or a reboot).** Coral's tmux server and guardian are now their own responsible process, so macOS may ask, per folder, whether `tmux` (or `coral`) may reach Documents, Desktop or Downloads. Full Disk Access you gave Coral.app does not carry over: if you gave Coral Full Disk Access, add `tmux` and `coral` too (both in `Coral.app/Contents/MacOS`). The staged tmux copy (each Coral version keeps its own under `tmux-bin/`) asks again after a tmux change. Say yes once; if you say no, nothing is lost, the agent just cannot read that folder.
+- **Windows: in-app update does not work from 2.0.0 through 2.0.6.** If you're on one of those, download and install the MSI by hand; from 2.0.7 on, in-app update works.
+- **macOS: a Coral of 2.0.5 or earlier cannot install updates in-app; install 2.0.6 or later by hand once.**
+- **OpenCode agents are tested on macOS and Linux; OpenCode on Windows is not yet tested end to end.**
+- **Hermes agents are still experimental.**
+- Setting up a computer over SSH is supported from a macOS or Linux hub, and is not yet tested from a Windows hub.
+- A wake button for a member whose name has a colon or a slash is still refused (#12938, next release).
+
+#### For Coral Hub
+
+- **`release-diff` output** (`go run ./internal/releasediff/cmd/release-diff v2.0.39 <head>`):
+
+  ### Tunnel routes, v2.0.39 to f3363c2bd
+
+  Changed (1)
+
+  - `PUT /api/board/{project}/artifacts/{id}/tags`: never to interact owner-only
+
+  Added, never reachable (the Hub has nothing to do) (5)
+
+  - `GET /api/skills/search`: never
+  - `POST /api/board/{project}/goals/{goalID}/driver`: never
+  - `POST /api/board/{project}/goals/{goalID}/move`: never
+  - `POST /api/sessions/live/{name}/skills`: never
+  - `POST /api/sessions/live/{name}/waiting/dismiss`: never
+
+  ### Board settings keys (BoardSettings, HealthSettings included), v2.0.39 to f3363c2bd
+
+  No key was added, removed or changed.
+
+  ### What Coral Hub compiles in or embeds, v2.0.39 to f3363c2bd
+
+  `pkg/tunnel`: 1 file of Go code changed (+3, -0)
+
+  - `coral-go/pkg/tunnel/routes.go`: +3, -0
+  - test files, not compiled by the Hub: 3 files (+34, -2)
+
+  `pkg/frontend`: 124 files the Hub embeds changed (+2851, -579)
+
+  - `coral-go/pkg/frontend/bundle_lazy.go`: +1, -0
+  - `coral-go/pkg/frontend/static/api.js`: +1, -0
+  - `coral-go/pkg/frontend/static/app_actions.js`: +2, -2
+  - `coral-go/pkg/frontend/static/app_wiring.js`: +4, -0
+  - `coral-go/pkg/frontend/static/artifact_names.js`: +7, -4
+  - `coral-go/pkg/frontend/static/artifact_preview.js`: +1, -1
+  - `coral-go/pkg/frontend/static/artifact_private.js`: +2, -2
+  - `coral-go/pkg/frontend/static/artifact_refs.js`: +3, -3
+  - `coral-go/pkg/frontend/static/artifact_star.js`: +3, -1
+  - `coral-go/pkg/frontend/static/artifact_table.js`: +1, -1
+  - `coral-go/pkg/frontend/static/artifact_viewer.js`: +21, -27
+  - `coral-go/pkg/frontend/static/ask_filter.js`: +6, -0
+  - `coral-go/pkg/frontend/static/ask_ignore.js`: +2, -1
+  - `coral-go/pkg/frontend/static/auth_page.js`: +17, -0
+  - `coral-go/pkg/frontend/static/automations.js`: +4, -4
+  - `coral-go/pkg/frontend/static/board_export.js`: +1, -1
+  - `coral-go/pkg/frontend/static/board_fetch.js`: +24, -2
+  - `coral-go/pkg/frontend/static/board_message_text.js`: +3, -2
+  - `coral-go/pkg/frontend/static/changed_files.js`: +70, -25
+  - `coral-go/pkg/frontend/static/chief_look.js`: +7, -4
+  - `coral-go/pkg/frontend/static/cloud_server_view.js`: +10, -7
+  - `coral-go/pkg/frontend/static/css/agentic.css`: +6, -4
+  - `coral-go/pkg/frontend/static/css/artifact-comments.css`: +19, -4
+  - `coral-go/pkg/frontend/static/css/artifact_viewer_header.css`: +2, -1
+  - `coral-go/pkg/frontend/static/css/base.css`: +2, -0
+  - `coral-go/pkg/frontend/static/css/cloud.css`: +5, -0
+  - `coral-go/pkg/frontend/static/css/components.css`: +2, -0
+  - `coral-go/pkg/frontend/static/css/data_table.css`: +4, -2
+  - `coral-go/pkg/frontend/static/css/goal_editor.css`: +122, -0
+  - `coral-go/pkg/frontend/static/css/goals.css`: +3, -0
+  - `coral-go/pkg/frontend/static/css/layout.css`: +1, -1
+  - `coral-go/pkg/frontend/static/css/mobile.css`: +8, -4
+  - `coral-go/pkg/frontend/static/css/needs_actions.css`: +5, -0
+  - `coral-go/pkg/frontend/static/css/session.css`: +3, -6
+  - `coral-go/pkg/frontend/static/css/settings.css`: +7, -1
+  - `coral-go/pkg/frontend/static/css/settings_view.css`: +1, -1
+  - `coral-go/pkg/frontend/static/css/skill_mention.css`: +40, -0
+  - `coral-go/pkg/frontend/static/css/skills.css`: +1, -0
+  - `coral-go/pkg/frontend/static/css/team_page.css`: +22, -8
+  - `coral-go/pkg/frontend/static/css/view_list.css`: +2, -1
+  - `coral-go/pkg/frontend/static/custom_views.js`: +22, -7
+  - `coral-go/pkg/frontend/static/dashboard_analytics.js`: +12, -0
+  - `coral-go/pkg/frontend/static/data_table.js`: +28, -11
+  - `coral-go/pkg/frontend/static/default_prompts_dialog.js`: +1, -1
+  - `coral-go/pkg/frontend/static/detail_pane.js`: +3, -3
+  - `coral-go/pkg/frontend/static/details_disclosure.js`: +10, -5
+  - `coral-go/pkg/frontend/static/diff_comments.js`: +4, -0
+  - `coral-go/pkg/frontend/static/folder_suggestion.js`: +2, -5
+  - `coral-go/pkg/frontend/static/folder_tags.js`: +28, -19
+  - `coral-go/pkg/frontend/static/goal_editor.js`: +237, -0
+  - `coral-go/pkg/frontend/static/goal_guide.js`: +81, -0
+  - `coral-go/pkg/frontend/static/goal_operator_dialogs.js`: +103, -0
+  - `coral-go/pkg/frontend/static/goal_text.js`: +16, -0
+  - `coral-go/pkg/frontend/static/goal_view.js`: +24, -4
+  - `coral-go/pkg/frontend/static/goals_view.js`: +18, -70
+  - `coral-go/pkg/frontend/static/history_pages.js`: +17, -0
+  - `coral-go/pkg/frontend/static/history_source.js`: +2, -2
+  - `coral-go/pkg/frontend/static/hub_access.js`: +5, -0
+  - `coral-go/pkg/frontend/static/inbox_activity.js`: +4, -4
+  - `coral-go/pkg/frontend/static/inbox_artifacts.js`: +3, -1
+  - `coral-go/pkg/frontend/static/inbox_coral.js`: +4, -4
+  - `coral-go/pkg/frontend/static/inbox_panel.js`: +5, -5
+  - `coral-go/pkg/frontend/static/inbox_reviews.js`: +33, -7
+  - `coral-go/pkg/frontend/static/inbox_servers.js`: +36, -10
+  - `coral-go/pkg/frontend/static/inbox_sidebar.js`: +62, -24
+  - `coral-go/pkg/frontend/static/inbox_tab.js`: +5, -2
+  - `coral-go/pkg/frontend/static/initial_load.js`: +1, -1
+  - `coral-go/pkg/frontend/static/inline_diff.js`: +6, -3
+  - `coral-go/pkg/frontend/static/launch_dialog.js`: +3, -1
+  - `coral-go/pkg/frontend/static/list_card_parts.js`: +4, -3
+  - `coral-go/pkg/frontend/static/machine_health.js`: +1, -1
+  - `coral-go/pkg/frontend/static/mailbox_chats.js`: +4, -1
+  - `coral-go/pkg/frontend/static/mailbox_starred_artifacts.js`: +1, -1
+  - `coral-go/pkg/frontend/static/menu_button.js`: +55, -5
+  - `coral-go/pkg/frontend/static/mobile_connect.js`: +4, -4
+  - `coral-go/pkg/frontend/static/nav_tabs.js`: +8, -2
+  - `coral-go/pkg/frontend/static/needs_filters.js`: +14, -0
+  - `coral-go/pkg/frontend/static/notice_pause.js`: +2, -2
+  - `coral-go/pkg/frontend/static/operator_ask_dialog.js`: +117, -0
+  - `coral-go/pkg/frontend/static/operator_asks.js`: +25, -113
+  - `coral-go/pkg/frontend/static/pinned_folders.js`: +44, -32
+  - `coral-go/pkg/frontend/static/registered_server_view.js`: +1, -1
+  - `coral-go/pkg/frontend/static/render.js`: +1, -1
+  - `coral-go/pkg/frontend/static/resume_dialog.js`: +2, -2
+  - `coral-go/pkg/frontend/static/safe_markdown.js`: +19, -1
+  - `coral-go/pkg/frontend/static/scheduler.js`: +1, -1
+  - `coral-go/pkg/frontend/static/server_access.js`: +10, -0
+  - `coral-go/pkg/frontend/static/server_base.js`: +6, -0
+  - `coral-go/pkg/frontend/static/server_rows.js`: +1, -1
+  - `coral-go/pkg/frontend/static/session_header_updates.js`: +21, -2
+  - `coral-go/pkg/frontend/static/sessions.js`: +32, -6
+  - `coral-go/pkg/frontend/static/settings_core.js`: +3, -0
+  - `coral-go/pkg/frontend/static/settings_fields.js`: +22, -10
+  - `coral-go/pkg/frontend/static/settings_fill.js`: +4, -0
+  - `coral-go/pkg/frontend/static/settings_form.js`: +4, -0
+  - `coral-go/pkg/frontend/static/settings_inbox.js`: +113, -0
+  - `coral-go/pkg/frontend/static/settings_modal.js`: +1, -0
+  - `coral-go/pkg/frontend/static/settings_nav.js`: +3, -0
+  - `coral-go/pkg/frontend/static/settings_rows_boot.js`: +12, -13
+  - `coral-go/pkg/frontend/static/settings_saved_words.js`: +2, -1
+  - `coral-go/pkg/frontend/static/sidebar_groups.js`: +13, -0
+  - `coral-go/pkg/frontend/static/skill_filter.js`: +18, -0
+  - `coral-go/pkg/frontend/static/skill_mention.js`: +134, -0
+  - `coral-go/pkg/frontend/static/skill_mention_boot.js`: +21, -0
+  - `coral-go/pkg/frontend/static/skills_tab.js`: +13, -8
+  - `coral-go/pkg/frontend/static/tags.js`: +4, -4
+  - `coral-go/pkg/frontend/static/task_detail_html.js`: +1, -1
+  - `coral-go/pkg/frontend/static/team_agents_page.js`: +1, -1
+  - `coral-go/pkg/frontend/static/team_artifacts_page.js`: +24, -8
+  - `coral-go/pkg/frontend/static/team_dialogs.js`: +26, -2
+  - `coral-go/pkg/frontend/static/team_form.js`: +9, -2
+  - `coral-go/pkg/frontend/static/team_tasks_page.js`: +6, -6
+  - `coral-go/pkg/frontend/static/template_browser.js`: +14, -11
+  - `coral-go/pkg/frontend/static/terminal_backend.js`: +9, -2
+  - `coral-go/pkg/frontend/static/theme_config.js`: +3, -3
+  - `coral-go/pkg/frontend/static/view_list.js`: +2, -2
+  - `coral-go/pkg/frontend/static/view_switch.js`: +1, -1
+  - `coral-go/pkg/frontend/static/waiting.js`: +56, -3
+  - `coral-go/pkg/frontend/static/workflows.js`: +2, -2
+  - `coral-go/pkg/frontend/static/xterm_renderer.js`: +6, -4
+  - `coral-go/pkg/frontend/static_budget_baseline.txt`: +720, -0
+  - `coral-go/pkg/frontend/templates/includes/modals.html`: +10, -5
+  - `coral-go/pkg/frontend/templates/includes/views/live_session.html`: +1, -1
+  - `coral-go/pkg/frontend/templates/index.html`: +0, -1
+  - test files, not compiled by the Hub: 3 files (+353, -37)
+
+  `agent_docs`: 9 files the Hub embeds changed (+105, -13)
+
+  - `coral-go/agent_docs/README.md`: +1, -0
+  - `coral-go/agent_docs/artifacts.md`: +2, -0
+  - `coral-go/agent_docs/chief-guide.md`: +51, -0
+  - `coral-go/agent_docs/how-do-i.md`: +1, -1
+  - `coral-go/agent_docs/hub.md`: +1, -1
+  - `coral-go/agent_docs/quickstart.md`: +4, -4
+  - `coral-go/agent_docs/teams.md`: +2, -0
+  - `coral-go/agent_docs/telemetry.md`: +40, -4
+  - `coral-go/agent_docs/troubleshooting.md`: +3, -3
+
+  Unchanged: `pkg/hubproxy`, `pkg/hubowner`, `pkg/redact`.
+
+  ### Coral packages compiled into the Hub through its imports, v2.0.39 to f3363c2bd
+
+  `internal/secfile`: 2 files of Go code changed (+20, -3), imported by `pkg/hubowner`
+
+  - `coral-go/internal/secfile/admin_group.go`: +11, -0
+  - `coral-go/internal/secfile/pathwriters.go`: +9, -3
+  - test files, not compiled by the Hub: 1 file (+87, -0)
+
+  Unchanged: `internal/fsreplace`, `internal/httputil`, `internal/logsafe`, `internal/safego`, `internal/secrets`, `pkg/redact/betterleaks`.
+
+- **Routes**: five added, none reachable through the tunnel (`GET /api/skills/search`, `POST /api/board/{project}/goals/{goalID}/driver`, `POST /api/board/{project}/goals/{goalID}/move`, `POST /api/sessions/live/{name}/skills`, `POST /api/sessions/live/{name}/waiting/dismiss`: the Operator's, census class b). One changed: **`PUT /api/board/{project}/artifacts/{id}/tags` is now an owner row** (#12742, marking a file read through the Hub): the Hub's Operator only, a closed body (tags of a-z, 0-9, space and hyphen) judged against the list the server holds; the reviewed owner set and the owner-route census carry it. No route removed.
+- **Computer-owned data goes to its own computer through the Hub** (#12581, #12583, #12612, #12617, #12653, #12667): artifact-name lookups, Operator questions, Keep/Star/Delete, pinned folders, custom views, Chief's appearance and folder tags use the owning computer's `data-server`; a new lint (`bare_api_fetch_census`) fails a bare `/api` fetch of computer data. Hub View mode no longer asks for a Files refresh it cannot have (#12646), and Needs you through the Hub keeps its order when a computer answers late (#12636).
+- **Machine launch (#12584, #12588)**: `coral machine launch` asks `GET /api/bootstrap/ready` (https, no Authorization, no redirects) before it creates anything; a Hub that answers 404 or 501 (today's app.coralhub.dev) is refused with nothing created. Against a Hub with bootstrap on it goes on; the CLI pins the Linux digests of v2.0.39 (`tools/pin-release-digests.sh`, checked with `--new-bundle-format`).
+- **Embedded docs**: `pkg/frontend`'s agent docs are shipped as `<name>.md.gz` (the same bytes are served, #12865); `agent_docs` also gains the Chief user guide (new) and an updated telemetry page.
+- **`internal/secfile`** (imported by `pkg/hubowner`): the group-write check accepts root's folder that the system administrators' group can write (macOS `/Applications`, #12656); nothing else is trusted that was not.
+- **Usage events**: the funnel moves to schema 6 (step by step, counts and closed values only; the Inbox's three events); sends only after the Terms are accepted.
+- **Ready signals, hooks, tokens, framed paths**: unchanged.
+
+#### For developers and releases
+
+- The static-tree budget is one constant with a baseline file and a report that names what grew (#12865); it is 5,729,280 bytes (the tree plus 64 KiB).
+- `tools/pin-release-digests.sh` passes `--new-bundle-format` (a v0.3 Sigstore bundle fails without it); its test's shim cosign now fails like the real one without the flag.
+- Census and test fixes on the way: the goroutine census (`internal/tmux/disclaimed.go` recovers), the no-gate and launch censuses, fixed dates in the board and routes tests are gone (#12927), `servers_below_minimum`, `cli_dialogs`, `inbox_server_columns`, the artifact viewer's phone suites and the settings suites were brought to the pages they test.
+- macOS GUI tests: the window-opening webview tests in `cmd/coral-app` run only with `CORAL_ALLOW_GUI_TESTS=1`; never run them from an agent shell (#12836).
+- windows-tests still has reds that are not this release's (the Hermes home tests, `TestShortLivedChildrenOfTheAgentNeverRefuseIt`, `cloud_rekey` on Windows); the Windows team has them.
+
 ## v2.0.39 — The data-folder hotfix, released: upgrading from v2.0.37 restores your agents, a lost terminal server is recovered, and the macOS build retries its staple
 
 ### Changes
