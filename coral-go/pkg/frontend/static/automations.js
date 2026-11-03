@@ -221,7 +221,7 @@ function recentTable(rows, narrowed) {
         empty: { line: narrowed ? 'No run matches the search and filters.' : 'Nothing has run yet.', hint: narrowed ? '' : 'Every run of a job or workflow shows here, newest first. A dot marks one you have not opened.', ...(narrowed ? {} : firstRun()) },
         signature: JSON.stringify([!!firstRun().cards, rows.map(i => [i.key, i.run.status, AR.isUnread(i), i.name, AR.resultWords(i.run).full])]),
         node: () => DT.dataTable({
-            label: `Recent runs, ${rows.length}`, rows, oneLine: true, rowKey: i => i.key, rowName: i => `${i.name}, ${AR.resultWords(i.run).full}${AR.isUnread(i) ? ', not opened' : ''}`, state: stateOf('recent'), open: openRun,
+            label: `Recent runs, ${rows.length}`, rows, oneLine: true, resize: true, rowKey: i => i.key, rowName: i => `${i.name}, ${AR.resultWords(i.run).full}${AR.isUnread(i) ? ', not opened' : ''}`, state: stateOf('recent'), open: openRun,
             columns: [ // one line a row (Goal #79): a narrow list drops Kind (under 52 rem: the run's name is at least 24 characters, #9856), then When it started and How long it took (dropAt, #8931): the name and the result stay, the name whole
                 { key: 'name', label: 'Run', primary: true, width: 'grow', sort: true, sortValue: i => i.name, cell: i => {
                     const b = nameButton(i, i.kind === 'workflow' ? 'A workflow run' : 'A job run');
