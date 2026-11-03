@@ -107,8 +107,8 @@ var versionRe = regexp.MustCompile(`^[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,4}(-[A-Za-z
 // DefaultDataDir is the data folder of a set up that chose nothing, relative to the home folder there. A person can choose another (a Coral set up by hand keeps its data in ".coral").
 const DefaultDataDir = InstallDir + "/data"
 
-// dataDirSeg is one folder name: an optional single leading dot, then a letter, digit or underscore, then letters, digits, dot, underscore or hyphen. So there is no "..", no "." alone and no empty name.
-const dataDirSeg = `\.?[A-Za-z0-9_][A-Za-z0-9._-]{0,60}`
+// dataDirSeg is one folder name: an optional single leading dot, then a letter, digit or underscore, then letters, digits, underscore or hyphen, a dot allowed only before another of those. So no name has ".." in it or ends in a dot, there is no "." alone and no empty name: the same text the remote read-back (readDataDir) accepts.
+const dataDirSeg = `\.?[A-Za-z0-9_](?:[A-Za-z0-9_-]|\.[A-Za-z0-9_-]){0,60}`
 
 // dataDirArgRe is a data folder as an argument: relative to the home folder, up to five names, or "@keep" (the one recorded at the last start, else the default).
 var dataDirArgRe = regexp.MustCompile(`^(@keep|` + dataDirSeg + `(/` + dataDirSeg + `){0,4})$`)
