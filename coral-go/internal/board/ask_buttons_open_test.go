@@ -53,15 +53,17 @@ func TestTheOperatorsTypedReplyFreesTheSlotsOfTheQuestionsItAnswered(t *testing.
 	}
 	require.Equal(t, AskButtonsOpenMax, openCount(t, s, ctx))
 
-	askPost(t, s, ctx, "Operator", "yes, go ahead", false, qs[0].ID)             // a typed reply to it
-	askPost(t, s, ctx, "Operator", "@Lead the second one is fine too", false, 0) // answers by mentioning the asker, no reply_to
-	askPost(t, s, ctx, "Operator", "@Lead I see", false, qs[2].ID)
+	askPost(t, s, ctx, "Operator", "@Lead the second one is fine too", false, 0) // tags the asker, replies to nothing: it answers no button question (#12490: one post must not clear them all)
+	assert.Equal(t, AskButtonsOpenMax, openCount(t, s, ctx), "a post that only tags the asker leaves every earlier button question pending")
+	assert.Equal(t, []string{ButtonPending, ButtonPending}, buttonStates(t, s, ctx, qs[1]))
 
-	assert.Zero(t, openCount(t, s, ctx), "the Operator's words (a reply, or a post that tags the asker) answered every question asked before them")
+	askPost(t, s, ctx, "Operator", "yes, go ahead", false, qs[0].ID) // a typed reply TO it
+	askPost(t, s, ctx, "Operator", "@Lead I see", false, qs[2].ID)   // a reply to another one that tags the asker: it answers only that one
+
+	assert.Equal(t, AskButtonsOpenMax-2, openCount(t, s, ctx), "only the two questions answered with a reply to them are resolved")
 	assert.Equal(t, []string{ButtonClosed, ButtonClosed}, buttonStates(t, s, ctx, qs[0]), "its buttons are resolved, not left pending")
-	later := buttonAsk(t, s, ctx, time.Now(), "Yes=reply", "Wake Dev A=wake:Dev A") // asked after those words: nobody has answered it
-	assert.Equal(t, 1, openCount(t, s, ctx))
-	assert.Equal(t, []string{ButtonPending, ButtonPending}, buttonStates(t, s, ctx, later))
+	assert.Equal(t, []string{ButtonClosed, ButtonClosed}, buttonStates(t, s, ctx, qs[2]))
+	assert.Equal(t, []string{ButtonPending, ButtonPending}, buttonStates(t, s, ctx, qs[1]))
 }
 
 func TestAWakeButtonPendingMoreThanADayExpiresAndAReplyButtonDoesNot(t *testing.T) {
@@ -82,6 +84,7 @@ func TestAMigrationResolvesTheButtonsOfQuestionsAlreadyAnswered(t *testing.T) {
 	answered := buttonAsk(t, s, ctx, time.Now(), "Yes=reply")
 	waiting := buttonAsk(t, s, ctx, time.Now(), "Yes=reply")
 	askPost(t, s, ctx, "Operator", "done", false, answered.ID)
+	askPost(t, s, ctx, "Operator", "@Lead thanks", false, 0) // tags the asker only: answers neither question
 
 	require.NoError(t, s.ResolveAskButtons(ctx, time.Now()))
 

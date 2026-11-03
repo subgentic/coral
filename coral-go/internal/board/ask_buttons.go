@@ -161,7 +161,7 @@ func (s *Store) OpenButtonAsks(ctx context.Context, project, asker string) (int,
 	return n, err
 }
 
-// ResolveAskButtons settles the pending buttons of every question on every board that no longer needs a click: its question was closed or the Operator answered it in words, or a wake button is older than
+// ResolveAskButtons settles the pending buttons of every question on every board that no longer needs a click: its question was closed or the Operator replied to it (a reply TO it, not a post that tags the asker), or a wake button is older than
 // WakeButtonLife. It is the one-time clean-up of questions answered before buttons were resolved on an answer (#12610), and safe to run again.
 func (s *Store) ResolveAskButtons(ctx context.Context, now time.Time) error {
 	var projects []string
@@ -189,17 +189,15 @@ func (s *Store) resolveAskButtons(ctx context.Context, project, asker string, no
 	if err := s.db.SelectContext(ctx, &asks, q, args...); err != nil || len(asks) == 0 {
 		return err
 	}
-	subs, err := s.subscriberIndex(ctx, project)
-	if err != nil {
-		return err
-	}
 	for _, a := range asks {
 		closed, err := s.AskIsClosed(ctx, project, a.MessageID)
 		if err != nil {
 			return err
 		}
 		if !closed {
-			if closed, err = s.answeredBy(ctx, project, a, "Operator", subs); err != nil {
+			// Only a reply to THIS question resolves its buttons: a later post that merely tags the asker answers a plain question (the board's rule) but must not clear every button question the asker has open (#12490, #12610).
+			if err := s.reader().GetContext(ctx, &closed, `SELECT EXISTS(SELECT 1 FROM board_messages m JOIN board_replies r ON r.message_id = m.id
+				WHERE m.project = ? AND m.id > ? AND m.subscriber_id = 'Operator' AND COALESCE(m.is_system, 0) = 0 AND r.reply_to = ?)`, project, a.MessageID, a.MessageID); err != nil {
 				return err
 			}
 		}
