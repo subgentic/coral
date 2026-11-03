@@ -2,6 +2,9 @@ package routes
 
 import (
 	"context"
+	"errors"
+	"net/http"
+	"net/http/httptest"
 	"strconv"
 	"strings"
 	"testing"
@@ -313,4 +316,48 @@ func TestAFileNewOnTheListStillGetsItsKind(t *testing.T) {
 	require.Equal(t, 201, code, out)
 	assert.Equal(t, board.KindDone, k.kindOf(out))
 	assert.Nil(t, out["kind_ignored"])
+}
+
+// QA's SHOULDs on #12783: the server's own checks in uploadKindFor, asked directly (the upload route refuses another member's task and an unverified caller before them, so a mutant of one of these checks would
+// pass the route tests): another member's task, a task with no number, a caller with no verified session, and a request for a kind that is not for review.
+func TestUploadKindForChecksTheFactsItselfAndNotOnlyTheRoutesBefore(t *testing.T) {
+	k := newKindRig(t)
+	owner := func(sid, name string) context.Context {
+		return context.WithValue(context.Background(), verifiedSessionKey{}, &store.SessionTokenOwner{SessionID: sid, SessionName: name})
+	}
+	ask := func(ctx context.Context, kind string, task int64, review bool) string {
+		req := httptest.NewRequest(http.MethodPost, "/api/agent/artifacts?kind="+kind, nil)
+		_, refused := k.h.uploadKindFor(ctx, req, task, review)
+		return refused
+	}
+	mine := owner("s1", "agent-s1") // Backend
+	op, err := k.h.bs.CreateTask(context.Background(), "alpha", "OPERATOR belongs to Frontend", "", "medium", "lead", "Frontend")
+	require.NoError(t, err)
+	rel, err := k.h.bs.CreateTask(context.Background(), "alpha", "Release v3.0.0", "", "medium", "lead", "Frontend")
+	require.NoError(t, err)
+	assert.Contains(t, ask(mine, "done", op.ID, true), "assigned to you", "another member's OPERATOR task")
+	assert.Contains(t, ask(mine, "release", rel.ID, true), "assigned to you", "another member's release task")
+	assert.Contains(t, ask(mine, "done", 0, true), "the task this file is for", "no task at all")
+	assert.Contains(t, ask(mine, "done", -1, true), "the task this file is for", "an explicit none")
+	assert.Contains(t, ask(context.Background(), "done", op.ID, true), "on a team's board", "a caller with no verified session")
+	assert.Contains(t, ask(owner("s9", "agent-nobody"), "decided", 0, true), "on a team's board", "a session that is on no board")
+	assert.Contains(t, ask(mine, "done", op.ID, false), "for a file for review", "not for review")
+	mineTask, err := k.h.bs.CreateTask(context.Background(), "alpha", "OPERATOR mine", "", "medium", "lead", "Backend")
+	require.NoError(t, err)
+	assert.Empty(t, ask(mine, "done", mineTask.ID, true), "the same checks pass for the agent's own OPERATOR task")
+}
+
+// A failed read of the settings mutes nothing: the comment says a failure never hides a file, and this holds it to that.
+func TestAFailedSettingsReadMutesNothing(t *testing.T) {
+	e := newInboxEnv(t)
+	e.kind(t, "release")
+	e.settings["inbox_kind_release"] = "false"
+	e.settings["inbox_included_teams"] = `["somebody-else"]`
+	require.Equal(t, 0, e.count(t), "with the settings readable the file is muted")
+	e.h.SetInboxSettings(func(context.Context) (map[string]string, error) {
+		return nil, errors.New("the settings could not be read")
+	})
+	assert.Equal(t, 1, e.count(t), "a read that fails: the file counts, it is never hidden on a guess")
+	assert.Nil(t, e.needsYou(t)["muted"])
+	assert.False(t, readInboxPrefs(nil).muted("t", "release"))
 }
