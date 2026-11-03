@@ -279,14 +279,21 @@ func startHeartbeat(ctx context.Context, dataDir string) {
 }
 
 // startWindowAtLaunch opens the Coral window once, when a start that somebody asked for finds the server running (see opensWindowAtStart); a start nobody asked for stays in the background, and a server that is not running gets no window.
-func startWindowAtLaunch(noBrowser, loginItem bool, running func() bool, showWindow func()) {
+// showWindow says whether a window (the native one, or the dashboard in the browser) opened; when none did, notify says so in one short sentence, so the person is not left with a tray icon and nothing else.
+func startWindowAtLaunch(noBrowser, loginItem, shownBefore bool, running func() bool, showWindow func() bool, notify func(string)) {
 	switch {
-	case !opensWindowAtStart(noBrowser, loginItem):
-		log.Printf("[STARTUP] staying in the background (no-browser=%v, login item=%v): the window opens when the app is opened again", noBrowser, loginItem)
+	case !opensWindowAtStart(noBrowser, loginItem, shownBefore):
+		log.Printf("[STARTUP] staying in the background (no-browser=%v, login item=%v, window shown before=%v): the window opens when the app is opened again", noBrowser, loginItem, shownBefore)
 	case running():
-		go func() { defer safego.Recover("coral-tray/main:298"); showWindow() }()
+		go func() {
+			defer safego.Recover("coral-tray/main:298")
+			if !showWindow() {
+				log.Printf("[STARTUP] no window could be opened")
+				notify(noticeWindowNotOpened)
+			}
+		}()
 	default:
-		log.Printf("[STARTUP] the server is not running: no window (the tray menu has the log and Retry)")
+		log.Printf("[STARTUP] the server is not running: no window (the tray menu has the log and Retry; a failed start already raised its own notification, trayStatus.set)")
 	}
 }
 
@@ -382,15 +389,23 @@ func runForeground(host string, port int, noBrowser, debugMode bool, backendType
 
 	// The Coral window (the native one, or the dashboard in the browser when it cannot open): shown when the person launched the app, brought forward when they launch it again
 	// (a reopen event on macOS, SIGUSR1 from a second start), and not at all for a start nobody asked for: a login item, the relaunch after an update (--no-browser) (#5827).
-	showWindow := func() {
-		if err := launchCoralApp(url, mintLink); err != nil {
-			executil.OpenLogin(loginlink.Or(url, mintLink))
+	showWindow := func() bool {
+		ok := launchCoralApp(url, mintLink) == nil || executil.TryOpenLogin(loginlink.Or(url, mintLink))
+		if ok {
+			windowmark.NoteShown(dataDir) // the tray's own record: a fresh install's first background start looks at it (opensWindowAtStart)
 		}
+		return ok
 	}
+	notifyTray := func(msg string) { _ = beeep.Notify("Coral", msg, "") }
 	onShowWindowSignal(func() {
-		go func() { defer safego.Recover("coral-tray/main:showWindowSignal"); showWindow() }()
+		go func() {
+			defer safego.Recover("coral-tray/main:showWindowSignal")
+			if !showWindow() {
+				notifyTray(noticeWindowNotOpened)
+			}
+		}()
 	})
-	startWindowAtLaunch(noBrowser, loginItemLaunch(), status.running, showWindow)
+	startWindowAtLaunch(noBrowser, loginItemLaunch(), windowmark.EverShown(dataDir), status.running, showWindow, notifyTray)
 
 	// Check for updates in background
 	go func() {
@@ -828,11 +843,14 @@ func launchCoralApp(url string, mint func() (string, error)) error {
 	// Reap the process in background and clear the reference when it exits. The window is recorded as open until the person closes it (windowmark, #5827).
 	go func() {
 		defer safego.Recover("coral-tray/main:693")
-		trackWindow(coralAppDataDir, cmd, func() bool {
+		code := trackWindow(coralAppDataDir, cmd, func() bool {
 			coralAppMu.Lock()
 			defer coralAppMu.Unlock()
 			return coralAppProcess == cmd.Process
 		})
+		if code == windowmark.AppExitTermsDeclined { // the window showed the Terms and they were declined: the tray and the server keep running, so say so
+			_ = beeep.Notify("Coral", noticeTermsDeclined, "")
+		}
 		coralAppMu.Lock()
 		if coralAppProcess == cmd.Process {
 			coralAppProcess = nil

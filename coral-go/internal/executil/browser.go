@@ -20,7 +20,12 @@ func OpenBrowser(url string) {
 	if !ok {
 		return
 	}
-	startOpener(browserCommand(runtime.GOOS, u))
+	tryOpenBrowser(u)
+}
+
+// tryOpenBrowser starts the system's opener on an address that is already a web address, and says whether it started.
+func tryOpenBrowser(u string) bool {
+	return startOpener(browserCommand(runtime.GOOS, u))
 }
 
 // startOpener runs the system's opener with argv (a test seam) and reports whether it started.
@@ -36,19 +41,21 @@ var startOpener = func(argv []string) bool {
 // link is the one secret in a browser launch. The opener is given a small page that only redirects to the link, written for its owner alone (0600, in the user's temp folder), so what the
 // argument list shows is a file's name. A link is single use and lasts ten minutes, so the page is harmless once it has been followed, and any left behind are removed on the next call. An
 // address with no secret in it, or a page that cannot be written, is opened as OpenBrowser does.
-func OpenLogin(link string) {
+func OpenLogin(link string) { TryOpenLogin(link) }
+
+// TryOpenLogin is OpenLogin that says whether the system's opener started (false: the link is not a web address, or no opener ran).
+func TryOpenLogin(link string) bool {
 	u, ok := WebURL(link)
 	if !ok {
-		return
+		return false
 	}
 	if !strings.Contains(u, "login_token=") {
-		OpenBrowser(u)
-		return
+		return tryOpenBrowser(u)
 	}
 	if path, err := writeLoginPage(u); err == nil && startOpener(fileOpenCommand(runtime.GOOS, path)) {
-		return
+		return true
 	}
-	OpenBrowser(u)
+	return tryOpenBrowser(u)
 }
 
 // fileOpenCommand is the argv that opens the file at path in its default program on goos (the browser, for a page).

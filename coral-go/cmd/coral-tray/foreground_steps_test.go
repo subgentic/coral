@@ -83,13 +83,13 @@ func TestStartWindowAtLaunchDecisionTable(t *testing.T) {
 		{"asked for, server running", false, false, true, true, true},
 		{"asked for, server not running", false, false, false, false, true},
 		{"--no-browser", true, false, true, false, false},
-		{"login item", false, true, true, false, false},
+		{"login item, window shown before", false, true, true, false, false},
 		{"both", true, true, true, false, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			shown := make(chan struct{}, 1)
 			asked := false
-			startWindowAtLaunch(tc.noBrowser, tc.loginItem, func() bool { asked = true; return tc.running }, func() { shown <- struct{}{} })
+			startWindowAtLaunch(tc.noBrowser, tc.loginItem, true, func() bool { asked = true; return tc.running }, func() bool { shown <- struct{}{}; return true }, func(string) {})
 			select {
 			case <-shown:
 				if !tc.wantShown {
