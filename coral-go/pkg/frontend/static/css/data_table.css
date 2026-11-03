@@ -254,6 +254,7 @@
 @media (prefers-reduced-motion: reduce) { .dt-resize::after { transition: none; } }
 .dt-resize:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .dt-box.dt-sized { overflow-x: auto; }
+.dt-box.dt-sized.dt-one-line { overflow-x: clip; } /* a one-line table is sized to fit its box (its columns drop as it narrows), so it needs no sideways scroll, and a scroll box here would take a scrollbar's width and keep the sticky header from sticking to the page: the Artifacts table was 6 px short and its list lost its place on a refresh (#12905, after the resizing of #12754) */
 .dt-box.dt-sized .dt-table td { max-width: none; }
 .dt-box.dt-folded .dt-resize { display: none; }
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) { .dt-resize { display: none; } } /* a column's drag handle is a pointer's: on a phone an unfolded table (the dock's one-line rows) has none, not a 10 px target (#8837) */

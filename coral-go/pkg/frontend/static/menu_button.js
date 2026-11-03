@@ -117,6 +117,8 @@ function scrollPositions(toggle) {
 document.addEventListener('scroll', e => {
     if (!current || current.menu.contains(e.target)) return;
     const el = e.target === document ? document.scrollingElement : e.target;
-    if (el && current.scrolled.get(el) === el.scrollTop) return; // it did not move since the menu opened: the event is for an earlier scroll
+    if (!el) return;
+    if (el !== document.scrollingElement && !el.contains(current.toggle)) return; // a list that does not hold the toggle (the board's messages jumping to a search match) does not move the menu's row (#12905)
+    if (current.scrolled.get(el) === el.scrollTop) return; // it did not move since the menu opened: the event is for an earlier scroll
     closeMenus();
 }, true);
