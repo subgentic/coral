@@ -21,19 +21,24 @@ function dialog(titleText, id) {
     const dlg = document.createElement('dialog'); dlg.className = 'dlg-confirm goals-dialog goals-operator-dialog'; dlg.setAttribute('aria-labelledby', id);
     const form = el('form', 'goals-form'); form.noValidate = true;
     const title = el('h3', null, titleText); title.id = id;
-    return { dlg, form, title };
+    const head = el('div', 'goals-form-head'), body = el('div', 'goals-form-body');
+    const back = btn('goals-form-back', null, () => dlg.close()); back.setAttribute('aria-label', 'Back'); back.title = 'Back';
+    const arrow = el('span', 'material-icons', 'arrow_back'); arrow.setAttribute('aria-hidden', 'true'); back.append(arrow);
+    head.append(back, title); form.append(head, body);
+    return { dlg, form, body };
 }
 
 const field = (label, control, id) => { const l = el('label', 'goals-field'); control.id = id; l.append(el('span', null, label), control); return l; };
 
 /** The Change driver dialog: a select of the team's members (and "No driver"); Save sends the one route. */
 export function openChangeDriver({ project, goal, onDone, onClose }) {
-    const { dlg, form, title } = dialog('Change who drives this goal', 'goal-driver-title');
+    const { dlg, form, body } = dialog('Change who drives this goal', 'goal-driver-title');
     const sel = el('select'); sel.disabled = true; sel.append(new Option('Loading…', ''));
     const err = el('p', 'goals-field-error'); err.setAttribute('role', 'alert');
     const go = btn('btn btn-primary', 'Save'); go.type = 'submit'; go.disabled = true;
     const actions = el('div', 'goals-actions'); actions.append(btn('btn', 'Cancel', () => dlg.close()), go);
-    form.append(title, el('p', 'goals-close-goal', goal.title), field('Driver', sel, 'goal-driver-select'), el('p', 'goals-note', 'The driver is told on the board, as when a goal is given to them.'), err, actions);
+    body.append(el('p', 'goals-close-goal', goal.title), field('Driver', sel, 'goal-driver-select'), el('p', 'goals-note', 'The driver is told on the board, as when a goal is given to them.'), err);
+    form.append(actions);
     dlg.append(form); document.body.append(dlg);
     membersOf(project).then(people => {
         sel.replaceChildren(...people.map(p => new Option(p.label, p.id)), new Option('No driver', ''));
@@ -54,7 +59,7 @@ export function openChangeDriver({ project, goal, onDone, onClose }) {
 
 /** The Move dialog: the other team, and (optionally) a driver from that team. It says what moves and what stays before anything is sent. */
 export function openMoveGoal({ project, goal, openTasks, onMoved, onClose }) {
-    const { dlg, form, title } = dialog('Give this goal to another team', 'goal-move-title');
+    const { dlg, form, body } = dialog('Give this goal to another team', 'goal-move-title');
     const teamSel = el('select'); teamSel.append(new Option('Loading…', '')); teamSel.disabled = true;
     const driverSel = el('select'); driverSel.append(new Option('No driver yet: that team\'s Orchestrator is told', '')); driverSel.disabled = true;
     const err = el('p', 'goals-field-error'); err.setAttribute('role', 'alert');
@@ -64,7 +69,8 @@ export function openMoveGoal({ project, goal, openTasks, onMoved, onClose }) {
     dlg.setAttribute('aria-describedby', what.id);
     const go = btn('btn btn-primary', 'Give goal'); go.type = 'submit'; go.disabled = true;
     const actions = el('div', 'goals-actions'); actions.append(btn('btn', 'Cancel', () => dlg.close()), go);
-    form.append(title, el('p', 'goals-close-goal', goal.title), what, field('Team', teamSel, 'goal-move-team'), field('Driver there (optional)', driverSel, 'goal-move-driver'), err, actions);
+    body.append(el('p', 'goals-close-goal', goal.title), what, field('Team', teamSel, 'goal-move-team'), field('Driver there (optional)', driverSel, 'goal-move-driver'), err);
+    form.append(actions);
     dlg.append(form); document.body.append(dlg);
     fetch('/api/board/projects').then(r => (r.ok ? r.json() : Promise.reject(new Error(String(r.status))))).then(rows => {
         const others = (Array.isArray(rows) ? rows : []).filter(t => t && t.board_id && t.board_id !== project);
