@@ -2,9 +2,13 @@ package routes
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -178,4 +182,70 @@ func trackFolder(t *testing.T, repo, dir string) {
 	require.NoError(t, os.WriteFile(filepath.Join(repo, dir, ".tracked"), []byte("t\n"), 0o644))
 	gitIn(t, repo, "add", filepath.Join(dir, ".tracked"))
 	gitIn(t, repo, "commit", "-q", "-m", "track "+dir)
+}
+
+// Pins for QA's survivors on #12524 (#12543).
+
+// An ignored file inside a SMALL untracked folder is not listed, by the folder's own .gitignore (the folder listing keeps --exclude-standard).
+func TestAnIgnoredFileInASmallUntrackedFolderIsNotListed(t *testing.T) {
+	_, h, _, _ := setupSessionsTestServer(t)
+	repo := diffRepo(t)
+	require.NoError(t, os.MkdirAll(filepath.Join(repo, "mixed"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(repo, "mixed", ".gitignore"), []byte("*.log\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(repo, "mixed", "skip.log"), []byte("ignored\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(repo, "mixed", "keep.txt"), []byte("kept\n"), 0o644))
+	out, err := h.generateChangesDiff(context.Background(), repo)
+	require.NoError(t, err)
+	assert.Contains(t, string(out), "diff --git a/mixed/keep.txt b/mixed/keep.txt")
+	assert.NotContains(t, string(out), "skip.log")
+}
+
+// A folder named with glob characters is a name, never a pattern: a folder named `*` is folded by its own files, and does not also count the folders `a/` and `b/` the pattern would match.
+func TestAFolderNamedWithGlobCharactersIsALiteralName(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("a folder named * cannot exist on Windows")
+	}
+	_, h, _, _ := setupSessionsTestServer(t)
+	repo := diffRepo(t)
+	tree(t, repo, "*", 30) // folded
+	tree(t, repo, "a", 2)  // small: file by file
+	tree(t, repo, "b", 2)
+	out, err := h.generateChangesDiff(context.Background(), repo)
+	require.NoError(t, err)
+	got := string(out)
+	assert.Contains(t, got, `new folder "*/": 30 untracked files`, "its own 30 files, not 34")
+	assert.Contains(t, got, "diff --git a/a/f00.json b/a/f00.json")
+	assert.Contains(t, got, "diff --git a/b/f01.json b/b/f01.json")
+}
+
+// A link inside a folder is never followed: its target's size is not the folder's size. Five small files and a link to a 1 MB file elsewhere stay a small folder (file by file).
+func TestALinkInAnUntrackedFolderIsNotFollowedForItsSize(t *testing.T) {
+	_, h, _, _ := setupSessionsTestServer(t)
+	repo := diffRepo(t)
+	tree(t, repo, "linked", 5)
+	big := filepath.Join(t.TempDir(), "big.bin")
+	require.NoError(t, os.WriteFile(big, []byte(strings.Repeat("x", 1<<20)), 0o644))
+	require.NoError(t, os.Symlink(big, filepath.Join(repo, "linked", "to-big")))
+	out, err := h.generateChangesDiff(context.Background(), repo)
+	require.NoError(t, err)
+	got := string(out)
+	assert.NotContains(t, got, `new folder "linked/"`, "the link's target is not counted: a small folder stays file by file")
+	assert.Contains(t, got, "diff --git a/linked/f00.json b/linked/f00.json")
+}
+
+// The click on a folded row in the Files list (#12543): the single-file diff of "dir/" says what the folder is, not an empty panel.
+func TestTheDiffOfAFoldedFolderRowSaysWhatItIs(t *testing.T) {
+	r := newFollowRig(t, true)
+	tree(t, r.launch, ".git.sync.traces/a", 30)
+	req, err := http.NewRequest(http.MethodGet, r.server.URL+"/api/sessions/live/"+r.name+"/diff?session_id="+r.sid+"&filepath="+url.QueryEscape(".git.sync.traces/"), nil)
+	require.NoError(t, err)
+	req.Header.Set("Origin", r.server.URL)
+	req.Header.Set("Sec-Fetch-Site", "same-origin")
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.Equal(t, 200, resp.StatusCode)
+	var body map[string]any
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+	assert.Contains(t, body["diff"], `new folder ".git.sync.traces/": 30 untracked files`)
 }

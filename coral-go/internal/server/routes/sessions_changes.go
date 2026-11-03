@@ -92,7 +92,12 @@ func (h *SessionsHandler) Diff(w http.ResponseWriter, r *http.Request) {
 		realFull, err := safefs.Resolve(fullPath)
 		realWork, _ := safefs.Resolve(workdir)
 		if err == nil && strings.HasPrefix(realFull, realWork+string(os.PathSeparator)) {
-			if info, err := os.Stat(realFull); err == nil && !info.IsDir() {
+			if info, err := os.Stat(realFull); err == nil && info.IsDir() && strings.HasSuffix(fp, "/") {
+				// The row of a folded untracked folder (#12524, #12543): say what the folder is, not an empty panel.
+				if files, total, exact, merr := measureFolder(workdir, fp, func(args ...string) ([]byte, error) { return gitutil.Command(ctx, workdir, args...).Output() }); merr == nil && len(files) > 0 {
+					diffText = string(diffNote("%s", untrackedItem{Path: fp, Folded: true, Files: len(files), Bytes: total, BytesExact: exact}.foldedNote()))
+				}
+			} else if info, err := os.Stat(realFull); err == nil && !info.IsDir() {
 				if strict && (info.Size() > maxFileBytes() || isBinaryFile(realFull)) {
 					diffText = string(diffNote("new file %q, %d bytes, not shown", fp, info.Size()))
 				} else if data, err := os.ReadFile(realFull); err == nil {
