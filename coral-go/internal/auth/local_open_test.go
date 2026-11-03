@@ -117,12 +117,26 @@ func TestOpenCoralOnThisComputerRefusesEveryOtherCaller(t *testing.T) {
 	}
 }
 
+// #12834, QA Reviewer 2's MUST: the button's note is shared by the create page and the sign-in page. Only the create page (no password yet) says Coral asks for a password next; a page for a computer that has one
+// never promises that. (The server offers the button only while no password is set, so the sign-in rendering is the template's own rule, pinned here.)
+func TestTheOpenOnThisComputerNoteSaysThePasswordPromptOnlyWhereItIsTrue(t *testing.T) {
+	create := AuthPage(PageState{Local: true, LocalOpen: true})
+	assert.Contains(t, create, "Coral then asks you to create a password")
+	signIn := AuthPage(PageState{Local: true, LocalOpen: true, PasswordSet: true})
+	require.Contains(t, signIn, "so it can open Coral from here.")
+	assert.NotContains(t, signIn, "asks you to create a password", "a computer that already has a password is never told it will be asked for one")
+	assert.NotContains(t, strings.ToLower(signIn), "without a password")
+}
+
 // The page shows the button only to a browser on this computer, in both its states.
 func TestTheSignInPageOffersOpenOnThisComputerOnlyLocally(t *testing.T) {
 	page := AuthPage(PageState{Local: true, LocalOpen: true})
 	assert.Contains(t, page, `action="/auth/local"`)
 	assert.Contains(t, page, "Open Coral on this computer")
 	assert.Equal(t, 1, strings.Count(page, `id="local-open"`))
+	// #12834: the words match what happens next. The dashboard asks for a password at once (a password is always created, #11892), so the page says so and never promises a way in without one.
+	assert.Contains(t, page, "Coral then asks you to create a password")
+	assert.NotContains(t, strings.ToLower(page), "without a password", "the button's note no longer promises what the next screen takes back")
 	for _, s := range []PageState{{PasswordSet: true, Local: true}, {Local: true}, {PasswordSet: true}, {}} {
 		assert.NotContains(t, AuthPage(s), "/auth/local", "offered only when the server says so (this computer, no password yet)")
 	}

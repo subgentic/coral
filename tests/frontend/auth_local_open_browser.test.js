@@ -144,6 +144,8 @@ const ATTACK = {
                 await p.c.Page.navigate({ url: BASE + '/auth' });
                 await p.waitFor(`!!document.getElementById('local-open') && document.readyState === 'complete'`, 'the button');
                 assert.equal(await p.status(), 401, 'not signed in before');
+                const promised = await p.ev(`document.getElementById('local-open-note').textContent`); // #12834: the words match what the next screen does
+                assert.ok(/asks you to create a password/i.test(promised) && !/without a password/i.test(promised), 'the note says the password prompt comes next, and promises no way around it: ' + promised);
                 await p.ev(`document.getElementById('local-open').click(), true`);
                 await until(() => localOpen(p.reqs).some(r => r.status), 'the answer to the button request');
                 const posts = localOpen(p.reqs);
@@ -155,6 +157,7 @@ const ATTACK = {
                 await p.waitFor(`!location.pathname.startsWith('/auth')`, 'the page to leave /auth', 10000);
                 assert.ok((await p.cookies()).length > 0, 'a session cookie is set');
                 assert.equal(await p.status(), 200, 'signed in after');
+                await p.waitFor(`!!document.getElementById('set-password-modal')`, 'the password prompt the note said would come', 20000); // #12834: and it does
             });
             // Security's extra case: with require_auth_on_loopback on, the button is not offered and the route refuses, even with no password. Changed from the suite's
             // own tab and put back as it was whatever happens: its old value, and no row at all if there was none (a PUT cannot delete a row, so the row this
