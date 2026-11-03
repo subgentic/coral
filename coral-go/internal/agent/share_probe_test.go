@@ -2,6 +2,7 @@ package agent
 
 import (
 	"os"
+	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -144,4 +145,24 @@ func TestAProbeThatPanicsLeavesNoStuckProbeBehind(t *testing.T) {
 	assert.Nil(t, stuck, "the in-flight probe is cleared")
 	assert.True(t, shareAnswers(dir), "the next call starts a fresh probe, which answers")
 	assert.EqualValues(t, 2, calls.Load())
+}
+
+// A share that answered is not probed again for a few seconds (one lookup's candidates cost one probe); after that it is probed afresh. A folder that answered
+// "not there" is not remembered at all.
+func TestAShareThatAnsweredIsNotProbedAgainForAFewSeconds(t *testing.T) {
+	dir := t.TempDir()
+	f := useShareFake(t, dir, nil)
+	assert.True(t, shareAnswers(dir))
+	assert.True(t, shareAnswers(dir))
+	assert.True(t, shareAnswers(dir))
+	assert.Equal(t, int32(1), f.calls.Load(), "three lookups within the window: one probe")
+	f.move(shareAnswered + time.Second)
+	assert.True(t, shareAnswers(dir))
+	assert.Equal(t, int32(2), f.calls.Load(), "after the window: probed again")
+
+	gone := filepath.Join(dir, "gone")
+	g := useShareFake(t, gone, nil)
+	assert.False(t, shareAnswers(gone))
+	assert.False(t, shareAnswers(gone))
+	assert.Equal(t, int32(2), g.calls.Load(), "a folder that is not there is asked again each time")
 }
