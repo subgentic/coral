@@ -14,7 +14,14 @@ import { looksDone, hiddenList, hideGoalDone } from './goal_done.js';
 import { pollEvery } from './overload.js';
 const { linkedText } = await importOnce('./artifact_refs.js');
 const { renderGoalText } = await importOnce('./goal_text.js'); // the description is Markdown-lite (#12724)
-const linkedDd = (text, server) => { const d = document.createElement('dd'); d.append(linkedText(text, { server })); return d; }; // a coral://artifacts/<hex> in a goal's words is a link (#11416)
+const CHECKLIST = /^\s*[-*+]\s+\[[ xX]\]\s/m;
+const linkedDd = (text, server, checklist = true) => { // checklist: false where renderGoalText draws the words anyway (the description, #12724): two writers into one element would race
+    const d = document.createElement('dd'); d.append(linkedText(text, { server }));
+    if (checklist && CHECKLIST.test(String(text || ''))) { // a checklist is drawn as one (real, read-only checkboxes), the way a task's text is (#12770); other descriptions stay the plain text they were
+        importOnce('./vendor_loader.js').then(v => v.loadSafeMarkdown()).then(() => importOnce('./safe_markdown.js')).then(async sm => { const { node } = sm.renderSafe(String(text), {}); if (!d.isConnected && !d.parentNode) return; (await importOnce('./artifact_refs.js')).linkArtifactRefsIn(node, { server }); d.replaceChildren(node); }).catch(() => {});
+    }
+    return d;
+}; // a coral://artifacts/<hex> in a goal's words is a link (#11416)
 const { openDetailPane, closeDetailPane } = await importOnce('./detail_pane.js'); // the one shared pane (#8914): a goal's task or artifact opens in it, beside the list
 const DT = await importOnce('./data_table.js');
 const { el } = DT;
@@ -181,7 +188,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         if (g.outcome || g.doneWhen || g.images.length) {
             const dl = el('dl', 'facts goals-facts');
             if (g.outcome) { // the outcome field, which the New goal screen's writing fills (#11653): plain words at once, then the same words as Markdown-lite (#12724); both look artifact names up on the goal's own computer (#12583)
-                const server = remoteServer(model.project), dd = linkedDd(g.outcome, server); dl.append(el('dt', null, 'Description'), dd);
+                const server = remoteServer(model.project), dd = linkedDd(g.outcome, server, false); dl.append(el('dt', null, 'Description'), dd);
                 renderGoalText(g.outcome, { server }).then(node => { if (dd.isConnected) dd.replaceChildren(node); }).catch(() => { /* the plain words stay */ });
             }
             if (g.doneWhen) dl.append(el('dt', null, 'Done when'), linkedDd(g.doneWhen, remoteServer(model.project)));

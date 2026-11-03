@@ -5,13 +5,31 @@
  * If the renderer did not load, the text is shown as plain text: never as markup.
  * opts.linkPolicy is the host's link callback; makeLinkPolicy builds Coral's. */
 
+/** A Markdown checklist item ("- [ ] a", "- [x] b") is a list item whose text starts with "[ ] " or "[x] ": the shared renderer leaves that as text, so it read "[ ] first item" (#12770). It becomes a real checkbox, read-only (disabled, checked for x), made here
+ *  with createElement: nothing from the text is markup. A leading mark only, in a list item; "[ ]" anywhere else stays text. */
+export function taskListBoxes(root) {
+    for (const li of root.querySelectorAll('li')) {
+        const first = li.firstChild;
+        if (!first || first.nodeType !== 3) continue;
+        const m = /^\[([ xX])\]\s+/.exec(first.nodeValue);
+        if (!m) continue;
+        const box = document.createElement('input');
+        box.type = 'checkbox'; box.disabled = true; box.checked = m[1] !== ' '; box.className = 'md-task-box';
+        box.setAttribute('aria-label', box.checked ? 'Done' : 'Not done');
+        first.nodeValue = first.nodeValue.slice(m[0].length);
+        li.insertBefore(box, first); li.insertBefore(document.createTextNode(' '), first);
+        li.classList.add('md-task-item'); li.style.listStyle = 'none'; box.style.margin = '0 0.4em 0 0'; // in script: the start CSS is at its cap
+    }
+    return root;
+}
+
 /** @param {string} text @param {{ linkPolicy?: (url: string) => unknown }} [opts] @returns {{ node: HTMLElement, partial: boolean }} */
 export function renderSafe(text, opts) {
     const m = globalThis.AccountMarkdown;
     if (m && typeof m.render === 'function') {
         try {
             const r = m.render(String(text == null ? '' : text), opts);
-            if (r && r.node && r.node.classList) r.node.classList.add('prose'); // the shared markdown look; the renderer's own class stays .md
+            if (r && r.node && r.node.classList) { r.node.classList.add('prose'); taskListBoxes(r.node); } // the shared markdown look; the renderer's own class stays .md
             return r;
         } catch { /* falls through to the plain text below */ }
     }
