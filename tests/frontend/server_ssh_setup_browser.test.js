@@ -4,6 +4,7 @@
 // failure are in a live region or an alert. Screenshots with CORAL_SCREENSHOT_DIR. Drives Chrome over CDP through agent_view_harness.js against the isolated dev server.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const { setTheme } = require('./helpers/contrast');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 
@@ -78,6 +79,31 @@ const HUB = `(() => {
             check(`${label}: the page does not widen`, await ev(`${noOverflow}`));
             check(`${label}: the one line says what the computer records, as information`, await ev(`document.querySelector('.ssh-consent').textContent === 'That computer records who accepted (hub-owner@my-mac), when, and which version.'`));
             await shot(`ssh-keys-terms-${label}`);
+            // the data folder field (#12958, #12971): an invalid folder shows in the shared error colour on the words and the field, and says why Set up is closed; a valid one does not
+            const typeDir = v => ev(`(() => { const i = document.getElementById('ssh-datadir-input'); i.value = ${JSON.stringify(v)}; i.dispatchEvent(new Event('input')); return true; })()`);
+            const dirStyle = () => ev(`(() => { const i = document.getElementById('ssh-datadir-input'), n = document.getElementById('ssh-datadir-note'), p = document.createElement('span'); document.body.append(p);
+                p.style.color = 'var(--error-text, var(--error))'; const word = getComputedStyle(p).color; p.style.color = 'var(--error)'; const edge = getComputedStyle(p).color; p.remove();
+                return { wordOk: getComputedStyle(n).color === word, edgeOk: getComputedStyle(i).borderTopColor === edge, invalid: i.getAttribute('aria-invalid'), text: n.textContent }; })()`);
+            await typeDir('../x'); const bad = await dirStyle();
+            check(`${label}: an invalid data folder's note is in the error colour`, bad.wordOk && bad.invalid === 'true', JSON.stringify(bad));
+            check(`${label}: and its field has the error border`, bad.edgeOk, JSON.stringify(bad));
+            check(`${label}: and it says why Set up is closed`, /Set up waits until this is fixed/.test(bad.text) && await ev(`${btn('Set up')}.disabled === true`));
+            await ev(`document.getElementById('ssh-datadir-input').scrollIntoView({ block: 'center' }); true`); await settle(200);
+            await shot(`ssh-datadir-invalid-${label}`);
+            await typeDir(''); const ok = await dirStyle();
+            check(`${label}: a valid data folder is not in the error colour`, !ok.wordOk && !ok.edgeOk && ok.invalid === 'false', JSON.stringify(ok));
+            if (label === '390') { // the phone: the folder field and the footer scrolled into view, in the light theme, and at 200% text
+                const scrolls = async tag => {
+                    await ev(`document.getElementById('ssh-datadir-input').scrollIntoView({ block: 'center' }); true`); await settle(200); await shot(`ssh-datadir-field-${tag}`);
+                    await ev(`${btn('Cancel')}.scrollIntoView({ block: 'end' }); true`); await settle(200); await shot(`ssh-footer-${tag}`);
+                    check(`${label} ${tag}: the page does not widen`, await ev(`${noOverflow}`));
+                };
+                await scrolls('dark');
+                await setTheme(ev, 'light'); await scrolls('light');
+                await ev(`document.documentElement.style.fontSize = '200%'; true`); await settle(300); await scrolls('light-200');
+                await ev(`document.documentElement.style.fontSize = ''; true`);
+                await setTheme(ev, 'dark'); await ev(`window.scrollTo(0, 0); true`); await settle(200);
+            }
             await ev(`(() => { const c = document.getElementById('ssh-keys-ok'); c.click(); return true; })()`); await settle(100);
             check(`${label}: ticking the box enables Set up`, await ev(`${btn('Set up')}.disabled === false`));
             const nameOf = await ev(`${btn('Set up')}.getAttribute('aria-label') || ${btn('Set up')}.textContent.trim()`);

@@ -36,6 +36,7 @@
 .ssh-datadir .form-label { margin: 0; }
 .ssh-datadir-row { display: flex; flex-wrap: wrap; gap: var(--space-sm); align-items: center; }
 .ssh-datadir-row .field { flex: 1 1 16rem; min-width: 0; font-family: var(--font-mono, monospace); }
-.ssh-datadir-bad { color: var(--error-text, var(--error)); }
+.ssh-setup .ssh-help.ssh-datadir-bad { color: var(--error-text, var(--error)); }
 .ssh-setup .ssh-help { color: var(--text-primary); } /* the help under a field is what the person reads to decide: full text colour, not the dim one */
 .ssh-backend, .ssh-datadir { margin-top: var(--space-md); }
+.ssh-datadir-row button { white-space: normal; max-width: 100%; height: auto; min-height: var(--control-height); text-align: center; } /* the words wrap at large text instead of running off the page */
