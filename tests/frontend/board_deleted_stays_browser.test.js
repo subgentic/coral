@@ -12,6 +12,7 @@ const { coralReady } = require('./helpers/wait');
     const api = `/api/board/${B}`;
     const J = { method: 'POST', headers: { 'Content-Type': 'application/json' } };
     const call = (path, init, body) => ev(`fetch(${JSON.stringify(api + path)}, ${JSON.stringify({ ...init, body: body ? JSON.stringify(body) : undefined })}).then(r => r.status)`);
+    const call2 = (path, init) => ev(`fetch(${JSON.stringify(path)}, ${JSON.stringify(init)}).then(r => r.status)`);
     const listed = () => ev(`fetch('/api/board/projects').then(r => r.json()).then(p => (Array.isArray(p) ? p : p.projects || []).some(x => x.project === ${JSON.stringify(B)}))`);
     try {
         await Page.enable();
@@ -46,10 +47,28 @@ const { coralReady } = require('./helpers/wait');
         assert.equal(await listed(), false, 'nothing started the board again');
         console.log('   ✓');
 
+        console.log('2b. A board deleted while its FIRST page of messages is on its way: that late reply does not draw over the words');
+        const B2 = B + '-b', api2 = `/api/board/${B2}`;
+        assert.equal(await ev(`fetch(${JSON.stringify(api2 + '/messages')}, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'qa', as: 'QA Engineer', content: 'a second board' }) }).then(r => r.status)`), 200);
+        await ev(`window.__got2 = 0; window.__delivered2 = 0; { const R = window.fetch; window.fetch = async (u, o) => { const r = await R(u, o);
+            if (String(u).includes(${JSON.stringify(api2 + '/messages')}) && !(o && o.method && o.method !== 'GET') && r.ok) { window.__got2++;
+                await new Promise(x => setTimeout(x, 1500)); // sleep-ok: holds the reply back on purpose, so the delete lands while it is on its way
+                window.__delivered2++; } return r; }; }
+            window.__show2 = () => import((window.__coralStatic || '/static/') + 'message_board.js').then(m => m.showBoardInPage(${JSON.stringify(B2)}, document.getElementById('mb-board').parentElement)).then(() => true); true`);
+        await ev(`window.__show2()`);
+        await waitFor(`window.__got2 >= 1`, 'the first page of messages answered by the server (its delivery to the page is held back)', 8000);
+        assert.equal(await call2(api2, { method: 'DELETE' }), 200);
+        await ev(`window.__show2()`);
+        await waitFor(`(document.getElementById('mb-messages') || {}).textContent === 'This team was deleted.'`, 'the deleted-team words for the second board', 8000);
+        await waitFor(`window.__delivered2 >= 1`, 'the held-back reply reaching the page', 8000);
+        await new Promise(r => setTimeout(r, 400)); // sleep-ok: node-side wait for the page to act on the reply, if it will
+        assert.equal(await ev(`document.getElementById('mb-messages').textContent`), 'This team was deleted.', 'the late first page did not replace the words');
+        console.log('   ✓');
+
         console.log('3. An agent joins a board of the same name on purpose: it works, and then so does the Operator');
         assert.equal(await call('/subscribe', J, { subscriber_id: 'qa', job_title: 'QA Engineer' }), 200);
         assert.equal(await listed(), true, 'the board is back, started by the join');
         assert.equal(await call('/subscribe', J, { subscriber_id: 'Operator', job_title: 'Operator' }), 200);
         console.log('   ✓');
-    } finally { await removeBoards(ev, [B]); await client.close(); }
+    } finally { await removeBoards(ev, [B, B + '-b']); await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
