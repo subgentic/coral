@@ -459,7 +459,9 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
     .list-bar-bar:has(> .team-toolbar-selecting) { position: sticky; top: 0; z-index: 25; background: var(--bg-primary); } /* a phone's selection bar is the top row of the screen and stays there while the list scrolls (#11707, the operator's comment 28) */
 }
 @media (max-width: 767px) { /* a phone's mail rows run edge to edge (UI/UX, #9545): no card around them, the page's side padding given back, and no Sort row (a mail list has none) */
-    .group-table-view .dt-box.dt-mail-on { margin-inline: calc(-1 * var(--space-2xl)); border-inline: 0; border-radius: 0; }
+    .group-table-view .dt-box.dt-mail-on, #group-table-view[data-group^="hub-inbox:"] .dt-box { margin-inline: calc(-1 * var(--space-2xl)); border-inline: 0; border-radius: 0; }
+    #group-table-view[data-group^="hub-inbox:"] { scrollbar-width: none; }
+    #group-table-view[data-group^="hub-inbox:"] .dt-box:not(.dt-mail-on) { border: 0; box-shadow: none; --table-pad-x: 16px; }
     .dt-box.dt-mail-on .dt-sortbar { display: none; }
 }
 /* the mail row's button keeps its padding whatever the table's own primary-button rules say (a compact table zeroed it, and the time sat on the screen's edge: #9613) */
