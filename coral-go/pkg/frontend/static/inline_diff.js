@@ -42,8 +42,10 @@ function drop(slot) {
     if (view) { try { view.destroy(); } catch { /* already gone */ } views.delete(slot); }
 }
 
-async function mount(slot, file, { original, content }) {
+async function mount(slot, file, { original, content }, drawing) {
+    const current = () => slot.dataset.drawing === drawing && !slot.hidden;
     if (!window.CoralCM) await loadCodeMirror();
+    if (!current()) return; // closed or replaced while the editor loaded
     const cm = getCm();
     if (!cm) throw new Error('no editor');
     const body = document.createElement('div');
@@ -62,7 +64,7 @@ async function mount(slot, file, { original, content }) {
     if (langExt) extensions.push(langExt);
     const view = new cm.EditorView({ state: cm.EditorState.create({ doc: content, extensions }), parent: host });
     views.set(slot, view);
-    importOnce('./diff_comments.js').then(m => m.attachDiffComments(slot, file, view, { original, content }, compareBase(file), m.mergeFields(mergeExt))).catch(() => {}); // comments on these lines (#12536); the diff reads fine without them
+    importOnce('./diff_comments.js').then(m => { if (current() && views.get(slot) === view) return m.attachDiffComments(slot, file, view, { original, content }, compareBase(file), m.mergeFields(mergeExt)); }).catch(() => {}); // comments on these lines (#12536); the diff reads fine without them
 }
 
 /** The state the diff was made on, for a comment's anchor: the file's status and counts. */
@@ -88,7 +90,8 @@ export async function showFileDiff(slot, file, force = false) {
             b.type = 'button'; b.className = 'btn btn-small file-diff-more'; b.textContent = 'Show the diff';
             b.addEventListener('click', () => showFileDiff(slot, file, true));
             p.append(b);
-        } else await mount(slot, file, texts);
+        } else await mount(slot, file, texts, drawing);
+        if (slot.dataset.drawing !== drawing || slot.hidden) return;
         slot.dataset.shown = `${file.filepath}|${file.status}|${file.additions || 0}|${file.deletions || 0}|${force ? 1 : 0}`;
     } catch {
         if (slot.dataset.drawing === drawing) note(slot, 'Could not load the changes. Open the file to see it.', 'error');

@@ -156,6 +156,20 @@ const TEAM = 'team-x', SID = 'wp-sess1';
             await ev(`delete window.__files['m.go']; window.__files['e.go'].current = window.__files['e.go'].original.replace('func f20() int { return 20 }', 'func f20() int { return 2000 }'); window.__files['e.go'].additions = 1; window.__files['e.go'].deletions = 1; window.refreshChangedFiles(false).then(() => true)`);
             await waitFor(`!!document.querySelector('#changed-files-list .file-diff[data-filepath="e.go"] .diff-comments .ac-card') && /outdated/.test(document.querySelector('#changed-files-list .file-diff[data-filepath="e.go"] .diff-comments .ac-card').textContent)`, `${tag}: the comment says outdated once its lines are gone`, 10000).catch(() => {});
             check(`${tag}: a comment whose lines left the diff is kept and says outdated`, await ev(`/outdated/.test((document.querySelector('#changed-files-list .diff-comments .ac-card') || {}).textContent || '')`));
+            // #12847: a team's subject digest may finish after Collapse all. Hold that await,
+            // close the freshly opened editor, then let the real digest finish.
+            await ev(`(() => { const original = crypto.subtle.digest; window.__digestWas = original; window.__heldDigests = []; crypto.subtle.digest = function(algorithm, bytes) { if (new TextDecoder().decode(bytes) !== 'e.go') return original.call(this, algorithm, bytes); return new Promise(resolve => window.__heldDigests.push(() => original.call(crypto.subtle, algorithm, bytes).then(resolve))); }; document.querySelector('#changed-files-list .files-expand-all').click(); return true; })()`);
+            await waitFor(`document.querySelector('#changed-files-list .file-diff[data-filepath="e.go"]').hidden`, `${tag}: close before the held digest`, 6000);
+            await ev(`document.querySelector('#changed-files-list .files-expand-all').click(); true`);
+            await waitFor(`window.__heldDigests.length > 0`, `${tag}: comments wait for the subject digest`, 8000);
+            await ev(`document.querySelector('#changed-files-list .files-expand-all').click(); true`);
+            await waitFor(`document.querySelector('#changed-files-list .file-diff[data-filepath="e.go"]').hidden`, `${tag}: collapse while the digest waits`, 6000);
+            await ev(`crypto.subtle.digest = window.__digestWas; Promise.all(window.__heldDigests.splice(0).map(release => release())).then(() => true)`);
+            await ev(framesJs(3));
+            check(`${tag}: a late subject digest cannot repopulate a collapsed diff`, await ev(`(() => { const slot = document.querySelector('#changed-files-list .file-diff[data-filepath="e.go"]'); return slot.hidden && slot.children.length === 0; })()`));
+            await ev(`document.querySelector('#changed-files-list .files-expand-all').click(); true`);
+            await waitFor(`!!document.querySelector('#changed-files-list .file-diff[data-filepath="e.go"] .diff-comments .ac-panel')`, `${tag}: comments work again after reopening`, 10000);
+
             // an agent on no team has no board to send a comment to: one line says so, and there is no Comment button (#12570)
             await ev(`window.__m.add('nt', 'A', 3, { sleeping: false, session_id: 'nt-sess1' }); true`);
             await ev(framesJs(10));
