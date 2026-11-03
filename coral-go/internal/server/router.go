@@ -449,6 +449,8 @@ func (s *Server) registerSessions(r *chi.Mux, h *routeHandlers) {
 	// The Skills Store, the Operator's side (#12022): the list, the approval view and the decisions; only a person decides.
 	r.Get("/api/skills", skillsHandler.ListSkillsOperator)
 	r.Post("/api/skills", skillsHandler.PublishSkillOperator)
+	r.Get("/api/skills/search", skillsHandler.SearchSkillsMenu)                 // the $skill menu: approved skills, the Operator only, never through the Hub (#12676)
+	r.Post("/api/sessions/live/{name}/skills", skillsHandler.AttachSkillToLive) // attach an approved skill to a running agent and answer with the line for the message (#12676)
 	r.Get("/api/skills/{id}", skillsHandler.GetSkillOperator)
 	r.Post("/api/skills/{id}/approve", skillsHandler.ApproveSkill)
 	r.Post("/api/skills/{id}/reject", skillsHandler.RejectSkill)

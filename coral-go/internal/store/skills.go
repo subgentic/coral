@@ -473,6 +473,12 @@ func (s *SessionStore) AttachSkillsRetry(ctx context.Context, sessionID string, 
 	return nil
 }
 
+// DetachOtherSkillVersions removes the older (or other) versions of the skill called name that are attached to a session, keeping keepID, so attaching a newer version replaces the pin instead of adding a second row.
+func (s *SessionStore) DetachOtherSkillVersions(ctx context.Context, sessionID, name, keepID string) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM skills_attached WHERE session_id = ? AND name = ? AND skill_id <> ?`, sessionID, name, keepID)
+	return err
+}
+
 // AttachedSkill is a skill attached to an agent with what became of it since.
 type AttachedSkill struct {
 	SkillID       string `db:"skill_id" json:"id"`
