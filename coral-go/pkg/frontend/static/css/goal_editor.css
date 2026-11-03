@@ -1,0 +1,48 @@
+/* The New goal screen (#12724, direction A "Writing room"): a near-full-screen sheet on a desktop, the phone's own screen under 768 px (goals.css keeps the phone's bar, scrolling body and pinned actions). Loaded
+ * with goal_editor.js, not at start. */
+@media (min-width: 768px) {
+    dialog.goal-editor { --dlg-max: 96vw; width: min(var(--dlg-max), 1240px); height: min(94dvh, 980px); padding: 0; overflow: hidden; border-radius: var(--radius-xl); }
+    dialog.goal-editor[open] { display: flex; flex-direction: column; }
+    .goal-form { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 340px; grid-template-rows: auto minmax(0, 1fr); gap: 0 32px; }
+    .goal-editor .goals-form-head { display: flex; align-items: center; gap: 12px; padding: 0 24px; min-height: 56px; border-bottom: 1px solid var(--border); }
+    .goal-editor .goals-form-head h3 { font-size: var(--fs-lg); margin: 0 8px 0 0; }
+    .goal-editor .goals-form-back { display: inline-grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 16px; background: none; color: var(--text-primary); cursor: pointer; }
+    .goal-editor .goals-form-back:hover { background: var(--bg-hover); }
+    .goal-editor .goals-actions { grid-column: 2; align-items: center; padding: 0 24px 0 0; border-bottom: 1px solid var(--border); }
+    .goal-editor .goals-form-body { display: flex; flex-direction: column; gap: 8px; grid-column: 1; min-height: 0; overflow-y: auto; padding: 28px 0 40px 24px; }
+}
+.goal-scopes { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.goal-scope { max-width: 100%; min-width: 0; display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 0 4px 0 10px; border: 1px solid var(--border); border-radius: 15px; background: var(--bg-secondary); color: var(--text-secondary); font-size: var(--fs-md); }
+.goal-scope-fixed { padding-right: 10px; }
+.goal-scope b { color: var(--text-primary); font-weight: var(--fw-strong); }
+.goal-scope select { border: 0; background: transparent; color: var(--text-primary); font: inherit; font-weight: var(--fw-strong); max-width: 16rem; min-width: 0; flex: 1 1 auto; text-overflow: ellipsis; min-height: 28px; }
+.goal-editor .goal-title { width: 100%; min-height: 0; flex: none; padding: 0 0 6px; border: 0; border-radius: 0; border-bottom: 1px solid transparent; background: none; color: var(--text-primary); font: inherit; font-size: var(--fs-display); font-weight: var(--fw-strong); outline: 0; }
+.goal-editor .goal-title:focus { border-bottom-color: var(--accent); }
+.goal-editor .goal-title::placeholder { color: var(--text-muted); }
+.goal-editor .goal-title[aria-invalid="true"] { border-bottom-color: var(--error); }
+.goal-label { margin-top: 8px; font-size: var(--fs-sm); letter-spacing: var(--ls-caps); text-transform: uppercase; color: var(--text-muted); font-weight: var(--fw-strong); }
+.goal-label-note { text-transform: none; letter-spacing: 0; font-weight: var(--fw-regular); }
+.goal-toolbar { flex: none; display: flex; gap: 2px; padding: 4px; border: 1px solid var(--border); border-bottom: 0; border-radius: var(--radius-md) var(--radius-md) 0 0; background: var(--bg-secondary); overflow-x: auto; scrollbar-width: none; }
+.goal-toolbar::-webkit-scrollbar { display: none; }
+.goal-tb { flex: none; display: inline-grid; place-items: center; width: 32px; height: 30px; padding: 0; border: 0; border-radius: var(--radius-sm); background: none; color: var(--text-secondary); cursor: pointer; font: inherit; }
+.goal-tb:hover, .goal-tb:focus-visible { background: var(--bg-hover); color: var(--text-primary); }
+.goal-tb .material-icons { font-size: var(--fs-xl); }
+.goal-tb-glyph { font-size: var(--fs-xl); line-height: 1; }
+.goal-tb-bold .goal-tb-glyph { font-weight: var(--fw-strong); }
+.goal-tb-italic .goal-tb-glyph { font-style: italic; }
+.goal-tb-sep { flex: none; width: 1px; margin: 4px 6px; background: var(--border); }
+.goal-editor .goal-outcome { flex: none; width: 100%; min-height: 300px; padding: 16px 18px; margin: 0; border: 1px solid var(--border); border-radius: 0 0 var(--radius-md) var(--radius-md); background: var(--bg-primary); color: var(--text-primary); font: inherit; font-size: var(--fs-xl); line-height: var(--lh-body); resize: vertical; }
+.goal-editor .goal-outcome:focus { outline: 0; border-color: var(--accent); }
+.goal-gap { flex: none; height: 8px; }
+.goal-editor .goals-form-body > input#goal-new-done { min-height: 40px; padding: 8px 12px; border: 1px solid var(--control-border); border-radius: var(--radius-md); background: var(--bg-primary); color: var(--text-primary); font: inherit; font-size: var(--fs-xl); }
+@media (max-width: 767px) {
+    .goal-editor .goals-actions { order: 3; } /* the bar, the writing, then the actions pinned at the bottom (the DOM has the actions second so a desktop's bar can hold them) */
+    .goal-editor .goals-form-head { flex-wrap: wrap; padding-block: 6px; }
+    .goal-editor .goals-form-head h3 { flex: 1 1 auto; }
+    .goal-scopes { flex: none; }
+    .goal-editor .goals-form-body { padding: 12px 16px 16px; }
+    .goal-editor .goal-title { font-size: var(--fs-2xl); }
+    .goal-editor .goal-outcome { min-height: 220px; font-size: var(--fs-xl); }
+    .goal-tb { width: var(--control-touch-height); height: var(--control-touch-height); }
+    .goal-editor .goals-form-body > input#goal-new-done { min-height: var(--control-touch-height); }
+}
