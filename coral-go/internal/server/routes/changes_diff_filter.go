@@ -203,20 +203,26 @@ func (h *SessionsHandler) generatePersistedDiff(ctx context.Context, workdir str
 		return nil, err
 	}
 	trackedDiff := filterPatch(tracked)
-	var untracked []byte
+	var untracked []untrackedItem
 	if gitutil.IncludesWorkingTree(diffMode) { // the last commit alone has no untracked files
-		if untracked, err = gitOutput(ctx, workdir, "ls-files", "--others", "--exclude-standard", "-z"); err != nil {
+		// A big untracked folder is one note, a small one its files (listUntracked, #12524).
+		if untracked, err = listUntracked(workdir, func(args ...string) ([]byte, error) { return gitOutput(ctx, workdir, args...) }); err != nil {
 			return nil, err
 		}
 	}
 	var notes []byte
 	var files []string
 	size, skipped := len(trackedDiff), 0
-	for _, raw := range bytes.Split(untracked, []byte{0}) {
-		if len(raw) == 0 {
+	for _, item := range untracked {
+		rel := item.Path
+		if item.Folded {
+			if diffPathHidden(rel) { // a hidden folder's name is not shown either
+				notes = append(notes, diffNote("a new hidden folder not shown (%d untracked files)", item.Files)...)
+			} else {
+				notes = append(notes, diffNote("new folder %q: %d untracked files, %s, not stored", rel, item.Files, item.size())...)
+			}
 			continue
 		}
-		rel := string(raw)
 		if diffPathHidden(rel) {
 			notes = append(notes, diffNote("a new sensitive file not shown")...)
 			continue

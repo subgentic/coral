@@ -205,23 +205,21 @@ func (h *SessionsHandler) refreshFilesInner(w http.ResponseWriter, r *http.Reque
 
 	// Include untracked files (not for the last commit alone: they are not in it)
 	untrackedSet := make(map[string]bool)
-	untrackedOut, err := []byte(nil), error(nil)
+	var untracked []untrackedItem
 	if withTree {
-		untrackedOut, err = gitCmd(ctx, workdir, "ls-files", "--others", "--exclude-standard").Output()
+		// A big untracked folder is one row (its path ends in "/"), a small one its files (listUntracked, #12524).
+		untracked, err = listUntracked(workdir, func(args ...string) ([]byte, error) { return gitCmd(ctx, workdir, args...).Output() })
 	}
 	if err != nil {
 		slog.Warn("git ls-files (untracked) failed", "agent_name", name, "workdir", logsafe.Dir(workdir), "error", err)
 	} else {
 		counted := 0
-		for _, f := range strings.Split(strings.TrimSpace(string(untrackedOut)), "\n") {
-			if f == "" {
-				continue
-			}
-			f = unquoteGitPath(f)
+		for _, item := range untracked {
+			f := item.Path
 			untrackedSet[f] = true
 			if _, exists := fileMap[f]; !exists {
 				adds := 0
-				if counted < gitutil.MaxNewFileStatFiles {
+				if !item.Folded && counted < gitutil.MaxNewFileStatFiles {
 					adds = lineCount(f)
 					counted++
 				}

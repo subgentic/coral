@@ -33,6 +33,7 @@ func TestPersistedDiffKeepsTrackedChangesBeforeNewFiles(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(repo, "zz.txt"), []byte("before\nthe agent's tracked edit\n"), 0o644))
 	body := strings.Repeat("a line of a new file\n", 200) // 4,200 bytes: 3,000 of them are 12 MiB
 	require.NoError(t, os.MkdirAll(filepath.Join(repo, "u"), 0o755))
+	trackFolder(t, repo, "u") // a tracked file in it: its new files are listed one by one (an untracked folder this big is folded, #12524)
 	const n = 3000
 	for i := 0; i < n; i++ {
 		require.NoError(t, os.WriteFile(filepath.Join(repo, "u", fmt.Sprintf("f%04d.txt", i)), []byte(body), 0o644))

@@ -3,7 +3,6 @@
 package routes
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -170,17 +169,22 @@ func (h *SessionsHandler) generateChangesDiff(ctx context.Context, workdir strin
 		return nil, err
 	}
 
-	// A normal git diff omits untracked files. Render each as a new-file patch (not for the last commit alone).
-	var untracked []byte
+	// A normal git diff omits untracked files. Render each as a new-file patch (not for the last commit alone). A big untracked folder is one note, a small one its files (listUntracked, #12524).
+	var untracked []untrackedItem
 	if gitutil.IncludesWorkingTree(diffMode) {
-		if untracked, err = gitutil.Command(ctx, workdir, "ls-files", "--others", "--exclude-standard", "-z").Output(); err != nil {
+		if untracked, err = listUntracked(workdir, func(args ...string) ([]byte, error) { return gitutil.Command(ctx, workdir, args...).Output() }); err != nil {
 			return nil, err
 		}
 	}
-	for _, rawPath := range bytes.Split(untracked, []byte{0}) {
-		if len(rawPath) == 0 {
+	for _, item := range untracked {
+		if item.Folded { // one note line (git apply skips it), no file diffs
+			if len(diff) > 0 && diff[len(diff)-1] != '\n' {
+				diff = append(diff, '\n')
+			}
+			diff = append(diff, diffNote("%s", item.foldedNote())...)
 			continue
 		}
+		rawPath := []byte(item.Path)
 		cmd := gitutil.Command(ctx, workdir, "diff", "--no-index", "--binary", "--", os.DevNull, string(rawPath))
 		fileDiff, fileErr := cmd.Output()
 		// git diff --no-index returns 1 when differences were found.
