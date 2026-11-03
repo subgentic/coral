@@ -292,11 +292,14 @@ for (const [phase, word] of [['done', /Done/], ['failed', /did not|could not|Cou
 
 // ── the data folder on that computer is a setting the person can set (a Coral set up by hand keeps its data in .coral) ──
 {
-    const { cleanDataDir, dataDirOk } = await importUi('server_ssh_setup');
+    const { cleanDataDir, dataDirOk, dataDirProblem } = await importUi('server_ssh_setup');
     assert.equal(cleanDataDir('  ~/.coral/ '), '.coral', 'a typed ~/ and a trailing slash are dropped');
     assert.equal(cleanDataDir('/x/y'), 'x/y');
     for (const ok of ['', '.coral', 'my-coral/data', '.coral-server/data']) assert.equal(dataDirOk(ok), true, ok);
-    for (const bad of ['..', '../x', 'a/../b', 'a b', 'a;b', '-x', '$HOME', 'a//b', 'a/b/c/d/e/f']) assert.equal(dataDirOk(bad), false, bad);
+    for (const bad of ['..', '../x', 'a/../b', 'a b', 'a;b', '-x', '$HOME', 'a//b', 'a/b/c/d/e/f', '.ssh', '.ssh/x', '.gnupg', '.config/coral']) assert.equal(dataDirOk(bad), false, bad);
+    assert.match(dataDirProblem('.ssh'), /keys or settings/, 'a folder of keys says why');
+    assert.match(dataDirProblem('../x'), /plain folder names/, 'a bad name says why');
+    assert.equal(dataDirOk('.ssh-old') && dataDirOk('myconfig/.config'), true, 'only a first name of .ssh, .gnupg or .config is refused');
 
     hub({ keys: [] });
     let host = fresh();
@@ -313,9 +316,15 @@ for (const [phase, word] of [['done', /Done/], ['failed', /did not|could not|Cou
     assert.match($(host, '#ssh-datadir-note').textContent, /~\/\.coral-server\/data/, 'and the note says what the default is');
     input.value = '../x'; input.dispatchEvent(new dom.window.Event('input'));
     assert.equal(input.getAttribute('aria-invalid'), 'true', 'a folder that goes up is flagged');
+    assert.match($(host, '#ssh-datadir-note').textContent, /Set up waits until this is fixed/, 'and the note says why Set up is closed');
+    assert.equal(btn(host, 'Set up').disabled, true, 'Set up is closed while the folder is not one Coral will use');
+    input.value = '.ssh'; input.dispatchEvent(new dom.window.Event('input'));
+    assert.match($(host, '#ssh-datadir-note').textContent, /keys or settings/, 'a folder of keys is refused with its reason');
+    assert.equal(btn(host, 'Set up').disabled, true);
     btn(host, 'Use .coral (a Coral set up by hand)').click();
     assert.equal($(host, '#ssh-datadir-input').value, '.coral');
     assert.match($(host, '#ssh-datadir-note').textContent, /~\/\.coral there/, 'the note says what will be used');
+    assert.equal(btn(host, 'Set up').disabled, false, 'and open again once it is');
     btn(host, 'Set up').click();
     await until(() => runBody, 'the run');
     assert.deepEqual(runBody, { backend: 'pty', data_dir: '.coral' }, 'the chosen folder is sent');

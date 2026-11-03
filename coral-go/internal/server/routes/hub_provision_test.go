@@ -854,9 +854,10 @@ func TestProvisionDataDirChoice(t *testing.T) {
 	plan := v["plan"].(string)
 	assert.Equal(t, ".coral-server/data", v["data_dir"], "the default")
 	pe.do("POST", "/api/servers/provision/"+plan+"/connect", nil)
-	for _, bad := range []string{"../x", "/etc", "a b", "a;rm -rf x", "~/x", "@keep", "$HOME"} {
-		code, _ := pe.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{"data_dir": bad})
+	for _, bad := range []string{"../x", "/etc", "a b", "a;rm -rf x", "~/x", "@keep", "$HOME", ".ssh", ".gnupg/x", ".config"} {
+		code, v := pe.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{"data_dir": bad})
 		assert.Equal(t, 400, code, bad)
+		assert.NotEmpty(t, v["error"], "it says why: "+bad)
 	}
 	code, _ := pe.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{"accept_terms": true, "terms_sha256": terms.EULADigest(), "data_dir": ".coral"})
 	require.Equal(t, 202, code)
