@@ -46,6 +46,7 @@ func TestTeamLaunchWithAWorktreeInARepositoryNotOnMain(t *testing.T) {
 			server, _, _, ss := setupSessionsTestServerWithConfig(t, cfg)
 			stubCLIPaths(t, ss)
 			require.NoError(t, ss.SetSetting(context.Background(), "cli_path_claude", stubCLI(t)))
+			require.NoError(t, ss.SetSetting(context.Background(), "launch_in_worktree", "true")) // the experimental switch (#12746)
 			repo, git := repoOn(t, branch, true)
 			body := map[string]any{"board_name": "wt-" + branch, "working_dir": repo, "worktree": true, "agent_type": "claude", "agents": []map[string]any{{"name": "A", "prompt": "x"}}}
 			if base != "" {
@@ -64,6 +65,7 @@ func TestTeamLaunchWithAWorktreeInARepositoryWithNoCommitsSaysSo(t *testing.T) {
 	server, _, _, ss := setupSessionsTestServerWithConfig(t, config.Load(t.TempDir()))
 	stubCLIPaths(t, ss)
 	require.NoError(t, ss.SetSetting(context.Background(), "cli_path_claude", stubCLI(t)))
+	require.NoError(t, ss.SetSetting(context.Background(), "launch_in_worktree", "true")) // the experimental switch (#12746)
 	repo, _ := repoOn(t, "master", false)
 	status, out := postTeam(t, server.URL, map[string]any{"board_name": "wt-empty", "working_dir": repo, "worktree": true, "agent_type": "claude", "agents": []map[string]any{{"name": "A", "prompt": "x"}}})
 	assert.GreaterOrEqual(t, status, 400, "%v", out)
@@ -107,6 +109,7 @@ func teamServerH(t *testing.T) (url string, cfg *config.Config, h *SessionsHandl
 	h.SetTeamStore(store.NewTeamStore(h.db))
 	stubCLIPaths(t, ss)
 	require.NoError(t, ss.SetSetting(context.Background(), "cli_path_claude", stubCLI(t)))
+	require.NoError(t, ss.SetSetting(context.Background(), "launch_in_worktree", "true")) // the experimental switch (#12746)
 	r := chi.NewRouter()
 	r.Use(testIdentity(h.db))
 	r.Post("/api/sessions/launch-team", h.LaunchTeam)

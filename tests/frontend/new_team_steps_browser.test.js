@@ -81,6 +81,7 @@ const { existing: recentsExist } = require('./helpers/recent_dirs');
         });
         await S.run('step 1: "Launch in a git worktree" with a Base branch appears only for a git folder', async () => {
             await reopen();
+            await ev(`import((window.__coralStatic || '/static/') + 'state.js').then(m => { m.state.settings = { ...(m.state.settings || {}), launch_in_worktree: 'true' }; return true; })`); // the experimental switch is on (#12746): the option is offered only then
             await t.type('input', N.folder, '/tmp/qa-not-a-repo'); await settle(600);
             assert.ok(!(await t.has('input', /worktree/i)), 'no worktree option for a folder that is not a git repository');
             await t.type('input', N.folder, gitDir);

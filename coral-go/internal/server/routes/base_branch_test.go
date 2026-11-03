@@ -2,6 +2,7 @@ package routes
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -19,6 +20,7 @@ import (
 	"github.com/subgentic/coral/internal/board/boardtest"
 	"github.com/subgentic/coral/internal/config"
 	"github.com/subgentic/coral/internal/consoletest"
+	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/internal/store/storetest"
 	"github.com/subgentic/coral/pkg/tunnel"
 )
@@ -81,6 +83,7 @@ func TestLaunchTeamRefusesAnOptionAsBaseBranch(t *testing.T) {
 	cfg := &config.Config{LogDir: t.TempDir()}
 	cfg.UseCoralDir(t.TempDir())
 	handler := NewSessionsHandler(db, cfg, nil, newMockTerminal(), bs)
+	require.NoError(t, store.NewSessionStore(db).SetSetting(context.Background(), "launch_in_worktree", "true")) // the experimental switch (#12746): the base branch is what is refused here
 	repo := gitRepo(t)
 	for _, base := range []string{"--upload-pack=touch /tmp/pwned", "-b", "main other"} {
 		b, _ := json.Marshal(map[string]any{"board_name": "w24team", "working_dir": repo, "worktree": true, "base_branch": base,

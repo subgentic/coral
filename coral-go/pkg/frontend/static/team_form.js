@@ -7,6 +7,7 @@ import { boardNameProblem } from './utils.js';
 import { onBuilt } from './lazy_dom.js';
 import { usesSuggestion } from './folder_suggestion.js';
 import { isHub } from './server_base.js';
+import { state } from './state.js';
 
 let _view = null;
 
@@ -54,7 +55,9 @@ export function showTeamAddress(on) {
 }
 
 /** Offer the worktree (the folder is a git repo on the target server); no repo, no worktree. */
+export const worktreeLaunchOn = () => { const v = state.settings && state.settings.launch_in_worktree; return v === true || v === 'true' || v === 1 || v === '1'; }; // the experimental switch in Settings (#12746): off unless turned on
 export function showTeamWorktree(on) {
+    on = on && worktreeLaunchOn(); // not offered while the experimental setting is off, in a git repo or not
     const row = rowOf('launch-team-worktree');
     if (!row) return;
     row.hidden = !on;

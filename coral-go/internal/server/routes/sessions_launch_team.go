@@ -24,6 +24,7 @@ import (
 	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/gitutil"
 	"github.com/subgentic/coral/internal/naming"
+	setreg "github.com/subgentic/coral/internal/settings"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/internal/tracking"
 )
@@ -140,6 +141,18 @@ func (h *SessionsHandler) LaunchTeam(w http.ResponseWriter, r *http.Request) {
 				errBadRequest(w, fmt.Sprintf("agent %q: %s", a.Name, strings.TrimPrefix(aerr.Error(), board.ErrReviewArea.Error()+": ")))
 				return
 			}
+		}
+	}
+	// A team in a git worktree is an experimental feature, off unless the person turned it on (#12746): a request for one, from any page or agent, is refused while it is off, before anything is written.
+	if body.Worktree {
+		st, err := h.ss.GetSettings(r.Context())
+		if err != nil {
+			errInternalServer(w, err.Error())
+			return
+		}
+		if !setreg.Bool(st, setreg.LaunchInWorktree) {
+			errBadRequest(w, WorktreeLaunchOffMessage)
+			return
 		}
 	}
 	// Through the Coral Hub, a team with any member that skips permission prompts needs the owner's local switch, checked
