@@ -21,7 +21,7 @@ import { operatorAsks, refreshOperatorAsks, askLine, askPlain, askKey, openAskDi
 import { go, note, backIs, currentRoute } from './nav.js';
 
 import { build, keyRoute, parse as parseRoute, inboxFolderPath, BOARDS_FOLDER, BOARDS_SUB } from './routes.js';
-import { sessionServer, keyLabel, identityKey, splitKey, goalTeamKey, nativeInbox, decisionNeedsPerson, LOCAL_SERVER, boardFetch } from './server_base.js';
+import { sessionServer, normServer, keyLabel, identityKey, splitKey, goalTeamKey, nativeInbox, decisionNeedsPerson, LOCAL_SERVER, boardFetch } from './server_base.js';
 import { teamLabel } from './server_status.js';
 import { showView, showToast, OPERATOR_ID } from './utils.js';
 import { registerActions, textOf } from './actions.js';
@@ -866,6 +866,8 @@ async function openChat(c) {
     CH.chatOpened(c); renderInboxNav(true); // opened: read at its stamp, and the folders' unread numbers go down in memory, no request (#9687, #9703)
     const isGroup = c.type === 'group' || String(c.session_id || '').startsWith('board:');
     if (isGroup) { const { historyServer } = await importOnce('./history_source.js'); openItemRoute('boards', identityKey(c.server || historyServer(), c.title || String(c.session_id).replace(/^board:/, '')), null, c.session_id); return; }
+    const live = (state.liveSessions || []).find(s => s.session_id === c.session_id && normServer(sessionServer(s)) === normServer(c.server || LOCAL_SERVER)); // an agent this computer has running now: its chat is the live one, with the message box (#12654); the history view is a transcript only
+    if (live) { openInAgents(live); return; }
     const { setHistorySource } = await importOnce('./history_source.js');
     if (!setHistorySource(c.server || 'local')) return;
     window.selectHistorySession?.(c.session_id, null, c);
