@@ -5,7 +5,6 @@ import { loadStyles } from './lazy_styles.js';
 import { showView, showToast } from './utils.js';
 import { requestJson } from './api.js';
 import { note, currentRoute } from './nav.js';
-import { registerActions } from './actions.js';
 import { isPhoneLayout } from './phone_layout.js';
 import { SKILL_FOLDERS } from './routes.js';
 const DT = await importOnce('./data_table.js');
@@ -62,7 +61,7 @@ function drawNav() {
     if (sideFolders && list.contains(sideFolders)) VL.update(sideFolders, spec);
     else { sideFolders = VL.build({ id: 'skills-folders', label: 'Skills folders', ...spec, onPick: pickFolder }); list.replaceChildren(sideFolders); }
 }
-registerActions({ 'skills-search-filter': el => { query = String(el.value || '').trim().toLowerCase(); if (!open) draw(); } });
+export function filterSkills(v) { query = String(v || '').trim().toLowerCase(); if (!open) draw(); } // the sidebar's search box (its action is in app_actions.js, the page is loaded with the tab)
 const matches = r => !query || `${r.name} ${r.description} ${publisher(r)}`.toLowerCase().includes(query);
 
 async function loadOne(id) {
