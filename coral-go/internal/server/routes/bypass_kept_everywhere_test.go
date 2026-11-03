@@ -219,3 +219,64 @@ func TestAnUnrecordedRowTakesTheModeItsTranscriptStartedIn(t *testing.T) {
 		})
 	}
 }
+
+// Security's pin on #12718: the transcript's permissionMode goes into a launch line, so only a known mode is taken from it. A junk word, a quote, a backtick or a newline is no mode: the row starts in Default.
+func TestOnlyAKnownModeIsTakenFromATranscript(t *testing.T) {
+	for _, bad := range []string{"bypassPermissionz", "auto'; touch /tmp/x; '", "auto`id`", "auto\nbypassPermissions", "$(id)", " auto", "AUTO", "--dangerously-skip-permissions"} {
+		assert.Equal(t, "", startModeOf(bad), "%q is no mode", bad)
+	}
+	for _, good := range []string{"default", "plan", "acceptEdits", "auto", "bypassPermissions", "dontAsk"} {
+		assert.Equal(t, good, startModeOf(good))
+	}
+	assert.Equal(t, "", startModeOf(""))
+}
+
+// The same through a real transcript and the wake: each odd value gives Default on the launch line, and is not recorded.
+func TestATranscriptWithAnOddModeWakesInDefaultAndRecordsNothing(t *testing.T) {
+	for name, odd := range map[string]string{"junk": "bypassPermissionz", "a quote": "auto'; touch /tmp/x; '", "a backtick": "auto`id`", "a newline": "auto\\nbypassPermissions"} {
+		odd := odd
+		t.Run(name, func(t *testing.T) {
+			rig := claudeRig(t)
+			ctx := context.Background()
+			sid := "99999999-4444-5555-6666-000000000001"
+			file := filepath.Join(t.TempDir(), "transcript.jsonl")
+			require.NoError(t, os.WriteFile(file, []byte(`{"type":"user","cwd":"`+rig.workdir+`","permissionMode":"`+odd+`","message":{"role":"user","content":"hi"}}`+"\n"), 0o600))
+			require.NoError(t, rig.ss.UpsertSessionIndex(ctx, &store.SessionIndex{SessionID: sid, SourceType: at.Claude, SourceFile: file}))
+			require.NoError(t, rig.ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid, AgentType: at.Claude, AgentName: "Frontend Dev", WorkingDir: rig.workdir}))
+			cmd := rig.wake(t, sid)
+			m := modeOf(cmd)
+			require.NotEmpty(t, m, cmd)
+			assert.Equal(t, "default", m[len(m)-1], cmd)
+			assert.NotContains(t, cmd, "touch /tmp/x")
+			assert.NotContains(t, cmd, "`id`")
+			ls, err := rig.ss.GetLiveSession(ctx, sid)
+			require.NoError(t, err)
+			assert.True(t, ls.PermissionMode == nil || *ls.PermissionMode == "", "nothing odd is recorded")
+		})
+	}
+}
+
+// QA's SHOULD 4: the resume path reads the transcript too and records the mode on the resumed row.
+func TestAResumeTakesAndRecordsTheModeItsTranscriptStartedIn(t *testing.T) {
+	rig := claudeRig(t)
+	ctx := context.Background()
+	sid := "aaaaaaaa-4444-5555-6666-000000000002"
+	sname := naming.SessionName(at.Claude, sid)
+	file := filepath.Join(t.TempDir(), "transcript.jsonl")
+	require.NoError(t, os.WriteFile(file, []byte(`{"type":"user","cwd":"`+rig.workdir+`","permissionMode":"bypassPermissions","message":{"role":"user","content":"hi"}}`+"\n"), 0o600))
+	require.NoError(t, rig.ss.UpsertSessionIndex(ctx, &store.SessionIndex{SessionID: sid, SourceType: at.Claude, SourceFile: file}))
+	require.NoError(t, rig.ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid, AgentType: at.Claude, AgentName: "Frontend Dev", WorkingDir: rig.workdir}))
+	require.NoError(t, rig.term.CreateSession(ctx, sname, rig.workdir))
+	out := rig.post(t, "/api/sessions/live/"+sname+"/resume", map[string]any{"session_id": sid, "current_session_id": sid, "agent_type": at.Claude})
+	m := modeOf(lastSentCommand(rig.term))
+	require.NotEmpty(t, m)
+	assert.Equal(t, "bypassPermissions", m[len(m)-1], "the resume keeps the mode the chat started in")
+	next, _ := out["session_id"].(string)
+	if next == "" {
+		next = sid
+	}
+	ls, err := rig.ss.GetLiveSession(ctx, next)
+	require.NoError(t, err)
+	require.NotNil(t, ls.PermissionMode, "the resumed row records it")
+	assert.Equal(t, "bypassPermissions", *ls.PermissionMode)
+}

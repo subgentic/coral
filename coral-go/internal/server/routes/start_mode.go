@@ -28,6 +28,12 @@ func (h *SessionsHandler) transcriptStartMode(ctx context.Context, ls *store.Liv
 		return ""
 	}
 	_, mode := transcriptStart(idx.SourceFile)
+	return startModeOf(mode)
+}
+
+// startModeOf is a transcript's permissionMode as a mode Coral may put on a command line: a known mode and nothing else. The word comes from a file the CLI wrote and goes into the launch line, so a value
+// that is not one of the known modes (a junk word, a quote, a backtick, a newline) is no mode at all and the row starts in Default; PermissionModeForCLI passes any word through, so this is the check.
+func startModeOf(mode string) string {
 	if mode == "" || !agent.ValidPermissionMode(mode) {
 		return ""
 	}
