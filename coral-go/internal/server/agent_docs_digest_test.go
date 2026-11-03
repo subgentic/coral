@@ -76,3 +76,32 @@ func TestEmbeddedAgentDocsMatchTheSources(t *testing.T) {
 	}
 	assert.Empty(t, stale, "the embedded agent docs are stale: run tools/sync-agent-docs.sh and rebuild:\n  %s", strings.Join(stale, "\n  "))
 }
+
+// #12865: a synced tree holds every doc ONLY as <name>.md.gz (848 KB of Markdown ship as 315 KB), never also as plain text, and each unzips to exactly its agent_docs/ source (the server reads
+// the .gz copies as the plain files, #6814). Skipped with no docs embedded, like the test above.
+func TestSyncedAgentDocsAreEmbeddedGzippedAndServedWithTheSourceBytes(t *testing.T) {
+	sub, err := fs.Sub(staticFS, "static/agent_docs")
+	require.NoError(t, err)
+	entries, err := fs.ReadDir(sub, ".")
+	if err != nil || len(entries) == 0 {
+		t.Skip("this build embeds no agent docs (run tools/sync-agent-docs.sh)")
+	}
+	const src = "../../agent_docs"
+	sources, err := os.ReadDir(src)
+	require.NoError(t, err)
+	for _, e := range sources {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".md") {
+			continue
+		}
+		_, plain := fs.Stat(sub, e.Name())
+		assert.Error(t, plain, "%s is embedded as plain text: the sync must write %s.gz only", e.Name(), e.Name())
+		zipped, err := fs.ReadFile(sub, e.Name()+".gz")
+		require.NoError(t, err, "%s.gz is not embedded", e.Name())
+		want, err := os.ReadFile(filepath.Join(src, e.Name()))
+		require.NoError(t, err)
+		assert.Less(t, len(zipped), len(want), "%s.gz is not smaller than the source", e.Name())
+		got, err := fs.ReadFile(newGzDocsFS(sub), e.Name()) // what the server serves for the doc
+		require.NoError(t, err)
+		assert.Equal(t, string(want), string(got), "%s is served with other bytes than its source", e.Name())
+	}
+}
