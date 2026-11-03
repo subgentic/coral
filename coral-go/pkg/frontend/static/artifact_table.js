@@ -45,7 +45,7 @@ export function artifactTable(cfg) {
             if (star) wrap.append(star);
             return wrap;
         } },
-        ...(cfg.showUploader ? [{ key: 'uploader', label: 'Uploaded by', width: '9rem', sort: true, sortValue: uploaderText, cell: item => { const text = uploaderText(item) || '—', node = isOperatorUpload(item) ? DT.tag(text) : DT.el('span', '', text); DT.tipIf(node, text, () => node.parentElement.scrollWidth > node.parentElement.clientWidth); return node; } }] : []),
+        ...(cfg.showUploader ? [{ key: 'uploader', label: 'Uploaded by', width: '9rem', drop: 1, sort: true, sortValue: uploaderText, cell: item => { const text = uploaderText(item) || '—', node = isOperatorUpload(item) ? DT.tag(text) : DT.el('span', '', text); DT.tipIf(node, text, () => node.parentElement.scrollWidth > node.parentElement.clientWidth); return node; } }] : []),
         ...(cfg.afterName || []), // the Inbox's list spans teams and computers: its Team (or Server) column, which drops with the optional ones
         { key: 'type', label: 'Type', width: '6.5rem', dropAt: 36, tone: 'tertiary', sort: true, sortValue: typeText, cell: i => isUnverified(i) ? '—' : DT.tag(typeText(i)) },
         { key: 'tags', label: 'Tags', width: '16rem', dropAt: cfg.tagsDropAt || 52, sort: true, sortValue: i => (i.tags || []).join(', '), cell: i => Tags.rowTags(i.tags) || '—' },
@@ -54,7 +54,7 @@ export function artifactTable(cfg) {
         ...(cfg.details ? [{ key: 'details', label: 'Details', hideLabel: true, width: '3.75rem', cell: cfg.details }] : []),
     ];
     const table = DT.dataTable({ ...cfg, columns, state, oneLine: true, resize: true, sortBar: false,
-        rowKey: cfg.rowKey || itemKey, rowName: i => Tags.nameWithTags(readableName(i), i.tags) + (i.starred ? ', starred' : '') + (cfg.showUploader ? `, Uploaded by ${uploaderText(i) || 'not recorded'}` : ''),
+        rowKey: cfg.rowKey || itemKey, rowName: i => Tags.nameWithTags(readableName(i), i.tags) + (cfg.showUploader && uploaderText(i) ? `, Uploaded by ${uploaderText(i)}` : '') + (i.starred ? ', starred' : ''),
         ...(cfg.paged ? { onSort: (key, dir) => {
             state.sort = { key, dir };
             browserLocal.set(SORT_KEY, JSON.stringify(state.sort)); cfg.onPageSort?.(serverArtifactSort(state.sort));
