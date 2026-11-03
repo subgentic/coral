@@ -125,7 +125,7 @@ func (h *SessionsHandler) uploadAgentArtifact(w http.ResponseWriter, r *http.Req
 	if mediaType == "" {
 		mediaType = mediatype.Generic
 	}
-	taskID, refused := h.artifactTaskLink(r.Context(), r) // before a byte is read: a task that cannot be named stores nothing (#7739)
+	taskID, refused, linkNote := h.artifactTaskLink(r.Context(), r) // before a byte is read: a task that cannot be named stores nothing (#7739)
 	if refused != "" {
 		errNotFound(w, refused)
 		return
@@ -307,6 +307,9 @@ func (h *SessionsHandler) uploadAgentArtifact(w http.ResponseWriter, r *http.Req
 	_ = fresh
 	// a task's artifact count is kept for a few seconds: an upload just changed it (#12855)
 	noteArtifactsChanged()
+	if h.boardHandler != nil {
+		h.boardHandler.forgetTaskCounts() // the board's kept lists are one upload short now (#12755)
+	}
 	h.noteOffBooksUpload(r.Context(), taskID, hexID) // an agent with no task in progress: a line of the orchestrator's check (#7793)
 	// The kind is written only for a file that is NEW on this team's list (#12144, Security's MUST): the same bytes another agent already put there keep what they are, so an agent cannot quiet someone
 	// else's plain file for review by uploading the identical bytes with --kind. The asked kind is then ignored, and the reply says so.
@@ -389,6 +392,9 @@ func (h *SessionsHandler) uploadAgentArtifact(w http.ResponseWriter, r *http.Req
 		"size":       meta.Size, // the stored size: smaller than the file when metadata was removed
 		"digest":     meta.Digest,
 		"stripped":   stripped, // image metadata was removed: the id is the hash of the stored bytes
+	}
+	if linkNote != "" {
+		reply["task_note"] = linkNote // why the upload is linked to no task, when it could have been (#12755)
 	}
 	if taskID > 0 {
 		reply["task_id"] = taskID // the task the upload is linked to (#7739)

@@ -91,3 +91,21 @@ func TestAnUploadOfAMemberWithTwoTasksInProgressIsNotOffTheBooks(t *testing.T) {
 	assert.NotContains(t, out, "task_id")
 	assert.Empty(t, l.offBooks(), "linked to none, but not off the books")
 }
+
+// An agent whose only open work is a task IN REVIEW, or who has two open tasks, is not working off the books when an unnamed upload links to none (#12755).
+func TestAnUploadFromAnAgentWithOpenWorkInReviewIsNotOffTheBooks(t *testing.T) {
+	l := newLinkRig(t)
+	ctx := context.Background()
+	require.NoError(t, l.h.bs.SetHealthOn(ctx, "alpha", true))
+	_, err := l.h.bs.Subscribe(ctx, "alpha", "Frontend", "Orchestrator", "agent-s2", nil, "all")
+	require.NoError(t, err)
+	a := l.task("alpha", "Backend", true)
+	b := l.task("alpha", "Backend", false)
+	l.setStatus(t, a, "review_pending")
+	l.setStatus(t, b, "review_pending") // two open: the upload links to none, but the agent has work
+
+	code, out := l.post("s1", "evidence for either", nil)
+	require.Equal(t, http.StatusCreated, code, out)
+	assert.NotContains(t, out, "task_id")
+	assert.Empty(t, l.offBooks(), "it has open work: not noted as off the books")
+}

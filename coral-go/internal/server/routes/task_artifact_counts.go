@@ -24,9 +24,10 @@ var artifactGeneration atomic.Uint64
 func noteArtifactsChanged() { artifactGeneration.Add(1) }
 
 type taskCountEntry struct {
-	at     time.Time
-	gen    uint64
-	counts map[int64]int
+	at      time.Time
+	gen     uint64
+	counts  map[int64]int
+	uploads map[int64][]teamArtifact // the uploads each task is linked to, for the task's own read (#12755)
 }
 
 type taskCountCache struct {
@@ -60,16 +61,39 @@ func (h *BoardHandler) taskArtifactCounts(ctx context.Context, project string) m
 	items = h.mergeCrossTeamRows(items, project)
 	h.linkUploadTasks(ctx, project, items)
 	counts := map[int64]int{}
+	uploads := map[int64][]teamArtifact{}
 	for _, it := range items {
 		if it.TaskID > 0 {
 			counts[it.TaskID]++
+			if it.uploadTask == it.TaskID { // an upload the task is linked to by its record, whatever the task's state
+				uploads[it.TaskID] = append(uploads[it.TaskID], it)
+			}
 		}
 	}
 	h.taskCounts.mu.Lock()
 	if h.taskCounts.entries == nil || len(h.taskCounts.entries) >= taskCountCacheLimit {
 		h.taskCounts.entries = map[string]taskCountEntry{}
 	}
-	h.taskCounts.entries[project] = taskCountEntry{at: now, gen: gen, counts: counts}
+	h.taskCounts.entries[project] = taskCountEntry{at: now, gen: gen, counts: counts, uploads: uploads}
 	h.taskCounts.mu.Unlock()
 	return counts
+}
+
+// forgetTaskCounts drops every board's kept counts and upload lists: an upload was just stored, so a task's read made in the next seconds must see it (#12755), not the list kept for taskCountTTL.
+func (h *BoardHandler) forgetTaskCounts() {
+	h.taskCounts.mu.Lock()
+	h.taskCounts.entries = nil
+	h.taskCounts.mu.Unlock()
+}
+
+// taskUploads are the uploads an agent linked to the task (its record names it), whatever the task's state: the task's own read lists them with its result files, so `coral-board task show` finds what a reviewer asks for (#12755).
+// Kept for a few seconds with the counts; empty when the scan fails.
+func (h *BoardHandler) taskUploads(ctx context.Context, project string, taskID int64) []teamArtifact {
+	h.taskArtifactCounts(ctx, project) // makes (or reuses) the board's entry
+	h.taskCounts.mu.Lock()
+	defer h.taskCounts.mu.Unlock()
+	if e, ok := h.taskCounts.entries[project]; ok {
+		return append([]teamArtifact(nil), e.uploads[taskID]...)
+	}
+	return nil
 }

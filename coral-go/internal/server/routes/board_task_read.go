@@ -3,6 +3,7 @@
 package routes
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -157,7 +158,28 @@ func (h *BoardHandler) GetTask(w http.ResponseWriter, r *http.Request) {
 		errNotFound(w, "task not found")
 		return
 	}
+	h.addUploadedArtifacts(r.Context(), urlParam(r, "project"), task)
 	writeJSON(w, http.StatusOK, task)
+}
+
+// addUploadedArtifacts puts the files an agent uploaded for the task (linked by the upload's record) after the artifacts its result names, once each by link: the task's artifacts are what it has, however it got them (#12755).
+// The task is only changed in this answer, never stored.
+func (h *BoardHandler) addUploadedArtifacts(ctx context.Context, project string, task *board.Task) {
+	if task == nil || h.coralDir == "" {
+		return
+	}
+	have := map[string]bool{}
+	for _, a := range task.Workflow.Artifacts {
+		have[a.URI] = true
+	}
+	for _, u := range h.taskUploads(ctx, project, task.ID) {
+		uri := "coral://artifacts/" + u.ID
+		if have[uri] {
+			continue
+		}
+		have[uri] = true
+		task.Workflow.Artifacts = append(task.Workflow.Artifacts, board.TaskArtifact{Name: u.Name, URI: uri, MediaType: u.MediaType, Digest: u.Digest})
+	}
 }
 
 // POST /api/board/{project}/tasks/current
