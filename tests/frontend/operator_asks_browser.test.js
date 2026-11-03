@@ -36,10 +36,12 @@ const LONG = 'Which of the two \u202edesigns do we ship? ' + 'We have weighed th
             assert.ok(lead.text.includes('Which of the two <U+202E>designs'), at + 'the question is on the row, with the hidden character written out: ' + lead.text.slice(0, 120));
             assert.ok(!lead.text.includes('\u202e'), at + 'a hidden character is written out, never drawn raw');
             assert.ok(dev.text.includes('may I delete the old table?'), at + "the wait's question is on the row");
-            // a question reads like a review row (#11534, then the approved three-line row #11719): the top line is who asked and then the question's first words, and under it the question itself; the team is not on the row
+            // #12649: the asker leads the preview; its subtitle continues the question without repeating that preview.
+            // #12722: the dialog names the asker/team and retains the complete question, checked below.
             const leadRow = await ev(`(() => { const r = [...document.querySelectorAll('#group-table-view tbody tr')].find(x => x.textContent.includes('Lead')); const n = r.querySelector('.inbox-review-name'), sub = r.querySelector('.cell-subtitle, [class*="subtitle"]'), from = r.querySelector('.inbox-review-from'); return { name: n ? n.textContent : '', sub: sub ? sub.textContent : '', from: from ? from.textContent.replace(/ \u00b7$/, '') : '' }; })()`);
             assert.ok(leadRow.name.startsWith('Which of the two'), at + "the row's name is the question's first line: " + JSON.stringify(leadRow));
-            assert.ok(leadRow.from === 'Lead' && leadRow.sub.startsWith('Which of the two <U+202E>designs'), at + 'who asked leads the top line and the question is under it: ' + JSON.stringify(leadRow));
+            assert.equal(leadRow.from, 'Lead', at + 'the asker leads the top line');
+            assert.equal((leadRow.name.replace(/…$/, '') + ' ' + leadRow.sub).replace(/\s+/g, ' ').trim(), LONG.replace(/\u202e/g, '<U+202E>'), at + 'the subtitle continues the preview to preserve the complete question without repeating it (#12649)');
             await waitFor(`document.getElementById('nav-tab-hub-inbox-badge').textContent === '2'`, at + 'the badge counts both', 6000);
 
             // opens whole
@@ -48,6 +50,7 @@ const LONG = 'Which of the two \u202edesigns do we ship? ' + 'We have weighed th
             const dlg = await ev(`(() => { const d = document.querySelector('dialog.inbox-ask-dialog'); const r = d.getBoundingClientRect(); const btns = [...d.querySelectorAll('.inbox-ask-buttons button, .inbox-ask-offer button')].map(b => Math.round(b.getBoundingClientRect().height));
                 return { whole: d.querySelector('.inbox-ask-text').textContent, title: d.querySelector('h2').textContent, fits: r.left >= 0 && r.right <= innerWidth + 1, btns, focus: document.activeElement && document.activeElement.className }; })()`);
             assert.equal(dlg.title, 'Lead · team', at + 'title names the asker and team');
+            assert.equal(dlg.whole.trimEnd(), LONG.replace(/\u202e/g, '<U+202E>'), at + 'the complete question remains in the dialog (#12722)');
             assert.ok(dlg.whole.includes('Reply with 1 or 2.') && dlg.whole.includes('<U+202E>evil') && !dlg.whole.includes('\u202e'), at + 'the whole question, marked: ' + dlg.whole.slice(-60));
             assert.ok(dlg.fits, at + 'the dialog fits the screen'); assert.ok(dlg.btns.every(h => h >= 44), at + 'buttons are 44 px tall: ' + dlg.btns); assert.ok(/inbox-ask-box/.test(dlg.focus), at + 'the box has the focus: ' + dlg.focus);
 
