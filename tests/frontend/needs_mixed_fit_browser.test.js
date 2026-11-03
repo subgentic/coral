@@ -62,6 +62,11 @@ const STUB = `(() => {
             check(actions.some(a => a.text.includes('looks done')), 'mixed table includes the completed goal');
             check(actions.some(a => a.text.includes('Agent 1')) && actions.some(a => a.text.includes('Ship the beta')), 'mixed table includes agents and proposals');
             check(actions.every(a => a.buttons.every(b => b.inside)), 'every visible action button is inside its cell at ' + width + ': ' + JSON.stringify(actions));
+            if (width >= 1280) {
+                check(r.shown.includes('team'), 'Team stays visible beside the single-line goal actions at '+width+': '+JSON.stringify(r));
+                const goalActions = await ev(`(() => { const box=document.querySelector('${T} .inbox-goaldone-actions');return [...box.querySelectorAll('button')].filter(b=>b.getBoundingClientRect().width>1&&!b.closest('[hidden]')).map(b=>({text:b.textContent.trim(),top:b.getBoundingClientRect().top}));})()`);
+                check(goalActions.length >= 3 && Math.max(...goalActions.map(b=>b.top))-Math.min(...goalActions.map(b=>b.top)) < 2, 'goal actions share one desktop line at '+width+': '+JSON.stringify(goalActions));
+            }
             await ev(`document.querySelector('${T} .inbox-goaldone-actions button').focus(); true`);
             await ev(framesJs(2));
             await shot('mixed-' + width);

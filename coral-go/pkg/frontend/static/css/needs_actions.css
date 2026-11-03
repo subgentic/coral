@@ -10,3 +10,9 @@
 @media (min-width: 768px) {
     .inbox-needs-results .inbox-review-actions { flex-wrap: wrap; min-width: 0; max-width: 100%; }
 }
+
+/* Keep the three goal answers together without taking room from Team at desktop widths. */
+@media (min-width: 768px) {
+    .inbox-needs-results .inbox-goaldone-actions { column-gap: 4px; }
+    .inbox-needs-results .inbox-goaldone-actions > .btn { padding-inline: 4px; }
+}
