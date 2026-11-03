@@ -1,6 +1,6 @@
 # Release Notes
 
-## v2.0.40 — Choose what reaches Needs you, a New goal screen, a $ menu of skills, resizable tables, and agents that survive a window program quitting
+## v2.0.41 — Choose what reaches Needs you, a New goal screen, a $ menu of skills, resizable tables, wake buttons for any name, and agents that survive a window program quitting
 
 ### Changes
 
@@ -23,6 +23,15 @@
 - **Phone and landscape**: a landscape phone gets the list strip and the phone bar, the last card scrolls clear of + New, a goal's title wraps and is read whole, and enlarged text keeps navigation and form actions in their layout.
 - **Windows**: the CLI search looks in `%USERPROFILE%\.local\bin` (where Claude Code's native installer puts `claude.exe`), Check again re-reads the saved Path so a CLI installed after Coral started is found, and a Path entry on a network share is skipped or probed with a 2 s limit.
 - **Machine launch** (experimental): `coral machine launch` asks the Hub whether it can make machine credentials before it creates anything, and the CLI pins the digests of v2.0.39.
+- **v2.0.40 was tagged but never released** (its macOS builds failed in a release-only test, nothing was published): everything it carried is in this release, and so is the fix.
+- **Wake buttons accept any member name**: the target is everything after the first `wake:` (a colon, a slash or spaces in the name are fine), a refusal says which part and why, and a name no member carries gets a suggestion.
+- **Upgrade says why it failed**: a restart that fails says why and how to restart by hand, and a port held by another process names it and stops nothing.
+- **Set up a server**: the data folder on the far computer is a setting, Set up waits for a valid folder (the keys and settings folders and any name with `..` are refused), and the dialog has clearer groups and readable help.
+- **Skills has the app's left sidebar** (Imported, Agent created, Coral skills), its table runs edge to edge on a phone, and approval notices stack instead of sitting in a row.
+- **A deleted team stays deleted**: the Operator's page subscribing or a settings save no longer starts a deleted board again, and an open team page says the team was deleted and stops polling.
+- **Analytics**: the Inbox share is one point per day (the day's own share, a gap for a day with no action), with the day's counts on hover and tap.
+- **Touch and keyboard polish**: the Skills Show filter is 44 px on a coarse pointer, a landscape phone gets phone-sized touch targets, "Skip to message box" is a Tab stop only while the box is on screen, "Edit with agent" is sentence case, Show computer puts the computer on its own line under the team, and a Hub sign-in whose late 401 arrives on a page the browser is already leaving no longer replaces the navigation.
+- **Needs you and the Inbox**: action rows stay stable while their popover has focus, native Inbox lists use the full phone width, completed-goal actions fit one desktop line, and an agent asleep after a terminal loss shows only "Terminal gone".
 - **Usage events** (the Operator's choice, counts and closed values only, never a path, a name or text): the new-user funnel is recorded step by step, with `first_prompt_submitted` for every way a message goes (it no longer carries `source=http_send`), and the Inbox reports `inbox_opened`, `inbox_waiting` and `inbox_item_actioned` for a person's own actions, capped per day; the tray and the app report the new funnel steps only after the Terms are accepted, and an offline first start keeps its count. `CORAL_TELEMETRY_DISABLED=1` turns all of it off.
 
 #### Known issues
@@ -33,13 +42,12 @@
 - **OpenCode agents are tested on macOS and Linux; OpenCode on Windows is not yet tested end to end.**
 - **Hermes agents are still experimental.**
 - Setting up a computer over SSH is supported from a macOS or Linux hub, and is not yet tested from a Windows hub.
-- A wake button for a member whose name has a colon or a slash is still refused (#12938, next release).
 
 #### For Coral Hub
 
-- **`release-diff` output** (`go run ./internal/releasediff/cmd/release-diff v2.0.39 <head>`):
+- **`release-diff` output** (`go run ./internal/releasediff/cmd/release-diff v2.0.39 <head>`; v2.0.40 was never released, so this is against v2.0.39):
 
-  ### Tunnel routes, v2.0.39 to f3363c2bd
+  ### Tunnel routes, v2.0.39 to ee1fb88ca
 
   Changed (1)
 
@@ -53,23 +61,28 @@
   - `POST /api/sessions/live/{name}/skills`: never
   - `POST /api/sessions/live/{name}/waiting/dismiss`: never
 
-  ### Board settings keys (BoardSettings, HealthSettings included), v2.0.39 to f3363c2bd
+  ### Board settings keys (BoardSettings, HealthSettings included), v2.0.39 to ee1fb88ca
 
   No key was added, removed or changed.
 
-  ### What Coral Hub compiles in or embeds, v2.0.39 to f3363c2bd
+  ### What Coral Hub compiles in or embeds, v2.0.39 to ee1fb88ca
 
   `pkg/tunnel`: 1 file of Go code changed (+3, -0)
 
   - `coral-go/pkg/tunnel/routes.go`: +3, -0
   - test files, not compiled by the Hub: 3 files (+34, -2)
 
-  `pkg/frontend`: 124 files the Hub embeds changed (+2851, -579)
+  `pkg/frontend`: 147 files the Hub embeds changed (+3133, -668)
 
   - `coral-go/pkg/frontend/bundle_lazy.go`: +1, -0
+  - `coral-go/pkg/frontend/static/analytics_tabs.js`: +7, -5
+  - `coral-go/pkg/frontend/static/analytics_tabs_data.js`: +14, -5
+  - `coral-go/pkg/frontend/static/analytics_viz.js`: +16, -3
   - `coral-go/pkg/frontend/static/api.js`: +1, -0
-  - `coral-go/pkg/frontend/static/app_actions.js`: +2, -2
-  - `coral-go/pkg/frontend/static/app_wiring.js`: +4, -0
+  - `coral-go/pkg/frontend/static/app_actions.js`: +3, -2
+  - `coral-go/pkg/frontend/static/app_navigation.js`: +1, -1
+  - `coral-go/pkg/frontend/static/app_routes.js`: +1, -1
+  - `coral-go/pkg/frontend/static/app_wiring.js`: +6, -0
   - `coral-go/pkg/frontend/static/artifact_names.js`: +7, -4
   - `coral-go/pkg/frontend/static/artifact_preview.js`: +1, -1
   - `coral-go/pkg/frontend/static/artifact_private.js`: +2, -2
@@ -80,32 +93,40 @@
   - `coral-go/pkg/frontend/static/ask_filter.js`: +6, -0
   - `coral-go/pkg/frontend/static/ask_ignore.js`: +2, -1
   - `coral-go/pkg/frontend/static/auth_page.js`: +17, -0
-  - `coral-go/pkg/frontend/static/automations.js`: +4, -4
+  - `coral-go/pkg/frontend/static/automations.js`: +7, -7
   - `coral-go/pkg/frontend/static/board_export.js`: +1, -1
   - `coral-go/pkg/frontend/static/board_fetch.js`: +24, -2
+  - `coral-go/pkg/frontend/static/board_members.js`: +2, -1
   - `coral-go/pkg/frontend/static/board_message_text.js`: +3, -2
   - `coral-go/pkg/frontend/static/changed_files.js`: +70, -25
+  - `coral-go/pkg/frontend/static/chat_import.js`: +2, -0
   - `coral-go/pkg/frontend/static/chief_look.js`: +7, -4
+  - `coral-go/pkg/frontend/static/cloud.js`: +16, -1
   - `coral-go/pkg/frontend/static/cloud_server_view.js`: +10, -7
   - `coral-go/pkg/frontend/static/css/agentic.css`: +6, -4
   - `coral-go/pkg/frontend/static/css/artifact-comments.css`: +19, -4
   - `coral-go/pkg/frontend/static/css/artifact_viewer_header.css`: +2, -1
   - `coral-go/pkg/frontend/static/css/base.css`: +2, -0
+  - `coral-go/pkg/frontend/static/css/chat_import.css`: +3, -0
   - `coral-go/pkg/frontend/static/css/cloud.css`: +5, -0
   - `coral-go/pkg/frontend/static/css/components.css`: +2, -0
-  - `coral-go/pkg/frontend/static/css/data_table.css`: +4, -2
-  - `coral-go/pkg/frontend/static/css/goal_editor.css`: +122, -0
+  - `coral-go/pkg/frontend/static/css/data_table.css`: +13, -5
+  - `coral-go/pkg/frontend/static/css/goal_editor.css`: +124, -0
   - `coral-go/pkg/frontend/static/css/goals.css`: +3, -0
   - `coral-go/pkg/frontend/static/css/layout.css`: +1, -1
   - `coral-go/pkg/frontend/static/css/mobile.css`: +8, -4
-  - `coral-go/pkg/frontend/static/css/needs_actions.css`: +5, -0
-  - `coral-go/pkg/frontend/static/css/session.css`: +3, -6
+  - `coral-go/pkg/frontend/static/css/needs_actions.css`: +11, -0
+  - `coral-go/pkg/frontend/static/css/session.css`: +7, -12
   - `coral-go/pkg/frontend/static/css/settings.css`: +7, -1
   - `coral-go/pkg/frontend/static/css/settings_view.css`: +1, -1
   - `coral-go/pkg/frontend/static/css/skill_mention.css`: +40, -0
-  - `coral-go/pkg/frontend/static/css/skills.css`: +1, -0
+  - `coral-go/pkg/frontend/static/css/skills.css`: +3, -1
+  - `coral-go/pkg/frontend/static/css/ssh_setup.css`: +16, -4
   - `coral-go/pkg/frontend/static/css/team_page.css`: +22, -8
+  - `coral-go/pkg/frontend/static/css/touch.css`: +16, -1
+  - `coral-go/pkg/frontend/static/css/updates.css`: +1, -1
   - `coral-go/pkg/frontend/static/css/view_list.css`: +2, -1
+  - `coral-go/pkg/frontend/static/css/workflows.css`: +1, -1
   - `coral-go/pkg/frontend/static/custom_views.js`: +22, -7
   - `coral-go/pkg/frontend/static/dashboard_analytics.js`: +12, -0
   - `coral-go/pkg/frontend/static/data_table.js`: +28, -11
@@ -121,6 +142,7 @@
   - `coral-go/pkg/frontend/static/goal_text.js`: +16, -0
   - `coral-go/pkg/frontend/static/goal_view.js`: +24, -4
   - `coral-go/pkg/frontend/static/goals_view.js`: +18, -70
+  - `coral-go/pkg/frontend/static/group_cards.js`: +5, -5
   - `coral-go/pkg/frontend/static/history_pages.js`: +17, -0
   - `coral-go/pkg/frontend/static/history_source.js`: +2, -2
   - `coral-go/pkg/frontend/static/hub_access.js`: +5, -0
@@ -135,11 +157,12 @@
   - `coral-go/pkg/frontend/static/initial_load.js`: +1, -1
   - `coral-go/pkg/frontend/static/inline_diff.js`: +6, -3
   - `coral-go/pkg/frontend/static/launch_dialog.js`: +3, -1
-  - `coral-go/pkg/frontend/static/list_card_parts.js`: +4, -3
+  - `coral-go/pkg/frontend/static/list_card_parts.js`: +18, -18
   - `coral-go/pkg/frontend/static/machine_health.js`: +1, -1
   - `coral-go/pkg/frontend/static/mailbox_chats.js`: +4, -1
   - `coral-go/pkg/frontend/static/mailbox_starred_artifacts.js`: +1, -1
   - `coral-go/pkg/frontend/static/menu_button.js`: +55, -5
+  - `coral-go/pkg/frontend/static/message_board.js`: +6, -1
   - `coral-go/pkg/frontend/static/mobile_connect.js`: +4, -4
   - `coral-go/pkg/frontend/static/nav_tabs.js`: +8, -2
   - `coral-go/pkg/frontend/static/needs_filters.js`: +14, -0
@@ -150,12 +173,15 @@
   - `coral-go/pkg/frontend/static/registered_server_view.js`: +1, -1
   - `coral-go/pkg/frontend/static/render.js`: +1, -1
   - `coral-go/pkg/frontend/static/resume_dialog.js`: +2, -2
+  - `coral-go/pkg/frontend/static/routes.js`: +3, -1
   - `coral-go/pkg/frontend/static/safe_markdown.js`: +19, -1
   - `coral-go/pkg/frontend/static/scheduler.js`: +1, -1
   - `coral-go/pkg/frontend/static/server_access.js`: +10, -0
   - `coral-go/pkg/frontend/static/server_base.js`: +6, -0
   - `coral-go/pkg/frontend/static/server_rows.js`: +1, -1
+  - `coral-go/pkg/frontend/static/server_ssh_setup.js`: +52, -3
   - `coral-go/pkg/frontend/static/session_header_updates.js`: +21, -2
+  - `coral-go/pkg/frontend/static/session_rows.js`: +2, -2
   - `coral-go/pkg/frontend/static/sessions.js`: +32, -6
   - `coral-go/pkg/frontend/static/settings_core.js`: +3, -0
   - `coral-go/pkg/frontend/static/settings_fields.js`: +22, -10
@@ -166,11 +192,13 @@
   - `coral-go/pkg/frontend/static/settings_nav.js`: +3, -0
   - `coral-go/pkg/frontend/static/settings_rows_boot.js`: +12, -13
   - `coral-go/pkg/frontend/static/settings_saved_words.js`: +2, -1
+  - `coral-go/pkg/frontend/static/sidebar.js`: +1, -0
   - `coral-go/pkg/frontend/static/sidebar_groups.js`: +13, -0
   - `coral-go/pkg/frontend/static/skill_filter.js`: +18, -0
   - `coral-go/pkg/frontend/static/skill_mention.js`: +134, -0
   - `coral-go/pkg/frontend/static/skill_mention_boot.js`: +21, -0
-  - `coral-go/pkg/frontend/static/skills_tab.js`: +13, -8
+  - `coral-go/pkg/frontend/static/skills_tab.js`: +52, -15
+  - `coral-go/pkg/frontend/static/skip_link.js`: +9, -0
   - `coral-go/pkg/frontend/static/tags.js`: +4, -4
   - `coral-go/pkg/frontend/static/task_detail_html.js`: +1, -1
   - `coral-go/pkg/frontend/static/team_agents_page.js`: +1, -1
@@ -182,12 +210,15 @@
   - `coral-go/pkg/frontend/static/terminal_backend.js`: +9, -2
   - `coral-go/pkg/frontend/static/theme_config.js`: +3, -3
   - `coral-go/pkg/frontend/static/view_list.js`: +2, -2
-  - `coral-go/pkg/frontend/static/view_switch.js`: +1, -1
+  - `coral-go/pkg/frontend/static/view_switch.js`: +2, -3
   - `coral-go/pkg/frontend/static/waiting.js`: +56, -3
-  - `coral-go/pkg/frontend/static/workflows.js`: +2, -2
+  - `coral-go/pkg/frontend/static/workflow_agent.js`: +3, -3
+  - `coral-go/pkg/frontend/static/workflow_editor.js`: +2, -2
+  - `coral-go/pkg/frontend/static/workflows.js`: +5, -5
   - `coral-go/pkg/frontend/static/xterm_renderer.js`: +6, -4
   - `coral-go/pkg/frontend/static_budget_baseline.txt`: +720, -0
-  - `coral-go/pkg/frontend/templates/includes/modals.html`: +10, -5
+  - `coral-go/pkg/frontend/templates/includes/modals.html`: +14, -9
+  - `coral-go/pkg/frontend/templates/includes/sidebar.html`: +13, -4
   - `coral-go/pkg/frontend/templates/includes/views/live_session.html`: +1, -1
   - `coral-go/pkg/frontend/templates/index.html`: +0, -1
   - test files, not compiled by the Hub: 3 files (+353, -37)
@@ -206,7 +237,7 @@
 
   Unchanged: `pkg/hubproxy`, `pkg/hubowner`, `pkg/redact`.
 
-  ### Coral packages compiled into the Hub through its imports, v2.0.39 to f3363c2bd
+  ### Coral packages compiled into the Hub through its imports, v2.0.39 to ee1fb88ca
 
   `internal/secfile`: 2 files of Go code changed (+20, -3), imported by `pkg/hubowner`
 
@@ -230,6 +261,7 @@
 - `tools/pin-release-digests.sh` passes `--new-bundle-format` (a v0.3 Sigstore bundle fails without it); its test's shim cosign now fails like the real one without the flag.
 - Census and test fixes on the way: the goroutine census (`internal/tmux/disclaimed.go` recovers), the no-gate and launch censuses, fixed dates in the board and routes tests are gone (#12927), `servers_below_minimum`, `cli_dialogs`, `inbox_server_columns`, the artifact viewer's phone suites and the settings suites were brought to the pages they test.
 - macOS GUI tests: the window-opening webview tests in `cmd/coral-app` run only with `CORAL_ALLOW_GUI_TESTS=1`; never run them from an agent shell (#12836).
+- `TestBundledPayloadSmoke` (a macOS-only test that `release.yml` runs after the tmux payload is built, so no gate ran it) now expects Coral's staged copy of the bundled tmux, which is what failed v2.0.40's macOS builds (#13014); `.github/workflows/release-prerun.yml` runs it on both Macs on demand before a tag (#13015).
 - windows-tests still has reds that are not this release's (the Hermes home tests, `TestShortLivedChildrenOfTheAgentNeverRefuseIt`, `cloud_rekey` on Windows); the Windows team has them.
 
 ## v2.0.39 — The data-folder hotfix, released: upgrading from v2.0.37 restores your agents, a lost terminal server is recovered, and the macOS build retries its staple
