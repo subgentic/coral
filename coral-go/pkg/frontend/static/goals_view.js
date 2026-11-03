@@ -170,7 +170,7 @@ function drawTableRaw(col) {
         selectable: { contextKey: model.project, canSelect: g => !g.noGoal && W.isOpenGoal(g), actions: goalBulkActions(), onChange: keys => Toolbar.mountSelection(toolbar, keys.size ? table.bar : null), ...(PHONE.matches ? { longPress: true, iconBar: true, clearLabel: 'Cancel' } : {}) }, // a phone: a long press selects, as in Needs you; no checkboxes and no Select button (#12230)
         onSort: () => drawList(), // keep the no-goal navigation row last in either direction
         open: g => g.noGoal ? window.openTeamPage?.(model.project, { tab: 'tasks', noGoal: true }) : openGoal(g.id, true),
-        columns: GC.goalColumns({ progressLabel: 'Tasks' }, ['goal', 'state', 'progress', 'updated']), oneLine: true, sortBar: false, bare: PHONE.matches, // a phone: no card around the rows (#12230)
+        columns: GC.goalColumns({ progressLabel: 'Tasks' }, ['goal', 'state', 'progress', 'updated']), oneLine: true, resize: true, sortBar: false, bare: PHONE.matches, // a phone: no card around the rows (#12230)
         ...(PHONE.matches ? { mail: g => (g.noGoal ? { lead: { icon: 'checklist', square: true, name: 'Tasks with no goal' }, title: g.title, snippet: '', state: '', time: '' } : { lead: { icon: 'flag', square: true, name: W.stateWord(g) }, title: g.title, ask: g.outcome || '', state: W.stateWord(g), time: `${W.stateWord(g)}${totalOf(g.rollup) ? ` \u00b7 ${doneOf(g.rollup)}/${totalOf(g.rollup)}` : ''}` }) } : {}), // a phone's row, like the Inbox's Goals: a flag, the goal, its outcome, when it moved
     });
     if (PHONE.matches) { const bleed = el('div', 'goals-bleed'); bleed.append(table.el); col.append(bleed); } else col.append(table.el); // a phone: the rows run to the screen's edges (goals_phone.css)
