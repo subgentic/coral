@@ -90,14 +90,19 @@ func (h *HubClient) endpoint() (string, error) {
 // ErrHubBootstrapOff: the Hub answered that it does not serve /api/bootstrap (404 or 501): it does not make machine credentials (yet), so a launch cannot finish, and none is started (#12584).
 var ErrHubBootstrapOff = errors.New("Coral Hub does not offer machine credentials yet")
 
+// ErrHubUnrecognised: the Hub's answer to the probe was neither the one a Hub that makes machine credentials gives nor "not served", or there was none. A launch spends money, so an answer it does not
+// know stops it before anything is created (#12584).
+var ErrHubUnrecognised = errors.New("Coral Hub did not answer the way a Hub that makes machine credentials does")
+
 // Preflighter is a Hub client that can say, before anything is created at the provider, that a launch could not get its credential. Launch asks it first when the Hub client has it.
 type Preflighter interface {
 	Preflight(ctx context.Context) error
 }
 
 // Preflight asks the Hub, before any machine exists, whether it serves machine credentials, so a Hub that does not (app.coralhub.dev until it enables /api/bootstrap) is refused with nothing made at the
-// provider instead of after a billable machine is running (#12584). It makes no credential: a HEAD to the mint's address with the key, no body. Only a definite "not served" (404 or 501) is ErrHubBootstrapOff;
-// a key or an address that can never work is refused here too; anything else (a method refusal, a login refusal, a limit, a server fault, a Hub that cannot be reached) goes on, and the mint says what is wrong.
+// provider instead of after a billable machine is running (#12584). It makes no credential and sends no key: a POST to the mint's address with no Authorization and an empty object, which a Hub that serves
+// the route answers 401 {"error":"unauthorized"} before it looks at anything else. Only that answer goes on (an allow-list: a launch spends money). 404 and 501 are ErrHubBootstrapOff; any other
+// status, or no answer, is ErrHubUnrecognised. A key or an address that can never work is refused here too.
 func (h *HubClient) Preflight(ctx context.Context) error {
 	if !keyShape.MatchString(h.Key) {
 		return errors.New("the Coral Hub key does not look like one (it starts with chk_): check the key file")
@@ -106,33 +111,42 @@ func (h *HubClient) Preflight(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	host := ""
+	if u, err := url.Parse(endpoint); err == nil {
+		host = u.Host
+	}
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodHead, endpoint, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader("{}"))
 	if err != nil {
-		return nil
+		return fmt.Errorf("%w (the request could not be made)", ErrHubUnrecognised)
 	}
-	req.Header.Set("Authorization", "Bearer "+h.Key)
+	req.Header.Set("Content-Type", "application/json") // no Authorization: the key is not sent to a probe
+	req.Header.Set("Accept", "application/json")
 	req.Header.Set("User-Agent", "coral-machine-launch")
 	client := h.HTTP
 	if client == nil {
 		client = &http.Client{Timeout: 30 * time.Second}
 	}
 	c := *client
-	c.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse } // the key goes to this host and no other
+	c.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 	resp, err := c.Do(req)
 	if err != nil {
-		return nil // cannot tell: the mint will report an unreachable Hub
+		return fmt.Errorf("%w (could not reach %s)", ErrHubUnrecognised, host) // the transport error text may hold the URL: dropped
 	}
-	resp.Body.Close()
-	if resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusNotImplemented {
-		host := ""
-		if u, err := url.Parse(endpoint); err == nil {
-			host = u.Host
-		}
+	defer resp.Body.Close()
+	raw, _ := io.ReadAll(io.LimitReader(resp.Body, maxHubAnswer))
+	var answer struct {
+		Error string `json:"error"`
+	}
+	_ = json.Unmarshal(raw, &answer)
+	switch {
+	case resp.StatusCode == http.StatusUnauthorized && answer.Error == "unauthorized":
+		return nil
+	case resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusNotImplemented:
 		return fmt.Errorf("%w (it answered HTTP %d for /api/bootstrap/credentials at %s)", ErrHubBootstrapOff, resp.StatusCode, host)
 	}
-	return nil
+	return fmt.Errorf("%w (it answered HTTP %d for /api/bootstrap/credentials at %s)", ErrHubUnrecognised, resp.StatusCode, host)
 }
 
 // Mint makes the request described in the joint note: generic adapter, scope digitalocean, the machine's name as the label, ephemeral, 5 minutes.

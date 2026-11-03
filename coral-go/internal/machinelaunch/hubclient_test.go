@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -265,50 +266,69 @@ func TestMintKeepsTheHubsExpiryAndAnswerWithoutOneSaysNothingGuessed(t *testing.
 	}
 }
 
-// #12584 (coral-hub's question): a Hub that does not serve /api/bootstrap is found out BEFORE anything is created at the provider, not after a machine is running. The probe makes no credential: it is a
-// HEAD with the key, and only a definite "not served" (404 or 501) refuses; anything else, including an answer it cannot read, goes on and lets the mint say what is wrong.
-func TestPreflightRefusesOnlyAHubThatDoesNotServeBootstrap(t *testing.T) {
-	var methods, paths, auths []string
-	var bodies int
-	status := http.StatusMethodNotAllowed
+// #12584 (coral-hub's question): a Hub that does not serve /api/bootstrap is found out BEFORE anything is created at the provider, not after a machine is running. The probe makes no credential and sends
+// no key: a POST with no Authorization, which a Hub that serves the route answers 401 {"error":"unauthorized"}. Only that goes on: a launch spends money, so any other answer stops it.
+func TestPreflightGoesOnOnlyForTheHubsOwnUnauthorizedAnswer(t *testing.T) {
+	var methods, paths, auths, bodies []string
+	status, body := http.StatusUnauthorized, `{"error":"unauthorized"}`
 	h, _ := hubServer(t, func(w http.ResponseWriter, r *http.Request) {
-		methods, paths, auths = append(methods, r.Method), append(paths, r.URL.Path), append(auths, r.Header.Get("Authorization"))
-		if r.ContentLength > 0 {
-			bodies++
-		}
+		b, _ := io.ReadAll(r.Body)
+		methods, paths, auths, bodies = append(methods, r.Method), append(paths, r.URL.Path), append(auths, r.Header.Get("Authorization")), append(bodies, string(b))
 		w.WriteHeader(status)
+		_, _ = w.Write([]byte(body))
 	})
+	status, body = http.StatusUnauthorized, `{"error":"unauthorized"}`
+	if err := h.Preflight(context.Background()); err != nil {
+		t.Fatalf("a Hub that serves the route answers 401 unauthorized to a request with no key: %v", err)
+	}
+
+	// not served: said plainly as such
 	for _, st := range []int{http.StatusNotFound, http.StatusNotImplemented} {
-		status = st
+		status, body = st, ""
 		err := h.Preflight(context.Background())
-		if !errors.Is(err, ErrHubBootstrapOff) {
+		if !errors.Is(err, ErrHubBootstrapOff) || errors.Is(err, ErrHubUnrecognised) {
 			t.Fatalf("%d: want ErrHubBootstrapOff, got %v", st, err)
 		}
 		if strings.Contains(err.Error(), goodKey) {
 			t.Fatalf("the refusal holds the key: %v", err)
 		}
 	}
-	for _, st := range []int{http.StatusMethodNotAllowed, http.StatusUnauthorized, http.StatusForbidden, http.StatusBadRequest, http.StatusOK, http.StatusFound, http.StatusTooManyRequests, http.StatusInternalServerError, http.StatusServiceUnavailable} {
-		status = st
-		if err := h.Preflight(context.Background()); err != nil {
-			t.Errorf("%d: the probe cannot tell, so the launch goes on (the mint says what is wrong): %v", st, err)
+	// anything else stops it: a 401 that is not the Hub's own word, other statuses, a body that is not JSON
+	for name, c := range map[string]struct {
+		st   int
+		body string
+	}{
+		"401 with no word":       {http.StatusUnauthorized, ""},
+		"401 another word":       {http.StatusUnauthorized, `{"error":"bootstrap_disabled"}`},
+		"403":                    {http.StatusForbidden, `{"error":"forbidden"}`},
+		"405":                    {http.StatusMethodNotAllowed, ""},
+		"400":                    {http.StatusBadRequest, `{"error":"invalid_request"}`},
+		"200":                    {http.StatusOK, `{"credential":"chb_0123456789abcdef"}`},
+		"302":                    {http.StatusFound, ""},
+		"429":                    {http.StatusTooManyRequests, ""},
+		"500":                    {http.StatusInternalServerError, ""},
+		"503":                    {http.StatusServiceUnavailable, ""},
+		"200 with an unreadable": {http.StatusOK, "<html>"},
+	} {
+		status, body = c.st, c.body
+		err := h.Preflight(context.Background())
+		if !errors.Is(err, ErrHubUnrecognised) || errors.Is(err, ErrHubBootstrapOff) {
+			t.Errorf("%s: an answer the launch does not know stops it: %v", name, err)
 		}
 	}
 	for i := range methods {
-		if methods[i] != http.MethodHead || paths[i] != "/api/bootstrap/credentials" || auths[i] != "Bearer "+goodKey {
-			t.Errorf("probe %d: %s %s %q", i, methods[i], paths[i], auths[i])
+		if methods[i] != http.MethodPost || paths[i] != "/api/bootstrap/credentials" || auths[i] != "" || bodies[i] != "{}" {
+			t.Errorf("probe %d: %s %s auth %q body %q", i, methods[i], paths[i], auths[i], bodies[i])
 		}
 	}
-	if bodies != 0 {
-		t.Errorf("the probe sends no body")
-	}
 
-	// an unreachable Hub: not a reason to refuse here (the mint will report it)
+	// an unreachable Hub stops it too, without the transport error's text (it may hold the address)
 	srv := httptest.NewServer(http.NotFoundHandler())
 	url := srv.URL
 	srv.Close()
-	if err := (&HubClient{BaseURL: url, Key: goodKey}).Preflight(context.Background()); err != nil {
-		t.Errorf("an unreachable Hub is not 'bootstrap off': %v", err)
+	err := (&HubClient{BaseURL: url, Key: goodKey}).Preflight(context.Background())
+	if !errors.Is(err, ErrHubUnrecognised) || !strings.Contains(err.Error(), "could not reach") {
+		t.Errorf("an unreachable Hub: %v", err)
 	}
 
 	// a key or an address that can never work is refused now, not after a machine exists

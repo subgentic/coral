@@ -886,6 +886,13 @@ func TestLaunchAsksTheHubFirstAndRefusesBeforeTheProviderCreatesAnything(t *test
 		t.Errorf("the error holds a secret")
 	}
 
+	// an answer it does not know stops it just the same, with the same promise
+	p3 := &stubProvider{}
+	h3 := &stubHub{preflightErr: fmt.Errorf("%w (it answered HTTP 502 for /api/bootstrap/credentials at app.coralhub.dev)", ErrHubUnrecognised)}
+	o3, d3, _ := setup(p3, h3)
+	if _, err := Launch(context.Background(), o3, d3); !errors.Is(err, ErrHubUnrecognised) || !strings.Contains(err.Error(), "nothing was created at") || len(p3.calls) != 0 {
+		t.Errorf("an unknown answer: %v, provider calls %v", err, p3.calls)
+	}
 	// a Hub that does serve them: the launch goes on to the provider as before
 	p2, h2 := &stubProvider{}, &stubHub{}
 	o2, d2, _ := setup(p2, h2)
