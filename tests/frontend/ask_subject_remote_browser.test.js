@@ -21,14 +21,14 @@ const { coralReady } = require('./helpers/wait');
             await waitFor(`!!document.querySelector('button[aria-label="Answer the question of Orchestrator"]')`, at + 'the question row', 10000);
             await ev(`document.querySelector('button[aria-label="Answer the question of Orchestrator"]').click(); true`);
             await waitFor(`!!document.querySelector('dialog.inbox-ask-dialog[open]')`, at + 'the dialog opens', 4000);
-            const d = await ev(`(() => { const p = document.querySelector('dialog.inbox-ask-dialog .inbox-ask-subjects'); return { text: p.textContent, buttons: [...p.querySelectorAll('button, a')].map(b => ({ kind: b.dataset.kind, h: Math.round(b.getBoundingClientRect().height) })) }; })()`);
-            assert.ok(!/[\u202e\u200b\u0007]/.test(d.text) && /Ship.*beta/.test(d.text) && /Fix the login.* page/.test(d.text) && d.text.length > 'About Goal #7: Ship the beta · Task #12: Fix the login page (named by Orchestrator)'.length, at + 'hidden characters in the titles are written out, none are in the line: ' + JSON.stringify(d.text));
+            const d = await ev(`(() => { const p = document.querySelector('dialog.inbox-ask-dialog .inbox-ask-subjects'); return { text: p.textContent, titles: [...p.querySelectorAll('[title]')].map(e => e.title).join(' · '), buttons: [...p.querySelectorAll('button, a')].map(b => ({ kind: b.dataset.kind, h: Math.round(b.getBoundingClientRect().height) })) }; })()`);
+            assert.ok(!/[\u202e\u200b\u0007]/.test(d.titles) && /Ship.*beta/.test(d.titles) && /Fix the login.* page/.test(d.titles) && /named by Orchestrator/.test(d.titles), at + 'full titles and attribution are in hover text, with hidden characters written out: ' + d.titles);
             if (remote) assert.deepEqual(d.buttons, [], at + 'a question from another computer shows the goal and the task as words, with no link (their numbers are that computer\'s): ' + JSON.stringify(d));
             else {
                 assert.deepEqual(d.buttons.map(b => b.kind), ['goal', 'task'], at + 'a question from this computer has its two links: ' + JSON.stringify(d));
                 if (mobile) assert.ok(d.buttons.every(b => b.h >= 44), at + 'the goal and task links are 44 px tall on a touch screen: ' + JSON.stringify(d.buttons));
             }
-            assert.match(d.text, /^About Goal #7: .* · Task #12: .* \(named by Orchestrator\)$/, at + 'the line still says the asker named them: ' + d.text);
+            assert.equal(d.text, 'About Goal #7 · Task #12', at + 'compact About line');
             await ev(`document.querySelector('dialog.inbox-ask-dialog .inbox-ask-buttons .btn:not(.btn-primary)').click(); true`);
         }
     } finally { await client.close(); }
