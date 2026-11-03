@@ -70,7 +70,7 @@ const STUB = `(() => { window.__posts = []; const R = window.fetch; const json =
                 await client.Input.dispatchKeyEvent({ type: 'rawKeyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r' }); await client.Input.dispatchKeyEvent({ type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
                 s = await state(); check(`${tag}: Enter on an empty one ends the list`, s.v === '- one\n', JSON.stringify(s));
                 const roles = await ev(`(() => { const b = document.querySelector('.goal-toolbar'); return { role: b.getAttribute('role'), names: [...b.querySelectorAll('.goal-tb')].map(x => x.getAttribute('aria-label')) }; })()`);
-                check(`${tag}: a toolbar with named buttons`, roles.role === 'toolbar' && roles.names.length === 7 && roles.names.every(Boolean), JSON.stringify(roles));
+                check(`${tag}: a toolbar with named buttons`, roles.role === 'toolbar' && roles.names.length === 8 && roles.names.every(Boolean), JSON.stringify(roles));
                 await ev(`document.querySelector('.goal-tb[data-tool="bold"]').focus(); true`);
                 await client.Input.dispatchKeyEvent({ type: 'rawKeyDown', key: 'ArrowRight', code: 'ArrowRight', windowsVirtualKeyCode: 39 }); await client.Input.dispatchKeyEvent({ type: 'keyUp', key: 'ArrowRight', code: 'ArrowRight', windowsVirtualKeyCode: 39 });
                 check(`${tag}: the arrow keys move along the toolbar`, (await ev(`document.activeElement.dataset.tool`)) === 'italic', await ev(`document.activeElement.dataset.tool`));

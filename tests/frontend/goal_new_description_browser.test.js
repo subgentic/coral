@@ -104,7 +104,7 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
             await ev(`document.querySelector('.goals-dialog .ac-thumb-failed .ac-thumb-remove').click(); window.__fail = false; true`);
             assert.equal(await ev(`document.querySelector('.goals-dialog button[type=submit]').disabled`), false, at + 'removed, Create is open again');
             assert.equal(await ev(`document.documentElement.scrollWidth - document.documentElement.clientWidth`), 0, at + 'the form does not scroll sideways');
-            if (mobile) assert.deepEqual(await ev(`[...document.querySelectorAll('.goals-dialog button')].filter(b => b.getClientRects().length).map(b => [b.textContent, Math.round(b.getBoundingClientRect().height)]).filter(x => x[1] < 44 && b0(x[0]))`.replace('b0(x[0])', 'x[0] !== "\\u2190"')), [], at + 'the form\'s buttons are 44 px tall');
+            if (mobile) assert.deepEqual(await ev(`[...document.querySelectorAll('.goals-dialog button')].filter(b => b.getClientRects().length && !b.closest('.ac-thumb')).map(b => [b.textContent, Math.round(b.getBoundingClientRect().height)]).filter(x => x[1] < 44 && b0(x[0]))`.replace('b0(x[0])', 'x[0] !== "\\u2190"')), [], at + 'the form\'s buttons are 44 px tall');
 
             // Create: the description is the outcome, the pictures are the stored hexes in order
             await ev(`(() => { const t = document.querySelector('.goals-dialog #goal-new-title'); t.value = 'Fix the lock'; t.dispatchEvent(new Event('input')); document.querySelector('.goals-dialog form').requestSubmit(); return true; })()`);

@@ -70,6 +70,8 @@ const TOOLS = [
     { key: 'checks', label: 'Checklist', icon: 'check_box', run: f => prefixLines(f, '- [ ] ') },
     { key: 'code', label: 'Code', icon: 'code', run: f => wrapSelection(f, '`') },
     { key: 'link', label: 'Link', icon: 'link', run: f => linkSelection(f) },
+    { sep: true },
+    { key: 'image', label: 'Add a picture', icon: 'image', run: () => {} }, // opens the picture picker (wired where the tray exists)
 ];
 
 /** The New goal screen. opts: { project, teams: [{ key, label }], onCreated(project), onClose() }. With more than one team the screen asks which (the one the caller named is chosen). Resolves nothing: it reports through onCreated and onClose. */
@@ -114,9 +116,11 @@ export function openGoalEditor(opts = {}) {
     });
     const d = el('input'); d.type = 'text'; d.maxLength = 300; d.autocomplete = 'off'; d.id = 'goal-new-done'; d.placeholder = 'What a person can check';
     const doneLab = el('label', 'goal-label'); doneLab.htmlFor = 'goal-new-done'; doneLab.append('Done when ', el('span', 'goal-label-note', '· one thing a person can check (optional)'));
-    const pics = el('div', 'goals-pics'); let tray = null; // the pictures of the goal: the comment box's tray, loaded when the form opens
+    const pics = el('div', 'goals-pics goal-pics'); let tray = null; // the pictures of the goal: the comment box's tray, loaded when the form opens
+    const picLab = el('div', 'goal-label', 'Pictures'); picLab.id = 'goal-pics-label';
+    const picRow = el('div', 'goal-pics-row'); picRow.setAttribute('role', 'group'); picRow.setAttribute('aria-labelledby', 'goal-pics-label');
     const err = el('p', 'goals-field-error'); err.setAttribute('role', 'alert');
-    const main = el('div', 'goals-form-body goal-main'); main.append(t, descLab, bar, desc, descCount, el('div', 'goal-gap'), doneLab, d, pics, err);
+    const main = el('div', 'goals-form-body goal-main'); main.append(t, descLab, bar, desc, descCount, el('div', 'goal-gap'), doneLab, d, picLab, pics, err);
 
     const go = btn('btn btn-primary', 'Create goal'); go.type = 'submit';
     const cancel = btn('btn', 'Cancel', () => dlg.close());
@@ -141,11 +145,13 @@ export function openGoalEditor(opts = {}) {
         if (!r.ok || !/^[0-9a-f]{64}$/.test(String(j.hex || ''))) throw new Error((j && typeof j.error === 'string' && j.error) || `The picture was not stored (HTTP ${r.status}).`);
         return { hex: j.hex, name: String(j.name || ''), contentType: String(j.content_type || blob.type), size: Number(j.size) || blob.size };
     };
-    const sync = () => { go.disabled = !!tray && (tray.busy() || tray.failed()); }; // Create waits for a picture going up, and for a failed one to be removed
+    const sync = () => { go.disabled = !!tray && (tray.busy() || tray.failed()); picLab.textContent = tray && tray.items().length ? `Pictures \u00b7 ${tray.items().length}` : 'Pictures'; }; // Create waits for a picture going up, and for a failed one to be removed
     importOnce('./artifact_comment_images.js').then(m => {
         if (!dlg.isConnected) return;
         tray = m.createImageTray({ upload: uploadImage }); tray.attach(form, desc); tray.listen(sync);
-        pics.append(tray.picker(), tray.hint(), tray.node);
+        const picker = tray.picker(), add = picker.querySelector('button'); add.textContent = 'Drop, paste or choose'; add.classList.add('goal-drop'); add.setAttribute('aria-label', 'Add a picture to this goal');
+        picRow.append(tray.node, picker); pics.append(picRow, tray.hint());
+        bar.querySelector('[data-tool="image"]').addEventListener('click', () => picker.querySelector('input').click());
     }).catch(() => { /* a goal needs no picture: the form works without the button */ });
     pick.addEventListener('change', () => { if (tray) tray.clear('The pictures were taken out: they were stored on the other team.'); project = pick.value; dr.disabled = true; dr.replaceChildren(new Option('Loading this board\'s agents…', '')); loadDrivers(); });
     form.addEventListener('submit', async (e) => {

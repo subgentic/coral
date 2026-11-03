@@ -46,3 +46,25 @@
     .goal-tb { width: var(--control-touch-height); height: var(--control-touch-height); }
     .goal-editor .goals-form-body > input#goal-new-done { min-height: var(--control-touch-height); }
 }
+
+/* the pictures: thumbnails in a row (the tray's own list), each with Mark up and Remove laid over its corner, and a dashed tile to drop, paste or choose one (#12724) */
+.goal-pics { align-items: stretch; }
+.goal-pics-row { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 10px; }
+.goal-editor .goal-pics-row > .ac-images { flex: 0 1 auto; width: auto; max-width: 100%; }
+.goal-pics-row > .ac-picker { flex: none; }
+.goal-editor .ac-thumbs { gap: 10px; }
+.goal-editor .ac-thumb { position: relative; width: 96px; gap: 0; }
+.goal-editor .ac-thumb-img { width: 96px; height: 72px; }
+.goal-editor .ac-thumb-state { position: absolute; left: 0; right: 0; bottom: 0; padding: 2px 6px; background: rgba(var(--black-rgb), 0.65); color: var(--text-primary); }
+.goal-editor .ac-thumb .btn-small { position: absolute; top: 4px; width: 24px; min-width: 0; height: 24px; min-height: 0; margin: 0; padding: 0; overflow: hidden; white-space: nowrap; border-radius: var(--radius-xl); background: rgba(var(--black-rgb), 0.7); border-color: transparent; color: transparent; opacity: 0; transition: none; } /* icon buttons: the words stay for a screen reader (aria-label) */
+.goal-editor .ac-thumb .btn-small::before { position: absolute; inset: 0; display: grid; place-items: center; color: var(--text-on-accent); font-size: var(--fs-lg); line-height: 1; }
+.goal-editor .ac-thumb-remove { right: 4px; }
+.goal-editor .ac-thumb-remove::before { content: "\00d7"; }
+.goal-editor .ac-thumb-markup { right: 32px; }
+.goal-editor .ac-thumb-markup::before { content: "\270e"; }
+.goal-editor .ac-thumb:hover .btn-small, .goal-editor .ac-thumb:focus-within .btn-small { opacity: 1; }
+@media (pointer: coarse) { .goal-editor .ac-thumb .btn-small { opacity: 1; width: 32px; height: 32px; border-radius: 16px; } .goal-editor .ac-thumb-markup { right: 40px; } }
+.goal-editor .goal-drop { width: 150px; height: 72px; margin: 0; padding: 4px 8px; border: 1.5px dashed var(--control-border); background: none; color: var(--text-secondary); font-size: var(--fs-md); white-space: normal; text-align: center; }
+.goal-editor .goal-drop:hover, .goal-editor .goal-drop:focus-visible { border-color: var(--accent); color: var(--text-primary); }
+.goal-editor .ac-drop { outline: 2px dashed var(--accent); outline-offset: -4px; }
+@media (max-width: 767px) { .goal-editor .goal-drop { width: 100%; height: 56px; } .goal-pics-row .ac-picker { flex: 1 1 100%; } }
