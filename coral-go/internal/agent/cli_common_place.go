@@ -31,6 +31,9 @@ func CommonPlaceCLI(binary string, screen func(path string) string) string {
 func CommonPlaceLookup(binary string, screen func(path string) string) CommonLookup {
 	var res CommonLookup
 	check := func(p string) bool {
+		if !shareAnswers(filepath.Dir(p)) { // a folder on a network share that did not answer in time: skipped, never waited on (share_probe.go, #464)
+			return false
+		}
 		if _, err := os.Stat(p); err != nil { // the link is followed here, at each use: an updater that moves its target is no stale path
 			return false
 		}
