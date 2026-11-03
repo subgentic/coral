@@ -26,7 +26,7 @@ const { coralReady } = require('./helpers/wait');
             return true; })()`);
 
         console.log('1. the dialog says what you get');
-        await ev(`document.getElementById('welcome-open-folder').click(); true`);
+        await ev(`(async () => { window.showLaunchModal(); for (let i = 0; i < 100 && !document.getElementById('launch-type-open-folder'); i++) await new Promise(r => setTimeout(r, 50)); document.getElementById('launch-type-open-folder').click(); return true; })()`); // Open folder is in the +New chooser (it left Home's cards for New goal, #13012)
         await waitFor(`getComputedStyle(document.getElementById('open-folder-modal')).display !== 'none'`, 'the Open folder dialog');
         const help = await ev(`document.querySelector('#open-folder-modal .open-folder-help').textContent`);
         assert.match(help, /Adds this folder to your list/, help); assert.match(help, /agent or a terminal/, help); assert.doesNotMatch(help, /pinned|unpin/i, 'no sidebar jargon: ' + help);

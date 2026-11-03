@@ -39,7 +39,7 @@ const SKIPPED = { 'restart-modal': 'needs a live session; opened by an unexporte
 // one focus must come back to, or to the control that opened the menu it was in). Each runs again with a real mouse click on the real opener (#6188: the census's own opener cannot see a real opener losing focus).
 const REAL = {
     'launch-modal': { prep: `window.switchNavTab('agents')`, steps: ['[data-on-click="launch-show"]'] },
-    'open-folder-modal': { prep: `window.switchNavTab('agents')`, steps: ['#welcome-open-folder'] },
+    'open-folder-modal': { prep: `window.switchNavTab('agents')`, steps: ['[data-on-click="launch-show"]', '#launch-type-open-folder'], returnsTo: 0 },
     'settings-modal': { prep: `window.switchNavTab('agents')`, steps: ['[aria-controls="top-bar-settings-menu"]', '[data-on-click="m-close-top-bar-settings-then-show-settings-modal"]'], returnsTo: 0 },
     'wf-create-modal': { prep: `window.openAutomationsFolder('workflows')`, steps: ['[data-on-click="wf-create"]'] },
     'job-modal': { prep: `window.openAutomationsFolder('jobs')`, steps: ['[data-on-click="job-new"], [data-on-click="m-show-job-modal"], #scheduler-new-job-btn'] },

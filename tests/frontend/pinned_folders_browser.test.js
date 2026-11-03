@@ -57,9 +57,9 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         check('no pinned folders to start with', start.status === 200 && Array.isArray(start.body.folders) && start.body.folders.length === 0, JSON.stringify(start));
 
         // ── Open folder from the home page ─────────────────────────────────
-        const card = await ev(`(() => { const c = document.getElementById('welcome-open-folder'); return c && { text: c.textContent.replace(/\\s+/g, ' ').trim(), shown: c.getClientRects().length > 0 }; })()`);
-        check('the home page has an Open folder card', card && card.shown && /Open folder/.test(card.text), JSON.stringify(card));
-        await ev(`document.getElementById('welcome-open-folder').click(); true`);
+        const card = await ev(`(() => { const c = document.getElementById('welcome-new-goal'); return { goal: !!c && c.getClientRects().length > 0, folder: !!document.getElementById('welcome-open-folder') }; })()`);
+        check('the home page has a New goal card and no Open folder card (#13012); Open folder is in the +New chooser', card.goal && !card.folder, JSON.stringify(card));
+        await ev(`(async () => { window.showLaunchModal(); for (let i = 0; i < 100 && !document.getElementById('launch-type-open-folder'); i++) await new Promise(r => setTimeout(r, 50)); document.getElementById('launch-type-open-folder').click(); return true; })()`);
         await until(`getComputedStyle(document.getElementById('open-folder-modal')).display !== 'none' && document.activeElement && document.activeElement.id === 'open-folder-dir'`, 'the Open folder dialog with focus in the path');
         const dlg = await ev(`({ shown: getComputedStyle(document.getElementById('open-folder-modal')).display !== 'none', focus: document.activeElement && document.activeElement.id,
             role: document.getElementById('open-folder-modal').getAttribute('role'), label: document.getElementById('open-folder-title').textContent })`);
