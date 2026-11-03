@@ -30,6 +30,7 @@ SHIM
 # the shim cosign: accepts only the identity, tag, commit and trigger the "bundle" was signed for (SIGNED_*), and records what it was asked
 cat > "$T/bin/cosign" <<'SHIM'
 #!/usr/bin/env bash
+if [ "$1" = version ]; then [ "$COSIGN_SHIM_VERSION" = none ] || printf 'GitVersion:    %s\nGitCommit:     abc\n' "$COSIGN_SHIM_VERSION"; exit 0; fi
 echo "$*" >> "$FIX/cosign.calls"
 id=""; iss=""; repo=""; ref=""; wsha=""; trig=""; [ "$1" = verify-blob ] || { echo "cosign shim: $*" >&2; exit 2; }
 while [ $# -gt 0 ]; do case "$1" in
@@ -42,8 +43,11 @@ echo "Verified OK" >&2
 SHIM
 chmod +x "$T/bin/gh" "$T/bin/cosign"
 ln -s "$(command -v jq)" "$T/nocosign/jq"; cp "$T/bin/gh" "$T/nocosign/gh"
+PINNED="$(sed -n 's/^COSIGN_VERSION=//p' "$here/../../tools/devops/install-cosign.sh" | head -1)"
+[ -n "$PINNED" ] || fail "no pinned cosign version in install-cosign.sh"
 
 export FIX="$T/fix" GITHUB_SERVER_URL=https://github.com
+export COSIGN_SHIM_VERSION="$PINNED"
 good_files() {
   rm -f "$FIX"/*
   printf '{"draft":false,"tag_name":"v2.0.36","immutable":true}\n' > "$FIX/release.json"
@@ -106,9 +110,29 @@ good_files
 OUT="$(PATH="$T/nocosign:/usr/bin:/bin" bash "$SCRIPT" 2.0.36 2>"$T/err")"; CODE=$?
 [ "$CODE" = 1 ] && [ -z "$OUT" ] && grep -q "cosign is not on PATH" "$T/err" || fail "cosign missing: exit $CODE out '$OUT' $(cat "$T/err")"
 
-# 6. the repository: the home that built the tag by default (tools/release-homes.txt), --repo overrides it
+# 6. the repository: the home that built the tag by default (tools/release-homes.txt); --repo only names another home the table lists
 good_files; run 2.0.36 --repo example/other
-[ "$CODE" = 1 ] || fail "--repo with a bundle signed for another identity must be refused: exit $CODE"
-good_files; export SIGNED_ID="https://github.com/example/other/.github/workflows/release.yml@refs/tags/v2.0.36" SIGNED_REPO=example/other; run 2.0.36 --repo example/other
-[ "$CODE" = 0 ] && grep -q "example/other/.github/workflows/release.yml@refs/tags/v2.0.36" <<<"$OUT" || fail "--repo: exit $CODE $ERR"
+[ "$CODE" = 1 ] && [ -z "$OUT" ] && grep -q "is not a home listed" <<<"$ERR" || fail "--repo of an unlisted repository must be refused: exit $CODE $ERR"
+printf 'v0.0.0 cdknorowski/coral\nv1.4.142 subgentic/coral\nv2.0.0 example/other\n' > "$T/homes.txt"
+good_files; export SIGNED_ID="https://github.com/example/other/.github/workflows/release.yml@refs/tags/v2.0.36" SIGNED_REPO=example/other
+OUT="$(RELEASE_HOMES_FILE="$T/homes.txt" PATH="$T/bin:$PATH" bash "$SCRIPT" 2.0.36 --repo example/other 2>"$T/err")"; CODE=$?
+[ "$CODE" = 0 ] && grep -q "example/other/.github/workflows/release.yml@refs/tags/v2.0.36" <<<"$OUT" || fail "--repo of a listed home: exit $CODE $(cat "$T/err")"
+
+# 7. the cosign version: only the pinned one; a v2 gets --new-bundle-format, as verify-release.sh passes it
+good_files; COSIGN_SHIM_VERSION=v9.9.9 refused "a cosign that is not the pinned version" 2.0.36
+grep -q "not the pinned" <<<"$ERR" || fail "the refusal names the pinned version: $ERR"
+good_files; COSIGN_SHIM_VERSION=none refused "a cosign that prints no version" 2.0.36
+good_files; run 2.0.36; [ "$CODE" = 0 ] || fail "the pinned cosign: exit $CODE $ERR"
+if [[ "$PINNED" == v2.* ]]; then grep -q -- "--new-bundle-format" "$FIX/cosign.calls" || fail "a v2 cosign is given --new-bundle-format"; else ! grep -q -- "--new-bundle-format" "$FIX/cosign.calls" || fail "a v3 cosign is not"; fi
+
+# the pin is READ from install-cosign.sh, not remembered: a copy of the tools whose pin is v3.0.6 accepts v3.0.6 (and passes no --new-bundle-format) and refuses the v2.4.1 that was the pin
+mkdir -p "$T/tools2/devops"; cp "$here/../../tools/pin-release-digests.sh" "$here/../../tools/release-homes.sh" "$here/../../tools/release-homes.txt" "$T/tools2/"
+sed 's/^COSIGN_VERSION=.*/COSIGN_VERSION=v3.0.6/' "$here/../../tools/devops/install-cosign.sh" > "$T/tools2/devops/install-cosign.sh"
+good_files
+OUT="$(COSIGN_SHIM_VERSION=v3.0.6 PATH="$T/bin:$PATH" bash "$T/tools2/pin-release-digests.sh" 2.0.36 2>"$T/err")"; CODE=$?
+[ "$CODE" = 0 ] || fail "a copy pinned to v3.0.6 accepts v3.0.6: exit $CODE $(cat "$T/err")"
+! grep -q -- "--new-bundle-format" "$FIX/cosign.calls" || fail "a v3 pin passes no --new-bundle-format"
+good_files
+OUT="$(COSIGN_SHIM_VERSION=v2.4.1 PATH="$T/bin:$PATH" bash "$T/tools2/pin-release-digests.sh" 2.0.36 2>"$T/err")"; CODE=$?
+[ "$CODE" = 1 ] && [ -z "$OUT" ] || fail "a copy pinned to v3.0.6 refuses v2.4.1: exit $CODE '$OUT'"
 echo "PASS pin_release_digests"

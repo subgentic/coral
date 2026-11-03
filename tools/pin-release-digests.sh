@@ -16,8 +16,8 @@
 # ANY failure (cosign or gh or jq missing, a check that does not hold, a line missing or twice, a digest that is not 64 lower-case hex, the two digests equal)
 # exits 1 and PRINTS NOTHING on stdout: the rows come out only from a verified file. Messages go to stderr.
 #
-# Needs: gh (logged in), jq, cosign (the PINNED one: tools/devops/install-cosign.sh), sha256 is not recomputed here. GITHUB_SERVER_URL defaults to https://github.com.
-# The repository is the home that built and signed that tag (tools/release-homes.txt); --repo OWNER/NAME overrides it.
+# Needs: gh (logged in), jq, and cosign of EXACTLY the version tools/devops/install-cosign.sh pins (any other is refused). The sha256 of the tarballs is not recomputed here: it is read from the signed file. GITHUB_SERVER_URL defaults to https://github.com.
+# The repository is the home that built and signed that tag (tools/release-homes.txt); --repo OWNER/NAME names another home the table lists, and only one it lists.
 set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -41,13 +41,28 @@ for tool in gh jq cosign; do
   command -v "$tool" >/dev/null 2>&1 || die "$tool is not on PATH: nothing is printed without a check (cosign: tools/devops/install-cosign.sh)"
 done
 
+# shellcheck source=release-homes.sh
+. "$here/release-homes.sh"
 if [ -z "$REPO" ]; then
-  # shellcheck source=release-homes.sh
-  . "$here/release-homes.sh"
   REPO="$(release_home_for_tag "$TAG" || true)"
+else
+  # --repo is for a home the table lists (a release is signed by the repository that built it), never for any repository a caller names: the identity checked below comes from here
+  listed=0
+  while read -r _ home; do [ "$home" = "$REPO" ] && listed=1; done < <(_rh_rows)
+  [ "$listed" = 1 ] || die "--repo $REPO is not a home listed in tools/release-homes.txt"
 fi
 [[ "$REPO" =~ ^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ ]] || die "the repository must be OWNER/NAME"
 SERVER="${GITHUB_SERVER_URL:-https://github.com}"
+
+# The cosign that checks the signature is the one this repository pins (tools/devops/install-cosign.sh, whose sha256 anchor is tools/devops/cosign.sha256): any other version is refused, so a
+# different cosign cannot be what says "verified".
+pinned="$(sed -n 's/^COSIGN_VERSION=//p' "$here/devops/install-cosign.sh" | head -1)"
+[[ "$pinned" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "could not read the pinned cosign version from tools/devops/install-cosign.sh"
+have="$(cosign version 2>&1 | sed -n 's/^GitVersion:[[:space:]]*//p' | head -1)"
+[ "$have" = "$pinned" ] || die "cosign is ${have:-of an unknown version}, not the pinned ${pinned}: install it with tools/devops/install-cosign.sh"
+# cosign v2 reads this repository's bundles (written in the new bundle format) only with the flag, as tools/verify-release.sh passes it; v3 reads them by default
+bundle_flag=()
+[[ "$pinned" == v2.* ]] && bundle_flag=(--new-bundle-format)
 
 work="$(mktemp -d "${TMPDIR:-/tmp}/pin-digests.XXXXXX")"
 trap 'rm -rf "$work"' EXIT
@@ -67,7 +82,7 @@ gh release download "$TAG" --repo "$REPO" --pattern SHA256SUMS.txt --pattern SHA
 [ -s "$work/sums/SHA256SUMS.txt.sigstore.json" ] || die "SHA256SUMS.txt.sigstore.json is missing from the release"
 
 # Only what release.yml signed at this tag, from this commit, by a tag push: the exact identity, not a pattern (promote.yml's rule).
-cosign verify-blob "$work/sums/SHA256SUMS.txt" --bundle "$work/sums/SHA256SUMS.txt.sigstore.json" \
+cosign verify-blob "$work/sums/SHA256SUMS.txt" --bundle "$work/sums/SHA256SUMS.txt.sigstore.json" ${bundle_flag[@]+"${bundle_flag[@]}"} \
   --certificate-identity "${SERVER}/${REPO}/.github/workflows/release.yml@refs/tags/${TAG}" \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   --certificate-github-workflow-repository "$REPO" \
