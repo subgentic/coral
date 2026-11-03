@@ -3,8 +3,9 @@
 // request, and the preview pane is not opened by any of it. 1280 and 390 px. The panel's reads are answered in the page; Drives Chrome over CDP.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { safePaused } = require('./helpers/paused');
 const BASE = require('./test_base').BASE;
-const { coralReady } = require('./helpers/wait');
+const { coralReady, framesJs } = require('./helpers/wait');
 
 const A_ORIG = ['package main', '', 'func a() int {', '\treturn 1', '}', ''].join('\n');
 const A_CUR = ['package main', '', 'func a() int {', '\treturn 2 // changed in a', '}', ''].join('\n');
@@ -28,10 +29,15 @@ const FILES = {
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
+    const { Fetch } = client;
+    const heldComments = [];
+    safePaused(client, async event => { heldComments.push(event.requestId); await ev('window.__diffCommentsHeld = true'); });
     const problems = [];
     const check = (label, cond, detail) => { if (!cond) problems.push(`${label}${detail !== undefined ? ': ' + detail : ''}`); };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        // Hold the actual lazy comments module, so its continuation resumes only after Collapse all.
+        await Fetch.enable({ patterns: [{ urlPattern: '*diff_comments.js*', requestStage: 'Request' }] });
         for (const [w, h, mobile, zoom] of [[1280, 900, false, ''], [390, 844, true, ''], [390, 844, true, '32px']]) {
             const tag = `${w} px${zoom ? ', 200% text' : ''}`;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
@@ -101,6 +107,15 @@ const FILES = {
             await waitFor(`[...document.querySelectorAll('#changed-files-list .file-diff')].every(d => d.hidden)`, `${tag}: every diff closes`, 6000);
             check(`${tag}: Collapse all empties them and the chevrons say closed`, await ev(`[...document.querySelectorAll('#changed-files-list .file-diff')].every(d => d.children.length === 0) && [...document.querySelectorAll('.file-expand-btn')].every(b => b.getAttribute('aria-expanded') === 'false') && document.querySelector('#changed-files-list .files-expand-all').textContent === 'Expand all'`));
 
+            if (w === 1280) {
+                await waitFor('window.__diffCommentsHeld === true', 'comments import held across collapse', 8000);
+                for (const requestId of heldComments.splice(0)) await Fetch.continueRequest({ requestId });
+                await Fetch.disable();
+                await ev(`import((window.__coralStatic || '/static/') + 'diff_comments.js').then(() => true)`);
+                await ev(framesJs(3));
+                check(`${tag}: late comments cannot repopulate collapsed diffs`, await ev(`[...document.querySelectorAll('#changed-files-list .file-diff')].every(d => d.hidden && d.children.length === 0)`));
+            }
+
             // an open diff survives the list being drawn again
             await ev(`document.querySelector('#changed-files-list .file-expand-btn[data-path="a.go"]').click(); true`);
             await waitFor(`!!document.querySelector('#changed-files-list .file-diff[data-filepath="a.go"] .cm-line')`, `${tag}: a.go open again`, 8000);
@@ -109,7 +124,7 @@ const FILES = {
             await waitFor(`!!document.querySelector('#changed-files-list .file-diff[data-filepath="a.go"] .cm-line')`, `${tag}: a.go's diff is drawn again after the list moved`, 8000);
             check(`${tag}: a diff that was open stays open when the list is drawn again`, await ev(`!document.querySelector('#changed-files-list .file-diff[data-filepath="a.go"]').hidden`));
         }
-    } finally { await client.close(); }
+    } finally { await Fetch.disable().catch(() => {}); await client.close(); }
     assert.deepEqual(problems, [], 'the inline diffs:\n  ' + problems.join('\n  '));
     console.log('PASS inline diffs: expand one, expand all in order, collapse all');
 })().catch(e => { console.error(e); process.exit(1); });

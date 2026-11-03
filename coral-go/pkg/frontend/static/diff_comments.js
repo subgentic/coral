@@ -95,6 +95,9 @@ const mounted = new WeakMap(); // slot -> its box
 
 /** Put the comments of `file` under its diff in `slot`. view is the editor of the diff, texts its two texts. Does nothing through Coral Hub or when the agent has no team. */
 export async function attachDiffComments(slot, file, view, texts, base = '', fields = []) {
+    const drawing = slot.dataset.drawing;
+    const current = () => !!drawing && slot.dataset.drawing === drawing && !slot.hidden && slot.contains(view.dom);
+    if (!current()) return; // the lazy import may have finished after this editor closed
     const s = state.currentSession, team = s && s.board_project, sid = s && s.session_id;
     if (!s || s.type !== 'live' || !sid) return;
     if (isCloud() || !team) { // a line that says why there is no Comment button (#12570): comments go to an agent on a team's board, on the computer itself
@@ -103,6 +106,7 @@ export async function attachDiffComments(slot, file, view, texts, base = '', fie
     }
     mounted.get(slot)?.destroy();
     const key = await diffSubject(team, sid, file.filepath);
+    if (!current()) return; // the digest must not attach a thread to a closed or replacement diff
     const box = el('div', 'diff-comments'), body = el('div', 'diff-comments-body'), btn = el('button', 'btn btn-small diff-comment-btn', 'Comment');
     body.hidden = true; btn.type = 'button'; btn.hidden = true; btn.setAttribute('aria-label', `Comment on the selected lines of ${file.filepath}`);
     box.append(body); slot.append(box, btn);
