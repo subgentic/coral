@@ -204,7 +204,7 @@ function layoutSelect() {
         if (hamburger.hasAttribute('data-waiting') !== !!waits) hamburger.toggleAttribute('data-waiting', !!waits);
     }
     }
-    if (_menuFor && (_menuFor.id === 'nav-select' && !isPhone() || (_menuFor.id === 'top-menu-btn' || _menuFor.hasAttribute('data-hamburger')) && !window.matchMedia('(max-width: 639px)').matches)) closeMenu();
+    if (_menuFor && (_menuFor.id === 'nav-select' && !isPhone() || (_menuFor.id === 'top-menu-btn' || _menuFor.hasAttribute('data-hamburger')) && !isPhone())) closeMenu();
 }
 
 let _scheduled = 0;
