@@ -11,7 +11,7 @@ import { refreshAgentUI } from './agent_ui.js';
 import { state, sessionKey, saveSessionDraft } from './state.js';
 import { showToast, escapeHtml, escapeAttr, dbg, showView } from './utils.js';
 import { loadHistoryMessages } from './api.js';
-import { HISTORY_PAGE, setHistoryWindow } from './history_pages.js';
+import { HISTORY_PAGE, setHistoryWindow, showHistoryReadState } from './history_pages.js';
 import { normServer, serverForSession, serverFetch, sessionServer, agentPath, identityKey, keyLabel, isCloud, nativeInbox } from './server_base.js';
 import { updateHeaderContext } from './header_context.js';
 import { stopCaptureRefresh, startCaptureRefresh } from './capture.js';
@@ -440,7 +440,7 @@ export async function selectHistorySession(sessionId, locator = null, entry = nu
     const source = historyServer();
     const fromSource = x => x.session_id === sessionId && (x.server || (isCloud() ? source : 'local')) === source;
     const current = currentRoute();
-    const folder = current?.view === 'inbox-folder' && current.id === sessionId && current.server === source ? current.folder : state.inboxFolder?.key || 'chats';
+    const folder = current?.view === 'inbox-folder' && (!current.server || current.server === source) ? current.folder : state.inboxFolder?.key || 'chats';
     const route = normalize(historyRoute(sessionId, '', folder));
     if (!route || (isCloud() && !source)) return false;
     markRead(String(sessionId).startsWith('board:') ? 'board' : 'chat', `${source || 'local'}:${sessionId}`, Date.now()); // opened, by the list, an address (/inbox/chats/...), a saved message or a link: read as of now (#9687); the Inbox's list reads the same key
@@ -545,7 +545,19 @@ export async function selectHistorySession(sessionId, locator = null, entry = nu
     switchHistoryTab('chat');
 
     // The newest page (#3718: a whole transcript can be too big for one reply through Coral Hub).
-    let data = await loadHistoryMessages(sessionId, { limit: HISTORY_PAGE });
+    showHistoryReadState();
+    let data;
+    try {
+        data = await loadHistoryMessages(sessionId, { limit: HISTORY_PAGE, throwOnError: true });
+        if (data && !Array.isArray(data.messages)) throw new Error('Invalid transcript');
+    } catch (error) {
+        if (generation !== switchGeneration || source !== historyServer()) return;
+        if (error.status === 404) return false;
+        showHistoryReadState(() => {
+            if (generation === switchGeneration && source === historyServer()) selectHistorySession(sessionId, locator, entry);
+        });
+        return true; // handled on the chat page: route restoration must not replace a read failure with "not found"
+    }
     let messageBaseIndex = 0;
     if (generation !== switchGeneration || source !== historyServer()) return;
     if (data && data.messages) {
