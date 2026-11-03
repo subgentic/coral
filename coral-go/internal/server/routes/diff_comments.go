@@ -40,6 +40,9 @@ const (
 // maxDiffCommentsPerSession is the live comments one agent session's diffs hold in all (the store caps one file's key at store.MaxArtifactComments), so one session cannot fill the table (#12536, Security's point 5). A var so a test can lower it.
 var maxDiffCommentsPerSession = 200
 
+// sendDiffSnippetCap is the characters of the selected lines a message carries (more than a document quote: code is read as lines, and the message is shrunk by its comment first).
+const sendDiffSnippetCap = 1000
+
 // diffAnchorRedact is the redactor the lines of an anchor go through: redactComment, a var so a test can say it is unavailable.
 var diffAnchorRedact = redactComment
 
@@ -276,7 +279,7 @@ func (h *SessionsHandler) deliverDiffComment(r *http.Request, caller commentCall
 	snippet := "(the lines are not quoted: they could not be checked for secrets)"
 	ok2 := true
 	if !anchor.Withheld {
-		snippet, ok2 = sendQuote(anchor.Quote, sendSnippetCap)
+		snippet, ok2 = sendQuoteLines(anchor.Quote, sendDiffSnippetCap)
 	}
 	if !ok1 || !ok2 {
 		return autoDelivery{Reason: "redaction_unavailable"}

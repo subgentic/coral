@@ -43,7 +43,7 @@ const TEAM = 'team-x', SID = 'wp-sess1';
             await ev(`window.__files = ${JSON.stringify(FILES)}; window.__posts = []; window.__comments = [];
                 (() => { const R = window.fetch; const json = (b, status = 201) => Promise.resolve(new Response(JSON.stringify(b), { status, headers: { 'Content-Type': 'application/json' } }));
                     window.fetch = (u, o = {}) => { const url = new URL(String(u), location.href), p = decodeURIComponent(url.pathname);
-                        if (/\\/api\\/sessions\\/live\\/wp\\/files(\\/refresh)?$/.test(p)) return json({ files: Object.entries(window.__files).map(([filepath, f]) => ({ filepath, status: f.status, additions: f.additions, deletions: f.deletions })), is_git: true, compare: { label: 'HEAD' } }, 200);
+                        if (/\\/api\\/sessions\\/live\\/(wp|nt)\\/files(\\/refresh)?$/.test(p)) return json({ files: Object.entries(window.__files).map(([filepath, f]) => ({ filepath, status: f.status, additions: f.additions, deletions: f.deletions })), is_git: true, compare: { label: 'HEAD' } }, 200);
                         const m = /^\\/api\\/artifacts\\/(diff:[^/]+)\\/comments$/.exec(p);
                         if (m && (!o.method || o.method === 'GET')) return json({ comments: window.__comments, locked: false, you: { kind: 'owner', name: 'You', can_comment: true, can_lock: false }, limits: {} }, 200);
                         if (m && o.method === 'POST') { const b = JSON.parse(o.body); window.__posts.push({ key: m[1], ...b }); const c = { id: window.__comments.length + 1, parent_id: null, anchor: b.anchor, body: b.body, author: { subject: 'install-owner-id', name: 'You', kind: 'owner' }, created_at: new Date().toISOString(), mine: true, can: { reply: true, edit: true, delete: true, resolve: true }, sent_to: 'Dev' }; window.__comments.push(c); return json(c); }
@@ -78,6 +78,7 @@ const TEAM = 'team-x', SID = 'wp-sess1';
             check(`${tag}: the anchor carries the lines, some context and the state`, /CHANGED LINE ONE/.test(post.anchor.quote) && /CHANGED LINE TWO/.test(post.anchor.quote) && /f39/.test(post.anchor.prefix) && /f42/.test(post.anchor.suffix) && /^modified \+3 -3$/.test(post.anchor.base), JSON.stringify(post.anchor));
             check(`${tag}: the board is the agent's team`, post.board === 'team-x', String(post.board));
             await waitFor(`!!document.querySelector('#changed-files-list .file-diff[data-filepath="e.go"] .diff-comments .ac-card')`, `${tag}: the thread stands under the diff`, 6000);
+            check(`${tag}: the thread's quote keeps the lines' breaks and indentation`, await ev(`(() => { const q = document.querySelector('#changed-files-list .file-diff[data-filepath="e.go"] .diff-comments .ac-card .ac-quote'); return /^pre/.test(getComputedStyle(q).whiteSpace) && q.textContent.includes('\\n'); })()`));
             const card = await ev(`(() => { const c = document.querySelector('#changed-files-list .file-diff[data-filepath="e.go"] .diff-comments .ac-card'); return { text: c.textContent, lines: /lines 41-42/.test(c.textContent), outdated: /outdated/.test(c.textContent) }; })()`);
             check(`${tag}: the card shows the words, the lines, and is not outdated`, /Why 4000 and not 40\?/.test(card.text) && card.lines && !card.outdated, JSON.stringify(card));
             check(`${tag}: the page does not scroll sideways`, await ev(`document.documentElement.scrollWidth <= innerWidth`));
@@ -119,6 +120,28 @@ const TEAM = 'team-x', SID = 'wp-sess1';
             const rep = await ev(`window.__posts[3].anchor`);
             check(`${tag}: a removed } among repeats is the view's own old line 10, not the first } (2) nor the guess (7)`, rep.path === 'm.go' && rep.side === 'old' && rep.start_line === 10 && rep.end_line === 10, JSON.stringify(rep));
 
+            // a later row of a block of several removed rows is numbered by its row (#12560, QA): the first removed block of m.go holds old lines 1 to 5
+            let rowPicked = false;
+            for (let i = 0; i < 5 && !rowPicked; i++) {
+                await ev(`(() => { const slot = document.querySelector('#changed-files-list .file-diff[data-filepath="m.go"]'), d = [...slot.querySelectorAll('.cm-deletedChunk')].find(x => x.querySelectorAll('.cm-deletedLine').length > 3); d.scrollIntoView({ block: 'center' }); const row = [...d.querySelectorAll('.cm-deletedLine')].find(r => r.textContent.trim() === 'end'), w = document.createTreeWalker(row, NodeFilter.SHOW_TEXT), n = w.nextNode(), r = document.createRange(); r.setStart(n, 0); r.setEnd(n, n.length); const s = getSelection(); s.removeAllRanges(); s.addRange(r); slot.dispatchEvent(new MouseEvent('mouseup', { bubbles: true })); return true; })()`);
+                await ev(framesJs(8));
+                rowPicked = await ev(`!document.querySelector('#changed-files-list .file-diff[data-filepath="m.go"] .diff-comment-btn').hidden`);
+            }
+            check(`${tag}: the Comment button appears on a later row of a removed block`, rowPicked);
+            await ev(`document.querySelector('#changed-files-list .file-diff[data-filepath="m.go"] .diff-comment-btn').click(); true`);
+            await waitFor(`!!document.querySelector('#changed-files-list .file-diff[data-filepath="m.go"] .diff-comments .ac-input')`, `${tag}: the composer opens on the later row`, 4000);
+            await ev(`(() => { const ta = document.querySelector('#changed-files-list .file-diff[data-filepath="m.go"] .diff-comments .ac-input'); ta.value = 'And this one?'; ta.dispatchEvent(new Event('input', { bubbles: true })); document.querySelector('#changed-files-list .file-diff[data-filepath="m.go"] .diff-comments .ac-send').click(); return true; })()`);
+            await waitFor(`window.__posts.length === 5`, `${tag}: the fifth comment is sent`, 6000);
+            const later = await ev(`window.__posts[4].anchor`);
+            check(`${tag}: the fifth row of the first removed block is old line 5`, later.side === 'old' && later.start_line === 5 && later.end_line === 5 && later.quote === 'end', JSON.stringify(later));
+
+            // chunks the view will not give up: no button, never a line made up (#12560, QA)
+            await ev(`window.__fieldWas = window.CoralCM.EditorState.prototype.field; window.CoralCM.EditorState.prototype.field = function () { throw new Error('no chunks'); }; true`);
+            await ev(`(() => { const slot = document.querySelector('#changed-files-list .file-diff[data-filepath="m.go"]'), d = [...slot.querySelectorAll('.cm-deletedChunk')].find(x => x.querySelectorAll('.cm-deletedLine').length === 1), row = d.querySelector('.cm-deletedLine'), w = document.createTreeWalker(row, NodeFilter.SHOW_TEXT), n = w.nextNode(), r = document.createRange(); r.setStart(n, 0); r.setEnd(n, n.length); const s = getSelection(); s.removeAllRanges(); s.addRange(r); slot.dispatchEvent(new MouseEvent('mouseup', { bubbles: true })); return true; })()`);
+            await ev(framesJs(10));
+            check(`${tag}: removed lines whose chunks cannot be read offer no comment`, await ev(`document.querySelector('#changed-files-list .file-diff[data-filepath="m.go"] .diff-comment-btn').hidden`));
+            await ev(`window.CoralCM.EditorState.prototype.field = window.__fieldWas; getSelection().removeAllRanges(); true`);
+
             // selections that cannot be commented on: outside the diff, and across removed and kept lines
             await ev(`(() => { const r = document.createRange(); const t = document.querySelector('#changed-files-list .file-item[data-filepath="e.go"] .file-name'); r.selectNodeContents(t); const s = getSelection(); s.removeAllRanges(); s.addRange(r); document.querySelector('#changed-files-list .file-diff[data-filepath="e.go"]').dispatchEvent(new MouseEvent('mouseup', { bubbles: true })); return true; })()`);
             await ev(framesJs(8));
@@ -133,6 +156,15 @@ const TEAM = 'team-x', SID = 'wp-sess1';
             await ev(`delete window.__files['m.go']; window.__files['e.go'].current = window.__files['e.go'].original.replace('func f20() int { return 20 }', 'func f20() int { return 2000 }'); window.__files['e.go'].additions = 1; window.__files['e.go'].deletions = 1; window.refreshChangedFiles(false).then(() => true)`);
             await waitFor(`!!document.querySelector('#changed-files-list .file-diff[data-filepath="e.go"] .diff-comments .ac-card') && /outdated/.test(document.querySelector('#changed-files-list .file-diff[data-filepath="e.go"] .diff-comments .ac-card').textContent)`, `${tag}: the comment says outdated once its lines are gone`, 10000).catch(() => {});
             check(`${tag}: a comment whose lines left the diff is kept and says outdated`, await ev(`/outdated/.test((document.querySelector('#changed-files-list .diff-comments .ac-card') || {}).textContent || '')`));
+            // an agent on no team has no board to send a comment to: one line says so, and there is no Comment button (#12570)
+            await ev(`window.__m.add('nt', 'A', 3, { sleeping: false, session_id: 'nt-sess1' }); true`);
+            await ev(framesJs(10));
+            await ev(`window.selectLiveSession('nt', 'claude', 'nt-sess1', 'local'); true`);
+            await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'changed_files.js'); await m.loadChangedFiles('nt', 'nt-sess1'); return true; })()`);
+            await waitFor(`document.querySelectorAll('#changed-files-list .file-item').length >= 1`, `${tag}: the files of the agent with no team`, 8000);
+            // e.go is still open from before: the new list draws its diff by itself
+            await waitFor(`!!document.querySelector('#changed-files-list .file-diff .diff-comments-note')`, `${tag}: a line says why there are no comments`, 10000);
+            check(`${tag}: no team, no comments, and the line says so`, await ev(`(() => { const n = document.querySelector('#changed-files-list .file-diff .diff-comments-note'); return /need a team/.test(n.textContent) && !document.querySelector('#changed-files-list .diff-comments') && !document.querySelector('#changed-files-list .diff-comment-btn'); })()`));
         }
     } finally { await client.close(); }
     if (problems.length) { console.error(problems.join('\n')); process.exit(1); }

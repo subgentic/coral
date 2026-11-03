@@ -498,6 +498,7 @@ async function setGitDiffMode(mode) {
 
 // The diffs under the rows (#11350). A row's chevron opens or closes its own; Expand all stacks every file's in the list's order and Collapse all closes them. Done in place: the list is not drawn again.
 const fileOf = path => _currentFiles.find(f => f.filepath === path);
+let _drawnFor = ''; // the agent (name and session) the list on screen was last drawn for
 const scrollerOf = el => { for (let e = el; e; e = e.parentElement) if (/(auto|scroll)/.test(getComputedStyle(e).overflowY) && e.scrollHeight > e.clientHeight + 1) return e; return null; }; // the nearest ancestor that scrolls
 const slotOf = (list, path) => [...list.querySelectorAll('.file-diff')].find(e => e.dataset.filepath === path);
 function showExpanded(list, files) {
@@ -680,7 +681,8 @@ export async function refreshChangedFiles(quiet = false) { // quiet: the panel's
     // What the colours mean, said once as the list's own first line, so the header keeps its height when the first file arrives (#10386, Beta; #10054)
     // The list is drawn again on every poll that moved it, and the reader is in the middle of it (#12520): the open diffs' slots (each holds its editor, with the unchanged-line blocks the person opened) are set aside and put back
     // into the new rows, and the scroll position is put back, so a refresh does not send them to the top or draw every open diff again from "Loading the changes…".
-    const kept = new Map(); for (const slot of list.querySelectorAll('.file-diff')) if (!slot.hidden && slot.firstChild && _expandedFiles.has(slot.dataset.filepath)) kept.set(slot.dataset.filepath, slot);
+    const forAgent = `${state.currentSession ? state.currentSession.name + '|' + (state.currentSession.session_id || '') : ''}`, sameAgent = forAgent === _drawnFor; _drawnFor = forAgent; // a diff drawn for one agent is never put under another's row of the same name (#12570)
+    const kept = new Map(); if (sameAgent) for (const slot of list.querySelectorAll('.file-diff')) if (!slot.hidden && slot.firstChild && _expandedFiles.has(slot.dataset.filepath)) kept.set(slot.dataset.filepath, slot);
     const scroller = scrollerOf(list), scrolled = scroller ? scroller.scrollTop : 0;
     let anchor = null; // the file under the top of the view and how far its row is from that top: a file that arrives above it moves the list, not the reader's place
     if (scroller) { const top = scroller.getBoundingClientRect().top; for (const row of list.querySelectorAll('.file-item')) { const slot = row.nextElementSibling, end = (slot && slot.classList.contains('file-diff') && !slot.hidden ? slot : row).getBoundingClientRect().bottom; if (end > top) { anchor = { path: row.dataset.filepath, at: row.getBoundingClientRect().top - top }; break; } } }

@@ -5,3 +5,5 @@
 .diff-comment-btn { position: absolute; z-index: 5; box-shadow: var(--shadow-md); }
 .diff-comment-btn[hidden] { display: none; } /* display-ok: a button the page shows only while lines are selected */
 .diff-comments .ac-sheet-close { display: none; } /* display-ok: the thread panel stays open under its diff; there is no toggle to bring a closed one back */
+.diff-comments-note { margin: 8px 12px; color: var(--text-muted); font-size: var(--fs-sm); }
+.diff-comments .ac-quote, .diff-comments .ac-composer .ac-quote { white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--font-mono, monospace); } /* the lines read as lines, with their indentation (#12570) */
