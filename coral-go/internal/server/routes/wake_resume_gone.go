@@ -2,7 +2,9 @@ package routes
 
 import (
 	"context"
+	"io"
 	"log"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -69,16 +71,9 @@ func (h *SessionsHandler) watchResumeGone(ls *store.LiveSession) {
 	}
 	logFile := naming.LogFile(h.cfg.LogDir, ls.AgentType, ls.SessionID)
 	sid := ls.SessionID
+	offset := logSize(logFile) // only what is written after this resume counts: an older run's line in the same log is not this one's
 	time.AfterFunc(wakeResumeCheckAfter, func() {
-		m, _ := readLogTail(logFile, nil)
-		lines, _ := m["recent_lines"].([]string)
-		saw := false
-		for _, l := range lines {
-			if strings.Contains(l, conversationGoneLine) {
-				saw = true
-			}
-		}
-		if !saw {
+		if !logHasSince(logFile, offset, conversationGoneLine) {
 			return
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
@@ -95,4 +90,41 @@ func (h *SessionsHandler) watchResumeGone(ls *store.LiveSession) {
 			log.Printf("[wake] session=%s: the fresh start failed: %v", naming.SessionName(ls.AgentType, sid), err)
 		}
 	})
+}
+
+// logSize is the size of the log at path, 0 when there is none.
+func logSize(path string) int64 {
+	fi, err := os.Lstat(path)
+	if err != nil || !fi.Mode().IsRegular() {
+		return 0
+	}
+	return fi.Size()
+}
+
+// logHasSince reports whether the log at path holds want in what was written after offset (the whole log when it is shorter than offset: it was reset, as a new terminal does). At most the last 64 KiB of that is read, from a
+// regular file only, never through a link.
+func logHasSince(path string, offset int64, want string) bool {
+	fi, err := os.Lstat(path)
+	if err != nil || !fi.Mode().IsRegular() {
+		return false
+	}
+	start := offset
+	if fi.Size() < offset {
+		start = 0
+	}
+	if fi.Size()-start > 64<<10 {
+		start = fi.Size() - 64<<10
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+	buf := make([]byte, fi.Size()-start)
+	if n, err := f.ReadAt(buf, start); err != nil && err != io.EOF {
+		return false
+	} else {
+		buf = buf[:n]
+	}
+	return strings.Contains(string(buf), want)
 }

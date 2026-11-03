@@ -503,6 +503,16 @@ func (s *SessionStore) UpdateContextWindow(ctx context.Context, sessionID string
 	return err
 }
 
+// SessionHasTokenUsage reports whether Coral ever recorded token usage for the session: it reads that from the agent's transcript, so a session that has some had a conversation Coral could find (any retention tier). A read that fails says
+// no.
+func (s *SessionStore) SessionHasTokenUsage(ctx context.Context, sessionID string) bool {
+	var n int
+	if err := s.reader().GetContext(ctx, &n, `SELECT EXISTS(SELECT 1 FROM token_usage_all WHERE session_id = ?)`, sessionID); err != nil {
+		return false
+	}
+	return n == 1
+}
+
 // SetObservedModel records the model a hook reported for a live session (display only).
 func (s *SessionStore) SetObservedModel(ctx context.Context, sessionID, model string) error {
 	_, err := s.db.ExecContext(ctx, "UPDATE live_sessions SET observed_model = ? WHERE session_id = ?", model, sessionID)

@@ -105,8 +105,15 @@ func TestAWakeWithItsTranscriptResumesTheConversation(t *testing.T) {
 	assert.Equal(t, 0, g.notes(), "nothing to tell")
 }
 
+// sawConversation records token usage for the session, as the token poller does from a transcript it reads: Coral once found this conversation.
+func (g *goneRig) sawConversation(t *testing.T) {
+	t.Helper()
+	require.NoError(t, store.NewTokenUsageStore(g.h.db).RecordUsage(context.Background(), &store.TokenUsage{SessionID: goneSID, AgentName: "repo", AgentType: "claude", InputTokens: 10, OutputTokens: 5, TotalTokens: 15, NumTurns: 1, RecordedAt: time.Now().UTC().Format(time.RFC3339Nano)}))
+}
+
 func TestAWakeWithNoTranscriptStartsFreshUnderTheSameIdAndTheBoardIsToldOnce(t *testing.T) {
-	g := newGoneRig(t) // the projects folder holds nothing
+	g := newGoneRig(t)   // the projects folder holds nothing
+	g.sawConversation(t) // but Coral read this conversation once
 
 	g.wake(t)
 
@@ -201,4 +208,63 @@ func TestTheBackstopLeavesNoFlagWhenItsWakeFailed(t *testing.T) {
 	time.Sleep(1500 * time.Millisecond) // sleep-ok: the backstop looks at 200 ms and its refused wake returns at once
 	_, left := resumeGone.Load(goneSID)
 	assert.False(t, left, "a wake that failed leaves no note for a later one")
+}
+
+// Codex And Security Review on #12714: an agent whose Claude uses a config folder of its own (CLAUDE_CONFIG_DIR) that Coral's environment does not name is never started fresh on a lookup that could not have found it.
+func TestAnAgentWithAConfigFolderOfItsOwnIsResumedNotCalledGone(t *testing.T) {
+	g := newGoneRig(t) // Coral's projects folder holds nothing...
+	own := t.TempDir() // ...the agent's own CLAUDE_CONFIG_DIR does: its transcript is there
+	writeTranscript(t, filepath.Join(own, "projects"), goneSID)
+
+	g.wake(t) // Coral never read a transcript of this session (it could not see where it is): no evidence it ever existed
+
+	cmds := g.launchLines()
+	assert.Contains(t, cmds, "--resume "+goneSID, "resumed: the agent's own Claude finds its own conversation")
+	assert.NotContains(t, cmds, "--session-id")
+	assert.Equal(t, 0, g.notes(), "no false 'could not resume'")
+}
+
+// The line only counts when it was written after this resume (Codex And Security Review on #12714).
+func TestAnOlderLineInTheLogIsNotThisResumesLine(t *testing.T) {
+	dir := t.TempDir()
+	log := filepath.Join(dir, "agent.log")
+	line := "No conversation found with session ID: x\n"
+	require.NoError(t, os.WriteFile(log, []byte("old run\n"+line+"$ \n"), 0o600))
+	off := logSize(log)
+	assert.False(t, logHasSince(log, off, conversationGoneLine), "an older run's line in the same log is not this one's")
+	f, err := os.OpenFile(log, os.O_APPEND|os.O_WRONLY, 0o600)
+	require.NoError(t, err)
+	_, err = f.WriteString("$ claude --resume y\n" + line)
+	require.NoError(t, err)
+	require.NoError(t, f.Close())
+	assert.True(t, logHasSince(log, off, conversationGoneLine), "a line after the offset is")
+	require.NoError(t, os.WriteFile(log, []byte(line), 0o600)) // the log was reset: shorter than the offset, so all of it is new
+	assert.True(t, logHasSince(log, off+1000, conversationGoneLine), "a reset log is read whole")
+	assert.False(t, logHasSince(filepath.Join(dir, "none.log"), 0, conversationGoneLine), "no log, no line")
+	link := filepath.Join(dir, "link.log")
+	require.NoError(t, os.Symlink(log, link))
+	assert.False(t, logHasSince(link, 0, conversationGoneLine), "never through a link")
+}
+
+func TestTheBackstopIgnoresALineThatWasThereBeforeItsResume(t *testing.T) {
+	g := newGoneRig(t)
+	writeTranscript(t, os.Getenv("CLAUDE_PROJECTS_DIR"), goneSID)
+	prev := wakeResumeCheckAfter
+	t.Cleanup(func() { wakeResumeCheckAfter = prev })
+	wakeResumeCheckAfter = 24 * time.Hour // the wake's own backstop never fires in this test: the one under test is started by hand below
+	g.wake(t)
+	wakeResumeCheckAfter = 200 * time.Millisecond
+	before := len(g.term.sentTo(g.name + ".0"))
+	logFile := naming.LogFile(g.h.cfg.LogDir, "claude", goneSID)
+	require.NoError(t, os.MkdirAll(filepath.Dir(logFile), 0o700))
+	require.NoError(t, os.WriteFile(logFile, []byte("an earlier run\nNo conversation found with session ID: "+goneSID+"\n"), 0o600))
+	g.term.setFG(g.name, "zsh")
+	ls, err := g.ss.GetLiveSession(context.Background(), goneSID)
+	require.NoError(t, err)
+
+	g.h.watchResumeGone(ls) // the offset is taken now, after the old line
+
+	time.Sleep(1200 * time.Millisecond) // sleep-ok: the backstop looks at 200 ms
+	assert.Equal(t, before, len(g.term.sentTo(g.name+".0")), "nothing started fresh on an old line")
+	assert.Equal(t, 0, g.notes())
 }

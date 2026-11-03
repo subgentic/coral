@@ -190,9 +190,11 @@ func (h *SessionsHandler) prepareWake(ctx context.Context, ls *store.LiveSession
 		RunTag:          h.runTagFor(ctx, ls.SessionID, "", ""),
 	}
 
-	// A Claude agent whose conversation is gone starts a new one under the same session id (#12714): looked for here, before the launch, and the CLI's own "No conversation found" line is only a backstop.
+	// A Claude agent whose conversation is gone starts a new one under the same session id (#12714): looked for here, before the launch, and the CLI's own "No conversation found" line is only a backstop. "Gone" needs both that
+	// Coral finds no transcript AND that Coral once read one for this session (it recorded token usage from it): an agent whose Claude uses a config folder Coral does not see (its own CLAUDE_CONFIG_DIR) has none of Coral's
+	// finds, and is resumed, never started fresh on a lookup that could not have found it.
 	freshStart := false
-	if ls.AgentType == at.Claude && launchParams.ResumeSessionID != "" && (forceFresh(ls.SessionID) || !claudeConversationFound(ls.SessionID, ls.WorkingDir)) {
+	if ls.AgentType == at.Claude && launchParams.ResumeSessionID != "" && (forceFresh(ls.SessionID) || (!claudeConversationFound(ls.SessionID, ls.WorkingDir) && h.ss.SessionHasTokenUsage(ctx, ls.SessionID))) {
 		log.Printf("[wake] session=%s: Claude could not find its conversation (no transcript for it); starting a new one with its role", sessionName)
 		launchParams.ResumeSessionID = ""
 		freshStart = true
