@@ -52,9 +52,9 @@ AGENTS[0].waits_on_this = { count: 2, top_title: 'Ship the build', priority: 'lo
             check(await ev(`window.__taskCalls.length`) === 0, at + 'no task query for a team (the rows carry the field): ' + await ev(`window.__taskCalls.join(' ')`));
             await shot(`inbox-blockers-${w}`);
             if (!mobile) { // the table fits its box and the agent's name keeps its room (the new column once squeezed it to nothing)
-                const box = await ev(`(() => { const b = document.querySelector('${T} .dt-box'), h = [...b.querySelectorAll('thead th')].find(x => /^Agent/.test(x.textContent.trim())); return { box: b.clientWidth, sw: b.scrollWidth, agent: h ? Math.round(h.getBoundingClientRect().width) : null }; })()`);
+                const box = await ev(`(() => { const b = document.querySelector('${T} .dt-box'), h = [...b.querySelectorAll('thead th')].find(x => /^Item/.test(x.textContent.trim())); return { box: b.clientWidth, sw: b.scrollWidth, agent: h ? Math.round(h.getBoundingClientRect().width) : null }; })()`);
                 check(box.sw <= box.box + 1, at + 'the table fits its box: ' + JSON.stringify(box));
-                check(box.agent !== null && box.agent >= 100, at + 'the Agent column keeps its room: ' + JSON.stringify(box));
+                check(box.agent !== null && box.agent >= 100, at + 'the Item column (the agent name) keeps its room: ' + JSON.stringify(box));
             }
             // the sort: Blocking first is the default and the first of the choices; Waiting longest gives the old order back
             const sortSel = `[...document.querySelectorAll('select')].find(s => [...s.options].some(o => o.textContent.trim() === 'Waiting longest'))`;

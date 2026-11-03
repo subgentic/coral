@@ -71,7 +71,7 @@ const GOAL = 'Explore goals with two teams';
                 assert.ok(await ev(`!!window.__tp.find('button', /^Add task$/i)`), 'Add task');
                 assert.ok(await ev(`!!window.__tp.find('button', /^Close goal/i)`), 'Close goal');
                 const head = await ev(`(() => { const h = document.querySelector('.goal-back-row'), names = h ? [...h.querySelectorAll('.goal-head-actions .btn')].map(b => b.textContent.trim()) : []; return { names, primary: !!h && !!h.querySelector('.goal-head-actions .btn:last-child.btn-primary'), bar: !!document.querySelector('.goals-pinbar') }; })()`);
-                assert.deepEqual(head.names.map(n => n.replace(/^(Close goal).*/, '$1')), ['Add task', 'Close goal'], "the goal's actions are in its header (#11823)");
+                assert.deepEqual(head.names.map(n => n.replace(/^(Close goal).*/, '$1')), ['Add task', 'Change driver', 'Move to another team', 'Close goal'], "the goal's actions are in its header (#11823; Change driver and Move to another team are the Operator's own, #12693)");
                 assert.ok(head.primary && !head.bar, 'Close goal is the primary, last, and there is no bar at the bottom of the page');
             });
             await S.run(`${label}: Back returns to the list with the focus on the goal's row (not the page)`, async () => {
