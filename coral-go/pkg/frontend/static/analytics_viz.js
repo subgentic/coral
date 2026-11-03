@@ -105,6 +105,7 @@ export function dayPicker(rows, selected, texts, onChange) {
     const bar = el('div', 'atab-days');
     const prev = el('button', 'btn', 'Previous day'), next = el('button', 'btn', 'Next day');
     prev.type = next.type = 'button';
+    prev.setAttribute('aria-label', 'Previous day'); next.setAttribute('aria-label', 'Next day'); // stable names: the tab is redrawn on each press and puts focus back on the button by its name (analytics_tabs.js draw)
     prev.disabled = selected <= 0; next.disabled = selected >= rows.length - 1;
     prev.addEventListener('click', () => onChange(selected - 1)); next.addEventListener('click', () => onChange(selected + 1));
     const say = el('span', 'atab-day-say'); say.setAttribute('role', 'status'); say.textContent = texts[selected] || '';
