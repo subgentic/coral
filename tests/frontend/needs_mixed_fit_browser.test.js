@@ -81,6 +81,27 @@ const STUB = `(() => {
         const tight=await ev(`(()=>{const b=document.querySelector('${T} .dt-box'),t=b.querySelector('table');return {box:b.clientWidth,table:t.getBoundingClientRect().width,scroll:b.scrollWidth>b.clientWidth+1,shown:[...t.querySelectorAll('thead th')].filter(e=>e.getClientRects().length).map(e=>e.dataset.key)};})()`);
         check(tight.box<=840&&tight.shown.includes('team')&&!tight.scroll&&tight.table<=tight.box+2,'Team stays visible when optional columns yield at 840px: '+JSON.stringify(tight));
         await shot('mixed-priority-840');
+        // Add a real review row so this table declares Goal, and a live agent's
+        // goal so that column is nonempty. Exercise ordering, not numeric values.
+        await Emulation.setDeviceMetricsOverride({ width: 1800, height: 800, deviceScaleFactor: 1, mobile: false });
+        await ev(`(async()=>{const original=window.fetch,json=b=>Promise.resolve(new Response(JSON.stringify(b),{headers:{'content-type':'application/json'}}));window.fetch=(url,opts={})=>{const u=new URL(String(url),location.origin);if(u.pathname==='/api/board/projects')return json([{project:'team-a'}]);if(u.pathname==='/api/board/team-a/artifacts')return json({artifacts:u.searchParams.get('tag')==='for review'?[{id:'${'8'.repeat(64)}',uri:'coral://artifacts/${'8'.repeat(64)}',name:'priority-review.md',produced_by:'Reviewer',available:true,tags:['for review'],goal_id:88,goal_title:'Ship the completed release',created_at:new Date().toISOString()}]:[],has_more:false});return original(url,opts);};const {state}=await import(${S}+'state.js');state.liveSessions=state.liveSessions.map(a=>({...a,goal:{id:88,title:'Ship the completed release',board:'team-a'}}));await(await import(${S}+'inbox_reviews.js')).refreshReviews(true);return true;})()`);
+        await waitFor(`document.querySelector('${T} th[data-key="goal"]')&&[...document.querySelectorAll('${T} tbody tr')].some(r=>r.textContent.includes('priority-review.md'))`,'mixed review and populated Goal fixture',10000);
+        await ev(`document.querySelector('${T} .dt-box').style.maxWidth='';true`);await ev(framesJs(12));
+        const prioritySnap=()=>ev(`(()=>{const b=document.querySelector('${T} .dt-box'),t=b.querySelector('table');return {box:b.clientWidth,scroll:b.scrollWidth>b.clientWidth+1,shown:[...t.querySelectorAll('thead th')].filter(e=>e.getClientRects().length).map(e=>e.dataset.key)};})()`);
+        const wide=await prioritySnap();
+        check(['cli','folder','goal','team'].every(k=>wide.shown.includes(k)),'priority fixture starts with all optional columns: '+JSON.stringify(wide));
+        let cliBeforeFolder=null,goalAndFolderBeforeTeam=null;
+        for(let width=Math.floor(wide.box/20)*20;width>=620;width-=20){
+            await ev(`document.querySelector('${T} .dt-box').style.maxWidth='${width}px';true`);await ev(framesJs(6));
+            const p=await prioritySnap(),has=k=>p.shown.includes(k);
+            check(!p.scroll,'priority fixture fits at '+width+': '+JSON.stringify(p));
+            if(!cliBeforeFolder&&!has('cli')&&has('folder')&&has('team')){cliBeforeFolder=p;await shot('mixed-priority-cli-before-folder');}
+            if(!goalAndFolderBeforeTeam&&!has('goal')&&!has('folder')&&has('team')){goalAndFolderBeforeTeam=p;await shot('mixed-priority-goal-folder-before-team');}
+            if(cliBeforeFolder&&goalAndFolderBeforeTeam)break;
+        }
+        check(!!cliBeforeFolder,'CLI drops while Folder and Team remain: '+JSON.stringify(cliBeforeFolder));
+        check(!!goalAndFolderBeforeTeam,'Goal and Folder drop while Team remains: '+JSON.stringify(goalAndFolderBeforeTeam));
+        console.log('priority stages: '+JSON.stringify({cliBeforeFolder,goalAndFolderBeforeTeam}));
     } finally { await client.close(); }
     if (failures.length) { console.error(failures.join('\n')); process.exit(1); }
     console.log('needs_mixed_fit_browser: ok');
