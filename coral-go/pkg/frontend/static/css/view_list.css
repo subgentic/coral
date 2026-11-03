@@ -63,7 +63,8 @@
 .sidebar-section-body > div > .view-list > .view-list-nav { background: none; border-right: 0; padding: 4px 4px 8px; }
 /* The phone's tabs: ONE pattern (#11236, #11239 slice A). Under 600 px the view list is a strip of text tabs under the bar, 44 px tall, the current one in the text colour with a 3 px accent underline and its count inside,
  * scrolling sideways with a fade at the edge, in place of the select and the drawer's button. Section titles are not drawn (a strip has no groups): the order is the sections' order. */
-@media (max-width: 600px) {
+/* A landscape phone (coarse pointer, short, up to 950 px: phone_layout.js PHONE_QUERY) gets the strip too (#12647): the column was 1,000 px tall there and pushed the page below the fold. */
+@media (max-width: 600px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
     .view-list .view-list-nav { display: flex; flex-direction: row; gap: 0; overflow-x: auto; scrollbar-width: none; padding: 0; margin-bottom: 8px; padding-right: 0; scroll-padding-inline: 32px; -webkit-mask-image: linear-gradient(90deg, rgb(var(--black-rgb)) calc(100% - 28px), transparent); mask-image: linear-gradient(90deg, rgb(var(--black-rgb)) calc(100% - 28px), transparent); background: none; border: 0; border-bottom: 1px solid var(--border); position: static; width: auto; }
     .view-list .view-list-nav::-webkit-scrollbar { display: none; }
     .view-list .view-list-select, .view-list-drawer .view-list-trigger { display: none; }
