@@ -116,3 +116,32 @@ func TestTheLastAgentEndedOnPurposeIsNotALostServer(t *testing.T) {
 		t.Fatalf("no awake agent was in it: %+v %s", g.got, g.logs)
 	}
 }
+
+// A row read at the start of the pass can be put to sleep for another reason by a person before the loss is acted on: its reason is kept, and it is not among the lost.
+func TestALostServerKeepsTheSleepReasonOfAnAgentPutToSleepMeanwhile(t *testing.T) {
+	g := newLostRig(t)
+	ctx := context.Background()
+	live, err := g.ss.GetAllLiveSessions(ctx) // read first, as the pass does
+	if err != nil {
+		t.Fatal(err)
+	}
+	g.rt.state = tmux.ServerState{PID: 4242, Sessions: 2, Up: true, Known: true}
+	g.r.watchServer(ctx, live)
+
+	if err := g.ss.SetSessionSleepingFor(ctx, lostSid1, store.SleepReasonCoralStopped); err != nil {
+		t.Fatal(err)
+	}
+	g.rt.state = tmux.ServerState{Known: true}
+	g.r.watchServer(ctx, live)
+
+	ls, err := g.ss.GetLiveSession(ctx, lostSid1)
+	if err != nil || ls == nil || ls.SleepReason == nil || *ls.SleepReason != store.SleepReasonCoralStopped {
+		t.Fatalf("the reason it was put to sleep for is kept: %+v %v", ls, err)
+	}
+	if len(g.got) != 1 || len(g.got[0].SessionIDs) != 1 || g.got[0].SessionIDs[0] != lostSid2 {
+		t.Fatalf("only the agent still awake is among the lost: %+v", g.got)
+	}
+	if !strings.Contains(g.logs.String(), "lost_sessions=1") {
+		t.Errorf("the WARN counts only the lost: %s", g.logs)
+	}
+}

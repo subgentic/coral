@@ -89,9 +89,14 @@ func (r *SessionReconciler) watchServer(ctx context.Context, live []store.LiveSe
 	}
 	var ids []string
 	for _, ls := range live {
-		if ls.IsSleeping != 1 {
-			ids = append(ids, ls.SessionID)
+		if ls.IsSleeping == 1 {
+			continue
 		}
+		// Read again: a person may have put it to sleep for another reason since the pass began, and that reason is kept.
+		if now, err := r.sessionStore.GetLiveSession(ctx, ls.SessionID); err != nil || now == nil || now.IsSleeping == 1 {
+			continue
+		}
+		ids = append(ids, ls.SessionID)
 	}
 	if len(ids) == 0 {
 		r.serverUp = false // the last agent was ended on purpose: a server with no session exits by itself
