@@ -16,11 +16,14 @@ import (
 // taskCountTTL is how long a board's counts are kept; a variable so a test that changes things between two reads can ask for none.
 var taskCountTTL = 3 * time.Second
 
-// artifactGeneration counts the changes that can change a task's count outside the board's own writes (an upload, an unlink): an answer kept from an earlier generation is not used (#12855). A package
+// artifactGeneration counts the changes that can change a task's count outside the board's own list (an upload, a task completed with result files): an answer kept from an earlier generation is not used (#12855). A package
 // counter, not a per-handler one: the upload route and the board's lists are different handlers.
 var artifactGeneration atomic.Uint64
 
-// noteArtifactsChanged drops every kept count: an upload, or a link to a task, was just stored.
+// afterTaskCountScan is a test's hook between a scan and the storing of its answer: where a change made during the scan lands.
+var afterTaskCountScan func()
+
+// noteArtifactsChanged drops every kept count: an upload, or a completion with result files, was just stored.
 func noteArtifactsChanged() { artifactGeneration.Add(1) }
 
 type taskCountEntry struct {
@@ -64,6 +67,9 @@ func (h *BoardHandler) taskArtifactCounts(ctx context.Context, project string) m
 		if it.TaskID > 0 {
 			counts[it.TaskID]++
 		}
+	}
+	if afterTaskCountScan != nil {
+		afterTaskCountScan()
 	}
 	h.taskCounts.mu.Lock()
 	if h.taskCounts.entries == nil || len(h.taskCounts.entries) >= taskCountCacheLimit {

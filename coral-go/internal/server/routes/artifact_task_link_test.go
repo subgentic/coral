@@ -257,3 +257,43 @@ func TestACountScannedBeforeAnUploadButStoredAfterItIsNotKept(t *testing.T) {
 	bh.taskCounts.mu.Unlock()
 	assert.Equal(t, 1, bh.taskArtifactCounts(ctx, "alpha")[task])
 }
+
+// QA's SHOULDs on #12855: a task completed with result files then read at once (no sleep, the same second), and a change that lands DURING a scan: the generation must be the one read before the scan,
+// so the answer the scan stores is not used again.
+func TestATaskCompletedWithFilesIsCountedAtOnce(t *testing.T) {
+	srv, h := setupBoardTestServer(t)
+	ctx := context.Background()
+	_, err := h.bs.Subscribe(ctx, "alpha", "Alice", "Alice", "agent-a", nil, "all")
+	require.NoError(t, err)
+	tk, err := h.bs.CreateTask(ctx, "alpha", "Work", "", "medium", "lead", "Alice")
+	require.NoError(t, err)
+	_, err = h.bs.ClaimTask(ctx, "alpha", "Alice", tk.ID)
+	require.NoError(t, err)
+	h.SetTaskArtifactWriter(t.TempDir(), nil)
+	assert.Zero(t, h.taskArtifactCounts(ctx, "alpha")[tk.ID], "primed: the empty answer is kept")
+	resp := postJSON(t, srv.URL+"/api/board/alpha/tasks/"+strconv.FormatInt(tk.ID, 10)+"/complete", map[string]any{
+		"subscriber_id": "Alice", "outcome": "success", "artifacts": []map[string]any{{"name": "result.md", "content": "# done"}},
+	})
+	resp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, 1, h.taskArtifactCounts(ctx, "alpha")[tk.ID], "the result file is counted in the same second")
+}
+
+func TestAChangeDuringAScanMakesItsAnswerStale(t *testing.T) {
+	l := newLinkRig(t)
+	task := l.task("alpha", "Backend", true)
+	bh := NewBoardHandler(l.h.bs)
+	bh.SetTaskArtifactWriter(l.coralDir, nil)
+	t.Cleanup(bh.WaitBackground)
+	ctx := context.Background()
+	once := true
+	afterTaskCountScan = func() {
+		if once {
+			once = false
+			l.post("s1", "lands during the scan", nil) // stored after the scan read the folders, before its answer is kept
+		}
+	}
+	t.Cleanup(func() { afterTaskCountScan = nil })
+	assert.Zero(t, bh.taskArtifactCounts(ctx, "alpha")[task], "this scan began before the upload")
+	assert.Equal(t, 1, bh.taskArtifactCounts(ctx, "alpha")[task], "its kept answer is not used: the generation changed after it began")
+}
