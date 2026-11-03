@@ -71,7 +71,7 @@ func main() {
 
 	// Check EULA acceptance before proceeding. On macOS, this shows a native
 	// Cocoa dialog on first launch. If the user declines, the app exits.
-	if !checkAndShowEULA() {
+	if !checkAndShowEULA(config.ResolveCoralDir(cfg.dataDir)) {
 		fmt.Fprintln(os.Stderr, "Terms of Service must be accepted to use Coral.")
 		os.Exit(0)
 	}

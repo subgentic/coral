@@ -159,6 +159,7 @@ func runServerChild(host string, port int, backendType string) {
 	})
 	if err != nil {
 		log.Printf("Failed to start: %v", err)
+		tracking.HoldFunnelStep(tracking.EventFunnelStartupFailed, tracking.StartupFailureClass(err)) // its class only, sent at a later good start (#7455)
 		os.Exit(childExitStartFailed)
 	}
 	sayTelemetry(os.Stdout, tracking.TelemetryOn()) // the setting startup applied (fail closed) and the environment's opt-out

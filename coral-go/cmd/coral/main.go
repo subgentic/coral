@@ -253,6 +253,7 @@ func configureServer(cfg *config.Config, sf *serverFlags) {
 	// production install's state be read by an instance run with --home.
 	tracking.SetEntrypoint("coral")
 	tracking.SetCoralDir(cfg.CoralDir())
+	tracking.HoldFunnelStep(tracking.EventFunnelAppStarted, tracking.AppStartCLI) // the funnel (#7455): held on disk, sent only after the Terms and with analytics on
 
 	log.Printf("[STARTUP] build tier=%s eula=%v", config.TierName, config.EULARequired())
 
@@ -281,7 +282,7 @@ func configureServer(cfg *config.Config, sf *serverFlags) {
 		if bootstrapOffered(cfg) {
 			cfg.TermsViaHub = true
 			log.Println("[EULA] not accepted here; a Coral Hub credential is offered: the Hub's confirmation of this terms version when it enrolls this server is the acceptance, and Coral exits if it does not come")
-		} else if !license.CheckAndPromptEULA(license.TerminalEULADialog) {
+		} else if !license.CheckAndPromptEULA(tracking.ObserveEULADialog(tracking.EULASurfaceConsole, license.TerminalEULADialog)) {
 			fmt.Fprintln(os.Stderr, "Terms of Service must be accepted to use Coral.")
 			os.Exit(0)
 		}
@@ -313,7 +314,13 @@ func announceDashboard(cfg *config.Config, rs *startup.RunningServer, sf *server
 		// coral.log persists and is shared in bug reports (#3387).
 		if *sf.noBrowser || !canOpenBrowser() {
 			openDashboard(os.Stderr, link, false)
+			if *sf.noBrowser {
+				tracking.HoldFunnelStep(tracking.EventFunnelDashboardOpen, tracking.OpenSkippedNoBrowser)
+			} else {
+				tracking.HoldFunnelStep(tracking.EventFunnelDashboardOpen, tracking.OpenPrintedNoDisplay)
+			}
 		} else {
+			tracking.HoldFunnelStep(tracking.EventFunnelDashboardOpen, tracking.OpenBrowser)
 			go func() {
 				defer safego.Recover("coral/main:272")
 				time.Sleep(500 * time.Millisecond)
@@ -321,6 +328,7 @@ func announceDashboard(cfg *config.Config, rs *startup.RunningServer, sf *server
 			}()
 		}
 	} else if !*sf.noBrowser {
+		tracking.HoldFunnelStep(tracking.EventFunnelDashboardOpen, tracking.OpenBrowser)
 		go func() {
 			defer safego.Recover("coral/main:278")
 			time.Sleep(500 * time.Millisecond)
@@ -424,6 +432,7 @@ func main() {
 
 	rs, err := startup.Start(ctx, cfg, startupOptions(sf, instance))
 	if err != nil {
+		tracking.HoldFunnelStep(tracking.EventFunnelStartupFailed, tracking.StartupFailureClass(err)) // its class only, sent at a later good start
 		logexit.Fatalf("Failed to start: %v", err)
 	}
 	defer rs.Close()

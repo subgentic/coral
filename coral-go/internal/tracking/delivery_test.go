@@ -398,7 +398,11 @@ func TestPendingMilestoneKeepsItsOriginalOutcomeAcrossLaterTriggers(t *testing.T
 	s := loadMilestonesAt(dir + "/" + milestonesFileName)
 	frozen := s.Pending[EventFirstTaskCompleted]
 	require.NotEmpty(t, frozen.Timestamp)
-	assert.Equal(t, map[string]string{"outcome": "failed"}, frozen.Props, "only allowlisted props are frozen")
+	assert.Equal(t, "failed", frozen.Props["outcome"])
+	assert.NotContains(t, frozen.Props, "junk", "only allowlisted props are frozen")
+	for k := range frozen.Props { // the outcome, and the funnel's common properties (#7455)
+		assert.Contains(t, []string{"outcome", "backend", "secs_since_install"}, k)
+	}
 
 	// A later SUCCESSFUL completion is the trigger that finally delivers.
 	c.set(200)

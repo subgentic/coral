@@ -93,6 +93,10 @@ func main() {
 	}
 
 	dataDir := getDataDir()
+	if *fromInstaller { // the installer's Launch Coral (not elevated: an elevated one returned above): the funnel's first start, held until the Terms and analytics allow it (#7455)
+		tracking.SetCoralDir(dataDir)
+		tracking.HoldFunnelStep(tracking.EventFunnelAppStarted, tracking.AppStartInstaller)
+	}
 
 	// Handle --stop
 	if *stop {
@@ -283,10 +287,12 @@ func startWindowAtLaunch(noBrowser, loginItem bool, running func() bool, showWin
 	switch {
 	case !opensWindowAtStart(noBrowser, loginItem):
 		log.Printf("[STARTUP] staying in the background (no-browser=%v, login item=%v): the window opens when the app is opened again", noBrowser, loginItem)
+		tracking.HoldFunnelStep(tracking.EventFunnelDashboardOpen, tracking.OpenBackgroundStart)
 	case running():
 		go func() { defer safego.Recover("coral-tray/main:298"); showWindow() }()
 	default:
 		log.Printf("[STARTUP] the server is not running: no window (the tray menu has the log and Retry)")
+		tracking.HoldFunnelStep(tracking.EventFunnelDashboardOpen, tracking.OpenServerNotRunning)
 	}
 }
 
@@ -376,6 +382,7 @@ func runForeground(host string, port int, noBrowser, debugMode bool, backendType
 	tracking.SetTelemetryEnabled(false)
 	tracking.SetEntrypoint("coral-tray")
 	tracking.SetCoralDir(dataDir)
+	tracking.HoldFunnelStep(tracking.EventFunnelAppStarted, tracking.AppStartTray) // kept only if no earlier start was held (an installer launch)
 	sup, status, stopServer := startServerChild(exe, host, port, backendType)
 
 	startHeartbeat(ctx, dataDir)
@@ -385,7 +392,10 @@ func runForeground(host string, port int, noBrowser, debugMode bool, backendType
 	showWindow := func() {
 		if err := launchCoralApp(url, mintLink); err != nil {
 			executil.OpenLogin(loginlink.Or(url, mintLink))
+			tracking.HoldFunnelStep(tracking.EventFunnelDashboardOpen, tracking.OpenNativeFallback)
+			return
 		}
+		tracking.HoldFunnelStep(tracking.EventFunnelDashboardOpen, tracking.OpenNativeWindow)
 	}
 	onShowWindowSignal(func() {
 		go func() { defer safego.Recover("coral-tray/main:showWindowSignal"); showWindow() }()

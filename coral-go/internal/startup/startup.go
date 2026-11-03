@@ -289,6 +289,10 @@ func Start(ctx context.Context, cfg *config.Config, opts Options) (*RunningServe
 	if accepted {
 		tracking.TrackEULAAccepted(source)
 	}
+	// The funnel (#7455): the backend this run uses, and the steps held before consent (the first start, the Terms shown or declined, an earlier failed
+	// start, the dashboard open), sent now that the analytics setting is applied, and only if the current Terms are accepted (deleted if analytics is off).
+	tracking.SetBackend(cfg.TerminalBackend)
+	tracking.FlushHeldFunnel(!config.EULARequired() || license.IsEULAAccepted())
 
 	// Bind the port now and keep the listeners open to avoid a TOCTOU race
 	// (another process grabbing the port between check and serve). One listener per --host

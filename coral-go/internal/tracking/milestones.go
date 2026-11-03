@@ -56,6 +56,9 @@ type milestoneState struct {
 	// original event. Removed once the service accepts the event, and cleared
 	// when telemetry is switched off so an old event is never replayed.
 	Pending map[string]pendingMilestone `json:"pending_events,omitempty"`
+	// Held are funnel steps that happened before consent (#7455, HoldFunnelStep): a closed-list value and a time each, sent once the Terms are accepted
+	// with analytics on, deleted when analytics is off then.
+	Held map[string]heldStep `json:"held,omitempty"`
 }
 
 // pendingMilestone is one frozen one-time event.
@@ -143,6 +146,11 @@ var milestoneInflight = map[string]bool{}
 // persisted it returns false, so a broken disk yields no events rather than
 // one per launch.
 func reserveMilestone(name string, canSend bool, props map[string]string) (send bool, snap pendingMilestone) {
+	return reserveMilestoneAt(name, canSend, props, "")
+}
+
+// reserveMilestoneAt is reserveMilestone for a step that happened at at (RFC3339Nano), or now when at is "": a held funnel step keeps its own time.
+func reserveMilestoneAt(name string, canSend bool, props map[string]string, at string) (send bool, snap pendingMilestone) {
 	if !stateDirReady() {
 		return false, snap
 	}
@@ -154,8 +162,11 @@ func reserveMilestone(name string, canSend bool, props map[string]string) (send 
 	if s.Reached == nil {
 		s.Reached = map[string]string{}
 	}
+	if at == "" {
+		at = nowUTC()
+	}
 	if _, ok := s.Reached[name]; !ok {
-		s.Reached[name] = nowUTC()
+		s.Reached[name] = at
 		changed = true
 	}
 	// With telemetry off (by any means) nothing pending may survive: an old
@@ -173,7 +184,7 @@ func reserveMilestone(name string, canSend bool, props map[string]string) (send 
 			s.Pending = map[string]pendingMilestone{}
 		}
 		if _, ok := s.Pending[name]; !ok {
-			s.Pending[name] = pendingMilestone{Timestamp: nowUTC(), Props: freezeProps(name, props)}
+			s.Pending[name] = pendingMilestone{Timestamp: at, Props: freezeProps(name, props)}
 			changed = true
 		}
 		snap = s.Pending[name]
@@ -283,7 +294,7 @@ func TrackOnce(eventName string, extraProps map[string]string) {
 	}
 	gen := telemetryGen.Load()
 	asyncGo(func() {
-		send, snap := reserveMilestone(eventName, posthogKeyPresent() && telemetryValid(gen), extraProps)
+		send, snap := reserveMilestone(eventName, posthogKeyPresent() && telemetryValid(gen), withFunnelCommon(eventName, extraProps, time.Now().UTC()))
 		if !send {
 			return
 		}

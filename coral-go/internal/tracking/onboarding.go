@@ -53,6 +53,8 @@ func TrackDashboardSignedIn(via string) {
 // TrackFirstMessageSent records, once, the first message a person sent to an agent and the way it went.
 func TrackFirstMessageSent(via string) {
 	TrackOnce(EventFirstMessageSent, map[string]string{"via": via})
+	// first_prompt_submitted keeps its name for the dashboards that read it, and now counts every way a person's first message goes (#7455), as first_message_sent does.
+	TrackOnce(EventFirstPromptSubmitted, map[string]string{"source": via})
 }
 
 // firstReplyKey is the milestone key of one outcome: the first ok turn and the first error turn each send once, so a first turn that failed does not use up the install's reply event.
@@ -87,7 +89,7 @@ func TrackFirstAgentReply(provider string, took time.Duration, outcome string) {
 	gen := telemetryGen.Load()
 	asyncGo(func() {
 		key := firstReplyKey(outcome)
-		send, snap := reserveMilestone(key, posthogKeyPresent() && telemetryValid(gen), props)
+		send, snap := reserveMilestone(key, posthogKeyPresent() && telemetryValid(gen), withFunnelCommon(EventFirstAgentReply, props, time.Now().UTC()))
 		if !send {
 			return
 		}

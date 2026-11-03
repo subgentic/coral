@@ -2,6 +2,7 @@ package tracking
 
 import (
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -17,7 +18,19 @@ var BrowserEvents = map[string]bool{
 	EventPromptSubmitRequested: true,
 	EventUpdateNoticeShown:     true, // the dashboard's update toast was shown (#5952)
 	EventUpdateOfferOpened:     true, // its Download link was opened
+	// The funnel (#7455): the launch dialog was opened. The page's properties are dropped: the server sends the step with its own.
+	EventFunnelLaunchDialogOpened: true,
 }
+
+// onDashboardLoaded, when set, runs once per process after the first dashboard page of this run finished loading: the server's own first-load steps
+// (the CLIs it finds, whether the welcome items are on) are taken then, from its own state, never from the page.
+var (
+	onDashboardLoaded   atomic.Pointer[func()]
+	dashboardLoadedOnce sync.Once
+)
+
+// OnDashboardLoaded registers what runs after the first dashboard page of this run loaded.
+func OnDashboardLoaded(fn func()) { onDashboardLoaded.Store(&fn) }
 
 const (
 	// maxBrowserKeys bounds the in-memory dedupe sets so a misbehaving page
@@ -60,17 +73,24 @@ func TrackBrowserEvent(event string, props map[string]string) {
 			return
 		}
 		TrackEvent(event, map[string]string{"page_id": page})
+		TrackFunnelStep(EventFunnelDashboardLoaded, nil)
+		if fn := onDashboardLoaded.Load(); fn != nil && *fn != nil {
+			dashboardLoadedOnce.Do(func() { asyncGo(*fn) })
+		}
 	case EventDashboardActiveDay:
 		asyncGo(trackActiveDay)
 		asyncGo(trackActiveWeek)
 	case EventDashboardFailed:
 		code := props["code"]
+		TrackFunnelStep(EventFunnelDashboardLoadFailed, map[string]string{"code": dashboardFailCode(code)}) // the page's code only if it is one of the dashboard's own, else other
 		if !allowFailure(code) {
 			return
 		}
 		TrackEvent(event, map[string]string{"code": code})
 	case EventPromptSubmitRequested:
 		TrackOnce(event, map[string]string{"source": props["source"]})
+	case EventFunnelLaunchDialogOpened:
+		TrackFunnelStep(event, nil)
 	case EventUpdateNoticeShown, EventUpdateOfferOpened:
 		// Only the version and the channel are taken from the page; the source is the dashboard and the method the link, by construction, so the page cannot claim to be the tray.
 		version, channel, ok := updateBrowserProps(props)
