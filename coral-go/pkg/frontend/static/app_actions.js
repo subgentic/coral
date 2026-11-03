@@ -248,9 +248,9 @@ registerActions({
     'resume-show': () => showResumeModal(),
     'history-flag': el => toggleChatFlag(el.dataset.flag),
     'history-details': el => { const id = document.getElementById('history-session-id'); if (!id) return; id.hidden = !id.hidden; el.setAttribute('aria-expanded', String(!id.hidden)); el.textContent = id.hidden ? 'Details' : 'Hide details'; document.getElementById('history-token-usage')?.classList.toggle('htu-open', !id.hidden); }, // on a phone the usage line is folded behind the same button (#10578)
-    'history-list': () => {
+    'history-list': el => {
         state.currentSession = null;
-        switchNavTab('history');
+        switchNavTab('history', { folder: el.dataset.group || state.inboxFolder?.key });
         document.getElementById('history-search')?.focus();
     },
     'history-tab': el => { if (HISTORY_TABS.has(el.dataset.tab)) switchHistoryTab(el.dataset.tab); },

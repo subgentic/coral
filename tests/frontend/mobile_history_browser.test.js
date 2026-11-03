@@ -57,7 +57,7 @@ const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
         await ev(`document.querySelector('.chat-search-hit').click();true`);
         await waitFor(`document.querySelector('#history-messages .chat-search-target')?.textContent.includes('needle')`, 'search hit opens transcript');
         assert.equal(await ev(`document.getElementById('history-search').checkVisibility()`),false,'list hidden while reading transcript');
-        assert.equal(await ev(`document.querySelector('.mobile-history-back').getAttribute('aria-label')`), 'Back to chats', 'return button says where it goes');
+        assert.equal(await ev(`document.querySelector('.mobile-history-back').getAttribute('aria-label')`), 'Back to All chats', 'return button says where it goes');
         const target = await ev(`(() => {const r=document.querySelector('.mobile-history-back').getBoundingClientRect(); return {w:r.width,h:r.height};})()`);
         assert.ok(target.w>=44 && target.h>=44,'Chats return target '+JSON.stringify(target));
         for (const theme of ['dark','light']) { await setTheme(ev,theme); await shot(`${theme}-390-transcript`); }
@@ -67,6 +67,13 @@ const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
         await require('./helpers/hub_chats').showHubChats(ev); // as above: the hub's Chats list
         await waitFor(`document.getElementById('history-search').checkVisibility()`, 'keyboard returns to Chats');
         assert.ok(await ev(`location.pathname==='/chats' && document.getElementById('history-search').value==='needle'`),'query preserved on return'); // the focus on Search, browser Back and Forward are the hub's Chats list (#7776): a local Coral's way back is the Inbox folder
+        await ev(`window.switchNavTab('hub-inbox', {folder:'chats-archived'}); import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.selectInboxTab('chats-archived')).then(()=>true)`);
+        await waitFor(`!!document.querySelector('#group-table-view .dt-primary')`, 'Archived row');
+        await ev(`document.querySelector('#group-table-view .dt-primary').click();true`);
+        await waitFor(`document.getElementById('history-messages').textContent.includes('needle')`, 'archived transcript');
+        assert.equal(await ev(`document.querySelector('.mobile-history-back').getAttribute('aria-label')`), 'Back to Archived');
+        assert.equal(await ev(`document.querySelector('.mobile-history-back').textContent.trim()`), '← Archived');
+        // The legacy-list shim owns navigation here; hub_archived_chat_browser checks the native Inbox's return route.
         await Page.addScriptToEvaluateOnNewDocument({ source: 'window.__historyEmpty=true;' });
         await Page.navigate({url:BASE+'/chats'}); await Page.loadEventFired(); await install(); await coralReady(ev); await require('./helpers/hub_chats').showHubChats(ev);
         await waitFor(`document.getElementById('history-sessions-list').checkVisibility() && document.getElementById('history-sessions-list').textContent.includes('No history found')`, 'empty history');

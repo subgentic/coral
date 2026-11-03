@@ -175,6 +175,7 @@ export async function loadHistoryMessages(sessionId, options = {}) {
         return source === historyServer() ? data : null;
     } catch (e) {
         if (e.name === 'AbortError') return;
+        if (options.throwOnError) throw e;
         console.error("Failed to load history messages:", e);
         return null;
     }
