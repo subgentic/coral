@@ -1,6 +1,6 @@
 /* Folder-level tags: load, render, dropdown picker, add/remove */
 
-import { serverFetch, splitKey } from './server_base.js';
+import { serverFetch, splitKey, isCloud } from './server_base.js';
 import { inboxSources } from './inbox_servers.js';
 import { state } from './state.js';
 import { escapeHtml, escapeAttr, showToast, tagColor } from './utils.js';
@@ -11,7 +11,7 @@ import { loadAllTags } from './tags.js';
 const allFolderTags = new Map();
 
 export async function loadAllFolderTags(onlyServer = null) {
-    await Promise.all((onlyServer ? [onlyServer] : inboxSources()).map(async server => {
+    await Promise.all((onlyServer ? [onlyServer] : inboxSources()).filter(server => !isCloud() || server !== 'local').map(async server => {
         try {
             const resp = await serverFetch(server, '/api/folder-tags');
             if (!resp.ok) throw new Error('Folder tags unavailable');
@@ -42,7 +42,8 @@ export function renderFolderTagPills(tags) {
 
 export async function showFolderTagDropdown(folderName, anchorEl) {
     hideFolderTagDropdown();
-    await loadAllTags(false, splitKey(folderName).server);
+    const server = splitKey(folderName).server;
+    await Promise.all([loadAllFolderTags(server), loadAllTags(false, server)]);
 
     const rect = anchorEl.getBoundingClientRect();
     const dropdown = document.createElement("div");
