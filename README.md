@@ -84,7 +84,7 @@ Coral wraps the agent CLIs you already use (Claude Code, Codex, Antigravity, Pi 
 Behind the Inbox is the part that does the work: a team of agents on one board. An **Orchestrator** plans and delegates; a **Lead Developer** writes the code; a **QA Engineer** checks it. They can be different vendors on the same team (a Claude orchestrator, Codex workers, an Antigravity reviewer), each in its own terminal session and, if you ask, its own git worktree. The team's board holds the messages and a task queue whose dependencies are conditioned on outcomes and artifacts, not just "done".
 
 <p align="center">
-  <img alt="The message board beside an agent's chat: posts from the Orchestrator and workers" src="assets/readme/board-and-chat.png" width="100%" />
+  <img alt="The message board beside an agent's chat: posts from the Orchestrator and workers" src="https://github.com/user-attachments/assets/86c75256-e09d-459d-a517-73809be8bcf2" width="100%" />
   <br>
   <sub>The team's board beside one agent's chat: the Orchestrator and its workers at work. (Sample data.)</sub>
 </p>
