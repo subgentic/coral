@@ -17,6 +17,10 @@
       "count": 8,
       "reason": "the Analytics page is this computer's: every one of its cost routes is a bare path, and the page has no computer switch"
     },
+    "goal_operator_dialogs.js": {
+      "count": 1,
+      "reason": "the Move to another team dialog lists this computer's teams: the goal's Change driver and Move buttons are drawn only for a goal of this computer's own server (never through Coral Hub: both routes are classified never), so the team list is this computer's alone (#12693)"
+    },
     "guide_names.js": {
       "count": 1,
       "reason": "a guide's roster is the Hub's own route (the guide role is a Hub grant on a board), read by the owner there"
