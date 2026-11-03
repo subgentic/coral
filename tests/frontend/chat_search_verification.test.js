@@ -11,68 +11,10 @@ import assert from 'node:assert/strict';
 // The rendering, escaping, status-contract and locator-dispatch assertions this file
 // once duplicated were removed (#3814); only the generation/late-response race stays.
 
-globalThis.window = globalThis;
-globalThis.location = { search: '' };
-globalThis.localStorage = { getItem: () => null, setItem: () => {} };
-
-const container = {
-    hidden: false,
-    textContent: '',
-    children: [],
-    replaceChildren(...args) {
-        this.children = [...args];
-        this.textContent = args.map(a => a.textContent || '').join('');
-    },
-    appendChild(child) {
-        this.children = this.children || [];
-        this.children.push(child);
-    }
-};
-
-const list = { hidden: false };
-
-globalThis.document = {
-    getElementById(id) {
-        if (id === 'chat-search-results') return container;
-        if (id === 'history-sessions-list') return list;
-        return null;
-    },
-    createElement(tag) {
-        return {
-            tagName: tag,
-            className: '',
-            _textContent: '',
-            get textContent() { return this._textContent; },
-            set textContent(v) { this._textContent = String(v); },
-            get innerHTML() {
-                if (this._innerHTML != null) return this._innerHTML;
-                return (this._textContent || '')
-                    .replace(/&/g, '&amp;')
-                    .replace(/</g, '&lt;')
-                    .replace(/>/g, '&gt;')
-                    .replace(/"/g, '&quot;')
-                    .replace(/'/g, '&#39;');
-            },
-            set innerHTML(v) { this._innerHTML = v; },
-            attributes: {},
-            dataset: {},
-            children: [],
-            listeners: {},
-            setAttribute(name, val) { this.attributes[name] = String(val); },
-            getAttribute(name) { return this.attributes[name]; },
-            addEventListener(type, fn) {
-                this.listeners[type] = this.listeners[type] || [];
-                this.listeners[type].push(fn);
-            },
-            dispatchEvent(event) {
-                for (const h of (this.listeners[event.type] || [])) h(event);
-            },
-            click() { this.dispatchEvent({ type: 'click' }); },
-            appendChild(child) { this.children.push(child); },
-            replaceChildren(...args) { this.children = [...args]; }
-        };
-    }
-};
+import { installDom } from './helpers/jsdom_env.mjs';
+const dom = installDom({ mode: 'local' });
+const container = document.getElementById('chat-search-results');
+assert.ok(container, 'the real app shell includes the search results container');
 
 const { searchChats } = await import('../../coral-go/pkg/frontend/static/chat_search.js');
 
@@ -97,15 +39,17 @@ const { searchChats } = await import('../../coral-go/pkg/frontend/static/chat_se
     const p2 = searchChats('second');  // fast
 
     await p2;
-    const afterFast = container.children.filter(c => c.className === 'chat-search-result');
+    const afterFast = [...container.children].filter(c => c.className === 'chat-search-result');
     assert.equal(afterFast.length, 1);
     assert.ok(afterFast[0].innerHTML.includes('src-fast'), 'Second (fast) response is displayed'); // the header names the chat by its title ("Chat" when it is not in the loaded list), never its id (#6288): the source tells the two answers apart
 
     resolveFirst();
     await p1;
 
-    const afterLate = container.children.filter(c => c.className === 'chat-search-result');
+    const afterLate = [...container.children].filter(c => c.className === 'chat-search-result');
     assert.equal(afterLate.length, 1);
     assert.ok(afterLate[0].innerHTML.includes('src-fast'), 'Late first response was dropped by the generation check');
     console.log('chat_search_verification: generation check drops stale late responses — ok');
 }
+
+dom.window.close();

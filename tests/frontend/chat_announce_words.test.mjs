@@ -1,8 +1,8 @@
 // #12426: the reply a screen reader hears ("<agent> replied: ...") shows the agent's text as written. Its underscores were all removed as if they were Markdown emphasis: HERMES_TEST_REPLY was said and shown as HERMESTESTREPLY.
 // An underscore inside a word is the word's; one that wraps a word as emphasis (_so_) goes, as do backticks, asterisks and a line's leading # or >.
 import assert from 'node:assert/strict';
-import { STATIC } from './helpers/jsdom_env.mjs';
-const { words } = await import(STATIC + 'chat_announce.js');
+import { importUi } from './helpers/jsdom_env.mjs';
+const { words } = await importUi('chat_announce'); // importUi converts the native path with pathToFileURL (Windows drive letters are not URL schemes)
 const cases = [
     ['HERMES_TEST_REPLY', 'HERMES_TEST_REPLY'],
     ['the file snake_case_name.py changed', 'the file snake_case_name.py changed'],

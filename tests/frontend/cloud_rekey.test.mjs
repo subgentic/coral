@@ -3,7 +3,10 @@
 import assert from 'node:assert';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { JSDOM } from 'jsdom';
+import { JSDOM, VirtualConsole } from 'jsdom';
+const domErrors = [];
+const virtualConsole = new VirtualConsole();
+virtualConsole.on('jsdomError', error => domErrors.push(error));
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const dir = path.resolve(here, '../../coral-go/pkg/frontend/static');
@@ -14,8 +17,8 @@ const dom = new JSDOM(`<!doctype html><body>
     <div data-cloud="rekey-row" hidden><div data-cloud="rekey-text"></div><button data-cloud="rekey">Replace the secret key</button></div>
   </div>
   <div id="confirm-modal" style="display:none"><h3 id="confirm-modal-title"></h3><p id="confirm-modal-message"></p><button id="confirm-modal-yes">Yes</button></div>
-</body>`, { url: 'http://127.0.0.1:8420/' });
-for (const k of ['window', 'document', 'navigator', 'localStorage', 'location', 'sessionStorage', 'getComputedStyle', 'HTMLElement', 'Node', 'Event', 'CustomEvent', 'MutationObserver']) {
+</body>`, { url: 'http://127.0.0.1:8420/', virtualConsole });
+for (const k of ['window', 'document', 'navigator', 'localStorage', 'location', 'sessionStorage', 'getComputedStyle', 'Element', 'HTMLElement', 'Node', 'Event', 'CustomEvent', 'MutationObserver']) {
     Object.defineProperty(globalThis, k, { value: dom.window[k], configurable: true, writable: true });
 }
 
@@ -74,5 +77,6 @@ await tick();
 assert.deepStrictEqual(posts, [{ confirm: true }]);
 assert.strictEqual(part('rekey-row').hidden, true, 'gone once replaced');
 assert.match(part('status').textContent, /secret key was replaced/);
+assert.deepStrictEqual(domErrors.map(error => error.message), [], 'DOM listeners must not throw during the confirmation flow');
 console.log('cloud_rekey: ok');
 process.exit(0);
