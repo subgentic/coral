@@ -290,8 +290,8 @@ The command in that line is the one for this computer: `brew` on macOS; `apt`, `
 `zypper` on Linux, by what is installed. A launch that fails for this reason says the same, and so
 do the dashboard's launch dialogs before you press Launch.
 
-The macOS app packaging includes tmux and its terminal definitions. Older downloads
-and standalone/source builds may still need tmux installed separately. Keep the app
+The macOS app packaging includes tmux and its terminal definitions, for when you choose tmux.
+Other builds need tmux installed only if you choose it. Keep the app
 bundle intact when moving it. Agent CLIs still need to be installed and authenticated
 separately.
 
@@ -719,7 +719,7 @@ too unless run with SeSecurityPrivilege, because it writes the audit list as wel
 
 There are two tarballs, x86-64 (`amd64`) and ARM64 (`arm64`). Each contains bare binaries with no
 installer, service unit, or desktop entry, and no tray or desktop app; Linux is CLI/server
-only. tmux is not bundled; install it or start with `--backend pty`.
+only. Agents run in the built-in terminal; tmux is not bundled and is needed only if you choose it.
 
 ### macOS Gatekeeper
 

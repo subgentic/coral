@@ -13,7 +13,7 @@ The example output and timings in steps 4-5 are illustrative: they come from a t
 
 | Requirement | Notes |
 |---|---|
-| **tmux** | The macOS app bundles tmux 3.7c; older downloads and standalone/source builds may still need it installed separately. Linux requires a separate tmux installation for the default backend. The PTY backend (`--backend pty`) does not require tmux. See [Platform support](#platform-support). |
+| **tmux** | Not needed. Agents run in Coral's built-in terminal (pty) by default on every system. tmux is needed only if you choose it (Settings > Terminal, or `--backend tmux`) to keep agents running after Coral quits; the macOS app bundles tmux 3.7c, and elsewhere you install it first. See [Platform support](#platform-support). |
 | **git** | Worktree and branch features need a real repository. |
 | **An agent CLI** | At least one of `claude`, `codex`, `agy` (Antigravity), or `pi` — **installed and authenticated**. Coral drives these tools; it does not install, configure, or authenticate them. |
 
@@ -53,7 +53,7 @@ setting. Coral launches only the agent CLIs listed above; adding another one nee
 |---|---|
 | **macOS** | Signed and notarized universal app ([`Coral.dmg`](https://github.com/subgentic/coral/releases/latest/download/Coral.dmg), Apple Silicon and Intel, macOS 13 minimum) with bundled tmux. The macOS 13 minimum is checked in the binaries but has not been run on a macOS 13 host. |
 | **Windows** | [`Coral-x64.msi`](https://github.com/subgentic/coral/releases/latest/download/Coral-x64.msi) (installer) or [`Coral-x64-portable.zip`](https://github.com/subgentic/coral/releases/latest/download/Coral-x64-portable.zip), x64. Not code-signed (SmartScreen warns of an unknown publisher; verify the download as the README shows). Agents run with the native pty backend (no tmux); the default port is 8450. |
-| **Linux** | [`coral-linux-amd64.tar.gz`](https://github.com/subgentic/coral/releases/latest/download/coral-linux-amd64.tar.gz) (x86-64) or [`coral-linux-arm64.tar.gz`](https://github.com/subgentic/coral/releases/latest/download/coral-linux-arm64.tar.gz) (ARM64), statically linked. CLI/server only — no tray or desktop app. tmux is not bundled. |
+| **Linux** | [`coral-linux-amd64.tar.gz`](https://github.com/subgentic/coral/releases/latest/download/coral-linux-amd64.tar.gz) (x86-64) or [`coral-linux-arm64.tar.gz`](https://github.com/subgentic/coral/releases/latest/download/coral-linux-arm64.tar.gz) (ARM64), statically linked. CLI/server only — no tray or desktop app. Agents run in the built-in terminal; tmux is not bundled and is needed only if you choose it. |
 | **Homebrew** | `brew install --cask cdknorow/coral/coral` installs the release's macOS app; the release workflow updates the tap with each release's checksum. |
 
 ## 1. Install
@@ -102,7 +102,7 @@ Press Ctrl+C to stop
 ```
 
 On first launch, review the Terms of Service and accept them if you agree. Keep the
-terminal open while the server runs. Without tmux, add `--backend pty`.
+terminal open while the server runs. Agents run in the built-in terminal; tmux is not needed.
 
 Useful flags: `--home <dir>` (data directory, default `~/.coral`), `--port` (default
 8420), `--host` (one address or a comma list, see [below](#listening-on-a-tailnet-address)),
@@ -335,7 +335,7 @@ by trusting the agent's summary.
 | `coral: command not found` after a DMG install | `install-cli.sh` was never run, or its link directory (`~/.local/bin` by default) is not on your `PATH`. |
 | `coral` starts something unfamiliar | The retired `agent-coral` pip package is shadowing it. Run `which -a coral`. |
 | Agents launch but never post to the board | Confirm the server's view with `/api/board/<project>/subscribers`. Agents are given `CORAL_URL` and `CORAL_DATA_DIR`; a custom wrapper that clears the environment can lose them. |
-| Agent launch fails with a tmux error | tmux is missing (Linux, source builds). The macOS app bundles it. Coral starts anyway and only fails at launch time; `--backend pty` avoids tmux. |
+| Agent launch fails with a tmux error | tmux was chosen (Settings > Terminal or `--backend tmux`) and is missing. The macOS app bundles it. Coral starts anyway and only fails at launch time; choose the built-in terminal (Settings > Terminal, or `--backend pty`) or install tmux. |
 
 ## Stop only what you started
 
