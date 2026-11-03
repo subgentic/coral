@@ -60,6 +60,16 @@ const { coralReady } = require('./helpers/wait');
             await ev(`window.__projects = null; document.querySelector('#settings-inbox-teams .settings-inbox-teams-failed button').click(); true`);
             await sleep(500); // sleep-ok: Retry reads the boards again
             check(`${tag}: Retry draws the teams with the saved choice (alpha only)`, JSON.stringify(await view().then(x => x.teams)) === '[["alpha",true],["beta",false],["gamma",false]]');
+            // UI Reviewer's MUST: an explicit saved choice stays explicit. alpha is included and online, beta is left out and offline (not drawn): every DRAWN box is ticked, and Save of an unrelated setting keeps ["alpha"]
+            await refill(['alpha'], '["alpha"]');
+            check(`${tag}: every drawn box ticked is not "all": a saved ["alpha"] stays ["alpha"]`, (await ev(`import(${S} + 'settings_inbox.js').then(m => m.readInboxSettings({ inbox_included_teams: '["alpha"]' }).inbox_included_teams)`)) === '["alpha"]');
+            await refill(['alpha', 'beta'], '["alpha"]');
+            check(`${tag}: ticking another box makes a list of its own, never "all"`, (await ev(`(() => { document.querySelector('#settings-inbox-teams input[data-team="beta"]').click(); return import(${S} + 'settings_inbox.js').then(m => m.readInboxSettings({ inbox_included_teams: '["alpha"]' }).inbox_included_teams); })()`)) === '["alpha","beta"]');
+            await refill(['alpha', 'beta'], '["alpha"]');
+            await ev(`document.querySelector('#settings-inbox-teams .settings-inbox-every').click(); true`);
+            check(`${tag}: only the person's own choice of every team saves "all" (Include every team)`, (await ev(`import(${S} + 'settings_inbox.js').then(m => m.readInboxSettings({ inbox_included_teams: '["alpha"]' }).inbox_included_teams)`)) === 'all');
+            await ev(`document.querySelector('#settings-inbox-teams input[data-team="beta"]').click(); true`);
+            check(`${tag}: and a box changed by hand afterwards is a list again`, (await ev(`import(${S} + 'settings_inbox.js').then(m => m.readInboxSettings({ inbox_included_teams: '["alpha"]' }).inbox_included_teams)`)) === '["alpha"]');
             // another computer is managed from here: a failed read of it is a failure of the whole list (never a shorter list that Save would rewrite the choice from); when it answers its teams are drawn
             await ev(`import(${S} + 'state.js').then(m => { m.state.hub = true; m.state.servers = [{ id: 'srv2', name: 'srv2', status: 'online' }]; return true; })`);
             await ev(`window.__remote = 'fail'; true`);

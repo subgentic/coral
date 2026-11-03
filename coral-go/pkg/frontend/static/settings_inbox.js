@@ -51,16 +51,26 @@ export async function drawInboxTeams(raw) {
         frag.append(label);
     }
     host.replaceChildren(frag);
+    delete host.dataset.everyTeam;
+    host.addEventListener('change', e => { if (e.target && e.target.matches && e.target.matches('input[data-team]')) delete host.dataset.everyTeam; }); // a box changed by hand is a choice of its own: it is no longer "every team"
+    if (chosen !== 'all' && projects.length) { // an explicit choice has a way back to "every team", for the teams that are not shown as well
+        const b = document.createElement('button');
+        b.type = 'button'; b.className = 'btn btn-quiet btn-small settings-inbox-every'; b.textContent = 'Include every team';
+        b.addEventListener('click', () => { host.querySelectorAll('input[data-team]').forEach(x => { x.checked = true; }); host.dataset.everyTeam = '1'; b.remove(); });
+        host.prepend(b);
+    }
 }
 
-/** What the team boxes say: "all" when every box is ticked (or there are none to tick), else the JSON list of the ticked teams. */
+/** What the team boxes say. A saved explicit choice stays explicit: "all" is saved only when it was all, or when the person pressed Include every team; ticking every box that is DRAWN proves nothing about a team that is not (its computer is
+ *  away, or it was left out), so it is never taken for "all". The ticked teams are saved, and a saved team that is not drawn now stays in the list as it was (Save never rewrites what it did not show). */
 export function readIncludedTeams(fallback) {
-    const boxes = [...(teamsHost()?.querySelectorAll('input[data-team]') || [])];
-    if (!boxes.length) return fallback === undefined ? 'all' : includedTeams(fallback) === 'all' ? 'all' : JSON.stringify(includedTeams(fallback));
-    if (boxes.every(b => b.checked)) return 'all';
-    const drawn = new Set(boxes.map(b => b.dataset.team)), saved = includedTeams(fallback);
-    const kept = saved === 'all' ? [] : saved.filter(t => !drawn.has(t)); // a saved team that is not drawn now (its computer is offline) stays as it was: Save never rewrites what it did not show
-    return JSON.stringify([...boxes.filter(b => b.checked).map(b => b.dataset.team), ...kept]);
+    const host = teamsHost(), boxes = [...(host?.querySelectorAll('input[data-team]') || [])], saved = includedTeams(fallback);
+    if (!boxes.length) return saved === 'all' ? 'all' : JSON.stringify(saved);
+    if (host.dataset.everyTeam === '1') return 'all';
+    if (saved === 'all') return boxes.every(b => b.checked) ? 'all' : JSON.stringify(boxes.filter(b => b.checked).map(b => b.dataset.team));
+    const drawn = new Set(boxes.map(b => b.dataset.team)), ticked = boxes.filter(b => b.checked).map(b => b.dataset.team);
+    const kept = saved.filter(t => !drawn.has(t));
+    return JSON.stringify([...ticked, ...kept]);
 }
 
 /** Fills the Inbox controls from the saved settings: a kind is on unless it was turned off, the teams are all unless a list was saved, the time is 09:00 unless one was set. */
