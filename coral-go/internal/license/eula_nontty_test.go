@@ -119,3 +119,27 @@ func TestEULACommandLinesPowerShellCurlyQuotes(t *testing.T) {
 		}
 	}
 }
+
+// The no-terminal give-up is told apart from a person's decline, so a caller can end with a failure code and show its own note.
+func TestTheNoTerminalGiveUpIsToldApartFromADecline(t *testing.T) {
+	noTerminal.Store(false)
+	pr, pw, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pw.Close()
+	defer pr.Close()
+	old := os.Stdin
+	os.Stdin = pr
+	defer func() { os.Stdin = old }()
+	if DeclinedForNoTerminal() {
+		t.Fatal("set before anything was asked")
+	}
+	if TerminalEULADialog("terms") {
+		t.Fatal("a non-terminal stdin must not accept the terms")
+	}
+	if !DeclinedForNoTerminal() {
+		t.Fatal("the give-up for no terminal was not recorded")
+	}
+	t.Cleanup(func() { noTerminal.Store(false) })
+}

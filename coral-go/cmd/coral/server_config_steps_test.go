@@ -9,6 +9,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"runtime"
 	"strconv"
 	"testing"
 	"time"
@@ -182,6 +183,7 @@ func TestConfigureServerStopsWithoutAcceptedTerms(t *testing.T) {
 				os.Exit(3)
 			}
 		}
+		showTermsNeeded = func() { os.Stderr.WriteString("[note shown]" + "\n") } // never a message box under a test
 		cfg := config.Load(os.Getenv("CORAL_DATA_DIR"))
 		flag.CommandLine = flag.NewFlagSet("coral", flag.ContinueOnError)
 		sf := defineServerFlags()
@@ -215,7 +217,13 @@ func TestConfigureServerStopsWithoutAcceptedTerms(t *testing.T) {
 		return code, stdout.String(), stderr.String()
 	}
 	code, out, errs := run(false)
-	assert.Equal(t, 0, code, errs)
+	if runtime.GOOS == "windows" {
+		assert.Equal(t, 1, code, errs+" (no terminal: nobody could be asked, so a failure code)")
+		assert.Contains(t, errs, "[note shown]", "and the person is told another way")
+	} else {
+		assert.Equal(t, 0, code, errs+" (elsewhere the start ends quietly, as before)")
+		assert.NotContains(t, errs, "[note shown]")
+	}
 	assert.NotContains(t, out, "passed the gate", "the step must not return without accepted Terms")
 	assert.Contains(t, errs, "Terms of Service must be accepted to use Coral.")
 	code, out, errs = run(true)
