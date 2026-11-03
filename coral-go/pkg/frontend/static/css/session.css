@@ -1605,11 +1605,9 @@ body .terminal-header { flex-wrap: wrap; height: auto; min-height: 36px; row-gap
 .server-launch-note, .server-launch-hint { margin: 0 0 var(--space-md); color: var(--text-secondary); font-size: var(--fs-md); }
 .server-version { justify-self: start; cursor: help; border-bottom: 1px dotted var(--text-secondary); }
 .server-details-update:not(.server-below-minimum) { display: flex; align-items: center; justify-content: space-between; gap: var(--space-md); padding-top: var(--space-md); border-top: 1px solid var(--border); }
-/* 'Show server': the server before a team/folder name, "pro-coral-hub", server in italics (#3507). */
-.row-name-with-server { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.row-server-prefix { font-style: italic; font-weight: var(--fw-medium); opacity: 0.7; white-space: nowrap; }
-.row-server-prefix .row-server-sep { font-style: normal; }
-.row-server-prefix.is-down { opacity: 0.45; }
+/* 'Show server': the computer of a team/folder on its own quiet line under the name, in italics, cut with an ellipsis (#3507, #12949). */
+.group-server-line { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-style: italic; font-weight: var(--fw-medium); font-size: var(--fs-sm); line-height: var(--lh-label); color: var(--text-secondary); }
+.group-server-line.is-down { opacity: 0.6; } /* a computer that is down is dimmed, and its state is in the tooltip and for a screen reader; one that is up is full strength (4.5:1 in both themes) */
 /* Phone width and touch screens: the header's controls are the touch size, all of them (mobile.css gives every .btn that minimum at this width). */
 @media (max-width: 767px), (pointer: coarse) {
     .sidebar-header.sidebar-header, .mobile-list-header.mobile-list-header { --ctl-h: var(--control-touch-height, 44px); }
@@ -1637,7 +1635,7 @@ body .terminal-header { flex-wrap: wrap; height: auto; min-height: 36px; row-gap
 /* In a box that narrow (at 200% text the header's buttons leave it 7em) the magnifier goes and the placeholder takes its room: the whole placeholder is shown, and the box's name is the same. */
 @container (max-width: 8rem) { .sidebar-search-icon { display: none; } .sidebar-search-input.field-search { padding-left: 0.625rem; padding-right: 0.25rem; } }
 /* Status text for screen readers only (the dot carries it visually). */
-.row-server-prefix .sr-only {
+.group-server-line .sr-only {
     position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
     overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
 }

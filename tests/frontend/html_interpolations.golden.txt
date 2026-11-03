@@ -210,6 +210,8 @@
 2	group_cards.js	_pinMenuItem(groupName, groupDirRaw)
 2	group_cards.js	_rowNameWithServer(boardName)
 2	group_cards.js	_rowNameWithServer(groupName)
+2	group_cards.js	_rowServerLine(boardName)
+2	group_cards.js	_rowServerLine(groupName)
 2	group_cards.js	_teamHeaderAttrs(boardName)
 2	group_cards.js	accentStyle
 2	group_cards.js	bKebab
@@ -248,9 +250,6 @@
 1	list_card_parts.js	PIN_ICON
 1	list_card_parts.js	SVGO.o5
 4	list_card_parts.js	icon
-1	list_card_parts.js	name
-1	list_card_parts.js	prefix
-1	list_card_parts.js	st.cls
 1	markdown.js	HL_MARK
 2	message_board.js	p.message_count
 1	message_board.js	p.subscriber_count

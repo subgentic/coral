@@ -54,7 +54,7 @@ const SETTINGS_PRELOAD = `(() => {
     const view = () => ev(`(() => {
         return {
             strip: document.querySelectorAll('#live-sessions-list .server-strip-row, #live-sessions-list .server-strip-item').length,
-            chips: [...document.querySelectorAll('#live-sessions-list .row-server-prefix .row-server-name')].map(c => c.textContent.trim()),
+            chips: [...document.querySelectorAll('#live-sessions-list .group-server-line .row-server-name')].map(c => c.textContent.trim()),
             headers: [...document.querySelectorAll('#live-sessions-list li.server-group-header')].map(h => ({ id: h.dataset.serverGroup, name: h.querySelector('.server-group-name').textContent, state: h.querySelector('.server-group-state')?.textContent || null, expanded: h.querySelector('.server-group-toggle').getAttribute('aria-expanded') })),
             rows: [...document.querySelectorAll('#live-sessions-list li[data-session-id]')].map(li => li.dataset.sessionId),
             showServerRow: (r => r ? !r.hidden && getComputedStyle(r).display !== 'none' : null)(document.getElementById('display-show-server-row')),
@@ -103,7 +103,7 @@ const SETTINGS_PRELOAD = `(() => {
         await waitFor(`window.__settingsPutsAnswered.some(p => p && p.show_session_server === true)`, 'PUT /api/settings {show_session_server: true} answered', 3000);
         const stored = await ev(`fetch('/api/settings').then(r => r.json()).then(d => String((d.settings || d).show_session_server))`);
         assert.equal(stored.toLowerCase(), 'true', `the server keeps the setting (${stored})`);
-        await waitFor(`document.querySelectorAll('#live-sessions-list .row-server-prefix').length > 0`, 'server prefixes after Show computer', 3000);
+        await waitFor(`document.querySelectorAll('#live-sessions-list .group-server-line').length > 0`, 'computer lines after Show computer', 3000);
         v = await view();
         assert.ok(v.chips.every(c => /^studio-mac/.test(c)), `chips use the short name (${JSON.stringify(v.chips)})`);
         await ev(`document.getElementById('display-show-server').click(); true`);
@@ -119,24 +119,25 @@ const SETTINGS_PRELOAD = `(() => {
         assert.ok(v.chips.length > 0, "'Show computer' is on by default with 2+ servers");
         assert.ok(v.chips.some(c => /^Old Laptop/.test(c)) && v.chips.some(c => /^workstation/.test(c)), `chips name each server (${JSON.stringify(v.chips)})`);
         assert.equal(v.groupRow, true, "'Group by computer' is offered with 2+ servers");
-        // #3507 ungrouped: the server BEFORE the team name, in italics, with no dot; an offline one is dimmed.
+        // #3507 ungrouped, #12949: the computer on its own quiet line UNDER the team name, in italics, with no dot; an offline one is dimmed.
         const pre = await ev(`(() => {
-            const li = id => [...document.querySelectorAll('#live-sessions-list li')].find(l => l.querySelector('.row-server-prefix') && l.textContent.includes(id));
-            const one = (id) => { const l = li(id); const p = l && l.querySelector('.row-server-prefix'); const w = l && l.querySelector('.row-name-with-server');
-                return p && { text: w.textContent.replace(p.querySelector('.sr-only').textContent, ''), italic: getComputedStyle(p.querySelector('.row-server-name')).fontStyle,
+            const li = id => [...document.querySelectorAll('#live-sessions-list li')].find(l => l.querySelector('.group-server-line') && l.textContent.includes(id));
+            const one = (id) => { const l = li(id); const p = l && l.querySelector('.group-server-line'); const n = l && l.querySelector('.group-name-line'); const hb = l.querySelector('.group-header-text').getBoundingClientRect();
+                return p && { team: n.textContent.trim().replace(/\\s+/g, ' '), line: p.querySelector('.row-server-name').textContent, italic: getComputedStyle(p).fontStyle,
                     down: p.classList.contains('is-down'), title: p.getAttribute('title'), sr: p.querySelector('.sr-only').textContent.trim(), op: Number(getComputedStyle(p).opacity),
-                    first: w.firstElementChild === p }; };
-            return { m2: one('team-m2'), m3: one('team-m3'), dots: document.querySelectorAll('#live-sessions-list .row-server-prefix .server-dot, #live-sessions-list .row-server-chip').length };
+                    below: p.getBoundingClientRect().top >= n.getBoundingClientRect().bottom - 1, inside: p.getBoundingClientRect().right <= hb.right + 1, one: getComputedStyle(p).whiteSpace === 'nowrap' }; };
+            return { m2: one('team-m2'), m3: one('team-m3'), dots: document.querySelectorAll('#live-sessions-list .group-server-line .server-dot, #live-sessions-list .row-server-chip').length };
         })()`);
-        assert.equal(pre.m2.text, 'workstation-team-m2', `"server-team" (${JSON.stringify(pre.m2)})`);
-        assert.ok(pre.m2.first, 'the server comes before the team name');
-        assert.equal(pre.m2.italic, 'italic', 'the server part is in italics');
+        assert.ok(/^team-m2/.test(pre.m2.team) && !/workstation/.test(pre.m2.team), `the team's line is the team: no computer in it (${JSON.stringify(pre.m2)})`);
+        assert.equal(pre.m2.line, 'workstation', 'the computer is the line under it');
+        assert.ok(pre.m2.below && pre.m2.inside && pre.m2.one, `below the name, inside the header, one line (${JSON.stringify(pre.m2)})`);
+        assert.equal(pre.m2.italic, 'italic', 'the computer is in italics');
         assert.equal(pre.m2.down, false); assert.equal(pre.m2.title, 'workstation.lan: Online'); assert.equal(pre.m2.sr, '(computer)');
         assert.equal(pre.m3.down, true, 'an offline server is marked'); assert.ok(pre.m3.op < pre.m2.op, `and dimmed (${pre.m3.op} < ${pre.m2.op})`);
         assert.equal(pre.m3.title, 'Old Laptop: Unreachable', 'its state is in the tooltip'); assert.equal(pre.m3.sr, '(computer, unreachable)', 'and for screen readers');
         assert.equal(pre.dots, 0, 'no status dot or chip on a row');
         // Team view from a prefixed row opens that server's team.
-        await ev(`(() => { const l = [...document.querySelectorAll('#live-sessions-list li')].find(l => l.querySelector('.row-server-prefix') && l.textContent.includes('team-m2')); (l.matches('[data-on-click="team-name-open"]') ? l : l.querySelector('[data-on-click="team-name-open"]')).click(); return true; })()`);
+        await ev(`(() => { const l = [...document.querySelectorAll('#live-sessions-list li')].find(l => l.querySelector('.group-server-line') && l.textContent.includes('team-m2')); (l.matches('[data-on-click="team-name-open"]') ? l : l.querySelector('[data-on-click="team-name-open"]')).click(); return true; })()`);
         await waitFor(`T.state.selectedTeam === '@m2/team-m2'`, 'team view of @m2/team-m2', 3000, `T.state.selectedTeam`);
         await ev(`window.exitTeamPage({ force: true }); true`);
         console.log('   ✓ ungrouped: "workstation-team-m2", server in italics first, offline dimmed with tooltip + sr text, no dots; team view opens @m2/team-m2');
@@ -246,7 +247,7 @@ const SETTINGS_PRELOAD = `(() => {
             const probe = document.createElement('span'); probe.style.color = 'color-mix(in srgb, var(--text-primary) 82%, transparent)'; document.body.appendChild(probe);
             const neutral = getComputedStyle(probe).color; probe.remove();
             const team = id => { const l = [...document.querySelectorAll('#live-sessions-list li.session-team-group')].find(x => x.textContent.includes(id)); return l && getComputedStyle(l.querySelector('.group-name-line')).color; };
-            const pre = id => [...document.querySelectorAll('#live-sessions-list .row-server-prefix')].find(p => p.closest('li').textContent.includes(id));
+            const pre = id => [...document.querySelectorAll('#live-sessions-list .group-server-line')].find(p => p.closest('li').textContent.includes(id));
             return { neutral, m1: team('team-m1'), m2: team('team-m2'), m3: team('team-m3'), m3down: pre('team-m3')?.classList.contains('is-down'), m3sr: pre('team-m3')?.querySelector('.sr-only').textContent.trim() };
         })()`);
         assert.equal(col.m1, col.neutral, `a team with no color of its own is the neutral group color (${JSON.stringify(col)})`);

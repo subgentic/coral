@@ -70,28 +70,27 @@ export function _pinMenuItem(groupName, dir) {
 export const FOLDER_GROUP_ICON = '<svg class="team-group-icon folder-group-icon" role="img" aria-label="Folder" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"'
     + ' stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>';
 
-/** The server before a team/folder name ("pro-coral-hub", the server part in italics), when
- *  'Show server' is on and not grouped (#3507: replaces the green-dot chip after the name). An
- *  offline or stale server is dimmed, and its state is in the tooltip and for screen readers. */
-function _rowServerPrefix(key) {
-    if (!isServerShownOnRows() || isGroupedByServer() || !serversShown().length) return '';
+/** The computer a team/folder is on, when 'Show server' is on and the list is not grouped by computer (#3507): its own quiet line UNDER the name (#12949, the Operator: the computer inline with the team read as
+ *  one long name), in italics, one line, cut with an ellipsis (the full name on hover and for a screen reader). An offline or stale one is dimmed, and its state is in the tooltip and for screen readers.
+ *  Nothing is drawn, and the row stays as high as it was, when the option is off. */
+function _rowServerInfo(key) {
+    if (!isServerShownOnRows() || isGroupedByServer() || !serversShown().length) return null;
     const id = splitKey(key).server;
     const e = serversShown().find(x => x.id === id) || { id, label: serverLabel(id), status: 'unknown' };
-    const name = serverLabel(id);
     const st = statusMeta(e.status);
     // Not checked yet ('unknown') isn't a failure: shown like an online server (QA's review).
-    const down = e.status !== 'online' && e.status !== 'unknown';
-    return `<span class="row-server-prefix server-${st.cls}${down ? ' is-down' : ''}" title="${escapeAttr(`${e.label || e.id}: ${st.label}`)}">`
-        + `<span class="row-server-name">${escapeHtml(name)}</span><span class="row-server-sep" aria-hidden="true">-</span>`
-        + `<span class="sr-only"> (computer${down ? ', ' + escapeHtml(st.label.toLowerCase()) : ''}) </span></span>`;
+    return { name: serverLabel(id), cls: st.cls, label: st.label, title: `${e.label || e.id}: ${st.label}`, down: e.status !== 'online' && e.status !== 'unknown' };
+}
+export function _rowServerLine(key) {
+    const i = _rowServerInfo(key);
+    if (!i) return '';
+    return `<div class="group-server-line server-${escapeAttr(i.cls)}${i.down ? ' is-down' : ''}" title="${escapeAttr(i.title)}"><span class="row-server-name">${escapeHtml(i.name)}</span>`
+        + `<span class="sr-only"> (computer${i.down ? ', ' + escapeHtml(i.label.toLowerCase()) : ''})</span></div>`;
 }
 
-/** A team/folder header's name, with its server before it when shown: one inline item, so
- *  the name line's flex gap doesn't split "pro-" from "coral-hub". */
+/** A team/folder header's name (its computer is the line under it: _rowServerLine). */
 export function _rowNameWithServer(key) {
-    const prefix = _rowServerPrefix(key);
-    const name = escapeHtml(keyLabel(key));
-    return prefix ? `<span class="row-name-with-server">${prefix}${name}</span>` : name;
+    return escapeHtml(keyLabel(key));
 }
 
 // A team's color: the one the user picked for it (the team's color menu, kept per viewer),

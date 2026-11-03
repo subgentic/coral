@@ -10,7 +10,7 @@ import { CHEVRON_DECO, _chevron, _collapseAttrs, _isGroupCollapsed, _teamHeaderA
 import { getFolderTags, renderFolderTagPills } from './folder_tags.js';
 import { pinPathForKey, emptyPins, notePinKeys } from './pinned_folders.js';
 import { localFirst } from './server_status.js';
-import { killAllItem, deleteTeamItem, teamHealthBtn, _rowNameWithServer, _boardAccentStyle, _pinMenuItem, FOLDER_GROUP_ICON } from './list_card_parts.js';
+import { killAllItem, deleteTeamItem, teamHealthBtn, _rowNameWithServer, _rowServerLine, _boardAccentStyle, _pinMenuItem, FOLDER_GROUP_ICON } from './list_card_parts.js';
 import { _pinMatchesFilter } from './list_filter_match.js';
 import { SVGO } from './svg_open.js';
 const _mk0 = "<line x1=\"4\" y1=\"4\" x2=\"12\" y2=\"12\"/><line x1=\"12\" y1=\"4\" x2=\"4\" y2=\"12\"/></svg>\n                    Kill All\n                </button>";
@@ -90,7 +90,7 @@ function _renderTeamCard(boardName, boardSessions) {
         const sleepingClass = boardIsSleeping ? ' team-sleeping' : '';
         html += `<li class="session-board-card session-team-group session-board-card-toplevel${sleepingClass}"${accentStyle}>
             <div class="session-group-header board-card-header${escapeAttr(state.selectedTeam === boardName ? ' team-selected' : '')}"${state.selectedTeam === boardName ? ' aria-current="true"' : ''} data-group-name="${escapeAttr(boardName)}" data-on-click="team-name-open" data-board="${escapeAttr(boardName)}" data-group="${escapeAttr(boardName)}"${_teamHeaderAttrs(boardName)}>${_chevron(boardName, boardCollapsed)}
-                <div class="group-header-text"><div class="group-name-line"><svg class="team-group-icon" aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7" r="3"/><path d="M3 21v-2a6 6 0 0 1 12 0v2M16 4a3 3 0 0 1 0 6M21 21v-2a6 6 0 0 0-4-5.65"/></svg><span class="group-name-text" title="${escapeAttr(keyLabel(boardName))}">${_rowNameWithServer(boardName)}</span>${boardSleepIcon}${distillChip(boardName)} <span class="session-group-count">${boardSessions.filter(s => !s.sleeping).length}</span></div></div><span class="session-name-spacer"></span>${boardLink}${teamHealthBtn(boardName, boardSessions)}${bKebab}
+                <div class="group-header-text"><div class="group-name-line"><svg class="team-group-icon" aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7" r="3"/><path d="M3 21v-2a6 6 0 0 1 12 0v2M16 4a3 3 0 0 1 0 6M21 21v-2a6 6 0 0 0-4-5.65"/></svg><span class="group-name-text" title="${escapeAttr(keyLabel(boardName))}">${_rowNameWithServer(boardName)}</span>${boardSleepIcon}${distillChip(boardName)} <span class="session-group-count">${boardSessions.filter(s => !s.sleeping).length}</span></div>${_rowServerLine(boardName)}</div><span class="session-name-spacer"></span>${boardLink}${teamHealthBtn(boardName, boardSessions)}${bKebab}
             </div>
             <ul class="board-card-agents${boardCollapsed ? ' board-card-collapsed' : ''}">`;
 
@@ -182,7 +182,7 @@ function _renderFolderGroup(groupName, groupSessions) {
         const groupWorkDir = groupDirRaw;
         const copyBtn = `<button class="btn btn-quiet btn-icon btn-xs folder-copy-btn" data-on-click="folder-copy" data-dir="${escapeAttr(groupWorkDir)}" title="Copy path">${SVGO.o4}${_mk3}`;
         html += `<li class="session-group-header" data-group-name="${escapeAttr(groupName)}" data-on-click="group-collapse" data-group="${escapeAttr(groupName)}"${_collapseAttrs(collapsed)}>${CHEVRON_DECO}
-            <div class="group-header-text"><div class="group-name-line">${FOLDER_GROUP_ICON}<span class="group-name-text" title="${escapeAttr(keyLabel(groupName))}">${_rowNameWithServer(groupName)}</span>${countBadge}</div></div>${tagDots}<span class="session-name-spacer"></span>${copyBtn}${groupKebab}</li>`;
+            <div class="group-header-text"><div class="group-name-line">${FOLDER_GROUP_ICON}<span class="group-name-text" title="${escapeAttr(keyLabel(groupName))}">${_rowNameWithServer(groupName)}</span>${countBadge}</div>${_rowServerLine(groupName)}</div>${tagDots}<span class="session-name-spacer"></span>${copyBtn}${groupKebab}</li>`;
 
         if (!collapsed && sorted.length) {
             html += _renderAgentListWithSubgroups(sorted, groupWorkDir, false, groupName, true);
@@ -229,7 +229,7 @@ function _renderFolderFirstGroup(groupName, groupSessions) {
         const groupWorkDir = groupDirRaw;
         const copyBtn = `<button class="btn btn-quiet btn-icon btn-xs folder-copy-btn" data-on-click="folder-copy" data-dir="${escapeAttr(groupWorkDir)}" title="Copy path">${SVGO.o4}${_mk3}`;
         html += `<li class="session-group-header" data-group-name="${escapeAttr(groupName)}" data-on-click="group-collapse" data-group="${escapeAttr(groupName)}"${_collapseAttrs(collapsed)}>${CHEVRON_DECO}
-            <div class="group-header-text"><div class="group-name-line">${FOLDER_GROUP_ICON}<span class="group-name-text" title="${escapeAttr(keyLabel(groupName))}">${_rowNameWithServer(groupName)}</span>${countBadge}</div></div>${tagDots}<span class="session-name-spacer"></span>${copyBtn}${groupKebab}</li>`;
+            <div class="group-header-text"><div class="group-name-line">${FOLDER_GROUP_ICON}<span class="group-name-text" title="${escapeAttr(keyLabel(groupName))}">${_rowNameWithServer(groupName)}</span>${countBadge}</div>${_rowServerLine(groupName)}</div>${tagDots}<span class="session-name-spacer"></span>${copyBtn}${groupKebab}</li>`;
 
         if (collapsed || !sorted.length) {
             // Skip rendering items when collapsed (or a pinned folder with no agents, #3630)
@@ -305,7 +305,7 @@ function _renderFolderFirstGroup(groupName, groupSessions) {
                 </div>`;
                 html += `<li class="session-board-card session-team-group"${accentStyle}>
                     <div class="session-group-header board-card-header${escapeAttr(state.selectedTeam === boardName ? ' team-selected' : '')}"${state.selectedTeam === boardName ? ' aria-current="true"' : ''} data-group-name="${escapeAttr(boardName)}" data-on-click="team-name-open" data-board="${escapeAttr(boardName)}" data-group="${escapeAttr(boardName)}"${_teamHeaderAttrs(boardName)}>${_chevron(boardName, boardCollapsed)}
-                        <div class="group-header-text"><div class="group-name-line"><svg class="team-group-icon" aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7" r="3"/><path d="M3 21v-2a6 6 0 0 1 12 0v2M16 4a3 3 0 0 1 0 6M21 21v-2a6 6 0 0 0-4-5.65"/></svg><span class="group-name-text" title="${escapeAttr(keyLabel(boardName))}">${_rowNameWithServer(boardName)}</span>${boardSleepIcon}${distillChip(boardName)} <span class="session-group-count">${boardSessions.length}</span></div></div><span class="session-name-spacer"></span>${boardLink}${teamHealthBtn(boardName, boardSessions)}${bKebab}
+                        <div class="group-header-text"><div class="group-name-line"><svg class="team-group-icon" aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7" r="3"/><path d="M3 21v-2a6 6 0 0 1 12 0v2M16 4a3 3 0 0 1 0 6M21 21v-2a6 6 0 0 0-4-5.65"/></svg><span class="group-name-text" title="${escapeAttr(keyLabel(boardName))}">${_rowNameWithServer(boardName)}</span>${boardSleepIcon}${distillChip(boardName)} <span class="session-group-count">${boardSessions.length}</span></div>${_rowServerLine(boardName)}</div><span class="session-name-spacer"></span>${boardLink}${teamHealthBtn(boardName, boardSessions)}${bKebab}
                     </div>
                     <ul class="board-card-agents${boardCollapsed ? ' board-card-collapsed' : ''}">`;
                 const orderedBoardNested = _sortByOrder(boardSessions);
