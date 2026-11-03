@@ -133,3 +133,18 @@ func TestTheStagedFolderIsMadePrivateAndAWritableCopyIsNotTrusted(t *testing.T) 
 	require.NoError(t, os.Chmod(good, 0o770)) // group-writable: someone else could have changed it
 	assert.Empty(t, stageTmux(data, bin, ""), "a copy others can write is not trusted")
 }
+
+// A copy staged by an earlier start is run once too before it is used again (#12598): it may have been quarantined or re-signed since.
+func TestAReusedCopyThatCannotRunFallsBackToo(t *testing.T) {
+	data := t.TempDir()
+	bin := writeTmux(t, t.TempDir(), "echo v1")
+	good := stageTmux(data, bin, "")
+	require.NotEmpty(t, good)
+
+	prev := canRun
+	canRun = func(string) error { return os.ErrPermission }
+	t.Cleanup(func() { canRun = prev })
+	assert.Empty(t, stageTmux(data, bin, ""))
+	_, err := os.Stat(good)
+	assert.NoError(t, err, "a copy a server may have been started from is never deleted")
+}
