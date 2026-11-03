@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/subgentic/coral/internal/safego"
 )
 
 // A common install place can be on a network share: on a domain computer whose AppData is redirected, %APPDATA%\npm (where npm really installs claude.cmd and
@@ -71,6 +73,7 @@ func shareAnswers(dir string) bool {
 		p = &shareProbe{done: make(chan struct{})}
 		f.inflight = p
 		go func() {
+			defer safego.Recover("agent/share-probe")
 			_, err := shareStat(dir)
 			shareMu.Lock()
 			p.ok = err == nil

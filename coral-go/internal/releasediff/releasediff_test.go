@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -180,6 +181,7 @@ func TestTheReaderReadsTwoRefsOfARealRepository(t *testing.T) {
 
 // A ref that starts with a dash is refused before git is run: git would read it as an option. A git that records its calls proves it is never started.
 func TestARefThatStartsWithADashNeverReachesGit(t *testing.T) {
+	skipWithoutShellStubs(t)
 	bin, log := t.TempDir(), filepath.Join(t.TempDir(), "calls")
 	require.NoError(t, os.WriteFile(filepath.Join(bin, "git"), []byte("#!/bin/sh\necho \"$@\" >> "+log+"\nexit 1\n"), 0o755))
 	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
@@ -313,6 +315,7 @@ func TestPackageChangesReadsARealRepositoryFromAnyDirectory(t *testing.T) {
 
 // Every git the tool starts goes through gitutil.Command (#12419, the repository's own config can name commands for git to run): a git that records its calls shows the command-running config turned off, and the repository's directory is still the one given.
 func TestGitIsStartedWithTheRepositoryCommandsTurnedOff(t *testing.T) {
+	skipWithoutShellStubs(t)
 	bin, log := t.TempDir(), filepath.Join(t.TempDir(), "calls")
 	require.NoError(t, os.WriteFile(filepath.Join(bin, "git"), []byte("#!/bin/sh\necho \"$@\" >> "+log+"\nexit 1\n"), 0o755))
 	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
@@ -326,4 +329,13 @@ func TestGitIsStartedWithTheRepositoryCommandsTurnedOff(t *testing.T) {
 	assert.Contains(t, calls, "core.hooksPath=")
 	assert.Contains(t, calls, "-C "+repo)
 	assert.Contains(t, calls, "show")
+}
+
+// skipWithoutShellStubs: these tests put a shell script named "git" first on PATH to record its calls. Windows finds only git.exe (PATHEXT), so the script is never started, no calls file is written and the
+// real git runs instead: the stand-in cannot be a probe there (#12891).
+func skipWithoutShellStubs(t *testing.T) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("a shell-script git stand-in is not found on Windows (only git.exe is)")
+	}
 }

@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/subgentic/coral/internal/fsreplace"
 	"github.com/subgentic/coral/internal/logsafe"
 )
 
@@ -94,7 +95,7 @@ func stageTmux(coralDir, bin, terminfoDir string) string {
 		log.Printf("[tmux] staging the bundled tmux: cannot write the copy: %v %v", werr, cerr)
 		return ""
 	}
-	if err := os.Rename(tmp.Name(), dst); err != nil {
+	if err := fsreplace.Rename(tmp.Name(), dst); err != nil { // not os.Rename: a reader holding the destination fails it on Windows (#9738)
 		os.Remove(tmp.Name())
 		log.Printf("[tmux] staging the bundled tmux: cannot name the copy: %v", err)
 		return ""
