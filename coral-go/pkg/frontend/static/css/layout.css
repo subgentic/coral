@@ -204,7 +204,7 @@ body.panel-dragging .sidebar {
 .sidebar-pane[hidden] { display: none; }
 /* A pane whose header (the search) stays put while its own list scrolls (the Inbox's folders: a long list of chat folders and tags is cut at the bottom of the sidebar otherwise) */
 .sidebar-pane-fixed { flex: 1 1 0; }
-.sidebar-pane-fixed > .sidebar-section { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.sidebar-pane-fixed > .sidebar-section { flex: 1 1 auto; min-height: 0; overflow-y: auto; scrollbar-gutter: stable; padding-right: 10px; } /* the rows and their counts end clear of the scrollbar, and stay where they are when the list starts to scroll (#12726) */
 .sidebar-collapse-btn[hidden], .sidebar-rail-btn[hidden] { display: none; }
 
 .sidebar-search {
