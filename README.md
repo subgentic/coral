@@ -7,27 +7,6 @@
 </p>
 
 <p align="center">
-  <strong>Install on macOS or Linux with one command:</strong>
-</p>
-
-```bash
-curl -fsSL \
-  https://raw.githubusercontent.com/subgentic/coral/main/install.sh \
-  | bash
-```
-
-<p align="center">
-  <sub><a href="https://github.com/subgentic/coral/blob/main/install.sh">Read the script first</a>, or pin a release (this one is v2.0.37; use the version you want):</sub>
-</p>
-
-```bash
-curl -fsSL \
-  https://raw.githubusercontent.com/subgentic/coral/v2.0.37/install.sh \
-  | bash
-```
-
-<p align="center">
-  <sub>  The script covers macOS and Linux (x86-64 and ARM64); on Windows there is no one-line installer yet. Download for
   <a href="https://github.com/subgentic/coral/releases/latest/download/Coral.dmg">macOS (.dmg)</a> &bull;
   <a href="https://github.com/subgentic/coral/releases/latest/download/Coral-x64.msi">Windows (.msi)</a> &bull;
   <a href="https://github.com/subgentic/coral/releases/latest/download/Coral-x64-portable.zip">Windows portable (.zip)</a> &bull;
@@ -59,6 +38,17 @@ curl -fsSL \
 </p>
 
 ---
+
+<p align="center">
+  <strong>Install on macOS or Linux with one command:</strong>
+</p>
+
+
+```bash
+curl -fsSL \
+  https://raw.githubusercontent.com/subgentic/coral/main/install.sh \
+  | bash
+```
 
 ## The Inbox
 

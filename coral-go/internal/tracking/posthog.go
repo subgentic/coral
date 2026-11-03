@@ -103,19 +103,37 @@ func TelemetryOn() bool { return telemetryEnabled() }
 // opt-out takes effect immediately and queued work is dropped, never replayed.
 func telemetryEnabled() bool { return !telemetryDisabled.Load() && !TelemetryEnvDisabled() }
 
-// getInstallID returns the install ID, reading from disk once and caching.
+// getInstallID returns the install ID, read from disk and cached once it is there. An ID not written yet is not cached: the tray's server child can ask before
+// the tray writes it on a first run, and an empty answer kept for the run would drop every event of that run.
 func getInstallID() string {
-	installIDOnce.Do(func() {
-		if !stateDirReady() {
-			return
-		}
-		installIDMu.Lock()
-		cachedInstallID = readFile(filepath.Join(resolveCoralDir(), ".install_id"))
-		installIDMu.Unlock()
-	})
 	installIDMu.RLock()
-	defer installIDMu.RUnlock()
+	id := cachedInstallID
+	installIDMu.RUnlock()
+	if id != "" || !stateDirReady() {
+		return id
+	}
+	id = readFile(filepath.Join(resolveCoralDir(), ".install_id"))
+	if id == "" {
+		return ""
+	}
+	installIDMu.Lock()
+	defer installIDMu.Unlock()
+	if cachedInstallID == "" {
+		cachedInstallID = id
+	}
 	return cachedInstallID
+}
+
+// sendGate, when set, must say yes before any event is sent (SetSendGate).
+var sendGate atomic.Pointer[func() bool]
+
+// SetSendGate makes every send ask allowed first (postEvent, the one place every event goes through: install and upgrade included); nothing is sent while it says no. The tray's server child uses it for the Terms: that process does not show them
+// (the Coral window does), so it may run before they are accepted, and nothing may leave before they are.
+func SetSendGate(allowed func() bool) { sendGate.Store(&allowed) }
+
+func sendAllowed() bool {
+	g := sendGate.Load()
+	return g == nil || *g == nil || (*g)()
 }
 
 // TrackInstallAsync checks for first install or version upgrade and sends
@@ -273,6 +291,9 @@ var retryDelays = []time.Duration{500 * time.Millisecond, 2 * time.Second}
 // non-retryable 4xx is logged and dropped. It reports whether the service
 // accepted the event.
 func postEvent(event, distinctID, eventUUID, timestamp string, gen uint64, properties map[string]any) bool {
+	if !sendAllowed() {
+		return false
+	}
 	payload := map[string]any{
 		"api_key":     config.PostHogKey,
 		"event":       event,
