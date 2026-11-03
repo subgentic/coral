@@ -89,7 +89,10 @@ export function showBoardInPage(project, host, messageId = null) {
     mountBoardSearch(document.getElementById('mb-tools'), project, SEARCH_HOOKS);
     if (bs._goneProject && bs._goneProject !== project) bs._goneProject = null;
     subscribeDashboard(project).then(r => { // a team deleted elsewhere is not started again by this page (#12995): stop polling and say so
-        if (r !== 'gone') { if (bs._goneProject === project) bs._goneProject = null; return; } // the board is back (an agent joined it): the page loads it as usual
+        if (r !== 'gone') { // the board is back (an agent joined it): the words go at once, not at the next poll, and the board loads and is polled as usual
+            if (bs._goneProject === project) { bs._goneProject = null; if (bs.currentProject === project) { loadBoardMessages(project); startBoardPoll(); } }
+            return;
+        }
         if (bs.currentProject !== project) return;
         bs._goneProject = project;
         stopBoardPoll();
