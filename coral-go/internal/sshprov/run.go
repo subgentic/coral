@@ -121,7 +121,7 @@ var deniedDataDirs = []string{".ssh", ".gnupg", ".config"}
 
 // DataDirProblem is why d is not a data folder a set up may name, in a plain sentence, or "" when it is one ("" itself is not: it means the default and is never sent).
 func DataDirProblem(d string) string {
-	if d == "@keep" || !dataDirArgRe.MatchString(d) {
+	if d == "@keep" || strings.Contains(d, "..") || !dataDirArgRe.MatchString(d) { // ".." anywhere in a name: the remote read-back drops such a record, so the start and the later reads would use different folders
 		return "Use plain folder names such as .coral or my-coral/data: letters, digits, dot, underscore and hyphen, up to five names, with no .. in them."
 	}
 	first := strings.SplitN(d, "/", 2)[0]
