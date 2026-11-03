@@ -641,7 +641,7 @@ export async function refreshChangedFiles(quiet = false) { // quiet: the panel's
         } else {
             if (resp.status === 403) { // refused for the mode (limited by the Hub or by the computer): do not ask again from this view
                 const why = await resp.clone().json().catch(() => null);
-                if (why && (why.limited_by === 'hub' || why.error === 'access_mode' || why.error === 'local_mode')) { _refreshBlock = { key: refreshViewKey(agentName, sessionId) }; renderChangedFiles(); }
+                if (why && (why.limited_by === 'hub' || why.error === 'access_mode' || why.error === 'local_mode') && _keyOf(state.currentSession) === mine) { _refreshBlock = { key: refreshViewKey(agentName, sessionId) }; renderChangedFiles(); } // only while this agent is still the open one: another's refusal draws nothing on the agent now open
             }
             _filesStale = false;
             if (_keyOf(state.currentSession) === mine) await loadChangedFiles(agentName, sessionId); // the answer is for an agent that is no longer open: no read for it (#12690)
