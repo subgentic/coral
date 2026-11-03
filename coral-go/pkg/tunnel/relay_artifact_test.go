@@ -304,8 +304,13 @@ func TestRelayArtifactIdleDeadline(t *testing.T) {
 		_, cs := connect(t, h, noopLocal(), nil)
 		src := newPattern(4 << 20) // more than the stream window, so the sender blocks too
 		begin := time.Now()
-		_, err := cs.RelayArtifact(context.Background(), 4<<20, src)
-		require.Error(t, err)
+		resp, err := cs.RelayArtifact(context.Background(), 4<<20, src)
+		// Two idle deadlines run on the same 300 ms, the sender's and the hub's, and either may end it first (#12801). The sender's ends the call with an error. The hub's cancels the hook's
+		// context, the hook answers 504, and that answer is the call's result with no error (a hub that answers before the body is done: the answer is the result, see awaitArtifactReply).
+		// Both abort the upload; what it must never be is a success.
+		if err == nil {
+			assert.Equal(t, http.StatusGatewayTimeout, resp.Status, "no error means the hub's own answer to the abort, never a success")
+		}
 		assert.Less(t, time.Since(begin), 8*time.Second)
 		select {
 		case <-ctxDone:
