@@ -70,9 +70,15 @@ func (c *Client) runOnSocket(ctx context.Context, socketPath string, args ...str
 		args = append(socketArgs(socketPath), args...)
 	}
 	bin := c.resolveTmuxBin()
-	cmd := exec.CommandContext(ctx, bin, args...)
-	cmd.Env = tmuxEnv(bin)
-	out, err := cmd.Output()
+	var out []byte
+	var err error
+	if disclaimedOut, derr, ok := outputDisclaimedIf(startsServer(args), ctx, bin, args, tmuxEnv(bin)); ok {
+		out, err = disclaimedOut, derr
+	} else {
+		cmd := exec.CommandContext(ctx, bin, args...)
+		cmd.Env = tmuxEnv(bin)
+		out, err = cmd.Output()
+	}
 	noteTmuxResult(err, bin, socketPath)
 	if err != nil {
 		logExecFailure(bin, socketPath, args, err)

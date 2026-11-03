@@ -137,7 +137,7 @@ require (
 	github.com/dlclark/regexp2 v1.11.5 // indirect
 	github.com/dsnet/compress v0.0.2-0.20230904184137-39efe44ab707 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
-	github.com/ebitengine/purego v0.11.1 // indirect
+	github.com/ebitengine/purego v0.11.1
 	github.com/esiqveland/notify v0.13.3 // indirect
 	github.com/eskriett/confusables v0.0.0-20250910043846-220432c5bd73
 	github.com/expr-lang/expr v1.17.8 // indirect

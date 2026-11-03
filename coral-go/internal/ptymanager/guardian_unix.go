@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"os/signal"
 	"strconv"
 	"strings"
@@ -189,7 +188,7 @@ type guardianClient struct {
 }
 
 type guardianHandle struct {
-	cmd      *exec.Cmd
+	cmd      *guardianProc
 	in       io.WriteCloser
 	done     chan struct{} // closed when the process has exited and been waited for
 	started  time.Time
