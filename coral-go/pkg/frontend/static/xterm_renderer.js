@@ -7,7 +7,7 @@ import { state } from './state.js';
 import { markRestarting, currentIsRestarting, showRestartingOverlay, hideSessionOverlay } from './session_overlay.js';
 import { isInteractiveOwner, claimOwnership, ownershipSessionId } from './ownership.js';
 import { dbg, showToast } from './utils.js';
-import { normServer, serverWsBase, sessionServer } from './server_base.js';
+import { normServer, serverWsBase, sessionServer, serverFetch } from './server_base.js';
 import { hubBlocksKeystrokes, applyHubReadOnlyFrame } from './hub_access.js';
 import { feedRetryDelay } from './feed_pacing.js';
 import { isSignedOut } from './overload.js';
@@ -371,9 +371,11 @@ function _setSessionEndedOverlay(visible) {
         // Before showing "Session ended", check if we can reach the server.
         // If we can't, show "Lost connection" instead of "Restart Agent".
         const forSession = state.currentSession && state.currentSession.session_id;
-        const stillHere = () => !!state.currentSession && state.currentSession.session_id === forSession; // the answer of a switched-away agent shows nothing
-        fetch("/api/sessions", { method: "GET", signal: AbortSignal.timeout(3000) })
-            .then(() => {
+        const server = sessionServer(state.currentSession);
+        const stillHere = () => !!state.currentSession && state.currentSession.session_id === forSession && sessionServer(state.currentSession) === server; // the answer of a switched-away agent shows nothing
+        serverFetch(server, "/api/sessions", { method: "GET", signal: AbortSignal.timeout(3000) })
+            .then(response => {
+                if (!response.ok) throw new Error('Computer unavailable');
                 if (!stillHere()) return;
                 overlay.style.display = "";
                 const defaultContent = document.getElementById("session-ended-default");

@@ -1,25 +1,31 @@
 /* Folder-level tags: load, render, dropdown picker, add/remove */
 
+import { serverFetch, splitKey } from './server_base.js';
+import { inboxSources } from './inbox_servers.js';
 import { state } from './state.js';
 import { escapeHtml, escapeAttr, showToast, tagColor } from './utils.js';
 import { registerActions, idOf, textOf } from './actions.js';
 import { renderLiveSessions } from './render.js';
 import { loadAllTags } from './tags.js';
 
-let allFolderTags = {};
+const allFolderTags = new Map();
 
-export async function loadAllFolderTags() {
-    try {
-        const resp = await fetch("/api/folder-tags");
-        allFolderTags = await resp.json();
-    } catch (e) {
-        console.error("Failed to load folder tags:", e);
-        allFolderTags = {};
-    }
+export async function loadAllFolderTags(onlyServer = null) {
+    await Promise.all((onlyServer ? [onlyServer] : inboxSources()).map(async server => {
+        try {
+            const resp = await serverFetch(server, '/api/folder-tags');
+            if (!resp.ok) throw new Error('Folder tags unavailable');
+            const data = await resp.json();
+            allFolderTags.set(server, data);
+        } catch (e) {
+            console.warn('Failed to load folder tags:', e); // retain this computer's last successful answer
+        }
+    }));
 }
 
 export function getFolderTags(folderName) {
-    return allFolderTags[folderName] || [];
+    const { server, name } = splitKey(folderName);
+    return allFolderTags.get(server)?.[name] || [];
 }
 
 export function renderFolderTagPills(tags) {
@@ -36,7 +42,7 @@ export function renderFolderTagPills(tags) {
 
 export async function showFolderTagDropdown(folderName, anchorEl) {
     hideFolderTagDropdown();
-    await loadAllTags();
+    await loadAllTags(false, splitKey(folderName).server);
 
     const rect = anchorEl.getBoundingClientRect();
     const dropdown = document.createElement("div");
@@ -123,8 +129,9 @@ function _getAllTagsFromCache() {
 }
 
 export async function addFolderTag(folderName, tagId) {
+    const { server, name } = splitKey(folderName);
     try {
-        const resp = await fetch(`/api/folder-tags/${encodeURIComponent(folderName)}`, {
+        const resp = await serverFetch(server, `/api/folder-tags/${encodeURIComponent(name)}`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ tag_id: tagId }),
@@ -134,7 +141,7 @@ export async function addFolderTag(folderName, tagId) {
             showToast(result.error, true);
             return;
         }
-        await loadAllFolderTags();
+        await loadAllFolderTags(server);
         renderLiveSessions(state.liveSessions);
         // Re-open dropdown to show updated state
         const header = _findGroupHeader(folderName);
@@ -146,8 +153,9 @@ export async function addFolderTag(folderName, tagId) {
 }
 
 export async function removeFolderTag(folderName, tagId) {
+    const { server, name } = splitKey(folderName);
     try {
-        const resp = await fetch(`/api/folder-tags/${encodeURIComponent(folderName)}/${tagId}`, {
+        const resp = await serverFetch(server, `/api/folder-tags/${encodeURIComponent(name)}/${tagId}`, {
             method: "DELETE",
         });
         const result = await resp.json();
@@ -155,7 +163,7 @@ export async function removeFolderTag(folderName, tagId) {
             showToast(result.error, true);
             return;
         }
-        await loadAllFolderTags();
+        await loadAllFolderTags(server);
         renderLiveSessions(state.liveSessions);
         // Re-open dropdown to show updated state
         const header = _findGroupHeader(folderName);
@@ -167,6 +175,7 @@ export async function removeFolderTag(folderName, tagId) {
 }
 
 export async function createAndAddFolderTag(folderName) {
+    const { server } = splitKey(folderName);
     const nameInput = document.getElementById("folder-tag-new-name");
     const colorInput = document.getElementById("folder-tag-new-color");
     const name = nameInput ? nameInput.value.trim() : "";
@@ -178,7 +187,7 @@ export async function createAndAddFolderTag(folderName) {
     }
 
     try {
-        const resp = await fetch("/api/tags", {
+        const resp = await serverFetch(server, "/api/tags", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ name, color }),
@@ -198,8 +207,7 @@ export async function createAndAddFolderTag(folderName) {
 function _findGroupHeader(folderName) {
     const headers = document.querySelectorAll(".session-group-header");
     for (const h of headers) {
-        const nameEl = h.querySelector(".session-group-name");
-        if (nameEl && nameEl.textContent.trim().startsWith(folderName)) return h;
+        if (h.dataset.groupName === folderName) return h;
     }
     return null;
 }

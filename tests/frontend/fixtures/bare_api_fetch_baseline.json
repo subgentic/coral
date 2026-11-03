@@ -1,6 +1,10 @@
 {
   "about": "Bare fetch() calls of /api paths on data a computer holds, each with why it is this computer alone (#12617). A call not here must go through serverFetch with its server. Only ever shorter.",
   "files": {
+    "analytics_efficiency.js": {
+      "count": 1,
+      "reason": "the Analytics page is this computer's: every one of its cost and efficiency routes is a bare path, and the page has no computer switch"
+    },
     "board_export.js": {
       "count": 1,
       "reason": "the live list is the merged list of every computer ({sessions, servers}); the code below it keeps this board's server"
@@ -10,7 +14,7 @@
       "reason": "this computer's own board list: the remote computers' lists are read next to it with serverFetch"
     },
     "cost_dashboard.js": {
-      "count": 1,
+      "count": 8,
       "reason": "the Analytics page is this computer's: every one of its cost routes is a bare path, and the page has no computer switch"
     },
     "guide_names.js": {
@@ -18,8 +22,12 @@
       "reason": "a guide's roster is the Hub's own route (the guide role is a Hub grant on a board), read by the owner there"
     },
     "job_form.js": {
-      "count": 1,
+      "count": 5,
       "reason": "Automations (scheduled jobs and workflows) run on this computer: the page has no server for them"
+    },
+    "needs_skills.js": {
+      "count": 1,
+      "reason": "by design, Hub: not enabled (Skills Store stays on the computer in v1)"
     },
     "operator_asks.js": {
       "count": 2,
@@ -29,12 +37,16 @@
       "count": 1,
       "reason": "this computer's own artifact store notice, never asked through the Hub (isCloud returns first)"
     },
+    "resume_dialog.js": {
+      "count": 1,
+      "reason": "Resume launches a new agent on this computer (the dialog has no launch-computer selector); only its source transcript metadata is read from another computer"
+    },
     "scheduler.js": {
-      "count": 2,
+      "count": 7,
       "reason": "Automations (scheduled jobs and workflows) run on this computer: the page has no server for them"
     },
     "search_access.js": {
-      "count": 1,
+      "count": 2,
       "reason": "Settings > Security of this computer: the Hub's dialog is read-only and reads its own record"
     },
     "team_artifacts_page.js": {

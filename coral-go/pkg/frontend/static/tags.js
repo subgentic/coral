@@ -1,5 +1,5 @@
 import { historyFetch } from './history_source.js';
-import { isCloud } from './server_base.js';
+import { isCloud, contextServer, serverFetch } from './server_base.js';
 /* Session tags: CRUD, tag pills, dropdown picker */
 
 import { state } from './state.js';
@@ -10,9 +10,9 @@ import { showToast } from './utils.js';
 let allTags = [];
 let currentSessionTags = [];
 
-export async function loadAllTags(forHistory = false) {
+export async function loadAllTags(forHistory = false, server = contextServer()) {
     try {
-        const resp = await (forHistory ? historyFetch("/api/tags") : fetch("/api/tags"));
+        const resp = await (forHistory ? historyFetch("/api/tags") : serverFetch(server, "/api/tags"));
         allTags = await resp.json();
     } catch (e) {
         if (e?.name === 'AbortError') return null;
@@ -138,7 +138,7 @@ export async function createTag() {
     }
 
     try {
-        const resp = await fetch("/api/tags", {
+        const resp = await serverFetch(contextServer(), "/api/tags", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ name, color }),

@@ -563,12 +563,6 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
     line-height: 1rem;
 }
 
-.session-group-name {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
 .folder-tag-full {
     color: var(--text-secondary);
     white-space: nowrap;

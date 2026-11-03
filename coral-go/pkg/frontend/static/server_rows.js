@@ -31,7 +31,7 @@ if (typeof document !== 'undefined') {
         const id = b.dataset.serverId || '';
         const d = b.closest('details[data-server-details]');
         if (d) d.open = false;
-        if (kind === 'folder') { window.showOpenFolderModal?.(); return; }
+        if (kind === 'folder') { window.showOpenFolderModal?.(id); return; }
         if (kind !== 'team' && kind !== 'agent') return;
         window.showLaunchModal?.(id);
         window._selectLaunchType?.(kind);
