@@ -97,6 +97,15 @@ func Launch(ctx context.Context, o Options, d Deps) (*Result, error) {
 		wait = defaultWait
 	}
 	p := d.Provider
+	// The Hub is asked first, while nothing exists: a Hub that does not serve machine credentials (yet) is refused here, not after a billable machine is up and the credential cannot be minted (#12584).
+	if pf, ok := d.Hub.(Preflighter); ok {
+		if err := pf.Preflight(ctx); err != nil {
+			if errors.Is(err, ErrHubBootstrapOff) || errors.Is(err, ErrHubUnrecognised) {
+				return nil, fmt.Errorf("%w; nothing was created at %s: run this again once Coral Hub says machine credentials are enabled, or ask coral-hub", err, p.Name())
+			}
+			return nil, err
+		}
+	}
 
 	if err := p.Validate(ctx); err != nil {
 		if errors.Is(err, ErrUnauthorized) {

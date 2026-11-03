@@ -3,6 +3,8 @@ package machinelaunch
 import (
 	"fmt"
 	"regexp"
+	"sort"
+	"strings"
 )
 
 // ReleaseDigests are the SHA-256 digests of one Coral release's Linux tarballs, pinned in this CLI (#10919, coral-hub Lead's read of the launch design): the machine checks the tarball it downloads against the digest
@@ -28,6 +30,27 @@ var sha256HexRe = regexp.MustCompile(`^[0-9a-f]{64}$`)
 func PinnedReleaseDigests(version string) (ReleaseDigests, bool) {
 	d, ok := releaseDigests[version]
 	return d, ok
+}
+
+// PinnedVersions is every version this CLI pins, sorted.
+func PinnedVersions() []string {
+	out := make([]string, 0, len(releaseDigests))
+	for v := range releaseDigests {
+		out = append(out, v)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// NoPinnedDigestWords is the refusal for a version with no pinned digest: the way out (a pinned version, or the person's own digests from a SHA256SUMS they checked) and the versions this build does pin. own says
+// the version is this build's own, which the person did not ask for: a build cannot pin its own release (the digest does not exist until the release is made), so the newest CLI always meets this for itself and
+// the words say so, and to pass --coral-version of a pinned one.
+func NoPinnedDigestWords(version string, own bool) string {
+	pinned := strings.Join(PinnedVersions(), ", ")
+	if own {
+		return fmt.Sprintf("Coral %s, this build's own release, is too new for this build to pin its digest (a release's digest does not exist until the release is made, so a later build pins it): pass --coral-version of a release this build pins (it pins %s), or pass --coral-sha256-amd64 and --coral-sha256-arm64, the two Linux lines of that release's SHA256SUMS.txt (check the file first)", version, pinned)
+	}
+	return fmt.Sprintf("this build has no pinned digest for Coral %s: pass --coral-sha256-amd64 and --coral-sha256-arm64, the two Linux lines of that release's SHA256SUMS.txt (check the file first), or launch a version this build pins (it pins %s)", version, pinned)
 }
 
 // Valid reports whether both digests are 64 lower-case hex digits.
