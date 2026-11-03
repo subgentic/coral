@@ -22,6 +22,7 @@ globalThis.fetch = async (url, opts = {}) => {
     asked.push(server + (u.searchParams.has('versions') ? '+v' : ''));
     const json = (b, status = 200) => new Response(JSON.stringify(b), { status, headers: { 'content-type': 'application/json' } });
     if (p.versionsBad && u.searchParams.has('versions')) return json({ error: 'unknown' }, p.versionsBad);
+    if (p.abort) { const e = new Error('The operation was aborted.'); e.name = 'AbortError'; throw e; }
     if (p.ownerOnly) return json({ error: 'owner_only', code: 'owner_only' }, 403);
     if (p.status && p.status !== 200) return json({ error: 'boom' }, p.status);
     const rows = Array.from({ length: p.rows || 0 }, (_, i) => ({ id: server + i, name: `${server}-${i}.md`, board_id: 'team' }));
@@ -43,6 +44,18 @@ assert.equal(asked.length, 0, 'nobody was asked');
 // no computer online: it throws, it does not return an empty list
 reset([{ id: 'srv1', label: 'SRV1', status: 'offline' }], {});
 await assert.rejects(read(), /No linked computer is online/);
+
+// a filter that names a computer that is not online (a saved computer filter, a team of one) is an empty list, as it always was: not "no computer is online" (two are)
+reset([{ id: 'srv1', label: 'SRV1', status: 'online' }, { id: 'srv2', label: 'SRV2', status: 'online' }], {});
+d = await read({ server: 'srv9' });
+assert.deepEqual([d.artifacts.length, d.answered, d.expected, d.failed, d.waiting], [0, 0, 0, [], undefined], 'a computer filter that names none that is online: an empty list');
+assert.equal(asked.length, 0, 'nobody was asked');
+d = await read({ team: 'srv9::t' });
+assert.deepEqual([d.artifacts.length, d.answered, d.expected], [0, 0, 0], 'a team of a computer that is not online: an empty list');
+
+// the caller's own cancel is not a computer failing: it is rethrown, not counted as one that could not be read
+reset(online(['srv1', 'srv2']), { srv1: { rows: 1, all: 1 }, srv2: { abort: true } });
+await assert.rejects(read(), e => e.name === 'AbortError');
 
 // one computer fails: the others answer, the failing one is named, the count is of the two that answered
 reset(online(['srv1', 'srv2', 'srv3']), { srv1: { rows: 3, all: 500 }, srv2: { rows: 2, all: 113 }, srv3: { status: 500 } });

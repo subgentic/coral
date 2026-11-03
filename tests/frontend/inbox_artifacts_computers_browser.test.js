@@ -72,10 +72,29 @@ const STUB = `(() => {
         check('with every computer failing the page says so, not "No artifacts yet"', !/No artifacts yet/.test(failed) && /Alpha, Beta, Gamma|Artifacts could not be read/.test(failed), failed);
         check('and offers Retry', await ev(`!!document.querySelector('#group-table-view .team-artifacts-retry')`));
 
-        // 3. the computer asked for is not online: the read says why (it throws), and is never an empty list that the page would call "No artifacts yet"
+        // 3. a filter that names a computer that is not online is an empty list, as it always was (it is not "no computer is online": others are)
         await open({}, [{ id: 'srv1', label: 'Alpha', status: 'offline' }, { id: 'srv2', label: 'Beta', status: 'online' }]);
-        const none = await ev(`import(${S} + 'inbox_servers.js').then(m => m.readInboxArtifacts(new URLSearchParams(), { server: 'srv1' })).then(() => 'answered', e => e.message)`);
-        check('a read with no computer online to ask says so instead of answering with nothing', /No linked computer is online/.test(none), none);
+        const none = await ev(`import(${S} + 'inbox_servers.js').then(m => m.readInboxArtifacts(new URLSearchParams(), { server: 'srv1' })).then(d => JSON.stringify({ rows: d.artifacts.length, expected: d.expected, answered: d.answered }), e => 'threw: ' + e.message)`);
+        check('a computer filter that names one that is not online gives an empty list, not an error', none === '{"rows":0,"expected":0,"answered":0}', none);
+
+        // 3b. the sidebar's count does not go down on a read some computer did not answer
+        await open({ srv1: { rows: 3, all: 500 }, srv2: { rows: 2, all: 113 }, srv3: { rows: 4, all: 4 } }, three);
+        await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length >= 9`, 'the whole folder', 15000);
+        const full = await ev(`import(${S} + 'inbox_artifacts.js').then(m => m.artifactCount())`);
+        check('the folder\'s count is the sum of all three computers', full === 617, String(full));
+        await ev(`window.__plan.srv3 = { status: 500 }; const real = Date.now.bind(Date); Date.now = () => real() + 120000; true`); // the count's own freshness window has passed
+        const after = await ev(`import(${S} + 'inbox_artifacts.js').then(m => m.refreshArtifactCount().then(() => m.artifactCount()))`);
+        check('a read some computer did not answer does not take the count down (it is a sum of the others)', after === 617, String(after));
+
+        // 3c. the first drawing of the list, before its read has started, and the wait for a slow computer, never say "No artifacts yet"
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
+        await ev(`localStorage.removeItem('coral.inbox.tab'); localStorage.removeItem('coral-team-artifacts-filters:@inbox'); ${STUB}; window.__plan = ${JSON.stringify({ srv1: { rows: 2, all: 2, delay: 1200 }, srv2: { rows: 1, all: 1, delay: 1200 }, srv3: { rows: 1, all: 1, delay: 1200 } })}; true`);
+        await ev(`import(${S} + 'state.js').then(m => { m.state.hub = true; m.state.servers = ${JSON.stringify(three)}; return true; })`);
+        await ev(`window.__lines = []; new MutationObserver(() => { const t = (document.querySelector('#group-table-view .team-count-line') || {}).textContent; if (t !== undefined && window.__lines[window.__lines.length - 1] !== t) window.__lines.push(t); }).observe(document.body, { subtree: true, childList: true, characterData: true }); window.switchNavTab('hub-inbox'); true`);
+        await ev(`import(${S} + 'inbox_sidebar.js').then(m => m.openInboxGroup('artifacts')).then(() => true)`);
+        await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length >= 4`, 'the rows after the slow computers', 15000);
+        const lines = await ev(`window.__lines`);
+        check('from the first drawing until the rows arrive the status line says loading, never "No artifacts yet"', lines.length > 0 && lines.every(l => !/No artifacts yet/.test(l)) && lines.some(l => /Loading artifacts/.test(l)), JSON.stringify(lines));
 
         // 4. an older Coral that does not know versions=newest: its count is of every version, and the page says so; the key is read without it there
         await open({ srv1: { rows: 2, all: 20809, versionsBad: true }, srv2: { rows: 1, all: 3 }, srv3: { rows: 1, all: 2 } }, three);

@@ -299,3 +299,4 @@ node no_ignore_word.test.mjs
 node agent_list_starting.test.mjs
 node bare_api_fetch_census.test.mjs
 node inbox_servers_read.test.mjs
+node inbox_artifacts_loading.test.mjs

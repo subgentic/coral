@@ -36,8 +36,9 @@ export async function readInboxArtifacts(params, filters = {}, signal) {
             Object.values(parsed).every(value => value && typeof value === 'object' && !Array.isArray(value))) cursors = parsed;
     } catch { /* Old single-source or malformed cursors restart each source from the top. */ }
     const team = filters.team ? splitKey(filters.team) : null;
-    const sources = inboxSources().filter(id => (!multipleServers() || !filters.server || filters.server === id) && (!team || team.server === id));
-    if (!sources.length && state.hub) { // no computer to ask: the list of computers has not loaded yet (the read is not finished), or none is online (it cannot be read): neither is "no artifacts"
+    const everyone = inboxSources();
+    const sources = everyone.filter(id => (!multipleServers() || !filters.server || filters.server === id) && (!team || team.server === id));
+    if (!everyone.length && state.hub) { // no computer to ask at all (a filter that names a computer that is not online is not this: it is an empty list, as it always was): the list of computers has not loaded yet (the read is not finished), or none is online (it cannot be read): neither is "no artifacts"
         if (!Array.isArray(state.servers)) return { waiting: true, artifacts: [], teams: [], all: 0, total: 0, tag_counts: Object.create(null), has_more: false, next_cursor: '{}', truncated: false, failed: [], answered: 0, expected: 0, versionless: [] };
         throw new Error('No linked computer is online, so artifacts cannot be read.');
     }
