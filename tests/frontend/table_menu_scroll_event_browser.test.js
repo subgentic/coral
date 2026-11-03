@@ -1,7 +1,7 @@
 // An open table menu closes when the page or a list it sits in scrolls, but not for a scroll that had already ended when it opened (#12880, found by QA Reviewer 2 as a red inbox_review_decisions_browser at 390 px).
 // A scroll event is dispatched a frame after the scroll itself, so a tap that follows a scrollIntoView (or a poll's redraw) opens the menu and THEN receives the event of the earlier scroll; the menu closed at once
 // and the person saw it flash. The menu now remembers where each scrolled ancestor was when it opened and closes only for one that has moved since.
-// A scroll container with a table menu, scrolled and opened in one task: the menu stays open after the late event; a scroll after it opened closes it. 1280 and 390 px.
+// A scroll container with a table menu, scrolled and opened in one task: the menu stays open after the late event; a scroll after it opened closes it; an unrelated list scrolling does not (#12905, board_search). 1280 and 390 px.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
@@ -33,6 +33,15 @@ const { coralReady, framesJs } = require('./helpers/wait');
             assert.equal(await open(), 'true', at + 'opened again with nothing moving: it stays open');
             await ev(`document.getElementById('mst').scrollTop = 20; true`);
             await waitFor(`document.getElementById('mt').getAttribute('aria-expanded') === 'false'`, at + 'a later scroll closes it again', 5000);
+            // a list that does not hold the toggle (the board's messages jumping to a search match) scrolling does not move the menu's row: it stays open (#12905); the page or a list that holds the toggle still closes it
+            await ev(`document.body.insertAdjacentHTML('beforeend', '<div id="oth" style="position:fixed;right:0;top:0;width:100px;height:100px;overflow:auto;z-index:50;background:#eee"><div style="height:1000px"></div></div>'); import(${S} + 'menu_button.js').then(m => { m.openMenu(document.getElementById('mt')); return true; })`);
+            await ev(framesJs(2));
+            assert.equal(await open(), 'true', at + 'opened with another list beside it');
+            await ev(`document.getElementById('oth').scrollTop = 300; true`);
+            await ev(framesJs(4));
+            assert.equal(await open(), 'true', at + 'a list that does not hold the toggle scrolling does not close the menu');
+            await ev(`document.getElementById('mst').scrollTop = 700; true`);
+            await waitFor(`document.getElementById('mt').getAttribute('aria-expanded') === 'false'`, at + 'the list that holds the toggle scrolling closes it', 5000);
             console.log(`   ✓ ${w} px`);
         }
         console.log('PASS a table menu ignores the late event of a scroll that ended before it opened');
