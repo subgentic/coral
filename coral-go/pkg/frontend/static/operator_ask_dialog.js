@@ -6,6 +6,8 @@ import { loadStyles } from './lazy_styles.js';
 import { showToast } from './notifications.js';
 import { importOnce } from './import_once.js';
 import { askParts, askSubjects, fromAnotherComputer, buttonsOf, buttonWords, claimButton, settleButton, wakeMember, refreshOperatorAsks, replyToAsk, forgetAsk } from './operator_asks.js';
+await loadStyles('operator_ask_dialog.css');
+
 const isReply = action => /^reply$/.test(action);
 
 export function openAskDialog(a, onDone, runners = {}) {
@@ -45,8 +47,7 @@ export function openAskDialog(a, onDone, runners = {}) {
     row.append(close, ...(dismiss.hidden ? [] : [dismiss]), send); // Close on the left, then Dismiss, Send reply on the right (as the other dialogs)
     let tray = null;
     const finish = () => { if (tray) tray.destroy(); dlg.close(); dlg.remove(); if (onDone) onDone(); };
-    let pictureHint = null;
-    const sync = () => { send.disabled = !!tray && (tray.busy() || tray.failed()); if (pictureHint) pictureHint.hidden = !tray.items().length; }; // Send waits for a picture going up, and for a failed one to be taken out
+    const sync = () => { send.disabled = !!tray && (tray.busy() || tray.failed()); }; // Send waits for a picture going up, and for a failed one to be taken out
     const offers = fromAnotherComputer(a) ? [] : buttonsOf(a); // a question from another computer through the Hub keeps the plain Reply and Close
     let offered = null;
     if (offers.length) { // what the asker offered: one tap per choice, each with what it does
@@ -85,10 +86,11 @@ export function openAskDialog(a, onDone, runners = {}) {
         const hint = document.createElement('p'); hint.className = 'inbox-ask-offers-hint'; hint.textContent = offers.every(b => isReply(b.action)) ? 'Replies are sent as you.' : 'These actions run as you when you choose one.';
         offered.append(head, list, hint);
     }
-    const foot = document.createElement('div'); foot.className = 'inbox-ask-foot'; const addSlot = document.createElement('span'); foot.append(addSlot, row); // Add image on the left, Close and Send reply on the right: one row of buttons
+    const foot = document.createElement('div'); foot.className = 'inbox-ask-foot'; foot.append(row); // Reply attachments belong with the reply box; the footer holds its final actions
     const reading = document.createElement('div'); reading.className = 'inbox-ask-reading'; reading.tabIndex = -1;
     if (!whole.hidden) reading.append(whole);
     const compose = document.createElement('div'); compose.className = 'inbox-ask-compose';
+    const addSlot = document.createElement('div'); addSlot.className = 'inbox-ask-attach'; pics.append(addSlot);
     compose.append(...(offered ? [offered] : []), label, pics, err);
     dlg.append(title, sub, ...(links.hidden ? [] : [links]), reading, compose, foot);
     if (!fromAnotherComputer(a)) { // the picture is stored on the question's own team, as a goal's pictures are
@@ -98,8 +100,7 @@ export function openAskDialog(a, onDone, runners = {}) {
             tray.attach(dlg, box); tray.listen(sync);
             const picker = tray.picker(), add = picker.querySelector('button');
             add.textContent = ''; const icon = document.createElement('span'); icon.className = 'material-icons'; icon.setAttribute('aria-hidden', 'true'); icon.textContent = 'image'; add.append(icon); add.title = 'Add image';
-            pictureHint = tray.hint(); pictureHint.hidden = true;
-            addSlot.append(picker); pics.append(pictureHint, tray.node);
+            addSlot.append(picker, tray.hint()); pics.append(tray.node);
         }).catch(() => { /* a reply needs no picture: the dialog works without the button */ });
     }
     close.addEventListener('click', finish);
