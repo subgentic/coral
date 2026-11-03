@@ -72,6 +72,7 @@ const ATTACK = {
     };
     // A condition on this side (the events Chrome sent), polled: no fixed sleep.
     const until = async (fn, what, ms = 8000) => { const end = Date.now() + ms; while (Date.now() < end) { if (await fn()) return; await sleep(25); } throw new Error('timed out waiting for ' + what); };
+    const shownButton = p => p.ev(`(() => { const b = document.getElementById('local-open'); if (!b) return false; const r = b.getBoundingClientRect(); return r.width > 0 && r.height > 0 && !b.closest('[hidden]'); })()`);
     const localOpen = reqs => reqs.filter(r => r.method === 'POST' && r.url.startsWith('/auth/local'));
     let failed = 0;
     const test = async (name, fn) => {
@@ -104,49 +105,78 @@ const ATTACK = {
             assert.ok(auth, 'the frame asked for /auth');
             assert.notEqual(child.frame.url, BASE + '/auth', 'the frame never shows /auth');
         });
-        await test('the button on /auth signs this browser in', async () => {
+        // The operator's choice for #289: the button only while no password is set. Every test server starts with the runner's throwaway password (run_cdp_suites.mjs,
+        // TEST_PASSWORD), so this is the state a fresh browser meets first.
+        await test('with a password set, no button and the route refuses', async () => {
             const p = await freshPage();
             await p.c.Page.navigate({ url: BASE + '/auth' });
-            await p.waitFor(`!!document.getElementById('local-open') && document.readyState === 'complete'`, 'the button');
-            assert.equal(await p.status(), 401, 'not signed in before');
-            await p.ev(`document.getElementById('local-open').click(), true`);
-            await until(() => localOpen(p.reqs).some(r => r.status), `the answer to the button request: ${JSON.stringify(p.reqs.map(r => [r.method, r.url, r.status]))}`);
-            const posts = localOpen(p.reqs);
-            assert.equal(posts.length, 1, JSON.stringify(p.reqs.map(r => r.method + ' ' + r.url)));
-            const sent = `Origin ${posts[0].headers['origin']}, Sec-Fetch-Site ${posts[0].headers['sec-fetch-site']}, answered ${posts[0].status}`;
-            assert.equal(posts[0].headers['origin'], BASE, `the request names this server (${sent})`);
-            assert.equal(posts[0].headers['sec-fetch-site'], 'same-origin', sent);
-            assert.ok(posts[0].status < 400, `the route accepts its own button (${sent})`);
-            await p.waitFor(`!location.pathname.startsWith('/auth')`, 'the page to leave /auth', 10000);
-            assert.ok((await p.cookies()).length > 0, 'a session cookie is set');
-            assert.equal(await p.status(), 200, 'signed in after');
+            await p.waitFor(`document.readyState === 'complete' && !!document.body`, '/auth');
+            assert.equal(await shownButton(p), false, 'the button is not offered');
+            assert.equal(await p.ev(`fetch('${BASE}/auth/local', { method: 'POST', credentials: 'include' }).then(r => r.status)`), 403, 'the route refuses');
+            assert.deepEqual(await p.cookies(), [], 'no cookie');
         });
-        // Security's extra case: with require_auth_on_loopback on, the button is not offered and the route refuses. The setting is changed from the suite's own tab, which
-        // the strict shard signs in (coral open --print), and turned back off whatever happens.
-        await test('with require_auth_on_loopback on, no button and the route refuses', async () => {
-            const { targetInfos } = await browser.Target.getTargets();
-            const mine = targetInfos.find(t => t.type === 'page' && !contexts.includes(t.browserContextId)); // the suite's own tab: not in a context this suite made
-            assert.ok(mine, 'the suite tab');
-            const own = await CDP({ port, target: mine.targetId });
-            pages.push(own);
-            await own.Runtime.enable();
-            const ownEv = async x => (await own.Runtime.evaluate({ expression: x, returnByValue: true, awaitPromise: true })).result.value;
-            const put = v => ownEv(`fetch('${BASE}/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ require_auth_on_loopback: ${v} }) }).then(r => r.status)`);
-            await own.Page.enable(); await own.Page.navigate({ url: BASE + '/' }); await until(async () => (await ownEv('document.readyState')) === 'complete' && (await ownEv('location.origin')) === BASE, 'the suite tab on this server');
-            assert.equal(await put(true), 200, 'the setting was turned on');
-            try {
+        // Without a password: cleared with 'coral reset-password --clear' (the runner's coral and data folder), and the runner's password set back afterwards whatever
+        // happens, so the suites after this one meet the server as it was. Clearing signs every browser out, so the suite's own tab signs in again through the button.
+        const coralCLI = (args, input) => require('./helpers/child_process').spawnSync(process.env.CORAL_TEST_BIN, [...args, '--url', BASE, '--home', process.env.CORAL_TEST_DATA_DIR], { encoding: 'utf8', timeout: 30000, windowsHide: true, input });
+        const runnerPassword = (require('node:fs').readFileSync(require('node:path').join(__dirname, 'run_cdp_suites.mjs'), 'utf8').match(/const TEST_PASSWORD = '([^']+)'/) || [])[1];
+        assert.ok(runnerPassword, "the runner's TEST_PASSWORD, to set back");
+        const cleared = coralCLI(['reset-password', '--clear']);
+        assert.equal(cleared.status, 0, `the password was cleared: ${(cleared.stderr || '').slice(0, 300)}`);
+        try {
+            let ownEv = null;
+            await test("the suite's own tab signs in again through the button", async () => {
+                const { targetInfos } = await browser.Target.getTargets();
+                const mine = targetInfos.find(t => t.type === 'page' && !contexts.includes(t.browserContextId)); // the suite's own tab: not in a context this suite made
+                assert.ok(mine, 'the suite tab');
+                const own = await CDP({ port, target: mine.targetId });
+                pages.push(own);
+                await Promise.all([own.Runtime.enable(), own.Page.enable()]);
+                const ev = async x => (await own.Runtime.evaluate({ expression: x, returnByValue: true, awaitPromise: true })).result.value;
+                await own.Page.navigate({ url: BASE + '/auth' });
+                await until(async () => (await ev(`!!document.getElementById('local-open') && document.readyState === 'complete'`)) === true, 'the button in the suite tab');
+                await ev(`document.getElementById('local-open').click(), true`);
+                await until(async () => (await ev(`location.origin === '${BASE}' && !location.pathname.startsWith('/auth') && document.readyState === 'complete'`)) === true, 'the suite tab to leave /auth', 10000);
+                assert.equal(await ev(`fetch('${BASE}/api/system/status', { cache: 'no-store' }).then(r => r.status)`), 200);
+                ownEv = ev;
+            });
+            await test('the button on /auth signs this browser in', async () => {
                 const p = await freshPage();
                 await p.c.Page.navigate({ url: BASE + '/auth' });
-                await p.waitFor(`document.readyState === 'complete' && !!document.body`, '/auth');
-                const shown = await p.ev(`(() => { const b = document.getElementById('local-open'); if (!b) return false; const r = b.getBoundingClientRect(); return r.width > 0 && r.height > 0 && !b.closest('[hidden]'); })()`);
-                assert.equal(shown, false, 'the button is not offered');
-                const st = await p.ev(`fetch('${BASE}/auth/local', { method: 'POST', credentials: 'include' }).then(r => r.status)`);
-                assert.equal(st, 403, 'the route refuses');
-                assert.deepEqual(await p.cookies(), [], 'no cookie');
-            } finally {
-                assert.equal(await put(false), 200, 'the setting was turned back off');
-            }
-        });
+                await p.waitFor(`!!document.getElementById('local-open') && document.readyState === 'complete'`, 'the button');
+                assert.equal(await p.status(), 401, 'not signed in before');
+                await p.ev(`document.getElementById('local-open').click(), true`);
+                await until(() => localOpen(p.reqs).some(r => r.status), 'the answer to the button request');
+                const posts = localOpen(p.reqs);
+                assert.equal(posts.length, 1, JSON.stringify(p.reqs.map(r => r.method + ' ' + r.url)));
+                const sent = `Origin ${posts[0].headers['origin']}, Sec-Fetch-Site ${posts[0].headers['sec-fetch-site']}, answered ${posts[0].status}`;
+                assert.equal(posts[0].headers['origin'], BASE, `the request names this server (${sent})`);
+                assert.equal(posts[0].headers['sec-fetch-site'], 'same-origin', sent);
+                assert.ok(posts[0].status < 400, `the route accepts its own button (${sent})`);
+                await p.waitFor(`!location.pathname.startsWith('/auth')`, 'the page to leave /auth', 10000);
+                assert.ok((await p.cookies()).length > 0, 'a session cookie is set');
+                assert.equal(await p.status(), 200, 'signed in after');
+            });
+            // Security's extra case: with require_auth_on_loopback on, the button is not offered and the route refuses, even with no password. Changed from the suite's
+            // own tab and turned back off whatever happens.
+            await test('with require_auth_on_loopback on, no button and the route refuses', async () => {
+                assert.ok(ownEv, 'the suite tab is signed in (the case above)');
+                const put = v => ownEv(`fetch('${BASE}/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ require_auth_on_loopback: ${v} }) }).then(r => r.status)`);
+                assert.equal(await put(true), 200, 'the setting was turned on');
+                try {
+                    const p = await freshPage();
+                    await p.c.Page.navigate({ url: BASE + '/auth' });
+                    await p.waitFor(`document.readyState === 'complete' && !!document.body`, '/auth');
+                    assert.equal(await shownButton(p), false, 'the button is not offered');
+                    assert.equal(await p.ev(`fetch('${BASE}/auth/local', { method: 'POST', credentials: 'include' }).then(r => r.status)`), 403, 'the route refuses');
+                    assert.deepEqual(await p.cookies(), [], 'no cookie');
+                } finally {
+                    assert.equal(await put(false), 200, 'the setting was turned back off');
+                }
+            });
+        } finally {
+            const back = coralCLI(['reset-password', '--stdin'], runnerPassword + '\n');
+            if (back.status !== 0) { failed++; console.log(`  FAIL - the runner's password was not set back: ${(back.stderr || '').slice(0, 300)}`); }
+        }
     } finally {
         for (const c of pages) await c.close().catch(() => {});
         for (const id of contexts) await browser.Target.disposeBrowserContext({ browserContextId: id }).catch(() => {});
