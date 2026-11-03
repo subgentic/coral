@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/clitext"
@@ -59,7 +60,11 @@ func (h *BoardHandler) checkAskButtons(w http.ResponseWriter, r *http.Request, p
 		case board.ActionWake:
 			sub, err := h.bs.GetProjectSubscription(ctx, project, b.Arg)
 			if err != nil || sub == nil || strings.EqualFold(b.Arg, "Operator") {
-				return refuse("button " + strconv.Itoa(b.Pos) + " (" + b.Label + "): " + b.Arg + " is not a member of this team")
+				why := b.Arg + " is not a member of this team"
+				if board.ValidMemberName(b.Arg) != nil { // no member can have such a name (#11687): say so, and what was probably meant
+					why += " (a member's name starts and ends with a letter or a digit; did you mean " + strconv.Quote(strings.TrimFunc(b.Arg, func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsDigit(r) })) + "?)"
+				}
+				return refuse("button " + strconv.Itoa(b.Pos) + " (" + b.Label + "): " + why)
 			}
 		}
 	}

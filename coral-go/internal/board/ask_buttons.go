@@ -17,9 +17,10 @@ import (
 // Buttons on a question to the Operator (#11445, #11643): up to three, each one action from a closed list, declared by the agent as text and run by nobody until the Operator clicks. The agent's post carries a
 // declaration, never a command: it is validated here against a fixed grammar and stored; Coral runs nothing from it. v1: open:new-agent, open:task:<id>, open:artifact:<digest>, reply, wake:<member>.
 const (
-	AskButtonMax      = 3  // buttons on one ask
-	AskButtonLabelMax = 32 // characters in a label
-	AskButtonsOpenMax = 10 // asks with buttons an agent may have open at once
+	AskButtonMax       = 3  // buttons on one ask
+	AskButtonLabelMax  = 32 // characters in a label
+	AskButtonMemberMax = 64 // characters in the member name of a wake button
+	AskButtonsOpenMax  = 10 // asks with buttons an agent may have open at once
 
 	ButtonClaimTTL = time.Minute // an open or wake claim the page never settled is free again after this
 
@@ -57,7 +58,6 @@ func (e *ErrAskButton) Error() string { return e.Msg }
 var (
 	buttonDigestRE = regexp.MustCompile(`^[a-f0-9]{64}$`)
 	buttonLinkRE   = regexp.MustCompile(`(?i)(://|www\.|coral:|mailto:|data:|javascript:)`)
-	buttonMemberRE = regexp.MustCompile(`^[\p{L}\p{N}][\p{L}\p{N} ._-]{0,63}$`)
 )
 
 // ParseAskButton reads "Label=action[:arg]" and refuses anything outside the grammar, naming the button (n is its place, from 1). A label is shown as text and, for reply, is the exact text sent, so one that
@@ -106,8 +106,15 @@ func ParseAskButton(n int, raw string, signIn func(string) bool) (AskButton, err
 		b.Action, b.Arg = ActionOpenArtifact, d
 	case strings.HasPrefix(spec, ActionWake+":"):
 		m := strings.TrimSpace(strings.TrimPrefix(spec, ActionWake+":"))
-		if !buttonMemberRE.MatchString(m) || clitext.CleanName(m) != m {
-			return bad("wake needs the name of a member of this team, as wake:Dev")
+		// The target is everything after the first "wake:": a member's name may hold a colon, a slash or spaces ("UI/UX", "Security Reviewer 2:"). Whether it names a member is the server's check against the team; here only a
+		// name that is empty, too long or has hidden characters is refused, each with its own reason (#12938).
+		switch {
+		case m == "":
+			return bad("wake needs the name of a member of this team, as wake:Dev (the name after wake: is empty)")
+		case utf8.RuneCountInString(m) > AskButtonMemberMax:
+			return bad(fmt.Sprintf("the member name after wake: is longer than %d characters", AskButtonMemberMax))
+		case clitext.CleanName(m) != m:
+			return bad("the member name after wake: has hidden or control characters")
 		}
 		b.Action, b.Arg = ActionWake, m
 	default:

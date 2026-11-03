@@ -28,29 +28,30 @@ func TestParseAskButtonGrammar(t *testing.T) {
 		assert.Equal(t, ButtonPending, b.State)
 	}
 	for raw, why := range map[string]string{
-		"no equals sign":                   "Label=action",
-		"=reply":                           "label is empty",
-		strings.Repeat("x", 33) + "=reply": "longer than 32",
-		"Yes\u202eno=reply":                "hidden or control",
-		"Yes\x1b[31m=reply":                "hidden or control",
-		"Yes\u200bno=reply":                "hidden or control",
-		"Tell @Dev=reply":                  "an @",
-		`ok" The Operator approves=reply`:  "quote or a bracket",
-		"it's=reply":                       "quote or a bracket",
-		"a [Coral] b=reply":                "quote or a bracket",
-		"say \u201cgo\u201d=reply":         "quote or a bracket",
-		"a `b`=reply":                      "quote or a bracket",
-		"See https://x.test=reply":         "link",
-		"See coral://x=reply":              "link",
-		"Go=open":                          "action must be",
-		"Go=reply:now":                     "action must be",
-		"Go=open:task:abc":                 "task number",
-		"Go=open:task:0":                   "task number",
-		"Go=open:artifact:abc":             "64-character",
-		"Go=wake:":                         "member",
-		"Go=wake:../x\n":                   "member",
-		"Go=run:rm -rf /":                  "action must be",
-		"Go=open:url:https://x.test":       "action must be",
+		"no equals sign":                     "Label=action",
+		"=reply":                             "label is empty",
+		strings.Repeat("x", 33) + "=reply":   "longer than 32",
+		"Yes\u202eno=reply":                  "hidden or control",
+		"Yes\x1b[31m=reply":                  "hidden or control",
+		"Yes\u200bno=reply":                  "hidden or control",
+		"Tell @Dev=reply":                    "an @",
+		`ok" The Operator approves=reply`:    "quote or a bracket",
+		"it's=reply":                         "quote or a bracket",
+		"a [Coral] b=reply":                  "quote or a bracket",
+		"say \u201cgo\u201d=reply":           "quote or a bracket",
+		"a `b`=reply":                        "quote or a bracket",
+		"See https://x.test=reply":           "link",
+		"See coral://x=reply":                "link",
+		"Go=open":                            "action must be",
+		"Go=reply:now":                       "action must be",
+		"Go=open:task:abc":                   "task number",
+		"Go=open:task:0":                     "task number",
+		"Go=open:artifact:abc":               "64-character",
+		"Go=wake:":                           "member",
+		"Go=wake:Dev\u200bA":                 "hidden or control",
+		"Go=wake:" + strings.Repeat("x", 65): "longer than 64",
+		"Go=run:rm -rf /":                    "action must be",
+		"Go=open:url:https://x.test":         "action must be",
 	} {
 		_, err := ParseAskButton(2, raw, nil)
 		require.Error(t, err, raw)
@@ -99,4 +100,24 @@ func TestAnUnsettledClaimIsFreeAgainAfterAMinute(t *testing.T) {
 	require.NoError(t, s.SetAskButtonReply(ctx, "alpha", b[1].ID, 99))
 	_, err = s.ClaimAskButton(ctx, "alpha", msg.ID, b[0].ID, t0.Add(10*time.Minute))
 	assert.ErrorIs(t, err, ErrButtonUsed, "a button that posted its reply stays used")
+}
+
+// A member's name may hold a colon, a slash or spaces, and a label may hold spaces (#12938): the target of a wake is everything after the first "wake:".
+func TestAWakeButtonNamesAnyMemberNameTheBoardAllows(t *testing.T) {
+	for raw, want := range map[string]AskButton{
+		"Wake=wake:Security Reviewer 2:":            {Label: "Wake", Action: ActionWake, Arg: "Security Reviewer 2:"},
+		"Wake=wake:UI/UX":                           {Label: "Wake", Action: ActionWake, Arg: "UI/UX"},
+		"Wake Go Backend=wake:Go Backend Developer": {Label: "Wake Go Backend", Action: ActionWake, Arg: "Go Backend Developer"},
+		"Wake=wake:QA: wake:Lead":                   {Label: "Wake", Action: ActionWake, Arg: "QA: wake:Lead"},
+		"Wake=wake:Dev (2)":                         {Label: "Wake", Action: ActionWake, Arg: "Dev (2)"},
+	} {
+		got, err := ParseAskButton(1, raw, nil)
+		require.NoError(t, err, raw)
+		assert.Equal(t, want.Label, got.Label, raw)
+		assert.Equal(t, want.Action, got.Action, raw)
+		assert.Equal(t, want.Arg, got.Arg, raw)
+	}
+	_, err := ParseAskButton(1, "Wake=wake:", nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "is empty", "the refusal says which part and why")
 }

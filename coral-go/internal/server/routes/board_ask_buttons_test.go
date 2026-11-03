@@ -148,3 +148,23 @@ func TestAColonAfterAMembersNameDoesNotTurnAButtonQuestionIntoAQuestionToThem(t 
 	status, out := post(map[string]any{"subscriber_id": "Lead", "content": "@Operator @UI Reviewer wake you?", "ask": true, "buttons": []string{"Wake UI Reviewer=wake:UI Reviewer"}})
 	assert.Equal(t, http.StatusBadRequest, status, "a real @ of another member is still refused: %v", out)
 }
+
+// #12938: a wake button names a member by the name the board knows, colon, slash and spaces included; anything that is not a member is still refused, with the name in the reason.
+func TestAWakeButtonAcceptsMemberNamesWithAColonASlashOrSpaces(t *testing.T) {
+	post, _, _, base := buttonRig(t)
+	for _, who := range []string{"Security: Reviewer 2", "UI/UX", "Go Backend Developer"} {
+		postJSON(t, base+"/subscribe", map[string]string{"subscriber_id": who, "job_title": who}).Body.Close()
+	}
+	for _, spec := range []string{"Wake=wake:Security: Reviewer 2", "Wake=wake:UI/UX", "Wake Go Backend=wake:Go Backend Developer"} {
+		status, out := post(map[string]any{"subscriber_id": "Lead", "content": "@Operator ok? " + spec, "ask": true, "buttons": []string{spec}})
+		assert.Equal(t, http.StatusOK, status, spec+": %v", out)
+	}
+	status, out := post(map[string]any{"subscriber_id": "Lead", "content": "@Operator who?", "ask": true, "buttons": []string{"Wake=wake:UI/Nobody"}})
+	assert.Equal(t, http.StatusBadRequest, status)
+	assert.Contains(t, out["error"], "UI/Nobody is not a member of this team", "a non-member is refused, named")
+	assert.Contains(t, out["error"], "button 1")
+	// A trailing colon cannot be part of a member's name (#11687): refused, with what was probably meant.
+	status, out = post(map[string]any{"subscriber_id": "Lead", "content": "@Operator who?", "ask": true, "buttons": []string{"Wake=wake:Go Backend Developer:"}})
+	assert.Equal(t, http.StatusBadRequest, status)
+	assert.Contains(t, out["error"], `did you mean "Go Backend Developer"?`)
+}
