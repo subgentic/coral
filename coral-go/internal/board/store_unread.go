@@ -504,3 +504,56 @@ func (s *Store) getUnreadStates(ctx context.Context, sessionNames []string) (map
 	}
 	return states, nil
 }
+
+// PeekCounted lists the messages CheckUnread counts for a member, oldest first, up to limit, without moving its read position (#12713: the agent view's "N team messages have not reached this agent yet"
+// and its list). The list used to be PeekMessages, the selection of a plain read, which is wider than the count: an orchestrator's read returns Coral Task Queue's audit rows and Coral's notices to other
+// agents, which are never counted, so the page said 12 and listed fifty rows back to the week before. Here the same filters as the count are applied, so the list is the count's messages, and no more.
+func (s *Store) PeekCounted(ctx context.Context, project, subscriberID string, limit int) ([]Message, error) {
+	var sub struct {
+		LastReadID  int64  `db:"last_read_id"`
+		JobTitle    string `db:"job_title"`
+		ReceiveMode string `db:"receive_mode"`
+		CanPeek     int    `db:"can_peek"`
+	}
+	if err := s.reader().GetContext(ctx, &sub,
+		"SELECT last_read_id, job_title, receive_mode, can_peek FROM board_subscribers WHERE project = ? AND subscriber_id = ?",
+		project, subscriberID); err != nil {
+		return nil, nil // not subscribed: nothing is counted
+	}
+	if sub.ReceiveMode == "none" {
+		return nil, nil
+	}
+	everything := sub.ReceiveMode == "all" && isOrchestrator(subscriberID, sub.JobTitle, sub.CanPeek) // CheckUnread's first branch: every message from others
+	rule := &readRule{subscriberID: subscriberID, jobTitle: sub.JobTitle, lastReadID: sub.LastReadID, tagged: !everything}
+	counted := func(m Message) bool {
+		if m.SubscriberID == "Coral Task Queue" {
+			return false
+		}
+		return !everything || m.SubscriberID != CoralSender || strings.Contains(m.Content, "@"+sub.JobTitle) // Coral's own notice counts only for the agent it names
+	}
+	var out []Message
+	after := sub.LastReadID
+	for len(out) < limit {
+		batch, scanned, more, err := s.selectRead(ctx, project, rule, after, limit)
+		if err != nil {
+			return nil, err
+		}
+		for _, m := range batch {
+			if counted(m) && len(out) < limit {
+				out = append(out, m)
+			}
+		}
+		if !more || scanned <= after {
+			break
+		}
+		after = scanned
+	}
+	return s.withAsks(ctx, project, out, nil)
+}
+
+// NewestMessageID is the id of the project's newest message, 0 for none.
+func (s *Store) NewestMessageID(ctx context.Context, project string) (int64, error) {
+	var id int64
+	err := s.reader().GetContext(ctx, &id, "SELECT COALESCE(MAX(id), 0) FROM board_messages WHERE project = ?", project)
+	return id, err
+}

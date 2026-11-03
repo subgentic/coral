@@ -417,6 +417,7 @@ POST /api/sessions/live/{name}/tasks interact
 POST /api/sessions/live/{name}/tasks/reorder never
 POST /api/sessions/live/{name}/token-usage never
 POST /api/sessions/live/{name}/turn-end never
+POST /api/sessions/live/{name}/waiting/dismiss never
 POST /api/sessions/live/{name}/waiting/send never
 POST /api/sessions/live/{sessionID}/archive interact
 POST /api/sessions/live/{sessionID}/record-agent never

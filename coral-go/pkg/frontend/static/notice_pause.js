@@ -35,9 +35,9 @@ export function timeLeftText(until, now = Date.now()) {
 
 /** The bar's sentence for a row: '' when nothing is to be said. */
 export function barText(row, now = Date.now()) {
-    const p = pauseOf(row), n = Number.isSafeInteger(row && row.notices_waiting) && row.notices_waiting >= 0 ? Math.min(row.notices_waiting, 999) : waitingCount(row); // the server's own count of what the pause holds, else the unread board messages
+    const p = pauseOf(row), n = Number.isSafeInteger(row && row.notices_waiting) && row.notices_waiting >= 0 ? Math.min(Math.max(row.notices_waiting, p.holding ? waitingCount(row) : 0), 999) : waitingCount(row); // the server's own count of what the pause holds, else the unread board messages
     if (p.paused) { const left = timeLeftText(p.until, now); return `Coral's messages are paused while you talk. ${n} waiting.${left ? ` ${left}.` : ''}`; }
-    if (p.holding) return "Coral's messages wait until you stop typing";
+    if (p.holding && n > 0) return "Coral's messages wait until you stop typing"; // only while a message is actually waiting (#12713, the Operator: "we don't need to show this all the time"): the person typing holds nothing back when nothing is held, and it goes once delivered
     return '';
 }
 

@@ -101,7 +101,7 @@ func (h *SessionsHandler) ListWaiting(w http.ResponseWriter, r *http.Request) {
 			if n, err := h.bs.CheckUnread(r.Context(), sub.Project, sub.SubscriberID); err == nil {
 				out["unread"] = n
 			}
-			if msgs, err := h.bs.PeekMessages(r.Context(), sub.Project, sub.SubscriberID, maxWaitingMessages); err == nil { // a look, not a read: the agent keeps them unread
+			if msgs, err := h.bs.PeekCounted(r.Context(), sub.Project, sub.SubscriberID, maxWaitingMessages); err == nil { // a look, not a read: the agent keeps them unread; the messages the count counts (#12713)
 				rows := make([]waitingMessage, 0, len(msgs))
 				for _, m := range msgs {
 					text, cut := clitext.Clean(m.Content), false
@@ -177,4 +177,56 @@ func (h *SessionsHandler) SendWaitingNow(w http.ResponseWriter, r *http.Request)
 		}
 	}
 	writeJSON(w, http.StatusOK, out)
+}
+
+// DismissWaiting marks the board messages the page lists as read for one live agent, as a person's own action (#12713, the Operator: "I don't have an option to dismiss these messages"): the agent's read
+// position moves up to through_id, the newest message the person was shown, and nothing is typed into the agent. A message that came after it stays unread, and so does the next nudge for it. Never an
+// agent's: the identity layer refuses a token (a member cannot clear another's messages, an Orchestrator included), and the handler asks again.
+// POST /api/sessions/live/{name}/waiting/dismiss  {"agent_type":..,"session_id":..,"through_id":N}
+func (h *SessionsHandler) DismissWaiting(w http.ResponseWriter, r *http.Request) {
+	if _, agent := VerifiedSession(r.Context()); agent {
+		errForbidden(w, "An agent can't mark another agent's messages read")
+		return
+	}
+	name := chi.URLParam(r, "name")
+	var body struct {
+		AgentType string `json:"agent_type"`
+		SessionID string `json:"session_id"`
+		ThroughID int64  `json:"through_id"`
+	}
+	if err := decodeJSON(r, &body); err != nil {
+		errBadRequest(w, "invalid JSON")
+		return
+	}
+	ls, status, message := h.validateExactLiveTarget(r.Context(), name, body.AgentType, body.SessionID, false)
+	if status != 0 {
+		writeExactTargetError(w, status, message)
+		return
+	}
+	name = naming.SessionName(ls.AgentType, ls.SessionID)
+	if h.bs == nil {
+		errBadRequest(w, "no board")
+		return
+	}
+	sub, err := h.bs.GetSubscriptionBySessionName(r.Context(), name)
+	if err != nil || sub == nil {
+		errBadRequest(w, "this agent is not on a board")
+		return
+	}
+	if body.ThroughID <= 0 {
+		errBadRequest(w, "through_id is the newest message shown")
+		return
+	}
+	// Only up to a message that exists and that the person could have been shown: an id past the board's newest would skip messages not yet written.
+	if newest, err := h.bs.NewestMessageID(r.Context(), sub.Project); err != nil || body.ThroughID > newest {
+		errBadRequest(w, "through_id is past the newest message")
+		return
+	}
+	before, _ := h.bs.CheckUnread(r.Context(), sub.Project, sub.SubscriberID)
+	if _, _, _, err := h.bs.MarkReadThrough(r.Context(), sub.Project, sub.SubscriberID, body.ThroughID, body.ThroughID+1); err != nil {
+		errInternalServer(w, err.Error())
+		return
+	}
+	after, _ := h.bs.CheckUnread(r.Context(), sub.Project, sub.SubscriberID)
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "dismissed": max(before-after, 0), "unread": after})
 }
