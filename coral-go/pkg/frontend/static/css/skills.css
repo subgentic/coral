@@ -5,7 +5,7 @@
 .skills-head .btn, .skills-head select { margin: 0; }
 .skills-hint { font-size: var(--fs-sm, 12px); color: var(--text-secondary); }
 .skills-note { margin: 0 0 12px; max-width: 70ch; font-size: var(--fs-base); color: var(--text-secondary); }
-.skills-banner, .skills-ack { margin: 0 0 16px; max-width: 80ch; } /* the look is the shared .notice; only where it sits is here */
+.skills-banner, .skills-ack { margin: 0 0 16px; max-width: 80ch; flex-direction: column; align-items: stretch; gap: 0; } /* the notice is a row for an icon and a line; these hold a heading, paragraphs and a list: a column, or each ran off the panel as a third of a row (#12943) */ /* the look is the shared .notice; only where it sits is here */
 .skills-banner strong { display: block; margin-bottom: 4px; }
 .skills-meta { display: flex; flex-wrap: wrap; gap: 4px 20px; margin: 0 0 16px; font-size: var(--fs-base); color: var(--text-secondary); }
 .skills-section { margin: 0 0 20px; }
@@ -14,6 +14,7 @@
 .skills-file-text { margin: 8px 0 0; padding: 10px 12px; max-height: 24rem; overflow: auto; white-space: pre-wrap; word-break: break-word; border: 1px solid var(--border-color); border-radius: var(--radius-md, 8px); font-family: var(--font-mono, ui-monospace, monospace); font-size: var(--fs-base); }
 .skills-ack ul { margin: 6px 0 10px; padding-left: 20px; }
 .skills-ack code { font-family: var(--font-mono, ui-monospace, monospace); }
+.skills-ack li { overflow-wrap: anywhere; } /* a file's 64-character SHA-256 has no break of its own: it wraps inside the notice (#12943) */
 .skills-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; }
 .skills-actions .btn { margin: 0; }
 .skills-error { margin: 0 0 12px; color: var(--error-text); }
