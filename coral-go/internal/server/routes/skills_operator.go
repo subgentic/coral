@@ -12,6 +12,7 @@ import (
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/skills"
 	"github.com/subgentic/coral/internal/store"
+	"github.com/subgentic/coral/internal/tracking"
 )
 
 // The Operator's side of the Skills Store (#12022, goal #191): the list of every skill, the approval view with every file in full, and the decisions. An agent has none of these routes: what it
@@ -173,6 +174,7 @@ func (h *SkillsHandler) ApproveSkill(w http.ResponseWriter, r *http.Request) {
 	}
 	h.record(r, board.ActSkillApprove, row, "")
 	h.recordAcks(r, row, req.ScriptsAcked, "")
+	inboxActioned(r, tracking.InboxSkill, "", "approve", inboxTime(row.CreatedAt)) // the Inbox's numbers (#7512)
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
@@ -195,6 +197,7 @@ func (h *SkillsHandler) RejectSkill(w http.ResponseWriter, r *http.Request) {
 	if row != nil {
 		h.record(r, board.ActSkillReject, row, "")
 		h.releaseSkillZip(r, row.Digest)
+		inboxActioned(r, tracking.InboxSkill, "", "reject", inboxTime(row.CreatedAt))
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }

@@ -16,7 +16,12 @@ type TrackingHandler struct {
 	// install ID and display where its telemetry state lives. Passed in rather than read
 	// from package state so the paths shown always belong to this instance.
 	coralDir string
+	// inboxCounts is what is waiting for the person who opened the Inbox, by kind (BoardHandler.InboxOpenedCounts): counts only (#7512).
+	inboxCounts func(*http.Request) map[string]int
 }
+
+// SetInboxCounts gives the handler the server's own count of what waits in the Inbox, for inbox_opened.
+func (h *TrackingHandler) SetInboxCounts(f func(*http.Request) map[string]int) { h.inboxCounts = f }
 
 func NewTrackingHandler(coralDir string) *TrackingHandler {
 	return &TrackingHandler{coralDir: coralDir}
@@ -46,6 +51,15 @@ func (h *TrackingHandler) TrackEvent(w http.ResponseWriter, r *http.Request) {
 
 	if len(body.Props) > 8 {
 		errBadRequest(w, "too many properties")
+		return
+	}
+	// inbox_opened (#7512): the page names the event and nothing else. What waits is the server's own count, read as this person sees it, and only a
+	// person's own opening counts (humanInputCaller): an agent or a script posting the name sends nothing.
+	if body.Event == tracking.EventInboxOpened {
+		if humanInputCaller(r) && h.inboxCounts != nil {
+			tracking.TrackInboxOpened(h.inboxCounts(r))
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 		return
 	}
 	// Typed validation, per-event server-side dedupe and caps live in the

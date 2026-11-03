@@ -10,6 +10,7 @@ import (
 // drives the user-facing disclosure, so the two must agree exactly: an event
 // missing from AllEvents is an event Coral sends without disclosing.
 var allEventConstants = []string{
+	EventInboxOpened, EventInboxWaiting, EventInboxItemActioned,
 	EventFunnelAppStarted, EventFunnelStartupFailed, EventFunnelEULAShown, EventFunnelEULADeclined, EventFunnelDashboardOpen, EventFunnelSigninPageShown, EventFunnelSigninLinkRefused, EventFunnelDashboardLoaded, EventFunnelDashboardLoadFailed, EventFunnelWelcomeShown, EventFunnelWelcomeDone, EventFunnelCLIDetected, EventFunnelLaunchDialogOpened, EventFunnelLaunchClicked, EventFunnelLaunchFailed, EventFunnelAgentFirstOutput, EventFunnelAgentReady,
 	EventInstall,
 	EventUpgrade,

@@ -12,6 +12,7 @@ import (
 
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/clitext"
+	"github.com/subgentic/coral/internal/tracking"
 )
 
 // The Operator's click on a button an agent declared on a question (#11643). Two routes, both the Operator's alone (the person at this computer, or through Coral Hub the owner; never an agent's token, a
@@ -106,6 +107,7 @@ func (h *BoardHandler) ClaimAskButton(w http.ResponseWriter, r *http.Request) {
 	}
 	out := map[string]any{"ok": true, "id": claimed.ID, "ask_id": askID, "label": claimed.Label, "action": claimed.Action, "arg": claimed.Arg}
 	h.recordActivity(r, board.ActAnswer, "question", strconv.FormatInt(askID, 10), project, "", claimed.Label) // the option the Operator chose (text an agent wrote: cleaned, redacted and cut)
+	inboxActioned(r, tracking.InboxAsk, "", "button", time.Time{})                                             // the Inbox's numbers (#7512): the kind and the action only
 	if claimed.Action != board.ActionReply {
 		writeJSON(w, http.StatusOK, out)
 		return
