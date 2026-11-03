@@ -2,6 +2,7 @@ package board
 
 import (
 	"errors"
+	"strconv"
 	"strings"
 	"unicode"
 )
@@ -36,6 +37,18 @@ func ValidMemberNameNear(name string) string {
 		rs = rs[:len(rs)-1]
 	}
 	return string(rs)
+}
+
+// MemberNameHint is the clause that follows "X is not a member of this team" when no member could have the name X (ValidMemberName refuses it): the rule, and the nearest valid name when anything is left of it. "" for a valid name.
+func MemberNameHint(name string) string {
+	if ValidMemberName(name) == nil {
+		return ""
+	}
+	h := " (a member's name starts with a letter or a digit and ends with a letter, a digit, or a closing ) or ]"
+	if near := ValidMemberNameNear(name); near != "" {
+		h += "; did you mean " + strconv.Quote(near) + "?"
+	}
+	return h + ")"
 }
 
 func alnumRune(r rune) bool { return unicode.IsLetter(r) || unicode.IsDigit(r) }

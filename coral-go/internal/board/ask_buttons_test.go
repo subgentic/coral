@@ -127,3 +127,15 @@ func TestTheNearestValidMemberNameKeepsAClosingBracket(t *testing.T) {
 		assert.Equal(t, want, ValidMemberNameNear(in), in)
 	}
 }
+
+// #12968: the hint says what ValidMemberName says (a closing bracket may end a name) and offers no suggestion when nothing is left of the name.
+func TestTheMemberNameHintMatchesTheRuleAndNeverSuggestsNothing(t *testing.T) {
+	assert.Equal(t, "", MemberNameHint("Dev (x)"), "a valid name needs no hint")
+	h := MemberNameHint("Dev (x):")
+	assert.Contains(t, h, `did you mean "Dev (x)"?`)
+	assert.Contains(t, h, "a letter, a digit, or a closing ) or ]")
+	h = MemberNameHint("::")
+	assert.NotContains(t, h, "did you mean", "nothing is left to suggest")
+	assert.NotContains(t, h, `""`)
+	assert.Contains(t, h, "a letter, a digit, or a closing ) or ]")
+}
