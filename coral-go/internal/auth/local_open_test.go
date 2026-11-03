@@ -123,6 +123,9 @@ func TestTheSignInPageOffersOpenOnThisComputerOnlyLocally(t *testing.T) {
 	assert.Contains(t, page, `action="/auth/local"`)
 	assert.Contains(t, page, "Open Coral on this computer")
 	assert.Equal(t, 1, strings.Count(page, `id="local-open"`))
+	// #12834: the words match what happens next. The dashboard asks for a password at once (a password is always created, #11892), so the page says so and never promises a way in without one.
+	assert.Contains(t, page, "Coral then asks you to create a password")
+	assert.NotContains(t, strings.ToLower(page), "without a password", "the button's note no longer promises what the next screen takes back")
 	for _, s := range []PageState{{PasswordSet: true, Local: true}, {Local: true}, {PasswordSet: true}, {}} {
 		assert.NotContains(t, AuthPage(s), "/auth/local", "offered only when the server says so (this computer, no password yet)")
 	}

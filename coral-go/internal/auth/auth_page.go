@@ -65,7 +65,7 @@ func AuthPage(s PageState) string {
 var authPageTmpl = template.Must(template.New("auth").Parse(`{{define "localopen"}}{{if .LocalOpen}}
     <form method="post" action="/auth/local" id="local-open-form" class="local-open">
       <div class="btnrow"><button type="submit" disabled data-needs-script class="btn btn-primary wide" id="local-open">Open Coral on this computer</button></div>
-      <p class="note" id="local-open-note">This browser is on the computer that runs Coral, in the same account, so it can open Coral without a password.</p>
+      <p class="note" id="local-open-note">This browser is on the computer that runs Coral, in the same account, so it can open Coral from here. Coral then asks you to create a password, which keeps other people and other devices out.</p>
     </form>
 {{end}}{{end}}{{define "hubwarn"}}
 {{if or (eq .HubSignin "disabled_in_hub") (eq .HubSignin "ready")}}
@@ -213,7 +213,7 @@ var authPageTmpl = template.Must(template.New("auth").Parse(`{{define "localopen
     <details class="howin" id="how-in">
       <summary>Other ways to sign in</summary>
 {{if .Local}}
-      <p><b>Sign in without a password.</b> Open the Coral app on this computer, or, in a terminal there, run <b>coral open</b>: either opens Coral signed in.</p>
+      <p><b>Sign in from this computer.</b> Open the Coral app on this computer, or, in a terminal there, run <b>coral open</b>: either opens Coral signed in. Coral then asks you to create a password.</p>
       <p><b>Or create a password below</b> to open Coral in this browser.</p>
 {{else}}
       <p><b>Sign in on the computer.</b> On the computer that runs Coral, run <b>coral open</b>: it opens Coral there, signed in. To sign in on this device instead, run <b>coral open --print</b>, put the computer's network address in place of <b>127.0.0.1</b> in the link (Coral Mobile shows it) and open the link here: it works once, for 10 minutes, so do not post it where others can read it.</p>
