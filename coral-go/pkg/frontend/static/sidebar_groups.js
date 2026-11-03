@@ -224,7 +224,7 @@ export function openGroupTable(kind, key, { focus = false } = {}) {
 // The redraw waits for the pointer to go up (or be cancelled, or the window to lose focus; a hold older than 10 s is taken as lost) and then happens once.
 let heldAt = null, deferredKind = null;
 const holding = () => heldAt !== null && Date.now() - heldAt < 10000;
-function releasePointer() { if (heldAt === null) return; heldAt = null; const k = deferredKind; deferredKind = null; if (k) refreshGroupTable(k); }
+function releasePointer() { if (heldAt === null) return; heldAt = null; const k = deferredKind; deferredKind = null; if (k) setTimeout(() => { if (!holding()) refreshGroupTable(k); }, 0); } // after the mouseup and the click of this very press have reached the button that was pressed (a redraw inside pointerup would take it out of the page first)
 if (typeof document !== 'undefined') {
     document.addEventListener('pointerdown', e => { if (e.target instanceof Element && e.target.closest('#group-table-view')) heldAt = Date.now(); }, true);
     document.addEventListener('pointerup', releasePointer, true); document.addEventListener('pointercancel', releasePointer, true); window.addEventListener('blur', releasePointer);

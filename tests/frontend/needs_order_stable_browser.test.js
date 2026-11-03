@@ -54,6 +54,8 @@ const { coralReady, framesJs } = require('./helpers/wait');
             await refresh();
             assert.deepEqual(await order(), [...sorted, 'Aardvark'], at + 'under a column sort a late row sorting first still goes after the rows on screen');
 
+            // the page's own click on a row opens its question: the held presses below are counted and swallowed here, so the table stays in view
+            await ev(`window.__clicks = []; document.addEventListener('click', e => { const row = e.target.closest && e.target.closest('${T} tbody tr'); if (!row) return; window.__clicks.push({ connected: e.target.isConnected && document.contains(row), row: (/Q-(\\w+)-end/.exec(row.textContent) || [])[1] }); e.stopImmediatePropagation(); e.preventDefault(); }, true); true`);
             // a row under the pointer never moves: hold the mouse down on a row, a late older row arrives, the row is where it was
             const target = await ev(`(() => { const row = [...document.querySelectorAll('${T} tbody tr')].find(t => /Q-(\\w+)-end/.exec(t.textContent)[1] === ${JSON.stringify(sorted[1])}); const b = row.getBoundingClientRect(); return { x: Math.round(b.left + b.width / 2), y: Math.round(b.top + b.height / 2), top: Math.round(b.top) }; })()`);
             await client.Input.dispatchMouseEvent({ type: 'mousePressed', x: target.x, y: target.y, button: 'left', clickCount: 1 });
@@ -70,9 +72,21 @@ const { coralReady, framesJs } = require('./helpers/wait');
             const heldNames = await order();
             const heldTop = await ev(`(() => { const row = [...document.querySelectorAll('${T} tbody tr')].find(t => /Q-(\\w+)-end/.exec(t.textContent)[1] === ${JSON.stringify(sorted[1])}); return Math.round(row.getBoundingClientRect().top); })()`);
             await client.Input.dispatchMouseEvent({ type: 'mouseReleased', x: target.x, y: target.y, button: 'left', clickCount: 1 });
-            assert.equal(heldTop, target.top, at + 'a row above the held one was answered elsewhere: the held row did not move up');
+            assert.equal(heldTop, target.top, at + 'a row above the held one was answered elsewhere: the held row did not move up: ' + JSON.stringify({ heldTop, target, heldNames, sorted }));
             assert.ok(heldNames.includes(sorted[0]), at + 'the answered row stays until the pointer is released: ' + JSON.stringify(heldNames));
             await waitFor(`!${JSON.stringify(sorted[0])} || ![...document.querySelectorAll('${T} tbody tr')].some(t => t.textContent.includes('Q-' + ${JSON.stringify(sorted[0])} + '-end'))`, 'the answered row goes once the pointer is up', 10000);
+
+            // a press on a row, a row elsewhere answered during the hold, release: the click reaches the row that was pressed, once, still in the page (the redraw waits until the click is done)
+            const pick = await ev(`(() => { const names = [...document.querySelectorAll('${T} tbody tr')].map(t => (/Q-(\\w+)-end/.exec(t.textContent) || [])[1]); const row = [...document.querySelectorAll('${T} tbody tr')].find(t => (/Q-(\\w+)-end/.exec(t.textContent) || [])[1] === names[names.length - 1]); row.scrollIntoView({ block: 'center' }); const r = row.getBoundingClientRect(); return { name: names[names.length - 1], first: names[0], x: Math.round(Math.max(r.left, 0) + 120), y: Math.round(r.top + r.height / 2) }; })()`);
+            await ev(`window.__clicks = []; true`);
+            await client.Input.dispatchMouseEvent({ type: 'mousePressed', x: pick.x, y: pick.y, button: 'left', clickCount: 1 });
+            await ev(`window.__asks = window.__asks.filter(a => !(new RegExp('Q-' + ${JSON.stringify(pick.first)} + '-end')).test(a.text)); true`);
+            await refresh();
+            await client.Input.dispatchMouseEvent({ type: 'mouseReleased', x: pick.x, y: pick.y, button: 'left', clickCount: 1 });
+            await waitFor(`window.__clicks.length >= 1`, 'the click on the pressed row', 5000);
+            await ev(framesJs(10));
+            const clicks = await ev(`window.__clicks`);
+            assert.deepEqual(clicks, [{ connected: true, row: pick.name }], at + 'the pressed row got its click, once, while it was still in the page: ' + JSON.stringify(clicks));
             console.log(`   ✓ ${w} px`);
         }
         console.log('PASS Needs you keeps its order when a computer answers late');
