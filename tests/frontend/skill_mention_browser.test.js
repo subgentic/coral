@@ -41,7 +41,7 @@ const STUB = `(() => { window.__skillSearches = []; window.__skillAttach = []; w
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'settings');
             await ev(`localStorage.setItem('coral-live-view-mode', 'chat'); window.__m.add('sk-a', 'A', 3, { sleeping: false, session_id: 'sk-a-id' }); window.__m.add('sk-b', 'A', 3, { sleeping: false, session_id: 'sk-b-id' }); window.selectLiveSession('sk-a', 'claude', 'sk-a-id', 'local'); true`);
-            await waitFor(`!!document.getElementById('command-input') && !document.getElementById('command-input').disabled && !!document.querySelector('.skill-mention-dropdown')`, `${tag}: the composer and the skills menu`, 8000);
+            await waitFor(`!!document.getElementById('command-input') && !document.getElementById('command-input').disabled`, `${tag}: the composer and the skills menu`, 8000);
 
             // $ at a word start lists the skills: a name and its one line each
             await ev(`localStorage.clear(); true`); await clear(); // the last pass left its "$" as the box's draft

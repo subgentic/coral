@@ -1,3 +1,4 @@
+import { setAccessCacheReader } from './hub_access.js';
 /* Cloud server access policy and cached lookups; independent of the Servers view. */
 import { accessBlockedMessage } from './hub_access.js';
 
@@ -137,3 +138,5 @@ export function refusalMessage(status, body, serverName = '') {
     return '';
 }
 
+
+setAccessCacheReader(cachedServerAccess);

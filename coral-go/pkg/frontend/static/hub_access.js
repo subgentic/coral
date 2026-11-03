@@ -241,3 +241,8 @@ export function syncUnreachableBanner() {
     if (!el) return;
     setPill(el, down, down ? unreachableReason(s) : ''); // an overlay pill, shown after a delay (#5287)
 }
+
+/* A synchronous cache-only read. The policy module installs its reader when first loaded. */
+let read = () => null;
+export const cachedServerAccess = id => read(id);
+export const setAccessCacheReader = reader => { read = reader; };

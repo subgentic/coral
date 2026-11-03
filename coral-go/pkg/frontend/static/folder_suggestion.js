@@ -1,3 +1,5 @@
+import { usesSuggestion } from './team_form.js';
+export { usesSuggestion } from './team_form.js';
 // The first agent and the first team need a folder, and a person who has used none has nothing to pick from (#11258 item 3): the Folder field starts as
 // <home>/Coral/<name>, which Coral makes when the launch is confirmed (create_dir). A person with a recent folder or a Settings default is not offered one, and
 // a folder they type or Browse to is never made for them.
@@ -13,11 +15,6 @@ function suggestedFolder(root, name) {
     const sep = r.includes('\\') && !r.includes('/') ? '\\' : '/';
     const n = String(name || '').trim().replace(SAFE, '-').replace(/^[-.]+|-+$/g, '').slice(0, 64) || 'first-agent';
     return `${r}${sep}Coral${sep}${n}`;
-}
-
-/** True when the field still holds the folder this module suggested: only then is create_dir sent. */
-export function usesSuggestion(input) {
-    return !!(input && input.dataset.suggested && input.value.trim() === input.dataset.suggested);
 }
 
 /** True when every recent folder is one Coral made under <root>/Coral/ (a person who has only used the suggestions has chosen no folder of their own, #11336). */

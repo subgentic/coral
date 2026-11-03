@@ -1,3 +1,4 @@
+import './board_fetch.js'; // shared retry-safe route helpers used statically by the lazy board views
 import './inbox_servers.js'; // source helpers shared by lazy Inbox filters and lists
 import { needsYou, askedRow } from './asked_before_restart.js';
 import { unrecordedItem } from './waiting.js';
@@ -10,7 +11,7 @@ import { syncWelcome } from './welcome_items.js';
 
 import { state } from './state.js';
 import { reportInboxOpened } from './dashboard_analytics.js';
-import { unreadReviewItems, refreshReviews, onReviewsChanged } from './inbox_reviews.js';
+import { unreadReviewItems, refreshReviews } from './ask_filter.js';
 import { failedUnread, refreshRuns, onRunsChanged } from './automation_runs.js';
 import { pendingProposals, refreshProposals, onProposalsChanged } from './proposals_state.js';
 import { goalDoneCount } from './goal_done.js';
@@ -23,7 +24,7 @@ import { resolveSessionIdentity, sessionStateInfo, askWords } from './session_st
 import './safe_markdown.js'; // the shared Inbox renderer's wrapper: the lazy Inbox modules import it, and a lazy module imports only what loads at startup (import_hygiene)
 
 const INBOX_URL = '/inbox';
-onReviewsChanged(() => updateInboxTab());
+document.addEventListener('coral:reviews-changed', () => updateInboxTab());
 onProposalsChanged(() => updateInboxTab()); // what agents asked to add and wait for the Operator's approval is a Needs you row (#11389)
 onRunsChanged(() => updateInboxTab()); // a failed run nobody has opened is a Needs you row (#9296)
 onOperatorAsksChanged(() => updateInboxTab()); // a question an agent asked the Operator is a Needs you row (#11417)

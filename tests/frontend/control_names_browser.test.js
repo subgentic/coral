@@ -13,7 +13,7 @@ const { coralReady } = require('./helpers/wait');
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
         await coralReady(ev);
-        await ev(`window.__coral.buildAllLazy(); true`); // the dialogs are built on first open (#4500): check every control in them
+        await ev(`(async () => { await window.__coral.buildAllLazy(); return true; })()`); // the dialogs are built on first open (#4500): check every control in them
         const unnamed = await ev(`(() => { const t = s => (s || '').replace(/\\s+/g, ' ').trim(); const out = [];
             for (const root of ['settings-modal', 'default-prompts-modal', 'prompt-modal']) {
                 for (const el of document.querySelectorAll('#' + root + ' input, #' + root + ' select, #' + root + ' textarea')) {

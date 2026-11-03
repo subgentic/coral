@@ -15,7 +15,7 @@ import { doneGoals, nextQuietEnd, quietEndsAt, hideGoalDone, setGoalDoneCount, i
  * are in Display options. The hub's own framed /inbox is not this: it keeps the frame, full width (inbox_tab.js). */
 import { state } from './state.js';
 
-import { mutedReviewItems, mutedWords, reviewItems, unreadReviewItems, reviewErrors, refreshReviews, reviewGroups, setReviewRead, markOpenedReadVisibly, isRead, savedFiles } from './inbox_reviews.js';
+const { mutedReviewItems, mutedWords, reviewItems, unreadReviewItems, reviewErrors, refreshReviews, reviewGroups, setReviewRead, markOpenedReadVisibly, isRead, savedFiles } = await importOnce('./inbox_reviews.js');
 import { failedUnread, finishedUnread, refreshRuns, markSeen, runRoute, failureWords } from './automation_runs.js';
 import { operatorAsks, refreshOperatorAsks, askLine, askPlain, askKey, openAskDialog, askSubjects, askSubjectWords } from './operator_asks.js';
 import { go, note, backIs, currentRoute } from './nav.js';
