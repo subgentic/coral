@@ -29,6 +29,11 @@ const { coralReady } = require('./helpers/wait');
             check(`${tag}: each Hub access choice carries its line`, ['Laptop', 'Desktop'].every(n => by(n).opts.length === 3 && by(n).opts.every(([v, t]) => t.length > 20) && new Set(by(n).opts.map(o => o[1])).size === 3), JSON.stringify(by('Laptop').opts));
             check(`${tag}: the chosen access's line is shown under the select (View, Interact)`, /^Look at terminals, chats, files and boards\. Changes nothing\.$/.test(by('Laptop').line) && /^Also type into running agents and post on boards\.$/.test(by('Desktop').line), JSON.stringify([by('Laptop').line, by('Desktop').line]));
             check(`${tag}: the select is described by that line`, / [^ ]+-line$/.test(by('Laptop').described), by('Laptop').described);
+            const lineShown = () => ev(`[...document.querySelectorAll('#servers-tab-body .cs-access-line')].map(e => getComputedStyle(e).display !== 'none')`);
+            check(`${tag}: at rest no row shows the access line`, (await lineShown()).every(v => v === false), JSON.stringify(await lineShown()));
+            await ev(`document.querySelector('#servers-tab-body .cs-launch select').focus(); true`);
+            check(`${tag}: only the row whose access is being changed shows it`, JSON.stringify(await lineShown().then(a => a.filter(Boolean).length)) === '1', JSON.stringify(await lineShown()));
+            await ev(`document.activeElement.blur(); true`);
             const clicked = await click('#servers-tab-body .cs-name');
             await sleep(500); // sleep-ok: the page draws
             check(`${tag}: a real click on the computer's name opens its page`, clicked && (await ev(`!!document.querySelector('#servers-tab-body .cs-page-name')`)), String(clicked));
