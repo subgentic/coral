@@ -89,6 +89,17 @@ const COUNTS = days => ({ days: Array.from({ length: days }, (_, i) => ({ day: d
             assert.match(await text('#cost-inbox-chat .atab-trend .atab-day-say'), /90% in the Inbox \(9 of 10 actions\)/, 'the latest day is selected at first');
             await ev(`document.querySelectorAll('#cost-inbox-chat .atab-trend svg .atab-hit')[1].dispatchEvent(new MouseEvent('click', { bubbles: true })); true`);
             await waitFor(`/75% in the Inbox \\(6 of 8 actions\\)/.test(document.querySelector('#cost-inbox-chat .atab-trend .atab-day-say').textContent)`, 'a tap selects that day', 5000);
+            // the day buttons keep keyboard focus (#13000): the view is redrawn on each press, and focus is restored by the button's name
+            const focused = () => ev(`(() => { const a = document.activeElement; return a ? (a.getAttribute('aria-label') || a.tagName) + (a.disabled ? ' (disabled)' : '') : ''; })()`);
+            const names = await ev(`[...document.querySelectorAll('#cost-inbox-chat .atab-days button')].map(b => b.getAttribute('aria-label'))`);
+            assert.deepEqual(names, ['Previous day', 'Next day'], 'the day buttons have names of their own');
+            await ev(`document.querySelector('#cost-inbox-chat .atab-days button[aria-label="Previous day"]').focus(); true`);
+            for (let i = 0; i < 2; i++) {
+                await ev(`document.activeElement.click(); true`); // what Enter or Space on a focused button does
+                await waitFor(`document.activeElement && document.activeElement.getAttribute('aria-label') === 'Previous day'`, `focus stays on Previous day after press ${i + 1}`, 4000);
+            }
+            for (let i = 0; i < 6 && !/disabled/.test(await focused()); i++) await ev(`document.querySelector('#cost-inbox-chat .atab-days button[aria-label="Previous day"]:not(:disabled)')?.click(); true`);
+            await waitFor(`!!document.querySelector('#cost-inbox-chat .atab-days') && document.querySelector('#cost-inbox-chat .atab-days').contains(document.activeElement) && !document.activeElement.disabled`, 'at the first day focus moves to the other button, not to the page', 4000);
             await ev(`window.__ivc.body = { days_asked: 30, generated_at: new Date().toISOString(), counts: ${JSON.stringify(COUNTS(20))} }; [...document.querySelectorAll('#cost-inbox-chat select')][0].dispatchEvent(new Event('change', { bubbles: true })); true`);
             await waitFor(`document.querySelectorAll('#cost-inbox-chat .atab-trend svg .atab-dot').length >= 20`, 'back to the 20-day sample', 10000);
         });
