@@ -91,6 +91,8 @@ const COUNTS = days => ({ days: Array.from({ length: days }, (_, i) => ({ day: d
             await waitFor(`/75% in the Inbox \\(6 of 8 actions\\)/.test(document.querySelector('#cost-inbox-chat .atab-trend .atab-day-say').textContent)`, 'a tap selects that day', 5000);
             // the day buttons keep keyboard focus (#13000): the view is redrawn on each press, and focus is restored by the button's name
             const focused = () => ev(`(() => { const a = document.activeElement; return a ? (a.getAttribute('aria-label') || a.tagName) + (a.disabled ? ' (disabled)' : '') : ''; })()`);
+            await ev(`document.querySelectorAll('#cost-inbox-chat .atab-trend svg .atab-hit')[5].dispatchEvent(new MouseEvent('click', { bubbles: true })); true`); // the last day: room to step back twice before the first day
+            await waitFor(`/90% in the Inbox/.test(document.querySelector('#cost-inbox-chat .atab-trend .atab-day-say').textContent)`, 'the last day selected', 4000);
             const names = await ev(`[...document.querySelectorAll('#cost-inbox-chat .atab-days button')].map(b => b.getAttribute('aria-label'))`);
             assert.deepEqual(names, ['Previous day', 'Next day'], 'the day buttons have names of their own');
             await ev(`document.querySelector('#cost-inbox-chat .atab-days button[aria-label="Previous day"]').focus(); true`);
