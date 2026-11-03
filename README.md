@@ -11,12 +11,20 @@
 </p>
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/subgentic/coral/main/install.sh | bash
+curl -fsSL \
+  https://raw.githubusercontent.com/subgentic/coral/main/install.sh \
+  | bash
 ```
 
 <p align="center">
-  <sub><a href="https://github.com/subgentic/coral/blob/main/install.sh">Read the script first</a>, or pin a release: <code>curl -fsSL https://raw.githubusercontent.com/subgentic/coral/v&lt;version&gt;/install.sh | bash</code></sub>
+  <sub><a href="https://github.com/subgentic/coral/blob/main/install.sh">Read the script first</a>, or pin a release (this one is v2.0.37; use the version you want):</sub>
 </p>
+
+```bash
+curl -fsSL \
+  https://raw.githubusercontent.com/subgentic/coral/v2.0.37/install.sh \
+  | bash
+```
 
 <p align="center">
   <sub>  The script covers macOS and Linux (x86-64 and ARM64); on Windows there is no one-line installer yet. Download for
