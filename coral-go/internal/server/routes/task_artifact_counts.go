@@ -3,6 +3,7 @@ package routes
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/subgentic/coral/internal/board"
@@ -15,8 +16,16 @@ import (
 // taskCountTTL is how long a board's counts are kept; a variable so a test that changes things between two reads can ask for none.
 var taskCountTTL = 3 * time.Second
 
+// artifactGeneration counts the changes that can change a task's count outside the board's own writes (an upload, an unlink): an answer kept from an earlier generation is not used (#12855). A package
+// counter, not a per-handler one: the upload route and the board's lists are different handlers.
+var artifactGeneration atomic.Uint64
+
+// noteArtifactsChanged drops every kept count: an upload, or a link to a task, was just stored.
+func noteArtifactsChanged() { artifactGeneration.Add(1) }
+
 type taskCountEntry struct {
 	at     time.Time
+	gen    uint64
 	counts map[int64]int
 }
 
@@ -30,8 +39,9 @@ const taskCountCacheLimit = 256 // boards; the map is dropped when full
 // taskArtifactCounts is the number of artifacts each task of the board has, the section's count; a task with none is absent. A scan that fails answers nil: the lists then say nothing rather than a wrong number.
 func (h *BoardHandler) taskArtifactCounts(ctx context.Context, project string) map[int64]int {
 	now := time.Now()
+	gen := artifactGeneration.Load() // before the scan: a change during it makes the answer stale on its first use
 	h.taskCounts.mu.Lock()
-	if e, ok := h.taskCounts.entries[project]; ok && now.Sub(e.at) < taskCountTTL {
+	if e, ok := h.taskCounts.entries[project]; ok && e.gen == gen && now.Sub(e.at) < taskCountTTL {
 		h.taskCounts.mu.Unlock()
 		return e.counts
 	}
@@ -59,7 +69,7 @@ func (h *BoardHandler) taskArtifactCounts(ctx context.Context, project string) m
 	if h.taskCounts.entries == nil || len(h.taskCounts.entries) >= taskCountCacheLimit {
 		h.taskCounts.entries = map[string]taskCountEntry{}
 	}
-	h.taskCounts.entries[project] = taskCountEntry{at: now, counts: counts}
+	h.taskCounts.entries[project] = taskCountEntry{at: now, gen: gen, counts: counts}
 	h.taskCounts.mu.Unlock()
 	return counts
 }

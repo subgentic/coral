@@ -117,6 +117,9 @@ func (h *BoardHandler) CompleteTaskByID(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	h.persistTaskArtifactAfterReply(task)
+	if len(body.Artifacts) > 0 {
+		noteArtifactsChanged() // the task's artifact count is kept for a few seconds: its result files just changed it (#12855)
+	}
 	// Task outcome and funnel milestones (first completion, first success).
 	tracking.TrackTaskCompleted(taskOutcomeForTracking(task, body.Outcome))
 	completionMsg := ""
