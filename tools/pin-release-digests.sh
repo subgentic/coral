@@ -67,7 +67,7 @@ gh release download "$TAG" --repo "$REPO" --pattern SHA256SUMS.txt --pattern SHA
 [ -s "$work/sums/SHA256SUMS.txt.sigstore.json" ] || die "SHA256SUMS.txt.sigstore.json is missing from the release"
 
 # Only what release.yml signed at this tag, from this commit, by a tag push: the exact identity, not a pattern (promote.yml's rule).
-cosign verify-blob "$work/sums/SHA256SUMS.txt" --bundle "$work/sums/SHA256SUMS.txt.sigstore.json" \
+cosign verify-blob "$work/sums/SHA256SUMS.txt" --bundle "$work/sums/SHA256SUMS.txt.sigstore.json" --new-bundle-format \
   --certificate-identity "${SERVER}/${REPO}/.github/workflows/release.yml@refs/tags/${TAG}" \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   --certificate-github-workflow-repository "$REPO" \
