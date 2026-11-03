@@ -214,6 +214,13 @@ class T(unittest.TestCase):
             self.assertNotEqual(rc, 0, f"{files}: {out}")
             self.assertIn("| trailer | refused | Gated-commit names", out)
 
+    def test_a_code_file_renamed_onto_a_readme_path_is_refused(self):
+        commits = {TAGGED: {"files": ["RELEASE_NOTES.md"], "parents": [self.MERGED], "message": f"release notes\n\nGated-commit: {GATED}\n"}}
+        for prev, ok in (("coral-go/internal/x.go", False), ("README.md", True), ("assets/readme/a.png", True)):
+            between = {(GATED, self.MERGED): {"status": "ahead", "behind_by": 0, "files": [{"filename": "README.md", "status": "renamed", "previous_filename": prev}]}}
+            rc, out = go(commits, {TAGGED: "identical"}, ALL_GREEN, between=between)
+            self.assertEqual(rc == 0, ok, f"{prev}: {out}")
+
     def test_a_readme_merge_must_be_ahead_with_nothing_behind_and_a_trustworthy_list(self):
         for kw in ({"status": "diverged"}, {"status": "behind"}, {"status": "identical"}, {"behind_by": 2}, {"files": []}, {"count": 300}):
             rc, out = self.readme_case(kw.get("files", ["README.md"]), **{k: v for k, v in kw.items() if k != "files"})

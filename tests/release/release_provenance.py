@@ -140,7 +140,8 @@ def readme_only_between(get, base, head):
     """True when head is ahead of base (base is an ancestor of head, nothing of base's missing from head) and every file changed between them is a README file:
     a merge of the README edits made on main needs no new gate. The compare API lists at most 300 files: a longer list is never trusted."""
     c = get(f"/compare/{base}...{head}")
-    files = [f["filename"] for f in c.get("files", [])]
+    # a renamed file counts under both names: a code file renamed onto README.md must not pass
+    files = [n for f in c.get("files", []) for n in (f["filename"], f.get("previous_filename") or f["filename"])]
     return c.get("status") == "ahead" and not c.get("behind_by") and 0 < len(files) < 300 and all(readme_only(f) for f in files)
 
 
