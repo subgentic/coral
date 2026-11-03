@@ -494,7 +494,7 @@ registerActions({
     'folder-add-terminal': menu(el => { const d = dirOf(el); if (d) W('launchStandaloneTerminal')(d, textOf(el.dataset.server) || ''); }),
     'folder-launch-default': menu(el => { const d = dirOf(el); if (d) W('launchDefaultAgent')(d, textOf(el.dataset.server) || ''); }),
     'folder-copy': (el, event) => { event.stopPropagation(); const d = dirOf(el); if (d) window.copyFolderPath(d); },
-    'folder-pin': menu(el => { const d = dirOf(el); if (d && (el.dataset.mode === 'pin' || el.dataset.mode === 'unpin')) W(el.dataset.mode === 'pin' ? 'pinFolder' : 'unpinFolder')(d); }),
+    'folder-pin': menu(el => { const d = dirOf(el); if (d && (el.dataset.mode === 'pin' || el.dataset.mode === 'unpin')) W(el.dataset.mode === 'pin' ? 'pinFolder' : 'unpinFolder')(d, textOf(el.dataset.server) || ''); }),
     'wf-run-open': menu(el => { const id = idOf(el.dataset.runId); if (id) window.selectWorkflowRun(id); }),
     // A row (or a rail tile) opens its agent.
     'session-open': (el, event) => {
