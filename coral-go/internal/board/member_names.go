@@ -23,6 +23,21 @@ func ValidMemberName(name string) error {
 	return nil
 }
 
+// ValidMemberNameNear is name with the punctuation ValidMemberName refuses taken off its ends: the start up to a letter or a digit, the end back to a letter, a digit or a closing ")" or "]" ("Dev (x):" gives "Dev (x)").
+func ValidMemberNameNear(name string) string {
+	rs := []rune(strings.TrimSpace(name))
+	for len(rs) > 0 && !alnumRune(rs[0]) {
+		rs = rs[1:]
+	}
+	for len(rs) > 0 {
+		if last := rs[len(rs)-1]; alnumRune(last) || last == ')' || last == ']' {
+			break
+		}
+		rs = rs[:len(rs)-1]
+	}
+	return string(rs)
+}
+
 func alnumRune(r rune) bool { return unicode.IsLetter(r) || unicode.IsDigit(r) }
 
 // nearerMember is the member a mention that reached the shorter member `matched` was probably meant for: the words after the mention that look like the rest of a longer name (one or two words), when a member's name is
