@@ -153,3 +153,52 @@ func TestTheCLIsOwnLineIsABackstopForATranscriptThatWentAfterTheLook(t *testing.
 		"the line was seen and the agent started fresh in the same terminal: %q", g.launchLines())
 	assert.Eventually(t, func() bool { return g.notes() == 1 }, 3*time.Second, 50*time.Millisecond, "and the board is told once")
 }
+
+// Security's SHOULD 3 on #12714: when the backstop's wake does not launch (the CLI is still alive in its terminal), the "conversation is gone" note is not left for a later wake to start fresh on.
+func TestTheBackstopLeavesNoFlagWhenItsWakeDidNotLaunch(t *testing.T) {
+	g := newGoneRig(t)
+	writeTranscript(t, os.Getenv("CLAUDE_PROJECTS_DIR"), goneSID)
+	prev := wakeResumeCheckAfter
+	wakeResumeCheckAfter = 200 * time.Millisecond
+	t.Cleanup(func() { wakeResumeCheckAfter = prev })
+
+	g.wake(t)
+	logFile := naming.LogFile(g.h.cfg.LogDir, "claude", goneSID)
+	require.NoError(t, os.MkdirAll(filepath.Dir(logFile), 0o700))
+	require.NoError(t, os.WriteFile(logFile, []byte("No conversation found with session ID: "+goneSID+"\n"), 0o600))
+	g.term.setFG(g.name, "node") // the CLI is alive after all: the backstop's wake finds a running agent and launches nothing
+	before := len(g.term.sentTo(g.name + ".0"))
+
+	require.Eventually(t, func() bool { _, ok := resumeGone.Load(goneSID); return !ok }, 3*time.Second, 20*time.Millisecond)
+	time.Sleep(600 * time.Millisecond) // sleep-ok: the backstop has run and its wake has returned; nothing more is coming
+	assert.Equal(t, before, len(g.term.sentTo(g.name+".0")), "nothing was typed: the CLI was alive")
+	_, left := resumeGone.Load(goneSID)
+	assert.False(t, left, "no flag left behind")
+	assert.False(t, forceFresh(goneSID), "so a later wake does not start fresh on a stale note")
+
+	// An old note is not believed either.
+	resumeGone.Store(goneSID, time.Now().Add(-2*resumeGoneLife))
+	assert.False(t, forceFresh(goneSID), "a note older than a minute counts for nothing")
+	resumeGone.Store(goneSID, time.Now())
+	assert.True(t, forceFresh(goneSID), "a fresh one does")
+}
+
+// ... and when the backstop's wake fails before it gets as far as deciding (a CLI path that is refused), the note is not left either.
+func TestTheBackstopLeavesNoFlagWhenItsWakeFailed(t *testing.T) {
+	g := newGoneRig(t)
+	writeTranscript(t, os.Getenv("CLAUDE_PROJECTS_DIR"), goneSID)
+	prev := wakeResumeCheckAfter
+	wakeResumeCheckAfter = 200 * time.Millisecond
+	t.Cleanup(func() { wakeResumeCheckAfter = prev })
+
+	g.wake(t)
+	require.NoError(t, g.ss.SetSetting(context.Background(), "cli_path_claude", filepath.Join(t.TempDir(), "no-such-claude"))) // the next wake is refused at the CLI
+	logFile := naming.LogFile(g.h.cfg.LogDir, "claude", goneSID)
+	require.NoError(t, os.MkdirAll(filepath.Dir(logFile), 0o700))
+	require.NoError(t, os.WriteFile(logFile, []byte("No conversation found with session ID: "+goneSID+"\n"), 0o600))
+	g.term.setFG(g.name, "zsh")
+
+	time.Sleep(1500 * time.Millisecond) // sleep-ok: the backstop looks at 200 ms and its refused wake returns at once
+	_, left := resumeGone.Load(goneSID)
+	assert.False(t, left, "a wake that failed leaves no note for a later one")
+}

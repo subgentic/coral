@@ -31,13 +31,20 @@ const conversationGoneLine = "No conversation found with session ID"
 // wakeResumeCheckAfter is how long after a Claude resume the backstop reads the agent's log for that line; a variable for tests.
 var wakeResumeCheckAfter = 12 * time.Second
 
-// resumeGone holds the sessions whose CLI said its conversation is gone: the next wake of each starts fresh without looking again.
+// resumeGone holds the sessions whose CLI said its conversation is gone (session id -> when it was said): the wake the backstop starts then starts it fresh without looking again. It lives resumeGoneLife at most, and the backstop
+// clears it as soon as that wake returns, launched or not: a wake that did not launch (the CLI was still alive) must not leave it for a later, unrelated wake to start fresh.
 var resumeGone sync.Map
 
-// forceFresh reports (and forgets) that the CLI said the conversation of sessionID is gone.
+const resumeGoneLife = time.Minute
+
+// forceFresh reports (and forgets) that the CLI said, within the last minute, that the conversation of sessionID is gone.
 func forceFresh(sessionID string) bool {
-	_, ok := resumeGone.LoadAndDelete(sessionID)
-	return ok
+	v, ok := resumeGone.LoadAndDelete(sessionID)
+	if !ok {
+		return false
+	}
+	at, _ := v.(time.Time)
+	return time.Since(at) < resumeGoneLife
 }
 
 // freshStartNote is the one line the board gets when an agent was started fresh.
@@ -81,9 +88,10 @@ func (h *SessionsHandler) watchResumeGone(ls *store.LiveSession) {
 			return
 		}
 		log.Printf("[wake] session=%s: the CLI could not find its conversation; starting it fresh", naming.SessionName(ls.AgentType, sid))
-		resumeGone.Store(sid, true)
-		if err := h.wakeExistingSession(ctx, cur); err != nil {
-			resumeGone.Delete(sid)
+		resumeGone.Store(sid, time.Now())
+		err = h.wakeExistingSession(ctx, cur)
+		resumeGone.Delete(sid) // used by that wake's own look, or not used at all (it did not launch): never left for a later wake
+		if err != nil {
 			log.Printf("[wake] session=%s: the fresh start failed: %v", naming.SessionName(ls.AgentType, sid), err)
 		}
 	})
