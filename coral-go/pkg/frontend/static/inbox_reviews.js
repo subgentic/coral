@@ -162,6 +162,17 @@ export function settleReview(row) {
     changed();
 }
 
+let lastReadNotice = 0;
+/** markOpenedRead that says so on the page when the write is refused (#12742): the sentence goes to `say` (the live region) and, at most once in ten seconds, to a visible toast, so a file that stays unread is never silent. Resolves either way. */
+export function markOpenedReadVisibly(hex, say) {
+    return markOpenedRead(hex).catch(error => {
+        const text = `Could not mark the file read: ${error && error.message ? error.message : 'try again'}`;
+        if (say) say(text);
+        const now = Date.now();
+        if (now - lastReadNotice > 10000) { lastReadNotice = now; importOnce('./utils.js').then(m => m.showToast(text, true)).catch(() => {}); }
+    });
+}
+
 const reading = new Map(); // hex -> the write in flight, so the viewer and the preview opening the same artifact write once
 /** The operator opened an artifact (the viewer, a preview, a link): when it is one of the for-review artifacts, tag it read. Any other artifact is never tagged. Resolves when it is done; rejects with the server's words. */
 export function markOpenedRead(hex) {
