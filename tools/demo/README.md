@@ -26,11 +26,11 @@ tools/demo/
 
 ## Rebuild from a clean checkout
 
-`DEMO_ROOT` is an empty scratch folder you own. Never use `~/.coral`, never port 8420, never a real Coral's data. Run these from a normal terminal: the takes are headless browsers, but a build or a recording that opens an app window (the Coral app, the tray) does not belong here.
+`DEMO_ROOT` is a scratch folder you made for the demo, with an empty file named `.coral-demo-root` in it (the scripts delete things under it and refuse a folder without the marker, `/` and your home folder). Never use `~/.coral`, never port 8420, never a real Coral's data. Run these from a normal terminal: the takes are headless browsers, but a build or a recording that opens an app window (the Coral app, the tray) does not belong here.
 
 1. **Build the release you want to film** (dev build: no Terms screen), the tools into `$DEMO_ROOT/bin`:
    ```bash
-   export DEMO_ROOT=$HOME/coral-demo-work; mkdir -p "$DEMO_ROOT/bin"
+   export DEMO_ROOT=$HOME/coral-demo-work; mkdir -p "$DEMO_ROOT/bin" && touch "$DEMO_ROOT/.coral-demo-root"
    cd coral-go && go build -tags dev -o "$DEMO_ROOT/bin/" ./cmd/coral ./cmd/coral-board ./cmd/coral-agent ./cmd/mock-agent ./cmd/coral-hook-agentic-state ./cmd/coral-hook-message-check ./cmd/coral-hook-session-start ./cmd/coral-hook-task-sync
    ```
 2. **Playwright and headless Chromium**, into the scratch folder (Node 18 or later; the film was made with 1.62.1):

@@ -1,5 +1,6 @@
 import fs from "node:fs"
 import { OPEN, chromium, beat, launchTeam, sleep, agent, BASE, KEY, S, SEED, HERE, PORT } from "./lib.mjs"
+process.env.CORAL_TELEMETRY_DISABLED = "1" // the demo Coral and everything the takes start send no usage events
 const which = process.argv.slice(2)
 const browser = await chromium.launch({ headless: true })
 const out = {}

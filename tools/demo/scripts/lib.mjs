@@ -3,10 +3,12 @@ import { execFileSync } from "node:child_process"
 import fs from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
+process.env.CORAL_TELEMETRY_DISABLED = "1" // the demo Coral and everything the takes start send no usage events
 export const HERE = path.dirname(fileURLToPath(import.meta.url))
 export const SEED = path.resolve(HERE, "../seed")
 if (!process.env.DEMO_ROOT) throw new Error("set DEMO_ROOT to a scratch folder")
 export const S = path.resolve(process.env.DEMO_ROOT)
+if (S === "/" || S === process.env.HOME || !fs.existsSync(S + "/.coral-demo-root")) throw new Error("refusing DEMO_ROOT " + S + ": make a folder for the demo and touch .coral-demo-root in it (see the README)")
 export const PORT = process.env.DEMO_PORT || "8471"
 if (PORT === "8420") throw new Error("refusing port 8420")
 const require = createRequire(S + "/package.json")
