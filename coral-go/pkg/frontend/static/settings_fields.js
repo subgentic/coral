@@ -1,5 +1,5 @@
 import { importOnce } from './import_once.js';
-const { TERMINAL_BACKEND_IDS, backendHint } = await importOnce('./terminal_backend_fields.js');
+const { TERMINAL_BACKEND_IDS, backendHint } = await importOnce('./terminal_backend.js');
 export { TERMINAL_BACKEND_IDS, backendHint };
 /* The main Settings' rows as fields (#7744, #7838): each group of the Settings dialog is a list of fields drawn by settings_view (the same rows as the team Settings), into the pane's own host. The ids are the contract
  * the dialog (settings_dialog.js) and the suites read and fill by, so each field keeps its id; the dialog's own load and Apply read the controls by id as before (the view has no load and no bar here). A group moves here

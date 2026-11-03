@@ -1,5 +1,5 @@
-import { usesSuggestion } from './folder_suggestion_state.js';
-export { usesSuggestion } from './folder_suggestion_state.js';
+import { usesSuggestion } from './team_form.js';
+export { usesSuggestion } from './team_form.js';
 // The first agent and the first team need a folder, and a person who has used none has nothing to pick from (#11258 item 3): the Folder field starts as
 // <home>/Coral/<name>, which Coral makes when the launch is confirmed (create_dir). A person with a recent folder or a Settings default is not offered one, and
 // a folder they type or Browse to is never made for them.

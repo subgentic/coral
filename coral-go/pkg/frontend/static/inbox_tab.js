@@ -11,7 +11,7 @@ import { syncWelcome } from './welcome_items.js';
 
 import { state } from './state.js';
 import { reportInboxOpened } from './dashboard_analytics.js';
-import { unreadReviewItems, refreshReviews } from './inbox_review_cache.js';
+import { unreadReviewItems, refreshReviews } from './ask_filter.js';
 import { failedUnread, refreshRuns, onRunsChanged } from './automation_runs.js';
 import { pendingProposals, refreshProposals, onProposalsChanged } from './proposals_state.js';
 import { goalDoneCount } from './goal_done.js';

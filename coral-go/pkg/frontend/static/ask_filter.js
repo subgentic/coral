@@ -3,3 +3,9 @@ let hidden = () => false;
 /** inbox_reviews.js says which questions to leave out. */
 export const hideAsksWhen = fn => { hidden = fn; };
 export const isHiddenAsk = a => hidden(a);
+
+/* The badge can read a view's existing cache without loading the review routes at startup. */
+let read = () => [], refresh = () => null;
+export const unreadReviewItems = () => read();
+export const refreshReviews = () => refresh();
+export function setReviewCacheReader(reader, refresher) { read = reader; refresh = refresher; }

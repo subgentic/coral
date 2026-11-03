@@ -1,4 +1,4 @@
-import { cachedServerAccess } from './server_access_cache.js';
+import { cachedServerAccess } from './hub_access.js';
 /* Changed files panel — load and render per-agent file diffs */
 
 import { state } from './state.js';

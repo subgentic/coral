@@ -188,3 +188,6 @@ onBuilt('settings-modal', modal => {
     if (!updatesUiOn()) modal.querySelectorAll('[data-flag="updates"]').forEach(e => e.remove()); // behind the flag: no tab, no pane (#5275)
     buildTabs(modal); buildInfoButtons(modal); buildCloudInfoButtons(modal);
 });
+
+/** Complete hints after lazy field rows have supplied their headings. Idempotent for existing hints. */
+export function buildSettingsHints(modal) { buildInfoButtons(modal); buildCloudInfoButtons(modal); }

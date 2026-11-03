@@ -5,7 +5,6 @@ import { mountSettingsView } from './settings_view.js';
 import { joinBrowse, FOLDER_ON_THIS_COMPUTER } from './dir_row.js';
 import { boardNameProblem } from './utils.js';
 import { onBuilt } from './lazy_dom.js';
-import { usesSuggestion } from './folder_suggestion_state.js';
 import { isHub } from './server_base.js';
 import { state } from './state.js';
 
@@ -121,3 +120,8 @@ function mount(modal) {
 
 onBuilt('launch-modal', mount);
 onBuilt('launch-modal', mountMembers);
+
+/** True when the field still holds the folder this module suggested: only then is create_dir sent. */
+export function usesSuggestion(input) {
+    return !!(input && input.dataset.suggested && input.value.trim() === input.dataset.suggested);
+}
