@@ -60,9 +60,7 @@ func (h *BoardHandler) checkAskButtons(w http.ResponseWriter, r *http.Request, p
 			sub, err := h.bs.GetProjectSubscription(ctx, project, b.Arg)
 			if err != nil || sub == nil || strings.EqualFold(b.Arg, "Operator") {
 				why := b.Arg + " is not a member of this team"
-				if board.ValidMemberName(b.Arg) != nil { // no member can have such a name (#11687): say so, and what was probably meant
-					why += " (a member's name starts and ends with a letter or a digit; did you mean " + strconv.Quote(board.ValidMemberNameNear(b.Arg)) + "?)"
-				}
+				why += board.MemberNameHint(b.Arg) // no member can have a name ValidMemberName refuses (#11687): say so, and what was probably meant
 				return refuse("button " + strconv.Itoa(b.Pos) + " (" + b.Label + "): " + why)
 			}
 		}
