@@ -21,7 +21,7 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
     const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; require('node:fs').mkdirSync(d, { recursive: true }); require('node:fs').writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const file = (name) => `new File([Uint8Array.from(atob('${PNG}'), c => c.charCodeAt(0))], '${name}', { type: 'image/png' })`;
     const thumbs = () => ev(`[...document.querySelectorAll('.goal-editor .ac-thumb')].map(t => ({ ready: !t.classList.contains('ac-thumb-uploading') && !t.classList.contains('ac-thumb-failed'), w: Math.round(t.getBoundingClientRect().width), markup: !!t.querySelector('.ac-thumb-markup:not([hidden])'), remove: !!t.querySelector('.ac-thumb-remove') }))`);
-    const label = () => ev(`document.getElementById('goal-pics-label').textContent`);
+    const label = () => ev(`document.getElementById('goal-picbox-label').textContent`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: STUB });
         for (const [w, h, mobile, fs] of [[1280, 900, false, 16], [390, 844, true, 16], [390, 844, true, 32]]) {
@@ -40,9 +40,9 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
             await waitFor(`document.querySelectorAll('.goal-editor .ac-thumb').length === 2 && !document.querySelector('.goal-editor .ac-thumb-uploading')`, `${tag}: the dropped picture is a thumbnail`, 6000);
             check(`${tag}: the screen shows it takes a drop`, (await ev(`window.__over`)) === true);
             // the picker, and the toolbar's picture button opens it
-            await ev(`window.__pickClicks = 0; document.querySelector('.goal-pics-row input[type=file]').addEventListener('click', e => { window.__pickClicks++; e.preventDefault(); }, true); document.querySelector('.goal-tb[data-tool="image"]').click(); true`);
+            await ev(`window.__pickClicks = 0; document.querySelector('.goal-picrow input[type=file]').addEventListener('click', e => { window.__pickClicks++; e.preventDefault(); }, true); document.querySelector('.goal-tb[data-tool="image"]').click(); true`);
             check(`${tag}: the toolbar's picture button opens the picker`, (await ev(`window.__pickClicks`)) === 1);
-            await ev(`(() => { const i = document.querySelector('.goal-pics-row input[type=file]'), dt = new DataTransfer(); dt.items.add(${file('chosen.png')}); i.files = dt.files; i.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+            await ev(`(() => { const i = document.querySelector('.goal-picrow input[type=file]'), dt = new DataTransfer(); dt.items.add(${file('chosen.png')}); i.files = dt.files; i.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
             await waitFor(`document.querySelectorAll('.goal-editor .ac-thumb').length === 3 && !document.querySelector('.goal-editor .ac-thumb-uploading')`, `${tag}: the chosen picture is a thumbnail`, 6000);
             let t = await thumbs();
             check(`${tag}: three thumbnails, each stored, each with Mark up and Remove`, t.length === 3 && t.every(x => x.ready && x.markup && x.remove && x.w === Math.round(x.w)), JSON.stringify(t));

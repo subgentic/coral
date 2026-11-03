@@ -98,7 +98,7 @@ export function openGoalEditor(opts = {}) {
     // the writing: the title, what should be true (with its toolbar), done when
     const t = el('input', 'goal-title'); t.type = 'text'; t.maxLength = 200; t.autocomplete = 'off'; t.id = 'goal-new-title'; t.placeholder = 'Name the goal'; t.setAttribute('aria-label', 'Title (required)');
     const desc = el('textarea', 'goal-outcome'); desc.id = 'goal-new-description'; desc.rows = 10; desc.maxLength = GOAL_DESCRIPTION_MAX; desc.placeholder = 'Say what should be true when this is done. Drop or paste a picture to add it.';
-    const descLab = el('label', 'goal-label', 'What should be true'); descLab.htmlFor = 'goal-new-description';
+    const descLab = el('label', 'goal-field-label', 'What should be true'); descLab.htmlFor = 'goal-new-description';
     const descCount = el('span', 'goals-count'); descCount.hidden = true; descCount.setAttribute('role', 'status');
     desc.addEventListener('input', () => { const n = desc.value.length; descCount.hidden = n < GOAL_DESCRIPTION_MAX - 500; descCount.textContent = `${n} / ${GOAL_DESCRIPTION_MAX}`; }); // the count shows only near the limit
     const bar = el('div', 'goal-toolbar'); bar.setAttribute('role', 'toolbar'); bar.setAttribute('aria-label', 'Formatting'); bar.setAttribute('aria-controls', 'goal-new-description');
@@ -117,20 +117,20 @@ export function openGoalEditor(opts = {}) {
         continueList(desc, e);
     });
     const d = el('input'); d.type = 'text'; d.maxLength = 300; d.autocomplete = 'off'; d.id = 'goal-new-done'; d.placeholder = 'What a person can check';
-    const doneLab = el('label', 'goal-label'); doneLab.htmlFor = 'goal-new-done'; doneLab.append('Done when ', el('span', 'goal-label-note', '· one thing a person can check (optional)'));
+    const doneLab = el('label', 'goal-field-label'); doneLab.htmlFor = 'goal-new-done'; doneLab.append('Done when ', el('span', 'goal-field-label-note', '· one thing a person can check (optional)'));
     const doneChips = el('div', 'goal-done-signs'); doneChips.setAttribute('aria-label', 'What the done-when has'); // under Done when: the checks as small notes
     const pics = el('div', 'goals-pics goal-pics'); let tray = null; // the pictures of the goal: the comment box's tray, loaded when the form opens
-    const picLab = el('div', 'goal-label', 'Pictures'); picLab.id = 'goal-pics-label';
-    const picRow = el('div', 'goal-pics-row'); picRow.setAttribute('role', 'group'); picRow.setAttribute('aria-labelledby', 'goal-pics-label');
+    const picLab = el('div', 'goal-field-label', 'Pictures'); picLab.id = 'goal-picbox-label';
+    const picRow = el('div', 'goal-picrow'); picRow.setAttribute('role', 'group'); picRow.setAttribute('aria-labelledby', 'goal-picbox-label');
     const err = el('p', 'goals-field-error'); err.setAttribute('role', 'alert');
-    const main = el('div', 'goals-form-body goal-main'); main.append(t, descLab, bar, desc, descCount, el('div', 'goal-gap'), doneLab, d, doneChips, picLab, pics, err);
+    const main = el('div', 'goals-form-body goal-writing'); main.append(t, descLab, bar, desc, descCount, el('div', 'goal-gap'), doneLab, d, doneChips, picLab, pics, err);
 
     // the Guide rail: the board's rules for how big a goal is, as local checks that follow the words (goal_guide.js; no model, no agent)
     const guide = el('section', 'goal-card goal-guide'); guide.setAttribute('aria-labelledby', 'goal-guide-title');
     const gTitle = el('h4', null, 'Guide'); gTitle.id = 'goal-guide-title'; const gNote = el('span', 'goal-guide-note', ' \u00b7 updates as you write'); gTitle.append(gNote);
     const gSummary = el('p', 'goal-guide-summary'); gSummary.setAttribute('role', 'status'); gSummary.setAttribute('aria-live', 'polite'); // said once, a moment after the words stop
     const gChecks = el('ul', 'goal-checks');
-    const gSize = el('div', 'goal-size'), gSizeLab = el('div', 'goal-label', 'Likely size'), meter = el('div', 'goal-meter'), fill = el('i'), gSizeWords = el('p', 'goal-size-words');
+    const gSize = el('div', 'goal-size'), gSizeLab = el('div', 'goal-field-label', 'Likely size'), meter = el('div', 'goal-meter'), fill = el('i'), gSizeWords = el('p', 'goal-size-words');
     meter.append(fill); gSize.append(gSizeLab, meter, gSizeWords);
     guide.append(gTitle, gSummary, gChecks, gSize);
     const examples = el('section', 'goal-card goal-examples'); examples.setAttribute('aria-labelledby', 'goal-examples-title');

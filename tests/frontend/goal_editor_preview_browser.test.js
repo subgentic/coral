@@ -38,7 +38,7 @@ const MD = 'Customers import a **CSV** and _only_ a CSV.\n\n- read the file\n- [
             await waitFor(`!document.querySelector('.goal-preview').hidden && !!document.querySelector('.goal-preview-title')`, `${tag}: the empty preview`, 5000);
             check(`${tag}: an empty goal previews as untitled with nothing written`, /Untitled goal/.test(await ev(`document.querySelector('.goal-preview-title').textContent`)) && /Nothing written yet/.test(await ev(`document.querySelector('.goal-preview').textContent`)) && /Not set yet/.test(await ev(`document.querySelector('.goal-preview').textContent`)));
             await ev(`document.querySelector('.goal-preview-toggle').click(); true`);
-            check(`${tag}: Edit goes back to the writing`, (await ev(`document.querySelector('.goal-preview').hidden`)) === true && (await ev(`document.querySelector('.goal-main').hidden`)) === false && (await ev(`document.querySelector('.goal-preview-toggle').textContent`)) === 'Preview');
+            check(`${tag}: Edit goes back to the writing`, (await ev(`document.querySelector('.goal-preview').hidden`)) === true && (await ev(`document.querySelector('.goal-writing').hidden`)) === false && (await ev(`document.querySelector('.goal-preview-toggle').textContent`)) === 'Preview');
 
             // written: Markdown-lite drawn as the page draws it
             await set('goal-new-title', 'Customers import a CSV'); await set('goal-new-description', MD); await set('goal-new-done', 'A customer sees every row in under a minute');

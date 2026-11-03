@@ -20,8 +20,8 @@
 .goal-editor .goal-title:focus { border-bottom-color: var(--accent); }
 .goal-editor .goal-title::placeholder { color: var(--text-muted); }
 .goal-editor .goal-title[aria-invalid="true"] { border-bottom-color: var(--error); }
-.goal-label { margin-top: 8px; font-size: var(--fs-sm); letter-spacing: var(--ls-caps); text-transform: uppercase; color: var(--text-muted); font-weight: var(--fw-strong); }
-.goal-label-note { text-transform: none; letter-spacing: 0; font-weight: var(--fw-regular); }
+.goal-field-label { margin-top: 8px; font-size: var(--fs-sm); letter-spacing: var(--ls-caps); text-transform: uppercase; color: var(--text-muted); font-weight: var(--fw-strong); }
+.goal-field-label-note { text-transform: none; letter-spacing: 0; font-weight: var(--fw-regular); }
 .goal-toolbar { flex: none; display: flex; gap: 2px; padding: 4px; border: 1px solid var(--border); border-bottom: 0; border-radius: var(--radius-md) var(--radius-md) 0 0; background: var(--bg-secondary); overflow-x: auto; scrollbar-width: none; }
 .goal-toolbar::-webkit-scrollbar { display: none; }
 .goal-tb { flex: none; display: inline-grid; place-items: center; width: 32px; height: 30px; padding: 0; border: 0; border-radius: var(--radius-sm); background: none; color: var(--text-secondary); cursor: pointer; font: inherit; }
@@ -49,9 +49,9 @@
 
 /* the pictures: thumbnails in a row (the tray's own list), each with Mark up and Remove laid over its corner, and a dashed tile to drop, paste or choose one (#12724) */
 .goal-pics { align-items: stretch; }
-.goal-pics-row { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 10px; }
-.goal-editor .goal-pics-row > .ac-images { flex: 0 1 auto; width: auto; max-width: 100%; }
-.goal-pics-row > .ac-picker { flex: none; }
+.goal-picrow { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 10px; }
+.goal-editor .goal-picrow > .ac-images { flex: 0 1 auto; width: auto; max-width: 100%; }
+.goal-picrow > .ac-picker { flex: none; }
 .goal-editor .ac-thumbs { gap: 10px; }
 .goal-editor .ac-thumb { position: relative; width: 96px; gap: 0; }
 .goal-editor .ac-thumb-img { width: 96px; height: 72px; }
@@ -67,7 +67,7 @@
 .goal-editor .goal-drop { width: 150px; height: 72px; margin: 0; padding: 4px 8px; border: 1.5px dashed var(--control-border); background: none; color: var(--text-secondary); font-size: var(--fs-md); white-space: normal; text-align: center; }
 .goal-editor .goal-drop:hover, .goal-editor .goal-drop:focus-visible { border-color: var(--accent); color: var(--text-primary); }
 .goal-editor .ac-drop { outline: 2px dashed var(--accent); outline-offset: -4px; }
-@media (max-width: 767px) { .goal-editor .goal-drop { width: 100%; height: 56px; } .goal-pics-row .ac-picker { flex: 1 1 100%; } }
+@media (max-width: 767px) { .goal-editor .goal-drop { width: 100%; height: 56px; } .goal-picrow .ac-picker { flex: 1 1 100%; } }
 
 /* the Guide rail (#12724): checks that follow the words, the likely size, and examples of a good done-when */
 @media (min-width: 768px) {
@@ -119,3 +119,4 @@
 .goal-md > :first-child { margin-top: 0; }
 .goal-md > :last-child { margin-bottom: 0; }
 .goal-rail-quiet .goal-preview-card { display: none; }
+.goal-preview-card p { margin: 0 0 10px; font-size: var(--fs-md); color: var(--text-secondary); }

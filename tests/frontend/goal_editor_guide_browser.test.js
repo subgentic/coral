@@ -33,7 +33,7 @@ const STUB = `(() => { const R = window.fetch; const json = (b, s = 200) => Prom
             let c = await checks();
             check(`${tag}: nothing typed: todo, not a warning`, c.one && c.one[0] === 'todo' && c.done && c.done[0] === 'todo' && (await ev(`document.querySelector('.goal-guide-summary').dataset.looks`)) === '0', JSON.stringify(c));
             // where it sits
-            const main = await box('.goal-main'), rail = await box('.goal-rail'), out = await box('#goal-new-description');
+            const main = await box('.goal-writing'), rail = await box('.goal-rail'), out = await box('#goal-new-description');
             if (!mobile) check(`${tag}: the Guide is at the right of the writing`, rail.l >= main.r - 4 && rail.t < 200, JSON.stringify({ main, rail }));
             else check(`${tag}: on a phone the Guide is under the writing`, rail.t >= out.b && rail.w >= 300 / (fs === 32 ? 1 : 1) * 0 + 1, JSON.stringify({ out, rail }));
 
@@ -63,6 +63,7 @@ const STUB = `(() => { const R = window.fetch; const json = (b, s = 200) => Prom
             // an example fills the done-when
             await set('goal-new-done', ''); await ev(`document.querySelector('.goal-example').click(); true`);
             check(`${tag}: an example fills the done-when and the Guide follows`, /^A person can open Settings/.test(await ev(`document.getElementById('goal-new-done').value`)) && (await checks()).done[0] === 'ok');
+            if (mobile && fs === 16) { await ev(`document.querySelector('.goal-guide').scrollIntoView({ block: 'start' }); true`); const sc = await ev(`(() => { const d = document.querySelector('dialog.goal-editor'), m = document.querySelector('.goal-writing'), a = document.querySelector('.goals-actions').getBoundingClientRect(); return { dialogScrolled: d.scrollTop, mainScrolled: m.scrollTop, actionsBottom: Math.round(a.bottom), vh: innerHeight }; })()`); check(`${tag}: the writing scrolls inside the screen and the actions stay pinned at the bottom`, sc.dialogScrolled === 0 && sc.mainScrolled > 0 && sc.actionsBottom >= sc.vh - 8, JSON.stringify(sc)); await ev(`document.querySelector('.goal-writing').scrollTop = 0; true`); }
             check(`${tag}: nothing scrolls sideways`, (await ev(`document.documentElement.scrollWidth - document.documentElement.clientWidth`)) <= 0 && (await ev(`(() => { const d = document.querySelector('dialog.goal-editor'); return d.scrollWidth - d.clientWidth; })()`)) <= 1);
             check(`${tag}: no model or agent call was made`, (await ev(`window.__asked || 0`)) === 0);
             if (fs === 16) { await set('goal-new-title', 'Importer is live for every customer'); await set('goal-new-description', 'Customers can bring their data into Coral from a CSV file and also from Notion.\n- The import runs in the background\n- Rows that fail are listed'); await set('goal-new-done', 'A new customer imports a 10,000-row CSV and sees every row in under a minute'); await new Promise(r => setTimeout(r, 800)); await shot(`guide-${w}`); } // sleep-ok: the summary is said after a pause
