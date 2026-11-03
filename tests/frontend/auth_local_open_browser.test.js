@@ -157,9 +157,13 @@ const ATTACK = {
                 assert.equal(await p.status(), 200, 'signed in after');
             });
             // Security's extra case: with require_auth_on_loopback on, the button is not offered and the route refuses, even with no password. Changed from the suite's
-            // own tab and turned back off whatever happens.
+            // own tab and put back as it was whatever happens: its old value, and no row at all if there was none (a PUT cannot delete a row, so the row this
+            // suite added is deleted from the server's database; the live value is already back to the default by then).
             await test('with require_auth_on_loopback on, no button and the route refuses', async () => {
                 assert.ok(ownEv, 'the suite tab is signed in (the case above)');
+                const { sqliteText, sqliteExec } = require('./helpers/sqlite');
+                const db = require('node:path').join(process.env.CORAL_TEST_DATA_DIR, 'sessions.db');
+                const rowBefore = sqliteText(db, `SELECT value FROM user_settings WHERE key = 'require_auth_on_loopback'`).trim().split('\n').filter(Boolean);
                 const put = v => ownEv(`fetch('${BASE}/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ require_auth_on_loopback: ${v} }) }).then(r => r.status)`);
                 assert.equal(await put(true), 200, 'the setting was turned on');
                 try {
@@ -170,7 +174,11 @@ const ATTACK = {
                     assert.equal(await p.ev(`fetch('${BASE}/auth/local', { method: 'POST', credentials: 'include' }).then(r => r.status)`), 403, 'the route refuses');
                     assert.deepEqual(await p.cookies(), [], 'no cookie');
                 } finally {
-                    assert.equal(await put(false), 200, 'the setting was turned back off');
+                    const old = rowBefore.length ? rowBefore[0] === 'true' : false;
+                    assert.equal(await put(old), 200, 'the setting was put back');
+                    if (!rowBefore.length) sqliteExec(db, `DELETE FROM user_settings WHERE key = 'require_auth_on_loopback'`);
+                    const rowAfter = sqliteText(db, `SELECT value FROM user_settings WHERE key = 'require_auth_on_loopback'`).trim().split('\n').filter(Boolean);
+                    assert.deepEqual(rowAfter, rowBefore, 'the settings row is as it was');
                 }
             });
         } finally {
