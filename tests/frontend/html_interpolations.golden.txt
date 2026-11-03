@@ -88,7 +88,6 @@
 1	changed_files.js	adds
 1	changed_files.js	agentOnlyCls
 1	changed_files.js	agentsHtml
-2	changed_files.js	branch
 2	changed_files.js	cls
 1	changed_files.js	compareNote
 2	changed_files.js	copyBtn
@@ -103,16 +102,15 @@
 1	changed_files.js	modeSelect
 1	changed_files.js	moreButton(f.filepath, rowName)
 1	changed_files.js	moreButton(filepath, name)
-2	changed_files.js	name
 1	changed_files.js	options
 2	changed_files.js	previewBtn
 2	changed_files.js	shareBtn
+1	changed_files.js	staleNoteHtml()
 2	changed_files.js	starBtn
 2	changed_files.js	stats
 1	changed_files.js	statusCls
 1	changed_files.js	totals.adds
 1	changed_files.js	totals.dels
-1	changed_files.js	worktreeNoteHtml()
 1	chat_bubbles.js	artifactRef ? '' : `<button type="button" class="menu-item" role="menuitem" data-action="edit"><span class="ma
 1	chat_bubbles.js	editors.map((ed, i) => `<button type="button" class="menu-item" role="menuitem" data-action="editor" data-edit
 2	chat_bubbles.js	line > 0 ? ` (line ${line})` : ""
@@ -342,6 +340,7 @@
 1	server_status.js	serverDetailsHtml(e)
 1	server_status.js	serverLaunchActionsHtml(e)
 1	server_status.js	updateBadgeHtml(e)
+1	session_header_updates.js	_whereBack
 2	session_rows.js	!instructionsOffered(s, isCloud()) ? '' : `<button class="menu-item overflow-menu-item" data-on-click="agent-i
 1	session_rows.js	MORE_DOTS_SVG
 18	session_rows.js	SVGO.o0

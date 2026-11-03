@@ -1,5 +1,5 @@
-// The Files panel follows an agent into the git worktree it works in (#11351, the operator): the list is read with worktree=follow, the panel names the worktree and its branch and offers "Back to launch folder";
-// the way back reads the launch folder's list (worktree=launch) and offers "Follow it"; every file read the panel and its inline diffs make carries the same choice. The server's answers are stubbed in the page.
+// The Files panel follows an agent into the git worktree it works in (#11351, the operator): the list is read with worktree=follow, the panel names the worktree and its branch in ONE line at the top (#12690, the Operator: the followed folder only, no second path, no sentence) with a small icon back to the launch folder;
+// the way back reads the launch folder's list (worktree=launch) and the same line offers an icon to follow the worktree; every file read the panel and its inline diffs make carries the same choice. The server's answers are stubbed in the page.
 // 1280 and 390 px. Drives Chrome over CDP.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -8,6 +8,7 @@ const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
+    const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; require('node:fs').mkdirSync(d, { recursive: true }); require('node:fs').writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const problems = [];
     const check = (label, cond, detail) => { if (!cond) problems.push(`${label}${detail !== undefined ? ': ' + detail : ''}`); };
     try {
@@ -33,10 +34,21 @@ const { coralReady } = require('./helpers/wait');
             await ev(`window.switchAgenticTab && window.switchAgenticTab('files', 'top'); window.toggleAgenticPanel && window.toggleAgenticPanel(true); true`);
             await waitFor(`document.getElementById('changed-files-title').getClientRects().length > 0`, `${tag}: the Files header on screen`, 8000);
             await ev(`window.refreshChangedFiles().then(() => true)`);
-            await waitFor(`!!document.querySelector('#changed-files-list .files-worktree')`, `${tag}: the worktree is named`, 8000);
+            await waitFor(`!!document.querySelector('#files-where [data-on-click="worktree-launch"]')`, `${tag}: the worktree is named`, 8000);
 
-            const first = await ev(`({ note: document.querySelector('#changed-files-list .files-worktree').innerText, files: [...document.querySelectorAll('#changed-files-list .file-item')].map(r => r.dataset.filepath), reads: window.__reads })`);
-            check(`${tag}: the panel follows by default and names the worktree and its branch`, /Following the agent in the worktree/.test(first.note) && /feature-tree/.test(first.note) && /feature/.test(first.note) && /Back to launch folder/.test(first.note), first.note);
+            await shot('follow-' + w);
+            if (false) throw new Error('PROBE ' + JSON.stringify(await ev(`(() => { const b = document.querySelector('#files-where [data-on-click]'), r = b.getBoundingClientRect(), c = getComputedStyle(b), i = b.firstChild, ci = getComputedStyle(i); return { r: [r.left, r.top, r.width, r.height], disp: c.display, color: c.color, bg: c.backgroundColor, fs: ci.fontSize, ff: ci.fontFamily, ww: document.getElementById('files-where').getBoundingClientRect().width }; })()`)));
+            const first = await ev(`({ note: document.getElementById('files-where').innerText, title: document.getElementById('files-where').title, lines: document.querySelectorAll('#files-where').length, bar: document.querySelectorAll('.files-worktree').length, panel: document.getElementById('agentic-panel-files').innerText, back: (() => { const b = document.querySelector('#files-where [data-on-click="worktree-launch"]'); return { label: b.getAttribute('aria-label'), text: b.innerText.replace(/arrow_back/, '').trim() }; })(), files: [...document.querySelectorAll('#changed-files-list .file-item')].map(r => r.dataset.filepath), reads: window.__reads })`);
+            check(`${tag}: the panel follows by default and names ONLY the worktree and its branch in one short line`, /^feature-tree \u00b7 feature/.test(first.note) && first.title === '/work/feature-tree' && first.lines === 1 && first.bar === 0, JSON.stringify(first));
+            check(`${tag}: no sentence and no second path (the launch folder is not named)`, !/Following the agent|in the worktree/.test(first.panel) && !/main-repo/.test(first.panel) && !/Back to launch folder/.test(first.panel.replace(first.back.label, '')), first.panel);
+            check(`${tag}: the way back is a small icon button named for screen readers`, first.back.label === 'Back to launch folder' && first.back.text === '', JSON.stringify(first.back));
+            if (mobile) { const r = await ev(`(() => { const b = document.querySelector('#files-where [data-on-click]').getBoundingClientRect(); return [b.width, b.height]; })()`); check(`${tag}: the icon is a 44 px target on a phone`, r[0] >= 44 && r[1] >= 44, JSON.stringify(r)); }
+            // by keyboard: focus the button and press Enter
+            await ev(`window.__reads = []; document.querySelector('#files-where [data-on-click="worktree-launch"]').focus(); true`);
+            await ev(`document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); document.activeElement.click(); true`);
+            await waitFor(`!!document.querySelector('#files-where [data-on-click="worktree-follow"]')`, `${tag}: the way back by the keyboard-focused button`, 8000);
+            await ev(`document.querySelector('#files-where [data-on-click="worktree-follow"]').click(); true`);
+            await waitFor(`!!document.querySelector('#files-where [data-on-click="worktree-launch"]')`, `${tag}: following again before the checks`, 8000);
             check(`${tag}: the worktree's file is listed`, JSON.stringify(first.files) === JSON.stringify(['work.txt']), JSON.stringify(first.files));
             check(`${tag}: the list was read with worktree=follow`, first.reads.length > 0 && first.reads.every(r => r.mode === 'follow'), JSON.stringify(first.reads));
 
@@ -46,18 +58,18 @@ const { coralReady } = require('./helpers/wait');
             check(`${tag}: a diff's file reads carry worktree=follow`, (await ev(`window.__reads`)).every(r => r.mode === 'follow'), JSON.stringify(await ev(`window.__reads`)));
 
             // the way back
-            await ev(`window.__reads = []; document.querySelector('#changed-files-list [data-on-click="worktree-launch"]').click(); true`);
-            await waitFor(`!!document.querySelector('#changed-files-list [data-on-click="worktree-follow"]')`, `${tag}: the way back is taken`, 8000);
-            const back = await ev(`({ note: document.querySelector('#changed-files-list .files-worktree').innerText, files: [...document.querySelectorAll('#changed-files-list .file-item')].map(r => r.dataset.filepath), reads: window.__reads, open: document.querySelectorAll('#changed-files-list .file-diff:not([hidden])').length })`);
-            check(`${tag}: back in the launch folder the list is its own and the worktree is offered`, JSON.stringify(back.files) === JSON.stringify(['launch.txt']) && /The agent is working in the worktree/.test(back.note) && /Follow it/.test(back.note), JSON.stringify(back));
+            await ev(`window.__reads = []; document.querySelector('#files-where [data-on-click="worktree-launch"]').click(); true`);
+            await waitFor(`!!document.querySelector('#files-where [data-on-click="worktree-follow"]')`, `${tag}: the way back is taken`, 8000);
+            const back = await ev(`({ note: document.getElementById('files-where').title + '|' + document.querySelector('#files-where [data-on-click]').getAttribute('aria-label'), files: [...document.querySelectorAll('#changed-files-list .file-item')].map(r => r.dataset.filepath), reads: window.__reads, open: document.querySelectorAll('#changed-files-list .file-diff:not([hidden])').length })`);
+            check(`${tag}: back in the launch folder the list is its own and the worktree is offered`, JSON.stringify(back.files) === JSON.stringify(['launch.txt']) && /Follow the agent into its worktree feature-tree/.test(back.note) && back.note.split('|')[0] !== '/work/feature-tree', JSON.stringify(back));
             check(`${tag}: the launch folder was read with worktree=launch, and no diff of the other folder stays open`, back.reads.length > 0 && back.reads.every(r => r.mode === 'launch') && back.open === 0, JSON.stringify(back.reads));
 
             // the choice is kept for the browser session: a reload does not flip it back
             check(`${tag}: the way back is remembered in the browser session`, (await ev(`sessionStorage.getItem('coral-files-launch:wp-id')`)) === '1' && (await ev(`import((window.__coralStatic || '/static/') + 'agent_file_api.js').then(m => m.worktreeMode('wp-id'))`)) === 'launch');
 
             // and forward again
-            await ev(`window.__reads = []; document.querySelector('#changed-files-list [data-on-click="worktree-follow"]').click(); true`);
-            await waitFor(`!!document.querySelector('#changed-files-list [data-on-click="worktree-launch"]')`, `${tag}: following again`, 8000);
+            await ev(`window.__reads = []; document.querySelector('#files-where [data-on-click="worktree-follow"]').click(); true`);
+            await waitFor(`!!document.querySelector('#files-where [data-on-click="worktree-launch"]')`, `${tag}: following again`, 8000);
             check(`${tag}: following again forgets the choice`, (await ev(`sessionStorage.getItem('coral-files-launch:wp-id')`)) === null);
             check(`${tag}: following again reads worktree=follow`, (await ev(`window.__reads`)).every(r => r.mode === 'follow'), JSON.stringify(await ev(`window.__reads`)));
             check(`${tag}: the page does not scroll sideways`, (await ev(`document.documentElement.scrollWidth - document.documentElement.clientWidth`)) <= 0);
