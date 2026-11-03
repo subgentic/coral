@@ -55,9 +55,18 @@ const SKILLS = [
 
         await ev(`window.showLaunchModal(); window._selectLaunchType('agent'); true`);
         await waitFor(`getComputedStyle(document.getElementById('launch-step-agent')).display !== 'none' && !document.getElementById('launch-skills-row').hidden`, 'the agent step with its skills row', 8000);
-        const agent = await ev(`(() => { const h = document.getElementById('launch-skills-host'); const s = h.querySelector('details > summary'); return { has: !!s, text: s && s.textContent, shown: !!s && s.getClientRects().length > 0, section: (document.getElementById('launch-skills-row').closest('[role=tabpanel], .settings-pane, .sd-extra') || {}).id || null }; })()`);
-        assert.ok(agent.has && /Choose from 3 skills/.test(agent.text), 'New agent has the same disclosure: ' + JSON.stringify(agent));
-        console.log('agent skills disclosure: ' + JSON.stringify(agent));
+        await ev(`(() => { const e = document.getElementById('launch-dir'); e.value = '/tmp/work'; e.dispatchEvent(new Event('input', { bubbles: true })); e.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+        for (const stage of ['persona', 'agent']) {
+            await ev(`(() => { const b = [...document.querySelectorAll('#launch-step-agent button')].find(x => x.textContent.trim() === 'Next' && x.getClientRects().length); if (b) b.click(); return !!b; })()`);
+            await waitFor(`document.getElementById('launch-step-agent').dataset.stage === '${stage}'`, `step ${stage}`, 5000);
+        }
+        // step 3 opens on its Agent section: the skills are in it, with no other section to find first (a phone's section list is a dropdown)
+        const agent = await ev(`(() => { const h = document.getElementById('launch-skills-host'); const s = h.querySelector('details > summary'); const r = s && s.getBoundingClientRect(); return { has: !!s, text: s && s.textContent, shown: !!s && s.getClientRects().length > 0, inView: !!r && r.bottom <= innerHeight && r.left >= 0 && r.right <= innerWidth, section: (document.querySelector('#launch-agent-acf .settings-pane:not([hidden])') || {}).dataset?.section }; })()`);
+        assert.ok(agent.has && /Choose from 3 skills/.test(agent.text), 'New agent has the disclosure: ' + JSON.stringify(agent));
+        assert.ok(agent.shown && agent.section === 'agent' && agent.inView, 'step 3 shows it in its first section, on screen at 390: ' + JSON.stringify(agent));
+        await ev(`document.querySelector('#launch-skills-host details > summary').click(); true`);
+        check('New agent', await measure('launch-skills-host'));
+        await shot('skills-agent-390');
     } finally { await client.close(); }
     console.log('PASS the skills list fits a phone in New team and New agent has the disclosure');
 })().catch(e => { console.error(e); process.exit(1); });
