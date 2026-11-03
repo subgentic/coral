@@ -91,7 +91,7 @@ func TestDataFolderNamesAreOnlyPlainRelativeFolders(t *testing.T) {
 			t.Errorf("%q should be allowed", ok)
 		}
 	}
-	for _, bad := range []string{"", "@keep", "..", "../x", "a/../b", "/etc", "~/x", "a b", "a;b", "a/", "-x", ".", "./x", "a//b", "$HOME", "a\nb", "a/b/c/d/e/f", ".ssh", ".ssh/coral", ".gnupg", ".config/x"} {
+	for _, bad := range []string{"", "@keep", "..", "../x", "a/../b", "a..b", "my..coral/data", "x/y..", "/etc", "~/x", "a b", "a;b", "a/", "-x", ".", "./x", "a//b", "$HOME", "a\nb", "a/b/c/d/e/f", ".ssh", ".ssh/coral", ".gnupg", ".config/x"} {
 		if ValidDataDir(bad) {
 			t.Errorf("%q should be refused", bad)
 		}
@@ -132,4 +132,24 @@ func TestStartIgnoresARecordedKeysFolder(t *testing.T) {
 		time.Sleep(50 * time.Millisecond)
 	}
 	t.Error("a recorded .ssh folder was followed")
+}
+
+// Whatever the validator accepts, the remote read-back gives the same folder: the start, the key read and an upgrade's @keep all use one.
+func TestEveryAcceptedDataFolderReadsBackAsItself(t *testing.T) {
+	for _, d := range []string{".coral", "my-coral/data", "a.b", "a.b/c_d", ".coral-server/data", "x/y.z"} {
+		if !ValidDataDir(d) {
+			t.Fatalf("%q should be allowed", d)
+		}
+		home := t.TempDir()
+		if err := os.MkdirAll(filepath.Join(home, InstallDir), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		_ = os.WriteFile(filepath.Join(home, InstallDir, "datadir"), []byte(d), 0o600)
+		cmd := exec.Command("sh", "-c", readDataDir+`printf %s "$d"`)
+		cmd.Env = append(os.Environ(), "HOME="+home)
+		out, _ := cmd.Output()
+		if string(out) != d {
+			t.Errorf("%q reads back as %q", d, out)
+		}
+	}
 }

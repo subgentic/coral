@@ -38,7 +38,7 @@ export const cleanDataDir = (v) => String(v || '').trim().replace(/^(~\/|\/)+/, 
 /** Why a folder is not one the hub accepts (the server checks again), in a plain sentence; '' when it is fine or empty (the default). Up to five names of letters, digits, dot, underscore and hyphen; not the folders of keys and settings. */
 export const dataDirProblem = (v) => {
     if (v === '') return '';
-    if (!/^\.?[A-Za-z0-9_][A-Za-z0-9._-]{0,60}(\/\.?[A-Za-z0-9_][A-Za-z0-9._-]{0,60}){0,4}$/.test(v)) return 'Use plain folder names such as .coral or my-coral/data: letters, digits, dot, underscore and hyphen, up to five names, with no .. in them.';
+    if (v.includes('..') || !/^\.?[A-Za-z0-9_][A-Za-z0-9._-]{0,60}(\/\.?[A-Za-z0-9_][A-Za-z0-9._-]{0,60}){0,4}$/.test(v)) return 'Use plain folder names such as .coral or my-coral/data: letters, digits, dot, underscore and hyphen, up to five names, with no .. in them.';
     const first = v.split('/')[0];
     if (['.ssh', '.gnupg', '.config'].includes(first)) return `${first} holds your keys or settings on that computer, so Coral will not keep its data there. Choose another folder.`;
     return '';
