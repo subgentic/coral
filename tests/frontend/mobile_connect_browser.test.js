@@ -70,23 +70,24 @@ const BASE = require('./test_base').BASE;
         await ev('window._showMobileConnectModal()');
         assert.match(await status(), /^Scan a QR code to open Coral on your phone\. Mobile access is off/, 'one line says what the QR is for, before Enable (#10572)');
         assert.match(await status(), /turning it on lets devices on your network reach Coral; they need your password or a setup code\. Or use Coral Hub, which needs no network access\./); // what Enable does, before it is pressed (#10149)
-        assert.deepEqual(await ev(`[...document.querySelectorAll('#mobile-connect-actions button')].map(b => b.textContent)`), ['Enable', 'Use Coral Hub instead', 'Cancel'], 'the Hub way is a named button');
+        assert.deepEqual(await ev(`[...document.querySelectorAll('#mobile-connect-actions button')].map(b => b.textContent)`), ['Cancel', 'Use Coral Hub instead', 'Enable'], 'Cancel first, the primary Enable last (R1, #12897); the Hub way is a named button');
         assert.deepEqual(await ev('window.__calls.map(c=>c.url)'),['/api/system/privacy']);
         await noQR(); await shot('mobile-qr-disabled');
         // Focus trap excludes controls hidden in the enabled-only details.
         await Input.dispatchKeyEvent({type:'keyDown',key:'Tab',code:'Tab',windowsVirtualKeyCode:9,modifiers:8});
         await Input.dispatchKeyEvent({type:'keyUp',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
-        assert.equal(await ev('document.activeElement.textContent'),'Cancel'); // Shift+Tab from the first button wraps to the last: Enable, Use Coral Hub instead, Cancel
+        assert.equal(await ev('document.activeElement.textContent'),'Enable'); // Shift+Tab from the first button (Cancel, the safe answer, has the focus) wraps to the last: Cancel, Use Coral Hub instead, Enable
         await action('Cancel');
         assert.equal(await ev(`document.getElementById('mobile-connect-modal').style.display`),'none');
         assert.equal(await ev('document.activeElement.id'),'qr-test-opener');
         assert.equal(await ev(`window.__calls.filter(c=>c.body).length`),0);
         // Explicit Enable is the sole write; duplicate clicks do not resubmit.
         await ev('window._showMobileConnectModal()');
-        await ev(`const b=document.querySelector('#mobile-connect-actions button');b.click();b.click()`);await tick();
+        await ev(`const b=[...document.querySelectorAll('#mobile-connect-actions button')].find(x=>x.textContent==='Enable');b.click();b.click()`);await tick();
         assert.deepEqual(await ev(`window.__calls.filter(c=>c.body).map(c=>c.body)`),[{remote_access_enabled:true}]);
         assert.match(await status(),/Restart Coral/);await noQR();await shot('mobile-qr-restart-required');
         assert.equal(await ev(`window.__calls.some(c=>c.url==='/api/system/api-key')`),false);
+        assert.equal(await ev(`[...document.querySelectorAll('#mobile-connect-actions button')].map(b=>b.textContent).join()`),'Close,Check again','the dismiss first, the primary last in every state (R1, #12897)');
         await action('Check again');await tick();await noQR();
         assert.equal(await ev(`window.__calls.filter(c=>c.body).length`),1);
         // Only a fresh effective=true response unlocks network/key/QR details.
@@ -121,6 +122,7 @@ const BASE = require('./test_base').BASE;
         // Failures leave access closed; retry reads status, never writes settings.
         await ev('window.__mode="error";window._showMobileConnectModal()');
         assert.match(await status(),/Could not check mobile access/);await noQR();
+        assert.equal(await ev(`[...document.querySelectorAll('#mobile-connect-actions button')].map(b=>b.textContent).join()`),'Cancel,Retry','the failed check: Cancel first, Retry last (R1, #12897)');
         await ev('window.__mode="invalid"');await action('Retry');await tick();
         assert.match(await status(),/Could not verify/);await noQR();
         await ev('window.__mode="normal";window.__effective=false');await action('Retry');await tick();

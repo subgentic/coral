@@ -52,15 +52,15 @@ const { coralReady, framesJs } = require('./helpers/wait');
         await ev(`(() => { const s = document.getElementById('theme-save-base'); s.value = 'dark'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
         await waitFor(`document.querySelector('#theme-configurator-modal .theme-color-text[data-var="${bgVar}"]').value === ${JSON.stringify(darkBg)}`, 'back to the Dark values', 6000).catch(() => {});
         check(await val(bgVar) === darkBg && (await val(otherVar)).toLowerCase() === '#123456', `back on Dark the untouched colours are Dark's and the edited one stays: ${await val(bgVar)} ${await val(otherVar)}`);
-        // Light in Load, then Save & Apply: a light theme on the server and on the page
+        // Light in Load, then Save and apply: a light theme on the server and on the page
         await ev(`(() => { const s = document.getElementById('theme-load-select'); s.value = 'base:light'; document.querySelector('[data-on-click="theme-load"]').click(); return true; })()`);
         await waitFor(`document.getElementById('theme-save-base').value === 'light'`, 'Light loaded', 6000).catch(() => {});
         check(await val(bgVar) === lightBg, `Load > Light fills the Light colours: ${await val(bgVar)} vs ${lightBg}`);
         await ev(`document.getElementById('theme-save-name').value = ${JSON.stringify(NAME)}; document.querySelector('[data-on-click="theme-save"]').click(); true`);
-        await waitFor(`document.documentElement.getAttribute('data-theme') === 'light'`, 'the page is light after Save & Apply', 8000).catch(() => {});
+        await waitFor(`document.documentElement.getAttribute('data-theme') === 'light'`, 'the page is light after Save and apply', 8000).catch(() => {});
         const saved = await ev(`fetch('/api/themes/${NAME}').then(r => r.json()).then(d => ({ base: d.theme && d.theme.base, bg: d.theme && d.theme.variables && d.theme.variables[${JSON.stringify(bgVar)}] }))`);
         check(saved.base === 'light' && saved.bg && saved.bg.toLowerCase() === lightBg.toLowerCase(), 'the saved theme is Based on Light with the Light colours: ' + JSON.stringify({ saved, lightBg }));
-        check(await ev(`document.documentElement.getAttribute('data-theme')`) === 'light', 'the page is on the light base after Save & Apply');
+        check(await ev(`document.documentElement.getAttribute('data-theme')`) === 'light', 'the page is on the light base after Save and apply');
         // applied again at page load: still light
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await ev(`import(${S} + 'settings_core.js').then(sc => sc.applyCustomThemeByName(${JSON.stringify(NAME)}, { remember: false })).then(() => true)`); await ev(framesJs(4));

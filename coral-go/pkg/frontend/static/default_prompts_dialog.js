@@ -9,7 +9,7 @@ ensureBuilt('default-prompts-modal'); // built on this module's first load, its 
 // ── Default Prompts Modal ──────────────────────────────────────────
 
 // Cached default prompts fetched from the backend API.
-// Populated on first open of the modal; used for "Reset to Default".
+// Populated on first open of the modal; used for "Reset to default".
 let _defaultPrompts = null;
 
 async function _ensureDefaultPrompts() {

@@ -21,7 +21,7 @@ New agents use it unless you choose a model when you launch them.
 ## Switch to the light theme
 
 1. Click the gear at the top right to open **Settings**. **General** is the first group.
-2. Next to **Theme**, pick **Light**. **System** follows your computer instead, and **Customize Theme** beside it makes your own.
+2. Next to **Theme**, pick **Light**. **System** follows your computer instead, and **Customize theme** beside it makes your own.
 3. Press **Save settings**.
 
 ## Copy a chat, or keep part of it
