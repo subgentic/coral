@@ -125,6 +125,7 @@ export function showOpenFolderModal(server) { // server: the computer whose serv
     if (!modal) return;
     modal.dataset.server = typeof server === 'string' ? server : '';
     window.hideLaunchModal?.();
+    const hiding = document.getElementById('launch-modal'); if (hiding && hiding.contains(document.activeElement)) document.activeElement.blur(); // Open folder is in the +New chooser now (#13012): the chooser's card is hidden, so the dialog's opener is the control the keyboard was on before it, as for any dialog opened from a menu
     const input = document.getElementById('open-folder-dir');
     const err = document.getElementById('open-folder-error');
     if (err) { err.textContent = ''; err.hidden = true; }

@@ -21,8 +21,8 @@ const { coralReady } = require('./helpers/wait');
             await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             await sleep(700); // sleep-ok: Home draws after the first reads
             if (!mobile) {
-                const open = await text('#welcome-open-folder .welcome-launch-copy');
-                check(`${tag}: Open folder says what it is for`, open === 'Open folder Add a project folder to start agents in later.', open);
+                const open = await text('#welcome-new-goal .welcome-launch-copy');
+                check(`${tag}: New goal says what it is for`, open === 'New goal Give a team an outcome to work toward.' || open === 'New goal No team yet. Start one to give it a goal.', open);
                 await ev(`(() => { const h = document.querySelector('.editions-home'); if (h) h.hidden = false; return true; })()`);
                 const hub = await ev(`(() => { const q = s => (document.querySelector(s) || {}).textContent; const items = [...document.querySelectorAll('.editions-home-copy')].map(e => e.innerText.replace(/\\s+/g, ' ').trim()); return { title: (q('#editions-home-title') || '').trim(), items }; })()`);
                 check(`${tag}: the Hub card says what it gives (your agents on a phone or another computer), then Run your own hub (the Mobile QR code card left, #11414), in plain words`, hub.title === 'Use your agents from your phone or another computer' && hub.items.length === 2 && hub.items[0] === 'Coral Hub Open your agents in any browser, including your phone. Invite-only beta.' && /^Run your own hub Or host it yourself: connect your own computers with coral --hub\./.test(hub.items[1] || ''), JSON.stringify(hub));
