@@ -22,6 +22,17 @@ const STEP_MS = { '5m': 300000, '1h': 3600000, '1d': 86400000 };
 const STEP_WORD = { '5m': 'each 5 minutes', '1h': 'each hour', '1d': 'each day' };
 
 const svg = (tag, attrs, text) => { const e = document.createElementNS('http://www.w3.org/2000/svg', tag); for (const k in attrs || {}) e.setAttribute(k, attrs[k]); if (text != null) e.textContent = text; return e; };
+/** How much larger the axis text is drawn than its design size (200% text, a large-text setting): the margins grow with it so a label is not cut off (#13065). */
+function textScale(host) {
+    const p = svg('svg', { class: 'viz-svg', 'aria-hidden': 'true' }), t = svg('text', {}, '0'); p.append(t); p.style.cssText = 'position:absolute;visibility:hidden;width:0;height:0';
+    host.append(p); const px = parseFloat(getComputedStyle(t).fontSize) || 11; p.remove(); return Math.max(1, px / 11);
+}
+/** Date ticks that would run into each other are left out: the last one stays first, then the first, then the middle ones (#13065). Needs the svg in the page. */
+function thinTicks(s) {
+    const ts = [...s.querySelectorAll('text.viz-tick')]; if (ts.length < 2) return;
+    const box = t => { const b = t.getBBox(); return [b.x, b.x + b.width]; }, kept = [];
+    for (const t of [ts[ts.length - 1], ts[0], ...ts.slice(1, -1)]) { const [a, b] = box(t); if (kept.some(([c, d]) => a < d + 8 && c < b + 8)) t.remove(); else kept.push([a, b]); }
+}
 
 // ── pure: the axis and the series ───────────────────────────────────────
 
@@ -124,7 +135,7 @@ export function timeLabel(ms, interval) {
 export function drawChart(host, { times, lines, metric, interval, hi, phone, xLabel, when, fmt, log }) {
     const label = xLabel || (i => timeLabel(times[i], interval)), heading = when || label;
     host.replaceChildren();
-    const W = Math.max(280, Math.round(host.clientWidth || (phone ? 340 : 880))), H = phone ? 200 : 250, L = 52, R = phone ? 12 : 112, T = 10, B = 24, pw = W - L - R, ph = H - T - B, N = times.length;
+    const k = textScale(host), W = Math.max(280, Math.round(host.clientWidth || (phone ? 340 : 880))), B = Math.round(24 * k), H = (phone ? 200 : 250) + B - 24, L = Math.round(52 * k), R = phone ? 12 : Math.round(112 * k), T = 10, pw = W - L - R, ph = H - T - B, N = times.length;
     const m = { ...(METRICS.find(x => x.key === metric) || METRICS[0]), ...(fmt ? { fmt } : {}) };
     const top = Math.max(0, ...lines.flatMap(l => l.plot)), max = log ? 10 ** Math.max(1, Math.ceil(Math.log10(top + 1))) : niceMax(top);
     const x = i => L + (N > 1 ? (i / (N - 1)) * pw : pw / 2), y = log ? (v => T + ph - (Math.log10(1 + Math.max(v, 0)) / Math.log10(1 + max)) * ph) : (v => T + ph - (v / max) * ph);
@@ -133,7 +144,7 @@ export function drawChart(host, { times, lines, metric, interval, hi, phone, xLa
     const gridText = axisLabels(m.fmt, gridAt);
     gridAt.forEach((v, k) => { s.append(svg('line', { x1: L, x2: W - R, y1: y(v), y2: y(v), class: 'viz-grid' }), svg('text', { x: L - 6, y: y(v) + 4, 'text-anchor': 'end', class: 'viz-axis' }, gridText[k])); });
     const ticks = N <= 1 ? [0] : [0, Math.round((N - 1) / 3), Math.round(((N - 1) * 2) / 3), N - 1].filter((v, i, a) => a.indexOf(v) === i);
-    for (const i of ticks.slice(0, phone ? 3 : 4)) s.append(svg('text', { x: x(i), y: H - 6, 'text-anchor': i === 0 ? 'start' : i === N - 1 ? 'end' : 'middle', class: 'viz-axis' }, label(i)));
+    for (const i of ticks.slice(0, phone ? 3 : 4)) s.append(svg('text', { x: x(i), y: H - 6, 'text-anchor': i === 0 ? 'start' : i === N - 1 ? 'end' : 'middle', class: 'viz-axis viz-tick' }, label(i)));
     const order = lines.map((l, k) => k).sort((a, b) => (hi === lines[a].key) - (hi === lines[b].key)); // the highlighted line is drawn last, so in front
     for (const k of order) {
         const l = lines[k], dim = hi && hi !== l.key;
@@ -149,7 +160,7 @@ export function drawChart(host, { times, lines, metric, interval, hi, phone, xLa
     const cross = svg('line', { y1: T, y2: T + ph, class: 'viz-cross', visibility: 'hidden' }); s.append(cross);
     const dots = lines.map((l, k) => { const c = svg('circle', { r: 4, fill: colorOf(l), class: 'viz-dot', visibility: 'hidden' }); s.append(c); return c; });
     const hit = svg('rect', { x: L, y: T, width: pw, height: ph, fill: 'transparent' }); s.append(hit);
-    host.classList.add('viz-host'); host.append(s);
+    host.classList.add('viz-host'); host.append(s); thinTicks(s);
     const tip = el('div', 'viz-tip'); tip.hidden = true; host.append(tip);
     const show = ev => {
         const r = s.getBoundingClientRect(), sx = r.width / W, px = (ev.clientX - r.left) / sx;
@@ -295,7 +306,7 @@ export function bucketTotals(buckets) {
 /** The lines stacked, each fill one line (2 px of the surface between fills), the daily or hourly total the height; a crosshair and a tooltip that lists the fills at the time and their total. */
 function drawArea(host, { times, lines, metric, interval, hi, phone }) {
     host.replaceChildren();
-    const W = Math.max(280, Math.round(host.clientWidth || (phone ? 340 : 880))), H = phone ? 190 : 230, L = 52, R = 12, T = 10, B = 24, pw = W - L - R, ph = H - T - B, N = times.length;
+    const k = textScale(host), W = Math.max(280, Math.round(host.clientWidth || (phone ? 340 : 880))), B = Math.round(24 * k), H = (phone ? 190 : 230) + B - 24, L = Math.round(52 * k), R = 12, T = 10, pw = W - L - R, ph = H - T - B, N = times.length;
     const m = METRICS.find(x => x.key === metric) || METRICS[0];
     const sums = times.map((_, i) => lines.reduce((a, l) => a + l.vals[i], 0));
     const max = niceMax(Math.max(0, ...sums));
@@ -304,7 +315,7 @@ function drawArea(host, { times, lines, metric, interval, hi, phone }) {
     const gridVals = [0, 1, 2, 3, 4].map(g => (max / 4) * g), gridText = axisLabels(m.fmt, gridVals);
     gridVals.forEach((v, g) => { s.append(svg('line', { x1: L, x2: W - R, y1: y(v), y2: y(v), class: 'viz-grid' }), svg('text', { x: L - 6, y: y(v) + 4, 'text-anchor': 'end', class: 'viz-axis' }, gridText[g])); });
     const ticks = N <= 1 ? [0] : [0, Math.round((N - 1) / 3), Math.round(((N - 1) * 2) / 3), N - 1].filter((v, i, a) => a.indexOf(v) === i);
-    for (const i of ticks.slice(0, phone ? 3 : 4)) s.append(svg('text', { x: x(i), y: H - 6, 'text-anchor': i === 0 ? 'start' : i === N - 1 ? 'end' : 'middle', class: 'viz-axis' }, timeLabel(times[i], interval)));
+    for (const i of ticks.slice(0, phone ? 3 : 4)) s.append(svg('text', { x: x(i), y: H - 6, 'text-anchor': i === 0 ? 'start' : i === N - 1 ? 'end' : 'middle', class: 'viz-axis viz-tick' }, timeLabel(times[i], interval)));
     let base = new Array(N).fill(0);
     lines.forEach((l, k) => { // the first line is the bottom fill
         const top = base.map((b, i) => b + l.vals[i]);
@@ -313,7 +324,7 @@ function drawArea(host, { times, lines, metric, interval, hi, phone }) {
     });
     const cross = svg('line', { y1: T, y2: T + ph, class: 'viz-cross', visibility: 'hidden' }); s.append(cross);
     const hit = svg('rect', { x: L, y: T, width: pw, height: ph, fill: 'transparent' }); s.append(hit);
-    host.classList.add('viz-host'); host.append(s);
+    host.classList.add('viz-host'); host.append(s); thinTicks(s);
     const tip = el('div', 'viz-tip'); tip.hidden = true; host.append(tip);
     const show = ev => {
         const r = s.getBoundingClientRect(), sx = r.width / W, i = Math.max(0, Math.min(N - 1, Math.round(N > 1 ? ((((ev.clientX - r.left) / sx) - L) / pw) * (N - 1) : 0)));
@@ -366,7 +377,7 @@ export function bucketWindow(startMs, interval) { return { since: new Date(start
  *  (sel). parts = [{ name, color, vals }]. The chart is aria-hidden: whatever it says is also a table or a control beside it. */
 export function drawBars(host, { times, parts, fmt, interval, sel, onPick, phone, xLabel }) {
     host.replaceChildren();
-    const W = Math.max(280, Math.round(host.clientWidth || (phone ? 340 : 880))), H = phone ? 150 : 170, L = 52, R = 8, T = 10, B = 22, pw = W - L - R, ph = H - T - B, N = times.length;
+    const k = textScale(host), W = Math.max(280, Math.round(host.clientWidth || (phone ? 340 : 880))), B = Math.round(22 * k), H = (phone ? 150 : 170) + B - 22, L = Math.round(52 * k), R = 8, T = 10, pw = W - L - R, ph = H - T - B, N = times.length;
     const label = xLabel || (i => timeLabel(times[i], interval));
     const sums = times.map((_, i) => parts.reduce((a, p) => a + p.vals[i], 0));
     const max = niceMax(Math.max(0, ...sums) * 1.05), y = v => T + ph - (v / max) * ph, bw = Math.max(2, pw / Math.max(N, 1) - 2);
@@ -394,7 +405,7 @@ export function drawBars(host, { times, parts, fmt, interval, sel, onPick, phone
         hit.addEventListener('pointerleave', () => { tip.hidden = true; });
         if (onPick) hit.addEventListener('click', () => onPick(i));
         g.append(hit); s.append(g);
-        if (ticks.includes(i)) s.append(svg('text', { x: x0 + bw / 2, y: H - 6, 'text-anchor': i === 0 ? 'start' : i === N - 1 ? 'end' : 'middle', class: 'viz-axis' }, label(i)));
+        if (ticks.includes(i)) s.append(svg('text', { x: x0 + bw / 2, y: H - 6, 'text-anchor': i === 0 ? 'start' : i === N - 1 ? 'end' : 'middle', class: 'viz-axis viz-tick' }, label(i)));
     }
-    host.classList.add('viz-host'); host.append(s, tip);
+    host.classList.add('viz-host'); host.append(s, tip); thinTicks(s);
 }
