@@ -44,6 +44,7 @@ var nanoWriters = map[string]nanoWriter{
 	"store/call_metrics.go":                  {calls: 5, tables: []string{"call_metrics"}},      // created_at (hour-prefix ranges, a prune cutoff, and the summary's and the series' window start)
 	"store/cloud_enrollment.go":              {calls: 1, tables: []string{"cloud_enrollment"}},  // parsed to time.Time, never compared as text
 	"tracking/milestones.go":                 {calls: 1, why: "a JSON file, parsed"},
+	"tracking/funnel.go":                     {calls: 1, why: "a JSON file, parsed: a held funnel step keeps its own time in the milestones file, read back with time.Parse, never ordered as text"},
 	"server/routes/token_usage.go":           {calls: 1, why: "a response field, not stored"},
 	"background/health_held.go":              {calls: 1, why: "part of an episode id, not compared"},
 	"jsonl/parse_hermes.go":                  {calls: 1, why: "a Hermes message's time in a chat reply, parsed by the dashboard; never stored or ordered as text"},
