@@ -13,6 +13,7 @@ import { openPreviewTab, openArtifactTab, setPreviewSession, refreshOpenFiles } 
 import { storeKey, readStars, writeStars } from './local_store.js';
 import { importOnce } from './import_once.js';
 import { serverFetch, serverForSession, sessionServer, currentServer, isCloud, dropBody } from './server_base.js';
+import { cachedServerAccess } from './server_access.js';
 
 let _currentFiles = [];
 let _worktree = null; // the worktree the agent works in, when it is not its launch folder: { path, name, branch, followed, launch } (#11351)
@@ -332,7 +333,7 @@ function watchFiles() {
     if (_watch) return;
     _watch = setInterval(() => { // interval-ok: only while the Files panel shows for a live agent in a visible tab; it clears itself otherwise
         const cur = state.currentSession;
-        if (!cur || cur.type !== 'live' || document.hidden || isSignedOut() || !filesPanelShowing()) { clearInterval(_watch); _watch = null; return; } // a signed-out page makes no /api request (#12444)
+        if (!cur || cur.type !== 'live' || document.hidden || isSignedOut() || !filesPanelShowing()) { clearInterval(_watch); _watch = null; _refreshBlock = null; return; } // a signed-out page makes no /api request (#12444)
         followRead(true);
     }, watchMs());
 }
@@ -541,11 +542,12 @@ function toggleAllExpanded() {
 
 // Which worktree the list is from (#11351): the agent's own, once it works in one, named with its branch and a way back to the folder it was launched in; or the launch folder, with the worktree offered.
 function worktreeNoteHtml() {
-    if (!_worktree || !_worktree.name) return '';
+    const stale = staleNoteHtml();
+    if (!_worktree || !_worktree.name) return stale;
     const name = escapeHtml(String(_worktree.name)), branch = _worktree.branch ? ` <span class="files-worktree-branch">${escapeHtml(String(_worktree.branch))}</span>` : '';
-    return _worktree.followed
+    return stale + (_worktree.followed
         ? `<div class="files-worktree" role="status"><span>Following the agent in the worktree <strong>${name}</strong>${branch}</span><button type="button" class="btn btn-quiet btn-xs" data-on-click="worktree-launch">Back to launch folder</button></div>`
-        : `<div class="files-worktree" role="status"><span>The agent is working in the worktree <strong>${name}</strong>${branch}</span><button type="button" class="btn btn-quiet btn-xs" data-on-click="worktree-follow">Follow it</button></div>`;
+        : `<div class="files-worktree" role="status"><span>The agent is working in the worktree <strong>${name}</strong>${branch}</span><button type="button" class="btn btn-quiet btn-xs" data-on-click="worktree-follow">Follow it</button></div>`);
 }
 
 // The switch between the two: the list is read again from the other folder, and the diffs opened under the rows of the first are closed.
@@ -565,6 +567,25 @@ function _getGitDiffMode() {
     return (state.settings || {}).git_diff_mode || 'branch_point';
 }
 
+// Through the Coral Hub on a computer in View mode the refresh (a POST, an Interact route) is refused 403 access_mode and leaves an audit row each time (#12646, coral-hub's beta pass): the watch asked about
+// every 2 s for as long as the panel showed. So once the page knows the computer is in View mode (its cached access) or a refresh was refused for the mode, this view stops asking: it reads the cached list
+// (a GET) and says once, quietly, that the list may be out of date. The block ends when the panel stops showing (the watch ends: reopening asks again), for another agent or server, and when the
+// access the page knows allows Interact again. The route stays Interact: no access changes here.
+let _refreshBlock = null; // { key } while this view does not call the refresh
+const refreshViewKey = (agentName, sessionId) => `${currentServer()}|${agentName}|${sessionId || ''}`;
+function staleNoteHtml() {
+    return _refreshBlock ? '<div class="files-stale-note">This computer is in View mode, so Coral does not re-check its files from here: the list may be out of date.</div>' : '';
+}
+// whether this view must not call the refresh now; sets or clears the block from what the page knows. Draws the note once when it first appears.
+function refreshBlockedFor(agentName, sessionId) {
+    const key = refreshViewKey(agentName, sessionId);
+    if (_refreshBlock && _refreshBlock.key !== key) _refreshBlock = null; // another agent or server
+    const access = cachedServerAccess(currentServer());
+    if (_refreshBlock && access && access.mayInteract) { _refreshBlock = null; renderChangedFiles(); } // the mode changed: ask again
+    else if (!_refreshBlock && access && !access.mayInteract) { _refreshBlock = { key }; renderChangedFiles(); }
+    return !!_refreshBlock;
+}
+
 export async function refreshChangedFiles(quiet = false) { // quiet: the panel's own watch (#10485), which draws only when the list moved
     if (!state.currentSession || state.currentSession.type !== 'live') return;
     const btn = quiet ? null : document.querySelector('.refresh-files-btn');
@@ -573,6 +594,12 @@ export async function refreshChangedFiles(quiet = false) { // quiet: the panel's
     const agentName = state.currentSession.name;
     const sessionId = state.currentSession.session_id;
 
+    if (refreshBlockedFor(agentName, sessionId)) { // View mode: the cached list, no POST (#12646)
+        _filesStale = false;
+        await loadChangedFiles(agentName, sessionId, quiet);
+        if (btn) setTimeout(() => btn.classList.remove('refreshing'), 300);
+        return;
+    }
     try {
         const body = {};
         if (sessionId) body.session_id = sessionId;
@@ -597,6 +624,11 @@ export async function refreshChangedFiles(quiet = false) { // quiet: the panel's
             renderChangedFiles();
             refreshOpenFiles().catch(() => {});
         } else {
+            if (resp.status === 403) { // refused for the mode (limited by the Hub or by the computer): do not ask again from this view
+                const why = await resp.clone().json().catch(() => null);
+                if (why && (why.limited_by === 'hub' || why.error === 'access_mode' || why.error === 'local_mode')) { _refreshBlock = { key: refreshViewKey(agentName, sessionId) }; renderChangedFiles(); }
+            }
+            _filesStale = false;
             await loadChangedFiles(agentName, sessionId);
         }
     } catch (e) {
