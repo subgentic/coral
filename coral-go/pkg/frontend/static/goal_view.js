@@ -1,7 +1,7 @@
 // One goal's detail view, shared by the team Goals list and other page hosts.
 import { loadStyles } from './lazy_styles.js';
 import { openTask } from './task_navigation.js';
-import { boardFetch, keyLabel, serverUrl, splitKey, LOCAL_SERVER } from './server_base.js';
+import { boardFetch, keyLabel, serverUrl, splitKey, remoteServer, LOCAL_SERVER } from './server_base.js';
 import { OPERATOR_ID, copyText, showToast } from './utils.js';
 import { whenText } from './when_text.js';
 import { toTaskPage, toGoal, errorOf } from './goals_adapter.js';
@@ -13,7 +13,7 @@ import { onGoalsSeq } from './goals_feed.js';
 import { looksDone, hiddenList, hideGoalDone } from './goal_done.js';
 import { pollEvery } from './overload.js';
 const { linkedText } = await importOnce('./artifact_refs.js');
-const linkedDd = text => { const d = document.createElement('dd'); d.append(linkedText(text)); return d; }; // a coral://artifacts/<hex> in a goal's words is a link (#11416)
+const linkedDd = (text, server) => { const d = document.createElement('dd'); d.append(linkedText(text, { server })); return d; }; // a coral://artifacts/<hex> in a goal's words is a link (#11416)
 const { openDetailPane, closeDetailPane } = await importOnce('./detail_pane.js'); // the one shared pane (#8914): a goal's task or artifact opens in it, beside the list
 const DT = await importOnce('./data_table.js');
 const { el } = DT;
@@ -170,8 +170,8 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         paintWaiting(g, waitNote);
         if (g.outcome || g.doneWhen || g.images.length) {
             const dl = el('dl', 'facts goals-facts');
-            if (g.outcome) dl.append(el('dt', null, 'Description'), linkedDd(g.outcome)); // the outcome field, which the New goal form's Description fills (#11653)
-            if (g.doneWhen) dl.append(el('dt', null, 'Done when'), linkedDd(g.doneWhen));
+            if (g.outcome) dl.append(el('dt', null, 'Description'), linkedDd(g.outcome, remoteServer(model.project))); // the outcome field, which the New goal form's Description fills (#11653)
+            if (g.doneWhen) dl.append(el('dt', null, 'Done when'), linkedDd(g.doneWhen, remoteServer(model.project)));
             main.append(dl);
             if (g.images.length) main.append(goalPictures(g));
         }

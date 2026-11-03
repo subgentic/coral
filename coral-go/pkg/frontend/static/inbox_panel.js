@@ -55,10 +55,10 @@ function checkAdapter(a) {
 
 /** The text as DOM. When the adapter has prepareLinks(text) (a lookup that must answer before a link is owned), it is awaited for THIS text and the policy it returns is the one used; if it throws, the
  *  adapter's own linkPolicy (or none) is used, so a failed lookup leaves the links as text. */
-async function renderBody(text, adapter, server) {
+async function renderBody(text, adapter, from) { // from: the task or item the text is of ({ server, project }): its computer is where its artifacts are asked for (#12581)
     let policy = adapter.linkPolicy;
     if (typeof adapter.prepareLinks === 'function') {
-        try { const p = await adapter.prepareLinks(text, server); if (typeof p === 'function') policy = p; } catch { /* the links stay as the renderer's default has them */ }
+        try { const p = await adapter.prepareLinks(text, from && from.server, from && from.project); if (typeof p === 'function') policy = p; } catch { /* the links stay as the renderer's default has them */ }
     }
     const opts = typeof policy === 'function' ? { linkPolicy: policy } : undefined;
     return renderSafe(text, opts).node;
@@ -185,7 +185,7 @@ export function mountInbox(host, adapter, options) {
         }
         if (!options?.conversationOnly && metaRow.childNodes.length) out.push(metaRow);
         const text = full.body == null ? '' : String(full.body);
-        if (!options?.conversationOnly) out.push(inset(text ? await renderBody(text, adapter, task.server) : el('p', 'empty-state empty-state-tight', 'This task has no text.')));
+        if (!options?.conversationOnly) out.push(inset(text ? await renderBody(text, adapter, task) : el('p', 'empty-state empty-state-tight', 'This task has no text.')));
         else if (reviewNote) out.push(reviewNote);
         const thread = only && typeof adapter.listTaskMessages === 'function' ? threadSection(task, from) : null; // the conversation under the text, above the box (#7703)
         if (thread) out.push(thread.node);
@@ -221,7 +221,7 @@ export function mountInbox(host, adapter, options) {
                 let text = String(m.content == null ? '' : m.content);
                 const lead = creator ? `@${creator}: ` : ''; // the reply route starts a person's reply with a mention of the task's creator: the page does not repeat it
                 if (m.mine && lead && text.startsWith(lead) && text.length > lead.length) text = text.slice(lead.length);
-                const body = el('div', 'ibx-thread-text'); body.append(await renderBody(text, adapter, task.server));
+                const body = el('div', 'ibx-thread-text'); body.append(await renderBody(text, adapter, task));
                 li.append(who, body); items.push(li);
             }
             list.replaceChildren(...items);
@@ -362,7 +362,7 @@ export function mountInbox(host, adapter, options) {
                 const parts = [];
                 const reason = res.reason && SAVED_WORDS[res.reason];
                 if (reason) parts.push(el('p', 'ibx-why', reason));
-                if (res.text) parts.push(inset(await renderBody(res.text, adapter, item.server)));
+                if (res.text) parts.push(inset(await renderBody(res.text, adapter, item)));
                 if (res.partial && res.reason !== 'too_long') parts.push(el('p', 'ibx-why', 'Shown in part: the message is very long.'));
                 if (!parts.length) parts.push(el('p', 'ibx-why', 'There is no more text than the snippet.'));
                 region.replaceChildren(...parts);

@@ -7,7 +7,7 @@ import { openTask, taskHref } from './task_navigation.js';
 import { cleanArtifactName } from './artifact_names.js';
 import { onAccountForgotten } from './local_store.js';
 import { loadSafeMarkdown } from './vendor_loader.js';
-import { keyLabel, pathId, serverFetch, boardFetch, identityKey, noteBoardLabels, isCloud } from './server_base.js';
+import { keyLabel, splitKey, pathId, serverFetch, boardFetch, identityKey, noteBoardLabels, isCloud } from './server_base.js';
 import { setInboxCount } from './inbox_tab.js'; // the count on the Tasks tab
 const { mountInbox, clearInboxDrafts, INBOX_CONTRACT } = await importOnce('./inbox_panel.js'); // the component (shared with the hub); this file is the one that is Coral's
 
@@ -93,7 +93,7 @@ export const coralInboxAdapter = {
     openTask(task) { return openTask(task.project, task.id); },
     linkPolicy: makeLinkPolicy({}), // without a lookup, artifact links stay plain text
     // Before the text is drawn: the renderer is loaded on first use (a failed load leaves the text as plain text, renderSafe's own fallback), then the artifact lookups.
-    async prepareLinks(text, server) { await loadSafeMarkdown().catch(() => {}); return artifactLinkPolicy(text, server); },
+    async prepareLinks(text, server, project) { await loadSafeMarkdown().catch(() => {}); return artifactLinkPolicy(text, server || (project ? splitKey(project).server : undefined)); }, // a task opened from a team's page has its team key, not a server field
 };
 
 let _inbox = null;
