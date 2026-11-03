@@ -36,7 +36,7 @@ const BASE = require('./test_base').BASE;
         await ev(`document.querySelector('#scheduler-detail .sched-more-btn').click(); true`); await settle(250);
         const menu = await ev(`[...document.querySelectorAll('#scheduler-detail .sched-more-menu .menu-item')].filter(e => e.getClientRects().length).map(e => e.textContent.trim())`);
         assert.deepEqual(menu, ['Edit', 'Turn off', 'Delete'], 'Edit and Turn off are in the More menu with Delete: ' + JSON.stringify(menu));
-        // a workflow's page: the same single primary footer: More and Run; Edit with Agent, Edit, Duplicate and Delete are in the More menu
+        // a workflow's page: the same single primary footer: More and Run; Edit with agent, Edit, Duplicate and Delete are in the More menu
         await ev(`window.openAutomationsFolder('workflows'); true`); await waitFor(`!!document.querySelector('#group-table-view tbody tr[data-key] .dt-primary')`, 'the workflows list', 10000);
         await ev(`document.querySelector('#group-table-view tbody tr[data-key] .dt-primary').click(); true`); await waitFor(`!!document.querySelector('#wf-detail-container .wf-detail-actions')`, 'the workflow page', 10000); await settle(400);
         const wf = await ev(`(() => { const bs = [...document.querySelectorAll('#wf-detail-container .wf-detail-actions > .btn, #wf-detail-container .wf-detail-actions > .wf-more > .btn')].filter(b => b.getClientRects().length); return { names: bs.map(b => b.textContent.replace(/\\s+/g, ' ').trim().replace(/^(smart_toy|play_arrow)\\s*/, '')), small: bs.filter(b => b.getBoundingClientRect().height < 44).length }; })()`);
@@ -45,7 +45,7 @@ const BASE = require('./test_base').BASE;
         await shot('model-d-workflow');
         await ev(`document.querySelector('#wf-detail-container .wf-more-btn').click(); true`); await settle(250);
         const wm = await ev(`[...document.querySelectorAll('#wf-detail-container .wf-more-menu .menu-item')].filter(e => e.getClientRects().length).map(e => e.textContent.trim())`);
-        assert.deepEqual(wm, ['Edit with Agent', 'Edit', 'Duplicate', 'Delete'], 'the More menu holds the rest: ' + JSON.stringify(wm));
+        assert.deepEqual(wm, ['Edit with agent', 'Edit', 'Duplicate', 'Delete'], 'the More menu holds the rest: ' + JSON.stringify(wm));
         // More (#11400, the v2.0.10 phone walk): the floating nav has Home, Inbox and Tasks, so the menu does not list them again; Computers is in it on every Coral (it is a top-level screen), with Automations, Analytics and Docs
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev); await settle(500);
         await ev(`[...document.querySelectorAll('.phone-menu-btn')].find(b => b.getClientRects().length).click(); true`); // the ☰ in the top bar opens the menu (the bar has no More slot, #11472)

@@ -1,4 +1,4 @@
-// "Build with agent" and "Edit with Agent" on the Workflows pages (#8360 pins them before workflows.js is split): the builder's skill prompt is read, the agent is launched on this computer's coral root
+// "Build with agent" and "Edit with agent" on the Workflows pages (#8360 pins them before workflows.js is split): the builder's skill prompt is read, the agent is launched on this computer's coral root
 // with that prompt, and a toast names it; an edit launches in the workflow's own folder with the workflow's definition and the PUT instruction in the prompt. Refusals say why: no skill, no working
 // directory, a launch error. The server's answers are stubbed in the page; the launches are recorded.
 const assert = require('node:assert/strict');
@@ -36,7 +36,7 @@ const { coralReady } = require('./helpers/wait');
         assert.ok((await toasts()).some(t => /Launched: Workflow Builder/.test(t)), 'the toast names the agent ' + JSON.stringify(await toasts()));
         console.log('   ✓');
 
-        console.log('2. Edit with Agent launches in the workflow\'s folder with its definition and the PUT instruction');
+        console.log('2. Edit with agent launches in the workflow\'s folder with its definition and the PUT instruction');
         await clearToasts();
         await call('editWorkflowWithAgent', 7);
         assert.equal(await ev(`window.__launches.length`), 1, 'one launch');
@@ -61,6 +61,6 @@ const { coralReady } = require('./helpers/wait');
         await ev(`document.body.dataset.coralRoot = '/repo/coral'; window.__launchAnswer = { error: 'No room for another agent' }; true`); await call('launchWorkflowAgent');
         assert.ok((await toasts()).some(t => /No room for another agent/.test(t)), 'a launch error is shown ' + JSON.stringify(await toasts()));
         console.log('   ✓');
-        console.log('PASS Workflows: Build with agent and Edit with Agent launch the builder, with their prompts and refusals');
+        console.log('PASS Workflows: Build with agent and Edit with agent launch the builder, with their prompts and refusals');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });

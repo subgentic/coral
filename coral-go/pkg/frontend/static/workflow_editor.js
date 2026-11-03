@@ -280,7 +280,7 @@ export async function editWorkflow(id) {
     if (!wf) return;
     const v = workflowView();
     editingWorkflowId = id; returnTo = null;
-    document.getElementById('wf-build-hint').hidden = true; // a workflow that exists is changed with Edit with Agent on its page
+    document.getElementById('wf-build-hint').hidden = true; // a workflow that exists is changed with Edit with agent on its page
     showTemplateRow(false); showNameNote('');
     v.reset();
     for (const [k, val] of Object.entries({ name: wf.name || '', steps: wf.steps || [], description: wf.description || '', repo_path: wf.repo_path || '', max_duration_s: wf.max_duration_s || DEFAULT_LIMIT_S })) v.set(k, val);

@@ -1,4 +1,4 @@
-/* Workflows: Build with agent and Edit with Agent (moved out of workflows.js, #8360; no behaviour change). */
+/* Workflows: Build with agent and Edit with agent (moved out of workflows.js, #8360; no behaviour change). */
 
 import { showToast } from './utils.js';
 import { apiFetch, loadLiveSessions } from './api.js';
