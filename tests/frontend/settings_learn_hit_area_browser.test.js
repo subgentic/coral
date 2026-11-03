@@ -34,7 +34,7 @@ const { connect } = require('./agent_view_harness');
         for (const [label, w, h, mobile, zoom] of [['1280', 1280, 1000, false, ''], ['1280-200', 1280, 1000, false, '200%'], ['390', 390, 844, true, ''], ['390-200', 390, 844, true, '200%']]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install(); await coralReady();
-            await ev(`window.__coral.buildAllLazy(); window.showSettingsModal(); true`);
+            await ev(`(async () => { await window.__coral.buildAllLazy(); await window.showSettingsModal(); return true; })()`);
             await waitFor(`!!document.getElementById('settings-tab-network')`, 'the Settings dialog', { timeout: 8000 });
             if (zoom) await ev(`document.documentElement.style.fontSize = ${JSON.stringify(zoom)}; true`);
             const tabs = await ev(`[...document.querySelectorAll('#settings-tabs [role=tab]')].map(b => b.id)`);

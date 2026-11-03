@@ -14,7 +14,7 @@
       "what": "Needs you rows: 'From <agent>' on a review row, a question row and the phone's metadata line"
     },
     {
-      "file": "operator_asks.js",
+      "file": "operator_ask_dialog.js",
       "what": "the question view: '<asker> asks you'"
     },
     {

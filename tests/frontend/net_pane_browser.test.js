@@ -25,7 +25,7 @@ const { coralReady } = require('./helpers/wait');
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
             await coralReady(ev);
             await ev(`(async () => {
-                window.__coral.buildAllLazy(); const real = window.fetch; window.__timers = [];
+                await window.__coral.buildAllLazy(); const real = window.fetch; window.__timers = [];
                 const so = window.setTimeout; window.setTimeout = (f, ms, ...a) => { if (ms === 60000) window.__timers.push(f); return so(f, ms, ...a); };
                 Object.defineProperty(navigator, 'clipboard', { value: { writeText: () => Promise.resolve() }, configurable: true });
                 window.__st = { configured: true, state: 'idle', hub_url: 'https://hub.example', max_mode: 'view', max_mode_saved: true, redact_tokens: true, hub_cross_team_settings: true };

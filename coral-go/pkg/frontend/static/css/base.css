@@ -114,3 +114,5 @@ button,
         transition: none !important;
     }
 }
+
+[data-quiet-focus] :focus-visible { outline: 0 !important; box-shadow: none !important; } /* a dialog opened by a pointer: no ring on what the script focused (quiet_focus.js; the ring comes with the first key) */

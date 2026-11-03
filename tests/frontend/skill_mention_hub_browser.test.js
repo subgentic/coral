@@ -18,7 +18,7 @@ const STUB = `(() => { window.__skillAsks = []; const R = window.fetch; const js
     const open = async url => {
         await Page.navigate({ url }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'settings');
         await ev(`localStorage.setItem('coral-live-view-mode', 'chat'); window.__m.add('hub-a', 'A', 3, { sleeping: false, session_id: 'hub-a-id' }); window.selectLiveSession('hub-a', 'claude', 'hub-a-id', 'local'); true`);
-        await waitFor(`!!document.getElementById('command-input') && !document.getElementById('command-input').disabled && !!document.querySelector('.skill-mention-dropdown')`, 'the composer', 10000);
+        await waitFor(`!!document.getElementById('command-input') && !document.getElementById('command-input').disabled`, 'the composer', 10000);
         await ev(`document.getElementById('command-input').focus(); true`); await Input.insertText({ text: '$' });
     };
     try {

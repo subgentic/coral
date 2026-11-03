@@ -1,3 +1,6 @@
+import { importOnce } from './import_once.js';
+const { TERMINAL_BACKEND_IDS, backendHint } = await importOnce('./terminal_backend_fields.js');
+export { TERMINAL_BACKEND_IDS, backendHint };
 /* The main Settings' rows as fields (#7744, #7838): each group of the Settings dialog is a list of fields drawn by settings_view (the same rows as the team Settings), into the pane's own host. The ids are the contract
  * the dialog (settings_dialog.js) and the suites read and fill by, so each field keeps its id; the dialog's own load and Apply read the controls by id as before (the view has no load and no bar here). A group moves here
  * when its rows do: General first. */
@@ -63,13 +66,6 @@ const OS_NOTE = {
     linux: "Linux: with pty, a program running as you can still reach Coral's terminals through /proc today, so pty protects agents from tmux-style access, not from every program running as you.",
 };
 const osNote = () => (`${navigator.userAgentData?.platform || navigator.platform || ''}`.toLowerCase().includes('linux') ? OS_NOTE.linux : OS_NOTE.mac);
-export const TERMINAL_BACKEND_IDS = ['tb-choice', 'tb-fixed', 'tb-now', 'tb-pending', 'tb-autowake-on', 'tb-autowake-cap']; // the ids of the rows that start hidden
-// The one line under the backend choice says what the chosen backend does (#9490): it follows the select, and the pty sentence says they wake next time only while Wake agents after a restart is on (#6263).
-const BACKEND_HINT = { tmux: "Agents keep running when you quit Coral, and can reach each other's terminals.", ptyWake: 'Agents stop when you quit Coral and wake next time.', pty: 'Agents stop when you quit Coral.' };
-export const backendHint = () => {
-    const sel = document.getElementById('tb-choice'), wake = document.getElementById('tb-autowake-on');
-    return !sel || sel.value === 'tmux' ? BACKEND_HINT.tmux : (wake && wake.checked ? BACKEND_HINT.ptyWake : BACKEND_HINT.pty);
-};
 const TERMINAL_BACKEND_FIELDS = [
     { key: 'terminal-backend', type: 'select', id: 'tb-choice', labelId: 'tb-choice-label', label: 'Terminal backend',
         helpTextClass: 'tb-hint', helpOf: backendHint, help: { text: "Agents keep running when you quit Coral, and can reach each other's terminals.", about: 'the terminal backends', more: [

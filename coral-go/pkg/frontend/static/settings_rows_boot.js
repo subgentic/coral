@@ -1,17 +1,15 @@
-/* The Settings dialog's rows that are fields (settings_fields.js) exist from the moment the dialog's markup is built, whichever code builds it (the dialog's own open, a test that builds every lazy part): this module is
- * loaded at startup together with the view that draws them (settings_view.js and the shared section list it uses), so the rows are drawn at once when the modal is built, on a slow machine as on a fast one. */
-import { onBuilt, ensureBuilt } from './lazy_dom.js';
+import { loadStyles } from './lazy_styles.js';
+/* Build the Settings field rows only when their dialog is built. The open path awaits readiness. */
+import { onBuilt, ensureBuilt, buildAllLazy } from './lazy_dom.js';
 import { mountSettingsView } from './settings_view.js';
-import { drawSettingsGroups } from './settings_fields.js';
-
+import { importOnce } from './import_once.js';
+let pending = null;
 function draw(modal) {
-    drawSettingsGroups(modal, mountSettingsView);
+    if (!modal) return Promise.resolve(null);
+    if (!pending) pending = Promise.all([importOnce('./settings_fields.js'), loadStyles('settings.css')]).then(([m]) => { m.drawSettingsGroups(modal, mountSettingsView); return modal; }).catch(e => { pending = null; throw e; });
+    return pending;
 }
-onBuilt('settings-modal', draw);
+onBuilt('settings-modal', modal => { draw(modal).catch(e => console.error('Settings fields could not be loaded', e)); });
+export function settingsRowsReady() { return draw(ensureBuilt('settings-modal')); }
 
-/** The Settings dialog, built and with its rows drawn (the dialog's open takes it from here). */
-export function settingsRowsReady() {
-    const modal = ensureBuilt('settings-modal');
-    if (modal) draw(modal);
-    return Promise.resolve(modal);
-}
+if (typeof window !== 'undefined') (window.__coral ||= {}).buildAllLazy = async () => { buildAllLazy(); await settingsRowsReady(); };

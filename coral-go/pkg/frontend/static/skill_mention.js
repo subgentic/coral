@@ -1,3 +1,5 @@
+import { loadStyles } from './lazy_styles.js';
+await loadStyles('skill_mention.css');
 /* $skill mention autocomplete for the command input textarea (#12677, the Operator): "$" at the start of a word opens the approved skills, the words after it search them, a pick attaches
  * the skill to this agent and puts the route's line ("Use the skill X (coral-agent skills get --id ...).") in place of "$words". Built on the list /command and @file share (mention_list.js). */
 
@@ -6,7 +8,8 @@ import { createMentionList, findTriggerStart, highlightRuns } from './mention_li
 import { serverFetch, serverForSession, isCloud, LOCAL_SERVER } from './server_base.js';
 import { showToast } from './utils.js';
 import { go } from './nav.js';
-import { filterSkills } from './skill_filter.js';
+import { importOnce } from './import_once.js';
+const { filterSkills } = await importOnce('./skill_filter.js');
 
 const list = createMentionList({ dropdown: 'skill-mention-dropdown', item: 'skill-mention-item' }, { onInput: e => onInput(e), onPick: i => pick(i), onHide: () => { _asked++; _all = null; _loading = false; } });
 let _asked = 0; // each read is numbered: an answer for a menu that was closed since is dropped
@@ -16,12 +19,15 @@ let _dismissed = -1, _dismissedFor = ''; // where an Escape closed the menu, and
 const MENU_FULL = 20; // the route lists at most this many (maxMenuSkills)
 const SKILLS_STAY = 'Skills stay on the computer: open this agent from its own Coral to add one.';
 
-export function initSkillMention() {
+export function initSkillMention({ dismissed = false } = {}) {
     const input = document.getElementById('command-input');
     if (!input) return;
     list.mount(input);
+    input.removeEventListener('keydown', list.onKeydown);
     // Escape closes the menu, and also a mention whose list is still on its way: the answer then opens nothing
     input.addEventListener('keydown', e => { if (e.key === 'Escape' && (list.visible() || _loading)) { _dismissed = list.start; _dismissedFor = agentKey(state.currentSession); if (!list.visible()) list.hide(); }  }, true); // before the list's own Escape handler hides it and forgets where it started
+    if (dismissed) { _dismissed = findTriggerStart(input.value.slice(0, input.selectionStart), '$'); _dismissedFor = agentKey(state.currentSession); }
+    input.addEventListener('keydown', list.onKeydown, true); // lazy mounting must still choose a skill before the composer handles Enter
 }
 
 function onInput(e) {
@@ -123,3 +129,6 @@ async function pick(index) {
     } catch (e) { showToast(`The skill was not attached: ${e && e.message ? e.message : 'try again'}`); }
     finally { _picking = false; }
 }
+
+// The first trigger was typed before this module loaded; read the current field, not the old event.
+export const refreshSkillMention = input => onInput({ target: input });

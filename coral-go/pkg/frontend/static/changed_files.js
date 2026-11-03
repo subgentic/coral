@@ -1,3 +1,4 @@
+import { cachedServerAccess } from './server_access_cache.js';
 /* Changed files panel — load and render per-agent file diffs */
 
 import { state } from './state.js';
@@ -13,7 +14,6 @@ import { openPreviewTab, openArtifactTab, setPreviewSession, refreshOpenFiles } 
 import { storeKey, readStars, writeStars } from './local_store.js';
 import { importOnce } from './import_once.js';
 import { serverFetch, serverForSession, sessionServer, currentServer, isCloud, dropBody } from './server_base.js';
-import { cachedServerAccess } from './server_access.js';
 
 let _currentFiles = [];
 const _keyOf = s => s ? `${sessionServer(s)}|${s.name || ''}|${s.session_id || ''}` : ''; // the same key as session_header_updates.js whereKey

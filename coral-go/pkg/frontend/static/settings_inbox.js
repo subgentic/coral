@@ -3,7 +3,7 @@
 import { fetchProjectsChecked } from './board_fetch.js';
 import { keyLabel } from './server_base.js';
 import { settingBool } from './settings_core.js';
-import { mutedReviewItems, mutedWords } from './inbox_reviews.js';
+const { mutedReviewItems, mutedWords } = await importOnce('./inbox_reviews.js');
 import { importOnce } from './import_once.js';
 
 export const INBOX_KINDS = [

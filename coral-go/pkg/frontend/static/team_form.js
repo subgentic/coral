@@ -5,7 +5,7 @@ import { mountSettingsView } from './settings_view.js';
 import { joinBrowse, FOLDER_ON_THIS_COMPUTER } from './dir_row.js';
 import { boardNameProblem } from './utils.js';
 import { onBuilt } from './lazy_dom.js';
-import { usesSuggestion } from './folder_suggestion.js';
+import { usesSuggestion } from './folder_suggestion_state.js';
 import { isHub } from './server_base.js';
 import { state } from './state.js';
 
