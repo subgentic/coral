@@ -290,4 +290,35 @@ for (const [phase, word] of [['done', /Done/], ['failed', /did not|could not|Cou
     assert.ok(pre.getAttribute('aria-label'), 'and it is named');
 }
 
+// ── the data folder on that computer is a setting the person can set (a Coral set up by hand keeps its data in .coral) ──
+{
+    const { cleanDataDir, dataDirOk } = await importUi('server_ssh_setup');
+    assert.equal(cleanDataDir('  ~/.coral/ '), '.coral', 'a typed ~/ and a trailing slash are dropped');
+    assert.equal(cleanDataDir('/x/y'), 'x/y');
+    for (const ok of ['', '.coral', 'my-coral/data', '.coral-server/data']) assert.equal(dataDirOk(ok), true, ok);
+    for (const bad of ['..', '../x', 'a/../b', 'a b', 'a;b', '-x', '$HOME', 'a//b', 'a/b/c/d/e/f']) assert.equal(dataDirOk(bad), false, bad);
+
+    hub({ keys: [] });
+    let host = fresh();
+    mountSshSetup(host, { mode: 'setup', pollMs: 5 });
+    await until(() => $(host, '#ssh-picked'), 'the form');
+    $(host, '#ssh-picked').value = 'build-box'; $(host, '#ssh-picked').dispatchEvent(new dom.window.Event('change'));
+    $(host, 'form').dispatchEvent(new dom.window.Event('submit', { cancelable: true }));
+    await until(() => btn(host, 'Connect'), 'the plan');
+    btn(host, 'Connect').click();
+    await until(() => btn(host, 'Set up'), 'the connected step');
+    const input = $(host, '#ssh-datadir-input');
+    assert.ok(input, 'the data folder is a field of the set up');
+    assert.equal(input.value, '', 'empty is the default');
+    assert.match($(host, '#ssh-datadir-note').textContent, /~\/\.coral-server\/data/, 'and the note says what the default is');
+    input.value = '../x'; input.dispatchEvent(new dom.window.Event('input'));
+    assert.equal(input.getAttribute('aria-invalid'), 'true', 'a folder that goes up is flagged');
+    btn(host, 'Use .coral (a Coral set up by hand)').click();
+    assert.equal($(host, '#ssh-datadir-input').value, '.coral');
+    assert.match($(host, '#ssh-datadir-note').textContent, /~\/\.coral there/, 'the note says what will be used');
+    btn(host, 'Set up').click();
+    await until(() => runBody, 'the run');
+    assert.deepEqual(runBody, { backend: 'pty', data_dir: '.coral' }, 'the chosen folder is sent');
+}
+
 console.log('server_ssh_setup: ok');

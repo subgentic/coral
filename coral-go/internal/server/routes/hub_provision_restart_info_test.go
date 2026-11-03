@@ -84,7 +84,7 @@ func wantRestartHelp(t *testing.T, help string) {
 	assert.Contains(t, help, "tmux kill-session -t coral-server", "and to end that older kind")
 	assert.Contains(t, help, `grep -F "$HOME/.coral-server/"`, "and a process of this install")
 	assert.Contains(t, help, "~/.coral-server/2.0.10/root/coral --host 127.0.0.1 --port 8420 --no-browser --cloud-url off", "how to start it, the release this hub installed")
-	assert.Contains(t, help, "--home ~/.coral-server/data")
+	assert.Contains(t, help, `--home "$HOME/$(cat ~/.coral-server/datadir 2>/dev/null || echo .coral-server/data)"`, "Coral's data folder as set up, not a fresh one")
 	assert.Contains(t, help, "choose Upgrade here again", "and what to do after")
 	assert.NotContains(t, help, "api_key", "no secret is in the help")
 }

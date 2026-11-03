@@ -28,17 +28,17 @@ func TestVersionSlotRefusesAnythingButAVersion(t *testing.T) {
 // The daemon start takes the version and a backend, each matched before anything is run (#12233); a version that is a path, or a backend that is anything but pty, tmux or keep, is refused.
 func TestStartDaemonRefusesABadVersionOrBackend(t *testing.T) {
 	for _, v := range []string{`1.2.3"; rm -rf ~; "`, "$(id)", "1.2.3/../x", "latest", ""} {
-		if _, err := remoteText(CmdStartDaemon, v, "pty"); !errors.Is(err, ErrNotAllowed) {
+		if _, err := remoteText(CmdStartDaemon, v, "pty", "@keep"); !errors.Is(err, ErrNotAllowed) {
 			t.Errorf("the version %q: %v", v, err)
 		}
 	}
 	for _, b := range []string{"", "PTY", "tmux; id", "$(id)", "screen", "pty ", "keep\n"} {
-		if _, err := remoteText(CmdStartDaemon, "2.0.10", b); !errors.Is(err, ErrNotAllowed) {
+		if _, err := remoteText(CmdStartDaemon, "2.0.10", b, "@keep"); !errors.Is(err, ErrNotAllowed) {
 			t.Errorf("the backend %q: %v", b, err)
 		}
 	}
 	for _, b := range []string{"pty", "tmux", "keep"} {
-		if _, err := remoteText(CmdStartDaemon, "2.0.10", b); err != nil {
+		if _, err := remoteText(CmdStartDaemon, "2.0.10", b, "@keep"); err != nil {
 			t.Errorf("the backend %q: %v", b, err)
 		}
 	}

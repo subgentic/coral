@@ -33,6 +33,11 @@ async function api(method, path, body) {
 const sayError = (r, fallback) => (r.data && (r.data.error || r.data.message)) || fallback;
 
 /** The backend to show chosen (#12271): the person's choice, except tmux where the computer turned out not to have it, which goes back to pty (the default). Exported for the test. */
+/** The data folder as the person typed it, ready to send: relative to the home folder there, no leading ~/ or /, no trailing slash. "" is the default. Exported for the test. */
+export const cleanDataDir = (v) => String(v || '').trim().replace(/^(~\/|\/)+/, '').replace(/\/+$/, '');
+/** Whether it is a folder name the hub accepts (the server checks again): up to five names of letters, digits, dot, underscore and hyphen, none starting with a hyphen or being only dots. */
+export const dataDirOk = (v) => v === '' || /^\.?[A-Za-z0-9_][A-Za-z0-9._-]{0,60}(\/\.?[A-Za-z0-9_][A-Za-z0-9._-]{0,60}){0,4}$/.test(v);
+
 export const backendChoice = (current, tmux) => (tmux === false && current === 'tmux' ? 'pty' : (current === 'tmux' ? 'tmux' : 'pty'));
 
 /** What each kind of plan is called and does, in the words the person confirms. */
@@ -51,7 +56,7 @@ const [SETUP, UPGRADE, STOP, REMOVE] = Object.keys(KINDS);
  * onClose() is called when the person leaves it; onChanged() when the server list changed (a server was added or removed, or upgraded). Returns { unmount }.
  */
 export function mountSshSetup(host, { mode = 'setup', server = null, action = null, deleteData = false, resume = '', pollMs = POLL_MS, onClose = () => {}, onChanged = () => {} } = {}) {
-    const st = { step: 'loading', options: null, plan: null, error: '', busy: false, keysOk: false, typed: '', backend: 'pty', allowDowngrade: false, timer: null, dead: false, form: { host: '', picked: '', label: '' } };
+    const st = { step: 'loading', options: null, plan: null, error: '', busy: false, keysOk: false, typed: '', backend: 'pty', dataDir: '', allowDowngrade: false, timer: null, dead: false, form: { host: '', picked: '', label: '' } };
 
     const kind = () => (st.plan ? st.plan.kind : mode === 'manage' ? action : 'setup');
     const words = () => KINDS[kind()] || KINDS.setup;
@@ -146,7 +151,7 @@ export function mountSshSetup(host, { mode = 'setup', server = null, action = nu
         const body = {};
         if (st.plan.host_keys && st.plan.host_keys.length) body.accept_keys = true;
         if (kind() === REMOVE) body.confirm = st.typed.trim();
-        if (kind() === SETUP) body.backend = st.backend === 'tmux' ? 'tmux' : 'pty';
+        if (kind() === SETUP) { body.backend = st.backend === 'tmux' ? 'tmux' : 'pty'; const d = cleanDataDir(st.dataDir); if (d && dataDirOk(d)) body.data_dir = d; }
         if (kind() === UPGRADE && downgrade()) body.allow_downgrade = !!st.allowDowngrade;
         const r = await api('POST', `/api/servers/provision/${encodeURIComponent(st.plan.plan)}/run`, body);
         if (st.dead) return;
@@ -275,6 +280,31 @@ export function mountSshSetup(host, { mode = 'setup', server = null, action = nu
         root.append(box);
     }
 
+    /** Where Coral keeps its data on that computer (set up only): a folder under its home folder. The default is a new one of its own; a Coral that was already there (set up by hand) keeps its data in .coral, which this can point at. */
+    function drawDataDir(root) {
+        const box = el('fieldset', 'ssh-datadir');
+        box.append(el('legend', 'ssh-subhead', 'Where Coral keeps its data on that computer'));
+        const row = el('div', 'ssh-datadir-row');
+        const lab = el('label', 'ssh-datadir-label', 'Folder under its home folder'); lab.htmlFor = 'ssh-datadir-input';
+        const input = el('input', 'input'); input.type = 'text'; input.id = 'ssh-datadir-input'; input.value = st.dataDir;
+        input.placeholder = '.coral-server/data'; input.autocomplete = 'off'; input.spellcheck = false; input.disabled = st.busy;
+        input.setAttribute('aria-describedby', 'ssh-datadir-note');
+        const note = el('p', 'ssh-note', ''); note.id = 'ssh-datadir-note'; note.setAttribute('role', 'status');
+        const show = () => {
+            const d = cleanDataDir(st.dataDir), ok = dataDirOk(d);
+            input.setAttribute('aria-invalid', ok ? 'false' : 'true');
+            note.textContent = !ok ? 'Use plain folder names such as .coral or my-coral/data: letters, digits, dot, underscore and hyphen, with no .. in them.'
+                : (d === '' || d === '.coral-server/data' ? 'The default: a new folder of its own, ~/.coral-server/data. Leave it empty for that.'
+                    : `Coral will use ~/${d} there, and create it if it is not there. Make sure no other Coral is running on that folder.`);
+        };
+        input.addEventListener('input', () => { st.dataDir = input.value; show(); });
+        const mine = button('Use .coral (a Coral set up by hand)', '', () => { st.dataDir = '.coral'; input.value = '.coral'; show(); }, st.busy);
+        row.append(lab, input, mine);
+        box.append(row, note);
+        root.append(box);
+        show();
+    }
+
     function drawPlan(root) {
         const p = st.plan;
         const dl = el('dl', 'facts servers-facts');
@@ -320,7 +350,7 @@ export function mountSshSetup(host, { mode = 'setup', server = null, action = nu
             row.append(cb, el('span', '', ' These fingerprints are the computer I mean to set up.'));
             root.append(row);
         }
-        if (kind() === SETUP) drawBackend(root);
+        if (kind() === SETUP) { drawBackend(root); drawDataDir(root); }
         if (kind() === UPGRADE) {
             const v = versions();
             const dl = el('dl', 'facts servers-facts');

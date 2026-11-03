@@ -393,7 +393,7 @@ func TestRemoteTextRefusesATemplateWithAFormattingError(t *testing.T) {
 // no listener, no key, and setup's wait for the key fails. The start command gives it standard input from /dev/null. The far side here (the stand-in) lets Coral get going only when the command did that, so
 // taking the redirect out makes the key never come (the ported FIFO test of be-ssh-start-stdin).
 func TestStartGivesCoralNoTerminalToAskAt(t *testing.T) {
-	text, err := remoteText(CmdStartDaemon, "2.0.10", "tmux")
+	text, err := remoteText(CmdStartDaemon, "2.0.10", "tmux", "@keep")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -468,7 +468,7 @@ func TestDaemonCommandsTestTheCommandLineBeforeTheyActOnAPID(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	start, err := remoteText(CmdStartDaemon, "2.0.10", "tmux")
+	start, err := remoteText(CmdStartDaemon, "2.0.10", "tmux", "@keep")
 	if err != nil {
 		t.Fatal(err)
 	}

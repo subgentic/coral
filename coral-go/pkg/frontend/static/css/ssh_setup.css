@@ -29,3 +29,9 @@
 .ssh-uptodate { color: var(--success); }
 .servers-uptodate { align-self: center; color: var(--success); font-size: var(--fs-base); }
 @media (max-width: 640px) { .ssh-backend-grid { grid-template-columns: 1fr; } }
+
+.ssh-datadir { border: 0; padding: 0; margin: var(--space-md) 0 0; min-width: 0; }
+.ssh-datadir-row { display: flex; flex-wrap: wrap; gap: var(--space-sm); align-items: center; }
+.ssh-datadir-label { color: var(--text-secondary); font-size: var(--fs-base); }
+.ssh-datadir-row input { flex: 1 1 14rem; min-width: 0; font-family: var(--font-mono, monospace); }
+.ssh-datadir-row input[aria-invalid="true"] { border-color: var(--danger); }
