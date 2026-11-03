@@ -186,3 +186,28 @@ func TestManageUpgradeSaysWhichWayTheStopWasNotConfirmed(t *testing.T) {
 		assert.Contains(t, logs(), "found="+code, "the hub's log has what the check found")
 	}
 }
+
+// An old process still on port 8420 (#12947, the Operator's case): the sentence names it (pid and command), the help gives the line that stops it, and the hub stops nothing itself.
+func TestManageUpgradeNamesTheProcessHoldingThePortAndDoesNotKillIt(t *testing.T) {
+	logs := captureSlog(t)
+	me := newManageEnv(t)
+	require.NoError(t, os.WriteFile(filepath.Join(me.dir, "portheld"), nil, 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(me.dir, "portholder"), []byte("4242 coral-old\n"), 0o600))
+	failed := me.upgradeFails(t)
+	assert.Contains(t, failed["error"], "pid 4242, command coral-old")
+	assert.Contains(t, failed["error"], "Nothing was stopped")
+	help := stepHelp(t, failed, "restart")
+	assert.Contains(t, help, "kill 4242", "the line that stops it, for the person to run")
+	wantRestartHelp(t, help)
+	assert.Contains(t, logs(), "port_holder_pid=4242")
+}
+
+// What the far side prints for the holder is shown only when it is a pid and a plain name.
+func TestManageUpgradeDoesNotShowAPortHolderThatIsNotAPidAndAName(t *testing.T) {
+	me := newManageEnv(t)
+	require.NoError(t, os.WriteFile(filepath.Join(me.dir, "portheld"), nil, 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(me.dir, "portholder"), []byte("12 <img src=x onerror=1>\n"), 0o600))
+	failed := me.upgradeFails(t)
+	assert.Equal(t, portInUseSentence, failed["error"])
+	assert.NotContains(t, fmt.Sprint(failed), "onerror")
+}

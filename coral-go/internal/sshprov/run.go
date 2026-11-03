@@ -82,6 +82,8 @@ const (
 	CmdCheckPort
 	// CmdTailLog prints the last 20 lines of <install>/coral.log, the output of the Coral a start left (#12947): for the hub's own log when a restart fails, never for the person.
 	CmdTailLog
+	// CmdPortHolder prints "<pid> <command name>" of what listens on port 8420 (lsof, else ss), or nothing; the hub only shows a pid and a name that match fixed patterns.
+	CmdPortHolder
 )
 
 // aliveTest is true (exit 0) when <install>/coral.pid names a live process of this user whose command line is a Coral from the install folder: the daemon a start left. A recycled PID of another program fails the
@@ -138,6 +140,7 @@ var specs = map[Command]spec{
 		"if printf '%%s\\n' \"$out\" | grep -F -- \"$HOME/" + InstallDir + "/\" | grep -Eq '/root/coral( |$)'; then exit 2; fi; exit 0"},
 	CmdCheckPort: {template: "if tmux has-session -t =coral-server 2>/dev/null; then exit 0; fi; if " + aliveTest + "; then exit 0; fi; [ -r /proc/net/tcp ] || exit 3; " +
 		"if grep -Eqs '^ *[0-9]+: [0-9A-Fa-f]+:20E4 [0-9A-Fa-f:]+ 0A ' /proc/net/tcp /proc/net/tcp6; then exit 2; fi; exit 0"},
+	CmdPortHolder:         {template: `p=$(lsof -nP -iTCP:8420 -sTCP:LISTEN 2>/dev/null | awk 'NR==2{print $2" "$1}'); if [ -z "$p" ]; then p=$(ss -ltnpH 'sport = :8420' 2>/dev/null | sed -n 's/.*users:(("\([^"]*\)",pid=\([0-9]*\).*/\3 \1/p' | head -1); fi; echo "$p"`},
 	CmdTailLog:            {template: "tail -n 20 \"$HOME/" + InstallDir + "/coral.log\" 2>/dev/null"},
 	CmdInstallOwnerSecret: {template: "\"$HOME/" + InstallDir + "/%s/root/coral\" hub-owner-secret --home \"$HOME/" + InstallDir + "/data\"", args: []*regexp.Regexp{versionRe}},
 	CmdFreeKB:             {template: "df -Pk \"$HOME\" | awk 'NR==2 {print $4}'"},
