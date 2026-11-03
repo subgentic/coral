@@ -258,6 +258,9 @@ func (h *SessionsHandler) uploadAgentArtifact(w http.ResponseWriter, r *http.Req
 		return
 	}
 	_ = fresh
+	if h.boardHandler != nil {
+		h.boardHandler.forgetTaskCounts() // the board's kept lists are one upload short now (#12755)
+	}
 	h.noteOffBooksUpload(r.Context(), taskID, hexID) // an agent with no task in progress: a line of the orchestrator's check (#7793)
 	var tags []string
 	if asked := board.CleanArtifactTags(r.URL.Query()["tag"]); len(asked) > 0 { // --tag (#8583): the team's tags of this object, added to what it already has

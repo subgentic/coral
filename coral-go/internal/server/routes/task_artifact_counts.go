@@ -69,6 +69,13 @@ func (h *BoardHandler) taskArtifactCounts(ctx context.Context, project string) m
 	return counts
 }
 
+// forgetTaskCounts drops every board's kept counts and upload lists: an upload was just stored, so a task's read made in the next seconds must see it (#12755), not the list kept for taskCountTTL.
+func (h *BoardHandler) forgetTaskCounts() {
+	h.taskCounts.mu.Lock()
+	h.taskCounts.entries = nil
+	h.taskCounts.mu.Unlock()
+}
+
 // taskUploads are the uploads an agent linked to the task (its record names it), whatever the task's state: the task's own read lists them with its result files, so `coral-board task show` finds what a reviewer asks for (#12755).
 // Kept for a few seconds with the counts; empty when the scan fails.
 func (h *BoardHandler) taskUploads(ctx context.Context, project string, taskID int64) []teamArtifact {

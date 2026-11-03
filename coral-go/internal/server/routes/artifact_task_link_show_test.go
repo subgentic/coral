@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jmoiron/sqlx"
@@ -145,4 +146,33 @@ func TestTwoOpenTasksLinkAnUnnamedUploadToNoneAndSayWhy(t *testing.T) {
 	require.Equal(t, http.StatusCreated, code, out)
 	assert.EqualValues(t, b, out["task_id"], "naming one links it")
 	_ = a
+}
+
+// QA's SHOULD on #12755: a task read made right after an upload (inside the three seconds the board's counts are kept) lists it: the upload forgets the kept lists.
+func TestATaskReadRightAfterAnUploadListsItWithTheCacheOn(t *testing.T) {
+	l := newLinkRig(t)
+	bh := NewBoardHandler(l.h.bs)
+	bh.SetTaskArtifactWriter(l.coralDir, nil)
+	l.h.boardHandler = bh // the one handler whose kept lists the upload must clear
+	r := chi.NewRouter()
+	r.Get("/api/board/{project}/tasks/{taskID}", bh.GetTask)
+	show := func(id int64) map[string]any {
+		t.Helper()
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/board/alpha/tasks/"+strconv.FormatInt(id, 10), nil))
+		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+		var out map[string]any
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &out))
+		return out
+	}
+	prev := taskCountTTL
+	taskCountTTL = time.Minute // the cache is on: a stale list would be kept
+	t.Cleanup(func() { taskCountTTL = prev })
+	id := l.task("alpha", "Backend", true)
+	assert.Empty(t, taskArtifactNames(show(id)), "nothing yet (this read keeps the board's list)")
+
+	code, out := l.post("s1", "# right after\n", nil)
+	require.Equal(t, http.StatusCreated, code, out)
+
+	assert.Equal(t, []string{"report.md"}, taskArtifactNames(show(id)), "the very next read lists it")
 }
