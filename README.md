@@ -165,7 +165,7 @@ The build puts the tools in `bin/`. For the commands below, add that directory t
 ### Use it from your phone
 
 <p align="center">
-  <img width="100%" alt="The dashboard on a phone: the live sessions list, and an agent's chat" src="https://github.com/user-attachments/assets/e7fab914-e7f6-4814-ac83-625f48a0c58a" />
+<img width="100%" alt="Phone App for easy mobile access" src="https://github.com/user-attachments/assets/87323d58-29af-4e4b-ad8a-7b81f3bbf358" />
 
   <br>
   <sub>The same dashboard on a phone: the agent list, and one agent's chat. (Sample data.)</sub>
