@@ -75,7 +75,3 @@ export function groupHead(item, by, items, complete) {
     const n = items.filter(x => groupOf(x, by).key === g.key).length;
     return { key: g.key, label: `${g.label}, ${n} ${n === 1 ? 'file' : 'files'}` };
 }
-
-/** Attribution is the uploader recorded for this version; ownership is not authorship. */
-export const isOperatorUpload = item => item.uploaded_by === "owner";
-export const uploaderText = item => isOperatorUpload(item) ? "Operator" : String(item.role || item.uploader || "").trim();

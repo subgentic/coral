@@ -34,13 +34,10 @@ var digestLikeName = regexp.MustCompile(`^(?:sha256:)?[a-fA-F0-9]{32,64}$`)
 
 // teamArtifact is one deduplicated artifact reference in a team's task results.
 type teamArtifact struct {
-	Uploader   string `json:"uploader,omitempty"`
-	Role       string `json:"role,omitempty"`
-	UploadedBy string `json:"uploaded_by,omitempty"`
-	ID         string `json:"id"`
-	Name       string `json:"name"`
-	MediaType  string `json:"media_type,omitempty"`
-	Size       *int64 `json:"size"`
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	MediaType string `json:"media_type,omitempty"`
+	Size      *int64 `json:"size"`
 	// Starred: the Operator starred this stored object on this computer (#9819); false for a row with no stored object.
 	Starred   bool   `json:"starred"`
 	CreatedAt string `json:"created_at"`
@@ -618,29 +615,19 @@ func (c *uploadDirCache) merge(items []teamArtifact, coralDir string, sessions m
 	if len(sessions) == 0 {
 		return items
 	}
-	have := make(map[string]int, len(items))
-	for i, it := range items {
-		have[it.ID] = i
+	have := make(map[string]bool, len(items))
+	for _, it := range items {
+		have[it.ID] = true
 	}
 	added := false
-	sessionIDs := make([]string, 0, len(sessions))
-	for sid := range sessions {
-		sessionIDs = append(sessionIDs, sid)
-	}
-	sort.Strings(sessionIDs)
-	for _, sessionID := range sessionIDs {
-		producer := sessions[sessionID]
+	for sessionID, producer := range sessions {
 		for _, u := range c.list(coralDir, sessionID) {
-			if i, ok := have[u.id]; ok {
-				if items[i].SessionID == nil || *items[i].SessionID == sessionID {
-					items[i].Uploader, items[i].Role, items[i].UploadedBy = u.rec.Uploader, u.rec.Role, u.rec.UploadedBy
-				}
+			if have[u.id] {
 				continue
 			}
-			have[u.id] = len(items)
+			have[u.id] = true
 			sid := sessionID
 			item := teamArtifact{
-				Uploader: u.rec.Uploader, Role: u.rec.Role, UploadedBy: u.rec.UploadedBy,
 				ID: u.id, Name: u.rec.Name, MediaType: u.rec.MediaType, CreatedAt: u.rec.CreatedAt, Size: sizeOfRecord(u.rec.Size),
 				Source: "upload", URI: "coral://artifacts/" + u.id, Digest: u.rec.Digest,
 				ReferenceCount: 1, SessionID: &sid, managed: u.id, uploadTask: u.rec.TaskID,

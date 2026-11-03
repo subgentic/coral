@@ -35,7 +35,7 @@ var teamArtifactQueryParams = []string{"q", "kind", "origin", "by", "board", "ke
 var (
 	teamArtifactKinds   = []string{"image", "pdf", "text", "other"}
 	teamArtifactOrigins = []string{"task", "upload", "shared", "received", "unlisted"}
-	teamArtifactSorts   = []string{"newest", "oldest", "name", "name_desc", "size", "size_asc", "type", "type_desc", "tags", "tags_desc", "uploader", "uploader_desc"} // name: A to Z, size: largest first, the others have the direction in the name (#8945)
+	teamArtifactSorts   = []string{"newest", "oldest", "name", "name_desc", "size", "size_asc", "type", "type_desc", "tags", "tags_desc"} // name: A to Z, size: largest first, the others have the direction in the name (#8945)
 )
 
 // validTeamArtifactSort reports whether s is one of the sort words (the team lists' and the standalone agent's list take the same ones, #8945).
@@ -73,18 +73,17 @@ type teamArtifactQuery struct {
 }
 
 type teamArtifactCursor struct {
-	Sort     string `json:"s"`
-	Finger   string `json:"f"`
-	At       string `json:"a"`
-	Name     string `json:"n"`
-	Size     int64  `json:"z"`
-	Type     string `json:"y"`
-	Tags     string `json:"g"`
-	Uploader string `json:"u,omitempty"`
-	TaskID   int64  `json:"t"`
-	Source   string `json:"r"`
-	Index    int    `json:"x"`
-	ID       string `json:"i"`
+	Sort   string `json:"s"`
+	Finger string `json:"f"`
+	At     string `json:"a"`
+	Name   string `json:"n"`
+	Size   int64  `json:"z"`
+	Type   string `json:"y"`
+	Tags   string `json:"g"`
+	TaskID int64  `json:"t"`
+	Source string `json:"r"`
+	Index  int    `json:"x"`
+	ID     string `json:"i"`
 }
 
 // crossTeamScopeParam is the internal marker ListAllTeamArtifacts sets on the values it parses (never a parameter a caller may send: both handlers refuse unknown names first).
@@ -458,7 +457,7 @@ func (q *teamArtifactQuery) textMatch(it teamArtifact) bool {
 	if q.q == "" {
 		return true
 	}
-	for _, f := range []string{it.Name, it.TaskTitle, ptrOr(it.ProducedBy), it.Uploader, it.Role, it.SentBy, it.SharedTo, it.ReceivedFrom, it.FromBoard, it.MediaType} {
+	for _, f := range []string{it.Name, it.TaskTitle, ptrOr(it.ProducedBy), it.SentBy, it.SharedTo, it.ReceivedFrom, it.FromBoard, it.MediaType} {
 		if f != "" && strings.Contains(strings.ToLower(f), q.q) {
 			return true
 		}
@@ -530,7 +529,6 @@ func redactItemForTunnel(it *teamArtifact) {
 		}
 		it.Tags = tags
 	}
-	it.Uploader, it.Role = shownText(it.Uploader), shownText(it.Role)
 	it.SentBy, it.SharedTo, it.ReceivedFrom, it.FromBoard = shownText(it.SentBy), shownText(it.SharedTo), shownText(it.ReceivedFrom), shownText(it.FromBoard)
 	if it.ProducedBy != nil {
 		p := shownText(*it.ProducedBy)
@@ -546,16 +544,15 @@ func redactItemForTunnel(it *teamArtifact) {
 }
 
 type artifactSortKey struct {
-	At       string
-	Name     string
-	Size     int64
-	Type     string // the media type, lowercase (the type sorts); a cursor carries it only for them
-	Tags     string // the tags joined, the first words (the tags sorts)
-	Uploader string
-	TaskID   int64
-	Source   string
-	Index    int
-	ID       string
+	At     string
+	Name   string
+	Size   int64
+	Type   string // the media type, lowercase (the type sorts); a cursor carries it only for them
+	Tags   string // the tags joined, the first words (the tags sorts)
+	TaskID int64
+	Source string
+	Index  int
+	ID     string
 }
 
 func keyOf(it teamArtifact) artifactSortKey {
@@ -569,7 +566,7 @@ func keyOf(it teamArtifact) artifactSortKey {
 		tie = it.BoardID + "\x00" + it.ID // the cross-team list: one digest in two teams is two rows, in a total order
 	}
 	sum := sha256.Sum256([]byte(tie))
-	return artifactSortKey{Uploader: strings.ToLower(artifactUploaderLabel(it)), At: it.CreatedAt, Name: strings.ToLower(it.Name), Size: size, Type: strings.ToLower(strings.TrimSpace(it.MediaType)), Tags: clipKey(strings.Join(it.Tags, " "), 64), TaskID: it.TaskID, Source: it.Source, Index: it.index, ID: hex.EncodeToString(sum[:])}
+	return artifactSortKey{At: it.CreatedAt, Name: strings.ToLower(it.Name), Size: size, Type: strings.ToLower(strings.TrimSpace(it.MediaType)), Tags: clipKey(strings.Join(it.Tags, " "), 64), TaskID: it.TaskID, Source: it.Source, Index: it.index, ID: hex.EncodeToString(sum[:])}
 }
 
 // newestAfter: a comes after b in the plain list's order (newest first; ties by task id, source, position, then id, so it is total).
@@ -615,10 +612,6 @@ func artifactAfter(sortName string, a, b artifactSortKey) bool {
 	case "type", "type_desc":
 		if a.Type != b.Type {
 			return wordAfter(sortName == "type_desc", a.Type, b.Type)
-		}
-	case "uploader", "uploader_desc":
-		if a.Uploader != b.Uploader {
-			return wordAfter(sortName == "uploader_desc", a.Uploader, b.Uploader)
 		}
 	case "tags", "tags_desc":
 		if a.Tags != b.Tags {
@@ -715,7 +708,7 @@ func (h *BoardHandler) selectTeamArtifacts(r *http.Request, items []teamArtifact
 	sel := &teamArtifactSelection{total: len(set), tags: counts}
 	start := offset
 	if q.cursor != nil {
-		ck := artifactSortKey{At: q.cursor.At, Name: q.cursor.Name, Size: q.cursor.Size, Type: q.cursor.Type, Tags: q.cursor.Tags, Uploader: q.cursor.Uploader, TaskID: q.cursor.TaskID, Source: q.cursor.Source, Index: q.cursor.Index, ID: q.cursor.ID}
+		ck := artifactSortKey{At: q.cursor.At, Name: q.cursor.Name, Size: q.cursor.Size, Type: q.cursor.Type, Tags: q.cursor.Tags, TaskID: q.cursor.TaskID, Source: q.cursor.Source, Index: q.cursor.Index, ID: q.cursor.ID}
 		start = sort.Search(len(set), func(i int) bool { return artifactAfter(q.sortName, keyOf(set[i]), ck) })
 	}
 	if start > len(set) {
@@ -754,10 +747,7 @@ func (h *BoardHandler) selectTeamArtifacts(r *http.Request, items []teamArtifact
 		if q.sortName != "tags" && q.sortName != "tags_desc" {
 			k.Tags = ""
 		}
-		if q.sortName != "uploader" && q.sortName != "uploader_desc" {
-			k.Uploader = ""
-		}
-		sel.next = teamArtifactCursor{Uploader: k.Uploader, Sort: q.sortName, Finger: q.finger, At: k.At, Name: k.Name, Size: k.Size, Type: k.Type, Tags: k.Tags, TaskID: k.TaskID, Source: k.Source, Index: k.Index, ID: k.ID}.encode()
+		sel.next = teamArtifactCursor{Sort: q.sortName, Finger: q.finger, At: k.At, Name: k.Name, Size: k.Size, Type: k.Type, Tags: k.Tags, TaskID: k.TaskID, Source: k.Source, Index: k.Index, ID: k.ID}.encode()
 	}
 	return sel, nil
 }
@@ -843,15 +833,4 @@ func collapseVersions(items []teamArtifact) []teamArtifact {
 		out = append(out, it)
 	}
 	return out
-}
-
-// artifactUploaderLabel is the display/sort label; ownership alone does not identify the uploader.
-func artifactUploaderLabel(it teamArtifact) string {
-	if it.UploadedBy == uploadedByOwner {
-		return "Operator"
-	}
-	if it.Role != "" {
-		return it.Role
-	}
-	return it.Uploader
 }
