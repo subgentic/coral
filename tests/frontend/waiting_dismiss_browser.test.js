@@ -48,6 +48,8 @@ const { coralReady } = require('./helpers/wait');
             await openList();
             v = await view();
             check(`${tag}: the list holds those 3, all open, with no Show all`, v.rows === 3 && v.behind === 0 && v.all === null, JSON.stringify(v));
+            const order = await ev(`[...document.querySelectorAll('#composer-waiting-items > details .composer-waiting-body')].map(p => p.textContent.slice(0, 16))`);
+            check(`${tag}: the list is newest first (the server's oldest-first order is reversed by the page)`, JSON.stringify(order) === JSON.stringify(['message number 3', 'message number 2', 'message number 1']), JSON.stringify(order));
             check(`${tag}: Dismiss is offered, and the message box stays on the screen`, v.dismiss && v.boxOnScreen, JSON.stringify(v));
             await ev(`document.getElementById('composer-waiting-dismiss').click(); true`);
             await waitFor(`window.__calls.some(c => c.what === 'dismiss')`, 'Dismiss asks the server', 6000);
