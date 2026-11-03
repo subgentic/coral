@@ -71,7 +71,11 @@ const BUNDLE = { exists: true, team_name: TEAM, created_at: '2026-10-25T05:00:00
             const W = await ev(`(() => { const panel = document.querySelector('#detail-pane .detail-details'), pr = panel.getBoundingClientRect(); return { scrollW: panel.scrollWidth, clientW: panel.clientWidth, outside: [...panel.querySelectorAll('.detail-chip')].filter(c => c.getBoundingClientRect().right > pr.right + 1).length }; })()`);
             assert.ok(W.scrollW <= W.clientW + 1 && W.outside === 0, `${label}: nothing in the panel runs past its edge: ` + JSON.stringify(W));
             assert.ok(L.panelH <= L.win * 0.25 + 2, `${label}: open, the panel is at most a quarter of the window: ${JSON.stringify(L)}`);
+            const hb = await ev(`(() => { const p = document.querySelector('#detail-pane .detail-details'), b = p.querySelector('.details-hide'), pr = p.getBoundingClientRect(), r = b.getBoundingClientRect(); return { text: b.textContent, right: Math.round(pr.right - r.right), top: Math.round(r.top - pr.top) }; })()`);
+            assert.ok(hb.text === 'Hide details' && hb.right <= 24 && hb.top <= 12, `${label}: Hide details is at the top right of the box: ` + JSON.stringify(hb));
             await shot(`preview-details-open-${w}`);
+            await ev(`document.querySelector('#detail-pane .details-hide').click(); true`);
+            assert.equal(await ev(`document.querySelector('#detail-pane .detail-details').hidden`), true, `${label}: Hide details closes it`);
             await ev(`document.querySelector('#detail-pane .detail-close').click(); true`);
         }
     } finally { await removeBoards(ev, [TEAM]).catch(() => {}); await client.close(); }
