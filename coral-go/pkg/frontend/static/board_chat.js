@@ -8,6 +8,8 @@ import { morphHtml } from './dom_morph.js';
 import { OPERATOR_ID, isOperatorId, escapeHtml, showToast, escapeAttr, getAgentColor, askBadge, externalMessageBadge, replyWithHtml, hubUserBadge, renderBoardMessageBody, setBoardMentionNames, highlightMentionsIn, boardMessageColorStyle } from './utils.js';
 import { splitKey, keyLabel, boardFetch } from './server_base.js';
 import { groupTaskQueueRuns, renderTaskQueueRun } from './board_system_lines.js';
+const { threadItems } = await importOnce('./board_threads.js'); // a part of the board page's group
+const { setReplyStrip } = await importOnce('./board_reply_strip.js');
 import { messageAttachmentAttrs, messageAttachmentsHtml } from './board_attachments.js';
 import { pollEvery } from './overload.js';
 import { resolveBoardArtifacts } from './board_artifacts.js';
@@ -153,7 +155,7 @@ export function showBoardChatTab(boardName, agent = null) {
         _boardChatScope = scope;
         _boardChatBoardTotal = 0;
         forgetOpenRows(); // no row stays open across teams
-        _boardChatReplyTo = null;
+        _boardChatReplyTo = null; setReplyStrip(document.getElementById('board-panel-input'), null);
         _boardChatLoaded = false;
         _boardChatMessages = [];
         _boardChatTotal = 0;
@@ -358,14 +360,14 @@ function _renderBoardPanelMessages(msgsEl, scrollToBottom) {
     _wireBoardChatScroll(msgsEl);
 
     // Runs of task-queue lines are one collapsed row (#3343), except in select mode.
-    const items = groupTaskQueueRuns(messages, !_boardChatSelectMode);
+    const items = threadItems(groupTaskQueueRuns(messages, !_boardChatSelectMode));
     // Unchanged messages keep their nodes (and the artifact images and links already resolved in them); only new or changed ones
     // are built (#3881: the whole page was rebuilt on every agent switch, 170 to 200 ms over five switches).
     const lastWhen = (it) => it.kind === 'queue' ? it.msgs[it.msgs.length - 1].created_at : it.m.created_at;
     applyView(msgsEl, boardView());
     watchFold(msgsEl, { always: true }); // the dock is narrow: its rows are always the folded two lines
     morphHtml(msgsEl, loadEarlierHtml + items.map((item, i) => {
-        const day = dayLineBefore(item.kind === 'queue' ? item.msgs[0].created_at : item.m.created_at, i > 0 ? lastWhen(items[i - 1]) : null);
+        const day = item.nested ? '' : dayLineBefore(item.kind === 'queue' ? item.msgs[0].created_at : item.m.created_at, i > 0 ? lastWhen(items[i - 1]) : null);
         if (item.kind === 'queue') return day + renderTaskQueueRun(item, _formatTime);
         const m = item.m;
         const agent = m.job_title || m.sender_name || 'Unknown';
@@ -373,7 +375,7 @@ function _renderBoardPanelMessages(msgsEl, scrollToBottom) {
         const prev = i > 0 && items[i - 1].kind === 'msg' ? items[i - 1].m : null;
         const prevAgent = prev ? (prev.job_title || prev.sender_name || 'Unknown') : null;
         const sameAsPrev = agent === prevAgent;
-        const spacing = sameAsPrev ? 'mb-message-grouped' : 'mb-message-first';
+        const spacing = sameAsPrev && !item.nested ? 'mb-message-grouped' : 'mb-message-first';
         const isLeader = /orchestrator/i.test(agent) || isOperatorId(m.subscriber_id || m.session_id);
         const alignClass = isLeader ? ' board-msg-left' : ' board-msg-right';
 
@@ -381,7 +383,7 @@ function _renderBoardPanelMessages(msgsEl, scrollToBottom) {
         const checkbox = _boardChatSelectMode ? `<input type="checkbox" class="check mb-select-checkbox" data-msg-id="${Number(m.id)}" ${_boardChatSelectedIds.has(m.id) ? 'checked' : ''} data-on-click="board-chat-msg-select">` : '';
         const parent = m.reply_to ? messages.find(x => x.id === m.reply_to) : null;
         const parts = rowParts(m, { agent, timeHtml: messageTimeHtml(m.created_at), moreLabel: '', replyName: m.reply_to ? (parent ? (parent.job_title || parent.sender_name || 'Unknown') : 'an earlier message') : '', more: false, idp: 'dbd' });
-        return day + `<div class="mb-message ${spacing}${alignClass}${selectedClass}${parts.classes}"${parts.attrs} data-message-id="${Number(m.id)}"${m.reply_to ? ` data-reply-to="${Number(m.reply_to)}"` : ''}${messageAttachmentAttrs(m)} style="${boardMessageColorStyle(color)}">
+        return day + `<div class="mb-message ${spacing}${alignClass}${selectedClass}${parts.classes}${item.nested ? ' mb-thread-reply' : ''}"${parts.attrs} data-message-id="${Number(m.id)}"${m.reply_to ? ` data-reply-to="${Number(m.reply_to)}"` : ''}${messageAttachmentAttrs(m)} style="${boardMessageColorStyle(color)}">
             ${parts.toggle}
             <div class="mb-message-header">
                 ${checkbox}
@@ -592,6 +594,7 @@ function _boardChatReply(id, name) {
     const prefix = `@${name} `;
     if (!input.value.toLowerCase().startsWith(prefix.toLowerCase())) input.value = prefix + input.value;
     _boardChatReplyTo = { id: Number(id), name };
+    setReplyStrip(input, { ..._boardChatReplyTo, text: (_boardChatMessages || []).find(m => Number(m.id) === Number(id))?.content }, () => { _boardChatReplyTo = null; });
     input.dispatchEvent(new Event('input', { bubbles: true }));
     input.focus();
     input.setSelectionRange(input.value.length, input.value.length);
@@ -616,7 +619,7 @@ async function _sendBoardChat(boardName) {
         const resp = await boardFetch(boardName, `/messages`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ subscriber_id: OPERATOR_ID, as: 'Operator', content, ...(_boardChatReplyTo && content.toLowerCase().startsWith(`@${_boardChatReplyTo.name.toLowerCase()}`) ? { reply_to: _boardChatReplyTo.id } : {}) }),
+            body: JSON.stringify({ subscriber_id: OPERATOR_ID, as: 'Operator', content, ...(_boardChatReplyTo ? { reply_to: _boardChatReplyTo.id } : {}) }),
         });
         sent = resp.ok;
         if (!sent) unknown = await outcomeUnknownLine(resp); // the hub lost the answer: it may have reached the computer
@@ -628,7 +631,7 @@ async function _sendBoardChat(boardName) {
         showToast(unknown || 'Could not send to the team. Your message is back in the box.', true); // the words are back in the box either way; nothing is sent again by itself
         return;
     }
-    _boardChatReplyTo = null;
+    _boardChatReplyTo = null; setReplyStrip(inputEl, null);
     announceNotice('Message sent'); // heard once, not drawn: the message itself appears in the list
     _loadBoardPanelChat(boardName);
 }

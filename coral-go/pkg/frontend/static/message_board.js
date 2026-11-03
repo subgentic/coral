@@ -193,7 +193,7 @@ function applyBoardTable(project) {
     const box = document.getElementById('mb-messages'), host = document.getElementById('mb-tools');
     if (!box || !host) return;
     if (_tableTeam !== project) {
-        _tableTeam = project; _pill = 'all'; bs._replyTo = null;
+        _tableTeam = project; _pill = 'all'; bs._replyTo = null; importOnce('./board_reply_strip.js').then(r => r.setReplyStrip(document.getElementById('mb-post-input'), null)).catch(() => {});
         forgetOpenRows();
         host.querySelector(':scope > .mb-table-tools')?.remove();
     }

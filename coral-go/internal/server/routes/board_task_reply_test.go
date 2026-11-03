@@ -360,3 +360,22 @@ func TestAReplyWithAnUnknownMentionIsRefused(t *testing.T) {
 	assert.Equal(t, "unknown_mention", out["code"])
 	assert.Empty(t, e.messages("p", "?task_id="+itoa(id)), "nothing is posted on that error")
 }
+
+// #12502: a task reply may say which message of the task it answers, so the board threads it under that message; a message that is not of the board is refused before anything is posted.
+func TestATaskReplyCarriesReplyToTheMessageItAnswers(t *testing.T) {
+	e := newReplyEnv(t)
+	e.join("p", "Backend Dev", "Frontend Dev")
+	id := e.task("p", "Backend Dev")
+	_, first, _ := e.do("POST", "/api/board/p/tasks/"+itoa(id)+"/reply", `{"content":"first question"}`, map[string]string{"X-Test-Actor": "token:Frontend Dev"})
+	msgID := int64(first["message_id"].(float64))
+	code, _, b := e.do("POST", "/api/board/p/tasks/"+itoa(id)+"/reply", `{"content":"the answer","reply_to":`+idText(msgID)+`}`, map[string]string{"X-Test-Actor": "token:Frontend Dev"})
+	require.Equal(t, 200, code, string(b))
+	msgs := e.messages("p", "") // the unfiltered list carries reply_to
+	require.Len(t, msgs, 2)
+	require.NotNil(t, msgs[1].ReplyTo, "the answer links back to the message")
+	assert.Equal(t, msgID, *msgs[1].ReplyTo)
+
+	code, _, _ = e.do("POST", "/api/board/p/tasks/"+itoa(id)+"/reply", `{"content":"to nothing","reply_to":999999}`, map[string]string{"X-Test-Actor": "token:Frontend Dev"})
+	assert.Equal(t, 400, code, "a reply_to that is no message of the board is refused")
+	assert.Len(t, e.messages("p", ""), 2, "nothing was posted")
+}

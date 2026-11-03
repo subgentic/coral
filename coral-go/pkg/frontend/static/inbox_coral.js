@@ -75,8 +75,8 @@ export const coralInboxAdapter = {
     async getTask(project, id) {
         return json(await boardFetch(project, `/tasks/${pathId(id)}`));
     },
-    async replyToTask({ project, taskId, content }) {
-        const d = await json(await boardFetch(project, `/tasks/${pathId(taskId)}/reply`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content }) }));
+    async replyToTask({ project, taskId, content, replyTo }) {
+        const d = await json(await boardFetch(project, `/tasks/${pathId(taskId)}/reply`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content, ...(Number(replyTo) > 0 ? { reply_to: Number(replyTo) } : {}) }) }));
         return { ok: !!d.ok, notified: d.notified || [], warnings: d.warnings || [] };
     },
     async listTaskMessages(project, taskId) { // the task's conversation (#7703): the person's replies and the agents' answers posted with --task, oldest first
