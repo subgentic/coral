@@ -118,6 +118,7 @@ const BASE = require('./test_base').BASE;
         // Pending disable immediately withholds old QR and API key.
         await ev('window.__saved=false;window.__calls=[];window._showMobileConnectModal()');
         assert.match(await status(),/finish disabling/);await noQR();
+        assert.equal(await ev(`[...document.querySelectorAll('#mobile-connect-actions button')].map(b=>b.textContent).join()`),'Close,Check again','the finish-disabling state: Close first, Check again last (R1, #12897)');
         assert.deepEqual(await ev('window.__calls.map(c=>c.url)'),['/api/system/privacy']);
         // Failures leave access closed; retry reads status, never writes settings.
         await ev('window.__mode="error";window._showMobileConnectModal()');
