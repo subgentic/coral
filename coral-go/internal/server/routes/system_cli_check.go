@@ -107,6 +107,11 @@ func (h *SystemHandler) CLICheck(w http.ResponseWriter, r *http.Request) {
 		source = tracking.SourceSettingsCheck
 	}
 
+	// A person's Check again is the moment after an install: re-read the saved Path, which a running Coral does not see otherwise (#457). An ordinary check does not.
+	if source == tracking.SourceCLIRecheck {
+		cliRefreshSavedPath()
+	}
+
 	// Try LookPath first, then common install locations
 	resolvedPath, err := cliLookPath(binaryPath)
 	if err != nil {
@@ -305,10 +310,12 @@ func hubCLIReply(r *http.Request, m map[string]any) map[string]any {
 // Seams for the CLI and tmux prerequisite checks; tests replace them so no real
 // executable or user directory is consulted.
 var (
-	cliLookPath     = exec.LookPath
-	cliCommonPath   = agent.FindCLIInCommonPaths
-	cliProbeTimeout = 3 * time.Second
-	tmuxProbe       = tmux.IsAvailable
+	cliLookPath   = exec.LookPath
+	cliCommonPath = agent.FindCLIInCommonPaths
+	// cliRefreshSavedPath re-reads the Path the system keeps for the person (Windows: the registry), on a person's Check again only.
+	cliRefreshSavedPath = agent.RefreshSavedPath
+	cliProbeTimeout     = 3 * time.Second
+	tmuxProbe           = tmux.IsAvailable
 )
 
 // Version probe results.
