@@ -53,6 +53,8 @@ curl -fsSL \
   | bash
 ```
 
+Coral wraps the agent CLIs you already use (Claude Code, Codex, Antigravity, Pi and OpenCode, and Hermes, which is experimental). It calls no AI API itself: your keys, your subscriptions, your tools. It runs as one Go binary on your laptop or a remote box.
+
 ## The Inbox
 
 Running agents is easy. *Knowing when one of them needs you* is the part that goes wrong: a permission prompt sits for an hour in a terminal you closed, a question waits behind a tab you forgot, a finished file never gets looked at. Coral puts all of that in one place.
@@ -97,8 +99,14 @@ Running agents is easy. *Knowing when one of them needs you* is the part that go
 
 
 
+### Use it from your phone
 
-Coral wraps the agent CLIs you already use (Claude Code, Codex, Antigravity, Pi and OpenCode, and Hermes, which is experimental). It calls no AI API itself: your keys, your subscriptions, your tools. It runs as one Go binary on your laptop or a remote box.
+<p align="center">
+<img width="100%" alt="Phone App" src="https://github.com/user-attachments/assets/72fd5d37-97ed-4975-98b0-ec6e9ed92ae6" />
+  <br>
+  <sub>The same dashboard on a : the agent list, and one agent's chat. (Sample data.)</sub>
+</p>
+
 
 ## Chief, your front agent
 
@@ -160,46 +168,10 @@ In the dashboard, choose **New agent** (then **New agent** again in the dialog: 
 
 See [Getting started](https://subgentic.github.io/coral/getting-started/) for the full installation and first-agent walkthrough.
 
-### Use it from your phone
-
-<p align="center">
-<img width="100%" alt="Phone App" src="https://github.com/user-attachments/assets/72fd5d37-97ed-4975-98b0-ec6e9ed92ae6" />
-  <br>
-  <sub>The same dashboard on a : the agent list, and one agent's chat. (Sample data.)</sub>
-</p>
-
-On a phone you can:
-
-- Watch every agent's live terminal and current goal
-- Read and post on the board, and check task status
-- Approve or deny an agent's permission prompt the moment it appears
-- Sleep, wake, restart, or kill agents
 
 ### Coral Hub (beta)
 
 Coral Hub (app.coralhub.dev, invite-only beta) lets you reach your Coral servers from any browser without opening a port. A fresh install never connects, or asks you to, on its own: connect a server from the home screen or **Settings › Coral Hub**, or run `coral cloud connect` on it. Coral offers it at first launch (the dashboard's Connect screen and a prompt in the terminal) only when you pass a hub URL (`--cloud-url https://app.coralhub.dev` or `CORAL_CLOUD_URL`) or start it with `--cloud-connect prompt` (`CORAL_CLOUD_CONNECT=prompt`); `--cloud-connect off` turns that off. See [Coral Hub](coral-go/agent_docs/hub.md#connecting-a-server-to-coral-hub).
-
-## How a team works
-
-### 1. Create a team
-
-Define a team of agents, each with a role and a system prompt. For example: an Orchestrator that plans and delegates, a Lead Developer that writes code, and a QA Engineer that reviews and tests. You can create teams from the dashboard UI, use built-in templates, or describe what you need in plain English and let AI generate the team configuration.
-
-<p align="center">
-  <img alt="The Launch New Session dialog with four choices: AI Agent, Agent Team, Terminal, and Open Folder" src="assets/readme/launch-new-session.png" width="100%" />
-  <br>
-  <sub><strong>+ New</strong> offers four things to launch: a single agent, a whole team on a shared board, a plain terminal that lives alongside your agents, or a folder pinned to your Agents list.</sub>
-</p>
-
-### 2. You monitor and steer from the dashboard
-
-The web dashboard shows every agent's live terminal, current status, and message board activity. You can:
-- Send messages or commands to any agent
-- Sleep an agent (preserving full state) and wake it later
-- Add new agents to a running team
-- Answer an agent's permission prompt from the dashboard — including from your phone
-- Define teams in JSON, import a skill folder as a team, or generate one from a plain-English description
-- See what it all cost — by model, team, branch, and individual agent
 
 ## Documentation
 
