@@ -105,7 +105,7 @@ const GROUPS = nativeInbox() ? [{ key: 'needs', label: 'Needs you', frame: HUB_F
 const GROUP_KEY = 'coral.inbox.tab'; // the group last on screen, kept in this browser
 let tasks = [];
 /** A folder's name and its search words: the groups above, or a chat folder (its title comes from the chat folders' own list). */
-const groupMeta = key => GROUPS.find(g => g.key === key) || (CH.CHAT_KEY.test(key) && CH.chatFolder(key) ? { key, label: CH.chatFolder(key).title, search: 'Search chats', short: 'Search' } : null);
+const groupMeta = key => GROUPS.find(g => g.key === key) || (CH.CHAT_KEY.test(key) && CH.chatFolder(key) ? { key, label: CH.chatFolder(key).title, search: CH.searchWords(key), short: 'Search' } : null);
 const DEFAULT_GROUP = nativeInbox() ? 'chats' : 'needs';
 let group = (() => { const v = browserLocal.get(GROUP_KEY); return groupMeta(v) ? v : DEFAULT_GROUP; })();
 const queries = { needs: '', tasks: '', goals: '', artifacts: '', saved: '', activity: '' }; // a chat folder keeps its search as typed under its own key // each group's own search text (lower case; Saved's goes to the server as typed)
@@ -631,7 +631,7 @@ function inboxChatsToolbar(key) {
         if (has.has('agent')) fields.push({ type: 'text', key: 'agent', id: 'inbox-chats-agent', className: 'list-bar-by', label: 'Agent', max: 80, placeholder: 'Agent name' });
         if (has.has('tagId')) fields.push({ type: 'select', key: 'tagId', id: 'inbox-chats-tag', label: 'Tag', values: [], labels: {}, any: 'Any tag' });
         if (has.has('dates')) fields.push({ type: 'date', key: 'from', id: 'inbox-chats-from', label: 'From' }, { type: 'date', key: 'to', id: 'inbox-chats-to', label: 'To' });
-        chatBars.set(key, IT.folderToolbar({ idp: 'inbox-chats', noun: 'chat', searchLabel: 'Search chats', fields, commitOnEnter: nativeInbox(), model: { EMPTY: CF.EMPTY, clean: CF.clean, chips: CF.chips, isFiltered: CF.isFiltered, without: CF.without } }, next => {
+        chatBars.set(key, IT.folderToolbar({ idp: 'inbox-chats', noun: 'chat', searchLabel: CH.searchWords(key), fields, commitOnEnter: nativeInbox(), model: { EMPTY: CF.EMPTY, clean: CF.clean, chips: CF.chips, isFiltered: CF.isFiltered, without: CF.without } }, next => {
             chatFilters.set(key, next); CF.saveFilters(key, next);
             queries[key] = next.q;
             const input = $('inbox-search'); if (input && group === key) input.value = next.q; // the sidebar's box shows the same words
