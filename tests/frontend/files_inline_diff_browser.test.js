@@ -30,14 +30,18 @@ const FILES = {
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const { Fetch } = client;
-    const heldComments = [];
-    safePaused(client, async event => { heldComments.push(event.requestId); await ev('window.__diffCommentsHeld = true'); });
+    const heldComments = [], heldEditor = [];
+    safePaused(client, async event => {
+        const editor = event.request.url.includes('codemirror-bundle.js');
+        (editor ? heldEditor : heldComments).push(event.requestId);
+        await ev(editor ? 'window.__diffEditorHeld = true' : 'window.__diffCommentsHeld = true');
+    });
     const problems = [];
     const check = (label, cond, detail) => { if (!cond) problems.push(`${label}${detail !== undefined ? ': ' + detail : ''}`); };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         // Hold the actual lazy comments module, so its continuation resumes only after Collapse all.
-        await Fetch.enable({ patterns: [{ urlPattern: '*diff_comments.js*', requestStage: 'Request' }] });
+        await Fetch.enable({ patterns: [{ urlPattern: '*diff_comments.js*', requestStage: 'Request' }, { urlPattern: '*codemirror-bundle.js*', requestStage: 'Request' }] });
         for (const [w, h, mobile, zoom] of [[1280, 900, false, ''], [390, 844, true, ''], [390, 844, true, '32px']]) {
             const tag = `${w} px${zoom ? ', 200% text' : ''}`;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
@@ -64,6 +68,20 @@ const FILES = {
             check(`${tag}: the list is in path order`, JSON.stringify(order) === JSON.stringify(['a.go', 'b.txt', 'c.png', 'd.log', 'e.go', 'f.txt']), JSON.stringify(order));
             check(`${tag}: each row has a chevron and no diff is open`, await ev(`document.querySelectorAll('#changed-files-list .file-expand-btn[aria-expanded="false"]').length === 6 && [...document.querySelectorAll('#changed-files-list .file-diff')].every(d => d.hidden)`));
             check(`${tag}: the header offers Expand all`, (await ev(`(document.querySelector('#changed-files-list .files-expand-all') || {}).textContent`)) === 'Expand all');
+
+            // #12847 follow-up: mount is awaiting the editor script when the person closes
+            // everything. Neither a stale editor nor its completion marker may survive that close.
+            if (w === 1280) {
+                await ev(`document.querySelector('#changed-files-list .files-expand-all').click(); true`);
+                await waitFor('window.__diffEditorHeld === true', 'editor load held', 8000);
+                await waitFor(`[...document.querySelectorAll('#changed-files-list .file-diff')].every(d => !d.hidden)`, 'all diff slots opening before the editor loads', 8000);
+                await ev(`document.querySelector('#changed-files-list .files-expand-all').click(); true`);
+                await waitFor(`[...document.querySelectorAll('#changed-files-list .file-diff')].every(d => d.hidden)`, 'collapse while editor loading', 6000);
+                for (const requestId of heldEditor.splice(0)) await Fetch.continueRequest({ requestId });
+                await waitFor('!!window.CoralCM', 'held editor script finishes', 8000);
+                await ev(framesJs(3));
+                check(`${tag}: an editor loaded after collapse cannot mount or mark a hidden diff as drawn`, await ev(`[...document.querySelectorAll('#changed-files-list .file-diff')].every(d => d.hidden && d.children.length === 0 && !d.dataset.shown)`));
+            }
 
             // expand one
             await ev(`document.querySelector('#changed-files-list .file-expand-btn[data-path="a.go"]').click(); true`);
