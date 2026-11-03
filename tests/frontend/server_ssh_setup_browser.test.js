@@ -25,6 +25,8 @@ const HUB = `(() => {
       host_keys: world.plans.at(-1).action ? [] : [{ host: 'box.example.com', type: 'ssh-ed25519', fingerprint: 'SHA256:' + 'Zq9'.repeat(14) + '<img src=x onerror=window.__pwned=1>' }], steps: steps() });
     if (u.endsWith('/run')) { world.runBody = body; world.runs++; world.polls = 0; return json({ plan: 'p1', kind: world.plans.at(-1).action || 'setup', phase: 'running', steps: steps({ connect: 'ok' }) }, 202); }
     if (method === 'DELETE') return json({ status: 'cancelled' });
+    if (method === 'GET' && world.failUpgrade && (world.plans.at(-1).action || 'setup') === 'upgrade') { const help = ['# To see why, and to start it yourself, sign in to that computer and run these lines. The kill line may say there is nothing to stop: that is fine.', 'tail -n 40 ~/.coral-server/coral.log', 'kill "$(cat ~/.coral-server/coral.pid)"', 'nohup ~/.coral-server/2.0.10/root/coral --host 127.0.0.1 --port 8420 --no-browser --cloud-url off --backend "$(cat ~/.coral-server/backend 2>/dev/null || echo pty)" --home ~/.coral-server/data </dev/null >> ~/.coral-server/coral.log 2>&1 & echo $! > ~/.coral-server/coral.pid <img src=x onerror=window.__pwned=1>', '# Then choose Upgrade here again: this hub finds the release already running and only checks it.'];
+      return json({ plan: 'p1', kind: 'upgrade', phase: 'failed', error: 'The new release could not be started on that computer: its start command ended with code 9. The old release was stopped and the new one is installed.', steps: [{ name: 'install', title: 'Install the new release', state: 'ok', detail: 'Installed.' }, { name: 'restart', title: 'Restart Coral', state: 'failed', detail: 'The new release could not be started on that computer: its start command ended with code 9. The old release was stopped and the new one is installed.', help }, { name: 'verify', title: 'Check the new release', state: 'pending' }] }); }
     if (method === 'GET') { world.polls++;
       const done = world.polls >= 2;
       if (done && !world.plans.at(-1).action && !world.servers.some(s => s.id === 'ssh-box-example-com')) world.servers = [...world.servers, { ...row, id: 'ssh-box-example-com', label: 'ssh-box-example-com' }];
@@ -98,6 +100,22 @@ const HUB = `(() => {
             await waitFor(`!!document.querySelector('[data-action="ssh-remove"]')`, 'the server page', 8000);
             check(`${label}: an ssh server's page has Upgrade, Stop Coral and Uninstall`, await ev(`['ssh-upgrade', 'ssh-stop', 'ssh-remove'].every(a => !!document.querySelector('[data-action="' + a + '"]'))`));
             await shot(`ssh-page-${label}`);
+
+            // a failed restart of an upgrade shows the commands to run by hand under the step (#12947): wrapped, as text, in a page that does not widen
+            await ev(`window.__hub.failUpgrade = true; document.querySelector('[data-action="ssh-upgrade"]').click(); true`);
+            await waitFor(`!!${btn('Connect')}`, 'the upgrade plan', 8000);
+            await ev(`${btn('Connect')}.click(); true`);
+            const upBtn = `[...document.querySelectorAll('.ssh-setup button')].find(b => /^Upgrade/.test(b.textContent.trim()))`;
+            await waitFor(`!!${upBtn}`, 'the upgrade button', 8000);
+            await ev(`${upBtn}.click(); true`);
+            await waitFor(`!!document.querySelector('.ssh-step-help')`, 'the commands under the failed step', 12000); await settle(200);
+            check(`${label}: the commands are under the failed step and hold the log, the stop and the start`, await ev(`(() => { const p = document.querySelector('.ssh-step-help'); return p.closest('.ssh-step').classList.contains('ssh-step-failed') && p.textContent.includes('tail -n 40 ~/.coral-server/coral.log') && p.textContent.includes('kill "$(cat ~/.coral-server/coral.pid)"') && p.textContent.includes('nohup ~/.coral-server/2.0.10/root/coral'); })()`));
+            check(`${label}: they wrap: nothing is wider than the page and the block has no sideways scroll`, await ev(`${noOverflow} && (() => { const p = document.querySelector('.ssh-step-help'); return p.scrollWidth <= p.clientWidth + 1; })()`));
+            check(`${label}: they are text, not markup`, await ev(`!document.querySelector('.ssh-step-help img') && window.__pwned !== 1`));
+            check(`${label}: a keyboard can reach the block and it is named`, await ev(`(() => { const p = document.querySelector('.ssh-step-help'); return p.tabIndex === 0 && !!p.getAttribute('aria-label'); })()`));
+            await shot(`ssh-restart-failed-${label}`);
+            await ev(`window.__hub.failUpgrade = false; ${btn('Close')}.click(); true`);
+            await waitFor(`!!document.querySelector('[data-action="ssh-remove"]')`, 'back to the server page', 8000);
             await ev(`document.querySelector('[data-action="ssh-remove"]').click(); true`);
             await waitFor(`!!${btn('Connect')}`, 'the remove plan', 8000);
             // what happens to the data is a choice on the plan (#12263): kept by default, and deleted only when ticked

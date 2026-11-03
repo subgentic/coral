@@ -70,6 +70,8 @@ type provisionStep struct {
 	Title  string `json:"title"`
 	State  string `json:"state"`
 	Detail string `json:"detail,omitempty"`
+	// Help is a block of lines under a failed step: what the person can run on the far computer (shell comments and commands, built from this hub's own constants, never text from the far side) (#12947).
+	Help []string `json:"help,omitempty"`
 }
 
 type provisionKey struct {
@@ -173,6 +175,17 @@ func (p *provisionPlan) backendOrDefault() string {
 		return sshprov.BackendTmux
 	}
 	return sshprov.BackendPTY
+}
+
+// setStepHelp puts the help lines under the named step.
+func (p *provisionPlan) setStepHelp(name string, lines []string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	for i := range p.steps {
+		if p.steps[i].Name == name {
+			p.steps[i].Help = lines
+		}
+	}
 }
 
 func (p *provisionPlan) setStep(name, state, detail string) {

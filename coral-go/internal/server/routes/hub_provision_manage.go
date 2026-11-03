@@ -3,6 +3,7 @@ package routes
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"regexp"
@@ -278,28 +279,36 @@ func (pr *Provisioner) upgradeSteps(ctx context.Context, p *provisionPlan) {
 	}
 	p.setStep("restart", stepRunning, "Stopping Coral and starting the new release.")
 	if err := pr.runner.StopAndConfirm(ctx, p.Target); err != nil {
-		pr.fail(p, "restart", "The running Coral did not stop, or that could not be checked, so the new release was not started.")
+		pr.failRestart(ctx, p, "restart", stopFailureSentence(err), err, restartNote{})
 		return
 	}
 	if p.acceptance != nil { // this hub's own acceptance, made by Run; none on a tier that skips the EULA
 		if err := pr.runner.AcceptTerms(ctx, p.Target, pr.version, p.acceptance); err != nil {
-			pr.fail(p, "restart", "Could not record your acceptance of the terms on that computer.")
+			pr.failRestart(ctx, p, "restart", "Could not record your acceptance of the terms on that computer. The new release was not started.", err, restartNote{})
 			return
 		}
 	}
 	if err := pr.runner.Start(ctx, p.Target, pr.version, sshprov.BackendKeep); err != nil {
-		if errors.Is(err, sshprov.ErrPortInUse) {
-			pr.fail(p, "restart", portInUseSentence)
-			return
+		var se *sshprov.StartError
+		switch {
+		case errors.Is(err, sshprov.ErrPortInUse):
+			pr.failRestart(ctx, p, "restart", portInUseSentence, err, restartNote{})
+		case errors.Is(err, sshprov.ErrNoTmux):
+			pr.failRestart(ctx, p, "restart", "Coral on that computer was set up to run its agents in tmux, but tmux is not installed there now, so the new release was not started. The last lines below start it without tmux.", err, restartNote{noTmux: true})
+		case errors.As(err, &se):
+			pr.failRestart(ctx, p, "restart", fmt.Sprintf("The new release could not be started on that computer: its start command ended with code %d. The old release was stopped and the new one is installed.", se.ExitCode), err, restartNote{})
+		case errors.Is(err, sshprov.ErrConnect) || errors.Is(err, sshprov.ErrHostKey) || errors.Is(err, sshprov.ErrHostKeyChanged):
+			pr.failRestart(ctx, p, "restart", connectSentence(err), err, restartNote{})
+		default:
+			pr.failRestart(ctx, p, "restart", "The new release could not be started on that computer.", err, restartNote{})
 		}
-		pr.fail(p, "restart", "Could not start the new release.")
 		return
 	}
 	p.setStep("restart", stepOK, "Started.")
 	p.setStep("verify", stepRunning, "")
 	if h := pr.checkHealth(ctx, row, key); h.Status != store.RemoteStatusOnline || h.Version != want {
 		slog.Info("[provision] upgrade did not come back", "plan", p.ID)
-		pr.fail(p, "verify", "The new release was started, but it did not answer as expected.")
+		pr.failRestart(ctx, p, "verify", "The new release was started, but it did not answer as expected.", errors.New("the new release did not answer after the start"), restartNote{stoppedAgain: true})
 		return
 	}
 	p.setStep("verify", stepOK, "It answers on the new release."+pr.ensureOwnerSecret(ctx, p, row))
