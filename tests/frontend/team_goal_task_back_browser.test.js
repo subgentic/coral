@@ -69,6 +69,28 @@ const { coralReady } = require('./helpers/wait');
             assert.equal(await ev(`document.activeElement?.id`), await ev(`window.__early`), at + 'the control the person moved to before the row was back keeps the focus');
             console.log('   \u2713');
 
+            console.log(`${at}a focus that is on the page while the goal's list is held still goes to the row when it is back (#12552: the loop's own job)`);
+            await openTaskFromGoal(goalUrl, taskUrl, T);
+            await ev(`(() => { const R = window.fetch.bind(window); window.__release = null; window.fetch = (u, o = {}) => { const url = new URL(String(u), location.origin); if (/\\/api\\/board\\/[^/]+\\/tasks$/.test(url.pathname) && url.searchParams.get('goal') && !window.__release) return new Promise(res => { window.__release = () => res(R(u, o)); }); return R(u, o); }; return true; })()`);
+            await ev(`document.querySelector('#team-panel-item .goals-back').click(); true`);
+            await waitFor(`location.pathname === ${JSON.stringify(goalUrl)} && !!window.__release`, at + 'Back is on the goal and its task list is being read', 8000);
+            await ev(`document.activeElement && document.activeElement.blur(); true`); // the focus falls to the page, as when a redraw drops it
+            assert.equal(await ev(`document.activeElement === document.body`), true, at + 'the focus is on the page');
+            await ev(`window.__release(); true`);
+            await waitFor(`document.activeElement?.dataset?.taskId === '${T}'`, at + 'the row takes the focus the page had lost', 8000);
+            console.log('   \u2713');
+
+            console.log(`${at}after it has held the row, the loop does not take the focus from the goal's way back (#12552: the heldSince gate)`);
+            await openTaskFromGoal(goalUrl, taskUrl, T);
+            await ev(`document.querySelector('#team-panel-item .goals-back').click(); true`);
+            await waitFor(`document.activeElement?.dataset?.taskId === '${T}'`, at + 'the row is focused first', 8000);
+            const way = await ev(`(() => { const b = [...document.querySelectorAll('#team-panel-goals .goals-back')].find(x => x.getClientRects().length && !x.disabled); if (!b) return null; b.id = b.id || 'way-back-held'; b.focus(); return b.id; })()`);
+            if (way) {
+                await new Promise(r => setTimeout(r, 1500)); // sleep-ok: the loop looks every 50 ms for a while after the row held; a focus that stays on the way back through 1.5 s of those looks is the proof
+                assert.equal(await ev(`document.activeElement?.id`), way, at + 'the way back keeps the focus the person gave it');
+            } else console.log(`${at}   (no goal way back is shown here: nothing to pin)`);
+            console.log('   \u2713');
+
             console.log(`${at}a task opened by address keeps the Tasks list`);
             await load(taskUrl);
             await waitFor(`document.querySelector('#team-panel-item .team-task-page')?.textContent.includes(${JSON.stringify(TASK)})`, 'the task by address', 15000);
