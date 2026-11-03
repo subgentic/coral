@@ -103,7 +103,7 @@ function renderModal() {
 
     modal.innerHTML = `
         <div class="modal-content dlg-form theme-configurator-content">
-            <h3>Theme Configurator</h3>
+            <h3>Customize theme</h3>
             <div class="toolbar toolbar-pad-bare theme-toolbar">
                 <select id="theme-load-select" class="settings-select">
                     <option value="">Load theme...</option>
@@ -134,8 +134,8 @@ function renderModal() {
             <div class="modal-actions">
                 <button class="btn" data-on-click="theme-close">Cancel</button>
                 <button class="btn" data-on-click="theme-reset">Reset</button>
-                <button class="btn btn-primary" data-on-click="theme-preview">Preview</button>
-                <button class="btn btn-primary" data-on-click="theme-save">Save &amp; Apply</button>
+                <button class="btn" data-on-click="theme-preview">Preview</button>
+                <button class="btn btn-primary" data-on-click="theme-save">Save and apply</button>
             </div>
         </div>
     `;

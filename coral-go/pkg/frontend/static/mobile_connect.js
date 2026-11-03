@@ -83,7 +83,7 @@ async function renderAccess(status, gen, signal) {
                 [button('Check again', checkAccess, true), button('Close', hideMobileConnectModal)]);
         } else {
             renderState(DISABLED_WORDS,
-                [button(ENABLE_LABEL, enableMobileAccess, true), button(USE_HUB_LABEL, useCoralHub), button('Cancel', hideMobileConnectModal)]);
+                [button('Cancel', hideMobileConnectModal), button(USE_HUB_LABEL, useCoralHub), button(ENABLE_LABEL, enableMobileAccess, true)]);
         }
         return;
     }

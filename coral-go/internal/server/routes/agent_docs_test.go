@@ -259,7 +259,7 @@ func TestHowDoIAnswersThreeMoreQuestions(t *testing.T) {
 	}
 	fields, chat, menu, board, lists, saved := read("settings_fields.js"), read("chat_messages.js"), read("message_menu.js"), read("board_chat.js"), read("history_list.js"), read("saved_marks.js")
 	for want, src := range map[string]string{
-		"label: 'Theme'": fields, "label: 'Light'": fields, "Customize Theme": fields, // the Theme select with Light and System, and its Customize Theme button
+		"label: 'Theme'": fields, "label: 'Light'": fields, "Customize theme": fields, // the Theme select with Light and System, and its Customize theme button
 		"aria-label=\"Copy message\"": chat, "item(menu, 'Copy'": menu, "Save for later": saved,
 		"Export Markdown": board, "label: 'Search chats'": lists,
 	} {
