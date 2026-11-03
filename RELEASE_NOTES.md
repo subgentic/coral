@@ -1,5 +1,96 @@
 # Release Notes
 
+## v2.0.37 — An installer and a README, starter skills, Restart with changes that keeps the mode you pick, one question closed by one reply, and sign-in that works on a signed macOS release
+
+### Changes
+
+#### What you will notice first
+
+- **Sign-in works on a signed macOS 27 release again**: a published (Developer ID signed) release refused every sign-in link, `coral open` and `coral setup-code` as "no socket row for the connection", so a new user could not sign in; Coral now recognises that layout and signs the person in with the same rules a system without a peer check uses.
+- **An installer and a README**: `install.sh` at the repo root installs Coral on macOS and Linux with one line (it finds the OS and CPU, downloads the latest release, checks its checksum and signature, and on macOS verifies the app's Developer ID team before it puts it in place); the README has a one-line install and a first screen with pictures.
+- **Starter skills in the Skills Store**: three example skills ship with Coral (how to write a skill for Coral, how an agent uses Coral, how to make an automation), shown as published by "Coral (example)"; they are Markdown only, no scripts and no secrets.
+- **Restart with changes keeps the permission mode you pick**, both ways: Default to Bypass gives `--yolo`, Bypass to Default drops it; the dialog opens on the mode a restart will use and a note says when the running mode differs. Hermes Bypass sends `--yolo` from the launch dialog too.
+- **A reply to one question closes only that question**: an @mention of the asker no longer answers all their other open questions.
+- **Inbox column resizing follows your pick** (an edge dragged right widens that column, the ones to its right give room), and the hidden-columns bar has **Reset column widths**.
+- **Switching agents through a self-hosted hub over SSH stays fast**: the first switch after the shared SSH session expired no longer starts about seven connections at once, and Forgetting a host key closes the idle streams too.
+- **A signed-out page makes no requests**: the chats list and the other timer loops stop once the page is signed out.
+- **The Needs you page title stays whole** beside the filter chips, a Needs link by team name opens the item, and the New team skills list fits a phone.
+- **Chief**: the decision notice names the team by its label, and Settings > Chief refuses a "Which agent" that is on the team it fronts.
+- **Hermes**: the requested-level note names the setting; the word "Ignore" can no longer return to the bars (Dismiss is the word).
+
+#### Known issues
+
+- **Windows: in-app update does not work from 2.0.0 through 2.0.6.** If you're on one of those, download and install the MSI by hand; from 2.0.7 on, in-app update works.
+- **macOS: a Coral of 2.0.5 or earlier cannot install updates in-app; install 2.0.6 or later by hand once.**
+- **OpenCode agents are tested on macOS and Linux; OpenCode on Windows is not yet tested end to end.**
+- **Hermes agents are still experimental**; a Hermes that died in its first-use setup is typed into the shell until the next check.
+- After an upgrade from before 2.0.35, an install that has agents but no board messages may be treated as a copy: run `coral --adopt-data-dir` once.
+- `team_goal_task_back_browser` passes only on a retry in the release gate (a test race, #12547); the feature itself works.
+
+#### For Coral Hub
+
+- **`release-diff` output** (`go run ./internal/releasediff/cmd/release-diff v2.0.36 <head>`):
+
+  ### Tunnel routes, v2.0.36 to the v2.0.37 head
+
+  No route was added, removed or changed.
+
+  ### Board settings keys (BoardSettings, HealthSettings included), v2.0.36 to the v2.0.37 head
+
+  No key was added, removed or changed.
+
+  ### What Coral Hub compiles in or embeds, v2.0.36 to the v2.0.37 head
+
+  `pkg/frontend`: 27 files the Hub embeds changed (+128, -39)
+
+  - `coral-go/pkg/frontend/static/agent_config_form.js`: +6, -2
+  - `coral-go/pkg/frontend/static/artifact_comment_ask.js`: +2, -1
+  - `coral-go/pkg/frontend/static/changed_files.js`: +2, -1
+  - `coral-go/pkg/frontend/static/chief_setup.js`: +12, -4
+  - `coral-go/pkg/frontend/static/cloud_connect.js`: +3, -1
+  - `coral-go/pkg/frontend/static/css/skills.css`: +14, -2
+  - `coral-go/pkg/frontend/static/css/team_page.css`: +3, -2
+  - `coral-go/pkg/frontend/static/data_table.js`: +26, -11
+  - `coral-go/pkg/frontend/static/dismiss_wait.js`: +9, -2
+  - `coral-go/pkg/frontend/static/inbox_link.js`: +14, -2
+  - `coral-go/pkg/frontend/static/launch_dialog.js`: +2, -1
+  - `coral-go/pkg/frontend/static/launch_skills.js`: +4, -1
+  - `coral-go/pkg/frontend/static/manifest.json`: +1, -1
+  - `coral-go/pkg/frontend/static/model_chip.js`: +1, -1
+  - `coral-go/pkg/frontend/static/notes.js`: +2, -0
+  - `coral-go/pkg/frontend/static/permission_flags.js`: +1, -0
+  - `coral-go/pkg/frontend/static/popout.js`: +2, -0
+  - `coral-go/pkg/frontend/static/relaunch_badge.js`: +3, -2
+  - `coral-go/pkg/frontend/static/restart_flow.js`: +5, -0
+  - `coral-go/pkg/frontend/static/resume_dialog.js`: +2, -1
+  - `coral-go/pkg/frontend/static/scheduler.js`: +2, -2
+  - `coral-go/pkg/frontend/static/server_ssh_setup.js`: +2, -0
+  - `coral-go/pkg/frontend/static/sessions.js`: +1, -0
+  - `coral-go/pkg/frontend/static/skills_tab.js`: +2, -1
+  - `coral-go/pkg/frontend/static/startup_status.js`: +3, -0
+  - `coral-go/pkg/frontend/static/team_dialogs.js`: +2, -1
+  - `coral-go/pkg/frontend/static/update_settings.js`: +2, -0
+  - test files, not compiled by the Hub: 1 file (+2, -2)
+
+  `agent_docs`: 1 file the Hub embeds changed (+4, -0)
+
+  - `coral-go/agent_docs/skills.md`: +4, -0
+
+  Unchanged: `pkg/hubproxy`, `pkg/hubowner`, `pkg/redact`, `pkg/tunnel`.
+
+  ### Coral packages compiled into the Hub through its imports, v2.0.36 to the v2.0.37 head
+
+  Unchanged: `internal/fsreplace`, `internal/httputil`, `internal/logsafe`, `internal/safego`, `internal/secfile`, `internal/secrets`, `pkg/redact/betterleaks`.
+
+- **Local-client identification (#12529, #12542)**: macOS 27 shows a process signed the usual way (Developer ID, hardened runtime) an empty or own-sockets-only process socket table, so the client's row was never found and every sign-in link, `coral open` and `coral setup-code` of a published release was refused. A table that has the server's end of the connection and not the client's, or no sockets at all, is now the layout answer (the peer check is unavailable: the rules for a system without a peer check apply, no local-only powers, the dashboard's warning) instead of a missing row; both ends of a connection must match for it to count as the client's. No route, token, framed path or tunnel rule changed; the Hub's own sign-in is unchanged.
+- **Ready signals, hooks, tokens**: unchanged.
+
+
+#### For developers and releases
+
+- `install.sh` has its own test (`tests/release/install_sh_test.sh`, a fake release over `file://`; `INSTALL_SH_REAL=1` also runs the real latest release); it passes on a clean PATH, and its macOS section expects no real `cosign` on PATH.
+- The "Ignore" word census, the Windows machine-launch test fixes (`//go:build unix`), and goldens regenerated for the restart dialog, the Chief and column changes.
+
 ## v2.0.36 — Mark up in the file viewer, Needs you row actions with Dismiss, links to files in Markdown, a clear list of CLIs, and a Hub sign-in that brings a deep link back whole
 
 ### Changes
