@@ -103,7 +103,9 @@ Behind the Inbox is the part that does the work: a team of agents on one board. 
 </p>
 
 - **Mixed-vendor teams.** Permissions are written once and translated into each CLI's native format, so a read-only QA agent is read-only whether it is Claude or Codex.
-- **Idle agents sleep by themselves.** An agent that has been idle for a while is put to sleep to free memory and wakes when something is sent to it; an agent mid-work stays awake. On by default, with a switch in Settings.- **A Skills Store (experimental).** Import a skill, review it, approve it; approved skills appear in New agent and New team, and agents can publish and search skills themselves.- **Teams that survive closing the lid.** Sleep a whole team and wake it tomorrow, or after upgrading Coral: every agent resumes its own session.
+- **Idle agents sleep by themselves.** An agent that has been idle for a while is put to sleep to free memory and wakes when something is sent to it; an agent mid-work stays awake. On by default, with a switch in Settings.
+- **A Skills Store (experimental).** Import a skill, review it, approve it; approved skills appear in New agent and New team, and agents can publish and search skills themselves.
+- **Teams that survive closing the lid.** Sleep a whole team and wake it tomorrow, or after upgrading Coral: every agent resumes its own session.
 - **Run it anywhere.** Put Coral on a build server or a spare Mac; open it from any browser, or scan a QR code for a phone client.
 
 Everything else is in the [feature list](#features).
