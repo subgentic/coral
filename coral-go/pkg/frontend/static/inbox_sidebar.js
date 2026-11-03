@@ -763,7 +763,7 @@ function renderInboxNav(force = false) {
     // what the tables show is part of the key too: the folder list is drawn from the counts, but the table on screen is refreshed (refreshGroupTable below) only when a row of it changed
     const needs = needsRows(), tk = taskRows(), sv = saved.savedView().shown.map(saved.savedItemFacts);
     const key = JSON.stringify([here, sections, queries.needs, queries.tasks, page && `${page.kind}:${page.project || ''}#${page.id}`,
-        needs.map(s => [sessionServer(s), s.session_id, s.display_name, s.waiting_kind, s.waiting_since, teamOf(s), askOf(s)]), tk.map(t => [t.project, t.id, t.title, t.priority, t.status, t.board, t.updated_at, t.artifact_count]), sv.map(f => [f.id, f.which, f.saved, f.state]), savedFiles().map(a => a.reviewKey)]);
+        needs.map(s => [sessionServer(s), s.session_id, s.display_name, s.waiting_kind, s.waiting_since, teamOf(s), askOf(s)]), tk.map(t => [t.project, t.id, t.title, t.priority, t.status, t.board, t.updated_at, t.artifact_count]), sv.map(f => [f.id, f.which, f.saved, f.state]), savedFiles().map(a => a.reviewKey), mutedWords(mutedReviewItems()), dayOldMutedFiles().map(a => a.hex)]); // the quiet Muted line is part of what the table shows: a change that only moves muted files redraws it (#12881)
     if (!force && key === _navKey) return;
     _navKey = key;
     if (needsRows().some(s => s.waiting_since) && !_poll) _poll = pollEvery(() => { refreshReviews(); refreshProposals(); refreshGoals(); renderInboxNav(true); }, 30000); // "waiting 4 min" in the Needs you table moves on while the tab is open
