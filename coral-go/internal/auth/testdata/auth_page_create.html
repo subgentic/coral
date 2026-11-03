@@ -43,6 +43,7 @@
   ol.steps li { margin-bottom: 8px; }
   .howin { background: var(--bg-primary); border: 1px solid var(--border-light); border-radius: 8px; padding: 12px; margin: 0 0 20px; font-size: 0.8125rem; line-height: 1.5; color: var(--text-secondary); }
   .howin b { color: var(--text-primary); }
+  .howin summary { cursor: pointer; font-weight: 600; color: var(--text-primary); }
   .howin p { margin: 6px 0 0; }
   .note { font-size: 0.75rem; color: var(--text-secondary); line-height: 1.5; margin: 14px 0 0; }
   .panel[hidden], .err[hidden], .lock[hidden], .warn[hidden] { display: none; }
@@ -78,7 +79,6 @@
   <section id="panel-create" class="panel">
     <h1>Create a password</h1>
     <p class="sub">A password keeps other people and other devices out of Coral when it is opened in a web browser.</p>
-
     <div id="err" class="err" role="alert" hidden></div>
     <div id="lock" class="lock" role="status" hidden><span>&#9202;</span><span><b>Setup is paused.</b> Too many wrong attempts. It opens again in <span class="count" id="count">0:00</span>.</span></div>
     <form id="create-form" autocomplete="on">
@@ -91,6 +91,7 @@
       <div class="btnrow"><button type="submit" disabled data-needs-script id="submit" class="btn btn-primary wide">Create password and open Coral</button></div>
     </form>
     <p class="note">It keeps other people and other devices out of Coral in a web browser. Your password manager can save it. Forgot it? Run coral reset-password in a terminal on this computer.</p>
+
 
 
 
