@@ -185,6 +185,18 @@ const series = (rows, key) => Array.from({ length: 24 }, (_, h) => ({ cost_usd: 
         }
         console.log('   ✓');
 
+        console.log('5b. A team launched from the dashboard has a board id for a key: the chart names it by its label (#13045)');
+        await ev(`(() => { const R = window.fetch; window.fetch = (u, o) => { const url = String(u && u.url || u), q = new URL(url, location.origin).searchParams;
+            if (url.includes('/api/token-usage/timeseries') && q.get('group_by') === 'team' && !q.get('until')) { const t = new Date(Date.now() - 3600000).toISOString().replace(/:\\d\\d:\\d\\d\\.\\d+Z$/, ':00:00Z'), row = (key, label, c) => ({ key, label, cost_usd: c, input_tokens: 1, output_tokens: 1, cache_read_tokens: 0, cache_write_tokens: 0, num_requests: 1 });
+                return Promise.resolve(new Response(JSON.stringify({ interval: '1h', group_by: 'team', buckets: [{ bucket: t, cost_usd: 3, input_tokens: 2, output_tokens: 2, cache_read_tokens: 0, cache_write_tokens: 0, num_requests: 2, series: [row('b-6xccqbikbn', 'phone-pass', 2), row('b-other', 'other-team', 1)] }] }), { headers: { 'content-type': 'application/json' } })); }
+            return R(u, o); }; return true; })()`);
+        await view('overview'); await view('team');
+        await waitFor(`[...document.querySelectorAll('#cost-series-team .viz-svg text.viz-end')].some(t => t.textContent === 'phone-pass')`, 'the end label says the team name', 10000);
+        const ends = await ev(`[...document.querySelectorAll('#cost-series-team .viz-svg text.viz-end')].map(t => t.textContent)`);
+        assert.ok(!ends.some(t => /^b-/.test(t)), 'no board id in an end label: ' + JSON.stringify(ends));
+        const tipText = await ev(`(() => { const r = document.querySelector('#cost-series-team .viz-svg rect:last-of-type'); const b = r.getBoundingClientRect(); r.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: b.left + b.width / 2, clientY: b.top + 40 })); return document.querySelector('#cost-series-team .viz-tip').textContent; })()`);
+        assert.ok(/phone-pass/.test(tipText) && !/b-6xccqbikbn|b-other/.test(tipText), 'the tooltip names the team, not its board id: ' + tipText);
+        console.log('   ✓');
         console.log('6. A phone: the chart fits, no end labels, the swatches are targets, the table is one line a row');
         await open(390, 844, true);
         await waitFor(`document.querySelector('#cost-by-team .dt-box').classList.contains('dt-one-line')`, 'the table is one line a row', 6000);

@@ -1,7 +1,7 @@
 // The lines over time (#7857): the axis has a point for every interval (a time with no usage is a zero), the colours follow the ranking by cost (not the metric shown), the top 7 are their own lines and the
 // rest are one Other, a running total ends on the sum, and "Totals agree" is a comparison a float cannot break.
 import assert from 'node:assert/strict';
-import { axis, bucketStart, rankKeys, assignLines, buildSeries, buildMetricLines, metricUnits, METRIC_SLOT, agrees, changeText, bucketTotals, priorWord, cacheHit, bucketWindow, TOP, OTHER, METRICS } from '../../coral-go/pkg/frontend/static/analytics_series.js';
+import { labelsOf, axis, bucketStart, rankKeys, assignLines, buildSeries, buildMetricLines, metricUnits, METRIC_SLOT, agrees, changeText, bucketTotals, priorWord, cacheHit, bucketWindow, TOP, OTHER, METRICS } from '../../coral-go/pkg/frontend/static/analytics_series.js';
 
 const H = 3600000, t0 = Date.UTC(2026, 9, 25, 10, 0, 0);
 assert.equal(bucketStart(t0 + 1234, '1h'), t0);
@@ -82,4 +82,9 @@ const ml2 = buildMetricLines([{ bucket: iso(t0), series: [{ key: 'a', cost_usd: 
 assert.deepEqual(ml2.map(l => [l.key, l.slot, l.total]), [['cost_usd', METRIC_SLOT.cost_usd, 1], ['input_tokens', METRIC_SLOT.input_tokens, 5], ['cache_read_tokens', METRIC_SLOT.cache_read_tokens, 50]], 'in the order of the picker');
 assert.deepEqual(metricUnits(mm).map(g => g.map(m => m.key)), [['cost_usd'], ['input_tokens', 'cache_read_tokens']]);
 assert.deepEqual(metricUnits(METRICS).map(g => g.length), [1, 4, 1]);
+// a key joins, a label is read (#13045): a team's series is keyed by its board id and says its name; a series with no label, or one that repeats its key, shows the key
+const tb = [{ bucket: iso(t0), series: [{ key: 'b-6xccqbikbn', label: 'phone-pass', cost_usd: 2, num_requests: 1 }, { key: 'plain', label: 'plain', cost_usd: 1, num_requests: 1 }, { key: 'nolabel', cost_usd: 0.5, num_requests: 1 }] }];
+assert.deepEqual([...labelsOf(tb)], [['b-6xccqbikbn', 'phone-pass'], ['plain', 'plain'], ['nolabel', 'nolabel']]);
+const tl = buildSeries(tb, assignLines(rankKeys(tb), null), [t0], 'cost_usd', false);
+assert.deepEqual(tl.map(l => [l.key, l.label]), [['b-6xccqbikbn', 'phone-pass'], ['plain', 'plain'], ['nolabel', 'nolabel']], 'the line is named by the label and keeps the key it joins on');
 console.log('analytics_series: ok');

@@ -352,6 +352,24 @@ func (h *TokenUsageHandler) UsageTimeSeries(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	// A team's series is keyed by its board id (the chart and the By team rows join on it) and says the team's current label, as the By team rows do (#13045): a board with no row, or no board store, keeps its key.
+	if groupBy == "team" && h.bs != nil {
+		var ids []string
+		for _, b := range buckets {
+			for _, s := range b.Series {
+				ids = append(ids, s.Key)
+			}
+		}
+		labels := h.bs.BoardLabels(r.Context(), ids)
+		for i := range buckets {
+			for j := range buckets[i].Series {
+				if l := labels[buckets[i].Series[j].Key]; l != "" {
+					buckets[i].Series[j].Label = l
+				}
+			}
+		}
+	}
+
 	// Compute cumulative cost
 	type bucketWithCumulative struct {
 		Bucket           string                   `json:"bucket"`
