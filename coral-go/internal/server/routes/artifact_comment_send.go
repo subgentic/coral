@@ -107,6 +107,38 @@ func sendQuote(s string, n int) (string, bool) {
 	return capChars(sendDashes.ReplaceAllString(cleanSendText(red), "- - -"), n), true
 }
 
+// sendQuoteLines is sendQuote for lines of code (the diff comments, #12570): the same redaction, the same ANSI, control, bidi and zero-width cleaning and the same defused marker dashes, but the line breaks and the
+// indentation stay, so the lines read as lines in the frame. Cut to n characters after redacting, at a line break when one is near.
+func sendQuoteLines(s string, n int) (string, bool) {
+	red, ok := redactComment(s)
+	if !ok {
+		return "", false
+	}
+	red = sendANSISequence.ReplaceAllString(strings.ReplaceAll(strings.ReplaceAll(red, "\r\n", "\n"), "\r", "\n"), "")
+	var b strings.Builder
+	for _, r := range red {
+		switch {
+		case r == '\n' || r == '\t' || r == ' ':
+		case r == 0xa0 || r == 0x2028 || r == 0x2029:
+			r = ' '
+		case r < 0x20 || r == 0x7f || (r >= 0x80 && r < 0xa0) || r == 0x200b || r == 0x200c || r == 0x200d || r == 0x2060 || r == 0xfeff || (r >= 0x202a && r <= 0x202e) || (r >= 0x2066 && r <= 0x2069),
+			!unicode.IsPrint(r) && !unicode.IsSpace(r):
+			continue
+		}
+		b.WriteRune(r)
+	}
+	out := sendDashes.ReplaceAllString(strings.TrimRight(b.String(), " \t\n"), "- - -")
+	if utf8.RuneCountInString(out) > n {
+		r := []rune(out)
+		cut := string(r[:n])
+		if i := strings.LastIndex(cut, "\n"); i > n/2 {
+			cut = cut[:i]
+		}
+		out = strings.TrimRight(cut, " \t\n") + "\n…"
+	}
+	return out, true
+}
+
 // sendDashes are runs of three or more hyphens: the markers of the message are such runs, so quoted text never holds one (a comment that says "--- end ---" must not close the block).
 var sendDashes = regexp.MustCompile(`-{3,}`)
 

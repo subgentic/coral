@@ -96,7 +96,11 @@ const mounted = new WeakMap(); // slot -> its box
 /** Put the comments of `file` under its diff in `slot`. view is the editor of the diff, texts its two texts. Does nothing through Coral Hub or when the agent has no team. */
 export async function attachDiffComments(slot, file, view, texts, base = '', fields = []) {
     const s = state.currentSession, team = s && s.board_project, sid = s && s.session_id;
-    if (isCloud() || !team || !sid || !s || s.type !== 'live') return;
+    if (!s || s.type !== 'live' || !sid) return;
+    if (isCloud() || !team) { // a line that says why there is no Comment button (#12570): comments go to an agent on a team's board, on the computer itself
+        if (!slot.querySelector('.diff-comments-note')) slot.append(el('p', 'diff-comments-note', isCloud() ? 'Comments on a diff are made on the computer itself.' : 'Comments need a team: this agent is not on one, so there is no board to send a comment to.'));
+        return;
+    }
     mounted.get(slot)?.destroy();
     const key = await diffSubject(team, sid, file.filepath);
     const box = el('div', 'diff-comments'), body = el('div', 'diff-comments-body'), btn = el('button', 'btn btn-small diff-comment-btn', 'Comment');
