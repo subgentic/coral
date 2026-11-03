@@ -473,8 +473,9 @@ func (h *SessionsHandler) agentRow(trace *phaseTrace, agent AgentInfo, lv liveIn
 		h.applyTranscriptState(&stateInput, d.stateEvents[sid], agent.AgentType, agent.TmuxSession, sid, agent.WorkingDir)
 	}
 	trace.agentDetail("transcript_state", sid, time.Since(transcriptStarted))
-	state := DeriveSessionState(stateInput)
-	if !skipExpensive { // the funnel's agent steps (#7455): read only when the startup screen and sign-in were read too
+	state := h.holdForAutoMode(sid, DeriveSessionState(stateInput), time.Now()) // a permission request that Claude's auto mode may still decide is not yet something that waits for the Operator (#12694)
+	// the funnel's agent steps (#7455): read only when the startup screen and sign-in were read too
+	if !skipExpensive {
 		funnelAgentStep(agent.AgentType, lv.createdAt[sid], staleness != nil, staleF, latestEv, stateInput, state)
 	}
 
