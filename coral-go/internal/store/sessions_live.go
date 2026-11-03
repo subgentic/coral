@@ -776,3 +776,9 @@ func (s *SessionStore) SetSessionThinking(ctx context.Context, sessionID, level 
 	_, err := s.db.ExecContext(ctx, "UPDATE live_sessions SET thinking = ? WHERE session_id = ?", level, sessionID)
 	return err
 }
+
+// SetLivePermissionModeIfEmpty records the mode a row started in when it recorded none (#12718); a mode already recorded is never replaced.
+func (s *SessionStore) SetLivePermissionModeIfEmpty(ctx context.Context, sessionID, mode string) error {
+	_, err := s.db.ExecContext(ctx, "UPDATE live_sessions SET permission_mode = ? WHERE session_id = ? AND (permission_mode IS NULL OR permission_mode = '')", mode, sessionID)
+	return err
+}

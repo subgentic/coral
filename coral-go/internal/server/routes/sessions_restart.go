@@ -65,6 +65,8 @@ type restartPlan struct {
 	capsJSON, toolsJSON                                       *string
 	tools                                                     []string
 	permMode                                                  string
+	startMode                                                 string // the mode the stored agent's transcript says its chat started in, read when it had none recorded (#12718)
+	modeFromTranscript                                        bool   // the stored agent had no mode and no permission flag: its transcript's start mode is the one it restarts in and records (#12718)
 	pickedMode                                                bool   // the dialog named the mode: it replaces the stored one and the stored permission flags
 	modeNotRecorded                                           bool   // the stored agent had no mode: it restarts in Default and the answer says so
 	chiefMode                                                 string // set when the restarted agent is the recorded Chief: the mode its chief_actions setting names (#11798)
@@ -155,6 +157,7 @@ func (h *SessionsHandler) restartResolve(ctx context.Context, name string, req r
 				}
 			}
 			p.stored = ls
+			p.startMode = h.transcriptStartMode(ctx, ls, store.UnmarshalFlags(ls.Flags))
 			if ls.Capabilities != nil && *ls.Capabilities != "" {
 				p.caps = &agent.Capabilities{}
 				if err := json.Unmarshal([]byte(*ls.Capabilities), p.caps); err != nil {
@@ -363,6 +366,8 @@ func (p *restartPlan) restartSettings() {
 	} else {
 		if perm := agent.PermissionModeFromFlags(storedFlags); perm != "" {
 			p.permMode = perm
+		} else if p.startMode != "" {
+			p.permMode, p.modeFromTranscript = p.startMode, true // from before modes were recorded: the mode the chat started in (#12718)
 		}
 	}
 	if p.permMode == "" {
