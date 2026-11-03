@@ -75,10 +75,37 @@ func (ks *KeyStore) MintLoginToken() (string, error) {
 	for h, exp := range ks.loginTokens {
 		if now.After(exp) {
 			delete(ks.loginTokens, h)
+			delete(ks.localTokens, h)
 		}
 	}
 	ks.loginTokens[hashLoginToken(token)] = now.Add(loginTokenTTL())
 	return token, nil
+}
+
+// MintLocalLoginToken is MintLoginToken for "Open Coral on this computer" (LocalOpen): the same single-use link, marked so the session it makes
+// is labelled as opened on this computer, the one trace in Settings > Sessions that such a sign-in leaves.
+func (ks *KeyStore) MintLocalLoginToken() (string, error) {
+	token, err := ks.MintLoginToken()
+	if err != nil {
+		return "", err
+	}
+	ks.mu.Lock()
+	defer ks.mu.Unlock()
+	if ks.localTokens == nil {
+		ks.localTokens = map[string]bool{}
+	}
+	ks.localTokens[hashLoginToken(token)] = true
+	return token, nil
+}
+
+// takeLocalMark reports whether token was made by LocalOpen, and forgets the mark.
+func (ks *KeyStore) takeLocalMark(token string) bool {
+	ks.mu.Lock()
+	defer ks.mu.Unlock()
+	h := hashLoginToken(token)
+	local := ks.localTokens[h]
+	delete(ks.localTokens, h)
+	return local
 }
 
 // consumeLoginToken reports whether token is a valid, unused, unexpired login token,
@@ -203,6 +230,7 @@ func (ks *KeyStore) handleLoginToken(w http.ResponseWriter, r *http.Request) boo
 			})
 		}
 	}
+	local := ks.takeLocalMark(token)
 	if !ks.consumeLoginToken(token) {
 		if viaRelay {
 			log.Printf("[auth] a sign-in link opened through WSL's localhost relay was used or expired: refused")
@@ -210,7 +238,11 @@ func (ks *KeyStore) handleLoginToken(w http.ResponseWriter, r *http.Request) boo
 		writeLinkUsed(w)
 		return true
 	}
-	session, err := ks.NewSessionRotating(r, SessionByLink, false)
+	label := newSessionLabel(r, SessionByLink)
+	if local {
+		label = LocalSessionLabelPrefix + label
+	}
+	session, err := ks.newSessionRotating(r, SessionByLink, false, label)
 	if err != nil {
 		http.Error(w, "could not start a session", http.StatusInternalServerError)
 		return true

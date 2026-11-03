@@ -39,6 +39,23 @@ func TestOpenCoralOnThisComputerSignsInThroughASingleUseLink(t *testing.T) {
 	first := follow()
 	require.Equal(t, http.StatusFound, first.Code, first.Body.String())
 	assert.True(t, g.ks.ValidateSession(sessionCookie(t, first).Value))
+	// The one trace such a sign-in leaves: Settings > Sessions shows it as opened on this computer. An ordinary link's session is not labelled so.
+	ordinary, err := g.ks.MintLoginToken()
+	require.NoError(t, err)
+	rec := httptest.NewRecorder()
+	require.True(t, g.ks.handleLoginToken(rec, g.req("GET", "/?"+LoginTokenParam+"="+ordinary, "", "127.0.0.1", nil)))
+	list, err := g.ks.backend().ListSessions(t.Context())
+	require.NoError(t, err)
+	local, plain := 0, 0
+	for _, s := range list {
+		if strings.HasPrefix(s.Label, LocalSessionLabelPrefix) {
+			local++
+		} else {
+			plain++
+		}
+	}
+	assert.Equal(t, 1, local, "the button's session is labelled")
+	assert.Equal(t, 1, plain, "an ordinary link's session is not")
 	second := follow()
 	assert.NotEqual(t, http.StatusFound, second.Code, "single use")
 }

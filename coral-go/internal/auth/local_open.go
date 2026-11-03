@@ -32,7 +32,7 @@ func (ar *Routes) LocalOpen(w http.ResponseWriter, r *http.Request) {
 		authError(w, http.StatusForbidden, "not_this_computer", "This works only in a browser on the computer that runs Coral, in the same account. Sign in with the password, or run coral open there.")
 		return
 	}
-	token, err := ar.ks.MintLoginToken()
+	token, err := ar.ks.MintLocalLoginToken()
 	if err != nil {
 		log.Printf("[auth] could not make a sign-in link for this computer: %v", err)
 		authError(w, http.StatusInternalServerError, "internal", "Coral could not open: try again")
