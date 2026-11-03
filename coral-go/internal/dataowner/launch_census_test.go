@@ -57,6 +57,7 @@ var pinnedSites = map[string]string{
 	"sessions_launch_session.go SessionsHandler.startOnBackend": person + ": the launch handlers",
 	"sessions_launch_session.go SessionsHandler.startOnTmux":    person + ": the launch handlers",
 	"sessions_restart.go SessionsHandler.restartTerminal":       person + ": the restart and resume handlers",
+	"agent_server_lost.go SessionsHandler.recoverAgent":         "lost-server recovery: restarts the agents of a tmux server that died, each from its own row in this Coral's database, once, spaced out; reached only from SessionsHandler.ServerLost (the report that the terminal server died), never from a request or an agent (#12592)",
 	"sessions_wake.go SessionsHandler.startWake":                person + ": wakeExistingSession's own start, below",
 	"sessions_wake.go SessionsHandler.wakeExistingSession":      person + ": the wake handlers' wake; it only forwards to wakeSession, and its background callers (autoResume, autoWakeOne) are gated entries",
 	// the background resumes of a session
@@ -219,6 +220,7 @@ var pinnedCallers = map[string]string{
 	"scheduler_turn.go JobScheduler.settleOnTurn":              "only reached from the scheduler's turn watchers (started by Run or by a run a person started)",
 	"sessions_launch_session.go SessionsHandler.launchSession": "the launch, team launch, team lifecycle and team reset handlers",
 	"sessions_launch_team.go SessionsHandler.launchTeamMember": "the team launch handlers",
+	"agent_server_lost.go SessionsHandler.recoverAgent":        "restarts the agents of a tmux server that died, each from its own row in this Coral's database; reached only from SessionsHandler.ServerLost (the report that the terminal server died), never from a request or an agent (#12592)",
 	"sessions_wake.go SessionsHandler.wakeExistingSession":     "the wake handlers; its two background callers (autoResume, autoWakeOne) are gated entries",
 	"sessions_wake.go SessionsHandler.wakeSession":             "wakeExistingSession (the wake handlers and their gated background callers) and WakeIdleFor, a gated entry",
 }
