@@ -4,6 +4,7 @@
 import { importOnce } from './import_once.js';
 import { ensureBuilt } from './lazy_dom.js';
 
+await importOnce('./settings_fields.js'); // schemas are part of this open path and register before the template builds
 ensureBuilt('settings-modal');
 const settingsDialog = await importOnce('./settings_dialog.js');
 export const { showSettingsModal, hideSettingsModal, applySettings } = settingsDialog;
