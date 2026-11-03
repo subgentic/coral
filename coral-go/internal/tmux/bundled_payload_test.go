@@ -1,6 +1,7 @@
 package tmux
 
 import (
+	"bytes"
 	"context"
 	"os"
 	"os/exec"
@@ -76,7 +77,16 @@ func TestBundledPayloadSmoke(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { os.RemoveAll(sockDir) })
 	c := NewClient(sockDir)
-	require.Equal(t, bundled, c.TmuxBin)
+	// The client starts its server from Coral's own copy of the bundled tmux, <data dir>/tmux-bin/tmux-<16 hex of its contents> (#12598), never from the file an upgrade replaces: the copy's bytes are the payload's.
+	staged := c.TmuxBin
+	require.NotEqual(t, bundled, staged, "the client starts the staged copy, not the bundled file")
+	require.Equal(t, filepath.Join(sockDir, "tmux-bin"), filepath.Dir(staged))
+	require.Regexp(t, `^tmux-[0-9a-f]{16}$`, filepath.Base(staged))
+	wantBytes, err := os.ReadFile(bundled)
+	require.NoError(t, err)
+	gotBytes, err := os.ReadFile(staged)
+	require.NoError(t, err)
+	require.True(t, bytes.Equal(wantBytes, gotBytes), "the staged copy is the bundled payload, byte for byte")
 	t.Cleanup(func() { _, _ = c.run(ctx, "kill-server") })
 
 	// 2. Create a session running a harmless program (no agent, no prompt).
@@ -108,7 +118,7 @@ func TestBundledPayloadSmoke(t *testing.T) {
 
 	// 6. A new client on the same per-instance socket still sees the session.
 	restarted := NewClient(sockDir)
-	require.Equal(t, bundled, restarted.TmuxBin)
+	require.Equal(t, staged, restarted.TmuxBin, "an unchanged tmux reuses the same staged copy")
 	assert.True(t, restarted.HasSession(ctx, name), "the session survives the Coral client being replaced")
 
 	// 7. Helper discovery: a helper in the same bundle (no CORAL_TMUX_BIN, no
@@ -126,7 +136,8 @@ func TestBundledPayloadSmoke(t *testing.T) {
 	attach := c.AttachCommand(name)
 	require.Contains(t, attach, userTerminfo+":/usr/share/terminfo:", "the user's list comes first and is preserved")
 	require.Contains(t, attach, filepath.Join(root, "Coral Smoke.app", "Contents", "Resources", "terminfo"))
-	require.Contains(t, attach, "'"+bundled+"'", "the quoted bundled binary")
+	require.Contains(t, attach, " "+quoteIfNeeded(staged)+" -S ", "the staged copy, quoted as needed: the attach runs the same file the server was started from")
+	require.NotContains(t, attach, bundled, "and never the bundled file an upgrade replaces")
 	require.NoError(t, exec.Command("/bin/sh", "-n", "-c", attach).Run(), "the exact attach command parses")
 	probe := strings.Replace(attach, "attach -t "+shellQuoteOrPlain(name), "list-sessions -F '#{session_name}'", 1)
 	got, err := exec.Command("/bin/sh", "-c", probe).Output()
