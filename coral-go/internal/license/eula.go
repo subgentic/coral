@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 	"unicode"
 
@@ -269,10 +270,18 @@ func eulaCommand() []string {
 	return eulaCommandLines(runtime.GOOS, path)
 }
 
+// noTerminal is set when TerminalEULADialog found no terminal to ask in (nobody could answer), as opposed to a person who read the terms and declined.
+var noTerminal atomic.Bool
+
+// DeclinedForNoTerminal reports whether the last TerminalEULADialog gave up because there was no terminal to ask in. The caller can say so another way (the Windows program with no
+// console shows a message box) and end with a failure code, since nothing was declined by anybody.
+func DeclinedForNoTerminal() bool { return noTerminal.Load() }
+
 // TerminalEULADialog shows the TOS in the terminal and prompts for acceptance.
 func TerminalEULADialog(tosText string) bool {
 	if !term.IsTerminal(int(os.Stdin.Fd())) {
 		// Nobody can answer: a background start must not block in read(0).
+		noTerminal.Store(true)
 		fmt.Println("The Terms of Service have not been accepted and stdin is not a terminal, so Coral cannot ask.")
 		fmt.Println("To accept them, run this once in a terminal, read the terms and type 'accept':")
 		fmt.Println()
