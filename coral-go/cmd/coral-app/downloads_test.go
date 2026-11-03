@@ -110,3 +110,51 @@ func TestDownloadInterceptScript(t *testing.T) {
 		}
 	}
 }
+
+// Both init scripts must run: the isolated download test cannot see an earlier
+// external-link listener opening a browser before the native save completes.
+func TestNativeDownloadPrecedesExternalLinkPolicy(t *testing.T) {
+	node, err := exec.LookPath("node")
+	if err != nil {
+		t.Skip("node is not installed")
+	}
+	const harness = `
+global.location={href:'http://localhost:8420/inbox/artifacts',origin:'http://localhost:8420'};
+const handlers=[],saved=[],opened=[],requests=[];let complete;const done=new Promise(r=>complete=r);
+global.window=globalThis;global.document={addEventListener:(t,fn)=>{if(t==='click')handlers.push(fn);}};
+global.CustomEvent=class{constructor(t,o){this.type=t;this.detail=o.detail;}};
+global.dispatchEvent=e=>{if(e.type==='coral:native-download')complete(e.detail);};
+global.FileReader=class{readAsDataURL(b){this.result='data:application/octet-stream;base64,'+Buffer.from(b.text).toString('base64');this.onload();}};
+class Anchor{constructor(){this.tagName='A';this.href='http://localhost:8420/api/artifacts/abc';this.target='_blank';}hasAttribute(n){return n==='download';}getAttribute(n){return n==='href'?this.href:n==='download'?'':null;}click(){}}
+global.HTMLAnchorElement=Anchor;global._coralOpenExternal=u=>opened.push(u);
+global._coralSaveFile=async(n,b)=>{saved.push([n,Buffer.from(b,'base64').toString()]);return '/Downloads/'+n;};
+global.fetch=async(u,o)=>{requests.push({url:u,credentials:o.credentials});return {ok:true,headers:{get:()=> 'attachment; filename="report.html"'},blob:async()=>({text:'window-session-bytes',size:20})};};
+eval(process.argv[1]);
+(async()=>{const a=new Anchor();let stopped=false,prevented=false;const e={target:{closest:()=>a},preventDefault(){prevented=true;this.defaultPrevented=true;},stopPropagation(){},stopImmediatePropagation(){stopped=true;}};for(const fn of handlers){fn(e);if(stopped)break;}await done;console.log(JSON.stringify({saved,opened,requests,prevented}));})();`
+	for _, order := range []struct{ name, script string }{{"native registration order", linkInterceptScript + "\n" + downloadInterceptScript}, {"download listener first", downloadInterceptScript + "\n" + linkInterceptScript}} {
+		t.Run(order.name, func(t *testing.T) {
+			out, err := exec.Command(node, "-e", harness, order.script).CombinedOutput()
+			if err != nil {
+				t.Fatalf("node: %v\n%s", err, out)
+			}
+			var got struct {
+				Saved     [][]string
+				Opened    []string
+				Requests  []struct{ Credentials string }
+				Prevented bool
+			}
+			if err := json.Unmarshal(out, &got); err != nil {
+				t.Fatalf("decode: %v\n%s", err, out)
+			}
+			if len(got.Opened) != 0 {
+				t.Errorf("download escaped to system browser: %v", got.Opened)
+			}
+			if !got.Prevented || len(got.Saved) != 1 || got.Saved[0][0] != "report.html" || got.Saved[0][1] != "window-session-bytes" {
+				t.Errorf("native save: %+v", got)
+			}
+			if len(got.Requests) != 1 || got.Requests[0].Credentials != "same-origin" {
+				t.Errorf("window session was not used: %+v", got.Requests)
+			}
+		})
+	}
+}
