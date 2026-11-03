@@ -1,5 +1,5 @@
-// Needs you never draws its "Waiting for" column empty on open (#10581, Beta #10394 point 3: the column was blank for a second): an agent waiting with a question, a review artifact and a failed run, all in Needs you; the
-// table is sampled every 25 ms from the first draw, and at no sample may a "Waiting for" header sit over cells that are all empty. 1280 and 390 px, isolated dev server, the harness's page; the review artifact and the runs
+// Needs you never draws a "Waiting for" column over empty cells on open (#10581, Beta #10394 point 3: the column was blank for a second), and since #12649 draws it only for a proposal: an agent waiting with a question, a review artifact and a failed run, all in Needs you (no proposal); the
+// table is sampled every 25 ms from the first draw, and at no sample is there a "Waiting for" header at all. 1280 and 390 px, isolated dev server, the harness's page; the review artifact and the runs
 // are stood in at their routes.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -37,11 +37,13 @@ const { coralReady } = require('./helpers/wait');
             await new Promise(r => setTimeout(r, 3200)); // sleep-ok: the samples run for three seconds from the first draw
             const snaps = await ev(`window.__snaps`);
             const withCol = snaps.filter(s => s.th.some(t => /^Waiting for/.test(t)));
-            assert.ok(withCol.length > 0 && withCol.some(s => s.rows >= 3), `${w}: the scenario has the column and the three rows (agent, review, run): ` + JSON.stringify(snaps.filter(s => s.rows > 0).slice(-1)));
+            const withRows = snaps.filter(s => s.rows > 0);
+            // #12649: Waiting for is drawn only when a row is a proposal; this table has an agent's question, a review and a run, so the header is never there, at any sample
+            assert.ok(withRows.some(s => s.rows >= 3), `${w}: the scenario has the three rows (agent, review, run): ` + JSON.stringify(snaps.filter(s => s.rows > 0).slice(-1)));
+            assert.deepEqual(withCol.map(s => [s.t, s.th]).slice(0, 2), [], `${w}: a Waiting for header was on screen in ${withCol.length} frames of a table with no proposal`);
+            // and a Waiting for header over cells that are all empty is still never drawn (#10581)
             const blank = withCol.filter(s => s.rows > 0 && s.cells.length && s.cells.every(c => c === ''));
-            const agentBlank = withCol.filter(s => s.agentCell === '');
-            assert.deepEqual(agentBlank.map(s => [s.t, s.cells]).slice(0, 2), [], `${w}: the agent row's Waiting for cell was empty in ${agentBlank.length} frames`);
-            assert.deepEqual(blank.map(s => [s.t, s.th, s.rows, s.cells]).slice(0, 2), [], `${w}: a Waiting for column with every cell empty was on screen (${blank.length} of ${withCol.length} frames with the column)`);
+            assert.deepEqual(blank.map(s => [s.t, s.th, s.rows, s.cells]).slice(0, 2), [], `${w}: a Waiting for column with every cell empty was on screen`);
             console.log(`   ${w}: ${snaps.length} samples, ${withCol.length} with a Waiting for column, ${snaps.filter(s => s.rows > 0).length} with rows; last: ${JSON.stringify(snaps[snaps.length - 1])}`);
         }
         console.log('PASS Needs you never draws an empty Waiting for column on open');
