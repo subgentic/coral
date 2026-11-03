@@ -473,10 +473,22 @@ func (s *SessionStore) AttachSkillsRetry(ctx context.Context, sessionID string, 
 	return nil
 }
 
-// DetachOtherSkillVersions removes the older (or other) versions of the skill called name that are attached to a session, keeping keepID, so attaching a newer version replaces the pin instead of adding a second row.
-func (s *SessionStore) DetachOtherSkillVersions(ctx context.Context, sessionID, name, keepID string) error {
-	_, err := s.db.ExecContext(ctx, `DELETE FROM skills_attached WHERE session_id = ? AND name = ? AND skill_id <> ?`, sessionID, name, keepID)
-	return err
+// ReplaceAttachedSkill pins r to a session in ONE transaction: the other versions of the skill called r.Name are removed and r is attached, so a failure leaves the old pin as it was (never none), and attaching a newer
+// version replaces the pin instead of adding a second row. Tried a second time when the first fails, as AttachSkillsRetry is.
+func (s *SessionStore) ReplaceAttachedSkill(ctx context.Context, sessionID string, r SkillRow) error {
+	once := func() error {
+		return s.db.WithTx(ctx, func(tx *sqlx.Tx) error {
+			if _, err := tx.ExecContext(ctx, `DELETE FROM skills_attached WHERE session_id = ? AND name = ? AND skill_id <> ?`, sessionID, r.Name, r.ID); err != nil {
+				return err
+			}
+			_, err := tx.ExecContext(ctx, `INSERT OR REPLACE INTO skills_attached (session_id, skill_id, name, version, digest, attached_at) VALUES (?, ?, ?, ?, ?, ?)`, sessionID, r.ID, r.Name, r.Version, r.Digest, now())
+			return err
+		})
+	}
+	if err := once(); err != nil {
+		return once()
+	}
+	return nil
 }
 
 // AttachedSkill is a skill attached to an agent with what became of it since.

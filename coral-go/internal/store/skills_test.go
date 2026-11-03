@@ -381,3 +381,26 @@ func TestACoralExampleIsApprovedAtOnceHoldsNoScriptsAndCannotBeRemoved(t *testin
 	require.NoError(t, err)
 	assert.Len(t, hits, 1, "still found")
 }
+
+// Replacing a pin is one transaction (QA's SHOULD on #12676): when the new attach fails, the old pin is still there, never none.
+func TestReplacingAnAttachedSkillIsOneTransactionAndAFailureKeepsTheOldPin(t *testing.T) {
+	ctx, ss, db := skillStore(t)
+	old := SkillRow{ID: strings.Repeat("1", 32), Name: "release-notes", Version: 1, Digest: strings.Repeat("a", 64)}
+	require.NoError(t, ss.AttachSkills(ctx, "sid-a", []SkillRow{old}))
+
+	bad := SkillRow{ID: strings.Repeat("2", 32), Name: "release-notes", Version: 2, Digest: strings.Repeat("b", 64)}
+	_, err := db.ExecContext(ctx, `CREATE TRIGGER refuse_new_pin BEFORE INSERT ON skills_attached WHEN NEW.skill_id = '`+bad.ID+`' BEGIN SELECT RAISE(ABORT, 'refused'); END`)
+	require.NoError(t, err)
+	require.Error(t, ss.ReplaceAttachedSkill(ctx, "sid-a", bad), "the attach fails")
+	have, err := ss.AttachedSkills(ctx, "sid-a")
+	require.NoError(t, err)
+	require.Len(t, have, 1, "the old pin is still there")
+	assert.Equal(t, old.ID, have[0].SkillID)
+
+	_, err = db.ExecContext(ctx, `DROP TRIGGER refuse_new_pin`)
+	require.NoError(t, err)
+	require.NoError(t, ss.ReplaceAttachedSkill(ctx, "sid-a", bad))
+	have, _ = ss.AttachedSkills(ctx, "sid-a")
+	require.Len(t, have, 1, "the new version replaces the old one")
+	assert.Equal(t, bad.ID, have[0].SkillID)
+}

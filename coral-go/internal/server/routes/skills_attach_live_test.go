@@ -185,3 +185,36 @@ func TestTheNameInThePathMustBelongToTheSessionIdGiven(t *testing.T) {
 	code, out = e.call("POST", "/api/sessions/live/claude-sid-b/skills", attachBody(sk.ID), "operator")
 	assert.Equal(t, 200, code, "with no session_id it is taken from the name, so it matches by construction: %v", out)
 }
+
+// QA's SHOULDs on #12676: the menu and the attach mean the same version; an archived agent and a long search are refused.
+func TestTheMenuOffersTheNewestVersionEvenWhenOnlyAnOlderOneMatchesTheWords(t *testing.T) {
+	e := newSkillsEnv(t)
+	old := e.approved("changelog", "Writes a changelog with the rare word zyzzyva.", 400)
+	newer, _, err := e.ss.AddSkill(context.Background(), store.AddSkillInput{Skill: &skills.Skill{Name: "changelog", Description: "Writes a changelog.", Digest: fmt.Sprintf("%064x", 401), Metadata: map[string]string{},
+		Files: []skills.File{{Path: "SKILL.md", Size: 5, Kind: skills.KindInstructions, SHA256: strings.Repeat("a", 64)}}}, Digest: fmt.Sprintf("%064x", 401), Kind: store.PublisherOperator})
+	require.NoError(t, err)
+	require.Greater(t, newer.Version, old.Version)
+
+	code, out := e.call("GET", "/api/skills/search?q=zyzzyva", "", "operator")
+	require.Equal(t, 200, code)
+	list := out["skills"].([]any)
+	require.Len(t, list, 1)
+	assert.Equal(t, newer.ID, list[0].(map[string]any)["id"], "the menu names the version an attach would pin, not the older one the words matched")
+	assert.EqualValues(t, newer.Version, list[0].(map[string]any)["version"])
+}
+
+func TestAnArchivedAgentAndALongSearchAreRefused(t *testing.T) {
+	e := newSkillsEnv(t)
+	e.liveAgent("sid-a")
+	sk := e.approved("release-notes", "Writes release notes.", 1)
+	require.NoError(t, e.ss.SetSessionArchived(context.Background(), "sid-a", true))
+	code, _ := e.call("POST", e.attachPath("sid-a"), attachBody(sk.ID), "operator")
+	assert.Equal(t, 404, code, "an archived agent is not running")
+	have, _ := e.ss.AttachedSkills(context.Background(), "sid-a")
+	assert.Empty(t, have)
+
+	code, _ = e.call("GET", "/api/skills/search?q="+strings.Repeat("a", 501), "", "operator")
+	assert.Equal(t, 400, code, "the search words are capped")
+	code, _ = e.call("GET", "/api/skills/search?q="+strings.Repeat("a", 500), "", "operator")
+	assert.Equal(t, 200, code)
+}

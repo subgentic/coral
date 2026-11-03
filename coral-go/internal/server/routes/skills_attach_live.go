@@ -57,19 +57,23 @@ func (h *SkillsHandler) SearchSkillsMenu(w http.ResponseWriter, r *http.Request)
 			rows = append(rows, store.SkillRow{ID: x.ID, Name: x.Name, Version: x.Version, Description: x.Description, HasScripts: x.HasScripts, NotReviewable: x.NotReviewable})
 		}
 	}
-	newest := map[string]int{} // name -> the highest version among the hits
-	for _, x := range rows {
-		if x.Version > newest[x.Name] {
-			newest[x.Name] = x.Version
+	// The menu offers the newest approved version of each name, whichever version the words matched: what is attached is the newest too.
+	current := map[string]store.SkillRow{}
+	if all, err := h.ss.ListApprovedSkills(r.Context()); err == nil {
+		for _, x := range all {
+			current[x.Name] = x
 		}
 	}
 	out := make([]skillSummary, 0, len(rows))
 	seen := map[string]bool{}
 	for _, x := range rows {
-		if x.Version != newest[x.Name] || seen[x.Name] {
+		if seen[x.Name] {
 			continue
 		}
 		seen[x.Name] = true
+		if c, ok := current[x.Name]; ok {
+			x = c
+		}
 		out = append(out, skillSummary{ID: x.ID, Name: x.Name, Version: x.Version, Description: x.Description, HasScripts: x.HasScripts, NotReviewable: x.NotReviewable})
 		if len(out) == maxMenuSkills {
 			break
@@ -134,11 +138,7 @@ func (h *SkillsHandler) AttachSkillToLive(w http.ResponseWriter, r *http.Request
 		}
 	}
 	if !already {
-		if err := h.ss.DetachOtherSkillVersions(r.Context(), live.SessionID, newest.Name, newest.ID); err != nil {
-			errInternalServer(w, "could not attach the skill")
-			return
-		}
-		if err := h.ss.AttachSkillsRetry(r.Context(), live.SessionID, []store.SkillRow{newest}); err != nil {
+		if err := h.ss.ReplaceAttachedSkill(r.Context(), live.SessionID, newest); err != nil {
 			errInternalServer(w, "could not attach the skill")
 			return
 		}
