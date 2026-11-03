@@ -43,6 +43,12 @@ const { coralReady, framesJs } = require('./helpers/wait');
             assert.ok(g.headH <= 135 && g.above <= 175, `${w}: the rows take at most 135 px (two rows are about 107; a wrapped status adds one line) and, with the question line, 175 above the file (they take ${g.headH} and ${g.above}; before slice d: 155 and 193 with this file; the design said about 96, and the rows are 44 px targets)`);
             assert.ok(g.footBottom <= g.vv + 1 && g.bodyBottom <= g.footTop + 1, `${w}: the bar is inside the screen and the file ends where it starts: ` + JSON.stringify(g));
             assert.ok(g.padBottom >= 4, `${w}: the bar keeps room for the home bar (the safe area): ` + g.padBottom);
+            // A wider status used to fall to a new row on Linux by 0.33 px (#12913).
+            // Stress the text metrics without fixing a platform font or weakening the height cap.
+            const wideStatus = await ev(`(() => { const state=document.querySelector('.artifact-review-state'), version=document.querySelector('.av-current');state.style.letterSpacing='1px';const a=state.getBoundingClientRect(),b=version.getBoundingClientRect();return {sameRow:a.top>=b.top-1&&a.bottom<=b.bottom+1,fullText:state.textContent,inside:a.right<=state.parentElement.getBoundingClientRect().right+1};})()`);
+            assert.ok(wideStatus.sameRow && wideStatus.inside && /Waiting for your review/.test(wideStatus.fullText), 'wider status fits beside versions and keeps its full accessible text: '+JSON.stringify(wideStatus));
+            await shot('viewer-phone-wide-status-' + w);
+            await ev(`document.querySelector('.artifact-review-state').style.letterSpacing='';true`);
             // the soft keyboard: the viewer follows what it leaves (--visual-viewport-height, which the page itself rewrites from the visual viewport: the keyboard is the window made shorter, as the browser does), the bar rides above it and the file still has room
             await Emulation.setDeviceMetricsOverride({ width: w, height: 470, deviceScaleFactor: 1, mobile: true });
             await waitFor(`Math.round(document.querySelector('.artifact-viewer').getBoundingClientRect().height) === 470`, `${w}: the viewer follows the keyboard`, 4000);
