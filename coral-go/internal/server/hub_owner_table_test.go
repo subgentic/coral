@@ -138,6 +138,7 @@ func TestTheOwnerRoutesOfTheTableAreTheReviewedSet(t *testing.T) {
 		"PUT /api/artifacts/{hex64}/comments/lock": "owner-only", "DELETE /api/artifacts/{hex64}/comments/lock": "owner-only", "POST /api/artifacts/{hex64}/comments/{id}/send": "owner-only", "POST /api/artifacts/{hex64}/comment-images": "owner-only", "POST /api/board/{project}/goal-images": "owner-only",
 		// Approve, or ask changes of, a for-review artifact through the Hub is the owner's alone (#136584, #11354).
 		"POST /api/board/{project}/artifacts/{id}/review":                      "owner-only",
+		"PUT /api/board/{project}/artifacts/{id}/tags":                         "owner-only",
 		"POST /api/board/{project}/asks/{messageID}/buttons/{buttonID}/claim":  "owner-only",
 		"POST /api/board/{project}/asks/{messageID}/buttons/{buttonID}/settle": "owner-only",
 		"POST /api/sessions/live/{name}/dismiss-wait":                          "owner-only",

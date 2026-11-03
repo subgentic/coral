@@ -69,6 +69,7 @@ POST /api/system/update/relaunch launch owner-update
 PUT /api/artifacts/{id}/comments/lock interact owner-only
 PUT /api/artifacts/{id}/private interact owner-only
 PUT /api/artifacts/{id}/star interact owner-only
+PUT /api/board/{project}/artifacts/{id}/tags interact owner-only
 PUT /api/board/{project}/guide-roster launch owner-only
 PUT /api/board/{project}/orchestrator-grant launch owner-only
 PUT /api/board/{project}/settings launch owner-only

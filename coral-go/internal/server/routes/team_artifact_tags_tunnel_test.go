@@ -149,3 +149,31 @@ func TestThroughTheHubOnlyAddedTagsAreHeldToTheClosedRuleAndReadIsNeverCounted(t
 	assert.Equal(t, http.StatusBadRequest, code, "only exactly read is the count's exception")
 	assert.ElementsMatch(t, []string{"café", "a", "b", "c", "read"}, stored(), "the refusals changed nothing")
 }
+
+// QA's SHOULDs on #12742: a Hub write fails closed when the stored tags cannot be read (no list to judge "added" by: nothing is accepted), and repeated tags are stored once.
+func TestAHubTagsWriteFailsClosedWhenTheStoredTagsCannotBeReadAndRepeatsAreOnce(t *testing.T) {
+	e := newTagEnv(t)
+	id := e.ids["report.md"]
+	withLabel(t, ownerLabel, nil)
+	req, err := http.NewRequest(http.MethodPut, e.srv.URL+"/api/board/tag-team/artifacts/"+id+"/tags", strings.NewReader(`{"tags":["a","a","read","read"]}`))
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+	for k, v := range ownerHeaders(ownerLabel) {
+		req.Header.Set(k, v)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	var out map[string]any
+	_ = json.NewDecoder(resp.Body).Decode(&out)
+	resp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode, "%v", out)
+	assert.Equal(t, []any{"a", "read"}, out["tags"], "repeats are one tag")
+	all, err := e.h.bs.ArtifactTags(context.Background(), "tag-team")
+	require.NoError(t, err)
+	assert.Equal(t, []string{"a", "read"}, all[id])
+
+	require.NoError(t, e.h.bs.Close()) // the stored tags can no longer be read
+	tags, err := e.h.hubArtifactTags(context.Background(), "tag-team", id, []string{"read"})
+	assert.Error(t, err, "no stored list to judge by: refused, never accepted unchecked")
+	assert.Nil(t, tags)
+}
