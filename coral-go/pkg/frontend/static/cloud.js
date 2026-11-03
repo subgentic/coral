@@ -64,6 +64,18 @@ export function signInUrl() {
 
 const SAFE = new Set(['GET', 'HEAD', 'OPTIONS']);
 
+/** When this page was last told it is being left (beforeunload, pagehide), 0 if never or if it was shown again (a back-forward restore). A 401 that arrives after the browser has started to leave is the old page's late
+ *  answer: sending it to sign-in then replaces the navigation in flight, with next= built from this page's address, not the one being opened (#12970, a deep link /files lost to its shorter parent). A person who cancels
+ *  the leave (a beforeunload prompt) is still here, so the mark lapses after LEAVING_MS and the next 401 is handled as usual. */
+const LEAVING_MS = 10000;
+let leavingSince = 0;
+export function pageIsLeaving(now = Date.now()) { return leavingSince > 0 && now - leavingSince < LEAVING_MS; }
+if (typeof window !== 'undefined' && window.addEventListener) {
+    window.addEventListener('beforeunload', () => { leavingSince = Date.now(); });
+    window.addEventListener('pagehide', () => { leavingSince = Date.now(); });
+    window.addEventListener('pageshow', () => { leavingSince = 0; });
+}
+
 function sameOrigin(input) {
     try {
         const u = new URL(typeof input === 'string' || input instanceof URL ? String(input) : input.url, location.href);
@@ -173,7 +185,7 @@ export function installCloudFetch() {
         // a refusal there is not worth a toast, only an action the user took is.
         if (resp.status === 403 && sameOrigin(input) && !(init && init.quiet)) explainRefusal(resp);
         if ((resp.status === 400 || resp.status === 413) && method === 'PUT' && sameOrigin(input) && /^\/api\/(settings$|themes\/)/.test(settingsPath(input))) explainSettingsRefusal(resp);
-        if (resp.status === 401 && sameOrigin(input) && !/^\/(signin|auth|enroll)/.test(location.pathname)) {
+        if (resp.status === 401 && sameOrigin(input) && !/^\/(signin|auth|enroll)/.test(location.pathname) && !pageIsLeaving()) {
             location.replace(signInUrl());
         }
         return resp;
