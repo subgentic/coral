@@ -2,6 +2,7 @@ package routes
 
 import (
 	"errors"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -49,9 +50,10 @@ func TestCLICheckSaysAShareDidNotAnswer(t *testing.T) {
 
 // The sentence names the CLI by its fixed name, never the file name of a path set in Settings (Security's INFO 2 on #295).
 func TestTheShareSentenceNamesTheCLINotACustomPath(t *testing.T) {
-	note := cliShareNote("claude", `C:\tools\my-claude-wrapper.exe`)
+	tools := filepath.Join(t.TempDir(), "tools") // this OS's own separator: the test is the same on Windows, macOS and Linux
+	note := cliShareNote("claude", filepath.Join(tools, "my-claude-wrapper.exe"))
 	assert.Contains(t, note, "looks for claude is")
 	assert.NotContains(t, note, "my-claude-wrapper")
-	assert.NotContains(t, note, `C:\tools`)
-	assert.Contains(t, cliShareNote("", `C:\tools\thing.exe`), "looks for thing.exe is", "a check by path with no known type names the file the person gave")
+	assert.NotContains(t, note, tools)
+	assert.Contains(t, cliShareNote("", filepath.Join(tools, "thing.exe")), "looks for thing.exe is", "a check by path with no known type names the file the person gave")
 }
