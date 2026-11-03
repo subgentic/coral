@@ -1,33 +1,39 @@
 #!/usr/bin/env python3
-"""Build the multi-size Windows icon (16, 24, 32, 48, 256) from the colour artwork.
+"""Build the multi-size Windows icon from the macOS app icon's 1024 master.
 
 Usage: python3 tools/make_windows_icon.py
-Writes coral-go/cmd/coral-tray/icon.ico and assets/icons/coral.ico. The colour artwork
-reads on both light and dark taskbars (the macOS menu-bar glyph is white, so it must not
-be used on Windows). Sizes up to 48 are stored as 32-bit BMP/DIB entries (what the
-notification-area loader and old shells expect); 256 is a PNG entry.
+Writes coral-go/cmd/coral-tray/icon.ico and assets/icons/coral.ico. The master is the 1024 image
+inside Coral.icns (the icon build-macos.sh ships: Apple's template, a white rounded tile with the
+navy coral, 824 px inside the 1024 canvas), so the Windows icon is the Mac icon: same shape and
+padding. Every size is resized from that master, never from another size. Sizes up to 128 are
+stored as 32-bit BMP/DIB entries (what the notification-area loader and old shells expect);
+256 is a PNG entry. (The macOS menu-bar glyph is white and is not used on Windows.)
 """
 import io
 import struct
 from pathlib import Path
 
-from PIL import Image
+from PIL import Image, ImageFilter
 
 ROOT = Path(__file__).resolve().parent.parent
-SRC = ROOT / "assets/icons/cora-icon-color-1024x1024.png"
+SRC = ROOT / "Coral.icns"
 OUTS = [ROOT / "coral-go/cmd/coral-tray/icon.ico", ROOT / "assets/icons/coral.ico"]
-SIZES = [16, 24, 32, 48, 256]
+SIZES = [16, 20, 24, 32, 40, 48, 64, 96, 128, 256]
+# Up to 32 px the Mac padding (100 px each side of the 1024 canvas) costs a fifth of the icon, so these sizes are
+# resized from the master cropped to the tile's edge (the same tile, same shape) and lightly sharpened, which keeps the
+# ring and the coral's gaps apart; 40 px and up keep the Mac padding.
+TILE = (100, 100, 924, 924)
+SMALL = 32
 
 
-def square_art():
-    im = Image.open(SRC).convert("RGBA")
-    box = im.getbbox()
-    side = max(box[2] - box[0], box[3] - box[1])
-    side += side // 25  # small margin so the ring is not clipped when scaled
-    cx, cy = (box[0] + box[2]) // 2, (box[1] + box[3]) // 2
-    canvas = Image.new("RGBA", (side, side), (0, 0, 0, 0))
-    canvas.alpha_composite(im.crop(box), ((side - (box[2] - box[0])) // 2, (side - (box[3] - box[1])) // 2))
-    return canvas
+def master():
+    """The 1024 px image of Coral.icns (the 512 px @2x entry): the tile as the Mac shows it."""
+    im = Image.open(SRC)
+    best = max(im.info["sizes"], key=lambda t: t[0] * t[2])
+    im.size = best
+    im = im.convert("RGBA")
+    assert im.size == (1024, 1024), im.size
+    return im
 
 
 def dib(im):
@@ -43,10 +49,13 @@ def dib(im):
 
 
 def main():
-    art = square_art()
+    art = master()
     entries = []
     for s in SIZES:
-        im = art.resize((s, s), Image.LANCZOS)
+        if s <= SMALL:
+            im = art.crop(TILE).resize((s, s), Image.LANCZOS).filter(ImageFilter.UnsharpMask(radius=0.6, percent=120, threshold=0))
+        else:
+            im = art.resize((s, s), Image.LANCZOS)
         if s >= 256:
             buf = io.BytesIO()
             im.save(buf, "PNG", optimize=True)
