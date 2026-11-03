@@ -1,6 +1,6 @@
 // Touch targets the keyboard audit's part 2 (#12963) listed at 24 px or less on a phone (#12978): the Skills "Show" filter was a bare select 21 px tall (it is the shared .field now: 44 px on a coarse pointer); a file row's
 // Star, Copy path and More buttons (the Files panel) and the Browse row's Copy path are 24 px boxes whose hit area is 44 px through the shared .btn-icon.btn-xs rule (an ::after of -10 px), so the audit's measure
-// of the box was too small: pinned here by what a finger would hit (a point 20 px above and below the button's centre reaches the button), not by the box. 390 px, coarse pointer, the real isolated dev server and a real
+// of the box was too small: pinned here by what a finger would hit (points 20 px around the button's centre reach that same button where no neighbour occupies the point), not by the box. 390 px, coarse pointer, the real isolated dev server and a real
 // agent (the mock in ready mode, in a folder with a file). Not on Windows (a script CLI).
 'use strict';
 const assert = require('node:assert/strict');
@@ -18,8 +18,26 @@ if (process.platform === 'win32') { console.log('phone_touch_targets_12978_brows
     const api = (m, p, b) => ev(`fetch(${JSON.stringify(p)}, { method: ${JSON.stringify(m)}, headers: { 'Content-Type': 'application/json' }, body: ${b === undefined ? 'undefined' : JSON.stringify(JSON.stringify(b))} }).then(async r => ({ status: r.status, data: await r.json().catch(() => null) }))`);
     let originalCli = null, wrapperDir = '', dir = '', agent = null; const problems = [];
     const check = (label, cond, detail) => { if (!cond) problems.push(`${label}${detail !== undefined ? ': ' + detail : ''}`); };
-    // what a finger reaches: the points 20 px above and 20 px below the button's centre must hit the button (or something inside it)
-    const reach = sel => ev(`(() => [...document.querySelectorAll(${JSON.stringify(sel)})].filter(b => b.getClientRects().length).map(b => { const r = b.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2; const hit = y => { const e = document.elementFromPoint(cx, y); return !!e && (e === b || b.contains(e)); }; return { name: b.getAttribute('aria-label') || b.title || b.textContent.trim().slice(0, 30), box: Math.round(r.width) + 'x' + Math.round(r.height), up: hit(cy - 20), down: hit(cy + 20), here: hit(cy) }; }))()`);
+    // A probe must hit this button, never a neighbour. Skip a horizontal point
+    // only when it is outside the viewport or inside another control's own box.
+    // The uncovered side is reported, and each button must have a horizontal probe.
+    const reach = sel => ev(`(() => {
+        const visible = b => b.getClientRects().length && getComputedStyle(b).visibility !== 'hidden';
+        const controls = [...document.querySelectorAll('button, input, select, textarea, a[href]')].filter(visible);
+        return [...document.querySelectorAll(${JSON.stringify(sel)})].filter(visible).map(b => {
+            const r = b.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+            const name = e => e.getAttribute('aria-label') || e.title || e.textContent.trim().slice(0, 30);
+            const hit = (x, y) => { const e = document.elementFromPoint(x, y); return !!e && (e === b || b.contains(e)); };
+            const side = x => {
+                if (x < 0 || x >= innerWidth || cy < 0 || cy >= innerHeight) return { sampled: false, reason: 'viewport' };
+                const neighbour = controls.find(c => { if(c === b || b.contains(c) || c.contains(b)) return false; const q=c.getBoundingClientRect();return x>=q.left&&x<q.right&&cy>=q.top&&cy<q.bottom; });
+                if(neighbour) return { sampled: false, reason: 'neighbour: '+name(neighbour) };
+                return { sampled: true, hit: hit(x, cy), x, y: cy };
+            };
+            return { name: name(b), box: Math.round(r.width)+'x'+Math.round(r.height), up: hit(cx, cy-20), down: hit(cx, cy+20), here: hit(cx,cy), left: side(cx-20), right: side(cx+20) };
+        });
+    })()`);
+    const horizontal = rows => rows.every(b => [b.left,b.right].some(p=>p.sampled) && [b.left,b.right].every(p=>!p.sampled||p.hit));
     try {
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
         await Page.navigate({ url: BASE + '/skills' }); await Page.loadEventFired(); await coralReady();
@@ -41,10 +59,15 @@ if (process.platform === 'win32') { console.log('phone_touch_targets_12978_brows
         const row = await reach('#changed-files-list .file-action-btn, #changed-files-list .file-more-btn, #changed-files-list .file-star, #changed-files-list [data-on-click="file-star"]');
         check('the Files panel row has its buttons', row.length >= 2, JSON.stringify(row));
         check('each of a file row\'s buttons (Star, More) is reached 20 px above and below its centre: a 44 px hit area', row.every(b => b.here && b.up && b.down), JSON.stringify(row));
+        check('each file button owns its unobstructed 20 px horizontal probes, where unobstructed', horizontal(row), JSON.stringify(row));
+        check('the Files row exercises both horizontal directions', ['left','right'].every(side=>row.some(b=>b[side].sampled)), JSON.stringify(row));
+        console.log('FILES_HORIZONTAL ' + JSON.stringify(row));
         await ev(`window.switchAgenticTab && window.switchAgenticTab('browse', 'top'); true`);
         await waitFor(`document.querySelectorAll('#agentic-panel-browse button[title="Copy path"], #agentic-panel-browse .explorer-action-btn').length >= 1`, 'the Browse row buttons', { timeout: 15000 });
         const browse = await reach('#agentic-panel-browse button[title="Copy path"]');
         check('the Browse row\'s Copy path has a 44 px hit area', browse.length >= 1 && browse.every(b => b.here && b.up && b.down), JSON.stringify(browse));
+        check('Browse Copy path owns its unobstructed 20 px horizontal probes, where unobstructed', horizontal(browse), JSON.stringify(browse));
+        console.log('BROWSE_HORIZONTAL ' + JSON.stringify(browse));
     } finally {
         if (agent) await api('POST', `/api/sessions/live/${encodeURIComponent(agent.session_name || agent.name)}/kill`, { session_id: agent.session_id, agent_type: 'claude' }).catch(() => {});
         if (originalCli) await api('PUT', '/api/settings', { cli_path_claude: originalCli }).catch(() => {});
