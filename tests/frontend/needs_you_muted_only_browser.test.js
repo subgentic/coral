@@ -20,7 +20,7 @@ const { coralReady } = require('./helpers/wait');
             await ev(`(() => { const real = window.fetch; const json = b => Promise.resolve(new Response(JSON.stringify(b), { status: 200, headers: { 'content-type': 'application/json' } }));
                 const hex = c => c.repeat(64), at = i => new Date(Date.now() - i * 3600000).toISOString();
                 const file = (c, name, extra) => ({ id: hex(c), name, uri: 'coral://artifacts/' + hex(c), digest: hex(c), available: true, tags: ['for review'], created_at: at(3), ...extra });
-                const files = [file('b', 'release-notes.md', { kind: 'release', muted: true }), file('d', 'decisions.md', { kind: 'decided', muted: true })];
+                const files = window.__mutedFiles = [file('b', 'release-notes.md', { kind: 'release', muted: true }), file('d', 'decisions.md', { kind: 'decided', muted: true })];
                 window.fetch = (u, o = {}) => { const url = new URL(String(u), location.href);
                     if (url.pathname === '/api/board/projects') return json([{ project: 'alpha' }]);
                     if (url.pathname === '/api/board/alpha/artifacts' && url.searchParams.get('tag') === 'for review') return new Promise(r => setTimeout(() => r(json({ artifacts: files, has_more: false })), 900)); // the read ends AFTER the folder first drew (nothing to show yet)
@@ -31,6 +31,11 @@ const { coralReady } = require('./helpers/wait');
             const line = await ev(`(() => { const p = document.querySelector('.inbox-muted-line'); return p ? p.textContent.replace(/\\s+/g, ' ').trim() : null; })()`);
             check(`${tag}: only muted files exist: the quiet line is there on the first view, without leaving the tab`, /^Muted by your settings: 1 release summary, 1 decision made for you\. Show them$/.test(line || ''), JSON.stringify(line));
             check(`${tag}: and nothing is counted`, (await ev(`import(${S} + 'inbox_reviews.js').then(m => m.unreadReviewItems().length)`)) === 0);
+            // The same count of muted files, but other kinds (a release summary and a decision become a decision and a digest): the line must be redrawn with the new words (#12881, QA's SHOULD: a key on the count alone missed it).
+            await ev(`window.__mutedFiles.splice(0, 2, { id: 'e'.repeat(64), name: 'decisions-2.md', uri: 'coral://artifacts/' + 'e'.repeat(64), digest: 'e'.repeat(64), available: true, tags: ['for review'], created_at: new Date().toISOString(), kind: 'decided', muted: true }, { id: 'f'.repeat(64), name: 'digest.md', uri: 'coral://artifacts/' + 'f'.repeat(64), digest: 'f'.repeat(64), available: true, tags: ['for review'], created_at: new Date().toISOString(), kind: 'digest', muted: true }); import(${S} + 'inbox_reviews.js').then(m => m.refreshReviews(true)).then(() => true)`);
+            await waitFor(`/digest/.test((document.querySelector('.inbox-muted-line') || {}).textContent || '')`, `${tag}: the line redrawn for the swapped kinds`, 8000).catch(() => {});
+            const swapped = await ev(`(() => { const p = document.querySelector('.inbox-muted-line'); return p ? p.textContent.replace(/\\s+/g, ' ').trim() : null; })()`);
+            check(`${tag}: two other kinds at the same count redraw the line`, /^Muted by your settings: 1 decision made for you, 1 daily digest/.test(swapped || '') && !/release summary/.test(swapped || ''), swapped);
         }
     } finally { await client.close(); }
     if (results.some(r => !r)) { console.error(`${results.filter(r => !r).length} of ${results.length} failed`); process.exit(1); }
