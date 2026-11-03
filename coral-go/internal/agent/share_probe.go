@@ -16,14 +16,17 @@ import (
 //     the fixed few of CommonPlaceCandidates, so at most that many goroutines can be waiting at once;
 //   - a folder that does not answer within shareProbeLimit is "not answered" for shareQuiet: it is skipped, and the check and the launch say so in one fixed
 //     sentence (ShareNotAnsweredNote), which names no folder, server or person. The mark expires on its own;
-//   - a late answer is thrown away. Nothing is remembered as found: the candidates are stat'ed again, through the same screens, at the next lookup.
+//   - a late answer is thrown away. Nothing is remembered as found: the candidates are stat'ed again, through the same screens, at the next lookup;
+//   - a folder that answered in time is not probed again for shareAnswered (5 s), so one lookup's candidates in it (claude, claude.exe, .cmd, .bat) cost one probe.
+//     Only "the share answered" is remembered, never a path that was found.
 
 var (
 	shareProbeLimit = 2 * time.Second
 	shareQuiet      = 60 * time.Second
-	shareStat       = os.Stat   // the probe's one call; a test makes it slow
-	shareNow        = time.Now  // a test moves the clock
-	onShareFolder   = isOnShare // which folders are probed; a test marks one as a share
+	shareAnswered   = 5 * time.Second // a folder that answered is not probed again for this long (the candidates themselves are still stat'ed each time)
+	shareStat       = os.Stat         // the probe's one call; a test makes it slow
+	shareNow        = time.Now        // a test moves the clock
+	onShareFolder   = isOnShare       // which folders are probed; a test marks one as a share
 )
 
 type shareProbe struct {
@@ -32,8 +35,9 @@ type shareProbe struct {
 }
 
 type shareFolder struct {
-	inflight   *shareProbe
-	quietUntil time.Time
+	inflight      *shareProbe
+	quietUntil    time.Time
+	answeredUntil time.Time
 }
 
 var (
@@ -66,6 +70,10 @@ func shareAnswers(dir string) bool {
 		shareMu.Unlock()
 		return false
 	}
+	if shareNow().Before(f.answeredUntil) { // it answered a moment ago: no new probe for each candidate in it
+		shareMu.Unlock()
+		return true
+	}
 	p := f.inflight
 	if p == nil {
 		p = &shareProbe{done: make(chan struct{})}
@@ -88,6 +96,9 @@ func shareAnswers(dir string) bool {
 	case <-p.done:
 		shareMu.Lock()
 		ok := p.ok
+		if ok {
+			f.answeredUntil = shareNow().Add(shareAnswered) // only an answer in time is remembered, and only that the folder answered: never what is in it
+		}
 		shareMu.Unlock()
 		return ok // a folder that answered "not there" is simply empty: nothing to search, no note
 	case <-timer.C:
