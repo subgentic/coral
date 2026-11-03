@@ -13,7 +13,14 @@ import { onGoalsSeq } from './goals_feed.js';
 import { looksDone, hiddenList, hideGoalDone } from './goal_done.js';
 import { pollEvery } from './overload.js';
 const { linkedText } = await importOnce('./artifact_refs.js');
-const linkedDd = (text, server) => { const d = document.createElement('dd'); d.append(linkedText(text, { server })); return d; }; // a coral://artifacts/<hex> in a goal's words is a link (#11416)
+const CHECKLIST = /^\s*[-*+]\s+\[[ xX]\]\s/m;
+const linkedDd = (text, server) => {
+    const d = document.createElement('dd'); d.append(linkedText(text, { server }));
+    if (CHECKLIST.test(String(text || ''))) { // a checklist is drawn as one (real, read-only checkboxes), the way a task's text is (#12770); other descriptions stay the plain text they were
+        importOnce('./vendor_loader.js').then(v => v.loadSafeMarkdown()).then(() => importOnce('./safe_markdown.js')).then(async sm => { const { node } = sm.renderSafe(String(text), {}); if (!d.isConnected && !d.parentNode) return; (await importOnce('./artifact_refs.js')).linkArtifactRefsIn(node, { server }); d.replaceChildren(node); }).catch(() => {});
+    }
+    return d;
+}; // a coral://artifacts/<hex> in a goal's words is a link (#11416)
 const { openDetailPane, closeDetailPane } = await importOnce('./detail_pane.js'); // the one shared pane (#8914): a goal's task or artifact opens in it, beside the list
 const DT = await importOnce('./data_table.js');
 const { el } = DT;
