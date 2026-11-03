@@ -4,21 +4,22 @@
 import { state } from './state.js';
 import { isDropdownVisible as isFileMentionVisible } from './file_mention.js';
 import { createMentionList, findTriggerStart, isMentionListOpen, highlightRuns } from './mention_list.js';
-import { serverFetch, serverForSession, isCloud } from './server_base.js';
+import { serverFetch, serverForSession, isCloud, LOCAL_SERVER } from './server_base.js';
 import { showToast } from './utils.js';
 import { go } from './nav.js';
 
 const list = createMentionList({ dropdown: 'skill-mention-dropdown', item: 'skill-mention-item' }, { onInput: e => onInput(e), onPick: i => pick(i), onHide: () => { _asked++; } });
 let _asked = 0; // each search is numbered: an answer that is not for the latest words is dropped
 let _timer = null;
-let _dismissed = -1; // where an Escape closed the menu: it stays closed for that "$" until the text around it changes
+let _dismissed = -1, _dismissedFor = ''; // where an Escape closed the menu, and for which agent: it stays closed for that "$" until the text around it changes or another agent is open
 const SEARCH_DELAY_MS = 120;
+const SKILLS_STAY = 'Skills stay on the computer: open this agent from its own Coral to add one.';
 
 export function initSkillMention() {
     const input = document.getElementById('command-input');
     if (!input) return;
     list.mount(input);
-    input.addEventListener('keydown', e => { if (e.key === 'Escape' && list.visible()) _dismissed = list.start; }, true); // before the list's own Escape handler hides it and forgets where it started
+    input.addEventListener('keydown', e => { if (e.key === 'Escape' && list.visible()) { _dismissed = list.start; _dismissedFor = agentKey(state.currentSession); } }, true); // before the list's own Escape handler hides it and forgets where it started
 }
 
 function onInput(e) {
@@ -26,11 +27,11 @@ function onInput(e) {
     const input = e.target, before = input.value.slice(0, input.selectionStart);
     const idx = findTriggerStart(before, '$'); // a "$" inside a word (a price, $PATH in a command) is not a mention
     if (idx === -1) { _dismissed = -1; list.hide(); return; }
-    if (idx === _dismissed) return; // Escape closed this one
+    if (idx === _dismissed && _dismissedFor === agentKey(state.currentSession)) return; // Escape closed this one (for this agent)
     list.start = idx;
     const words = before.slice(idx + 1);
     clearTimeout(_timer);
-    if (isCloud()) { showRows([], words, 'Skills stay on your computer: open this agent from its own Coral to add one.'); return; } // through the Hub there is no skill list to read (#12677)
+    if (isCloud()) { showRows([], words, SKILLS_STAY); return; } // through the Hub there is no skill list to read (#12677)
     const mine = ++_asked;
     _timer = setTimeout(() => search(words, mine, idx), SEARCH_DELAY_MS);
 }
@@ -38,9 +39,13 @@ function onInput(e) {
 async function search(words, mine, idx) {
     const cur = state.currentSession;
     if (!cur || cur.type !== 'live') { list.hide(); return; }
+    const at = serverForSession(cur.name, cur.session_id);
     try {
-        const r = await serverFetch(serverForSession(cur.name, cur.session_id), `/api/skills/search?q=${encodeURIComponent(words)}`);
-        if (!r.ok) throw new Error(String(r.status));
+        const r = await serverFetch(at, `/api/skills/search?q=${encodeURIComponent(words)}`);
+        if (!r.ok) {
+            if (at !== LOCAL_SERVER && mine === _asked && list.start === idx) { showRows([], words, SKILLS_STAY); return; } // another computer's agent and its Hub refuses: one row that says why, not a menu that closes without a word (QA)
+            throw new Error(String(r.status));
+        }
         const j = await r.json();
         if (mine !== _asked || list.start !== idx) return; // the words moved on, or the menu was closed
         const skills = Array.isArray(j.skills) ? j.skills : [];

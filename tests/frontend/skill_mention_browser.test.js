@@ -11,8 +11,9 @@ const SKILLS = [
     { id: 'b'.repeat(32), name: 'abacus-math', version: 1, description: 'Do sums with care' },
     { id: 'c'.repeat(32), name: 'release-notes', version: 1, description: 'Write the release notes' },
 ];
-const STUB = `(() => { window.__skillSearches = []; window.__skillAttach = []; window.__skillMode = 'some'; window.__skillGate = null; const R = window.fetch; const json = (b, s = 200) => Promise.resolve(new Response(JSON.stringify(b), { status: s, headers: { 'Content-Type': 'application/json' } }));
+const STUB = `(() => { window.__skillSearches = []; window.__skillAttach = []; window.__skillMode = 'some'; window.__skillGate = null; window.__remoteSearch = []; const R = window.fetch; const json = (b, s = 200) => Promise.resolve(new Response(JSON.stringify(b), { status: s, headers: { 'Content-Type': 'application/json' } }));
     window.fetch = (u, o) => { const url = new URL(String(u), location.href);
+        if (/^\\/api\\/remote\\/[^/]+\\/api\\/skills\\/search$/.test(url.pathname)) { window.__remoteSearch.push(url.pathname); return json({ error: 'access_mode' }, 403); } // another computer: the Hub refuses
         if (url.pathname === '/api/skills/search') { const q = (url.searchParams.get('q') || '').toLowerCase(); window.__skillSearches.push(q);
             const all = ${JSON.stringify(SKILLS)}; return json({ skills: window.__skillMode === 'none' ? [] : all.filter(s => !q || (s.name + ' ' + s.description).toLowerCase().includes(q)) }); }
         if (/\\/api\\/sessions\\/live\\/[^/]+\\/skills$/.test(url.pathname) && o && o.method === 'POST') { const b = JSON.parse(o.body); window.__skillAttach.push({ path: url.pathname, session_id: url.searchParams.get('session_id'), skill_id: b.skill_id });
@@ -120,6 +121,17 @@ const STUB = `(() => { window.__skillSearches = []; window.__skillAttach = []; w
             await type('s');
             await new Promise(r => setTimeout(r, 500)); // sleep-ok: the menu must stay closed; nothing to wait for
             check(`${tag}: it stays closed while the word goes on`, (await menu()) === null);
+
+            // an agent on another computer whose Hub refuses the search: one row that says why, not a menu that closes without a word
+            await ev(`window.__m.add('sk-r', 'A', 3, { sleeping: false, session_id: 'sk-r-id', server: 's1' }); window.selectLiveSession('sk-r', 'claude', 'sk-r-id', 's1'); true`);
+            await waitFor(`window.T && window.T.state.currentSession && window.T.state.currentSession.name === 'sk-r'`, `${tag}: the other computer's agent is open`, 6000);
+            await clear(); await ev(`window.__remoteSearch.length = 0; true`); await type('$');
+            await waitFor(shown(1), `${tag}: the refusal row`, 4000);
+            m = await menu();
+            check(`${tag}: a refused search on another computer says skills stay on that computer`, /Skills stay on the computer/.test(m.rows[0].text), JSON.stringify(m.rows));
+            check(`${tag}: and it asked that computer, not this one`, (await ev(`window.__remoteSearch.length`)) >= 1);
+            await ev(`window.selectLiveSession('sk-a', 'claude', 'sk-a-id', 'local'); true`);
+            await waitFor(`window.T && window.T.state.currentSession && window.T.state.currentSession.name === 'sk-a'`, `${tag}: back on the local agent`, 4000);
 
             // no approved skills: one row that says so and leads to the Skills Store
             await clear(); await ev(`window.__skillMode = 'none'; true`);
