@@ -5,6 +5,7 @@
 const assert = require('node:assert/strict');
 const { safePaused } = require('./helpers/paused');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 const BASE = require('./test_base').BASE;
 
@@ -61,6 +62,7 @@ const CLOUD_PRELOAD = `(() => {
         await Page.navigate({ url: BASE + '/' });
         await Page.loadEventFired();
         await install();
+        await coralReady(ev, 'startup', 'liveListLoaded'); // a late list answer would overwrite the injected servers (#12932)
         await ev(`(() => { T.state.servers = ${JSON.stringify(LIVE)}; return true; })()`);
 
         console.log('1. The Servers list: the hint beside the machines that are below, nowhere else');
@@ -120,6 +122,7 @@ const CLOUD_PRELOAD = `(() => {
         await Page.navigate({ url: BASE + '/' });
         await Page.loadEventFired();
         await install();
+        await coralReady(ev, 'startup', 'liveListLoaded'); // a late list answer would overwrite the injected servers (#12932)
         await ev(`(() => { window.__arrayShape = true; T.state.hub = true; T.state.servers = ${JSON.stringify(LIVE)}; return true; })()`);
         await ev(`window.switchNavTab('servers'); true`);
         await waitFor(`document.querySelectorAll('#servers-view .dt-row').length >= ${SERVERS.length}`, 'the self-hosted hub server rows', 8000);
