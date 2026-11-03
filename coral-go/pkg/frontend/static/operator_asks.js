@@ -205,7 +205,9 @@ export function openAskDialog(a, onDone, runners = {}) {
     const row = document.createElement('div'); row.className = 'inbox-ask-buttons';
     const send = document.createElement('button'); send.type = 'button'; send.className = 'btn btn-primary'; send.textContent = 'Send reply';
     const close = document.createElement('button'); close.type = 'button'; close.className = 'btn'; close.textContent = 'Close';
-    row.append(close, send); // Close on the left, Send reply on the right (as the other dialogs)
+    // Dismiss closes a question with no answer and nothing said to the agent, as the row's own Dismiss does (#12599): the same route and the same toast with Undo. A wait has no ask row to close, so it has no Dismiss.
+    const dismiss = document.createElement('button'); dismiss.type = 'button'; dismiss.className = 'btn btn-quiet'; dismiss.textContent = 'Dismiss'; dismiss.title = 'Take it out of Needs you; nobody is told'; dismiss.hidden = a.kind !== 'ask' || fromAnotherComputer(a); // the close route is this computer's: a question from another computer is answered there
+    row.append(close, ...(dismiss.hidden ? [] : [dismiss]), send); // Close on the left, then Dismiss, Send reply on the right (as the other dialogs)
     let tray = null;
     const finish = () => { if (tray) tray.destroy(); dlg.close(); dlg.remove(); if (onDone) onDone(); };
     const sync = () => { send.disabled = !!tray && (tray.busy() || tray.failed()); }; // Send waits for a picture going up, and for a failed one to be taken out
@@ -256,6 +258,11 @@ export function openAskDialog(a, onDone, runners = {}) {
         }).catch(() => { /* a reply needs no picture: the dialog works without the button */ });
     }
     close.addEventListener('click', finish);
+    dismiss.addEventListener('click', async () => {
+        err.textContent = ''; dismiss.disabled = true; send.disabled = true;
+        try { const m = await importOnce('./ask_ignore.js'); await m.ignoreAsk(a, markHidden(a.asker, { strict: true })); asks = asks.filter(x => askKey(x) !== askKey(a)); fire(); finish(); }
+        catch (e) { err.textContent = e.message || 'Could not dismiss it.'; dismiss.disabled = false; sync(); }
+    });
     dlg.addEventListener('cancel', e => { e.preventDefault(); finish(); });
     send.addEventListener('click', async () => {
         err.textContent = ''; send.disabled = true;
