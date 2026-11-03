@@ -19,44 +19,34 @@ export async function diffSubject(team, sid, path) {
     return `diff:${team}:${sid}:${[...new Uint8Array(sum).slice(0, 8)].map(b => b.toString(16).padStart(2, '0')).join('')}`;
 }
 
-/** The diff of two files by lines, as the hunks the diff view draws: { oldStart, del, newStart, ins }, the lines in each, 1-based, a hunk sitting before the new line newStart (where its removed lines are drawn). null when the files differ too much to walk cheaply. */
-export function lineHunks(a, b) {
-    let s = 0;
-    while (s < a.length && s < b.length && a[s] === b[s]) s++;
-    let ea = a.length, eb = b.length;
-    while (ea > s && eb > s && a[ea - 1] === b[eb - 1]) { ea--; eb--; }
-    const A = a.slice(s, ea), B = b.slice(s, eb), n = A.length, m = B.length;
-    if (n * m > 4_000_000) return null;
-    const L = Array.from({ length: n + 1 }, () => new Uint32Array(m + 1));
-    for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) L[i][j] = A[i] === B[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
-    const hunks = []; let i = 0, j = 0, cur = null;
-    const open = () => cur || (cur = { oldStart: s + i + 1, del: [], newStart: s + j + 1, ins: [] });
-    while (i < n || j < m) {
-        if (i < n && j < m && A[i] === B[j]) { if (cur) { hunks.push(cur); cur = null; } i++; j++; }
-        else if (j < m && (i === n || L[i][j + 1] >= L[i + 1][j])) { open().ins.push(B[j]); j++; }
-        else { open().del.push(A[i]); i++; }
-    }
-    if (cur) hunks.push(cur);
-    return hunks;
+/** The state fields of the merge view's extension, found once when the diff is drawn: one of them holds the view's own chunks ({ fromA, toA, fromB, toB }, offsets in the old and the new text), which is where the removed lines' numbers are read. */
+export function mergeFields(ext) {
+    const out = [];
+    const walk = e => { if (Array.isArray(e)) e.forEach(walk); else if (e && typeof e === 'object' && typeof e.createF === 'function') out.push(e); };
+    walk(ext);
+    return out;
 }
 
-/** The old-side line numbers of the removed lines selected in one removed block: the block's own rows are looked up in the old file as one run of lines (a block of two or more lines is found once), and a block that is a line
- *  repeated elsewhere (a "}") takes the run nearest to where it must be: the line it is drawn before, moved by what the hunks above it added and removed. So it is named where it was removed, not where it first appears. null when the rows are not in the old file. */
-function oldLines(chunk, from, to, view, texts) {
-    const rows = [...chunk.querySelectorAll('.cm-deletedLine')], seq = rows.map(r => r.textContent), old = texts.original.split('\n');
-    if (!rows.length) return null;
-    const runs = [];
-    for (let i = 0; i + seq.length <= old.length; i++) if (seq.every((l, k) => old[i + k] === l)) runs.push(i + 1);
-    if (!runs.length) return null;
-    let at = runs[0];
-    if (runs.length > 1) {
-        let where = 1;
-        try { where = view.state.doc.lineAt(view.posAtDOM(chunk, 0)).number; } catch { /* a block at the end of the file */ }
-        const hunks = lineHunks(old, texts.content.split('\n')) || [];
-        const guess = where + hunks.filter(h => h.newStart < where).reduce((d, h) => d + h.del.length - h.ins.length, 0);
-        at = runs.reduce((x, y) => (Math.abs(y - guess) < Math.abs(x - guess) ? y : x));
+/** The chunks the merge view holds now, or null when they cannot be read. */
+const chunksOf = (view, fields) => {
+    for (const f of fields || []) {
+        let v;
+        try { v = view.state.field(f, false); } catch { continue; }
+        if (Array.isArray(v) && (!v.length || ('fromA' in v[0] && 'fromB' in v[0]))) return v;
     }
-    return { start: at + from, end: at + to, lines: old };
+    return null;
+};
+
+/** The old-side line numbers of the removed rows from..to (indexes into the block) of one removed block: the block sits in the new text where its chunk begins, and the chunk says where it began in the old text, so the numbers are the view's own and nothing is searched for or guessed (a "}" that repeats is named where it was removed). null when the view's chunks cannot be read. */
+function oldLines(block, from, to, view, texts, fields) {
+    const chunks = chunksOf(view, fields);
+    if (!chunks) return null;
+    let pos;
+    try { pos = view.posAtDOM(block, 0); } catch { return null; }
+    const c = chunks.find(k => k.fromB === pos && k.toA > k.fromA) || chunks.find(k => k.fromB <= pos && pos <= k.toB && k.toA > k.fromA);
+    if (!c) return null;
+    const at = texts.original.slice(0, c.fromA).split('\n').length; // the old line the chunk begins on
+    return { start: at + from, end: at + to, lines: texts.original.split('\n') };
 }
 
 const lineCount = t => (t ? t.split('\n').length : 0);
@@ -64,7 +54,7 @@ const clip = (t, n) => (t.length > n ? t.slice(t.length - n) : t);
 const headClip = (t, n) => (t.length > n ? t.slice(0, n) : t);
 
 /** The anchor of the text selected in this file's diff, or null when nothing in it is selected. side is new for lines of the file as it is now and old for lines the diff shows as removed; the line numbers are the file's own on that side. */
-export function selectionAnchor(slot, view, texts, file, base) {
+export function selectionAnchor(slot, view, texts, file, base, fields) {
     const sel = window.getSelection();
     if (!sel || !sel.rangeCount || sel.isCollapsed) return null;
     const node = sel.anchorNode && (sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement);
@@ -78,7 +68,7 @@ export function selectionAnchor(slot, view, texts, file, base) {
     let startLine, endLine, before, after;
     if (old) {
         const rows = [...chunkA.querySelectorAll('.cm-deletedLine')], at = el => Math.max(0, rows.indexOf(el.closest('.cm-deletedLine')));
-        const x = at(node), y = at(end), got = oldLines(chunkA, Math.min(x, y), Math.max(x, y), view, texts);
+        const x = at(node), y = at(end), got = oldLines(chunkA, Math.min(x, y), Math.max(x, y), view, texts, fields);
         if (!got) return null;
         startLine = got.start; endLine = got.end;
         before = got.lines.slice(Math.max(0, startLine - 1 - CONTEXT_LINES), startLine - 1).join('\n'); after = got.lines.slice(endLine, endLine + CONTEXT_LINES).join('\n');
@@ -104,7 +94,7 @@ export const stillThere = (a, texts) => !a || !a.quote || (a.side === 'old' ? te
 const mounted = new WeakMap(); // slot -> its box
 
 /** Put the comments of `file` under its diff in `slot`. view is the editor of the diff, texts its two texts. Does nothing through Coral Hub or when the agent has no team. */
-export async function attachDiffComments(slot, file, view, texts, base = '') {
+export async function attachDiffComments(slot, file, view, texts, base = '', fields = []) {
     const s = state.currentSession, team = s && s.board_project, sid = s && s.session_id;
     if (isCloud() || !team || !sid || !s || s.type !== 'live') return;
     mounted.get(slot)?.destroy();
@@ -119,7 +109,7 @@ export async function attachDiffComments(slot, file, view, texts, base = '') {
     comments.setSheet(true);
     let anchor = null;
     const place = () => {
-        const a = selectionAnchor(slot, view, texts, file, base);
+        const a = selectionAnchor(slot, view, texts, file, base, fields);
         anchor = a && !a.tooLong ? a : null;
         btn.hidden = !a;
         if (!a) return;
