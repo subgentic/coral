@@ -7,12 +7,6 @@
 </p>
 
 <p align="center">
-  <strong>Install on macOS or Linux with one command:</strong>
-</p>
-
-
-<p align="center">
-  <sub>  The script covers macOS and Linux (x86-64 and ARM64); on Windows there is no one-line installer yet. Download for
   <a href="https://github.com/subgentic/coral/releases/latest/download/Coral.dmg">macOS (.dmg)</a> &bull;
   <a href="https://github.com/subgentic/coral/releases/latest/download/Coral-x64.msi">Windows (.msi)</a> &bull;
   <a href="https://github.com/subgentic/coral/releases/latest/download/Coral-x64-portable.zip">Windows portable (.zip)</a> &bull;
@@ -45,7 +39,10 @@
 
 ---
 
-## Install
+<p align="center">
+  <strong>Install on macOS or Linux with one command:</strong>
+</p>
+
 
 ```bash
 curl -fsSL \
