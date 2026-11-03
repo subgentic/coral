@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/subgentic/coral/internal/logsafe"
-	"log/slog"
 	"net/http"
 	"os"
 	"os/exec"
@@ -81,7 +80,7 @@ func (h *SessionsHandler) Diff(w http.ResponseWriter, r *http.Request) {
 	out, err := gitutil.Command(ctx, workdir, gitArgs...).Output()
 	diffText := ""
 	if err != nil {
-		slog.Warn("git diff failed", "agent_name", name, "filepath", logsafe.Dir(fp), "error", err)
+		warnGit("git diff failed", err, "agent_name", name, "filepath", logsafe.Dir(fp))
 	} else {
 		diffText = string(out)
 	}
@@ -153,7 +152,7 @@ func (h *SessionsHandler) ChangesDiff(w http.ResponseWriter, r *http.Request) {
 	}
 	diff, err := gen(ctx, workdir)
 	if err != nil {
-		slog.Warn("git changes diff failed", "agent_name", name, "workdir", logsafe.Dir(workdir), "error", err)
+		warnGit("git changes diff failed", err, "agent_name", name, "workdir", logsafe.Dir(workdir))
 		errInternalServer(w, "Could not generate changes.diff")
 		return
 	}
@@ -230,7 +229,7 @@ func (h *SessionsHandler) SessionChanges(w http.ResponseWriter, r *http.Request)
 			writeSessionChanges(w, r, diff, workdir)
 			return
 		} else {
-			slog.Warn("git session changes failed", "session_id", sessionID, "workdir", logsafe.Dir(workdir), "error", err)
+			warnGit("git session changes failed", err, "session_id", sessionID, "workdir", logsafe.Dir(workdir))
 		}
 	}
 
