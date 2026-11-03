@@ -221,6 +221,9 @@ func TestTheTrayServerChildSendsTheServersEvents(t *testing.T) {
 
 // The child's tracking waits for the Terms: while they are not accepted nothing is sent, and once they are, events go out.
 func TestTheTrayServerChildWaitsForTheTerms(t *testing.T) {
+	// Every CI workflow sets CORAL_TELEMETRY_DISABLED=1 so that no run reaches the real analytics; this test sends to its own sink and needs the opt-out OFF for itself, as the routes' TestMain does for
+	// its tests (#12902: with the variable set, tracking never sent and "after acceptance want one event, got 0" failed on every CI run that sets it, Linux and Windows).
+	t.Setenv("CORAL_TELEMETRY_DISABLED", "")
 	sink, url := newEventSink(t)
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, ".install_id"), []byte("tray-child-terms"), 0o600); err != nil {
