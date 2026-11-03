@@ -7,7 +7,7 @@ import (
 
 // #9934 round 1, item 4: the releases a person can run this CLI from today must be launchable with pinned digests (a version without them needs --coral-sha256-* from the person).
 func TestTheShippedReleasesAreLaunchableWithPinnedDigests(t *testing.T) {
-	for _, v := range []string{"2.0.3", "2.0.34", "2.0.35", "2.0.36", "2.0.37"} {
+	for _, v := range []string{"2.0.3", "2.0.34", "2.0.35"} {
 		d, ok := PinnedReleaseDigests(v)
 		if !ok {
 			t.Errorf("no pinned digests for %s", v)
@@ -37,6 +37,15 @@ func TestEveryPinnedReleaseIsAPlainVersionWithTwoDistinctValidDigestsNobodyElseS
 				t.Errorf("%s and %s share the digest %s", o, v, h)
 			}
 			seen[h] = v
+		}
+	}
+}
+
+// Security (#9934, 2026-11-03): a version enters the table only after coral-hub DevOps's cosign-verified check of that very tag. 2.0.36 and 2.0.37 are not verified yet: the launch says the person passes the digests.
+func TestAReleaseNobodyHasVerifiedIsNotPinned(t *testing.T) {
+	for _, v := range []string{"2.0.36", "2.0.37"} {
+		if _, ok := PinnedReleaseDigests(v); ok {
+			t.Errorf("%s is pinned but its SHA256SUMS has not been cosign-verified: take it out until it is, or compare it with the verified file", v)
 		}
 	}
 }
