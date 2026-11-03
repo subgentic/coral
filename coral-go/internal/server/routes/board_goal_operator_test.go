@@ -220,3 +220,19 @@ func TestAMoveThatCannotHappenChangesNothing(t *testing.T) {
 	code, out := g.call("person", "alpha", gl.ID, "move", map[string]any{"to_project": "beta"})
 	assert.Equal(t, 409, code, "a closed goal is not moved: %v", out)
 }
+
+// A goal that is only proposed is given to the other team as proposed: the move does not make it a goal that team works on (QA's SHOULD on #12693).
+func TestAProposedGoalMovesAsProposed(t *testing.T) {
+	g := newGoalOpRig(t)
+	ctx := context.Background()
+	gl, err := g.bs.CreateGoal(ctx, "alpha", board.GoalInput{Title: "Maybe later", Outcome: "An idea.", State: board.GoalProposed, CreatedBy: "Operator"})
+	require.NoError(t, err)
+
+	code, out := g.call("person", "alpha", gl.ID, "move", map[string]any{"to_project": "beta"})
+	require.Equal(t, 200, code, out)
+
+	assert.Equal(t, "proposed", out["goal"].(map[string]any)["state"], "it stays proposed on the new team")
+	fresh, err := g.bs.GetGoal(ctx, "beta", int64(out["goal"].(map[string]any)["id"].(float64)))
+	require.NoError(t, err)
+	assert.Equal(t, board.GoalProposed, fresh.State)
+}
