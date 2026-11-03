@@ -9,6 +9,7 @@
 //   R7 the same for every row mix (the caller runs the mixes) and at 200% text.
 //   R8 a phone (under 600 px): folded rows, no handles, no sideways scroll.
 //   R9 a row's action buttons sit in the Actions column only, never inside another column (the operator's Dismiss inside Waiting for); a control marked data-display-control (a chart legend's line toggle) and an agent's name link (.agent-link) are not row actions.
+// Handle presence identifies a resizable column even when its last edge is hidden; handleVisible tests the phone rule.
 // folded below means the header row is not drawn (the class dt-fold-column names the mode, not the state), or the table is a one-line table (dt-one-line: the phone form of a table with no folded second line, #11943)
 const AUDIT = `(box) => {
   const vis = e => !!e && e.getClientRects().length > 0 && e.getBoundingClientRect().width > 0;
@@ -19,7 +20,7 @@ const AUDIT = `(box) => {
     if (t) { const g = document.createRange(); g.selectNodeContents(t); need = Math.ceil(g.getBoundingClientRect().width); clipped = t.scrollWidth > t.clientWidth + 1; }
     const cells = [...box.querySelectorAll('tbody tr.dt-row td[data-key="' + key + '"]')];
     const empty = cells.length > 0 && cells.every(td => !td.textContent.trim() && !td.querySelector('button, svg, img, progress, input, .dt-chip, .dt-person, .dt-tag'));
-    return { key, label: (t ? t.textContent : h.textContent).trim(), w: Math.round(r.width), need, clipped, empty, grow: h.classList.contains('dt-grow'), unused: h.classList.contains('dt-col-unused'), handle: vis(h.querySelector('.dt-resize')), check: h.classList.contains('dt-check') || !!h.querySelector('input[type=checkbox]') };
+    return { key, label: (t ? t.textContent : h.textContent).trim(), w: Math.round(r.width), need, clipped, empty, grow: h.classList.contains('dt-grow'), unused: h.classList.contains('dt-col-unused'), handle: !!h.querySelector('.dt-resize'), handleVisible: vis(h.querySelector('.dt-resize')), check: h.classList.contains('dt-check') || !!h.querySelector('input[type=checkbox]') };
   }).filter(c => c.w > 0);
   const b = box.getBoundingClientRect(), tb = box.querySelector('table.dt-table'), tr = tb ? tb.getBoundingClientRect() : b;
   const sc = document.scrollingElement;
@@ -33,7 +34,7 @@ function judge(m, { phone = false, scrollByDesign = false } = {}) {
     const v = [];
     if (phone) {
         if (!m.folded) v.push('R8: under 600 px the rows fold to lines (the table is not folded)');
-        if (m.cols.some(c => c.handle)) v.push('R8: no resize handles on a phone (' + m.cols.filter(c => c.handle).map(c => c.key).join(',') + ')');
+        if (m.cols.some(c => c.handleVisible)) v.push('R8: no resize handles on a phone (' + m.cols.filter(c => c.handleVisible).map(c => c.key).join(',') + ')');
         if (m.pageOver > 1 || m.boxOver > 1) v.push(`R8: sideways scroll on a phone (page ${m.pageOver}, box ${m.boxOver})`);
         return v;
     }
