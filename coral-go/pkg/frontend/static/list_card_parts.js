@@ -64,7 +64,7 @@ export function _pinMenuItem(groupName, dir) {
     const at = splitKey(groupName).server; // the computer the folder is on: its pin is kept there (#12653)
     if (!dir) return '';
     const pinned = isPinnedDir(dir, at);
-    return `<button class="menu-item overflow-menu-item" data-pin-action="${escapeAttr(pinned ? 'unpin' : 'pin')}" data-on-click="folder-pin" data-mode="${escapeAttr(pinned ? 'unpin' : 'pin')}" data-dir="${escapeAttr(dir)}" data-server="${escapeAttr(at === LOCAL_SERVER ? '' : at)}">${PIN_ICON}${pinned ? 'Unpin folder' : 'Pin folder'}</button>`;
+    return `<button class="menu-item overflow-menu-item" data-pin-action="${escapeAttr(pinned ? 'unpin' : 'pin')}" data-on-click="folder-pin" data-mode="${escapeAttr(pinned ? 'unpin' : 'pin')}" data-dir="${escapeAttr(dir)}"${at === LOCAL_SERVER ? '' : ` data-server="${escapeAttr(at)}"`}>${PIN_ICON}${pinned ? 'Unpin folder' : 'Pin folder'}</button>`;
 }
 
 export const FOLDER_GROUP_ICON = '<svg class="team-group-icon folder-group-icon" role="img" aria-label="Folder" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"'
