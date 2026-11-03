@@ -9,8 +9,9 @@ package main
 //     page, looking like Coral, had the app's native bindings.
 //   - Only an http or https address is ever followed. A file:, a custom scheme, a javascript: or an address that does not parse does nothing (the window
 //     is not navigated to a local file or handed to the system's opener).
-//   - A web address on another origin, and any link with target _blank, opens in the system browser; a same-origin link without target is the page's own.
+//   - A web address on another origin, and a link with target _blank (except a same-origin native download), opens in the system browser; a same-origin link without target is the page's own.
 const linkInterceptScript = `document.addEventListener('click', function(e) {
+	if (e.defaultPrevented) return;
 	var a = e.target && e.target.closest ? e.target.closest('a') : null;
 	if (!a) return;
 	var href = a.getAttribute('href');
@@ -18,6 +19,8 @@ const linkInterceptScript = `document.addEventListener('click', function(e) {
 	var u;
 	try { u = new URL(href, location.href); } catch (err) { e.preventDefault(); return; }
 	if (u.protocol !== 'http:' && u.protocol !== 'https:') { e.preventDefault(); return; }
+	// Same-origin downloads belong to the native saver, including target=_blank links.
+	if (u.origin === location.origin && a.hasAttribute('download') && typeof window._coralSaveFile === 'function') return;
 	if (u.origin !== location.origin || a.target === '_blank') {
 		e.preventDefault();
 		if (window._coralOpenExternal) { _coralOpenExternal(u.href); } else { window.open(u.href, '_blank'); }

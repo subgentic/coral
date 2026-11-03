@@ -100,6 +100,8 @@ function initLinkInterceptor() {
     document.addEventListener('click', function(e) {
         const a = e.target.closest('a');
         if (!a) return;
+        // A native download was consumed by the injected saver; do not reopen it.
+        if (e.defaultPrevented && a.hasAttribute('download')) return;
         const href = a.getAttribute('href');
         if (!href) return;
         // Single-agent popout links: prefer a second in-app window when the
