@@ -231,17 +231,18 @@ export function openAskDialog(a, onDone, runners = {}) {
                 try {
                     const got = await claimButton(a, b); // the stored action, whatever the label says
                     if (isReply(got.action)) { asks = asks.filter(x => askKey(x) !== askKey(a)); fire(); refreshOperatorAsks(true); finish(); showToast(`Sent: ${markHidden(got.label, { strict: true })}`); return; }
+                    const navigates = ['open:new-agent', 'open:task', 'open:artifact'].includes(got.action);
                     finish(); // the dialog is modal: it goes before the page it opens
                     try {
-                        if (got.action === 'open:new-agent') { if (!window.showLaunchModal) throw new Error('The New agent dialog is not available here.'); window.showLaunchModal(); }
-                        else if (got.action === 'open:task') { if (!runners.task) throw new Error('Tasks cannot be opened here.'); runners.task(a, String(got.arg)); }
+                        if (got.action === 'open:new-agent') { if (!window.showLaunchModal) throw new Error('The New agent dialog is not available here.'); await window.showLaunchModal(); }
+                        else if (got.action === 'open:task') { if (!runners.task) throw new Error('Tasks cannot be opened here.'); await runners.task(a, String(got.arg)); }
                         else if (got.action === 'open:artifact') { if (!runners.artifact) throw new Error('Files cannot be opened here.'); await runners.artifact(a, String(got.arg)); }
                         else if (got.action === 'wake') { await wakeMember(a, String(got.arg)); showToast(`Woke ${markHidden(got.arg, { strict: true })}.`); }
                         else throw new Error('This button does something this version does not know.');
-                        await settleButton(a, b, 'done'); // closes the question
+                        if (!navigates) await settleButton(a, b, 'done'); // only an action that answers the question settles it
                     } catch (e) {
                         showToast(e.message || 'That did not work.', true);
-                        await settleButton(a, b, 'failed').catch(() => {}); // the button is given back
+                        if (!navigates) await settleButton(a, b, 'failed').catch(() => {}); // give a failed wake back; navigation never claims an answer
                     }
                     refreshOperatorAsks(true);
                 } catch (e) { err.textContent = e.message || 'Not done.'; choices.forEach(c => { c.disabled = false; }); send.disabled = false; }

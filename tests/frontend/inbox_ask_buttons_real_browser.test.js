@@ -1,5 +1,5 @@
 // Buttons an agent put on a question to the Operator (#11445, #11643), end to end against the REAL server: a stood-in agent with a real session token posts asks with buttons; the Operator's Needs you opens the
-// question with each button and what it DOES in the app's own words (the agent's label is text); a wake of an agent that is not asleep fails and is given back; an open of a task runs and closes the question; a reply
+// question with each button and what it DOES in the app's own words (the agent's label is text); a wake of an agent that is not asleep fails and is given back; opening a file or task keeps the question pending and reusable; a reply
 // is posted by the server as a click on the agent's own label and closes its question; an agent's token cannot claim. 1280 and 390 px. No stubs.
 const assert = require('node:assert/strict');
 const { launchStandIn } = require('./helpers/stand_in_agent');
@@ -52,6 +52,52 @@ async function httpJson(method, path, body, headers = {}) {
         const claim403 = await httpJson('POST', `/api/board/${B}/asks/${q1}/buttons/${first.buttons[0].id}/claim`, {}, tok);
         assert.equal(claim403.status, 403, 'an agent token cannot claim: ' + JSON.stringify(claim403));
 
+        // A real document button must leave both choices reusable. Wait for the action's final
+        // refresh before asserting: checking as soon as the viewer opens missed the old settle race.
+        const upload = await ev(`fetch('/api/board/${B}/operator-artifacts?session_id=${standIn.sid}', { method: 'POST', headers: { 'Content-Type': 'application/octet-stream', 'X-Artifact-Name': 'design.md', 'X-Artifact-Media-Type': 'text/markdown' }, body: '# Document button regression\\nRead this design before deciding.' }).then(async r => ({ status: r.status, data: await r.json() }))`);
+        assert.equal(upload.status, 201, JSON.stringify(upload));
+        const documentQuestion = await ask('@Operator Read the design before deciding (document review)', [`Open document=open:artifact:${upload.data.id}`, 'Build the design=reply']);
+        await ev(`window.switchNavTab('hub-inbox'); import(${S} + 'operator_asks.js').then(m => m.refreshOperatorAsks(true)).then(() => import(${S} + 'inbox_tab.js')).then(m => m.selectInboxTab('needs')).then(() => true)`);
+        const documentRow = `[...document.querySelectorAll('#group-table-view tbody tr')].find(r => r.textContent.includes('(document review)'))`;
+        await waitFor(`!!(${documentRow})`, 'the document question in Needs you', 15000);
+        await ev(`(() => { const original = window.fetch; window.__askRefreshes = 0; window.__buttonSettles = 0; window.fetch = async function(u, ...args) { const r = await original.call(this, u, ...args); const path = String(u); if (path.includes('/api/operator-asks')) window.__askRefreshes++; if (/buttons\\/\\d+\\/settle/.test(path)) window.__buttonSettles++; return r; }; })()`);
+        const reopenFromActivity = async () => {
+            const record = await person('GET', '/api/activity');
+            const action = record.data.actions.find(r => r.item_kind === 'question' && String(r.item_id) === String(documentQuestion));
+            assert.ok(action, 'the question has an Activity record: ' + JSON.stringify(record));
+            await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('activity')).then(() => true)`);
+            const activityRow = `document.querySelector('#group-table-view tr[data-key="${action.id}"]')`;
+            await waitFor(`!!(${activityRow})`, 'the question in Activity', 10000);
+            assert.ok(await ev(`!!(${activityRow}).querySelector('.dt-primary')`), 'the question in Activity can be opened');
+            await ev(`(${activityRow}).querySelector('.dt-primary').click(); true`);
+            await waitFor(`!!document.querySelector('.mb-message[data-message-id="${documentQuestion}"] [data-on-click="mb-msg-reply"]')`, 'Activity opens the original board question with Reply', 15000);
+            assert.ok(await ev(`document.querySelector('.mb-message[data-message-id="${documentQuestion}"]').textContent.includes('(document review)')`), 'the original question can still be read');
+        };
+        for (let opening = 0; opening < 2; opening++) {
+            await ev(`(${documentRow}).querySelector('button[aria-label^="Answer the question of"]').click(); true`);
+            await waitFor(`!!document.querySelector('dialog.inbox-ask-dialog[open]')`, 'reopen the same question', 6000);
+            assert.equal(await ev(`[...document.querySelectorAll('dialog.inbox-ask-dialog .inbox-ask-offer button')].filter(b => !b.disabled).length`), 2, 'both choices remain usable');
+            const reads = await ev('window.__askRefreshes');
+            await ev(`[...document.querySelectorAll('dialog.inbox-ask-dialog .inbox-ask-offer button')].find(b => b.textContent === 'Open document').click(); true`);
+            await waitFor(`!!document.querySelector('#artifact-viewer .artifact-viewer-body')?.textContent.includes('Read this design before deciding.')`, 'the actual document opens', 10000);
+            await waitFor(`window.__askRefreshes > ${reads}`, 'the action finishes refreshing Needs you', 10000);
+            const pending = (await mine()).find(a => a.id === documentQuestion);
+            assert.ok(pending && pending.buttons.length === 2 && pending.buttons.every(b => b.state === 'pending'), 'opening a document leaves the question and both buttons pending: ' + JSON.stringify(pending));
+            assert.equal(await ev('window.__buttonSettles'), 0, 'navigation never sends a settle request');
+            await ev(`document.querySelector('#artifact-viewer .artifact-viewer-close').click(); true`);
+            await waitFor(`!!(${documentRow})`, 'the question remains in Needs you', 8000);
+        }
+        await reopenFromActivity(); // the same route works while the question is still pending
+        assert.ok((await mine()).some(a => a.id === documentQuestion), 'opening Activity does not answer it');
+        await ev(`window.switchNavTab('hub-inbox'); import(${S} + 'operator_asks.js').then(m => m.refreshOperatorAsks(true)).then(() => import(${S} + 'inbox_tab.js')).then(m => m.selectInboxTab('needs')).then(() => true)`);
+        await waitFor(`!!(${documentRow})`, 'return to the unanswered question', 10000);
+        await ev(`(${documentRow}).querySelector('button[aria-label^="Answer the question of"]').click(); true`);
+        await waitFor(`!!document.querySelector('dialog.inbox-ask-dialog[open]')`, 'answer after reading', 6000);
+        await ev(`[...document.querySelectorAll('dialog.inbox-ask-dialog .inbox-ask-offer button')].find(b => b.textContent === 'Build the design').click(); true`);
+        await waitFor(`!document.querySelector('dialog.inbox-ask-dialog[open]')`, 'the reply finishes', 6000);
+        assert.ok(!(await mine()).some(a => a.id === documentQuestion), 'the reply settles the question');
+        await reopenFromActivity(); // settled questions stay readable and replyable
+
         for (const [w, h, mobile] of [[1280, 900, false], [390, 844, true]]) {
             const at = `${w} px: `, which = mobile ? '(three)' : '(one)';
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
@@ -81,14 +127,14 @@ async function httpJson(method, path, body, headers = {}) {
                 asks = await mine();
                 const again = asks.find(a => a.id === q1);
                 assert.ok(again && again.buttons.every(b => b.state === 'pending'), at + 'the failed wake was given back: ' + JSON.stringify(again));
-                // Open the task: it runs and the question is closed
+                // Open the task: navigation keeps the question pending
                 await ev(`import(${S} + 'operator_asks.js').then(m => m.refreshOperatorAsks(true)).then(() => true)`);
                 await waitFor(`!!(${rowOf('(one)')})`, at + 'the question is still in Needs you', 8000);
                 await open('(one)');
                 await ev(`[...document.querySelectorAll('dialog.inbox-ask-dialog .inbox-ask-offer button')].find(b => b.textContent === 'Look at it').click(); true`);
                 await waitFor(`!document.querySelector('dialog.inbox-ask-dialog[open]')`, at + 'closes', 6000);
-                const closedBy = async id => { for (let i = 0; i < 40; i++) { if (!(await mine()).some(a => a.id === id)) return true; await new Promise(r => setTimeout(r, 250)); } return false; }; // sleep-ok: the page settles after it opened the task
-                assert.ok(await closedBy(q1), at + 'opening the task closed the question');
+                const stillPending = (await mine()).find(a => a.id === q1);
+                assert.ok(stillPending && stillPending.buttons.every(b => b.state === 'pending'), at + 'opening the task keeps all choices pending');
             } else {
                 await ev(`document.querySelector('dialog.inbox-ask-dialog .inbox-ask-buttons .btn:not(.btn-primary)').click(); true`); // Close: nothing runs on a phone walk of the layout
                 await waitFor(`!document.querySelector('dialog.inbox-ask-dialog[open]')`, at + 'closes', 6000);
@@ -108,7 +154,7 @@ async function httpJson(method, path, body, headers = {}) {
         let reply = null;
         for (let i = 0; i < 40 && !reply; i++) {
             const m = await person('GET', `/api/board/${B}/messages/all`);
-            reply = (m.data || []).find(x => x.subscriber_id === 'Operator' && /clicked the button labelled/.test(x.content));
+            reply = (m.data || []).find(x => x.subscriber_id === 'Operator' && /clicked the button labelled/.test(x.content) && x.content.includes('\"Yes, ship it\"'));
             if (!reply) await new Promise(r => setTimeout(r, 250)); // sleep-ok: the click's post
         }
         assert.ok(reply, 'the server posted the reply');
