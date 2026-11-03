@@ -108,10 +108,6 @@ Running agents is easy. *Knowing when one of them needs you* is the part that go
 </p>
 
 
-## Chief, your front agent
-
-**Chief** is one of your running agents that you make the front door. In Settings > Chief you pick which agent it is, give it a name and an avatar (one of eight colours and a letter), and choose the team it fronts: the team whose agents Chief takes your requests to. Chief has its own page on your phone, `/chief`, with its own chat (you turn the page on in Settings). You decide how much it may do on its own: **Ask first** (the default) asks before each action; **Act** edits without asking, and a shell command still asks; the level applies when Chief restarts. Chief has to be an agent that is already running (on a team of its own, a team of one), and Settings > Chief is on the computer itself, not through Coral Hub.
-
 ## A team of agents with different skills
 
 Behind the Inbox is the part that does the work: a team of agents on one board. An **Orchestrator** plans and delegates; a **Lead Developer** writes the code; a **QA Engineer** checks it. They can be different vendors on the same team (a Claude orchestrator, Codex workers, an Antigravity reviewer), each in its own terminal session and, if you ask, its own git worktree. The team's board holds the messages and a task queue whose dependencies are conditioned on outcomes and artifacts, not just "done".
@@ -169,9 +165,17 @@ In the dashboard, choose **New agent** (then **New agent** again in the dialog: 
 See [Getting started](https://subgentic.github.io/coral/getting-started/) for the full installation and first-agent walkthrough.
 
 
-### Coral Hub (beta)
+## Beta 
+
+### Chief, your front agent
+
+**Chief** is one of your running agents that you make the front door. In Settings > Chief you pick which agent it is, give it a name and an avatar (one of eight colours and a letter), and choose the team it fronts: the team whose agents Chief takes your requests to. Chief has its own page on your phone, `/chief`, with its own chat (you turn the page on in Settings). You decide how much it may do on its own: **Ask first** (the default) asks before each action; **Act** edits without asking, and a shell command still asks; the level applies when Chief restarts. Chief has to be an agent that is already running (on a team of its own, a team of one), and Settings > Chief is on the computer itself, not through Coral Hub.
+ Coral Hub and the Chief x 
+
+### Coral Hub
 
 Coral Hub (app.coralhub.dev, invite-only beta) lets you reach your Coral servers from any browser without opening a port. A fresh install never connects, or asks you to, on its own: connect a server from the home screen or **Settings › Coral Hub**, or run `coral cloud connect` on it. Coral offers it at first launch (the dashboard's Connect screen and a prompt in the terminal) only when you pass a hub URL (`--cloud-url https://app.coralhub.dev` or `CORAL_CLOUD_URL`) or start it with `--cloud-connect prompt` (`CORAL_CLOUD_CONNECT=prompt`); `--cloud-connect off` turns that off. See [Coral Hub](coral-go/agent_docs/hub.md#connecting-a-server-to-coral-hub).
+
 
 ## Documentation
 
