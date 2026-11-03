@@ -44,6 +44,24 @@ const { coralReady, framesJs } = require('./helpers/wait');
             await ev(`window.__asks.push(${JSON.stringify(ask(4, 'Delta', 0.5))}); true`);
             await refresh();
             assert.deepEqual(await order(), [first[1], 'Charlie', 'Delta'], at + 'switching folders keeps what the person saw too, until a filter changes');
+
+            // a column sort the person chose is kept the same way: Item ascending, then a late computer's row that sorts first goes after the rows shown (the table used to sort the whole list again)
+            await ev(`(() => { const th = document.querySelector('${T} thead th[data-key=agent]'); (th.querySelector('button') || th).click(); return true; })()`);
+            await ev(framesJs(6));
+            const sorted = await order();
+            assert.deepEqual(sorted, [...sorted].sort(), at + 'Item ascending sorts the rows shown: ' + JSON.stringify(sorted));
+            await ev(`window.__asks.push(${JSON.stringify(ask(5, 'Aardvark', 2))}); true`);
+            await refresh();
+            assert.deepEqual(await order(), [...sorted, 'Aardvark'], at + 'under a column sort a late row sorting first still goes after the rows on screen');
+
+            // a row under the pointer never moves: hold the mouse down on a row, a late older row arrives, the row is where it was
+            const target = await ev(`(() => { const row = [...document.querySelectorAll('${T} tbody tr')].find(t => /Q-(\\w+)-end/.exec(t.textContent)[1] === ${JSON.stringify(sorted[1])}); const b = row.getBoundingClientRect(); return { x: Math.round(b.left + b.width / 2), y: Math.round(b.top + b.height / 2), top: Math.round(b.top) }; })()`);
+            await client.Input.dispatchMouseEvent({ type: 'mousePressed', x: target.x, y: target.y, button: 'left', clickCount: 1 });
+            await ev(`window.__asks.push(${JSON.stringify(ask(6, 'Aaron', 90))}); true`);
+            await refresh();
+            const held = await ev(`(() => { const row = [...document.querySelectorAll('${T} tbody tr')].find(t => /Q-(\\w+)-end/.exec(t.textContent)[1] === ${JSON.stringify(sorted[1])}); return Math.round(row.getBoundingClientRect().top); })()`);
+            await client.Input.dispatchMouseEvent({ type: 'mouseReleased', x: target.x, y: target.y, button: 'left', clickCount: 1 });
+            assert.equal(held, target.top, at + 'the row under the held pointer did not move when a late row arrived');
             console.log(`   ✓ ${w} px`);
         }
         console.log('PASS Needs you keeps its order when a computer answers late');
