@@ -47,6 +47,20 @@ const { coralReady } = require('./helpers/wait');
         assert.equal(await listed(), false, 'nothing started the board again');
         console.log('   ✓');
 
+        console.log('3. An agent joins a board of the same name on purpose: it works, and then so does the Operator');
+        assert.equal(await call('/subscribe', J, { subscriber_id: 'qa', job_title: 'QA Engineer' }), 200);
+        assert.equal(await listed(), true, 'the board is back, started by the join');
+        assert.equal(await call('/subscribe', J, { subscriber_id: 'Operator', job_title: 'Operator' }), 200);
+        console.log('   ✓');
+        console.log('4. The same board is shown again: the words go at once (not at the next 10 s poll), the messages come back and the poll runs again');
+        assert.equal(await call('/messages', J, { subscriber_id: 'qa', as: 'QA Engineer', content: 'back again' }), 200);
+        await ev(`window.__showB = () => import((window.__coralStatic || '/static/') + 'message_board.js').then(m => m.showBoardInPage(${JSON.stringify(B)}, document.getElementById('mb-board').parentElement)).then(() => true); window.__showB()`);
+        await waitFor(`(document.getElementById('mb-messages') || {}).textContent.includes('back again')`, 'the messages back within a few seconds, well inside one poll', 4000);
+        assert.equal(await ev(`(document.getElementById('mb-messages') || {}).textContent.includes('This team was deleted.')`), false, 'the words are gone');
+        assert.equal(await ev(`window.__polls.some(id => !window.__cleared.has(id))`), true, 'and a 10 s poll is running again');
+        console.log('   ✓');
+
+
         console.log('2b. A board deleted while its FIRST page of messages is on its way: that late reply does not draw over the words');
         const B2 = B + '-b', api2 = `/api/board/${B2}`;
         assert.equal(await ev(`fetch(${JSON.stringify(api2 + '/messages')}, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'qa', as: 'QA Engineer', content: 'a second board' }) }).then(r => r.status)`), 200);
@@ -65,10 +79,11 @@ const { coralReady } = require('./helpers/wait');
         assert.equal(await ev(`document.getElementById('mb-messages').textContent`), 'This team was deleted.', 'the late first page did not replace the words');
         console.log('   ✓');
 
-        console.log('3. An agent joins a board of the same name on purpose: it works, and then so does the Operator');
-        assert.equal(await call('/subscribe', J, { subscriber_id: 'qa', job_title: 'QA Engineer' }), 200);
-        assert.equal(await listed(), true, 'the board is back, started by the join');
-        assert.equal(await call('/subscribe', J, { subscriber_id: 'Operator', job_title: 'Operator' }), 200);
+
+        console.log('5. Switching to another board clears the mark: the board shown after the second one loads as usual');
+        await ev(`window.__showB()`);
+        await waitFor(`(document.getElementById('mb-messages') || {}).textContent.includes('back again')`, 'the first board loading again after the second board was gone', 4000);
+        assert.equal(await ev(`import((window.__coralStatic || '/static/') + 'board_state.js').then(m => m.bs._goneProject)`), null, 'no board is marked gone');
         console.log('   ✓');
     } finally { await removeBoards(ev, [B, B + '-b']); await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
