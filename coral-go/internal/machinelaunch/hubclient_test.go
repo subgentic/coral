@@ -264,3 +264,58 @@ func TestMintKeepsTheHubsExpiryAndAnswerWithoutOneSaysNothingGuessed(t *testing.
 		t.Fatal("nothing minted has none")
 	}
 }
+
+// #12584 (coral-hub's question): a Hub that does not serve /api/bootstrap is found out BEFORE anything is created at the provider, not after a machine is running. The probe makes no credential: it is a
+// HEAD with the key, and only a definite "not served" (404 or 501) refuses; anything else, including an answer it cannot read, goes on and lets the mint say what is wrong.
+func TestPreflightRefusesOnlyAHubThatDoesNotServeBootstrap(t *testing.T) {
+	var methods, paths, auths []string
+	var bodies int
+	status := http.StatusMethodNotAllowed
+	h, _ := hubServer(t, func(w http.ResponseWriter, r *http.Request) {
+		methods, paths, auths = append(methods, r.Method), append(paths, r.URL.Path), append(auths, r.Header.Get("Authorization"))
+		if r.ContentLength > 0 {
+			bodies++
+		}
+		w.WriteHeader(status)
+	})
+	for _, st := range []int{http.StatusNotFound, http.StatusNotImplemented} {
+		status = st
+		err := h.Preflight(context.Background())
+		if !errors.Is(err, ErrHubBootstrapOff) {
+			t.Fatalf("%d: want ErrHubBootstrapOff, got %v", st, err)
+		}
+		if strings.Contains(err.Error(), goodKey) {
+			t.Fatalf("the refusal holds the key: %v", err)
+		}
+	}
+	for _, st := range []int{http.StatusMethodNotAllowed, http.StatusUnauthorized, http.StatusForbidden, http.StatusBadRequest, http.StatusOK, http.StatusFound, http.StatusTooManyRequests, http.StatusInternalServerError, http.StatusServiceUnavailable} {
+		status = st
+		if err := h.Preflight(context.Background()); err != nil {
+			t.Errorf("%d: the probe cannot tell, so the launch goes on (the mint says what is wrong): %v", st, err)
+		}
+	}
+	for i := range methods {
+		if methods[i] != http.MethodHead || paths[i] != "/api/bootstrap/credentials" || auths[i] != "Bearer "+goodKey {
+			t.Errorf("probe %d: %s %s %q", i, methods[i], paths[i], auths[i])
+		}
+	}
+	if bodies != 0 {
+		t.Errorf("the probe sends no body")
+	}
+
+	// an unreachable Hub: not a reason to refuse here (the mint will report it)
+	srv := httptest.NewServer(http.NotFoundHandler())
+	url := srv.URL
+	srv.Close()
+	if err := (&HubClient{BaseURL: url, Key: goodKey}).Preflight(context.Background()); err != nil {
+		t.Errorf("an unreachable Hub is not 'bootstrap off': %v", err)
+	}
+
+	// a key or an address that can never work is refused now, not after a machine exists
+	if err := (&HubClient{BaseURL: "https://app.coralhub.dev", Key: "not-a-key"}).Preflight(context.Background()); err == nil || !strings.Contains(err.Error(), "does not look like one") {
+		t.Errorf("a malformed key: %v", err)
+	}
+	if err := (&HubClient{BaseURL: "http://example.com", Key: goodKey}).Preflight(context.Background()); err == nil || !strings.Contains(err.Error(), "must be https") {
+		t.Errorf("a plain http Hub: %v", err)
+	}
+}

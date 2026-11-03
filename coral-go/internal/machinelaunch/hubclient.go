@@ -87,6 +87,54 @@ func (h *HubClient) endpoint() (string, error) {
 	return u.Scheme + "://" + u.Host + "/api/bootstrap/credentials", nil
 }
 
+// ErrHubBootstrapOff: the Hub answered that it does not serve /api/bootstrap (404 or 501): it does not make machine credentials (yet), so a launch cannot finish, and none is started (#12584).
+var ErrHubBootstrapOff = errors.New("Coral Hub does not offer machine credentials yet")
+
+// Preflighter is a Hub client that can say, before anything is created at the provider, that a launch could not get its credential. Launch asks it first when the Hub client has it.
+type Preflighter interface {
+	Preflight(ctx context.Context) error
+}
+
+// Preflight asks the Hub, before any machine exists, whether it serves machine credentials, so a Hub that does not (app.coralhub.dev until it enables /api/bootstrap) is refused with nothing made at the
+// provider instead of after a billable machine is running (#12584). It makes no credential: a HEAD to the mint's address with the key, no body. Only a definite "not served" (404 or 501) is ErrHubBootstrapOff;
+// a key or an address that can never work is refused here too; anything else (a method refusal, a login refusal, a limit, a server fault, a Hub that cannot be reached) goes on, and the mint says what is wrong.
+func (h *HubClient) Preflight(ctx context.Context) error {
+	if !keyShape.MatchString(h.Key) {
+		return errors.New("the Coral Hub key does not look like one (it starts with chk_): check the key file")
+	}
+	endpoint, err := h.endpoint()
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodHead, endpoint, nil)
+	if err != nil {
+		return nil
+	}
+	req.Header.Set("Authorization", "Bearer "+h.Key)
+	req.Header.Set("User-Agent", "coral-machine-launch")
+	client := h.HTTP
+	if client == nil {
+		client = &http.Client{Timeout: 30 * time.Second}
+	}
+	c := *client
+	c.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse } // the key goes to this host and no other
+	resp, err := c.Do(req)
+	if err != nil {
+		return nil // cannot tell: the mint will report an unreachable Hub
+	}
+	resp.Body.Close()
+	if resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusNotImplemented {
+		host := ""
+		if u, err := url.Parse(endpoint); err == nil {
+			host = u.Host
+		}
+		return fmt.Errorf("%w (it answered HTTP %d for /api/bootstrap/credentials at %s)", ErrHubBootstrapOff, resp.StatusCode, host)
+	}
+	return nil
+}
+
 // Mint makes the request described in the joint note: generic adapter, scope digitalocean, the machine's name as the label, ephemeral, 5 minutes.
 func (h *HubClient) Mint(ctx context.Context, label string) (string, error) {
 	if !keyShape.MatchString(h.Key) {
