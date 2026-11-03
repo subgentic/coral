@@ -209,9 +209,9 @@ func (h *SessionsHandler) LaunchTeam(w http.ResponseWriter, r *http.Request) {
 	msg, madeDir := createSuggestedDirReport(body.WorkingDir, body.CreateDir, h.cfg.CoralRoot)
 	if msg == "" && body.CreateNewFolder && !body.CreateDir {
 		if msg = newFolderCallerRefusal(r); msg == "" {
-			var made bool
-			msg, made = createChosenFolder(body.WorkingDir)
-			madeDir = madeDir || made
+			// A folder the person typed and Coral made is NOT one Coral suggested: only the suggested folder is trusted without the tick (#11889). This one follows the Trust switch like any other folder (#12882:
+			// the switch said off, the launch trusted it anyway and showed an error for it in a shared place), so its being made does not go into madeDir.
+			msg, _ = createChosenFolder(body.WorkingDir)
 		}
 	}
 	if msg != "" {
