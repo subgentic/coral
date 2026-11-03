@@ -153,6 +153,15 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
             ny.setAttribute('aria-label', `Not yet: ${g.title}`);
             acts.append(ny);
         }
+        if (W.isOpenGoal(g) && sp.server === LOCAL_SERVER) { // the Operator's own two changes, made on this computer's server (#12693)
+            const dv = btn('btn goals-change-driver', 'Change driver', () => importOnce('./goal_operator_dialogs.js').then(m => m.openChangeDriver({ project: sp.name, goal: g, onClose: () => dv.focus(),
+                onDone: async driver => { say(driver ? `Driver changed to ${driver}` : 'Driver cleared'); showToast(driver ? `Driver changed to ${driver}` : 'Driver cleared'); await loadGoals(); } })));
+            dv.setAttribute('aria-label', `Change driver: ${g.title}`);
+            const mv = btn('btn goals-move', 'Move to another team', () => importOnce('./goal_operator_dialogs.js').then(m => m.openMoveGoal({ project: sp.name, goal: g, openTasks: W.openTasksOf(g.rollup), onClose: () => mv.focus(),
+                onMoved: async (out, label) => { showToast(`Goal given to ${label} as goal #${out.goal.id}`); closeGoal(); await loadGoals(); } })));
+            mv.setAttribute('aria-label', `Move to another team: ${g.title}`);
+            acts.append(dv, mv);
+        }
         if (W.isOpenGoal(g)) { const cb = btn('btn btn-primary goals-close', 'Close goal', () => openClose(g)); cb.setAttribute('aria-label', `Close goal: ${g.title}`); acts.append(cb); } // named for its goal: the Close dialog's own button is just Close goal
         else if (W.isClosedGoal(g)) acts.append(btn('btn goals-reopen', 'Reopen', () => reopenGoal(g)));
         row.append(acts); main.append(row);
