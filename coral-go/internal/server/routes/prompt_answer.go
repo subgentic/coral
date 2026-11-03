@@ -21,6 +21,7 @@ import (
 	"github.com/subgentic/coral/internal/permreview"
 	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/terminalinput"
+	"github.com/subgentic/coral/internal/tracking"
 )
 
 // Answering an agent's prompt from the chat.
@@ -645,7 +646,11 @@ func (h *SessionsHandler) AnswerPrompt(w http.ResponseWriter, r *http.Request) {
 		writeExactTargetError(w, status, message)
 		return
 	}
-	h.touch(r, body.SessionID, board.TouchAnswer) // the Operator answers an agent's question (#11225): counted before the keys go, so a typed answer is not counted twice
+	h.touch(r, body.SessionID, board.TouchAnswer)    // the Operator answers an agent's question (#11225): counted before the keys go, so a typed answer is not counted twice
+	if body.SessionID != "" && humanInputCaller(r) { // the Inbox's numbers (#7512): the wait's kind and age, never the agent or the answer
+		st := h.deriveSingleSessionState(r.Context(), body.SessionID, 0)
+		inboxActioned(r, tracking.InboxAgentWait, st.WaitingKind, "answer", st.WaitingSince)
+	}
 	// opencode is answered through its own server, not by typing into its terminal (#11395)
 	if body.AgentType == at.Opencode && body.SessionID != "" && !body.Submit {
 		h.answerOpencodePermission(w, r, body.SessionID, body.N, body.Label, body.AskID)

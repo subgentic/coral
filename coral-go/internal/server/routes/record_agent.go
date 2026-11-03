@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -18,6 +19,7 @@ import (
 	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/safefs"
 	"github.com/subgentic/coral/internal/store"
+	"github.com/subgentic/coral/internal/tracking"
 )
 
 // "Record as agent" (#391). An agent that was already running when Coral updated has no record of its agent process, so its board notices are paused until it is restarted, woken or
@@ -272,6 +274,7 @@ func (h *SessionsHandler) RecordAgents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	slog.Info("the Operator recorded the agents' processes after an update", "recorded", len(recorded), "left", len(left))
+	inboxActioned(r, tracking.InboxUnrecorded, "", "record", time.Time{}) // the Inbox's numbers (#7512)
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "recorded": recorded, "left": left})
 }
 

@@ -9,6 +9,7 @@ import { syncWelcome } from './welcome_items.js';
  * the three counts, and the announcement of an agent that has just started waiting. */
 
 import { state } from './state.js';
+import { reportInboxOpened } from './dashboard_analytics.js';
 import { unreadReviewItems, refreshReviews, onReviewsChanged } from './inbox_reviews.js';
 import { failedUnread, refreshRuns, onRunsChanged } from './automation_runs.js';
 import { pendingProposals, refreshProposals, onProposalsChanged } from './proposals_state.js';
@@ -135,6 +136,7 @@ export function searchInboxFolder(text) { return importOnce('./inbox_sidebar.js'
 export function showInboxTabContent({ folder = '', quiet = false } = {}) {
     const view = document.getElementById('inbox-view');
     if (!view) return;
+    reportInboxOpened();
     if (!isCloud() || nativeInbox()) {
         const local = document.getElementById('inbox-local');
         if (local) local.hidden = false;

@@ -110,6 +110,9 @@ func (h *SystemHandler) PutSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	applyLiveSettings(values)
+	if _, hid := values["goal_done_hidden"]; hid { // the Inbox's "goal looks done" row hidden (Not yet, Dismiss): the Inbox's numbers (#7512)
+		inboxActioned(r, tracking.InboxGoalDone, "", "hide", time.Time{})
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 

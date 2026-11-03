@@ -17,6 +17,7 @@ import (
 
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/clitext"
+	"github.com/subgentic/coral/internal/tracking"
 )
 
 // The Operator's approval of what an agent adds to a team (#11389). With a team's goals_need_approval or tasks_need_approval on, an agent's new goal or task is a PROPOSAL (board_proposals), not a goal or
@@ -334,6 +335,7 @@ func (h *BoardHandler) ApproveProposal(w http.ResponseWriter, r *http.Request) {
 	}
 	slog.Info("[proposals] approved", "surface", "local", "board", project, "proposal", id, "kind", p.Kind, "ref", ref)
 	h.recordActivity(r, board.ActApprove, "proposal", strconv.FormatInt(id, 10), project, p.Title, "")
+	inboxActioned(r, tracking.InboxProposal, "", "approve", inboxTime(p.CreatedAt)) // the Inbox's numbers (#7512)
 	writeJSON(w, http.StatusOK, map[string]any{"proposal_id": id, "state": board.ProposalApproved, "kind": p.Kind, "created_id": ref})
 }
 
@@ -434,6 +436,7 @@ func (h *BoardHandler) RejectProposal(w http.ResponseWriter, r *http.Request) {
 	h.tellOnce(r.Context(), project, p, board.ProposalRejected, p.Reason)
 	slog.Info("[proposals] rejected", "surface", "local", "board", project, "proposal", id, "kind", p.Kind)
 	h.recordActivity(r, board.ActDeny, "proposal", strconv.FormatInt(id, 10), project, p.Title, body.Reason)
+	inboxActioned(r, tracking.InboxProposal, "", "reject", inboxTime(p.CreatedAt))
 	writeJSON(w, http.StatusOK, map[string]any{"proposal_id": id, "state": board.ProposalRejected, "kind": p.Kind})
 }
 

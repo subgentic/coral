@@ -609,6 +609,12 @@ func (s *Server) registerSystem(r *chi.Mux, h *routeHandlers) {
 	r.Get("/api/system/status", sysHandler.Status)
 	tracking.OnDashboardLoaded(sysHandler.FunnelOnDashboardLoaded) // the funnel's first-load steps (#7455), from the server's own state
 	trackHandler := routes.NewTrackingHandler(s.cfg.CoralDir())
+	trackHandler.SetInboxCounts(func(r *http.Request) map[string]int { // the Inbox's waiting counts (#7512), read when it is opened; the board handler is set by registerBoard
+		if s.boardHandler == nil {
+			return nil
+		}
+		return s.boardHandler.InboxOpenedCounts(r)
+	})
 	r.Post("/api/tracking/event", trackHandler.TrackEvent)
 	r.Get("/api/system/telemetry", trackHandler.TelemetryDisclosure)
 	r.Post("/api/system/telemetry/acknowledge", trackHandler.AcknowledgeTelemetryDisclosure)

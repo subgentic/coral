@@ -13,6 +13,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/subgentic/coral/internal/board"
+	"github.com/subgentic/coral/internal/tracking"
 )
 
 // The Operator's decision on an artifact a team tagged "for review" (#136584, #136588): Approve takes it out of Needs you and tells the agent that uploaded it; Request changes keeps it in Needs you and
@@ -142,6 +143,7 @@ func (h *BoardHandler) ReviewArtifact(w http.ResponseWriter, r *http.Request) {
 		errInternalServer(w, "could not record the review")
 		return
 	}
+	inboxActioned(r, tracking.InboxReview, "", body.Decision, inboxTime(item.CreatedAt)) // the Inbox's numbers (#7512): a person's own decision, by kind and action only
 	reviews, _ := h.bs.ArtifactReviews(r.Context(), project)
 	out := map[string]any{"id": id, "state": state, "changed": change.Changed, "tags": tags, "review": reviews[id], "delivered": false}
 	if (state != board.ReviewApproved && state != board.ReviewDenied) || !change.Changed {
@@ -228,6 +230,9 @@ func (h *BoardHandler) ignoreArtifact(w http.ResponseWriter, r *http.Request, pr
 		errInternalServer(w, "could not record that")
 		return
 	}
+	if ignore {
+		inboxActioned(r, tracking.InboxReview, "", "ignore", inboxTime(item.CreatedAt))
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"id": id, "changed": change.Changed, "tags": tags, "delivered": false})
 }
 
@@ -248,6 +253,11 @@ func (h *BoardHandler) saveArtifact(w http.ResponseWriter, r *http.Request, proj
 		errInternalServer(w, "could not record that")
 		return
 	}
+	action := "unsave"
+	if save {
+		action = "save"
+	}
+	inboxActioned(r, tracking.InboxReview, "", action, inboxTime(item.CreatedAt))
 	writeJSON(w, http.StatusOK, map[string]any{"id": id, "changed": change.Changed, "tags": tags, "delivered": false})
 }
 
