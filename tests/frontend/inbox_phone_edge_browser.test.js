@@ -49,6 +49,16 @@ const BASE = require('./test_base').BASE;
                 if(folder==='needs'||(inset===34))await shot(`${folder}-${theme}-${font}-${inset}`);
             }
         }
+        // The import offer also fits a narrow phone and long translated words.
+        await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.selectInboxTab('chats')).then(()=>true)`);
+        await waitFor(`document.querySelector('#group-table-view .chat-import-line button')`,'narrow translated import offer');
+        await Emulation.setDeviceMetricsOverride({width:320,height:844,deviceScaleFactor:1,mobile:true});
+        for(const width of [272,224]){
+            await ev(`(()=>{document.documentElement.style.fontSize='32px';const row=document.querySelector('#group-table-view .chat-import-line');row.parentElement.style.maxWidth='${width}px';row.querySelector('button').textContent='FrühereUnterhaltungsverläufeAusAllenArbeitsbereichenImportieren'.repeat(4);return true;})()`);await ev(framesJs(6));
+            const p=await ev(`(()=>{const page=document.getElementById('group-table-view'),row=page.querySelector('.chat-import-line'),b=row.querySelector('button'),r=b.getBoundingClientRect(),q=row.getBoundingClientRect();return {width:innerWidth,row:q.width,host:row.parentElement.getBoundingClientRect().width,hostRight:row.parentElement.getBoundingClientRect().right,button:r.width,left:r.left,right:r.right,height:r.height,clipped:b.scrollWidth>b.clientWidth+1||b.scrollHeight>b.clientHeight+1,pageScroll:page.scrollWidth,pageClient:page.clientWidth};})()`);
+            assert.ok(p.left>=0&&p.right<=p.hostRight+1&&p.row<=p.host+1&&p.height>=44&&!p.clipped&&p.pageScroll<=p.pageClient+1,'translated import offer fits '+width+'px container: '+JSON.stringify(p));
+            await shot('translated-import-'+width);
+        }
         await Emulation.setSafeAreaInsetsOverride({insets:{top:0,bottom:0,left:0,right:0}});
         await Emulation.setDeviceMetricsOverride({width:1280,height:800,deviceScaleFactor:1,mobile:false});
         await Emulation.setTouchEmulationEnabled({enabled:false});
