@@ -156,7 +156,7 @@ function serversTable(local, remotes) {
     const rows = [local, ...remotes];
     const live = s => (isLocal(s) ? { id: 'local', status: 'online' } : liveOf(s));
     return buildServersTable(DT, {
-        label: 'Registered computers', state: _dt, rows, oneLine: true, rowKey: s => (isLocal(s) ? 'local' : s.id), rowName: s => s.label || s.id,
+        label: 'Registered computers', state: _dt, rows, oneLine: true, resize: true, rowKey: s => (isLocal(s) ? 'local' : s.id), rowName: s => s.label || s.id,
         columns: [ // one line a row (Goal #79, UI/UX's order #9679): Server, Tags, Status, Agents, Needs you, Last seen, Version; a narrow list drops Version, then Tags and Last seen, then Agents (dropAt, #8931); Needs you and the name's warning never go; under 16 rem (a phone at 200% text) Status leaves and its dot moves before the name
             { key: 'server', label: 'Computer', primary: true, width: 'grow', sort: true, sortValue: s => (s.label || s.id || '').toLowerCase(), cell: s => serverCell(s, live(s)), title: s => s.label || s.id },
             { key: 'tags', label: 'Tags', width: '11rem', dropAt: 36, cell: tagsCell },
