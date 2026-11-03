@@ -91,7 +91,7 @@ func TestDataFolderNamesAreOnlyPlainRelativeFolders(t *testing.T) {
 			t.Errorf("%q should be allowed", ok)
 		}
 	}
-	for _, bad := range []string{"", "@keep", "..", "../x", "a/../b", "a..b", "my..coral/data", "x/y..", "/etc", "~/x", "a b", "a;b", "a/", "-x", ".", "./x", "a//b", "$HOME", "a\nb", "a/b/c/d/e/f", ".ssh", ".ssh/coral", ".gnupg", ".config/x"} {
+	for _, bad := range []string{"", "@keep", "..", "../x", "a/../b", "a..b", "my..coral/data", "x/y..", "a.", "x/y.", "/etc", "~/x", "a b", "a;b", "a/", "-x", ".", "./x", "a//b", "$HOME", "a\nb", "a/b/c/d/e/f", ".ssh", ".ssh/coral", ".gnupg", ".config/x"} {
 		if ValidDataDir(bad) {
 			t.Errorf("%q should be refused", bad)
 		}
@@ -151,5 +151,17 @@ func TestEveryAcceptedDataFolderReadsBackAsItself(t *testing.T) {
 		if string(out) != d {
 			t.Errorf("%q reads back as %q", d, out)
 		}
+	}
+}
+
+// The argument pattern itself refuses two dots, so the remote command never gets one (the validator is not the only guard).
+func TestTheRemoteArgumentPatternRefusesTwoDots(t *testing.T) {
+	for _, bad := range []string{"a..b", "my..coral/data", "x/y..", "a."} {
+		if _, err := remoteText(CmdStartDaemon, "2.0.10", "pty", bad); err == nil {
+			t.Errorf("%q reached the remote command", bad)
+		}
+	}
+	if _, err := remoteText(CmdStartDaemon, "2.0.10", "pty", ".coral"); err != nil {
+		t.Error(err)
 	}
 }
