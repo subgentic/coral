@@ -258,28 +258,36 @@ func TestAWakeClickDoesNotCloseTheQuestionWhileAnotherWakeButtonWaits(t *testing
 // #12785: the Operator's bug: opening a question's document removed the question. An open button is reusable, and a stale page's settle=done for one leaves the question open and answerable.
 func TestAnOpenButtonIsReusableAndItsSettleNeverClosesTheQuestion(t *testing.T) {
 	c := newClickRig(t)
-	for _, spec := range []string{"New agent=open:new-agent"} {
-		ask, ids := c.ask(spec, "Yes=reply")
-		for i := 0; i < 3; i++ {
-			code, out := c.call(true, ask, ids[0], "claim", `{}`)
-			require.Equal(t, http.StatusOK, code, "click %d: %v", i, out)
-			assert.Equal(t, "open:new-agent", out["action"])
-			code, out = c.call(true, ask, ids[0], "settle", `{"outcome":"done"}`)
-			require.Equal(t, http.StatusOK, code, out)
-			assert.NotEqual(t, true, out["closed"], "a stale client's done")
-			code, _ = c.call(true, ask, ids[0], "settle", `{"outcome":"failed"}`)
-			assert.Equal(t, http.StatusOK, code)
+	digest := strings.Repeat("a", 64)
+	completeWithArtifacts(t, c.h, "clk", "Design document", []board.TaskArtifact{{Name: "design.md", URI: "coral://artifacts/" + digest}})
+	for _, tc := range []struct{ spec, action string }{
+		{"New agent=open:new-agent", board.ActionOpenNewAgent},
+		{"Open document=open:artifact:" + digest, board.ActionOpenArtifact},
+	} {
+		t.Run(tc.action, func(t *testing.T) {
+			ask, ids := c.ask(tc.spec, "Yes=reply")
+			for i := 0; i < 3; i++ {
+				code, out := c.call(true, ask, ids[0], "claim", `{}`)
+				require.Equal(t, http.StatusOK, code, "click %d: %v", i, out)
+				assert.Equal(t, tc.action, out["action"])
+				code, out = c.call(true, ask, ids[0], "settle", `{"outcome":"done"}`)
+				require.Equal(t, http.StatusOK, code, out)
+				assert.NotEqual(t, true, out["closed"], "a stale client's done")
+				code, _ = c.call(true, ask, ids[0], "settle", `{"outcome":"failed"}`)
+				assert.Equal(t, http.StatusOK, code)
+				closed, _ := c.bs.AskIsClosed(context.Background(), "clk", ask)
+				require.False(t, closed, "the question is still open after open click %d", i)
+			}
+			code, out := c.call(true, ask, ids[1], "claim", `{}`)
+			assert.Equal(t, http.StatusOK, code, "the reply is not blocked by the opens: %v", out)
 			closed, _ := c.bs.AskIsClosed(context.Background(), "clk", ask)
-			require.False(t, closed, "the question is still open after open click %d", i)
-		}
-		code, out := c.call(true, ask, ids[1], "claim", `{}`)
-		assert.Equal(t, http.StatusOK, code, "the reply is not blocked by the opens: %v", out)
-		closed, _ := c.bs.AskIsClosed(context.Background(), "clk", ask)
-		assert.True(t, closed, "the reply closes it as before")
-		code, out = c.call(true, ask, ids[0], "claim", `{}`)
-		assert.Equal(t, http.StatusConflict, code)
-		assert.Equal(t, "ask_closed", out["code"])
+			assert.True(t, closed, "the reply closes it as before")
+			code, out = c.call(true, ask, ids[0], "claim", `{}`)
+			assert.Equal(t, http.StatusConflict, code)
+			assert.Equal(t, "ask_closed", out["code"])
+		})
 	}
+
 }
 
 func TestAWakeSettleClosesTheQuestionEvenWithOpenButtonsLeft(t *testing.T) {

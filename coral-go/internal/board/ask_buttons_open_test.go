@@ -2,6 +2,7 @@ package board
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -154,27 +155,32 @@ func TestOpeningABoardResolvesTheButtonsOfAnsweredQuestions(t *testing.T) {
 
 // #12785: an open button (document, task, new agent) is reusable: never marked used, never blocks a reply or wake, never blocks another open; only a closed question refuses it.
 func TestAnOpenButtonIsNeverClaimedAndBlocksNothing(t *testing.T) {
-	s, ctx := operatorBoard(t)
-	q := buttonAsk(t, s, ctx, time.Now(), "Doc=open:task:12", "New=open:new-agent", "Yes=reply")
-	got, err := s.AskButtonsOf(ctx, "alpha", []int64{q.ID})
-	require.NoError(t, err)
-	b := got[q.ID]
-	for i := 0; i < 3; i++ {
-		for _, j := range []int{0, 1} {
-			_, err = s.ClaimAskButton(ctx, "alpha", q.ID, b[j].ID, time.Now())
-			require.NoError(t, err, "open button %d, click %d", j, i)
-		}
+	for _, spec := range []string{"Task=open:task:12", "Open document=open:artifact:" + strings.Repeat("a", 64)} {
+		t.Run(spec, func(t *testing.T) {
+			s, ctx := operatorBoard(t)
+			q := buttonAsk(t, s, ctx, time.Now(), spec, "New=open:new-agent", "Yes=reply")
+			got, err := s.AskButtonsOf(ctx, "alpha", []int64{q.ID})
+			require.NoError(t, err)
+			b := got[q.ID]
+			for i := 0; i < 3; i++ {
+				for _, j := range []int{0, 1} {
+					_, err = s.ClaimAskButton(ctx, "alpha", q.ID, b[j].ID, time.Now())
+					require.NoError(t, err, "open button %d, click %d", j, i)
+				}
+			}
+			after, err := s.AskButtonsOf(ctx, "alpha", []int64{q.ID})
+			require.NoError(t, err)
+			for _, x := range after[q.ID] {
+				assert.Equal(t, ButtonPending, x.State, "%s stays pending", x.Action)
+			}
+			_, err = s.ClaimAskButton(ctx, "alpha", q.ID, b[2].ID, time.Now())
+			assert.NoError(t, err, "the reply is not blocked by the opens")
+			_, err = s.ClaimAskButton(ctx, "alpha", q.ID, b[0].ID, time.Now())
+			assert.NoError(t, err, "an open is usable even after the reply was claimed")
+			require.NoError(t, s.CloseAsk(ctx, "alpha", q.ID, "Operator", "answered"))
+			_, err = s.ClaimAskButton(ctx, "alpha", q.ID, b[0].ID, time.Now())
+			assert.ErrorIs(t, err, ErrAskClosed)
+
+		})
 	}
-	after, err := s.AskButtonsOf(ctx, "alpha", []int64{q.ID})
-	require.NoError(t, err)
-	for _, x := range after[q.ID] {
-		assert.Equal(t, ButtonPending, x.State, "%s stays pending", x.Action)
-	}
-	_, err = s.ClaimAskButton(ctx, "alpha", q.ID, b[2].ID, time.Now())
-	assert.NoError(t, err, "the reply is not blocked by the opens")
-	_, err = s.ClaimAskButton(ctx, "alpha", q.ID, b[0].ID, time.Now())
-	assert.NoError(t, err, "an open is usable even after the reply was claimed")
-	require.NoError(t, s.CloseAsk(ctx, "alpha", q.ID, "Operator", "answered"))
-	_, err = s.ClaimAskButton(ctx, "alpha", q.ID, b[0].ID, time.Now())
-	assert.ErrorIs(t, err, ErrAskClosed)
 }
