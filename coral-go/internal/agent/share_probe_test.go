@@ -119,3 +119,29 @@ func TestALateAnswerIsThrownAway(t *testing.T) {
 	assert.True(t, shareAnswers(dir), "after the mark, a fresh probe")
 	assert.Equal(t, int32(2), f.calls.Load())
 }
+
+// QA's INFO on #12891: a probe that panics is recovered (safego), but it must also leave its place: the answer is "no" at once (not the full limit), the in-flight probe is cleared, and the next call starts a fresh one.
+func TestAProbeThatPanicsLeavesNoStuckProbeBehind(t *testing.T) {
+	dir := t.TempDir()
+	f := useShareFake(t, dir, nil)
+	var calls atomic.Int32
+	shareStat = func(p string) (os.FileInfo, error) {
+		if calls.Add(1) == 1 {
+			panic("boom")
+		}
+		f.calls.Add(1)
+		return os.Stat(p)
+	}
+	prevLimit := shareProbeLimit
+	shareProbeLimit = 5 * time.Second // a probe that did not clean up would hold the caller for this long
+	t.Cleanup(func() { shareProbeLimit = prevLimit })
+	begin := time.Now()
+	assert.False(t, shareAnswers(dir), "a probe that died answers no")
+	assert.Less(t, time.Since(begin), 2*time.Second, "at once, not after the limit")
+	shareMu.Lock()
+	stuck := shareFolders[dir].inflight
+	shareMu.Unlock()
+	assert.Nil(t, stuck, "the in-flight probe is cleared")
+	assert.True(t, shareAnswers(dir), "the next call starts a fresh probe, which answers")
+	assert.EqualValues(t, 2, calls.Load())
+}
