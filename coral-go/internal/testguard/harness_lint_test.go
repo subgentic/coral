@@ -46,6 +46,7 @@ var (
 // The key is the path relative to the repo root; the value is the reason (shown if the entry is stale).
 var allowlistReasons = map[string]string{
 	"tests/frontend/installed_tray_guard.test.mjs":   "feeds the installed-Coral guard's functions made-up process lists (#5293, #234); it starts no server and no agent, so there is nothing to sandbox",
+	"tests/frontend/server_ssh_setup.test.mjs":       "a page-text test: it only holds a made-up start command (an HTML-injection fixture, line 268) as a string to show on the server-setup page; it spawns no process, starts no server and no agent (#13028: the lint could not read it before, behind the node_modules link)",
 	"tests/release/operator_cli_smoke.sh":            "an env -i smoke of the CLI with no agents; the stub PATH and isolated HOME would defeat its clean-environment purpose",
 	"tests/release/smoke_linux.sh":                   "runs the release tarball's server in an env -i with only system dirs on PATH and cli_path_claude set to the stand-in CLI (smoke_macos/standin_cli.py) before any launch; no real agent CLI can start, and the sandbox's stub PATH would defeat the point of testing the shipped binaries",
 	"tests/release/update_rehearsal.sh":              "starts the real server of a release it built in an env -i with only system dirs on PATH, an isolated HOME and data folder, and launches no agent at all (it only posts a board message), so no agent CLI can start; a stub PATH would defeat running the programs a release ships",
@@ -74,21 +75,28 @@ func launchesCoralServer(content string) bool {
 	return false
 }
 
-func TestHarnessScriptsUseTheMockAgentSandbox(t *testing.T) {
-	root := repoRootForLint(t)
-	var offenders []string
-	seenAllowed := map[string]bool{}
+// scanHarnessScripts walks tests/ and tools/ under root and returns the scripts that start the coral server without the sandbox and are not allowlisted, and the allowlisted ones it saw. A node_modules folder is
+// skipped whole, but ONLY when it is a folder: in a worktree tests/frontend/node_modules is a symlink (a link is not a directory to WalkDir), and returning SkipDir for it skips the rest of the folder it sits in,
+// which let this lint pass without reading the other scripts there (#13028).
+func scanHarnessScripts(t *testing.T, root string) (offenders []string, seenAllowed map[string]bool) {
+	seenAllowed = map[string]bool{}
 	for _, sub := range []string{"tests", "tools"} {
 		base := filepath.Join(root, sub)
 		if _, err := os.Stat(base); err != nil {
 			continue
 		}
 		err := filepath.WalkDir(base, func(p string, d os.DirEntry, err error) error {
-			if err != nil || d.IsDir() {
+			if err != nil {
 				return nil
 			}
 			if d.Name() == "node_modules" {
-				return filepath.SkipDir
+				if d.IsDir() {
+					return filepath.SkipDir
+				}
+				return nil // a link to it (or a file of that name): skip only this entry, and keep walking the folder
+			}
+			if d.IsDir() {
+				return nil
 			}
 			switch filepath.Ext(p) {
 			case ".sh", ".mjs":
@@ -117,6 +125,12 @@ func TestHarnessScriptsUseTheMockAgentSandbox(t *testing.T) {
 			t.Fatalf("walking %s: %v", base, err)
 		}
 	}
+	return offenders, seenAllowed
+}
+
+func TestHarnessScriptsUseTheMockAgentSandbox(t *testing.T) {
+	root := repoRootForLint(t)
+	offenders, seenAllowed := scanHarnessScripts(t, root)
 	sort.Strings(offenders)
 	if len(offenders) > 0 {
 		t.Fatalf("these scripts start a test Coral server but do not use the #4354 sandbox and are not "+
@@ -295,5 +309,36 @@ func repoRootForLint(t *testing.T) string {
 			t.Skip("repo root (with tests/ and coral-go/) not found from " + wd + "; skipping harness lint")
 		}
 		dir = parent
+	}
+}
+
+// #13028: a node_modules symlink in tests/frontend (every worktree has one) must not end the scan of its folder: a bad script that sorts after it is still found; a real node_modules folder is skipped whole.
+func TestTheHarnessLintKeepsWalkingPastANodeModulesLink(t *testing.T) {
+	root := t.TempDir()
+	front := filepath.Join(root, "tests", "frontend")
+	elsewhere := filepath.Join(root, "elsewhere", "node_modules")
+	for _, d := range []string{front, elsewhere, filepath.Join(root, "tests", "other", "node_modules", "pkg")} {
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	bad := "#!/bin/sh\n./coral --port 1234\n"
+	for _, f := range []string{
+		filepath.Join(front, "a_bad.sh"),                                     // sorts before the link
+		filepath.Join(front, "z_bad.sh"),                                     // sorts after it: the one the old walk never read
+		filepath.Join(root, "tests", "other", "node_modules", "pkg", "x.sh"), // inside a real node_modules folder: not read
+	} {
+		if err := os.WriteFile(f, []byte(bad), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Symlink(elsewhere, filepath.Join(front, "node_modules")); err != nil {
+		t.Skipf("no symlinks here: %v", err)
+	}
+	offenders, _ := scanHarnessScripts(t, root)
+	sort.Strings(offenders)
+	want := []string{"tests/frontend/a_bad.sh", "tests/frontend/z_bad.sh"}
+	if strings.Join(offenders, ",") != strings.Join(want, ",") {
+		t.Fatalf("offenders = %v, want %v", offenders, want)
 	}
 }
