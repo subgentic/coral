@@ -207,7 +207,7 @@ func TestAFileLinkedTwiceIsListedOnceInTheTasksAnswer(t *testing.T) {
 
 	bh := NewBoardHandler(l.h.bs)
 	bh.SetTaskArtifactWriter(l.coralDir, nil)
-	bh.taskCounts.entries = map[string]taskCountEntry{"alpha": {at: time.Now(), counts: map[int64]int{}, uploads: map[int64][]teamArtifact{
+	bh.taskCounts.entries = map[string]taskCountEntry{"alpha": {at: time.Now(), gen: artifactGeneration.Load(), counts: map[int64]int{}, uploads: map[int64][]teamArtifact{
 		id: {{ID: hexID, Name: "same-file.md"}, {ID: hexID, Name: "same-file-again.md"}, {ID: strings.Repeat("cd", 32), Name: "other.md"}}}}}
 	prev := taskCountTTL
 	taskCountTTL = time.Minute
