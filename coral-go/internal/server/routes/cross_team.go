@@ -163,6 +163,10 @@ const boardSettingsHubMax = 16 << 10
 // change them, so an agent cannot open its own board to other teams.
 // PUT /api/board/{project}/settings {"subscriber_id": "Operator", "cross_team_messaging": true}
 func (h *BoardHandler) UpdateBoardSettings(w http.ResponseWriter, r *http.Request) {
+	if h.bs.StaysDeleted(r.Context(), urlParam(r, "project")) { // a save from a page left open elsewhere must not start a deleted board again (#12995)
+		writeError(w, http.StatusNotFound, "board_deleted", "this board was deleted")
+		return
+	}
 	var body struct {
 		SubscriberID string `json:"subscriber_id"`
 		board.BoardSettingsUpdate

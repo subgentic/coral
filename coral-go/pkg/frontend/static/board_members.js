@@ -34,11 +34,12 @@ export async function subscribeDashboard(project) {
             const access = await (await importOnce('./server_access.js')).serverAccess(splitKey(project).server);
             if (!access?.mayInteract) return;
         }
-        await boardFetch(project, `/subscribe`, {
+        const r = await boardFetch(project, `/subscribe`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ subscriber_id: OPERATOR_ID, job_title: 'Operator' }),
         });
+        if (r.status === 404) return 'gone'; // the team was deleted elsewhere while this page was open (#12995): the server will not start it again; the page stops polling and says so
     } catch (e) {
         // Best effort
     }

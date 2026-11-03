@@ -33,6 +33,7 @@ type Store struct {
 	completionCheckRunner   CompletionCheckRunner
 	completionChecksEnabled bool
 	unreadCounts            unreadCountCache
+	deleted                 deletedBoards // boards deleted since the server started (#12995)
 	numbered                numberedCache // each board's numbered agent names (#4598)
 	readSets                readSetCache  // each member's read set between the dock's polls (#8525)
 	noMentionIndex          bool          // tests: read as before the mention index (#4465)

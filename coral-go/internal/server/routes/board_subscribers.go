@@ -83,6 +83,11 @@ func (h *BoardHandler) Subscribe(w http.ResponseWriter, r *http.Request) {
 		errBadRequest(w, "subscriber_id required")
 		return
 	}
+	// The Operator's page polls its board; one deleted elsewhere is not started again by that (#12995). An agent's join is explicit and does start it.
+	if board.IsOperatorName(subscriberID) && h.bs.StaysDeleted(r.Context(), project) {
+		writeError(w, http.StatusNotFound, "board_deleted", "this board was deleted")
+		return
+	}
 	// A name that starts or ends with punctuation ("Security Reviewer 2:") cannot be written after an @ and reaches a shorter member instead: refused at the join (#11687).
 	for _, n := range []string{subscriberID, body.JobTitle} {
 		if board.ValidMemberName(n) != nil {
@@ -111,6 +116,9 @@ func (h *BoardHandler) Subscribe(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		errInternalServer(w, err.Error())
 		return
+	}
+	if !board.IsOperatorName(subscriberID) {
+		h.bs.ClearBoardDeleted(project)
 	}
 	writeJSON(w, http.StatusOK, sub)
 }
