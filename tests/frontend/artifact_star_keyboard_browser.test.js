@@ -19,7 +19,7 @@ const WORLD = `(() => {
         { n: 4, name: 'alpha-chart.png', mt: 'image/png', board: 'alpha', m: 60, task: 8, title: 'Draw the chart' },
         { n: 5, name: 'alpha-plan.md', mt: 'text/markdown', board: 'alpha', m: 90, task: 6, title: 'Plan the work' },
     ].map(a => ({ id: String(a.n).padStart(64, '0'), name: a.name, media_type: a.mt, size: 1000 * a.n, created_at: at(a.m), task_id: a.task, task_title: a.title, source: 'task', uri: 'coral://artifacts/' + String(a.n).padStart(64, '0'),
-        available: true, inline: false, reference_count: 1, board_id: a.board, team: a.board, starred: a.n === 2 }));
+        available: true, inline: false, reference_count: 1, board_id: a.board, team: a.board, starred: a.n === 2, ...(a.n === 2 ? { uploader: 'qa-agent', role: 'QA Engineer' } : {}) }));
     const json = (b, status = 200) => Promise.resolve(new Response(JSON.stringify(b), { status, headers: { 'content-type': 'application/json' } }));
     window.fetch = (u, o = {}) => {
         const url = new URL(String(u), location.origin), p = url.pathname, m = (o.method || 'GET').toUpperCase();
@@ -61,6 +61,9 @@ const WORLD = `(() => {
             await waitFor(`document.getElementById('group-table-view').dataset.group === 'hub-inbox:artifacts' && document.querySelectorAll('#group-table-view tbody tr').length === 5`, `${label}: five rows`, 10000);
             await new Promise(r => setTimeout(r, 400)); // sleep-ok: the table settles
             const rows = await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].map((r, i) => ({ i, text: r.textContent.replace(/\s+/g, ' ').trim().slice(0, 60), btn: !!r.querySelector('button.dt-star'), glyph: !!r.querySelector('.dt-mail-star, .dt-star-on'), name: [...r.querySelectorAll('[aria-label]')].map(e => e.getAttribute('aria-label')).filter(n => !/star/i.test(n) || /, starred/.test(n)).slice(0, 2) }))`);
+            const names = await ev(`[...document.querySelectorAll('#group-table-view tbody [aria-label]')].map(e=>e.getAttribute('aria-label'))`);
+            check(names.every(n=>!n.includes('Uploaded by not recorded')), 'missing uploader adds no empty attribution to the accessible name');
+            check(names.some(n=>n.includes('alpha-report.md')&&n.includes('Uploaded by QA Engineer')), 'the recorded uploader remains in the accessible name');
             if (!mobile) {
                 // an unstarred row (beta-notes.txt, the first): Tab reaches its star, which is drawn when it has the keyboard
                 const star = `#group-table-view tbody tr:nth-child(1) button.dt-star`;
