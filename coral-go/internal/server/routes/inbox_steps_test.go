@@ -4,8 +4,14 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"github.com/go-chi/chi/v5"
+	"github.com/subgentic/coral/internal/config"
+	"github.com/subgentic/coral/internal/store"
+	"github.com/subgentic/coral/internal/store/storetest"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -88,4 +94,50 @@ func TestInboxOpenedTakesTheServersCountsAndAPersonsOpeningOnly(t *testing.T) {
 	}
 	assert.Equal(t, map[string]any{tracking.InboxAgentWait: "1-2", tracking.InboxReview: "3-5"}, kinds)
 	assert.False(t, strings.Contains(sink.allRaw(), "secret-"), "the page's properties never reach the sink")
+}
+
+// D3 through a real route that any caller may use (marking a failed run seen): the route answers an agent's tool and a script as it answers a
+// person, and only the person's call sends inbox_item_actioned. So the guard in inboxActioned decides, not the route's own checks.
+func TestOnlyAPersonsActionSendsAnInboxEventEvenWhereTheRouteAnswersEveryone(t *testing.T) {
+	sink := captureAnalytics(t)
+	cfg := config.Load(t.TempDir())
+	db, err := storetest.Open(t, filepath.Join(t.TempDir(), "test.db"))
+	require.NoError(t, err)
+	t.Cleanup(func() { db.Close() })
+	sh := NewScheduleHandler(db, cfg)
+	ctx := context.Background()
+	job, err := sh.sched.CreateScheduledJob(ctx, &store.ScheduledJob{Name: "secret-job-name", CronExpr: "* * * * *", RepoPath: "/tmp/secret-repo", Prompt: "secret prompt", Enabled: 1})
+	require.NoError(t, err)
+	run, err := sh.sched.CreateScheduledRun(ctx, job.ID, "2026-10-27T00:00:00Z", "failed")
+	require.NoError(t, err)
+	path := "/api/scheduled/runs/" + strconv.FormatInt(run, 10) + "/seen"
+	r := chi.NewRouter()
+	r.Post("/api/scheduled/runs/{runID}/seen", sh.MarkRunSeen)
+	seen := func(prep func(*http.Request) *http.Request) int {
+		req := httptest.NewRequest(http.MethodPost, path, nil)
+		req.Header.Set("X-Coral-Surface", "inbox")
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, prep(req))
+		return rec.Code
+	}
+
+	// An agent's tool (its session token) and a script (no caller the identity layer knows): the route answers both, and nothing is sent.
+	assert.Equal(t, http.StatusOK, seen(func(req *http.Request) *http.Request {
+		req.Header.Set(store.SessionTokenHeader, "an-agent-token")
+		return req
+	}))
+	assert.Equal(t, http.StatusOK, seen(func(req *http.Request) *http.Request { return req }))
+	sink.none(t, tracking.EventInboxItemActioned)
+
+	// The person: one event, kind and action only.
+	assert.Equal(t, http.StatusOK, seen(func(req *http.Request) *http.Request {
+		return req.WithContext(context.WithValue(req.Context(), callerKindKey{}, callerDashCookie))
+	}))
+	got := sink.wait(t, tracking.EventInboxItemActioned, 1)
+	assert.Equal(t, tracking.InboxRun, got[0]["kind"])
+	assert.Equal(t, "seen", got[0]["action"])
+	assert.Equal(t, "inbox", got[0]["surface"])
+	for _, seeded := range []string{"secret-job-name", "secret-repo", "secret prompt"} {
+		assert.NotContains(t, sink.allRaw(), seeded)
+	}
 }
