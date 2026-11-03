@@ -17,6 +17,8 @@ const { coralReady, framesJs } = require('./helpers/wait');
                 await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
                 await Page.navigate({ url: BASE + route }); await Page.loadEventFired(); await install();
                 await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
+                // The Inbox list is lazy and has its own readiness part; agent startup does not draw it.
+                if (route === '/inbox/needs') await coralReady(ev, 'startup', 'inboxListDrawn');
                 await ev(`for (const n of ['Ada', 'Bo', 'Cy']) window.__m.add(n, 'A', 2, { sleeping: false, session_id: n + '-id', board_project: 'team-a' }); true`);
                 await waitFor(`(window.__qaState.liveSessions || []).length >= 3`, 'the agents', 10000);
                 await ev(`(async () => { const s = await import((window.__coralStatic || '/static/') + 'state.js'), r = await import((window.__coralStatic || '/static/') + 'render.js'); r.renderLiveSessions(s.state.liveSessions); return true; })()`);
