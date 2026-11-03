@@ -140,7 +140,7 @@ func main() {
 		go func() {
 			defer safego.Recover("launch-coral/main:119")
 			time.Sleep(time.Second)
-			executil.OpenBrowser(loginlink.Or(fmt.Sprintf("http://localhost:%d", cfg.Port), mintLink))
+			executil.OpenLogin(loginlink.Or(fmt.Sprintf("http://localhost:%d", cfg.Port), mintLink))
 		}()
 	}
 

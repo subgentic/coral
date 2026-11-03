@@ -384,7 +384,7 @@ func runForeground(host string, port int, noBrowser, debugMode bool, backendType
 	// (a reopen event on macOS, SIGUSR1 from a second start), and not at all for a start nobody asked for: a login item, the relaunch after an update (--no-browser) (#5827).
 	showWindow := func() {
 		if err := launchCoralApp(url, mintLink); err != nil {
-			executil.OpenBrowser(loginlink.Or(url, mintLink))
+			executil.OpenLogin(loginlink.Or(url, mintLink))
 		}
 	}
 	onShowWindowSignal(func() {
@@ -489,11 +489,11 @@ func runForeground(host string, port int, noBrowser, debugMode bool, backendType
 				case <-mOpenApp.ClickedCh:
 					go func() { defer safego.Recover("coral-tray/main:launchCoralApp"); launchCoralApp(url, mintLink) }()
 				case <-mOpenBrowser.ClickedCh:
-					executil.OpenBrowser(loginlink.Or(url, mintLink))
+					executil.OpenLogin(loginlink.Or(url, mintLink))
 				case <-mUpdateAvail.ClickedCh:
 					go func() {
 						defer safego.Recover("coral-tray/main:updateItemOpen")
-						upd.open(func() { executil.OpenBrowser(loginlink.OnPage(loginlink.Or(url, mintLink), updatesPaneLink)) }, executil.OpenBrowser, trackTrayOffer)
+						upd.open(func() { executil.OpenLogin(loginlink.OnPage(loginlink.Or(url, mintLink), updatesPaneLink)) }, executil.OpenBrowser, trackTrayOffer)
 					}()
 				case <-mSetupCode.ClickedCh:
 					go func() { defer safego.Recover("coral-tray/main:setupCodeClick"); setup.click(url, dataDir) }()

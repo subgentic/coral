@@ -60,6 +60,11 @@ export async function showSettingsModal(group) {
     fetch('/api/system/status').then(r => r.json()).then(d => {
         const el = document.getElementById('app-version-label');
         if (el && d.version) el.textContent = 'Version ' + d.version;
+        const peer = document.getElementById('peer-check-line'); // one line when this computer does not let Coral tell which account opens a sign-in link (#12546)
+        if (peer && d.peer_check_unavailable) {
+            peer.hidden = false;
+            requestAnimationFrame(() => { peer.textContent = 'This computer does not let Coral check which account opens a sign-in link, so a link works for whoever opens it (once, for ten minutes). Open it yourself.'; }); // shown first, filled a frame later: a screen reader says it
+        } else if (peer) { peer.hidden = true; peer.textContent = ''; }
     }).catch(() => {});
 
     if (isCloud()) applyCloudSettingsDialog();

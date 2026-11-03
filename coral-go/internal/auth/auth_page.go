@@ -44,8 +44,10 @@ type PageState struct {
 	Strict      bool
 	Locked      bool
 	SignedOut   bool // this browser's session was ended by another browser's "Sign out other browsers" (#10431)
-	HubSignin   string
-	HubURL      string
+	// PeerUnavailable says Coral cannot tell which account on this computer opens a sign-in link (the peer check is lost, #12529): one line says so and what the link's limits are (#12546).
+	PeerUnavailable bool
+	HubSignin       string
+	HubURL          string
 }
 
 // AuthPage renders the page for a state. The markup is fixed and has no user data; the behaviour lives in
@@ -154,7 +156,8 @@ var authPageTmpl = template.Must(template.New("auth").Parse(`{{define "hubwarn"}
   <div class="brand"><img src="/static/icon-192.png" alt="" width="44" height="44">Coral</div>
   <div id="live" class="panel" role="status" aria-live="polite"></div>
   <div id="hub-flash" class="err" role="alert" hidden></div>
-{{if .PasswordSet}}
+{{if .PeerUnavailable}}  <p class="note" id="peer-unavailable" role="status"><b>This computer does not let Coral check which account opens a sign-in link.</b> A link works for whoever opens it, once and for ten minutes: open it yourself, and do not leave it where others can read it.</p>
+{{end}}{{if .PasswordSet}}
   <section id="panel-signin" class="panel">
     <h1>Sign in</h1>
     <p class="sub">Enter the password you made for Coral on this computer.</p>

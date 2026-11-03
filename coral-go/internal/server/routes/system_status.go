@@ -121,6 +121,8 @@ func (h *SystemHandler) Status(w http.ResponseWriter, r *http.Request) {
 		// A data folder other people on this computer can read (Windows; #3637): shown on the
 		// dashboard's first page, not only in the log. "" when there is nothing to say.
 		"security_warning": securityWarning(dataDirWarning(h.cfg.CoralDir()), auth.PeerCheckWarning()),
+		// Coral cannot tell which account opens a sign-in link (#12529): Settings says so in one line beside the version (#12546).
+		"peer_check_unavailable": auth.PeerCheckLost(),
 		// A Windows Firewall rule for Coral's programs that allows more than it needs (Public profile, every port), found by the
 		// read-only startup check (#97): shown as its own warning with the commands that narrow or remove it. "" when none.
 		"firewall_warning": firewall.Warning(),

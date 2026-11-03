@@ -30,7 +30,7 @@ func canOpenBrowser() bool {
 // is none to open (#3387).
 func openDashboard(out io.Writer, link string, browse bool) {
 	if browse && canOpenBrowser() {
-		executil.OpenBrowser(link)
+		executil.OpenLogin(link)
 		return
 	}
 	fmt.Fprintf(out, "  Open the dashboard (sign-in link, single use, 10 minutes):\n  %s\n\n", link)
