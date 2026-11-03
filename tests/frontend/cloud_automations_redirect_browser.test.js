@@ -1,5 +1,5 @@
 // The Hub does not serve Automations (#9711, coral-hub's fact of 00:07Z): on a Hub-served dashboard typing /jobs, /workflows or any /automations/** address lands on Agents, never on the Automations
-// screen (its New job, Build with Agent, New workflow, run controls). The page is the local server's own with the Hub's boot flag and a Hub sign-in answered (as team_presets_hub_browser does it);
+// screen (its New job, Build with agent, New workflow, run controls). The page is the local server's own with the Hub's boot flag and a Hub sign-in answered (as team_presets_hub_browser does it);
 // a local dashboard keeps the screen (the control, in the same run).
 const assert = require('node:assert/strict');
 const { safePaused } = require('./helpers/paused');

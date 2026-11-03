@@ -1,4 +1,4 @@
-// The Automations lists on a phone say what they are (Mobile pass 19, #10267, #10275), at 390 and 320 px: (1) New job, New workflow and Build with Agent are buttons with their words (a "+" and a robot said nothing to a
+// The Automations lists on a phone say what they are (Mobile pass 19, #10267, #10275), at 390 and 320 px: (1) New job, New workflow and Build with agent are buttons with their words (a "+" and a robot said nothing to a
 // person looking at them) and every one is 44 px tall and on the screen; (2) the Jobs list marks a paused job Paused beside its name, which a phone's list needs because its Next column, where the chip is, has gone;
 // (3) a long workflow name wraps at its hyphens and spaces and is not cut mid-word with an ellipsis. At 1280 px the words are there as before and the name's row is one line. A stubbed server. Drives Chrome over CDP
 // through agent_view_harness.js.
@@ -51,7 +51,7 @@ const { coralReady } = require('./helpers/wait');
             await new Promise(r => setTimeout(r, 400)); // sleep-ok: the toolbar draws
             a = await acts();
             if (mobile) { const f = await fabItems(); check(a.length === 0 && f.items.includes('New workflow') && f.items.some(i => /Build a workflow with an agent/.test(i)), `Workflows: the + says New workflow and Build a workflow with an agent (it shows ${JSON.stringify(f.items)}, buttons ${JSON.stringify(a.map(x => x.seen))})`); }
-            else { check(a.length === 2 && a.some(x => /Build with Agent/.test(x.seen)) && a.some(x => /New workflow/.test(x.seen)), `Workflows: Build with Agent and New workflow say their words (they show ${JSON.stringify(a.map(x => x.seen))})`);
+            else { check(a.length === 2 && a.some(x => /Build with agent/.test(x.seen)) && a.some(x => /New workflow/.test(x.seen)), `Workflows: Build with agent and New workflow say their words (they show ${JSON.stringify(a.map(x => x.seen))})`);
             check(a.every(x => x.h >= (mobile ? 44 : 0) && x.l >= 0 && x.r <= w), `Workflows: each create button is 44 px tall and on the screen ${JSON.stringify(a)}`); }
             // (3) a long name wraps at its words (narrow) or fits (wide), never an ellipsis mid-word
             const names = await ev(`[...document.querySelectorAll('#group-table-view button.dt-primary')].map(b => { const cs = getComputedStyle(b); return { t: b.textContent.trim(), cut: b.scrollWidth > b.clientWidth + 1, ellipsis: cs.textOverflow === 'ellipsis' && cs.whiteSpace === 'nowrap', h: Math.round(b.getBoundingClientRect().height) }; })`);

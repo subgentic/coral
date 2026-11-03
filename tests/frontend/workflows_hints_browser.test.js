@@ -1,5 +1,5 @@
 // The Workflows page says how its two ways to make a workflow differ and what starts one (#6988, UI Accessibility's #6962 LOWs): short lines, as text (not a hover title), in the empty page's hint (#7471: the page has no header
-// and no disclosure of its own; once there are workflows the first group's table is the page and the lines are not on screen); the Build with Agent button names its line with aria-describedby. 1280 px, and 390 px at 200% text (nothing overflows sideways). Drives Chrome over CDP
+// and no disclosure of its own; once there are workflows the first group's table is the page and the lines are not on screen); the Build with agent button names its line with aria-describedby. 1280 px, and 390 px at 200% text (nothing overflows sideways). Drives Chrome over CDP
 // through agent_view_harness.js against the isolated dev server.
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
@@ -23,10 +23,10 @@ const S = `(window.__coralStatic || '/static/')`;
             await sleep(300); // sleep-ok: the page lays out
             const r = await ev(`(() => { const hint = (document.querySelector('#group-table-view .empty-state .empty-state-hint') || {}).textContent || ''; const btn = a => [...document.querySelectorAll('#group-table-view .automations-act[data-on-click="' + a + '"]')].filter(e => e.getClientRects().length > 0).length; // the toolbar's buttons: the first-run card "Run steps from a workflow" (#9297) is a second way to New workflow, counted below
                 return { hint, build: btn('wf-build-agent'), create: btn('wf-create'), card: [...document.querySelectorAll('#group-table-view .start-card [data-on-click], #group-table-view button.start-card[data-on-click="wf-create"]')].filter(e => e.getClientRects().length > 0).length, over: document.documentElement.scrollWidth - document.documentElement.clientWidth }; })()`);
-            check(`${tag}: one line says what Build with Agent does and what New workflow does, as visible text`, /Build with Agent starts an agent that builds one with you; New workflow opens an empty form/.test(r.hint), r.hint);
+            check(`${tag}: one line says what Build with agent does and what New workflow does, as visible text`, /Build with agent starts an agent that builds one with you; New workflow opens an empty form/.test(r.hint), r.hint);
             check(`${tag}: and what starts a workflow (pressing Run, a job's schedule, the API)`, /runs when you press Run, when a job schedules it, or through the API/.test(r.hint), r.hint);
             if (/390|320/.test(tag)) { await ev(`document.getElementById('phone-fab').click(); true`); await new Promise(rr => setTimeout(rr, 150)); /* sleep-ok: the menu draws */ const items = await ev(`[...document.querySelectorAll('#phone-fab-menu [role=menuitem]')].map(b => b.textContent.trim())`); await ev(`document.body.click(); true`); check(`${tag}: a phone's + has New workflow and Build a workflow with an agent, the toolbar none`, r.build === 0 && r.create === 0 && items.includes('New workflow') && items.some(i => /Build a workflow with an agent/.test(i)), JSON.stringify({ r, items })); }
-            else check(`${tag}: Build with Agent and New workflow are on the folder's toolbar`, r.build === 1 && r.create === 1, JSON.stringify(r));
+            else check(`${tag}: Build with agent and New workflow are on the folder's toolbar`, r.build === 1 && r.create === 1, JSON.stringify(r));
             check(`${tag}: and the empty page's first-run card is a second way to New workflow (#9297)`, r.card === 1, JSON.stringify(r));
             check(`${tag}: nothing overflows sideways`, r.over <= 1, String(r.over));
             // with workflows the lines are not on the page: the first group's table (a phone: the list) is

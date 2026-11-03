@@ -152,7 +152,7 @@ function workflowFields() {
             key: 'build_hint', type: 'notice',
             render: slot => {
                 slot.id = 'wf-build-hint'; slot.classList.add('wf-build-hint');
-                const b = el('button', 'btn btn-small', 'Build with Agent'); b.type = 'button'; b.setAttribute('data-on-click', 'wf-build-agent-from-form');
+                const b = el('button', 'btn btn-small', 'Build with agent'); b.type = 'button'; b.setAttribute('data-on-click', 'wf-build-agent-from-form');
                 slot.append(el('span', '', 'Not sure what the steps are? An agent can write them with you.'), ' ', b);
             },
         },

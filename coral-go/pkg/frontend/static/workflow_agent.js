@@ -1,10 +1,10 @@
-/* Workflows: Build with Agent and Edit with Agent (moved out of workflows.js, #8360; no behaviour change). */
+/* Workflows: Build with agent and Edit with Agent (moved out of workflows.js, #8360; no behaviour change). */
 
 import { showToast } from './utils.js';
 import { apiFetch, loadLiveSessions } from './api.js';
 import { selectLiveSession } from './sessions.js';
 
-// ── Build with Agent ──────────────────────────────────────────────────
+// ── Build with agent ──────────────────────────────────────────────────
 
 // Workflows are hub-local (definitions, runs and the builder prompt all live on
 // the hub), so these agents always launch on the hub itself, in the hub's coral
@@ -58,7 +58,7 @@ export async function launchWorkflowAgent() {
     } catch (e) {
         showToast('Failed to launch workflow agent', true);
     } finally {
-        if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-icons" style="font-size:var(--fs-xl)" aria-hidden="true">smart_toy</span> Build with Agent'; }
+        if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-icons" style="font-size:var(--fs-xl)" aria-hidden="true">smart_toy</span> Build with agent'; }
     }
 }
 

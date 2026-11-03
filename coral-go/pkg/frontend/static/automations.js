@@ -122,12 +122,12 @@ function newMenu() {
     box.append(toggle, menu);
     return box;
 }
-/** The create actions at the toolbar's right: New job, or New workflow with Build with Agent beside it (the agent that builds a workflow with you). */
+/** The create actions at the toolbar's right: New job, or New workflow with Build with agent beside it (the agent that builds a workflow with you). */
 function createAction(key) {
     if (key === 'jobs') return button('New job', 'job-new');
     if (folderOf(key).attention) return newMenu();
     const box = document.createElement('span'); box.className = 'automations-create';
-    box.append(button('Build with Agent', 'wf-build-agent', 'btn', 'smart_toy'), button('New workflow', 'wf-create'));
+    box.append(button('Build with agent', 'wf-build-agent', 'btn', 'smart_toy'), button('New workflow', 'wf-create'));
     return box;
 }
 function toolbarOf(key) {
@@ -264,7 +264,7 @@ function folderTable(key) {
     if (key === 'recent') return recentTable(rows, narrowed);
     if (f.attention) return attentionTable(key, rows, narrowed);
     const base = { title: f.label, noun: f.noun, rows, status: key === 'jobs' ? _gone : '',
-        empty: { line: narrowed ? `No ${f.noun[0]} matches the search and filters.` : `No ${f.noun[1]} yet.`, hint: narrowed ? '' : key === 'jobs' ? 'New job schedules one.' : 'Build with Agent starts an agent that builds one with you; New workflow opens an empty form. A workflow runs when you press Run, when a job schedules it, or through the API.', ...(narrowed ? {} : firstRun()) } };
+        empty: { line: narrowed ? `No ${f.noun[0]} matches the search and filters.` : `No ${f.noun[1]} yet.`, hint: narrowed ? '' : key === 'jobs' ? 'New job schedules one.' : 'Build with agent starts an agent that builds one with you; New workflow opens an empty form. A workflow runs when you press Run, when a job schedules it, or through the API.', ...(narrowed ? {} : firstRun()) } };
     if (key === 'jobs') {
         return { ...base, signature: JSON.stringify([_gone, !!firstRun().cards, rows.map(i => [i.job, lastWords(i.run), nextOf(i.job), runsWords(i)])]),
             node: () => DT.dataTable({
