@@ -31,3 +31,10 @@
     border: none !important;
     text-decoration: none !important;
 }
+
+/* Text on an added or removed line stands out from its band in both themes (#12523): each syntax colour is lifted (dark) or deepened (light) by a filter, keeping its hue, and the plain text takes a clearer colour. */
+.cm-merge-b .cm-changedLine span,
+.cm-deletedChunk span { filter: var(--diff-token-filter, none); }
+.cm-merge-b .cm-changedLine,
+.cm-deletedChunk { color: var(--diff-line-text, inherit); }
+.cm-merge-b .cm-line:not(.cm-changedLine) span { filter: var(--diff-context-filter, none); } /* the lines around a change: a comment was 3.9:1 on the dark editor */

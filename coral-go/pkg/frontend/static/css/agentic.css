@@ -2000,3 +2000,10 @@ body.panel-dragging .agentic-state {
 .preview-disk-note { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 6px 12px; font-size: var(--fs-sm); color: var(--text-secondary); border-bottom: 1px solid var(--border); }
 .files-legend { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: var(--space-xs) var(--space-md); font-size: var(--fs-sm); color: var(--text-muted); } /* the line also holds Expand all (#11350) */
 .files-where { padding: 6px 12px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-sm); color: var(--text-secondary); } /* where the agent lives: its folder and branch, at the top of Files (#11580) */
+
+/* Text on an added or removed line stands out from its band in both themes (#12523): each syntax colour is lifted (dark) or deepened (light) by a filter, keeping its hue, and the plain text takes a clearer colour. */
+.inline-preview-cm .cm-merge-b .cm-changedLine span,
+.inline-preview-cm .cm-deletedChunk span { filter: var(--diff-token-filter, none); }
+.inline-preview-cm .cm-merge-b .cm-changedLine,
+.inline-preview-cm .cm-deletedChunk { color: var(--diff-line-text, inherit); }
+.inline-preview-cm .cm-merge-b .cm-line:not(.cm-changedLine) span { filter: var(--diff-context-filter, none); } /* the lines around a change: a comment was 3.9:1 on the dark editor */
