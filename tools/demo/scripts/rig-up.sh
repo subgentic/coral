@@ -19,10 +19,10 @@ stop_demo() {
 }
 if [ "$1" = stop ]; then stop_demo; exit 0; fi
 stop_demo
-mkdir -p "$S/work"; rm -rf "$S/data" "$S/home" "$S/repo" "$S/work/claude-projects" "$S/work/envdump" "$S/work/state.json" "$S/work/launch.json"
-mkdir -p "$S/data" "$S/home" "$S/repo" "$S/work/claude-projects" "$S/work/envdump"
+mkdir -p "$S/work"; rm -rf "$S/data" "$S/home" "$S/work/claude-projects" "$S/work/envdump" "$S/work/state.json" "$S/work/launch.json"
+mkdir -p "$S/data" "$S/home" "$REPO" "$S/work/claude-projects" "$S/work/envdump"
 # the throwaway Go package the agents "work on"
-( cd "$S/repo" && git init -q -b main . && printf 'package slug\n\n// Slug lowercases s and joins words with dashes.\nfunc Slug(s string) string { return s }\n' > slug.go \
+( cd "$REPO" && git init -q -b main . && printf 'package slug\n\n// Slug lowercases s and joins words with dashes.\nfunc Slug(s string) string { return s }\n' > slug.go \
   && printf 'module example.com/slug\n\ngo 1.22\n' > go.mod && git add . && git -c user.name=Demo -c user.email=demo@example.invalid commit -qm "Start the slug package" )
 cd "$S/home"
 nohup env -i HOME="$S/home" PATH="$S/bin:/usr/bin:/bin" CORAL_DATA_DIR="$S/data" CORAL_TELEMETRY_DISABLED=1 CORAL_HOOK_DIR="$S/bin" \
@@ -35,7 +35,7 @@ PW=$(python3 -I -c "import secrets;print(secrets.token_hex(8))")   # a random on
 printf '%s\n%s\n' "$PW" "$PW" | "$HERE/denv.sh" coral set-password --stdin --url "http://127.0.0.1:$PORT" --home "$S/data" >/dev/null 2>&1
 if [ -z "$NOLAUNCH" ]; then
   curl -s -m 30 -X POST "http://127.0.0.1:$PORT/api/sessions/launch-team" -H "Authorization: Bearer $KEY" -H 'Content-Type: application/json' \
-    -d "{\"board_name\":\"slug-team\",\"working_dir\":\"$S/repo\",\"agents\":[{\"agent_type\":\"claude\",\"name\":\"Orchestrator\",\"prompt\":\"Sample agent.\"},{\"agent_type\":\"claude\",\"name\":\"Developer\",\"prompt\":\"Sample agent.\"},{\"agent_type\":\"claude\",\"name\":\"Reviewer\",\"prompt\":\"Sample agent.\"}]}" > "$S/work/launch.json"
+    -d "{\"board_name\":\"slug-team\",\"working_dir\":\"$REPO\",\"agents\":[{\"agent_type\":\"claude\",\"name\":\"Orchestrator\",\"prompt\":\"Sample agent.\"},{\"agent_type\":\"claude\",\"name\":\"Developer\",\"prompt\":\"Sample agent.\"},{\"agent_type\":\"claude\",\"name\":\"Reviewer\",\"prompt\":\"Sample agent.\"}]}" > "$S/work/launch.json"
   sleep 3
 fi
 URL=$("$HERE/denv.sh" coral open --print 2>&1 | grep -o 'http[^ ]*')

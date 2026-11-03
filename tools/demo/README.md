@@ -30,7 +30,7 @@ tools/demo/
 
 1. **Build the release you want to film** (dev build: no Terms screen), the tools into `$DEMO_ROOT/bin`:
    ```bash
-   export DEMO_ROOT=$HOME/coral-demo-work; mkdir -p "$DEMO_ROOT/bin" && touch "$DEMO_ROOT/.coral-demo-root"
+   export DEMO_ROOT=/tmp/coral-demo; mkdir -p "$DEMO_ROOT/bin" && touch "$DEMO_ROOT/.coral-demo-root"
    cd coral-go && go build -tags dev -o "$DEMO_ROOT/bin/" ./cmd/coral ./cmd/coral-board ./cmd/coral-agent ./cmd/mock-agent ./cmd/coral-hook-agentic-state ./cmd/coral-hook-message-check ./cmd/coral-hook-session-start ./cmd/coral-hook-task-sync
    ```
 2. **Playwright and headless Chromium**, into the scratch folder (Node 18 or later; the film was made with 1.62.1):
@@ -39,7 +39,7 @@ tools/demo/
    PLAYWRIGHT_BROWSERS_PATH="$DEMO_ROOT/pw-browsers" "$DEMO_ROOT/node_modules/.bin/playwright" install chromium
    ```
 3. **ffmpeg with libx264** at `$DEMO_ROOT/bin/ffmpeg` (or on `PATH`). A static build is fine; `pip install imageio-ffmpeg` ships one.
-4. **A fresh demo Coral with no team** (beat 2 launches the team on camera):
+4. **A fresh demo Coral with no team** (beat 2 launches the team on camera). Use a short neutral `DEMO_ROOT` like `/tmp/coral-demo`: its folders appear on screen (the demo repo is `$DEMO_ROOT/home/projects/demo-app`, inside the demo HOME), so a long scratch path would end up in a frame:
    ```bash
    export PATH=$HOME/.local/bin:$PATH   # only if node is not on PATH
    NOLAUNCH=1 tools/demo/scripts/rig-up.sh
@@ -49,11 +49,16 @@ tools/demo/
    ```bash
    export PLAYWRIGHT_BROWSERS_PATH="$DEMO_ROOT/pw-browsers"
    node take.mjs b1 b2 b3 b4 b5 drain perm b6 b7
-   node hubclip.mjs          # the public page at the end (an outward request: loads coralhub.dev once)
+   node hubclip.mjs          # the public page at the end (an outward request: loads coralhub.dev once) ...
+   node endcard.mjs          # ... or a plain end card instead (then encode with ENDING=card); a live page can go stale
    ```
    Each beat writes `work/clips/<beat>/*.webm`. A beat that fails closes its clip and prints `FAILED <beat>`.
-6. **Encode**: `tools/demo/scripts/encode.sh` writes `$DEMO_ROOT/out/coral-demo-16x9.mp4` (1:41), `coral-demo-9x16-phone.mp4` (21 s) and `coral-demo-inbox.gif`. Keep the GIF under about 5 MB (the one in the repo is 2.6 MB).
+6. **Encode**: `tools/demo/scripts/encode.sh` (`ENDING=card tools/demo/scripts/encode.sh` for the plain end card) writes `$DEMO_ROOT/out/coral-demo-16x9.mp4` (1:41), `coral-demo-9x16-phone.mp4` (21 s) and `coral-demo-inbox.gif`. Keep the GIF under about 5 MB (the one in the repo is 2.6 MB).
 7. **Stop the demo Coral**: `tools/demo/scripts/rig-up.sh stop` (it stops the server it recorded, and only if that process is still this demo's own server; a reused pid is left alone).
+
+## The leak check
+
+While a beat is recorded, `lib.mjs` scans the page twice a second (visible text, titles, aria-labels, placeholders) for the host's home folder, a scratch or agent-scratchpad path, a macOS temp folder, or a session id (a UUID). If one shows, the beat fails (`FAILED bN: leak on screen in bN: ...`) after its clip is closed, so a path cannot reach the film unnoticed. `node selftest.mjs` proves the check fires (a page showing the home folder and one showing a session id must fail, a clean page must pass); run it after changing `lib.mjs`. It is a text check: it does not read pixels, so a path drawn into an image is not caught.
 
 ## Iterating
 

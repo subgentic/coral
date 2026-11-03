@@ -1,5 +1,5 @@
 import fs from "node:fs"
-import { OPEN, chromium, beat, launchTeam, sleep, agent, BASE, KEY, S, SEED, HERE, PORT } from "./lib.mjs"
+import { OPEN, chromium, beat, launchTeam, sleep, agent, BASE, KEY, S, SEED, HERE, PORT, REPO } from "./lib.mjs"
 process.env.CORAL_TELEMETRY_DISABLED = "1" // the demo Coral and everything the takes start send no usage events
 const which = process.argv.slice(2)
 const browser = await chromium.launch({ headless: true })
@@ -74,7 +74,7 @@ const B = {
     return t.finish()
   },
   async b5() { // follow the agent into its diff and tasks
-    fs.copyFileSync(SEED + "/slug.go.new", S + "/repo/slug.go"); fs.copyFileSync(SEED + "/slug_test.go.new", S + "/repo/slug_test.go")
+    fs.copyFileSync(SEED + "/slug.go.new", REPO + "/slug.go"); fs.copyFileSync(SEED + "/slug_test.go.new", REPO + "/slug_test.go")
     const t = await beat(browser, "b5")
     await t.go("/agents"); await t.cap("Click the agent to see what it changes.")
     await t.click(t.page.locator("text=Developer >> visible=true").first()); await sleep(3500)

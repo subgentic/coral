@@ -8,4 +8,5 @@ if [ -z "$S" ] || [ "$S" = / ] || [ "$S" = "$HOME" ]; then echo "refusing DEMO_R
 [ -f "$S/.coral-demo-root" ] || { echo "refusing $S: it has no .coral-demo-root marker (touch it yourself, in an empty folder made for the demo)" >&2; exit 2; }
 PORT="${DEMO_PORT:-8471}"
 if [ "$PORT" = 8420 ]; then echo "refusing port 8420 (a real Coral's port)" >&2; exit 2; fi
+REPO="$S/home/projects/demo-app"   # inside the demo HOME, so on screen it reads as ~/projects/demo-app, not a scratch path
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
