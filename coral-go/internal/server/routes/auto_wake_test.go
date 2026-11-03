@@ -210,6 +210,7 @@ func TestAutoWakeNoticeGoesToThatAgentOnly(t *testing.T) {
 	r := newWakeRig(t)
 	ctx := context.Background()
 	const team = "team-3636"
+	haveClaudeConversation(t, sid(1)) // a wake of a session with no transcript starts fresh and says so (#12714); this test is about the restart notice
 	// The agent's board row is the one its wake re-subscribes (subscriber ID and title: its
 	// display name), so the lookup after the wake can't pick another row of the same session.
 	const name = "Dev \u202eOne\x07"

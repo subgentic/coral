@@ -497,6 +497,7 @@ func (n *BoardNotifier) nudgeAgent(ctx context.Context, pass *notifyPass, a Agen
 			n.notified[sessName] = h
 		}
 	}
+	prevHeld, wasHeld := n.heldNudge[sessName]
 	delete(n.heldNudge, sessName)
 	last, notified := n.notified[sessName]
 	n.notifiedMu.Unlock()
@@ -525,7 +526,11 @@ func (n *BoardNotifier) nudgeAgent(ctx context.Context, pass *notifyPass, a Agen
 		n.logger.Warn("mention check failed; the nudge goes as a mention", "subscriber_id", subscriberID, "error", mErr)
 		mention = true
 	}
-	n.logger.Info("sending nudge", "subscriber_id", subscriberID, "session", sessName, "unread", unread, "mention", mention)
+	if wasHeld && prevHeld.count == unread && prevHeld.latestID == latestID { // the same nudge that was held at the last pass (an exited CLI is not typed into): not said again every few seconds (#12714)
+		n.logger.Debug("nudge still held", "subscriber_id", subscriberID, "session", sessName, "unread", unread)
+	} else {
+		n.logger.Info("sending nudge", "subscriber_id", subscriberID, "session", sessName, "unread", unread, "mention", mention)
+	}
 	// One line (#3376), through the automated-input gate (#3431): a newer
 	// unread count for this board replaces a held one.
 	// Counted again just before it is typed, held or not (#4362): a nudge held while the agent

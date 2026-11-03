@@ -41,7 +41,8 @@ func (h *SessionsHandler) wakeSession(ctx context.Context, ls *store.LiveSession
 			return nil
 		}
 	}
-	launched := false // the agent CLI was started again: it loaded the current hook set
+	launched := false                    // the agent CLI was started again: it loaded the current hook set
+	fresh, resumedClaude := false, false // the conversation was gone and a new one started (the board is told once); a Claude resume the backstop watches (#12714)
 	// A team's agents start in the team's home folder, which the Operator may have changed since this one last ran (#10815): the wake uses it and the row follows once it has started.
 	movedTo := ""
 	if dir := h.teamHomeFolder(ctx, ls); dir != "" && dir != ls.WorkingDir {
@@ -58,12 +59,18 @@ func (h *SessionsHandler) wakeSession(ctx context.Context, ls *store.LiveSession
 			h.noteStartSucceeded(ctx, ls.SessionID)          // the launch line was typed now: the safety net's window starts here, and no start failure stands (#353)
 			_ = h.ss.StampSessionSettings(ctx, ls.SessionID) // the CLI now runs with the stored model and level: turns the transcript recorded before are older than them (#6225)
 			h.watchWakeToken(ls)                             // a few seconds on, did the agent get its token, and is it still the live one (#12291)
+			if fresh {
+				h.noteFreshStart(ctx, ls) // said once: the next wake finds the new conversation's transcript
+			} else if resumedClaude {
+				h.watchResumeGone(ls) // the backstop for a transcript that went between the look and Claude's
+			}
 		}
 	}()
 	plan, err := h.prepareWake(ctx, ls, noStartPrompt)
 	if err != nil {
 		return err
 	}
+	fresh, resumedClaude = plan.freshStart, ls.AgentType == at.Claude && plan.params.ResumeSessionID != ""
 	err = h.startWake(ctx, ls, plan, &launched)
 	if err != nil {
 		return err
@@ -83,6 +90,7 @@ type wakePlan struct {
 	agentImpl                                             agent.Agent
 	params                                                agent.LaunchParams
 	backend, sessionName, logFile, boardName, displayName string
+	freshStart                                            bool // the conversation was gone: started new, and the board is told (#12714)
 }
 
 func (h *SessionsHandler) prepareWake(ctx context.Context, ls *store.LiveSession, noStartPrompt bool) (*wakePlan, error) {
@@ -182,6 +190,13 @@ func (h *SessionsHandler) prepareWake(ctx context.Context, ls *store.LiveSession
 		RunTag:          h.runTagFor(ctx, ls.SessionID, "", ""),
 	}
 
+	// A Claude agent whose conversation is gone starts a new one under the same session id (#12714): looked for here, before the launch, and the CLI's own "No conversation found" line is only a backstop.
+	freshStart := false
+	if ls.AgentType == at.Claude && launchParams.ResumeSessionID != "" && (forceFresh(ls.SessionID) || !claudeConversationFound(ls.SessionID, ls.WorkingDir)) {
+		log.Printf("[wake] session=%s: Claude could not find its conversation (no transcript for it); starting a new one with its role", sessionName)
+		launchParams.ResumeSessionID = ""
+		freshStart = true
+	}
 	// A Codex agent that never completed a turn has no saved session: "codex resume" would end at "No saved session found" and a bare shell. It starts a new one
 	// (a wake is asked to bring the agent back, not to resume a particular conversation) (#5222).
 	if ls.AgentType == at.Codex && !codexSessionSaved(ls.SessionID) {
@@ -195,7 +210,7 @@ func (h *SessionsHandler) prepareWake(ctx context.Context, ls *store.LiveSession
 	}
 	// Only a launch that resumes a conversation can go without its first message: one that starts a new conversation (Codex with no saved session, Hermes with no session of its own) has none to lean on.
 	launchParams.NoStartPrompt = noStartPrompt && launchParams.ResumeSessionID != ""
-	return &wakePlan{agentImpl: agentImpl, params: launchParams, backend: backend, sessionName: sessionName, logFile: logFile, boardName: boardName, displayName: displayName}, nil
+	return &wakePlan{agentImpl: agentImpl, params: launchParams, backend: backend, sessionName: sessionName, logFile: logFile, boardName: boardName, displayName: displayName, freshStart: freshStart}, nil
 }
 
 func (h *SessionsHandler) startWake(ctx context.Context, ls *store.LiveSession, plan *wakePlan, launched *bool) error {

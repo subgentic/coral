@@ -244,6 +244,7 @@ func TestAutoWakeSendsNoStartingPromptAndAManualWakeDoes(t *testing.T) {
 		delete(autoWakeSlots.m, "autosleep")
 		autoWakeSlots.Unlock()
 		r := newSleepRig(t)
+		haveClaudeConversation(t, r.sid)
 		_, err := r.ss.SetPrompt(r.ctx, r.sid, ptr.NonEmpty(first))
 		require.NoError(t, err)
 		r.autoSleep(t)
@@ -258,6 +259,7 @@ func TestAutoWakeSendsNoStartingPromptAndAManualWakeDoes(t *testing.T) {
 	})
 	t.Run("manual wake", func(t *testing.T) {
 		r := newSleepRig(t)
+		haveClaudeConversation(t, r.sid)
 		_, err := r.ss.SetPrompt(r.ctx, r.sid, ptr.NonEmpty(first))
 		require.NoError(t, err)
 		require.NoError(t, r.ss.SetSessionSleeping(r.ctx, r.sid, true))
@@ -274,6 +276,7 @@ func TestAutoWakeSendsNoStartingPromptAndAManualWakeDoes(t *testing.T) {
 // A launch that starts a NEW conversation has none to lean on, so it keeps its first message even on an auto-wake (QA's SHOULD, #12358): Codex with no saved session is started without a resume id.
 func TestAutoWakeOfALaunchThatDoesNotResumeKeepsItsFirstMessage(t *testing.T) {
 	r := newSleepRig(t)
+	haveClaudeConversation(t, r.sid)
 	truePath, lerr := exec.LookPath("true")
 	if lerr != nil {
 		t.Skip("no true(1) to stand in for the Codex CLI")
