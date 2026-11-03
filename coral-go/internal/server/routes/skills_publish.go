@@ -68,11 +68,11 @@ func (h *SkillsHandler) allowPublish(session string) bool {
 	return true
 }
 
-// zipOfSkillMD wraps one SKILL.md as a zip with that one file at its root, the same bytes for the same text (no time stamp): the rest of the import cannot tell it from a zip someone made.
+// zipOfSkillMD wraps one SKILL.md as a zip with that one file at its root, stored not compressed, the same bytes for the same text on any Go version (no time stamp): the rest of the import cannot tell it from a zip someone made.
 func zipOfSkillMD(md []byte) ([]byte, error) {
 	var buf bytes.Buffer
 	zw := zip.NewWriter(&buf)
-	fw, err := zw.CreateHeader(&zip.FileHeader{Name: "SKILL.md", Method: zip.Deflate})
+	fw, err := zw.CreateHeader(&zip.FileHeader{Name: "SKILL.md", Method: zip.Store})
 	if err != nil {
 		return nil, err
 	}

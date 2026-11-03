@@ -1,6 +1,8 @@
 package routes
 
 import (
+	"archive/zip"
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"strings"
@@ -84,4 +86,27 @@ func TestAZipStillImportsAndAnAgentStillPublishesOnlyAZip(t *testing.T) {
 	list, _ := e2.ss.ListSkills(t.Context(), "")
 	assert.Empty(t, list)
 	_ = store.PublisherOperator
+}
+
+// The same text is always the same skill (Security's INFO 4): the wrapper is stored, not compressed, so no compressor's output (another Go version's deflate) can change the bytes or the digest.
+func TestTheWrappedSkillMDIsStoredNotCompressedSoItsDigestIsStable(t *testing.T) {
+	a, err := zipOfSkillMD([]byte(skillMD))
+	require.NoError(t, err)
+	b, err := zipOfSkillMD([]byte(skillMD))
+	require.NoError(t, err)
+	assert.Equal(t, a, b, "the same text, the same bytes")
+	zr, err := zip.NewReader(bytes.NewReader(a), int64(len(a)))
+	require.NoError(t, err)
+	require.Len(t, zr.File, 1)
+	assert.Equal(t, "SKILL.md", zr.File[0].Name)
+	assert.Equal(t, zip.Store, zr.File[0].Method, "stored")
+
+	e1, e2 := newSkillsEnv(t), newSkillsEnv(t)
+	_, o1 := e1.call("POST", "/api/skills", mdBody(t, skillMD), "operator")
+	_, o2 := e2.call("POST", "/api/skills", mdBody(t, skillMD), "operator")
+	r1, _ := e1.ss.ListSkills(t.Context(), "")
+	r2, _ := e2.ss.ListSkills(t.Context(), "")
+	require.Len(t, r1, 1)
+	require.Len(t, r2, 1)
+	assert.Equal(t, r1[0].Digest, r2[0].Digest, "two imports of one text, one digest: %v %v", o1, o2)
 }
