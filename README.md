@@ -53,7 +53,12 @@ curl -fsSL \
 
 Running agents is easy. *Knowing when one of them needs you* is the part that goes wrong: a permission prompt sits for an hour in a terminal you closed, a question waits behind a tab you forgot, a finished file never gets looked at. Coral puts all of that in one place.
 
+<img width="100%" alt="Needs You for review and questions" src="https://github.com/user-attachments/assets/2c995cf7-7a5b-4be0-94ad-ee5e3efd4552" />
+
 - **Needs you.** Every agent that is waiting for a permission, a question or a decision, and every file an agent asks you to review, in one list. One tap answers it; the agent carries on. The number on the Inbox tab is what is waiting, and you can turn on desktop alerts. While the tab is in the background its title carries the total too.
+
+<img width="100%" alt="Needs you review screen with comments" src="https://github.com/user-attachments/assets/2b65a084-f328-4e44-a043-2e67a3ca89e2" />
+
 -  **Review that keeps its history.** Open a file the agent made, read it, **Approve** or **Request changes**. A new version of the same file arrives as the next version with **Compare**, so you see what changed. Comment on the whole document or a passage, and add a picture you have marked up (pen, arrow, box); the agent is told, and the original is kept. A file that is almost right can be **approved with a note**, and a row you do not want to act on can be **dismissed** (with Undo).
 - **Goals you can close.** Give a team a goal, watch its tasks and files, and **Close goal** when it is true. Coral tells you when files for a goal are still waiting for you before you close it, and an active goal whose tasks are all done shows up in Needs you as "looks done" for you to close.
 - **A question to you is an item like a review.** It says who asked and about which goal and task, shows its words rendered, and takes your reply with pictures if you want them; a question whose wait ran out while you were away is kept, not lost.
