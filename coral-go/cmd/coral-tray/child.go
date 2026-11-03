@@ -18,10 +18,24 @@ import (
 	"time"
 
 	"github.com/subgentic/coral/internal/config"
+	"github.com/subgentic/coral/internal/license"
 	"github.com/subgentic/coral/internal/safego"
 	"github.com/subgentic/coral/internal/startup"
 	"github.com/subgentic/coral/internal/tracking"
 )
+
+// setupChildTracking points this server's usage events at its own data folder, as the coral command does (cmd/coral configureServer): without it the tracking
+// package keeps no state and sends nothing, and an install run from the Coral app sent none of the server's events. The entrypoint is the fixed name coral-tray.
+// The Terms are asked by the Coral window, not here, so this server can run before they are accepted: every send waits for them (termsAccepted). Whether
+// analytics is on is still the saved setting, applied by startup.Start.
+func setupChildTracking(dir string) {
+	tracking.SetEntrypoint("coral-tray")
+	tracking.SetSendGate(func() bool { return termsAccepted() })
+	tracking.SetCoralDir(dir)
+}
+
+// termsAccepted is true when this build needs no Terms acceptance, or the current Terms were accepted.
+var termsAccepted = func() bool { return !config.EULARequired() || license.IsEULAAccepted() }
 
 // sayTelemetry writes the line the tray reads (childSaysTelemetryOn or childSaysTelemetryOff).
 func sayTelemetry(w io.Writer, on bool) {
@@ -94,6 +108,7 @@ func runServerChild(host string, port int, backendType string) {
 		os.Exit(childExitStartFailed)
 	}
 	cfg := config.Load()
+	setupChildTracking(cfg.CoralDir())
 	if host != "" {
 		cfg.Host, cfg.HostExplicit = host, true
 	}

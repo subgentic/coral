@@ -103,19 +103,37 @@ func TelemetryOn() bool { return telemetryEnabled() }
 // opt-out takes effect immediately and queued work is dropped, never replayed.
 func telemetryEnabled() bool { return !telemetryDisabled.Load() && !TelemetryEnvDisabled() }
 
-// getInstallID returns the install ID, reading from disk once and caching.
+// getInstallID returns the install ID, read from disk and cached once it is there. An ID not written yet is not cached: the tray's server child can ask before
+// the tray writes it on a first run, and an empty answer kept for the run would drop every event of that run.
 func getInstallID() string {
-	installIDOnce.Do(func() {
-		if !stateDirReady() {
-			return
-		}
-		installIDMu.Lock()
-		cachedInstallID = readFile(filepath.Join(resolveCoralDir(), ".install_id"))
-		installIDMu.Unlock()
-	})
 	installIDMu.RLock()
-	defer installIDMu.RUnlock()
+	id := cachedInstallID
+	installIDMu.RUnlock()
+	if id != "" || !stateDirReady() {
+		return id
+	}
+	id = readFile(filepath.Join(resolveCoralDir(), ".install_id"))
+	if id == "" {
+		return ""
+	}
+	installIDMu.Lock()
+	defer installIDMu.Unlock()
+	if cachedInstallID == "" {
+		cachedInstallID = id
+	}
 	return cachedInstallID
+}
+
+// sendGate, when set, must say yes before any event is sent (SetSendGate).
+var sendGate atomic.Pointer[func() bool]
+
+// SetSendGate makes every send ask allowed first; nothing is sent while it says no. The tray's server child uses it for the Terms: that process does not show them
+// (the Coral window does), so it may run before they are accepted, and nothing may leave before they are.
+func SetSendGate(allowed func() bool) { sendGate.Store(&allowed) }
+
+func sendAllowed() bool {
+	g := sendGate.Load()
+	return g == nil || *g == nil || (*g)()
 }
 
 // TrackInstallAsync checks for first install or version upgrade and sends
@@ -178,7 +196,7 @@ func trackEventSync(eventName string, extraProps map[string]string) bool {
 // telemetry generation the event was created in. It reports whether the
 // service accepted the event.
 func emitEvent(eventName string, extraProps map[string]string, eventUUID, timestamp string, gen uint64) bool {
-	if config.PostHogKey == "" || !telemetryValid(gen) {
+	if config.PostHogKey == "" || !telemetryValid(gen) || !sendAllowed() {
 		return false
 	}
 	typed, known := sanitizeProps(eventName, extraProps)
