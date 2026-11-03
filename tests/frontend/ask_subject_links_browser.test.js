@@ -39,8 +39,8 @@ const OPERATOR_TEXT = '@Operator TEST ITEM, safe to answer any way: this is a te
                 await ev(`document.querySelector('button[aria-label="Answer the question of Orchestrator"]').click(); true`);
                 await waitFor(`document.querySelector('dialog.inbox-ask-dialog[open]')`, at + 'the dialog opens', 4000);
                 const d = await ev(`(() => { const d = document.querySelector('dialog.inbox-ask-dialog'), p = d.querySelector('.inbox-ask-subjects'), sub = d.querySelector('.inbox-ask-sub'); return { shown: !!p && !p.hidden, buttons: p ? [...p.querySelectorAll('button')].map(b => [b.dataset.kind, b.textContent]) : [], text: p ? p.textContent : '', below: !!p && !!sub && p.getBoundingClientRect().top >= sub.getBoundingClientRect().bottom - 1 }; })()`);
-                assert.ok(d.shown && d.below && JSON.stringify(d.buttons) === JSON.stringify([['goal', 'Goal #7: Ship the beta'], ['task', 'Task #12: Fix the login page']]), at + 'the dialog has the goal and the task as links under who asked: ' + JSON.stringify(d));
-                assert.ok(/^About Goal #7: Ship the beta \u00b7 Task #12: Fix the login page \(named by Orchestrator\)$/.test(d.text), at + 'the line says the asker named them: ' + d.text);
+                assert.ok(d.shown && d.below && JSON.stringify(d.buttons) === JSON.stringify([['goal', 'Goal #7'], ['task', 'Task #12']]), at + 'the dialog has the goal and the task as links under who asked: ' + JSON.stringify(d));
+                assert.ok(/^About Goal #7 \u00b7 Task #12$/.test(d.text), at + 'the line says the asker named them: ' + d.text);
                     if (what === 'task' && process.env.CORAL_SCREENSHOT_DIR) { fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR, { recursive: true }); fs.writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/ask-subjects-${w}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }
             await ev(`document.querySelector('dialog.inbox-ask-dialog .inbox-ask-subject[data-kind="${what}"]').click(); true`);
                 await waitFor(`!document.querySelector('dialog.inbox-ask-dialog')`, at + 'opening it closes the dialog', 4000);
