@@ -242,7 +242,7 @@ function attentionTable(key, rows, narrowed) {
         empty: { line: narrowed ? `No ${f.noun[0]} matches the search.` : failed ? 'Nothing has failed.' : 'Nothing is running.', hint: narrowed ? '' : failed ? 'A job or workflow whose last run failed shows here.' : 'A job or workflow with a run going shows here.', ...(narrowed ? {} : firstRun()) },
         signature: JSON.stringify([!!firstRun().cards, rows.map(i => [i.kind, i.id, i.name, i.run && i.run.status, i.run && i.run.id, i.kind === 'job' ? nextOf(i.job) : ''])]),
         node: () => DT.dataTable({
-            label: `${f.label}, ${rows.length}`, rows, oneLine: true, rowKey: itemKey, rowName: i => i.name, state: stateOf(key), open: openItem,
+            label: `${f.label}, ${rows.length}`, rows, oneLine: true, resize: true, rowKey: itemKey, rowName: i => i.name, state: stateOf(key), open: openItem,
             columns: [ // one line a row (Goal #79): what it is goes to the name's tooltip, and a narrow list drops Schedule, then Kind, then Next (dropAt, #8931)
                 { key: 'name', label: 'Name', primary: true, width: 'grow', sort: true, sortValue: i => i.name, cell: i => nameButton(i, whatWords(i)) },
                 { key: 'kind', label: 'Kind', width: '7rem', dropAt: 36, sort: true, sortValue: i => KIND_WORD[i.kind], cell: i => DT.tag(KIND_WORD[i.kind]) },
