@@ -16,8 +16,9 @@ import (
 var taskCountTTL = 3 * time.Second
 
 type taskCountEntry struct {
-	at     time.Time
-	counts map[int64]int
+	at      time.Time
+	counts  map[int64]int
+	uploads map[int64][]teamArtifact // the uploads each task is linked to, for the task's own read (#12755)
 }
 
 type taskCountCache struct {
@@ -50,16 +51,32 @@ func (h *BoardHandler) taskArtifactCounts(ctx context.Context, project string) m
 	items = h.mergeCrossTeamRows(items, project)
 	h.linkUploadTasks(ctx, project, items)
 	counts := map[int64]int{}
+	uploads := map[int64][]teamArtifact{}
 	for _, it := range items {
 		if it.TaskID > 0 {
 			counts[it.TaskID]++
+			if it.uploadTask == it.TaskID { // an upload the task is linked to by its record, whatever the task's state
+				uploads[it.TaskID] = append(uploads[it.TaskID], it)
+			}
 		}
 	}
 	h.taskCounts.mu.Lock()
 	if h.taskCounts.entries == nil || len(h.taskCounts.entries) >= taskCountCacheLimit {
 		h.taskCounts.entries = map[string]taskCountEntry{}
 	}
-	h.taskCounts.entries[project] = taskCountEntry{at: now, counts: counts}
+	h.taskCounts.entries[project] = taskCountEntry{at: now, counts: counts, uploads: uploads}
 	h.taskCounts.mu.Unlock()
 	return counts
+}
+
+// taskUploads are the uploads an agent linked to the task (its record names it), whatever the task's state: the task's own read lists them with its result files, so `coral-board task show` finds what a reviewer asks for (#12755).
+// Kept for a few seconds with the counts; empty when the scan fails.
+func (h *BoardHandler) taskUploads(ctx context.Context, project string, taskID int64) []teamArtifact {
+	h.taskArtifactCounts(ctx, project) // makes (or reuses) the board's entry
+	h.taskCounts.mu.Lock()
+	defer h.taskCounts.mu.Unlock()
+	if e, ok := h.taskCounts.entries[project]; ok {
+		return append([]teamArtifact(nil), e.uploads[taskID]...)
+	}
+	return nil
 }

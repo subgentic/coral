@@ -52,6 +52,10 @@ func (h *SessionsHandler) artifactTaskLink(ctx context.Context, r *http.Request)
 		if terr != nil || task == nil || task.AssignedTo == nil || *task.AssignedTo != sub.SubscriberID {
 			return 0, "that task is not one of yours on this board"
 		}
+		switch task.Status { // a finished task takes no more files: said now, never an upload that links to a task that is closed and vanishes from its page (#12755)
+		case "completed", "skipped":
+			return 0, "task " + strconv.FormatInt(id, 10) + " is " + task.Status + ": it takes no more files. Upload with --no-task, or to a task that is open"
+		}
 		return id, ""
 	}
 	ids, err := h.bs.InProgressTaskIDsOf(ctx, sub.Project, sub.SubscriberID)
