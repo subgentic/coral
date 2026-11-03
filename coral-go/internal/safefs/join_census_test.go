@@ -213,6 +213,7 @@ var joinSites = map[string]joinEntry{
 	"internal/dbcrypt/dbcrypt.go\tMigrationRecoveryPath":                                     {1, joinOwn, "a fixed or program-made name in its own folder"},
 	"internal/dbcrypt/dbcrypt.go\tSave":                                                      {1, joinFixed, "names from a directory listing or numbers and hashes the program makes"},
 	"internal/dbcrypt/dbcrypt.go\tkeyPath":                                                   {1, joinOwn, "a fixed or program-made name in its own folder"},
+	"internal/executil/browser.go\twriteLoginPage":                                           {1, joinOwn, "os.TempDir() and a constant prefix with a glob, to find the sign-in pages this program made; each is removed only if Lstat says it is a regular file older than the link's ten minutes, and the new page is made by os.CreateTemp (0600) in that folder"},
 	"internal/executil/editor.go\tEditor.macApp":                                             {1, joinOwn, "a fixed or program-made name in its own folder"},
 	"internal/executil/editor.go\teditorCommand":                                             {1, joinOwn, "a fixed or program-made name in its own folder"},
 	"internal/gitutil/gitutil.go\tResolveGitRoot":                                            {1, joinFixed, "names from a directory listing or numbers and hashes the program makes"},
