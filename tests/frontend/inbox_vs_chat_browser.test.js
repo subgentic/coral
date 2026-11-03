@@ -65,6 +65,20 @@ const COUNTS = days => ({ days: Array.from({ length: days }, (_, i) => ({ day: d
             const days = [{ day: D(5), inbox: 1, chat: 3 }, { day: D(4), inbox: 6, chat: 2 }, { day: gap, inbox: 0, chat: 0 }, { day: D(2), inbox: 3, chat: 1 }, { day: D(1), inbox: 0, chat: 0 }, { day: D(0), inbox: 9, chat: 1 }];
             const body = JSON.stringify({ days_asked: 30, generated_at: new Date().toISOString(), counts: { ...COUNTS(6), days, record_since: D(5) } });
             await ev(`window.__ivc.body = ${body}; [...document.querySelectorAll('#cost-inbox-chat select')][0].dispatchEvent(new Event('change', { bubbles: true })); true`);
+            if (process.env.IVC_SHOTS) { // opt-in evidence: the card in both themes at 1440 and 390 (the before/after for review)
+                await waitFor(`!!document.querySelector('#cost-inbox-chat .atab-trend svg path.atab-line')`, 'the line', 10000);
+                for (const [w, h, mob] of [[1440, 900, false], [390, 844, true]]) for (const theme of ['light', 'dark']) {
+                    await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 2, mobile: mob });
+                    await ev(`[...document.querySelectorAll('#cost-inbox-chat select')][0].dispatchEvent(new Event('change', { bubbles: true })); true`);
+                    if (mob) await ev(`[...document.querySelectorAll('#cost-nav-list .row-btn')].find(b => /Inbox vs chat/.test(b.textContent))?.click(); true`); // a phone shows the list first
+                    await waitFor(`(document.querySelector('#cost-inbox-chat .atab-trend svg path.atab-line')?.getBoundingClientRect().width || 0) > 50`, 'the chart drawn at this width', 10000);
+                    await ev(`document.documentElement.setAttribute('data-theme', '${theme}'); document.querySelector('#cost-inbox-chat .atab-trend').closest('.atab-card').scrollIntoView(); true`);
+                    await new Promise(r => setTimeout(r, 600)); // sleep-ok: the repaint
+                    const clip = await ev(`(() => { const r = document.querySelector('#cost-inbox-chat .atab-trend').closest('.atab-card').getBoundingClientRect(); return { x: r.left, y: r.top, width: r.width, height: r.height, scale: 1 }; })()`);
+                    require('node:fs').writeFileSync(`${process.env.IVC_SHOTS}-${w}-${theme}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png', clip })).data, 'base64'));
+                }
+                await Emulation.setDeviceMetricsOverride({ width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
+            }
             await waitFor(`document.querySelectorAll('#cost-inbox-chat .atab-trend svg .atab-dot').length === 4`, 'a dot for each of the 4 days with actions', 10000);
             assert.match(await text('#cost-inbox-chat .atab-card:has(.atab-trend) h3'), /Inbox share.*each day/, 'the subtitle says daily');
             assert.ok(!/7-day share/.test(await text('#cost-inbox-chat .atab-card:has(.atab-trend) h3')), 'no 7-day claim on the chart');

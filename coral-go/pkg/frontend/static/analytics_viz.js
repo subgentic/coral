@@ -144,16 +144,16 @@ export function lineChart(points, { fmt = String, phone = false, dots = false, t
     if (texts || onPick) {
         const cw = iw / Math.max(n, 1), cx = i => (n > 1 ? pl + iw * i / (n - 1) : pl + iw / 2);
         points.forEach((p, i) => {
-            const x = Math.max(pl - 2, cx(i) - cw / 2);
-            if (i === selected) svg.append(sv('rect', { x: (cx(i) - cw / 2).toFixed(1), y: pt, width: cw.toFixed(1), height: ih, rx: 3, class: 'atab-sel' }));
-            const hit = sv('rect', { x: x.toFixed(1), y: pt, width: cw.toFixed(1), height: ih, class: 'atab-hit' });
+            const x0 = Math.max(pl - 2, cx(i) - cw / 2), x1 = Math.min(W - 6, cx(i) + cw / 2);
+            if (i === selected) svg.append(sv('line', { x1: cx(i).toFixed(1), x2: cx(i).toFixed(1), y1: pt, y2: pt + ih, class: 'atab-sel' })); // a line through the day, not a box: the end label sits beside it
+            const hit = sv('rect', { x: x0.toFixed(1), y: pt, width: (x1 - x0).toFixed(1), height: ih, class: 'atab-hit' });
             if (texts && texts[i]) hit.append(sv('title', {}, texts[i]));
             if (onPick) hit.addEventListener('click', () => onPick(i));
             svg.append(hit);
         });
     }
     const last = xy.map((q, i) => q && i).filter(i => i !== null && i !== undefined).at(-1);
-    if (last != null) { const e = xy[last]; svg.append(sv('circle', { cx: e[0], cy: e[1], r: 4, class: 'atab-dot' }), sv('text', { x: e[0] - 7, y: e[1] - 9, 'text-anchor': 'end', class: 'atab-end' }, fmt(points[last].value))); }
+    if (last != null) { const e = xy[last]; if (!dots) svg.append(sv('circle', { cx: e[0], cy: e[1], r: 4, class: 'atab-dot' })); svg.append(sv('text', { x: e[0] - 7, y: e[1] - 9, 'text-anchor': 'end', class: 'atab-end' }, fmt(points[last].value))); }
     return svg;
 }
 
