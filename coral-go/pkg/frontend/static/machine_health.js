@@ -72,7 +72,7 @@ export function applyMachineHealth(msg) {
 }
 
 /** One line for the status, e.g. "Busy (CPU)", "OK", "Unknown"; "Busy (other programs)" when the server says the load is not Coral's (busy_by). */
- function healthStatusText(h) {
+export function healthStatusText(h) {
     const s = healthStatus(h);
     if (s === 'unknown') return 'Unknown';
     if (busyByOthers(h)) return 'Busy (other programs)';
