@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -117,13 +119,43 @@ func TestOpenCoralOnThisComputerRefusesEveryOtherCaller(t *testing.T) {
 
 // The page shows the button only to a browser on this computer, in both its states.
 func TestTheSignInPageOffersOpenOnThisComputerOnlyLocally(t *testing.T) {
-	for _, s := range []PageState{{PasswordSet: true, Local: true}, {Local: true}} {
-		page := AuthPage(s)
-		assert.Contains(t, page, `action="/auth/local"`)
-		assert.Contains(t, page, "Open Coral on this computer")
-		assert.Equal(t, 1, strings.Count(page, `id="local-open"`))
+	page := AuthPage(PageState{Local: true, LocalOpen: true})
+	assert.Contains(t, page, `action="/auth/local"`)
+	assert.Contains(t, page, "Open Coral on this computer")
+	assert.Equal(t, 1, strings.Count(page, `id="local-open"`))
+	for _, s := range []PageState{{PasswordSet: true, Local: true}, {Local: true}, {PasswordSet: true}, {}} {
+		assert.NotContains(t, AuthPage(s), "/auth/local", "offered only when the server says so (this computer, no password yet)")
 	}
-	for _, s := range []PageState{{PasswordSet: true}, {}} {
-		assert.NotContains(t, AuthPage(s), "/auth/local", "not offered to another computer")
+}
+
+// The operator's choice (#289): only while no password is set, by a positive answer. A set password, or a password file that cannot be read,
+// means no button on the page and a 403 from the route; no link is made.
+func TestOpenCoralOnThisComputerOnlyWhileNoPasswordIsSet(t *testing.T) {
+	for name, prep := range map[string]func(g *pwRig){
+		"a password is set": func(g *pwRig) { g.setPassword("correct horse") },
+		"the file cannot be read": func(g *pwRig) {
+			require.NoError(t, os.Mkdir(filepath.Join(g.ks.dataDir(), PasswordFile), 0o700)) // a folder where the file should be: there, but not readable as a password
+		},
+		"the file is empty": func(g *pwRig) {
+			require.NoError(t, os.WriteFile(filepath.Join(g.ks.dataDir(), PasswordFile), nil, 0o600))
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			g := newPwRig(t)
+			g.ar.SetPeerUser(func(*http.Request) (bool, bool) { return true, true })
+			prep(g)
+			assert.False(t, g.ar.LocalOpenOffered(g.req("GET", "/auth", "", "127.0.0.1", nil)), "no button")
+			w, out := g.do(g.ar.LocalOpen, g.req("POST", LocalOpenPath, "", "127.0.0.1", nil))
+			assert.Equal(t, http.StatusForbidden, w.Code, w.Body.String())
+			assert.Equal(t, "password_set", out["code"])
+			g.ks.mu.Lock()
+			made := len(g.ks.loginTokens)
+			g.ks.mu.Unlock()
+			assert.Zero(t, made, "no link was made")
+		})
 	}
+	g := newPwRig(t)
+	g.ar.SetPeerUser(func(*http.Request) (bool, bool) { return true, true })
+	assert.True(t, g.ar.LocalOpenOffered(g.req("GET", "/auth", "", "127.0.0.1", nil)), "no file at all: offered")
+	assert.False(t, g.ar.LocalOpenOffered(g.req("GET", "/auth", "", "10.0.0.5", nil)), "never to another computer")
 }

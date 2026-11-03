@@ -79,7 +79,7 @@ func (ar *Routes) AuthPage(w http.ResponseWriter, r *http.Request) {
 	set, local, strict := ar.PageState(r)
 	signedOut := set && ar.ks.wasSignedOutByOthers(ar.ks.extractSessionCookie(r)) && !ar.signedIn(r) // told why only to the browser whose session another browser ended (#10431)
 	// PeerUnavailable is read after PageState: its attribution of this request is what sets the flag (#12546).
-	w.Write([]byte(AuthPage(PageState{PasswordSet: set, Local: local, Strict: strict, SignedOut: signedOut, Locked: r.URL.Query().Get("locked") == "1", HubSignin: ar.hub.PageState(r), HubURL: ar.hub.HubURL(), PeerUnavailable: peerCheckLost.Load()})))
+	w.Write([]byte(AuthPage(PageState{PasswordSet: set, Local: local, Strict: strict, SignedOut: signedOut, Locked: r.URL.Query().Get("locked") == "1", HubSignin: ar.hub.PageState(r), HubURL: ar.hub.HubURL(), PeerUnavailable: peerCheckLost.Load(), LocalOpen: ar.LocalOpenOffered(r)})))
 }
 
 // authPageCSP: scripts only from this server (the page has no inline script), never framed;

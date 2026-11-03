@@ -46,8 +46,10 @@ type PageState struct {
 	SignedOut   bool // this browser's session was ended by another browser's "Sign out other browsers" (#10431)
 	// PeerUnavailable says Coral cannot tell which account on this computer opens a sign-in link (the peer check is lost, #12529): one line says so and what the link's limits are (#12546).
 	PeerUnavailable bool
-	HubSignin       string
-	HubURL          string
+	// LocalOpen offers "Open Coral on this computer": this computer, Coral's account, and no password set yet (Routes.LocalOpenOffered).
+	LocalOpen bool
+	HubSignin string
+	HubURL    string
 }
 
 // AuthPage renders the page for a state. The markup is fixed and has no user data; the behaviour lives in
@@ -60,7 +62,7 @@ func AuthPage(s PageState) string {
 	return b.String()
 }
 
-var authPageTmpl = template.Must(template.New("auth").Parse(`{{define "localopen"}}{{if .Local}}
+var authPageTmpl = template.Must(template.New("auth").Parse(`{{define "localopen"}}{{if .LocalOpen}}
     <form method="post" action="/auth/local" id="local-open-form" class="local-open">
       <div class="btnrow"><button type="submit" disabled data-needs-script class="btn btn-primary wide" id="local-open">Open Coral on this computer</button></div>
       <p class="note" id="local-open-note">This browser is on the computer that runs Coral, in the same account, so it can open Coral without a password.</p>

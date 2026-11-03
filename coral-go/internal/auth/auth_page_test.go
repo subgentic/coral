@@ -71,7 +71,7 @@ func TestAuthPageCarriesNoSecretAndNoInlineScript(t *testing.T) {
 func TestAuthPageGolden(t *testing.T) {
 	for name, s := range map[string]PageState{
 		"signin":              {PasswordSet: true, Local: true, Strict: true},
-		"create":              {Local: true},
+		"create":              {Local: true, LocalOpen: true},
 		"setup":               {},
 		"hub-ready":           {PasswordSet: true, Local: true, HubSignin: "ready", HubURL: "https://app.coralhub.dev"},
 		"hub-unpaired":        {PasswordSet: true, Local: true, HubSignin: "unpaired"},
