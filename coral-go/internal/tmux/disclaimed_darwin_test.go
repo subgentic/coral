@@ -41,3 +41,15 @@ func TestTheTmuxServerCoralStartsIsNotAttributedToCoral(t *testing.T) {
 	pp, _ := strconv.Atoi(pane)
 	assert.NotEqual(t, mine, responsiblePid(t, pp), "an agent in it is not attributed to Coral either")
 }
+
+// A bare program name (the tmux Coral finds on PATH) is found as exec.Command finds it, and a name that is not there goes to the plain start, which reports it (#12836, Security's SHOULD).
+func TestADisclaimedStartFindsABareNameAndFallsBackWhenItIsNotThere(t *testing.T) {
+	out, err, ok := outputDisclaimed(context.Background(), "echo", []string{"hi"}, os.Environ())
+	require.True(t, ok, "a bare name is resolved on PATH, not refused")
+	require.NoError(t, err)
+	assert.Equal(t, "hi\n", string(out))
+	_, _, ok = outputDisclaimed(context.Background(), "coral-no-such-program-12836", nil, os.Environ())
+	assert.False(t, ok, "a program that is not there: the caller's plain start reports it")
+	_, _, ok = outputDisclaimed(context.Background(), "/nonexistent/dir/tmux", nil, os.Environ())
+	assert.False(t, ok)
+}

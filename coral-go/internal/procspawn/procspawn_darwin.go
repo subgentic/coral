@@ -5,6 +5,8 @@ package procspawn
 import (
 	"fmt"
 	"os"
+	"os/exec"
+	"strings"
 	"runtime"
 	"sync"
 	"syscall"
@@ -64,6 +66,14 @@ func Supported() bool { return load() == nil }
 func Spawn(path string, argv []string, o Options) (int, error) {
 	if err := load(); err != nil {
 		return 0, ErrUnsupported
+	}
+	// posix_spawn does not search PATH (exec.Command does): a bare name is resolved the same way first, so "tmux" starts as it always did.
+	if !strings.Contains(path, "/") {
+		resolved, err := exec.LookPath(path)
+		if err != nil {
+			return 0, &os.PathError{Op: "spawn", Path: path, Err: syscall.ENOENT}
+		}
+		path = resolved
 	}
 	cargv, pargv, err := cstrings(argv)
 	if err != nil {

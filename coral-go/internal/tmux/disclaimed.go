@@ -3,7 +3,6 @@ package tmux
 import (
 	"bytes"
 	"context"
-	"errors"
 	"io"
 	"os"
 	"os/exec"
@@ -49,10 +48,7 @@ func outputDisclaimed(ctx context.Context, bin string, args, env []string) (out 
 	if serr != nil {
 		outR.Close()
 		errR.Close()
-		if errors.Is(serr, procspawn.ErrUnsupported) {
-			return nil, nil, false
-		}
-		return nil, &exec.Error{Name: bin, Err: unwrapPathErr(serr)}, true
+		return nil, nil, false // not spawned this way (no such program as spawn sees it, no call here): the plain start runs it and reports in its own words
 	}
 	var stdout, stderr bytes.Buffer
 	var wg sync.WaitGroup
@@ -81,12 +77,4 @@ func outputDisclaimed(ctx context.Context, bin string, args, env []string) (out 
 		return stdout.Bytes(), &exec.ExitError{ProcessState: st, Stderr: stderr.Bytes()}, true
 	}
 	return stdout.Bytes(), nil, true
-}
-
-func unwrapPathErr(err error) error {
-	var pe *os.PathError
-	if errors.As(err, &pe) {
-		return pe.Err
-	}
-	return err
 }
