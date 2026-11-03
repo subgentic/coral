@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/subgentic/coral/internal/board"
+	"github.com/subgentic/coral/internal/clitext"
 	"github.com/subgentic/coral/internal/httputil"
 )
 
@@ -20,7 +21,17 @@ func (h *BoardHandler) checkAskButtons(w http.ResponseWriter, r *http.Request, p
 		return refuse("buttons go on a question to @Operator (post --ask)")
 	}
 	if len(asked) != 1 || !strings.EqualFold(asked[0], "Operator") {
-		return refuse("buttons go on a question to @Operator alone: ask only the Operator")
+		var others []string
+		for _, a := range asked {
+			if !strings.EqualFold(a, "Operator") {
+				others = append(others, "@"+clitext.CleanName(a))
+			}
+		}
+		why := "buttons go on a question to @Operator alone: ask only the Operator"
+		if len(others) > 0 { // the usual cause of a wake button refused: the text tags the very agent it would wake (#12600)
+			why += "; this text also @mentions " + strings.Join(others, ", ") + ": write the name without the @ (a wake button names who to wake)"
+		}
+		return refuse(why)
 	}
 	poster := body.SubscriberID
 	if name, verified := actorName(callerActor(r)); verified {

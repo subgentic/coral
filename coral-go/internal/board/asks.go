@@ -91,6 +91,15 @@ func (s *Store) ensureAsksSchema(ctx context.Context) error {
 
 // AskTargets are the members a post would ask: every member other than the poster that the text explicitly @mentions. @all names no one in particular and asks nobody.
 func (s *Store) AskTargets(ctx context.Context, project, poster, content string) ([]string, error) {
+	return s.askTargets(ctx, project, poster, content, false)
+}
+
+// AskTargetsAt is AskTargets counting only a real "@": a question with buttons asks the Operator alone, and a member written as "UI Reviewer:" or "Name —" in its text (which the board reads as a tag) is not asked (#12600).
+func (s *Store) AskTargetsAt(ctx context.Context, project, poster, content string) ([]string, error) {
+	return s.askTargets(ctx, project, poster, content, true)
+}
+
+func (s *Store) askTargets(ctx context.Context, project, poster, content string, atOnly bool) ([]string, error) {
 	subs, err := s.ListSubscribers(ctx, project)
 	if err != nil {
 		return nil, err
@@ -101,7 +110,7 @@ func (s *Store) AskTargets(ctx context.Context, project, poster, content string)
 		if SameIdentity(sub.SubscriberID, poster) {
 			continue
 		}
-		if containsExplicitTag(content, sub.SubscriberID, sub.JobTitle) {
+		if containsTag(content, sub.SubscriberID, sub.JobTitle, atOnly) {
 			out = append(out, sub.SubscriberID)
 		}
 	}

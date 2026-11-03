@@ -169,3 +169,17 @@ func TestCLICommandsSucceedOn2xx(t *testing.T) {
 	run = runBoard(t, srv.URL, dir, "check")
 	assert.Equal(t, 0, run.code, "check stderr=%q", run.stderr)
 }
+
+// A 4xx carries the server's reason, not only its code (#12600): the post --ask --button refusal said "bad_buttons" and hid "not posted: button 1 (...): X is not a member of this team".
+func TestServerErrorShowsTheServersReasonWithItsCode(t *testing.T) {
+	err := serverError(400, map[string]any{"error": "not posted: button 1 (\"Wake QA=wake:QA\"): QA is not a member of this team", "code": "bad_buttons"})
+	assert.ErrorContains(t, err, "bad_buttons")
+	assert.ErrorContains(t, err, "QA is not a member of this team")
+	assert.ErrorContains(t, err, "answered 400")
+
+	// A code that is the same words, or already starts the text, is not said twice.
+	assert.Equal(t, 1, strings.Count(serverError(401, map[string]any{"error": "unauthorized", "code": "unauthorized"}).Error(), "unauthorized"))
+	assert.Equal(t, 1, strings.Count(serverError(409, map[string]any{"error": "reserved_name: a starter skill", "code": "reserved_name"}).Error(), "reserved_name"))
+	// No code: the text alone, as before.
+	assert.ErrorContains(t, serverError(400, map[string]any{"error": "bad input"}), "answered 400: bad input")
+}

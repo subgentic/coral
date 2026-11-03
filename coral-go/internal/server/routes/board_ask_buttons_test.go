@@ -9,6 +9,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/board"
 )
 
 // Buttons on a question to @Operator (#11643): declared on the post, checked by the server against a closed grammar and against the team, stored, listed for the Operator; run by nobody until they click.
@@ -81,4 +83,68 @@ func TestAnAgentMayHaveTenAsksWithButtonsOpen(t *testing.T) {
 	assert.Equal(t, http.StatusOK, status, "the cap is per agent")
 	status, _ = post(map[string]any{"subscriber_id": "Lead", "content": "@Operator plain question", "ask": true})
 	assert.Equal(t, http.StatusOK, status, "a question with no buttons is not counted")
+}
+
+// A wake button names a member as the team lists it: spaces and a number in it are fine (#12600).
+func TestAWakeButtonAcceptsAMemberWhoseNameHasSpacesAndANumber(t *testing.T) {
+	post, _, _, base := buttonRig(t)
+	for _, who := range []string{"QA Reviewer 2", "QA Engineer", "Frontend Dev"} {
+		postJSON(t, base+"/subscribe", map[string]string{"subscriber_id": who, "job_title": who}).Body.Close()
+	}
+	status, out := post(map[string]any{"subscriber_id": "Lead", "content": "@Operator Wake them?", "ask": true,
+		"buttons": []string{"Wake QA Reviewer 2=wake:QA Reviewer 2", "Wake QA Engineer=wake:QA Engineer"}})
+	require.Equal(t, http.StatusOK, status, out)
+	status, out = post(map[string]any{"subscriber_id": "Lead", "content": "@Operator And this one?", "ask": true,
+		"buttons": []string{"Wake Frontend Dev=wake:Frontend Dev", "Wake QA Reviewer 2=wake:QA Reviewer 2"}})
+	require.Equal(t, http.StatusOK, status, out)
+}
+
+// A refused ask is nothing posted, so it is never one of the open asks with buttons (#12600): refusing more often than the cap leaves the agent able to ask.
+func TestARefusedAskWithButtonsIsNotCountedAsOpen(t *testing.T) {
+	post, count, _, _ := buttonRig(t)
+	for i := 0; i < board10(); i++ {
+		status, _ := post(map[string]any{"subscriber_id": "Lead", "content": "@Operator refused", "ask": true, "buttons": []string{"Wake=wake:Nobody"}})
+		require.Equal(t, http.StatusBadRequest, status)
+	}
+	assert.Zero(t, count())
+	status, out := post(map[string]any{"subscriber_id": "Lead", "content": "@Operator now a good one", "ask": true, "buttons": []string{"Wake Dev=wake:Dev"}})
+	assert.Equal(t, http.StatusOK, status, out)
+}
+
+func board10() int { return board.AskButtonsOpenMax + 2 }
+
+// The likeliest reason a wake button was refused (#12600): the question's own text tags the agent to wake, which makes it a question to them as well. It is refused, and the refusal says which name and what to do.
+func TestAWakeQuestionThatTagsTheAgentIsRefusedWithTheCause(t *testing.T) {
+	post, count, _, _ := buttonRig(t)
+	status, out := post(map[string]any{"subscriber_id": "Lead", "content": "@Operator @Dev is asleep: wake them?", "ask": true, "buttons": []string{"Wake Dev=wake:Dev"}})
+	require.Equal(t, http.StatusBadRequest, status, out)
+	msg, _ := out["error"].(string)
+	assert.Contains(t, msg, "@Dev", "names the member the text tags")
+	assert.Contains(t, msg, "without the @", "and what to do")
+	assert.Zero(t, count())
+
+	status, out = post(map[string]any{"subscriber_id": "Lead", "content": "@Operator Dev is asleep: wake them?", "ask": true, "buttons": []string{"Wake Dev=wake:Dev"}})
+	assert.Equal(t, http.StatusOK, status, out)
+}
+
+// The board treats "Name:" as a tag of that member (chat style: "Dev: do X"), so a question that explains each wake with "UI Reviewer: ..." or "Wake UI Reviewer: ..." was a question to them too and its buttons
+// were refused with no @ anywhere (#12600, the Orchestrator's three texts). A button question asks only the Operator, and only a real @ of another member refuses it.
+func TestAColonAfterAMembersNameDoesNotTurnAButtonQuestionIntoAQuestionToThem(t *testing.T) {
+	post, _, h, base := buttonRig(t)
+	for _, who := range []string{"UI Reviewer", "QA Engineer"} {
+		postJSON(t, base+"/subscribe", map[string]string{"subscriber_id": who, "job_title": who}).Body.Close()
+	}
+	for _, c := range []string{
+		"@Operator Two wakes, please.\nUI Reviewer: the provider-cards review and your Dismiss button.\nQA Engineer: takes half of the queued reviews.",
+		"@Operator Wake UI Reviewer: the provider-cards review and your Dismiss button.",
+		"@Operator Wake QA Engineer — it takes half of the queued reviews.",
+	} {
+		status, out := post(map[string]any{"subscriber_id": "Lead", "content": c, "ask": true, "buttons": []string{"Wake UI Reviewer=wake:UI Reviewer", "Wake QA Engineer=wake:QA Engineer"}})
+		require.Equal(t, http.StatusOK, status, "%q: %v", c, out)
+		ask, _ := out["ask"].(map[string]any)
+		assert.Equal(t, []any{"Operator"}, ask["to"], "the question is to the Operator alone, not to the members named with a colon")
+		_ = h
+	}
+	status, out := post(map[string]any{"subscriber_id": "Lead", "content": "@Operator @UI Reviewer wake you?", "ask": true, "buttons": []string{"Wake UI Reviewer=wake:UI Reviewer"}})
+	assert.Equal(t, http.StatusBadRequest, status, "a real @ of another member is still refused: %v", out)
 }

@@ -120,7 +120,11 @@ func (h *BoardHandler) PostMessage(w http.ResponseWriter, r *http.Request) {
 		}
 		guideAsk, asked = label, []string{label}
 	} else if derr == nil && body.Ask {
-		to, err := h.bs.AskTargets(r.Context(), project, body.SubscriberID, clitext.Clean(unescapeLineBreaks(body.Content)))
+		targets := h.bs.AskTargets
+		if len(body.Buttons) > 0 {
+			targets = h.bs.AskTargetsAt // a question with buttons asks the Operator alone: "UI Reviewer: ..." in its text is not a question to them (#12600)
+		}
+		to, err := targets(r.Context(), project, body.SubscriberID, clitext.Clean(unescapeLineBreaks(body.Content)))
 		if err != nil {
 			errBadRequest(w, err.Error())
 			return
@@ -177,7 +181,11 @@ func (h *BoardHandler) PostMessage(w http.ResponseWriter, r *http.Request) {
 		}
 	} else if len(asked) > 0 {
 		// The sender is known now (the request proved it): who is asked is decided again from what was stored, so the asker is never among them.
-		if to, err := h.bs.AskTargets(r.Context(), project, msg.SubscriberID, msg.Content); err == nil {
+		again := h.bs.AskTargets
+		if len(buttons) > 0 {
+			again = h.bs.AskTargetsAt
+		}
+		if to, err := again(r.Context(), project, msg.SubscriberID, msg.Content); err == nil {
 			if err := h.bs.RecordAsk(r.Context(), project, msg, to); err != nil {
 				slog.Warn("board ask not recorded", "board", project, "message", msg.ID, "error", err)
 			} else {
