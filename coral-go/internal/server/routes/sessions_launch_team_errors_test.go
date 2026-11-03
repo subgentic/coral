@@ -137,6 +137,7 @@ func TestTeamLaunchWhereNoMemberStartsRemovesItsWorktree(t *testing.T) {
 	server, _, _, ss := setupSessionsTestServerWithConfig(t, cfg)
 	stubCLIPaths(t, ss)
 	require.NoError(t, ss.SetSetting(context.Background(), "cli_path_claude", filepath.Join(t.TempDir(), "no-such-cli")))
+	require.NoError(t, ss.SetSetting(context.Background(), "launch_in_worktree", "true")) // the experimental switch (#12746)
 	repo := t.TempDir()
 	for _, args := range [][]string{{"init", "-q", "-b", "main"}, {"-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "--allow-empty", "-m", "init"}} {
 		cmd := consoletest.HiddenCommand("git", append([]string{"-C", repo}, args...)...)
@@ -159,6 +160,7 @@ func TestTeamLaunchWhereNoMemberStartsRemovesTheBranchItMade(t *testing.T) {
 	server, _, _, ss := setupSessionsTestServerWithConfig(t, config.Load(t.TempDir()))
 	stubCLIPaths(t, ss)
 	require.NoError(t, ss.SetSetting(context.Background(), "cli_path_claude", filepath.Join(t.TempDir(), "no-such-cli")))
+	require.NoError(t, ss.SetSetting(context.Background(), "launch_in_worktree", "true")) // the experimental switch (#12746)
 	repo := t.TempDir()
 	git := func(args ...string) string {
 		out, err := consoletest.HiddenCommand("git", append([]string{"-C", repo, "-c", "user.email=t@t", "-c", "user.name=t"}, args...)...).CombinedOutput()

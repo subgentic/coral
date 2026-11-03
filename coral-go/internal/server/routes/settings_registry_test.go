@@ -46,6 +46,7 @@ var settingRows = map[string]struct{ good, bad string }{
 	"artifact_comments_hub_write": {`"true"`, `"nope"`},
 	"auto_summarize":              {`"1"`, `"nope"`},
 	"nudge_claude_artifacts":      {`"off"`, `"nope"`},
+	"launch_in_worktree":          {`"off"`, `"nope"`},
 	"refuse_pattern_kill":         {`"off"`, `"nope"`},
 	"update_auto_install":         {`"off"`, `"nope"`},
 	"turn_end_handoff":            {`"off"`, `"later"`},

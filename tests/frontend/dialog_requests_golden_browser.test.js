@@ -136,6 +136,7 @@ const GOLDEN = path.join(__dirname, 'fixtures', 'dialog_requests_golden.json');
         };
         console.log('Agent Team: two agents added through the dialog, one edited, a remote server and a worktree');
         n = await last();
+        await ev(`import((window.__coralStatic || '/static/') + 'state.js').then(m => { m.state.settings = { ...(m.state.settings || {}), launch_in_worktree: 'true' }; return true; })`); // the experimental switch is on (#12746): the option is offered only then
         await openTeam();
         await ev(`document.getElementById('team-agents-list').innerHTML = ''; true`);
         await fill('team-board-name', 'alpha-team');
