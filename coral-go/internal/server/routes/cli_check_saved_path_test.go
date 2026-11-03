@@ -46,3 +46,12 @@ func TestCLICheckSaysAShareDidNotAnswer(t *testing.T) {
 	assert.Equal(t, false, out["found"])
 	assert.Contains(t, out["install_note"], agent.ShareNotAnsweredNote("codex"))
 }
+
+// The sentence names the CLI by its fixed name, never the file name of a path set in Settings (Security's INFO 2 on #295).
+func TestTheShareSentenceNamesTheCLINotACustomPath(t *testing.T) {
+	note := cliShareNote("claude", `C:\tools\my-claude-wrapper.exe`)
+	assert.Contains(t, note, "looks for claude is")
+	assert.NotContains(t, note, "my-claude-wrapper")
+	assert.NotContains(t, note, `C:\tools`)
+	assert.Contains(t, cliShareNote("", `C:\tools\thing.exe`), "looks for thing.exe is", "a check by path with no known type names the file the person gave")
+}

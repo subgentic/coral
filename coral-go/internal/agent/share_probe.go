@@ -106,9 +106,10 @@ func shareNotAnswered(dir string) bool {
 	return f != nil && shareNow().Before(f.quietUntil)
 }
 
-// ShareNotAnsweredNote is the one sentence a person sees when a share holding a common install place did not answer in time (for binary, a CLI's fixed name).
+// ShareNotAnsweredNote is the one sentence a person sees when a share holding a common install place did not answer in time: AppData's npm folder, or the home
+// folder's .local\bin when the home folder is on a share. binary is a CLI's own fixed name (claude, codex), never a path's file name.
 func ShareNotAnsweredNote(binary string) string {
-	return "Your AppData folder is on a network share that did not answer in time, so Coral could not look for " + binary + " there. Check again when the network is back, or set the path in Settings > CLI paths."
+	return "A folder where Coral looks for " + binary + " is on a network share that did not answer in time, so Coral could not look there. Check again when the network is back, or set the path in Settings > CLI paths."
 }
 
 // ShareSkipped reports whether a search for binary skipped a common place because its share did not answer (the CLI check adds ShareNotAnsweredNote then).
