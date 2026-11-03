@@ -35,7 +35,7 @@ const ROWS = [mk('1', 'release-notes', 'operator'), mk('4', 'working-in-a-coral-
         await ev(`document.querySelector('#skills-view tr.dt-row[data-key="${ROWS[0].id}"]').click(); true`);
         await waitFor(`/release-notes/.test(document.getElementById('skills-view').innerText) && ${remove}`, 'the Operator\'s skill keeps its Remove', 6000);
 
-        await ev(`Array.from(document.querySelectorAll('#skills-view button')).find(b => /^All skills/.test(b.textContent))?.click(); true`);
+        await ev(`Array.from(document.querySelectorAll('#skills-view button')).find(b => /^Back to all skills/.test(b.textContent))?.click(); true`);
         await waitFor(`document.querySelectorAll('#skills-view tr.dt-row').length === 2`, 'back to the list', 6000);
         await ev(`document.querySelector('#skills-view tr.dt-row[data-key="${ROWS[1].id}"]').click(); true`);
         await waitFor(`/An example from Coral/.test(document.getElementById('skills-view').innerText)`, 'the example says it stays', 6000);
