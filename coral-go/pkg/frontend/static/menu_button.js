@@ -64,7 +64,8 @@ export function openMenu(toggle, { focusFirst = true } = {}) {
         current.observer = new MutationObserver(() => { if (!toggle.isConnected || !menu.isConnected) closeMenus(); });
         current.observer.observe(document.body, { childList: true, subtree: true });
     } else place(toggle, menu);
-    if (focusFirst) items(menu)[0]?.focus();
+    if (focusFirst) items(menu)[0]?.focus({ preventScroll: true }); // the placed menu is already on screen: taking focus must not scroll the dialog (that scroll would close the menu, #12909)
+    current.scrolled = scrollPositions(toggle); // the baseline for 'moved since open' is taken after the open's own focus and placement: only a LATER scroll closes it
 }
 
 /** The menu button's click: open it, or close it when it is open. */

@@ -42,6 +42,13 @@ const { coralReady, framesJs } = require('./helpers/wait');
             assert.equal(await open(), 'true', at + 'a list that does not hold the toggle scrolling does not close the menu');
             await ev(`document.getElementById('mst').scrollTop = 700; true`);
             await waitFor(`document.getElementById('mt').getAttribute('aria-expanded') === 'false'`, at + 'the list that holds the toggle scrolling closes it', 5000);
+            // a plain menu (not a table's) in a dialog-like scroller whose first item is below the fold: taking focus used to scroll the dialog to it, and that scroll, which the open itself caused, closed the menu (#12909, the New team dialog's More). It stays open; a later scroll still closes it.
+            await ev(`document.getElementById('mst').remove(); document.body.insertAdjacentHTML('beforeend', '<div id="dlg" style="position:fixed;left:0;top:0;width:280px;height:200px;overflow:auto;z-index:50;background:#fff"><div style="height:700px"></div><button id="mt2" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="mm2">More</button><div id="mm2" class="menu" role="menu" hidden style="position:static"><button type="button" role="menuitem">One</button><button type="button" role="menuitem">Two</button></div><div style="height:50px"></div></div>'); import(${S} + 'menu_button.js').then(m => { m.openMenu(document.getElementById('mt2')); return true; })`);
+            await ev(framesJs(4));
+            assert.equal(await ev(`document.getElementById('mt2').getAttribute('aria-expanded')`), 'true', at + 'a menu in a dialog-like scroller stays open after its first item took focus');
+            assert.equal(await ev(`document.getElementById('dlg').scrollTop`), 0, at + 'and taking focus did not scroll the dialog');
+            await ev(`document.getElementById('dlg').scrollTop = 40; true`);
+            await waitFor(`document.getElementById('mt2').getAttribute('aria-expanded') === 'false'`, at + 'a later scroll of that dialog still closes it', 5000);
             console.log(`   ✓ ${w} px`);
         }
         console.log('PASS a table menu ignores the late event of a scroll that ended before it opened');
