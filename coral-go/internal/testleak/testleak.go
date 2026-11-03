@@ -20,6 +20,9 @@ var Ignore = []goleak.Option{
 	// (a sync.Once), and it can still be setting up its performance counter, inside a syscall,
 	// when the server context it was given has already ended.
 	goleak.IgnoreAnyFunction("github.com/shirou/gopsutil/v4/load.loadAvgGoroutine"),
+	// Go's Windows synchronous file IO (internal/poll, in the Go development tree after 1.27): the runtime keeps a worker goroutine, locked to its thread, for the process once a file read or
+	// write has needed it, so it is still there when a package's TestMain checks. Not Coral's: it is not listed in Go 1.27.3, and a package that passed there would otherwise fail on the next Go.
+	goleak.IgnoreAnyFunction("internal/poll.(*syncIOWorkerState).run"),
 	// The guardian client's watcher (internal/ptymanager, #6129): one goroutine for the process waits on the guardian that ends terminals when Coral dies, and starts another if it exits.
 	goleak.IgnoreAnyFunction("github.com/subgentic/coral/internal/ptymanager.(*guardianClient).watch"),
 }
