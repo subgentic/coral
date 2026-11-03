@@ -201,8 +201,11 @@ func TestSkillSearchQuotesEveryWordAndRanksTheDescriptionFirst(t *testing.T) {
 	hits, _ = ss.SearchSkills(ctx, `pdf OR accounting`, 10)
 	assert.Empty(t, hits, "OR is a word that is in no skill, not an operator")
 	hits, _ = ss.SearchSkills(ctx, `acc*`, 10)
-	assert.Empty(t, hits, "no prefix search")
-	assert.Equal(t, `"a" "b" "c" "d" "e" "f" "g" "h"`, skillMatch("a b c d e f g h i j"), "at most eight words")
+	require.Len(t, hits, 1, "the last word is a prefix whether or not the asker typed the star: the star is not syntax")
+	assert.Equal(t, "accounting", hits[0].Name)
+	hits, _ = ss.SearchSkills(ctx, `acc pdf`, 10)
+	assert.Empty(t, hits, "an earlier word is whole, never a prefix")
+	assert.Equal(t, `"a" "b" "c" "d" "e" "f" "g" "h"*`, skillMatch("a b c d e f g h i j"), "at most eight words, the last one a prefix")
 	for i := 0; i < 30; i++ {
 		_, _, err := addSkill(ctx, ss, AddSkillInput{Skill: skillOf(fmt.Sprintf("bulk-%d", i), "common bulk words", "b"), Digest: dg(400 + i), Kind: PublisherOperator})
 		require.NoError(t, err)
@@ -403,4 +406,35 @@ func TestReplacingAnAttachedSkillIsOneTransactionAndAFailureKeepsTheOldPin(t *te
 	have, _ = ss.AttachedSkills(ctx, "sid-a")
 	require.Len(t, have, 1, "the new version replaces the old one")
 	assert.Equal(t, bad.ID, have[0].SkillID)
+}
+
+// #12781: the last word of a search matches as a prefix, so a person typing "cr" finds "create-...". Operators and quotes in the words stay words.
+func TestSkillSearchMatchesThePrefixOfTheLastWord(t *testing.T) {
+	ctx, ss, _ := skillStore(t)
+	_, _, err := addSkill(ctx, ss, AddSkillInput{Skill: skillOf("creating-reports", "Builds a quarterly report.", "Gather the figures."), Digest: dg(21), Kind: PublisherOperator})
+	require.NoError(t, err)
+	_, _, err = addSkill(ctx, ss, AddSkillInput{Skill: skillOf("deploy-helper", "Ships a release.", "Run the deploy."), Digest: dg(22), Kind: PublisherOperator})
+	require.NoError(t, err)
+	names := func(q string) []string {
+		hits, err := ss.SearchSkills(ctx, q, 10)
+		require.NoError(t, err, q)
+		var out []string
+		for _, h := range hits {
+			out = append(out, h.Name)
+		}
+		return out
+	}
+	assert.Equal(t, []string{"creating-reports"}, names("cr"))
+	assert.Equal(t, []string{"creating-reports"}, names("creat"))
+	assert.Equal(t, []string{"creating-reports"}, names("quarterly rep"), "earlier words stay whole, the last is a prefix")
+	assert.Empty(t, names("quar rep"), "an earlier word is not a prefix")
+	assert.Equal(t, []string{"deploy-helper"}, names("DEP"))
+	assert.Empty(t, names("zzz"))
+	for _, q := range []string{`cr"`, `"cr`, "cr*", "cr OR deploy", "NEAR(cr deploy)", "name:cr", "-cr", `"" *`, "(", "^cr"} {
+		_, err := ss.SearchSkills(ctx, q, 10)
+		assert.NoError(t, err, "no FTS syntax from the words: %q", q)
+	}
+	assert.Equal(t, `"cr"*`, skillMatch(`cr"`))
+	assert.Equal(t, `"cr" "deploy"*`, skillMatch("cr deploy"))
+	assert.Equal(t, "", skillMatch(`"*()`))
 }
