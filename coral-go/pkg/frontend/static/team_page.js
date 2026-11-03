@@ -443,7 +443,7 @@ async function focusGoalTask(id) {
         if (target && S.tab === 'goals') {
             const on = document.activeElement;
             if (on === target) { if (heldSince < 0) heldSince = i; if (i - heldSince >= 10) return; }
-            else if (heldSince < 0 || !on || on === document.body) { target.focus(); heldSince = document.activeElement === target ? i : -1; }
+            else if (!on || on === document.body || (heldSince < 0 && on.closest('#team-panel-goals .goals-back, #goals-detail-title'))) { target.focus(); heldSince = document.activeElement === target ? i : -1; } // the page's own focus (the body, the goal's way back or its heading) is taken; a control the person moved to before the row was back is theirs (#12547)
             else return;
         }
         await new Promise(r => setTimeout(r, 50));
