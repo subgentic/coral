@@ -34,11 +34,11 @@ func TestWindowsIconHasAllSizes(t *testing.T) {
 			t.Fatalf("entry %d runs past the end of the file", size)
 		}
 		img := data[off : off+length]
-		if size <= 48 && binary.LittleEndian.Uint32(img[0:4]) != 40 {
+		if size <= 128 && binary.LittleEndian.Uint32(img[0:4]) != 40 {
 			t.Errorf("%dpx entry is not a BMP/DIB image", size)
 		}
 	}
-	for _, want := range []int{16, 24, 32, 48, 256} {
+	for _, want := range []int{16, 20, 24, 32, 40, 48, 64, 96, 128, 256} {
 		if !got[want] {
 			t.Errorf("icon.ico has no %dpx image", want)
 		}
@@ -52,7 +52,15 @@ func TestUserFacingExesLinkTheIconResource(t *testing.T) {
 	}
 	// A slice from the middle of the 48px DIB (artwork pixels, not header or transparent
 	// corners) must appear in each resource.
-	e := ico[6+16*3 : 22+16*3]
+	var e []byte
+	for i := 0; i < int(binary.LittleEndian.Uint16(ico[4:6])); i++ {
+		if ico[6+16*i] == 48 {
+			e = ico[6+16*i : 22+16*i]
+		}
+	}
+	if e == nil {
+		t.Fatal("icon.ico has no 48px image")
+	}
 	img := ico[binary.LittleEndian.Uint32(e[12:16]):][:binary.LittleEndian.Uint32(e[8:12])]
 	chunk := img[len(img)/2-64 : len(img)/2+64]
 	for _, cmd := range []string{"coral", "launch-coral", "coral-tray", "coral-app"} {
