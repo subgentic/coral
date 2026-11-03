@@ -361,3 +361,14 @@ func TestAFailedSettingsReadMutesNothing(t *testing.T) {
 	assert.Nil(t, e.needsYou(t)["muted"])
 	assert.False(t, readInboxPrefs(nil).muted("t", "release"))
 }
+
+// QA's SHOULD on #12783 (the other branch of the same rule): with no settings reader wired at all, nothing is muted either.
+func TestNoSettingsReaderMutesNothing(t *testing.T) {
+	e := newInboxEnv(t)
+	e.kind(t, "release")
+	e.settings["inbox_kind_release"] = "false"
+	require.Equal(t, 0, e.count(t), "with the settings readable the file is muted")
+	e.h.SetInboxSettings(nil)
+	assert.Equal(t, 1, e.count(t), "no reader: the file counts")
+	assert.Nil(t, e.needsYou(t)["muted"])
+}
