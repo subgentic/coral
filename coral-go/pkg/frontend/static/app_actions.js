@@ -265,6 +265,7 @@ registerActions({
     'analytics-advanced': () => { importOnce('./analytics_views.js').then(m => m.toggleAdvanced()).catch(() => {}); },
     'analytics-view': el => { const key = el.dataset.view; importOnce('./analytics_views.js').then(m => m.selectView(key, { focus: true })).catch(() => {}); },
     'analytics-phone-back': () => { importOnce('./analytics_views.js').then(m => m.phoneBack()).catch(() => {}); },
+    'skills-search-filter': el => { const v = el.value; importOnce('./skills_tab.js').then(m => m.filterSkills(v)).catch(() => {}); }, // the Skills sidebar's search box is in the page from the start; skills_tab.js loads with the page (#12997)
     'automations-search-filter': el => { const v = el.value; importOnce('./automations.js').then(m => m.filterAutomations(v)).catch(() => {}); }, // the Automations sidebar's search box is in the page from the start; automations.js loads with the tab
     'inbox-search-filter': el => { if (nativeInbox()) return; /* the Hub-served Inbox searches on Enter (inbox_sidebar.js) */ const v = el.value; importOnce('./inbox_sidebar.js').then(m => m.filterInbox(v)).catch(() => {}); }, // the Inbox sidebar's search box is in the page from the start; inbox_sidebar.js loads with the tab
     'wf-build-agent': () => launchWorkflowAgent(),
