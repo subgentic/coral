@@ -13,6 +13,7 @@
 .ssh-step-failed .ssh-step-glyph { color: var(--error); }
 .ssh-step-body { display: flex; flex-direction: column; min-width: 0; overflow-wrap: anywhere; }
 .ssh-step-state, .ssh-step-detail { color: var(--text-secondary); font-size: var(--fs-sm); }
+.ssh-step-help { margin: var(--space-xs) 0 0; padding: var(--space-sm); background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-md); font-family: var(--font-mono, monospace); font-size: var(--fs-sm); white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; } /* the commands to run by hand under a failed step: wrapped, so a long line needs no sideways scroll, and selectable (#12947) */
 .ssh-key { display: flex; flex-wrap: wrap; gap: var(--space-xs) var(--space-sm); min-width: 0; overflow-wrap: anywhere; }
 .ssh-key-fp { font-family: var(--font-mono, monospace); font-size: var(--fs-sm); overflow-wrap: anywhere; }
 .ssh-check { display: flex; gap: var(--space-sm); align-items: flex-start; font-size: var(--fs-base); }

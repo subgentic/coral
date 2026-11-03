@@ -186,6 +186,13 @@ export function mountSshSetup(host, { mode = 'setup', server = null, action = nu
             const body = el('span', 'ssh-step-body');
             body.append(el('span', 'ssh-step-title', s.title), el('span', 'ssh-step-state', ` ${STEP_WORDS[s.state] || ''}`));
             if (s.detail) body.append(el('span', 'ssh-step-detail', s.detail));
+            if (Array.isArray(s.help) && s.help.length) { // what to run on that computer by hand, from the hub's own constants: text, one line to a line, in one block that can be selected (#12947)
+                const pre = el('pre', 'ssh-step-help');
+                pre.tabIndex = 0;
+                pre.setAttribute('aria-label', `Commands to run on that computer for the ${s.title || 'failed'} step`);
+                pre.textContent = s.help.map(String).join('\n');
+                body.append(pre);
+            }
             li.append(g, body);
             ol.append(li);
         }

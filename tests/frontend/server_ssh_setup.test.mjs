@@ -261,4 +261,33 @@ for (const [phase, word] of [['done', /Done/], ['failed', /did not|could not|Cou
     assert.equal(seen, 1);
 }
 
+// ── a failed restart shows the commands to run by hand under its step, as text in one block (#12947) ──────────────────────────────────
+{
+    hub(); planKind = 'upgrade';
+    const help = ['# To see why, and to start it yourself, sign in to that computer and run these lines.', 'tail -n 40 ~/.coral-server/coral.log', 'kill "$(cat ~/.coral-server/coral.pid)"',
+        'nohup ~/.coral-server/2.0.10/root/coral --host 127.0.0.1 --port 8420 <img src=x onerror=alert(1)> & echo $! > ~/.coral-server/coral.pid', '# Then choose Upgrade here again.'];
+    globalThis.fetch = async (url, init = {}) => {
+        const json = (d, status = 200) => new Response(JSON.stringify(d), { status, headers: { 'Content-Type': 'application/json' } });
+        if (url === '/api/servers/provision/options') return json(options);
+        if (url === '/api/servers/provision/p1' && (init.method || 'GET') === 'GET') {
+            return json({ plan: 'p1', kind: 'upgrade', phase: 'failed', error: 'The new release could not be started on that computer: its start command ended with code 9.', steps: [
+                { name: 'install', title: 'Install', state: 'ok', detail: 'Installed.' },
+                { name: 'restart', title: 'Restart Coral', state: 'failed', detail: 'The new release could not be started on that computer: its start command ended with code 9.', help },
+                { name: 'verify', title: 'Check the new release', state: 'pending' }] });
+        }
+        return json({}, 404);
+    };
+    const host = fresh();
+    mountSshSetup(host, { mode: 'manage', server: { id: 'ssh-box', label: 'Build box' }, action: 'upgrade', resume: 'p1', pollMs: 5 });
+    await until(() => host.querySelector('.ssh-step-help'), 'the commands under the failed step');
+    const pre = host.querySelector('.ssh-step-help');
+    assert.equal(pre.tagName, 'PRE', 'one block of preformatted text');
+    assert.equal(pre.textContent, help.join('\n'), 'the lines, one to a line, exactly');
+    assert.equal(host.querySelector('img'), null, 'a line from the hub became markup');
+    assert.equal(host.querySelectorAll('.ssh-step-help').length, 1, 'only the failed step has them');
+    assert.ok(pre.closest('.ssh-step').classList.contains('ssh-step-failed'), 'and it is under the failed step');
+    assert.equal(pre.tabIndex, 0, 'a keyboard can reach it to scroll or select');
+    assert.ok(pre.getAttribute('aria-label'), 'and it is named');
+}
+
 console.log('server_ssh_setup: ok');

@@ -80,6 +80,8 @@ const (
 	// CmdCheckPort is the check before a start: exit 0 when this user's coral-server session exists (a start leaves it as it is) or nothing listens on port 8420 (read from /proc/net/tcp and tcp6, Linux),
 	// 2 when something does (another user's Coral, or any program), 3 when it cannot tell (the start then goes ahead as it always did).
 	CmdCheckPort
+	// CmdTailLog prints the last 20 lines of <install>/coral.log, the output of the Coral a start left (#12947): for the hub's own log when a restart fails, never for the person.
+	CmdTailLog
 )
 
 // aliveTest is true (exit 0) when <install>/coral.pid names a live process of this user whose command line is a Coral from the install folder: the daemon a start left. A recycled PID of another program fails the
@@ -136,6 +138,7 @@ var specs = map[Command]spec{
 		"if printf '%%s\\n' \"$out\" | grep -F -- \"$HOME/" + InstallDir + "/\" | grep -Eq '/root/coral( |$)'; then exit 2; fi; exit 0"},
 	CmdCheckPort: {template: "if tmux has-session -t =coral-server 2>/dev/null; then exit 0; fi; if " + aliveTest + "; then exit 0; fi; [ -r /proc/net/tcp ] || exit 3; " +
 		"if grep -Eqs '^ *[0-9]+: [0-9A-Fa-f]+:20E4 [0-9A-Fa-f:]+ 0A ' /proc/net/tcp /proc/net/tcp6; then exit 2; fi; exit 0"},
+	CmdTailLog:            {template: "tail -n 20 \"$HOME/" + InstallDir + "/coral.log\" 2>/dev/null"},
 	CmdInstallOwnerSecret: {template: "\"$HOME/" + InstallDir + "/%s/root/coral\" hub-owner-secret --home \"$HOME/" + InstallDir + "/data\"", args: []*regexp.Regexp{versionRe}},
 	CmdFreeKB:             {template: "df -Pk \"$HOME\" | awk 'NR==2 {print $4}'"},
 	// The recorded sum goes FIRST: a re-unpack that is interrupted leaves no sum next to a half-written root, so the next run does not say "already installed". It is written last.
