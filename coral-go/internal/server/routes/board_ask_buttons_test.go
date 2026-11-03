@@ -126,3 +126,25 @@ func TestAWakeQuestionThatTagsTheAgentIsRefusedWithTheCause(t *testing.T) {
 	status, out = post(map[string]any{"subscriber_id": "Lead", "content": "@Operator Dev is asleep: wake them?", "ask": true, "buttons": []string{"Wake Dev=wake:Dev"}})
 	assert.Equal(t, http.StatusOK, status, out)
 }
+
+// The board treats "Name:" as a tag of that member (chat style: "Dev: do X"), so a question that explains each wake with "UI Reviewer: ..." or "Wake UI Reviewer: ..." was a question to them too and its buttons
+// were refused with no @ anywhere (#12600, the Orchestrator's three texts). A button question asks only the Operator, and only a real @ of another member refuses it.
+func TestAColonAfterAMembersNameDoesNotTurnAButtonQuestionIntoAQuestionToThem(t *testing.T) {
+	post, _, h, base := buttonRig(t)
+	for _, who := range []string{"UI Reviewer", "QA Engineer"} {
+		postJSON(t, base+"/subscribe", map[string]string{"subscriber_id": who, "job_title": who}).Body.Close()
+	}
+	for _, c := range []string{
+		"@Operator Two wakes, please.\nUI Reviewer: the provider-cards review and your Dismiss button.\nQA Engineer: takes half of the queued reviews.",
+		"@Operator Wake UI Reviewer: the provider-cards review and your Dismiss button.",
+		"@Operator Wake QA Engineer — it takes half of the queued reviews.",
+	} {
+		status, out := post(map[string]any{"subscriber_id": "Lead", "content": c, "ask": true, "buttons": []string{"Wake UI Reviewer=wake:UI Reviewer", "Wake QA Engineer=wake:QA Engineer"}})
+		require.Equal(t, http.StatusOK, status, "%q: %v", c, out)
+		ask, _ := out["ask"].(map[string]any)
+		assert.Equal(t, []any{"Operator"}, ask["to"], "the question is to the Operator alone, not to the members named with a colon")
+		_ = h
+	}
+	status, out := post(map[string]any{"subscriber_id": "Lead", "content": "@Operator @UI Reviewer wake you?", "ask": true, "buttons": []string{"Wake UI Reviewer=wake:UI Reviewer"}})
+	assert.Equal(t, http.StatusBadRequest, status, "a real @ of another member is still refused: %v", out)
+}

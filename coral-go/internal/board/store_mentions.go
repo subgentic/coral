@@ -156,6 +156,11 @@ func isAlphaNum(b byte) bool {
 // "@Orchestrator 3 tasks are ready" still tags the Orchestrator on a board without an
 // "Orchestrator 3" (Security's #3543 review).
 func containsExplicitTag(content, subscriberID, jobTitle string, numbered ...map[string]bool) bool {
+	return containsTag(content, subscriberID, jobTitle, false, numbered...)
+}
+
+// containsTag is containsExplicitTag, and with atOnly only an "@" form counts: "Name:" and "Name —" (the chat style) do not.
+func containsTag(content, subscriberID, jobTitle string, atOnly bool, numbered ...map[string]bool) bool {
 	var names map[string]bool
 	if len(numbered) > 0 {
 		names = numbered[0]
@@ -164,6 +169,9 @@ func containsExplicitTag(content, subscriberID, jobTitle string, numbered ...map
 	ts := mentionTermsOf(subscriberID, jobTitle)
 	for ti, term := range ts.terms {
 		tLower := ts.lower[ti]
+		if atOnly && !strings.HasPrefix(term, "@") {
+			continue
+		}
 		idx := 0
 		for {
 			pos := strings.Index(contentLower[idx:], tLower)
