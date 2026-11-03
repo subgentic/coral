@@ -235,3 +235,32 @@ func TestCallersPastTheScanQueueAreRefusedAtOnceAndTheRestStillGetTheirTurn(t *t
 		}
 	}
 }
+
+// The gap is 100 ms (QA): two asks 10 ms apart share one scan, and an ask 150 ms after the scan makes a new one. The default gap is used, not a test value.
+func TestTwoAsksTenMillisecondsApartShareAScanAndOneAfterTheGapDoesNot(t *testing.T) {
+	real := mySockets
+	defer func() { mySockets = real; forgetScan() }()
+	forgetScan()
+	require.Equal(t, 100*time.Millisecond, scanGap, "the gap this test is about")
+	server := netip.MustParseAddrPort("127.0.0.1:8420")
+	client := netip.MustParseAddrPort("127.0.0.1:50001")
+	var scans atomic.Int32
+	mySockets = func(visit func(local, remote netip.AddrPort) bool) error {
+		scans.Add(1)
+		visit(client, server)
+		visit(server, client)
+		return nil
+	}
+	ask := func() {
+		mine, err := ownedByMyProcess(client, server)
+		require.NoError(t, err)
+		require.True(t, mine)
+	}
+	ask()
+	time.Sleep(10 * time.Millisecond) // sleep-ok: the gap itself is what is measured
+	ask()
+	assert.Equal(t, int32(1), scans.Load(), "10 ms apart: one scan")
+	time.Sleep(150*time.Millisecond - 10*time.Millisecond) // sleep-ok: 150 ms after the first scan
+	ask()
+	assert.Equal(t, int32(2), scans.Load(), "150 ms after the scan: a new one")
+}
