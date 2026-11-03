@@ -10,14 +10,14 @@ const { coralReady, framesJs } = require('./helpers/wait');
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const { Input } = client;
-    const S = `(window.__coralStatic || '/static/')`, team = 'edge-' + Date.now().toString(36), T = '#group-table-view';
+    const S = `(window.__coralStatic || '/static/')`, teamPrefix = 'edge-' + Date.now().toString(36), teams = [], T = '#group-table-view';
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [w, h] of [[1280, 800], [1440, 900]]) {
-            const at = `${w} px: `;
+            const at = `${w} px: `, team = `${teamPrefix}-${w}`; teams.push(team); // Each viewport owns a fresh board; a deleted key stays deleted (#12995).
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile: false });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await ev(`localStorage.clear(); sessionStorage.clear(); true`); await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
-            const post = (path, body) => ev(`fetch(${JSON.stringify(path)}, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: ${JSON.stringify(JSON.stringify(body))} }).then(r => r.status)`);
+            const post = async (path, body) => { const status = await ev(`fetch(${JSON.stringify(path)}, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: ${JSON.stringify(JSON.stringify(body))} }).then(r => r.status)`); assert.ok(status >= 200 && status < 300, at + path + ': fixture POST returned ' + status); };
             await post(`/api/board/${team}/subscribe`, { subscriber_id: 'Operator', job_title: 'Operator' }); await post(`/api/board/${team}/subscribe`, { subscriber_id: 'Writer', job_title: 'Writer' });
             await post(`/api/board/${team}/messages`, { subscriber_id: 'Writer', content: '@Operator may I go ahead with the launch plan?', ask: true });
             await ev(`window.__m.add('proj1', 'A', 2, { sleeping: false, session_id: 'w-sid', display_name: 'Writer', board_project: '${team}' }); window._coralSetLiveSessions(Object.values(window.__m.agents).map(a => ({ ...window.__m.entry(a), waiting_for_input: true, working_directory: '/Users/someone/Projects/a-folder', agent_type: 'claude' }))); true`);
@@ -50,6 +50,6 @@ const { coralReady, framesJs } = require('./helpers/wait');
             assert.ok(await ev(`document.querySelector('${T} .cols-reset-btn').hidden`) && !(await ev(`localStorage.getItem(Object.keys(localStorage).find(k => k.startsWith('coral-dt-widths:Needs')) || 'none')`)), at + 'and the button and the kept widths are gone');
             await removeBoards(ev, [team]).catch(() => {});
         }
-    } finally { await removeBoards(ev, [team]).catch(() => {}); await client.close(); }
+    } finally { await removeBoards(ev, teams).catch(() => {}); await client.close(); }
     console.log('table_edge_drag_browser: ok');
 })().catch(e => { console.error(e && e.message || e); process.exit(1); });
