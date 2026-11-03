@@ -163,3 +163,25 @@ func TestTheLineIsMadeOfTheCleanedNameAndTheIdOnly(t *testing.T) {
 	assert.NotContains(t, line, "‮")
 	assert.True(t, strings.HasSuffix(line, "(coral-agent skills get --id "+id+")."), line)
 }
+
+// The agent named in the path must be the one the session_id belongs to (Security's SHOULD on #12676): a mismatch is refused and attaches nothing, to either.
+func TestTheNameInThePathMustBelongToTheSessionIdGiven(t *testing.T) {
+	e := newSkillsEnv(t)
+	e.liveAgent("sid-a")
+	e.liveAgent("sid-b")
+	sk := e.approved("release-notes", "Writes release notes.", 1)
+
+	code, out := e.call("POST", "/api/sessions/live/claude-sid-b/skills?session_id=sid-a", attachBody(sk.ID), "operator")
+	assert.Equal(t, 400, code, out)
+	code, _ = e.call("POST", "/api/sessions/live/codex-sid-a/skills?session_id=sid-a", attachBody(sk.ID), "operator")
+	assert.Equal(t, 400, code, "the right id under another CLI's name is not that agent either")
+	for _, id := range []string{"sid-a", "sid-b"} {
+		have, _ := e.ss.AttachedSkills(context.Background(), id)
+		assert.Empty(t, have, id+": nothing attached by a mismatched call")
+	}
+
+	code, out = e.call("POST", "/api/sessions/live/claude-sid-a/skills?session_id=sid-a", attachBody(sk.ID), "operator")
+	assert.Equal(t, 200, code, out)
+	code, out = e.call("POST", "/api/sessions/live/claude-sid-b/skills", attachBody(sk.ID), "operator")
+	assert.Equal(t, 200, code, "with no session_id it is taken from the name, so it matches by construction: %v", out)
+}

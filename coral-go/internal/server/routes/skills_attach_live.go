@@ -108,6 +108,10 @@ func (h *SkillsHandler) AttachSkillToLive(w http.ResponseWriter, r *http.Request
 		errNotFound(w, "agent not found")
 		return
 	}
+	if name := chi.URLParam(r, "name"); !strings.EqualFold(name, live.AgentType+"-"+live.SessionID) { // the name in the path is the agent the session_id belongs to, never another one (Security's SHOULD on #12676)
+		errBadRequest(w, "the agent name in the path does not belong to that session_id")
+		return
+	}
 	row, err := h.ss.GetApprovedSkill(r.Context(), body.SkillID)
 	if err != nil {
 		writeError(w, http.StatusConflict, "skill_not_approved", "that skill is not an approved skill")
