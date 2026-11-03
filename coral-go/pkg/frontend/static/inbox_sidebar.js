@@ -888,6 +888,7 @@ function hubFrameTable(key) {
 }
 
 registerGroupSource('hub-inbox', {
+    holdRedraw: true, // not redrawn under a held pointer (#12636): a row answered elsewhere would move the one under the finger
     signature: () => JSON.stringify([state.hub, state.servers]),
     toolbar: key => HUB_FRAMES[key] && nativeInbox() ? null : key === 'needs' ? inboxNeedsToolbar() : key === 'tasks' ? inboxTaskToolbar() : key === 'goals' ? inboxGoalsToolbar() : key === 'saved' ? inboxSavedToolbar() : key === 'activity' ? inboxActivityToolbar() : CH.CHAT_KEY.test(key) ? inboxChatsToolbar(key) : key === 'artifacts' ? IA.artifactsToolbar(() => renderFolderCounts()) : ({ search: { id: 'inbox-search', label: 'Search the Inbox' } }), // the page's toolbar line, the same shape for Needs you, Tasks and Saved (#7723)
     keys: () => GROUPS.map(g => g.key),

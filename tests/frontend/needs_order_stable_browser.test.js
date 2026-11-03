@@ -62,6 +62,17 @@ const { coralReady, framesJs } = require('./helpers/wait');
             const held = await ev(`(() => { const row = [...document.querySelectorAll('${T} tbody tr')].find(t => /Q-(\\w+)-end/.exec(t.textContent)[1] === ${JSON.stringify(sorted[1])}); return Math.round(row.getBoundingClientRect().top); })()`);
             await client.Input.dispatchMouseEvent({ type: 'mouseReleased', x: target.x, y: target.y, button: 'left', clickCount: 1 });
             assert.equal(held, target.top, at + 'the row under the held pointer did not move when a late row arrived');
+
+            // and when a row ABOVE it is answered elsewhere while the pointer is held: it stays on screen until the pointer goes up, then it goes
+            await client.Input.dispatchMouseEvent({ type: 'mousePressed', x: target.x, y: target.y, button: 'left', clickCount: 1 });
+            await ev(`window.__asks = window.__asks.filter(a => !(new RegExp('Q-' + ${JSON.stringify(sorted[0])} + '-end')).test(a.text)); true`);
+            await refresh();
+            const heldNames = await order();
+            const heldTop = await ev(`(() => { const row = [...document.querySelectorAll('${T} tbody tr')].find(t => /Q-(\\w+)-end/.exec(t.textContent)[1] === ${JSON.stringify(sorted[1])}); return Math.round(row.getBoundingClientRect().top); })()`);
+            await client.Input.dispatchMouseEvent({ type: 'mouseReleased', x: target.x, y: target.y, button: 'left', clickCount: 1 });
+            assert.equal(heldTop, target.top, at + 'a row above the held one was answered elsewhere: the held row did not move up');
+            assert.ok(heldNames.includes(sorted[0]), at + 'the answered row stays until the pointer is released: ' + JSON.stringify(heldNames));
+            await waitFor(`!${JSON.stringify(sorted[0])} || ![...document.querySelectorAll('${T} tbody tr')].some(t => t.textContent.includes('Q-' + ${JSON.stringify(sorted[0])} + '-end'))`, 'the answered row goes once the pointer is up', 10000);
             console.log(`   ✓ ${w} px`);
         }
         console.log('PASS Needs you keeps its order when a computer answers late');
