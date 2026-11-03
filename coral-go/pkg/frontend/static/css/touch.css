@@ -29,7 +29,8 @@
     }
 
     /* Tabs and inline selects keep their width; only short ones grow wider. */
-    .nav-select {
+    .nav-select,
+    .skills-head select { /* the Skills list's Show filter was a bare 21 px select on a phone (#12978); a mouse keeps its size */
         min-width: var(--control-touch-height);
         min-height: var(--control-touch-height);
     }
