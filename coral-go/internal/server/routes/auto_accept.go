@@ -329,9 +329,6 @@ func (a *AutoAcceptor) Kick() {
 // Run checks auto-accept sessions every 2 s and on each kick until ctx ends.
 // Call Start first.
 func (a *AutoAcceptor) Run(ctx context.Context) {
-	if ptymanager.Foreign() { // a Coral on a copy of another's database answers nothing (internal/dataowner)
-		return
-	}
 	t := time.NewTicker(autoAcceptInterval)
 	defer t.Stop()
 	for {

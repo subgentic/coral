@@ -31,9 +31,6 @@ const (
 // DeliverAutomated types an automated send now, with its Enter, unless the screen shows that typing would be a wrong answer
 // (see the package comment): then it types nothing, keeps nothing and says so (SkippedOf).
 func DeliverAutomated(ctx context.Context, in AutomatedInput) (Delivery, error) {
-	if err := RefuseIfForeign(); err != nil { // a Coral on a copy of another's database types nothing (foreign.go)
-		return Skipped, err
-	}
 	if in.Send == nil {
 		return Sent, errors.New("automated input without a send function")
 	}
@@ -296,9 +293,6 @@ func (g *inputGate) typeNow(ctx context.Context, in AutomatedInput) (enterWithhe
 // AutoAcceptSend is the one automated path allowed to type into an open prompt: the opt-in auto-accept feature answering an approval
 // it judged safe. It is logged in the input debug log. Nothing else may call it (a test enforces that).
 func AutoAcceptSend(ctx context.Context, name string, send func(ctx context.Context) error) error {
-	if err := RefuseIfForeign(); err != nil {
-		return err
-	}
 	inputlog.Note(name, inputlog.Keys, "[auto-accept answers an approval prompt]")
 	return send(ctx)
 }

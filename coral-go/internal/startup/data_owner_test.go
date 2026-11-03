@@ -99,11 +99,10 @@ func TestAFolderTheLastReleaseLeftBehindOpensOwnedWithItsAgentsRecovered(t *test
 		require.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte("x"), 0o600))
 	}
 	addAgents(t, db, 3) // the team: awake when the last release stopped
-	t.Cleanup(func() { ptymanager.SetForeign(false); dataowner.ResetCopyWarningForTest() })
+	t.Cleanup(dataowner.ResetCopyWarningForTest)
 
 	v := settleDataOwner(ctx, db, dir)
 	assert.False(t, v.Foreign, "no id: an upgrade in place")
-	assert.False(t, ptymanager.Foreign(), "nothing is withheld")
 	assert.Empty(t, dataowner.CopyWarning(), "and there is no warning")
 	id, err := db.DataDirID(ctx)
 	require.NoError(t, err)
@@ -122,7 +121,7 @@ func TestAFolderTheLastReleaseLeftBehindOpensOwnedWithItsAgentsRecovered(t *test
 // A copy (the id's row without the id file) only warns: Coral starts as usual, the warning is there for the dashboard, and the press adopts the folder in place.
 func TestACopyOnlyWarnsAndTheButtonAdoptsItInPlace(t *testing.T) {
 	ctx := context.Background()
-	t.Cleanup(func() { ptymanager.SetForeign(false); dataowner.ResetCopyWarningForTest() })
+	t.Cleanup(dataowner.ResetCopyWarningForTest)
 	live, liveDir := ownerRig(t)
 	require.False(t, settleDataOwner(ctx, live, liveDir).Foreign)
 	addAgents(t, live, 2)
@@ -135,7 +134,6 @@ func TestACopyOnlyWarnsAndTheButtonAdoptsItInPlace(t *testing.T) {
 
 	v := settleDataOwner(ctx, copied, copyDir)
 	assert.True(t, v.Foreign, "the ids show a copy")
-	assert.False(t, ptymanager.Foreign(), "and Coral still runs as usual: nothing is withheld")
 	assert.Equal(t, dataowner.Notice, dataowner.CopyWarning(), "the dashboard is told")
 
 	adopted, err := dataowner.AdoptPending(ctx)
@@ -145,17 +143,12 @@ func TestACopyOnlyWarnsAndTheButtonAdoptsItInPlace(t *testing.T) {
 	assert.False(t, verifyDataOwner(ctx, copied, copyDir).Foreign, "the folder is its own now, with no restart")
 }
 
-// Start asks settleDataOwner and never lets the verdict gate recovery: no `ownership.Foreign` branch, no SetForeign(true) in the startup source (#12591).
+// Start asks settleDataOwner and never lets the verdict gate recovery: no `ownership.Foreign` branch in the startup source (#12591). The census of the whole program (internal/dataowner) pins that
+// nothing else branches on a data-folder verdict either (#12603).
 func TestStartNeverGatesOnTheDataOwnerVerdict(t *testing.T) {
 	src, err := os.ReadFile("startup.go")
 	require.NoError(t, err)
 	text := string(src)
 	assert.Contains(t, text, "settleDataOwner(ctx, db, cfg.CoralDir())")
 	assert.NotContains(t, text, "ownership.Foreign", "the verdict does not decide whether recovery runs")
-	assert.NotContains(t, text, "SetForeign(true)")
-	assert.NotContains(t, text, "SetForeign(ownership")
-	own, err := os.ReadFile("startup_dataowner.go")
-	require.NoError(t, err)
-	assert.Contains(t, string(own), "ptymanager.SetForeign(false)")
-	assert.NotContains(t, string(own), "SetForeign(v.Foreign)")
 }

@@ -143,10 +143,6 @@ func NewSessionReconciler(ss *store.SessionStore, rt AgentRuntime, interval time
 
 // Run starts the reconciliation loop.
 func (r *SessionReconciler) Run(ctx context.Context) error {
-	if ptymanager.Foreign() { // a Coral on a copy of another's database reconciles and kills nothing (internal/dataowner)
-		<-ctx.Done()
-		return nil
-	}
 	return runOnTicker(ctx, r.interval, func() { r.reconcileOnce(ctx) })
 }
 
@@ -243,9 +239,6 @@ func (r *SessionReconciler) reconcileOnce(ctx context.Context) {
 // (historically because the tmux pane listing was mis-parsed) and they would
 // otherwise linger forever, consuming resources and confusing the sidebar.
 func (r *SessionReconciler) killOrphans(ctx context.Context, agents []AgentInfo) {
-	if ptymanager.Foreign() { // it would kill the REAL agents' sessions that the copy lists as stopped
-		return
-	}
 	if len(agents) == 0 {
 		return
 	}

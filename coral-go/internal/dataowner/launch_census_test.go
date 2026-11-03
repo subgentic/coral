@@ -14,17 +14,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// The one-gate rule for what starts, resumes or ends an agent (Security's SHOULD on #277): a Coral on a copy of another's database (FOREIGN) must not launch, resume, kill or type by itself, and
-// the next background loop somebody adds must not reopen the 2026-11-01 incident. So every non-test function in internal/server/routes and internal/background that calls one of the launch or
-// end primitives below is either
+// A census of who may launch, resume, wake or end an agent (task #429, kept by #12603 after the data-folder check became a warning only; the foreign-gate half is gone). Coral never blocks on the
+// data-folder check, so this is no longer about a gate: it is about knowing every place that starts or ends an agent. Every function in internal/server/routes and internal/background that calls a
+// launch, resume or end primitive must be:
 //   - an HTTP handler (it takes an http.ResponseWriter: a person's, or a Hub command's, action), or
-//   - listed in pinnedSites with the reason it is safe, and, where the reason is "gated", the census checks that the function (or the loop entry it names) asks ptymanager.Foreign or
-//     ptymanager.RefuseIfForeign.
+//   - listed in pinnedSites with the reason it is safe: who reaches it.
 //
-// A new function that calls a primitive fails here until a reviewer lists it. A listed one that no longer exists fails too.
+// A new function that calls a primitive fails here until a reviewer lists it. A listed one that no longer exists fails too. The second pass
+// (TestEveryCallerOfAPersonTriggeredFunctionIsAHandlerListedOrGated) covers the callers of the helpers pinned below.
 //
-// SCOPE: internal/server/routes and internal/background only. A launcher added in another package (internal/startup, internal/server, cmd) is not seen by this census; such a package must be added
-// to scanDirs when it gains one. The second pass (TestEveryCallerOfAPersonTriggeredFunctionIsAHandlerListedOrGated) covers the callers of the helpers pinned below.
+// SCOPE: internal/server/routes and internal/background only. A launcher added in another package (internal/startup, internal/server, cmd) is not seen by this census; such a package must be added to
+// scanDirs when it gains one.
 var primitives = map[string]bool{
 	"Spawn": true, "CreateSession": true, "RestartPane": true,
 	"KillAgent": true, "KillSession": true, "KillSessionOnly": true,
@@ -35,41 +35,41 @@ var primitives = map[string]bool{
 var scanDirs = []string{"../server/routes", "../background"}
 
 const (
-	person = "person-triggered"
-	gated  = "gated"
+	person     = "person-triggered"
+	background = "background"
 )
 
-// pinnedSites is "file Receiver.Function" -> "kind: why". "gated" ones must contain a Foreign gate themselves; the others are reached only through the named handlers or gated entries.
+// pinnedSites is "file Receiver.Function" -> "kind: why": reached only through the named handlers or background entries.
 var pinnedSites = map[string]string{
 	// the runtime implementations: reached through the launcher, the scheduler and the handlers below
 	"runtime_pty.go PTYRuntime.SpawnAgent":   person + ": the runtime behind the launcher, the scheduler and the launch handlers",
 	"runtime_tmux.go TmuxRuntime.SpawnAgent": person + ": the runtime behind the launcher, the scheduler and the launch handlers",
 	"runtime_tmux.go TmuxRuntime.KillAgent":  person + ": the runtime behind the reconciler, the scheduler and the kill handlers",
 	// the scheduler and the workflow runner
-	"scheduler.go JobScheduler.killRunSession":                 gated + ": only reached from JobScheduler.Run's ticks (Run returns at once in a foreign Coral) and the run handlers",
-	"scheduler_turn.go JobScheduler.endRunSession":             gated + ": only reached from JobScheduler.Run's ticks",
+	"scheduler.go JobScheduler.killRunSession":                 background + ": only reached from JobScheduler.Run's ticks and the run handlers",
+	"scheduler_turn.go JobScheduler.endRunSession":             background + ": only reached from JobScheduler.Run's ticks",
 	"workflow_runner.go WorkflowRunner.KillRun":                person + ": the workflow run's kill handler",
-	"workflow_steps.go WorkflowRunner.executeAgentInteractive": gated + ": the workflow agent step refuses itself",
+	"workflow_steps.go WorkflowRunner.executeAgentInteractive": background + ": the workflow agent step, reached from the workflow runner",
 	// the reconciler
-	"reconciler.go SessionReconciler.killOrphans": gated + ": kills the real agents' sessions a copy lists as stopped",
+	"reconciler.go SessionReconciler.killOrphans": background + ": the reconciler kills the orphan sessions of agents the database lists as stopped",
 	// what the handlers launch with
 	"orchestrator_agents.go SessionsHandler.sleepNow":           person + ": the orchestrator's sleep handler",
 	"sessions_launch_session.go SessionsHandler.startOnBackend": person + ": the launch handlers",
 	"sessions_launch_session.go SessionsHandler.startOnTmux":    person + ": the launch handlers",
 	"sessions_restart.go SessionsHandler.restartTerminal":       person + ": the restart and resume handlers",
 	"sessions_wake.go SessionsHandler.startWake":                person + ": wakeExistingSession's own start, below",
-	"sessions_wake.go SessionsHandler.wakeExistingSession":      person + ": the wake handlers' wake; it only forwards to wakeSession, and its background callers (autoResume, autoWakeOne) are gated entries",
+	"sessions_wake.go SessionsHandler.wakeExistingSession":      person + ": the wake handlers' wake; it only forwards to wakeSession, and its background callers are autoResume and autoWakeOne",
 	// the background resumes of a session
-	"agent_exit.go SessionsHandler.autoResume":          gated + ": the resume after an agent exit asks first",
-	"agent_server_lost.go SessionsHandler.recoverAgent": "background: restarts the agents of a tmux server that died, from their own rows in this Coral's database (only one still asleep because its terminal was lost); it runs only from the lost-server path (ServerLost, from the reconciler), never from a request or an agent; not gated on purpose: an upgrade in place owns its folder and a foreign Coral gets a one-click adopt, never silent withholding (Operator, #12592); the 10-minute loop guard is its only brake",
-	"auto_wake.go SessionsHandler.autoWakeOne":          gated + ": only reached from AutoWakeAfterRestart, which returns at once in a foreign Coral",
-	// auto-sleep (#12111): it ends a terminal by itself and a delivery wakes an agent by itself, so a foreign Coral does neither
-	"auto_sleep.go SessionsHandler.autoSleepOne":     gated + ": only reached from autoSleepPass, which RunAutoSleep runs and which asks the gate first; it asks too",
-	"auto_sleep_wake.go SessionsHandler.WakeIdleFor": gated + ": an automated wake (a delivery's) asks first; a person's own Send is a person's action",
+	"agent_exit.go SessionsHandler.autoResume":          background + ": the resume after an agent exit, from the exit watcher",
+	"agent_server_lost.go SessionsHandler.recoverAgent": background + ": restarts the agents of a tmux server that died, from their own rows in this Coral's database (only one still asleep because its terminal was lost); it runs only from the lost-server path (ServerLost, from the reconciler), never from a request or an agent; not gated on purpose: an upgrade in place owns its folder and a foreign Coral gets a one-click adopt, never silent withholding (Operator, #12592); the 10-minute loop guard is its only brake",
+	"auto_wake.go SessionsHandler.autoWakeOne":          background + ": only reached from AutoWakeAfterRestart",
+	// auto-sleep (#12111): it ends a terminal by itself and a delivery wakes an agent by itself
+	"auto_sleep.go SessionsHandler.autoSleepOne":     background + ": only reached from autoSleepPass, which RunAutoSleep runs",
+	"auto_sleep_wake.go SessionsHandler.WakeIdleFor": background + ": an automated wake (a delivery's); a person's own Send is a person's action",
 }
 
-// gatedEntries are the loop entries and functions that must ask the gate in their own body.
-var gatedEntries = []string{
+// backgroundEntries are the reviewed loop entries and functions that start or end agents on their own: the callers of the guarded helpers that are not handlers.
+var backgroundEntries = []string{
 	"reconciler.go SessionReconciler.Run",
 	"reconciler.go SessionReconciler.killOrphans",
 	"scheduler.go JobScheduler.Run",
@@ -89,7 +89,6 @@ type fnInfo struct {
 	handler bool
 	calls   []string
 	callees map[string]bool // every function called by name in the body
-	gate    bool
 }
 
 func scan(t *testing.T) map[string]*fnInfo {
@@ -143,15 +142,11 @@ func scan(t *testing.T) map[string]*fnInfo {
 						seen[callee] = true
 						info.calls = append(info.calls, callee)
 					}
-					if callee == "Foreign" || callee == "RefuseIfForeign" {
-						info.gate = true
-					}
 					return true
 				})
 				sort.Strings(info.calls)
 				if prev, dup := out[info.key]; dup { // the same name twice in a package folder pair: keep both facts
 					prev.calls = append(prev.calls, info.calls...)
-					prev.gate = prev.gate || info.gate
 					for c := range info.callees {
 						prev.callees[c] = true
 					}
@@ -177,7 +172,7 @@ func TestEveryFunctionThatLaunchesOrEndsAnAgentIsAHandlerOrListed(t *testing.T) 
 		}
 	}
 	sort.Strings(unlisted)
-	assert.Empty(t, unlisted, "a function that launches, resumes or ends an agent must be an HTTP handler (a person's action) or be listed in pinnedSites with why it is safe in a foreign Coral (and, if gated, ask ptymanager.Foreign / RefuseIfForeign)")
+	assert.Empty(t, unlisted, "a function that launches, resumes or ends an agent must be an HTTP handler (a person's action) or be listed in pinnedSites with who reaches it")
 	for key := range pinnedSites {
 		fn, ok := all[key]
 		if assert.True(t, ok, "%s is listed but no longer exists: take it off the list", key) {
@@ -186,42 +181,20 @@ func TestEveryFunctionThatLaunchesOrEndsAnAgentIsAHandlerOrListed(t *testing.T) 
 	}
 }
 
-func TestTheGatedEntriesAskTheForeignGate(t *testing.T) {
-	all := scan(t)
-	for _, key := range gatedEntries {
-		fn, ok := all[key]
-		if assert.True(t, ok, "%s not found", key) {
-			assert.True(t, fn.gate, "%s must ask ptymanager.Foreign or RefuseIfForeign in its body", key)
-		}
-	}
-	for key, why := range pinnedSites {
-		if strings.HasPrefix(why, gated) {
-			found := false
-			for _, g := range gatedEntries {
-				found = found || g == key
-			}
-			if !found {
-				// a gated site that is not itself an entry: reached only through entries listed above (named in its reason)
-				assert.Contains(t, why, "only reached from", key)
-			}
-		}
-	}
-}
-
-// guardedHelpers are the helpers pinned above as reached only from a person's action or a gated entry. The second pass: every function that CALLS one of them is itself an HTTP handler, pinned in
-// pinnedSites or gatedEntries, or listed in pinnedCallers with why. So a new background caller of startWake or restartTerminal cannot slip past the first pass, which only sees the primitives.
+// guardedHelpers are the helpers pinned above as reached only from a person's action or a background entry. The second pass: every function that CALLS one of them is itself an HTTP handler, pinned in
+// pinnedSites or backgroundEntries, or listed in pinnedCallers with why. So a new background caller of startWake or restartTerminal cannot slip past the first pass, which only sees the primitives.
 var guardedHelpers = []string{"startOnBackend", "startOnTmux", "restartTerminal", "startWake", "sleepNow", "killRunSession", "endRunSession", "autoWakeOne", "launchSession", "wakeExistingSession", "wakeSession"}
 
-// pinnedCallers are the callers of the guarded helpers that are neither handlers nor pinned above: each is reached only from the handler or gated entry named.
+// pinnedCallers are the callers of the guarded helpers that are neither handlers nor pinned above: each is reached only from the handler or background entry named.
 var pinnedCallers = map[string]string{
 	"scheduler.go JobScheduler.KillRun":                        "the run-kill handler (tasks.go) and the workflow run handlers",
-	"scheduler.go JobScheduler.finishRun":                      "only reached from the scheduler's ticks and watchers (JobScheduler.Run returns at once in a foreign Coral) or a run a person started",
-	"scheduler_reap.go JobScheduler.reapStaleRuns":             "only reached from JobScheduler.Run, which returns at once in a foreign Coral",
+	"scheduler.go JobScheduler.finishRun":                      "only reached from the scheduler's ticks and watchers or a run a person started",
+	"scheduler_reap.go JobScheduler.reapStaleRuns":             "only reached from JobScheduler.Run",
 	"scheduler_turn.go JobScheduler.settleOnTurn":              "only reached from the scheduler's turn watchers (started by Run or by a run a person started)",
 	"sessions_launch_session.go SessionsHandler.launchSession": "the launch, team launch, team lifecycle and team reset handlers",
 	"sessions_launch_team.go SessionsHandler.launchTeamMember": "the team launch handlers",
-	"sessions_wake.go SessionsHandler.wakeExistingSession":     "the wake handlers; its two background callers (autoResume, autoWakeOne) are gated entries",
-	"sessions_wake.go SessionsHandler.wakeSession":             "wakeExistingSession (the wake handlers and their gated background callers) and WakeIdleFor, a gated entry",
+	"sessions_wake.go SessionsHandler.wakeExistingSession":     "the wake handlers; its two background callers are autoResume and autoWakeOne",
+	"sessions_wake.go SessionsHandler.wakeSession":             "wakeExistingSession (the wake handlers and their background callers) and WakeIdleFor, a background entry",
 }
 
 func TestEveryCallerOfAPersonTriggeredFunctionIsAHandlerListedOrGated(t *testing.T) {
@@ -246,19 +219,23 @@ func TestEveryCallerOfAPersonTriggeredFunctionIsAHandlerListedOrGated(t *testing
 		}
 		_, pinned := pinnedSites[key]
 		_, extra := pinnedCallers[key]
-		gate := false
-		for _, g := range gatedEntries {
-			gate = gate || g == key
+		entry := false
+		for _, g := range backgroundEntries {
+			entry = entry || g == key
 		}
-		if !pinned && !extra && !gate {
+		if !pinned && !extra && !entry {
 			sort.Strings(hits)
 			unknown = append(unknown, fmt.Sprintf("%s calls %v", key, hits))
 		}
 	}
 	sort.Strings(unknown)
-	assert.Empty(t, unknown, "a function that calls a person-triggered helper must be an HTTP handler, or be listed in pinnedSites, gatedEntries or pinnedCallers")
+	assert.Empty(t, unknown, "a function that calls a person-triggered helper must be an HTTP handler, or be listed in pinnedSites, backgroundEntries or pinnedCallers")
 	for key := range pinnedCallers {
 		_, ok := all[key]
 		assert.True(t, ok, "%s is listed in pinnedCallers but no longer exists", key)
+	}
+	for _, key := range backgroundEntries {
+		_, ok := all[key]
+		assert.True(t, ok, "%s is listed in backgroundEntries but no longer exists", key)
 	}
 }
