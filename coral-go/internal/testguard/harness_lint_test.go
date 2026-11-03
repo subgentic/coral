@@ -46,7 +46,6 @@ var (
 // The key is the path relative to the repo root; the value is the reason (shown if the entry is stale).
 var allowlistReasons = map[string]string{
 	"tests/frontend/installed_tray_guard.test.mjs":   "feeds the installed-Coral guard's functions made-up process lists (#5293, #234); it starts no server and no agent, so there is nothing to sandbox",
-	"tests/frontend/server_ssh_setup.test.mjs":       "a page-text test: it only holds a made-up start command (an HTML-injection fixture, line 268) as a string to show on the server-setup page; it spawns no process, starts no server and no agent (#13028: the lint could not read it before, behind the node_modules link)",
 	"tests/release/operator_cli_smoke.sh":            "an env -i smoke of the CLI with no agents; the stub PATH and isolated HOME would defeat its clean-environment purpose",
 	"tests/release/smoke_linux.sh":                   "runs the release tarball's server in an env -i with only system dirs on PATH and cli_path_claude set to the stand-in CLI (smoke_macos/standin_cli.py) before any launch; no real agent CLI can start, and the sandbox's stub PATH would defeat the point of testing the shipped binaries",
 	"tests/release/update_rehearsal.sh":              "starts the real server of a release it built in an env -i with only system dirs on PATH, an isolated HOME and data folder, and launches no agent at all (it only posts a board message), so no agent CLI can start; a stub PATH would defeat running the programs a release ships",
