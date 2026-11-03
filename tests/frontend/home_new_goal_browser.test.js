@@ -16,20 +16,22 @@ const NONE = 'No team yet. Start one to give it a goal.';
     const shot = async name => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; const fs = require('node:fs'); fs.mkdirSync(d, { recursive: true }); await sleep(350); fs.writeFileSync(`${d}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }; // sleep-ok: a picture waits for the paint
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
-        await Page.addScriptToEvaluateOnNewDocument({ source: `(() => { const real = window.fetch; window.fetch = (u, o) => { try { const p = new URL(String(u), location.href); if (p.pathname === '/api/board/projects' && window.__teams) return Promise.resolve(new Response(JSON.stringify(window.__teams), { status: 200, headers: { 'content-type': 'application/json' } })); } catch (e) {} return real(u, o); }; })();` });
-        const states = [['one team', [{ project: 'alpha' }]], ['two teams', [{ project: 'alpha' }, { project: 'beta' }]], ['no team', []]];
+        await Page.addScriptToEvaluateOnNewDocument({ source: `(() => { const real = window.fetch; window.fetch = (u, o) => { try { const p = new URL(String(u), location.href); if (p.pathname === '/api/board/projects' && window.__refuse) return Promise.resolve(new Response(JSON.stringify({ error: 'unavailable' }), { status: 503, headers: { 'content-type': 'application/json' } })); if (p.pathname === '/api/board/projects' && window.__teams) return Promise.resolve(new Response(JSON.stringify(window.__teams), { status: 200, headers: { 'content-type': 'application/json' } })); } catch (e) {} return real(u, o); }; })();` });
+        const states = [['one team', [{ project: 'alpha' }]], ['two teams', [{ project: 'alpha' }, { project: 'beta' }]], ['no team', []], ['a refused read', 'refuse'], ['an error body', 'errbody']];
         for (const [w, h, mobile, big] of [[1280, 800, false, false], [390, 844, true, false], [390, 844, true, true]]) {
-            for (const [what, teams] of states) {
+            for (const [what, teamsIn] of states) {
+                const unreadable = typeof teamsIn === 'string'; // a refused read or an error body: not "no teams"
+                const teams = unreadable ? [] : teamsIn;
                 const tag = `${w}px${big ? ' 200%' : ''}, ${what}`;
                 await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
                 await Page.navigate({ url: 'about:blank' });
-                await Page.addScriptToEvaluateOnNewDocument({ source: `window.__teams = ${JSON.stringify(teams)}; ${big ? "document.addEventListener('DOMContentLoaded', () => { document.documentElement.style.fontSize = '32px'; });" : ''}` }).then(r => { global.__lastScript = r.identifier; });
+                await Page.addScriptToEvaluateOnNewDocument({ source: `window.__refuse = ${teamsIn === 'refuse'}; window.__teams = ${JSON.stringify(teamsIn === 'errbody' ? { error: 'unavailable' } : unreadable ? [] : teamsIn)}; ${big ? "document.addEventListener('DOMContentLoaded', () => { document.documentElement.style.fontSize = '32px'; });" : ''}` }).then(r => { global.__lastScript = r.identifier; });
                 await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
                 await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
                 const cardSel = mobile ? '.session-list li.empty-welcome .empty-launch' : '#welcome-screen .welcome-launch';
-                await waitFor(`(() => { const d = document.querySelector('${mobile ? ".session-list li.empty-welcome [data-goal-desc]" : "#welcome-screen [data-goal-desc]"}'); return !!d && d.textContent === ${JSON.stringify(teams.length ? PLAIN : NONE)}; })()`, `the goal card's line for ${what}`, 8000);
+                await waitFor(`(() => { const d = document.querySelector('${mobile ? ".session-list li.empty-welcome [data-goal-desc]" : "#welcome-screen [data-goal-desc]"}'); return !!d && d.textContent === ${JSON.stringify(unreadable || teams.length ? PLAIN : NONE)}; })()`, `the goal card's line for ${what}`, 8000);
                 const cards = await ev(`[...document.querySelectorAll(${JSON.stringify(cardSel)})].filter(c => c.getClientRects().length).map(c => c.querySelector('strong').textContent + ' | ' + c.querySelector('span:not(.material-icons) span, strong + span').textContent)`);
-                check(`${tag}: the three cards are New agent, New team, New goal; no Open folder`, cards.length === 3 && /^New agent/.test(cards[0]) && /^New team/.test(cards[1]) && cards[2] === `New goal | ${teams.length ? PLAIN : NONE}`, JSON.stringify(cards));
+                check(`${tag}: the three cards are New agent, New team, New goal; no Open folder`, cards.length === 3 && /^New agent/.test(cards[0]) && /^New team/.test(cards[1]) && cards[2] === `New goal | ${unreadable || teams.length ? PLAIN : NONE}`, JSON.stringify(cards));
                 // keyboard: the cards are buttons in that order
                 const order = await ev(`(() => { const cs = [...document.querySelectorAll(${JSON.stringify(cardSel)})].filter(c => c.getClientRects().length); const all = [...document.querySelectorAll('button, a[href], input, select, textarea, [tabindex="0"]')].filter(e => e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden'); const idx = cs.map(c => all.indexOf(c)); return { tag: cs.map(c => c.tagName), increasing: idx.every((v, i) => v >= 0 && (i === 0 || v > idx[i - 1])), height: cs.map(c => Math.round(c.getBoundingClientRect().height)), wide: cs.every(c => c.getBoundingClientRect().right <= innerWidth + 1) }; })()`);
                 check(`${tag}: the cards are buttons in reading order, 44 px tall, inside the window`, order.tag.every(t => t === 'BUTTON') && order.increasing && order.height.every(v => v >= 44) && order.wide, JSON.stringify(order));
@@ -44,7 +46,14 @@ const NONE = 'No team yet. Start one to give it a goal.';
                 if (!big && (what === 'one team' || what === 'no team')) await shot(`home-after-${w}-${what.replace(' ', '-')}`);
                 // press the card
                 await ev(`[...document.querySelectorAll(${JSON.stringify(cardSel)})].filter(c => c.getClientRects().length)[2].click(); true`);
-                if (teams.length) {
+                if (unreadable) {
+                    await sleep(400); // sleep-ok: the refused read answers; the line must still be the plain one
+                    const line = await ev(`document.querySelector('[data-goal-desc]').textContent`);
+                    check(`${tag}: a team list that could not be read is not "no team": the line stays plain`, line === PLAIN, line);
+                    await waitFor(`!!document.querySelector('.toast, #toast-container .toast, [role=status]')`, 'a toast', 8000).catch(() => {});
+                    const u = await ev(`(() => { const t = [...document.querySelectorAll('.toast, [role=status], [role=alert]')].map(e => e.textContent.trim()).join(' | '); const m = document.getElementById('confirm-modal'); return { toast: t, confirm: !!m && getComputedStyle(m).display !== 'none', goalForm: !!document.querySelector('dialog.goal-editor[open]') }; })()`);
+                    check(`${tag}: pressing it says the read failed; no "No team" explanation and no goal form`, /Could not read your teams/.test(u.toast) && !u.confirm && !u.goalForm, JSON.stringify(u));
+                } else if (teams.length) {
                     await waitFor(`!!document.querySelector('dialog.goal-editor[open]')`, 'the New goal screen', 8000);
                     const g = await ev(`(() => { const d = document.querySelector('dialog.goal-editor[open]'); const sel = document.getElementById('goal-new-team'); return { title: d.querySelector('#goals-create-title').textContent, select: !!sel, options: sel ? [...sel.options].map(o => o.textContent) : [], fixed: [...d.querySelectorAll('.goal-scope-fixed b')].map(b => b.textContent) }; })()`);
                     check(`${tag}: the card opens the New goal screen, on the team (one) or asking which (two)`, g.title === 'New goal' && (teams.length === 1 ? !g.select && g.fixed.join() === 'alpha' : g.select && g.options.length === 2), JSON.stringify(g));
