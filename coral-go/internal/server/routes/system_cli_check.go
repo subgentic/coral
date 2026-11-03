@@ -159,7 +159,11 @@ func (h *SystemHandler) CLICheck(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 			if cliShareSkipped(binaryPath) { // a common place on a network share did not answer in time (#464): one fixed sentence, no folder named
-				note := agent.ShareNotAnsweredNote(filepath.Base(binaryPath))
+				name := filepath.Base(binaryPath)
+				if info := agent.GetCLIInfo(agentType); info != nil && info.Binary != "" {
+					name = info.Binary // the CLI's own fixed name, never the file name of a path set in Settings
+				}
+				note := agent.ShareNotAnsweredNote(name)
 				if prev, _ := result["install_note"].(string); prev != "" {
 					note = prev + " " + note
 				}
