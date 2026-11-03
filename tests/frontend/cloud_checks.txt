@@ -296,3 +296,4 @@ node hub_hooks.test.mjs
 node chat_announce_words.test.mjs
 node hermes_permission_flags.test.mjs
 node no_ignore_word.test.mjs
+node agent_list_starting.test.mjs

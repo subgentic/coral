@@ -188,6 +188,8 @@ export function sessionStateInfo(s, opts) {
     const info = { key, ...SESSION_STATES[key] };
     // Asleep because its terminal session is gone, not because anyone asked (#3344): the
     // same state, said plainly. The row's "Terminal gone" chip restarts it.
+    // The CLI has not written its first event (row.starting, #6381): the agent's own page says Starting, so a list does not say Idle (#12533, the new-user walk). The key stays idle (dot, sort and filters unchanged); only the word moves.
+    if (key === 'idle' && s.starting === true && s.agent_type !== 'terminal') info.label = 'Starting';
     if (key === 'sleeping' && isGoneAsleep(s)) info.label = 'Terminal gone';
     // Asleep because its CLI exited (#6058): the word is "Ended", in the row and the header, not a plain "Sleeping".
     if (key === 'sleeping' && !s.archived && s.sleep_reason === 'agent_exited') info.label = info.pill = 'Ended';
