@@ -39,4 +39,4 @@ if [ -z "$NOLAUNCH" ]; then
   sleep 3
 fi
 URL=$("$HERE/denv.sh" coral open --print 2>&1 | grep -o 'http[^ ]*')
-PLAYWRIGHT_BROWSERS_PATH="$S/pw-browsers" node "$HERE/login.mjs" "$URL" 2>&1 | tail -1
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-$S/pw-browsers}" node "$HERE/login.mjs" "$URL" 2>&1 | tail -1
