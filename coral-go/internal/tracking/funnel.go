@@ -228,6 +228,11 @@ func trackFunnel(key, event string, props map[string]string, at time.Time) {
 }
 
 func sendFunnel(key, event string, props map[string]string, at time.Time, gen uint64) {
+	sendFunnelStep(key, event, props, at, gen)
+}
+
+// sendFunnelStep is sendFunnel, and reports whether a delivery was attempted and failed (the service did not accept it): a held step is then held again.
+func sendFunnelStep(key, event string, props map[string]string, at time.Time, gen uint64) (failed bool) {
 	when := at
 	if when.IsZero() {
 		when = time.Now().UTC()
@@ -235,14 +240,38 @@ func sendFunnel(key, event string, props map[string]string, at time.Time, gen ui
 	send, snap := reserveMilestoneAt(key, posthogKeyPresent() && telemetryValid(gen), withFunnelCommon(event, props, when), when.UTC().Format(time.RFC3339Nano))
 	reachedHere.Store(firedHereKey(key), true)
 	if !send {
-		return
+		return false
 	}
 	uid := uuid.NewSHA1(uuid.NameSpaceOID, []byte("coral-funnel|"+getInstallID()+"|"+key+"|"+snap.Timestamp)).String()
 	if emitEvent(event, snap.Props, uid, snap.Timestamp, gen) {
 		confirmMilestoneSent(key)
-		return
+		return false
 	}
 	releaseMilestone(key)
+	return true
+}
+
+// reholdStep puts a held step back after its send failed (no network on a first start), with its own value and time, so the next flush sends it, under the same
+// event id. Not while analytics is off: a step is never kept for a later opt-in.
+func reholdStep(event string, h heldStep, gen uint64) {
+	if !stateDirReady() || !telemetryValid(gen) {
+		return
+	}
+	milestoneMu.Lock()
+	defer milestoneMu.Unlock()
+	s := loadMilestones()
+	if _, fired := s.Fired[event]; fired {
+		return
+	}
+	if s.Held == nil {
+		s.Held = map[string]heldStep{}
+	}
+	if _, ok := s.Held[event]; !ok {
+		s.Held[event] = h
+		if err := saveMilestones(s); err != nil {
+			logDeliveryFailure(event, 0, "held step not kept after a failed send: "+err.Error())
+		}
+	}
 }
 
 // TrackFunnelStep sends a funnel step once per install. Use it only after the Terms were accepted and the analytics setting was applied (the server's own steps);
@@ -382,7 +411,12 @@ func flushHeld(gen uint64) {
 			continue
 		}
 		props := map[string]string{field: h.Value}
-		asyncGo(func() { sendFunnel(event, event, props, at, gen) })
+		h := h
+		asyncGo(func() {
+			if sendFunnelStep(event, event, props, at, gen) {
+				reholdStep(event, h, gen)
+			}
+		})
 	}
 }
 

@@ -21,6 +21,7 @@ import (
 // rawCapture keeps every request the sink received whole (URL, headers and body) and the decoded events.
 type rawCapture struct {
 	mu     sync.Mutex
+	status int // what the sink answers (0: 200, and the event is kept)
 	raw    []string
 	events []capturedEvent
 }
@@ -61,12 +62,19 @@ func newFunnelTracking(t *testing.T) (*rawCapture, string) {
 		var e capturedEvent
 		_ = json.Unmarshal(body, &e)
 		c.mu.Lock()
-		c.raw = append(c.raw, r.URL.String()+"\n"+strings.Join(hdr, "\n")+"\n"+string(body))
-		c.events = append(c.events, e)
+		status := c.status
+		if status == 0 {
+			c.raw = append(c.raw, r.URL.String()+"\n"+strings.Join(hdr, "\n")+"\n"+string(body))
+			c.events = append(c.events, e)
+		}
 		c.mu.Unlock()
+		if status != 0 {
+			w.WriteHeader(status)
+		}
 	}))
 	t.Cleanup(srv.Close)
-	prevURL, prevKey, prevDir, prevID := posthogURL, config.PostHogKey, coralDir, cachedInstallID
+	prevURL, prevKey, prevDir, prevID, prevDelays := posthogURL, config.PostHogKey, coralDir, cachedInstallID, retryDelays
+	retryDelays = nil
 	posthogURL, config.PostHogKey, coralDir, cachedInstallID = srv.URL, "phc_test_key", dir, "funnel-install"
 	installIDOnce.Do(func() {})
 	consentKnown.Store(false)
@@ -77,7 +85,7 @@ func newFunnelTracking(t *testing.T) (*rawCapture, string) {
 	SetBackend("pty")
 	t.Cleanup(func() {
 		waitForAsync()
-		posthogURL, config.PostHogKey, coralDir, cachedInstallID = prevURL, prevKey, prevDir, prevID
+		posthogURL, config.PostHogKey, coralDir, cachedInstallID, retryDelays = prevURL, prevKey, prevDir, prevID, prevDelays
 		consentKnown.Store(false)
 		funnelBackend.Store("")
 	})
@@ -413,5 +421,42 @@ func TestNoFunnelStepWithAnalyticsOff(t *testing.T) {
 	waitForAsync()
 	if n := len(c.all()); n != 0 {
 		t.Fatalf("analytics off, yet %d events", n)
+	}
+}
+
+// A held step whose send fails (no network on a first start) is held again, and the next flush sends it once, at the time it happened.
+func TestAHeldStepWhoseSendFailsIsHeldAgain(t *testing.T) {
+	c, dir := newFunnelTracking(t)
+	HoldFunnelStep(EventFunnelAppStarted, AppStartCLI)
+	var held milestoneState
+	data, _ := os.ReadFile(filepath.Join(dir, milestonesFileName))
+	_ = json.Unmarshal(data, &held)
+	at := held.Held[EventFunnelAppStarted].At
+
+	c.mu.Lock()
+	c.status = http.StatusServiceUnavailable
+	c.mu.Unlock()
+	FlushHeldFunnel(true)
+	waitForAsync()
+	var after milestoneState
+	data, _ = os.ReadFile(filepath.Join(dir, milestonesFileName))
+	_ = json.Unmarshal(data, &after)
+	if h, ok := after.Held[EventFunnelAppStarted]; !ok || h.At != at || h.Value != AppStartCLI {
+		t.Fatalf("a step whose send failed must be held again as it was: %+v", after.Held)
+	}
+
+	c.mu.Lock()
+	c.status = 0
+	c.mu.Unlock()
+	FlushHeldFunnel(true)
+	waitForAsync()
+	got := c.named(EventFunnelAppStarted)
+	if len(got) != 1 || got[0].Properties["source"] != AppStartCLI {
+		t.Fatalf("want the step once after the network came back, got %+v", got)
+	}
+	FlushHeldFunnel(true)
+	waitForAsync()
+	if n := len(c.named(EventFunnelAppStarted)); n != 1 {
+		t.Fatalf("sent %d times", n)
 	}
 }
