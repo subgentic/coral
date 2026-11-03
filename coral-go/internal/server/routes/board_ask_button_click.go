@@ -177,6 +177,10 @@ func (h *BoardHandler) SettleAskButton(w http.ResponseWriter, r *http.Request) {
 		errInternalServer(w, "could not read the button")
 		return
 	}
+	if board.IsOpenAction(b.Action) { // a page that still settles an open button (an older one) changes nothing: the question stays open and the button stays usable (#12785)
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "closed": false})
+		return
+	}
 	if b.State != board.ButtonUsed || b.Action == board.ActionReply {
 		writeError(w, http.StatusConflict, "not_claimed", "this button was not claimed for the page to run")
 		return

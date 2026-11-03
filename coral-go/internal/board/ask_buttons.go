@@ -277,6 +277,11 @@ func (s *Store) AskIsClosed(ctx context.Context, project string, messageID int64
 	return n > 0, err
 }
 
+// IsOpenAction says the action only opens something in the page (a task, a file, the new-agent dialog): reusable, never claimed (#12785).
+func IsOpenAction(action string) bool {
+	return action == ActionOpenTask || action == ActionOpenArtifact || action == ActionOpenNewAgent
+}
+
 // ClaimAskButton moves a pending button to used in ONE statement: it runs only if the button is pending, no other button of the same question is in use (a wake button is not held up by another wake: an Operator
 // who was offered two wakes can click both, #12610) and the question is not closed, and the row count is
 // checked, so a double click, two tabs or two buttons run one action. It returns the stored button; nothing the caller sent decides what it is.
@@ -284,6 +289,16 @@ func (s *Store) ClaimAskButton(ctx context.Context, project string, messageID, b
 	b, err := s.AskButtonByID(ctx, project, messageID, buttonID)
 	if err != nil {
 		return b, err
+	}
+	// An open button (a document, a task, the new-agent dialog) changes nothing on the board: it is never marked used, never holds up another button and never closes the question, so the Operator can open it again
+	// and still answer (#12785). Only a closed question refuses it.
+	if IsOpenAction(b.Action) {
+		if closed, cerr := s.AskIsClosed(ctx, project, messageID); cerr != nil {
+			return b, cerr
+		} else if closed {
+			return b, ErrAskClosed
+		}
+		return b, nil
 	}
 	// A claim the page never settled (a closed tab, a crash) is free again after a minute, so it cannot leave a question with no usable button. A reply is never freed: it was posted.
 	if _, err := s.db.ExecContext(ctx, `UPDATE board_ask_buttons SET state = ?, used_at = '' WHERE project = ? AND message_id = ? AND state = ? AND reply_message_id = 0 AND action <> ? AND used_at <> '' AND used_at < ?`,

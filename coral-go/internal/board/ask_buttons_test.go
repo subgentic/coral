@@ -82,7 +82,7 @@ func TestAnUnsettledClaimIsFreeAgainAfterAMinute(t *testing.T) {
 	msg, err := s.PostMessage(ctx, "alpha", "Lead", "@Operator ok?", nil)
 	require.NoError(t, err)
 	require.NoError(t, s.RecordAsk(ctx, "alpha", msg, []string{"Operator"}))
-	require.NoError(t, s.RecordAskButtons(ctx, "alpha", msg.ID, []AskButton{{Label: "Wake", Action: ActionWake, Arg: "Dev"}, {Label: "Open", Action: ActionOpenNewAgent}, {Label: "Yes", Action: ActionReply}}, time.Now()))
+	require.NoError(t, s.RecordAskButtons(ctx, "alpha", msg.ID, []AskButton{{Label: "Wake", Action: ActionWake, Arg: "Dev"}, {Label: "Yes", Action: ActionReply}, {Label: "Open", Action: ActionOpenNewAgent}}, time.Now()))
 	got, err := s.AskButtonsOf(ctx, "alpha", []int64{msg.ID})
 	require.NoError(t, err)
 	b := got[msg.ID]
@@ -91,10 +91,12 @@ func TestAnUnsettledClaimIsFreeAgainAfterAMinute(t *testing.T) {
 	require.NoError(t, err)
 	_, err = s.ClaimAskButton(ctx, "alpha", msg.ID, b[1].ID, t0.Add(30*time.Second))
 	assert.ErrorIs(t, err, ErrButtonUsed, "within the minute the first claim still holds the question")
+	_, err = s.ClaimAskButton(ctx, "alpha", msg.ID, b[2].ID, t0.Add(30*time.Second))
+	assert.NoError(t, err, "an open button is never held up by it (#12785)")
 	_, err = s.ClaimAskButton(ctx, "alpha", msg.ID, b[1].ID, t0.Add(2*time.Minute))
 	assert.NoError(t, err, "a claim nobody settled for a minute is free: the question is not stuck")
 	// a reply that was posted is never freed
 	require.NoError(t, s.SetAskButtonReply(ctx, "alpha", b[1].ID, 99))
-	_, err = s.ClaimAskButton(ctx, "alpha", msg.ID, b[2].ID, t0.Add(10*time.Minute))
+	_, err = s.ClaimAskButton(ctx, "alpha", msg.ID, b[0].ID, t0.Add(10*time.Minute))
 	assert.ErrorIs(t, err, ErrButtonUsed, "a button that posted its reply stays used")
 }
