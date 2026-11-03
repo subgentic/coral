@@ -66,7 +66,7 @@ function draw() {
 function drawList() {
     const page = el('div', 'skills-page');
     const head = el('div', 'skills-head');
-    const sel = el('select'); sel.setAttribute('aria-label', 'Show');
+    const sel = el('select', 'field field-dense'); sel.setAttribute('aria-label', 'Show'); // the shared field look: padding, radius, the page font (#12990); 44 px on a phone or touch
     for (const [v, label] of FILTERS) { const o = el('option', '', label); o.value = v; sel.append(o); }
     sel.value = showStatus;
     sel.addEventListener('change', async () => { showStatus = sel.value; await loadList(); draw(); });

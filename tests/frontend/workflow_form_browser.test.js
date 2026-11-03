@@ -44,8 +44,8 @@ const STUB = `(() => {
             assert.equal(await ev(`document.querySelectorAll('#wf-steps-editor .wf-step-editor-item').length`), 1, at + 'one step is already there');
             assert.deepEqual(await ev(`[document.querySelector('.wf-step-type-select').value, document.querySelector('.wf-step-name-input').value, document.querySelector('.wf-step-content').value]`), ['shell', 'Run tests', ''], at + 'it is a named step to fill in, with no command saved by accident (#9297)');
             assert.equal(await ev(`document.querySelector('.wf-step-content').placeholder`), 'e.g. npm test', at + 'the example is the placeholder');
-            assert.equal(await ev(vis('#wf-build-hint')), true, at + 'a hint offers Build with Agent');
-            assert.match(await ev(`document.getElementById('wf-build-hint').textContent.replace(/\\s+/g, ' ').trim()`), /^Not sure what the steps are\? An agent can write them with you\. Build with Agent$/, at);
+            assert.equal(await ev(vis('#wf-build-hint')), true, at + 'a hint offers Build with agent');
+            assert.match(await ev(`document.getElementById('wf-build-hint').textContent.replace(/\\s+/g, ' ').trim()`), /^Not sure what the steps are\? An agent can write them with you\. Build with agent$/, at);
             for (const id of ['#wf-input-desc', '#wf-input-repo', '#wf-input-max-dur']) assert.equal(await ev(vis(id)), false, at + id + ' is behind More options');
             assert.equal(await ev(`document.getElementById('wf-more').open`), false);
             assert.deepEqual(await ev(`(() => { const r = document.getElementById('wf-input-name').closest('.sv-row'); return [r.querySelector('.sv-label').textContent.replace('Required', '').trim(), !!r.querySelector('.sv-required'), document.getElementById('wf-input-name').getAttribute('aria-required')]; })()`), ['Name', true, 'true'], at + 'Name says Required');

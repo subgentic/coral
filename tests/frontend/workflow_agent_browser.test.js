@@ -1,4 +1,4 @@
-// "Build with Agent" and "Edit with Agent" on the Workflows pages (#8360 pins them before workflows.js is split): the builder's skill prompt is read, the agent is launched on this computer's coral root
+// "Build with agent" and "Edit with Agent" on the Workflows pages (#8360 pins them before workflows.js is split): the builder's skill prompt is read, the agent is launched on this computer's coral root
 // with that prompt, and a toast names it; an edit launches in the workflow's own folder with the workflow's definition and the PUT instruction in the prompt. Refusals say why: no skill, no working
 // directory, a launch error. The server's answers are stubbed in the page; the launches are recorded.
 const assert = require('node:assert/strict');
@@ -27,7 +27,7 @@ const { coralReady } = require('./helpers/wait');
         const clearToasts = () => ev(`document.querySelectorAll('.toast').forEach(t => t.remove()); window.__launches.length = 0; true`);
         const call = (fn, ...args) => ev(`import(${S} + 'workflows.js').then(m => m.${fn}(${args.map(a => JSON.stringify(a)).join(', ')})).then(() => true)`);
 
-        console.log('1. Build with Agent launches the builder with its skill, in the coral root');
+        console.log('1. Build with agent launches the builder with its skill, in the coral root');
         await call('launchWorkflowAgent');
         assert.equal(await ev(`window.__launches.length`), 1, 'one launch');
         const l1 = await ev(`window.__launches[0]`);
@@ -61,6 +61,6 @@ const { coralReady } = require('./helpers/wait');
         await ev(`document.body.dataset.coralRoot = '/repo/coral'; window.__launchAnswer = { error: 'No room for another agent' }; true`); await call('launchWorkflowAgent');
         assert.ok((await toasts()).some(t => /No room for another agent/.test(t)), 'a launch error is shown ' + JSON.stringify(await toasts()));
         console.log('   ✓');
-        console.log('PASS Workflows: Build with Agent and Edit with Agent launch the builder, with their prompts and refusals');
+        console.log('PASS Workflows: Build with agent and Edit with Agent launch the builder, with their prompts and refusals');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });

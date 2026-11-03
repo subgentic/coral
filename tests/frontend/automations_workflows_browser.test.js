@@ -1,5 +1,5 @@
 // Automations, the Workflows folder (Goal #74, UI/UX #8862; it carried the Workflows tab's checks from #7471): the sidebar's folder list has Workflows with its count; the folder's page is one table on the shared
-// toolbar (the search named "Search workflows", the All / Active / Paused pills with counts, Filters: Result, Step type, Sort, Build with Agent and New workflow at the right) with the columns Workflow, Steps, Last run and
+// toolbar (the search named "Search workflows", the All / Active / Paused pills with counts, Filters: Result, Step type, Sort, Build with agent and New workflow at the right) with the columns Workflow, Steps, Last run and
 // Used by (no state-changing button in a row: Run is on the workflow's page); a workflow's page has its link back, a 20/700 name, one facts line, Steps and Runs as tables, and a bar pinned at the foot (More, Edit with Agent,
 // Edit, Run as the primary); a run's page has its link back to the workflow and a bar (Re-run); with no workflow the folder is one empty line with its hint; /workflows opens the folder; both themes and 200%
 // text; a phone's table is the page and a workflow the screen after it. Drives Chrome over CDP through agent_view_harness.js, stubbed API.
@@ -72,7 +72,7 @@ const STUB = `(() => { const real = window.fetch; const J = b => Promise.resolve
             await oneLinePerRow(ev, '#group-table-view tbody tr[data-key]', `${at}the workflows`, assert, { min: 3 }); // Goal #79: one line a row; the description is the name's tooltip, a narrow list drops Steps and Used by
             assert.equal(await ev(`document.querySelectorAll('#group-table-view tbody .dt-action').length`), 0, at + 'no state-changing button in a row: Run is on the workflow\'s page (UI/UX #8863)');
             assert.equal(await ev(`document.querySelector('#group-table-view .list-bar-search').getAttribute('aria-label')`), 'Search workflows', at + 'the search is named for the folder');
-            assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view .team-tb-action .btn')].map(b => b.textContent.replace('smart_toy', '').trim())`), ['Build with Agent', 'New workflow'], at + 'Build with Agent and New workflow are the create actions');
+            assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view .team-tb-action .btn')].map(b => b.textContent.replace('smart_toy', '').trim())`), ['Build with agent', 'New workflow'], at + 'Build with agent and New workflow are the create actions');
             if (!mobile) assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view .team-tb-pills .goals-chip')].map(b => b.textContent.trim().replace(/\\s+/g, ' '))`), ['All 3', 'Active 2', 'Turned off 1'], at + 'the pills have the table\'s counts');
             assert.equal(await ev(`document.documentElement.scrollWidth <= document.documentElement.clientWidth`), true, at + 'no sideways scroll');
             assert.deepEqual(await ev(`(${ON_SCALE})(document.getElementById('group-table-view'), ${SCALE})`), [], at + 'every text of the table is on the scale');
@@ -174,7 +174,7 @@ const STUB = `(() => { const real = window.fetch; const J = b => Promise.resolve
                 await ev(`window.__wfEmpty = true; import((window.__coralStatic || '/static/') + 'workflows.js').then(m => m.refreshWorkflows()).then(() => true)`);
                 await waitFor(`!!document.querySelector('#group-table-view .empty-state .empty-state-line') && document.querySelectorAll('#group-table-view tbody tr[data-key]').length === 0`, at + 'the empty folder', 8000);
                 assert.equal(await ev(`document.querySelector('#group-table-view .empty-state .empty-state-line').textContent`), 'No workflows yet.', at + 'one empty line');
-                assert.equal(await ev(`[...document.querySelectorAll('#group-table-view [data-on-click="wf-build-agent"]')].some(b => b.getClientRects().length > 0)`), true, at + 'Build with Agent is on the toolbar');
+                assert.equal(await ev(`[...document.querySelectorAll('#group-table-view [data-on-click="wf-build-agent"]')].some(b => b.getClientRects().length > 0)`), true, at + 'Build with agent is on the toolbar');
                 await shot(`automations-workflows-empty-${w}`);
                 await ev(`window.__wfEmpty = false; import((window.__coralStatic || '/static/') + 'workflows.js').then(m => m.refreshWorkflows()).then(() => true)`);
                 await waitFor(`document.querySelectorAll('#group-table-view tbody tr[data-key]').length === 3`, at + 'the table is back', 8000);

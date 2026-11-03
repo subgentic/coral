@@ -1,6 +1,6 @@
 // The lazy modules of the bundled family make no stub requests (#8670, plan (c) of #8663). A tab's first visit used to cost its module and one stub for each
 // startup module that module imports (Workflows 21 requests, Analytics 12: 36 over the seven main tabs); now a lazy module is built against the bundle's instance
-// and a tab family is ONE file: Workflows is workflows.js (with its editor, run page and Build with Agent), Analytics is cost_dashboard.js (with its views, charts,
+// and a tab family is ONE file: Workflows is workflows.js (with its editor, run page and Build with agent), Analytics is cost_dashboard.js (with its views, charts,
 // agent page and the two team views). One instance of each module stays: a member asked for by importOnce or by URL, before or after its group, is the group's.
 // Drives the real dashboard over CDP against an isolated dev server; run_cdp_suites.mjs finds it by name.
 const assert = require('node:assert/strict');

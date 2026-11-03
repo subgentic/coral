@@ -1,5 +1,5 @@
 // A first visit to Automations (#9297, the Operator's audit 2 and 9): with no job and no workflow every folder offers two cards, "Run a prompt on a schedule" and "Run steps from a workflow";
-// the first opens New job on the Agent prompt; the New workflow form starts with an example step and a Build with Agent hint. The isolated server has no jobs and no workflows. 1280 and 390 px.
+// the first opens New job on the Agent prompt; the New workflow form starts with an example step and a Build with agent hint. The isolated server has no jobs and no workflows. 1280 and 390 px.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
@@ -43,7 +43,7 @@ const { coralReady } = require('./helpers/wait');
             await waitFor(`getComputedStyle(document.getElementById('wf-create-modal')).display !== 'none'`, 'New workflow opens', 8000);
             assert.equal(await ev(`document.querySelector('.wf-step-name-input').value + ' / ' + document.querySelector('.wf-step-content').value`), 'Run tests / ', at + 'the example step is named, its command empty');
             assert.equal(await ev(`document.querySelector('.wf-step-content').placeholder`), 'e.g. npm test', at + 'with the example as its placeholder');
-            assert.equal(await ev(vis('#wf-build-hint')), true, at + 'the Build with Agent hint');
+            assert.equal(await ev(vis('#wf-build-hint')), true, at + 'the Build with agent hint');
             await shot(`first-run-workflow-${w}`);
             await ev(`[...document.querySelectorAll('#wf-footer button')].find(b => b.textContent.trim() === 'Cancel').click(); true`);
             assert.equal(await ev(`(() => { const m = document.getElementById('job-modal'); return m ? getComputedStyle(m).display : 'none'; })()`), 'none', at + 'a workflow dialog opened from a card does not bring New job back');
