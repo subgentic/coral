@@ -10,7 +10,7 @@ const STUB = (refusal) => `(() => { const R = window.fetch; window.__posts = 0; 
     window.fetch = (u, o) => { const url = new URL(String(u), location.href), method = (o && o.method) || 'GET';
         const json = (b, status = 200) => Promise.resolve(new Response(JSON.stringify(b), { status, headers: { 'Content-Type': 'application/json' } }));
         if (/\\/files\\/refresh$/.test(url.pathname) && method === 'POST') { window.__posts++; return window.__refusal ? json(window.__refusal, 403) : json({ files: [], is_git: true, compare: { label: 'HEAD' } }); }
-        if (/\\/sessions\\/live\\/wp\\/files$/.test(url.pathname)) { window.__gets++; return json({ files: [{ filepath: 'cached.txt', status: 'modified', additions: 1, deletions: 0 }], is_git: true, compare: { label: 'HEAD' } }); }
+        if (/\\/sessions\\/live\\/[^/]+\\/files$/.test(url.pathname)) { window.__gets++; return json({ files: [{ filepath: 'cached.txt', status: 'modified', additions: 1, deletions: 0 }], is_git: true, compare: { label: 'HEAD' } }); }
         if (url.pathname === '/api/servers') return json({ servers: window.__servers || [] });
         return R(u, o); }; return true; })()`;
 
@@ -65,6 +65,34 @@ const STUB = (refusal) => `(() => { const R = window.fetch; window.__posts = 0; 
         await open(null, [{ id: 'srv1', label: 'srv1', access_mode: 'interact', hub_mode: 'interact', local_mode: 'interact', effective_mode: 'interact' }]);
         await waitFor(`window.__posts >= 1`, 'an Interact computer is asked', 8000);
         check('an Interact computer is refreshed as before, with no note', (await note()).length === 0);
+
+        // 4. a 403 that is not about the access mode (the page's CSRF check, a lost session, a plain refusal) does not stop the refreshes: they go on being asked
+        for (const [label, refusal] of [['a CSRF refusal', { error: 'forbidden' }], ['a 403 with no body', ''], ['a 403 of another word', { error: 'owner_only' }]]) {
+            await open(refusal, undefined);
+            await waitFor(`window.__posts >= 3`, `${label}: the watch keeps asking`, 14000);
+            check(`${label} does not block the refresh: it is asked again and again`, (await ev(`window.__posts`)) >= 3 && (await note()).length === 0, String(await ev(`window.__posts`)));
+        }
+
+        // 5. a view blocked for the mode asks again for ANOTHER agent, and for the same agent on ANOTHER computer (the block belongs to one view)
+        const blocked = async () => { await open({ error: 'access_mode', limited_by: 'hub', hub_mode: 'view' }); await waitFor(`window.__posts === 1 && /View mode/.test((document.querySelector('#changed-files-list .files-stale-note') || {}).textContent || '')`, 'the view is blocked', 10000); await ev(`window.__refusal = null; true`); };
+        const refreshNow = () => ev(`Promise.resolve(window.refreshChangedFiles(true)).then(() => true)`); // the window entry a person's click reaches
+        await blocked();
+        await ev(`import((window.__coralStatic || '/static/') + 'state.js').then(m => { m.state.currentSession = { type: 'live', name: 'wp2', session_id: 'sid-wp2', agent_type: 'claude', server: 'srv1' }; return true; })`);
+        await refreshNow();
+        check('another agent on the same computer is asked again (the block is the first view\'s)', (await ev(`window.__posts`)) === 2, String(await ev(`window.__posts`)));
+        await blocked();
+        await ev(`import((window.__coralStatic || '/static/') + 'state.js').then(m => { m.state.currentSession = { type: 'live', name: 'wp', session_id: 'sid-wp', agent_type: 'claude', server: 'srv2' }; return true; })`);
+        await refreshNow();
+        check('the same agent on another computer is asked again', (await ev(`window.__posts`)) === 2, String(await ev(`window.__posts`)));
+        await blocked();
+        await refreshNow(); await refreshNow();
+        check('the view that was refused stays blocked while nothing changed (no POST for a manual refresh either)', (await ev(`window.__posts`)) === 1, String(await ev(`window.__posts`)));
+
+        // 6. the access the page knows turning Interact lifts the block
+        await blocked();
+        await ev(`window.__servers = [{ id: 'srv1', label: 'srv1', access_mode: 'interact', hub_mode: 'interact', local_mode: 'interact', effective_mode: 'interact' }]; import((window.__coralStatic || '/static/') + 'server_access.js').then(async m => { m.invalidateServerAccess(); await m.serverAccess('srv1'); return true; })`);
+        await refreshNow();
+        check('a cached access that now allows Interact lifts the block: the refresh is asked again, and the note goes', (await ev(`window.__posts`)) === 2 && (await note()).length === 0, `${await ev('window.__posts')} ${JSON.stringify(await note())}`);
     } finally { await client.close(); }
     if (results.some(r => !r)) { console.error(`${results.filter(r => !r).length} of ${results.length} failed`); process.exit(1); }
     console.log(`\nAll ${results.length} Files refresh View-mode checks passed`);
