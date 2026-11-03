@@ -32,6 +32,12 @@
 </p>
 
 <p align="center">
+  <img width="100%" alt="A short demo: a team of agents launches, a document arrives in the Inbox, you comment on it and the agent updates it" src="assets/demo/coral-demo-inbox.gif" />
+  <br>
+  <sub>A document lands in the Inbox, you comment, the agent answers and updates it. (Sample data; staged with scripted agents. <a href="tools/demo/README.md">How it is made.</a>)</sub>
+</p>
+
+<p align="center">
   
 <img width="100%" alt="Needs You for review and questions" src="https://github.com/user-attachments/assets/2c995cf7-7a5b-4be0-94ad-ee5e3efd4552" />
 

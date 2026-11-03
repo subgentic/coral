@@ -1,0 +1,22 @@
+package slug
+
+import (
+	"strings"
+	"unicode"
+)
+
+// Slug lowercases s, keeps letters and digits, and joins words with single dashes.
+func Slug(s string) string {
+	var b strings.Builder
+	dash := false
+	for _, r := range strings.ToLower(s) {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			b.WriteRune(r)
+			dash = false
+		} else if !dash && b.Len() > 0 {
+			b.WriteByte('-')
+			dash = true
+		}
+	}
+	return strings.TrimRight(b.String(), "-")
+}

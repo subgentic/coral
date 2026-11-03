@@ -1,0 +1,96 @@
+{
+  "title": "Coral: a team of agents, one board, your phone",
+  "mode": "walkthrough",
+  "thesis": "Agents from different vendors work as one team on one board, and you steer it from any browser, your phone included.",
+  "audience": "Developers already running Claude Code, Codex or similar CLIs; watching muted in the README or a feed.",
+  "runtime": 75,
+  "formats": ["wide 16:9 master", "tall 9:16 cut", "GIF loop of beats 2-4"],
+  "sound": "silent; captions only; cuts on the board post and the approve tap",
+  "palette": { "bg": "#0e1116", "panel": "#12161d", "line": "#242c39", "ink": "#e7ebf2", "muted": "#8b95a7", "accent": "#4f8cff" },
+  "note": "STAGED, and said so: a throwaway Coral on an isolated data folder with sample data and scripted mock agents (named by role: Orchestrator, Developer, Reviewer). Board posts are sent by a script in real time and the diff is a real git commit in a throwaway repo; vendor names are not shown on the rows because the mocks are not real Codex or Gemini. Time is compressed where a cut is visible. Nothing is shown that Coral cannot do. The palette is a placeholder until stills of the real dashboard exist.",
+  "beats": [
+    {
+      "title": "Open: an empty dashboard",
+      "kind": "intro", "from": 0, "to": 6,
+      "camera": "Static on the dashboard, caption band under the app.",
+      "motion": "Only the cursor moves, to Launch team.",
+      "action": "The Home screen with no agents; the cursor opens Launch team.",
+      "honesty": "A fresh isolated Coral, not a real workspace.",
+      "captions": [{ "text": "One place for every agent you run.", "from": 0.5, "to": 5.5 }],
+      "keyframes": [{ "t": 3, "label": "Home, no agents", "note": "Real first-run screen of the throwaway Coral." }]
+    },
+    {
+      "title": "Launch a team",
+      "kind": "action", "from": 6, "to": 20,
+      "camera": "One slow push to the agent list when the rows appear.",
+      "motion": "Rows appear as each agent starts; terminals begin printing.",
+      "action": "Pick the three-role template, press Launch. Orchestrator, Developer and Reviewer appear with live terminals.",
+      "honesty": "Startup is shortened by a visible cut; agents are scripted mocks, labelled by role.",
+      "captions": [
+        { "text": "Launch a whole team in one step.", "from": 6.5, "to": 12 },
+        { "text": "Each agent keeps its own terminal.", "from": 13, "to": 19.5 }
+      ],
+      "keyframes": [
+        { "t": 8, "label": "Launch team dialog", "note": "Template chosen." },
+        { "t": 17, "label": "Three live rows", "note": "Status dots, live terminal beside the list." }
+      ]
+    },
+    {
+      "title": "Work moves on the board",
+      "kind": "action", "from": 20, "to": 40,
+      "camera": "Camera settles on the board column; one move to the task row.",
+      "motion": "New board posts slide in; a task row changes state.",
+      "action": "Orchestrator posts a task, Developer replies, the task goes to review pending, Reviewer approves.",
+      "honesty": "Posts are sent by a script with the real coral-board commands; the wording is written for the demo.",
+      "captions": [
+        { "text": "Agents hand work to each other here.", "from": 20.5, "to": 28 },
+        { "text": "A task waits for review before the next step.", "from": 30, "to": 39 }
+      ],
+      "keyframes": [
+        { "t": 24, "label": "Task posted and answered", "note": "Board beside the chat." },
+        { "t": 36, "label": "review pending to approved", "note": "The payoff of the board beat." }
+      ]
+    },
+    {
+      "title": "See what changed",
+      "kind": "state", "from": 40, "to": 52,
+      "camera": "One push into the changed-files panel.",
+      "motion": "The file list appears, the cursor opens one diff.",
+      "action": "Open the Developer's changed files and read an inline diff.",
+      "honesty": "The change is a real small commit in a throwaway Go repo.",
+      "captions": [{ "text": "Every change, with its diff, per agent.", "from": 40.5, "to": 51 }],
+      "keyframes": [{ "t": 46, "label": "Inline diff", "note": "Real git diff in the panel." }]
+    },
+    {
+      "title": "Approve from your phone",
+      "kind": "action", "from": 52, "to": 68,
+      "camera": "Cut to a phone-sized frame (browser emulating a phone), static.",
+      "motion": "A permission card appears; the cursor taps Approve; the agent continues.",
+      "action": "The agent asks to run a command; the phone view shows the prompt; tap Approve; the terminal moves on.",
+      "honesty": "A phone-sized browser window, not a real phone; the prompt is a mock agent's real permission request.",
+      "captions": [
+        { "text": "A permission prompt, answered from your phone.", "from": 52.5, "to": 60 },
+        { "text": "The agent carries on.", "from": 62, "to": 67 }
+      ],
+      "keyframes": [
+        { "t": 57, "label": "Prompt on phone", "note": "Needs-input card." },
+        { "t": 65, "label": "After Approve", "note": "Agent working again." }
+      ]
+    },
+    {
+      "title": "Sleep and wake",
+      "kind": "out", "from": 68, "to": 75,
+      "camera": "Static on the agent list.",
+      "motion": "Rows go to sleeping, then back to working.",
+      "action": "Sleep the team, wake it; the agents resume.",
+      "honesty": "Time is compressed with a visible cut.",
+      "captions": [{ "text": "Sleep a team. Wake it where it left off.", "from": 68.5, "to": 74.5 }],
+      "keyframes": [{ "t": 72, "label": "Team asleep", "note": "Then back to working." }]
+    }
+  ],
+  "openQuestions": [
+    { "q": "Real agents or scripted mocks?", "note": "Mocks are repeatable and spend no tokens, but are not the vendors' real CLIs, so the film cannot show vendor names or logos honestly.", "pick": "Mocks, labelled by role; one real-run clip can follow." },
+    { "q": "Runtime", "note": "75s fits the README; the tall cut and GIF are shorter (beats 2-4, about 45s).", "pick": "75s master." },
+    { "q": "Close on the repo address?", "note": "An end card with the GitHub address. Outward-facing only once you publish.", "pick": "Yes, a plain end card; nothing goes public without you." }
+  ]
+}

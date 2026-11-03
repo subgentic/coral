@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Coral demo storyboard</title>
+<style>
+:root{--bg:#0e1116;--panel:#12161d;--line:#242c39;--ink:#e7ebf2;--muted:#8b95a7;--accent:#4f8cff;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:40px 16px 80px}
+h1{font-size:clamp(26px,4vw,36px);line-height:1.15;margin:6px 0 10px}
+h2{font-size:17px;margin:0}
+.label{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+.lede{color:var(--muted);max-width:72ch;margin:8px 0}
+.thesis{color:var(--ink);font-size:18px}
+.meta{display:flex;flex-wrap:wrap;gap:4px 18px;color:var(--muted);font-size:13px;margin:12px 0}
+.meta b{color:var(--ink);font-weight:600}
+.ruler{display:flex;height:34px;border:1px solid var(--line);border-radius:8px;overflow:hidden;margin:10px 0 28px}
+.ruler a{display:flex;align-items:center;justify-content:center;min-width:0;background:var(--panel);color:var(--muted);text-decoration:none;border-right:1px solid var(--bg);font-size:11px}
+.ruler a span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 6px}
+.beat{border-top:1px solid var(--line);padding:22px 0;display:grid;gap:12px}
+.head{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline}
+.tc{font:12.5px ui-monospace,Menlo,monospace;color:var(--accent)}
+.frames{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.fr{aspect-ratio:16/9;background:var(--panel);border:1px dashed var(--line);border-radius:8px;display:grid;place-items:center;text-align:center;padding:8px;color:var(--muted);font-size:12.5px}
+.fr small{display:block;color:var(--muted);opacity:.8}
+.notes{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:20px}
+dl{display:grid;grid-template-columns:76px minmax(0,1fr);gap:6px 12px;margin:0;font-size:14px;align-content:start}
+dt{font:11.5px ui-monospace,Menlo,monospace;color:var(--muted);padding-top:3px}
+dd{margin:0}
+.caps{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;align-self:start}
+.caps ol{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:10px}
+.caps .line{font-size:16px;font-weight:600;display:block}
+.caps .tm{font:11px ui-monospace,Menlo,monospace;color:var(--muted)}
+.qs{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-top:10px}
+.q{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.q h3{font-size:15px;margin:0 0 4px}
+.q p{margin:4px 0;font-size:13.5px;color:var(--muted)}
+.q .pick b{color:var(--accent)}
+.warn{border:1px solid var(--line);border-left:3px solid var(--accent);padding:10px 14px;border-radius:6px;background:var(--panel);margin:14px 0;font-size:14px}
+@media(max-width:760px){.notes{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<span class="label">Storyboard · for review before any frames are rendered</span>
+<h1>Coral: a team of agents, one board, your phone</h1>
+<p class="lede thesis">Agents from different vendors work as one team on one board, and you steer it from any browser, your phone included.</p>
+<div class="meta">
+<span>Mode <b>walkthrough</b></span>
+<span>Runtime <b>92 s</b></span>
+<span>Formats <b>16:9 master, 9:16 cut, GIF of beats 2-4</b></span>
+<span>Sound <b>silent, captions only</b></span>
+<span>Audience <b>developers already running agent CLIs, watching muted</b></span>
+</div>
+<div class="warn"><b>What is staged, said up front.</b> A throwaway Coral on an isolated data folder with sample data and scripted mock agents named by role (Orchestrator, Developer, Reviewer). Board posts are sent by a script with the real <code>coral-board</code> commands; the diff is a real commit in a throwaway repo. The mocks are not real Codex or Gemini, so no vendor names or logos appear. Time is compressed only with a visible cut. Nothing is shown that Coral cannot do. Placeholders below become real stills once the demo Coral runs.</div>
+
+<div class="ruler" role="img" aria-label="Timeline of six beats">
+<a href="#b0" style="width:6.5%"><span>Open</span></a>
+<a href="#b1" style="width:13.0%"><span>Launch a team</span></a>
+<a href="#bg" style="width:17.4%"><span>Create a goal</span></a>
+<a href="#b2" style="width:23.9%"><span>Inbox and review</span></a>
+<a href="#b3" style="width:21.7%"><span>Agent diff and tasks</span></a>
+<a href="#b4" style="width:17.4%"><span>Phone tour</span></a>
+</div>
+
+<section class="beat" id="b0">
+<div class="head"><h2>1. Open: an empty dashboard</h2><span class="tc">0:00 – 0:06 · 6 s</span></div>
+<div class="frames"><div class="fr"><div>0:03 Home, no agents<small>real first-run screen</small></div></div></div>
+<div class="notes"><dl>
+<dt>Action</dt><dd>The Home screen with no agents; the cursor opens Launch team.</dd>
+<dt>Camera</dt><dd>Static, caption band under the app.</dd>
+<dt>Motion</dt><dd>Only the cursor moves.</dd>
+<dt>Honesty</dt><dd>A fresh isolated Coral, not a real workspace.</dd></dl>
+<div class="caps"><span class="label">Captions</span><ol><li><span class="line">One place for every agent you run.</span><span class="tm">0:00.5 – 0:05.5</span></li></ol></div></div>
+</section>
+
+<section class="beat" id="b1">
+<div class="head"><h2>2. Launch a team</h2><span class="tc">0:06 – 0:18 · 12 s</span></div>
+<div class="frames"><div class="fr"><div>0:08 Launch team dialog<small>template chosen</small></div></div><div class="fr"><div>0:17 Three live rows<small>status dots, live terminal</small></div></div></div>
+<div class="notes"><dl>
+<dt>Action</dt><dd>Pick the three-role template, press Launch. Orchestrator, Developer and Reviewer appear with live terminals.</dd>
+<dt>Camera</dt><dd>One slow push to the agent list when the rows appear.</dd>
+<dt>Motion</dt><dd>Rows appear as each agent starts; terminals begin printing.</dd>
+<dt>Honesty</dt><dd>Startup shortened by a visible cut; agents are scripted mocks.</dd></dl>
+<div class="caps"><span class="label">Captions</span><ol>
+<li><span class="line">Launch a whole team in one step.</span><span class="tm">0:06.5 – 0:12</span></li>
+<li><span class="line">Each agent keeps its own terminal.</span><span class="tm">0:13 – 0:19.5</span></li></ol></div></div>
+</section>
+
+<section class="beat" id="bg">
+<div class="head"><h2>3. Create a goal for the team</h2><span class="tc">0:18 – 0:34 · 16 s</span></div>
+<div class="frames"><div class="fr"><div>0:21 New goal form<small>title and done-when filled in</small></div></div><div class="fr"><div>0:30 Goal on the team's page<small>Orchestrator picks it up</small></div></div></div>
+<div class="notes"><dl>
+<dt>Action</dt><dd>Open the team, create a goal with a title and a done-when line; the Orchestrator posts the first task toward it.</dd>
+<dt>Camera</dt><dd>Static on the goal form, one push to the goal row.</dd>
+<dt>Motion</dt><dd>Typing, then the goal row appears with its task count.</dd>
+<dt>Honesty</dt><dd>The goal text is written for the demo; the Orchestrator's first task is posted by script.</dd></dl>
+<div class="caps"><span class="label">Captions</span><ol>
+<li><span class="line">Give the team a goal, in plain words.</span><span class="tm">0:18.5 – 0:26</span></li>
+<li><span class="line">It turns into tasks for the agents.</span><span class="tm">0:27 – 0:33</span></li></ol></div></div>
+</section>
+
+<section class="beat" id="b2">
+<div class="head"><h2>4. A document lands in the Inbox: review it</h2><span class="tc">0:34 – 0:56 · 22 s</span></div>
+<div class="frames"><div class="fr"><div>0:36 A full Inbox<small>sample items; a new one arrives</small></div></div><div class="fr"><div>0:42 The document opens<small>a short design note for review</small></div></div><div class="fr"><div>0:49 A comment on one paragraph</div></div><div class="fr"><div>0:54 The agent replies in the thread<small>new version of the document</small></div></div></div>
+<div class="notes"><dl>
+<dt>Action</dt><dd>The Inbox is full of sample items. A new item arrives: a document for review. Open it, comment on a paragraph. The agent answers in the comment thread and uploads a new version; the document updates.</dd>
+<dt>Camera</dt><dd>Static on the Inbox, one push into the document, one into the thread.</dd>
+<dt>Motion</dt><dd>New row slides in at the top; the comment appears; the reply and the new version appear.</dd>
+<dt>Honesty</dt><dd>Document review, comments and versions are real Coral features. The document, the agent's reply and its new version are scripted for the demo.</dd></dl>
+<div class="caps"><span class="label">Captions</span><ol>
+<li><span class="line">Work lands in your Inbox.</span><span class="tm">0:34.5 – 0:41</span></li>
+<li><span class="line">Comment on it. The agent answers.</span><span class="tm">0:44 – 0:55</span></li></ol></div></div>
+</section>
+
+<section class="beat" id="b3">
+<div class="head"><h2>5. Follow the agent into its diff</h2><span class="tc">0:56 – 1:16 · 20 s</span></div>
+<div class="frames"><div class="fr"><div>0:58 Click the agent in the chat</div></div><div class="fr"><div>1:03 File tree and inline diff<small>real git diff</small></div></div><div class="fr"><div>1:10 Task list beside it<small>task states from the goal</small></div></div></div>
+<div class="notes"><dl>
+<dt>Action</dt><dd>Click the agent in the chat; its changed files open as the IDE view: the file tree, then an inline diff, with the team's task list beside it.</dd>
+<dt>Camera</dt><dd>One push into the changed-files panel.</dd>
+<dt>Motion</dt><dd>The file list appears, the cursor opens one diff.</dd>
+<dt>Honesty</dt><dd>The change is a real small commit in a throwaway Go repo.</dd></dl>
+<div class="caps"><span class="label">Captions</span><ol>
+<li><span class="line">Click the agent to see what it changes.</span><span class="tm">0:56.5 – 1:04</span></li>
+<li><span class="line">Every change, with its diff and tasks.</span><span class="tm">1:06 – 1:15</span></li></ol></div></div>
+</section>
+
+<section class="beat" id="b4">
+<div class="head"><h2>6. The phone: a quick tour, then approve</h2><span class="tc">1:16 – 1:32 · 16 s</span></div>
+<div class="frames"><div class="fr"><div>1:17 Inbox<small>needs-you items</small></div></div><div class="fr"><div>1:20 Tasks &amp; Goals<small>the goal made in beat 3</small></div></div><div class="fr"><div>1:23 Agent Overview<small>the three agents, status</small></div></div><div class="fr"><div>1:26 Agent Chat<small>permission prompt shown</small></div></div><div class="fr"><div>1:30 After Approve<small>agent working again</small></div></div></div>
+<div class="notes"><dl>
+<dt>Action</dt><dd>On a phone-sized frame, jump between the four phone screens (Inbox, Tasks &amp; Goals, Agent Overview, Agent Chat) with taps on the bottom bar, then tap Approve on a permission prompt.</dd>
+<dt>Camera</dt><dd>Static phone frame; each jump is a cut on the tap, no zoom.</dd>
+<dt>Motion</dt><dd>Fast screen changes, about 3 s each; a prompt card appears in the last one and the cursor taps Approve.</dd>
+<dt>Honesty</dt><dd>A phone-sized browser window, not a real phone. Sample names and text only. The prompt is a mock agent's real permission request.</dd></dl>
+<div class="caps"><span class="label">Captions</span><ol>
+<li><span class="line">The same team, on your phone.</span><span class="tm">1:16.5 – 1:25</span></li>
+<li><span class="line">Approve a prompt without leaving the couch.</span><span class="tm">1:26 – 1:31.5</span></li></ol></div></div>
+</section>
+
+<span class="label" style="display:block;margin-top:40px">Decisions I need from you</span>
+<div class="qs">
+<div class="q"><h3>Real agents or scripted mocks?</h3><p>Mocks are repeatable and spend no tokens, but are not the vendors' real CLIs, so the film cannot show vendor names or logos honestly.</p><p class="pick"><b>My pick:</b> mocks, labelled by role; one real-run clip can follow.</p></div>
+<div class="q"><h3>Runtime</h3><p>92 s is longer than the first plan (more to show). The tall cut and GIF stay about 45 s. Beats 2 and 6 can be trimmed if you want it near 75 s.</p><p class="pick"><b>My pick:</b> 92 s master; trim on request.</p></div>
+<div class="q"><h3>End card with the repo address?</h3><p>Outward-facing only once you publish; nothing goes public without you.</p><p class="pick"><b>My pick:</b> yes, a plain end card.</p></div>
+</div>
+<p class="lede" style="margin-top:32px">Reply with changes, or say go. Rendering waits for your permission to run demo-director's scripts and to download Chromium and ffmpeg.</p>
+</div>
+</body>
+</html>
