@@ -87,6 +87,7 @@ const BASE = require('./test_base').BASE;
         assert.deepEqual(await ev(`window.__calls.filter(c=>c.body).map(c=>c.body)`),[{remote_access_enabled:true}]);
         assert.match(await status(),/Restart Coral/);await noQR();await shot('mobile-qr-restart-required');
         assert.equal(await ev(`window.__calls.some(c=>c.url==='/api/system/api-key')`),false);
+        assert.equal(await ev(`[...document.querySelectorAll('#mobile-connect-actions button')].map(b=>b.textContent).join()`),'Close,Check again','the dismiss first, the primary last in every state (R1, #12897)');
         await action('Check again');await tick();await noQR();
         assert.equal(await ev(`window.__calls.filter(c=>c.body).length`),1);
         // Only a fresh effective=true response unlocks network/key/QR details.
@@ -121,6 +122,7 @@ const BASE = require('./test_base').BASE;
         // Failures leave access closed; retry reads status, never writes settings.
         await ev('window.__mode="error";window._showMobileConnectModal()');
         assert.match(await status(),/Could not check mobile access/);await noQR();
+        assert.equal(await ev(`[...document.querySelectorAll('#mobile-connect-actions button')].map(b=>b.textContent).join()`),'Cancel,Retry','the failed check: Cancel first, Retry last (R1, #12897)');
         await ev('window.__mode="invalid"');await action('Retry');await tick();
         assert.match(await status(),/Could not verify/);await noQR();
         await ev('window.__mode="normal";window.__effective=false');await action('Retry');await tick();

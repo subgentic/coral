@@ -42,7 +42,7 @@ function renderState(message, actions = [], error = false) {
 }
 
 function failure(message) {
-    renderState(message, [button('Retry', checkAccess, true), button('Cancel', hideMobileConnectModal)], true);
+    renderState(message, [button('Cancel', hideMobileConnectModal), button('Retry', checkAccess, true)], true);
 }
 
 export function hideMobileConnectModal() {
@@ -74,13 +74,13 @@ async function renderAccess(status, gen, signal) {
     rememberStatus(status);
     if (!status.remote_access_enabled && status.remote_access_effective) {
         renderState('Mobile access is disabled in settings. Restart Coral to finish disabling access on the running server.',
-            [button('Check again', checkAccess, true), button('Close', hideMobileConnectModal)]);
+            [button('Close', hideMobileConnectModal), button('Check again', checkAccess, true)]);
         return;
     }
     if (!status.remote_access_effective) {
         if (status.remote_access_enabled) {
             renderState('Mobile access is enabled in settings but is not running yet. Restart Coral to apply the change, then check again.',
-                [button('Check again', checkAccess, true), button('Close', hideMobileConnectModal)]);
+                [button('Close', hideMobileConnectModal), button('Check again', checkAccess, true)]);
         } else {
             renderState(DISABLED_WORDS,
                 [button('Cancel', hideMobileConnectModal), button(USE_HUB_LABEL, useCoralHub), button(ENABLE_LABEL, enableMobileAccess, true)]);
