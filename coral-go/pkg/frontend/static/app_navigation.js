@@ -84,7 +84,7 @@ export function switchNavTab(tab, opts = {}) {
     } else if (tab === 'skills') {
         // The Skills Store: the Operator's list, the approval view and Import (skills_tab.js), local Coral only; it writes its own address.
         showView('skills-view');
-        importOnce('./skills_tab.js').then(m => m.showSkillsTab({ id: opts.skillId }));
+        importOnce('./skills_tab.js').then(m => m.showSkillsTab({ id: opts.skillId, folder: opts.skillFolder }));
     } else if (tab === 'artifacts') {
         // The hub's /artifacts page in a frame (artifacts_tab.js), the Inbox's way; the tab writes no address of its own.
         showView('artifacts-view');

@@ -5,14 +5,18 @@ import { loadStyles } from './lazy_styles.js';
 import { showView, showToast } from './utils.js';
 import { requestJson } from './api.js';
 import { note, currentRoute } from './nav.js';
+import { registerActions } from './actions.js';
+import { isPhoneLayout } from './phone_layout.js';
+import { SKILL_FOLDERS } from './routes.js';
 const DT = await importOnce('./data_table.js');
+const VL = await importOnce('./view_list.js'); // the folders in the sidebar (and a phone's strip), as Automations and the Inbox have them (#12997)
 await loadStyles('skills.css');
 
 const { el } = DT;
 const STATUS = { pending: ['Pending approval', 'goal-state-task-active'], approved: ['Approved', ''], rejected: ['Rejected', 'team-state-bad'] }; // the tones the other lists pass to chip()
 const FILTERS = [['', 'All'], ['pending', 'Pending approval'], ['approved', 'Approved'], ['rejected', 'Rejected']];
 const tableState = DT.tableState();
-let rows = [], showStatus = '', loadError = '', open = null /* { id, data, error, busy, acked, fileShown, opened: Set of the files shown } */;
+let rows = [], everyRow = [], folder = '', query = '', showStatus = '', loadError = '', open = null /* { id, data, error, busy, acked, fileShown, opened: Set of the files shown } */;
 
 const host = () => document.getElementById('skills-view');
 const publisher = r => (r.publisher_kind === 'operator' ? 'Operator' : r.publisher_kind === 'coral' ? 'Coral (example)' : `${r.publisher_agent}${r.publisher_team ? ' · ' + r.publisher_team : ''}`);
@@ -33,9 +37,33 @@ export async function loadSkillsBadge() {
 }
 
 async function loadList() {
-    try { rows = (await requestJson('GET', '/api/skills' + (showStatus ? `?status=${showStatus}` : ''))).skills || []; loadError = ''; }
-    catch (e) { rows = []; loadError = e.message || 'The skills could not be read'; }
+    try {
+        everyRow = (await requestJson('GET', '/api/skills')).skills || []; // the whole store: the folders' counts do not move with the status filter
+        rows = showStatus ? everyRow.filter(r => r.status === showStatus) : everyRow;
+        loadError = '';
+    } catch (e) { rows = []; everyRow = []; loadError = e.message || 'The skills could not be read'; }
 }
+
+// ── the folders (#12997, the Operator: 'Skills can be Imported, Agent Created, Coral Skills') ──
+// A skill's source is on its record (publisher_kind: operator = imported, agent = agent created, coral = Coral's own).
+const KIND_OF = { imported: 'operator', 'agent-created': 'agent', 'coral-skills': 'coral' };
+const FOLDER_LABEL = { '': 'All skills', imported: 'Imported', 'agent-created': 'Agent created', 'coral-skills': 'Coral skills' };
+const inFolder = (r, f) => !f || r.publisher_kind === KIND_OF[f];
+const sections = () => [{ title: 'Skills', items: ['', ...SKILL_FOLDERS].map(key => {
+    const mine = everyRow.filter(r => inFolder(r, key)), waiting = key === 'agent-created' ? mine.filter(r => r.status === 'pending').length : 0;
+    return { key: key || 'all', label: FOLDER_LABEL[key], count: waiting ? `${waiting} of ${mine.length}` : mine.length, alert: waiting > 0 }; // what waits on the Operator is said on Agent created, red, as Needs you says its unread
+}) }];
+let sideFolders = null;
+function pickFolder(key) { folder = key === 'all' ? '' : key; open = null; note(folder ? { view: 'skills', folder } : { view: 'skills' }); draw(); }
+function drawNav() {
+    const list = document.getElementById('skills-nav-list');
+    if (!list) return;
+    const spec = { sections: sections(), current: folder || 'all' };
+    if (sideFolders && list.contains(sideFolders)) VL.update(sideFolders, spec);
+    else { sideFolders = VL.build({ id: 'skills-folders', label: 'Skills folders', ...spec, onPick: pickFolder }); list.replaceChildren(sideFolders); }
+}
+registerActions({ 'skills-search-filter': el => { query = String(el.value || '').trim().toLowerCase(); if (!open) draw(); } });
+const matches = r => !query || `${r.name} ${r.description} ${publisher(r)}`.toLowerCase().includes(query);
 
 async function loadOne(id) {
     open = { id, data: null, error: '', busy: false, acked: false, fileShown: null, opened: new Set() };
@@ -47,6 +75,7 @@ async function loadOne(id) {
 
 export async function showSkillsTab(opts = {}) {
     showView('skills-view');
+    folder = SKILL_FOLDERS.includes(opts.folder) ? opts.folder : '';
     if (opts.id) { await loadList(); await loadOne(opts.id); return; }
     open = null;
     await loadList();
@@ -54,17 +83,19 @@ export async function showSkillsTab(opts = {}) {
     loadSkillsBadge();
 }
 
-function writeRoute(id) { const cur = currentRoute(); if (!cur || cur.view !== 'skills' || cur.id !== (id || undefined)) note(id ? { view: 'skills', id } : { view: 'skills' }); }
+function writeRoute(id) { const cur = currentRoute(); if (!cur || cur.view !== 'skills' || cur.id !== (id || undefined) || (!id && (cur.folder || '') !== folder)) note(id ? { view: 'skills', id } : folder ? { view: 'skills', folder } : { view: 'skills' }); }
 
 function draw() {
     const h = host(); if (!h) return;
     h.replaceChildren(open ? drawDetail() : drawList());
+    drawNav();
     writeRoute(open ? open.id : null);
 }
 
 // ── the list ────────────────────────────────────────────────────────────
 function drawList() {
     const page = el('div', 'skills-page');
+    if (isPhoneLayout()) page.append(VL.build({ id: 'skills-folders-page', label: 'Skills folders', sections: sections(), current: folder || 'all', onPick: pickFolder, tabs: true })); // a phone has no sidebar: the folders are a strip at the top of the page, as Automations has them
     const head = el('div', 'skills-head');
     const sel = el('select'); sel.setAttribute('aria-label', 'Show');
     for (const [v, label] of FILTERS) { const o = el('option', '', label); o.value = v; sel.append(o); }
@@ -84,8 +115,9 @@ function drawList() {
         { key: 'scripts', label: 'Scripts', width: '5rem', align: 'end', sort: true, sortValue: r => (r.has_scripts || r.not_reviewable ? 1 : 0), cell: r => (r.has_scripts ? 'yes' : r.not_reviewable ? 'files' : '-'), narrowHide: true },
         { key: 'updated', label: 'Updated', width: '7rem', fixed: true, sort: 'date', sortValue: r => r.decided_at || r.created_at, cell: r => DT.timeCell(r.decided_at || r.created_at) },
     ];
-    page.append(DT.dataTable({ label: `Skills, ${rows.length}`, rows, rowKey: r => r.id, rowName: r => r.name, state: tableState, columns, open: r => loadOne(r.id),
-        empty: { line: showStatus ? 'No skill in this list.' : 'No skills yet.', hint: 'Import a skill, or an agent can publish one with coral-agent skills publish.' } }).el);
+    const shown = rows.filter(r => inFolder(r, folder) && matches(r));
+    page.append(DT.dataTable({ label: `${FOLDER_LABEL[folder]}, ${shown.length}`, rows: shown, rowKey: r => r.id, rowName: r => r.name, state: tableState, columns, open: r => loadOne(r.id),
+        empty: { line: showStatus || folder || query ? 'No skill in this list.' : 'No skills yet.', hint: 'Import a skill, or an agent can publish one with coral-agent skills publish.' } }).el);
     return page;
 }
 
