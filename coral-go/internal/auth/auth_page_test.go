@@ -1,8 +1,10 @@
 package auth
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -11,6 +13,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/peercred"
 )
 
 // #3948: the /auth page has three states, chosen by the server, and never carries a secret or runs inline script.
@@ -223,4 +227,41 @@ func TestAuthPageSaysWhyAPasswordIsNeededAndOffersNoSkip(t *testing.T) {
 	signin := AuthPage(PageState{PasswordSet: true, Local: true, Strict: true})
 	assert.NotContains(t, strings.ToLower(signin), "opens without a password", "the forgot-password note no longer says the app opens without one")
 	assert.Contains(t, signin, `<p class="note">A password keeps other people and other devices out of Coral when it is opened in a web browser.</p>`)
+}
+
+// #12546 (Security): when Coral cannot tell which account opens a sign-in link (the check is unavailable on this computer), the sign-in page says so in one line, where the person is, and
+// says what that means for the link. A page for a computer where the check works says nothing of it.
+func TestAuthPageSaysWhenTheCheckIsUnavailable(t *testing.T) {
+	for _, s := range []PageState{{PasswordSet: true, Local: true}, {Local: true}, {}} {
+		on := AuthPage(withUnavailable(s))
+		assert.Equal(t, 1, strings.Count(on, `id="peer-unavailable"`), "once, on every state: %+v", s)
+		assert.Contains(t, on, "does not let Coral check which account opens a sign-in link")
+		assert.Contains(t, on, "once", "the link's own limit")
+		assert.NotContains(t, AuthPage(s), "peer-unavailable", "nothing when the check works: %+v", s)
+	}
+}
+
+func withUnavailable(s PageState) PageState { s.PeerUnavailable = true; return s }
+
+// The handler fills it from the attribution of the very request: a computer whose peer check is lost shows the line on GET /auth, one where it works does not.
+func TestAuthRouteShowsTheLineOnlyWhenTheCheckIsLost(t *testing.T) {
+	if !peercred.Supported {
+		t.Skip("a system with no peer check never loses it")
+	}
+	t.Cleanup(func() { peerCheckLost.Store(false) })
+	ks, err := NewKeyStore(t.TempDir())
+	require.NoError(t, err)
+	ar := NewRoutes(ks)
+	get := func() string {
+		r := httptest.NewRequest("GET", "/auth", nil).WithContext(ConnContext(context.Background(), tcpConn{}))
+		r.RemoteAddr = "127.0.0.1:50000"
+		rec := httptest.NewRecorder()
+		ar.AuthPage(rec, r)
+		return rec.Body.String()
+	}
+	peerCheckLost.Store(false)
+	t.Cleanup(SetPeerAttribution(func(netip.AddrPort, netip.AddrPort) (peercred.Verdict, error) { return peercred.Self, nil }))
+	assert.NotContains(t, get(), "peer-unavailable")
+	t.Cleanup(SetPeerAttribution(func(netip.AddrPort, netip.AddrPort) (peercred.Verdict, error) { return peercred.Unsupported, nil }))
+	assert.Contains(t, get(), `id="peer-unavailable"`)
 }
