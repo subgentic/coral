@@ -19,7 +19,7 @@ export function createHighlights({ st, dialog, body, panel, threads, groupOf, re
         if (!st.data || dialog.classList.contains('av-comparing')) return;
         const ix = docIndex();
         for (const { c } of threads()) {
-            if (c.deleted || !c.anchor || c.anchor.whole || groupOf(c) !== 'main') continue;
+            if (c.deleted || !c.anchor || c.anchor.whole || c.anchor.path || groupOf(c) !== 'main') continue; // an anchor with a path is on an agent's diff (#12536): the diff view says when its lines are gone
             const hit = locateQuote(ix.text, c.anchor);
             if (!hit) { st.orphan.add(c.id); continue; }
             const first = ix.at(hit.start), last = ix.at(hit.end - 1);

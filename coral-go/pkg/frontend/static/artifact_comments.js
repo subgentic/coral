@@ -191,7 +191,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         panel.append(wrap);
         if (st.composing && st.composing.anchor) panel.append(composer());
         else if (d.canComment && !d.locked) {
-            const whole = btn('ac-whole', opts.words?.whole || 'Comment on the whole document'); whole.addEventListener('click', () => { st.composing = { anchor: { whole: true } }; st.error = ''; render(); panel.querySelector('.ac-input')?.focus(); });
+            const whole = btn('ac-whole', opts.words?.whole || 'Comment on the whole document'); whole.addEventListener('click', () => { st.composing = { anchor: opts.wholeAnchor ? opts.wholeAnchor() : { whole: true } }; st.error = ''; render(); panel.querySelector('.ac-input')?.focus(); });
             panel.append(whole);
         }
         const act = panel.querySelector('.ac-card.ac-active'); if (act && st.scrollCard) { st.scrollCard = false; act.scrollIntoView({ block: 'nearest', behavior: scrollBehavior() }); }
@@ -222,6 +222,7 @@ export function attachComments(dialog, body, host, opts = {}) {
                 if (g === 'main') m.append(el('span', 'ac-from', `from v${c.fromVersion}`)); // muted text, not a pill
                 else m.append(el('span', 'chip ac-pill ac-pill-orphan', g === 'look' ? 'text appears twice' : 'text no longer present'));
             } else if (st.orphan.has(c.id)) m.append(el('span', 'chip ac-pill ac-pill-orphan', 'text changed'));
+            if (opts.outdated && opts.outdated(c)) m.append(el('span', 'chip ac-pill ac-pill-orphan', 'outdated')); // a comment on an agent's diff whose lines are no longer in it (#12536): kept, never dropped, and never sent again
             if (!c.deleted && c.can.resolve) {
                 const r = act(c.resolved ? 'Reopen' : 'Resolve', () => run(() => (c.resolved ? api.reopenComment : api.resolveComment)(ownHex(c), st.server, c.id), c.resolved ? 'Comment reopened' : 'Comment resolved'));
                 r.classList.add('ac-resolve'); r.setAttribute('aria-label', `${c.resolved ? 'Reopen' : 'Resolve'} the thread by ${c.authorName || c.authorId || 'unknown'}`);
@@ -425,6 +426,12 @@ export function attachComments(dialog, body, host, opts = {}) {
             st.error = ''; setSheet(true); render();
             const cm = st.composing; panel.querySelector('.ac-input')?.focus();
             if (cm.tray) cm.tray.add([new File([blob], name || 'marked-picture.png', { type: blob.type })]);
+            return true;
+        },
+        /** A comment on an anchor the caller made (the lines selected in an agent's diff, #12536): the composer opens on it, in the panel. Resolves false when this person cannot comment here. */
+        composeOn(anchor) {
+            if (!st.hex || !st.data || !st.data.canComment || st.data.locked) return false;
+            st.composing = { anchor }; st.error = ''; setSheet(true); render(); panel.querySelector('.ac-input')?.focus();
             return true;
         },
         docWhole() { st.source = ''; st.text = false; st.whole = true; refresh(); },

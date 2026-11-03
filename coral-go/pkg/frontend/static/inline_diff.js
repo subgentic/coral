@@ -4,6 +4,7 @@
 import { serverUrl, currentServer } from './server_base.js';
 import { agentName, apiQs } from './agent_file_api.js';
 import { retryOnce } from './overload.js';
+import { importOnce } from './import_once.js';
 import { isImagePath, isMediaPath } from './utils.js';
 import { loadCodeMirror } from './vendor_loader.js';
 import { getCm, getLangExtension, getLangFromPath, DIFF_CONFIG, cmHost, cmTheme } from './cm_util.js';
@@ -36,6 +37,7 @@ async function readTexts(file) {
 }
 
 function drop(slot) {
+    if (slot.querySelector('.diff-comments')) importOnce('./diff_comments.js').then(m => m.detachDiffComments(slot)).catch(() => {});
     const view = views.get(slot);
     if (view) { try { view.destroy(); } catch { /* already gone */ } views.delete(slot); }
 }
@@ -57,8 +59,13 @@ async function mount(slot, file, { original, content }) {
     ];
     const langExt = getLangExtension(cm, getLangFromPath(file.filepath));
     if (langExt) extensions.push(langExt);
-    views.set(slot, new cm.EditorView({ state: cm.EditorState.create({ doc: content, extensions }), parent: host }));
+    const view = new cm.EditorView({ state: cm.EditorState.create({ doc: content, extensions }), parent: host });
+    views.set(slot, view);
+    importOnce('./diff_comments.js').then(m => m.attachDiffComments(slot, file, view, { original, content }, compareBase(file))).catch(() => {}); // comments on these lines (#12536); the diff reads fine without them
 }
+
+/** The state the diff was made on, for a comment's anchor: the file's status and counts. */
+const compareBase = file => `${file.status || 'changed'} +${file.additions || 0} -${file.deletions || 0}`;
 
 /** Draws the file's diff into its slot (a block under its row), or what stands in for it. force: a long file's diff the person asked for. */
 export async function showFileDiff(slot, file, force = false) {

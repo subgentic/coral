@@ -57,6 +57,11 @@ type commentAnchor struct {
 	StartLine int    `json:"start_line,omitempty"`
 	EndLine   int    `json:"end_line,omitempty"`
 	Whole     bool   `json:"whole,omitempty"`
+	// A comment on an agent's diff (#12536) also names its file, the side of the diff, and the state it was made on; Withheld is true when the lines could not be checked for secrets and are not kept.
+	Path     string `json:"path,omitempty"`
+	Side     string `json:"side,omitempty"`
+	Base     string `json:"base,omitempty"`
+	Withheld bool   `json:"withheld,omitempty"`
 }
 
 // commentLimiter allows each author maxCommentWrites writes in any minute, in memory; the table of authors is bounded so a stream of new identities cannot grow it.
@@ -244,6 +249,9 @@ func (h *SessionsHandler) commentArtifact(w http.ResponseWriter, r *http.Request
 // WHOLE document (#11444: HTML, pictures, PDFs, tables, video, downloads); only a text-like one takes a comment pointing into its text, and the create route says so.
 func (h *SessionsHandler) commentArtifactKind(w http.ResponseWriter, r *http.Request) (id string, textLike, ok bool) {
 	id = chi.URLParam(r, "id")
+	if strings.HasPrefix(id, "diff:") { // an agent's diff (#12536): the same routes, one changed file in the place of an artifact
+		return id, false, h.diffCommentSubject(w, r, id)
+	}
 	if strings.HasPrefix(id, "goal:") { // a goal's thread (#11955): the same routes, a goal in the place of a file
 		return id, false, h.goalCommentSubject(w, r, id)
 	}
@@ -617,6 +625,9 @@ func (h *SessionsHandler) createArtifactComment(w http.ResponseWriter, r *http.R
 	if team := goalTeamOf(r); team != "" {
 		in.Board = team // a goal comment belongs to the goal's team, whatever the request says (#11955)
 	}
+	if team := diffTeamOf(r); team != "" {
+		in.Board = team // so does a comment on a diff (#12536)
+	}
 	if in.Board != "" && !commentBoardRe.MatchString(in.Board) {
 		errBadRequest(w, "invalid board")
 		return
@@ -632,7 +643,20 @@ func (h *SessionsHandler) createArtifactComment(w http.ResponseWriter, r *http.R
 		return
 	}
 	anchorJSON := ""
-	if in.ParentID == nil {
+	if team, sid, _, isDiff := parseDiffSubject(id); isDiff {
+		if n, err := h.ss.CountCommentsUnder(r.Context(), "diff:"+team+":"+sid+":"); err == nil && n >= maxDiffCommentsPerSession {
+			commentRefuse(w, http.StatusConflict, "too_many_comments", "this agent's diff already has the most comments it can hold")
+			return
+		}
+	}
+	if in.ParentID == nil && diffTeamOf(r) != "" {
+		if msg := h.cleanDiffAnchor(r, id, in.Anchor); msg != "" {
+			errBadRequest(w, msg)
+			return
+		}
+		b, _ := json.Marshal(in.Anchor)
+		anchorJSON = string(b)
+	} else if in.ParentID == nil {
 		msg, unchecked := cleanAnchor(in.Anchor)
 		if msg != "" {
 			errBadRequest(w, msg)

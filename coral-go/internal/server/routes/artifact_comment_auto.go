@@ -29,6 +29,9 @@ func (h *SessionsHandler) deliverOperatorComment(r *http.Request, caller comment
 	if !h.operatorComment(r, caller) {
 		return autoDelivery{Reason: "not_owner"}
 	}
+	if team, sid, hash, ok := parseDiffSubject(id); ok { // a comment on an agent's diff goes to that agent (#12536)
+		return h.deliverDiffComment(r, caller, c, id, team, sid, hash)
+	}
 	if team, gid, ok := parseGoalSubject(id); ok { // a goal's comment goes to the goal's owner (#11955)
 		return h.deliverGoalComment(r, caller, c, id, team, gid)
 	}

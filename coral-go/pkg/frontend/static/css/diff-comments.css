@@ -1,0 +1,7 @@
+/* Comments on an agent's diff (#12536): the thread panel under a file's diff and the button that offers a comment on the selected lines. The panel itself is the artifact comments' (ac-*). */
+.file-diff { position: relative; }
+.diff-comments { margin: 8px 0 12px; }
+.diff-comments .ac-panel { position: static; width: auto; max-width: none; }
+.diff-comment-btn { position: absolute; z-index: 5; box-shadow: var(--shadow-md); }
+.diff-comment-btn[hidden] { display: none; } /* display-ok: a button the page shows only while lines are selected */
+.diff-comments .ac-sheet-close { display: none; } /* display-ok: the thread panel stays open under its diff; there is no toggle to bring a closed one back */

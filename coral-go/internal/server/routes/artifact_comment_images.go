@@ -329,7 +329,9 @@ func checkedPictures(objectDir, scope string, hexes []string) ([]commentImage, s
 // commentImagesOf is checkedPictures for a comment on artifactID, as the JSON kept with the comment.
 func (h *SessionsHandler) commentImagesOf(artifactID string, hexes []string) (string, string) {
 	scope := artifactID
-	if team, _, ok := parseGoalSubject(artifactID); ok {
+	if team, _, _, ok := parseDiffSubject(artifactID); ok {
+		scope = goalImageScope(team) // a diff's pictures are added through the team's picture route too (#12536)
+	} else if team, _, ok := parseGoalSubject(artifactID); ok {
 		scope = goalImageScope(team) // a goal's pictures are added through the team's goal-images route (#11955)
 	}
 	imgs, why := checkedPictures(h.artifactDir(), scope, hexes)
