@@ -57,10 +57,6 @@
       "count": 2,
       "reason": "generating a team runs the CLI on this computer"
     },
-    "template_browser.js": {
-      "count": 3,
-      "reason": "to do (#12653): the team templates live on a computer and are read bare"
-    },
     "terminal_backend.js": {
       "count": 2,
       "reason": "the auto-wake and hooks banners list this computer's own agents (read from /api/system/auto-wake and /hooks-status)"

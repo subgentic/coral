@@ -57,7 +57,19 @@ const { coralReady } = require('./helpers/wait');
    const writes=await ev(`window.__resourceCalls.filter(c=>c.path.includes('folder-tags')&&c.method!=='GET')`);
    assert.deepEqual(writes.map(c=>[c.server,c.path,c.method]),[['srv1','/api/folder-tags/app','POST'],['srv2','/api/folder-tags/app/7','DELETE']]);
   });
+  await check('template browser per computer, including category cache',async()=>{
+   for(const server of ['srv1','srv2']){
+    await ev(`(async()=>{const {state}=await import(${S}+'state.js');state.selectedTeam='@${server}/team';await (await import(${S}+'template_browser.js')).showTemplateBrowser('agents',()=>{});return true;})()`);
+    await ev(`document.querySelector('.template-cat-btn').click();true`);
+    await waitFor(`!!document.querySelector('.template-item-btn')`,'template');
+    await ev(`document.querySelector('.template-item-btn').click();true`);
+    await waitFor(`!!document.querySelector('.template-use-btn')`,'preview');
+    assert.ok(await ev(`document.querySelector('.template-browser-preview').textContent.includes('Template ${server}')`),'remote template content');
+    await ev(`document.querySelector('[data-on-click=template-browser-close]').click();true`);
+   }
+  });
   const calls=await ev('window.__resourceCalls');
+  for(const resource of ['chief','views','folder-tags','templates']) assert.ok(calls.some(c=>c.server==='srv1'&&c.path.startsWith('/api/'+resource)) || failures.length,'resource sent to its computer');
   assert.deepEqual(failures,[],'all remote resources are scoped');
   console.log('PASS remote @srv1/team resources and two-computer isolation');
  }finally{await client.close();}
