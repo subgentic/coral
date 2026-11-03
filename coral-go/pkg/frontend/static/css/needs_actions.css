@@ -5,3 +5,8 @@
     .inbox-slots > [data-slot="approve"] { grid-column: 1; } .inbox-slots > [data-slot="changes"] { grid-column: 2; } .inbox-slots > [data-slot="save"] { grid-column: 3; }
     .inbox-slots > [data-slot="ignore"] { grid-column: 2 / span 2; } .inbox-slots > [data-slot="dots"] { grid-column: 4; justify-self: center; }
 }
+/* A row kind may need more words than the shared Actions width (Close goal, Not yet, Dismiss).
+   Let desktop flex actions wrap inside their cell; preserve the hidden phone actions. */
+@media (min-width: 768px) {
+    .inbox-needs-results .inbox-review-actions { flex-wrap: wrap; min-width: 0; max-width: 100%; }
+}
