@@ -275,3 +275,42 @@ func TestTheRootOfAChainIsFoundWithinABoundAndOnItsBoard(t *testing.T) {
 	assert.Equal(t, int64(99999), k.h.bs.RootTask(ctx, "alpha", 99999), "a task that is not there is its own root")
 	assert.Equal(t, cur, k.h.bs.RootTask(ctx, "beta", cur), "never off the board")
 }
+
+// Security's MUST on #12144: an agent cannot quiet another agent's plain file for review by uploading the identical bytes with --kind. The kind is written only for a file that is new on the team's list; the asked kind
+// is ignored (and the reply says so), and the first agent's ask stays a plain, counted file.
+func TestAnAgentCannotQuietAnotherAgentsFileByUploadingTheSameBytesWithAKind(t *testing.T) {
+	k := newKindRig(t)
+	ctx := context.Background()
+	code, out := k.post("s2&tag=for+review&question=Approve+the+plan%3F", "the same bytes", nil) // agent A (Frontend): a plain file for review
+	require.Equal(t, 201, code, out)
+	assert.Equal(t, board.KindFile, k.kindOf(out))
+	op := k.task("OPERATOR a task of B's", "Backend")
+	code, out = k.post("s1&tag=for+review&question=Does+it+work%3F&kind=done", "the same bytes", taskHeader12144(op)) // agent B (Backend), identical bytes
+	require.Less(t, code, 300, "%v", out)
+	assert.Equal(t, board.KindFile, k.kindOf(out), "A's file stays a plain file")
+	assert.Nil(t, out["kind"])
+	assert.NotEmpty(t, out["kind_ignored"], "B is told the kind was ignored")
+	id := strings.TrimPrefix(out["uri"].(string), "coral://artifacts/")
+	kinds, err := k.h.bs.ArtifactKindsOf(ctx, "alpha")
+	require.NoError(t, err)
+	assert.Empty(t, kinds[id], "no kind row was written")
+	// and the Operator's switch for done does not touch it
+	assert.False(t, readInboxPrefs(map[string]string{"inbox_kind_done": "false"}).muted("alpha", k.kindStr(t, id)), "a plain file is counted with the done switch off")
+}
+
+func (k *kindRig) kindStr(t *testing.T, id string) string {
+	t.Helper()
+	got, err := k.h.bs.ArtifactKind(context.Background(), "alpha", id)
+	require.NoError(t, err)
+	return got
+}
+
+// A file that is new on the list still gets its checked kind.
+func TestAFileNewOnTheListStillGetsItsKind(t *testing.T) {
+	k := newKindRig(t)
+	op := k.task("OPERATOR new work", "Backend")
+	code, out := k.up("s1", "&kind=done", taskHeader12144(op))
+	require.Equal(t, 201, code, out)
+	assert.Equal(t, board.KindDone, k.kindOf(out))
+	assert.Nil(t, out["kind_ignored"])
+}

@@ -306,6 +306,23 @@ func (h *SessionsHandler) uploadAgentArtifact(w http.ResponseWriter, r *http.Req
 	}
 	_ = fresh
 	h.noteOffBooksUpload(r.Context(), taskID, hexID) // an agent with no task in progress: a line of the orchestrator's check (#7793)
+	// The kind is written only for a file that is NEW on this team's list (#12144, Security's MUST): the same bytes another agent already put there keep what they are, so an agent cannot quiet someone
+	// else's plain file for review by uploading the identical bytes with --kind. The asked kind is then ignored, and the reply says so.
+	kindIgnored := false
+	if kind != "" && h.bs != nil {
+		if teamBoard, _, _ := uploaderOf(sid); teamBoard != "" {
+			onList := false
+			if pre, perr := h.bs.ArtifactTags(r.Context(), teamBoard); perr != nil || len(pre[hexID]) > 0 {
+				onList = true // already tagged on this board, or not readable: never written on a guess
+			}
+			if k, kerr := h.bs.ArtifactKind(r.Context(), teamBoard, hexID); kerr != nil || k != board.KindFile {
+				onList = true
+			}
+			if onList {
+				kind, kindIgnored = "", true
+			}
+		}
+	}
 	var tags []string
 	if asked := board.CleanArtifactTags(r.URL.Query()["tag"]); len(asked) > 0 { // --tag (#8583): the team's tags of this object, added to what it already has
 		if teamBoard, _, _ := uploaderOf(sid); teamBoard != "" && h.bs != nil {
@@ -379,6 +396,9 @@ func (h *SessionsHandler) uploadAgentArtifact(w http.ResponseWriter, r *http.Req
 	}
 	if kind != "" {
 		reply["kind"] = kind
+	}
+	if kindIgnored {
+		reply["kind_ignored"] = "this file is already on the team's list: it keeps what it is"
 	}
 	if plan == nil {
 		// Bytes that are already a version of their own board's series say so (#6495): a script that uploaded v1 again needs not read the series back. Only the uploading board's own series

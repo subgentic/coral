@@ -25,7 +25,7 @@ func (h *BoardHandler) inboxPrefs(ctx context.Context) inboxPrefs {
 }
 
 // attachArtifactKinds puts Kind and Muted on the rows of the files the Operator's settings speak of. It is the Operator's alone, as the comments are: a list an agent or a Coral Hub guest reads has neither,
-// so no agent learns what is muted. A row not tagged for review is never muted: the switches are for what waits for the Operator. A read that fails leaves the rows as they are (nothing muted).
+// so no agent learns what is muted. A file with a kind that is switched off is muted wherever it would wait for the Operator: tagged for review, or back in Needs you for news in its thread. Needs you counts only those rows, so the mark matters only for them. A read that fails leaves the rows as they are (nothing muted).
 func (h *BoardHandler) attachArtifactKinds(r *http.Request, project string, items []teamArtifact) {
 	if len(items) == 0 || !operatorOrKeyCaller(r) {
 		return
