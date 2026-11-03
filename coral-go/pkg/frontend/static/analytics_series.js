@@ -42,6 +42,13 @@ export function rankKeys(buckets) {
     return [...cost.keys()].sort((a, b) => (cost.get(b) - cost.get(a)) || (reqs.get(b) - reqs.get(a)) || String(a).localeCompare(String(b)));
 }
 
+/** What a person calls each key: the series' own label (a team's name, where its key is a board id), else the key. A key joins things; the label is only ever read (#13045). */
+export function labelsOf(buckets) {
+    const names = new Map();
+    for (const b of buckets) for (const s of b.series || []) if (!names.has(s.key) || names.get(s.key) === s.key) names.set(s.key, s.label || s.key);
+    return names;
+}
+
 /** Which keys get a line and which colour. With nothing checked: the top `top` of `ranked` (by cost), their colours their ranks, the rest folded into Other. With rows checked: only those, a checked key that was in the top keeping the colour
  *  it had, and a checked key that was not taking a colour no checked key has (so a filter never repaints a line that survives it); more checked keys than colours fold into Other. */
 export function assignLines(ranked, selected, top = TOP) {
@@ -60,8 +67,8 @@ const accumulate = (l, cumulative) => { if (cumulative) { let run = 0; l.plot = 
 
 /** The lines of one metric for an assignment: a line per assigned key (every time of the axis has a value), one "Other" line for the folded keys; `cumulative` makes each a running total. */
 export function buildSeries(buckets, assignment, times, metric, cumulative) {
-    const at = new Map(times.map((t, i) => [t, i]));
-    const lines = assignment.lines.map(a => ({ key: a.key, label: a.key, slot: a.slot, other: false, vals: new Array(times.length).fill(0) }));
+    const at = new Map(times.map((t, i) => [t, i])), names = labelsOf(buckets);
+    const lines = assignment.lines.map(a => ({ key: a.key, label: names.get(a.key) || a.key, slot: a.slot, other: false, vals: new Array(times.length).fill(0) }));
     const byKey = new Map(lines.map(l => [l.key, l]));
     const folded = new Set(assignment.folded);
     const rest = { key: OTHER, label: `Other (${assignment.folded.length})`, slot: 0, other: true, vals: new Array(times.length).fill(0) };
@@ -243,7 +250,7 @@ export function drawPanel(host, view, { tableTotal, redraw, phone }) {
     if (picked.length === 1) byRows(picked[0], `${picked[0].label}, ${when}`);
     else if (asg.lines.length === 1 && !asg.folded.length) { // one row, several metrics: the metrics are the lines, a chart for each unit
         for (const group of metricUnits(picked)) {
-            const lines = buildMetricLines(buckets, [asg.lines[0].key], times, group, st.cumulative), chart = card(`${asg.lines[0].key}: ${joinWords(group.map(g => g.label))}, ${when}`);
+            const lines = buildMetricLines(buckets, [asg.lines[0].key], times, group, st.cumulative), chart = card(`${labelsOf(buckets).get(asg.lines[0].key) || asg.lines[0].key}: ${joinWords(group.map(g => g.label))}, ${when}`);
             if (asg.active) addReset(chart.parentElement.querySelector('.viz-title'), shownKeys.length);
             drawChart(chart, { times, lines, metric: group[0].key, interval, hi: '', phone, log: !!st.log && group.length > 1 });
             if (lines.length > 1) { // the metrics are the lines: a key (the table names rows, not metrics), each metric with what it adds up to
