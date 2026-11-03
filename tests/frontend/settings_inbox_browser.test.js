@@ -26,6 +26,7 @@ const { coralReady } = require('./helpers/wait');
                 window.__files = [file('a', 'plan.md'), file('b', 'release-notes.md', { kind: 'release', muted: true }), file('d', 'decisions.md', { kind: 'decided', muted: true }), file('e', 'old-notes.md', { muted: true, created_at: at(50) })];
                 window.fetch = (u, o = {}) => { const url = new URL(String(u), location.href), m = (o.method || 'GET').toUpperCase();
                     if (url.pathname === '/api/settings' && m === 'PUT') { window.__puts.push(JSON.parse(o.body)); return json({ ok: true }); }
+                    if (url.pathname !== '/api/board/projects' && url.pathname.endsWith('/api/board/projects')) return window.__remote === 'fail' ? json({ error: 'that computer did not answer' }, 502) : json((window.__remote || []).map(p => ({ project: p })));
                     if (url.pathname === '/api/board/projects') return window.__projects === 'fail' ? json({ error: 'could not read the boards' }, 500) : json((window.__projects || ['alpha', 'beta', 'gamma']).map(p => ({ project: p })));
                     if (/^\\/api\\/board\\/[a-z]+\\/artifacts$/.test(url.pathname) && url.searchParams.get('tag') === 'for review') return json({ artifacts: url.pathname.includes('/alpha/') ? window.__files : [], has_more: false });
                     return real(u, o); }; return true; })()`);
@@ -59,6 +60,19 @@ const { coralReady } = require('./helpers/wait');
             await ev(`window.__projects = null; document.querySelector('#settings-inbox-teams .settings-inbox-teams-failed button').click(); true`);
             await sleep(500); // sleep-ok: Retry reads the boards again
             check(`${tag}: Retry draws the teams with the saved choice (alpha only)`, JSON.stringify(await view().then(x => x.teams)) === '[["alpha",true],["beta",false],["gamma",false]]');
+            // another computer is managed from here: a failed read of it is a failure of the whole list (never a shorter list that Save would rewrite the choice from); when it answers its teams are drawn
+            await ev(`import(${S} + 'state.js').then(m => { m.state.hub = true; m.state.servers = [{ id: 'srv2', name: 'srv2', status: 'online' }]; return true; })`);
+            await ev(`window.__remote = 'fail'; true`);
+            await refill(null, '["alpha","srv2:away"]');
+            const part = await ev(`(() => { const h = document.getElementById('settings-inbox-teams'); return { failed: !!h.querySelector('.settings-inbox-teams-failed'), boxes: h.querySelectorAll('input[data-team]').length }; })()`);
+            check(`${tag}: one computer that cannot be read fails the whole list: no partial boxes`, part.failed && part.boxes === 0, JSON.stringify(part));
+            await ev(`window.__remote = ['delta']; true`);
+            await refill(null, '["alpha","srv2:away"]');
+            const drawn = await ev(`(() => ({ boxes: [...document.querySelectorAll('#settings-inbox-teams input[data-team]')].map(b => [b.dataset.team, b.checked]) }))()`);
+            check(`${tag}: when it answers its teams are drawn too`, drawn.boxes.length === 4 && drawn.boxes.some(([t]) => /delta/.test(t)), JSON.stringify(drawn));
+            check(`${tag}: a saved team that is not drawn now (its computer is away) stays in the choice`, (await ev(`import(${S} + 'settings_inbox.js').then(m => m.readInboxSettings({ inbox_included_teams: '["alpha","srv2:away"]' }).inbox_included_teams)`)) === '["alpha","srv2:away"]');
+            await ev(`import(${S} + 'state.js').then(m => { m.state.hub = false; m.state.servers = []; return true; })`);
+            await ev(`window.__remote = null; true`);
             await refill(null, 'all');
             // turn Release summaries off and untick gamma, set the time, Save
             await ev(`(() => { const set = (id, f) => { const e = document.getElementById(id); f(e); e.dispatchEvent(new Event('input', { bubbles: true })); e.dispatchEvent(new Event('change', { bubbles: true })); };
@@ -89,6 +103,7 @@ const { coralReady } = require('./helpers/wait');
             await sleep(400); // sleep-ok: the pane draws over a frame or two
             const sline = await ev(`(() => { const p = document.getElementById('settings-inbox-muted'); return { shown: !!p && !p.hidden, text: p ? p.textContent.replace(/\\s+/g, ' ').trim() : '', btn: !!(p && p.querySelector('button')) }; })()`);
             check(`${tag}: the Settings line says what was muted in the last 7 days, with Show them`, sline.shown && /^Muted in the last 7 days: 1 file for review, 1 release summary, 1 decision made for you\. Show them$/.test(sline.text) && sline.btn, JSON.stringify(sline));
+            await ev(`document.getElementById('settings-inbox-muted').scrollIntoView({ block: 'center' }); true`);
             await shot(`settings-inbox-muted-${w}`);
             await ev(`document.querySelector('#settings-inbox-muted button').click(); true`);
             await sleep(500); // sleep-ok: the dialog closes and the folder switches

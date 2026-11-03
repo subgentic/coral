@@ -1,7 +1,7 @@
 /* Settings > Inbox (#12144, the Operator's design v6): what reaches Needs you. A switch for each kind of optional item, the teams the switches apply to, and the time of the daily items. Questions and decisions have no
  * switch and always reach the Operator. The values are the computer's own settings (inbox_kind_*, inbox_included_teams, inbox_digest_time): the page sends what it shows, and the server parses each value again. */
-import { fetchProjects } from './board_fetch.js';
-import { keyLabel, isCloud, serverFetch } from './server_base.js';
+import { fetchProjectsChecked } from './board_fetch.js';
+import { keyLabel } from './server_base.js';
 import { settingBool } from './settings_core.js';
 import { mutedReviewItems, mutedWords } from './inbox_reviews.js';
 import { importOnce } from './import_once.js';
@@ -28,15 +28,12 @@ export async function drawInboxTeams(raw) {
     const host = teamsHost();
     if (!host) return;
     let projects = [];
-    try {
-        // fetchProjects reads a refused answer as no teams, so a refusal is checked here first (this computer's own boards): not being able to read them is not an empty list
-        if (!isCloud()) { const r = await serverFetch('local', '/api/board/projects'); if (!r.ok || !Array.isArray(await r.json())) throw new Error('the boards could not be read'); }
-        projects = (await fetchProjects()).map(p => p.project);
+    try { projects = (await fetchProjectsChecked()).map(p => p.project); // every contributing source is checked: a source that cannot be read is a failure, never an empty list
     } catch {
         // The teams could not be read: that is not an empty list. Say so, with a way to try again; no box is drawn, so Save sends the saved choice as it was (readIncludedTeams) and nothing is lost.
         const p = document.createElement('p'), b = document.createElement('button');
         p.className = 'sv-help settings-inbox-teams-failed'; p.setAttribute('role', 'alert');
-        p.append('Your teams could not be loaded, so the choice below cannot be changed now. What you saved stays as it is. ');
+        p.append('Your teams could not be loaded, so they cannot be changed now. What you saved stays as it is. ');
         b.type = 'button'; b.className = 'btn btn-quiet btn-small'; b.textContent = 'Retry';
         b.addEventListener('click', () => drawInboxTeams(raw));
         p.append(b);
@@ -61,7 +58,9 @@ export function readIncludedTeams(fallback) {
     const boxes = [...(teamsHost()?.querySelectorAll('input[data-team]') || [])];
     if (!boxes.length) return fallback === undefined ? 'all' : includedTeams(fallback) === 'all' ? 'all' : JSON.stringify(includedTeams(fallback));
     if (boxes.every(b => b.checked)) return 'all';
-    return JSON.stringify(boxes.filter(b => b.checked).map(b => b.dataset.team));
+    const drawn = new Set(boxes.map(b => b.dataset.team)), saved = includedTeams(fallback);
+    const kept = saved === 'all' ? [] : saved.filter(t => !drawn.has(t)); // a saved team that is not drawn now (its computer is offline) stays as it was: Save never rewrites what it did not show
+    return JSON.stringify([...boxes.filter(b => b.checked).map(b => b.dataset.team), ...kept]);
 }
 
 /** Fills the Inbox controls from the saved settings: a kind is on unless it was turned off, the teams are all unless a list was saved, the time is 09:00 unless one was set. */
