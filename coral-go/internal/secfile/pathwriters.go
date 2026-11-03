@@ -225,10 +225,16 @@ func (w *walker) add(text, path string, group bool) {
 	w.who[text] = Writer{Text: text, Path: path, Group: group}
 }
 
-// groupIsMine says whether a group write bit on an entry grants nobody else anything: the entry is the user's own and the caller's check calls the group the user's alone. A walker with no
-// check never trusts one.
+// groupIsMine says whether a group write bit on an entry grants nobody else anything: the entry is the user's own and the caller's check calls the group the user's alone, or it is root's and the group is the
+// system's administrators (isSystemAdminGroup). A walker with no check never trusts one.
 func (w *walker) groupIsMine(sys *syscall.Stat_t) (bool, error) {
-	if w.groupOK == nil || int(sys.Uid) != w.uid {
+	if w.groupOK == nil {
+		return false, nil
+	}
+	if sys.Uid == 0 && isSystemAdminGroup(sys.Gid) { // root's own folder that the administrators' group can write (/Applications on a Mac): the system's, and those members can become root anyway (#12656)
+		return true, nil
+	}
+	if int(sys.Uid) != w.uid {
 		return false, nil
 	}
 	ok, err := w.groupOK(sys.Gid)
