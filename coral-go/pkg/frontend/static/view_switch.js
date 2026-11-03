@@ -35,7 +35,7 @@ const VIEW_DISPLAY = {
     "live-session-view": "flex",
     "history-session-view": "flex",
     "scheduler-view": "block",
-    "group-table-view": "block",
+    "group-table-view": "", // its stylesheet chooses block for tables and flex for a phone Inbox frame
     "messageboard-view": "flex",
     "team-page-view": "flex",
     "workflows-view": "block",
