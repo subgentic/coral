@@ -1,3 +1,4 @@
+import { setReviewCacheReader } from './inbox_review_cache.js';
 /* Review artifacts use the same owner-protected team list and tags routes as Artifacts.
  * After the Inbox first opens, keep its badge updated on other tabs without eager startup reads. */
 import { fetchProjects } from './board_fetch.js';
@@ -5,7 +6,7 @@ import { boardFetch, keyLabel, splitKey } from './server_base.js';
 import { hideAsksWhen } from './ask_filter.js';
 import { importOnce } from './import_once.js';
 
-let items = [], saved = [], muted = [], errors = [], pending = null, lastRead = 0, revision = 0, changed = () => {};
+let items = [], saved = [], muted = [], errors = [], pending = null, lastRead = 0, revision = 0, changed = () => { if (typeof document !== 'undefined') document.dispatchEvent(new Event('coral:reviews-changed')); };
 let activated = false;
 // One row per artifact (#11533): versions (same uploader, team, name) are one item, the newest, with `earlier`.
 const vkey = a => (a.session_id || a.produced_by) ? JSON.stringify([a.team, a.session_id, a.produced_by, a.name]) : a.reviewKey; // a JSON array: no name or id can run into the next field
@@ -56,7 +57,6 @@ export function mutedWords(rows) {
 /** The files the Operator's settings keep out of Needs you (#12144), one row per file like Needs you: in their folder and under the quiet Muted line, never counted. */
 export const mutedReviewItems = () => collapseVersions(muted);
 export const reviewErrors = () => errors;
-export function onReviewsChanged(fn) { changed = fn; }
 
 /** Ten open rows per producer across teams; a session's identity includes its server. */
 export function reviewGroups(rows) {
@@ -210,3 +210,5 @@ export function markOpenedRead(hex) {
     return p;
 }
 
+
+setReviewCacheReader(unreadReviewItems, refreshReviews);

@@ -20,7 +20,7 @@ const { coralReady } = require('./helpers/wait');
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
         await coralReady(ev);
         await ev(`(async () => {
-            window.__coral.buildAllLazy(); // Settings is built on first open
+            await window.__coral.buildAllLazy(); // Settings is built on first open
             const real = window.fetch; window.__puts = [];
             window.__st = { configured: true, state: 'idle', hub_url: 'https://hub.example', max_mode: 'view', max_mode_saved: false, allow_hub_auto_accept: true };
             window.fetch = async (url, opts = {}) => { const u = String(url), m = (opts.method || 'GET').toUpperCase();

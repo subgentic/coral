@@ -26,7 +26,7 @@ const { coralReady } = require('./helpers/wait');
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
             await coralReady(ev);
             await ev(`(async () => {
-                window.__coral.buildAllLazy(); const real = window.fetch; window.__calls = [];
+                await window.__coral.buildAllLazy(); const real = window.fetch; window.__calls = [];
                 window.__st = { configured: true, state: 'idle', hub_url: 'https://hub.example', max_mode: 'view', max_mode_saved: false, allow_hub_auto_accept: true, redact_tokens: true, hub_cross_team_settings: true };
                 window.__op = { linked: false, disabled: false }; window.__fail = false;
                 const json = (b, status = 200) => new Response(JSON.stringify(b), { status, headers: { 'Content-Type': 'application/json' } });

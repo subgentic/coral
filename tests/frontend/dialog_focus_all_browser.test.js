@@ -20,7 +20,7 @@ const { coralReady } = require('./helpers/wait');
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired();
         await coralReady(ev);
-        await ev(`window.__coral.buildAllLazy(); true`); // the dialogs built on first open (#4500), each with the same focus handling
+        await ev(`(async () => { await window.__coral.buildAllLazy(); return true; })()`); // the dialogs built on first open (#4500), each with the same focus handling
         const ids = await ev(`[...document.querySelectorAll('.modal[role=dialog]')].map(d => d.id)`);
         assert.ok(ids.length >= 18, `the page has its dialogs (${ids.length})`);
         const problems = [], skipped = [];

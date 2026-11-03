@@ -1,3 +1,4 @@
+import { importOnce } from './import_once.js';
 /* Settings > Terminal backend (#3634): tmux keeps agents running across Coral restarts but any
  * agent can reach other agents' terminals through its socket; pty isolates agents, which end when
  * Coral restarts. One Coral runs one backend, chosen when it starts, so a change applies at the
@@ -7,14 +8,13 @@
  * this exists through Coral Hub. */
 
 import { showToast } from './utils.js';
-import { backendHint } from './settings_fields.js';
+const { backendHint, TERMINAL_BACKEND_IDS } = await importOnce('./terminal_backend_fields.js');
 import { setHooksMissing, setPiHooksInactive } from './hooks_missing.js';
 import { isCloud } from './server_base.js';
 import { isSignedOut, pollEvery } from './overload.js';
 import { showConfirmModal } from './render.js';
 import { state } from './state.js';
 import { browserSession } from './safe_storage.js';
-import { TERMINAL_BACKEND_IDS } from './settings_fields.js';
 
 let _status = null; // GET /api/system/terminal-backend
 let _autoWakeShown = null; // the auto-wake values as the dialog opened (#3636)

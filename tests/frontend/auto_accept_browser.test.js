@@ -205,7 +205,7 @@ const BASE = require('./test_base').BASE;
 
         console.log('10. Settings: "Coral Hub can turn on auto-accept" shows only with Launch, on by default, saves locally');
         const cloudRow = await ev(`(async () => {
-            window.__coral.buildAllLazy(); // Settings is built on first open (#4500)
+            await window.__coral.buildAllLazy(); // Settings is built on first open (#4500)
             if (!document.getElementById('settings-cloud-allow-auto-accept')) return 'missing';
             const real = window.fetch;
             window.__cloudPuts = [];
