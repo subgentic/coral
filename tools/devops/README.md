@@ -98,6 +98,11 @@ the first failed check.
 
    Edit the body only after verify-release has passed, since its notes row compares the body with the tag's notes.
 
+5b. **Pin the release for the next one (#12626)**: `tools/pin-release-digests.sh X.Y.Z` on the new tag. It needs `gh` (logged in) and the PINNED cosign on PATH, as step 5 does. It checks the release's `SHA256SUMS.txt` Sigstore bundle with the rules `promote.yml` uses
+   (published, immutable, the tag's own commit, the exact `release.yml@refs/tags/vX.Y.Z` identity by a tag push) and prints the two Linux rows `coral machine launch` pins, or it fails and **prints nothing**. Run it, paste its two lines (a comment and a row) into
+   `releaseDigests` in `coral-go/internal/machinelaunch/releases.go` with the versions in order, and **review the diff**: the version, the commit the comment names, two different 64-digit hex digests. Land that row in the NEXT release's batch, so every release's CLI can
+   launch the previous release (a build cannot hold its own release's digest, because the digest does not exist until the release is made). Never add a row by hand from a `SHA256SUMS.txt` that was not checked this way; Security reads the diff.
+
 6. **Approval and cask (the operator's act, #5551)**: the operator runs *Actions > Approve release > Run workflow* with the tag
    (no agent ever dispatches it, revokes, or edits the Latest mark). Three jobs, one per privilege: `verify` (read only: the
    release is published, immutable, a pre-release, on `main`, newer than the current latest, not revoked, and
