@@ -34,6 +34,19 @@ const BASE = require('./test_base').BASE;
         await ev(`(async () => { const { state } = await import(${S} + 'state.js'); state.liveSessions = [{ ...window.__waiting, display_name: 'Frontend Dev', waiting_summary: 'Review the component' }]; (await import(${S} + 'inbox_tab.js')).updateInboxTab(); return true; })()`);
         await waitFor(`document.querySelector('${T} td[data-key=agent]')?.textContent.includes('Frontend Dev')`, 'fields arrive');
         await inspect('after fields');
+        // #12740: agent rows also need the placeholder among questions and among proposals.
+        await ev(`(() => { const real = window.fetch; window.__mixedAsks = []; window.__mixedProposals = []; window.fetch = (u, o) => { const path = new URL(String(u), location.origin).pathname, json = d => Promise.resolve(new Response(JSON.stringify(d), { headers: { 'Content-Type': 'application/json' } })); if (path === '/api/operator-asks') return json(window.__mixedAsks); if (path === '/api/proposals') return json({ proposals: window.__mixedProposals }); return real(u, o); }; return true; })()`);
+        for (const kind of ['question', 'proposal']) {
+            await ev(`(async () => { window.__mixedAsks = ${kind === 'question' ? "[{ board: 'team-a', kind: 'ask', id: 41, asker: 'Orchestrator', text: 'Which port should we use?', at: new Date().toISOString() }]" : '[]'}; window.__mixedProposals = ${kind === 'proposal' ? "[{ id: 11, board_id: 'team-a', kind: 'goal', title: 'Ship the beta', proposer: 'Orchestrator', state: 'pending', created_at: new Date().toISOString(), payload: { title: 'Ship the beta', outcome: 'Release is out' } }]" : '[]'}; const { state } = await import(${S} + 'state.js'); state.liveSessions = [window.__waiting]; await (await import(${S} + 'operator_asks.js')).refreshOperatorAsks(true); await (await import(${S} + 'inbox_proposals.js')).refreshProposals(true); (await import(${S} + 'inbox_tab.js')).updateInboxTab(); return true; })()`);
+            await waitFor(`document.querySelectorAll('${T} tbody tr').length === 2`, 'mixed ' + kind + ' table');
+            await ev(framesJs(8));
+            const mixed = await ev(`(() => { const row = document.querySelector('${T} tr[data-key="local:00000001-0000-4000-8000-000000000001"]'), item = row?.querySelector('td[data-key=agent]'), sub = item?.querySelector('.dt-subtitle'); return { item: item?.textContent, placeholder: sub?.textContent, shown: !!sub && sub.getClientRects().length > 0, rest: [...document.querySelectorAll('${T} tbody tr')].filter(r => r !== row).map(r => r.textContent).join(' ') }; })()`);
+            check(mixed.shown && mixed.placeholder === 'Waiting for details…' && mixed.item.includes('coral-go'), 'missing summary in mixed ' + kind + ' table: ' + JSON.stringify(mixed));
+            check(kind === 'question' ? mixed.rest.includes('Which port should we use?') : mixed.rest.includes('Ship the beta'), 'mixed item retains its own text: ' + JSON.stringify(mixed));
+            await ev(`(async () => { const { state } = await import(${S} + 'state.js'); state.liveSessions = [{ ...window.__waiting, waiting_summary: 'Review the component' }]; (await import(${S} + 'inbox_tab.js')).updateInboxTab(); return true; })()`);
+            await waitFor(`!document.querySelector('${T} tr[data-key="local:00000001-0000-4000-8000-000000000001"]').textContent.includes('Waiting for details…')`, 'arriving summary removes mixed placeholder');
+        }
+
     } finally { await client.close(); }
     if (failures.length) throw new Error(failures.join('\n'));
     console.log('needs_agent_actions_browser: ok');
