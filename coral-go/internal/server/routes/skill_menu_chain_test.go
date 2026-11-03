@@ -2,6 +2,7 @@ package routes
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"regexp"
@@ -54,9 +55,23 @@ func jsonQuote(s string) string {
 	return b.String()
 }
 
+// asAgent is a call as the agent of session sid (its own identity, as its token gives it), not the fixed one the shared helper uses: the agent the skill was attached to is the agent the line is sent to.
+func (e *skillsEnv) asAgent(sid, name, method, path string) (int, map[string]any) {
+	req := httptest.NewRequest(method, path, nil)
+	req = req.WithContext(context.WithValue(req.Context(), verifiedSessionKey{}, &store.SessionTokenOwner{SessionID: sid, SessionName: name}))
+	rec := httptest.NewRecorder()
+	e.router.ServeHTTP(rec, req)
+	out := map[string]any{}
+	_ = json.Unmarshal(rec.Body.Bytes(), &out)
+	return rec.Code, out
+}
+
 func TestASkillPickedFromTheMenuReachesTheAgentAndTheAgentReadsExactlyThatSkill(t *testing.T) {
 	e := newSkillsEnv(t)
-	e.liveAgent("sid-a")
+	rig := newSleepRig(t) // agent A: the one the skill is attached to AND the one the line is sent to
+	sidA, nameA := rig.sid, rig.name
+	e.liveAgent(sidA)
+	e.liveAgent("sid-b") // agent B: another agent on the computer, with nothing attached
 	row, digest := e.publish(map[string]string{"SKILL.md": menuSkillMD, "references/format.md": "format: one bullet per merged PR"}, store.PublisherOperator)
 
 	// 1. the menu lists the skill (the Operator's own search, as the page asks it)
@@ -67,7 +82,7 @@ func TestASkillPickedFromTheMenuReachesTheAgentAndTheAgentReadsExactlyThatSkill(
 	assert.Equal(t, row.ID, menu[0].(map[string]any)["id"])
 
 	// 2. the pick: attach, and the line the message carries
-	code, out = e.call("POST", e.attachPath("sid-a"), attachBody(row.ID), "operator")
+	code, out = e.call("POST", e.attachPath(sidA), attachBody(row.ID), "operator")
 	require.Equal(t, 200, code, out)
 	line, _ := out["line"].(string)
 	m := lineIDRe.FindStringSubmatch(line)
@@ -75,35 +90,38 @@ func TestASkillPickedFromTheMenuReachesTheAgentAndTheAgentReadsExactlyThatSkill(
 	assert.Equal(t, row.ID, m[1], "the line names the skill that was picked")
 
 	// 3. the agent RECEIVES the line: the person sends it, through the real Send route, to the agent's terminal, whole and unchanged (not redacted, not shortened)
-	rig := newSleepRig(t)
 	require.Equal(t, http.StatusOK, sendToAgent(t, rig, line))
 	rig.term.mu.Lock()
-	got := append([]string(nil), rig.term.sent[rig.name]...)
+	got := append([]string(nil), rig.term.sent[nameA]...)
 	rig.term.mu.Unlock()
 	require.NotEmpty(t, got, "the agent's terminal was typed something")
 	assert.Contains(t, got[len(got)-1], line, "the agent receives the exact line, id included")
 
 	// 4. the agent does what the line says, with its own identity: its list shows the pin, and `skills get --id` returns the picked skill's text
-	code, out = e.call("GET", "/api/agent/skills", "", "agent")
+	code, out = e.asAgent(sidA, nameA, "GET", "/api/agent/skills")
 	require.Equal(t, 200, code)
 	list, _ := out["skills"].([]any)
-	require.Len(t, list, 1)
+	require.Len(t, list, 1, "agent A's own list shows the pin")
 	assert.Equal(t, "release-notes", list[0].(map[string]any)["name"])
+	code, out = e.asAgent("sid-b", "claude-sid-b", "GET", "/api/agent/skills")
+	require.Equal(t, 200, code)
+	other, _ := out["skills"].([]any)
+	assert.Empty(t, other, "agent B has no pin: a line sent to B is not answered from A's attach")
 
-	code, out = e.call("GET", "/api/agent/skills/"+m[1], "", "agent")
+	code, out = e.asAgent(sidA, nameA, "GET", "/api/agent/skills/"+m[1])
 	require.Equal(t, 200, code, out)
 	assert.Contains(t, out["skill_md"], "ZXQ-4417", "the agent reads the skill's own instructions")
 	assert.Equal(t, digest, out["digest"], "and they are the version that was approved and pinned")
 	assert.Contains(t, out["frame"], "A skill the Operator approved", "framed as outside text, not Coral's instruction")
 
-	code, out = e.call("GET", "/api/agent/skills/"+m[1]+"?file=references/format.md", "", "agent")
+	code, out = e.asAgent(sidA, nameA, "GET", "/api/agent/skills/"+m[1]+"?file=references/format.md")
 	require.Equal(t, 200, code, out)
 	assert.Equal(t, "format: one bullet per merged PR", out["content"], "a file the skill points to is readable too")
 
 	// 5. a stale line does not leak a removed skill: the Operator removes it, and the same command now says so
 	code, _ = e.call("DELETE", "/api/skills/"+m[1], "", "operator")
 	require.Equal(t, 200, code)
-	code, out = e.call("GET", "/api/agent/skills/"+m[1], "", "agent")
+	code, out = e.asAgent(sidA, nameA, "GET", "/api/agent/skills/"+m[1])
 	assert.Equal(t, http.StatusGone, code, "a removed skill is not served from an old line: %v", out)
 	_ = context.Background()
 }
