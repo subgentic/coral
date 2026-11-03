@@ -73,6 +73,7 @@ func stageTmux(coralDir, bin, terminfoDir string) string {
 				return ""
 			}
 			remember(dst, terminfoDir)
+			pruneStaged(dir, dst)
 			return dst
 		}
 		log.Printf("[tmux] staging the bundled tmux: %s is not the copy it should be; using the bundled file", logsafe.Path(dst))
@@ -105,6 +106,7 @@ func stageTmux(coralDir, bin, terminfoDir string) string {
 	}
 	log.Printf("[tmux] the tmux server will start from its own copy of the bundled tmux: %s", logsafe.Path(dst))
 	remember(dst, terminfoDir)
+	pruneStaged(dir, dst)
 	return dst
 }
 
