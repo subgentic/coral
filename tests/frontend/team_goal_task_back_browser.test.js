@@ -84,6 +84,7 @@ const { coralReady } = require('./helpers/wait');
             await openTaskFromGoal(goalUrl, taskUrl, T);
             await ev(`document.querySelector('#team-panel-item .goals-back').click(); true`);
             await waitFor(`document.activeElement?.dataset?.taskId === '${T}'`, at + 'the row is focused first', 8000);
+            await new Promise(r => setTimeout(r, 400)); // sleep-ok: the loop looks every 50 ms and has held the row for 10 looks (500 ms) before it stops; the row may have been focused by something else than the loop, and a focus moved within one look of that is, to the loop, the page's own (#12576: 6 of 20 runs at 4x throttle). By 400 ms it has seen the row held, and the gate is what is left to test
             const way = await ev(`(() => { const b = [...document.querySelectorAll('#team-panel-goals .goals-back')].find(x => x.getClientRects().length && !x.disabled); if (!b) return null; b.id = b.id || 'way-back-held'; b.focus(); return b.id; })()`);
             if (way) {
                 await new Promise(r => setTimeout(r, 1500)); // sleep-ok: the loop looks every 50 ms for a while after the row held; a focus that stays on the way back through 1.5 s of those looks is the proof
