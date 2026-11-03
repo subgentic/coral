@@ -49,7 +49,8 @@ export const COMMENT_IMAGE_MAX = 4;
  *  just uploaded, when this one is its marked-up version (a second version of the same artifact); `board` names the team when several hold the artifact. A refusal throws an Error with the server's reason. */
 export async function uploadCommentImage(hex, server, blob, versionOf, board) {
     const goal = /^goal:([A-Za-z0-9][A-Za-z0-9_.-]{0,63}):[1-9][0-9]*$/.exec(hex); // a goal's comment (#11955): the picture is stored with the team's goal pictures, as the New goal form's are
-    if (goal) { hex = null; board = goal[1]; }
+    const diff = /^diff:([A-Za-z0-9][A-Za-z0-9_.-]{0,63}):[A-Za-z0-9][A-Za-z0-9_-]{5,63}:[0-9a-f]{16}$/.exec(hex); // so is a comment on an agent's diff (#12536)
+    if (goal || diff) { hex = null; board = (goal || diff)[1]; }
     const q = [versionOf ? `version_of=${encodeURIComponent(versionOf)}` : '', board ? `board=${encodeURIComponent(board)}` : ''].filter(Boolean).join('&'); // board: the team the comment is on, when several teams hold the file
     const url = hex === null ? `/api/board/${encodeURIComponent(board)}/goal-images${versionOf ? `?version_of=${encodeURIComponent(versionOf)}` : ''}` : `/api/artifacts/${hex}/comment-images${q ? '?' + q : ''}`;
     const resp = await fetch(serverUrl(url, server), { method: 'POST', headers: { 'Content-Type': blob.type }, body: blob });
