@@ -26,7 +26,8 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 	defer h.kickWS() // the feed shows the change now, not on the next tick
 	var body struct {
 		WorkingDir      string                 `json:"working_dir"`
-		CreateDir       bool                   `json:"create_dir"` // the folder is the suggested <home>/Coral/<name>: make it (#11258)
+		CreateDir       bool                   `json:"create_dir"`        // the folder is the suggested <home>/Coral/<name>: make it (#11258)
+		CreateNewFolder bool                   `json:"create_new_folder"` // the folder is a new one the person chose inside an existing folder, and step 1 said Coral makes it (#12833)
 		AgentType       string                 `json:"agent_type"`
 		DisplayName     string                 `json:"display_name"`
 		Flags           []string               `json:"flags"`
@@ -116,6 +117,11 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 	// A directory that does not exist is the caller's mistake: 400 naming the
 	// field, so the dialog can mark it (it used to surface as a 500) (#3152).
 	msg := createSuggestedDir(body.WorkingDir, body.CreateDir, h.cfg.CoralRoot)
+	if msg == "" && body.CreateNewFolder && !body.CreateDir {
+		if msg = newFolderCallerRefusal(r); msg == "" {
+			msg, _ = createChosenFolder(body.WorkingDir)
+		}
+	}
 	if msg == "" {
 		msg = launchDirError(body.WorkingDir)
 	}

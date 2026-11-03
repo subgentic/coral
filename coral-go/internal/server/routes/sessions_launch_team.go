@@ -53,19 +53,20 @@ type launchTeamAgent struct {
 
 // launchTeamRequest is a team launch's body.
 type launchTeamRequest struct {
-	BoardName   string            `json:"board_name"`
-	BoardID     string            `json:"board_id"`  // relaunch on this board (#3536)
-	NewBoard    bool              `json:"new_board"` // create another board even if the name exists
-	WorkingDir  string            `json:"working_dir"`
-	CreateDir   bool              `json:"create_dir"` // the folder is the suggested <home>/Coral/<name>: make it (#11258)
-	AgentType   string            `json:"agent_type"`
-	Flags       []string          `json:"flags"`
-	BoardServer string            `json:"board_server"`
-	Backend     string            `json:"backend"`
-	BoardType   string            `json:"board_type"`
-	Worktree    bool              `json:"worktree"`
-	BaseBranch  string            `json:"base_branch"`
-	Agents      []launchTeamAgent `json:"agents"`
+	BoardName       string            `json:"board_name"`
+	BoardID         string            `json:"board_id"`  // relaunch on this board (#3536)
+	NewBoard        bool              `json:"new_board"` // create another board even if the name exists
+	WorkingDir      string            `json:"working_dir"`
+	CreateDir       bool              `json:"create_dir"`        // the folder is the suggested <home>/Coral/<name>: make it (#11258)
+	CreateNewFolder bool              `json:"create_new_folder"` // the folder is a new one the person chose inside an existing folder, and step 1 said Coral makes it (#12833)
+	AgentType       string            `json:"agent_type"`
+	Flags           []string          `json:"flags"`
+	BoardServer     string            `json:"board_server"`
+	Backend         string            `json:"backend"`
+	BoardType       string            `json:"board_type"`
+	Worktree        bool              `json:"worktree"`
+	BaseBranch      string            `json:"base_branch"`
+	Agents          []launchTeamAgent `json:"agents"`
 	// Skills are approved skills every member is told about (#12023): ids from the Skills Store.
 	Skills             []string `json:"skills"`
 	TeamKnowledgeIndex string   `json:"team_knowledge_index"`
@@ -206,6 +207,13 @@ func (h *SessionsHandler) LaunchTeam(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	msg, madeDir := createSuggestedDirReport(body.WorkingDir, body.CreateDir, h.cfg.CoralRoot)
+	if msg == "" && body.CreateNewFolder && !body.CreateDir {
+		if msg = newFolderCallerRefusal(r); msg == "" {
+			var made bool
+			msg, made = createChosenFolder(body.WorkingDir)
+			madeDir = madeDir || made
+		}
+	}
 	if msg != "" {
 		refuse(tracking.FailWorkdirUnavailable, msg)
 		return

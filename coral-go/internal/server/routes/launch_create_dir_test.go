@@ -155,3 +155,81 @@ func TestCreateSuggestedDirRefusesANameThatIsALink(t *testing.T) {
 		t.Fatal("a name that is a link is refused")
 	}
 }
+
+// #12833 (the first-time user's report): step 1 of the New team wizard accepted a folder that did not exist and Launch refused it ("Folder not found"). A person who chose a new folder inside one that exists
+// has it made, and only that.
+func TestCreateChosenFolderMakesOneNewFolderInsideAnExistingOne(t *testing.T) {
+	parent := t.TempDir()
+	dir := filepath.Join(parent, "planner-shop")
+	msg, made := createChosenFolder(dir)
+	require.Empty(t, msg)
+	assert.True(t, made)
+	fi, err := os.Stat(dir)
+	require.NoError(t, err)
+	assert.True(t, fi.IsDir())
+	if runtime.GOOS != "windows" {
+		assert.Equal(t, os.FileMode(0o700), fi.Mode().Perm(), "only its owner")
+	}
+	msg, made = createChosenFolder(dir)
+	assert.Empty(t, msg, "a folder that is already there is not an error")
+	assert.False(t, made, "and it is not one this call made")
+	msg, made = createChosenFolder("")
+	assert.Empty(t, msg)
+	assert.False(t, made)
+}
+
+func TestCreateChosenFolderRefusesEverythingButOnePlainNameInAnExistingParent(t *testing.T) {
+	parent := t.TempDir()
+	other := t.TempDir()
+	for name, bad := range map[string]string{
+		"relative":           "planner-shop",
+		"dot dot":            parent + string(filepath.Separator) + "a" + string(filepath.Separator) + ".." + string(filepath.Separator) + "escape",
+		"dot dot at the end": parent + string(filepath.Separator) + "..",
+		"missing parent":     filepath.Join(parent, "no-such", "deep"),
+		"two levels":         filepath.Join(parent, "x", "y"),
+		"leading dot":        filepath.Join(parent, ".hidden"),
+		"a space":            filepath.Join(parent, "has space"),
+		"too long":           filepath.Join(parent, strings.Repeat("x", 65)),
+		"reserved":           filepath.Join(parent, "CON"),
+		"dot ending":         filepath.Join(parent, "dot."),
+		"doubled separator":  parent + string(filepath.Separator) + string(filepath.Separator) + "twice",
+	} {
+		msg, made := createChosenFolder(bad)
+		assert.NotEmpty(t, msg, name)
+		assert.False(t, made, name)
+	}
+	entries, err := os.ReadDir(parent)
+	require.NoError(t, err)
+	assert.Empty(t, entries, "nothing was made by a refused request")
+	// the parent is a file, not a folder
+	file := filepath.Join(other, "afile")
+	require.NoError(t, os.WriteFile(file, []byte("x"), 0o600))
+	msg, _ := createChosenFolder(filepath.Join(file, "child"))
+	assert.Contains(t, msg, "not a folder that exists", "a file is no parent")
+	msg, _ = createChosenFolder(filepath.Join(parent, "no-such", "deep"))
+	assert.Contains(t, msg, "not a folder that exists", "no parent is made for it")
+}
+
+func TestCreateChosenFolderNeverFollowsOrReplacesALink(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("links need privileges on Windows")
+	}
+	parent, target := t.TempDir(), t.TempDir()
+	link := filepath.Join(parent, "pointer")
+	require.NoError(t, os.Symlink(target, link))
+	msg, made := createChosenFolder(link)
+	assert.Empty(t, msg, "a name that is already there (a link) is left as it is: the launch checks it as before")
+	assert.False(t, made)
+	fi, err := os.Lstat(link)
+	require.NoError(t, err)
+	assert.NotZero(t, fi.Mode()&os.ModeSymlink, "the link is still a link")
+	entries, _ := os.ReadDir(target)
+	assert.Empty(t, entries, "nothing was made through it")
+	// a new folder inside a parent reached through a link is the person's own folder, made once
+	viaLink := filepath.Join(link, "inside")
+	msg, made = createChosenFolder(viaLink)
+	assert.Empty(t, msg)
+	assert.True(t, made)
+	_, err = os.Stat(filepath.Join(target, "inside"))
+	assert.NoError(t, err)
+}
