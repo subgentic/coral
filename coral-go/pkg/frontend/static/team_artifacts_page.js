@@ -4,7 +4,7 @@ import { state } from './state.js';
 /* The team page's Artifacts tab (#7453): the team's artifacts as a table (Name, Type, Size, Task, Created) under the search, Filters and Sort bar the old tab had, and the document in the detail pane. The name opens the pane: the preview, every detail the old
  * row's (i) showed, and the actions pinned under it (Open, Download, Copy link, Keep, Delete). The server does the matching: a search covers every artifact, not the loaded page (team_artifact_filters.js is the query). Everything drawn is built with the DOM and
  * textContent: names, task titles and the words about where a file came from are written by agents and other computers. Lazy: team_page.js imports it. */
-import { boardFetch, serverUrl, isCloud, splitKey, keyLabel, isBoardAnswer, isBoardAnswerPending, onBoardLabelsChanged, LOCAL_SERVER } from './server_base.js';
+import { boardFetch, serverFetch, serverUrl, isCloud, splitKey, keyLabel, isBoardAnswer, isBoardAnswerPending, onBoardLabelsChanged, LOCAL_SERVER } from './server_base.js';
 import { whenText } from './when_text.js';
 import { pollEvery } from './overload.js';
 import { importOnce } from './import_once.js';
@@ -99,7 +99,7 @@ export function createArtifactsList({ inbox = false } = {}) {
 
     async function toggleKeep(hex, name, button) {
         const on = button.getAttribute('aria-pressed') !== 'true';
-        const r = await fetch(`/api/artifacts/${hex}/keep`, { method: on ? 'PUT' : 'DELETE' }).catch(() => null);
+        const r = await serverFetch(server(), `/api/artifacts/${hex}/keep`, { method: on ? 'PUT' : 'DELETE' }).catch(() => null); // on this list's own computer (the page's bare /api is the Hub's through the Hub, #12617)
         if (!r || !r.ok) { showToast(`Couldn't ${on ? 'keep' : 'release'} ${name}.`, true); return; }
         if (on) model.kept.add(hex); else model.kept.delete(hex);
         button.setAttribute('aria-pressed', String(on));
@@ -111,7 +111,7 @@ export function createArtifactsList({ inbox = false } = {}) {
     // The star is a bookmark on an artifact (#9819): on this computer's store through the dashboard, and the owner's through Coral Hub, so it is offered for any artifact with a stored object.
     async function toggleStar(hex, name, button, item) {
         const on = button.getAttribute('aria-pressed') !== 'true';
-        const r = await fetch(`/api/artifacts/${hex}/star`, { method: on ? 'PUT' : 'DELETE' }).catch(() => null);
+        const r = await serverFetch(inbox ? serverOf(item) : server(), `/api/artifacts/${hex}/star`, { method: on ? 'PUT' : 'DELETE' }).catch(() => null); // the computer the file is on, not the page's own (#12617)
         if (!r || !r.ok) { showToast(`Couldn't ${on ? 'star' : 'unstar'} ${name}.`, true); return; }
         item.starred = on;
         document.dispatchEvent(new CustomEvent('artifact-star-changed')); // the Inbox's Starred folder reads its artifacts again (#10258)
@@ -126,7 +126,7 @@ export function createArtifactsList({ inbox = false } = {}) {
             `Delete ${name}${size ? ` (${size})` : ''}? It is removed from Coral, and links to it in board posts and task results will show "unavailable". A copy a browser already cached may remain. This can't be undone.`,
             async () => {
                 try {
-                    const r = await fetch(`/api/artifacts/${hex}`, { method: 'DELETE' });
+                    const r = await serverFetch(server(), `/api/artifacts/${hex}`, { method: 'DELETE' });
                     if (r.ok || r.status === 404) {
                         const at = [...(root?.querySelectorAll('tbody tr') || [])].findIndex(tr => tr.dataset.key === hex);
                         forget(hex); deletions?.postMessage({ hex, server: server() });
@@ -289,7 +289,7 @@ export function createArtifactsList({ inbox = false } = {}) {
                     if (model.bulkBusy || !local() || rows.some(item => !managedHex(item) || !linkOf(item)?.preview)) return;
                     model.bulkBusy = true; const key = model.key, origin = server(), ok = []; let failed = 0;
                     for (const item of rows) { const hex = managedHex(item); try {
-                        const r = await fetch(`/api/artifacts/${hex}`, { method: 'DELETE' });
+                        const r = await serverFetch(origin, `/api/artifacts/${hex}`, { method: 'DELETE' });
                         if (!r.ok && r.status !== 404) throw new Error('Delete failed');
                         ok.push(itemKey(item)); deletions?.postMessage({ hex, server: origin });
                         if (key === model.key) { model.items = model.items.filter(it => managedHex(it) !== hex || (inbox && serverOf(it) !== LOCAL_SERVER)); if (detailKey() === hex) closeDetailPane(); }
