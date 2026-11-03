@@ -89,6 +89,7 @@ export async function _fillMachineSettings(s) {
         // Off unless the Operator turned it on (#3563); an empty value is unset.
         if (autoAttach) autoAttach.checked = settingBool(s.board_auto_attach || undefined, false);
         loadCodexTrustHooks(); // its own local route, saved when it changes (#153)
+        importOnce('./settings_inbox.js').then(m => m.fillInboxSettings(s)).catch(() => {}); // what reaches Needs you (#12144): the switches, the teams, the time
         const worktreeLaunch = document.getElementById('settings-launch-in-worktree');
         // Off unless the Operator turned it on (#12746, experimental); an empty value is unset.
         if (worktreeLaunch) worktreeLaunch.checked = settingBool(s.launch_in_worktree || undefined, false);

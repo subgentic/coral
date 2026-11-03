@@ -29,6 +29,20 @@ const NOTIFICATIONS_FIELDS = [
     { key: 'alert_sound', type: 'toggle', id: 'settings-alert-sound', label: 'Play a sound with alerts', help: "Your computer's own alert sound.", disabledWhen: () => alertsOff() },
 ];
 
+// Settings > Inbox (#12144): what reaches Needs you. Questions and decisions have no switch: they always reach you. Filled and read by settings_inbox.js.
+const INBOX_FIELDS = [
+    { key: 'inbox_always', type: 'notice', render: slot => { const p = document.createElement('p'); p.id = 'settings-inbox-always'; p.className = 'sv-help'; p.textContent = 'Questions and decisions always reach you: an agent waiting on a question, a permission or a plan, a goal or task proposal, a goal that looks done.'; slot.append(p); } },
+    { key: 'inbox_kind_file', type: 'toggle', id: 'settings-inbox-file', label: 'Files for review', help: 'A file an agent wants you to read, approve or send back.', default: true },
+    { key: 'inbox_kind_done', type: 'toggle', id: 'settings-inbox-done', label: 'Finished requests', help: '"Done. Does it work for you?" when a request of yours is finished, with what changed.', default: true },
+    { key: 'inbox_kind_release', type: 'toggle', id: 'settings-inbox-release', label: 'Release summaries', help: 'One page per release: what is new for you and the known issues.', default: true },
+    { key: 'inbox_kind_decided', type: 'toggle', id: 'settings-inbox-decided', label: 'Decisions made for you', help: 'What the Orchestrator decided on your behalf, once a day.', default: true },
+    { key: 'inbox_kind_digest', type: 'toggle', id: 'settings-inbox-digest', label: 'Daily digest', help: 'What landed, what is blocked and what waits for you. Coral writes it from the board.', default: true },
+    { key: 'inbox_teams_title', type: 'heading', id: 'settings-inbox-teams-title', label: 'Included teams' },
+    { key: 'inbox_teams', type: 'notice', render: slot => { const p = document.createElement('p'); p.className = 'sv-help'; p.textContent = 'The switches above apply to the teams ticked here. A team you untick has its optional kinds muted; its questions and decisions still reach you.'; const host = document.createElement('div'); host.id = 'settings-inbox-teams'; host.className = 'settings-inbox-teams'; slot.append(p, host); } },
+    { key: 'inbox_digest_time', type: 'text', id: 'settings-inbox-digest-time', label: 'Time of the daily items', help: 'When the digest is made and the Orchestrator is asked for the day\'s decisions. Hours and minutes, 24 hours.', default: '09:00', attrs: { inputmode: 'numeric', maxlength: '5', placeholder: '09:00', pattern: '([01][0-9]|2[0-3]):[0-5][0-9]', 'aria-label': 'Time of the daily items, HH:MM' } },
+    { key: 'inbox_muted', type: 'notice', render: slot => { const p = document.createElement('p'); p.id = 'settings-inbox-muted'; p.className = 'sv-help'; p.setAttribute('role', 'status'); p.hidden = true; slot.append(p); } },
+];
+
 const FILES_FIELDS = [
     { key: 'file_search_mode', type: 'select', id: 'settings-file-search-mode', label: 'File search mode', help: 'How @ mentions and the file browser find files', options: [{ value: 'directory', label: 'Browse folders' }, { value: 'fuzzy', label: 'Match any part of a name' }] },
     { key: 'file_search_limit', type: 'select', id: 'settings-file-search-limit', label: 'File search limit', help: 'Max number of files returned in search results', default: '500',
@@ -222,7 +236,7 @@ export const NETWORK_FIELDS = [
 
 /** Draws the groups that are fields into the Settings modal's panes (once, when the modal is built). mount is mountSettingsView. */
 export function drawSettingsGroups(modal, mount) {
-    for (const [hostId, fields] of [['settings-general-rows', GENERAL_FIELDS], ['settings-notifications-rows', NOTIFICATIONS_FIELDS], ['settings-files-rows', FILES_FIELDS], ['settings-terminal-rows', TERMINAL_FIELDS], ['settings-agents-rows', AGENTS_FIELDS], ['settings-cleanup-rows', CLEANUP_FIELDS], ['settings-security-rows', SECURITY_FIELDS], ['settings-network-rows', NETWORK_FIELDS]]) {
+    for (const [hostId, fields] of [['settings-general-rows', GENERAL_FIELDS], ['settings-notifications-rows', NOTIFICATIONS_FIELDS], ['settings-inbox-rows', INBOX_FIELDS], ['settings-files-rows', FILES_FIELDS], ['settings-terminal-rows', TERMINAL_FIELDS], ['settings-agents-rows', AGENTS_FIELDS], ['settings-cleanup-rows', CLEANUP_FIELDS], ['settings-security-rows', SECURITY_FIELDS], ['settings-network-rows', NETWORK_FIELDS]]) {
         const host = modal.querySelector(`#${hostId}`);
         if (host && !host.firstChild) mount(host, { mode: 'settings', saveBar: false, fields: typeof fields === 'function' ? fields(host) : fields });
         for (const id of hostId === 'settings-terminal-rows' ? TERMINAL_BACKEND_IDS : hostId === 'settings-agents-rows' ? ['settings-custom-models'] : []) host.querySelector(`#${id}`)?.closest('.sv-row')?.setAttribute('hidden', ''); // until the module that fills them has read its status

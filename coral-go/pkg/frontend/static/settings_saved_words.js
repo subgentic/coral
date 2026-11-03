@@ -13,6 +13,7 @@ const ROWS = {
     terminal_font_size: ['Terminal font size'], terminal_scrollback: ['Terminal scrollback'],
     file_search_mode: ['File search mode'], file_search_limit: ['File search limit'], git_diff_mode: ['Git diff mode'], git_poll_interval_s: ['Git scan interval'],
     agent_priority: ['Run agents at lower priority', 'low'], telemetry_enabled: ['Usage analytics', 'switch'], board_auto_attach: ['Attach files linked in posts', 'switch'],
+    inbox_kind_file: ['Files for review', 'switch'], inbox_kind_done: ['Finished requests', 'switch'], inbox_kind_release: ['Release summaries', 'switch'], inbox_kind_decided: ['Decisions made for you', 'switch'], inbox_kind_digest: ['Daily digest', 'switch'], inbox_included_teams: ['Included teams'], inbox_digest_time: ['Time of the daily items'],
     launch_in_worktree: ['Enable launch into git worktree (experimental)', 'switch'], nudge_claude_artifacts: ['Coral artifact reminders', 'switch'], board_health_monitor: ['Team health checks', 'switch'], auto_resume_after_api_error: ['Resume after API errors', 'switch'],
     auto_sleep: ['Auto-sleep', 'switch'], auto_sleep_idle_minutes: ['Minutes idle before sleeping'],
     auto_goals: ["Name each agent's goal", 'switch'], debug_input_log: ['Record what Coral types', 'switch'], remote_access_enabled: ['Remote access', 'switch'],
