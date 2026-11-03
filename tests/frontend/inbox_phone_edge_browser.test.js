@@ -16,10 +16,21 @@ const BASE = require('./test_base').BASE;
         await Emulation.setTouchEmulationEnabled({enabled:true});
         await Page.navigate({url:BASE+'/'});await Page.loadEventFired();await install();await coralReady(ev);await ev(INBOX_WORLD);
         await ev(`(() => {const real=window.fetch;window.fetch=(u,o={})=>new URL(String(u),location.origin).pathname==='/api/goals'?Promise.resolve(new Response(JSON.stringify({goals:[88,89].map(id=>({id,board_id:'team-a',title:'Ship the completed release',done_when:'All checks pass',state:'active',rollup:{done:2},updated_at:'2026-11-01T00:00:00Z'}))}),{headers:{'content-type':'application/json'}})):real(u,o);T.state.liveSessions=[];return true;})()`);
+        await ev(`(() => {const real=window.fetch,now=new Date().toISOString(),json=b=>Promise.resolve(new Response(JSON.stringify(b),{headers:{'content-type':'application/json'}}));window.fetch=(url,o={})=>{const u=new URL(String(url),location.origin),p=u.pathname;
+            if(p==='/api/sessions/history/counts')return json({all:2,group:2,starred:2,archived:2,notes:2,active:2,tags:[{id:7,name:'Planning',count:2,color:'#abc'}],by_agent_type:{claude:2,codex:2,agy:2,pi:2,opencode:2,hermes:2}});
+            if(p==='/api/sessions/history')return json({sessions:[1,2].map(i=>({session_id:u.searchParams.get('type')==='group'?'board:team-'+i:'chat-'+i,type:u.searchParams.get('type')==='group'?'group':'agent',title:'Conversation '+i,display_name:'Agent '+i,agent_name:'Agent '+i,agent_type:u.searchParams.get('source_types')||'claude',source_type:u.searchParams.get('source_types')||'claude',summary:'The next release',last_timestamp:now,duration_sec:60,starred:true,archived:true,active:true,notes:'A note'})),total:2});
+            if(p==='/api/team-artifacts')return json({artifacts:[1,2].map(i=>({id:String(i).repeat(64),name:'Plan '+i+'.txt',media_type:'text/plain',size:25,created_at:now,board_id:'team-a',team:'Release team',source:'upload',available:true,uri:'coral://artifacts/'+String(i).repeat(64),produced_by:'Writer',starred:true})),all:2,total:2,has_more:false,teams:[{board_id:'team-a',team:'Release team',all:2}]});
+            if(p==='/api/activity')return json({actions:[1,2].map(i=>({id:i,action:'approve',item_kind:'goal',item_id:String(i),team:'team-a',title:'Goal '+i,at:now,source:'local'})),check:{intact:true,rows:2},has_more:false});
+            return real(url,o);};return true;})()`);
         await ev(`window.switchNavTab('hub-inbox');true`);
-        for(const folder of ['needs','tasks','goals','saved']) {
+        const folders=['needs','tasks','goals','saved','artifacts','activity','chats','chats-group','chats-notes','chats-starred','chats-active','chats-archived',...['claude','codex','agy','pi','opencode','hermes'].map(cli=>'chats-cli-'+cli),'chats-tag-7'];
+        await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.selectInboxTab('needs')).then(()=>true)`);
+        await waitFor(`document.querySelector('.view-list-item[data-key="chats-tag-7"]')`, 'the tag folder is drawn');
+        const drawn=await ev(`[...new Set([...document.querySelectorAll('.view-list-item[data-key]')].map(e=>e.dataset.key))].filter(k=>!k.startsWith('board:'))`);
+        assert.ok(drawn.every(key=>folders.includes(key)), 'cover every phone Inbox folder: '+JSON.stringify(drawn));
+        for(const folder of folders) {
             await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.selectInboxTab('${folder}')).then(()=>true)`);
-            await waitFor(`document.querySelector('#group-table-view tbody tr.dt-row')`,folder+' rows');
+            await waitFor(`document.querySelector('#group-table-view[data-group="hub-inbox:${folder}"] tbody tr.dt-row')`,folder+' rows');
             for(const theme of ['dark','light'])for(const font of [16,32])for(const inset of [0,34]) {
                 await Emulation.setSafeAreaInsetsOverride({insets:{top:0,bottom:inset,left:0,right:0}});
                 await ev(`document.documentElement.setAttribute('data-theme','${theme}');document.documentElement.style.fontSize='${font}px';document.getElementById('group-table-view').scrollTop=0;true`);
@@ -29,10 +40,10 @@ const BASE = require('./test_base').BASE;
                 if(Math.abs(p.left)>1||Math.abs(p.right-390)>1||Math.abs(p.width-390)>1)failures.push(at+' row must equal viewport: '+JSON.stringify(p));
                 if(p.borderLeft!=='0px'||p.borderRight!=='0px'||p.radius!=='0px'||p.sideways)failures.push(at+' no inset card or sideways scroll: '+JSON.stringify(p));
                 if(!p.mail&&Math.abs(p.textLeft-16)>1)failures.push(at+' text inset must be 16px: '+JSON.stringify(p));
-                if(parseFloat(p.divider)===0&&p.shadow==='none'&&p.count>1&&folder!=='goals')failures.push(at+' keep row dividers: '+JSON.stringify(p));
+                if(parseFloat(p.divider)===0&&p.shadow==='none'&&p.count>1&&['needs','tasks','saved'].includes(folder))failures.push(at+' keep row dividers: '+JSON.stringify(p));
                 assert.equal(p.navPadding,8+inset,at+' safe-area applies');
                 assert.ok(p.pagePadding>=96+inset,at+' last row clears phone controls');
-                await shot(`${folder}-${theme}-${font}-${inset}`);
+                if(folder==='needs'||(inset===34))await shot(`${folder}-${theme}-${font}-${inset}`);
             }
         }
         await Emulation.setSafeAreaInsetsOverride({insets:{top:0,bottom:0,left:0,right:0}});
