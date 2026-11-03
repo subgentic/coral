@@ -55,10 +55,11 @@ func newLedger() *realisticLedger {
 
 func TestEveryAnalyticsNumberMatchesADirectCountOnARealisticBoard(t *testing.T) {
 	ctx := context.Background()
-	now := time.Date(2026, 10, 30, 12, 0, 0, 0, time.UTC)
-	// The seeded days count back from this fixed date, and the store expires an unanswered goal request after 14 days of ITS clock (board.GoalRequestTTL): on the real clock the requests seeded 10 days back
-	// expired at noon UTC on 2026-11-03 and the accepted replies were refused ("no open request of this board matches that reply", #12925). The expiry reads the seed's clock, so the board is the same on every day.
-	t.Cleanup(board.SetGoalRequestClockForTest(func() time.Time { return now }))
+	// The seeded days count back from noon UTC of YESTERDAY (the real date), never from a fixed one and never from a time of day that could be after the real clock. The store expires an unanswered goal request
+	// after 14 days of the REAL clock (board.GoalRequestTTL) and reads a request made after the real clock as not open yet, so a board seeded from a date long past had its requests expired and the accepted replies
+	// refused ("no open request of this board matches that reply", #12925), and one seeded from today's noon fails for the hours of the day before it (#12927, QA Reviewer 2's sweep). Noon of yesterday is
+	// 12 to 36 hours behind the real clock at any hour of any day, and the oldest request (10 days before it) is under 12 days old on any day, so the board is the same on every day; the handler reads this as its clock (h.now).
+	now := time.Now().UTC().Truncate(24 * time.Hour).Add(-12 * time.Hour)
 	const team = "coral-go-team"
 	bs, err := board.NewStoreWithKey(filepath.Join(t.TempDir(), "board.db"), "")
 	require.NoError(t, err)
