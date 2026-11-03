@@ -366,7 +366,8 @@ func (s *SessionStore) ListSkills(ctx context.Context, status string) ([]SkillRo
 
 var searchWordRe = regexp.MustCompile(`[\p{L}\p{N}_-]+`)
 
-// skillMatch makes the FTS5 query of words: each word quoted as one phrase (FTS5's operators, NEAR, columns and prefixes are not the asker's), at most maxSearchWords of them; "" for none.
+// skillMatch makes the FTS5 query of words: each word quoted as one phrase (FTS5's operators, NEAR and columns are not the asker's), at most maxSearchWords of them; "" for none. The LAST word also matches as a
+// prefix (a trailing * after its closing quote), so "cr" finds "create-..." as a person types (#12781). The words are only letters, digits, _ and -, and sit inside quotes: nothing of FTS5's syntax comes from them.
 func skillMatch(words string) string {
 	var out []string
 	for _, w := range searchWordRe.FindAllString(words, -1) {
@@ -374,6 +375,9 @@ func skillMatch(words string) string {
 		if len(out) == maxSearchWords {
 			break
 		}
+	}
+	if n := len(out); n > 0 {
+		out[n-1] += "*"
 	}
 	return strings.Join(out, " ")
 }
