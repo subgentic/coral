@@ -50,7 +50,7 @@ function draw(root, { sections, current }) {
             if (it.unread && it.total != null) b.title = `${it.total} in all`; // the name and the count are read apart ("Board history, 1"), the count once (it is not in the name's text twice)
             if (it.soon) { b.disabled = true; b.classList.add('view-list-soon'); b.append(el('span', 'view-list-count', 'soon')); }
             else if (total != null) b.append(el('span', 'view-list-count', total));
-            else if (it.count != null) b.append(el('span', it.alert && Number(it.count) > 0 ? 'view-list-count view-list-alert' : it.unread ? 'view-list-count view-list-new' : 'view-list-count', it.count)); // alert: the one count that is a red pill (Needs you), and only while it is above 0; every other count stays quiet
+            else if (it.count != null) b.append(el('span', it.alert && (Number(it.count) > 0 || Number.isNaN(Number(it.count))) ? 'view-list-count view-list-alert' : it.unread ? 'view-list-count view-list-new' : 'view-list-count', it.count)); // alert: the one count that is a red pill (Needs you), and only while it is above 0; every other count stays quiet
             if (it.key === current) { b.setAttribute('aria-current', 'true'); b.classList.add('view-list-current', 'list-row-current'); }
             if (root._tabs) { b.setAttribute('role', 'tab'); b.id = `${root.dataset.viewList}-tab-${it.key}`; b.setAttribute('aria-selected', it.key === current ? 'true' : 'false'); b.setAttribute('aria-controls', `${root.dataset.viewList}-panel`); } // the phone's strip is a tab list: the page's content under it is its panel (sidebar_groups.js)
             nav.append(b);
@@ -58,7 +58,7 @@ function draw(root, { sections, current }) {
                 const chevron = el('span', 'material-icons view-list-trigger-icon', 'expand_more'); chevron.setAttribute('aria-hidden', 'true'); // a chevron after the name (it opens a list), not a hamburger
                 const lead = folderIcon(it.icon); if (lead) lead.classList.add('view-list-trigger-lead'); // the open folder's own icon in front: the button is the list's switcher, not a page title (#9999)
                 trigger.replaceChildren(...(lead ? [lead] : []), el('span', 'view-list-trigger-name', it.label));
-                if (it.count != null) trigger.append(el('span', it.alert && Number(it.count) > 0 ? 'view-list-count view-list-alert' : 'view-list-count', it.count));
+                if (it.count != null) trigger.append(el('span', it.alert && (Number(it.count) > 0 || Number.isNaN(Number(it.count))) ? 'view-list-count view-list-alert' : 'view-list-count', it.count));
                 trigger.append(chevron);
                 trigger.setAttribute('aria-label', `${it.label}${it.count != null ? `, ${it.count}` : ''}. Open the folders`);
             }
