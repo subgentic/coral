@@ -302,3 +302,4 @@ node bare_api_fetch_census.test.mjs
 node inbox_servers_read.test.mjs
 node inbox_artifacts_loading.test.mjs
 node files_refresh_403_other_agent.test.mjs
+node skill_filter.test.mjs
