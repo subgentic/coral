@@ -50,6 +50,13 @@ const { coralReady } = require('./helpers/wait');
    await ev(`(async()=>{const {state}=await import(${S}+'state.js');state.selectedTeam='@srv2/team';await (await import(${S}+'custom_views.js')).loadCustomViews();window.__releaseViews();await window.__heldViewRead;return true;})()`);
    assert.ok(await ev(`!!document.querySelector('#custom-view-tabs [title="View srv2"]') && !document.querySelector('#custom-view-tabs [title="STALE view"]')`),'late old-computer views do not replace the new computer');
   });
+  await check('folder tags per computer and scoped writes',async()=>{
+   const tags=await ev(`(async()=>{const m=await import(${S}+'folder_tags.js');await m.loadAllFolderTags();return [m.getFolderTags('@srv1/app')[0]?.name,m.getFolderTags('@srv2/app')[0]?.name];})()`);
+   assert.deepEqual(tags,['Tag srv1','Tag srv2']);
+   await ev(`(async()=>{const m=await import(${S}+'folder_tags.js');await window.addFolderTag('@srv1/app',7);await window.removeFolderTag('@srv2/app',7);return true;})()`);
+   const writes=await ev(`window.__resourceCalls.filter(c=>c.path.includes('folder-tags')&&c.method!=='GET')`);
+   assert.deepEqual(writes.map(c=>[c.server,c.path,c.method]),[['srv1','/api/folder-tags/app','POST'],['srv2','/api/folder-tags/app/7','DELETE']]);
+  });
   const calls=await ev('window.__resourceCalls');
   assert.deepEqual(failures,[],'all remote resources are scoped');
   console.log('PASS remote @srv1/team resources and two-computer isolation');
