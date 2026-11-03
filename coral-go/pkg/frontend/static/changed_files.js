@@ -15,6 +15,7 @@ import { importOnce } from './import_once.js';
 import { serverFetch, serverForSession, sessionServer, currentServer, isCloud, dropBody } from './server_base.js';
 
 let _currentFiles = [];
+const paintWhere = () => { importOnce('./session_header_updates.js').then(m => m.setFilesWorktree(_worktree)).catch(() => {}); }; // the one line at the top of Files names the followed worktree (#12690)
 let _worktree = null; // the worktree the agent works in, when it is not its launch folder: { path, name, branch, followed, launch } (#11351)
 const _expandedFiles = new Set(); // the paths whose diff is open under their row (#11350): kept across the list's redraws, and by path so a file that moves in the list keeps it
 let _actionsOpenFor = ''; // the path whose row has its Copy, Preview and Edit open on a phone (#7652): kept across the list's redraws
@@ -282,7 +283,7 @@ export async function loadChangedFiles(agentName, sessionId, quiet = false) { //
         const data = await resp.json();
         if (quiet && JSON.stringify(data.files || []) === JSON.stringify(_currentFiles) && JSON.stringify(data.worktree || null) === JSON.stringify(_worktree)) return;
         _currentFiles = data.files || [];
-        _worktree = data.worktree && typeof data.worktree === 'object' ? data.worktree : null;
+        _worktree = data.worktree && typeof data.worktree === 'object' ? data.worktree : null; paintWhere();
         _notGit = data.is_git === false;
         _compareLabel = (data.compare && typeof data.compare.label === 'string') ? data.compare.label : '';
         if (data.diff_mode) _cloudDiffMode = data.diff_mode;
@@ -541,14 +542,7 @@ function toggleAllExpanded() {
     paintExpandAll();
 }
 
-// Which worktree the list is from (#11351): the agent's own, once it works in one, named with its branch and a way back to the folder it was launched in; or the launch folder, with the worktree offered.
-function worktreeNoteHtml() {
-    if (!_worktree || !_worktree.name) return '';
-    const name = escapeHtml(String(_worktree.name)), branch = _worktree.branch ? ` <span class="files-worktree-branch">${escapeHtml(String(_worktree.branch))}</span>` : '';
-    return _worktree.followed
-        ? `<div class="files-worktree" role="status"><span>Following the agent in the worktree <strong>${name}</strong>${branch}</span><button type="button" class="btn btn-quiet btn-xs" data-on-click="worktree-launch">Back to launch folder</button></div>`
-        : `<div class="files-worktree" role="status"><span>The agent is working in the worktree <strong>${name}</strong>${branch}</span><button type="button" class="btn btn-quiet btn-xs" data-on-click="worktree-follow">Follow it</button></div>`;
-}
+// Which worktree the list is from (#11351) is the one line at the top of Files (session_header_updates.js setFilesWorktree, #12690), not a bar in the list.
 
 // The switch between the two: the list is read again from the other folder, and the diffs opened under the rows of the first are closed.
 function switchWorktree(mode) {
@@ -557,7 +551,7 @@ function switchWorktree(mode) {
     setWorktreeMode(s.session_id, mode);
     _expandedFiles.clear();
     _currentFiles = [];
-    _worktree = null;
+    _worktree = null; paintWhere();
     renderChangedFiles();
     refreshChangedFiles();
 }
@@ -591,7 +585,7 @@ export async function refreshChangedFiles(quiet = false) { // quiet: the panel's
             const data = await resp.json();
             if (quiet && JSON.stringify(data.files || []) === JSON.stringify(_currentFiles) && JSON.stringify(data.worktree || null) === JSON.stringify(_worktree)) return;
             _currentFiles = data.files || [];
-            _worktree = data.worktree && typeof data.worktree === 'object' ? data.worktree : null;
+            _worktree = data.worktree && typeof data.worktree === 'object' ? data.worktree : null; paintWhere();
             _notGit = data.is_git === false;
             _compareLabel = (data.compare && typeof data.compare.label === 'string') ? data.compare.label : '';
             if (data.diff_mode) _cloudDiffMode = data.diff_mode;
@@ -620,7 +614,7 @@ export async function refreshChangedFiles(quiet = false) { // quiet: the panel's
         const shell = state.currentSession && state.currentSession.agent_type === 'terminal'; // a terminal has no changes to list: no talk of git for a shell (#10077)
         if (titleEl) { titleEl.textContent = shell ? 'No changes to list' : 'Not a git folder'; titleEl._html = ''; }
         if (countEl) countEl.textContent = '';
-        list.innerHTML = worktreeNoteHtml() + `<div class="empty-state empty-state-tight">${shell ? 'A terminal does not track changed files. Start an agent in this folder to see its changes.' : 'No files changed here this week. Changes show once the folder is a git repository, and an agent can also share a file with you as an artifact.'}</div>`;
+        list.innerHTML = `<div class="empty-state empty-state-tight">${shell ? 'A terminal does not track changed files. Start an agent in this folder to see its changes.' : 'No files changed here this week. Changes show once the folder is a git repository, and an agent can also share a file with you as an artifact.'}</div>`;
         return;
     }
 
@@ -670,7 +664,7 @@ export async function refreshChangedFiles(quiet = false) { // quiet: the panel's
 
     if (files.length === 0) {
         // The comparison choice is in the header above, with the count: not drawn a second time under "No changed files" (#5991).
-        list.innerHTML = worktreeNoteHtml() + (_filesRefused
+        list.innerHTML = (_filesRefused
             ? '<div class="empty-state empty-state-tight">Too many changed files to show through Coral Hub; open the agent on the computer.</div>'
             : `<div class="empty-state empty-state-tight">No changed files</div>`);
         return;
@@ -738,7 +732,7 @@ export async function refreshChangedFiles(quiet = false) { // quiet: the panel's
     const allOpen = !plain && files.every(f => _expandedFiles.has(f.filepath)), expandAllText = allOpen ? 'Collapse all' : 'Expand all', expandAllLabel = `${expandAllText} the changes`;
     // Expand all (#11350) is on the list's first line, not in the header: the header keeps its size when the first list arrives (#7671).
     const expandAll = plain ? '' : `<button type="button" class="btn btn-quiet btn-xs files-expand-all" data-on-click="files-expand-all" aria-label="${escapeAttr(expandAllLabel)}">${escapeHtml(expandAllText)}</button>`;
-    list.insertAdjacentHTML('afterbegin', `${worktreeNoteHtml()}<div class="files-legend"><span>New files are green, deleted ones red, the rest changed.</span>${expandAll}</div>`);
+    list.insertAdjacentHTML('afterbegin', `<div class="files-legend"><span>New files are green, deleted ones red, the rest changed.</span>${expandAll}</div>`);
     if (heldMore) [...list.querySelectorAll('.file-more-btn')].find(b => b.dataset.path === heldMore)?.focus({ preventScroll: true });
     paintExpandAll();
     if (!plain && _expandedFiles.size) showExpanded(list, files); // the diffs that were open are drawn again from what was read (#11350)
