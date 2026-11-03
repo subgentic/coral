@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
+	"os"
 	"path/filepath"
 	"sync"
 	"time"
@@ -212,6 +213,30 @@ func (h *SessionsHandler) prepareWake(ctx context.Context, ls *store.LiveSession
 		launchParams.ResumeSessionID = ""
 		freshStart = true
 	}
+	// Pi, Antigravity and OpenCode (#12778): a wake with nothing to resume starts the agent fresh, with its role, the way Claude does above. Each CLI's own look is Coral's: Pi's session folder is the one Coral makes for it, Antigravity's
+	// conversation is the one its hook bound to this session, and OpenCode's is the one Coral stored. Without this a wake passed Antigravity Coral's own id (which agy does not know: it warns "conversation not found" and starts a new
+	// one), and an auto-wake sent none of the three its first message, the role, because a resume id was set.
+	if !freshStart && launchParams.ResumeSessionID != "" {
+		switch ls.AgentType {
+		case at.Pi:
+			if !agent.PiHasSession(h.cfg.CoralDir(), ls.SessionID) {
+				launchParams.ResumeSessionID, freshStart = "", true
+			}
+		case at.Agy, at.Antigravity:
+			if conv := transcriptlink.AgyConversation(ls.SessionID); conv != "" && agent.IsResumeID(at.Agy, conv) && regularFile(transcriptlink.AgyTranscript(conv)) {
+				launchParams.ResumeSessionID = conv // the conversation agy knows, not Coral's id for it
+			} else {
+				launchParams.ResumeSessionID, freshStart = "", true
+			}
+		case at.Opencode:
+			if h.opencode != nil && h.opencodeResumeSession(launchParams) == "" {
+				launchParams.ResumeSessionID, freshStart = "", true
+			}
+		}
+		if freshStart {
+			log.Printf("[wake] session=%s: %s has no conversation to resume; starting a new one with its role", sessionName, ls.AgentType)
+		}
+	}
 	// A Codex agent that never completed a turn has no saved session: "codex resume" would end at "No saved session found" and a bare shell. It starts a new one
 	// (a wake is asked to bring the agent back, not to resume a particular conversation) (#5222).
 	if ls.AgentType == at.Codex && !codexSessionSaved(ls.SessionID) {
@@ -351,4 +376,10 @@ func takeWakeNote(sid string) string {
 		}
 	}
 	return ""
+}
+
+// regularFile says path names a regular file (not a link, not a folder), "" none.
+func regularFile(path string) bool {
+	fi, err := os.Lstat(path)
+	return path != "" && err == nil && fi.Mode().IsRegular()
 }

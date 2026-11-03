@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -26,6 +27,10 @@ func TestWakeBringsAPiAgentBackInItsOwnSessionFolder(t *testing.T) {
 	require.NoError(t, ss.SetSetting(ctx, agent.CLIPathSettingKey(at.Pi), fake))
 	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: id, AgentType: at.Pi, AgentName: "coral-go", WorkingDir: t.TempDir()}))
 	require.NoError(t, ss.SetSessionSleeping(ctx, id, true))
+	// the folder holds the session Pi saved (with none the wake starts fresh, #12778)
+	sdir := filepath.Join(h.cfg.CoralDir(), "pi-sessions", id)
+	require.NoError(t, os.MkdirAll(sdir, 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(sdir, "s.jsonl"), []byte("{}\n"), 0o600))
 
 	req := dropAt2(httptest.NewRequest(http.MethodPost, "/api/sessions/live/"+id+"/wake", nil), map[string]string{"sessionID": id})
 	rec := httptest.NewRecorder()
