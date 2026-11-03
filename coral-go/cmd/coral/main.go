@@ -283,7 +283,7 @@ func configureServer(cfg *config.Config, sf *serverFlags) {
 			log.Println("[EULA] not accepted here; a Coral Hub credential is offered: the Hub's confirmation of this terms version when it enrolls this server is the acceptance, and Coral exits if it does not come")
 		} else if !license.CheckAndPromptEULA(license.TerminalEULADialog) {
 			fmt.Fprintln(os.Stderr, "Terms of Service must be accepted to use Coral.")
-			os.Exit(0)
+			os.Exit(termsDeclinedExit(runtime.GOOS, license.DeclinedForNoTerminal(), showTermsNeeded))
 		}
 	}
 }
