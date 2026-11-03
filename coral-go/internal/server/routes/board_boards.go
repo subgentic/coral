@@ -34,6 +34,7 @@ func (h *BoardHandler) DeleteBoard(w http.ResponseWriter, r *http.Request) {
 		errInternalServer(w, err.Error())
 		return
 	}
+	h.bs.NoteBoardDeleted(project) // a page left open elsewhere must not start it again (#12995)
 	// The in-memory pause goes only once the board is gone: a delete that failed leaves the board as it was, paused or not.
 	h.mu.Lock()
 	delete(h.paused, project)
