@@ -127,7 +127,7 @@ func getInstallID() string {
 // sendGate, when set, must say yes before any event is sent (SetSendGate).
 var sendGate atomic.Pointer[func() bool]
 
-// SetSendGate makes every send ask allowed first; nothing is sent while it says no. The tray's server child uses it for the Terms: that process does not show them
+// SetSendGate makes every send ask allowed first (postEvent, the one place every event goes through: install and upgrade included); nothing is sent while it says no. The tray's server child uses it for the Terms: that process does not show them
 // (the Coral window does), so it may run before they are accepted, and nothing may leave before they are.
 func SetSendGate(allowed func() bool) { sendGate.Store(&allowed) }
 
@@ -196,7 +196,7 @@ func trackEventSync(eventName string, extraProps map[string]string) bool {
 // telemetry generation the event was created in. It reports whether the
 // service accepted the event.
 func emitEvent(eventName string, extraProps map[string]string, eventUUID, timestamp string, gen uint64) bool {
-	if config.PostHogKey == "" || !telemetryValid(gen) || !sendAllowed() {
+	if config.PostHogKey == "" || !telemetryValid(gen) {
 		return false
 	}
 	typed, known := sanitizeProps(eventName, extraProps)
@@ -291,6 +291,9 @@ var retryDelays = []time.Duration{500 * time.Millisecond, 2 * time.Second}
 // non-retryable 4xx is logged and dropped. It reports whether the service
 // accepted the event.
 func postEvent(event, distinctID, eventUUID, timestamp string, gen uint64, properties map[string]any) bool {
+	if !sendAllowed() {
+		return false
+	}
 	payload := map[string]any{
 		"api_key":     config.PostHogKey,
 		"event":       event,

@@ -55,3 +55,22 @@ func TestAnInstallIDWrittenLaterIsUsed(t *testing.T) {
 		t.Fatalf("want one event under the id written later, got %+v", all)
 	}
 }
+
+// The gate covers install and upgrade too: they go through postEvent like every other event.
+func TestTheSendGateCoversInstall(t *testing.T) {
+	rec, dir := newTestTracking(t)
+	if err := os.Remove(filepath.Join(dir, ".install_id")); err != nil {
+		t.Fatal(err)
+	}
+	installIDMu.Lock()
+	cachedInstallID = ""
+	installIDMu.Unlock()
+	SetSendGate(func() bool { return false })
+	t.Cleanup(func() { SetSendGate(nil) })
+
+	TrackInstallAsync()
+	waitForAsync()
+	if got := rec.names(); len(got) != 0 {
+		t.Fatalf("sent while the gate said no: %v", got)
+	}
+}
