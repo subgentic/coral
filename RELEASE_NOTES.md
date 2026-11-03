@@ -1,5 +1,105 @@
 # Release Notes
 
+## v2.0.39 — The data-folder hotfix, released: upgrading from v2.0.37 restores your agents, a lost terminal server is recovered, and the macOS build retries its staple
+
+### Changes
+
+#### What you will notice first
+
+- **v2.0.39 is the v2.0.38 hotfix, released**: v2.0.38 was tagged but its macOS build could not be completed while Apple's ticket service was unreachable. v2.0.39 has the same code and a release build that retries the staple (5 tries, 2 minutes apart); if Apple's ticket service is still down, the macOS app is notarized (Apple accepted it) but ships unstapled, and its ticket is checked online at first launch.
+- **Upgrading from v2.0.37 restores your agents**: v2.0.37 could treat an existing Coral folder as a copy of another and stop recovering agents, auto-sleeping and delivering messages. Coral no longer blocks on the data-folder check: a folder with no id (one a release before the id existed left behind, even a copy of a never-restarted one) is an install upgrading in place and is yours, whatever its file dates; only a folder with positive evidence of being a copy (a different id, or another folder holding the same id) is flagged, and then it only warns and an **Adopt** button takes it over in place.
+- **A lost terminal server is logged, told and recovered from**: when Coral's own tmux server goes away while agents are awake, Coral logs a warning, tells the board which agents were lost and restarts the ones that were running (at most once per 10 minutes).
+- **Threaded board replies**: a reply is drawn under the message it answers, on the board and in Needs you, with a "Replying to" strip that sets what it answers from the message you chose.
+- **Comments on an agent's diff**: select lines in a file's inline diff and a Comment button opens the comment composer (pictures, Mark up) on them; the selected lines reach the agent with their line numbers, breaks and indentation. One agent session holds at most 200 live comments.
+- **Diff colours as GitHub draws them**: text on an added or removed line stands out from its band (light and dark themes, AA contrast), and the unchanged lines around a change keep their syntax colours readable.
+- **The changed-files view keeps your place** across its refresh (scroll, open files, opened blocks), and an untracked folder is one entry, as `git status` shows it (a sync tool's trace folder no longer floods the list; only big ones fold).
+- **Messages to the Operator are easy to read**: a post, ask or cross-team message to the Operator that is a wall of text (over 280 characters on one line, or numbered steps run together) is refused with a message that says how to write it: a one-line summary, then one point per line. A question reads well in Needs you: its line breaks stay, lists draw as lists, and a short first line is the title.
+- **Sign-in page**: a sign-in link that did not open Coral now says so correctly ("refused", not "used"), Settings says when Coral cannot check which account opens a sign-in link, and the sign-in link no longer travels in an argument list.
+- **A starting agent's row says Starting, not Idle**; the team header status and the team tab strip fit a phone; "Trust this folder" with no settings file yet is guidance, not an error.
+- **The README's install line reads on a phone**, and the New agent skills list is reachable on a phone.
+- **A pinned `install.sh` install verifies a signing requirement** (Coral.app must be signed by Coral's Developer ID team, checked with Apple's chain), not only the printed team.
+
+#### Known issues
+
+- **Windows: in-app update does not work from 2.0.0 through 2.0.6.** If you're on one of those, download and install the MSI by hand; from 2.0.7 on, in-app update works.
+- **macOS: a Coral of 2.0.5 or earlier cannot install updates in-app; install 2.0.6 or later by hand once.**
+- **OpenCode agents are tested on macOS and Linux; OpenCode on Windows is not yet tested end to end.**
+- **Hermes agents are still experimental.**
+- After an upgrade from before 2.0.35, an install that has agents but no board messages may be treated as a copy: run `coral --adopt-data-dir` once.
+- Setting up a computer over SSH is supported from a macOS or Linux hub, and is not yet tested from a Windows hub.
+
+#### For Coral Hub
+
+- **`release-diff` output** (`go run ./internal/releasediff/cmd/release-diff v2.0.37 <head>`):
+
+  ### Tunnel routes, v2.0.37 to the v2.0.39 head
+
+  Added, never reachable (the Hub has nothing to do) (1)
+
+  - `POST /api/system/data-folder/adopt`: never
+
+  ### Board settings keys (BoardSettings, HealthSettings included), v2.0.37 to the v2.0.39 head
+
+  No key was added, removed or changed.
+
+  ### What Coral Hub compiles in or embeds, v2.0.37 to the v2.0.39 head
+
+  `pkg/frontend`: 31 files the Hub embeds changed (+400, -44)
+
+  - `coral-go/pkg/frontend/static/artifact_comment_highlights.js`: +1, -1
+  - `coral-go/pkg/frontend/static/artifact_comments.js`: +8, -1
+  - `coral-go/pkg/frontend/static/artifact_comments_api.js`: +2, -1
+  - `coral-go/pkg/frontend/static/board_chat.js`: +10, -7
+  - `coral-go/pkg/frontend/static/board_composer.js`: +6, -3
+  - `coral-go/pkg/frontend/static/board_reply_strip.js`: +25, -0
+  - `coral-go/pkg/frontend/static/board_threads.js`: +42, -0
+  - `coral-go/pkg/frontend/static/board_window.js`: +8, -5
+  - `coral-go/pkg/frontend/static/changed_files.js`: +15, -0
+  - `coral-go/pkg/frontend/static/css/agentic.css`: +11, -4
+  - `coral-go/pkg/frontend/static/css/board_table.css`: +5, -0
+  - `coral-go/pkg/frontend/static/css/cm_shadow.css`: +11, -4
+  - `coral-go/pkg/frontend/static/css/diff-comments.css`: +9, -0
+  - `coral-go/pkg/frontend/static/css/skills.css`: +2, -2
+  - `coral-go/pkg/frontend/static/css/team_page.css`: +2, -1
+  - `coral-go/pkg/frontend/static/css/variables.css`: +4, -0
+  - `coral-go/pkg/frontend/static/diff_comments.js`: +134, -0
+  - `coral-go/pkg/frontend/static/inbox_coral.js`: +2, -2
+  - `coral-go/pkg/frontend/static/inbox_panel.js`: +3, -1
+  - `coral-go/pkg/frontend/static/inline_diff.js`: +10, -2
+  - `coral-go/pkg/frontend/static/launch_dialog.js`: +5, -0
+  - `coral-go/pkg/frontend/static/message_board.js`: +1, -1
+  - `coral-go/pkg/frontend/static/operator_asks.js`: +20, -2
+  - `coral-go/pkg/frontend/static/session_state.js`: +2, -0
+  - `coral-go/pkg/frontend/static/settings_dialog.js`: +5, -0
+  - `coral-go/pkg/frontend/static/startup_status.js`: +8, -1
+  - `coral-go/pkg/frontend/static/strip_reveal.js`: +19, -0
+  - `coral-go/pkg/frontend/static/team_dialogs.js`: +2, -0
+  - `coral-go/pkg/frontend/static/team_page.js`: +4, -4
+  - `coral-go/pkg/frontend/static/update_check.js`: +22, -1
+  - `coral-go/pkg/frontend/templates/includes/modals.html`: +2, -1
+
+  `agent_docs`: 2 files the Hub embeds changed (+4, -0)
+
+  - `coral-go/agent_docs/board.md`: +2, -0
+  - `coral-go/agent_docs/hub.md`: +2, -0
+
+  Unchanged: `pkg/hubproxy`, `pkg/hubowner`, `pkg/redact`, `pkg/tunnel`.
+
+  ### Coral packages compiled into the Hub through its imports, v2.0.37 to the v2.0.39 head
+
+  Unchanged: `internal/fsreplace`, `internal/httputil`, `internal/logsafe`, `internal/safego`, `internal/secfile`, `internal/secrets`, `pkg/redact/betterleaks`.
+
+- **The new route** `POST /api/system/data-folder/adopt` is the Operator's alone (the Adopt button), census class b, never reachable through the tunnel.
+- **Board replies are threaded** (`reply_to`): the board and the dock draw a reply under the message it answers; no route changed, the existing post routes carry `reply_to`.
+- **Ready signals, hooks, tokens, framed paths**: unchanged.
+
+
+#### For developers and releases
+
+- The release workflow retries the macOS staple and records an unstapled artifact in the run artifact `coral-macos-unstapled`; `tools/verify-release.sh --allow-unstapled` honours only that marker (#12721).
+- Census entries: the untracked-folder size read (`measureFolder`) and the sign-in page (`writeLoginPage`); the libproc attribution queue is capped at 8 callers.
+- `team_goal_task_back_browser` no longer races its loop (6 of 20 runs failed at 4x throttle before).
+
 ## v2.0.38 — Upgrading from v2.0.37 restores your agents, a lost terminal server is recovered, threaded board replies, comments on an agent's diff, and diff colours as GitHub draws them
 
 ### Changes
