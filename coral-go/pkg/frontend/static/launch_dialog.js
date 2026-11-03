@@ -97,6 +97,7 @@ function _selectLaunchType(type) {
         _loadAgentBoardProjects();
         document.getElementById('agent-preset-selector')?.replaceChildren(); // a new dialog starts from Blank again (#7391)
         _initAgentPresets();
+        { const row = document.getElementById('launch-skills-row'), park = document.getElementById('launch-advanced-extra'); if (row && park && !park.contains(row)) park.prepend(row); } // the form's panes are built again: the skills row goes back to the part that is kept, and is placed in the Agent section after (#12569)
         // Render agent config form
         renderAgentConfigForm('launch-agent-acf', {
             showPreset: false,
@@ -108,6 +109,10 @@ function _selectLaunchType(type) {
             adoptEnd: { agent: 'launch-note-slot' }, // the provider's notes have their room at the END of the Agent pane, under Thinking: nothing above it moves when a note appears (#8528)
             value: launch.member ? launch.member.value : { agentType: _settingsFor(_effectiveServer(launch.server)).default_agent_type || 'claude' }, // a member's own values (#7861)
         });
+        { // the skills are the agent's own choice: they sit at the end of the Agent section (step 3's first), not behind the Advanced entry of the section list, which a phone shows as a dropdown nobody opens (#12569)
+            const pane = document.querySelector('#launch-agent-acf [data-section="agent"]'), skills = document.getElementById('launch-skills-row'), slot = document.getElementById('launch-note-slot');
+            if (pane && skills) pane.insertBefore(skills, slot && slot.parentNode === pane ? slot : null);
+        }
         importOnce('./launch_signin_notice.js').then(m => m.mountLaunchSigninNotice({ slot: document.getElementById('launch-cli-slot'), before: document.getElementById('launch-agent-pick-label')?.parentElement, form: document.getElementById('launch-agent-acf'), server: _effectiveServer(launch.server) })).catch(e => console.error('sign-in notice', e)); // Claude not signed in is said here, with how (#11336)
         // The agent is chosen in this step, not only under More options (#6199): a radio group that follows the form's own select, the installed agents first.
         importOnce('./launch_provider_cards.js').then(m => m.buildProviderCards({ group: document.getElementById('launch-agent-pick'), form: document.getElementById('launch-agent-acf'), server: _effectiveServer(launch.server), implicitDefault: !_settingsFor(_effectiveServer(launch.server)).default_agent_type })).catch(() => {});
