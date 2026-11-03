@@ -24,52 +24,52 @@ const taskLinkNone int64 = -1
 
 // artifactTaskLink is the task number an upload by the verified session in ctx links to: 0 for none, taskLinkNone for an explicit "none". refused says why an explicitly named task cannot be
 // used (nothing is stored then); an upload that names none and has no one task in progress is simply not linked.
-func (h *SessionsHandler) artifactTaskLink(ctx context.Context, r *http.Request) (taskID int64, refused string) {
+func (h *SessionsHandler) artifactTaskLink(ctx context.Context, r *http.Request) (taskID int64, refused, note string) {
 	named := strings.TrimSpace(r.Header.Get(taskHeader))
 	if strings.EqualFold(named, "none") {
-		return taskLinkNone, ""
+		return taskLinkNone, "", ""
 	}
 	owner, ok := VerifiedSession(ctx)
 	if !ok || owner == nil || h.bs == nil {
 		if named != "" {
-			return 0, "a task can only be named by an agent that is on the task's board"
+			return 0, "a task can only be named by an agent that is on the task's board", ""
 		}
-		return 0, ""
+		return 0, "", ""
 	}
 	sub, err := h.bs.GetSubscriptionBySessionName(ctx, owner.SessionName)
 	if err != nil || sub == nil {
 		if named != "" {
-			return 0, "a task can only be named by an agent that is on the task's board"
+			return 0, "a task can only be named by an agent that is on the task's board", ""
 		}
-		return 0, ""
+		return 0, "", ""
 	}
 	if named != "" {
 		id, perr := strconv.ParseInt(named, 10, 64)
 		if perr != nil || id <= 0 {
-			return 0, "X-Artifact-Task must be a task number, or none"
+			return 0, "X-Artifact-Task must be a task number, or none", ""
 		}
 		task, terr := h.bs.GetTask(ctx, sub.Project, id)
 		if terr != nil || task == nil || task.AssignedTo == nil || *task.AssignedTo != sub.SubscriberID {
-			return 0, "that task is not one of yours on this board"
+			return 0, "that task is not one of yours on this board", ""
 		}
 		switch task.Status { // a finished task takes no more files: said now, never an upload that links to a task that is closed and vanishes from its page (#12755)
 		case "completed", "skipped":
-			return 0, "task " + strconv.FormatInt(id, 10) + " is " + task.Status + ": it takes no more files. Upload with --no-task, or to a task that is open"
+			return 0, "task " + strconv.FormatInt(id, 10) + " is " + task.Status + ": it takes no more files. Upload with --no-task, or to a task that is open", ""
 		}
-		return id, ""
+		return id, "", ""
 	}
-	ids, err := h.bs.InProgressTaskIDsOf(ctx, sub.Project, sub.SubscriberID)
+	ids, err := h.bs.OpenTaskIDsOf(ctx, sub.Project, sub.SubscriberID) // in progress OR in review: evidence is added after a submit (#12755)
 	if err != nil {
-		return 0, ""
+		return 0, "", ""
 	}
 	if len(ids) > 1 {
-		slog.Warn("[artifacts] a member has more than one task in progress: the upload is linked to none", "board", sub.Project, "member", sub.SubscriberID, "tasks", ids)
-		return 0, ""
+		slog.Warn("[artifacts] a member has more than one open task: the upload is linked to none", "board", sub.Project, "member", sub.SubscriberID, "tasks", ids)
+		return 0, "", "you have more than one open task, so this upload is linked to none: name the task with --task N" // said in the reply, never a silent miss
 	}
 	if len(ids) == 1 {
-		return ids[0], ""
+		return ids[0], "", ""
 	}
-	return 0, ""
+	return 0, "", ""
 }
 
 // noteOffBooksUpload: an agent's upload that links to no task and was not sent with --no-task, from an agent with no task in progress, is work done off the books (#7793, goal #21): the
@@ -93,7 +93,7 @@ func (h *SessionsHandler) noteOffBooksUpload(ctx context.Context, taskID int64, 
 	if orch, err := h.bs.TeamOrchestrator(ctx, sub.Project); err == nil && board.SameIdentity(sub.SubscriberID, orch) {
 		return
 	}
-	if ids, err := h.bs.InProgressTaskIDsOf(ctx, sub.Project, sub.SubscriberID); err != nil || len(ids) > 0 {
+	if ids, err := h.bs.OpenTaskIDsOf(ctx, sub.Project, sub.SubscriberID); err != nil || len(ids) > 0 {
 		return // two in progress links none, but it has work: not off the books
 	}
 	short := digest

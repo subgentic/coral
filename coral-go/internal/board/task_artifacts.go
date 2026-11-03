@@ -17,6 +17,15 @@ func (s *Store) InProgressTaskIDsOf(ctx context.Context, project, member string)
 	return ids, err
 }
 
+// OpenTaskIDsOf is the ids of the tasks the member has OPEN and not parked on the board: in progress, or in review (an agent adds its evidence after it submits, #12755), at most two: one is the task its unnamed uploads link to, and a
+// second means the caller links none and says so.
+func (s *Store) OpenTaskIDsOf(ctx context.Context, project, member string) ([]int64, error) {
+	var ids []int64
+	err := s.reader().SelectContext(ctx, &ids,
+		`SELECT id FROM board_tasks WHERE board_id = ? AND assigned_to = ? AND (`+holdsSlotSQL+` OR (status = 'review_pending' AND NOT `+parkedSQL+`)) ORDER BY id LIMIT 2`, project, member)
+	return ids, err
+}
+
 // TaskTitles is the titles of the board's tasks with these ids: a task that is not on this board (or is gone) is not in the answer.
 func (s *Store) TaskTitles(ctx context.Context, project string, ids []int64) (map[int64]string, error) {
 	out := make(map[int64]string, len(ids))
