@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/store"
 )
@@ -26,14 +27,16 @@ type waitingRig struct {
 }
 
 // An Orchestrator (receive mode all) with Coral Task Queue's audit rows and Coral's notices to other agents before and among its real unread messages.
-func newWaitingRig(t *testing.T) *waitingRig {
+func newWaitingRig(t *testing.T) *waitingRig { return newWaitingRigMode(t, "all") }
+
+func newWaitingRigMode(t *testing.T, mode string) *waitingRig {
 	t.Helper()
 	server, h, _, ss := setupSessionsTestServer(t)
 	ctx := context.Background()
 	sid := "22222222-2222-3333-4444-555555555555"
 	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid, AgentName: "Lead", AgentType: "claude", WorkingDir: t.TempDir()}))
 	name := naming.SessionName("claude", sid)
-	_, err := h.bs.Subscribe(ctx, "alpha", "Lead", "Orchestrator", name, nil, "all")
+	_, err := h.bs.Subscribe(ctx, "alpha", "Lead", "Orchestrator", name, nil, mode)
 	require.NoError(t, err)
 	_, err = h.bs.Subscribe(ctx, "alpha", "Dev", "Backend", "claude-dev", nil, "mentions")
 	require.NoError(t, err)
@@ -131,4 +134,41 @@ func TestDismissRefusesAnIdPastTheNewestAnAgentAndNoId(t *testing.T) {
 	status, _ = r.dismiss(ids[len(ids)-1], r.tok)
 	assert.Equal(t, http.StatusForbidden, status)
 	assert.Equal(t, 6, r.unread(), "none of the refused calls moved the read position")
+}
+
+// QA's SHOULDs on #12713. (4) Coral's own notice counts, and is listed, only for the agent it names: an Orchestrator is not counted or shown a notice to another agent. (5) A member whose receive mode is none is
+// counted and listed nothing. (6) The list is the count's messages in the order the read position moves (oldest first from the server; the page shows them newest first: waiting_dismiss_browser).
+func TestACoralNoticeToAnotherAgentIsNeitherCountedNorListed(t *testing.T) {
+	r := newWaitingRig(t)
+	ctx := context.Background()
+	_, err := r.h.bs.PostSystemMessage(ctx, "alpha", board.CoralSender, "@Backend Coral restarted: check your last step", nil)
+	require.NoError(t, err)
+	n, ids := r.list()
+	assert.Equal(t, 6, n, "a notice to Backend is not the Orchestrator's")
+	assert.Len(t, ids, 6)
+	_, err = r.h.bs.PostSystemMessage(ctx, "alpha", board.CoralSender, "@Orchestrator Coral restarted: check your last step", nil)
+	require.NoError(t, err)
+	n, ids = r.list()
+	assert.Equal(t, 7, n, "a notice that names the Orchestrator is counted")
+	assert.Len(t, ids, 7, "and listed: the count and the list agree")
+	assert.Equal(t, r.unread(), n)
+}
+
+func TestAMemberWhoReceivesNothingIsListedNothing(t *testing.T) {
+	r := newWaitingRigMode(t, "none")
+	_, err := r.h.bs.PostMessage(context.Background(), "alpha", "Dev", "@Orchestrator a message that tags the member", nil)
+	require.NoError(t, err)
+	n, ids := r.list()
+	assert.Equal(t, 0, n)
+	assert.Empty(t, ids, "receive mode none: the count says 0 and the list holds nothing")
+	assert.Equal(t, 0, r.unread())
+}
+
+func TestTheWaitingListIsInTheOrderOfTheReadPosition(t *testing.T) {
+	r := newWaitingRig(t)
+	_, ids := r.list()
+	require.Len(t, ids, 6)
+	for i := 1; i < len(ids); i++ {
+		assert.Greater(t, ids[i], ids[i-1], "oldest first by id, the order the read position moves through")
+	}
 }
