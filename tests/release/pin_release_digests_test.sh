@@ -31,11 +31,14 @@ SHIM
 cat > "$T/bin/cosign" <<'SHIM'
 #!/usr/bin/env bash
 echo "$*" >> "$FIX/cosign.calls"
-id=""; iss=""; repo=""; ref=""; wsha=""; trig=""; [ "$1" = verify-blob ] || { echo "cosign shim: $*" >&2; exit 2; }
+id=""; iss=""; repo=""; ref=""; wsha=""; trig=""; bundle=""; newfmt=0; [ "$1" = verify-blob ] || { echo "cosign shim: $*" >&2; exit 2; }
 while [ $# -gt 0 ]; do case "$1" in
   --certificate-identity) id="$2"; shift ;; --certificate-oidc-issuer) iss="$2"; shift ;; --certificate-github-workflow-repository) repo="$2"; shift ;;
   --certificate-github-workflow-ref) ref="$2"; shift ;; --certificate-github-workflow-sha) wsha="$2"; shift ;; --certificate-github-workflow-trigger) trig="$2"; shift ;;
+  --bundle) bundle="$2"; shift ;; --new-bundle-format) newfmt=1 ;;
 esac; shift; done
+# the release bundles are the new (v0.3) format; cosign v2 reads one only with --new-bundle-format and otherwise fails like this (found on v2.0.39, #12885)
+if grep -q "bundle.v0.3" "$bundle" 2>/dev/null && [ "$newfmt" != 1 ]; then echo "Error: bundle does not contain cert for verification, please provide public key" >&2; exit 1; fi
 [ "$id" = "$SIGNED_ID" ] && [ "$iss" = https://token.actions.githubusercontent.com ] && [ "$repo" = "$SIGNED_REPO" ] && [ "$ref" = "$SIGNED_REF" ] && [ "$wsha" = "$SIGNED_SHA" ] && [ "$trig" = push ] \
   || { echo "Error: none of the expected identities matched" >&2; exit 1; }
 echo "Verified OK" >&2
@@ -49,7 +52,7 @@ good_files() {
   printf '{"draft":false,"tag_name":"v2.0.36","immutable":true}\n' > "$FIX/release.json"
   printf '%s' "$SHA" > "$FIX/sha"
   printf '%s  coral-linux-amd64-2.0.36.tar.gz\n%s  coral-linux-arm64-2.0.36.tar.gz\n%s  Coral.v2.0.36.dmg\n' "$D1" "$D2" "$D3" > "$FIX/SHA256SUMS.txt"
-  echo bundle > "$FIX/SHA256SUMS.txt.sigstore.json"
+  printf '{"mediaType":"application/vnd.dev.sigstore.bundle.v0.3+json","verificationMaterial":{"certificate":{"rawBytes":"x"}},"messageSignature":{}}\n' > "$FIX/SHA256SUMS.txt.sigstore.json"
   export SIGNED_ID="https://github.com/subgentic/coral/.github/workflows/release.yml@refs/tags/v2.0.36" SIGNED_REPO=subgentic/coral SIGNED_REF=refs/tags/v2.0.36 SIGNED_SHA="$SHA"
 }
 run() { # args...: sets OUT, ERR, CODE
@@ -73,6 +76,7 @@ grep -q "ARM64: \"$D2\"," <<<"$OUT" || fail "good: arm64 digest: $OUT"
 grep -q "cosign-verified" <<<"$OUT" || fail "good: the row says it was verified"
 grep -q "$SHA" <<<"$OUT" || fail "good: the row names the commit"
 grep -q -- "--certificate-identity https://github.com/subgentic/coral/.github/workflows/release.yml@refs/tags/v2.0.36 " "$FIX/cosign.calls" || fail "the exact identity was not asked: $(cat "$FIX/cosign.calls")"
+grep -q -- "--new-bundle-format" "$FIX/cosign.calls" || fail "the new (v0.3) bundle format flag was not passed to cosign"
 grep -q -- "--certificate-github-workflow-sha $SHA " "$FIX/cosign.calls" && grep -q -- "--certificate-github-workflow-trigger push" "$FIX/cosign.calls" || fail "commit and trigger not asked"
 [ "$(grep -c . <<<"$OUT")" = 5 ] || fail "good: five lines (a comment and a row): $OUT"
 
