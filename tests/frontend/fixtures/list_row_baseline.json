@@ -26,6 +26,7 @@
     "server-strip-item": "a list inside a pane or the rail (slice 4's second pass)",
     "session-group-item": "the phone's agent card (mobile.css: its own radius and 56 px height) and the compact row's height; the selected look, the hover and the focus are .list-row's",
     "session-name-row": "a line inside or under an agent row (slice 4, second pass)",
+    "skill-mention-item": "a menu or dropdown item (slice 1's menus): the $skill list, with the /command list's look (#12677)",
     "sidebar-rail-item": "a list inside a pane or the rail (slice 4's second pass)",
     "sleeping-summary-row": "a line inside or under an agent row (slice 4, second pass)",
     "tag-dropdown-item": "a menu or dropdown item (slice 1's menus)",

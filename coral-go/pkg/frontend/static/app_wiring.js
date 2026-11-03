@@ -16,6 +16,7 @@ import { sendCommand, initImageDrop } from './controls.js';
 import { initFileSearch } from './changed_files.js';
 import { initFileMention } from './file_mention.js';
 import { initCommandMention } from './command_mention.js';
+import { initSkillMention } from './skill_mention.js';
 import { initNotesMd } from './agent_notes.js';
 import { initChatFind } from './chat_find.js';
 import { initSidebarResize, initTaskBarResize, initSidebarCollapse, initAgenticPanelCollapse, initAgenticBlockResize, initAgenticBlockCollapse, initSidebarRail } from './sidebar.js';
@@ -77,6 +78,9 @@ export function wireComposer() {
 
     // /command mention autocomplete
     initCommandMention();
+
+    // $skill mention autocomplete (#12677)
+    initSkillMention();
 
     // Markdown notes panel: click-to-edit, blur-to-save
     initNotesMd();
