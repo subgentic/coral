@@ -32,13 +32,13 @@ export async function beat(browser, name, { w = 1600, h = 900, mobile = false } 
   const ctx = await browser.newContext({ storageState: S + "/work/state.json", viewport: { width: w, height: h }, deviceScaleFactor: 1, isMobile: mobile, hasTouch: mobile,
     recordVideo: { dir, size: { width: w, height: h } } })
   // Leak check: while a beat runs, the page is scanned twice a second (visible text, titles, aria-labels, placeholders) for anything that
-  // would give away the machine it was made on: the host's home folder or user name, the scratch folder, an agent scratchpad, a session id.
+  // would give away the machine it was made on or an internal id: the host's home folder, the scratch folder, an agent scratchpad, a session id, a board id (b- and 8 or more letters or digits), a long hex digest, a coral:// link.
   const real = (p) => { try { return fs.realpathSync(p) } catch { return p } }
   const needles = [...new Set([os.homedir(), real(os.homedir()), "/claude-501/", "scratchpad", "/private/var/folders"].filter((x) => x && x.length >= 4))]
   const needleSrc = needles.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
   await ctx.addInitScript((src) => {
     window.__leaks = []
-    const re = new RegExp(src.join("|") + "|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", "i")
+    const re = new RegExp(src.join("|") + "|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|\\bb-[a-z0-9]{8,}\\b|\\b[0-9a-f]{32,}\\b|coral://", "i")   // session ids, board ids (b-xxxxxxxx), digests and artifact links
     const scan = () => {
       const bits = [document.body ? document.body.innerText : ""]
       for (const el of document.querySelectorAll("[title],[aria-label],[placeholder],[alt]")) bits.push(el.title, el.getAttribute("aria-label"), el.getAttribute("placeholder"), el.getAttribute("alt"))

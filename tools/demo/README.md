@@ -58,7 +58,7 @@ tools/demo/
 
 ## The leak check
 
-While a beat is recorded, `lib.mjs` scans the page twice a second (visible text, titles, aria-labels, placeholders) for the host's home folder, a scratch or agent-scratchpad path, a macOS temp folder, or a session id (a UUID). If one shows, the beat fails (`FAILED bN: leak on screen in bN: ...`) after its clip is closed, so a path cannot reach the film unnoticed. `node selftest.mjs` proves the check fires (a page showing the home folder and one showing a session id must fail, a clean page must pass); run it after changing `lib.mjs`. It is a text check: it does not read pixels, so a path drawn into an image is not caught.
+While a beat is recorded, `lib.mjs` scans the page twice a second (visible text, titles, aria-labels, placeholders) for the host's home folder, a scratch or agent-scratchpad path, a macOS temp folder, a session id (a UUID), a board id (`b-` and 8 or more letters or digits), a long hex digest or a `coral://` link. If one shows, the beat fails (`FAILED bN: leak on screen in bN: ...`) after its clip is closed, so a path cannot reach the film unnoticed. `node selftest.mjs` proves the check fires (pages showing the home folder, a session id, a board id or a digest must fail; a clean page, including words like "b-tree", must pass); run it after changing `lib.mjs`. It is a text check: it does not read pixels, so a path drawn into an image is not caught.
 
 ## Iterating
 

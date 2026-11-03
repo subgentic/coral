@@ -111,7 +111,7 @@ const B = {
     await t.page.screenshot({ path: S + "/work/x-b6-after-yes.png" })
     await t.cap("See what it all cost.")
     await t.click(t.page.locator("text=Analytics >> visible=true").last()); await sleep(3000)
-    for (let i = 0; i < 4; i++) { await t.page.mouse.wheel(0, 380); await sleep(900) }
+    for (let i = 0; i < 2; i++) { await t.page.mouse.wheel(0, 300); await sleep(900) }   // the cost cards only: the cost-by-team chart below them names a team by its board id (a product bug, #13044) until that is fixed
     await t.page.screenshot({ path: S + "/work/x-b6-analytics.png" })
     return t.finish()
   },

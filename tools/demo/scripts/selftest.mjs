@@ -14,8 +14,11 @@ async function run(html) {
 }
 const clean = await run("<p>Agent in ~/projects/demo-app</p>")
 const leaky = await run("<p title='x'>Folder " + os.homedir() + "/work/demo</p>")
+const board = await run("<p>team b-v2ye7b5ue</p>")
+const digest = await run("<p>sha " + "ab12".repeat(16) + "</p>")
+const word = await run("<p>a b-tree and a b-side are words</p>")
 const uuid = await run("<p>session 3ff4933c-1fe8-1854-145a-025cf4eb0844</p>")
 await browser.close()
-console.log("clean page:", clean); console.log("home folder:", leaky); console.log("session id:", uuid)
-const ok = clean === "clean" && leaky.startsWith("LEAK") && uuid.startsWith("LEAK")
+console.log("clean page:", clean); console.log("home folder:", leaky); console.log("session id:", uuid); console.log("board id:", board); console.log("digest:", digest); console.log("plain b- words:", word)
+const ok = clean === "clean" && leaky.startsWith("LEAK") && uuid.startsWith("LEAK") && board.startsWith("LEAK") && digest.startsWith("LEAK") && word === "clean"
 console.log(ok ? "selftest ok" : "selftest FAILED"); process.exit(ok ? 0 : 1)
