@@ -9,6 +9,7 @@ import { importOnce } from './import_once.js';
 import * as W from './goal_words.js';
 import { PHONE_QUERY } from './phone_layout.js';
 const { assess, EXAMPLES, TASKS_MAX } = await importOnce('./goal_guide.js'); // lazy: its failure is retried
+const { renderGoalText } = await importOnce('./goal_text.js'); // the Preview and the goal's page draw the words the same way
 await loadStyles('goal_editor.css'); // not at start (page_weight): the editor's own sheet loads with this module, before anything draws
 const GOAL_DESCRIPTION_MAX = 2000; // the server's cap on a goal's outcome (MaxGoalOutcome)
 
@@ -137,7 +138,11 @@ export function openGoalEditor(opts = {}) {
     const exList = el('ul', 'goal-example-list');
     for (const text of EXAMPLES.slice(0, 2)) { const li = el('li'), b = btn('goal-example', `\u201c${text}\u201d`, () => { d.value = text; d.dispatchEvent(new Event('input', { bubbles: true })); d.focus(); }); b.setAttribute('aria-label', `Use this done-when: ${text}`); li.append(b); exList.append(li); }
     examples.append(exTitle, exList);
-    const rail = el('aside', 'goal-rail'); rail.setAttribute('aria-label', 'Guide'); rail.append(guide, examples);
+    const previewCard = el('section', 'goal-card goal-preview-card'); previewCard.setAttribute('aria-labelledby', 'goal-preview-card-title');
+    const pvTitle = el('h4', null, 'Preview'); pvTitle.id = 'goal-preview-card-title';
+    const pvOpen = btn('btn goal-preview-open', 'Open preview', () => togglePreview(true)); // the same as the bar's Preview
+    previewCard.append(pvTitle, el('p', 'goal-guide-note', 'See how this reads on its page before you create it.'), pvOpen);
+    const rail = el('aside', 'goal-rail'); rail.setAttribute('aria-label', 'Guide'); rail.append(guide, examples, previewCard);
     const ICON = { ok: 'check_circle', warn: 'warning', todo: 'info' };
     let summaryTimer = null;
     const refresh = () => {
@@ -154,11 +159,36 @@ export function openGoalEditor(opts = {}) {
     refresh(); gSummary.textContent = 'Nothing to look at';
     const go = btn('btn btn-primary', 'Create goal'); go.type = 'submit';
     const cancel = btn('btn', 'Cancel', () => dlg.close());
-    const actions = el('div', 'goals-actions'); actions.append(cancel, go);
+    const previewBtn = btn('btn btn-quiet goal-preview-toggle', 'Preview', () => togglePreview()); previewBtn.setAttribute('aria-pressed', 'false'); previewBtn.title = 'See how the goal will read on its page';
+    const actions = el('div', 'goals-actions'); actions.append(previewBtn, cancel, go);
+    // the Preview: the goal as its page will show it (the title, the state, the driver, the description as Markdown-lite, done when, the pictures), drawn the same way (goal_text.js); Edit goes back
+    const pane = el('section', 'goal-preview'); pane.hidden = true; pane.setAttribute('aria-label', 'Preview of the goal'); let previewUrls = [];
+    const drawPreview = async () => {
+        for (const u of previewUrls) URL.revokeObjectURL(u); previewUrls = [];
+        const who = dr.selectedOptions[0] && dr.value ? dr.selectedOptions[0].textContent : '', teamName = keyLabel(project);
+        const state = el('span', 'goal-preview-state', 'Proposed'), h = el('h2', 'goal-preview-title', t.value.trim() || 'Untitled goal'); h.tabIndex = -1; if (!t.value.trim()) h.classList.add('goal-preview-blank');
+        const meta = el('p', 'goal-preview-meta', [who ? `Driver: ${who}` : 'No driver yet', teamName].join(' \u00b7 '));
+        const dl = el('dl', 'facts goals-facts');
+        const dd = el('dd'); dl.append(el('dt', null, 'Description'), dd);
+        if (desc.value.trim()) { const node = await renderGoalText(desc.value); dd.append(node); } else { dd.textContent = 'Nothing written yet.'; dd.classList.add('goal-preview-blank'); }
+        const dd2 = el('dd', d.value.trim() ? null : 'goal-preview-blank', d.value.trim() || 'Not set yet.'); dl.append(el('dt', null, 'Done when'), dd2);
+        const kids = [state, h, meta, dl];
+        const shots = tray ? tray.items().filter(x => x.state === 'ready') : [];
+        if (shots.length) { const row = el('ul', 'goal-preview-pics'); for (const x of shots) { const li = el('li'), img = el('img'); const u = URL.createObjectURL(x.blob); previewUrls.push(u); img.src = u; img.alt = x.name || 'Picture'; li.append(img); row.append(li); } kids.push(row); }
+        kids.push(el('p', 'goal-preview-tasks', 'No tasks yet. The goal\u2019s driver plans them once it exists.'));
+        pane.replaceChildren(...kids);
+        return h;
+    };
+    let previewing = false;
+    async function togglePreview(on = !previewing) {
+        previewing = on; previewBtn.setAttribute('aria-pressed', String(on)); previewBtn.textContent = on ? 'Edit' : 'Preview';
+        if (on) { const h = await drawPreview(); if (!previewing) return; main.hidden = true; pane.hidden = false; rail.classList.add('goal-rail-quiet'); h.focus(); }
+        else { pane.hidden = true; main.hidden = false; rail.classList.remove('goal-rail-quiet'); t.focus(); }
+    }
     const phone = matchMedia(PHONE_QUERY); // the bar is back and the title on a phone (56 px, as every form screen), the chips are the first line of the body; on a desktop they sit in the bar
     const place = () => { if (phone.matches) { main.prepend(chips); main.append(rail); } else { head.append(chips); form.append(rail); } };
     place(); phone.addEventListener('change', place);
-    form.append(head, actions, main);
+    form.append(head, actions, main, pane);
     dlg.append(form); document.body.append(dlg);
 
     const loadDrivers = () => { const asked = project; return boardFetch(asked, '/subscribers').then(r => r.ok ? r.json() : Promise.reject(new Error(String(r.status)))).then(json => {
@@ -198,7 +228,7 @@ export function openGoalEditor(opts = {}) {
             if (opts.onCreated) await opts.onCreated(project, told);
         } catch (ex) { err.textContent = `The goal was not created: ${W.errorWords(ex && ex.code, ex && ex.message)}`; go.disabled = false; sync(); }
     });
-    dlg.addEventListener('close', () => { clearTimeout(summaryTimer); if (tray) tray.destroy(); dlg.remove(); if (opts.onClose) opts.onClose(); });
+    dlg.addEventListener('close', () => { clearTimeout(summaryTimer); for (const u of previewUrls) URL.revokeObjectURL(u); if (tray) tray.destroy(); dlg.remove(); if (opts.onClose) opts.onClose(); });
     dlg.showModal(); t.focus();
     return dlg;
 }

@@ -63,3 +63,19 @@ export const EXAMPLES = [
     'The nightly report runs 7 days in a row with no failed task.',
     'Every row of a 10,000-row CSV is imported in under a minute, and each failed row says why.',
 ];
+
+const BLOCKISH = /^\s*(?:[-*+]\s|\d+[.)]\s|#{1,6}\s|>|```|---+\s*$|\|)/;
+/** The description's single line breaks stay line breaks (#12724): the renderer joins the lines of a paragraph with a space, but a goal's words were always shown with their breaks, so two plain lines in a row become two
+ *  paragraphs. Lists, headings, quotes, tables and fenced code are left to the renderer. */
+export function keepBreaks(text) {
+    const lines = String(text == null ? '' : text).replace(/\r\n?/g, '\n').split('\n'), out = [];
+    let fence = false;
+    const plain = l => l.trim() !== '' && !BLOCKISH.test(l) && !/^( {4}|\t)/.test(l);
+    for (let i = 0; i < lines.length; i++) {
+        const l = lines[i];
+        if (/^\s*```/.test(l)) fence = !fence;
+        out.push(l);
+        if (!fence && plain(l) && i + 1 < lines.length && plain(lines[i + 1])) out.push('');
+    }
+    return out.join('\n');
+}

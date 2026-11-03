@@ -120,8 +120,9 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
             await load(`/team/${B}/goals/${G}`, w, h, mobile, G);
             await waitFor(`!!document.querySelector('#team-panel-goals .goals-facts')`, at + 'the goal page', 15000);
             assert.equal(await ev(`[...document.querySelectorAll('#team-panel-goals .goals-facts dt')].map(d => d.textContent).join()`), 'Description,Done when', at + 'the page says Description');
-            assert.equal(await ev(`getComputedStyle(document.querySelector('#team-panel-goals .goals-facts dd')).whiteSpace`), 'pre-line', at + 'and keeps its line breaks');
-            assert.equal(await ev(`document.querySelector('#team-panel-goals .goals-facts dd').textContent`), OUTCOME);
+            assert.equal(await ev(`getComputedStyle(document.querySelector('#team-panel-goals .goals-facts dd')).whiteSpace`), 'pre-line', at + 'the plain words before the render keep their line breaks');
+            await waitFor(`!!document.querySelector('#team-panel-goals .goals-facts dd .goal-md')`, at + 'the description drawn as Markdown-lite (#12724)', 8000);
+            assert.deepEqual(await ev(`[...document.querySelectorAll('#team-panel-goals .goals-facts dd .goal-md p')].map(p => p.textContent)`), OUTCOME.split('\n'), at + 'each line of the description is its own line (the line break is a paragraph break)');
             await ev(`window.dispatchEvent(new Event('focus')); true`); // the page reads its goal again: now through the stub, which adds the pictures
             await waitFor(`document.querySelectorAll('#team-panel-goals .goal-pic-img').length === 2`, at + 'its pictures', 8000);
             await waitFor(`[...document.querySelectorAll('#team-panel-goals .goal-pic-img')].every(i => i.complete && i.naturalWidth > 0)`, at + 'drawn', 8000);

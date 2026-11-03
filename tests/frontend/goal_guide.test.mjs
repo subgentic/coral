@@ -1,6 +1,6 @@
 // The Guide's rules for a goal being written (#12724): the board's "how big a goal is" as local checks on the words. Each rule has a case that trips it and one that does not; no model is asked.
 import assert from 'node:assert/strict';
-import { assess, listItems, EXAMPLES, TASKS_MIN, TASKS_MAX } from '../../coral-go/pkg/frontend/static/goal_guide.js';
+import { assess, listItems, keepBreaks, EXAMPLES, TASKS_MIN, TASKS_MAX } from '../../coral-go/pkg/frontend/static/goal_guide.js';
 
 const one = a => a.checks.find(c => c.id === 'one'), done = a => a.checks.find(c => c.id === 'done');
 // nothing written: todo, not warnings
@@ -38,4 +38,13 @@ a = assess({ title: 'Add search plus filters', doneWhen: 'It works well' });
 assert.equal(a.looks, 2); assert.equal(a.summary, '2 things to look at');
 assert.equal(assess({ title: 'Customers import a CSV on their own', doneWhen: 'A customer imports a CSV in under a minute' }).summary, 'Nothing to look at');
 assert.equal(TASKS_MIN, 2); assert.equal(TASKS_MAX, 15); assert.ok(EXAMPLES.length >= 2 && EXAMPLES.every(e => assess({ doneWhen: e }).checks.find(c => c.id === 'done').state === 'ok'), 'every example passes its own rule');
+// single line breaks stay breaks: two plain lines are two paragraphs; lists, headings and code are left alone
+assert.equal(keepBreaks('one\ntwo'), 'one\n\ntwo');
+assert.equal(keepBreaks('one\n\ntwo'), 'one\n\ntwo', 'a blank line is already a break');
+assert.equal(keepBreaks('- a\n- b'), '- a\n- b');
+assert.equal(keepBreaks('intro\n- a\n- b'), 'intro\n- a\n- b');
+assert.equal(keepBreaks('# T\nline one\nline two'), '# T\nline one\n\nline two');
+assert.equal(keepBreaks('```\na\nb\n```'), '```\na\nb\n```', 'code is left as written');
+assert.equal(keepBreaks('a\r\nb'), 'a\n\nb');
+assert.equal(keepBreaks(''), '');
 console.log('PASS goal_guide: one outcome, done when, size and the summary');
