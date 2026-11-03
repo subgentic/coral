@@ -19,7 +19,7 @@ const { coralReady } = require('./helpers/wait');
         await waitFor(`!document.getElementById('nav-more-menu').hidden`, 'the menu', 5000);
         await ev(`[...document.querySelectorAll('#nav-more-menu .nav-more-item, #nav-more-menu [role=menuitem]')].find(b => /Settings\\s*$/.test(b.textContent.trim())).click(); true`);
         // a phone's Settings opens on the list of groups: General's row says Theme is inside, and tapping it shows Theme
-        await waitFor(`document.querySelectorAll('#settings-tabs [role=tab]').length === 9 && getComputedStyle(document.getElementById('settings-modal')).display === 'flex'`, 'the nine groups, the dialog open', 10000);
+        await waitFor(`document.querySelectorAll('#settings-tabs [role=tab]').length === 10 && getComputedStyle(document.getElementById('settings-modal')).display === 'flex'`, 'the ten groups (Needs you joined the nine, #12783), the dialog open', 10000);
         const hint = await ev(`getComputedStyle([...document.querySelectorAll('#settings-tabs [role=tab]')].find(t => /General/.test(t.textContent)).querySelector('.settings-tab-name'), '::after').content`);
         assert.ok(/Theme/.test(hint) && /Light/.test(hint), 'General\'s row says what is inside (Theme, Light): ' + hint);
         await ev(`[...document.querySelectorAll('#settings-tabs [role=tab]')].find(t => /General/.test(t.textContent)).click(); true`);
