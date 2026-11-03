@@ -28,13 +28,19 @@ const { coralReady } = require('./helpers/wait');
         console.log('   ✓');
 
         console.log('2. The page asks again (its Messages tab shown): it says the team was deleted, stops polling and the board stays gone');
-        await ev(`window.__after = []; { const R = window.fetch; window.fetch = (u, o) => { if (String(u).includes(${JSON.stringify(api)})) window.__after.push((o && o.method || 'GET') + ' ' + String(u)); return R(u, o); }; }
+        // The board's poll is one 10 s interval (board_poll.js). Record the 10 s intervals this page starts and the ones it clears, so "stops polling" is checked directly, not by waiting out several periods (#13016).
+        await ev(`window.__polls = []; window.__cleared = new Set(); { const S = window.setInterval, C = window.clearInterval;
+            window.setInterval = (fn, ms, ...a) => { const id = S(fn, ms, ...a); if (ms === 10000) window.__polls.push(id); return id; };
+            window.clearInterval = id => { window.__cleared.add(id); return C(id); }; }
+            window.__after = []; { const R = window.fetch; window.fetch = (u, o) => { if (String(u).includes(${JSON.stringify(api)})) window.__after.push((o && o.method || 'GET') + ' ' + String(u)); return R(u, o); }; }
             import((window.__coralStatic || '/static/') + 'message_board.js').then(m => m.showBoardInPage(${JSON.stringify(B)}, document.getElementById('mb-board').parentElement)).then(() => true)`);
         await waitFor(`(document.getElementById('mb-messages') || {}).textContent === 'This team was deleted.'`, 'the deleted-team words', 8000);
         const seen = await ev(`window.__after.length`);
         await new Promise(r => setTimeout(r, 1500)); // sleep-ok: node-side wait to see that nothing more goes out
         assert.equal(await ev(`window.__after.filter(x => x.startsWith('POST') || x.startsWith('PUT')).length`), 1, 'one subscribe was sent and refused; no write after it');
         assert.ok((await ev(`window.__after.length`)) - seen <= 2, 'and the page is not polling the board');
+        assert.ok((await ev(`window.__polls.length`)) >= 1, 'showing the board started its 10 s poll');
+        assert.equal(await ev(`window.__polls.every(id => window.__cleared.has(id))`), true, 'and the page cleared every 10 s interval it started: the deleted-team page does not poll (#13016)');
         assert.equal(await listed(), false, 'nothing started the board again');
         console.log('   ✓');
 
