@@ -289,6 +289,18 @@ func TestMachineLaunchPinsTheCoralDigest(t *testing.T) {
 	if code := runMachine(base("9.9.9"), strings.NewReader(""), &out, &errb); code != 2 || !strings.Contains(errb.String(), "2.0.3") || !strings.Contains(errb.String(), "pins") {
 		t.Fatalf("the refusal names the versions this build pins: exit %d %q", code, errb.String())
 	}
+	// the build's own version (no --coral-version) with no row: too new for this build to pin
+	{
+		prev := config.Version
+		config.Version = "9.9.9"
+		defer func() { config.Version = prev }()
+		own := []string{"launch", "--provider", "digitalocean", "--token-file", tf, "--hub-key-file", kf, "--hub-url", "https://hub.example", "--yes"}
+		out.Reset()
+		errb.Reset()
+		if code := runMachine(own, strings.NewReader(""), &out, &errb); code != 2 || !strings.Contains(errb.String(), "too new for this build to pin") || !strings.Contains(errb.String(), "--coral-version") {
+			t.Fatalf("the build's own version says it is too new and to pass --coral-version: exit %d %q", code, errb.String())
+		}
+	}
 	for name, args := range map[string][]string{
 		"a version with no pinned digest and none given": base("9.9.9"),
 		"one digest only":          base("9.9.9", "--coral-sha256-amd64", strings.Repeat("ab", 32)),

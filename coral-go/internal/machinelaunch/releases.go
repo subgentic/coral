@@ -42,10 +42,15 @@ func PinnedVersions() []string {
 	return out
 }
 
-// NoPinnedDigestWords is the refusal for a version with no pinned digest: the way out (the person's own digests, from a SHA256SUMS they checked) and the versions this build does pin. A build cannot pin its
-// own release (the digest does not exist until the release is made), so the newest CLI always meets this for its own version until a later build pins it.
-func NoPinnedDigestWords(version string) string {
-	return fmt.Sprintf("this build has no pinned digest for Coral %s: pass --coral-sha256-amd64 and --coral-sha256-arm64, the two Linux lines of that release's SHA256SUMS.txt (check the file first), or launch a version this build pins (it pins %s)", version, strings.Join(PinnedVersions(), ", "))
+// NoPinnedDigestWords is the refusal for a version with no pinned digest: the way out (a pinned version, or the person's own digests from a SHA256SUMS they checked) and the versions this build does pin. own says
+// the version is this build's own, which the person did not ask for: a build cannot pin its own release (the digest does not exist until the release is made), so the newest CLI always meets this for itself and
+// the words say so, and to pass --coral-version of a pinned one.
+func NoPinnedDigestWords(version string, own bool) string {
+	pinned := strings.Join(PinnedVersions(), ", ")
+	if own {
+		return fmt.Sprintf("Coral %s, this build's own release, is too new for this build to pin its digest (a release's digest does not exist until the release is made, so a later build pins it): pass --coral-version of a release this build pins (it pins %s), or pass --coral-sha256-amd64 and --coral-sha256-arm64, the two Linux lines of that release's SHA256SUMS.txt (check the file first)", version, pinned)
+	}
+	return fmt.Sprintf("this build has no pinned digest for Coral %s: pass --coral-sha256-amd64 and --coral-sha256-arm64, the two Linux lines of that release's SHA256SUMS.txt (check the file first), or launch a version this build pins (it pins %s)", version, pinned)
 }
 
 // Valid reports whether both digests are 64 lower-case hex digits.

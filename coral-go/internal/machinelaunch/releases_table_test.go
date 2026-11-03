@@ -46,8 +46,21 @@ func TestPinnedVersionsAreListedSortedAndTheLaunchRefusalNamesThem(t *testing.T)
 			t.Errorf("%s is listed but not pinned", v)
 		}
 	}
-	words := NoPinnedDigestWords("9.9.9")
+	words := NoPinnedDigestWords("9.9.9", false)
 	if !strings.Contains(words, "9.9.9") || !strings.Contains(words, "--coral-sha256-amd64") || !strings.Contains(words, strings.Join(got, ", ")) {
 		t.Errorf("the refusal names the version, the way out and the pinned versions: %q", words)
+	}
+}
+
+// The build's own version with no row (the newest CLI, always) says it is too new to pin and to pass --coral-version of a pinned one (#12623, Security); a version the person asked for does not say "too new".
+func TestTheBuildsOwnVersionWithNoRowSaysItIsTooNewForThisBuildToPin(t *testing.T) {
+	own := NoPinnedDigestWords("9.9.9", true)
+	for _, want := range []string{"9.9.9", "this build's own release", "too new for this build to pin", "--coral-version", strings.Join(PinnedVersions(), ", "), "--coral-sha256-amd64"} {
+		if !strings.Contains(own, want) {
+			t.Errorf("the own-version refusal lacks %q: %q", want, own)
+		}
+	}
+	if asked := NoPinnedDigestWords("9.9.9", false); strings.Contains(asked, "too new") || strings.Contains(asked, "own release") {
+		t.Errorf("a version the person asked for is not 'too new': %q", asked)
 	}
 }
