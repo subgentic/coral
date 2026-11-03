@@ -148,7 +148,7 @@ async function importFile(file, scriptsAcked, acknowledgeSecret) {
 // ── the approval view ──────────────────────────────────────────────────
 function drawDetail() {
     const page = el('div', 'skills-page');
-    const back = button('btn btn-small', 'All skills', async () => { open = null; await loadList(); draw(); loadSkillsBadge(); });
+    const back = button('btn btn-small', 'Back to ' + (folder ? FOLDER_LABEL[folder] : 'all skills'), async () => { open = null; await loadList(); draw(); loadSkillsBadge(); });
     const top = el('div', 'skills-head'); top.append(back); page.append(top);
     if (open.error) { const p = el('p', 'skills-error', open.error); p.setAttribute('role', 'alert'); page.append(p); return page; }
     if (!open.data) { page.append(el('p', 'skills-note', 'Loading…')); return page; }
