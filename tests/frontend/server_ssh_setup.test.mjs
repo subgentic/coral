@@ -265,7 +265,7 @@ for (const [phase, word] of [['done', /Done/], ['failed', /did not|could not|Cou
 {
     hub(); planKind = 'upgrade';
     const help = ['# To see why, and to start it yourself, sign in to that computer and run these lines.', 'tail -n 40 ~/.coral-server/coral.log', 'kill "$(cat ~/.coral-server/coral.pid)"',
-        'nohup ~/.coral-server/2.0.10/root/coral --host 127.0.0.1 --port 8420 <img src=x onerror=alert(1)> & echo $! > ~/.coral-server/coral.pid', '# Then choose Upgrade here again.'];
+        'start-the-release-line <img src=x onerror=alert(1)> & echo started', '# Then choose Upgrade here again.'];
     globalThis.fetch = async (url, init = {}) => {
         const json = (d, status = 200) => new Response(JSON.stringify(d), { status, headers: { 'Content-Type': 'application/json' } });
         if (url === '/api/servers/provision/options') return json(options);
@@ -296,7 +296,7 @@ for (const [phase, word] of [['done', /Done/], ['failed', /did not|could not|Cou
     assert.equal(cleanDataDir('  ~/.coral/ '), '.coral', 'a typed ~/ and a trailing slash are dropped');
     assert.equal(cleanDataDir('/x/y'), 'x/y');
     for (const ok of ['', '.coral', 'my-coral/data', '.coral-server/data']) assert.equal(dataDirOk(ok), true, ok);
-    for (const bad of ['..', '../x', 'a/../b', 'a..b', 'my..coral/data', 'x/y..', 'a.', 'a b', 'a;b', '-x', '$HOME', 'a//b', 'a/b/c/d/e/f', '.ssh', '.ssh/x', '.gnupg', '.config/coral']) assert.equal(dataDirOk(bad), false, bad);
+    for (const bad of ['..', '../x', 'a/../b', 'a..b', 'my..coral/data', 'x/y..', 'a.', 'a b', 'a;b', '-x', '$HOME', 'a//b', 'a/b/c/d/e/f', '.ssh', '.ssh/x', '.gnupg', '.config/data']) assert.equal(dataDirOk(bad), false, bad);
     assert.match(dataDirProblem('.ssh'), /keys or settings/, 'a folder of keys says why');
     assert.match(dataDirProblem('../x'), /plain folder names/, 'a bad name says why');
     assert.equal(dataDirOk('.ssh-old') && dataDirOk('myconfig/.config'), true, 'only a first name of .ssh, .gnupg or .config is refused');
