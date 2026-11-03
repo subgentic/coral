@@ -7,9 +7,12 @@ const path = require('node:path');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { coralReady } = require('./helpers/wait');
+const { safePaused } = require('./helpers/paused');
 
 const SOURCE = fs.readFileSync(path.join(__dirname, '../../coral-go/cmd/coral-app/downloads.go'), 'utf8');
 const SCRIPT = SOURCE.slice(SOURCE.indexOf('`', SOURCE.indexOf('const downloadInterceptScript')) + 1, SOURCE.lastIndexOf('`'));
+const LINKS_SOURCE = fs.readFileSync(path.join(__dirname, '../../coral-go/cmd/coral-app/links.go'), 'utf8');
+const LINKS_SCRIPT = LINKS_SOURCE.slice(LINKS_SOURCE.indexOf('`', LINKS_SOURCE.indexOf('const linkInterceptScript')) + 1, LINKS_SOURCE.lastIndexOf('`'));
 assert.ok(/coral:native-download/.test(SCRIPT), "the app's script was read from downloads.go");
 
 (async () => {
@@ -18,7 +21,7 @@ assert.ok(/coral:native-download/.test(SCRIPT), "the app's script was read from 
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         // before the page's own scripts: the native flag, the stand-in native save, and the app's download script
-        await Page.addScriptToEvaluateOnNewDocument({ source: `window.__CORAL_APP__ = true; window.__saved = []; window.__told = []; window.addEventListener('coral:native-download', e => window.__told.push(e.detail)); window._coralSaveFile = async (name, b64) => { window.__saved.push([name, atob(b64)]); return '/tmp/dl/' + name; };\n${SCRIPT}` });
+        await Page.addScriptToEvaluateOnNewDocument({ source: `window.__CORAL_APP__ = true; window.__saved = []; window.__opened = []; window._coralOpenExternal = u => window.__opened.push(u); window.__told = []; window.addEventListener('coral:native-download', e => window.__told.push(e.detail)); window._coralSaveFile = async (name, b64) => { window.__saved.push([name, atob(b64)]); return '/tmp/dl/' + name; };\n${LINKS_SCRIPT}\n${SCRIPT}` });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         const before = await ev(`location.pathname`);
         // the person's click on <a download> (the Download button of an artifact is one)
@@ -31,14 +34,58 @@ assert.ok(/coral:native-download/.test(SCRIPT), "the app's script was read from 
         assert.ok(/ok|status/i.test(first[1]), 'with the bytes the server answered: ' + first[1].slice(0, 80));
         await waitFor(`[...document.querySelectorAll('.toast, .notification-toast')].some(t => /Saved to Downloads: health\\.json/.test(t.textContent))`, 'the toast says where it went', 6000);
         assert.equal(await ev(`location.pathname`), before, 'the page did not navigate away');
+        // The actual oversized HTML fallback has target=_blank. Both native init
+        // scripts must be present: the external-link listener used to run first.
+        const digest = 'a'.repeat(64), downloadRequests = [];
+        await client.Network.enable();
+        await client.Network.setCookie({ name: 'native_download_session_proof', value: 'window-only', url: BASE, httpOnly: true, sameSite: 'Lax' });
+        await client.Fetch.enable({ patterns: [{ urlPattern: BASE + '/api/artifacts/' + digest + '*' }] });
+        safePaused(client, async ({ requestId, request }) => {
+            downloadRequests.push(request);
+            await client.Fetch.fulfillRequest({ requestId, responseCode: 200, responseHeaders: [
+                { name: 'Content-Type', value: 'text/html' },
+                { name: 'Content-Disposition', value: 'attachment; filename="before-and-after.html"' }
+            ], body: Buffer.from('<html>session-protected report</html>').toString('base64') });
+        });
+        await ev(`(async () => {
+            const { renderArtifact } = await import('/static/artifact_preview.js');
+            const fetchOriginal = window.fetch;
+            let preview = true;
+            window.fetch = (url, opts) => {
+                if (preview && String(url).includes('${digest}')) {
+                    preview = false;
+                    return Promise.resolve(new Response('', { headers: { 'Content-Type': 'text/html', 'Content-Length': String(3 * 1024 * 1024) } }));
+                }
+                return fetchOriginal(url, opts);
+            };
+            const body = document.createElement('div'); body.id = 'oversized-report';
+            body.style.cssText = 'position:fixed;left:200px;top:20px;width:400px;z-index:99999;background:#fff;color:#000';
+            document.body.append(body);
+            try { await renderArtifact(body, 'coral://artifacts/${digest}', { filename: 'Before and after', mediaType: 'text/html' }, { signal: new AbortController().signal, isStale: () => false }); }
+            finally { window.fetch = fetchOriginal; }
+            return true;
+        })()`);
+        assert.match(await ev(`document.getElementById('oversized-report').textContent`), /Preview is limited/);
+        const point = await ev(`(() => { const a = document.querySelector('#oversized-report a[download]'); const r = a.getBoundingClientRect(); return { x:r.x+r.width/2, y:r.y+r.height/2, target:a.target }; })()`);
+        assert.equal(point.target, '_blank');
+        await client.Input.dispatchMouseEvent({ type: 'mousePressed', x: point.x, y: point.y, button: 'left', clickCount: 1 });
+        await client.Input.dispatchMouseEvent({ type: 'mouseReleased', x: point.x, y: point.y, button: 'left', clickCount: 1 });
+        await waitFor(`window.__saved.length === 2`, 'the oversized HTML fallback reached native save', 8000);
+        assert.deepEqual(await ev(`window.__opened`), [], 'no system browser opened');
+        assert.deepEqual(await ev(`window.__saved[1]`), ['before-and-after.html', '<html>session-protected report</html>']);
+        assert.equal(downloadRequests.length, 1, 'one download request');
+        const cookie = Object.entries(downloadRequests[0].headers).find(([name]) => name.toLowerCase() === 'cookie')?.[1] || '';
+        assert.match(cookie, /native_download_session_proof=window-only/, 'the app window session accompanies the download');
+        assert.equal(await ev(`location.pathname`), before, 'the fallback did not navigate the page');
+        await client.Fetch.disable();
         // a script's click on a link that is not in the page (how the exports and the manifest download work): a blob: address
         await ev(`(() => { const blob = new Blob(['{"a":1}'], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'export.json'; a.click(); return true; })()`);
-        await waitFor(`window.__saved.length === 2`, 'a script click on a blob link reached the native save', 8000, `window.__told`);
-        assert.deepEqual(await ev(`window.__saved[1]`), ['export.json', '{"a":1}'], 'the blob content, under its name');
+        await waitFor(`window.__saved.length === 3`, 'a script click on a blob link reached the native save', 8000, `window.__told`);
+        assert.deepEqual(await ev(`window.__saved[2]`), ['export.json', '{"a":1}'], 'the blob content, under its name');
         // a link that is not a download is left alone
         await ev(`(() => { const a = document.createElement('a'); a.href = '#plain'; a.id = 'plain'; a.click(); return true; })()`);
         await ev(`new Promise(r => setTimeout(r, 300))`); // sleep-ok: a wrongly intercepted link would have been saved by now
-        assert.equal(await ev(`window.__saved.length`), 2, 'a link that is not a download is not saved');
+        assert.equal(await ev(`window.__saved.length`), 3, 'a link that is not a download is not saved');
         // the app says why when the save fails
         await ev(`window._coralSaveFile = async () => { throw new Error('the Downloads folder is not writable'); }; document.getElementById('dl-test').click(); true`);
         await waitFor(`[...document.querySelectorAll('.toast, .notification-toast')].some(t => /Could not save the download: the Downloads folder is not writable/.test(t.textContent))`, 'a failed save is said', 6000);

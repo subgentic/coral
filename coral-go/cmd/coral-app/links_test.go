@@ -10,7 +10,7 @@ import (
 )
 
 // linkClick runs linkInterceptScript in node against a page at pageURL and returns what a click on a link with this href and target did.
-func linkClick(t *testing.T, node, pageURL, href, target string) (prevented bool, opened []string, navigatedHere bool) {
+func linkClick(t *testing.T, node, pageURL, href, target string, nativeDownload ...bool) (prevented bool, opened []string, navigatedHere bool) {
 	t.Helper()
 	harness := `
 const page = new URL(process.argv[1]);
@@ -20,12 +20,20 @@ global.document = { addEventListener: (type, fn) => { if (type === 'click') hand
 global.window = { open: u => opened.push(u) };
 global._coralOpenExternal = u => opened.push(u);
 window._coralOpenExternal = global._coralOpenExternal;
+if (process.argv[5] === 'native') window._coralSaveFile = () => {};
 eval(process.argv[2]);
 let prevented = false;
-const anchor = { getAttribute: () => process.argv[3], target: process.argv[4] };
+const anchor = { getAttribute: () => process.argv[3], hasAttribute: () => process.argv[5] !== 'plain', target: process.argv[4] };
 handler({ target: { closest: () => anchor }, preventDefault: () => { prevented = true; } });
 console.log(JSON.stringify({ prevented, opened }));`
-	out, err := exec.Command(node, "-e", harness, pageURL, linkInterceptScript, href, target).CombinedOutput()
+	mode := "plain"
+	if len(nativeDownload) > 0 {
+		mode = "no-native"
+		if nativeDownload[0] {
+			mode = "native"
+		}
+	}
+	out, err := exec.Command(node, "-e", harness, pageURL, linkInterceptScript, href, target, mode).CombinedOutput()
 	if err != nil {
 		t.Fatalf("node: %v\n%s", err, out)
 	}
@@ -78,5 +86,32 @@ func TestLinkInterceptScript(t *testing.T) {
 		if strings.Join(opened, "|") != strings.Join(want, "|") {
 			t.Errorf("%s: opened %v, want %v", c.name, opened, want)
 		}
+	}
+}
+
+// Download priority does not broaden the native binding to another origin or scheme.
+func TestDownloadLinkPolicyBoundary(t *testing.T) {
+	node, err := exec.LookPath("node")
+	if err != nil {
+		t.Skip("node is not installed")
+	}
+	for _, c := range []struct {
+		name, href        string
+		native, prevented bool
+		opened            string
+	}{
+		{"native same-origin download", "/api/artifacts/abc", true, false, ""},
+		{"no native binding", "/api/artifacts/abc", false, true, "http://localhost:8420/api/artifacts/abc"},
+		{"external download", "https://example.invalid/report.html", true, true, "https://example.invalid/report.html"},
+		{"look-alike origin", "http://localhost:8420@evil.example/report.html", true, true, "http://localhost:8420@evil.example/report.html"},
+		{"local file", "file:///tmp/report.html", true, true, ""},
+		{"script", "javascript:alert(1)", true, true, ""},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			prevented, opened, _ := linkClick(t, node, "http://localhost:8420/inbox", c.href, "_blank", c.native)
+			if prevented != c.prevented || strings.Join(opened, "|") != c.opened {
+				t.Fatalf("prevented=%v opened=%v", prevented, opened)
+			}
+		})
 	}
 }
