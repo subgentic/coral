@@ -1,13 +1,17 @@
 package tmux
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"io"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/subgentic/coral/internal/logsafe"
 )
@@ -22,6 +26,19 @@ var (
 	stagedMu   sync.Mutex
 	stagedBins = map[string]string{} // staged copy -> the bundled tmux's terminfo folder
 )
+
+// canRun is whether the copy at path can be run at all: it is started once with -V. A tmux that starts and exits with an error did run (a test's stand-in does that); one the system refuses to start
+// (no execute permission, a format or a signature macOS rejects) or kills with a signal did not. A variable so a test can fake a refusal.
+var canRun = func(path string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	err := exec.CommandContext(ctx, path, "-V").Run()
+	var ee *exec.ExitError
+	if errors.As(err, &ee) && ee.ExitCode() >= 0 {
+		return nil
+	}
+	return err
+}
 
 // stageTmux copies the bundled tmux bin into <coralDir>/tmux-bin/tmux-<hash of its contents> (once) and returns the copy's path, or "" when it cannot (the caller keeps using bin). The copy is written
 // to a temporary file in the same folder and renamed, so a half-written file never has the name; a folder or file there that is a link is refused.
@@ -44,9 +61,17 @@ func stageTmux(coralDir, bin, terminfoDir string) string {
 		log.Printf("[tmux] staging the bundled tmux: cannot make its folder: %v", err)
 		return ""
 	}
+	if err := os.Chmod(dir, 0o700); err != nil { // a folder made looser by anything else is made private again: nobody else may swap a file in it
+		log.Printf("[tmux] staging the bundled tmux: cannot make its folder private: %v", err)
+		return ""
+	}
 	dst := filepath.Join(dir, "tmux-"+hex.EncodeToString(sum[:8]))
 	if fi, err := os.Lstat(dst); err == nil {
-		if fi.Mode().IsRegular() && fi.Mode()&0o100 != 0 && sameContent(dst, sum) {
+		if fi.Mode().IsRegular() && fi.Mode()&0o100 != 0 && fi.Mode()&0o022 == 0 && sameContent(dst, sum) {
+			if err := canRun(dst); err != nil {
+				log.Printf("[tmux] staging the bundled tmux: its copy %s cannot be run (%v); using the bundled file", logsafe.Path(dst), err)
+				return ""
+			}
 			remember(dst, terminfoDir)
 			return dst
 		}
@@ -71,6 +96,11 @@ func stageTmux(coralDir, bin, terminfoDir string) string {
 	if err := os.Rename(tmp.Name(), dst); err != nil {
 		os.Remove(tmp.Name())
 		log.Printf("[tmux] staging the bundled tmux: cannot name the copy: %v", err)
+		return ""
+	}
+	if err := canRun(dst); err != nil { // the copy is not used, and not kept: a later start may try again
+		os.Remove(dst)
+		log.Printf("[tmux] staging the bundled tmux: the new copy cannot be run (%v); using the bundled file", err)
 		return ""
 	}
 	log.Printf("[tmux] the tmux server will start from its own copy of the bundled tmux: %s", logsafe.Path(dst))

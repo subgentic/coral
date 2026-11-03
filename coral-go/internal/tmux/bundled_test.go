@@ -189,7 +189,12 @@ exit 0`)
 
 	data, err := os.ReadFile(logFile)
 	require.NoError(t, err)
-	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+	var lines []string
+	for _, l := range strings.Split(strings.TrimSpace(string(data)), "\n") {
+		if !strings.Contains(l, "|-V ") { // the one -V NewClient ran to see the staged copy starts, before any operation
+			lines = append(lines, l)
+		}
+	}
 	require.GreaterOrEqual(t, len(lines), 3)
 	for _, line := range lines {
 		parts := strings.Split(line, "|")

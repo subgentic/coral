@@ -92,3 +92,44 @@ func TestNewClientStartsTheBundledTmuxFromItsOwnCopy(t *testing.T) {
 	}
 	assert.True(t, found, "the bundle's terminfo still goes with the copy")
 }
+
+// A copy that cannot be run (macOS refuses it, a signature check, no execute permission) is never used: Coral keeps the bundled file and says so, and agents still start (#12598).
+func TestACopyThatCannotRunFallsBackToTheBundledFile(t *testing.T) {
+	data := t.TempDir()
+	bin := writeTmux(t, t.TempDir(), "echo v1")
+
+	prev := canRun
+	canRun = func(string) error { return os.ErrPermission }
+	t.Cleanup(func() { canRun = prev })
+	assert.Empty(t, stageTmux(data, bin, ""), "a copy that cannot run is not used")
+	entries, _ := os.ReadDir(filepath.Join(data, stagedDir))
+	assert.Empty(t, entries, "and not kept: a later start may try again")
+
+	canRun = prev
+	// The real check: a file that is no program at all cannot be started; a program that starts and exits with an error did run.
+	junk := filepath.Join(t.TempDir(), "tmux")
+	require.NoError(t, os.WriteFile(junk, []byte("not a program"), 0o755))
+	assert.Empty(t, stageTmux(t.TempDir(), junk, ""), "a copy the system will not start falls back")
+	assert.NotEmpty(t, stageTmux(t.TempDir(), writeTmux(t, t.TempDir(), "exit 1"), ""), "one that ran and exited nonzero did run")
+
+	// And one made not executable afterwards is not trusted either.
+	good := stageTmux(data, bin, "")
+	require.NotEmpty(t, good)
+	require.NoError(t, os.Chmod(good, 0o600))
+	assert.Empty(t, stageTmux(data, bin, ""))
+}
+
+func TestTheStagedFolderIsMadePrivateAndAWritableCopyIsNotTrusted(t *testing.T) {
+	data := t.TempDir()
+	bin := writeTmux(t, t.TempDir(), "echo v1")
+	require.NoError(t, os.MkdirAll(filepath.Join(data, stagedDir), 0o777))
+	require.NoError(t, os.Chmod(filepath.Join(data, stagedDir), 0o777))
+	good := stageTmux(data, bin, "")
+	require.NotEmpty(t, good)
+	fi, err := os.Stat(filepath.Join(data, stagedDir))
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o700), fi.Mode().Perm(), "the folder is forced to owner-only")
+
+	require.NoError(t, os.Chmod(good, 0o770)) // group-writable: someone else could have changed it
+	assert.Empty(t, stageTmux(data, bin, ""), "a copy others can write is not trusted")
+}
