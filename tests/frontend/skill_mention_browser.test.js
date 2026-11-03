@@ -11,9 +11,10 @@ const SKILLS = [
     { id: 'b'.repeat(32), name: 'abacus-math', version: 1, description: 'Do sums with care' },
     { id: 'c'.repeat(32), name: 'release-notes', version: 1, description: 'Write the release notes' },
 ];
-const STUB = `(() => { window.__skillSearches = []; window.__skillAttach = []; window.__skillMode = 'some'; window.__skillGate = null; window.__remoteSearch = []; const R = window.fetch; const json = (b, s = 200) => Promise.resolve(new Response(JSON.stringify(b), { status: s, headers: { 'Content-Type': 'application/json' } }));
+const STUB = `(() => { window.__skillSearches = []; window.__skillAttach = []; window.__skillMode = 'some'; window.__skillGate = null; window.__listGate = null; window.__remoteSearch = []; const R = window.fetch; const json = (b, s = 200) => Promise.resolve(new Response(JSON.stringify(b), { status: s, headers: { 'Content-Type': 'application/json' } }));
     window.fetch = (u, o) => { const url = new URL(String(u), location.href);
         if (/^\\/api\\/remote\\/[^/]+\\/api\\/skills\\/search$/.test(url.pathname)) { window.__remoteSearch.push(url.pathname); return json({ error: 'access_mode' }, 403); } // another computer: the Hub refuses
+        if (url.pathname === '/api/skills/search' && !url.searchParams.get('q') && window.__listGate) return window.__listGate.then(() => json({ skills: ${JSON.stringify(SKILLS)} })); // the list's answer, held
         if (url.pathname === '/api/skills/search') { const q = (url.searchParams.get('q') || '').toLowerCase(); window.__skillSearches.push(q);
             const all = ${JSON.stringify(SKILLS)}; return json({ skills: window.__skillMode === 'none' ? [] : all.filter(s => !q || (s.name + ' ' + s.description).toLowerCase().includes(q)) }); }
         if (/\\/api\\/sessions\\/live\\/[^/]+\\/skills$/.test(url.pathname) && o && o.method === 'POST') { const b = JSON.parse(o.body); window.__skillAttach.push({ path: url.pathname, session_id: url.searchParams.get('session_id'), skill_id: b.skill_id });
@@ -61,7 +62,7 @@ const STUB = `(() => { window.__skillSearches = []; window.__skillAttach = []; w
             await waitFor(`/Use the skill abacus-math/.test(document.getElementById('command-input').value)`, `${tag}: the line is inserted`, 4000);
             check(`${tag}: "$ab" is replaced by the route's line and a space`, (await value()) === 'Use the skill abacus-math (coral-agent skills get --id ' + 'b'.repeat(32) + ').' + ' ', await value());
             const att = await ev(`window.__skillAttach`);
-            check(`${tag}: one attach, for this agent and the picked skill`, att.length === 1 && att[0].path === '/api/sessions/live/sk-a/skills' && att[0].session_id === 'sk-a-id' && att[0].skill_id === 'b'.repeat(32), JSON.stringify(att));
+            check(`${tag}: one attach, for this agent and the picked skill`, att.length === 1 && att[0].path === '/api/sessions/live/claude-sk-a-id/skills' && att[0].session_id === 'sk-a-id' && att[0].skill_id === 'b'.repeat(32), JSON.stringify(att));
             await closed();
 
             // a tap picks too
@@ -81,6 +82,19 @@ const STUB = `(() => { window.__skillSearches = []; window.__skillAttach = []; w
             await new Promise(r => setTimeout(r, 500)); // sleep-ok: as above
             check(`${tag}: a $ inside a word opens no menu`, (await menu()) === null);
             check(`${tag}: and nothing was attached`, (await ev(`window.__skillAttach.length`)) === 0);
+
+            // the list's answer comes late: it is filtered by what was typed meanwhile, not by the words it was asked with
+            await clear(); await ev(`window.__listGate = new Promise(r => { window.__listRelease = r; }); true`);
+            await type('$'); await type('rel'); await new Promise(r => setTimeout(r, 400)); // sleep-ok: nothing is the expected result while the answer is held
+            check(`${tag}: no menu while the list is on its way`, (await menu()) === null);
+            await ev(`window.__listRelease(); window.__listGate = null; true`);
+            await waitFor(shown(1), `${tag}: the late list is filtered by "rel"`, 4000);
+            m = await menu(); check(`${tag}: a late answer shows only what the words now match`, m.rows.length === 1 && /^release-notes/.test(m.rows[0].text), JSON.stringify(m.rows));
+            // a menu closed while its list was on its way is not opened by the answer
+            await clear(); await ev(`window.__listGate = new Promise(r => { window.__listRelease = r; }); true`);
+            await type('$ab'); await key('Escape'); await new Promise(r => setTimeout(r, 200)); // sleep-ok: the menu is closed by the key; the answer is still held
+            await ev(`window.__listRelease(); window.__listGate = null; true`); await new Promise(r => setTimeout(r, 400)); // sleep-ok: nothing is the expected result
+            check(`${tag}: an answer for a menu that was closed opens nothing`, (await menu()) === null);
 
             // the attach is on its way (held in the page) while the person edits or leaves: what the pick was for is fixed at pick time
             const hold = () => ev(`window.__skillGate = new Promise(r => { window.__skillRelease = r; }); window.__skillAttach.length = 0; true`);
