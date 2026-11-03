@@ -18,6 +18,7 @@ Run `coral-agent docs` to list the topics, `coral-agent docs <topic>` to read on
 
 ### Getting Started
 - [How do I...?](how-do-i.md) — Click-by-click answers: add a team member, change the default model, open Coral on your phone, put a team to sleep
+- [Chief: a user guide](chief-guide.md) — The one agent you talk to from your phone: set it up in Settings > Chief, the `/chief` page, how a request reaches the dev team and how answers and approvals come back
 - [Quickstart](quickstart.md) — Install, launch your first agent, and get a committed change
 - [Worked Demos](worked-demos.md) — Three multi-agent scenarios run end to end, with real output
 - [Using the Dashboard](using-the-dashboard.md) — Task-oriented: model and thinking level and the chat-bar chip, Cost by thinking level, the team health monitor, the agent list's Display panel, the sectioned dialogs, image thumbnails
