@@ -643,6 +643,12 @@ func (h *SessionsHandler) createArtifactComment(w http.ResponseWriter, r *http.R
 		return
 	}
 	anchorJSON := ""
+	if team, sid, _, isDiff := parseDiffSubject(id); isDiff {
+		if n, err := h.ss.CountCommentsUnder(r.Context(), "diff:"+team+":"+sid+":"); err == nil && n >= maxDiffCommentsPerSession {
+			commentRefuse(w, http.StatusConflict, "too_many_comments", "this agent's diff already has the most comments it can hold")
+			return
+		}
+	}
 	if in.ParentID == nil && diffTeamOf(r) != "" {
 		if msg := h.cleanDiffAnchor(r, id, in.Anchor); msg != "" {
 			errBadRequest(w, msg)

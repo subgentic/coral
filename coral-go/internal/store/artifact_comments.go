@@ -273,6 +273,14 @@ func (s *SessionStore) CountArtifactCommentsBy(ctx context.Context, issuer, subj
 	return n, err
 }
 
+// CountCommentsUnder is how many live comments (replies included) are on subjects whose key starts with prefix: the files of one agent's diff (diff:<team>:<session>:, #12536). A prefix match by substr, not LIKE, so a
+// key's underscores are not wildcards.
+func (s *SessionStore) CountCommentsUnder(ctx context.Context, prefix string) (int, error) {
+	var n int
+	err := s.db.GetContext(ctx, &n, `SELECT COUNT(*) FROM artifact_comments WHERE substr(artifact_id, 1, ?) = ? AND deleted_at IS NULL`, len(prefix), prefix)
+	return n, err
+}
+
 // OwnerCommentCount is how many comments the Operator wrote on one day, on one team's files and goals (counts only: the comment's text is never read).
 type OwnerCommentCount struct {
 	Day   string `db:"day"`

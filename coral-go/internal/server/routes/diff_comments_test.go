@@ -169,3 +169,20 @@ func TestTheHubsRouteTableDoesNotMatchADiffKey(t *testing.T) {
 	pattern, mode := tunnel.OwnerRoute("GET", "/api/artifacts/"+cmtDoc+"/comments")
 	assert.True(t, mode.Stamped(), "control: an artifact's comments are in the table (%q)", pattern)
 }
+
+func TestOneSessionsDiffsHoldAtMostSoManyComments(t *testing.T) {
+	old := maxDiffCommentsPerSession
+	maxDiffCommentsPerSession = 2
+	t.Cleanup(func() { maxDiffCommentsPerSession = old })
+	rig := newCmtRig(t)
+	sid := rig.diffRig(1, "Dev", "pkg/a.go", "pkg/b.go")
+	sid2 := rig.diffRig(2, "QA", "pkg/a.go")
+	post := func(sid, p string) int {
+		code, _ := rig.do("POST", cp(diffSubject("team-a", sid, p)), cmtAsOwner, map[string]any{"body": "Q", "anchor": diffAnchor(p, nil)})
+		return code
+	}
+	assert.Equal(t, http.StatusCreated, post(sid, "pkg/a.go"))
+	assert.Equal(t, http.StatusCreated, post(sid, "pkg/b.go"), "the cap counts the session's files together")
+	assert.Equal(t, http.StatusConflict, post(sid, "pkg/a.go"), "a third comment on the session's diffs is refused")
+	assert.Equal(t, http.StatusCreated, post(sid2, "pkg/a.go"), "another session has its own room")
+}

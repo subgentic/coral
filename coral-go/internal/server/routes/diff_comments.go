@@ -37,6 +37,9 @@ const (
 	maxDiffPath       = 1024
 )
 
+// maxDiffCommentsPerSession is the live comments one agent session's diffs hold in all (the store caps one file's key at store.MaxArtifactComments), so one session cannot fill the table (#12536, Security's point 5). A var so a test can lower it.
+var maxDiffCommentsPerSession = 200
+
 // diffSubjectRe is a diff's subject key: diff:<team>:<session id>:<16 hex>, the team as commentBoardRe has it.
 var diffSubjectRe = regexp.MustCompile(`^diff:([A-Za-z0-9][A-Za-z0-9_.-]{0,63}):([A-Za-z0-9][A-Za-z0-9_-]{5,63}):([0-9a-f]{16})$`)
 
