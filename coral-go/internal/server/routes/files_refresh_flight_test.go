@@ -41,3 +41,13 @@ func TestRefreshFlightFreshAsksForANewPassButTheDefaultReusesASlowOne(t *testing
 	require.Equal(t, 2, runs, "Refresh runs a new pass")
 	require.Equal(t, 2, r.total)
 }
+
+// QA's SHOULD 6 on #13079: two agents in one folder, known by name with no session id, are not one pass.
+func TestRefreshFlightKeyKeepsAgentsInOneFolderApart(t *testing.T) {
+	a := refreshFlightKey("/work/repo", "branch_point", "", false, "agent-a")
+	b := refreshFlightKey("/work/repo", "branch_point", "", false, "agent-b")
+	require.NotEqual(t, a, b, "two agents of one folder with no session id do not share a pass")
+	require.Equal(t, a, refreshFlightKey("/work/repo", "branch_point", "", false, "agent-a"), "the same agent asking again does")
+	require.NotEqual(t, a, refreshFlightKey("/work/repo", "branch_point", "", true, "agent-a"), "a followed worktree is its own pass")
+	require.NotEqual(t, a, refreshFlightKey("/work/repo", "main_head", "", false, "agent-a"), "and so is another mode")
+}
