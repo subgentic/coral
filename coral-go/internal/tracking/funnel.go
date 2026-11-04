@@ -50,7 +50,7 @@ const (
 	OpenBrowser            = "opened"                         // the browser was asked to open the sign-in link
 	OpenNativeWindow       = "native_window"                  // the Coral window opened
 	OpenNativeFallback     = "native_window_fallback_browser" // the Coral window could not open; the browser was asked instead
-	OpenPrintedNoDisplay   = "printed_no_display"             // no display: the link was printed in the terminal
+	OpenPrintedNoDisplay   = "printed_no_display"             // the link was printed in the terminal: no display, or no browser opener started (WSLg with no xdg-open)
 	OpenSkippedNoBrowser   = "skipped_no_browser_flag"        // --no-browser: nothing was opened
 	OpenBackgroundStart    = "background_start"               // a start nobody asked for (a login item, an update's relaunch): no window
 	OpenServerNotRunning   = "server_not_running"             // the server had not started, so no window
