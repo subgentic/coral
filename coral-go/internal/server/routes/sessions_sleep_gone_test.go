@@ -3,6 +3,7 @@ package routes
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 	"testing"
@@ -96,4 +97,21 @@ func TestAnAgentWhoseTerminalIsGoneIsFiledUnderSleepingOneByOneOrInBulk(t *testi
 	assert.EqualValues(t, 0, out["sessions_affected"], "an empty list names no one")
 	code, _ = post("/api/sessions/live/sleep-gone", `not json`)
 	assert.Equal(t, http.StatusBadRequest, code)
+
+	// at most 500 agents at once: 501 is refused and moves none, 500 is taken
+	require.NoError(t, ss.SetSessionSleepingFor(ctx, c, store.SleepReasonTerminalGone))
+	ids := make([]string, 501)
+	for i := range ids {
+		ids[i] = fmt.Sprintf("00000000-0000-4000-8000-%012d", 1000+i)
+	}
+	ids[0] = c
+	raw, _ := json.Marshal(map[string]any{"session_ids": ids})
+	code, _ = post("/api/sessions/live/sleep-gone", string(raw))
+	assert.Equal(t, http.StatusBadRequest, code, "501 ids is over the cap")
+	_, reason, _, _ = state(c)
+	assert.Equal(t, store.SleepReasonTerminalGone, reason, "a refused request moved no one")
+	raw, _ = json.Marshal(map[string]any{"session_ids": ids[:500]})
+	code, out = post("/api/sessions/live/sleep-gone", string(raw))
+	assert.Equal(t, http.StatusOK, code, "500 ids is taken")
+	assert.EqualValues(t, 1, out["sessions_affected"])
 }
