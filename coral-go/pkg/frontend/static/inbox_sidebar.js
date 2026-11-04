@@ -225,7 +225,7 @@ let needsFilters = NF.loadFilters(), needsBar = null;
 const NO_GOAL = 'No goal';
 const goalLabel = s => (s.goal && s.goal.id && s.goal.title ? String(s.goal.title) : NO_GOAL); // the goal a row's task serves (a review's artifact roll-up, #8579; an agent's task, #7302), or the words for none
 const needsCtx = { text: needsText, teamOf, nameOf: needsName, goalOf: goalLabel };
-const orderedNeeds = () => NF.ordered(allNeeds().filter(s => NF.matches(s, s.queried ? { ...needsFilters, q: '', team: '', agent: '', longer: '' } : needsFilters, needsCtx) && serverMatches(s, needsFilters)), needsFilters, s => (BL ? BL.weightOf(waitsOf(s)) : 0));
+const orderedNeeds = () => NF.ordered(allNeeds().filter(s => NF.matches(s, s.queried ? { ...needsFilters, q: '', team: '', agent: needsFilters.agent === 'Unknown agent' ? needsFilters.agent : '', longer: '' } : needsFilters, needsCtx) && serverMatches(s, needsFilters)), needsFilters, s => (BL ? BL.weightOf(waitsOf(s)) : 0));
 let needsOrder = null; // what the person has seen, in its order (#12636): a computer that answers late adds its rows at the end, it never moves the ones under the finger
 const needsKey = s => `${sessionServer(s)}:${s.session_id}`;
 const filteredNeeds = () => { const kept = NF.keepOrder(orderedNeeds(), needsKey, needsOrder, JSON.stringify([needsFilters, queries.needs])); needsOrder = kept.memory; return kept.rows; };

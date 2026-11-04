@@ -12,6 +12,7 @@ let items = [], saved = [], muted = [], errors = [], pending = null, lastRead = 
 let activated = false;
 // One row per artifact (#11533): versions (same uploader, team, name) are one item, the newest, with `earlier`.
 const vkey = a => (a.session_id || a.produced_by) ? JSON.stringify([a.team, a.session_id, a.produced_by, a.name]) : a.reviewKey; // a JSON array: no name or id can run into the next field
+const UNKNOWN_AGENT = 'Unknown agent'; // what the page calls a file's producer when it has none (the group and the agent filter)
 const byAge = (a, b) => String(a.created_at).localeCompare(String(b.created_at)) || a.reviewKey.localeCompare(b.reviewKey);
 /** The versions older than `row`, still for review. */
 export const earlierVersions = row => { const key = row.reviewKey || `${row.team}:${row.id}`, pool = saved.some(a => a.reviewKey === key) ? saved : items, me = pool.find(a => a.reviewKey === key) || row; return pool.filter(a => a.reviewKey !== key && vkey(a) === vkey(me) && byAge(a, me) < 0); }; // in the list the row is in: Needs you's, or Saved's (#11937)
@@ -65,7 +66,7 @@ export function reviewGroups(rows) {
     const groups = new Map();
     for (const row of rows) {
         const key = `${splitKey(row.team).server}:${row.session_id || row.produced_by || row.team}`;
-        if (!groups.has(key)) groups.set(key, { name: row.produced_by || 'Unknown agent', rows: [], more: [] });
+        if (!groups.has(key)) groups.set(key, { name: row.produced_by || UNKNOWN_AGENT, rows: [], more: [] });
         const group = groups.get(key);
         (group.rows.length < 10 ? group.rows : group.more).push(row);
     }
@@ -110,7 +111,7 @@ export const reviewQueryKey = f => { const v = viewParts(f); return (v.q || v.te
 export function reviewQueryParams(f, now = Date.now()) {
     const v = viewParts(f), p = new URLSearchParams({ tag: 'for review', limit: '50', versions: 'newest' });
     if (v.q) p.set('q', v.q);
-    if (v.agent) p.set('by', v.agent);
+    if (v.agent && v.agent !== UNKNOWN_AGENT) p.set('by', v.agent); // the computer's by is who produced or sent a file; the page's name for a file with no producer is not a name it has, so that filter stays the page's (below)
     if (v.longer) p.set('until', new Date(now - Number(v.longer) * 60000).toISOString());
     if (v.oldest) p.set(SORT_PARAM, 'oldest');
     return p;
