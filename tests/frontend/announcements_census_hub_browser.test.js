@@ -12,7 +12,8 @@ const S = `(window.__coralStatic || '/static/')`;
     const { client, Page, Emulation, ev, waitFor } = await connect();
     const scenes = []; const found = [];
     const wait = ms => new Promise(r => setTimeout(r, ms)); // sleep-ok: announcements are timed; there is no event to wait for
-    const scene = async (name, run, { must = [], forbid = [] } = {}) => {
+    const scene = async (name, run, { must = [], forbid = [], before = null } = {}) => {
+        if (before) await before(); // settle the fixture before this scene's announcement window
         await clear(ev);
         try { await run(); } catch (e) { scenes.push({ name, entries: [] }); found.push(`${name}: the scene did not run (${String(e && e.message || e).slice(0, 160)})`); return; }
         await wait(600); // sleep-ok: the last announcement lands
@@ -21,11 +22,16 @@ const S = `(window.__coralStatic || '/static/')`;
         found.push(...problems(name, entries, { forbid }));
         for (const [re, label, count = 1] of must) { const n = said(entries, re).length; if (n !== count) found.push(`${name}: ${label} must be announced ${count === 1 ? 'once' : count + ' times'} (it was ${n})`); }
     };
+    const connectedHub = () => waitFor(`(async () => {
+        const {state} = await import(${S} + 'state.js');
+        return navigator.onLine !== false && state.coralWs?.readyState === 1 && !document.getElementById('connection-bar');
+    })()`, 'the Hub feed connected with its reconnect notice settled', 20000);
     try {
         await setupHubWorld({ client, Page, Emulation, width: 1280, height: 800, mobile: false });
         const run = async tag => {
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
             await waitFor(`typeof window.switchNavTab==='function' && !!window.__coralReady`, 'dashboard'); await coralReady(ev, 'startup', 'liveList', 'settings');
+            await connectedHub();
             await watch(ev);
             await scene(`${tag}: hub: a search is made`, async () => {
                 await ev(`window.switchNavTab('history'); true`);
@@ -59,7 +65,7 @@ const S = `(window.__coralStatic || '/static/')`;
             await scene(`${tag}: hub: the Artifacts tab is opened`, async () => {
                 await ev(`window.switchNavTab('artifacts'); true`);
                 await waitFor(`!!document.getElementById('artifacts-frame')`, 'artifacts frame', 10000);
-            }, { forbid: [/./] }); // the tab says nothing of its own: the hub's page in the frame is its own document
+            }, { before: connectedHub, forbid: [/./] }); // pre-settlement notices are outside this scene; all announcements after opening still fail. The tab says nothing of its own: the hub's page in the frame is its own document
             await scene(`${tag}: hub: toasts`, async () => {
                 await ev(`(async () => { const n = await import(${S} + 'notifications.js'); n.showToast('Saved to the board.'); n.showToast('Could not reach the computer.', true); return true; })()`);
                 await wait(1500); // sleep-ok: the two are said one after the other

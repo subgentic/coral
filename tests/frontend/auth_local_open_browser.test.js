@@ -126,8 +126,8 @@ const ATTACK = {
             if (localOpen(p.reqs).length > 0) return;
             if (state.includedStatus === 200 && state.cookieLessStatus === 401) throw new Error('session still alive after reset-password --clear: ' + await diagnostics(p,state));
             let leftAuth = false;
-            try { const u = new URL(typeof result === 'string' ? result : state.url); leftAuth = u.origin === base.origin && !u.pathname.startsWith('/auth'); } catch { /* no usable URL */ }
-            if (attempt === 0 && leftAuth && Date.now() < deadline) { await p.c.Page.navigate({url:BASE+'/auth'}); continue; }
+            for (const raw of [result,state.url]) { try { const u = new URL(raw); leftAuth ||= u.origin === base.origin && !u.pathname.startsWith('/auth'); } catch { /* no usable URL */ } }
+            if (attempt === 0 && (leftAuth || (error && isNavigationError(error))) && Date.now() < deadline) { await p.c.Page.navigate({url:BASE+'/auth'}); continue; }
             if (error && !isNavigationError(error)) throw error;
             throw new Error('local-open was not clicked within its two-navigation cap: ' + await diagnostics(p,state));
         }
@@ -190,6 +190,9 @@ const ATTACK = {
                 const { c: own, ev } = p;
                 await own.Page.navigate({ url: BASE + '/auth' });
                 await clickLocalOpen(p);
+                await until(() => localOpen(p.reqs).some(r => r.status), 'the suite tab button POST', 30000, p);
+                assert.equal(localOpen(p.reqs).length, 1, 'the suite tab clicks once');
+                assert.ok(localOpen(p.reqs)[0].status < 400, 'the suite tab button POST succeeds');
                 await until(async () => (await ev(`location.origin === '${BASE}' && !location.pathname.startsWith('/auth') && document.readyState === 'complete'`)) === true, 'the suite tab to leave /auth', 30000, p);
                 assert.equal(await ev(`fetch('${BASE}/api/system/status', { cache: 'no-store' }).then(r => r.status)`), 200);
                 ownEv = ev;
