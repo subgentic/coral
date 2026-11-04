@@ -48,7 +48,7 @@ export function createArtifactsList({ inbox = false } = {}) {
         : { EMPTY, load: k => loadFilters(k, browserLocal), save: (k, v) => saveFilters(k, v, browserLocal), isFiltered };
     const linkOf = (item) => linkOfItem(item, { server: inbox ? serverOf(item) : server(), project: inbox ? item.board_id : model.project }); // where the bytes are, for the list this page shows
 
-    const PAGE = 100;
+    const PAGE = 50; // a computer answers at most 50 a request (#13161)
     const model = { project: '', scope: null, key: '', loaded: false, items: [], hasMore: false, cursor: '', counts: null, truncated: false, loading: false, error: '', loadingMore: false, filters: { ...F.EMPTY }, kept: new Set(), tagCounts: {}, gen: 0, controller: null, teams: [] };
     let root = null, hooks = {}, bar = null, barKey = '';
     let pendingBoard = null, labelTimer = null, retryLabels = false;

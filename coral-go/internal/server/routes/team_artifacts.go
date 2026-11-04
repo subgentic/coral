@@ -24,10 +24,11 @@ import (
 )
 
 const (
-	defaultTeamArtifactLimit = 100
-	maxTeamArtifactLimit     = 200
-	maxTeamArtifactOffset    = 10000
-	maxArtifactMetaBytes     = 64 << 10
+	defaultTeamArtifactLimit  = 50 // a computer answers at most this many artifacts per request (#13161): the next page is asked for with the cursor
+	maxTeamArtifactLimit      = 50
+	maxTeamArtifactLimitAsked = 200 // a limit up to this is still accepted (an older page asks for 200), and is cut to maxTeamArtifactLimit
+	maxTeamArtifactOffset     = 10000
+	maxArtifactMetaBytes      = 64 << 10
 )
 
 var digestLikeName = regexp.MustCompile(`^(?:sha256:)?[a-fA-F0-9]{32,64}$`)
@@ -116,6 +117,16 @@ func (h *BoardHandler) artifactObjectDir() string {
 	return filepath.Join(h.coralDir, "artifacts", "objects")
 }
 
+// artifactPageLimit is the page size of a list request: what was asked for (default and cap 50, #13161; an older page's 200 is accepted and cut to 50, the answer says so in its limit), false for a value that is not a
+// positive integer or is past what was ever accepted.
+func artifactPageLimit(raw string) (int, bool) {
+	n, ok := parseBoundedInt(raw, defaultTeamArtifactLimit, 1, maxTeamArtifactLimitAsked)
+	if !ok {
+		return 0, false
+	}
+	return min(n, maxTeamArtifactLimit), true
+}
+
 func parseBoundedInt(raw string, def, min, max int) (int, bool) {
 	if raw == "" {
 		return def, true
@@ -163,9 +174,9 @@ func (h *BoardHandler) ListTeamArtifacts(w http.ResponseWriter, r *http.Request)
 		errBadRequest(w, strings.TrimPrefix(qerr.Error(), errTeamArtifactQuery.Error()+": "))
 		return
 	}
-	limit, ok := parseBoundedInt(r.URL.Query().Get("limit"), defaultTeamArtifactLimit, 1, maxTeamArtifactLimit)
+	limit, ok := artifactPageLimit(r.URL.Query().Get("limit"))
 	if !ok {
-		errBadRequest(w, fmt.Sprintf("limit must be an integer between 1 and %d", maxTeamArtifactLimit))
+		errBadRequest(w, fmt.Sprintf("limit must be an integer between 1 and %d", maxTeamArtifactLimitAsked))
 		return
 	}
 	offset, ok := parseBoundedInt(r.URL.Query().Get("offset"), 0, 0, maxTeamArtifactOffset)
@@ -682,7 +693,7 @@ func (h *BoardHandler) ListSessionArtifacts(w http.ResponseWriter, r *http.Reque
 		errBadRequest(w, "session_id is required")
 		return
 	}
-	limit, ok := parseBoundedInt(r.URL.Query().Get("limit"), defaultTeamArtifactLimit, 1, maxTeamArtifactLimit)
+	limit, ok := artifactPageLimit(r.URL.Query().Get("limit"))
 	offset, ok2 := parseBoundedInt(r.URL.Query().Get("offset"), 0, 0, maxTeamArtifactOffset)
 	if !ok || !ok2 {
 		errBadRequest(w, "invalid limit or offset")
