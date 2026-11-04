@@ -6,6 +6,7 @@ export async function sendCommentQueue(comments, { send, isCurrent, record }) {
     for (const c of comments) {
         if (!isCurrent()) return { cancelled: true };
         const part = await send(c);
+        if (!isCurrent()) return { cancelled: true };
         record(c, part.results);
         for (const r of part.results) {
             const prior = combined.get(r.agent);

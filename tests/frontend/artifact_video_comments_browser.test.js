@@ -25,7 +25,7 @@ const HEX = '9'.repeat(64), OLD = '8'.repeat(64);
  });
  const shot=async name=>{if(!process.env.CORAL_SCREENSHOT_DIR)return; fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR,{recursive:true});const s=await Page.captureScreenshot({format:'png'});fs.writeFileSync(path.join(process.env.CORAL_SCREENSHOT_DIR,name+'.png'),Buffer.from(s.data,'base64'));};
  try {
-  for(const config of [{width:1280,theme:'dark'},{width:390,theme:'light'},{width:1280,theme:'light',zoom:true},{width:390,theme:'dark',cloud:true}]) {
+  for(const config of [{width:1280,theme:'dark'},{width:390,theme:'light'},{width:1280,theme:'light',zoom:true},{width:390,theme:'light',zoom:true},{width:390,theme:'dark',zoom:true},{width:390,theme:'dark',cloud:true}]) {
    cloud=!!config.cloud;
    await Emulation.setDeviceMetricsOverride({width:config.width,height:900,deviceScaleFactor:1,mobile:config.width===390});
    await Page.navigate({url:BASE+'/'});await Page.loadEventFired();await install();await setTheme(ev,config.theme);
@@ -115,6 +115,20 @@ const HEX = '9'.repeat(64), OLD = '8'.repeat(64);
    assert.equal(await ev(`document.querySelector('#artifact-viewer').scrollWidth<=innerWidth+1`),true,'no horizontal overflow');
    assert.equal(await ev(`(()=>{const t=document.querySelector('.artifact-viewer-title').getBoundingClientRect(),h=document.querySelector('.artifact-viewer-header').getBoundingClientRect(),c=document.querySelector('.artifact-viewer-content').getBoundingClientRect();return t.top>=h.top-1&&t.bottom<=h.bottom+1&&h.top>=c.top-1})()`),true,'video header stays whole at large text '+JSON.stringify(await ev(`(()=>{const names=['.artifact-viewer-title','.artifact-viewer-header','.artifact-viewer-content','.artifact-viewer-main'];return names.map(s=>{const e=document.querySelector(s),r=e.getBoundingClientRect();return{selector:s,top:r.top,bottom:r.bottom,height:r.height,scroll:e.scrollTop}})})()`)));
    assert.equal(await ev(`(()=>{const b=document.querySelector('.artifact-viewer-close').getBoundingClientRect(),c=document.querySelector('.artifact-viewer-content').getBoundingClientRect();return b.top>=c.top&&b.bottom<=c.bottom})()`),true,'Close stays fully visible at large text');
+   if(config.width===390&&config.zoom&&!cloud){
+    // Real keyboard input at 200% on the phone in both themes: timeline,
+    // point comment, composer actions and close remain reachable.
+    await ev(`document.querySelector('.avc-track').scrollIntoView({block:'center',behavior:'instant'});document.querySelector('.avc-track').focus()`);
+    await Input.dispatchKeyEvent({type:'keyDown',key:'ArrowRight',code:'ArrowRight',windowsVirtualKeyCode:39});await Input.dispatchKeyEvent({type:'keyUp',key:'ArrowRight',code:'ArrowRight',windowsVirtualKeyCode:39});
+    await Input.dispatchKeyEvent({type:'keyDown',key:'c',code:'KeyC',windowsVirtualKeyCode:67});await Input.dispatchKeyEvent({type:'keyUp',key:'c',code:'KeyC',windowsVirtualKeyCode:67});
+    await waitFor(`document.activeElement?.matches('.ac-input')`,'phone 200% keyboard comment focuses composer');
+    await ev(`document.querySelector('.ac-input').scrollIntoView({block:'center',behavior:'instant'})`);
+    assert.equal(await ev(`(()=>{const r=document.querySelector('.ac-input').getBoundingClientRect();return r.width>0&&r.left>=0&&r.right<=innerWidth+1&&r.top>=0&&r.bottom<=innerHeight})()`),true,'phone 200% composer reachable');
+    const cancel=await ev(`(()=>{const e=document.querySelector('.ac-composer .ac-cancel');e.scrollIntoView({block:'center',behavior:'instant'});e.focus();return{focused:document.activeElement===e,text:e.textContent}})()`);
+    assert.equal(cancel.focused,true,'phone 200% cancel receives keyboard focus');
+    await Input.dispatchKeyEvent({type:'keyDown',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});await Input.dispatchKeyEvent({type:'keyUp',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});
+    await waitFor(`!document.querySelector('.ac-input')`,'phone 200% keyboard cancel closes composer');
+   }
    await shot(`video-after-${config.width}-${config.theme}${config.zoom?'-200':''}${cloud?'-hub':''}`);
    console.log('[PASS] video review '+JSON.stringify(config));
    await ev(`document.querySelector('#artifact-viewer .artifact-viewer-close')?.click()`);
