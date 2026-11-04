@@ -1,5 +1,77 @@
 # Release Notes
 
+## v2.0.46 — The Inbox opens a file at once and follows it when it settles, artifact reviews remember their layout, and a Windows start with no terminal says why
+
+### Changes
+
+#### What you will notice first
+
+- **A link to a file in Needs you opens from what the Inbox already has**, teams are read four at a time, a scan already in flight is joined (a click during the first full scan joins it), and an open viewer follows a file that is settled meanwhile (a late answer for another file is ignored).
+- **Artifact reviews fill the viewport and remember their layout by file type**; the Comments panel's first-visit defaults are separate from the choices you remembered per type.
+- **The cross-team artifact count is files, not versions** (the newest version of each).
+- **Windows: `coral.exe` started with no terminal and no accepted Terms says so in a message box and exits 1**.
+- **A missing `git` is warned about once**, not on every poll of the Files and Changes panels.
+- **A hiccup in reading the terminal's processes no longer refuses an agent's text**: a read that fails for a moment is checked again before the refusal stands.
+- **A share folder that answered its probe is not probed again for 5 seconds** (found paths stay uncached).
+- **Home**: the goal card keeps no observer alive for a hidden card.
+
+#### Known issues
+
+- **macOS: the tmux change (#12836) can make macOS ask once more, only after tmux restarts (a full restart of your agents or a reboot).** Coral's tmux server and guardian are now their own responsible process, so macOS may ask, per folder, whether `tmux` (or `coral`) may reach Documents, Desktop or Downloads. Full Disk Access you gave Coral.app does not carry over: if you gave Coral Full Disk Access, add `tmux` and `coral` too (both in `Coral.app/Contents/MacOS`). The staged tmux copy (each Coral version keeps its own under `tmux-bin/`) asks again after a tmux change. Say yes once; if you say no, nothing is lost, the agent just cannot read that folder.
+- **Windows: in-app update does not work from 2.0.0 through 2.0.6.** If you're on one of those, download and install the MSI by hand; from 2.0.7 on, in-app update works.
+- **macOS: a Coral of 2.0.5 or earlier cannot install updates in-app; install 2.0.6 or later by hand once.**
+- **OpenCode agents are tested on macOS and Linux; OpenCode on Windows is not yet tested end to end.**
+- **Hermes agents are still experimental.**
+- Setting up a computer over SSH is supported from a macOS or Linux hub, and is not yet tested from a Windows hub.
+
+#### For Coral Hub
+
+- **`release-diff` output** (`go run ./internal/releasediff/cmd/release-diff v2.0.45 <head>`):
+
+  ### Tunnel routes, v2.0.45 to ffacd4012
+
+  No route was added, removed or changed.
+
+  ### Board settings keys (BoardSettings, HealthSettings included), v2.0.45 to ffacd4012
+
+  No key was added, removed or changed.
+
+  ### What Coral Hub compiles in or embeds, v2.0.45 to ffacd4012
+
+  `pkg/tunnel`: 1 file of Go code changed (+1, -1)
+
+  - `coral-go/pkg/tunnel/routes_query.go`: +1, -1
+  - test files, not compiled by the Hub: 1 file (+34, -0)
+
+  `pkg/frontend`: 9 files the Hub embeds changed (+114, -31)
+
+  - `coral-go/pkg/frontend/static/artifact_comments.js`: +4, -3
+  - `coral-go/pkg/frontend/static/artifact_preview.js`: +6, -1
+  - `coral-go/pkg/frontend/static/artifact_review.js`: +12, -0
+  - `coral-go/pkg/frontend/static/artifact_viewer.js`: +41, -3
+  - `coral-go/pkg/frontend/static/css/artifact_viewer_header.css`: +10, -0
+  - `coral-go/pkg/frontend/static/inbox_link.js`: +9, -3
+  - `coral-go/pkg/frontend/static/inbox_reviews.js`: +24, -11
+  - `coral-go/pkg/frontend/static/launch_cards.js`: +7, -10
+  - `coral-go/pkg/frontend/static/view_switch.js`: +1, -0
+
+  Unchanged: `pkg/hubproxy`, `pkg/hubowner`, `pkg/redact`, `agent_docs`.
+
+  ### Coral packages compiled into the Hub through its imports, v2.0.45 to ffacd4012
+
+  Unchanged: `internal/fsreplace`, `internal/httputil`, `internal/logsafe`, `internal/safego`, `internal/secfile`, `internal/secrets`, `pkg/redact/betterleaks`.
+
+- **Files route** (#13127, coral-hub Security): `GET .../files` ignores `live` and `manual`, and the tunnel's query allowlist row for that GET drops them; no route was added, removed or changed, and no setting key changed.
+- **Cross-team artifact count** (#13151): the count is files, not versions, with `versions=newest`; no route changed.
+- **Ready signals, hooks, tokens, framed paths**: unchanged.
+
+
+#### For developers and releases
+
+- The goroutine census read a Windows-only goroutine (`terms_no_terminal_windows.go`) on Linux: it now starts with `safego.Recover` (v2.0.46 gate).
+- Test fixes: the Hermes home tests on Windows, the large-repo and Files tests, `viewer_settled_meanwhile`, `inbox_open_need` and `teardown_stability` now pin what they should; the Windows team's environment skips and the `windowmark` tests (#290) are in.
+- Known Windows runner flake, fixed after this release: `TestDownloadInterceptScript` waited a fixed 30 ms for an asynchronous save and failed on about one Windows package job in three (#13225).
+
 ## v2.0.45 — Sign-in redirects that spare a page already leaving, and Set up a server confirms host keys on the server too
 
 ### Changes
