@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -299,8 +300,11 @@ func TestARealLaunchCarriesTheProtocolForATeamAgentAndTheCoralSectionForEveryAge
 	e := newLaunchEnv(t)
 	code, out := e.post("/api/sessions/launch", e.h.Launch, map[string]any{"working_dir": t.TempDir(), "agent_type": "claude"})
 	require.Equal(t, http.StatusOK, code, "%v", out)
+	// each launch's command is sent after its reply: wait for the first before the second, or under load the two can be recorded the other way round and sys[0] is the team agent's (#13556)
+	require.Eventually(t, func() bool { return len(e.systemPrompts()) == 1 }, 10*time.Second, 5*time.Millisecond, "the first launch sent its command")
 	code, out = e.post("/api/sessions/launch", e.h.Launch, map[string]any{"working_dir": t.TempDir(), "agent_type": "claude", "board_name": "team-x", "role": "Developer"})
 	require.Equal(t, http.StatusOK, code, "%v", out)
+	require.Eventually(t, func() bool { return len(e.systemPrompts()) == 2 }, 10*time.Second, 5*time.Millisecond, "the second launch sent its command")
 	sys := e.systemPrompts()
 	require.Len(t, sys, 2)
 	assert.True(t, strings.Contains(sys[0], "coral-agent skills search using-coral"), "a plain agent is told what Coral gives it")

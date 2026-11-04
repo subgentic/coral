@@ -34,6 +34,7 @@ func messagesOf(t *testing.T, h *BoardHandler) []board.Message {
 
 func TestClosingAGoalPostsOneBoardLine(t *testing.T) {
 	call, h, gid := steeringRig(t)
+	h.WaitBackground() // the "you now drive this goal" notice is posted by a background goroutine (announceGoalDriver); counted late it looked like a second line after the close (#13556)
 	_, err := h.bs.CreateTaskWithOpts(context.Background(), "team", "open task", "", "medium", "Orchestrator", &board.CreateTaskOpts{GoalID: &gid})
 	require.NoError(t, err)
 	before := len(messagesOf(t, h))
