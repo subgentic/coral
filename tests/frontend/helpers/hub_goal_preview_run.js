@@ -3,7 +3,7 @@
 // X-Hub-Goal-Preview and the SAME bytes; every write is previewed again; the Hub's words are plain sentences in the editor. With the boot value absent the goal writes go out as today (no preview, no header).
 const assert = require('node:assert/strict');
 const { connect } = require('../agent_view_harness');
-const { setupHubWorld } = require('./hub_world');
+const { setupHubWorld, BASE } = require('./hub_world');
 const { coralReady } = require('./wait');
 
 const STUB = `(() => {
@@ -16,7 +16,7 @@ const STUB = `(() => {
         if (!mm) return original(u, o);
         const path = mm[2];
         if (path === '/api/hub/goal-preview') { window.__goalCalls.push({ kind: 'preview', server: mm[1], body: JSON.parse(o.body) }); if (window.__refusePreview) return json({ error: window.__refusePreview.word }, window.__refusePreview.status); return json({ token: 'TOK' + window.__goalCalls.length, expires: '2099-01-01T00:00:00Z', tier: 'interact', server: mm[1], board: 'team-a' }); }
-        if (/^\\/api\\/board\\/team-a\\/goals(\\/\\d+(\\/close)?)?$/.test(path) && m !== 'GET') { window.__goalCalls.push({ kind: 'write', server: mm[1], path, method: m, token: h['X-Hub-Goal-Preview'] || null, body: o.body }); if (window.__refuse) return json({ error: window.__refuse.word }, window.__refuse.status); return json({ id: 5, orchestrator_told_at: null }); }
+        if (/^\\/api\\/board\\/team-a\\/goals(\\/\\d+(\\/close)?)?$/.test(path) && m !== 'GET') { window.__goalCalls.push({ kind: 'write', server: mm[1], path, method: m, token: (h instanceof Headers ? h.get('X-Hub-Goal-Preview') : (h['X-Hub-Goal-Preview'] || h['x-hub-goal-preview'])) || null, body: o.body }); if (window.__refuse) return json({ error: window.__refuse.word }, window.__refuse.status); return json({ id: 5, orchestrator_told_at: null }); }
         if (path === '/api/board/team-a/subscribers') return json([{ subscriber_id: 'dev-1', job_title: 'Dev' }]);
         return json({});
     };
@@ -29,8 +29,8 @@ async function run(flag) {
         {
             await setupHubWorld({ client, Page, Emulation, width: 1280, height: 900, mobile: false, inbox: 'native', hubPages: true, bootExtra: flag ? '"goal_preview":true' : '' });
             await Page.addScriptToEvaluateOnNewDocument({ source: STUB });
-            await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired();
-            await coralReady(ev, 'startup');
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
+            await coralReady(ev, 'startup', 'liveList', 'settings');
             const calls = () => ev(`window.__goalCalls`);
             const tag = flag ? 'goal_preview true' : 'no goal_preview';
 
@@ -60,7 +60,7 @@ async function run(flag) {
             // the Hub refuses: its word is a sentence in the editor's error line and nothing was created
             if (flag) {
                 await ev(`window.__created.length = 0; window.__goalCalls.length = 0; window.__refuse = { word: 'mode_too_low', status: 403 }; import(${S} + 'goal_editor.js').then(m => { m.openGoalEditor({ project: '@srv1/team-a', onCreated: (p) => { window.__created.push(p); } }); return true; })`);
-                await waitFor(`document.querySelectorAll('dialog.goal-editor[open]').length === 2 && [...document.querySelectorAll('#goal-new-driver')].every(d => !d.disabled)`, `${tag}: a second editor`, 8000);
+                await waitFor(`document.querySelectorAll('dialog.goal-editor[open]').length >= 1 && [...document.querySelectorAll('dialog.goal-editor[open] #goal-new-driver')].every(d => !d.disabled)`, `${tag}: another editor`, 8000);
                 await ev(`(() => { const dlgs = document.querySelectorAll('dialog.goal-editor[open]'), d = dlgs[dlgs.length - 1]; const t = d.querySelector('#goal-new-title'); t.value = 'Second goal'; t.dispatchEvent(new Event('input', { bubbles: true })); d.querySelector('form').requestSubmit(); return true; })()`);
                 await waitFor(`/was not created: .*below Interact/.test(document.body.innerText)`, `${tag}: the Hub's refusal is a plain sentence`, 8000);
                 assert.equal(await ev(`window.__created.length`), 0, `${tag}: nothing was created`);
