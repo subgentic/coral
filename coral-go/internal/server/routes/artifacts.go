@@ -304,6 +304,12 @@ func (h *SessionsHandler) uploadAgentArtifact(w http.ResponseWriter, r *http.Req
 		errInternalServer(w, "could not store the artifact")
 		return
 	}
+	// Metadata and series membership may be committed after the upload record.
+	// A scan in between must become stale again when this handler finishes.
+	if h.bs != nil {
+		b, _, _ := uploaderOf(sid)
+		defer h.bs.NoteArtifactsChanged(b)
+	}
 	_ = fresh
 	// a task's artifact count is kept for a few seconds: an upload just changed it (#12855)
 	noteArtifactsChanged()
@@ -524,7 +530,9 @@ func storeArtifactFileAs(coralDir, sessionID, name, mediaType, tmpPath, hexID st
 				}
 			}
 			rec, _ := json.Marshal(ur)
-			_ = writeFileAtomic(recPath, rec, 0o600)
+			if err := writeFileAtomic(recPath, rec, 0o600); err == nil {
+				noteArtifactRecordChanged(coralDir, ur.Board)
+			}
 		}
 	}
 	return stored, fresh, nil

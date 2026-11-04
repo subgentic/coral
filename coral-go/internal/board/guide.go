@@ -200,7 +200,12 @@ func shortLabel(s string) string {
 }
 
 // SetArtifactPrivate marks an artifact private to the manager, or clears the mark. The caller has decided who may (the Operator, or the Hub owner); a guide never does. Setting it twice is fine.
-func (s *Store) SetArtifactPrivate(ctx context.Context, artifactID string, private bool, by string) error {
+func (s *Store) SetArtifactPrivate(ctx context.Context, artifactID string, private bool, by string) (errOut error) {
+	defer func() {
+		if errOut == nil {
+			s.NoteAllArtifactsChanged()
+		}
+	}()
 	if !ValidArtifactDigest(artifactID) {
 		return fmt.Errorf("not an artifact id")
 	}

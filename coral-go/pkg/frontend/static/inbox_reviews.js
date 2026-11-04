@@ -1,3 +1,4 @@
+import { artifactRevision, artifactsUnchanged, onArtifactsRev } from './artifacts_feed.js';
 import { setReviewCacheReader } from './ask_filter.js';
 /* Review artifacts use the same owner-protected team list and tags routes as Artifacts.
  * After the Inbox first opens, keep its badge updated on other tabs without eager startup reads. */
@@ -7,7 +8,14 @@ import { hideAsksWhen } from './ask_filter.js';
 import { importOnce } from './import_once.js';
 
 let items = [], saved = [], muted = [], errors = [], pending = null, lastRead = 0, revision = 0, changed = () => { if (typeof document !== 'undefined') document.dispatchEvent(new Event('coral:reviews-changed')); };
-let activated = false;
+let activated = false, refreshAgain = false;
+const loadedRevisions = new Map();
+onArtifactsRev((team, rev, reconnect) => {
+    if (!activated) return;
+    if (reconnect) { if (team === null) loadedRevisions.clear(); else loadedRevisions.delete(team); }
+    lastRead = 0;
+    if (pending) refreshAgain = true; else refreshReviews();
+});
 // One row per artifact (#11533): versions (same uploader, team, name) are one item, the newest, with `earlier`.
 const vkey = a => (a.session_id || a.produced_by) ? JSON.stringify([a.team, a.session_id, a.produced_by, a.name]) : a.reviewKey; // a JSON array: no name or id can run into the next field
 const byAge = (a, b) => String(a.created_at).localeCompare(String(b.created_at)) || a.reviewKey.localeCompare(b.reviewKey);
@@ -72,13 +80,15 @@ export function reviewGroups(rows) {
 
 /** Refresh in bounded pages, coalescing feed updates. Failed teams retain their last known rows. */
 /** One team's files tagged for review (not saved, available), every page: the rows the Inbox reads, for one team. */
-async function readTeam(team, mutedOut = null) {
+async function readTeam(team, mutedOut = null, stamp = {}) {
     const rows = [], seen = new Set();
     for (let offset = 0; offset <= 10000; offset += 200) {
         const r = await boardFetch(team, `/artifacts?tag=for%20review&limit=200&offset=${offset}`);
         if (r.status === 403 || r.status === 404) break; // inaccessible teams never contribute rows
         if (!r.ok) throw new Error('Could not read review artifacts');
         const data = await r.json();
+        const token = artifactRevision(data.artifacts_rev);
+        stamp.rev = offset === 0 ? token : stamp.rev === token ? token : null;
         for (const a of data.artifacts || []) {
             const decidedWithNews = a.new_comments > 0 && (a.tags?.includes('approved') || a.tags?.includes('denied')) && !a.tags.includes('for review'); // a file the Operator decided that agents replied about in their thread: the server puts it in this list (#12097), marked and counted once
             if (!(a.tags?.includes('for review') || decidedWithNews) || a.tags.includes('saved') || a.tags.includes('ignored') || a.tags.includes('superseded') || (a.tags.includes('changes requested') && !(a.new_comments > 0)) || !a.available || seen.has(a.id)) continue; // changes requested without news is the agent's turn (needsYouFile's rule, #11985, #12026); // changes requested: the agent's turn, so the file leaves Needs you and its counts; its next version comes back as a new item (#11985). Artifacts and the goal still show it as changes requested // a saved file stays tagged for review (its decisions work) but is not in Needs you (#11641)
@@ -122,14 +132,23 @@ export function refreshReviews(force = false) {
             const readOne = async (i) => {
                 const team = projects[i].project, mutedHere = [], got = { rows: [], saved: [], mutedHere, failed: '' };
                 try {
-                    got.rows = await readTeam(team, mutedHere);
+                    if (!force && await artifactsUnchanged(team, loadedRevisions.get(team))) {
+                        results[i] = { rows: items.filter(a => a.team === team), saved: saved.filter(a => a.team === team), mutedHere: muted.filter(a => a.team === team), failed: '' };
+                        return;
+                    }
+                    const stamp = {};
+                    got.rows = await readTeam(team, mutedHere, stamp);
                     try { // the saved files of this team: one page, a failure here leaves the others alone
                         const r = await boardFetch(team, '/artifacts?tag=saved&limit=200');
-                        if (r.ok) for (const a of (await r.json()).artifacts || []) {
-                            const hex = /(?:sha256:|coral:\/\/artifacts\/)?([a-f0-9]{64})$/i.exec(a.uri || a.digest || a.id || '')?.[1];
-                            if (a.tags?.includes('saved') && a.tags.includes('for review') && a.available && hex) got.saved.push({ ...a, team, hex, reviewKey: `${team}:${a.id}` });
-                        }
-                    } catch { got.saved = saved.filter(a => a.team === team); }
+                        if (r.ok) {
+                            const data = await r.json();
+                            loadedRevisions.set(team, stamp.rev === artifactRevision(data.artifacts_rev) ? stamp.rev : null);
+                            for (const a of data.artifacts || []) {
+                                const hex = /(?:sha256:|coral:\/\/artifacts\/)?([a-f0-9]{64})$/i.exec(a.uri || a.digest || a.id || '')?.[1];
+                                if (a.tags?.includes('saved') && a.tags.includes('for review') && a.available && hex) got.saved.push({ ...a, team, hex, reviewKey: `${team}:${a.id}` });
+                            }
+                        } else loadedRevisions.delete(team);
+                    } catch { loadedRevisions.delete(team); got.saved = saved.filter(a => a.team === team); }
                 } catch {
                     got.rows = items.filter(a => a.team === team);
                     got.mutedHere.push(...muted.filter(a => a.team === team));
@@ -141,15 +160,23 @@ export function refreshReviews(force = false) {
             await Promise.all(Array.from({ length: Math.min(SCAN_AT_ONCE, projects.length) }, async () => { while (at < projects.length) await readOne(at++); }));
             const next = [], failed = [], nextSaved = [], nextMuted = []; // joined in the teams' own order, whatever order the reads finished in
             for (const g of results) { next.push(...g.rows); nextSaved.push(...g.saved); nextMuted.push(...g.mutedHere); if (g.failed) failed.push(g.failed); }
-            if (started !== revision) return;
+            if (started !== revision) { loadedRevisions.clear(); return; } // discarded payloads cannot certify the retained rows as fresh
             items = next.sort(byAge); saved = nextSaved.sort(byAge); muted = nextMuted.sort(byAge);
             errors = failed;
         } catch { errors = ['Review artifacts could not be refreshed.']; }
         changed();
     })().finally(() => {
         pending = null;
-        // the hub's list of computers arrived while this scan ran (a scan that starts at load finishes before it does): it covered fewer computers than there are now, so it runs again (at most twice more)
-        if (sourcesKey() !== sources && rescans < 2) { rescans++; refreshReviews(true).catch(() => {}); } else if (sourcesKey() === sources) rescans = 0;
+        // A changed source list needs a bounded full rescan; join a queued
+        // artifact revision notification into that scan rather than start two.
+        const sourcesChanged = sourcesKey() !== sources;
+        if (sourcesChanged && rescans < 2) {
+            rescans++; refreshAgain = false;
+            refreshReviews(true).catch(() => {});
+        } else {
+            if (!sourcesChanged) rescans = 0;
+            if (refreshAgain) { refreshAgain = false; lastRead = 0; refreshReviews(); }
+        }
     });
     return pending;
 }

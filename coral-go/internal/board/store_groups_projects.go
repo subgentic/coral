@@ -281,5 +281,8 @@ func (s *Store) deleteProject(ctx context.Context, project string, onlyIfUnused 
 	err = tx.Commit()
 	s.unreadCounts.invalidate()
 	s.subscribersChanged()
+	if err == nil {
+		s.NoteArtifactsChanged(project)
+	}
 	return err == nil, err
 }

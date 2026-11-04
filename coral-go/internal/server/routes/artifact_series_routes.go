@@ -143,6 +143,9 @@ func (h *SessionsHandler) deleteSeries(w http.ResponseWriter, r *http.Request) {
 		errNotFound(w, "artifact not found")
 		return
 	}
+	if h.bs != nil {
+		defer h.bs.NoteAllArtifactsChanged()
+	}
 	var freed int64
 	for _, m := range members {
 		f, _, _, err := func() (int64, int, bool, error) {

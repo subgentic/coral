@@ -87,6 +87,9 @@ func (h *SessionsHandler) removePastedCopy(ctx context.Context, sessionID, id st
 	if os.Remove(filepath.Join(uploadsDir(coralDir, sessionID), id+".json")) != nil {
 		return false, false
 	}
+	if h.bs != nil {
+		h.bs.NoteAllArtifactsChanged()
+	}
 	if otherReferences(coralDir, id, sessionID) > 0 {
 		return true, false
 	}

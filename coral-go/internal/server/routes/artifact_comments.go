@@ -363,7 +363,9 @@ func (h *SessionsHandler) listArtifactComments(w http.ResponseWriter, r *http.Re
 		_ = h.ss.MarkAsksSeen(r.Context(), id, caller.Subject, time.Now())
 	}
 	if caller.Kind == commentCallerOwner { // the Operator opened the file's comments: an agent's replies in their threads are seen, and the file's row stops saying "new comments" (#12026)
-		_ = h.ss.MarkThreadsSeen(r.Context(), id, time.Now())
+		if changed, err := h.ss.MarkThreadsSeenChanged(r.Context(), id, time.Now()); err == nil && changed && h.bs != nil {
+			h.bs.NoteAllArtifactsChanged()
+		}
 	}
 	state := r.URL.Query().Get("state")
 	switch state {
@@ -708,6 +710,9 @@ func (h *SessionsHandler) createArtifactComment(w http.ResponseWriter, r *http.R
 		slog.Warn("[artifact comments] create failed", "error", err)
 		errInternalServer(w, "could not save the comment")
 	default:
+		if h.bs != nil {
+			h.bs.NoteAllArtifactsChanged()
+		}
 		view := h.commentView(caller, c, locked, hubWrite)
 		if _, isGuide := guideOf(r); !isGuide && (in.NotifyAgent == nil || *in.NotifyAgent) {
 			if d := h.deliverOperatorComment(r, caller, c, id, in.Board); d.To != "" {
@@ -794,6 +799,9 @@ func (h *SessionsHandler) editArtifactComment(w http.ResponseWriter, r *http.Req
 	case !found:
 		errNotFound(w, "comment not found")
 	default:
+		if h.bs != nil {
+			h.bs.NoteAllArtifactsChanged()
+		}
 		writeJSON(w, http.StatusOK, h.commentView(caller, c, locked, hubWrite))
 	}
 }
@@ -823,6 +831,9 @@ func (h *SessionsHandler) deleteArtifactComment(w http.ResponseWriter, r *http.R
 	if _, err := h.ss.DeleteArtifactComment(r.Context(), id, t.ID); err != nil {
 		errInternalServer(w, "could not delete the comment")
 		return
+	}
+	if h.bs != nil {
+		h.bs.NoteAllArtifactsChanged()
 	}
 	_ = h.ss.CloseArtifactAsks(r.Context(), t.ID, time.Now()) // a deleted comment is no thread an agent may still reply into
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
@@ -863,6 +874,9 @@ func (h *SessionsHandler) resolveArtifactComment(resolved bool) http.HandlerFunc
 		case !found:
 			errNotFound(w, "comment not found")
 		default:
+			if h.bs != nil {
+				h.bs.NoteAllArtifactsChanged()
+			}
 			if resolved {
 				_ = h.ss.CloseArtifactAsks(r.Context(), t.ID, time.Now()) // a resolved thread takes no more agent replies
 			}

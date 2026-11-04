@@ -1,3 +1,4 @@
+import { publishArtifactsRev } from './artifacts_feed.js';
 import { importOnce } from './import_once.js';
 import { bindNativeDialog } from './modal_chrome.js';
 import { escapeHtml } from './utils.js';
@@ -60,6 +61,7 @@ function fetchTeamAvailability(team, validated = false) {
             if (seq > (availabilityWrittenSeq.get(team) || 0)) {
                 availabilityWrittenSeq.set(team, seq);
                 availabilityCache.set(team, data);
+                publishArtifactsRev({ [team]: data.artifacts_rev });
             }
             return data;
         } finally {

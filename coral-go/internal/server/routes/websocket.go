@@ -282,16 +282,17 @@ func (h *SessionsHandler) WSCoral(w http.ResponseWriter, r *http.Request) {
 
 // coralFeed is one /ws/coral connection's view of what it was last sent, for the diffs.
 type coralFeed struct {
-	fieldDiff       bool                      // field-level diffs (#3281)
-	prevSessions    map[string]string         // session key -> json string
-	prevByKey       map[string]map[string]any // session key -> the row last sent (read-only tick data)
-	prevRunsJSON    string
-	prevGoalsJSON   string            // the goals brief as last sent (#7116)
-	prevGoalSeqs    map[string]int64  // each board's goals counter as last sent: the goal events a frame carries are the ones above it (#7355)
-	prevHealth      map[string]string // machine_health: each top-level field as last sent (#3444)
-	prevServersJSON string
-	firstMessage    bool
-	lastSent        time.Time // last message written to this connection
+	fieldDiff         bool                      // field-level diffs (#3281)
+	prevSessions      map[string]string         // session key -> json string
+	prevByKey         map[string]map[string]any // session key -> the row last sent (read-only tick data)
+	prevRunsJSON      string
+	prevArtifactsJSON string
+	prevGoalsJSON     string            // the goals brief as last sent (#7116)
+	prevGoalSeqs      map[string]int64  // each board's goals counter as last sent: the goal events a frame carries are the ones above it (#7355)
+	prevHealth        map[string]string // machine_health: each top-level field as last sent (#3444)
+	prevServersJSON   string
+	firstMessage      bool
+	lastSent          time.Time // last message written to this connection
 }
 
 // coralFrame is the kind of frame coralFeed.frame built.
@@ -313,6 +314,9 @@ func (f *coralFeed) frame(tick *wsTick, pending []Notification, healthDelta map[
 			"type":        "coral_update",
 			"sessions":    tick.sessions,
 			"active_runs": tick.activeRuns,
+		}
+		if len(tick.artifactsRev) > 0 {
+			msg["artifacts_rev"] = tick.artifactsRev
 		}
 		if healthNow != nil {
 			msg["machine_health"] = healthDelta
@@ -354,11 +358,15 @@ func (f *coralFeed) frame(tick *wsTick, pending []Notification, healthDelta map[
 	}
 	serversChanged := tick.serversJSON != f.prevServersJSON
 	runsChanged := tick.runsJSON != f.prevRunsJSON
+	artifactsChanged := tick.artifactsJSON != f.prevArtifactsJSON
 	goalsChanged := tick.goalsJSON != f.prevGoalsJSON
 	hasNotifications := len(pending) > 0
 	healthChanged := len(healthDelta) > 0
-	if len(changed) > 0 || len(removed) > 0 || len(removedRemote) > 0 || serversChanged || runsChanged || goalsChanged || hasNotifications || healthChanged {
+	if len(changed) > 0 || len(removed) > 0 || len(removedRemote) > 0 || serversChanged || runsChanged || goalsChanged || artifactsChanged || hasNotifications || healthChanged {
 		payload := map[string]any{"type": "coral_diff"}
+		if artifactsChanged {
+			payload["artifacts_rev"] = tick.artifactsRev
+		}
 		if healthChanged {
 			payload["machine_health"] = healthDelta
 		}
@@ -421,6 +429,7 @@ func (f *coralFeed) sent(kind coralFrame, tick *wsTick, healthDelta map[string]a
 	f.prevSessions = tick.current
 	f.prevByKey = tick.byKey
 	f.prevRunsJSON = tick.runsJSON
+	f.prevArtifactsJSON = tick.artifactsJSON
 	f.prevGoalsJSON = tick.goalsJSON
 	f.prevGoalSeqs = make(map[string]int64, len(tick.goals))
 	for id, b := range tick.goals {
