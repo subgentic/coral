@@ -219,7 +219,7 @@ function openRun(i) {
 function recentTable(rows, narrowed) {
     const info = AR.pagedInfo(), filt = filtersOf('recent');
     return { title: 'Recent runs', noun: ['run', 'runs'], rows,
-        empty: info.loaded ? { line: narrowed ? 'No run matches the search and filters.' : 'Nothing has run yet.', hint: narrowed ? '' : 'Every run of a job or workflow shows here, newest first. A dot marks one you have not opened.', ...(narrowed ? {} : firstRun()) } : (info.failed ? { line: 'Could not read the runs.', hint: narrowed ? 'The runs of an earlier search are not shown as this one\'s results.' : '', action: { label: 'Try again', run: () => AR.retryRunsPage() } } : { line: 'Loading runs…', hint: '' }),
+        empty: info.loaded ? { line: narrowed ? 'No run matches the search and filters.' : 'Nothing has run yet.', hint: narrowed ? '' : 'Every run of a job or workflow shows here, newest first. A dot marks one you have not opened.', ...(narrowed ? {} : firstRun()) } : (info.failed ? { line: 'Could not read the runs.', hint: narrowed ? 'The runs of an earlier search are not shown as this one\'s results.' : '', retry: { action: 'automations-runs-retry', label: 'Try again' } } : { line: 'Loading runs…', hint: '' }),
         signature: JSON.stringify([!!firstRun().cards, info.total, info.hasMore, info.loading, info.loaded, info.failed, info.failedMore, info.stale, rows.map(i => [i.key, i.run.status, AR.isUnread(i), i.name, AR.resultWords(i.run).full])]),
         node: () => DT.dataTable({
             label: `Recent runs, ${info.loaded ? info.total : rows.length}`, rows, oneLine: true, resize: true, rowKey: i => i.key, rowName: i => `${i.name}, ${AR.resultWords(i.run).full}${AR.isUnread(i) ? ', not opened' : ''}`, state: stateOf('recent'), open: openRun,
@@ -234,7 +234,7 @@ function recentTable(rows, narrowed) {
                 { key: 'started', label: 'Started', width: '7rem', dropAt: 28, tone: 'tertiary', cell: i => DT.el('span', 'dt-time', whenWords(i.at)) },
                 { key: 'took', label: 'Took', width: '6rem', dropAt: 28, tone: 'tertiary', cell: i => AR.tookWords(i.at, i.finishedAt) },
             ],
-            footer: { auto: !info.failedMore, text: info.stale ? 'Searching…' : info.failedMore ? `Showing ${rows.length} of ${info.total}. The next runs could not be read.` : `Showing ${rows.length} of ${info.total}`, more: info.failedMore ? { label: 'Try again', busy: info.loading, run: () => AR.retryRunsPage() } : info.hasMore && !info.stale ? { label: 'Load more', busy: info.loading, run: () => AR.loadMoreRuns() } : null }, // 50 a page, newest first (the cursor follows that order, so these columns do not sort); the rest when the footer scrolls into view, or by the button; a failed next page says so and offers to ask again
+            footer: { auto: !info.failedMore && !info.stale, text: info.stale ? 'Searching…' : info.failedMore ? `Showing ${rows.length} of ${info.total}. The next runs could not be read.` : `Showing ${rows.length} of ${info.total}`, more: info.failedMore ? { label: 'Try again', busy: info.loading, run: () => AR.retryRunsPage() } : info.hasMore && !info.stale ? { label: 'Load more', busy: info.loading, run: () => AR.loadMoreRuns() } : null }, // 50 a page, newest first (the cursor follows that order, so these columns do not sort); the rest when the footer scrolls into view, or by the button; a failed next page says so and offers to ask again
         }).el };
 }
 /** Running now and Failed: the jobs and workflows together, one table, the same five columns in both. */
@@ -389,5 +389,6 @@ export function filterAutomations(value) { setFilters(folder, { ...filtersOf(fol
 
 registerActions({
     'automations-back': el => backToFolder(textOf(el.dataset.folder)),
+    'automations-runs-retry': () => { AR.retryRunsPage(); }, // Recent runs, a first page that did not come: ask again (#13183)
     'automations-new-toggle': el => { importOnce('./menu_button.js').then(m => m.toggleMenu(el)).catch(() => {}); }, // Running now and Failed make either kind: the New button's menu
 });

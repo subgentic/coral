@@ -65,7 +65,7 @@ const STUB = `(() => {
             assert.ok(!q.some(u => /q=rare/.test(u) && /cursor=/.test(u)), `${at}the old cursor was never sent with the new search: ${JSON.stringify(q.filter(u => /q=rare/.test(u)))}`);
             await waitFor(`window.__autoRunsHeld.length === 1`, `${at}the new search's first page is read (held)`, 5000);
             assert.equal(await more(), 'nothing', `${at}while the new first page is on its way Load more asks for nothing`);
-            assert.ok(/Searching/.test(await foot()), `${at}the footer says it is searching, not that these rows are the results: ${await foot()}`);
+            assert.ok(/Searching/.test(await foot()), `${at}the footer says it is searching: ${await foot()}`);
             await ev(`window.__autoRunsHold = null; window.__autoRunsHeld.shift()(); true`);
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr[data-key]').length === 1`, `${at}the new search's one run, and none of the old page's rows`, 10000);
             assert.deepEqual(await rows(), ['rare-report'], `${at}the answer of the old search did not land after the new one`);
