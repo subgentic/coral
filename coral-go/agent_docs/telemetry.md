@@ -57,7 +57,7 @@ Steps that can come before the Terms are accepted or the analytics setting is re
 | `funnel_startup_failed` | The first start that failed, sent at a later good start (held) | `class` (`port_in_use`, `permission_denied`, `other`: from the error's type, never its text) |
 | `funnel_eula_shown` | The Terms were shown (held) | `surface` (`app_dialog`, `terminal`) |
 | `funnel_eula_declined` | The Terms were declined; sent only if they are accepted later (held) | `surface` |
-| `funnel_dashboard_open` | What the first start did about opening the dashboard (held) | `result` (`opened`, `native_window`, `native_window_fallback_browser`, `printed_no_display`, `skipped_no_browser_flag`, `background_start`, `server_not_running`) |
+| `funnel_dashboard_open` | What the first start did about opening the dashboard (held) | `result` (`opened`, `native_window`, `native_window_fallback_browser`, `printed_no_display` (the link was printed: no display, or no browser opener started), `skipped_no_browser_flag`, `background_start`, `server_not_running`) |
 | `funnel_signin_page_shown` | The sign-in page was served to a browser that was not signed in. Any request for the page counts, a program on this computer or a scan from the network included: it says someone reached the page, not who | `page` (`setup`, `create`, `signin`); nothing of the request |
 | `funnel_signin_link_refused` | A sign-in link was refused | `class` (`used_or_expired`, `other_user`) |
 | `funnel_dashboard_loaded` | The first dashboard page finished loading (sent by the server when the page reports `dashboard_ready`) | — |
