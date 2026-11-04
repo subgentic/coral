@@ -186,3 +186,29 @@ func TestTheGuardsBeforeANoTeamNoticeIsTyped(t *testing.T) {
 	assert.Equal(t, autoDelivery{Reason: "rate_limited"}, last, "past sendLimitPerHour comments an hour the next is not typed")
 	assert.Len(t, mock.sentTo(name), sendLimitPerHour, "exactly the allowed ones were typed")
 }
+
+// QA Reviewer 2's two remaining pins (#13539): an idle waker that refuses to wake the uploader gives asleep_or_gone and types nothing, and a session that is not named or a file nobody holds gives no_uploader.
+func TestTheIdleWakerAndTheMissingUploaderBeforeANoTeamNoticeIsTyped(t *testing.T) {
+	h, mock, name, id, _ := noTeamNoticeRig(t)
+	ctx := context.Background()
+
+	woken := 0
+	h.idleWaker = func(context.Context, string) bool { woken++; return false } // an auto-asleep agent that cannot be woken
+	delivered, why := h.tellNoTeamUploaderOf(ctx, id, "[Coral] a line")
+	assert.False(t, delivered)
+	assert.Equal(t, "asleep_or_gone", why, "an agent the idle waker cannot wake is not typed into")
+	assert.Equal(t, 1, woken, "the waker was asked")
+	assert.Empty(t, mock.sentTo(name))
+	h.idleWaker = func(context.Context, string) bool { return true }
+	delivered, why = h.tellNoTeamUploaderOf(ctx, id, "[Coral] a line")
+	assert.True(t, delivered, "woken: it is typed (%q)", why)
+	h.idleWaker = nil
+
+	delivered, why = h.tellNoTeamUploader(ctx, "", "[Coral] a line")
+	assert.False(t, delivered)
+	assert.Equal(t, "no_uploader", why, "a record with no session names no one")
+	delivered, why = h.tellNoTeamUploaderOf(ctx, strings.Repeat("c", 64), "[Coral] a line")
+	assert.False(t, delivered)
+	assert.Equal(t, "no_uploader", why, "a file no session of an agent on no team holds")
+	assert.Len(t, mock.sentTo(name), 1, "only the woken one was typed")
+}
