@@ -114,7 +114,7 @@ const { coralReady } = require('./helpers/wait');
 
         console.log('7. A row says two tags then +N; the title and the row\'s name list them all');
         const row = await ev(`(() => { const r = ${rowOf('log.txt')}, w = r.querySelector('.artifact-tags-row'); return { chips: [...w.querySelectorAll('.artifact-tag:not(.artifact-tag-more)')].map(c => c.textContent), more: w.querySelector('.artifact-tag-more')?.textContent, title: w.title, name: r.querySelector('input[type=checkbox]').getAttribute('aria-label') }; })()`);
-        assert.deepEqual(row, { chips: ['alpha', 'beta'], more: '+1', title: 'Tags: alpha, beta, gamma', name: 'Select log.txt, tags: alpha, beta, gamma' });
+        assert.deepEqual(row, { chips: ['alpha', 'beta'], more: '+1', title: 'Tags: alpha, beta, gamma', name: 'Select log.txt, tags: alpha, beta, gamma, Uploaded by Backend Dev' });
         const two = await ev(`(() => { const w = ${rowOf('plan.txt')}.querySelector('.artifact-tags-row'); return { n: w.querySelectorAll('.artifact-tag').length, more: !!w.querySelector('.artifact-tag-more') }; })()`);
         assert.deepEqual(two, { n: 2, more: false }, 'two tags: no +N');
         console.log('   ✓');
