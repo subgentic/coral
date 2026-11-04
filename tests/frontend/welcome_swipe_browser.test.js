@@ -70,7 +70,9 @@ const { installGuard, reached } = require('./helpers/silent_dismiss');
         check((await titles()).includes(AGENT) && after.some(p => p.inbox_welcome === 'on' && !String(p.inbox_welcome_done).split(',').includes('agent')), 'Undo puts the row back and saves it: ' + JSON.stringify(after.slice(-1)));
 
         // the visible Dismiss button is the same dismissal, with no Undo toast
-        await ev(`document.querySelectorAll('.toast').forEach(t => t.remove()); [...${rowOf('Make a team so agents can work together')}.querySelectorAll('button')].find(b => b.textContent.trim() === 'Dismiss').click(); true`);
+        const TEAM = 'Make a team so agents can work together';
+        try { await waitFor(`!!${rowOf(TEAM)}`, 'the team item is a row to press Dismiss on', 8000); } catch (e) { throw new Error(e.message + ' | rows now: ' + JSON.stringify(await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].map(tr => (tr.querySelector('.inbox-welcome-name') || tr).textContent.slice(0, 50))`))); } // a row that is not there says which are (the list may be drawn again after Undo)
+        await ev(`document.querySelectorAll('.toast').forEach(t => t.remove()); [...${rowOf(TEAM)}.querySelectorAll('button')].find(b => b.textContent.trim() === 'Dismiss').click(); true`);
         await waitFor(`![...document.querySelectorAll('#group-table-view .inbox-welcome-name')].some(e => ${NAME_TEXT}(e) === 'Make a team so agents can work together')`, 'the Dismiss button dismisses', 6000).catch(() => {});
         check(!(await titles()).includes('Make a team so agents can work together') && !(await ev(`[...document.querySelectorAll('.toast')].some(t => /Undo/.test(t.textContent))`)), 'the Dismiss button still works and offers no Undo');
 
