@@ -65,7 +65,7 @@ assert.equal(previous.items.length,300);assert.equal(previous.cursor,'opaque-aft
     assert.equal(r.c.done,true,'prior done and no total: done');
     r=merge(false,300);      // a prior that was not done is not made done by a total
     assert.equal(r.c.done,false,'a prior that was not done stays not done even when the total is covered');
-    r=merge(true,'300');     // a total that is not an integer is no total
+    r=merge(true,'999');     // a total that is not an integer is no total ('999' would read as above the rows held if it were compared)
     assert.equal(r.c.done,true,'a non-integer total is ignored');
 }
 // 3. truncated carries over: either side's truncation marks the merged window, and neither side clears the other's.
