@@ -176,3 +176,23 @@ func TestASettingsNoticeCannotMentionAnyoneThroughWhatItQuotes(t *testing.T) {
 		assert.LessOrEqual(t, len(text), 1600)
 	}
 }
+
+// #13221 (first_run_walkthrough): a team's own launch applies the launch dialog's choices with one settings save (team_launch_settings.js). That is how the team starts, not a change to tell its Orchestrator about:
+// it would be the Orchestrator's first message ("You have 1 unread message") before its first task. The save says it is the launch's (launch: true) and tells nothing; every later save is told as before.
+func TestATeamsLaunchSettingsAreNotToldToItsOrchestratorButLaterSavesAre(t *testing.T) {
+	holdSettingsNotices(t)
+	server, h := setupBoardTestServer(t)
+	base := server.URL + "/api/board/launch-team"
+	postJSON(t, base+"/subscribe", map[string]string{"subscriber_id": "Lead", "job_title": "Orchestrator"}).Body.Close()
+
+	require.Equal(t, http.StatusOK, putJSON(t, base+"/settings", `{"subscriber_id":"Operator","launch":true,"cross_team_messaging":false,"require_goal":true}`))
+	h.bs.FlushSettingsNotice(context.Background(), "launch-team")
+	assert.Empty(t, settingsNotices(t, h.bs, "launch-team"), "the launch's own save is not a change to tell")
+
+	require.Equal(t, http.StatusOK, putJSON(t, base+"/settings", `{"subscriber_id":"Operator","max_open_goals":3}`))
+	h.bs.FlushSettingsNotice(context.Background(), "launch-team")
+	got := settingsNotices(t, h.bs, "launch-team")
+	require.Len(t, got, 1, "a later save is told")
+	assert.Contains(t, got[0], "max_open_goals: 0 -> 3")
+	assert.NotContains(t, got[0], "require_goal", "what the launch saved is not told with it")
+}
