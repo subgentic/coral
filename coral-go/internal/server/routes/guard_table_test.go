@@ -93,7 +93,11 @@ func TestValidateGuardedRoutesNamesAnUnservedEntry(t *testing.T) {
 
 	// Hub mode's registry routes may be absent outside hub mode, never in it.
 	plain := chi.NewRouter()
-	for _, k := range append(OperatorOnlyRouteKeys(), "POST /api/sessions/launch", "POST /api/sessions/launch-team") {
+	keys := OperatorOnlyRouteKeys()
+	for k := range recordedAgentRoutes {
+		keys = append(keys, k)
+	}
+	for _, k := range keys {
 		if hubModeRoutes[k] {
 			continue
 		}
