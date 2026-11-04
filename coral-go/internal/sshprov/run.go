@@ -240,6 +240,7 @@ type Runner struct {
 type Result struct {
 	Stdout   string
 	ExitCode int
+	Stderr   string // the start of what the command wrote to stderr, cleaned, for the hub's log only; set when it exited non-zero
 }
 
 // ErrHostKey is an unknown or changed host key (ssh refused it). The owner confirms or investigates; the runner never accepts it.
@@ -453,6 +454,7 @@ func (r Runner) RunInput(ctx context.Context, t Target, input io.Reader, c Comma
 			se := errOut.b.String()
 			return res, &ConnectError{Kind: classifyConnect(se), Stderr: cleanStderr(se)}
 		}
+		res.Stderr = cleanStderr(errOut.b.String())
 		return res, nil // the command ran and exited non-zero: the caller reads ExitCode (tmux absent is not an error)
 	}
 	if ctx.Err() != nil {

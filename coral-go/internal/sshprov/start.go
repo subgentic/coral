@@ -109,7 +109,8 @@ func (r Runner) StopAndConfirm(ctx context.Context, t Target) error {
 }
 
 // InstallOwnerSecret installs the secret the hub signs its owner stamps for this computer with (#11378): the far Coral's own `hub-owner-secret` command writes it (0600) under the id this hub knows the
-// computer by. Both go on stdin; nothing of them is in argv, a log or an error.
+// computer by. Both go on stdin; nothing of them is in argv. A failure keeps the start of the far computer's stderr for the hub's log (#13251) with the secret and the id taken out of it first: a far command that echoed its stdin
+// in an error would otherwise put the secret in the log, and no general redactor knows a random hub-owner secret.
 func (r Runner) InstallOwnerSecret(ctx context.Context, t Target, version, remoteID, secret string) error {
 	payload, err := json.Marshal(map[string]string{"remote": remoteID, "secret": secret})
 	if err != nil {
@@ -120,10 +121,28 @@ func (r Runner) InstallOwnerSecret(ctx context.Context, t Target, version, remot
 		return err
 	}
 	if res.ExitCode != 0 {
-		return errors.New("sshprov: the far computer did not take the secret")
+		return &OwnerSecretError{ExitCode: res.ExitCode, Stderr: withoutSecret(res.Stderr, secret, string(payload))}
 	}
 	return nil
 }
+
+// longHex is a run of 16 or more hex digits: a secret, or the part of one the stderr's length cut left (the secret is 64 digits and the text is cut at 300 characters).
+var longHex = regexp.MustCompile(`(?i)[0-9a-f]{16,}`)
+
+// withoutSecret takes the secret, the whole stdin and any long hex run out of the far computer's stderr before the hub logs it (#13251, Security's SHOULD).
+func withoutSecret(s, secret, payload string) string {
+	s = strings.ReplaceAll(s, payload, "[stdin]")
+	s = strings.ReplaceAll(s, secret, "[secret]")
+	return longHex.ReplaceAllString(s, "[hex]")
+}
+
+// OwnerSecretError is the far computer's `hub-owner-secret` ending non-zero (#13230: the install failed with nothing said anywhere). The exit code and the start of its stderr are for the hub's log only.
+type OwnerSecretError struct {
+	ExitCode int
+	Stderr   string
+}
+
+func (e *OwnerSecretError) Error() string { return "sshprov: the far computer did not take the secret" }
 
 // ErrPortInUse is port 8420 held on the far computer by something that is not this user's coral-server session: another user's Coral, usually. Every Coral set up from here listens on 8420, so a second
 // user's would fail to bind and the hub would talk to the first user's with the second's key.

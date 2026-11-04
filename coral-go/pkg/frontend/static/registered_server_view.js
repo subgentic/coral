@@ -212,6 +212,7 @@ function pageHtml(s) {
         : `<button type="button" class="btn" data-action="test" data-id="${escHtml(s.id)}"${busy ? ' disabled aria-busy="true"' : ''}>${busy ? 'Testing...' : 'Test'}</button>
            <button type="button" class="btn" data-action="edit" data-id="${escHtml(s.id)}"${busy ? ' disabled' : ''}>Edit</button>
            ${s.transport === 'ssh' && !running ? `${upgradeControl(s, version, busy)}
+           ${s.owner_stamp ? '' : `<button type="button" class="btn" data-action="ssh-approvals" data-id="${escHtml(s.id)}"${busy ? ' disabled' : ''}>Set up approvals</button>`}
            <button type="button" class="btn" data-action="ssh-stop" data-id="${escHtml(s.id)}"${busy ? ' disabled' : ''}>Stop Coral</button>
            <button type="button" class="btn btn-danger" data-action="ssh-remove" data-id="${escHtml(s.id)}"${busy ? ' disabled' : ''}>Uninstall</button>` : ''}
            ${s.transport !== 'ssh' ? `<button type="button" class="btn" data-action="owner-secret" data-id="${escHtml(s.id)}"${busy ? ' disabled' : ''}>${s.owner_stamp ? 'Change the Approve secret' : 'Approve through this hub'}</button>` : ''}
@@ -375,7 +376,7 @@ async function onClick(e) {
         return render();
     }
     if (action === 'ssh-back') { closeSsh(); _focusNext = 'row'; return render(); }
-    if (action === 'ssh-upgrade' || action === 'ssh-stop' || action === 'ssh-remove') {
+    if (action === 'ssh-upgrade' || action === 'ssh-stop' || action === 'ssh-remove' || action === 'ssh-approvals') {
         const s = _servers.find(x => x.id === id);
         if (!s) return;
         _ssh = { mode: 'manage', server: { id: s.id, label: s.label }, action: action.slice(4) };

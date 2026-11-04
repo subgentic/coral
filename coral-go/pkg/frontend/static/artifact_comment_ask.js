@@ -2,7 +2,8 @@
 import { importOnce } from './import_once.js';
 import { isSignedOut } from './overload.js';
 import { scrollBehavior } from './motion.js';
-import { decisionNeedsPerson } from './server_base.js';
+import { decisionNeedsPerson, normServer } from './server_base.js';
+import { state } from './state.js';
 const api = await importOnce('./artifact_comments_api.js');
 const askUi = await importOnce('./artifact_comment_send.js');
 const { agentLink } = await importOnce('./agent_link.js');
@@ -11,6 +12,13 @@ const { agentLink } = await importOnce('./agent_link.js');
 export function createAsk({ st, panel, render, announce, refresh, ownHex }) {
     const askedBy = new Map(); // comment id -> Map(agent role, lowercase -> words): who was asked into a thread from this panel (the server refuses a second ask of an open one, and says so)
     const canAsk = (c) => !decisionNeedsPerson(st.server) && !!st.board && !!st.data?.canLock && !c.deleted && !c.resolved && c.parentId == null;
+    /** Why Send to agent is not offered on this computer's file, when the reason is the missing Approve secret (#13230): `{ id, ssh }` for the computer, null when nothing is wrong. A person who comments on a file from a computer set up
+     *  over SSH saw no Send to agent and no word why; the note says it and points at the Computers page, where an SSH computer has a button that sets it up. */
+    const askSetup = () => {
+        if (!st.board || !st.data?.canLock || !decisionNeedsPerson(st.server)) return null;
+        const live = (state.servers || []).find(s => s && normServer(s.id) === normServer(st.server));
+        return live ? { id: live.id, ssh: live.transport === 'ssh' } : null;
+    };
     const names = new Map(); // lower-cased role -> the role as written ("UX/UX Engineer"): the line under a comment shows it as written (#12168)
     const askedOf = (id) => askedBy.get(id) || (askedBy.set(id, new Map()), askedBy.get(id));
     // Who is asked into this thread: what the server's list says (an ask that is still open, with how many times the agent has replied: it survives a reload) and what this page sent since (the newest words).
@@ -75,5 +83,5 @@ export function createAsk({ st, panel, render, announce, refresh, ownHex }) {
         redrawAsk(); redrawStatus(k.id);
         panel.querySelector('.ac-ask .ac-cancel')?.focus();
     }
-    return { canAsk, openAsk, askBlock, askedNow, statusWords, fillStatus };
+    return { canAsk, askSetup, openAsk, askBlock, askedNow, statusWords, fillStatus };
 }

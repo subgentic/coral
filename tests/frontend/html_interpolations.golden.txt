@@ -303,7 +303,7 @@
 1	registered_server_view.js	label
 1	registered_server_view.js	m.cls
 1	registered_server_view.js	online
-1	registered_server_view.js	s.transport === 'ssh' && !running ? `${upgradeControl(s, version, busy)} <button type="button" class="btn" dat
+1	registered_server_view.js	s.transport === 'ssh' && !running ? `${upgradeControl(s, version, busy)} ${s.owner_stamp ? '' : `<button type=
 1	registered_server_view.js	setup
 1	registered_server_view.js	statusPill(status)
 1	registered_server_view.js	title

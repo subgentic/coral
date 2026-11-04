@@ -34,6 +34,8 @@ func manageSteps(kind string) []provisionStep {
 			s("install", "Download, verify and install this hub's release"), s("restart", "Restart Coral on the new release"), s("verify", "Check that it answers")}
 	case kindStop:
 		return []provisionStep{s("connect", "Connect over SSH and check the host key"), s("identity", "Check it is the computer that was set up"), s("stop", "Stop Coral")}
+	case kindApprovals:
+		return []provisionStep{s("connect", "Connect over SSH and check the host key"), s("identity", "Check it is the computer that was set up"), s("approvals", "Set up Approve through this hub")}
 	}
 	return []provisionStep{s("connect", "Connect over SSH and check the host key"), s("identity", "Check it is the computer that was set up"), s("stop", "Stop Coral"),
 		s("remove", "Delete the installed files"), s("forget", "Remove it from this hub")}
@@ -45,8 +47,8 @@ func (pr *Provisioner) planManage(w http.ResponseWriter, r *http.Request, req pl
 		errBadRequest(w, "a server to manage is named by its id only")
 		return
 	}
-	if req.Action != kindUpgrade && req.Action != kindStop && req.Action != kindRemove {
-		errBadRequest(w, "the action is upgrade, stop or remove")
+	if req.Action != kindUpgrade && req.Action != kindStop && req.Action != kindRemove && req.Action != kindApprovals {
+		errBadRequest(w, "the action is upgrade, stop, remove or approvals")
 		return
 	}
 	if req.DeleteData && req.Action != kindRemove {
@@ -136,6 +138,8 @@ func (pr *Provisioner) runPlan(ctx context.Context, p *provisionPlan) {
 		pr.upgradeSteps(ctx, p)
 	case kindStop:
 		pr.stopSteps(ctx, p)
+	case kindApprovals:
+		pr.approvalsSteps(ctx, p)
 	case kindRemove:
 		pr.removeSteps(ctx, p)
 	}
@@ -171,6 +175,86 @@ func (pr *Provisioner) identity(ctx context.Context, p *provisionPlan, row *stor
 	}
 	p.setStep("identity", stepOK, "It is the computer that was set up.")
 	return true
+}
+
+// ownerFolder is the release folder whose own `hub-owner-secret` takes the secret: the release the computer runs when an approvals plan read it (and it is a plain version), else this hub's.
+func (pr *Provisioner) ownerFolder(p *provisionPlan) string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if sshprov.ValidVersion(p.ownerVersion) {
+		return p.ownerVersion
+	}
+	return pr.version
+}
+
+// installOwnerLogged installs the secret and, when that fails, logs why (#13230: an owner install that failed was silent, and the person was left with Send to agent hidden and no way to see why). The exit code and
+// the start of the far computer's stderr go to the hub's log; the person is shown a fixed sentence.
+func (pr *Provisioner) installOwnerLogged(ctx context.Context, p *provisionPlan, secret string) error {
+	err := pr.installOwner(ctx, p, secret)
+	if err != nil {
+		attrs := []any{"plan", p.ID, "server", p.ServerID, "error", err.Error()}
+		var oe *sshprov.OwnerSecretError
+		if errors.As(err, &oe) {
+			attrs = append(attrs, "exit_code", oe.ExitCode, "stderr", oe.Stderr)
+		}
+		var ce *sshprov.ConnectError
+		if errors.As(err, &ce) {
+			attrs = append(attrs, "ssh", ce.Stderr)
+		}
+		slog.Warn("[provision] the owner secret was not installed on the computer", attrs...)
+	}
+	return err
+}
+
+// approvalsSteps gives a computer set up over SSH its Approve secret (#13230): a computer whose setup could not install it, or one set up before it existed, has Approve, Request changes and Send to agent
+// hidden here. The release folder is the one the computer's own Coral runs from (read by its health answer), else this hub's. A computer that already has one keeps it: a new secret is a person's act.
+func (pr *Provisioner) approvalsSteps(ctx context.Context, p *provisionPlan) {
+	row, err := pr.store.Get(ctx, p.ServerID)
+	if err != nil {
+		pr.fail(p, "identity", "That server is no longer registered.")
+		return
+	}
+	key, err := pr.store.DecryptedKey(ctx, p.ServerID)
+	if err != nil {
+		pr.fail(p, "identity", "This hub cannot read that server's key.")
+		return
+	}
+	if !pr.identity(ctx, p, row) {
+		return
+	}
+	if row.OwnerStamp {
+		p.setStep("approvals", stepSkipped, "Approve through this hub is already set up for it.")
+		pr.done(p)
+		return
+	}
+	p.setStep("approvals", stepRunning, "")
+	if h := pr.checkHealth(ctx, row, key); h.Status == store.RemoteStatusOnline {
+		if v := cleanVersionText(h.Version); sshprov.ValidVersion(v) {
+			p.mu.Lock()
+			p.ownerVersion = v
+			p.mu.Unlock()
+		}
+	}
+	secret, err := hubowner.NewSecret()
+	if err != nil {
+		pr.fail(p, "approvals", "Could not make a secret.")
+		return
+	}
+	if err := pr.installOwnerLogged(ctx, p, secret); err != nil {
+		if isConnectFailure(err) {
+			pr.failConnect(p, "approvals", err)
+			return
+		}
+		pr.fail(p, "approvals", "That computer did not take the secret. Nothing was changed. The reason is in this hub's log.")
+		return
+	}
+	if err := pr.store.SetOwnerSecret(ctx, p.ServerID, secret); err != nil {
+		slog.Warn("[provision] could not save the owner secret", "plan", p.ID, "server", p.ServerID, "error", err.Error())
+		pr.fail(p, "approvals", "The computer took the secret but this hub could not save it. Try again.")
+		return
+	}
+	p.setStep("approvals", stepOK, "Approve and Request changes now work through this hub. It takes a minute to show.")
+	pr.done(p)
 }
 
 func (pr *Provisioner) stopSteps(ctx context.Context, p *provisionPlan) {
@@ -338,7 +422,7 @@ func (pr *Provisioner) ensureOwnerSecret(ctx context.Context, p *provisionPlan, 
 		return ""
 	}
 	secret, err := hubowner.NewSecret()
-	if err != nil || pr.installOwner(ctx, p, secret) != nil || pr.store.SetOwnerSecret(ctx, p.ServerID, secret) != nil {
+	if err != nil || pr.installOwnerLogged(ctx, p, secret) != nil || pr.store.SetOwnerSecret(ctx, p.ServerID, secret) != nil {
 		return " Approve and Request changes through this hub are not set up for it."
 	}
 	return " Approve and Request changes now work through this hub."

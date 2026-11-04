@@ -129,7 +129,7 @@ const SERVERS = [
             await shot(`servers-page-${w}`);
             ok(at + 'the page: facts, a way back, Test, Edit, Approve through this hub and Remove pinned at the foot, Remove the danger button');
 
-            // 2b. the owner-stamp button follows what the hub holds and how the computer was added (#11378): none for a computer set up over SSH (its setup installed the secret),
+            // 2b. the owner-stamp button follows what the hub holds and how the computer was added (#11378): none for a computer set up over SSH once it has its secret ('Set up approvals' until then, #13251),
             // 'Change the Approve secret' for one the hub already holds a secret for, so the one label 'Approve through this hub' is only where there is none
             const barFor = async (mutate) => {
                 await ev(`(() => { window.__list = ${JSON.stringify(SERVERS)}.map(${mutate}); window.switchNavTab('agents'); window.switchNavTab('servers'); return true; })()`);
@@ -140,7 +140,8 @@ const SERVERS = [
             };
             assert.deepEqual(await barFor(`s => s.id === 'lan' ? { ...s, owner_stamp: true } : s`), ['Test', 'Edit', 'Change the Approve secret', 'Remove'], at + 'a computer the hub holds a secret for');
             const viaSsh = await barFor(`s => s.id === 'lan' ? { ...s, transport: 'ssh', ssh_target: 'rich@192.168.1.50:22', url: 'ssh://rich@192.168.1.50:22' } : s`);
-            assert.deepEqual(viaSsh, ['Test', 'Edit', 'Upgrade', 'Stop Coral', 'Uninstall', 'Remove'], at + 'a computer set up over SSH has no Approve button: its setup installed the secret');
+            assert.deepEqual(viaSsh, ['Test', 'Edit', 'Upgrade', 'Set up approvals', 'Stop Coral', 'Uninstall', 'Remove'], at + 'a computer set up over SSH that the hub holds no secret for has the button that sets it up (#13251: its setup could not install it)');
+            assert.deepEqual(await barFor(`s => s.id === 'lan' ? { ...s, transport: 'ssh', ssh_target: 'rich@192.168.1.50:22', url: 'ssh://rich@192.168.1.50:22', owner_stamp: true } : s`), ['Test', 'Edit', 'Upgrade', 'Stop Coral', 'Uninstall', 'Remove'], at + 'one that has its secret has no such button');
             assert.deepEqual(await barFor(`s => s`), ['Test', 'Edit', 'Approve through this hub', 'Remove'], at + 'back to the plain computer');
             await waitFor(`document.activeElement && document.activeElement.id === 'servers-back'`, 'the focus on the way back').catch(() => {});
             ok(at + 'the Approve through this hub button: only where the hub holds no secret, not for an SSH computer');
