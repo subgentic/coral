@@ -4,7 +4,7 @@ import { state } from './state.js';
 import { importOnce } from './import_once.js';
 import { escapeHtml, escapeAttr, renderImagePanes } from './utils.js';
 import { renderJSONReport } from './artifact_report.js';
-import { splitKey, serverUrl, contextServer, isCloud, artifactPath } from './server_base.js';
+import { splitKey, serverUrl, contextServer, isCloud, artifactPath, boardTeamKey } from './server_base.js';
 import { inlineArtifactPath } from './artifact_paths.js';
 import { isSvg, svgDataUrl } from './image_source.js';
 import { wireDownloads } from './artifact_download.js';
@@ -197,7 +197,7 @@ export async function renderArtifact(body, uri, options, ctx) {
 async function _renderArtifactInto(body, uri, options, ctx, source, kind) {
     const { url, externalURL } = source;
     const opened = CORAL_ARTIFACT_URI_RE.exec(uri);
-    if (opened) importOnce('./inbox_reviews.js').then(m => m.markOpenedReadVisibly(opened[1])).catch(() => {}); // a for-review artifact opened in a preview is read (#9277); any other is never tagged
+    if (opened) importOnce('./inbox_reviews.js').then(m => m.markOpenedReadVisibly(opened[1], undefined, options && options.board ? boardTeamKey(options.server, options.board) : '')).catch(() => {}); // a for-review artifact opened in a preview is read (#9277); any other is never tagged; with its board known only that team is read (#13489)
     body.innerHTML = '<div class="inline-preview-loading">Loading...</div>';
     if (externalURL) {
         if (ctx.isStale()) return;
