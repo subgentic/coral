@@ -75,7 +75,13 @@ export function artifactsToolbar(redraw) {
 
 /** The folder's page for the group table: its own title row, the list and the detail pane. */
 export function artifactsSpec() {
-    return { title: 'Artifacts', headless: true, rows: [], signature: 'artifacts', node: () => {
+    return { title: 'Artifacts', headless: true, rows: [], signature: 'artifacts', preserveScroll: true, node: () => {
+        if (pageHost) {
+            // A computer rename may rebuild the parent. Keep loaded pages and
+            // the pane; refresh labels after the existing node is reattached.
+            queueMicrotask(() => { if (pageHost.isConnected) list.redraw(); });
+            return pageHost;
+        }
         const row = DT.el('div', 'inbox-artifacts-row');
         const main = DT.el('div', 'inbox-artifacts-main');
         const head = DT.el('div', 'group-table-head');

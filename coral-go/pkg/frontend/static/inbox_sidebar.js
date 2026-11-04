@@ -924,7 +924,9 @@ function hubFrameTable(key) {
 
 registerGroupSource('hub-inbox', {
     holdRedraw: true, // not redrawn under a held pointer (#12636): a row answered elsewhere would move the one under the finger
-    signature: () => JSON.stringify([state.hub, state.servers]),
+    // Only computer membership/names change the page structure. Health and
+    // last_seen updates must not replace a scrolled Artifacts subtree.
+    signature: () => JSON.stringify([state.hub, (state.servers || []).map(s => [s.id, s.label || s.name || s.id]).sort((a, b) => String(a[0]).localeCompare(String(b[0])))]),
     toolbar: key => HUB_FRAMES[key] && nativeInbox() ? null : key === 'needs' ? inboxNeedsToolbar() : key === 'tasks' ? inboxTaskToolbar() : key === 'goals' ? inboxGoalsToolbar() : key === 'saved' ? inboxSavedToolbar() : key === 'activity' ? inboxActivityToolbar() : CH.CHAT_KEY.test(key) ? inboxChatsToolbar(key) : key === 'artifacts' ? IA.artifactsToolbar(() => renderFolderCounts()) : ({ search: { id: 'inbox-search', label: 'Search the Inbox' } }), // the page's toolbar line, the same shape for Needs you, Tasks and Saved (#7723)
     keys: () => GROUPS.map(g => g.key),
     redraw: () => renderInboxNav(true),

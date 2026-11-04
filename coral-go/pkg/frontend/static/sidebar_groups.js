@@ -171,7 +171,9 @@ function drawTable() {
     const back = isPhoneLayout() && !lead ? `<button type="button" class="back-link group-table-back" data-on-click="sgroup-list" data-kind="${escapeAttr(open.kind)}">\u2190 ${escapeHtml(TAB_NAME[open.kind] || 'List')}</button>` : '';
     const bar = src.toolbar ? src.toolbar(open.key) : null;
     const html = (bar && !bar.node ? toolbarHtml(bar, tables[0]) : '') + tables.map((x, i) => tableHtml(x, i, i ? '' : back, !!bar)).join('');
-    host.dataset.group = open.kind + ':' + open.key; // which table is on screen (saved.js asks for the Inbox's Saved)
+    const groupKey = open.kind + ':' + open.key;
+    const keptScroll = host.dataset.group === groupKey && tables.some(x => x.preserveScroll) ? { top: host.scrollTop, left: host.scrollLeft } : null;
+    host.dataset.group = groupKey; // which table is on screen (saved.js asks for the Inbox's Saved)
     const a = document.activeElement, typing = a && host.contains(a) && a.id === 'gt-search' ? { start: a.selectionStart, end: a.selectionEnd } : null;
     // A component toolbar keeps its own listeners, open panel, search, and focus across table redraws.
     const toolbarFocus = bar?.node?.contains(a) ? a : null;
@@ -194,6 +196,7 @@ function drawTable() {
         for (const x of tables) if (x.node && (x.rows.length || !x.empty)) slots[k++]?.replaceWith(x.node());
         for (const x of tables) { const f = x.foot && x.foot(); if (f) host.querySelector('.vl-panel') ? host.querySelector('.vl-panel').append(f) : host.append(f); } // a line under the page that is not part of the table (Needs you's alerts offer, #11837); a phone's panel holds the page
     }
+    if (keptScroll) { host.scrollTop = keptScroll.top; host.scrollLeft = keptScroll.left; }
     if (toolbarFocus && toolbarFocus.isConnected && document.activeElement !== toolbarFocus) {
         toolbarFocus.focus({ preventScroll: true });
         if (toolbarCaret) toolbarFocus.setSelectionRange(...toolbarCaret);

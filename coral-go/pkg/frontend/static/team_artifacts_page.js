@@ -141,15 +141,17 @@ export function createArtifactsList({ inbox = false } = {}) {
 
     // ── reading the list ─────────────────────────────────────────────────────
 
+    const visibleState = () => JSON.stringify([model.items, model.hasMore, model.counts, model.error, model.notFound, model.waiting, [...model.kept], model.tagCounts, model.teams, model.partial, model.versionless]);
     async function loadArtifacts({ append = false, keep = false } = {}) {
         const { project, key } = model; if (!key || (append && (model.controller || !model.hasMore))) return;
         const scope = model.scope;
+        const quiet = keep && !append && model.items.length > 0, before = quiet ? visibleState() : null;
         clearPendingBoard(); retryLabels = false;
         model.controller?.abort();
         const gen = ++model.gen, ctrl = model.controller = new AbortController();
         if (!append) { if (!keep || !model.items.length) { model.items = []; model.hasMore = false; model.truncated = false; model.counts = null; } model.cursor = ''; model.loading = !model.items.length; }
         model.loadingMore = append; model.error = ''; model.notFound = false; model.waiting = false;
-        draw();
+        if (!quiet) draw();
         try {
             model.filters.sort = serverArtifactSort(artifactState.sort || undefined);
             const params = new URLSearchParams({ limit: String(PAGE) });
@@ -197,7 +199,7 @@ export function createArtifactsList({ inbox = false } = {}) {
             if (gen !== model.gen || e.name === 'AbortError') return;
             model.error = e.message || 'Unable to load artifacts.';
         } finally {
-            if (gen === model.gen) { model.controller = null; model.loading = false; model.loadingMore = false; draw(); }
+            if (gen === model.gen) { model.controller = null; model.loading = false; model.loadingMore = false; if (!quiet || before !== visibleState()) draw(); }
         }
     }
 
@@ -319,6 +321,9 @@ export function createArtifactsList({ inbox = false } = {}) {
         const body = root && root.querySelector('.team-artifacts-body'); if (!body) return;
         const rowsBefore = drawnRows;
         const box = scrollBox(body), at = box ? box.scrollTop : 0;
+        const edge = box?.getBoundingClientRect().top;
+        const anchor = box && [...body.querySelectorAll('tbody tr[data-key]')].find(r => r.getBoundingClientRect().bottom > edge);
+        const anchorKey = anchor?.dataset.key, anchorY = anchor?.getBoundingClientRect().top;
         const tableBox = body.querySelector('.dt-box'), tableAt = tableBox ? tableBox.scrollTop : 0; // the table's own box is built again with the table
         ensureBar();
         const a = document.activeElement;
@@ -392,7 +397,9 @@ export function createArtifactsList({ inbox = false } = {}) {
         bar.set(model.filters, model.counts ? model.counts : model.items.length || !model.loading ? { matched: model.items.length, all: model.items.length } : null);
         drawnRows = model.items.length;
         if (tableAt) { const now = body.querySelector('.dt-box'); if (now) now.scrollTop = tableAt; }
-        if (box && box.scrollTop !== at) box.scrollTop = at; // the same place in the list, as the redraw left the box shorter for a moment
+        if (box && box.scrollTop !== at) box.scrollTop = at;
+        const sameRow = anchorKey && body.querySelector(`tr[data-key="${CSS.escape(anchorKey)}"]`);
+        if (box && sameRow) box.scrollTop += sameRow.getBoundingClientRect().top - anchorY; // keep the logical row when uploads sort above it // the same place in the list, as the redraw left the box shorter for a moment
         // Load more: the button again, or, when the last page came and the button is gone, the first new row (the keyboard stays in the list, not on the page)
         if (held === '#load-more') (body.querySelector('.dt-more') || body.querySelectorAll('[data-artifact-id]')[Math.min(rowsBefore, model.items.length - 1)])?.focus({ preventScroll: true });
         else if (held === '#retry') (body.querySelector('.team-artifacts-retry') || body.querySelector('[data-artifact-id]') || bar.node.querySelector('.list-bar-search'))?.focus({ preventScroll: true }); // Retry is drawn away by the answer: the list's first row, never the page
@@ -573,7 +580,7 @@ export function createArtifactsList({ inbox = false } = {}) {
         if (root && root.isConnected && root.getClientRects().length) loadArtifacts({ keep: true });
     }
 
-    return { listChanged, loadArtifacts, showArtifacts, useBar, reviewPills, setFilters: next => setFilters(next), filters: () => model.filters, teams: () => model.teams, names: () => [...new Set(model.items.flatMap(i => [i.produced_by, i.sent_by]).filter(n => typeof n === 'string' && n))].sort().slice(0, 50) };
+    return { redraw: draw, listChanged, loadArtifacts, showArtifacts, useBar, reviewPills, setFilters: next => setFilters(next), filters: () => model.filters, teams: () => model.teams, names: () => [...new Set(model.items.flatMap(i => [i.produced_by, i.sent_by]).filter(n => typeof n === 'string' && n))].sort().slice(0, 50) };
 }
 
 const teamList = createArtifactsList(); // the team page's and the agent tab's: one at a time on screen
