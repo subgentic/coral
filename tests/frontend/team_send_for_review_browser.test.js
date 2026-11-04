@@ -44,6 +44,8 @@ const { coralReady } = require('./helpers/wait');
         await waitFor(`!!document.querySelector('dialog.send-review-dialog[open] input')`, 'the question dialog', 8000);
         const dlg = await ev(`(() => { const d = document.querySelector('dialog.send-review-dialog[open]'), i = d.querySelector('input'); return { title: d.querySelector('h2').textContent, label: d.querySelector('label').textContent, labelled: d.getAttribute('aria-labelledby') === d.querySelector('h2').id && d.querySelector('label').htmlFor === i.id, focused: document.activeElement === i, max: i.maxLength, described: !!document.getElementById(i.getAttribute('aria-describedby')) }; })()`);
         assert.ok(/plan\.txt/.test(dlg.title) && /optional/.test(dlg.label) && dlg.labelled && dlg.focused && dlg.max === 140 && dlg.described, 'the dialog names the file, says the question is optional, is labelled and focused: ' + JSON.stringify(dlg));
+        const box = await ev(`(() => { const r = document.querySelector('dialog.send-review-dialog[open]').getBoundingClientRect(); return { cx: Math.round((r.left + r.right) / 2), cy: Math.round((r.top + r.bottom) / 2), vw: innerWidth, vh: innerHeight, left: Math.round(r.left), top: Math.round(r.top) }; })()`);
+        assert.ok(Math.abs(box.cx - box.vw / 2) <= 2 && Math.abs(box.cy - box.vh / 2) <= 2 && box.left > 0 && box.top > 0, 'the dialog is centred in the window, not in its top-left corner: ' + JSON.stringify(box));
         await shot('send_for_review_dialog');
         await ev(`[...document.querySelectorAll('dialog.send-review-dialog[open] button')].find(b => b.textContent === 'Cancel').click(); true`);
         await waitFor(`!document.querySelector('dialog.send-review-dialog')`, 'the dialog closed', 4000);

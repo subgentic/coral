@@ -5,6 +5,8 @@
  * The server applies an upload's own rules (a file Needs you cannot show inline is refused, the question is cleaned and cut at 140 characters) and answers in words for a person. The question is optional
  * here: it is the Operator's own file. Lazy: the pages import it when the action is used. */
 import { boardFetch } from './server_base.js';
+import { loadStyles } from './lazy_styles.js';
+await loadStyles('send_review_dialog.css'); // the dialog's own placement and type (it is drawn only here)
 
 const QUESTION_MAX = 140;
 
