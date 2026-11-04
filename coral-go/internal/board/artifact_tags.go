@@ -8,6 +8,9 @@ import (
 	"sort"
 	"strings"
 	"unicode"
+
+	"modernc.org/sqlite"
+	sqlite3 "modernc.org/sqlite/lib"
 )
 
 // Artifact tags (#8583, Goal #61): short lowercase words a team puts on its artifacts to find the ones that matter ("for review", "internal"). A tag belongs to a team's use of a stored object (board,
@@ -156,8 +159,12 @@ func (s *Store) setArtifactTags(ctx context.Context, boardID, hex string, tags, 
 		if !sameTagSet(have, was) {
 			return ErrArtifactTagsChanged
 		}
+		tagsCASAfterRead()
 	}
 	if _, err := tx.ExecContext(ctx, `DELETE FROM artifact_tags WHERE board_id = ? AND hex = ?`, boardID, hex); err != nil {
+		if check && isSQLiteBusy(err) { // a writer committed after this transaction's read: the snapshot is stale, which is the same answer as a changed list (#13138)
+			return ErrArtifactTagsChanged
+		}
 		return err
 	}
 	if !slices.Contains(tags, tagForReview) { // the tag is gone: the question it came with goes too (#11555)
@@ -170,7 +177,28 @@ func (s *Store) setArtifactTags(ctx context.Context, boardID, hex string, tags, 
 			return err
 		}
 	}
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		if check && isSQLiteBusy(err) {
+			return ErrArtifactTagsChanged
+		}
+		return err
+	}
+	return nil
+}
+
+// tagsCASAfterRead is a seam for a test: it runs inside SetArtifactTagsIf once its read matched, before the write.
+var tagsCASAfterRead = func() {}
+
+// isSQLiteBusy says err is SQLite's busy or locked answer (including the stale-snapshot kind a deferred transaction gets when it upgrades to a write after another writer committed).
+func isSQLiteBusy(err error) bool {
+	var se *sqlite.Error
+	if errors.As(err, &se) {
+		switch se.Code() & 0xff {
+		case sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED:
+			return true
+		}
+	}
+	return false
 }
 
 // sameTagSet says a and b hold the same tags, whatever their order or repeats.
