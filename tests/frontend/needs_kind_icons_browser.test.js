@@ -36,15 +36,26 @@ const { coralReady, framesJs } = require('./helpers/wait');
 
             // B: in the real table: the icon leads the agent's button, the click target stays, the row's height is the same without it
             // inCell: the row holds the icon (in the first cell on a computer, in the mail row's button on a phone)
-            const row = await ev(`(() => { const tr = document.querySelector('${T} tbody tr'), td = tr.querySelector('td'), i = tr.querySelector('.inbox-kind-icon'), btn = tr.querySelector('.dt-primary'), h = () => Math.round(tr.getBoundingClientRect().height);
+            const measureRow = () => ev(`(() => { const tr = document.querySelector('${T} tbody tr'), td = tr.querySelector('td'), i = tr.querySelector('.inbox-kind-icon'), btn = tr.querySelector('.dt-primary'), h = () => Math.round(tr.getBoundingClientRect().height);
                 if (!i) return null; const withIcon = h(), t = tr.textContent; i.style.display = 'none'; const without = h(); i.style.display = '';
-                return { label: i.getAttribute('aria-label'), kind: i.dataset.kind, mail: !!btn.contains(i), before: btn.contains(i) ? !!(i.compareDocumentPosition(tr.querySelector('.dt-mail-title')) & Node.DOCUMENT_POSITION_FOLLOWING) : !!(i.compareDocumentPosition(btn) & Node.DOCUMENT_POSITION_FOLLOWING), withIcon, without, hasName: /Backend Dev/.test(t), noLigatureText: !/lock|help_outline|rate_review/.test(t), inCell: tr.contains(i), iconRight: Math.round(i.getBoundingClientRect().right), btnLeft: Math.round(btn.getBoundingClientRect().left), color: getComputedStyle(i).color }; })()`);
+                return { label: i.getAttribute('aria-label'), kind: i.dataset.kind, mail: !!btn.contains(i), before: (() => { const t = tr.querySelector('.dt-mail-title'); return t ? (t.contains(i) && t.firstChild === i) : !!(i.compareDocumentPosition(btn) & Node.DOCUMENT_POSITION_FOLLOWING); })(), sameLine: (() => { const t = tr.querySelector('.dt-mail-title'); if (!t) return true; const a = i.getBoundingClientRect(), b = t.getBoundingClientRect(), mid = (a.top + a.bottom) / 2; return mid >= b.top - 1 && mid <= b.bottom + 1; })(), name: btn.getAttribute('aria-label') || '', withIcon, without, hasName: /Backend Dev/.test(t), noLigatureText: !/lock|help_outline|rate_review/.test(t), inCell: tr.contains(i), iconRight: Math.round(i.getBoundingClientRect().right), btnLeft: Math.round(btn.getBoundingClientRect().left), color: getComputedStyle(i).color }; })()`);
+            const row = await measureRow();
             check(!!row && row.label === 'Permission' && row.kind === 'permission' && row.inCell, at + 'the permission row has its icon: ' + JSON.stringify(row));
             check(!!row && row.before && (row.mail || row.iconRight <= row.btnLeft + 1), at + 'the icon is in front of the agent (on a phone: before the title in the row\'s line), not over it: ' + JSON.stringify(row));
             check(!!row && row.withIcon === row.without, at + `the row keeps its height (${row && row.withIcon} with the icon, ${row && row.without} without)`);
             check(!!row && row.hasName && row.noLigatureText, at + 'the row text is its words, no icon names: ' + JSON.stringify(row));
             await shot(`needs_kind_icons_${w}`);
             check(await ev(`!!document.querySelector('${T} tbody tr .dt-primary')`), at + 'the agent button is still there');
+            if (mobile) { // a phone's open button names itself (aria-label): the kind is in that name, and the focused control says it
+                check(/\bPermission\b/.test(row.name), at + "the open button's name says the kind: " + JSON.stringify(row.name));
+                const focused = await ev(`(() => { const b = document.querySelector('${T} tbody tr .dt-primary'); b.focus(); return document.activeElement === b ? (b.getAttribute('aria-label') || '') : 'not focused'; })()`);
+                check(/Permission/.test(focused), at + 'the focused control is named with the kind: ' + focused);
+            }
+            // real 200% text (root 32 px): the icon stays on the title's own line and the row is as tall with it as without
+            await ev(`document.documentElement.style.fontSize = '200%'; true`); await ev(framesJs(4));
+            const big = await measureRow();
+            check(!!big && big.before && big.sameLine && big.withIcon === big.without, at + '200% text: the icon leads the title, on its line, and the row keeps its height: ' + JSON.stringify(big));
+            await ev(`document.documentElement.style.fontSize = ''; true`);
         }
     } finally { await client.close(); }
     if (failures.length) { console.error(failures.join('\n')); process.exit(1); }

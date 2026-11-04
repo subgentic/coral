@@ -598,6 +598,7 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 
 /* A Needs you row's kind icon (#13144, needs_filters.js kindIcon): a small leading glyph, the sidebar's secondary colour, no taller than the row's text line so the row keeps its height. The glyph is drawn here from data-kind (icons in the font subset). */
 .material-icons.inbox-kind-icon { font-size: var(--fs-xl); color: var(--text-secondary); align-self: center; margin-right: 6px; vertical-align: middle; }
+.dt-mail-title > .material-icons.inbox-kind-icon { vertical-align: -3px; margin-block: -2px; margin-right: 6px; } /* inside a phone row's title (the line's cut and wraps act on the title): no taller than the text's own line */
 .inbox-kind-icon::before { content: 'help_outline'; }
 .inbox-kind-icon[data-kind="permission"]::before { content: 'lock'; }
 .inbox-kind-icon[data-kind="other"]::before { content: 'input'; }
