@@ -23,3 +23,4 @@ body[data-chief="true"] .chat-bubble.assistant::before { content: var(--chief-le
 .sidebar-chief-link { display: flex; align-items: center; justify-content: flex-start; gap: 8px; width: 100%; min-height: 36px; text-decoration: none; }
 .sidebar-chief-link > span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nav-more-item .chief-avatar { width: 20px; height: 20px; font-size: var(--fs-sm); }
+.sidebar-chief-slot { min-width: 0; } /* a long name is cut inside the slot, not widening it (the slot's size and reserved room are in layout.css) */
