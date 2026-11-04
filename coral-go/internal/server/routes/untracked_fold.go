@@ -3,6 +3,7 @@ package routes
 import (
 	"bytes"
 	"fmt"
+	"github.com/subgentic/coral/internal/gitutil"
 	"os"
 	"path/filepath"
 )
@@ -11,9 +12,9 @@ import (
 // grow a row per file. A BIG untracked folder is now one entry, as `git status` shows it; a small one (a new package an agent just wrote) stays file by file, so its code can still be reviewed. No name decides it:
 // only how many files and how many bytes.
 const (
-	foldFilesOver = 20        // a folder with more untracked files than this is folded
-	foldBytesOver = 256 << 10 // or with more than this many bytes in them
-	foldStatMax   = 5000      // files whose size is read for the note: the count is always exact, the size is "at least" past this
+	foldFilesOver = gitutil.UntrackedFoldFilesOver // a folder with more untracked files than this is folded
+	foldBytesOver = gitutil.UntrackedFoldBytesOver // or with more than this many bytes in them
+	foldStatMax   = 5000                           // files whose size is read for the note: the count is always exact, the size is "at least" past this
 )
 
 // untrackedItem is one untracked path: a file, or a big folder folded to one entry (Path ends in "/", Files and Bytes say what is in it).

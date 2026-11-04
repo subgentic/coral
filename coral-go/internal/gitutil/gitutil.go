@@ -351,3 +351,9 @@ func ValidRef(ref string) error {
 	}
 	return nil
 }
+
+// An untracked folder with more files than UntrackedFoldFilesOver, or more bytes than UntrackedFoldBytesOver, is one entry in the changes views (#12524); a smaller one is its files, so a new package can be reviewed.
+const (
+	UntrackedFoldFilesOver = 20
+	UntrackedFoldBytesOver = 256 << 10
+)

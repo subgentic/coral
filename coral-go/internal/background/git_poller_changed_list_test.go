@@ -53,12 +53,16 @@ func TestGitPollKeepsTheSameFilesWhenNothingChanged(t *testing.T) {
 	require.Equal(t, "f-00000.txt", first[0], "the kept files are the first by name, not an arbitrary subset")
 }
 
-// An untracked folder: git status (normal) names the folder, 'gen/'; the list must hold the files in it.
-func TestGitPollListsTheFilesOfAnUntrackedFolder(t *testing.T) {
+// An untracked folder: git status (normal) names the folder, 'gen/'. A small one is its files, as the Files route lists it (#12524), so a new package can be reviewed; a big one (over 20 files) stays one entry.
+func TestGitPollListsTheFilesOfASmallUntrackedFolderAndFoldsABigOne(t *testing.T) {
 	dir := repoWithTracked(t, 1)
 	require.NoError(t, os.MkdirAll(filepath.Join(dir, "gen", "sub"), 0o755))
 	for _, n := range []string{"gen/a.txt", "gen/b.txt", "gen/sub/c.txt"} {
 		require.NoError(t, os.WriteFile(filepath.Join(dir, n), []byte("z\n"), 0o644))
+	}
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "big"), 0o755))
+	for i := 0; i < 25; i++ {
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "big", fmt.Sprintf("f%02d.txt", i)), []byte("z\n"), 0o644))
 	}
 	sid := "s-untracked"
 	p, gs := newPollerFor(t, dir, sid)
@@ -70,5 +74,5 @@ func TestGitPollListsTheFilesOfAnUntrackedFolder(t *testing.T) {
 		got = append(got, f.Filepath)
 	}
 	sort.Strings(got)
-	require.Equal(t, []string{"gen/a.txt", "gen/b.txt", "gen/sub/c.txt"}, got, "three new files, not one 'gen/' entry")
+	require.Equal(t, []string{"big/", "gen/a.txt", "gen/b.txt", "gen/sub/c.txt"}, got, "three new files of a small folder, one entry for the folder of 25")
 }
