@@ -77,11 +77,11 @@ process.on('SIGINT', () => done(130));
     };
 
     // ── request recording ──
-    const reqs = new Map(); const rows = []; let phase = 'load'; let t0 = 0; let started = 0;
-    Network.requestWillBeSent(e => { if (e.request.url.startsWith(BASE)) started++; if (e.request.url.startsWith(BASE)) reqs.set(e.requestId, { url: e.request.url, method: e.request.method, sent: e.timestamp, phase, at: e.timestamp }); });
+    const reqs = new Map(); const rows = []; let phase = 'load'; let t0 = 0; let started = 0; let lastActivity = Date.now();
+    Network.requestWillBeSent(e => { if (e.request.url.startsWith(BASE)) { started++; lastActivity = Date.now(); } if (e.request.url.startsWith(BASE)) reqs.set(e.requestId, { url: e.request.url, method: e.request.method, sent: e.timestamp, phase, at: e.timestamp, type: e.type }); });
     Network.responseReceived(e => { const r = reqs.get(e.requestId); if (r) r.status = e.response.status; });
-    Network.loadingFinished(e => { const r = reqs.get(e.requestId); if (!r) return; r.end = e.timestamp; r.bytes = e.encodedDataLength; rows.push(r); reqs.delete(e.requestId); });
-    Network.loadingFailed(e => { const r = reqs.get(e.requestId); if (!r) return; r.end = e.timestamp; r.bytes = 0; r.status = 0; rows.push(r); reqs.delete(e.requestId); });
+    Network.loadingFinished(e => { const r = reqs.get(e.requestId); if (!r) return; r.end = e.timestamp; r.bytes = e.encodedDataLength; rows.push(r); reqs.delete(e.requestId); lastActivity = Date.now(); });
+    Network.loadingFailed(e => { const r = reqs.get(e.requestId); if (!r) return; r.end = e.timestamp; r.bytes = 0; r.status = 0; rows.push(r); reqs.delete(e.requestId); lastActivity = Date.now(); });
 
     // ── the load ──
     const token = TOKEN_FILE && fs.existsSync(TOKEN_FILE) ? fs.readFileSync(TOKEN_FILE, 'utf8').trim() : '';
@@ -110,12 +110,14 @@ process.on('SIGINT', () => done(130));
         const list = document.querySelector('#live-sessions-list'); const rowsN = list ? list.children.length : 0;
         if (rowsN > 0 || performance.now() - t0 > 60000) { clearInterval(iv); res({ rows: rowsN, waited: performance.now() - t0 }); } }, 50); })`);
     const loadMs = Date.now() - t0;
-    // the first load is over once the page has started no new request for 1.5 s (or 120 s): a request still open (a stream) does not hold it
-    let quietSince = Date.now(); let lastStarted = started;
+    // The first load is over when no request of the page is still OPEN (a stream, an EventSource or a WebSocket, is not counted: it never ends) and nothing has started or finished for 1.5 s
+    // (or 120 s). The time is that of the LAST start or finish, from the navigation (#13377: it used to ignore open requests, so a 2.6 s list still in flight counted as settled at 218 ms).
+    const STREAMS = new Set(['EventSource', 'WebSocket', 'Ping', 'Other']);
     for (const end = Date.now() + 120000; Date.now() < end; await sleep(100)) {
-        if (started !== lastStarted) { lastStarted = started; quietSince = Date.now(); } else if (Date.now() - quietSince > 1500) break;
+        const open = [...reqs.values()].filter(r => !STREAMS.has(r.type));
+        if (!open.length && Date.now() - lastActivity > 1500) break;
     }
-    const settledMs = Date.now() - t0 - 1500;
+    const settledMs = lastActivity - t0;
     const nav = await ev(`(() => { const n = performance.getEntriesByType('navigation')[0]; const lcp = performance.getEntriesByType('largest-contentful-paint').pop(); const fcp = performance.getEntriesByName('first-contentful-paint')[0];
         return { domContentLoaded: n && n.domContentLoadedEventEnd, load: n && n.loadEventEnd, fcp: fcp && fcp.startTime, lcp: lcp && lcp.startTime }; })()`);
     let out_interactions = {}; let idleEnd = 0; const out_profiles = {};
