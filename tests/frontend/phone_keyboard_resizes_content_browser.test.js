@@ -21,7 +21,7 @@ const FAKE_VV = android => `(() => { ${android ? "Object.defineProperty(navigato
             if (sid) await Page.removeScriptToEvaluateOnNewDocument({ identifier: sid });
             sid = (await Page.addScriptToEvaluateOnNewDocument({ source: FAKE_VV(android) })).identifier;
             const tag = chrome100 ? 'Chrome 100 (virtualKeyboard, no resizes-content)' : android ? 'Android (resizes-content)' : 'iOS (no virtualKeyboard)';
-            await Emulation.setUserAgentOverride({ userAgent: chrome100 ? 'Mozilla/5.0 (Linux; Android 12; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.127 Mobile Safari/537.36' : '' });
+            await Emulation.setUserAgentOverride({ userAgent: chrome100 ? 'Mozilla/5.0 (Linux; Android 12; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.127 Mobile Safari/537.36' : 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Mobile Safari/537.36' });
             await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
             await ev(`window.__m.add('kb-agent', 'A', 14, { sleeping: false, session_id: 'kb-id' }); true`);
