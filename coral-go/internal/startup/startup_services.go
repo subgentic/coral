@@ -22,6 +22,7 @@ import (
 	"github.com/subgentic/coral/internal/background"
 	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/config"
+	"github.com/subgentic/coral/internal/gitguard"
 	"github.com/subgentic/coral/internal/jsonl"
 	"github.com/subgentic/coral/internal/license"
 	"github.com/subgentic/coral/internal/logexit"
@@ -209,6 +210,7 @@ func startIndexingServices(ctx context.Context, cfg *config.Config, srv *server.
 	// Git poller. Its cadence is a user setting, re-read before every wait, so
 	// someone on a repository where scanning is slow can stretch it out or
 	// turn it off without restarting.
+	gitguard.Init(cfg.CoralDir()) // the folders paused for being slow to read, kept across restarts (#13079)
 	gitPoller := background.NewGitPoller(gitStore, agentRT, time.Duration(cfg.GitPollerIntervalS)*time.Second)
 	gitPoller.SetLandingWatch(landingWatch)
 	gitPoller.SetCurrentDirFn(background.NewCurrentDirReader(jsonl.NewSessionReader().CurrentDirectory))             // the branch, commit and changed files are those of the worktree an agent has moved to (#11704)

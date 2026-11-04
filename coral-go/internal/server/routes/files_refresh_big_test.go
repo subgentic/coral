@@ -18,6 +18,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/gitguard"
 	"github.com/subgentic/coral/internal/store"
 )
 
@@ -95,4 +96,78 @@ func TestRefreshFilesOnABigRepoRunsOnePassAndSendsTheCap(t *testing.T) {
 	_ = stored
 	_ = found
 	_ = err
+}
+
+// A slow folder is paused (#13079): the page's own refresh then gets the stored list and no git runs; Refresh (manual=1) runs one pass; a manual pass that comes back fast turns live updates back on.
+func TestRefreshFilesPausesASlowFolderAndRefreshRunsOnePass(t *testing.T) {
+	gitguard.Reset()
+	t.Cleanup(gitguard.Reset)
+	oldSlow := gitguard.SlowPass
+	t.Cleanup(func() { gitguard.SlowPass = oldSlow })
+	_, handler, terminal, ss := setupSessionsTestServer(t)
+	router := chi.NewRouter()
+	router.Post("/api/sessions/live/{name}/files/refresh", handler.RefreshFiles)
+	server := httptest.NewServer(router)
+	t.Cleanup(server.Close)
+	repo := t.TempDir()
+	git := func(args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", append([]string{"-C", repo}, args...)...)
+		cmd.Env = append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "HOME="+repo)
+		out, err := cmd.CombinedOutput()
+		require.NoError(t, err, "git %v: %s", args, out)
+	}
+	git("init", "-q")
+	git("config", "user.email", "t@example.invalid")
+	git("config", "user.name", "t")
+	require.NoError(t, os.WriteFile(filepath.Join(repo, "README.md"), []byte("hi\n"), 0o644))
+	git("add", "-A")
+	git("commit", "-qm", "init")
+	for i := 0; i < 7; i++ {
+		require.NoError(t, os.WriteFile(filepath.Join(repo, fmt.Sprintf("n-%d.txt", i)), []byte("x\n"), 0o644))
+	}
+	const sid = "00000000-0000-0000-0000-00000000c2c2"
+	name := "claude-" + sid
+	terminal.addSession(name, repo)
+	require.NoError(t, ss.RegisterLiveSession(context.Background(), &store.LiveSession{SessionID: sid, AgentType: "claude", AgentName: name, WorkingDir: repo}))
+	var passes atomic.Int64
+	refreshComputeHook = func() { passes.Add(1) }
+	t.Cleanup(func() { refreshComputeHook = func() {} })
+	post := func(query string) map[string]any {
+		t.Helper()
+		req, _ := http.NewRequest("POST", server.URL+"/api/sessions/live/"+name+"/files/refresh"+query, bytes.NewBufferString(`{"session_id":"`+sid+`"}`))
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		var out map[string]any
+		require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
+		return out
+	}
+
+	gitguard.SlowPass = time.Nanosecond
+	first := post("")
+	require.EqualValues(t, 1, passes.Load())
+	require.NotNil(t, first["paused"], "a slow pass pauses the folder and the answer says so")
+	require.Len(t, first["files"], 7)
+
+	for i := 7; i < 10; i++ {
+		require.NoError(t, os.WriteFile(filepath.Join(repo, fmt.Sprintf("n-%d.txt", i)), []byte("x\n"), 0o644))
+	}
+	second := post("")
+	require.EqualValues(t, 1, passes.Load(), "a paused folder runs no git for the page's own refresh")
+	require.NotNil(t, second["paused"])
+	require.Len(t, second["files"], 7, "the stored list is the answer")
+
+	third := post("?manual=1")
+	require.EqualValues(t, 2, passes.Load(), "Refresh runs one pass on demand")
+	require.Len(t, third["files"], 10)
+	require.NotNil(t, third["paused"], "still slow, so still paused")
+
+	gitguard.SlowPass = time.Hour
+	fourth := post("?manual=1")
+	require.EqualValues(t, 3, passes.Load())
+	require.Nil(t, fourth["paused"], "a manual pass that came back fast turns live updates back on")
+	fifth := post("")
+	require.EqualValues(t, 4, passes.Load(), "live again: the page's refresh runs git")
+	require.Nil(t, fifth["paused"])
 }

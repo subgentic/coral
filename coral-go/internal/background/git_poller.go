@@ -5,6 +5,7 @@ import (
 	"bufio"
 	"context"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"github.com/subgentic/coral/internal/logsafe"
 	"log/slog"
@@ -16,6 +17,7 @@ import (
 	"time"
 
 	"github.com/subgentic/coral/internal/executil"
+	"github.com/subgentic/coral/internal/gitguard"
 	"github.com/subgentic/coral/internal/gitutil"
 	"github.com/subgentic/coral/internal/safefs"
 	setreg "github.com/subgentic/coral/internal/settings"
@@ -272,9 +274,17 @@ func (p *GitPoller) pollDir(ctx context.Context, workdir string, dirAgents []Age
 	if failed && p.now().Before(retryAt) {
 		return
 	}
+	if _, paused := gitguard.Get(workdir); paused { // too slow for live updates (#13079): the Files panel's Refresh asks for one pass on demand; nothing polls this folder
+		return
+	}
 	queryStart := time.Now()
 	gitInfo, err := queryGit(ctx, workdir)
 	queryDur := time.Since(queryStart)
+	if err != nil && (errors.Is(err, context.DeadlineExceeded) || queryDur >= gitQueryTimeout) {
+		p.logger.Warn("git is too slow for this folder; live updates paused (Refresh in the Files panel asks for one pass)", "workdir", logsafe.Dir(workdir), "duration_ms", queryDur.Milliseconds())
+		gitguard.Pause(workdir, 0, queryDur)
+		return
+	}
 	if err != nil {
 		if !failed {
 			p.logger.Warn("git query failed (not a git repository?); checking this folder again every 30 minutes", "workdir", logsafe.Dir(workdir), "duration_ms", queryDur.Milliseconds(), "error", err)
@@ -301,11 +311,20 @@ func (p *GitPoller) pollDir(ctx context.Context, workdir string, dirAgents []Age
 	mode := p.diffMode()
 	changedFiles, err := queryChangedFilesFrom(ctx, workdir, mode, gitInfo.status, gitInfo.statusErr)
 	filesDur := time.Since(filesStart)
+	if err != nil && (errors.Is(err, context.DeadlineExceeded) || filesDur >= gitQueryTimeout) { // the last good list stays, it is not cleared to empty
+		p.logger.Warn("git changed files timed out; live updates paused for this folder (Refresh in the Files panel asks for one pass)", "workdir", logsafe.Dir(workdir), "duration_ms", filesDur.Milliseconds())
+		gitguard.Pause(workdir, gitInfo.DirtyCount, queryDur+filesDur)
+		return
+	}
 	if err != nil {
 		p.logger.Warn("git changed files query failed; clearing cached list", "workdir", logsafe.Dir(workdir), "duration_ms", filesDur.Milliseconds(), "error", err)
 		changedFiles = []store.ChangedFile{}
 	} else {
 		p.logger.Debug("git changed files", "workdir", logsafe.Dir(workdir), "file_count", len(changedFiles), "duration_ms", filesDur.Milliseconds())
+	}
+	if took := queryDur + filesDur; took > gitguard.SlowPass { // this pass is the last one: the folder is paused, its list below is the last good one
+		p.logger.Warn("git is slow for this folder; live updates paused (Refresh in the Files panel asks for one pass)", "workdir", logsafe.Dir(workdir), "duration_ms", took.Milliseconds(), "files", len(changedFiles))
+		gitguard.Pause(workdir, len(changedFiles), took)
 	}
 	// Cap file count to prevent DB thrashing on large monorepos
 	if len(changedFiles) > maxChangedFiles {
