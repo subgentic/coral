@@ -597,7 +597,7 @@ const refreshViewKey = (agentName, sessionId) => `${currentServer()}|${agentName
 function staleNoteHtml() {
     const pz = pausedNow();
     const paused = pz ? `<div class="files-stale-note files-paused-note" role="status"><span>Live updates paused: this repo is large (${escapeHtml(String(Math.max(pz.changes || 0, _currentFiles.length)).replace(/\B(?=(\d{3})+(?!\d))/g, ','))} changes) and reading it takes a while.</span> <button type="button" class="btn btn-small" data-on-click="files-refresh">Refresh</button> <button type="button" class="btn btn-small btn-quiet" data-on-click="files-live-on">Turn on live updates</button></div>` : '';
-    const timedOut = timedOutNow() ? `<div class="files-stale-note files-timedout-note" role="status"><span>Git took too long on this folder; showing the last list.</span> <button type="button" class="btn btn-small" data-on-click="files-refresh">Refresh</button></div>` : '';
+    const timedOut = timedOutNow() ? `<div class="files-stale-note files-timedout-note" role="status"><span>Git took too long on this folder${_currentFiles.length > 0 ? '; showing the last list' : ''}.</span> <button type="button" class="btn btn-small" data-on-click="files-refresh">Refresh</button></div>` : '';
     return timedOut + paused + (_refreshBlock ? '<div class="files-stale-note">This computer is in View mode, so Coral does not re-check its files from here: the list may be out of date.</div>' : '');
 }
 /** 'Turn on live updates' for a paused folder: one pass that also lets the poller and the page's follow take the folder up again (they pause it again if git is still slow). */
