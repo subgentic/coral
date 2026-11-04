@@ -17,6 +17,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/subgentic/coral/internal/board"
 	"io"
 	"log/slog"
 	"net/http"
@@ -215,6 +216,9 @@ type UpdateRelaunchHandler struct {
 	// CanRestart says whether Coral can be started again once it has ended (the server's own record of how it was started, or a service manager that restarts it);
 	// nil is yes. A relaunch is not offered, and the route answers 409, while it says no (#5419).
 	CanRestart func() bool
+	// Activity writes a row of the Operator's record (board.Store.RecordActivity): Coral Hub's owner had this computer check for an update, or relaunch into one (#13340). Nil: no row (a test, or a server with no board store). A
+	// row that cannot be written is logged and never stops the request: the record does not block an update.
+	Activity func(ctx context.Context, m board.ActivityMeta, action, kind, item, version, team string) error
 	// Dir is <data dir>/updates.
 	Dir string
 	Now func() time.Time
@@ -759,6 +763,32 @@ func (h *UpdateRelaunchHandler) refuse(w http.ResponseWriter, r *http.Request, i
 
 func (h *UpdateRelaunchHandler) audit(ctx context.Context, id callerIdentity, v *relaunchView, code string) {
 	h.auditAs(ctx, id, v, code, relaunchSource(id.pseudo))
+	switch code { // the two things the Hub did that the Operator may want to find in their record (#13340); a refusal is in the update audit above, not here
+	case "check_started":
+		h.hubActivity(ctx, id, board.ActHubUpdateCheck, "", "")
+	case "started":
+		version, from := "", ""
+		if v != nil {
+			version, from = v.version, v.rec.Installed
+		}
+		h.hubActivity(ctx, id, board.ActHubUpdateRelaunch, version, from)
+	}
+}
+
+// hubActivity writes the row for something Coral Hub's owner had this computer do: by the Hub user (the record's opaque "hub:" label), source "hub", the update as the item and the staged version. Only a request
+// that came through the Hub is Coral Hub's: this computer's own person and Coral's own idle install are not.
+func (h *UpdateRelaunchHandler) hubActivity(ctx context.Context, id callerIdentity, action, version, installed string) {
+	if h.Activity == nil || relaunchSource(id.pseudo) != "hub" {
+		return
+	}
+	note := ""
+	if installed != "" && version != "" {
+		note = "from " + installed
+	}
+	m := board.ActivityMeta{Actor: activityActor(id), Source: "hub", Title: "Coral update", Note: note}
+	if err := h.Activity(context.WithoutCancel(ctx), m, action, "update", "coral", version, ""); err != nil {
+		slog.Warn("[update] could not record the Hub's update action in the Operator's record", "action", action, "error", err)
+	}
 }
 
 // relaunchSource is the source word for whoever asked: the Hub's owner is a pseudonym, the person here is "local", Coral's own idle install is "auto".

@@ -51,6 +51,9 @@ const (
 	ActProposal   = "proposal"
 	ActMarkRead   = "mark_read"
 	ActGoalReview = "goal_review"
+	// ActHubUpdateCheck and ActHubUpdateRelaunch: Coral Hub's owner had this computer check for an update, or relaunch into one it staged (#13340, #13258). The row names the Hub user.
+	ActHubUpdateCheck    = "hub_update_check"
+	ActHubUpdateRelaunch = "hub_update_relaunch"
 )
 
 // ActivityMeta is what a handler knows about the action, set on the context so the store's own transaction can write the row: the actor and source come from the verified request, never the body.
