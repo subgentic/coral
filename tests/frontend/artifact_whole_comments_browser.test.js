@@ -56,7 +56,9 @@ const WIDTHS = [{ label: '1280', width: 1280, height: 800, mobile: false }, { la
                 check(`${tag}: the Comments button is offered`, await ev(`!document.querySelector('.ac-toggle').hidden`));
                 await ev(`(() => { const p = document.querySelector('.ac-panel'); if (!p.classList.contains('ac-sheet-open')) document.querySelector('.ac-toggle').click(); return true; })()`);
                 await waitFor(`!!document.querySelector('.ac-panel .ac-whole')`, `${tag}: Comment on the whole document`, 6000);
-                check(`${tag}: the panel offers "Comment on the whole document"`, await ev(`document.querySelector('.ac-panel .ac-whole').textContent.trim() === 'Comment on the whole document'`));
+                // a video's panel has a timeline and its one button is "Comment at playhead" (#13175); a video that cannot play here (these bytes are not one) has no playhead, so the comment it opens is still on the whole file
+                const want = k.mediaType.startsWith('video/') ? 'Comment at playhead' : 'Comment on the whole document';
+                check(`${tag}: the panel offers "${want}"`, await ev(`document.querySelector('.ac-panel .ac-whole').textContent.trim() === ${JSON.stringify(want)}`));
                 check(`${tag}: no comment can be made by selecting text unless it is text`, await ev(`(() => { const b = document.querySelector('.ac-selbtn'); return !b || b.hidden; })()`));
                 check(`${tag}: the panel is beside the document, never inside it`, await ev(`(() => { const p = document.querySelector('.ac-panel'), body = document.querySelector('.artifact-viewer-body'); return !body.contains(p) && !p.closest('iframe') && p.closest('.artifact-viewer-main') !== null; })()`));
                 if (k.html) {
