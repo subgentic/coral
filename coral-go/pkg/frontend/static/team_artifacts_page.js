@@ -276,9 +276,10 @@ export function createArtifactsList({ inbox = false } = {}) {
         model.bulkBusy = true; const key = model.key;
         try {
             const r = await m.changeMany(files, { question, remove });
-            if (key === model.key) { for (const [hex, tags] of r.ok) for (const it of model.items) if (managedHex(it) === hex) it.tags = tags.length ? tags : undefined; loadArtifacts({ keep: true }); }
-            const keyOf = new Map(files.map(f => [f.hex, f.key]));
-            return { ok: [...r.ok.keys()].map(h => keyOf.get(h)), failed: r.failed, why: r.why };
+            // a file's outcome belongs to its own team's row: the same bytes in another team (the Inbox lists both) are another artifact, so rows are matched by project and hash, never by hash alone
+            if (key === model.key) { for (const [k, tags] of r.ok) { const [project, hex] = JSON.parse(k); for (const it of model.items) if (managedHex(it) === hex && (inbox ? it.board_id : model.project) === project) it.tags = tags.length ? tags : undefined; } loadArtifacts({ keep: true }); }
+            const keyOf = new Map(files.map(f => [m.reviewKey(f.project, f.hex), f.key]));
+            return { ok: [...r.ok.keys()].map(k => keyOf.get(k)), failed: r.failed, why: r.why };
         } finally { model.bulkBusy = false; }
     }
     const reviewFiles = items => items.filter(it => managedHex(it)).map(it => ({ project: inbox ? it.board_id : model.project, hex: managedHex(it), key: artifactKey(it) }));

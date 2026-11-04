@@ -19,7 +19,7 @@ const { coralReady } = require('./helpers/wait');
     const sleep = ms => new Promise(r => setTimeout(r, ms)); // sleep-ok: a poll of the server's own state
     let sid = null, sname = null, files = [];
     const tagsOf = async hex => (await api('GET', `/api/board/${B}/artifacts?limit=50`)).body.artifacts.find(a => a.id === hex || (a.uri || '').includes(hex))?.tags || [];
-    const until = async (hex, want, what) => { for (let i = 0; i < 40; i++) { if ((await tagsOf(hex)).includes('for review') === want) return; await sleep(250); } assert.fail(`${what}: tags ${JSON.stringify(await tagsOf(hex))}`); };
+    const until = async (hex, want, what) => { for (let i = 0; i < 40; i++) { if ((await tagsOf(hex)).includes('for review') === want) return; await sleep(250); /* sleep-ok: a bounded poll of the server's own state, 40 tries */ } assert.fail(`${what}: tags ${JSON.stringify(await tagsOf(hex))}`); };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });

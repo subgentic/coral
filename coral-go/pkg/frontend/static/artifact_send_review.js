@@ -21,12 +21,15 @@ export const sendForReview = (project, hex, question = '') => call(project, hex,
 /** Takes one file out of review; resolves to { tags }. */
 export const removeFromReview = (project, hex) => call(project, hex, 'DELETE');
 
+/** One file in one team: its project and hash, as a key (JSON, so no team name can run into a hash). The same bytes can be a separate artifact in several teams, and the Inbox lists them as separate rows: every outcome is keyed by both. */
+export const reviewKey = (project, hex) => JSON.stringify([project, hex]);
+
 /** The same change on many files ([{ project, hex }]): each is its own call, the ones that failed are counted and the first reason is kept.
- *  Resolves to { ok: Map(hex -> tags), failed, why }. */
+ *  Resolves to { ok: Map(reviewKey(project, hex) -> tags), failed, why }. */
 export async function changeMany(files, { question = '', remove = false } = {}) {
     const ok = new Map(); let failed = 0, why = '';
     for (const { project, hex } of files) {
-        try { const d = remove ? await removeFromReview(project, hex) : await sendForReview(project, hex, question); ok.set(hex, Array.isArray(d.tags) ? d.tags : []); }
+        try { const d = remove ? await removeFromReview(project, hex) : await sendForReview(project, hex, question); ok.set(reviewKey(project, hex), Array.isArray(d.tags) ? d.tags : []); }
         catch (e) { failed++; why = why || e.message; }
     }
     return { ok, failed, why };
