@@ -134,3 +134,45 @@ func TestTheKeptAnswersAreBoundedTheOldestGoesAFailedPassIsNotKeptAndAnOldOneIsN
 	g.mu.Unlock()
 	assert.False(t, still, "dropped when the next answer is kept")
 }
+
+// The Orchestrator's tiny tests on #13267: the bound is 256, and a key kept again is the newest (it is not the next to go).
+func TestTheKeptAnswersBoundIs256AndAKeptAgainKeyIsTheNewest(t *testing.T) {
+	assert.Equal(t, 256, refreshLastKeep, "the bound")
+	f := &refreshFlight{calls: map[string]*refreshCall{}, recent: map[string]refreshRecent{}}
+	now := time.Now()
+	f.mu.Lock()
+	for i := 0; i < refreshLastKeep; i++ {
+		f.keep(fmt.Sprintf("k%03d", i), refreshedFiles{total: i}, now)
+	}
+	require.Len(t, f.last, 256, "full")
+	f.keep("k000", refreshedFiles{total: 1000}, now) // the oldest is kept again: now the newest
+	require.Len(t, f.last, 256, "keeping a key again adds none")
+	f.keep("one-more", refreshedFiles{total: 1}, now) // one past the bound: the oldest goes, which is k001 now
+	f.mu.Unlock()
+	got, ok := f.lastFor("k000")
+	require.True(t, ok, "k000 was kept again, so it is not the one that went")
+	assert.Equal(t, 1000, got.total, "with its newest answer")
+	_, ok = f.lastFor("k001")
+	assert.False(t, ok, "the oldest after it went instead")
+	_, ok = f.lastFor("k002")
+	assert.True(t, ok)
+	f.mu.Lock()
+	assert.Len(t, f.last, 256)
+	assert.Len(t, f.order, 256, "the order list is in step with the map")
+	f.mu.Unlock()
+}
+
+// A key kept again while there is room is not listed twice: the order list stays in step with the map (a duplicate would make the next eviction delete a live answer).
+func TestAKeyKeptAgainIsListedOnceInTheOrder(t *testing.T) {
+	f := &refreshFlight{calls: map[string]*refreshCall{}, recent: map[string]refreshRecent{}}
+	now := time.Now()
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, k := range []string{"a", "b", "c"} {
+		f.keep(k, refreshedFiles{total: 1}, now)
+	}
+	f.keep("a", refreshedFiles{total: 2}, now)
+	assert.Equal(t, []string{"b", "c", "a"}, f.order, "a moved to the end, listed once")
+	assert.Len(t, f.last, 3)
+	assert.Equal(t, 2, f.last["a"].res.total)
+}
