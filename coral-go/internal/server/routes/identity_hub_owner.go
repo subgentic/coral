@@ -11,7 +11,7 @@ import (
 	"github.com/subgentic/coral/pkg/hubowner"
 )
 
-// The signed owner stamp, remote side (#11378, gap A). A hub that reaches this Coral with its API key may add X-Coral-Hub-Owner to ONE of two requests (hubowner.Routes: Approve / Request changes, and the
+// The signed owner stamp, remote side (#11378, gap A). A hub that reaches this Coral with its API key may add X-Coral-Hub-Owner to ONE of a few requests (hubowner.Routes: Approve / Request changes, Ignore and Undo of a question (#13462), and the
 // change-request send) when the person behind them is signed in at the hub. This file decides whether the stamp is genuine; if it is, the request is a person's (humanInputCaller) and nothing else about
 // the caller changes. The secret it checks against was written by a human act (hubowner.WriteFile); no route here can write it.
 

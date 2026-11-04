@@ -300,3 +300,23 @@ func TestTheProposalDecisionsTakeAnOwnerStampAndABareKeyStaysAutomation(t *testi
 	})
 	assert.Equal(t, 403, w.Code, "a stamp covers the body it was made for: an edited title is refused")
 }
+
+// Ignore and Undo of a question through our own hub (#13462): a genuine stamp on the close route makes the API-key request the hub's signed-in person's; a bare key is automation; a stamp made for another question's
+// close, or for another body, is refused.
+func TestAGenuineStampOnTheAskCloseMakesItAPersonsAndNothingElseDoes(t *testing.T) {
+	const route = "/api/board/team/asks/42/close"
+	rig := newStampRig(t, true)
+	body := `{"note":"Dismissed by the operator"}`
+	w := rig.do("POST", route, body, nil)
+	require.Equal(t, 200, w.Code)
+	assert.False(t, rig.seen.human, "a bare API key is automation")
+	w = rig.do("POST", route, body, func(r *http.Request) { r.Header.Set(hubowner.Header, stampFor(t, "POST", route, body, time.Now())) })
+	require.Equal(t, 200, w.Code, w.Body.String())
+	assert.True(t, rig.seen.human, "a genuine stamp is the hub's signed-in person")
+	assert.Equal(t, callerHubOwner, rig.seen.kind)
+	w = rig.do("POST", "/api/board/team/asks/43/close", body, func(r *http.Request) { r.Header.Set(hubowner.Header, stampFor(t, "POST", route, body, time.Now())) })
+	assert.NotEqual(t, 200, w.Code, "a stamp for question 42's close is refused on question 43")
+	assert.False(t, rig.seen.ran)
+	w = rig.do("POST", route, `{"undo":true}`, func(r *http.Request) { r.Header.Set(hubowner.Header, stampFor(t, "POST", route, body, time.Now())) })
+	assert.NotEqual(t, 200, w.Code, "a stamp for one body is refused on another")
+}
