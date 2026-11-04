@@ -223,6 +223,9 @@ func (h *BoardHandler) PostMessage(w http.ResponseWriter, r *http.Request) {
 				notified = append(notified, guideAsk) // a question to a guide reaches that guide (#11457)
 			}
 			out["notified"] = notified
+			if rest := h.postRestNotes(r.Context(), project, msg.SubscriberID, notified); len(rest) > 0 {
+				out["asleep"] = rest // who will not read it now, and why (#13189)
+			}
 			writeJSON(w, http.StatusOK, out)
 			return
 		}

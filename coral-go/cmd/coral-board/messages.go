@@ -327,6 +327,15 @@ func cmdPost() {
 		if list, ok := result["notified"].([]any); ok && len(list) == 0 && !broadcast && taskArg == "" && replyArg == "" && assigned == nil {
 			fmt.Fprintln(os.Stderr, postReachedNoOne(message)) // posted, but nobody was told (#11441): a name that is no member of the team
 		}
+		if rest, ok := result["asleep"].([]any); ok { // a recipient that will not read it now (#13189): said at once, not found out later
+			for _, r := range rest {
+				if m, ok := r.(map[string]any); ok {
+					if note, _ := m["note"].(string); note != "" {
+						fmt.Printf("  Note: %s\n", clitext.Clean(note))
+					}
+				}
+			}
+		}
 		if a, ok := result["ask"].(map[string]any); ok {
 			fmt.Printf("  A question to %s: open until each has answered (they answer with  coral-board post --reply-to %.0f \"...\"  or a post that @mentions you).\n", joinAnyStrings(a["to"]), id)
 		}
