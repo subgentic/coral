@@ -7,7 +7,12 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"time"
 	"unicode"
+
+	"github.com/jmoiron/sqlx"
+	"modernc.org/sqlite"
+	sqlite3 "modernc.org/sqlite/lib"
 )
 
 // Artifact tags (#8583, Goal #61): short lowercase words a team puts on its artifacts to find the ones that matter ("for review", "internal"). A tag belongs to a team's use of a stored object (board,
@@ -130,13 +135,47 @@ func (s *Store) ArtifactTags(ctx context.Context, boardID string) (map[string][]
 
 // SetArtifactTags makes tags (already normalised, at most MaxArtifactTags) the whole set of the object's tags on the board.
 func (s *Store) SetArtifactTags(ctx context.Context, boardID, hex string, tags []string) error {
+	return s.setArtifactTags(ctx, boardID, hex, tags, nil, false, "")
+}
+
+// ErrArtifactTagsChanged: the tags of the object are not what the caller read, so a write built on that read was not made (#13129).
+var ErrArtifactTagsChanged = errors.New("the artifact's tags changed since they were read")
+
+// SetArtifactTagsIf is SetArtifactTags as a compare-and-set (#13129): the write is made only if the object's tags, read in the same transaction, are exactly was (as a set); otherwise nothing is written and the
+// error is ErrArtifactTagsChanged. A write that was worked out from a list read earlier (a Hub write judged against the stored tags) can therefore never overwrite a tag edit that landed in between.
+func (s *Store) SetArtifactTagsIf(ctx context.Context, boardID, hex string, was, tags []string) error {
+	return s.setArtifactTags(ctx, boardID, hex, tags, was, true, "")
+}
+
+// TakeArtifactOutOfReview is SetArtifactTagsIf for the Operator taking a file out of review (#13231): the write and its row in the Operator's record (ActUnsendReview, when ctx says the Operator acted) are one
+// transaction, so a row that cannot be written undoes the take-out and the caller says so.
+func (s *Store) TakeArtifactOutOfReview(ctx context.Context, boardID, hex string, was, tags []string) error {
+	s.activityMu.Lock() // the record's chain is written in this transaction: one writer at a time
+	defer s.activityMu.Unlock()
+	return s.setArtifactTags(ctx, boardID, hex, tags, was, true, ActUnsendReview)
+}
+
+func (s *Store) setArtifactTags(ctx context.Context, boardID, hex string, tags, was []string, check bool, record string) error {
 	tx, err := s.db.BeginTxx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	if _, err := tx.ExecContext(ctx, `DELETE FROM artifact_tags WHERE board_id = ? AND hex = ?`, boardID, hex); err != nil {
+	var have []string
+	if err := tx.SelectContext(ctx, &have, `SELECT tag FROM artifact_tags WHERE board_id = ? AND hex = ? ORDER BY tag`, boardID, hex); err != nil {
 		return err
+	}
+	if check {
+		if !sameTagSet(have, was) {
+			return ErrArtifactTagsChanged
+		}
+		tagsCASAfterRead()
+	}
+	if err := noteReviewTag(ctx, tx, boardID, hex, slices.Contains(have, tagForReview), slices.Contains(tags, tagForReview), time.Now()); err != nil { // when it was sent for review (#13231)
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM artifact_tags WHERE board_id = ? AND hex = ?`, boardID, hex); err != nil {
+		return tagsWriteErr(check, err) // a writer committed after this transaction's read: the snapshot is stale, which is the same answer as a changed list (#13138)
 	}
 	if !slices.Contains(tags, tagForReview) { // the tag is gone: the question it came with goes too (#11555)
 		if _, err := tx.ExecContext(ctx, `DELETE FROM artifact_questions WHERE board_id = ? AND hex = ?`, boardID, hex); err != nil {
@@ -148,7 +187,57 @@ func (s *Store) SetArtifactTags(ctx context.Context, boardID, hex string, tags [
 			return err
 		}
 	}
-	return tx.Commit()
+	if record != "" {
+		if err := s.recordInTx(ctx, tx, time.Now(), record, "file", hex, "", boardID); err != nil {
+			return err // the take-out and its row stand or fall together
+		}
+	}
+	if err := commitArtifactTagsTx(tx); err != nil {
+		return tagsWriteErr(check, err)
+	}
+	return nil
+}
+
+// commitArtifactTagsTx commits the tags transaction; a variable so a test can make the commit answer busy.
+var commitArtifactTagsTx = func(tx *sqlx.Tx) error { return tx.Commit() }
+
+// tagsWriteErr is the answer for a failed write of the tags: for a compare-and-set (check) a SQLite busy is "the tags changed" (the caller retries); every other write, and every other error, keeps its own.
+func tagsWriteErr(check bool, err error) error {
+	if check && isSQLiteBusy(err) {
+		return ErrArtifactTagsChanged
+	}
+	return err
+}
+
+// tagsCASAfterRead is a seam for a test: it runs inside SetArtifactTagsIf once its read matched, before the write.
+var tagsCASAfterRead = func() {}
+
+// isSQLiteBusy says err is SQLite's busy or locked answer (including the stale-snapshot kind a deferred transaction gets when it upgrades to a write after another writer committed).
+func isSQLiteBusy(err error) bool {
+	var se *sqlite.Error
+	if errors.As(err, &se) {
+		switch se.Code() & 0xff {
+		case sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED:
+			return true
+		}
+	}
+	return false
+}
+
+// sameTagSet says a and b hold the same tags, whatever their order or repeats.
+func sameTagSet(a, b []string) bool {
+	in := map[string]bool{}
+	for _, t := range a {
+		in[t] = true
+	}
+	seen := map[string]bool{}
+	for _, t := range b {
+		if !in[t] {
+			return false
+		}
+		seen[t] = true
+	}
+	return len(seen) == len(in)
 }
 
 // AddArtifactTags adds tags (already cleaned) to the object's tags on the board, up to MaxArtifactTags in all and MaxBoardArtifactTagRows on the board: what is over is left off. It reports the object's tags after.
@@ -162,6 +251,7 @@ func (s *Store) AddArtifactTags(ctx context.Context, boardID, hex string, add []
 	if err := tx.SelectContext(ctx, &have, `SELECT tag FROM artifact_tags WHERE board_id = ? AND hex = ? ORDER BY tag`, boardID, hex); err != nil {
 		return nil, err
 	}
+	hadReview := slices.Contains(have, tagForReview)
 	var rows int
 	if err := tx.GetContext(ctx, &rows, `SELECT COUNT(*) FROM artifact_tags WHERE board_id = ?`, boardID); err != nil {
 		return nil, err
@@ -182,6 +272,9 @@ func (s *Store) AddArtifactTags(ctx context.Context, boardID, hex string, add []
 				return nil, err
 			}
 		}
+	}
+	if err := noteReviewTag(ctx, tx, boardID, hex, hadReview, slices.Contains(have, tagForReview), time.Now()); err != nil { // when it was sent for review (#13231)
+		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, err

@@ -21,6 +21,7 @@ var boardOwnedRows = []struct{ table, col string }{
 	{"artifact_tags", "board_id"},        // #8583: a team's tags of its artifacts
 	{"artifact_reviews", "board_id"},     // #136584: when the Operator decided a review of a team's artifact
 	{"artifact_questions", "board_id"},   // #11555: what an upload for review asks the Operator
+	{"artifact_review_sent", "board_id"}, // #13231: when a file was sent for review
 	{"artifact_kinds", "board_id"},       // #12144: the kind of a file for review
 	{"artifact_task_chains", "board_id"}, // #12144: the latest file for review of a task chain
 }

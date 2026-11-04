@@ -44,8 +44,10 @@ type teamArtifact struct {
 	// Starred: the Operator starred this stored object on this computer (#9819); false for a row with no stored object.
 	Starred   bool   `json:"starred"`
 	CreatedAt string `json:"created_at"`
-	TaskID    int64  `json:"task_id"`
-	TaskTitle string `json:"task_title"`
+	// ReviewSentAt is when the file was sent for review (RFC 3339, UTC), present only while it carries the tag "for review" and was sent after the time was kept (#13231): "waiting for review" counts from it, a re-send starts it again.
+	ReviewSentAt string `json:"review_sent_at,omitempty"`
+	TaskID       int64  `json:"task_id"`
+	TaskTitle    string `json:"task_title"`
 	// GoalID and GoalTitle: the goal of this board the task works toward (#8579); absent for a task with none, and for a row of no task.
 	GoalID    *int64 `json:"goal_id,omitempty"`
 	GoalTitle string `json:"goal_title,omitempty"`

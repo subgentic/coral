@@ -8,6 +8,7 @@ DELETE /api/artifacts/{id}/star interact
 DELETE /api/auth/sessions/{id} never
 DELETE /api/board/remotes never
 DELETE /api/board/{project} launch
+DELETE /api/board/{project}/artifacts/{id}/review interact
 DELETE /api/board/{project}/cross-team-links never
 DELETE /api/board/{project}/groups/{groupID}/members/{sessionID} never
 DELETE /api/board/{project}/messages/{messageID} launch
@@ -469,6 +470,7 @@ PUT /api/artifacts/{id}/private interact
 PUT /api/artifacts/{id}/star interact
 PUT /api/auth/hub-origins never
 PUT /api/auth/hub-signin never
+PUT /api/board/{project}/artifacts/{id}/review interact
 PUT /api/board/{project}/artifacts/{id}/tags interact
 PUT /api/board/{project}/guide-roster launch
 PUT /api/board/{project}/orchestrator-grant launch

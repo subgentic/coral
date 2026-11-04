@@ -182,6 +182,11 @@ export function attachReview(d, { reload }) {
     const mk = (tag, cls, text, attrs = {}) => { const e = document.createElement(tag); e.className = cls; if (text) e.textContent = text; for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); if (tag === 'button') e.type = 'button'; return e; };
     const stateEl = mk('span', 'chip artifact-review-state', '', { role: 'status' }), approve = mk('button', 'btn btn-primary artifact-review-approve', 'Approve'), changes = mk('button', 'btn artifact-review-changes', 'Request changes', { 'aria-expanded': 'false' });
     const approveNote = mk('button', 'menu-item artifact-review-note', 'Approve with a note', { role: 'menuitem' });
+    // Send for review / Remove from review (#13152): the Operator's own way to put this file in Needs you, or take it out, in the ⋯ menu (artifact_send_review.js)
+    const sendItem = mk('button', 'menu-item artifact-review-send', 'Send for review', { role: 'menuitem' }); sendItem.hidden = true;
+    (d.querySelector('.artifact-viewer-menu') || bar).prepend(sendItem);
+    let sendCtx = null; // { team, hex, server, filename, inReview } of the open file
+    const syncSendItem = () => { sendItem.hidden = !sendCtx || decisionNeedsPerson(sendCtx.server); if (sendCtx) sendItem.textContent = sendCtx.inReview ? 'Remove from review' : 'Send for review'; };
     const slotted = !!d.querySelector('.artifact-viewer-chips'); // the controls are on the header row; without it (a bare viewer) they stay in this bar
     stateEl.hidden = approve.hidden = changes.hidden = approveNote.hidden = true;
     (d.querySelector('.artifact-viewer-chips') || bar).append(stateEl); (d.querySelector('.artifact-viewer-actions') || bar).append(approve, changes); (d.querySelector('.artifact-viewer-menu') || bar).prepend(approveNote);
@@ -226,6 +231,16 @@ export function attachReview(d, { reload }) {
         try { const out = await approveRow(cur.team, cur.row); sayApproved(cur.row.name || 'the artifact', out); show({ ...cur, state: 'approved', at: out.review?.at || new Date().toISOString() }); }
         catch (e) { showToast(e.message, true); } finally { approve.disabled = false; }
     });
+    sendItem.addEventListener('click', async () => {
+        const c = sendCtx; if (!c) return;
+        try {
+            const m = await importOnce('./artifact_send_review.js');
+            if (c.inReview) { await m.removeFromReview(c.team, c.hex); showToast('Removed from review'); }
+            else { const q = await m.askReviewQuestion({ count: 1, name: c.filename }); if (q === null) return; await m.sendForReview(c.team, c.hex, q); showToast('Sent for review: it is in Needs you'); }
+            importOnce('./inbox_reviews.js').then(x => x.refreshReviews(true)).catch(() => {});
+            reload();
+        } catch (e) { showToast(e.message, true); }
+    });
     approveNote.addEventListener('click', () => {
         if (!cur) return;
         const was = cur;
@@ -252,15 +267,17 @@ export function attachReview(d, { reload }) {
     });
     return {
         async open(hex, opts = {}) {
-            const g = ++gen; show(null); if (!opts.switched) done = false;
+            const g = ++gen; show(null); sendCtx = null; syncSendItem(); if (!opts.switched) done = false;
             if (!opts.board) return;
             const team = identityKey(opts.server, opts.board);
             let s = null;
             try { s = await reviewStateOf(team, hex); } catch { s = null; }
-            if (g !== gen || !s) return;
+            if (g !== gen) return;
+            sendCtx = { team, hex, server: opts.server, filename: opts.filename || '', inReview: !!s && (s.state === 'pending' || s.state === 'changes') }; syncSendItem();
+            if (!s) return;
             show({ ...s, team, hex, server: opts.server, name: opts.board });
             if (opts.requestChanges && !opts.switched && !done && (s.state === 'pending' || s.state === 'changes')) openForm(true); // not on the reload after a send: the form stays closed
         },
-        close() { gen++; show(null); form.hidden = true; tray.clear(); },
+        close() { gen++; show(null); sendCtx = null; syncSendItem(); form.hidden = true; tray.clear(); },
     };
 }

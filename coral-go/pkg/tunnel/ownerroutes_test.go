@@ -169,6 +169,10 @@ func TestTheOwnerTableAgreesWithTheHandWrittenListItReplaced(t *testing.T) {
 			if m == http.MethodPost && strings.HasPrefix(p, "/api/artifacts/") && (strings.HasSuffix(p, "/comments") || strings.HasSuffix(p, "/resolve") || strings.HasSuffix(p, "/reopen") || strings.HasSuffix(p, "/comment-images")) {
 				continue
 			}
+			// Sending a file for review and taking it out again (#13217) is the owner's alone: the old list never had it.
+			if (m == http.MethodPut || m == http.MethodDelete) && strings.HasPrefix(p, "/api/board/") && strings.HasSuffix(p, "/review") {
+				continue
+			}
 			// The one difference of #5610: the table's {id} is any one segment, so a task artifact-content path with a non-number id is stamped too (its handler refuses it).
 			if strings.HasPrefix(p, "/api/board/") && strings.HasSuffix(p, "/artifact-content") && m == http.MethodGet {
 				continue

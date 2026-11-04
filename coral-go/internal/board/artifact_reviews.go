@@ -5,6 +5,9 @@ import (
 	"database/sql"
 	"errors"
 	"sort"
+	"strings"
+
+	"github.com/jmoiron/sqlx"
 	"time"
 )
 
@@ -30,6 +33,124 @@ var ErrNotForReview = errors.New("this artifact is not waiting for a review")
 type ArtifactReview struct {
 	State string `json:"state"`
 	At    string `json:"at"`
+}
+
+// ensureArtifactReviewSentSchema makes the table of when each file was sent for review (#13231): the time "for review" was last put on it (an upload with the tag, a task result, the tag editor, the Operator's send
+// route), kept apart from the file's own time so "waiting longer than X" counts from when the review began and a re-send starts it again.
+func (s *Store) ensureArtifactReviewSentSchema(ctx context.Context) error {
+	_, err := s.db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS artifact_review_sent (
+		board_id TEXT NOT NULL,
+		hex      TEXT NOT NULL,
+		at       TEXT NOT NULL,
+		PRIMARY KEY (board_id, hex)
+	)`)
+	return err
+}
+
+// noteReviewTag keeps the sent-for-review time in step with a write of the object's tags: the time is set when "for review" is put on a file that did not have it, and left alone while the file keeps it.
+func noteReviewTag(ctx context.Context, tx *sqlx.Tx, boardID, hex string, had, has bool, at time.Time) error {
+	if had || !has {
+		return nil
+	}
+	_, err := tx.ExecContext(ctx, `INSERT INTO artifact_review_sent (board_id, hex, at) VALUES (?, ?, ?) ON CONFLICT(board_id, hex) DO UPDATE SET at = excluded.at`, boardID, hex, at.UTC().Format(time.RFC3339))
+	return err
+}
+
+// ArtifactReviewSent maps each file of the board that was sent for review to when (RFC 3339, UTC). A file that carries the tag from before the time was kept has none: the page falls back to the file's own time.
+func (s *Store) ArtifactReviewSent(ctx context.Context, boardID string) (map[string]string, error) {
+	var rows []struct {
+		Hex string `db:"hex"`
+		At  string `db:"at"`
+	}
+	if err := s.reader().SelectContext(ctx, &rows, `SELECT hex, at FROM artifact_review_sent WHERE board_id = ?`, boardID); err != nil {
+		return nil, err
+	}
+	out := make(map[string]string, len(rows))
+	for _, r := range rows {
+		out[r.Hex] = r.At
+	}
+	return out, nil
+}
+
+// reviewRoundTags are what an earlier round of review left on a file: the Operator's decision and their marks, which a new round starts without ("saved" is theirs to keep).
+var reviewRoundTags = map[string]bool{ReviewApproved: true, ReviewChangesRequested: true, ReviewDenied: true, tagIgnored: true, ReviewSuperseded: true, tagRead: true, tagReviewed: true}
+
+// StartArtifactReview sends the file to the Operator for review (#13217, #13231), in one transaction: "for review" goes on, the time it was sent is set, and a file that was decided before starts a new round: its
+// decision (approved, changes requested, denied, ignored, superseded) and its "read" mark go, and the review row with them, so Needs you shows it as new. It reports the tags after and the earlier decision ("" for none).
+// A file that is already waiting is left as it is (its time too). ErrArtifactTag when the tags would be more than a file may have.
+func (s *Store) StartArtifactReview(ctx context.Context, boardID, hex string, at time.Time) (tags []string, was string, err error) {
+	s.activityMu.Lock() // the Operator's record is written in this transaction (the send and its row stand or fall together): one writer of its chain at a time
+	defer s.activityMu.Unlock()
+	tx, err := s.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return nil, "", err
+	}
+	defer tx.Rollback()
+	var have []string
+	if err := tx.SelectContext(ctx, &have, `SELECT tag FROM artifact_tags WHERE board_id = ? AND hex = ? ORDER BY tag`, boardID, hex); err != nil {
+		return nil, "", err
+	}
+	waiting := false
+	for _, t := range have {
+		if t == tagForReview {
+			waiting = true
+		}
+	}
+	var prior string
+	_ = tx.GetContext(ctx, &prior, `SELECT state FROM artifact_reviews WHERE board_id = ? AND hex = ?`, boardID, hex)
+	next := map[string]bool{}
+	decided := ""
+	for _, t := range have {
+		if reviewRoundTags[t] && !waiting {
+			if t == ReviewApproved || t == ReviewChangesRequested || t == ReviewDenied {
+				decided = t
+			}
+			continue
+		}
+		next[t] = true
+	}
+	if decided == "" && !waiting {
+		decided = prior
+	}
+	next[tagForReview] = true
+	if len(next) > MaxArtifactTags {
+		return nil, "", ErrArtifactTag
+	}
+	out := make([]string, 0, len(next))
+	for t := range next {
+		out = append(out, t)
+	}
+	sort.Strings(out)
+	if !waiting {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM artifact_tags WHERE board_id = ? AND hex = ?`, boardID, hex); err != nil {
+			return nil, "", err
+		}
+		for _, t := range out {
+			if _, err := tx.ExecContext(ctx, `INSERT INTO artifact_tags (board_id, hex, tag) VALUES (?, ?, ?)`, boardID, hex, t); err != nil {
+				return nil, "", err
+			}
+		}
+		if _, err := tx.ExecContext(ctx, `DELETE FROM artifact_reviews WHERE board_id = ? AND hex = ?`, boardID, hex); err != nil {
+			return nil, "", err
+		}
+		if err := noteReviewTag(ctx, tx, boardID, hex, false, true, at); err != nil {
+			return nil, "", err
+		}
+	} else {
+		out = have
+	}
+	if m, ok := activityOf(ctx); ok { // the row of the send, with the earlier decision in its note when this starts a new round
+		if !waiting && decided != "" {
+			m.Note = strings.TrimSpace("again after " + decided + ". " + m.Note)
+		}
+		if err := s.recordInTx(WithActivity(ctx, m), tx, at, ActSendReview, "file", hex, "", boardID); err != nil {
+			return nil, "", err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, "", err
+	}
+	return out, decided, nil
 }
 
 func (s *Store) ensureArtifactReviewsSchema(ctx context.Context) error {

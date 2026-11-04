@@ -1,5 +1,6 @@
 DELETE /api/board/remotes | (*BoardRemotesHandler).RemoveSubscription-fm
 DELETE /api/board/{project} | (*BoardHandler).DeleteBoard-fm
+DELETE /api/board/{project}/artifacts/{id}/review | (*BoardHandler).UnmarkArtifactForReview-fm
 DELETE /api/board/{project}/cross-team-links | (*BoardHandler).RemoveLocalLinks-fm
 DELETE /api/board/{project}/groups/{groupID}/members/{sessionID} | (*BoardHandler).RemoveGroupMember-fm
 DELETE /api/board/{project}/messages/{messageID} | (*BoardHandler).DeleteMessage-fm
@@ -131,6 +132,7 @@ POST /api/cloud/cross-team-links | (*BoardHandler).PostCrossTeamLinks-fm
 POST /api/notifications | (*NotificationHandler).Create-fm
 POST /api/tasks/run | (*TasksHandler).SubmitTask-fm
 POST /api/tasks/runs/{runID}/kill | (*TasksHandler).KillTask-fm
+PUT /api/board/{project}/artifacts/{id}/review | (*BoardHandler).MarkArtifactForReview-fm
 PUT /api/board/{project}/artifacts/{id}/tags | (*BoardHandler).SetArtifactTags-fm
 PUT /api/board/{project}/guide-roster | (*BoardHandler).GuideRoster-fm
 PUT /api/board/{project}/orchestrator-grant | (*SessionsHandler).OrchestratorGrant-fm

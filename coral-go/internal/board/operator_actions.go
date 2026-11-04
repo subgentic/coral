@@ -51,6 +51,9 @@ const (
 	ActProposal   = "proposal"
 	ActMarkRead   = "mark_read"
 	ActGoalReview = "goal_review"
+	// ActSendReview and ActUnsendReview: the Operator sent a file for review from the Artifacts tab, or took it out again (#13231).
+	ActSendReview   = "send_review"
+	ActUnsendReview = "unsend_review"
 )
 
 // ActivityMeta is what a handler knows about the action, set on the context so the store's own transaction can write the row: the actor and source come from the verified request, never the body.

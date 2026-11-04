@@ -266,6 +266,23 @@ export function createArtifactsList({ inbox = false } = {}) {
         return null;
     }
     let drawnRows = 0; // the rows of the last drawing: the first new row is the one after them
+    /** Send for review / Remove from review (#13152) on files [{ project, hex, key }]: the optional question first (sending only), then each file through the review route; the rows say so at once.
+     *  Resolves to { ok: [keys], failed, why }, or null when the question was cancelled. */
+    async function changeReview(files, remove, name = '') {
+        if (model.bulkBusy || !files.length) return null;
+        const m = await importOnce('./artifact_send_review.js');
+        let question = '';
+        if (!remove) { question = await m.askReviewQuestion({ count: files.length, name }); if (question === null) return null; }
+        model.bulkBusy = true; const key = model.key;
+        try {
+            const r = await m.changeMany(files, { question, remove });
+            // a file's outcome belongs to its own team's row: the same bytes in another team (the Inbox lists both) are another artifact, so rows are matched by project and hash, never by hash alone
+            if (key === model.key) { for (const [k, tags] of r.ok) { const [project, hex] = JSON.parse(k); for (const it of model.items) if (managedHex(it) === hex && (inbox ? it.board_id : model.project) === project) it.tags = tags.length ? tags : undefined; } loadArtifacts({ keep: true }); }
+            const keyOf = new Map(files.map(f => [m.reviewKey(f.project, f.hex), f.key]));
+            return { ok: [...r.ok.keys()].map(k => keyOf.get(k)), failed: r.failed, why: r.why };
+        } finally { model.bulkBusy = false; }
+    }
+    const reviewFiles = items => items.filter(it => managedHex(it)).map(it => ({ project: inbox ? it.board_id : model.project, hex: managedHex(it), key: artifactKey(it) }));
     function artifactBulkActions() {
         const finish = (key, ok, failed, verb) => {
             if (key === model.key) { for (const k of ok) artifactState.selected.delete(k); draw(); root?.querySelector('.list-bar-search')?.focus({ preventScroll: true }); }
@@ -299,6 +316,9 @@ export function createArtifactsList({ inbox = false } = {}) {
                     loadArtifacts({ keep: true });
                     showToast(`${label === 'Tag' ? 'Tagged' : 'Untagged'} ${ok.size} artifact${ok.size === 1 ? '' : 's'} ${tag}${failed ? `; ${failed} could not be changed` : ''}`, !!failed);
                 } })) : []),
+            ...[['Send for review', false, 'Put the selected files in Needs you to approve or ask for changes'], ['Remove from review', true, 'Take the selected files out of Needs you']].map(([label, remove, title]) => ({ label, title,
+                disabled: rows => rows.every(item => !managedHex(item) || (item.tags || []).includes(REVIEW) === !remove),
+                run: async rows => { const key = model.key, r = await changeReview(reviewFiles(rows.filter(item => (item.tags || []).includes(REVIEW) === !!remove)), remove); if (r) finish(key, r.ok, r.failed, remove ? 'Removed from review:' : 'Sent for review:'); } })),
             ...(local() ? [{ label: 'Delete', danger: true, disabled: rows => rows.some(item => !managedHex(item) || !linkOf(item)?.preview),
                 confirm: n => `Delete ${n} artifacts? Their links will become unavailable. This cannot be undone.`, run: async rows => {
                     if (model.bulkBusy || !local() || rows.some(item => !managedHex(item) || !linkOf(item)?.preview)) return;
@@ -484,6 +504,11 @@ export function createArtifactsList({ inbox = false } = {}) {
             actions.push({ label: 'Copy link', run: () => { navigator.clipboard?.writeText(hex ? `coral://artifacts/${hex}` : new URL(link.url, location.href).href).then(() => showToast('Link copied'), () => showToast('The link could not be copied', true)); } });
             if (hex) actions.push({ label: item.starred ? 'Starred' : 'Star', title: item.starred ? 'Starred (click to remove the star)' : 'Star: add it to your Starred list (it can still be cleaned up)', pressed: !!item.starred, run: b => toggleStar(hex, name, b, item) });
             if (hex && (item.tags || []).includes(IGNORED)) actions.push({ label: 'Unignore', title: 'Put it back in Needs you', run: () => importOnce('./artifact_review.js').then(async m => { const out = await m.unignoreRow(inbox ? item.board_id : model.project, { id: hex }); retag(hex, out.tags || (item.tags || []).filter(t => t !== IGNORED).concat(REVIEW)); showToast(`Back in Needs you: ${name}`); }).catch(e => showToast(e.message, true)) });
+            if (hex && !isUnverified(item)) { // the Operator's own way to put a file in Needs you, and to take it out (#13152)
+                const inReview = (item.tags || []).includes(REVIEW);
+                actions.push(inReview ? { label: 'Remove from review', title: 'Take it out of Needs you', run: () => changeReview(reviewFiles([item]), true, name).then(r => { if (r) showToast(r.failed ? `Could not remove it from review: ${r.why}` : 'Removed from review', !!r.failed); }) }
+                    : { label: 'Send for review', title: 'Put it in Needs you to approve or ask for changes', run: () => changeReview(reviewFiles([item]), false, name).then(r => { if (r) showToast(r.failed ? `Could not send it for review: ${r.why}` : 'Sent for review: it is in Needs you', !!r.failed); }) });
+            }
             if (hex && local()) {
                 const on = model.kept.has(hex);
                 actions.push({ label: on ? 'Kept' : 'Keep', title: on ? 'Kept: Coral\u2019s cleanup never deletes this file (click to release)' : 'Keep: Coral\u2019s cleanup never deletes this file', pressed: on, run: b => toggleKeep(hex, name, b) });

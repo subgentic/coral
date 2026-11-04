@@ -122,6 +122,7 @@ c GET /api/board/{project}/tasks/{taskID}/changes.diff
 c GET /api/board/{project}/tasks/{taskID}/cost
 a GET /api/board/{project}/waits
 a GET /api/board/{project}/waits/poll
+b DELETE /api/board/{project}/artifacts/{id}/review
 c GET /api/board/{project}/working-mode
 c GET /api/board/{project}/working-mode/presets
 c GET /api/call-metrics/summary
@@ -476,6 +477,7 @@ b POST /api/board/{project}/asks/{messageID}/buttons/{buttonID}/settle
 b POST /api/board/{project}/operator-artifacts
 b POST /api/board/{project}/operator-artifacts/message
 b POST /api/board/{project}/goal-images
+b PUT /api/board/{project}/artifacts/{id}/review
 b PUT /api/board/{project}/artifacts/{id}/tags
 b PUT /api/board/{project}/guide-roster
 b PUT /api/board/{project}/orchestrator-grant

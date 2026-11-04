@@ -2,6 +2,7 @@ DELETE /api/agent/ui/{id} | token-bound
 DELETE /api/artifacts/{id}/comments/{cid} | token-session | operator-only
 DELETE /api/board/remotes | board-unchecked | operator-only
 DELETE /api/board/{project} | board-claims | operator-only
+DELETE /api/board/{project}/artifacts/{id}/review | board-claims | operator-only
 DELETE /api/board/{project}/cross-team-links | board-claims +token-session | operator-only
 DELETE /api/board/{project}/groups/{groupID}/members/{sessionID} | board-claims | operator-only
 DELETE /api/board/{project}/messages/{messageID} | board-claims | operator-only
@@ -266,6 +267,7 @@ POST /api/sessions/live/{sessionID}/unarchive | unbound | operator-only
 POST /api/sessions/live/{sessionID}/wake | unbound | operator-only
 POST /api/sessions/record-agents | unbound | operator-only
 PUT /api/agent/ui/{id} | token-bound
+PUT /api/board/{project}/artifacts/{id}/review | board-claims | operator-only
 PUT /api/board/{project}/artifacts/{id}/tags | board-claims | operator-only
 PUT /api/board/{project}/guide-roster | board-claims | operator-only
 PUT /api/board/{project}/orchestrator-grant | board-claims | operator-only
