@@ -27,18 +27,18 @@ const CASES = [
             let got;
             if (!mobile) {
                 await new Promise(r => setTimeout(r, 1200)); // sleep-ok: the sidebar paints Chief's entry when the browser is idle, there is no event for it
-                got = await ev(`(() => { const s = document.getElementById('sidebar-chief-slot'), n = s && s.querySelector('a, button'); return { shown: !!s && !s.hidden && !!n, text: n ? n.textContent.trim() : '', href: n && n.getAttribute('href'), avatar: n ? (n.querySelector('.chief-avatar') || {}).textContent || '' : '', h: n ? Math.round(n.getBoundingClientRect().height) : 0 }; })()`);
+                got = await ev(`(() => { const s = document.getElementById('sidebar-chief-slot'), n = s && s.querySelector('a, button'); return { shown: !!s && !s.hidden && !!n, text: n ? n.lastElementChild.textContent.trim() : '', href: n && n.getAttribute('href'), avatar: n ? (n.querySelector('.chief-avatar') || {}).textContent || '' : '', h: n ? Math.round(n.getBoundingClientRect().height) : 0 }; })()`);
             } else {
                 await ev(`document.getElementById('top-menu-btn').click(); true`);
                 await waitFor(`!document.getElementById('nav-more-menu').hidden`, `${tag}: the menu opens`, 6000);
-                got = await ev(`(() => { const m = document.getElementById('nav-more-menu'), n = [...m.querySelectorAll('.nav-more-item')].find(x => /^(Atlas|Set up Chief)$/.test(x.textContent.trim())); return { shown: !!n, text: n ? n.textContent.trim() : '', href: n && n.getAttribute('href'), avatar: n ? (n.querySelector('.chief-avatar') || {}).textContent || '' : '', h: n ? Math.round(n.getBoundingClientRect().height) : 0 }; })()`);
+                got = await ev(`(() => { const m = document.getElementById('nav-more-menu'), n = [...m.querySelectorAll('.nav-more-item')].find(x => /^(Atlas|Set up Chief)$/.test(x.lastElementChild.textContent.trim())); return { shown: !!n, text: n ? n.lastElementChild.textContent.trim() : '', href: n && n.getAttribute('href'), avatar: n ? (n.querySelector('.chief-avatar') || {}).textContent || '' : '', h: n ? Math.round(n.getBoundingClientRect().height) : 0 }; })()`);
             }
             if (c.want === 'open') {
-                check(`${tag}: Chief's name links to /chief`, got.shown && got.text.replace(/^A/, '') .length > 0 && /Atlas/.test(got.text) && got.href === '/chief', JSON.stringify(got));
+                check(`${tag}: Chief's name links to /chief`, got.shown && /Atlas/.test(got.text) && got.href === '/chief', JSON.stringify(got));
                 check(`${tag}: it has Chief's letter on its avatar`, got.avatar === 'A', JSON.stringify(got));
             } else if (c.want === 'setup') {
                 check(`${tag}: it says Set up Chief`, got.shown && got.text === 'Set up Chief', JSON.stringify(got));
-                await ev(`(() => { const m = document.getElementById('nav-more-menu'), s = document.getElementById('sidebar-chief-slot'); const n = ${mobile} ? [...m.querySelectorAll('.nav-more-item')].find(x => x.textContent.trim() === 'Set up Chief') : s.querySelector('button'); n.click(); return true; })()`);
+                await ev(`(() => { const m = document.getElementById('nav-more-menu'), s = document.getElementById('sidebar-chief-slot'); const n = ${mobile} ? [...m.querySelectorAll('.nav-more-item')].find(x => x.lastElementChild.textContent.trim() === 'Set up Chief') : s.querySelector('button'); n.click(); return true; })()`);
                 await waitFor(`!!document.querySelector('#settings-pane-chief') && document.querySelector('#settings-pane-chief').hidden === false`, `${tag}: Settings opens on Chief`, 8000).catch(() => check(`${tag}: Set up Chief opens Settings > Chief`, false));
             } else check(`${tag}: nothing is shown when the machine refuses`, !got.shown, JSON.stringify(got));
             if (got.shown && !mobile) check(`${tag}: a 36 px row at least`, got.h >= 35, JSON.stringify(got));
