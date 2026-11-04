@@ -42,6 +42,31 @@ let _lastOpts = {};
 let _details = null;     // the Details button and its panel (the readers' row)
 let _overlay = 0;        // its entry in overlay_history.js while it is open on a phone (#5219)
 
+// Layout preferences are scoped by kind, not by artifact ID; browserLocal catches
+// blocked/full storage (including an embedded Hub frame) and falls back to memory.
+let _layoutType = 'application/octet-stream';
+function layoutType(opts) {
+    const mime = String(opts.mediaType || '').split(';')[0].trim().toLowerCase();
+    if (mime) return mime;
+    const ext = String(opts.filename || '').split('.').pop().toLowerCase();
+    return ({ html: 'text/html', htm: 'text/html', md: 'text/markdown', markdown: 'text/markdown', txt: 'text/plain', pdf: 'application/pdf', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', svg: 'image/svg+xml' })[ext] || 'application/octet-stream';
+}
+function setFullScreen(d, on, remember = false) {
+    d.classList.toggle('av-fullscreen', on);
+    const button = d.querySelector('.artifact-viewer-fullscreen');
+    button.setAttribute('aria-pressed', String(on));
+    button.setAttribute('aria-label', on ? 'Exit full screen' : 'Full screen');
+    button.title = on ? 'Exit full screen (Esc)' : 'Full screen';
+    button.textContent = on ? '⤡' : '⤢';
+    if (remember) browserLocal.set('coral-artifact-fullscreen:' + _layoutType, String(on));
+}
+function escapeViewer(d) {
+    if (d.classList.contains('av-fullscreen') && !isPhoneLayout()) {
+        setFullScreen(d, false, true);
+        d.querySelector('.artifact-viewer-fullscreen').focus();
+    } else closeArtifactViewer();
+}
+
 /** Render an artifact's text: Markdown through the strict renderer, anything else as plain text. */
  function renderArtifactText(el, content, path, server) {
     if (/\.(?:md|markdown|mdown)$/i.test(path || '')) {
@@ -67,6 +92,7 @@ function _build() {
             <span class="artifact-viewer-from" hidden></span>
             <span class="artifact-viewer-chips"></span>
             <span class="artifact-viewer-actions"><button type="button" class="btn artifact-viewer-markup" hidden>Mark up</button></span>
+            <button type="button" class="btn btn-icon artifact-viewer-fullscreen" aria-label="Full screen" aria-pressed="false" title="Full screen">⤢</button>
             <span class="artifact-viewer-morewrap">
                 <button type="button" class="btn btn-icon artifact-viewer-more" aria-haspopup="menu" aria-expanded="false" aria-controls="artifact-viewer-menu" aria-label="More actions" title="More actions">\u22ef</button>
                 <div class="menu artifact-viewer-menu" id="artifact-viewer-menu" role="menu" aria-label="More actions" hidden>
@@ -91,6 +117,7 @@ function _build() {
     const fromEl = d.querySelector('.artifact-viewer-from'); fromEl.tabIndex = 0; fromEl.setAttribute('role', 'button'); fromEl.setAttribute('aria-expanded', 'false');
     const flipFrom = () => { const on = !fromEl.classList.contains('is-open'); fromEl.classList.toggle('is-open', on); fromEl.setAttribute('aria-expanded', String(on)); };
     fromEl.addEventListener('click', flipFrom); fromEl.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flipFrom(); } });
+    d.querySelector('.artifact-viewer-fullscreen').addEventListener('click', () => setFullScreen(d, !d.classList.contains('av-fullscreen'), true));
     const more = d.querySelector('.artifact-viewer-more'), menu = d.querySelector('.artifact-viewer-menu');
     more.addEventListener('click', async (e) => { e.stopPropagation(); (await importOnce('./menu_button.js')).toggleMenu(more); });
     menu.addEventListener('click', async () => { (await importOnce('./menu_button.js')).closeMenus(); }); // a choice closes the menu
@@ -121,10 +148,10 @@ function _build() {
         e.preventDefault();
         openArtifactViewer(m[1], { server: _server, filename: a.textContent.trim() });
     });
-    setDialogHide(d, () => closeArtifactViewer()); // modal_chrome's Escape (with the focus anywhere on the page) closes it through its own close, not by display:none, which left it open and every later open a no-op (#12290)
+    setDialogHide(d, () => escapeViewer(d)); // modal_chrome's Escape (with the focus anywhere on the page) closes it through its own close, not by display:none, which left it open and every later open a no-op (#12290)
     d.addEventListener('keydown', (e) => {
         // Stop here: the page-wide Escape handler (modal_chrome) would also close a modal under the viewer.
-        if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeArtifactViewer(); }
+        if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); escapeViewer(d); }
         else if (e.key === 'Tab') trapTab(d, e);
     });
     keepFragmentsInside(d.querySelector('.artifact-viewer-body'));
@@ -132,7 +159,7 @@ function _build() {
     let _isPicture = false, _canWrite = false;
     const syncMarkUp = () => { d.querySelector('.artifact-viewer-markup').hidden = d.querySelector('.artifact-viewer-markup-item').hidden = !(_isPicture && _canWrite); };
     d._markUp = { picture: on => { _isPicture = on; syncMarkUp(); }, write: on => { _canWrite = on; syncMarkUp(); } };
-    _comments = attachComments(d, d.querySelector('.artifact-viewer-body'), d.querySelector('.artifact-viewer-main'), { onCanWrite: ok => d._markUp.write(ok) });
+    _comments = attachComments(d, d.querySelector('.artifact-viewer-body'), d.querySelector('.artifact-viewer-main'), { onCanWrite: ok => d._markUp.write(ok), preferenceKey: () => 'coral-artifact-comments:' + _layoutType });
     _versions = attachVersions(d, {
         version: n => { const t = d.querySelector('.artifact-viewer-title'); t.querySelector('.artifact-viewer-version')?.remove(); if (n > 1) t.append(Object.assign(document.createElement('span'), { className: 'artifact-viewer-version', textContent: ` · version ${n}` })); }, // Coral numbers the versions: the name is the agent's (#11865)
         body: () => d.querySelector('.artifact-viewer-body'),
@@ -178,6 +205,8 @@ export function openArtifactViewer(hex, opts = {}) {
     _abort = new AbortController();
     const gen = ++_gen;
     _server = opts.server; _hex = hex; _lastOpts = opts;
+    _layoutType = layoutType(opts);
+    setFullScreen(d, browserLocal.get('coral-artifact-fullscreen:' + _layoutType) === 'true');
     importOnce('./inbox_reviews.js').then(m => m.markOpenedReadVisibly(hex)).catch(() => {}); // opening a for-review artifact reads it, wherever it is opened from (#9277)
     const url = serverUrl(artifactPath(hex), opts.server);
     const title = d.querySelector('.artifact-viewer-title');
