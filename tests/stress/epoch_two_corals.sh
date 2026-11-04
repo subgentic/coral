@@ -27,6 +27,7 @@ cleanup() {
   for pid in "${PIDS[@]:-}"; do [ -n "$pid" ] && kill "$pid" 2>/dev/null; done
   sleep 1
   for pid in "${PIDS[@]:-}"; do [ -n "$pid" ] && kill -9 "$pid" 2>/dev/null; done
+  for d in "$QA/A" "$QA/B"; do CORAL_DATA_DIR="$d" coral_test_kill_tmux_server; done   # the tmux server on each Coral's own socket, nothing else
   [ "${KEEP_TEST_DATA:-}" = 1 ] || rm -rf "$QA"
   coral_test_sandbox_cleanup 2>/dev/null || true
 }
@@ -34,6 +35,8 @@ trap cleanup EXIT INT TERM
 # the sandbox: a temp HOME and stub CLIs for every agent, so nothing real starts
 # shellcheck source=../lib/mock_sandbox.sh
 source "$HERE/../lib/mock_sandbox.sh"
+# shellcheck source=../lib/backend.sh
+source "$HERE/../lib/backend.sh"
 coral_test_sandbox
 start() { # name port
   local name="$1" port="$2" dir="$QA/$1"
