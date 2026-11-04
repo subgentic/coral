@@ -33,6 +33,7 @@ const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 
 const INSTALL_KINDS = ['app', 'msi', 'portable', 'tarball', 'homebrew', 'unwritable'];
 const CHECKED_RESULTS = ['up_to_date', 'staged', 'already_staged', 'not_promoted', 'failed', 'rate_limited', 'unknown'];
+const HUB_STATES = ['hub_relaunch_off', 'checking', 'failed', 'staged', 'not_checked', 'up_to_date']; // the closed words a computer's status through Coral Hub carries (hub_state, #13258)
 const NOT_READY = ['not_checked', 'up_to_date', 'not_promoted', 'backoff', 'rate_limited', 'check_failed', 'unsupported_install', 'switch_off', 'applying'];
 const ROLLBACK_REASONS = ['did_not_start', 'not_healthy', 'swap_failed', 'verify_failed', 'other'];
 const VERSION_RE = /^\d{1,4}\.\d{1,4}\.\d{1,4}$/;
@@ -57,6 +58,7 @@ export function normalizeStatus(raw) {
     const last = raw.last_result && typeof raw.last_result === 'object' ? { at: str(raw.last_result.at), from: str(raw.last_result.from), to: str(raw.last_result.to), result: str(raw.last_result.result), by: str(raw.last_result.by) } : null;
     return {
         enabled: raw.enabled === true,
+        hubState: HUB_STATES.includes(raw.hub_state) ? raw.hub_state : '', // through Coral Hub only: what the computer says about updating it from there
         installed: str(raw.installed),
         state: ['none', 'staged', 'applying', 'failed'].includes(raw.state) ? raw.state : 'none',
         staged,
@@ -108,6 +110,7 @@ const REASON_TEXT = {
     max_mode: 'This Coral is not allowed to restart agents from here.',
     owner_only: 'Only the owner can relaunch this Coral.',
     hub_relaunch_off: 'Relaunching from Coral Hub is switched off on this computer. Change it in Settings > Network and Hub.',
+    relink_needed: 'This computer was linked to Coral Hub before it recorded its owner. Link it to Coral Hub again to update it from here.',
     switch_off: 'Relaunching from Coral Hub is switched off on this computer. Change it in Settings > Network and Hub.',
     nothing_staged: 'There is no update ready to install.',
     not_verified: 'The update has not been verified, so it was not installed.',
@@ -221,13 +224,18 @@ export async function requestInstall(version) {
 
 /** The saved "Coral Hub may relaunch this Coral" switch, or null when it can't be read (the status of the update has no such field; the connector's does). */
 export async function fetchHubRelaunch() {
+    hubRelaunchAtLaunch = false;
     try {
         const resp = await fetch(ROUTES.cloudStatus);
         if (!resp.ok) return null;
-        const v = (await resp.json()).hub_relaunch_updates;
+        const d = await resp.json(), v = d.hub_relaunch_updates;
+        hubRelaunchAtLaunch = d.hub_relaunch_updates_at_launch === true; // the server was started with --allow-hub-update / CORAL_ALLOW_HUB_UPDATE (#13258): on says so, and an off lasts only until the next start
         return typeof v === 'boolean' ? v : null;
     } catch { return null; }
 }
+let hubRelaunchAtLaunch = false;
+/** Whether the last fetchHubRelaunch read says the server was started with the launch flag (Settings says "On (set at launch)", or that an off lasts only until the next start). */
+export const hubRelaunchSetAtLaunch = () => hubRelaunchAtLaunch;
 
 /** Ask the updater to look for a release now (false when the server has no such route). */
 export async function requestCheckNow() {
@@ -268,3 +276,39 @@ export async function saveChannel(channel) {
 
 /** How long an update has been ready, as the three states of the control. */
 export const ageTier = (days) => (days >= 7 ? 'stale' : days >= 2 ? 'warm' : 'fresh');
+
+/** A computer's update status through Coral Hub (its own proxy), or null when it did not answer. Never touches this page's own updates-enabled flag. */
+export async function fetchUpdateStatusOf(server) {
+    if (isLocalServer(server)) return fetchUpdateStatus();
+    try {
+        const resp = await fetch(serverBase(server) + ROUTES.status, { headers: { Accept: 'application/json' } });
+        return resp.ok ? normalizeStatus(await resp.json()) : null;
+    } catch { return null; }
+}
+
+/** Ask a computer behind the hub to check for an update and stage it (POST /api/system/update/check-hub, no body: the computer's own updater decides what to fetch, #13258). Resolves { ok, status, code }. */
+export async function requestHubCheck(server) {
+    try {
+        const resp = await fetch(serverBase(server) + '/api/system/update/check-hub', { method: 'POST' });
+        let body = {};
+        try { body = await resp.json(); } catch { /* an empty body */ }
+        return { ok: resp.ok, status: resp.status, code: str(body.code) };
+    } catch { return { ok: false, status: 0, code: 'network' }; }
+}
+
+/** What the Update button of a computer behind the hub does, from that computer's own status (the words of its hub_state): open the confirmation (an update is staged and verified and the relaunch is open), ask the computer to check first,
+ *  wait for a check that is running, or say in words what is missing. The words are this build's; nothing the computer sent is shown. */
+export function hubUpdateAction(s) {
+    if (!s) return { kind: 'hint', text: 'Could not read that computer\'s update status.' };
+    switch (s.hubState) {
+        case 'hub_relaunch_off': return { kind: 'hint', text: 'Turn on "relaunch to install updates" in Settings > Network and Hub on that computer, then try again.' };
+        case 'staged':
+            if (s.staged && s.staged.verified && s.relaunch.available) return { kind: 'dialog' };
+            if (s.staged && !s.staged.verified) return { kind: 'hint', text: 'The update is downloaded but not verified yet. Try again in a moment.' };
+            return { kind: 'hint', text: s.relaunch.reason ? reasonText(s.relaunch.reason) : 'That computer cannot update from here right now.' };
+        case 'checking': return { kind: 'wait', text: 'That computer is checking for the update…' };
+        case 'not_checked': case 'up_to_date': return { kind: 'check' };
+        case 'failed': return { kind: 'hint', text: 'That computer could not check for an update. Try again later.' };
+        default: return { kind: 'hint', text: 'That computer does not report its update status to Coral Hub.' };
+    }
+}

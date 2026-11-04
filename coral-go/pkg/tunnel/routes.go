@@ -537,7 +537,8 @@ var routeTable = cat(
 	owner(OwnerRefuse, rules(http.MethodPut, TierInteract, "/api/artifacts/{hex64}/star")),
 	owner(OwnerRefuse, rules(http.MethodDelete, TierInteract, "/api/artifacts/{hex64}/star")),
 	owner(OwnerRefuse, rules(http.MethodGet, TierLaunch, PromptInspectionPath)),
-	owner(OwnerUpdate, rules(http.MethodPost, TierLaunch, UpdateRelaunchPath)),
+	owner(OwnerRefuse, rules(http.MethodPost, TierLaunch, UpdateRelaunchPath)), // installing and restarting a computer is the owner's alone, refused before the handler (a grantee at any tier gets 403 owner_only); the machine linked before the owner label was recorded must link again (#13258)
+	owner(OwnerRefuse, rules(http.MethodPost, TierLaunch, UpdateCheckPath)),    // ask this computer to check for and stage an update (never installs): no body, no query, the owner's alone and only with the person's switch on (#13258)
 	// Pinning a folder to the Agents list names a folder to launch into (#3630): Launch, like
 	// browsing for one. Reading the pins is View (above).
 	rules(http.MethodPost, TierLaunch, "/api/pinned-folders"),

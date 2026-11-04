@@ -104,6 +104,7 @@ node cloud_hardening.test.mjs
 node hub_too_large.test.mjs
 node server_base.test.js
 node remote_limit.test.mjs
+node update_hub_action.test.mjs
 node team_artifact_filters.test.js
 node task_filters.test.js
 node server_state.test.mjs
@@ -331,3 +332,4 @@ node chief_checks_state_api.test.mjs
 
 node chief_checks_lan.test.mjs
 node goal_write.test.mjs
+node hub_update_launch_words.test.mjs

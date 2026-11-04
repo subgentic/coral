@@ -22,6 +22,9 @@ type CloudHandler struct {
 	// OfferAtLaunch is config.OffersCloudConnect (#3459), set by the server.
 	OfferAtLaunch bool
 
+	// HubUpdateAtLaunch: the Hub update switch was turned on by --allow-hub-update / CORAL_ALLOW_HUB_UPDATE, set by the server (#13258): Settings says so.
+	HubUpdateAtLaunch bool
+
 	// Hub mode (#3460), set by the server: whether this process runs as a hub, whether
 	// --hub or CORAL_HUB=1 forced it, and how to restart, when this process can.
 	HubModeRunning bool

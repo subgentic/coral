@@ -34,6 +34,8 @@ Every server flag:
     	Make this data folder's database its own (a new id in the database and the folder) and exit; for a restored or copied database that Coral treats as foreign. Wakes nothing; Coral must be stopped
   -agent-priority string
     	Priority of agent processes: low (default, nice +10 / below normal so the server stays responsive) or normal. Also CORAL_AGENT_PRIORITY or the Settings choice
+  -allow-hub-update
+    	Turn on the switch that lets Coral Hub relaunch this Coral to install updates (also CORAL_ALLOW_HUB_UPDATE=1), for a computer nobody sits at. Applied at every start; it only turns the switch on. Settings shows it as on (set at launch)
   -allow-shared-data-dir
     	Run even when the data folder can be read by other accounts and Coral can't make it private (Windows: it is owned by someone else, or is a link). By default Coral makes such a folder private to you, or refuses to start (also CORAL_ALLOW_SHARED_DATA_DIR=1)
   -backend string
