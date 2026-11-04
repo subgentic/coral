@@ -47,6 +47,9 @@ func (h *ChiefChecksHandler) Register(r chi.Router) {
 	r.Get("/api/chief/triggers", h.triggers)
 	r.Post("/api/chief/triggers/{triggerID}/state", h.state)
 }
+
+// chiefLocal and chiefPerson are defence in depth: the router identity table and
+// tunnel policy also reject these callers before dispatch in the full server.
 func chiefLocal(w http.ResponseWriter, r *http.Request) bool {
 	if cloud.Tunneled(r) || r.Header.Get(tunnel.ViaHeader) != "" {
 		commentRefuse(w, 404, "not_available_through_hub", "Chief checks are not available through the Hub")
