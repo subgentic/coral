@@ -40,7 +40,7 @@ export function editCheck(check, agents, onSaved) {
     const cancel = el('button', 'btn', 'Cancel'); cancel.type = 'button';
     const discard = el('button', 'btn', 'Discard changes'); discard.type = 'button'; discard.hidden = true;
     const save = el('button', 'btn btn-primary', 'Save check'); save.type = 'submit';
-    footer.append(cancel, discard, save); form.append(error, footer); dialog.append(heading, form);
+    footer.append(error, cancel, discard, save); form.append(footer); dialog.append(heading, form);
     const closing = () => {
         if (busy) return;
         if (dirty) { error.hidden = false; error.textContent = 'You have unsaved changes. Keep editing or discard them.'; discard.hidden = false; discard.focus(); }

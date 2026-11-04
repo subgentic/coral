@@ -24,7 +24,7 @@ dialog.chief-check-editor { position: fixed; inset: 0; margin: auto; height: fit
 .chief-check-field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
 .chief-check-field input, .chief-check-field select, .chief-check-field textarea { width: 100%; box-sizing: border-box; min-height: 44px; font: inherit; }
 .chief-check-field textarea { resize: vertical; }
-.chief-check-checkbox { display: flex; align-items: center; gap: 10px; min-height: 44px; }
+.chief-check-editor .chief-check-checkbox { display: flex; align-items: center; gap: 10px; min-height: 44px; }
 .chief-check-editor .chief-check-checkbox input { width: auto; }
 .chief-check-editor .chief-check-actions { position: sticky; bottom: -24px; padding-block: 12px; background: var(--bg-primary); }
 @media (max-width: 900px) { .chief-checks-layout { grid-template-columns: minmax(0, 1fr); } }
@@ -35,3 +35,5 @@ dialog.chief-check-editor { position: fixed; inset: 0; margin: auto; height: fit
 }
 
 .chief-checks [hidden], .chief-check-editor [hidden] { display: none; }
+
+.chief-check-editor .chief-check-error { flex-basis: 100%; margin: 0; }
