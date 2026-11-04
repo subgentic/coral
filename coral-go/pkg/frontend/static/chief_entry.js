@@ -8,7 +8,7 @@ import { serverFetch, contextServer, isCloud } from './server_base.js';
 import { importOnce } from './import_once.js';
 const { lookOf, avatarNode } = await importOnce('./chief_look.js'); // lazy: its failure is retried
 
-const cache = new Map();
+const cache = new Map(), known = new Map(); // per computer: the asked answer, and the answer once it has arrived (the menu draws from the second without waiting)
 /** The entry's state for the computer shown now, once per page load per computer (force: ask again). */
 export function chiefState(force = false) {
     const server = contextServer();
@@ -20,10 +20,16 @@ export function chiefState(force = false) {
                 if (!j.enabled || !j.session_id) return { kind: isCloud() ? 'hub-setup' : 'setup' };
                 const look = lookOf(j);
                 return { kind: 'open', look, name: look.name || 'Chief', href: isCloud() ? `/chief/${encodeURIComponent(server)}` : '/chief' };
-            }).catch(() => null));
+            }).catch(() => null).then(st => { known.set(server, st); return st; }));
     }
     return cache.get(server);
 }
+
+/** The answer for the computer shown now when it has arrived (undefined before: the menu does not wait for it). */
+export function chiefStateKnown() { return known.get(contextServer()); }
+
+// Settings > Chief saved something (chief_setup.js): every computer's answer is read again and the sidebar redrawn, so Set up Chief becomes Chief without a reload.
+document.addEventListener('coral-chief-changed', () => { cache.clear(); known.clear(); paintSidebarChief(); });
 
 /** The avatar node of an 'open' state, as the page draws it. */
 export function chiefAvatar(state) { return avatarNode(state.look, state.name); }

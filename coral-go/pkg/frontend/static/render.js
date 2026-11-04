@@ -7,7 +7,7 @@ import { state } from './state.js';
 import { LAUNCH_CARDS, goalDesc, refreshGoalCardSoon } from './launch_cards.js';
 import './settings_lists.js';
 import './hub_access.js';
-import { sessionServer, noteBoardLabels, sessionTeamKey } from './server_base.js';
+import { sessionServer, noteBoardLabels, sessionTeamKey, contextServer } from './server_base.js';
 import './sleeping_view.js';
 import './knowledge_distill.js';
 import { escapeHtml, showToast } from './utils.js';
@@ -160,10 +160,12 @@ export function agentSearchKey(e) {
  *  A pending scheduled render is dropped: this one shows the latest list. */
 // Chief's entry in the Agents sidebar (#13167) is asked for by the first live-list render after the start has settled (8 s of uptime), never at the start: no request, timer or listener joins the startup sequence
 // (page_weight and its golden stay as they were); a test sets window.__chiefAfterMs to ask at once.
-let _chiefAsked = false;
+let _chiefFor = null; // the computer the entry was last asked for: switching computers asks again (an answer for the one left is dropped by chief_entry.js)
 function paintChiefLater() {
-    if (_chiefAsked || performance.now() < (window.__chiefAfterMs ?? 8000)) return;
-    _chiefAsked = true;
+    if (performance.now() < (window.__chiefAfterMs ?? 8000)) return;
+    const at = contextServer();
+    if (_chiefFor === at) return;
+    _chiefFor = at;
     importOnce('./chief_entry.js').then(m => m.paintSidebarChief()).catch(() => {});
 }
 
