@@ -33,6 +33,7 @@ type ChiefCheck struct {
 	SourceKey     string `db:"source_key" json:"source_key"`
 	WakeIfAsleep  bool   `db:"wake_if_asleep" json:"wake_if_asleep"`
 	Enabled       bool   `db:"enabled" json:"enabled"`
+	PausedReason  string `db:"paused_reason" json:"paused_reason,omitempty"`
 	ScheduleKind  string `db:"schedule_kind" json:"schedule_kind"`
 	EveryMinutes  int    `db:"every_minutes" json:"every_minutes"`
 	At            string `db:"at_time" json:"at"`
@@ -78,7 +79,7 @@ func ChiefCron(c ChiefCheck) (string, error) {
 	return fmt.Sprintf("%d %d * * %s", at.Minute(), at.Hour(), days), nil
 }
 
-const chiefCheckCols = `c.id,c.job_id,c.revision,c.name,c.instruction,c.target_board,c.target_session,c.notify_mode,c.source_key,c.wake_if_asleep,j.enabled,c.schedule_kind,c.every_minutes,c.at_time,j.timezone,c.deleted`
+const chiefCheckCols = `c.id,c.job_id,c.revision,c.name,c.instruction,c.target_board,c.target_session,c.notify_mode,c.source_key,c.wake_if_asleep,j.enabled,j.paused_reason,c.schedule_kind,c.every_minutes,c.at_time,j.timezone,c.deleted`
 
 func (s *ScheduleStore) ChiefCheck(ctx context.Context, id int64) (*ChiefCheck, error) {
 	var c ChiefCheck
@@ -151,7 +152,7 @@ func (s *ScheduleStore) SaveChiefCheck(ctx context.Context, c ChiefCheck) (*Chie
 		if err = tx.GetContext(ctx, &jid, `SELECT job_id FROM chief_checks WHERE id=?`, c.ID); err != nil {
 			return nil, err
 		}
-		_, err = tx.ExecContext(ctx, `UPDATE scheduled_jobs SET name=?,cron_expr=?,timezone=?,enabled=?,updated_at=?,paused_reason='' WHERE id=?`, c.Name, cron, c.Timezone, c.Enabled, now, jid)
+		_, err = tx.ExecContext(ctx, `UPDATE scheduled_jobs SET name=?,cron_expr=?,timezone=?,enabled=?,updated_at=?,paused_reason='',resumed_at=CASE WHEN ? THEN ? ELSE resumed_at END WHERE id=?`, c.Name, cron, c.Timezone, c.Enabled, now, c.Enabled, now, jid)
 		if err != nil {
 			return nil, err
 		}
