@@ -19,7 +19,7 @@ globalThis.fetch = async (url) => {
     if (tag === 'saved') return Response.json({ artifacts: [], has_more: false });
     const cursor = u.searchParams.get('cursor') || '', until = u.searchParams.get('until') || '';
     asked.push({ team, cursor, until });
-    if (hold && hold.team === team && !cursor) await hold.promise;
+    if (hold && hold.team === team && (hold.cursor === undefined ? !cursor : cursor.startsWith(hold.cursor))) await hold.promise;
     if (failOnce.has(team + ':' + cursor)) { failOnce.delete(team + ':' + cursor); return Response.json({}, { status: 503 }); }
     let start = 0;
     if (cursor) { const [at, boundUntil] = cursor.split('|'); if (boundUntil !== until) return Response.json({ error: 'invalid cursor' }, { status: 400 }); start = Number(at); } // the server's fingerprint includes until
@@ -85,8 +85,13 @@ M.settleReview({ team: 'a', id: 'a-3', reviewKey: 'a:a-3', name: 'file-003.md' }
 release(); hold = null; await pending;
 assert.ok(!keys().includes('a:a-3'), 'the settled row did not reappear from the query that was in flight');
 assert.ok(keys().includes('a:a-4'), 'the others did arrive');
-// and a Show more in flight
-await M.moreQueriedReviews(F);
-M.settleReview({ team: 'a', id: 'a-60', reviewKey: 'a:a-60', name: 'x' });
-assert.ok(!keys().includes('a:a-60'));
+// and a Show more in flight: hold team a's second page, settle one of its rows while it is on its way, release it
+let release2; hold = { team: 'a', cursor: '50|', promise: new Promise(r => { release2 = r; }) };
+assert.ok(keys().includes('a:a-4') && !keys().includes('a:a-60'), 'a-60 is on the second page of team a, not yet read');
+const more = M.moreQueriedReviews(F);
+await settle();
+M.settleReview({ team: 'a', id: 'a-60', reviewKey: 'a:a-60', name: 'x' }); // the Operator approved it while the page was on its way
+release2(); hold = null; await more;
+assert.ok(!keys().includes('a:a-60'), 'the settled row did not come back with the Show more that was in flight');
+assert.ok(keys().includes('a:a-61'), 'the rest of the page did arrive');
 console.log('inbox_reviews_query: ok');
