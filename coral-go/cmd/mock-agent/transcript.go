@@ -33,6 +33,10 @@ type transcript struct {
 	model     string
 	last      string // the previous entry's uuid
 	turns     int
+
+	script     []scriptedReply // MOCK_AGENT_REPLIES, read at the first turn
+	scriptRead bool
+	unkeyed    int // unkeyed script entries used so far
 }
 
 // sessionIDRe is a session id as Coral passes it (a uuid): it names the file, so nothing else
@@ -95,6 +99,7 @@ func (t *transcript) Turn(prompt string) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.turns++
+	sr := t.scriptedFor(prompt)
 	start := time.Now()
 	var lines []map[string]any
 
@@ -104,25 +109,35 @@ func (t *transcript) Turn(prompt string) error {
 	lines = append(lines, user)
 
 	usage := map[string]any{"input_tokens": 1200 + 10*t.turns, "cache_creation_input_tokens": 0, "cache_read_input_tokens": 9000, "output_tokens": 80, "service_tier": "standard"}
-	if t.turns%2 == 0 {
+	tool := (*scriptedTool)(nil)
+	if sr != nil {
+		tool = sr.Tool
+	} else if t.turns%2 == 0 {
+		tool = &scriptedTool{Name: "Bash", Command: "ls", Output: "README.md\nmain.go"}
+	}
+	if tool != nil {
+		name := tool.Name
+		if name == "" {
+			name = "Bash"
+		}
 		toolID := "toolu_mock" + strings.ReplaceAll(newUUID(), "-", "")[:20]
 		call := t.common("assistant", start.Add(300*time.Millisecond))
 		call["message"] = map[string]any{
 			"model": t.model, "id": "msg_mock" + strings.ReplaceAll(newUUID(), "-", "")[:20], "type": "message", "role": "assistant",
-			"content":     []any{map[string]any{"type": "tool_use", "id": toolID, "name": "Bash", "input": map[string]any{"command": "ls", "description": "List files"}}},
+			"content":     []any{map[string]any{"type": "tool_use", "id": toolID, "name": name, "input": map[string]any{"command": tool.Command, "description": "Run " + tool.Command}}},
 			"stop_reason": "tool_use", "stop_sequence": nil, "usage": usage,
 		}
 		call["requestId"] = "req_mock" + strings.ReplaceAll(newUUID(), "-", "")[:20]
 		lines = append(lines, call)
 		result := t.common("user", start.Add(600*time.Millisecond))
-		result["message"] = map[string]any{"role": "user", "content": []any{map[string]any{"type": "tool_result", "tool_use_id": toolID, "content": "README.md\nmain.go", "is_error": false}}}
-		result["toolUseResult"] = map[string]any{"stdout": "README.md\nmain.go", "stderr": "", "interrupted": false}
+		result["message"] = map[string]any{"role": "user", "content": []any{map[string]any{"type": "tool_result", "tool_use_id": toolID, "content": tool.Output, "is_error": false}}}
+		result["toolUseResult"] = map[string]any{"stdout": tool.Output, "stderr": "", "interrupted": false}
 		lines = append(lines, result)
 	}
 	reply := t.common("assistant", start.Add(time.Second))
 	reply["message"] = map[string]any{
 		"model": t.model, "id": "msg_mock" + strings.ReplaceAll(newUUID(), "-", "")[:20], "type": "message", "role": "assistant",
-		"content":     []any{map[string]any{"type": "text", "text": t.replyText(prompt)}},
+		"content":     []any{map[string]any{"type": "text", "text": t.replyTextFor(prompt, sr)}},
 		"stop_reason": "end_turn", "stop_sequence": nil, "usage": usage,
 	}
 	reply["requestId"] = "req_mock" + strings.ReplaceAll(newUUID(), "-", "")[:20]
@@ -185,6 +200,14 @@ func firstLine(s string) string {
 		s = string(r[:80])
 	}
 	return s
+}
+
+// replyTextFor is the scripted answer when there is one, else replyText's.
+func (t *transcript) replyTextFor(prompt string, sr *scriptedReply) string {
+	if sr != nil {
+		return sr.Text
+	}
+	return t.replyText(prompt)
 }
 
 // replyText is the assistant's answer to prompt: the canned greeting in ready mode, else the numbered line every suite reads.

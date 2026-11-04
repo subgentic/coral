@@ -9,6 +9,7 @@
 // model (default claude-opus-5-5), so stress and soak runs read real transcripts.
 // MOCK_AGENT_REPLY_DELAY=<seconds> keeps each turn's prompt in the transcript at once and writes the reply after the delay (a slow first answer); MOCK_AGENT_EXIT_ON_INPUT=1 makes it die
 // when it is first asked something, before any reply (#6050).
+// MOCK_AGENT_REPLIES=<file> (replies.go, #13180) scripts the answers: a JSON array of {when, text, tool}, matched by a keyword in the prompt or in order; unset, the answers are the canned ones.
 // MOCK_AGENT_READY=1 (ready.go, #10010) is a CLI that is up and waiting: the input box, the first hook event and a canned reply in the transcript for each message.
 // In raw-input mode (so in ready mode) a line typed to it makes it act on demand (#10168): MOCK_ASK_QUESTION, MOCK_ASK_PERMISSION (a Needs you row; Enter answers), MOCK_STUCK_ENTER (the next sends are refused), MOCK_GO_DEAF (no reply ever), MOCK_EXIT.
 package main
