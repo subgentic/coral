@@ -1,5 +1,57 @@
 # Release Notes
 
+## v2.0.45 — Sign-in redirects that spare a page already leaving, and Set up a server confirms host keys on the server too
+
+### Changes
+
+#### What you will notice first
+
+- **A page that is already leaving is no longer sent to sign-in** by two more paths, the Hub start (`initCloud`) and the live feed, the same rule the other sign-in redirects follow.
+- **Set up a server confirms host keys on the server too**: a host key is trusted only when the request echoes the fingerprints the dialog showed, and after a "host keys changed" refusal the dialog shows the keys the hub has now, unticked, so you confirm them again (also when two keys changed).
+- **Home**: the goal card reads its teams only when somebody can see the card.
+- **Phone**: the Hub-framed Inbox no longer leaves unused space below its frame for the floating button.
+
+#### Known issues
+
+- **macOS: the tmux change (#12836) can make macOS ask once more, only after tmux restarts (a full restart of your agents or a reboot).** Coral's tmux server and guardian are now their own responsible process, so macOS may ask, per folder, whether `tmux` (or `coral`) may reach Documents, Desktop or Downloads. Full Disk Access you gave Coral.app does not carry over: if you gave Coral Full Disk Access, add `tmux` and `coral` too (both in `Coral.app/Contents/MacOS`). The staged tmux copy (each Coral version keeps its own under `tmux-bin/`) asks again after a tmux change. Say yes once; if you say no, nothing is lost, the agent just cannot read that folder.
+- **Windows: in-app update does not work from 2.0.0 through 2.0.6.** If you're on one of those, download and install the MSI by hand; from 2.0.7 on, in-app update works.
+- **macOS: a Coral of 2.0.5 or earlier cannot install updates in-app; install 2.0.6 or later by hand once.**
+- **OpenCode agents are tested on macOS and Linux; OpenCode on Windows is not yet tested end to end.**
+- **Hermes agents are still experimental.**
+- Setting up a computer over SSH is supported from a macOS or Linux hub, and is not yet tested from a Windows hub.
+
+#### For Coral Hub
+
+- **`release-diff` output** (`go run ./internal/releasediff/cmd/release-diff v2.0.44 <head>`):
+
+  ### Tunnel routes, v2.0.44 to 0ada67600
+
+  No route was added, removed or changed.
+
+  ### Board settings keys (BoardSettings, HealthSettings included), v2.0.44 to 0ada67600
+
+  No key was added, removed or changed.
+
+  ### What Coral Hub compiles in or embeds, v2.0.44 to 0ada67600
+
+  `pkg/frontend`: 5 files the Hub embeds changed (+41, -11)
+
+  - `coral-go/pkg/frontend/static/cloud.js`: +9, -4
+  - `coral-go/pkg/frontend/static/css/mobile.css`: +2, -0
+  - `coral-go/pkg/frontend/static/launch_cards.js`: +18, -4
+  - `coral-go/pkg/frontend/static/server_ssh_setup.js`: +10, -1
+  - `coral-go/pkg/frontend/static/websocket.js`: +2, -2
+
+  Unchanged: `pkg/hubproxy`, `pkg/hubowner`, `pkg/redact`, `pkg/tunnel`, `agent_docs`.
+
+  ### Coral packages compiled into the Hub through its imports, v2.0.44 to 0ada67600
+
+  Unchanged: `internal/fsreplace`, `internal/httputil`, `internal/logsafe`, `internal/safego`, `internal/secfile`, `internal/secrets`, `pkg/redact/betterleaks`.
+
+- **Sign-in redirect safeguard** (coral-hub Security, #13102): `initCloud` and the live feed use the one helper that sends a page to sign-in unless it is leaving; no route, token or framed path changed.
+- **Set up a server**: the request must echo the shown host-key fingerprints, and after a "host keys changed" refusal the page reloads the plan to show the hub's current keys; one Go file (`hub_provision.go`) and `server_ssh_setup.js` changed, no route added or removed.
+- **Ready signals, hooks, tokens, framed paths**: unchanged.
+
 ## v2.0.44 — Big repositories stop slowing the Files panel, a port for Set up a server, Uploaded by in Artifacts, a wider reply dialog, and a New goal card on Home
 
 ### Changes
