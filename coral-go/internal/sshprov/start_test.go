@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -487,6 +488,9 @@ func TestDaemonCommandsTestTheCommandLineBeforeTheyActOnAPID(t *testing.T) {
 
 // A secret install the far computer ends non-zero (a release folder it does not have, say) says why: the exit code and the start of what it wrote, for the hub's log only (#13230).
 func TestInstallOwnerSecretThatFailsSaysWhy(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the far ssh is a #!/bin/sh stand-in, which Windows cannot run; the shipped code does not depend on it")
+	}
 	ssh := filepath.Join(t.TempDir(), "ssh")
 	if err := os.WriteFile(ssh, []byte("#!/bin/sh\ncat >/dev/null\necho 'sh: coral: not found' >&2\nexit 127\n"), 0o700); err != nil {
 		t.Fatal(err)
@@ -504,6 +508,9 @@ func TestInstallOwnerSecretThatFailsSaysWhy(t *testing.T) {
 
 // A far command that echoes its stdin in an error must not put the secret in the hub's log (#13251, Security's SHOULD): the secret, the whole payload and a cut piece of a secret are taken out.
 func TestInstallOwnerSecretFailureKeepsTheSecretOutOfTheKeptStderr(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the far ssh is a #!/bin/sh stand-in, which Windows cannot run; the shipped code does not depend on it")
+	}
 	secret := strings.Repeat("ab", 32)
 	ssh := filepath.Join(t.TempDir(), "ssh")
 	script := "#!/bin/sh\ninput=$(cat)\necho \"bad input: $input and again ${input#*secret}\" >&2\necho \"half " + secret[:40] + " end\" >&2\nexit 3\n"

@@ -372,7 +372,7 @@ func TestMessageIndexBuiltBeforeTheWatermarkIsComplete(t *testing.T) {
 func TestMessageSearchIndexIsRepairedWhenItDoesNotMatchTheMessages(t *testing.T) {
 	s := ftsStoreWithMessages(t, ftsTexts, 60)
 	ctx := context.Background()
-	require.NoError(t, s.BuildMessageSearchIndex(ctx))
+	buildAfterOpenBuild(t, s, ctx)
 	t.Setenv(messageSearchIndexEnv, "on") // the repair looks at the setting just before it rebuilds
 	healthy, err := s.CheckMessageSearchIndex(ctx)
 	require.NoError(t, err)
@@ -404,7 +404,7 @@ func TestMessageSearchIndexIsRepairedWhenItDoesNotMatchTheMessages(t *testing.T)
 func TestMessageSearchIndexCheckLeavesABigBoardAlone(t *testing.T) {
 	s := ftsStoreWithMessages(t, ftsTexts, 30)
 	ctx := context.Background()
-	require.NoError(t, s.BuildMessageSearchIndex(ctx))
+	buildAfterOpenBuild(t, s, ctx)
 	t.Setenv(messageSearchIndexEnv, "on") // the repair looks at the setting just before it rebuilds
 	old := messageIndexCheckMaxMessages
 	messageIndexCheckMaxMessages = 10
@@ -432,7 +432,7 @@ func TestMessageSearchIndexIsCheckedAfterOpen(t *testing.T) {
 		_, err := s.PostMessage(ctx, "proj", "dev", fmt.Sprintf("%s #%d", ftsTexts[i%len(ftsTexts)], i), nil)
 		require.NoError(t, err)
 	}
-	require.NoError(t, s.BuildMessageSearchIndex(ctx))
+	buildAfterOpenBuild(t, s, ctx)
 	for _, q := range []string{`DROP TRIGGER board_messages_fts_au`, `UPDATE board_messages SET content = 'edited later: heron' WHERE id = 5`, messageFTSTriggers[2]} {
 		_, err := s.db.ExecContext(ctx, q)
 		require.NoError(t, err)
@@ -496,7 +496,7 @@ func TestMessageSearchIndexRepairNeedsRoomOnTheDisk(t *testing.T) {
 		_, err := s.PostMessage(ctx, "proj", "dev", fmt.Sprintf("%s #%d", ftsTexts[i%len(ftsTexts)], i), nil)
 		require.NoError(t, err)
 	}
-	require.NoError(t, s.BuildMessageSearchIndex(ctx))
+	buildAfterOpenBuild(t, s, ctx)
 	for _, q := range []string{`DROP TRIGGER board_messages_fts_au`, `UPDATE board_messages SET content = 'edited later: ibis' WHERE id = 5`, messageFTSTriggers[2]} {
 		_, err := s.db.ExecContext(ctx, q)
 		require.NoError(t, err)
@@ -523,7 +523,7 @@ func TestMessageSearchIndexTurnedOffDuringTheCheckStaysOff(t *testing.T) {
 	t.Setenv(messageSearchIndexEnv, "on")
 	s := ftsStoreWithMessages(t, ftsTexts, 40)
 	ctx := context.Background()
-	require.NoError(t, s.BuildMessageSearchIndex(ctx))
+	buildAfterOpenBuild(t, s, ctx)
 	for _, q := range []string{`DROP TRIGGER board_messages_fts_au`, `UPDATE board_messages SET content = 'edited later: kiwi' WHERE id = 5`, messageFTSTriggers[2]} {
 		_, err := s.db.ExecContext(ctx, q)
 		require.NoError(t, err)
@@ -553,7 +553,7 @@ func TestTheIndexCheckWaitsForAQuietBoard(t *testing.T) {
 		_, err := s.PostMessage(ctx, "proj", "dev", fmt.Sprintf("%s #%d", ftsTexts[i%len(ftsTexts)], i), nil)
 		require.NoError(t, err)
 	}
-	require.NoError(t, s.BuildMessageSearchIndex(ctx))
+	buildAfterOpenBuild(t, s, ctx)
 	require.NoError(t, s.Close())
 
 	defer func(d, q, p, m time.Duration) {
@@ -591,7 +591,7 @@ func TestTheIndexCheckRunsAfterTheLongestWaitOnABoardThatIsNeverQuiet(t *testing
 		_, err := s.PostMessage(ctx, "proj", "dev", fmt.Sprintf("%s #%d", ftsTexts[i%len(ftsTexts)], i), nil)
 		require.NoError(t, err)
 	}
-	require.NoError(t, s.BuildMessageSearchIndex(ctx))
+	buildAfterOpenBuild(t, s, ctx)
 	require.NoError(t, s.Close())
 	defer func(d, q, p, m time.Duration) {
 		messageIndexCheckDelay, messageIndexQuiet, messageIndexQuietPoll, messageIndexQuietWaitMax = d, q, p, m
@@ -643,4 +643,12 @@ func TestTheIndexCheckNeverRunsOnAStoreClosedDuringTheQuietWait(t *testing.T) {
 	require.NoError(t, st.Close())
 	time.Sleep(300 * time.Millisecond) // sleep-ok: nothing should happen; wait out several looks to show no run follows the close
 	require.EqualValues(t, 0, ran.Load(), "closed during the wait: no check")
+}
+
+// A store opened with the index on and none built starts a build of its own in the background (applyMessageSearchIndexSetting): a test's own BuildMessageSearchIndex made while that one runs drops
+// and creates the same tables under it ("table already exists", "no such table: board_message_fts_meta"), which a slow machine (Windows) shows (#13389). Wait for the open's build to be over first.
+func buildAfterOpenBuild(t *testing.T, s *Store, ctx context.Context) {
+	t.Helper()
+	require.Eventually(t, func() bool { return s.MessageSearchIndexState() != "building" }, 30*time.Second, 2*time.Millisecond, "the build the open started is over")
+	require.NoError(t, s.BuildMessageSearchIndex(ctx))
 }
