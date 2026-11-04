@@ -381,7 +381,7 @@ func TestOnATeamsMachineEachOwnerSeesOnlyTheirOwnRowsAndTheLocalPersonSeesAll(t 
 	assert.Len(t, items(all), 5, "the local person reads every row")
 	assert.Equal(t, float64(5), all["check"].(map[string]any)["rows"])
 	// a break is said, but not as the id of a row that is not theirs
-	outside, err := sqlx.Open("sqlite", lastBoardTestDBPath) // another owner's row edited outside Coral, by another program
+	outside, err := sqlx.Open("sqlite", boardTestDBPath(e.h)) // another owner's row edited outside Coral, by another program
 	require.NoError(t, err)
 	defer outside.Close()
 	_, err = outside.ExecContext(ctx, `UPDATE operator_actions SET action = 'deny' WHERE item_id = 'b-1'`)
