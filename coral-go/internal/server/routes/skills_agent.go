@@ -282,6 +282,7 @@ func (h *SkillsHandler) GetSkill(w http.ResponseWriter, r *http.Request) {
 			contents[p] = string(b)
 		}
 		_ = h.ss.LogSkillAccess(r.Context(), "get", row.ID, row.Digest, kind, name, "all")
+		h.noteLoad(r, *row)
 		writeJSON(w, http.StatusOK, map[string]any{"frame": skillFrame(row), "skill": summaryOf(*row), "digest": row.Digest, "files": sk.Files, "contents": contents})
 		return
 	}
@@ -299,9 +300,18 @@ func (h *SkillsHandler) GetSkill(w http.ResponseWriter, r *http.Request) {
 		}
 		detail = "file"
 		_ = h.ss.LogSkillAccess(r.Context(), "get", row.ID, row.Digest, kind, name, detail)
+		h.noteLoad(r, *row)
 		writeJSON(w, http.StatusOK, map[string]any{"frame": skillFrame(row), "path": p, "content": string(content)})
 		return
 	}
 	_ = h.ss.LogSkillAccess(r.Context(), "get", row.ID, row.Digest, kind, name, detail)
+	h.noteLoad(r, *row)
 	writeJSON(w, http.StatusOK, map[string]any{"frame": skillFrame(row), "skill": summaryOf(*row), "digest": row.Digest, "skill_md": string(sk.Content["SKILL.md"]), "files": sk.Files})
+}
+
+// noteLoad records that the agent behind this request read row (#13208): only an agent's own read counts (the Operator's reading in the page is not an agent loading a skill), best effort, never a failed read.
+func (h *SkillsHandler) noteLoad(r *http.Request, row store.SkillRow) {
+	if owner, ok := VerifiedSession(r.Context()); ok {
+		_ = h.ss.RecordSkillLoad(context.WithoutCancel(r.Context()), owner.SessionID, row)
+	}
 }

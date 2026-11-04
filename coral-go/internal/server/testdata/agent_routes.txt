@@ -178,6 +178,7 @@ c GET /api/sessions/live/{name}/file-content
 c GET /api/sessions/live/{name}/file-original
 c GET /api/sessions/live/{name}/files
 c GET /api/sessions/live/{name}/git
+b GET /api/sessions/live/{name}/loaded-skills
 b GET /api/sessions/live/{name}/mcp-servers
 b GET /api/sessions/live/{name}/waiting
 c GET /api/sessions/live/{name}/history/context

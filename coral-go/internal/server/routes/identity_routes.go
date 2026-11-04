@@ -91,6 +91,7 @@ var operatorOnlyRoutes = map[string]string{
 	"GET /api/board/{project}/cross-team/settings":       "read a team's cross-team switches for Coral Hub",
 	"GET /api/board/{project}/cross-team-state":          "read who may message a board",
 	"GET /api/sessions/live/{name}/mcp-servers":          "read an agent's MCP servers",
+	"GET /api/sessions/live/{name}/loaded-skills":        "read an agent's loaded skills",
 	"GET /api/board/{project}/cross-team-candidates":     "list the boards that may be put on a board's list",
 	"GET /api/board/{project}/cross-team-links":          "read the links between this computer's teams",
 	"POST /api/board/{project}/cross-team-links":         "link two teams of this computer",
