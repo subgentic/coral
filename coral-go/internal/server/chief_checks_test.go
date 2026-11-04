@@ -260,3 +260,52 @@ func TestChiefPrivateDeliveryRunsStayOutOfGenericTaskRoutes(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "pending", run.Status)
 }
+
+// The person clicks from an older list snapshot after the agent has reported.
+func TestChiefPersonResolutionPreservesInterveningAgentReport(t *testing.T) {
+	e := newChecksEnv(t)
+	ctx := context.Background()
+	code, check := e.call(t, "POST", "/api/chief/checks", checksBody(), false, "")
+	require.Equal(t, 201, code, check)
+	tr, err := e.sched.BeginChiefTrigger(ctx, int64(check["id"].(float64)), 0, "person-preserve", time.Now())
+	require.NoError(t, err)
+	path := fmt.Sprintf("/api/chief/triggers/%d/state", tr.ID)
+	task, err := e.srv.BoardStore().CreateTask(ctx, "chief", "Check result task", "", "medium", "Operator")
+	require.NoError(t, err)
+	_, err = e.srv.BoardStore().Subscribe(ctx, "chief", "Operator", "Operator", "", nil, "all")
+	require.NoError(t, err)
+	code, ask := e.call(t, "POST", "/api/board/chief/messages", map[string]any{"subscriber_id": "Chief", "content": "@Operator Decide the latest check", "ask": true}, true, "")
+	require.Equal(t, 200, code, ask)
+	code, brief := e.call(t, "POST", "/api/board/chief/messages", map[string]any{"subscriber_id": "Chief", "content": "Latest check brief"}, true, "")
+	require.Equal(t, 200, code, brief)
+	for _, report := range []map[string]any{
+		{"state": "routed", "summary": "Latest task report", "task_id": task.ID, "brief_id": brief["id"]},
+		{"state": "waiting_on_operator", "summary": "Latest question report", "ask_id": ask["id"], "brief_id": brief["id"]},
+	} {
+		code, listed := e.call(t, "GET", "/api/chief/triggers", nil, false, "")
+		require.Equal(t, 200, code, listed)
+		code, updated := e.call(t, "POST", path, report, true, "")
+		require.Equal(t, 200, code, updated)
+		for _, state := range []string{"done", "open"} {
+			code, out := e.call(t, "POST", path, map[string]any{"state": state}, false, "")
+			require.Equal(t, 200, code, out)
+			require.Equal(t, state, out["state"])
+			saved, err := e.sched.ChiefTrigger(ctx, tr.ID)
+			require.NoError(t, err)
+			for _, field := range []string{"summary", "task_id", "ask_id", "brief_id"} {
+				require.Equal(t, updated[field], out[field], "%s response preserves %s", state, field)
+			}
+			require.Equal(t, report["summary"], saved.Summary)
+			require.EqualValues(t, brief["id"], saved.BriefID)
+			if report["state"] == "routed" {
+				require.Equal(t, task.ID, saved.TaskID)
+			} else {
+				require.EqualValues(t, ask["id"], saved.AskID)
+			}
+		}
+	}
+	code, out := e.call(t, "POST", path, map[string]any{"state": "done", "summary": "stale cached summary", "brief_id": 999999}, false, "")
+	require.Equal(t, 200, code, out)
+	require.Equal(t, "Latest question report", out["summary"])
+	require.Equal(t, brief["id"], out["brief_id"])
+}

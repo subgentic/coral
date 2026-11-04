@@ -16,4 +16,4 @@ export const loadSources = agent => request(`/api/sessions/live/${encodeURICompo
 export const saveCheck = check => request('/api/chief/checks' + (check.id ? `/${pathId(check.id)}` : ''), { method: check.id ? 'PUT' : 'POST', ...json(check) });
 export const deleteCheck = check => request(`/api/chief/checks/${pathId(check.id)}`, { method: 'DELETE', ...json({ revision: check.revision }) });
 export const runCheck = async (id, key) => (await request(`/api/chief/checks/${pathId(id)}/run`, { method: 'POST', headers: { 'Idempotency-Key': key } })).trigger;
-export const setTriggerState = (trigger, state) => request(`/api/chief/triggers/${pathId(trigger.id)}/state`, { method: 'POST', ...json({ state, summary: trigger.summary || '', brief_id: trigger.brief_id || 0 }) });
+export const setTriggerState = (trigger, state) => request(`/api/chief/triggers/${pathId(trigger.id)}/state`, { method: 'POST', ...json({ state }) });
