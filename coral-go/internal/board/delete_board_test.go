@@ -2,6 +2,7 @@ package board
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -12,6 +13,7 @@ import (
 
 // Everything a board has, with the table and key column it is in: DeleteProject must leave none of it for the deleted board and all of it for another.
 var boardOwnedRows = []struct{ table, col string }{
+	{"board_message_sessions", "project"}, {"chief_check_messages", "project"},
 	{"board_subscribers", "project"}, {"board_messages", "project"}, {"board_reminders", "project"}, {"board_groups", "project"},
 	{"board_tasks", "board_id"}, {"board_settings", "project"}, {"board_waits", "project"}, {"board_working_modes", "board_id"},
 	{"board_workflow_presets", "board_id"}, {"health_counters", "project"}, {"health_items", "project"}, {"health_offbooks", "project"}, {"health_goal_size", "project"}, {"boards", "id"},
@@ -47,6 +49,9 @@ func fillBoard(t *testing.T, s *Store, project string) (taskIDs []int64) {
 	_, err = s.Subscribe(ctx, project, "Dev", "Developer", "claude-"+project+"-dev", nil, "all")
 	require.NoError(t, err)
 	hello, err := s.PostMessage(ctx, project, "Boss", "hello", nil)
+	require.NoError(t, err)
+	require.NoError(t, s.RecordMessageSession(ctx, project, hello.ID, "session-"+project))
+	_, err = s.PostChiefCheckMessage(ctx, project, hello.ID, fmt.Sprintf("%032d", hello.ID), "delivery", "@Dev scheduled check")
 	require.NoError(t, err)
 	require.NoError(t, s.RecordAsk(ctx, project, hello, []string{"Dev"}))
 	require.NoError(t, s.RecordReply(ctx, project, hello.ID, hello.ID))

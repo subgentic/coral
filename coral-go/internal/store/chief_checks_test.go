@@ -110,3 +110,23 @@ func TestChiefTriggerCapacityPrunesOldestResolvedOnly(t *testing.T) {
 	require.NoError(t, s.db.GetContext(ctx, &n, `SELECT COUNT(*) FROM chief_triggers`))
 	require.Equal(t, MaxChiefTriggers, n)
 }
+
+func TestChiefCheckResumeResetsFailureWindowAndExposesPause(t *testing.T) {
+	s := NewScheduleStore(openTestDB(t))
+	ctx := context.Background()
+	c, err := s.SaveChiefCheck(ctx, ChiefCheck{Name: "Mail", Instruction: "Check mail", TargetBoard: "chief", TargetSession: "session", NotifyMode: "only_if_found", ScheduleKind: "interval", EveryMinutes: 15, Timezone: "UTC", Enabled: true})
+	require.NoError(t, err)
+	_, err = s.UpdateScheduledJob(ctx, c.JobID, map[string]interface{}{"enabled": 0, "paused_reason": "Repeated failures"})
+	require.NoError(t, err)
+	c, err = s.ChiefCheck(ctx, c.ID)
+	require.NoError(t, err)
+	require.False(t, c.Enabled)
+	require.Equal(t, "Repeated failures", c.PausedReason)
+	c.Enabled = true
+	c, err = s.SaveChiefCheck(ctx, *c)
+	require.NoError(t, err)
+	require.Empty(t, c.PausedReason)
+	job, err := s.GetScheduledJob(ctx, c.JobID)
+	require.NoError(t, err)
+	require.NotEmpty(t, job.ResumedAt)
+}

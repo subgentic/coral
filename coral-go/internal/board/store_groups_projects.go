@@ -253,6 +253,8 @@ func (s *Store) deleteProject(ctx context.Context, project string, onlyIfUnused 
 		{"DELETE FROM artifact_task_chains WHERE board_id = ?", 1}, // nor the latest file of a task chain
 		{"DELETE FROM artifact_reviews WHERE board_id = ?", 1},     // nor the decisions on its artifacts (#136584)
 		{"DELETE FROM artifact_review_sent WHERE board_id = ?", 1}, // nor when its files were sent for review (#13231)
+		{"DELETE FROM board_message_sessions WHERE project = ?", 1},
+		{"DELETE FROM chief_check_messages WHERE project = ?", 1},
 		{"DELETE FROM board_messages WHERE project = ?", 1},
 		{"DELETE FROM board_subscribers WHERE project = ?", 1},
 		{"DELETE FROM board_reminders WHERE project = ?", 1},
