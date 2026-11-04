@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -120,5 +121,42 @@ func TestNextCursorIsUnpaddedBase64urlAndShortForEverySort(t *testing.T) {
 		require.Regexp(t, `^[A-Za-z0-9_-]+$`, next, "%s: unpadded base64url", sortName)
 		again, _ := taPage(t, e, "/api/board/alpha/artifacts?limit=50&versions=newest&sort="+sortName+"&cursor="+url.QueryEscape(next))
 		require.NotEmpty(t, again.Artifacts, "%s: the cursor it issued is one it accepts", sortName)
+	}
+}
+
+// #13162: Needs you's unread filter is the computer's: read=0 keeps the files still unread, read=1 the ones read (a read tag and no news in the thread), applied before the page is cut, so the total and the page follow
+// it, and a cursor made for one value is refused for the other.
+func TestReadParamFiltersOnTheComputerBeforeThePageIsCut(t *testing.T) {
+	e := newTAEnv(t)
+	seedFiles(e, 120)
+	// read the first 70 by tag (the artifacts' tags route is how the page marks a file read)
+	for i := 0; i < 70; i++ {
+		require.NoError(t, e.h.bs.SetArtifactTags(context.Background(), "alpha", e.ids[fmt.Sprintf("bulk-%04d.md", i)], []string{"read"}))
+	}
+	unread, rawU := taPage(t, e, "/api/board/alpha/artifacts?limit=50&versions=newest&read=0&q=bulk-")
+	require.NotNil(t, unread.Total)
+	require.Equal(t, 50, *unread.Total, "50 of the 120 bulk files are unread: the total is the filter's, not the page's")
+	require.Len(t, unread.Artifacts, 50)
+	read, _ := taPage(t, e, "/api/board/alpha/artifacts?limit=50&versions=newest&read=1&q=bulk-")
+	require.Equal(t, 70, *read.Total, "70 are read")
+	require.Len(t, read.Artifacts, 50, "a page of 50 of them")
+	require.True(t, read.HasMore)
+	// the match that is past the first 50 shows on page 1 of its own filter
+	one, _ := taPage(t, e, "/api/board/alpha/artifacts?limit=50&versions=newest&read=1&q=bulk-0003")
+	require.Len(t, one.Artifacts, 1)
+	require.Equal(t, "bulk-0003.md", one.Artifacts[0].Name)
+	// bad values and a cursor of another filter
+	for _, bad := range []string{"read=2", "read=true", "read=", "read=1&read=0"} {
+		resp, err := http.Get(e.srv.URL + "/api/board/alpha/artifacts?limit=50&" + bad)
+		require.NoError(t, err)
+		resp.Body.Close()
+		require.Equal(t, 400, resp.StatusCode, bad)
+	}
+	next, _ := rawU["next_cursor"].(string)
+	if next != "" {
+		resp, err := http.Get(e.srv.URL + "/api/board/alpha/artifacts?limit=50&versions=newest&read=1&q=bulk-&cursor=" + url.QueryEscape(next))
+		require.NoError(t, err)
+		resp.Body.Close()
+		require.Equal(t, 400, resp.StatusCode, "a cursor made for read=0 is not one for read=1")
 	}
 }
