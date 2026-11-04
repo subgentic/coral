@@ -32,12 +32,12 @@ const scriptSID = "00000000-0000-4000-8000-00000000b13a"
 func TestScriptedRepliesByKeywordAndOrder(t *testing.T) {
 	t.Setenv("CLAUDE_PROJECTS_DIR", t.TempDir())
 	scriptFile(t, `[
-	  {"when":"Wind Chill","text":"Added FeelsLike and a test.","tool":{"name":"Bash","command":"go test ./...","output":"ok  skyline 0.4s"}},
+	  {"when":"WIND CHILL","text":"Added FeelsLike and a test.","tool":{"name":"Bash","command":"go test ./...","output":"ok  skyline 0.4s"}},
 	  {"text":"First unkeyed answer."},
 	  {"text":"Second unkeyed answer."}
 	]`)
 	tr := newTranscript(scriptSID, "")
-	for _, p := range []string{"hello", "please add the wind chill change", "and now?", "last one"} {
+	for _, p := range []string{"hello", "please add the Wind Chill change", "and now?", "last one"} {
 		if err := tr.Turn(p); err != nil {
 			t.Fatal(err)
 		}
