@@ -29,11 +29,16 @@ const HEX = t => (t.charCodeAt(1).toString(16) + 'a').padEnd(64, 'c').slice(0, 6
         await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         const S = `(window.__coralStatic || '/static/')`;
         const reset = () => ev(`window.__r.inflight = 0; window.__r.max = 0; window.__r.reads = {}; true`);
+        // UI Reviewer's SHOULD: the time is to the requested file's viewer on screen (openNeed does not await openReview, so a no-op would have passed), -1 when it is not there in 6 s
+        const viewerShown = team => ev(`(async () => { const t0 = performance.now(); const L = await import(${S} + 'inbox_link.js'); await L.openNeed({ kind: 'review', server: '', team: '${team}', id: '${HEX(team)}' });
+            for (;;) { const t = document.querySelector('.artifact-viewer-title'); if (t && t.checkVisibility() && t.textContent === '${team}.html') return Math.round(performance.now() - t0); if (performance.now() - t0 > 6000) return -1; await new Promise(r => setTimeout(r, 20)); } // sleep-ok: polling for the viewer to appear
+        })()`);
         const time = expr => ev(`(async () => { const t0 = performance.now(); await (${expr}); return Math.round(performance.now() - t0); })()`);
 
         // 1: a link when nothing is loaded: the item's own team is read, not all eight (one team: 500 ms)
-        const cold = await time(`(async () => { const L = await import(${S} + 'inbox_link.js'); await L.openNeed({ kind: 'review', server: '', team: 't3', id: '${HEX('t3')}' }); })()`);
-        console.log(`cold link opened in ${cold} ms`);
+        const cold = await viewerShown('t3');
+        console.log(`cold link: the viewer of t3.html on screen after ${cold} ms`);
+        assert.ok(cold >= 0, "the requested file's viewer is on screen");
         assert.ok(cold < 1500, `a link opens from its own team's read, not a scan of eight teams (500 ms each): ${cold} ms`);
         await waitFor(`!window.__r.inflight`, 'the background scan ends', 15000);
         assert.ok((await ev(`window.__r.reads.t3`)) >= 1, 'the named team was read');
@@ -54,8 +59,9 @@ const HEX = t => (t.charCodeAt(1).toString(16) + 'a').padEnd(64, 'c').slice(0, 6
 
         // 4: with the Inbox loaded, a link opens at once (the scan after it is in the background)
         await reset();
-        const warm = await time(`(async () => { const L = await import(${S} + 'inbox_link.js'); await L.openNeed({ kind: 'review', server: '', team: 't5', id: '${HEX('t5')}' }); })()`);
-        console.log(`warm link opened in ${warm} ms`);
+        const warm = await viewerShown('t5');
+        console.log(`warm link: the viewer of t5.html on screen after ${warm} ms`);
+        assert.ok(warm >= 0, "the requested file's viewer is on screen");
         assert.ok(warm < 400, `a link opens from the rows in hand, no scan first: ${warm} ms`);
         console.log('PASS');
     } finally { try { client.close(); } catch (e) {} }
