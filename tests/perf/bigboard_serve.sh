@@ -11,11 +11,15 @@
 set -uo pipefail
 export CORAL_TELEMETRY_DISABLED=1
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$HERE/bigboard_lib.sh"
 if [[ "${1:-}" == stop ]]; then
   RD="${2:?usage: bigboard_serve.sh stop RUN_DIR}"
   [[ -f "$RD/pid" ]] || { echo "no $RD/pid"; exit 1; }
-  kill "$(cat "$RD/pid")" 2>/dev/null; for _ in $(seq 60); do kill -0 "$(cat "$RD/pid")" 2>/dev/null || break; sleep 0.5; done; kill -9 "$(cat "$RD/pid")" 2>/dev/null
-  [[ -S "$RD/data/tmux.sock" ]] && tmux -S "$RD/data/tmux.sock" kill-server 2>/dev/null
+  PIDF="$(cat "$RD/pid")"
+  # a stale pid file (after a reboot or a long run) can name an unrelated process: only a process whose command line is a coral with THIS run's --home is stopped
+  if ! ps -o command= -p "$PIDF" 2>/dev/null | grep -qF -- "--home $RD/data"; then echo "pid $PIDF is not this run's coral (--home $RD/data): not stopping it"; stop_private_tmux "$RD/data/tmux.sock"; exit 1; fi
+  kill "$PIDF" 2>/dev/null; for _ in $(seq 60); do kill -0 "$PIDF" 2>/dev/null || break; sleep 0.5; done; kill -9 "$PIDF" 2>/dev/null
+  stop_private_tmux "$RD/data/tmux.sock"
   echo "stopped"; exit 0
 fi
 [[ "${PERF_RUN:-}" == 1 ]] || { echo "[bigboard-serve] opt-in: set PERF_RUN=1" >&2; exit 2; }
@@ -31,14 +35,14 @@ env -u TMUX -u CORAL_CLOUD_URL -u CORAL_URL -u CORAL_SESSION_NAME -u CORAL_SUBSC
   CODEX_HOME="$CORAL_TEST_HOME/codex" nohup "$BIN" --home "$RUN_DIR/data" --no-browser --host 127.0.0.1 --port "$PORT" --cloud-url off > "$RUN_DIR/server.log" 2>&1 &
 echo $! > "$RUN_DIR/pid"
 for _ in $(seq 600); do kill -0 "$(cat "$RUN_DIR/pid")" 2>/dev/null || { tail -20 "$RUN_DIR/server.log"; exit 1; }; curl -s -m 2 "http://127.0.0.1:$PORT/api/health" >/dev/null && break; sleep 0.5; done
-KEY="$(tr -d '[:space:]' < "$RUN_DIR/data/api_key")"
+KEY="$(tr -d '[:space:]' < "$RUN_DIR/data/api_key")"; write_auth_header "$RUN_DIR/auth.hdr" "$KEY"
 if [[ "$LIVE" -gt 0 ]]; then
   agents=""; for i in $(seq "$LIVE"); do agents="$agents${agents:+,}{\"agent_type\":\"claude\",\"name\":\"live-$i\",\"prompt\":\"You are live agent $i.\"}"; done
-  command curl -s -m 300 -X POST "http://127.0.0.1:$PORT/api/sessions/launch-team" -H "Authorization: Bearer $KEY" -H 'Content-Type: application/json' \
+  command curl -s -m 300 -X POST "http://127.0.0.1:$PORT/api/sessions/launch-team" -H @"$RUN_DIR/auth.hdr" -H 'Content-Type: application/json' \
     -d "{\"board_name\":\"live\",\"working_dir\":\"$FIXTURE/repo\",\"agents\":[$agents]}" > "$RUN_DIR/launch.json"
   sleep 12
 fi
-command curl -s -m 30 "http://127.0.0.1:$PORT/api/sessions/live" -H "Authorization: Bearer $KEY" | python3 -I -c 'import sys,json; d=json.load(sys.stdin); r=d if isinstance(d,list) else d.get("sessions",[]); print("agent rows:", len(r), " awake:", sum(1 for x in r if not x.get("sleeping")))'
+command curl -s -m 30 "http://127.0.0.1:$PORT/api/sessions/live" -H @"$RUN_DIR/auth.hdr" | python3 -I -c 'import sys,json; d=json.load(sys.stdin); r=d if isinstance(d,list) else d.get("sessions",[]); print("agent rows:", len(r), " awake:", sum(1 for x in r if not x.get("sleeping")))'
 echo "revision: $(cat "$FIXTURE/commit.txt") (the fixture's build); server binary: $BIN"
 echo "URL: http://127.0.0.1:$PORT   sign-in link: http://127.0.0.1:$PORT/?login_token=$(cat "$RUN_DIR/data/login_token" 2>/dev/null)"
 echo "run folder: $RUN_DIR   stop: PERF_RUN=1 bash $HERE/bigboard_serve.sh stop $RUN_DIR"

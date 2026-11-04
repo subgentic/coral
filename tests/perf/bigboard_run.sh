@@ -19,6 +19,7 @@ PORT="${PORT:-8742}"; HUBPORT="${HUBPORT:-8743}"; IDLE_S="${IDLE_S:-60}"
 for p in "$PORT" "$HUBPORT"; do lsof -nP -iTCP:"$p" -sTCP:LISTEN >/dev/null 2>&1 && { echo "[bigboard-run] port $p is in use" >&2; exit 2; }; done
 mkdir -p "$OUT"; OUT="$(cd "$OUT" && pwd)"
 source "$HERE/../lib/mock_sandbox.sh"
+source "$HERE/bigboard_lib.sh"
 log() { echo "[bigboard-run] $*"; }
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/bigboard-run.XXXXXX")" || exit 1
 PIDS=()
@@ -26,7 +27,7 @@ cleanup() {
   for p in ${PIDS[@]+"${PIDS[@]}"}; do kill "$p" 2>/dev/null; done
   for _ in $(seq 60); do alive=0; for p in ${PIDS[@]+"${PIDS[@]}"}; do kill -0 "$p" 2>/dev/null && alive=1; done; [[ $alive == 0 ]] && break; sleep 0.5; done
   for p in ${PIDS[@]+"${PIDS[@]}"}; do kill -9 "$p" 2>/dev/null; done
-  [[ -S "$WORK/data/tmux.sock" ]] && tmux -S "$WORK/data/tmux.sock" kill-server 2>/dev/null
+  stop_private_tmux "$WORK/data/tmux.sock"
   sleep 1; rm -rf -- "$WORK"; coral_test_sandbox_cleanup
 }
 trap cleanup EXIT
@@ -64,8 +65,8 @@ export CORAL_PPROF_ADDR="127.0.0.1:$PPROF_PORT"; [[ -n "${DEBUG_PHASES:-}" ]] &&
 start local "$FIXTURE/bin/coral" "$WORK/data" "$PORT"
 unset CORAL_PPROF_ADDR CORAL_DEBUG_PHASES
 SRV=$LAST_PID
-KEY="$(tr -d '[:space:]' < "$WORK/data/api_key")"
-api() { local m="$1" p="$2"; shift 2; command curl -s -m 120 -X "$m" "http://127.0.0.1:$PORT$p" -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" "$@"; }
+KEY="$(tr -d '[:space:]' < "$WORK/data/api_key")"; write_auth_header "$WORK/auth.hdr" "$KEY"
+api() { local m="$1" p="$2"; shift 2; command curl -s -m 120 -X "$m" "http://127.0.0.1:$PORT$p" -H @"$WORK/auth.hdr" -H "Content-Type: application/json" "$@"; }
 # LIVE: the counts of live mock agents (in tmux, working in the fixture's big repo) the page is measured at; each step adds agents to the server it is on
 LIVE="${LIVE:-0 30}"; launched=0; LAST_N=0
 for n in $LIVE; do
@@ -88,8 +89,9 @@ if [[ "${HUB:-}" == 1 ]]; then
   mkdir -p "$WORK/hub"
   start hub "$FIXTURE/bin/coral" "$WORK/hub" "$HUBPORT" --hub
   HUBKEY="$(tr -d '[:space:]' < "$WORK/hub/api_key")"
-  code=$(curl -s -m 60 -o "$OUT/hub-add.json" -w '%{http_code}' -X POST "http://127.0.0.1:$HUBPORT/api/servers" -H "Authorization: Bearer $HUBKEY" -H 'Content-Type: application/json' \
-    -d "{\"id\":\"bigboard\",\"label\":\"bigboard\",\"url\":\"http://127.0.0.1:$PORT\",\"api_key\":\"$KEY\",\"allow_private\":true}")
+  write_auth_header "$WORK/hub-auth.hdr" "$HUBKEY"   # the keys go in files, not on curl's command line (another account's ps could read them)
+  ( umask 077; printf '{"id":"bigboard","label":"bigboard","url":"http://127.0.0.1:%s","api_key":"%s","allow_private":true}' "$PORT" "$KEY" > "$WORK/hub-add.body" )
+  code=$(curl -s -m 60 -o "$OUT/hub-add.json" -w '%{http_code}' -X POST "http://127.0.0.1:$HUBPORT/api/servers" -H @"$WORK/hub-auth.hdr" -H 'Content-Type: application/json' -d @"$WORK/hub-add.body")
   log "hub add server: HTTP $code"; head -c 300 "$OUT/hub-add.json"; echo
   sleep 5
   log "measuring through the hub with $LAST_N live agents (idle ${IDLE_S}s)"

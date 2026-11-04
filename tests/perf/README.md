@@ -99,3 +99,8 @@ page is measured through a second `coral --hub` that has the first added as a re
 
 Known limits: about 2% of the seeded messages are refused (an @mention of a name that is not on the board); the seeded agents are asleep or
 gone when the fixture is measured (the server is stopped after the seed), so the agent rows are real but nothing is typing into them.
+
+Safety notes (Security's read of the rig, #13154): the scripts stop a tmux server only through `stop_private_tmux` in `bigboard_lib.sh`, which refuses any socket under a real Coral
+folder (`~/.coral`, `$CORAL_DIR`, any `.coral/`) or at a path that is not `<run folder>/data/tmux.sock`; a private socket made by the run's own server is exempt from the "no tmux
+kill-server" rule (#12836) because nothing else can be attached to it. `bigboard_serve.sh stop` stops a PID from `RUN_DIR/pid` only if its command line is a coral with that run's `--home`.
+The API keys go to curl through mode-600 header files, not the command line. The pprof listeners (`127.0.0.1:8744` and `:8747`) serve heap data to any local user while the run lasts.

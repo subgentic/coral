@@ -42,13 +42,14 @@ mkdir -p "$ST/env"
 if lsof -nP -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1; then echo "[bigboard] port $PORT is in use" >&2; exit 2; fi
 
 source "$HERE/../lib/mock_sandbox.sh"
+source "$HERE/bigboard_lib.sh"
 log() { echo "[bigboard] $*"; }
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/bigboard.XXXXXX")" || exit 1
 SRV=""; UP=""
 cleanup() {
   [[ -n "$UP" ]] && kill -0 "$UP" 2>/dev/null && kill "$UP" 2>/dev/null
   [[ -n "$SRV" ]] && kill -0 "$SRV" 2>/dev/null && { kill "$SRV" 2>/dev/null; for _ in $(seq 120); do kill -0 "$SRV" 2>/dev/null || break; sleep 0.5; done; kill -9 "$SRV" 2>/dev/null; }
-  [[ -S "$FIXTURE/data/tmux.sock" ]] && tmux -S "$FIXTURE/data/tmux.sock" kill-server 2>/dev/null
+  stop_private_tmux "$FIXTURE/data/tmux.sock"
   sleep 2
   rm -rf -- "$WORK"
   coral_test_sandbox_cleanup
@@ -100,9 +101,9 @@ start_server() {
 }
 start_server
 KEY="$(tr -d '[:space:]' < "$FIXTURE/data/api_key" 2>/dev/null)"; [[ -n "$KEY" ]] || { log "no API key"; exit 1; }
-printf '%s\n' "$KEY" > "$WORK/key.txt"; chmod 600 "$WORK/key.txt"
+printf '%s\n' "$KEY" > "$WORK/key.txt"; chmod 600 "$WORK/key.txt"; write_auth_header "$WORK/auth.hdr" "$KEY"
 BASE="http://127.0.0.1:$PORT"
-api() { local m="$1" p="$2"; shift 2; command curl -s -m 600 -X "$m" "$BASE$p" -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" "$@"; }
+api() { local m="$1" p="$2"; shift 2; command curl -s -m 600 -X "$m" "$BASE$p" -H @"$WORK/auth.hdr" -H "Content-Type: application/json" "$@"; }
 api PUT /api/settings -d "{\"cli_path_claude\": \"$FIXTURE/bin/mock-agent\"}" >/dev/null
 
 # 4. the agents (one team, on the seeded board), working in the big repo; launch_agents PREFIX launches AGENTS mock agents named PREFIX-<i>
@@ -140,7 +141,7 @@ fi
 # 6. stop, record
 for _ in 1 2 3; do api GET /api/sessions/live > "$WORK/live.json"; done
 kill "$SRV" 2>/dev/null; for _ in $(seq 120); do kill -0 "$SRV" 2>/dev/null || break; sleep 0.5; done; SRV=""
-[[ -S "$FIXTURE/data/tmux.sock" ]] && tmux -S "$FIXTURE/data/tmux.sock" kill-server 2>/dev/null
+stop_private_tmux "$FIXTURE/data/tmux.sock"
 [[ $up -eq 0 ]] || { log "uploads did not finish (exit $up): run the same command again to resume"; exit 1; }
 python3 -I - "$WORK" "$FIXTURE" "$BOARD_ID" "$FILES" "$VERSIONS" "$AGENTS" "$TASKS" "$MSGS" "$CHANGES" "$RELAUNCHED" <<'PY'
 import json, sys
