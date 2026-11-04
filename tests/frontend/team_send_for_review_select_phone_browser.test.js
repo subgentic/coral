@@ -51,17 +51,21 @@ const { coralReady } = require('./helpers/wait');
         const pick = name => ev(`(() => { const b = [...document.querySelectorAll('#team-panel-artifacts [data-artifact-id]')].find(x => (x.querySelector('.dt-mail-title') || x).textContent.trim().startsWith(${JSON.stringify(name)})); const lead = b && b.closest('tr').querySelector('button.dt-mail-lead'); if (!lead) return 'no lead button for ' + ${JSON.stringify(name)}; lead.click(); return 'ok'; })()`);
         for (const n of ['plan.txt', 'draft.txt']) assert.equal(await pick(n), 'ok', n);
         // both actions are always in the bar; the one that has nothing to do is disabled (data_table's `disabled`), so 'offered' means enabled
-        const barAll = text => `[...document.querySelectorAll('#team-panel-artifacts .dt-bar-action')].filter(b => b.getClientRects().length && b.textContent.trim() === ${JSON.stringify(text)})`;
+        // a phone's bar is one line (Cancel, the count, the three dots): the actions are the menu's items (#13396); the menu is opened first
+        const openMore = async () => { await ev(`document.querySelector('#team-panel-artifacts .dt-bar-more-toggle').click(); true`); await waitFor(`!document.querySelector('#team-panel-artifacts .dt-bar-more .dt-mail-menu').hidden`, 'the More menu opens', 4000); };
+        const barAll = text => `[...document.querySelectorAll('#team-panel-artifacts .dt-bar-action, #team-panel-artifacts .dt-bar-more .menu-item')].filter(b => b.getClientRects().length && b.textContent.trim() === ${JSON.stringify(text)})`;
         const bar = text => `${barAll(text)}.filter(b => !b.disabled && b.getAttribute('aria-disabled') !== 'true')`;
+        await waitFor(`!!document.querySelector('#team-panel-artifacts .dt-bar-more-toggle')`, 'the bar has its More button', 8000);
+        const strip = await ev(`(() => { const b = document.querySelector('#team-panel-artifacts .dt-bar'); return { over: b.scrollWidth - b.clientWidth, vw: innerWidth }; })()`);
+        assert.ok(strip.over <= 1, 'the bar does not scroll sideways: ' + JSON.stringify(strip));
+        await openMore();
         await waitFor(`${bar('Send for review')}.length === 1`, 'Send for review in the selection bar', 8000);
         const h = await ev(`Math.round(${bar('Send for review')}[0].getBoundingClientRect().height)`);
         assert.ok(h >= 43.5, 'the bar action is a 44 px touch target: ' + h);
         assert.equal(await ev(`${bar('Remove from review')}.length`), 0, 'files that are not for review do not offer Remove (it is disabled)');
         assert.equal(await ev(`${barAll('Remove from review')}.length`), 1, 'it stays in the bar, disabled');
-        // the bar scrolls sideways on a phone: Send for review is partly off screen until it is scrolled to (see the picture); a person can reach it by swiping the bar, and it is then inside the screen
-        const reach = await ev(`(() => { const b = ${bar('Send for review')}[0]; const before = b.getBoundingClientRect(); b.scrollIntoView({ inline: 'center', block: 'nearest' }); const r = b.getBoundingClientRect(); return { offscreenBefore: before.right > innerWidth + 0.5, left: Math.round(r.left), right: Math.round(r.right), vw: innerWidth }; })()`);
-        assert.ok(reach.left >= 0 && reach.right <= reach.vw + 0.5, 'Send for review can be scrolled fully into the screen: ' + JSON.stringify(reach));
-        console.log('   note: Send for review is partly off screen before the bar is scrolled: ' + reach.offscreenBefore);
+        const inside = await ev(`(() => { const r = ${bar('Send for review')}[0].getBoundingClientRect(); return { left: Math.round(r.left), right: Math.round(r.right), top: Math.round(r.top), bottom: Math.round(r.bottom), vw: innerWidth, vh: innerHeight }; })()`);
+        assert.ok(inside.left >= 0 && inside.right <= inside.vw && inside.top >= 0 && inside.bottom <= inside.vh, 'Send for review is fully on screen, with no scrolling: ' + JSON.stringify(inside));
         await shot('select_review_phone_bar');
         console.log('   ✓');
 
@@ -81,6 +85,7 @@ const { coralReady } = require('./helpers/wait');
         await ev(`document.querySelector('#team-panel-artifacts .dt-bar-clear, #team-panel-artifacts .dt-bar-close')?.click(); true`);
         const sel = await ev(`document.querySelectorAll('#team-panel-artifacts tr.dt-selected').length`);
         if (sel < 2) for (const n of ['plan.txt', 'draft.txt']) await pick(n);
+        await openMore();
         await waitFor(`${bar('Remove from review')}.length === 1`, 'Remove from review in the selection bar', 8000);
         assert.equal(await ev(`${bar('Send for review')}.length`), 0, 'files that are for review do not offer Send (it is disabled)');
         await ev(`${bar('Remove from review')}[0].click(); true`);
