@@ -119,13 +119,13 @@ func applyControl(box *inputBox, line string) (handled, waiting bool) {
 	case "MOCK_ASK_QUESTION":
 		box.promptOpen, box.question = true, true
 		drawBox(box)
-		fmt.Print(questionMenu)
+		fmt.Print(questionMenuFor(loadPromptCfg(), false))
 		box.tell("question_request")
 		return true, true
 	case "MOCK_ASK_QUESTION_TEXT":
 		box.promptOpen, box.question, box.textOption, box.typing = true, true, true, false
 		drawBox(box)
-		fmt.Print(questionTextMenu)
+		fmt.Print(questionMenuFor(loadPromptCfg(), true))
 		box.tell("question_request")
 		return true, true
 	case "MOCK_STUCK_ENTER":

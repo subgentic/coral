@@ -389,18 +389,18 @@ func runRawInput(dir, sessionID, settingsFile string, turn func(string)) {
 	box.notify = func(kind string) {
 		events <- func() {
 			if k, text, ok := strings.Cut(kind, "\x00"); ok && k == "question_answered_text" { // a typed answer (MOCK_ASK_QUESTION_TEXT)
-				hooks.fire("PostToolUse", map[string]any{"tool_name": "AskUserQuestion", "tool_use_id": "toolu_mock_q_" + name, "tool_response": map[string]any{"answers": map[string]any{"Pick a color:": text}}})
+				hooks.fire("PostToolUse", map[string]any{"tool_name": "AskUserQuestion", "tool_use_id": "toolu_mock_q_" + name, "tool_response": map[string]any{"answers": map[string]any{loadPromptCfg().Question.Question: text}}})
 				hooks.fire("Stop", map[string]any{"stop_hook_active": false})
 				return
 			}
 			switch kind {
 			case "permission_request": // the tool call's request, then the notification that follows it, as Claude Code sends them
-				hooks.fire("PermissionRequest", map[string]any{"tool_name": "Bash", "tool_use_id": "toolu_mock_" + name, "tool_input": map[string]any{"command": "rm -rf build", "description": "Remove the build folder"}})
+				hooks.fire("PermissionRequest", map[string]any{"tool_name": "Bash", "tool_use_id": "toolu_mock_" + name, "tool_input": map[string]any{"command": loadPromptCfg().Permission.Command, "description": loadPromptCfg().Permission.Description}})
 				hooks.fire("Notification", map[string]any{"notification_type": "permission_prompt", "message": "Claude needs your permission to use Bash"})
 			case "question_request": // Claude's AskUserQuestion: a permission request of the tool, as Coral reads a question (#10168)
-				hooks.fire("PermissionRequest", map[string]any{"tool_name": "AskUserQuestion", "tool_use_id": "toolu_mock_q_" + name, "tool_input": map[string]any{"questions": []any{map[string]any{"header": "Color", "multiSelect": false, "question": "Pick a color:", "options": []any{map[string]any{"label": "Red", "description": "Choose red"}, map[string]any{"label": "Blue", "description": "Choose blue"}}}}}})
+				hooks.fire("PermissionRequest", map[string]any{"tool_name": "AskUserQuestion", "tool_use_id": "toolu_mock_q_" + name, "tool_input": map[string]any{"questions": []any{map[string]any{"header": loadPromptCfg().Question.Header, "multiSelect": false, "question": loadPromptCfg().Question.Question, "options": loadPromptCfg().questionOptions()}}}})
 			case "question_answered":
-				hooks.fire("PostToolUse", map[string]any{"tool_name": "AskUserQuestion", "tool_use_id": "toolu_mock_q_" + name, "tool_response": map[string]any{"answers": map[string]any{"Pick a color:": "Red"}}})
+				hooks.fire("PostToolUse", map[string]any{"tool_name": "AskUserQuestion", "tool_use_id": "toolu_mock_q_" + name, "tool_response": map[string]any{"answers": map[string]any{loadPromptCfg().Question.Question: loadPromptCfg().Question.Options[0].Label}}})
 				hooks.fire("Stop", map[string]any{"stop_hook_active": false})
 			case "permission_answered":
 				hooks.fire("PostToolUse", map[string]any{"tool_name": "Bash", "tool_use_id": "toolu_mock_" + name, "tool_response": map[string]any{"stdout": ""}})
