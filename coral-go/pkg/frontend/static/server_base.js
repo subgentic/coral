@@ -476,6 +476,12 @@ export function nativeInbox() {
     return isCloud() && bootConfig().inbox === 'native';
 }
 
+/** The Hub-served dashboard draws Coral's own Needs you table, not the Hub's framed page (#13446, #13450): the Hub's boot value `needs: 'native'`, read only together with `inbox: 'native'`. The Hub's own page config
+ *  (a machine, a URL or a message cannot set it), so a folder can move off the frame, or back, without the others. The table is the owner's: every route it calls is owner-only through the Hub. */
+export function nativeNeeds() {
+    return nativeInbox() && bootConfig().needs === 'native';
+}
+
 /** Read /api/health once and cache the flag in state.hub. Safe to call often.
  *  The Cloud Hub is always a hub; it does not need /api/health to say so. */
 export function initHub() {
