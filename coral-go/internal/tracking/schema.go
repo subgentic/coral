@@ -101,6 +101,7 @@ const (
 	FailSpawnFailed        = "spawn_failed"
 	FailWorktreeFailed     = "worktree_failed"
 	FailInternal           = "internal"
+	FailHomeFolderAsked    = "home_folder_asked" // the dashboard asked about the home folder and nothing started: a question, not a failed launch (#13425)
 )
 
 type propKind int
@@ -130,7 +131,7 @@ var (
 	backendEnu  = enum("tmux", "pty", "unknown")
 	kindEnu     = enum(KindAgent, KindTeam)
 	failureEnu  = enum(FailInvalidRequest, FailUnsupportedOption, FailLimitReached, FailWorkdirUnavailable,
-		FailBackendUnavailable, FailProviderMissing, FailProviderUnrunnable, FailSpawnFailed, FailWorktreeFailed, FailInternal)
+		FailBackendUnavailable, FailProviderMissing, FailProviderUnrunnable, FailSpawnFailed, FailWorktreeFailed, FailInternal, FailHomeFolderAsked)
 	agentCount = intRange(0, 64)
 )
 
