@@ -1,0 +1,18 @@
+/* The agent's permission card (inbox_agent_card.js, #13169): its own layout. It shares .inbox-ask-dialog's size and type with the Operator's question dialog, but not that dialog's two-column grid
+   (operator_ask_dialog.css, 1000 px and wider), which auto-placed the card's body, error line and buttons into cells made for a reader and a reply box: Open agent and Close sat over the command and
+   the choices. The card is a column: heading, the body (the one part that scrolls), the error line, then Open agent and Close in a row of their own at the bottom, never over the content. */
+dialog.inbox-ask-dialog.inbox-card-dialog[open] { display: flex; flex-direction: column; width: var(--dlg-w-form); max-width: calc(100vw - 2 * var(--space-md, 12px)); height: auto; max-height: 90dvh; overflow: hidden; }
+.inbox-card-dialog > * { flex-shrink: 0; min-width: 0; }
+.inbox-card-dialog > .inbox-card-body { flex: 1 1 auto; min-height: 0; overflow: auto; }
+/* what the agent wants to run: a wrapped monospace block that scrolls inside itself, never past the dialog */
+.inbox-card-dialog .inbox-ask-text { box-sizing: border-box; max-width: 100%; max-height: 40dvh; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; margin: 0 0 12px; padding: 8px 10px; font-family: var(--font-mono, monospace); font-size: var(--fs-sm); background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius-md); }
+/* the choices size to their label and wrap onto lines; a long one never runs past its button */
+.inbox-card-dialog .inbox-ask-offers-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.inbox-card-dialog .inbox-ask-offers-list .btn { flex: 0 1 auto; box-sizing: border-box; max-width: 100%; height: auto; min-height: 44px; padding-block: 8px; white-space: normal; overflow-wrap: anywhere; text-align: left; line-height: var(--lh-ui); }
+.inbox-card-dialog > .inbox-ask-error { margin: 8px 0 0; }
+.inbox-card-dialog > .inbox-ask-buttons { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.inbox-card-dialog > .inbox-ask-buttons .btn { height: auto; }
+@media (max-width: 500px) {
+    .inbox-card-dialog .inbox-ask-offers-list .btn { flex: 1 1 100%; }
+    .inbox-card-dialog > .inbox-ask-buttons .btn { flex: 1 1 0; }
+}
