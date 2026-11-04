@@ -168,6 +168,12 @@ func (m *BoardHealthMonitor) buildRoster(ctx context.Context, in rosterInputs) (
 				attention++
 			case sig.InTurn:
 				// a limit can cut a turn short with no hook event (Codex), so "in a turn" is not proof it works (#9267)
+				if model, refused := m.modelRefused(ctx, a); refused {
+					r.Counts[teamhealth.StateRefused]++
+					r.Blocked = append(r.Blocked, teamhealth.BlockedEntry{Name: name, Model: model})
+					attention++
+					break
+				}
 				if resets, blocked := m.blockedByLimit(ctx, a); blocked {
 					r.Counts[teamhealth.StateBlocked]++
 					r.Blocked = append(r.Blocked, teamhealth.BlockedEntry{Name: name, Resets: resets})
@@ -176,6 +182,12 @@ func (m *BoardHealthMonitor) buildRoster(ctx context.Context, in rosterInputs) (
 				}
 				r.Counts[teamhealth.StateWorking]++
 			default:
+				if model, refused := m.modelRefused(ctx, a); refused { // its model is refused (#13480): not idle, and not for a nudge
+					r.Counts[teamhealth.StateRefused]++
+					r.Blocked = append(r.Blocked, teamhealth.BlockedEntry{Name: name, Model: model})
+					attention++
+					break
+				}
 				if resets, blocked := m.blockedByLimit(ctx, a); blocked {
 					r.Counts[teamhealth.StateBlocked]++
 					r.Blocked = append(r.Blocked, teamhealth.BlockedEntry{Name: name, Resets: resets})

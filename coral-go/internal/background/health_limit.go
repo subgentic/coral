@@ -50,6 +50,9 @@ func screenLimit(rt AgentRuntime) func(ctx context.Context, a AgentInfo) (time.D
 		var ok bool
 		if a.AgentType == at.Codex {
 			resets, ok = ptymanager.CodexLimitOnScreen(screen, time.Now())
+			if _, refused := ptymanager.CodexModelRefusedOnScreen(screen); !ok && refused {
+				resets, ok = 0, true // its model is refused (#13480): no turn it is given does any work, so it is blocked for every gate that skips a usage-limited agent
+			}
 		} else {
 			resets, ok = ptymanager.AgyQuotaOnScreen(screen)
 		}
@@ -60,7 +63,7 @@ func screenLimit(rt AgentRuntime) func(ctx context.Context, a AgentInfo) (time.D
 	}
 }
 
-const limitScreenTTL = 10 * time.Second
+var limitScreenTTL = 10 * time.Second // a var so a test can read the screen afresh each time
 
 // blockedByLimit says whether a is stopped by a usage limit, and when it resets.
 func (m *BoardHealthMonitor) blockedByLimit(ctx context.Context, a AgentInfo) (time.Duration, bool) {
@@ -82,4 +85,47 @@ func sendUnlessBlocked(ctx context.Context, limit func(context.Context, AgentInf
 		}
 	}
 	return deliver(ctx, a, key, text)
+}
+
+// screenModelRefused reads a Codex agent's "model is not supported" notice off its screen (#13480): which model its login cannot use. Only Codex is looked at, and a runtime that cannot show a screen sees nothing.
+func screenModelRefused(rt AgentRuntime) func(ctx context.Context, a AgentInfo) (string, bool) {
+	sr, ok := rt.(screenReader)
+	if !ok {
+		return nil
+	}
+	type seen struct {
+		at    time.Time
+		model string
+		ok    bool
+	}
+	var mu sync.Mutex
+	cache := map[string]seen{}
+	return func(ctx context.Context, a AgentInfo) (string, bool) {
+		if a.AgentType != at.Codex {
+			return "", false
+		}
+		mu.Lock()
+		c, hit := cache[a.SessionID]
+		mu.Unlock()
+		if hit && time.Since(c.at) < limitScreenTTL {
+			return c.model, c.ok
+		}
+		screen, err := sr.AgentScreen(ctx, naming.SessionName(a.AgentType, a.SessionID), a.AgentType, a.SessionID)
+		if err != nil {
+			return "", false
+		}
+		model, found := ptymanager.CodexModelRefusedOnScreen(screen)
+		mu.Lock()
+		cache[a.SessionID] = seen{time.Now(), model, found}
+		mu.Unlock()
+		return model, found
+	}
+}
+
+// modelRefused says whether a is a Codex agent whose model is refused, and which model.
+func (m *BoardHealthMonitor) modelRefused(ctx context.Context, a AgentInfo) (string, bool) {
+	if m.refused == nil {
+		return "", false
+	}
+	return m.refused(ctx, a)
 }

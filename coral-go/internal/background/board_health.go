@@ -35,6 +35,8 @@ type BoardHealthMonitor struct {
 	deliver  func(ctx context.Context, a AgentInfo, key, text string) error
 	// limit says whether a live agent is stopped by a usage limit, and how long until it resets (0 if not shown); nil: nothing is.
 	limit func(ctx context.Context, a AgentInfo) (resets time.Duration, blocked bool)
+	// refused says whether a live Codex agent's model is refused by its login, and which model (#13480); nil: nothing is. Such an agent also counts as blocked in limit, so every gate that skips a usage-limited agent skips it.
+	refused func(ctx context.Context, a AgentInfo) (model string, refused bool)
 
 	// paused says whether a board is paused: nothing is nudged on it, and the check says so (#11182); nil: not said.
 	paused func(project string) bool
@@ -65,6 +67,7 @@ func (m *BoardHealthMonitor) SetAgents(ts *store.TaskStore, rt AgentRuntime, dis
 	m.discover = discover
 	m.signal = hookSignal(ts)
 	m.limit = screenLimit(rt)
+	m.refused = screenModelRefused(rt)
 	m.deliver = func(ctx context.Context, a AgentInfo, _ string, text string) error {
 		_, err := deliverAutomated(ctx, rt, m.logger, naming.SessionName(a.AgentType, a.SessionID), a.AgentType, a.SessionID, typedHealth(text), "health check", false, false) // what reaches a terminal is the typed form (goal #7)
 		return err
