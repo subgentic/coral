@@ -1,5 +1,48 @@
 # Release Notes
 
+## v2.0.43 — Set up a server: the new computer's key confirmation can no longer be skipped
+
+### Changes
+
+#### What you will notice first
+
+- **Set up a server**: the new computer's key confirmation can no longer be skipped.
+
+#### Known issues
+
+- **macOS: the tmux change (#12836) can make macOS ask once more, only after tmux restarts (a full restart of your agents or a reboot).** Coral's tmux server and guardian are now their own responsible process, so macOS may ask, per folder, whether `tmux` (or `coral`) may reach Documents, Desktop or Downloads. Full Disk Access you gave Coral.app does not carry over: if you gave Coral Full Disk Access, add `tmux` and `coral` too (both in `Coral.app/Contents/MacOS`). The staged tmux copy (each Coral version keeps its own under `tmux-bin/`) asks again after a tmux change. Say yes once; if you say no, nothing is lost, the agent just cannot read that folder.
+- **Windows: in-app update does not work from 2.0.0 through 2.0.6.** If you're on one of those, download and install the MSI by hand; from 2.0.7 on, in-app update works.
+- **macOS: a Coral of 2.0.5 or earlier cannot install updates in-app; install 2.0.6 or later by hand once.**
+- **OpenCode agents are tested on macOS and Linux; OpenCode on Windows is not yet tested end to end.**
+- **Hermes agents are still experimental.**
+- Setting up a computer over SSH is supported from a macOS or Linux hub, and is not yet tested from a Windows hub.
+
+#### For Coral Hub
+
+- **`release-diff` output** (`go run ./internal/releasediff/cmd/release-diff v2.0.42 <head>`):
+
+  ### Tunnel routes, v2.0.42 to 8933fb135
+
+  No route was added, removed or changed.
+
+  ### Board settings keys (BoardSettings, HealthSettings included), v2.0.42 to 8933fb135
+
+  No key was added, removed or changed.
+
+  ### What Coral Hub compiles in or embeds, v2.0.42 to 8933fb135
+
+  `pkg/frontend`: 1 file the Hub embeds changed (+24, -8)
+
+  - `coral-go/pkg/frontend/static/server_ssh_setup.js`: +24, -8
+
+  Unchanged: `pkg/hubproxy`, `pkg/hubowner`, `pkg/redact`, `pkg/tunnel`, `agent_docs`.
+
+  ### Coral packages compiled into the Hub through its imports, v2.0.42 to 8933fb135
+
+  Unchanged: `internal/fsreplace`, `internal/httputil`, `internal/logsafe`, `internal/safego`, `internal/secfile`, `internal/secrets`, `pkg/redact/betterleaks`.
+
+- **Ready signals, hooks, tokens, framed paths**: unchanged.
+
 ## v2.0.42 — A self-hosted Hub always shows its Computers tab
 
 ### Changes
