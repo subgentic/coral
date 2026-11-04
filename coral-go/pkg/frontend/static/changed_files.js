@@ -612,6 +612,7 @@ function refreshBlockedFor(agentName, sessionId) {
 export async function refreshChangedFiles(quiet = false, auto = false) { // quiet: the panel's own watch (#10485), which draws only when the list moved; auto: the page's own follow, not a person's Refresh
     if (!state.currentSession || state.currentSession.type !== 'live') return;
     if (auto && pausedNow()) return; // live updates are paused for this folder: nothing asks git until a person presses Refresh
+    const live = _wantLive; _wantLive = false; // Turn on live updates asks once: a request that fails, is refused or never goes out must not leave live=on on the next ones
     const btn = quiet ? null : document.querySelector('.refresh-files-btn');
     if (btn) btn.classList.add('refreshing');
 
@@ -629,7 +630,7 @@ export async function refreshChangedFiles(quiet = false, auto = false) { // quie
         const body = {};
         if (sessionId) body.session_id = sessionId;
         const resp = await serverFetch(
-            currentServer(), `/api/sessions/live/${encodeURIComponent(agentName)}/files/refresh?worktree=${worktreeMode(sessionId)}${_wantLive ? '&live=on' : pausedNow() ? '&manual=1' : ''}`,
+            currentServer(), `/api/sessions/live/${encodeURIComponent(agentName)}/files/refresh?worktree=${worktreeMode(sessionId)}${live ? '&live=on' : pausedNow() ? '&manual=1' : ''}`,
             {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -640,7 +641,6 @@ export async function refreshChangedFiles(quiet = false, auto = false) { // quie
         if (resp.ok) {
             const data = await resp.json();
             if (_keyOf(state.currentSession) !== mine) { if (btn) btn.classList.remove('refreshing'); return; } // the answer is for an agent that is no longer open
-            _wantLive = false;
             const wasPaused = JSON.stringify(pausedNow()), wasTotal = _totalChanged;
             readPause(data, mine);
             if (quiet && JSON.stringify(data.files || []) === JSON.stringify(_currentFiles) && JSON.stringify(data.worktree || null) === JSON.stringify(_worktree) && wasPaused === JSON.stringify(pausedNow()) && wasTotal === _totalChanged) return;
