@@ -34,6 +34,9 @@ func newProposalEnv(t *testing.T) *proposalEnv {
 			if req.Header.Get("X-Test-Caller") == "person" {
 				req = req.WithContext(context.WithValue(req.Context(), callerKindKey{}, callerDashCookie))
 			}
+			if req.Header.Get("X-Test-Caller") == "hubowner" { // the hub's signed-in owner: an API key request with a verified owner stamp (#13454)
+				req = req.WithContext(context.WithValue(req.Context(), callerKindKey{}, callerHubOwner))
+			}
 			fn(w, req)
 		}
 	}
@@ -533,4 +536,23 @@ func TestProposalRowsCarryTheTeamsNameBesideItsBoardID(t *testing.T) {
 	require.Contains(t, byTitle, "From a board with no row")
 	_, has := byTitle["From a board with no row"]["board_label"]
 	assert.False(t, has, "a board with no name of its own carries none: the page then says the id")
+}
+
+// #13454: the hub's signed-in owner (a verified owner stamp on an API-key request) decides a proposal on this computer, Approve and Reject; the same request with the key alone is refused.
+func TestTheHubOwnerDecidesAProposalOnThisComputer(t *testing.T) {
+	e := newProposalEnv(t)
+	e.settings(t, board.BoardSettingsUpdate{GoalsNeedApproval: boolp(true)})
+	_, out := e.call(t, "", "POST", "/api/board/team/goals", map[string]any{"title": "Via the hub", "subscriber_id": "Orchestrator"})
+	id := int64(out["proposal_id"].(float64))
+	code, body := e.call(t, "", "POST", "/api/board/team/proposals/"+itoa(id)+"/approve", nil)
+	assert.Equal(t, http.StatusForbidden, code, "a key alone: "+propJSON(body))
+	code, body = e.call(t, "hubowner", "POST", "/api/board/team/proposals/"+itoa(id)+"/approve", nil)
+	assert.Equal(t, http.StatusOK, code, "the owner's stamped Approve: "+propJSON(body))
+	assert.Len(t, e.goals(t), 1, "the goal was made on this computer")
+
+	_, out = e.call(t, "", "POST", "/api/board/team/goals", map[string]any{"title": "Not this one", "subscriber_id": "Orchestrator"})
+	id2 := int64(out["proposal_id"].(float64))
+	code, body = e.call(t, "hubowner", "POST", "/api/board/team/proposals/"+itoa(id2)+"/reject", map[string]any{"reason": "no"})
+	assert.Equal(t, http.StatusOK, code, "the owner's stamped Reject: "+propJSON(body))
+	assert.Len(t, e.goals(t), 1, "a rejected one is not made")
 }

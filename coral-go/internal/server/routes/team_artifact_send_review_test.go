@@ -226,11 +226,11 @@ func TestSendingForReviewIsRecordedStampedAndAnApprovedFileStartsANewRound(t *te
 	ctx := context.Background()
 	withLabel(t, ownerLabel, nil)
 	hub := ownerHeaders(ownerLabel)
-	call := func(method, body string) (int, map[string]any) {
+	callAs := func(hdr map[string]string, method, body string) (int, map[string]any) {
 		req, err := http.NewRequest(method, e.srv.URL+"/api/board/tag-team/artifacts/"+id+"/review", strings.NewReader(body))
 		require.NoError(t, err)
 		req.Header.Set("Content-Type", "application/json")
-		for k, v := range hub {
+		for k, v := range hdr {
 			req.Header.Set(k, v)
 		}
 		resp, err := http.DefaultClient.Do(req)
@@ -238,6 +238,7 @@ func TestSendingForReviewIsRecordedStampedAndAnApprovedFileStartsANewRound(t *te
 		defer resp.Body.Close()
 		return resp.StatusCode, decodeBody(t, resp)
 	}
+	call := func(method, body string) (int, map[string]any) { return callAs(hub, method, body) }
 	row := func() map[string]any {
 		out := e.list(t, "", 200)
 		for _, a := range out["artifacts"].([]any) {
@@ -273,6 +274,8 @@ func TestSendingForReviewIsRecordedStampedAndAnApprovedFileStartsANewRound(t *te
 	require.Contains(t, all[id], "approved")
 	time.Sleep(1100 * time.Millisecond) // sleep-ok: the time has one-second resolution; a re-send is a later second
 	code, out = call(http.MethodPut, `{"question":"One more look?"}`)
+	assert.Equal(t, http.StatusConflict, code, "a decided file is final through a hub (#13494): %v", out)
+	code, out = callAs(map[string]string{testDashboardHeader: "1"}, http.MethodPut, `{"question":"One more look?"}`) // starting a new round is this computer's own act
 	require.Equal(t, http.StatusOK, code, "%v", out)
 	assert.Equal(t, []any{"for review"}, out["tags"], "approved and read are gone: a new round")
 	assert.Equal(t, "One more look?", out["question"])

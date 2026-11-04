@@ -145,6 +145,10 @@ func TestTheOwnerTableAgreesWithTheHandWrittenListItReplaced(t *testing.T) {
 			if m == http.MethodPost && strings.HasPrefix(p, "/api/board/") && strings.Contains(p, "/asks/") && strings.Contains(p, "/buttons/") {
 				continue
 			}
+			// Ignore and Undo of a question in the owner's Needs you table drawn on the Hub (#13446, #13450) are the owner's alone through the hub: the old list never had them.
+			if m == http.MethodPost && strings.HasPrefix(p, "/api/board/") && strings.Contains(p, "/asks/") && strings.HasSuffix(p, "/close") {
+				continue
+			}
 			// Sharing a file with an agent as the Operator (#11376) is the owner's alone through the hub: the old list never had it.
 			if m == http.MethodPost && strings.HasPrefix(p, "/api/board/") && (strings.HasSuffix(p, "/operator-artifacts") || strings.HasSuffix(p, "/operator-artifacts/message")) {
 				continue

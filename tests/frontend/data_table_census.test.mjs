@@ -7,7 +7,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { cssCount, jsCount, EXEMPT, EXEMPT_SELECTORS } from './helpers/data_table_scan.mjs';
+import { cssCount, jsCount, EXEMPT, EXEMPT_SELECTORS, EXEMPT_OWN } from './helpers/data_table_scan.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const STATIC = path.join(HERE, '..', '..', 'coral-go', 'pkg', 'frontend', 'static');
@@ -22,7 +22,7 @@ const bad = [];
 let exemptRules = 0;
 for (const f of fs.readdirSync(path.join(STATIC, 'css')).filter(n => n.endsWith('.css'))) {
     if (f === 'data_table.css') continue;
-    const { n, own, exempted } = cssCount(fs.readFileSync(path.join(STATIC, 'css', f), 'utf8'), EXEMPT_SELECTORS);
+    const { n, own, exempted } = cssCount(fs.readFileSync(path.join(STATIC, 'css', f), 'utf8'), EXEMPT_SELECTORS, EXEMPT_OWN);
     if (exempted) exemptRules += exempted;
     for (const sel of own) bad.push(`css/${f}: a rule styles the component's own class outside data_table.css: ${sel}`);
     if (EXEMPT.css[f]) exempt.css[f] = n; else if (n) counts.css[f] = n;
@@ -31,6 +31,10 @@ for (const f of fs.readdirSync(STATIC).filter(n => n.endsWith('.js'))) {
     if (f === 'data_table.js') continue;
     const n = jsCount(fs.readFileSync(path.join(STATIC, f), 'utf8'));
     if (EXEMPT.js[f]) exempt.js[f] = n; else if (n) counts.js[f] = n;
+}
+for (const e of EXEMPT_OWN) {
+    if (!e.why || e.why.length < 20) bad.push(`css selector ${e.sel}: an exemption needs its reason`);
+    if (!(e.used > 0)) bad.push(`css selector ${e.sel}: exempt, but it no longer matches anything: remove the exemption`);
 }
 for (const kind of ['css', 'js']) for (const [f, why] of Object.entries(EXEMPT[kind])) {
     if (!why || why.length < 20) bad.push(`${kind}/${f}: an exemption needs its reason`);

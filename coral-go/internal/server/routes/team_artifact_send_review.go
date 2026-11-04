@@ -60,7 +60,15 @@ func (h *BoardHandler) MarkArtifactForReview(w http.ResponseWriter, r *http.Requ
 	}
 	question, _ := board.CleanReviewQuestion(body.Question) // empty once cleaned: none, and an earlier one is kept
 	// The row of the send is written in the same transaction as the send (Security's SHOULD on #13231): a row that cannot be written undoes the send.
-	tags, _, err := h.bs.StartArtifactReview(board.WithActivity(context.WithoutCancel(ctx), activityMetaFor(r, item.Name, question)), project, id, time.Now()) // a file decided before starts a new round (#13231)
+	sendCtx := board.WithActivity(context.WithoutCancel(ctx), activityMetaFor(r, item.Name, question))
+	if throughAHub(r) { // a decided file is final through a hub (#13494): sending it again starts a new round, which stays a local act
+		sendCtx = board.WithOneDecision(sendCtx)
+	}
+	tags, _, err := h.bs.StartArtifactReview(sendCtx, project, id, time.Now()) // a file decided before starts a new round (#13231)
+	if errors.Is(err, board.ErrAlreadyDecided) {
+		commentRefuse(w, http.StatusConflict, "already_decided", alreadyDecidedWords)
+		return
+	}
 	if errors.Is(err, board.ErrArtifactTag) {
 		writeError(w, http.StatusBadRequest, "too_many_tags", "this file already has the most tags a file can have; remove one to send it for review")
 		return
@@ -94,6 +102,17 @@ func (h *BoardHandler) UnmarkArtifactForReview(w http.ResponseWriter, r *http.Re
 	if !h.teamHasManagedArtifact(ctx, project, id) {
 		errNotFound(w, "this team has no such artifact")
 		return
+	}
+	if throughAHub(r) { // taking a decided file off is local too (#13494); a read that fails refuses, it never allows
+		decided, err := h.hasDecision(ctx, project, id)
+		if err != nil {
+			commentRefuse(w, http.StatusConflict, "decision_unknown", "this computer could not check whether the file has a decision, so it was not changed: try again")
+			return
+		}
+		if decided {
+			commentRefuse(w, http.StatusConflict, "already_decided", alreadyDecidedWords)
+			return
+		}
 	}
 	// The write is a compare-and-set on the tags read (#13129): a tag edit made meanwhile is not lost; the read is taken again a few times.
 	for attempt := 0; ; attempt++ {
