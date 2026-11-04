@@ -6,7 +6,7 @@ const { sendCommentQueue } = await importUi('artifact_comment_send_queue');
 let controls, release, started;
 const calls=[];
 registerBundled({
- 'artifact_comments_api.js':{listComments:async()=>({comments:[],canComment:true,canLock:true}),sendComment:async(hex,server,id,agents)=>{calls.push({hex,server,id,agents});if(id===1){started?.();await new Promise(r=>release=r);}return{ok:true,results:[{agent:'Dev',state:'sent'}],error:''};}},
+ 'artifact_comments_api.js':{listComments:async()=>({comments:[],canComment:true,canLock:true}),sendComment:async(hex,server,id,agents)=>{calls.push({hex,server,id,agents:[...agents]});if(id===1){started?.();await new Promise(r=>release=r);}return{ok:true,results:[{agent:'Dev',state:'sent'}],error:''};}},
  'artifact_comment_send.js':{MAX_AGENTS:10,pickableAgents:()=>[],askedWords:()=>'',buildSendBlock:args=>{controls=args;const e=document.createElement('div');e.className='ac-ask';return e;}},
  'artifact_comment_send_queue.js':{sendCommentQueue},
  'agent_link.js':{agentLink:()=>document.createElement('a')},
@@ -42,3 +42,31 @@ const panel=attachComments(dialog,body,host);panel.open('current','A','team-a');
 await Promise.all([panel.docWhole(),panel.docWhole()]);
 assert.equal(attached,1,'concurrent docWhole attaches the lazy video module once');
 panel.close();dialog.remove();
+
+// Positive path: a stable context sends the second thread, using the picker-time
+// artifact IDs and the send-time agents snapshot despite later picker edits.
+{
+ const dialog=document.createElement('div'),body=document.createElement('div'),host=document.createElement('div');dialog.append(body,host);document.body.append(dialog);
+ const panel=attachComments(dialog,body,host);panel.open('current','A','team-a');st.data={canLock:true,comments:[]};
+ const comments=[{id:1,artifactId:'first-original'},{id:2,artifactId:'second-original'}];
+ const nativeTimeout=globalThis.setTimeout,timers=[];
+ globalThis.setTimeout=(fn,...args)=>{const timer=nativeTimeout(fn,...args);timers.push(timer);return timer;};
+ try {
+  await ask.openMany(comments);st.ask.picked.add('Dev');ask.askBlock();
+  const context=[st.hex,st.server,st.board,st.lifetime],before=calls.length;
+  const began=new Promise(r=>started=r),pending=controls.onSend();await began;
+  assert.deepEqual(calls.slice(before),[{hex:'first-original',server:'A',id:1,agents:['Dev']}],'first original thread sent to the captured computer');
+  st.ask.picked.clear();st.ask.picked.add('Different agent');
+  comments[1].artifactId='changed-after-picker-open';
+  release();await pending;
+  assert.deepEqual([st.hex,st.server,st.board,st.lifetime],context,'the context stays current so cancellation cannot hide a wrong second request');
+  assert.deepEqual(calls.slice(before),[
+   {hex:'first-original',server:'A',id:1,agents:['Dev']},
+   {hex:'second-original',server:'A',id:2,agents:['Dev']},
+  ],'both writes use the same captured computer, each original artifact, and the original picked agents');
+  assert.equal(ask.askedNow(1).get('dev'),'Asked just now');
+  assert.equal(ask.askedNow(2).get('dev'),'Asked just now');
+  assert.match(dialog.querySelector('.ac-live').textContent,/Sent 2 of 2 comments/);
+ } finally {for(const timer of timers)clearTimeout(timer);globalThis.setTimeout=nativeTimeout;panel.close();dialog.remove();}
+}
+console.log('artifact_comment_ask_context: stable-context second write pins destination, per-thread artifacts and selected agents');
