@@ -54,6 +54,8 @@ var routes = []string{
 	"POST /api/board/{project}/proposals/{id}/approve", // #13454: the owner's decision on a team's proposed goal or task, made at the hub: a person's act on the remote
 	"POST /api/board/{project}/proposals/{id}/reject",
 	"POST /api/board/{project}/asks/{messageID}/close", // Ignore, and Undo of an Ignore, of a question in Needs you (#13462): the Operator's own action, recorded and counted as theirs only when a person made it
+	"POST /api/board/{project}/goals/{id}/driver",      // #13517: the owner's change of who drives a goal, made at the hub: a person's act on the remote
+	"POST /api/board/{project}/goals/{id}/move",        // #13517: and the move of a goal to another team
 }
 
 // MustBeSigned reports whether a request is one whose words are the person's own and become automation on the remote when no stamp goes with it: the owner's message to an agent (#13456). The hub refuses such a

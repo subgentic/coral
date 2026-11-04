@@ -13,6 +13,7 @@ const READERS = new Map([
     ['board_chat.js', "the team board's message box says the line and puts the words back"],
     ['board_composer.js', "the message board's post says the line"],
     ['image_attach.js', "an upload says the line with no Retry"],
+    ['goal_words.js', "the sentence for the Hub's goal preview word: goal_write.js sends the write once and never again (goal_write.test.mjs: one write, no second preview, after outcome_unknown; #13503)"],
 ]);
 const walk = d => fs.readdirSync(d, { withFileTypes: true }).flatMap(e => e.isDirectory() ? (['vendor', 'css', 'fonts'].includes(e.name) ? [] : walk(path.join(d, e.name))) : e.name.endsWith('.js') ? [path.join(d, e.name)] : []);
 const mention = [];

@@ -3,6 +3,7 @@
  * agent call). Lazy: goals_view.js openCreate imports it when New goal is pressed. Everything drawn is built with the DOM and textContent. */
 import { loadStyles } from './lazy_styles.js';
 import { boardFetch, keyLabel } from './server_base.js';
+const { goalWrite } = await importOnce('./goal_write.js'); // a goal create is previewed first when the Hub asks for it (#13503)
 import { OPERATOR_ID, showToast } from './utils.js';
 import { toDrivers, createBody, errorOf } from './goals_adapter.js';
 import { importOnce } from './import_once.js';
@@ -223,7 +224,7 @@ export function openGoalEditor(opts = {}) {
         if (!t.value.trim()) { err.textContent = 'A goal needs a title.'; t.setAttribute('aria-invalid', 'true'); t.focus(); return; }
         t.removeAttribute('aria-invalid'); go.disabled = true;
         try {
-            const r = await boardFetch(project, '/goals', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(createBody({ title: t.value, description: desc.value, doneWhen: d.value, driver: dr.value, images: tray ? tray.hexes() : [], by: OPERATOR_ID })) });
+            const r = await goalWrite(project, 'goal_create', 0, '/goals', 'POST', createBody({ title: t.value, description: desc.value, doneWhen: d.value, driver: dr.value, images: tray ? tray.hexes() : [], by: OPERATOR_ID }));
             if (!r.ok) throw await failure(r);
             dlg.close();
             const made = await r.json().catch(() => null), told = !!(made && made.orchestrator_told_at); // the toast only when it was told (#11880)

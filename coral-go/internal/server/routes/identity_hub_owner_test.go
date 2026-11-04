@@ -320,3 +320,29 @@ func TestAGenuineStampOnTheAskCloseMakesItAPersonsAndNothingElseDoes(t *testing.
 	w = rig.do("POST", route, `{"undo":true}`, func(r *http.Request) { r.Header.Set(hubowner.Header, stampFor(t, "POST", route, body, time.Now())) })
 	assert.NotEqual(t, 200, w.Code, "a stamp for one body is refused on another")
 }
+
+// The owner's change of a goal's driver and its move to another team, made at the hub (#13517), are a person's on the remote: a genuine stamp makes the API-key request the hub's signed-in person's, a bare key stays automation, and a stamp
+// made for one goal or one of the two routes is no use for another.
+func TestGoalDriverAndMoveTakeAnOwnerStampAndABareKeyStaysAutomation(t *testing.T) {
+	rig := newStampRig(t, true)
+	for _, c := range []struct{ route, body string }{
+		{"/api/board/team/goals/7/driver", `{"driver":"dev-1"}`},
+		{"/api/board/team/goals/7/move", `{"to_project":"other"}`},
+	} {
+		w := rig.do("POST", c.route, c.body, nil)
+		require.Equal(t, 200, w.Code)
+		assert.False(t, rig.seen.human, "a bare API key on %s is automation, whoever holds it", c.route)
+		stamp := stampFor(t, "POST", c.route, c.body, time.Now())
+		w = rig.do("POST", c.route, c.body, func(r *http.Request) { r.Header.Set(hubowner.Header, stamp) })
+		require.Equal(t, 200, w.Code, w.Body.String())
+		assert.True(t, rig.seen.human, "the hub's signed-in owner is a person on %s", c.route)
+		assert.Equal(t, callerHubOwner, rig.seen.kind)
+	}
+	driverStamp := stampFor(t, "POST", "/api/board/team/goals/7/driver", `{"driver":"dev-1"}`, time.Now())
+	w := rig.do("POST", "/api/board/team/goals/7/move", `{"driver":"dev-1"}`, func(r *http.Request) { r.Header.Set(hubowner.Header, driverStamp) })
+	assert.Equal(t, 403, w.Code, "a driver stamp does not move a goal")
+	w = rig.do("POST", "/api/board/team/goals/8/driver", `{"driver":"dev-1"}`, func(r *http.Request) {
+		r.Header.Set(hubowner.Header, stampFor(t, "POST", "/api/board/team/goals/7/driver", `{"driver":"dev-1"}`, time.Now()))
+	})
+	assert.Equal(t, 403, w.Code, "a stamp for goal 7 is no use for goal 8")
+}
