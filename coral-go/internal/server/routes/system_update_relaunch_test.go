@@ -436,7 +436,7 @@ func TestTheTokenIsBoundToTheIdentityAndExpires(t *testing.T) {
 	tok := e.token(ownerA)
 	code, out := e.post(ack(tok), hubHdr(ownerB))
 	assert.Equal(t, 403, code)
-	assert.Equal(t, "owner_only", out["code"])
+	assert.Equal(t, "relink_needed", out["code"], "a distinct answer: link this computer again, not 'you are not the owner'")
 	assert.Zero(t, e.up.applyCount())
 
 	// A token with its payload or MAC changed does not verify.

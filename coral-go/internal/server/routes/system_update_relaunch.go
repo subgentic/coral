@@ -274,6 +274,18 @@ func (h *UpdateRelaunchHandler) identify(r *http.Request) callerIdentity {
 	return ownerIdentityWith(r, h.OwnerUser, h.OwnerRecord, &h.noLabelLogged)
 }
 
+// relinkNeeded: the request carries a stamped owner marker for a personal machine, but this computer was linked to Coral Hub before it recorded its owner label, so the routes that need the label (the relaunch and the
+// Hub's check) refuse even the owner until the computer is linked again. A distinct answer (#13258, Security's INFO): the Hub user is told what to do, not that they are not the owner.
+func (h *UpdateRelaunchHandler) relinkNeeded(r *http.Request) bool {
+	id := identifyOwner(r, h.OwnerUser, h.OwnerRecord, &h.noLabelLogged)
+	return id.owner && !id.team && routeNeedsOwnerLabel(r) && !ownerLabelRecordedWith(r, h.OwnerUser)
+}
+
+const (
+	codeRelinkNeeded = "relink_needed"
+	textRelinkNeeded = "this computer was linked to Coral Hub before it recorded its owner: link this computer to Coral Hub again to update it from there"
+)
+
 // gate is the status of the checks that don't depend on the update's state, as the reason the relaunch is unavailable ("" = pass).
 func (h *UpdateRelaunchHandler) gate(ctx context.Context, id callerIdentity) (reason string, code string) {
 	if id.local {
@@ -775,6 +787,10 @@ func (h *UpdateRelaunchHandler) Relaunch(w http.ResponseWriter, r *http.Request)
 	// 1 and 2: the stamp is authentic and the caller is the owner. (A local caller is not: the local control relaunches locally.)
 	id := h.identify(r)
 	if !id.owner {
+		if h.relinkNeeded(r) {
+			h.refuse(w, r, id, nil, http.StatusForbidden, codeRelinkNeeded, textRelinkNeeded, nil)
+			return
+		}
 		h.refuse(w, r, id, nil, http.StatusForbidden, "owner_only", "only the account this computer is linked to can relaunch it from Coral Hub", nil)
 		return
 	}

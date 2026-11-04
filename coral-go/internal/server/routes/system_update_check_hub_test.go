@@ -47,6 +47,12 @@ func TestCheckHubIsTheOwnersAloneAndOnlyWithThePersonsSwitch(t *testing.T) {
 	delete(e.settings, "hub_operator_disabled")
 	assert.Zero(t, e.checksRun(), "none of those started a check")
 
+	e.label = ""
+	code, out = e.checkHub("", "", owner)
+	assert.Equal(t, http.StatusForbidden, code, "a computer linked before it recorded its owner")
+	assert.Equal(t, "relink_needed", out["code"], "is told to link again, not that the caller is not the owner")
+	e.label = ownerA
+
 	e.on = false
 	code, _ = e.checkHub("", "", owner)
 	assert.Equal(t, http.StatusNotFound, code, "and with the feature off the route is not there")

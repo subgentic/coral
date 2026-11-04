@@ -162,6 +162,10 @@ func (h *UpdateRelaunchHandler) CheckHub(w http.ResponseWriter, r *http.Request)
 	}
 	id := h.identify(r)
 	if !id.owner {
+		if h.relinkNeeded(r) {
+			h.refuse(w, r, id, nil, http.StatusForbidden, codeRelinkNeeded, textRelinkNeeded, nil)
+			return
+		}
 		h.refuse(w, r, id, nil, http.StatusForbidden, "owner_only", "only the account this computer is linked to can ask it to check for an update from Coral Hub", nil)
 		return
 	}
