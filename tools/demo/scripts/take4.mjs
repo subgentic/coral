@@ -60,10 +60,11 @@ const B = {
     await t.cap("Choose the agent and its model.")
     await shot(t, "c1-agent"); const sel = t.page.locator("select >> visible=true").first(); await t.move(sel); await sel.focus(); await sleep(900)
     for (let i = 0; i < 4; i++) { await t.page.keyboard.press("ArrowDown"); await sleep(1100) }   // a native menu is not drawn in a recording: step through the models instead
-    await t.click(t.page.locator("button:has-text('Refresh models') >> visible=true").first()); await sleep(2500)
     await t.cap("Every model the CLI offers, one list.")
-    await sleep(2500)
-    await t.click(t.page.locator("button:text-is('Cancel') >> visible=true").first()); await sleep(1000)
+    await sleep(1800)
+    await t.click(t.page.locator("button:text-is('Launch') >> visible=true").first()); await sleep(3500)   // launch the agent from the wizard
+    await t.cap("It starts in its own folder, and it is on your list.")
+    await sleep(3500)
     return t.finish()
   },
   async launch() { // not recorded: the team (the film showed the launch in c1's lead-in before; here the rows just appear)
