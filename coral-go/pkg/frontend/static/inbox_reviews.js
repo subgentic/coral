@@ -3,6 +3,8 @@ import { setReviewCacheReader } from './ask_filter.js';
  * After the Inbox first opens, keep its badge updated on other tabs without eager startup reads. */
 import { fetchProjects } from './board_fetch.js';
 import { boardFetch, boardArtifactPage, nextArtifactPage, keyLabel, splitKey } from './server_base.js';
+import { teamLabel } from './server_status.js';
+import { SORT_PARAM } from './filter_model.js';
 import { hideAsksWhen } from './ask_filter.js';
 import { importOnce } from './import_once.js';
 
@@ -71,6 +73,16 @@ export function reviewGroups(rows) {
 }
 
 /** Refresh in bounded pages, coalescing feed updates. Failed teams retain their last known rows. */
+/** One artifact of a team's for-review list as a Needs you row, or null when it is not one (not waiting, saved, ignored, superseded, not available, seen already) or is muted (then it goes to mutedOut). */
+function reviewRowOf(a, team, seen, mutedOut = null) {
+    const decidedWithNews = a.new_comments > 0 && (a.tags?.includes('approved') || a.tags?.includes('denied')) && !a.tags.includes('for review'); // a file the Operator decided that agents replied about in their thread: the server puts it in this list (#12097), marked and counted once
+    if (!(a.tags?.includes('for review') || decidedWithNews) || a.tags.includes('saved') || a.tags.includes('ignored') || a.tags.includes('superseded') || (a.tags.includes('changes requested') && !(a.new_comments > 0)) || !a.available || seen.has(a.id)) return null; // changes requested without news is the agent's turn (needsYouFile's rule, #11985, #12026)
+    const hex = /(?:sha256:|coral:\/\/artifacts\/)?([a-f0-9]{64})$/i.exec(a.uri || a.digest || a.id || '')?.[1];
+    if (!hex) return null;
+    seen.add(a.id);
+    if (a.muted === true) { if (mutedOut) mutedOut.push({ ...a, team, hex, reviewKey: `${team}:${a.id}` }); return null; } // the Operator's settings keep this kind (or team) out of Needs you (#12144): not a row, not counted, listed under the Muted line
+    return { ...a, team, hex, reviewKey: `${team}:${a.id}` };
+}
 /** One team's files tagged for review (not saved, available), every page: the rows the Inbox reads, for one team. */
 async function readTeam(team, mutedOut = null) {
     const rows = [], seen = new Set();
@@ -80,18 +92,77 @@ async function readTeam(team, mutedOut = null) {
         if (!r.ok) throw new Error('Could not read review artifacts');
         const data = await r.json();
         for (const a of data.artifacts || []) {
-            const decidedWithNews = a.new_comments > 0 && (a.tags?.includes('approved') || a.tags?.includes('denied')) && !a.tags.includes('for review'); // a file the Operator decided that agents replied about in their thread: the server puts it in this list (#12097), marked and counted once
-            if (!(a.tags?.includes('for review') || decidedWithNews) || a.tags.includes('saved') || a.tags.includes('ignored') || a.tags.includes('superseded') || (a.tags.includes('changes requested') && !(a.new_comments > 0)) || !a.available || seen.has(a.id)) continue; // changes requested without news is the agent's turn (needsYouFile's rule, #11985, #12026); // changes requested: the agent's turn, so the file leaves Needs you and its counts; its next version comes back as a new item (#11985). Artifacts and the goal still show it as changes requested // a saved file stays tagged for review (its decisions work) but is not in Needs you (#11641)
-            const hex = /(?:sha256:|coral:\/\/artifacts\/)?([a-f0-9]{64})$/i.exec(a.uri || a.digest || a.id || '')?.[1];
-            if (!hex) continue;
-            seen.add(a.id);
-            if (a.muted === true) { if (mutedOut) mutedOut.push({ ...a, team, hex, reviewKey: `${team}:${a.id}` }); continue; } // the Operator's settings keep this kind (or team) out of Needs you (#12144): not a row, not counted, listed under the Muted line
-            rows.push({ ...a, team, hex, reviewKey: `${team}:${a.id}` });
+            const row = reviewRowOf(a, team, seen, mutedOut);
+            if (row) rows.push(row);
         }
         if (!nextArtifactPage(at, data)) break;
     }
     return rows;
 }
+
+// ── Needs you's filters are the computer's (#13162, Stage 1) ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+// With a filter on (the words, a team, an agent, how long a file has waited, a computer) the file rows are what each computer answers for that query: its first 50 matches, with Show more by its cursor, and its total.
+// A match that is item 897 of 900 is on page 1 of its filter. Nothing here changes what the page holds with no filter, nor the counts, pills and options, which keep reading the whole list (Stage 2).
+let fview = null; // { key, rows, total, cursors: { team: cursor }, more, loading, error, at, promise }
+const viewParts = f => ({ q: f.q || '', team: f.team || '', agent: f.agent || '', longer: f.longer || '', server: f.server || '', oldest: f.sort === 'oldest' });
+export const reviewQueryKey = f => { const v = viewParts(f); return (v.q || v.team || v.agent || v.longer || v.server) ? JSON.stringify(v) : ''; };
+/** The Needs you filters as the computer's artifact list takes them: q, by (the uploader), until (waited at least this long: created before), sort. */
+export function reviewQueryParams(f, now = Date.now()) {
+    const v = viewParts(f), p = new URLSearchParams({ tag: 'for review', limit: '50', versions: 'newest' });
+    if (v.q) p.set('q', v.q);
+    if (v.agent) p.set('by', v.agent);
+    if (v.longer) p.set('until', new Date(now - Number(v.longer) * 60000).toISOString());
+    if (v.oldest) p.set(SORT_PARAM, 'oldest');
+    return p;
+}
+/** The rows the computers answered for filters `f`, or null when the query is not for these filters (not asked yet, or another one is current). */
+export const queriedReviews = f => (fview && fview.key === reviewQueryKey(f) && !fview.loading ? fview.rows : null);
+/** { total, shown, more, loading, error } of the current query, or null. */
+export const reviewQueryState = () => (fview ? { total: fview.total, shown: fview.rows.length, more: fview.more, loading: fview.loading, error: fview.error } : null);
+export const clearReviewQuery = () => { if (fview) { fview = null; changed(); } };
+async function readQueryPage(team, params, cursor) {
+    const q = new URLSearchParams(params); if (cursor) q.set('cursor', cursor);
+    const r = await boardFetch(team, `/artifacts?${q}`);
+    if (r.status === 403 || r.status === 404) return { rows: [], total: 0, cursor: '' }; // an inaccessible team has nothing for this person
+    if (!r.ok) throw new Error('Could not read review artifacts');
+    const data = await r.json(), seen = new Set(), rows = [];
+    for (const a of data.artifacts || []) { const row = reviewRowOf(a, team, seen); if (row) rows.push(row); }
+    return { rows, total: Number(data.total) || 0, cursor: data.has_more && data.next_cursor ? data.next_cursor : '' };
+}
+const inFours = async (list, each) => { let at = 0; await Promise.all(Array.from({ length: Math.min(4, list.length) }, async () => { while (at < list.length) await each(list[at++]); })); };
+/** Asks the computers for the files matching `f` (the first 50 of each team that has any); a second call for the same filters joins it (and does not ask again within 30 seconds); a different filter starts over. */
+export function queryReviews(f) {
+    const key = reviewQueryKey(f);
+    if (!key) { clearReviewQuery(); return null; }
+    if (fview && fview.key === key && (fview.loading || Date.now() - fview.at < 30000)) return fview.promise;
+    const mine = fview = { key, rows: [], total: 0, cursors: {}, more: false, loading: true, error: '', at: Date.now(), promise: null };
+    mine.promise = (async () => {
+        try {
+            const params = reviewQueryParams(f), v = viewParts(f), projects = await fetchProjects();
+            const teams = projects.filter(p => (!v.team || teamLabel(p.project, p.board_label || '') === v.team) && (!v.server || splitKey(p.project).server === v.server)).map(p => p.project);
+            const got = [];
+            await inFours(teams, async team => { try { got.push({ team, ...(await readQueryPage(team, params, '')) }); } catch { mine.error = 'Some computers could not be asked.'; } });
+            if (fview !== mine) return;
+            for (const g of got) { mine.rows.push(...g.rows); mine.total += g.total; if (g.cursor) { mine.cursors[g.team] = g.cursor; mine.more = true; } }
+            mine.rows.sort(byAge);
+        } catch { if (fview === mine) mine.error = 'Review artifacts could not be read.'; }
+        if (fview === mine) { mine.loading = false; mine.at = Date.now(); changed(); }
+    })();
+    return mine.promise;
+}
+/** The next 50 of each team that has more, for the current query. */
+export async function moreQueriedReviews(f) {
+    const mine = fview;
+    if (!mine || mine.loading || mine.key !== reviewQueryKey(f) || !mine.more) return;
+    mine.loading = true; changed();
+    const params = reviewQueryParams(f), have = new Set(mine.rows.map(r => r.reviewKey)), teams = Object.keys(mine.cursors), got = [];
+    await inFours(teams, async team => { try { got.push({ team, ...(await readQueryPage(team, params, mine.cursors[team])) }); } catch { mine.error = 'Some computers could not be asked.'; } });
+    if (fview !== mine) return;
+    mine.cursors = {}; mine.more = false;
+    for (const g of got) { for (const r of g.rows) if (!have.has(r.reviewKey)) mine.rows.push(r); if (g.cursor) { mine.cursors[g.team] = g.cursor; mine.more = true; } }
+    mine.rows.sort(byAge); mine.loading = false; changed();
+}
+
 /** The rows of one team, as Needs you has them (newest version of each file): a link to one file reads only its own team (#13116), not every team. */
 export async function reviewsOfTeam(team) { return collapseVersions((await readTeam(team)).sort(byAge)); }
 /** The files for review on one goal of one team that nobody decided (one row per file, as Needs you has them): a goal page asks only its own team, not every team (#11913). */
@@ -190,6 +261,7 @@ export function settleReview(row) {
     revision++;
     const gone = new Set([row.reviewKey || `${row.team}:${row.id}`, ...earlierVersions(row).map(a => a.reviewKey)]); // the versions before it were settled with it (settleEarlierVersions)
     items = items.filter(a => !gone.has(a.reviewKey)); saved = saved.filter(a => !gone.has(a.reviewKey));
+    if (fview) fview.rows = fview.rows.filter(a => !gone.has(a.reviewKey));
     changed();
 }
 
