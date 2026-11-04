@@ -27,7 +27,7 @@ type liveProcs struct {
 }
 
 func newLiveProcs() (*liveProcs, error) {
-	snap, err := windows.CreateToolhelp32Snapshot(windows.TH32CS_SNAPPROCESS, 0)
+	snap, err := processSnapshot()
 	if err != nil {
 		return nil, err
 	}
@@ -47,6 +47,23 @@ func newLiveProcs() (*liveProcs, error) {
 		}
 	}
 	return l, nil
+}
+
+// processSnapshot takes a snapshot of the process table. Windows can fail it with ERROR_BAD_LENGTH while processes are being created, and asks
+// the caller to try again until it succeeds (CreateToolhelp32Snapshot's documentation): it is tried snapshotTries times (#470).
+func processSnapshot() (windows.Handle, error) {
+	const snapshotTries = 3
+	var err error
+	for try := 0; try < snapshotTries; try++ {
+		var snap windows.Handle
+		if snap, err = windows.CreateToolhelp32Snapshot(windows.TH32CS_SNAPPROCESS, 0); err == nil {
+			return snap, nil
+		}
+		if err != windows.ERROR_BAD_LENGTH {
+			return 0, err
+		}
+	}
+	return 0, err
 }
 
 func (l *liveProcs) children(pid int) []int { return l.kids[pid] }
@@ -205,16 +222,6 @@ func (p *windowsPTY) TextRefused() (bool, string, error) {
 	if root <= 0 {
 		return false, "", fmt.Errorf("no shell pid")
 	}
-	src, err := newLiveProcs()
-	if err != nil {
-		return false, "", err
-	}
 	rec, adopted, _ := p.agent.snapshot()
-	refused, why := decideWinText(src, root, rec, adopted)
-	if refused && why == tmux.ReasonChildReads { // once more, in a fresh snapshot, before it stands (Security's #6911 point 5)
-		if again, err := newLiveProcs(); err == nil {
-			refused, why = decideWinText(again, root, rec, adopted)
-		}
-	}
-	return refused, why, nil
+	return textRefusedWithRetry(func() (procSource, error) { return newLiveProcs() }, root, rec, adopted) // a failed read is read again (#470)
 }
