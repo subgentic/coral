@@ -16,8 +16,9 @@ const STUB = `(() => {
         if (!mm) return original(u, o);
         const path = mm[2];
         if (path === '/api/hub/goal-preview') { window.__goalCalls.push({ kind: 'preview', server: mm[1], body: JSON.parse(o.body) }); if (window.__refusePreview) return json({ error: window.__refusePreview.word }, window.__refusePreview.status); if (window.__limitAt && window.__goalCalls.filter(c => c.kind === 'preview').length >= window.__limitAt) return json({ error: 'too_many_requests' }, 429); return json({ token: 'TOK' + window.__goalCalls.length, expires: '2099-01-01T00:00:00Z', tier: 'interact', server: mm[1], board: 'team-a' }); }
-        if (/^\\/api\\/board\\/team-a\\/goals(\\/\\d+(\\/close)?)?$/.test(path) && m !== 'GET') { window.__goalCalls.push({ kind: 'write', server: mm[1], path, method: m, token: (h instanceof Headers ? h.get('X-Hub-Goal-Preview') : (h['X-Hub-Goal-Preview'] || h['x-hub-goal-preview'])) || null, body: o.body }); if (window.__refuse) return json({ error: window.__refuse.word }, window.__refuse.status); return json({ id: 5, orchestrator_told_at: null }); }
-        if (path === '/api/board/team-a/subscribers') return json([{ subscriber_id: 'dev-1', job_title: 'Dev' }]);
+        if (/^\\/api\\/board\\/team-a\\/goals(\\/\\d+(\\/(close|driver|move))?)?$/.test(path) && m !== 'GET') { window.__goalCalls.push({ kind: 'write', server: mm[1], path, method: m, token: (h instanceof Headers ? h.get('X-Hub-Goal-Preview') : (h['X-Hub-Goal-Preview'] || h['x-hub-goal-preview'])) || null, body: o.body }); if (window.__refuse) return json(window.__refuse.body || { error: window.__refuse.word }, window.__refuse.status); if (/\\/move$/.test(path)) return json({ goal: { id: 12 } }); if (/\\/driver$/.test(path)) return json({ ok: true }); return json({ id: 5, orchestrator_told_at: null }); }
+        if (path === '/api/board/team-a/subscribers' || path === '/api/board/team-b/subscribers') return json([{ subscriber_id: 'dev-1', job_title: 'Dev' }]);
+        if (path === '/api/board/projects') return json([{ board_id: 'team-a', board_label: 'Team A' }, { board_id: 'team-b', board_label: 'Team B' }]);
         if (m === 'GET' && /^\\/api\\/board\\/team-a\\/goals($|\\?)/.test(path + new URL(String(u), location.href).search)) return json({ goals: [1, 2, 3].map(i => ({ id: i, title: 'Goal ' + i, state: 'active', outcome: 'o', done_when: 'd', rollup: { open: 0, done: 0, total: 0 } })), has_more: false });
         return json({});
     };
@@ -35,14 +36,42 @@ async function run(flag) {
             const calls = () => ev(`window.__goalCalls`);
             const tag = flag ? 'goal_preview true' : 'no goal_preview';
 
-            // #13515: served by a Hub, a goal page offers no Change driver and no Move to another team (the tunnel does not list them: the dialogs said not found); Close goal is still there
-            await ev(`import(${S} + 'goal_view.js').then(async v => { const a = await import(${S} + 'goals_adapter.js'); const host = document.createElement('div'); host.id = 'gp-nodrv'; document.body.appendChild(host); v.mountGoal(host, { team: 'team-a', id: 9, goal: a.toGoal({ id: 9, title: 'No driver here', state: 'active', outcome: 'o', done_when: 'd', rollup: { open: 0, done: 0, total: 0 } }), back() {}, refresh() {} }); return true; })`);
-            await waitFor(`!!document.querySelector('#gp-nodrv .goals-close')`, `${tag}: a goal page opens`, 8000);
-            assert.deepEqual(await ev(`({ driver: !!document.querySelector('#gp-nodrv .goals-change-driver'), move: !!document.querySelector('#gp-nodrv .goals-move') })`), { driver: false, move: false }, `${tag}: no Change driver and no Move through a Hub`);
-            await ev(`document.getElementById('gp-nodrv').remove(); true`);
+            // #13517: through a Hub the goal page offers Change driver and Move to another team (the goal's own computer does them); with goal_preview each is previewed, then written with the token
+            await ev(`import(${S} + 'goal_view.js').then(async v => { const a = await import(${S} + 'goals_adapter.js'); const host = document.createElement('div'); host.id = 'gp-ops'; document.body.appendChild(host); v.mountGoal(host, { team: '@srv1/team-a', id: 9, goal: a.toGoal({ id: 9, title: 'Hand me over', state: 'active', outcome: 'o', done_when: 'd', rollup: { open: 0, done: 0, total: 0 } }), back() {}, refresh() {} }); return true; })`);
+            await waitFor(`!!document.querySelector('#gp-ops .goals-change-driver') && !!document.querySelector('#gp-ops .goals-move')`, `${tag}: Change driver and Move are offered through a Hub`, 8000);
+            await ev(`window.__goalCalls.length = 0; document.querySelector('#gp-ops .goals-change-driver').click(); true`);
+            await waitFor(`!!document.querySelector('#goal-driver-select') && !document.querySelector('#goal-driver-select').disabled`, `${tag}: the driver dialog and its members`, 8000);
+            await ev(`document.getElementById('goal-driver-select').value = 'dev-1'; document.getElementById('goal-driver-select').closest('form').requestSubmit(); true`);
+            await waitFor(`window.__goalCalls.some(c => c.kind === 'write')`, `${tag}: the driver change is sent`, 8000);
+            let oc = await calls();
+            if (flag) {
+                assert.deepEqual(oc.map(x => x.kind), ['preview', 'write'], `${tag}: the driver change is previewed first`);
+                assert.equal(oc[0].body.action, 'goal_driver'); assert.equal(oc[0].body.goal, 9); assert.equal(oc[0].server, 'srv1');
+                assert.equal(oc[1].path, '/api/board/team-a/goals/9/driver'); assert.equal(oc[1].token, 'TOK1'); assert.equal(oc[1].body, oc[0].body.body, `${tag}: the previewed bytes`);
+                assert.deepEqual(JSON.parse(oc[1].body), { driver: 'dev-1' }, `${tag}: no subscriber_id on a driver change`);
+            } else {
+                assert.deepEqual(oc.map(x => x.kind), ['write'], `${tag}: no preview without the boot value`); assert.equal(oc[0].token, null);
+            }
+            await ev(`document.querySelectorAll('dialog.goals-operator-dialog[open]').forEach(d => d.close()); window.__goalCalls.length = 0; window.__moved = null; document.querySelector('#gp-ops .goals-move').click(); true`);
+            await waitFor(`!!document.querySelector('#goal-move-team') && [...document.querySelector('#goal-move-team').options].some(o => o.value === 'team-b')`, `${tag}: the move dialog lists the computer's other teams`, 8000);
+            await ev(`(() => { const t = document.getElementById('goal-move-team'); t.value = 'team-b'; t.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+            await waitFor(`!document.getElementById('goal-move-team').closest('form').querySelector('button.btn-primary').disabled`, `${tag}: Give goal on`, 5000);
+            // a refusal of the computer's own comes through the Hub as the Hub passes it (a closed word with its readable message) and is said in the dialog
+            await ev(`window.__refuse = { body: { code: 'team_not_found', message: 'No team by that name on this computer.' }, status: 404 }; document.getElementById('goal-move-team').closest('form').requestSubmit(); true`);
+            await waitFor(`/Not moved: No team by that name on this computer\\./.test(document.body.innerText)`, `${tag}: the machine's sentence through the Hub`, 8000);
+            await ev(`window.__refuse = null; document.getElementById('goal-move-team').closest('form').requestSubmit(); true`);
+            await waitFor(`window.__goalCalls.filter(c => c.kind === 'write').length === 2`, `${tag}: the move is sent again`, 8000);
+            oc = await calls();
+            if (flag) {
+                assert.deepEqual(oc.map(x => x.kind), ['preview', 'write', 'preview', 'write'], `${tag}: each attempt of the move is previewed`);
+                assert.equal(oc[0].body.action, 'goal_move'); assert.equal(oc[0].body.goal, 9); assert.deepEqual(JSON.parse(oc[1].body), { to_project: 'team-b', driver: '' }, `${tag}: the move body: no subscriber_id`);
+                assert.notEqual(oc[1].token, oc[3].token, `${tag}: one token, one write`);
+            }
+            await waitFor(`/Goal given to Team B as goal #12/.test(document.body.innerText)`, `${tag}: the move toast reads the answer's goal id`, 8000);
+            await ev(`document.getElementById('gp-ops').remove(); true`);
 
             // a create: the editor, its Create button
-            await ev(`window.__created = []; import(${S} + 'goal_editor.js').then(m => { m.openGoalEditor({ project: '@srv1/team-a', onCreated: (p) => { window.__created.push(p); } }); return true; })`);
+            await ev(`window.__goalCalls.length = 0; window.__created = []; import(${S} + 'goal_editor.js').then(m => { m.openGoalEditor({ project: '@srv1/team-a', onCreated: (p) => { window.__created.push(p); } }); return true; })`);
             await waitFor(`!!document.querySelector('dialog.goal-editor[open] #goal-new-title') && !document.querySelector('#goal-new-driver').disabled`, `${tag}: the editor and its drivers`, 8000);
             await ev(`(() => { const t = document.getElementById('goal-new-title'); t.value = 'Ship the preview'; t.dispatchEvent(new Event('input', { bubbles: true })); document.querySelector('dialog.goal-editor form').requestSubmit(); return true; })()`);
             await waitFor(`window.__goalCalls.some(c => c.kind === 'write')`, `${tag}: the create is sent`, 8000);

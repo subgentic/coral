@@ -106,6 +106,27 @@ for (const [resp, word] of [[json({ error: 'mode_too_low' }, 403), 'mode_too_low
     const r = rig(); const out = await r.call('goal_close', 1, '/goals/1/close', 'POST', { subscriber_id: 'op', state: 'done' });
     assert.equal(out.status, 400); assert.equal(r.log.length, 0, 'nothing was sent');
 }
+// the Operator's driver change and move (#13517): coral-hub's shapes (no subscriber_id; driver 0-128 characters, '' clears; to_project one board name), previewed with their own actions and the goal bound
+{
+    const ok = (a, b) => assert.equal(checkGoalBody(a, b), '', JSON.stringify(b));
+    const no = (a, b) => assert.notEqual(checkGoalBody(a, b), '', JSON.stringify(b));
+    ok('goal_driver', { driver: '' }); ok('goal_driver', { driver: 'd'.repeat(128) }); no('goal_driver', { driver: 'd'.repeat(129) }); no('goal_driver', {}); no('goal_driver', { driver: 'x', subscriber_id: 'Operator' }); no('goal_driver', { driver: 3 });
+    ok('goal_move', { to_project: 'team-b' }); ok('goal_move', { to_project: 'team-b', driver: 'dev-1' }); no('goal_move', { to_project: '' }); no('goal_move', { to_project: '   ' }); no('goal_move', { to_project: 'a/b' }); no('goal_move', { to_project: 'a\\b' });
+    no('goal_move', { to_project: 'x'.repeat(257) }); no('goal_move', { to_project: 'x', subscriber_id: 'Operator' }); no('goal_move', { to_project: 'x', driver: 'd'.repeat(129) }); no('goal_move', { driver: 'x' });
+    const r = rig();
+    await r.call('goal_driver', 4, '/goals/4/driver', 'POST', { driver: 'dev-1' });
+    await r.call('goal_move', 4, '/goals/4/move', 'POST', { to_project: 'team-b', driver: '' });
+    assert.deepEqual(r.log.map(x => x.kind), ['preview', 'write', 'preview', 'write']);
+    assert.deepEqual([r.log[0].body.action, r.log[0].body.goal, r.log[2].body.action, r.log[2].body.goal], ['goal_driver', 4, 'goal_move', 4]);
+    assert.equal(r.log[1].body, r.log[0].body.body); assert.equal(r.log[3].body, r.log[2].body.body); assert.ok(r.log[1].headers[PREVIEW_HEADER]);
+    const bad = rig(); const out = await bad.call('goal_move', 4, '/goals/4/move', 'POST', { to_project: 'team-b', subscriber_id: 'Operator' });
+    assert.equal(out.status, 400); assert.equal(bad.log.length, 0, 'a body outside the shape is not sent');
+    // the computer's own answer passes through the Hub as the Hub gives it: a closed word with its readable message
+    const own = { code: 'team_not_found', message: 'No team by that name on this computer.' };
+    const pass = rig({ writes: [json(own, 404)] });
+    const p = await pass.call('goal_move', 4, '/goals/4/move', 'POST', { to_project: 'nope' });
+    assert.equal(p.status, 404); assert.deepEqual(await p.json(), own);
+}
 // a bulk close with the preview on: one at a time, a pause between goals (about 10 a minute), progress said, and the Hub's 429 stops it (never loops, never retries); with it off: no pause, no limit
 {
     assert.ok(BULK_GAP_MS >= 6000, 'about 10 a minute at most');

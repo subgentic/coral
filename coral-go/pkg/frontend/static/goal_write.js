@@ -9,7 +9,7 @@ import { PREVIEW_WORDS } from './goal_words.js';
 
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
 export const PREVIEW_HEADER = 'X-Hub-Goal-Preview';
-export const GOAL_ACTIONS = ['goal_create', 'goal_close', 'goal_update'];
+export const GOAL_ACTIONS = ['goal_create', 'goal_close', 'goal_update', 'goal_driver', 'goal_move'];
 
 /** A refused answer as the editor reads it: {code: the Hub's word, error: our sentence} with the status. */
 const refused = (status, word) => new Response(JSON.stringify({ code: word, error: PREVIEW_WORDS[word] || PREVIEW_WORDS.bad_request }), { status, headers: { 'Content-Type': 'application/json' } });
@@ -40,6 +40,15 @@ async function preview(server, board, action, goalId, bodyText, f) {
  *  title (200), outcome (4000), done_when (4000), blocked_on (500), driver (128), state (proposed|active|blocked|done|dropped). Returns '' when the body is inside them, else why not: a body outside them is `bad_request`, so it is not sent. */
 const UPDATE_CAPS = { title: 200, outcome: 4000, done_when: 4000, blocked_on: 500, driver: 128 };
 export function checkGoalBody(action, b) {
+    if (action === 'goal_driver' || action === 'goal_move') { // the Operator's own two changes (#13517): no subscriber_id, each key once, strings (coral-hub's Security: driver 0-128 characters, '' clears; to_project 1-256, one path segment)
+        if (!b || typeof b !== 'object' || Array.isArray(b)) return 'the body is an object';
+        const allowed = action === 'goal_driver' ? ['driver'] : ['to_project', 'driver'];
+        if (!Object.keys(b).every(k => allowed.includes(k))) return `a ${action === 'goal_driver' ? 'driver change' : 'move'} takes only ${allowed.join(' and ')}`;
+        if (action === 'goal_driver' && typeof b.driver !== 'string') return 'driver is a string';
+        if (b.driver !== undefined && (typeof b.driver !== 'string' || [...b.driver].length > 128)) return 'driver is at most 128 characters';
+        if (action === 'goal_move' && (typeof b.to_project !== 'string' || !b.to_project.trim() || b.to_project.length > 256 || /[\/\\\u0000-\u001f]/.test(b.to_project))) return 'to_project is one board name, at most 256 characters';
+        return '';
+    }
     if (action !== 'goal_close' && action !== 'goal_update') return ''; // a create's body is the computer's own (createBody)
     if (!b || typeof b !== 'object' || b.subscriber_id !== 'Operator') return 'subscriber_id must be Operator';
     if (action === 'goal_close') {

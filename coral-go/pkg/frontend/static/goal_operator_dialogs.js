@@ -1,5 +1,7 @@
-// The Operator's two changes to a goal (#12693): who drives it, and which team it belongs to. Both are the Operator's alone and are made on this computer's own server (the routes are not offered through Coral Hub).
-import { boardFetch } from './server_base.js';
+// The Operator's two changes to a goal (#12693): who drives it, and which team it belongs to. Both are the Operator's alone; through a Hub (coral-hub's or our own) they are made on the goal's own computer, and with the Hub's goal_preview they are previewed first (#13517).
+import { boardFetch, serverFetch, splitKey, identityKey } from './server_base.js';
+import { importOnce } from './import_once.js';
+const { goalWrite } = await importOnce('./goal_write.js');
 import { toDrivers, errorOf } from './goals_adapter.js';
 
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
@@ -48,7 +50,7 @@ export function openChangeDriver({ project, goal, onDone, onClose }) {
     form.addEventListener('submit', async e => {
         e.preventDefault(); err.textContent = ''; go.disabled = true;
         try {
-            const r = await boardFetch(project, `/goals/${goal.id}/driver`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ driver: sel.value }) });
+            const r = await goalWrite(project, 'goal_driver', goal.id, `/goals/${goal.id}/driver`, 'POST', { driver: sel.value });
             if (!r.ok) throw new Error(await say(r));
             dlg.close(); await onDone(sel.value);
         } catch (ex) { err.textContent = `Not changed: ${ex.message}`; go.disabled = false; }
@@ -72,8 +74,9 @@ export function openMoveGoal({ project, goal, openTasks, onMoved, onClose }) {
     body.append(el('p', 'goals-close-goal', goal.title), what, field('Team', teamSel, 'goal-move-team'), field('Driver there (optional)', driverSel, 'goal-move-driver'), err);
     form.append(actions);
     dlg.append(form); document.body.append(dlg);
-    fetch('/api/board/projects').then(r => (r.ok ? r.json() : Promise.reject(new Error(String(r.status))))).then(rows => {
-        const others = (Array.isArray(rows) ? rows : []).filter(t => t && t.board_id && t.board_id !== project);
+    const { server, name: here } = splitKey(project); // the other teams are the goal's own computer's: the move is made there (#13517)
+    serverFetch(server, '/api/board/projects').then(r => (r.ok ? r.json() : Promise.reject(new Error(String(r.status))))).then(rows => {
+        const others = (Array.isArray(rows) ? rows : []).filter(t => t && t.board_id && t.board_id !== here);
         teamSel.replaceChildren(new Option(others.length ? 'Choose a team' : 'There is no other team', ''), ...others.map(t => new Option(t.board_label || t.board_id, t.board_id)));
         teamSel.disabled = !others.length;
     }).catch(() => { teamSel.replaceChildren(new Option('The teams could not be read', '')); });
@@ -83,7 +86,7 @@ export function openMoveGoal({ project, goal, openTasks, onMoved, onClose }) {
         if (!teamSel.value) return;
         const asked = teamSel.value;
         try {
-            const people = await membersOf(asked);
+            const people = await membersOf(identityKey(server, asked));
             if (teamSel.value !== asked) return; // another team was chosen meanwhile: a slower answer must not fill this list
             driverSel.replaceChildren(new Option('No driver yet: that team\'s Orchestrator is told', ''), ...people.map(p => new Option(p.label, p.id)));
         } catch { /* the driver stays optional */ }
@@ -92,7 +95,7 @@ export function openMoveGoal({ project, goal, openTasks, onMoved, onClose }) {
     form.addEventListener('submit', async e => {
         e.preventDefault(); err.textContent = ''; if (!teamSel.value) return; go.disabled = true;
         try {
-            const r = await boardFetch(project, `/goals/${goal.id}/move`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to_project: teamSel.value, driver: driverSel.value }) });
+            const r = await goalWrite(project, 'goal_move', goal.id, `/goals/${goal.id}/move`, 'POST', { to_project: teamSel.value, driver: driverSel.value });
             if (!r.ok) throw new Error(await say(r));
             const out = await r.json();
             dlg.close(); await onMoved(out, teamSel.selectedOptions[0]?.textContent || teamSel.value);
