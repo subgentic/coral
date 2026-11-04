@@ -2,7 +2,7 @@ import { setReviewCacheReader } from './ask_filter.js';
 /* Review artifacts use the same owner-protected team list and tags routes as Artifacts.
  * After the Inbox first opens, keep its badge updated on other tabs without eager startup reads. */
 import { fetchProjects } from './board_fetch.js';
-import { boardFetch, keyLabel, splitKey } from './server_base.js';
+import { boardFetch, boardArtifactPage, nextArtifactPage, keyLabel, splitKey } from './server_base.js';
 import { hideAsksWhen } from './ask_filter.js';
 import { importOnce } from './import_once.js';
 
@@ -74,8 +74,8 @@ export function reviewGroups(rows) {
 /** One team's files tagged for review (not saved, available), every page: the rows the Inbox reads, for one team. */
 async function readTeam(team, mutedOut = null) {
     const rows = [], seen = new Set();
-    for (let offset = 0; offset <= 10000; offset += 200) {
-        const r = await boardFetch(team, `/artifacts?tag=for%20review&limit=200&offset=${offset}`);
+    for (let at = { cursor: '', offset: 0 }, pages = 0; pages < 200; pages++) { // 50 a page, by the computer's cursor (#13161)
+        const r = await boardArtifactPage(team, 'for%20review', at);
         if (r.status === 403 || r.status === 404) break; // inaccessible teams never contribute rows
         if (!r.ok) throw new Error('Could not read review artifacts');
         const data = await r.json();
@@ -88,7 +88,7 @@ async function readTeam(team, mutedOut = null) {
             if (a.muted === true) { if (mutedOut) mutedOut.push({ ...a, team, hex, reviewKey: `${team}:${a.id}` }); continue; } // the Operator's settings keep this kind (or team) out of Needs you (#12144): not a row, not counted, listed under the Muted line
             rows.push({ ...a, team, hex, reviewKey: `${team}:${a.id}` });
         }
-        if (!data.has_more || !(data.artifacts || []).length) break;
+        if (!nextArtifactPage(at, data)) break;
     }
     return rows;
 }
@@ -120,11 +120,16 @@ export function refreshReviews(force = false) {
                 const team = projects[i].project, mutedHere = [], got = { rows: [], saved: [], mutedHere, failed: '' };
                 try {
                     got.rows = await readTeam(team, mutedHere);
-                    try { // the saved files of this team: one page, a failure here leaves the others alone
-                        const r = await boardFetch(team, '/artifacts?tag=saved&limit=200');
-                        if (r.ok) for (const a of (await r.json()).artifacts || []) {
-                            const hex = /(?:sha256:|coral:\/\/artifacts\/)?([a-f0-9]{64})$/i.exec(a.uri || a.digest || a.id || '')?.[1];
-                            if (a.tags?.includes('saved') && a.tags.includes('for review') && a.available && hex) got.saved.push({ ...a, team, hex, reviewKey: `${team}:${a.id}` });
+                    try { // the saved files of this team, every page (50 a request, #13161): a failure here leaves the others alone
+                        for (let at = { cursor: '', offset: 0 }, pages = 0; pages < 200; pages++) {
+                            const r = await boardArtifactPage(team, 'saved', at);
+                            if (!r.ok) break;
+                            const data = await r.json();
+                            for (const a of data.artifacts || []) {
+                                const hex = /(?:sha256:|coral:\/\/artifacts\/)?([a-f0-9]{64})$/i.exec(a.uri || a.digest || a.id || '')?.[1];
+                                if (a.tags?.includes('saved') && a.tags.includes('for review') && a.available && hex) got.saved.push({ ...a, team, hex, reviewKey: `${team}:${a.id}` });
+                            }
+                            if (!nextArtifactPage(at, data)) break;
                         }
                     } catch { got.saved = saved.filter(a => a.team === team); }
                 } catch {
@@ -149,13 +154,13 @@ export function refreshReviews(force = false) {
 
 /** The artifact's tags as the server has them now, read right before a write: the tags route replaces the whole list, so a tag someone added since the last refresh would be lost from the row's copy. null when it is no longer a for-review artifact. */
 export async function currentTags(row) {
-    for (let offset = 0; offset <= 10000; offset += 200) {
-        const r = await boardFetch(row.team, `/artifacts?tag=for%20review&limit=200&offset=${offset}`);
+    for (let at = { cursor: '', offset: 0 }, pages = 0; pages < 200; pages++) { // 50 a page, by the computer's cursor (#13161)
+        const r = await boardArtifactPage(row.team, 'for%20review', at);
         if (!r.ok) throw new Error(`Could not read the current tags (HTTP ${r.status}).`);
         const data = await r.json(), list = data.artifacts || [];
         const hit = list.find(a => a.id === row.id);
         if (hit) return hit.tags || [];
-        if (!data.has_more || !list.length) return null;
+        if (!nextArtifactPage(at, data)) return null;
     }
     return null;
 }
