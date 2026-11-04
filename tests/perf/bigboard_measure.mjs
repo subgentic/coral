@@ -197,7 +197,8 @@ process.on('SIGINT', () => done(130));
     if (process.env.TYPING_TRACE === '1') {
         const { measureTypingBurst } = await import('./typing_trace.mjs');
         const traceDir = path.join(path.dirname(OUT), path.basename(OUT, '.json') + '-typing');
-        for (const target of ['composer', 'terminal']) await step('typing_trace_' + target, async () => {
+        // A requested confirmation subset never relaxes the complete two-target gate below.
+        for (const target of ['composer', 'terminal'].filter(t => !process.env.TYPING_TARGETS || process.env.TYPING_TARGETS.split(',').includes(t))) await step('typing_trace_' + target, async () => {
             const agent = await ev(`fetch('/api/sessions/live').then(r=>r.json()).then(j=>(Array.isArray(j)?j:j.sessions||[]).find(a=>!a.sleeping&&!a.archived&&a.agent_type!=='terminal'))`);
             if (!agent) throw new Error('No awake mock agent: restart/wake fixture agents on the isolated copy before tracing');
             await ev(`(async()=>{await window.selectLiveSession(${JSON.stringify(agent.name)},${JSON.stringify(agent.agent_type || 'claude')},${JSON.stringify(agent.session_id)},${JSON.stringify(agent.server || 'local')});window.switchAgenticTab('files','top');window.setLiveViewMode(${JSON.stringify(target === 'composer' ? 'chat' : 'terminal')});const x=await import((window.__coralStatic||'/static/')+'xterm_renderer.js');const ready=await window.__until(()=>{const el=document.querySelector(${JSON.stringify(target === 'composer' ? '#command-input' : '#xterm-container .xterm-helper-textarea')}),files=document.getElementById('changed-files-list');return !!el&&!el.disabled&&el.getClientRects().length>0&&!!files&&files.getClientRects().length>0&&${target === 'terminal' ? 'x.isTerminalWsOpen()' : 'true'};},${CAP});if(ready===null)throw Error('Live input/Files not ready');return true;})()`);

@@ -105,7 +105,7 @@ if [[ "${HUB:-}" == 1 ]]; then
   sleep 5
   log "measuring through the hub with $LAST_N live agents (idle ${IDLE_S}s)"
   if [[ "${TYPING_TRACE:-}" == 1 ]]; then
-    run_bigboard_measure hub "$OUT/hub.log" env PERF_RUN=1 API_KEY_FILE="$WORK/hub/api_key" IDLE_S="$IDLE_S" node "$HERE/bigboard_measure.mjs" "http://127.0.0.1:$HUBPORT" "$WORK/hub/login_token" "$OUT/hub-$LAST_N.json" || typing_gate_failed=1
+    run_bigboard_measure hub "$OUT/hub.log" env PERF_RUN=1 TYPING_TARGETS="${HUB_TYPING_TARGETS:-composer,terminal}" API_KEY_FILE="$WORK/hub/api_key" IDLE_S="$IDLE_S" node "$HERE/bigboard_measure.mjs" "http://127.0.0.1:$HUBPORT" "$WORK/hub/login_token" "$OUT/hub-$LAST_N.json" || typing_gate_failed=1
   else
     measure "$OUT/hub.log" IDLE_S="$IDLE_S" node "$HERE/bigboard_measure.mjs" "http://127.0.0.1:$HUBPORT" "$WORK/hub/login_token" "$OUT/hub-$LAST_N.json"; echo "hub measure exit=$?"
   fi
