@@ -237,7 +237,7 @@ func (h *SessionsHandler) computeRefreshedFiles(ctx0 context.Context, name, sess
 	}
 
 	// Run git diff --numstat to get changed files
-	ctx, cancel := context.WithTimeout(ctx0, 10*time.Second)
+	ctx, cancel := context.WithTimeout(ctx0, refreshGitTimeout)
 	defer cancel()
 
 	diffMode := h.getDiffMode(ctx0)
@@ -410,6 +410,9 @@ type refreshRecent struct {
 }
 
 const refreshReuseOver = 250 * time.Millisecond
+
+// refreshGitTimeout is how long one pass of git for the Files list may take before its commands are ended and the pass answers with what it has (a variable so a test of a very large repository can give a slow machine more room).
+var refreshGitTimeout = 10 * time.Second
 
 var refreshFlights = &refreshFlight{calls: map[string]*refreshCall{}, recent: map[string]refreshRecent{}}
 
