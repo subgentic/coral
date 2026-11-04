@@ -15,12 +15,17 @@ export function mergeMessages(...lists) {
 // Boards live on the server that hosts the team, so the project list is the
 // hub's own boards plus those of every online remote. Each entry's `project`
 // is a team key (server + name); local keys are the bare name.
+/** The computers a scan of every team reads: the online ones this hub manages. */
+const onlineRemotes = () => !state.hub ? [] : (state.servers || []).filter(s => s.id !== 'local' && s.status === 'online');
+/** Which computers a scan would cover now: their ids, and a mark while the hub's list of them has not arrived. A scan that started under another key missed a computer (#13304). */
+export const sourcesKey = () => onlineRemotes().map(s => s.id).sort().join(',') + (state.hub && !state.serversKnown ? '?' : '');
+
 export async function fetchProjects() {
     const resp = isCloud() ? null : await fetch('/api/board/projects');
     const data = resp ? await resp.json() : [];
     const local = Array.isArray(data) ? data : [];
     noteBoardLabels(local, 'project'); // board_label beside each key (#3536)
-    const remotes = !state.hub ? [] : (state.servers || []).filter(s => s.id !== 'local' && s.status === 'online');
+    const remotes = onlineRemotes();
     const lists = await Promise.all(remotes.map(async srv => {
         try {
             const r = await serverFetch(srv.id, '/api/board/projects');

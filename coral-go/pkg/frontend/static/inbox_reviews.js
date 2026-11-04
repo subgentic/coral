@@ -1,7 +1,7 @@
 import { setReviewCacheReader } from './ask_filter.js';
 /* Review artifacts use the same owner-protected team list and tags routes as Artifacts.
  * After the Inbox first opens, keep its badge updated on other tabs without eager startup reads. */
-import { fetchProjects } from './board_fetch.js';
+import { fetchProjects, sourcesKey } from './board_fetch.js';
 import { boardFetch, keyLabel, splitKey } from './server_base.js';
 import { hideAsksWhen } from './ask_filter.js';
 import { importOnce } from './import_once.js';
@@ -102,13 +102,16 @@ export async function reviewsOfGoal(team, goalId) {
 // Teams are read a few at a time (#13116): through the Hub each read is about a second, and eight teams one after the other were eight seconds, twice when a click came during a scan.
 const SCAN_AT_ONCE = 4;
 let pendingStarted = 0;
+let lastSources = null, rescans = 0; // which computers the last scan covered, and how many times in a row it started again because the list of computers moved under it
 export function refreshReviews(force = false) {
     // showInbox requests a forced read; badge/feed updates alone must not start the project scan.
     if (force) activated = true;
     if (!activated) return null;
     // A scan in flight is joined, not queued behind (#13116): its answer is as new as one started now, unless something was settled or tagged since it began (revision moved): it will be discarded, so a second one follows.
     if (pending) return force && pendingStarted !== revision ? pending.then(() => refreshReviews(true)) : pending;
-    if (!force && Date.now() - lastRead < 30000) return null;
+    const sources = sourcesKey();
+    if (!force && Date.now() - lastRead < 30000 && sources === lastSources) return null; // the 30 s wait is for the same computers: a computer that came into the list since is read now (#13304)
+    lastSources = sources;
     const started = revision;
     pendingStarted = started;
     lastRead = Date.now();
@@ -143,9 +146,14 @@ export function refreshReviews(force = false) {
             errors = failed;
         } catch { errors = ['Review artifacts could not be refreshed.']; }
         changed();
-    })().finally(() => { pending = null; });
+    })().finally(() => {
+        pending = null;
+        // the hub's list of computers arrived while this scan ran (a scan that starts at load finishes before it does): it covered fewer computers than there are now, so it runs again (at most twice more)
+        if (sourcesKey() !== sources && rescans < 2) { rescans++; refreshReviews(true).catch(() => {}); } else if (sourcesKey() === sources) rescans = 0;
+    });
     return pending;
 }
+if (typeof document !== 'undefined') document.addEventListener('coral:servers-updated', () => { if (activated) refreshReviews(); });
 
 /** The artifact's tags as the server has them now, read right before a write: the tags route replaces the whole list, so a tag someone added since the last refresh would be lost from the row's copy. null when it is no longer a for-review artifact. */
 export async function currentTags(row) {
