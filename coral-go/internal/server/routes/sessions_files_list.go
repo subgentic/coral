@@ -20,6 +20,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/subgentic/coral/internal/background"
+	"github.com/subgentic/coral/internal/gitguard"
 	"github.com/subgentic/coral/internal/gitutil"
 	"github.com/subgentic/coral/internal/ptr"
 	"github.com/subgentic/coral/internal/safefs"
@@ -86,6 +87,12 @@ func (h *SessionsHandler) Files(w http.ResponseWriter, r *http.Request) {
 	files, found, err := h.gs.GetChangedFiles(r.Context(), name, sidPtr, diffMode)
 	if r.URL.Query().Get("worktree") == "" && err == nil && found && filesCacheFresh(files, h.filesCacheMaxAge(r.Context()), time.Now()) {
 		out := map[string]any{"agent_name": name, "files": hubVisibleFiles(r, files), "diff_mode": diffMode}
+		if wd := h.resolveGitRoot(agentCtx(r), name, "", ptr.Value(sidPtr)); wd != "" {
+			if pz, isPaused := gitguard.Get(wd); isPaused {
+				out["paused"] = pz
+				out["total_changed"] = max(pz.Changes, len(files))
+			}
+		}
 		if workdir := h.resolveGitRoot(agentCtx(r), name, "", ptr.Value(sidPtr)); workdir != "" {
 			out["compare"] = map[string]any{"mode": diffMode, "label": gitutil.CompareLabel(r.Context(), workdir, diffMode)}
 		}
@@ -166,6 +173,21 @@ func (h *SessionsHandler) refreshFilesInner(w http.ResponseWriter, r *http.Reque
 	}
 
 	follow := followOn(agentCtx(r))
+	manual := r.URL.Query().Get("manual") == "1" || r.URL.Query().Get("live") == "on"
+	if r.URL.Query().Get("live") == "on" {
+		gitguard.Resume(workdir) // 'Turn live updates on': this pass runs, and the poller takes the folder up again (it pauses it again if git is still slow)
+	}
+	if pz, isPaused := gitguard.Get(workdir); isPaused && !manual {
+		// Live updates are paused for this folder (#13079): the stored list is the answer, no git runs; Refresh (manual=1) asks for one pass
+		mode := h.getDiffMode(r.Context())
+		if mode == "" {
+			mode = "branch_point"
+		}
+		stored, _, _ := h.gs.GetChangedFiles(r.Context(), name, ptr.NonEmpty(sessionID), mode)
+		writeJSON(w, http.StatusOK, h.withWorktree(r, name, sessionID, map[string]any{"agent_name": name, "files": hubVisibleFiles(r, stored), "diff_mode": mode, "total_changed": max(pz.Changes, len(stored)), "capped": pz.Changes > len(stored),
+			"paused": pz}))
+		return
+	}
 	key := fmt.Sprintf("%s\x00%s\x00%s\x00%v", workdir, h.getDiffMode(r.Context()), sessionID, follow)
 	res, ok := refreshFlights.do(r.Context(), key, func() refreshedFiles {
 		return h.computeRefreshedFiles(context.WithoutCancel(r.Context()), name, sessionID, workdir, follow)
@@ -173,7 +195,16 @@ func (h *SessionsHandler) refreshFilesInner(w http.ResponseWriter, r *http.Reque
 	if !ok {
 		return // the page went away while it waited
 	}
-	writeJSON(w, http.StatusOK, h.withWorktree(r, name, sessionID, map[string]any{"agent_name": name, "files": hubVisibleFiles(r, res.files), "diff_mode": res.diffMode, "total_changed": res.total, "capped": res.total > len(res.files),
+	var pausedNow any
+	if res.took > gitguard.SlowPass {
+		gitguard.Pause(workdir, res.total, res.took) // this pass was slow: no more live passes for the folder
+	} else if manual {
+		gitguard.Resume(workdir) // an on-demand pass that came back fast: live updates are back on by themselves
+	}
+	if pz, isPaused := gitguard.Get(workdir); isPaused {
+		pausedNow = pz
+	}
+	writeJSON(w, http.StatusOK, h.withWorktree(r, name, sessionID, map[string]any{"agent_name": name, "files": hubVisibleFiles(r, res.files), "diff_mode": res.diffMode, "total_changed": res.total, "capped": res.total > len(res.files), "paused": pausedNow,
 		"compare": map[string]any{"mode": res.diffMode, "label": res.label}}))
 }
 
@@ -183,6 +214,7 @@ type refreshedFiles struct {
 	total    int
 	diffMode string
 	label    string
+	took     time.Duration
 }
 
 // refreshComputeHook runs at the start of every pass (tests: count passes, make one slow).
@@ -191,6 +223,7 @@ var refreshComputeHook = func() {}
 // computeRefreshedFiles runs the git queries for a folder and stores the list (#13079: it used to store and send every file, 35,000 of them, on every call).
 func (h *SessionsHandler) computeRefreshedFiles(ctx0 context.Context, name, sessionID, workdir string, follow bool) refreshedFiles {
 	refreshComputeHook()
+	began := time.Now()
 	// New files' line counts are read through the working tree held as a root (#3596 W5): a
 	// symlinked folder on the way, a symlink, a FIFO or a device is never read. If the tree can't
 	// be opened, new files count 0 lines.
@@ -356,7 +389,7 @@ func (h *SessionsHandler) computeRefreshedFiles(ctx0 context.Context, name, sess
 	if !follow { // the cache is the launch folder's list (the poller writes it): a followed worktree's is not kept in its place (#11351)
 		h.gs.ReplaceChangedFiles(ctx0, name, workdir, files, sidPtr, diffMode)
 	}
-	return refreshedFiles{files: files, total: total, diffMode: diffMode, label: gitutil.CompareLabel(ctx0, workdir, diffMode)}
+	return refreshedFiles{files: files, total: total, diffMode: diffMode, label: gitutil.CompareLabel(ctx0, workdir, diffMode), took: time.Since(began)}
 }
 
 // refreshFilesCap is the most files one refresh stores and sends, the same as the background poller's cap.
