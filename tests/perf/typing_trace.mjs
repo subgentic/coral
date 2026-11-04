@@ -1,6 +1,7 @@
 // #13156: optional typing trace for the #13154 real big-board rig. This module
 // starts no server/browser and never wakes agents: the rig owns those lifetimes.
 import fs from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { gzipSync } from 'node:zlib';
 
@@ -74,6 +75,7 @@ export async function measureTypingBurst({client, ev, outDir, target, label, cha
     if (!['composer','terminal'].includes(target)) throw new Error('target must be composer or terminal');
     if (!Number.isInteger(characters) || characters<200) throw new Error('typing requires at least 200 characters');
     if (!/^[a-z0-9_-]+$/i.test(label)) throw new Error('label must be a simple artifact filename');
+    const uptimeBefore=execFileSync('uptime',{encoding:'utf8',timeout:3000}).trim();
     const selector=target==='composer'?'#command-input':'#xterm-container .xterm-helper-textarea';
     const context=await ev(`(async()=>{const {state}=await import((window.__coralStatic||'/static/')+'state.js');const s=state.currentSession;const x=${JSON.stringify(target)}==='terminal'?await import((window.__coralStatic||'/static/')+'xterm_renderer.js'):null;const el=document.querySelector(${JSON.stringify(selector)}),files=document.getElementById('changed-files-list'),side=document.getElementById('live-sessions-list');return {session:s?{id:s.session_id,server:s.server,type:s.type,sleeping:!!s.sleeping}:null,live:state.liveSessions.length,awake:state.liveSessions.filter(s=>!s.sleeping&&!s.archived).length,input:!!el&&!el.disabled&&el.getClientRects().length>0,filesVisible:!!files&&files.getClientRects().length>0,sidebarVisible:!!side&&side.getClientRects().length>0,terminalConnected:x?x.isTerminalWsOpen():null};})()`);
     if (!context.session || context.session.sleeping || !context.input || !context.filesVisible || !context.sidebarVisible || (target==='terminal'&&!context.terminalConnected)) throw new Error('Invalid live typing setup: '+JSON.stringify(context));
@@ -106,7 +108,7 @@ export async function measureTypingBurst({client, ev, outDir, target, label, cha
         const {traceComplete,rendererTaskCount}=typingTraceCoverage(events);
         const tasks=summarizeTypingTrace(events,profile).filter(t=>t.startUs<end&&t.endUs>begin);
         const sorted=[...latencies].sort((a,b)=>a-b),pct=p=>sorted[Math.min(sorted.length-1,Math.floor(sorted.length*p))];
-        const result={label,target,characters,context,keyToFrameMs:{p50:pct(.5),p95:pct(.95),max:Math.max(...latencies)},longTasks:longTasks.filter(t=>t.ms>50),traceLongTasks:tasks,traceComplete,rendererTaskCount,budgetPassed:traceComplete&&!tasks.length&&!longTasks.some(t=>t.ms>50),profiled:true};
+        const result={label,target,characters,context,machine:{uptimeBefore,uptimeAfter:execFileSync('uptime',{encoding:'utf8',timeout:3000}).trim()},keyToFrameMs:{p50:pct(.5),p95:pct(.95),max:Math.max(...latencies)},longTasks:longTasks.filter(t=>t.ms>50),traceLongTasks:tasks,traceComplete,rendererTaskCount,budgetPassed:traceComplete&&!tasks.length&&!longTasks.some(t=>t.ms>50),profiled:true};
         fs.mkdirSync(outDir,{recursive:true});
         fs.writeFileSync(path.join(outDir,label+'.trace.json.gz'),gzipSync(JSON.stringify({traceEvents:events})));
         fs.writeFileSync(path.join(outDir,label+'.cpuprofile'),JSON.stringify(profile));
