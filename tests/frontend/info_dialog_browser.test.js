@@ -72,11 +72,12 @@ const { coralReady } = require('./helpers/wait');
         await ev(`window.__sk = { body: { skills: [{ name: 'release-notes', version: 2, loads: 3, status: 'approved' }, { name: 'old', version: 1, loads: 1, status: 'removed' }] }, status: 200 };
             window.__mem = { body: { files: [{ id: 'a'.repeat(32), file: 'CLAUDE.md', kind: 'instructions', level: 'project' }] }, status: 200 };
             window.__file = { body: { text: 'Be <b>brief</b>.', truncated: false }, status: 200 };
+            window.__secReqs = 0;
             const prev = window.fetch;
             window.fetch = (u, o) => { const url = String(u), reply = r => Promise.resolve(new Response(JSON.stringify(r.body), { status: r.status }));
-                if (/\\/loaded-skills\\?/.test(url)) return reply(window.__sk);
+                if (/\\/loaded-skills\\?/.test(url)) { window.__secReqs++; return reply(window.__sk); }
                 if (/\\/memory\\/[0-9a-f]{32}\\?/.test(url)) { window.__reqs.push(url); return reply(window.__file); }
-                if (/\\/memory\\?/.test(url)) return reply(window.__mem);
+                if (/\\/memory\\?/.test(url)) { window.__secReqs++; return reply(window.__mem); }
                 return prev(u, o); };
             window.__state_.currentSession = { type: 'live', name: 'info a', agent_type: 'claude', session_id: 'sid-1', server: 'local' };
             window.__answer.body = { agent_name: 'info a', agent_type: 'claude', tmux_command: 'tmux attach -t tm-1' }; true`);
@@ -89,8 +90,10 @@ const { coralReady } = require('./helpers/wait');
         await waitFor(`document.getElementById('info-memory-text').textContent === 'Be <b>brief</b>.'`, 'the file text');
         assert.equal(await ev(`document.querySelector('#info-memory-text b')`), null, 'the text is text, never markup');
         assert.match(await ev(`window.__reqs[window.__reqs.length - 1]`), /\/memory\/a{32}\?session_id=sid-1$/);
+        const before = await ev(`window.__secReqs`);
         await ev(`window.__sk = { body: { error: 'no' }, status: 403 }; window.__mem = { body: { error: 'no' }, status: 403 }; true`); await run();
-        await new Promise(r => setTimeout(r, 300)); // sleep-ok: the rows' fetches answer asynchronously; nothing appears
+        await waitFor(`window.__secReqs >= ${before + 2}`, 'both refused answers'); // both rows' requests were answered: the dialog's code after them runs in the next turns of the page, so wait for those, not a fixed time
+        await ev(`new Promise(r => setTimeout(() => setTimeout(() => r(true), 0), 0))`);
         assert.equal(await ev(`document.getElementById('info-skills').hidden && document.getElementById('info-memory').hidden`), true, 'a refusal shows no rows');
         await ev(`window.__sk = { body: { skills: [] }, status: 200 }; window.__mem = { body: { files: [] }, status: 200 }; true`); await run();
         await waitFor(`document.getElementById('info-skills').hidden === false`, 'the empty Skills row');
