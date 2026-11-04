@@ -577,34 +577,64 @@ func statusEntries(out []byte) []statusEntry {
 	return entries
 }
 
-// untrackedFolderFileLimit bounds how many files of untracked folders are listed in one pass: past the stored cap nobody reads them, and a folder of build output can hold millions.
-const untrackedFolderFileLimit = maxChangedFiles + 1
+// expandUntrackedFolders replaces each small untracked folder git status names ('gen/': status normal shows a folder whole) with the files in it that are not ignored, the rule the Files route applies (#12524, #13079):
+// a folder of at most UntrackedFoldFilesOver files and UntrackedFoldBytesOver bytes is its files, so a new package can be reviewed, a bigger one stays one entry. One ls-files call per folder, read only as far as the rule
+// needs; at most untrackedFoldersLooked folders are looked into.
+const untrackedFoldersLooked = 50
 
-// expandUntrackedFolders replaces each untracked folder git status names ('gen/', status normal shows a folder whole) with the files in it that are not ignored, so 3,000 new files are
-// 3,000 entries and not one 'gen/' (#13079). One ls-files call for all the folders, read until the limit.
 func expandUntrackedFolders(ctx context.Context, workdir string, entries []statusEntry) []statusEntry {
-	var dirs []string
+	expanded := map[string][]string{}
+	looked := 0
 	for _, e := range entries {
-		if e.code == "??" && strings.HasSuffix(e.path, "/") {
-			dirs = append(dirs, e.path)
+		if e.code != "??" || !strings.HasSuffix(e.path, "/") || looked >= untrackedFoldersLooked {
+			continue
+		}
+		looked++
+		if files, ok := smallUntrackedFolder(ctx, workdir, e.path); ok {
+			expanded[e.path] = files
 		}
 	}
-	if len(dirs) == 0 {
+	if len(expanded) == 0 {
 		return entries
 	}
+	out := make([]statusEntry, 0, len(entries))
+	for _, e := range entries {
+		if files, ok := expanded[e.path]; ok && e.code == "??" {
+			for _, f := range files {
+				out = append(out, statusEntry{code: "??", path: f})
+			}
+			continue
+		}
+		out = append(out, e)
+	}
+	return out
+}
+
+// smallUntrackedFolder lists the untracked, not-ignored files of dir (a path ending in "/") when there are few and small enough to show one by one; false for a folder that is folded or holds nothing to show.
+func smallUntrackedFolder(ctx context.Context, workdir, dir string) ([]string, bool) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	cmd := gitutil.Command(ctx, workdir, append([]string{"ls-files", "--others", "--exclude-standard", "-z", "--"}, dirs...)...)
+	cmd := gitutil.Command(ctx, workdir, "--literal-pathspecs", "ls-files", "--others", "--exclude-standard", "-z", "--", dir)
 	pipe, err := cmd.StdoutPipe()
 	if err != nil || cmd.Start() != nil {
-		return entries
+		return nil, false
 	}
 	var files []string
+	var total int64
 	rd := bufio.NewReader(pipe)
-	for len(files) < untrackedFolderFileLimit {
+	small := true
+	for {
 		rec, err := rd.ReadString(0)
 		if len(rec) > 1 {
-			files = append(files, strings.TrimSuffix(rec, "\x00"))
+			f := strings.TrimSuffix(rec, "\x00")
+			files = append(files, f)
+			if fi, lerr := os.Lstat(filepath.Join(workdir, f)); lerr == nil && fi.Mode().IsRegular() { // a link is never followed
+				total += fi.Size()
+			}
+			if len(files) > gitutil.UntrackedFoldFilesOver || total > gitutil.UntrackedFoldBytesOver {
+				small = false
+				break
+			}
 		}
 		if err != nil {
 			break
@@ -612,17 +642,7 @@ func expandUntrackedFolders(ctx context.Context, workdir string, entries []statu
 	}
 	cancel()
 	_ = cmd.Wait()
-	out := make([]statusEntry, 0, len(entries)+len(files))
-	for _, e := range entries {
-		if e.code == "??" && strings.HasSuffix(e.path, "/") {
-			continue
-		}
-		out = append(out, e)
-	}
-	for _, f := range files {
-		out = append(out, statusEntry{code: "??", path: f})
-	}
-	return out
+	return files, small && len(files) > 0
 }
 
 // queryChangedFiles runs its own status; the poller passes the one queryGit ran instead
