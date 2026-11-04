@@ -18,7 +18,7 @@ const { coralReady } = require('./helpers/wait');
                 const tag = `${view} at ${fs16 === 32 ? '200% text' : '100%'}`;
                 const gap = await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'view_switch.js'); m.showView(${JSON.stringify(view)}); const h = document.getElementById(${JSON.stringify(host)}); document.querySelectorAll('.test-frame').forEach(f => f.remove());
                     const f = document.createElement('iframe'); f.className = 'inbox-frame test-frame'; ${view === 'inbox-view' ? "f.id = 'inbox-frame';" : ''} f.setAttribute('src', 'about:blank'); h.append(f);
-                    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+                    await new Promise(r => setTimeout(r, 250)); /* sleep-ok: layout after the frame is added has no event */
                     const nav = document.querySelector('.phone-nav'); if (!nav || !nav.getClientRects().length) return { nav: false }; const n = nav.getBoundingClientRect(), r = f.getBoundingClientRect();
                     return { nav: true, gap: Math.round(n.top - r.bottom), frameH: Math.round(r.height), top: Math.round(r.top) }; })()`);
                 check(`${tag}: the page has its docked nav`, gap.nav, JSON.stringify(gap));
