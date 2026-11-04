@@ -1,10 +1,12 @@
 package routes
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -102,4 +104,64 @@ func TestOperatorAsksPagedIsOptInAndTheBareArrayIsUnchanged(t *testing.T) {
 		code, _ = read(bad)
 		assert.Equal(t, http.StatusBadRequest, code, bad)
 	}
+}
+
+// QA's boundaries for the pager (#13188).
+func TestPageOperatorAsksBoundaries(t *testing.T) {
+	mk := func(n int) []operatorAskRow {
+		var rows []operatorAskRow
+		for i := 0; i < n; i++ {
+			rows = append(rows, operatorAskRow{Board: "b", Kind: "ask", ID: int64(i + 1), At: fmt.Sprintf("2026-11-04T10:%02d:00Z", i)})
+		}
+		return rows
+	}
+	// exactly one page: has_more false, no cursor, no empty second page
+	p := pageOperatorAsks(mk(5), 5, nil)
+	assert.Equal(t, false, p["has_more"])
+	assert.Nil(t, p["next_cursor"])
+	assert.Len(t, p["asks"], 5)
+	assert.Equal(t, 5, p["total"])
+	// one more than a page: has_more, and the next page is the one row
+	p = pageOperatorAsks(mk(6), 5, nil)
+	require.Equal(t, true, p["has_more"])
+	pos, ok := decodeOperatorAskPos(p["next_cursor"].(string))
+	require.True(t, ok)
+	p = pageOperatorAsks(mk(6), 5, &pos)
+	assert.Len(t, p["asks"], 1)
+	assert.Equal(t, false, p["has_more"])
+
+	// the tie-breaks: the same time, then the board, then the id (kind between them), one row a page
+	same := []operatorAskRow{
+		{Board: "b2", Kind: "ask", ID: 1, At: "2026-11-04T10:00:00Z"},
+		{Board: "b1", Kind: "ask", ID: 9, At: "2026-11-04T10:00:00Z"},
+		{Board: "b1", Kind: "ask", ID: 3, At: "2026-11-04T10:00:00Z"},
+		{Board: "b1", Kind: "wait", ID: 2, At: "2026-11-04T10:00:00Z"},
+		{Board: "b0", Kind: "ask", ID: 7, At: "2026-11-04T09:00:00Z"}, // older: last
+	}
+	var got []string
+	var after *operatorAskPos
+	for i := 0; i < 8; i++ {
+		pg := pageOperatorAsks(append([]operatorAskRow(nil), same...), 1, after)
+		for _, a := range pg["asks"].([]operatorAskRow) {
+			got = append(got, fmt.Sprintf("%s/%s/%d", a.Board, a.Kind, a.ID))
+		}
+		if pg["has_more"] != true {
+			break
+		}
+		p2, ok := decodeOperatorAskPos(pg["next_cursor"].(string))
+		require.True(t, ok)
+		after = &p2
+	}
+	assert.Equal(t, []string{"b1/ask/3", "b1/ask/9", "b1/wait/2", "b2/ask/1", "b0/ask/7"}, got, "same time: board, then kind, then id; older after")
+
+	// the 1,024-byte cursor cap: 1,024 characters is accepted, 1,028 is not, though both decode as JSON
+	padded := func(chars int) string { // raw bytes = chars*3/4 of valid JSON, padded with spaces
+		body := `{"a":"2026-11-04T10:00:00Z","b":"b","k":"ask","i":3}`
+		raw := body + strings.Repeat(" ", chars*3/4-len(body))
+		return base64.RawURLEncoding.EncodeToString([]byte(raw))
+	}
+	_, ok = decodeOperatorAskPos(padded(1024))
+	assert.True(t, ok, "exactly 1,024 characters")
+	_, ok = decodeOperatorAskPos(padded(1028))
+	assert.False(t, ok, "1,028 characters")
 }
