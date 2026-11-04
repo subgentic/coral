@@ -35,16 +35,14 @@ export function tookWords(startedAt, finishedAt) {
 const scheduledRunOf = r => { try { return Number(JSON.parse(r.trigger_context || '{}').scheduled_run_id) || 0; } catch { return 0; } };
 const jobName = r => String(r.display_name || r.job_name || '').replace(/^__oneshot__$/, '') || `Job ${r.job_id}`;
 /** The two reads as one list of items, newest first. A workflow run a job made (trigger "scheduled" with the job run's id in its context) is left out: the job's run stands for it. */
+const jobItem = r => { const at = r.started_at || r.scheduled_at || r.created_at || ''; return { key: `job-${r.id}`, kind: 'job', runId: Number(r.id), parentId: Number(r.job_id), name: jobName(r), at, atMs: ms(at), finishedAt: r.finished_at || '', run: r, result: resultOf(r), over: isOver(r), failed: isFailed(r), sessionId: r.session_id || '' }; };
+const workflowItem = r => { const at = r.started_at || r.created_at || ''; return { key: `wf-${r.id}`, kind: 'workflow', runId: Number(r.id), parentId: Number(r.workflow_id), name: String(r.workflow_name || `Workflow ${r.workflow_id}`), at, atMs: ms(at), finishedAt: r.finished_at || '', run: r, result: resultOf(r), over: isOver(r), failed: isFailed(r), sessionId: '' }; };
 export function mergeRuns(jobRuns, workflowRuns) {
     const items = [];
-    for (const r of jobRuns || []) {
-        const at = r.started_at || r.scheduled_at || r.created_at || '';
-        items.push({ key: `job-${r.id}`, kind: 'job', runId: Number(r.id), parentId: Number(r.job_id), name: jobName(r), at, atMs: ms(at), finishedAt: r.finished_at || '', run: r, result: resultOf(r), over: isOver(r), failed: isFailed(r), sessionId: r.session_id || '' });
-    }
+    for (const r of jobRuns || []) items.push(jobItem(r));
     for (const r of workflowRuns || []) {
         if (r.trigger_type === 'scheduled' && scheduledRunOf(r)) continue;
-        const at = r.started_at || r.created_at || '';
-        items.push({ key: `wf-${r.id}`, kind: 'workflow', runId: Number(r.id), parentId: Number(r.workflow_id), name: String(r.workflow_name || `Workflow ${r.workflow_id}`), at, atMs: ms(at), finishedAt: r.finished_at || '', run: r, result: resultOf(r), over: isOver(r), failed: isFailed(r), sessionId: '' });
+        items.push(workflowItem(r));
     }
     return items.sort((a, b) => b.atMs - a.atMs || b.runId - a.runId).slice(0, LIMIT);
 }
@@ -70,10 +68,10 @@ const opened = new Map(); // key -> when, for runs opened here that a read answe
 export function markSeen(item) {
     if (item.run.seen_at) return Promise.resolve();
     const at = new Date().toISOString(); opened.set(item.key, at);
-    for (const i of [item, ...runs.filter(r => r.key === item.key)]) i.run.seen_at = at; // the row that was clicked may hold an item from before the last read: the list's own is read too
+    for (const i of [item, ...runs.filter(r => r.key === item.key), ...page.items.filter(r => r.key === item.key)]) i.run.seen_at = at; // the row that was clicked may hold an item from before the last read: the list's own is read too
     fire();
     const path = item.kind === 'workflow' ? `/api/workflows/runs/${item.runId}/seen` : `/api/scheduled/runs/${item.runId}/seen`;
-    return fetch(path, { method: 'POST' }).then(r => { if (!r.ok) throw new Error(String(r.status)); }).catch(() => { opened.delete(item.key); for (const i of [item, ...runs.filter(r => r.key === item.key)]) delete i.run.seen_at; fire(); });
+    return fetch(path, { method: 'POST' }).then(r => { if (!r.ok) throw new Error(String(r.status)); }).catch(() => { opened.delete(item.key); for (const i of [item, ...runs.filter(r => r.key === item.key), ...page.items.filter(r => r.key === item.key)]) delete i.run.seen_at; fire(); });
 }
 /** Where a run opens (the route handler's shape): a job's run on its job's page, a workflow's run on its run page. */
 export const runRoute = item => (item.kind === 'workflow' ? { view: 'automations', folder: 'workflows', id: item.parentId, run: item.runId } : { view: 'automations', folder: 'jobs', id: item.parentId });
@@ -83,6 +81,56 @@ export function failureWords(item) {
     const why = String(r.failure_reason || r.error_msg || '').replace(/\s+/g, ' ').trim();
     return why.length > 140 ? `${why.slice(0, 139)}\u2026` : why;
 }
+
+
+// ── Recent runs as pages (#13183) ────────────────────────────────────────
+// The Recent runs list asks the computer for a page: GET /api/automations/runs gives at most 50 runs, newest first, with the search and the Result filter applied there (before the cut) and the true total. Load more asks for the next
+// page with the cursor the last one gave. The merged list above (at most 100) stays for the Inbox's Needs you rows and its unread badge: they read what is unread and failed, not a page of the history.
+const PAGE_SIZE = 50, SEARCH_DEBOUNCE_MS = 250;
+const page = { q: '', result: '', items: [], hasMore: false, cursor: '', total: 0, loading: false, loaded: false, failed: false, seq: 0, timer: 0 };
+/** The runs of the page(s) loaded for the search and Result filter now asked for, newest first. */
+export const pagedRuns = () => page.items;
+/** What the footer says: how many of how many, whether another page waits and whether one is on its way. */
+export const pagedInfo = () => ({ total: page.total, hasMore: page.hasMore, loading: page.loading, loaded: page.loaded, failed: page.failed });
+/** A string that changes when the paged list does, for the folder's redraw check. */
+export const pagedSignature = () => JSON.stringify([page.q, page.result, page.loaded, page.loading, page.hasMore, page.total, page.failed, page.items.map(i => [i.key, i.run.status, isUnread(i)])]);
+const RESULT_WORDS = ['passed', 'failed', 'running'];
+function readPage(more) {
+    const mySeq = ++page.seq;
+    const params = new URLSearchParams({ limit: String(PAGE_SIZE) });
+    if (page.q) params.set('q', page.q);
+    if (page.result) params.set('result', page.result);
+    if (more && page.cursor) params.set('cursor', page.cursor);
+    page.loading = true; page.failed = false; fire();
+    return fetch(`/api/automations/runs?${params}`).then(r => (r.ok ? r.json() : null)).catch(() => null).then(d => {
+        if (mySeq !== page.seq) return; // a newer search is on its way (or has come): this answer is for one nobody is looking at
+        page.loading = false;
+        if (!d || !Array.isArray(d.runs)) { page.failed = true; fire(); return; } // keep what is drawn
+        const items = d.runs.map(r => (r.kind === 'workflow' ? workflowItem(r) : jobItem(r)));
+        for (const i of items) if (opened.has(i.key)) { if (i.run.seen_at) opened.delete(i.key); else i.run.seen_at = opened.get(i.key); }
+        const have = new Set(page.items.map(i => i.key));
+        page.items = more ? [...page.items, ...items.filter(i => !have.has(i.key))] : items;
+        page.hasMore = d.has_more === true && !!d.next_cursor; page.cursor = d.next_cursor || ''; page.total = Number(d.total) || 0; page.loaded = true;
+        fire();
+    });
+}
+/** Make the paged list the one for this search and Result filter: nothing to do when it already is (or is on its way); a new Result filter reads at once, a new search a moment after the last key. */
+export function ensureRunsPage({ q = '', result = '' } = {}) {
+    q = String(q || '').trim().slice(0, 200); result = RESULT_WORDS.includes(result) ? result : '';
+    if (page.loaded && page.q === q && page.result === result) return;
+    if (page.timer && page.q === q && page.result === result) return; // already waiting for it
+    clearTimeout(page.timer); page.timer = 0;
+    const read = () => { page.timer = 0; page.q = q; page.result = result; page.cursor = ''; readPage(false); };
+    if (!page.loaded && !page.loading && page.q === q && page.result === result) { read(); return; }
+    if (page.loaded && page.q !== q) { page.q = q; page.result = result; page.timer = setTimeout(read, SEARCH_DEBOUNCE_MS); return; } // typing: wait for a pause
+    read();
+}
+/** The next page of the same search and filter, appended. Nothing when there is none or one is already coming. */
+export function loadMoreRuns() { if (!page.hasMore || page.loading || !page.cursor) return null; return readPage(true); }
+/** The list read again from the first page (a run ended, the person came back to it), for the search and filter it has. */
+export function reloadRunsPage() { page.cursor = ''; return readPage(false); }
+/** The first page read again when one is loaded (a run ended, Automations came back on screen): the page the person has is replaced by the newest 50 for the same search and filter. */
+export function refreshRunsPage() { return page.loaded && !page.loading ? reloadRunsPage() : null; }
 
 // ── The reads ────────────────────────────────────────────────────────────
 /** Read both lists (at most once in 30 s unless forced; one read at a time). Called when Automations or the Inbox is shown, and by the Inbox's badge once it has been. */
