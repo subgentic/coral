@@ -59,7 +59,7 @@ const { coralReady } = require('./helpers/wait');
             await ev(`document.querySelector('.artifact-viewer-more').click(); true`);
             await waitFor(`!!document.querySelector('.artifact-viewer-menu:not([hidden])')`, `${w}: the ⋯ menu opens`, 4000);
             const items = await ev(`[...document.querySelectorAll('.artifact-viewer-menu [role=menuitem]')].filter(e => e.getClientRects().length).map(e => e.textContent.trim())`);
-            assert.deepEqual(items.filter(t => t !== 'Details'), ['Approve with a note', 'Open in new tab', 'Download'], `${w}: the ⋯ menu holds the less used (and Details when the file has facts to show): ` + JSON.stringify(items));
+            assert.deepEqual(items.filter(t => t !== 'Details'), ['Approve with a note', 'Remove from review', 'Open in new tab', 'Download'], `${w}: the ⋯ menu holds the less used, and Remove from review for a file that is in review (#13152; Details when the file has facts to show): ` + JSON.stringify(items));
             await ev(`document.querySelector('.artifact-viewer-more').click(); true`);
             // the version list holds Compare
             await ev(`document.querySelector('.av-current').click(); true`);
