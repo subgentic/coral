@@ -2,12 +2,15 @@ package routes
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -185,4 +188,92 @@ func TestCommentPollOnlyInvalidatesArtifactsWhenUnreadRepliesChange(t *testing.T
 	}
 	require.Equal(t, before, r.h.bs.ArtifactsRevision("team-a"), "unchanged comment polls must preserve the board token")
 	require.Equal(t, all, r.h.bs.ArtifactsRevision(""), "and the aggregate token")
+}
+
+func TestUploadMetadataAfterRecordMakesAnInterveningListStale(t *testing.T) {
+	rig, _ := ownerRig(t)
+	base := rig.uploadText("a1", "plan.txt", "first revision before series metadata")
+	text := "second revision awaiting series metadata"
+	digest := fmt.Sprintf("%x", sha256.Sum256([]byte(text)))
+	recordPath := filepath.Join(uploadsDir(rig.coralDir, "a1"), digest+".json")
+	reached, release, done := make(chan struct{}), make(chan struct{}), make(chan struct{})
+	var paused, unblocked sync.Once
+	unblock := func() { unblocked.Do(func() { close(release) }) }
+	oldLookup := uploaderLookup
+	// Both the deferred-notification lookup and the later series-review check
+	// reach this seam. Thus removing the defer cannot remove the synchronization.
+	uploaderLookup = func(ctx context.Context, sid string) (string, string, string) {
+		b, n, r := oldLookup(ctx, sid)
+		if sid == "a1" {
+			if _, err := os.Stat(recordPath); err == nil {
+				stop := false
+				paused.Do(func() { stop = true; close(reached) })
+				if stop {
+					<-release
+				}
+			}
+		}
+		return b, n, r
+	}
+	t.Cleanup(func() { uploaderLookup = oldLookup })
+	bh := NewBoardHandler(rig.h.bs)
+	bh.SetTaskArtifactWriter(rig.coralDir, nil)
+	subscribeSession(t, bh, "team-a", "a1", "a1")
+	router := chi.NewRouter()
+	router.Get("/api/board/{project}/artifacts", bh.ListTeamArtifacts)
+	readList := func() (uint64, int) {
+		req := httptest.NewRequest("GET", "/api/board/team-a/artifacts", nil)
+		req = req.WithContext(context.WithValue(req.Context(), callerKindKey{}, callerDashCookie))
+		out := httptest.NewRecorder()
+		router.ServeHTTP(out, req)
+		require.Equal(t, 200, out.Code, out.Body.String())
+		var body struct {
+			Revision uint64         `json:"artifacts_rev"`
+			Items    []teamArtifact `json:"artifacts"`
+		}
+		require.NoError(t, json.Unmarshal(out.Body.Bytes(), &body))
+		for _, item := range body.Items {
+			if artifactStoreID(item) == base {
+				return body.Revision, item.Versions
+			}
+		}
+		t.Fatal("base artifact is missing from the list")
+		return 0, 0
+	}
+	before := rig.h.bs.ArtifactsRevision("team-a")
+	req := httptest.NewRequest("POST", "/api/agent/artifacts?session_id=a1", strings.NewReader(text))
+	req.Header.Set(testAgentHeader, "a1")
+	req.Header.Set("X-Artifact-Name", "plan.txt")
+	req.Header.Set("X-Artifact-Media-Type", "text/plain")
+	req.Header.Set(seriesHeader, "coral://artifacts/"+base)
+	out := httptest.NewRecorder()
+	go func() { rig.srv.Config.Handler.ServeHTTP(out, req); close(done) }()
+	defer func() {
+		unblock()
+		select {
+		case <-done:
+		case <-time.After(5 * time.Second):
+			t.Error("upload did not finish after releasing the metadata barrier")
+		}
+	}()
+	select {
+	case <-reached:
+	case <-done:
+		t.Fatalf("upload returned before the record barrier: %d %s", out.Code, out.Body.String())
+	case <-time.After(5 * time.Second):
+		t.Fatal("upload never reached the post-record barrier")
+	}
+	middle, versions := readList()
+	require.Greater(t, middle, before, "the upload record already advanced the revision")
+	require.Zero(t, versions, "the list ran before the base artifact was stamped into the series")
+	unblock()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("upload did not finish")
+	}
+	require.Equal(t, http.StatusCreated, out.Code, out.Body.String())
+	after, versions := readList()
+	require.Equal(t, 2, versions, "series metadata landed after the intervening list")
+	require.Greater(t, after, middle, "handler completion must invalidate the pre-metadata list, beyond the record-write notification")
 }

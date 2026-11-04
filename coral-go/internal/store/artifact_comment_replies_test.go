@@ -185,3 +185,31 @@ func TestMarkThreadsSeenChangedConcurrentReadersReportOneChange(t *testing.T) {
 	}
 	require.Equal(t, 1, changes, "only one concurrent reader actually clears the unread reply")
 }
+
+func TestMarkThreadsSeenChangedKeepsRepliesStampedAfterTheReadUnread(t *testing.T) {
+	ctx := context.Background()
+	s := newCommentStore(t)
+	readAt := time.Date(2026, 11, 4, 10, 0, 0, 0, time.UTC)
+	root, err := s.CreateArtifactComment(ctx, ArtifactComment{ArtifactID: artA, Body: "check", AuthorKind: "owner"})
+	require.NoError(t, err)
+	reply, err := s.CreateArtifactComment(ctx, ArtifactComment{ArtifactID: artA, ParentID: &root.ID, Body: "arrived later", AuthorKind: "agent"})
+	require.NoError(t, err)
+	replyAt := readAt.Add(time.Second)
+	stamp(t, s, reply.ID, replyAt)
+	changed, err := s.MarkThreadsSeenChanged(ctx, artA, readAt)
+	require.NoError(t, err)
+	require.False(t, changed, "a reply newer than the read cannot be cleared or certify a change")
+	var seenRows int
+	require.NoError(t, s.db.GetContext(ctx, &seenRows, `SELECT COUNT(*) FROM artifact_comment_seen`))
+	require.Zero(t, seenRows)
+	news, err := s.UnseenAgentReplies(ctx)
+	require.NoError(t, err)
+	require.Len(t, news, 1)
+	require.Equal(t, 1, news[0].Count)
+	changed, err = s.MarkThreadsSeenChanged(ctx, artA, replyAt.Add(time.Microsecond))
+	require.NoError(t, err)
+	require.True(t, changed)
+	news, err = s.UnseenAgentReplies(ctx)
+	require.NoError(t, err)
+	require.Empty(t, news, "a later read clears the reply")
+}
