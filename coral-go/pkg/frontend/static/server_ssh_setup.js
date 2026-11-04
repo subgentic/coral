@@ -43,6 +43,14 @@ export const dataDirProblem = (v) => {
     if (['.ssh', '.gnupg', '.config'].includes(first)) return `${first} holds your keys or settings on that computer, so Coral will not keep its data there. Choose another folder.`;
     return '';
 };
+/** The port as typed: '' is the default (8420). Why it is not one the hub accepts (the server checks again), in a plain sentence, or ''. 1024 to 65535, digits only. Exported for the test. */
+export const portProblem = (v) => {
+    const t = String(v == null ? '' : v).trim();
+    if (t === '') return '';
+    if (!/^[1-9][0-9]{3,4}$/.test(t) || Number(t) < 1024 || Number(t) > 65535) return 'Use a number from 1024 to 65535 (the ports below 1024 need more rights than Coral has there).';
+    return '';
+};
+export const portOk = (v) => portProblem(v) === '';
 export const dataDirOk = (v) => dataDirProblem(v) === '';
 
 export const backendChoice = (current, tmux) => (tmux === false && current === 'tmux' ? 'pty' : (current === 'tmux' ? 'tmux' : 'pty'));
@@ -63,7 +71,7 @@ const [SETUP, UPGRADE, STOP, REMOVE] = Object.keys(KINDS);
  * onClose() is called when the person leaves it; onChanged() when the server list changed (a server was added or removed, or upgraded). Returns { unmount }.
  */
 export function mountSshSetup(host, { mode = 'setup', server = null, action = null, deleteData = false, resume = '', pollMs = POLL_MS, onClose = () => {}, onChanged = () => {} } = {}) {
-    const st = { step: 'loading', options: null, plan: null, error: '', busy: false, keysOk: false, typed: '', backend: 'pty', dataDir: '', allowDowngrade: false, timer: null, dead: false, form: { host: '', picked: '', label: '' } };
+    const st = { step: 'loading', options: null, plan: null, error: '', busy: false, keysOk: false, typed: '', backend: 'pty', dataDir: '', port: '', allowDowngrade: false, timer: null, dead: false, form: { host: '', picked: '', label: '' } };
 
     const kind = () => (st.plan ? st.plan.kind : mode === 'manage' ? action : 'setup');
     const words = () => KINDS[kind()] || KINDS.setup;
@@ -154,12 +162,13 @@ export function mountSshSetup(host, { mode = 'setup', server = null, action = nu
     }
 
     async function run() {
-        if (kind() === SETUP && !dataDirOk(cleanDataDir(st.dataDir))) { st.error = dataDirProblem(cleanDataDir(st.dataDir)); draw(); return; } // never sent without the folder, which would start it in the default one
+        if (kind() === SETUP && !dataDirOk(cleanDataDir(st.dataDir))) { st.error = dataDirProblem(cleanDataDir(st.dataDir)); draw(); return; }
+        if (kind() === SETUP && !portOk(st.port)) { st.error = portProblem(st.port); draw(); return; } // never sent without the folder, which would start it in the default one
         st.busy = true; st.error = ''; draw();
         const body = {};
         if (st.plan.host_keys && st.plan.host_keys.length) body.accept_keys = true;
         if (kind() === REMOVE) body.confirm = st.typed.trim();
-        if (kind() === SETUP) { body.backend = st.backend === 'tmux' ? 'tmux' : 'pty'; const d = cleanDataDir(st.dataDir); if (d) body.data_dir = d; }
+        if (kind() === SETUP) { body.backend = st.backend === 'tmux' ? 'tmux' : 'pty'; const d = cleanDataDir(st.dataDir); if (d) body.data_dir = d; const pt = String(st.port || '').trim(); if (pt && portOk(pt) && Number(pt) !== 8420) body.port = Number(pt); }
         if (kind() === UPGRADE && downgrade()) body.allow_downgrade = !!st.allowDowngrade;
         const r = await api('POST', `/api/servers/provision/${encodeURIComponent(st.plan.plan)}/run`, body);
         if (st.dead) return;
@@ -302,7 +311,7 @@ export function mountSshSetup(host, { mode = 'setup', server = null, action = nu
             const d = cleanDataDir(st.dataDir), ok = dataDirOk(d);
             input.setAttribute('aria-invalid', ok ? 'false' : 'true');
             note.classList.toggle('ssh-datadir-bad', !ok);
-            const g = host.querySelector('[data-ssh-go]'); if (g && !st.busy) g.disabled = !ok || g.dataset.sshHold === '1'; // Set up is closed while the folder is not one Coral will use: it never falls back to the default without the person knowing
+            const g = host.querySelector('[data-ssh-go]'); if (g && !st.busy) g.disabled = !ok || !portOk(st.port) || g.dataset.sshHold === '1'; // Set up is closed while the folder is not one Coral will use: it never falls back to the default without the person knowing
             note.textContent = !ok ? dataDirProblem(d) + ' Set up waits until this is fixed.'
                 : (d === '' || d === '.coral-server/data' ? 'The default: a new folder of its own, ~/.coral-server/data. Leave it empty for that.'
                     : `Coral will use ~/${d} there, and create it if it is not there. Make sure no other Coral is running on that folder.`);
@@ -310,6 +319,32 @@ export function mountSshSetup(host, { mode = 'setup', server = null, action = nu
         input.addEventListener('input', () => { st.dataDir = input.value; show(); });
         const mine = button('Use .coral (a Coral set up by hand)', '', () => { st.dataDir = '.coral'; input.value = '.coral'; show(); }, st.busy);
         row.append(input, mine);
+        box.append(lab, row, note);
+        root.append(box);
+        show();
+    }
+
+    /** The port Coral listens on over there, loopback only (#13081): default 8420. The hub reaches it through SSH, so any free port from 1024 to 65535 will do; the far side refuses a port that is taken. */
+    function drawPort(root) {
+        const box = el('fieldset', 'ssh-datadir ssh-port');
+        box.append(el('legend', 'ssh-subhead', 'Port Coral listens on over there'));
+        const lab = el('label', 'form-label', 'Port (1024 to 65535)'); lab.htmlFor = 'ssh-port-input';
+        const row = el('div', 'ssh-datadir-row');
+        const input = el('input', 'field'); input.type = 'text'; input.id = 'ssh-port-input'; input.value = st.port; input.inputMode = 'numeric';
+        input.placeholder = '8420'; input.autocomplete = 'off'; input.spellcheck = false; input.disabled = st.busy; input.setAttribute('aria-describedby', 'ssh-port-note');
+        const note = el('p', 'ssh-help', ''); note.id = 'ssh-port-note'; note.setAttribute('role', 'status');
+        const show = () => {
+            const bad = portProblem(st.port), ok = bad === '';
+            input.setAttribute('aria-invalid', ok ? 'false' : 'true');
+            note.classList.toggle('ssh-datadir-bad', !ok);
+            const g = host.querySelector('[data-ssh-go]'); if (g && !st.busy) g.disabled = !ok || !dataDirOk(cleanDataDir(st.dataDir)) || g.dataset.sshHold === '1';
+            const t = String(st.port || '').trim();
+            note.textContent = !ok ? bad + ' Set up waits until this is fixed.'
+                : (t === '' || t === '8420' ? 'The default: 8420. Use another when that one is taken there (several Corals on one computer need one each); it is only reachable from that computer.'
+                    : `Coral will listen on 127.0.0.1:${t} there. Set up checks it is free first.`);
+        };
+        input.addEventListener('input', () => { st.port = input.value; show(); });
+        row.append(input);
         box.append(lab, row, note);
         root.append(box);
         show();
@@ -360,7 +395,7 @@ export function mountSshSetup(host, { mode = 'setup', server = null, action = nu
             row.append(cb, el('span', '', ' These fingerprints are the computer I mean to set up.'));
             root.append(row);
         }
-        if (kind() === SETUP) { drawBackend(root); drawDataDir(root); }
+        if (kind() === SETUP) { drawBackend(root); drawDataDir(root); drawPort(root); }
         if (kind() === UPGRADE) {
             const v = versions();
             const dl = el('dl', 'facts servers-facts');
@@ -400,7 +435,7 @@ export function mountSshSetup(host, { mode = 'setup', server = null, action = nu
         const upLabel = kind() === UPGRADE && versions() && versions().hub ? `${downgrade() ? 'Downgrade' : 'Upgrade'} to v${versions().hub}` : words().go;
         const go = button(st.busy ? 'Working...' : upLabel, kind() === REMOVE ? 'btn-danger' : 'btn-primary', run, st.busy || (keys.length > 0 && !st.keysOk) || !typedOk || (kind() === UPGRADE && (same() || (downgrade() && !st.allowDowngrade))));
         go.dataset.sshGo = '1';
-        if (kind() === SETUP && !dataDirOk(cleanDataDir(st.dataDir))) go.disabled = true;
+        if (kind() === SETUP && (!dataDirOk(cleanDataDir(st.dataDir)) || !portOk(st.port))) go.disabled = true;
         else if (go.disabled) go.dataset.sshHold = '1'; // closed for another reason (keys not confirmed): typing in the folder field does not open it
         bar.append(button('Cancel', '', cancelPlan), go);
         root.append(bar);

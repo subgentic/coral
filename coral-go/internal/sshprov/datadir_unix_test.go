@@ -48,7 +48,7 @@ func TestStartUsesTheChosenDataFolderAndKeepsItForLaterStarts(t *testing.T) {
 		_ = os.Remove(filepath.Join(home, InstallDir, "coral.log"))
 	}
 
-	run(CmdStartDaemon, "2.0.10", "pty", ".coral")
+	run(CmdStartDaemon, "2.0.10", "pty", ".coral", "8420")
 	if !logHas("--home " + filepath.Join(home, ".coral")) {
 		t.Fatal("the chosen folder was not Coral's --home")
 	}
@@ -65,21 +65,21 @@ func TestStartUsesTheChosenDataFolderAndKeepsItForLaterStarts(t *testing.T) {
 		t.Errorf("the owner secret went to %q, not the chosen folder", got)
 	}
 	rm()
-	run(CmdStartDaemon, "2.0.10", "pty", "@keep") // an upgrade
+	run(CmdStartDaemon, "2.0.10", "pty", "@keep", "8420") // an upgrade
 	if !logHas("--home " + filepath.Join(home, ".coral")) {
 		t.Error("an upgrade did not keep the recorded folder")
 	}
 	// a record that is not a plain relative path is not followed
 	rm()
 	_ = os.WriteFile(filepath.Join(home, InstallDir, "datadir"), []byte("/etc"), 0o600)
-	run(CmdStartDaemon, "2.0.10", "pty", "@keep")
+	run(CmdStartDaemon, "2.0.10", "pty", "@keep", "8420")
 	if !logHas("--home " + filepath.Join(home, DefaultDataDir)) {
 		t.Error("a datadir record of /etc was followed")
 	}
 	// none recorded: the default
 	rm()
 	_ = os.Remove(filepath.Join(home, InstallDir, "datadir"))
-	run(CmdStartDaemon, "2.0.10", "pty", "@keep")
+	run(CmdStartDaemon, "2.0.10", "pty", "@keep", "8420")
 	if !logHas("--home " + filepath.Join(home, DefaultDataDir)) {
 		t.Error("with no record the folder is not the default")
 	}
@@ -121,7 +121,7 @@ func TestStartIgnoresARecordedKeysFolder(t *testing.T) {
 		t.Fatal(err)
 	}
 	_ = os.WriteFile(filepath.Join(home, InstallDir, "datadir"), []byte(".ssh/x"), 0o600)
-	text, _ := remoteText(CmdStartDaemon, "2.0.10", "pty", "@keep")
+	text, _ := remoteText(CmdStartDaemon, "2.0.10", "pty", "@keep", "8420")
 	cmd := exec.Command("sh", "-c", text)
 	cmd.Env = append(os.Environ(), "HOME="+home)
 	_ = cmd.Run()
@@ -157,11 +157,11 @@ func TestEveryAcceptedDataFolderReadsBackAsItself(t *testing.T) {
 // The argument pattern itself refuses two dots, so the remote command never gets one (the validator is not the only guard).
 func TestTheRemoteArgumentPatternRefusesTwoDots(t *testing.T) {
 	for _, bad := range []string{"a..b", "my..coral/data", "x/y..", "a."} {
-		if _, err := remoteText(CmdStartDaemon, "2.0.10", "pty", bad); err == nil {
+		if _, err := remoteText(CmdStartDaemon, "2.0.10", "pty", bad, "8420"); err == nil {
 			t.Errorf("%q reached the remote command", bad)
 		}
 	}
-	if _, err := remoteText(CmdStartDaemon, "2.0.10", "pty", ".coral"); err != nil {
+	if _, err := remoteText(CmdStartDaemon, "2.0.10", "pty", ".coral", "8420"); err != nil {
 		t.Error(err)
 	}
 }

@@ -82,7 +82,7 @@ case "$last" in
       unknown) if grep -q 'box.example.com' '` + known + `' 2>/dev/null; then echo '` + uname + `'; exit 0; fi; echo 'Host key verification failed.' >&2; exit 255;;
     esac;;
   *"command -v tmux"*) exit ` + tm + `;;
-  *"20E4"*) [ -e '` + filepath.Join(dir, "portheld") + `' ] && exit 2; exit 0;;
+  *"%04X"*) [ -e '` + filepath.Join(dir, "portheld") + `' ] && exit 2; exit 0;;
 esac
 exit 0
 `

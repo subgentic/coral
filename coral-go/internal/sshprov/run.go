@@ -136,6 +136,15 @@ func DataDirProblem(d string) string {
 // readDataDir sets d to the data folder recorded at the last start (<install>/datadir), or the default when there is none or it is not a plain relative path.
 const readDataDir = "d=$(cat \"$HOME/" + InstallDir + "/datadir\" 2>/dev/null); case \"$d\" in \"\"|/*|*..*|.ssh|.ssh/*|.gnupg|.gnupg/*|.config|.config/*) d=" + DefaultDataDir + ";; esac; "
 
+// DefaultPort is the port the far Coral listens on unless the person chose another (#13081).
+const DefaultPort = 8420
+
+// portArgRe is a port as an argument: 1024 to 65535 written out, no leading zero or sign (ValidPort says the same in code). A number only, so it can sit in the shell text unquoted.
+var portArgRe = regexp.MustCompile(`^(102[4-9]|10[3-9][0-9]|1[1-9][0-9]{2}|[2-9][0-9]{3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])$`)
+
+// ValidPort reports whether p is a port a set up may name: 1024 to 65535 (not the ones that need root).
+func ValidPort(p int) bool { return p >= 1024 && p <= 65535 }
+
 var backendArgRe = regexp.MustCompile(`^(pty|tmux|keep)$`)
 
 var archRe = regexp.MustCompile(`^(amd64|arm64)$`)
@@ -159,7 +168,7 @@ var specs = map[Command]spec{
 		"if [ \"$b\" = tmux ] && ! command -v tmux >/dev/null 2>&1; then exit 7; fi; printf %%s \"$b\" > \"$bf\"; s=; command -v setsid >/dev/null 2>&1 && s=setsid; " +
 		"l=\"$HOME/" + InstallDir + "/coral.log\"; if [ \"$(wc -c < \"$l\" 2>/dev/null || echo 0)\" -gt 10485760 ]; then mv -f \"$l\" \"$l.1\"; fi; " +
 		"P=\"$HOME/" + InstallDir + "/coral.pid\" C=\"$HOME/" + InstallDir + "/%[1]s/root/coral\" B=$b H=\"$HOME/$d\" " +
-		"nohup $s sh -c 'echo $$ > \"$P\"; exec \"$C\" --host 127.0.0.1 --port 8420 --no-browser --cloud-url off --backend \"$B\" --home \"$H\"' </dev/null >>\"$l\" 2>&1 & }; }", args: []*regexp.Regexp{versionRe, backendArgRe, dataDirArgRe}},
+		"nohup $s sh -c 'echo $$ > \"$P\"; exec \"$C\" --host 127.0.0.1 --port %[4]s --no-browser --cloud-url off --backend \"$B\" --home \"$H\"' </dev/null >>\"$l\" 2>&1 & }; }", args: []*regexp.Regexp{versionRe, backendArgRe, dataDirArgRe, portArgRe}},
 	CmdEnsureInstanceID: {template: "umask 077 && mkdir -p \"$HOME/" + InstallDir + "\" && f=\"$HOME/" + InstallDir + "/instance-id\" && { [ -s \"$f\" ] || head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \\n' > \"$f\"; } && cat \"$f\""},
 	CmdReadAPIKey:       {template: readDataDir + "\"$HOME/" + InstallDir + "/%s/root/coral\" api-key --home \"$HOME/$d\" 2>/dev/null", args: []*regexp.Regexp{versionRe}},
 	CmdAcceptTerms:      {template: "\"$HOME/" + InstallDir + "/%s/root/coral\" accept-terms", args: []*regexp.Regexp{versionRe}},
@@ -171,9 +180,9 @@ var specs = map[Command]spec{
 		"if [ -L \"$d\" ] || [ ! -d \"$d\" ] || [ -L \"$d/instance-id\" ] || [ ! -f \"$d/instance-id\" ]; then exit 7; fi; rm -rf -- \"$d\""},
 	CmdCheckStopped: {template: "if tmux has-session -t =coral-server 2>/dev/null; then exit 1; fi; out=$(ps -u \"$(id -u)\" -o args= 2>/dev/null) || exit 3; " +
 		"if printf '%%s\\n' \"$out\" | grep -F -- \"$HOME/" + InstallDir + "/\" | grep -Eq '/root/coral( |$)'; then exit 2; fi; exit 0"},
-	CmdCheckPort: {template: "if tmux has-session -t =coral-server 2>/dev/null; then exit 0; fi; if " + aliveTest + "; then exit 0; fi; [ -r /proc/net/tcp ] || exit 3; " +
-		"if grep -Eqs '^ *[0-9]+: [0-9A-Fa-f]+:20E4 [0-9A-Fa-f:]+ 0A ' /proc/net/tcp /proc/net/tcp6; then exit 2; fi; exit 0"},
-	CmdPortHolder:         {template: `p=$(lsof -nP -iTCP:8420 -sTCP:LISTEN 2>/dev/null | awk 'NR==2{print $2" "$1}'); if [ -z "$p" ]; then p=$(ss -ltnpH 'sport = :8420' 2>/dev/null | sed -n 's/.*users:(("\([^"]*\)",pid=\([0-9]*\).*/\3 \1/p' | head -1); fi; echo "$p"`},
+	CmdCheckPort: {template: "if tmux has-session -t =coral-server 2>/dev/null; then exit 0; fi; if " + aliveTest + "; then exit 0; fi; [ -r /proc/net/tcp ] || exit 3; h=$(printf '%%04X' %[1]s); " +
+		"if grep -Eqs \"^ *[0-9]+: [0-9A-Fa-f]+:$h [0-9A-Fa-f:]+ 0A \" /proc/net/tcp /proc/net/tcp6; then exit 2; fi; exit 0", args: []*regexp.Regexp{portArgRe}},
+	CmdPortHolder:         {template: `p=$(lsof -nP -iTCP:%[1]s -sTCP:LISTEN 2>/dev/null | awk 'NR==2{print $2" "$1}'); if [ -z "$p" ]; then p=$(ss -ltnpH 'sport = :%[1]s' 2>/dev/null | sed -n 's/.*users:(("\([^"]*\)",pid=\([0-9]*\).*/\3 \1/p' | head -1); fi; echo "$p"`, args: []*regexp.Regexp{portArgRe}},
 	CmdTailLog:            {template: "tail -n 20 \"$HOME/" + InstallDir + "/coral.log\" 2>/dev/null"},
 	CmdInstallOwnerSecret: {template: readDataDir + "\"$HOME/" + InstallDir + "/%s/root/coral\" hub-owner-secret --home \"$HOME/$d\"", args: []*regexp.Regexp{versionRe}},
 	CmdFreeKB:             {template: "df -Pk \"$HOME\" | awk 'NR==2 {print $4}'"},

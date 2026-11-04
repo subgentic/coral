@@ -17,7 +17,7 @@ import (
 // through the SSH stream target, never a port.
 
 // RemotePort is the loopback port the remote Coral listens on.
-const RemotePort = 8420
+const RemotePort = DefaultPort
 
 var (
 	instanceIDRe = regexp.MustCompile(`^[0-9a-f]{32}$`)
@@ -148,6 +148,14 @@ func (r Runner) Start(ctx context.Context, t Target, version, backend string) er
 // StartWithDataDir is Start with the data folder Coral keeps its data in, relative to the home folder there (a set up's choice, ValidDataDir). "" keeps the one recorded at the last start, or the default
 // (DefaultDataDir) for a computer with none; the folder is recorded in <install>/datadir so an upgrade and the key reads use it too.
 func (r Runner) StartWithDataDir(ctx context.Context, t Target, version, backend, dataDir string) error {
+	return r.StartOn(ctx, t, version, backend, dataDir, DefaultPort)
+}
+
+// StartOn is StartWithDataDir on the port the person chose (ValidPort, 1024 to 65535; DefaultPort is 8420). The port is checked free first (ErrPortInUse, with what holds it) and given to Coral as --port.
+func (r Runner) StartOn(ctx context.Context, t Target, version, backend, dataDir string, port int) error {
+	if !ValidPort(port) {
+		return ErrNotAllowed
+	}
 	if dataDir == "" {
 		dataDir = "@keep"
 	} else if !ValidDataDir(dataDir) {
@@ -156,14 +164,14 @@ func (r Runner) StartWithDataDir(ctx context.Context, t Target, version, backend
 	if backend == "" {
 		backend = BackendPTY
 	}
-	if chk, err := r.Run(ctx, t, CmdCheckPort); err != nil {
+	if chk, err := r.Run(ctx, t, CmdCheckPort, strconv.Itoa(port)); err != nil {
 		return err
 	} else if chk.ExitCode == 2 {
-		pe := &PortInUseError{}
-		pe.Pid, pe.Command = r.PortHolder(ctx, t)
+		pe := &PortInUseError{Port: port}
+		pe.Pid, pe.Command = r.PortHolder(ctx, t, port)
 		return pe
 	}
-	res, err := r.Run(ctx, t, CmdStartDaemon, version, backend, dataDir)
+	res, err := r.Run(ctx, t, CmdStartDaemon, version, backend, dataDir, strconv.Itoa(port))
 	if err != nil {
 		return err
 	}
@@ -287,6 +295,7 @@ func (r Runner) ReadAPIKey(ctx context.Context, t Target, version string) (strin
 // PortInUseError is ErrPortInUse with what holds the port, when the far computer could say: Pid 0 when it could not (another user's process is not shown to this one, and neither lsof nor ss may be there).
 // Pid is digits and Command a short name of letters, digits and . _ - only; anything else the far side printed is dropped (#12027).
 type PortInUseError struct {
+	Port    int // the port that was asked for
 	Pid     int
 	Command string
 }
@@ -296,9 +305,9 @@ func (e *PortInUseError) Is(target error) bool { return target == ErrPortInUse }
 
 var portHolderRe = regexp.MustCompile(`^([0-9]{1,8}) ([A-Za-z0-9._-]{1,40})$`)
 
-// PortHolder is the pid and command name of what listens on port 8420 there, or 0 and "" when that is not known.
-func (r Runner) PortHolder(ctx context.Context, t Target) (int, string) {
-	res, err := r.Run(ctx, t, CmdPortHolder)
+// PortHolder is the pid and command name of what listens on the port there, or 0 and "" when that is not known.
+func (r Runner) PortHolder(ctx context.Context, t Target, port int) (int, string) {
+	res, err := r.Run(ctx, t, CmdPortHolder, strconv.Itoa(port))
 	if err != nil || res.ExitCode != 0 {
 		return 0, ""
 	}

@@ -66,7 +66,7 @@ func TestDaemonCommandsInARealShell(t *testing.T) {
 	if err := os.WriteFile(big, make([]byte, 11<<20), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if code := run(CmdStartDaemon, "2.0.10", "pty", "@keep"); code != 0 {
+	if code := run(CmdStartDaemon, "2.0.10", "pty", "@keep", "8420"); code != 0 {
 		t.Fatalf("start exited %d", code)
 	}
 	if st, err := os.Stat(big + ".1"); err != nil || st.Size() != 11<<20 {
@@ -84,10 +84,10 @@ func TestDaemonCommandsInARealShell(t *testing.T) {
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
-	if run(CmdStartDaemon, "2.0.10", "pty", "@keep") != 0 || pidOf() != pid {
+	if run(CmdStartDaemon, "2.0.10", "pty", "@keep", "8420") != 0 || pidOf() != pid {
 		t.Error("a second start started another Coral")
 	}
-	if run(CmdCheckPort) != 0 {
+	if run(CmdCheckPort, "8420") != 0 {
 		t.Error("this user's own live Coral counted as a port held by another")
 	}
 	if code := run(CmdStopDaemon); code != 0 {

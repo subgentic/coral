@@ -330,4 +330,51 @@ for (const [phase, word] of [['done', /Done/], ['failed', /did not|could not|Cou
     assert.deepEqual(runBody, { backend: 'pty', data_dir: '.coral' }, 'the chosen folder is sent');
 }
 
+// ── the port Coral listens on over there is a setting too (#13081): 1024 to 65535, default 8420 ──
+{
+    const { portProblem, portOk } = await importUi('server_ssh_setup');
+    for (const ok of ['', '  ', '1024', '8420', '8461', '65535']) assert.equal(portOk(ok), true, ok);
+    for (const bad of ['80', '1023', '65536', '99999', '08420', '84 20', '8420;ls', '-1', '8.4', 'abc', '+8461']) assert.equal(portOk(bad), false, bad);
+    assert.match(portProblem('80'), /1024 to 65535/, 'a bad port says why');
+
+    hub({ keys: [] });
+    let host = fresh();
+    mountSshSetup(host, { mode: 'setup', pollMs: 5 });
+    await until(() => $(host, '#ssh-picked'), 'the form');
+    $(host, '#ssh-picked').value = 'build-box'; $(host, '#ssh-picked').dispatchEvent(new dom.window.Event('change'));
+    $(host, 'form').dispatchEvent(new dom.window.Event('submit', { cancelable: true }));
+    await until(() => btn(host, 'Connect'), 'the plan');
+    btn(host, 'Connect').click();
+    await until(() => btn(host, 'Set up'), 'the connected step');
+    const pin = $(host, '#ssh-port-input');
+    assert.ok(pin, 'the port is a field of the set up');
+    assert.equal(pin.value, '', 'empty is the default');
+    assert.match($(host, '#ssh-port-note').textContent, /The default: 8420/);
+    pin.value = '80'; pin.dispatchEvent(new dom.window.Event('input'));
+    assert.equal(pin.getAttribute('aria-invalid'), 'true', 'a port below 1024 is flagged');
+    assert.match($(host, '#ssh-port-note').textContent, /Set up waits until this is fixed/);
+    assert.equal(btn(host, 'Set up').disabled, true, 'Set up is closed while the port is not one Coral can use');
+    pin.value = '8461'; pin.dispatchEvent(new dom.window.Event('input'));
+    assert.match($(host, '#ssh-port-note').textContent, /127\.0\.0\.1:8461/, 'the note says where Coral will listen');
+    assert.equal(btn(host, 'Set up').disabled, false, 'and Set up opens again');
+    btn(host, 'Set up').click();
+    await until(() => runBody, 'the run');
+    assert.deepEqual(runBody, { backend: 'pty', port: 8461 }, 'the chosen port is sent as a number');
+
+    // the default is not sent
+    hub({ keys: [] });
+    host = fresh();
+    mountSshSetup(host, { mode: 'setup', pollMs: 5 });
+    await until(() => $(host, '#ssh-picked'), 'the form');
+    $(host, '#ssh-picked').value = 'build-box'; $(host, '#ssh-picked').dispatchEvent(new dom.window.Event('change'));
+    $(host, 'form').dispatchEvent(new dom.window.Event('submit', { cancelable: true }));
+    await until(() => btn(host, 'Connect'), 'the plan');
+    btn(host, 'Connect').click();
+    await until(() => btn(host, 'Set up'), 'the connected step');
+    $(host, '#ssh-port-input').value = '8420'; $(host, '#ssh-port-input').dispatchEvent(new dom.window.Event('input'));
+    btn(host, 'Set up').click();
+    await until(() => runBody, 'the run');
+    assert.deepEqual(runBody, { backend: 'pty' }, 'port 8420 is the default and is not sent');
+}
+
 console.log('server_ssh_setup: ok');
