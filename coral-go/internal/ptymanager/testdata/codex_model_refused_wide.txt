@@ -1,0 +1,9 @@
+› You have 8 unread messages on the message board. Run 'coral-board read' to see them.
+■ The 'gpt-6.1-sol' model is not supported when using Codex with a ChatGPT account.
+› You have 11 unread messages on the message board. Run 'coral-board read' to see them.
+■ The 'gpt-6.1-sol' model is not supported when using Codex with a ChatGPT account.
+› You have 11 unread messages on the message board. Run 'coral-board read' to see them.
+■ The 'gpt-6.1-sol' model is not supported when using Codex with a ChatGPT account.
+› Ask Codex to do anything
+  GPT-6.1-Sol default · ~/Software/coral/coral-go · Coordinate frontend development
+  ? for shortcuts                                                                                             ⚠ 2 warnings · f2 to view

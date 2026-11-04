@@ -126,6 +126,14 @@ func (in CheckInput) actions(items []Item) []action {
 		out = append(out, action{age: it.Age, rank: it.Rank, pinned: it.Rank == 0, text: l})
 	}
 	for _, b := range r.Blocked {
+		if b.ModelRefused {
+			model := "its model"
+			if b.Model != "" {
+				model = "its model " + b.Model
+			}
+			out = append(out, action{rank: 5, text: b.Name + " is blocked: Codex refuses " + model + " (its login cannot use it), so every turn ends with no work: change the agent's model or log Codex in again; messages wait unread until then."})
+			continue
+		}
 		l := b.Name + " is blocked by a usage limit"
 		if b.Resets > 0 {
 			l += " (resets in " + Age(b.Resets) + ")"
