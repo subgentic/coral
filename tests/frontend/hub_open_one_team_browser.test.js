@@ -32,6 +32,7 @@ const BOARDS = 9;
         assert.equal(await ev(`import(${S}+'server_base.js').then(m => m.isCloud())`), true, 'a real cloud boot');
         await ev(`new Promise(r => setTimeout(r, 1500))`); // sleep-ok: the page's own start-up reads finish before the click is counted
         // each way of opening one file: the viewer (team-1), a preview (team-2) and a task's artifact list (team-3). One click reads its own board's list only (20 requests over 9 boards before #13489).
+        const reqs0 = (all, n) => all.some(r => r.startsWith(`/api/remote/m1/api/artifacts/${HEX(n)}`)) && !all.some(r => r.startsWith(`/api/artifacts/${HEX(n)}`));
         const clicks = {
             viewer: [1, 'team-1', `import(${S}+'artifact_viewer.js').then(m => m.openArtifactViewer('${HEX(1)}', { server: 'm1', board: 'team-1', filename: 'plan-1.md', mediaType: 'text/markdown' })).then(() => true)`],
             preview: [2, 'team-2', `import(${S}+'artifact_preview.js').then(m => { const b = document.createElement('div'); document.body.append(b); return m.renderArtifact(b, 'coral://artifacts/${HEX(2)}', { server: 'm1', board: 'team-2', filename: 'plan-2.md', mediaType: 'text/markdown' }, { signal: new AbortController().signal, isStale: () => false }); }).then(() => true)`],
@@ -49,6 +50,7 @@ const BOARDS = 9;
             assert.ok(boardsRead.size <= 1 && (boardsRead.size === 0 || boardsRead.has(board)), `${how}: one click read the review lists of ${boardsRead.size} boards (${lists.length} list requests: ${lists.join(' , ')}); the file's own board is enough`);
             assert.ok(lists.length <= 3, `${how}: one click made ${lists.length} review/saved list requests: ${lists.join(' , ')}`);
             assert.equal(await ev(`window.__puts.length`), 1, `${how}: the file was tagged read once`);
+            assert.ok(reqs0(await ev(`window.__requests.slice()`), n), `${how}: the file's bytes were fetched through the computer (/api/remote/m1/...), never from the Hub itself`);
             const reqs = await ev(`window.__requests.slice()`); // the 404s the Hub's operator saw: each is asked at most once per open, and a 404 draws nothing again (UI Accessibility's SHOULD on #13489)
             assert.ok(reqs.filter(r => /\/versions$/.test(r.split('?')[0])).length <= 1, `${how}: versions asked more than once: ${reqs.filter(r => /\/versions/.test(r)).join(' , ')}`);
             assert.ok(reqs.filter(r => /\/comments\?/.test(r)).length <= 1, `${how}: comments asked more than once: ${reqs.filter(r => /\/comments/.test(r)).join(' , ')}`);
