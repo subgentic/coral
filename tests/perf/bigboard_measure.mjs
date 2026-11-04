@@ -35,21 +35,34 @@ const fold = p => p.replace(/[0-9a-f]{64}/g, '{hex}').replace(/[0-9a-f]{8}-[0-9a
     .replace(/\/b-[a-z0-9]{6,}/g, '/{board}').replace(/\/agent-\d+/g, '/{agent}').replace(/\/\d+(?=\/|$)/g, '/{n}');
 const pct = (a, q) => { if (!a.length) return 0; const s = [...a].sort((x, y) => x - y); return s[Math.min(s.length - 1, Math.floor(q * s.length))]; };
 
-const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'bigboard-chrome.'));
-const chrome = spawn(chromePath, ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`, '--no-first-run', '--no-default-browser-check',
-    '--disable-gpu', '--window-size=1400,900', ...(process.env.CI ? ['--no-sandbox'] : []), 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
-let chromeErr = ''; chrome.stderr.on('data', d => { chromeErr = (chromeErr + d).slice(-3000); });
-let chromeExit = ''; chrome.on('exit', (c, sig) => { chromeExit = `exit ${c} ${sig}`; });
+// Chrome: a fresh profile per try, the flags an automated run wants (no keychain prompt, no updater or component update, no background networking), a 25 s deadline for the
+// DevTools port, and the spawned process killed by PID before the next try (a launch that hung once did not come back in 90 s: #13154's 9 tries in a row).
+const CHROME_FLAGS = ['--headless=new', '--remote-debugging-port=0', '--no-first-run', '--no-default-browser-check', '--disable-gpu', '--window-size=1400,900', '--use-mock-keychain', '--password-store=basic',
+    '--disable-background-networking', '--disable-component-update', '--no-service-autorun', '--disable-sync', ...(process.env.CI ? ['--no-sandbox'] : [])];
+let profile = '', chrome = null, chromeErr = '', chromeExit = '';
+const launchChrome = async () => {
+    for (let attempt = 1; attempt <= 4; attempt++) {
+        profile = fs.mkdtempSync(path.join(os.tmpdir(), 'bigboard-chrome.')); chromeErr = ''; chromeExit = '';
+        chrome = spawn(chromePath, [...CHROME_FLAGS, `--user-data-dir=${profile}`, 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
+        chrome.stderr.on('data', d => { chromeErr = (chromeErr + d).slice(-3000); });
+        chrome.on('exit', (c, sig) => { chromeExit = `exit ${c} ${sig}`; });
+        let port = 0;
+        for (const end = Date.now() + 25000; !port && Date.now() < end; await sleep(100)) {
+            try { port = Number(fs.readFileSync(path.join(profile, 'DevToolsActivePort'), 'utf8').split('\n')[0]) || 0; } catch {}
+        }
+        if (port) { if (attempt > 1) console.log('[measure] Chrome opened its DevTools port on try ' + attempt); return port; }
+        console.error(`[measure] Chrome try ${attempt}: no DevTools port in 25 s (${chromeExit || 'still running'}) ${chromeErr.split('\n').filter(l => /ERROR|FATAL/.test(l)).slice(0, 2).join(' | ').slice(0, 200)}`);
+        try { chrome.kill('SIGKILL'); } catch {}
+        await sleep(1500); try { fs.rmSync(profile, { recursive: true, force: true }); } catch {}
+    }
+    throw new Error('Chrome did not open its DevTools port in 4 tries');
+};
 let client;
 const done = async code => { try { await client?.close(); } catch {} try { chrome.kill('SIGTERM'); } catch {} await sleep(500); try { fs.rmSync(profile, { recursive: true, force: true }); } catch {} process.exit(code); };
 process.on('SIGINT', () => done(130));
 
 (async () => {
-    let port = 0;
-    for (const end = Date.now() + 90000; !port && Date.now() < end; await sleep(100)) {
-        try { port = Number(fs.readFileSync(path.join(profile, 'DevToolsActivePort'), 'utf8').split('\n')[0]) || 0; } catch {}
-    }
-    if (!port) throw new Error('Chrome did not open its DevTools port: ' + (chromeExit || 'still running') + '\n' + chromeErr);
+    const port = await launchChrome();
     client = await CDP({ port });
     const { Page, Runtime, Network, Emulation } = client;
     await Promise.all([Page.enable(), Runtime.enable(), Network.enable()]);
