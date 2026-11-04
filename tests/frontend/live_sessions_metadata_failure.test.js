@@ -35,7 +35,7 @@ const html = '<!doctype html><html><body><section data-section="live-sessions"><
                 {session_id:'fixture-ui',name:'repo',display_name:'UI Specialist',board_project:'coral-task-workflows',agent_type:'codex',working_directory:'/fixture/repo',status:'idle'}
             ];
             window.fetch=async url=>{
-                if(url==='/api/sessions/live'){
+                if(String(url).split('?')[0]==='/api/sessions/live'){ // the dashboard asks ?compact=1 (#13186)
                     liveRequests++;
                     return metadataUnavailable
                         ? new Response(JSON.stringify({error:'agent_metadata_unavailable'}),{status:503,headers:{'Content-Type':'application/json'}})

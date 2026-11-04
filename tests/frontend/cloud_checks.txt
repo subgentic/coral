@@ -313,3 +313,6 @@ node cloud_signin_leaving.test.js
 
 node hub_world_scope.test.js
 node server_approvals_page.test.mjs
+node live_list_compact_ask.test.mjs
+node held_row_compact.test.mjs
+node live_list_hub_plain.test.mjs
