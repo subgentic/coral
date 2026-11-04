@@ -74,6 +74,7 @@ const B = 'bigboard-13326-' + TAG, SESSION = '13326000-0000-4000-8000-' + String
         await new Promise(r => setTimeout(r, 5000)); // sleep-ok: the upload folder cache trusts a folder only after it has been unchanged a few seconds, as in use
 
         // 1. first load: from the navigation to an interactive page (the app started, the agent list drawn), on a fresh page
+        await Page.addScriptToEvaluateOnNewDocument({ source: `performance.setResourceTimingBufferSize(20000); try { window.__lts = []; new PerformanceObserver(l => { for (const e of l.getEntries()) window.__lts.push([Math.round(e.startTime), Math.round(e.duration)]); }).observe({ type: 'longtask', buffered: true }); } catch (e) {}` }); // for the profile of where the early time goes (#13522): every request's timing and the long tasks of the load
         const loadFrom = Date.now();
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
         await ev(`new Promise(res => { const t0 = performance.now(); const iv = setInterval(() => { const l = document.querySelector('#live-sessions-list'); if ((window.__coralReady && window.__coralReady.startup && l && l.children.length > 0) || performance.now() - t0 > 30000) { clearInterval(iv); res(true); } }, 20); })`);
@@ -81,6 +82,11 @@ const B = 'bigboard-13326-' + TAG, SESSION = '13326000-0000-4000-8000-' + String
         // 2. Needs you within 20 s of the load ("early"), the Inbox tab to its first rows
         await ev(`window.__until = (cond, cap = ${Math.round(BUDGET.needsYouEarlyMs) + 10000}) => new Promise(res => { const t = performance.now(); const tick = () => { let v = false; try { v = cond(); } catch (e) {} if (v) res(performance.now() - t); else if (performance.now() - t > cap) res(null); else setTimeout(tick, 16); }; tick(); }); true`);
         results.needsYouEarlyMs = await ev(`(async () => { if (typeof window.switchNavTab !== 'function') return -1; window.switchNavTab('hub-inbox'); const v = await window.__until(() => document.querySelectorAll('#group-table-view tbody tr').length > 0); return v === null ? -2 : Math.round(v); })()`);
+        if (process.env.CORAL_BIGBOARD_OUT) results.profile = await ev(`(() => { const nav = performance.timeOrigin; const all = performance.getEntriesByType('resource'); const pick = re => all.filter(e => re.test(e.name));
+            const sum = (l, f) => Math.round(l.reduce((t, e) => t + f(e), 0));
+            const sh = l => ({ n: l.length, ttfbMs: sum(l, e => e.responseStart - e.requestStart), transferMs: sum(l, e => e.responseEnd - e.responseStart), queuedMs: sum(l, e => e.requestStart - e.fetchStart), bodyKB: sum(l, e => e.encodedBodySize / 1024), firstStartMs: l.length ? Math.round(Math.min(...l.map(e => e.startTime))) : null, lastEndMs: l.length ? Math.round(Math.max(...l.map(e => e.responseEnd))) : null, maxConcurrent: (() => { let m = 0; for (const e of l) { const c = l.filter(o => o.startTime < e.responseEnd && o.responseEnd > e.startTime).length; if (c > m) m = c; } return m; })() });
+            const lts = window.__lts || [];
+            return { review: sh(pick(/\\/artifacts\\?tag=for%20review/)), saved: sh(pick(/\\/artifacts\\?tag=saved/)), other: sh(all.filter(e => !/\\/artifacts\\?tag=/.test(e.name))), longTasks: { n: lts.length, totalMs: lts.reduce((t, x) => t + x[1], 0), maxMs: Math.max(0, ...lts.map(x => x[1])) } }; })()`);
         // 3. settled: the page has been open 20 s; leave Inbox and open it again
         await new Promise(r => setTimeout(r, Math.max(0, 20000 - (Date.now() - loadFrom)))); // sleep-ok: the budget is for a page that has settled (20 s after its load)
         await ev(`(() => { if (typeof window.switchNavTab === 'function') window.switchNavTab('agents'); return true; })()`);
