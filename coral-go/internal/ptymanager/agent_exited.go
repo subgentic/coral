@@ -51,6 +51,23 @@ func AgentExited(ctx context.Context, term any, name, agentType, sessionID strin
 	return idle, shell
 }
 
+// AgentRunning reports whether the terminal can be read and shows a program running in the agent's pane (not an idle shell): a positive reading only. False for a terminal agent, a
+// terminal that cannot say, and an idle shell (#13431).
+func AgentRunning(ctx context.Context, term any, name, agentType, sessionID string) bool {
+	if agentType == "" {
+		agentType, _ = logparse.ParseSessionName(name)
+	}
+	if agentType == at.Terminal {
+		return false
+	}
+	c, ok := term.(ShellIdleChecker)
+	if !ok {
+		return false
+	}
+	idle, _, ok := c.AgentShellIdle(ctx, name, agentType, sessionID)
+	return ok && !idle
+}
+
 // AgentShellIdle implements ShellIdleChecker for tmux.
 func (t *TmuxSessionTerminal) AgentShellIdle(ctx context.Context, name, agentType, sessionID string) (bool, string, bool) {
 	idle, shell, err := t.client.AgentShellIdle(ctx, name, agentType, sessionID)

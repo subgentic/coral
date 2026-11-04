@@ -262,3 +262,51 @@ func TestReconciler_ReplacedSessionGetsItsOwnLaunchGrace(t *testing.T) {
 	}
 	assert.False(t, isSleeping(t, ss, newID), "inside its own launch grace it is not an exited agent")
 }
+
+// An agent marked Ended whose terminal runs a program again (a person started the CLI by hand in that shell) is awake again on the next pass, with no wake (#13431). Only the reason
+// agent_exited is undone, and only by a reading that shows a program running.
+func TestReconciler_AnEndedAgentWhoseCLIRunsAgainIsAwakeAgain(t *testing.T) {
+	ss, rt, r := newExitedFixture(t)
+	ctx := context.Background()
+	registerAwake(t, ss, "claude", testUUID)
+	rt.listed = []AgentInfo{{AgentType: "claude", SessionID: testUUID}}
+	name := FormatSessionName("claude", testUUID)
+	rt.set(name, "zsh")
+	r.reconcileOnce(ctx)
+	require.True(t, isSleeping(t, ss, testUUID), "ended at its idle shell")
+
+	r.reconcileOnce(ctx)
+	assert.True(t, isSleeping(t, ss, testUUID), "still at the shell: still Ended")
+
+	rt.set(name, "node") // the person started the CLI by hand
+	r.reconcileOnce(ctx)
+	assert.False(t, isSleeping(t, ss, testUUID), "running again: awake without a wake")
+	ls, err := ss.GetLiveSession(ctx, testUUID)
+	require.NoError(t, err)
+	assert.Nil(t, ls.SleepReason)
+}
+
+func TestReconciler_OnlyAnAgentExitedSleepIsUndoneByARunningTerminal(t *testing.T) {
+	ss, rt, r := newExitedFixture(t)
+	ctx := context.Background()
+	registerAwake(t, ss, "claude", testUUID)
+	rt.listed = []AgentInfo{{AgentType: "claude", SessionID: testUUID}}
+	rt.set(FormatSessionName("claude", testUUID), "node")
+	require.NoError(t, ss.SetSessionSleeping(ctx, testUUID, true)) // a person's sleep: no reason
+	r.reconcileOnce(ctx)
+	assert.True(t, isSleeping(t, ss, testUUID), "a person's sleep stays")
+	require.NoError(t, ss.SetSessionSleepingFor(ctx, testUUID, store.SleepReasonTerminalGone))
+	r.reconcileOnce(ctx)
+	assert.True(t, isSleeping(t, ss, testUUID), "another reason stays")
+}
+
+func TestReconciler_AnEndedAgentWhoseTerminalIsGoneIsNotWoken(t *testing.T) {
+	ss, rt, r := newExitedFixture(t)
+	ctx := context.Background()
+	registerAwake(t, ss, "claude", testUUID)
+	require.NoError(t, ss.SetSessionSleepingFor(ctx, testUUID, store.SleepReasonAgentExited))
+	rt.listed = nil // no terminal of its own listed
+	rt.set(FormatSessionName("claude", testUUID), "node")
+	r.reconcileOnce(ctx)
+	assert.True(t, isSleeping(t, ss, testUUID), "no terminal to read: stays Ended")
+}
