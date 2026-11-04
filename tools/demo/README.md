@@ -21,6 +21,7 @@ tools/demo/
     hubclip.mjs         the closing public-page clip (loads and scrolls a page, signed out, types nothing)
     shot.mjs            a headless screenshot of one dashboard page (for looking, not for the film)
     stills.mjs          the two README review stills (a rig with the team, then take.mjs seed, then node stills.mjs <outdir>)
+    seed-usage.py       invented 7-day usage history for the demo Coral's own database (Analytics charts); DEMO_ROOT marker required
     encode.sh           clips to the 16:9 master, the 9:16 phone cut and the GIF
   story.json            the example the film tells: team, agents, goal, tasks, the Inbox documents, the board chatter, the live comment, the code change
   seed/                 the documents and the code change those refer to
