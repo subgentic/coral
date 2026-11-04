@@ -81,8 +81,16 @@ func TestFilesGetIgnoresTheRefreshFlagsAndThePostStillHonoursThem(t *testing.T) 
 	require.EqualValues(t, 1, passes.Load(), "the POST with manual=1 runs a pass, as before")
 	_, paused := gitguard.Get(realRepo)
 	require.False(t, paused, "a fast manual pass turns live updates back on")
+	// live=on resumes by itself, not only because the pass it runs is fast (QA's SHOULD: a mutant that removed gitguard.Resume survived, since any fast pass resumes): with every pass slow, a paused folder stays paused
+	// under manual=1 (a slow pass of a paused folder keeps it paused) and is resumed by live=on (Resume, then one slow pass is one strike, not a pause).
+	oldSlow := gitguard.SlowPass
+	t.Cleanup(func() { gitguard.SlowPass = oldSlow })
+	gitguard.SlowPass = time.Nanosecond
 	gitguard.Pause(realRepo, 7, 3*time.Second)
+	post("?manual=1")
+	_, paused = gitguard.Get(realRepo)
+	require.True(t, paused, "a slow manual pass of a paused folder keeps it paused")
 	post("?live=on")
 	_, paused = gitguard.Get(realRepo)
-	require.False(t, paused, "the POST with live=on resumes, as before")
+	require.False(t, paused, "the POST with live=on resumes the folder itself, even when the pass it runs is slow")
 }
