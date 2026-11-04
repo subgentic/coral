@@ -151,6 +151,7 @@ func TestAllowedIsTheTwoDecisionsAndNothingElse(t *testing.T) {
 	for _, ok := range []struct{ m, p string }{
 		{"POST", "/api/board/team/artifacts/abc/review"},
 		{"POST", "/api/artifacts/abc/comments/c1/send"},
+		{"POST", "/api/sessions/live/claude-abc/send"}, // #13456: the owner's own message to an agent
 	} {
 		if !Allowed(ok.m, ok.p) {
 			t.Errorf("%v not allowed", ok)
@@ -164,7 +165,10 @@ func TestAllowedIsTheTwoDecisionsAndNothingElse(t *testing.T) {
 		{"POST", "/api/board//artifacts/abc/review"},
 		{"POST", "/api/artifacts/abc/comments/c1/resolve"},
 		{"POST", "/api/artifacts/abc/comments/c1/send/x"},
-		{"POST", "/api/sessions/live/x/send"},
+		{"POST", "/api/sessions/live//send"},
+		{"POST", "/api/sessions/live/x/send/more"},
+		{"GET", "/api/sessions/live/x/send"},
+		{"POST", "/api/sessions/live/x/keys"},
 		{"DELETE", "/api/artifacts/abc"},
 		{"POST", ""},
 		{"POST", "/"},
@@ -173,7 +177,7 @@ func TestAllowedIsTheTwoDecisionsAndNothingElse(t *testing.T) {
 			t.Errorf("%v allowed", bad)
 		}
 	}
-	if len(Routes()) != 2 {
+	if len(Routes()) != 3 {
 		t.Errorf("the allowlist has %d routes: a new one needs a reason and a review", len(Routes()))
 	}
 }

@@ -238,3 +238,28 @@ func TestAStampRefusalAsksForTheClocksToBeChecked(t *testing.T) {
 	require.Equal(t, http.StatusForbidden, w.Code)
 	assert.Contains(t, w.Body.String(), "Check that both computers' clocks are right")
 }
+
+// #13456: a message to an agent through a self-hosted Hub reaches the remote with the server's API key. A bare key is automation (a script holding it must not appear as the Operator), but the hub's signed-in owner
+// at Interact is a person: the owner stamp is accepted on the send route too, so the chat shows the message as theirs and the agent gets it as a person's.
+func TestTheSendRouteTakesAnOwnerStampAndABareKeyStaysAutomation(t *testing.T) {
+	rig := newStampRig(t, true)
+	route := "/api/sessions/live/claude-abc/send"
+	body := `{"command":"please send me a short summary of the batch","agent_type":"claude","session_id":"abc"}`
+
+	w := rig.do("POST", route, body, nil)
+	require.Equal(t, 200, w.Code)
+	assert.False(t, rig.seen.human, "a bare API key on the send route is automation, whoever holds the key")
+
+	w = rig.do("POST", route, body, func(r *http.Request) {
+		r.Header.Set(hubowner.Header, stampFor(t, "POST", route, body, time.Now()))
+	})
+	require.Equal(t, 200, w.Code, w.Body.String())
+	assert.True(t, rig.seen.human, "the hub's signed-in owner is a person on the send route")
+	assert.Equal(t, callerHubOwner, rig.seen.kind)
+
+	other := "/api/sessions/live/claude-abc/keys" // a stamp for any other input route is still refused
+	w = rig.do("POST", other, body, func(r *http.Request) {
+		r.Header.Set(hubowner.Header, stampFor(t, "POST", other, body, time.Now()))
+	})
+	assert.Equal(t, 403, w.Code, "only the send route joined the allowlist")
+}

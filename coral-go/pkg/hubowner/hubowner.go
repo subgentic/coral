@@ -50,6 +50,13 @@ const secretBytes = 32
 var routes = []string{
 	"POST /api/board/{project}/artifacts/{id}/review",
 	"POST /api/artifacts/{id}/comments/{cid}/send",
+	"POST /api/sessions/live/{name}/send", // #13456: the owner's own message to an agent through the hub: a person's input on the remote, not automation
+}
+
+// MustBeSigned reports whether a request is one whose words are the person's own and become automation on the remote when no stamp goes with it: the owner's message to an agent (#13456). The hub refuses such a
+// request that is too big to stamp (MaxBody) with a clear answer instead of sending it unstamped, so a long message never silently loses its author. path is the decoded path without its query.
+func MustBeSigned(method, path string) bool {
+	return Allowed(method, path) && strings.HasPrefix(strings.Trim(path, "/"), "api/sessions/live/")
 }
 
 // Routes lists the allowlist, for census tests on both sides.
