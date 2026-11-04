@@ -10,7 +10,7 @@ FADE=0.5
 # speed-ups per beat (the slow waits are compressed; the review page says so); 1.0 = real time
 sp() { case $1 in c1) echo 1.3;; c2|c3|c6) echo 1.2;; c4|c5|c8) echo 1.4;; c9) echo 1.3;; c7) echo 1.6;; *) echo 1.0;; esac; }   # (macOS bash has no associative arrays)
 LAST=hub; [ "$ENDING" = card ] && LAST=endcard
-BEATS=(c1 c2 c3 c4 c5 c6 c7 c8 c9 c10 $LAST)
+BEATS=(c1 c2 c3 c4 c5 c6 c7 c9 c10 $LAST)   # (c8, the docked diff, is out: the diff is shown once, by Expand all in c3)
 dur() { "$FF" -hide_banner -i "$(g $1)" 2>&1 | python3 -I -c "import re,sys;m=re.search(r'Duration: (\d+):(\d+):([\d.]+)',sys.stdin.read());print(int(m[1])*3600+int(m[2])*60+float(m[3]))"; }
 ARGS=(); FC=""; DURS=(); i=0
 for n in "${BEATS[@]}"; do

@@ -138,7 +138,9 @@ const B = {
     const t = await beat(browser, "c3")
     await t.go("/agents/" + sid(diffAgent)); await t.cap("Every agent keeps its own conversation.")
     await sleep(4500)
-    await t.click(t.page.locator("button[aria-label='Files']")); await t.cap("And the files it changed."); await sleep(3500)
+    await t.click(t.page.locator("button[aria-label='Files']")); await t.cap("And the files it changed."); await sleep(2200)
+    await t.click(t.page.locator("text=Expand all >> visible=true").first()); await t.cap("Expand all to read every change as a diff."); await sleep(3000)
+    await t.page.mouse.move(1350, 500, { steps: 15 }); await t.page.mouse.wheel(0, 300); await sleep(3000)
     await t.click(t.page.locator("button[aria-label^='Tasks']")); await t.cap("And where its tasks stand."); await sleep(3500)
     return t.finish()
   },

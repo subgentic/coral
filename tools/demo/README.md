@@ -83,14 +83,14 @@ While a beat is recorded, `lib.mjs` scans the page twice a second (visible text,
 
 ## Film v4 (`take4.mjs`, `encode4.sh`)
 
-The v4 film (the New agent wizard and models, terminal to chat, filled chats, a goal with detail and a picture, a goal walkthrough with a comment, the Inbox, a document review with an instant new version, the expanded diff, Analytics) is recorded by `take4.mjs` and encoded by `encode4.sh`; the phone beat is gone. Run from `tools/demo/scripts` with `DEMO_ROOT` and `PLAYWRIGHT_BROWSERS_PATH` set:
+The v4 film (the New agent wizard and models, terminal to chat, filled chats, a goal with detail and a picture, a goal walkthrough with a comment, the Inbox, a document review with an instant new version, the diff by Expand all, Analytics) is recorded by `take4.mjs` and encoded by `encode4.sh`; the phone beat is gone. Run from `tools/demo/scripts` with `DEMO_ROOT` and `PLAYWRIGHT_BROWSERS_PATH` set:
 
 ```bash
 NOLAUNCH=1 ./rig-up.sh                 # a fresh demo Coral (also passes MOCK_AGENT_REPLIES and MOCK_AGENT_MODELS to the mock agents)
 node take4.mjs c1                      # the wizard, on the empty dashboard
 node take4.mjs launch world chats      # the team, the history, the Inbox documents, the scripted chats
 python3 -I seed-usage.py               # a week of invented usage for Analytics
-node take4.mjs c2 c3 c4 c5 prompts c6 c7 c8 c9 c10
+node take4.mjs c2 c3 c4 c5 prompts c6 c7 c9 c10
 node endcard.mjs; node hubclip.mjs     # the endings
 ENDING=card ./encode4.sh; ./encode4.sh # the masters (cross-fades), the GIF and the poster
 ./rig-up.sh stop
