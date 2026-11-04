@@ -329,6 +329,7 @@ var routeTable = cat(
 	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/saved")),
 	owner(OwnerRefuse, rules(http.MethodGet, TierView, "/api/board/{project}/proposals", "/api/proposals")),                                               // what agents asked to add: the Operator's (#11389)
 	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/board/{project}/proposals/{id}/approve", "/api/board/{project}/proposals/{id}/reject")), // and the Operator's decision
+	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/board/{project}/goals/{id}/driver", "/api/board/{project}/goals/{id}/move")),            // the Operator's own two changes to a goal, who drives it and which team it is on (#12693, #13517): a person's, as the question buttons are
 	owner(OwnerRefuse, rules(http.MethodPatch, TierInteract, "/api/saved/{id}")),
 	owner(OwnerRefuse, rules(http.MethodDelete, TierInteract, "/api/saved/{id}")),
 	// What a viewer sees of a board's settings is the machine's to decide (the health setup is the owner's, #5307): the marker is stamped, the handler gives a non-owner less.

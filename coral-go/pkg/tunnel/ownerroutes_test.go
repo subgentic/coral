@@ -161,6 +161,10 @@ func TestTheOwnerTableAgreesWithTheHandWrittenListItReplaced(t *testing.T) {
 			if m == http.MethodPost && strings.HasPrefix(p, "/api/board/") && (strings.HasSuffix(p, "/goal-images") || strings.HasSuffix(p, "/goals")) { // and the goal create, which names them
 				continue
 			}
+			// The Operator's change of a goal's driver and its move to another team (#13517) are the owner's alone through the hub: the old list never had them.
+			if m == http.MethodPost && regexp.MustCompile(`^/api/board/[^/]+/goals/[^/]+/(driver|move)$`).MatchString(p) {
+				continue
+			}
 			// Chief's state (#11470) is the owner's alone through the hub: the old list never had it.
 			if m == http.MethodGet && p == "/api/chief" {
 				continue

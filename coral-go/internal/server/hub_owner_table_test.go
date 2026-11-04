@@ -100,9 +100,9 @@ func TestTheOwnerRoutesOfTheTableAreTheReviewedSet(t *testing.T) {
 		"DELETE /api/artifacts/{hex64}": "owner-only", "PUT /api/artifacts/{hex64}/star": "owner-only", "DELETE /api/artifacts/{hex64}/star": "owner-only", // the star (#9819)
 		"GET /api/board/{project}/proposals":               "owner-only",
 		"GET /api/proposals":                               "owner-only",
-		"POST /api/board/{project}/proposals/{id}/approve": "owner-only",
-		"POST /api/board/{project}/proposals/{id}/reject":  "owner-only",
-		"GET /api/board/{project}/artifacts":               "owner-only", "GET /api/board/{project}/tasks/{id}/artifact-content": "owner-only",
+		"POST /api/board/{project}/proposals/{id}/approve": "owner-only", "POST /api/board/{project}/goals/{id}/driver": "owner-only", "POST /api/board/{project}/goals/{id}/move": "owner-only", // #13517
+		"POST /api/board/{project}/proposals/{id}/reject": "owner-only",
+		"GET /api/board/{project}/artifacts":              "owner-only", "GET /api/board/{project}/tasks/{id}/artifact-content": "owner-only",
 		"GET /api/session-artifacts": "owner-only", "GET /api/team-artifacts": "owner-only", "GET /api/settings/prompt-inspection": "owner-only", "PUT /api/board/{project}/settings": "owner-only",
 		"POST /api/board/{project}/cross-team/enable": "owner-only-hub", "POST /api/board/{project}/cross-team/disable": "owner-only-hub",
 		"POST /api/board/{project}/cross-team/files/enable": "owner-only-hub", "POST /api/board/{project}/cross-team/files/disable": "owner-only-hub",

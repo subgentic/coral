@@ -151,6 +151,8 @@ func TestAllowedIsTheTwoDecisionsAndNothingElse(t *testing.T) {
 	for _, ok := range []struct{ m, p string }{
 		{"POST", "/api/board/team/artifacts/abc/review"},
 		{"POST", "/api/artifacts/abc/comments/c1/send"},
+		{"POST", "/api/board/team/goals/7/driver"}, // #13517: the owner's change of a goal's driver and its move to another team
+		{"POST", "/api/board/team/goals/7/move"},
 	} {
 		if !Allowed(ok.m, ok.p) {
 			t.Errorf("%v not allowed", ok)
@@ -165,6 +167,14 @@ func TestAllowedIsTheTwoDecisionsAndNothingElse(t *testing.T) {
 		{"POST", "/api/artifacts/abc/comments/c1/resolve"},
 		{"POST", "/api/artifacts/abc/comments/c1/send/x"},
 		{"POST", "/api/sessions/live/x/send"},
+		{"GET", "/api/board/team/goals/7/driver"}, // #13517: only the two writes, on one goal of one board
+		{"PUT", "/api/board/team/goals/7/move"},
+		{"POST", "/api/board/team/goals/7/driver/extra"},
+		{"POST", "/api/board/team/goals//driver"},
+		{"POST", "/api/board//goals/7/move"},
+		{"POST", "/api/board/team/goals/7/drive"},
+		{"POST", "/api/board/team/goals/7/close"},
+		{"PATCH", "/api/board/team/goals/7"},
 		{"DELETE", "/api/artifacts/abc"},
 		{"POST", ""},
 		{"POST", "/"},
@@ -173,7 +183,7 @@ func TestAllowedIsTheTwoDecisionsAndNothingElse(t *testing.T) {
 			t.Errorf("%v allowed", bad)
 		}
 	}
-	if len(Routes()) != 2 {
+	if len(Routes()) != 4 {
 		t.Errorf("the allowlist has %d routes: a new one needs a reason and a review", len(Routes()))
 	}
 }

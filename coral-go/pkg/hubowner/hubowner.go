@@ -50,6 +50,8 @@ const secretBytes = 32
 var routes = []string{
 	"POST /api/board/{project}/artifacts/{id}/review",
 	"POST /api/artifacts/{id}/comments/{cid}/send",
+	"POST /api/board/{project}/goals/{id}/driver", // #13517: the owner's change of who drives a goal, made at the hub: a person's act on the remote
+	"POST /api/board/{project}/goals/{id}/move",   // #13517: and the move of a goal to another team
 }
 
 // Routes lists the allowlist, for census tests on both sides.
