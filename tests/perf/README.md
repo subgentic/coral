@@ -82,3 +82,25 @@ what was allocated during the CPU profile (`allocs-start.pprof` and `allocs-end.
 start, so the steady state is not hidden under the first scan. `load.json` has `slow`: every request of 0.5 s or more with its
 start in seconds from the load's start, to line a stall up with `server.log`. A stall on a loaded epoch is the machine's:
 `machine.txt` has its load average, and a stall seen once at a load of 12 did not come back at a load of 1.
+
+## The big-board fixture and baseline (#13154, goal #215): runs on a Mac
+
+`bigboard_seed.sh` makes the fixture the performance sprint measures against: 30 mock agents in one team, 2,000 tasks, 50,000 board
+messages, 20,000 artifact uploads (200 files x 100 versions, all tagged for review, through the agents' own session tokens) and a 35,000-change
+git repo (`PERF_RUN=1 FIXTURE=<empty folder> bash tests/perf/bigboard_seed.sh`; `SMALL=1` is a one-minute smoke). A real server refuses
+more than 100 uploads per agent per hour, so only the seed server is built with that window raised, by `go build -overlay` (a patched copy in a
+temp folder; nothing in the repo changes). `bigboard_run.sh` copies the fixture's data, starts the plain build on the copy and measures it
+(`PERF_RUN=1 FIXTURE=... OUT=... [HUB=1] [IDLE_S=60] bash tests/perf/bigboard_run.sh`): `bigboard_measure.mjs` loads the dashboard in a
+headless Chrome and records every request (path with ids folded, p50/p95/max ms, bytes, status) at load and while idle, then times an agent
+switch, 83 keystrokes in the composer (with the page's long tasks), the Files panel and opening a file from Needs you. With `HUB=1` the same
+page is measured through a second `coral --hub` that has the first added as a remote server over loopback. `bigboard_table.py` writes
+`ranked.md`, worst first. Both are heavy runs: one at a time, announced (HEAVY RUN START/END). They use their own data folders and ports
+(8741 to 8743), `--cloud-url off`, `--no-browser`, the mock-agent sandbox and never `~/.coral` or `:8420`.
+
+Known limits: about 2% of the seeded messages are refused (an @mention of a name that is not on the board); the seeded agents are asleep or
+gone when the fixture is measured (the server is stopped after the seed), so the agent rows are real but nothing is typing into them.
+
+Safety notes (Security's read of the rig, #13154): the scripts stop a tmux server only through `stop_private_tmux` in `bigboard_lib.sh`, which refuses any socket under a real Coral
+folder (`~/.coral`, `$CORAL_DIR`, any `.coral/`) or at a path that is not `<run folder>/data/tmux.sock`; a private socket made by the run's own server is exempt from the "no tmux
+kill-server" rule (#12836) because nothing else can be attached to it. `bigboard_serve.sh stop` stops a PID from `RUN_DIR/pid` only if its command line is a coral with that run's `--home`.
+The API keys go to curl through mode-600 header files, not the command line. The pprof listeners (`127.0.0.1:8744` and `:8747`) serve heap data to any local user while the run lasts.
