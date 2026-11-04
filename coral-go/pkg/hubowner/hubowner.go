@@ -1,5 +1,5 @@
 // Package hubowner is the signed owner stamp of the self-hosted hub (#11378, gap A): how a Coral that a hub reaches with its API key can tell that a request is from a PERSON signed in at the hub, so
-// Approve, Request changes and the change-request send (which refuse a bare API key, because a script holds that) work through coral --hub.
+// Approve, Request changes, the change-request send and Ignore (and Undo) of a question (which refuse a bare API key, or do not count it as the person's, because a script holds that) work through coral --hub.
 //
 // The hub signs a request it forwards when the person behind it is signed in at the hub (the hub's own identity layer decided that: a dashboard session, never an API key or an agent token). The remote
 // verifies the stamp with a secret that only a human act put on it: the hub's own SSH session or the remote's own command line wrote a 0600 file, never an HTTP route an API key can call. The stamp binds
@@ -12,7 +12,7 @@
 //     the hub is what makes "the person signed in" mean one person.
 //   - Replacing the secret is a person's act at the remote (coral hub-owner-secret, which refuses inside an agent's session). Every time the file is written or replaced the remote logs one warning and its
 //     health answer carries the file's time, so a silent rotation shows.
-//   - A stamp covers one request for one of two routes, for 30 seconds, once: a captured stamp is dead after that, after a restart of the remote, and for any other body, route, query or computer.
+//   - A stamp covers one request for one of the routes below, for 30 seconds, once: a captured stamp is dead after that, after a restart of the remote, and for any other body, route, query or computer.
 
 package hubowner
 
@@ -50,6 +50,7 @@ const secretBytes = 32
 var routes = []string{
 	"POST /api/board/{project}/artifacts/{id}/review",
 	"POST /api/artifacts/{id}/comments/{cid}/send",
+	"POST /api/board/{project}/asks/{messageID}/close", // Ignore, and Undo of an Ignore, of a question in Needs you (#13462): the Operator's own action, recorded and counted as theirs only when a person made it
 }
 
 // Routes lists the allowlist, for census tests on both sides.

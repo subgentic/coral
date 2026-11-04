@@ -173,3 +173,25 @@ func TestTheSecretIsNeverSentToTheRemoteOrBack(t *testing.T) {
 	}
 	assert.NotContains(t, s.body, ownerTestSecret)
 }
+
+// Ignore and Undo of a question through our own hub (#13462): the signed-in person's close is signed for the remote to verify; the same request from an API key or an agent (no person) goes out unsigned, and a
+// stamp is bound to that one question's close (the target), so it cannot be used on another question.
+func TestTheSignedInPersonsIgnoreOfAQuestionIsSignedAndAnythingElseIsNot(t *testing.T) {
+	const closePath = "/api/board/team/asks/42/close"
+	hub, s := hubFor(t, ownerTestSecret)
+	body := `{"note":"Dismissed by the operator"}`
+	post(t, hub, closePath, body, true, nil)
+	s.mu.Lock()
+	stamp := s.header.Get(hubowner.Header)
+	require.NotEmpty(t, stamp, "the person's Ignore was not signed")
+	require.NoError(t, verifier().Verify(stamp, s.method, closePath, s.target, []byte(s.body)))
+	assert.Error(t, verifier().Verify(stamp, s.method, "/api/board/team/asks/43/close", "/api/board/team/asks/43/close", []byte(s.body)), "one question's stamp is not another's")
+	s.mu.Unlock()
+
+	hub2, s2 := hubFor(t, ownerTestSecret)
+	post(t, hub2, closePath, `{"undo":true}`, false, nil) // an API key or an agent at the hub, not the person
+	s2.mu.Lock()
+	assert.Empty(t, s2.header.Get(hubowner.Header), "a request that is not the signed-in person's is not signed")
+	assert.Equal(t, `{"undo":true}`, s2.body)
+	s2.mu.Unlock()
+}
