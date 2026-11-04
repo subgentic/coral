@@ -47,6 +47,7 @@ func (s *Server) configureBoardHandlers(h *routeHandlers) (*routes.BoardHandler,
 	boardHandler.SetArchivedSessionLookup(routes.ArchivedSessionLookup(store.NewSessionStore(s.db)))
 	boardHandler.SetLiveSessionLookup(routes.LiveSessionLookup(store.NewSessionStore(s.db)))
 	boardHandler.SetSessionAsleepLookup(routes.SessionAsleepLookup(store.NewSessionStore(s.db)))
+	boardHandler.SetMemberRestLookup(routes.MemberRestLookup(s.boardStore, store.NewSessionStore(s.db))) // a post to an agent that will not read it now says so (#13189)
 	boardHandler.SetNeedsYouAgents(sessHandler.NeedsYouAgents)
 	boardHandler.SetIdleWaker(sessHandler.WakeIdleForDelivery)                         // any typed delivery to an auto-asleep agent wakes it first (#12111)
 	boardHandler.SetNeedsYouSkills(routes.NewSkillsHandler(s.db, s.cfg).NeedsYouItems) // the skills that wait for the Operator are items of Needs you (#12139)

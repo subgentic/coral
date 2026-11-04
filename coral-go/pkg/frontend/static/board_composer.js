@@ -49,6 +49,10 @@ export async function postBoardMessage() {
         }
         input.value = '';
         bs._replyTo = null; setReplyStrip(input, null);
+        // A recipient that will not read it now (asleep, terminal gone, ended, archived) is said at once, in the server's words (#13189)
+        const sent = await resp.json().catch(() => null);
+        const resting = sent && Array.isArray(sent.asleep) ? sent.asleep.map(a => (a && typeof a.note === 'string' ? a.note : '')).filter(Boolean) : [];
+        if (resting.length) showToast(resting.slice(0, 3).join(' ') + (resting.length > 3 ? ` (and ${resting.length - 3} more)` : ''));
         // Fetch new messages since our last known total
         await _pollNewMessages();
         const list = document.getElementById('mb-messages'); if (list) list.scrollTop = list.scrollHeight; // the person's own message is the newest, and in view (#10088)
