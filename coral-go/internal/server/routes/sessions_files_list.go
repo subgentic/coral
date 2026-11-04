@@ -252,8 +252,7 @@ func (h *SessionsHandler) computeRefreshedFiles(ctx0 context.Context, name, sess
 
 	diffMode := h.getDiffMode(ctx0)
 	withTree := gitutil.IncludesWorkingTree(diffMode)
-	diffArgs := append(append([]string{"diff"}, gitutil.DiffRefs(ctx, workdir, diffMode)...), "--numstat")
-	out, err := gitCmd(ctx, workdir, diffArgs...).Output()
+	out, moreChanged, err := gitutil.CappedNumstat(ctx, workdir, gitutil.DiffRefs(ctx, workdir, diffMode), refreshFilesCap, false) // a big tree is numbered for the rows kept only (#13155)
 	fileMap := make(map[string]store.ChangedFile)
 	if err != nil {
 		warnGit("git diff --numstat failed", err, "agent_name", name, "workdir", logsafe.Dir(workdir))
@@ -387,7 +386,7 @@ func (h *SessionsHandler) computeRefreshedFiles(ctx0 context.Context, name, sess
 		files = append(files, f)
 	}
 	sort.Slice(files, func(i, j int) bool { return files[i].Filepath < files[j].Filepath })
-	total := len(files)
+	total := len(files) + moreChanged
 	if total > refreshFilesCap {
 		files = files[:refreshFilesCap]
 	}
