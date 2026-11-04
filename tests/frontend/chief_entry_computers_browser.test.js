@@ -28,6 +28,7 @@ const STUB = `(() => { window.__chiefAfterMs = 0; window.__chief = { a: { status
         let g = await side(); check('A: Atlas links /chief/machine-a', /Atlas/.test(g.text) && g.href === '/chief/machine-a', JSON.stringify(g));
         await at('b'); await waitFor(`(() => { const s = document.getElementById('sidebar-chief-slot'); return !!s && !!s.querySelector('button'); })()`, 'B: Set up Chief in the sidebar', 8000);
         g = await side(); check('B: Set up Chief (not A\'s entry)', g.shown && g.text === 'Set up Chief', JSON.stringify(g));
+        await at('b'); g = await side(); check('B loading (slow): A\'s entry is not shown meanwhile', !g.shown || g.text === 'Set up Chief', JSON.stringify(g));
         await at('c'); await waitFor(`document.getElementById('sidebar-chief-slot').hidden === true`, 'C: nothing in the sidebar', 8000);
         await at('a'); await waitFor(`(() => { const s = document.getElementById('sidebar-chief-slot'); return !!s && !s.hidden && !!s.querySelector('a'); })()`, 'A again: Chief in the sidebar', 8000);
         // a late answer for the computer left is dropped: ask B (700 ms), switch to A at once
@@ -39,6 +40,11 @@ const STUB = `(() => { window.__chiefAfterMs = 0; window.__chief = { a: { status
         check('B (slow): the menu is drawn at once, with Settings, before Chief answers', e.settings && e.chief === null, JSON.stringify(e));
         await waitFor(`!!document.querySelector('#nav-more-menu [data-chief-entry]')`, 'B: Chief joins the open menu', 6000);
         e = await entry(); check('B: the menu says Set up Chief', e.chief === 'Set up Chief', JSON.stringify(e));
+        const role = await ev(`(() => { const m = document.getElementById('nav-more-menu'), n = m.querySelector('[data-chief-entry]'); const items = [...m.querySelectorAll('[role=menuitem]')]; return { role: n.getAttribute('role'), index: items.indexOf(n), settings: items.indexOf(m.querySelector('[data-account-start]')) }; })()`);
+        check('B: the late-added Chief entry is a menuitem, in the keyboard order just before Settings', role.role === 'menuitem' && role.index >= 0 && role.index === role.settings - 1, JSON.stringify(role));
+        await ev(`document.querySelector('#nav-more-menu [data-chief-entry]').focus(); true`);
+        await ev(`document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true })); true`);
+        check('B: ArrowDown from the late Chief entry moves to Settings', await ev(`document.activeElement.hasAttribute('data-account-start')`), await ev(`document.activeElement.textContent.trim()`));
         await close(); await at('a'); await menu(); await waitFor(`!!document.querySelector('#nav-more-menu [data-chief-entry]')`, 'A: the menu has Chief', 6000);
         e = await entry(); check('A: the menu says Atlas, not B\'s Set up Chief', e.chief === 'Atlas' || /Atlas/.test(e.chief || ''), JSON.stringify(e));
         await close(); await at('c'); await menu(); await new Promise(r => setTimeout(r, 400)); // sleep-ok: nothing to wait for when the answer is a refusal; the entry must stay absent
