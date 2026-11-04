@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"github.com/stretchr/testify/require"
 	"github.com/subgentic/coral/internal/store"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -85,4 +88,17 @@ func TestVideoCommentDeliveryIncludesTimeAndReplyThread(t *testing.T) {
 	require.Contains(t, msgs[0].Content, "Video time: 01:05–01:10")
 	require.Contains(t, msgs[0].Content, fmt.Sprintf("%s %d", cmtDoc, int64(out["id"].(float64))))
 	require.Contains(t, msgs[0].Content, "untrusted")
+}
+
+func TestVideoCommentArtifactRejectsNonDigestBeforeReadingMetadata(t *testing.T) {
+	rig := newCmtRig(t)
+	for _, id := range []string{"../" + strings.Repeat("a", 61), strings.Repeat("A", 64), strings.Repeat("g", 64)} {
+		// Each path exists and describes a video. Validation must refuse it before
+		// classification; a length-only guard would read the ../ sidecar outside artifacts.
+		sidecar := filepath.Join(rig.h.artifactDir(), id+".json")
+		require.NoError(t, os.WriteFile(sidecar, []byte(`{"name":"demo.mp4","media_type":"video/mp4"}`), 0600))
+		require.False(t, rig.h.videoCommentArtifact(id), id)
+	}
+	rig.artifact(cmtPic, "demo.mp4", "video/mp4")
+	require.True(t, rig.h.videoCommentArtifact(cmtPic))
 }
