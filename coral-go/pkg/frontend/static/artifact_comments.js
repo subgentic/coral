@@ -171,7 +171,14 @@ export function attachComments(dialog, body, host, opts = {}) {
         const setup = !d.locked && askSetup();
         if (setup) { // Send to agent is not offered: say why, and where it is set up (#13230)
             const n = el('p', 'ac-note ac-ask-setup', setup.ssh ? 'Send to agent is not set up for this computer: this hub has no Approve secret for it. Open the computer, then choose Set up approvals.' : 'Send to agent is not set up for this computer: this hub has no Approve secret for it. Open the computer, then choose Approve through this hub.');
-            const go = btn('ac-act ac-ask-setup-open', 'Open the computer'); go.addEventListener('click', async () => { const { openServersTab } = await importOnce('./servers_tab.js'); openServersTab(setup.id); });
+            const go = btn('ac-act ac-ask-setup-open', 'Open the computer'); go.addEventListener('click', async () => { // the viewer this panel is in closes first, or Computers opens behind it (#13251, UI Reviewer); a phone's viewer has its own history entry, whose Back lands after the click, so Computers opens once it has
+                const viewer = document.querySelector('#artifact-viewer:not([hidden])');
+                const settled = viewer && isPhoneLayout() ? new Promise(res => { window.addEventListener('popstate', () => res(), { once: true }); setTimeout(res, 600); }) : Promise.resolve();
+                viewer?.querySelector('.artifact-viewer-close')?.click();
+                for (const d of document.querySelectorAll('dialog[open]')) { try { d.close(); } catch { /* already closing */ } }
+                await settled;
+                const { openServersTab } = await importOnce('./servers_tab.js'); openServersTab(setup.id);
+            });
             panel.append(n, go);
         }
         if (d.canLock) {
