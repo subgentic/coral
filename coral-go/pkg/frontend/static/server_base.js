@@ -127,6 +127,8 @@ export function sessionServer(session) {
 /** Stable string key for (server, name). Local keys are the bare name, so keys
  *  persisted before the hub existed keep working. Remote keys can never equal a
  *  local name because server ids are slugs and contain no "/" or "@". */
+/** The team key of a board named on a computer, for a caller that has the computer and the board's own name (a key that already names its computer, '@m1/team', is kept). */
+export const boardTeamKey = (server, board) => (String(board).startsWith('@') ? String(board) : identityKey(server, board));
 export function identityKey(server, name) {
     const s = normServer(server);
     return s === LOCAL_SERVER ? String(name ?? '') : `@${s}/${name ?? ''}`;
