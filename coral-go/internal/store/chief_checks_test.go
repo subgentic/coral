@@ -130,3 +130,41 @@ func TestChiefCheckResumeResetsFailureWindowAndExposesPause(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, job.ResumedAt)
 }
+
+func TestChiefScheduleRefusesUnsupportedTimesAndIntervals(t *testing.T) {
+	base := ChiefCheck{Name: "Mail", Instruction: "Check mail", TargetBoard: "chief", TargetSession: "session", NotifyMode: "only_if_found", ScheduleKind: "interval", EveryMinutes: 15, Timezone: "UTC"}
+	for _, minutes := range []int{0, 1, 7, 45, 90} {
+		c := base
+		c.EveryMinutes = minutes
+		_, err := ChiefCron(c)
+		require.Error(t, err)
+	}
+	for _, zone := range []string{"", "Local", "not/a/timezone"} {
+		c := base
+		c.Timezone = zone
+		_, err := ChiefCron(c)
+		require.Error(t, err)
+	}
+	for _, at := range []string{"", "9:00", "24:00", "12:60", "12:00:00"} {
+		c := base
+		c.ScheduleKind = "daily"
+		c.At = at
+		_, err := ChiefCron(c)
+		require.Error(t, err)
+	}
+	c := base
+	c.ScheduleKind = "weekdays"
+	c.At = "09:30"
+	c.Timezone = "America/Los_Angeles"
+	cron, err := ChiefCron(c)
+	require.NoError(t, err)
+	require.Equal(t, "30 9 * * 1-5", cron)
+	c = base
+	c.EveryMinutes = 60
+	cron, err = ChiefCron(c)
+	require.NoError(t, err)
+	require.Equal(t, "0 * * * *", cron)
+	c.NotifyMode = "invented"
+	_, err = ChiefCron(c)
+	require.Error(t, err)
+}
