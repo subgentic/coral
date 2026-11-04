@@ -91,9 +91,7 @@ func TestReconciler_ExitedAgentIsMarkedSleeping(t *testing.T) {
 	rt.set(FormatSessionName("claude", testUUID), "zsh")
 
 	r.reconcileOnce(ctx)
-	assert.False(t, isSleeping(t, ss, testUUID), "one pass is not enough")
-	r.reconcileOnce(ctx)
-	assert.True(t, isSleeping(t, ss, testUUID), "marked sleeping after reconcileMissThreshold passes")
+	assert.True(t, isSleeping(t, ss, testUUID), "a terminal back at its idle shell is Ended on the first pass, not the second (#13418)")
 	assert.Empty(t, rt.killed, "the shell is left as it is (Wake resumes in it)")
 	ls, err := ss.GetLiveSession(ctx, testUUID)
 	require.NoError(t, err)
@@ -120,12 +118,13 @@ func TestReconciler_ShellBlipDoesNotMark(t *testing.T) {
 	rt.listed = []AgentInfo{{AgentType: "claude", SessionID: testUUID}}
 	name := FormatSessionName("claude", testUUID)
 	rt.set(name, "zsh")
+	rt.set(name, "node") // the CLI runs: nothing to mark however many passes
 	r.reconcileOnce(ctx)
-	rt.set(name, "node") // the CLI is back (e.g. the user resumed it by hand)
 	r.reconcileOnce(ctx)
+	assert.False(t, isSleeping(t, ss, testUUID))
 	rt.set(name, "zsh")
 	r.reconcileOnce(ctx)
-	assert.False(t, isSleeping(t, ss, testUUID), "the count resets when the CLI is seen again")
+	assert.True(t, isSleeping(t, ss, testUUID), "gone again: marked at that pass")
 }
 
 func TestReconciler_ExitedWithinLaunchGraceIsNotMarked(t *testing.T) {
