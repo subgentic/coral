@@ -271,6 +271,16 @@ func (h *SessionsHandler) startWake(ctx context.Context, ls *store.LiveSession, 
 	if alreadyRunning {
 		log.Printf("[wake] session=%s is still running — skipping relaunch, clearing sleeping flag only", sessionName)
 	}
+	if alreadyRunning && backend != "pty" && h.terminal != nil {
+		// A restart/wake can retain the pane after its pipe worker has gone.
+		// StartLogging is idempotent for a healthy pipe; preserve its history.
+		if err := ptymanager.EnsureAgentLog(logFile); err != nil {
+			return fmt.Errorf("prepare wake log: %w", err)
+		}
+		if err := h.terminal.StartLogging(ctx, sessionName, logFile); err != nil {
+			return fmt.Errorf("restore wake logging: %w", err)
+		}
+	}
 	// The terminal is there but the agent CLI exited from it, leaving a plain shell (#3219):
 	// resume the agent in that shell, as launch does, instead of only clearing the flag.
 	if alreadyRunning && ls.AgentType != at.Terminal && h.terminal != nil {
