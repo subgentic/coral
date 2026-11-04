@@ -193,6 +193,15 @@ export function mountSshSetup(host, { mode = 'setup', server = null, action = nu
         if (kind() === UPGRADE && downgrade()) body.allow_downgrade = !!st.allowDowngrade;
         const r = await api('POST', `/api/servers/provision/${encodeURIComponent(st.plan.plan)}/run`, body);
         if (st.dead) return;
+        if (!r.ok && r.status === 400 && /not the ones this computer has now/.test(sayError(r, ''))) { // the keys changed since they were shown (#13088): show the ones it has now, unticked, so the person confirms THOSE
+            const fresh = await api('GET', `/api/servers/provision/${encodeURIComponent(st.plan.plan)}`);
+            if (st.dead) return;
+            st.error = sayError(r, '');
+            st.busy = false;
+            st.keysOk = false;
+            if (fresh.ok && fresh.data && (fresh.data.host_keys || []).length) st.plan = fresh.data;
+            return draw();
+        }
         if (!apply(r, 'Could not start.')) return draw();
         st.step = 'running';
         draw();
