@@ -21,10 +21,13 @@ export function cssRules(src) {
 }
 
 /** The rules of a stylesheet that style a table part (a rule of the component's own dt-* class is reported apart; a rule whose selector matches one of `exempt` is counted in `exempted`, not in `n`). */
-export function cssCount(src, exempt = []) {
+export function cssCount(src, exempt = [], ownExempt = []) {
     let n = 0, exempted = 0; const own = [];
     for (const sel of cssRules(src)) {
-        if (DT_CLASS.test(sel)) own.push(sel.slice(0, 80));
+        if (DT_CLASS.test(sel)) { // the component's own class outside data_table.css: refused, unless this exact selector is listed with its reason (EXEMPT_OWN: no pattern, no wildcard)
+            const hit = ownExempt.find(e => e.sel === sel.trim());
+            if (hit) { hit.used = (hit.used || 0) + 1; exempted++; } else own.push(sel.slice(0, 80));
+        }
         else if (CSS_SELECTOR.test(sel)) { if (exempt.some(re => re.test(sel))) exempted++; else n++; }
     }
     return { n, own, exempted };
@@ -41,3 +44,12 @@ export const EXEMPT = {
 };
 // rules in a stylesheet that has real tables too, exempt by selector with a reason (none now: the session tooltip is a .facts list, facts.js)
 export const EXEMPT_SELECTORS = [];
+// rules of the component's own dt-* classes that sit outside data_table.css, each EXACT selector with its reason (#13144): the census fails when an entry stops matching (data_table_census.test.mjs). To go back to data_table.css when the start CSS has room.
+const WHY_NEEDS_ROWS = 'Inbox-only rules of the Needs you table; the start CSS is 13 bytes under its cap, so they load with the Inbox in needs_phone.css';
+export const EXEMPT_OWN = [
+    '.inbox-needs-results .dt-row:has(.inbox-review-item > .inbox-review-from) > [data-key=waiting]',
+    '.dt-folded .inbox-review-item:has(> .inbox-kind-icon) > .inbox-review-name',
+    '.dt-person:has(> .inbox-kind-icon)',
+    '.dt-person > .material-icons.inbox-kind-icon',
+    '.dt-mail-title > .material-icons.inbox-kind-icon',
+].map(sel => ({ sel, why: WHY_NEEDS_ROWS }));
