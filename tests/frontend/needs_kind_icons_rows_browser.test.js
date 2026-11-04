@@ -44,6 +44,10 @@ const { removeBoards } = require('./helpers/board_cleanup');
         // a phone (#13144, the Orchestrator's 12:07): the words of a row never lie over one another, in both themes. Every element that carries its own text is a box; no two boxes of one row intersect.
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
         await ev(`document.documentElement.style.fontSize = '100%'; true`);
+        // the same rows are as tall at 390 with the icon as without it: a review row's file name stays on its first line (#13144, UI Reviewer)
+        await ev(framesJs(6));
+        const tall = await ev(`(() => [...document.querySelectorAll('${T} tbody tr')].map(tr => { const i = tr.querySelector('.inbox-kind-icon'); if (!i) return null; const h = () => Math.round(tr.getBoundingClientRect().height * 100) / 100, w = h(); i.style.display = 'none'; const wo = h(); i.style.display = ''; return { text: tr.textContent.replace(/\\s+/g, ' ').slice(0, 30), withIcon: w, without: wo }; }).filter(Boolean))()`);
+        for (const r of tall) check(Math.abs(r.withIcon - r.without) < 0.5, `390 px: a row keeps its height with the icon (${r.withIcon} with, ${r.without} without): ${r.text}`);
         const { themeJs } = require('./helpers/theme');
         for (const theme of ['dark', 'light']) {
             await ev(`${themeJs(theme)}; true`); await ev(framesJs(8));

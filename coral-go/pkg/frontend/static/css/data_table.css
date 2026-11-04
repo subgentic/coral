@@ -529,6 +529,7 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 .inbox-review-earlier::before { content: "\00b7  "; }
 .inbox-needs-results .dt-row.dt-read .inbox-review-from { font-weight: var(--fw-regular); }
 /* The phone's cell is narrow: the line wraps so "2 earlier versions" is not cut off (#11776). */
+.dt-folded .inbox-review-from { flex: 0 1 auto; min-width: 6ch; } /* a narrow row (a phone): the sender shrinks (cut with an ellipsis) before the name is pushed to a line of its own, so the kind icon does not make a review row taller (#13144) */
 .dt-folded .inbox-review-item { flex-wrap: wrap; }
 .dt-folded .inbox-review-item > .inbox-review-name { flex: 1 1 0; }
 .inbox-needs-results tr:has(.inbox-review-item) .dt-subtitle { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; white-space: normal; margin-top: 2px; }
