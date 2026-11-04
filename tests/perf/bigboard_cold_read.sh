@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # bigboard_cold_read.sh (#13154, for #13292): a CPU profile of the FIRST reads after a server start on the big-board fixture, and what each took.
 #
-#   PERF_RUN=1 FIXTURE=<bigboard fixture> OUT=<empty folder> [BIN=<a coral build>] [SECONDS_PROFILE=8] bash tests/perf/bigboard_cold_read.sh
+#   PERF_RUN=1 FIXTURE=<bigboard fixture> OUT=<empty folder> [BIN=<a coral build>] [SECONDS_PROFILE=8] [WAIT_BEFORE_S=0] bash tests/perf/bigboard_cold_read.sh
 #
 # Starts the plain build (or BIN) on a COPY of FIXTURE/data (own port 8746, pprof 8747, mock-agent sandbox, --cloud-url off), starts a CPU profile, then makes the page's first
 # calls once each, timed: the board's artifacts list (cold), team-artifacts, the board's own tasks (/api/board/<id>/tasks), all boards' tasks, then the same artifacts list again (warm). OUT gets cold.pb.gz (read it with
@@ -28,7 +28,10 @@ for _ in $(seq 240); do kill -0 "$SRV" 2>/dev/null || { tail -20 "$OUT/server.lo
 KEY="$(tr -d '[:space:]' < "$WORK/data/api_key")"; write_auth_header "$WORK/auth.hdr" "$KEY"
 BOARD="$(python3 -I -c 'import json,sys; print(json.load(open(sys.argv[1]))["board"])' "$FIXTURE/fixture.json")"
 get() { curl -s -m 120 -o "$WORK/response.body" -w "$1 %{http_code} %{time_total}s %{size_download}B\n" -H @"$WORK/auth.hdr" "http://127.0.0.1:$PORT$1"; }
-echo "server up; board $BOARD; the first call comes right after the profile starts" | tee "$OUT/reads.txt"
+# WAIT_BEFORE_S: seconds to wait after the server answers /api/health before the profile and the first call (default 0). A build that warms its caches at start (#13292) is measured twice: at 0
+# (the first read races the warm) and at 5 (the warm has finished), to tell "the warm is done" from "the scan is still cold".
+[[ "${WAIT_BEFORE_S:-0}" -gt 0 ]] && sleep "$WAIT_BEFORE_S"
+echo "server up; board $BOARD; waited ${WAIT_BEFORE_S:-0} s after health; the first call comes right after the profile starts" | tee "$OUT/reads.txt"
 curl -s -m $((SECS + 30)) -o "$OUT/cold.pb.gz" "http://127.0.0.1:$PPORT/debug/pprof/profile?seconds=$SECS" &
 PROF=$!; sleep 1
 { get "/api/board/$BOARD/artifacts"; get "/api/team-artifacts"; get "/api/board/$BOARD/tasks"; get "/api/board/tasks"; get "/api/board/$BOARD/artifacts"; get "/api/board/$BOARD/artifacts?limit=50"; } | tee -a "$OUT/reads.txt"
