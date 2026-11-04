@@ -720,6 +720,7 @@ func (s *Server) registerSystem(r *chi.Mux, h *routeHandlers) {
 	r.Post("/api/scheduled/jobs/{jobID}/run", schedHandler.RunJob)
 	r.Get("/api/scheduled/jobs/{jobID}/runs", schedHandler.GetJobRuns)
 	r.Get("/api/scheduled/runs/recent", schedHandler.GetRecentRuns)
+	r.Get("/api/automations/runs", schedHandler.AutomationRuns) // Recent runs as pages: 50 a request, search and filters before the cut, the true total (#13183)
 	r.Post("/api/scheduled/runs/{runID}/seen", schedHandler.MarkRunSeen)
 	r.Post("/api/scheduled/validate-cron", schedHandler.ValidateCron)
 
