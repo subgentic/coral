@@ -7,3 +7,7 @@
 .diff-comments .ac-sheet-close { display: none; } /* display-ok: the thread panel stays open under its diff; there is no toggle to bring a closed one back */
 .diff-comments-note { margin: 8px 12px; color: var(--text-muted); font-size: var(--fs-sm); }
 .diff-comments .ac-quote, .diff-comments .ac-composer .ac-quote { white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--font-mono, monospace); } /* the lines read as lines, with their indentation (#12570) */
+/* A file's comment icon (#13528): one bubble in its row (diff_comments.js puts it there); the thread and its composer are under the row once it is pressed. The count of open comments hangs off its corner and takes no room. */
+.file-comment-btn { flex: none; position: relative; }
+.file-comment-count { position: absolute; top: -5px; right: -7px; display: inline-flex; align-items: center; justify-content: center; min-width: 14px; height: 14px; padding: 0 3px; box-sizing: border-box; border-radius: 7px; font-size: var(--fs-sm); font-weight: var(--fw-strong); background: var(--text-primary); color: var(--bg-primary); } /* the page's two ends of contrast, not a colour */
+.file-comment-count[hidden] { display: none; } /* display-ok: a count shown only when there are comments */

@@ -91,7 +91,13 @@ const fileAnchor = (texts, file, base) => ({ path: file.filepath, side: 'new', s
 /** Is a comment's anchor still in the diff? A comment with no quote (the file as a whole) always is. */
 export const stillThere = (a, texts) => !a || !a.quote || (a.side === 'old' ? texts.original : texts.content).includes(a.quote);
 
-const mounted = new WeakMap(); // slot -> its box
+const mounted = new WeakMap(); // slot -> its handle
+let boxSeq = 0;
+
+/** The file's row, the block above its diff slot, or null. */
+const rowOf = slot => { const r = slot.previousElementSibling; return r && r.classList.contains('file-item') ? r : null; };
+/** Put a file's comment icon back in its row (a list that was drawn again keeps the diff slot but brings a new row). */
+export function placeDiffCommentIcon(slot) { mounted.get(slot)?.place(); }
 
 /** Put the comments of `file` under its diff in `slot`. view is the editor of the diff, texts its two texts. Does nothing through Coral Hub or when the agent has no team. */
 export async function attachDiffComments(slot, file, view, texts, base = '', fields = []) {
@@ -109,9 +115,22 @@ export async function attachDiffComments(slot, file, view, texts, base = '', fie
     if (!current()) return; // the digest must not attach a thread to a closed or replacement diff
     const box = el('div', 'diff-comments'), body = el('div', 'diff-comments-body'), btn = el('button', 'btn btn-small diff-comment-btn', 'Comment');
     body.hidden = true; btn.type = 'button'; btn.hidden = true; btn.setAttribute('aria-label', `Comment on the selected lines of ${file.filepath}`);
-    box.append(body); slot.append(box, btn);
-    const words = { empty: 'No comments on this file yet. Select lines in the diff and press Comment: your comment goes to the agent, who answers here.', whole: 'Comment on this file’s changes', quote: '' };
-    const comments = attachComments(box, body, box, { toggleHost: true, sheet: () => false, shown: () => true, words, wholeAnchor: () => fileAnchor(texts, file, base), outdated: c => !stillThere(c.anchor, texts) });
+    box.id = `diff-comments-${++boxSeq}`; box.hidden = true; // the thread is drawn when the person asks: one small icon in the file's row (#13528)
+    box.append(body); slot.prepend(box); slot.append(btn); // the thread is right under the row, not at the end of a long diff
+    // The icon: a comment bubble in the file's row. Pressing it opens the thread with the composer for the file; pressing it again hides them (a draft stays). The count of open comments is on it, so a file with a thread says so before it is opened.
+    const name = file.filepath.split('/').pop() || file.filepath;
+    const icon = el('button', 'btn btn-quiet btn-icon btn-xs file-comment-btn'), glyph = el('span', 'material-icons', 'chat_bubble_outline'), badge = el('span', 'file-comment-count');
+    icon.type = 'button'; icon.setAttribute('aria-controls', box.id); glyph.setAttribute('aria-hidden', 'true'); badge.hidden = true; icon.append(glyph, badge);
+    let count = 0, opened = false;
+    const paint = () => {
+        const label = count ? `Comment on ${name}, ${count} ${count === 1 ? 'comment' : 'comments'}` : `Comment on ${name}`;
+        icon.setAttribute('aria-label', label); icon.title = label; icon.setAttribute('aria-expanded', String(opened));
+        badge.textContent = count > 99 ? '99+' : String(count); badge.hidden = !count;
+    };
+    const show = on => { opened = on; box.hidden = !on; paint(); };
+    const place = () => { const row = rowOf(slot); if (!row || row.contains(icon)) return; const acts = row.querySelector('.file-action-btns'); if (acts) acts.before(icon); else row.append(icon); };
+    const comments = attachComments(box, body, box, { toggleHost: true, compact: true, sheet: () => false, shown: () => true, words: { quote: '' }, wholeAnchor: () => fileAnchor(texts, file, base), outdated: c => !stillThere(c.anchor, texts),
+        onState: now => { count = now.count; if (opened && !now.composing && !now.count) { opened = false; box.hidden = true; } paint(); } }); // a cancelled composer on a file with no comments leaves nothing open
     comments.open(key, contextServer(), team);
     comments.docWhole();
     comments.setSheet(true);
@@ -129,8 +148,16 @@ export async function attachDiffComments(slot, file, view, texts, base = '', fie
     const soon = () => { clearTimeout(timer); timer = setTimeout(place, 60); };
     slot.addEventListener('mouseup', soon); slot.addEventListener('keyup', soon); slot.addEventListener('touchend', soon);
     btn.addEventListener('mousedown', e => e.preventDefault()); // pressing it must not clear the selection it is about
-    btn.addEventListener('click', () => { if (!anchor) return; comments.composeOn(anchor); btn.hidden = true; window.getSelection().removeAllRanges(); });
-    const handle = { destroy() { clearTimeout(timer); slot.removeEventListener('mouseup', soon); slot.removeEventListener('keyup', soon); slot.removeEventListener('touchend', soon); comments.close(); box.remove(); btn.remove(); mounted.delete(slot); } };
+    btn.addEventListener('click', () => { if (!anchor) return; show(true); comments.composeOn(anchor); btn.hidden = true; window.getSelection().removeAllRanges(); });
+    icon.addEventListener('click', e => {
+        e.stopPropagation(); // the row opens the file when it is pressed: this button is not that
+        if (opened) { show(false); return; }
+        show(true);
+        if (!comments.isComposing()) comments.composeOn(fileAnchor(texts, file, base)); // false when this person cannot comment (locked): the thread opens and says why
+        else box.querySelector('.ac-input')?.focus();
+    });
+    paint(); place();
+    const handle = { place, destroy() { clearTimeout(timer); slot.removeEventListener('mouseup', soon); slot.removeEventListener('keyup', soon); slot.removeEventListener('touchend', soon); comments.close(); box.remove(); btn.remove(); icon.remove(); mounted.delete(slot); } };
     mounted.set(slot, handle);
 }
 
