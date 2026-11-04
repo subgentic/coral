@@ -347,9 +347,11 @@ var reviewedOrigins = map[string]bool{
 	"internal/ptymanager/tmux_backend.go	TmuxBackend.Restart	SendKeysToTarget	Internal":                              true,
 	"internal/ptymanager/tmux_backend.go	TmuxBackend.sendInput	SendTerminalInputToTarget	o":                          true,
 	"internal/ptymanager/tmux_backend.go	TmuxBackend.Spawn	SendKeysToTarget	Internal":                                true,
-	"internal/server/routes/agent_exited.go	deliverAutomatedWhile	SendInput	Coral":                                   true,
+	"internal/server/routes/agent_exited.go	deliverAutomatedOutcome	SendInput	Coral":                                 true,
 	"internal/server/routes/agent_ui_request.go	SessionsHandler.agentUIRequest	SendPrompt	Coral":                     true,
 	"internal/server/routes/auto_accept.go	AutoAcceptor.check	SendRawInput	Internal":                                 true,
+	"internal/server/routes/dialog_timeout.go	SessionsHandler.dialogTimeout	SendRawInput	Internal":                   true,
+	"internal/server/routes/auto_recommend.go	AutoRecommender.pick	SendRawInput	Internal":                            true, // the operator's opt-in answer to a question with its Recommended option (inside AutoAcceptSend)
 	"internal/server/routes/human_send.go	SessionsHandler.deliverHumanSend	SendInput	Person":                         true,
 	"internal/server/routes/prompt_answer.go	SessionsHandler.AnswerPrompt	SendInput	Person":                          true, // the text typed into a prompt's field (#5715)
 	"internal/server/routes/prompt_answer.go	SessionsHandler.AnswerPrompt	SendRawInput	Unclassified":                 true, // the option digits of the answer cards: choices, not text a person typed; logged as they are

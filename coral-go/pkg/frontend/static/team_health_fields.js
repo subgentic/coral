@@ -18,6 +18,7 @@ const tagPatternProblem = (value) => {
     return p.length > 60 || p[0] === '-' || !/^[A-Za-z0-9._/*?[\]^-]+$/.test(p) ? `"${p.slice(0, 40)}" is not a tag pattern Coral reads (letters, digits, . _ - / and the glob characters * ? [ ]; at most 60 characters).` : '';
 };
 const [C_LO, C_HI] = HEALTH_LIMITS.checkWait;
+const [D_LO, D_HI] = HEALTH_LIMITS.dialogTimeout;
 /** The server's words for a branch name it will not read (LandingBranchValid): letters, digits and . _ - /, at most 100, not starting with - or /, no .., not ending in / or .lock; empty is the default. */
 const branchProblem = (value) => {
     const b = String(value || '').trim();
@@ -25,7 +26,7 @@ const branchProblem = (value) => {
     const bad = b.length > 100 || b[0] === '-' || b[0] === '/' || b.includes('..') || b.endsWith('/') || b.endsWith('.lock') || !/^[A-Za-z0-9._/-]+$/.test(b);
     return bad ? `"${b.slice(0, 40)}" is not a branch name Coral reads (letters, digits, . _ - /; at most 100 characters).` : '';
 };
-const RULES = ['claim_nudge', 'status_nudge', 'mention_renudge', 'held_notice', 'busy_no_task', 'post_no_task', 'upload_no_task', 'goal_size', 'ask_reminder', 'landing', 'release', 'goals_ready', 'unowned_tasks'];
+const RULES = ['claim_nudge', 'status_nudge', 'mention_renudge', 'held_notice', 'busy_no_task', 'post_no_task', 'upload_no_task', 'goal_size', 'ask_reminder', 'auto_recommend', 'landing', 'release', 'goals_ready', 'unowned_tasks', 'dialog_timeout'];
 
 /** The health object as the flat values of the fields. */
 export function healthToValues(h) {
@@ -48,6 +49,7 @@ export function valuesToHealth(v, base) {
     h.status_nudge = { ...h.status_nudge, on: !!v.status_nudge_on, after_min: v.status_nudge_after_min, escalate_after_min: v.status_nudge_escalate_after_min };
     h.mention_renudge = { ...h.mention_renudge, on: !!v.mention_renudge_on, after_min: v.mention_renudge_after_min };
     if (h.ask_reminder && v.ask_reminder_on !== undefined) h.ask_reminder = { ...h.ask_reminder, on: !!v.ask_reminder_on, after_min: v.ask_reminder_after_min };
+    if (h.auto_recommend && v.auto_recommend_on !== undefined) h.auto_recommend = { ...h.auto_recommend, on: !!v.auto_recommend_on, grace_min: Number.isInteger(v.auto_recommend_grace_min) ? v.auto_recommend_grace_min : h.auto_recommend.grace_min };
     if (h.held_notice && v.held_notice_on !== undefined) h.held_notice = { ...h.held_notice, on: !!v.held_notice_on, after_min: v.held_notice_after_min };
     if (h.busy_no_task && v.busy_no_task_on !== undefined) h.busy_no_task = { ...h.busy_no_task, on: !!v.busy_no_task_on, after_min: v.busy_no_task_after_min };
     if (h.post_no_task && v.post_no_task_on !== undefined) h.post_no_task = { ...h.post_no_task, on: !!v.post_no_task_on };
@@ -55,6 +57,7 @@ export function valuesToHealth(v, base) {
     if (h.release && v.release_on !== undefined) h.release = { ...h.release, on: !!v.release_on, branch: String(v.release_branch || '').trim(), tag_pattern: String(v.release_tag_pattern || '').trim(), wait_min: Number.isInteger(v.release_wait_min) ? v.release_wait_min : h.release.wait_min, nudge: v.release_nudge || '' };
     if (h.landing && v.landing_on !== undefined) h.landing = { ...h.landing, on: !!v.landing_on, branch: String(v.landing_branch || '').trim(), wait_min: Number.isInteger(v.landing_wait_min) ? v.landing_wait_min : h.landing.wait_min, nudge: v.landing_nudge || '' };
     for (const k of ['goals_ready', 'unowned_tasks']) if (h[k] && v[`${k}_on`] !== undefined) h[k] = { ...h[k], on: !!v[`${k}_on`], wait_min: Number.isInteger(v[`${k}_wait_min`]) ? v[`${k}_wait_min`] : h[k].wait_min, nudge: v[`${k}_nudge`] || '' };
+    if (h.dialog_timeout && v.dialog_timeout_on !== undefined) h.dialog_timeout = { ...h.dialog_timeout, on: !!v.dialog_timeout_on, after_min: Number.isInteger(v.dialog_timeout_after_min) ? v.dialog_timeout_after_min : h.dialog_timeout.after_min };
     if (h.goal_size && v.goal_size_on !== undefined) h.goal_size = { ...h.goal_size, on: !!v.goal_size_on, limit: v.goal_size_limit };
     return h;
 }
@@ -62,7 +65,7 @@ export function valuesToHealth(v, base) {
 /** The keys of the values (the page sends a change of any of them as the health object). */
 export const HEALTH_KEYS = Object.keys(healthToValues({ ...HEALTH_DEFAULTS, held_notice: HEALTH_DEFAULTS.held_notice }));
 
-/** The fields of the Health check group. ctx: { members: () => Promise<[{ subscriber_id, job_title }]>, hasHeld: () => bool, monitorOff: () => bool, onReset(view), openSettings() }. */
+/** The fields of the Health check group. ctx: { members: () => Promise<[{ subscriber_id, job_title }]>, hasHeld: () => bool, hasRecommend: () => bool, monitorOff: () => bool, onReset(view), openSettings() }. */
 export function healthFields(ctx) {
     const alsoTell = (rule) => ({ type: 'select', label: 'Also tell', help: 'One member who also gets it as a message of their own when it is new.', disabledWhen: v => !v[`${rule}_on`], options: async () => {
         const members = await ctx.members();
@@ -99,6 +102,10 @@ export function healthFields(ctx) {
         { key: 'held_notice_on', type: 'toggle', label: 'Tell the Operator about a held delivery', visibleWhen: () => ctx.hasHeld(),
             help: 'A message Coral could not type into an agent (its terminal is on a dialog) and has held back for a while is reported to the Operator.' },
         { ...minutes('held_notice_after_min', 'After', 'minutes held', 'held_notice_on'), visibleWhen: () => ctx.hasHeld() },
+        { key: 'health_dialogs', type: 'heading', label: 'Dialogs nobody answers', help: 'Works whether or not the health check is on.', visibleWhen: v => v.dialog_timeout_on !== undefined },
+        { key: 'dialog_timeout_on', type: 'toggle', label: 'Close a dialog nobody answered', visibleWhen: v => v.dialog_timeout_on !== undefined,
+            help: 'When an agent’s permission, plan or question dialog has waited past the limit, and nobody is at its terminal, Coral closes it the safe way (No, or Esc; never Yes) and tells the agent to ask the Operator on the board, so its other work goes on. A person typing in their own terminal window, outside Coral, is not seen as present. Off by default.' },
+        { key: 'dialog_timeout_after_min', type: 'number', label: 'After', unit: 'minutes waiting', help: '10 minutes to 1 day', min: D_LO, max: D_HI, integer: true, compact: true, disabledWhen: v => !v.dialog_timeout_on, visibleWhen: v => v.dialog_timeout_on !== undefined },
         { key: 'mention_renudge_on', type: 'toggle', label: 'Remind the orchestrator of an unanswered mention', help: 'A message that @mentions the orchestrator and has had no reply gets a reminder.' },
         minutes('mention_renudge_after_min', 'Remind the orchestrator after', 'minutes', 'mention_renudge_on'),
         { key: 'health_offbooks', type: 'heading', label: 'Work done off the books', help: 'Named to the orchestrator in the next health check, once each.' },
@@ -132,6 +139,8 @@ export function healthFields(ctx) {
         { key: 'health_questions', type: 'heading', label: 'Questions', help: 'Works whether or not the health check is on.' },
         { key: 'ask_reminder_on', type: 'toggle', label: 'Remind about unanswered questions', help: 'When an agent asks a question and the member it asks has not answered, remind that member once.' },
         minutes('ask_reminder_after_min', 'Remind the member after', 'minutes', 'ask_reminder_on'),
+        { key: 'auto_recommend_on', type: 'toggle', visibleWhen: () => ctx.hasRecommend(), label: 'Answer a question with its Recommended option', help: `When an agent's single-choice question has waited the grace period, nobody is at its terminal, and exactly one option is marked "(Recommended)", Coral picks that option and tells the agent the operator did not review the question. Off unless you turn it on. The agent writes that label, so this is the agent answering its own question. Questions that mention deleting, forcing, pushing, publishing, paying, secrets and the like are left for you: that is a brake, not a boundary, because re-wording gets past it. With auto-accept permissions set to allow everything, or an agent in a bypass permission mode, an agent can approve its own decisions.` },
+        { key: 'auto_recommend_grace_min', type: 'number', label: 'Wait first', unit: 'minutes', help: '1 to 9 minutes', min: HEALTH_LIMITS.recommendGrace[0], max: HEALTH_LIMITS.recommendGrace[1], integer: true, compact: true, visibleWhen: () => ctx.hasRecommend(), disabledWhen: v => !v.auto_recommend_on },
         { key: 'health_defaults', type: 'custom', label: 'Defaults', help: 'Put every health setting back to the defaults. Save to apply them.', action: { label: 'Reset to defaults', run: view => ctx.onReset(view) } },
     ];
     // The alert rules repeat the words Branch, Wait and Also tell under their own headings: each rule is a group named by its legend (a fieldset), so a screen reader's forms list says which rule a "Wait" belongs to; the screen looks the same (#9173)

@@ -51,7 +51,57 @@ type HealthSettings struct {
 	// or no assignee that are older than WaitMin, named by number. Each is a switch with its wait and an optional member who is also told.
 	GoalsReady   HealthWaitCheck `json:"goals_ready"`
 	UnownedTasks HealthWaitCheck `json:"unowned_tasks"`
+	// DialogTimeout closes a dialog that waited for a person longer than AfterMin, the safe way (deny or cancel, never allow), and tells the agent to ask the Operator on the board
+	// (goal #14). Off by default: Coral acting in an agent's terminal on its own is the Operator's choice, and only the Operator writes it (this route).
+	DialogTimeout HealthDialogTimeout `json:"dialog_timeout"`
+	// AutoRecommend (off by default; the operator's switch, goal #14 (B)): when an agent's single-select question has waited GraceMin minutes with nobody at the terminal, and exactly one option's label
+	// is marked "(Recommended)", Coral answers with that option and tells the agent so in one fixed line. The agent wrote the label, so this is the agent answering its own question: see
+	// routes/auto_recommend.go for what bounds it.
+	AutoRecommend HealthAutoRecommend `json:"auto_recommend"`
 }
+
+// HealthDialogTimeout: whether a dialog left unanswered is closed, and after how many minutes (DialogTimeoutMin to DialogTimeoutMax; 0 in a body is the default).
+type HealthDialogTimeout struct {
+	On       bool `json:"on"`
+	AfterMin int  `json:"after_min"`
+}
+
+// DialogTimeoutDefault is the wait when none is set: after the 5-minute "At a dialog" item and the 10-minute held notice, so the Operator has had two chances first. DialogTimeoutMin and
+// DialogTimeoutMax bound it.
+const (
+	DialogTimeoutDefault = 15
+	DialogTimeoutMin     = 10
+	DialogTimeoutMax     = 1440
+)
+
+// Problem is what is wrong with the setting as a user saves it, in words for them, or "". A wait the body does not carry (0) is the default and is not a problem.
+func (d HealthDialogTimeout) Problem() string {
+	if d.AfterMin != 0 && (d.AfterMin < DialogTimeoutMin || d.AfterMin > DialogTimeoutMax) {
+		return fmt.Sprintf("dialog_timeout.after_min: %d is outside %d to %d minutes", d.AfterMin, DialogTimeoutMin, DialogTimeoutMax)
+	}
+	return ""
+}
+
+// HealthAutoRecommend: the switch and how long a question waits first (GraceMin, 1 to AutoRecommendGraceMax, 3 by default).
+type HealthAutoRecommend struct {
+	On       bool `json:"on"`
+	GraceMin int  `json:"grace_min"`
+}
+
+// Problem is what is wrong with the setting as a user saves it, in words for them, or "". A grace the body does not carry (0) is the default and is not a problem; one outside 1 to
+// AutoRecommendGraceMax is refused, as the dialog timeout's wait is, and not quietly changed.
+func (a HealthAutoRecommend) Problem() string {
+	if a.GraceMin != 0 && (a.GraceMin < 1 || a.GraceMin > AutoRecommendGraceMax) {
+		return fmt.Sprintf("auto_recommend.grace_min: %d is outside 1 to %d minutes", a.GraceMin, AutoRecommendGraceMax)
+	}
+	return ""
+}
+
+// AutoRecommendGraceDefault and AutoRecommendGraceMax: the grace stays under the dialog timeout's own minimum (10 minutes), so a question is never closed before it could have been answered.
+const (
+	AutoRecommendGraceDefault = 3
+	AutoRecommendGraceMax     = 9
+)
 
 // HealthRelease: the branch and the tag pattern (a git glob, "v*" by default) to compare, how long the branch may be past the newest matching tag before Coral says so, and who else is told.
 type HealthRelease struct {
@@ -244,6 +294,8 @@ func DefaultHealthSettings() HealthSettings {
 		Release:        HealthRelease{On: false, Branch: "main", TagPattern: "v*", WaitMin: 1440},
 		GoalsReady:     HealthWaitCheck{On: true, WaitMin: GoalsReadyWaitMin},
 		UnownedTasks:   HealthWaitCheck{On: true, WaitMin: UnownedTasksWaitMin},
+		DialogTimeout:  HealthDialogTimeout{On: false, AfterMin: DialogTimeoutDefault},
+		AutoRecommend:  HealthAutoRecommend{On: false, GraceMin: AutoRecommendGraceDefault},
 	}
 }
 
@@ -288,6 +340,14 @@ func (h HealthSettings) Clamp() HealthSettings {
 	h.Release.Nudge = strings.TrimSpace(h.Release.Nudge)
 	h.GoalsReady = h.GoalsReady.clamp(GoalsReadyWaitMin)
 	h.UnownedTasks = h.UnownedTasks.clamp(UnownedTasksWaitMin)
+	if h.DialogTimeout.AfterMin == 0 {
+		h.DialogTimeout.AfterMin = DialogTimeoutDefault
+	}
+	h.DialogTimeout.AfterMin = min(max(h.DialogTimeout.AfterMin, DialogTimeoutMin), DialogTimeoutMax)
+	if h.AutoRecommend.GraceMin == 0 { // a body that does not carry the setting: the default grace
+		h.AutoRecommend.GraceMin = AutoRecommendGraceDefault
+	}
+	h.AutoRecommend.GraceMin = min(max(h.AutoRecommend.GraceMin, 1), AutoRecommendGraceMax)
 	h.Recipient = strings.TrimSpace(h.Recipient)
 	var revs []string
 	for _, r := range h.DefaultReviewers {

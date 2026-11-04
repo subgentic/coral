@@ -98,7 +98,7 @@ function settingsViewOptions(st) {
 function settingsGroups(st) {
     // Reset to defaults: every health field takes the default and the bar says to save (the held-delivery rule only when the server has it).
     function resetHealth(v) {
-        const d = { ...HEALTH_DEFAULTS }; if (!st.healthBase || !st.healthBase.held_notice) delete d.held_notice;
+        const d = { ...HEALTH_DEFAULTS }; if (!st.healthBase || !st.healthBase.held_notice) delete d.held_notice; if (!st.healthBase || !st.healthBase.auto_recommend) delete d.auto_recommend;
         for (const [k, val] of Object.entries(healthToValues(d))) v.set(k, val);
         v.say('The defaults are filled in. Save to apply them.');
         st.q('input[name="on"]')?.focus();
@@ -122,7 +122,7 @@ function settingsGroups(st) {
             { key: 'custom_instructions', type: 'textarea', label: 'Additional instructions', help: 'Team-specific conventions, given to agents with each task.', wide: true, rows: 4, placeholder: 'Team-specific conventions' },
             { key: 'presets', type: 'custom', label: 'Presets', help: 'A preset saves with Save preset, not Save settings.', wide: true, render: slot => { slot.innerHTML = PRESET_EDITOR; } },
         ] },
-        { id: 'health', domId: 'team-settings-health', label: 'Health check', icon: 'notifications', hint: 'When an agent that stopped working is noticed.', fields: healthFields({ members: () => st.membersReady, hasHeld: () => Boolean(st.healthBase && st.healthBase.held_notice), monitorOff: () => !st.healthMonitorOn, onReset: resetHealth, openSettings: () => window.showSettingsModal?.('agents') }) },
+        { id: 'health', domId: 'team-settings-health', label: 'Health check', icon: 'notifications', hint: 'When an agent that stopped working is noticed.', fields: healthFields({ members: () => st.membersReady, hasHeld: () => Boolean(st.healthBase && st.healthBase.held_notice), hasRecommend: () => Boolean(st.healthBase && st.healthBase.auto_recommend), monitorOff: () => !st.healthMonitorOn, onReset: resetHealth, openSettings: () => window.showSettingsModal?.('agents') }) },
         { id: 'messaging', domId: 'team-settings-messaging', label: 'Messaging', icon: 'chat', hint: 'How the team\'s messages reach its agents.', fields: st.xt.fields() },
         { id: 'orchestrator', domId: 'team-settings-orchestrator', label: 'Orchestrator access', icon: 'security', hint: 'What the Orchestrator may do to this team\'s agents.', fields: st.og.fields() },
         { id: 'guides', domId: 'team-settings-guides', label: 'Guides', icon: 'group', hint: 'The names agents see on a guide\'s messages.', fields: st.gr.fields() },

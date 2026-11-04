@@ -557,6 +557,7 @@ func (h *SessionsHandler) WSTerminal(w http.ResponseWriter, r *http.Request) {
 	}
 
 	defer h.backend.Unsubscribe(name, subID)
+	defer h.focus.closed(sessionID, subID) // this view's focus report goes with its socket; other views of the agent keep theirs
 
 	t := &terminalStream{h: h, ctx: ctx, conn: conn, name: name, agentType: agentType, sessionID: sessionID, viaHub: cloud.Tunneled(r), subID: subID,
 		sizeCheck: make(chan int64, 1)}
@@ -689,6 +690,8 @@ type terminalFrame struct {
 	// still typed, as before ids existed, and gets no answer.
 	RawID json.RawMessage `json:"id"`
 	ID    *int64          `json:"-"`
+	// Focused, on terminal_focus: whether this view of the terminal has the keyboard focus in a visible page (the dialog timeout's presence rule: a person looking at it keeps Coral's hands off).
+	Focused bool `json:"focused"`
 }
 
 // parseTerminalFrame decodes a client frame; ok is false for one that isn't JSON (it is skipped).
@@ -727,6 +730,9 @@ func (t *terminalStream) handleFrame(msg terminalFrame) {
 	switch msg.Type {
 	case "composer_send":
 		t.composerSend(msg)
+		return
+	case "terminal_focus":
+		t.h.focus.note(t.sessionID, t.subID, msg.Focused, time.Now()) // only that this view is focused, and when: nothing typed, nothing answered
 		return
 	case "terminal_input":
 		if strings.ContainsAny(msg.Data, "\r\n") {
