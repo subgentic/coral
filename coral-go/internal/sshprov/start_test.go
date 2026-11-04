@@ -334,18 +334,18 @@ func TestStopCheckReadsOnlyThisUsersProcessesAndPortCheckOnlyThePort(t *testing.
 	if strings.Contains(stop, "/proc/net/tcp") || strings.Contains(stop, "20E4") {
 		t.Errorf("the stop check reads the port, which another user's Coral can hold: %s", stop)
 	}
-	port, err := remoteText(CmdCheckPort)
+	port, err := remoteText(CmdCheckPort, "8420")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(port, "20E4") || !strings.Contains(port, "-t =coral-server") || strings.Contains(port, "kill") {
+	if !strings.Contains(port, "printf '%04X' 8420") || !strings.Contains(port, "-t =coral-server") || strings.Contains(port, "kill") {
 		t.Errorf("the port check: %s", port)
 	}
 }
 
 // No command's text may carry a formatting verb that did not get its argument ("%!s(MISSING)", "%!(EXTRA ...)"): the stop check once did and so always said "stopped" (#11429, QA Engineer's MUST).
 func TestNoRemoteCommandTextHasAFormattingError(t *testing.T) {
-	samples := []string{"2.0.10", "a/b.tgz", "amd64", strings.Repeat("a", 64), "pty"}
+	samples := []string{"2.0.10", "a/b.tgz", "amd64", strings.Repeat("a", 64), "pty", "8461"}
 	for c, s := range specs {
 		args := make([]string, len(s.args))
 		for i, re := range s.args {
@@ -393,7 +393,7 @@ func TestRemoteTextRefusesATemplateWithAFormattingError(t *testing.T) {
 // no listener, no key, and setup's wait for the key fails. The start command gives it standard input from /dev/null. The far side here (the stand-in) lets Coral get going only when the command did that, so
 // taking the redirect out makes the key never come (the ported FIFO test of be-ssh-start-stdin).
 func TestStartGivesCoralNoTerminalToAskAt(t *testing.T) {
-	text, err := remoteText(CmdStartDaemon, "2.0.10", "tmux", "@keep")
+	text, err := remoteText(CmdStartDaemon, "2.0.10", "tmux", "@keep", "8420")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -468,7 +468,7 @@ func TestDaemonCommandsTestTheCommandLineBeforeTheyActOnAPID(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	start, err := remoteText(CmdStartDaemon, "2.0.10", "tmux", "@keep")
+	start, err := remoteText(CmdStartDaemon, "2.0.10", "tmux", "@keep", "8420")
 	if err != nil {
 		t.Fatal(err)
 	}

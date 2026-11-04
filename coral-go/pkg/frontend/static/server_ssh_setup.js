@@ -43,6 +43,14 @@ export const dataDirProblem = (v) => {
     if (['.ssh', '.gnupg', '.config'].includes(first)) return `${first} holds your keys or settings on that computer, so Coral will not keep its data there. Choose another folder.`;
     return '';
 };
+/** The port as typed: '' is the default (8420). Why it is not one the hub accepts (the server checks again), in a plain sentence, or ''. 1024 to 65535, digits only. Exported for the test. */
+export const portProblem = (v) => {
+    const t = String(v == null ? '' : v).trim();
+    if (t === '') return '';
+    if (!/^[1-9][0-9]{3,4}$/.test(t) || Number(t) < 1024 || Number(t) > 65535) return 'Use a number from 1024 to 65535 (the ports below 1024 need more rights than Coral has there).';
+    return '';
+};
+export const portOk = (v) => portProblem(v) === '';
 export const dataDirOk = (v) => dataDirProblem(v) === '';
 
 export const backendChoice = (current, tmux) => (tmux === false && current === 'tmux' ? 'pty' : (current === 'tmux' ? 'tmux' : 'pty'));
@@ -63,7 +71,7 @@ const [SETUP, UPGRADE, STOP, REMOVE] = Object.keys(KINDS);
  * onClose() is called when the person leaves it; onChanged() when the server list changed (a server was added or removed, or upgraded). Returns { unmount }.
  */
 export function mountSshSetup(host, { mode = 'setup', server = null, action = null, deleteData = false, resume = '', pollMs = POLL_MS, onClose = () => {}, onChanged = () => {} } = {}) {
-    const st = { step: 'loading', options: null, plan: null, error: '', busy: false, keysOk: false, typed: '', backend: 'pty', dataDir: '', allowDowngrade: false, timer: null, dead: false, form: { host: '', picked: '', label: '' } };
+    const st = { step: 'loading', options: null, plan: null, error: '', busy: false, keysOk: false, typed: '', backend: 'pty', dataDir: '', port: '', allowDowngrade: false, timer: null, dead: false, form: { host: '', picked: '', label: '' } };
 
     const kind = () => (st.plan ? st.plan.kind : mode === 'manage' ? action : 'setup');
     const words = () => KINDS[kind()] || KINDS.setup;
@@ -154,8 +162,7 @@ export function mountSshSetup(host, { mode = 'setup', server = null, action = nu
     }
 
     /** Whether the main button (Set up, Upgrade, Remove) must stay closed. EVERY gate is read here, from the state, every time: the host keys not confirmed, a run going, the computer's name not typed, an upgrade that is not wanted,
-     *  a data folder that is not valid. A field handler or a redraw asks this and never remembers part of the answer, so no one gate can open the button another still holds (UI Reviewer's MUST on #13081: a bad folder, then the
-     *  host-key box ticked and unticked, then the folder corrected, opened Set up with the box unticked, and run() sent accept_keys). */
+     *  a data folder or port that is not valid. A field handler or a redraw asks this and never remembers part of the answer, so no one gate can open the button another still holds (#13081, UI Reviewer's MUST). */
     function goClosed() {
         const p = st.plan;
         if (!p) return true;
@@ -163,7 +170,7 @@ export function mountSshSetup(host, { mode = 'setup', server = null, action = nu
         if ((p.host_keys || []).length > 0 && !st.keysOk) return true;
         if (kind() === REMOVE && st.typed.trim() !== p.server_id) return true;
         if (kind() === UPGRADE && (same() || (downgrade() && !st.allowDowngrade))) return true;
-        if (kind() === SETUP && !dataDirOk(cleanDataDir(st.dataDir))) return true;
+        if (kind() === SETUP && (!dataDirOk(cleanDataDir(st.dataDir)) || !portOk(st.port))) return true;
         return false;
     }
     function refreshGo() { const g = host.querySelector('[data-ssh-go]'); if (g) g.disabled = goClosed(); }
@@ -172,14 +179,17 @@ export function mountSshSetup(host, { mode = 'setup', server = null, action = nu
         if (goClosed()) { // a click that reaches here with a gate closed sends nothing; the page says which
             if (st.plan && (st.plan.host_keys || []).length > 0 && !st.keysOk) st.error = 'Confirm the host fingerprints first.';
             else if (kind() === SETUP && !dataDirOk(cleanDataDir(st.dataDir))) st.error = dataDirProblem(cleanDataDir(st.dataDir));
+            else if (kind() === SETUP && !portOk(st.port)) st.error = portProblem(st.port);
             draw();
             return;
         }
+        if (kind() === SETUP && !dataDirOk(cleanDataDir(st.dataDir))) { st.error = dataDirProblem(cleanDataDir(st.dataDir)); draw(); return; }
+        if (kind() === SETUP && !portOk(st.port)) { st.error = portProblem(st.port); draw(); return; } // never sent without the folder, which would start it in the default one
         st.busy = true; st.error = ''; draw();
         const body = {};
         if (st.plan.host_keys && st.plan.host_keys.length) body.accept_keys = true;
         if (kind() === REMOVE) body.confirm = st.typed.trim();
-        if (kind() === SETUP) { body.backend = st.backend === 'tmux' ? 'tmux' : 'pty'; const d = cleanDataDir(st.dataDir); if (d) body.data_dir = d; }
+        if (kind() === SETUP) { body.backend = st.backend === 'tmux' ? 'tmux' : 'pty'; const d = cleanDataDir(st.dataDir); if (d) body.data_dir = d; const pt = String(st.port || '').trim(); if (pt && portOk(pt) && Number(pt) !== 8420) body.port = Number(pt); }
         if (kind() === UPGRADE && downgrade()) body.allow_downgrade = !!st.allowDowngrade;
         const r = await api('POST', `/api/servers/provision/${encodeURIComponent(st.plan.plan)}/run`, body);
         if (st.dead) return;
@@ -335,6 +345,32 @@ export function mountSshSetup(host, { mode = 'setup', server = null, action = nu
         show();
     }
 
+    /** The port Coral listens on over there, loopback only (#13081): default 8420. The hub reaches it through SSH, so any free port from 1024 to 65535 will do; the far side refuses a port that is taken. */
+    function drawPort(root) {
+        const box = el('fieldset', 'ssh-datadir ssh-port');
+        box.append(el('legend', 'ssh-subhead', 'Port Coral listens on over there'));
+        const lab = el('label', 'form-label', 'Port (1024 to 65535)'); lab.htmlFor = 'ssh-port-input';
+        const row = el('div', 'ssh-datadir-row');
+        const input = el('input', 'field'); input.type = 'text'; input.id = 'ssh-port-input'; input.value = st.port; input.inputMode = 'numeric';
+        input.placeholder = '8420'; input.autocomplete = 'off'; input.spellcheck = false; input.disabled = st.busy; input.setAttribute('aria-describedby', 'ssh-port-note');
+        const note = el('p', 'ssh-help', ''); note.id = 'ssh-port-note'; note.setAttribute('role', 'status');
+        const show = () => {
+            const bad = portProblem(st.port), ok = bad === '';
+            input.setAttribute('aria-invalid', ok ? 'false' : 'true');
+            note.classList.toggle('ssh-datadir-bad', !ok);
+            refreshGo();
+            const t = String(st.port || '').trim();
+            note.textContent = !ok ? bad + ' Set up waits until this is fixed.'
+                : (t === '' || t === '8420' ? 'The default: 8420. Use another when that one is taken there (several Corals on one computer need one each); it is only reachable from that computer.'
+                    : `Coral will listen on 127.0.0.1:${t} there. Set up checks it is free first.`);
+        };
+        input.addEventListener('input', () => { st.port = input.value; show(); });
+        row.append(input);
+        box.append(lab, row, note);
+        root.append(box);
+        show();
+    }
+
     function drawPlan(root) {
         const p = st.plan;
         const dl = el('dl', 'facts servers-facts');
@@ -380,7 +416,7 @@ export function mountSshSetup(host, { mode = 'setup', server = null, action = nu
             row.append(cb, el('span', '', ' These fingerprints are the computer I mean to set up.'));
             root.append(row);
         }
-        if (kind() === SETUP) { drawBackend(root); drawDataDir(root); }
+        if (kind() === SETUP) { drawBackend(root); drawDataDir(root); drawPort(root); }
         if (kind() === UPGRADE) {
             const v = versions();
             const dl = el('dl', 'facts servers-facts');

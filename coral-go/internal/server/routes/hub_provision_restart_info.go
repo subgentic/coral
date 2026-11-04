@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"time"
 
 	"github.com/subgentic/coral/internal/sshprov"
@@ -16,8 +17,16 @@ import (
 // restartNote is what else is known about a failed restart, for the help under it.
 type restartNote struct {
 	noTmux       bool // the start failed because tmux is gone: the help also gives the way to start without it
+	port         int  // the port the computer was set up on; 0 is the default
 	holderPid    int  // the process found on port 8420, when known: the help gives the line that stops it
 	stoppedAgain bool // the release was started but did not answer: it may still be starting, or it stopped again
+}
+
+func (n restartNote) portOrDefault() int {
+	if sshprov.ValidPort(n.port) {
+		return n.port
+	}
+	return sshprov.DefaultPort
 }
 
 func isConnectFailure(err error) bool {
@@ -105,11 +114,11 @@ func (pr *Provisioner) restartHelp(note restartNote) []string {
 		lines = append(lines, "# tmux is not installed there: this forgets that agents ran in tmux (they will end whenever Coral restarts):", "rm ~/.coral-server/backend")
 	}
 	if note.holderPid > 0 {
-		lines = append(lines, "# Port 8420 is held by that process; stop it only if it is not something you need:", fmt.Sprintf("kill %d", note.holderPid))
+		lines = append(lines, fmt.Sprintf("# Port %d is held by that process; stop it only if it is not something you need:", note.portOrDefault()), fmt.Sprintf("kill %d", note.holderPid))
 	}
 	lines = append(lines,
 		"# Start the release:",
-		"nohup "+bin+` --host 127.0.0.1 --port 8420 --no-browser --cloud-url off --backend "$(cat ~/.coral-server/backend 2>/dev/null || echo pty)" --home "$HOME/$(cat ~/.coral-server/datadir 2>/dev/null || echo .coral-server/data)" </dev/null >> ~/.coral-server/coral.log 2>&1 & echo $! > ~/.coral-server/coral.pid`,
+		"nohup "+bin+" --host 127.0.0.1 --port "+strconv.Itoa(note.portOrDefault())+` --no-browser --cloud-url off --backend "$(cat ~/.coral-server/backend 2>/dev/null || echo pty)" --home "$HOME/$(cat ~/.coral-server/datadir 2>/dev/null || echo .coral-server/data)" </dev/null >> ~/.coral-server/coral.log 2>&1 & echo $! > ~/.coral-server/coral.pid`,
 		"# Then choose Upgrade here again: this hub finds the release already running and only checks it.")
 	return lines
 }
