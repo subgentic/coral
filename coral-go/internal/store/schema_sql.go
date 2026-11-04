@@ -227,6 +227,19 @@ CREATE TABLE IF NOT EXISTS skills_attached (
 	PRIMARY KEY (session_id, skill_id)
 );
 
+-- What an agent LOADED through the Skills Store (#13208, goal #218): one row per session and skill, kept when the agent reads the skill with skills get (a search or a list is not a load). Names, versions and times only: no skill text, no caller words.
+CREATE TABLE IF NOT EXISTS skills_loaded (
+	session_id TEXT NOT NULL,
+	skill_id   TEXT NOT NULL,
+	name       TEXT NOT NULL,
+	version    INTEGER NOT NULL,
+	digest     TEXT NOT NULL,
+	first_at   TEXT NOT NULL,
+	last_at    TEXT NOT NULL,
+	loads      INTEGER NOT NULL DEFAULT 1,
+	PRIMARY KEY (session_id, skill_id)
+);
+
 CREATE TABLE IF NOT EXISTS skills_refused (
 	digest TEXT PRIMARY KEY,
 	at     TEXT NOT NULL,

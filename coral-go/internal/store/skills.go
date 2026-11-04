@@ -523,3 +523,50 @@ func (s *SessionStore) SkillDigestInUse(ctx context.Context, digest string) (boo
 	err := s.reader().GetContext(ctx, &n, `SELECT COUNT(*) FROM skills WHERE digest = ? AND status IN (?, ?)`, digest, SkillPending, SkillApproved)
 	return n > 0, err
 }
+
+// skillsLoadedPerSession bounds what one agent's record keeps: the newest loads, the oldest dropped.
+const skillsLoadedPerSession = 100
+
+// RecordSkillLoad notes that the agent of sessionID read r (#13208): a first read adds the row, a later one of the same skill updates its version, digest, time and count. Names, versions and times only. The
+// oldest rows past skillsLoadedPerSession go, and any row older than the access log's days.
+func (s *SessionStore) RecordSkillLoad(ctx context.Context, sessionID string, r SkillRow) error {
+	if sessionID == "" {
+		return nil
+	}
+	return s.db.WithTx(ctx, func(tx *sqlx.Tx) error {
+		t := now()
+		if _, err := tx.ExecContext(ctx, `INSERT INTO skills_loaded (session_id, skill_id, name, version, digest, first_at, last_at, loads) VALUES (?, ?, ?, ?, ?, ?, ?, 1)
+			ON CONFLICT(session_id, skill_id) DO UPDATE SET name = excluded.name, version = excluded.version, digest = excluded.digest, last_at = excluded.last_at, loads = loads + 1`, sessionID, r.ID, r.Name, r.Version, r.Digest, t, t); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `DELETE FROM skills_loaded WHERE session_id = ? AND skill_id NOT IN (SELECT skill_id FROM skills_loaded WHERE session_id = ? ORDER BY last_at DESC, rowid DESC LIMIT ?)`, sessionID, sessionID, skillsLoadedPerSession); err != nil {
+			return err
+		}
+		_, err := tx.ExecContext(ctx, `DELETE FROM skills_loaded WHERE last_at < ?`, time.Now().UTC().AddDate(0, 0, -skillsLogDays).Format(time.RFC3339))
+		return err
+	})
+}
+
+// LoadedSkill is a skill an agent read, with what became of it since.
+type LoadedSkill struct {
+	SkillID       string `db:"skill_id" json:"id"`
+	Name          string `db:"name" json:"name"`
+	Version       int    `db:"version" json:"version"`
+	FirstAt       string `db:"first_at" json:"first_at"`
+	LastAt        string `db:"last_at" json:"last_at"`
+	Loads         int    `db:"loads" json:"loads"`
+	Status        string `db:"status" json:"status"` // of the version it read: approved, or removed
+	LatestVersion int    `db:"latest_version" json:"latest_version"`
+}
+
+// LoadedSkills are the skills a session read, newest read first, each with the status of the version it read and the newest approved version of its name.
+func (s *SessionStore) LoadedSkills(ctx context.Context, sessionID string) ([]LoadedSkill, error) {
+	var rows []LoadedSkill
+	err := s.reader().SelectContext(ctx, &rows, `SELECT l.skill_id, l.name, l.version, l.first_at, l.last_at, l.loads, COALESCE(k.status, 'removed') AS status,
+		COALESCE((SELECT MAX(version) FROM skills WHERE name = l.name AND status = ?), 0) AS latest_version
+		FROM skills_loaded l LEFT JOIN skills k ON k.id = l.skill_id WHERE l.session_id = ? ORDER BY l.last_at DESC, l.rowid DESC`, SkillApproved, sessionID)
+	if rows == nil {
+		rows = []LoadedSkill{}
+	}
+	return rows, err
+}
