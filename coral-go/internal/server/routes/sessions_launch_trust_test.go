@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/linktest"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/pkg/tunnel"
 )
@@ -276,7 +277,7 @@ func TestATickedFolderTypedThroughALinkIsTrustedAtTheFolderItNames(t *testing.T)
 	r := newTrustRig(t)
 	real := mustMkdir(t, filepath.Join(r.home, "Code", "real", "app"))
 	link := filepath.Join(r.home, "Code", "link")
-	require.NoError(t, os.Symlink(filepath.Join(r.home, "Code", "real"), link))
+	linktest.Symlink(t, filepath.Join(r.home, "Code", "real"), link)
 	typed := filepath.Join(link, "app")
 	out := r.launch(t, typed, false, true, asCaller(callerDashCookie))
 	tf := trustOf(t, out)

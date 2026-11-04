@@ -25,6 +25,7 @@ func TestThemeGenerationCanUsePi(t *testing.T) {
 	settings := map[string]string{agent.CLIPathSettingKey(at.Pi): pi}
 	t.Setenv("HOME", t.TempDir())     // no CLI of this machine is found in its usual folders
 	t.Setenv("PATH", "/usr/bin:/bin") // nor on PATH
+	noSystemCLIs(t)                   // nor in the system folders (/usr/local/bin)
 
 	path, args, which := resolveThemeCLIAgent(settings, "pi")
 	assert.Equal(t, pi, path)

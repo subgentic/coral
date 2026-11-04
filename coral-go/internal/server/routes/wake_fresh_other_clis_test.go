@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/linktest"
 	"github.com/subgentic/coral/internal/store"
 )
 
@@ -43,10 +44,16 @@ func TestPiWakeWithNoSavedSessionStartsFresh(t *testing.T) {
 
 	// only a regular .jsonl file is a saved session: a link named *.jsonl (it could point anywhere) and a regular file of another name are not
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "notes.txt"), []byte("x"), 0o600))
-	require.NoError(t, os.Symlink(filepath.Join(dir, "notes.txt"), filepath.Join(dir, "link.jsonl")))
 	plan, err = r.h.prepareWake(r.ctx, ls, true)
 	require.NoError(t, err)
-	assert.True(t, plan.freshStart, "a symlink named .jsonl and a non-.jsonl file are no saved session")
+	assert.True(t, plan.freshStart, "a non-.jsonl file is no saved session")
+	// the link case alone skips where this account can't make a link (CI still runs it), so the rest of the test runs everywhere
+	t.Run("a link named .jsonl", func(t *testing.T) {
+		linktest.Symlink(t, filepath.Join(dir, "notes.txt"), filepath.Join(dir, "link.jsonl"))
+		plan, err := r.h.prepareWake(r.ctx, ls, true)
+		require.NoError(t, err)
+		assert.True(t, plan.freshStart, "a symlink named .jsonl is no saved session")
+	})
 
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "s.jsonl"), []byte("{}\n"), 0o600))
 	plan, err = r.h.prepareWake(r.ctx, ls, true)
