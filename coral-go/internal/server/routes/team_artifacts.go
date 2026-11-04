@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/subgentic/coral/internal/querypage"
+	"github.com/subgentic/coral/internal/safego"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -568,6 +569,9 @@ var uploadDirSettle = 2 * time.Second
 // uploadReadWorkers is how many record files are read at once in a cold directory (#13292: 20,000 records were read one after the other, 3.85 s).
 const uploadReadWorkers = 8
 
+// uploadWarmFolders is how many folders the start-up warm reads at once (each by uploadReadWorkers readers: 16 files open at most, Security's INFO on #13292).
+const uploadWarmFolders = 2
+
 // uploadRecordReadHook runs once for each record file that is actually read (tests count them).
 var uploadRecordReadHook = func() {}
 
@@ -624,6 +628,7 @@ func (c *uploadDirCache) list(coralDir, sessionID string) []sessionUpload {
 	for w := 0; w < uploadReadWorkers; w++ {
 		wg.Add(1)
 		go func() {
+			defer safego.Recover("upload records read")
 			defer wg.Done()
 			for i := range next {
 				slots[i].sig = readUploadRecordFile(dir, slots[i].name)
@@ -685,9 +690,10 @@ func (c *uploadDirCache) warm(coralDir string) {
 	}
 	var wg sync.WaitGroup
 	next := make(chan string)
-	for w := 0; w < 4; w++ {
+	for w := 0; w < uploadWarmFolders; w++ {
 		wg.Add(1)
 		go func() {
+			defer safego.Recover("upload records warm")
 			defer wg.Done()
 			for sid := range next {
 				c.list(coralDir, sid)
