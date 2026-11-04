@@ -70,3 +70,43 @@ func TestLiveGitSnapshotsPageWithATotalAndACursor(t *testing.T) {
 		assert.Equal(t, http.StatusBadRequest, code, bad)
 	}
 }
+
+// QA's boundaries (#13188): a list of exactly one page, and the 1,024-character cursor cap.
+func TestLiveGitPagedBoundaries(t *testing.T) {
+	_, h, _, _ := setupSessionsTestServer(t)
+	ctx := t.Context()
+	for i := 0; i < 4; i++ {
+		require.NoError(t, h.gs.UpsertGitSnapshot(ctx, &store.GitSnapshot{AgentName: "edge", AgentType: "claude", WorkingDirectory: "/w", Branch: "main", CommitHash: fmt.Sprintf("%040d", i), CommitSubject: fmt.Sprintf("c%d", i)}))
+	}
+	r := chi.NewRouter()
+	r.Get("/api/sessions/live/{name}/git", h.Git)
+	get := func(q string) (int, map[string]any) {
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "http://127.0.0.1/api/sessions/live/edge/git"+q, nil)
+		req.RemoteAddr = "127.0.0.1:50000"
+		req.Header.Set("Sec-Fetch-Site", "same-origin")
+		r.ServeHTTP(w, req)
+		var out map[string]any
+		_ = json.Unmarshal(w.Body.Bytes(), &out)
+		return w.Code, out
+	}
+	code, p := get("?limit=4")
+	require.Equal(t, http.StatusOK, code, p)
+	assert.Len(t, p["snapshots"], 4)
+	assert.Equal(t, false, p["has_more"])
+	assert.Nil(t, p["next_cursor"])
+	_, p = get("?limit=3")
+	require.Equal(t, true, p["has_more"])
+	_, p = get("?limit=3&cursor=" + p["next_cursor"].(string))
+	assert.Len(t, p["snapshots"], 1, "the next page is the one row")
+	assert.Equal(t, false, p["has_more"])
+
+	padded := func(chars int) string {
+		body := `{"r":"2026-10-10T10:02:00Z","i":3}`
+		return base64.RawURLEncoding.EncodeToString([]byte(body + strings.Repeat(" ", chars*3/4-len(body))))
+	}
+	code, _ = get("?cursor=" + padded(1024))
+	assert.Equal(t, http.StatusOK, code, "exactly 1,024 characters")
+	code, _ = get("?cursor=" + padded(1028))
+	assert.Equal(t, http.StatusBadRequest, code, "1,028 characters")
+}
