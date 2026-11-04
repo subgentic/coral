@@ -267,3 +267,42 @@ func TestAllTeamArtifactsAllCountsFilesNotVersionsWithVersionsNewest(t *testing.
 	plain := getAllTeamArtifacts(t, srv, "?limit=1", http.StatusOK)
 	require.Equal(t, 6, plain.All, "without versions=newest a version is a row, as it always was")
 }
+
+// #13163 (QA Reviewer 2's SHOULD on #13151): the no-team group's own count is files too. Reverting only the no-team ref in ListAllTeamArtifacts (filesOrVersions to len(rows)) left the test above green, because it
+// had only team files. A file with no team that has three versions is one file with versions=newest, and three rows without it; the Team filter "No team" agrees.
+func TestAllTeamArtifactsCountsAFileWithNoTeamAsAFileNotItsVersions(t *testing.T) {
+	t.Parallel()
+	srv, h := allTeamArtifactsServer(t)
+	const solo = "00000000-0000-4000-8000-0000000000c3" // an agent that belongs to no team
+	up := func(name, body, at string) {
+		t.Helper()
+		id := storeTyped(t, h.coralDir, body, name, "text/markdown")
+		dir := uploadsDir(h.coralDir, solo)
+		require.NoError(t, os.MkdirAll(dir, 0o755))
+		rec, _ := json.Marshal(agentUploadRecord{agentArtifactMeta: agentArtifactMeta{Name: name, MediaType: "text/markdown", Size: int64(len(body)), Digest: "sha256:" + id}, CreatedAt: at})
+		require.NoError(t, os.WriteFile(filepath.Join(dir, id+".json"), rec, 0o644))
+	}
+	up("notes.md", "n1", "2026-10-01T10:00:00Z")
+	up("notes.md", "n2", "2026-10-02T10:00:00Z")
+	up("notes.md", "n3", "2026-10-03T10:00:00Z")
+	up("other.md", "o1", "2026-10-04T10:00:00Z")
+
+	noTeamAll := func(q string) (all, group int) {
+		got := getAllTeamArtifacts(t, srv, q, http.StatusOK)
+		for _, ref := range got.Teams {
+			if ref.Team == "No team" {
+				group = ref.All
+			}
+		}
+		return got.All, group
+	}
+	all, group := noTeamAll("?limit=1&versions=newest")
+	require.Equal(t, 2, all, "the list's own count is the two files, not the four versions")
+	require.Equal(t, 2, group, "and so is the No team group's: the file counts once")
+	all, group = noTeamAll("?limit=1&team=No+team&versions=newest")
+	require.Equal(t, 2, all, "the No team filter agrees")
+	require.Equal(t, 2, group)
+	all, group = noTeamAll("?limit=1&versions=all")
+	require.Equal(t, 4, all, "as asked, every version is a row")
+	require.Equal(t, 4, group)
+}
