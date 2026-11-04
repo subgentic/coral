@@ -68,8 +68,8 @@ func (c *teamItemsCache) get(key teamItemsKey) (items []teamArtifact, truncated,
 	return nil, false, false, false
 }
 
-// put keeps items (the caller keeps its own copy) under key and drops the entries of the same board and filter that an older revision made, and the oldest beyond teamItemsEntries.
-func (c *teamItemsCache) put(key teamItemsKey, items []teamArtifact, truncated bool) {
+// put keeps items (the caller keeps its own copy) under key, aged from builtAt: when the build STARTED, which is when its data was read (a slow build does not buy the entry more time), and drops the entries of the same board and filter that an older revision made, and the oldest beyond teamItemsEntries.
+func (c *teamItemsCache) put(key teamItemsKey, builtAt time.Time, items []teamArtifact, truncated bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	kept := c.entries[:0:0]
@@ -79,7 +79,7 @@ func (c *teamItemsCache) put(key teamItemsKey, items []teamArtifact, truncated b
 		}
 		kept = append(kept, e)
 	}
-	e := &teamItemsEntry{key: key, at: c.clock(), items: append([]teamArtifact(nil), items...), truncated: truncated}
+	e := &teamItemsEntry{key: key, at: builtAt, items: append([]teamArtifact(nil), items...), truncated: truncated}
 	for i := range e.items {
 		if e.items[i].Private {
 			e.anyPrivate = true

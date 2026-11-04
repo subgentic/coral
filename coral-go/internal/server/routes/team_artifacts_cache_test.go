@@ -346,3 +346,78 @@ func TestNoRequestCanChangeTheKeptList(t *testing.T) {
 	require.JSONEq(t, string(wasJSON), string(againJSON), "a caller that changes its list changes nothing for the next")
 	require.Equal(t, before, snapshot())
 }
+
+// The task writers whose saves change what the list shows of a task (its review files, its title) note the board's revision, so the kept list is built again after them (Backend Dev's SHOULD on #13522).
+func TestTeamArtifactsListShowsTheTaskWritersOnTheNextRead(t *testing.T) {
+	srv, h, coralDir := teamArtifactServer(t)
+	ctx := context.Background()
+	subscribeSession(t, h, "alpha", "Alice", sessAlice)
+	writeUpload(t, coralDir, sessAlice, "# first\n", "first.md", "2026-10-09T10:00:00Z")
+	time.Sleep(uploadDirSettle + 500*time.Millisecond)
+	list := func() []teamArtifact {
+		return getTeamArtifacts(t, srv, "/api/board/alpha/artifacts?limit=200", 200).Artifacts
+	}
+	byName := func(rows []teamArtifact, name string) *teamArtifact {
+		for i := range rows {
+			if rows[i].Name == name {
+				return &rows[i]
+			}
+		}
+		return nil
+	}
+	require.NotNil(t, byName(list(), "first.md"))
+	task, err := h.bs.CreateTask(ctx, "alpha", "reviewed", "", "medium", "lead", "Alice")
+	require.NoError(t, err)
+	_, err = h.bs.ClaimTask(ctx, "alpha", "Alice", task.ID)
+	require.NoError(t, err)
+	require.Nil(t, byName(list(), "review-candidate"))
+
+	t.Run("a completion review submitted", func(t *testing.T) {
+		_, err := h.bs.SubmitCompletionReview(ctx, "alpha", task.ID, "Alice", "msg", "success", "needs review", []board.TaskArtifact{{Name: "review-candidate", Content: "r"}})
+		require.NoError(t, err)
+		row := byName(list(), "review-candidate")
+		require.NotNil(t, row, "a submitted review's file shows on the next read")
+		require.Equal(t, "reviewed", row.TaskTitle)
+	})
+	t.Run("a task's title edited", func(t *testing.T) {
+		title := "reviewed again"
+		_, err := h.bs.EditTaskText(ctx, "alpha", task.ID, "lead", &title, nil, 0, 0)
+		require.NoError(t, err)
+		require.Equal(t, "reviewed again", byName(list(), "review-candidate").TaskTitle, "the new title is on the row of its file on the next read")
+	})
+	t.Run("a completion review released", func(t *testing.T) {
+		_, err := h.bs.Subscribe(ctx, "alpha", "Lead", "Orchestrator", "claude-77777777-aaaa-0000-0000-000000000007", nil, "all")
+		require.NoError(t, err)
+		list()
+		builds := countBuilds(t)
+		list()
+		require.EqualValues(t, 0, builds.Load(), "nothing changed: the kept list")
+		_, err = h.bs.ReleaseCompletionReview(ctx, "alpha", task.ID, "Lead", "not needed")
+		require.NoError(t, err)
+		list()
+		require.EqualValues(t, 1, builds.Load(), "releasing the review moves the revision: the list is built again")
+	})
+}
+
+// The 5 s a kept list may live count from when its build started (when its data was read), not from when it was stored: a build that takes longer than the TTL leaves an entry that is already out of date (Backend Dev's SHOULD on #13522).
+func TestTeamArtifactsListTTLCountsFromTheStartOfTheBuild(t *testing.T) {
+	srv, h, coralDir := teamArtifactServer(t)
+	subscribeSession(t, h, "alpha", "Alice", sessAlice)
+	writeUpload(t, coralDir, sessAlice, "# one\n", "one.md", "2026-10-09T10:00:00Z")
+	time.Sleep(uploadDirSettle + 500*time.Millisecond)
+	now := time.Now()
+	h.itemsCache.now = func() time.Time { return now }
+	var n atomic.Int64
+	old := teamItemsBuildHook
+	teamItemsBuildHook = func() {
+		if n.Add(1) == 1 {
+			now = now.Add(teamItemsTTL + time.Second) // the first build is slow: it runs past the TTL
+		}
+	}
+	t.Cleanup(func() { teamItemsBuildHook = old })
+	getTeamArtifacts(t, srv, "/api/board/alpha/artifacts?limit=10", 200)
+	getTeamArtifacts(t, srv, "/api/board/alpha/artifacts?limit=10", 200)
+	require.EqualValues(t, 2, n.Load(), "the entry of a slow build was already past its TTL when it was stored: the next read builds again")
+	getTeamArtifacts(t, srv, "/api/board/alpha/artifacts?limit=10", 200)
+	require.EqualValues(t, 2, n.Load(), "and the fast build after it is kept")
+}

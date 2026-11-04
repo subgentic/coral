@@ -260,6 +260,7 @@ func (h *BoardHandler) projectArtifactItems(r *http.Request, project, sessionFil
 // rows are the kept list's (aliased: the slice itself, or a copy of it that still shares what the rows point to), which no request may write to or through; a request whose parts need a row changed (the new-comments counts, a kind or a muted team, a private mark taken off, a Hub viewer's redaction) gets its own
 // copy, and one that changes nothing, the Operator's walk of a big board, copies nothing: 20,000 rows were copied for every page (#13552).
 func (h *BoardHandler) projectArtifactItemsView(r *http.Request, project, sessionFilter string) (items []teamArtifact, scanTruncated, aliased bool, err error) {
+	builtAt := h.itemsCache.clock() // when the data is read: the entry is as old as this, however long the build takes
 	subscribers, err := h.bs.TeamSubscriberSessions(r.Context(), project)
 	if err != nil {
 		return nil, false, false, err
@@ -273,7 +274,7 @@ func (h *BoardHandler) projectArtifactItemsView(r *http.Request, project, sessio
 		if err != nil {
 			return nil, false, false, err
 		}
-		h.itemsCache.put(key, items, scanTruncated)
+		h.itemsCache.put(key, builtAt, items, scanTruncated)
 		for i := range items {
 			if items[i].Private {
 				anyPrivate = true

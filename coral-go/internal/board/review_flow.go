@@ -175,7 +175,11 @@ func (s *Store) HandToOrchestrator(ctx context.Context, project string, id int64
 	if err := saveWorkflow(ctx, tx, id, w); err != nil {
 		return "", nil, err
 	}
-	return orch, reopened, tx.Commit()
+	if err = tx.Commit(); err != nil {
+		return orch, reopened, err
+	}
+	s.NoteArtifactsChanged(project) // the completion review is released: its files leave the list's rows (#13522)
+	return orch, reopened, nil
 }
 
 // reopenReviews starts the next round with the last round's reviewers (#3787): each one's review

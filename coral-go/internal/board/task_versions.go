@@ -223,6 +223,7 @@ func (s *Store) EditTaskText(ctx context.Context, project string, id int64, edit
 	if err = tx.Commit(); err != nil {
 		return nil, err
 	}
+	s.NoteArtifactsChanged(project) // the task's title is on the rows of its files, and a text edit stales its reviews (#13522)
 	return s.GetTask(ctx, project, id)
 }
 

@@ -232,6 +232,7 @@ func (s *Store) AttachPatches(ctx context.Context, project string, id int64, act
 	if err := tx.Commit(); err != nil {
 		return nil, nil, err
 	}
+	s.NoteArtifactsChanged(project) // what the team's artifact list shows of this task changed (#13522: the kept list is built again when the revision moves)
 	task, err = s.getTaskByID(ctx, project, id)
 	return task, reopened, err
 }
@@ -278,5 +279,6 @@ func (s *Store) SendBack(ctx context.Context, project string, id int64, actor, n
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
+	s.NoteArtifactsChanged(project) // what the team's artifact list shows of this task changed (#13522: the kept list is built again when the revision moves)
 	return s.getTaskByID(ctx, project, id)
 }
