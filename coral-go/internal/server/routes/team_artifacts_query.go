@@ -27,10 +27,10 @@ import (
 // (so % and _ are ordinary characters), the rest are enum words, names compared for equality, and times.
 
 var teamArtifactParamNames = map[string]bool{"limit": true, "offset": true, "session_id": true,
-	"q": true, "kind": true, "origin": true, "by": true, "board": true, "kept": true, "starred": true, "task": true, "goal": true, "tag": true, "since": true, "until": true, "sort": true, "cursor": true, "versions": true}
+	"q": true, "kind": true, "origin": true, "by": true, "board": true, "kept": true, "starred": true, "task": true, "goal": true, "tag": true, "since": true, "until": true, "sort": true, "cursor": true, "versions": true, "read": true}
 
 // teamArtifactQueryParams are the parameters that make the reply a query (the others are the list's original ones).
-var teamArtifactQueryParams = []string{"q", "kind", "origin", "by", "board", "kept", "starred", "task", "goal", "tag", "since", "until", "sort", "cursor", "versions"}
+var teamArtifactQueryParams = []string{"q", "kind", "origin", "by", "board", "kept", "starred", "task", "goal", "tag", "since", "until", "sort", "cursor", "versions", "read"}
 
 var (
 	teamArtifactKinds   = []string{"image", "pdf", "text", "other"}
@@ -60,6 +60,7 @@ type teamArtifactQuery struct {
 	by       []string // lower-cased
 	boards   []string // lower-cased
 	kept     *bool
+	read     *bool // read=1: the files the Operator has read (a read tag and no news in their thread); read=0: the ones still unread (#13162, Needs you's unread filter, applied by the computer before the page is cut)
 	starred  *bool
 	tags     []string // any of these tags (#8583), normalised
 	goal     int64    // 0: any; a goal's number: only what the tasks that work toward it hold (#8579)
@@ -218,6 +219,17 @@ func parseTeamArtifactQuery(vals url.Values) (*teamArtifactQuery, error) {
 			return nil, taErr("kept must be true or false")
 		}
 	}
+	if v, ok, serr := taSingle("read", vals["read"]); serr != nil {
+		return nil, serr
+	} else if ok {
+		switch v {
+		case "1", "0":
+			b := v == "1"
+			q.read = &b
+		default:
+			return nil, taErr("read must be 1 or 0")
+		}
+	}
 	if v, ok, serr := taSingle("starred", vals["starred"]); serr != nil {
 		return nil, serr
 	} else if ok {
@@ -284,7 +296,7 @@ func parseTeamArtifactQuery(vals url.Values) (*teamArtifactQuery, error) {
 	}
 	// What a cursor is tied to: every filter and the sort (not limit, offset or the cursor itself).
 	fp := sha256.New()
-	fmt.Fprintf(fp, "%s|%v|%v|%v|%v|%v|%v|%v|%v|%v|%v|%v|%v|%s|%s", q.q, q.kinds, q.origins, q.by, q.boards, q.kept, q.starred, q.task, q.goal, q.tags, q.since, q.until, q.collapse, q.sortName, vals.Get("session_id"))
+	fmt.Fprintf(fp, "%s|%v|%v|%v|%v|%v|%v|%v|%v|%v|%v|%v|%v|%s|%s|%v", q.q, q.kinds, q.origins, q.by, q.boards, q.kept, q.starred, q.task, q.goal, q.tags, q.since, q.until, q.collapse, q.sortName, vals.Get("session_id"), q.read)
 	if scope := vals.Get(crossTeamScopeParam); scope != "" { // the cross-team list: its cursors are its own (a team route's is refused there) and tied to the teams asked for
 		fmt.Fprintf(fp, "|%s|%v", scope, vals["team"])
 	}
@@ -418,6 +430,9 @@ func (q *teamArtifactQuery) cheapMatch(it teamArtifact, kept, starred map[string
 	}
 	if len(q.tags) > 0 && !hasAnyTag(it.Tags, q.tags) && !(it.NewComments > 0 && hasAnyTag([]string{tagNewComments}, q.tags)) && !(hasAnyTag([]string{"for review"}, q.tags) && decidedWithNews(it.Tags, it.NewComments)) {
 		return false // the tag "new comments" is not stored: it matches the rows the Operator's list says have news (#12026); and the list tagged "for review" also holds the decided files that have news, so the page reads one list (#12097)
+	}
+	if q.read != nil && artifactIsRead(it) != *q.read {
+		return false
 	}
 	if q.kept != nil {
 		isKept := it.managed != "" && kept[it.managed]
@@ -859,4 +874,17 @@ func artifactUploaderLabel(it teamArtifact) string {
 		return it.Role
 	}
 	return it.Uploader
+}
+
+// artifactIsRead is whether the Operator has read a file, as Needs you says it (inbox_reviews.js isRead): it has the read tag and its thread has no news (replies an agent left since the Operator last opened it).
+func artifactIsRead(it teamArtifact) bool {
+	if it.NewComments > 0 {
+		return false
+	}
+	for _, t := range it.Tags {
+		if t == "read" {
+			return true
+		}
+	}
+	return false
 }
