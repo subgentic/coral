@@ -43,7 +43,8 @@ class Base(unittest.TestCase):
         for n in ('mini-lock', 'mini-idle'):
             os.chmod(os.path.join(self.minibin, n), 0o755)
         self.env = {'PATH': self.stubs + ':' + SYSPATH, 'HOME': self.d, 'CI_HOME': self.home, 'STUB_LOG': self.log, 'STUB_PS': self.psfile, 'CI_OWNER': 'tester',
-                    'CI_SSH': os.path.join(self.stubs, 'fake-ssh'), 'CI_MINI_BIN': self.minibin}
+                    'CI_SSH': os.path.join(self.stubs, 'fake-ssh'), 'CI_MINI_BIN': self.minibin,
+                    'CORAL_TELEMETRY_DISABLED': '1'}  # the stubs stand in for coral-board and coral-agent; a real one swapped in by mistake would send nothing (the census of runners that start a Coral, #13481)
 
     def tearDown(self):
         shutil.rmtree(self.d, ignore_errors=True)
