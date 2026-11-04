@@ -75,7 +75,7 @@ var routeQueries = map[string]string{
 	"GET /api/team-artifacts":                     "board,by,cursor,goal,kept,kind,limit,offset,origin,q,since,sort,starred,tag,task,team,until,versions=newest",
 	"GET /api/teams/all":                          "status",
 	"GET /api/teams/detail/{}/availability":       "activity,project,subscriber_id",
-	"GET /api/token-usage":                        "board_name,session_id,since",
+	"GET /api/token-usage":                        "board_name,cursor,limit,session_id,since",
 	"GET /api/token-usage/by-branch":              "branch,since",
 	"GET /api/token-usage/by-team":                "since",
 	"GET /api/token-usage/summary":                "by_agent_limit,include=totals,since",

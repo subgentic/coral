@@ -130,8 +130,15 @@ func NewTokenUsageStore(db *DB) *TokenUsageStore {
 	return &TokenUsageStore{db: db}
 }
 
-// ListUsage returns aggregated token usage per session (sum of all per-turn records).
-func (s *TokenUsageStore) ListUsage(ctx context.Context, f UsageFilter) ([]TokenUsage, error) {
+// UsageAfter is the place a page of ListUsagePage continues from: the last row sent, in the list's order (newest activity first, then session id).
+type UsageAfter struct {
+	RecordedAt string
+	SessionID  string
+}
+
+// usageSessionsQuery is one row per session for the filter, newest activity first, then session id: the query the list, its page, its totals and its per-agent rows all share.
+// after, when set, keeps only the rows past that place (keyset on MAX(recorded_at), session_id), so a page costs a page and not the whole list (#13218).
+func usageSessionsQuery(f UsageFilter, after *UsageAfter) (string, []interface{}) {
 	query := `SELECT MAX(t.id) as id, t.session_id,
 	          COALESCE(NULLIF(MAX(ls.display_name), ''), MAX(t.agent_name)) as agent_name,
 	          MAX(t.agent_type) as agent_type,
@@ -167,11 +174,77 @@ func (s *TokenUsageStore) ListUsage(ctx context.Context, f UsageFilter) ([]Token
 		args = append(args, windowBound(f.Since))
 	}
 
-	query += ` GROUP BY t.session_id ORDER BY MAX(t.recorded_at) DESC, t.session_id`
+	query += ` GROUP BY t.session_id`
+	if after != nil {
+		query += ` HAVING MAX(t.recorded_at) < ? OR (MAX(t.recorded_at) = ? AND t.session_id > ?)`
+		args = append(args, after.RecordedAt, after.RecordedAt, after.SessionID)
+	}
+	query += ` ORDER BY MAX(t.recorded_at) DESC, t.session_id`
+	return query, args
+}
 
+// ListUsage returns aggregated token usage per session (sum of all per-turn records).
+func (s *TokenUsageStore) ListUsage(ctx context.Context, f UsageFilter) ([]TokenUsage, error) {
+	query, args := usageSessionsQuery(f, nil)
 	var results []TokenUsage
 	err := s.db.Reader().SelectContext(ctx, &results, query, args...)
 	return results, err
+}
+
+// ListUsagePage returns at most limit sessions after the given place (nil: from the newest), in ListUsage's order, cut in SQL.
+func (s *TokenUsageStore) ListUsagePage(ctx context.Context, f UsageFilter, after *UsageAfter, limit int) ([]TokenUsage, error) {
+	query, args := usageSessionsQuery(f, after)
+	query += " LIMIT ?"
+	args = append(args, limit)
+	var results []TokenUsage
+	err := s.db.Reader().SelectContext(ctx, &results, query, args...)
+	return results, err
+}
+
+// UsageTotals adds up every session the filter matches, in SQL: no row is read into the process.
+type UsageTotals struct {
+	Sessions         int64   `db:"sessions"`
+	InputTokens      int64   `db:"input_tokens"`
+	OutputTokens     int64   `db:"output_tokens"`
+	CacheReadTokens  int64   `db:"cache_read_tokens"`
+	CacheWriteTokens int64   `db:"cache_write_tokens"`
+	TotalTokens      int64   `db:"total_tokens"`
+	CostUSD          float64 `db:"cost_usd"`
+	FirstStart       string  `db:"first_start"`
+	LastActivity     string  `db:"last_activity"`
+}
+
+// UsageTotalsFor is the totals of every session the filter matches.
+func (s *TokenUsageStore) UsageTotalsFor(ctx context.Context, f UsageFilter) (UsageTotals, error) {
+	inner, args := usageSessionsQuery(f, nil)
+	var t UsageTotals
+	err := s.db.Reader().GetContext(ctx, &t, `SELECT COUNT(*) AS sessions, COALESCE(SUM(input_tokens),0) AS input_tokens, COALESCE(SUM(output_tokens),0) AS output_tokens,
+	  COALESCE(SUM(cache_read_tokens),0) AS cache_read_tokens, COALESCE(SUM(cache_write_tokens),0) AS cache_write_tokens, COALESCE(SUM(total_tokens),0) AS total_tokens,
+	  COALESCE(SUM(cost_usd),0) AS cost_usd, COALESCE(MIN(NULLIF(session_start_at,'')),'') AS first_start, COALESCE(MAX(NULLIF(last_activity_at,'')),'') AS last_activity
+	  FROM (`+inner+`)`, args...)
+	return t, err
+}
+
+// UsageAgent is every matching session of one agent added up (a session's name, else its id).
+type UsageAgent struct {
+	Name             string  `db:"name" json:"name"`
+	InputTokens      int64   `db:"input_tokens" json:"input_tokens"`
+	OutputTokens     int64   `db:"output_tokens" json:"output_tokens"`
+	CacheReadTokens  int64   `db:"cache_read_tokens" json:"cache_read_tokens"`
+	CacheWriteTokens int64   `db:"cache_write_tokens" json:"cache_write_tokens"`
+	CostUSD          float64 `db:"cost_usd" json:"cost_usd"`
+	NumTurns         int64   `db:"num_turns" json:"num_turns"`
+}
+
+// UsageByAgent adds the matching sessions up by agent, newest activity first.
+func (s *TokenUsageStore) UsageByAgent(ctx context.Context, f UsageFilter) ([]UsageAgent, error) {
+	inner, args := usageSessionsQuery(f, nil)
+	out := []UsageAgent{}
+	err := s.db.Reader().SelectContext(ctx, &out, `SELECT COALESCE(NULLIF(agent_name,''), NULLIF(session_id,''), 'Unknown agent') AS name,
+	  COALESCE(SUM(input_tokens),0) AS input_tokens, COALESCE(SUM(output_tokens),0) AS output_tokens, COALESCE(SUM(cache_read_tokens),0) AS cache_read_tokens,
+	  COALESCE(SUM(cache_write_tokens),0) AS cache_write_tokens, COALESCE(SUM(cost_usd),0) AS cost_usd, COALESCE(SUM(num_turns),0) AS num_turns
+	  FROM (`+inner+`) GROUP BY name ORDER BY MAX(recorded_at) DESC, MIN(session_id)`, args...)
+	return out, err
 }
 
 // latestUsageRollup selects the rollup rows that count for each requested

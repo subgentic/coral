@@ -83,13 +83,10 @@ export async function showTeamTokenUsage(boardName) {
     const usageData = await teamFetch(boardName, n => `/api/token-usage?board_name=${encodeURIComponent(n)}`)
         .then(resp => resp.ok ? resp.json() : null)
         .catch(() => null);
-    // The unified usage API answers { records, totals }: one record per session (and source), so the members are the records grouped by agent name (one agent that ran in several sessions is one row).
+    // The unified usage API answers { records (one page of 50 sessions), total, next_cursor, agents, totals } (#13187): `agents` is every matching session added up by agent name (one agent that ran in several sessions is one row), so this table does not read the rows.
     const members = new Map();
-    for (const r of usageData?.records || []) {
-        const name = r.agent_name || r.session_id || 'Unknown agent', m = members.get(name) || { name, total_input_tokens: 0, total_output_tokens: 0, total_cache_read_tokens: 0, total_cache_write_tokens: 0, total_cost_usd: 0, total_requests: 0 };
-        m.total_input_tokens += r.input_tokens || 0; m.total_output_tokens += r.output_tokens || 0; m.total_cache_read_tokens += r.cache_read_tokens || 0; m.total_cache_write_tokens += r.cache_write_tokens || 0;
-        m.total_cost_usd += r.cost_usd || 0; m.total_requests += r.num_turns || 0;
-        members.set(name, m);
+    for (const r of usageData?.agents || []) {
+        members.set(r.name, { name: r.name, total_input_tokens: r.input_tokens || 0, total_output_tokens: r.output_tokens || 0, total_cache_read_tokens: r.cache_read_tokens || 0, total_cache_write_tokens: r.cache_write_tokens || 0, total_cost_usd: r.cost_usd || 0, total_requests: r.num_turns || 0 });
     }
     const agents = [...members.values()].filter(a => a.total_requests > 0 || a.total_cost_usd > 0);
 
