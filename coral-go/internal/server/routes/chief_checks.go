@@ -384,7 +384,7 @@ func (h *ChiefChecksHandler) DeliverScheduledCheck(ctx context.Context, job stor
 	if t.State == "done" {
 		return nil
 	}
-	if err = h.deliver(ctx, t.ID, "delivery"); err != nil {
+	if err = h.deliverTrigger(ctx, t.ID, "delivery"); err != nil {
 		return err
 	}
 	latest, err := h.sched.ChiefTrigger(ctx, t.ID)
@@ -407,7 +407,7 @@ func (h *ChiefChecksHandler) Poll(ctx context.Context) {
 			if t.Delivery == "delivered" {
 				kind = "reminder"
 			}
-			h.deliver(ctx, t.ID, kind)
+			h.deliverTrigger(ctx, t.ID, kind)
 		}
 	}
 	keys, err := h.sessions.bs.OldChiefDeliveryKeys(ctx, h.now().Add(-30*24*time.Hour).Unix())
@@ -419,7 +419,7 @@ func (h *ChiefChecksHandler) Poll(ctx context.Context) {
 		}
 	}
 }
-func (h *ChiefChecksHandler) deliver(ctx context.Context, id int64, kind string) error {
+func (h *ChiefChecksHandler) deliverTrigger(ctx context.Context, id int64, kind string) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	now := h.now()
