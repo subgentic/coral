@@ -99,7 +99,9 @@ type provisionPlan struct {
 	backend string
 	// dataDir is the data folder of a set up, relative to the home folder on that computer; "" is the default (~/.coral-server/data). An upgrade keeps the one recorded there.
 	dataDir string
-	tmux    string
+	// port is the port the far Coral listens on, the person's choice for a set up (1024 to 65535); 0 is the default, 8420. An upgrade uses the one stored with the computer.
+	port int
+	tmux string
 	// agentsSurvive is, for an upgrade, whether the agents on that computer survive the restart: it runs with tmux (the backend recorded there, or tmux where it is installed and none was recorded). "" before
 	// it was read, then "yes" or "no".
 	agentsSurvive string
@@ -145,6 +147,7 @@ func (p *provisionPlan) view() map[string]any {
 	if p.kind() == kindSetup {
 		v["backend"] = p.backendOrDefault()
 		v["data_dir"] = p.dataDirOrDefault()
+		v["port"] = p.portOrDefault()
 		if p.tmux != "" {
 			v["tmux"] = p.tmux == "yes" // whether that computer has tmux, so the page can say which choices are open
 		}
@@ -171,6 +174,14 @@ func (p *provisionPlan) view() map[string]any {
 		v["forgotten_keys"] = append([]provisionKey(nil), p.forgotten...)
 	}
 	return v
+}
+
+// portOrDefault is the port of a set up: the default unless the person chose one.
+func (p *provisionPlan) portOrDefault() int {
+	if p.port != 0 {
+		return p.port
+	}
+	return sshprov.DefaultPort
 }
 
 // dataDirOrDefault is the data folder of a set up: the default unless the person named one.
@@ -240,13 +251,20 @@ func hubEULAState() (required, accepted bool) { return config.EULARequired(), li
 // portInUseSentence is the answer when 8420 on the far computer is held by something that is not this user's Coral (usually another user's: every Coral set up from here listens on 8420).
 const portInUseSentence = "Port 8420 is already in use on that computer, perhaps by another user's Coral, so Coral was not started."
 
-// portInUseSentenceFor names what holds the port when the far computer could say (#12947: an old process was still on 8420). The hub never stops it: the person is given the command.
+// portInUseSentenceFor names what holds the port when the far computer could say (#12947: an old process was still on 8420). The hub never stops it: the person is given the command. The port is the one asked for (#13081).
 func portInUseSentenceFor(err error) string {
 	var pe *sshprov.PortInUseError
-	if errors.As(err, &pe) && pe.Pid > 0 {
-		return fmt.Sprintf("Port 8420 is held by another process on that computer (pid %d, command %s), so Coral was not started. Nothing was stopped: the lines below show how to stop it yourself.", pe.Pid, pe.Command)
+	port := sshprov.DefaultPort
+	if errors.As(err, &pe) && pe.Port != 0 {
+		port = pe.Port
 	}
-	return portInUseSentence
+	if pe != nil && pe.Pid > 0 {
+		return fmt.Sprintf("Port %d is held by another process on that computer (pid %d, command %s), so Coral was not started. Nothing was stopped: the lines below show how to stop it yourself.", port, pe.Pid, pe.Command)
+	}
+	if port == sshprov.DefaultPort {
+		return portInUseSentence
+	}
+	return fmt.Sprintf("Port %d is already in use on that computer, perhaps by another user's Coral, so Coral was not started. Choose another port.", port)
 }
 
 // noEULAMarker is the one sentence for a tier that requires the terms when this hub has no acceptance of the current ones (it cannot happen to a person who is using Coral).
@@ -496,6 +514,8 @@ type runRequest struct {
 	Backend string `json:"backend"`
 	// DataDir is the folder Coral keeps its data in on that computer, relative to its home folder (a Coral set up by hand keeps its data in ".coral"): "" is the default, ".coral-server/data". Set up only.
 	DataDir string `json:"data_dir"`
+	// Port is the port Coral listens on over there (loopback only), 1024 to 65535; 0 is the default, 8420. Set up only.
+	Port int `json:"port"`
 	// AllowDowngrade lets an upgrade install this hub's release over a NEWER one on that computer; without it that is refused before anything is changed (#12217).
 	AllowDowngrade bool `json:"allow_downgrade"`
 }
@@ -524,6 +544,10 @@ func (pr *Provisioner) Run(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.DataDir != "" && !sshprov.ValidDataDir(req.DataDir) {
 		errBadRequest(w, sshprov.DataDirProblem(req.DataDir))
+		return
+	}
+	if req.Port != 0 && !sshprov.ValidPort(req.Port) {
+		errBadRequest(w, "the port is a number from 1024 to 65535")
 		return
 	}
 	// A setup and an upgrade put Coral on the computer and record this hub's acceptance of the terms there. Stop and remove do not touch the terms. On a tier that requires the EULA the marker must hold the
@@ -569,6 +593,9 @@ func (pr *Provisioner) Run(w http.ResponseWriter, r *http.Request) {
 	}
 	if p.kind() == kindSetup && req.DataDir != "" && req.DataDir != sshprov.DefaultDataDir {
 		p.dataDir = req.DataDir
+	}
+	if p.kind() == kindSetup && req.Port != 0 && req.Port != sshprov.DefaultPort {
+		p.port = req.Port
 	}
 	p.mu.Unlock()
 	if len(keys) > 0 {
@@ -759,7 +786,7 @@ func (pr *Provisioner) finish(ctx context.Context, p *provisionPlan) error {
 	p.setStep("start", stepOK, "Coral is running in the background (its log is ~/.coral-server/coral.log).")
 
 	p.setStep("register", stepRunning, "Connecting it to this hub over SSH.")
-	rs := &store.RemoteServer{ID: p.ServerID, SSHTarget: p.Target.Stored(), RemotePort: sshprov.RemotePort}
+	rs := &store.RemoteServer{ID: p.ServerID, SSHTarget: p.Target.Stored(), RemotePort: p.portOrDefault()}
 	if h := pr.checkHealth(ctx, rs, key); h.Status != store.RemoteStatusOnline {
 		return &sshprov.ErrInstall{Step: "register", Msg: "Coral started, but this hub could not reach it over SSH."}
 	}
@@ -810,7 +837,7 @@ func (pr *Provisioner) realStartRemote(ctx context.Context, p *provisionPlan) (s
 		}
 		slog.Info("[provision] terms acceptance recorded for a setup", "plan", p.ID, "version", license.EULAVersion, "by", setupAcceptanceLabel(), "at", time.Now().UTC().Format(time.RFC3339))
 	}
-	if err := pr.runner.StartWithDataDir(ctx, p.Target, pr.version, p.backendOrDefault(), p.dataDir); err != nil {
+	if err := pr.runner.StartOn(ctx, p.Target, pr.version, p.backendOrDefault(), p.dataDir, p.portOrDefault()); err != nil {
 		if errors.Is(err, sshprov.ErrPortInUse) {
 			return "", "", fail(portInUseSentenceFor(err))
 		}
