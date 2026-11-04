@@ -3134,6 +3134,10 @@ button.terminal-gone-header { margin: 0 4px 0 0; font-size: var(--fs-sm); line-h
     padding: 0;
     overflow: hidden;
 }
+/* A steady height on a computer (#13179): a three-line note no longer opens a short, wide box with Comments squeezed; the dialog is most of the window whatever the document's length and the body scrolls. The phone's own rules are unchanged (the query is the one the Comments panel uses for a computer). */
+@media (min-width: 768px) and (min-height: 501px), (min-width: 768px) and (pointer: fine), (min-width: 951px) {
+    .artifact-viewer-content { height: 88vh; }
+}
 .artifact-viewer-header {
     display: flex;
     align-items: center;
