@@ -13,7 +13,11 @@ async function setupHubWorld({ client, Page, Emulation, width, height, mobile, i
     // Chromium's ProcessResponseOverride makes a fresh response head without the
     // loopback remote endpoint. LNA can therefore block this fixture's real socket.
     // Grant only this isolated origin; a real Hub uses its public same-origin feed.
-    await client.Browser.grantPermissions({ origin: new URL(BASE).origin, permissions: ['localNetworkAccess'] });
+    // Chrome 156 exposes split permissions: the legacy grant alone no longer
+    // authorizes loopback. Older runner Chromes advertise only the legacy name.
+    const networkPermissions = ['localNetworkAccess', 'localNetwork', 'loopbackNetwork']
+        .filter(name => client.Browser.PermissionType.enum.includes(name));
+    if (networkPermissions.length) await client.Browser.grantPermissions({ origin: new URL(BASE).origin, permissions: networkPermissions });
     await Promise.all([Page.enable(), Network.enable()]);
     await Network.setBypassServiceWorker({ bypass: true });
     await Emulation.setDeviceMetricsOverride({ width, height, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
