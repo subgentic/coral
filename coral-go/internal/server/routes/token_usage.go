@@ -1,10 +1,13 @@
 package routes
 
 import (
+	"encoding/base64"
 	"fmt"
 	"net/http"
+	"net/url"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -54,6 +57,11 @@ func (h *TokenUsageHandler) ListUsage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	page, nextCursor, ok := pageUsage(w, q, records)
+	if !ok {
+		return
+	}
+
 	// Compute aggregated totals
 	var totalInput, totalOutput, totalCacheRead, totalCacheWrite, totalTokens int64
 	var totalCost float64
@@ -78,7 +86,10 @@ func (h *TokenUsageHandler) ListUsage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
-		"records": records,
+		"records":     page,
+		"total":       len(records),
+		"next_cursor": nextCursor,
+		"agents":      usageByAgent(records),
 		"totals": map[string]any{
 			"input_tokens":       totalInput,
 			"output_tokens":      totalOutput,
@@ -92,6 +103,73 @@ func (h *TokenUsageHandler) ListUsage(w http.ResponseWriter, r *http.Request) {
 			"execution_time_sec": executionTimeSec,
 		},
 	})
+}
+
+// usagePageSize is the most session rows one request answers (#13187): the rest come by next_cursor. The totals and the per-agent rows are over every match, not the page.
+const usagePageSize = 50
+
+// pageUsage cuts the rows (already filtered, newest activity first, then session id) to one page: limit=N (1..50, default 50) and cursor, which the previous answer's next_cursor gives.
+// The cursor names the last row sent (its recorded_at and session id), so a row that lands between two requests moves the front, not the place: no row is sent twice or skipped after the cursor.
+func pageUsage(w http.ResponseWriter, q url.Values, rows []store.TokenUsage) (page []store.TokenUsage, next string, ok bool) {
+	limit := usagePageSize
+	if v := q.Get("limit"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 1 || n > usagePageSize {
+			errBadRequest(w, "limit must be 1 to 50")
+			return nil, "", false
+		}
+		limit = n
+	}
+	start := 0
+	if c := q.Get("cursor"); c != "" {
+		raw, err := base64.RawURLEncoding.DecodeString(c)
+		at, id, found := strings.Cut(string(raw), "|")
+		if err != nil || len(c) > 200 || !found {
+			errBadRequest(w, "invalid cursor")
+			return nil, "", false
+		}
+		start = sort.Search(len(rows), func(i int) bool { // the first row after the cursor's place in the order
+			if rows[i].RecordedAt != at {
+				return rows[i].RecordedAt < at
+			}
+			return rows[i].SessionID > id
+		})
+	}
+	end := start + limit
+	if end >= len(rows) {
+		return append([]store.TokenUsage{}, rows[start:]...), "", true
+	}
+	last := rows[end-1]
+	return append([]store.TokenUsage{}, rows[start:end]...), base64.RawURLEncoding.EncodeToString([]byte(last.RecordedAt + "|" + last.SessionID)), true
+}
+
+// usageByAgent adds up every matching row by agent (a session's name, else its id): what the team's usage table shows, so it need not read every row.
+func usageByAgent(rows []store.TokenUsage) []map[string]any {
+	idx := map[string]int{}
+	out := []map[string]any{}
+	for _, r := range rows {
+		name := r.AgentName
+		if name == "" {
+			name = r.SessionID
+		}
+		if name == "" {
+			name = "Unknown agent"
+		}
+		i, seen := idx[name]
+		if !seen {
+			i = len(out)
+			idx[name] = i
+			out = append(out, map[string]any{"name": name, "input_tokens": int64(0), "output_tokens": int64(0), "cache_read_tokens": int64(0), "cache_write_tokens": int64(0), "cost_usd": 0.0, "num_turns": int64(0)})
+		}
+		a := out[i]
+		a["input_tokens"] = a["input_tokens"].(int64) + int64(r.InputTokens)
+		a["output_tokens"] = a["output_tokens"].(int64) + int64(r.OutputTokens)
+		a["cache_read_tokens"] = a["cache_read_tokens"].(int64) + int64(r.CacheReadTokens)
+		a["cache_write_tokens"] = a["cache_write_tokens"].(int64) + int64(r.CacheWriteTokens)
+		a["cost_usd"] = a["cost_usd"].(float64) + r.CostUSD
+		a["num_turns"] = a["num_turns"].(int64) + int64(r.NumTurns)
+	}
+	return out
 }
 
 func formatOptionalTime(t time.Time) string {
