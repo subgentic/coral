@@ -163,13 +163,31 @@ func (h *SessionsHandler) refreshFilesInner(w http.ResponseWriter, r *http.Reque
 	if !h.requireAgentSession(w, r, name, sessionID) {
 		return
 	}
-	workdir := h.resolveGitRoot(agentCtx(r), name, "", sessionID)
+	handlerBegan := time.Now()
+	workdir := h.refreshWorkdir(agentCtx(r), name, sessionID)
 	if workdir == "" {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "Could not determine working directory", "files": []any{}})
 		return
 	}
+	follow := followOn(agentCtx(r))
+	manual := flags.manual || flags.live
+	if flags.live {
+		gitguard.Resume(workdir) // 'Turn live updates on': this pass runs, and the poller takes the folder up again (it pauses it again if git is still slow)
+	}
+	if pz, isPaused := gitguard.Get(workdir); isPaused && !manual {
+		// Live updates are paused for this folder (#13079): the stored list is the answer, no git runs (not even the repository check below: a paused folder is one); Refresh (manual=1) asks for one pass
+		mode := h.getDiffMode(r.Context())
+		if mode == "" {
+			mode = "branch_point"
+		}
+		stored, _, _ := h.gs.GetChangedFiles(r.Context(), name, ptr.NonEmpty(sessionID), mode)
+		writeJSON(w, http.StatusOK, h.withWorktree(r, name, sessionID, map[string]any{"agent_name": name, "files": hubVisibleFiles(r, stored), "diff_mode": mode, "total_changed": max(pz.Changes, len(stored)), "capped": pz.Changes > len(stored),
+			"paused": pz}))
+		return
+	}
 	// A folder that is not a git repository has nothing to compare: the panel says so (#6072), and lists its recently changed files instead (#10256); this is an answer, not an error. (ResolveGitRoot gives the folder itself back when it finds no repository.)
 	if gitutil.Available() {
+		gitProbeHook()
 		gctx, gcancel := context.WithTimeout(r.Context(), 5*time.Second)
 		err := gitCmd(gctx, workdir, "rev-parse", "--is-inside-work-tree").Run()
 		gcancel()
@@ -180,22 +198,6 @@ func (h *SessionsHandler) refreshFilesInner(w http.ResponseWriter, r *http.Reque
 		}
 	}
 
-	follow := followOn(agentCtx(r))
-	manual := flags.manual || flags.live
-	if flags.live {
-		gitguard.Resume(workdir) // 'Turn live updates on': this pass runs, and the poller takes the folder up again (it pauses it again if git is still slow)
-	}
-	if pz, isPaused := gitguard.Get(workdir); isPaused && !manual {
-		// Live updates are paused for this folder (#13079): the stored list is the answer, no git runs; Refresh (manual=1) asks for one pass
-		mode := h.getDiffMode(r.Context())
-		if mode == "" {
-			mode = "branch_point"
-		}
-		stored, _, _ := h.gs.GetChangedFiles(r.Context(), name, ptr.NonEmpty(sessionID), mode)
-		writeJSON(w, http.StatusOK, h.withWorktree(r, name, sessionID, map[string]any{"agent_name": name, "files": hubVisibleFiles(r, stored), "diff_mode": mode, "total_changed": max(pz.Changes, len(stored)), "capped": pz.Changes > len(stored),
-			"paused": pz}))
-		return
-	}
 	key := refreshFlightKey(workdir, h.getDiffMode(r.Context()), sessionID, follow, name)
 	res, ran, ok := refreshFlights.do(r.Context(), key, manual, func() refreshedFiles {
 		return h.computeRefreshedFiles(context.WithoutCancel(r.Context()), name, sessionID, workdir, follow)
@@ -205,7 +207,7 @@ func (h *SessionsHandler) refreshFilesInner(w http.ResponseWriter, r *http.Reque
 	}
 	var pausedNow any
 	if ran {
-		gitguard.Observe(workdir, res.total, res.took) // a slow pass is a strike (two in a row pause the folder); a fast one clears them and turns live updates back on if they were paused
+		gitguard.Observe(workdir, res.total, max(res.took, time.Since(handlerBegan))) // the whole request counts, not only the pass: finding the repository is git too (#13079). A slow pass is a strike (two in a row pause the folder); a fast one clears them and turns live updates back on if they were paused
 	}
 	if pz, isPaused := gitguard.Get(workdir); isPaused {
 		pausedNow = pz
@@ -470,4 +472,33 @@ func (f *refreshFlight) do(ctx context.Context, key string, fresh bool, fn func(
 // known by name alone (no session id) would otherwise share a pass with every other agent in its folder.
 func refreshFlightKey(workdir, mode, sessionID string, follow bool, agent string) string {
 	return fmt.Sprintf("%s\x00%s\x00%s\x00%v\x00%s", workdir, mode, sessionID, follow, agent)
+}
+
+// refreshRootTTL is how long the folder a files refresh resolved for an agent is kept: the resolution is git processes (the repository's top level, the followed worktree), and the Files panel asks every few seconds (#13079).
+const refreshRootTTL = 5 * time.Second
+
+// gitProbeHook runs before each git probe of the refresh path that is not the pass itself (tests: count the probes, make one slow).
+var gitProbeHook = func() {}
+
+type refreshRoot struct {
+	dir string
+	at  time.Time
+}
+
+// refreshWorkdir is resolveGitRoot, kept for refreshRootTTL per agent, session, follow and strictness: a miss is not kept.
+func (h *SessionsHandler) refreshWorkdir(ctx context.Context, name, sessionID string) string {
+	key := fmt.Sprintf("%s\x00%s\x00%t\x00%t", name, sessionID, followOn(ctx), strictIdentity(ctx))
+	if v, ok := h.refreshRoots.Load(key); ok {
+		if rr := v.(refreshRoot); time.Since(rr.at) < refreshRootTTL {
+			return rr.dir
+		}
+	}
+	gitProbeHook()
+	dir := h.resolveGitRoot(ctx, name, "", sessionID)
+	if dir == "" {
+		h.refreshRoots.Delete(key)
+		return ""
+	}
+	h.refreshRoots.Store(key, refreshRoot{dir: dir, at: time.Now()})
+	return dir
 }
