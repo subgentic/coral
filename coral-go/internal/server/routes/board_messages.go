@@ -178,6 +178,11 @@ func (h *BoardHandler) PostMessage(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	if owner, verified := VerifiedSession(r.Context()); verified && owner != nil {
+		if err := h.bs.RecordMessageSession(r.Context(), project, msg.ID, owner.SessionID); err != nil {
+			slog.Warn("verified message author not recorded", "board", project, "message", msg.ID)
+		}
+	}
 	if guideAsk != "" { // a question to a guide: the one asked is their label (the member rules above do not apply: a guide is not a member)
 		if err := h.bs.RecordGuideAsk(r.Context(), project, msg, guideAsk); err != nil {
 			slog.Warn("guide ask not recorded", "board", project, "message", msg.ID, "error", err)

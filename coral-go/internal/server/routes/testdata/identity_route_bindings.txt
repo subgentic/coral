@@ -219,6 +219,7 @@ POST /api/board/{project}/tasks/{taskID}/submit-review | board-claims +token-ses
 POST /api/board/{project}/waits | board-claims
 POST /api/board/{project}/working-mode/presets | board-claims | operator-only
 POST /api/board/{project}/working-mode/presets/{presetID}/reset | board-claims | operator-only
+POST /api/chief/triggers/{triggerID}/state | token-session
 POST /api/notifications | token-bound
 POST /api/sessions/history/{sessionID}/resummarize | unbound | operator-only
 POST /api/sessions/history/{sessionID}/tags | unbound | operator-only

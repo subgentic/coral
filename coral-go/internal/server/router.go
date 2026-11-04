@@ -305,6 +305,7 @@ func (s *Server) newRouteHandlers() *routeHandlers {
 	sysHandler.SetSavedPresence(savedBoardHas, histHandler.SavedAgentPresence)
 	schedHandler := routes.NewScheduleHandler(s.db, s.cfg)
 	s.schedHandler = schedHandler
+	s.chiefChecks = routes.NewChiefChecksHandler(s.db, sessHandler)
 	workflowHandler := routes.NewWorkflowHandler(s.db, s.cfg)
 	s.workflowHandler = workflowHandler
 	themeHandler := routes.NewThemesHandler(s.cfg)
@@ -712,6 +713,7 @@ func (s *Server) registerSystem(r *chi.Mux, h *routeHandlers) {
 	r.Get("/api/sessions/history/{sessionID}/resume-info", histHandler.GetResumeInfo)
 
 	// Scheduled jobs
+	s.chiefChecks.Register(r)
 	r.Get("/api/scheduled/jobs", schedHandler.ListJobs)
 	r.Get("/api/scheduled/jobs/{jobID}", schedHandler.GetJob)
 	r.With(routes.RefuseSignInLink).Post("/api/scheduled/jobs", schedHandler.CreateJob)

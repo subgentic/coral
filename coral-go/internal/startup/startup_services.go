@@ -260,8 +260,8 @@ func startScheduler(ctx context.Context, cfg *config.Config, srv *server.Server,
 	scheduler.SetRuntime(agentRT)
 	scheduler.SetNextFireTimeFn(background.NextFireTime)
 	scheduler.SetWorktreeRoot(coralnames.WorktreesRoot(cfg.CoralDir()))
-	safeGo(ctx, "job_scheduler", func() { scheduler.Run(ctx) })
 	srv.SetScheduler(scheduler)
+	safeGo(ctx, "job_scheduler", func() { scheduler.Run(ctx) })
 	return scheduler, launcher
 }
 

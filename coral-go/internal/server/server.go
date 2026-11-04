@@ -80,6 +80,7 @@ type Server struct {
 	goalMetrics     *routes.GoalMetricsHandler
 	systemHandler   *routes.SystemHandler
 	workflowHandler *routes.WorkflowHandler
+	chiefChecks     *routes.ChiefChecksHandler
 	schedHandler    *routes.ScheduleHandler
 
 	// The server's own background work (recoveries, the auto-accept loop) runs on bgCtx and
@@ -323,6 +324,9 @@ func (s *Server) SetCloud(m *cloud.Manager) {
 }
 
 func (s *Server) SetScheduler(sched *background.JobScheduler) {
+	if s.chiefChecks != nil {
+		s.chiefChecks.SetScheduler(sched)
+	}
 	if s.tasksHandler != nil {
 		s.tasksHandler.SetScheduler(sched)
 	}
