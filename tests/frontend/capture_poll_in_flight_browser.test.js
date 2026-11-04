@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     try {
@@ -12,7 +13,7 @@ const BASE = require('./test_base').BASE;
             const f = window.fetch; window.fetch = function (u) { if (/\\/api\\/sessions\\/live\\/[^/?]+\\/poll/.test(String(u)) && window.__hold) { window.__polls++; window.__out++; window.__maxOut = Math.max(window.__maxOut, window.__out);
                 return new Promise(r => setTimeout(r, window.__hold)).then(() => f.apply(this, arguments)).finally(() => { window.__out--; }); } return f.apply(this, arguments); }; })();` });
         await Page.navigate({ url: BASE }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'settings');
         await ev(`(() => { window.__m.add('slow-a', 'S', 4, { sleeping: false, session_id: 'slow-a-id' }); window.selectLiveSession('slow-a', 'claude', 'slow-a-id', 'local'); return true; })()`);
         await waitFor(`!!document.getElementById('command-input') && !document.getElementById('command-input').disabled`, 'the agent', 10000);
         await ev(`new Promise(r => setTimeout(r, 1500))`); // sleep-ok: the first polls of the open agent settle before the slow window is counted

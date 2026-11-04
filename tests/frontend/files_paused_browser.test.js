@@ -2,6 +2,7 @@
 // (live=on), makes no automatic request while it is paused, and a list that is cut says 'Showing 3 of 35,000 changed files'. Drives Chrome over CDP; the routes are stood in at the page's fetch.
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, ev, waitFor, PRELOAD, install } = await connect();
@@ -12,7 +13,7 @@ const BASE = require('./test_base').BASE;
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'settings');
         await ev(`window.__coralFilesWatchMs = 500; true`);
         await ev(`(() => { const R = window.fetch; window.__calls = []; window.__paused = true;
             const files = [{ filepath: 'a.txt', status: 'modified', additions: 1, deletions: 0 }, { filepath: 'b.txt', status: 'modified', additions: 1, deletions: 0 }, { filepath: 'c.txt', status: 'modified', additions: 1, deletions: 0 }];
