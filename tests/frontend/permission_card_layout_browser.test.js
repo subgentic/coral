@@ -35,7 +35,10 @@ const SHAPES = {
         const d = document.querySelector('dialog.inbox-ask-dialog[open]'); if (!d) return null;
         const R = e => e.getBoundingClientRect(), dr = R(d), vw = innerWidth, vh = innerHeight;
         const vis = e => e.getClientRects().length > 0;
-        const parts = [...d.querySelectorAll('h2, .inbox-ask-sub, .inbox-ask-text, .inbox-ask-offers-list > button, .inbox-ask-buttons > button')].filter(vis).map(e => ({ cls: e.className || e.tagName, r: R(e), over: e.scrollWidth - e.clientWidth, t: e.textContent.slice(0, 24) }));
+        const bodyBox = R(d.querySelector('.inbox-card-body')), body = d.querySelector('.inbox-card-body');
+        /* the body is the one part that scrolls (at 390 px and 200% text a choice may sit below its fold): what the eye sees of a part inside it is its box cut to the body's, so a choice scrolled out of sight is not over the buttons under it (a box measured unclipped lay under them in layout and was never visible) */
+        const seen = e => { const r = R(e); if (!body.contains(e)) return r; const l = Math.max(r.left, bodyBox.left), t = Math.max(r.top, bodyBox.top), rt = Math.min(r.right, bodyBox.right), b = Math.min(r.bottom, bodyBox.bottom); return rt > l && b > t ? { left: l, top: t, right: rt, bottom: b } : null; };
+        const parts = [...d.querySelectorAll('h2, .inbox-ask-sub, .inbox-ask-text, .inbox-ask-offers-list > button, .inbox-ask-buttons > button')].filter(vis).map(e => ({ cls: e.className || e.tagName, r: seen(e), over: e.scrollWidth - e.clientWidth, t: e.textContent.slice(0, 24) })).filter(p => p.r);
         const inter = (a, b) => Math.min(a.right, b.right) - Math.max(a.left, b.left) > 1 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 1;
         const overlaps = []; for (let i = 0; i < parts.length; i++) for (let j = i + 1; j < parts.length; j++) if (inter(parts[i].r, parts[j].r)) overlaps.push(parts[i].t + ' x ' + parts[j].t);
         const past = parts.filter(p => p.r.right > dr.right + 1 || p.r.left < dr.left - 1).map(p => p.t);
