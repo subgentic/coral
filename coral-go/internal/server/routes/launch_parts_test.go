@@ -62,6 +62,7 @@ func TestResolveLaunchCLI(t *testing.T) {
 
 	t.Setenv("PATH", dir)
 	t.Setenv("HOME", t.TempDir()) // no common install places
+	noSystemCLIs(t)               // nor the system ones (/usr/local/bin)
 	_, err = resolveLaunchCLI("claude", filepath.Join(dir, "missing-claude"))
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), agent.CLIPathSettingKey("claude"), "a configured path that is missing is refused, naming the setting (#115)")

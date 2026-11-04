@@ -20,6 +20,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/subgentic/coral/internal/config"
+	"github.com/subgentic/coral/internal/linktest"
 	"github.com/subgentic/coral/internal/skills"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/internal/store/storetest"
@@ -191,14 +192,14 @@ func TestGetChecksTheApprovedDigestOnEveryRead(t *testing.T) {
 	assert.NotContains(t, out, "skill_md")
 	// a link in place of the object is not followed
 	require.NoError(t, os.Remove(filepath.Join(e.dir, "skills", "objects", digest)))
-	require.NoError(t, os.Symlink(filepath.Join(e.dir, "elsewhere"), filepath.Join(e.dir, "skills", "objects", digest)))
+	linktest.Symlink(t, filepath.Join(e.dir, "elsewhere"), filepath.Join(e.dir, "skills", "objects", digest))
 	code, _ = e.get("/api/agent/skills/"+row.ID, "agent")
 	assert.Equal(t, 404, code)
 	// a link to a file that has exactly the approved bytes is refused too: the object is opened without following a link
 	right := zipOf(t, map[string]string{"SKILL.md": skillMD})
 	require.NoError(t, os.WriteFile(filepath.Join(e.dir, "right.zip"), right, 0o600))
 	require.NoError(t, os.Remove(filepath.Join(e.dir, "skills", "objects", digest)))
-	require.NoError(t, os.Symlink(filepath.Join(e.dir, "right.zip"), filepath.Join(e.dir, "skills", "objects", digest)))
+	linktest.Symlink(t, filepath.Join(e.dir, "right.zip"), filepath.Join(e.dir, "skills", "objects", digest))
 	sum := sha256.Sum256(right)
 	require.Equal(t, digest, hex.EncodeToString(sum[:]), "the file the link points to is the approved zip")
 	code, _ = e.get("/api/agent/skills/"+row.ID, "agent")

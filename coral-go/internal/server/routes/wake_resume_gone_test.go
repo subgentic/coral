@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/subgentic/coral/internal/board/boardtest"
+	"github.com/subgentic/coral/internal/linktest"
 	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/store"
 )
@@ -242,7 +243,7 @@ func TestAnOlderLineInTheLogIsNotThisResumesLine(t *testing.T) {
 	assert.True(t, logHasSince(log, off+1000, conversationGoneLine), "a reset log is read whole")
 	assert.False(t, logHasSince(filepath.Join(dir, "none.log"), 0, conversationGoneLine), "no log, no line")
 	link := filepath.Join(dir, "link.log")
-	require.NoError(t, os.Symlink(log, link))
+	linktest.Symlink(t, log, link)
 	assert.False(t, logHasSince(link, 0, conversationGoneLine), "never through a link")
 }
 

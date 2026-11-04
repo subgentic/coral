@@ -29,6 +29,7 @@ func TestALaunchWhoseCLIIsNotInstalledAnswers422CLINotFound(t *testing.T) {
 	t.Setenv("PATH", t.TempDir()) // nothing on PATH
 	t.Setenv("HOME", t.TempDir()) // and no install in the common places under the home folder
 	t.Setenv("USERPROFILE", t.TempDir())
+	noSystemCLIs(t) // nor in the system folders (/usr/local/bin): a machine with a CLI installed there must not change "not installed"
 
 	post := func(body map[string]any) (int, map[string]string) {
 		body["working_dir"] = rig.workdir
@@ -106,4 +107,14 @@ func TestTheFirstClaudeLaunchAsksOnceWhetherClaudeIsSignedIn(t *testing.T) {
 	raw, err := os.ReadFile(asked)
 	require.NoError(t, err)
 	assert.Equal(t, 1, strings.Count(string(raw), "ask"), "once per CLI: a second launch asks nothing")
+}
+
+// noSystemCLIs makes the system install folders (CommonSystemBinDirs: /usr/local/bin and the like) empty for this test, so a CLI installed on the machine running the
+// tests is not found by a test of "nothing is installed" (#479: a developer's WSL with claude in /usr/local/bin; a clean CI image has none there). The test's own
+// PATH and HOME already hide the rest.
+func noSystemCLIs(t *testing.T) {
+	t.Helper()
+	prev := agent.CommonSystemBinDirs
+	agent.CommonSystemBinDirs = func() []string { return nil }
+	t.Cleanup(func() { agent.CommonSystemBinDirs = prev })
 }
