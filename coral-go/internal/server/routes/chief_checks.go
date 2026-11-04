@@ -85,11 +85,11 @@ func chiefError(w http.ResponseWriter, err error) {
 	}
 }
 func chiefStateError(w http.ResponseWriter, err error) {
-	if errors.Is(err, store.ErrChiefNotFound) {
-		chiefError(w, err)
+	if errors.Is(err, store.ErrChiefTriggerConflict) {
+		commentRefuse(w, 409, "trigger_conflict", "another trigger is already open for that check")
 		return
 	}
-	commentRefuse(w, 409, "trigger_conflict", "another trigger is already open for that check")
+	chiefError(w, err)
 }
 
 func (h *ChiefChecksHandler) list(w http.ResponseWriter, r *http.Request) {

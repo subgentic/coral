@@ -11,11 +11,14 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	sqlite3 "modernc.org/sqlite/lib"
 )
 
 const MaxChiefChecks = 100
 const MaxChiefTriggers = 10000
 
+var ErrChiefTriggerConflict = errors.New("another trigger is already open for that check")
 var ErrChiefConflict = errors.New("check revision changed")
 var ErrChiefCapacity = errors.New("check history capacity reached")
 var ErrChiefNotFound = errors.New("check not found")
@@ -333,6 +336,17 @@ func (s *ScheduleStore) BeginChiefTrigger(ctx context.Context, checkID, runID in
 	}
 	return s.ChiefTrigger(ctx, prior)
 }
+
+// Only the one-open-trigger uniqueness constraint is a state conflict.
+// Busy, closed or otherwise failed storage must remain an internal error.
+func chiefTriggerStateError(err error) error {
+	var coded interface{ Code() int }
+	if errors.As(err, &coded) && coded.Code() == sqlite3.SQLITE_CONSTRAINT_UNIQUE && strings.Contains(err.Error(), "UNIQUE constraint failed: chief_triggers.check_id") {
+		return fmt.Errorf("%w: %w", ErrChiefTriggerConflict, err)
+	}
+	return err
+}
+
 func (s *ScheduleStore) UpdateChiefTriggerState(ctx context.Context, id int64, state, summary string, taskID, askID, briefID int64, now time.Time) error {
 	if state != "open" && state != "routed" && state != "waiting_on_operator" && state != "done" {
 		return errors.New("invalid trigger state")
@@ -342,7 +356,7 @@ func (s *ScheduleStore) UpdateChiefTriggerState(ctx context.Context, id int64, s
 	}
 	res, err := s.db.ExecContext(ctx, `UPDATE chief_triggers SET state=?,summary=?,task_id=?,ask_id=?,brief_id=?,updated_at=? WHERE id=?`, state, summary, taskID, askID, briefID, now.Unix(), id)
 	if err != nil {
-		return err
+		return chiefTriggerStateError(err)
 	}
 	n, _ := res.RowsAffected()
 	if n != 1 {
@@ -359,11 +373,11 @@ func (s *ScheduleStore) SetChiefTriggerResolution(ctx context.Context, id int64,
 	}
 	res, err := s.db.ExecContext(ctx, `UPDATE chief_triggers SET state=?,updated_at=? WHERE id=?`, state, now.Unix(), id)
 	if err != nil {
-		return err
+		return chiefTriggerStateError(err)
 	}
 	n, err := res.RowsAffected()
 	if err != nil {
-		return err
+		return chiefTriggerStateError(err)
 	}
 	if n != 1 {
 		return ErrChiefNotFound
