@@ -26,11 +26,14 @@ func canOpenBrowser() bool {
 	return true
 }
 
+// openLogin opens a sign-in link in the browser and says whether the opener started (a test seam).
+var openLogin = executil.TryOpenLogin
+
 // openDashboard opens the dashboard sign-in link in a browser, or prints it when there
-// is none to open (#3387).
+// is none to open (#3387). A display is no proof of a browser: WSLg sets DISPLAY on a
+// distro with no xdg-open, so when the opener did not start the link is printed too.
 func openDashboard(out io.Writer, link string, browse bool) {
-	if browse && canOpenBrowser() {
-		executil.OpenLogin(link)
+	if browse && canOpenBrowser() && openLogin(link) {
 		return
 	}
 	fmt.Fprintf(out, "  Open the dashboard (sign-in link, single use, 10 minutes):\n  %s\n\n", link)
