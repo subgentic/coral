@@ -4,6 +4,7 @@
 # A plain-node suite is "node <file>.test.js"; suites.mjs reads those lines to know no suite is left out of every run.
 node class_list_tokens.test.mjs
 node cli_refusal_words.test.mjs
+node comments_late_answer.test.mjs
 node computer_words_census.test.mjs
 node css_duplicate_census.test.mjs
 node phone_screens_census.test.mjs
