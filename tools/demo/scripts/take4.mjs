@@ -154,7 +154,15 @@ const B = {
     await sleep(600)
     const done = t.page.getByPlaceholder("What a person can check"); await t.click(done); await t.page.keyboard.type(story.goal.done, { delay: 25 }); await sleep(600)
     await t.cap("Add a picture, a mock-up or a screenshot.")
-    await t.page.locator("input[type=file]").first().setInputFiles(SEED + "/" + story.goal.picture); await sleep(2500)
+    // drop the picture on the box as a person would: the cursor goes to the box, then the page gets the drag events with the file; the file chooser is the fallback
+    const zone = t.page.locator("text=Drop, paste or choose >> visible=true").first(); await t.move(zone); await sleep(500)
+    const b64 = fs.readFileSync(SEED + "/" + story.goal.picture).toString("base64")
+    await t.page.evaluate(([data, name]) => {
+      const bytes = Uint8Array.from(atob(data), (c) => c.charCodeAt(0)); const dt = new DataTransfer(); dt.items.add(new File([bytes], name, { type: "image/png" }))
+      let el = [...document.querySelectorAll("*")].filter((e) => /Drop, paste or choose/.test(e.textContent || "") && e.getBoundingClientRect().height < 220 && e.getBoundingClientRect().width > 0).pop()
+      for (const type of ["dragenter", "dragover", "drop"]) el.dispatchEvent(new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer: dt }))
+    }, [b64, story.goal.picture]); await sleep(2500)
+    if (!(await t.page.locator("text=Drop, paste or choose").count().then((n) => n === 0).catch(() => false))) { await t.page.locator("input[type=file]").first().setInputFiles(SEED + "/" + story.goal.picture); await sleep(2500) }   // still empty: use the file chooser
     await t.cap("The guide sizes it as you write.")
     await sleep(2200)
     await t.click(t.page.locator("button:has-text('Create goal') >> visible=true").first()); await sleep(2500)
