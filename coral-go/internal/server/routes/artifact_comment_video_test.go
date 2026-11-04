@@ -72,7 +72,7 @@ func TestVideoCommentResolveAndReopenKeepTimes(t *testing.T) {
 
 func TestVideoCommentLabel(t *testing.T) {
 	at, end := 65.9, 125.25
-	require.Equal(t, "Video time: 01:05–02:05", videoCommentLabel(store.ArtifactComment{AtS: &at, EndS: &end}))
+	require.Equal(t, "Video time: 01:06–02:05", videoCommentLabel(store.ArtifactComment{AtS: &at, EndS: &end}))
 	require.Empty(t, videoCommentLabel(store.ArtifactComment{}))
 }
 
@@ -101,4 +101,32 @@ func TestVideoCommentArtifactRejectsNonDigestBeforeReadingMetadata(t *testing.T)
 	}
 	rig.artifact(cmtPic, "demo.mp4", "video/mp4")
 	require.True(t, rig.h.videoCommentArtifact(cmtPic))
+}
+
+func TestVideoManualSendIncludesRoundedTimeAndOwnReplyCommand(t *testing.T) {
+	rig := newCmtRig(t)
+	rig.agent(1, "Dev", false)
+	rig.artifact(cmtDoc, "demo.mp4", "video/mp4")
+	code, out := rig.do("POST", cp(cmtDoc), cmtAsOwner, map[string]any{"body": "trim this", "at_s": 1.9, "end_s": 12.6, "board": "team-a", "notify_agent": false})
+	require.Equal(t, 201, code, out)
+	cid := int64(out["id"].(float64))
+	code, out = rig.send(cid, "Dev")
+	require.Equal(t, 200, code, out)
+	msgs := rig.operatorMessages()
+	require.Len(t, msgs, 1)
+	require.Contains(t, msgs[0].Content, "Video time: 00:02–00:13")
+	require.Contains(t, msgs[0].Content, fmt.Sprintf("%s %d", cmtDoc, cid))
+}
+
+func TestVideoRouteRefusesTimedRepliesAndNonVideoMime(t *testing.T) {
+	rig := newCmtRig(t)
+	rig.artifact(cmtPic, "demo.mp4", "video/mp4")
+	code, out := rig.do("POST", cp(cmtPic), cmtAsOwner, map[string]any{"body": "thread", "at_s": 0})
+	require.Equal(t, 201, code, out)
+	code, out = rig.do("POST", cp(cmtPic), cmtAsOwner, map[string]any{"body": "reply", "parent_id": out["id"], "at_s": 1})
+	require.Equal(t, 400, code, out)
+	rig.artifact(cmtPic2, "document.mp4", "text/plain")
+	require.False(t, rig.h.videoCommentArtifact(cmtPic2))
+	code, out = rig.do("POST", cp(cmtPic2), cmtAsOwner, map[string]any{"body": "not video", "at_s": 1})
+	require.Equal(t, 400, code, out)
 }
