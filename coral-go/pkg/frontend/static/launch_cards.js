@@ -11,10 +11,18 @@ export const LAUNCH_CARDS = [
 export const GOAL_NO_TEAM_DESC = 'No team yet. Start one to give it a goal.';
 let noTeam = false;
 const checkTeams = () => importOnce('./home_goal.js').then(m => m.refreshGoalCard()).catch(() => {}); // a failed read leaves the plain line
-// Not part of the page's start (#13079, page_weight_browser: the module and the teams read were two more requests at start): the read is made GOAL_CHECK_AFTER_MS after the card is drawn, once however often it is drawn.
-const GOAL_CHECK_AFTER_MS = 2000;
+// Not part of the page's start (#13079, page_weight_browser: the module and the teams read were two more requests at start). The read is made once the page's own requests have gone quiet for GOAL_QUIET_MS, however
+// long they take (a slow runner or a slow answer holds it back; a fixed delay did not, #13087's INFO), and once however often the card is drawn.
+const GOAL_QUIET_MS = 1000;
 let checkPending = false;
-const checkTeamsSoon = () => { if (checkPending) return; checkPending = true; setTimeout(() => { checkPending = false; checkTeams(); }, GOAL_CHECK_AFTER_MS); };
+function whenRequestsQuiet(fn) {
+    let timer = 0, po = null;
+    const fire = () => { if (po) po.disconnect(); fn(); };
+    const arm = () => { clearTimeout(timer); timer = setTimeout(fire, GOAL_QUIET_MS); };
+    try { po = new PerformanceObserver(arm); po.observe({ type: 'resource' }); } catch { po = null; } // every finished request restarts the wait
+    arm();
+}
+const checkTeamsSoon = () => { if (checkPending) return; checkPending = true; whenRequestsQuiet(() => { checkPending = false; checkTeams(); }); };
 export { checkTeamsSoon as refreshGoalCardSoon };
 if (typeof document !== 'undefined') document.addEventListener('coral:welcome-built', checkTeamsSoon);
 export const goalDesc = () => (noTeam ? GOAL_NO_TEAM_DESC : LAUNCH_CARDS.find(c => c.key === 'goal').desc);
