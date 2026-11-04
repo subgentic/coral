@@ -393,6 +393,7 @@ b POST /api/sessions/history/{sessionID}/tags
 a POST /api/sessions/launch
 a POST /api/sessions/launch-team
 b POST /api/sessions/live/sleep-all
+b POST /api/sessions/live/sleep-gone
 b POST /api/sessions/live/team/{boardName}/kill
 b POST /api/sessions/live/team/{boardName}/reset
 b POST /api/sessions/live/team/{boardName}/sleep

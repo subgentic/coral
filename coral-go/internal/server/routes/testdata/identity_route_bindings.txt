@@ -224,6 +224,7 @@ POST /api/sessions/history/{sessionID}/tags | unbound | operator-only
 POST /api/sessions/launch | token-session
 POST /api/sessions/launch-team | token-session
 POST /api/sessions/live/sleep-all | unbound | operator-only
+POST /api/sessions/live/sleep-gone | unbound | operator-only
 POST /api/sessions/live/team/{boardName}/kill | unbound | operator-only
 POST /api/sessions/live/team/{boardName}/reset | unbound | operator-only
 POST /api/sessions/live/team/{boardName}/sleep | unbound | operator-only

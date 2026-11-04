@@ -2669,6 +2669,7 @@ func setupSessionsTestServerWithConfig(t *testing.T, cfg *config.Config) (*httpt
 	r.Post("/api/sessions/live/{name}/open-in-editor", handler.OpenInEditor)
 	r.Post("/api/sessions/live/{name}/restart", handler.Restart)
 	r.Post("/api/sessions/live/{name}/model", handler.SwitchModel)
+	r.Post("/api/sessions/live/sleep-gone", handler.SleepGone)
 	r.Post("/api/sessions/live/{sessionID}/sleep", handler.SleepSession)
 	r.Post("/api/sessions/live/{sessionID}/wake", handler.WakeSession)
 	r.Post("/api/sessions/live/{name}/resume", handler.Resume)

@@ -1081,6 +1081,14 @@ Both answer 200 `{"ok": false, "error": "Session not found"}` for an unknown ses
 {"ok": true, "sessions_affected": 5, "sessions_killed": 5}
 ```
 
+#### POST `/api/sessions/live/sleep-gone`
+
+Files agents whose terminal is gone under plain sleeping (#13171; the dashboard's **Sleep** on a "Terminal gone" row and **Sleep N terminal-gone agents**). They are asleep already, so nothing is stopped: the sleep reason `terminal_gone` is cleared (the row says "Sleeping", not "Terminal gone"), the agent's resume info stays, and a later Wake resumes it like any sleeper. The body may name agents, `{"session_ids": ["..."]}` (at most 500); only a named agent that is a terminal-gone sleeper and not archived moves, and with no body every such agent does. An agent that is awake, a plain sleeper, archived or ended (its CLI exited) is left as it is. Needs Launch through Coral Hub, like Sleep all; an agent's own token cannot use it. `POST /api/sessions/live/{sessionID}/sleep` does the same for one agent.
+
+```json
+{"ok": true, "sessions_affected": 2}
+```
+
 #### POST `/api/sessions/live/wake-all`
 
 Wakes every sleeping agent except archived ones.

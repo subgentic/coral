@@ -342,7 +342,7 @@
 1	session_header_updates.js	_whereBack
 2	session_rows.js	!instructionsOffered(s, isCloud()) ? '' : `<button class="menu-item overflow-menu-item" data-on-click="agent-i
 1	session_rows.js	MORE_DOTS_SVG
-18	session_rows.js	SVGO.o0
+19	session_rows.js	SVGO.o0
 8	session_rows.js	SVGO.o1
 4	session_rows.js	SVGO.o2
 2	session_rows.js	SVGO.o4
@@ -360,6 +360,7 @@
 1	session_rows.js	dirChip
 1	session_rows.js	dotClass
 1	session_rows.js	hooksMissingChip(s)
+1	session_rows.js	isGoneAsleep(s) ? `<button class="menu-item overflow-menu-item" data-on-click="agent-sleep" data-name="${escap
 2	session_rows.js	label
 1	session_rows.js	nameTail ? `<span class="session-label-tags">${reminderTag}${typeTag}${dirChip}</span>` : `${reminderTag}${typ
 1	session_rows.js	piHooksChip(s)
@@ -368,7 +369,7 @@
 1	session_rows.js	rowLinesHtml(s)
 1	session_rows.js	sleepingClass
 1	session_rows.js	stale ? '' : kebabMenu
-1	session_rows.js	stale ? '' : waitingBadge + heldChip + sleepChip + wakeBtn
+1	session_rows.js	stale ? '' : waitingBadge + heldChip + sleepChip + wakeBtn + sleepBtn
 1	session_rows.js	staleClass
 1	session_rows.js	stateInfo.pillClass ? ' ' + stateInfo.pillClass : ''
 1	session_rows.js	stuckClass

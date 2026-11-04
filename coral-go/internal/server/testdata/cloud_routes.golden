@@ -387,6 +387,7 @@ POST /api/sessions/history/{sessionID}/tags never
 POST /api/sessions/launch launch
 POST /api/sessions/launch-team launch
 POST /api/sessions/live/sleep-all launch
+POST /api/sessions/live/sleep-gone launch
 POST /api/sessions/live/team/{boardName}/kill launch
 POST /api/sessions/live/team/{boardName}/reset launch
 POST /api/sessions/live/team/{boardName}/sleep launch

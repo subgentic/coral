@@ -297,6 +297,7 @@ var operatorOnlyRoutes = map[string]string{
 	"POST /api/sessions/live/team/{boardName}/sleep":                  "put a team to sleep",
 	"POST /api/sessions/live/team/{boardName}/wake":                   "wake a team",
 	"POST /api/sessions/live/sleep-all":                               "put every agent to sleep",
+	"POST /api/sessions/live/sleep-gone":                              "move the agents whose terminal is gone to sleeping",
 	"POST /api/sessions/live/wake-all":                                "wake every agent",
 	"POST /api/sessions/live/{sessionID}/sleep":                       "put an agent to sleep",
 	"GET /api/sessions/live/{sessionID}/agent-candidate":              "see whether an agent's board notices are paused and which program could be recorded as the agent (#391)",
