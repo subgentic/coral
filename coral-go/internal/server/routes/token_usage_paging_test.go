@@ -62,6 +62,38 @@ func TestListUsagePagesFiftyWithATrueTotal(t *testing.T) {
 	require.Len(t, p.Agents, 3, "one row per agent over every session")
 	assert.Equal(t, float64(40*10), p.Agents[0]["input_tokens"], "an agent's row adds up its 40 sessions")
 
+	// The SQL sums are the plain sums of the rows: read every row back and add them up here.
+	all, err := ts.ListUsage(ctx, store.UsageFilter{})
+	require.NoError(t, err)
+	var in, out, cr, cw, tt int64
+	var cost float64
+	perAgent := map[string][4]float64{}
+	for _, r := range all {
+		in += int64(r.InputTokens)
+		out += int64(r.OutputTokens)
+		cr += int64(r.CacheReadTokens)
+		cw += int64(r.CacheWriteTokens)
+		tt += int64(r.TotalTokens)
+		cost += r.CostUSD
+		a := perAgent[r.AgentName]
+		perAgent[r.AgentName] = [4]float64{a[0] + float64(r.InputTokens), a[1] + float64(r.OutputTokens), a[2] + r.CostUSD, a[3] + float64(r.NumTurns)}
+	}
+	assert.Equal(t, float64(in), p.Totals["input_tokens"])
+	assert.Equal(t, float64(out), p.Totals["output_tokens"])
+	assert.Equal(t, float64(cr), p.Totals["cache_read_tokens"])
+	assert.Equal(t, float64(cw), p.Totals["cache_write_tokens"])
+	assert.Equal(t, float64(tt), p.Totals["total_tokens"])
+	assert.InDelta(t, cost, p.Totals["cost_usd"].(float64), 1e-9)
+	require.Len(t, p.Agents, len(perAgent))
+	for _, ag := range p.Agents {
+		want, ok := perAgent[ag["name"].(string)]
+		require.True(t, ok, "an agent row names a session's agent: %v", ag["name"])
+		assert.Equal(t, want[0], ag["input_tokens"])
+		assert.Equal(t, want[1], ag["output_tokens"])
+		assert.InDelta(t, want[2], ag["cost_usd"].(float64), 1e-9)
+		assert.Equal(t, want[3], ag["num_turns"])
+	}
+
 	seen := map[string]bool{}
 	cursor, pages := "", 0
 	for {
@@ -111,5 +143,24 @@ func TestTokenUsageDocSaysTheListIsPaged(t *testing.T) {
 	for _, want := range []string{"50", "next_cursor", "total", "agents", "limit", "cursor"} {
 		assert.Contains(t, doc, want)
 	}
+	assert.Contains(t, doc, "| `GET` | `/api/token-usage` | One page of session records (newest activity first) plus totals and a per-agent sum: `limit` (1 to 50, default 50) and `cursor` (the last answer's `next_cursor`); filters: `session_id`, `board_name`, `team_id`, `since`. |", "the table row for the list says what it answers")
 	assert.NotContains(t, doc, "Records plus totals", "the old line reads as every row")
+}
+
+// Two agents whose sessions were last active at the same instant come back in the order of their lowest session id (the SQL's tie-break), not by name and not by chance.
+func TestListUsageAgentsWithTheSameTimeAreOrderedBySessionID(t *testing.T) {
+	ts, _, router := setupTokenUsageTest(t)
+	ctx := t.Context()
+	at := time.Now().UTC().Add(-time.Minute).Format(time.RFC3339Nano)
+	for _, r := range []struct{ sid, agent string }{{"s1", "zeta"}, {"s2", "alpha"}, {"s3", "mid"}, {"s4", "zeta"}} {
+		require.NoError(t, ts.RecordUsage(ctx, &store.TokenUsage{SessionID: r.sid, AgentName: r.agent, AgentType: "claude", InputTokens: 1, TotalTokens: 1, RecordedAt: at}))
+	}
+	for i := 0; i < 3; i++ { // the same every time
+		_, p := getUsagePage(t, router, "")
+		var names []string
+		for _, a := range p.Agents {
+			names = append(names, a["name"].(string))
+		}
+		assert.Equal(t, []string{"zeta", "alpha", "mid"}, names, "by each agent's lowest session id: s1, s2, s3")
+	}
 }
