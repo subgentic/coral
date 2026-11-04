@@ -30,7 +30,7 @@ func TestTmuxAttachRepairsDeadPipeWithExistingEmptyLog(t *testing.T) {
 	piped, err := b.client.DisplayMessage(context.Background(), target, "#{pane_pipe}")
 	require.NoError(t, err)
 	require.Equal(t, "1", strings.TrimSpace(piped), "an existing empty file cannot suppress pipe reattachment")
-	require.NoError(t, b.Write(name, []byte("printf 'REPAIRED_PIPE_MARKER\\n'\r")))
+	require.NoError(t, b.SendHumanInput(name, []byte("printf 'REPAIRED_PIPE_MARKER\\n'\r")))
 	timeout := time.NewTimer(5 * time.Second)
 	defer timeout.Stop()
 	var received string
