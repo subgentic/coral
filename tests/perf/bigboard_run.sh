@@ -79,7 +79,7 @@ for n in $LIVE; do
   api GET /api/sessions/live | python3 -I -c 'import sys,json; d=json.load(sys.stdin); r=d if isinstance(d,list) else d.get("sessions",[]); print("live rows:", len(r), "sleeping:", sum(1 for x in r if x.get("sleeping")))' | tee -a "$OUT/machine.txt"
   sleep 5
   log "measuring locally with $n live agents (idle ${IDLE_S}s)"
-  measure "$OUT/local-$n.log" IDLE_S="$IDLE_S" PPROF_URL="http://127.0.0.1:$PPROF_PORT" PROFILE_PREFIX="$OUT/cpu-$n-agents" node "$HERE/bigboard_measure.mjs" "http://127.0.0.1:$PORT" "" "$OUT/local-$n.json"; echo "local-$n measure exit=$?"
+  measure "$OUT/local-$n.log" API_KEY_FILE="$WORK/data/api_key" IDLE_S="$IDLE_S" PPROF_URL="http://127.0.0.1:$PPROF_PORT" PROFILE_PREFIX="$OUT/cpu-$n-agents" node "$HERE/bigboard_measure.mjs" "http://127.0.0.1:$PORT" "" "$OUT/local-$n.json"; echo "local-$n measure exit=$?"
   ps -o rss= -p "$SRV" | awk -v n="$n" '{printf "server RSS at %s live agents: %.0f MB\n", n, $1/1024}' | tee -a "$OUT/machine.txt"
   LAST_N=$n
 done

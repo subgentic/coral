@@ -85,6 +85,8 @@ process.on('SIGINT', () => done(130));
 
     // ── the load ──
     const token = TOKEN_FILE && fs.existsSync(TOKEN_FILE) ? fs.readFileSync(TOKEN_FILE, 'utf8').trim() : '';
+    // API_KEY_FILE: no sign-in at all, every request carries the server's API key (what an agent's own tools send); the pages and the API answer as for a signed-in browser
+    if (process.env.API_KEY_FILE) await Network.setExtraHTTPHeaders({ headers: { Authorization: 'Bearer ' + fs.readFileSync(process.env.API_KEY_FILE, 'utf8').trim() } });
     // sign in the way a person does: the locked page's "Open Coral on this computer" form (no token needed, so any number of runs on one server);
     // then the measured load starts from a cleared cache, signed in, as a first visit of the day
     await Page.navigate({ url: BASE + (token ? '/?login_token=' + token : '/') });
