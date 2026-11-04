@@ -52,21 +52,36 @@ cp -R "$FIXTURE/data" "$WORK/data"
 rm -f "$WORK/data/coral-server.lock" "$WORK/data/login_token"
 start local "$FIXTURE/bin/coral" "$WORK/data" "$PORT"
 SRV=$LAST_PID
-sleep 5
-log "measuring locally (idle ${IDLE_S}s)"
-PERF_RUN=1 IDLE_S="$IDLE_S" node "$HERE/bigboard_measure.mjs" "http://127.0.0.1:$PORT" "$WORK/data/login_token" "$OUT/local.json" > "$OUT/local.log" 2>&1; echo "local measure exit=$?"
-ps -o rss= -p "$SRV" | awk '{printf "server RSS %.0f MB\n", $1/1024}' | tee -a "$OUT/machine.txt"
+KEY="$(tr -d '[:space:]' < "$WORK/data/api_key")"
+api() { local m="$1" p="$2"; shift 2; command curl -s -m 120 -X "$m" "http://127.0.0.1:$PORT$p" -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" "$@"; }
+# LIVE: the counts of live mock agents (in tmux, working in the fixture's big repo) the page is measured at; each step adds agents to the server it is on
+LIVE="${LIVE:-0 30}"; launched=0; LAST_N=0
+for n in $LIVE; do
+  need=$((n - launched))
+  if [[ $need -gt 0 ]]; then
+    log "launching $need live mock agents (to $n)"
+    agents=""; for i in $(seq "$need"); do agents="$agents${agents:+,}{\"agent_type\":\"claude\",\"name\":\"live$n-$i\",\"prompt\":\"You are live agent $i.\"}"; done
+    api POST /api/sessions/launch-team -d "{\"board_name\":\"live$n\",\"working_dir\":\"$FIXTURE/repo\",\"agents\":[$agents]}" > "$OUT/launch-$n.json"
+    launched=$n; sleep 12
+  fi
+  api GET /api/sessions/live | python3 -I -c 'import sys,json; d=json.load(sys.stdin); r=d if isinstance(d,list) else d.get("sessions",[]); print("live rows:", len(r), "sleeping:", sum(1 for x in r if x.get("sleeping")))' | tee -a "$OUT/machine.txt"
+  sleep 5
+  log "measuring locally with $n live agents (idle ${IDLE_S}s)"
+  PERF_RUN=1 IDLE_S="$IDLE_S" node "$HERE/bigboard_measure.mjs" "http://127.0.0.1:$PORT" "" "$OUT/local-$n.json" > "$OUT/local-$n.log" 2>&1; echo "local-$n measure exit=$?"
+  ps -o rss= -p "$SRV" | awk -v n="$n" '{printf "server RSS at %s live agents: %.0f MB\n", n, $1/1024}' | tee -a "$OUT/machine.txt"
+  LAST_N=$n
+done
 
 if [[ "${HUB:-}" == 1 ]]; then
   mkdir -p "$WORK/hub"
   start hub "$FIXTURE/bin/coral" "$WORK/hub" "$HUBPORT" --hub
-  HUBKEY="$(tr -d '[:space:]' < "$WORK/hub/api_key")"; KEY="$(tr -d '[:space:]' < "$WORK/data/api_key")"
+  HUBKEY="$(tr -d '[:space:]' < "$WORK/hub/api_key")"
   code=$(curl -s -m 60 -o "$OUT/hub-add.json" -w '%{http_code}' -X POST "http://127.0.0.1:$HUBPORT/api/servers" -H "Authorization: Bearer $HUBKEY" -H 'Content-Type: application/json' \
     -d "{\"id\":\"bigboard\",\"label\":\"bigboard\",\"url\":\"http://127.0.0.1:$PORT\",\"api_key\":\"$KEY\",\"allow_private\":true}")
   log "hub add server: HTTP $code"; head -c 300 "$OUT/hub-add.json"; echo
   sleep 5
-  log "measuring through the hub (idle ${IDLE_S}s)"
-  PERF_RUN=1 IDLE_S="$IDLE_S" node "$HERE/bigboard_measure.mjs" "http://127.0.0.1:$HUBPORT" "$WORK/hub/login_token" "$OUT/hub.json" > "$OUT/hub.log" 2>&1; echo "hub measure exit=$?"
+  log "measuring through the hub with $LAST_N live agents (idle ${IDLE_S}s)"
+  PERF_RUN=1 IDLE_S="$IDLE_S" node "$HERE/bigboard_measure.mjs" "http://127.0.0.1:$HUBPORT" "$WORK/hub/login_token" "$OUT/hub-$LAST_N.json" > "$OUT/hub.log" 2>&1; echo "hub measure exit=$?"
 fi
 python3 -I "$HERE/bigboard_table.py" "$OUT" > "$OUT/ranked.md" && head -40 "$OUT/ranked.md"
 log "results in $OUT"

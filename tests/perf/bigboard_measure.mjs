@@ -70,13 +70,25 @@ process.on('SIGINT', () => done(130));
 
     // ── the load ──
     const token = TOKEN_FILE && fs.existsSync(TOKEN_FILE) ? fs.readFileSync(TOKEN_FILE, 'utf8').trim() : '';
-    t0 = Date.now();
+    // sign in the way a person does: the locked page's "Open Coral on this computer" form (no token needed, so any number of runs on one server);
+    // then the measured load starts from a cleared cache, signed in, as a first visit of the day
     await Page.navigate({ url: BASE + (token ? '/?login_token=' + token : '/') });
+    await Page.loadEventFired();
+    if (await ev(`!!document.getElementById('local-open-form')`)) {
+        await ev(`document.getElementById('local-open-form').submit(); true`, false);
+        for (const end = Date.now() + 20000; Date.now() < end; await sleep(200)) { // signed in: the form's redirect has landed on the app
+            if (await ev(`document.readyState === 'complete' && !document.getElementById('local-open-form')`).catch(() => false)) break;
+        }
+    }
+    await Network.clearBrowserCache();
+    for (const k of rows.splice(0)) void k; reqs.clear(); started = 0;
+    t0 = Date.now();
+    await Page.navigate({ url: BASE + '/' });
     await Page.loadEventFired();
     // the app is ready when its start has finished and the agent list has loaded (the events the suites wait for)
     const ready = await ev(`new Promise(res => { const t0 = performance.now(); const ok = () => (window.__coralReady && window.__coralReady.startup) ; const iv = setInterval(() => {
         const list = document.querySelector('#live-sessions-list'); const rowsN = list ? list.children.length : 0;
-        if (rowsN > 0 || performance.now() - t0 > 120000) { clearInterval(iv); res({ rows: rowsN, waited: performance.now() - t0 }); } }, 50); })`);
+        if (rowsN > 0 || performance.now() - t0 > 60000) { clearInterval(iv); res({ rows: rowsN, waited: performance.now() - t0 }); } }, 50); })`);
     const loadMs = Date.now() - t0;
     // the first load is over once the page has started no new request for 1.5 s (or 120 s): a request still open (a stream) does not hold it
     let quietSince = Date.now(); let lastStarted = started;
@@ -95,7 +107,8 @@ process.on('SIGINT', () => done(130));
 
     // ── interactions: each timed in the page (performance.now), one at a time, each in its own try so one broken selector leaves the others ──
     // The page-side helper waits for a condition on animation frames and reports how long it took (null on the 60 s cap).
-    const WAIT = `window.__until = (cond, cap = 60000) => new Promise(res => { const t = performance.now(); const tick = () => { let v = false; try { v = cond(); } catch (e) {} if (v) res(performance.now() - t); else if (performance.now() - t > cap) res(null); else setTimeout(tick, 16); }; tick(); }); true`;
+    const CAP = Number(process.env.STEP_CAP_MS || 30000);
+    const WAIT = `window.__until = (cond, cap = ${CAP}) => new Promise(res => { const t = performance.now(); const tick = () => { let v = false; try { v = cond(); } catch (e) {} if (v) res(performance.now() - t); else if (performance.now() - t > cap) res(null); else setTimeout(tick, 16); }; tick(); }); true`;
     await ev(WAIT);
     const interactions = {};
     const step = async (name, fn) => { try { interactions[name] = await fn(); } catch (e) { interactions[name] = { error: String(e.message || e).slice(0, 200) }; } console.log('[measure] ' + name + ': ' + JSON.stringify(interactions[name])); };
@@ -111,7 +124,7 @@ process.on('SIGINT', () => done(130));
         for (let i = 0; i < 6; i++) {
             const a = live[i % 2];
             out.push(Math.round(await ev(`(async () => { const t = performance.now(); window.selectLiveSession(${JSON.stringify(a.name)}, ${JSON.stringify(a.type || 'claude')}, ${JSON.stringify(a.id)}, 'local');
-                await Promise.race([window.__coralReady.agentSelected(${JSON.stringify(a.id)}), new Promise(r => setTimeout(r, 60000))]); return performance.now() - t; })()`)));
+                await Promise.race([window.__coralReady.agentSelected(${JSON.stringify(a.id)}), new Promise(r => setTimeout(r, ${CAP}))]); const d = performance.now() - t; return d >= ${CAP} ? -1 : d; })()`)));
             await sleep(300);
         }
         return { ms: out, p50: pct(out, 0.5), max: Math.max(...out) };
@@ -134,7 +147,7 @@ process.on('SIGINT', () => done(130));
     await step('files_panel', async () => {
         const marker = rows.length;
         const ms = await ev(`(async () => { const t = performance.now(); const tab = document.getElementById('agentic-tab-files'); if (!tab) return { error: 'no files tab' }; tab.click();
-            const v = await window.__until(() => document.querySelectorAll('#changed-files-list > *').length > 3, 90000); return { ms: v, rows: document.querySelectorAll('#changed-files-list > *').length, title: (document.getElementById('changed-files-title') || {}).textContent || '' }; })()`);
+            const v = await window.__until(() => document.querySelectorAll('#changed-files-list > *').length > 3, ${CAP}); return { ms: v, rows: document.querySelectorAll('#changed-files-list > *').length, title: (document.getElementById('changed-files-title') || {}).textContent || '' }; })()`);
         const f = rows.slice(marker).filter(r => /files|changes|git|worktree/i.test(r.url)).map(r => ({ route: fold(new URL(r.url).pathname), ms: Math.round((r.end - r.sent) * 1000), bytes: r.bytes }));
         return { ...ms, requests: f };
     });
@@ -142,9 +155,9 @@ process.on('SIGINT', () => done(130));
     await step('needs_you_open', async () => {
         const m0 = rows.length;
         const t1 = await ev(`(async () => { const t = performance.now(); const tab = document.getElementById('nav-tab-hub-inbox'); if (!tab) return { error: 'no inbox tab' }; tab.click();
-            const v = await window.__until(() => document.querySelectorAll('#group-table-view tbody tr').length > 0, 90000); return v; })()`);
+            const v = await window.__until(() => document.querySelectorAll('#group-table-view tbody tr').length > 0, ${CAP}); return v; })()`);
         const t2 = await ev(`(async () => { const row = [...document.querySelectorAll('#group-table-view tbody tr')].find(r => r.querySelector('.inbox-review-name')); if (!row) return { error: 'no review row' };
-            const t = performance.now(); row.querySelector('.inbox-review-name').click(); return await window.__until(() => { const e = document.getElementById('artifact-viewer-title'); return e && e.offsetParent !== null && e.textContent.trim().length > 0; }, 90000); })()`);
+            const t = performance.now(); row.querySelector('.inbox-review-name').click(); return await window.__until(() => { const e = document.getElementById('artifact-viewer-title'); return e && e.offsetParent !== null && e.textContent.trim().length > 0; }, ${CAP}); })()`);
         return { ms_to_rows: typeof t1 === 'number' ? Math.round(t1) : t1, ms_row_click_to_viewer: typeof t2 === 'number' ? Math.round(t2) : t2, requests: rows.slice(m0).filter(r => !new URL(r.url).pathname.startsWith('/static/')).length };
     });
     out_interactions = interactions;
