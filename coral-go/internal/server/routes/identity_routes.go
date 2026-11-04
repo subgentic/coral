@@ -30,6 +30,13 @@ func isAgentTool(r *http.Request) bool {
 // every mode since #3929 (only with strict local auth before); the Operator can (the dashboard,
 // an API key, the signed command line). Each agent call is recorded in the identity report.
 var operatorOnlyRoutes = map[string]string{
+	"GET /api/chief/checks":                "read scheduled checks",
+	"POST /api/chief/checks":               "create scheduled checks",
+	"GET /api/chief/checks/{checkID}":      "read a scheduled check",
+	"PUT /api/chief/checks/{checkID}":      "edit a scheduled check",
+	"DELETE /api/chief/checks/{checkID}":   "delete a scheduled check",
+	"POST /api/chief/checks/{checkID}/run": "run a scheduled check",
+	"GET /api/chief/triggers":              "read check triggers",
 	// #3668 (the board authorization audit): deleting a message, and pausing or resuming a board
 	// (the Operator's brake), are the Operator's.
 	"DELETE /api/board/{project}/messages/{messageID}": "delete a board message",
@@ -426,8 +433,9 @@ var hubModeRoutes = map[string]bool{
 // its team, terminal ones included, by design) but each call is recorded in the identity
 // report's agent_operator_calls, so the owner can see who launched what (#3445).
 var recordedAgentRoutes = map[string]string{
-	"POST /api/sessions/launch":      "launch an agent",
-	"POST /api/sessions/launch-team": "launch a team",
+	"POST /api/chief/triggers/{triggerID}/state": "report a check trigger outcome",
+	"POST /api/sessions/launch":                  "launch an agent",
+	"POST /api/sessions/launch-team":             "launch a team",
 }
 
 // guardPrefixes limit the (costly) route match: per method, the static start of every entry of

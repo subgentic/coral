@@ -66,3 +66,10 @@ func LogRedactor() redact.Redactor {
 	once.Do(build)
 	return logRed
 }
+
+// CredentialRedactor always includes credential keyword rules. Use it when a
+// feature must refuse credential storage, even if Hub redaction was opted out.
+func CredentialRedactor() redact.Redactor {
+	once.Do(build)
+	return hubRed
+}

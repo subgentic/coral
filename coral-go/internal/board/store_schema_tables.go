@@ -6,6 +6,9 @@ import (
 
 func (s *Store) createBoardCoreTables(ctx context.Context) error {
 	_, err := s.db.ExecContext(ctx, `
+ CREATE TABLE IF NOT EXISTS board_message_sessions(message_id INTEGER PRIMARY KEY REFERENCES board_messages(id) ON DELETE CASCADE,project TEXT NOT NULL,session_id TEXT NOT NULL);
+ CREATE TABLE IF NOT EXISTS chief_check_messages(trigger_id INTEGER NOT NULL,trigger_key TEXT NOT NULL,kind TEXT NOT NULL,project TEXT NOT NULL,message_id INTEGER NOT NULL,created_at INTEGER NOT NULL,PRIMARY KEY(trigger_key,kind));
+
 		CREATE TABLE IF NOT EXISTS board_subscribers (
 			id            INTEGER PRIMARY KEY AUTOINCREMENT,
 			project       TEXT NOT NULL,

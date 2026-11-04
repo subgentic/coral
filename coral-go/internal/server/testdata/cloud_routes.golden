@@ -18,6 +18,7 @@ DELETE /api/board/{project}/subscribe never
 DELETE /api/board/{project}/tasks/{taskID}/park never
 DELETE /api/board/{project}/tasks/{taskID}/reminder interact
 DELETE /api/board/{project}/waits never
+DELETE /api/chief/checks/{checkID} never
 DELETE /api/folder-tags/{folderName}/{tagID} never
 DELETE /api/pinned-folders launch
 DELETE /api/saved/{id} interact
@@ -121,6 +122,9 @@ GET /api/board/{project}/working-mode view
 GET /api/board/{project}/working-mode/presets view
 GET /api/call-metrics/summary view
 GET /api/chief view
+GET /api/chief/checks never
+GET /api/chief/checks/{checkID} never
+GET /api/chief/triggers never
 GET /api/cloud/owner-label never
 GET /api/cloud/status never
 GET /api/custom-models view
@@ -361,6 +365,9 @@ POST /api/board/{project}/waits never
 POST /api/board/{project}/working-mode/presets interact
 POST /api/board/{project}/working-mode/presets/{presetID}/reset never
 POST /api/call-metrics never
+POST /api/chief/checks never
+POST /api/chief/checks/{checkID}/run never
+POST /api/chief/triggers/{triggerID}/state never
 POST /api/cloud/cli-hello never
 POST /api/cloud/connect never
 POST /api/cloud/connect/cancel never
@@ -481,6 +488,7 @@ PUT /api/board/{project}/subscribers/{subscriberID}/review-settings never
 PUT /api/board/{project}/tasks/{taskID}/goal interact
 PUT /api/board/{project}/working-mode interact
 PUT /api/board/{project}/working-mode/presets/{presetID} never
+PUT /api/chief/checks/{checkID} never
 PUT /api/cloud/allow-auto-accept never
 PUT /api/cloud/hub-cross-team never
 PUT /api/cloud/hub-relaunch never

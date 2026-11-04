@@ -31,6 +31,18 @@ func (s *JobScheduler) reapStaleRuns(ctx context.Context) {
 		if err != nil || job == nil {
 			continue
 		}
+		if job.JobType == "check" {
+			s.runningMu.Lock()
+			_, watching := s.running[run.ID]
+			if !watching {
+				s.running[run.ID] = func() {}
+			}
+			s.runningMu.Unlock()
+			if !watching {
+				s.deliverCheckRun(run.ID, *job)
+			}
+			continue
+		}
 		maxDur := time.Duration(job.MaxDurationS) * time.Second
 		if maxDur == 0 {
 			maxDur = time.Hour
