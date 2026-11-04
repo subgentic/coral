@@ -109,3 +109,15 @@ func TestTheChatRepliesLimitNoticeIsTheRefusalForARefusedCodexAgent(t *testing.T
 	_, _, notice = h.chatNotices(r, "codex-"+sid, "codex", sid, t.TempDir())
 	assert.Equal(t, "Codex refuses its model gpt-6.1-sol: change the model for this agent.", notice)
 }
+
+// The mark lasts two minutes after the monitor's read and no longer (#13518): present at 119 s, gone at 121 s, with the constant pinned; a sleeping agent never carries it whatever was read.
+func TestABlockedMarkLastsTwoMinutesAfterTheReadAndASleepingAgentNeverHasOne(t *testing.T) {
+	require.Equal(t, 2*time.Minute, blockedMaxAge, "the spec says two minutes: a change of it is a change of the contract the dashboard reads")
+	const sid = "cccccccc-1518-4000-8000-0000000000d1"
+	t.Cleanup(func() { ptymanager.NoteCodexModelRefusal(sid, "", false, time.Now()) })
+	ptymanager.NoteCodexModelRefusal(sid, "gpt-6.1-sol", true, time.Now().Add(-119*time.Second))
+	assert.NotNil(t, blockedField(sid, "codex", false), "a read 119 s old still counts")
+	assert.Nil(t, blockedField(sid, "codex", true), "a sleeping agent never carries it, however fresh the read")
+	ptymanager.NoteCodexModelRefusal(sid, "gpt-6.1-sol", true, time.Now().Add(-121*time.Second))
+	assert.Nil(t, blockedField(sid, "codex", false), "a read 121 s old says nothing")
+}
