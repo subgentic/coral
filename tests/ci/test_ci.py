@@ -444,6 +444,49 @@ class SecurityTests(Base):
         self.assertFalse(os.path.exists(marker))
         self.assertFalse(os.path.exists(os.path.join(self.home, 'mac.lock')), 'the lock is released')
 
+    def _rmtree(self, tmp, base):
+        code = "import sys; sys.path.insert(0, %r); import ci; ci.safe_rmtree(%r, %r)" % (os.path.dirname(CI), tmp, base)
+        r = subprocess.run([sys.executable, '-c', code], env=dict(self.env), capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+    def _under_private_tmp(self):
+        d = tempfile.mkdtemp(prefix='ci-rmtree-', dir='/private/tmp')
+        self.addCleanup(shutil.rmtree, d, ignore_errors=True)
+        return d
+
+    def test_safe_rmtree_clause_base_must_be_under_private_tmp(self):  # clause 1 alone: everything else holds
+        outside = os.path.join(self.d, 'outside')  # not under /private/tmp
+        os.makedirs(os.path.join(outside, 'job1'))
+        wr(os.path.join(outside, 'job1', 'keep.txt'), 'precious')
+        link = os.path.join(self._under_private_tmp(), 'base')
+        os.symlink(outside, link)  # the owner's base folder is itself a link to somewhere outside /private/tmp
+        self._rmtree(os.path.join(link, 'job1'), link)
+        self.assertEqual(rd(os.path.join(outside, 'job1', 'keep.txt')), 'precious')
+
+    def test_safe_rmtree_clause_tmp_must_be_inside_base(self):  # clause 2 alone: a real folder next to the base, under /private/tmp
+        root = self._under_private_tmp()
+        os.makedirs(os.path.join(root, 'base'))
+        os.makedirs(os.path.join(root, 'sibling'))
+        wr(os.path.join(root, 'sibling', 'keep.txt'), 'precious')
+        self._rmtree(os.path.join(root, 'sibling'), os.path.join(root, 'base'))
+        self.assertEqual(rd(os.path.join(root, 'sibling', 'keep.txt')), 'precious')
+
+    def test_safe_rmtree_clause_tmp_must_not_be_a_link(self):  # clause 4 alone: the link points at a real folder inside the base
+        root = self._under_private_tmp()
+        base = os.path.join(root, 'base')
+        os.makedirs(os.path.join(base, 'real'))
+        wr(os.path.join(base, 'real', 'keep.txt'), 'precious')
+        os.symlink(os.path.join(base, 'real'), os.path.join(base, 'job1'))
+        self._rmtree(os.path.join(base, 'job1'), base)
+        self.assertEqual(rd(os.path.join(base, 'real', 'keep.txt')), 'precious')
+
+    def test_safe_rmtree_removes_a_real_folder_inside_the_base(self):  # the positive case, so the guards are not just refusing everything
+        root = self._under_private_tmp()
+        base = os.path.join(root, 'base')
+        os.makedirs(os.path.join(base, 'job1', 'data'))
+        self._rmtree(os.path.join(base, 'job1'), base)
+        self.assertFalse(os.path.exists(os.path.join(base, 'job1')))
+
     def test_the_ssh_command_notices_a_dead_connection(self):
         r = subprocess.run([sys.executable, '-c', 'import sys; sys.path.insert(0, %r); import ci; print(" ".join(ci.ssh_cmd()))' % os.path.dirname(CI)], env={'PATH': SYSPATH, 'HOME': self.d}, capture_output=True, text=True)
         self.assertIn('ServerAliveInterval=', r.stdout, r.stdout + r.stderr)
