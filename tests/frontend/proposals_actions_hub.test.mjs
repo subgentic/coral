@@ -13,7 +13,7 @@ for (const k of ['window', 'document', 'navigator', 'localStorage', 'location', 
 }
 globalThis.fetch = async () => new Response('', { status: 200, headers: { 'content-type': 'text/css' } });
 const { state } = await import(pathToFileURL(path.join(dir, 'state.js')).href);
-const { proposalActions } = await import(pathToFileURL(path.join(dir, 'inbox_proposals.js')).href);
+const { proposalActions, openProposalDialog } = await import(pathToFileURL(path.join(dir, 'inbox_proposals.js')).href);
 state.hub = true;
 state.servers = [{ id: 'signed', status: 'online', owner_stamp: true }, { id: 'older', status: 'online', owner_stamp: false }, { id: 'unknown', status: 'online' }];
 const row = server => ({ id: 1, board_id: `@${server}/team`, kind: 'goal', title: 'Ship it', proposer: 'Dev', state: 'pending', server, rowKey: `proposal:@${server}/team:1` });
@@ -24,4 +24,21 @@ assert.deepEqual(labels(row('older')), [], 'a computer without the stamp secret:
 assert.deepEqual(labels(row('unknown')), [], 'a computer that has not said it can be signed for: no buttons');
 assert.match(proposalActions(row('older')).textContent, /Decide it on that computer/);
 assert.deepEqual(labels(row('local')), ['Approve', 'Edit', 'Reject'], "this computer's own proposals are decided as ever");
+
+// the decision dialog has its own gate (it opens from the row's title as well as from the buttons): Approve, Edit and Reject are hidden for a computer the hub cannot sign for, and it says where to decide
+dom.window.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
+const shown = (server, mode) => {
+    const d = openProposalDialog(row(server), mode);
+    const visible = [...d.querySelectorAll('.proposal-buttons button')].filter(b => !b.hidden).map(b => b.textContent);
+    const say = d.querySelector('.proposal-status').textContent;
+    d.remove();
+    return { visible, say };
+};
+for (const mode of ['view', 'edit', 'reject']) {
+    assert.deepEqual(shown('older', mode).visible, ['Close'], `no decision button for a computer without the stamp secret (${mode})`);
+    assert.match(shown('older', mode).say, /decide it on that computer/);
+    assert.deepEqual(shown('unknown', mode).visible, ['Close']);
+}
+assert.ok(shown('signed', 'view').visible.includes('Approve') && shown('signed', 'view').visible.includes('Reject…'), 'a computer the hub can sign for keeps its decisions');
+assert.ok(shown('local', 'view').visible.includes('Approve'), "this computer's own proposal keeps its decisions");
 console.log('proposals_actions_hub: ok');
