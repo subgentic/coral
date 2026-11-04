@@ -89,9 +89,18 @@ func sendUnlessBlocked(ctx context.Context, limit func(context.Context, AgentInf
 
 // screenModelRefused reads a Codex agent's "model is not supported" notice off its screen (#13480): which model its login cannot use. Only Codex is looked at, and a runtime that cannot show a screen sees nothing.
 func screenModelRefused(rt AgentRuntime) func(ctx context.Context, a AgentInfo) (string, bool) {
+	f, _ := screenModelRefusedSized(rt)
+	return f
+}
+
+// screenCacheMaxAge is how long a session's last screen read is kept after it was made: past it the entry is dropped the next time any session is read, so the cache does not grow with every session ever seen.
+var screenCacheMaxAge = time.Hour
+
+// screenModelRefusedSized is screenModelRefused and a way to see how many sessions it remembers (a test's).
+func screenModelRefusedSized(rt AgentRuntime) (func(ctx context.Context, a AgentInfo) (string, bool), func() int) {
 	sr, ok := rt.(screenReader)
 	if !ok {
-		return nil
+		return nil, func() int { return 0 }
 	}
 	type seen struct {
 		at    time.Time
@@ -100,6 +109,7 @@ func screenModelRefused(rt AgentRuntime) func(ctx context.Context, a AgentInfo) 
 	}
 	var mu sync.Mutex
 	cache := map[string]seen{}
+	size := func() int { mu.Lock(); defer mu.Unlock(); return len(cache) }
 	return func(ctx context.Context, a AgentInfo) (string, bool) {
 		if a.AgentType != at.Codex {
 			return "", false
@@ -116,10 +126,16 @@ func screenModelRefused(rt AgentRuntime) func(ctx context.Context, a AgentInfo) 
 		}
 		model, found := ptymanager.CodexModelRefusedOnScreen(screen)
 		mu.Lock()
-		cache[a.SessionID] = seen{time.Now(), model, found}
+		now := time.Now()
+		for id, e := range cache {
+			if now.Sub(e.at) >= screenCacheMaxAge {
+				delete(cache, id) // a session not looked at for a long while: ended, or no longer asked about
+			}
+		}
+		cache[a.SessionID] = seen{now, model, found}
 		mu.Unlock()
 		return model, found
-	}
+	}, size
 }
 
 // modelRefused says whether a is a Codex agent whose model is refused, and which model.
