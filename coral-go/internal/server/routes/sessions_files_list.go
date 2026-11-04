@@ -103,7 +103,7 @@ func (h *SessionsHandler) Files(w http.ResponseWriter, r *http.Request) {
 	if sidPtr != nil {
 		sid = *sidPtr
 	}
-	h.refreshFilesInner(w, r, name, sid)
+	h.refreshFilesInner(w, r, name, sid, noRefreshFlags) // the View tier's read: Refresh and Turn on live updates are the POST's flags (Interact), never read here (#13127)
 }
 
 // RefreshFiles runs fresh git queries and merges agent Write/Edit events.
@@ -114,8 +114,17 @@ func (h *SessionsHandler) RefreshFiles(w http.ResponseWriter, r *http.Request) {
 		SessionID string `json:"session_id"`
 	}
 	decodeJSON(r, &body)
-	h.refreshFilesInner(w, r, name, body.SessionID)
+	q := r.URL.Query()
+	flags := refreshFlags{manual: q.Get("manual") == "1", live: q.Get("live") == "on"}
+	h.refreshFilesInner(w, r, name, body.SessionID, flags)
 }
+
+// refreshFlags are what a person's Refresh and Turn on live updates ask of one pass (#13079): manual runs a pass even for a paused folder, live also turns live updates back on. Only the POST refresh (Interact) passes them;
+// the GET (View) never does, so a viewer can neither resume a paused folder nor force git to run (#13127).
+type refreshFlags struct{ manual, live bool }
+
+// noRefreshFlags is what a read passes. (The calls pass a plain name, not a literal: tools/gen_route_queries.py follows a helper that receives the request only through such a call, and the route's own parameters, worktree, are read inside it.)
+var noRefreshFlags = refreshFlags{}
 
 // trackedPaths reports which of the given repo-relative paths git tracks. It
 // asks only about those paths, so the cost follows the number of candidates
@@ -150,7 +159,7 @@ func gitCmd(ctx context.Context, workdir string, args ...string) *exec.Cmd {
 }
 
 // refreshFilesInner contains the shared logic for computing fresh changed files.
-func (h *SessionsHandler) refreshFilesInner(w http.ResponseWriter, r *http.Request, name, sessionID string) {
+func (h *SessionsHandler) refreshFilesInner(w http.ResponseWriter, r *http.Request, name, sessionID string, flags refreshFlags) {
 	if !h.requireAgentSession(w, r, name, sessionID) {
 		return
 	}
@@ -172,8 +181,8 @@ func (h *SessionsHandler) refreshFilesInner(w http.ResponseWriter, r *http.Reque
 	}
 
 	follow := followOn(agentCtx(r))
-	manual := r.URL.Query().Get("manual") == "1" || r.URL.Query().Get("live") == "on"
-	if r.URL.Query().Get("live") == "on" {
+	manual := flags.manual || flags.live
+	if flags.live {
 		gitguard.Resume(workdir) // 'Turn live updates on': this pass runs, and the poller takes the folder up again (it pauses it again if git is still slow)
 	}
 	if pz, isPaused := gitguard.Get(workdir); isPaused && !manual {
