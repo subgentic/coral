@@ -3,6 +3,8 @@ package ptymanager
 import (
 	"context"
 	"log/slog"
+	"path"
+	"strings"
 
 	at "github.com/subgentic/coral/internal/agenttypes"
 	"github.com/subgentic/coral/internal/logparse"
@@ -51,21 +53,34 @@ func AgentExited(ctx context.Context, term any, name, agentType, sessionID strin
 	return idle, shell
 }
 
-// AgentRunning reports whether the terminal can be read and shows a program running in the agent's pane (not an idle shell): a positive reading only. False for a terminal agent, a
-// terminal that cannot say, and an idle shell (#13431).
-func AgentRunning(ctx context.Context, term any, name, agentType, sessionID string) bool {
+// AgentCLIRunning reports whether the single foreground program of the agent's pane, read from the terminal, is the agent's own CLI: its image (or, for a script run by node, bun or deno, the
+// script) is named binary, directly below the pane's shell and with its image readable. A positive reading only (#13431): false for a terminal agent, a terminal that cannot say, an idle shell, a
+// pager, an editor, a REPL or anything else a person runs in the pane. The name is not authentication (a program can be named like the CLI), the same trust the notice record has.
+func AgentCLIRunning(ctx context.Context, term any, name, agentType, sessionID, binary string) bool {
 	if agentType == "" {
 		agentType, _ = logparse.ParseSessionName(name)
 	}
-	if agentType == at.Terminal {
+	if agentType == at.Terminal || binary == "" {
 		return false
 	}
-	c, ok := term.(ShellIdleChecker)
+	rec, ok := term.(AgentRecorder)
 	if !ok {
 		return false
 	}
-	idle, _, ok := c.AgentShellIdle(ctx, name, agentType, sessionID)
-	return ok && !idle
+	cand, why, err := rec.AgentCandidate(ctx, name, agentType, sessionID, "")
+	if err != nil || why != "" || cand.Unidentified || cand.Under != "" || cand.Image == "" {
+		return false
+	}
+	return programIs(cand.Image, binary) || (cand.Script != "" && programIs(cand.Script, binary))
+}
+
+// programIs is whether a program's path has the base name binary (case-insensitive, without a .exe, .cmd or .js ending).
+func programIs(p, binary string) bool {
+	base := path.Base(strings.ReplaceAll(p, "\\", "/"))
+	for _, ext := range []string{".exe", ".cmd", ".js", ".mjs"} {
+		base = strings.TrimSuffix(strings.ToLower(base), ext)
+	}
+	return base == strings.ToLower(binary)
 }
 
 // AgentShellIdle implements ShellIdleChecker for tmux.

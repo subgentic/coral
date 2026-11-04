@@ -297,14 +297,15 @@ func (r *SessionReconciler) checkExited(ctx context.Context, ls store.LiveSessio
 }
 
 // checkResumed wakes an agent that was marked Ended (its CLI exited, reason agent_exited) when its terminal now plainly runs a program again: a person started the CLI by hand in that shell
-// (#13431). It needs a positive reading (the shell's process table shows a foreground program, ptymanager.AgentRunning); a terminal that cannot be read, a gone terminal and every other
+// (#13431). It needs a positive reading that the program in the pane is the agent's own CLI (ptymanager.AgentCLIRunning), not any program a person runs there; a terminal that cannot be read, a gone terminal and every other
 // sleep reason (a person's, auto-sleep, a lost terminal server) are left as they are.
 func (r *SessionReconciler) checkResumed(ctx context.Context, ls store.LiveSession, alive map[string]bool) {
 	if ls.SleepReason == nil || *ls.SleepReason != store.SleepReasonAgentExited || ls.IsArchived == 1 || !alive[strings.ToLower(ls.SessionID)] {
 		return
 	}
 	name := FormatSessionName(ls.AgentType, ls.SessionID)
-	if !ptymanager.AgentRunning(ctx, r.runtime, name, ls.AgentType, ls.SessionID) {
+	info := agent.GetCLIInfo(ls.AgentType)
+	if info == nil || !ptymanager.AgentCLIRunning(ctx, r.runtime, name, ls.AgentType, ls.SessionID, info.Binary) {
 		return
 	}
 	if err := r.sessionStore.SetSessionSleeping(ctx, ls.SessionID, false); err != nil {
