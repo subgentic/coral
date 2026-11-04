@@ -36,7 +36,7 @@ const S = `(window.__coralStatic || '/static/')`;
         return {onLine: navigator.onLine, socketReadyState: state.coralWs?.readyState ?? null, socketURL: state.coralWs?.url ?? null, barPresent: !!bar, barText: bar?.textContent ?? null, url: location.href};
     })()`);
     try {
-        await setupHubWorld({ client, Page, Emulation, width: 1280, height: 800, mobile: false });
+        await setupHubWorld({ client, Page, Emulation, width: 1280, height: 800, mobile: false, hubFeed: true });
         const run = async tag => {
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
             await waitFor(`typeof window.switchNavTab==='function' && !!window.__coralReady`, 'dashboard'); await coralReady(ev, 'startup', 'liveList', 'settings');
