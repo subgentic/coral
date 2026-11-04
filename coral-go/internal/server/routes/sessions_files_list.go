@@ -181,6 +181,10 @@ func (h *SessionsHandler) refreshFilesInner(w http.ResponseWriter, r *http.Reque
 			mode = "branch_point"
 		}
 		stored, _, _ := h.gs.GetChangedFiles(r.Context(), name, ptr.NonEmpty(sessionID), mode)
+		// A followed worktree's list is never stored (it is not the launch folder's, which the poller writes): the last list a pass computed for it is the answer, or the panel shows nothing and the count of a list it never got (#13247)
+		if last, ok := refreshFlights.lastFor(refreshFlightKey(workdir, h.getDiffMode(r.Context()), sessionID, follow, name)); follow && ok {
+			stored = last.files
+		}
 		writeJSON(w, http.StatusOK, h.withWorktree(r, name, sessionID, map[string]any{"agent_name": name, "files": hubVisibleFiles(r, stored), "diff_mode": mode, "total_changed": max(pz.Changes, len(stored)), "capped": pz.Changes > len(stored),
 			"paused": pz}))
 		return
@@ -408,7 +412,20 @@ type refreshFlight struct {
 	mu     sync.Mutex
 	calls  map[string]*refreshCall
 	recent map[string]refreshRecent
+	last   map[string]refreshedFiles // the newest answer of each key, kept for a paused folder that has no stored list to show (#13247)
 }
+
+// refreshLastKeep bounds last: it starts over when full.
+const refreshLastKeep = 256
+
+// lastFor is the newest list a pass computed for key.
+func (f *refreshFlight) lastFor(key string) (refreshedFiles, bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	res, ok := f.last[key]
+	return res, ok
+}
+
 type refreshCall struct {
 	done chan struct{}
 	res  refreshedFiles
@@ -421,7 +438,7 @@ type refreshRecent struct {
 
 const refreshReuseOver = 250 * time.Millisecond
 
-var refreshFlights = &refreshFlight{calls: map[string]*refreshCall{}, recent: map[string]refreshRecent{}}
+var refreshFlights = &refreshFlight{calls: map[string]*refreshCall{}, recent: map[string]refreshRecent{}, last: map[string]refreshedFiles{}}
 
 // do returns the answer for key, running fn if nobody is (ran: this call ran the pass; false when it shared one); ok is false when ctx ended while waiting. fresh asks for a new pass whatever was just answered (a person's Refresh); a pass already running is still shared.
 // The pass is left cleanly even if fn panics: the key is freed and the waiters released (they get an empty answer), so one panic cannot make every later refresh of the folder wait.
@@ -455,6 +472,12 @@ func (f *refreshFlight) do(ctx context.Context, key string, fresh bool, fn func(
 			if !time.Now().Before(rc.until) {
 				delete(f.recent, k)
 			}
+		}
+		if c.ok {
+			if f.last == nil || len(f.last) >= refreshLastKeep {
+				f.last = map[string]refreshedFiles{}
+			}
+			f.last[key] = c.res
 		}
 		if took > refreshReuseOver && c.ok {
 			f.recent[key] = refreshRecent{res: c.res, until: time.Now().Add(min(took, 10*time.Second))}
