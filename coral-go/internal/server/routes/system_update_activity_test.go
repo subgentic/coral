@@ -124,3 +124,41 @@ func TestTheHubUpdateRowCarriesOnlyAPlainVersion(t *testing.T) {
 	assert.Equal(t, "", rows[2].version, "a staged version that is not x.y.z is not written")
 	assert.Equal(t, "", rows[2].meta.Note)
 }
+
+// #13370 (the #13340 review's SHOULDs): the two lines a test did not pin.
+func hubUpdateCaller() callerIdentity { return callerIdentity{owner: true, pseudo: "hub-user-a"} }
+
+// (a) the row is written with a context that outlives the request: the Hub user who closes the page at once must not lose the record of what they had the computer do.
+func TestTheHubUpdateRowIsWrittenAfterTheClientLeavesNotWithTheRequestContext(t *testing.T) {
+	var sawErr error
+	called := false
+	h := &UpdateRelaunchHandler{Activity: func(ctx context.Context, _ board.ActivityMeta, _, _, _, _, _ string) error {
+		called = true
+		sawErr = ctx.Err()
+		return nil
+	}}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // the client has gone
+	h.hubActivity(ctx, hubUpdateCaller(), board.ActHubUpdateRelaunch, "1.2.3", "1.2.2")
+	require.True(t, called, "the row was written")
+	require.NoError(t, sawErr, "with a context the client leaving does not cancel")
+}
+
+// (b) the "from <installed>" note needs both versions: with the staged one missing, or the installed one, there is no note (and no half-sentence).
+func TestTheHubUpdateRowsFromNoteNeedsBothTheInstalledAndTheStagedVersion(t *testing.T) {
+	for _, c := range []struct{ name, installed, version, note string }{
+		{"both", "1.2.2", "1.2.3", "from 1.2.2"},
+		{"no staged version", "1.2.2", "", ""},
+		{"no installed version", "", "1.2.3", ""},
+		{"neither", "", "", ""},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			rec := &activityRows{}
+			h := &UpdateRelaunchHandler{Activity: rec.record}
+			h.hubActivity(context.Background(), hubUpdateCaller(), board.ActHubUpdateRelaunch, c.version, c.installed)
+			rows := rec.all()
+			require.Len(t, rows, 1)
+			require.Equal(t, c.note, rows[0].meta.Note)
+		})
+	}
+}
