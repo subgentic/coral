@@ -42,7 +42,7 @@ const { coralReady } = require('./helpers/wait');
         await ev(`window.__mode = 'none'; document.querySelector('#changed-files-list .files-timedout-note button').click(); true`);
         await waitFor(`!/a\\.txt/.test(document.getElementById('changed-files-list').textContent)`, 'the empty timed out answer', 6000);
         t = await text(); h = await title();
-        check('with no last list the note is still there', /Git took too long on this folder; showing the last list\./.test(t), t.slice(0, 160));
+        check('with no last list the note is still there, without "showing the last list"', /Git took too long on this folder\./.test(t) && !/showing the last list/.test(t), t.slice(0, 160));
         check('it does not say "No changed files"', !/No changed files/.test(t), t.slice(0, 160));
         check('the header does not say "0 files changed"', !/0 files changed/.test(h), h.slice(0, 100));
 
