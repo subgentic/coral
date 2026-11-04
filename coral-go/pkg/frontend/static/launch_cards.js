@@ -10,9 +10,13 @@ export const LAUNCH_CARDS = [
 /** The goal card says, in its own line, when there is no team to give a goal to (the teams the app lists, remote ones on a Hub included: home_goal.js counts them as the Inbox's New goal does). Until that is known it is the plain line. */
 export const GOAL_NO_TEAM_DESC = 'No team yet. Start one to give it a goal.';
 let noTeam = false;
-const checkTeams = () => importOnce('./home_goal.js').then(m => m.refreshGoalCard()).catch(() => {}); // after the page is up; a failed read leaves the plain line
-export { checkTeams as refreshGoalCardSoon };
-if (typeof document !== 'undefined') document.addEventListener('coral:welcome-built', () => setTimeout(checkTeams, 0));
+const checkTeams = () => importOnce('./home_goal.js').then(m => m.refreshGoalCard()).catch(() => {}); // a failed read leaves the plain line
+// Not part of the page's start (#13079, page_weight_browser: the module and the teams read were two more requests at start): the read is made GOAL_CHECK_AFTER_MS after the card is drawn, once however often it is drawn.
+const GOAL_CHECK_AFTER_MS = 2000;
+let checkPending = false;
+const checkTeamsSoon = () => { if (checkPending) return; checkPending = true; setTimeout(() => { checkPending = false; checkTeams(); }, GOAL_CHECK_AFTER_MS); };
+export { checkTeamsSoon as refreshGoalCardSoon };
+if (typeof document !== 'undefined') document.addEventListener('coral:welcome-built', checkTeamsSoon);
 export const goalDesc = () => (noTeam ? GOAL_NO_TEAM_DESC : LAUNCH_CARDS.find(c => c.key === 'goal').desc);
 export function setNoTeam(v) {
     noTeam = !!v;
