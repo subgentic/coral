@@ -188,7 +188,7 @@ func (h *SessionsHandler) refreshFilesInner(w http.ResponseWriter, r *http.Reque
 			"paused": pz}))
 		return
 	}
-	key := fmt.Sprintf("%s\x00%s\x00%s\x00%v", workdir, h.getDiffMode(r.Context()), sessionID, follow)
+	key := refreshFlightKey(workdir, h.getDiffMode(r.Context()), sessionID, follow, name)
 	res, ok := refreshFlights.do(r.Context(), key, manual, func() refreshedFiles {
 		return h.computeRefreshedFiles(context.WithoutCancel(r.Context()), name, sessionID, workdir, follow)
 	})
@@ -458,4 +458,10 @@ func (f *refreshFlight) do(ctx context.Context, key string, fresh bool, fn func(
 	c.res = fn()
 	c.ok = true
 	return c.res, true
+}
+
+// refreshFlightKey is what one pass of git is shared by: the folder, the mode, the session, the follow state and the agent. The agent too: a pass stores that agent's own list and reads its own events, and an agent
+// known by name alone (no session id) would otherwise share a pass with every other agent in its folder.
+func refreshFlightKey(workdir, mode, sessionID string, follow bool, agent string) string {
+	return fmt.Sprintf("%s\x00%s\x00%s\x00%v\x00%s", workdir, mode, sessionID, follow, agent)
 }
