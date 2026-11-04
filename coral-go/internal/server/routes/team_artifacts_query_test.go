@@ -613,3 +613,18 @@ func TestArtifactSortTextOrdersEmptyLast(t *testing.T) {
 		assert.Contains(t, teamArtifactSorts, name)
 	}
 }
+
+// #13162, QA Reviewer 2's MUST: Needs you's search matched a file's review question, its goal's title and its team in the page; the computer's q, which now answers it, must match them too, or a word only in the question finds nothing.
+func TestTeamArtifactsSearchMatchesTheReviewQuestionTheGoalAndTheTeam(t *testing.T) {
+	it := teamArtifact{Name: "plan.md", TaskTitle: "Write the plan", GoalTitle: "Ship the Quokka release", ReviewQuestion: "Is the Zulu migration safe to run?", Team: "payments-team"}
+	for q, want := range map[string]bool{
+		"zulu migration": true,  // only in the question
+		"quokka":         true,  // only in the goal's title
+		"payments":       true,  // only in the team
+		"plan":           true,  // the name, as before
+		"unrelated":      false, // none
+	} {
+		qq := teamArtifactQuery{q: strings.ToLower(q)}
+		require.Equal(t, want, qq.textMatch(it), q)
+	}
+}
