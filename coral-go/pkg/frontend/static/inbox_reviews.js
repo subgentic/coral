@@ -105,13 +105,14 @@ async function readTeam(team, mutedOut = null) {
 // With a filter on (the words, a team, an agent, how long a file has waited, a computer) the file rows are what each computer answers for that query: its first 50 matches, with Show more by its cursor, and its total.
 // A match that is item 897 of 900 is on page 1 of its filter. Nothing here changes what the page holds with no filter, nor the counts, pills and options, which keep reading the whole list (Stage 2).
 let fview = null; // { key, rows, total, cursors: { team: cursor }, more, loading, error, at, promise }
-const viewParts = f => ({ q: f.q || '', team: f.team || '', agent: f.agent || '', longer: f.longer || '', server: f.server || '', oldest: f.sort === 'oldest' });
+const viewParts = f => ({ q: f.q || '', team: f.team || '', agent: f.agent === UNKNOWN_AGENT ? '' : f.agent || '', // 'Unknown agent' is the page's own word for a file with no producer: the computer cannot filter by it, so it is not a query
+    longer: f.longer || '', server: f.server || '', oldest: f.sort === 'oldest' });
 export const reviewQueryKey = f => { const v = viewParts(f); return (v.q || v.team || v.agent || v.longer || v.server) ? JSON.stringify(v) : ''; };
 /** The Needs you filters as the computer's artifact list takes them: q, by (the uploader), until (waited at least this long: created before), sort. */
 export function reviewQueryParams(f, now = Date.now()) {
     const v = viewParts(f), p = new URLSearchParams({ tag: 'for review', limit: '50', versions: 'newest' });
     if (v.q) p.set('q', v.q);
-    if (v.agent && v.agent !== UNKNOWN_AGENT) p.set('by', v.agent); // the computer's by is who produced or sent a file; the page's name for a file with no producer is not a name it has, so that filter stays the page's (below)
+    if (v.agent) p.set('by', v.agent);
     if (v.longer) p.set('until', new Date(now - Number(v.longer) * 60000).toISOString());
     if (v.oldest) p.set(SORT_PARAM, 'oldest');
     return p;

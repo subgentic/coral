@@ -17,7 +17,7 @@ const N = 900;
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Page.addScriptToEvaluateOnNewDocument({ source: `(() => { const real = window.fetch, N = ${N}; window.__asked = [];
             const hex = i => String(i + 1).padStart(64, '0');
-            const art = i => ({ id: 'a-' + i, uri: 'coral://artifacts/' + hex(i), tags: ['for review'], name: 'report-' + String(i).padStart(3, '0') + '.md', created_at: new Date(Date.UTC(2026, 10, 4) - i * 1000).toISOString(), available: true, produced_by: 'Dev', session_id: 's-1', ...(i === 321 ? { review_question: 'Is the Zulu migration safe to run?' } : {}) });
+            const art = i => ({ id: 'a-' + i, uri: 'coral://artifacts/' + hex(i), tags: ['for review'], name: 'report-' + String(i).padStart(3, '0') + '.md', created_at: new Date(Date.UTC(2026, 10, 4) - i * 1000).toISOString(), available: true, ...(i === 150 ? {} : { produced_by: 'Dev', session_id: 's-1' }), ...(i === 321 ? { review_question: 'Is the Zulu migration safe to run?' } : {}) });
             const json = b => Promise.resolve(new Response(JSON.stringify(b), { status: 200, headers: { 'Content-Type': 'application/json' } }));
             window.fetch = (u, o) => { const url = new URL(String(u), location.href), p = url.pathname;
                 if (p === '/api/board/projects') return json([{ project: 't1' }]);
@@ -25,6 +25,7 @@ const N = 900;
                     if (tag !== 'for review') return json({ has_more: false, artifacts: [] });
                     const q = (url.searchParams.get('q') || '').toLowerCase(), cursor = url.searchParams.get('cursor'), start = cursor ? Number(cursor) : Number(url.searchParams.get('offset') || 0), limit = Math.min(50, Number(url.searchParams.get('limit') || 50));
                     let all = Array.from({ length: q ? N : 200 }, (_, i) => art(i)); // the whole list read stops at 200; a query is answered over all 900
+                    const by = url.searchParams.get('by'); if (by) all = all.filter(a => (a.produced_by || '').toLowerCase() === by.toLowerCase()); // the computer's by: who produced it
                     if (q) all = all.filter(a => a.name.includes(q) || (a.review_question || '').toLowerCase().includes(q)); // the computer's q covers the question too (QA Reviewer 2's MUST on #13162)
                     const page = all.slice(start, start + limit), more = start + page.length < all.length;
                     return json({ artifacts: page, limit, offset: start, has_more: more, ...(more ? { next_cursor: String(start + page.length) } : {}), total: all.length }); }
@@ -63,6 +64,15 @@ const N = 900;
         await type('');
         await waitFor(`/report-000/.test(document.getElementById('group-table-view').innerText)`, 'the unfiltered list is back', 10000);
         assert.ok(!(await ev(`!!document.querySelector('#group-table-view .inbox-more-files')`)), 'and no Show more line');
+        // 4: the agent filter 'Unknown agent' (a file with no producer) is the page's: it is not sent as by=, and the file with no producer is shown
+        await ev(`localStorage.setItem('coral-inbox-needs-filters', JSON.stringify({ agent: 'Unknown agent' })); true`);
+        await ev(`window.__asked.length = 0; true`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
+        await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
+        await ev(`window.switchNavTab('hub-inbox'); true`);
+        await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
+        await waitFor(`/report-150/.test(document.getElementById('group-table-view').innerText)`, 'the file with no producer is shown under Agent: Unknown agent', 10000);
+        assert.ok(!(await ev(`window.__asked.some(s => /by=/.test(s))`)), 'and by= was not sent for it');
         console.log('PASS');
     } finally { try { client.close(); } catch (e) {} }
 })().catch(e => { console.error(e); process.exit(1); });
