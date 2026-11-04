@@ -32,7 +32,7 @@ export function editCheck(check, agents, onSaved) {
     field('timezone', 'Timezone').required = true;
     field('notify_mode', 'Tell me', 'select', NOTIFY_MODES);
     for (const [key, word] of [['enabled', 'Schedule enabled'], ['wake_if_asleep', 'Wake the agent if it is asleep']]) {
-        const label = el('label', 'chief-check-checkbox'); const input = el('input'); input.type = 'checkbox'; input.checked = check[key] === true; fields[key] = input; label.append(input, document.createTextNode(word)); form.append(label);
+        const label = el('label', 'chief-check-checkbox'); const input = el('input'); input.type = 'checkbox'; input.name = key; input.checked = check[key] === true; fields[key] = input; label.append(input, document.createTextNode(word)); form.append(label);
     }
     form.append(el('p', 'chief-check-hint', 'Waking is off by default. When enabled, ordinary permission and team limits still apply.'));
     const error = el('p', 'chief-check-error'); error.setAttribute('role', 'alert'); error.hidden = true;
