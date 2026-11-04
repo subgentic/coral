@@ -47,3 +47,32 @@ func TestTmuxAttachRepairsDeadPipeWithExistingEmptyLog(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, string(data), "REPAIRED_PIPE_MARKER", "repaired pipe writes the real log, not only a fallback capture")
 }
+
+// A transient failure to repair the pipe does not stop a person attaching (#13458, Lead's SHOULD B on #13421): only a terminal that is gone is an error; anything else is logged and the viewer attaches from
+// the log as before.
+func TestTmuxAttachCarriesOnWhenThePipeCannotBeChecked(t *testing.T) {
+	b := newTestTmuxBackend(t)
+	const name, sid = "pipe-hiccup", "sid-pipe-hiccup"
+	require.NoError(t, b.Spawn(name, "claude", t.TempDir(), sid, "", 137, 42))
+	t.Cleanup(func() { _ = b.Kill(name) })
+	blocker := t.TempDir() + "/afile"
+	require.NoError(t, os.WriteFile(blocker, []byte("x"), 0600))
+	b.mu.RLock()
+	sess := b.sessions[name]
+	b.mu.RUnlock()
+	sess.logPath = blocker + "/session.log" // a log path that cannot be looked at (not a missing file): the pipe check fails with an ordinary error
+	ch, err := b.Attach(name, "viewer")
+	require.NoError(t, err, "a pipe check that fails for another reason than a gone terminal must not refuse the attach")
+	require.NotNil(t, ch)
+	b.Unsubscribe(name, "viewer")
+}
+
+func TestTmuxAttachToAGoneTerminalIsStillErrTerminalGone(t *testing.T) {
+	b := newTestTmuxBackend(t)
+	const name, sid = "pipe-gone", "sid-pipe-gone"
+	require.NoError(t, b.Spawn(name, "claude", t.TempDir(), sid, "", 137, 42))
+	require.NoError(t, os.Remove(b.LogPath(name)))
+	require.NoError(t, b.client.KillSessionOnly(context.Background(), name, "claude", sid))
+	_, err := b.Attach(name, "viewer")
+	require.ErrorIs(t, err, ErrTerminalGone)
+}

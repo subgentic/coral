@@ -410,8 +410,12 @@ func (b *TmuxBackend) Attach(name, subscriberID string) (<-chan []byte, error) {
 
 	// A file can outlive its pipe worker after wake/restart. Check the pipe,
 	// not just the file, before subscribing to a stream that would stay silent.
+	// Only a terminal that is gone stops the attach: a transient failure of the check is logged and the viewer attaches from the log as before (#13458).
 	if err := b.ensureSessionPipe(name, sess); err != nil {
-		return nil, err
+		if errors.Is(err, ErrTerminalGone) {
+			return nil, err
+		}
+		log.Printf("[tmux] session=%s: the log pipe could not be checked, attaching from the log as it is: %v", name, err)
 	}
 
 	ch := make(chan []byte, 256)
