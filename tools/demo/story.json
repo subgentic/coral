@@ -25,10 +25,10 @@
     "done": "Search a city and see five days of highs, lows and a feels-like figure",
     "body": [
       "Skyline should answer one question well: what will the weather do this week?",
-      "- Search any city by name, with the country",
-      "- Five days of highs, lows and a feels-like figure",
-      "- Dark by default, with a light switch",
-      "- Works on a phone-sized window"
+      "Search any city by name, with the country",
+      "Five days of highs, lows and a feels-like figure",
+      "Dark by default, with a light switch",
+      "Works on a phone-sized window"
     ],
     "picture": "skyline-mockup.png"
   },
@@ -68,6 +68,36 @@
       "file": "test-plan.md",
       "name": "skyline-test-plan.md",
       "question": "Is this test plan enough for the first beta?"
+    },
+    {
+      "agent": "Backend",
+      "file": "rain-alert-spec.md",
+      "name": "skyline-rain-alert-spec.md",
+      "question": "Notification or email for the rain alert?"
+    },
+    {
+      "agent": "Designer",
+      "file": "icons-review.md",
+      "name": "skyline-icons.md",
+      "question": "Are the twelve weather icons right?"
+    },
+    {
+      "agent": "Reviewer",
+      "file": "a11y-checklist.md",
+      "name": "skyline-accessibility.md",
+      "question": "Is the accessibility checklist enough for the beta?"
+    },
+    {
+      "agent": "Frontend",
+      "file": "perf-budget.md",
+      "name": "skyline-performance-budget.md",
+      "question": "Approve the performance budget?"
+    },
+    {
+      "agent": "Orchestrator",
+      "file": "release-notes-draft.md",
+      "name": "skyline-release-notes.md",
+      "question": "Are the 0.2 release notes ready to publish?"
     }
   ],
   "chatter": [
@@ -325,5 +355,22 @@
         }
       }
     }
-  ]
+  ],
+  "fillers": [
+    "Got it, thanks. I will pick that up.",
+    "Noted. I will post an update on the board when it is done.",
+    "Understood, working on it.",
+    "Thanks, that helps. Continuing.",
+    "Acknowledged. I will check back after the next step.",
+    "Seen. Nothing blocks me right now.",
+    "Copy that. Carrying on.",
+    "Thanks. Nothing needed from you.",
+    "Logged. I will keep going.",
+    "Okay, I will take it from here.",
+    "Noted, thank you.",
+    "Received. Continuing with the plan.",
+    "Understood. I will flag anything that blocks me.",
+    "Seen it. On with the next step."
+  ],
+  "goalFilesTask": "Add the units switch"
 }

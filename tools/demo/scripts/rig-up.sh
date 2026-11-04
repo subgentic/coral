@@ -25,7 +25,7 @@ mkdir -p "$S/data" "$S/home" "$S/work/claude-projects" "$S/work/envdump"
 node "$HERE/setup.mjs" repo || exit 1
 cd "$S/home"
 # the scripted answers of the mock agents (MOCK_AGENT_REPLIES): one entry per agent, keyed by its [Name] tag, from story.json
-python3 -I -c "import json,sys;print(json.dumps([c['reply'] for c in json.load(open(sys.argv[1]))['chats']]))" "$HERE/../story.json" > "$S/work/replies.json"
+python3 -I -c "import json,sys;d=json.load(open(sys.argv[1]));print(json.dumps([c['reply'] for c in d['chats']]+[{'text':x} for x in d.get('fillers',[])]))" "$HERE/../story.json" > "$S/work/replies.json"
 nohup env -i HOME="$S/home" PATH="$S/bin:/usr/bin:/bin" CORAL_DATA_DIR="$S/data" CORAL_TELEMETRY_DISABLED=1 CORAL_HOOK_DIR="$S/bin" \
   MOCK_AGENT_READY=1 MOCK_AGENT_MODELS=1 MOCK_AGENT_REPLIES="$S/work/replies.json" MOCK_AGENT_ENV_DUMP="$S/work/envdump" CLAUDE_PROJECTS_DIR="$S/work/claude-projects" \
   "$S/bin/coral" --host 127.0.0.1 --port "$PORT" --cloud-url off --no-browser --backend pty > "$S/work/server.log" 2>&1 &
