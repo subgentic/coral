@@ -688,7 +688,7 @@ func queryChangedFilesFrom(ctx context.Context, workdir, mode string, status []b
 	// -z: NUL-terminated records with raw paths. Without it git quotes names
 	// containing non-ASCII bytes (e.g. macOS screenshots' U+202F) with octal
 	// escapes, which then never match a file on disk.
-	out, err := gitutil.Command(ctx, workdir, append(append([]string{"diff"}, refs...), "--numstat", "-z")...).Output()
+	out, _, err := gitutil.CappedNumstat(ctx, workdir, refs, maxChangedFiles, true) // the list is cut at maxChangedFiles by name: a big tree is numbered for those rows only (#13155)
 	if err != nil {
 		// A timeout or git failure: the list would be incomplete.
 		return nil, fmt.Errorf("git diff %s --numstat: %w", base, err)

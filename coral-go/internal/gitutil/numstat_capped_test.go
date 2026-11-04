@@ -1,0 +1,154 @@
+package gitutil
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+// bigTree is a repo with n committed files, each then changed by i+1 added lines, so a file's count says which it is.
+func bigTree(t *testing.T, n int) string {
+	t.Helper()
+	dir := t.TempDir()
+	run := func(args ...string) {
+		c := exec.Command("git", append([]string{"-C", dir, "-c", "user.email=a@b", "-c", "user.name=x", "-c", "commit.gpgsign=false"}, args...)...)
+		out, err := c.CombinedOutput()
+		require.NoError(t, err, string(out))
+	}
+	run("init", "-q", ".")
+	for i := 0; i < n; i++ {
+		require.NoError(t, os.WriteFile(filepath.Join(dir, fmt.Sprintf("f%04d.txt", i)), []byte("base\n"), 0o644))
+	}
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "[glob]*.txt"), []byte("base\n"), 0o644))
+	run("add", "-A")
+	run("commit", "-qm", "base")
+	for i := 0; i < n; i++ {
+		require.NoError(t, os.WriteFile(filepath.Join(dir, fmt.Sprintf("f%04d.txt", i)), []byte("base\n"+strings.Repeat("x\n", i%7+1)), 0o644))
+	}
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "[glob]*.txt"), []byte("base\nmore\n"), 0o644))
+	return dir
+}
+
+// #13155: a diff of more files than the cap is numbered for its first limit names only and says how many more there are; a smaller one is numbered whole, as before; every count is the plain numstat's.
+func TestCappedNumstatNumbersOnlyTheRowsKeptAndSaysHowManyAreLeft(t *testing.T) {
+	dir := bigTree(t, 40)
+	old := numstatArgBytes
+	numstatArgBytes = 60 // several batches
+	t.Cleanup(func() { numstatArgBytes = old })
+	ctx := context.Background()
+	refs := []string{"HEAD"}
+	plain, err := Command(ctx, dir, "diff", "HEAD", "--numstat", "-z").Output()
+	require.NoError(t, err)
+	want := map[string]string{}
+	for _, rec := range strings.Split(string(plain), "\x00") {
+		if parts := strings.SplitN(rec, "\t", 3); len(parts) == 3 {
+			want[parts[2]] = parts[0] + "\t" + parts[1]
+		}
+	}
+	require.Len(t, want, 41)
+	parse := func(out []byte) map[string]string {
+		got := map[string]string{}
+		for _, rec := range strings.Split(string(out), "\x00") {
+			if parts := strings.SplitN(rec, "\t", 3); len(parts) == 3 {
+				got[parts[2]] = parts[0] + "\t" + parts[1]
+			}
+		}
+		return got
+	}
+	// under the cap: whole, nothing left
+	out, more, err := CappedNumstat(ctx, dir, refs, 100, true)
+	require.NoError(t, err)
+	assert.Equal(t, 0, more)
+	assert.Equal(t, want, parse(out))
+	// over the cap: the first 10 names, their own counts, 31 left; a glob character in a name is only a name
+	out, more, err = CappedNumstat(ctx, dir, refs, 10, true)
+	require.NoError(t, err)
+	assert.Equal(t, 31, more)
+	got := parse(out)
+	assert.Len(t, got, 10)
+	for p, c := range got {
+		assert.Equal(t, want[p], c, p)
+	}
+	assert.Contains(t, got, "[glob]*.txt", "'[' sorts before 'f': the glob-named file is among the first by name, and numbered as itself")
+	assert.NotContains(t, got, "f0039.txt")
+	// the text form (no -z) the refresh route reads
+	out, more, err = CappedNumstat(ctx, dir, refs, 10, false)
+	require.NoError(t, err)
+	assert.Equal(t, 31, more)
+	assert.Len(t, strings.Split(strings.TrimSpace(string(out)), "\n"), 10)
+	// no limit: plain
+	out, more, err = CappedNumstat(ctx, dir, refs, 0, true)
+	require.NoError(t, err)
+	assert.Equal(t, 0, more)
+	assert.Len(t, parse(out), 41)
+	// a git failure is the plain command's failure
+	_, _, err = CappedNumstat(ctx, dir, []string{"no-such-ref"}, 10, true)
+	assert.Error(t, err)
+}
+
+// The pathspecs are folders where a folder is whole in the cut, so a big tree is one cheap diff, and files only where the cut runs through a folder or at the top.
+func TestThePathspecsOfACutAreFoldersWhereTheFolderIsWholeInIt(t *testing.T) {
+	sorted := []string{"a.txt", "d1/a", "d1/b", "d2/s1/x", "d2/s1/y", "d2/s2/z", "d3/a", "d3/b", "d4/a"}
+	assert.Equal(t, []string{"a.txt", "d1", "d2"}, pathspecsFor(sorted, 6), "d1 and d2 are whole before the cut at d3/a")
+	assert.Equal(t, []string{"a.txt", "d1", "d2/s1"}, pathspecsFor(sorted, 5), "the cut runs through d2 (the next path is d2/s2/z): its whole subfolder s1 is named, and the file s2/z is not in")
+}
+
+func TestCappedNumstatInANestedTreeMatchesThePlainCountsForTheRowsKept(t *testing.T) {
+	dir := t.TempDir()
+	run := func(args ...string) {
+		out, err := exec.Command("git", append([]string{"-C", dir, "-c", "user.email=a@b", "-c", "user.name=x", "-c", "commit.gpgsign=false"}, args...)...).CombinedOutput()
+		require.NoError(t, err, string(out))
+	}
+	run("init", "-q", ".")
+	var all []string
+	for d := 0; d < 6; d++ {
+		for s := 0; s < 3; s++ {
+			require.NoError(t, os.MkdirAll(filepath.Join(dir, fmt.Sprintf("d%d/s%d", d, s)), 0o755))
+			for f := 0; f < 4; f++ {
+				p := fmt.Sprintf("d%d/s%d/f%d.txt", d, s, f)
+				require.NoError(t, os.WriteFile(filepath.Join(dir, p), []byte("base\n"), 0o644))
+				all = append(all, p)
+			}
+		}
+	}
+	run("add", "-A")
+	run("commit", "-qm", "base")
+	for i, p := range all {
+		require.NoError(t, os.WriteFile(filepath.Join(dir, p), []byte("base\n"+strings.Repeat("x\n", i%5+1)), 0o644))
+	}
+	ctx := context.Background()
+	plain, err := Command(ctx, dir, "diff", "HEAD", "--numstat", "-z").Output()
+	require.NoError(t, err)
+	want := map[string]string{}
+	for _, rec := range strings.Split(string(plain), "\x00") {
+		if parts := strings.SplitN(rec, "\t", 3); len(parts) == 3 {
+			want[parts[2]] = parts[0] + "\t" + parts[1]
+		}
+	}
+	require.Len(t, want, 72)
+	for _, limit := range []int{1, 5, 13, 30, 71} { // the cut falls in a file, a subfolder, a folder
+		out, more, err := CappedNumstat(ctx, dir, []string{"HEAD"}, limit, true)
+		require.NoError(t, err)
+		assert.Equal(t, 72-limit, more, "limit %d", limit)
+		got := map[string]string{}
+		for _, rec := range strings.Split(string(out), "\x00") {
+			if parts := strings.SplitN(rec, "\t", 3); len(parts) == 3 {
+				got[parts[2]] = parts[0] + "\t" + parts[1]
+			}
+		}
+		assert.GreaterOrEqual(t, len(got), limit, "limit %d: at least the rows kept", limit)
+		for _, p := range all[:limit] { // sorted order is d0/s0/f0.. which is the creation order
+			assert.Equal(t, want[p], got[p], "limit %d: %s", limit, p)
+		}
+		for p, c := range got {
+			assert.Equal(t, want[p], c, "limit %d: any row given is the plain count", limit)
+		}
+	}
+}
