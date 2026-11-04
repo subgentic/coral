@@ -426,3 +426,37 @@ func TestAnAgentCannotTagItsUploadWithTheOperatorsStates(t *testing.T) {
 	code, _ := e.put(t, "tag-team", rid, `{"tags":["read","saved"]}`)
 	assert.Equal(t, http.StatusOK, code)
 }
+
+// An agent that belongs to no team has no board whose Needs you a file for review could reach: the tag used to be dropped and the upload answered 201, as if the Operator would see it (#13524). It is refused
+// before a byte is stored, in words that say what to do; the same file without the tag, and any agent on a team, are as they were.
+func TestAFileForReviewFromAnAgentWithNoTeamIsRefusedNotSilentlyDropped(t *testing.T) {
+	l := newLinkRig(t)
+	old := uploaderLookup
+	t.Cleanup(func() { uploaderLookup = old })
+	team := ""
+	uploaderLookup = func(ctx context.Context, sid string) (string, string, string) { return team, "Solo", "Solo" }
+	up := func(query, content string) (int, map[string]any) {
+		req, err := http.NewRequest(http.MethodPost, l.srv.URL+"/api/agent/artifacts?session_id=s1"+query, strings.NewReader(content))
+		require.NoError(t, err)
+		req.Header.Set("X-Artifact-Name", "report.md")
+		req.Header.Set("X-Artifact-Media-Type", "text/markdown")
+		resp, err := agentClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		var out map[string]any
+		_ = json.NewDecoder(resp.Body).Decode(&out)
+		return resp.StatusCode, out
+	}
+	code, out := up("&tag=for+review&question=Approve+the+report%3F", "no team bytes")
+	require.Equal(t, http.StatusBadRequest, code, "a tag that goes nowhere is never a 201: %v", out)
+	assert.Equal(t, "no_team_for_review", out["code"])
+	assert.Contains(t, out["error"], "team", "it says why")
+
+	code, out = up("", "no team bytes")
+	assert.Equal(t, http.StatusCreated, code, "the same file with no tag is a plain upload: %v", out)
+
+	team = "alpha" // an agent on a team: as before
+	code, out = up("&tag=for+review&question=Approve+the+report%3F", "team bytes")
+	assert.Equal(t, http.StatusCreated, code, "%v", out)
+	assert.Equal(t, []any{"for review"}, out["tags"])
+}

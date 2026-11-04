@@ -229,6 +229,14 @@ func (h *SessionsHandler) uploadAgentArtifact(w http.ResponseWriter, r *http.Req
 		reviewQuestion = q
 	}
 
+	// A file for review goes to the Operator's Needs you through a TEAM: an agent that belongs to no team has no board to carry the tag, so it used to be dropped and the upload answered 201 as if the Operator would see
+	// it (#13524). Refused here, before a byte is stored, with what to do; the same file with no tag is a plain upload.
+	if hasTag(board.CleanArtifactTags(r.URL.Query()["tag"]), tagForReview) {
+		if teamBoard, _, _ := uploaderOf(sid); teamBoard == "" {
+			writeError(w, http.StatusBadRequest, "no_team_for_review", noTeamForReviewText)
+			return
+		}
+	}
 	// The kind of a file for review (#12144): checked against the task rows and the roster before a byte is stored; no --kind is a plain file.
 	kind, kindRefused := h.uploadKindFor(r.Context(), r, taskID, hasTag(board.CleanArtifactTags(r.URL.Query()["tag"]), tagForReview))
 	if kindRefused != "" {
@@ -619,3 +627,6 @@ func notViewableForReview(name, mediaType string) string {
 
 // questionRequiredText is the refusal of the "for review" tag on an upload with no question.
 const questionRequiredText = "a file tagged \"for review\" needs --question \"<what the Operator is to decide, one line, at most 140 characters>\" (for example --question \"Approve this phone layout for the Goals list?\"): the review row shows it above the file. Test screenshots and logs are not for review: upload them without the tag and link them in your post."
+
+// noTeamForReviewText is the answer to an upload tagged "for review" by an agent that belongs to no team (#13524).
+const noTeamForReviewText = "this agent is not on a team's board, so a file tagged for review would reach no one's Needs you: upload it without the tag and say in your answer what the Operator is to decide, or work from a team"
