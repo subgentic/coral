@@ -22,7 +22,11 @@ const { coralReady, framesJs } = require('./helpers/wait');
             // the menu path: openServersTab is what the Settings menu's Computers item runs
             await ev(`Promise.resolve(window.showServersModal()).then(() => true)`); // the entry point the Settings menu's item reaches
             await waitFor(`(() => { const v = document.getElementById('servers-view'); return !!v && getComputedStyle(v).display !== 'none'; })()`, at + 'the Computers page opens from the menu action', 10000);
-            await waitFor(`!![...document.querySelectorAll('#servers-tab-body button')].find(b => /Add computer|Set up over SSH/.test(b.textContent))`, at + 'Add computer is reachable on the empty page', 10000);
+            await waitFor(`!!document.querySelector('#servers-tab-body button[data-action="add"]')`, at + 'the Add computer button is on the empty page', 10000);
+            assert.equal(await ev(`document.querySelector('#servers-tab-body button[data-action="add"]').textContent.trim()`), 'Add computer', at + 'and it is named Add computer');
+            await ev(`document.querySelector('#servers-tab-body button[data-action="add"]').click(); true`);
+            await waitFor(`!!document.getElementById('servers-form')`, at + 'pressing it opens the add form', 10000);
+            assert.match(await ev(`document.getElementById('servers-form').textContent`), /Add computer/, at + 'the form is the Add computer form');
             assert.match(await ev(`document.querySelector('#servers-tab-body .empty-state').textContent.replace(/\\s+/g, ' ').trim()`), /^No computers connected yet\. Add one to see its agents here\.$/, at + 'the empty page says so');
             console.log(`   ✓ ${w} px`);
         }
