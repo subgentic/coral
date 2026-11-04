@@ -1,15 +1,20 @@
 package routes
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/subgentic/coral/internal/store"
 	"path/filepath"
 	"strings"
+
+	"github.com/subgentic/coral/internal/store"
 )
 
 func (h *SessionsHandler) videoCommentArtifact(id string) bool {
-	if len(id) != 64 {
+	if len(id) != 64 || strings.ToLower(id) != id {
+		return false
+	}
+	if _, err := hex.DecodeString(id); err != nil {
 		return false
 	}
 	b, err := readSmallFile(filepath.Join(h.artifactDir(), id+".json"), 64<<10)
