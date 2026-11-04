@@ -129,7 +129,7 @@
   "live": {
     "agent": "Designer",
     "file": "theme-note.md",
-    "name": "skyline-theme-note.md",
+    "name": "skyline-design-note.md",
     "question": "Dark or light by default?",
     "comment": "The rain chart blue is hard to read on the dark card. Can you lighten it and tick the chart off the checklist?",
     "reply": "Done: the rain bar is lighter on dark (5.1 to 1 contrast) and the chart is ticked off. Decision recorded: dark by default.",

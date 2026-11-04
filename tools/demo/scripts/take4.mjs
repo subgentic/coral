@@ -33,6 +33,8 @@ function addTask(gid, title, state, n) {
 const flushClaims = () => { for (const [who, id] of claims.splice(0)) { try { agent(who, "coral-board", "task", "claim", String(id)) } catch (e) { /* already current */ } } }
 // a click that does not wait for the element to hold still (a few panels re-render while the page polls): move to it, then press where it is
 const pclick = async (t, loc) => { await t.move(loc); await loc.evaluate((el) => el.click()) }   // the goal panel's buttons do not take a pointer press in a recording; the page's own click does
+// type into a box by growing its value with the page's own input events: keys sent to some panels' boxes do not land in them in a recording
+const typeInto = async (t, box, text, ms = 22) => { await t.move(box); for (const ch of text) { await box.evaluate((el, c) => { el.value += c; el.dispatchEvent(new Event("input", { bubbles: true })) }, ch); await sleep(ms) } }
 const shot = async (t, name) => t.page.screenshot({ path: S + "/work/x-" + name + ".png" }).catch(() => {})
 const bare = (t) => t.page.evaluate(() => { for (const id of ["__cur"]) document.getElementById(id)?.remove() }).catch(() => {})
 const B = {
@@ -169,26 +171,29 @@ const B = {
     return t.finish()
   },
   async c7() { // a document to review: comment on it, the new version comes back at once, and Compare
-    fs.copyFileSync(SEED + "/" + live.file, S + "/work/live.md")
+    fs.writeFileSync(S + "/work/live.md", fs.readFileSync(SEED + "/" + live.file, "utf8") + "\n<!-- take " + Date.now() + " -->\n")   // a hidden marker: the same bytes as an earlier take would be refused
     const t = await beat(browser, "c7")
     await t.go("/inbox/needs")
     const up = uploadOf(agent(live.agent, "coral-agent", "artifact", "upload", S + "/work/live.md", "--name", live.name, "--tag", "for review", "--question", live.question))
-    await sleep(3500); await shot(t, "c7-list")
-    await t.click(t.page.locator(`text=${live.name} >> visible=true`).first()); await sleep(2500)
+    const row = t.page.locator(`text=${live.name} >> visible=true`).first()
+    const there = await row.waitFor({ state: "visible", timeout: 12000 }).then(() => true).catch(() => false)
+    if (!there) { await shot(t, "c7-list"); await t.page.reload({ waitUntil: "domcontentloaded" }); await sleep(2500) }   // the list did not take the new item live: load it again
+    await t.click(row); await sleep(2500)
     await t.cap("A file to review, with everything it says.")
     await t.page.mouse.wheel(0, 500); await sleep(2500); await t.page.mouse.wheel(0, -500); await sleep(1000)
     await t.click(t.page.getByRole("button", { name: /^Comments/ })); await sleep(900)
-    await t.click(t.page.getByRole("button", { name: /Comment on the whole/i })); await sleep(700)
-    const box = t.page.locator("textarea:visible, [contenteditable=true]:visible").last(); await t.click(box)
+    await pclick(t, t.page.locator("button.ac-whole >> visible=true").first()); await sleep(700)
+    const box = t.page.locator(".ac-composer .ac-input >> visible=true").first()
     await t.cap("Comment on it.")
-    await t.page.keyboard.type(live.comment, { delay: 30 }); await sleep(400)
-    const send = t.page.getByRole("button", { name: /^(Comment|Post|Send|Add comment|Save)$/ }).last()
-    if (await send.count()) await t.click(send); else await t.page.keyboard.press("Control+Enter")
-    await sleep(900)
-    const cs = agent(live.agent, "coral-agent", "artifact", "comments", up.uri); const id = (cs.match(/Thread (\d+)/) || [])[1]
+    await typeInto(t, box, live.comment, 18); await sleep(400)
+    await pclick(t, t.page.locator(".ac-composer button >> visible=true").filter({ hasText: /^Comment$/ }).first())
+    await sleep(1500); await shot(t, "c7-after-send")
+    const link = up.series_id ? "coral://artifacts/series/" + up.series_id : up.uri   // an earlier take of the same name makes this a version: comments belong to the series
+    let id; for (let k = 0; k < 14 && !id; k++) { await sleep(500); try { const o = agent(live.agent, "coral-agent", "artifact", "comments", link); id = (o.match(/Thread (\d+)/) || [])[1]; if (!id && k === 13) console.error("comments output: " + o.slice(0, 300)) } catch (e) { if (k === 13) console.error("comments error: " + String(e.stderr || e.message).slice(0, 300)) } }   // the comment reaches the agent a moment after Send
+    if (!id) throw new Error("the comment never reached the agent")
     let txt = fs.readFileSync(S + "/work/live.md", "utf8"); for (const [a, b] of live.edits) txt = txt.replace(a, b); fs.writeFileSync(S + "/work/live.md", txt)
-    agent(live.agent, "coral-agent", "artifact", "reply", up.uri, id, live.reply)
-    agent(live.agent, "coral-agent", "artifact", "upload", S + "/work/live.md", "--name", live.name, "--new-version-of", up.uri, "--tag", "for review", "--question", live.question2)
+    agent(live.agent, "coral-agent", "artifact", "reply", link, id, live.reply)
+    agent(live.agent, "coral-agent", "artifact", "upload", S + "/work/live.md", "--name", live.name, "--new-version-of", link, "--tag", "for review", "--question", live.question2)
     await t.cap("The answer and a new version, within seconds.")
     await t.page.locator(`text=${live.replyFind}`).first().waitFor({ state: "visible", timeout: 9000 }).catch(() => shot(t, "c7-noreply"))
     await sleep(3000)
@@ -207,8 +212,13 @@ const B = {
   },
   async c9() { // Analytics: totals, the spend chart, cost by provider, model and team
     const t = await beat(browser, "c9")
+    await t.page.addInitScript(() => setInterval(() => document.querySelectorAll("[class*=toast]").forEach((e) => e.remove()), 150))   // a restart notice from re-opening the rig is not part of the story
     await t.go("/analytics"); await t.cap("What did the team cost?")
-    await sleep(4000)
+    await sleep(2500)
+    const range = t.page.locator("select:has(option)").filter({ has: t.page.locator("option", { hasText: /7 days|week/i }) }).first()   // the time range: a week, so the invented history shows
+    if (await range.count()) { const label = await range.evaluate((el) => [...el.options].find((o) => /7 days|week/i.test(o.text))?.text); await t.move(range); await range.selectOption({ label }); await sleep(3500) } else await shot(t, "c9-norange")
+    await t.cap("A week of spend, by day.")
+    await sleep(2500)
     await t.page.mouse.move(900, 500, { steps: 15 }); await t.page.mouse.wheel(0, 450); await t.cap("By provider, model and team."); await sleep(3500)
     await t.page.mouse.wheel(0, 450); await sleep(3500)
     return t.finish()

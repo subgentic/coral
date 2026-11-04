@@ -29,10 +29,10 @@ for k in $(seq 0 $((${#BEATS[@]}-2))); do
   nxt="x$k"; FC+="[$prev][v$((k+1))]xfade=transition=fade:duration=$FADE:offset=${O_ARR[$k]}[$nxt];"; prev=$nxt
 done
 FC=${FC%;}
-"$FF" -y -loglevel error "${ARGS[@]}" -filter_complex "$FC" -map "[$prev]" -threads 2 -c:v libx264 -preset veryfast -crf 20 -pix_fmt yuv420p -movflags +faststart -an "$O/coral-demo-v4-16x9.mp4"
+"$FF" -y -loglevel error "${ARGS[@]}" -filter_complex "$FC" -map "[$prev]" -threads 2 -c:v libx264 -preset veryfast -crf 20 -pix_fmt yuv420p -movflags +faststart -an "$O/coral-demo-v4-16x9-${LAST}.mp4"
 # the GIF: the document review (c7) of the master, where its fade-in starts and for its own length
 GS=${O_ARR[5]}; GL=${DURS[6]}
-"$FF" -y -loglevel error -ss "$GS" -t "$GL" -i "$O/coral-demo-v4-16x9.mp4" -vf "fps=12,scale=800:-1:flags=lanczos,split[a][b];[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=4" -loop 0 "$O/coral-demo-v4-inbox.gif"
-"$FF" -y -loglevel error -ss "$GS" -i "$O/coral-demo-v4-16x9.mp4" -frames:v 1 "$O/coral-demo-v4-poster.png"
+"$FF" -y -loglevel error -ss "$GS" -t "$GL" -i "$O/coral-demo-v4-16x9-${LAST}.mp4" -vf "fps=12,scale=800:-1:flags=lanczos,split[a][b];[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=4" -loop 0 "$O/coral-demo-v4-inbox.gif"
+"$FF" -y -loglevel error -ss "$GS" -i "$O/coral-demo-v4-16x9-${LAST}.mp4" -frames:v 1 "$O/coral-demo-v4-poster.png"
 echo "beats: ${BEATS[*]}"; echo "lengths: ${DURS[*]}"
 echo "wrote $O: $(ls -la "$O" | grep v4 | awk '{print $9" "$5}' | tr '\n' ' ')"

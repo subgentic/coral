@@ -80,3 +80,20 @@ While a beat is recorded, `lib.mjs` scans the page twice a second (visible text,
 - The Inbox does not always live-update an open document, so beat 4 reloads and reopens it if the agent's reply has not appeared in 7 seconds.
 - `storyboard/` was planned with the discipline of [demo-director](https://github.com/precious112/demo-director) (MIT, pinned at `97a7ca9cf57a31069046f90e5714e4e2ccbd1775`); its scripts are not used and nothing of it is vendored here. The film is rendered by `take.mjs` and `encode.sh`, not by its engine.
 - Chromium, Playwright and ffmpeg are downloaded by you, into `$DEMO_ROOT`; none is checked in.
+
+## Film v4 (`take4.mjs`, `encode4.sh`)
+
+The v4 film (the New agent wizard and models, terminal to chat, filled chats, a goal with detail and a picture, a goal walkthrough with a comment, the Inbox, a document review with an instant new version, the expanded diff, Analytics) is recorded by `take4.mjs` and encoded by `encode4.sh`; the phone beat is gone. Run from `tools/demo/scripts` with `DEMO_ROOT` and `PLAYWRIGHT_BROWSERS_PATH` set:
+
+```bash
+NOLAUNCH=1 ./rig-up.sh                 # a fresh demo Coral (also passes MOCK_AGENT_REPLIES and MOCK_AGENT_MODELS to the mock agents)
+node take4.mjs c1                      # the wizard, on the empty dashboard
+node take4.mjs launch world chats      # the team, the history, the Inbox documents, the scripted chats
+python3 -I seed-usage.py               # a week of invented usage for Analytics
+node take4.mjs c2 c3 c4 c5 prompts c6 c7 c8 c9 c10
+node endcard.mjs; node hubclip.mjs     # the endings
+ENDING=card ./encode4.sh; ./encode4.sh # the masters (cross-fades), the GIF and the poster
+./rig-up.sh stop
+```
+
+Notes: take a beat again on a fresh rig where you can (`c4`, `c5` and `c7` create things that exist afterwards); `RESUME=1 ./rig-up.sh` starts the server again on a stopped rig's data, enough for `c9` (Analytics). Native menus (the model list) are not drawn in a recording, so `c1` steps through them; some goal-panel boxes do not take sent keys in a recording, so `c5` and `c7` grow the box's value with the page's own input events. The flash check is in the skill `making-coral-demo-film`.
