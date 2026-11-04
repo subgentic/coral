@@ -119,6 +119,7 @@ export function ensureRunsPage({ q = '', result = '' } = {}) {
     q = String(q || '').trim().slice(0, 200); result = RESULT_WORDS.includes(result) ? result : '';
     if (page.loaded && page.q === q && page.result === result) return;
     if (page.timer && page.q === q && page.result === result) return; // already waiting for it
+    if (page.loading && !page.loaded && page.q === q && page.result === result) return; // the first read of it is on its way: a redraw while it comes must not ask again
     clearTimeout(page.timer); page.timer = 0;
     const read = () => { page.timer = 0; page.q = q; page.result = result; page.cursor = ''; readPage(false); };
     if (!page.loaded && !page.loading && page.q === q && page.result === result) { read(); return; }
@@ -146,6 +147,7 @@ export function refreshRuns(force = false) {
         const old = key => runs.filter(i => i.kind === key).map(i => i.run); // one list that answered and one that did not: the other's runs stay as they were
         runs = mergeRuns(jobRuns ?? old('job'), wfRuns ?? old('workflow'));
         for (const i of runs) if (opened.has(i.key)) { if (i.run.seen_at) opened.delete(i.key); else i.run.seen_at = opened.get(i.key); }
+        if (page.items.length) { const seen = new Map(runs.filter(i => i.run.seen_at).map(i => [i.key, i.run.seen_at])); for (const i of page.items) if (!i.run.seen_at && seen.has(i.key)) i.run.seen_at = seen.get(i.key); } // a run opened on another screen: the page's copy of it is read too, with no read of its own (the page itself is read again only when the person comes back or a run ends)
         fire();
     }).finally(() => { pending = null; });
     return pending;

@@ -140,7 +140,7 @@ const STUB = `(() => {
             await ev(`window.__wfRuns.find(r => r.id === 200).seen_at = new Date().toISOString(); import(${S} + 'automation_runs.js').then(m => m.refreshRuns(true)).then(() => true)`);
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr[data-key] .automations-unread').length === 0`, `${at}the last unread run was opened on another screen: it lost its dot here too`, 8000);
             // no runs at all: one line and its hint
-            await ev(`window.__jobRuns = []; window.__wfRuns = []; import(${S} + 'automation_runs.js').then(m => m.refreshRuns(true)).then(() => true)`);
+            await ev(`window.__jobRuns = []; window.__wfRuns = []; import(${S} + 'automation_runs.js').then(m => m.refreshRuns(true).then(() => m.refreshRunsPage())).then(() => true)`);
             await waitFor(`!!document.querySelector('#group-table-view .empty-state .empty-state-line')`, `${at}the empty folder`, 8000);
             assert.equal(await ev(`document.querySelector('#group-table-view .empty-state .empty-state-line').textContent`), 'Nothing has run yet.', `${at}one empty line`);
             console.log(`${at}ok`);
