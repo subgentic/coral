@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/subgentic/coral/internal/clitext"
 	"github.com/subgentic/coral/internal/safego"
 )
 
@@ -146,7 +147,7 @@ func SettingsNoticeText(who string, changes []SettingChange) string {
 	}
 	text := who + " changed " + strings.Join(parts, "; ") + "."
 	if len(text) > settingNoticeMax {
-		text = text[:settingNoticeMax-1] + "…"
+		text = strings.ToValidUTF8(text[:settingNoticeMax-4], "") + "…" // cut on a character, not in the middle of one
 	}
 	return text
 }
@@ -232,7 +233,9 @@ func (s *Store) FlushSettingsNotice(ctx context.Context, project string) {
 	if len(titles) == 0 {
 		return
 	}
-	if _, err := s.PostSystemMessage(ctx, project, SettingsSender, strings.Join(titles, " ")+" "+SettingsNoticeText(p.who, changes), nil); err != nil {
+	// The text quotes what a person typed (a setting's value, the Hub user's name): cleaned, and no "@" in it can mention a member or "@all"; only the Orchestrators' own titles in front are live.
+	body := DefuseMentions(clitext.Clean(SettingsNoticeText(p.who, changes)), s.BoardMentionNames(ctx, project))
+	if _, err := s.PostSystemDefusedMessage(ctx, project, SettingsSender, strings.Join(titles, " ")+" "+body, nil); err != nil {
 		slog.Warn("settings notice: could not post", "board", project, "error", err)
 	}
 }

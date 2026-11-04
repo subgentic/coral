@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -141,4 +142,37 @@ func TestASettingsNoticeHidesSecretsSkipsTheOrchestratorsOwnChangeAndTheNameIsRe
 		many = append(many, board.SettingChange{Name: "s" + string(rune('a'+i)), Old: "0", New: "1"})
 	}
 	assert.Contains(t, board.SettingsNoticeText("The Operator", many), "and 4 more.")
+}
+
+// Security's SHOULD on #13173: the notice quotes what a person typed (a setting's value, the Hub user's name); no "@" in it can mention a member or everyone. Only the Orchestrator's own title in front is live. And the cut at
+// the end is on a character.
+func TestASettingsNoticeCannotMentionAnyoneThroughWhatItQuotes(t *testing.T) {
+	holdSettingsNotices(t)
+	server, h := setupBoardTestServer(t)
+	base := server.URL + "/api/board/quote-team"
+	postJSON(t, base+"/subscribe", map[string]string{"subscriber_id": "Lead", "job_title": "Orchestrator"}).Body.Close()
+	postJSON(t, base+"/subscribe", map[string]string{"subscriber_id": "Dev", "job_title": "Developer"}).Body.Close()
+	require.Equal(t, http.StatusOK, putJSON(t, base+"/working-mode", `{"mode":"worktrees","custom_instructions":"ping @Dev and @all and @Lead now"}`))
+	h.bs.NoteSettingsChange("quote-team", "The Operator (through Coral Hub, @Dev)", "Operator", []board.SettingChange{{Name: "note", Old: "a", New: "b @all"}})
+	h.bs.FlushSettingsNotice(context.Background(), "quote-team")
+	got := settingsNotices(t, h.bs, "quote-team")
+	require.NotEmpty(t, got)
+	for _, content := range got {
+		assert.True(t, strings.HasPrefix(content, "@Orchestrator "), "the Orchestrator is addressed: %q", content)
+		assert.NotContains(t, strings.TrimPrefix(content, "@Orchestrator "), "@Dev", "no member can be mentioned through a quoted value")
+		assert.NotContains(t, strings.TrimPrefix(content, "@Orchestrator "), "@all")
+		assert.NotContains(t, strings.TrimPrefix(content, "@Orchestrator "), "@Lead")
+		notified := h.bs.NotifiedBy(context.Background(), "quote-team", board.SettingsSender, content)
+		assert.Equal(t, []string{"Lead"}, notified, "only the Orchestrator (Lead) is told, not Dev or everyone: %q", content)
+	}
+	// the cut at the end of a long text is on a character
+	for pad := 0; pad < 4; pad++ { // whatever byte the cut falls on, it is not inside a character
+		many := make([]board.SettingChange, 0, 10)
+		for i := 0; i < 10; i++ {
+			many = append(many, board.SettingChange{Name: "s" + strings.Repeat("n", pad) + string(rune('a'+i)), Old: strings.Repeat("é", 80), New: strings.Repeat("日", 80)})
+		}
+		text := board.SettingsNoticeText("The Operator", many)
+		assert.True(t, utf8.ValidString(text), "no character is split (pad %d)", pad)
+		assert.LessOrEqual(t, len(text), 1600)
+	}
 }
