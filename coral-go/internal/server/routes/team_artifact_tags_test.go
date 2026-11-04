@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -472,4 +473,32 @@ func TestAFileForReviewFromAnAgentWithNoTeamIsKeptUnderTheReservedKey(t *testing
 	assert.Empty(t, tags[teamID], "a team's file is not under the reserved key")
 	tags, _ = l.h.bs.ArtifactTags(ctx, "alpha")
 	assert.Equal(t, []string{"for review"}, tags[teamID])
+}
+
+// A team that cannot be told is not "no team" (Security's INFO on #13524, #13527): a for-review upload whose checked lookup fails is a 500 and nothing is filed under the reserved key; with the lookup working
+// it is as before.
+func TestAFileForReviewWhoseUploadersTeamCannotBeCheckedIsA500NotFiledAsNoTeam(t *testing.T) {
+	l := newLinkRig(t)
+	old, oldCheck := uploaderLookup, uploaderTeamCheck
+	t.Cleanup(func() { uploaderLookup, uploaderTeamCheck = old, oldCheck })
+	uploaderLookup = func(ctx context.Context, sid string) (string, string, string) { return "", "Solo", "Solo" }
+	var failure error = errors.New("database is locked")
+	uploaderTeamCheck = func(ctx context.Context, sid string) (string, error) { return "", failure }
+	up := func(query, content string) int {
+		req, err := http.NewRequest(http.MethodPost, l.srv.URL+"/api/agent/artifacts?session_id=s1"+query, strings.NewReader(content))
+		require.NoError(t, err)
+		req.Header.Set("X-Artifact-Name", "report.md")
+		req.Header.Set("X-Artifact-Media-Type", "text/markdown")
+		resp, err := agentClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		return resp.StatusCode
+	}
+	assert.Equal(t, http.StatusInternalServerError, up("&tag=for+review&question=Approve%3F", "bytes while the store is busy"))
+	tags, err := l.h.bs.ArtifactTags(context.Background(), noTeamBoardID)
+	require.NoError(t, err)
+	assert.Empty(t, tags, "nothing was filed under the reserved key on a guess")
+	assert.Equal(t, http.StatusCreated, up("", "plain bytes while the store is busy"), "a file that is not for review never asks the checked lookup")
+	failure = nil
+	assert.Equal(t, http.StatusCreated, up("&tag=for+review&question=Approve%3F", "bytes once it answers"), "no team and no error: filed under the reserved key")
 }

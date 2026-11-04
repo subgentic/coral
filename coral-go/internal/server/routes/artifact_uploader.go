@@ -5,6 +5,8 @@ package routes
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"time"
 
 	"github.com/subgentic/coral/internal/board"
@@ -47,6 +49,62 @@ func NewUploaderLookup(ss *store.SessionStore, bs *board.Store) func(ctx context
 		}
 		return boardID, name, role
 	}
+}
+
+// uploaderTeamCheck is the checked form of the lookup for the one decision that must not guess (#13527): which team a session is on, with a real error when it cannot be told (the store is busy or closed), so
+// "no team" is never read off a failed lookup. nil (a test, a server with no store) falls back to uploaderOf, which has no error to give.
+var uploaderTeamCheck func(ctx context.Context, sessionID string) (team string, err error)
+
+// SetUploaderTeamCheck gives the upload paths the checked lookup of a session's team.
+func SetUploaderTeamCheck(fn func(ctx context.Context, sessionID string) (string, error)) {
+	uploaderTeamCheck = fn
+}
+
+// NewUploaderTeamCheck is the server's checked lookup: the live session's board, else the board of its subscription; a session the store has no row of is on no team, and any other store error is an error.
+func NewUploaderTeamCheck(ss *store.SessionStore, bs *board.Store) func(ctx context.Context, sessionID string) (string, error) {
+	return func(ctx context.Context, sessionID string) (string, error) {
+		if ss == nil {
+			return "", nil
+		}
+		ls, err := ss.GetLiveSession(ctx, sessionID)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return "", err
+		}
+		if ls == nil {
+			return "", nil
+		}
+		if ls.BoardName != nil && *ls.BoardName != "" {
+			return *ls.BoardName, nil
+		}
+		if bs != nil {
+			sub, err := bs.GetSubscriptionBySessionName(ctx, naming.SessionName(ls.AgentType, sessionID))
+			if err != nil && !errors.Is(err, sql.ErrNoRows) {
+				return "", err
+			}
+			if sub != nil {
+				return sub.Project, nil
+			}
+		}
+		return "", nil
+	}
+}
+
+// uploaderTeamChecked is the team of the session making an upload, or the error that stopped it being told. With no checked lookup it is uploaderOf's answer and no error.
+func uploaderTeamChecked(sessionID string) (string, error) {
+	if uploaderTeamCheck == nil || sessionID == "" {
+		b, _, _ := uploaderOf(sessionID)
+		return b, nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	b, err := uploaderTeamCheck(ctx, sessionID)
+	if err != nil {
+		return "", err
+	}
+	if !board.ValidLabel(b, uploaderLabelMax) {
+		return "", nil
+	}
+	return b, nil
 }
 
 // uploaderLabelMax bounds each recorded label; one that is longer or holds a control or formatting character is dropped, never stored.
