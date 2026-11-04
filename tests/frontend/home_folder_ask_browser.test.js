@@ -63,7 +63,7 @@ const { coralReady } = require('./helpers/wait');
         await ev(`window.__dup = false; true`);
 
         // a wake: the first request says home_folder_ask; Wake anyway sends it again with confirm_home_folder
-        await ev(`window.__sent.length = 0; window.__w = 'pending'; import(${S} + 'agent_actions.js').then(m => m.toggleAgentSleep('x', 'claude', 'hf-1', 'wake')).then(v => { window.__w = v; }); true`);
+        await ev(`window.__sent.length = 0; window.__w = 'pending'; Promise.resolve(window.toggleAgentSleep('x', 'claude', 'hf-1', 'wake')).then(v => { window.__w = v; }); true`);
         await waitFor(`document.getElementById('confirm-modal') && getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, 'the wake question opens', 8000);
         assert.equal(await yesLabel(), 'Wake anyway');
         sent = await ev(`window.__sent`);
