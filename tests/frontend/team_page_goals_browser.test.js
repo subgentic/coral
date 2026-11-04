@@ -69,10 +69,10 @@ const GOAL = 'Explore goals with two teams';
                 assert.equal(await ev(`!!window.__tp.page().querySelector('.goal-side, .goal-tasks-open')`), false, 'no right-hand Tasks column and no phone Tasks button');
                 assert.equal(await ev(`window.__tp.page().querySelectorAll('.goal-list .dt-primary').length`), 3, 'the goal\'s three tasks are rows of the list under the strip');
                 assert.ok(await ev(`!!window.__tp.find('button', /^Add task$/i)`), 'Add task');
-                assert.ok(await ev(`!!window.__tp.find('button', /^Close goal/i)`), 'Close goal');
+                if (!mobile) assert.ok(await ev(`!!window.__tp.find('button', /^Close goal/i)`), 'Close goal'); // a phone: Add task is the one button, Close goal is in More (#13119)
                 const head = await ev(`(() => { const h = document.querySelector('.goal-back-row'), names = h ? [...h.querySelectorAll('.goal-head-actions .btn')].map(b => b.textContent.trim()) : []; return { names, primary: !!h && !!h.querySelector('.goal-head-actions .btn:last-child.btn-primary'), bar: !!document.querySelector('.goals-pinbar') }; })()`);
-                assert.deepEqual(head.names.map(n => n.replace(/^(Close goal).*/, '$1')), ['Add task', 'Change driver', 'Move to another team', 'Close goal'], "the goal's actions are in its header (#11823; Change driver and Move to another team are the Operator's own, #12693)");
-                assert.ok(head.primary && !head.bar, 'Close goal is the primary, last, and there is no bar at the bottom of the page');
+                assert.deepEqual(head.names.map(n => n.replace(/^(Close goal).*/, '$1')), mobile ? ['Add task', 'More'] : ['Add task', 'Change driver', 'Move to another team', 'Close goal'], "the goal's actions are in its header (#11823; Change driver and Move to another team are the Operator's own, #12693)");
+                if (!mobile) assert.ok(head.primary && !head.bar, 'Close goal is the primary, last, and there is no bar at the bottom of the page'); else assert.ok(!head.bar, 'no bar at the bottom of the page');
             });
             await S.run(`${label}: Back returns to the list with the focus on the goal's row (not the page)`, async () => {
                 await click('button, a', /^(\u2190\s*)?Goals$/, 'back link');
