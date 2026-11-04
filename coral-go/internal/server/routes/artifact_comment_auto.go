@@ -63,6 +63,9 @@ func (h *SessionsHandler) deliverOperatorComment(r *http.Request, caller comment
 		return autoDelivery{Reason: "rate_limited"}
 	}
 	text, ok1 := sendQuote(c.Body, 2*sendCommentCap)
+	if label := videoCommentLabel(root); label != "" {
+		text = label + "\n" + text
+	}
 	snippet, ok2 := "", true
 	if a := anchorOfComment(root); a != nil && !a.Whole {
 		snippet, ok2 = sendQuote(strings.TrimSpace(a.Prefix+" ["+a.Quote+"] "+a.Suffix), sendSnippetCap)

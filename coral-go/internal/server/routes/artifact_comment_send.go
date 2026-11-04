@@ -365,7 +365,11 @@ func (h *SessionsHandler) sendArtifactComment(w http.ResponseWriter, r *http.Req
 			case !created:
 				res.State, res.AskID = "already_asked", ask.ID
 			default:
-				msg := sendMessage(title, author, version, sendReplyCommand(id, t.ID), text, snippet, mentionNames, commentPictureLinks(t.ImagesJSON)...)
+				timedText := text
+				if label := videoCommentLabel(t); label != "" {
+					timedText = label + "\n" + text
+				}
+				msg := sendMessage(title, author, version, sendReplyCommand(id, t.ID), timedText, snippet, mentionNames, commentPictureLinks(t.ImagesJSON)...)
 				if _, err := h.bs.PostDefusedMessage(r.Context(), t.Board, board.OperatorName, msg); err != nil {
 					slog.Warn("[artifact comments] message not posted", "board", t.Board, "error", err)
 					_ = h.ss.CloseArtifactAsk(r.Context(), t.ID, ls.SessionID, time.Now())
