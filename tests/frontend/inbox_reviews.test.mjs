@@ -105,3 +105,29 @@ assert.ok(M.reviewItems().some(a => a.id === row(402).id), 'the source arriving 
 await new Promise(setImmediate);
 assert.equal(projectScans, 2, 'the source change and queued revision share exactly one rescan');
 console.log('inbox_reviews: late source and pending revision coalesce');
+
+// An older computer may ignore the No team filter and return every team's files.
+// Neither those rows nor rows without the reserved board identity belong in Needs you.
+state.hub = true;
+state.serversKnown = true;
+state.servers = [{ id: 'old-box', status: 'online' }];
+const oldSourceReads = [];
+globalThis.fetch = async url => {
+    const u = new URL(url, 'http://localhost');
+    if (u.pathname.endsWith('/projects')) return Response.json([]);
+    if (u.pathname.endsWith('/team-artifacts')) {
+        oldSourceReads.push(u.pathname);
+        return Response.json({ artifacts: [
+            { ...row(901), board_id: 'another-team' },
+            { ...row(902), board_id: '@old-box/another-team' },
+            row(903),
+        ], has_more: false });
+    }
+    return Response.json({ artifacts: [], has_more: false });
+};
+await M.refreshReviews(true);
+assert.equal(M.reviewItems().length, 0, 'an old source returning every team must add no no-team review rows');
+assert.equal(M.savedFiles().length, 0, 'an old source must add no no-team saved rows either');
+assert.ok(oldSourceReads.includes('/api/team-artifacts'), 'the local reserved source was scanned');
+assert.ok(oldSourceReads.includes('/api/remote/old-box/api/team-artifacts'), 'the remote reserved source was scanned');
+console.log('inbox_reviews: older unfiltered local and remote sources add no reserved review rows');
