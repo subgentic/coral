@@ -84,6 +84,9 @@ process.on('SIGINT', () => done(130));
     }
     await Network.clearBrowserCache();
     for (const k of rows.splice(0)) void k; reqs.clear(); started = 0;
+    // sidebar and tab counts as times: from the start of the page, the first moment each count says a number above 0 (polled every 50 ms in the page)
+    const COUNT_IDS = ['nav-tab-hub-inbox-badge', 'saved-tab-count', 'nav-tab-skills-badge', 'history-tasks-count', 'history-activity-count', 'team-agents-count'];
+    await Page.addScriptToEvaluateOnNewDocument({ source: `(() => { const ids = ${JSON.stringify(COUNT_IDS)}; window.__counts = {}; const tick = () => { for (const id of ids) { const e = document.getElementById(id); const t = e && e.textContent.trim(); if (t && /[1-9]/.test(t) && !(id in window.__counts)) window.__counts[id] = { ms: Math.round(performance.now()), text: t }; } }; setInterval(tick, 50); })();` });
     t0 = Date.now();
     await Page.navigate({ url: BASE + '/' });
     await Page.loadEventFired();
@@ -101,6 +104,20 @@ process.on('SIGINT', () => done(130));
     const nav = await ev(`(() => { const n = performance.getEntriesByType('navigation')[0]; const lcp = performance.getEntriesByType('largest-contentful-paint').pop(); const fcp = performance.getEntriesByName('first-contentful-paint')[0];
         return { domContentLoaded: n && n.domContentLoadedEventEnd, load: n && n.loadEventEnd, fcp: fcp && fcp.startTime, lcp: lcp && lcp.startTime }; })()`);
     let out_interactions = {}; let idleEnd = 0; const out_profiles = {};
+    const counts = await ev(`window.__counts || {}`);
+    // Needs you within 20 s of the load (coral-hub's worst case: the click comes while the page's own counts are still coming in): the Inbox tab and the first file, timed
+    const early = {};
+    if (Date.now() - t0 < 20000 || process.env.EARLY_ALWAYS) {
+        early.seconds_after_load_start = Math.round((Date.now() - t0) / 100) / 10;
+        phase = 'early';
+        const e1 = await ev(`(async () => { const t = performance.now(); const tab = document.getElementById('nav-tab-hub-inbox'); if (!tab) return { error: 'no inbox tab' }; tab.click();
+            const v = await new Promise(res => { const t0 = performance.now(); const tick = () => { if (document.querySelectorAll('#group-table-view tbody tr').length > 0) res(performance.now() - t0); else if (performance.now() - t0 > 30000) res(-1); else setTimeout(tick, 16); }; tick(); }); return v; })()`).catch(e => ({ error: String(e.message || e).slice(0, 120) }));
+        const e2 = await ev(`(async () => { const row = [...document.querySelectorAll('#group-table-view tbody tr')].find(r => r.querySelector('.inbox-review-name')); if (!row) return { error: 'no review row' };
+            const t0 = performance.now(); row.querySelector('.inbox-review-name').click(); return await new Promise(res => { const tick = () => { const e = document.getElementById('artifact-viewer-title'); if (e && e.offsetParent !== null && e.textContent.trim().length > 0) res(performance.now() - t0); else if (performance.now() - t0 > 30000) res(-1); else setTimeout(tick, 16); }; tick(); }); })()`).catch(e => ({ error: String(e.message || e).slice(0, 120) }));
+        early.ms_to_rows = typeof e1 === 'number' ? Math.round(e1) : e1; early.ms_row_click_to_viewer = typeof e2 === 'number' ? Math.round(e2) : e2; // -1: not within 30 s
+        // a fresh load for the idle minute (the Inbox is open now)
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await sleep(3000);
+    }
     // ── profiles (PPROF_URL, PROFILE_PREFIX): a CPU profile of the server during the idle minute and one while an agent is open and polling (Backend Dev's #13182) ──
     const PPROF = process.env.PPROF_URL, PREFIX = process.env.PROFILE_PREFIX, PROF_S = Number(process.env.PROFILE_S || 40);
     const profile = async (label) => { if (!PPROF || !PREFIX) return null; try { const r = await fetch(`${PPROF}/debug/pprof/profile?seconds=${PROF_S}`); const b = Buffer.from(await r.arrayBuffer()); fs.writeFileSync(`${PREFIX}-${label}.pb.gz`, b); return b.length; } catch (e) { return String(e.message || e); } };
@@ -186,7 +203,7 @@ process.on('SIGINT', () => done(130));
     const routes = [...by.values()].map(o => ({ route: o.route, phase: o.phase, n: o.ms.length, p50: +pct(o.ms, 0.5).toFixed(1), p95: +pct(o.ms, 0.95).toFixed(1), max: +Math.max(...o.ms).toFixed(1),
         bytes: o.bytes, bytes_each: Math.round(o.bytes / o.ms.length), status: o.status })).sort((a, b) => b.p95 - a.p95);
     const out = { base: BASE, chrome: chromePath, at: new Date().toISOString(), load: { ready_rows: ready.rows, ms_to_agent_list: loadMs, ms_to_settled: settledMs, nav, requests: rows.filter(r => r.phase === 'load').length, static_files: rows.filter(r => new URL(r.url).pathname.startsWith('/static/')).length },
-        idle: { seconds: IDLE_S, requests: idleEnd - idleFrom }, routes, interactions: out_interactions, profiles: out_profiles };
+        idle: { seconds: IDLE_S, requests: idleEnd - idleFrom }, routes, interactions: { ...out_interactions, sidebar_counts_first_nonzero: counts, needs_you_early: early }, profiles: out_profiles };
     fs.writeFileSync(OUT, JSON.stringify(out, null, 1));
     console.log(JSON.stringify({ load: out.load, idle: out.idle }));
     for (const r of routes.slice(0, 14)) console.log(`${r.phase.padEnd(5)} ${String(r.p95).padStart(8)} ms p95 ${String(r.p50).padStart(8)} p50 ${String(r.max).padStart(8)} max  n=${String(r.n).padStart(3)}  ${String(r.bytes_each).padStart(8)} B  ${r.route}`);
