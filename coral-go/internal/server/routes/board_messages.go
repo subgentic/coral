@@ -3,11 +3,13 @@
 package routes
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"github.com/subgentic/coral/internal/claudeartifact"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -573,6 +575,12 @@ func (h *BoardHandler) ReadMessages(w http.ResponseWriter, r *http.Request) {
 // Pass ?id=N to fetch a single message by ID (does not advance cursor).
 func (h *BoardHandler) ListAllMessages(w http.ResponseWriter, r *http.Request) {
 	h.setBoardIdentity(w, r, urlParam(r, "project"))
+	// ?paged=1: the board's whole list as {messages, total, has_more, next_cursor} (#13188). Without it the answer is the bare array it always was.
+	if r.URL.Query().Has("paged") || strings.Contains(r.URL.RawQuery, "paged") {
+		project := urlParam(r, "project")
+		h.listMessagesPaged(w, r, project)
+		return
+	}
 	// Single message lookup by ID
 	if idStr := r.URL.Query().Get("id"); idStr != "" {
 		msgID, err := parseID(idStr) // canonical decimal only (#7261); 0 is a canonical id that is not there: 404 below, as before
@@ -759,4 +767,70 @@ func (h *BoardHandler) DeleteMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+// listMessagesPaged answers GET /api/board/{project}/messages/all?paged=1[&limit=N][&cursor=C]: the newest limit messages of the board (oldest first inside the page, as the bare list has them),
+// the true total, and next_cursor for the page before them (base64url, at most 1024 bytes: the first message of this page). limit is 1 to 500, 200 by default, as the bare list. It is the board's whole
+// list: with id, task_id or for_subscriber it is a 400.
+func (h *BoardHandler) listMessagesPaged(w http.ResponseWriter, r *http.Request, project string) {
+	q, perr := url.ParseQuery(r.URL.RawQuery)
+	if perr != nil {
+		errBadRequest(w, "the query string is not valid")
+		return
+	}
+	if len(q["paged"]) != 1 || q.Get("paged") != "1" {
+		errBadRequest(w, "paged must be 1")
+		return
+	}
+	for _, k := range []string{"id", "task_id", "for_subscriber", "offset", "before_id", "after_id", "format"} {
+		if q.Has(k) {
+			errBadRequest(w, "paged can't be combined with "+k)
+			return
+		}
+	}
+	for k, v := range q {
+		if (k != "paged" && k != "limit" && k != "cursor") || len(v) != 1 {
+			errBadRequest(w, "unknown or repeated parameter "+k)
+			return
+		}
+	}
+	limit := 200
+	if v := q.Get("limit"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 1 || n > 500 {
+			errBadRequest(w, "limit must be 1 to 500")
+			return
+		}
+		limit = n
+	}
+	var messages []board.Message
+	var err error
+	if c := r.URL.Query().Get("cursor"); c != "" { // read from the request itself: the Hub allowlist generator follows this
+		raw, derr := base64.RawURLEncoding.DecodeString(c)
+		before, perr := strconv.ParseInt(strings.TrimPrefix(string(raw), "b:"), 10, 64)
+		if derr != nil || len(c) > 1024 || !strings.HasPrefix(string(raw), "b:") || perr != nil || before <= 0 {
+			errBadRequest(w, "invalid cursor")
+			return
+		}
+		messages, err = h.bs.ListMessagesBefore(r.Context(), project, before, limit)
+	} else {
+		messages, err = h.bs.ListMessages(r.Context(), project, limit, 0, 0)
+	}
+	if err != nil {
+		errInternalServer(w, err.Error())
+		return
+	}
+	total, err := h.bs.CountMessages(r.Context(), project)
+	if err != nil {
+		errInternalServer(w, err.Error())
+		return
+	}
+	out := map[string]any{"messages": emptyIfNil(messages), "total": total, "has_more": false}
+	if len(messages) > 0 {
+		if older, cerr := h.bs.CountMessagesBefore(r.Context(), project, messages[0].ID); cerr == nil && older > 0 {
+			out["has_more"] = true
+			out["next_cursor"] = base64.RawURLEncoding.EncodeToString([]byte("b:" + strconv.FormatInt(messages[0].ID, 10)))
+		}
+	}
+	writeJSON(w, http.StatusOK, out)
 }

@@ -359,6 +359,7 @@ Returns messages without advancing any cursor, oldest first. Page by message id 
 |-----------|------|---------|-------------|
 | `id` | int | — | Fetch a single message by ID |
 | `limit` | int | 200 (max 500) | Page size |
+| `paged` | `1` | — | Opt in to `{"messages": [...], "total": N, "has_more": bool, "next_cursor": "..."}` instead of the bare array: the newest `limit` messages (oldest first inside the page), the true `total`, and `next_cursor` (only when `has_more`) which comes back as `cursor` with `paged=1` for the next older page. A bad `limit` or `cursor`, or `paged` with `id`, `task_id`, `for_subscriber`, `offset`, `before_id`, `after_id` or `format`, is a 400 |
 | `before_id` | int | — | The newest `limit` messages with id < `before_id` (the page just before that message), oldest first |
 | `after_id` | int | — | The oldest `limit` messages with id > `after_id` (what arrived after that message), oldest first. `after_id=0` starts at the first message |
 | `offset` | int | 0 | Offset pagination (kept for older clients). With no `offset`, `before_id` or `after_id`, returns the latest page |
@@ -993,7 +994,7 @@ shifts the pages after a cursor.
 as before.
 
 To list recent tasks across every board, use
-`GET /api/board/tasks?limit=100` (default `100`). That read is the Operator's (the dashboard, an API key or the signed command line): an agent's session token gets 403 `forbidden_for_agent`. An agent reads its own board's tasks with `GET /api/board/{project}/tasks` or `coral-board task list`.
+`GET /api/board/tasks?limit=100` (default `100`, up to `500` whole rows). The answer is `{"tasks": [...], "total": N, "has_more": bool, "next_cursor": "..."}`: `total` is every task of every board, newest first, and `next_cursor` (only when `has_more`) goes back as `?cursor=` on the task query below for the next page. That read is the Operator's (the dashboard, an API key or the signed command line): an agent's session token gets 403 `forbidden_for_agent`. An agent reads its own board's tasks with `GET /api/board/{project}/tasks` or `coral-board task list`.
 
 ### Task query (`GET /api/board/tasks` with parameters)
 
