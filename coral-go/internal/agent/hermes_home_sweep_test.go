@@ -8,6 +8,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/linktest"
 )
 
 // #11949 (Security's SHOULD on #11936): a home no session record reaches (a launch that failed after the home was made, a crash, a record deleted by hand) holds a copy of the person's .env. A sweep removes the
@@ -36,7 +38,7 @@ func TestSweepHermesHomes(t *testing.T) {
 	keep := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(keep, "f"), []byte("keep"), 0o600))
 	link := filepath.Join(team, "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c05")
-	require.NoError(t, os.Symlink(keep, link))
+	linktest.Symlink(t, keep, link)
 	require.NoError(t, os.Chtimes(keep, old, old)) // what the link points at is old too: still not followed
 
 	removed := SweepHermesHomes(r.data, func(id string) bool { return id == live }, 24*time.Hour, now)
@@ -67,9 +69,9 @@ func TestSweepHermesHomesDoesNotFollowALinkedParent(t *testing.T) {
 			require.NoError(t, os.Chtimes(victim, old, old))
 			if level == "team" {
 				require.NoError(t, os.MkdirAll(filepath.Join(r.data, hermesHomesFolder), 0o700))
-				require.NoError(t, os.Symlink(keep, HermesTeamHome(r.data, "t")))
+				linktest.Symlink(t, keep, HermesTeamHome(r.data, "t"))
 			} else {
-				require.NoError(t, os.Symlink(keep, filepath.Join(r.data, hermesHomesFolder)))
+				linktest.Symlink(t, keep, filepath.Join(r.data, hermesHomesFolder))
 			}
 			assert.Zero(t, SweepHermesHomes(r.data, func(string) bool { return false }, 24*time.Hour, time.Now()))
 			_, err := os.Stat(victim)

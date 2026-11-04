@@ -15,6 +15,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
+
+	"github.com/subgentic/coral/internal/linktest"
 )
 
 // treeSum is a hash of every path, mode, size, mtime and content under dir: the person's home must be exactly as it was.
@@ -189,7 +191,7 @@ func TestTheEnvIsNeverLoosenedFollowedOrRewritten(t *testing.T) {
 	require.NoError(t, os.WriteFile(other, []byte("keep"), 0o600))
 	home2 := HermesAgentHome(r.data, "linked", testSID)
 	require.NoError(t, os.MkdirAll(home2, 0o700))
-	require.NoError(t, os.Symlink(other, filepath.Join(home2, ".env")))
+	linktest.Symlink(t, other, filepath.Join(home2, ".env"))
 	_, err = PrepareHermesHome(r.data, "linked", testSID, r.person, time.Now())
 	assert.Error(t, err)
 	got, _ := os.ReadFile(other)
@@ -199,7 +201,7 @@ func TestTheEnvIsNeverLoosenedFollowedOrRewritten(t *testing.T) {
 	r2 := hermesRig(t)
 	secret := filepath.Join(t.TempDir(), "secret")
 	require.NoError(t, os.WriteFile(secret, []byte("TOKEN=linked\n"), 0o600))
-	require.NoError(t, os.Symlink(secret, filepath.Join(r2.person, ".env")))
+	linktest.Symlink(t, secret, filepath.Join(r2.person, ".env"))
 	h3, err := PrepareHermesHome(r2.data, "t", testSID, r2.person, time.Now())
 	require.NoError(t, err)
 	e, _ := os.ReadFile(filepath.Join(h3, ".env"))
@@ -213,7 +215,7 @@ func TestAHomeThatIsALinkOrAFileIsRefused(t *testing.T) {
 	r := hermesRig(t)
 	elsewhere := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(r.data, hermesHomesFolder), 0o700))
-	require.NoError(t, os.Symlink(elsewhere, HermesTeamHome(r.data, "t")))
+	linktest.Symlink(t, elsewhere, HermesTeamHome(r.data, "t"))
 	_, err := PrepareHermesHome(r.data, "t", testSID, r.person, time.Now())
 	assert.Error(t, err)
 	entries, _ := os.ReadDir(elsewhere)
@@ -366,7 +368,7 @@ func TestTheHookIsInstalledOnlyWhenNobodyElseCanChangeTheTool(t *testing.T) {
 	require.NoError(t, os.WriteFile(elsewhere, []byte("#!/bin/sh\n"), 0o777))
 	require.NoError(t, os.Chmod(elsewhere, 0o777))
 	require.NoError(t, os.Remove(hookToolFile(r2.tools)))
-	require.NoError(t, os.Symlink(elsewhere, hookToolFile(r2.tools)))
+	linktest.Symlink(t, elsewhere, hookToolFile(r2.tools))
 	assert.Zero(t, hooksOf(r2))
 }
 
@@ -432,7 +434,7 @@ func TestAnAgentHomeThatIsALinkIsRefused(t *testing.T) {
 	elsewhere := t.TempDir()
 	home := HermesAgentHome(r.data, "t", testSID)
 	require.NoError(t, os.MkdirAll(filepath.Dir(home), 0o700))
-	require.NoError(t, os.Symlink(elsewhere, home))
+	linktest.Symlink(t, elsewhere, home)
 	_, err := PrepareHermesHome(r.data, "t", testSID, r.person, time.Now())
 	assert.Error(t, err)
 	entries, _ := os.ReadDir(elsewhere)
@@ -440,7 +442,7 @@ func TestAnAgentHomeThatIsALinkIsRefused(t *testing.T) {
 
 	r2 := hermesRig(t)
 	require.NoError(t, os.MkdirAll(filepath.Join(r2.data, hermesHomesFolder), 0o700))
-	require.NoError(t, os.Symlink(elsewhere, HermesTeamHome(r2.data, "t")))
+	linktest.Symlink(t, elsewhere, HermesTeamHome(r2.data, "t"))
 	_, err = PrepareHermesHome(r2.data, "t", testSID, r2.person, time.Now())
 	assert.Error(t, err)
 	entries, _ = os.ReadDir(elsewhere)
@@ -488,7 +490,7 @@ func TestRemovingAnAgentHome(t *testing.T) {
 
 	keep := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(keep, "f"), []byte("keep"), 0o600))
-	require.NoError(t, os.Symlink(keep, a))
+	linktest.Symlink(t, keep, a)
 	require.NoError(t, RemoveHermesHome(r.data, "t", testSID))
 	_, err = os.Stat(filepath.Join(keep, "f"))
 	assert.NoError(t, err, "the link's target is untouched")
@@ -503,11 +505,11 @@ func TestRemovingAnAgentHomeRefusesALinkedParent(t *testing.T) {
 			victim := filepath.Join(keep, testSID)
 			if level == "team" {
 				require.NoError(t, os.MkdirAll(filepath.Join(r.data, hermesHomesFolder), 0o700))
-				require.NoError(t, os.Symlink(keep, HermesTeamHome(r.data, "t")))
+				linktest.Symlink(t, keep, HermesTeamHome(r.data, "t"))
 			} else {
 				require.NoError(t, os.MkdirAll(filepath.Join(keep, filepath.Base(HermesTeamHome(r.data, "t"))), 0o700))
 				victim = filepath.Join(keep, filepath.Base(HermesTeamHome(r.data, "t")), testSID)
-				require.NoError(t, os.Symlink(keep, filepath.Join(r.data, hermesHomesFolder)))
+				linktest.Symlink(t, keep, filepath.Join(r.data, hermesHomesFolder))
 			}
 			require.NoError(t, os.MkdirAll(victim, 0o700))
 			require.NoError(t, os.WriteFile(filepath.Join(victim, "state.db"), []byte("keep"), 0o600))
