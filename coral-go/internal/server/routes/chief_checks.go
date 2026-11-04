@@ -87,6 +87,14 @@ func chiefError(w http.ResponseWriter, err error) {
 		errInternalServer(w, "the check operation failed")
 	}
 }
+func chiefStateError(w http.ResponseWriter, err error) {
+	if errors.Is(err, store.ErrChiefNotFound) {
+		chiefError(w, err)
+		return
+	}
+	commentRefuse(w, 409, "trigger_conflict", "another trigger is already open for that check")
+}
+
 func (h *ChiefChecksHandler) list(w http.ResponseWriter, r *http.Request) {
 	if !chiefPerson(w, r) {
 		return
@@ -333,7 +341,7 @@ func (h *ChiefChecksHandler) state(w http.ResponseWriter, r *http.Request) {
 		// One state-only UPDATE preserves the latest agent report and all links;
 		// never copy fields from the earlier list read or the UI request body.
 		if err = h.sched.SetChiefTriggerResolution(r.Context(), id, b.State, h.now()); err != nil {
-			commentRefuse(w, 409, "trigger_conflict", "another trigger is already open for that check")
+			chiefStateError(w, err)
 			return
 		}
 		out, err := h.sched.ChiefTrigger(r.Context(), id)
@@ -383,7 +391,7 @@ func (h *ChiefChecksHandler) state(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err = h.sched.UpdateChiefTriggerState(r.Context(), id, b.State, summary, b.TaskID, b.AskID, b.BriefID, h.now()); err != nil {
-		commentRefuse(w, 409, "trigger_conflict", "another trigger is already open for that check")
+		chiefStateError(w, err)
 		return
 	}
 	out, err := h.sched.ChiefTrigger(r.Context(), id)

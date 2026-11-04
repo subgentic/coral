@@ -321,3 +321,5 @@ node team_launch_settings_launch_flag.test.mjs
 node chief_checks_model.test.mjs
 
 node chief_checks_state_api.test.mjs
+
+node chief_checks_lan.test.mjs
