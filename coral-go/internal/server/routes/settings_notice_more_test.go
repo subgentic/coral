@@ -162,3 +162,28 @@ func TestAHubSettingsChangeThatIsUndoneIsNotToldToTheOrchestrator(t *testing.T) 
 	bs.FlushSettingsNotice(ctx, "team")
 	assert.Len(t, settingsNotices(t, bs, "team"), 1, "the change that was undone is not told: the undo cancels it")
 }
+
+// The Orchestrator's tiny tests on #13221: resetting a built-in preset to its default tells the Orchestrator what it was and what it is again, and the production window is 3 seconds (a test changes the variable, so it
+// is pinned here before any does and read back after them).
+func TestResettingABuiltInPresetIsToldToTheOrchestrator(t *testing.T) {
+	holdSettingsNotices(t)
+	server, h := setupBoardTestServer(t)
+	base := server.URL + "/api/board/reset-team"
+	postJSON(t, base+"/subscribe", map[string]string{"subscriber_id": "Lead", "job_title": "Orchestrator"}).Body.Close()
+	ctx := context.Background()
+	require.Equal(t, http.StatusOK, putJSON(t, base+"/working-mode/presets/worktrees", `{"name":"Worktrees","instructions":"Only my own words"}`))
+	h.bs.FlushSettingsNotice(ctx, "reset-team")
+	require.Len(t, settingsNotices(t, h.bs, "reset-team"), 1, "the edit is told")
+	resp := postJSON(t, base+"/working-mode/presets/worktrees/reset", map[string]string{})
+	resp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	h.bs.FlushSettingsNotice(ctx, "reset-team")
+	got := settingsNotices(t, h.bs, "reset-team")
+	require.Len(t, got, 2, "the reset is told too")
+	assert.Contains(t, got[1], "workflow_preset.worktrees.instructions: Only my own words -> ")
+	assert.NotContains(t, got[1], "Only my own words ->  ", "back to the built-in text")
+}
+
+func TestTheProductionSettingsNoticeWindowIsThreeSeconds(t *testing.T) {
+	assert.Equal(t, 3*time.Second, board.SettingsNoticeDelay, "a slider dragged through values is one message: the window a person's drag fits in")
+}
