@@ -18,3 +18,15 @@ const refusal=await sendCommentQueue(comments,{isCurrent:()=>true,send:async c=>
 assert.deepEqual(attempted,[4,2],'a refusal stops the remaining sends');assert.deepEqual(kept,[[4,'sent'],[2,'paused']]);
 assert.equal(refusal.response.ok,false);assert.equal(refusal.response.error,'Paused');assert.equal(refusal.sentThreads,1);assert.equal(refusal.response.results[0].state,'paused','a later failure is visible despite an earlier successful send');
 console.log('artifact_comment_send_queue: sequential order, source artifact, cancellation and partial refusal pass');
+
+// Aggregate agent states must keep a later refusal visible and preserve a
+// successful send when the next thread merely reports an existing ask.
+for (const [states,expected] of [
+ [['sent','already_asked'],'sent'],
+ [['already_asked','sent'],'sent'],
+ [['sent','paused','already_asked'],'paused'],
+]) {
+ let n=0;
+ const result=await sendCommentQueue(comments.slice(0,states.length),{isCurrent:()=>true,send:async()=>({ok:true,results:[{agent:'Dev',state:states[n++]}]}),record:()=>{}});
+ assert.equal(result.response.results[0].state,expected,'merge '+states.join(' -> '));
+}
