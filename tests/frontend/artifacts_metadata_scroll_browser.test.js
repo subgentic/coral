@@ -8,25 +8,28 @@ const BASE=require('./test_base').BASE;
  const h=await connect();const {client,Page,Emulation,ev,waitFor,PRELOAD,install}=h;
  const S=`(window.__coralStatic || '/static/')`;
  const ROWS='#group-table-view tbody tr';
- const setup=async(width,hub)=>{
+ const setup=async(width,hub,partial=false)=>{
   await Emulation.setDeviceMetricsOverride({width,height:900,deviceScaleFactor:1,mobile:width===390});
   await Page.navigate({url:BASE+'/'});await Page.loadEventFired();await install();await coralReady(ev);
   await ev(`(async()=>{
    localStorage.removeItem('coral-team-artifacts-filters:@inbox');localStorage.removeItem('coral.inbox.tab');
-   window.__reads=0;window.__prepend=0;window.__held=[];window.__hold=false;
+   window.__remoteFails=${partial};window.__reads=0;window.__prepend=0;window.__held=[];window.__hold=false;
    const state=(await import(${S}+'state.js')).state;
    window.__servers=${hub?"[{id:'remote-a',label:'Remote A',status:'online',owner_stamp:true,last_seen:'2026-11-04T00:00:00Z',agents:1}]":"[]"};
    state.hub=${hub};state.servers=window.__servers;state.serversKnown=true;
-   const real=window.fetch,json=x=>new Response(JSON.stringify(x),{headers:{'Content-Type':'application/json'}});
+   const real=window.fetch,json=(x,status=200)=>new Response(JSON.stringify(x),{status,headers:{'Content-Type':'application/json'}});
    const row=(i,fresh=false)=>({id:String(i+1).padStart(64,'0'),name:(fresh?'new-':'report-')+i+'.md',media_type:'text/markdown',size:100,created_at:new Date(Date.UTC(2026,10,4)+(fresh?i:-i)*60000).toISOString(),source:'upload',tags:[],available:true,board_id:'alpha',team:'alpha'});
    window.fetch=async(u,o={})=>{
     const url=new URL(String(u),location.origin),p=url.pathname;
     if(p.endsWith('/api/team-artifacts')){
-     const remote=p.includes('/api/remote/'),limit=Number(url.searchParams.get('limit')||100),start=Number(url.searchParams.get('cursor')||url.searchParams.get('offset')||0);
+     const remote=p.includes('/api/remote/'),limit=Number(url.searchParams.get('limit')||100);
+     if(remote&&window.__remoteFails)return json({error:'Remote temporarily unavailable'},503);
      const all=remote?[]:[...Array.from({length:window.__prepend},(_,i)=>row(10000+i,true)).reverse(),...Array.from({length:700},(_,i)=>row(i))];
+     const cursor=url.searchParams.get('cursor');
+     const start=cursor?.startsWith('after:')?all.findIndex(r=>r.id===cursor.slice(6))+1:Number(url.searchParams.get('offset')||0);
      const artifacts=all.slice(start,start+limit),more=start+artifacts.length<all.length;
      if(limit>1){window.__reads++;if(window.__hold)await new Promise(r=>window.__held.push(r));}
-     return json({artifacts,limit,offset:start,has_more:more,next_cursor:more?String(start+artifacts.length):'',total:all.length,all:all.length,teams:[{board_id:'alpha',team:'alpha',all:all.length}]});
+     return json({artifacts,limit,offset:start,has_more:more,next_cursor:more?'after:'+artifacts.at(-1).id:'',total:all.length,all:all.length,teams:[{board_id:'alpha',team:'alpha',all:all.length}]});
     }
     if(p==='/api/system/artifact-store/kept')return json({kept:[]});
     if(p==='/api/servers')return json(window.__servers);
@@ -72,13 +75,40 @@ const BASE=require('./test_base').BASE;
    await anchor(before,width+' structural rename',true,false);
    assert.equal(await ev(`window.__reads`),reads,'renaming a computer does not throw away loaded artifact pages');
    console.log('[PASS] '+width+' metadata and rename');
+   // A real keep:true caller bypassing the deep-list quiet-refresh guard:
+   // Retry a failed computer while the other computer has later pages loaded.
+   await setup(width,true,true);
+   for(let i=0;i<5;i++){
+    const n=await ev(`document.querySelectorAll('${ROWS}').length`);if(n>=300)break;
+    await ev(`window.__scroller().scrollTop=window.__scroller().scrollHeight`);
+    await waitFor(`document.querySelectorAll('${ROWS}').length>${n}`,'partial list additional page');
+   }
+   before=await middle();assert.ok(before.n>=300);
+   const idleReads=await ev(`window.__reads`);
+   await ev(`window.dispatchEvent(new Event('focus'));document.dispatchEvent(new Event('visibilitychange'));true`);
+   assert.equal(await ev(`window.__reads`),idleReads,'focus/visibility leave the deep-list performance guard intact');
+   await ev(`window.__loadedKeys=[...document.querySelectorAll('${ROWS}')].map(r=>r.dataset.key);document.querySelector('.team-partial-retry').click();true`);
+   await waitFor(`window.__reads>${idleReads}`,'actual partial-computer Retry read');
+   await waitFor(`!document.querySelector('.dt-more[aria-busy="true"]')`,'unchanged Retry settled');
+   await anchor(before,width+' multipage unchanged partial Retry');
+   const refreshReads=await ev(`window.__reads`);
+   await ev(`window.__prepend=3;document.querySelector('.team-partial-retry').click();true`);
+   await waitFor(`window.__reads>${refreshReads}&&document.querySelector('${ROWS}')?.textContent.includes('new-')`,'multipage Retry with true prepend');
+   await anchor({...before,n:before.n+3},width+' multipage prepend partial Retry',false);
+   assert.equal(await ev(`window.__loadedKeys.every(k=>[...document.querySelectorAll('${ROWS}')].some(r=>r.dataset.key===k))`),true,'all previously loaded row keys survive');
+   const loaded=await ev(`document.querySelectorAll('${ROWS}').length`);
+   await ev(`window.__scroller().scrollTop=window.__scroller().scrollHeight`);
+   await waitFor(`document.querySelectorAll('${ROWS}').length>${loaded}`,'append after multipage refresh');
+   assert.equal(await ev(`(()=>{const rs=[...document.querySelectorAll('${ROWS}')];return new Set(rs.map(r=>r.dataset.key)).size===rs.length&&rs.some(r=>r.textContent.includes('report-399.md'))})()`),true,'tail cursor continues without duplicate or missing rows');
+   console.log('[PASS] '+width+' real multipage Retry, performance guard and cursor');
+
    for(const hub of [false,true]){
     await setup(width,hub);before=await middle();
     const reads=await ev(`window.__reads`);
     await ev(`window.__prepend=3;window.dispatchEvent(new Event('focus'));true`);
     await waitFor(`window.__reads>${reads}`,'quiet read after actual prepend');
     await waitFor(`document.querySelector('${ROWS}')?.textContent.includes('new-')`,'new files really precede old rows');
-    await anchor(before,width+' prepend hub='+hub,false);
+    await anchor({...before,n:before.n+3},width+' prepend hub='+hub,false);
     console.log('[PASS] '+width+' real prepend hub='+hub);
    }
   }
