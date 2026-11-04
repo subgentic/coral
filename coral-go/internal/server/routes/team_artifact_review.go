@@ -173,11 +173,7 @@ func (h *BoardHandler) ReviewArtifact(w http.ResponseWriter, r *http.Request) {
 		if state == board.ReviewDenied {
 			notice = denyNotice("x", item.Name, id, noticeData(body.Reason, reviewReasonCap, nil), nil)
 		}
-		sid := ""
-		if item.SessionID != nil {
-			sid = *item.SessionID
-		}
-		delivered, why := h.tellNoTeamUploader(r.Context(), sid, noTeamNoticeLine(notice, "x"))
+		delivered, why := h.tellNoTeamUploaderOf(r.Context(), id, noTeamNoticeLine(notice, "x"))
 		h.tellChief(context.WithoutCancel(r.Context()), decision, "file", project, item.Name, "")
 		out["delivered"] = delivered
 		if !delivered {

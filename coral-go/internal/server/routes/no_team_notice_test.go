@@ -74,6 +74,8 @@ func TestADecisionOnANoTeamFileIsTypedIntoTheSessionThatUploadedIt(t *testing.T)
 	require.Len(t, sent, 2)
 	assert.Contains(t, sent[1], "denied")
 	assert.Contains(t, sent[1], "Wrong template.")
+	assert.True(t, strings.HasPrefix(sent[1], "[Coral]"), sent[1])
+	assert.NotContains(t, sent[1], "@", "a deny names no one either")
 
 	setLive(false) // the agent's session is gone
 	_, err = h.bs.AddArtifactTags(context.Background(), noTeamBoardID, id, []string{"for review"})
@@ -105,6 +107,7 @@ func TestACommentOnANoTeamFileIsTypedIntoTheSessionThatUploadedIt(t *testing.T) 
 	assert.Contains(t, sent[0], "Please add the Q4 table.")
 	assert.NotContains(t, sent[0], "hunter2hunter2", "the comment is redacted as every sent comment is")
 	assert.NotContains(t, sent[0], "@")
+	assert.True(t, strings.HasPrefix(sent[0], "[Coral]"), sent[0])
 
 	d = sh.deliverNoTeamComment(req, caller, c, strings.Repeat("a", 64))
 	assert.Equal(t, autoDelivery{Reason: "no_uploader"}, d, "a file that is not a no-team upload")
@@ -121,4 +124,29 @@ func TestACommentOnANoTeamFileIsTypedIntoTheSessionThatUploadedIt(t *testing.T) 
 	d = sh.deliverOperatorComment(person, owner, c, id, noTeamBoardID)
 	assert.Equal(t, "the agent that uploaded it", d.To, "reason %q", d.Reason)
 	assert.Len(t, mock.sentTo(name), 2)
+}
+
+// The same bytes uploaded by two agents on no team name no one of them (#13539, Security's SHOULD): neither is told, the answer says ambiguous_uploader, and the decision or comment stands. Typing it into the wrong
+// agent is the risk; the one-uploader case above is unchanged.
+func TestADecisionOrCommentOnBytesTwoNoTeamAgentsUploadedTellsNoneOfThem(t *testing.T) {
+	h, mock, name, id, _ := noTeamNoticeRig(t)
+	const other = "00000000-0000-4000-8000-00000000b0b0"
+	otherName := naming.SessionName("claude", other)
+	mock.addSession(otherName, "/tmp/solo2")
+	writeUpload(t, h.coralDir, other, "the report", "report.md", "2026-10-09T10:05:00Z") // the same bytes: the same object, held by two sessions
+
+	code, out := decideNoTeam(h, id, `{"decision":"approve"}`)
+	require.Equal(t, http.StatusOK, code, "the decision stands: %v", out)
+	assert.Equal(t, false, out["delivered"])
+	assert.Equal(t, "ambiguous_uploader", out["reason"])
+	assert.Empty(t, mock.sentTo(name), "neither agent was told")
+	assert.Empty(t, mock.sentTo(otherName))
+
+	_, sh, _, _ := setupSessionsTestServer(t)
+	sh.SetBoardHandler(h)
+	req := httptest.NewRequest(http.MethodPost, "/api/artifacts/"+id+"/comments", nil)
+	d := sh.deliverNoTeamComment(req, commentCaller{Issuer: "local", Subject: "owner"}, store.ArtifactComment{Body: "A comment."}, id)
+	assert.Equal(t, autoDelivery{Reason: "ambiguous_uploader"}, d)
+	assert.Empty(t, mock.sentTo(name))
+	assert.Empty(t, mock.sentTo(otherName))
 }
