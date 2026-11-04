@@ -36,6 +36,7 @@ type TmuxBackend struct {
 }
 
 type tmuxSession struct {
+	pipeMu  sync.Mutex // serialize pipe repair for viewers of this session
 	info    SessionInfo
 	logPath string
 }
@@ -407,12 +408,10 @@ func (b *TmuxBackend) Attach(name, subscriberID string) (<-chan []byte, error) {
 
 	logPath := sess.logPath
 
-	// Self-heal: if the log file is missing, recreate and restart pipe-pane
-	if _, err := os.Lstat(logPath); os.IsNotExist(err) {
-		createLog(logPath)
-		ctx := context.Background()
-		tmuxName := naming.SessionName(sess.info.AgentType, sess.info.SessionID)
-		b.client.PipePane(ctx, tmuxName, logPath)
+	// A file can outlive its pipe worker after wake/restart. Check the pipe,
+	// not just the file, before subscribing to a stream that would stay silent.
+	if err := b.ensureSessionPipe(name, sess); err != nil {
+		return nil, err
 	}
 
 	ch := make(chan []byte, 256)
@@ -431,6 +430,40 @@ func (b *TmuxBackend) Attach(name, subscriberID string) (<-chan []byte, error) {
 	tail.mu.Unlock()
 
 	return ch, nil
+}
+
+// ensureSessionPipe repairs a stopped logger even when its old file remains.
+// A healthy pipe is left alone; a deleted log requires closing the writer of the
+// old inode before attaching a writer to the replacement file.
+func (b *TmuxBackend) ensureSessionPipe(name string, sess *tmuxSession) error {
+	sess.pipeMu.Lock()
+	defer sess.pipeMu.Unlock()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	target := naming.SessionName(sess.info.AgentType, sess.info.SessionID)
+	_, statErr := os.Lstat(sess.logPath)
+	missing := os.IsNotExist(statErr)
+	if statErr != nil && !missing {
+		return statErr
+	}
+	if missing {
+		if err := createLog(sess.logPath); err != nil && !os.IsExist(err) {
+			return err
+		}
+		if err := b.client.ClosePipePane(ctx, target); err != nil {
+			return b.client.GoneAfter(ctx, name, sess.info.AgentType, sess.info.SessionID, err)
+		}
+	}
+	piped, err := b.client.DisplayMessage(ctx, target, "#{pane_pipe}")
+	if err != nil {
+		return b.client.GoneAfter(ctx, name, sess.info.AgentType, sess.info.SessionID, err)
+	}
+	if missing || strings.TrimSpace(piped) == "0" {
+		if err := b.client.PipePane(ctx, target, sess.logPath); err != nil {
+			return b.client.GoneAfter(ctx, name, sess.info.AgentType, sess.info.SessionID, err)
+		}
+	}
+	return nil
 }
 
 // Lagged implements LagReporter (#4161).
