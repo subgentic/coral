@@ -56,6 +56,12 @@ func DiffSettings(before, after any) []SettingChange {
 		if ov == nv {
 			continue
 		}
+		if _, ok := b[name]; !ok {
+			ov = settingValueText(nil) // a setting that did not exist before (a new preset, a new guide) was "(none)"
+		}
+		if _, ok := a[name]; !ok {
+			nv = settingValueText(nil)
+		}
 		out = append(out, SettingChange{Name: name, Old: ov, New: nv})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
@@ -225,7 +231,7 @@ func (s *Store) FlushSettingsNotice(ctx context.Context, project string) {
 		if p.actorID != "" && strings.EqualFold(sub.SubscriberID, p.actorID) {
 			return // its own change is not told back to it
 		}
-		if t := strings.TrimSpace(sub.JobTitle); t != "" && !seen[strings.ToLower(t)] {
+		if t := clitext.CleanName(sub.JobTitle); t != "" && !seen[strings.ToLower(t)] { // a title is typed by a member: cleaned before it is put in front of the message
 			seen[strings.ToLower(t)] = true
 			titles = append(titles, "@"+t)
 		}

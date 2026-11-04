@@ -344,6 +344,7 @@ func (h *BoardHandler) GuideRoster(w http.ResponseWriter, r *http.Request) {
 		errBadRequest(w, `send {"roster": {"hub-user-<8 hex>": "Name"}}`)
 		return
 	}
+	priorRoster, _ := h.bs.GetGuideRoster(r.Context(), project) // what the Orchestrator is told changed (#13221)
 	roster, err := h.bs.SetGuideRoster(r.Context(), project, in.Roster)
 	if err != nil {
 		if strings.Contains(err.Error(), board.ErrGuideRoster.Error()) {
@@ -353,5 +354,15 @@ func (h *BoardHandler) GuideRoster(w http.ResponseWriter, r *http.Request) {
 		errInternalServer(w, "could not save the roster")
 		return
 	}
+	noteSettingsChange(h.bs, r, project, guideRosterShown(priorRoster), guideRosterShown(roster))
 	writeJSON(w, http.StatusOK, map[string]any{"roster": roster})
+}
+
+// guideRosterShown is the guides' names as the settings notice compares them: one setting per Hub user.
+func guideRosterShown(roster map[string]string) map[string]any {
+	out := make(map[string]any, len(roster))
+	for hubUser, name := range roster {
+		out["guide_roster."+hubUser] = name
+	}
+	return out
 }
