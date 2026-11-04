@@ -17,6 +17,7 @@ import { showToast } from './utils.js';
 /** An agent's file with no team says whose it is where the Team column would say "No team" (#10797): the name comes from the live list, and "No team" stays when the agent is not in it. */
 const placeOf = item => { const a = item.team === 'No team' && item.session_id && (state.liveSessions || []).find(s => s.session_id === item.session_id); return a ? (a.display_name || a.name) : teamLabel(item.board_id, item.team); };
 const DT = await importOnce('./data_table.js');
+const { mergeArtifactWindow } = await importOnce('./artifact_loaded_window.js');
 const { artifactTable, serverArtifactSort, tableSortOf } = await importOnce('./artifact_table.js');
 const { starControl } = await importOnce('./artifact_star.js');
 const SORT_PARAM = 'so' + 'rt'; // the query word, spelled in two parts: the icon-name lint reads that quoted word as an icon name
@@ -146,10 +147,11 @@ export function createArtifactsList({ inbox = false } = {}) {
         const { project, key } = model; if (!key || (append && (model.controller || !model.hasMore))) return;
         const scope = model.scope;
         const quiet = keep && !append && model.items.length > 0, before = quiet ? visibleState() : null;
+        const previous = quiet ? { items: model.items, cursor: model.cursor, hasMore: model.hasMore, truncated: model.truncated } : null;
         clearPendingBoard(); retryLabels = false;
         model.controller?.abort();
         const gen = ++model.gen, ctrl = model.controller = new AbortController();
-        if (!append) { if (!keep || !model.items.length) { model.items = []; model.hasMore = false; model.truncated = false; model.counts = null; } model.cursor = ''; model.loading = !model.items.length; }
+        if (!append) { if (!keep || !model.items.length) { model.items = []; model.hasMore = false; model.truncated = false; model.counts = null; } if (!quiet) model.cursor = ''; model.loading = !model.items.length; }
         model.loadingMore = append; model.error = ''; model.notFound = false; model.waiting = false;
         if (!quiet) draw();
         try {
@@ -186,10 +188,12 @@ export function createArtifactsList({ inbox = false } = {}) {
             model.partial = inbox && data.expected > data.answered ? { failed: data.failed || [], answered: data.answered, expected: data.expected, all: data.all } : null; // some computers did not answer: the count is of the others, and the page says so (#12672)
             model.versionless = inbox && Array.isArray(data.versionless) ? data.versionless : []; // computers on an older Coral count every version of a file, not files
             const rows = data.artifacts.filter(a => a && (a.uri || a.id || a.name));
-            model.items = append ? model.items.concat(rows) : rows;
+            const keptWindow = quiet ? mergeArtifactWindow(previous, { ...data, artifacts: rows }, itemKey, inbox ? serverOf : null) : null;
+            model.items = keptWindow ? keptWindow.items : append ? model.items.concat(rows) : rows;
             if (!append) model.tagCounts = data.tag_counts && typeof data.tag_counts === 'object' ? data.tag_counts : {}; // the team's tags with how many files carry each (the whole list, not the page)
             if (inbox) model.teams = Array.isArray(data.teams) ? data.teams.filter(t => t && t.board_id) : [];
             model.hasMore = !!data.has_more; model.truncated = !!data.truncated; model.cursor = typeof data.next_cursor === 'string' ? data.next_cursor : '';
+            if (keptWindow) { model.hasMore = keptWindow.hasMore; model.truncated = keptWindow.truncated; model.cursor = keptWindow.cursor; }
             const matched = Number.isSafeInteger(data.total) ? data.total : model.items.length;
             model.counts = { matched, all: Number.isSafeInteger(data.all) ? Math.max(data.all, matched) : matched, truncated: !!data.truncated };
             if (!append) model.kept = await loadKept();
