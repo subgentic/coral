@@ -495,6 +495,7 @@ func (s *Server) registerCloud(r *chi.Mux) {
 	// Cloud Hub connector settings (never reachable through the tunnel)
 	s.cloudHandler = routes.NewCloudHandler(store.NewSessionStore(s.db), s.cfg.CoralDir())
 	s.cloudHandler.OfferAtLaunch = s.cfg.OffersCloudConnect()
+	s.cloudHandler.HubUpdateAtLaunch = s.cfg.AllowHubUpdate
 	r.Get("/api/cloud/status", s.cloudHandler.GetStatus)
 	r.Post("/api/cloud/connect", s.cloudHandler.Connect)
 	r.Post("/api/cloud/connect/cancel", s.cloudHandler.CancelConnect)

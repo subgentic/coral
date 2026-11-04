@@ -153,6 +153,20 @@ func applyCloudMaxMode(ctx context.Context, db *store.DB, cfg *config.Config) er
 	return nil
 }
 
+// applyAllowHubUpdate saves the switch given at launch (--allow-hub-update, CORAL_ALLOW_HUB_UPDATE=1) as the hub_relaunch_updates setting, so the update routes, the dashboard and 'coral cloud status' read it as
+// any other: the launch-time form of the person's own choice in Settings, for a computer with nobody at its dashboard (#13258). Unset changes nothing, and this never turns the switch off. The Hub, a tunneled
+// request and the API still cannot write it (its write has its own route), and every other gate of a Hub relaunch is unchanged. A switch that was asked for and cannot be saved stops Coral from starting.
+func applyAllowHubUpdate(ctx context.Context, db *store.DB, cfg *config.Config) error {
+	if !cfg.AllowHubUpdate {
+		return nil
+	}
+	if err := store.NewSessionStore(db).SetSetting(ctx, routes.HubRelaunchSetting, "true"); err != nil {
+		return fmt.Errorf("could not save the Coral Hub update switch: %w", err)
+	}
+	log.Printf("[CLOUD] Coral Hub may relaunch this Coral to install updates: set by --allow-hub-update / CORAL_ALLOW_HUB_UPDATE (applied at every start)")
+	return nil
+}
+
 // applyReplayBytesFromSettings reads the terminal_replay_bytes value from
 // user_settings and applies it to the ptymanager replay buffer limit. Values
 // outside [4096, 16 MiB] are clamped. Invalid or missing values leave the

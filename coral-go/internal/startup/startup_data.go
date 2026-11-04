@@ -176,6 +176,9 @@ func prepareWithDatabase(ctx context.Context, db *store.DB, cfg *config.Config, 
 	if err := applyCloudMaxMode(ctx, db, cfg); err != nil {
 		return err
 	}
+	if err := applyAllowHubUpdate(ctx, db, cfg); err != nil {
+		return err
+	}
 	setupSessionTokens(db, cfg.CoralDir())
 	setupAgentTools(cfg.CoralDir())
 	removeOrphanProxyCA(cfg.CoralDir())
