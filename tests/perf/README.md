@@ -109,7 +109,7 @@ recorded sessions alone are insufficient. Wake/restart mock agents on the rig's 
 
 Each local/Hub output gets a `*-typing/` folder containing compressed Chrome traces, CPU profiles and a JSON summary of every
 main-thread task longer than 50 ms, its nested events and sampled source owners. Only events overlapping the marked typing burst
-are budgeted; unrelated renderer processes and nested duplicate tasks are excluded. Key-to-frame timing includes CDP overhead.
+are budgeted; exact microsecond task durations are kept alongside rounded display times, and incomplete renderer tasks cannot certify a clean capture; unrelated renderer processes and nested duplicate tasks are excluded. Key-to-frame timing includes CDP overhead.
 Set `TYPING_GATE=1` with `TYPING_TRACE=1` to fail the measurement and outer runner for a setup error or any task over 50 ms. Profiling is enabled
 in this mode, so retain machine/load details when comparing timings. The long-task attribution parser has light checks:
 `node --test tests/perf/typing_trace.test.mjs`. Trace mode makes one Chrome startup attempt and does not retry a failed measurement.

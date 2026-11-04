@@ -11,6 +11,7 @@
 set -uo pipefail
 export CORAL_TELEMETRY_DISABLED=1
 if [[ "${PERF_RUN:-}" != "1" ]]; then echo "[bigboard-run] opt-in: set PERF_RUN=1" >&2; exit 2; fi
+if [[ "${TYPING_GATE:-}" == 1 && "${TYPING_TRACE:-}" != 1 ]]; then echo "[bigboard-run] TYPING_GATE requires TYPING_TRACE=1" >&2; exit 2; fi
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 [[ -n "${FIXTURE:-}" && -f "$FIXTURE/fixture.json" && -x "$FIXTURE/bin/coral" ]] || { echo "[bigboard-run] FIXTURE must be a bigboard_seed.sh fixture" >&2; exit 2; }
 [[ -n "${OUT:-}" ]] || { echo "[bigboard-run] set OUT to a results folder" >&2; exit 2; }

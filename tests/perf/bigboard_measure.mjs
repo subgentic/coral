@@ -16,6 +16,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 if (process.env.PERF_RUN !== '1') { console.error('[measure] opt-in: set PERF_RUN=1'); process.exit(2); }
+if (process.env.TYPING_GATE === '1' && process.env.TYPING_TRACE !== '1') { console.error('[measure] TYPING_GATE requires TYPING_TRACE=1'); process.exit(2); }
 const [BASE, TOKEN_FILE, OUT] = process.argv.slice(2);
 if (!BASE || !OUT) { console.error('usage: PERF_RUN=1 node bigboard_measure.mjs BASE LOGIN_TOKEN_FILE OUT.json'); process.exit(2); }
 const url = new URL(BASE);

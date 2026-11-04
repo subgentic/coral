@@ -7,20 +7,44 @@ import { gzipSync } from 'node:zlib';
 const ms = us => Math.round(us / 100) / 10;
 const sourceOf = frame => ({ function: frame.functionName || '(anonymous)', url: frame.url || '', line: (frame.lineNumber ?? -1) + 1, column: (frame.columnNumber ?? -1) + 1 });
 
-/** Attribute samples by overlapping time, not by nested inclusive event totals. */
-export function summarizeTypingTrace(events, profile, thresholdMs = 50) {
+const isTask = e => /(?:^|::)RunTask$/.test(e.name);
+
+// Reconstruct completed tasks once for both attribution and capture validation.
+function rendererTimeline(events) {
     const marker = events.find(e => e.name === 'coral-typing-start');
     const main = new Set(events.filter(e => e.name === 'thread_name' && e.args?.name === 'CrRendererMain').map(e => `${e.pid}/${e.tid}`));
     if (marker) for (const key of main) if (key !== `${marker.pid}/${marker.tid}`) main.delete(key);
-    const complete = [];
+    const complete = [], unmatchedEnds = [];
     const stacks = new Map();
     for (const e of [...events].sort((a,b) => a.ts-b.ts)) {
         const key = `${e.pid}/${e.tid}`;
         if (!main.has(key)) continue;
-        if (e.ph === 'X' && Number.isFinite(e.dur)) complete.push(e);
+        if (e.ph === 'X' && Number.isFinite(e.dur) && e.dur >= 0) complete.push(e);
         else if (e.ph === 'B') { const stack = stacks.get(key) || []; stack.push(e); stacks.set(key, stack); }
-        else if (e.ph === 'E') { const begin = stacks.get(key)?.pop(); if (begin) complete.push({...begin, ph:'X', dur:e.ts-begin.ts}); }
+        else if (e.ph === 'E') {
+            const begin = stacks.get(key)?.pop();
+            if (begin) complete.push({...begin, ph:'X', dur:e.ts-begin.ts});
+            else unmatchedEnds.push(e);
+        }
     }
+    return { marker, main, complete, stacks, unmatchedEnds };
+}
+
+/** A partial task cannot certify a clean typing budget. Ignore incomplete work
+ * that starts after the end marker (for example the command stopping tracing). */
+export function typingTraceCoverage(events) {
+    const { marker, main, complete, stacks, unmatchedEnds } = rendererTimeline(events);
+    const end = events.find(e => e.name === 'coral-typing-end' && e.pid === marker?.pid && e.tid === marker?.tid);
+    if (!marker || !end || !Number.isFinite(marker.ts) || !Number.isFinite(end.ts) || end.ts < marker.ts || !main.has(`${marker.pid}/${marker.tid}`)) return { traceComplete: false, rendererTaskCount: 0 };
+    const rendererTaskCount = complete.filter(e => isTask(e) && e.ts < end.ts && e.ts + e.dur > marker.ts).length;
+    const incomplete = [...stacks.values()].flat().some(e => isTask(e) && e.ts < end.ts)
+        || unmatchedEnds.some(e => e.ts > marker.ts && e.ts < end.ts);
+    return { traceComplete: rendererTaskCount > 0 && !incomplete, rendererTaskCount };
+}
+
+/** Attribute samples by overlapping time, not by nested inclusive event totals. */
+export function summarizeTypingTrace(events, profile, thresholdMs = 50) {
+    const { complete } = rendererTimeline(events);
     const nodes = new Map((profile?.nodes || []).map(n => [n.id,n]));
     const samples = []; let at = profile?.startTime || 0;
     for (let i=0;i<(profile?.samples?.length || 0);i++) {
@@ -28,7 +52,7 @@ export function summarizeTypingTrace(events, profile, thresholdMs = 50) {
         samples.push({start:at,end,node:nodes.get(profile.samples[i])}); at=end;
     }
     const tasks=[];
-    for (const task of complete.filter(e => /(?:^|::)RunTask$/.test(e.name) && e.dur>thresholdMs*1000).sort((a,b)=>a.ts-b.ts || b.dur-a.dur)) {
+    for (const task of complete.filter(e => isTask(e) && e.dur>thresholdMs*1000).sort((a,b)=>a.ts-b.ts || b.dur-a.dur)) {
         if (!tasks.some(parent=>parent.pid===task.pid&&parent.tid===task.tid&&parent.ts<=task.ts&&parent.ts+parent.dur>=task.ts+task.dur)) tasks.push(task);
     }
     return tasks.sort((a,b)=>b.dur-a.dur).map(task => {
@@ -41,7 +65,7 @@ export function summarizeTypingTrace(events, profile, thresholdMs = 50) {
         }
         const inside=complete.filter(e=>e!==task && e.pid===task.pid && e.tid===task.tid && e.ts>=task.ts && e.ts+e.dur<=task.ts+task.dur && e.dur>=1000)
             .sort((a,b)=>b.dur-a.dur).slice(0,20).map(e=>({event:e.name,ms:ms(e.dur),...(e.args?.data?.url?{url:e.args.data.url}:{}),...(e.args?.data?.functionName?{function:e.args.data.functionName}:{})}));
-        return {startUs:task.ts,endUs:task.ts+task.dur,ms:ms(task.dur),pid:task.pid,tid:task.tid,owners:[...owned.values()].sort((a,b)=>b.selfUs-a.selfUs).slice(0,10).map(({selfUs,...row})=>({...row,selfMs:ms(selfUs)})),events:inside};
+        return {startUs:task.ts,endUs:task.ts+task.dur,ms:ms(task.dur),durationUs:task.dur,pid:task.pid,tid:task.tid,owners:[...owned.values()].sort((a,b)=>b.selfUs-a.selfUs).slice(0,10).map(({selfUs,...row})=>({...row,selfMs:ms(selfUs)})),events:inside};
     });
 }
 
@@ -79,9 +103,7 @@ export async function measureTypingBurst({client, ev, outDir, target, label, cha
         const marker=events.find(e=>e.name==='coral-typing-start');
         const begin=marker?.ts,end=events.find(e=>e.name==='coral-typing-end')?.ts;
         if(!Number.isFinite(begin)||!Number.isFinite(end))throw new Error('Trace is missing typing boundary markers');
-        const rendererKnown=events.some(e=>e.name==='thread_name'&&e.args?.name==='CrRendererMain'&&e.pid===marker.pid&&e.tid===marker.tid);
-        const rendererTaskCount=events.filter(e=>e.pid===marker.pid&&e.tid===marker.tid&&/(?:^|::)RunTask$/.test(e.name)&&['X','B'].includes(e.ph)).length;
-        const traceComplete=rendererKnown&&rendererTaskCount>0;
+        const {traceComplete,rendererTaskCount}=typingTraceCoverage(events);
         const tasks=summarizeTypingTrace(events,profile).filter(t=>t.startUs<end&&t.endUs>begin);
         const sorted=[...latencies].sort((a,b)=>a-b),pct=p=>sorted[Math.min(sorted.length-1,Math.floor(sorted.length*p))];
         const result={label,target,characters,context,keyToFrameMs:{p50:pct(.5),p95:pct(.95),max:Math.max(...latencies)},longTasks:longTasks.filter(t=>t.ms>50),traceLongTasks:tasks,traceComplete,rendererTaskCount,budgetPassed:traceComplete&&!tasks.length&&!longTasks.some(t=>t.ms>50),profiled:true};
