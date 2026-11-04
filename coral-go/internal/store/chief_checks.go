@@ -350,6 +350,27 @@ func (s *ScheduleStore) UpdateChiefTriggerState(ctx context.Context, id int64, s
 	}
 	return nil
 }
+
+// SetChiefTriggerResolution changes only the person's resolution state. The
+// report and its links belong to the agent and must survive an older UI snapshot.
+func (s *ScheduleStore) SetChiefTriggerResolution(ctx context.Context, id int64, state string, now time.Time) error {
+	if state != "open" && state != "done" {
+		return errors.New("invalid resolution state")
+	}
+	res, err := s.db.ExecContext(ctx, `UPDATE chief_triggers SET state=?,updated_at=? WHERE id=?`, state, now.Unix(), id)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n != 1 {
+		return ErrChiefNotFound
+	}
+	return nil
+}
+
 func (s *ScheduleStore) ChiefPendingDelivery(ctx context.Context, now time.Time) ([]ChiefTrigger, error) {
 	out := []ChiefTrigger{}
 	err := s.db.SelectContext(ctx, &out, `SELECT * FROM chief_triggers WHERE state!='done' AND lease_until<=? AND (delivery IN ('pending','held') OR (delivery='delivered' AND state='open' AND reminder IN ('none','held') AND created_at<=?)) ORDER BY id LIMIT 100`, now.Unix(), now.Add(-15*time.Minute).Unix())

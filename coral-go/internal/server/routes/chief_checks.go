@@ -322,6 +322,25 @@ func (h *ChiefChecksHandler) state(w http.ResponseWriter, r *http.Request) {
 		errBadRequest(w, "invalid trigger state")
 		return
 	}
+	if !agent {
+		if b.State != "open" && b.State != "done" {
+			errBadRequest(w, "the person may only resolve or reopen a trigger")
+			return
+		}
+		// One state-only UPDATE preserves the latest agent report and all links;
+		// never copy fields from the earlier list read or the UI request body.
+		if err = h.sched.SetChiefTriggerResolution(r.Context(), id, b.State, h.now()); err != nil {
+			commentRefuse(w, 409, "trigger_conflict", "another trigger is already open for that check")
+			return
+		}
+		out, err := h.sched.ChiefTrigger(r.Context(), id)
+		if err != nil {
+			chiefError(w, err)
+			return
+		}
+		writeJSON(w, 200, out)
+		return
+	}
 	if b.State == "routed" {
 		task, e := h.sessions.bs.GetTask(r.Context(), t.TargetBoard, b.TaskID)
 		if e != nil || task == nil {
