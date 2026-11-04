@@ -219,22 +219,22 @@ function openRun(i) {
 function recentTable(rows, narrowed) {
     const info = AR.pagedInfo(), filt = filtersOf('recent');
     return { title: 'Recent runs', noun: ['run', 'runs'], rows,
-        empty: info.loaded ? { line: narrowed ? 'No run matches the search and filters.' : 'Nothing has run yet.', hint: narrowed ? '' : 'Every run of a job or workflow shows here, newest first. A dot marks one you have not opened.', ...(narrowed ? {} : firstRun()) } : { line: info.failed ? 'Could not read the runs.' : 'Loading runs…', hint: '' },
-        signature: JSON.stringify([!!firstRun().cards, info.total, info.hasMore, info.loading, info.loaded, rows.map(i => [i.key, i.run.status, AR.isUnread(i), i.name, AR.resultWords(i.run).full])]),
+        empty: info.loaded ? { line: narrowed ? 'No run matches the search and filters.' : 'Nothing has run yet.', hint: narrowed ? '' : 'Every run of a job or workflow shows here, newest first. A dot marks one you have not opened.', ...(narrowed ? {} : firstRun()) } : (info.failed ? { line: 'Could not read the runs.', hint: narrowed ? 'The runs of an earlier search are not shown as this one\'s results.' : '', action: { label: 'Try again', run: () => AR.retryRunsPage() } } : { line: 'Loading runs…', hint: '' }),
+        signature: JSON.stringify([!!firstRun().cards, info.total, info.hasMore, info.loading, info.loaded, info.failed, info.failedMore, info.stale, rows.map(i => [i.key, i.run.status, AR.isUnread(i), i.name, AR.resultWords(i.run).full])]),
         node: () => DT.dataTable({
             label: `Recent runs, ${info.loaded ? info.total : rows.length}`, rows, oneLine: true, resize: true, rowKey: i => i.key, rowName: i => `${i.name}, ${AR.resultWords(i.run).full}${AR.isUnread(i) ? ', not opened' : ''}`, state: stateOf('recent'), open: openRun,
             columns: [ // one line a row (Goal #79): a narrow list drops Kind (under 52 rem: the run's name is at least 24 characters, #9856), then When it started and How long it took (dropAt, #8931): the name and the result stay, the name whole
-                { key: 'name', label: 'Run', primary: true, width: 'grow', sort: true, sortValue: i => i.name, cell: i => {
+                { key: 'name', label: 'Run', primary: true, width: 'grow', cell: i => {
                     const b = nameButton(i, i.kind === 'workflow' ? 'A workflow run' : 'A job run');
                     if (AR.isUnread(i)) { b.prepend(DT.el('span', 'automations-unread', ''), DT.el('span', 'sr-only', 'Not opened: ')); b.querySelector('.automations-unread').setAttribute('aria-hidden', 'true'); }
                     return b;
                 } },
-                { key: 'kind', label: 'Kind', width: '7rem', dropAt: 52, sort: true, sortValue: i => i.kind, cell: i => DT.tag(i.kind === 'workflow' ? 'Workflow' : 'Job') },
-                { key: 'result', label: 'Result', width: '7rem', sort: true, sortValue: i => AR.resultWords(i.run).word, cell: i => { const w = AR.resultWords(i.run), c = DT.chip(w.word, resultClass(i.run)); c.title = w.full; return c; } },
-                { key: 'started', label: 'Started', width: '7rem', dropAt: 28, tone: 'tertiary', sort: 'date', sortValue: i => i.atMs, firstDir: 'desc', cell: i => DT.el('span', 'dt-time', whenWords(i.at)) },
-                { key: 'took', label: 'Took', width: '6rem', dropAt: 28, tone: 'tertiary', sort: 'date', sortValue: i => (i.finishedAt ? Date.parse(i.finishedAt) - i.atMs : -1), cell: i => AR.tookWords(i.at, i.finishedAt) },
+                { key: 'kind', label: 'Kind', width: '7rem', dropAt: 52, cell: i => DT.tag(i.kind === 'workflow' ? 'Workflow' : 'Job') },
+                { key: 'result', label: 'Result', width: '7rem', cell: i => { const w = AR.resultWords(i.run), c = DT.chip(w.word, resultClass(i.run)); c.title = w.full; return c; } },
+                { key: 'started', label: 'Started', width: '7rem', dropAt: 28, tone: 'tertiary', cell: i => DT.el('span', 'dt-time', whenWords(i.at)) },
+                { key: 'took', label: 'Took', width: '6rem', dropAt: 28, tone: 'tertiary', cell: i => AR.tookWords(i.at, i.finishedAt) },
             ],
-            footer: { auto: true, text: `Showing ${rows.length} of ${info.total}`, more: info.hasMore ? { label: 'Load more', busy: info.loading, run: () => AR.loadMoreRuns() } : null }, // 50 a page; the rest when the footer scrolls into view, or by the button
+            footer: { auto: !info.failedMore, text: info.stale ? 'Searching…' : info.failedMore ? `Showing ${rows.length} of ${info.total}. The next runs could not be read.` : `Showing ${rows.length} of ${info.total}`, more: info.failedMore ? { label: 'Try again', busy: info.loading, run: () => AR.retryRunsPage() } : info.hasMore && !info.stale ? { label: 'Load more', busy: info.loading, run: () => AR.loadMoreRuns() } : null }, // 50 a page, newest first (the cursor follows that order, so these columns do not sort); the rest when the footer scrolls into view, or by the button; a failed next page says so and offers to ask again
         }).el };
 }
 /** Running now and Failed: the jobs and workflows together, one table, the same five columns in both. */

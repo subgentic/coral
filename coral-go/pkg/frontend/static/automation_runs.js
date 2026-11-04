@@ -87,13 +87,13 @@ export function failureWords(item) {
 // The Recent runs list asks the computer for a page: GET /api/automations/runs gives at most 50 runs, newest first, with the search and the Result filter applied there (before the cut) and the true total. Load more asks for the next
 // page with the cursor the last one gave. The merged list above (at most 100) stays for the Inbox's Needs you rows and its unread badge: they read what is unread and failed, not a page of the history.
 const PAGE_SIZE = 50, SEARCH_DEBOUNCE_MS = 250;
-const page = { q: '', result: '', items: [], hasMore: false, cursor: '', total: 0, loading: false, loaded: false, failed: false, seq: 0, timer: 0 };
+const page = { q: '', result: '', items: [], hasMore: false, cursor: '', total: 0, loading: false, loaded: false, failed: false, failedMore: false, stale: false, seq: 0, timer: 0 }; // stale: the rows drawn are for an earlier search or filter, a new first page is on its way (their cursor is gone); failedMore: the first page is current and the NEXT one did not come
 /** The runs of the page(s) loaded for the search and Result filter now asked for, newest first. */
 export const pagedRuns = () => page.items;
 /** What the footer says: how many of how many, whether another page waits and whether one is on its way. */
-export const pagedInfo = () => ({ total: page.total, hasMore: page.hasMore, loading: page.loading, loaded: page.loaded, failed: page.failed });
+export const pagedInfo = () => ({ total: page.total, hasMore: page.hasMore, loading: page.loading, loaded: page.loaded, failed: page.failed, failedMore: page.failedMore, stale: page.stale });
 /** A string that changes when the paged list does, for the folder's redraw check. */
-export const pagedSignature = () => JSON.stringify([page.q, page.result, page.loaded, page.loading, page.hasMore, page.total, page.failed, page.items.map(i => [i.key, i.run.status, isUnread(i)])]);
+export const pagedSignature = () => JSON.stringify([page.q, page.result, page.loaded, page.loading, page.hasMore, page.total, page.failed, page.failedMore, page.stale, page.items.map(i => [i.key, i.run.status, isUnread(i)])]);
 const RESULT_WORDS = ['passed', 'failed', 'running'];
 function readPage(more) {
     const mySeq = ++page.seq;
@@ -101,37 +101,44 @@ function readPage(more) {
     if (page.q) params.set('q', page.q);
     if (page.result) params.set('result', page.result);
     if (more && page.cursor) params.set('cursor', page.cursor);
-    page.loading = true; page.failed = false; fire();
+    page.loading = true; page.failed = false; page.failedMore = false; fire();
     return fetch(`/api/automations/runs?${params}`).then(r => (r.ok ? r.json() : null)).catch(() => null).then(d => {
         if (mySeq !== page.seq) return; // a newer search is on its way (or has come): this answer is for one nobody is looking at
         page.loading = false;
-        if (!d || !Array.isArray(d.runs)) { page.failed = true; fire(); return; } // keep what is drawn
+        if (!d || !Array.isArray(d.runs)) {
+            page.failed = true;
+            if (more) page.failedMore = true; // the rows drawn are this search's: they stay, with a way to ask for the next page again
+            else { page.items = []; page.hasMore = false; page.cursor = ''; page.total = 0; page.loaded = false; page.stale = false; } // a first page that did not come: rows of an earlier search are not this one's results
+            fire(); return;
+        }
         const items = d.runs.map(r => (r.kind === 'workflow' ? workflowItem(r) : jobItem(r)));
         for (const i of items) if (opened.has(i.key)) { if (i.run.seen_at) opened.delete(i.key); else i.run.seen_at = opened.get(i.key); }
         const have = new Set(page.items.map(i => i.key));
         page.items = more ? [...page.items, ...items.filter(i => !have.has(i.key))] : items;
-        page.hasMore = d.has_more === true && !!d.next_cursor; page.cursor = d.next_cursor || ''; page.total = Number(d.total) || 0; page.loaded = true;
+        page.hasMore = d.has_more === true && !!d.next_cursor; page.cursor = d.next_cursor || ''; page.total = Number(d.total) || 0; page.loaded = true; page.stale = false;
         fire();
     });
 }
-/** Make the paged list the one for this search and Result filter: nothing to do when it already is (or is on its way); a new Result filter reads at once, a new search a moment after the last key. */
+/** Make the paged list the one for this search and Result filter: nothing to do when it already is (loaded, on its way, waiting for the typing to pause, or failed: Retry asks again). A different search or filter drops the old cursor and any answer still on its way AT ONCE, also while the typing pauses; a new Result filter reads at once, a new search a moment after the last key. */
 export function ensureRunsPage({ q = '', result = '' } = {}) {
     q = String(q || '').trim().slice(0, 200); result = RESULT_WORDS.includes(result) ? result : '';
-    if (page.loaded && page.q === q && page.result === result) return;
-    if (page.timer && page.q === q && page.result === result) return; // already waiting for it
-    if (page.loading && !page.loaded && page.q === q && page.result === result) return; // the first read of it is on its way: a redraw while it comes must not ask again
+    const same = page.q === q && page.result === result;
+    if (same && (page.loaded || page.loading || page.timer || page.failed)) return;
     clearTimeout(page.timer); page.timer = 0;
-    const read = () => { page.timer = 0; page.q = q; page.result = result; page.cursor = ''; readPage(false); };
-    if (!page.loaded && !page.loading && page.q === q && page.result === result) { read(); return; }
-    if (page.loaded && page.q !== q) { page.q = q; page.result = result; page.timer = setTimeout(read, SEARCH_DEBOUNCE_MS); return; } // typing: wait for a pause
+    const changed = !same, wasLoaded = page.loaded, sameResult = page.result === result;
+    if (changed) { page.seq++; page.cursor = ''; page.hasMore = false; page.loading = false; page.failed = false; page.failedMore = false; page.q = q; page.result = result; if (page.loaded) page.stale = true; }
+    const read = () => { page.timer = 0; readPage(false); };
+    if (changed && wasLoaded && sameResult) { page.timer = setTimeout(read, SEARCH_DEBOUNCE_MS); fire(); return; } // typing: wait for a pause
     read();
 }
-/** The next page of the same search and filter, appended. Nothing when there is none or one is already coming. */
-export function loadMoreRuns() { if (!page.hasMore || page.loading || !page.cursor) return null; return readPage(true); }
+/** The next page of the same search and filter, appended. Nothing when there is none, one is already coming, or the rows drawn are an earlier search's. */
+export function loadMoreRuns() { if (!page.hasMore || page.loading || !page.cursor || page.stale || page.timer) return null; return readPage(true); }
+/** Ask again after a failure: the next page when the first came, else the first. */
+export function retryRunsPage() { if (page.loading) return null; if (page.failedMore && page.cursor) return readPage(true); page.cursor = ''; return readPage(false); }
 /** The list read again from the first page (a run ended, the person came back to it), for the search and filter it has. */
 export function reloadRunsPage() { page.cursor = ''; return readPage(false); }
 /** The first page read again when one is loaded (a run ended, Automations came back on screen): the page the person has is replaced by the newest 50 for the same search and filter. */
-export function refreshRunsPage() { return page.loaded && !page.loading ? reloadRunsPage() : null; }
+export function refreshRunsPage() { return page.loaded && !page.loading && !page.stale && !page.timer ? reloadRunsPage() : null; }
 
 // ── The reads ────────────────────────────────────────────────────────────
 /** Read both lists (at most once in 30 s unless forced; one read at a time). Called when Automations or the Inbox is shown, and by the Inbox's badge once it has been. */

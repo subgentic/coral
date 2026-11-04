@@ -33,8 +33,10 @@ exports.AUTO_RUNS_STUB = `(() => {
         const url = String(u), method = (o && o.method) || 'GET';
         if (method === 'GET' && /\\/api\\/automations\\/runs(\\?|$)/.test(url)) {
             window.__autoRunsAsked.push(url);
-            const a = window.__autoRunsPage(url);
-            return Promise.resolve(new Response(JSON.stringify(a.body), { status: a.status, headers: { 'Content-Type': 'application/json' } }));
+            if (window.__autoRunsFail && window.__autoRunsFail.test(url)) return Promise.resolve(new Response('{}', { status: 500, headers: { 'Content-Type': 'application/json' } })); // a test makes the reads that match fail
+            const a = window.__autoRunsPage(url), answer = () => new Response(JSON.stringify(a.body), { status: a.status, headers: { 'Content-Type': 'application/json' } });
+            if (window.__autoRunsHold && window.__autoRunsHold.test(url)) return new Promise(res => { (window.__autoRunsHeld = window.__autoRunsHeld || []).push(() => res(answer())); }); // a test holds the reads that match until it lets them go
+            return Promise.resolve(answer());
         }
         return prev(u, o);
     };
