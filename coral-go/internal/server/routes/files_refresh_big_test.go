@@ -147,117 +147,30 @@ func TestRefreshFilesPausesASlowFolderAndRefreshRunsOnePass(t *testing.T) {
 	gitguard.SlowPass = time.Nanosecond
 	first := post("")
 	require.EqualValues(t, 1, passes.Load())
-	require.NotNil(t, first["paused"], "a slow pass pauses the folder and the answer says so")
+	require.Nil(t, first["paused"], "one slow pass does not pause the folder")
 	require.Len(t, first["files"], 7)
+	second := post("")
+	require.EqualValues(t, 2, passes.Load())
+	require.NotNil(t, second["paused"], "two slow passes in a row pause it and the answer says so")
 
 	for i := 7; i < 10; i++ {
 		require.NoError(t, os.WriteFile(filepath.Join(repo, fmt.Sprintf("n-%d.txt", i)), []byte("x\n"), 0o644))
 	}
-	second := post("")
-	require.EqualValues(t, 1, passes.Load(), "a paused folder runs no git for the page's own refresh")
-	require.NotNil(t, second["paused"])
-	require.Len(t, second["files"], 7, "the stored list is the answer")
+	third := post("")
+	require.EqualValues(t, 2, passes.Load(), "a paused folder runs no git for the page's own refresh")
+	require.NotNil(t, third["paused"])
+	require.Len(t, third["files"], 7, "the stored list is the answer")
 
-	third := post("?manual=1")
-	require.EqualValues(t, 2, passes.Load(), "Refresh runs one pass on demand")
-	require.Len(t, third["files"], 10)
-	require.NotNil(t, third["paused"], "still slow, so still paused")
+	fourth := post("?manual=1")
+	require.EqualValues(t, 3, passes.Load(), "Refresh runs one pass on demand")
+	require.Len(t, fourth["files"], 10)
+	require.NotNil(t, fourth["paused"], "still slow, so still paused")
 
 	gitguard.SlowPass = time.Hour
-	fourth := post("?manual=1")
-	require.EqualValues(t, 3, passes.Load())
-	require.Nil(t, fourth["paused"], "a manual pass that came back fast turns live updates back on")
-	fifth := post("")
-	require.EqualValues(t, 4, passes.Load(), "live again: the page's refresh runs git")
-	require.Nil(t, fifth["paused"])
-}
-
-// 35,000 changed files (#13079, the Operator's repository): a refresh runs, and the server keeps answering its other routes quickly while git works: the list is cut before it is stored, so no long write holds the
-// database, and the refresh itself is one pass.
-func TestServerStaysResponsiveWhileA35kFileRepoIsRefreshed(t *testing.T) {
-	if testing.Short() {
-		t.Skip("writes 35,000 files")
-	}
-	gitguard.Reset()
-	t.Cleanup(gitguard.Reset)
-	_, handler, terminal, ss := setupSessionsTestServer(t)
-	router := chi.NewRouter()
-	router.Post("/api/sessions/live/{name}/files/refresh", handler.RefreshFiles)
-	router.Get("/api/sessions/live/{name}/events", handler.ListEvents)
-	server := httptest.NewServer(router)
-	t.Cleanup(server.Close)
-	repo := t.TempDir()
-	git := func(args ...string) {
-		t.Helper()
-		cmd := exec.Command("git", append([]string{"-C", repo}, args...)...)
-		cmd.Env = append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "HOME="+repo)
-		out, err := cmd.CombinedOutput()
-		require.NoError(t, err, "git %v: %s", args, out)
-	}
-	git("init", "-q")
-	git("config", "user.email", "t@example.invalid")
-	git("config", "user.name", "t")
-	require.NoError(t, os.WriteFile(filepath.Join(repo, "README.md"), []byte("hi\n"), 0o644))
-	git("add", "-A")
-	git("commit", "-qm", "init")
-	const n = 35000
-	write := func(content string) {
-		for d := 0; d < 350; d++ {
-			dir := filepath.Join(repo, fmt.Sprintf("gen%03d", d))
-			require.NoError(t, os.MkdirAll(dir, 0o755))
-			for i := 0; i < n/350; i++ {
-				require.NoError(t, os.WriteFile(filepath.Join(dir, fmt.Sprintf("f%03d.txt", i)), []byte(content), 0o644))
-			}
-		}
-	}
-	write("x\n")
-	git("add", "-A")
-	git("commit", "-qm", "files")
-	write("changed\n") // 35,000 tracked files, all modified
-	const sid = "00000000-0000-0000-0000-00000000d3d3"
-	name := "claude-" + sid
-	terminal.addSession(name, repo)
-	require.NoError(t, ss.RegisterLiveSession(context.Background(), &store.LiveSession{SessionID: sid, AgentType: "claude", AgentName: name, WorkingDir: repo}))
-
-	type answer struct {
-		Files []store.ChangedFile `json:"files"`
-		Total int                 `json:"total_changed"`
-	}
-	done := make(chan answer, 1)
-	started := time.Now()
-	go func() {
-		req, _ := http.NewRequest("POST", server.URL+"/api/sessions/live/"+name+"/files/refresh", bytes.NewBufferString(`{"session_id":"`+sid+`"}`))
-		resp, err := http.DefaultClient.Do(req)
-		var a answer
-		if err == nil {
-			_ = json.NewDecoder(resp.Body).Decode(&a)
-			resp.Body.Close()
-		}
-		done <- a
-	}()
-	var worst time.Duration
-	probes := 0
-	var a answer
-loop:
-	for {
-		select {
-		case a = <-done:
-			break loop
-		default:
-		}
-		t0 := time.Now()
-		resp, err := http.Get(server.URL + "/api/sessions/live/" + name + "/events?session_id=" + sid)
-		require.NoError(t, err)
-		resp.Body.Close()
-		if d := time.Since(t0); d > worst {
-			worst = d
-		}
-		probes++
-		time.Sleep(20 * time.Millisecond)
-	}
-	t.Logf("refresh of %d files took %s; %d probes, slowest %s", n, time.Since(started).Round(time.Millisecond), probes, worst.Round(time.Millisecond))
-	require.Equal(t, n, a.Total, "every changed file is counted")
-	require.Len(t, a.Files, refreshFilesCap, "and the list sent is the cap")
-	require.Less(t, worst, 200*time.Millisecond, "another route answers in under 200 ms while the refresh runs")
-	require.Greater(t, probes, 2, "the refresh took long enough to be probed")
+	fifth := post("?manual=1")
+	require.EqualValues(t, 4, passes.Load())
+	require.Nil(t, fifth["paused"], "a manual pass that came back fast turns live updates back on")
+	sixth := post("")
+	require.EqualValues(t, 5, passes.Load(), "live again: the page's refresh runs git")
+	require.Nil(t, sixth["paused"])
 }

@@ -13,11 +13,11 @@ func TestRefreshFlightFreesTheKeyWhenAPassPanics(t *testing.T) {
 	f := &refreshFlight{calls: map[string]*refreshCall{}, recent: map[string]refreshRecent{}}
 	func() {
 		defer func() { _ = recover() }()
-		_, _ = f.do(context.Background(), "k", false, func() refreshedFiles { panic("git went wrong") })
+		_, _, _ = f.do(context.Background(), "k", false, func() refreshedFiles { panic("git went wrong") })
 	}()
 	done := make(chan refreshedFiles, 1)
 	go func() {
-		r, _ := f.do(context.Background(), "k", false, func() refreshedFiles { return refreshedFiles{total: 7} })
+		r, _, _ := f.do(context.Background(), "k", false, func() refreshedFiles { return refreshedFiles{total: 7} })
 		done <- r
 	}()
 	select {
@@ -33,11 +33,11 @@ func TestRefreshFlightFreshAsksForANewPassButTheDefaultReusesASlowOne(t *testing
 	f := &refreshFlight{calls: map[string]*refreshCall{}, recent: map[string]refreshRecent{}}
 	runs := 0
 	pass := func() refreshedFiles { runs++; time.Sleep(300 * time.Millisecond); return refreshedFiles{total: runs} }
-	_, _ = f.do(context.Background(), "k", false, pass)
-	r, _ := f.do(context.Background(), "k", false, pass)
+	_, _, _ = f.do(context.Background(), "k", false, pass)
+	r, _, _ := f.do(context.Background(), "k", false, pass)
 	require.Equal(t, 1, runs, "the page's own ask just after a slow pass reuses it")
 	require.Equal(t, 1, r.total)
-	r, _ = f.do(context.Background(), "k", true, pass)
+	r, _, _ = f.do(context.Background(), "k", true, pass)
 	require.Equal(t, 2, runs, "Refresh runs a new pass")
 	require.Equal(t, 2, r.total)
 }
