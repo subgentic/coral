@@ -3,6 +3,7 @@ import { state } from './state.js';
 import { showToast } from './utils.js';
 import { setHidden } from './dom_write.js';
 import { serverFetch, currentServer, identityKey, keyLabel, isCloud, isLocalServer } from './server_base.js';
+import { importOnce } from './import_once.js';
 
 /** The lines the Info dialog shows for an agent's MCP servers (#9769): one per server, "name: transport, scope"; [] when the CLI is not one Coral reads, and one line saying none when it reads it and finds none. */
 export function mcpLines(result) {
@@ -30,6 +31,42 @@ async function showMcpServers(name, sid) {
     const lines = mcpLines(result);
     if (!lines.length) return;
     val.replaceChildren(...lines.map(l => Object.assign(document.createElement('div'), { textContent: l })));
+    setHidden(label, false); setHidden(val, false);
+}
+
+let sectionsAsked = '';
+const getJson = async (path) => { try { const r = await serverFetch(currentServer(), path); return r.ok ? await r.json() : null; } catch { return null; } };
+/** The dialog's Skills and Memory rows (#13209, goal #218), beside the MCP row: what the agent LOADED through skills get (a record, not a folder scan) and its instruction and memory files, each opened read-only on a click. Same rule as the MCP row: this computer's own agents, the Operator's routes, a failure leaves the row hidden. */
+async function showAgentSections(name, sid) {
+    const rows = { skills: ['info-skills-label', 'info-skills'], memory: ['info-memory-label', 'info-memory'] };
+    for (const [label, val] of Object.values(rows)) { setHidden(document.getElementById(label), true); setHidden(document.getElementById(val), true); }
+    if (!sid || isCloud() || !isLocalServer(currentServer())) return;
+    sectionsAsked = sid;
+    const q = `session_id=${encodeURIComponent(sid)}`, base = `/api/sessions/live/${encodeURIComponent(name)}`;
+    const { skillLines, memoryItems, memoryText } = await importOnce('./agent_info_sections.js'); // a lazy module loads the others through importOnce, so a failed load is retried
+    const [skills, memory] = await Promise.all([getJson(`${base}/loaded-skills?${q}`), getJson(`${base}/memory?${q}`)]);
+    if (sectionsAsked !== sid) return; // the dialog was opened for another agent meanwhile
+    const lines = skillLines(skills);
+    if (lines.length) { fill('info-skills', lines.map(l => Object.assign(document.createElement('div'), { textContent: l }))); }
+    const items = memoryItems(memory);
+    if (items.length) {
+        const nodes = items.map(it => {
+            if (!it.id) return Object.assign(document.createElement('div'), { textContent: it.label });
+            const b = Object.assign(document.createElement('button'), { type: 'button', className: 'info-memory-open', textContent: it.label });
+            b.addEventListener('click', async () => { // listener-ok: a button this dialog makes for one file, gone when the dialog is filled again
+                const pre = document.getElementById('info-memory-text'); pre.textContent = 'Loading...'; setHidden(pre, false);
+                const text = memoryText(await getJson(`${base}/memory/${encodeURIComponent(it.id)}?${q}`));
+                if (sectionsAsked === sid) pre.textContent = text;
+            });
+            return b;
+        });
+        const pre = Object.assign(document.createElement('pre'), { id: 'info-memory-text', className: 'info-memory-text', hidden: true });
+        fill('info-memory', [...nodes, pre]);
+    }
+}
+function fill(id, nodes) {
+    const val = document.getElementById(id), label = document.getElementById(id + '-label');
+    val.replaceChildren(...nodes);
     setHidden(label, false); setHidden(val, false);
 }
 
@@ -110,6 +147,7 @@ export async function showInfoModal() {
 
         document.getElementById("info-modal").style.display = "flex";
         showMcpServers(name, sid);
+        showAgentSections(name, sid);
     } catch (e) {
         showToast("Failed to load session info", true);
         console.error("showInfoModal exception:", e);

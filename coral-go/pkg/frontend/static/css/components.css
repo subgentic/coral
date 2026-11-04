@@ -896,6 +896,10 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     line-height: var(--lh-ui);
 }
 
+/* The Info dialog's Memory row (#13209): one file per line, opened read-only on a click into a scrolling block under the list */
+.info-memory-open { display: block; width: 100%; min-height: 36px; padding: 6px 0; background: none; border: 0; font: inherit; text-align: left; color: var(--accent); text-decoration: underline; cursor: pointer; overflow-wrap: anywhere; }
+.info-memory-text { margin: 6px 0 0; padding: 10px 12px; max-height: 40vh; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; border: 1px solid var(--border); background: var(--bg-secondary); }
+
 .info-token-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
