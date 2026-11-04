@@ -84,4 +84,26 @@ ac.abort();
 await assert.rejects(waiting, e => e.name === 'AbortError');
 assert.equal(started, false, 'an aborted request that waited for its turn is never sent');
 await Promise.all(hold);
+// a slot is held for at most remoteLimitHooks.holdMs (30 s): six requests that hang through the Hub do not block the computer's lane until reload (#13351, Security's INFO on #13304); the hung requests go on, only their slots are given back
+reset(); hubCap = 100;
+rl.remoteLimitHooks.holdMs = 25; // the seam: a test does not wait 30 s
+const hang = () => new Promise(() => {}); // never answers
+const hung = Array.from({ length: rl.MAX_IN_FLIGHT }, () => rl.limited('lane-hung', 'GET', null, hang));
+let seventh = false;
+const seventhReq = rl.limited('lane-hung', 'GET', null, async () => { seventh = true; return new Response('{}', { status: 200 }); });
+const early = await Promise.race([seventhReq.then(() => 'started'), new Promise(r => setTimeout(() => r('blocked'), 5))]); // sleep-ok: the seventh must NOT start before a slot is given back
+assert.equal(early, 'blocked', 'while six hang inside their hold the seventh waits its turn');
+const later = await Promise.race([seventhReq.then(() => 'started'), new Promise(r => setTimeout(() => r('blocked'), 400))]); // sleep-ok: well past the hold
+assert.equal(later, 'started', 'after the hold the six slots are given back and a seventh request starts: ' + later);
+assert.ok(seventh, 'the seventh request was sent');
+// a slot is given back once: a request that answers within its hold frees its slot at that moment, and its timer does not free a second slot later
+rl.remoteLimitHooks.holdMs = 30;
+reset();
+let running = 0, peakRunning = 0;
+const tracked = () => new Promise(res => { running++; peakRunning = Math.max(peakRunning, running); setTimeout(() => { running--; res(new Response('{}', { status: 200 })); }, 5); }); // sleep-ok: a request that takes a moment
+await Promise.all(Array.from({ length: 20 }, () => rl.limited('lane-once', 'GET', null, tracked)));
+await new Promise(r => setTimeout(r, 60)); // sleep-ok: past every hold timer
+assert.ok(peakRunning <= rl.MAX_IN_FLIGHT, 'answered requests free their slot once: at most 6 ran together, saw ' + peakRunning);
+rl.remoteLimitHooks.holdMs = 30000;
+
 console.log('remote_limit: ok');

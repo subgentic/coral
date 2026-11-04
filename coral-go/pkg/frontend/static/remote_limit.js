@@ -5,6 +5,7 @@
  * /api/remote/<computer>/ (the only kind that crosses the Hub), installed under every other wrapper of window.fetch:
  *   - at most MAX_IN_FLIGHT of one computer's requests are in flight; the rest wait their turn (a request that is aborted while it waits never starts);
  *   - a read (GET or HEAD) answered 503 is asked again after the answer's Retry-After (1 s without one, at most 5 s, spread a little), at most RETRIES times, before anyone sees the 503; a write is never asked again;
+ *   - a request keeps its slot for at most HOLD_MS (30 s): one that is still unanswered then goes on, but its slot is given to the next in line (#13351);
  *   - a computer's requests never wait for another computer's.
  * Nothing else changes: the same Response comes back, and a 503 that is still there after the retries is the answer (overload.js then pauses that computer's pollers as before). */
 import { machineOf } from './overload.js';
@@ -13,9 +14,10 @@ export const MAX_IN_FLIGHT = 6;
 export const RETRIES = 2;
 const DEFAULT_WAIT_MS = 1000;
 const MAX_WAIT_MS = 5000;
+const HOLD_MS = 30000; // the longest a request may keep its slot (#13351): six that hang through the Hub must not block the computer's lane until a reload; the request goes on, only its slot is given back
 
 /** Test seams. */
-export const remoteLimitHooks = { sleep: ms => new Promise(r => setTimeout(r, ms)), rand: Math.random }; // sleep-ok: the Hub asked for the wait
+export const remoteLimitHooks = { sleep: ms => new Promise(r => setTimeout(r, ms)), rand: Math.random, holdMs: HOLD_MS }; // sleep-ok: the Hub asked for the wait
 
 const lanes = new Map(); // computer -> { running, queue: [() => void] }
 
@@ -59,8 +61,10 @@ export async function limited(computer, method, signal, send) {
     const read = method === 'GET' || method === 'HEAD';
     for (let attempt = 0; ; attempt++) {
         await acquire(lane, signal);
-        let resp;
-        try { resp = await send(); } finally { release(lane); }
+        let resp, freed = false;
+        const free = () => { if (!freed) { freed = true; release(lane); } }; // a slot is given back once: by the answer, or by the hold running out, whichever comes first
+        const hold = setTimeout(free, remoteLimitHooks.holdMs); // timer-ok: a one-shot cap on how long a slot is held, cleared when the request settles
+        try { resp = await send(); } finally { clearTimeout(hold); free(); }
         if (!read || resp.status !== 503 || attempt >= RETRIES) return resp;
         await remoteLimitHooks.sleep(retryWaitMs(resp));
         if (signal && signal.aborted) throw abortError();
