@@ -69,7 +69,7 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
         await Emulation.setEmulatedMedia({ features: [{ name: 'prefers-color-scheme', value: theme }] });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
         await coralReady(ev);
-        await ev(`try { localStorage.removeItem('coral-artifact-comments-open'); } catch {} true`); // each view starts as a new viewer: nothing remembered
+        await ev(`import(${S} + 'safe_storage.js').then(({browserLocal}) => { browserLocal.remove('coral-artifact-comments-open'); browserLocal.remove('coral-artifact-comments:text/markdown'); return true; })`); // each theme/layout starts with no remembered Comments choice
         await installAudit(ev); await setTheme(ev, theme);
     };
     const select = (text) => ev(`(() => { const body = document.querySelector('#artifact-viewer .artifact-viewer-body'); const w = document.createTreeWalker(body, NodeFilter.SHOW_TEXT); let n; while ((n = w.nextNode())) { const i = n.nodeValue.indexOf(${JSON.stringify(text)}); if (i >= 0) { const r = document.createRange(); r.setStart(n, i); r.setEnd(n, i + ${JSON.stringify(text)}.length); const s = getSelection(); s.removeAllRanges(); s.addRange(r); return true; } } return false; })()`);
@@ -83,13 +83,22 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
 
         for (const theme of ['dark', 'light']) {
             await load(1280, 800, false, theme);
+            // #13113: a saved per-type choice wins; #12225's closed default is
+            // the first-visit case, checked separately below without a choice.
+            await ev(`import(${S} + 'safe_storage.js').then(({browserLocal}) => { browserLocal.set('coral-artifact-comments:text/markdown', 'open'); return true; })`);
+            await open();
+            await waitFor(`document.querySelectorAll('.ac-card').length >= 3`, 'remembered-open threads', 5000);
+            check(`desktop, ${theme}: a remembered per-type open choice opens Comments on entry`, await ev(`document.querySelector('.ac-toggle').getAttribute('aria-expanded') === 'true' && document.querySelector('.ac-panel').getClientRects().length > 0`));
+            await click('.artifact-viewer-close');
+            await waitFor(`document.getElementById('artifact-viewer').hidden`, 'remembered-open viewer closes', 3000);
+            await ev(`import(${S} + 'safe_storage.js').then(({browserLocal}) => { browserLocal.remove('coral-artifact-comments:text/markdown'); return true; })`);
             await open();
             await waitFor(`document.querySelectorAll('.ac-card').length >= 3`, 'the threads', 5000);
             const at = `desktop, ${theme}`;
-            // Three open threads start shown; resolved threads and replies do not count. The header toggle opens and closes the side column.
+            // Without a remembered choice, three open threads start collapsed; resolved threads and replies do not count. The header toggle opens and closes the side column.
             const shut = await ev(`(() => { const t = document.querySelector('.ac-toggle'), p = document.querySelector('.ac-panel'), v = document.getElementById('artifact-viewer'); return { toggle: t && !t.hidden && t.getClientRects().length > 0, text: t && t.textContent, name: t && t.getAttribute('aria-label'), expanded: t && t.getAttribute('aria-expanded'), panelShown: p.getClientRects().length > 0, wide: v.classList.contains('ac-on'), width: Math.round(v.querySelector('.artifact-viewer-content').getBoundingClientRect().width) }; })()`);
             check(`${at}: the button names the panel it opens (aria-controls)`, await ev(`(() => { const t = document.querySelector('.ac-toggle'), id = t.getAttribute('aria-controls'); return !!id && document.getElementById(id) === document.querySelector('.ac-panel'); })()`));
-            check(`${at}: closed by default with 3 open threads (#12225): a "Comments (3)" button (aria-expanded false), no panel, the file has the whole width`, shut.toggle && shut.text === 'Comments (3)' && shut.name === 'Comments (3)' && shut.expanded === 'false' && !shut.panelShown && !shut.wide, JSON.stringify(shut));
+            check(`${at}: first visit with no saved choice: closed by default with 3 open threads (#12225): a "Comments (3)" button (aria-expanded false), no panel, the file has the whole width`, shut.toggle && shut.text === 'Comments (3)' && shut.name === 'Comments (3)' && shut.expanded === 'false' && !shut.panelShown && !shut.wide, JSON.stringify(shut));
             await click('.ac-toggle'); await waitFor(`document.querySelector('.ac-panel').getClientRects().length > 0`, 'the panel opening first', 3000); // the rest of the scene starts from the panel open
             await click('.ac-toggle');
             await shot(`comments-desktop-closed-${theme}`);
