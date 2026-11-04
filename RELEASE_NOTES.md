@@ -1,5 +1,103 @@
 # Release Notes
 
+## v2.0.44 — Big repositories stop slowing the Files panel, a port for Set up a server, Uploaded by in Artifacts, a wider reply dialog, and a New goal card on Home
+
+### Changes
+
+#### What you will notice first
+
+- **A big repository no longer slows Coral down**: the Files panel's changed-files list is the same on every pass, one pass of git runs per folder at a time, a long list is cut at 2,000 files and says so ("Showing 2,000 of 35,000"), and the page polls the open agent one request at a time. A folder that is too slow for live git updates is paused after two slow passes in a row (kept across restarts, tried again every 10 minutes); the sidebar and header say "paused" where the change count would show, and the panel has **Refresh** and **Turn on**. A small untracked folder is listed as its files and a big one stays one entry.
+- **Set up a server: choose the port Coral listens on over there.**
+- **Artifacts lists show who uploaded a file** (an "Uploaded by" column and label, "not recorded" when nobody did), with the table's column priorities kept.
+- **A wider reply dialog** on large screens (two columns), with the image picker directly beneath the reply box and the footer after the body.
+- **Home's third card is New goal** (it was Open folder) and says when there is no team to give a goal to; its teams read is no longer part of the page's start.
+- **Skills**: the way back from a skill says where it goes ("Back to <folder>", "Back to all skills" from All), and the Skills page clears the phone's bottom bar so Approve and Reject are not under it.
+- **Analytics charts**: the cost chart grouped by team names the team (not its board id), value labels and date ticks are no longer cut off at large text (390 px, 200%), and the day picker keeps keyboard focus on Previous and Next.
+- **Native app downloads stay in the app window's session.**
+- **A deleted team stays deleted** even when it is deleted during its first load, and a deleted board shown again loads and polls at once.
+
+#### Known issues
+
+- **macOS: the tmux change (#12836) can make macOS ask once more, only after tmux restarts (a full restart of your agents or a reboot).** Coral's tmux server and guardian are now their own responsible process, so macOS may ask, per folder, whether `tmux` (or `coral`) may reach Documents, Desktop or Downloads. Full Disk Access you gave Coral.app does not carry over: if you gave Coral Full Disk Access, add `tmux` and `coral` too (both in `Coral.app/Contents/MacOS`). The staged tmux copy (each Coral version keeps its own under `tmux-bin/`) asks again after a tmux change. Say yes once; if you say no, nothing is lost, the agent just cannot read that folder.
+- **Windows: in-app update does not work from 2.0.0 through 2.0.6.** If you're on one of those, download and install the MSI by hand; from 2.0.7 on, in-app update works.
+- **macOS: a Coral of 2.0.5 or earlier cannot install updates in-app; install 2.0.6 or later by hand once.**
+- **OpenCode agents are tested on macOS and Linux; OpenCode on Windows is not yet tested end to end.**
+- **Hermes agents are still experimental.**
+- Setting up a computer over SSH is supported from a macOS or Linux hub, and is not yet tested from a Windows hub.
+
+#### For Coral Hub
+
+- **`release-diff` output** (`go run ./internal/releasediff/cmd/release-diff v2.0.43 <head>`):
+
+  ### Tunnel routes, v2.0.43 to f0742cbdc
+
+  No route was added, removed or changed.
+
+  ### Board settings keys (BoardSettings, HealthSettings included), v2.0.43 to f0742cbdc
+
+  No key was added, removed or changed.
+
+  ### What Coral Hub compiles in or embeds, v2.0.43 to f0742cbdc
+
+  `pkg/tunnel`: 1 file of Go code changed (+2, -2)
+
+  - `coral-go/pkg/tunnel/routes_query.go`: +2, -2
+
+  `pkg/frontend`: 31 files the Hub embeds changed (+292, -77)
+
+  - `coral-go/pkg/frontend/static/analytics_series.js`: +31, -12
+  - `coral-go/pkg/frontend/static/analytics_tabs.js`: +6, -1
+  - `coral-go/pkg/frontend/static/analytics_viz.js`: +1, -0
+  - `coral-go/pkg/frontend/static/app_actions.js`: +3, -1
+  - `coral-go/pkg/frontend/static/artifact_item.js`: +4, -0
+  - `coral-go/pkg/frontend/static/artifact_table.js`: +6, -5
+  - `coral-go/pkg/frontend/static/board_state.js`: +1, -0
+  - `coral-go/pkg/frontend/static/board_window.js`: +1, -0
+  - `coral-go/pkg/frontend/static/capture.js`: +21, -0
+  - `coral-go/pkg/frontend/static/changed_files.js`: +22, -7
+  - `coral-go/pkg/frontend/static/css/chat_import.css`: +2, -2
+  - `coral-go/pkg/frontend/static/css/mobile.css`: +1, -1
+  - `coral-go/pkg/frontend/static/css/operator_ask_dialog.css`: +38, -0
+  - `coral-go/pkg/frontend/static/css/pictures.css`: +2, -2
+  - `coral-go/pkg/frontend/static/css/session.css`: +1, -0
+  - `coral-go/pkg/frontend/static/css/team_page.css`: +0, -12
+  - `coral-go/pkg/frontend/static/data_table.js`: +2, -2
+  - `coral-go/pkg/frontend/static/group_cards.js`: +2, -1
+  - `coral-go/pkg/frontend/static/home_goal.js`: +27, -0
+  - `coral-go/pkg/frontend/static/launch_cards.js`: +32, -1
+  - `coral-go/pkg/frontend/static/message_board.js`: +7, -1
+  - `coral-go/pkg/frontend/static/operator_ask_dialog.js`: +14, -8
+  - `coral-go/pkg/frontend/static/pinned_folders.js`: +1, -0
+  - `coral-go/pkg/frontend/static/platform/native.js`: +2, -0
+  - `coral-go/pkg/frontend/static/render.js`: +5, -5
+  - `coral-go/pkg/frontend/static/server_ssh_setup.js`: +42, -6
+  - `coral-go/pkg/frontend/static/session_state.js`: +8, -1
+  - `coral-go/pkg/frontend/static/skills_tab.js`: +1, -1
+  - `coral-go/pkg/frontend/static/team_artifact_filters.js`: +2, -2
+  - `coral-go/pkg/frontend/static/team_artifacts_page.js`: +3, -2
+  - `coral-go/pkg/frontend/templates/index.html`: +4, -4
+
+  `agent_docs`: 1 file the Hub embeds changed (+1, -1)
+
+  - `coral-go/agent_docs/quickstart.md`: +1, -1
+
+  Unchanged: `pkg/hubproxy`, `pkg/hubowner`, `pkg/redact`.
+
+  ### Coral packages compiled into the Hub through its imports, v2.0.43 to f0742cbdc
+
+  Unchanged: `internal/fsreplace`, `internal/httputil`, `internal/logsafe`, `internal/safego`, `internal/secfile`, `internal/secrets`, `pkg/redact/betterleaks`.
+
+- **Tunnel allowlist** (`pkg/tunnel/routes_query.go`, regenerated, Security Reviewer approved): `GET /api/sessions/live/{}/files` and its `files/refresh` read two more plain query flags (`live`, `manual`; the live files route also still reads `session_id` and `worktree`); no route was added, removed or changed, and no setting key changed.
+- **Uploader label and Hub API redaction**: Artifacts lists show the recorded uploader; its label validation and the Hub API redaction of it are pinned by tests.
+- **Ready signals, hooks, tokens, framed paths**: unchanged.
+
+
+#### For developers and releases
+
+- `release-prerun.yml` (#13015) reaches main with this release: a manual workflow that runs the release's macOS payload smoke on both Macs before a tag; from v2.0.45 it is dispatched on every `ci/<version>` (until then it was run from a scratch branch).
+- Census and lint fixes: the test-guard link for `internal/sshprov`, a contained join in the git poller, `fsreplace.Rename` in gitguard, `consoletest.HiddenCommand` in the big-repo test, the regenerated tunnel allowlist, and the harness lint no longer reads a node_modules symlink or a help line as a Coral start.
+- Browser suites that raced the Home teams read now wait for it (`perf_budgets`, `settings_apply_oracle`, `select_session_trace`, `team_artifact_tags`, `analytics_agent_draws`); the fail-fast pre-run now includes the repository-wide Go census set.
+
 ## v2.0.43 — Set up a server: the new computer's key confirmation can no longer be skipped
 
 ### Changes
