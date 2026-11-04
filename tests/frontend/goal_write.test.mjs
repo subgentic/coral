@@ -116,6 +116,8 @@ for (const [resp, word] of [[json({ error: 'mode_too_low' }, 403), 'mode_too_low
     assert.equal(res.done, 3); assert.equal(res.failed, 0); assert.match(res.stopped, /half a minute\. 3 of 6 goals were changed; the rest are unchanged\./);
     assert.deepEqual(waits, [BULK_GAP_MS, BULK_GAP_MS, BULK_GAP_MS], 'a pause before every goal but the first');
     assert.equal(said[0], 'Changing goals: 1 of 6'); assert.equal(said.length, 4, 'progress for each goal tried');
+    const one = await writeEach([1, 2, 3], async g => (g === 2 ? json({}, 429) : json({ ok: true })), { on: () => true, wait: async () => {} });
+    assert.match(one.stopped, /1 of 3 goals was changed;/, 'one goal: "was"');
     const off = []; const all = await writeEach(list, async g => json({ ok: true }), { on: () => false, wait: async ms => off.push(ms), say: t => off.push(t) });
     assert.equal(all.done, 6); assert.deepEqual(off, [], 'flag off: no pause, no progress line, as before');
     const fails = await writeEach([1, 2], async g => { if (g === 1) throw new Error('x'); return json({}, 500); }, { on: () => false });

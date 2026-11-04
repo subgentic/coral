@@ -97,7 +97,7 @@ async function run(flag) {
                 assert.equal(new Set(bc.filter(x => x.kind === 'write').map(x => x.token)).size, 3, `${tag}: one token per goal`);
                 assert.ok(bc.filter(x => x.kind === 'write').every(x => JSON.parse(x.body).reason === 'Wrapping up' && JSON.parse(x.body).subscriber_id === 'Operator'));
                 await bulk(2); // the Hub's limit on the second preview
-                await waitFor(`/half a minute\\. 1 of 3 goals were changed; the rest are unchanged\\./.test(document.body.innerText)`, `${tag}: the Hub's limit stops the bulk close with its plain line`, 10000);
+                await waitFor(`/half a minute\\. 1 of 3 goals was changed; the rest are unchanged\\./.test(document.body.innerText)`, `${tag}: the Hub's limit stops the bulk close with its plain line`, 10000);
                 bc = await calls();
                 assert.equal(bc.filter(x => x.kind === 'write').length, 1, `${tag}: only the first goal was written; the Hub's 429 stopped it, no retry`);
                 assert.equal(bc.filter(x => x.kind === 'preview').length, 2, `${tag}: and no third preview was asked`);

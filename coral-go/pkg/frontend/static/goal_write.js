@@ -70,7 +70,7 @@ export async function writeEach(list, one, { on = goalPreviewOn, say = () => {},
         if (on()) { if (i) await wait(gapMs()); say(`Changing ${noun}: ${i + 1} of ${list.length}`); }
         let r = null;
         try { r = await one(list[i]); } catch { failed++; continue; }
-        if (r && r.status === 429) { stopped = `${PREVIEW_WORDS.too_many_requests} ${done} of ${list.length} ${noun} were changed; the rest are unchanged.`; break; }
+        if (r && r.status === 429) { stopped = `${PREVIEW_WORDS.too_many_requests} ${done} of ${list.length} ${noun} ${done === 1 ? 'was' : 'were'} changed; the rest are unchanged.`; break; }
         if (r && r.ok) done++; else failed++;
     }
     return { done, failed, stopped };
