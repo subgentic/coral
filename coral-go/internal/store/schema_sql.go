@@ -117,6 +117,8 @@ CREATE TABLE IF NOT EXISTS artifact_comments (
 	board       TEXT NOT NULL DEFAULT '',
 	parent_id   INTEGER,
 	anchor_json TEXT NOT NULL DEFAULT '',
+ at_s REAL,
+ end_s REAL,
 	body        TEXT NOT NULL,
 	author_issuer  TEXT NOT NULL,
 	author_subject TEXT NOT NULL,

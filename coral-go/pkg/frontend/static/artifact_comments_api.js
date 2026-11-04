@@ -10,6 +10,7 @@ const base = (hex, server) => serverUrl(`/api/artifacts/${hex}/comments`, server
 function normalizeComment(c) {
     const can = c.can || {}, who = c.author || {};
     return {
+        atS: typeof c.at_s === 'number' && Number.isFinite(c.at_s) ? c.at_s : null, endS: typeof c.end_s === 'number' && Number.isFinite(c.end_s) ? c.end_s : null,
         id: c.id, parentId: c.parent_id == null ? null : c.parent_id, anchor: c.anchor || { whole: true }, body: String(c.body == null ? '' : c.body),
         authorId: who.subject || '', authorName: who.name || '', authorKind: who.kind || '',
         createdAt: c.created_at || '', editedAt: c.edited_at || '', resolved: !!c.resolved_at, resolvedBy: c.resolved_by ? (c.resolved_by.subject || '') : '', deleted: !!c.deleted, mine: !!c.mine, sentTo: String(c.sent_to || ''), // sentTo: the agents the owner's new comment or reply was sent to on its own (#12203), on the answer to its creation only
@@ -38,8 +39,8 @@ export async function listComments(hex, server, board, series = false) {
 }
 
 /** Make a comment: a thread on an anchor ({quote, prefix, suffix, start_line, end_line} or {whole: true}), or a reply to parentId (a reply has no anchor). */
-export const createComment = (hex, server, { body, anchor, parentId, board, images }) => requestJson('POST', base(hex, server),
-    { body, ...(parentId != null ? { parent_id: parentId } : { anchor }), ...(board ? { board } : {}), ...(images && images.length ? { images } : {}) }).then(normalizeComment);
+export const createComment = (hex, server, { body, anchor, parentId, board, images, atS, endS }) => requestJson('POST', base(hex, server),
+    { body, ...(atS != null ? { at_s: atS, ...(endS != null ? { end_s: endS } : {}), notify_agent: false } : {}), ...(parentId != null ? { parent_id: parentId } : { anchor }), ...(board ? { board } : {}), ...(images && images.length ? { images } : {}) }).then(normalizeComment);
 
 /** The picture types a comment takes, and the most it carries (the server decides again: png, jpeg, webp and four pictures). */
 export const COMMENT_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
