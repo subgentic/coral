@@ -33,8 +33,10 @@ const ATTACK = {
     // A new page in a new browser context, with the Network, Page, Runtime and Log domains on, and the other site's two pages served by interception.
     const freshPage = async () => {
         const { browserContextId } = await browser.Target.createBrowserContext({ disposeOnDetach: true });
+        assert.ok(browserContextId, 'the case owns a new browser context');
         contexts.push(browserContextId);
         const { targetId } = await browser.Target.createTarget({ url: 'about:blank', browserContextId });
+        assert.ok(targetId, 'the case owns an exact page target');
         const c = await CDP({ port, target: targetId });
         pages.push(c);
         await Promise.all([c.Page.enable(), c.Runtime.enable(), c.Network.enable(), c.Log.enable()]);
@@ -64,14 +66,23 @@ const ATTACK = {
                 if (ok) return;
                 await sleep(25);
             }
-            throw new Error(`timed out waiting for ${what}: requests ${JSON.stringify(reqs)}`);
+            throw new Error(`timed out waiting for ${what}: requests ${JSON.stringify(reqs)}; targets ${await diagnostics({ targetId, ev })}`);
         };
         const cookies = async () => (await c.Network.getCookies({ urls: [BASE] })).cookies.map(k => k.name);
         const status = () => ev(`fetch('${BASE}/api/system/status', { cache: 'no-store', credentials: 'include' }).then(r => r.status)`);
-        return { c, ev, waitFor, reqs, log, cookies, status };
+        return { c, targetId, browserContextId, ev, waitFor, reqs, log, cookies, status };
+    };
+    // Queries/hashes may carry sign-in credentials: timeout evidence needs target
+    // identity and origin/path only, never those credentials.
+    const safeUrl = raw => { try { const u = new URL(raw); u.search = ''; u.hash = ''; return ['http:', 'https:', 'about:'].includes(u.protocol) ? u.href : u.protocol + '<omitted>'; } catch { return '<unavailable>'; } };
+    const diagnostics = async page => {
+        const { targetInfos } = await browser.Target.getTargets();
+        let url = '<unavailable>';
+        try { url = safeUrl(await page.ev('location.href')); } catch { /* detached or navigating */ }
+        return JSON.stringify({ targetId: page.targetId, url, targets: targetInfos.map(t => ({ targetId: t.targetId, type: t.type, url: safeUrl(t.url), browserContextId: t.browserContextId, attached: t.attached })) });
     };
     // A condition on this side (the events Chrome sent), polled: no fixed sleep.
-    const until = async (fn, what, ms = 8000) => { const end = Date.now() + ms; while (Date.now() < end) { if (await fn()) return; await sleep(25); } throw new Error('timed out waiting for ' + what); };
+    const until = async (fn, what, ms = 8000, page = null) => { const end = Date.now() + ms; while (Date.now() < end) { try { if (await fn()) return; } catch (e) { if (!isNavigationError(e)) throw e; } await sleep(25); } throw new Error('timed out waiting for ' + what + (page ? ': targets ' + await diagnostics(page) : '')); };
     const shownButton = p => p.ev(`(() => { const b = document.getElementById('local-open'); if (!b) return false; const r = b.getBoundingClientRect(); return r.width > 0 && r.height > 0 && !b.closest('[hidden]'); })()`);
     const localOpen = reqs => reqs.filter(r => r.method === 'POST' && r.url.startsWith('/auth/local'));
     let failed = 0;
@@ -125,24 +136,22 @@ const ATTACK = {
         try {
             let ownEv = null;
             await test("the suite's own tab signs in again through the button", async () => {
-                const { targetInfos } = await browser.Target.getTargets();
-                const mine = targetInfos.find(t => t.type === 'page' && !contexts.includes(t.browserContextId)); // the suite's own tab: not in a context this suite made
-                assert.ok(mine, 'the suite tab');
-                const own = await CDP({ port, target: mine.targetId });
-                pages.push(own);
-                await Promise.all([own.Runtime.enable(), own.Page.enable()]);
-                const ev = async x => (await own.Runtime.evaluate({ expression: x, returnByValue: true, awaitPromise: true })).result.value;
+                // Own an exact target in a fresh context. A leftover page from an
+                // earlier strict suite can have the same BASE URL, so neither
+                // URL matching nor target-list order identifies this case.
+                const p = await freshPage();
+                const { c: own, ev } = p;
                 await own.Page.navigate({ url: BASE + '/auth' });
-                await until(async () => (await ev(`!!document.getElementById('local-open') && document.readyState === 'complete'`)) === true, 'the button in the suite tab', 30000);
+                await until(async () => (await ev(`document.documentElement.dataset.authReady === 'true' && !!document.getElementById('local-open') && !document.getElementById('local-open').disabled && document.readyState === 'complete'`)) === true, 'the button handler in the suite tab', 30000, p);
                 await ev(`document.getElementById('local-open').click(), true`);
-                await until(async () => (await ev(`location.origin === '${BASE}' && !location.pathname.startsWith('/auth') && document.readyState === 'complete'`)) === true, 'the suite tab to leave /auth', 30000);
+                await until(async () => (await ev(`location.origin === '${BASE}' && !location.pathname.startsWith('/auth') && document.readyState === 'complete'`)) === true, 'the suite tab to leave /auth', 30000, p);
                 assert.equal(await ev(`fetch('${BASE}/api/system/status', { cache: 'no-store' }).then(r => r.status)`), 200);
                 ownEv = ev;
             });
             await test('the button on /auth signs this browser in', async () => {
                 const p = await freshPage();
                 await p.c.Page.navigate({ url: BASE + '/auth' });
-                await p.waitFor(`!!document.getElementById('local-open') && document.readyState === 'complete'`, 'the button');
+                await p.waitFor(`document.documentElement.dataset.authReady === 'true' && !!document.getElementById('local-open') && !document.getElementById('local-open').disabled && document.readyState === 'complete'`, 'the button handler');
                 if (process.env.CORAL_TEST_STRICT !== '1') { console.log('  skipped here: only a strict shard (the runner sets CORAL_TEST_STRICT=1 there) gives this browser a 401 to turn into a 200; the strict shard asserts it'); return; } // the default-mode run of a STRICT_SUITES suite (#12907, Security's SHOULD: the skip depends on the shard, not on the answer)
                 assert.equal(await p.status(), 401, 'not signed in before');
                 const promised = await p.ev(`document.getElementById('local-open-note').textContent`); // #12834: the words match what the next screen does
