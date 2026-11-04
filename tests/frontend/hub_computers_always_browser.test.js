@@ -23,6 +23,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
             await ev(`Promise.resolve(window.showServersModal()).then(() => true)`); // the entry point the Settings menu's item reaches
             await waitFor(`(() => { const v = document.getElementById('servers-view'); return !!v && getComputedStyle(v).display !== 'none'; })()`, at + 'the Computers page opens from the menu action', 10000);
             await waitFor(`!![...document.querySelectorAll('#servers-tab-body button')].find(b => /Add computer|Set up over SSH/.test(b.textContent))`, at + 'Add computer is reachable on the empty page', 10000);
+            assert.match(await ev(`document.querySelector('#servers-tab-body .empty-state').textContent.replace(/\\s+/g, ' ').trim()`), /^No computers connected yet\. Add one to see its agents here\.$/, at + 'the empty page says so');
             console.log(`   ✓ ${w} px`);
         }
         console.log('PASS a hub with no computers still has its Computers tab, the menu item opens it, and Add computer is there');
