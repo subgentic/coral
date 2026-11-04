@@ -5,6 +5,7 @@ package gitguard
 
 import (
 	"encoding/json"
+	"github.com/subgentic/coral/internal/fsreplace"
 	"os"
 	"path/filepath"
 	"sync"
@@ -92,7 +93,7 @@ func save() {
 	}
 	tmp := path + ".tmp"
 	if os.WriteFile(tmp, b, 0o600) == nil {
-		_ = os.Rename(tmp, path)
+		_ = fsreplace.Rename(tmp, path) // over a file that may be open elsewhere (Windows): never a bare os.Rename
 	}
 }
 
