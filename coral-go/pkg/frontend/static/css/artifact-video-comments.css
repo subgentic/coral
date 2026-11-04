@@ -24,3 +24,6 @@
 }
 
 .ac-send-open { min-height: 44px; white-space: normal; }
+
+/* Keep the title and controls whole when large text makes the player taller. */
+.artifact-viewer.avc-video .artifact-viewer-header { flex-shrink: 0; }

@@ -39,13 +39,14 @@ export function attachVideoComments(video, { onComment, onActivate }) {
         selected.hidden = !range;
         if (range && dur) { selected.style.left = `${range.atS / dur * 100}%`; selected.style.width = `${(range.endS - range.atS) / dur * 100}%`; }
         comment.hidden = !writable; comment.disabled = !dur;
+        hint.textContent = writable ? 'Drag to select a stretch. Space: play/pause · C: comment · arrows: seek 5 seconds.' : 'Space: play/pause · arrows: seek 5 seconds. Select a comment marker to seek.';
         comment.textContent = range ? `Comment ${videoTime(range.atS)}–${videoTime(range.endS)}` : `Comment at ${videoTime(now)}`;
         status.textContent = playError || (range ? `Selected ${videoTime(range.atS)} to ${videoTime(range.endS)}. Use Comment to review this stretch.` : '');
     }
     async function togglePlay() {
         playError = '';
         try { if (video.paused) await video.play(); else video.pause(); }
-        catch { playError = 'This video could not be played. Try its Download link.'; }
+        catch (error) { if (error?.name !== 'AbortError') playError = 'This video could not be played. Try its Download link.'; }
         sync();
     }
     const compose = () => { if (!writable || !duration()) return; video.pause(); onComment(range || { atS: Math.min(604800, video.currentTime || 0) }); };
