@@ -1,0 +1,66 @@
+name: Release pre-run
+
+# The release-only checks that need a macOS payload, run on a ref BEFORE its tag (#13015, after v2.0.40: its macOS builds
+# failed in `go test ./internal/tmux -run TestBundledPayloadSmoke`, a step that exists only in release.yml and skips
+# without a built payload, so no gate or dry run ran it).
+#
+# Manual only (workflow_dispatch), like linux-runner-dryrun.yml: no secrets, no `release` environment, no upload, no
+# signing. Each macOS job does what release.yml's build-macos-arm64 and build-macos-amd64 do up to their payload smoke:
+# the same runners, the same setup-go-macos and bundled-tmux actions (the payload is restored from main's cache with its
+# attestation checked, as a release does, or built from source), and the same test.
+#
+# Dispatch it on the gated head next to release-dryrun.yml:
+#   gh workflow run release-prerun.yml --ref ci/<version>
+#
+# What it does not run, and where those run instead: the Windows package and its smoke are built and run by
+# windows-tests.yml ("package and smoke", dispatchable); TestSignedMSIMatchesTheUpdatersPins needs the signed MSI;
+# signing, notarising and stapling need the release secrets; the Linux smokes are linux-runner-dryrun.yml.
+on:
+  workflow_dispatch:
+  push:
+    branches: [devops-prerun-try3]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-prerun-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CORAL_TELEMETRY_DISABLED: "1"
+
+jobs:
+  macos-payload-smoke:
+    name: macOS ${{ matrix.arch }} payload smoke
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      attestations: read # the cached tmux payload's attestation (bundled-tmux)
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: arm64, runner: macos-15, dist: macos-arm64 }
+          - { arch: x86_64, runner: macos-15-intel, dist: macos-amd64 }
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      # Go from go.dev, checksum-pinned, with main's Go caches restored only (as release.yml).
+      - uses: ./.github/actions/setup-go-macos
+        with:
+          cache: restore
+      - name: Sync agent docs
+        run: bash tools/sync-agent-docs.sh
+      - uses: ./.github/actions/bundled-tmux
+        with:
+          arch: ${{ matrix.arch }}
+          out: dist/${{ matrix.dist }}/tmux-payload
+      - name: Smoke test bundled tmux (${{ matrix.arch }})
+        working-directory: coral-go
+        env:
+          CORAL_BUNDLED_TMUX_BIN: ${{ github.workspace }}/dist/${{ matrix.dist }}/tmux-payload/bin/tmux
+          CORAL_BUNDLED_TMUX_TERMINFO: ${{ github.workspace }}/dist/${{ matrix.dist }}/tmux-payload/terminfo
+        run: go test ./internal/tmux -run '^TestBundledPayloadSmoke$' -count=1
