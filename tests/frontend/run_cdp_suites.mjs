@@ -177,7 +177,7 @@ const tmuxOnly = flag('--tmux');
 // TMUX_ONLY_SUITES drive tmux itself: they run only in the tmux phase (on pty they cannot pass). CROSS_SUITES run in the main run and again on tmux.
 const TMUX_ONLY_SUITES = [
   'terminal_pane_size_browser.test.js', 'terminal_fit_width_browser.test.js', 'terminal_gone_browser.test.js', 'terminal_gone_ws_browser.test.js', 'terminal_gone_asleep_browser.test.js',
-  'terminal_silent_socket_browser.test.js', 'terminal_reconnect_browser.test.js',
+  'terminal_silent_socket_browser.test.js', 'terminal_reconnect_browser.test.js', 'terminal_restart_replay_browser.test.js',
 ];
 const CROSS_SUITES = [
   'first_run_browser.test.js', 'terminal_backend_browser.test.js', 'tmux_first_run_browser.test.js', 'auto_wake_browser.test.js', 'kill_log_note_browser.test.js',
