@@ -200,11 +200,15 @@ func TestEveryOwnerRouteIsInTheTableWithATierAndAMode(t *testing.T) {
 		assert.Equal(t, r.Mode, mode, key)
 		assert.Equal(t, r.Tier, Classify(r.Method, p, ""), key)
 	}
-	// the update routes keep their label optional, everything that refuses a non-owner needs the label
-	_, m := OwnerRoute(http.MethodPost, UpdateRelaunchPath)
+	// the update status keeps its label optional (the handler decides what a non-owner sees); the relaunch, which installs and restarts a computer, refuses a non-owner before the handler and needs the label (#13258)
+	_, m := OwnerRoute(http.MethodGet, UpdateStatusPath)
 	assert.Equal(t, OwnerUpdate, m)
 	assert.False(t, m.LabelRequired())
 	assert.False(t, m.Refuses())
+	_, m = OwnerRoute(http.MethodPost, UpdateRelaunchPath)
+	assert.Equal(t, OwnerRefuse, m)
+	assert.True(t, m.LabelRequired())
+	assert.True(t, m.Refuses())
 	_, m = OwnerRoute(http.MethodGet, "/api/artifacts")
 	assert.True(t, m.LabelRequired())
 	assert.True(t, m.Refuses())
