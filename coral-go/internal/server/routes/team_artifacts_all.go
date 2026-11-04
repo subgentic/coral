@@ -152,7 +152,7 @@ func (h *BoardHandler) ListAllTeamArtifacts(w http.ResponseWriter, r *http.Reque
 	}
 	// The files of agents that belong to no team (their own Artifacts tab lists them, GET /api/session-artifacts) are one more "team" of this list, so the Inbox does not say 0 artifacts for a pasted
 	// screenshot that the agent's tab shows (#10312). Each file is listed once: one a team's list already holds is not repeated.
-	if len(teams) == 0 || wanted[noTeamLabel] {
+	if len(teams) == 0 || wanted[noTeamLabel] || wanted["No team"] {
 		if rows := h.standaloneUploadItems(r, items, projects); len(rows) > 0 {
 			for i := range rows {
 				rows[i].Team, rows[i].BoardID = noTeamLabel, noTeamBoardID // the board key a file for review is kept under (#13527): the Inbox reads the row as a review of that key

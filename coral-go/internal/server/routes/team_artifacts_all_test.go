@@ -230,6 +230,9 @@ func TestAllTeamArtifactsListsTheFilesOfAgentsWithoutATeam(t *testing.T) {
 
 	only := getAllTeamArtifacts(t, srv, "?team=Not+on+a+team", http.StatusOK)
 	require.Equal(t, []string{"screen.png"}, names(only.Artifacts), "the Team filter takes Not on a team")
+	legacy := getAllTeamArtifacts(t, srv, "?team=No+team", http.StatusOK)
+	require.Equal(t, []string{"screen.png"}, names(legacy.Artifacts), "an older Hub filter still finds the renamed group")
+	require.Equal(t, "Not on a team", legacy.Artifacts[0].Team)
 	notThem := getAllTeamArtifacts(t, srv, "?team=alpha", http.StatusOK)
 	require.NotContains(t, names(notThem.Artifacts), "screen.png", "a team's filter leaves the no-team files out")
 }
