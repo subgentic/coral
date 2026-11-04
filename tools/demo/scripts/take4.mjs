@@ -202,7 +202,9 @@ const B = {
     agent("Orchestrator", "coral-agent", "artifact", "reply", link, cid, goalComment.reply)
     await t.cap("The agent answers, and adds a task.")
     const seen = () => t.page.locator("text=" + goalComment.replyFind).first().waitFor({ state: "visible", timeout: 5000 }).then(() => true).catch(() => false)
-    if (!(await seen())) { await t.click(t.page.locator("text=Tasks >> visible=true").last()); await sleep(1200); await t.click(t.page.locator("text=Comments >> visible=true").last()); await seen() }   // the panel did not take the answer live: draw it again
+    let shown = await seen()
+    for (let k = 0; k < 3 && !shown; k++) { await t.click(t.page.locator("text=Tasks >> visible=true").last()); await sleep(1200); await t.click(t.page.locator("text=Comments >> visible=true").last()); shown = await seen() }   // the panel did not take the answer live: draw it again
+    if (!shown) { await shot(t, "c5-noreply"); throw new Error("the agent's answer never showed on the goal") }
     await sleep(4500)
     return t.finish()
   },
@@ -243,8 +245,15 @@ const B = {
     agent(live.agent, "coral-agent", "artifact", "reply", link, id, live.reply)
     agent(live.agent, "coral-agent", "artifact", "upload", S + "/work/live.md", "--name", live.name, "--new-version-of", link, "--tag", "for review", "--question", live.question2)
     await t.cap("The answer and a new version, within seconds.")
-    await t.page.locator(`text=${live.replyFind}`).first().waitFor({ state: "visible", timeout: 9000 }).catch(() => shot(t, "c7-noreply"))
-    await sleep(3000)
+    // the agent's answer must be on screen: wait for it, draw the panel again (Comments button) if it does not come, and fail the take rather than film a silent agent
+    const answered = () => t.page.locator(`text=${live.replyFind}`).first().waitFor({ state: "visible", timeout: 6000 }).then(() => true).catch(() => false)
+    let ok = await answered()
+    for (let k = 0; k < 3 && !ok; k++) { await t.click(t.page.getByRole("button", { name: /^Comments/ })); await sleep(900); await t.click(t.page.getByRole("button", { name: /^Comments/ })); await sleep(900); ok = await answered() }
+    if (!ok) { await shot(t, "c7-noreply"); throw new Error("the agent's answer never showed on screen") }
+    await sleep(3500)
+    await t.cap("And the new version, with what changed.")   // the version chip, then Compare
+    await t.click(t.page.getByRole("button", { name: /v\d+ of \d+/ }).first()); await sleep(1200)
+    await t.click(t.page.getByText(/Compare/).first()); await sleep(4500)
     return t.finish()
   },
   async c8() { // the agent's changes: the expanded diff
