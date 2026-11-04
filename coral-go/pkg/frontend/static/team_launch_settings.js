@@ -151,7 +151,7 @@ export function setTeamLaunchMode(mode) {
 export async function applyTeamBoardSettings(teamKey, board) {
     if (!board) return '';
     try {
-        const resp = await boardFetch(teamKey, '/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'Operator', ...board }) });
+        const resp = await boardFetch(teamKey, '/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'Operator', launch: true, ...board }) });
         if (resp.ok) return '';
         const names = { require_goal: 'Require a goal', goals_need_approval: 'goal approval', tasks_need_approval: 'task approval', health: 'the health check', cross_team_messaging: 'messaging', cross_team_artifacts: 'file sharing' };
         return `The team started, but these settings were not saved: ${Object.keys(board).map(k => names[k] || k).join(', ')}. Set them in Team settings.`;

@@ -173,6 +173,8 @@ func (h *BoardHandler) UpdateBoardSettings(w http.ResponseWriter, r *http.Reques
 		// HealthRaw takes the "health" key before the embedded update's own field can (the shallower field wins), so the update sees the request's own keys and a health body that names only
 		// some settings changes only those.
 		HealthRaw json.RawMessage `json:"health"`
+		// Launch says the save is the team launch's own: the dialog's choices applied once the board exists (team_launch_settings.js). That is how the team starts, not a change to tell its Orchestrator about (#13221).
+		Launch bool `json:"launch"`
 	}
 	if cloud.Tunneled(r) {
 		// Through Coral Hub this is the owner's alone, decided before the body is read (#5307), and the body is strict: one JSON object of at
@@ -375,7 +377,9 @@ func (h *BoardHandler) UpdateBoardSettings(w http.ResponseWriter, r *http.Reques
 		errInternalServer(w, err.Error())
 		return
 	}
-	noteSettingsChange(h.bs, r, project, priorSettings, settings)
+	if !(body.Launch && callerActor(r).Kind != ActorToken) { // an agent's token cannot silence the notice for its own change
+		noteSettingsChange(h.bs, r, project, priorSettings, settings)
+	}
 	listEditRefused = false
 	if hubRecorded {
 		// The change and its record are one or neither: if the record cannot be written the change is undone and the owner is told (the switch routes' rule, Security's #5572 condition 4).
