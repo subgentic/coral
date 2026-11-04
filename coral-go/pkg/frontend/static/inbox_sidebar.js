@@ -119,7 +119,7 @@ const $ = id => document.getElementById(id);
 /** The Hub-served dashboard's own Inbox (Goal #100, nativeInbox()): Needs you, Tasks and Saved are the Hub's own pages, drawn in the centre in a frame at the constant addresses below (the addresses coral-hub gave on the board, Oct 27);
  *  the chat folders are native, and so are Goals (GET /api/goals, a View route of every online computer) and Artifacts (GET /api/team-artifacts: a View route the Hub answers owner_only for a grantee, who then has no Artifacts folder, #11071). */
 const HUB_FRAMES = { needs: '/inbox/hub/needs', tasks: '/inbox/hub/tasks', saved: '/inbox/hub/saved' };
-const GROUPS = nativeInbox() ? [{ key: 'needs', label: 'Needs you', frame: HUB_FRAMES.needs }, { key: 'tasks', label: 'Tasks', frame: HUB_FRAMES.tasks }, { key: 'goals', label: 'Goals' }, { key: 'artifacts', label: 'Artifacts' }, { key: 'saved', label: 'Saved for later', frame: HUB_FRAMES.saved }].map(g => ({ ...g, search: g.frame ? 'Search the Inbox' : g.key === 'goals' ? 'Search goals' : 'Search artifacts', short: 'Search' })) : [
+const GROUPS = nativeInbox() ? [{ key: 'needs', label: 'Needs you', frame: HUB_FRAMES.needs }, { key: 'tasks', label: 'Tasks', frame: HUB_FRAMES.tasks }, { key: 'goals', label: 'Goals' }, { key: 'artifacts', label: 'Artifacts' }, { key: 'saved', label: 'Saved', frame: HUB_FRAMES.saved }].map(g => ({ ...g, search: g.frame ? 'Search the Inbox' : g.key === 'goals' ? 'Search goals' : 'Search artifacts', short: 'Search' })) : [
     { key: 'needs', label: 'Needs you', search: 'Search needs you', short: 'Search' },
     { key: 'tasks', label: 'Tasks', search: 'Search tasks', short: 'Search' },
     { key: 'goals', label: 'Goals', search: 'Search goals', short: 'Search' }, // the open goals of every team the person runs (GET /api/goals): the team page's goal row plus a Team column (#7776)
@@ -717,11 +717,18 @@ const navCurrent = () => (isPhoneLayout() && page?.kind === BOARDS_SUB ? BOARD_I
 const FOLDER_TIPS = { needs: 'Agents waiting for you: a question, a permission or a review', tasks: 'Tasks assigned to you', goals: 'The open goals of your teams', saved: 'Messages you saved for later', artifacts: 'Files agents shared', activity: 'What you did in Needs you' }; // one line each (#10074)
 // The Needs you number is the unread ones, and when the list holds more (read files are listed, not counted: #9277) it says so as the kind pills do, "1 of 4" (#12789, the Operator: "Needs you 0" over a table of read files). The welcome items are listed and never counted (#11622): they do not make it "0 of 5" on a new install.
 const needsCountSaid = () => { const unread = countOf('needs'), listed = allNeeds().filter(s => !s.welcome).length; return listed > unread ? `${unread} of ${listed}` : unread; };
-const folderSections = () => (nativeInbox() ? [{ title: 'Needs attention', items: GROUPS.filter(g => g.key !== 'artifacts' || !IA.artifactsOwnerOnly()).map(g => ({ key: g.key, label: g.label, count: g.key === 'goals' || g.key === 'artifacts' ? countOf(g.key) : undefined })) }, ...CH.chatSections(), ...boardSection()] : [{ title: 'Needs attention', items: [
-    { key: 'needs', label: 'Needs you', count: needsCountSaid(), alert: countOf('needs') > 0 }, { key: 'tasks', label: 'Tasks', count: countOf('tasks') },
-    { key: 'goals', label: 'Goals', count: countOf('goals') },
-    { key: 'saved', label: 'Saved', count: countOf('saved') }] },
-    { title: 'Files', items: [{ key: 'artifacts', label: 'Artifacts', count: countOf('artifacts') }] }, { title: 'History', items: [{ key: 'activity', label: 'Activity' }] }, ...CH.chatSections(), ...boardSection()]).map(section => ({ ...section, items: section.items.map(item => ({ ...item, tip: FOLDER_TIPS[item.key], icon: FOLDER_ICONS[item.key] || (item.key.startsWith(BOARD_ITEM) ? 'forum' : undefined) || (item.key.startsWith('chats-cli-') ? `cli:${item.key.slice(10)}` : undefined) })) }));
+/** The sidebar's groups, one list for this dashboard and the Hub-served one (#13256): Needs attention (Needs you, Tasks, Goals, Saved), Files (Artifacts), History (Activity), the same order and words. Under the Hub an entry shows only where the Hub serves it
+ *  (a native group in GROUPS: Artifacts not for a grantee, Activity not served today) and a Hub-frame page keeps no number of its own (the page says it). */
+const folderSections = () => {
+    const hub = nativeInbox(), shown = key => !hub || (GROUPS.some(g => g.key === key) && (key !== 'artifacts' || !IA.artifactsOwnerOnly())), framed = key => hub && !!GROUPS.find(g => g.key === key)?.frame;
+    const item = (key, label, count, extra) => shown(key) ? [{ key, label, count: framed(key) ? undefined : count, ...extra }] : [];
+    const sections = [
+        { title: 'Needs attention', items: [...item('needs', 'Needs you', needsCountSaid(), { alert: !hub && countOf('needs') > 0 }), ...item('tasks', 'Tasks', countOf('tasks')), ...item('goals', 'Goals', countOf('goals')), ...item('saved', 'Saved', countOf('saved'))] },
+        { title: 'Files', items: item('artifacts', 'Artifacts', countOf('artifacts')) },
+        { title: 'History', items: item('activity', 'Activity') },
+    ].filter(section => section.items.length);
+    return [...sections, ...CH.chatSections(), ...boardSection()].map(section => ({ ...section, items: section.items.map(item => ({ ...item, tip: FOLDER_TIPS[item.key], icon: FOLDER_ICONS[item.key] || (item.key.startsWith(BOARD_ITEM) ? 'forum' : undefined) || (item.key.startsWith('chats-cli-') ? `cli:${item.key.slice(10)}` : undefined) })) }));
+};
 let _navKey = null, _folders = null, _poll = 0;
 /** A folder was picked: a page that is open gives way, and the folder's table opens with the keyboard at its heading. */
 function pickFolder(key) {
