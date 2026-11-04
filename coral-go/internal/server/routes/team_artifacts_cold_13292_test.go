@@ -92,3 +92,75 @@ func TestWarmReadsEveryUploadDirectoryBeforeTheFirstRead(t *testing.T) {
 	}
 	require.EqualValues(t, 200, reads.Load(), "the first reads after it read no file")
 }
+
+// #13361 (the #13292 review's surviving mutants): each rule that decides a record file is NOT read again is pinned alone. A file counts as unchanged only when its size, its time and its age (not written in the last uploadDirSettle) all say so.
+func touchDir(t *testing.T, coral, sid string, at time.Time) {
+	t.Helper()
+	require.NoError(t, os.Chtimes(uploadsDir(coral, sid), at, at)) // the folder's time moved: it is listed again
+}
+
+func rewriteRecord(t *testing.T, coral, sid string, i int, name string, size int64, mtime time.Time) {
+	t.Helper()
+	id := fmt.Sprintf("%064x", i+1)
+	rec, _ := json.Marshal(agentUploadRecord{agentArtifactMeta: agentArtifactMeta{Name: name, MediaType: "text/markdown", Size: size, Digest: "sha256:" + id}, CreatedAt: "2026-10-01T10:00:00Z"})
+	p := filepath.Join(uploadsDir(coral, sid), id+".json")
+	require.NoError(t, os.WriteFile(p, rec, 0o644))
+	require.NoError(t, os.Chtimes(p, mtime, mtime))
+}
+
+func TestAChangedFolderRereadsAFileWrittenInTheLastMomentsAndOnlyThat(t *testing.T) {
+	coral := t.TempDir()
+	writeSettledUploads(t, coral, "sess-s", 0, 5)
+	// one record written just now (its file time is recent) inside a folder whose own time is old
+	rewriteRecord(t, coral, "sess-s", 2, "fresh.md", 3, time.Now())
+	old := time.Now().Add(-time.Hour)
+	touchDir(t, coral, "sess-s", old)
+	reads := countUploadReads(t)
+	var c uploadDirCache
+	require.Len(t, c.list(coral, "sess-s"), 5)
+	require.EqualValues(t, 5, reads.Load(), "cold: all five")
+	touchDir(t, coral, "sess-s", old.Add(time.Minute)) // the folder changed: listed again
+	require.Len(t, c.list(coral, "sess-s"), 5)
+	require.EqualValues(t, 6, reads.Load(), "the four settled files are reused and the one written in the last moments is read again (a mutant without the age rule reuses it: 5)")
+}
+
+func TestAFileWhoseSizeChangedIsReadAgainEvenWithTheSameTime(t *testing.T) {
+	coral := t.TempDir()
+	writeSettledUploads(t, coral, "sess-z", 0, 3)
+	old := time.Now().Add(-time.Hour)
+	reads := countUploadReads(t)
+	var c uploadDirCache
+	require.Len(t, c.list(coral, "sess-z"), 3)
+	require.EqualValues(t, 3, reads.Load())
+	st, err := os.Stat(filepath.Join(uploadsDir(coral, "sess-z"), fmt.Sprintf("%064x", 2)+".json"))
+	require.NoError(t, err)
+	rewriteRecord(t, coral, "sess-z", 1, "a-much-longer-name-than-before.md", 3, st.ModTime()) // a different size, the file's time put back to exactly what it was
+	touchDir(t, coral, "sess-z", old.Add(time.Minute))
+	got := c.list(coral, "sess-z")
+	require.EqualValues(t, 4, reads.Load(), "the size alone says it changed (a mutant that compares only the time reuses it: 3)")
+	var names []string
+	for _, u := range got {
+		names = append(names, u.rec.Name)
+	}
+	require.Contains(t, names, "a-much-longer-name-than-before.md")
+}
+
+func TestAFileWhoseTimeChangedIsReadAgainEvenWithTheSameSize(t *testing.T) {
+	coral := t.TempDir()
+	writeSettledUploads(t, coral, "sess-t", 0, 3)
+	old := time.Now().Add(-time.Hour)
+	reads := countUploadReads(t)
+	var c uploadDirCache
+	require.Len(t, c.list(coral, "sess-t"), 3)
+	require.EqualValues(t, 3, reads.Load())
+	// the same number of bytes (f1.md -> g1.md), a new settled time
+	rewriteRecord(t, coral, "sess-t", 1, "g1.md", 3, old.Add(10*time.Minute))
+	touchDir(t, coral, "sess-t", old.Add(time.Minute))
+	got := c.list(coral, "sess-t")
+	require.EqualValues(t, 4, reads.Load(), "the time alone says it changed (a mutant that compares only the size reuses it: 3)")
+	var names []string
+	for _, u := range got {
+		names = append(names, u.rec.Name)
+	}
+	require.Contains(t, names, "g1.md")
+}

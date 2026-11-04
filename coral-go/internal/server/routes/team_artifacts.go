@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -572,6 +573,12 @@ const uploadReadWorkers = 8
 // uploadWarmFolders is how many folders the start-up warm reads at once (each by uploadReadWorkers readers: 16 files open at most, Security's INFO on #13292).
 const uploadWarmFolders = 2
 
+// uploadRecordReads counts every record file that was read (the server's start-up test reads it through UploadRecordReads).
+var uploadRecordReads atomic.Int64
+
+// UploadRecordReads is how many upload record files have been read by this process so far (a test seam: the start-up warm reads them before any request).
+func UploadRecordReads() int64 { return uploadRecordReads.Load() }
+
 // uploadRecordReadHook runs once for each record file that is actually read (tests count them).
 var uploadRecordReadHook = func() {}
 
@@ -664,6 +671,7 @@ func (c *uploadDirCache) list(coralDir, sessionID string) []sessionUpload {
 // readUploadRecordFile reads and parses one record file: the file as read (its size and time are those before the read, so a write during it is read again next time).
 func readUploadRecordFile(dir, name string) uploadFileSig {
 	uploadRecordReadHook()
+	uploadRecordReads.Add(1)
 	path := filepath.Join(dir, name)
 	var sig uploadFileSig
 	if info, err := os.Stat(path); err == nil {
