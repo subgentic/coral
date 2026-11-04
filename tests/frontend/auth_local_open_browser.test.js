@@ -75,16 +75,63 @@ const ATTACK = {
     // Queries/hashes may carry sign-in credentials: timeout evidence needs target
     // identity and origin/path only, never those credentials.
     const safeUrl = raw => { try { const u = new URL(raw); u.search = ''; u.hash = ''; return ['http:', 'https:', 'about:'].includes(u.protocol) ? u.href : u.protocol + '<omitted>'; } catch { return '<unavailable>'; } };
-    const diagnostics = async page => {
+    const pageState = async page => {
+        try {
+            const [at, included, omitted] = await page.ev(`Promise.all([
+                Promise.resolve({url:location.href,title:document.title}),
+                fetch('${BASE}/api/system/status',{cache:'no-store',credentials:'include',signal:AbortSignal.timeout(3000)}).then(r=>r.status).catch(()=>null),
+                fetch('${BASE}/api/system/status',{cache:'no-store',credentials:'omit',signal:AbortSignal.timeout(3000)}).then(r=>r.status).catch(()=>null)
+            ])`);
+            return { url: safeUrl(at.url), title: at.title, includedStatus: included, cookieLessStatus: omitted };
+        } catch { return { url: '<unavailable>', title: '<unavailable>', includedStatus: null, cookieLessStatus: null }; }
+    };
+    const diagnostics = async (page, state = null) => {
         const { targetInfos } = await browser.Target.getTargets();
-        let url = '<unavailable>';
-        try { url = safeUrl(await page.ev('location.href')); } catch { /* detached or navigating */ }
-        return JSON.stringify({ targetId: page.targetId, url, targets: targetInfos.map(t => ({ targetId: t.targetId, type: t.type, url: safeUrl(t.url), browserContextId: t.browserContextId, attached: t.attached })) });
+        return JSON.stringify({ targetId: page.targetId, ...(state || await pageState(page)), targets: targetInfos.map(t => ({ targetId: t.targetId, type: t.type, url: safeUrl(t.url), browserContextId: t.browserContextId, attached: t.attached })) });
     };
     // A condition on this side (the events Chrome sent), polled: no fixed sleep.
     const until = async (fn, what, ms = 8000, page = null) => { const end = Date.now() + ms; while (Date.now() < end) { try { if (await fn()) return; } catch (e) { if (!isNavigationError(e)) throw e; } await sleep(25); } throw new Error('timed out waiting for ' + what + (page ? ': targets ' + await diagnostics(page) : '')); };
     const shownButton = p => p.ev(`(() => { const b = document.getElementById('local-open'); if (!b) return false; const r = b.getBoundingClientRect(); return r.width > 0 && r.height > 0 && !b.closest('[hidden]'); })()`);
     const localOpen = reqs => reqs.filter(r => r.method === 'POST' && r.url.startsWith('/auth/local'));
+    // Observe readiness and click in the SAME evaluate. The module can enable
+    // the button and then navigate away when loopback is open: a separate CDP
+    // readiness check followed by a click races that intended redirect.
+    const clickLocalOpen = async p => {
+        const deadline = Date.now() + 30000;
+        for (let attempt = 0; attempt < 2; attempt++) {
+            let result = null, error = null;
+            try {
+                const cap = Math.max(1, Math.min(15000, deadline - Date.now()));
+                result = await p.ev(`new Promise(resolve => {
+                    let observer, timer;
+                    const finish = value => { observer?.disconnect(); clearTimeout(timer); document.removeEventListener('readystatechange',check); resolve(value); };
+                    const check = () => {
+                        const b = document.getElementById('local-open');
+                        if (b && document.documentElement.dataset.authReady === 'true' && !b.disabled) { b.click(); finish(true); return true; }
+                        if (!b && document.readyState === 'complete') { finish(location.href); return true; }
+                        return false;
+                    };
+                    if (check()) return;
+                    observer = new MutationObserver(check);
+                    observer.observe(document,{subtree:true,childList:true,attributes:true,attributeFilter:['data-auth-ready','disabled']});
+                    document.addEventListener('readystatechange',check);
+                    timer = setTimeout(()=>finish(location.href),${cap});
+                })`);
+            } catch (e) { error = e; }
+            if (result === true) return;
+            const state = await pageState(p);
+            console.log('  local-open miss: ' + await diagnostics(p,state));
+            // A navigation can destroy the evaluate after its click already
+            // issued the POST. Never click twice in that case.
+            if (localOpen(p.reqs).length > 0) return;
+            if (state.includedStatus === 200 && state.cookieLessStatus === 401) throw new Error('session still alive after reset-password --clear: ' + await diagnostics(p,state));
+            let leftAuth = false;
+            try { const u = new URL(typeof result === 'string' ? result : state.url); leftAuth = u.origin === base.origin && !u.pathname.startsWith('/auth'); } catch { /* no usable URL */ }
+            if (attempt === 0 && leftAuth && Date.now() < deadline) { await p.c.Page.navigate({url:BASE+'/auth'}); continue; }
+            if (error && !isNavigationError(error)) throw error;
+            throw new Error('local-open was not clicked within its two-navigation cap: ' + await diagnostics(p,state));
+        }
+    };
     let failed = 0;
     const test = async (name, fn) => {
         try { await fn(); console.log(`  ok - ${name}`); } catch (e) { failed++; console.log(`  FAIL - ${name}: ${e.message}`); }
@@ -142,8 +189,7 @@ const ATTACK = {
                 const p = await freshPage();
                 const { c: own, ev } = p;
                 await own.Page.navigate({ url: BASE + '/auth' });
-                await until(async () => (await ev(`document.documentElement.dataset.authReady === 'true' && !!document.getElementById('local-open') && !document.getElementById('local-open').disabled && document.readyState === 'complete'`)) === true, 'the button handler in the suite tab', 30000, p);
-                await ev(`document.getElementById('local-open').click(), true`);
+                await clickLocalOpen(p);
                 await until(async () => (await ev(`location.origin === '${BASE}' && !location.pathname.startsWith('/auth') && document.readyState === 'complete'`)) === true, 'the suite tab to leave /auth', 30000, p);
                 assert.equal(await ev(`fetch('${BASE}/api/system/status', { cache: 'no-store' }).then(r => r.status)`), 200);
                 ownEv = ev;
@@ -151,12 +197,12 @@ const ATTACK = {
             await test('the button on /auth signs this browser in', async () => {
                 const p = await freshPage();
                 await p.c.Page.navigate({ url: BASE + '/auth' });
-                await p.waitFor(`document.documentElement.dataset.authReady === 'true' && !!document.getElementById('local-open') && !document.getElementById('local-open').disabled && document.readyState === 'complete'`, 'the button handler');
                 if (process.env.CORAL_TEST_STRICT !== '1') { console.log('  skipped here: only a strict shard (the runner sets CORAL_TEST_STRICT=1 there) gives this browser a 401 to turn into a 200; the strict shard asserts it'); return; } // the default-mode run of a STRICT_SUITES suite (#12907, Security's SHOULD: the skip depends on the shard, not on the answer)
+                await p.waitFor(`document.documentElement.dataset.authReady === 'true' && !!document.getElementById('local-open')`, 'the button handler');
                 assert.equal(await p.status(), 401, 'not signed in before');
                 const promised = await p.ev(`document.getElementById('local-open-note').textContent`); // #12834: the words match what the next screen does
                 assert.ok(/asks you to create a password/i.test(promised) && !/without a password/i.test(promised), 'the note says the password prompt comes next, and promises no way around it: ' + promised);
-                await p.ev(`document.getElementById('local-open').click(), true`);
+                await clickLocalOpen(p);
                 await until(() => localOpen(p.reqs).some(r => r.status), 'the answer to the button request');
                 const posts = localOpen(p.reqs);
                 assert.equal(posts.length, 1, JSON.stringify(p.reqs.map(r => r.method + ' ' + r.url)));
