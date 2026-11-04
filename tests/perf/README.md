@@ -113,3 +113,8 @@ are budgeted; unrelated renderer processes and nested duplicate tasks are exclud
 Set `TYPING_GATE=1` with `TYPING_TRACE=1` to fail the measurement and outer runner for a setup error or any task over 50 ms. Profiling is enabled
 in this mode, so retain machine/load details when comparing timings. The long-task attribution parser has light checks:
 `node --test tests/perf/typing_trace.test.mjs`. The default baseline run remains unchanged without these opt-in variables.
+
+Safety notes (Security's read of the rig, #13154): the scripts stop a tmux server only through `stop_private_tmux` in `bigboard_lib.sh`, which refuses any socket under a real Coral
+folder (`~/.coral`, `$CORAL_DIR`, any `.coral/`) or at a path that is not `<run folder>/data/tmux.sock`; a private socket made by the run's own server is exempt from the "no tmux
+kill-server" rule (#12836) because nothing else can be attached to it. `bigboard_serve.sh stop` stops a PID from `RUN_DIR/pid` only if its command line is a coral with that run's `--home`.
+The API keys go to curl through mode-600 header files, not the command line. The pprof listeners (`127.0.0.1:8744` and `:8747`) serve heap data to any local user while the run lasts.

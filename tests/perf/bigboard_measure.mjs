@@ -35,19 +35,34 @@ const fold = p => p.replace(/[0-9a-f]{64}/g, '{hex}').replace(/[0-9a-f]{8}-[0-9a
     .replace(/\/b-[a-z0-9]{6,}/g, '/{board}').replace(/\/agent-\d+/g, '/{agent}').replace(/\/\d+(?=\/|$)/g, '/{n}');
 const pct = (a, q) => { if (!a.length) return 0; const s = [...a].sort((x, y) => x - y); return s[Math.min(s.length - 1, Math.floor(q * s.length))]; };
 
-const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'bigboard-chrome.'));
-const chrome = spawn(chromePath, ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`, '--no-first-run', '--no-default-browser-check',
-    '--disable-gpu', '--window-size=1400,900', ...(process.env.CI ? ['--no-sandbox'] : []), 'about:blank'], { stdio: 'ignore' });
+// Chrome: a fresh profile per try, the flags an automated run wants (no keychain prompt, no updater or component update, no background networking), a 25 s deadline for the
+// DevTools port, and the spawned process killed by PID before the next try (a launch that hung once did not come back in 90 s: #13154's 9 tries in a row).
+const CHROME_FLAGS = ['--headless=new', '--remote-debugging-port=0', '--no-first-run', '--no-default-browser-check', '--disable-gpu', '--window-size=1400,900', '--use-mock-keychain', '--password-store=basic',
+    '--disable-background-networking', '--disable-component-update', '--no-service-autorun', '--disable-sync', ...(process.env.CI ? ['--no-sandbox'] : [])];
+let profile = '', chrome = null, chromeErr = '', chromeExit = '';
+const launchChrome = async () => {
+    for (let attempt = 1; attempt <= 4; attempt++) {
+        profile = fs.mkdtempSync(path.join(os.tmpdir(), 'bigboard-chrome.')); chromeErr = ''; chromeExit = '';
+        chrome = spawn(chromePath, [...CHROME_FLAGS, `--user-data-dir=${profile}`, 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
+        chrome.stderr.on('data', d => { chromeErr = (chromeErr + d).slice(-3000); });
+        chrome.on('exit', (c, sig) => { chromeExit = `exit ${c} ${sig}`; });
+        let port = 0;
+        for (const end = Date.now() + 25000; !port && Date.now() < end; await sleep(100)) {
+            try { port = Number(fs.readFileSync(path.join(profile, 'DevToolsActivePort'), 'utf8').split('\n')[0]) || 0; } catch {}
+        }
+        if (port) { if (attempt > 1) console.log('[measure] Chrome opened its DevTools port on try ' + attempt); return port; }
+        console.error(`[measure] Chrome try ${attempt}: no DevTools port in 25 s (${chromeExit || 'still running'}) ${chromeErr.split('\n').filter(l => /ERROR|FATAL/.test(l)).slice(0, 2).join(' | ').slice(0, 200)}`);
+        try { chrome.kill('SIGKILL'); } catch {}
+        await sleep(1500); try { fs.rmSync(profile, { recursive: true, force: true }); } catch {}
+    }
+    throw new Error('Chrome did not open its DevTools port in 4 tries');
+};
 let client;
 const done = async code => { try { await client?.close(); } catch {} try { chrome.kill('SIGTERM'); } catch {} await sleep(500); try { fs.rmSync(profile, { recursive: true, force: true }); } catch {} process.exit(code); };
 process.on('SIGINT', () => done(130));
 
 (async () => {
-    let port = 0;
-    for (const end = Date.now() + 30000; !port && Date.now() < end; await sleep(100)) {
-        try { port = Number(fs.readFileSync(path.join(profile, 'DevToolsActivePort'), 'utf8').split('\n')[0]) || 0; } catch {}
-    }
-    if (!port) throw new Error('Chrome did not open its DevTools port');
+    const port = await launchChrome();
     client = await CDP({ port });
     const { Page, Runtime, Network, Emulation } = client;
     await Promise.all([Page.enable(), Runtime.enable(), Network.enable()]);
@@ -70,6 +85,8 @@ process.on('SIGINT', () => done(130));
 
     // ── the load ──
     const token = TOKEN_FILE && fs.existsSync(TOKEN_FILE) ? fs.readFileSync(TOKEN_FILE, 'utf8').trim() : '';
+    // API_KEY_FILE: no sign-in at all, every request carries the server's API key (what an agent's own tools send); the pages and the API answer as for a signed-in browser
+    if (process.env.API_KEY_FILE) await Network.setExtraHTTPHeaders({ headers: { Authorization: 'Bearer ' + fs.readFileSync(process.env.API_KEY_FILE, 'utf8').trim() } });
     // sign in the way a person does: the locked page's "Open Coral on this computer" form (no token needed, so any number of runs on one server);
     // then the measured load starts from a cleared cache, signed in, as a first visit of the day
     await Page.navigate({ url: BASE + (token ? '/?login_token=' + token : '/') });
@@ -82,6 +99,9 @@ process.on('SIGINT', () => done(130));
     }
     await Network.clearBrowserCache();
     for (const k of rows.splice(0)) void k; reqs.clear(); started = 0;
+    // sidebar and tab counts as times: from the start of the page, the first moment each count says a number above 0 (polled every 50 ms in the page)
+    const COUNT_IDS = ['nav-tab-hub-inbox-badge', 'saved-tab-count', 'nav-tab-skills-badge', 'history-tasks-count', 'history-activity-count', 'team-agents-count'];
+    await Page.addScriptToEvaluateOnNewDocument({ source: `(() => { const ids = ${JSON.stringify(COUNT_IDS)}; window.__counts = {}; const tick = () => { for (const id of ids) { const e = document.getElementById(id); const t = e && e.textContent.trim(); if (t && /[1-9]/.test(t) && !(id in window.__counts)) window.__counts[id] = { ms: Math.round(performance.now()), text: t }; } }; setInterval(tick, 50); })();` });
     t0 = Date.now();
     await Page.navigate({ url: BASE + '/' });
     await Page.loadEventFired();
@@ -98,11 +118,30 @@ process.on('SIGINT', () => done(130));
     const settledMs = Date.now() - t0 - 1500;
     const nav = await ev(`(() => { const n = performance.getEntriesByType('navigation')[0]; const lcp = performance.getEntriesByType('largest-contentful-paint').pop(); const fcp = performance.getEntriesByName('first-contentful-paint')[0];
         return { domContentLoaded: n && n.domContentLoadedEventEnd, load: n && n.loadEventEnd, fcp: fcp && fcp.startTime, lcp: lcp && lcp.startTime }; })()`);
-    let out_interactions = {}; let idleEnd = 0;
+    let out_interactions = {}; let idleEnd = 0; const out_profiles = {};
+    const counts = await ev(`window.__counts || {}`);
+    // Needs you within 20 s of the load (coral-hub's worst case: the click comes while the page's own counts are still coming in): the Inbox tab and the first file, timed
+    const early = {};
+    if (Date.now() - t0 < 20000 || process.env.EARLY_ALWAYS) {
+        early.seconds_after_load_start = Math.round((Date.now() - t0) / 100) / 10;
+        phase = 'early';
+        const e1 = await ev(`(async () => { const t = performance.now(); const tab = document.getElementById('nav-tab-hub-inbox'); if (!tab) return { error: 'no inbox tab' }; tab.click();
+            const v = await new Promise(res => { const t0 = performance.now(); const tick = () => { if (document.querySelectorAll('#group-table-view tbody tr').length > 0) res(performance.now() - t0); else if (performance.now() - t0 > 30000) res(-1); else setTimeout(tick, 16); }; tick(); }); return v; })()`).catch(e => ({ error: String(e.message || e).slice(0, 120) }));
+        const e2 = await ev(`(async () => { const row = [...document.querySelectorAll('#group-table-view tbody tr')].find(r => r.querySelector('.inbox-review-name')); if (!row) return { error: 'no review row' };
+            const t0 = performance.now(); row.querySelector('.inbox-review-name').click(); return await new Promise(res => { const tick = () => { const e = document.getElementById('artifact-viewer-title'); if (e && e.offsetParent !== null && e.textContent.trim().length > 0) res(performance.now() - t0); else if (performance.now() - t0 > 30000) res(-1); else setTimeout(tick, 16); }; tick(); }); })()`).catch(e => ({ error: String(e.message || e).slice(0, 120) }));
+        early.ms_to_rows = typeof e1 === 'number' ? Math.round(e1) : e1; early.ms_row_click_to_viewer = typeof e2 === 'number' ? Math.round(e2) : e2; // -1: not within 30 s
+        // a fresh load for the idle minute (the Inbox is open now)
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await sleep(3000);
+    }
+    // ── profiles (PPROF_URL, PROFILE_PREFIX): a CPU profile of the server during the idle minute and one while an agent is open and polling (Backend Dev's #13182) ──
+    const PPROF = process.env.PPROF_URL, PREFIX = process.env.PROFILE_PREFIX, PROF_S = Number(process.env.PROFILE_S || 40);
+    const profile = async (label) => { if (!PPROF || !PREFIX) return null; try { const r = await fetch(`${PPROF}/debug/pprof/profile?seconds=${PROF_S}`); const b = Buffer.from(await r.arrayBuffer()); fs.writeFileSync(`${PREFIX}-${label}.pb.gz`, b); return b.length; } catch (e) { return String(e.message || e); } };
     // ── idle ──
     phase = 'idle'; const idleFrom = rows.length; const idleStarted = started;
     for (const r of reqs.values()) r.phase = 'load';
-    await sleep(IDLE_S * 1000);
+    const idleProf = profile('idle'); // runs for PROF_S seconds inside the idle minute (start it first: the profile call blocks that long)
+    await sleep(Math.max(IDLE_S, PROF_S + 2) * 1000);
+    out_profiles.idle = await idleProf;
     idleEnd = rows.length; phase = 'action';
 
     // ── interactions: each timed in the page (performance.now), one at a time, each in its own try so one broken selector leaves the others ──
@@ -172,6 +211,13 @@ process.on('SIGINT', () => done(130));
             const t = performance.now(); row.querySelector('.inbox-review-name').click(); return await window.__until(() => { const e = document.getElementById('artifact-viewer-title'); return e && e.offsetParent !== null && e.textContent.trim().length > 0; }, ${CAP}); })()`);
         return { ms_to_rows: typeof t1 === 'number' ? Math.round(t1) : t1, ms_row_click_to_viewer: typeof t2 === 'number' ? Math.round(t2) : t2, requests: rows.slice(m0).filter(r => !new URL(r.url).pathname.startsWith('/static/')).length };
     });
+    // the poll load: an agent open (the page polls it and its terminal) for PROF_S seconds, profiled
+    if (PPROF && PREFIX && live.length) {
+        await ev(`window.selectLiveSession(${JSON.stringify(live[0].name)}, ${JSON.stringify(live[0].type || 'claude')}, ${JSON.stringify(live[0].id)}, 'local'); true`);
+        const m0 = rows.length; const pp = profile('poll'); await sleep((PROF_S + 2) * 1000); out_profiles.poll = await pp;
+        const polls = rows.slice(m0).filter(r => /poll|capture|event|worktree/i.test(r.url)).length; out_profiles.poll_requests = polls;
+    }
+    if (PPROF && PREFIX) for (const k of ['mutex', 'block', 'heap']) { try { const r = await fetch(`${PPROF}/debug/pprof/${k}`); fs.writeFileSync(`${PREFIX}-${k}.pb.gz`, Buffer.from(await r.arrayBuffer())); } catch {} }
     out_interactions = interactions;
     // ── the table ──
     const by = new Map();
@@ -184,7 +230,7 @@ process.on('SIGINT', () => done(130));
     const routes = [...by.values()].map(o => ({ route: o.route, phase: o.phase, n: o.ms.length, p50: +pct(o.ms, 0.5).toFixed(1), p95: +pct(o.ms, 0.95).toFixed(1), max: +Math.max(...o.ms).toFixed(1),
         bytes: o.bytes, bytes_each: Math.round(o.bytes / o.ms.length), status: o.status })).sort((a, b) => b.p95 - a.p95);
     const out = { base: BASE, chrome: chromePath, at: new Date().toISOString(), load: { ready_rows: ready.rows, ms_to_agent_list: loadMs, ms_to_settled: settledMs, nav, requests: rows.filter(r => r.phase === 'load').length, static_files: rows.filter(r => new URL(r.url).pathname.startsWith('/static/')).length },
-        idle: { seconds: IDLE_S, requests: idleEnd - idleFrom }, routes, interactions: out_interactions };
+        idle: { seconds: IDLE_S, requests: idleEnd - idleFrom }, routes, interactions: { ...out_interactions, sidebar_counts_first_nonzero: counts, needs_you_early: early }, profiles: out_profiles };
     fs.writeFileSync(OUT, JSON.stringify(out, null, 1));
     console.log(JSON.stringify({ load: out.load, idle: out.idle }));
     for (const r of routes.slice(0, 14)) console.log(`${r.phase.padEnd(5)} ${String(r.p95).padStart(8)} ms p95 ${String(r.p50).padStart(8)} p50 ${String(r.max).padStart(8)} max  n=${String(r.n).padStart(3)}  ${String(r.bytes_each).padStart(8)} B  ${r.route}`);

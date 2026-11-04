@@ -21,6 +21,7 @@ mkdir -p "$OUT"; OUT="$(cd "$OUT" && pwd)"
 source "$HERE/typing_measure_gate.sh"
 typing_gate_failed=0
 source "$HERE/../lib/mock_sandbox.sh"
+source "$HERE/bigboard_lib.sh"
 log() { echo "[bigboard-run] $*"; }
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/bigboard-run.XXXXXX")" || exit 1
 PIDS=()
@@ -28,7 +29,7 @@ cleanup() {
   for p in ${PIDS[@]+"${PIDS[@]}"}; do kill "$p" 2>/dev/null; done
   for _ in $(seq 60); do alive=0; for p in ${PIDS[@]+"${PIDS[@]}"}; do kill -0 "$p" 2>/dev/null && alive=1; done; [[ $alive == 0 ]] && break; sleep 0.5; done
   for p in ${PIDS[@]+"${PIDS[@]}"}; do kill -9 "$p" 2>/dev/null; done
-  [[ -S "$WORK/data/tmux.sock" ]] && tmux -S "$WORK/data/tmux.sock" kill-server 2>/dev/null
+  stop_private_tmux "$WORK/data/tmux.sock"
   sleep 1; rm -rf -- "$WORK"; coral_test_sandbox_cleanup
 }
 trap cleanup EXIT
@@ -48,14 +49,26 @@ start() {  # start NAME BINARY DATADIR PORT [extra flags]: starts a server, sets
   printf '%s: health after %.1f s\n' "$name" "$(awk -v a="$(date +%s.%N)" -v b="$t0" 'BEGIN{print a-b}')" | tee -a "$OUT/startup.txt"
 }
 
+measure() {  # measure LOGFILE ENV... -- ARGS: runs bigboard_measure.mjs, up to 3 tries (a headless Chrome sometimes does not open its DevTools port while the Mac is busy)
+  local log="$1"; shift; local try rc=1
+  for try in 1 2 3; do
+    env PERF_RUN=1 "$@" > "$log" 2>&1; rc=$?
+    [[ $rc == 0 ]] && break
+    echo "measure try $try failed (exit $rc): $(grep -m1 'Error' "$log" | cut -c1-120)"; sleep 5
+  done
+  return $rc
+}
 { echo "commit $(cat "$FIXTURE/commit.txt")"; echo "load $(uptime | sed 's/.*load averages*: //')"; sysctl -n machdep.cpu.brand_string 2>/dev/null; } > "$OUT/machine.txt"
 log "copying the fixture data"
 cp -R "$FIXTURE/data" "$WORK/data"
 rm -f "$WORK/data/coral-server.lock" "$WORK/data/login_token"
+PPROF_PORT="${PPROF_PORT:-8744}"
+export CORAL_PPROF_ADDR="127.0.0.1:$PPROF_PORT"; [[ -n "${DEBUG_PHASES:-}" ]] && export CORAL_DEBUG_PHASES=1   # the measured server only (the hub must not bind the same address)
 start local "$FIXTURE/bin/coral" "$WORK/data" "$PORT"
+unset CORAL_PPROF_ADDR CORAL_DEBUG_PHASES
 SRV=$LAST_PID
-KEY="$(tr -d '[:space:]' < "$WORK/data/api_key")"
-api() { local m="$1" p="$2"; shift 2; command curl -s -m 120 -X "$m" "http://127.0.0.1:$PORT$p" -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" "$@"; }
+KEY="$(tr -d '[:space:]' < "$WORK/data/api_key")"; write_auth_header "$WORK/auth.hdr" "$KEY"
+api() { local m="$1" p="$2"; shift 2; command curl -s -m 120 -X "$m" "http://127.0.0.1:$PORT$p" -H @"$WORK/auth.hdr" -H "Content-Type: application/json" "$@"; }
 # LIVE: the counts of live mock agents (in tmux, working in the fixture's big repo) the page is measured at; each step adds agents to the server it is on
 LIVE="${LIVE:-0 30}"; launched=0; LAST_N=0
 for n in $LIVE; do
@@ -69,7 +82,11 @@ for n in $LIVE; do
   api GET /api/sessions/live | python3 -I -c 'import sys,json; d=json.load(sys.stdin); r=d if isinstance(d,list) else d.get("sessions",[]); print("live rows:", len(r), "sleeping:", sum(1 for x in r if x.get("sleeping")))' | tee -a "$OUT/machine.txt"
   sleep 5
   log "measuring locally with $n live agents (idle ${IDLE_S}s)"
-  run_bigboard_measure "local-$n" "$OUT/local-$n.log" env PERF_RUN=1 IDLE_S="$IDLE_S" node "$HERE/bigboard_measure.mjs" "http://127.0.0.1:$PORT" "" "$OUT/local-$n.json" || typing_gate_failed=1
+  if [[ "${TYPING_TRACE:-}" == 1 ]]; then
+    run_bigboard_measure "local-$n" "$OUT/local-$n.log" env PERF_RUN=1 API_KEY_FILE="$WORK/data/api_key" IDLE_S="$IDLE_S" PPROF_URL="http://127.0.0.1:$PPROF_PORT" PROFILE_PREFIX="$OUT/cpu-$n-agents" node "$HERE/bigboard_measure.mjs" "http://127.0.0.1:$PORT" "" "$OUT/local-$n.json" || typing_gate_failed=1
+  else
+    measure "$OUT/local-$n.log" API_KEY_FILE="$WORK/data/api_key" IDLE_S="$IDLE_S" PPROF_URL="http://127.0.0.1:$PPROF_PORT" PROFILE_PREFIX="$OUT/cpu-$n-agents" node "$HERE/bigboard_measure.mjs" "http://127.0.0.1:$PORT" "" "$OUT/local-$n.json"; echo "local-$n measure exit=$?"
+  fi
   ps -o rss= -p "$SRV" | awk -v n="$n" '{printf "server RSS at %s live agents: %.0f MB\n", n, $1/1024}' | tee -a "$OUT/machine.txt"
   LAST_N=$n
 done
@@ -78,12 +95,17 @@ if [[ "${HUB:-}" == 1 ]]; then
   mkdir -p "$WORK/hub"
   start hub "$FIXTURE/bin/coral" "$WORK/hub" "$HUBPORT" --hub
   HUBKEY="$(tr -d '[:space:]' < "$WORK/hub/api_key")"
-  code=$(curl -s -m 60 -o "$OUT/hub-add.json" -w '%{http_code}' -X POST "http://127.0.0.1:$HUBPORT/api/servers" -H "Authorization: Bearer $HUBKEY" -H 'Content-Type: application/json' \
-    -d "{\"id\":\"bigboard\",\"label\":\"bigboard\",\"url\":\"http://127.0.0.1:$PORT\",\"api_key\":\"$KEY\",\"allow_private\":true}")
+  write_auth_header "$WORK/hub-auth.hdr" "$HUBKEY"   # the keys go in files, not on curl's command line (another account's ps could read them)
+  ( umask 077; printf '{"id":"bigboard","label":"bigboard","url":"http://127.0.0.1:%s","api_key":"%s","allow_private":true}' "$PORT" "$KEY" > "$WORK/hub-add.body" )
+  code=$(curl -s -m 60 -o "$OUT/hub-add.json" -w '%{http_code}' -X POST "http://127.0.0.1:$HUBPORT/api/servers" -H @"$WORK/hub-auth.hdr" -H 'Content-Type: application/json' -d @"$WORK/hub-add.body")
   log "hub add server: HTTP $code"; head -c 300 "$OUT/hub-add.json"; echo
   sleep 5
   log "measuring through the hub with $LAST_N live agents (idle ${IDLE_S}s)"
-  run_bigboard_measure hub "$OUT/hub.log" env PERF_RUN=1 IDLE_S="$IDLE_S" node "$HERE/bigboard_measure.mjs" "http://127.0.0.1:$HUBPORT" "$WORK/hub/login_token" "$OUT/hub-$LAST_N.json" || typing_gate_failed=1
+  if [[ "${TYPING_TRACE:-}" == 1 ]]; then
+    run_bigboard_measure hub "$OUT/hub.log" env PERF_RUN=1 API_KEY_FILE="$WORK/hub/api_key" IDLE_S="$IDLE_S" node "$HERE/bigboard_measure.mjs" "http://127.0.0.1:$HUBPORT" "$WORK/hub/login_token" "$OUT/hub-$LAST_N.json" || typing_gate_failed=1
+  else
+    measure "$OUT/hub.log" IDLE_S="$IDLE_S" node "$HERE/bigboard_measure.mjs" "http://127.0.0.1:$HUBPORT" "$WORK/hub/login_token" "$OUT/hub-$LAST_N.json"; echo "hub measure exit=$?"
+  fi
 fi
 python3 -I "$HERE/bigboard_table.py" "$OUT" > "$OUT/ranked.md" && head -40 "$OUT/ranked.md"
 log "results in $OUT"
