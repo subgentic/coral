@@ -134,7 +134,7 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if askAboutHomeFolder(w, r, body.WorkingDir, body.HomeFolderAsk, body.ConfirmHomeFolder) {
-		attempt.Finish(tracking.OutcomeFailure, tracking.FailInvalidRequest, 0, 1)
+		attempt.Finish(tracking.OutcomeFailure, tracking.FailHomeFolderAsked, 0, 1)
 		return
 	}
 	slog.Info("launch request received",

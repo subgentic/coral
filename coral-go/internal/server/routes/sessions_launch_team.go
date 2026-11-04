@@ -209,7 +209,7 @@ func (h *SessionsHandler) LaunchTeam(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if askAboutHomeFolder(w, r, body.WorkingDir, body.HomeFolderAsk, body.ConfirmHomeFolder) {
-		attempt.Finish(tracking.OutcomeFailure, tracking.FailInvalidRequest, 0, len(body.Agents))
+		attempt.Finish(tracking.OutcomeFailure, tracking.FailHomeFolderAsked, 0, len(body.Agents))
 		takeBoardBack() // the question comes before anything is made: the board a new name made goes again
 		return
 	}

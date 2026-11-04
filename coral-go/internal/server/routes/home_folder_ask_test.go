@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
@@ -95,8 +96,8 @@ func TestWakeInTheHomeFolderAsksTheDashboardOnce(t *testing.T) {
 	ctx := context.Background()
 	const id = "6682ebdf-65a4-4396-8ef3-26ead8208b8a"
 	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: id, AgentType: "claude", AgentName: "cknorowski", WorkingDir: home, IsSleeping: 1}))
-	wake := func(query string, wrap func(*http.Request) *http.Request) *httptest.ResponseRecorder {
-		req := httptest.NewRequest(http.MethodPost, "/api/sessions/live/"+id+"/wake"+query, nil)
+	wake := func(body string, wrap func(*http.Request) *http.Request) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodPost, "/api/sessions/live/"+id+"/wake", strings.NewReader(body))
 		rctx := chi.NewRouteContext()
 		rctx.URLParams.Add("sessionID", id)
 		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
@@ -109,12 +110,12 @@ func TestWakeInTheHomeFolderAsksTheDashboardOnce(t *testing.T) {
 		defer term.mu.Unlock()
 		return term.sessions[naming.SessionName("claude", id)] != nil
 	}
-	rec := wake("?home_folder_ask=1", asDashCookie13425)
+	rec := wake(`{"home_folder_ask":true}`, asDashCookie13425)
 	assert.Equal(t, http.StatusConflict, rec.Code, rec.Body.String())
 	assert.Contains(t, rec.Body.String(), homeFolderCode)
 	assert.False(t, started(), "nothing started")
 
-	rec = wake("?home_folder_ask=1&confirm_home_folder=1", asDashCookie13425)
+	rec = wake(`{"home_folder_ask":true,"confirm_home_folder":true}`, asDashCookie13425)
 	assert.Contains(t, rec.Body.String(), `"ok":true`, rec.Body.String())
 	assert.True(t, started())
 }

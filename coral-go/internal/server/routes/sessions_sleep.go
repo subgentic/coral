@@ -243,7 +243,13 @@ func (h *SessionsHandler) WakeSession(w http.ResponseWriter, r *http.Request) {
 	if dir := h.teamHomeFolder(ctx, sess); dir != "" {
 		wakeDir = dir
 	}
-	if askAboutHomeFolder(w, r, wakeDir, r.URL.Query().Get("home_folder_ask") == "1", r.URL.Query().Get("confirm_home_folder") == "1") {
+	// Asked and confirmed in the POST body, as a launch does (the Hub's tunnel refuses a query it does not list): an empty or other body is an older page, which is never asked.
+	var ask struct {
+		HomeFolderAsk     bool `json:"home_folder_ask"`
+		ConfirmHomeFolder bool `json:"confirm_home_folder"`
+	}
+	_ = decodeJSONLimit(r, &ask, 4096)
+	if askAboutHomeFolder(w, r, wakeDir, ask.HomeFolderAsk, ask.ConfirmHomeFolder) {
 		return
 	}
 	if err := h.wakeExistingSession(ctx, sess); err != nil {
