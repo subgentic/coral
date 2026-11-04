@@ -148,7 +148,11 @@ func (s *Store) SetArtifactTags(ctx context.Context, boardID, hex string, tags [
 			return err
 		}
 	}
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	s.NoteArtifactsChanged(boardID)
+	return nil
 }
 
 // AddArtifactTags adds tags (already cleaned) to the object's tags on the board, up to MaxArtifactTags in all and MaxBoardArtifactTagRows on the board: what is over is left off. It reports the object's tags after.
@@ -186,6 +190,7 @@ func (s *Store) AddArtifactTags(ctx context.Context, boardID, hex string, add []
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
+	s.NoteArtifactsChanged(boardID)
 	sort.Strings(have)
 	return have, nil
 }

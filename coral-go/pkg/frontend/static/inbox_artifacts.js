@@ -1,4 +1,5 @@
-import { readInboxArtifacts, artifactsOwnerOnlyEverywhere } from './inbox_servers.js';
+import { onArtifactsRev } from './artifacts_feed.js';
+import { readInboxArtifacts, artifactsOwnerOnlyEverywhere, inboxArtifactsUnchanged } from './inbox_servers.js';
 import { teamLabel } from './server_status.js';
 /* The Inbox's Artifacts folder (Goal #62): every file the agents of every team made, in one list, as the team page's Artifacts tab draws it (team_artifacts_page.js, its search, Filters and
  * table) with a Team filter and column, and the document in a pane on the page's right: a click on a row opens it there and the list stays. The server merges the teams (GET /api/team-artifacts);
@@ -25,15 +26,19 @@ export const artifactsOwnerOnly = () => artifactsOwnerOnlyEverywhere();
 
 /** Read the count without drawing the page (the Inbox was opened): a request for one row, at most one in 30 seconds and one at a time. The Artifacts list tells the
  *  folder its own count whenever it reads (hooks below), which is the "refreshed on change". */
+let countSnapshot = null;
+onArtifactsRev(() => { countAt = 0; });
 export function refreshArtifactCount(done) {
     if (done) onCount = done;
     if (count !== null && Date.now() - countAt < COUNT_FRESH_MS) return counting || Promise.resolve();
     if (counting) return counting;
     counting = (async () => {
         try {
+            if (count !== null && await inboxArtifactsUnchanged(countSnapshot)) { countAt = Date.now(); return; }
             const hidden = artifactsOwnerOnly();
             const d = await readInboxArtifacts(new URLSearchParams({limit:'1', versions:'newest'}));
             if (d.waiting) return; // the list of computers has not loaded: nothing was read
+            countSnapshot = d.artifact_revisions || null;
             countAt = Date.now();
             let changed = hidden !== artifactsOwnerOnly(); // the folder went (every computer refused)
             const lower = d.expected > d.answered && count !== null && d.all < count; // some computers did not answer: a sum of the others does not take the count down (#12672); the list says which are missing

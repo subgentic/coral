@@ -169,6 +169,7 @@ func (s *Store) DecideArtifactReview(ctx context.Context, boardID, hex, state st
 	if err := tx.Commit(); err != nil {
 		return ch, nil, err
 	}
+	s.NoteArtifactsChanged(boardID)
 	ch.Changed = true
 	return ch, tags, nil
 }
@@ -210,6 +211,7 @@ func (s *Store) UndoArtifactReview(ctx context.Context, ch ReviewChange) error {
 	if err := tx.Commit(); err != nil {
 		return err
 	}
+	s.NoteArtifactsChanged(ch.board)
 	if m, ok := activityOf(ctx); ok { // the decision was rolled back (the agent could not be told): the record says so, as one more row
 		_ = s.RecordActivity(ctx, m, ActUndone, "file", ch.hex, ch.hex, ch.board)
 	}
@@ -253,7 +255,11 @@ func (s *Store) SupersedeArtifactReview(ctx context.Context, boardID, hex string
 		ON CONFLICT(board_id, hex) DO UPDATE SET state = excluded.state, at = excluded.at`, boardID, hex, ReviewSuperseded, now.UTC().Format(time.RFC3339)); err != nil {
 		return false, err
 	}
-	return true, tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return false, err
+	}
+	s.NoteArtifactsChanged(boardID)
+	return true, nil
 }
 
 // IgnoreArtifactReview takes an artifact out of Needs you with no verdict (#11552): "for review" is replaced by "ignored" and every other tag stays (read, changes requested), so Unignore (on false) puts
@@ -306,6 +312,7 @@ func (s *Store) IgnoreArtifactReview(ctx context.Context, boardID, hex string, i
 	if err := tx.Commit(); err != nil {
 		return ch, nil, err
 	}
+	s.NoteArtifactsChanged(boardID)
 	ch.Changed = true
 	return ch, tags, nil
 }
@@ -354,6 +361,7 @@ func (s *Store) SaveArtifactReview(ctx context.Context, boardID, hex string, sav
 	if err := tx.Commit(); err != nil {
 		return ch, nil, err
 	}
+	s.NoteArtifactsChanged(boardID)
 	ch.Changed = true
 	return ch, tags, nil
 }

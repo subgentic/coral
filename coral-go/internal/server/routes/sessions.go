@@ -354,6 +354,7 @@ func defaultModelFromSettings(settings map[string]string, agentType, requestMode
 
 // NewSessionsHandler creates a SessionsHandler with the given dependencies.
 func NewSessionsHandler(db *store.DB, cfg *config.Config, backend ptymanager.TerminalBackend, terminal ptymanager.SessionTerminal, bs *board.Store) *SessionsHandler {
+	bindArtifactRevisions(cfg.CoralDir(), bs)
 	reader := jsonl.NewSessionReader()
 	return &SessionsHandler{
 		currentDir:      background.NewCurrentDirFinder(reader.CurrentDirectory),

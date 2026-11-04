@@ -1,3 +1,4 @@
+import { artifactRevision, artifactsUnchanged } from './artifacts_feed.js';
 /* The Inbox's source identity and shared Server controls. No requests run at module load. */
 import { state } from './state.js';
 import { splitKey, serverFetch, identityKey, isCloud } from './server_base.js';
@@ -58,7 +59,7 @@ export async function readInboxArtifacts(params, filters = {}, signal) {
         if (!response.ok) throw Object.assign(new Error(`${serverLabel(server)} artifacts could not be read (${response.status}).`), { server });
         const data = await response.json();
         if (!Array.isArray(data.artifacts)) throw Object.assign(new Error(`${serverLabel(server)} sent an answer this page does not understand.`), { server });
-        return { ...data, server, versionless, artifacts: data.artifacts.map(row => ({ ...row, server, board_id: identityKey(server, row.board_id) })),
+        return { ...data, artifacts_board: data.artifacts_board ? identityKey(server, data.artifacts_board) : null, server, versionless, artifacts: data.artifacts.map(row => ({ ...row, server, board_id: identityKey(server, row.board_id) })),
             teams: (data.teams || []).map(row => ({ ...row, board_id: identityKey(server, row.board_id) })),
             offset: (prior?.offset || 0) + data.artifacts.length, cursor: data.next_cursor || '', done: !data.has_more };
     }));
@@ -78,9 +79,22 @@ export async function readInboxArtifacts(params, filters = {}, signal) {
         throw new Error(bad.length === 1 && failed.length === 1 ? bad[0].message : `Artifacts could not be read from ${failed.map(serverLabel).join(', ')}.`);
     }
     const next = Object.fromEntries(results.map(({ artifacts, ...data }) => [data.server, data]));
-    return { artifacts: results.flatMap(d => d.artifacts), teams: results.flatMap(d => d.teams || []),
+    return { artifact_revisions: Object.fromEntries(results.filter(d => !d.failed && !d.ownerOnly).map(d => [d.server, { rev: artifactRevision(d.artifacts_rev), team: d.artifacts_board || d.teams?.find(t => t.board_id)?.board_id }])),
+        artifacts: results.flatMap(d => d.artifacts), teams: results.flatMap(d => d.teams || []),
         all: results.reduce((n,d) => n + (d.all || 0), 0), total: results.reduce((n,d) => n + (d.total || 0), 0),
         tag_counts: results.reduce((counts,d) => { for (const [tag,n] of Object.entries(d.tag_counts || {})) counts[tag] = (counts[tag] || 0) + n; return counts; }, Object.create(null)),
         has_more: results.some(d => !d.done), next_cursor: JSON.stringify(next), truncated: results.some(d => d.truncated),
         failed: [...new Set(failed)], answered: read.length, expected, versionless: results.filter(d => d.versionless).map(d => d.server) };
+}
+
+/** Only a complete snapshot of the currently online sources can suppress a read.
+ * Empty/legacy sources have no board status token, so retain the old fallback. */
+export async function inboxArtifactsUnchanged(snapshot) {
+    const sources = inboxSources().filter(id => !ownerOnly.has(id));
+    if (!snapshot || sources.length !== Object.keys(snapshot).length) return false;
+    const matches = await Promise.all(sources.map(id => {
+        const s = snapshot[id];
+        return s?.team && artifactRevision(s.rev) !== null ? artifactsUnchanged(s.team, s.rev, true) : false;
+    }));
+    return matches.every(Boolean);
 }

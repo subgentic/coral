@@ -44,3 +44,29 @@ assert.equal(M.reviewErrors().length,1);
 failRead=false; artifacts=[]; await M.refreshReviews(true);
 assert.equal(M.reviewItems().length,0,'deletion removes rows at next refresh');
 console.log('inbox_reviews: ok');
+
+// A discarded scan must not certify its unapplied payload as fresh (#13293).
+let token = 100, rows = [row(301)], hold = false, resolveList, sawList;
+let heldList = new Promise(resolve => { sawList = resolve; });
+globalThis.fetch = async url => {
+    const u = new URL(url, 'http://localhost');
+    if (u.pathname === '/api/board/projects') return Response.json([{ project: 'a' }]);
+    if (u.pathname.endsWith('/status')) return Response.json({ artifacts_rev: token });
+    const data = { artifacts: u.searchParams.get('tag') === 'saved' ? [] : rows.slice(), has_more: false, artifacts_rev: token };
+    if (hold && u.searchParams.get('tag') !== 'saved') {
+        hold = false; sawList(); await new Promise(resolve => { resolveList = resolve; });
+    }
+    return Response.json(data);
+};
+await M.refreshReviews(true);
+rows.push(row(302)); token++; hold = true;
+const discarded = M.refreshReviews(true);
+await heldList;
+M.settleReview(M.reviewItems()[0]);
+resolveList(); await discarded;
+assert.ok(!M.reviewItems().some(a => a.id === row(302).id), 'the superseded scan was discarded');
+const realNow = Date.now;
+Date.now = () => realNow() + 31000;
+try { await M.refreshReviews(); } finally { Date.now = realNow; }
+assert.ok(M.reviewItems().some(a => a.id === row(302).id), 'a discarded scan cannot suppress the next background read of unapplied rows');
+console.log('inbox_reviews: discarded revision is not cached');
