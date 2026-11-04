@@ -224,13 +224,18 @@ export async function requestInstall(version) {
 
 /** The saved "Coral Hub may relaunch this Coral" switch, or null when it can't be read (the status of the update has no such field; the connector's does). */
 export async function fetchHubRelaunch() {
+    hubRelaunchAtLaunch = false;
     try {
         const resp = await fetch(ROUTES.cloudStatus);
         if (!resp.ok) return null;
-        const v = (await resp.json()).hub_relaunch_updates;
+        const d = await resp.json(), v = d.hub_relaunch_updates;
+        hubRelaunchAtLaunch = v === true && d.hub_relaunch_updates_at_launch === true; // the switch is on because the server was started with --allow-hub-update / CORAL_ALLOW_HUB_UPDATE (#13258)
         return typeof v === 'boolean' ? v : null;
     } catch { return null; }
 }
+let hubRelaunchAtLaunch = false;
+/** Whether the switch the last fetchHubRelaunch read was set at launch (Settings says "On (set at launch)"). */
+export const hubRelaunchSetAtLaunch = () => hubRelaunchAtLaunch;
 
 /** Ask the updater to look for a release now (false when the server has no such route). */
 export async function requestCheckNow() {

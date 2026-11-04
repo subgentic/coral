@@ -8,8 +8,8 @@ import { copyText, showToast } from './utils.js';
 import { isCloud } from './server_base.js';
 import { mountSettingsView } from './settings_view.js';
 import { el as mk } from './dom_el.js'; // the pane's rows (a startup module: the Settings rows draw from it)
-const { actName, releaseNotesUrl, RELEASES_REPO, ageTier, canStart, installsLocally, notAvailable, reasonText, notReadyText, foundText, fetchHubRelaunch, requestCheckNow, savePrefs, saveChannel, saveAutoInstall, serverHas } = await importOnce('./update_api.js');
-const { HUB_RELAUNCH_ON, HUB_RELAUNCH_OFF, HUB_RELAUNCH_WINDOWS } = await importOnce('./update_words.js');
+const { actName, releaseNotesUrl, RELEASES_REPO, ageTier, canStart, installsLocally, notAvailable, reasonText, notReadyText, foundText, fetchHubRelaunch, hubRelaunchSetAtLaunch, requestCheckNow, savePrefs, saveChannel, saveAutoInstall, serverHas } = await importOnce('./update_api.js');
+const { HUB_RELAUNCH_ON, HUB_RELAUNCH_OFF, HUB_RELAUNCH_WINDOWS, HUB_RELAUNCH_AT_LAUNCH } = await importOnce('./update_words.js');
 const { failureNotice, getUpdateStatus, refreshUpdateStatus, relaunchOffered } = await importOnce('./update_ui.js');
 
 
@@ -176,7 +176,7 @@ export async function showUpdatesPane() {
         fields.push({
             key: 'hub_relaunch', type: 'custom', label: 'Relaunch from Coral Hub',
             // On Windows Coral Hub cannot install at all (the install asks the person here): the sentence says so and there is no switch to change (#7338)
-            help: windowsInstall(s) ? HUB_RELAUNCH_WINDOWS : hubOn ? HUB_RELAUNCH_ON : HUB_RELAUNCH_OFF,
+            help: windowsInstall(s) ? HUB_RELAUNCH_WINDOWS : hubOn ? (hubRelaunchSetAtLaunch() ? HUB_RELAUNCH_AT_LAUNCH : HUB_RELAUNCH_ON) : HUB_RELAUNCH_OFF,
             render: slot => {
                 if (windowsInstall(s)) return;
                 const go = mk('button', 'btn btn-small', 'Change in Network and Hub'); go.type = 'button';
