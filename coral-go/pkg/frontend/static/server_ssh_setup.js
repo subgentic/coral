@@ -153,8 +153,28 @@ export function mountSshSetup(host, { mode = 'setup', server = null, action = nu
         draw();
     }
 
+    /** Whether the main button (Set up, Upgrade, Remove) must stay closed. EVERY gate is read here, from the state, every time: the host keys not confirmed, a run going, the computer's name not typed, an upgrade that is not wanted,
+     *  a data folder that is not valid. A field handler or a redraw asks this and never remembers part of the answer, so no one gate can open the button another still holds (UI Reviewer's MUST on #13081: a bad folder, then the
+     *  host-key box ticked and unticked, then the folder corrected, opened Set up with the box unticked, and run() sent accept_keys). */
+    function goClosed() {
+        const p = st.plan;
+        if (!p) return true;
+        if (st.busy) return true;
+        if ((p.host_keys || []).length > 0 && !st.keysOk) return true;
+        if (kind() === REMOVE && st.typed.trim() !== p.server_id) return true;
+        if (kind() === UPGRADE && (same() || (downgrade() && !st.allowDowngrade))) return true;
+        if (kind() === SETUP && !dataDirOk(cleanDataDir(st.dataDir))) return true;
+        return false;
+    }
+    function refreshGo() { const g = host.querySelector('[data-ssh-go]'); if (g) g.disabled = goClosed(); }
+
     async function run() {
-        if (kind() === SETUP && !dataDirOk(cleanDataDir(st.dataDir))) { st.error = dataDirProblem(cleanDataDir(st.dataDir)); draw(); return; } // never sent without the folder, which would start it in the default one
+        if (goClosed()) { // a click that reaches here with a gate closed sends nothing; the page says which
+            if (st.plan && (st.plan.host_keys || []).length > 0 && !st.keysOk) st.error = 'Confirm the host fingerprints first.';
+            else if (kind() === SETUP && !dataDirOk(cleanDataDir(st.dataDir))) st.error = dataDirProblem(cleanDataDir(st.dataDir));
+            draw();
+            return;
+        }
         st.busy = true; st.error = ''; draw();
         const body = {};
         if (st.plan.host_keys && st.plan.host_keys.length) body.accept_keys = true;
@@ -302,7 +322,7 @@ export function mountSshSetup(host, { mode = 'setup', server = null, action = nu
             const d = cleanDataDir(st.dataDir), ok = dataDirOk(d);
             input.setAttribute('aria-invalid', ok ? 'false' : 'true');
             note.classList.toggle('ssh-datadir-bad', !ok);
-            const g = host.querySelector('[data-ssh-go]'); if (g && !st.busy) g.disabled = !ok || g.dataset.sshHold === '1'; // Set up is closed while the folder is not one Coral will use: it never falls back to the default without the person knowing
+            refreshGo(); // Set up is closed while the folder is not one Coral will use (and for any other reason that still holds): it never falls back to the default without the person knowing
             note.textContent = !ok ? dataDirProblem(d) + ' Set up waits until this is fixed.'
                 : (d === '' || d === '.coral-server/data' ? 'The default: a new folder of its own, ~/.coral-server/data. Leave it empty for that.'
                     : `Coral will use ~/${d} there, and create it if it is not there. Make sure no other Coral is running on that folder.`);
@@ -388,20 +408,16 @@ export function mountSshSetup(host, { mode = 'setup', server = null, action = nu
         if (needsTerms() && st.options.records_acceptance) {
             root.append(el('p', 'ssh-consent', `That computer records who accepted (${st.options.acceptance_label}), when, and which version.`));
         }
-        let typedOk = true;
         if (kind() === REMOVE) {
             const l = el('label', 'ssh-label', `Type the computer name (${p.server_id}) to confirm`); l.htmlFor = 'ssh-typed';
             const t = el('input', 'field ssh-input'); t.id = 'ssh-typed'; t.type = 'text'; t.value = st.typed; t.autocomplete = 'off'; t.spellcheck = false;
-            t.addEventListener('input', () => { st.typed = t.value; const go = root.querySelector('[data-ssh-go]'); if (go) go.disabled = st.busy || (keys.length > 0 && !st.keysOk) || st.typed.trim() !== p.server_id; });
+            t.addEventListener('input', () => { st.typed = t.value; refreshGo(); });
             root.append(l, t);
-            typedOk = st.typed.trim() === p.server_id;
         }
         const bar = el('div', 'servers-form-actions');
         const upLabel = kind() === UPGRADE && versions() && versions().hub ? `${downgrade() ? 'Downgrade' : 'Upgrade'} to v${versions().hub}` : words().go;
-        const go = button(st.busy ? 'Working...' : upLabel, kind() === REMOVE ? 'btn-danger' : 'btn-primary', run, st.busy || (keys.length > 0 && !st.keysOk) || !typedOk || (kind() === UPGRADE && (same() || (downgrade() && !st.allowDowngrade))));
+        const go = button(st.busy ? 'Working...' : upLabel, kind() === REMOVE ? 'btn-danger' : 'btn-primary', run, goClosed());
         go.dataset.sshGo = '1';
-        if (kind() === SETUP && !dataDirOk(cleanDataDir(st.dataDir))) go.disabled = true;
-        else if (go.disabled) go.dataset.sshHold = '1'; // closed for another reason (keys not confirmed): typing in the folder field does not open it
         bar.append(button('Cancel', '', cancelPlan), go);
         root.append(bar);
     }
