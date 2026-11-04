@@ -98,9 +98,9 @@ func (h *BoardHandler) ListAllTeamArtifacts(w http.ResponseWriter, r *http.Reque
 		errBadRequest(w, strings.TrimPrefix(qerr.Error(), errTeamArtifactQuery.Error()+": "))
 		return
 	}
-	limit, ok := parseBoundedInt(vals.Get("limit"), defaultTeamArtifactLimit, 1, maxTeamArtifactLimit)
+	limit, ok := artifactPageLimit(vals.Get("limit"))
 	if !ok {
-		errBadRequest(w, fmt.Sprintf("limit must be an integer between 1 and %d", maxTeamArtifactLimit))
+		errBadRequest(w, fmt.Sprintf("limit must be an integer between 1 and %d", maxTeamArtifactLimitAsked))
 		return
 	}
 	offset, ok := parseBoundedInt(vals.Get("offset"), 0, 0, maxTeamArtifactOffset)
