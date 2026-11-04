@@ -28,3 +28,18 @@ test('typing marker restricts attribution to its renderer and nested RunTask is 
  {name:'RunTask',ph:'X',pid:2,tid:7,ts:100,dur:120000}],null);
  assert.equal(rows.length,1);assert.equal(rows[0].pid,1);assert.equal(rows[0].ms,90);
 });
+
+test('outer measurement gate preserves child failures and diagnostic logs without a browser',async()=>{
+ const {spawnSync}=await import('node:child_process');
+ const fs=await import('node:fs');const os=await import('node:os');const path=await import('node:path');
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'typing-gate-'));
+ const helper=new URL('./typing_measure_gate.sh',import.meta.url).pathname;
+ try {
+  for(const [gate,child,expected] of [['1',7,7],['1',0,0],['0',7,0],['',7,0]]) {
+   const log=path.join(dir,'child log.txt');
+   const out=spawnSync('bash',['-c',`source "$1"; run_bigboard_measure fixture "$2" bash -c 'printf diagnostic; exit "$1"' -- "$3"`,'--',helper,log,String(child)],{env:{...process.env,TYPING_GATE:gate},encoding:'utf8'});
+   assert.equal(out.status,expected,out.stderr);assert.equal(fs.readFileSync(log,'utf8'),'diagnostic');
+   assert.match(out.stdout,new RegExp('fixture measure exit='+child));
+  }
+ } finally {fs.rmSync(dir,{recursive:true,force:true});}
+});

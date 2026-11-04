@@ -76,11 +76,15 @@ export async function measureTypingBurst({client, ev, outDir, target, label, cha
         if(target==='composer' && !await ev(`document.querySelector('#command-input').value===${JSON.stringify(text)}`))throw new Error('Composer did not receive every synthetic character');
         if(target==='terminal' && !terminalInput.includes(text))throw new Error('Terminal input was not observed on the live WebSocket');
         if(truncated)throw new Error('Trace event cap reached; attribution incomplete');
-        const begin=events.find(e=>e.name==='coral-typing-start')?.ts,end=events.find(e=>e.name==='coral-typing-end')?.ts;
+        const marker=events.find(e=>e.name==='coral-typing-start');
+        const begin=marker?.ts,end=events.find(e=>e.name==='coral-typing-end')?.ts;
         if(!Number.isFinite(begin)||!Number.isFinite(end))throw new Error('Trace is missing typing boundary markers');
+        const rendererKnown=events.some(e=>e.name==='thread_name'&&e.args?.name==='CrRendererMain'&&e.pid===marker.pid&&e.tid===marker.tid);
+        const rendererTaskCount=events.filter(e=>e.pid===marker.pid&&e.tid===marker.tid&&/(?:^|::)RunTask$/.test(e.name)&&['X','B'].includes(e.ph)).length;
+        const traceComplete=rendererKnown&&rendererTaskCount>0;
         const tasks=summarizeTypingTrace(events,profile).filter(t=>t.startUs<end&&t.endUs>begin);
         const sorted=[...latencies].sort((a,b)=>a-b),pct=p=>sorted[Math.min(sorted.length-1,Math.floor(sorted.length*p))];
-        const result={label,target,characters,context,keyToFrameMs:{p50:pct(.5),p95:pct(.95),max:Math.max(...latencies)},longTasks:longTasks.filter(t=>t.ms>50),traceLongTasks:tasks,budgetPassed:!tasks.length&&!longTasks.some(t=>t.ms>50),profiled:true};
+        const result={label,target,characters,context,keyToFrameMs:{p50:pct(.5),p95:pct(.95),max:Math.max(...latencies)},longTasks:longTasks.filter(t=>t.ms>50),traceLongTasks:tasks,traceComplete,rendererTaskCount,budgetPassed:traceComplete&&!tasks.length&&!longTasks.some(t=>t.ms>50),profiled:true};
         fs.mkdirSync(outDir,{recursive:true});
         fs.writeFileSync(path.join(outDir,label+'.trace.json.gz'),gzipSync(JSON.stringify({traceEvents:events})));
         fs.writeFileSync(path.join(outDir,label+'.cpuprofile'),JSON.stringify(profile));
