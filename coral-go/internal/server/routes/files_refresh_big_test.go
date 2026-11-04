@@ -198,6 +198,9 @@ func TestRefreshFilesPausesASlowFolderAndRefreshRunsOnePass(t *testing.T) {
 // 35,000 changed files (#13079, the Operator's repository): a refresh runs, and the server keeps answering its other routes quickly while git works: the list is cut before it is stored, so no long write holds the
 // database, and the refresh itself is one pass.
 func TestServerStaysResponsiveWhileA35kFileRepoIsRefreshed(t *testing.T) {
+	oldGitTimeout := refreshGitTimeout
+	refreshGitTimeout = 90 * time.Second // the pass is 6-9 s on a loaded Mac, near the 10 s default: the test is about the server staying responsive, not about that limit
+	t.Cleanup(func() { refreshGitTimeout = oldGitTimeout })
 	if testing.Short() {
 		t.Skip("writes 35,000 files")
 	}
