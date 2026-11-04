@@ -311,6 +311,13 @@ class MiniTests(Base):
         self.assertEqual(r.returncode, 3)
         self.assertEqual(len(os.listdir(os.path.join(self.home, 'mini', 'pending'))), 1)
 
+    def test_a_mini_jobs_path_has_local_bin_first_for_tmux(self):
+        out = os.path.join(self.d, 'path.txt')
+        self.submit('mini', 'normal', ['sh', '-c', 'echo $PATH > %s' % out])
+        self.assertEqual(self.ci('run', '--machine', 'mini', '--once', '--no-post').returncode, 0)
+        parts = rd(out).strip().split(':')
+        self.assertEqual(parts[:2], [self.d + '/.local/bin', self.d + '/.local/node/bin'])
+
     def test_the_time_limit_applies_on_the_mini_too(self):
         self.submit('mini', 'normal', ['sleep', '60'], timeout=2)
         t0 = time.time()

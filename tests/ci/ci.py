@@ -176,7 +176,7 @@ def cmd_cancel(a):
 def job_env(job, tmp):
     env = {k: v for k, v in os.environ.items() if not k.startswith(('CORAL_', 'CLAUDE', 'ANTHROPIC')) and k not in ('TMUX', 'SSH_AUTH_SOCK')}
     if job['machine'] == 'mini':
-        env['PATH'] = '%s/.local/node/bin:/usr/local/go/bin:%s' % (HOME, env.get('PATH', '/usr/bin:/bin:/usr/sbin:/sbin'))
+        env['PATH'] = '%s/.local/bin:%s/.local/node/bin:/usr/local/go/bin:%s' % (HOME, HOME, env.get('PATH', '/usr/bin:/bin:/usr/sbin:/sbin'))  # ~/.local/bin: tmux
         env['GOCACHE'] = HOME + '/coral-test/.cache/go-build'
         env['GOMODCACHE'] = HOME + '/coral-test/.cache/go-mod'
     else:
