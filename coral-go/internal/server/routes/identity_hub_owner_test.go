@@ -263,3 +263,40 @@ func TestTheSendRouteTakesAnOwnerStampAndABareKeyStaysAutomation(t *testing.T) {
 	})
 	assert.Equal(t, 403, w.Code, "only the send route joined the allowlist")
 }
+
+// The owner's decision on a team's proposed goal or task, made at the hub, is a person's on the remote (#13454): Approve and Reject take an owner stamp, a bare key stays automation (and the
+// handlers refuse it), a stamp for one decision or one proposal is no use for another, and a stamp is used once.
+func TestTheProposalDecisionsTakeAnOwnerStampAndABareKeyStaysAutomation(t *testing.T) {
+	rig := newStampRig(t, true)
+	body := `{"title":"Ship it"}`
+	for _, action := range []string{"approve", "reject"} {
+		route := "/api/board/team/proposals/7/" + action
+		w := rig.do("POST", route, body, nil)
+		require.Equal(t, 200, w.Code)
+		assert.False(t, rig.seen.human, "a bare key on %s is automation, whoever holds it", action)
+
+		stamp := stampFor(t, "POST", route, body, time.Now())
+		w = rig.do("POST", route, body, func(r *http.Request) { r.Header.Set(hubowner.Header, stamp) })
+		require.Equal(t, 200, w.Code, w.Body.String())
+		assert.True(t, rig.seen.human, "the hub's signed-in owner decides on %s", action)
+		assert.Equal(t, callerHubOwner, rig.seen.kind)
+
+		w = rig.do("POST", route, body, func(r *http.Request) { r.Header.Set(hubowner.Header, stamp) })
+		assert.Equal(t, 403, w.Code, "a stamp is used once: a replay is refused (%s)", action)
+	}
+
+	approveStamp := stampFor(t, "POST", "/api/board/team/proposals/7/approve", body, time.Now())
+	w := rig.do("POST", "/api/board/team/proposals/7/reject", body, func(r *http.Request) { r.Header.Set(hubowner.Header, approveStamp) })
+	assert.Equal(t, 403, w.Code, "an Approve stamp does not Reject")
+	w = rig.do("POST", "/api/board/team/proposals/8/approve", body, func(r *http.Request) {
+		r.Header.Set(hubowner.Header, stampFor(t, "POST", "/api/board/team/proposals/7/approve", body, time.Now()))
+	})
+	assert.Equal(t, 403, w.Code, "a stamp for proposal 7 is no use for proposal 8")
+	other := "/api/board/team/proposals/7/edit" // no other proposal route joined the allowlist
+	w = rig.do("POST", other, body, func(r *http.Request) { r.Header.Set(hubowner.Header, stampFor(t, "POST", other, body, time.Now())) })
+	assert.Equal(t, 403, w.Code, "only Approve and Reject joined the allowlist")
+	w = rig.do("POST", "/api/board/team/proposals/7/approve", `{"title":"changed"}`, func(r *http.Request) {
+		r.Header.Set(hubowner.Header, stampFor(t, "POST", "/api/board/team/proposals/7/approve", body, time.Now()))
+	})
+	assert.Equal(t, 403, w.Code, "a stamp covers the body it was made for: an edited title is refused")
+}

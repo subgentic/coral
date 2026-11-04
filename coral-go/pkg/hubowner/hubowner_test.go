@@ -177,7 +177,7 @@ func TestAllowedIsTheTwoDecisionsAndNothingElse(t *testing.T) {
 			t.Errorf("%v allowed", bad)
 		}
 	}
-	if len(Routes()) != 3 {
+	if len(Routes()) != 5 {
 		t.Errorf("the allowlist has %d routes: a new one needs a reason and a review", len(Routes()))
 	}
 }
