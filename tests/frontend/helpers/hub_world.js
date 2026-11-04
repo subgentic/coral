@@ -9,6 +9,11 @@ const CSP = ["default-src 'self'", "script-src 'self'", "style-src 'self'", "sty
 /** Set the page up as the Hub's before the first navigation: the viewport, the cloud boot flag with the hub's CSP, and the stubbed API. */
 async function setupHubWorld({ client, Page, Emulation, width, height, mobile, inbox, hubPages }) {
     const { Fetch, Network } = client;
+    // Fetch.fulfillRequest below replaces the document with a synthetic response:
+    // Chromium's ProcessResponseOverride makes a fresh response head without the
+    // loopback remote endpoint. LNA can therefore block this fixture's real socket.
+    // Grant only this isolated origin; a real Hub uses its public same-origin feed.
+    await client.Browser.grantPermissions({ origin: new URL(BASE).origin, permissions: ['localNetworkAccess'] });
     await Promise.all([Page.enable(), Network.enable()]);
     await Network.setBypassServiceWorker({ bypass: true });
     await Emulation.setDeviceMetricsOverride({ width, height, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });

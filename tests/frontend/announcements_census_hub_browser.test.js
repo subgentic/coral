@@ -10,6 +10,11 @@ const S = `(window.__coralStatic || '/static/')`;
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor } = await connect();
+    const socketEvents = [];
+    client.Network.webSocketCreated(e => socketEvents.push({event: 'created', id: e.requestId, url: e.url}));
+    client.Network.webSocketHandshakeResponseReceived(e => socketEvents.push({event: 'handshake', id: e.requestId, status: e.response.status, statusText: e.response.statusText}));
+    client.Network.webSocketFrameError(e => socketEvents.push({event: 'error', id: e.requestId, error: e.errorMessage}));
+    client.Network.webSocketClosed(e => socketEvents.push({event: 'closed', id: e.requestId}));
     const scenes = []; const found = [];
     const wait = ms => new Promise(r => setTimeout(r, ms)); // sleep-ok: announcements are timed; there is no event to wait for
     const scene = async (name, run, { must = [], forbid = [], before = null } = {}) => {
@@ -78,7 +83,7 @@ const S = `(window.__coralStatic || '/static/')`;
         await run('desktop');
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
         await run('phone');
-    } finally { await client.close(); }
+    } finally { console.log('Hub socket events: ' + JSON.stringify(socketEvents)); await client.close(); }
     if (process.env.ANNOUNCE_REPORT) { require('node:fs').writeFileSync(process.env.ANNOUNCE_REPORT, scenes.map(s => `## ${s.name}\n` + s.entries.map(e => `  ${String(e.t).padStart(5)} ms ${e.loud ? '!' : ' '} ${e.region}: ${e.text}`).join('\n')).join('\n') + '\n--\n' + found.join('\n') + '\n'); process.exit(0); }
     assert.deepEqual(found, [], 'screen-reader announcement problems through the Hub:\n  ' + found.join('\n  '));
     console.log(`PASS ${scenes.length} Hub scenes: each state is announced once, nothing chatters`);
