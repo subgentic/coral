@@ -530,7 +530,6 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 .inbox-needs-results .dt-row.dt-read .inbox-review-from { font-weight: var(--fw-regular); }
 /* The phone's cell is narrow: the line wraps so "2 earlier versions" is not cut off (#11776). */
 .dt-folded .inbox-review-item:has(> .inbox-kind-icon) > .inbox-review-name { min-width: 0; } /* a narrow row (a phone, an item cell about 130 px wide): the file name's 44 px minimum width, the sender, the gaps and the kind icon no longer fit on one line, so the name wrapped to a line of its own and the row grew; with no minimum the name takes what is left and is cut with an ellipsis, as it was with no icon (#13144, measured: the row is 77 px with or without the icon) */
-.dt-folded .inbox-review-item:has(> .inbox-kind-icon) > .inbox-review-from { max-width: 34%; } /* and the sender gives the file name room: the file name is what the row is about, so at about 130 px it reads 'plan-...' beside 'sende...' instead of 'p...' beside 'sender un...' */
 .dt-folded .inbox-review-item { flex-wrap: wrap; }
 .dt-folded .inbox-review-item > .inbox-review-name { flex: 1 1 0; }
 .inbox-needs-results tr:has(.inbox-review-item) .dt-subtitle { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; white-space: normal; margin-top: 2px; }
