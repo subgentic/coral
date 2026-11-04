@@ -104,12 +104,15 @@ func TestAHubVerdictNeedsTheStoredDigestToMatchTheId(t *testing.T) {
 	for name, c := range map[string]struct {
 		withMeta bool
 		hub      bool
+		stamp    bool // the self-hosted hub's signed owner stamp, no tunnel
 		want     int
 	}{
-		"through the Hub, digest confirmed":  {true, true, http.StatusOK},
-		"through the Hub, no digest record":  {false, true, http.StatusConflict},
-		"on this computer, no digest record": {false, false, http.StatusOK},
-		"on this computer, digest confirmed": {true, false, http.StatusOK},
+		"stamped, digest confirmed":          {true, false, true, http.StatusOK},
+		"stamped, no digest record":          {false, false, true, http.StatusConflict},
+		"through the Hub, digest confirmed":  {true, true, false, http.StatusOK},
+		"through the Hub, no digest record":  {false, true, false, http.StatusConflict},
+		"on this computer, no digest record": {false, false, false, http.StatusOK},
+		"on this computer, digest confirmed": {true, false, false, http.StatusOK},
 	} {
 		srv, h, coralDir := teamArtifactServer(t)
 		_ = srv
@@ -120,6 +123,9 @@ func TestAHubVerdictNeedsTheStoredDigestToMatchTheId(t *testing.T) {
 			kind := callerDashCookie
 			if c.hub {
 				kind = callerHub
+			}
+			if c.stamp {
+				kind = callerHubOwner
 			}
 			h.ReviewArtifact(w, req.WithContext(context.WithValue(req.Context(), callerKindKey{}, kind)))
 		})

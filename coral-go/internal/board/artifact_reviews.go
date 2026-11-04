@@ -29,6 +29,19 @@ const (
 // ErrNotForReview is a decision on an artifact that is not waiting for one.
 var ErrNotForReview = errors.New("this artifact is not waiting for a review")
 
+// ErrAlreadyDecided is a decision on a file that already has a DIFFERENT approve, changes or deny decision, for a caller that asked to refuse a conflicting one (WithOneDecision): the same decision again is no error (#13494).
+var ErrAlreadyDecided = errors.New("this artifact already has a different decision")
+
+type oneDecisionKey struct{}
+
+// WithOneDecision says a review decision on this context must not replace a different one already made on the file (#13494, coral-hub: agents act on decisions, so two conflicting decisions on one file is the risk). It is
+// judged inside the decision's own transaction, with the stored state, so two requests at once cannot both pass.
+func WithOneDecision(ctx context.Context) context.Context {
+	return context.WithValue(ctx, oneDecisionKey{}, true)
+}
+
+func oneDecision(ctx context.Context) bool { v, _ := ctx.Value(oneDecisionKey{}).(bool); return v }
+
 // ArtifactReview is the recorded state of one review.
 type ArtifactReview struct {
 	State string `json:"state"`
@@ -231,6 +244,9 @@ func (s *Store) DecideArtifactReview(ctx context.Context, boardID, hex, state st
 	}
 	if ch.prevState != nil && ch.prevState.State == state && (state == ReviewApproved || state == ReviewDenied || set[tagForReview]) {
 		return ch, have, nil // already decided this way
+	}
+	if oneDecision(ctx) && ch.prevState != nil && ch.prevState.State != state && (ch.prevState.State == ReviewApproved || ch.prevState.State == ReviewChangesRequested || ch.prevState.State == ReviewDenied) {
+		return ch, have, ErrAlreadyDecided // a Hub caller does not change a decision already made (#13494)
 	}
 	if state == ReviewChangesRequested && ch.prevState != nil && ch.prevState.State == ReviewApproved {
 		return ch, have, ErrNotForReview // approved is settled: a later request needs a new version

@@ -138,10 +138,10 @@ func (h *BoardHandler) ReviewArtifact(w http.ResponseWriter, r *http.Request) {
 		errNotFound(w, "this team has no such artifact")
 		return
 	}
-	// Through Coral Hub a verdict is on a file this computer can PROVE is the one named (#13493, Security on coral-hub's #169685): an artifact's id is the SHA-256 of its stored bytes (storeArtifactVia names the object by
+	// Through a hub (Coral Hub's tunnel, or the self-hosted hub's signed stamp) a verdict is on a file this computer can PROVE is the one named (#13493, Security on coral-hub's #169685): an artifact's id is the SHA-256 of its stored bytes (storeArtifactVia names the object by
 	// the hash and never replaces it), so "approve this id" is "approve these bytes". A row whose stored record does not say so (no digest, or one that is not sha256:<id>: a link to an object this computer does not hold,
 	// a record from before digests) cannot be decided through the Hub by id alone: it is refused, and a person decides it on this computer.
-	if cloud.Tunneled(r) && !h.storedDigestMatches(id) {
+	if throughAHub(r) && !h.storedDigestMatches(id) { // the tunnel, or the self-hosted hub's stamp (Security's INFO 4)
 		commentRefuse(w, http.StatusConflict, "digest_unknown", "this computer cannot confirm what is in this file, so it cannot be decided through Coral Hub: open it on this computer")
 		return
 	}
@@ -149,9 +149,15 @@ func (h *BoardHandler) ReviewArtifact(w http.ResponseWriter, r *http.Request) {
 	if state == board.ReviewDenied {
 		note = body.Reason
 	}
+	if throughAHub(r) { // a Hub caller (the tunnel, or the self-hosted hub's stamp or key) never changes a decision already made on the file (#13494); this computer's own dashboard still may
+		r = r.WithContext(board.WithOneDecision(r.Context()))
+	}
 	r = r.WithContext(board.WithActivity(r.Context(), activityMetaFor(r, item.Name, note))) // the Activity record: the decision and its row are one transaction (#12069)
 	change, tags, err := h.bs.DecideArtifactReview(r.Context(), project, id, state, time.Now())
 	switch {
+	case errors.Is(err, board.ErrAlreadyDecided):
+		commentRefuse(w, http.StatusConflict, "already_decided", "this file already has a different decision: it is final through Coral Hub; a person can change it on this computer")
+		return
 	case err == board.ErrNotForReview:
 		commentRefuse(w, http.StatusConflict, "not_for_review", h.notForReviewWords(r.Context(), project, item))
 		return
@@ -355,4 +361,13 @@ func (h *BoardHandler) storedDigestMatches(id string) bool {
 	}
 	meta, ok := readArtifactSidecar(filepath.Join(dir, id+".json"))
 	return ok && meta.Digest == "sha256:"+id
+}
+
+// throughAHub says the request came through a hub: the tunnel's connector, or the self-hosted hub (its signed owner stamp, or its API key).
+func throughAHub(r *http.Request) bool {
+	if cloud.Tunneled(r) {
+		return true
+	}
+	kind, _ := r.Context().Value(callerKindKey{}).(string)
+	return kind == callerHubOwner || kind == callerAPIKey
 }
