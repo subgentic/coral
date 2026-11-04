@@ -234,56 +234,49 @@ func (h *BoardHandler) askerUploaded(session, id string) bool {
 	return ok
 }
 
-// hubArtifactTags is the tags of a write that came through Coral Hub (#12742), checked against the list the server holds, never the client's word for what is there. The local rule (a tag is 1 to 24 letters, digits, spaces
-// or hyphens) holds for every tag; a tag the request ADDS must also be a-z, 0-9, space or hyphen, so the closed body is only for what is new, and a tag the artifact already has is kept whatever its letters (the page writes the
-// whole list back to add "read"). At most five tags, except that a request that adds nothing but "read" (the Operator opening a file) is never refused for the count: an artifact that already has more must still be markable read.
+// hubArtifactTags is the tags of a write that came through Coral Hub (#12742, #13117), judged against the list the server holds, never the client's word for what is there. The tags of a file are this computer's: a Hub
+// write may only ADD or REMOVE "read" (the Hub passes this computer's read mark through). Any other difference from the stored list, a tag added or a tag removed, is refused and nothing is stored. The request is a set:
+// the same tags in another order, or a repeat of the stored list, changes nothing, and what is stored keeps its order ("read" goes on the end). Marking a file read is never refused for the five-tag count, since it adds
+// nothing else. The local rule (1 to 24 letters, digits, spaces or hyphens) still holds for every tag in the request.
 func (h *BoardHandler) hubArtifactTags(ctx context.Context, project, id string, raw []string) ([]string, error) {
-	out := make([]string, 0, len(raw))
-	seen := map[string]bool{}
+	want := map[string]bool{}
 	for _, r := range raw {
 		tag, ok := board.NormalizeArtifactTag(r)
 		if !ok {
 			return nil, fmt.Errorf("%w: %q (1 to %d letters, digits, spaces or hyphens)", board.ErrArtifactTag, r, board.MaxArtifactTagLen)
 		}
-		if !seen[tag] {
-			seen[tag] = true
-			out = append(out, tag)
-		}
+		want[tag] = true
 	}
-	stored, err := h.bs.ArtifactTags(ctx, project)
+	all, err := h.bs.ArtifactTags(ctx, project)
 	if err != nil {
 		return nil, fmt.Errorf("%w: the tags could not be read", board.ErrArtifactTag)
 	}
+	stored := all[id]
 	had := map[string]bool{}
-	for _, t := range stored[id] {
+	for _, t := range stored {
 		had[t] = true
 	}
-	onlyRead := true
-	for _, t := range out {
-		if had[t] {
-			continue
-		}
-		if t != "read" {
-			onlyRead = false
-		}
-		if !asciiArtifactTags([]string{t}) {
-			return nil, fmt.Errorf("%w: %q (through Coral Hub a tag you add is 1 to %d of a-z, 0-9, spaces or hyphens)", board.ErrArtifactTag, t, board.MaxArtifactTagLen)
+	for t := range want {
+		if !had[t] && t != hubMarkTag {
+			return nil, fmt.Errorf("%w: through Coral Hub only the tag %q can be added or removed, and %q is not on this file", board.ErrArtifactTag, hubMarkTag, t)
 		}
 	}
-	if len(out) > board.MaxArtifactTags && !onlyRead {
-		return nil, fmt.Errorf("%w: at most %d tags on an artifact", board.ErrArtifactTag, board.MaxArtifactTags)
+	for t := range had {
+		if !want[t] && t != hubMarkTag {
+			return nil, fmt.Errorf("%w: through Coral Hub only the tag %q can be added or removed, and %q is on this file", board.ErrArtifactTag, hubMarkTag, t)
+		}
+	}
+	out := make([]string, 0, len(stored)+1)
+	for _, t := range stored {
+		if t != hubMarkTag || want[t] {
+			out = append(out, t)
+		}
+	}
+	if want[hubMarkTag] && !had[hubMarkTag] {
+		out = append(out, hubMarkTag)
 	}
 	return out, nil
 }
 
-// asciiArtifactTags says every tag (already normalised: lower case, single spaces) uses only a-z, 0-9, space and hyphen.
-func asciiArtifactTags(tags []string) bool {
-	for _, t := range tags {
-		for _, r := range t {
-			if !(r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == ' ' || r == '-') {
-				return false
-			}
-		}
-	}
-	return true
-}
+// hubMarkTag is the one tag a write through Coral Hub may add or remove: the file was opened (#13117).
+const hubMarkTag = "read"
