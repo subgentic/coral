@@ -173,3 +173,53 @@ func TestTheSecretIsNeverSentToTheRemoteOrBack(t *testing.T) {
 	}
 	assert.NotContains(t, s.body, ownerTestSecret)
 }
+
+// #13456: the signed-in owner's message to an agent is signed for that agent only, a message at the cap is signed, one over it is refused at the hub with a clear answer (never sent unstamped, which would
+// make the person's words automation on the remote), and a grantee's send (not the signed-in owner) goes out unstamped and whole.
+const sendPath = "/api/sessions/live/claude-abc/send"
+
+func TestTheOwnersSendIsSignedForThatAgentOnly(t *testing.T) {
+	hub, s := hubFor(t, ownerTestSecret)
+	body := `{"command":"please send me a short summary","agent_type":"claude","session_id":"abc"}`
+	post(t, hub, sendPath, body, true, nil)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	stamp := s.header.Get(hubowner.Header)
+	require.NotEmpty(t, stamp, "the owner's message to an agent was not signed")
+	require.NoError(t, verifier().Verify(stamp, s.method, sendPath, s.target, []byte(s.body)))
+	other := verifier()
+	assert.Error(t, other.Verify(stamp, s.method, "/api/sessions/live/claude-xyz/send", "/api/sessions/live/claude-xyz/send", []byte(s.body)), "a stamp for one agent's send was accepted on another agent's")
+}
+
+func TestAGranteesSendIsNotSignedAndAnOwnersLongSendIsRefusedNotUnstamped(t *testing.T) {
+	hub, s := hubFor(t, ownerTestSecret)
+	atCap := `{"command":"` + strings.Repeat("x", hubowner.MaxBody-len(`{"command":""}`)) + `"}`
+	require.Equal(t, hubowner.MaxBody, len(atCap))
+	post(t, hub, sendPath, atCap, true, nil)
+	s.mu.Lock()
+	assert.NotEmpty(t, s.header.Get(hubowner.Header), "a message at the cap is signed")
+	s.mu.Unlock()
+
+	over := `{"command":"` + strings.Repeat("x", hubowner.MaxBody) + `"}`
+	s.mu.Lock()
+	s.body, s.header = "", nil
+	s.mu.Unlock()
+	req, _ := http.NewRequest("POST", hub.URL+"/api/remote/a"+sendPath, strings.NewReader(over))
+	req.Header.Set("X-Test-Person", "1")
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	b, _ := io.ReadAll(resp.Body)
+	assert.Equal(t, http.StatusRequestEntityTooLarge, resp.StatusCode, "a long message from the owner is refused with a clear status")
+	assert.Contains(t, string(b), `"not_sent":true`)
+	assert.Contains(t, string(b), "too long")
+	s.mu.Lock()
+	assert.Empty(t, s.body, "nothing of the refused message reached the remote")
+	s.mu.Unlock()
+
+	post(t, hub, sendPath, over, false, nil) // a grantee: not the owner, never stamped, never refused here
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	assert.Empty(t, s.header.Get(hubowner.Header))
+	assert.Equal(t, over, s.body, "a grantee's long message went through whole")
+}
