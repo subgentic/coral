@@ -183,7 +183,7 @@ export function resolveArtifactSource(uri, options = {}) {
 /**
  * Render an artifact into `body`.
  * ctx: { signal, isStale(), renderContent(body, content, path, server), openEntry({name, uri, media_type}),
- *        setMeta({ title, filename }), typeKnown?(entries|null) }  (typeKnown: once, when the kind is known: the files of a manifest, so a Download can name the file and not the manifest (#9925), or null for any other artifact; a host with a Download offers none before it, #9941)
+ *        setMeta({ title, filename }), typeResolved?({ mediaType, filename }), typeKnown?(entries|null) }  (typeKnown: once, when the kind is known: the files of a manifest, so a Download can name the file and not the manifest (#9925), or null for any other artifact; a host with a Download offers none before it, #9941)
  */
 export async function renderArtifact(body, uri, options, ctx) {
     const source = resolveArtifactSource(uri, options);
@@ -200,6 +200,8 @@ async function _renderArtifactInto(body, uri, options, ctx, source, kind) {
     if (opened) importOnce('./inbox_reviews.js').then(m => m.markOpenedReadVisibly(opened[1])).catch(() => {}); // a for-review artifact opened in a preview is read (#9277); any other is never tagged
     body.innerHTML = '<div class="inline-preview-loading">Loading...</div>';
     if (externalURL) {
+        if (ctx.isStale()) return;
+        ctx.typeResolved?.({ mediaType: 'text/html', filename: options.filename || '' });
         _renderSandboxed(body, { url: externalURL, name: options.filename, isStale: ctx.isStale });
         return;
     }
@@ -226,6 +228,9 @@ async function _renderArtifactInto(body, uri, options, ctx, source, kind) {
         const sizeHeader = Number(resp.headers.get('Content-Length'));
         const size = Number.isFinite(sizeHeader) && sizeHeader >= 0 ? sizeHeader : -1;
         if (ctx.isStale()) return;
+        // Tell the host before rendering starts comments or any per-kind UI.
+        // This uses the existing response, including a bare link's metadata.
+        ctx.typeResolved?.({ mediaType: isHTML ? 'text/html' : isMarkdown ? 'text/markdown' : type, filename: responseFilename || filename });
         // The hub's response filter rewrites SVG to an octet-stream download, so there SVG is recognised by its declared
         // type or name, read as text and shown through an <img> data: URL (never inline markup; see image_source.js).
         const isSvgArtifact = isCloud() && (isSvg(type) || isSvg(declaredType) || filenameHints.some(isSvg));
