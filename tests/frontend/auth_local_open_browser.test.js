@@ -273,7 +273,7 @@ const ATTACK = {
     } finally {
         // Closing is bounded: a CDP call whose answer never comes (a page or context that is already gone, a browser that exits first) used to hang the suite for the runner's whole 180 s after the last case had printed ok
         // (trial-248, run 41897148416: all 7 ok, then "[runner] TIMEOUT"). `.catch` only handles a rejection, never a silence, so each step races a short timer, and the suite ends with an explicit exit below.
-        const bounded = p => Promise.race([Promise.resolve(p).catch(() => {}), new Promise(r => setTimeout(r, 5000).unref())]);
+        const bounded = p => Promise.race([Promise.resolve(p).catch(() => {}), new Promise(r => setTimeout(r, 5000).unref())]); // sleep-ok: the bound on a close that may never answer, not a wait for the page
         for (const c of pages) await bounded(c.close());
         for (const id of contexts) await bounded(browser.Target.disposeBrowserContext({ browserContextId: id }));
         await bounded(browser.close());
