@@ -83,9 +83,13 @@ const CASES = [
     const S = `(window.__coralStatic||'/static/')`;
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        // the Home goal card reads the teams once the page's requests are quiet, or 5 s after it is drawn at the latest (#13087): stamp when that read is made, so the recording below starts after it and the late read is
+        // not a fetch of the case it lands in (v2.0.44's cdp gate: 'GET /api/board/projects' in `fetched` on a slow runner)
+        await Page.addScriptToEvaluateOnNewDocument({ source: `(() => { window.__teamsRead = 0; const f = window.fetch; window.fetch = function (u) { try { if (new URL(String(u), location.href).pathname === '/api/board/projects') window.__teamsRead++; } catch (e) {} return f.apply(this, arguments); }; })();` });
         await Emulation.setDeviceMetricsOverride({ width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
         await coralReady(ev);
+        await waitFor(`window.__teamsRead >= 1`, 'the Home goal card reads the teams', 9000).catch(() => {}); // no card drawn, no read: nothing to wait for
         await ev(`(async () => { const st = ${S};
             window.ST = (await import(st + 'state.js')).state; window.MD = await import(st + 'modals.js'); window.SD = await import(st + 'settings_dialog.js'); window.XT = await import(st + 'xterm_renderer.js'); window.LM = await import(st + 'launch_models.js');
             await (await import(st + 'vendor_loader.js')).loadXterm();
