@@ -29,6 +29,10 @@ if (typeof document !== 'undefined') document.addEventListener('coral:welcome-bu
 export const goalDesc = () => (noTeam ? GOAL_NO_TEAM_DESC : LAUNCH_CARDS.find(c => c.key === 'goal').desc);
 export function setNoTeam(v) {
     noTeam = !!v;
-    for (const el of document.querySelectorAll('[data-goal-desc]')) el.textContent = goalDesc();
+    // Only the places the card is drawn are looked into (the welcome page, the sidebar's empty Agents list, the phone's Agents page), never the whole document: this runs when a read lands, which can be while someone types, and the
+    // speed budget allows no page-wide selector then (perf_budgets_browser, #13012's lookup was the one it caught).
+    for (const root of ['welcome-screen', 'live-sessions-list', 'mobile-agent-list'].map(id => document.getElementById(id))) {
+        if (root) for (const el of root.querySelectorAll('[data-goal-desc]')) el.textContent = goalDesc();
+    }
 }
 
