@@ -9,7 +9,7 @@ Date.now = () => clock;
 const hex = i => i.toString(16).padStart(64, 'c');
 const art = i => ({ id: 'a-' + i, uri: 'coral://artifacts/' + hex(i), tags: ['for review'], name: `file-${String(i).padStart(3, '0')}.md`, created_at: new Date(Date.UTC(2026, 10, 4) - i * 1000).toISOString(), available: true, produced_by: 'Dev', session_id: 's-1' });
 const TEAMS = { a: Array.from({ length: 120 }, (_, i) => art(i)), b: Array.from({ length: 120 }, (_, i) => art(1000 + i)) };
-let failOnce = new Set(), asked = [], hold = null;
+let failOnce = new Set(), asked = [], hold = null, laterTotals = false; // laterTotals: a computer whose total on a later page counts what is left (the page must keep the first page's)
 globalThis.fetch = async (url) => {
     const u = new URL(url, 'http://localhost'), p = u.pathname;
     if (p === '/api/board/projects') return Response.json([{ project: 'a' }, { project: 'b' }]);
@@ -18,13 +18,14 @@ globalThis.fetch = async (url) => {
     const team = m[1], tag = u.searchParams.get('tag');
     if (tag === 'saved') return Response.json({ artifacts: [], has_more: false });
     const cursor = u.searchParams.get('cursor') || '', until = u.searchParams.get('until') || '';
-    asked.push({ team, cursor, until });
+    const rest = new URLSearchParams(u.searchParams); rest.delete('cursor'); rest.sort();
+    asked.push({ team, cursor, until, params: rest.toString() });
     if (hold && hold.team === team && (hold.cursor === undefined ? !cursor : cursor.startsWith(hold.cursor))) await hold.promise;
     if (failOnce.has(team + ':' + cursor)) { failOnce.delete(team + ':' + cursor); return Response.json({}, { status: 503 }); }
     let start = 0;
     if (cursor) { const [at, boundUntil] = cursor.split('|'); if (boundUntil !== until) return Response.json({ error: 'invalid cursor' }, { status: 400 }); start = Number(at); } // the server's fingerprint includes until
     const page = TEAMS[team].slice(start, start + 50), more = start + 50 < TEAMS[team].length;
-    return Response.json({ artifacts: page, has_more: more, total: TEAMS[team].length, ...(more ? { next_cursor: `${start + 50}|${until}` } : {}) });
+    return Response.json({ artifacts: page, has_more: more, total: laterTotals && cursor ? TEAMS[team].length - start : TEAMS[team].length, ...(more ? { next_cursor: `${start + 50}|${until}` } : {}) });
 };
 const M = await import('../../coral-go/pkg/frontend/static/inbox_reviews.js');
 const keys = () => M.queriedReviews(F)?.map(r => r.reviewKey) || [];
@@ -94,4 +95,41 @@ M.settleReview({ team: 'a', id: 'a-60', reviewKey: 'a:a-60', name: 'x' }); // th
 release2(); hold = null; await more;
 assert.ok(!keys().includes('a:a-60'), 'the settled row did not come back with the Show more that was in flight');
 assert.ok(keys().includes('a:a-61'), 'the rest of the page did arrive');
+// 4 (#13366, round 3 SHOULD a): the frozen parameters are the WHOLE query, not only `until`: every page of a walk, first and later, of every team, sends the same q, by, until, sort, tag, limit and versions, though time passes between them
+F = { q: 'frozen', agent: 'Dev', longer: '30', sort: 'oldest' };
+asked = []; clock += 60000;
+await M.queryReviews(F);
+const firstParams = asked[0].params;
+const expectedAt = new Date(clock - 30 * 60000).toISOString();
+const want = new URLSearchParams({ tag: 'for review', limit: '50', versions: 'newest', q: 'frozen', by: 'Dev', until: expectedAt, sort: 'oldest' }); want.sort();
+assert.equal(firstParams, want.toString(), 'the first page asks for the whole query: ' + firstParams);
+clock += 7000; await M.moreQueriedReviews(F);
+clock += 7000; await M.moreQueriedReviews(F);
+assert.ok(asked.length >= 6, 'three pages of two teams were asked: ' + asked.length);
+assert.deepEqual([...new Set(asked.map(a => a.params))], [firstParams], 'every page of the walk, whatever the time, sends the one set of parameters');
+
+// 5 (#13366, SHOULD c): a team's total is its first page's: a computer that counts what is left on a later page does not shrink the total
+F = { q: 'total-first-page' };
+laterTotals = true; asked = [];
+await M.queryReviews(F);
+assert.equal(M.reviewQueryState().total, 240, 'the totals of both teams on their first pages');
+await M.moreQueriedReviews(F);
+assert.equal(M.reviewQueryState().total, 240, 'the total after Show more is still the first pages\' (a later page says 70 left for each team)');
+await M.moreQueriedReviews(F);
+assert.equal(M.reviewQueryState().total, 240, 'and after the last pages');
+laterTotals = false;
+
+// 6 (#13366, SHOULD b): a walk that was replaced while its answers were on the way folds nothing into the walk now shown: the new walk's rows, total and Show more are its own
+F = { q: 'old-walk' };
+let releaseOld; hold = { team: 'a', promise: new Promise(r => { releaseOld = r; }) };
+const oldWalk = M.queryReviews(F);
+await settle();
+const G = { q: 'new-walk' }; hold = null;
+await M.queryReviews(G); // a different filter starts over while the first walk's page of team a is still on its way
+const newKeys = M.queriedReviews(G).map(r => r.reviewKey), newState = JSON.stringify(M.reviewQueryState());
+releaseOld(); await oldWalk; await settle(); // the old walk's answers arrive now
+assert.deepEqual(M.queriedReviews(G).map(r => r.reviewKey), newKeys, 'the old walk added no row to the new one');
+assert.equal(JSON.stringify(M.reviewQueryState()), newState, 'nor changed its total, Show more or errors');
+assert.equal(M.queriedReviews(F), null, 'the old filters are no longer the current query');
+
 console.log('inbox_reviews_query: ok');
