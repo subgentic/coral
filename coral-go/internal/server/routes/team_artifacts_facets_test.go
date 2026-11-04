@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,6 +10,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/board"
 )
 
 // #13172: facets=by,goal,team on the artifacts list: the distinct values of the matching set with their counts, each with its own filter left out, so a Filters panel still offers the other choices after one is picked.
@@ -128,4 +131,68 @@ func TestFacetCountsFilesNotVersionsWithVersionsNewest(t *testing.T) {
 	}
 	assert.Equal(t, 3, count(""), "three versions are three rows")
 	assert.Equal(t, 1, count("&versions=newest"), "with versions=newest the file is one, as the totals say")
+}
+
+// #13378 (2): the team facet leaves its own filter (team=) out: picking a team narrows the list and still offers every team. (The first version of this pin used board=, which is the OTHER board of a shared or received file;
+// the team a list is for is team=, which only chose which teams were read, so the facet could not offer the others: now it reads them for the facet and filters the list.)
+func TestTheTeamFacetLeavesItsOwnBoardFilterOut(t *testing.T) {
+	t.Parallel()
+	srv, h := allTeamArtifactsServer(t)
+	twoTeamsFourResults(t, h)
+	teams := func(q string) (map[string]int, int) {
+		code, r := getFacets(t, srv.URL+"/api/team-artifacts?"+q)
+		require.Equal(t, 200, code, q)
+		return factsOf(r.Facets["team"]), *r.Total
+	}
+	all, total := teams("facets=team&limit=1")
+	assert.Equal(t, map[string]int{"alpha": 2, "beta": 2}, all)
+	assert.Equal(t, 4, total)
+	picked, total := teams("facets=team&team=alpha&limit=1")
+	assert.Equal(t, 2, total, "the list is narrowed to the picked team")
+	assert.Equal(t, map[string]int{"alpha": 2, "beta": 2}, picked, "and the team facet still offers every team (its own filter is left out)")
+	other, total := teams("facets=team&q=alpha&limit=1")
+	assert.Equal(t, 2, total)
+	assert.Equal(t, map[string]int{"alpha": 2}, other, "another filter does narrow it")
+}
+
+// #13378 (3): goals are told apart by their number: two goals with one title are two choices, each with its own id and count.
+func TestTwoGoalsWithOneTitleAreTwoGoalChoices(t *testing.T) {
+	srv, h, _ := teamArtifactServer(t)
+	ctx := context.Background()
+	g1, err := h.bs.CreateGoal(ctx, "g-team", board.GoalInput{Title: "Tidy the docs", CreatedBy: "lead"})
+	require.NoError(t, err)
+	g2, err := h.bs.CreateGoal(ctx, "g-team", board.GoalInput{Title: "Tidy the docs", CreatedBy: "lead"})
+	require.NoError(t, err)
+	for i, g := range []*board.Goal{g1, g1, g2} {
+		task, err := h.bs.CreateTaskWithOpts(ctx, "g-team", "task", "", "medium", "lead", &board.CreateTaskOpts{GoalID: &g.ID}, "lead")
+		require.NoError(t, err)
+		_, err = h.bs.CompleteTaskWithArtifacts(ctx, "g-team", task.ID, "lead", nil, "success", []board.TaskArtifact{{Name: fmt.Sprintf("f%d.md", i), Content: "x"}})
+		require.NoError(t, err)
+	}
+	code, r := getFacets(t, srv.URL+"/api/board/g-team/artifacts?facets=goal&limit=1")
+	require.Equal(t, 200, code)
+	got := map[int64]artifactFacetValue{}
+	for _, v := range r.Facets["goal"] {
+		got[v.ID] = v
+	}
+	require.Len(t, got, 2, "two goals, two choices, though they share a title: %v", r.Facets["goal"])
+	assert.Equal(t, artifactFacetValue{V: "Tidy the docs", N: 2, ID: g1.ID}, got[g1.ID])
+	assert.Equal(t, artifactFacetValue{V: "Tidy the docs", N: 1, ID: g2.ID}, got[g2.ID])
+}
+
+// #13378 (1): with a search, the list and every facet are separate passes over the files; each file's sidecar is read once, not once per pass (q + by + three facets was twice the cost of q + by).
+func TestEachFilesSidecarIsReadOnceForTheListAndEveryFacet(t *testing.T) {
+	e := newTAEnv(t)
+	read := func(q string) int64 {
+		before := teamArtifactEnrichments.Load()
+		code, _, raw := e.get(q)
+		require.Equal(t, 200, code, taJSON(raw))
+		return teamArtifactEnrichments.Load() - before
+	}
+	plain := read("?q=md&by=alice&limit=1")
+	require.Positive(t, plain, "a search reads sidecars")
+	_, full, _ := e.get("?sort=newest&limit=1")
+	withFacets := read("?q=md&by=alice&facets=by,goal,team&limit=1")
+	assert.LessOrEqual(t, withFacets, int64(*full.All), "every file at most once in all the passes together (the list narrowed to alice, the by facet over everyone's, the others): without the memo each pass read its own")
+	assert.Greater(t, withFacets, plain, "the by facet did read the files the by filter had left out")
 }

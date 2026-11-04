@@ -66,4 +66,6 @@ func TestTeamArtifactsQuery10kCost(t *testing.T) {
 	time1("facets=by,goal,team (#13172)", "?facets=by,goal,team&limit=1")
 	time1("facets=by with by= (#13172)", "?facets=by&by=alice&limit=1")
 	time1("facets=by with q (reads sidecars)", "?facets=by&q=report&limit=1")
+	time1("q + by (reads sidecars)", "?q=report&by=alice&limit=1")
+	time1("q + by + facets=by,goal,team (#13378)", "?q=report&by=alice&facets=by,goal,team&limit=1")
 }

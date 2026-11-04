@@ -117,7 +117,7 @@ func (h *BoardHandler) ListAllTeamArtifacts(w http.ResponseWriter, r *http.Reque
 	for _, t := range teams {
 		wanted[t] = true
 	}
-	var items []teamArtifact
+	var items, pool []teamArtifact // pool: rows of the teams not asked for, kept only for the team facet
 	var refs []teamArtifactTeamRef
 	truncated, cut := false, false
 	walked := 0
@@ -126,7 +126,8 @@ func (h *BoardHandler) ListAllTeamArtifacts(w http.ResponseWriter, r *http.Reque
 		if label == "" {
 			label = p.Project
 		}
-		if len(teams) > 0 && !wanted[p.Project] && !wanted[label] {
+		unwanted := len(teams) > 0 && !wanted[p.Project] && !wanted[label]
+		if unwanted && !(tq != nil && hasFacet(tq.facets, "team")) {
 			continue
 		}
 		if walked == maxTeamArtifactTeams {
@@ -142,6 +143,10 @@ func (h *BoardHandler) ListAllTeamArtifacts(w http.ResponseWriter, r *http.Reque
 		truncated = truncated || scanCut
 		for i := range rows {
 			rows[i].BoardID, rows[i].Team = p.Project, label
+		}
+		if unwanted { // read only so the team facet can offer it (facets=team): it is no part of the list, its count or its refs
+			pool = append(pool, rows...)
+			continue
 		}
 		if len(rows) > 0 {
 			refs = append(refs, teamArtifactTeamRef{BoardID: p.Project, Team: label, All: filesOrVersions(tq, rows)})
@@ -160,6 +165,10 @@ func (h *BoardHandler) ListAllTeamArtifacts(w http.ResponseWriter, r *http.Reque
 		}
 	}
 	all := filesOrVersions(tq, items) // with versions=newest the unfiltered count is files, as the total and the team route's own all are (#11700, #13151)
+	if len(pool) > 0 {                // facets=team with a team asked for: the rows of the other teams join the pass, the asked-for teams stay the list (the team= filter), and the team facet leaves that filter out (#13378)
+		items = append(items, pool...)
+		tq.teams = teams
+	}
 	sel, err := h.selectTeamArtifacts(r, items, limit, offset, tq)
 	if err != nil {
 		errInternalServer(w, "could not list artifacts")

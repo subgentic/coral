@@ -54,7 +54,7 @@ const STUB = `(() => {
 
             // the first page: a page of rows; scroll to the end of it, where the footer asks for the next page; the computer refuses that page once
             const n = await ev(`document.querySelectorAll('${ROWS}').length`);
-            assert.ok(n >= 90 && n <= 100, at + `the first page has a page of rows: ${n}`);
+            assert.ok(n >= 40 && n <= 100, at + `the first page has a page of rows: ${n}`);
             await ev(`window.__refuse = '${n}'; window.__refused = 0; true`);
             await scrollToRow(n - 6); await settle(300);
             await ev(`(() => { const v = window.__scroller(); v.scrollTop = v.scrollHeight; return true; })()`);

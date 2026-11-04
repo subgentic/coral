@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/subgentic/coral/internal/board"
@@ -73,6 +74,7 @@ type teamArtifactQuery struct {
 	collapse bool // versions=newest (#11700): the versions of one file are one row, the newest; the totals and the tag counts follow
 	cursor   *teamArtifactCursor
 	finger   string
+	teams    []string // the cross-team list's team= restriction, as a filter (set by the handler, not parsed): with facets=team the other teams' rows are collected too, so the team facet can leave this one out (#13378)
 	facets   []string // facets=team,by,goal (#13172): the distinct values of the matching set, each with its own filter left out
 }
 
@@ -458,6 +460,15 @@ func (q *teamArtifactQuery) cheapMatch(it teamArtifact, kept, starred map[string
 			return false
 		}
 	}
+	if len(q.teams) > 0 {
+		in := false
+		for _, t := range q.teams {
+			in = in || t == it.BoardID || t == it.Team
+		}
+		if !in {
+			return false
+		}
+	}
 	if len(q.boards) > 0 && !teamArtifactMatchesBoard(it, q.boards) {
 		return false
 	}
@@ -751,28 +762,36 @@ func (h *BoardHandler) selectTeamArtifacts(r *http.Request, items []teamArtifact
 		counts = teamTagCountsByFile(items) // files, not versions (#11700)
 	}
 	// filtered is the matching set of a query (qq): the cheap filters, then the ones that need each file's sidecar (search, kind). The facets run it again with one filter left out.
+	// A file's sidecar is read (its name, type and size) once however many of the passes want it: the list and each facet are separate passes over a changing set of files, and the search and the kind test are the same for a file in all of them (#13378).
+	type enrichedRow struct {
+		it teamArtifact
+	}
+	memo := map[int]enrichedRow{}
 	filtered := func(qq *teamArtifactQuery) (set []teamArtifact, enriched bool) {
-		for _, it := range items {
-			if qq.cheapMatch(it, kept, starred) {
+		needs := qq.needsEnrichment()
+		for i, it := range items {
+			if !qq.cheapMatch(it, kept, starred) {
+				continue
+			}
+			if !needs {
 				set = append(set, it)
+				continue
 			}
-		}
-		if qq.needsEnrichment() {
 			enriched = true
-			for i := range set {
-				enrichTeamArtifact(&set[i], dir)
-				finishTeamArtifactName(&set[i])
+			e, ok := memo[i]
+			if !ok {
+				e.it = it
+				teamArtifactEnrichments.Add(1)
+				enrichTeamArtifact(&e.it, dir)
+				finishTeamArtifactName(&e.it)
 				if tunneled {
-					redactItemForTunnel(&set[i]) // the sidecar's name and type are new text
+					redactItemForTunnel(&e.it) // the sidecar's name and type are new text
 				}
+				memo[i] = e
 			}
-			var out []teamArtifact
-			for _, it := range set {
-				if qq.textMatch(it) && qq.kindMatch(it) && !(qq.waiting != nil && *qq.waiting && !it.Available) { // a file that waits is one the Operator can open: its stored file is there
-					out = append(out, it)
-				}
+			if qq.textMatch(e.it) && qq.kindMatch(e.it) && !(qq.waiting != nil && *qq.waiting && !e.it.Available) { // a file that waits is one the Operator can open: its stored file is there
+				set = append(set, e.it)
 			}
-			set = out
 		}
 		return set, enriched
 	}
@@ -790,8 +809,8 @@ func (h *BoardHandler) selectTeamArtifacts(r *http.Request, items []teamArtifact
 					own, _ = filtered(&qq)
 				}
 			case "team":
-				if len(qq.boards) > 0 {
-					qq.boards = nil
+				if len(qq.teams) > 0 {
+					qq.teams = nil
 					own, _ = filtered(&qq)
 				}
 			case "goal":
@@ -1031,3 +1050,15 @@ func artifactFacetOf(facet string, set []teamArtifact) []artifactFacetValue {
 	}
 	return out
 }
+
+func hasFacet(list []string, f string) bool {
+	for _, x := range list {
+		if x == f {
+			return true
+		}
+	}
+	return false
+}
+
+// teamArtifactEnrichments counts the files whose sidecar a list query has read (a test seam: each file once per query, however many facets are asked, #13378).
+var teamArtifactEnrichments atomic.Int64
