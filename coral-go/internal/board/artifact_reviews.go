@@ -219,9 +219,25 @@ func (s *Store) UndoArtifactReview(ctx context.Context, ch ReviewChange) error {
 // ReviewSuperseded is the state of a review whose artifact has a newer version in its series that is for review itself.
 const ReviewSuperseded = "superseded"
 
+// ErrNotOlderReview means no verified newer candidate still has a review or an
+// approved/denied decision. The route supplies candidates from upload records.
+var ErrNotOlderReview = errors.New("this is not an older version with a newer review")
+
 // SupersedeArtifactReview closes the review of an older version of an artifact (#136588): when the agent uploads the next version of the series for review, the older one, still waiting or with changes
 // requested, is no longer something to review ("for review", "read", "saved" and "changes requested" go, "superseded" comes), and the new version is the pending one. Anything else (approved, never for review) is left alone.
 func (s *Store) SupersedeArtifactReview(ctx context.Context, boardID, hex string, now time.Time) (bool, error) {
+	return s.supersedeArtifactReview(ctx, boardID, hex, nil, now, false)
+}
+
+// SettleOlderArtifactReview checks the newer candidates' state and records the
+// automatic settlement in Activity in the same transaction as the tag changes.
+func (s *Store) SettleOlderArtifactReview(ctx context.Context, boardID, hex string, newer []string, now time.Time) (bool, error) {
+	s.activityMu.Lock()
+	defer s.activityMu.Unlock()
+	return s.supersedeArtifactReview(ctx, boardID, hex, newer, now, true)
+}
+
+func (s *Store) supersedeArtifactReview(ctx context.Context, boardID, hex string, newer []string, now time.Time, activity bool) (bool, error) {
 	tx, err := s.db.BeginTxx(ctx, nil)
 	if err != nil {
 		return false, err
@@ -238,6 +254,22 @@ func (s *Store) SupersedeArtifactReview(ctx context.Context, boardID, hex string
 	if !waiting {
 		return false, nil
 	}
+	if activity {
+		eligible := false
+		for _, candidate := range newer {
+			if candidate == hex {
+				continue
+			}
+			var active bool
+			if err := tx.GetContext(ctx, &active, `SELECT EXISTS (SELECT 1 FROM artifact_tags WHERE board_id = ? AND hex = ? AND tag = ?) OR EXISTS (SELECT 1 FROM artifact_reviews WHERE board_id = ? AND hex = ? AND state IN (?, ?))`, boardID, candidate, tagForReview, boardID, candidate, ReviewApproved, ReviewDenied); err != nil {
+				return false, err
+			}
+			eligible = eligible || active
+		}
+		if !eligible {
+			return false, ErrNotOlderReview
+		}
+	}
 	for _, t := range []string{tagForReview, tagRead, ReviewChangesRequested, tagSaved} {
 		if _, err := tx.ExecContext(ctx, `DELETE FROM artifact_tags WHERE board_id = ? AND hex = ? AND tag = ?`, boardID, hex, t); err != nil {
 			return false, err
@@ -252,6 +284,11 @@ func (s *Store) SupersedeArtifactReview(ctx context.Context, boardID, hex string
 	if _, err := tx.ExecContext(ctx, `INSERT INTO artifact_reviews (board_id, hex, state, at) VALUES (?, ?, ?, ?)
 		ON CONFLICT(board_id, hex) DO UPDATE SET state = excluded.state, at = excluded.at`, boardID, hex, ReviewSuperseded, now.UTC().Format(time.RFC3339)); err != nil {
 		return false, err
+	}
+	if activity {
+		if err := s.recordInTx(ctx, tx, now, ActSupersede, "file", hex, hex, boardID); err != nil {
+			return false, err
+		}
 	}
 	return true, tx.Commit()
 }

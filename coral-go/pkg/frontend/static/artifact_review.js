@@ -58,7 +58,7 @@ async function settleEarlierVersions(m, row) {
                 }
             }
             settled++;
-        } catch (e) { if (e.status === 409 && e.code === 'not_for_review') settled++; else failed++; }
+        } catch (e) { if (isCloud() && e.status === 404) continue; if (e.status === 409 && e.code === 'not_for_review') settled++; else failed++; }
     }
     return { settled, failed };
 }
