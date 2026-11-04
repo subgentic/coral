@@ -24,8 +24,10 @@ import (
 
 // Store provides message board operations with its own SQLite database.
 type Store struct {
-	activityMu              sync.Mutex // one writer of the Activity record's chain at a time (operator_actions.go)
-	dbPath                  string     // the board file's path (the disk the message search index is built on)
+	settingsMu              sync.Mutex                  // the settings changes waiting to be told to a team's Orchestrator (settings_notice.go)
+	settingsPending         map[string]*settingsPending // by board
+	activityMu              sync.Mutex                  // one writer of the Activity record's chain at a time (operator_actions.go)
+	dbPath                  string                      // the board file's path (the disk the message search index is built on)
 	db                      *sqlx.DB
 	readDB                  *sqlx.DB
 	sessionsDB              *sqlx.DB                            // optional reference to the main sessions DB for cross-DB queries

@@ -105,6 +105,7 @@ func (h *SessionsHandler) OrchestratorGrant(w http.ResponseWriter, r *http.Reque
 		errInternalServer(w, "could not save the grant")
 		return
 	}
+	noteSettingsChange(h.bs, r, project, orchGrantShown(cur), orchGrantShown(g)) // what the Orchestrator is told changed (#13173)
 	if cur.Enabled != g.Enabled || cur.SeatSession != g.SeatSession || cur.MaxPerHour != g.MaxPerHour || cur.MaxLive != g.MaxLive || cur.IdleMin != g.IdleMin {
 		if id, err := h.bs.ReserveLifecycle(r.Context(), project, "grant", "Operator", h.orchGrantWords(r.Context(), g), nil); err == nil {
 			_ = h.bs.FinishLifecycle(r.Context(), id, "ok", "")
@@ -478,4 +479,9 @@ func launcherWords(name string) string {
 		return "An agent"
 	}
 	return name
+}
+
+// orchGrantShown is a grant as the settings notice compares it: its settings, not who set it or when.
+func orchGrantShown(g board.OrchGrant) map[string]any {
+	return map[string]any{"orchestrator_grant.enabled": g.Enabled, "orchestrator_grant.seat_session": g.SeatSession, "orchestrator_grant.max_per_hour": g.MaxPerHour, "orchestrator_grant.max_live": g.MaxLive, "orchestrator_grant.idle_minutes": g.IdleMin}
 }

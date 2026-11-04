@@ -369,11 +369,13 @@ func (h *BoardHandler) UpdateBoardSettings(w http.ResponseWriter, r *http.Reques
 	if hubRecorded {
 		beforeHub, _ = h.bs.GetBoardSettings(r.Context(), project)
 	}
+	priorSettings, _ := h.bs.GetBoardSettings(r.Context(), project) // what the Orchestrator is told changed (#13173)
 	settings, err := h.bs.UpdateBoardSettings(r.Context(), project, body.BoardSettingsUpdate)
 	if err != nil {
 		errInternalServer(w, err.Error())
 		return
 	}
+	noteSettingsChange(h.bs, r, project, priorSettings, settings)
 	listEditRefused = false
 	if hubRecorded {
 		// The change and its record are one or neither: if the record cannot be written the change is undone and the owner is told (the switch routes' rule, Security's #5572 condition 4).
@@ -896,8 +898,10 @@ func (h *BoardHandler) recordHubSettings(w http.ResponseWriter, r *http.Request,
 		if u.Health != nil || u.HealthPatch != nil { // the health setup sent in the same body was applied with the rest: it is undone with it (QA's #7329 finding)
 			undo.Health = &before.Health
 		}
-		if _, uerr := h.bs.UpdateBoardSettings(ctx, project, undo); uerr != nil {
+		if undone, uerr := h.bs.UpdateBoardSettings(ctx, project, undo); uerr != nil {
 			slog.Error("[cloud] could not undo a Coral Hub settings change that was not recorded", "board", project, "error", uerr)
+		} else {
+			noteSettingsChange(h.bs, r, project, after, undone) // the change was told when it was made: the undo cancels it in the same window, or is told as its own change after it
 		}
 		writeError(w, http.StatusInternalServerError, "record_failed", textHubSwitchNotRecorded)
 		return false
