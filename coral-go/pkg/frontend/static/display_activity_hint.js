@@ -4,7 +4,7 @@ import { dialogDue } from './at_dialog.js';
 export const DISPLAY_HINT_MAX_AGE_MS = 10_000;
 export function hasWorkingDisplayHint(s, now = Date.now()) {
     if (!s || s.agent_type !== 'codex' || s.display_activity_hint !== 'working' || !s.waiting_for_input || s.waiting_kind !== 'permission'
-        || s.sleeping || s.archived || s.needs_login || s.stuck || s.not_started) return false;
+        || s.sleeping || s.archived || s.needs_login || s.stuck || s.blocked || s.not_started) return false;
     if (typeof s.display_activity_hint_at !== 'string' || typeof s.waiting_since !== 'string') return false;
     const at = Date.parse(s.display_activity_hint_at), since = Date.parse(s.waiting_since);
     const age = now - at;
