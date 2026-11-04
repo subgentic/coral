@@ -417,6 +417,9 @@ func (h *SessionsHandler) chatNotices(r *http.Request, name, agentType, sessionI
 		})
 	}
 	if !needsLogin {
+		if limitNotice = modelRefusedNotice(sessionID, agentType); limitNotice != "" {
+			return needsLogin, loginReason, limitNotice // its model is refused (#13486): that is what blocks it, not a usage limit
+		}
 		limitNotice = h.usageLimitText(agentType, sessionID, workingDir, h.cachedLogStatus(h.findLogPath(agentType, sessionID)))
 	}
 	return needsLogin, loginReason, limitNotice

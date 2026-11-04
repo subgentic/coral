@@ -3,6 +3,8 @@ package ptymanager
 import (
 	"regexp"
 	"strings"
+	"sync"
+	"time"
 )
 
 // Codex refuses a model its login cannot use (#13480): "■ The 'gpt-6.1-sol' model is not supported when using Codex with a ChatGPT account." It says so only on its own screen, in the turn a
@@ -30,4 +32,37 @@ func CodexModelRefusedOnScreen(screen string) (model string, ok bool) {
 		}
 	}
 	return "", false
+}
+
+// refusedReads is what the health monitor's screen reads last found for each Codex session (#13486): the live list and the chat say it from here and never read a screen of their own. Entries are
+// dropped when they are read stale and when a read finds no refusal.
+var refusedReads sync.Map // session id -> refusedRead
+
+type refusedRead struct {
+	model string
+	at    time.Time
+}
+
+// NoteCodexModelRefusal records what a screen read found for a session at `at`: a refusal (model "" when the name is not a safe one), or none (which forgets an earlier one).
+func NoteCodexModelRefusal(sessionID, model string, refused bool, at time.Time) {
+	if !refused {
+		refusedReads.Delete(sessionID)
+		return
+	}
+	refusedReads.Store(sessionID, refusedRead{model: model, at: at})
+}
+
+// CodexModelRefusalOf is the refusal the last screen read found for a session, when it was made within maxAge of now: a read that is older says nothing, so a mark disappears by itself once Codex works again
+// and nobody is reading its screen.
+func CodexModelRefusalOf(sessionID string, maxAge time.Duration, now time.Time) (model string, refused bool) {
+	v, ok := refusedReads.Load(sessionID)
+	if !ok {
+		return "", false
+	}
+	r := v.(refusedRead)
+	if now.Sub(r.at) > maxAge {
+		refusedReads.Delete(sessionID)
+		return "", false
+	}
+	return r.model, true
 }
