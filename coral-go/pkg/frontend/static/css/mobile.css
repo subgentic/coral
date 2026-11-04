@@ -1442,7 +1442,7 @@
     body.phone-nav-on:not(.keyboard-open):not(.popout-mode) .phone-nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; display: flex; align-items: stretch; justify-content: space-around; min-height: calc(var(--phone-bar-h) + env(safe-area-inset-bottom, 0px)); padding: 8px 4px calc(8px + env(safe-area-inset-bottom, 0px)); background: var(--bg-secondary); border-top: 1px solid var(--border); box-sizing: border-box; }
     .phone-nav-slot { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; flex: 1 1 0; min-width: 0; min-height: 56px; padding: 0; border: 0; background: none; color: var(--text-muted); cursor: pointer; }
     .phone-nav-icon { position: relative; display: grid; place-items: center; width: 64px; height: 32px; border-radius: 16px; }
-    :root { --phone-bar-h: max(73px, calc(53px + var(--fs-sm) * var(--lh-label))); } /* icon, gap, insets and one label line; page/FAB clearance grows with text too */
+    :root { --phone-bar-h: max(73px, calc(54px + var(--fs-sm) * var(--lh-label))); } /* icon, gap, insets and one label line; page/FAB clearance grows with text too */
     .phone-nav-label { font-size: var(--fs-sm); line-height: var(--lh-label); max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center; }
     .phone-nav-slot.active { color: var(--text-primary); }
     .phone-nav-slot.active .phone-nav-icon { background: var(--bg-hover); }
