@@ -304,3 +304,42 @@ func TestOwnWorktreeTakesOnlyAOneElementTeamName(t *testing.T) {
 		assert.False(t, ownWorktree(coralDir, &store.Team{Name: name}, folder), "team name %q", name)
 	}
 }
+
+// #13422: coral-hub's Security Reviewer was launched from the home folder and is on the board "coral-hub" with no team id and no member row; its team's folder was never used and a dashboard
+// wake reopened it in the home folder (Claude's trust dialog, its conversation elsewhere). A row with no team link is found by its board's name, the team of that name.
+func TestWakeFindsTheTeamByTheBoardWhenTheRowHasNoTeamLink(t *testing.T) {
+	srv, _, terminal, ss, ts := homeFolderServer(t)
+	ctx := context.Background()
+	home, teamDir := t.TempDir(), filepath.Join(t.TempDir(), "coral-hub")
+	require.NoError(t, os.MkdirAll(teamDir, 0o755))
+	_, err := ts.CreateTeam(ctx, &store.Team{Name: "coral-hub", ConfigJSON: "{}", WorkingDir: teamDir})
+	require.NoError(t, err)
+	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: homeSID, AgentType: "claude", AgentName: "cknorowski", WorkingDir: home, IsSleeping: 1, BoardName: ptr.NonEmpty("coral-hub")}))
+
+	resp, err := http.Post(srv.URL+"/api/sessions/live/"+homeSID+"/wake", "application/json", strings.NewReader("{}"))
+	require.NoError(t, err)
+	resp.Body.Close()
+	terminal.mu.Lock()
+	pane := terminal.sessions[naming.SessionName("claude", homeSID)]
+	terminal.mu.Unlock()
+	require.NotNil(t, pane)
+	assert.Equal(t, homeReal(t, teamDir), pane.CurrentPath, "in its team's folder, not the home folder it was launched from")
+}
+
+// The board's name is used only when no team link exists, and only for a team of that name: another board, or a row the Operator placed in a team, keeps its own rules.
+func TestWakeKeepsTheRowsFolderWhenNoTeamHasTheBoardsName(t *testing.T) {
+	srv, _, terminal, ss, ts := homeFolderServer(t)
+	ctx := context.Background()
+	own, other := t.TempDir(), t.TempDir()
+	_, err := ts.CreateTeam(ctx, &store.Team{Name: "another", ConfigJSON: "{}", WorkingDir: other})
+	require.NoError(t, err)
+	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: homeSID, AgentType: "claude", AgentName: "m", WorkingDir: own, IsSleeping: 1, BoardName: ptr.NonEmpty("no-such-team")}))
+	resp, err := http.Post(srv.URL+"/api/sessions/live/"+homeSID+"/wake", "application/json", strings.NewReader("{}"))
+	require.NoError(t, err)
+	resp.Body.Close()
+	terminal.mu.Lock()
+	pane := terminal.sessions[naming.SessionName("claude", homeSID)]
+	terminal.mu.Unlock()
+	require.NotNil(t, pane)
+	assert.Equal(t, own, pane.CurrentPath)
+}

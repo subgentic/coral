@@ -77,7 +77,7 @@ func validTeamHomeFolder(coralDir string, team *store.Team, dir string) (string,
 }
 
 // teamHomeFolder is the folder the team of a session says its agents start in, or "" when the session is on no team, the team has none, or the folder
-// is gone (the session then keeps its own: a missing folder never stops a wake). A team is found by the row's team id, else by its member row.
+// is gone (the session then keeps its own: a missing folder never stops a wake). A team is found by the row's team id, else by its member row, else by the name of its board.
 func (h *SessionsHandler) teamHomeFolder(ctx context.Context, ls *store.LiveSession) string {
 	if ls == nil || h.teamStore == nil {
 		return ""
@@ -90,6 +90,9 @@ func (h *SessionsHandler) teamHomeFolder(ctx context.Context, ls *store.LiveSess
 		if m, _ := h.teamStore.GetMemberBySessionID(ctx, ls.SessionID); m != nil {
 			team, _ = h.teamStore.GetTeamByID(ctx, m.TeamID)
 		}
+	}
+	if team == nil && ls.BoardName != nil && *ls.BoardName != "" { // a row with no team link (one launched on its own into the team's board, #13422) is on the team of its board's name
+		team, _ = h.teamStore.GetTeam(ctx, *ls.BoardName)
 	}
 	if team == nil || team.WorkingDir == "" {
 		return ""
