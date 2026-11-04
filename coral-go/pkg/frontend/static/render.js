@@ -158,7 +158,17 @@ export function agentSearchKey(e) {
 
 /** Render the agent list now (user actions, which may read the DOM right after).
  *  A pending scheduled render is dropped: this one shows the latest list. */
+// Chief's entry in the Agents sidebar (#13167) is asked for by the first live-list render after the start has settled (8 s of uptime), never at the start: no request, timer or listener joins the startup sequence
+// (page_weight and its golden stay as they were); a test sets window.__chiefAfterMs to ask at once.
+let _chiefAsked = false;
+function paintChiefLater() {
+    if (_chiefAsked || performance.now() < (window.__chiefAfterMs ?? 8000)) return;
+    _chiefAsked = true;
+    importOnce('./chief_entry.js').then(m => m.paintSidebarChief()).catch(() => {});
+}
+
 export function renderLiveSessions(sessions) {
+    paintChiefLater();
     if (_scheduledRender) { cancelAnimationFrame(_scheduledRender); _scheduledRender = 0; }
     followServerOrder(sessions); // a replaced agent's place was moved to its new id on the server (#4943)
     noteBoardLabels(sessions); // board_label beside board_project (#3536): what keyLabel shows

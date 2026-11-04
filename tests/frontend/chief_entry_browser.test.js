@@ -21,12 +21,13 @@ const CASES = [
         for (const c of CASES) for (const [w, h, mobile] of [[1280, 800, false], [390, 844, true]]) {
             const tag = `${c.name} at ${w} px`;
             if (stub) await Page.removeScriptToEvaluateOnNewDocument({ identifier: stub });
-            stub = (await Page.addScriptToEvaluateOnNewDocument({ source: `(() => { const R = window.fetch; window.fetch = (u, o) => { if (new URL(String(u && u.url || u), location.origin).pathname === '/api/chief') return Promise.resolve(new Response(JSON.stringify(${JSON.stringify(c.body)}), { status: ${c.status}, headers: { 'content-type': 'application/json' } })); return R(u, o); }; })();` })).identifier;
+            stub = (await Page.addScriptToEvaluateOnNewDocument({ source: `(() => { window.__chiefAfterMs = 0; window.__chiefCalls = 0; const R = window.fetch; window.fetch = (u, o) => { if (new URL(String(u && u.url || u), location.origin).pathname === '/api/chief') { window.__chiefCalls++; return Promise.resolve(new Response(JSON.stringify(${JSON.stringify(c.body)}), { status: ${c.status}, headers: { 'content-type': 'application/json' } })); } return R(u, o); }; })();` })).identifier;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'settings');
             let got;
             if (!mobile) {
-                await new Promise(r => setTimeout(r, 1200)); // sleep-ok: the sidebar paints Chief's entry when the browser is idle, there is no event for it
+                await waitFor(`window.__chiefCalls >= 1`, `${tag}: Chief's entry is asked for once the start has settled`, 12000);
+                await new Promise(r => setTimeout(r, 400)); // sleep-ok: the answer is painted a tick after the request, no event for it
                 got = await ev(`(() => { const s = document.getElementById('sidebar-chief-slot'), n = s && s.querySelector('a, button'); return { shown: !!s && !s.hidden && !!n, text: n ? n.lastElementChild.textContent.trim() : '', href: n && n.getAttribute('href'), avatar: n ? (n.querySelector('.chief-avatar') || {}).textContent || '' : '', h: n ? Math.round(n.getBoundingClientRect().height) : 0 }; })()`);
             } else {
                 await ev(`document.getElementById('top-menu-btn').click(); true`);
