@@ -38,7 +38,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
             // Escape and Close dismiss nothing
             await open('Dev'); await waitFor(`document.querySelector('dialog.inbox-ask-dialog[open]')`, at + 'the question dialog opens', 4000);
             const d = await dismissIn();
-            check(at + 'a question has Dismiss between Close and Send reply', !!d && JSON.stringify(d.order) === JSON.stringify(['Close', 'Dismiss', 'Send reply']), JSON.stringify(d));
+            check(at + 'a question has Close and Dismiss in the footer (Send reply is under the box, #13148)', !!d && JSON.stringify(d.order) === JSON.stringify(['Close', 'Dismiss']), JSON.stringify(d));
             check(at + 'Dismiss is a touch target', !!d && d.h >= (mobile ? 44 : 28), JSON.stringify(d));
             await ev(`document.querySelector('dialog.inbox-ask-dialog[open]').dispatchEvent(new Event('cancel', { cancelable: true })); true`);
             await waitFor(`!document.querySelector('dialog.inbox-ask-dialog')`, at + 'Escape closes the dialog', 4000);
