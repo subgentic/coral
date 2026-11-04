@@ -119,6 +119,7 @@ const B = {
       const bad = [/\/tmp\//, /\/Users\//, /@[\w-]+\.[a-z]{2,}/i, /Welcome back/i, /scratchpad/, /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i].map((re) => (cap.match(re) || [])[0]).filter(Boolean)
       if (bad.length) throw new Error("the real terminal shows: " + bad.join(" | "))
       const t = await beat(browser, "real")
+      await t.page.addInitScript(() => setInterval(() => { for (const el of document.querySelectorAll("div, section, aside, p, span")) if (/isn.t signed in/i.test(el.textContent || "") && el.textContent.length < 400 && el.children.length < 6) el.style.display = "none" }, 120))   // the CLI is signed out on purpose here: the page's notice about it is not part of the shot
       await t.go("/agents/" + id); await t.cap("Any CLI agent runs in Coral just as it does in your terminal.")
       await t.click(t.page.locator("button[aria-label='Terminal view']")); await sleep(7000)
       return await t.finish()

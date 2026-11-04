@@ -6,7 +6,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/env.sh"
 FF="$S/bin/ffmpeg"; [ -x "$FF" ] || FF=ffmpeg
 C="$S/work/clips"; O="$S/out"; mkdir -p "$O"
 g() { ls -t "$C/$1"/*.webm | head -1; }   # the newest take of a beat
-FADE=0.5
+FADE=0.35
 # speed-ups per beat (the slow waits are compressed; the review page says so); 1.0 = real time
 sp() { case $1 in c1) echo 1.3;; c2|c3|c6) echo 1.2;; c4|c5|c8) echo 1.4;; real) echo 1.2;; c9) echo 1.3;; c7) echo 1.6;; *) echo 1.0;; esac; }   # (macOS bash has no associative arrays)
 LAST=endcard; [ "$ENDING" = hub ] && LAST=hub   # the end card (the text coralhub.dev) is the ending; ENDING=hub uses the live public page clip instead

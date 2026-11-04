@@ -31,7 +31,7 @@ cd "$S/home"
 python3 -I -c "import json,sys;d=json.load(open(sys.argv[1]));print(json.dumps([c['reply'] for c in d['chats']]+[{'text':x} for x in d.get('fillers',[])]))" "$HERE/../story.json" > "$S/work/replies.json"
 python3 -I -c "import json,sys;print(json.dumps(json.load(open(sys.argv[1]))['mockPrompts']))" "$HERE/../story.json" > "$S/work/prompts.json"   # the words of the prompts the mock raises (MOCK_PROMPTS_FILE)
 nohup env -i HOME="$S/home" PATH="$S/bin:/usr/bin:/bin" CORAL_DATA_DIR="$S/data" CORAL_TELEMETRY_DISABLED=1 CORAL_HOOK_DIR="$S/bin" \
-  MOCK_AGENT_READY=1 MOCK_AGENT_MODELS=1 MOCK_AGENT_QUIET=1 MOCK_PROMPTS_FILE="$S/work/prompts.json" MOCK_AGENT_REPLIES="$S/work/replies.json" MOCK_AGENT_ENV_DUMP="$S/work/envdump" CLAUDE_PROJECTS_DIR="$S/work/claude-projects" \
+  MOCK_AGENT_READY=1 MOCK_AGENT_MODELS=1 MOCK_AGENT_QUIET=1 MOCK_AGENT_GOAL="$(python3 -I -c "import json,sys;print(json.load(open(sys.argv[1]))['goal']['title'])" "$HERE/../story.json")" MOCK_PROMPTS_FILE="$S/work/prompts.json" MOCK_AGENT_REPLIES="$S/work/replies.json" MOCK_AGENT_ENV_DUMP="$S/work/envdump" CLAUDE_PROJECTS_DIR="$S/work/claude-projects" \
   "$S/bin/coral" --host 127.0.0.1 --port "$PORT" --cloud-url off --no-browser --backend pty > "$S/work/server.log" 2>&1 &
 echo $! > "$S/work/server.pid"; sleep 4
 KEY=$("$HERE/denv.sh" coral api-key 2>&1 | tail -1); (umask 077; echo "$KEY" > "$S/work/key")

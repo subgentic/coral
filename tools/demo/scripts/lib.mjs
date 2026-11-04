@@ -62,10 +62,13 @@ export async function beat(browser, name, { w = 1600, h = 900, mobile = false } 
   await ctx.addInitScript(() => {
     const mk = () => {
       if (document.getElementById("__cap")) return
-      const st = document.createElement("style"); st.textContent = "#__cap{pointer-events:none;position:fixed;left:0;right:0;bottom:0;z-index:2147483647;padding:14px 24px;text-align:center;font:600 22px/1.3 system-ui,sans-serif;color:#e7ebf2;background:rgba(14,17,22,.92);opacity:0}@media(max-width:500px){#__cap{bottom:78px;font-size:16px;padding:10px 14px;margin:0 8px;border-radius:10px}}#__cur{position:fixed;z-index:2147483647;width:18px;height:18px;border-radius:50%;background:rgba(79,140,255,.85);border:2px solid #fff;pointer-events:none;transform:translate(-9px,-9px);left:-40px;top:-40px;transition:left .02s,top .02s}"
+      const st = document.createElement("style"); st.textContent = "#__cap{pointer-events:none;position:fixed;inset:auto 0 0 0;width:auto;height:auto;margin:0;border:0;overflow:visible;z-index:2147483647;padding:14px 24px;text-align:center;font:600 22px/1.3 system-ui,sans-serif;color:#e7ebf2;background:rgba(14,17,22,.92);opacity:0}@media(max-width:500px){#__cap{bottom:78px;font-size:16px;padding:10px 14px;margin:0 8px;border-radius:10px}}#__cur{position:fixed;inset:auto;margin:0;padding:0;overflow:visible;z-index:2147483647;width:18px;height:18px;border-radius:50%;background:rgba(79,140,255,.85);border:2px solid #fff;pointer-events:none;transform:translate(-9px,-9px);left:-40px;top:-40px;transition:left .02s,top .02s}"
       document.documentElement.append(st)
       const c = document.createElement("div"); c.id = "__cap"; document.documentElement.append(c)
       const k = document.createElement("div"); k.id = "__cur"; document.documentElement.append(k)
+      c.setAttribute("popover", "manual"); k.setAttribute("popover", "manual")
+      const lift = () => { for (const e of [c, k]) { try { e.hidePopover(); e.showPopover() } catch (err) { /* no popover support: stays below modals */ } } }
+      lift(); setInterval(lift, 250)
       addEventListener("mousemove", (e) => { k.style.left = e.clientX + "px"; k.style.top = e.clientY + "px" }, true)
     }
     document.addEventListener("DOMContentLoaded", mk); mk()
