@@ -34,43 +34,19 @@ async function showMcpServers(name, sid) {
     setHidden(label, false); setHidden(val, false);
 }
 
-let sectionsAsked = '';
-const getJson = async (path) => { try { const r = await serverFetch(currentServer(), path); return r.ok ? await r.json() : null; } catch { return null; } };
-/** The dialog's Skills and Memory rows (#13209, goal #218), beside the MCP row: what the agent LOADED through skills get (a record, not a folder scan) and its instruction and memory files, each opened read-only on a click. Same rule as the MCP row: this computer's own agents, the Operator's routes, a failure leaves the row hidden. */
-async function showAgentSections(name, sid) {
+let sectionsGen = 0; // bumped on EVERY open and close of the dialog, eligible or not: an answer that arrives after that belongs to an earlier look and is dropped (UI Reviewer, #13245)
+/** The dialog's Skills and Memory rows (#13209, goal #218), beside the MCP row. `gen` and `server` are what showInfoModal took when it opened, before any await; the rows themselves are agent_info_sections.js's. */
+async function showAgentSections(name, sid, gen, server) {
     const rows = { skills: ['info-skills-label', 'info-skills'], memory: ['info-memory-label', 'info-memory'] };
     for (const [label, val] of Object.values(rows)) { setHidden(document.getElementById(label), true); setHidden(document.getElementById(val), true); }
-    if (!sid || isCloud() || !isLocalServer(currentServer())) return;
-    sectionsAsked = sid;
-    const q = `session_id=${encodeURIComponent(sid)}`, base = `/api/sessions/live/${encodeURIComponent(name)}`;
-    const { skillLines, memoryItems, memoryText } = await importOnce('./agent_info_sections.js'); // a lazy module loads the others through importOnce, so a failed load is retried
-    const [skills, memory] = await Promise.all([getJson(`${base}/loaded-skills?${q}`), getJson(`${base}/memory?${q}`)]);
-    if (sectionsAsked !== sid) return; // the dialog was opened for another agent meanwhile
-    const lines = skillLines(skills);
-    if (lines.length) { fill('info-skills', lines.map(l => Object.assign(document.createElement('div'), { textContent: l }))); }
-    const items = memoryItems(memory);
-    if (items.length) {
-        const nodes = items.map(it => {
-            if (!it.id) return Object.assign(document.createElement('div'), { textContent: it.label });
-            const b = Object.assign(document.createElement('button'), { type: 'button', className: 'info-memory-open', textContent: it.label });
-            b.addEventListener('click', async () => { // listener-ok: a button this dialog makes for one file, gone when the dialog is filled again
-                const pre = document.getElementById('info-memory-text'); pre.textContent = 'Loading...'; setHidden(pre, false);
-                const text = memoryText(await getJson(`${base}/memory/${encodeURIComponent(it.id)}?${q}`));
-                if (sectionsAsked === sid) pre.textContent = text;
-            });
-            return b;
-        });
-        const pre = Object.assign(document.createElement('pre'), { id: 'info-memory-text', className: 'info-memory-text', hidden: true });
-        fill('info-memory', [...nodes, pre]);
-    }
+    if (!sid || isCloud() || !isLocalServer(server)) return;
+    const { loadAgentSections } = await importOnce('./agent_info_sections.js'); // a lazy module loads the others through importOnce, so a failed load is retried
+    await loadAgentSections({ name, sid, server, current: () => gen === sectionsGen, fetchJson: getJson, rows: { skills: ['info-skills-label', 'info-skills'], memory: ['info-memory-label', 'info-memory'] } });
 }
-function fill(id, nodes) {
-    const val = document.getElementById(id), label = document.getElementById(id + '-label');
-    val.replaceChildren(...nodes);
-    setHidden(label, false); setHidden(val, false);
-}
+const getJson = async (server, path) => { try { const r = await serverFetch(server, path); return r.ok ? await r.json() : null; } catch { return null; } };
 
 export async function showInfoModal() {
+    const gen = ++sectionsGen, server = currentServer(); // every open drops the answers still pending for an earlier one, before any early return and any await
     if (!state.currentSession || state.currentSession.type !== "live") {
         showToast("No live session selected", true);
         return;
@@ -147,7 +123,7 @@ export async function showInfoModal() {
 
         document.getElementById("info-modal").style.display = "flex";
         showMcpServers(name, sid);
-        showAgentSections(name, sid);
+        showAgentSections(name, sid, gen, server);
     } catch (e) {
         showToast("Failed to load session info", true);
         console.error("showInfoModal exception:", e);
@@ -155,6 +131,7 @@ export async function showInfoModal() {
 }
 
 export function hideInfoModal() {
+    sectionsGen++; // a close drops what is still pending
     document.getElementById("info-modal").style.display = "none";
 }
 

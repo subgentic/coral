@@ -898,6 +898,8 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 
 /* The Info dialog's Memory row (#13209): one file per line, opened read-only on a click into a scrolling block under the list */
 .info-memory-open { display: block; width: 100%; min-height: 36px; padding: 6px 0; background: none; border: 0; font: inherit; text-align: left; color: var(--accent); text-decoration: underline; cursor: pointer; overflow-wrap: anywhere; }
+@media (max-width: 767px), (pointer: coarse) { .info-memory-open { min-height: 44px; } } /* a touch size, as the shared buttons have (UI Reviewer, #13245) */
+.info-memory-open[aria-pressed="true"] { font-weight: var(--fw-strong); }
 .info-memory-text { margin: 6px 0 0; padding: 10px 12px; max-height: 40vh; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; border: 1px solid var(--border); background: var(--bg-secondary); }
 
 .info-token-grid {

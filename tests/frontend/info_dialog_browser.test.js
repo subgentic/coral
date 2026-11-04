@@ -7,7 +7,7 @@ const BASE = require('./test_base').BASE;
 const { coralReady } = require('./helpers/wait');
 
 (async () => {
-    const { client, Page, ev, waitFor, PRELOAD, install } = await connect();
+    const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Page.navigate({ url: BASE }); await Page.loadEventFired(); await install();
@@ -75,8 +75,8 @@ const { coralReady } = require('./helpers/wait');
             window.__secReqs = 0;
             const prev = window.fetch;
             window.fetch = (u, o) => { const url = String(u), reply = r => Promise.resolve(new Response(JSON.stringify(r.body), { status: r.status }));
-                if (/\\/loaded-skills\\?/.test(url)) { window.__secReqs++; return reply(window.__sk); }
-                if (/\\/memory\\/[0-9a-f]{32}\\?/.test(url)) { window.__reqs.push(url); return reply(window.__file); }
+                if (/\\/loaded-skills\\?/.test(url)) { window.__secReqs++; return (window.__gateSk || Promise.resolve()).then(() => reply(window.__sk)); }
+                if (/\\/memory\\/[0-9a-f]{32}\\?/.test(url)) { window.__reqs.push(url); const id = url.match(/memory\\/([0-9a-f]{32})\\?/)[1], f = window.__files && window.__files[id]; return f ? f.gate.then(() => reply({ body: { text: f.text }, status: 200 })) : reply(window.__file); }
                 if (/\\/memory\\?/.test(url)) { window.__secReqs++; return reply(window.__mem); }
                 return prev(u, o); };
             window.__state_.currentSession = { type: 'live', name: 'info a', agent_type: 'claude', session_id: 'sid-1', server: 'local' };
@@ -98,6 +98,62 @@ const { coralReady } = require('./helpers/wait');
         await ev(`window.__sk = { body: { skills: [] }, status: 200 }; window.__mem = { body: { files: [] }, status: 200 }; true`); await run();
         await waitFor(`document.getElementById('info-skills').hidden === false`, 'the empty Skills row');
         assert.equal(await text('info-skills'), 'None loaded yet'); assert.equal(await text('info-memory'), 'None found');
+
+        console.log('Stale answers (UI Reviewer, #13245 M1): an open dropped by a later open (ineligible, or after a close) writes no row when its answer comes');
+        await ev(`window.__sk = { body: { skills: [{ name: 'only-local', version: 1, loads: 1, status: 'approved' }] }, status: 200 };
+            window.__mem = { body: { files: [] }, status: 200 };
+            window.__gateSk = new Promise(r => { window.__releaseSk = r; });
+            window.__state_.currentSession = { type: 'live', name: 'info a', agent_type: 'claude', session_id: 'sid-1', server: 'local' }; true`);
+        const held = await ev(`window.__secReqs`);
+        await run(); await waitFor(`window.__secReqs > ${held}`, 'the held skills request'); // the answer for agent A is still on its way
+        await ev(`window.__state_.currentSession = { type: 'live', name: 'info b', agent_type: 'claude', session_id: '', server: 'local' }; true`);
+        await run(); // the dialog opens for another agent that gets no sections (no session id: the same path a remote computer takes)
+        await ev(`window.__releaseSk(); true`);
+        await ev(`new Promise(r => setTimeout(() => setTimeout(() => r(true), 0), 0))`);
+        assert.equal(await ev(`document.getElementById('info-skills').hidden`), true, 'A\'s answer arrives after the open for B: the Skills row stays hidden');
+        await ev(`window.__gateSk = new Promise(r => { window.__releaseSk = r; });
+            window.__state_.currentSession = { type: 'live', name: 'info a', agent_type: 'claude', session_id: 'sid-1', server: 'local' }; true`);
+        const held2 = await ev(`window.__secReqs`);
+        await run(); await waitFor(`window.__secReqs > ${held2}`, 'the second held request');
+        await ev(`window.__m_.hideInfoModal(); window.__releaseSk(); true`);
+        await ev(`new Promise(r => setTimeout(() => setTimeout(() => r(true), 0), 0))`);
+        assert.equal(await ev(`document.getElementById('info-skills').hidden`), true, 'an answer after the dialog was closed writes nothing');
+        await ev(`window.__gateSk = null; true`);
+
+        console.log('Out-of-order files (M2): the file clicked last is the one shown, whatever order the answers come in; the block names it');
+        await ev(`window.__sk = { body: { skills: [] }, status: 200 };
+            window.__mem = { body: { files: [{ id: 'a'.repeat(32), file: 'one.md', kind: 'memory', level: 'user' }, { id: 'b'.repeat(32), file: 'two.md', kind: 'memory', level: 'user' }] }, status: 200 };
+            window.__files = {}; for (const [c, t] of [['a', 'FIRST file'], ['b', 'SECOND file']]) { const f = { text: t }; f.gate = new Promise(r => { f.release = r; }); window.__files[c.repeat(32)] = f; }
+            window.__state_.currentSession = { type: 'live', name: 'info a', agent_type: 'claude', session_id: 'sid-1', server: 'local' }; true`);
+        await run();
+        await waitFor(`document.querySelectorAll('#info-memory button').length === 2`, 'two files');
+        await ev(`const [b1, b2] = document.querySelectorAll('#info-memory button'); b1.click(); b2.click(); true`);
+        await waitFor(`window.__reqs.filter(u => /\\/memory\\/[0-9a-f]{32}\\?/.test(u)).length >= 2 && window.__reqs.some(u => u.includes('b'.repeat(32)))`, 'both file requests');
+        await ev(`window.__files['b'.repeat(32)].release(); true`); await waitFor(`document.getElementById('info-memory-text').textContent === 'SECOND file'`, 'the second file');
+        await ev(`window.__files['a'.repeat(32)].release(); true`);
+        await ev(`new Promise(r => setTimeout(() => setTimeout(() => r(true), 0), 0))`);
+        assert.equal(await text('info-memory-text'), 'SECOND file', 'the slower first file does not overwrite the second');
+        assert.equal(await ev(`document.getElementById('info-memory-text').dataset.file`), 'two.md: memory, user', 'the block names the file it shows');
+        assert.deepEqual(await ev(`[...document.querySelectorAll('#info-memory button')].map(b => b.getAttribute('aria-pressed'))`), ['false', 'true']);
+        await ev(`window.__files = null; true`);
+
+        console.log('Touch size (M3): at 390 px and at 200% zoom (195 px) the file buttons are at least 44 px tall, in both themes, and the dialog does not scroll sideways');
+        await ev(`window.__files = null; window.__sk = { body: { skills: [{ name: 'release-notes', version: 2, loads: 3, status: 'approved' }] }, status: 200 }; true`);
+        await run(); await waitFor(`document.querySelectorAll('#info-memory button').length === 2`, 'two files');
+        await ev(`document.querySelector('#info-memory button').click(); true`); // a file open, read-only: the text block shows under the list
+        await waitFor(`document.getElementById('info-memory-text').hidden === false`, 'the file block');
+        for (const width of [390, 195]) {
+            await Emulation.setDeviceMetricsOverride({ width, height: 844, deviceScaleFactor: 2, mobile: true });
+            for (const theme of ['light', 'dark']) {
+                await ev(`document.documentElement.setAttribute('data-theme', ${JSON.stringify(theme)}); true`);
+                const m = await ev(`(() => { const bs = [...document.querySelectorAll('#info-memory button')], modal = document.getElementById('info-modal'); return { h: bs.map(b => Math.round(b.getBoundingClientRect().height)), wide: modal.scrollWidth > modal.clientWidth + 1 }; })()`);
+                assert.ok(m.h.length === 2 && m.h.every(h => h >= 44), `${width} px ${theme}: both buttons are 44 px or taller: ${JSON.stringify(m)}`);
+                assert.equal(m.wide, false, `${width} px ${theme}: nothing runs past the dialog's edge`);
+                if (process.env.INFO_SHOTS) require('node:fs').writeFileSync(`${process.env.INFO_SHOTS}/info-sections-${width}-${theme}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); // evidence for a reviewer, not part of the check
+            }
+        }
+        await ev(`document.documentElement.removeAttribute('data-theme'); true`);
+        await Emulation.clearDeviceMetricsOverride();
 
         console.log('Copy and close');
         await ev(`window.__answer.body = { agent_name: 'info a', tmux_command: 'tmux attach -t zz' }; true`); await run();
