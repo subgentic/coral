@@ -160,19 +160,25 @@ export async function sleepTerminalGone(ids) {
         if (!byServer.has(server)) byServer.set(server, []);
         byServer.get(server).push(id);
     }
-    let moved = 0, failed = false;
+    let moved = 0, failed = false, short = false;
     for (const [server, list] of byServer) {
         try {
             const resp = await serverFetch(server, '/api/sessions/live/sleep-gone', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ session_ids: list }) });
             const data = await resp.json().catch(() => ({}));
             if (!resp.ok || !data.ok) { failed = true; continue; }
-            moved += Number(data.sessions_affected) || 0;
-            for (const id of list) {
-                const row = state.liveSessions.find(x => x.session_id === id && sessionServer(x) === server);
-                if (row) row.sleep_reason = null;
+            const affected = Number(data.sessions_affected) || 0;
+            moved += affected;
+            if (affected >= list.length) {
+                for (const id of list) {
+                    const row = state.liveSessions.find(x => x.session_id === id && sessionServer(x) === server);
+                    if (row) row.sleep_reason = null;
+                }
+            } else {
+                short = true; // the server moved fewer than asked (some changed meanwhile): which ones is its to say, so the rows are read again and no marker is cleared by guess (#13222)
             }
         } catch { failed = true; }
     }
+    if (short) await importOnce('./api.js').then(m => m.loadLiveSessions()).catch(() => {});
     redrawLiveList();
     if (failed) showToast(moved ? `${moved} agent${moved === 1 ? ' is' : 's are'} now sleeping; some could not be moved` : 'Could not move the agents to sleeping', true);
     else if (moved) showToast(`${moved} agent${moved === 1 ? ' is' : 's are'} now sleeping`);

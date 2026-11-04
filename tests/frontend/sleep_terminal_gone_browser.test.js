@@ -109,6 +109,35 @@ const BASE = require('./test_base').BASE;
         }
         assert.equal(await ev(`window.T.state.liveSessions.find(s => s.session_id === 'arch-id').sleep_reason`), 'terminal_gone', 'an archived agent is not moved');
         console.log('   ✓ bulk: one request naming the agents; the row goes');
+
+        // #13222: when the server moves fewer agents than asked (here none: they changed meanwhile), no Terminal gone marker is cleared by guess; the rows are read again from the server
+        await ev(`(async () => {
+            window.__m.add('late-1', 'L', 3, { sleeping: true, sleep_reason: 'terminal_gone', board_project: 'late-team' });
+            window.__m.add('late-2', 'L', 3, { sleeping: true, sleep_reason: 'terminal_gone', board_project: 'late-team' });
+            window.__affected = 0; window.__listReads = 0;
+            const f = window.fetch;
+            window.fetch = (url, opts = {}) => {
+                const u = String(url);
+                if ((opts.method || 'GET') === 'POST' && u.endsWith('/api/sessions/live/sleep-gone')) {
+                    const ids = JSON.parse(opts.body).session_ids; window.__calls.push({ kind: 'bulk', ids });
+                    return Promise.resolve(new Response(JSON.stringify({ ok: true, sessions_affected: window.__affected }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+                }
+                if (u.split('?')[0].endsWith('/api/sessions/live')) window.__listReads++;
+                return f(url, opts);
+            };
+            window.T.render.renderLiveSessions(window.T.state.liveSessions);
+            return true;
+        })()`);
+        await ev(framesJs(2));
+        const bulkLate = await ev(`(() => { const b = document.querySelector('.sleep-gone-row button'); return b ? b.textContent.trim() : null; })()`);
+        assert.equal(bulkLate, 'Sleep 2 terminal-gone agents');
+        await ev(`document.querySelector('.sleep-gone-row button').click(); true`);
+        await ev(framesJs(4));
+        for (const id of ['late-1-id', 'late-2-id']) {
+            assert.equal(await ev(`window.T.state.liveSessions.find(s => s.session_id === '${id}').sleep_reason`), 'terminal_gone', `${id}: still Terminal gone: the server moved none`);
+        }
+        assert.ok((await ev('window.__listReads')) >= 1, 'the rows were read again from the server');
+        console.log('   ✓ a short answer reads the rows again and clears no marker by guess');
         console.log('PASS sleep_terminal_gone_browser');
     } finally {
         await client.close();
