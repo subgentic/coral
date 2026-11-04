@@ -1,23 +1,43 @@
 // The Chief entry belongs to the computer shown (#13167, UI Reviewer's MUSTs on dce78ebe3): on one page, switching A -> B -> C -> A changes the sidebar's entry and the menu's with it (configured, Set up, refused: nothing), an answer for the computer
 // left is dropped, the menu is drawn at once and Chief's entry joins it when a slow computer answers, and Set up Chief becomes Chief when Settings > Chief saves. The computers are stubbed (/api/remote/<id>/api/chief); the sidebar's ask runs at once
-// (window.__chiefAfterMs = 0). 1280 px.
+// (window.__chiefAfterMs = 0). The page is served as the Hub's (mode cloud: the document is rewritten, /auth/session, /api/servers and the live list are stubbed, as in hub_account_nav_browser), so Chief's link is /chief/<computer>. 1280 px.
 const assert = require('node:assert/strict');
-const { connect } = require('./agent_view_harness');
+const CDP = require('chrome-remote-interface');
+const { safePaused } = require('./helpers/paused');
 const BASE = require('./test_base').BASE;
-const { coralReady } = require('./helpers/wait');
 
 const STUB = `(() => { window.__chiefAfterMs = 0; window.__chief = { a: { status: 200, body: { enabled: true, session_id: 's-a', name: 'Atlas', avatar: '3', avatar_letter: 'A' } }, b: { status: 200, body: { enabled: false, session_id: '' }, delay: 700 }, c: { status: 403, body: { error: 'owner only' } } };
     const R = window.fetch; window.fetch = (u, o) => { const m = /^\\/api\\/remote\\/machine-([abc])\\/api\\/chief$/.exec(new URL(String(u && u.url || u), location.origin).pathname);
         if (m) { const c = window.__chief[m[1]]; return new Promise(r => setTimeout(() => r(new Response(JSON.stringify(c.body), { status: c.status, headers: { 'content-type': 'application/json' } })), c.delay || 0)); } return R(u, o); }; })();`;
 
 (async () => {
-    const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
+    const client = await CDP({ port: Number(process.env.CDP_PORT || 9222) });
+    const { Page, Runtime, Network, Fetch, Emulation } = client;
+    const ev = async expression => { const r = await Runtime.evaluate({ expression, returnByValue: true, awaitPromise: true }); if (r.exceptionDetails) throw new Error(JSON.stringify(r.exceptionDetails).slice(0, 400)); return r.result.value; };
+    const { waitFor } = require('./helpers/wait').bind(ev);
     const problems = []; const check = (l, c, d) => { if (!c) problems.push(`${l}${d !== undefined ? ': ' + d : ''}`); };
     try {
-        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: STUB });
+        await Promise.all([Page.enable(), Runtime.enable(), Network.enable()]);
+        await Network.setCacheDisabled({ cacheDisabled: true });
+        await Page.addScriptToEvaluateOnNewDocument({ source: STUB });
+        await Fetch.enable({ patterns: [{ urlPattern: `${BASE}/`, resourceType: 'Document', requestStage: 'Response' }, { urlPattern: `${BASE}/auth/session`, requestStage: 'Request' }, { urlPattern: `${BASE}/api/account*`, requestStage: 'Request' },
+            { urlPattern: `${BASE}/api/servers*`, requestStage: 'Request' }, { urlPattern: `${BASE}/api/sessions/live*`, requestStage: 'Request' }] });
+        const json = (id, status, body) => Fetch.fulfillRequest({ requestId: id, responseCode: status, responseHeaders: [{ name: 'Content-Type', value: 'application/json' }], body: Buffer.from(JSON.stringify(body)).toString('base64') });
+        safePaused(client, async e => {
+            const u = e.request.url;
+            if (u.endsWith('/auth/session')) return json(e.requestId, 200, { authenticated: true, email: 'tester@example.com', csrf: 'x' });
+            if (/\/api\/account(\?|$)/.test(u)) return json(e.requestId, 200, {});
+            if (/\/api\/servers(\?|$)/.test(u)) return json(e.requestId, 200, { servers: ['a', 'b', 'c'].map(x => ({ id: 'machine-' + x, label: 'Computer ' + x, status: 'online' })) });
+            if (/\/api\/sessions\/live(\?|$)/.test(u)) return json(e.requestId, 200, { sessions: [], servers: [] });
+            if (e.responseStatusCode !== 200) return Fetch.continueRequest({ requestId: e.requestId });
+            const { body, base64Encoded } = await Fetch.getResponseBody({ requestId: e.requestId });
+            const html = (base64Encoded ? Buffer.from(body, 'base64').toString('utf8') : body).replace('"mode":"local"', '"mode":"cloud"');
+            await Fetch.fulfillRequest({ requestId: e.requestId, responseCode: 200, responseHeaders: (e.responseHeaders || []).filter(h => !/^content-length$/i.test(h.name)), body: Buffer.from(html).toString('base64') });
+        });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'settings');
-        const at = id => ev(`T.state.selectedTeam = '@machine-${id}/team'; T.render.renderLiveSessions([]); true`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
+        await waitFor(`document.body.classList.contains('cloud-mode')`, 'the Hub page', { timeout: 20000 });
+        const at = id => ev(`(async () => { const base = window.__coralStatic || '/static/'; const st = await import(base + 'state.js'), r = await import(base + 'render.js'); st.state.selectedTeam = '@machine-${id}/team'; r.renderLiveSessions([]); return true; })()`);
         const side = () => ev(`(() => { const s = document.getElementById('sidebar-chief-slot'), n = s && s.querySelector('a, button'); return { shown: !!s && !s.hidden && !!n, text: n ? n.lastElementChild.textContent.trim() : '', href: n && n.getAttribute('href') }; })()`);
         const menu = async () => { await ev(`document.getElementById('top-menu-btn').click(); true`); await waitFor(`!document.getElementById('nav-more-menu').hidden`, 'the menu opens', 6000); };
         const entry = () => ev(`(() => { const m = document.getElementById('nav-more-menu'), n = m.querySelector('[data-chief-entry]'); return { chief: n ? n.lastElementChild.textContent.trim() : null, settings: !!m.querySelector('[data-account-start]') }; })()`);
