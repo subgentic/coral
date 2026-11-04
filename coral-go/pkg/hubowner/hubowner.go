@@ -12,7 +12,7 @@
 //     the hub is what makes "the person signed in" mean one person.
 //   - Replacing the secret is a person's act at the remote (coral hub-owner-secret, which refuses inside an agent's session). Every time the file is written or replaced the remote logs one warning and its
 //     health answer carries the file's time, so a silent rotation shows.
-//   - A stamp covers one request for one of two routes, for 30 seconds, once: a captured stamp is dead after that, after a restart of the remote, and for any other body, route, query or computer.
+//   - A stamp covers one request for one of the routes below (the decisions that need a person: Approve and Request changes, the change-request send, and the owner's own message to an agent), for 30 seconds, once: a captured stamp is dead after that, after a restart of the remote, and for any other body, route, query or computer.
 
 package hubowner
 

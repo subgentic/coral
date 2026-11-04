@@ -6,6 +6,7 @@
 #   bash tests/stress/run.sh                          this board stress test
 #   bash tests/stress/run.sh --identity [--strict]    session tokens and impersonation (run_identity.sh)
 #   bash tests/stress/run.sh --kill-all               folder Kill all in the real dashboard
+#   bash tests/stress/run.sh --hub-owner-send         the owner's message to an agent through a self-hosted Hub, on loopback (run_hub_owner_send.sh, #13456)
 #   bash tests/stress/run.sh --goals [--repeat N]     goals integration, incl. `coral-board goal brief` by a mock agent (Goal #153)
 #   bash tests/stress/run.sh --send-after-restart [--repeat N]
 #                                                     send after a Coral restart, a wake and a due board nudge (Goal #133, #10996)
@@ -30,6 +31,9 @@ if [[ "${1:-}" == "--identity" ]]; then
 elif [[ "${1:-}" == "--search" ]]; then
     # Agent search (#11005): board search at the own reach, the doors around it, identity, reach, restart and wake, log bounds; strict.
     exec bash "$SCRIPT_DIR/run_search.sh"
+elif [[ "${1:-}" == "--hub-owner-send" ]]; then
+    # The owner's message to an agent through a self-hosted Hub (#13456, #13467): a hub plus a key-registered Coral, both isolated on loopback.
+    exec bash "$SCRIPT_DIR/run_hub_owner_send.sh"
 elif [[ "${1:-}" == "--kill-all" ]]; then
     # Folder Kill all with real agents in the real dashboard (#3053/#3058); its own server and port.
     exec bash "$SCRIPT_DIR/run_kill_all.sh"
