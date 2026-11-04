@@ -25,7 +25,7 @@ export const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 export const agent = (name, ...args) => execFileSync(HERE + "/asagent.sh", [name, ...args], { encoding: "utf8" })
 export async function launchTeam() {
   const r = await fetch(BASE + "/api/sessions/launch-team", { method: "POST", headers: { Authorization: "Bearer " + key(), "Content-Type": "application/json" },
-    body: JSON.stringify({ board_name: story.team, working_dir: REPO, agents: story.agents.map((n) => ({ agent_type: "claude", name: n, prompt: "Sample agent." })) }) })
+    body: JSON.stringify({ board_name: story.team, working_dir: REPO, agents: story.agents.map((n) => ({ agent_type: "claude", name: n, prompt: (story.agentPrompts && story.agentPrompts[n]) || "Sample agent." })) }) })
   const j = await r.json(); fs.writeFileSync(S + "/work/launch.json", JSON.stringify(j)); return j
 }
 // one recorded context per beat; a caption band and a visible cursor are injected into every page
@@ -62,7 +62,7 @@ export async function beat(browser, name, { w = 1600, h = 900, mobile = false } 
   await ctx.addInitScript(() => {
     const mk = () => {
       if (document.getElementById("__cap")) return
-      const st = document.createElement("style"); st.textContent = "#__cap{pointer-events:none;position:fixed;left:0;right:0;bottom:0;z-index:2147483647;padding:14px 24px;text-align:center;font:600 22px/1.3 system-ui,sans-serif;color:#e7ebf2;background:rgba(14,17,22,.92);transition:opacity .18s;opacity:0}@media(max-width:500px){#__cap{bottom:78px;font-size:16px;padding:10px 14px;margin:0 8px;border-radius:10px}}#__cur{position:fixed;z-index:2147483647;width:18px;height:18px;border-radius:50%;background:rgba(79,140,255,.85);border:2px solid #fff;pointer-events:none;transform:translate(-9px,-9px);left:-40px;top:-40px;transition:left .02s,top .02s}"
+      const st = document.createElement("style"); st.textContent = "#__cap{pointer-events:none;position:fixed;left:0;right:0;bottom:0;z-index:2147483647;padding:14px 24px;text-align:center;font:600 22px/1.3 system-ui,sans-serif;color:#e7ebf2;background:rgba(14,17,22,.92);opacity:0}@media(max-width:500px){#__cap{bottom:78px;font-size:16px;padding:10px 14px;margin:0 8px;border-radius:10px}}#__cur{position:fixed;z-index:2147483647;width:18px;height:18px;border-radius:50%;background:rgba(79,140,255,.85);border:2px solid #fff;pointer-events:none;transform:translate(-9px,-9px);left:-40px;top:-40px;transition:left .02s,top .02s}"
       document.documentElement.append(st)
       const c = document.createElement("div"); c.id = "__cap"; document.documentElement.append(c)
       const k = document.createElement("div"); k.id = "__cur"; document.documentElement.append(k)

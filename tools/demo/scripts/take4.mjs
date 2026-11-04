@@ -1,7 +1,7 @@
 import fs from "node:fs"
 import path from "node:path"
 import { execFileSync } from "node:child_process"
-import { OPEN, chromium, beat, launchTeam, sleep, agent, askPermission, askQuestion, BASE, S, SEED, REPO, HERE, story } from "./lib.mjs"
+import { OPEN, key, chromium, beat, launchTeam, sleep, agent, askPermission, askQuestion, BASE, S, SEED, REPO, HERE, story } from "./lib.mjs"
 process.env.CORAL_TELEMETRY_DISABLED = "1"
 // Demo film v4. Beats are recorded (c1..c10); steps are not (world, chats, usage). Order of a run (see ../README.md):
 //   NOLAUNCH=1 rig-up.sh; node take4.mjs c1; node take4.mjs launch world chats; python3 -I seed-usage.py; node take4.mjs c2 c3 c4 c5 c6 c7 c8 c9 c10
@@ -35,6 +35,15 @@ const flushClaims = () => { for (const [who, id] of claims.splice(0)) { try { ag
 const pclick = async (t, loc) => { await t.move(loc); await loc.evaluate((el) => el.click()) }   // the goal panel's buttons do not take a pointer press in a recording; the page's own click does
 // type into a box by growing its value with the page's own input events: keys sent to some panels' boxes do not land in them in a recording
 const typeInto = async (t, box, text, ms = 22) => { await t.move(box); for (const ch of text) { await box.evaluate((el, c) => { el.value += c; el.dispatchEvent(new Event("input", { bubbles: true })) }, ch); await sleep(ms) } }
+// The terminal is drawn on a canvas, so the on-screen text scan cannot read it: read the pane's text from the server and scan it with the same patterns plus the mock's own giveaways.
+async function termCheck(name) {
+  const r = await fetch(BASE + "/api/sessions/live/claude-" + sid(name) + "/capture", { headers: { Authorization: "Bearer " + key() } })
+  const text = await r.text()
+  const bad = [/\/tmp\//, /\/private\/var\//, /session_id/i, /\bport=\d+/, /\bboard=/, /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i, /\bb-[a-z0-9]{8,}\b/, /\b[0-9a-f]{32,}\b/i, /coral:\/\//, /\/Users\//, /scratchpad/]
+  const hit = bad.map((re) => (text.match(re) || [])[0]).filter(Boolean)
+  if (r.status !== 200 || !text.trim()) throw new Error("the terminal text could not be read (" + r.status + "): do not film it blind")
+  if (hit.length) throw new Error("leak in the terminal text of " + name + ": " + hit.join(" | "))
+}
 const shot = async (t, name) => t.page.screenshot({ path: S + "/work/x-" + name + ".png" }).catch(() => {})
 const bare = (t) => t.page.evaluate(() => { for (const id of ["__cur"]) document.getElementById(id)?.remove() }).catch(() => {})
 const B = {
@@ -44,6 +53,7 @@ const B = {
     await t.click(t.page.locator("button:text-is('New agent') >> visible=true").last()); await sleep(1200); await shot(t, "c1-dialog")
     await t.page.mouse.move(578, 440, { steps: 25 }); await sleep(300); await t.page.mouse.click(578, 440); await sleep(1500)   // the card is not a button: by position
     await t.cap("Pick a folder.")
+    const folder = t.page.locator("input[value*='first-agent'], input[type=text] >> visible=true").first(); await t.move(folder); await folder.fill("~/projects/skyline"); await sleep(700)   // the default shows the demo's scratch path
     await t.click(t.page.locator("button:text-is('Next') >> visible=true").first()); await sleep(1800)
     await t.cap("Start from a persona, or from blank.")
     await t.click(t.page.locator("button:text-is('Next') >> visible=true").first()); await sleep(2200)
@@ -91,6 +101,7 @@ const B = {
     return "prompts " + (story.prompts || []).length
   },
   async c2() { // terminal first (it is the CLI), then the chat view of the same agent
+    await termCheck("Orchestrator")
     const t = await beat(browser, "c2")
     await t.go("/agents"); await t.cap("Every agent is a CLI you already use.")
     await t.click(t.page.locator("text=Orchestrator >> visible=true").first()); await sleep(2500)

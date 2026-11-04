@@ -42,61 +42,61 @@
     {
       "agent": "Orchestrator",
       "file": "release-checklist.md",
-      "name": "skyline-release-checklist.md",
+      "name": "release-checklist.md",
       "question": "Ship the beta on Friday, or wait for the units switch?"
     },
     {
       "agent": "Backend",
       "file": "accuracy.csv",
-      "name": "skyline-accuracy.csv",
+      "name": "accuracy.csv",
       "question": "Forecast error averages 2.1 C: good enough for the beta?"
     },
     {
       "agent": "Frontend",
       "file": "city-search.md",
-      "name": "skyline-city-search.md",
+      "name": "city-search.md",
       "question": "Search by city name only, or by postcode too?"
     },
     {
       "agent": "Backend",
       "file": "forecast-api.md",
-      "name": "skyline-forecast-api.md",
+      "name": "forecast-api.md",
       "question": "Return only Celsius, or Fahrenheit as well?"
     },
     {
       "agent": "Reviewer",
       "file": "test-plan.md",
-      "name": "skyline-test-plan.md",
+      "name": "test-plan.md",
       "question": "Is this test plan enough for the first beta?"
     },
     {
       "agent": "Backend",
       "file": "rain-alert-spec.md",
-      "name": "skyline-rain-alert-spec.md",
+      "name": "rain-alert.md",
       "question": "Notification or email for the rain alert?"
     },
     {
       "agent": "Designer",
       "file": "icons-review.md",
-      "name": "skyline-icons.md",
+      "name": "icons.md",
       "question": "Are the twelve weather icons right?"
     },
     {
       "agent": "Reviewer",
       "file": "a11y-checklist.md",
-      "name": "skyline-accessibility.md",
+      "name": "a11y-checklist.md",
       "question": "Is the accessibility checklist enough for the beta?"
     },
     {
       "agent": "Frontend",
       "file": "perf-budget.md",
-      "name": "skyline-performance-budget.md",
+      "name": "perf-budget.md",
       "question": "Approve the performance budget?"
     },
     {
       "agent": "Orchestrator",
       "file": "release-notes-draft.md",
-      "name": "skyline-release-notes.md",
+      "name": "release-notes.md",
       "question": "Are the 0.2 release notes ready to publish?"
     }
   ],
@@ -129,7 +129,7 @@
   "live": {
     "agent": "Designer",
     "file": "theme-note.md",
-    "name": "skyline-design-note.md",
+    "name": "design-note.md",
     "question": "Dark or light by default?",
     "comment": "The rain chart blue is hard to read on the dark card. Can you lighten it and tick the chart off the checklist?",
     "reply": "Done: the rain bar is lighter on dark (5.1 to 1 contrast) and the chart is ticked off. Decision recorded: dark by default.",
@@ -372,5 +372,12 @@
     "Understood. I will flag anything that blocks me.",
     "Seen it. On with the next step."
   ],
-  "goalFilesTask": "Add the units switch"
+  "goalFilesTask": "Add the units switch",
+  "agentPrompts": {
+    "Orchestrator": "You lead the Skyline team: plan the work, assign it and report to the Operator.",
+    "Backend": "You are the Skyline backend engineer: the forecast package, its API and its tests.",
+    "Frontend": "You are the Skyline frontend engineer: the forecast cards, city search and the theme.",
+    "Designer": "You are the Skyline designer: the look in dark and light, the icons and the charts.",
+    "Reviewer": "You review Skyline's changes: read the diff, run the tests, approve or ask for changes."
+  }
 }
