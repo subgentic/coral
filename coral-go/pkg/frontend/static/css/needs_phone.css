@@ -1,24 +1,4 @@
 /* A phone's Needs you row is as tall as its content (#11858). Loaded with the Inbox (inbox_sidebar.js), not at start. */
-/* Row 12's remaining Inbox-only rows rules (#13144), here with the kind icon's so the start stylesheet stays under its weight ceiling (trial-248 is 13 bytes under it before them): */
-@media (max-width: 480px) {
-    .inbox-needs-results .dt-row:has(.inbox-review-item > .inbox-review-from) > [data-key=waiting] { order: 4; flex: 1 1 100%; align-self: auto; text-align: start; line-height: var(--lh-label); } /* a narrow phone's review row (#13144, the Operator: give the file name room): "waiting N min" goes under the file name and the line under it, so the name has the whole first line beside the sender; the row may be one line taller. Permission rows and questions (no sender span) keep theirs on the right. */
-}
-.dt-folded .inbox-review-item:has(> .inbox-kind-icon) > .inbox-review-name { min-width: 0; } /* a narrow row (a phone, an item cell about 130 px wide): the file name's 44 px minimum width, the sender, the gaps and the kind icon no longer fit on one line, so the name wrapped to a line of its own and the row grew; with no minimum the name takes what is left and is cut with an ellipsis, as it was with no icon (#13144, measured: the row is 77 px with or without the icon) */
-/* The kind icon's rules (#13144), moved here from data_table.css so the start stylesheet stays under its weight ceiling: loaded with the Inbox, which is the only place the icon is drawn; they sit first so the rules below still win as before. */
-/* A Needs you row's kind icon (#13144, needs_filters.js kindIcon): a small leading glyph, the sidebar's secondary colour, no taller than the row's text line so the row keeps its height. The glyph is drawn here from data-kind (icons in the font subset). */
-.material-icons.inbox-kind-icon { font-size: 1.2em; margin-block: -0.3em; color: var(--text-secondary); align-self: center; margin-right: 6px; vertical-align: middle; } /* the size follows the row's own text and the block margins take its extra height back, so at any text size the icon never sets the line (the row is as tall with it as without) */
-.dt-person:has(> .inbox-kind-icon) { position: relative; padding-left: calc(1.2em + 6px); } /* a computer's Needs you row (#13144): the icon sits in the person cell's left padding, out of the flow, so it can set no line or row height at any text size (it was a flex item and added 1 to 4 px at 200% text, whatever its own height) */
-.dt-person > .material-icons.inbox-kind-icon { position: absolute; left: 0; top: 50%; transform: translateY(-50%); margin: 0; height: auto; line-height: 1; font-size: 1.2em; }
-.dt-mail-title > .material-icons.inbox-kind-icon { vertical-align: -0.2em; margin-block: -0.3em; margin-right: 6px; } /* inside a phone row's title (the line's cut and wraps act on the title): no taller than the text's own line */
-.inbox-kind-icon::before { content: 'help_outline'; }
-.inbox-kind-icon[data-kind="permission"]::before { content: 'lock'; }
-.inbox-kind-icon[data-kind="other"]::before { content: 'input'; }
-.inbox-kind-icon[data-kind="review"]::before { content: 'rate_review'; }
-.inbox-kind-icon[data-kind="run"]::before { content: 'error_outline'; }
-.inbox-kind-icon[data-kind="proposal"]::before { content: 'task'; }
-.inbox-kind-icon[data-kind="goal_done"]::before { content: 'flag'; }
-.inbox-kind-icon[data-kind="skill_review"]::before { content: 'auto_awesome'; }
-.inbox-kind-icon[data-kind="welcome"]::before { content: 'info'; }
 @media (max-width: 760px) {
     .inbox-needs-results .inbox-review-item > .inbox-review-name:not(.inbox-ask-name) { margin: -12px 0; } /* the 44 px target stays, the line is the text's: only a name inside an item row, and not a question's (a plain span that may take two lines on a phone, #11894: the negative margin dragged its second line onto the line under it, #13144); a bare title span (a goal that looks done, #12029) is not hit, so it keeps its height */
     .inbox-needs-results [data-key=waiting] { align-self: flex-start; line-height: 20px; } /* on the name line: its 20 px, from the row's top padding */

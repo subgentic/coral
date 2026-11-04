@@ -72,6 +72,7 @@ console.log('data_table_scan: ok');
     assert.equal(cssCount('.dt-person:has(> .inbox-kind-icon) .x { color: red; }', [], entry).own.length, 1, 'a longer selector is not covered');
     assert.equal(cssCount('.dt-person { color: red; }', [], entry).own.length, 1, 'neither is a shorter one');
     assert.equal(cssCount(sel + ' { color: red; }', [], []).own.length, 1, 'with no entry it is refused');
-    assert.ok(EXEMPT_OWN.length === 5 && EXEMPT_OWN.every(e => typeof e.sel === 'string' && !/[*]/.test(e.sel) && e.why.length >= 20), 'five exact selectors, each with its reason');
+    assert.ok(EXEMPT_OWN.every(e => typeof e.sel === 'string' && !/[*]/.test(e.sel) && e.why.length >= 20), 'every entry is an exact selector with its reason');
+    assert.equal(EXEMPT_OWN.length, 0, 'none now: the Needs you rows rules are in data_table.css again (#13487)');
 }
 console.log('data_table_scan: EXEMPT_OWN ok');
