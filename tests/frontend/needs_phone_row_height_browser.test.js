@@ -1,5 +1,5 @@
 // A phone's Needs you row is as tall as its content (#11858, from the Hub parity comparison #11857): no empty 44 px line under the question (the empty Waiting-for and Goal cells and the name's 44 px target used to add
-// about 40 px, rows were 111 to 129 px, now 70 to 90), and the wait text sits on the name line's baseline at the right with the name cut before it, on every row. Five For review files (two read), 390 and 412 px, light and
+// about 40 px, rows were 111 to 129 px, now 70 to 90), and (the Operator's decision, #13144) the wait text sits UNDER the file name so the name has the first line beside the sender and rows with different names read differently, on every row. Five For review files (two read), 390 and 412 px, light and
 // dark. Drives Chrome through agent_view_harness.js against the isolated dev server; CORAL_SCREENSHOT_DIR saves the pictures.
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
@@ -36,13 +36,15 @@ const { removeBoards } = require('./helpers/board_cleanup');
                 const base = e => { const w = document.createTreeWalker(e, NodeFilter.SHOW_TEXT, { acceptNode: n => (n.textContent.trim() ? 1 : 3) }), n = w.nextNode(), r = document.createRange(); r.selectNodeContents(n); const t = r.getBoundingClientRect(); return t.top + k * t.height; };
                 return [...document.querySelectorAll('${T} tbody tr')].map(tr => { const b = tr.getBoundingClientRect(), nm = tr.querySelector('.inbox-review-name'), wt = tr.querySelector('td[data-key="waiting"]'), q = tr.querySelector('.dt-subtitle'), vis = [...tr.querySelectorAll('td')].filter(t => t.getClientRects().length && t.getBoundingClientRect().width > 0);
                     const wtext = wt.querySelector('*') && [...wt.querySelectorAll('*')].find(e => e.children.length === 0 && e.textContent.trim()) || wt, lowest = Math.max(...vis.filter(t => !t.matches('[data-key="review"]')).map(t => t.getBoundingClientRect().bottom));
-                    return { h: Math.round(b.height), nameBase: Math.round(base(nm) * 10) / 10, waitBase: Math.round(base(wtext) * 10) / 10, nameRight: Math.round(nm.getBoundingClientRect().right), waitLeft: Math.round(wtext.getBoundingClientRect().left), waitCut: wtext.scrollWidth > wtext.clientWidth + 1, gap: Math.round(b.bottom - lowest), q: !!q }; }); })()`);
+                    const nb = nm.getBoundingClientRect(), tn = [...nm.childNodes].find(n => n.nodeType === 3); let seen = ''; if (tn) for (let k = 0; k < tn.length; k++) { const rg = document.createRange(); rg.setStart(tn, k); rg.setEnd(tn, k + 1); const qb = rg.getBoundingClientRect(); if (qb.width && qb.right <= nb.right + 0.5 && qb.bottom <= nb.bottom + 1) seen += tn.data[k]; }
+                    return { name: nm.textContent, seen, nameBottom: Math.round(nb.bottom), waitTop: Math.round(wtext.getBoundingClientRect().top), h: Math.round(b.height), nameBase: Math.round(base(nm) * 10) / 10, waitBase: Math.round(base(wtext) * 10) / 10, nameRight: Math.round(nm.getBoundingClientRect().right), waitLeft: Math.round(wtext.getBoundingClientRect().left), waitCut: wtext.scrollWidth > wtext.clientWidth + 1, gap: Math.round(b.bottom - lowest), q: !!q }; }); })()`);
             rows.forEach((r, i) => {
-                check(r.h >= 60 && r.h <= 95, `${at}row ${i + 1} is as tall as its content, 60 to 95 px, not 111 to 129: ${r.h}`);
+                check(r.h >= 60 && r.h <= 135, `${at}row ${i + 1} is as tall as its content (one line taller than before is the Operator's choice), 60 to 135 px: ${r.h}`);
                 check(r.gap <= 12, `${at}row ${i + 1} has no empty line under its text (${r.gap} px below the last cell, 8 px padding): ${JSON.stringify(r)}`);
-                check(Math.abs(r.nameBase - r.waitBase) <= 1.5, `${at}row ${i + 1}: the wait text is on the name line's baseline (${r.nameBase} against ${r.waitBase})`);
-                check(r.nameRight <= r.waitLeft + 1 && !r.waitCut, `${at}row ${i + 1}: the name ends before the wait, which is not cut: ${JSON.stringify(r)}`);
+                check(r.waitTop >= r.nameBottom - 1, `${at}row ${i + 1}: "waiting N min" is under the file name, not beside it (name ends ${r.nameBottom}, wait starts ${r.waitTop})`);
+                check(!r.waitCut, `${at}row ${i + 1}: the wait text is not cut: ${JSON.stringify(r)}`);
             });
+            const seen = rows.map(r => r.seen); check(new Set(rows.map(r => r.name)).size === rows.length ? new Set(seen).size === seen.length && seen.every(t => t.length >= 4) : true, `${at}review rows with different names show different visible text (the file name has room): ${JSON.stringify(rows.map(r => [r.name, r.seen]))}`);
             await shot(`needs-phone-rows-${w}-${theme}`);
         }
     } finally { await removeBoards(ev, [team]).catch(() => {}); await client.close(); }
