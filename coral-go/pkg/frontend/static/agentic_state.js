@@ -100,7 +100,7 @@ export function switchAgenticTab(tabName, blockId) {
     if (activePanel) activePanel.classList.add('active');
 
     // Persist tab choice per block
-    if (blockId) {
+    if (blockId && tabName !== 'no-tabs') {
         browserLocal.set(dockKey(`coral-agentic-tab-${blockId}`), tabName);
     }
 

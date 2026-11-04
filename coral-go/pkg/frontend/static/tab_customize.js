@@ -96,6 +96,7 @@ export function applyTabPrefs() {
         emptyPanel = document.createElement('div');
         emptyPanel.id = 'agentic-panel-no-tabs';
         emptyPanel.className = 'agentic-panel';
+        emptyPanel.setAttribute('role', 'status');
         emptyPanel.textContent = 'All tabs are hidden. Use Customize tabs to show a tab.';
         block.appendChild(emptyPanel);
     }
