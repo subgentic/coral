@@ -66,7 +66,7 @@ var routeQueries = map[string]string{
 	"GET /api/sessions/live/{}/notes":             "session_id",
 	"GET /api/sessions/live/{}/poll":              "agent_type,session_id",
 	"GET /api/sessions/live/{}/resolve-path":      "filepath*,session_id,worktree",
-	"GET /api/sessions/live/{}/search-files":      "dir*,offset,q,session_id,view,worktree",
+	"GET /api/sessions/live/{}/search-files":      "cursor,dir*,limit,offset,q,session_id,view,worktree",
 	"GET /api/sessions/live/{}/subagents":         "session_id",
 	"GET /api/sessions/live/{}/subagents/{}":      "session_id",
 	"GET /api/sessions/live/{}/tasks":             "limit,session_id",

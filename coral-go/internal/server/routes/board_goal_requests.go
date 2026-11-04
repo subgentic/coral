@@ -198,12 +198,23 @@ func (h *BoardHandler) ListGoalRequests(w http.ResponseWriter, r *http.Request) 
 		errBadRequest(w, "status is pending, accepted, declined or expired")
 		return
 	}
-	rows, err := h.bs.ListGoalRequestsIn(r.Context(), project, status, 100)
+	// limit (1 to 200, 100 by default as always) and cursor (the last answer's next_cursor, an id) page the list newest first; total is every request the status matches (#13289).
+	limit, before, ok := idPageParams(w, r, 100, 200)
+	if !ok {
+		return
+	}
+	rows, total, err := h.bs.ListGoalRequestsInPage(r.Context(), project, status, before, limit+1)
 	if err != nil {
 		errInternalServer(w, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"requests": rows})
+	resp := map[string]any{"requests": rows, "total": total, "has_more": false}
+	if len(rows) > limit {
+		resp["requests"] = rows[:limit]
+		resp["has_more"] = true
+		resp["next_cursor"] = encodeIDCursor(rows[limit-1].ID)
+	}
+	writeJSON(w, http.StatusOK, resp)
 }
 
 // requestID reads {requestID} as the board's own number for the request.
