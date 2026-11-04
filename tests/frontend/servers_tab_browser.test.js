@@ -314,7 +314,7 @@ const contrast = (a, b) => {
         await Emulation.clearDeviceMetricsOverride();
         console.log('   ✓ overflow 0 (document, view, rows, the machine\'s page), controls inside, the foot bar');
 
-        console.log('6. Local Coral: hidden without remotes, shown on a hub with one, falls back when it goes');
+        console.log('6. Local Coral: hidden without remotes; a hub shows it with a remote and without (#13078)');
         await cloudMode(false);
         await open('#servers');
         await sleep(300);
@@ -341,9 +341,9 @@ const contrast = (a, b) => {
         assert.equal(sh.badges, 0, 'self-hosted rows have no update badge');
         await ev(`(async () => { T.state.servers = []; (await import((window.__coralStatic||'/static/')+'servers_tab.js')).updateServersTabVisibility(); return true; })()`);
         t = await tabState();
-        assert.equal(t.tabShown, false, 'the last remote gone: tab hidden');
-        assert.equal(t.viewShown, false, 'and the active tab falls back to Agents');
-        console.log('   ✓ hidden locally, shown with a remote, falls back to Agents when it goes');
+        assert.equal(t.tabShown, true, 'the last remote gone: a hub keeps its tab (#13078: it is the way to add the next computer)');
+        assert.equal(t.viewShown, true, 'and the page stays open, with its empty state');
+        console.log('   ✓ hidden on a local Coral, shown on a hub with a remote and still shown when the last one goes');
 
         console.log('7. Enroll page points new machines at Servers');
         const enroll = fs.readFileSync(path.join(__dirname, '../../coral-go/pkg/frontend/templates/cloud/enroll.html'), 'utf8');
