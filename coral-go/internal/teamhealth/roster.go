@@ -18,6 +18,7 @@ const (
 	StateWaiting   = "waiting"   // parked in coral-board wait
 	StatePrompt    = "prompt"    // stopped at a prompt that needs input
 	StateBlocked   = "blocked"   // stopped by a usage limit (its quota is used up): nothing to do until it resets (#5229)
+	StateRefused   = "refused"   // a Codex agent whose model its login cannot use (#13480): every turn it is given ends at once with no work
 	StateIdle      = "idle"      // awake, in no turn and in no wait
 	StateAsleep    = "asleep"    // its session is asleep
 	StateAvailable = "available" // auto-asleep (#12111): put to sleep for being idle; any delivery wakes it, so it is free for work and nothing to act on
@@ -45,10 +46,11 @@ type WaitGroup struct {
 	Waiters []WaitEntry
 }
 
-// BlockedEntry is an agent stopped by a usage limit; Resets is how long until it resets, 0 when the CLI did not say.
+// BlockedEntry is an agent stopped by a usage limit; Resets is how long until it resets, 0 when the CLI did not say. Model is set instead for a Codex agent whose model is refused (#13480): it is not a limit and nothing resets.
 type BlockedEntry struct {
 	Name   string
 	Resets time.Duration
+	Model  string
 }
 
 // Roster is everything the check says about the agents.
@@ -80,7 +82,7 @@ type NameIssue struct {
 
 // Awake is how many agents are awake (every state but asleep and offline).
 func (r *Roster) Awake() int {
-	return r.Counts[StateWorking] + r.Counts[StateWaiting] + r.Counts[StatePrompt] + r.Counts[StateBlocked] + r.Counts[StateIdle] + r.Counts[StateUnknown]
+	return r.Counts[StateWorking] + r.Counts[StateWaiting] + r.Counts[StatePrompt] + r.Counts[StateBlocked] + r.Counts[StateRefused] + r.Counts[StateIdle] + r.Counts[StateUnknown]
 }
 
 // AllWorking: every awake agent is in a turn (and there is at least one): the only case the check says nobody is stuck.
@@ -90,7 +92,7 @@ func (r *Roster) AllWorking() bool {
 
 // NeedsAttention: something in the roster is for the reader: a wait, a prompt, an idle agent.
 func (r *Roster) NeedsAttention() bool {
-	return len(r.Waits) > 0 || r.Counts[StatePrompt] > 0 || r.Counts[StateBlocked] > 0 || r.Counts[StateIdle] > 0 || r.Counts[StateUnknown] > 0
+	return len(r.Waits) > 0 || r.Counts[StatePrompt] > 0 || r.Counts[StateBlocked] > 0 || r.Counts[StateRefused] > 0 || r.Counts[StateIdle] > 0 || r.Counts[StateUnknown] > 0
 }
 
 // maxWaiters is how many agents one wait group lists before counting the rest.
@@ -106,6 +108,9 @@ func (r *Roster) headerCounts() string {
 	}
 	if n := r.Counts[StateBlocked]; n > 0 {
 		parts = append(parts, fmt.Sprintf("%d BLOCKED by a usage limit", n))
+	}
+	if n := r.Counts[StateRefused]; n > 0 {
+		parts = append(parts, fmt.Sprintf("%d BLOCKED (model refused)", n))
 	}
 	if n := r.Counts[StateIdle]; n > 0 {
 		parts = append(parts, fmt.Sprintf("%d idle", n))
@@ -252,7 +257,7 @@ func (r *Roster) Facts() []string {
 		out = append(out, fmt.Sprintf("w:%s/%t:%s", g.On, g.You, strings.Join(names, ",")))
 	}
 	for _, b := range r.Blocked {
-		out = append(out, "b:"+b.Name)
+		out = append(out, "b:"+b.Name+b.Model)
 	}
 	for _, ni := range r.NameIssues {
 		out = append(out, fmt.Sprintf("n:%s/%t/%d", ni.Name, ni.Edge, ni.Posts)) // a new one is news; its age ticking is not (#11729)

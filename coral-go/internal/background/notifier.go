@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	at "github.com/subgentic/coral/internal/agenttypes"
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/ptymanager"
@@ -30,6 +31,9 @@ type BoardNotifier struct {
 	liftSleepFn  func(project string, seenAwake time.Time) bool   // lifts a pause that sleep put on the board (not a person's) unless it was made after seenAwake; true when it did (#11182, #11204)
 	pauseLogMu   sync.Mutex
 	pauseLogged  map[string]bool // boards a skipped nudge was already logged for, until they are resumed
+	refusedMu    sync.Mutex
+	refusedFn    func(ctx context.Context, a AgentInfo) (string, bool) // reads a Codex agent's refused model off its screen (#13480); made with the runtime's first use
+	refusedLog   map[string]string                                     // session_name -> the model a held nudge was already logged for, until the refusal is gone
 	notifiedMu   sync.Mutex
 	notified     map[string]notifyState      // session_name -> last nudge since the agent last read
 	nudgeTold    func(sessionID string) bool // whether a summary told the held nudge (nil: ptymanager.TakeBoardNudgeTold); a test fills it
@@ -510,6 +514,21 @@ func (n *BoardNotifier) nudgeAgent(ctx context.Context, pass *notifyPass, a Agen
 	if !send {
 		return
 	}
+	// A Codex agent whose model its login refuses ends every turn at once with no work (#13480): the nudge would only start another one. It is not typed, said once, and goes (with everything unread)
+	// as soon as the refusal is off the agent's screen; the health check names the agent meanwhile.
+	if model, refused := n.modelRefused(ctx, a, sessName); refused {
+		n.refusedMu.Lock()
+		first := n.refusedLog[sessName] != model
+		if n.refusedLog == nil {
+			n.refusedLog = map[string]string{}
+		}
+		n.refusedLog[sessName] = model
+		n.refusedMu.Unlock()
+		if first {
+			n.logger.Warn("no nudge: Codex refuses this agent's model, so a turn would do no work; change its model or log Codex in again", "subscriber_id", subscriberID, "session", sessName, "model", model, "unread", unread)
+		}
+		return
+	}
 	nudge := nudgeText(sub.Project, unread, health)
 	if !health && latestID > 0 { // the newest unread message is from another board: the nudge says how to answer it (#9054)
 		if m, merr := n.boardStore.GetMessageByID(ctx, sub.Project, latestID); merr == nil && m != nil && m.ReplyWith != "" {
@@ -570,6 +589,29 @@ func (n *BoardNotifier) nudgeAgent(ctx context.Context, pass *notifyPass, a Agen
 	n.notifiedMu.Lock()
 	n.notified[sessName] = notifyState{count: unread, latestID: latestID, at: n.now()}
 	n.notifiedMu.Unlock()
+}
+
+// modelRefused says whether a is a Codex agent whose model is refused (#13480), and which; and forgets the log of one whose refusal is gone.
+func (n *BoardNotifier) modelRefused(ctx context.Context, a AgentInfo, sessName string) (string, bool) {
+	if a.AgentType != at.Codex {
+		return "", false
+	}
+	n.refusedMu.Lock()
+	if n.refusedFn == nil {
+		n.refusedFn = screenModelRefused(n.runtime)
+	}
+	fn := n.refusedFn
+	n.refusedMu.Unlock()
+	if fn == nil {
+		return "", false
+	}
+	model, ok := fn(ctx, a)
+	if !ok {
+		n.refusedMu.Lock()
+		delete(n.refusedLog, sessName)
+		n.refusedMu.Unlock()
+	}
+	return model, ok
 }
 
 // nudgeDeliverFn delivers a nudge; its key labels deliveries for notifier recording tests.
