@@ -501,3 +501,25 @@ func TestInstallOwnerSecretThatFailsSaysWhy(t *testing.T) {
 		t.Errorf("got %+v", oe)
 	}
 }
+
+// A far command that echoes its stdin in an error must not put the secret in the hub's log (#13251, Security's SHOULD): the secret, the whole payload and a cut piece of a secret are taken out.
+func TestInstallOwnerSecretFailureKeepsTheSecretOutOfTheKeptStderr(t *testing.T) {
+	secret := strings.Repeat("ab", 32)
+	ssh := filepath.Join(t.TempDir(), "ssh")
+	script := "#!/bin/sh\ninput=$(cat)\necho \"bad input: $input and again ${input#*secret}\" >&2\necho \"half " + secret[:40] + " end\" >&2\nexit 3\n"
+	if err := os.WriteFile(ssh, []byte(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	tg, _ := ParseTarget("rich@box.example.com")
+	err := Runner{SSH: ssh}.InstallOwnerSecret(context.Background(), tg, "2.0.10", "ssh-box", secret)
+	var oe *OwnerSecretError
+	if !errors.As(err, &oe) {
+		t.Fatalf("err = %v", err)
+	}
+	if strings.Contains(oe.Stderr, secret[:20]) || strings.Contains(oe.Stderr, `"remote"`) {
+		t.Errorf("the secret or the payload is in the kept stderr: %q", oe.Stderr)
+	}
+	if !strings.Contains(oe.Stderr, "bad input") {
+		t.Errorf("the rest of the message was lost: %q", oe.Stderr)
+	}
+}
