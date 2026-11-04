@@ -302,7 +302,20 @@ func (h *BoardHandler) settleSupersededArtifact(w http.ResponseWriter, r *http.R
 		errNotFound(w, "this team has no such artifact")
 		return
 	}
-	changed, err := h.bs.SupersedeArtifactReview(r.Context(), project, id, time.Now())
+	var newer []string
+	if sid, n, ok := digestSeriesOnBoard(h.coralDir, artifactStoreID(item), project); ok {
+		for _, m := range seriesMembers(h.coralDir, sid) {
+			if m.Board == project && m.N > n && m.Digest != artifactStoreID(item) {
+				newer = append(newer, m.Digest)
+			}
+		}
+	}
+	r = r.WithContext(board.WithActivity(r.Context(), activityMetaFor(r, item.Name, "Automatic settlement of an older version")))
+	changed, err := h.bs.SettleOlderArtifactReview(r.Context(), project, id, newer, time.Now())
+	if errors.Is(err, board.ErrNotOlderReview) {
+		commentRefuse(w, http.StatusConflict, "not_older_version", "Only an older version with a newer review or an approved/denied version in the same team and series can be settled automatically")
+		return
+	}
 	if err != nil {
 		errInternalServer(w, "could not settle that version")
 		return
