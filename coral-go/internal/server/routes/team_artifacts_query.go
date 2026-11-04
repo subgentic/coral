@@ -472,12 +472,12 @@ func ptrOr(p *string) string {
 	return *p
 }
 
-// textMatch: q is a substring of the name, the task title, who produced or sent it, where it went or came from, or its type.
+// textMatch: q is a substring of the name, the task title, the goal's title, the question a file for review asks, the team, who produced or sent it, where it went or came from, or its type. (The question, the goal and the team are what Needs you's own search matched in the page, #13162: a filter that is the computer's must find what the page's did.)
 func (q *teamArtifactQuery) textMatch(it teamArtifact) bool {
 	if q.q == "" {
 		return true
 	}
-	for _, f := range []string{it.Name, it.TaskTitle, ptrOr(it.ProducedBy), it.Uploader, it.Role, it.SentBy, it.SharedTo, it.ReceivedFrom, it.FromBoard, it.MediaType} {
+	for _, f := range []string{it.Name, it.TaskTitle, it.GoalTitle, it.ReviewQuestion, it.Team, ptrOr(it.ProducedBy), it.Uploader, it.Role, it.SentBy, it.SharedTo, it.ReceivedFrom, it.FromBoard, it.MediaType} {
 		if f != "" && strings.Contains(strings.ToLower(f), q.q) {
 			return true
 		}
