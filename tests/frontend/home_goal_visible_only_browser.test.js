@@ -7,6 +7,7 @@ const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
+    const S = `(window.__coralStatic || '/static/')`;
     const sleep = ms => new Promise(r => setTimeout(r, ms)); // sleep-ok: the test shows that no read is made in this time, which only waiting can show
     const open = async (agents) => {
         await Page.navigate({ url: 'about:blank' });
@@ -39,15 +40,16 @@ const { coralReady } = require('./helpers/wait');
         await ev(`(async () => { window.__m.agents = {}; window._coralSetLiveSessions([]); (await import((window.__coralStatic || '/static/') + 'view_switch.js')).showView('welcome-screen'); return true; })()`);
         await waitFor(`window.__reads >= 1`, 'the card that came back reads the teams', 9000);
 
-        // 4: QA Reviewer 2's SHOULD, the IntersectionObserver path: the card is drawn and then hidden before the page goes quiet; it is shown again with no redraw; exactly one read, and only when it comes into view
+        // 4: QA Reviewer 2's SHOULD, a card drawn and hidden before the page goes quiet: no read while it is hidden; it comes back with the app's own view change (showView, no redraw, no coral:welcome-built): exactly one read, and no observer is left behind (#13132: teardown_stability_browser holds observers to 0)
         await open(false);
-        await ev(`document.getElementById('welcome-screen').style.display = 'none'; true`);
+        await ev(`window.__obs = 0; for (const k of ['IntersectionObserver']) { const O = window[k]; window[k] = class extends O { constructor(...a) { super(...a); window.__obs++; } }; } (async () => { (await import(${S} + 'view_switch.js')).showView('servers-view'); })(); true`);
         await sleep(2500); // sleep-ok: the page goes quiet and the 1 s wait ends with the card hidden: only waiting shows that no read is made
         assert.equal(await ev(`window.__reads`), 0, 'the card is hidden when the page goes quiet: no read yet');
-        await ev(`document.getElementById('welcome-screen').style.display = ''; true`); // shown again, the same elements: no coral:welcome-built, no redraw
-        await waitFor(`window.__reads >= 1`, 'the card that comes into view reads the teams', 9000);
+        await ev(`(async () => { (await import(${S} + 'view_switch.js')).showView('welcome-screen'); return true; })()`);
+        await waitFor(`window.__reads >= 1`, 'the card that comes back reads the teams', 9000);
         await sleep(1500); // sleep-ok: no second read may follow: only waiting shows that
-        assert.equal(await ev(`window.__reads`), 1, 'exactly one read, when the card came into view');
+        assert.equal(await ev(`window.__reads`), 1, 'exactly one read, when the card came back');
+        assert.equal(await ev(`window.__obs`), 0, 'no IntersectionObserver was made for the hidden card');
         console.log('PASS');
     } finally { try { client.close(); } catch (e) {} }
 })().catch(e => { console.error(e); process.exit(1); });

@@ -48,6 +48,15 @@ type teamArtifactTeamRef struct {
 	All     int    `json:"all"`
 }
 
+// filesOrVersions is how many rows a count of these items is: the files when the query collapses the versions of one file (versions=newest), else every row (#13151: the cross-team `all` counted versions with
+// versions=newest, so the Inbox's sidebar said 21,117 for 647 files).
+func filesOrVersions(tq *teamArtifactQuery, items []teamArtifact) int {
+	if tq != nil && tq.collapse {
+		return len(collapseVersions(items))
+	}
+	return len(items)
+}
+
 // ListAllTeamArtifacts: GET /api/team-artifacts?team=&q=&kind=&origin=&by=&board=&kept=&task=&since=&until=&sort=&limit=&offset=&cursor=
 func (h *BoardHandler) ListAllTeamArtifacts(w http.ResponseWriter, r *http.Request) {
 	if refuseNonOwner(w, r) { // through Coral Hub the owner's alone, like the team route
@@ -135,7 +144,7 @@ func (h *BoardHandler) ListAllTeamArtifacts(w http.ResponseWriter, r *http.Reque
 			rows[i].BoardID, rows[i].Team = p.Project, label
 		}
 		if len(rows) > 0 {
-			refs = append(refs, teamArtifactTeamRef{BoardID: p.Project, Team: label, All: len(rows)})
+			refs = append(refs, teamArtifactTeamRef{BoardID: p.Project, Team: label, All: filesOrVersions(tq, rows)})
 		}
 		items = append(items, rows...)
 	}
@@ -146,11 +155,11 @@ func (h *BoardHandler) ListAllTeamArtifacts(w http.ResponseWriter, r *http.Reque
 			for i := range rows {
 				rows[i].Team = noTeamLabel
 			}
-			refs = append(refs, teamArtifactTeamRef{Team: noTeamLabel, All: len(rows)})
+			refs = append(refs, teamArtifactTeamRef{Team: noTeamLabel, All: filesOrVersions(tq, rows)})
 			items = append(items, rows...)
 		}
 	}
-	all := len(items)
+	all := filesOrVersions(tq, items) // with versions=newest the unfiltered count is files, as the total and the team route's own all are (#11700, #13151)
 	sel, err := h.selectTeamArtifacts(r, items, limit, offset, tq)
 	if err != nil {
 		errInternalServer(w, "could not list artifacts")

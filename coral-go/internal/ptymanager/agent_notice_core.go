@@ -351,6 +351,46 @@ func decideWinText(src procSource, root int, rec winProc, recorded bool) (bool, 
 	return false, ""
 }
 
+// Reading the terminal's processes can fail for a moment while programs start and end below the agent (a snapshot taken mid-change, a handle
+// refused for an instant): one failed read is not "the processes cannot be read". textReadTries fresh reads are taken, textReadGap apart, and the
+// text is refused as unreadable only when every one fails (#470).
+const (
+	textReadTries = 3
+	textReadGap   = 10 * time.Millisecond
+)
+
+// textRefusedWithRetry is decideWinText on a fresh read of the processes (newSrc), retried while the read fails or the terminal's own shell
+// cannot be read; any other answer stands at once. A refusal because a program below the agent reads the terminal is checked once more in a
+// fresh read before it stands (Security's #6911 point 5). err is the last read's error when every read failed to take a snapshot.
+func textRefusedWithRetry(newSrc func() (procSource, error), root int, rec winProc, recorded bool) (bool, string, error) {
+	var lastErr error
+	for try := 0; try < textReadTries; try++ {
+		if try > 0 {
+			time.Sleep(textReadGap)
+		}
+		src, err := newSrc()
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		lastErr = nil
+		refused, why := decideWinText(src, root, rec, recorded)
+		if refused && why == reasonUnreadable {
+			continue // the shell could not be read in this snapshot: read again
+		}
+		if refused && why == tmux.ReasonChildReads {
+			if again, err := newSrc(); err == nil {
+				refused, why = decideWinText(again, root, rec, recorded)
+			}
+		}
+		return refused, why, nil
+	}
+	if lastErr != nil {
+		return false, "", lastErr
+	}
+	return true, reasonUnreadable, nil
+}
+
 // winNoticeVerdict is the whole answer for a session: waiting while the record is being made, nothing recorded, or decideWinNotice.
 func (a *winAgent) verdict(src procSource, root int) tmux.NoticeVerdict {
 	rec, adopted, adopting := a.snapshot()

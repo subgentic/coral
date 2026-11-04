@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/subgentic/coral/internal/logsafe"
-	"log/slog"
 	"net/http"
 	"os/exec"
 	"path/filepath"
@@ -104,7 +103,7 @@ func (h *SessionsHandler) Files(w http.ResponseWriter, r *http.Request) {
 	if sidPtr != nil {
 		sid = *sidPtr
 	}
-	h.refreshFilesInner(w, r, name, sid)
+	h.refreshFilesInner(w, r, name, sid, noRefreshFlags) // the View tier's read: Refresh and Turn on live updates are the POST's flags (Interact), never read here (#13127)
 }
 
 // RefreshFiles runs fresh git queries and merges agent Write/Edit events.
@@ -115,8 +114,17 @@ func (h *SessionsHandler) RefreshFiles(w http.ResponseWriter, r *http.Request) {
 		SessionID string `json:"session_id"`
 	}
 	decodeJSON(r, &body)
-	h.refreshFilesInner(w, r, name, body.SessionID)
+	q := r.URL.Query()
+	flags := refreshFlags{manual: q.Get("manual") == "1", live: q.Get("live") == "on"}
+	h.refreshFilesInner(w, r, name, body.SessionID, flags)
 }
+
+// refreshFlags are what a person's Refresh and Turn on live updates ask of one pass (#13079): manual runs a pass even for a paused folder, live also turns live updates back on. Only the POST refresh (Interact) passes them;
+// the GET (View) never does, so a viewer can neither resume a paused folder nor force git to run (#13127).
+type refreshFlags struct{ manual, live bool }
+
+// noRefreshFlags is what a read passes. (The calls pass a plain name, not a literal: tools/gen_route_queries.py follows a helper that receives the request only through such a call, and the route's own parameters, worktree, are read inside it.)
+var noRefreshFlags = refreshFlags{}
 
 // trackedPaths reports which of the given repo-relative paths git tracks. It
 // asks only about those paths, so the cost follows the number of candidates
@@ -132,7 +140,7 @@ func trackedPaths(ctx context.Context, workdir string, paths []string) map[strin
 	if err != nil {
 		// Unknown tracked status: treat every candidate as untracked, which at
 		// worst shows a clean file in the list rather than hiding a dirty one.
-		slog.Warn("git ls-files (tracked) failed", "workdir", logsafe.Dir(workdir), "error", err)
+		warnGit("git ls-files (tracked) failed", err, "workdir", logsafe.Dir(workdir))
 		return tracked
 	}
 	for _, f := range bytes.Split(out, []byte{0}) {
@@ -151,17 +159,35 @@ func gitCmd(ctx context.Context, workdir string, args ...string) *exec.Cmd {
 }
 
 // refreshFilesInner contains the shared logic for computing fresh changed files.
-func (h *SessionsHandler) refreshFilesInner(w http.ResponseWriter, r *http.Request, name, sessionID string) {
+func (h *SessionsHandler) refreshFilesInner(w http.ResponseWriter, r *http.Request, name, sessionID string, flags refreshFlags) {
 	if !h.requireAgentSession(w, r, name, sessionID) {
 		return
 	}
-	workdir := h.resolveGitRoot(agentCtx(r), name, "", sessionID)
+	handlerBegan := time.Now()
+	workdir := h.refreshWorkdir(agentCtx(r), name, sessionID)
 	if workdir == "" {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "Could not determine working directory", "files": []any{}})
 		return
 	}
+	follow := followOn(agentCtx(r))
+	manual := flags.manual || flags.live
+	if flags.live {
+		gitguard.Resume(workdir) // 'Turn live updates on': this pass runs, and the poller takes the folder up again (it pauses it again if git is still slow)
+	}
+	if pz, isPaused := gitguard.Get(workdir); isPaused && !manual {
+		// Live updates are paused for this folder (#13079): the stored list is the answer, no git runs (not even the repository check below: a paused folder is one); Refresh (manual=1) asks for one pass
+		mode := h.getDiffMode(r.Context())
+		if mode == "" {
+			mode = "branch_point"
+		}
+		stored, _, _ := h.gs.GetChangedFiles(r.Context(), name, ptr.NonEmpty(sessionID), mode)
+		writeJSON(w, http.StatusOK, h.withWorktree(r, name, sessionID, map[string]any{"agent_name": name, "files": hubVisibleFiles(r, stored), "diff_mode": mode, "total_changed": max(pz.Changes, len(stored)), "capped": pz.Changes > len(stored),
+			"paused": pz}))
+		return
+	}
 	// A folder that is not a git repository has nothing to compare: the panel says so (#6072), and lists its recently changed files instead (#10256); this is an answer, not an error. (ResolveGitRoot gives the folder itself back when it finds no repository.)
 	if gitutil.Available() {
+		gitProbeHook()
 		gctx, gcancel := context.WithTimeout(r.Context(), 5*time.Second)
 		err := gitCmd(gctx, workdir, "rev-parse", "--is-inside-work-tree").Run()
 		gcancel()
@@ -172,22 +198,6 @@ func (h *SessionsHandler) refreshFilesInner(w http.ResponseWriter, r *http.Reque
 		}
 	}
 
-	follow := followOn(agentCtx(r))
-	manual := r.URL.Query().Get("manual") == "1" || r.URL.Query().Get("live") == "on"
-	if r.URL.Query().Get("live") == "on" {
-		gitguard.Resume(workdir) // 'Turn live updates on': this pass runs, and the poller takes the folder up again (it pauses it again if git is still slow)
-	}
-	if pz, isPaused := gitguard.Get(workdir); isPaused && !manual {
-		// Live updates are paused for this folder (#13079): the stored list is the answer, no git runs; Refresh (manual=1) asks for one pass
-		mode := h.getDiffMode(r.Context())
-		if mode == "" {
-			mode = "branch_point"
-		}
-		stored, _, _ := h.gs.GetChangedFiles(r.Context(), name, ptr.NonEmpty(sessionID), mode)
-		writeJSON(w, http.StatusOK, h.withWorktree(r, name, sessionID, map[string]any{"agent_name": name, "files": hubVisibleFiles(r, stored), "diff_mode": mode, "total_changed": max(pz.Changes, len(stored)), "capped": pz.Changes > len(stored),
-			"paused": pz}))
-		return
-	}
 	key := refreshFlightKey(workdir, h.getDiffMode(r.Context()), sessionID, follow, name)
 	res, ran, ok := refreshFlights.do(r.Context(), key, manual, func() refreshedFiles {
 		return h.computeRefreshedFiles(context.WithoutCancel(r.Context()), name, sessionID, workdir, follow)
@@ -197,7 +207,7 @@ func (h *SessionsHandler) refreshFilesInner(w http.ResponseWriter, r *http.Reque
 	}
 	var pausedNow any
 	if ran {
-		gitguard.Observe(workdir, res.total, res.took) // a slow pass is a strike (two in a row pause the folder); a fast one clears them and turns live updates back on if they were paused
+		gitguard.Observe(workdir, res.total, max(res.took, time.Since(handlerBegan))) // the whole request counts, not only the pass: finding the repository is git too (#13079). A slow pass is a strike (two in a row pause the folder); a fast one clears them and turns live updates back on if they were paused
 	}
 	if pz, isPaused := gitguard.Get(workdir); isPaused {
 		pausedNow = pz
@@ -242,11 +252,10 @@ func (h *SessionsHandler) computeRefreshedFiles(ctx0 context.Context, name, sess
 
 	diffMode := h.getDiffMode(ctx0)
 	withTree := gitutil.IncludesWorkingTree(diffMode)
-	diffArgs := append(append([]string{"diff"}, gitutil.DiffRefs(ctx, workdir, diffMode)...), "--numstat")
-	out, err := gitCmd(ctx, workdir, diffArgs...).Output()
+	out, moreChanged, err := gitutil.CappedNumstat(ctx, workdir, gitutil.DiffRefs(ctx, workdir, diffMode), refreshFilesCap, false) // a big tree is numbered for the rows kept only (#13155)
 	fileMap := make(map[string]store.ChangedFile)
 	if err != nil {
-		slog.Warn("git diff --numstat failed", "agent_name", name, "workdir", logsafe.Dir(workdir), "error", err)
+		warnGit("git diff --numstat failed", err, "agent_name", name, "workdir", logsafe.Dir(workdir))
 	} else {
 		for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
 			if line == "" {
@@ -271,7 +280,7 @@ func (h *SessionsHandler) computeRefreshedFiles(ctx0 context.Context, name, sess
 		untracked, err = listUntracked(workdir, func(args ...string) ([]byte, error) { return gitCmd(ctx, workdir, args...).Output() })
 	}
 	if err != nil {
-		slog.Warn("git ls-files (untracked) failed", "agent_name", name, "workdir", logsafe.Dir(workdir), "error", err)
+		warnGit("git ls-files (untracked) failed", err, "agent_name", name, "workdir", logsafe.Dir(workdir))
 	} else {
 		counted := 0
 		for _, item := range untracked {
@@ -377,7 +386,7 @@ func (h *SessionsHandler) computeRefreshedFiles(ctx0 context.Context, name, sess
 		files = append(files, f)
 	}
 	sort.Slice(files, func(i, j int) bool { return files[i].Filepath < files[j].Filepath })
-	total := len(files)
+	total := len(files) + moreChanged
 	if total > refreshFilesCap {
 		files = files[:refreshFilesCap]
 	}
@@ -462,4 +471,33 @@ func (f *refreshFlight) do(ctx context.Context, key string, fresh bool, fn func(
 // known by name alone (no session id) would otherwise share a pass with every other agent in its folder.
 func refreshFlightKey(workdir, mode, sessionID string, follow bool, agent string) string {
 	return fmt.Sprintf("%s\x00%s\x00%s\x00%v\x00%s", workdir, mode, sessionID, follow, agent)
+}
+
+// refreshRootTTL is how long the folder a files refresh resolved for an agent is kept: the resolution is git processes (the repository's top level, the followed worktree), and the Files panel asks every few seconds (#13079).
+const refreshRootTTL = 5 * time.Second
+
+// gitProbeHook runs before each git probe of the refresh path that is not the pass itself (tests: count the probes, make one slow).
+var gitProbeHook = func() {}
+
+type refreshRoot struct {
+	dir string
+	at  time.Time
+}
+
+// refreshWorkdir is resolveGitRoot, kept for refreshRootTTL per agent, session, follow and strictness: a miss is not kept.
+func (h *SessionsHandler) refreshWorkdir(ctx context.Context, name, sessionID string) string {
+	key := fmt.Sprintf("%s\x00%s\x00%t\x00%t", name, sessionID, followOn(ctx), strictIdentity(ctx))
+	if v, ok := h.refreshRoots.Load(key); ok {
+		if rr := v.(refreshRoot); time.Since(rr.at) < refreshRootTTL {
+			return rr.dir
+		}
+	}
+	gitProbeHook()
+	dir := h.resolveGitRoot(ctx, name, "", sessionID)
+	if dir == "" {
+		h.refreshRoots.Delete(key)
+		return ""
+	}
+	h.refreshRoots.Store(key, refreshRoot{dir: dir, at: time.Now()})
+	return dir
 }

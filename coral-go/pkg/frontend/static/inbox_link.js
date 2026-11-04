@@ -22,9 +22,15 @@ export async function openNeed({ kind, server, team, id }) {
         return;
     }
     const ask = kind === 'ask', m = await importOnce(ask ? './operator_asks.js' : './inbox_reviews.js');
-    await (ask ? m.refreshOperatorAsks : m.refreshReviews)(true);
-    const list = ask ? m.operatorAsks() : m.reviewItems(), at = await teamKeyOf(server, team, list);
-    const item = ask ? list.find(a => a.board === at && String(a.id) === id) : list.find(a => a.team === at && a.hex === id);
+    const pick = (list, at) => (ask ? list.find(a => a.board === at && String(a.id) === id) : list.find(a => a.team === at && a.hex === id));
+    // The item is opened from what the Inbox already has (#13116: the link used to wait for a scan of every team, eight seconds through the Hub, twice if a scan was running); not loaded yet: a review reads only its own
+    // team; a question reads as before. The lists are brought up to date after the viewer is open, in the background.
+    let list = ask ? m.operatorAsks() : m.reviewItems(), at = await teamKeyOf(server, team, list), item = pick(list, at);
+    if (!item) {
+        if (ask) { await m.refreshOperatorAsks(true); list = m.operatorAsks(); at = await teamKeyOf(server, team, list); item = pick(list, at); }
+        else { try { item = pick(await m.reviewsOfTeam(at), at); } catch { item = null; } }
+    }
+    Promise.resolve((ask ? m.refreshOperatorAsks : m.refreshReviews)(true)).catch(() => {});
     if (!item) showToast(`That ${ask ? 'question' : 'file'} is not waiting for you any more.`);
     else if (ask) m.openAskDialog(item, () => {});
     else (await importOnce('./inbox_sidebar.js')).openReview(item);

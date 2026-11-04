@@ -92,39 +92,52 @@ async function readTeam(team, mutedOut = null) {
     }
     return rows;
 }
+/** The rows of one team, as Needs you has them (newest version of each file): a link to one file reads only its own team (#13116), not every team. */
+export async function reviewsOfTeam(team) { return collapseVersions((await readTeam(team)).sort(byAge)); }
 /** The files for review on one goal of one team that nobody decided (one row per file, as Needs you has them): a goal page asks only its own team, not every team (#11913). */
 export async function reviewsOfGoal(team, goalId) {
     return collapseVersions((await readTeam(team)).sort(byAge)).filter(a => String(a.goal_id) === String(goalId));
 }
 
+// Teams are read a few at a time (#13116): through the Hub each read is about a second, and eight teams one after the other were eight seconds, twice when a click came during a scan.
+const SCAN_AT_ONCE = 4;
+let pendingStarted = 0;
 export function refreshReviews(force = false) {
     // showInbox requests a forced read; badge/feed updates alone must not start the project scan.
     if (force) activated = true;
     if (!activated) return null;
-    if (pending) return force ? pending.then(() => refreshReviews(true)) : pending;
+    // A scan in flight is joined, not queued behind (#13116): its answer is as new as one started now, unless something was settled or tagged since it began (revision moved): it will be discarded, so a second one follows.
+    if (pending) return force && pendingStarted !== revision ? pending.then(() => refreshReviews(true)) : pending;
     if (!force && Date.now() - lastRead < 30000) return null;
     const started = revision;
+    pendingStarted = started;
     lastRead = Date.now();
     pending = (async () => {
         try {
-            const projects = await fetchProjects(), next = [], failed = [], nextSaved = [], nextMuted = [];
-            for (const { project: team } of projects) {
+            const projects = await fetchProjects();
+            const results = new Array(projects.length);
+            const readOne = async (i) => {
+                const team = projects[i].project, mutedHere = [], got = { rows: [], saved: [], mutedHere, failed: '' };
                 try {
-                    const rows = await readTeam(team, nextMuted);
-                    next.push(...rows);
+                    got.rows = await readTeam(team, mutedHere);
                     try { // the saved files of this team: one page, a failure here leaves the others alone
                         const r = await boardFetch(team, '/artifacts?tag=saved&limit=200');
                         if (r.ok) for (const a of (await r.json()).artifacts || []) {
                             const hex = /(?:sha256:|coral:\/\/artifacts\/)?([a-f0-9]{64})$/i.exec(a.uri || a.digest || a.id || '')?.[1];
-                            if (a.tags?.includes('saved') && a.tags.includes('for review') && a.available && hex) nextSaved.push({ ...a, team, hex, reviewKey: `${team}:${a.id}` });
+                            if (a.tags?.includes('saved') && a.tags.includes('for review') && a.available && hex) got.saved.push({ ...a, team, hex, reviewKey: `${team}:${a.id}` });
                         }
-                    } catch { nextSaved.push(...saved.filter(a => a.team === team)); }
+                    } catch { got.saved = saved.filter(a => a.team === team); }
                 } catch {
-                    next.push(...items.filter(a => a.team === team));
-                    nextMuted.push(...muted.filter(a => a.team === team));
-                    failed.push(`${keyLabel(team)} review artifacts could not be refreshed.`);
+                    got.rows = items.filter(a => a.team === team);
+                    got.mutedHere.push(...muted.filter(a => a.team === team));
+                    got.failed = `${keyLabel(team)} review artifacts could not be refreshed.`;
                 }
-            }
+                results[i] = got;
+            };
+            let at = 0;
+            await Promise.all(Array.from({ length: Math.min(SCAN_AT_ONCE, projects.length) }, async () => { while (at < projects.length) await readOne(at++); }));
+            const next = [], failed = [], nextSaved = [], nextMuted = []; // joined in the teams' own order, whatever order the reads finished in
+            for (const g of results) { next.push(...g.rows); nextSaved.push(...g.saved); nextMuted.push(...g.mutedHere); if (g.failed) failed.push(g.failed); }
             if (started !== revision) return;
             items = next.sort(byAge); saved = nextSaved.sort(byAge); muted = nextMuted.sort(byAge);
             errors = failed;

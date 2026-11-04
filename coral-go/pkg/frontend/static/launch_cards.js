@@ -15,18 +15,15 @@ const GOAL_ROOTS = ['welcome-screen', 'live-sessions-list', 'mobile-agent-list']
 const goalCards = () => { const out = []; for (const id of GOAL_ROOTS) { const r = document.getElementById(id); if (r) out.push(...r.querySelectorAll('[data-goal-desc]')); } return out; };
 const shown = el => (el.checkVisibility ? el.checkVisibility() : el.getClientRects().length > 0);
 const checkTeams = () => importOnce('./home_goal.js').then(m => m.refreshGoalCard()).catch(() => {}); // a failed read leaves the plain line
-/** The teams are read only for a card somebody can see (#13109): on a page that shows none (an agent is open, Settings covers Home, another view) there is no read at all. A card that is drawn but hidden is watched, and the
- *  read is made when it comes into view; a card drawn later asks again (coral:welcome-built, the phone's list). */
-let watching = null;
+/** The teams are read only for a card somebody can see (#13109): on a page that shows none (an agent is open, Settings covers Home, another view) there is no read at all. A card that is drawn but hidden waits for the
+ *  app's own view change (coral:view-shown, from showView: the welcome page, the phone's list and the sidebar come back through showView) and is read then: no observer stays alive for a hidden card (teardown_stability_browser holds
+ *  observers to a bound of 0, #13132). A card drawn later asks again (coral:welcome-built, the phone's list). */
+let wantRead = false;
 function readWhenShown() {
-    const cards = goalCards();
-    if (cards.some(shown)) { checkTeams(); return; }
-    if (watching) watching.disconnect();
-    watching = null;
-    if (!cards.length || typeof IntersectionObserver === 'undefined') return;
-    watching = new IntersectionObserver(entries => { if (entries.some(e => e.isIntersecting && shown(e.target))) { watching.disconnect(); watching = null; checkTeams(); } });
-    for (const el of cards) watching.observe(el);
+    if (goalCards().some(shown)) { wantRead = false; checkTeams(); return; }
+    wantRead = true;
 }
+if (typeof document !== 'undefined') document.addEventListener('coral:view-shown', () => { if (wantRead && goalCards().some(shown)) { wantRead = false; checkTeams(); } }); // view_switch.js says so on every showView
 // Not part of the page's start (#13079, page_weight_browser: the module and the teams read were two more requests at start). The read is made once the page's own requests have gone quiet for GOAL_QUIET_MS, however
 // long they take (a slow runner or a slow answer holds it back; a fixed delay did not, #13087's INFO), and once however often the card is drawn.
 const GOAL_QUIET_MS = 1000, GOAL_LATEST_MS = 5000; // steady polling never goes quiet: the read is made at most GOAL_LATEST_MS after the card is drawn whatever the requests

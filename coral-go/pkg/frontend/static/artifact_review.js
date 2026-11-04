@@ -208,6 +208,18 @@ export function attachReview(d, { reload }) {
     changes.addEventListener('click', () => openForm(form.hidden));
     $('.artifact-review-cancel').addEventListener('click', () => { openForm(false); changes.focus(); });
     document.addEventListener('coral:review-approved', e => { if (cur && cur.team === e.detail.team && cur.row.id === e.detail.id && cur.state !== 'approved') show({ ...cur, state: 'approved', at: e.detail.at }); });
+    // The file may be settled while its viewer is open (a link opens from the rows the Inbox has, up to a scan old; #13128): when the Inbox's list is read again and no longer holds the pending file, the file's own state
+    // is read once more and the viewer says what it is now (Approved, no Approve button), instead of leaving a decision that the server would only refuse.
+    document.addEventListener('coral:reviews-changed', async () => {
+        const was = cur, g = gen;
+        if (!was || was.state !== 'pending') return;
+        try {
+            const m = await importOnce('./inbox_reviews.js');
+            if (m.reviewItems().some(a => a.team === was.team && a.hex === was.hex)) return; // still waiting in the list
+            const s = await reviewStateOf(was.team, was.hex);
+            if (g === gen && cur === was && s && s.state !== was.state) show({ ...s, team: was.team, hex: was.hex, server: was.server, name: was.name });
+        } catch { /* the viewer keeps what it shows; a decision the server refuses says so */ }
+    });
     approve.addEventListener('click', async () => {
         if (!cur) return;
         approve.disabled = true;

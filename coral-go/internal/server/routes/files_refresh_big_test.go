@@ -154,6 +154,7 @@ func TestRefreshFilesPausesASlowFolderAndRefreshRunsOnePass(t *testing.T) {
 	t.Cleanup(func() { refreshComputeHook = func() {} })
 	post := func(query string) map[string]any {
 		t.Helper()
+		forgetRefreshResults() // a pass over refreshReuseOver (a loaded machine's cold git) is reused by the next ask: this test counts passes, so each ask starts with none stored (the full-run flake: expected 2 passes, saw 1)
 		req, _ := http.NewRequest("POST", server.URL+"/api/sessions/live/"+name+"/files/refresh"+query, bytes.NewBufferString(`{"session_id":"`+sid+`"}`))
 		resp, err := http.DefaultClient.Do(req)
 		require.NoError(t, err)
@@ -282,4 +283,11 @@ loop:
 	require.Len(t, a.Files, refreshFilesCap, "and the list sent is the cap")
 	require.Less(t, worst, 200*time.Millisecond, "another route answers in under 200 ms while the refresh runs")
 	require.Greater(t, probes, 2, "the refresh took long enough to be probed")
+}
+
+// forgetRefreshResults drops the answers the flight group keeps for reuse (not a pass in flight).
+func forgetRefreshResults() {
+	refreshFlights.mu.Lock()
+	clear(refreshFlights.recent)
+	refreshFlights.mu.Unlock()
 }
