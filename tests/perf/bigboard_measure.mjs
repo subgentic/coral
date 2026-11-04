@@ -39,9 +39,10 @@ const pct = (a, q) => { if (!a.length) return 0; const s = [...a].sort((x, y) =>
 // DevTools port, and the spawned process killed by PID before the next try (a launch that hung once did not come back in 90 s: #13154's 9 tries in a row).
 const CHROME_FLAGS = ['--headless=new', '--remote-debugging-port=0', '--no-first-run', '--no-default-browser-check', '--disable-gpu', '--window-size=1400,900', '--use-mock-keychain', '--password-store=basic',
     '--disable-background-networking', '--disable-component-update', '--no-service-autorun', '--disable-sync', ...(process.env.CI ? ['--no-sandbox'] : [])];
+const CHROME_ATTEMPTS = process.env.TYPING_TRACE === '1' ? 1 : 4;
 let profile = '', chrome = null, chromeErr = '', chromeExit = '';
 const launchChrome = async () => {
-    for (let attempt = 1; attempt <= 4; attempt++) {
+    for (let attempt = 1; attempt <= CHROME_ATTEMPTS; attempt++) {
         profile = fs.mkdtempSync(path.join(os.tmpdir(), 'bigboard-chrome.')); chromeErr = ''; chromeExit = '';
         chrome = spawn(chromePath, [...CHROME_FLAGS, `--user-data-dir=${profile}`, 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
         chrome.stderr.on('data', d => { chromeErr = (chromeErr + d).slice(-3000); });
@@ -55,7 +56,7 @@ const launchChrome = async () => {
         try { chrome.kill('SIGKILL'); } catch {}
         await sleep(1500); try { fs.rmSync(profile, { recursive: true, force: true }); } catch {}
     }
-    throw new Error('Chrome did not open its DevTools port in 4 tries');
+    throw new Error('Chrome did not open its DevTools port in ' + CHROME_ATTEMPTS + ' attempt(s)');
 };
 let client;
 const done = async code => { try { await client?.close(); } catch {} try { chrome.kill('SIGTERM'); } catch {} await sleep(500); try { fs.rmSync(profile, { recursive: true, force: true }); } catch {} process.exit(code); };

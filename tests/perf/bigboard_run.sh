@@ -14,6 +14,8 @@ if [[ "${PERF_RUN:-}" != "1" ]]; then echo "[bigboard-run] opt-in: set PERF_RUN=
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 [[ -n "${FIXTURE:-}" && -f "$FIXTURE/fixture.json" && -x "$FIXTURE/bin/coral" ]] || { echo "[bigboard-run] FIXTURE must be a bigboard_seed.sh fixture" >&2; exit 2; }
 [[ -n "${OUT:-}" ]] || { echo "[bigboard-run] set OUT to a results folder" >&2; exit 2; }
+BIN="${BIN:-$FIXTURE/bin/coral}"
+[[ -x "$BIN" ]] || { echo "[bigboard-run] BIN must be executable" >&2; exit 2; }
 PORT="${PORT:-8742}"; HUBPORT="${HUBPORT:-8743}"; IDLE_S="${IDLE_S:-60}"
 [[ "$PORT" != 8420 && "$HUBPORT" != 8420 ]] || { echo "[bigboard-run] refusing :8420" >&2; exit 2; }
 for p in "$PORT" "$HUBPORT"; do lsof -nP -iTCP:"$p" -sTCP:LISTEN >/dev/null 2>&1 && { echo "[bigboard-run] port $p is in use" >&2; exit 2; }; done
@@ -58,13 +60,13 @@ measure() {  # measure LOGFILE ENV... -- ARGS: runs bigboard_measure.mjs, up to 
   done
   return $rc
 }
-{ echo "commit $(cat "$FIXTURE/commit.txt")"; echo "load $(uptime | sed 's/.*load averages*: //')"; sysctl -n machdep.cpu.brand_string 2>/dev/null; } > "$OUT/machine.txt"
+{ echo "fixture commit $(cat "$FIXTURE/commit.txt")"; echo "candidate ${CANDIDATE_REV:-fixture build}"; echo "binary $BIN"; echo "load $(uptime | sed 's/.*load averages*: //')"; sysctl -n machdep.cpu.brand_string 2>/dev/null; } > "$OUT/machine.txt"
 log "copying the fixture data"
 cp -R "$FIXTURE/data" "$WORK/data"
 rm -f "$WORK/data/coral-server.lock" "$WORK/data/login_token"
 PPROF_PORT="${PPROF_PORT:-8744}"
 export CORAL_PPROF_ADDR="127.0.0.1:$PPROF_PORT"; [[ -n "${DEBUG_PHASES:-}" ]] && export CORAL_DEBUG_PHASES=1   # the measured server only (the hub must not bind the same address)
-start local "$FIXTURE/bin/coral" "$WORK/data" "$PORT"
+start local "$BIN" "$WORK/data" "$PORT"
 unset CORAL_PPROF_ADDR CORAL_DEBUG_PHASES
 SRV=$LAST_PID
 KEY="$(tr -d '[:space:]' < "$WORK/data/api_key")"; write_auth_header "$WORK/auth.hdr" "$KEY"
@@ -93,7 +95,7 @@ done
 
 if [[ "${HUB:-}" == 1 ]]; then
   mkdir -p "$WORK/hub"
-  start hub "$FIXTURE/bin/coral" "$WORK/hub" "$HUBPORT" --hub
+  start hub "$BIN" "$WORK/hub" "$HUBPORT" --hub
   HUBKEY="$(tr -d '[:space:]' < "$WORK/hub/api_key")"
   write_auth_header "$WORK/hub-auth.hdr" "$HUBKEY"   # the keys go in files, not on curl's command line (another account's ps could read them)
   ( umask 077; printf '{"id":"bigboard","label":"bigboard","url":"http://127.0.0.1:%s","api_key":"%s","allow_private":true}' "$PORT" "$KEY" > "$WORK/hub-add.body" )

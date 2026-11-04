@@ -112,7 +112,9 @@ main-thread task longer than 50 ms, its nested events and sampled source owners.
 are budgeted; unrelated renderer processes and nested duplicate tasks are excluded. Key-to-frame timing includes CDP overhead.
 Set `TYPING_GATE=1` with `TYPING_TRACE=1` to fail the measurement and outer runner for a setup error or any task over 50 ms. Profiling is enabled
 in this mode, so retain machine/load details when comparing timings. The long-task attribution parser has light checks:
-`node --test tests/perf/typing_trace.test.mjs`. The default baseline run remains unchanged without these opt-in variables.
+`node --test tests/perf/typing_trace.test.mjs`. Trace mode makes one Chrome startup attempt and does not retry a failed measurement.
+Pass `BIN=<plain candidate coral>` and `CANDIDATE_REV=<sha>` to measure a candidate on a copy of the existing fixture; the default still uses the fixture build.
+The default baseline measurement keeps QA’s existing retry policy without the typing opt-in.
 
 Safety notes (Security's read of the rig, #13154): the scripts stop a tmux server only through `stop_private_tmux` in `bigboard_lib.sh`, which refuses any socket under a real Coral
 folder (`~/.coral`, `$CORAL_DIR`, any `.coral/`) or at a path that is not `<run folder>/data/tmux.sock`; a private socket made by the run's own server is exempt from the "no tmux
