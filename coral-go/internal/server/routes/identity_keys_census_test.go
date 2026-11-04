@@ -29,6 +29,7 @@ var notIdentityFields = map[string]string{
 	"reviewers":          "task add --reviewers: names the Operator or orchestrator chose, checked against the board's members when delegated (#4175 rule 13)",
 	"to":                 "who a message is for (a mention list): a target, not who it is from",
 	"to_address":         "a cross-team address",
+	"session_ids":        "sleep-gone (#13171): the live sessions the person names for 'Sleep all terminal-gone'; each is looked up in the live table and acted on only if its terminal is already gone, a target the person chose, never who the request is from",
 	"from_board":         "a board id on a cross-team send; the sender is subscriber_id",
 	"from_board_label":   "the sending team's display name in a relayed message (#11506): cleaned by board.CleanTeamLabel (the board id shows when it fails), shown in the sender label only; the sender is subscriber_id",
 	"from_cross_team_id": "the sending Coral's claim of its board's generated cross-team id (#5508): shape-checked, compared with the receiving board's list, never echoed; the sender is subscriber_id",
