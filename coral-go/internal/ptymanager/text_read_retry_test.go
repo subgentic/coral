@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/subgentic/coral/internal/tmux"
 )
 
 // #470: a read of the terminal's processes that fails for a moment (a snapshot taken while programs start and end, the shell's handle refused for
@@ -63,5 +65,55 @@ func TestAFailedProcessReadIsReadAgainBeforeTheTextIsRefused(t *testing.T) {
 	refused, why, _ = textRefusedWithRetry(src, root, winProc{}, false)
 	assert.True(t, refused)
 	assert.Equal(t, reasonCmdShell, why, "an answer read from the processes stands at once")
+	assert.Equal(t, 1, *reads)
+}
+
+// The "a program below the agent reads the terminal" refusal stands only if a fresh read agrees (Security's #6911 point 5): a reader seen once and
+// gone in the re-read does not refuse; one seen in both does; a re-read that fails keeps the refusal; and a clean first read stands at once.
+func TestAChildReaderRefusesOnlyWhenTheFreshReadAgrees(t *testing.T) {
+	const root, agent, child = 10, 20, 30
+	rec := winProc{pid: agent, start: 200, known: true}
+	clean := func() *fakeProcs { return newFake().add(1, root, 100, kindVerifiedShell).add(root, agent, 200, 0) }
+	reading := func() *fakeProcs {
+		f := clean().add(agent, child, 300, 0)
+		f.procs[child] = winProc{pid: child, start: 300, known: true, name: "node"}
+		return f.withStdin(child, stdinConsole)
+	}
+	seq := func(steps ...any) (func() (procSource, error), *int) {
+		n := 0
+		return func() (procSource, error) {
+			i := n
+			n++
+			if i >= len(steps) {
+				i = len(steps) - 1
+			}
+			if err, ok := steps[i].(error); ok {
+				return nil, err
+			}
+			return steps[i].(*fakeProcs), nil
+		}, &n
+	}
+
+	src, reads := seq(reading(), clean())
+	refused, why, err := textRefusedWithRetry(src, root, rec, true)
+	assert.NoError(t, err)
+	assert.False(t, refused, "a reader in the first read and gone in the fresh one does not refuse (%s)", why)
+	assert.Equal(t, 2, *reads, "the refusal was read again")
+
+	src, reads = seq(reading(), reading())
+	refused, why, _ = textRefusedWithRetry(src, root, rec, true)
+	assert.True(t, refused, "a reader in both reads refuses")
+	assert.Equal(t, tmux.ReasonChildReads, why)
+	assert.Equal(t, 2, *reads)
+
+	src, reads = seq(reading(), errors.New("snapshot failed"))
+	refused, why, _ = textRefusedWithRetry(src, root, rec, true)
+	assert.True(t, refused, "a re-read that fails keeps the refusal")
+	assert.Equal(t, tmux.ReasonChildReads, why)
+	assert.Equal(t, 2, *reads)
+
+	src, reads = seq(clean(), reading())
+	refused, _, _ = textRefusedWithRetry(src, root, rec, true)
+	assert.False(t, refused, "a clean first read stands: no second read is asked for")
 	assert.Equal(t, 1, *reads)
 }
