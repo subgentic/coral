@@ -37,17 +37,19 @@ const pct = (a, q) => { if (!a.length) return 0; const s = [...a].sort((x, y) =>
 
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'bigboard-chrome.'));
 const chrome = spawn(chromePath, ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`, '--no-first-run', '--no-default-browser-check',
-    '--disable-gpu', '--window-size=1400,900', ...(process.env.CI ? ['--no-sandbox'] : []), 'about:blank'], { stdio: 'ignore' });
+    '--disable-gpu', '--window-size=1400,900', ...(process.env.CI ? ['--no-sandbox'] : []), 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
+let chromeErr = ''; chrome.stderr.on('data', d => { chromeErr = (chromeErr + d).slice(-3000); });
+let chromeExit = ''; chrome.on('exit', (c, sig) => { chromeExit = `exit ${c} ${sig}`; });
 let client;
 const done = async code => { try { await client?.close(); } catch {} try { chrome.kill('SIGTERM'); } catch {} await sleep(500); try { fs.rmSync(profile, { recursive: true, force: true }); } catch {} process.exit(code); };
 process.on('SIGINT', () => done(130));
 
 (async () => {
     let port = 0;
-    for (const end = Date.now() + 30000; !port && Date.now() < end; await sleep(100)) {
+    for (const end = Date.now() + 90000; !port && Date.now() < end; await sleep(100)) {
         try { port = Number(fs.readFileSync(path.join(profile, 'DevToolsActivePort'), 'utf8').split('\n')[0]) || 0; } catch {}
     }
-    if (!port) throw new Error('Chrome did not open its DevTools port');
+    if (!port) throw new Error('Chrome did not open its DevTools port: ' + (chromeExit || 'still running') + '\n' + chromeErr);
     client = await CDP({ port });
     const { Page, Runtime, Network, Emulation } = client;
     await Promise.all([Page.enable(), Runtime.enable(), Network.enable()]);
@@ -98,11 +100,16 @@ process.on('SIGINT', () => done(130));
     const settledMs = Date.now() - t0 - 1500;
     const nav = await ev(`(() => { const n = performance.getEntriesByType('navigation')[0]; const lcp = performance.getEntriesByType('largest-contentful-paint').pop(); const fcp = performance.getEntriesByName('first-contentful-paint')[0];
         return { domContentLoaded: n && n.domContentLoadedEventEnd, load: n && n.loadEventEnd, fcp: fcp && fcp.startTime, lcp: lcp && lcp.startTime }; })()`);
-    let out_interactions = {}; let idleEnd = 0;
+    let out_interactions = {}; let idleEnd = 0; const out_profiles = {};
+    // ── profiles (PPROF_URL, PROFILE_PREFIX): a CPU profile of the server during the idle minute and one while an agent is open and polling (Backend Dev's #13182) ──
+    const PPROF = process.env.PPROF_URL, PREFIX = process.env.PROFILE_PREFIX, PROF_S = Number(process.env.PROFILE_S || 40);
+    const profile = async (label) => { if (!PPROF || !PREFIX) return null; try { const r = await fetch(`${PPROF}/debug/pprof/profile?seconds=${PROF_S}`); const b = Buffer.from(await r.arrayBuffer()); fs.writeFileSync(`${PREFIX}-${label}.pb.gz`, b); return b.length; } catch (e) { return String(e.message || e); } };
     // ── idle ──
     phase = 'idle'; const idleFrom = rows.length; const idleStarted = started;
     for (const r of reqs.values()) r.phase = 'load';
-    await sleep(IDLE_S * 1000);
+    const idleProf = profile('idle'); // runs for PROF_S seconds inside the idle minute (start it first: the profile call blocks that long)
+    await sleep(Math.max(IDLE_S, PROF_S + 2) * 1000);
+    out_profiles.idle = await idleProf;
     idleEnd = rows.length; phase = 'action';
 
     // ── interactions: each timed in the page (performance.now), one at a time, each in its own try so one broken selector leaves the others ──
@@ -160,6 +167,13 @@ process.on('SIGINT', () => done(130));
             const t = performance.now(); row.querySelector('.inbox-review-name').click(); return await window.__until(() => { const e = document.getElementById('artifact-viewer-title'); return e && e.offsetParent !== null && e.textContent.trim().length > 0; }, ${CAP}); })()`);
         return { ms_to_rows: typeof t1 === 'number' ? Math.round(t1) : t1, ms_row_click_to_viewer: typeof t2 === 'number' ? Math.round(t2) : t2, requests: rows.slice(m0).filter(r => !new URL(r.url).pathname.startsWith('/static/')).length };
     });
+    // the poll load: an agent open (the page polls it and its terminal) for PROF_S seconds, profiled
+    if (PPROF && PREFIX && live.length) {
+        await ev(`window.selectLiveSession(${JSON.stringify(live[0].name)}, ${JSON.stringify(live[0].type || 'claude')}, ${JSON.stringify(live[0].id)}, 'local'); true`);
+        const m0 = rows.length; const pp = profile('poll'); await sleep((PROF_S + 2) * 1000); out_profiles.poll = await pp;
+        const polls = rows.slice(m0).filter(r => /poll|capture|event|worktree/i.test(r.url)).length; out_profiles.poll_requests = polls;
+    }
+    if (PPROF && PREFIX) for (const k of ['mutex', 'block', 'heap']) { try { const r = await fetch(`${PPROF}/debug/pprof/${k}`); fs.writeFileSync(`${PREFIX}-${k}.pb.gz`, Buffer.from(await r.arrayBuffer())); } catch {} }
     out_interactions = interactions;
     // ── the table ──
     const by = new Map();
@@ -172,7 +186,7 @@ process.on('SIGINT', () => done(130));
     const routes = [...by.values()].map(o => ({ route: o.route, phase: o.phase, n: o.ms.length, p50: +pct(o.ms, 0.5).toFixed(1), p95: +pct(o.ms, 0.95).toFixed(1), max: +Math.max(...o.ms).toFixed(1),
         bytes: o.bytes, bytes_each: Math.round(o.bytes / o.ms.length), status: o.status })).sort((a, b) => b.p95 - a.p95);
     const out = { base: BASE, chrome: chromePath, at: new Date().toISOString(), load: { ready_rows: ready.rows, ms_to_agent_list: loadMs, ms_to_settled: settledMs, nav, requests: rows.filter(r => r.phase === 'load').length, static_files: rows.filter(r => new URL(r.url).pathname.startsWith('/static/')).length },
-        idle: { seconds: IDLE_S, requests: idleEnd - idleFrom }, routes, interactions: out_interactions };
+        idle: { seconds: IDLE_S, requests: idleEnd - idleFrom }, routes, interactions: out_interactions, profiles: out_profiles };
     fs.writeFileSync(OUT, JSON.stringify(out, null, 1));
     console.log(JSON.stringify({ load: out.load, idle: out.idle }));
     for (const r of routes.slice(0, 14)) console.log(`${r.phase.padEnd(5)} ${String(r.p95).padStart(8)} ms p95 ${String(r.p50).padStart(8)} p50 ${String(r.max).padStart(8)} max  n=${String(r.n).padStart(3)}  ${String(r.bytes_each).padStart(8)} B  ${r.route}`);

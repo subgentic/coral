@@ -46,11 +46,23 @@ start() {  # start NAME BINARY DATADIR PORT [extra flags]: starts a server, sets
   printf '%s: health after %.1f s\n' "$name" "$(awk -v a="$(date +%s.%N)" -v b="$t0" 'BEGIN{print a-b}')" | tee -a "$OUT/startup.txt"
 }
 
+measure() {  # measure LOGFILE ENV... -- ARGS: runs bigboard_measure.mjs, up to 3 tries (a headless Chrome sometimes does not open its DevTools port while the Mac is busy)
+  local log="$1"; shift; local try rc=1
+  for try in 1 2 3; do
+    env PERF_RUN=1 "$@" > "$log" 2>&1; rc=$?
+    [[ $rc == 0 ]] && break
+    echo "measure try $try failed (exit $rc): $(grep -m1 'Error' "$log" | cut -c1-120)"; sleep 5
+  done
+  return $rc
+}
 { echo "commit $(cat "$FIXTURE/commit.txt")"; echo "load $(uptime | sed 's/.*load averages*: //')"; sysctl -n machdep.cpu.brand_string 2>/dev/null; } > "$OUT/machine.txt"
 log "copying the fixture data"
 cp -R "$FIXTURE/data" "$WORK/data"
 rm -f "$WORK/data/coral-server.lock" "$WORK/data/login_token"
+PPROF_PORT="${PPROF_PORT:-8744}"
+export CORAL_PPROF_ADDR="127.0.0.1:$PPROF_PORT"; [[ -n "${DEBUG_PHASES:-}" ]] && export CORAL_DEBUG_PHASES=1   # the measured server only (the hub must not bind the same address)
 start local "$FIXTURE/bin/coral" "$WORK/data" "$PORT"
+unset CORAL_PPROF_ADDR CORAL_DEBUG_PHASES
 SRV=$LAST_PID
 KEY="$(tr -d '[:space:]' < "$WORK/data/api_key")"
 api() { local m="$1" p="$2"; shift 2; command curl -s -m 120 -X "$m" "http://127.0.0.1:$PORT$p" -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" "$@"; }
@@ -67,7 +79,7 @@ for n in $LIVE; do
   api GET /api/sessions/live | python3 -I -c 'import sys,json; d=json.load(sys.stdin); r=d if isinstance(d,list) else d.get("sessions",[]); print("live rows:", len(r), "sleeping:", sum(1 for x in r if x.get("sleeping")))' | tee -a "$OUT/machine.txt"
   sleep 5
   log "measuring locally with $n live agents (idle ${IDLE_S}s)"
-  PERF_RUN=1 IDLE_S="$IDLE_S" node "$HERE/bigboard_measure.mjs" "http://127.0.0.1:$PORT" "" "$OUT/local-$n.json" > "$OUT/local-$n.log" 2>&1; echo "local-$n measure exit=$?"
+  measure "$OUT/local-$n.log" IDLE_S="$IDLE_S" PPROF_URL="http://127.0.0.1:$PPROF_PORT" PROFILE_PREFIX="$OUT/cpu-$n-agents" node "$HERE/bigboard_measure.mjs" "http://127.0.0.1:$PORT" "" "$OUT/local-$n.json"; echo "local-$n measure exit=$?"
   ps -o rss= -p "$SRV" | awk -v n="$n" '{printf "server RSS at %s live agents: %.0f MB\n", n, $1/1024}' | tee -a "$OUT/machine.txt"
   LAST_N=$n
 done
@@ -81,7 +93,7 @@ if [[ "${HUB:-}" == 1 ]]; then
   log "hub add server: HTTP $code"; head -c 300 "$OUT/hub-add.json"; echo
   sleep 5
   log "measuring through the hub with $LAST_N live agents (idle ${IDLE_S}s)"
-  PERF_RUN=1 IDLE_S="$IDLE_S" node "$HERE/bigboard_measure.mjs" "http://127.0.0.1:$HUBPORT" "$WORK/hub/login_token" "$OUT/hub-$LAST_N.json" > "$OUT/hub.log" 2>&1; echo "hub measure exit=$?"
+  measure "$OUT/hub.log" IDLE_S="$IDLE_S" node "$HERE/bigboard_measure.mjs" "http://127.0.0.1:$HUBPORT" "$WORK/hub/login_token" "$OUT/hub-$LAST_N.json"; echo "hub measure exit=$?"
 fi
 python3 -I "$HERE/bigboard_table.py" "$OUT" > "$OUT/ranked.md" && head -40 "$OUT/ranked.md"
 log "results in $OUT"
