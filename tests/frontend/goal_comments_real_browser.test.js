@@ -5,12 +5,20 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
+const path = require('node:path');
+const { sqliteText, sqliteExec } = require('./helpers/sqlite.js');
 const BASE = require('./test_base').BASE;
 const { coralReady } = require('./helpers/wait');
+const DATA = process.env.CORAL_TEST_DATA_DIR || '';
+// The first comment anyone writes on a computer makes its comment identity, a row in user_settings (artifact_comments_owner_id). This suite is often that first writer on a shared server: when the row was
+// not there at the start it is removed at the end, so the suite leaves the server as it found it whoever runs it (the runner does the same after each suite; this does not depend on it, #13341).
+const OWNER_KEY = 'artifact_comments_owner_id';
+const ownerRowExists = () => { try { return sqliteText(path.join(DATA, 'sessions.db'), `SELECT 1 FROM user_settings WHERE key = '${OWNER_KEY}';`).trim() !== ''; } catch { return null; } };
 const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
+    const hadOwnerRow = DATA ? ownerRowExists() : null; // null: not readable here, nothing to restore
     const B = 'gcm-' + Date.now().toString(36);
     const SID = 'b1b2c3d4-0000-4000-8000-' + Date.now().toString(16).padStart(12, '0').slice(-12);
     const api = (method, p, body) => ev(`fetch(${JSON.stringify(p)}, { method: ${JSON.stringify(method)}, headers: { 'Content-Type': 'application/json' }, body: ${body ? JSON.stringify(JSON.stringify(body)) : 'undefined'} }).then(async r => ({ status: r.status, body: await r.json().catch(() => ({})) }))`);
@@ -88,5 +96,8 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
         assert.equal(await ev(`(() => { const p = document.querySelector('#team-panel-goals .goal-comments > .ac-panel'); return getComputedStyle(p).position === 'static' && getComputedStyle(p).transform === 'none'; })()`), true, 'the panel is in the tab, not a bottom sheet');
         console.log('   ✓');
         console.log('PASS goal comments: the tab, a comment with a picture, Resolve and Reopen, the count, a reload, a phone');
-    } finally { await removeBoards(ev, [B]).catch(() => {}); await client.close(); }
+    } finally {
+        await removeBoards(ev, [B]).catch(() => {}); await client.close();
+        if (hadOwnerRow === false && ownerRowExists()) { try { sqliteExec(path.join(DATA, 'sessions.db'), `PRAGMA busy_timeout = 5000; DELETE FROM user_settings WHERE key = '${OWNER_KEY}';`); } catch (e) { console.error('could not put the comment identity setting back: ' + e.message); } }
+    }
 })().catch(e => { console.error(e); process.exitCode = 1; });
