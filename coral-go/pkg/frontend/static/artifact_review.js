@@ -1,7 +1,7 @@
 /* The Operator's review of an artifact a team tagged "for review" (#136584, #136588), in the artifact viewer: Approve (the row leaves Needs you, the uploading agent is told) and Request changes (a comment
  * on the whole document, sent to the uploader through the comments' own Send to agent, and the file leaves Needs you: it is the agent's turn, and its next version comes back as a new item). The state is read from the team's artifact list (its tags and,
  * once decided, the time); the buttons show only for a pending one; through Coral Hub the owner has both: the change-request send is the owner's too (#11354). */
-import { boardFetch, identityKey, decisionNeedsPerson } from './server_base.js';
+import { boardFetch, identityKey, decisionNeedsPerson, isCloud } from './server_base.js';
 import { showToast, announceNotice } from './notifications.js';
 import { markHidden } from './visible_marks.js';
 import { importOnce } from './import_once.js';
@@ -41,15 +41,21 @@ async function decide(team, row, decision, reason, note) {
     return body;
 }
 
-/** Approving a version settles the ones before it quietly: their 'for review' tag comes off (no review, no message); resolves { settled, failed }. */
+/** Approving or denying a version settles the ones before it quietly (no review or message): locally their 'for review' tag comes off; through the Hub the quiet Dismiss decision keeps the restricted tags route out of it. Resolves { settled, failed }. */
 async function settleEarlierVersions(m, row) {
     let settled = 0, failed = 0;
     for (const e of m.earlierVersions(row)) {
         try {
             const current = await m.currentTags(e);
             if (current !== null) {
-                const r = await boardFetch(e.team, `/artifacts/${encodeURIComponent(e.id)}/tags`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tags: current.filter(t => t !== 'for review') }) });
-                if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                if (isCloud()) {
+                    // Hub tags may only change read (#13117). Dismiss is the
+                    // existing quiet decision: no verdict or agent notice.
+                    await decide(e.team, e, 'ignore');
+                } else {
+                    const r = await boardFetch(e.team, `/artifacts/${encodeURIComponent(e.id)}/tags`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tags: current.filter(t => t !== 'for review') }) });
+                    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                }
             }
             settled++;
         } catch { failed++; }

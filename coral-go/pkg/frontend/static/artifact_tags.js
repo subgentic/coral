@@ -2,7 +2,7 @@
  * hyphens, 1 to 24 characters, at most 5 on a file. This module draws them: the chips of a row (two, then +N), the editor of the sheet and the preview (a chip with an x each, an "Add tag" button that opens the
  * starter set, the team's own tags and a box), and the one call that changes them (the Operator's and the team owner's: PUT /api/board/<team>/artifacts/<id>/tags). Tag words are agents' and people's text:
  * everything is built with textContent. Lazy: the Artifacts page, the preview pane and the Inbox import it. */
-import { boardFetch } from './server_base.js';
+import { boardFetch, isCloud } from './server_base.js';
 import { importOnce } from './import_once.js';
 import { el as mk } from './dom_el.js';
 const { STARTER, MAX_TAGS, MAX_LEN, normalizeTag } = await importOnce('./artifact_tag_rules.js');
@@ -10,6 +10,7 @@ const { STARTER, MAX_TAGS, MAX_LEN, normalizeTag } = await importOnce('./artifac
 
 /** Replaces the tags of one stored file; resolves to the tags the server kept, rejects with its words. */
 async function putTags(project, hex, tags) {
+    if (isCloud()) throw new Error('Artifact tags cannot be edited through Coral Hub.'); // read marks use inbox_reviews; all other mutations need their own decision route (#13117)
     const r = await boardFetch(project, `/artifacts/${hex}/tags`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tags }) });
     const d = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(d.error || `Coral said ${r.status}`);
@@ -45,6 +46,7 @@ export const nameWithTags = (name, tags) => (Array.isArray(tags) && tags.length 
 /** The editor of one file's tags. editable false: the chips alone (a Coral Hub viewer reads them, cannot change them).
  *  { project, hex, tags, editable, offer() -> [[tag, count]] (the team's tags), onChange(tags) } -> the element. */
 export function tagEditor({ project, hex, tags, editable, offer = () => [], onChange = () => {} }) {
+    editable = !!editable && !isCloud(); // enforce read-only here too, even when a caller requests editing
     let current = Array.isArray(tags) ? [...tags] : [];
     const root = mk('div', 'artifact-tags');
     const list = mk('ul', 'artifact-tag-list'); list.setAttribute('aria-label', 'Tags');

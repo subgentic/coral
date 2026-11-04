@@ -14,10 +14,18 @@ const HEX = n => String(n).repeat(64);
         await setupHubWorld({client,Page,Emulation,width:1440,height:900,mobile:false,inbox:false});
         await Page.addScriptToEvaluateOnNewDocument({source:`(() => {
             const real=window.fetch, json=(b,status=200)=>Promise.resolve(new Response(JSON.stringify(b),{status,headers:{'content-type':'application/json'}}));
-            window.__puts=[]; window.__rejects=[];window.__requests=[];
+            window.__puts=[]; window.__rejects=[];window.__requests=[];window.__decisions=[];
             window.__files=[1,2].map(n=>({id:String(n).repeat(64),uri:'coral://artifacts/'+String(n).repeat(64),name:'plan-'+n+'.md',media_type:'text/markdown',source:'upload',available:true,size:32,produced_by:'Writer '+n,session_id:'writer-'+n,created_at:'2026-11-04T00:00:00Z',tags:['for review','internal','draft','final']}));
             window.fetch=(u,o={})=>{
                 const url=new URL(String(u),location.href), p=url.pathname;window.__requests.push(p+url.search);
+                const review=/^\\/api\\/remote\\/m1\\/api\\/board\\/same-team\\/artifacts\\/([a-f0-9]{64})\\/review$/.exec(p);
+                if(review && o.method==='POST') {
+                    const a=window.__files.find(a=>a.id===review[1]), decision=JSON.parse(o.body).decision;
+                    window.__decisions.push({id:a.id,decision});
+                    if(decision==='ignore')a.tags=[...a.tags.filter(t=>t!=='ignored'),'ignored'];
+                    else a.tags=[...a.tags.filter(t=>t!=='for review'),decision==='approve'?'approved':'denied'];
+                    return json({tags:a.tags,review:{state:decision==='approve'?'approved':'denied'},delivered:false,reason:'no_uploader'});
+                }
                 const m=/^\\/api\\/remote\\/(m[12])\\/api\\/board\\/same-team\\/artifacts(?:\\/([a-f0-9]{64})\\/tags)?$/.exec(p);
                 if(m && (o.method||'GET')==='PUT') {
                     const a=window.__files.find(a=>a.id===m[2]), tags=JSON.parse(o.body).tags;
@@ -69,6 +77,25 @@ const HEX = n => String(n).repeat(64);
             await waitFor(`window.__files.every(a=>${label==='Mark read'?'':'!'}a.tags.includes('read'))`,'both files '+label);
         };
         await bulk('Mark read');await bulk('Mark unread');
+        // Approve and Deny settle an earlier version quietly via the decision
+        // route; the read-only tags route must never be used for this mutation.
+        for (const decision of ['approve','deny']) {
+            await ev(`(() => {const base=window.__files.find(a=>a.id==='${HEX(2)}');base.tags=['for review','internal','draft','final'];window.__files=window.__files.filter(a=>a.id!=='${HEX(3)}');window.__files.push({...base,id:'${HEX(3)}',uri:'coral://artifacts/${HEX(3)}',tags:[...base.tags],created_at:'2026-11-03T00:00:00Z'});window.__decisions=[];return true;})()`);
+            const result=await ev(`(async()=>{const m=await import(${S}+'inbox_reviews.js');await m.refreshReviews(true);const row=m.reviewItems().find(a=>a.hex==='${HEX(2)}');const r=await import(${S}+'artifact_review.js');const out=await r.${decision==='approve'?'approveRow':'denyRow'}(row.team,row${decision==='deny' ? ", 'Does not meet the requirements'" : ''});await m.refreshReviews(true);return {earlier:out.earlier,oldStillNeeded:m.reviewItems().some(a=>a.hex==='${HEX(3)}')};})()`);
+            assert.deepEqual(result.earlier,{settled:1,failed:0},decision+': earlier version settles under the strict Hub rule');
+            assert.equal(result.oldStillNeeded,false,decision+': earlier version stays out after a fresh read');
+            assert.deepEqual(await ev(`window.__decisions`),[{id:HEX(2),decision},{id:HEX(3),decision:'ignore'}],decision+': old version gets a quiet dismissal, no extra approval/verdict');
+            assert.deepEqual(await ev(`window.__rejects`),[],decision+': no forbidden tags PUT');
+        }
+        // The shared writer is guarded even if a future caller forgets to hide
+        // its editor; both editor and bulkTag entry points get a Hub case.
+        await ev(`import(${S}+'artifact_tags.js').then(m=>{const node=m.tagEditor({project:'same-team',hex:'${HEX(1)}',tags:['for review'],editable:true});node.id='hub-tag-editor-probe';document.body.append(node);return true;})`);
+        assert.equal(await ev(`[...document.querySelectorAll('#hub-tag-editor-probe button')].filter(b=>b.getClientRects().length&&!b.disabled).length`),0,'shared editor enforces read-only under the Hub even with editable requested');
+        const attempts=await ev(`window.__requests.filter(p=>p.endsWith('/tags')).length`);
+        const tagResult=await ev(`import(${S}+'artifact_tags.js').then(m=>m.bulkTag('@m1/same-team',[{hex:'${HEX(1)}',tags:['for review']}],'another tag',true)).then(r=>({ok:r.ok.size,failed:r.failed}))`);
+        assert.deepEqual(tagResult,{ok:0,failed:1},'shared bulk writer refuses a non-read Hub tag change');
+        assert.equal(await ev(`window.__requests.filter(p=>p.endsWith('/tags')).length`),attempts,'refused tag edit never reaches the Hub transport');
+        await ev(`document.getElementById('hub-tag-editor-probe').remove();window.__files=window.__files.filter(a=>a.id!=='${HEX(3)}');for(const a of window.__files)a.tags=['for review','internal','draft','final'];true`);
         await Emulation.setDeviceMetricsOverride({width:1440,height:900,deviceScaleFactor:1,mobile:false});
         await Emulation.setTouchEmulationEnabled({enabled:false});
         // A local-server team key makes !isCloud() the decisive editor guard,
