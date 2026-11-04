@@ -290,7 +290,9 @@ export async function loadChangedFiles(agentName, sessionId, quiet = false) { //
         if (!resp.ok) { dropBody(resp); throw new Error(`files fetch failed: ${resp.status}`); }
         const data = await resp.json();
         if (staleRead()) return; // the answer is for an agent that is no longer open
-        if (quiet && JSON.stringify(data.files || []) === JSON.stringify(_currentFiles) && JSON.stringify(data.worktree || null) === JSON.stringify(_worktree)) return;
+        const wasPaused = JSON.stringify(pausedNow()), wasTotal = _totalChanged;
+        readPause(data, mine);
+        if (quiet && JSON.stringify(data.files || []) === JSON.stringify(_currentFiles) && JSON.stringify(data.worktree || null) === JSON.stringify(_worktree) && wasPaused === JSON.stringify(pausedNow()) && wasTotal === _totalChanged) return;
         _currentFiles = data.files || [];
         _worktree = data.worktree && typeof data.worktree === 'object' ? data.worktree : null; paintWhere();
         _notGit = data.is_git === false;
@@ -320,6 +322,10 @@ const FOLLOW_DELAY_MS = 300;
 // has no refresh to call: it reads the list (#10268). Each read of the owner's watch is that refresh, so a few git commands about every 4 s while the panel shows (#10485).
 const MIN_REFRESH_GAP_MS = 2000;
 let _refreshBusy = false, _refreshQueued = false, _queuedQuiet = true, _refreshAt = 0;
+// A folder git is too slow for is paused by the server (#13079): live updates stop, the list is the last one, and Refresh asks for one pass. The page makes no automatic request for it meanwhile.
+let _paused = null, _pausedFor = '', _totalChanged = 0, _wantLive = false;
+const pausedNow = () => (_paused && _pausedFor === _keyOf(state.currentSession) ? _paused : null);
+const readPause = (data, key) => { _paused = data && data.paused && typeof data.paused === 'object' ? data.paused : null; _pausedFor = key; _totalChanged = Number(data && data.total_changed) || 0; };
 async function followRead(quiet = false) {
     const cur = state.currentSession;
     if (cur && cur.hubReadOnly) { loadChangedFiles(cur.name, cur.session_id, quiet); return; }
@@ -329,7 +335,7 @@ async function followRead(quiet = false) {
         const wait = _refreshAt + MIN_REFRESH_GAP_MS - Date.now();
         if (wait > 0) await new Promise(r => setTimeout(r, wait));
         _refreshAt = Date.now();
-        await refreshChangedFiles(quiet);
+        await refreshChangedFiles(quiet, true);
     } finally {
         _refreshBusy = false;
         if (_refreshQueued) { _refreshQueued = false; followRead(_queuedQuiet); }
@@ -587,8 +593,12 @@ function _getGitDiffMode() {
 let _refreshBlock = null; // { key } while this view does not call the refresh
 const refreshViewKey = (agentName, sessionId) => `${currentServer()}|${agentName}|${sessionId || ''}`;
 function staleNoteHtml() {
-    return _refreshBlock ? '<div class="files-stale-note">This computer is in View mode, so Coral does not re-check its files from here: the list may be out of date.</div>' : '';
+    const pz = pausedNow();
+    const paused = pz ? `<div class="files-stale-note files-paused-note" role="status"><span>Live updates paused: this repo is large (${escapeHtml(String(Math.max(pz.changes || 0, _currentFiles.length)).replace(/\B(?=(\d{3})+(?!\d))/g, ','))} changes) and reading it takes a while.</span> <button type="button" class="btn btn-small" data-on-click="files-refresh">Refresh</button> <button type="button" class="btn btn-small btn-quiet" data-on-click="files-live-on">Turn on live updates</button></div>` : '';
+    return paused + (_refreshBlock ? '<div class="files-stale-note">This computer is in View mode, so Coral does not re-check its files from here: the list may be out of date.</div>' : '');
 }
+/** 'Turn on live updates' for a paused folder: one pass that also lets the poller and the page's follow take the folder up again (they pause it again if git is still slow). */
+export function turnOnLiveFiles() { _wantLive = true; return refreshChangedFiles(); }
 // whether this view must not call the refresh now; sets or clears the block from what the page knows. Draws the note once when it first appears.
 function refreshBlockedFor(agentName, sessionId) {
     const key = refreshViewKey(agentName, sessionId);
@@ -599,8 +609,9 @@ function refreshBlockedFor(agentName, sessionId) {
     return !!_refreshBlock;
 }
 
-export async function refreshChangedFiles(quiet = false) { // quiet: the panel's own watch (#10485), which draws only when the list moved
+export async function refreshChangedFiles(quiet = false, auto = false) { // quiet: the panel's own watch (#10485), which draws only when the list moved; auto: the page's own follow, not a person's Refresh
     if (!state.currentSession || state.currentSession.type !== 'live') return;
+    if (auto && pausedNow()) return; // live updates are paused for this folder: nothing asks git until a person presses Refresh
     const btn = quiet ? null : document.querySelector('.refresh-files-btn');
     if (btn) btn.classList.add('refreshing');
 
@@ -618,7 +629,7 @@ export async function refreshChangedFiles(quiet = false) { // quiet: the panel's
         const body = {};
         if (sessionId) body.session_id = sessionId;
         const resp = await serverFetch(
-            currentServer(), `/api/sessions/live/${encodeURIComponent(agentName)}/files/refresh?worktree=${worktreeMode(sessionId)}`,
+            currentServer(), `/api/sessions/live/${encodeURIComponent(agentName)}/files/refresh?worktree=${worktreeMode(sessionId)}${_wantLive ? '&live=on' : pausedNow() ? '&manual=1' : ''}`,
             {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -629,7 +640,10 @@ export async function refreshChangedFiles(quiet = false) { // quiet: the panel's
         if (resp.ok) {
             const data = await resp.json();
             if (_keyOf(state.currentSession) !== mine) { if (btn) btn.classList.remove('refreshing'); return; } // the answer is for an agent that is no longer open
-            if (quiet && JSON.stringify(data.files || []) === JSON.stringify(_currentFiles) && JSON.stringify(data.worktree || null) === JSON.stringify(_worktree)) return;
+            _wantLive = false;
+            const wasPaused = JSON.stringify(pausedNow()), wasTotal = _totalChanged;
+            readPause(data, mine);
+            if (quiet && JSON.stringify(data.files || []) === JSON.stringify(_currentFiles) && JSON.stringify(data.worktree || null) === JSON.stringify(_worktree) && wasPaused === JSON.stringify(pausedNow()) && wasTotal === _totalChanged) return;
             _currentFiles = data.files || [];
             _worktree = data.worktree && typeof data.worktree === 'object' ? data.worktree : null; paintWhere();
             _notGit = data.is_git === false;
@@ -693,7 +707,8 @@ export async function refreshChangedFiles(quiet = false) { // quiet: the panel's
         const stats = files.length > 0
             ? `<span class="file-adds">+${totals.adds}</span><span class="file-dels">-${totals.dels}</span>`
             : '';
-        const html = `<span class="changed-files-count">${files.length} file${files.length !== 1 ? 's' : ''} changed</span>
+        const cut = _totalChanged > files.length && !pausedNow() ? ` Showing ${files.length.toLocaleString('en-US')} of ${_totalChanged.toLocaleString('en-US')} changed files` : '';
+        const html = `<span class="changed-files-count">${cut ? escapeHtml(cut.trim()) : `${files.length} file${files.length !== 1 ? 's' : ''} changed`}</span>
             ${stats}
             ${modeSelect}${compareNote}`;
         // The list is redrawn on every poll: the header is written only when it says something new, so its select and counts are not replaced under a person's pointer or a layout pass (#7671).
