@@ -240,6 +240,7 @@ var writeRoutesWithoutTheGuard = map[string]string{
 	"POST /api/scheduled/validate-cron":                                    "checks a schedule and keeps nothing",
 	"POST /api/sessions/history/{sessionID}/resummarize":                   "a control: no text is kept",
 	"POST /api/sessions/live/sleep-all":                                    "a control: no text is kept",
+	"POST /api/sessions/live/sleep-gone":                                   "a control: no text is kept",
 	"POST /api/sessions/live/team/{boardName}/kill":                        "a control: no text is kept",
 	"POST /api/sessions/live/team/{boardName}/reset":                       "a control: no text is kept",
 	"POST /api/sessions/live/team/{boardName}/sleep":                       "a control: no text is kept",

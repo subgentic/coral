@@ -435,6 +435,7 @@ var routeTable = cat(
 		"/api/sessions/live/{id}/sleep",
 		"/api/sessions/live/team/{board}/sleep",
 		"/api/sessions/live/sleep-all",
+		"/api/sessions/live/sleep-gone", // #13171: filing terminal-gone agents under sleeping is the same Launch as sleeping them
 		"/api/board/{project}/pause",
 	),
 	rules(http.MethodDelete, TierLaunch, "/api/board/{project}/messages/{id}"),

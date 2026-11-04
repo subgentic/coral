@@ -400,6 +400,7 @@ func (s *Server) registerSessions(r *chi.Mux, h *routeHandlers) {
 
 	// Bulk sleep/wake all (must be registered before {name} routes to avoid conflicts)
 	r.Post("/api/sessions/live/sleep-all", sessHandler.SleepAll)
+	r.Post("/api/sessions/live/sleep-gone", sessHandler.SleepGone) // agents whose terminal is gone move to plain sleeping (#13171)
 	r.Post("/api/sessions/live/wake-all", sessHandler.WakeAll)
 
 	// Team sleep/wake
