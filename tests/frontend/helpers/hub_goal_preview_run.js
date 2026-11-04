@@ -35,6 +35,12 @@ async function run(flag) {
             const calls = () => ev(`window.__goalCalls`);
             const tag = flag ? 'goal_preview true' : 'no goal_preview';
 
+            // #13515: served by a Hub, a goal page offers no Change driver and no Move to another team (the tunnel does not list them: the dialogs said not found); Close goal is still there
+            await ev(`import(${S} + 'goal_view.js').then(async v => { const a = await import(${S} + 'goals_adapter.js'); const host = document.createElement('div'); host.id = 'gp-nodrv'; document.body.appendChild(host); v.mountGoal(host, { team: 'team-a', id: 9, goal: a.toGoal({ id: 9, title: 'No driver here', state: 'active', outcome: 'o', done_when: 'd', rollup: { open: 0, done: 0, total: 0 } }), back() {}, refresh() {} }); return true; })`);
+            await waitFor(`!!document.querySelector('#gp-nodrv .goals-close')`, `${tag}: a goal page opens`, 8000);
+            assert.deepEqual(await ev(`({ driver: !!document.querySelector('#gp-nodrv .goals-change-driver'), move: !!document.querySelector('#gp-nodrv .goals-move') })`), { driver: false, move: false }, `${tag}: no Change driver and no Move through a Hub`);
+            await ev(`document.getElementById('gp-nodrv').remove(); true`);
+
             // a create: the editor, its Create button
             await ev(`window.__created = []; import(${S} + 'goal_editor.js').then(m => { m.openGoalEditor({ project: '@srv1/team-a', onCreated: (p) => { window.__created.push(p); } }); return true; })`);
             await waitFor(`!!document.querySelector('dialog.goal-editor[open] #goal-new-title') && !document.querySelector('#goal-new-driver').disabled`, `${tag}: the editor and its drivers`, 8000);

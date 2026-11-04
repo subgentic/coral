@@ -1,7 +1,7 @@
 // One goal's detail view, shared by the team Goals list and other page hosts.
 import { loadStyles } from './lazy_styles.js';
 import { openTask } from './task_navigation.js';
-import { boardFetch, keyLabel, serverUrl, splitKey, remoteServer, LOCAL_SERVER } from './server_base.js';
+import { boardFetch, keyLabel, serverUrl, splitKey, remoteServer, LOCAL_SERVER, isCloud } from './server_base.js';
 const { goalWrite } = await importOnce('./goal_write.js'); // a goal close or update is previewed first when the Hub asks for it (#13503)
 import { OPERATOR_ID, copyText, showToast } from './utils.js';
 import { whenText } from './when_text.js';
@@ -166,7 +166,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
                 } catch (e) { if (ny) ny.disabled = false; showToast(`Not saved: ${e && e.message ? e.message : 'try again'}`, true); }
             } });
         }
-        if (W.isOpenGoal(g) && sp.server === LOCAL_SERVER) { // the Operator's own two changes, made on this computer's server (#12693)
+        if (W.isOpenGoal(g) && sp.server === LOCAL_SERVER && !isCloud()) { // the Operator's own two changes, made on this computer's server (#12693); not through a Hub: its tunnel does not list /driver and /move, so the dialogs would only say not found (#13515)
             act.push({ key: 'driver', cls: 'btn goals-change-driver', label: 'Change driver', aria: `Change driver: ${g.title}`, run: () => importOnce('./goal_operator_dialogs.js').then(m => m.openChangeDriver({ project: sp.name, goal: g, onClose: () => backToAction('.goals-change-driver'),
                 onDone: async driver => { say(driver ? `Driver changed to ${driver}` : 'Driver cleared'); showToast(driver ? `Driver changed to ${driver}` : 'Driver cleared'); await loadGoals(); } })) });
             act.push({ key: 'move', cls: 'btn goals-move', label: 'Move to another team', aria: `Move to another team: ${g.title}`, run: () => importOnce('./goal_operator_dialogs.js').then(m => m.openMoveGoal({ project: sp.name, goal: g, openTasks: W.openTasksOf(g.rollup), onClose: () => backToAction('.goals-move'),
