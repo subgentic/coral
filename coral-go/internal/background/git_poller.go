@@ -614,6 +614,11 @@ func expandUntrackedFolders(ctx context.Context, workdir string, entries []statu
 
 // smallUntrackedFolder lists the untracked, not-ignored files of dir (a path ending in "/") when there are few and small enough to show one by one; false for a folder that is folded or holds nothing to show.
 func smallUntrackedFolder(ctx context.Context, workdir, dir string) ([]string, bool) {
+	root, rootErr := safefs.OpenRoot(workdir) // a name git lists is looked at through the working tree held as a root: a link on the way, or a name that climbs out, is never followed (#13079, the join census)
+	if rootErr != nil {
+		return nil, false
+	}
+	defer root.Close()
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	cmd := gitutil.Command(ctx, workdir, "--literal-pathspecs", "ls-files", "--others", "--exclude-standard", "-z", "--", dir)
@@ -630,7 +635,7 @@ func smallUntrackedFolder(ctx context.Context, workdir, dir string) ([]string, b
 		if len(rec) > 1 {
 			f := strings.TrimSuffix(rec, "\x00")
 			files = append(files, f)
-			if fi, lerr := os.Lstat(filepath.Join(workdir, f)); lerr == nil && fi.Mode().IsRegular() { // a link is never followed
+			if fi, lerr := root.Lstat(f); lerr == nil && fi.Mode().IsRegular() { // a link is never followed
 				total += fi.Size()
 			}
 			if len(files) > gitutil.UntrackedFoldFilesOver || total > gitutil.UntrackedFoldBytesOver {
