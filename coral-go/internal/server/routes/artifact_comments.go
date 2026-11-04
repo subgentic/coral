@@ -122,6 +122,8 @@ func commentRefuse(w http.ResponseWriter, status int, code, msg string) {
 
 // commentView is one comment as the client sees it. Mine and the can* flags are for the UI only (the server decides again on every write).
 type commentView struct {
+	AtS        *float64       `json:"at_s,omitempty"`
+	EndS       *float64       `json:"end_s,omitempty"`
 	SentTo     string         `json:"sent_to,omitempty"` // the agent the Operator's comment was sent to on its own (#11420): set only on the answer to the comment's creation
 	ID         int64          `json:"id"`
 	ArtifactID string         `json:"artifact_id"`
@@ -204,7 +206,7 @@ func viewAuthor(viewer commentCaller, kind, issuer, subject, name string) commen
 }
 
 func (h *SessionsHandler) commentView(c commentCaller, t store.ArtifactComment, locked, hubWrite bool) commentView {
-	v := commentView{ID: t.ID, ArtifactID: t.ArtifactID, Board: t.Board, ParentID: t.ParentID, Body: t.Body, CreatedAt: t.CreatedAt, EditedAt: t.EditedAt, ResolvedAt: t.ResolvedAt, Deleted: t.DeletedAt != nil,
+	v := commentView{AtS: t.AtS, EndS: t.EndS, ID: t.ID, ArtifactID: t.ArtifactID, Board: t.Board, ParentID: t.ParentID, Body: t.Body, CreatedAt: t.CreatedAt, EditedAt: t.EditedAt, ResolvedAt: t.ResolvedAt, Deleted: t.DeletedAt != nil,
 		Author: viewAuthor(c, t.AuthorKind, t.AuthorIssuer, t.AuthorSubject, t.AuthorName), Images: parseCommentImages(t.ImagesJSON)}
 	if t.AnchorJSON != "" {
 		var a commentAnchor
@@ -578,6 +580,8 @@ func (h *SessionsHandler) createArtifactComment(w http.ResponseWriter, r *http.R
 		return
 	}
 	var in struct {
+		AtS      *float64       `json:"at_s"`
+		EndS     *float64       `json:"end_s"`
 		Body     string         `json:"body"`
 		Anchor   *commentAnchor `json:"anchor"`
 		ParentID *int64         `json:"parent_id"`
@@ -642,6 +646,13 @@ func (h *SessionsHandler) createArtifactComment(w http.ResponseWriter, r *http.R
 		errPayloadTooLarge(w, "a comment is at most "+strconv.Itoa(store.MaxArtifactCommentBody)+" bytes")
 		return
 	}
+	if in.AtS != nil || in.EndS != nil {
+		if !store.ValidArtifactCommentTime(in.AtS, in.EndS) || in.ParentID != nil || !h.videoCommentArtifact(id) || (in.Anchor != nil && !in.Anchor.Whole) {
+			errBadRequest(w, "times require a video thread, at_s from 0 to 604800, and end_s greater than at_s and at most 604800")
+			return
+		}
+		in.Anchor = &commentAnchor{Whole: true}
+	}
 	anchorJSON := ""
 	if team, sid, _, isDiff := parseDiffSubject(id); isDiff {
 		if n, err := h.ss.CountCommentsUnder(r.Context(), "diff:"+team+":"+sid+":"); err == nil && n >= maxDiffCommentsPerSession {
@@ -693,7 +704,7 @@ func (h *SessionsHandler) createArtifactComment(w http.ResponseWriter, r *http.R
 	if !h.commentRate(w, caller) {
 		return
 	}
-	c, err := h.ss.CreateArtifactComment(r.Context(), store.ArtifactComment{ArtifactID: id, Board: in.Board, ParentID: in.ParentID, AnchorJSON: anchorJSON, Body: body,
+	c, err := h.ss.CreateArtifactComment(r.Context(), store.ArtifactComment{AtS: in.AtS, EndS: in.EndS, ArtifactID: id, Board: in.Board, ParentID: in.ParentID, AnchorJSON: anchorJSON, Body: body,
 		AuthorIssuer: caller.Issuer, AuthorSubject: caller.Subject, AuthorName: caller.Name, AuthorKind: caller.Kind, ImagesJSON: imagesJSON})
 	switch {
 	case errors.Is(err, store.ErrCommentEmpty):

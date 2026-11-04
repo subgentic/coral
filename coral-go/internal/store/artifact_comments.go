@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"math"
+	"sort"
 	"strings"
 	"time"
 )
@@ -30,12 +32,14 @@ var (
 
 // ArtifactComment is one comment (or reply) on an artifact.
 type ArtifactComment struct {
-	ID         int64  `db:"id" json:"id"`
-	ArtifactID string `db:"artifact_id" json:"artifact_id"`
-	Board      string `db:"board" json:"board"`
-	ParentID   *int64 `db:"parent_id" json:"parent_id"`
-	AnchorJSON string `db:"anchor_json" json:"-"`
-	Body       string `db:"body" json:"body"`
+	AtS        *float64 `db:"at_s" json:"at_s,omitempty"`
+	EndS       *float64 `db:"end_s" json:"end_s,omitempty"`
+	ID         int64    `db:"id" json:"id"`
+	ArtifactID string   `db:"artifact_id" json:"artifact_id"`
+	Board      string   `db:"board" json:"board"`
+	ParentID   *int64   `db:"parent_id" json:"parent_id"`
+	AnchorJSON string   `db:"anchor_json" json:"-"`
+	Body       string   `db:"body" json:"body"`
 	// The author is (AuthorIssuer, AuthorSubject); ownership is a comparison of the two. AuthorName is for display only.
 	AuthorIssuer    string  `db:"author_issuer" json:"-"`
 	AuthorSubject   string  `db:"author_subject" json:"-"`
@@ -54,12 +58,15 @@ type ArtifactComment struct {
 // MaxArtifactCommentImages is the most bytes of ImagesJSON (four pictures with their names).
 const MaxArtifactCommentImages = 2 << 10
 
-const artifactCommentCols = "id, artifact_id, board, parent_id, anchor_json, body, author_issuer, author_subject, author_name, author_kind, created_at, edited_at, resolved_by_issuer, resolved_by_subject, resolved_at, deleted_at, images_json"
+const artifactCommentCols = "id, artifact_id, board, parent_id, anchor_json, body, author_issuer, author_subject, author_name, author_kind, created_at, edited_at, resolved_by_issuer, resolved_by_subject, resolved_at, deleted_at, images_json, at_s, end_s"
 
 func nowStamp() string { return time.Now().UTC().Format(time.RFC3339Nano) }
 
 // CreateArtifactComment adds a comment, or a reply when c.ParentID is set. The id, the time and the cleared state are the store's; the caller decides the author and the board.
 func (s *SessionStore) CreateArtifactComment(ctx context.Context, c ArtifactComment) (ArtifactComment, error) {
+	if !ValidArtifactCommentTime(c.AtS, c.EndS) || (c.ParentID != nil && (c.AtS != nil || c.EndS != nil)) {
+		return ArtifactComment{}, ErrBadCommentTime
+	}
 	body := strings.TrimSpace(c.Body)
 	if body == "" && c.ImagesJSON == "" {
 		return ArtifactComment{}, ErrCommentEmpty
@@ -92,8 +99,8 @@ func (s *SessionStore) CreateArtifactComment(ctx context.Context, c ArtifactComm
 	if n >= MaxArtifactComments {
 		return ArtifactComment{}, ErrTooManyComments
 	}
-	res, err := tx.ExecContext(ctx, `INSERT INTO artifact_comments (artifact_id, board, parent_id, anchor_json, body, author_issuer, author_subject, author_name, author_kind, created_at, images_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		c.ArtifactID, c.Board, c.ParentID, c.AnchorJSON, body, c.AuthorIssuer, c.AuthorSubject, c.AuthorName, c.AuthorKind, nowStamp(), c.ImagesJSON)
+	res, err := tx.ExecContext(ctx, `INSERT INTO artifact_comments (artifact_id, board, parent_id, anchor_json, body, author_issuer, author_subject, author_name, author_kind, created_at, images_json, at_s, end_s) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		c.ArtifactID, c.Board, c.ParentID, c.AnchorJSON, body, c.AuthorIssuer, c.AuthorSubject, c.AuthorName, c.AuthorKind, nowStamp(), c.ImagesJSON, c.AtS, c.EndS)
 	if err != nil {
 		return ArtifactComment{}, err
 	}
@@ -118,7 +125,7 @@ func (s *SessionStore) GetArtifactComment(ctx context.Context, artifactID string
 	return out, err == nil, err
 }
 
-// ListArtifactComments returns an artifact's comments oldest first. state is "open", "resolved" or "" (all): it picks threads by their top comment, and a thread's replies come with it.
+// ListArtifactComments returns timed threads in timeline order, then untimed comments oldest first. state is "open", "resolved" or "" (all): it picks threads by their top comment, and a thread's replies come with it.
 // A deleted comment is listed only as a tombstone (empty body) when it still has replies. boards, when not nil, keeps only comments made on those boards (an agent sees its own).
 func (s *SessionStore) ListArtifactComments(ctx context.Context, artifactID, state string, boards []string) ([]ArtifactComment, error) {
 	q := "SELECT " + artifactCommentCols + " FROM artifact_comments WHERE artifact_id = ?"
@@ -179,6 +186,26 @@ func (s *SessionStore) ListArtifactComments(ctx context.Context, artifactID, sta
 		}
 		out = append(out, c)
 	}
+	// Keep threads together, in timeline order; untimed threads retain their original order.
+	sort.SliceStable(out, func(i, j int) bool {
+		a, b := out[i], out[j]
+		if a.ParentID != nil {
+			a = *top[*a.ParentID]
+		}
+		if b.ParentID != nil {
+			b = *top[*b.ParentID]
+		}
+		if a.AtS == nil {
+			return false
+		}
+		if b.AtS == nil {
+			return true
+		}
+		if *a.AtS == *b.AtS {
+			return a.ID < b.ID
+		}
+		return *a.AtS < *b.AtS
+	})
 	return out, nil
 }
 
@@ -301,4 +328,16 @@ func (s *SessionStore) OwnerCommentCounts(ctx context.Context, since, until, tea
 	out := []OwnerCommentCount{}
 	err := s.reader().SelectContext(ctx, &out, q, args...)
 	return out, err
+}
+
+// MaxArtifactCommentSeconds bounds a timestamp to seven days; no media probing is needed.
+const MaxArtifactCommentSeconds = 7 * 24 * 60 * 60
+
+var ErrBadCommentTime = errors.New("invalid video comment time")
+
+func ValidArtifactCommentTime(at, end *float64) bool {
+	valid := func(p *float64) bool {
+		return p == nil || (!math.IsNaN(*p) && !math.IsInf(*p, 0) && *p >= 0 && *p <= MaxArtifactCommentSeconds)
+	}
+	return valid(at) && valid(end) && (end == nil || (at != nil && *end > *at))
 }
