@@ -17,6 +17,8 @@ name: Release pre-run
 # signing, notarising and stapling need the release secrets; the Linux smokes are linux-runner-dryrun.yml.
 on:
   workflow_dispatch:
+  push:
+    branches: [devops-prerun-try6]
 
 permissions:
   contents: read
