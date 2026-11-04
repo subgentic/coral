@@ -11,7 +11,7 @@ const options = { hosts: ['build-box', 'second'], acceptance_label: 'hub-owner@m
 const steps = (states = {}) => ['connect', 'detect', 'install', 'start', 'register'].map(n => ({ name: n, title: `Step ${n}`, state: states[n] || 'pending', detail: n === 'detect' && states.detect === 'ok' ? 'Linux x86_64, tmux found.' : '' }));
 
 let calls, polls, planKind, runBody;
-function hub({ keys = [], failConnect = false, keyChanged = false, kind = 'setup', extra = {} } = {}) {
+function hub({ keys = [], failConnect = false, keyChanged = false, kind = 'setup', extra = {}, staleKeys = null } = {}) {
     calls = []; polls = 0; runBody = null;
     globalThis.fetch = async (url, init = {}) => {
         const method = init.method || 'GET';
@@ -29,7 +29,13 @@ function hub({ keys = [], failConnect = false, keyChanged = false, kind = 'setup
             return json({ plan: 'p1', target: 'user@box.example.com:22', server_id: 'ssh-box', label: 'Build box', kind: planKind, phase: keys.length ? 'needs_keys' : 'connected', ...extra, host_keys: keys, system: 'Linux x86_64', steps: steps() });
         }
         if (url === '/api/servers/provision/p1/forget-key') return json({ plan: 'p1', target: 'user@box.example.com:22', server_id: 'ssh-box', label: 'Build box', kind: planKind, phase: 'planned', forgotten_keys: [{ host: 'box.example.com', type: 'ssh-ed25519', fingerprint: 'SHA256:oldoldold<img src=x onerror=alert(1)>' }], steps: steps() });
+        if (url === '/api/servers/provision/p1/run' && staleKeys && !staleKeys.served) {
+            staleKeys.served = true; runBody = body;
+            return json({ error: 'the host keys shown are not the ones this computer has now: check the fingerprints again before confirming' }, 400);
+        }
+        if (url === '/api/servers/provision/p1' && method === 'GET' && staleKeys && staleKeys.served && !staleKeys.after) return json({ plan: 'p1', target: 'user@box.example.com:22', server_id: 'ssh-box', label: 'Build box', kind: planKind, phase: 'needs_keys', host_keys: staleKeys.keys, steps: steps() });
         if (url === '/api/servers/provision/p1/run') {
+            if (staleKeys) staleKeys.after = true; // the second press, with the new keys, runs
             runBody = body;
             return json({ plan: 'p1', kind: planKind, phase: 'running', steps: steps({ connect: 'ok' }) }, 202);
         }
@@ -479,6 +485,35 @@ for (const field of ['dataDir', 'port']) {
     assert.equal(up.disabled, true, 'same version: closed');
     up.disabled = false; up.removeAttribute('disabled'); up.click(); await settle();
     assert.equal(runCalls(), 0, 'upgrade not wanted: a forced click sends nothing');
+}
+
+// ── the keys changed between the scan and the click: the hub says so (400), the page shows the keys it has now, unticked, and the person confirms those (#13088, Security's INFO) ──
+{
+    const nowKeys = [{ host: 'box.example.com', type: 'ssh-ed25519', fingerprint: 'SHA256:NEWKEY' }];
+    hub({ keys: [{ host: 'box.example.com', type: 'ssh-ed25519', fingerprint: 'SHA256:OLDKEY' }], staleKeys: { keys: nowKeys } });
+    const host = fresh();
+    mountSshSetup(host, { mode: 'setup', pollMs: 5 });
+    await until(() => $(host, '#ssh-picked'), 'the form');
+    $(host, '#ssh-host').value = 'user@box.example.com'; $(host, '#ssh-host').dispatchEvent(new dom.window.Event('input'));
+    $(host, 'form').dispatchEvent(new dom.window.Event('submit', { cancelable: true }));
+    await until(() => btn(host, 'Connect'), 'the plan');
+    btn(host, 'Connect').click();
+    await until(() => $(host, '#ssh-keys-ok'), 'the host keys');
+    assert.match(host.textContent, /OLDKEY/);
+    $(host, '#ssh-keys-ok').click();
+    btn(host, 'Set up').click();
+    await until(() => runBody, 'the refused run');
+    assert.deepEqual(runBody.key_fingerprints, ['SHA256:OLDKEY'], 'the old fingerprint was what the person confirmed');
+    await until(() => /NEWKEY/.test(host.textContent), 'the keys it has now');
+    assert.doesNotMatch(host.textContent, /OLDKEY/, 'the old fingerprint is gone from the page');
+    assert.match(host.textContent, /not the ones this computer has now/, 'and the page says why');
+    assert.equal($(host, '#ssh-keys-ok').checked, false, 'the box is unticked: the new keys are not confirmed yet');
+    assert.equal(btn(host, 'Set up').disabled, true, 'Set up is closed until they are');
+    runBody = null;
+    $(host, '#ssh-keys-ok').click();
+    btn(host, 'Set up').click();
+    await until(() => runBody, 'the run with the new keys');
+    assert.deepEqual(runBody.key_fingerprints, ['SHA256:NEWKEY'], 'the new fingerprint is what is confirmed and sent');
 }
 
 console.log('server_ssh_setup: ok');

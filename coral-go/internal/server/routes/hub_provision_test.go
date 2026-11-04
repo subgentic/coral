@@ -905,3 +905,38 @@ func TestProvisionDataDirChoice(t *testing.T) {
 	got := pe.waitPhase(t, plan, "done")
 	assert.Equal(t, ".coral", got["data_dir"], "the plan says where Coral keeps its data")
 }
+
+// Two keys held (QA Engineer's case on #13088): the echo is the same SET, each once. A,A is refused, B,A is accepted.
+func TestProvisionTwoHeldKeysAreConfirmedAsTheSetNotACount(t *testing.T) {
+	fp := func(blob string) string {
+		s := sha256.Sum256(mustB64(t, blob))
+		return "SHA256:" + base64.RawStdEncoding.EncodeToString(s[:])
+	}
+	pe := newProvEnv(t, "unknown", "Linux x86_64", true)
+	_, v := pe.do("POST", "/api/servers/provision/plan", map[string]any{"target": "user@box.example.com"})
+	plan := v["plan"].(string)
+	_, v = pe.do("POST", "/api/servers/provision/"+plan+"/connect", nil)
+	require.Equal(t, "needs_keys", v["phase"], "%v", v)
+	blobA := pe.keyBlob
+	raw := mustB64(t, blobA)
+	raw[len(raw)-1] ^= 0xff
+	blobB := base64.StdEncoding.EncodeToString(raw)
+	require.NotEqual(t, fp(blobA), fp(blobB))
+	pl := pe.p.plan(plan)
+	pl.mu.Lock()
+	pl.keys = []sshprov.HostKey{{Host: "box.example.com", Type: "ssh-ed25519", Blob: blobA, Fingerprint: fp(blobA)}, {Host: "box.example.com", Type: "ssh-ed25519", Blob: blobB, Fingerprint: fp(blobB)}}
+	pl.mu.Unlock()
+	run := func(f ...string) (int, map[string]any) {
+		return pe.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{"accept_terms": true, "terms_sha256": terms.EULADigest(), "accept_keys": true, "key_fingerprints": f})
+	}
+	code, rv := run(fp(blobA), fp(blobA))
+	assert.Equal(t, 400, code, "A twice is two keys' worth of one key")
+	assert.Contains(t, rv["error"], "not the ones this computer has now")
+	code, _ = run(fp(blobA))
+	assert.Equal(t, 400, code, "one of two")
+	_, err := os.Stat(pe.known)
+	assert.True(t, os.IsNotExist(err), "nothing was trusted on those")
+	code, rv = run(fp(blobB), fp(blobA))
+	assert.NotEqual(t, 400, code, "B then A is the same set as A then B, so the confirmation is accepted: %v", rv)
+	assert.NotContains(t, fmt.Sprint(rv["error"]), "not the ones this computer has now", "it got past the fingerprint check (the fake second key is not one the trust step can save, so the run itself ends there)")
+}
