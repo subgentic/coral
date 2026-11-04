@@ -4,6 +4,7 @@
 import { importOnce } from './import_once.js';
 const { agentLink } = await importOnce('./agent_link.js');
 import { showToast } from './utils.js';
+import { decisionNeedsPerson } from './server_base.js';
 import { loadStyles } from './lazy_styles.js';
 const { markHidden } = await importOnce('./visible_marks.js'); // lazy: its failure is retried
 const { proposalItems, pendingProposals, onProposalsChanged, refreshProposals, dismissExpired, decide } = await importOnce('./proposals_state.js'); // lazy: its failure is retried
@@ -51,6 +52,7 @@ export function proposalActions(p) {
         box.append(el('span', 'inbox-proposal-expired', 'Expired, nothing was made'), btn('Dismiss', `Dismiss the expired ${kindWord(p)} ${markedText(p.title)}`, () => dismissExpired(p)));
         return box;
     }
+    if (decisionNeedsPerson(p.server)) { box.append(el('span', 'inbox-proposal-expired', 'Decide it on that computer')); return box; } // reached by this hub's key alone, the computer sees a script and refuses (#13454): no button that cannot work
     if (p.state === 'approving') { box.append(el('span', 'inbox-proposal-expired', 'Being approved…')); return box; } // an Approve has it: nothing to press until it finishes (a stuck one is looked into after five minutes)
     box.append(btn('Approve', `Approve the ${kindWord(p)} ${markedText(p.title)}`, async b => {
             b.disabled = true;
@@ -103,6 +105,7 @@ export function openProposalDialog(p, mode = 'view') {
         finish(await decide(p, 'reject', { reason: reason.value.trim() }));
     });
     editOpen.addEventListener('click', () => { editing = true; for (const [i, raw] of inputs) { i.value = raw; i.readOnly = false; } sayHidden(); editOpen.hidden = true; approve.textContent = 'Approve with these words'; title.focus(); });
+    if (decisionNeedsPerson(p.server)) { approve.hidden = rejectOpen.hidden = editOpen.hidden = true; status.textContent = 'This hub cannot sign your decision for that computer: decide it on that computer’s own dashboard.'; }
     row.append(close, rejectOpen, editOpen, approve);
     const carried = [];
     if (facts.instructions) { const b = el('div', 'proposal-carried'); b.append(el('strong', null, 'Instructions it gives the assignee'), linkArtifactRefsIn(el('pre', 'proposal-pre', markedBlock(facts.instructions)))); carried.push(b); }
