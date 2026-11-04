@@ -2,6 +2,7 @@ import { hasWorkingDisplayHint, trackDisplayHint } from './display_activity_hint
 import { dialogOf } from './at_dialog.js';
 /* Moved out of render.js as it was (#3795): no behaviour change. */
 import { isPhoneLayout } from './phone_layout.js';
+import { isCloud, serverForSession, LOCAL_SERVER } from './server_base.js';
 import { modelDisplayName } from './model_names.js';
 import { sessionLevel, typeName } from './model_labels.js';
 import { escapeHtml, escapeAttr } from './utils.js';
@@ -48,11 +49,13 @@ const GOAL_LINE_MAX = 140;
 // (#8206: a 60-character name made the phone's box seven lines tall).
 const NAME_IN_BOX = 24;
 const nameInBox = (identity) => (String(identity).length > NAME_IN_BOX ? 'this agent' : identity);
-export function commandPlaceholder(identity, agentType) {
+export function commandPlaceholder(identity, agentType, session) {
     const name = nameInBox(identity);
     if (isPhoneLayout()) return 'Message\u2026'; // the phone's box holds about 16 characters beside its buttons, and the header names the agent
     if (agentType === 'terminal') return `Type a command in ${name}`;
-    return `Message ${name}, @ to mention a file, or paste an image`; // the box teaches @ (#10147): a file of the project is mentioned, not attached
+    // The box teaches @ (#10147: a file of the project is mentioned, not attached) and $ (#13153, the Operator): the $ words only where the skill search lists skills, which is this computer's own agents; through the Hub and for another computer's agent it does not.
+    const skills = !isCloud() && !(session && serverForSession(session.name, session.session_id) !== LOCAL_SERVER);
+    return `Message ${name}, @ to mention a file, ${skills ? '$ to add a skill, ' : ''}or paste an image`;
 }
 
 /** The box's words while a new agent's CLI is not up yet (#6382): it says so. That a message typed now is held for it is on Send's own title (agent_starting.js), not in the box. */

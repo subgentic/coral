@@ -154,7 +154,7 @@ function _drawAgentHeader(name, agentType, sessionId, srv, agentData, displayNam
     // Update command input placeholder with session target
     const cmdInput = document.getElementById("command-input");
     if (cmdInput) {
-        const starting = agentIsStarting(agentData); setCommandPlaceholder(cmdInput, starting ? startingPlaceholder(identity) : commandPlaceholder(identity, agentType)); syncSendStarting(starting); // view only and asleep keep their words (#5856)
+        const starting = agentIsStarting(agentData); setCommandPlaceholder(cmdInput, starting ? startingPlaceholder(identity) : commandPlaceholder(identity, agentType, agentData)); syncSendStarting(starting); // view only and asleep keep their words (#5856)
     }
     // Keep the sleeping placeholder over the awake one just set.
     if (state.currentSession.sleeping && !isPopout()) applySleepingView(true);
