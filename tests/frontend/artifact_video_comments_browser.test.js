@@ -126,7 +126,7 @@ const HEX = '9'.repeat(64), OLD = '8'.repeat(64);
     assert.equal(await ev(`(()=>{const r=document.querySelector('.ac-input').getBoundingClientRect();return r.width>0&&r.left>=0&&r.right<=innerWidth+1&&r.top>=0&&r.bottom<=innerHeight})()`),true,'phone 200% composer reachable');
     const cancel=await ev(`(()=>{const e=document.querySelector('.ac-composer .ac-cancel');e.scrollIntoView({block:'center',behavior:'instant'});e.focus();return{focused:document.activeElement===e,text:e.textContent}})()`);
     assert.equal(cancel.focused,true,'phone 200% cancel receives keyboard focus');
-    await Input.dispatchKeyEvent({type:'keyDown',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});await Input.dispatchKeyEvent({type:'keyUp',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});
+    await Input.dispatchKeyEvent({type:'keyDown',key:'Enter',code:'Enter',text:'\r',windowsVirtualKeyCode:13});await Input.dispatchKeyEvent({type:'keyUp',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});
     await waitFor(`!document.querySelector('.ac-input')`,'phone 200% keyboard cancel closes composer');
    }
    await shot(`video-after-${config.width}-${config.theme}${config.zoom?'-200':''}${cloud?'-hub':''}`);
