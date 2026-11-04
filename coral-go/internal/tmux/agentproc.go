@@ -318,10 +318,31 @@ func adoptCandidate(t *procTable, shell int) (AgentProc, bool) {
 	return AgentProc{PID: progs[0], Start: t.byPID[progs[0]].start}, true
 }
 
+// sameStart is whether two ps start times name one process start. ps's lstart has whole-second resolution and on Linux it is the boot time plus the start ticks, so reading the
+// same process twice under load can give times a second apart (#13409): up to startSlack apart is the same process. A recycled pid starts later than that (a pid comes round only
+// after the pid space has wrapped). Identical text is always the same, as before (a table with no start times reads "" for all).
+func sameStart(a, b string) bool {
+	if a == b {
+		return true
+	}
+	ta, err1 := time.ParseInLocation(psStartLayout, a, time.Local)
+	tb, err2 := time.ParseInLocation(psStartLayout, b, time.Local)
+	if err1 != nil || err2 != nil {
+		return false
+	}
+	d := ta.Sub(tb)
+	return d >= -startSlack && d <= startSlack
+}
+
+const (
+	psStartLayout = "Mon Jan _2 15:04:05 2006"
+	startSlack    = 2 * time.Second
+)
+
 // decideNotice is whether a notice may be typed given the recorded process: it is alive (same pid, same start time) and it is the only foreground program of the pane.
 func decideNotice(t *procTable, shell int, rec AgentProc) NoticeVerdict {
 	e, ok := t.byPID[rec.PID]
-	if !ok || e.start != rec.Start {
+	if !ok || !sameStart(e.start, rec.Start) {
 		return NoticeVerdict{Reason: ReasonGone}
 	}
 	progs, deep := programsBelow(t, shell)

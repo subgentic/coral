@@ -63,7 +63,7 @@ func recordCandidate(t *procTable, shell int, session string, want AgentProc, ac
 	if why != "" {
 		return Candidate{}, fmt.Errorf("%w: %s", ErrNoCandidate, why)
 	}
-	if got.AgentProc != want || want.PID <= 0 || want.Start == "" {
+	if got.PID != want.PID || !sameStart(got.Start, want.Start) || want.PID <= 0 || want.Start == "" {
 		return Candidate{}, ErrCandidateChanged
 	}
 	if (got.Under != "" || !imageKnown) && !acknowledged { // a nested shell's program, or one whose image cannot be read (it cannot be told from anything)
