@@ -36,12 +36,17 @@ const HEX = t => (t.charCodeAt(1).toString(16) + 'a').padEnd(64, 'c').slice(0, 6
         const time = expr => ev(`(async () => { const t0 = performance.now(); await (${expr}); return Math.round(performance.now() - t0); })()`);
 
         // 1: a link when nothing is loaded: the item's own team is read, not all eight (one team: 500 ms)
+        // coral-hub's worst case (#13151): the first full scan is still running (the sidebar counts still 0) when the click comes
+        await ev(`(async () => { const M = await import(${S} + 'inbox_reviews.js'); window.__scan = M.refreshReviews(true); return true; })()`);
         const cold = await viewerShown('t3');
         console.log(`cold link: the viewer of t3.html on screen after ${cold} ms`);
         assert.ok(cold >= 0, "the requested file's viewer is on screen");
         assert.ok(cold < 1500, `a link opens from its own team's read, not a scan of eight teams (500 ms each): ${cold} ms`);
         await waitFor(`!window.__r.inflight`, 'the background scan ends', 15000);
         assert.ok((await ev(`window.__r.reads.t3`)) >= 1, 'the named team was read');
+        // the click joined the scan in flight: no team but the clicked one was read twice (the click's own team read and the viewer's reads of its file are on t3 only)
+        const counts = await ev(`window.__r.reads`);
+        for (const t of TEAMS.filter(t => t !== 't3')) assert.equal(counts[t], 1, `${t} was read once: a click during the first scan did not start a second scan behind it: ${JSON.stringify(counts)}`);
 
         // 2: a scan reads at most four teams at once and takes about two rounds, not eight
         await reset();
