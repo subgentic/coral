@@ -271,7 +271,8 @@ func (h *SessionsHandler) startWake(ctx context.Context, ls *store.LiveSession, 
 	if alreadyRunning {
 		log.Printf("[wake] session=%s is still running — skipping relaunch, clearing sleeping flag only", sessionName)
 	}
-	if alreadyRunning && backend != "pty" && h.terminal != nil {
+	_, onTmux := h.backend.(*ptymanager.TmuxBackend)
+	if alreadyRunning && (backend != "pty" || onTmux) && h.terminal != nil {
 		// A restart/wake can retain the pane after its pipe worker has gone.
 		// StartLogging is idempotent for a healthy pipe; preserve its history.
 		if err := ptymanager.EnsureAgentLog(logFile); err != nil {
