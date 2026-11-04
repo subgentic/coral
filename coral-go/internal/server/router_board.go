@@ -53,6 +53,7 @@ func (s *Server) configureBoardHandlers(h *routeHandlers) (*routes.BoardHandler,
 	boardHandler.SetNeedsYouSkills(routes.NewSkillsHandler(s.db, s.cfg).NeedsYouItems) // the skills that wait for the Operator are items of Needs you (#12139)
 	boardHandler.SetSessionThinkingLookup(routes.SessionThinkingLookup(store.NewSessionStore(s.db)))
 	boardHandler.SetTaskArtifactWriter(s.cfg.CoralDir(), sessHandler.PersistTaskChanges)
+	s.goBackground(func(context.Context) { boardHandler.WarmUploads() }) // the first artifacts read after a start no longer pays for reading every upload record (#13292)
 	sessStore := store.NewSessionStore(s.db)
 	boardHandler.SetBoardChatFlagsClearer(sessStore.DeleteBoardChatFlags)
 	boardHandler.SetAllowlistFlag(routes.AllowlistEnabled(sessStore))

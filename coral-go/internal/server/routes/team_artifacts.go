@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/subgentic/coral/internal/querypage"
+	"github.com/subgentic/coral/internal/safego"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -15,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -554,9 +556,33 @@ type uploadDirCache struct {
 type uploadDirEntry struct {
 	mod     time.Time
 	uploads []sessionUpload
+	files   map[string]uploadFileSig // each record file as it was read: a dir that changed re-reads only the files that did (#13292)
+}
+
+// uploadFileSig is what says a record file is as it was when it was read.
+type uploadFileSig struct {
+	size int64
+	mod  time.Time
+	up   sessionUpload
+	ok   bool // the file held a record (a file that did not is remembered too, so it is not read again)
 }
 
 var uploadDirSettle = 2 * time.Second
+
+// uploadReadWorkers is how many record files are read at once in a cold directory (#13292: 20,000 records were read one after the other, 3.85 s).
+const uploadReadWorkers = 8
+
+// uploadWarmFolders is how many folders the start-up warm reads at once (each by uploadReadWorkers readers: 16 files open at most, Security's INFO on #13292).
+const uploadWarmFolders = 2
+
+// uploadRecordReads counts every record file that was read (the server's start-up test reads it through UploadRecordReads).
+var uploadRecordReads atomic.Int64
+
+// UploadRecordReads is how many upload record files have been read by this process so far (a test seam: the start-up warm reads them before any request).
+func UploadRecordReads() int64 { return uploadRecordReads.Load() }
+
+// uploadRecordReadHook runs once for each record file that is actually read (tests count them).
+var uploadRecordReadHook = func() {}
 
 // list returns the session's upload records (nil when it has none).
 func (c *uploadDirCache) list(coralDir, sessionID string) []sessionUpload {
@@ -574,9 +600,10 @@ func (c *uploadDirCache) list(coralDir, sessionID string) []sessionUpload {
 	mod := st.ModTime()
 	settled := time.Since(mod) >= uploadDirSettle
 	c.mu.Lock()
-	if e, ok := c.dirs[dir]; ok && settled && e.mod.Equal(mod) {
+	prev, had := c.dirs[dir]
+	if had && settled && prev.mod.Equal(mod) {
 		c.mu.Unlock()
-		return e.uploads
+		return prev.uploads
 	}
 	c.mu.Unlock()
 
@@ -584,31 +611,112 @@ func (c *uploadDirCache) list(coralDir, sessionID string) []sessionUpload {
 	if err != nil {
 		return nil
 	}
-	var uploads []sessionUpload
+	type slot struct {
+		name string
+		sig  uploadFileSig
+		read bool // this file has to be read
+	}
+	slots := make([]slot, 0, len(entries))
 	for _, e := range entries {
 		id := strings.TrimSuffix(e.Name(), ".json")
 		if e.IsDir() || id == e.Name() || len(id) != 64 {
 			continue
 		}
-		data, err := os.ReadFile(filepath.Join(dir, e.Name()))
-		if err != nil || len(data) > maxArtifactMetaBytes {
-			continue
+		sl := slot{name: e.Name(), read: true}
+		if had {
+			if info, err := e.Info(); err == nil {
+				if old, ok := prev.files[e.Name()]; ok && old.size == info.Size() && old.mod.Equal(info.ModTime()) && time.Since(info.ModTime()) >= uploadDirSettle {
+					sl.sig, sl.read = old, false // as it was read, and not written in the last moments
+				}
+			}
 		}
-		var rec agentUploadRecord
-		if json.Unmarshal(data, &rec) != nil {
-			continue
+		slots = append(slots, sl)
+	}
+	var wg sync.WaitGroup
+	next := make(chan int)
+	for w := 0; w < uploadReadWorkers; w++ {
+		wg.Add(1)
+		go func() {
+			defer safego.Recover("upload records read")
+			defer wg.Done()
+			for i := range next {
+				slots[i].sig = readUploadRecordFile(dir, slots[i].name)
+			}
+		}()
+	}
+	for i := range slots {
+		if slots[i].read {
+			next <- i
 		}
-		uploads = append(uploads, sessionUpload{id: strings.ToLower(id), rec: rec})
+	}
+	close(next)
+	wg.Wait()
+	var uploads []sessionUpload
+	files := make(map[string]uploadFileSig, len(slots))
+	for _, sl := range slots {
+		files[sl.name] = sl.sig
+		if sl.sig.ok {
+			uploads = append(uploads, sl.sig.up)
+		}
 	}
 	if settled {
 		c.mu.Lock()
 		if c.dirs == nil {
 			c.dirs = make(map[string]uploadDirEntry)
 		}
-		c.dirs[dir] = uploadDirEntry{mod: mod, uploads: uploads}
+		c.dirs[dir] = uploadDirEntry{mod: mod, uploads: uploads, files: files}
 		c.mu.Unlock()
 	}
 	return uploads
+}
+
+// readUploadRecordFile reads and parses one record file: the file as read (its size and time are those before the read, so a write during it is read again next time).
+func readUploadRecordFile(dir, name string) uploadFileSig {
+	uploadRecordReadHook()
+	uploadRecordReads.Add(1)
+	path := filepath.Join(dir, name)
+	var sig uploadFileSig
+	if info, err := os.Stat(path); err == nil {
+		sig.size, sig.mod = info.Size(), info.ModTime()
+	}
+	data, err := os.ReadFile(path)
+	if err != nil || len(data) > maxArtifactMetaBytes {
+		return sig
+	}
+	var rec agentUploadRecord
+	if json.Unmarshal(data, &rec) != nil {
+		return sig
+	}
+	sig.up, sig.ok = sessionUpload{id: strings.ToLower(strings.TrimSuffix(name, ".json")), rec: rec}, true
+	return sig
+}
+
+// warm reads every session's upload records into the cache, a few at a time, so the first artifacts read after a start is not the one that pays for the scan (#13292).
+func (c *uploadDirCache) warm(coralDir string) {
+	root := filepath.Join(coralDir, "artifacts", "uploads")
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		return
+	}
+	var wg sync.WaitGroup
+	next := make(chan string)
+	for w := 0; w < uploadWarmFolders; w++ {
+		wg.Add(1)
+		go func() {
+			defer safego.Recover("upload records warm")
+			defer wg.Done()
+			for sid := range next {
+				c.list(coralDir, sid)
+			}
+		}()
+	}
+	for _, e := range entries {
+		if e.IsDir() {
+			next <- e.Name()
+		}
+	}
+	close(next)
+	wg.Wait()
 }
 
 // merge adds the listed sessions' uploaded objects that no task result in items
@@ -867,3 +975,6 @@ func (h *BoardHandler) attachSeriesVersions(rows []teamArtifact, project string)
 		}
 	}
 }
+
+// WarmUploads reads every session's upload records into the board handler's cache (called once after a start, in the background).
+func (h *BoardHandler) WarmUploads() { h.uploads.warm(h.coralDir) }
