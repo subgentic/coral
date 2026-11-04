@@ -70,10 +70,65 @@ func (s *SessionStore) UnseenAgentReplies(ctx context.Context) ([]CommentReply, 
 	return out, nil
 }
 
-// MarkThreadsSeen records that the owner opened the threads of an artifact: every thread the owner started on it is seen as of now.
+// MarkThreadsSeen records the owner's read, preserving the error-only API for
+// callers that do not need to invalidate a list.
 func (s *SessionStore) MarkThreadsSeen(ctx context.Context, artifactID string, now time.Time) error {
-	_, err := s.db.ExecContext(ctx, `INSERT INTO artifact_comment_seen (comment_id, seen_at)
-		SELECT id, ? FROM artifact_comments WHERE artifact_id = ? AND author_kind = 'owner' AND parent_id IS NULL
-		ON CONFLICT(comment_id) DO UPDATE SET seen_at = excluded.seen_at`, now.UTC().Format(ISOFormat), artifactID)
+	_, err := s.MarkThreadsSeenChanged(ctx, artifactID, now)
 	return err
+}
+
+// MarkThreadsSeenChanged reports whether this read cleared any unread agent
+// replies. Repeated polls do no writes and must not invalidate artifact lists.
+// Read and write share a transaction so two readers cannot both claim the same
+// change, or swallow a reply inserted between checking and marking it seen.
+func (s *SessionStore) MarkThreadsSeenChanged(ctx context.Context, artifactID string, now time.Time) (bool, error) {
+	tx, err := s.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback()
+	var rows []struct {
+		RootID int64   `db:"root_id"`
+		At     string  `db:"at"`
+		SeenAt *string `db:"seen_at"`
+	}
+	if err := tx.SelectContext(ctx, &rows, `
+  SELECT c.id AS root_id, r.created_at AS at, s.seen_at AS seen_at
+  FROM artifact_comments c
+  JOIN artifact_comments r ON r.parent_id = c.id
+  LEFT JOIN artifact_comment_seen s ON s.comment_id = c.id
+  WHERE c.artifact_id = ? AND c.author_kind = 'owner'
+   AND c.parent_id IS NULL AND c.deleted_at IS NULL
+   AND r.author_kind = 'agent' AND r.deleted_at IS NULL`, artifactID); err != nil {
+		return false, err
+	}
+	// ISOFormat stores microseconds: only a reply at/before the stored cutoff can
+	// actually become seen. Compare parsed times, never varying RFC3339 strings.
+	cutoff := now.UTC().Truncate(time.Microsecond)
+	roots := map[int64]bool{}
+	for _, r := range rows {
+		at, err := time.Parse(time.RFC3339Nano, r.At)
+		if err != nil || at.After(cutoff) {
+			continue
+		}
+		if r.SeenAt != nil {
+			if seen, err := time.Parse(time.RFC3339Nano, *r.SeenAt); err == nil && !at.After(seen) {
+				continue
+			}
+		}
+		roots[r.RootID] = true
+	}
+	if len(roots) == 0 {
+		return false, nil
+	}
+	for id := range roots {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO artifact_comment_seen (comment_id, seen_at) VALUES (?, ?)
+   ON CONFLICT(comment_id) DO UPDATE SET seen_at = excluded.seen_at`, id, cutoff.Format(ISOFormat)); err != nil {
+			return false, err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return false, err
+	}
+	return true, nil
 }
