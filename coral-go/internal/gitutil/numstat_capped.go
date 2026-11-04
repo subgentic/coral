@@ -10,6 +10,9 @@ import (
 // numstatArgBytes is how much of the names go on one git command line (Windows allows 32 KB in all).
 var numstatArgBytes = 20 << 10
 
+// numstatBatchHook runs once per batch of names, with how many it holds (a test counts the batches).
+var numstatBatchHook = func(names int) {}
+
 // CappedNumstat is `git diff <refs> --numstat` (with -z when z) for a list that is cut to its first limit files by name, and how many more files than that changed (#13155).
 //
 // A big working tree made the numstat the whole cost of a refresh: git reads and diffs every changed file for its line counts, 1.3 to 3 s for 35,000 changed files, to fill a list that is cut to limit rows anyway. The
@@ -53,6 +56,7 @@ func CappedNumstat(ctx context.Context, workdir string, refs []string, limit int
 			size += len(paths[n]) + 1
 			n++
 		}
+		numstatBatchHook(n)
 		args := append(append([]string{"diff"}, refs...), "--numstat", "--no-renames")
 		if z {
 			args = append(args, "-z")
