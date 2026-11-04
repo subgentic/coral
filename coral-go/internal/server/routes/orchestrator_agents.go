@@ -258,7 +258,7 @@ func (h *SessionsHandler) OrchestratorWake(w http.ResponseWriter, r *http.Reques
 	h.sayLifecycle(r.Context(), project, actor+" woke "+who)
 	h.tellWoken(r.Context(), project, member)
 	h.kickWS()
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "woke": who})
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "woke": who, "max_per_hour": g.MaxPerHour}) // the limit a wake counts against (#13420): coral-board agent wake prints it
 }
 
 // OrchestratorWakeNotice is the ONE line a woken agent is given by Coral, never any text of the caller's: a resumed agent re-ran its last step (a runaway test) twice, so it is told to read the board first.

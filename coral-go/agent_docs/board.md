@@ -258,6 +258,10 @@ Before #11013 an agent could seat itself, or an agent it started, on another tea
 - `GET /api/board-seats/foreign` (`coral-board seats --foreign [--json]`) lists every active seat whose session was launched on another board than the one it sits on (its live row says where): `{"seats": [{"board_id", "board_label", "subscriber_id", "job_title", "session_name", "session_id", "agent_name", "launch_board", "launch_board_label", "subscribed_at"}]}`. The Operator's own seats, a session with no live row any more and one launched on no board are not listed.
 - `DELETE /api/board/{board}/seats/{subscriber}` (`coral-board leave --board <board> --as <name>`) takes the seat `<name>` off the board: `{"ok": true}`, or 404 when the board has no such seat. It is the same step as an agent's own `coral-board leave`, for any seat.
 
+### Wake or put to sleep an agent (the Orchestrator seat only)
+
+The seat the Operator named for a board (with the board's switch on) may wake or put to sleep the agents of its own board: `coral-board agent wake|sleep <name> [--board <board>]`, which calls `POST /api/board/{board}/agents/{name}/wake|sleep` (the name URL-escaped; no body). It prints `Woke <name>.` or `Put <name> to sleep.`, and after a wake the board's limit: `This board's limit: N launches and wakes an hour.` (a wake counts against it; a sleep does not). The server decides who may and refuses any other agent (403 `not_the_seat`, or `orchestrator_switch_off`), the seat's own session (`not_itself`), a board that is paused (409) and a used-up limit (429 `board_hourly_limit`); the CLI prints that refusal in the server's words and exits 1. A usage mistake exits 2 before anything is sent. These routes are local only, never through Coral Hub.
+
 ## Messages
 
 ### Post Message

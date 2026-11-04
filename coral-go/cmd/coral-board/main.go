@@ -112,6 +112,8 @@ func main() {
 		cmdLeave()
 	case "seats":
 		cmdSeats()
+	case "agent":
+		cmdAgent()
 	case "delete":
 		cmdDelete()
 	case "export":
@@ -274,6 +276,9 @@ Commands:
   seats --foreign [--json]     The Operator only: the seats of agents launched on
                                another board than the one they sit on, with the
                                command that removes each (not for an agent's terminal)
+  agent wake|sleep <name> [--board <board>]
+                               The Orchestrator seat only: wake or put to sleep an agent of
+                               its board (the server refuses any other agent)
   delete                       Delete board and messages (Operator only)
   export [--output FILE] [--format json|markdown|html] [--merge FILE]
                                Export chat (auto-detects format from extension)
