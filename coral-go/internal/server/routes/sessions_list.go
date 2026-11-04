@@ -786,12 +786,17 @@ func (h *SessionsHandler) currentDirectoryOf(agentType, sessionID, launchDir str
 	return h.currentDir(context.Background(), background.AgentInfo{AgentType: agentType, SessionID: sessionID, WorkingDirectory: launchDir})
 }
 
-// dropNullKeys leaves out of each row the keys whose value is null (#13186: 43% of the list's bytes at QA's seed). Only null: false and 0 mean something (awaiting_user false is not "unknown"), and the page's reads of the nullable fields
-// treat a missing key as it treats null. The page replaces its list with this answer rather than merging it into the last one (a merge keeps a key the update omits, which would keep a stale value).
+// keepNullKeys are the keys whose null says something a missing key does not: held_messages null is the server's "none held" (a cancel or a send on another screen emptied the list) and a missing one is "not said, keep what
+// you have" (held_sends.js syncQueuedFromRow), so a compact row must keep it or a message that was cancelled or sent stays "Queued" (QA Reviewer 2's MUST on #13186). Every other key was read through the page's strict
+// null, undefined, in and typeof checks: they treat null and missing alike (context_pct guards both).
+var keepNullKeys = map[string]bool{"held_messages": true}
+
+// dropNullKeys leaves out of each row the keys whose value is null, except keepNullKeys (#13186: 43% of the list's bytes at QA's seed). Only null: false and 0 mean something (awaiting_user false is not "unknown"). The page
+// replaces its list with this answer rather than merging it into the last one (a merge keeps a key the update omits, which would keep a stale value).
 func dropNullKeys(rows []map[string]any) {
 	for _, row := range rows {
 		for k, v := range row {
-			if marshalsToNull(v) {
+			if marshalsToNull(v) && !keepNullKeys[k] {
 				delete(row, k)
 			}
 		}

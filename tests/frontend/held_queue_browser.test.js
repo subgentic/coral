@@ -89,6 +89,16 @@ const { coralReady } = require('./helpers/wait');
             await rowWith([]);
             l = await line();
             check(`${tag}: and an empty list from the row clears it`, !l.shown && l.texts.length === 0, JSON.stringify(l));
+            // the compact live list (#13186, ?compact=1) leaves null keys out but keeps held_messages: null ("none held"); a row without the key says nothing, and keeps what is drawn
+            const rowShape = (list, drop) => ev(`import(${S} + 'session_header_updates.js').then(m => { const row = { ...(window.__qaState.liveSessions.find(s => s.session_id === 'hq-id')) }; if (${drop}) delete row.held_messages; else row.held_messages = ${JSON.stringify(list)}; m.updateWaitingIndicator(row); return true; })`);
+            await ev(`localStorage.setItem('coral-held-mine', JSON.stringify({ 21: Date.now(), 22: Date.now(), 23: Date.now() })); true`); // this browser's own, as above
+            await rowWith([{ id: 23, text: 'compact case' }]);
+            await rowShape(null, true);
+            l = await line();
+            check(`${tag}: a row with no held_messages key keeps the line (not said)`, l.shown && l.texts.join() === '“compact case”', JSON.stringify(l));
+            await rowShape(null, false);
+            l = await line();
+            check(`${tag}: a compact row's held_messages null clears it (none held)`, !l.shown && l.texts.length === 0, JSON.stringify(l));
         }
     } finally { await client.close(); }
     if (results.some(r => !r)) { console.error(`${results.filter(r => !r).length} of ${results.length} failed`); process.exit(1); }

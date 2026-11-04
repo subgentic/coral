@@ -308,3 +308,4 @@ node inbox_teams_checked.test.mjs
 node launch_cards_goal_desc.test.js
 node cloud_signin_leaving.test.js
 node live_list_compact_ask.test.mjs
+node held_row_compact.test.mjs

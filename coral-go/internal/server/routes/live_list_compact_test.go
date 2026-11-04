@@ -54,7 +54,7 @@ func TestACompactLiveListLeavesOutNullKeysAndNothingElse(t *testing.T) {
 	nulls := 0
 	for i, row := range fullRows {
 		for k, v := range row {
-			if v == nil {
+			if v == nil && k != "held_messages" {
 				nulls++
 				_, there := compactRows[i][k]
 				assert.False(t, there, "row %d: %s is null and so is left out", i, k)
@@ -68,6 +68,15 @@ func TestACompactLiveListLeavesOutNullKeysAndNothingElse(t *testing.T) {
 		}
 	}
 	require.NotZero(t, nulls, "the rig has null keys to leave out")
+	heldNull := 0
+	for i, row := range fullRows {
+		if v, there := row["held_messages"]; there && v == nil {
+			heldNull++
+			got, kept := compactRows[i]["held_messages"]
+			assert.True(t, kept && got == nil, "row %d: held_messages null is kept: the page reads it as 'none held' and a missing key as 'not said' (#13186, QA's MUST)", i)
+		}
+	}
+	require.NotZero(t, heldNull, "the rig has rows that say none held")
 	assert.Less(t, len(compact)*10, len(full)*7, "at least 30%% of the bytes go: %d of %d", len(compact), len(full))
 	_, again := liveListBody(t, h, "?compact=0")
 	assert.Equal(t, fullRows, again, "anything but compact=1 is the full shape")
