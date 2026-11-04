@@ -417,8 +417,13 @@ function _initKeyboardDetection() {
     const coarse = () => typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches;
     const follows = () => isMobile() || coarse();
 
+    // Chrome on Android resizes the page itself for the keyboard (the viewport meta's interactive-widget=resizes-content; navigator.virtualKeyboard is there from the Chrome that honours it): the layout viewport,
+    // and so the CSS's own 100dvh, is already what the keyboard leaves, and it settles with the URL bar. A copy of the visual viewport read at a resize event can be read before it settles and stay short (a ~70 px
+    // band over the keyboard, the composer cut in half, #13236 from the Android report through the Hub), so there the page keeps 100dvh and stores nothing. iOS Safari (no virtualKeyboard) keeps the stored height.
+    const resizesContent = () => 'virtualKeyboard' in navigator;
+
     const updateViewportHeight = () => {
-        if (!follows()) {
+        if (!follows() || resizesContent()) {
             document.documentElement.style.removeProperty('--visual-viewport-height');
             return;
         }
