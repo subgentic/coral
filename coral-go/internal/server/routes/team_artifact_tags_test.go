@@ -427,9 +427,9 @@ func TestAnAgentCannotTagItsUploadWithTheOperatorsStates(t *testing.T) {
 	assert.Equal(t, http.StatusOK, code)
 }
 
-// An agent that belongs to no team has no board whose Needs you a file for review could reach: the tag used to be dropped and the upload answered 201, as if the Operator would see it (#13524). It is refused
-// before a byte is stored, in words that say what to do; the same file without the tag, and any agent on a team, are as they were.
-func TestAFileForReviewFromAnAgentWithNoTeamIsRefusedNotSilentlyDropped(t *testing.T) {
+// An agent that belongs to no team has no board, so what a file for review keeps is kept under the reserved key (#13524, #13527): the upload is a 201 that says the tag was kept, nothing is dropped, the question and
+// tag are read back from that key, and the same file with no tag keeps nothing (as before); an agent on a team keeps its own board's.
+func TestAFileForReviewFromAnAgentWithNoTeamIsKeptUnderTheReservedKey(t *testing.T) {
 	l := newLinkRig(t)
 	old := uploaderLookup
 	t.Cleanup(func() { uploaderLookup = old })
@@ -447,16 +447,29 @@ func TestAFileForReviewFromAnAgentWithNoTeamIsRefusedNotSilentlyDropped(t *testi
 		_ = json.NewDecoder(resp.Body).Decode(&out)
 		return resp.StatusCode, out
 	}
+	ctx := context.Background()
 	code, out := up("&tag=for+review&question=Approve+the+report%3F", "no team bytes")
-	require.Equal(t, http.StatusBadRequest, code, "a tag that goes nowhere is never a 201: %v", out)
-	assert.Equal(t, "no_team_for_review", out["code"])
-	assert.Contains(t, out["error"], "team", "it says why")
+	require.Equal(t, http.StatusCreated, code, "%v", out)
+	assert.Equal(t, []any{"for review"}, out["tags"], "the tag is kept, not dropped")
+	id := strings.TrimPrefix(out["uri"].(string), "coral://artifacts/")
+	tags, err := l.h.bs.ArtifactTags(ctx, noTeamBoardID)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"for review"}, tags[id], "kept under the reserved key")
+	qs, err := l.h.bs.ArtifactQuestions(ctx, noTeamBoardID)
+	require.NoError(t, err)
+	assert.Equal(t, "Approve the report?", qs[id].Question)
 
-	code, out = up("", "no team bytes")
-	assert.Equal(t, http.StatusCreated, code, "the same file with no tag is a plain upload: %v", out)
+	code, out = up("", "plain bytes")
+	require.Equal(t, http.StatusCreated, code, "%v", out)
+	tags, _ = l.h.bs.ArtifactTags(ctx, noTeamBoardID)
+	assert.Empty(t, tags[strings.TrimPrefix(out["uri"].(string), "coral://artifacts/")], "an untagged file keeps nothing")
 
-	team = "alpha" // an agent on a team: as before
+	team = "alpha" // an agent on a team keeps its own board's, nothing under the reserved key
 	code, out = up("&tag=for+review&question=Approve+the+report%3F", "team bytes")
-	assert.Equal(t, http.StatusCreated, code, "%v", out)
-	assert.Equal(t, []any{"for review"}, out["tags"])
+	require.Equal(t, http.StatusCreated, code, "%v", out)
+	teamID := strings.TrimPrefix(out["uri"].(string), "coral://artifacts/")
+	tags, _ = l.h.bs.ArtifactTags(ctx, noTeamBoardID)
+	assert.Empty(t, tags[teamID], "a team's file is not under the reserved key")
+	tags, _ = l.h.bs.ArtifactTags(ctx, "alpha")
+	assert.Equal(t, []string{"for review"}, tags[teamID])
 }

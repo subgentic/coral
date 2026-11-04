@@ -154,9 +154,9 @@ func (h *BoardHandler) ListAllTeamArtifacts(w http.ResponseWriter, r *http.Reque
 	if len(teams) == 0 || wanted[noTeamLabel] {
 		if rows := h.standaloneUploadItems(r, items, projects); len(rows) > 0 {
 			for i := range rows {
-				rows[i].Team = noTeamLabel
+				rows[i].Team, rows[i].BoardID = noTeamLabel, noTeamBoardID // the board key a file for review is kept under (#13527): the Inbox reads the row as a review of that key
 			}
-			refs = append(refs, teamArtifactTeamRef{Team: noTeamLabel, All: filesOrVersions(tq, rows)})
+			refs = append(refs, teamArtifactTeamRef{BoardID: noTeamBoardID, Team: noTeamLabel, All: filesOrVersions(tq, rows)})
 			items = append(items, rows...)
 		}
 	}
@@ -236,5 +236,8 @@ func (h *BoardHandler) standaloneUploadItems(r *http.Request, have []teamArtifac
 			out = append(out, it)
 		}
 	}
+	// What a no-team agent sent for review is kept under the reserved key (#13527): its tags, question and kind are read from there, so the file is a row Needs you shows, with the question it asks.
+	h.attachArtifactTags(r.Context(), noTeamBoardID, out)
+	h.attachArtifactKinds(r, noTeamBoardID, out)
 	return out
 }
