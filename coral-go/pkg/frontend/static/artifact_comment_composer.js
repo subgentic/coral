@@ -17,7 +17,7 @@ export function createComposer({ st, render, run, ownHex }) {
     function composer(editOf) {
         const cm = st.composing;
         const box = el('form', 'ac-composer'); box.noValidate = true;
-        if (cm.anchor) { const a = cm.anchor; const q = el('blockquote', 'ac-quote', a.whole ? 'The whole document' : a.quote); box.append(q); }
+        if (cm.anchor) { const a = cm.anchor; const q = el('blockquote', 'ac-quote', cm.atS != null ? `Video: ${cm.timeLabel || cm.atS + ' seconds'}` : a.whole ? 'The whole document' : a.quote); box.append(q); }
         const ta = el('textarea', 'field ac-input'); ta.rows = 3; ta.maxLength = BODY_MAX; ta.value = editOf ? editOf.body : (cm.draft || '');
         ta.setAttribute('aria-label', editOf ? 'Edit your comment' : cm.parentId != null ? 'Your reply' : 'Your comment'); ta.placeholder = cm.parentId != null ? 'Write a reply…' : 'Add a comment…';
         const count = el('span', 'ac-counter', `${ta.value.length} / ${BODY_MAX}`);
@@ -35,7 +35,7 @@ export function createComposer({ st, render, run, ownHex }) {
             if (!text && !pictures.length) { st.error = 'Write something first.'; err.textContent = st.error; err.hidden = false; return; }
             send.disabled = true;
             if (editOf) run(() => api.editComment(ownHex(editOf), st.server, editOf.id, text), 'Comment saved');
-            else run(async () => { const c = await api.createComment(cm.hex || st.hex, st.server, { body: text, anchor: cm.anchor, parentId: cm.parentId, board: st.board, images: pictures }); if (tray) tray.destroy(); st.active = c.id; st.scrollCard = true; return c.sentTo; }, cm.parentId != null ? 'Reply posted' : 'Comment posted');
+            else run(async () => { const c = await api.createComment(cm.hex || st.hex, st.server, { body: text, anchor: cm.anchor, parentId: cm.parentId, board: st.board, images: pictures, atS: cm.atS, endS: cm.endS }); if (tray) tray.destroy(); st.active = c.id; st.scrollCard = true; return c.sentTo; }, cm.parentId != null ? 'Reply posted' : 'Comment posted');
         });
         ta.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); cancel.click(); } else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) box.requestSubmit(); });
         return box;

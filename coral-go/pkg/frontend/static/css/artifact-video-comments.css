@@ -1,0 +1,26 @@
+.avc-controls { display: grid; gap: 12px; padding-block: 12px; color: var(--text-primary); min-width: 0; }
+.avc-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.avc-clock { font-variant-numeric: tabular-nums; color: var(--text-secondary); }
+.avc-comment { margin-left: auto; white-space: normal; }
+.avc-controls button { min-width: 44px; min-height: 44px; }
+.avc-rail { position: relative; margin-inline: 22px; height: 52px; }
+.avc-track { position: absolute; inset: 0; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-tertiary); touch-action: none; cursor: crosshair; overflow: hidden; }
+.avc-head { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--text-primary); pointer-events: none; }
+.avc-selection { position: absolute; top: 0; bottom: 0; background: color-mix(in srgb, var(--accent) 25%, transparent); pointer-events: none; }
+.avc-marks { position: absolute; inset: 0; pointer-events: none; }
+.avc-dot { position: absolute; top: 4px; transform: translateX(-50%); background: none; border: 0; padding: 0; pointer-events: auto; cursor: pointer; }
+.avc-dot::before { content: ''; display: block; width: 12px; height: 12px; margin: auto; border: 2px solid var(--bg-primary); border-radius: 50%; background: var(--accent); }
+.avc-dot.avc-resolved::before { background: var(--text-secondary); }
+.avc-dot.avc-active::before { outline: 2px solid var(--text-primary); outline-offset: 2px; }
+.avc-hint, .avc-status { margin: 0; font-size: var(--fs-sm); color: var(--text-secondary); overflow-wrap: anywhere; }
+.avc-status:empty { display: none; }
+.ac-video-time { min-height: 44px; font-variant-numeric: tabular-nums; white-space: normal; }
+.artifact-viewer.avc-video .artifact-viewer-main { overflow-y: auto; }
+.artifact-viewer.avc-video .artifact-preview-media { width: 100%; max-height: 55vh; }
+@media (max-width: 767px) {
+ .artifact-viewer.avc-video .artifact-viewer-main { flex-direction: column; }
+ .artifact-viewer.avc-video .artifact-viewer-body { flex: 0 0 auto; overflow: visible; }
+ .artifact-viewer.avc-video .ac-panel.ac-sheet-open { position: static; width: 100%; max-height: none; transform: none; flex: 0 0 auto; border-radius: 0; }
+}
+
+.ac-send-open { min-height: 44px; white-space: normal; }

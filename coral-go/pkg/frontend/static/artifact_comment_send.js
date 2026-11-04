@@ -50,7 +50,7 @@ export function pickableAgents(list) {
  */
 export function buildSendBlock(x) {
     const box = el('div', 'ac-ask'); box.setAttribute('role', 'group');
-    const title = el('p', 'ac-ask-title', `Send this comment to agents on ${teamWords(x.board)}`); title.id = `ac-ask-title-${x.id}`;
+    const title = el('p', 'ac-ask-title', x.count > 1 ? `Send ${x.count} open comments to agents on ${teamWords(x.board)}, in time order` : `Send this comment to agents on ${teamWords(x.board)}`); title.id = `ac-ask-title-${x.id}`;
     box.setAttribute('aria-labelledby', title.id);
     box.append(title);
     box.append(el('p', 'ac-ask-note', 'Each agent you pick gets this comment as a message. They answer in this thread.'));
