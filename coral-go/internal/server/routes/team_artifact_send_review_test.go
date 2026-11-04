@@ -217,3 +217,106 @@ func TestTakingAFileOutOfReviewNeverLosesALocalTagEditAndGivesUpWith409(t *testi
 	assert.Equal(t, hubTagsRetries+1, n, "one read and three retries")
 	assert.Contains(t, tags(), "for review", "the file is still for review")
 }
+
+// #13231 (Security's INFOs on e151d00e4, the Orchestrator's ask): sending and taking out are in the Operator's Activity; the time a file was sent for review is on its row (review_sent_at, only while it is for
+// review) and moves with a re-send; the since and until of the artifacts query count from it; and a file that was approved starts a new round (the decision and the read mark go, Needs you shows it as new).
+func TestSendingForReviewIsRecordedStampedAndAnApprovedFileStartsANewRound(t *testing.T) {
+	e := newTagEnv(t)
+	id := e.ids["report.md"]
+	ctx := context.Background()
+	withLabel(t, ownerLabel, nil)
+	hub := ownerHeaders(ownerLabel)
+	call := func(method, body string) (int, map[string]any) {
+		req, err := http.NewRequest(method, e.srv.URL+"/api/board/tag-team/artifacts/"+id+"/review", strings.NewReader(body))
+		require.NoError(t, err)
+		req.Header.Set("Content-Type", "application/json")
+		for k, v := range hub {
+			req.Header.Set(k, v)
+		}
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		return resp.StatusCode, decodeBody(t, resp)
+	}
+	row := func() map[string]any {
+		out := e.list(t, "", 200)
+		for _, a := range out["artifacts"].([]any) {
+			if m := a.(map[string]any); m["id"] == id {
+				return m
+			}
+		}
+		require.Fail(t, "the file is not listed")
+		return nil
+	}
+	actions := func() []board.OperatorAction {
+		rows, err := e.h.bs.ListActivity(ctx, board.ActivityFilter{Limit: 50})
+		require.NoError(t, err)
+		return rows
+	}
+	// not for review: no time on the row
+	assert.Nil(t, row()["review_sent_at"])
+
+	code, out := call(http.MethodPut, `{"question":"Ship it?"}`)
+	require.Equal(t, http.StatusOK, code, "%v", out)
+	first, _ := row()["review_sent_at"].(string)
+	require.NotEmpty(t, first, "the row says when it was sent")
+	// a repeat while it waits keeps the time
+	call(http.MethodPut, `{"question":"Ship it, really?"}`)
+	assert.Equal(t, first, row()["review_sent_at"], "a repeat does not start the wait again")
+
+	// the Operator approves it, and sends it again: a new round, with a new time, none of the old decision
+	_, _, err := e.h.bs.DecideArtifactReview(ctx, "tag-team", id, board.ReviewApproved, time.Now())
+	require.NoError(t, err)
+	_, err = e.h.bs.AddArtifactTags(ctx, "tag-team", id, []string{"read"}) // opened before
+	require.NoError(t, err)
+	all, _ := e.h.bs.ArtifactTags(ctx, "tag-team")
+	require.Contains(t, all[id], "approved")
+	time.Sleep(1100 * time.Millisecond) // sleep-ok: the time has one-second resolution; a re-send is a later second
+	code, out = call(http.MethodPut, `{"question":"One more look?"}`)
+	require.Equal(t, http.StatusOK, code, "%v", out)
+	assert.Equal(t, []any{"for review"}, out["tags"], "approved and read are gone: a new round")
+	assert.Equal(t, "One more look?", out["question"])
+	second, _ := row()["review_sent_at"].(string)
+	assert.Greater(t, second, first, "a re-send moves the time")
+	reviews, err := e.h.bs.ArtifactReviews(ctx, "tag-team")
+	require.NoError(t, err)
+	assert.NotContains(t, reviews, id, "the earlier decision's row is gone")
+
+	// since and until count from the review, not from the file
+	between := time.Now().Add(-time.Hour).UTC().Format(time.RFC3339) // older than the review, newer than nothing: a file sent just now has waited under an hour
+	hit := func(query string) bool {
+		out := e.list(t, query, 200)
+		for _, a := range out["artifacts"].([]any) {
+			if a.(map[string]any)["id"] == id {
+				return true
+			}
+		}
+		return false
+	}
+	assert.False(t, hit("until="+between), "sent a moment ago: it has not waited an hour (until is before the review time)")
+	assert.True(t, hit("since="+between), "and it is inside 'since an hour ago'")
+	// the file itself is older than its review (uploaded, then sent a while later): until at the review time is not "before" it, whatever the upload's time was
+	assert.False(t, hit("until="+second), "until at the review time excludes it: its time is the review's, not the upload's (the upload is earlier and would be returned)")
+	assert.True(t, hit("since="+second), "and since at the review time includes it")
+
+	// take-out
+	code, _ = call(http.MethodDelete, ``)
+	require.Equal(t, http.StatusOK, code)
+	assert.Nil(t, row()["review_sent_at"], "not for review: no time")
+
+	var got []string
+	for _, a := range actions() {
+		if a.ItemID == id {
+			got = append(got, a.Action+"|"+a.Note)
+		}
+	}
+	assert.Contains(t, got, "unsend_review|")
+	assert.Contains(t, got, "send_review|Ship it?")
+	found := false
+	for _, g := range got {
+		if strings.HasPrefix(g, "send_review|again after approved.") {
+			found = true
+		}
+	}
+	assert.True(t, found, "the re-send says it follows an approval: %v", got)
+}

@@ -38,6 +38,7 @@ func (h *BoardHandler) attachArtifactTags(ctx context.Context, project string, i
 	}
 	questions, _ := h.bs.ArtifactQuestions(ctx, project) // what each upload for review asks (#11555); a read that fails leaves the rows without it
 	reviews, _ := h.bs.ArtifactReviews(ctx, project)     // when a review was decided (#136584); a read that fails leaves the rows without it
+	sent, _ := h.bs.ArtifactReviewSent(ctx, project)     // when each file was sent for review (#13231); a read that fails leaves the rows without it
 	for i := range items {
 		if items[i].managed != "" {
 			items[i].Tags = tags[items[i].managed]
@@ -46,6 +47,9 @@ func (h *BoardHandler) attachArtifactTags(ctx context.Context, project string, i
 			}
 			if q, ok := questions[items[i].managed]; ok && hasTag(items[i].Tags, tagForReview) {
 				items[i].ReviewQuestion = q.Question
+			}
+			if at, ok := sent[items[i].managed]; ok && hasTag(items[i].Tags, tagForReview) {
+				items[i].ReviewSentAt = at
 			}
 			if rv, ok := reviews[items[i].managed]; ok {
 				rv := rv

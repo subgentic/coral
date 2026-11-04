@@ -7,6 +7,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/jmoiron/sqlx"
@@ -152,15 +153,18 @@ func (s *Store) setArtifactTags(ctx context.Context, boardID, hex string, tags, 
 		return err
 	}
 	defer tx.Rollback()
+	var have []string
+	if err := tx.SelectContext(ctx, &have, `SELECT tag FROM artifact_tags WHERE board_id = ? AND hex = ? ORDER BY tag`, boardID, hex); err != nil {
+		return err
+	}
 	if check {
-		var have []string
-		if err := tx.SelectContext(ctx, &have, `SELECT tag FROM artifact_tags WHERE board_id = ? AND hex = ? ORDER BY tag`, boardID, hex); err != nil {
-			return err
-		}
 		if !sameTagSet(have, was) {
 			return ErrArtifactTagsChanged
 		}
 		tagsCASAfterRead()
+	}
+	if err := noteReviewTag(ctx, tx, boardID, hex, slices.Contains(have, tagForReview), slices.Contains(tags, tagForReview), time.Now()); err != nil { // when it was sent for review (#13231)
+		return err
 	}
 	if _, err := tx.ExecContext(ctx, `DELETE FROM artifact_tags WHERE board_id = ? AND hex = ?`, boardID, hex); err != nil {
 		return tagsWriteErr(check, err) // a writer committed after this transaction's read: the snapshot is stale, which is the same answer as a changed list (#13138)
@@ -234,6 +238,7 @@ func (s *Store) AddArtifactTags(ctx context.Context, boardID, hex string, add []
 	if err := tx.SelectContext(ctx, &have, `SELECT tag FROM artifact_tags WHERE board_id = ? AND hex = ? ORDER BY tag`, boardID, hex); err != nil {
 		return nil, err
 	}
+	hadReview := slices.Contains(have, tagForReview)
 	var rows int
 	if err := tx.GetContext(ctx, &rows, `SELECT COUNT(*) FROM artifact_tags WHERE board_id = ?`, boardID); err != nil {
 		return nil, err
@@ -254,6 +259,9 @@ func (s *Store) AddArtifactTags(ctx context.Context, boardID, hex string, add []
 				return nil, err
 			}
 		}
+	}
+	if err := noteReviewTag(ctx, tx, boardID, hex, hadReview, slices.Contains(have, tagForReview), time.Now()); err != nil { // when it was sent for review (#13231)
+		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, err

@@ -432,7 +432,11 @@ func (q *teamArtifactQuery) cheapMatch(it teamArtifact, kept, starred map[string
 		}
 	}
 	if q.since != nil || q.until != nil {
-		t, ok := parseArtifactTime(it.CreatedAt)
+		when := it.CreatedAt
+		if it.ReviewSentAt != "" {
+			when = it.ReviewSentAt // a file waiting for review is as old as its review: "waiting longer than X" counts from when it was sent (#13231)
+		}
+		t, ok := parseArtifactTime(when)
 		if !ok {
 			return false
 		}

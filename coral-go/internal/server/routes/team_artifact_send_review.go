@@ -1,6 +1,8 @@
 package routes
 
 import (
+	"context"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -56,14 +58,14 @@ func (h *BoardHandler) MarkArtifactForReview(w http.ResponseWriter, r *http.Requ
 		writeError(w, http.StatusBadRequest, "sign_in_link", signInLinkRefusal)
 		return
 	}
-	question, _ := board.CleanReviewQuestion(body.Question) // empty once cleaned: none, and an earlier one is kept
-	tags, err := h.bs.AddArtifactTags(ctx, project, id, []string{tagForReview})
-	if err != nil {
-		errInternalServer(w, "could not mark the file for review")
+	question, _ := board.CleanReviewQuestion(body.Question)                  // empty once cleaned: none, and an earlier one is kept
+	tags, was, err := h.bs.StartArtifactReview(ctx, project, id, time.Now()) // a file decided before starts a new round (#13231)
+	if errors.Is(err, board.ErrArtifactTag) {
+		writeError(w, http.StatusBadRequest, "too_many_tags", "this file already has the most tags a file can have; remove one to send it for review")
 		return
 	}
-	if !hasTag(tags, tagForReview) {
-		writeError(w, http.StatusBadRequest, "too_many_tags", "this file already has the most tags a file can have; remove one to send it for review")
+	if err != nil {
+		errInternalServer(w, "could not mark the file for review")
 		return
 	}
 	if question != "" {
@@ -72,6 +74,11 @@ func (h *BoardHandler) MarkArtifactForReview(w http.ResponseWriter, r *http.Requ
 			return
 		}
 	}
+	note := question
+	if was != "" {
+		note = strings.TrimSpace("again after " + was + ". " + question) // a new round: the earlier decision is in the record
+	}
+	h.recordActivity(r, board.ActSendReview, "file", id, project, item.Name, note)
 	h.writeReviewAnswer(w, r, project, id, tags)
 }
 
@@ -119,7 +126,16 @@ func (h *BoardHandler) UnmarkArtifactForReview(w http.ResponseWriter, r *http.Re
 		}
 	}
 	all, _ := h.bs.ArtifactTags(ctx, project)
+	h.recordActivity(r, board.ActUnsendReview, "file", id, project, h.artifactNameOf(ctx, project, id), "")
 	h.writeReviewAnswer(w, r, project, id, all[id])
+}
+
+// artifactNameOf is the file's name as the team lists it, for a record; "" when it cannot be found.
+func (h *BoardHandler) artifactNameOf(ctx context.Context, project, id string) string {
+	if item, ok := h.teamManagedArtifact(ctx, project, id); ok {
+		return item.Name
+	}
+	return ""
 }
 
 // writeReviewAnswer answers with the file's tags and the question it carries now.

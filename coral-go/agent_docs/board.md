@@ -393,7 +393,7 @@ Artifacts query (`q`, `since`, `until`, `sort`, `cursor`; `total` and `next_curs
 | `q` | A plain, case-insensitive substring of the message text: at most 200 characters, no control characters, given once; `%` and `_` are ordinary characters (no pattern); an empty `q` is no search |
 | `from` | Multi: the sender's id or name (comma separated or repeated, at most 50), any case, exact |
 | `mentions` | A member's name: the messages that tag that member (`@name`, `@all`, `@notify-all`, with the numbered-agent rule unread counts use: `@Backend Dev 2` tags that agent, not `Backend Dev`) |
-| `since`, `until` | RFC 3339 times (an offset is read as that instant); `since` is inclusive, `until` exclusive |
+| `since`, `until` | RFC 3339 times (an offset is read as that instant); `since` is inclusive, `until` exclusive; they compare `created_at`, or `review_sent_at` for a file waiting for review |
 | `sort` | `newest` (default) or `oldest` |
 | `limit` | 1 to 200, default 50 |
 | `cursor` | A `next_cursor` or `prev_cursor` of an earlier reply, with the same filters and sort |
