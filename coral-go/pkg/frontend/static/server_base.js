@@ -132,6 +132,9 @@ export function identityKey(server, name) {
     return s === LOCAL_SERVER ? String(name ?? '') : `@${s}/${name ?? ''}`;
 }
 
+/** The team key of a board named on a computer, for a caller that has the computer and the board's own name (a key that already names its computer, '@m1/team', is kept). */
+export const boardTeamKey = (server, board) => (String(board).startsWith('@') ? String(board) : identityKey(server, board));
+
 /** DOM-id/attribute-safe version of identityKey. */
 export function identityDomId(server, name) {
     return identityKey(server, name).replace(/[^A-Za-z0-9_-]/g, '_');
