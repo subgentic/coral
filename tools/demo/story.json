@@ -22,7 +22,15 @@
   "permAgent": "Reviewer",
   "goal": {
     "title": "Skyline shows a five-day forecast for any city",
-    "done": "Search a city and see five days of highs, lows and a feels-like figure"
+    "done": "Search a city and see five days of highs, lows and a feels-like figure",
+    "body": [
+      "Skyline should answer one question well: what will the weather do this week?",
+      "- Search any city by name, with the country",
+      "- Five days of highs, lows and a feels-like figure",
+      "- Dark by default, with a light switch",
+      "- Works on a phone-sized window"
+    ],
+    "picture": "skyline-mockup.png"
   },
   "tasks": [
     "Add the wind-chill figure",
@@ -93,12 +101,28 @@
     "file": "theme-note.md",
     "name": "skyline-theme-note.md",
     "question": "Dark or light by default?",
-    "comment": "Dark by default, with a light switch.",
-    "reply": "Agreed: dark by default, light on request. I updated the note.",
-    "replyFind": "dark by default, light on request",
-    "from": "Should Skyline open in a dark theme or a light one?",
-    "to": "Decision: Skyline opens dark, with a light switch.",
-    "question2": "Approve the updated theme note?"
+    "comment": "The rain chart blue is hard to read on the dark card. Can you lighten it and tick the chart off the checklist?",
+    "reply": "Done: the rain bar is lighter on dark (5.1 to 1 contrast) and the chart is ticked off. Decision recorded: dark by default.",
+    "replyFind": "5.1 to 1 contrast",
+    "question2": "Approve the updated theme note?",
+    "edits": [
+      [
+        "Should Skyline open in a dark theme or a light one?",
+        "Decision: Skyline opens dark, with a light switch."
+      ],
+      [
+        "| Rain bar | #5aa7e8 | #2a78c4 |",
+        "| Rain bar | #8cc4f2 | #2a78c4 |"
+      ],
+      [
+        "1. The rain chart uses a fixed blue that reads poorly on the dark card.",
+        "1. The rain chart's blue is fixed in this version: lighter on the dark card (#8cc4f2), 5.1 to 1 contrast."
+      ],
+      [
+        "- [ ] Rain chart reads the tokens",
+        "- [x] Rain chart reads the tokens"
+      ]
+    ]
   },
   "prompts": [
     {
@@ -128,6 +152,178 @@
       "kind": "permission",
       "command": "git push origin theme-dark",
       "description": "Push the dark theme branch"
+    }
+  ],
+  "history": {
+    "goals": [
+      {
+        "title": "Skyline shows today's weather",
+        "state": "done",
+        "tasks": [
+          [
+            "Fetch today's weather for a city",
+            "completed"
+          ],
+          [
+            "Show the temperature and a weather icon",
+            "completed"
+          ],
+          [
+            "Handle a city that is not found",
+            "completed"
+          ]
+        ]
+      },
+      {
+        "title": "Skyline has a dark theme",
+        "state": "active",
+        "tasks": [
+          [
+            "Write the colour tokens for both themes",
+            "completed"
+          ],
+          [
+            "Add the theme switch to the header",
+            "completed"
+          ],
+          [
+            "Read the tokens in the forecast cards",
+            "in_progress"
+          ],
+          [
+            "Review the contrast of the rain chart",
+            "pending"
+          ]
+        ]
+      },
+      {
+        "title": "Skyline works offline for the last city",
+        "state": "blocked",
+        "tasks": [
+          [
+            "Cache the last forecast",
+            "completed"
+          ],
+          [
+            "Decide how long a cached forecast stays fresh",
+            "pending"
+          ]
+        ]
+      },
+      {
+        "title": "Skyline sends a rain alert",
+        "state": "proposed",
+        "tasks": []
+      }
+    ]
+  },
+  "goalTasks": [
+    [
+      "Add the wind-chill figure",
+      "completed"
+    ],
+    [
+      "Build the five-day forecast cards",
+      "completed"
+    ],
+    [
+      "Add city search with country names",
+      "completed"
+    ],
+    [
+      "Write the forecast contract",
+      "completed"
+    ],
+    [
+      "Measure the forecast error",
+      "completed"
+    ],
+    [
+      "Review the forecast code",
+      "in_progress"
+    ],
+    [
+      "Add the units switch",
+      "in_progress"
+    ],
+    [
+      "Write the beta test plan",
+      "pending"
+    ],
+    [
+      "Ship the beta",
+      "pending"
+    ]
+  ],
+  "goalComment": {
+    "text": "Where are we on this? Anything blocking the beta?",
+    "reply": "Five of nine tasks are done and two are in progress. Nothing blocks the beta; the units switch is the one to watch, and the review of the forecast code lands first."
+  },
+  "chats": [
+    {
+      "agent": "Orchestrator",
+      "prompt": "[Orchestrator] Plan this week: forecast contract, wind chill, city search, then the beta.",
+      "reply": {
+        "when": "[Orchestrator]",
+        "text": "Plan for the week:\n1. Contract first (Backend), so Frontend can build against it\n2. Wind chill and the forecast cards in parallel\n3. City search once the contract is approved\n4. Beta on Friday if the units switch is in\nI will post each step on the board and ask you only for the decisions.",
+        "tool": {
+          "name": "Bash",
+          "command": "coral-board task list",
+          "output": "#1 Add the wind-chill figure\n#2 Build the five-day forecast cards\n#3 Add city search with country names"
+        }
+      }
+    },
+    {
+      "agent": "Backend",
+      "prompt": "[Backend] Add the wind-chill figure to the forecast and test it.",
+      "reply": {
+        "when": "[Backend]",
+        "text": "Added FeelsLike with the wind-chill formula and a table test with four cases (cold and windy, mild, calm, warm). All four pass.",
+        "tool": {
+          "name": "Bash",
+          "command": "go test ./...",
+          "output": "ok  \texample.com/skyline\t0.31s"
+        }
+      }
+    },
+    {
+      "agent": "Frontend",
+      "prompt": "[Frontend] Build the five-day forecast cards against the contract.",
+      "reply": {
+        "when": "[Frontend]",
+        "text": "The five cards render from the contract: day, high, low, feels-like and a rain bar. Search is next once the country field is final.",
+        "tool": {
+          "name": "Bash",
+          "command": "npm run build",
+          "output": "built in 1.2s\n12 modules"
+        }
+      }
+    },
+    {
+      "agent": "Designer",
+      "prompt": "[Designer] Propose the dark and light theme for the dashboard.",
+      "reply": {
+        "when": "[Designer]",
+        "text": "I wrote a theme note with the colour tokens for both themes, a contrast table and the build checklist. It is in your Inbox for review: dark by default, with a light switch.",
+        "tool": {
+          "name": "Bash",
+          "command": "coral-agent artifact upload theme-note.md",
+          "output": "uploaded skyline-theme-note.md"
+        }
+      }
+    },
+    {
+      "agent": "Reviewer",
+      "prompt": "[Reviewer] Review the wind-chill change.",
+      "reply": {
+        "when": "[Reviewer]",
+        "text": "Reviewed the wind-chill change: the formula matches the standard one, and the tests cover the edge cases. One nit: name the unit in the doc comment. Approved.",
+        "tool": {
+          "name": "Bash",
+          "command": "git diff --stat",
+          "output": "forecast.go | 14 ++++++++------\nforecast_test.go | 17 +++++++++++++++++"
+        }
+      }
     }
   ]
 }
