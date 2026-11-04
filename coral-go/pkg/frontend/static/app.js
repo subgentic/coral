@@ -98,6 +98,7 @@ import './sidebar_menus.js';
 import './startup_status.js';
 import './history_state.js';
 import { installFetchShare } from './fetch_share.js';
+import { installRemoteLimit } from './remote_limit.js';
 import { initLocalStore, initPanels, initPlatform, installUnauthorizedRedirect, wireComposer, wirePaneScroll, wireWindowEvents, yieldToMain } from './app_wiring.js';
 import { wireHistoryFilters } from './history_filters.js';
 import './history_source.js';
@@ -121,6 +122,7 @@ async function startDashboard() {
     if (!isPhoneLayout()) buildWelcome(); // a phone starts on the agent list and builds the welcome screen only if it is shown (#4497)
     try {
     initPlatform();
+    installRemoteLimit(); // under every wrapper below: at most 6 requests in flight to one computer, and a read the Hub turned away (503) asked again (#13304)
     installFetchShare(); // the same read asked twice at load is one request (#9111); the wrappers below each see every caller's own answer
     installUnauthorizedRedirect();
 

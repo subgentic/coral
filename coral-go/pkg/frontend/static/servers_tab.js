@@ -20,6 +20,7 @@ import { isPhoneLayout } from './phone_layout.js';
 
 /** Show or hide the top-nav tab. Safe to call often (after each list update). */
 export function updateServersTabVisibility() {
+    document.dispatchEvent(new Event('coral:servers-updated')); // the list of computers just arrived or changed: what reads every computer (Needs you's scan) checks that it covered them all (#13304)
     const tab = document.getElementById('nav-tab-servers');
     if (!tab) return;
     const show = serversTabAvailable();
