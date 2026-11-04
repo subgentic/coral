@@ -105,3 +105,22 @@ func TestOnlyACallThroughTheHubWritesAHubUpdateRow(t *testing.T) {
 	e.h.Activity = nil
 	e.h.hubActivity(context.Background(), callerIdentity{owner: true, pseudo: ownerA}, board.ActHubUpdateCheck, "", "") // no hook: nothing, no panic
 }
+
+// Security's INFO a on #13340: the installed version in the note, and the version column, are only what the status reply would show (a plain x.y.z); anything else from the updater's record is left out.
+func TestTheHubUpdateRowCarriesOnlyAPlainVersion(t *testing.T) {
+	e := newRelaunchEnv(t)
+	rec := &activityRows{}
+	e.h.Activity = rec.record
+	id := callerIdentity{owner: true, pseudo: ownerA}
+	e.h.hubActivity(context.Background(), id, board.ActHubUpdateRelaunch, "1.4.131", "1.4.130")
+	e.h.hubActivity(context.Background(), id, board.ActHubUpdateRelaunch, "1.4.131", "1.4.130-beta\x1b[31m; rm -rf /")
+	e.h.hubActivity(context.Background(), id, board.ActHubUpdateRelaunch, "v9.9.9 http://evil.example/x", "1.4.130")
+	rows := rec.all()
+	require.Len(t, rows, 3)
+	assert.Equal(t, "from 1.4.130", rows[0].meta.Note)
+	assert.Equal(t, "1.4.131", rows[0].version)
+	assert.Equal(t, "", rows[1].meta.Note, "an installed version that is not x.y.z is no note")
+	assert.Equal(t, "1.4.131", rows[1].version)
+	assert.Equal(t, "", rows[2].version, "a staged version that is not x.y.z is not written")
+	assert.Equal(t, "", rows[2].meta.Note)
+}

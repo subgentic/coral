@@ -782,8 +782,11 @@ func (h *UpdateRelaunchHandler) hubActivity(ctx context.Context, id callerIdenti
 		return
 	}
 	note := ""
-	if installed != "" && version != "" {
+	if updateVersionRe.MatchString(installed) && updateVersionRe.MatchString(version) { // only a version the status reply would also show (Security's INFO a on #13340): anything else is no note
 		note = "from " + installed
+	}
+	if !updateVersionRe.MatchString(version) {
+		version = "" // and the same for the version column
 	}
 	m := board.ActivityMeta{Actor: activityActor(id), Source: "hub", Title: "Coral update", Note: note}
 	if err := h.Activity(context.WithoutCancel(ctx), m, action, "update", "coral", version, ""); err != nil {
