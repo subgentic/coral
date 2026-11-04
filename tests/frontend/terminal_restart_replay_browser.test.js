@@ -6,6 +6,7 @@ const fs = require('node:fs'), os = require('node:os'), path = require('node:pat
 const { execFileSync } = require('./helpers/child_process');
 const { connect } = require('./agent_view_harness');
 const { launchStandIn } = require('./helpers/stand_in_agent');
+const { sqliteExec } = require('./helpers/sqlite');
 const BASE = require('./test_base').BASE;
 const SOCK = process.env.CORAL_TEST_TMUX_SOCKET;
 assert.ok(SOCK && !SOCK.includes('/.coral/'), 'only the isolated test socket');
@@ -32,22 +33,33 @@ const q = s => "'" + s.replaceAll("'", "'\\''") + "'";
         assert.ok(cli.includes('coral-standin-'), 'replace only this helper-owned stand-in');
         const sizeFile = path.join(dir, 'size');
         fs.writeFileSync(cli, [
-            '#!/bin/sh',
-            'case "$1" in --version) echo "0.0.0 (stand-in)"; exit 0;; auth) echo \'{"loggedIn":true}\'; exit 0;; esac',
-            `size() { stty size > ${q(sizeFile)}; }`, 'trap size WINCH', 'size',
-            String.raw`printf '\033[2J\033[HREPLAY_ALPHA\r\nREPLAY_BETA\r\nREPLAY_GAMMA\r\n'`,
-            String.raw`while :; do if IFS= read -r line; then case "$line" in probe) printf 'RECOVERED_STREAM\r\n';; esac; fi; done`, ''
+            '#!/usr/bin/env node',
+            "const fs=require('node:fs');",
+            "if(process.argv.includes('--version')){console.log('0.0.0 (stand-in)');process.exit(0)}",
+            "if(process.argv[2]==='auth'){console.log(JSON.stringify({loggedIn:true}));process.exit(0)}",
+            "process.title='claude';",
+            `const save=()=>fs.writeFileSync(${JSON.stringify(sizeFile)},process.stdout.rows+' '+process.stdout.columns);`,
+            "process.stdout.on('resize',save);if(process.stdin.isTTY)process.stdin.setRawMode(true);save();",
+            String.raw`process.stdout.write('\x1b[2J\x1b[HREPLAY_ALPHA\r\nREPLAY_BETA\r\nREPLAY_GAMMA\r\n');`,
+            String.raw`let pending='';process.stdin.setEncoding('utf8');process.stdin.on('data',chunk=>{pending+=chunk;let end;while((end=pending.search(/[\r\n]/))>=0){const line=pending.slice(0,end);pending=pending.slice(end+1);if(line==='probe')process.stdout.write('RECOVERED_STREAM\r\n')}});process.stdin.resume();`, ''
         ].join('\n'), { mode: 0o755 });
-        const slept = await api('POST', `/api/sessions/live/${standIn.sid}/sleep`, {});
-        assert.equal(slept.data.ok, true, JSON.stringify(slept));
+        // Model a restart leaving a real program/pane behind but a sleeping DB
+        // row: normal Sleep kills the pane and would miss the faulty wake branch.
+        tmux('respawn-pane', '-k', '-t', `=${standIn.name}:0.0`, q(cli));
+        await until(() => fs.existsSync(sizeFile), 'retained mock program starts before any browser attaches');
+        const retainedPID = tmux('display-message', '-p', '-t', `=${standIn.name}:`, '#{pane_pid}').trim();
+        const log = path.join(process.env.CORAL_TEST_DATA_DIR, 'logs', `claude-${standIn.sid}.log`);
+        tmux('pipe-pane', '-t', `=${standIn.name}:`); fs.writeFileSync(log, '');
+        assert.match(standIn.sid, /^[0-9a-f-]+$/i);
+        sqliteExec(path.join(process.env.CORAL_TEST_DATA_DIR, 'sessions.db'), `UPDATE live_sessions SET is_sleeping=1 WHERE session_id='${standIn.sid}'`);
         const woke = await api('POST', `/api/sessions/live/${standIn.sid}/wake`, {});
         assert.equal(woke.data.ok, true, JSON.stringify(woke));
-        await until(() => fs.existsSync(sizeFile), 'stand-in starts before any browser attaches');
+        assert.equal(tmux('display-message', '-p', '-t', `=${standIn.name}:`, '#{pane_pid}').trim(), retainedPID, 'Wake retains the actual program and pane');
+        const pipeAfterWake = tmux('display-message', '-p', '-t', `=${standIn.name}:`, '#{pane_pipe}').trim();
         tmux('resize-window', '-t', `=${standIn.name}:`, '-x', '137', '-y', '42');
         await until(() => fs.readFileSync(sizeFile, 'utf8').trim() === '42 137', 'program receives 137x42');
         const capture = () => tmux('capture-pane', '-t', `=${standIn.name}:`, '-p', '-e');
         await until(() => capture().includes('REPLAY_GAMMA'), 'program screen is complete');
-        const log = path.join(process.env.CORAL_TEST_DATA_DIR, 'logs', `claude-${standIn.sid}.log`);
         tmux('pipe-pane', '-t', `=${standIn.name}:`);
         fs.writeFileSync(log, '');
         await Page.enable();
@@ -63,6 +75,7 @@ const q = s => "'" + s.replaceAll("'", "'\\''") + "'";
         await waitFor(`(async()=>{const m=await import(${modulePath});return m.isTerminalWsOpen()&&m.getTerminal()?.cols===137&&m.getTerminal()?.rows===42&&m.terminalScreenText().includes('REPLAY_GAMMA')})()`, 'captured replay at 137x42', 15000);
         const rows = await ev(`(async()=>{const t=(await import(${modulePath})).getTerminal();return Array.from({length:t.buffer.active.length},(_,i)=>t.buffer.active.getLine(i)?.translateToString(true)||'')})()`);
         for (const marker of ['REPLAY_ALPHA', 'REPLAY_BETA', 'REPLAY_GAMMA']) assert.equal(rows.find(s => s.includes(marker))?.indexOf(marker), 0, `${marker} must start in column zero, not staircase: ${JSON.stringify(rows)}`);
+        assert.equal(pipeAfterWake, '1', 'retained-pane Wake restores the pipe before any viewer attaches');
         assert.equal(fs.readFileSync(sizeFile, 'utf8').trim(), '42 137', 'the program width equals xterm, so correct dimensions cannot mask replay corruption');
         await ev(`window.disconnectTerminalWs(); true`);
         tmux('pipe-pane', '-t', `=${standIn.name}:`); fs.writeFileSync(log, '');
