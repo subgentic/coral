@@ -108,8 +108,7 @@ func TestReconciler_TheSamePhraseLongAfterTheLaunchIsAnOrdinaryExitNotAFailedSta
 	rt.set(name, "powershell")
 	rt.screens[name] = "bash: codex: command not found"
 	r.reconcileOnce(ctx)
-	assert.False(t, isSleeping(t, ss, testUUID), "one pass is not enough for an ordinary exit")
-	r.reconcileOnce(ctx)
+	assert.True(t, isSleeping(t, ss, testUUID), "an ordinary exit is marked on the first pass (#13418)")
 	ls, err := ss.GetLiveSession(ctx, testUUID)
 	require.NoError(t, err)
 	require.NotNil(t, ls.SleepReason)
@@ -131,6 +130,7 @@ func TestReconciler_AWakeWhoseShellCouldNotFindTheCLIIsCaughtByItsLaunchTime(t *
 	r.reconcileOnce(ctx)
 	ls, _ := ss.GetLiveSession(ctx, testUUID)
 	assert.Nil(t, ls.StartFailure, "created hours ago and never launched since: the words are not the launch's")
+	require.NoError(t, ss.SetSessionSleeping(ctx, testUUID, false)) // (an ordinary exit was marked on that pass: woken for the second half)
 
 	require.NoError(t, ss.StampLaunch(ctx, testUUID)) // a wake typed its line just now
 	r.now = time.Now

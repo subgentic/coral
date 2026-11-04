@@ -19,6 +19,11 @@ import (
 // sleeping. A single miss can be a transient tmux hiccup rather than a crash.
 const reconcileMissThreshold = 2
 
+// exitedPassThreshold is how many consecutive passes find an agent's terminal at a plain, known shell (its CLI gone, past the launch grace) before it is marked ended: one (#13418). That is
+// a certain reading (the shell's own process table, a shell of unknown contents is never taken for it), so the dot and the list say Ended within one tick, as after a restart. An agent
+// missing from the terminal list altogether stays on reconcileMissThreshold: that reading can be a listing that missed it.
+const exitedPassThreshold = 1
+
 // orphanGracePeriod is how long after a session is marked stopped in the DB
 // the reconciler waits before killing a runtime session that is still alive
 // under that ID. Gives in-flight kill/restart handlers time to finish.
@@ -295,7 +300,7 @@ func (r *SessionReconciler) checkExited(ctx context.Context, ls store.LiveSessio
 		return
 	}
 	r.exited[ls.SessionID]++
-	if r.exited[ls.SessionID] < reconcileMissThreshold {
+	if r.exited[ls.SessionID] < exitedPassThreshold {
 		return
 	}
 	delete(r.exited, ls.SessionID)
