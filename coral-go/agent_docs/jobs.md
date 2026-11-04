@@ -22,6 +22,8 @@ This page documents the one-shot Tasks API surface. Coral uses "job" for the UI 
 - `POST /api/tasks/runs/{run_id}/kill`
 - `GET /api/tasks/active`
 
+`GET /api/tasks/runs` answers `{"runs": [...], "total": N, "has_more": bool, "next_cursor": "..."}`: the newest `limit` runs (50 by default, up to 200; optional `status`), `total` is every run the status matches, and `next_cursor` (only when `has_more`) goes back as `?cursor=` for the next page; a bad `cursor` is a 400.
+
 ---
 
 ## Submit a task

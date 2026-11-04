@@ -2,6 +2,8 @@ package routes
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -68,13 +70,56 @@ func (h *SessionsHandler) Git(w http.ResponseWriter, r *http.Request) {
 
 	var snapshots []store.GitSnapshot
 	var err error
+	out := map[string]any{"agent_name": name}
 	if sessionID != "" {
 		snapshots, err = h.gs.GetGitSnapshotsForSession(r.Context(), sessionID, limit)
 	} else {
-		snapshots, err = h.gs.GetGitSnapshots(r.Context(), name, limit)
+		// By name: newest first, with cursor (the last answer's next_cursor), the true total and has_more (#13188). Without a cursor it is the same newest page as always.
+		var after *store.GitAfter
+		if c := r.URL.Query().Get("cursor"); c != "" {
+			pos, ok := decodeGitCursor(c)
+			if !ok {
+				errBadRequest(w, "invalid cursor")
+				return
+			}
+			after = &pos
+		}
+		var total int
+		snapshots, total, err = h.gs.GetGitSnapshotsPage(r.Context(), name, limit+1, after)
+		if err == nil {
+			out["total"] = total
+			out["has_more"] = false
+			if len(snapshots) > limit {
+				snapshots = snapshots[:limit]
+				out["has_more"] = true
+				out["next_cursor"] = encodeGitCursor(snapshots[limit-1].RecordedAt, snapshots[limit-1].ID)
+			}
+		}
 	}
 	if err != nil || snapshots == nil {
 		snapshots = []store.GitSnapshot{}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"agent_name": name, "snapshots": snapshots})
+	out["snapshots"] = snapshots
+	writeJSON(w, http.StatusOK, out)
+}
+
+// The git cursor: base64url of {"r": recorded_at, "i": id}, at most 1024 bytes, only a position in an agent's newest-first snapshots.
+func encodeGitCursor(recordedAt string, id int64) string {
+	raw, _ := json.Marshal(map[string]any{"r": recordedAt, "i": id})
+	return base64.RawURLEncoding.EncodeToString(raw)
+}
+
+func decodeGitCursor(c string) (store.GitAfter, bool) {
+	var p struct {
+		R string `json:"r"`
+		I int64  `json:"i"`
+	}
+	if len(c) > 1024 {
+		return store.GitAfter{}, false
+	}
+	raw, err := base64.RawURLEncoding.DecodeString(c)
+	if err != nil || json.Unmarshal(raw, &p) != nil || p.R == "" || p.I <= 0 {
+		return store.GitAfter{}, false
+	}
+	return store.GitAfter{RecordedAt: p.R, ID: p.I}, true
 }

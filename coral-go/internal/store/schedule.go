@@ -402,17 +402,38 @@ func (s *ScheduleStore) getAllJobSessionIDs(ctx context.Context) (map[string]boo
 
 // ListOneshotRuns returns recent one-shot (API-triggered) runs.
 func (s *ScheduleStore) ListOneshotRuns(ctx context.Context, limit int, status *string) ([]ScheduledRun, error) {
-	var runs []ScheduledRun
-	query := "SELECT * FROM scheduled_runs WHERE trigger_type = 'api'"
+	runs, _, err := s.ListOneshotRunsPage(ctx, limit, status, nil)
+	return runs, err
+}
+
+// RunAfter is the place a page of runs continues from: the last run sent, in the list's order (newest scheduled first, then id).
+type RunAfter struct {
+	ScheduledAt string
+	ID          int64
+}
+
+// ListOneshotRunsPage is the one-shot runs past the place after (nil: from the newest), at most limit, in ListOneshotRuns's order, with the true number the status matches (#13188).
+func (s *ScheduleStore) ListOneshotRunsPage(ctx context.Context, limit int, status *string, after *RunAfter) ([]ScheduledRun, int, error) {
+	where := " WHERE trigger_type = 'api'"
 	args := []interface{}{}
 	if status != nil {
-		query += " AND status = ?"
+		where += " AND status = ?"
 		args = append(args, *status)
+	}
+	var total int
+	if err := s.db.GetContext(ctx, &total, "SELECT COUNT(*) FROM scheduled_runs"+where, args...); err != nil {
+		return nil, 0, err
+	}
+	query := "SELECT * FROM scheduled_runs" + where
+	if after != nil {
+		query += " AND (scheduled_at < ? OR (scheduled_at = ? AND id < ?))"
+		args = append(args, after.ScheduledAt, after.ScheduledAt, after.ID)
 	}
 	query += " ORDER BY scheduled_at DESC, id DESC LIMIT ?"
 	args = append(args, limit)
+	var runs []ScheduledRun
 	err := s.db.SelectContext(ctx, &runs, query, args...)
-	return runs, err
+	return runs, total, err
 }
 
 // ListRunsWithWorktree returns the runs that recorded a worktree folder, newest first, with their job's name (the worktrees list, #6736). Whether the folder is still there is the caller's to check.

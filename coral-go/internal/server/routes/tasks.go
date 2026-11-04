@@ -2,6 +2,7 @@ package routes
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -256,13 +257,52 @@ func (h *TasksHandler) ListTasks(w http.ResponseWriter, r *http.Request) {
 	if status != "" {
 		statusPtr = &status
 	}
-	runs, err := h.sched.ListOneshotRuns(r.Context(), limit, statusPtr)
+	// cursor (the last answer's next_cursor) continues the list; the answer says how many runs there are and where the next page starts (#13188). Without a cursor it is the same newest page as always.
+	var after *store.RunAfter
+	if c := r.URL.Query().Get("cursor"); c != "" {
+		pos, ok := decodeRunCursor(c)
+		if !ok {
+			errBadRequest(w, "invalid cursor")
+			return
+		}
+		after = &pos
+	}
+	runs, total, err := h.sched.ListOneshotRunsPage(r.Context(), limit+1, statusPtr, after)
 	if err != nil {
 		errInternalServer(w, err.Error())
 		return
 	}
+	out := map[string]any{"total": total, "has_more": false}
+	if len(runs) > limit {
+		runs = runs[:limit]
+		last := runs[limit-1]
+		out["has_more"] = true
+		out["next_cursor"] = encodeRunCursor(last.ScheduledAt, last.ID)
+	}
 	h.attachProxyCosts(r.Context(), runs)
-	writeJSON(w, http.StatusOK, map[string]any{"runs": emptyIfNil(runs)})
+	out["runs"] = emptyIfNil(runs)
+	writeJSON(w, http.StatusOK, out)
+}
+
+// The run cursor: base64url of {"s": scheduled_at, "i": id}, at most 1024 bytes, only a position in the newest-first list.
+func encodeRunCursor(scheduledAt string, id int64) string {
+	raw, _ := json.Marshal(map[string]any{"s": scheduledAt, "i": id})
+	return base64.RawURLEncoding.EncodeToString(raw)
+}
+
+func decodeRunCursor(c string) (store.RunAfter, bool) {
+	var p struct {
+		S string `json:"s"`
+		I int64  `json:"i"`
+	}
+	if len(c) > 1024 {
+		return store.RunAfter{}, false
+	}
+	raw, err := base64.RawURLEncoding.DecodeString(c)
+	if err != nil || json.Unmarshal(raw, &p) != nil || p.S == "" || p.I <= 0 {
+		return store.RunAfter{}, false
+	}
+	return store.RunAfter{ScheduledAt: p.S, ID: p.I}, true
 }
 
 // ListActiveRuns returns currently running tasks.

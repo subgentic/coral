@@ -350,9 +350,11 @@ Fuzzy file search or directory browsing within the agent's working directory.
 
 Git snapshot for the agent's working directory.
 
-**Query Parameters:** `session_id`
+**Query Parameters:** `session_id`, `limit` (1 to 100, 20 by default), `cursor`
 
-**Response:**
+With no `session_id` the answer is `{"agent_name": "...", "snapshots": [...], "total": N, "has_more": bool, "next_cursor": "..."}`: the agent's snapshots newest first; `total` is every snapshot the agent has, and `next_cursor` (only when `has_more`) goes back as `cursor` for the next page. A bad `cursor` is a 400. With a `session_id` the answer holds that session's commits as before.
+
+**Response (the latest snapshot's fields, each snapshot has them):**
 ```json
 {
   "branch": "feature/new-thing",
