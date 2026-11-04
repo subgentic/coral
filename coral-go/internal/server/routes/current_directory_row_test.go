@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -33,7 +34,9 @@ func TestARowSaysWhereTheAgentIsNowOnlyInsideItsOwnRepository(t *testing.T) {
 	t.Setenv("CLAUDE_PROJECTS_DIR", projects)
 	require.NoError(t, os.MkdirAll(filepath.Join(projects, "proj"), 0o755))
 	transcript := func(sid, cwd string) {
-		line := `{"type":"assistant","cwd":"` + cwd + `","message":{"content":[{"type":"text","text":"x"}]}}` + "\n"
+		quoted, err := json.Marshal(cwd) // the path as JSON writes it: a Windows path's backslashes are escaped, as in Claude's own transcripts
+		require.NoError(t, err)
+		line := `{"type":"assistant","cwd":` + string(quoted) + `,"message":{"content":[{"type":"text","text":"x"}]}}` + "\n"
 		require.NoError(t, os.WriteFile(filepath.Join(projects, "proj", sid+".jsonl"), []byte(line), 0o644))
 	}
 	h := &SessionsHandler{}
