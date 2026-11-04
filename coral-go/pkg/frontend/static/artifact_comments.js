@@ -22,7 +22,7 @@ import { boardOfPage } from './dock_page.js';
 import { el } from './dom_el.js';
 await loadStyles('pictures.css'); // the picture rules load with this module, before anything draws (page_weight: not at start)
 
-const OPEN_KEY = 'coral-artifact-comments-open'; // explicit choice shared by the viewer and docked preview, at every width
+const OPEN_KEY = 'coral-artifact-comments-open'; // default for the docked preview; the viewer supplies a key for each file type
 
 /** The team the artifact is opened from, as the bare board name the comments routes take: the team's page (where a board opens, #8129), or the open agent's own team; none otherwise (#5182). The viewer and the docked preview pane (#5311) both ask. */
 export function commentBoard(opts) {
@@ -82,8 +82,8 @@ export function attachComments(dialog, body, host, opts = {}) {
     const phone = window.matchMedia(PHONE_QUERY);
     const sheet = opts.sheet || (() => phone.matches); // the panel is a bottom sheet over the document
     const isOpen = () => panel.classList.contains('ac-sheet-open');
-    const remember = (open) => browserLocal.set(OPEN_KEY, open ? 'open' : 'closed');
-    const remembered = () => { const choice = browserLocal.get(OPEN_KEY); return choice === 'open' ? true : choice === 'closed' ? false : null; };
+    const remember = (open) => browserLocal.set(opts.preferenceKey?.() || OPEN_KEY, open ? 'open' : 'closed');
+    const remembered = () => { const choice = browserLocal.get(opts.preferenceKey?.() || OPEN_KEY); return choice === 'open' ? true : choice === 'closed' ? false : null; };
     const syncOn = () => dialog.classList.toggle('ac-on', !!st.shownNow && (phone.matches || isOpen()));
     const shown = opts.shown || (() => !dialog.hidden);
     // Available on both the side column and the bottom sheet; never reserve a
