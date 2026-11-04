@@ -32,7 +32,7 @@ func TestRemoveWorktree(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, WorktreeOutcome{State: "removed", Path: wt, Branch: "coral-team/team"}, got)
 	assert.NoDirExists(t, wt)
-	assert.NotContains(t, gitIn(t, repo, "worktree", "list"), "team")
+	assert.NotContains(t, gitIn(t, repo, "worktree", "list"), filepath.ToSlash(wt), "the worktree is no longer listed") // (by its path: the folder the test runs in can have "team" in its own)
 	assert.Empty(t, gitIn(t, repo, "branch", "--list", "coral-team/team"), "nothing on the branch: it goes")
 
 	// the repository given as the folder that is none: found from the worktree
@@ -65,7 +65,7 @@ func TestRemoveWorktree(t *testing.T) {
 	got, err = RemoveWorktree(ctx, repo, wt, "")
 	require.NoError(t, err)
 	assert.Equal(t, "removed", got.State)
-	assert.NotContains(t, gitIn(t, repo, "worktree", "list"), "team")
+	assert.NotContains(t, gitIn(t, repo, "worktree", "list"), filepath.ToSlash(wt), "the registration went with the folder")
 
 	// something that is no worktree of any repository is said, in one line
 	_, err = RemoveWorktree(ctx, "", t.TempDir(), "")
@@ -157,10 +157,11 @@ func TestAddTeamWorktreeFailedCheckoutLeavesNoBranch(t *testing.T) {
 	blob := strings.TrimSpace(gitIn(t, repo, "rev-parse", "HEAD:f.txt"))
 	require.NoError(t, os.Remove(filepath.Join(repo, ".git", "objects", blob[:2], blob[2:]))) // the checkout cannot read it
 
-	_, err := AddTeamWorktree(ctx, repo, filepath.Join(t.TempDir(), "team"), "coral-team/broken", "master")
+	failedWt := filepath.Join(t.TempDir(), "team")
+	_, err := AddTeamWorktree(ctx, repo, failedWt, "coral-team/broken", "master")
 	require.Error(t, err)
 	assert.Empty(t, gitIn(t, repo, "branch", "--list", "coral-team/broken"), "no branch is left behind")
-	assert.NotContains(t, gitIn(t, repo, "worktree", "list"), "team")
+	assert.NotContains(t, gitIn(t, repo, "worktree", "list"), filepath.ToSlash(failedWt), "and no worktree")
 }
 
 // A base that exists only on the remote starts from the remote's branch.

@@ -6,12 +6,21 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// globName is the file name with glob characters in it: a Windows file name cannot hold '*', so there the brackets alone are the glob characters.
+func globName() string {
+	if runtime.GOOS == "windows" {
+		return "[glob]x.txt"
+	}
+	return "[glob]*.txt"
+}
 
 // bigTree is a repo with n committed files, each then changed by i+1 added lines, so a file's count says which it is.
 func bigTree(t *testing.T, n int) string {
@@ -26,13 +35,13 @@ func bigTree(t *testing.T, n int) string {
 	for i := 0; i < n; i++ {
 		require.NoError(t, os.WriteFile(filepath.Join(dir, fmt.Sprintf("f%04d.txt", i)), []byte("base\n"), 0o644))
 	}
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "[glob]*.txt"), []byte("base\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, globName()), []byte("base\n"), 0o644))
 	run("add", "-A")
 	run("commit", "-qm", "base")
 	for i := 0; i < n; i++ {
 		require.NoError(t, os.WriteFile(filepath.Join(dir, fmt.Sprintf("f%04d.txt", i)), []byte("base\n"+strings.Repeat("x\n", i%7+1)), 0o644))
 	}
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "[glob]*.txt"), []byte("base\nmore\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, globName()), []byte("base\nmore\n"), 0o644))
 	return dir
 }
 
@@ -76,7 +85,7 @@ func TestCappedNumstatNumbersOnlyTheRowsKeptAndSaysHowManyAreLeft(t *testing.T) 
 	for p, c := range got {
 		assert.Equal(t, want[p], c, p)
 	}
-	assert.Contains(t, got, "[glob]*.txt", "'[' sorts before 'f': the glob-named file is among the first by name, and numbered as itself")
+	assert.Contains(t, got, globName(), "'[' sorts before 'f': the glob-named file is among the first by name, and numbered as itself")
 	assert.NotContains(t, got, "f0039.txt")
 	// the text form (no -z) the refresh route reads
 	out, more, err = CappedNumstat(ctx, dir, refs, 10, false)
