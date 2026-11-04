@@ -100,6 +100,7 @@ func (h *BoardHandler) UnmarkArtifactForReview(w http.ResponseWriter, r *http.Re
 			return
 		}
 		was := all[id]
+		reviewDeleteAfterRead()
 		if !hasTag(was, tagForReview) {
 			h.writeReviewAnswer(w, r, project, id, was)
 			return
@@ -132,3 +133,6 @@ func (h *BoardHandler) writeReviewAnswer(w http.ResponseWriter, r *http.Request,
 	}
 	writeJSON(w, http.StatusOK, reviewAnswer{ID: id, Tags: tags, Question: question})
 }
+
+// reviewDeleteAfterRead is a seam for a test: it runs once DELETE has read the file's tags and before it writes (a local tag edit landing here must not be lost).
+var reviewDeleteAfterRead = func() {}

@@ -165,3 +165,55 @@ func decodeBody(t *testing.T, resp *http.Response) map[string]any {
 	_ = json.NewDecoder(resp.Body).Decode(&out)
 	return out
 }
+
+// QA Reviewer 2's SHOULD on #13217: DELETE's write is a compare-and-set. A local tag edit that lands between its read and its write is not lost (the read is taken again), and a list that keeps changing under it is
+// a 409 after three more tries, with the file still for review.
+func TestTakingAFileOutOfReviewNeverLosesALocalTagEditAndGivesUpWith409(t *testing.T) {
+	e := newTagEnv(t)
+	id := e.ids["report.md"]
+	ctx := context.Background()
+	t.Cleanup(func() { reviewDeleteAfterRead = func() {} })
+	del := func() (int, map[string]any) {
+		req, err := http.NewRequest(http.MethodDelete, e.srv.URL+"/api/board/tag-team/artifacts/"+id+"/review", nil)
+		require.NoError(t, err)
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		return resp.StatusCode, decodeBody(t, resp)
+	}
+	tags := func() []string {
+		all, err := e.h.bs.ArtifactTags(ctx, "tag-team")
+		require.NoError(t, err)
+		return all[id]
+	}
+
+	// a local edit lands once, right after the read: it is kept, and the file still comes out of review
+	require.NoError(t, e.h.bs.SetArtifactTags(ctx, "tag-team", id, []string{"for review", "internal"}))
+	fired := 0
+	reviewDeleteAfterRead = func() {
+		if fired++; fired == 1 {
+			require.NoError(t, e.h.bs.SetArtifactTags(ctx, "tag-team", id, []string{"for review", "internal", "approved"}))
+		}
+	}
+	code, out := del()
+	require.Equal(t, http.StatusOK, code, "%v", out)
+	assert.Equal(t, 2, fired, "the tags were read again after the change")
+	assert.Equal(t, []any{"approved", "internal"}, out["tags"], "the local edit stays, and only the review tag went")
+	assert.Equal(t, []string{"approved", "internal"}, tags())
+
+	// a list that changes under every attempt: 409, and nothing was taken out
+	require.NoError(t, e.h.bs.SetArtifactTags(ctx, "tag-team", id, []string{"for review", "internal"}))
+	n := 0
+	reviewDeleteAfterRead = func() {
+		n++
+		next := []string{"for review", "internal"}
+		if n%2 == 1 {
+			next = []string{"for review", "internal", "x"}
+		}
+		require.NoError(t, e.h.bs.SetArtifactTags(ctx, "tag-team", id, next))
+	}
+	code, out = del()
+	assert.Equal(t, http.StatusConflict, code, "%v", out)
+	assert.Equal(t, hubTagsRetries+1, n, "one read and three retries")
+	assert.Contains(t, tags(), "for review", "the file is still for review")
+}
