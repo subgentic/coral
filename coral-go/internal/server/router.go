@@ -547,6 +547,9 @@ func (s *Server) registerCloud(r *chi.Mux) {
 		s.sysHandler.SetUpdaterRecord(updater.Record) // the update notice reads what the updater's last check found, and asks GitHub for nothing where the updater checks (#9726)
 	}
 	upd := routes.NewUpdateRelaunchHandler(store.NewSessionStore(s.db), s.cfg.CoralDir(), func() string { return routes.TerminalKind(s.terminal) }, updater)
+	if s.boardStore != nil {
+		upd.Activity = s.boardStore.RecordActivity // the Hub's update check and relaunch are rows of the Operator's record (#13340)
+	}
 	r.Get("/api/system/update", upd.Status)
 	r.Post("/api/system/update/relaunch", upd.Relaunch)
 	r.Post("/api/system/update/install", s.cloudHandler.InstallUpdate) // #166: the local "Install update" (Windows), never through Coral Hub

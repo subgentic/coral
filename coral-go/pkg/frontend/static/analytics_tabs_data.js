@@ -166,7 +166,7 @@ export function pairGrid(rawPairs) {
 /** Names of action kinds, including automatic settlements in older reads. */
 export const IVC_KINDS = {
     approve: 'Approved', changes: 'Asked for changes', deny: 'Denied', ignore: 'Dismissed', supersede: 'Superseded automatically', unignore: 'Put back', save: 'Saved for later', unsave: 'Moved back to Needs you', answer: 'Answered a question (a button)',
-    goal_close: 'Closed a goal', proposal: 'Decided a proposal', mark_read: 'Marked read', send_review: 'Sent a file for review', unsend_review: 'Took a file out of review', dismiss: 'Dismissed', comment: 'Commented on a file or a goal', answer_prompt: 'Answered a question, plan or permission', typed: 'Typed to an agent',
+    goal_close: 'Closed a goal', proposal: 'Decided a proposal', mark_read: 'Marked read', hub_update_check: 'Coral Hub checked for an update', hub_update_relaunch: 'Coral Hub relaunched into an update', send_review: 'Sent a file for review', unsend_review: 'Took a file out of review', dismiss: 'Dismissed', comment: 'Commented on a file or a goal', answer_prompt: 'Answered a question, plan or permission', typed: 'Typed to an agent',
 };
 const ivcWord = k => IVC_KINDS[k] || k;
 const shareOf = (inbox, chat) => (inbox + chat > 0 ? inbox / (inbox + chat) : null);
