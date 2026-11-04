@@ -2,6 +2,7 @@ DELETE /api/artifacts/{id} launch owner-only
 DELETE /api/artifacts/{id}/comments/lock interact owner-only
 DELETE /api/artifacts/{id}/comments/{cid} interact owner-sees
 DELETE /api/artifacts/{id}/star interact owner-only
+DELETE /api/board/{project}/artifacts/{id}/review interact owner-only
 DELETE /api/saved/{id} interact owner-only
 GET /api/activity view owner-only
 GET /api/analytics/activity launch owner-only
@@ -69,6 +70,7 @@ POST /api/system/update/relaunch launch owner-update
 PUT /api/artifacts/{id}/comments/lock interact owner-only
 PUT /api/artifacts/{id}/private interact owner-only
 PUT /api/artifacts/{id}/star interact owner-only
+PUT /api/board/{project}/artifacts/{id}/review interact owner-only
 PUT /api/board/{project}/artifacts/{id}/tags interact owner-only
 PUT /api/board/{project}/guide-roster launch owner-only
 PUT /api/board/{project}/orchestrator-grant launch owner-only

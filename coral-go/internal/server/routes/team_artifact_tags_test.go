@@ -35,6 +35,8 @@ func newTagEnv(t *testing.T) *tagEnv {
 	r := chi.NewRouter()
 	r.Get("/api/board/{project}/artifacts", h.ListTeamArtifacts)
 	r.Put("/api/board/{project}/artifacts/{id}/tags", h.SetArtifactTags)
+	r.Put("/api/board/{project}/artifacts/{id}/review", h.MarkArtifactForReview)
+	r.Delete("/api/board/{project}/artifacts/{id}/review", h.UnmarkArtifactForReview)
 	put := httptest.NewServer(r)
 	t.Cleanup(put.Close)
 	e := &tagEnv{srv: put, h: h, coralDir: coralDir, ids: map[string]string{}}
