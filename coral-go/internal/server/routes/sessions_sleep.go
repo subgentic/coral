@@ -243,7 +243,7 @@ func (h *SessionsHandler) WakeSession(w http.ResponseWriter, r *http.Request) {
 	if dir := h.teamHomeFolder(ctx, sess); dir != "" {
 		wakeDir = dir
 	}
-	if askAboutHomeFolder(w, r, wakeDir, r.URL.Query().Get("confirm_home_folder") == "1") {
+	if askAboutHomeFolder(w, r, wakeDir, r.URL.Query().Get("home_folder_ask") == "1", r.URL.Query().Get("confirm_home_folder") == "1") {
 		return
 	}
 	if err := h.wakeExistingSession(ctx, sess); err != nil {

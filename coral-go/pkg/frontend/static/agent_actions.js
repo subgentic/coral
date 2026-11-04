@@ -119,7 +119,7 @@ export function toggleAgentSleep(name, agentType, sessionId, action) {
     // Resolves true when the server applied the action.
     const doIt = async (confirmHome) => { // true only from the home-folder question below (a confirm dialog may pass other arguments)
         try {
-            const resp = await serverFetch(server, `/api/sessions/live/${encodeURIComponent(sessionId)}/${action}${confirmHome === true ? '?confirm_home_folder=1' : ''}`, { method: 'POST' });
+            const resp = await serverFetch(server, `/api/sessions/live/${encodeURIComponent(sessionId)}/${action}${action === 'wake' ? `?home_folder_ask=1${confirmHome === true ? '&confirm_home_folder=1' : ''}` : ''}`, { method: 'POST' });
             const data = await resp.json();
             if (action === 'wake' && confirmHome !== true && isHomeFolderAsk(resp.status, data)) { // the home folder itself (#13425): asked once, Wake anyway sends it again
                 return (await askHomeFolder('Wake', data.message)) ? doIt(true) : false;

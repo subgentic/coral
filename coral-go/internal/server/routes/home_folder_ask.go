@@ -39,9 +39,10 @@ func isHomeFolder(dir string) bool {
 	return errA == nil && errB == nil && a == b
 }
 
-// askAboutHomeFolder answers 409 home_folder, and reports true, when a dashboard request would start an agent in the home folder itself and the person has not confirmed.
-func askAboutHomeFolder(w http.ResponseWriter, r *http.Request, dir string, confirmed bool) bool {
-	if confirmed || !dashboardCaller(r) || !isHomeFolder(dir) {
+// askAboutHomeFolder answers 409 home_folder, and reports true, when a dashboard request would start an agent in the home folder itself, the page says it can answer (canAnswer: home_folder_ask in the launch body,
+// ?home_folder_ask=1 on the wake, sent by the shell that has the dialog) and the person has not confirmed. A page from before this (the Hub's pinned shell) never sends the flag and gets today's behaviour: the agent starts.
+func askAboutHomeFolder(w http.ResponseWriter, r *http.Request, dir string, canAnswer, confirmed bool) bool {
+	if !canAnswer || confirmed || !dashboardCaller(r) || !isHomeFolder(dir) {
 		return false
 	}
 	writeJSON(w, http.StatusConflict, map[string]any{"ok": false, "error": homeFolderMessage, "code": homeFolderCode, "message": homeFolderMessage, "working_dir": dir})

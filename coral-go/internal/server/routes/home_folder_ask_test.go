@@ -37,7 +37,7 @@ func TestLaunchInTheHomeFolderAsksTheDashboardOnce(t *testing.T) {
 	_, h, term, ss := setupSessionsTestServer(t)
 	stubCLIPaths(t, ss)
 	launch := func(dir string, extra map[string]any, wrap func(*http.Request) *http.Request) *httptest.ResponseRecorder {
-		body := map[string]any{"agent_type": "claude", "working_dir": dir}
+		body := map[string]any{"agent_type": "claude", "working_dir": dir, "home_folder_ask": true}
 		for k, v := range extra {
 			body[k] = v
 		}
@@ -71,7 +71,7 @@ func TestTeamLaunchInTheHomeFolderAsksTheDashboardOnce(t *testing.T) {
 	_, h, term, ss := setupSessionsTestServer(t)
 	stubCLIPaths(t, ss)
 	start := func(extra map[string]any) *httptest.ResponseRecorder {
-		body := map[string]any{"board_name": "homeask", "new_board": true, "working_dir": home, "agent_type": "claude", "agents": []map[string]any{{"name": "a"}}}
+		body := map[string]any{"board_name": "homeask", "new_board": true, "working_dir": home, "home_folder_ask": true, "agent_type": "claude", "agents": []map[string]any{{"name": "a"}}}
 		for k, v := range extra {
 			body[k] = v
 		}
@@ -109,12 +109,12 @@ func TestWakeInTheHomeFolderAsksTheDashboardOnce(t *testing.T) {
 		defer term.mu.Unlock()
 		return term.sessions[naming.SessionName("claude", id)] != nil
 	}
-	rec := wake("", asDashCookie13425)
+	rec := wake("?home_folder_ask=1", asDashCookie13425)
 	assert.Equal(t, http.StatusConflict, rec.Code, rec.Body.String())
 	assert.Contains(t, rec.Body.String(), homeFolderCode)
 	assert.False(t, started(), "nothing started")
 
-	rec = wake("?confirm_home_folder=1", asDashCookie13425)
+	rec = wake("?home_folder_ask=1&confirm_home_folder=1", asDashCookie13425)
 	assert.Contains(t, rec.Body.String(), `"ok":true`, rec.Body.String())
 	assert.True(t, started())
 }
@@ -144,4 +144,33 @@ func TestWakeOfAnAutomationCallerOrAProjectFolderIsNotAsked(t *testing.T) {
 			assert.Contains(t, rec.Body.String(), `"ok":true`, rec.Body.String())
 		})
 	}
+}
+
+// Never break on upgrade: a page from before the question (the Hub's pinned shell) does not send home_folder_ask and gets today's behaviour: the launch and the wake go through.
+func TestAnOlderPageIsNeverAskedAboutTheHomeFolder(t *testing.T) {
+	home := homeFolderOf(t)
+	_, h, term, ss := setupSessionsTestServer(t)
+	stubCLIPaths(t, ss)
+	b, _ := json.Marshal(map[string]any{"agent_type": "claude", "working_dir": home}) // no home_folder_ask
+	rec := httptest.NewRecorder()
+	h.Launch(rec, asDashCookie13425(httptest.NewRequest(http.MethodPost, "/api/sessions/launch", bytes.NewReader(b))))
+	assert.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	assert.Contains(t, rec.Body.String(), `"ok":true`)
+
+	b, _ = json.Marshal(map[string]any{"board_name": "oldpage", "new_board": true, "working_dir": home, "agent_type": "claude", "agents": []map[string]any{{"name": "a"}}})
+	rec = httptest.NewRecorder()
+	h.LaunchTeam(rec, asDashCookie13425(httptest.NewRequest(http.MethodPost, "/api/sessions/launch-team", bytes.NewReader(b))))
+	assert.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+
+	ctx := context.Background()
+	const id = "6682ebdf-65a4-4396-8ef3-26ead8208b8a"
+	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: id, AgentType: "claude", AgentName: "cknorowski", WorkingDir: home, IsSleeping: 1}))
+	req := httptest.NewRequest(http.MethodPost, "/api/sessions/live/"+id+"/wake", nil)
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("sessionID", id)
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	rec = httptest.NewRecorder()
+	h.WakeSession(rec, asDashCookie13425(req))
+	assert.Contains(t, rec.Body.String(), `"ok":true`, rec.Body.String())
+	_ = term
 }
