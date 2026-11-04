@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/subgentic/coral/internal/logsafe"
 	"log/slog"
@@ -203,7 +204,7 @@ func (h *SessionsHandler) refreshFilesInner(w http.ResponseWriter, r *http.Reque
 		pausedNow = pz
 	}
 	writeJSON(w, http.StatusOK, h.withWorktree(r, name, sessionID, map[string]any{"agent_name": name, "files": hubVisibleFiles(r, res.files), "diff_mode": res.diffMode, "total_changed": res.total, "capped": res.total > len(res.files), "paused": pausedNow,
-		"compare": map[string]any{"mode": res.diffMode, "label": res.label}}))
+		"timed_out": res.timedOut, "compare": map[string]any{"mode": res.diffMode, "label": res.label}}))
 }
 
 // refreshedFiles is one run of the changed-files queries: the list kept (cut to refreshFilesCap, by name), how many files changed in all, the mode and what it compares with.
@@ -213,7 +214,17 @@ type refreshedFiles struct {
 	diffMode string
 	label    string
 	took     time.Duration
+	// timedOut: git ran out of time (refreshGitTimeout), so the list is the last good one (or empty when there never was one) and not what this pass read.
+	timedOut bool
 }
+
+// lastGoodTotals remembers, per refresh key, how many files changed in the last pass that finished: the stored list is cut at refreshFilesCap, so a pass that times out says the total it knew.
+var (
+	lastGoodMu     sync.Mutex
+	lastGoodTotals = map[string]int{}
+)
+
+const lastGoodMax = 1000
 
 // refreshComputeHook runs at the start of every pass (tests: count passes, make one slow).
 var refreshComputeHook = func() {}
@@ -242,8 +253,7 @@ func (h *SessionsHandler) computeRefreshedFiles(ctx0 context.Context, name, sess
 
 	diffMode := h.getDiffMode(ctx0)
 	withTree := gitutil.IncludesWorkingTree(diffMode)
-	diffArgs := append(append([]string{"diff"}, gitutil.DiffRefs(ctx, workdir, diffMode)...), "--numstat")
-	out, err := gitCmd(ctx, workdir, diffArgs...).Output()
+	out, moreChanged, err := gitutil.CappedNumstat(ctx, workdir, gitutil.DiffRefs(ctx, workdir, diffMode), refreshFilesCap, false) // a big tree is numbered for the rows kept only (#13155)
 	fileMap := make(map[string]store.ChangedFile)
 	if err != nil {
 		slog.Warn("git diff --numstat failed", "agent_name", name, "workdir", logsafe.Dir(workdir), "error", err)
@@ -377,13 +387,42 @@ func (h *SessionsHandler) computeRefreshedFiles(ctx0 context.Context, name, sess
 		files = append(files, f)
 	}
 	sort.Slice(files, func(i, j int) bool { return files[i].Filepath < files[j].Filepath })
-	total := len(files)
+	total := len(files) + moreChanged
 	if total > refreshFilesCap {
 		files = files[:refreshFilesCap]
 	}
 	if diffMode == "" {
 		diffMode = "branch_point"
 	}
+	key := refreshFlightKey(workdir, h.getDiffMode(ctx0), sessionID, follow, name)
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) && ctx0.Err() == nil {
+		// Git ran out of time: what it did answer is partial, and saying it was the whole list (0 changed, or a few) is wrong, so the answer carries timed_out and keeps the last good list and its
+		// total (nothing when there never was one); the stored list is left as it was.
+		// The stored list is the launch folder's (the poller writes it; a followed worktree's pass is never stored, #11351), so for a followed worktree there is nothing of its own to keep: empty.
+		kept := []store.ChangedFile{}
+		keptTotal := 0
+		if !follow {
+			if stored, found, _ := h.gs.GetChangedFiles(ctx0, name, sidPtr, diffMode); found {
+				kept = stored
+			}
+			keptTotal = len(kept)
+			lastGoodMu.Lock()
+			if t, ok := lastGoodTotals[key]; ok && t > keptTotal {
+				keptTotal = t
+			}
+			lastGoodMu.Unlock()
+		}
+		lctx, lcancel := context.WithTimeout(ctx0, 2*time.Second) // a folder git cannot read must not add one more slow call to a pass that already ran out of time
+		label := gitutil.CompareLabel(lctx, workdir, diffMode)
+		lcancel()
+		return refreshedFiles{files: kept, total: keptTotal, diffMode: diffMode, label: label, took: time.Since(began), timedOut: true}
+	}
+	lastGoodMu.Lock()
+	if len(lastGoodTotals) >= lastGoodMax { // one entry per folder, mode, session, follow state and agent seen: bounded, the oldest knowledge simply starts again
+		clear(lastGoodTotals)
+	}
+	lastGoodTotals[key] = total
+	lastGoodMu.Unlock()
 	if !follow { // the cache is the launch folder's list (the poller writes it): a followed worktree's is not kept in its place (#11351)
 		h.gs.ReplaceChangedFiles(ctx0, name, workdir, files, sidPtr, diffMode)
 	}
