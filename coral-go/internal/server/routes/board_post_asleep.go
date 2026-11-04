@@ -2,6 +2,7 @@ package routes
 
 import (
 	"context"
+	"regexp"
 	"strings"
 
 	"github.com/subgentic/coral/internal/board"
@@ -71,7 +72,11 @@ func restSentence(name, state string, mayWake bool) string {
 	default:
 		s = name + " is asleep; the message waits until it wakes."
 		if mayWake {
-			s += " The Operator's wake grant is on, so you may wake it: coral-board wake " + shellQuote(name) + "."
+			if safeCommandName.MatchString(name) { // written into a command only when every shell reads it the same: sh and PowerShell agree on single quotes round letters, digits, spaces, dots, hyphens and underscores (#13285)
+				s += " The Operator's wake grant is on, so you may wake it: coral-board wake " + shellQuote(name) + "."
+			} else {
+				s += " The Operator's wake grant is on, so you may wake it with coral-board wake and its name." // a name with anything else is not put into a command at all
+			}
 		}
 	}
 	return s
@@ -105,6 +110,10 @@ func (h *BoardHandler) postRestNotes(ctx context.Context, project, poster string
 	}
 	return out
 }
+
+// safeCommandName is a member name that is the same word in sh, bash, zsh and PowerShell once it is in single quotes: letters, digits, spaces, dots, hyphens and underscores. Any other name (a quote, $, a backtick,
+// a semicolon, a slash) is never written into the suggested command.
+var safeCommandName = regexp.MustCompile(`^[\p{L}\p{N} ._-]+$`)
 
 // shellQuote is name as one word of a POSIX shell: in single quotes, a single quote in it written '\”. A member name may hold $, a backtick or a double quote inside it (only its ends are checked), and a
 // sentence that suggests a command must not make a copy of it run anything (#13285). Go's own quoting is not a shell's.

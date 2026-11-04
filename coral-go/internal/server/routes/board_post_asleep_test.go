@@ -113,3 +113,20 @@ func TestTheSuggestedWakeCommandIsQuotedForAShell(t *testing.T) {
 		restSentence("Dev A", restAsleep, true), "the notice's own text is pinned")
 	assert.Equal(t, "Dev A is asleep; the message waits until it wakes.", restSentence("Dev A", restAsleep, false), "no hint for a worker")
 }
+
+// Security's SHOULD on #13285: a name that is not plain (a quote, $, a backtick, a semicolon, a slash) is not written into the suggested command at all, since PowerShell reads single quotes differently from sh; a plain name is
+// quoted as before, and the sentence is then the same in every shell.
+func TestTheSuggestedWakeCommandNamesOnlyAPlainMemberName(t *testing.T) {
+	for _, plain := range []string{"Dev A", "Backend Dev", "QA-2", "René", "dev_1.2"} {
+		got := restSentence(plain, restAsleep, true)
+		assert.Contains(t, got, "coral-board wake '"+plain+"'", plain)
+	}
+	for _, odd := range []string{"a'; calc; '", "x$(id)", "x`id`", `say "hi"`, "Dev/Ops", "a;b", "it's", "(Lead)"} {
+		got := restSentence(odd, restAsleep, true)
+		assert.NotContains(t, got, "coral-board wake '", odd)
+		assert.NotContains(t, got, "coral-board wake "+odd, odd)
+		assert.Contains(t, got, "you may wake it with coral-board wake and its name.", odd)
+	}
+	// without the grant, no hint at all, for any name
+	assert.NotContains(t, restSentence("a'; calc; '", restAsleep, false), "coral-board wake")
+}
