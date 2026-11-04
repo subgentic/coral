@@ -288,6 +288,7 @@ func (h *BoardHandler) UploadOperatorArtifact(w http.ResponseWriter, r *http.Req
 		errInternalServer(w, "could not store the file")
 		return
 	}
+	h.bs.NoteArtifactsChanged(project)
 	rememberOperatorShare(project, sessionID, hexID, name, time.Now())
 	slog.Info("[operator share] stored", "surface", "local", "board", project, "digest", hexID) // who and which, never a name or a byte of the file
 	writeJSON(w, http.StatusCreated, map[string]any{"uri": "coral://artifacts/" + hexID, "id": hexID, "name": meta.Name, "media_type": meta.MediaType, "size": meta.Size, "digest": meta.Digest})

@@ -40,5 +40,8 @@ func (h *SessionsHandler) starArtifactRoute(w http.ResponseWriter, r *http.Reque
 		errInternalServer(w, "could not update the star")
 		return
 	}
+	if h.bs != nil {
+		h.bs.NoteAllArtifactsChanged()
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"id": id, "starred": r.Method != http.MethodDelete})
 }

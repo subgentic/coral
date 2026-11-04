@@ -1,3 +1,4 @@
+import { publishArtifactsRev } from './artifacts_feed.js';
 import { needsInputAttention } from './display_activity_hint.js';
 import { dialogDue, DIALOG_WORDS } from './at_dialog.js';
 import { refreshNeedsInputCard } from './needs_input_card.js';
@@ -472,6 +473,7 @@ function _syncViewedSession(data) {
 }
 
 export function handleCoralMessage(data) {
+    publishArtifactsRev(data.artifacts_rev, data.type === 'coral_update');
     // This machine's health (#3444, #3446): before a diff is merged into a full update below.
     applyMachineHealth(data);
     if (data.goals_brief) publishGoalsBrief(data.goals_brief); // a board's goals changed: the Goals view reads them again (#7223)

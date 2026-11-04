@@ -195,6 +195,7 @@ func (s *Store) setArtifactTags(ctx context.Context, boardID, hex string, tags, 
 	if err := commitArtifactTagsTx(tx); err != nil {
 		return tagsWriteErr(check, err)
 	}
+	s.NoteArtifactsChanged(boardID)
 	return nil
 }
 
@@ -279,6 +280,7 @@ func (s *Store) AddArtifactTags(ctx context.Context, boardID, hex string, add []
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
+	s.NoteArtifactsChanged(boardID)
 	sort.Strings(have)
 	return have, nil
 }

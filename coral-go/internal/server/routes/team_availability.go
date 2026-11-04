@@ -159,7 +159,7 @@ func (h *SessionsHandler) teamAvailabilityUncached(w http.ResponseWriter, r *htt
 		exists, _ = h.bs.BoardExists(ctx, name)
 	}
 	w.Header().Set("Cache-Control", "no-store")
-	out := map[string]any{"board": name, "team": name, "exists": exists, "working_mode": mode, "agents": agents, "summary": availabilitySummary(agents), "unassigned_tasks": boardTasksAssignedTo(snap.tasks, ""), "health_report": availabilityHealthReport(snap.tasks, snap.reviews)}
+	out := map[string]any{"artifacts_rev": h.bs.ArtifactsRevision(name), "artifacts_all_rev": h.bs.ArtifactsRevision(""), "board": name, "team": name, "exists": exists, "working_mode": mode, "agents": agents, "summary": availabilitySummary(agents), "unassigned_tasks": boardTasksAssignedTo(snap.tasks, ""), "health_report": availabilityHealthReport(snap.tasks, snap.reviews)}
 	// The validator is of the status without its clock: a poll that finds nothing changed gets a 304 with no body, though observed_at moved on (#9337).
 	if tag := httputil.JSONValidator(out); tag != "" {
 		w.Header().Set("ETag", tag)

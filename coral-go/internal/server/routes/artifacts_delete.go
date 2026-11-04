@@ -121,6 +121,9 @@ func (h *SessionsHandler) deleteArtifactCore(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	freed, removed, found, err := deleteArtifactFiles(h.cfg.CoralDir(), id)
+	if h.bs != nil && (found || freed > 0 || removed > 0) {
+		h.bs.NoteAllArtifactsChanged()
+	}
 	if !found {
 		errNotFound(w, "artifact not found")
 		return

@@ -110,6 +110,9 @@ func (h *SessionsHandler) keepArtifactRoute(w http.ResponseWriter, r *http.Reque
 		errInternalServer(w, "could not update the keep mark")
 		return
 	}
+	if h.bs != nil {
+		h.bs.NoteAllArtifactsChanged()
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"id": id, "kept": r.Method != http.MethodDelete})
 }
 
