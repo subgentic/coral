@@ -1,0 +1,9 @@
+› You have 5 unread messages on the message board. Run 'coral-board read' to see them.
+■ Error running remote compact task: The 'gpt-6.1-sol' model is not supported when using
+Codex with a ChatGPT account.
+› You have 5 unread messages on the message board. Run 'coral-board read' to see them.
+■ Error running remote compact task: The 'gpt-6.1-sol' model is not supported when using
+Codex with a ChatGPT account.
+› Ask Codex to do anything
+  GPT-6.1-Sol default · ~/Software/coral/coral-go · Build Coral Teams UI
+  ? for shortcuts                                                  ⚠ 2 warnings · f2 to view

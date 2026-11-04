@@ -198,3 +198,80 @@ func TestACodexAgentAtItsLimitIsNeverWorkingWithNoTaskEndToEnd(t *testing.T) {
 		assert.NotContains(t, p.Agent, "Codex", "no busy-with-no-task occurrence is kept for it")
 	}
 }
+
+// #13480: a Codex agent whose model is refused (its login cannot use it) is BLOCKED in the check, named with the model and what to do, never "idle"; the screen is read for Codex only, and nothing is typed to it.
+func TestHealthCheckShowsACodexAgentWhoseModelIsRefusedAsBlocked(t *testing.T) {
+	h := newCheckHarness(t)
+	h.member("Orchestrator", "Orchestrator", 1, 0)
+	h.member("Idler", "Developer", 4, 40*time.Minute)
+	h.member("Refused", "Developer", 5, 40*time.Minute)
+	refusedSID := fmt.Sprintf("%08d-0000-0000-0000-000000000000", 5)
+
+	h.m.refused = func(_ context.Context, a AgentInfo) (string, bool) {
+		return "gpt-6.1-sol", a.SessionID == refusedSID
+	}
+	h.m.limit = func(ctx context.Context, a AgentInfo) (time.Duration, bool) { // the screen reader counts it as blocked for every gate that already skips a usage-limited agent
+		_, ok := h.m.refused(ctx, a)
+		return 0, ok
+	}
+	out := h.check()
+	require.Contains(t, out, "1 BLOCKED (model refused)", out)
+	assert.Contains(t, out, "1 idle", "the other is still idle")
+	assert.NotContains(t, out, "2 idle")
+	assert.Contains(t, out, "Refused is blocked: Codex refuses its model gpt-6.1-sol", out)
+	assert.Contains(t, out, "change the agent's model or log Codex in again", out)
+	assert.NotContains(t, out, "usage limit", "it is not a usage limit")
+	assert.NotContains(t, out, "Refused: idle", "a blocked agent is not named as one that needs work")
+	assert.Contains(t, out, "Idler: idle")
+}
+
+// The screen is read for Codex only, and a refused model on it is a block with no reset time.
+func TestScreenLimitAndModelRefusedReadCodexModelRefusalOnly(t *testing.T) {
+	const refused = "› You have 5 unread messages on the message board. Run 'coral-board read' to see them.\n■ The 'gpt-6.1-sol' model is not supported when using Codex with a ChatGPT account.\n\n› Ask Codex to do anything\n"
+	rt := screenRT{screen: refused}
+	model := screenModelRefused(rt)
+	require.NotNil(t, model)
+	got, ok := model(context.Background(), AgentInfo{AgentType: "codex", SessionID: "c1"})
+	assert.True(t, ok)
+	assert.Equal(t, "gpt-6.1-sol", got)
+	_, ok = model(context.Background(), AgentInfo{AgentType: "claude", SessionID: "c2"})
+	assert.False(t, ok, "other agent types are not read for it")
+	resets, blocked := screenLimit(rt)(context.Background(), AgentInfo{AgentType: "codex", SessionID: "c3"})
+	assert.True(t, blocked, "every gate that skips a usage-limited agent skips this one")
+	assert.Zero(t, resets)
+	_, ok = screenModelRefused(screenRT{screen: "› Ask Codex to do anything\n"})(context.Background(), AgentInfo{AgentType: "codex", SessionID: "c4"})
+	assert.False(t, ok)
+}
+
+// Security's SHOULD on #13480: a refused model with no safe name is said as "its model": the check's line, typed into the recipient's terminal, never carries text from the pane.
+func TestHealthCheckSaysItsModelWhenTheRefusedModelHasNoSafeName(t *testing.T) {
+	h := newCheckHarness(t)
+	h.member("Orchestrator", "Orchestrator", 1, 0)
+	h.member("Refused", "Developer", 5, 40*time.Minute)
+	refusedSID := fmt.Sprintf("%08d-0000-0000-0000-000000000000", 5)
+	h.m.refused = func(_ context.Context, a AgentInfo) (string, bool) { return "", a.SessionID == refusedSID } // no name: what a hostile one becomes
+	h.m.limit = func(ctx context.Context, a AgentInfo) (time.Duration, bool) {
+		_, ok := h.m.refused(ctx, a)
+		return 0, ok
+	}
+	out := h.check()
+	require.Contains(t, out, "1 BLOCKED (model refused)", out)
+	assert.Contains(t, out, "Refused is blocked: Codex refuses its model (its login cannot use it)", out)
+	assert.NotContains(t, out, "usage limit")
+}
+
+// The per-session reads of a screen are forgotten when the session has not been looked at for a long while, so they do not grow with every session ever seen.
+func TestScreenModelRefusedForgetsSessionsNotSeenForAWhile(t *testing.T) {
+	rt := screenRT{screen: "■ The 'gpt-6.1-sol' model is not supported when using Codex with a ChatGPT account.\n"}
+	f, size := screenModelRefusedSized(rt)
+	for i := 0; i < 50; i++ {
+		_, _ = f(context.Background(), AgentInfo{AgentType: "codex", SessionID: fmt.Sprintf("old-%d", i)})
+	}
+	require.Equal(t, 50, size())
+	old := screenCacheMaxAge
+	screenCacheMaxAge = 0
+	t.Cleanup(func() { screenCacheMaxAge = old })
+	time.Sleep(2 * time.Millisecond) // sleep-ok: entries must be older than the zero age
+	_, _ = f(context.Background(), AgentInfo{AgentType: "codex", SessionID: "new"})
+	assert.Equal(t, 1, size(), "only the session just read is kept")
+}
