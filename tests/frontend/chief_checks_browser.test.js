@@ -49,6 +49,7 @@ const FIXTURE = String.raw`(() => {
    assert.equal(await ev(`document.querySelectorAll('.chief-check-summary img').length`),0,label+' agent text is not markup');
    assert.equal(await ev(`document.querySelector('.chief-check-summary').textContent`),'<img src=x onerror=alert(1)>');
    assert.equal(await ev(`(()=>{const d=document.querySelector('.chief-checks');return d.scrollWidth<=d.clientWidth+1&&document.documentElement.scrollWidth<=innerWidth+1})()`),true,label+' no horizontal scroll');
+   assert.equal(await ev(`(()=>{const r=document.querySelector('.chief-checks').getBoundingClientRect();return Math.abs((r.left+r.right)/2-innerWidth/2)<1})()`),true,label+' dialog centred');
    if(process.env.CORAL_SCREENSHOT_DIR){fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR,{recursive:true}); const shot=await Page.captureScreenshot({format:'png'});fs.writeFileSync(path.join(process.env.CORAL_SCREENSHOT_DIR,`chief-checks-${label}.png`),Buffer.from(shot.data,'base64'));}
    await click('.chief-checks-list button','Run now');
    await waitFor(`window.__runs.length===1`,'manual request');
@@ -65,6 +66,7 @@ const FIXTURE = String.raw`(() => {
    await waitFor(`document.querySelector('.chief-check-editor .chief-check-error').textContent.includes('Remove the secret')`,'refusal shown');
    assert.equal(await ev(`document.querySelector('.chief-check-editor [name=instruction]').value`),'Check mail for a signed contract','refusal retains text');
    assert.equal(await ev(`document.querySelector('.chief-check-editor').scrollWidth<=document.querySelector('.chief-check-editor').clientWidth+1`),true,label+' editor reflows');
+   if(process.env.CORAL_SCREENSHOT_DIR){const shot=await Page.captureScreenshot({format:'png'});fs.writeFileSync(path.join(process.env.CORAL_SCREENSHOT_DIR,`chief-editor-${label}.png`),Buffer.from(shot.data,'base64'));}
    await ev(`window.__refuse=false;document.querySelector('.chief-check-form').requestSubmit();true`);
    await waitFor(`!document.querySelector('.chief-check-editor')`,'saved editor closes');
    assert.equal(await ev(`window.__saved.at(-1).target_session`),'chief-session');

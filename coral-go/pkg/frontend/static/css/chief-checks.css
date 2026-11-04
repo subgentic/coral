@@ -1,6 +1,6 @@
 /* Configurator cards follow the approved Sources / Checks / Recent triggers layout. */
-dialog.chief-checks { max-width: var(--dlg-max); max-height: calc(100dvh - 32px); overflow: auto; padding: 24px; color: var(--text-primary); background: var(--bg-primary); }
-dialog.chief-check-editor { max-width: var(--dlg-max); max-height: calc(100dvh - 32px); overflow: auto; padding: 24px; background: var(--bg-primary); color: var(--text-primary); }
+dialog.chief-checks { position: fixed; inset: 0; margin: auto; height: fit-content; max-width: var(--dlg-max); max-height: calc(100dvh - 32px); overflow: auto; padding: 24px; color: var(--text-primary); background: var(--bg-primary); }
+dialog.chief-check-editor { position: fixed; inset: 0; margin: auto; height: fit-content; max-width: var(--dlg-max); max-height: calc(100dvh - 32px); overflow: auto; padding: 24px; background: var(--bg-primary); color: var(--text-primary); }
 .chief-checks::backdrop, .chief-check-editor::backdrop { background: var(--modal-backdrop); }
 .chief-checks-head, .chief-check-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .chief-checks-head { position: sticky; top: -24px; z-index: 1; padding-block: 12px; background: var(--bg-primary); }
@@ -29,7 +29,7 @@ dialog.chief-check-editor { max-width: var(--dlg-max); max-height: calc(100dvh -
 .chief-check-editor .chief-check-actions { position: sticky; bottom: -24px; padding-block: 12px; background: var(--bg-primary); }
 @media (max-width: 900px) { .chief-checks-layout { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 500px) {
-    dialog.chief-checks, dialog.chief-check-editor { max-height: calc(100dvh - 16px); padding: 16px; }
+    dialog.chief-checks, dialog.chief-check-editor { position: fixed; inset: 0; margin: auto; height: fit-content; max-height: calc(100dvh - 16px); padding: 16px; }
     .chief-checks-head { top: -16px; }
     .chief-check-editor .chief-check-actions { bottom: -16px; }
 }
