@@ -15,7 +15,7 @@ import { doneGoals, nextQuietEnd, quietEndsAt, hideGoalDone, setGoalDoneCount, i
  * are in Display options. The hub's own framed /inbox is not this: it keeps the frame, full width (inbox_tab.js). */
 import { state } from './state.js';
 
-const { mutedReviewItems, mutedWords, reviewItems, unreadReviewItems, reviewErrors, refreshReviews, reviewGroups, setReviewRead, markOpenedReadVisibly, isRead, savedFiles, queryReviews, queriedReviews, moreQueriedReviews, reviewQueryState, reviewQueryKey } = await importOnce('./inbox_reviews.js');
+const { mutedReviewItems, mutedWords, reviewItems, unreadReviewItems, reviewErrors, refreshReviews, reviewGroups, setReviewRead, markOpenedReadVisibly, isRead, savedFiles, queryReviews, queriedReviews, moreQueriedReviews, retryQueriedReviews, reviewQueryState, reviewQueryKey } = await importOnce('./inbox_reviews.js');
 import { failedUnread, finishedUnread, refreshRuns, markSeen, runRoute, failureWords } from './automation_runs.js';
 import { operatorAsks, refreshOperatorAsks, askLine, askPlain, askKey, openAskDialog, askSubjects, askSubjectWords } from './operator_asks.js';
 import { go, note, backIs, currentRoute } from './nav.js';
@@ -101,6 +101,7 @@ function moreFilesLine() {
     if (!st || st.loading || (!st.more && !st.error)) return null;
     const p = DT.el('p', 'goals-note inbox-more-files', st.error || `Showing ${st.shown} of ${st.total} files for review that match. `);
     if (st.more) { const b = DT.el('button', 'btn btn-quiet btn-small', 'Show more'); b.type = 'button'; b.addEventListener('click', () => { moreQueriedReviews(f); }); p.append(b); }
+    if (st.failed) { const b = DT.el('button', 'btn btn-quiet btn-small', 'Retry'); b.type = 'button'; b.addEventListener('click', () => { retryQueriedReviews(f); }); p.append(' ', b); } // the computers that did not answer are asked again, each from where it stopped
     return p;
 }
 const needsFoot = () => { const parts = [mutedLine(), alertsLine(), moreFilesLine()].filter(Boolean); if (!parts.length) return null; const wrap = DT.el('div', 'inbox-needs-foot'); wrap.append(...parts); return wrap; };

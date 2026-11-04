@@ -104,7 +104,8 @@ async function readTeam(team, mutedOut = null) {
 // ── Needs you's filters are the computer's (#13162, Stage 1) ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 // With a filter on (the words, a team, an agent, how long a file has waited, a computer) the file rows are what each computer answers for that query: its first 50 matches, with Show more by its cursor, and its total.
 // A match that is item 897 of 900 is on page 1 of its filter. Nothing here changes what the page holds with no filter, nor the counts, pills and options, which keep reading the whole list (Stage 2).
-let fview = null; // { key, rows, total, cursors: { team: cursor }, more, loading, error, at, promise }
+let fview = null; // { key, params, rows, totals, cursors: { team: next cursor }, failed: Map(team -> the cursor its last request used), more, loading, error, at, promise }
+const settledAt = new Map(); // reviewKey -> the revision at which the Operator settled it: an answer that was asked before that must not bring it back (#13162, UI Reviewer)
 const viewParts = f => ({ q: f.q || '', team: f.team || '', agent: f.agent === UNKNOWN_AGENT ? '' : f.agent || '', // 'Unknown agent' is the page's own word for a file with no producer: the computer cannot filter by it, so it is not a query
     longer: f.longer || '', server: f.server || '', oldest: f.sort === 'oldest' });
 export const reviewQueryKey = f => { const v = viewParts(f); return (v.q || v.team || v.agent || v.longer || v.server) ? JSON.stringify(v) : ''; };
@@ -120,7 +121,7 @@ export function reviewQueryParams(f, now = Date.now()) {
 /** The rows the computers answered for filters `f`, or null when the query is not for these filters (not asked yet, or another one is current). */
 export const queriedReviews = f => (fview && fview.key === reviewQueryKey(f) && !fview.loading ? fview.rows : null);
 /** { total, shown, more, loading, error } of the current query, or null. */
-export const reviewQueryState = () => (fview ? { total: fview.total, shown: fview.rows.length, more: fview.more, loading: fview.loading, error: fview.error } : null);
+export const reviewQueryState = () => (fview ? { total: fview.total, shown: fview.rows.length, more: fview.more, loading: fview.loading, error: fview.error, failed: fview.failed.size } : null);
 export const clearReviewQuery = () => { if (fview) { fview = null; changed(); } };
 async function readQueryPage(team, params, cursor) {
     const q = new URLSearchParams(params); if (cursor) q.set('cursor', cursor);
@@ -132,38 +133,58 @@ async function readQueryPage(team, params, cursor) {
     return { rows, total: Number(data.total) || 0, cursor: data.has_more && data.next_cursor ? data.next_cursor : '' };
 }
 const inFours = async (list, each) => { let at = 0; await Promise.all(Array.from({ length: Math.min(4, list.length) }, async () => { while (at < list.length) await each(list[at++]); })); };
+/** Asks each job's team for its page ({ team, cursor }) with the query's own frozen parameters, four at once, and folds the answers into `mine`: a team whose request failed keeps the cursor it used (so Show more and Retry ask it again, never skip it),
+ *  and a row the Operator settled after the request began does not come back. */
+async function askTeams(mine, jobs) {
+    const began = revision;
+    const got = [];
+    await inFours(jobs, async job => {
+        try { got.push({ ...job, ...(await readQueryPage(job.team, mine.params, job.cursor)) }); } catch { got.push({ ...job, failed: true }); }
+    });
+    if (fview !== mine) return;
+    const have = new Set(mine.rows.map(r => r.reviewKey));
+    for (const g of got) {
+        if (g.failed) { mine.failed.set(g.team, g.cursor); continue; }
+        mine.failed.delete(g.team);
+        if (!(g.team in mine.totals)) mine.totals[g.team] = g.total; // a team's total is its first page's
+        for (const r of g.rows) if (!have.has(r.reviewKey) && !((settledAt.get(r.reviewKey) || 0) > began)) { have.add(r.reviewKey); mine.rows.push(r); }
+        if (g.cursor) mine.cursors[g.team] = g.cursor; else delete mine.cursors[g.team];
+    }
+    mine.total = Object.values(mine.totals).reduce((a, b) => a + b, 0);
+    mine.more = Object.keys(mine.cursors).length > 0;
+    mine.error = mine.failed.size ? 'Some computers could not be asked.' : '';
+    mine.rows.sort(byAge);
+}
 /** Asks the computers for the files matching `f` (the first 50 of each team that has any); a second call for the same filters joins it (and does not ask again within 30 seconds); a different filter starts over. */
 export function queryReviews(f) {
     const key = reviewQueryKey(f);
     if (!key) { clearReviewQuery(); return null; }
     if (fview && fview.key === key && (fview.loading || Date.now() - fview.at < 30000)) return fview.promise;
-    const mine = fview = { key, rows: [], total: 0, cursors: {}, more: false, loading: true, error: '', at: Date.now(), promise: null };
+    // the parameters are made once and kept for every page of this walk: the server's cursor is bound to them (a waited-longer-than filter would otherwise send a new time with each Show more)
+    const mine = fview = { key, params: reviewQueryParams(f).toString(), rows: [], totals: {}, total: 0, cursors: {}, failed: new Map(), more: false, loading: true, error: '', at: Date.now(), promise: null };
     mine.promise = (async () => {
         try {
-            const params = reviewQueryParams(f), v = viewParts(f), projects = await fetchProjects();
+            const v = viewParts(f), projects = await fetchProjects();
             const teams = projects.filter(p => (!v.team || teamLabel(p.project, p.board_label || '') === v.team) && (!v.server || splitKey(p.project).server === v.server)).map(p => p.project);
-            const got = [];
-            await inFours(teams, async team => { try { got.push({ team, ...(await readQueryPage(team, params, '')) }); } catch { mine.error = 'Some computers could not be asked.'; } });
-            if (fview !== mine) return;
-            for (const g of got) { mine.rows.push(...g.rows); mine.total += g.total; if (g.cursor) { mine.cursors[g.team] = g.cursor; mine.more = true; } }
-            mine.rows.sort(byAge);
+            await askTeams(mine, teams.map(team => ({ team, cursor: '' })));
         } catch { if (fview === mine) mine.error = 'Review artifacts could not be read.'; }
         if (fview === mine) { mine.loading = false; mine.at = Date.now(); changed(); }
     })();
     return mine.promise;
 }
-/** The next 50 of each team that has more, for the current query. */
-export async function moreQueriedReviews(f) {
+async function again(f, jobsOf) {
     const mine = fview;
-    if (!mine || mine.loading || mine.key !== reviewQueryKey(f) || !mine.more) return;
+    if (!mine || mine.loading || mine.key !== reviewQueryKey(f)) return;
+    const jobs = jobsOf(mine);
+    if (!jobs.length) return;
     mine.loading = true; changed();
-    const params = reviewQueryParams(f), have = new Set(mine.rows.map(r => r.reviewKey)), teams = Object.keys(mine.cursors), got = [];
-    await inFours(teams, async team => { try { got.push({ team, ...(await readQueryPage(team, params, mine.cursors[team])) }); } catch { mine.error = 'Some computers could not be asked.'; } });
-    if (fview !== mine) return;
-    mine.cursors = {}; mine.more = false;
-    for (const g of got) { for (const r of g.rows) if (!have.has(r.reviewKey)) mine.rows.push(r); if (g.cursor) { mine.cursors[g.team] = g.cursor; mine.more = true; } }
-    mine.rows.sort(byAge); mine.loading = false; changed();
+    await askTeams(mine, jobs);
+    if (fview === mine) { mine.loading = false; mine.at = Date.now(); changed(); }
 }
+/** The next 50 of each team that has more, for the current query (the same parameters as its first page). */
+export const moreQueriedReviews = f => again(f, m => Object.keys(m.cursors).map(team => ({ team, cursor: m.cursors[team] })));
+/** Asks again the teams whose last request failed, each with the cursor it used. */
+export const retryQueriedReviews = f => again(f, m => [...m.failed].map(([team, cursor]) => ({ team, cursor })));
 
 /** The rows of one team, as Needs you has them (newest version of each file): a link to one file reads only its own team (#13116), not every team. */
 export async function reviewsOfTeam(team) { return collapseVersions((await readTeam(team)).sort(byAge)); }
@@ -262,6 +283,7 @@ export async function setReviewRead(row, read) {
 export function settleReview(row) {
     revision++;
     const gone = new Set([row.reviewKey || `${row.team}:${row.id}`, ...earlierVersions(row).map(a => a.reviewKey)]); // the versions before it were settled with it (settleEarlierVersions)
+    for (const k of gone) settledAt.set(k, revision);
     items = items.filter(a => !gone.has(a.reviewKey)); saved = saved.filter(a => !gone.has(a.reviewKey));
     if (fview) fview.rows = fview.rows.filter(a => !gone.has(a.reviewKey));
     changed();
