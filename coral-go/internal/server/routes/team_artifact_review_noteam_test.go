@@ -15,7 +15,7 @@ import (
 )
 
 // The Operator decides on a file a no-team agent sent for review (#13532): the board key is the reserved ~no-team, the file is one of the uploads of an agent on no team, Approve, Changes and Deny are recorded
-// and leave Needs you, and nobody is told (the agent has no board: the answer says no_uploader). A file that is not a no-team upload of that key is still "no such artifact", a plain no-team file is not for review,
+// and leave Needs you, and, with no terminal to type into, nobody is told (the answer says so; no_team_notice_test.go covers the delivery). A file that is not a no-team upload of that key is still "no such artifact", a plain no-team file is not for review,
 // and a request that is not a person's is refused as on any team.
 func TestTheOperatorDecidesOnAFileANoTeamAgentSentForReview(t *testing.T) {
 	_, h, coralDir := teamArtifactServer(t)
@@ -54,8 +54,8 @@ func TestTheOperatorDecidesOnAFileANoTeamAgentSentForReview(t *testing.T) {
 	code, out = decide(true, review, `{"decision":"approve"}`)
 	require.Equal(t, http.StatusOK, code, "Approve: %v", out)
 	assert.Equal(t, "approved", out["state"])
-	assert.Equal(t, false, out["delivered"], "no board and no uploader to tell")
-	assert.Equal(t, "no_uploader", out["reason"])
+	assert.Equal(t, false, out["delivered"], "no terminal is wired in this rig: nobody could be told")
+	assert.Equal(t, "failed", out["reason"])
 	tags, err := h.bs.ArtifactTags(ctx, noTeamBoardID)
 	require.NoError(t, err)
 	assert.NotContains(t, tags[review], "for review", "it left Needs you")
