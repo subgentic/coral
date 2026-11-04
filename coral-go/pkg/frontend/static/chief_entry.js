@@ -42,11 +42,12 @@ export async function paintSidebarChief() {
     const slot = document.getElementById('sidebar-chief-slot');
     if (!slot) return;
     const mine = contextServer();
-    if (slot.dataset.for !== mine) { slot.replaceChildren(); slot.hidden = true; } // the entry of the computer left is not shown while this one's answer is on its way
+    if (slot.dataset.for !== mine) { slot.replaceChildren(); slot.hidden = false; slot.dataset.pending = ''; } // the entry of the computer left is not shown while this one's answer is on its way, but its room stays (nothing below it moves when the answer comes)
     const st = await chiefState();
     if (mine !== contextServer()) return; // another computer is shown now: its own paint follows
     slot.dataset.for = mine;
     slot.replaceChildren();
+    delete slot.dataset.pending;
     slot.hidden = !st;
     if (!st) return;
     let node;
