@@ -70,6 +70,13 @@ const SAFE = new Set(['GET', 'HEAD', 'OPTIONS']);
 const LEAVING_MS = 10000;
 let leavingSince = 0;
 export function pageIsLeaving(now = Date.now()) { return leavingSince > 0 && now - leavingSince < LEAVING_MS; }
+/** Send this page to sign-in, unless the browser has started to leave it (#13102): a late 'you are signed out' (the fetch wrapper's 401, the session read's authenticated:false, the live feed's signed-out hook) on
+ *  a page that is already navigating away would replace that navigation with next= built from this page's address. True when it went. The one place that does it. */
+export function goToSignIn() {
+    if (pageIsLeaving()) return false;
+    location.replace(signInUrl());
+    return true;
+}
 /** Start noting that the page is being left; installCloudFetch calls it once (a page that is not on the Hub never gets these three listeners). */
 function watchLeaving() {
     if (!window.addEventListener) return; // a test's stand-in window
@@ -188,9 +195,7 @@ export function installCloudFetch() {
         // a refusal there is not worth a toast, only an action the user took is.
         if (resp.status === 403 && sameOrigin(input) && !(init && init.quiet)) explainRefusal(resp);
         if ((resp.status === 400 || resp.status === 413) && method === 'PUT' && sameOrigin(input) && /^\/api\/(settings$|themes\/)/.test(settingsPath(input))) explainSettingsRefusal(resp);
-        if (resp.status === 401 && sameOrigin(input) && !/^\/(signin|auth|enroll)/.test(location.pathname) && !pageIsLeaving()) {
-            location.replace(signInUrl());
-        }
+        if (resp.status === 401 && sameOrigin(input) && !/^\/(signin|auth|enroll)/.test(location.pathname)) goToSignIn();
         return resp;
     };
 }
@@ -245,7 +250,7 @@ export async function initCloud() {
     state.hub = true;
     installCloudFetch();
     const s = await loadSession();
-    if (!s.authenticated) { location.replace(signInUrl()); return false; }
+    if (!s.authenticated) { goToSignIn(); return false; }
     state.account = { email: s.email };
     const actions = document.querySelector('.top-bar-actions');
     if (actions && !document.getElementById('cloud-account-menu')) actions.append(buildAccountMenu(s.email));

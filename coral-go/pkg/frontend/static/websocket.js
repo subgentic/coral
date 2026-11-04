@@ -9,7 +9,7 @@ import { agentIsStarting, syncSendStarting } from './agent_starting.js';
 import { updateModelChip } from './model_chip.js';
 import { importOnce } from './import_once.js';
 import { state } from './state.js';
-import { signInUrl } from './cloud.js';
+import { goToSignIn } from './cloud.js';
 import { feedRetryDelay, isStalenessDrift, DRIFT_RENDER_MAX_AGE_MS } from './feed_pacing.js';
 import { scheduleLiveSessionsRender, updateSessionStatus, updateSessionSummary, updateSessionBranch, updateSessionFolder, updateSessionModel, updateWaitingIndicator, resolveSessionIdentity, commandPlaceholder, startingPlaceholder, applyTerminalDot } from './render.js';
 import { renderLiveJobs } from './live_jobs.js';
@@ -94,7 +94,7 @@ function scheduleFeedReconnect() {
 // records the requested delays and runs them faster instead of waiting out the real backoff.
 export const feedHooks = {
     signedOut() {
-        if (!/^\/(signin|auth|enroll)/.test(location.pathname)) location.replace(signInUrl());
+        if (!/^\/(signin|auth|enroll)/.test(location.pathname)) goToSignIn(); // not while the browser is leaving the page (#13102)
     },
     schedule(fn, ms) { setTimeout(fn, ms); },
 };
