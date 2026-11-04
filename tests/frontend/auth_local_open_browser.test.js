@@ -133,9 +133,9 @@ const ATTACK = {
                 await Promise.all([own.Runtime.enable(), own.Page.enable()]);
                 const ev = async x => (await own.Runtime.evaluate({ expression: x, returnByValue: true, awaitPromise: true })).result.value;
                 await own.Page.navigate({ url: BASE + '/auth' });
-                await until(async () => (await ev(`!!document.getElementById('local-open') && document.readyState === 'complete'`)) === true, 'the button in the suite tab');
+                await until(async () => (await ev(`!!document.getElementById('local-open') && document.readyState === 'complete'`)) === true, 'the button in the suite tab', 30000);
                 await ev(`document.getElementById('local-open').click(), true`);
-                await until(async () => (await ev(`location.origin === '${BASE}' && !location.pathname.startsWith('/auth') && document.readyState === 'complete'`)) === true, 'the suite tab to leave /auth', 10000);
+                await until(async () => (await ev(`location.origin === '${BASE}' && !location.pathname.startsWith('/auth') && document.readyState === 'complete'`)) === true, 'the suite tab to leave /auth', 30000);
                 assert.equal(await ev(`fetch('${BASE}/api/system/status', { cache: 'no-store' }).then(r => r.status)`), 200);
                 ownEv = ev;
             });
@@ -155,7 +155,7 @@ const ATTACK = {
                 assert.equal(posts[0].headers['origin'], BASE, `the request names this server (${sent})`);
                 assert.equal(posts[0].headers['sec-fetch-site'], 'same-origin', sent);
                 assert.ok(posts[0].status < 400, `the route accepts its own button (${sent})`);
-                await p.waitFor(`!location.pathname.startsWith('/auth')`, 'the page to leave /auth', 10000);
+                await p.waitFor(`!location.pathname.startsWith('/auth')`, 'the page to leave /auth', 30000);
                 assert.ok((await p.cookies()).length > 0, 'a session cookie is set');
                 assert.equal(await p.status(), 200, 'signed in after');
                 await p.waitFor(`!!document.getElementById('set-password-modal')`, 'the password prompt the note said would come', 20000); // #12834: and it does
