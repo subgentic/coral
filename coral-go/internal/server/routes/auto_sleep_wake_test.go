@@ -223,7 +223,8 @@ func promptFilesOf(t *testing.T, r *sleepRig) []string {
 	r.term.mu.Lock()
 	defer r.term.mu.Unlock()
 	var out []string
-	re := regexp.MustCompile(`-- "\$\(cat '([^']+)'\)"`)
+	// The launch line passes the prompt file as bash does (-- "$(cat '<file>')") or, on Windows, as PowerShell does (-- "$(Get-Content -Raw -Encoding UTF8 -LiteralPath '<file>')").
+	re := regexp.MustCompile(`-- "\$\((?:cat|Get-Content -Raw -Encoding UTF8 -LiteralPath) '([^']+)'\)"`)
 	for _, lines := range r.term.sent {
 		for _, l := range lines {
 			for _, m := range re.FindAllStringSubmatch(l, -1) {
