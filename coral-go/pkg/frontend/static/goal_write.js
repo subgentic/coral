@@ -63,10 +63,11 @@ export function checkGoalBody(action, b) {
  *  and on the Hub's 429 STOPS with its plain line (never loops, never retries: the rest stay as they were, for the person to do after Retry-After's half minute). Flag off: no pause, no limit, as it always was.
  *  `one(item)` answers a Response (goalWrite) or throws; resolves { done, failed, stopped } where `stopped` is the sentence when the Hub's limit ended it. */
 export const BULK_GAP_MS = 6000;
+const gapMs = () => (typeof window !== 'undefined' && Number.isFinite(window.__coralBulkGapMs) ? window.__coralBulkGapMs : BULK_GAP_MS); // a suite shortens the pause (a person's page never sets it)
 export async function writeEach(list, one, { on = goalPreviewOn, say = () => {}, wait = ms => new Promise(r => setTimeout(r, ms)), noun = 'goals' } = {}) {
     let done = 0, failed = 0, stopped = '';
     for (let i = 0; i < list.length; i++) {
-        if (on()) { if (i) await wait(BULK_GAP_MS); say(`Changing ${noun}: ${i + 1} of ${list.length}`); }
+        if (on()) { if (i) await wait(gapMs()); say(`Changing ${noun}: ${i + 1} of ${list.length}`); }
         let r = null;
         try { r = await one(list[i]); } catch { failed++; continue; }
         if (r && r.status === 429) { stopped = `${PREVIEW_WORDS.too_many_requests} ${done} of ${list.length} ${noun} were changed; the rest are unchanged.`; break; }
