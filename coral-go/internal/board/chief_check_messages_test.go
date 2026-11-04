@@ -43,3 +43,24 @@ func TestChiefMessageHistoryCapAllowsDedupeButRefusesNewMessages(t *testing.T) {
 	require.NoError(t, s.db.GetContext(ctx, &n, `SELECT COUNT(*) FROM chief_check_messages`))
 	require.Equal(t, 20000, n)
 }
+
+func TestChiefDeliveryKeyCollisionCannotAcknowledgeAnotherBoard(t *testing.T) {
+	s := testStore(t)
+	ctx := context.Background()
+	key := strings.Repeat("a", 32)
+	original, err := s.PostChiefCheckMessage(ctx, "first-board", 1, key, "delivery", "@Chief first board check")
+	require.NoError(t, err)
+	// Delivery keys are globally unique. A collision on a different board must
+	// fail closed, not return that other board's message as this delivery's ack.
+	id, err := s.PostChiefCheckMessage(ctx, "second-board", 2, key, "delivery", "@Chief second board check")
+	require.Error(t, err)
+	require.Zero(t, id)
+	again, err := s.PostChiefCheckMessage(ctx, "first-board", 1, key, "delivery", "must not duplicate")
+	require.NoError(t, err)
+	require.Equal(t, original, again)
+	var first, second int
+	require.NoError(t, s.db.GetContext(ctx, &first, `SELECT COUNT(*) FROM board_messages WHERE project='first-board'`))
+	require.Equal(t, 1, first)
+	require.NoError(t, s.db.GetContext(ctx, &second, `SELECT COUNT(*) FROM board_messages WHERE project='second-board'`))
+	require.Zero(t, second)
+}
