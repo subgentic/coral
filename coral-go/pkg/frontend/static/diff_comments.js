@@ -128,7 +128,7 @@ export async function attachDiffComments(slot, file, view, texts, base = '', fie
         badge.textContent = count > 99 ? '99+' : String(count); badge.hidden = !count;
     };
     const show = on => { opened = on; box.hidden = !on; paint(); };
-    const place = () => { const row = rowOf(slot); if (!row || row.contains(icon)) return; const acts = row.querySelector('.file-action-btns'); if (acts) acts.before(icon); else row.append(icon); };
+    const placeIcon = () => { const row = rowOf(slot); if (!row || row.contains(icon)) return; const acts = row.querySelector('.file-action-btns'); if (acts) acts.before(icon); else row.append(icon); };
     const comments = attachComments(box, body, box, { toggleHost: true, compact: true, sheet: () => false, shown: () => true, words: { quote: '' }, wholeAnchor: () => fileAnchor(texts, file, base), outdated: c => !stillThere(c.anchor, texts),
         onState: now => { count = now.count; if (opened && !now.composing && !now.count) { opened = false; box.hidden = true; } paint(); } }); // a cancelled composer on a file with no comments leaves nothing open
     comments.open(key, contextServer(), team);
@@ -156,8 +156,8 @@ export async function attachDiffComments(slot, file, view, texts, base = '', fie
         if (!comments.isComposing()) comments.composeOn(fileAnchor(texts, file, base)); // false when this person cannot comment (locked): the thread opens and says why
         else box.querySelector('.ac-input')?.focus();
     });
-    paint(); place();
-    const handle = { place, destroy() { clearTimeout(timer); slot.removeEventListener('mouseup', soon); slot.removeEventListener('keyup', soon); slot.removeEventListener('touchend', soon); comments.close(); box.remove(); btn.remove(); icon.remove(); mounted.delete(slot); } };
+    paint(); placeIcon();
+    const handle = { place: placeIcon, destroy() { clearTimeout(timer); slot.removeEventListener('mouseup', soon); slot.removeEventListener('keyup', soon); slot.removeEventListener('touchend', soon); comments.close(); box.remove(); btn.remove(); icon.remove(); mounted.delete(slot); } };
     mounted.set(slot, handle);
 }
 
