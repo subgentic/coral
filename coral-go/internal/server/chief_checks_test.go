@@ -218,3 +218,45 @@ func TestChiefTriggerAskReferencesUseVerifiedSessionNotReusableRole(t *testing.T
 	code, out = e.call(t, "POST", fmt.Sprintf("/api/chief/triggers/%d/state", newer.ID), map[string]any{"state": "waiting_on_operator", "ask_id": askID}, true, "")
 	require.Equal(t, 400, code, out)
 }
+
+func TestChiefDailyBriefRemainsUnconsumedUntilActualBriefReference(t *testing.T) {
+	e := newChecksEnv(t)
+	ctx := context.Background()
+	body := checksBody()
+	body["notify_mode"] = "daily_brief"
+	code, out := e.call(t, "POST", "/api/chief/checks", body, false, "")
+	require.Equal(t, 201, code, out)
+	tr, err := e.sched.BeginChiefTrigger(ctx, int64(out["id"].(float64)), 0, "daily-brief-test", time.Now())
+	require.NoError(t, err)
+	path := fmt.Sprintf("/api/chief/triggers/%d/state", tr.ID)
+	code, out = e.call(t, "POST", path, map[string]any{"state": "done", "summary": "Saved for the brief"}, true, "")
+	require.Equal(t, 400, code, out)
+	saved, err := e.sched.ChiefTrigger(ctx, tr.ID)
+	require.NoError(t, err)
+	require.Equal(t, "open", saved.State)
+	code, msg := e.call(t, "POST", "/api/board/chief/messages", map[string]any{"subscriber_id": "Chief", "content": "Daily brief: no new mail"}, true, "")
+	require.Equal(t, 200, code, msg)
+	code, out = e.call(t, "POST", path, map[string]any{"state": "done", "brief_id": msg["id"]}, true, "")
+	require.Equal(t, 200, code, out)
+}
+
+func TestChiefPrivateDeliveryRunsStayOutOfGenericTaskRoutes(t *testing.T) {
+	e := newChecksEnv(t)
+	ctx := context.Background()
+	code, out := e.call(t, "POST", "/api/chief/checks", checksBody(), false, "")
+	require.Equal(t, 201, code, out)
+	c, err := e.sched.ChiefCheck(ctx, int64(out["id"].(float64)))
+	require.NoError(t, err)
+	id, err := e.sched.CreateScheduledRun(ctx, c.JobID, time.Now().UTC().Format(store.ISOFormat), "pending")
+	require.NoError(t, err)
+	code, out = e.call(t, "GET", fmt.Sprintf("/api/tasks/runs/%d", id), nil, true, "")
+	require.Equal(t, 404, code, out)
+	code, out = e.call(t, "GET", "/api/tasks/active", nil, false, "")
+	require.Equal(t, 200, code, out)
+	require.Empty(t, out["runs"])
+	code, out = e.call(t, "POST", fmt.Sprintf("/api/tasks/runs/%d/kill", id), nil, false, "")
+	require.Equal(t, 404, code, out)
+	run, err := e.sched.GetScheduledRun(ctx, id)
+	require.NoError(t, err)
+	require.Equal(t, "pending", run.Status)
+}
