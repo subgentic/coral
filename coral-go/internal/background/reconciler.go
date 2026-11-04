@@ -19,11 +19,6 @@ import (
 // sleeping. A single miss can be a transient tmux hiccup rather than a crash.
 const reconcileMissThreshold = 2
 
-// exitedPassThreshold is how many consecutive passes find an agent's terminal at a plain, known shell (its CLI gone, past the launch grace) before it is marked ended: one (#13418). That is
-// a certain reading (the shell's own process table, a shell of unknown contents is never taken for it), so the dot and the list say Ended within one tick, as after a restart. An agent
-// missing from the terminal list altogether stays on reconcileMissThreshold: that reading can be a listing that missed it.
-const exitedPassThreshold = 1
-
 // orphanGracePeriod is how long after a session is marked stopped in the DB
 // the reconciler waits before killing a runtime session that is still alive
 // under that ID. Gives in-flight kill/restart handlers time to finish.
@@ -44,7 +39,6 @@ type SessionReconciler struct {
 	interval     time.Duration
 	logger       *slog.Logger
 	misses       map[string]int // session_id -> consecutive passes not found
-	exited       map[string]int // session_id -> consecutive passes its terminal showed a plain shell
 	now          func() time.Time
 	// onSlept hears the sessions one pass marked sleeping (an exited CLI or a gone terminal),
 	// for the exit notice (#3613). Unset: nothing is told.
@@ -141,7 +135,6 @@ func NewSessionReconciler(ss *store.SessionStore, rt AgentRuntime, interval time
 		interval:     interval,
 		logger:       slog.Default().With("service", "session_reconciler"),
 		misses:       make(map[string]int),
-		exited:       make(map[string]int),
 		now:          time.Now,
 	}
 }
@@ -183,6 +176,7 @@ func (r *SessionReconciler) reconcileOnce(ctx context.Context) {
 	for _, ls := range liveSessions {
 		if ls.IsSleeping == 1 {
 			delete(r.misses, ls.SessionID)
+			r.checkResumed(ctx, ls, alive)
 			continue
 		}
 		seen[ls.SessionID] = true
@@ -228,11 +222,6 @@ func (r *SessionReconciler) reconcileOnce(ctx context.Context) {
 	for sid := range r.misses {
 		if !seen[sid] {
 			delete(r.misses, sid)
-		}
-	}
-	for sid := range r.exited {
-		if !seen[sid] {
-			delete(r.exited, sid)
 		}
 	}
 
@@ -290,7 +279,6 @@ func (r *SessionReconciler) checkExited(ctx context.Context, ls store.LiveSessio
 	// A shell of unknown contents is not "exited" here: marking the agent ended would let Wake type its launch line into it (Security on #216).
 	exited, fg, _ := ptymanager.AgentExitedForLaunch(ctx, r.runtime, name, ls.AgentType, ls.SessionID)
 	if !exited {
-		delete(r.exited, ls.SessionID)
 		return
 	}
 	if r.cliMissing(ctx, ls, name) || r.hermesGatewayRefused(ctx, ls, name) {
@@ -299,11 +287,6 @@ func (r *SessionReconciler) checkExited(ctx context.Context, ls store.LiveSessio
 	if created, err := time.Parse(store.ISOFormat, ls.CreatedAt); err == nil && r.now().Sub(created) < exitedLaunchGrace {
 		return
 	}
-	r.exited[ls.SessionID]++
-	if r.exited[ls.SessionID] < exitedPassThreshold {
-		return
-	}
-	delete(r.exited, ls.SessionID)
 	if err := r.sessionStore.SetSessionSleepingFor(ctx, ls.SessionID, store.SleepReasonAgentExited); err != nil {
 		r.logger.Error("failed to mark exited agent as sleeping", "session_id", ls.SessionID, "error", err)
 		return
@@ -311,6 +294,25 @@ func (r *SessionReconciler) checkExited(ctx context.Context, ls store.LiveSessio
 	r.slept = append(r.slept, ls.SessionID)
 	r.logger.Warn("agent CLI has exited, marking as sleeping (Wake resumes it)",
 		"session_id", ls.SessionID, "agent_name", ls.AgentName, "foreground", fg)
+}
+
+// checkResumed wakes an agent that was marked Ended (its CLI exited, reason agent_exited) when its terminal now plainly runs a program again: a person started the CLI by hand in that shell
+// (#13431). It needs a positive reading that the program in the pane is the agent's own CLI (ptymanager.AgentCLIRunning), not any program a person runs there; a terminal that cannot be read, a gone terminal and every other
+// sleep reason (a person's, auto-sleep, a lost terminal server) are left as they are.
+func (r *SessionReconciler) checkResumed(ctx context.Context, ls store.LiveSession, alive map[string]bool) {
+	if ls.SleepReason == nil || *ls.SleepReason != store.SleepReasonAgentExited || ls.IsArchived == 1 || !alive[strings.ToLower(ls.SessionID)] {
+		return
+	}
+	name := FormatSessionName(ls.AgentType, ls.SessionID)
+	info := agent.GetCLIInfo(ls.AgentType)
+	if info == nil || !ptymanager.AgentCLIRunning(ctx, r.runtime, name, ls.AgentType, ls.SessionID, info.Binary) {
+		return
+	}
+	if err := r.sessionStore.SetSessionSleeping(ctx, ls.SessionID, false); err != nil {
+		r.logger.Error("failed to mark a resumed agent as awake", "session_id", ls.SessionID, "error", err)
+		return
+	}
+	r.logger.Info("the agent's CLI runs again in its terminal, marking it awake", "session_id", ls.SessionID, "agent_name", ls.AgentName)
 }
 
 // missingCLIWindow is how long after Coral typed an agent's launch line a shell's "no such command" error for the agent's CLI counts as the launch's own: the reconciler's pass is
@@ -346,7 +348,6 @@ func (r *SessionReconciler) cliMissing(ctx context.Context, ls store.LiveSession
 	if err := r.sessionStore.SetStartFailure(ctx, ls.SessionID, store.StartFailureCLIMissing); err != nil {
 		r.logger.Error("failed to record why an agent could not start", "session_id", ls.SessionID, "error", err)
 	}
-	delete(r.exited, ls.SessionID)
 	r.slept = append(r.slept, ls.SessionID)
 	r.logger.Warn("the agent's shell could not find its CLI; marking it ended, failed to start", "session_id", ls.SessionID, "agent_name", ls.AgentName, "agent_type", ls.AgentType)
 	return true
@@ -391,7 +392,6 @@ func (r *SessionReconciler) hermesGatewayRefused(ctx context.Context, ls store.L
 	if err := r.sessionStore.SetStartFailure(ctx, ls.SessionID, code); err != nil {
 		r.logger.Error("failed to record why a Hermes agent could not start", "session_id", ls.SessionID, "error", err)
 	}
-	delete(r.exited, ls.SessionID)
 	r.slept = append(r.slept, ls.SessionID)
 	r.logger.Warn(why, "session_id", ls.SessionID, "agent_name", ls.AgentName)
 	return true
