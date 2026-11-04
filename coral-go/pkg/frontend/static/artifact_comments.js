@@ -168,6 +168,12 @@ export function attachComments(dialog, body, host, opts = {}) {
         const d = st.data;
         if (d.locked) panel.append(el('p', 'ac-note ac-locked', d.canLock ? 'Comments are locked: nobody can add comments to this file. You can unlock it any time.' : 'Comments are locked: read only.'));
         else if (!d.canComment) panel.append(el('p', 'ac-note ac-readonly', d.reason || 'You can read the comments here but not write them.'));
+        const setup = !d.locked && askSetup();
+        if (setup) { // Send to agent is not offered: say why, and where it is set up (#13230)
+            const n = el('p', 'ac-note ac-ask-setup', setup.ssh ? 'Send to agent is not set up for this computer: this hub has no Approve secret for it. Open the computer, then choose Set up approvals.' : 'Send to agent is not set up for this computer: this hub has no Approve secret for it. Open the computer, then choose Approve through this hub.');
+            const go = btn('ac-act ac-ask-setup-open', 'Open the computer'); go.addEventListener('click', async () => { const { openServersTab } = await importOnce('./servers_tab.js'); openServersTab(setup.id); });
+            panel.append(n, go);
+        }
         if (d.canLock) {
             const why = d.locked ? 'Comments are locked: nobody can add comments to this file. You can unlock it any time.' : 'Locking stops anyone adding comments to this file. You can unlock it any time.';
             const lock = btn('ac-lock', d.locked ? 'Unlock comments' : 'Lock comments'); lock.title = why;
@@ -285,7 +291,7 @@ export function attachComments(dialog, body, host, opts = {}) {
     }
     const act = (text, label, fn) => { if (typeof label === 'function') { fn = label; label = ''; } const b = btn('ac-act', text, label); b.addEventListener('click', fn); return b; };
 
-    const { canAsk, openAsk, askBlock, askedNow, fillStatus } = createAsk({ st, panel, render, announce, refresh, ownHex });
+    const { canAsk, askSetup, openAsk, askBlock, askedNow, fillStatus } = createAsk({ st, panel, render, announce, refresh, ownHex });
     function confirmThen(msg, fn) { if (window.showConfirmModal) window.showConfirmModal('Delete comment', msg, fn, undefined, { label: 'Delete comment', danger: true }); else fn(); }
     async function run(fn, said) {
         if (st.busy) return;

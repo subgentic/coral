@@ -120,10 +120,18 @@ func (r Runner) InstallOwnerSecret(ctx context.Context, t Target, version, remot
 		return err
 	}
 	if res.ExitCode != 0 {
-		return errors.New("sshprov: the far computer did not take the secret")
+		return &OwnerSecretError{ExitCode: res.ExitCode, Stderr: res.Stderr}
 	}
 	return nil
 }
+
+// OwnerSecretError is the far computer's `hub-owner-secret` ending non-zero (#13230: the install failed with nothing said anywhere). The exit code and the start of its stderr are for the hub's log only.
+type OwnerSecretError struct {
+	ExitCode int
+	Stderr   string
+}
+
+func (e *OwnerSecretError) Error() string { return "sshprov: the far computer did not take the secret" }
 
 // ErrPortInUse is port 8420 held on the far computer by something that is not this user's coral-server session: another user's Coral, usually. Every Coral set up from here listens on 8420, so a second
 // user's would fail to bind and the hub would talk to the first user's with the second's key.

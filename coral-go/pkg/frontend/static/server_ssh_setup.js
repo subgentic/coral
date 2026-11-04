@@ -61,10 +61,11 @@ const KINDS = {
     upgrade: { title: 'Upgrade Coral on that computer', go: 'Upgrade', intro: 'This hub will have that computer download and verify the release this hub runs, stop Coral there, start the new one and check it answers. The data, the key and the instance id are kept. A Coral that already runs this release is left alone.' },
     stop: { title: 'Stop Coral on that computer', go: 'Stop Coral', intro: 'This stops Coral on that computer. Its files stay, and the computer stays in this hub\'s list.' },
     remove: { title: 'Remove Coral from that computer', go: 'Remove', intro: 'This stops Coral on that computer, deletes what was installed there, and removes the computer from this hub.' },
+    approvals: { title: 'Set up Approve through this hub', go: 'Set up approvals', intro: 'This hub will make a secret for that computer and have the Coral running there store it, so Approve, Request changes and Send to agent work from this hub for it. Nothing else on the computer is changed, and Coral is not restarted.' },
 };
 
 // The kinds, by their KINDS keys in this order (the names the hub's plan uses). They are taken from the keys so no quoted word here is read as an icon's name (the icon census counts any whole string that is one).
-const [SETUP, UPGRADE, STOP, REMOVE] = Object.keys(KINDS);
+const [SETUP, UPGRADE, STOP, REMOVE] = Object.keys(KINDS); // approvals is the fifth key and needs no name here: it has no gate of its own
 
 /**
  * Mount the flow into `host`. mode 'setup' starts from a host; mode 'manage' acts on `server` (a registered server set up over SSH) with `action` (upgrade, stop or remove).

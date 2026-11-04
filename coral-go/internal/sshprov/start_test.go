@@ -484,3 +484,20 @@ func TestDaemonCommandsTestTheCommandLineBeforeTheyActOnAPID(t *testing.T) {
 		t.Errorf("stop must signal one PID with SIGTERM only: %s", stop)
 	}
 }
+
+// A secret install the far computer ends non-zero (a release folder it does not have, say) says why: the exit code and the start of what it wrote, for the hub's log only (#13230).
+func TestInstallOwnerSecretThatFailsSaysWhy(t *testing.T) {
+	ssh := filepath.Join(t.TempDir(), "ssh")
+	if err := os.WriteFile(ssh, []byte("#!/bin/sh\ncat >/dev/null\necho 'sh: coral: not found' >&2\nexit 127\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	tg, _ := ParseTarget("rich@box.example.com")
+	err := Runner{SSH: ssh}.InstallOwnerSecret(context.Background(), tg, "2.0.10", "ssh-box", strings.Repeat("ab", 32))
+	var oe *OwnerSecretError
+	if !errors.As(err, &oe) {
+		t.Fatalf("err = %v, want an OwnerSecretError", err)
+	}
+	if oe.ExitCode != 127 || !strings.Contains(oe.Stderr, "coral: not found") {
+		t.Errorf("got %+v", oe)
+	}
+}
