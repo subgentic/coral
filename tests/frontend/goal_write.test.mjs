@@ -1,8 +1,9 @@
 // #13503: a goal create, close or update through the Coral Hub carries the Hub's preview token. With the Hub's boot value goal_preview off (a computer's own dashboard, the self-hosted Hub) the write is exactly what it always was;
 // with it on, the preview comes first, the write carries X-Hub-Goal-Preview and the SAME bytes, every write is previewed again, a token that ran out is asked for once more, and each of the Hub's words is one plain sentence.
 import assert from 'node:assert/strict';
-import { goalWrite, PREVIEW_HEADER, checkGoalBody, writeEach, BULK_GAP_MS } from '../../coral-go/pkg/frontend/static/goal_write.js';
+import { goalWrite, PREVIEW_HEADER, checkGoalBody, writeEach, BULK_GAP_MS, computerHasOperatorRoutes, offersOperatorChanges, OPERATOR_ROUTES_SINCE } from '../../coral-go/pkg/frontend/static/goal_write.js';
 import { PREVIEW_WORDS } from '../../coral-go/pkg/frontend/static/goal_words.js';
+import { LOCAL_SERVER } from '../../coral-go/pkg/frontend/static/server_base.js';
 
 const json = (b, status = 200) => new Response(JSON.stringify(b), { status, headers: { 'Content-Type': 'application/json' } });
 function rig({ on = true, previews = [], writes = [] } = {}) {
@@ -126,6 +127,22 @@ for (const [resp, word] of [[json({ error: 'mode_too_low' }, 403), 'mode_too_low
     const pass = rig({ writes: [json(own, 404)] });
     const p = await pass.call('goal_move', 4, '/goals/4/move', 'POST', { to_project: 'nope' });
     assert.equal(p.status, 404); assert.deepEqual(await p.json(), own);
+}
+// the Operator's driver/move buttons are offered through a Hub only for a computer that reports a Coral with the routes (an older one would answer not found)
+{
+    const has = v => computerHasOperatorRoutes('srv1', () => ({ coral_version: v }));
+    for (const v of ['2.0.50', '2.0.51', '2.1.0', '3.0.0', '2.0.50-rc1', '2.0.50-beta', OPERATOR_ROUTES_SINCE]) assert.equal(has(v), true, v);
+    for (const v of ['2.0.49', '2.0.49-rc2', '1.9.99', '', undefined, 'dev', 'not a version']) assert.equal(has(v), false, String(v));
+    assert.equal(computerHasOperatorRoutes('srv1', () => ({ version: '2.0.50' })), true, "a self-hosted hub's entry says version");
+    assert.equal(computerHasOperatorRoutes('srv1', () => ({})), false, 'no version reported: not offered');
+    const yes = () => true, no = () => false;
+    assert.equal(offersOperatorChanges(LOCAL_SERVER, { cloud: false, hub: false, has: no }), true, "a computer's own dashboard: always");
+    assert.equal(offersOperatorChanges(LOCAL_SERVER, { cloud: true, hub: false, has: yes }), false, "coral-hub's Hub has no local computer");
+    assert.equal(offersOperatorChanges('srv1', { cloud: true, hub: false, has: yes }), true, 'through coral-hub: a computer that has the routes');
+    assert.equal(offersOperatorChanges('srv1', { cloud: true, hub: false, has: no }), false, 'through coral-hub: an older computer: hidden');
+    assert.equal(offersOperatorChanges('srv1', { cloud: false, hub: true, has: yes }), true, "through our own Hub: a computer that has them");
+    assert.equal(offersOperatorChanges('srv1', { cloud: false, hub: true, has: no }), false, 'through our own Hub: an older computer: hidden');
+    assert.equal(offersOperatorChanges('srv1', { cloud: false, hub: false, has: yes }), false, 'neither Hub nor a local key: nothing to offer');
 }
 // a bulk close with the preview on: one at a time, a pause between goals (about 10 a minute), progress said, and the Hub's 429 stops it (never loops, never retries); with it off: no pause, no limit
 {

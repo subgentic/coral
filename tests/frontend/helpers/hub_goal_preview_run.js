@@ -36,6 +36,13 @@ async function run(flag) {
             const calls = () => ev(`window.__goalCalls`);
             const tag = flag ? 'goal_preview true' : 'no goal_preview';
 
+            // an older computer behind the Hub: no buttons (they would only say not found); then the one that has the routes (2.0.50)
+            await ev(`import(${S} + 'state.js').then(m => { for (const s of m.state.servers || []) s.coral_version = '2.0.49'; return true; })`);
+            await ev(`import(${S} + 'goal_view.js').then(async v => { const a = await import(${S} + 'goals_adapter.js'); const host = document.createElement('div'); host.id = 'gp-old'; document.body.appendChild(host); v.mountGoal(host, { team: '@srv1/team-a', id: 8, goal: a.toGoal({ id: 8, title: 'Older computer', state: 'active', outcome: 'o', done_when: 'd', rollup: { open: 0, done: 0, total: 0 } }), back() {}, refresh() {} }); return true; })`);
+            await waitFor(`!!document.querySelector('#gp-old .goals-close')`, `${tag}: a goal page of the older computer`, 8000);
+            assert.deepEqual(await ev(`({ driver: !!document.querySelector('#gp-old .goals-change-driver'), move: !!document.querySelector('#gp-old .goals-move') })`), { driver: false, move: false }, `${tag}: no Change driver and no Move for a computer that reports 2.0.49`);
+            await ev(`document.getElementById('gp-old').remove(); import(${S} + 'state.js').then(m => { for (const s of m.state.servers || []) s.coral_version = '2.0.50'; return true; })`);
+
             // #13517: through a Hub the goal page offers Change driver and Move to another team (the goal's own computer does them); with goal_preview each is previewed, then written with the token
             await ev(`import(${S} + 'goal_view.js').then(async v => { const a = await import(${S} + 'goals_adapter.js'); const host = document.createElement('div'); host.id = 'gp-ops'; document.body.appendChild(host); v.mountGoal(host, { team: '@srv1/team-a', id: 9, goal: a.toGoal({ id: 9, title: 'Hand me over', state: 'active', outcome: 'o', done_when: 'd', rollup: { open: 0, done: 0, total: 0 } }), back() {}, refresh() {} }); return true; })`);
             await waitFor(`!!document.querySelector('#gp-ops .goals-change-driver') && !!document.querySelector('#gp-ops .goals-move')`, `${tag}: Change driver and Move are offered through a Hub`, 8000);

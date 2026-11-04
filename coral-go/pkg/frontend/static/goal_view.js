@@ -1,8 +1,8 @@
 // One goal's detail view, shared by the team Goals list and other page hosts.
 import { loadStyles } from './lazy_styles.js';
 import { openTask } from './task_navigation.js';
-import { boardFetch, keyLabel, serverUrl, splitKey, remoteServer, LOCAL_SERVER, isCloud, isHub } from './server_base.js';
-const { goalWrite } = await importOnce('./goal_write.js'); // a goal close or update is previewed first when the Hub asks for it (#13503)
+import { boardFetch, keyLabel, serverUrl, splitKey, remoteServer, LOCAL_SERVER } from './server_base.js';
+const { goalWrite, offersOperatorChanges } = await importOnce('./goal_write.js'); // a goal close or update is previewed first when the Hub asks for it (#13503)
 import { OPERATOR_ID, copyText, showToast } from './utils.js';
 import { whenText } from './when_text.js';
 import { toTaskPage, toGoal, errorOf } from './goals_adapter.js';
@@ -166,7 +166,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
                 } catch (e) { if (ny) ny.disabled = false; showToast(`Not saved: ${e && e.message ? e.message : 'try again'}`, true); }
             } });
         }
-        if (W.isOpenGoal(g) && (sp.server === LOCAL_SERVER || isCloud() || isHub())) { // the Operator's own two changes (#12693): on this computer, and through a Hub (coral-hub's or our own) on the goal's own computer, now that the tunnel lists /driver and /move (#13517; hidden through a Hub until then, #13515)
+        if (W.isOpenGoal(g) && offersOperatorChanges(sp.server)) { // the Operator's own two changes (#12693): on this computer, and through a Hub (coral-hub's or our own) on a goal's computer that reports a Coral with the routes (#13517; hidden through a Hub before that, #13515)
             act.push({ key: 'driver', cls: 'btn goals-change-driver', label: 'Change driver', aria: `Change driver: ${g.title}`, run: () => importOnce('./goal_operator_dialogs.js').then(m => m.openChangeDriver({ project: model.project, goal: g, onClose: () => backToAction('.goals-change-driver'),
                 onDone: async driver => { say(driver ? `Driver changed to ${driver}` : 'Driver cleared'); showToast(driver ? `Driver changed to ${driver}` : 'Driver cleared'); await loadGoals(); } })) });
             act.push({ key: 'move', cls: 'btn goals-move', label: 'Move to another team', aria: `Move to another team: ${g.title}`, run: () => importOnce('./goal_operator_dialogs.js').then(m => m.openMoveGoal({ project: model.project, goal: g, openTasks: W.openTasksOf(g.rollup), onClose: () => backToAction('.goals-move'),

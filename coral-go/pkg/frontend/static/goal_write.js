@@ -4,12 +4,27 @@
  * Before EVERY write, never once per page: one token, one write (a close or an update token works once). A preview that has run out (preview_expired) is asked for again, once, and the write sent again; anything else
  * is said in the Hub's word as one plain sentence (goal_words.js PREVIEW_WORDS) in the editor's own error line. With the flag off (the self-hosted Hub, a computer's own dashboard) this is boardFetch, the write as it always was.
  * The task add is not previewed: the Hub leaves it alone without a token. goalWrite answers a Response like boardFetch does, so a caller keeps its `if (!r.ok)` and its error line. */
-import { boardFetch, goalPreviewOn, serverFetch, splitKey } from './server_base.js';
+import { boardFetch, goalPreviewOn, serverFetch, splitKey, isCloud, isHub, LOCAL_SERVER } from './server_base.js';
+import { importOnce } from './import_once.js';
 import { PREVIEW_WORDS } from './goal_words.js';
+const { serverEntry, serverVersion, compareVersions } = await importOnce('./server_status.js');
 
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
 export const PREVIEW_HEADER = 'X-Hub-Goal-Preview';
 export const GOAL_ACTIONS = ['goal_create', 'goal_close', 'goal_update', 'goal_driver', 'goal_move'];
+
+/** The Coral that has the Operator's two goal routes (/driver and /move through a Hub, #13517): a Hub page in front of an older computer must not offer buttons that would only say not found. The prerelease floor '-0' counts a 2.0.50 candidate. */
+export const OPERATOR_ROUTES_SINCE = '2.0.50-0';
+/** Whether the computer a team is on reports a Coral that has them; a version it does not report (or one that cannot be read) is no. */
+export function computerHasOperatorRoutes(server, entryOf = serverEntry) {
+    const c = compareVersions(serverVersion(entryOf(server)), OPERATOR_ROUTES_SINCE);
+    return c !== null && c >= 0;
+}
+/** Whether the goal page offers Change driver and Move to another team for a goal on this server: on this computer's own dashboard always; through coral-hub's Hub or our own only for a computer that has the routes. */
+export function offersOperatorChanges(server, { cloud = isCloud(), hub = isHub(), has = computerHasOperatorRoutes } = {}) {
+    if (server === LOCAL_SERVER) return !cloud; // the Hub's own "local" is no computer behind coral-hub's Hub; on a computer's own dashboard (and a self-hosted Hub's own boards) it is this build
+    return (cloud || hub) && has(server);
+}
 
 /** A refused answer as the editor reads it: {code: the Hub's word, error: our sentence} with the status. */
 const refused = (status, word) => new Response(JSON.stringify({ code: word, error: PREVIEW_WORDS[word] || PREVIEW_WORDS.bad_request }), { status, headers: { 'Content-Type': 'application/json' } });
