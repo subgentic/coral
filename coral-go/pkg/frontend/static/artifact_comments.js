@@ -20,6 +20,7 @@ import { boardKeyName, sessionTeamKey, contextServer } from './server_base.js';
 import { browserLocal } from './safe_storage.js';
 import { boardOfPage } from './dock_page.js';
 import { el } from './dom_el.js';
+import { pollEvery } from './overload.js';
 await loadStyles('pictures.css'); // the picture rules load with this module, before anything draws (page_weight: not at start)
 
 const OPEN_KEY = 'coral-artifact-comments-open'; // default for the docked preview; the viewer supplies a key for each file type
@@ -123,6 +124,26 @@ export function attachComments(dialog, body, host, opts = {}) {
         }
         render(); paint();
     }
+
+    // Live replies (#13299): an open panel (a file's, a goal's) shows what arrives while it is open, an agent's reply above all, without reopening. A light read of the thread every few seconds while the page is visible
+    // (nothing while it is hidden or nothing is open), redrawn only when the thread differs from the one on show, with the panel's scroll kept; a comment being written keeps its draft (it lives in st.composing) and the
+    // focus goes back to the same control (render does that). The count of new comments is said once to a screen reader.
+    const LIVE_MS = Number(globalThis.__coralCommentsPollMs) || 8000, sigOf = d => (d ? JSON.stringify([d.locked, d.comments]) : '');
+    let liveTimer = 0, liveBusy = false;
+    async function liveTick() {
+        if (liveBusy || !st.hex || !st.data || (!st.text && !st.whole)) return;
+        liveBusy = true; const hex = st.hex;
+        try {
+            const data = await api.listComments(hex, st.server, st.board, st.series);
+            if (hex !== st.hex || !st.data || sigOf(data) === sigOf(st.data)) return;
+            const added = data.comments.filter(c => !c.deleted).length - st.data.comments.filter(c => !c.deleted).length, top = panel.scrollTop;
+            st.data = data; render(); paint(); panel.scrollTop = top;
+            if (added > 0) announce(added === 1 ? 'A new comment arrived' : `${added} new comments arrived`);
+        } catch { /* the next tick asks again */ } finally { liveBusy = false; }
+    }
+    const liveStart = () => { clearInterval(liveTimer); liveTimer = pollEvery(liveTick, LIVE_MS, { machine: () => st.server || '' }); }; // pollEvery: its ticks wait out an overloaded Coral or computer and a hidden tab
+    const liveStop = () => { clearInterval(liveTimer); liveTimer = 0; };
+    document.addEventListener('visibilitychange', () => { if (!document.hidden && liveTimer) liveTick(); });
 
     const { locate, hover, paint, forget } = createHighlights({ st, dialog, body, panel, threads, groupOf, render });
 
@@ -417,7 +438,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         sheetOpen: () => isOpen(), setSheet: (open) => setSheet(open),
         /** A new artifact is on show. */
         // The computer whose artifact it is: the caller's, else the one on show (the rule renderArtifact reads the content by); a bare /api/ route is the hub's own and 404s there (#6245).
-        open(hex, server, board, series = false) { st.series = !!series; region(false); { const hl = window.CSS && CSS.highlights; if (hl) { hl.delete('ac-comment'); hl.delete('ac-active'); } } forget(); st.hex = hex; st.server = server || contextServer(); st.board = board; st.data = null; st.active = null; st.composing = null; st.error = ''; st.text = false; st.whole = false; st.gone = false; st.filter = 'open'; st.visibilitySet = false; render(); setSheet(false); },
+        open(hex, server, board, series = false) { liveStart(); st.series = !!series; region(false); { const hl = window.CSS && CSS.highlights; if (hl) { hl.delete('ac-comment'); hl.delete('ac-active'); } } forget(); st.hex = hex; st.server = server || contextServer(); st.board = board; st.data = null; st.active = null; st.composing = null; st.error = ''; st.text = false; st.whole = false; st.gone = false; st.filter = 'open'; st.visibilitySet = false; render(); setSheet(false); },
         /** The document was drawn: `text` says whether it is text the comments apply to. */
         /** The document drawn is not text the comments can point into (HTML in its frame, a picture, a PDF, a table, a video, a download): the panel is there for a comment on the whole document. */
         /** Mark up in the viewer (#12367): the marked copy of the picture on show starts a comment on the whole file, in the tray with the text box ready, and the panel (a phone's sheet) opens on it. Resolves false when this person cannot comment here. */
@@ -437,6 +458,6 @@ export function attachComments(dialog, body, host, opts = {}) {
         },
         docWhole() { st.source = ''; st.text = false; st.whole = true; refresh(); },
         docRendered(source, text) { st.source = source || ''; st.text = !!text; if (!st.text) { render(); return; } region(true); refresh(); },
-        close() { hover(null); setSheet(false); region(false); forget(); st.ranges.clear(); st.hex = null; st.data = null; clearTimeout(selTimer); selBtn.hidden = true; const hl = window.CSS && CSS.highlights; if (hl) { hl.delete('ac-comment'); hl.delete('ac-active'); } render(); },
+        close() { liveStop(); hover(null); setSheet(false); region(false); forget(); st.ranges.clear(); st.hex = null; st.data = null; clearTimeout(selTimer); selBtn.hidden = true; const hl = window.CSS && CSS.highlights; if (hl) { hl.delete('ac-comment'); hl.delete('ac-active'); } render(); },
     };
 }
