@@ -112,6 +112,7 @@ export async function reviewsOfGoal(team, goalId) {
 // Teams are read a few at a time (#13116): through the Hub each read is about a second, and eight teams one after the other were eight seconds, twice when a click came during a scan.
 const SCAN_AT_ONCE = 4;
 let pendingStarted = 0;
+let finishedAt = 0, finishedRev = -1; // when the last whole scan finished, and the revision it was good for: a forced read soon after, with nothing settled or tagged since and the same computers, is that scan (#13489)
 let lastSources = null, rescans = 0; // which computers the last scan covered, and how many times in a row it started again because the list of computers moved under it
 export function refreshReviews(force = false) {
     // showInbox requests a forced read; badge/feed updates alone must not start the project scan.
@@ -120,6 +121,7 @@ export function refreshReviews(force = false) {
     // A scan in flight is joined, not queued behind (#13116): its answer is as new as one started now, unless something was settled or tagged since it began (revision moved): it will be discarded, so a second one follows.
     if (pending) return force && pendingStarted !== revision ? pending.then(() => refreshReviews(true)) : pending;
     const sources = sourcesKey();
+    if (force && finishedAt && Date.now() - finishedAt < 30000 && finishedRev === revision && sources === lastSources) return Promise.resolve(); // opening a file, a link, or the Inbox again within 30 s of a finished scan reads nothing again (#13489: one click was a scan of every board, x9 for review and x7 saved)
     if (!force && Date.now() - lastRead < 30000 && sources === lastSources) return null; // the 30 s wait is for the same computers: a computer that came into the list since is read now (#13304)
     lastSources = sources;
     const started = revision;
@@ -165,6 +167,7 @@ export function refreshReviews(force = false) {
             if (started !== revision) { loadedRevisions.clear(); return; } // discarded payloads cannot certify the retained rows as fresh
             items = next.sort(byAge); saved = nextSaved.sort(byAge); muted = nextMuted.sort(byAge);
             errors = failed;
+            if (!failed.length) { finishedAt = Date.now(); finishedRev = revision; }
         } catch { errors = ['Review artifacts could not be refreshed.']; }
         changed();
     })().finally(() => {
@@ -198,8 +201,8 @@ export async function currentTags(row) {
 }
 
 /** Add or remove the 'read' tag, keeping the other tags as they are now; the row stays in the list and the counts follow at once. Throws with the server's words when the save fails (the row keeps its tags). */
-export async function setReviewRead(row, read) {
-    const current = await currentTags(row);
+export async function setReviewRead(row, read, { fresh = false } = {}) { // fresh: the row's tags were read a moment ago from its own team (a file's open), so the list is not walked again before the write
+    const current = fresh ? (row.tags || []) : await currentTags(row);
     if (current === null) { revision++; items = items.filter(a => a.reviewKey !== row.reviewKey); changed(); return; } // someone settled it meanwhile: nothing to write
     const rest = current.filter(t => t !== 'read');
     const tags = read ? [...rest, 'read'] : rest;
@@ -227,8 +230,8 @@ export function settleReview(row) {
 
 let lastReadNotice = 0;
 /** markOpenedRead that says so on the page when the write is refused (#12742): the sentence goes to `say` (the live region) and, at most once in ten seconds, to a visible toast, so a file that stays unread is never silent. Resolves either way. */
-export function markOpenedReadVisibly(hex, say) {
-    return markOpenedRead(hex).catch(error => {
+export function markOpenedReadVisibly(hex, say, team = '') {
+    return markOpenedRead(hex, team).catch(error => {
         const text = `Could not mark the file read: ${error && error.message ? error.message : 'try again'}`;
         if (say) say(text);
         const now = Date.now();
@@ -238,13 +241,15 @@ export function markOpenedReadVisibly(hex, say) {
 
 const reading = new Map(); // hex -> the write in flight, so the viewer and the preview opening the same artifact write once
 /** The operator opened an artifact (the viewer, a preview, a link): when it is one of the for-review artifacts, tag it read. Any other artifact is never tagged. Resolves when it is done; rejects with the server's words. */
-export function markOpenedRead(hex) {
+export function markOpenedRead(hex, team = '') {
     hex = String(hex || '').toLowerCase();
     if (!hex) return Promise.resolve();
     if (reading.has(hex)) return reading.get(hex);
     const p = (async () => {
-        if (!activated) await refreshReviews(true); else if (pending) await pending;
-        const row = items.find(a => a.hex.toLowerCase() === hex && !isRead(a) && !(a.tags || []).includes('changes requested')); // a file the Operator asked changes of waits on the agent: the viewer and the preview redraw it after the request, and that is not reading it again (#11860); it stays counted until the agent answers
+        let own = null; // the file's own row, read from its own team alone when the Inbox's scan of every team has not run (a file opened through the Hub): one team's list, not nine (#13489)
+        if (!activated && team) own = (await readTeam(team)).find(a => a.hex.toLowerCase() === hex) || null;
+        else if (!activated) await refreshReviews(true); else if (pending) await pending;
+        const row = own ? (!isRead(own) && !(own.tags || []).includes('changes requested') ? own : undefined) : items.find(a => a.hex.toLowerCase() === hex && !isRead(a) && !(a.tags || []).includes('changes requested')); // a file the Operator asked changes of waits on the agent: the viewer and the preview redraw it after the request, and that is not reading it again (#11860); it stays counted until the agent answers
         if (row) {
             if (row.new_comments > 0) { // opening the file is opening its thread: the server marks the Operator's threads seen when the comments are read (#12026), so the row is read, and the count follows
                 const { listComments } = await importOnce('./artifact_comments_api.js');
@@ -253,7 +258,7 @@ export function markOpenedRead(hex) {
                 if (seen) { row.new_comments = 0; revision++; changed(); } // only a read that went through marks them seen on the server: a failed one leaves the marker, and it clears at the next open (Security's SHOULD on #12026)
                 else if (!row.tags?.includes('for review')) return; // a decided file is in Needs you only for its news: with the news still unseen its row stays (the tag write below would drop it)
             }
-            await setReviewRead(row, true);
+            await setReviewRead(row, true, { fresh: !!own });
         }
     })().finally(() => reading.delete(hex));
     reading.set(hex, p);

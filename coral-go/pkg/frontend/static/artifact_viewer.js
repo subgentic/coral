@@ -7,7 +7,7 @@
 import { isPhoneLayout } from './phone_layout.js';
 import { markHidden } from './visible_marks.js';
 import { escapeHtml, renderMarkdownStrict, highlightCodeIn, keepFragmentsInside } from './utils.js';
-import { serverUrl, artifactPath, isCloud } from './server_base.js';
+import { serverUrl, artifactPath, isCloud, identityKey } from './server_base.js';
 import { renderArtifact, manifestDownload } from './artifact_preview.js';
 import { downloadArtifact, sanitizeDownloadName } from './artifact_download.js';
 import { trapTab } from './dialog_focus.js';
@@ -210,7 +210,7 @@ export function openArtifactViewer(hex, opts = {}) {
     _layoutType = null;
     setFullScreen(d, false);
     d.querySelector('.artifact-viewer-fullscreen').disabled = true;
-    importOnce('./inbox_reviews.js').then(m => m.markOpenedReadVisibly(hex)).catch(() => {}); // opening a for-review artifact reads it, wherever it is opened from (#9277)
+    importOnce('./inbox_reviews.js').then(m => m.markOpenedReadVisibly(hex, undefined, opts.board ? (String(opts.board).startsWith('@') ? String(opts.board) : identityKey(opts.server, opts.board)) : '')).catch(() => {}); // opening a for-review artifact reads it, wherever it is opened from (#9277); with its board known, only that team is read (#13489)
     const url = serverUrl(artifactPath(hex), opts.server);
     const title = d.querySelector('.artifact-viewer-title');
     title.textContent = visibleName(opts.filename) || 'Artifact'; // the uploader's text, without what hides or reorders it (Security on #220)
