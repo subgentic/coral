@@ -27,10 +27,10 @@ import (
 // (so % and _ are ordinary characters), the rest are enum words, names compared for equality, and times.
 
 var teamArtifactParamNames = map[string]bool{"limit": true, "offset": true, "session_id": true,
-	"q": true, "kind": true, "origin": true, "by": true, "board": true, "kept": true, "starred": true, "task": true, "goal": true, "tag": true, "since": true, "until": true, "sort": true, "cursor": true, "versions": true, "read": true, "facets": true, "muted": true}
+	"q": true, "kind": true, "origin": true, "by": true, "board": true, "kept": true, "starred": true, "task": true, "goal": true, "tag": true, "since": true, "until": true, "sort": true, "cursor": true, "versions": true, "read": true, "facets": true, "muted": true, "waiting": true}
 
 // teamArtifactQueryParams are the parameters that make the reply a query (the others are the list's original ones).
-var teamArtifactQueryParams = []string{"q", "kind", "origin", "by", "board", "kept", "starred", "task", "goal", "tag", "since", "until", "sort", "cursor", "versions", "read", "facets", "muted"}
+var teamArtifactQueryParams = []string{"q", "kind", "origin", "by", "board", "kept", "starred", "task", "goal", "tag", "since", "until", "sort", "cursor", "versions", "read", "facets", "muted", "waiting"}
 
 var (
 	teamArtifactKinds   = []string{"image", "pdf", "text", "other"}
@@ -60,6 +60,7 @@ type teamArtifactQuery struct {
 	by       []string // lower-cased
 	boards   []string // lower-cased
 	kept     *bool
+	waiting  *bool // waiting=1|0 (#13172): the files that wait for the Operator, by the server's own rule (needsYouFile: for review and not opened, or news in a decided file's thread; never saved, ignored or superseded) and still available, or the ones that do not
 	muted    *bool // muted=1|0 (#13172): the files the Operator's inbox settings mute (#12144), or the ones they do not; only the Operator's own read marks any row muted
 	read     *bool // read=1: the files the Operator has read (a read tag and no news in their thread); read=0: the ones still unread (#13162, Needs you's unread filter, applied by the computer before the page is cut)
 	starred  *bool
@@ -232,6 +233,17 @@ func parseTeamArtifactQuery(vals url.Values) (*teamArtifactQuery, error) {
 			return nil, taErr("read must be 1 or 0")
 		}
 	}
+	if v, ok, serr := taSingle("waiting", vals["waiting"]); serr != nil {
+		return nil, serr
+	} else if ok {
+		switch v {
+		case "1", "0":
+			b := v == "1"
+			q.waiting = &b
+		default:
+			return nil, taErr("waiting must be 1 or 0")
+		}
+	}
 	if v, ok, serr := taSingle("muted", vals["muted"]); serr != nil {
 		return nil, serr
 	} else if ok {
@@ -323,7 +335,7 @@ func parseTeamArtifactQuery(vals url.Values) (*teamArtifactQuery, error) {
 	}
 	// What a cursor is tied to: every filter and the sort (not limit, offset or the cursor itself).
 	fp := sha256.New()
-	fmt.Fprintf(fp, "%s|%v|%v|%v|%v|%v|%v|%v|%v|%v|%v|%v|%v|%s|%s|%v|%v", q.q, q.kinds, q.origins, q.by, q.boards, q.kept, q.starred, q.task, q.goal, q.tags, q.since, q.until, q.collapse, q.sortName, vals.Get("session_id"), q.read, q.muted)
+	fmt.Fprintf(fp, "%s|%v|%v|%v|%v|%v|%v|%v|%v|%v|%v|%v|%v|%s|%s|%v|%v|%v", q.q, q.kinds, q.origins, q.by, q.boards, q.kept, q.starred, q.task, q.goal, q.tags, q.since, q.until, q.collapse, q.sortName, vals.Get("session_id"), q.read, q.muted, q.waiting)
 	if scope := vals.Get(crossTeamScopeParam); scope != "" { // the cross-team list: its cursors are its own (a team route's is refused there) and tied to the teams asked for
 		fmt.Fprintf(fp, "|%s|%v", scope, vals["team"])
 	}
@@ -458,6 +470,9 @@ func (q *teamArtifactQuery) cheapMatch(it teamArtifact, kept, starred map[string
 	if len(q.tags) > 0 && !hasAnyTag(it.Tags, q.tags) && !(it.NewComments > 0 && hasAnyTag([]string{tagNewComments}, q.tags)) && !(hasAnyTag([]string{"for review"}, q.tags) && decidedWithNews(it.Tags, it.NewComments)) {
 		return false // the tag "new comments" is not stored: it matches the rows the Operator's list says have news (#12026); and the list tagged "for review" also holds the decided files that have news, so the page reads one list (#12097)
 	}
+	if q.waiting != nil && needsYouFile(it.Tags, it.NewComments) != *q.waiting {
+		return false
+	}
 	if q.muted != nil && it.Muted != *q.muted {
 		return false // Muted is set only on the Operator's own read (attachArtifactKinds): for anyone else no row is muted
 	}
@@ -532,7 +547,7 @@ func (q *teamArtifactQuery) kindMatch(it teamArtifact) bool {
 // needsEnrichment: the name (a digest-named object takes its sidecar's name), the type and the size of managed files come from the
 // store, so searching, kind and the name and size sorts read each candidate's sidecar and stat its blob (never its bytes).
 func (q *teamArtifactQuery) needsEnrichment() bool {
-	return q.q != "" || len(q.kinds) > 0 || q.sortName == "name" || q.sortName == "name_desc" || q.sortName == "size" || q.sortName == "size_asc" || q.sortName == "type" || q.sortName == "type_desc" || q.sortName == "tags" || q.sortName == "tags_desc" // the text sorts read the shown text: through the Hub they are redacted before they sort (redactItemForTunnel)
+	return q.q != "" || len(q.kinds) > 0 || (q.waiting != nil && *q.waiting) || q.sortName == "name" || q.sortName == "name_desc" || q.sortName == "size" || q.sortName == "size_asc" || q.sortName == "type" || q.sortName == "type_desc" || q.sortName == "tags" || q.sortName == "tags_desc" // the text sorts read the shown text: through the Hub they are redacted before they sort (redactItemForTunnel)
 }
 
 func finishTeamArtifactName(it *teamArtifact) {
@@ -753,7 +768,7 @@ func (h *BoardHandler) selectTeamArtifacts(r *http.Request, items []teamArtifact
 			}
 			var out []teamArtifact
 			for _, it := range set {
-				if qq.textMatch(it) && qq.kindMatch(it) {
+				if qq.textMatch(it) && qq.kindMatch(it) && !(qq.waiting != nil && *qq.waiting && !it.Available) { // a file that waits is one the Operator can open: its stored file is there
 					out = append(out, it)
 				}
 			}
