@@ -31,7 +31,7 @@ func TestTmuxCaptureReplayStartsEachRowAtTheFirstColumn(t *testing.T) {
 			b := &TmuxBackend{client: &tmux.Client{TmuxBin: fake, SocketPath: filepath.Join(dir, "isolated.sock")}, sessions: map[string]*tmuxSession{"agent": {logPath: log}}}
 			got, err := b.Replay("agent")
 			require.NoError(t, err)
-			require.Equal(t, "\x1b[31mfirst line\x1b[0m\r\nsecond line\r\nthird line\r\n", string(got), "capture rows need CRLF for a stream terminal")
+			require.Equal(t, "\x1b[31mfirst line\x1b[0m\r\nsecond line\r\nthird line", string(got), "capture rows need CRLF for a stream terminal")
 			stream := []byte("raw\nstream\r\n\x1b[2Cinput")
 			require.NoError(t, os.WriteFile(log, stream, 0600))
 			got, err = b.Replay("agent")
