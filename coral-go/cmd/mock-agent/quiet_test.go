@@ -1,11 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // captured runs f and returns what it wrote to stdout and stderr.
@@ -65,5 +68,61 @@ func TestNoMockLineBypassesTheQuietHelpers(t *testing.T) {
 				t.Errorf("%s:%d prints a [mock-agent] line without the quiet helpers: %s", f, i+1, tl)
 			}
 		}
+	}
+}
+
+// startMock runs the test binary as the mock in ready mode with a pipe for a terminal, waits until its stdout holds want (or 6 seconds), then ends it and returns what it printed.
+func startMock(t *testing.T, quiet bool, want string) string {
+	t.Helper()
+	cmd := exec.Command(os.Args[0], "--session-id", "00000000-0000-4000-8000-00000000c0de")
+	cmd.Env = append(os.Environ(), "MOCK_AGENT_TEST_MAIN=1", "MOCK_AGENT_READY=1", "MOCK_AGENT_RAW_DIR="+t.TempDir(), "CLAUDE_PROJECTS_DIR="+t.TempDir(), "MOCK_AGENT_QUIET=")
+	if quiet {
+		cmd.Env = append(cmd.Env, "MOCK_AGENT_QUIET=1")
+	}
+	in, _ := cmd.StdinPipe()
+	out, _ := cmd.StdoutPipe()
+	var errBuf bytes.Buffer
+	cmd.Stderr = &errBuf
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	got := make(chan string, 1)
+	go func() {
+		var all strings.Builder
+		buf := make([]byte, 4096)
+		for {
+			n, err := out.Read(buf)
+			all.Write(buf[:n])
+			if strings.Contains(all.String(), want) || err != nil {
+				got <- all.String()
+				return
+			}
+		}
+	}()
+	var s string
+	select {
+	case s = <-got:
+	case <-time.After(6 * time.Second):
+		s = "(timed out)"
+	}
+	in.Close()
+	_ = cmd.Process.Kill()
+	_ = cmd.Wait()
+	return s + "\n--stderr--\n" + errBuf.String()
+}
+
+// QA Reviewer 2's SHOULD on #13180: the quiet raw-input start prints the banner line and none of the "[mock-agent]" lines; without the variable it prints the old ready line and no banner.
+func TestQuietRawInputStartPrintsOnlyTheBanner(t *testing.T) {
+	banner := strings.TrimSpace(quietBanner)
+	q := startMock(t, true, banner)
+	if !strings.Contains(q, banner) {
+		t.Errorf("a quiet mock did not print the banner: %s", q)
+	}
+	if strings.Contains(q, "[mock-agent]") || strings.Contains(q, "session_id") || strings.Contains(q, "port=") {
+		t.Errorf("a quiet mock printed one of its lines: %s", q)
+	}
+	loud := startMock(t, false, "raw input ready")
+	if !strings.Contains(loud, "[mock-agent] raw input ready") || strings.Contains(loud, banner) {
+		t.Errorf("an ordinary mock must print its ready line and no banner: %s", loud)
 	}
 }
