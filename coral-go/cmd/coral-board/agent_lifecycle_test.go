@@ -4,7 +4,10 @@ import (
 	"bytes"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"os/exec"
 	"strings"
+	"sync/atomic"
 	"testing"
 )
 
@@ -79,12 +82,57 @@ func TestAgentLifecycleRefusalsAreTheServersWords(t *testing.T) {
 
 func TestAgentLifecycleUsageMistakesNeedNoServer(t *testing.T) {
 	isolateBoardEnv(t)
-	serverURL = "http://127.0.0.1:1" // closed: a usage mistake must be refused before any call
-	for _, args := range [][]string{{}, {"wake"}, {"nap", "Dev"}, {"wake", "Dev", "Extra"}, {"sleep", "Operator", "--board"}} {
+	saveState(&boardState{Project: "t"}) // on a board: a mistake must not stop at "not on a board" instead of the check that is meant
+	serverURL = "http://127.0.0.1:1"     // closed: a usage mistake must be refused before any call
+	for _, args := range [][]string{{}, {"wake"}, {"nap", "Dev"}, {"wake", "Dev", "Extra"}, {"sleep", "Operator", "--board"}, {"wake", "   "}, {"sleep", ""}} {
 		if err := runAgentLifecycle(args, &bytes.Buffer{}); err == nil {
-			t.Errorf("%v: no error", args)
+			t.Errorf("%q: no error", args)
 		} else if _, ok := err.(errLinkUsage); !ok {
-			t.Errorf("%v: %v is not a usage error", args, err)
+			t.Errorf("%q: %v is not a usage error", args, err)
 		}
+	}
+	// off a board the mistake is still the person's to fix, and says so
+	t.Setenv("CORAL_SESSION_NAME", "another-session")
+	pidResolutionDone, cachedPIDResolution = true, nil
+	if err := runAgentLifecycle([]string{"wake", "Dev"}, &bytes.Buffer{}); err == nil || !strings.Contains(err.Error(), "not on a board") {
+		t.Errorf("no board: %v", err)
+	}
+}
+
+// cmdAgent turns a usage mistake into exit 2 with the usage line on stderr, before any request; a 403 from the server (a non-seat agent) is exit 5, the CLI's refused code, with its words.
+func TestCmdAgentExitCodes(t *testing.T) {
+	if os.Getenv("TEST_AGENT_SUBPROCESS") == "1" {
+		os.Args = append([]string{"coral-board", "agent"}, strings.Fields(os.Getenv("TEST_AGENT_ARGS"))...)
+		cmdAgent()
+		return
+	}
+	var requests atomic.Int32
+	status := http.StatusForbidden
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests.Add(1)
+		w.WriteHeader(status)
+		w.Write([]byte(`{"error":"only the orchestrator seat the Operator named may do this","code":"not_the_seat"}`))
+	}))
+	defer ts.Close()
+	run := func(args string) (int, string) {
+		dataDir := t.TempDir()
+		cmd := exec.Command(os.Args[0], "-test.run=^TestCmdAgentExitCodes$")
+		cmd.Env = append(os.Environ(), "TEST_AGENT_SUBPROCESS=1", "TEST_AGENT_ARGS="+args, "CORAL_DATA_DIR="+dataDir, "CORAL_DIR="+dataDir, "CORAL_URL="+ts.URL, "CORAL_SESSION_NAME=exit-code-test", "CORAL_TESTGUARD_TEST_URL=1")
+		var stderr bytes.Buffer
+		cmd.Stderr = &stderr
+		err := cmd.Run()
+		code := 0
+		if ee, ok := err.(*exec.ExitError); ok {
+			code = ee.ExitCode()
+		}
+		return code, stderr.String()
+	}
+	code, stderr := run("nap Dev --board team")
+	if code != 2 || !strings.Contains(stderr, "usage: coral-board agent wake|sleep <name> [--board <board>]") || requests.Load() != 0 {
+		t.Errorf("a usage mistake: exit %d, stderr %q, %d request(s)", code, stderr, requests.Load())
+	}
+	code, stderr = run("wake Dev --board team")
+	if code != 5 || !strings.Contains(stderr, "only the orchestrator seat the Operator named may do this") || requests.Load() != 1 {
+		t.Errorf("a refusal: exit %d, stderr %q, %d request(s)", code, stderr, requests.Load())
 	}
 }
