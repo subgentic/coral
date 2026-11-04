@@ -79,3 +79,38 @@ func TestInboxVsChatCountsRefuseAWindowPastNinetyDaysAndABackwardOne(t *testing.
 	_, err = s.InboxVsChatCounts(context.Background(), "", "yesterday", now.Format(time.RFC3339))
 	assert.ErrorIs(t, err, ErrBadActivityWindow)
 }
+
+func TestInboxVsChatExcludesAutomaticSupersedesButCountsPersonIgnores(t *testing.T) {
+	s := activityStore(t)
+	ctx := context.Background()
+	now := time.Now().UTC()
+	record := func(team, action, surface, hint string) {
+		require.NoError(t, s.RecordActivity(ctx, ActivityMeta{Actor: "local", Source: "local", Surface: surface, Hint: hint}, action, "file", "x", "x", team))
+	}
+	record("alpha", ActIgnore, SurfaceInbox, "phone")
+	record("alpha", ActApprove, SurfaceInbox, "")
+	record("alpha", ActSupersede, SurfaceInbox, "phone")
+	record("alpha", ActSupersede, SurfaceChat, "")
+	record("auto-only", ActSupersede, SurfaceInbox, "")
+	since, until := now.Add(-time.Hour).Format(time.RFC3339), now.Add(time.Hour).Format(time.RFC3339)
+	got, err := s.InboxVsChatCounts(ctx, "", since, until)
+	require.NoError(t, err)
+	require.Equal(t, map[string]int{ActIgnore: 1, ActApprove: 1}, got.Inbox)
+	require.Empty(t, got.Chat)
+	require.Equal(t, 1, got.Phone.Phone)
+	require.Equal(t, 1, got.Phone.Other)
+	require.Len(t, got.Days, 1)
+	require.Equal(t, 2, got.Days[0].Inbox)
+	require.Zero(t, got.Days[0].Chat)
+	require.Equal(t, []IVCTeam{{Team: "alpha", Inbox: 2}}, got.Teams)
+	only, err := s.InboxVsChatCounts(ctx, "auto-only", since, until)
+	require.NoError(t, err)
+	require.Empty(t, only.Inbox)
+	require.Empty(t, only.Chat)
+	require.Empty(t, only.Days)
+	require.Empty(t, only.Teams)
+	// Excluding automated work from this metric must preserve the Activity ledger.
+	rows, err := s.ListActivity(ctx, ActivityFilter{Action: ActSupersede})
+	require.NoError(t, err)
+	require.Len(t, rows, 3)
+}

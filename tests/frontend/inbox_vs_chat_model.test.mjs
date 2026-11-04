@@ -46,4 +46,9 @@ assert.equal(D.shareWords(null), 'no actions'); assert.equal(D.shareWords(0.456)
 assert.equal(D.inboxModel(read({ record_since: '2026-11-01', inbox: { brand_new: 2 } })).kinds[0].name, 'brand_new');
 assert.doesNotThrow(() => D.inboxModel(null));
 assert.doesNotThrow(() => D.inboxModel({}));
+// Older server reads may still carry this Activity kind: use honest words.
+const automatic = D.inboxModel(read({ record_since: '2026-11-01', inbox: { supersede: 1, ignore: 1 } }));
+assert.equal(automatic.kinds.find(k => k.key === 'supersede').name, 'Superseded automatically');
+assert.equal(automatic.kinds.find(k => k.key === 'ignore').name, 'Dismissed');
+
 console.log('PASS inbox_vs_chat_model: the grid, the 7-day share, the kinds, the teams, the unknowns');
