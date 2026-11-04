@@ -1223,6 +1223,7 @@ export async function showInbox({ folder = '', quiet = false } = {}) {
     if (nativeInbox()) { // the Hub-served Inbox draws the chat folders, Goals and Artifacts: Needs you, Tasks and Saved are the Hub's own framed pages (no request for them)
         refreshGoals();
         IA.refreshArtifactCount(() => renderFolderCounts());
+        if (nativeNeeds()) { refreshOperatorAsks(true); refreshReviews(true); refreshProposals(true); } // Coral's own Needs you table through the Hub (#13450): the questions agents asked the Operator (each online computer, through the Hub), the files for review and the proposals
     } else {
         refreshTasks();
         refreshReviews(true);
