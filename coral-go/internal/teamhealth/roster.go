@@ -50,7 +50,9 @@ type WaitGroup struct {
 type BlockedEntry struct {
 	Name   string
 	Resets time.Duration
-	Model  string
+	// ModelRefused: a Codex agent whose model its login refuses (#13480), not a usage limit; Model is the model's name when it has a safe one, "" otherwise.
+	ModelRefused bool
+	Model        string
 }
 
 // Roster is everything the check says about the agents.
@@ -257,7 +259,7 @@ func (r *Roster) Facts() []string {
 		out = append(out, fmt.Sprintf("w:%s/%t:%s", g.On, g.You, strings.Join(names, ",")))
 	}
 	for _, b := range r.Blocked {
-		out = append(out, "b:"+b.Name+b.Model)
+		out = append(out, fmt.Sprintf("b:%s/%t/%s", b.Name, b.ModelRefused, b.Model))
 	}
 	for _, ni := range r.NameIssues {
 		out = append(out, fmt.Sprintf("n:%s/%t/%d", ni.Name, ni.Edge, ni.Posts)) // a new one is news; its age ticking is not (#11729)
