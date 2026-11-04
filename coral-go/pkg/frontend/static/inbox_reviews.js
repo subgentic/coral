@@ -114,14 +114,14 @@ const SCAN_AT_ONCE = 4;
 let pendingStarted = 0;
 let finishedAt = 0, finishedRev = -1; // when the last whole scan finished, and the revision it was good for: a forced read soon after, with nothing settled or tagged since and the same computers, is that scan (#13489)
 let lastSources = null, rescans = 0; // which computers the last scan covered, and how many times in a row it started again because the list of computers moved under it
-export function refreshReviews(force = false) {
+export function refreshReviews(force = false, { reuse = false } = {}) { // reuse: a read for opening one file or link, which a scan finished in the last 30 s answers (#13489); every other forced read is a fresh one
     // showInbox requests a forced read; badge/feed updates alone must not start the project scan.
     if (force) activated = true;
     if (!activated) return null;
     // A scan in flight is joined, not queued behind (#13116): its answer is as new as one started now, unless something was settled or tagged since it began (revision moved): it will be discarded, so a second one follows.
     if (pending) return force && pendingStarted !== revision ? pending.then(() => refreshReviews(true)) : pending;
     const sources = sourcesKey();
-    if (force && finishedAt && Date.now() - finishedAt < 30000 && finishedRev === revision && sources === lastSources) return Promise.resolve(); // opening a file, a link, or the Inbox again within 30 s of a finished scan reads nothing again (#13489: one click was a scan of every board, x9 for review and x7 saved)
+    if (force && reuse && finishedAt && Date.now() - finishedAt < 30000 && finishedRev === revision && sources === lastSources) return Promise.resolve(); // opening a file, a link, or the Inbox again within 30 s of a finished scan reads nothing again (#13489: one click was a scan of every board, x9 for review and x7 saved)
     if (!force && Date.now() - lastRead < 30000 && sources === lastSources) return null; // the 30 s wait is for the same computers: a computer that came into the list since is read now (#13304)
     lastSources = sources;
     const started = revision;
@@ -248,7 +248,7 @@ export function markOpenedRead(hex, team = '') {
     const p = (async () => {
         let own = null; // the file's own row, read from its own team alone when the Inbox's scan of every team has not run (a file opened through the Hub): one team's list, not nine (#13489)
         if (!activated && team) own = (await readTeam(team)).find(a => a.hex.toLowerCase() === hex) || null;
-        else if (!activated) await refreshReviews(true); else if (pending) await pending;
+        else if (!activated) await refreshReviews(true, { reuse: true }); else if (pending) await pending;
         const row = own ? (!isRead(own) && !(own.tags || []).includes('changes requested') ? own : undefined) : items.find(a => a.hex.toLowerCase() === hex && !isRead(a) && !(a.tags || []).includes('changes requested')); // a file the Operator asked changes of waits on the agent: the viewer and the preview redraw it after the request, and that is not reading it again (#11860); it stays counted until the agent answers
         if (row) {
             if (row.new_comments > 0) { // opening the file is opening its thread: the server marks the Operator's threads seen when the comments are read (#12026), so the row is read, and the count follows
