@@ -151,7 +151,7 @@ func seedBigUploads(t *testing.T, coralDir string, n int) []string {
 		require.NoError(t, os.WriteFile(filepath.Join(objDir, id+".json"), meta, 0o644))
 		rec, _ := json.Marshal(agentUploadRecord{agentArtifactMeta: agentArtifactMeta{Name: name, MediaType: "text/markdown", Size: int64(len(content)), Digest: "sha256:" + id}, CreatedAt: base.Add(time.Duration(i) * time.Second).Format(time.RFC3339)})
 		require.NoError(t, os.WriteFile(filepath.Join(dir, id+".json"), rec, 0o644))
-			ids = append(ids, id)
+		ids = append(ids, id)
 	}
 	return ids
 }

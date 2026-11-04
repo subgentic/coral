@@ -249,6 +249,31 @@ func (h *BoardHandler) projectArtifactItems(r *http.Request, project, sessionFil
 	if err != nil {
 		return nil, false, err
 	}
+	// The revision is read BEFORE the data: a write during the build leaves the entry older than the next token (see teamItemsCache).
+	key := teamItemsKey{project: project, session: sessionFilter, rev: h.bs.ArtifactsRevision(project), subscribers: h.teamItemsSubscribers(subscribers)}
+	items, scanTruncated, hit := h.itemsCache.get(key)
+	if !hit {
+		items, scanTruncated, err = h.buildProjectArtifactItems(r, project, sessionFilter, subscribers)
+		if err != nil {
+			return nil, false, err
+		}
+		h.itemsCache.put(key, items, scanTruncated)
+	}
+	// What depends on the caller, or on settings that do not move the revision, is applied to this request's copy.
+	h.attachNewComments(r, items)
+	h.attachArtifactKinds(r, project, items)
+	items = filterReadable(r, h.coralDir, items) // an agent's list holds only what the one read check lets it read, so the totals and the cursor count nothing else (#5577)
+	if !ownerSeesPrivateMarks(r) {
+		for i := range items {
+			items[i].Private = false // the marks are kept with the list; this caller may not see them
+		}
+	}
+	return items, scanTruncated, nil
+}
+
+// buildProjectArtifactItems is the part of the list that is the team's own (the same for every caller): the task results, the uploads of its agents, the cross-team rows, the upload task links and the tags.
+func (h *BoardHandler) buildProjectArtifactItems(r *http.Request, project, sessionFilter string, subscribers map[string]string) ([]teamArtifact, bool, error) {
+	teamItemsBuildHook()
 	tasks, scanTruncated, err := h.bs.ListTeamArtifactTasksQuery(r.Context(), board.TeamArtifactQuery{
 		Project: project, Limit: board.MaxTeamArtifactTaskScan, SessionID: sessionFilter, Subscribers: subscribers,
 	})
@@ -268,10 +293,7 @@ func (h *BoardHandler) projectArtifactItems(r *http.Request, project, sessionFil
 	}
 	h.linkUploadTasks(r.Context(), project, items)
 	h.attachArtifactTags(r.Context(), project, items)
-	h.attachNewComments(r, items)
-	h.attachArtifactKinds(r, project, items)
-	items = filterReadable(r, h.coralDir, items) // an agent's list holds only what the one read check lets it read, so the totals and the cursor count nothing else (#5577)
-	h.attachArtifactPrivate(r, items)
+	h.markPrivateArtifacts(r.Context(), items)
 	return items, scanTruncated, nil
 }
 
@@ -936,7 +958,16 @@ func (h *BoardHandler) addWaitsOnThis(r *http.Request, project string, rows []te
 // attachArtifactPrivate marks the items the manager made private, for the owner's own read only (the person at this computer, or the Hub owner): an agent's list and a guide's never carry the mark. A failure leaves the
 // marks off (the list is the same without them).
 func (h *BoardHandler) attachArtifactPrivate(r *http.Request, items []teamArtifact) {
-	if h.bs == nil || !ownerSeesPrivateMarks(r) {
+	if !ownerSeesPrivateMarks(r) {
+		return
+	}
+	h.markPrivateArtifacts(r.Context(), items)
+}
+
+// markPrivateArtifacts puts Private on the rows whose artifact is private to the manager, whoever asks: the list kept for a walk holds it (a mark moves the revision, SetArtifactPrivate), and a caller who may not see
+// the marks has them taken off its copy (hidePrivateMarks).
+func (h *BoardHandler) markPrivateArtifacts(ctx context.Context, items []teamArtifact) {
+	if h.bs == nil {
 		return
 	}
 	ids := make([]string, 0, len(items))
@@ -945,7 +976,7 @@ func (h *BoardHandler) attachArtifactPrivate(r *http.Request, items []teamArtifa
 			ids = append(ids, id)
 		}
 	}
-	marks, err := h.bs.PrivateArtifacts(r.Context(), ids)
+	marks, err := h.bs.PrivateArtifacts(ctx, ids)
 	if err != nil || len(marks) == 0 {
 		return
 	}
