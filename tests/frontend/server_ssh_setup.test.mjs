@@ -11,7 +11,7 @@ const options = { hosts: ['build-box', 'second'], acceptance_label: 'hub-owner@m
 const steps = (states = {}) => ['connect', 'detect', 'install', 'start', 'register'].map(n => ({ name: n, title: `Step ${n}`, state: states[n] || 'pending', detail: n === 'detect' && states.detect === 'ok' ? 'Linux x86_64, tmux found.' : '' }));
 
 let calls, polls, planKind, runBody;
-function hub({ keys = [], failConnect = false, keyChanged = false, kind = 'setup' } = {}) {
+function hub({ keys = [], failConnect = false, keyChanged = false, kind = 'setup', extra = {} } = {}) {
     calls = []; polls = 0; runBody = null;
     globalThis.fetch = async (url, init = {}) => {
         const method = init.method || 'GET';
@@ -26,7 +26,7 @@ function hub({ keys = [], failConnect = false, keyChanged = false, kind = 'setup
         if (url === '/api/servers/provision/p1/connect') {
             if (keyChanged) return json({ plan: 'p1', kind: planKind, phase: 'failed', error: 'The host key has changed since you confirmed it. This may be a different computer.', key_changed: true, steps: steps({ connect: 'failed' }) });
             if (failConnect) return json({ plan: 'p1', kind: planKind, phase: 'failed', error: 'Could not connect.', steps: steps({ connect: 'failed' }) });
-            return json({ plan: 'p1', target: 'user@box.example.com:22', server_id: 'ssh-box', label: 'Build box', kind: planKind, phase: keys.length ? 'needs_keys' : 'connected', host_keys: keys, system: 'Linux x86_64', steps: steps() });
+            return json({ plan: 'p1', target: 'user@box.example.com:22', server_id: 'ssh-box', label: 'Build box', kind: planKind, phase: keys.length ? 'needs_keys' : 'connected', ...extra, host_keys: keys, system: 'Linux x86_64', steps: steps() });
         }
         if (url === '/api/servers/provision/p1/forget-key') return json({ plan: 'p1', target: 'user@box.example.com:22', server_id: 'ssh-box', label: 'Build box', kind: planKind, phase: 'planned', forgotten_keys: [{ host: 'box.example.com', type: 'ssh-ed25519', fingerprint: 'SHA256:oldoldold<img src=x onerror=alert(1)>' }], steps: steps() });
         if (url === '/api/servers/provision/p1/run') {
@@ -367,6 +367,51 @@ for (const field of ['dataDir']) {
         await until(() => runBody, 'the run');
         assert.equal(runBody.accept_keys, true, label + 'the confirmation is sent once the box is ticked and the field valid');
     }
+}
+
+// ── the gates also hold when run() itself is reached: a click that is forced past a disabled button sends nothing, whichever gate is closed (UI Reviewer's and QA Engineer's SHOULDs on the hotfix) ──
+{
+    const runCalls = () => calls.filter(c => c.path.endsWith('/run')).length;
+    const force = (host, label) => { const b = btn(host, label); b.disabled = false; b.removeAttribute('disabled'); b.click(); }; // what a script, a stale handler or a dispatched click does
+    const settle = () => new Promise(r => setTimeout(r, 30));
+    // a setup with host keys: the keys gate, then the folder gate, then the busy gate
+    hub({ keys: [{ host: 'box.example.com', type: 'ssh-ed25519', fingerprint: 'SHA256:abc' }] });
+    let host = fresh();
+    mountSshSetup(host, { mode: 'setup', pollMs: 5 });
+    await until(() => $(host, '#ssh-picked'), 'the form');
+    $(host, '#ssh-host').value = 'user@box.example.com'; $(host, '#ssh-host').dispatchEvent(new dom.window.Event('input'));
+    $(host, 'form').dispatchEvent(new dom.window.Event('submit', { cancelable: true }));
+    await until(() => btn(host, 'Connect'), 'the plan');
+    btn(host, 'Connect').click();
+    await until(() => $(host, '#ssh-keys-ok'), 'the host keys');
+    force(host, 'Set up'); await settle();
+    assert.equal(runCalls(), 0, 'keys not confirmed: a forced click sends nothing');
+    assert.match(host.textContent, /Confirm the host fingerprints first/, 'and the page says which gate holds');
+    $(host, '#ssh-keys-ok').click();
+    const f = $(host, '#ssh-datadir-input'); f.value = '../x'; f.dispatchEvent(new dom.window.Event('input'));
+    force(host, 'Set up'); await settle();
+    assert.equal(runCalls(), 0, 'folder invalid: a forced click sends nothing');
+    assert.match(host.textContent, /plain folder names/, 'and the page gives the folder\'s reason');
+    $(host, '#ssh-datadir-input').value = '.coral'; $(host, '#ssh-datadir-input').dispatchEvent(new dom.window.Event('input'));
+    btn(host, 'Set up').click();
+    await until(() => runBody, 'the run');
+    assert.equal(runCalls(), 1, 'every gate open: one run');
+    const working = [...host.querySelectorAll('button')].find(b => /Working/.test(b.textContent));
+    if (working) { working.disabled = false; working.removeAttribute('disabled'); working.click(); } // a second press while the run is going
+    await settle();
+    assert.equal(runCalls(), 1, 'busy: a forced second click does not start another run');
+
+    // an upgrade that is not wanted (the computer already runs this hub\'s release): a forced click sends nothing
+    hub({ extra: { remote_version: '2.0.42', hub_version: '2.0.42' } }); planKind = 'upgrade';
+    host = fresh();
+    mountSshSetup(host, { mode: 'manage', server: { id: 'ssh-box', label: 'Build box' }, action: 'upgrade', pollMs: 5 });
+    await until(() => btn(host, 'Connect'), 'the plan');
+    btn(host, 'Connect').click();
+    await until(() => [...host.querySelectorAll('button')].some(b => /Upgrade|Up to date/i.test(b.textContent) && b.dataset.sshGo), 'the confirm');
+    const up = host.querySelector('[data-ssh-go]');
+    assert.equal(up.disabled, true, 'same version: closed');
+    up.disabled = false; up.removeAttribute('disabled'); up.click(); await settle();
+    assert.equal(runCalls(), 0, 'upgrade not wanted: a forced click sends nothing');
 }
 
 console.log('server_ssh_setup: ok');
