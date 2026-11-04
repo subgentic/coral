@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math"
 	"path/filepath"
 	"strings"
 
@@ -40,7 +41,7 @@ func videoCommentLabel(c store.ArtifactComment) string {
 	if c.AtS == nil {
 		return ""
 	}
-	stamp := func(s float64) string { n := int(s); return fmt.Sprintf("%02d:%02d", n/60, n%60) }
+	stamp := func(s float64) string { n := int(math.Round(s)); return fmt.Sprintf("%02d:%02d", n/60, n%60) }
 	label := stamp(*c.AtS)
 	if c.EndS != nil {
 		label += "–" + stamp(*c.EndS)

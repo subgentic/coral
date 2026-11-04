@@ -62,3 +62,20 @@ func TestVideoTimelineOrderKeepsRepliesAndFiltersBoards(t *testing.T) {
 	require.Len(t, list, 1)
 	require.Equal(t, late.ID, list[0].ID)
 }
+
+func TestVideoEqualTimesUseRootIDTieBreakWithReplies(t *testing.T) {
+	s := newCommentStore(t)
+	ctx := context.Background()
+	at := 10.0
+	c := mk(artA, "team-a", "first", nil)
+	c.AtS = &at
+	first, e := s.CreateArtifactComment(ctx, c)
+	require.NoError(t, e)
+	second, e := s.CreateArtifactComment(ctx, c)
+	require.NoError(t, e)
+	reply, e := s.CreateArtifactComment(ctx, mk(artA, "team-a", "reply to first", &first.ID))
+	require.NoError(t, e)
+	list, e := s.ListArtifactComments(ctx, artA, "", nil)
+	require.NoError(t, e)
+	require.Equal(t, []int64{first.ID, reply.ID, second.ID}, []int64{list[0].ID, list[1].ID, list[2].ID})
+}
