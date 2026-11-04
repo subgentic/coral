@@ -26,7 +26,7 @@ const B = 'bigboard-13326-' + TAG, SESSION = '13326000-0000-4000-8000-' + String
     const client = await CDP({ port: Number(process.env.CDP_PORT || 9222) });
     const { Page, Runtime, Emulation, Input } = client;
     const ev = async expression => { const r = await Runtime.evaluate({ expression, returnByValue: true, awaitPromise: true }); if (r.exceptionDetails) throw new Error(JSON.stringify(r.exceptionDetails).slice(0, 400)); return r.result.value; };
-    const { waitFor, coralReady } = require('./helpers/wait').bind(ev);
+    const { waitFor, coralReady, nextFrame } = require('./helpers/wait').bind(ev);
     const objects = path.join(DATA, 'artifacts', 'objects'), uploads = path.join(DATA, 'artifacts', 'uploads', SESSION), boardDb = path.join(DATA, 'messageboard.db');
     const written = []; // the object ids this run wrote: removed again
     let agent = null, cleaned = null;
@@ -89,7 +89,7 @@ const B = 'bigboard-13326-' + TAG, SESSION = '13326000-0000-4000-8000-' + String
         await ev(`(() => { window.__lt = []; try { new PerformanceObserver(l => { for (const e of l.getEntries()) window.__lt.push(e.duration); }).observe({ type: 'longtask' }); } catch (e) {} const c = document.getElementById('command-input'); c.focus(); return true; })()`);
         for (const ch of 'the quick brown fox jumps over the lazy dog, a few more words to type in the box') {
             await Input.dispatchKeyEvent({ type: 'keyDown', key: ch, text: ch }); await Input.dispatchKeyEvent({ type: 'keyUp', key: ch });
-            await ev(`new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))`); await new Promise(r => setTimeout(r, 20)); // sleep-ok: a typist's pace
+            await nextFrame(); await new Promise(r => setTimeout(r, 20)); // sleep-ok: a typist's pace
         }
         const lt = await ev(`window.__lt.slice()`);
         results.typingLongestTaskMs = Math.round(Math.max(0, ...lt)); results.typingLongTasks = lt.length;
