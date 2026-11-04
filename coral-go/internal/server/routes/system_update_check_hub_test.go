@@ -117,3 +117,37 @@ func TestCheckHubDoesNotCheckAnInstallTheUpdaterDoesNotUpdate(t *testing.T) {
 	assert.NotEmpty(t, out["code"])
 	assert.Zero(t, e.checksRun())
 }
+
+// #13258: the closed words coral-hub reads, through the tunnel only; the local dashboard's shape is unchanged.
+func TestTheHubStatusSaysOneClosedWord(t *testing.T) {
+	e := newRelaunchEnv(t)
+	owner := hubHdr(ownerA)
+	word := func() any {
+		t.Helper()
+		code, out := e.status(owner)
+		require.Equal(t, http.StatusOK, code)
+		return out["hub_state"]
+	}
+	assert.Equal(t, "staged", word(), "a verified update is staged")
+	_, out := e.status(owner)
+	assert.Equal(t, "1.4.131", out["staged"].(map[string]any)["version"], "with its version as a plain string")
+	assert.Equal(t, true, out["staged"].(map[string]any)["verified"])
+
+	e.up.rec.Staged = nil
+	assert.Equal(t, "not_checked", word(), "nothing checked yet")
+	e.up.rec.CheckedAt = e.now.Add(-time.Hour)
+	assert.Equal(t, "up_to_date", word(), "checked, nothing newer")
+	e.up.rec.State = updFailed
+	assert.Equal(t, "failed", word())
+	e.up.rec.State = updNone
+	e.h.checking.Store(true)
+	assert.Equal(t, "checking", word(), "a check is running")
+	e.h.checking.Store(false)
+	e.settings[HubRelaunchSetting] = "false"
+	assert.Equal(t, "hub_relaunch_off", word(), "the person's switch off beats every other word")
+	e.settings[HubRelaunchSetting] = "true"
+
+	code, local := e.status(nil)
+	require.Equal(t, http.StatusOK, code)
+	assert.NotContains(t, local, "hub_state", "this computer's own dashboard reads the shape it always did")
+}

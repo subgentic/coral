@@ -699,6 +699,9 @@ func (h *UpdateRelaunchHandler) Status(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.addChannelFacts(r, out)
+	if viaTunnel(r) {
+		out["hub_state"] = h.hubState(v, out["state"])
+	}
 	// What the page may promise (#7343): the Hub's relaunch exists only while the Hub's feature is on
 	out["relaunch_available"] = h.on()
 	if relaunchNeedsLocalApproval && !viaTunnel(r) {
@@ -713,6 +716,34 @@ func (h *UpdateRelaunchHandler) Status(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, http.StatusOK, out)
+}
+
+// The closed set of words coral-hub's Computers page reads for a computer's update (#13258): nothing else, no path and no updater text. staged is told with the staged version and its verified flag (the existing
+// staged object); the switch words come first, so a computer that does not let the Hub update it says so whatever else is true.
+const (
+	hubStateRelaunchOff = "hub_relaunch_off"
+	hubStateChecking    = "checking"
+	hubStateFailed      = "failed"
+	hubStateStaged      = "staged"
+	hubStateNotChecked  = "not_checked"
+	hubStateUpToDate    = "up_to_date"
+)
+
+func (h *UpdateRelaunchHandler) hubState(v relaunchView, state any) string {
+	switch {
+	case !v.hubAllowed:
+		return hubStateRelaunchOff
+	case h.checking.Load():
+		return hubStateChecking
+	case state == updFailed:
+		return hubStateFailed
+	case v.version != "":
+		return hubStateStaged
+	case v.rec.CheckedAt.IsZero():
+		return hubStateNotChecked
+	default:
+		return hubStateUpToDate
+	}
 }
 
 // -- the relaunch --
