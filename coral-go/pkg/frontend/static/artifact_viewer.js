@@ -44,12 +44,14 @@ let _overlay = 0;        // its entry in overlay_history.js while it is open on 
 
 // Layout preferences are scoped by kind, not by artifact ID; browserLocal catches
 // blocked/full storage (including an embedded Hub frame) and falls back to memory.
-let _layoutType = 'application/octet-stream';
+let _layoutType = null; // unresolved: never read or persist a generic preference while loading
 function layoutType(opts) {
     const mime = String(opts.mediaType || '').split(';')[0].trim().toLowerCase();
-    if (mime) return mime;
     const ext = String(opts.filename || '').split('.').pop().toLowerCase();
-    return ({ html: 'text/html', htm: 'text/html', md: 'text/markdown', markdown: 'text/markdown', txt: 'text/plain', pdf: 'application/pdf', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', svg: 'image/svg+xml' })[ext] || 'application/octet-stream';
+    const hint = ({ html: 'text/html', htm: 'text/html', xhtml: 'text/html', md: 'text/markdown', markdown: 'text/markdown', mdown: 'text/markdown', txt: 'text/plain', pdf: 'application/pdf', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', svg: 'image/svg+xml', gif: 'image/gif', webp: 'image/webp', csv: 'text/csv', json: 'application/json' })[ext];
+    if (!mime || ['application/octet-stream', 'binary/octet-stream', 'application/x-download'].includes(mime)) return hint || null;
+    if (mime === 'text/plain' && hint) return hint;
+    return ({ 'text/x-markdown': 'text/markdown', 'application/xhtml+xml': 'text/html', 'image/jpg': 'image/jpeg' })[mime] || mime;
 }
 function setFullScreen(d, on, remember = false) {
     d.classList.toggle('av-fullscreen', on);
@@ -58,7 +60,7 @@ function setFullScreen(d, on, remember = false) {
     button.setAttribute('aria-label', on ? 'Exit full screen' : 'Full screen');
     button.title = on ? 'Exit full screen (Esc)' : 'Full screen';
     button.textContent = on ? '⤡' : '⤢';
-    if (remember) browserLocal.set('coral-artifact-fullscreen:' + _layoutType, String(on));
+    if (remember && _layoutType) browserLocal.set('coral-artifact-fullscreen:' + _layoutType, String(on));
 }
 function escapeViewer(d) {
     if (d.classList.contains('av-fullscreen') && !isPhoneLayout()) {
@@ -159,7 +161,7 @@ function _build() {
     let _isPicture = false, _canWrite = false;
     const syncMarkUp = () => { d.querySelector('.artifact-viewer-markup').hidden = d.querySelector('.artifact-viewer-markup-item').hidden = !(_isPicture && _canWrite); };
     d._markUp = { picture: on => { _isPicture = on; syncMarkUp(); }, write: on => { _canWrite = on; syncMarkUp(); } };
-    _comments = attachComments(d, d.querySelector('.artifact-viewer-body'), d.querySelector('.artifact-viewer-main'), { onCanWrite: ok => d._markUp.write(ok), preferenceKey: () => 'coral-artifact-comments:' + _layoutType });
+    _comments = attachComments(d, d.querySelector('.artifact-viewer-body'), d.querySelector('.artifact-viewer-main'), { onCanWrite: ok => d._markUp.write(ok), preferenceKey: () => _layoutType ? 'coral-artifact-comments:' + _layoutType : null });
     _versions = attachVersions(d, {
         version: n => { const t = d.querySelector('.artifact-viewer-title'); t.querySelector('.artifact-viewer-version')?.remove(); if (n > 1) t.append(Object.assign(document.createElement('span'), { className: 'artifact-viewer-version', textContent: ` · version ${n}` })); }, // Coral numbers the versions: the name is the agent's (#11865)
         body: () => d.querySelector('.artifact-viewer-body'),
@@ -205,8 +207,9 @@ export function openArtifactViewer(hex, opts = {}) {
     _abort = new AbortController();
     const gen = ++_gen;
     _server = opts.server; _hex = hex; _lastOpts = opts;
-    _layoutType = layoutType(opts);
-    setFullScreen(d, browserLocal.get('coral-artifact-fullscreen:' + _layoutType) === 'true');
+    _layoutType = null;
+    setFullScreen(d, false);
+    d.querySelector('.artifact-viewer-fullscreen').disabled = true;
     importOnce('./inbox_reviews.js').then(m => m.markOpenedReadVisibly(hex)).catch(() => {}); // opening a for-review artifact reads it, wherever it is opened from (#9277)
     const url = serverUrl(artifactPath(hex), opts.server);
     const title = d.querySelector('.artifact-viewer-title');
@@ -257,6 +260,12 @@ export function openArtifactViewer(hex, opts = {}) {
     Promise.resolve(renderArtifact(body, `coral://artifacts/${hex}`, { server: opts.server, filename: opts.filename, mediaType: opts.mediaType }, {
         signal: _abort.signal,
         isStale: () => gen !== _gen || d.hidden,
+        typeResolved: metadata => {
+            if (gen !== _gen || d.hidden) return;
+            _layoutType = layoutType(metadata) || layoutType(opts) || 'application/octet-stream';
+            setFullScreen(d, browserLocal.get('coral-artifact-fullscreen:' + _layoutType) === 'true');
+            d.querySelector('.artifact-viewer-fullscreen').disabled = false;
+        },
         renderContent: (el, content, path, server) => { textShown = true; renderArtifactText(el, content, path, server); _comments.docRendered(content, true); },
         openEntry: (entry) => {
             const m = /^coral:\/\/artifacts\/([a-f0-9]{64})$/i.exec(entry.uri || '');

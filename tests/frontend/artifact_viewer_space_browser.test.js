@@ -9,7 +9,7 @@ const BASE = require('./test_base').BASE;
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const { Input } = client;
     const failures = [];
-    const shot = async name => { const dir = process.env.CORAL_SCREENSHOT_DIR; if (dir) { await ev(`Promise.all((document.querySelector('#artifact-viewer .ac-panel')?.getAnimations() || []).map(a => a.finished.catch(() => {}))).then(() => true)`); fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(`${dir}/${name}.png`, Buffer.from((await Page.captureScreenshot({format:'png'})).data,'base64')); } };
+    const shot = async name => { const dir = process.env.CORAL_SCREENSHOT_DIR; await ev(`Promise.all((document.querySelector('#artifact-viewer .ac-panel')?.getAnimations() || []).map(a => a.finished.catch(() => {}))).then(() => true)`); if (dir) { fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(`${dir}/${name}.png`, Buffer.from((await Page.captureScreenshot({format:'png'})).data,'base64')); } };
     const open = async (hex = H3, filename = 'wide.html', mediaType = 'text/html') => {
         await ev(`import((window.__coralStatic || '/static/')+'artifact_viewer.js').then(m=>m.openArtifactViewer('${hex}', {filename:${JSON.stringify(filename)}, mediaType:${JSON.stringify(mediaType)}, board:'team-a', from:'Writer · Please review the wide table'})).then(()=>true)`);
         await waitFor(`document.querySelector('#artifact-viewer .ac-toggle:not([hidden])') && document.querySelector('#artifact-viewer .artifact-viewer-body').textContent !== 'Loading…'`, 'file and comments');
@@ -78,6 +78,30 @@ const BASE = require('./test_base').BASE;
             await close();
             await Emulation.setDeviceMetricsOverride({width:1440,height:900,deviceScaleFactor:1,mobile:false});
             await Emulation.setTouchEmulationEnabled({enabled:false});
+            // Raw coral links intentionally carry no filename/media type. Their
+            // fetched type must select the same preference as a named file.
+            await ev(`localStorage.clear(); true`);
+            const bare = async hex => {
+                await ev(`import((window.__coralStatic || '/static/')+'artifact_refs.js').then(m => { document.getElementById('space-bare-link')?.remove(); const p=document.createElement('p');p.id='space-bare-link';p.innerHTML=m.linkedHtml('coral://artifacts/${hex}');document.body.append(p);p.querySelector('a').click();return true; })`);
+                await waitFor(`!document.querySelector('#artifact-viewer').hidden && !!document.querySelector('#artifact-viewer .ac-toggle:not([hidden])') && !document.querySelector('#artifact-viewer .inline-preview-loading')`, 'bare artifact resolved');
+                await ev(framesJs(4));
+            };
+            const layout = () => ev(`({full:document.querySelector('#artifact-viewer .artifact-viewer-fullscreen').getAttribute('aria-pressed'),comments:document.querySelector('#artifact-viewer .ac-toggle').getAttribute('aria-expanded')})`);
+            await bare(H3); await click('.artifact-viewer-fullscreen'); await click('.ac-toggle');
+            assert.equal(await ev(`localStorage.getItem('coral-artifact-fullscreen:text/html')`),'true','bare HTML resolves its actual response type before saving');
+            await close(); await bare(H1);
+            assert.deepEqual(await layout(),{full:'false',comments:'false'},'bare Markdown does not inherit HTML preferences');
+            await close(); await bare(H3);
+            assert.deepEqual(await layout(),{full:'true',comments:'true'},'bare HTML restores its own preferences');
+            await close();
+            await ev(`(() => {const real=window.fetch;window.fetch=(u,o)=>String(u).includes('/api/artifacts/${'2'.repeat(64)}') && !/comments|versions/.test(String(u)) ? Promise.resolve(new Response('image bytes',{headers:{'content-type':'application/octet-stream','content-disposition':'attachment; filename="image.png"'}})) : real(u,o);return true;})()`);
+            await open('2'.repeat(64),'image.png','application/octet-stream');
+            assert.deepEqual(await layout(),{full:'false',comments:'false'},'generic-MIME image filename does not inherit HTML preferences');
+            await click('.artifact-viewer-fullscreen');
+            assert.equal(await ev(`localStorage.getItem('coral-artifact-fullscreen:image/png')`),'true','generic MIME uses the informative image filename');
+            await close(); await open(H3,'wide.html','application/octet-stream');
+            assert.deepEqual(await layout(),{full:'true',comments:'true'},'generic-MIME HTML canonicalizes to the existing HTML choice');
+            await close();
             await ev(`Object.defineProperty(window,'localStorage',{configurable:true,get(){throw new DOMException('Blocked','SecurityError');}});true`);
             await open(H1,'notes.txt','text/plain');
             await click('.artifact-viewer-fullscreen'); await click('.ac-toggle'); await close();

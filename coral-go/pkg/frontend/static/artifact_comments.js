@@ -82,8 +82,9 @@ export function attachComments(dialog, body, host, opts = {}) {
     const phone = window.matchMedia(PHONE_QUERY);
     const sheet = opts.sheet || (() => phone.matches); // the panel is a bottom sheet over the document
     const isOpen = () => panel.classList.contains('ac-sheet-open');
-    const remember = (open) => browserLocal.set(opts.preferenceKey?.() || OPEN_KEY, open ? 'open' : 'closed');
-    const remembered = () => { const choice = browserLocal.get(opts.preferenceKey?.() || OPEN_KEY); return choice === 'open' ? true : choice === 'closed' ? false : null; };
+    const preferenceKey = () => opts.preferenceKey ? opts.preferenceKey() : OPEN_KEY;
+    const remember = (open) => { const key = preferenceKey(); if (key) browserLocal.set(key, open ? 'open' : 'closed'); };
+    const remembered = () => { const key = preferenceKey(), choice = key ? browserLocal.get(key) : null; return choice === 'open' ? true : choice === 'closed' ? false : null; };
     const syncOn = () => dialog.classList.toggle('ac-on', !!st.shownNow && (phone.matches || isOpen()));
     const shown = opts.shown || (() => !dialog.hidden);
     // Available on both the side column and the bottom sheet; never reserve a
