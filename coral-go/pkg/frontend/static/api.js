@@ -115,7 +115,7 @@ async function _loadLiveSessions(onFailure) {
         // /api/health (is this a hub?) and the list are asked for together: the list used to wait for the health answer, one more round trip
         // before the first paint (#4326). The list is read only once the flag is known.
         const hubReady = initHub();
-        const raw = await apiFetchValidated("/api/sessions/live");
+        const raw = await apiFetchValidated("/api/sessions/live?compact=1"); // without the keys whose value is null (#13186); this list replaces the last one, it is not merged into it
         await hubReady;
         // With remotes registered the list may arrive as {sessions, servers}.
         const sessions = Array.isArray(raw) ? raw : (raw && Array.isArray(raw.sessions) ? raw.sessions : null);

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"reflect"
 	"sort"
 	"sync"
 	"time"
@@ -40,6 +41,10 @@ func (h *SessionsHandler) List(w http.ResponseWriter, r *http.Request) {
 	owner, isAgent := VerifiedSession(r.Context())
 	if isAgent {
 		sessions = scopeRowsForAgent(sessions, owner.SessionID)
+	}
+	// The dashboard's own load asks for the compact shape (#13186); everyone else, Coral Hub included, gets every key as before.
+	if r.URL.Query().Get("compact") == "1" {
+		dropNullKeys(sessions)
 	}
 	// Polled by every open dashboard: an unchanged list is a 304 with no body (#3439).
 	if snap := h.remoteSnapshot(); snap.Configured() {
@@ -779,4 +784,28 @@ func (h *SessionsHandler) currentDirectoryOf(agentType, sessionID, launchDir str
 		return ""
 	}
 	return h.currentDir(context.Background(), background.AgentInfo{AgentType: agentType, SessionID: sessionID, WorkingDirectory: launchDir})
+}
+
+// dropNullKeys leaves out of each row the keys whose value is null (#13186: 43% of the list's bytes at QA's seed). Only null: false and 0 mean something (awaiting_user false is not "unknown"), and the page's reads of the nullable fields
+// treat a missing key as it treats null. The page replaces its list with this answer rather than merging it into the last one (a merge keeps a key the update omits, which would keep a stale value).
+func dropNullKeys(rows []map[string]any) {
+	for _, row := range rows {
+		for k, v := range row {
+			if marshalsToNull(v) {
+				delete(row, k)
+			}
+		}
+	}
+}
+
+// marshalsToNull reports whether v is written as JSON null: nil, or a nil pointer, map, slice or interface (a *string field that is unset).
+func marshalsToNull(v any) bool {
+	if v == nil {
+		return true
+	}
+	switch rv := reflect.ValueOf(v); rv.Kind() {
+	case reflect.Pointer, reflect.Map, reflect.Slice, reflect.Interface:
+		return rv.IsNil()
+	}
+	return false
 }
