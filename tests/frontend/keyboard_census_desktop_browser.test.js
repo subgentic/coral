@@ -225,6 +225,7 @@ const BUBBLES = [{ type: 'user', content: 'Is the build green?', key: 'c1', time
             await waitFor(`!!document.querySelector('.ac-panel .ac-ask-open')`, 'Send to agent', 10000);
             await ev(`document.querySelector('.ac-panel .ac-ask-open').click(); true`);
             await waitFor(`document.querySelectorAll('.ac-ask .ac-ask-agent').length >= 3`, 'the agents', 10000);
+            await waitFor(`!!document.querySelector('.ac-ask')?.contains(document.activeElement)`, 'focus inside Send to agent before the Tab census', 10000, `(() => { const a = document.activeElement; return {activeElement: a?.outerHTML?.slice(0, 800), dialogPresent: !!document.querySelector('.ac-ask'), url: location.href}; })()`);
         }, { expect: `document.querySelectorAll('.ac-ask input[aria-disabled="true"]').length === 2 && document.querySelectorAll('.ac-ask input[aria-describedby]').length === 2` });
         // the plain artifact viewer, the dialog a coral://artifacts link opens (#6586): Download and Close, then its Comments panel
         await keyEsc(); // the send-to-agent scene's own state

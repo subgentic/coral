@@ -25,7 +25,11 @@ const S = `(window.__coralStatic || '/static/')`;
     const connectedHub = () => waitFor(`(async () => {
         const {state} = await import(${S} + 'state.js');
         return navigator.onLine !== false && state.coralWs?.readyState === 1 && !document.getElementById('connection-bar');
-    })()`, 'the Hub feed connected with its reconnect notice settled', 20000);
+    })()`, 'the Hub feed connected with its reconnect notice settled', 20000, `(async () => {
+        const {state} = await import(${S} + 'state.js');
+        const bar = document.getElementById('connection-bar');
+        return {onLine: navigator.onLine, socketReadyState: state.coralWs?.readyState ?? null, socketURL: state.coralWs?.url ?? null, barPresent: !!bar, barText: bar?.textContent ?? null, url: location.href};
+    })()`);
     try {
         await setupHubWorld({ client, Page, Emulation, width: 1280, height: 800, mobile: false });
         const run = async tag => {
