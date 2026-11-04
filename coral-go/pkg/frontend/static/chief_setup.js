@@ -101,6 +101,7 @@ export async function mountChiefSetup(host) {
             const r = await fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
             if (!r.ok) { let m = ''; try { m = (await r.json()).error || ''; } catch { /* no reason given */ } throw new Error(m || `Chief could not be saved (HTTP ${r.status}).`); }
             if (Object.hasOwn(body, 'chief_name') || Object.hasOwn(body, 'chief_avatar') || Object.hasOwn(body, 'chief_avatar_letter')) showToast('Chief’s look is saved.', false, 3000);
+            document.dispatchEvent(new Event('coral-chief-changed')); // the menus' Set up Chief becomes Chief (chief_entry.js, #13167)
             return {};
         },
     });

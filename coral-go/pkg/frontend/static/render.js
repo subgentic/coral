@@ -7,7 +7,7 @@ import { state } from './state.js';
 import { LAUNCH_CARDS, goalDesc, refreshGoalCardSoon } from './launch_cards.js';
 import './settings_lists.js';
 import './hub_access.js';
-import { sessionServer, noteBoardLabels, sessionTeamKey } from './server_base.js';
+import { sessionServer, noteBoardLabels, sessionTeamKey, contextServer } from './server_base.js';
 import './sleeping_view.js';
 import './knowledge_distill.js';
 import { escapeHtml, showToast } from './utils.js';
@@ -158,7 +158,19 @@ export function agentSearchKey(e) {
 
 /** Render the agent list now (user actions, which may read the DOM right after).
  *  A pending scheduled render is dropped: this one shows the latest list. */
+// Chief's entry in the Agents sidebar (#13167) is asked for by the first live-list render after the start has settled (8 s of uptime), never at the start: no request, timer or listener joins the startup sequence
+// (page_weight and its golden stay as they were); a test sets window.__chiefAfterMs to ask at once.
+let _chiefFor = null; // the computer the entry was last asked for: switching computers asks again (an answer for the one left is dropped by chief_entry.js)
+function paintChiefLater() {
+    if (performance.now() < (window.__chiefAfterMs ?? 8000)) return;
+    const at = contextServer();
+    if (_chiefFor === at) return;
+    _chiefFor = at;
+    importOnce('./chief_entry.js').then(m => m.paintSidebarChief()).catch(() => {});
+}
+
 export function renderLiveSessions(sessions) {
+    paintChiefLater();
     if (_scheduledRender) { cancelAnimationFrame(_scheduledRender); _scheduledRender = 0; }
     followServerOrder(sessions); // a replaced agent's place was moved to its new id on the server (#4943)
     noteBoardLabels(sessions); // board_label beside board_project (#3536): what keyLabel shows
