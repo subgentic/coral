@@ -92,7 +92,7 @@ func TestVideoCommentDeliveryIncludesTimeAndReplyThread(t *testing.T) {
 
 func TestVideoCommentArtifactRejectsNonDigestBeforeReadingMetadata(t *testing.T) {
 	rig := newCmtRig(t)
-	for _, id := range []string{"../" + strings.Repeat("a", 61), strings.Repeat("A", 64), strings.Repeat("g", 64)} {
+	for _, id := range []string{strings.Repeat("a", 62), strings.Repeat("a", 66), "../" + strings.Repeat("a", 61), strings.Repeat("A", 64), strings.Repeat("g", 64)} {
 		// Each path exists and describes a video. Validation must refuse it before
 		// classification; a length-only guard would read the ../ sidecar outside artifacts.
 		sidecar := filepath.Join(rig.h.artifactDir(), id+".json")
