@@ -17,7 +17,7 @@ const N = 900;
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Page.addScriptToEvaluateOnNewDocument({ source: `(() => { const real = window.fetch, N = ${N}; window.__asked = [];
             const hex = i => String(i + 1).padStart(64, '0');
-            const art = i => ({ id: 'a-' + i, uri: 'coral://artifacts/' + hex(i), tags: ['for review'], name: 'report-' + String(i).padStart(3, '0') + '.md', created_at: new Date(Date.UTC(2026, 10, 4) - i * 1000).toISOString(), available: true, produced_by: 'Dev', session_id: 's-1' });
+            const art = i => ({ id: 'a-' + i, uri: 'coral://artifacts/' + hex(i), tags: ['for review'], name: 'report-' + String(i).padStart(3, '0') + '.md', created_at: new Date(Date.UTC(2026, 10, 4) - i * 1000).toISOString(), available: true, produced_by: 'Dev', session_id: 's-1', ...(i === 321 ? { review_question: 'Is the Zulu migration safe to run?' } : {}) });
             const json = b => Promise.resolve(new Response(JSON.stringify(b), { status: 200, headers: { 'Content-Type': 'application/json' } }));
             window.fetch = (u, o) => { const url = new URL(String(u), location.href), p = url.pathname;
                 if (p === '/api/board/projects') return json([{ project: 't1' }]);
@@ -25,7 +25,7 @@ const N = 900;
                     if (tag !== 'for review') return json({ has_more: false, artifacts: [] });
                     const q = (url.searchParams.get('q') || '').toLowerCase(), cursor = url.searchParams.get('cursor'), start = cursor ? Number(cursor) : Number(url.searchParams.get('offset') || 0), limit = Math.min(50, Number(url.searchParams.get('limit') || 50));
                     let all = Array.from({ length: q ? N : 200 }, (_, i) => art(i)); // the whole list read stops at 200; a query is answered over all 900
-                    if (q) all = all.filter(a => a.name.includes(q));
+                    if (q) all = all.filter(a => a.name.includes(q) || (a.review_question || '').toLowerCase().includes(q)); // the computer's q covers the question too (QA Reviewer 2's MUST on #13162)
                     const page = all.slice(start, start + limit), more = start + page.length < all.length;
                     return json({ artifacts: page, limit, offset: start, has_more: more, ...(more ? { next_cursor: String(start + page.length) } : {}), total: all.length }); }
                 return real(u, o); }; })();` });
@@ -53,6 +53,11 @@ const N = 900;
         const pages = await ev(`window.__asked.filter(s => /q=report-5/.test(s)).length`);
         assert.ok(pages >= 2, `the second page was asked for with the cursor: ${pages} requests`);
         assert.ok(await ev(`window.__asked.some(s => /q=report-5/.test(s) && /cursor=50/.test(s))`), 'by the cursor the computer gave');
+
+        // 2b: a word only in a file's review question (the page's own search matched it; the computer's must too)
+        await type('zulu migration');
+        await waitFor(`/report-321/.test(document.getElementById('group-table-view').innerText)`, 'the file whose question holds the words is shown', 10000);
+        assert.ok(await ev(`window.__asked.some(s => /q=zulu/.test(s))`), 'and it was the computer that was asked for those words');
 
         // 3: no filter: the list the page reads, as before
         await type('');
