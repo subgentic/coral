@@ -63,4 +63,7 @@ func TestTeamArtifactsQuery10kCost(t *testing.T) {
 	time1("kind=image (reads sidecars)", "?kind=image&limit=100")
 	time1("sort=size (reads sidecars)", "?sort=size&limit=100")
 	time1("sort=name (reads sidecars)", "?sort=name&limit=100")
+	time1("facets=by,goal,team (#13172)", "?facets=by,goal,team&limit=1")
+	time1("facets=by with by= (#13172)", "?facets=by&by=alice&limit=1")
+	time1("facets=by with q (reads sidecars)", "?facets=by&q=report&limit=1")
 }
