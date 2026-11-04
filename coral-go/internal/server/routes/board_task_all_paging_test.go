@@ -1,7 +1,10 @@
 package routes
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -44,4 +47,32 @@ func TestPlainAllTasksSaysTheTotalAndWhereTheNextPageStarts(t *testing.T) {
 		seen[title] = true
 	}
 	assert.Len(t, seen, n)
+}
+
+// Security's whole-list check (#13188): with 100 long-bodied tasks the answer with no parameter holds the same rows, in the same order, as the old store call it replaced.
+func TestPlainAllTasksReturnsTheSameRowsAsTheOldCallForLongBodies(t *testing.T) {
+	e := newTQEnv(t)
+	long := strings.Repeat("a long body line, ", 600) // ~10 KB
+	for i := 0; i < 100; i++ {
+		e.add(fmt.Sprintf("b%d", i%4), fmt.Sprintf("long %03d", i), fmt.Sprintf("%s#%d", long, i), []string{"low", "medium", "high", "critical"}[i%4], "Orchestrator", "", fmt.Sprintf("created_at = '2026-10-10T%02d:%02d:00Z'", i/60, i%60))
+	}
+	old, err := e.bs.ListAllTasks(context.Background(), 100)
+	require.NoError(t, err)
+	require.Len(t, old, 100)
+
+	code, out, body := e.get("")
+	require.Equal(t, 200, code, body)
+	rows := out["tasks"].([]any)
+	require.Len(t, rows, 100)
+	assert.Equal(t, false, out["has_more"], "exactly 100 of 100: nothing more")
+	for i, o := range old {
+		raw, err := json.Marshal(o) // the old call's row as the old answer sent it
+		require.NoError(t, err)
+		var want map[string]any
+		require.NoError(t, json.Unmarshal(raw, &want))
+		r := rows[i].(map[string]any)
+		for _, k := range []string{"id", "title", "body", "status", "priority", "board_id", "created_at"} {
+			assert.Equal(t, want[k], r[k], "row %d, %s (same order, the long body whole)", i, k)
+		}
+	}
 }

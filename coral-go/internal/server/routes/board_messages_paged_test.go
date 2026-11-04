@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -86,4 +87,42 @@ func TestMessagesAllPagedIsOptInAndWalksBackWithoutGapsOrRepeats(t *testing.T) {
 		code, _ = get(bad)
 		assert.Equal(t, http.StatusBadRequest, code, bad)
 	}
+}
+
+// QA's table of the documented 400s of messages/all?paged=1 (#13188): each is refused, none ignored.
+func TestMessagesAllPagedRefusesEveryDocumentedBadRequest(t *testing.T) {
+	server, _ := setupBoardTestServer(t)
+	base := server.URL + "/api/board/pagedbad"
+	resp := postJSON(t, base+"/subscribe", map[string]string{"subscriber_id": "Lead", "job_title": "Lead Developer"})
+	resp.Body.Close()
+	resp = postJSON(t, base+"/messages", map[string]string{"subscriber_id": "Lead", "content": "one"})
+	resp.Body.Close()
+	b64 := func(s string) string { return base64.RawURLEncoding.EncodeToString([]byte(s)) }
+	cases := map[string]string{
+		"id":                   "?paged=1&id=1",
+		"task_id":              "?paged=1&task_id=1",
+		"for_subscriber":       "?paged=1&for_subscriber=Lead",
+		"offset":               "?paged=1&offset=1",
+		"before_id":            "?paged=1&before_id=5",
+		"after_id":             "?paged=1&after_id=0",
+		"format":               "?paged=1&format=dashboard",
+		"paged other value":    "?paged=0",
+		"cursor over 1024":     "?paged=1&cursor=" + b64("b:"+strings.Repeat("9", 1100)),
+		"no b: prefix":         "?paged=1&cursor=" + b64("7"),
+		"wrong prefix":         "?paged=1&cursor=" + b64("i:7"),
+		"cursor zero":          "?paged=1&cursor=" + b64("b:0"),
+		"cursor negative":      "?paged=1&cursor=" + b64("b:-3"),
+		"cursor not a number":  "?paged=1&cursor=" + b64("b:x"),
+		"cursor not base64url": "?paged=1&cursor=%21%21",
+	}
+	for name, q := range cases {
+		r, err := http.Get(base + "/messages/all" + q)
+		require.NoError(t, err)
+		r.Body.Close()
+		assert.Equal(t, http.StatusBadRequest, r.StatusCode, name)
+	}
+	r, err := http.Get(base + "/messages/all?paged=1&cursor=" + b64("b:99999"))
+	require.NoError(t, err)
+	r.Body.Close()
+	assert.Equal(t, http.StatusOK, r.StatusCode, "a well-formed cursor past the end is an empty page, not an error")
 }
