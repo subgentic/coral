@@ -103,8 +103,8 @@ func TestWakeEscapesABoardNameWithASpaceInThePath(t *testing.T) {
 	}))
 	defer srv.Close()
 	gs := &goalServer{Server: srv, reply: map[string]string{}}
-	res := goalRun(t, gs, "sleep", "--board", "my team", "Dev")
+	res := goalRun(t, gs, "sleep", "--board", "my team?x", "Dev") // a space (Go would encode it anyway) and a question mark (it would start a query)
 	require.Equal(t, 0, res.code, res.stderr)
 	require.Len(t, uris, 1)
-	assert.Equal(t, "/api/board/my%20team/agents/Dev/sleep", uris[0], "the board name is one escaped segment, a space is %20")
+	assert.Equal(t, "/api/board/my%20team%3Fx/agents/Dev/sleep", uris[0], "the board name is one escaped segment: a space is %20 and a question mark %3F")
 }
