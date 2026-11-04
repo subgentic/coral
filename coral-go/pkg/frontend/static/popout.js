@@ -54,7 +54,7 @@ let _waking = false;
 const DESTRUCTIVE_SELECTOR = actionSelector(DESTRUCTIVE_ACTIONS) + ',[data-action="restart"]';
 
 /** States in which the target is attached and may receive input. */
-const LIVE_STATES = new Set(['working', 'waiting', 'check', 'stuck', 'your-turn', 'idle']);
+const LIVE_STATES = new Set(['working', 'waiting', 'check', 'stuck', 'blocked', 'your-turn', 'idle']);
 
 const PILL_TEXT = {
     loading: 'Connecting…',
@@ -62,6 +62,7 @@ const PILL_TEXT = {
     waiting: 'Needs input',
     check: 'Check terminal',
     stuck: 'Stuck',
+    blocked: 'Blocked',
     'your-turn': 'Ready for input',
     idle: 'Idle',
     sleeping: 'Sleeping',
@@ -71,7 +72,7 @@ const PILL_TEXT = {
 };
 const TITLE_GLYPH = {
     // Existing title glyph contract kept (● ⏸ ○ ◌ ✕); only the new states are added.
-    working: '●', waiting: '⏸', check: '⏸', stuck: '!', 'your-turn': '◯', idle: '○', sleeping: '◌', ended: '✕',
+    working: '●', waiting: '⏸', check: '⏸', stuck: '!', blocked: '!', 'your-turn': '◯', idle: '○', sleeping: '◌', ended: '✕',
     reconnecting: '…', loading: '…', 'not-found': '?',
 };
 
@@ -365,7 +366,7 @@ function _applyLiveState(s) {
     _lastSession = s;
     // Same resolver and vocabulary as the dashboard rows (never "ended" here:
     // the popout's own lifecycle decides that).
-    const KEY_TO_POPOUT = { sleeping: 'sleeping', stuck: 'stuck', needs_input: 'waiting', check_terminal: 'check',
+    const KEY_TO_POPOUT = { sleeping: 'sleeping', stuck: 'stuck', needs_input: 'waiting', check_terminal: 'check', blocked: 'blocked',
                             your_turn: 'your-turn', working: 'working', idle: 'idle' };
     let next = KEY_TO_POPOUT[presentationSessionState(s)] || 'idle';
     if (_terminalDown && next !== 'sleeping') next = 'reconnecting';
