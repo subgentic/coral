@@ -9,6 +9,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/jmoiron/sqlx"
 	"modernc.org/sqlite"
 	sqlite3 "modernc.org/sqlite/lib"
 )
@@ -162,10 +163,7 @@ func (s *Store) setArtifactTags(ctx context.Context, boardID, hex string, tags, 
 		tagsCASAfterRead()
 	}
 	if _, err := tx.ExecContext(ctx, `DELETE FROM artifact_tags WHERE board_id = ? AND hex = ?`, boardID, hex); err != nil {
-		if check && isSQLiteBusy(err) { // a writer committed after this transaction's read: the snapshot is stale, which is the same answer as a changed list (#13138)
-			return ErrArtifactTagsChanged
-		}
-		return err
+		return tagsWriteErr(check, err) // a writer committed after this transaction's read: the snapshot is stale, which is the same answer as a changed list (#13138)
 	}
 	if !slices.Contains(tags, tagForReview) { // the tag is gone: the question it came with goes too (#11555)
 		if _, err := tx.ExecContext(ctx, `DELETE FROM artifact_questions WHERE board_id = ? AND hex = ?`, boardID, hex); err != nil {
@@ -177,13 +175,21 @@ func (s *Store) setArtifactTags(ctx context.Context, boardID, hex string, tags, 
 			return err
 		}
 	}
-	if err := tx.Commit(); err != nil {
-		if check && isSQLiteBusy(err) {
-			return ErrArtifactTagsChanged
-		}
-		return err
+	if err := commitArtifactTagsTx(tx); err != nil {
+		return tagsWriteErr(check, err)
 	}
 	return nil
+}
+
+// commitArtifactTagsTx commits the tags transaction; a variable so a test can make the commit answer busy.
+var commitArtifactTagsTx = func(tx *sqlx.Tx) error { return tx.Commit() }
+
+// tagsWriteErr is the answer for a failed write of the tags: for a compare-and-set (check) a SQLite busy is "the tags changed" (the caller retries); every other write, and every other error, keeps its own.
+func tagsWriteErr(check bool, err error) error {
+	if check && isSQLiteBusy(err) {
+		return ErrArtifactTagsChanged
+	}
+	return err
 }
 
 // tagsCASAfterRead is a seam for a test: it runs inside SetArtifactTagsIf once its read matched, before the write.
