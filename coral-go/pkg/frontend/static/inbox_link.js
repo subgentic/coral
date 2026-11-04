@@ -30,7 +30,7 @@ export async function openNeed({ kind, server, team, id }) {
         if (ask) { await m.refreshOperatorAsks(true); list = m.operatorAsks(); at = await teamKeyOf(server, team, list); item = pick(list, at); }
         else { try { item = pick(await m.reviewsOfTeam(at), at); } catch { item = null; } }
     }
-    Promise.resolve((ask ? m.refreshOperatorAsks : m.refreshReviews)(true)).catch(() => {});
+    Promise.resolve((ask ? m.refreshOperatorAsks(true) : m.refreshReviews(true, { reuse: true }))).catch(() => {});
     if (!item) showToast(`That ${ask ? 'question' : 'file'} is not waiting for you any more.`);
     else if (ask) m.openAskDialog(item, () => {});
     else (await importOnce('./inbox_sidebar.js')).openReview(item);

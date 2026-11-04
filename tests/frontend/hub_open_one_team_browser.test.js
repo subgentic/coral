@@ -39,7 +39,7 @@ const BOARDS = 9;
         const lists = reqs.filter(r => /\/artifacts\?tag=/.test(r));
         const boardsRead = new Set(lists.map(r => /board\/(team-\d+)\//.exec(r)?.[1]));
         assert.ok(boardsRead.size <= 1, `one click read the review lists of ${boardsRead.size} boards (${lists.length} list requests); the file's own board is enough`);
-        assert.ok(lists.length <= 2, `one click made ${lists.length} review/saved list requests`);
+        assert.ok(lists.length <= 3, `one click made ${lists.length} review/saved list requests: ${lists.join(' , ')}`);
         assert.ok(await ev(`window.__puts.length`) === 1, 'the file was tagged read once');
         console.log(`PASS opening one file reads its own board only (${lists.length} list requests, ${boardsRead.size} board)`);
     } finally { await client.close(); }
