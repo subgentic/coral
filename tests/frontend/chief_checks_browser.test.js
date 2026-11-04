@@ -65,6 +65,7 @@ const FIXTURE = String.raw`(() => {
    await ev(`window.__refuse=true; document.querySelector('.chief-check-form').requestSubmit();true`);
    await waitFor(`document.querySelector('.chief-check-editor .chief-check-error').textContent.includes('Remove the secret')`,'refusal shown');
    assert.equal(await ev(`document.querySelector('.chief-check-editor [name=instruction]').value`),'Check mail for a signed contract','refusal retains text');
+   assert.equal(await ev(`(()=>{const e=document.querySelector('.chief-check-editor .chief-check-error').getBoundingClientRect(),d=document.querySelector('.chief-check-editor').getBoundingClientRect();return e.height>0&&e.top>=d.top&&e.bottom<=d.bottom})()`),true,label+' refusal is visible without scrolling');
    assert.equal(await ev(`document.querySelector('.chief-check-editor').scrollWidth<=document.querySelector('.chief-check-editor').clientWidth+1`),true,label+' editor reflows');
    if(process.env.CORAL_SCREENSHOT_DIR){const shot=await Page.captureScreenshot({format:'png'});fs.writeFileSync(path.join(process.env.CORAL_SCREENSHOT_DIR,`chief-editor-${label}.png`),Buffer.from(shot.data,'base64'));}
    await ev(`window.__refuse=false;document.querySelector('.chief-check-form').requestSubmit();true`);
