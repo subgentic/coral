@@ -573,7 +573,7 @@ func keyOf(it teamArtifact) artifactSortKey {
 		tie = it.BoardID + "\x00" + it.ID // the cross-team list: one digest in two teams is two rows, in a total order
 	}
 	sum := sha256.Sum256([]byte(tie))
-	return artifactSortKey{Uploader: strings.ToLower(artifactUploaderLabel(it)), At: it.CreatedAt, Name: strings.ToLower(it.Name), Size: size, Type: strings.ToLower(strings.TrimSpace(it.MediaType)), Tags: clipKey(strings.Join(it.Tags, " "), 64), TaskID: it.TaskID, Source: it.Source, Index: it.index, ID: hex.EncodeToString(sum[:])}
+	return artifactSortKey{Uploader: clipKey(strings.ToLower(artifactUploaderLabel(it)), cursorTextRunes), At: it.CreatedAt, Name: clipKey(strings.ToLower(it.Name), cursorTextRunes), Size: size, Type: strings.ToLower(strings.TrimSpace(it.MediaType)), Tags: clipKey(strings.Join(it.Tags, " "), 64), TaskID: it.TaskID, Source: it.Source, Index: it.index, ID: hex.EncodeToString(sum[:])}
 }
 
 // newestAfter: a comes after b in the plain list's order (newest first; ties by task id, source, position, then id, so it is total).
@@ -642,6 +642,11 @@ func wordAfter(desc bool, a, b string) bool {
 	}
 	return a > b
 }
+
+// cursorTextRunes is how much of a name or an uploader's label is a sort key: the cursor carries it, and a cursor is at most 1024 bytes of unpadded base64url (the Hub passes nothing else, #13161): a name of 900 characters
+// (a task result's, not an upload's, which is at most 255) made a cursor of 1456 that the route then refused on its way back, ending the paging at page 1. Names alike in their first 128 characters tie and fall to the
+// next tie-break, in the sort as in the cursor, so a page continues exactly where the last one ended.
+const cursorTextRunes = 128
 
 // clipKey keeps the first n runes of a sort key's text: the cursor carries it, and a cursor is short.
 func clipKey(s string, n int) string {
