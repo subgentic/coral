@@ -307,3 +307,5 @@ node goal_guide.test.mjs
 node inbox_teams_checked.test.mjs
 node launch_cards_goal_desc.test.js
 node cloud_signin_leaving.test.js
+
+node hub_review_settlement.test.mjs
