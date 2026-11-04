@@ -6,13 +6,16 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"github.com/subgentic/coral/internal/logsafe"
 	"log/slog"
 	"net/http"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -162,6 +165,32 @@ func (h *SessionsHandler) refreshFilesInner(w http.ResponseWriter, r *http.Reque
 		}
 	}
 
+	follow := followOn(agentCtx(r))
+	key := fmt.Sprintf("%s\x00%s\x00%s\x00%v", workdir, h.getDiffMode(r.Context()), sessionID, follow)
+	res, ok := refreshFlights.do(r.Context(), key, func() refreshedFiles {
+		return h.computeRefreshedFiles(context.WithoutCancel(r.Context()), name, sessionID, workdir, follow)
+	})
+	if !ok {
+		return // the page went away while it waited
+	}
+	writeJSON(w, http.StatusOK, h.withWorktree(r, name, sessionID, map[string]any{"agent_name": name, "files": hubVisibleFiles(r, res.files), "diff_mode": res.diffMode, "total_changed": res.total, "capped": res.total > len(res.files),
+		"compare": map[string]any{"mode": res.diffMode, "label": res.label}}))
+}
+
+// refreshedFiles is one run of the changed-files queries: the list kept (cut to refreshFilesCap, by name), how many files changed in all, the mode and what it compares with.
+type refreshedFiles struct {
+	files    []store.ChangedFile
+	total    int
+	diffMode string
+	label    string
+}
+
+// refreshComputeHook runs at the start of every pass (tests: count passes, make one slow).
+var refreshComputeHook = func() {}
+
+// computeRefreshedFiles runs the git queries for a folder and stores the list (#13079: it used to store and send every file, 35,000 of them, on every call).
+func (h *SessionsHandler) computeRefreshedFiles(ctx0 context.Context, name, sessionID, workdir string, follow bool) refreshedFiles {
+	refreshComputeHook()
 	// New files' line counts are read through the working tree held as a root (#3596 W5): a
 	// symlinked folder on the way, a symlink, a FIFO or a device is never read. If the tree can't
 	// be opened, new files count 0 lines.
@@ -177,10 +206,10 @@ func (h *SessionsHandler) refreshFilesInner(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Run git diff --numstat to get changed files
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(ctx0, 10*time.Second)
 	defer cancel()
 
-	diffMode := h.getDiffMode(r.Context())
+	diffMode := h.getDiffMode(ctx0)
 	withTree := gitutil.IncludesWorkingTree(diffMode)
 	diffArgs := append(append([]string{"diff"}, gitutil.DiffRefs(ctx, workdir, diffMode)...), "--numstat")
 	out, err := gitCmd(ctx, workdir, diffArgs...).Output()
@@ -236,7 +265,7 @@ func (h *SessionsHandler) refreshFilesInner(w http.ResponseWriter, r *http.Reque
 	sidPtr := ptr.NonEmpty(sessionID)
 	var events []store.AgentEvent
 	if withTree { // what the agent wrote but git has not reported is working-tree work: not part of the last commit
-		events, _ = h.ts.ListAgentEvents(r.Context(), name, 200, sidPtr)
+		events, _ = h.ts.ListAgentEvents(ctx0, name, 200, sidPtr)
 	}
 	candidates := make([]string, 0, 16)
 	seen := make(map[string]bool)
@@ -292,7 +321,7 @@ func (h *SessionsHandler) refreshFilesInner(w http.ResponseWriter, r *http.Reque
 
 	// Annotate files with agent attribution from agent_events
 	if sessionID != "" {
-		if edits, err := h.ts.GetFileEdits(r.Context(), sessionID, workdir); err == nil {
+		if edits, err := h.ts.GetFileEdits(ctx0, sessionID, workdir); err == nil {
 			for fp, agents := range edits {
 				if f, exists := fileMap[fp]; exists {
 					f.Agents = agents
@@ -311,18 +340,84 @@ func (h *SessionsHandler) refreshFilesInner(w http.ResponseWriter, r *http.Reque
 		}
 	}
 
-	// Update DB cache
+	// Update DB cache. By name, and cut at refreshFilesCap: the list is stored and sent whole on every refresh, and 35,000 rows were (#13079); the total is said, not hidden.
 	files := make([]store.ChangedFile, 0, len(fileMap))
 	for _, f := range fileMap {
 		files = append(files, f)
 	}
+	sort.Slice(files, func(i, j int) bool { return files[i].Filepath < files[j].Filepath })
+	total := len(files)
+	if total > refreshFilesCap {
+		files = files[:refreshFilesCap]
+	}
 	if diffMode == "" {
 		diffMode = "branch_point"
 	}
-	if !followOn(agentCtx(r)) { // the cache is the launch folder's list (the poller writes it): a followed worktree's is not kept in its place (#11351)
-		h.gs.ReplaceChangedFiles(r.Context(), name, workdir, files, sidPtr, diffMode)
+	if !follow { // the cache is the launch folder's list (the poller writes it): a followed worktree's is not kept in its place (#11351)
+		h.gs.ReplaceChangedFiles(ctx0, name, workdir, files, sidPtr, diffMode)
 	}
+	return refreshedFiles{files: files, total: total, diffMode: diffMode, label: gitutil.CompareLabel(ctx0, workdir, diffMode)}
+}
 
-	writeJSON(w, http.StatusOK, h.withWorktree(r, name, sessionID, map[string]any{"agent_name": name, "files": hubVisibleFiles(r, files), "diff_mode": diffMode,
-		"compare": map[string]any{"mode": diffMode, "label": gitutil.CompareLabel(r.Context(), workdir, diffMode)}}))
+// refreshFilesCap is the most files one refresh stores and sends, the same as the background poller's cap.
+const refreshFilesCap = background.MaxChangedFiles
+
+// refreshFlight runs one refresh of a folder at a time (#13079): the Files panel asked every 4 s and each call ran git again, so a slow repo (3 s a pass) was queried back to back, several calls at once.
+// A call that arrives while one runs waits for it and shares its answer; after a pass that took over refreshReuseOver, its answer is also reused for as long as that pass took, so the next ask is not a new pass.
+type refreshFlight struct {
+	mu     sync.Mutex
+	calls  map[string]*refreshCall
+	recent map[string]refreshRecent
+}
+type refreshCall struct {
+	done chan struct{}
+	res  refreshedFiles
+}
+type refreshRecent struct {
+	res   refreshedFiles
+	until time.Time
+}
+
+const refreshReuseOver = 250 * time.Millisecond
+
+var refreshFlights = &refreshFlight{calls: map[string]*refreshCall{}, recent: map[string]refreshRecent{}}
+
+// do returns the answer for key, running fn if nobody is; false when ctx ended while waiting.
+func (f *refreshFlight) do(ctx context.Context, key string, fn func() refreshedFiles) (refreshedFiles, bool) {
+	f.mu.Lock()
+	if rc, ok := f.recent[key]; ok {
+		if time.Now().Before(rc.until) {
+			f.mu.Unlock()
+			return rc.res, true
+		}
+		delete(f.recent, key)
+	}
+	if c, ok := f.calls[key]; ok {
+		f.mu.Unlock()
+		select {
+		case <-c.done:
+			return c.res, true
+		case <-ctx.Done():
+			return refreshedFiles{}, false
+		}
+	}
+	c := &refreshCall{done: make(chan struct{})}
+	f.calls[key] = c
+	f.mu.Unlock()
+	start := time.Now()
+	c.res = fn()
+	took := time.Since(start)
+	f.mu.Lock()
+	delete(f.calls, key)
+	for k, rc := range f.recent {
+		if !time.Now().Before(rc.until) {
+			delete(f.recent, k)
+		}
+	}
+	if took > refreshReuseOver {
+		f.recent[key] = refreshRecent{res: c.res, until: time.Now().Add(min(took, 10*time.Second))}
+	}
+	f.mu.Unlock()
+	close(c.done)
+	return c.res, true
 }

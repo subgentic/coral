@@ -105,6 +105,9 @@ func prCacheExpiry(prNumber int, interval time.Duration) time.Duration {
 // maxChangedFiles caps the list stored per agent on large monorepos.
 const maxChangedFiles = 2000
 
+// MaxChangedFiles is that cap for the refresh route, which stores and sends the same list.
+const MaxChangedFiles = maxChangedFiles
+
 type writtenFiles struct {
 	hash  [sha256.Size]byte
 	stamp string
