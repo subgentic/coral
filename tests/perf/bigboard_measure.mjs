@@ -138,6 +138,18 @@ process.on('SIGINT', () => done(130));
         const f = rows.slice(marker).filter(r => /files|changes|git|worktree/i.test(r.url)).map(r => ({ route: fold(new URL(r.url).pathname), ms: Math.round((r.end - r.sent) * 1000), bytes: r.bytes }));
         return { ...ms, requests: f };
     });
+    // #13156: opt-in attribution on the real fixture, after Files has loaded.
+    // Choose the actual remote identity, and refuse sleeping/ended agents.
+    if (process.env.TYPING_TRACE === '1') {
+        const { measureTypingBurst } = await import('./typing_trace.mjs');
+        const traceDir = path.join(path.dirname(OUT), path.basename(OUT, '.json') + '-typing');
+        for (const target of ['composer', 'terminal']) await step('typing_trace_' + target, async () => {
+            const agent = await ev(`fetch('/api/sessions/live').then(r=>r.json()).then(j=>(Array.isArray(j)?j:j.sessions||[]).find(a=>!a.sleeping&&!a.archived&&a.agent_type!=='terminal'))`);
+            if (!agent) throw new Error('No awake mock agent: restart/wake fixture agents on the isolated copy before tracing');
+            await ev(`(async()=>{await window.selectLiveSession(${JSON.stringify(agent.name)},${JSON.stringify(agent.agent_type || 'claude')},${JSON.stringify(agent.session_id)},${JSON.stringify(agent.server || 'local')});window.switchAgenticTab('files','top');window.setLiveViewMode(${JSON.stringify(target === 'composer' ? 'chat' : 'terminal')});const x=await import((window.__coralStatic||'/static/')+'xterm_renderer.js');const ready=await window.__until(()=>{const el=document.querySelector(${JSON.stringify(target === 'composer' ? '#command-input' : '#xterm-container .xterm-helper-textarea')}),files=document.getElementById('changed-files-list');return !!el&&!el.disabled&&el.getClientRects().length>0&&!!files&&files.getClientRects().length>0&&${target === 'terminal' ? 'x.isTerminalWsOpen()' : 'true'};},30000);if(ready===null)throw Error('Live input/Files not ready');return true;})()`);
+            return measureTypingBurst({client,ev,outDir:traceDir,target,label:target,characters:200});
+        });
+    }
     // Needs you: the Inbox tab, then the first file for review opened; the time from the click to the viewer on screen, and the rows
     await step('needs_you_open', async () => {
         const m0 = rows.length;
@@ -163,5 +175,6 @@ process.on('SIGINT', () => done(130));
     fs.writeFileSync(OUT, JSON.stringify(out, null, 1));
     console.log(JSON.stringify({ load: out.load, idle: out.idle }));
     for (const r of routes.slice(0, 14)) console.log(`${r.phase.padEnd(5)} ${String(r.p95).padStart(8)} ms p95 ${String(r.p50).padStart(8)} p50 ${String(r.max).padStart(8)} max  n=${String(r.n).padStart(3)}  ${String(r.bytes_each).padStart(8)} B  ${r.route}`);
-    await done(0);
+    const typingFailed = ['composer','terminal'].some(target => interactions['typing_trace_' + target]?.budgetPassed !== true);
+    await done(process.env.TYPING_GATE === '1' && (process.env.TYPING_TRACE !== '1' || typingFailed) ? 1 : 0);
 })().catch(async e => { console.error('[measure] ' + (e.stack || e)); await done(1); });

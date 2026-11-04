@@ -99,3 +99,17 @@ page is measured through a second `coral --hub` that has the first added as a re
 
 Known limits: about 2% of the seeded messages are refused (an @mention of a name that is not on the board); the seeded agents are asleep or
 gone when the fixture is measured (the server is stopped after the seed), so the agent rows are real but nothing is typing into them.
+
+### Typing attribution on the big-board rig (#13156)
+
+Add `TYPING_TRACE=1` to `bigboard_run.sh` to capture 200 synthetic characters in both the composer and the terminal,
+with Files and the sidebar visible. This uses the actual selected agent/server identity, a CDP timeline and CPU samples.
+It starts no extra server. The measurement refuses a sleeping agent, disabled input or disconnected terminal; the fixture's
+recorded sessions alone are insufficient. Wake/restart mock agents on the rig's isolated copy first. No newline or Send is issued.
+
+Each local/Hub output gets a `*-typing/` folder containing compressed Chrome traces, CPU profiles and a JSON summary of every
+main-thread task longer than 50 ms, its nested events and sampled source owners. Only events overlapping the marked typing burst
+are budgeted; unrelated renderer processes and nested duplicate tasks are excluded. Key-to-frame timing includes CDP overhead.
+Set `TYPING_GATE=1` with `TYPING_TRACE=1` to fail the measurement for a setup error or any task over 50 ms. Profiling is enabled
+in this mode, so retain machine/load details when comparing timings. The long-task attribution parser has light checks:
+`node --test tests/perf/typing_trace.test.mjs`. The default baseline run remains unchanged without these opt-in variables.
