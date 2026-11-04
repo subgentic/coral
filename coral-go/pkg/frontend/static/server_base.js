@@ -369,8 +369,10 @@ export function boardArtifactPage(teamKey, tag, at) {
 /** Moves the walk to the next page of `data` (a page's answer); false when that was the last. It advances by what the computer returned, never by what was asked: an older Coral answers 200, a newer one 50, and the cursor, when there is one, is the place. */
 export function nextArtifactPage(at, data) {
     const list = (data && data.artifacts) || [];
+    at.seen = (at.seen || 0) + list.length; // everything the walk has been given so far
     if (!data || !data.has_more || !list.length) return false;
-    if (data.next_cursor) at.cursor = data.next_cursor; else at.offset += list.length;
+    if (data.next_cursor) at.cursor = data.next_cursor;
+    else { at.cursor = ''; at.offset = at.seen; } // a page with no cursor after one with a cursor (a computer that changed under the walk): the walk goes on by offset from what it has, it does not ask for the same cursor again
     return true;
 }
 
