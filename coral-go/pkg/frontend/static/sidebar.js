@@ -8,6 +8,7 @@ import { browserLocal } from './safe_storage.js';
 import { dockKey, dockOpenByDefault, onDockPage } from './dock_page.js';
 import { machineState } from './launch_server.js';
 import { setText, setAttr, setHidden, setTitle, setData } from './dom_write.js';
+import { importOnce } from './import_once.js';
 
 export function initSidebarResize() {
     const handle = document.getElementById("sidebar-resize-handle");
@@ -350,6 +351,7 @@ export function showSidebarPane(tab) {
     for (const el of document.querySelectorAll('.sidebar-pane[data-pane]')) setHidden(el, el.dataset.pane !== pane);
     if (!pane || !layout) return;
     setData(layout, 'sidebarPane', pane);
+    if (pane === 'agents' && !isPhoneLayout()) (window.requestIdleCallback || setTimeout)(() => importOnce('./chief_entry.js').then(m => m.paintSidebarChief()).catch(() => {})); // Chief's entry above New agent (#13167): after the first paint, never in the way of it
     const cfg = SIDEBAR_PANES[pane];
     const search = document.getElementById('sidebar-rail-search');
     if (search) {

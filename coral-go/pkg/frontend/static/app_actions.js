@@ -168,6 +168,10 @@ registerActions({
     'docs-copy-agent-line': () => { importOnce('./docs.js').then(m => m.copyDocsLine()).catch(() => {}); }, // the Docs page's button, in the page from the start; docs.js loads with the Docs tab
     'm-close-top-bar-settings-then-check-for-updates': () => { window.__coral.closeTopBarSettings(); window.checkForUpdates(true); },
     'm-close-top-bar-settings-then-show-servers-modal': () => { window.__coral.closeTopBarSettings(); window.showServersModal(); },
+    'm-open-chief-settings': () => { window.__coral.closeTopBarSettings(); window.showSettingsModal('chief'); }, // the menu's Set up Chief (#13167)
+    'open-chief-settings': () => { window.showSettingsModal('chief'); }, // the sidebar's
+    'm-chief-hub-note': () => { window.__coral.closeTopBarSettings(); importOnce('./chief_entry.js').then(m => showToast(m.HUB_SETUP_NOTE)); },
+    'chief-hub-note': () => { importOnce('./chief_entry.js').then(m => showToast(m.HUB_SETUP_NOTE)); },
     'm-close-top-bar-settings-then-show-settings-modal': () => { window.__coral.closeTopBarSettings(); window.showSettingsModal(); },
     'm-close-top-bar-settings-then-show-shortcuts': () => { window.__coral.closeTopBarSettings(); importOnce('./shortcuts.js').then(m => m.showShortcuts()); },
     'm-close-top-bar-settings-then-show-theme-configurator': () => { window.__coral.closeTopBarSettings(); window.showThemeConfigurator(); },

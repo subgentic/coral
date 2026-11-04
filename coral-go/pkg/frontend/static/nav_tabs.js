@@ -91,10 +91,13 @@ function entry(icon, label, { action, href, onClick } = {}) {
 }
 
 /** What the gear and the account buttons hold, as entries (#9021): the settings, the themes, the update check, the servers; on the Hub the account's pages and Sign out, by clicking the account menu's own items. */
-function menuEntries(viewLabels = new Set(), phoneNav = false) {
+function menuEntries(viewLabels = new Set(), phoneNav = false, chief = null) {
     const cloud = document.body.classList.contains('cloud-mode');
     const out = phoneNav ? [] : [entry('home', 'Home', { action: 'm-go-home' })]; // the floating nav's Home is one tap away
     const settingsEntry = entry('settings', 'Settings', { action: 'm-close-top-bar-settings-then-show-settings-modal' }); settingsEntry.dataset.accountStart = ''; // where the phone's account button takes the drawer (#12634)
+    const cs = chief && chief.st; // Chief (#13167): its avatar and name when it is set up, 'Set up Chief' when it is not, nothing when the machine refuses
+    if (cs && cs.kind === 'open') out.push(entry(chief.m.chiefAvatar(cs), cs.name, { href: cs.href }));
+    else if (cs) { const e = entry('smart_toy', 'Set up Chief'); if (cs.kind === 'setup') e.setAttribute('data-on-click', 'm-open-chief-settings'); else e.setAttribute('data-on-click', 'm-chief-hub-note'); out.push(e); } // the action census reads setAttribute's literal names
     out.push(settingsEntry, entry('palette', 'Themes', { action: 'm-close-top-bar-settings-then-show-theme-configurator' }));
     if (!cloud) out.push(entry('system_update', 'Check for updates', { action: 'm-close-top-bar-settings-then-check-for-updates' }));
     if ((isHub() || cloud) && !viewLabels.has('Computers')) out.push(entry('dns', 'Computers', { action: 'm-close-top-bar-settings-then-show-servers-modal' })); // not twice: when the Servers view is one of the views above, two entries are named alike
@@ -110,6 +113,7 @@ function menuEntries(viewLabels = new Set(), phoneNav = false) {
 let _more = [];          // the tabs the row's More menu lists right now
 let _menuFor = null;     // the button that opened the menu
 let _drawer = null;      // phone_drawer.js, loaded the first time a phone opens the ☰ (it is not in the start: page_weight)
+let _chief = null;       // chief_entry.js and the Chief state for the computer shown, loaded the first time the ☰ opens (#13167; not in the start)
 
 function closeMenu() {
     const menu = document.getElementById('nav-more-menu');
@@ -131,10 +135,11 @@ function openMenu(btn, focusKey = false) { // focusKey: true (opened by Enter or
     menu.classList.toggle('nav-hamburger', hamburger);
     if (hamburger) {
         const sep = document.createElement('div'); sep.className = 'nav-more-sep'; sep.setAttribute('role', 'separator');
+        if (!_chief) { importOnce('./chief_entry.js').then(async m => { _chief = { m, st: await m.chiefState().catch(() => null) }; openMenu(btn, focusKey); }, () => { _chief = { m: null, st: null }; openMenu(btn, focusKey); }); return; } // Chief's entry needs its state before the menu is drawn; the same tap's menu then opens (#13167)
         const drawer = isPhone(); // on a phone the ☰ is a left drawer: the Inbox's folders and the teams, a divider, then the less-used places (#11472)
         if (drawer && !_drawer) { importOnce('./phone_drawer.js').then(m => { _drawer = m; openMenu(btn, focusKey); }); return; } // the drawer's code arrives on the first tap, then the same tap's menu opens
         menu.classList.toggle('nav-drawer', drawer);
-        menu.replaceChildren(...(drawer ? _drawer.drawerTop() : []), ...(drawer ? [] : items.map(makeItem)), ...(drawer ? [sep] : []), ...(drawer ? items.map(makeItem) : [sep]), ...menuEntries(new Set(items.map(t => t.label)), phoneNav));
+        menu.replaceChildren(...(drawer ? _drawer.drawerTop() : []), ...(drawer ? [] : items.map(makeItem)), ...(drawer ? [sep] : []), ...(drawer ? items.map(makeItem) : [sep]), ...menuEntries(new Set(items.map(t => t.label)), phoneNav, _chief));
         if (drawer) _drawer.showScrim(closeMenu);
         for (const v of menu.querySelectorAll('.nav-more-item:not([role])')) v.setAttribute('role', 'menuitem');
     } else menu.replaceChildren(...items.map(makeItem));
