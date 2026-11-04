@@ -73,13 +73,14 @@ func (s *Store) InboxVsChatCounts(ctx context.Context, team, since, until string
 		}
 		return teams[t]
 	}
-	// the Activity record
+	// The Activity record: rollbacks and automatic supersedes are not the
+	// Operator’s actions, so neither enters any side, day, team or phone total.
 	var acts []struct {
 		Day, Team, Action, Surface, Hint string
 		N                                int
 	}
-	q := `SELECT substr(at, 1, 10) AS day, team, action, surface, hint, COUNT(*) AS n FROM operator_actions WHERE at >= ? AND at < ? AND action != ?`
-	args := []any{lo, hi, ActUndone}
+	q := `SELECT substr(at, 1, 10) AS day, team, action, surface, hint, COUNT(*) AS n FROM operator_actions WHERE at >= ? AND at < ? AND action NOT IN (?, ?)`
+	args := []any{lo, hi, ActUndone, ActSupersede}
 	if team != "" {
 		q += ` AND team = ?`
 		args = append(args, team)

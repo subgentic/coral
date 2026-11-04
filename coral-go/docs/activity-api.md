@@ -23,7 +23,7 @@ It is a **record for the Operator, not a tamper-proof audit trail**: a program t
 | parameter | meaning |
 |---|---|
 | `team` | one team's bare board name (letters, digits, `_`, `.`, `-`; at most 64); another value is `400` |
-| `action` | one of `approve`, `changes`, `deny`, `ignore`, `unignore`, `save`, `unsave`, `undone`, `answer`, `dismiss`, `goal_close`, `proposal`, `mark_read`, `goal_review`, `send_review`, `unsend_review`; another value is `400` |
+| `action` | one of `approve`, `changes`, `deny`, `ignore`, `supersede`, `unignore`, `save`, `unsave`, `undone`, `answer`, `dismiss`, `goal_close`, `proposal`, `mark_read`, `goal_review`, `send_review`, `unsend_review`; another value is `400` |
 | `before`, `before_at` | the cursor: rows older than the pair (`before_at`, `before`), both taken from the previous answer's `next_before` and `next_before_at`. `before_at` alone is `400`; `before` alone pages by id (the id grows with time on one computer) |
 | `limit` | rows per page; default 50, **at most 200** (more is cut to 200); `0`, a negative number or a non-number is `400` |
 

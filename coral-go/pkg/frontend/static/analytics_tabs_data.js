@@ -163,9 +163,9 @@ export function pairGrid(rawPairs) {
 
 /* ---- Inbox versus chat (#12158) ---- */
 
-/** The words of each kind of action the read counts, by side: what the Operator did. */
+/** Names of action kinds, including automatic settlements in older reads. */
 export const IVC_KINDS = {
-    approve: 'Approved', changes: 'Asked for changes', deny: 'Denied', ignore: 'Dismissed', unignore: 'Put back', save: 'Saved for later', unsave: 'Moved back to Needs you', answer: 'Answered a question (a button)',
+    approve: 'Approved', changes: 'Asked for changes', deny: 'Denied', ignore: 'Dismissed', supersede: 'Superseded automatically', unignore: 'Put back', save: 'Saved for later', unsave: 'Moved back to Needs you', answer: 'Answered a question (a button)',
     goal_close: 'Closed a goal', proposal: 'Decided a proposal', mark_read: 'Marked read', send_review: 'Sent a file for review', unsend_review: 'Took a file out of review', dismiss: 'Dismissed', comment: 'Commented on a file or a goal', answer_prompt: 'Answered a question, plan or permission', typed: 'Typed to an agent',
 };
 const ivcWord = k => IVC_KINDS[k] || k;

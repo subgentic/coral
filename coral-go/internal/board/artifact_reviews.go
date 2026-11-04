@@ -352,6 +352,8 @@ func (s *Store) SupersedeArtifactReview(ctx context.Context, boardID, hex string
 
 // SettleOlderArtifactReview checks the newer candidates' state and records the
 // automatic settlement in Activity in the same transaction as the tag changes.
+// The caller has verified that candidates are strictly newer versions of this
+// series, which already excludes the artifact being settled.
 func (s *Store) SettleOlderArtifactReview(ctx context.Context, boardID, hex string, newer []string, now time.Time) (bool, error) {
 	s.activityMu.Lock()
 	defer s.activityMu.Unlock()
@@ -378,9 +380,6 @@ func (s *Store) supersedeArtifactReview(ctx context.Context, boardID, hex string
 	if activity {
 		eligible := false
 		for _, candidate := range newer {
-			if candidate == hex {
-				continue
-			}
 			var active bool
 			if err := tx.GetContext(ctx, &active, `SELECT EXISTS (SELECT 1 FROM artifact_tags WHERE board_id = ? AND hex = ? AND tag = ?) OR EXISTS (SELECT 1 FROM artifact_reviews WHERE board_id = ? AND hex = ? AND state IN (?, ?))`, boardID, candidate, tagForReview, boardID, candidate, ReviewApproved, ReviewDenied); err != nil {
 				return false, err
