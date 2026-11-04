@@ -1,4 +1,4 @@
-// #13186: the dashboard's own load of the live list asks for the compact shape (?compact=1: no keys whose value is null), and what it gets replaces its list.
+// #13186: the dashboard's own load of the live list asks for the compact shape (?compact=1: no keys whose value is null) when it is served by Coral itself, and what it gets replaces its list. Through Coral Hub it asks the exact path (live_list_hub_plain.test.mjs).
 //   node live_list_compact_ask.test.mjs
 import assert from 'node:assert';
 import { installDom, importUi } from './helpers/jsdom_env.mjs';
