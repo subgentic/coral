@@ -245,9 +245,11 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 			body.AgentType, body.BoardName, launchedName(result, body.DisplayName))
 	}
 
-	if sid, _ := result["session_id"].(string); sid != "" && len(skillRows) > 0 { // pinned to the versions approved now; a newer one is an update to offer, never swapped in
-		if err := h.ss.AttachSkillsRetry(r.Context(), sid, skillRows); err != nil {
-			slog.Warn("[launch] the skills attached to an agent were not saved", "session", sid, "error", err)
+	if sid, _ := result["session_id"].(string); sid != "" { // pinned to the versions approved now; a newer one is an update to offer, never swapped in; using-coral is attached to every agent (#13523)
+		if attach := h.withDefaultSkills(r.Context(), skillRows); len(attach) > 0 {
+			if err := h.ss.AttachSkillsRetry(r.Context(), sid, attach); err != nil {
+				slog.Warn("[launch] the skills attached to an agent were not saved", "session", sid, "error", err)
+			}
 		}
 	}
 	tracking.TrackEvent(tracking.EventSessionLaunched, nil)

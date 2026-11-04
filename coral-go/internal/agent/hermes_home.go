@@ -397,7 +397,7 @@ var canonicalSessionID = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4
 // hermesFirstMessage is what the agent is told: the board system prompt (with the protocol file), then the action prompt (the launch prompt and the board's action text), then the session marker.
 func hermesFirstMessage(params LaunchParams) string {
 	var sys []string
-	if proto := readProtocolFile(params.ProtocolPath); proto != "" {
+	if proto := protocolText(params); proto != "" {
 		sys = append(sys, proto)
 	}
 	if b := BuildBoardSystemPrompt(params.BoardName, params.Role, "", params.PromptOverrides, params.BoardType); b != "" {

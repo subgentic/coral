@@ -283,7 +283,7 @@ func (a *AgyAgent) LaunchCommand(params LaunchParams) (string, error) {
 	var raw []string
 
 	var sysParts []string
-	if proto := readProtocolFile(params.ProtocolPath); proto != "" {
+	if proto := protocolText(params); proto != "" {
 		sysParts = append(sysParts, proto)
 	}
 	boardSysPrompt := BuildBoardSystemPrompt(params.BoardName, params.Role, "", params.PromptOverrides, params.BoardType)

@@ -186,7 +186,7 @@ func TestTheStarterSkillsAreSeededOnceAreRefreshedAndCannotBeRemoved(t *testing.
 	e.h.SeedStarterSkills(ctx)
 	rows, err := e.ss.ListSkills(ctx, "")
 	require.NoError(t, err)
-	require.Len(t, rows, 3)
+	require.Len(t, rows, 4)
 	for _, r := range rows {
 		assert.Equal(t, store.SkillApproved, r.Status, r.Name)
 		assert.Equal(t, store.PublisherCoral, r.PublisherKind, r.Name)
@@ -202,7 +202,7 @@ func TestTheStarterSkillsAreSeededOnceAreRefreshedAndCannotBeRemoved(t *testing.
 	e.h.SeedStarterSkills(ctx) // the next start
 	rows2, err := e.ss.ListSkills(ctx, "")
 	require.NoError(t, err)
-	assert.Len(t, rows2, 3, "a second start adds nothing")
+	assert.Len(t, rows2, 4, "a second start adds nothing")
 
 	// Removing one is refused, by the route and by the store; it is still there and still approved.
 	code, out := e.call("DELETE", "/api/skills/"+rows[0].ID, "", "operator")
@@ -258,7 +258,7 @@ func TestAnExampleSkillsFrameSaysItShipsWithCoral(t *testing.T) {
 	e.h.SeedStarterSkills(context.Background())
 	rows, err := e.ss.ListSkills(context.Background(), "")
 	require.NoError(t, err)
-	require.Len(t, rows, 3)
+	require.Len(t, rows, 4)
 	code, out := e.get("/api/agent/skills/"+rows[0].ID, "agent")
 	require.Equal(t, 200, code)
 	assert.Contains(t, out["frame"], "An example skill that ships with Coral")

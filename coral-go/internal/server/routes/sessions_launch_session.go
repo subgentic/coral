@@ -123,9 +123,9 @@ func (h *SessionsHandler) launchSession(ctx context.Context, spec launchSpec) (_
 		agent.TryPrepareResume(agentImpl, spec.ResumeSessionID, absDir)
 	}
 	launchParams := agent.LaunchParams{
-		SessionID:       sessionID,
-		SessionName:     sessionName,
-		ProtocolPath:    h.protocolPath(),
+		SessionID:    sessionID,
+		SessionName:  sessionName,
+		ProtocolPath: h.protocolPath(), EmbeddedProtocol: true,
 		ResumeSessionID: spec.ResumeSessionID,
 		Flags:           spec.Flags,
 		WorkingDir:      absDir,

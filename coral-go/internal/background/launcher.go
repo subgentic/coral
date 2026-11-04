@@ -169,13 +169,13 @@ func (l *AgentLauncher) launchAgent(ctx context.Context, workingDir, agentType, 
 		}
 		runTag = l.newRunTag()
 		launchCmd, err = ag.LaunchCommand(agent.LaunchParams{
-			SessionID:       sessionID,
-			SessionName:     sessionName, // CORAL_SESSION_NAME: the agent's hooks and coral-board name their session by it
-			CoralHost:       l.host,
-			CoralPort:       l.port,
-			CoralDir:        l.coralDir,
-			RunTag:          runTag,
-			ProtocolPath:    protocolPath,
+			SessionID:    sessionID,
+			SessionName:  sessionName, // CORAL_SESSION_NAME: the agent's hooks and coral-board name their session by it
+			CoralHost:    l.host,
+			CoralPort:    l.port,
+			CoralDir:     l.coralDir,
+			RunTag:       runTag,
+			ProtocolPath: protocolPath, EmbeddedProtocol: true,
 			ResumeSessionID: resumeSessionID,
 			Flags:           flags,
 			WorkingDir:      workingDir,
