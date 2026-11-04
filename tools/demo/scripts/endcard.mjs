@@ -10,6 +10,6 @@ const page = await ctx.newPage()
 await page.setContent(`<!doctype html><meta charset=utf-8><body style="margin:0;height:100vh;display:grid;place-items:center;background:#0e1116;color:#e7ebf2;font-family:system-ui,sans-serif;text-align:center">
 <div><div style="font-size:84px;font-weight:700;letter-spacing:-.02em">Coral</div>
 <div style="font-size:34px;color:#8b95a7;margin-top:14px">The Inbox for your agents.</div>
-<div style="font-size:26px;color:#4f8cff;margin-top:46px">github.com/subgentic/coral</div></div></body>`)
+<div style="font-size:44px;font-weight:600;color:#4f8cff;margin-top:46px">coralhub.dev</div></div></body>`)
 await sleep(6000); await ctx.close(); await browser.close()
 console.log(fs.readdirSync(dir).find((x) => x.endsWith(".webm")))

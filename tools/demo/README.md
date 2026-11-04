@@ -91,8 +91,8 @@ node take4.mjs c1                      # the wizard, on the empty dashboard
 node take4.mjs launch world chats      # the team, the history, the Inbox documents, the scripted chats
 python3 -I seed-usage.py               # a week of invented usage for Analytics
 node take4.mjs c2 c3 c4 c5 prompts c6 c7 c9 c10
-node endcard.mjs; node hubclip.mjs     # the endings
-ENDING=card ./encode4.sh; ./encode4.sh # the masters (cross-fades), the GIF and the poster
+node endcard.mjs                       # the ending: a card with the text coralhub.dev (node hubclip.mjs records the live page, for ENDING=hub)
+./encode4.sh                           # the master (cross-fades), the GIF and the poster
 ./rig-up.sh stop
 ```
 
