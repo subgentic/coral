@@ -18,12 +18,17 @@ const { coralReady } = require('./helpers/wait');
             const m = await import(${S} + 'session_state.js');
             const paused = m._gitStateSummary({ is_worktree: false, base_branch: '', ahead: 0, behind: 0, dirty: 3, paused: { changes: 35000, took_ms: 3200 } });
             const plain = m._gitStateSummary({ is_worktree: false, base_branch: 'main', ahead: 1, behind: 0, dirty: 3 });
-            return { paused, plain };
+            const clean = m._gitStateSummary({ is_worktree: false, base_branch: 'main', ahead: 0, behind: 0, dirty: 0, paused: { changes: 20, took_ms: 2500 } });
+            return { paused, plain, clean };
         })()`);
-        assert.match(html.paused, /●35000/, `the chip shows the last count read (35000), not the stale 3: ${html.paused}`);
-        assert.match(html.paused, /class="gs-paused"[^>]*>paused</, `and says paused: ${html.paused}`);
+        assert.match(html.paused, /●3</, `the chip keeps the uncommitted count (3): ${html.paused}`);
+        assert.ok(!/●35000/.test(html.paused), `and does not show the comparison's total as uncommitted files: ${html.paused}`);
+        assert.match(html.paused, /class="gs-paused"[^>]*>paused: 35000 files in the comparison</, `the paused marker says what its count is: ${html.paused}`);
         assert.ok(html.paused.includes('Refresh') && html.paused.includes('Turn on live updates'), `its hover words say where to go: ${html.paused}`);
         assert.ok(!/gs-paused/.test(html.plain) && /●3/.test(html.plain), `a folder that is not paused is as it was: ${html.plain}`);
+        // UI Reviewer's MUST: a clean worktree (dirty 0) with a comparison total is not given uncommitted files
+        assert.ok(!/gs-dirty/.test(html.clean) && !/uncommitted/.test(html.clean), `a clean worktree shows no uncommitted count: ${html.clean}`);
+        assert.match(html.clean, /paused: 20 files in the comparison/, `only the paused marker, with its total: ${html.clean}`);
         // the sidebar's folder group badge
         await ev(`(() => { localStorage.setItem('coral-live-view-mode', 'chat'); window.__m.agents = {};
             window.__m.add('pausedrepo', 'P', 2, { sleeping: false, session_id: 'pm-1-id' }); window.__m.add('plainrepo', 'Q', 2, { sleeping: false, session_id: 'pm-2-id' });
