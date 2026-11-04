@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"sort"
+	"strings"
 
 	"github.com/jmoiron/sqlx"
 	"time"
@@ -78,6 +79,8 @@ var reviewRoundTags = map[string]bool{ReviewApproved: true, ReviewChangesRequest
 // decision (approved, changes requested, denied, ignored, superseded) and its "read" mark go, and the review row with them, so Needs you shows it as new. It reports the tags after and the earlier decision ("" for none).
 // A file that is already waiting is left as it is (its time too). ErrArtifactTag when the tags would be more than a file may have.
 func (s *Store) StartArtifactReview(ctx context.Context, boardID, hex string, at time.Time) (tags []string, was string, err error) {
+	s.activityMu.Lock() // the Operator's record is written in this transaction (the send and its row stand or fall together): one writer of its chain at a time
+	defer s.activityMu.Unlock()
 	tx, err := s.db.BeginTxx(ctx, nil)
 	if err != nil {
 		return nil, "", err
@@ -135,6 +138,14 @@ func (s *Store) StartArtifactReview(ctx context.Context, boardID, hex string, at
 		}
 	} else {
 		out = have
+	}
+	if m, ok := activityOf(ctx); ok { // the row of the send, with the earlier decision in its note when this starts a new round
+		if !waiting && decided != "" {
+			m.Note = strings.TrimSpace("again after " + decided + ". " + m.Note)
+		}
+		if err := s.recordInTx(WithActivity(ctx, m), tx, at, ActSendReview, "file", hex, "", boardID); err != nil {
+			return nil, "", err
+		}
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, "", err

@@ -58,8 +58,9 @@ func (h *BoardHandler) MarkArtifactForReview(w http.ResponseWriter, r *http.Requ
 		writeError(w, http.StatusBadRequest, "sign_in_link", signInLinkRefusal)
 		return
 	}
-	question, _ := board.CleanReviewQuestion(body.Question)                  // empty once cleaned: none, and an earlier one is kept
-	tags, was, err := h.bs.StartArtifactReview(ctx, project, id, time.Now()) // a file decided before starts a new round (#13231)
+	question, _ := board.CleanReviewQuestion(body.Question) // empty once cleaned: none, and an earlier one is kept
+	// The row of the send is written in the same transaction as the send (Security's SHOULD on #13231): a row that cannot be written undoes the send.
+	tags, _, err := h.bs.StartArtifactReview(board.WithActivity(context.WithoutCancel(ctx), activityMetaFor(r, item.Name, question)), project, id, time.Now()) // a file decided before starts a new round (#13231)
 	if errors.Is(err, board.ErrArtifactTag) {
 		writeError(w, http.StatusBadRequest, "too_many_tags", "this file already has the most tags a file can have; remove one to send it for review")
 		return
@@ -74,11 +75,6 @@ func (h *BoardHandler) MarkArtifactForReview(w http.ResponseWriter, r *http.Requ
 			return
 		}
 	}
-	note := question
-	if was != "" {
-		note = strings.TrimSpace("again after " + was + ". " + question) // a new round: the earlier decision is in the record
-	}
-	h.recordActivity(r, board.ActSendReview, "file", id, project, item.Name, note)
 	h.writeReviewAnswer(w, r, project, id, tags)
 }
 
@@ -112,7 +108,7 @@ func (h *BoardHandler) UnmarkArtifactForReview(w http.ResponseWriter, r *http.Re
 			h.writeReviewAnswer(w, r, project, id, was)
 			return
 		}
-		err = h.bs.SetArtifactTagsIf(ctx, project, id, was, withoutTag(was, tagForReview))
+		err = h.bs.TakeArtifactOutOfReview(board.WithActivity(context.WithoutCancel(ctx), activityMetaFor(r, h.artifactNameOf(ctx, project, id), "")), project, id, was, withoutTag(was, tagForReview))
 		if err == nil {
 			break
 		}
@@ -126,7 +122,6 @@ func (h *BoardHandler) UnmarkArtifactForReview(w http.ResponseWriter, r *http.Re
 		}
 	}
 	all, _ := h.bs.ArtifactTags(ctx, project)
-	h.recordActivity(r, board.ActUnsendReview, "file", id, project, h.artifactNameOf(ctx, project, id), "")
 	h.writeReviewAnswer(w, r, project, id, all[id])
 }
 

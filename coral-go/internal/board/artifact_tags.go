@@ -135,7 +135,7 @@ func (s *Store) ArtifactTags(ctx context.Context, boardID string) (map[string][]
 
 // SetArtifactTags makes tags (already normalised, at most MaxArtifactTags) the whole set of the object's tags on the board.
 func (s *Store) SetArtifactTags(ctx context.Context, boardID, hex string, tags []string) error {
-	return s.setArtifactTags(ctx, boardID, hex, tags, nil, false)
+	return s.setArtifactTags(ctx, boardID, hex, tags, nil, false, "")
 }
 
 // ErrArtifactTagsChanged: the tags of the object are not what the caller read, so a write built on that read was not made (#13129).
@@ -144,10 +144,18 @@ var ErrArtifactTagsChanged = errors.New("the artifact's tags changed since they 
 // SetArtifactTagsIf is SetArtifactTags as a compare-and-set (#13129): the write is made only if the object's tags, read in the same transaction, are exactly was (as a set); otherwise nothing is written and the
 // error is ErrArtifactTagsChanged. A write that was worked out from a list read earlier (a Hub write judged against the stored tags) can therefore never overwrite a tag edit that landed in between.
 func (s *Store) SetArtifactTagsIf(ctx context.Context, boardID, hex string, was, tags []string) error {
-	return s.setArtifactTags(ctx, boardID, hex, tags, was, true)
+	return s.setArtifactTags(ctx, boardID, hex, tags, was, true, "")
 }
 
-func (s *Store) setArtifactTags(ctx context.Context, boardID, hex string, tags, was []string, check bool) error {
+// TakeArtifactOutOfReview is SetArtifactTagsIf for the Operator taking a file out of review (#13231): the write and its row in the Operator's record (ActUnsendReview, when ctx says the Operator acted) are one
+// transaction, so a row that cannot be written undoes the take-out and the caller says so.
+func (s *Store) TakeArtifactOutOfReview(ctx context.Context, boardID, hex string, was, tags []string) error {
+	s.activityMu.Lock() // the record's chain is written in this transaction: one writer at a time
+	defer s.activityMu.Unlock()
+	return s.setArtifactTags(ctx, boardID, hex, tags, was, true, ActUnsendReview)
+}
+
+func (s *Store) setArtifactTags(ctx context.Context, boardID, hex string, tags, was []string, check bool, record string) error {
 	tx, err := s.db.BeginTxx(ctx, nil)
 	if err != nil {
 		return err
@@ -177,6 +185,11 @@ func (s *Store) setArtifactTags(ctx context.Context, boardID, hex string, tags, 
 	for _, tag := range tags {
 		if _, err := tx.ExecContext(ctx, `INSERT INTO artifact_tags (board_id, hex, tag) VALUES (?, ?, ?)`, boardID, hex, tag); err != nil {
 			return err
+		}
+	}
+	if record != "" {
+		if err := s.recordInTx(ctx, tx, time.Now(), record, "file", hex, "", boardID); err != nil {
+			return err // the take-out and its row stand or fall together
 		}
 	}
 	if err := commitArtifactTagsTx(tx); err != nil {
