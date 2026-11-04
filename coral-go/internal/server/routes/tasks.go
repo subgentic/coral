@@ -213,7 +213,7 @@ func (h *TasksHandler) SubmitTask(w http.ResponseWriter, r *http.Request) {
 func (h *TasksHandler) GetTaskStatus(w http.ResponseWriter, r *http.Request) {
 	runID, _ := strconv.ParseInt(chi.URLParam(r, "runID"), 10, 64)
 	run, err := h.sched.GetScheduledRun(r.Context(), runID)
-	if err != nil {
+	if err != nil || run == nil || h.isChiefRun(r.Context(), run) {
 		errNotFound(w, "run not found")
 		return
 	}
@@ -225,6 +225,10 @@ func (h *TasksHandler) GetTaskStatus(w http.ResponseWriter, r *http.Request) {
 // POST /api/tasks/runs/{runID}/kill
 func (h *TasksHandler) KillTask(w http.ResponseWriter, r *http.Request) {
 	runID, _ := strconv.ParseInt(chi.URLParam(r, "runID"), 10, 64)
+	if run, err := h.sched.GetScheduledRun(r.Context(), runID); err == nil && run != nil && h.isChiefRun(r.Context(), run) {
+		errNotFound(w, "run not found")
+		return
+	}
 
 	if h.scheduler != nil {
 		if !h.scheduler.KillRun(r.Context(), runID) {
@@ -313,8 +317,19 @@ func (h *TasksHandler) ListActiveRuns(w http.ResponseWriter, r *http.Request) {
 		errInternalServer(w, err.Error())
 		return
 	}
-	h.attachProxyCosts(r.Context(), runs)
-	writeJSON(w, http.StatusOK, map[string]any{"runs": emptyIfNil(runs)})
+	visible := runs[:0]
+	for _, run := range runs {
+		if !h.isChiefRun(r.Context(), &run) {
+			visible = append(visible, run)
+		}
+	}
+	h.attachProxyCosts(r.Context(), visible)
+	writeJSON(w, http.StatusOK, map[string]any{"runs": emptyIfNil(visible)})
+}
+
+func (h *TasksHandler) isChiefRun(ctx context.Context, run *store.ScheduledRun) bool {
+	job, err := h.sched.GetScheduledJob(ctx, run.JobID)
+	return err == nil && job != nil && job.JobType == "check"
 }
 
 func (h *TasksHandler) attachProxyCost(ctx context.Context, run *store.ScheduledRun) {

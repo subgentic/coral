@@ -343,6 +343,10 @@ func (h *ChiefChecksHandler) state(w http.ResponseWriter, r *http.Request) {
 		errBadRequest(w, "ask_id goes with waiting_on_operator")
 		return
 	}
+	if agent && t.NotifyMode == "daily_brief" && b.State == "done" && b.BriefID == 0 {
+		errBadRequest(w, "daily brief results remain open until the actual brief message is linked")
+		return
+	}
 	if b.BriefID != 0 {
 		msg, e := h.sessions.bs.GetMessageByID(r.Context(), t.TargetBoard, b.BriefID)
 		author, authorErr := h.sessions.bs.MessageSession(r.Context(), t.TargetBoard, b.BriefID)
@@ -468,7 +472,7 @@ func (h *ChiefChecksHandler) deliver(ctx context.Context, id int64, kind string)
 		return finish("failed", "invalid_notify_mode", 0)
 	}
 	name := clitext.Clean(sub.JobTitle)
-	if name == "" || strings.ContainsAny(name, "\r\n@") {
+	if name == "" || strings.EqualFold(name, "all") || strings.ContainsAny(name, "\r\n@") {
 		return finish("failed", "invalid_recipient", 0)
 	}
 	subs, err := h.sessions.bs.ListSubscribers(ctx, t.TargetBoard)
@@ -487,7 +491,7 @@ func (h *ChiefChecksHandler) deliver(ctx context.Context, id int64, kind string)
 	if hasSignInLink(text) {
 		return finish("failed", "sign_in_link_refused", 0)
 	}
-	checkName := board.DefuseMentions(clitext.Clean(t.CheckName), names)
+	checkName := board.DefuseMentions(sendDashes.ReplaceAllString(strings.Join(strings.Fields(clitext.Clean(t.CheckName)), " "), "- - -"), names)
 	text = board.DefuseMentions(sendDashes.ReplaceAllString(text, "- - -"), names)
 	prefix := "A check the Operator scheduled"
 	if kind == "reminder" {

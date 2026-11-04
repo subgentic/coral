@@ -45,7 +45,8 @@ also uses the ordinary board hourly/live caps and normal wake permissions.
 and references: `routed` requires a same-board `task_id`; `waiting_on_operator`
 requires `ask_id` attributed to the original receiving session; optional
 `brief_id` must name that session's actual board message. Other states are
-`open` and `done`. The CLI is:
+`open` and `done`. Agents using `daily_brief` must link an actual brief before
+marking a result done; the person may explicitly resolve it. The CLI is:
 
     coral-agent check state ID --state done --summary 'Short result'
 
