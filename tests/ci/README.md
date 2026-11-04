@@ -38,6 +38,8 @@ ci install                                                       # copy the tool
 
 - The denylist is a typo guard, not a security boundary: quoting (`.cor""al`), a script file or an environment variable get past it. The queue is for agents of one team that mean well; it keeps accidents out.
 - The job runs as the same user with the real `HOME`, and variables such as `GH_TOKEN` or `AWS_*` still pass through (only `CORAL_*`, `CLAUDE*`, `ANTHROPIC*`, `TMUX` and `SSH_AUTH_SOCK` are removed). Fine for same-user agents; do not queue a job whose command prints its environment.
+- A job that a second runner took first is not run twice: the move from `pending/` to `running/` is the claim, and the runner that loses it returns `taken` without running anything (pinned by a test that makes the move fail; two real runners on one machine are not the setup, one runner per machine is).
+- The run-time lint repeats the submit-time denylist, so it is advisory too: a script file or a quoted form (`p"kill"`) gets past it, and a test body can run anything its command starts. The real protection is review of what is queued, the closed `CORAL_URL`, the scrubbed environment and the isolated folders.
 - The mac lock's takeover of a dead runner's lock has a narrow race: two runners that both see the dead pid at the same moment can remove each other's new lock (the slower one's `rmtree`). It needs two runners started on the same machine, which the setup does not do (one runner per machine).
 
 ## Examples

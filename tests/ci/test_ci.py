@@ -428,6 +428,22 @@ class SecurityTests(Base):
         self.assertEqual(self.ci('run', '--machine', 'mac', '--once', '--no-post').returncode, 0)
         self.assertEqual(rd(os.path.join(outside, 'keep.txt')), 'precious')
 
+    def test_a_job_a_second_runner_took_first_is_not_run_again(self):
+        marker = os.path.join(self.d, 'ran')
+        self.submit('mac', 'normal', ['sh', '-c', 'touch %s' % marker])
+        code = ("import sys, os; sys.path.insert(0, %r); import ci\n"
+                "ci.local_idle = lambda: []\n"
+                "real = os.rename\n"
+                "def rename(a, b):\n"
+                "    os.remove(a)  # the other runner moved it first\n"
+                "    raise FileNotFoundError(a)\n"
+                "os.rename = rename\n"
+                "print(ci.run_one('mac', post=False))\n") % os.path.dirname(CI)
+        r = subprocess.run([sys.executable, '-c', code], env=dict(self.env), capture_output=True, text=True)
+        self.assertEqual(r.stdout.strip(), 'taken', r.stdout + r.stderr)
+        self.assertFalse(os.path.exists(marker))
+        self.assertFalse(os.path.exists(os.path.join(self.home, 'mac.lock')), 'the lock is released')
+
     def test_the_ssh_command_notices_a_dead_connection(self):
         r = subprocess.run([sys.executable, '-c', 'import sys; sys.path.insert(0, %r); import ci; print(" ".join(ci.ssh_cmd()))' % os.path.dirname(CI)], env={'PATH': SYSPATH, 'HOME': self.d}, capture_output=True, text=True)
         self.assertIn('ServerAliveInterval=', r.stdout, r.stdout + r.stderr)
