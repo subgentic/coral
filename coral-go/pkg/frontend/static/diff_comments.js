@@ -123,7 +123,7 @@ export async function attachDiffComments(slot, file, view, texts, base = '', fie
     icon.type = 'button'; icon.setAttribute('aria-controls', box.id); glyph.setAttribute('aria-hidden', 'true'); badge.hidden = true; icon.append(glyph, badge);
     let count = 0, opened = false;
     const paint = () => {
-        const label = count ? `Comment on ${name}, ${count} ${count === 1 ? 'comment' : 'comments'}` : `Comment on ${name}`;
+        const label = count ? `Comment on ${name}, ${count} comment${count === 1 ? '' : 's'}` : `Comment on ${name}`;
         icon.setAttribute('aria-label', label); icon.title = label; icon.setAttribute('aria-expanded', String(opened));
         badge.textContent = count > 99 ? '99+' : String(count); badge.hidden = !count;
     };
