@@ -104,5 +104,6 @@ export function showView(activeId) {
     if ((document.body.getAttribute('data-agent-cli') || '') !== cli) document.body.setAttribute('data-agent-cli', cli); // (written only when it changes: the startup sequence does not gain a write)
     setDockPage(activeId); // the right sidebar follows the kind of page: its tabs and its own open state (#4539)
     for (const fn of shownHooks) fn(activeId); // the way back from an item to its group's table follows the view (sidebar_groups.js, #7443)
+    document.dispatchEvent(new CustomEvent('coral:view-shown', { detail: activeId })); // for a module that must not import this one (launch_cards.js: the Home goal card's teams read, #13109)
     checkAgentView(); // the agent's pollers and terminal socket follow whether its page is on screen (#3719)
 }
