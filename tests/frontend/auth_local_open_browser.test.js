@@ -57,20 +57,20 @@ const ATTACK = {
         c.Network.requestWillBeSentExtraInfo(e => { const r = byId.get(e.requestId); if (r) r.headers = Object.fromEntries(Object.entries(e.headers).map(([k, v]) => [k.toLowerCase(), v])); });
         c.Network.responseReceived(e => { const r = byId.get(e.requestId); if (r) r.status = e.response.status; });
         c.on('Log.entryAdded', e => log.push(e.entry.text));
-        const ev = async x => { const r = await c.Runtime.evaluate({ expression: x, returnByValue: true, awaitPromise: true }); if (r.exceptionDetails) throw new Error(JSON.stringify(r.exceptionDetails).slice(0, 300)); return r.result.value; };
+        const ev = async x => { const r = await c.Runtime.evaluate({ expression: x, returnByValue: true, awaitPromise: true }); if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description || r.exceptionDetails.text || JSON.stringify(r.exceptionDetails)); return r.result.value; };
         const waitFor = async (expr, what, ms = 8000) => {
             const end = Date.now() + ms;
             while (Date.now() < end) {
                 let ok = false;
-                try { ok = await ev(expr); } catch (e) { if (!isNavigationError(e)) throw e; }
+                try { ok = await ev(expr); } catch (e) { if (!isNavigationError(e)) throw new Error(e.message + '; page ' + await diagnostics({ targetId, ev })); }
                 if (ok) return;
                 await sleep(25);
             }
-            throw new Error(`timed out waiting for ${what}: requests ${JSON.stringify(reqs)}; targets ${await diagnostics({ targetId, ev })}`);
+            throw new Error(`timed out waiting for ${what}: requests ${JSON.stringify(reqs.map(({url,method,status})=>({url,method,status})))}; targets ${await diagnostics({ targetId, ev })}`);
         };
         const cookies = async () => (await c.Network.getCookies({ urls: [BASE] })).cookies.map(k => k.name);
         const status = () => ev(`fetch('${BASE}/api/system/status', { cache: 'no-store', credentials: 'include' }).then(r => r.status)`);
-        return { c, targetId, browserContextId, ev, waitFor, reqs, log, cookies, status };
+        return { c, targetId, browserContextId, ev, waitFor, reqs, log, cookies, status, authRenavigations: 0 };
     };
     // Queries/hashes may carry sign-in credentials: timeout evidence needs target
     // identity and origin/path only, never those credentials.
@@ -127,9 +127,32 @@ const ATTACK = {
             if (state.includedStatus === 200 && state.cookieLessStatus === 401) throw new Error('session still alive after reset-password --clear: ' + await diagnostics(p,state));
             let leftAuth = false;
             for (const raw of [result,state.url]) { try { const u = new URL(raw); leftAuth ||= u.origin === base.origin && !u.pathname.startsWith('/auth'); } catch { /* no usable URL */ } }
-            if (attempt === 0 && (leftAuth || (error && isNavigationError(error))) && Date.now() < deadline) { await p.c.Page.navigate({url:BASE+'/auth'}); continue; }
+            if (attempt === 0 && p.authRenavigations < 1 && (leftAuth || (error && isNavigationError(error))) && Date.now() < deadline) { p.authRenavigations++; await p.c.Page.navigate({url:BASE+'/auth'}); continue; }
             if (error && !isNavigationError(error)) throw error;
             throw new Error('local-open was not clicked within its two-navigation cap: ' + await diagnostics(p,state));
+        }
+    };
+    // Capture every pre-click assertion together, after the cookie-less status
+    // read. A separate awaited fetch must not leave a stale note-element lookup.
+    const localOpenProof = async p => {
+        const deadline = Date.now() + 30000;
+        for (let attempt = 0; attempt < 2; attempt++) {
+            let snapshot = null, error = null;
+            try {
+                await p.waitFor(`(location.origin === '${BASE}' && !location.pathname.startsWith('/auth')) || (document.documentElement?.dataset.authReady === 'true' && !!document.getElementById('local-open'))`, 'the auth handler or its redirect', Math.max(1,deadline-Date.now()));
+                snapshot = await p.ev(`(async () => {
+                    const cookieLessStatus = await fetch('${BASE}/api/system/status',{cache:'no-store',credentials:'omit',signal:AbortSignal.timeout(3000)}).then(r=>r.status);
+                    return {authReady:document.documentElement?.dataset.authReady === 'true',buttonPresent:!!document.getElementById('local-open'),note:document.getElementById('local-open-note')?.textContent ?? null,href:location.href,cookieLessStatus};
+                })()`);
+            } catch (e) { error = e; }
+            if (snapshot?.authReady && snapshot.buttonPresent && snapshot.note !== null) return snapshot;
+            const state = await pageState(p);
+            console.log('  local-open proof miss: ' + await diagnostics(p,state) + '; exception: ' + (error?.message || 'missing auth button/note'));
+            if (state.includedStatus === 200 && state.cookieLessStatus === 401) throw new Error('session still alive after reset-password --clear: ' + await diagnostics(p,state));
+            let leftAuth = false;
+            for (const raw of [snapshot?.href,state.url]) { try { const u = new URL(raw); leftAuth ||= u.origin === base.origin && !u.pathname.startsWith('/auth'); } catch { /* no usable URL */ } }
+            if (attempt === 0 && p.authRenavigations < 1 && (leftAuth || (error && isNavigationError(error))) && Date.now() < deadline) { p.authRenavigations++; await p.c.Page.navigate({url:BASE+'/auth'}); continue; }
+            throw new Error('auth button/note proof missing before click: ' + (error?.message || JSON.stringify(snapshot)) + '; page ' + await diagnostics(p,state));
         }
     };
     let failed = 0;
@@ -201,9 +224,9 @@ const ATTACK = {
                 const p = await freshPage();
                 await p.c.Page.navigate({ url: BASE + '/auth' });
                 if (process.env.CORAL_TEST_STRICT !== '1') { console.log('  skipped here: only a strict shard (the runner sets CORAL_TEST_STRICT=1 there) gives this browser a 401 to turn into a 200; the strict shard asserts it'); return; } // the default-mode run of a STRICT_SUITES suite (#12907, Security's SHOULD: the skip depends on the shard, not on the answer)
-                await p.waitFor(`document.documentElement.dataset.authReady === 'true' && !!document.getElementById('local-open')`, 'the button handler');
-                assert.equal(await p.status(), 401, 'not signed in before');
-                const promised = await p.ev(`document.getElementById('local-open-note').textContent`); // #12834: the words match what the next screen does
+                const proof = await localOpenProof(p);
+                assert.equal(proof.cookieLessStatus, 401, 'not signed in before (cookie-less): ' + JSON.stringify(proof));
+                const promised = proof.note; // one snapshot: no DOM access after an awaited status request
                 assert.ok(/asks you to create a password/i.test(promised) && !/without a password/i.test(promised), 'the note says the password prompt comes next, and promises no way around it: ' + promised);
                 await clickLocalOpen(p);
                 await until(() => localOpen(p.reqs).some(r => r.status), 'the answer to the button request');
