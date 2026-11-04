@@ -5,11 +5,13 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
+const { framesJs } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const shot = async name => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
-    const base = o => Object.assign({ name: 'coral-go', display_name: '', agent_type: 'codex', summary: 'Ship the release plan', model: 'gpt-5.5', working_directory: '/work/coral-project', context_pct: 10, working: false, waiting_for_input: false, not_started: false, stuck: false, sleeping: false, awaiting_user: true, done: true }, o);
+    // the same row shape as agent_row_one_line_browser (a row of any other shape is not what that suite proved the list draws); the page treats a blocked key the same whatever the CLI (the server sends it for Codex only)
+    const base = o => Object.assign({ name: 'coral-go', display_name: '', agent_type: 'claude', summary: 'Ship the release plan', model: 'claude-opus-5-5', branch: 'feat/long-branch-name', repo_name: 'coral', working_directory: '/work/coral-project', context_pct: 10, working: false, waiting_for_input: false, not_started: false, stuck: false, sleeping: false, awaiting_user: false, done: false, board_project: '', board_unread: 0 }, o);
     const ROWS = [
         base({ session_id: 'b1', display_name: 'Refused', blocked: { kind: 'model_refused', model: 'gpt-6.1-sol' } }),
         base({ session_id: 'b2', display_name: 'No name', blocked: { kind: 'model_refused', model: '' } }),
@@ -17,7 +19,7 @@ const { connect } = require('./agent_view_harness');
         base({ session_id: 'b4', display_name: 'Asleep', sleeping: true, blocked: { kind: 'model_refused', model: 'gpt-6.1-sol' } }),
         base({ session_id: 'b5', display_name: 'Later kind', blocked: { kind: 'usage_limit' } }),
         base({ session_id: 'b6', display_name: 'Hostile', blocked: { kind: 'model_refused', model: '<img src=x onerror=window.__pwned=1>' } }),
-        base({ session_id: 'b7', display_name: 'Fine' }),
+        base({ session_id: 'b7', display_name: 'Fine', awaiting_user: true, done: true }),
     ];
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
@@ -25,12 +27,12 @@ const { connect } = require('./agent_view_harness');
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
             await ev(`(async () => { T.state.liveSessions = ${JSON.stringify(ROWS)}; T.render.renderLiveSessions(T.state.liveSessions); return true; })()`);
-            await waitFor(`document.querySelectorAll('${root} .session-group-item').length >= 7`, `${label}: the rows`, 6000);
+            await waitFor(`document.querySelectorAll('${root} .session-group-item').length >= 6`, `${label}: the rows (six awake agents, and the sleeping one as a row or in a summary)`, 6000);
             const read = () => ev(`(() => { const out = {}; for (const li of document.querySelectorAll('${root} .session-group-item')) { const chip = li.querySelector('.session-state-pill'), dot = li.querySelector('.session-dot'), st = li.querySelector('.session-status-line');
                 out[li.dataset.sessionId] = { state: li.dataset.state, aria: li.getAttribute('aria-label') || '', chip: chip && chip.getClientRects().length ? chip.textContent.trim() : null, chipTitle: chip ? chip.getAttribute('title') || '' : '', dotClass: dot ? dot.className : '', status: st && st.getClientRects().length ? st.textContent.trim() : null, h: Math.round(li.getBoundingClientRect().height), imgs: li.querySelectorAll('img').length }; } return out; })()`);
             const at = zoom => `${label}${zoom ? ' at ' + zoom + ' text' : ''}`;
             for (const zoom of ['', '200%']) {
-                if (zoom) { await ev(`document.documentElement.style.fontSize = '${zoom}'; true`); await ev(`new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))`); }
+                if (zoom) { await ev(`document.documentElement.style.fontSize = '${zoom}'; true`); await ev(framesJs(3)); }
                 const r = await read();
                 assert.equal(r.b1.state, 'blocked', `${at(zoom)}: a refused agent's row state is blocked: ${JSON.stringify(r.b1)}`);
                 assert.match(r.b1.dotClass, /\bstuck\b/, `${at(zoom)}: its dot is Stuck's (a shape of its own in forced colours), not the idle or ready dot: ${r.b1.dotClass}`);
@@ -45,8 +47,8 @@ const { connect } = require('./agent_view_harness');
                     if (!zoom) assert.ok(r.b1.h <= 100, `${at(zoom)}: the row stays one card (${r.b1.h} px)`);
                 }
                 assert.equal(r.b3.state, 'needs_input', `${at(zoom)}: a question the agent asks wins over the block: ${JSON.stringify(r.b3)}`);
-                assert.notEqual(r.b4.state, 'blocked', `${at(zoom)}: a sleeping row never says blocked: ${JSON.stringify(r.b4)}`);
-                assert.equal(r.b4.state, 'sleeping');
+                if (r.b4) assert.equal(r.b4.state, 'sleeping', `${at(zoom)}: a sleeping agent's row (up to three are rows, more fold into a summary) never says blocked: ${JSON.stringify(r.b4)}`);
+                assert.equal(await ev(`T.render.sessionStateInfo(${JSON.stringify(ROWS[3])}).key`), 'sleeping', `${at(zoom)}: the one resolver says a sleeping agent is asleep, whatever its blocked key says`);
                 assert.equal(r.b5.state, 'blocked', `${at(zoom)}: a kind this page does not know is still a block: ${JSON.stringify(r.b5)}`);
                 if (!mobile) assert.equal(r.b5.chip, 'Blocked', `${at(zoom)}: and says plain Blocked`);
                 assert.equal(r.b6.imgs, 0, `${at(zoom)}: a model name is text, never markup: ${JSON.stringify(r.b6)}`);
