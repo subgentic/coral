@@ -243,7 +243,7 @@ func (s *TokenUsageStore) UsageByAgent(ctx context.Context, f UsageFilter) ([]Us
 	err := s.db.Reader().SelectContext(ctx, &out, `SELECT COALESCE(NULLIF(agent_name,''), NULLIF(session_id,''), 'Unknown agent') AS name,
 	  COALESCE(SUM(input_tokens),0) AS input_tokens, COALESCE(SUM(output_tokens),0) AS output_tokens, COALESCE(SUM(cache_read_tokens),0) AS cache_read_tokens,
 	  COALESCE(SUM(cache_write_tokens),0) AS cache_write_tokens, COALESCE(SUM(cost_usd),0) AS cost_usd, COALESCE(SUM(num_turns),0) AS num_turns
-	  FROM (`+inner+`) GROUP BY name ORDER BY MAX(recorded_at) DESC, name`, args...)
+	  FROM (`+inner+`) GROUP BY name ORDER BY MAX(recorded_at) DESC, MIN(session_id)`, args...)
 	return out, err
 }
 

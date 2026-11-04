@@ -254,6 +254,7 @@ var uniqueKeyRE = regexp.MustCompile(`(?i)^(?:\w+\.)?(?:id|rowid)\b`)
 var timeOrderAllowed = map[string]string{
 	"board/store_groups_projects.go: last_message_at": "p.project follows: the derived table lists each project once, and a project is its own key",
 	"store/token_usage.go: MAX(t.recorded_at)":        "t.session_id follows: the rows are grouped by it, so each is one row's key",
+	"store/token_usage.go: MAX(recorded_at)":          "MIN(session_id) follows: the per-agent groups are disjoint sets of sessions, so each has a session id of its own",
 	"store/call_metrics.go: created_at":               "the prune of the oldest rows below a cutoff: which of two rows in one second goes in this batch changes nothing that is pruned",
 	"store/agent_event_query.go: created_at ":         "the id key follows in the next piece of the statement (dir is the same for both)",
 }
