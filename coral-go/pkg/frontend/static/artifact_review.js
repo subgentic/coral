@@ -1,7 +1,7 @@
 /* The Operator's review of an artifact a team tagged "for review" (#136584, #136588), in the artifact viewer: Approve (the row leaves Needs you, the uploading agent is told) and Request changes (a comment
  * on the whole document, sent to the uploader through the comments' own Send to agent, and the file leaves Needs you: it is the agent's turn, and its next version comes back as a new item). The state is read from the team's artifact list (its tags and,
  * once decided, the time); the buttons show only for a pending one; through Coral Hub the owner has both: the change-request send is the owner's too (#11354). */
-import { boardFetch, identityKey, decisionNeedsPerson } from './server_base.js';
+import { boardFetch, identityKey, decisionNeedsPerson, isCloud } from './server_base.js';
 import { showToast, announceNotice } from './notifications.js';
 import { markHidden } from './visible_marks.js';
 import { importOnce } from './import_once.js';
@@ -34,25 +34,31 @@ export async function reviewStateOf(team, hex) {
 
 const timeWords = at => { const t = Date.parse(at); return Number.isNaN(t) ? '' : new Date(t).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }); };
 
-async function decide(team, row, decision, reason, note) {
-    const r = await boardFetch(team, `/artifacts/${encodeURIComponent(row.id)}/review`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(reason ? { decision, reason } : note ? { decision, note } : { decision }) });
+async function decide(team, row, decision, reason, note, quiet = false) {
+    const r = await boardFetch(team, `/artifacts/${encodeURIComponent(row.id)}/review`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ decision, ...(reason ? { reason } : {}), ...(note ? { note } : {}), ...(quiet ? { quiet: true } : {}) }) });
     const body = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(body.message || body.error || `Could not save the review (HTTP ${r.status}).`);
+    if (!r.ok) { const error = new Error(body.message || body.error || `Could not save the review (HTTP ${r.status}).`); error.status = r.status; error.code = body.code; throw error; }
     return body;
 }
 
-/** Approving a version settles the ones before it quietly: their 'for review' tag comes off (no review, no message); resolves { settled, failed }. */
+/** Approving or denying a version settles the ones before it quietly (no review or message): locally their 'for review' tag comes off; through the Hub automatic superseded settlement keeps the restricted tags route out of it. Resolves { settled, failed }. */
 async function settleEarlierVersions(m, row) {
     let settled = 0, failed = 0;
     for (const e of m.earlierVersions(row)) {
         try {
             const current = await m.currentTags(e);
             if (current !== null) {
-                const r = await boardFetch(e.team, `/artifacts/${encodeURIComponent(e.id)}/tags`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tags: current.filter(t => t !== 'for review') }) });
-                if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                if (isCloud()) {
+                    // Automatic settlement is superseded, not an Operator dismissal.
+                    // The server omits the Inbox action event for quiet cleanup.
+                    await decide(e.team, e, 'ignore', undefined, undefined, true);
+                } else {
+                    const r = await boardFetch(e.team, `/artifacts/${encodeURIComponent(e.id)}/tags`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tags: current.filter(t => t !== 'for review') }) });
+                    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                }
             }
             settled++;
-        } catch { failed++; }
+        } catch (e) { if (isCloud() && e.status === 404) continue; if (e.status === 409 && e.code === 'not_for_review') settled++; else failed++; }
     }
     return { settled, failed };
 }

@@ -41,6 +41,7 @@ const (
 	ActChanges    = "changes"
 	ActDeny       = "deny"
 	ActIgnore     = "ignore"
+	ActSupersede  = "supersede"
 	ActUnignore   = "unignore"
 	ActSave       = "save"
 	ActUnsave     = "unsave"

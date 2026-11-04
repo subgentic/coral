@@ -84,11 +84,16 @@ func (h *BoardHandler) ReviewArtifact(w http.ResponseWriter, r *http.Request) {
 	}
 	var body struct {
 		Decision string `json:"decision"`
+		Quiet    bool   `json:"quiet"`  // automatic settlement of older versions; ignore only
 		Reason   string `json:"reason"` // deny only: the Operator's one line to the uploader
 		Note     string `json:"note"`   // approve only: the Operator's one short comment to the uploader (#11888)
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		errBadRequest(w, "invalid JSON")
+		return
+	}
+	if body.Quiet && body.Decision != "ignore" {
+		errBadRequest(w, "quiet applies only to automatic older-version settlement (ignore)")
 		return
 	}
 	if strings.TrimSpace(body.Note) != "" && body.Decision != "approve" {
@@ -112,6 +117,10 @@ func (h *BoardHandler) ReviewArtifact(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	case "ignore", "unignore":
+		if body.Quiet {
+			h.settleSupersededArtifact(w, r, project, id)
+			return
+		}
 		h.ignoreArtifact(w, r, project, id, body.Decision == "ignore")
 		return
 	case "save", "unsave":
@@ -282,4 +291,43 @@ func (h *BoardHandler) notForReviewWords(ctx context.Context, project string, it
 		return "A newer version replaced this one, so it is no longer waiting for your review. Open the newest version to decide."
 	}
 	return plain
+}
+
+// settleSupersededArtifact is an automatic older-version cleanup on the same
+// owner/person-protected review route. It is neither a dismissal nor an Inbox
+// action by the Operator, and sends no notice to the uploader.
+func (h *BoardHandler) settleSupersededArtifact(w http.ResponseWriter, r *http.Request, project, id string) {
+	item, ok := h.teamManagedArtifact(r.Context(), project, id)
+	if !ok {
+		errNotFound(w, "this team has no such artifact")
+		return
+	}
+	var newer []string
+	if sid, n, ok := digestSeriesOnBoard(h.coralDir, artifactStoreID(item), project); ok {
+		for _, m := range seriesMembers(h.coralDir, sid) {
+			if m.Board == project && m.N > n && m.Digest != artifactStoreID(item) {
+				newer = append(newer, m.Digest)
+			}
+		}
+	}
+	r = r.WithContext(board.WithActivity(r.Context(), activityMetaFor(r, item.Name, "Automatic settlement of an older version")))
+	changed, err := h.bs.SettleOlderArtifactReview(r.Context(), project, id, newer, time.Now())
+	if errors.Is(err, board.ErrNotOlderReview) {
+		commentRefuse(w, http.StatusConflict, "not_older_version", "Only an older version with a newer review or an approved/denied version in the same team and series can be settled automatically")
+		return
+	}
+	if err != nil {
+		errInternalServer(w, "could not settle that version")
+		return
+	}
+	if !changed {
+		commentRefuse(w, http.StatusConflict, "not_for_review", h.notForReviewWords(r.Context(), project, item))
+		return
+	}
+	tags, err := h.bs.ArtifactTags(r.Context(), project)
+	if err != nil {
+		errInternalServer(w, "could not read the settled version")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"id": id, "state": board.ReviewSuperseded, "changed": true, "tags": tags[id], "delivered": false})
 }
