@@ -47,6 +47,9 @@ const BOARDS = 9;
             assert.ok(boardsRead.size <= 1 && (boardsRead.size === 0 || boardsRead.has(board)), `${how}: one click read the review lists of ${boardsRead.size} boards (${lists.length} list requests); the file's own board is enough`);
             assert.ok(lists.length <= 3, `${how}: one click made ${lists.length} review/saved list requests: ${lists.join(' , ')}`);
             assert.equal(await ev(`window.__puts.length`), 1, `${how}: the file was tagged read once`);
+            const reqs = await ev(`window.__requests.slice()`); // the 404s the Hub's operator saw: each is asked at most once per open, and a 404 draws nothing again (UI Accessibility's SHOULD on #13489)
+            assert.ok(reqs.filter(r => /\/versions$/.test(r.split('?')[0])).length <= 1, `${how}: versions asked more than once: ${reqs.filter(r => /\/versions/.test(r)).join(' , ')}`);
+            assert.ok(reqs.filter(r => /\/comments\?/.test(r)).length <= 1, `${how}: comments asked more than once: ${reqs.filter(r => /\/comments/.test(r)).join(' , ')}`);
         }
         console.log(`PASS opening one file (viewer, preview, a task's list) reads its own board only${process.env.HUB_NATIVE === '1' ? ' (the Hub-served Inbox)' : ''}`);
     } finally { await client.close(); }
