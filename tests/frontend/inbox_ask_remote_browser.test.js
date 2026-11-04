@@ -22,14 +22,14 @@ const { coralReady } = require('./helpers/wait');
             await open({});
             let r = await read();
             assert.equal(r.offers, 2, at + 'a question of this computer offers its two buttons');
-            assert.deepEqual(r.buttons, ['Close', 'Dismiss', 'Send reply'], at + 'beside the plain Reply and Close, with Dismiss (Send reply on the right, #12599)');
+            assert.deepEqual(r.buttons, ['Close', 'Dismiss'], at + 'beside the plain Reply and Close, with Dismiss (Send reply is under the box now, #13148)');
             await close();
 
             await open({ server: 'box-2' });
             r = await read();
             assert.equal(r.offersBox, false, at + 'a question from another computer has no offered buttons');
             assert.equal(r.offers, 0);
-            assert.deepEqual(r.buttons, ['Close', 'Send reply'], at + 'only the plain Reply and Close (Send reply on the right)');
+            assert.deepEqual(r.buttons, ['Close'], at + 'only the plain Reply and Close (Send reply is under the box, #13148)');
             assert.equal(r.reply, true, at + 'and the Reply box');
             // #12722's approved rule applies to remote questions too: identity in the title, question once in the body.
             assert.equal(r.text, 'Backend Dev · team-x', at + 'the title names the asker and team');
