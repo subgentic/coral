@@ -27,7 +27,8 @@ const { coralReady } = require('./helpers/wait');
             assert.equal(await ev(`!!document.querySelector('#inbox-page .goals-move')`), true, at + 'and Move to another team');
 
             // the header keeps all four buttons on screen at any width (QA's MUST: at 390 px they pushed Close goal out of the header)
-            const hb = await ev(`Array.from(document.querySelectorAll('#inbox-page .goal-head-actions button')).map(b => { const r = b.getBoundingClientRect(); return { t: b.textContent.trim(), l: Math.round(r.left), r: Math.round(r.right), h: Math.round(r.height) }; })`);
+            if (mobile) { await ev(`document.querySelector('#inbox-page .goal-head-actions .task-more-btn').click(); true`); await waitFor(`!document.querySelector('#inbox-page .task-more-menu').hidden`, at + 'More opens (a phone keeps one button and More, #13119)', 4000); }
+            const hb = await ev(`Array.from(document.querySelectorAll('#inbox-page .goal-head-actions button')).filter(b => b.getClientRects().length).map(b => { const r = b.getBoundingClientRect(); return { t: b.textContent.trim(), l: Math.round(r.left), r: Math.round(r.right), h: Math.round(r.height) }; })`);
             assert.ok(hb.length >= 4, at + 'Add task, Change driver, Move to another team and Close goal: ' + JSON.stringify(hb));
             for (const b of hb) assert.ok(b.l >= 0 && b.r <= width + 0.5 && (!mobile || b.h >= 40), at + 'on screen and touchable: ' + JSON.stringify(b));
             // Change driver: the team's own agents only, then Save

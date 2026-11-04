@@ -270,6 +270,11 @@
     .goal-team-link { display: inline-flex; align-items: center; min-height: 44px; }
 }
 
+/* The goal page's phone header (#13119): keyed on .goal-head-phone, which goal_view.js adds when isPhoneLayout() says phone (the shared query: <= 767 px, or a sideways phone), so it follows the same rule as the One-button-and-More actions and not a width of its own; at a sideways phone's width the desktop header's order and basis are undone. */
+.goal-back-row.goal-head-phone .phone-title-row > .goals-detail-title, .goal-back-row.goal-head-phone .goals-detail-title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; white-space: normal; order: 0; flex: 1 1 0; min-width: 0; margin-top: 0; } /* a goal's title is two lines at most on a phone (the Operator: three lines was clutter); the whole title is its tooltip */
+.goal-head-phone > .goal-head-actions { flex: 1 1 100%; justify-content: flex-start; margin-left: 0; order: 2; } /* the one button and More under the title, from the left, not a wrapped row at the right */
+.goal-head-actions .task-more-btn { min-height: 44px; }
+
 /* Inbox task and Board mounts keep the shared page spacing and their own phone folder picker. */
 .inbox-local:has(> .inbox-item-page:not([hidden])) { height: 100%; min-height: 0; }
 .inbox-page.inbox-item-page { padding: 0; min-height: 0; height: 100%; }

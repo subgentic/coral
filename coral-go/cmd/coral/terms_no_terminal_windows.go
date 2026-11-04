@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"golang.org/x/sys/windows"
+
+	"github.com/subgentic/coral/internal/safego"
 )
 
 // showTermsNeededNote shows the note in a message box (coral.exe has a console only when something gave it one: a start from a scheduled task or a launcher has none). The box is
@@ -18,6 +20,7 @@ func showTermsNeededNote() {
 	}
 	done := make(chan struct{})
 	go func() {
+		defer safego.Recover("coral/terms_no_terminal_windows:22")
 		defer close(done)
 		_, _ = windows.MessageBox(0, m, t, windows.MB_OK|windows.MB_ICONINFORMATION|windows.MB_SETFOREGROUND)
 	}()
