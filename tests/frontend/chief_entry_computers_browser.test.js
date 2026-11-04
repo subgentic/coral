@@ -55,7 +55,7 @@ const STUB = `(() => { window.__chiefAfterMs = 0; window.__chief = { a: { status
         await at('b'); await at('a'); await new Promise(r => setTimeout(r, 1200)); // sleep-ok: B's stubbed answer arrives after 700 ms, there is no event to wait on
         g = await side(); check('B answered late after A was shown again: the sidebar still says Atlas', /Atlas/.test(g.text), JSON.stringify(g));
         // the menu follows it too, drawn at once, Chief joins when it answers
-        await at('b'); await ev(`window.__chiefSeen = 0; true`);
+        await ev(`document.dispatchEvent(new Event('coral-chief-changed')); true`); await at('b'); // every answer is forgotten: B's is asked again, slowly, and the menu opens before it arrives
         await menu(); let e = await entry();
         check('B (slow): the menu is drawn at once, with Settings, before Chief answers', e.settings && e.chief === null, JSON.stringify(e));
         await waitFor(`!!document.querySelector('#nav-more-menu [data-chief-entry]')`, 'B: Chief joins the open menu', 6000);
