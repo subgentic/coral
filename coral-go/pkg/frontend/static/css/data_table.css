@@ -597,8 +597,8 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 #group-table-view[data-group="hub-inbox:needs"] .dt-row-open, #group-table-view[data-group="hub-inbox:needs"] .dt-row-open td { -webkit-user-select: none; user-select: none; } /* a row of Needs you that opens on a click is not text to select (the other lists keep their names copyable): a selection across its cells shows as blue bars between them, and a web view takes a click on a selection for the start of a drag of it, so the row stops opening (#11584) */
 
 /* A Needs you row's kind icon (#13144, needs_filters.js kindIcon): a small leading glyph, the sidebar's secondary colour, no taller than the row's text line so the row keeps its height. The glyph is drawn here from data-kind (icons in the font subset). */
-.material-icons.inbox-kind-icon { font-size: var(--fs-xl); color: var(--text-secondary); align-self: center; margin-right: 6px; vertical-align: middle; }
-.dt-mail-title > .material-icons.inbox-kind-icon { vertical-align: -3px; margin-block: -2px; margin-right: 6px; } /* inside a phone row's title (the line's cut and wraps act on the title): no taller than the text's own line */
+.material-icons.inbox-kind-icon { font-size: 1.2em; margin-block: -0.3em; color: var(--text-secondary); align-self: center; margin-right: 6px; vertical-align: middle; } /* the size follows the row's own text and the block margins take its extra height back, so at any text size the icon never sets the line (the row is as tall with it as without) */
+.dt-mail-title > .material-icons.inbox-kind-icon { vertical-align: -0.2em; margin-block: -0.3em; margin-right: 6px; } /* inside a phone row's title (the line's cut and wraps act on the title): no taller than the text's own line */
 .inbox-kind-icon::before { content: 'help_outline'; }
 .inbox-kind-icon[data-kind="permission"]::before { content: 'lock'; }
 .inbox-kind-icon[data-kind="other"]::before { content: 'input'; }
