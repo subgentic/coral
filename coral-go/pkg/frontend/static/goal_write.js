@@ -36,10 +36,51 @@ async function preview(server, board, action, goalId, bodyText, f) {
     return t && typeof t.token === 'string' && t.token ? { token: t.token } : { fail: refused(502, 'preview_required') };
 }
 
+/** The shapes the Hub checks at preview and at confirm (coral-hub, #13503): subscriber_id is REQUIRED and exactly 'Operator'; a close takes state (done|dropped, required) and an optional reason of at most 500 characters; an update takes at least one of
+ *  title (200), outcome (4000), done_when (4000), blocked_on (500), driver (128), state (proposed|active|blocked|done|dropped). Returns '' when the body is inside them, else why not: a body outside them is `bad_request`, so it is not sent. */
+const UPDATE_CAPS = { title: 200, outcome: 4000, done_when: 4000, blocked_on: 500, driver: 128 };
+export function checkGoalBody(action, b) {
+    if (action !== 'goal_close' && action !== 'goal_update') return ''; // a create's body is the computer's own (createBody)
+    if (!b || typeof b !== 'object' || b.subscriber_id !== 'Operator') return 'subscriber_id must be Operator';
+    if (action === 'goal_close') {
+        if (b.state !== 'done' && b.state !== 'dropped') return 'a close needs state done or dropped';
+        if (b.reason !== undefined && (typeof b.reason !== 'string' || [...b.reason].length > 500)) return 'the reason is at most 500 characters';
+        return Object.keys(b).every(k => ['subscriber_id', 'state', 'reason'].includes(k)) ? '' : 'a close takes state, reason and subscriber_id';
+    }
+    if (action === 'goal_update') {
+        const keys = Object.keys(b).filter(k => k !== 'subscriber_id');
+        if (!keys.length) return 'an update names at least one field';
+        for (const k of keys) {
+            if (k === 'state') { if (!['proposed', 'active', 'blocked', 'done', 'dropped'].includes(b.state)) return 'state is not one of the five'; }
+            else if (!(k in UPDATE_CAPS)) return `an update does not take ${k}`;
+            else if (typeof b[k] !== 'string' || [...b[k]].length > UPDATE_CAPS[k]) return `${k} is at most ${UPDATE_CAPS[k]} characters`;
+        }
+    }
+    return '';
+}
+
+/** Many writes one at a time through the preview (#13503): the Hub allows 20 previews and 20 confirms a minute per account, so with the flag on a bulk close goes at most about 10 a minute (a pause between goals), says where it is,
+ *  and on the Hub's 429 STOPS with its plain line (never loops, never retries: the rest stay as they were, for the person to do after Retry-After's half minute). Flag off: no pause, no limit, as it always was.
+ *  `one(item)` answers a Response (goalWrite) or throws; resolves { done, failed, stopped } where `stopped` is the sentence when the Hub's limit ended it. */
+export const BULK_GAP_MS = 6000;
+export async function writeEach(list, one, { on = goalPreviewOn, say = () => {}, wait = ms => new Promise(r => setTimeout(r, ms)), noun = 'goals' } = {}) {
+    let done = 0, failed = 0, stopped = '';
+    for (let i = 0; i < list.length; i++) {
+        if (on()) { if (i) await wait(BULK_GAP_MS); say(`Changing ${noun}: ${i + 1} of ${list.length}`); }
+        let r = null;
+        try { r = await one(list[i]); } catch { failed++; continue; }
+        if (r && r.status === 429) { stopped = `${PREVIEW_WORDS.too_many_requests} ${done} of ${list.length} ${noun} were changed; the rest are unchanged.`; break; }
+        if (r && r.ok) done++; else failed++;
+    }
+    return { done, failed, stopped };
+}
+
 /** goalWrite(project, action, goalId, path, method, body): the write as boardFetch would send it, previewed first when the Hub asks for it. `body` is the object; `goalId` is the goal for a close or an update (0/absent for a create). */
 export async function goalWrite(project, action, goalId, path, method, body, { boardFn = boardFetch, serverFn = serverFetch, on = goalPreviewOn } = {}) {
     const bodyText = JSON.stringify(body);
     if (!on() || !GOAL_ACTIONS.includes(action)) return boardFn(project, path, { method, headers: JSON_HEADERS, body: bodyText });
+    const bad = checkGoalBody(action, body); // a body outside the Hub's shapes would be bad_request: it is not sent
+    if (bad) return refused(400, 'bad_request');
     const { server, name } = splitKey(project);
     for (let attempt = 0; attempt < 2; attempt++) {
         const p = await preview(server, name, action, goalId, bodyText, serverFn);

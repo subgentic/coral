@@ -560,9 +560,10 @@ const goalKey = g => `${g.board_id}#${g.id}`;
 const closeGoalsActions = () => [{ label: 'Close goals', danger: true,
     choose: { label: 'Close as', options: () => [{ value: 'done', label: 'Done' }, { value: 'dropped', label: 'Dropped' }], text: { label: 'Reason for closing', maxLength: 300 } },
     confirm: n => `Close ${n} goals? Any open tasks stay open.`,
-    run: async (picked, keys, as, reason) => { if (!reason) return; let done = 0, failed = 0;
-        for (const g of picked) { try { const r = await (await importOnce('./goal_write.js')).goalWrite(g.board_id, 'goal_close', g.id, `/goals/${g.id}/close`, 'POST', { subscriber_id: OPERATOR_ID, state: as, reason }); if (!r.ok) throw new Error('Close failed'); /* previewed first when the Hub asks for it (#13503); loaded on use: not in the start */ goalsState.selected.delete(goalKey(g)); done++; } catch { failed++; } }
-        showToast(`Closed ${done} goals${failed ? `; ${failed} failed and remain selected` : ''}`, !!failed); await refreshGoals(); renderInboxNav(true); } }];
+    run: async (picked, keys, as, reason) => { if (!reason) return;
+        const GW = await importOnce('./goal_write.js'); // previewed first when the Hub asks for it, one goal at a time and about 10 a minute then; the Hub's limit stops it with its own line (#13503); loaded on use: not in the start
+        const res = await GW.writeEach(picked, async g => { const r = await GW.goalWrite(g.board_id, 'goal_close', g.id, `/goals/${g.id}/close`, 'POST', { subscriber_id: OPERATOR_ID, state: as, reason }); if (r.ok) goalsState.selected.delete(goalKey(g)); return r; }, { say: t => showToast(t) });
+        showToast(res.stopped || `Closed ${res.done} goals${res.failed ? `; ${res.failed} failed and remain selected` : ''}`, !!(res.stopped || res.failed)); await refreshGoals(); renderInboxNav(true); } }];
 const goalTeam = g => teamLabel(g.board_id); // with its computer when a hub has more than one: two teams called alpha are two (#8774)
 let goalFilters = GF.loadFilters(), goalBar = null;
 let activityFilters = AF.loadFilters(), activityBar = null;
