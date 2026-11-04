@@ -24,11 +24,13 @@ func (h *BoardHandler) SetWorkingMode(w http.ResponseWriter, r *http.Request) {
 	if refuseGuestNewBoard(w, r, h.bs, urlParam(r, "project")) {
 		return
 	}
+	priorMode, _ := h.bs.GetWorkingMode(r.Context(), urlParam(r, "project")) // what the Orchestrator is told changed (#13173)
 	result, err := h.bs.SetWorkingMode(r.Context(), urlParam(r, "project"), mode)
 	if err != nil {
 		errBadRequest(w, err.Error())
 		return
 	}
+	noteSettingsChange(h.bs, r, urlParam(r, "project"), workingModeShown(priorMode), workingModeShown(result))
 	writeJSON(w, http.StatusOK, result)
 }
 
@@ -87,4 +89,9 @@ func (h *BoardHandler) ResetWorkflowPreset(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	writeJSON(w, http.StatusOK, p)
+}
+
+// workingModeShown is a working mode as the settings notice compares it: the choices, not the instruction text built from them.
+func workingModeShown(m board.WorkingMode) map[string]any {
+	return map[string]any{"working_mode.mode": m.Mode, "working_mode.dependency_guidance": m.DependencyGuidance, "working_mode.asks_are_tasks": m.AsksAreTasks, "working_mode.custom_instructions": m.CustomInstructions}
 }

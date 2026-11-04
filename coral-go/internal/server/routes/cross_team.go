@@ -369,11 +369,13 @@ func (h *BoardHandler) UpdateBoardSettings(w http.ResponseWriter, r *http.Reques
 	if hubRecorded {
 		beforeHub, _ = h.bs.GetBoardSettings(r.Context(), project)
 	}
+	priorSettings, _ := h.bs.GetBoardSettings(r.Context(), project) // what the Orchestrator is told changed (#13173)
 	settings, err := h.bs.UpdateBoardSettings(r.Context(), project, body.BoardSettingsUpdate)
 	if err != nil {
 		errInternalServer(w, err.Error())
 		return
 	}
+	noteSettingsChange(h.bs, r, project, priorSettings, settings)
 	listEditRefused = false
 	if hubRecorded {
 		// The change and its record are one or neither: if the record cannot be written the change is undone and the owner is told (the switch routes' rule, Security's #5572 condition 4).

@@ -99,6 +99,7 @@ func setupBoardTestServer(t *testing.T) (*httptest.Server, *BoardHandler) {
 	r.Get("/api/board/{project}/paused", handler.GetPaused)
 	r.Delete("/api/board/{project}", handler.DeleteBoard)
 	r.Put("/api/board/{project}/settings", handler.UpdateBoardSettings)
+	r.Put("/api/board/{project}/working-mode", handler.SetWorkingMode)
 	r.Post("/api/board/{project}/waits", handler.RegisterWait)
 	r.Get("/api/board/{project}/waits", handler.GetActiveWait)
 	r.Delete("/api/board/{project}/waits", handler.CancelWait)
