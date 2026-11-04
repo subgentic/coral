@@ -89,3 +89,13 @@
 /* Mark up (#12367): a button beside Comments on a computer, an item of the ⋯ menu on a phone, for a picture */
 @media (min-width: 769px) { .artifact-viewer-markup-item { display: none; } }
 @media (max-width: 768px) { .artifact-viewer-markup { display: none; } }
+
+/* Full screen means the available embedding viewport; no browser fullscreen permission
+   is needed in the Hub's frame. Only this lazy viewer stylesheet carries the rules. */
+@media (min-width: 768px) and (min-height: 501px), (min-width: 768px) and (pointer: fine), (min-width: 951px) {
+    .artifact-viewer.av-fullscreen { padding: 0; }
+    .artifact-viewer.av-fullscreen .artifact-viewer-content { width: 100%; max-width: none; height: 100%; max-height: none; border-radius: 0; }
+    .artifact-viewer-header { flex-wrap: wrap; }
+    .artifact-viewer-fullscreen { flex: none; }
+}
+@media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) { .artifact-viewer-fullscreen { display: none; } }
