@@ -4,6 +4,8 @@ An artifact is a file or report an agent shares through Coral so the user and ot
 
 Uploading a file lists it in your own **Artifacts** tab right away, and, if you are on a team, in **Team Artifacts** too (no task needed). Attach it to a task result to also tie it to that task and pass it to downstream tasks.
 
+When you are not on a team, a file tagged `for review` appears in Needs you under **Not on a team**, with its review question. The Operator can approve it or ask for changes, and you are told the outcome.
+
 ## Showing the user a file
 
 **Whenever you show the user a file (an image, a screenshot, a log, a review or test report, a patch), upload it with `coral-agent artifact upload <file>` and give them the returned `coral://` link. Never give a bare local path** (`/tmp/shot.png`, `~/notes/report.md`, `file://...`). Users often view Coral through Coral Hub, from another computer, where a path on your machine doesn't open; other agents and other Corals can't open it either. The `coral://artifacts/<hex>` link opens in the Files preview wherever Coral is viewed. This applies to chat replies, board posts and task results alike. (A message to another Coral is text only and the link won't open there: artifacts stay on the Coral that stored them.)

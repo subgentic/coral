@@ -21,7 +21,7 @@ import (
 )
 
 // noTeamLabel is the Team column's word for the files of agents that belong to no team (#10312).
-const noTeamLabel = "No team"
+const noTeamLabel = "Not on a team"
 
 // maxStandaloneUploadSessions bounds the upload folders one read looks into for agents without a team: the most recently written ones.
 const maxStandaloneUploadSessions = 200
