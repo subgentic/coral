@@ -109,40 +109,45 @@ export function attachComments(dialog, body, host, opts = {}) {
     const openCount = () => threads().filter(t => !t.c.deleted && !t.c.resolved && groupOf(t.c) !== 'earlier').length;
     async function refresh() {
         if (!st.hex || (!st.text && !st.whole)) return;
-        const hex = st.hex;
+        const hex = st.hex, gen = ctxGen;
         try {
             const data = await api.listComments(hex, st.server, st.board, st.series);
-            if (hex !== st.hex) return;
+            if (hex !== st.hex || gen !== ctxGen) return;
             st.data = data; st.gone = false;
             if (!st.visibilitySet) {
                 st.visibilitySet = true;
                 setSheet(remembered() ?? (opts.toggleHost ? !phone.matches && openCount() > 0 : false)); // the viewer: closed until the person opens it, and then as they left it, so the file has the whole width (#12225); the docked preview keeps opening when there are comments
             }
         } catch (e) {
-            if (hex !== st.hex) return;
+            if (hex !== st.hex || gen !== ctxGen) return;
             st.gone = true; st.data = null; // no comments routes here (an older Coral, a hub that does not carry them): the viewer is as it was
         }
         render(); paint();
     }
 
-    // Live replies (#13299): an open panel (a file's, a goal's) shows what arrives while it is open, an agent's reply above all, without reopening. A light read of the thread every few seconds while the page is visible
-    // (nothing while it is hidden or nothing is open), redrawn only when the thread differs from the one on show, with the panel's scroll kept; a comment being written keeps its draft (it lives in st.composing) and the
-    // focus goes back to the same control (render does that). The count of new comments is said once to a screen reader.
+    // Live replies (#13299): an open panel (a file's, a goal's) shows what arrives while it is open, an agent's reply above all, without reopening. A light read of the thread every few seconds while the panel is on screen
+    // (nothing while the page is hidden, the panel is collapsed or nothing is open), redrawn only when the thread differs from the one on show, with the panel's scroll kept; a comment being written keeps its draft
+    // (st.composing.draft) and its caret and selection, and the focus goes back to the same control (render does that). The count of new comments is said once to a screen reader.
+    // An answer is only used by the context it was asked for: ctxGen moves on every open and close, and a late answer must match the generation, the file, the computer, the team and the series it was asked under, so a same-hash
+    // file of another computer or team (or the same file reopened) never shows an old answer.
     const LIVE_MS = Number(globalThis.__coralCommentsPollMs) || 8000, sigOf = d => (d ? JSON.stringify([d.locked, d.comments]) : '');
-    let liveTimer = 0, liveBusy = false;
+    let liveTimer = 0, ctxGen = 0, liveBusyGen = -1;
     async function liveTick() {
-        if (liveBusy || !st.hex || !st.data || (!st.text && !st.whole)) return;
-        liveBusy = true; const hex = st.hex;
+        if (liveBusyGen === ctxGen || !st.hex || !st.data || (!st.text && !st.whole) || !panel.getClientRects().length) return;
+        const gen = ctxGen, hex = st.hex, server = st.server, board = st.board, series = st.series; liveBusyGen = gen;
         try {
-            const data = await api.listComments(hex, st.server, st.board, st.series);
-            if (hex !== st.hex || !st.data || sigOf(data) === sigOf(st.data)) return;
+            const data = await api.listComments(hex, server, board, series);
+            if (gen !== ctxGen || hex !== st.hex || server !== st.server || board !== st.board || series !== st.series || !st.data || sigOf(data) === sigOf(st.data)) return;
             const added = data.comments.filter(c => !c.deleted).length - st.data.comments.filter(c => !c.deleted).length, top = panel.scrollTop;
+            const ta = document.activeElement && document.activeElement.matches?.('.ac-input') && panel.contains(document.activeElement) ? document.activeElement : null, sel = ta ? [ta.selectionStart, ta.selectionEnd, ta.selectionDirection] : null; // the caret of a comment being written
             st.data = data; render(); paint(); panel.scrollTop = top;
+            const now = document.activeElement;
+            if (sel && now && now.matches?.('.ac-input') && panel.contains(now)) { try { now.setSelectionRange(sel[0], sel[1], sel[2] || 'none'); } catch { /* a textarea always takes it */ } }
             if (added > 0) announce(added === 1 ? 'A new comment arrived' : `${added} new comments arrived`);
-        } catch { /* the next tick asks again */ } finally { liveBusy = false; }
+        } catch { /* the next tick asks again */ } finally { if (liveBusyGen === gen) liveBusyGen = -1; }
     }
-    const liveStart = () => { clearInterval(liveTimer); liveTimer = pollEvery(liveTick, LIVE_MS, { machine: () => st.server || '' }); }; // pollEvery: its ticks wait out an overloaded Coral or computer and a hidden tab
-    const liveStop = () => { clearInterval(liveTimer); liveTimer = 0; };
+    const liveStart = () => { ctxGen++; clearInterval(liveTimer); liveTimer = pollEvery(liveTick, LIVE_MS, { machine: () => st.server || '' }); }; // pollEvery: its ticks wait out an overloaded Coral or computer and a hidden tab
+    const liveStop = () => { ctxGen++; clearInterval(liveTimer); liveTimer = 0; };
     document.addEventListener('visibilitychange', () => { if (!document.hidden && liveTimer) liveTick(); });
 
     const { locate, hover, paint, forget } = createHighlights({ st, dialog, body, panel, threads, groupOf, render });
