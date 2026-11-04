@@ -7,10 +7,15 @@
 # n mod agents), each with its own session token from ENVDIR/<session>.env (the files MOCK_AGENT_ENV_DUMP makes). 200 x 100
 # is the 20,000 uploads of the Operator's report. The server must have been built with the upload window raised (the seed
 # script does that with a go build -overlay, never in the repo): the real one is 100 uploads per agent per hour.
+# LEDGER (optional, a JSONL file): every upload that lands is appended as {"n": file, "v": version, "hex": id}; a run that starts with a ledger
+# carries on from each file's last recorded version (the chain continues as a new version of that id), so a stopped seed resumes. At most one
+# upload per worker (8) can have landed without being recorded when the run was cut: that file then has one extra version. Exit code 3 means a
+# token was refused (401/403: the agent's session is not alive any more), so the caller can launch new agents and run again.
 # Stdlib only. The text of each version is fixed by the file and version numbers, so two runs seed the same bytes.
 import json, os, sys, threading, time, urllib.parse, urllib.request, urllib.error
 
 BASE, ENVDIR, NFILES, NVERS, OUT = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4]), sys.argv[5]
+LEDGER = sys.argv[6] if len(sys.argv) > 6 else ""
 WORKERS = int(os.environ.get("UPLOAD_WORKERS", "8"))
 
 agents = []  # (session id, token)
@@ -24,8 +29,18 @@ if not agents:
     sys.exit("no agent token files in " + ENVDIR)
 
 lock = threading.Lock()
-out = {"files": NFILES, "versions": NVERS, "agents": len(agents), "uploaded": 0, "failed": 0, "refused": {}}
-todo = list(range(NFILES))
+out = {"files": NFILES, "versions": NVERS, "agents": len(agents), "uploaded": 0, "failed": 0, "refused": {}, "resumed_from": 0, "token_refused": False}
+done = {}  # file -> (last version, its id), from the ledger
+if LEDGER and os.path.exists(LEDGER):
+    for line in open(LEDGER):
+        try:
+            r = json.loads(line)
+        except ValueError:
+            continue  # a line cut by the stop
+        done[r["n"]] = (r["v"], r["hex"])
+    out["resumed_from"] = sum(v for v, _ in done.values())
+todo = [n for n in range(NFILES) if done.get(n, (0, ""))[0] < NVERS]
+ledger = open(LEDGER, "a", buffering=1) if LEDGER else None
 
 
 def body(n, v):
@@ -49,6 +64,8 @@ def upload(n, v, prev, sid, token):
                 continue
             with lock:
                 out["refused"]["%d" % e.code] = e.read()[:200].decode("utf-8", "replace")
+                if e.code in (401, 403):
+                    out["token_refused"] = True
             return None
         except Exception:
             time.sleep(0.2)
@@ -62,11 +79,15 @@ def worker():
                 return
             n = todo.pop()
         sid, token = agents[n % len(agents)]
-        prev = ""
-        for v in range(1, NVERS + 1):
+        last, prev = done.get(n, (0, ""))
+        for v in range(last + 1, NVERS + 1):
+            if out["token_refused"]:
+                return
             h = upload(n, v, prev, sid, token)
             with lock:
                 out["uploaded" if h else "failed"] += 1
+                if h and ledger:
+                    ledger.write(json.dumps({"n": n, "v": v, "hex": h}) + "\n")
             if not h:
                 break
             prev = h
@@ -81,4 +102,4 @@ for t in ths:
 out["seconds"] = round(time.time() - t0, 1)
 json.dump(out, open(OUT, "w"), indent=1)
 print(json.dumps(out))
-sys.exit(0 if out["failed"] == 0 else 1)
+sys.exit(3 if out["token_refused"] else (0 if out["failed"] == 0 else 1))
