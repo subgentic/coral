@@ -13,13 +13,14 @@ let noTeam = false;
 const checkTeams = () => importOnce('./home_goal.js').then(m => m.refreshGoalCard()).catch(() => {}); // a failed read leaves the plain line
 // Not part of the page's start (#13079, page_weight_browser: the module and the teams read were two more requests at start). The read is made once the page's own requests have gone quiet for GOAL_QUIET_MS, however
 // long they take (a slow runner or a slow answer holds it back; a fixed delay did not, #13087's INFO), and once however often the card is drawn.
-const GOAL_QUIET_MS = 1000;
+const GOAL_QUIET_MS = 1000, GOAL_LATEST_MS = 5000; // steady polling never goes quiet: the read is made at most GOAL_LATEST_MS after the card is drawn whatever the requests
 let checkPending = false;
 function whenRequestsQuiet(fn) {
-    let timer = 0, po = null;
-    const fire = () => { if (po) po.disconnect(); fn(); };
+    let timer = 0, latest = 0, po = null, done = false;
+    const fire = () => { if (done) return; done = true; clearTimeout(timer); clearTimeout(latest); if (po) po.disconnect(); fn(); };
     const arm = () => { clearTimeout(timer); timer = setTimeout(fire, GOAL_QUIET_MS); };
     try { po = new PerformanceObserver(arm); po.observe({ type: 'resource' }); } catch { po = null; } // every finished request restarts the wait
+    latest = setTimeout(fire, GOAL_LATEST_MS);
     arm();
 }
 const checkTeamsSoon = () => { if (checkPending) return; checkPending = true; whenRequestsQuiet(() => { checkPending = false; checkTeams(); }); };
