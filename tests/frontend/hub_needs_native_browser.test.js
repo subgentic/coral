@@ -7,12 +7,14 @@ const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor } = await connect();
-    const open = async () => { await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await waitFor(`typeof window.switchNavTab === 'function' && !!window.__coralReady`, 'the dashboard'); await coralReady(ev); };
+    const open = async () => { await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await waitFor(`typeof window.switchNavTab === 'function' && !!window.__coralReady`, 'the dashboard'); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings'); };
     const S = `(window.__coralStatic || '/static/')`;
+    let needsNow = false;
     try {
+        await setupHubWorld({ client, Page, Emulation, width: 1280, height: 800, mobile: false, inbox: 'native', needs: () => needsNow, hubPages: true }); // one world; the boot value is read at each load
         for (const needs of [false, true]) {
+            needsNow = needs;
             const at = needs ? "needs: 'native': " : "inbox: 'native' alone: ";
-            await setupHubWorld({ client, Page, Emulation, width: 1280, height: 800, mobile: false, inbox: 'native', needs, hubPages: true });
             await open();
             await ev(`localStorage.removeItem('coral.inbox.tab'); window.switchNavTab('hub-inbox'); true`);
             await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
