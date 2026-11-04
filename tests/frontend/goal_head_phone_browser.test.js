@@ -12,7 +12,7 @@ const { coralReady } = require('./helpers/wait');
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const { Input } = client;
     const board = 'goal-phone-' + Date.now().toString(36);
-    const TITLE = 'A goal with a title long enough that it wraps onto three lines at 390 px, with a lot more words to make sure of it';
+    const TITLE = 'A goal with a title long enough that it wraps onto three lines at 390 px, and well past two at a sideways phone at 200% text, with a lot more words than any title needs to make sure of it every time';
     const api = (method, url, body) => ev(`fetch(${JSON.stringify(url)}, {method:${JSON.stringify(method)},headers:{'Content-Type':'application/json'},body:${JSON.stringify(JSON.stringify(body))}}).then(async r => ({status:r.status,body:await r.json()}))`);
     const shot = async name => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const load = async (url, fs16, theme) => { await Page.navigate({ url: BASE + url }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings'); await ev(`document.documentElement.style.fontSize = '${fs16}px'; document.documentElement.setAttribute('data-theme', '${theme}'); true`); };
@@ -36,7 +36,7 @@ const { coralReady } = require('./helpers/wait');
                 assert.ok((await api('POST', `/api/board/${board}/tasks/${tid}/complete`, { subscriber_id: 'orch', message: 'done', outcome: 'success' })).status < 300); }
             return c.body.id; };
         const openId = await mkGoal(TITLE, false), doneId = await mkGoal('A goal that is all done', true);
-        for (const [w, h, mobile, fs16, theme, tag] of [[390, 844, true, 16, 'light', '390 px light'], [390, 844, true, 16, 'dark', '390 px dark'], [390, 844, true, 32, 'light', '390 px 200% text'], [844, 390, true, 16, 'light', 'landscape 844x390'], [1280, 900, false, 16, 'light', '1280 px']]) {
+        for (const [w, h, mobile, fs16, theme, tag] of [[390, 844, true, 16, 'light', '390 px light'], [390, 844, true, 16, 'dark', '390 px dark'], [390, 844, true, 32, 'light', '390 px 200% text'], [844, 390, true, 16, 'light', 'landscape 844x390'], [844, 390, true, 32, 'light', 'landscape 200% light'], [844, 390, true, 32, 'dark', 'landscape 200% dark'], [1280, 900, false, 16, 'light', '1280 px']]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             const phone = w < 900 || mobile && h < 500;
             await load(`/inbox/goals/${board}/${openId}`, fs16, theme);
@@ -66,6 +66,21 @@ const { coralReady } = require('./helpers/wait');
             if (w === 390 && fs16 === 16 && theme === 'light') await shot('goal-phone-menu-390');
             await key('Escape', 'Escape', 27);
             assert.equal(await ev(`document.activeElement.classList.contains('task-more-btn')`), true, `${tag}: Escape gives the focus back to More`);
+            if (w === 390 && fs16 === 16 && theme === 'light') {
+                // a dialog opened from the menu gives the focus back to the visible More toggle, whether it is closed with Escape or Cancel (#13119, UI Reviewer M1)
+                for (const [first, downs, how] of [['Change driver', 0, 'Escape'], ['Change driver', 0, 'Cancel'], ['Move to another team', 1, 'Escape'], ['Move to another team', 1, 'Cancel']]) {
+                    await ev(`document.querySelector('${M} .goal-head-actions .task-more-btn').focus(); true`);
+                    await key('Enter', 'Enter', 13);
+                    await waitFor(`!document.querySelector('${M} .goal-head-actions .task-more-menu').hidden`, `${tag}: More opens for ${first}`, 4000);
+                    for (let i = 0; i < downs; i++) await key('ArrowDown', 'ArrowDown', 40);
+                    assert.equal(await ev(`document.activeElement.textContent.trim()`), first, `${tag}: ${first} has focus`);
+                    await key('Enter', 'Enter', 13);
+                    await waitFor(`!!document.querySelector('.goals-operator-dialog[open]')`, `${tag}: the ${first} dialog opens from the keyboard`, 8000);
+                    if (how === 'Escape') await key('Escape', 'Escape', 27); else await ev(`[...document.querySelectorAll('.goals-operator-dialog[open] button')].find(b => b.textContent.trim() === 'Cancel').click(); true`);
+                    await waitFor(`!document.querySelector('.goals-operator-dialog')`, `${tag}: the ${first} dialog closes by ${how} (and is removed: its close handler has run)`, 8000);
+                    assert.equal(await ev(`document.activeElement.classList.contains('task-more-btn')`), true, `${tag}: after ${how} on ${first} the focus is on the visible More toggle: ` + await ev(`document.activeElement.className + ' / ' + document.activeElement.textContent.trim().slice(0, 30)`));
+                }
+            }
             if (w === 390 && fs16 === 16) await shot(`goal-phone-390-${theme}`);
             if (fs16 === 32) await shot('goal-phone-390-200');
         }

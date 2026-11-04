@@ -152,6 +152,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         const phone = isPhoneLayout();
         const sp = splitKey(model.project);
         const act = [];  // { key, cls, label, aria, title, run, primary }
+        const backToAction = sel => (phone ? acts.querySelector('.task-more-btn') : acts.querySelector(sel) || main.querySelector('.goals-back'))?.focus(); // a dialog closes: focus goes back to what opened it; on a phone that is the visible More toggle, not the hidden menu item (#13119)
         act.push({ key: 'add', cls: 'btn goals-add-task', label: 'Add task', run: () => { (window.showCreateTaskModal || (() => {}))({ project: model.project, goal_id: g.id, onCreated: loadGoals }); } });
         // A goal that looks done has its item in Needs you with Close goal, Not yet and Dismiss; its page offers the first two too (#12248): Not yet hides the item until a task is added
         if (looksDone(g) && sp.server === LOCAL_SERVER && !hiddenList().some(e => e === `${sp.name}|${g.id}|${W.allTasksOf(g.rollup)}` || e === `${sp.name}|${g.id}|*`)) {
@@ -165,9 +166,9 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
             } });
         }
         if (W.isOpenGoal(g) && sp.server === LOCAL_SERVER) { // the Operator's own two changes, made on this computer's server (#12693)
-            act.push({ key: 'driver', cls: 'btn goals-change-driver', label: 'Change driver', aria: `Change driver: ${g.title}`, run: () => importOnce('./goal_operator_dialogs.js').then(m => m.openChangeDriver({ project: sp.name, goal: g, onClose: () => (acts.querySelector('.goals-change-driver') || main.querySelector('.goals-back'))?.focus(),
+            act.push({ key: 'driver', cls: 'btn goals-change-driver', label: 'Change driver', aria: `Change driver: ${g.title}`, run: () => importOnce('./goal_operator_dialogs.js').then(m => m.openChangeDriver({ project: sp.name, goal: g, onClose: () => backToAction('.goals-change-driver'),
                 onDone: async driver => { say(driver ? `Driver changed to ${driver}` : 'Driver cleared'); showToast(driver ? `Driver changed to ${driver}` : 'Driver cleared'); await loadGoals(); } })) });
-            act.push({ key: 'move', cls: 'btn goals-move', label: 'Move to another team', aria: `Move to another team: ${g.title}`, run: () => importOnce('./goal_operator_dialogs.js').then(m => m.openMoveGoal({ project: sp.name, goal: g, openTasks: W.openTasksOf(g.rollup), onClose: () => (acts.querySelector('.goals-move') || main.querySelector('.goals-back'))?.focus(),
+            act.push({ key: 'move', cls: 'btn goals-move', label: 'Move to another team', aria: `Move to another team: ${g.title}`, run: () => importOnce('./goal_operator_dialogs.js').then(m => m.openMoveGoal({ project: sp.name, goal: g, openTasks: W.openTasksOf(g.rollup), onClose: () => backToAction('.goals-move'),
                 onMoved: async (out, label) => { showToast(`Goal given to ${label} as goal #${out.goal.id}`); closeGoal(); await loadGoals(); } })) });
         }
         if (W.isOpenGoal(g)) act.push({ key: 'close', cls: 'btn btn-primary goals-close', label: 'Close goal', aria: `Close goal: ${g.title}`, run: () => openClose(g) }); // named for its goal: the Close dialog's own button is just Close goal
