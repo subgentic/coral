@@ -101,3 +101,87 @@ func TestUnseenAgentRepliesAreTheOwnersThreadsAnAgentAnsweredSinceTheyWereOpened
 	}
 	assert.True(t, found, "another file's thread stays unread")
 }
+
+func TestMarkThreadsSeenChangedOnlyWritesForUnreadReplies(t *testing.T) {
+	ctx := context.Background()
+	s := newCommentStore(t)
+	base := time.Now().UTC().Truncate(time.Second)
+	root, err := s.CreateArtifactComment(ctx, ArtifactComment{ArtifactID: artA, Board: "team-a", Body: "check", AuthorKind: "owner"})
+	require.NoError(t, err)
+	changed, err := s.MarkThreadsSeenChanged(ctx, artA, base)
+	require.NoError(t, err)
+	require.False(t, changed)
+	var count int
+	require.NoError(t, s.db.GetContext(ctx, &count, `SELECT COUNT(*) FROM artifact_comment_seen`))
+	require.Zero(t, count, "a no-op read must not add seen records")
+	reply, err := s.CreateArtifactComment(ctx, ArtifactComment{ArtifactID: artA, Board: "team-a", ParentID: &root.ID, Body: "done", AuthorKind: "agent"})
+	require.NoError(t, err)
+	stamp(t, s, reply.ID, base.Add(time.Minute))
+	changed, err = s.MarkThreadsSeenChanged(ctx, artA, base.Add(2*time.Minute))
+	require.NoError(t, err)
+	require.True(t, changed)
+	var before, after string
+	require.NoError(t, s.db.GetContext(ctx, &before, `SELECT seen_at FROM artifact_comment_seen WHERE comment_id = ?`, root.ID))
+	changed, err = s.MarkThreadsSeenChanged(ctx, artA, base.Add(3*time.Minute))
+	require.NoError(t, err)
+	require.False(t, changed)
+	require.NoError(t, s.db.GetContext(ctx, &after, `SELECT seen_at FROM artifact_comment_seen WHERE comment_id = ?`, root.ID))
+	require.Equal(t, before, after, "unchanged polling must not keep rewriting seen_at")
+	news, err := s.UnseenAgentReplies(ctx)
+	require.NoError(t, err)
+	require.Empty(t, news)
+}
+
+func TestMarkThreadsSeenChangedComparesInstantsAndIsArtifactScoped(t *testing.T) {
+	ctx := context.Background()
+	s := newCommentStore(t)
+	base := time.Date(2026, 11, 4, 10, 0, 0, 0, time.UTC)
+	for _, id := range []string{artA, artB} {
+		root, err := s.CreateArtifactComment(ctx, ArtifactComment{ArtifactID: id, Body: "check", AuthorKind: "owner"})
+		require.NoError(t, err)
+		reply, err := s.CreateArtifactComment(ctx, ArtifactComment{ArtifactID: id, ParentID: &root.ID, Body: "done", AuthorKind: "agent"})
+		require.NoError(t, err)
+		// Lexical RFC3339 order would put this newer fractional timestamp before Z.
+		_, err = s.db.ExecContext(ctx, `UPDATE artifact_comments SET created_at = ? WHERE id = ?`, base.Add(time.Nanosecond).Format(time.RFC3339Nano), reply.ID)
+		require.NoError(t, err)
+		_, err = s.db.ExecContext(ctx, `INSERT INTO artifact_comment_seen(comment_id,seen_at) VALUES(?,?)`, root.ID, base.Format(time.RFC3339))
+		require.NoError(t, err)
+	}
+	changed, err := s.MarkThreadsSeenChanged(ctx, artA, base.Add(2*time.Microsecond))
+	require.NoError(t, err)
+	require.True(t, changed)
+	changed, err = s.MarkThreadsSeenChanged(ctx, artA, base.Add(3*time.Microsecond))
+	require.NoError(t, err)
+	require.False(t, changed)
+	news, err := s.UnseenAgentReplies(ctx)
+	require.NoError(t, err)
+	require.Len(t, news, 1)
+	require.Equal(t, artB, news[0].ArtifactID)
+}
+
+func TestMarkThreadsSeenChangedConcurrentReadersReportOneChange(t *testing.T) {
+	ctx := context.Background()
+	s := newCommentStore(t)
+	root, err := s.CreateArtifactComment(ctx, ArtifactComment{ArtifactID: artA, Body: "check", AuthorKind: "owner"})
+	require.NoError(t, err)
+	_, err = s.CreateArtifactComment(ctx, ArtifactComment{ArtifactID: artA, ParentID: &root.ID, Body: "done", AuthorKind: "agent"})
+	require.NoError(t, err)
+	type result struct {
+		changed bool
+		err     error
+	}
+	results := make(chan result, 2)
+	now := time.Now().Add(time.Second)
+	for i := 0; i < 2; i++ {
+		go func() { changed, err := s.MarkThreadsSeenChanged(ctx, artA, now); results <- result{changed, err} }()
+	}
+	changes := 0
+	for i := 0; i < 2; i++ {
+		r := <-results
+		require.NoError(t, r.err)
+		if r.changed {
+			changes++
+		}
+	}
+	require.Equal(t, 1, changes, "only one concurrent reader actually clears the unread reply")
+}

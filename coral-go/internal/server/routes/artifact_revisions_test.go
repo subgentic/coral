@@ -164,3 +164,25 @@ func TestArtifactRevisionFollowsPersistedTaskDiff(t *testing.T) {
 		h.persistTaskArtifact(context.Background(), &board.Task{ID: 1, BoardID: "alpha", SessionID: &session})
 	})
 }
+
+func TestCommentPollOnlyInvalidatesArtifactsWhenUnreadRepliesChange(t *testing.T) {
+	r := newCmtRig(t)
+	r.agent(1, "Dev", false)
+	id := r.ownerComment("Please check this")
+	poll := func() { code, out := r.do("GET", cp(cmtDoc), cmtAsOwner, nil); require.Equal(t, 200, code, out) }
+	before, all := r.h.bs.ArtifactsRevision("team-a"), r.h.bs.ArtifactsRevision("")
+	poll()
+	require.Equal(t, before, r.h.bs.ArtifactsRevision("team-a"), "a thread without unread replies must not invalidate artifact lists")
+	require.Equal(t, all, r.h.bs.ArtifactsRevision(""))
+	_, out := r.send(id, "Dev")
+	require.Equal(t, "sent", states(out)["Dev"])
+	code, out := r.reply(id, asAgentSession(1), "Checked")
+	require.Equal(t, 201, code, out)
+	requireArtifactRevisionMoves(t, r.h.bs, "team-a", poll)
+	before, all = r.h.bs.ArtifactsRevision("team-a"), r.h.bs.ArtifactsRevision("")
+	for i := 0; i < 3; i++ {
+		poll()
+	}
+	require.Equal(t, before, r.h.bs.ArtifactsRevision("team-a"), "unchanged comment polls must preserve the board token")
+	require.Equal(t, all, r.h.bs.ArtifactsRevision(""), "and the aggregate token")
+}

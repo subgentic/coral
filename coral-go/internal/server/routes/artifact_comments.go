@@ -363,7 +363,7 @@ func (h *SessionsHandler) listArtifactComments(w http.ResponseWriter, r *http.Re
 		_ = h.ss.MarkAsksSeen(r.Context(), id, caller.Subject, time.Now())
 	}
 	if caller.Kind == commentCallerOwner { // the Operator opened the file's comments: an agent's replies in their threads are seen, and the file's row stops saying "new comments" (#12026)
-		if err := h.ss.MarkThreadsSeen(r.Context(), id, time.Now()); err == nil && h.bs != nil {
+		if changed, err := h.ss.MarkThreadsSeenChanged(r.Context(), id, time.Now()); err == nil && changed && h.bs != nil {
 			h.bs.NoteAllArtifactsChanged()
 		}
 	}
