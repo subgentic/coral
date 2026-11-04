@@ -111,6 +111,9 @@ func (s *Store) StartArtifactReview(ctx context.Context, boardID, hex string, at
 	}
 	var prior string
 	_ = tx.GetContext(ctx, &prior, `SELECT state FROM artifact_reviews WHERE board_id = ? AND hex = ?`, boardID, hex)
+	if oneDecision(ctx) && (prior == ReviewApproved || prior == ReviewChangesRequested || prior == ReviewDenied) {
+		return nil, "", ErrAlreadyDecided // through a hub a decided file is final: sending it for review again starts a new round, which is a local act (#13494)
+	}
 	next := map[string]bool{}
 	decided := ""
 	for _, t := range have {

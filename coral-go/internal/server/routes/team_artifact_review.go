@@ -149,14 +149,14 @@ func (h *BoardHandler) ReviewArtifact(w http.ResponseWriter, r *http.Request) {
 	if state == board.ReviewDenied {
 		note = body.Reason
 	}
-	if throughAHub(r) { // a Hub caller (the tunnel, or the self-hosted hub's stamp or key) never changes a decision already made on the file (#13494); this computer's own dashboard still may
+	if throughAHub(r) { // a hub caller (the tunnel, or the self-hosted hub: its stamp or its API key) never changes a decision already made on the file (#13494); this computer's own dashboard still may
 		r = r.WithContext(board.WithOneDecision(r.Context()))
 	}
 	r = r.WithContext(board.WithActivity(r.Context(), activityMetaFor(r, item.Name, note))) // the Activity record: the decision and its row are one transaction (#12069)
 	change, tags, err := h.bs.DecideArtifactReview(r.Context(), project, id, state, time.Now())
 	switch {
 	case errors.Is(err, board.ErrAlreadyDecided):
-		commentRefuse(w, http.StatusConflict, "already_decided", "this file already has a different decision: it is final through Coral Hub; a person can change it on this computer")
+		commentRefuse(w, http.StatusConflict, "already_decided", alreadyDecidedWords)
 		return
 	case err == board.ErrNotForReview:
 		commentRefuse(w, http.StatusConflict, "not_for_review", h.notForReviewWords(r.Context(), project, item))
@@ -363,11 +363,24 @@ func (h *BoardHandler) storedDigestMatches(id string) bool {
 	return ok && meta.Digest == "sha256:"+id
 }
 
-// throughAHub says the request came through a hub: the tunnel's connector, or the self-hosted hub (its signed owner stamp, or its API key).
+// throughAHub says the request came through a hub: the tunnel's connector, or the self-hosted hub (its signed owner stamp, or its API key: a key-only request is refused by the person check elsewhere, but is counted here so the rule never depends on that).
 func throughAHub(r *http.Request) bool {
 	if cloud.Tunneled(r) {
 		return true
 	}
 	kind, _ := r.Context().Value(callerKindKey{}).(string)
 	return kind == callerHubOwner || kind == callerAPIKey
+}
+
+// alreadyDecidedWords is what a hub is told when it tries to change, re-send or take off a file that already has a decision (#13494).
+const alreadyDecidedWords = "this file already has a decision: it is final through a hub; a person can change it on this computer"
+
+// hasDecision says the file has an approve, changes or deny decision on record.
+func (h *BoardHandler) hasDecision(ctx context.Context, project, id string) bool {
+	reviews, err := h.bs.ArtifactReviews(ctx, project)
+	if err != nil {
+		return false
+	}
+	rv, ok := reviews[id]
+	return ok && (rv.State == board.ReviewApproved || rv.State == board.ReviewChangesRequested || rv.State == board.ReviewDenied)
 }

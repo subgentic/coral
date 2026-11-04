@@ -31,16 +31,23 @@ func newOneDecisionRig(t *testing.T) *oneDecisionRig {
 	_ = srv
 	r := chi.NewRouter()
 	r.Put("/api/board/{project}/artifacts/{id}/tags", h.SetArtifactTags)
-	r.Post("/api/board/{project}/artifacts/{id}/review", func(w http.ResponseWriter, req *http.Request) {
-		kind := callerDashCookie
-		switch req.Header.Get("X-Test-Caller") {
-		case "tunnel":
-			kind = callerHub
-		case "stamp":
-			kind = callerHubOwner
+	as := func(h http.HandlerFunc) http.HandlerFunc {
+		return func(w http.ResponseWriter, req *http.Request) {
+			kind := callerDashCookie
+			switch req.Header.Get("X-Test-Caller") {
+			case "tunnel":
+				kind = callerHub
+			case "stamp":
+				kind = callerHubOwner
+			case "key":
+				kind = callerAPIKey
+			}
+			h(w, req.WithContext(context.WithValue(req.Context(), callerKindKey{}, kind)))
 		}
-		h.ReviewArtifact(w, req.WithContext(context.WithValue(req.Context(), callerKindKey{}, kind)))
-	})
+	}
+	r.Post("/api/board/{project}/artifacts/{id}/review", as(h.ReviewArtifact))
+	r.Put("/api/board/{project}/artifacts/{id}/review", as(h.MarkArtifactForReview))
+	r.Delete("/api/board/{project}/artifacts/{id}/review", as(h.UnmarkArtifactForReview))
 	s := httptest.NewServer(r)
 	t.Cleanup(s.Close)
 	subscribeSession(t, h, "alpha", "Alice", sessAlice)
@@ -64,13 +71,18 @@ func (g *oneDecisionRig) put(body string) {
 
 // decide sends a decision as caller ("local", "tunnel" or "stamp") and returns the status and the error code.
 func (g *oneDecisionRig) decide(caller, decision string) (int, string) {
+	return g.call(caller, http.MethodPost, `{"decision":"`+decision+`"}`)
+}
+
+// call sends one request to the review route with the given method and body, as caller ("local", "tunnel", "stamp" or "key").
+func (g *oneDecisionRig) call(caller, method, body string) (int, string) {
 	g.t.Helper()
-	req, err := http.NewRequest(http.MethodPost, g.srv.URL+"/api/board/alpha/artifacts/"+g.id+"/review", strings.NewReader(`{"decision":"`+decision+`"}`))
+	req, err := http.NewRequest(method, g.srv.URL+"/api/board/alpha/artifacts/"+g.id+"/review", strings.NewReader(body))
 	require.NoError(g.t, err)
 	req.Header.Set("Content-Type", "application/json")
 	if caller != "local" {
 		req.Header.Set("X-Test-Caller", caller)
-		if caller == "tunnel" {
+		if caller == "tunnel" || caller == "key" {
 			for k, v := range ownerHeaders(ownerLabel) {
 				req.Header.Set(k, v)
 			}
@@ -139,4 +151,34 @@ func TestTheLocalDashboardIsUnchangedByTheOneDecisionRule(t *testing.T) {
 	g = newOneDecisionRig(t)
 	code, _ = g.decide("tunnel", "approve")
 	assert.Equal(t, http.StatusOK, code, "a file nobody decided takes a decision through the Hub")
+}
+
+// A decided file is final through a hub (#13494, QA Reviewer 2's probe, the Orchestrator's decision): sending it for review again (PUT) and taking it off (DELETE) answer 409 already_decided, from the tunnel, the self-hosted
+// hub's stamp, and a request that carries only a key; this computer's own dashboard may still do both (re-opening stays a local act). A file nobody decided is not refused.
+func TestADecidedFileCannotBeSentAgainOrTakenOffThroughAHub(t *testing.T) {
+	for _, caller := range []string{"tunnel", "stamp", "key"} {
+		for _, decision := range []string{"approve", "changes", "deny"} {
+			g := newOneDecisionRig(t)
+			code, _ := g.decide("tunnel", decision) // decided through a hub, so the same file for every caller
+			require.Equal(t, http.StatusOK, code, caller+" setup: "+decision)
+			code, why := g.call(caller, http.MethodPut, `{"question":"look again"}`)
+			assert.Equal(t, http.StatusConflict, code, caller+": send again after "+decision)
+			assert.Equal(t, "already_decided", why, caller+": send again after "+decision)
+			code, why = g.call(caller, http.MethodDelete, ``)
+			assert.Equal(t, http.StatusConflict, code, caller+": take off after "+decision)
+			assert.Equal(t, "already_decided", why, caller+": take off after "+decision)
+		}
+	}
+	// nobody decided: a hub may send and take off
+	g := newOneDecisionRig(t)
+	code, _ := g.call("tunnel", http.MethodPut, `{"question":"one more look"}`)
+	assert.Equal(t, http.StatusOK, code, "an undecided file is sent through a hub")
+	code, _ = g.call("tunnel", http.MethodDelete, ``)
+	assert.Equal(t, http.StatusOK, code, "and taken off")
+	// this computer's own dashboard still can, after a decision
+	g = newOneDecisionRig(t)
+	code, _ = g.decide("tunnel", "approve")
+	require.Equal(t, http.StatusOK, code)
+	code, _ = g.call("local", http.MethodPut, `{"question":"a new round"}`)
+	assert.Equal(t, http.StatusOK, code, "locally a decided file can be sent for review again")
 }
