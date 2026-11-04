@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -440,6 +441,8 @@ func TestMessageSearchIndexIsCheckedAfterOpen(t *testing.T) {
 
 	defer func(d time.Duration) { messageIndexCheckDelay = d }(messageIndexCheckDelay)
 	messageIndexCheckDelay = 400 * time.Millisecond
+	defer func(q, p time.Duration) { messageIndexQuiet, messageIndexQuietPoll = q, p }(messageIndexQuiet, messageIndexQuietPoll)
+	messageIndexQuiet, messageIndexQuietPoll = 10*time.Millisecond, 10*time.Millisecond // this test reads the board every 50 ms while it waits: a quiet gap is 10 ms
 	s, err = NewStoreWithKey(path, "")
 	require.NoError(t, err)
 	defer s.Close()
@@ -526,4 +529,70 @@ func TestMessageSearchIndexTurnedOffDuringTheCheckStaysOff(t *testing.T) {
 	require.False(t, repaired, "turned off: not rebuilt")
 	require.Equal(t, "off", s.MessageSearchIndexState())
 	require.False(t, s.messageIndexExists(ctx), "and no index table came back")
+}
+
+// #13310: the one-time index check is not run while the board is being read: it waits for a quiet moment (and runs after the longest wait whatever happens).
+func TestTheIndexCheckWaitsForAQuietBoard(t *testing.T) {
+	t.Setenv(messageSearchIndexEnv, "on")
+	path := filepath.Join(t.TempDir(), "board_quiet.db")
+	s, err := NewStoreWithKey(path, "")
+	require.NoError(t, err)
+	ctx := context.Background()
+	_, err = sub(s, ctx, "proj", "dev", "Backend Dev")
+	require.NoError(t, err)
+	for i := 0; i < 10; i++ {
+		_, err := s.PostMessage(ctx, "proj", "dev", fmt.Sprintf("%s #%d", ftsTexts[i%len(ftsTexts)], i), nil)
+		require.NoError(t, err)
+	}
+	require.NoError(t, s.BuildMessageSearchIndex(ctx))
+	require.NoError(t, s.Close())
+
+	defer func(d, q, p, m time.Duration) {
+		messageIndexCheckDelay, messageIndexQuiet, messageIndexQuietPoll, messageIndexQuietWaitMax = d, q, p, m
+		messageIndexCheckHook = func() {}
+	}(messageIndexCheckDelay, messageIndexQuiet, messageIndexQuietPoll, messageIndexQuietWaitMax)
+	messageIndexCheckDelay, messageIndexQuiet, messageIndexQuietPoll, messageIndexQuietWaitMax = time.Millisecond, 250*time.Millisecond, 20*time.Millisecond, time.Hour
+	var ran atomic.Int64
+	messageIndexCheckHook = func() { ran.Add(1) }
+	s, err = NewStoreWithKey(path, "")
+	require.NoError(t, err)
+	defer s.Close()
+	// somebody reads the board every 20 ms for a second: the check does not run meanwhile
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		var n int
+		require.NoError(t, s.reader().GetContext(ctx, &n, `SELECT COUNT(*) FROM board_messages`))
+		time.Sleep(20 * time.Millisecond) // sleep-ok: a reader that keeps the board busy
+	}
+	require.EqualValues(t, 0, ran.Load(), "the board was being read: the check waited")
+	// nobody reads any more: it runs once the quiet time has passed
+	require.Eventually(t, func() bool { return ran.Load() == 1 }, 10*time.Second, 25*time.Millisecond, "a quiet board is checked")
+}
+
+// A board that is never quiet is still checked, after the longest wait.
+func TestTheIndexCheckRunsAfterTheLongestWaitOnABoardThatIsNeverQuiet(t *testing.T) {
+	t.Setenv(messageSearchIndexEnv, "on")
+	path := filepath.Join(t.TempDir(), "board_busy.db")
+	s, err := NewStoreWithKey(path, "")
+	require.NoError(t, err)
+	ctx := context.Background()
+	_, err = sub(s, ctx, "proj", "dev", "Backend Dev")
+	require.NoError(t, err)
+	for i := 0; i < 10; i++ {
+		_, err := s.PostMessage(ctx, "proj", "dev", fmt.Sprintf("%s #%d", ftsTexts[i%len(ftsTexts)], i), nil)
+		require.NoError(t, err)
+	}
+	require.NoError(t, s.BuildMessageSearchIndex(ctx))
+	require.NoError(t, s.Close())
+	defer func(d, q, p, m time.Duration) {
+		messageIndexCheckDelay, messageIndexQuiet, messageIndexQuietPoll, messageIndexQuietWaitMax = d, q, p, m
+		messageIndexCheckHook = func() {}
+	}(messageIndexCheckDelay, messageIndexQuiet, messageIndexQuietPoll, messageIndexQuietWaitMax)
+	messageIndexCheckDelay, messageIndexQuiet, messageIndexQuietPoll, messageIndexQuietWaitMax = time.Millisecond, time.Hour, 10*time.Millisecond, 300*time.Millisecond
+	var ran atomic.Int64
+	messageIndexCheckHook = func() { ran.Add(1) }
+	s, err = NewStoreWithKey(path, "")
+	require.NoError(t, err)
+	defer s.Close()
+	require.Eventually(t, func() bool { _ = s.reader(); return ran.Load() == 1 }, 10*time.Second, 20*time.Millisecond, "never quiet: checked after the longest wait")
 }
