@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -82,7 +83,9 @@ func (r *trustRig) codexTrusts(t *testing.T, path string) bool {
 	t.Helper()
 	b, err := os.ReadFile(r.codex)
 	require.NoError(t, err)
-	return strings.Contains(string(b), "[projects.\""+path+"\"]") && strings.Contains(string(b), "trust_level = \"trusted\"")
+	// The table key is a basic string ("<path>"), or on Windows a TOML literal string ('<path>') so a backslash needs no escape (foldertrust.codexTableKey).
+	keyed := strings.Contains(string(b), "[projects.\""+path+"\"]") || (runtime.GOOS == "windows" && strings.Contains(string(b), "[projects.'"+path+"']"))
+	return keyed && strings.Contains(string(b), "trust_level = \"trusted\"")
 }
 
 func trustOf(t *testing.T, out map[string]any) map[string]any {
@@ -108,7 +111,7 @@ func TestAFolderTheLaunchMadeIsTrustedForTheAgentsThatAsk(t *testing.T) {
 	// an Operator can see it afterwards: one board message names the folder and the agents
 	notices := r.trustNotices(t, out["board"].(string))
 	require.Len(t, notices, 1, "%v", notices)
-	assert.Contains(t, notices[0], dir)
+	assert.Contains(t, notices[0], noticeQuoted(dir), "the folder, quoted as text (a Windows path's backslashes written as \\\\)")
 	assert.Contains(t, notices[0], "claude, codex")
 }
 
@@ -239,14 +242,18 @@ func TestAWorktreeIsTrustedOnlyWithTheTick(t *testing.T) {
 // Security's SHOULD (1): the folder's name is text from the disk (it can hold a quote, a line break's look-alike or a bidi mark), so the board message quotes it, with every unprintable character written out.
 func TestTheBoardNoticeQuotesTheFolderName(t *testing.T) {
 	r := newTrustRig(t)
-	dir := filepath.Join(r.home, "Code", "ap\"p\u202egnp.exe")
+	name, trusted := "ap\"p\u202egnp.exe", []any{"claude"} // Codex refuses a name with a quote, Claude does not
+	if runtime.GOOS == "windows" {
+		name, trusted = "ap'p\u202egnp.exe", []any{"claude"} // Windows forbids a double quote in a folder's name; Codex refuses a single quote there (its key is a TOML literal string)
+	}
+	dir := filepath.Join(r.home, "Code", name)
 	require.NoError(t, os.MkdirAll(dir, 0o755))
 	out := r.launch(t, dir, false, true, asCaller(callerDashCookie))
-	assert.Equal(t, []any{"claude"}, trustOf(t, out)["trusted"], "Codex refuses a name with a quote, Claude does not")
+	assert.Equal(t, trusted, trustOf(t, out)["trusted"])
 	notices := r.trustNotices(t, out["board"].(string))
 	require.Len(t, notices, 1, "%v", notices)
 	cleaned := strings.ReplaceAll(dir, "\u202e", "") // noticeText removes a bidi mark
-	assert.Contains(t, notices[0], `"`+strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(cleaned)+`"`, "the name is cleaned and quoted, a quote written as \\\"")
+	assert.Contains(t, notices[0], noticeQuoted(cleaned), "the name is cleaned and quoted, a quote written as \\\"")
 	assert.NotContains(t, notices[0], "\u202e", "no bidi mark reaches the message")
 }
 
@@ -314,7 +321,11 @@ func TestATickedFolderCoralDidNotTrustIsSaidOnTheBoard(t *testing.T) {
 // neither mention the Operator nor carry the control character, and the quote cannot end the quoted name early. Removing quoteNotice or noticeText from the line must fail this.
 func TestTheNotTrustedBoardLineQuotesAndCleansTheFolderName(t *testing.T) {
 	r := newTrustRig(t)
-	dir := filepath.Join(r.home, ".hidden", "x @Operator \x07y \"q\" z") // a hidden folder under home: never trusted, so the line is the 'did not trust' one
+	name := "x @Operator \x07y \"q\" z"
+	if runtime.GOOS == "windows" {
+		name = "x @Operator y 'q' z" // Windows forbids a control character and a double quote in a folder's name: the mention is what can reach the board there
+	}
+	dir := filepath.Join(r.home, ".hidden", name) // a hidden folder under home: never trusted, so the line is the 'did not trust' one
 	require.NoError(t, os.MkdirAll(dir, 0o755))
 	out := r.launch(t, dir, false, true, asCaller(callerDashCookie))
 	require.NotEmpty(t, trustOf(t, out)["refused"])
@@ -331,6 +342,13 @@ func TestTheNotTrustedBoardLineQuotesAndCleansTheFolderName(t *testing.T) {
 	assert.NotContains(t, line, "@Operator", "the mention is broken: the line cannot notify the Operator")
 	assert.NotContains(t, line, "\x07", "the control character does not reach the board")
 	assert.Contains(t, line, "x ", "the name is still there, cleaned")
-	assert.Contains(t, line, `\"q\"`, "the name's own quotes are escaped inside the quoted name (quoteNotice)")
-	assert.Contains(t, line, `"`+r.home, "the folder opens with a quote: it is quoted as text")
+	if runtime.GOOS != "windows" {
+		assert.Contains(t, line, `\"q\"`, "the name's own quotes are escaped inside the quoted name (quoteNotice)")
+	}
+	assert.Contains(t, line, `"`+strings.ReplaceAll(r.home, `\`, `\\`), "the folder opens with a quote: it is quoted as text")
+}
+
+// noticeQuoted is a folder as a board notice quotes it (quoteNotice): in double quotes, a backslash written as \\ and a quote as \".
+func noticeQuoted(path string) string {
+	return `"` + strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(path) + `"`
 }
