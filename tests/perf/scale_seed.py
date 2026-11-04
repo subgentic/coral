@@ -7,7 +7,7 @@
 # open ones, as on an old board). Message and task text is varied in length and shape (short chat, long
 # pastes, @mentions, links, code) from a fixed seed, so two runs seed the same board. Stdlib only.
 # Writes the seconds each phase took and the counts to OUT.json.
-import json, random, sys, threading, time, urllib.parse, urllib.request
+import json, os, random, sys, threading, time, urllib.parse, urllib.request
 
 BASE, KEYFILE, BOARD, NMSG, NTASKS, OUT = sys.argv[1], sys.argv[2], sys.argv[3], int(sys.argv[4]), int(sys.argv[5]), sys.argv[6]
 KEY = open(KEYFILE).read().strip()
@@ -16,7 +16,7 @@ WORKERS = 8
 rnd = random.Random(4669)
 WORDS = ("build test merge review deploy rollback flake lint vet cache index schema migrate token session board task "
          "agent transcript window checkpoint redact budget deadline limit ceiling oracle mutation floor release gate").split()
-NAMES = ["Orchestrator", "Lead Developer", "Backend Dev", "Frontend Dev", "QA Engineer", "Security Reviewer", "DevOps Engineer", "UX Engineer"]
+NAMES = (os.environ.get("SEED_NAMES") or "Orchestrator,Lead Developer,Backend Dev,Frontend Dev,QA Engineer,Security Reviewer,DevOps Engineer,UX Engineer").split(",")  # SEED_NAMES: the board members an @mention may name (#13154)
 
 
 def sentence(n):
