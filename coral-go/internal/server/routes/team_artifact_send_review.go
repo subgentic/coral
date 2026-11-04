@@ -103,9 +103,16 @@ func (h *BoardHandler) UnmarkArtifactForReview(w http.ResponseWriter, r *http.Re
 		errNotFound(w, "this team has no such artifact")
 		return
 	}
-	if throughAHub(r) && h.hasDecision(ctx, project, id) { // taking a decided file off is local too (#13494)
-		commentRefuse(w, http.StatusConflict, "already_decided", alreadyDecidedWords)
-		return
+	if throughAHub(r) { // taking a decided file off is local too (#13494); a read that fails refuses, it never allows
+		decided, err := h.hasDecision(ctx, project, id)
+		if err != nil {
+			commentRefuse(w, http.StatusConflict, "decision_unknown", "this computer could not check whether the file has a decision, so it was not changed: try again")
+			return
+		}
+		if decided {
+			commentRefuse(w, http.StatusConflict, "already_decided", alreadyDecidedWords)
+			return
+		}
 	}
 	// The write is a compare-and-set on the tags read (#13129): a tag edit made meanwhile is not lost; the read is taken again a few times.
 	for attempt := 0; ; attempt++ {

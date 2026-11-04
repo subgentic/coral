@@ -375,12 +375,17 @@ func throughAHub(r *http.Request) bool {
 // alreadyDecidedWords is what a hub is told when it tries to change, re-send or take off a file that already has a decision (#13494).
 const alreadyDecidedWords = "this file already has a decision: it is final through a hub; a person can change it on this computer"
 
-// hasDecision says the file has an approve, changes or deny decision on record.
-func (h *BoardHandler) hasDecision(ctx context.Context, project, id string) bool {
-	reviews, err := h.bs.ArtifactReviews(ctx, project)
+// readArtifactReviews is the read of a team's decisions; a seam, so a test can make it fail.
+var readArtifactReviews = func(h *BoardHandler, ctx context.Context, project string) (map[string]board.ArtifactReview, error) {
+	return h.bs.ArtifactReviews(ctx, project)
+}
+
+// hasDecision says the file has an approve, changes or deny decision on record. A read that fails is an error, never "no decision": the caller (a hub) refuses then, so a broken read cannot let a decided file be changed (#13494).
+func (h *BoardHandler) hasDecision(ctx context.Context, project, id string) (bool, error) {
+	reviews, err := readArtifactReviews(h, ctx, project)
 	if err != nil {
-		return false
+		return false, err
 	}
 	rv, ok := reviews[id]
-	return ok && (rv.State == board.ReviewApproved || rv.State == board.ReviewChangesRequested || rv.State == board.ReviewDenied)
+	return ok && (rv.State == board.ReviewApproved || rv.State == board.ReviewChangesRequested || rv.State == board.ReviewDenied), nil
 }

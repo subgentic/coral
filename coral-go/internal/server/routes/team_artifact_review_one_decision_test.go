@@ -3,6 +3,7 @@ package routes
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -181,4 +182,24 @@ func TestADecidedFileCannotBeSentAgainOrTakenOffThroughAHub(t *testing.T) {
 	require.Equal(t, http.StatusOK, code)
 	code, _ = g.call("local", http.MethodPut, `{"question":"a new round"}`)
 	assert.Equal(t, http.StatusOK, code, "locally a decided file can be sent for review again")
+}
+
+// A read of the decisions that fails refuses a hub's take-off, it never lets it through (#13494, the rule of #13491): the file may have a decision the read could not see.
+func TestAFailedDecisionReadRefusesATakeOffThroughAHub(t *testing.T) {
+	g := newOneDecisionRig(t)
+	old := readArtifactReviews
+	readArtifactReviews = func(*BoardHandler, context.Context, string) (map[string]board.ArtifactReview, error) {
+		return nil, errors.New("the database is busy")
+	}
+	t.Cleanup(func() { readArtifactReviews = old })
+	for _, caller := range []string{"tunnel", "stamp", "key"} {
+		code, why := g.call(caller, http.MethodDelete, ``)
+		assert.Equal(t, http.StatusConflict, code, caller+": a take-off with a failed read is refused")
+		assert.Equal(t, "decision_unknown", why, caller)
+	}
+	code, _ := g.call("local", http.MethodDelete, ``)
+	assert.Equal(t, http.StatusOK, code, "this computer's own dashboard does not use the read")
+	readArtifactReviews = old
+	code, _ = g.call("tunnel", http.MethodDelete, ``)
+	assert.Equal(t, http.StatusOK, code, "with the read back, the same take-off on an undecided file is allowed")
 }
