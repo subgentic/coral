@@ -1,6 +1,7 @@
 /* What agents asked to add to a team, and have not been decided (#11389): the list, read from GET /api/proposals, and the decisions. No page here, so the Inbox's badge can count them without loading the table:
  * like the review rows it reads only after the Inbox was first opened, then keeps itself current (at most one read in 20 seconds). The Operator's alone: a guest or a grantee is answered 403, and has no rows. */
-import { serverFetch, LOCAL_SERVER } from './server_base.js';
+import { serverFetch, identityKey, splitKey } from './server_base.js';
+import { inboxSources } from './inbox_servers.js';
 import { browserLocal } from './safe_storage.js';
 import { visibleName } from './artifact_names.js';
 
@@ -23,13 +24,27 @@ export function refreshProposals(force = false) {
     if (!force && Date.now() - lastRead < 20000) return null;
     reading = (async () => {
         try {
-            const r = await serverFetch(LOCAL_SERVER, '/api/proposals?state=pending,approving,expired');
+            // Every computer the Inbox reads is asked on its own (#13454): a Hub-served page has none of its own, and a linked computer's teams are there. One that refuses (a grantee there, 403) has no
+            // rows, one that fails keeps the rows it had; neither blanks the others.
+            const sources = inboxSources(), hide = dismissed();
+            const settled = await Promise.allSettled(sources.map(async server => {
+                const r = await serverFetch(server, '/api/proposals?state=pending,approving,expired');
+                if (r.status === 403) return { server, rows: [] };
+                if (!r.ok) throw new Error(`${server}: ${r.status}`);
+                return { server, rows: (await r.json()).proposals || [] };
+            }));
             lastRead = Date.now();
-            if (r.status === 403) items = [];
-            else if (r.ok) {
-                const hide = dismissed(), rows = (await r.json()).proposals || [];
-                items = rows.filter(p => !(p.state === 'expired' && hide.has(`${p.board_id}:${p.id}`))).map(p => ({ ...p, rowKey: `proposal:${p.board_id}:${p.id}`, proposer: visibleName(p.proposer) ? String(p.proposer) : 'An agent' }));
-            }
+            const next = [];
+            settled.forEach((res, i) => {
+                const server = sources[i];
+                if (res.status === 'rejected') { next.push(...items.filter(p => p.server === server)); return; } // an error keeps what was shown for that computer
+                for (const p of res.value.rows) {
+                    const board = identityKey(server, p.board_id);
+                    if (p.state === 'expired' && hide.has(`${board}:${p.id}`)) continue;
+                    next.push({ ...p, server, board_id: board, rowKey: `proposal:${board}:${p.id}`, proposer: visibleName(p.proposer) ? String(p.proposer) : 'An agent' });
+                }
+            });
+            items = next;
         } catch { /* keep the rows as they are */ }
         reading = null;
         changed();
@@ -49,7 +64,7 @@ const wordsOf = async (r, fallback) => { try { const j = await r.json(); return 
 /** Approve (edits: the words changed) or reject (reason) a proposal. Resolves to { ok, text, created }: the words to show either way. */
 export async function decide(p, action, body = {}) {
     try {
-        const r = await serverFetch(LOCAL_SERVER, `/api/board/${encodeURIComponent(p.board_id)}/proposals/${p.id}/${action}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        const { server, name } = splitKey(p.board_id), r = await serverFetch(server, `/api/board/${encodeURIComponent(name)}/proposals/${p.id}/${action}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
         if (!r.ok) { const text = await wordsOf(r, `could not ${action} it (${r.status})`); await refreshProposals(true); return { ok: false, text }; }
         const out = await r.json().catch(() => ({}));
         await refreshProposals(true);
