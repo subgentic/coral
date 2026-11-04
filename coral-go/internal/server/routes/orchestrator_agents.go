@@ -238,8 +238,16 @@ func (h *SessionsHandler) OrchestratorWake(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	if target.IsSleeping != 1 {
-		orchRefusal(w, http.StatusConflict, "not_asleep", "that agent is not asleep")
-		return
+		// A row still awake whose CLI has ended and left a plain shell (a killed process the reconciler has not marked yet, #13413) is Ended: it is put to sleep as the reconciler would and woken now,
+		// instead of refused as awake. A running CLI, or a terminal that cannot be read, is still awake.
+		name := naming.SessionName(target.AgentType, target.SessionID)
+		if !h.markEndedAfterFailedSend(r.Context(), name, target.AgentType, target.SessionID) {
+			orchRefusal(w, http.StatusConflict, "not_asleep", "that agent is not asleep")
+			return
+		}
+		ended := *target
+		ended.IsSleeping = 1
+		target = &ended
 	}
 	actor, who := h.orchActor(seat), orchName(member)
 	id, err := h.reserveForBoard(r.Context(), project, board.LifecycleWake, actor, who, g)
