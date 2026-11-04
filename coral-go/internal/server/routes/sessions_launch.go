@@ -48,6 +48,9 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 		Hooks           map[string]interface{} `json:"hooks"`
 		// PermissionMode names Default and nothing else (#10362): the form sends no flag for Default, which is the same request as "nothing chosen", and nothing chosen starts in the saved default or Auto.
 		PermissionMode string `json:"permission_mode"`
+		// ConfirmHomeFolder: the person was asked about starting in the home folder itself and said Launch anyway (#13425).
+		HomeFolderAsk     bool `json:"home_folder_ask"` // the page can answer the home-folder question (#13425); a page that cannot never gets it, so no launch is stopped for it
+		ConfirmHomeFolder bool `json:"confirm_home_folder"`
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		errBadRequest(w, "invalid JSON")
@@ -128,6 +131,10 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 	if msg != "" {
 		attempt.Finish(tracking.OutcomeFailure, tracking.FailWorkdirUnavailable, 0, 1)
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": msg, "field": "working_dir"})
+		return
+	}
+	if askAboutHomeFolder(w, r, body.WorkingDir, body.HomeFolderAsk, body.ConfirmHomeFolder) {
+		attempt.Finish(tracking.OutcomeFailure, tracking.FailHomeFolderAsked, 0, 1)
 		return
 	}
 	slog.Info("launch request received",

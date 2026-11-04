@@ -264,6 +264,20 @@ func (h *SessionsHandler) WakeSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// The folder the wake will use: the team's home folder when one applies, else the row's. The home folder itself is asked about once (#13425).
+	wakeDir := sess.WorkingDir
+	if dir := h.teamHomeFolder(ctx, sess); dir != "" {
+		wakeDir = dir
+	}
+	// Asked and confirmed in the POST body, as a launch does (the Hub's tunnel refuses a query it does not list): an empty or other body is an older page, which is never asked.
+	var ask struct {
+		HomeFolderAsk     bool `json:"home_folder_ask"`
+		ConfirmHomeFolder bool `json:"confirm_home_folder"`
+	}
+	_ = decodeJSONLimit(r, &ask, 4096)
+	if askAboutHomeFolder(w, r, wakeDir, ask.HomeFolderAsk, ask.ConfirmHomeFolder) {
+		return
+	}
 	if err := h.wakeExistingSession(ctx, sess); err != nil {
 		log.Printf("Failed to wake session %s: %v", sessionID[:8], err)
 		if errors.Is(err, ErrStillInOldTmux) {
