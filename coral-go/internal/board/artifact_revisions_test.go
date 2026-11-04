@@ -2,6 +2,8 @@ package board
 
 import (
 	"context"
+	"errors"
+	"github.com/jmoiron/sqlx"
 	"testing"
 	"time"
 
@@ -81,4 +83,27 @@ func TestArtifactRevisionFollowsPrivateMark(t *testing.T) {
 		require.NoError(t, s.SetArtifactPrivate(context.Background(), "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", private, "Operator"))
 		require.Greater(t, s.ArtifactsRevision("team"), before)
 	}
+}
+
+// The rebased tag writer keeps its CAS/transactional record semantics: a failed
+// commit cannot advertise a revision for data that never committed.
+func TestArtifactTagRevisionFollowsSuccessfulCommitOnly(t *testing.T) {
+	s := testStore(t)
+	ctx := context.Background()
+	const team, hex = "team", "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+	require.NoError(t, s.SetArtifactTags(ctx, team, hex, []string{"for review"}))
+	before := s.ArtifactsRevision(team)
+	original := commitArtifactTagsTx
+	t.Cleanup(func() { commitArtifactTagsTx = original })
+	refused := errors.New("test commit refused")
+	commitArtifactTagsTx = func(tx *sqlx.Tx) error { _ = tx.Rollback(); return refused }
+	err := s.SetArtifactTagsIf(ctx, team, hex, []string{"for review"}, []string{"read"})
+	require.ErrorIs(t, err, refused)
+	require.Equal(t, before, s.ArtifactsRevision(team), "rolled-back tags have no new revision")
+	tags, err := s.ArtifactTags(ctx, team)
+	require.NoError(t, err)
+	require.Equal(t, []string{"for review"}, tags[hex])
+	commitArtifactTagsTx = original
+	require.NoError(t, s.TakeArtifactOutOfReview(ctx, team, hex, []string{"for review"}, []string{"read"}))
+	require.Greater(t, s.ArtifactsRevision(team), before, "take-out advertises the committed change")
 }
