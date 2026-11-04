@@ -52,6 +52,11 @@ const RECORD = `(() => {
             await Page.navigate({ url: BASE }); await Page.loadEventFired(); await install();
             await ev(RECORD);
             await coralReady(ev, 'startup', 'liveList', 'settings');
+            // Home's delayed New goal card reads the teams once (#13087), up to
+            // 5 s after it is drawn. Finish that startup request before tracing
+            // selections; otherwise its timer can land in the draft-only step.
+            // Keep all per-step requests (and the golden) unchanged.
+            await waitFor(`window.__seen.fetches.includes('GET /api/board/projects')`, 'Home goal card teams read', 10000);
             await ev(`localStorage.clear(); ${setup}; T.render.renderLiveSessions(T.state.liveSessions); true`);
             await sleep(300); // sleep-ok: the list and startup loads settle over frames; there is no completion event
             const steps = [];
