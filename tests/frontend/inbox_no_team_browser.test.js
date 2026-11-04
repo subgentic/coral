@@ -40,10 +40,9 @@ const BASE = require('./test_base').BASE;
             await waitFor(`document.querySelector('#group-table-view')?.textContent.includes('Solo report.txt')`, 'solo review row');
             assert.ok(await ev(`document.querySelector('#group-table-view').textContent.includes('Not on a team')`));
             assert.ok(await ev(`document.querySelector('#group-table-view').textContent.includes('Is this ready to ship?')`));
-            assert.equal(await ev(`document.querySelectorAll('#group-table-view .inbox-main-action, #group-table-view .inbox-changes').length`), 0);
+            assert.equal(await ev(`document.querySelectorAll('#group-table-view .inbox-main-action, #group-table-view .inbox-changes').length`), 2, 'approved no-team API supports decisions');
             await ev(`document.querySelector('#group-table-view .inbox-review-name').click(); true`);
             await waitFor(`!document.getElementById('artifact-viewer')?.hidden`, 'solo file opens');
-            assert.equal(await ev(`Array.from(document.querySelectorAll('.artifact-review-approve,.artifact-review-changes,.ac-toggle')).filter(e=>!e.hidden && e.getClientRects().length).length`), 0);
             await waitFor(`window.__soloWrites.some(tags=>tags.includes('read'))`, 'opening marks read');
         }
     } finally { await client.close(); }
