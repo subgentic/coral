@@ -17,9 +17,8 @@ const { removeBoards } = require('./helpers/board_cleanup');
 const DATA = process.env.CORAL_TEST_DATA_DIR || '';
 const FILES = Number(process.env.CORAL_BIGBOARD_FILES) || 200, VERSIONS = Number(process.env.CORAL_BIGBOARD_VERSIONS) || 100, TASKS = 2000, MESSAGES = 1000;
 const SCALE = Number(process.env.CORAL_BIGBOARD_SCALE) > 0 ? Number(process.env.CORAL_BIGBOARD_SCALE) : 1;
-// The goal's numbers, except Needs you within 20 s of a load: the first read after a start is measured at 4.9 s on the full seed today (v2.0.45 base), so its ceiling is 8 s until the cold-read fixes land
-// (#13292 the first artifacts read, #13304 Needs you through the Hub), when it tightens to the goal's 3 s (EARLY_GOAL_MS).
-const EARLY_GOAL_MS = 3000, EARLY_CEILING_MS = 8000;
+// The goal's numbers. (Before #13292, the first artifacts read, and #13304, Needs you through the Hub, landed the first read after a start measured 4.9 s on the full seed and this ceiling was 8 s.)
+const EARLY_GOAL_MS = 3000, EARLY_CEILING_MS = EARLY_GOAL_MS; // #13292 and #13304 have landed: the goal's number
 const BUDGET = { firstLoadMs: 2000 * SCALE, needsYouWarmMs: 1000 * SCALE, needsYouEarlyMs: EARLY_CEILING_MS * SCALE, longTaskMs: 50 * SCALE };
 const TAG = Date.now() % 100000;
 const B = 'bigboard-13326-' + TAG, SESSION = '13326000-0000-4000-8000-' + String(TAG).padStart(12, '0');
