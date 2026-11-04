@@ -311,3 +311,5 @@ node cloud_signin_leaving.test.js
 node chief_checks_model.test.mjs
 
 node chief_checks_state_api.test.mjs
+
+node chief_checks_lan.test.mjs

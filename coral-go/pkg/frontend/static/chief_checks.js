@@ -10,6 +10,12 @@ const { loadStyles } = await importOnce('./lazy_styles.js');
 await loadStyles('chief-checks.css');
 let opened = null;
 const button = (text, fn, cls = 'btn') => { const b = el('button', cls, text); b.type = 'button'; b.addEventListener('click', fn); return b; };
+// randomUUID requires a secure context; getRandomValues also works on a
+// plain-http LAN dashboard, as in agent_ui.js.
+function newRequestID() {
+    if (typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+    return Array.from(crypto.getRandomValues(new Uint8Array(16)), byte => byte.toString(16).padStart(2, '0')).join('');
+}
 export async function showChiefChecks() {
     if (isCloud()) return;
     if (opened?.open) { opened.focus(); return; }
@@ -44,7 +50,7 @@ export async function showChiefChecks() {
         if (busy || !rows.length) return;
         busy = true; dialog.setAttribute('aria-busy', 'true'); runAll.disabled = true;
         say(`Scheduling ${rows.length} check${rows.length === 1 ? '' : 's'}…`);
-        const results = await runCheckQueue(rows, api.runCheck, id => { if (!keys.has(id)) keys.set(id, crypto.randomUUID()); return keys.get(id); });
+        const results = await runCheckQueue(rows, api.runCheck, id => { if (!keys.has(id)) keys.set(id, newRequestID()); return keys.get(id); });
         for (const r of results) if (r.ok) keys.delete(r.id);
         busy = false;
         if (closed) return;
