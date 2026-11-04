@@ -462,7 +462,7 @@ registerActions({
     'agent-icon': withAgent('setAgentIcon'),
     'agent-attach': withAgent('attachDirect'),
     'agent-sleep': withAgent('toggleAgentSleep', ['sleep', 'wake']),
-    'agent-sleep-gone': menu(el => { const ids = String(el.dataset.ids || '').split(',').filter(x => /^[0-9a-f-]{8,64}$/i.test(x)).slice(0, 500); if (ids.length) W('sleepTerminalGone')(ids); }), // Sleep all terminal-gone (#13171)
+    'agent-sleep-gone': menu(el => { const ids = String(el.dataset.ids || '').split(',').filter(x => /^[A-Za-z0-9_.:-]{1,128}$/.test(x)).slice(0, 500); if (ids.length) W('sleepTerminalGone')(ids); }), // Sleep all terminal-gone (#13171)
     'agent-auto-sleep': withAgent('setAgentAutoSleep', ['off', 'on']), // the Operator's per-agent switch for auto-sleep (#12111)
     'agent-archive': withAgent('toggleAgentArchive', ['archive', 'unarchive']),
     'agent-move': menu(el => { const sid = textOf(el.dataset.sessionId); if (sid && UPDOWN[el.dataset.dir]) W(el.dataset.dir === 'up' ? 'moveSessionUp' : 'moveSessionDown')(sid); }),

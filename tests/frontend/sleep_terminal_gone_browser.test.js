@@ -2,6 +2,7 @@
 // says "Sleep N terminal-gone agents". Sleep asks nothing (nothing runs to stop), files the agent under sleeping (no Terminal gone chip, a plain sleeper that a Wake resumes) and says so in a toast; the bulk row
 // sends one request naming those agents. An awake agent, a plain sleeper and an archived agent are unchanged.
 //
+// The agents are one team (a bulk row is per team or folder group).
 // Drives Chrome over CDP through agent_view_harness.js; run_cdp_suites.mjs finds CDP suites by that name.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -18,12 +19,12 @@ const BASE = require('./test_base').BASE;
         await install();
         await coralReady(ev);
         await ev(`(async () => {
-            window.__m.add('gone-1', 'G', 3, { sleeping: true, sleep_reason: 'terminal_gone' });
-            window.__m.add('gone-2', 'G', 3, { sleeping: true, sleep_reason: 'terminal_gone' });
-            window.__m.add('gone-3', 'G', 3, { sleeping: true, sleep_reason: 'terminal_gone' });
-            window.__m.add('nap', 'N', 3, { sleeping: true });
-            window.__m.add('arch', 'A', 3, { archived: true, sleep_reason: 'terminal_gone' });
-            window.__m.add('busy', 'B', 3, { sleeping: false });
+            window.__m.add('gone-1', 'G', 3, { sleeping: true, sleep_reason: 'terminal_gone', board_project: 'gone-team' });
+            window.__m.add('gone-2', 'G', 3, { sleeping: true, sleep_reason: 'terminal_gone', board_project: 'gone-team' });
+            window.__m.add('gone-3', 'G', 3, { sleeping: true, sleep_reason: 'terminal_gone', board_project: 'gone-team' });
+            window.__m.add('nap', 'N', 3, { sleeping: true, board_project: 'gone-team' });
+            window.__m.add('arch', 'A', 3, { archived: true, sleep_reason: 'terminal_gone', board_project: 'gone-team' });
+            window.__m.add('busy', 'B', 3, { sleeping: false, board_project: 'gone-team' });
             // the server's two answers, on top of the harness: Sleep of one agent and Sleep all terminal-gone
             window.__calls = [];
             const f = window.fetch;
@@ -82,7 +83,7 @@ const BASE = require('./test_base').BASE;
         // Sleep on one row: no confirmation, one request, the chip goes and the agent is a plain sleeper
         await ev(`document.querySelector('.session-group-item[data-session-id="gone-1-id"] button[data-mode="sleep"]').click(); true`);
         await ev(framesJs(3));
-        const modal = await ev(`!!document.querySelector('.confirm-modal, [role="dialog"]:not([hidden])')`);
+        const modal = await ev(`(() => { const m = document.getElementById('confirm-modal'); return !!m && getComputedStyle(m).display !== 'none'; })()`);
         assert.equal(modal, false, 'Sleep of an agent that is asleep already asks nothing');
         assert.deepEqual(await ev('window.__calls'), [{ kind: 'one', id: 'gone-1-id' }]);
         const after = await rowInfo('gone-1-id');
