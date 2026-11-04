@@ -15,7 +15,7 @@ async function world(hubFeed) {
     await setupHubWorld({
         client: {
             Browser: { PermissionType: { enum: ['localNetworkAccess', 'loopbackNetwork'] }, grantPermissions: async p => grants.push(p) },
-            Fetch: { enable: async () => {}, requestPaused() {} },
+            Fetch: { enable: async () => {}, requestPaused() {} }, // paused-ok: inert fake CDP registrar; setupHubWorld registers its handler through safePaused
             Network: { enable: async () => {}, setBypassServiceWorker: async () => {} }
         },
         Page: { enable: async () => {}, addScriptToEvaluateOnNewDocument: async p => { source = p.source; } },
