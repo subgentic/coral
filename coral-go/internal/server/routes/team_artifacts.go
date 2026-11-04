@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -661,6 +662,13 @@ func (c *uploadDirCache) list(coralDir, sessionID string) []sessionUpload {
 			uploads = append(uploads, sl.sig.up)
 		}
 	}
+	// Newest first, ties by id, once per change of the folder (the cache keeps it sorted): every request merged these into the team's list and sorted 20,000 rows by their time again (#13522: 57% of a page's CPU).
+	slices.SortStableFunc(uploads, func(a, b sessionUpload) int {
+		if a.rec.CreatedAt != b.rec.CreatedAt {
+			return strings.Compare(b.rec.CreatedAt, a.rec.CreatedAt)
+		}
+		return strings.Compare(a.id, b.id)
+	})
 	if settled {
 		c.mu.Lock()
 		if c.dirs == nil {
@@ -771,11 +779,14 @@ func (c *uploadDirCache) merge(items []teamArtifact, coralDir string, sessions m
 	}
 	if added {
 		// Newest first; ties keep a stable order (by id) whatever the map order.
-		sort.SliceStable(items, func(i, j int) bool {
-			if items[i].CreatedAt != items[j].CreatedAt {
-				return items[i].CreatedAt > items[j].CreatedAt
+		slices.SortStableFunc(items, func(a, b teamArtifact) int {
+			if a.CreatedAt != b.CreatedAt {
+				return strings.Compare(b.CreatedAt, a.CreatedAt)
 			}
-			return items[i].TaskID == 0 && items[j].TaskID == 0 && items[i].ID < items[j].ID
+			if a.TaskID == 0 && b.TaskID == 0 {
+				return strings.Compare(a.ID, b.ID)
+			}
+			return 0
 		})
 	}
 	return items
