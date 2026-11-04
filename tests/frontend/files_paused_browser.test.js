@@ -18,9 +18,9 @@ const { coralReady } = require('./helpers/wait');
         await ev(`(() => { const R = window.fetch; window.__calls = []; window.__paused = true;
             const files = [{ filepath: 'a.txt', status: 'modified', additions: 1, deletions: 0 }, { filepath: 'b.txt', status: 'modified', additions: 1, deletions: 0 }, { filepath: 'c.txt', status: 'modified', additions: 1, deletions: 0 }];
             window.fetch = (u, o) => { const url = new URL(String(u), location.href), json = b => Promise.resolve(new Response(JSON.stringify(b), { status: 200, headers: { 'Content-Type': 'application/json' } }));
-                if (/\\/api\\/sessions\\/live\\/wp\\/files\\/refresh$/.test(url.pathname)) { window.__calls.push(url.search); if (url.search.includes('live=on')) window.__paused = false;
+                if (/\\/api\\/sessions\\/live\\/wp\\/files\\/refresh$/.test(url.pathname)) { window.__calls.push(url.search); if (url.search.includes('live=on')) { if (window.__failLive) { window.__failLive = false; return Promise.resolve(new Response('{}', { status: 500, headers: { 'Content-Type': 'application/json' } })); } window.__paused = false; }
                     return json({ files, is_git: true, compare: { label: 'HEAD' }, total_changed: 35000, capped: true, paused: window.__paused ? { changes: 35000, took_ms: 3200 } : undefined }); }
-                if (/\\/api\\/sessions\\/live\\/wp\\/files$/.test(url.pathname)) return json({ files, is_git: true, compare: { label: 'HEAD' } });
+                if (/\\/api\\/sessions\\/live\\/wp\\/files$/.test(url.pathname)) return json({ files, is_git: true, compare: { label: 'HEAD' }, total_changed: 35000, paused: window.__paused ? { changes: 35000, took_ms: 3200 } : undefined }); // the cached read of a paused folder carries the pause too
                 return R(u, o); }; return true; })()`);
         await ev(`(async () => { const st = await import((window.__coralStatic || '/static/') + 'state.js'); st.state.currentSession = { type: 'live', name: 'wp', session_id: 'sid-wp', agent_type: 'claude' }; return true; })()`);
         const shown = await ev(`(async () => { const p = document.getElementById('agentic-panel-files'); if (!p) return 'no panel'; window.switchAgenticTab('files'); for (let e = p; e && e !== document.body; e = e.parentElement) { e.hidden = false; e.classList.remove('collapsed'); if (getComputedStyle(e).display === 'none') e.style.setProperty('display', 'block', 'important'); if (!e.offsetWidth || !e.offsetHeight) { e.style.minWidth = '300px'; e.style.minHeight = '200px'; e.style.position = 'relative'; } } /* no agent is open in this bare page: its dock is shown by hand */ return p.classList.contains('active') && p.getClientRects().length > 0; })()`);
@@ -36,6 +36,14 @@ const { coralReady } = require('./helpers/wait');
         await ev(`document.querySelector('#changed-files-list .files-paused-note button').click(); true`);
         await waitFor(`window.__calls.length === ${before} + 1`, 'Refresh asks once', 5000);
         check('Refresh asks for one pass on demand (manual=1)', (await ev(`window.__calls[window.__calls.length - 1]`)).includes('manual=1'), await ev(`window.__calls[window.__calls.length - 1]`));
+        // QA's SHOULD 7: a Turn on that fails must not leave live=on on the next request
+        await ev(`window.__failLive = true; document.querySelector('#changed-files-list .files-paused-note .btn-quiet').click(); true`);
+        await waitFor(`window.__calls.filter(c => c.includes('live=on')).length === 1`, 'the failing Turn on asks once', 5000);
+        await quiet(300);
+        const afterFail = await ev(`window.__calls.length`);
+        await ev(`document.querySelector('#changed-files-list .files-paused-note button').click(); true`);
+        await waitFor(`window.__calls.length === ${afterFail} + 1`, 'Refresh asks after the failed Turn on', 5000);
+        check('a Turn on that failed does not leave live=on on the next request', !(await ev(`window.__calls[window.__calls.length - 1]`)).includes('live=on'), await ev(`window.__calls[window.__calls.length - 1]`));
         await ev(`document.querySelector('#changed-files-list .files-paused-note .btn-quiet').click(); true`);
         await waitFor(`window.__calls.some(c => c.includes('live=on'))`, 'Turn on asks with live=on', 5000);
         await waitFor(`!/Live updates paused/.test(document.getElementById('changed-files-list').textContent)`, 'the note goes', 5000);
