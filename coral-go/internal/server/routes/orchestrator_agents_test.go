@@ -764,3 +764,22 @@ func TestWakeRestartsAnAwakeRowWhoseProcessHasEnded(t *testing.T) {
 	assert.Equal(t, "Dev3", out["woke"])
 	assert.False(t, r.asleep("Dev3"), "woken, not left Ended")
 }
+
+// A member name with a slash or a space ("UX/UX Engineer") is reached by its escaped name (#13415): the path value is the raw escaped text, so the handler reads it unescaped.
+func TestWakeAndSleepReachAnAgentWhoseNameHasASlashAndASpace(t *testing.T) {
+	r := newOrchRig(t)
+	r.usualBoard()
+	r.seat("UX/UX Engineer", "Designer", orchBoard, "claude", true, 6)
+	code, _ := r.operatorGrant("Orchestrator", nil)
+	require.Equal(t, http.StatusOK, code)
+
+	code, out := r.agentPost("Orchestrator", "wake", "UX/UX Engineer", "") // sent as UX%2FUX%20Engineer
+	assert.Equal(t, http.StatusOK, code, "%v", out)
+	assert.False(t, r.asleep("UX/UX Engineer"))
+	code, out = r.agentPost("Orchestrator", "sleep", "UX/UX Engineer", "")
+	assert.Equal(t, http.StatusOK, code, "%v", out)
+	assert.True(t, r.asleep("UX/UX Engineer"))
+
+	code, out = r.agentPost("Orchestrator", "wake", "UX/Nobody", "")
+	assert.Equal(t, "no_such_agent", out["code"], "%d: another name with a slash is still unknown", code)
+}
