@@ -1,9 +1,12 @@
 package ptymanager
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // #13480: Codex refuses a model its login cannot use, and says so only on its own screen, once per turn it is nudged into; the agent looked idle while three of them sat for two hours with eleven unread messages.
@@ -52,5 +55,17 @@ func TestCodexModelRefusedNamesOnlyAModelShapedName(t *testing.T) {
 		model, ok := CodexModelRefusedOnScreen(screen)
 		assert.True(t, ok, name+": it is still a refusal")
 		assert.Equal(t, c.model, model, name)
+	}
+}
+
+// Real Codex screens (read-only tmux captures of the three Codex agents the refusal stopped, 2026-11-04, the bottom nine lines, nothing else): the notice has no border before its bullet, wraps at 80 and 93
+// columns, and one agent's says "Error running remote compact task:" before the same sentence (#13480).
+func TestCodexModelRefusedOnRealScreens(t *testing.T) {
+	for _, name := range []string{"codex_model_refused_wide.txt", "codex_model_refused_narrow.txt", "codex_model_refused_compact_task.txt"} {
+		b, err := os.ReadFile(filepath.Join("testdata", name))
+		require.NoError(t, err)
+		model, ok := CodexModelRefusedOnScreen(string(b))
+		assert.True(t, ok, name)
+		assert.Equal(t, "gpt-6.1-sol", model, name)
 	}
 }
