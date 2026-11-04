@@ -189,7 +189,7 @@ func (h *SessionsHandler) refreshFilesInner(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	key := fmt.Sprintf("%s\x00%s\x00%s\x00%v", workdir, h.getDiffMode(r.Context()), sessionID, follow)
-	res, ok := refreshFlights.do(r.Context(), key, func() refreshedFiles {
+	res, ok := refreshFlights.do(r.Context(), key, manual, func() refreshedFiles {
 		return h.computeRefreshedFiles(context.WithoutCancel(r.Context()), name, sessionID, workdir, follow)
 	})
 	if !ok {
@@ -405,6 +405,7 @@ type refreshFlight struct {
 type refreshCall struct {
 	done chan struct{}
 	res  refreshedFiles
+	ok   bool // fn returned (it did not panic)
 }
 type refreshRecent struct {
 	res   refreshedFiles
@@ -415,11 +416,12 @@ const refreshReuseOver = 250 * time.Millisecond
 
 var refreshFlights = &refreshFlight{calls: map[string]*refreshCall{}, recent: map[string]refreshRecent{}}
 
-// do returns the answer for key, running fn if nobody is; false when ctx ended while waiting.
-func (f *refreshFlight) do(ctx context.Context, key string, fn func() refreshedFiles) (refreshedFiles, bool) {
+// do returns the answer for key, running fn if nobody is; false when ctx ended while waiting. fresh asks for a new pass whatever was just answered (a person's Refresh); a pass already running is still shared.
+// The pass is left cleanly even if fn panics: the key is freed and the waiters released (they get an empty answer), so one panic cannot make every later refresh of the folder wait.
+func (f *refreshFlight) do(ctx context.Context, key string, fresh bool, fn func() refreshedFiles) (refreshedFiles, bool) {
 	f.mu.Lock()
 	if rc, ok := f.recent[key]; ok {
-		if time.Now().Before(rc.until) {
+		if !fresh && time.Now().Before(rc.until) {
 			f.mu.Unlock()
 			return rc.res, true
 		}
@@ -438,19 +440,22 @@ func (f *refreshFlight) do(ctx context.Context, key string, fn func() refreshedF
 	f.calls[key] = c
 	f.mu.Unlock()
 	start := time.Now()
-	c.res = fn()
-	took := time.Since(start)
-	f.mu.Lock()
-	delete(f.calls, key)
-	for k, rc := range f.recent {
-		if !time.Now().Before(rc.until) {
-			delete(f.recent, k)
+	defer func() {
+		took := time.Since(start)
+		f.mu.Lock()
+		delete(f.calls, key)
+		for k, rc := range f.recent {
+			if !time.Now().Before(rc.until) {
+				delete(f.recent, k)
+			}
 		}
-	}
-	if took > refreshReuseOver {
-		f.recent[key] = refreshRecent{res: c.res, until: time.Now().Add(min(took, 10*time.Second))}
-	}
-	f.mu.Unlock()
-	close(c.done)
+		if took > refreshReuseOver && c.ok {
+			f.recent[key] = refreshRecent{res: c.res, until: time.Now().Add(min(took, 10*time.Second))}
+		}
+		f.mu.Unlock()
+		close(c.done)
+	}()
+	c.res = fn()
+	c.ok = true
 	return c.res, true
 }
