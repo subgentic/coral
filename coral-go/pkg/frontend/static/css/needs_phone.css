@@ -1,5 +1,6 @@
 /* A phone's Needs you row is as tall as its content (#11858). Loaded with the Inbox (inbox_sidebar.js), not at start. */
 @media (max-width: 760px) {
     .inbox-needs-results .inbox-review-item > .inbox-review-name { margin: -12px 0; } /* the 44 px target stays, the line is the text's: only a name inside an item row; a bare title span (a goal that looks done, #12029) is not hit, so it keeps its height */
+    .inbox-needs-results .inbox-review-item > .inbox-review-name.inbox-ask-name { min-height: 0; padding-block: 12px; margin-block: -12px; } /* a question may take two lines on a phone (#11894): the 44 px target is padding, not a min-height, so the row's layout is the text's whatever its lines; with min-height and -12px margins a second line fell on the row's next line (#13144: the icon made 'May I rename the folder?' wrap) */
     .inbox-needs-results [data-key=waiting] { align-self: flex-start; line-height: 20px; } /* on the name line: its 20 px, from the row's top padding */
 }

@@ -41,6 +41,18 @@ const { removeBoards } = require('./helpers/board_cleanup');
                 check(r.inRow && r.beforeWords, `${label}: a ${r.kind} row's icon is inside the row and in front of its words, not over them: ${JSON.stringify(r)}`);
             }
         }
+        // a phone (#13144, the Orchestrator's 12:07): the words of a row never lie over one another, in both themes. Every element that carries its own text is a box; no two boxes of one row intersect.
+        await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
+        await ev(`document.documentElement.style.fontSize = '100%'; true`);
+        const { themeJs } = require('./helpers/theme');
+        for (const theme of ['dark', 'light']) {
+            await ev(`${themeJs(theme)}; true`); await ev(framesJs(8));
+            const clashes = await ev(`(() => { const out = []; for (const tr of document.querySelectorAll('${T} tbody tr')) {
+                const boxes = [...tr.querySelectorAll('*')].filter(e => [...e.childNodes].some(n => n.nodeType === 3 && n.textContent.trim()) && e.getClientRects().length).map(e => ({ t: e.textContent.trim().slice(0, 24), r: e.getBoundingClientRect() }));
+                for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) { const a = boxes[i].r, b = boxes[j].r, w = Math.min(a.right, b.right) - Math.max(a.left, b.left), h = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top); if (w > 2 && h > 2) out.push(boxes[i].t + ' x ' + boxes[j].t + ' (' + Math.round(w) + 'x' + Math.round(h) + ')'); } }
+                return out; })()`);
+            check(clashes.length === 0, `390 px, ${theme}: no two texts of a Needs you row overlap: ` + JSON.stringify(clashes));
+        }
     } finally { await removeBoards(ev, ['qn']).catch(() => {}); await client.close(); }
     if (failures.length) { console.error(failures.join('\n')); process.exit(1); }
     console.log('needs_kind_icons_rows_browser: ok');
