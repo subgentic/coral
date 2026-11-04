@@ -9,15 +9,17 @@ const CSP = ["default-src 'self'", "script-src 'self'", "style-src 'self'", "sty
 /** Set the page up as the Hub's before the first navigation: the viewport, the cloud boot flag with the hub's CSP, and the stubbed API. */
 async function setupHubWorld({ client, Page, Emulation, width, height, mobile, inbox, hubPages, hubFeed = false }) {
     const { Fetch, Network } = client;
-    // Fetch.fulfillRequest below replaces the document with a synthetic response:
-    // Chromium's ProcessResponseOverride makes a fresh response head without the
-    // loopback remote endpoint. LNA can therefore block this fixture's real socket.
-    // Grant only this isolated origin; a real Hub uses its public same-origin feed.
-    // Chrome 156 exposes split permissions: the legacy grant alone no longer
-    // authorizes loopback. Older runner Chromes advertise only the legacy name.
-    const networkPermissions = ['localNetworkAccess', 'localNetwork', 'loopbackNetwork']
-        .filter(name => client.Browser.PermissionType.enum.includes(name));
-    if (networkPermissions.length) await client.Browser.grantPermissions({ origin: new URL(BASE).origin, permissions: networkPermissions });
+    if (hubFeed) {
+        // Fetch.fulfillRequest below replaces the document with a synthetic response:
+        // Chromium's ProcessResponseOverride makes a fresh response head without the
+        // loopback remote endpoint. LNA can therefore block this fixture's real socket.
+        // Grant only this isolated origin; a real Hub uses its public same-origin feed.
+        // Chrome 156 exposes split permissions: the legacy grant alone no longer
+        // authorizes loopback. Older runner Chromes advertise only the legacy name.
+        const networkPermissions = ['localNetworkAccess', 'localNetwork', 'loopbackNetwork']
+            .filter(name => client.Browser.PermissionType.enum.includes(name));
+        if (networkPermissions.length) await client.Browser.grantPermissions({ origin: new URL(BASE).origin, permissions: networkPermissions });
+    }
     await Promise.all([Page.enable(), Network.enable()]);
     await Network.setBypassServiceWorker({ bypass: true });
     await Emulation.setDeviceMetricsOverride({ width, height, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
@@ -63,7 +65,7 @@ async function setupHubWorld({ client, Page, Emulation, width, height, mobile, i
     const p=new URL(String(u),location.href); const m=(o.method||'GET').toUpperCase();
     if(p.pathname==='/auth/session')return json({authenticated:true,email:'tester@example.com',csrf:'test'});
     if(p.pathname==='/api/account')return json({artifacts_tab:true,artifacts_frame:true});
-    if(p.pathname==='/api/sessions/live')return json({sessions:hubSessions(),servers:window.__noComputers?[]:computers});
+    if(p.pathname==='/api/sessions/live')return json({sessions:window.__noComputers?[]:[['m1','Review agent'],['m1','Docs agent'],['m2','Build agent']].map(([server,name],i)=>({session_id:'hub-agent-'+i,name:'hub-agent-'+i,display_name:name,agent_type:'claude',working_directory:'/tmp/hub-agent-'+i,server,sleeping:false,archived:false,status:'idle'})),servers:window.__noComputers?[]:computers});
     if(p.pathname==='/api/servers')return json({servers:computers});
     if(p.pathname==='/api/settings'&&m==='GET')return json({settings:{}});
     const match=p.pathname.match(/^\\/api\\/remote\\/([^/]+)(\\/api\\/.*)$/);
