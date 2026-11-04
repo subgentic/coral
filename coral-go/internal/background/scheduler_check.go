@@ -14,8 +14,8 @@ func (s *JobScheduler) SetCheckPollFn(fn func(context.Context)) { s.checkPollFn 
 func (s *JobScheduler) deliverCheckRun(runID int64, job store.ScheduledJob) {
 	s.watching.Add(1)
 	go func() {
-		defer s.watching.Done()
 		defer safego.Recover("background/check delivery")
+		defer s.watching.Done()
 		base := s.parentCtx
 		if base == nil {
 			base = context.Background()
