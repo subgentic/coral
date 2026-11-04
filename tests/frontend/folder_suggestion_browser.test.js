@@ -74,8 +74,8 @@ const { existing: recentsExist } = require('./helpers/recent_dirs');
         await S.run('New team: a long Windows path in the note wraps inside the dialog (390 px, 200% text)', async () => {
             await client.Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
             await ev(`document.documentElement.style.fontSize = '200%'; true`);
-            const r = await ev(`(() => { const n = document.getElementById('launch-team-dir-suggest'); n.hidden = false;
-                n.textContent = 'D:\\a\\_temp\\coral-cdp-6L5Vl7\\shard1-1\\home\\Coral\\first-team. The team\'s agents work in this folder. Coral creates it for you.';
+            const r = await ev(`(() => { const n = document.getElementById('launch-team-dir-suggest'); n.hidden = false; const bs = String.fromCharCode(92);
+                n.textContent = ['D:', 'a', '_temp', 'coral-cdp-6L5Vl7', 'shard1-1', 'home', 'Coral', 'first-team'].join(bs) + '. These agents work in this folder. Coral creates it for you.';
                 const box = n.getBoundingClientRect(), up = n.parentElement.getBoundingClientRect();
                 return { over: n.scrollWidth - n.clientWidth, right: Math.round(box.right), parentRight: Math.round(up.right), vw: innerWidth }; })()`);
             await client.Emulation.clearDeviceMetricsOverride(); await ev(`document.documentElement.style.fontSize = ''; true`);
