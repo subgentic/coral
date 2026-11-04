@@ -137,22 +137,44 @@ const { coralReady } = require('./helpers/wait');
         assert.deepEqual(await ev(`[...document.querySelectorAll('#info-memory button')].map(b => b.getAttribute('aria-pressed'))`), ['false', 'true']);
         await ev(`window.__files = null; true`);
 
-        console.log('Touch size (M3): at 390 px and at 200% zoom (195 px) the file buttons are at least 44 px tall, in both themes, and the dialog does not scroll sideways');
-        await ev(`window.__files = null; window.__sk = { body: { skills: [{ name: 'release-notes', version: 2, loads: 3, status: 'approved' }] }, status: 200 }; true`);
-        await run(); await waitFor(`document.querySelectorAll('#info-memory button').length === 2`, 'two files');
-        await ev(`document.querySelector('#info-memory button').click(); true`); // a file open, read-only: the text block shows under the list
-        await waitFor(`document.getElementById('info-memory-text').hidden === false`, 'the file block');
-        for (const width of [390, 195]) {
-            await Emulation.setDeviceMetricsOverride({ width, height: 844, deviceScaleFactor: 2, mobile: true });
+        console.log('Phone (M3, UI Reviewer round 2): at 390 px with the root text at 100% and at 200% (32 px), in both themes: the files and their text are reachable, nothing runs past the dialog, Close is on screen, a file opens from the keyboard and is read-only');
+        await ev(`window.__files = null; window.__file = { body: { text: 'Be careful with the memory text.\\nSecond line.' }, status: 200 }; window.__sk = { body: { skills: [{ name: 'release-notes', version: 2, loads: 3, status: 'approved' }] }, status: 200 };
+            window.__mem = { body: { files: [{ id: 'a'.repeat(32), file: 'CLAUDE.md', kind: 'instructions', level: 'project' }, { id: 'b'.repeat(32), file: 'notes.md', kind: 'memory', level: 'user' }] }, status: 200 };
+            window.__state_.currentSession = { type: 'live', name: 'info a', agent_type: 'claude', session_id: 'sid-1', server: 'local' }; true`);
+        await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
+        for (const rootPx of [null, '32px']) {
             for (const theme of ['light', 'dark']) {
-                await ev(`document.documentElement.setAttribute('data-theme', ${JSON.stringify(theme)}); true`);
-                const m = await ev(`(() => { const bs = [...document.querySelectorAll('#info-memory button')], modal = document.getElementById('info-modal'); return { h: bs.map(b => Math.round(b.getBoundingClientRect().height)), wide: modal.scrollWidth > modal.clientWidth + 1 }; })()`);
-                assert.ok(m.h.length === 2 && m.h.every(h => h >= 44), `${width} px ${theme}: both buttons are 44 px or taller: ${JSON.stringify(m)}`);
-                assert.equal(m.wide, false, `${width} px ${theme}: nothing runs past the dialog's edge`);
-                if (process.env.INFO_SHOTS) require('node:fs').writeFileSync(`${process.env.INFO_SHOTS}/info-sections-${width}-${theme}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); // evidence for a reviewer, not part of the check
+                const tag = `390 px, ${rootPx ? 'text 200% (root ' + rootPx + ')' : 'text 100%'}, ${theme}`;
+                await ev(`document.documentElement.setAttribute('data-theme', ${JSON.stringify(theme)}); document.documentElement.style.fontSize = ${JSON.stringify(rootPx || '')}; document.querySelectorAll('.toast').forEach(t => t.remove()); true`);
+                await run(); await waitFor(`document.querySelectorAll('#info-memory button').length === 2`, 'two files');
+                await ev(`document.querySelectorAll('.toast').forEach(t => t.remove()); true`);
+                // the keyboard opens a file: focus the button, press Enter (a real key event through the browser, not a script click)
+                await ev(`document.querySelector('#info-memory button').focus(); true`);
+                await client.Input.dispatchKeyEvent({ type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r' });
+                await client.Input.dispatchKeyEvent({ type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
+                await waitFor(`document.getElementById('info-memory-text').textContent.startsWith('Be careful')`, `${tag}: the file text after Enter`);
+                await ev(`document.getElementById('info-memory-text').scrollIntoView({ block: 'center' }); true`); // the section in view, as a person would scroll to it
+                const m = await ev(`(() => {
+                    const modal = document.getElementById('info-modal'), box = modal.querySelector('.modal-content').getBoundingClientRect(), vw = window.innerWidth, vh = window.innerHeight;
+                    const inBox = el => { const r = el.getBoundingClientRect(); return r.left >= box.left - 1 && r.right <= box.right + 1; };
+                    const bs = [...document.querySelectorAll('#info-memory button')], pre = document.getElementById('info-memory-text');
+                    const close = [...modal.querySelectorAll('button')].find(b => b.textContent.trim() === 'Close'), cr = close.getBoundingClientRect(), pr = pre.getBoundingClientRect();
+                    return { h: bs.map(b => Math.round(b.getBoundingClientRect().height)), buttonsInBox: bs.every(inBox), textInBox: inBox(pre), wide: modal.scrollWidth > modal.clientWidth + 1 || document.documentElement.scrollWidth > vw + 1,
+                        closeOnScreen: cr.top >= 0 && cr.bottom <= vh && cr.left >= 0 && cr.right <= vw, textVisible: pr.bottom > 0 && pr.top < vh, pressed: bs.map(b => b.getAttribute('aria-pressed')), file: pre.dataset.file,
+                        editable: !!document.querySelector('#info-memory input, #info-memory textarea, #info-memory [contenteditable]') || pre.isContentEditable, fs: getComputedStyle(document.documentElement).fontSize };
+                })()`);
+                assert.ok(m.h.length === 2 && m.h.every(h => h >= 44), `${tag}: both file buttons are 44 px or taller: ${JSON.stringify(m)}`);
+                assert.ok(m.buttonsInBox && m.textInBox, `${tag}: the files and their text stay inside the dialog: ${JSON.stringify(m)}`);
+                assert.equal(m.wide, false, `${tag}: no sideways scroll: ${JSON.stringify(m)}`);
+                assert.ok(m.closeOnScreen && m.textVisible, `${tag}: the opened text is on screen with Close reachable: ${JSON.stringify(m)}`);
+                assert.deepEqual(m.pressed, ['true', 'false'], `${tag}: Enter opened the first file`); assert.equal(m.file, 'CLAUDE.md: instructions, project');
+                assert.equal(m.editable, false, `${tag}: the text is read-only`);
+                if (rootPx) assert.equal(m.fs, rootPx, `${tag}: the page really is at 200% text`);
+                if (process.env.INFO_SHOTS) require('node:fs').writeFileSync(`${process.env.INFO_SHOTS}/info-sections-390-${rootPx ? 'text200' : 'text100'}-${theme}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); // evidence for a reviewer, not part of the check
+                await ev(`window.__m_.hideInfoModal(); true`);
             }
         }
-        await ev(`document.documentElement.removeAttribute('data-theme'); true`);
+        await ev(`document.documentElement.removeAttribute('data-theme'); document.documentElement.style.fontSize = ''; true`);
         await Emulation.clearDeviceMetricsOverride();
 
         console.log('Copy and close');
