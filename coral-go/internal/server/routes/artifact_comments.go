@@ -377,7 +377,7 @@ func (h *SessionsHandler) listArtifactComments(w http.ResponseWriter, r *http.Re
 		return
 	}
 	board := r.URL.Query().Get("board")
-	if board != "" && !commentBoardRe.MatchString(board) {
+	if board != "" && !validCommentBoard(board) {
 		errBadRequest(w, "invalid board")
 		return
 	}
@@ -630,7 +630,7 @@ func (h *SessionsHandler) createArtifactComment(w http.ResponseWriter, r *http.R
 	if team := diffTeamOf(r); team != "" {
 		in.Board = team // so does a comment on a diff (#12536)
 	}
-	if in.Board != "" && !commentBoardRe.MatchString(in.Board) {
+	if in.Board != "" && !validCommentBoard(in.Board) {
 		errBadRequest(w, "invalid board")
 		return
 	}
@@ -907,7 +907,7 @@ func (h *SessionsHandler) lockArtifactComments(on bool) http.HandlerFunc {
 		case "", "artifact":
 			scope = "artifact"
 		case "board":
-			if !commentBoardRe.MatchString(in.Board) {
+			if !validCommentBoard(in.Board) {
 				errBadRequest(w, "a board lock needs the board")
 				return
 			}
@@ -984,3 +984,6 @@ func redactCommentViews(views []commentView) bool {
 	}
 	return true
 }
+
+// validCommentBoard is whether a comment's board is one a comment may be made on: a team's key, or the reserved key of the files of agents on no team, whose review rows the Operator comments on too (#13532).
+func validCommentBoard(b string) bool { return commentBoardRe.MatchString(b) || b == noTeamBoardID }

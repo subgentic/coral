@@ -229,7 +229,7 @@ func (h *SessionsHandler) uploadCommentImage(w http.ResponseWriter, r *http.Requ
 	}
 	coralDir := h.cfg.CoralDir()
 	wantBoard := strings.TrimSpace(r.URL.Query().Get("board"))
-	if wantBoard != "" && !commentBoardRe.MatchString(wantBoard) {
+	if wantBoard != "" && !validCommentBoard(wantBoard) {
 		errBadRequest(w, "invalid board")
 		return
 	}
