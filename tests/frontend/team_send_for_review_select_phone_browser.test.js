@@ -50,11 +50,18 @@ const { coralReady } = require('./helpers/wait');
         console.log('1. Tap the lead button of two rows: the selection bar offers Send for review as a 44 px target');
         const pick = name => ev(`(() => { const b = [...document.querySelectorAll('#team-panel-artifacts [data-artifact-id]')].find(x => (x.querySelector('.dt-mail-title') || x).textContent.trim().startsWith(${JSON.stringify(name)})); const lead = b && b.closest('tr').querySelector('button.dt-mail-lead'); if (!lead) return 'no lead button for ' + ${JSON.stringify(name)}; lead.click(); return 'ok'; })()`);
         for (const n of ['plan.txt', 'draft.txt']) assert.equal(await pick(n), 'ok', n);
-        const bar = text => `[...document.querySelectorAll('#team-panel-artifacts .dt-bar-action')].filter(b => b.getClientRects().length && b.textContent.trim() === ${JSON.stringify(text)})`;
+        // both actions are always in the bar; the one that has nothing to do is disabled (data_table's `disabled`), so 'offered' means enabled
+        const barAll = text => `[...document.querySelectorAll('#team-panel-artifacts .dt-bar-action')].filter(b => b.getClientRects().length && b.textContent.trim() === ${JSON.stringify(text)})`;
+        const bar = text => `${barAll(text)}.filter(b => !b.disabled && b.getAttribute('aria-disabled') !== 'true')`;
         await waitFor(`${bar('Send for review')}.length === 1`, 'Send for review in the selection bar', 8000);
         const h = await ev(`Math.round(${bar('Send for review')}[0].getBoundingClientRect().height)`);
         assert.ok(h >= 43.5, 'the bar action is a 44 px touch target: ' + h);
-        assert.equal(await ev(`${bar('Remove from review')}.length`), 0, 'files that are not for review do not offer Remove');
+        assert.equal(await ev(`${bar('Remove from review')}.length`), 0, 'files that are not for review do not offer Remove (it is disabled)');
+        assert.equal(await ev(`${barAll('Remove from review')}.length`), 1, 'it stays in the bar, disabled');
+        // the bar scrolls sideways on a phone: Send for review is partly off screen until it is scrolled to (see the picture); a person can reach it by swiping the bar, and it is then inside the screen
+        const reach = await ev(`(() => { const b = ${bar('Send for review')}[0]; const before = b.getBoundingClientRect(); b.scrollIntoView({ inline: 'center', block: 'nearest' }); const r = b.getBoundingClientRect(); return { offscreenBefore: before.right > innerWidth + 0.5, left: Math.round(r.left), right: Math.round(r.right), vw: innerWidth }; })()`);
+        assert.ok(reach.left >= 0 && reach.right <= reach.vw + 0.5, 'Send for review can be scrolled fully into the screen: ' + JSON.stringify(reach));
+        console.log('   note: Send for review is partly off screen before the bar is scrolled: ' + reach.offscreenBefore);
         await shot('select_review_phone_bar');
         console.log('   ✓');
 
@@ -75,7 +82,7 @@ const { coralReady } = require('./helpers/wait');
         const sel = await ev(`document.querySelectorAll('#team-panel-artifacts tr.dt-selected').length`);
         if (sel < 2) for (const n of ['plan.txt', 'draft.txt']) await pick(n);
         await waitFor(`${bar('Remove from review')}.length === 1`, 'Remove from review in the selection bar', 8000);
-        assert.equal(await ev(`${bar('Send for review')}.length`), 0, 'files that are for review do not offer Send');
+        assert.equal(await ev(`${bar('Send for review')}.length`), 0, 'files that are for review do not offer Send (it is disabled)');
         await ev(`${bar('Remove from review')}[0].click(); true`);
         await until(files[0], false, 'plan.txt is out of review'); await until(files[1], false, 'draft.txt is out of review');
         assert.deepEqual(await needs(), [], 'both files left the for-review list');
