@@ -2,6 +2,7 @@ package routes
 
 import (
 	"encoding/json"
+	"github.com/subgentic/coral/internal/gitguard"
 	"slices"
 
 	"github.com/subgentic/coral/internal/gitutil"
@@ -27,20 +28,25 @@ func lookupGitState(states map[string]*store.GitSnapshot, sessionID, agentName s
 }
 
 // gitListFields returns the branch, repo_name and git_state entry values.
-// git_state is set only for worktrees or branches with a known base.
+// git_state is set only for worktrees, branches with a known base, or a folder whose live git updates are paused (git_state.paused: the counts are the last read).
 func gitListFields(git *store.GitSnapshot) (branch, repoName, gitState any) {
 	if git == nil {
 		return nil, nil, nil
 	}
-	branch = git.Branch // clean: the store hands out only cleaned text (#6832)
-	if git.Worktree || git.BaseBranch != "" {
-		gitState = map[string]any{
+	branch = git.Branch                                // clean: the store hands out only cleaned text (#6832)
+	pz, isPaused := gitguard.Get(git.WorkingDirectory) // live git updates are paused for this folder (#13079, #13092): the counts below are the last ones read, and the row and header say so
+	if git.Worktree || git.BaseBranch != "" || isPaused {
+		state := map[string]any{
 			"is_worktree": git.Worktree,
 			"base_branch": git.BaseBranch,
 			"ahead":       git.Ahead,
 			"behind":      git.Behind,
 			"dirty":       git.DirtyCount,
 		}
+		if isPaused {
+			state["paused"] = map[string]any{"changes": max(pz.Changes, git.DirtyCount), "took_ms": pz.TookMs}
+		}
+		gitState = state
 	}
 	if git.RemoteURL != nil {
 		if rn := gitutil.ParseRepoName(*git.RemoteURL); rn != "" {

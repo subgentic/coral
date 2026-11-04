@@ -147,7 +147,8 @@ function _renderFolderGroup(groupName, groupSessions) {
         const sorted = _sortByOrder(groupSessions);
         const isMulti = sorted.length > 1;
         const changed = sorted.reduce((n, s) => n + (Number(s.changed_file_count) || 0), 0); // what its agents have changed, from the count the feed already carries (#10386, Beta: a folder row said nothing of the work in it)
-        const changedBadge = changed > 0 ? ` <span class="group-changes" title="${escapeAttr(`${keyLabel(groupName)}: ${changed} file${changed === 1 ? '' : 's'} changed`)}">${changed} changed</span>` : '';
+        const pausedHere = sorted.some(s => s.git_state && s.git_state.paused); // live git updates are paused for the folder (#13092): its count is the last one read
+        const changedBadge = changed > 0 || pausedHere ? ` <span class="group-changes${pausedHere ? ' group-changes-paused' : ''}" title="${escapeAttr(pausedHere ? `${keyLabel(groupName)}: live updates paused, the count is the last one read. In Files, press Refresh or Turn on live updates.` : `${keyLabel(groupName)}: ${changed} file${changed === 1 ? '' : 's'} changed`)}">${changed > 0 ? `${changed} changed` : ''}${pausedHere ? `${changed > 0 ? ', ' : ''}paused` : ''}</span>` : '';
         const countBadge = ` <span class="session-group-count">${sorted.filter(s => !s.sleeping).length}</span>${changedBadge}`; void isMulti;
         const collapsed = _isGroupCollapsed(groupName);
         const groupDirRaw = sorted[0]?.working_directory || pinPathForKey(groupName);
