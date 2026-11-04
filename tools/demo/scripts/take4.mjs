@@ -100,6 +100,26 @@ const B = {
     for (const p of story.prompts || []) { if (p.kind === "permission") askPermission(p.agent, p.command, p.description); else askQuestion(p.agent, p.header, p.question, p.options); await sleep(1200) }
     return "prompts " + (story.prompts || []).length
   },
+  async real() { // the one real-CLI shot (the Operator's call): a real Claude Code launched in the demo's empty HOME, shown on its Terminal view, nothing typed.
+    // REAL_CLAUDE=<path of the claude CLI>. Its text is read from the server first (termCheck) and printed for a person to read: an account name or email would stop the shot.
+    const cli = process.env.REAL_CLAUDE; if (!cli || !fs.existsSync(cli)) throw new Error("set REAL_CLAUDE to the claude CLI")
+    const H = { Authorization: "Bearer " + key(), "Content-Type": "application/json" }
+    const put = (p) => fetch(BASE + "/api/settings", { method: "PUT", headers: H, body: JSON.stringify({ cli_path_claude: p }) })
+    await put(cli)
+    try {
+      const r = await fetch(BASE + "/api/sessions/launch-team", { method: "POST", headers: H, body: JSON.stringify({ board_name: "solo", working_dir: REPO, agents: [{ agent_type: "claude", name: "Claude", prompt: "Skyline sample." }] }) })
+      const j = await r.json(); if (!j.ok) throw new Error("the real launch was refused: " + JSON.stringify(j).slice(0, 200))
+      const id = j.agents[0].session_id; await sleep(9000)
+      const cap = await (await fetch(BASE + "/api/sessions/live/claude-" + id + "/capture", { headers: H })).text()
+      fs.writeFileSync(S + "/work/real-terminal.txt", cap); console.error("REAL TERMINAL TEXT:\n" + cap.slice(0, 1500))
+      const bad = [/\/tmp\//, /\/Users\//, /@[\w-]+\.[a-z]{2,}/i, /Welcome back/i, /scratchpad/, /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i].map((re) => (cap.match(re) || [])[0]).filter(Boolean)
+      if (bad.length) throw new Error("the real terminal shows: " + bad.join(" | "))
+      const t = await beat(browser, "real")
+      await t.go("/agents/" + id); await t.cap("Or the real thing: any CLI agent runs in Coral as it does in your terminal.")
+      await t.click(t.page.locator("button[aria-label='Terminal view']")); await sleep(7000)
+      return await t.finish()
+    } finally { await put(S + "/bin/mock-agent") }
+  },
   async c2() { // terminal first (it is the CLI), then the chat view of the same agent
     await termCheck("Orchestrator")
     const t = await beat(browser, "c2")
