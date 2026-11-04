@@ -1,7 +1,7 @@
 // #13152 (the operator: 'I'd like to be able to move artifacts to In Review'): the Artifacts tab and the file viewer have a Send for review action that puts a file in Needs you, and Remove from review as its
-// reverse. The server's route is a separate task (PUT and DELETE /api/board/<team>/artifacts/<id>/review, the approved contract), so this suite stubs that route in the page and checks what the PAGE does: a file's
-// sheet offers Send for review, which asks the one optional question (a dialog, Enter sends, Cancel sends nothing) and then calls PUT with {question}; the selection bar's Send for review does the same for every
-// selected file in one question; a file the stub says is for review offers Remove from review (DELETE); the viewer's ⋯ menu has the same two. Real stored files of a real board on the isolated dev server.
+// reverse, through the owner's route PUT and DELETE /api/board/<team>/artifacts/<id>/review (#13217). A file's sheet offers Send for review, which asks the one optional question (a dialog: Enter sends, Cancel
+// sends nothing) and the server keeps the tag; the selection bar's Send for review does the same for every selected file with one question; the row says "for review"; a file that is for review offers Remove from
+// review in its sheet and in the viewer's ⋯ menu, and the tag is gone after it. Real stored files of a real board on the isolated dev server (needs the review routes: run on a build with #13217).
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -15,9 +15,11 @@ const { coralReady } = require('./helpers/wait');
     const B = 'sr-' + Date.now().toString(36);
     const api = (method, path, body, headers) => ev(`fetch(${JSON.stringify(path)}, { method: ${JSON.stringify(method)}, headers: ${JSON.stringify(headers || { 'Content-Type': 'application/json' })}, body: ${body === undefined ? 'undefined' : typeof body === 'string' ? JSON.stringify(body) : JSON.stringify(JSON.stringify(body))} }).then(async r => ({ status: r.status, body: await r.json().catch(() => null) }))`);
     const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
-    const calls = () => ev(`window.__reviewCalls.slice()`);
     const btn = text => `[...document.querySelectorAll('button, [role=menuitem]')].filter(b => b.getClientRects().length && b.textContent.trim() === ${JSON.stringify(text)})`;
-    let sid = null, sname = null;
+    const sleep = ms => new Promise(r => setTimeout(r, ms)); // sleep-ok: a poll of the server's own state
+    let sid = null, sname = null, files = [];
+    const tagsOf = async hex => (await api('GET', `/api/board/${B}/artifacts?limit=50`)).body.artifacts.find(a => a.id === hex || (a.uri || '').includes(hex))?.tags || [];
+    const until = async (hex, want, what) => { for (let i = 0; i < 40; i++) { if ((await tagsOf(hex)).includes('for review') === want) return; await sleep(250); } assert.fail(`${what}: tags ${JSON.stringify(await tagsOf(hex))}`); };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
@@ -26,22 +28,16 @@ const { coralReady } = require('./helpers/wait');
         const launch = await api('POST', '/api/sessions/launch', { working_dir: os.tmpdir(), agent_type: 'terminal', display_name: 'Review QA' });
         sid = launch.body.session_id; sname = launch.body.session_name || launch.body.name; assert.ok(sid, JSON.stringify(launch));
         assert.ok((await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: 'Review QA', job_title: 'Backend Dev', session_name: sname })).status < 300);
-        const files = [];
         for (const n of ['plan.txt', 'draft.txt', 'log.txt']) {
             const up = await api('POST', `/api/agent/artifacts?session_id=${sid}`, 'content of ' + n + ' ' + Date.now(), { 'X-Artifact-Name': n, 'X-Artifact-Media-Type': 'text/plain' });
             assert.equal(up.status, 201, JSON.stringify(up)); files.push(/[a-f0-9]{64}/.exec(up.body.uri)[0]);
         }
-        // the review route, as a page stub: records the calls, answers as the contract says
-        await ev(`(() => { window.__reviewCalls = []; const real = window.fetch;
-            window.fetch = (input, init = {}) => { const u = new URL(String(input && input.url ? input.url : input), location.origin), m = /^\\/api\\/board\\/([^/]+)\\/artifacts\\/([a-f0-9]{64})\\/review$/.exec(u.pathname);
-                if (m) { const method = (init.method || 'GET').toUpperCase(), body = init.body ? JSON.parse(init.body) : null; window.__reviewCalls.push({ method, project: m[1], id: m[2], body });
-                    return Promise.resolve(new Response(JSON.stringify(method === 'PUT' ? { id: m[2], tags: ['for review'], question: (body && body.question) || '' } : { id: m[2], tags: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } })); }
-                return real(input, init); }; return true; })()`);
         await ev(`window.openTeamPage(${JSON.stringify(B)}, { tab: 'artifacts' }); true`);
         await waitFor(`document.querySelectorAll('#team-panel-artifacts [data-artifact-id]').length === 3`, 'the three files', 15000);
+        const openSheet = async name => { await ev(`[...document.querySelectorAll('#team-panel-artifacts [data-artifact-id]')].find(b => b.textContent === ${JSON.stringify(name)}).click(); true`); };
 
         console.log('1. A file\'s sheet offers Send for review; Cancel in the question sends nothing');
-        await ev(`[...document.querySelectorAll('#team-panel-artifacts [data-artifact-id]')].find(b => b.textContent === 'plan.txt').click(); true`);
+        await openSheet('plan.txt');
         await waitFor(`${btn('Send for review')}.length > 0`, 'Send for review in the sheet', 10000);
         assert.equal((await ev(`${btn('Remove from review')}.length`)), 0, 'a file that is not for review does not offer Remove');
         await ev(`${btn('Send for review')}[0].click(); true`);
@@ -51,39 +47,48 @@ const { coralReady } = require('./helpers/wait');
         await shot('send_for_review_dialog');
         await ev(`[...document.querySelectorAll('dialog.send-review-dialog[open] button')].find(b => b.textContent === 'Cancel').click(); true`);
         await waitFor(`!document.querySelector('dialog.send-review-dialog')`, 'the dialog closed', 4000);
-        assert.deepEqual(await calls(), [], 'Cancel sends nothing');
+        assert.ok(!(await tagsOf(files[0])).includes('for review'), 'Cancel sends nothing');
         console.log('   ✓');
 
-        console.log('2. Send with a question (Enter in the box): one PUT with the cleaned question');
+        console.log('2. Send with a question (Enter in the box): the server keeps the tag; the row says so');
         await ev(`${btn('Send for review')}[0].click(); true`);
         await waitFor(`!!document.querySelector('dialog.send-review-dialog[open] input')`, 'the question dialog again', 8000);
         await ev(`(() => { const i = document.querySelector('dialog.send-review-dialog[open] input'); i.value = '  Approve   this  plan?  '; i.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); return true; })()`);
-        await waitFor(`window.__reviewCalls.length === 1`, 'the PUT', 8000);
-        const c1 = (await calls())[0];
-        assert.deepEqual(c1, { method: 'PUT', project: B, id: files[0], body: { question: 'Approve this plan?' } }, JSON.stringify(c1));
+        await until(files[0], true, 'plan.txt is for review');
+        await waitFor(`[...document.querySelectorAll('#team-panel-artifacts tbody tr')].some(r => /plan\\.txt/.test(r.textContent) && /for review/.test(r.textContent))`, 'the row says for review', 10000);
+        await shot('send_for_review_row');
         console.log('   ✓');
 
         console.log('3. The selection bar sends two files with one question; an empty question is allowed');
-        await ev(`window.__reviewCalls.length = 0; [...document.querySelectorAll('#team-panel-artifacts tbody tr')].filter(r => /draft\\.txt|log\\.txt/.test(r.textContent)).forEach(r => r.querySelector('input[type=checkbox]').click()); true`);
+        await ev(`[...document.querySelectorAll('#team-panel-artifacts tbody tr')].filter(r => /draft\\.txt|log\\.txt/.test(r.textContent)).forEach(r => r.querySelector('input[type=checkbox]').click()); true`);
         await waitFor(`[...document.querySelectorAll('#team-panel-artifacts .dt-bar-action')].some(b => b.textContent === 'Send for review')`, 'the Send for review bar action', 8000);
         await ev(`[...document.querySelectorAll('#team-panel-artifacts .dt-bar-action')].find(b => b.textContent === 'Send for review').click(); true`);
         await waitFor(`!!document.querySelector('dialog.send-review-dialog[open] .send-review-go')`, 'the question dialog for two files', 8000);
         assert.ok(/2 files/.test(await ev(`document.querySelector('dialog.send-review-dialog[open] h2').textContent`)), 'the dialog says two files');
         await ev(`document.querySelector('dialog.send-review-dialog[open] .send-review-go').click(); true`);
-        await waitFor(`window.__reviewCalls.length === 2`, 'two PUTs', 8000);
-        const c2 = (await calls()).map(c => `${c.method} ${c.id} ${JSON.stringify(c.body)}`).sort();
-        assert.deepEqual(c2, [`PUT ${files[1]} {"question":""}`, `PUT ${files[2]} {"question":""}`].sort(), JSON.stringify(c2));
+        await until(files[1], true, 'draft.txt is for review'); await until(files[2], true, 'log.txt is for review');
         console.log('   ✓');
 
-        console.log('4. The viewer\'s ⋯ menu has Send for review for a file not in review');
-        await ev(`window.__reviewCalls.length = 0; import((window.__coralStatic || '/static/') + 'artifact_viewer.js').then(m => m.openArtifactViewer(${JSON.stringify(files[0])}, { filename: 'plan.txt', mediaType: 'text/plain', board: ${JSON.stringify(B)} })); true`);
-        await waitFor(`!!document.querySelector('#artifact-viewer .artifact-review-send:not([hidden])')`, 'the viewer menu item', 10000);
-        const item = await ev(`(() => { const b = document.querySelector('#artifact-viewer .artifact-review-send'); return { text: b.textContent, role: b.getAttribute('role'), inMenu: !!b.closest('.artifact-viewer-menu') }; })()`);
-        assert.deepEqual(item, { text: 'Send for review', role: 'menuitem', inMenu: true }, JSON.stringify(item));
+        console.log('4. A file that is for review offers Remove from review in its sheet, and the tag is gone after it');
+        await openSheet('draft.txt');
+        await waitFor(`${btn('Remove from review')}.length > 0`, 'Remove from review in the sheet', 10000);
+        assert.equal((await ev(`${btn('Send for review')}.length`)), 0, 'a file that is for review does not offer Send');
+        await ev(`${btn('Remove from review')}[0].click(); true`);
+        await until(files[1], false, 'draft.txt is out of review');
+        console.log('   ✓');
+
+        console.log('5. The viewer\'s ⋯ menu: Remove from review for a file in review, Send for review once it is out');
+        await ev(`import((window.__coralStatic || '/static/') + 'artifact_viewer.js').then(m => m.openArtifactViewer(${JSON.stringify(files[0])}, { filename: 'plan.txt', mediaType: 'text/plain', board: ${JSON.stringify(B)} })); true`);
+        await waitFor(`/Remove from review/.test(document.querySelector('#artifact-viewer .artifact-review-send:not([hidden])')?.textContent || '')`, 'Remove from review in the viewer menu', 10000);
+        const item = await ev(`(() => { const b = document.querySelector('#artifact-viewer .artifact-review-send'); return { role: b.getAttribute('role'), inMenu: !!b.closest('.artifact-viewer-menu') }; })()`);
+        assert.deepEqual(item, { role: 'menuitem', inMenu: true }, JSON.stringify(item));
         await shot('send_for_review_viewer_menu');
+        await ev(`document.querySelector('#artifact-viewer .artifact-review-send').click(); true`);
+        await until(files[0], false, 'plan.txt is out of review via the viewer');
+        await waitFor(`/Send for review/.test(document.querySelector('#artifact-viewer .artifact-review-send:not([hidden])')?.textContent || '')`, 'the viewer menu offers Send again after the reload', 10000);
         await ev(`document.querySelector('#artifact-viewer .artifact-viewer-close').click(); true`);
         console.log('   ✓');
-        console.log('PASS send for review: the sheet, the selection bar and the viewer menu ask the optional question and call the review route');
+        console.log('PASS send for review: the sheet, the selection bar and the viewer menu send and remove through the review route');
     } finally {
         if (sid) await ev(`fetch('/api/sessions/live/${encodeURIComponent(sname || '')}/kill', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agent_type: 'terminal', session_id: ${JSON.stringify(sid)} }) }).then(() => true)`).catch(() => {});
         await removeBoards(ev, [B]).catch(() => {}); await client.close();
