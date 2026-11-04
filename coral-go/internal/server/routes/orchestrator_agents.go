@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -189,7 +190,11 @@ func (h *SessionsHandler) orchSeat(w http.ResponseWriter, r *http.Request, proje
 
 // orchTarget resolves the agent to act on from the BOARD'S OWN seats, by member, never from a session name the caller supplies, and refuses what is not a plain agent of this board.
 func (h *SessionsHandler) orchTarget(w http.ResponseWriter, r *http.Request, project string, seat *store.LiveSession) (*store.LiveSession, string, bool) {
-	member := strings.TrimSpace(chi.URLParam(r, "subscriber"))
+	member := chi.URLParam(r, "subscriber")
+	if un, err := url.PathUnescape(member); err == nil { // chi routes on the escaped path, so a name with a slash or a space (UX%2FUX%20Engineer) arrives escaped (#13415)
+		member = un
+	}
+	member = strings.TrimSpace(member)
 	if member == "" || strings.EqualFold(member, "Operator") {
 		orchRefusal(w, http.StatusBadRequest, "bad_target", "name an agent of this board")
 		return nil, "", false
