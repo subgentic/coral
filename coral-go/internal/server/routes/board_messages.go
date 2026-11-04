@@ -3,8 +3,10 @@
 package routes
 
 import (
+	"database/sql"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/subgentic/coral/internal/claudeartifact"
 	"log/slog"
@@ -857,11 +859,18 @@ func (h *BoardHandler) refuseReplyToOperatorAsk(w http.ResponseWriter, r *http.R
 		return false
 	}
 	asked, err := h.bs.GetMessageByID(r.Context(), project, replyTo)
-	if err != nil || asked == nil || asked.Ask == nil {
+	if errors.Is(err, sql.ErrNoRows) {
+		return false // no such message on this board: the 400 for it is the handler's own, further on
+	}
+	if err != nil {
+		errInternalServer(w, "could not check what this reply answers") // a request that could be refused is never let through on a failed lookup (Security's SHOULD on #13491)
+		return true
+	}
+	if asked == nil || asked.Ask == nil {
 		return false
 	}
 	for _, to := range asked.Ask.To {
-		if strings.EqualFold(to, board.OperatorName) {
+		if board.IsOperatorName(to) {
 			writeJSON(w, http.StatusForbidden, map[string]string{"code": "owner_only", "error": "through Coral Hub only the account this computer is linked to can answer a question put to the Operator"})
 			return true
 		}

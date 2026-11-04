@@ -80,3 +80,29 @@ func TestAGuideCannotAnswerAnAskPutToTheOperator(t *testing.T) {
 	assert.Equal(t, http.StatusForbidden, code, raw)
 	assert.Equal(t, "owner_only", out["code"])
 }
+
+// A lookup that fails for a request that could be refused is a 500, never let through (Security's SHOULD on #13491); a reply_to that is no message of the board is the 400 it always was.
+func TestAFailedLookupOfWhatAReplyAnswersStopsTheRequestAndNotFoundKeepsItsRefusal(t *testing.T) {
+	_, h := setupBoardTestServer(t)
+	ctx := context.Background()
+	registerTaskPlanner(t, h, "team", "Orchestrator")
+	toOperator, err := h.bs.PostMessage(ctx, "team", "Orchestrator", "Which do you want? @Operator", nil)
+	require.NoError(t, err)
+	require.NoError(t, h.bs.RecordAsk(ctx, "team", toOperator, []string{"Operator"}))
+	post := func(replyTo int64) int {
+		req := httptest.NewRequest(http.MethodPost, "/api/board/team/messages", strings.NewReader(`{"subscriber_id":"Operator","content":"my answer","reply_to":`+itoa(replyTo)+`}`))
+		req.Header.Set("Content-Type", "application/json")
+		for k, v := range granteeHeaders() {
+			req.Header.Set(k, v)
+		}
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("project", "team")
+		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+		rec := httptest.NewRecorder()
+		h.PostMessage(rec, req)
+		return rec.Code
+	}
+	assert.Equal(t, http.StatusBadRequest, post(99999), "a message that is not on this board keeps its 400")
+	require.NoError(t, h.bs.Close())
+	assert.Equal(t, http.StatusInternalServerError, post(toOperator.ID), "a failed lookup stops a request that could be refused")
+}
