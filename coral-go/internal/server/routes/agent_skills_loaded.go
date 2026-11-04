@@ -13,7 +13,7 @@ import (
 // last read it, how many times, whether that version is still approved or was removed, and the newest approved version of its name (so the page can say a newer one exists). Names, versions and times only: never a skill's
 // text or files, never what the agent said. The Operator's on this computer (never an agent token, never through Coral Hub). It reads the record, not the CLI, so every agent type has the same answer and a sleeping
 // agent still has its list.
-// GET /api/sessions/live/{name}/skills?session_id=<id>
+// GET /api/sessions/live/{name}/loaded-skills?session_id=<id>
 func (h *SessionsHandler) AgentLoadedSkills(w http.ResponseWriter, r *http.Request) {
 	if refuseNonOperator(w, r, "read an agent's loaded skills") {
 		return

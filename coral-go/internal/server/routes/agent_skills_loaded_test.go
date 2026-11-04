@@ -86,7 +86,9 @@ func TestAnAgentsLoadedSkillsAreWhatItReadWithSkillsGet(t *testing.T) {
 	code, _ = e.call("DELETE", "/api/skills/"+row.ID, "", "operator")
 	require.Equal(t, 200, code)
 	_, out, _ = list("sid-a", nil)
-	assert.Equal(t, "removed", out["skills"].([]any)[0].(map[string]any)["status"])
+	removed := out["skills"].([]any)[0].(map[string]any)
+	assert.Equal(t, "removed", removed["status"], "a removed skill reads removed, not approved")
+	assert.NotEqual(t, "approved", removed["status"])
 
 	// the Operator's alone
 	for name, hdr := range map[string]map[string]string{"nobody": {"no-dash": "1"}, "an agent's token": {"no-dash": "1", testAgentHeader: "s1"}, "Coral Hub": {"no-dash": "1", tunnel.ViaHeader: "x"}} {
@@ -112,6 +114,7 @@ func TestALoadedSkillSaysWhenANewerVersionIsApprovedAndASleepingAgentKeepsItsLis
 	w := httptest.NewRecorder()
 	h.AgentLoadedSkills(w, req)
 	require.Equal(t, 200, w.Code, w.Body.String())
+	assert.Equal(t, "no-store", w.Header().Get("Cache-Control"), "what an agent loaded is never kept by a cache")
 	var out map[string]any
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &out))
 	assert.Equal(t, "hermes", out["agent_type"])
