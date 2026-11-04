@@ -48,8 +48,10 @@ const { removeBoards } = require('./helpers/board_cleanup');
         for (const theme of ['dark', 'light']) {
             await ev(`${themeJs(theme)}; true`); await ev(framesJs(8));
             const clashes = await ev(`(() => { const out = []; for (const tr of document.querySelectorAll('${T} tbody tr')) {
-                const boxes = [...tr.querySelectorAll('*')].filter(e => [...e.childNodes].some(n => n.nodeType === 3 && n.textContent.trim()) && e.getClientRects().length).map(e => ({ t: e.textContent.trim().slice(0, 24), r: e.getBoundingClientRect() }));
-                for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) { const a = boxes[i].r, b = boxes[j].r, w = Math.min(a.right, b.right) - Math.max(a.left, b.left), h = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top); if (w > 2 && h > 2) out.push(boxes[i].t + ' x ' + boxes[j].t + ' (' + Math.round(w) + 'x' + Math.round(h) + ')'); } }
+                const boxes = []; const walker = document.createTreeWalker(tr, NodeFilter.SHOW_TEXT);
+                for (let n = walker.nextNode(); n; n = walker.nextNode()) { if (!n.textContent.trim()) continue; const e = n.parentElement; if (!e || !e.getClientRects().length || !e.checkVisibility({ opacityProperty: true, visibilityProperty: true })) continue; const pb = e.getBoundingClientRect(); if (pb.width <= 2 || pb.height <= 2) continue; /* a screen-reader-only word (', unread') is a 1 px box, not text the eye sees */
+                    const rg = document.createRange(); rg.selectNodeContents(n); for (const r of rg.getClientRects()) if (r.width > 0 && r.height > 0) boxes.push({ t: n.textContent.trim().slice(0, 24), r }); }
+                for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) { if (boxes[i].t === boxes[j].t) continue; const a = boxes[i].r, b = boxes[j].r, w = Math.min(a.right, b.right) - Math.max(a.left, b.left), h = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top); if (w > 2 && h > 3) out.push(boxes[i].t + ' x ' + boxes[j].t + ' (' + Math.round(w) + 'x' + Math.round(h) + ')'); } }
                 return out; })()`);
             check(clashes.length === 0, `390 px, ${theme}: no two texts of a Needs you row overlap: ` + JSON.stringify(clashes));
         }
