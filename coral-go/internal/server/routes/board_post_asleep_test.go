@@ -85,3 +85,17 @@ func TestThePostAnswerCarriesTheAsleepNotes(t *testing.T) {
 	assert.Equal(t, "Dev", asleep[0].(map[string]any)["name"])
 	assert.Equal(t, "Dev is asleep; the message waits until it wakes.", asleep[0].(map[string]any)["note"])
 }
+
+// QA Reviewer 2's SHOULDs on #13189: the poster and the Operator are not told about themselves, and "all" is not looked up as if it were a member (a lookup that records what it is asked).
+func TestAPostNeverAsksAboutThePosterTheOperatorOrAll(t *testing.T) {
+	var asked []string
+	_, h := setupBoardTestServer(t)
+	h.SetMemberRestLookup(func(_ context.Context, _, member string) string {
+		asked = append(asked, member)
+		return restAsleep
+	})
+	notes := h.postRestNotes(context.Background(), "team", "Poster", []string{"poster", "Poster", "Operator", "operator", "all", "ALL", "Dev"})
+	assert.Equal(t, []string{"Dev"}, asked, "only a real other member is looked up")
+	require.Len(t, notes, 1)
+	assert.Equal(t, "Dev", notes[0]["name"])
+}

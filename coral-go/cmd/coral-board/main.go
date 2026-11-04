@@ -144,6 +144,10 @@ func main() {
 		cmdLink(true)
 	case "links":
 		cmdLinks()
+	case "wake":
+		cmdWakeSleep(false)
+	case "sleep":
+		cmdWakeSleep(true)
 	case "settings":
 		cmdSettings()
 	default:
@@ -259,6 +263,12 @@ Commands:
                                The Operator only: remove the link (--one-way:
                                only <team> messaging <other>)
   links [<team>]               The Operator only: who a team's links allow
+  wake <member> [--board <project>]
+                               The Orchestrator only, with the Operator's grant: wake an
+                               agent of this board that is asleep ('help wake' has the caps)
+  sleep <member> [--board <project>]
+                               The Orchestrator only, with the Operator's grant: put an
+                               awake agent of this board to sleep
   settings set <key> <value>   The Operator only: save one Coral setting (the server
                                checks the key and value). Not for an agent's terminal
   wait [--from <agent>] [--task <id>] [--commit <hash>] [--operator <question>]

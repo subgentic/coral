@@ -2,6 +2,7 @@ package routes
 
 import (
 	"context"
+	"strconv"
 	"strings"
 
 	"github.com/subgentic/coral/internal/board"
@@ -71,7 +72,7 @@ func restSentence(name, state string, mayWake bool) string {
 	default:
 		s = name + " is asleep; the message waits until it wakes."
 		if mayWake {
-			s += " The Operator's wake grant is on, so you may wake it."
+			s += " The Operator's wake grant is on, so you may wake it: coral-board wake " + strconv.Quote(name) + "."
 		}
 	}
 	return s
