@@ -5,16 +5,20 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/subgentic/coral/internal/ptymanager"
+	"github.com/subgentic/coral/internal/store"
 )
 
 // #4306: a turn that Coral typed into the agent comes back flagged coral_notice, however long or odd its text (a task notice
@@ -199,4 +203,53 @@ func TestSessionsChat_OperatorTurnsAreFlaggedTheirs(t *testing.T) {
 	require.Equal(t, ptymanager.Sent, d)
 	ptymanager.NoteOperatorText(name, notice) // the same text sent by a person too: the delivery came first and keeps its turn
 	assert.Equal(t, []string{"", "operator", "coral", "operator", ""}, origin(get()))
+}
+
+// #13456: a message to an agent through a self-hosted Hub reaches the remote with the server's API key (a script's request: automation, which Coral records as its own delivery, so the chat draws it as a Coral
+// notice) unless the hub's signed-in owner stamped it, which makes it a person's: recorded as the Operator's text, so the chat shows it as theirs. Both go through the real send route and the real chat route.
+func TestChatShowsAnOwnerStampedSendAsThePersonsAndAKeyOnlySendAsANotice(t *testing.T) {
+	server, h, terminal, ss := setupSessionsTestServer(t)
+	dir := t.TempDir()
+	projectDir := filepath.Join(dir, "project")
+	require.NoError(t, os.MkdirAll(projectDir, 0755))
+	t.Setenv("CLAUDE_PROJECTS_DIR", dir)
+	sid := uniqueSID(445)
+	require.NoError(t, ss.RegisterLiveSession(context.Background(), &store.LiveSession{SessionID: sid, AgentType: "claude", AgentName: "repo", WorkingDir: "/tmp/test"}))
+	terminal.addSession("claude-"+sid, "/tmp/test")
+
+	keyText := "please send me a short summary of where the batch stands now"
+	ownerText := "and tell me which of those still needs a decision from me"
+	send := func(text, kind string) {
+		t.Helper()
+		req := httptest.NewRequest("POST", "/api/sessions/live/claude-"+sid+"/send", strings.NewReader(`{"command":"`+text+`","agent_type":"claude","session_id":"`+sid+`"}`))
+		req.Header.Set("Content-Type", "application/json")
+		rc := chi.NewRouteContext()
+		rc.URLParams.Add("name", "claude-"+sid)
+		ctx := context.WithValue(req.Context(), chi.RouteCtxKey, rc)
+		ctx = context.WithValue(ctx, callerKindKey{}, kind) // what the identity layer decides: an API key, or an API key with a genuine owner stamp
+		rec := httptest.NewRecorder()
+		h.Send(rec, req.WithContext(ctx))
+		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	}
+	send(keyText, callerAPIKey)
+	send(ownerText, callerHubOwner)
+
+	now := time.Now().UTC()
+	line := func(at time.Time, text string) string {
+		b, _ := json.Marshal(map[string]any{"type": "user", "timestamp": at.Format(time.RFC3339Nano), "message": map[string]any{"role": "user", "content": text}})
+		return string(b) + "\n"
+	}
+	require.NoError(t, os.WriteFile(filepath.Join(projectDir, sid+".jsonl"), []byte(line(now.Add(time.Second), keyText)+line(now.Add(2*time.Second), ownerText)), 0644))
+
+	resp, err := http.Get(fmt.Sprintf("%s/api/sessions/live/claude-%s/chat?session_id=%s&agent_type=claude&after=0&limit=30", server.URL, sid, sid))
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	var body struct {
+		Messages []map[string]any `json:"messages"`
+	}
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+	require.Len(t, body.Messages, 2)
+	keyFlag, _ := body.Messages[0]["coral_notice"].(bool)
+	assert.True(t, keyFlag, "an API-key send is automation: the chat flags it as Coral's (a script must not appear as the Operator)")
+	assert.Equal(t, false, body.Messages[1]["coral_notice"], "the owner's stamped send is the person's own, flagged false, never a Coral reminder")
 }

@@ -21,10 +21,13 @@ export function cssRules(src) {
 }
 
 /** The rules of a stylesheet that style a table part (a rule of the component's own dt-* class is reported apart; a rule whose selector matches one of `exempt` is counted in `exempted`, not in `n`). */
-export function cssCount(src, exempt = []) {
+export function cssCount(src, exempt = [], ownExempt = []) {
     let n = 0, exempted = 0; const own = [];
     for (const sel of cssRules(src)) {
-        if (DT_CLASS.test(sel)) own.push(sel.slice(0, 80));
+        if (DT_CLASS.test(sel)) { // the component's own class outside data_table.css: refused, unless this exact selector is listed with its reason (EXEMPT_OWN: no pattern, no wildcard)
+            const hit = ownExempt.find(e => e.sel === sel.trim());
+            if (hit) { hit.used = (hit.used || 0) + 1; exempted++; } else own.push(sel.slice(0, 80));
+        }
         else if (CSS_SELECTOR.test(sel)) { if (exempt.some(re => re.test(sel))) exempted++; else n++; }
     }
     return { n, own, exempted };
@@ -41,3 +44,5 @@ export const EXEMPT = {
 };
 // rules in a stylesheet that has real tables too, exempt by selector with a reason (none now: the session tooltip is a .facts list, facts.js)
 export const EXEMPT_SELECTORS = [];
+// rules of the component's own dt-* classes that sit outside data_table.css, each EXACT selector with its reason ({ sel, why }): none now. #13144's five Inbox-only rules were here while the start CSS had no room; they are back in data_table.css since the Operator raised the start-CSS ceiling (#13487). The census fails an entry that stops matching.
+export const EXEMPT_OWN = [];

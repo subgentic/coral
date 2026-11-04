@@ -60,3 +60,19 @@ for (const f of fs.readdirSync(path.join(STATIC, 'css')).filter(n => n.endsWith(
     }
 }
 console.log('data_table_scan: ok');
+
+// EXEMPT_OWN (#13144): an own-class rule outside data_table.css is refused unless its EXACT selector is listed; no pattern, no prefix, a near miss is still refused, and every entry carries a reason.
+{
+    const { EXEMPT_OWN } = await import('./helpers/data_table_scan.mjs');
+    const sel = '.dt-person:has(> .inbox-kind-icon)';
+    const entry = [{ sel, why: 'a reason that is long enough to be one' }];
+    assert.deepEqual(cssCount(sel + ' { position: relative; }', [], entry).own, [], 'the exact selector is exempt');
+    assert.equal(cssCount(sel + ' { position: relative; }', [], entry).exempted, 1);
+    assert.equal(entry[0].used, 2, 'the entry records each match (two scans above; the census fails a stale one)');
+    assert.equal(cssCount('.dt-person:has(> .inbox-kind-icon) .x { color: red; }', [], entry).own.length, 1, 'a longer selector is not covered');
+    assert.equal(cssCount('.dt-person { color: red; }', [], entry).own.length, 1, 'neither is a shorter one');
+    assert.equal(cssCount(sel + ' { color: red; }', [], []).own.length, 1, 'with no entry it is refused');
+    assert.ok(EXEMPT_OWN.every(e => typeof e.sel === 'string' && !/[*]/.test(e.sel) && e.why.length >= 20), 'every entry is an exact selector with its reason');
+    assert.equal(EXEMPT_OWN.length, 0, 'none now: the Needs you rows rules are in data_table.css again (#13487)');
+}
+console.log('data_table_scan: EXEMPT_OWN ok');

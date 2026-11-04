@@ -309,6 +309,9 @@ var routeTable = cat(
 	owner(OwnerRefuse, rules(http.MethodPut, TierInteract, "/api/board/{project}/artifacts/{id}/tags")),
 	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/board/{project}/asks/{messageID}/buttons/{buttonID}/claim")),
 	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/board/{project}/asks/{messageID}/buttons/{buttonID}/settle")),
+	// Ignore, and Undo of an Ignore, in the Operator's own Needs you table drawn on the Hub (#13446, #13450): POST .../asks/{messageID}/close {note} puts a question away (or, with undo, opens it again). The OWNER'"'"'s alone through the Hub: the machine refuses
+	// anyone else (403 owner_only) before the handler runs, a grantee and a viewer included, and the handler refuses a body from a caller it cannot verify. It moves no work and types nothing: Interact, as the two button routes above are.
+	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/board/{project}/asks/{messageID}/close")),
 	// The Operator's Dismiss of a stale wait (#11352) is the OWNER's alone through the hub (the operator's rule: the owner gets everything): a guest or a grantee gets 403 owner_only. It clears Coral's
 	// own record of a wait and types nothing, presses nothing in the agent's terminal, so Interact; the machine's own mode still caps it.
 	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/sessions/live/{name}/dismiss-wait")),

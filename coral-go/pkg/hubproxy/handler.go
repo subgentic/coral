@@ -151,7 +151,7 @@ func (h *Handler) proxyHTTP(w http.ResponseWriter, r *http.Request, id string, t
 		_ = http.NewResponseController(w).SetReadDeadline(time.Now())
 	}}
 	defer deadlines.stop()
-	// The owner stamp (#11378): for one of the two decisions that need a person, made by the person signed in at this hub, on a target that holds a secret. The body is read (at most hubowner.MaxBody) so the
+	// The owner stamp (#11378): for one of the decisions that need a person (and the owner's own message to an agent), made by the person signed in at this hub, on a target that holds a secret. The body is read (at most hubowner.MaxBody) so the
 	// stamp can bind it, and put back; a bigger one is sent unstamped and the remote refuses it.
 	var stampBody []byte
 	var stamper OwnerStamper
@@ -160,6 +160,13 @@ func (h *Handler) proxyHTTP(w http.ResponseWriter, r *http.Request, id string, t
 		if err == nil && len(b) <= hubowner.MaxBody {
 			stamper, stampBody = s, b
 			r.Body, r.ContentLength = io.NopCloser(bytes.NewReader(b)), int64(len(b))
+		} else if hubowner.MustBeSigned(r.Method, dec) && err == nil {
+			// The owner's own message to an agent, too long to sign (#13456): sent unstamped it would be automation on the remote (shown as a Coral reminder, held behind prompts), so it is refused here, whole,
+			// with the reason, and nothing of it is sent. The person shortens it or sends it as a file.
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusRequestEntityTooLarge)
+			_, _ = io.WriteString(w, `{"error":"This message is too long to send through the Hub (the limit is 64 KB): shorten it or send it as a file.","code":"hub_message_too_long","not_sent":true}`)
+			return
 		} else {
 			r.Body = struct {
 				io.Reader
