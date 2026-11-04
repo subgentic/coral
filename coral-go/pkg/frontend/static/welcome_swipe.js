@@ -58,7 +58,8 @@ export function attachWelcomeSwipe(host) {
         if (e.type === 'pointerup' && (-d.dx > wide * COMMIT || (fast > FLICK && -d.dx > FLICK_MIN_PX))) {
             d.strip.remove(); d.row.style.transform = '';
             if (!d.id) { d.box._ignore(d.row); return; } // a review, a question or a failed run: the row's own Dismiss, which says it and offers Undo itself (#11642)
-            const title = (d.row.querySelector('.inbox-welcome-name')?.firstChild?.textContent || 'the item').trim();
+            const nameEl = d.row.querySelector('.inbox-welcome-name'), own = nameEl && [...nameEl.childNodes].find(n => !(n.nodeType === 1 && n.classList.contains('inbox-kind-icon'))); /* the kind icon is the name's first child (#13144): the title is the first node that is not the icon */
+            const title = ((own && own.textContent) || 'the item').trim();
             dismissWelcome(d.id);
             showToast(`Dismissed: ${title}`, false, undefined, { action: { label: 'Undo', onClick: () => undo(d.id) } });
             announceNotice(`Dismissed: ${title}. Undo is in the notice.`); // read out politely: the toast is not a live region of its own
