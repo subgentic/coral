@@ -181,6 +181,10 @@ func (h *SessionsHandler) refreshFilesInner(w http.ResponseWriter, r *http.Reque
 			mode = "branch_point"
 		}
 		stored, _, _ := h.gs.GetChangedFiles(r.Context(), name, ptr.NonEmpty(sessionID), mode)
+		// A followed worktree's list is never stored (it is not the launch folder's, which the poller writes): the last list a pass computed for it is the answer, or the panel shows nothing and the count of a list it never got (#13247)
+		if last, ok := refreshFlights.lastFor(refreshFlightKey(workdir, h.getDiffMode(r.Context()), sessionID, follow, name)); follow && ok {
+			stored = last.files
+		}
 		writeJSON(w, http.StatusOK, h.withWorktree(r, name, sessionID, map[string]any{"agent_name": name, "files": hubVisibleFiles(r, stored), "diff_mode": mode, "total_changed": max(pz.Changes, len(stored)), "capped": pz.Changes > len(stored),
 			"paused": pz}))
 		return
@@ -408,7 +412,54 @@ type refreshFlight struct {
 	mu     sync.Mutex
 	calls  map[string]*refreshCall
 	recent map[string]refreshRecent
+	last   map[string]refreshKept // the newest answer of each key, kept for a paused folder that has no stored list to show (#13247)
+	order  []string               // the keys of last, oldest first: the oldest goes when it is full
 }
+
+// refreshKept is a kept answer and when it was kept.
+type refreshKept struct {
+	res refreshedFiles
+	at  time.Time
+}
+
+// refreshLastKeep bounds last: when it is full the OLDEST key goes (#13267), not all of them. refreshLastFor is how long an answer is kept: an agent that ended leaves its list for no longer than that.
+const (
+	refreshLastKeep = 256
+	refreshLastFor  = time.Hour
+)
+
+// keep records the newest answer of key, dropping the answers older than refreshLastFor and, when full, the oldest key. The caller holds f.mu.
+func (f *refreshFlight) keep(key string, res refreshedFiles, now time.Time) {
+	if f.last == nil {
+		f.last = map[string]refreshKept{}
+	}
+	if _, ok := f.last[key]; ok {
+		for i, k := range f.order {
+			if k == key {
+				f.order = append(f.order[:i], f.order[i+1:]...)
+				break
+			}
+		}
+	}
+	for len(f.order) > 0 && (len(f.order) >= refreshLastKeep || now.Sub(f.last[f.order[0]].at) > refreshLastFor) {
+		delete(f.last, f.order[0])
+		f.order = f.order[1:]
+	}
+	f.last[key] = refreshKept{res: res, at: now}
+	f.order = append(f.order, key)
+}
+
+// lastFor is the newest list a pass computed for key.
+func (f *refreshFlight) lastFor(key string) (refreshedFiles, bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	kept, ok := f.last[key]
+	if ok && time.Since(kept.at) > refreshLastFor {
+		return refreshedFiles{}, false
+	}
+	return kept.res, ok
+}
+
 type refreshCall struct {
 	done chan struct{}
 	res  refreshedFiles
@@ -421,7 +472,7 @@ type refreshRecent struct {
 
 const refreshReuseOver = 250 * time.Millisecond
 
-var refreshFlights = &refreshFlight{calls: map[string]*refreshCall{}, recent: map[string]refreshRecent{}}
+var refreshFlights = &refreshFlight{calls: map[string]*refreshCall{}, recent: map[string]refreshRecent{}, last: map[string]refreshKept{}}
 
 // do returns the answer for key, running fn if nobody is (ran: this call ran the pass; false when it shared one); ok is false when ctx ended while waiting. fresh asks for a new pass whatever was just answered (a person's Refresh); a pass already running is still shared.
 // The pass is left cleanly even if fn panics: the key is freed and the waiters released (they get an empty answer), so one panic cannot make every later refresh of the folder wait.
@@ -455,6 +506,9 @@ func (f *refreshFlight) do(ctx context.Context, key string, fresh bool, fn func(
 			if !time.Now().Before(rc.until) {
 				delete(f.recent, k)
 			}
+		}
+		if c.ok { // a pass that panicked is not kept: its answer is empty
+			f.keep(key, c.res, time.Now())
 		}
 		if took > refreshReuseOver && c.ok {
 			f.recent[key] = refreshRecent{res: c.res, until: time.Now().Add(min(took, 10*time.Second))}
