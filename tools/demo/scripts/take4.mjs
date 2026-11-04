@@ -196,10 +196,14 @@ const B = {
     await pclick(t, t.page.locator(".ac-composer button >> visible=true").filter({ hasText: /^Comment$/ }).first()); await sleep(1500)
     const bid = JSON.parse(board("goal", "list", "--state", "all", "--json")).find((g) => g.id === gid).board_id
     const link = "coral://goals/" + bid + "/" + gid
-    const cs = agent("Orchestrator", "coral-agent", "artifact", "comments", link); const cid = (cs.match(/Thread (\d+)/) || [])[1]
-    agent("Orchestrator", "coral-agent", "artifact", "reply", link, cid, goalComment.reply); await sleep(1500)
-    await t.cap("The agent answers in a few seconds.")
-    await sleep(4000)
+    let cid; for (let k = 0; k < 14 && !cid; k++) { await sleep(500); try { cid = (agent("Orchestrator", "coral-agent", "artifact", "comments", link).match(/Thread (\d+)/) || [])[1] } catch (e) { /* not asked in yet */ } }
+    if (!cid) throw new Error("the goal comment never reached the agent")
+    board("task", "add", goalComment.newTask, "--goal", String(gid), "--assignee", "Frontend")   // the answer says a task was added: it is
+    agent("Orchestrator", "coral-agent", "artifact", "reply", link, cid, goalComment.reply)
+    await t.cap("The agent answers, and adds a task.")
+    const seen = () => t.page.locator("text=" + goalComment.replyFind).first().waitFor({ state: "visible", timeout: 5000 }).then(() => true).catch(() => false)
+    if (!(await seen())) { await t.click(t.page.locator("text=Tasks >> visible=true").last()); await sleep(1200); await t.click(t.page.locator("text=Comments >> visible=true").last()); await seen() }   // the panel did not take the answer live: draw it again
+    await sleep(4500)
     return t.finish()
   },
   async c6() { // the Inbox: an agent's question, Open agent, answer it

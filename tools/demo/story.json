@@ -287,7 +287,9 @@
   ],
   "goalComment": {
     "text": "Where are we on this? Anything blocking the beta?",
-    "reply": "Five of nine tasks are done and two are in progress. Nothing blocks the beta; the units switch is the one to watch, and the review of the forecast code lands first."
+    "reply": "Five of nine tasks are done and nothing blocks the beta. I added a new task, Test the units switch on a phone, and the review of the forecast code lands first.",
+    "replyFind": "I added a new task",
+    "newTask": "Test the units switch on a phone"
   },
   "chats": [
     {
