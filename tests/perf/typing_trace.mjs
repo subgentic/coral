@@ -68,7 +68,7 @@ export async function measureTypingBurst({client, ev, outDir, target, label, cha
         await Profiler.enable();await Profiler.setSamplingInterval({interval:1000});await Profiler.start();profiling=true;
         await Tracing.start({categories:'toplevel,devtools.timeline,disabled-by-default-devtools.timeline.stack,blink.user_timing,v8',transferMode:'ReportEvents'});tracing=true;
         const startMs=await ev(`performance.mark('coral-typing-start').startTime`);
-        for(const ch of text){const start=Date.now();await Input.dispatchKeyEvent({type:'keyDown',key:ch,text:ch});await Input.dispatchKeyEvent({type:'keyUp',key:ch});await ev(`new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve(true))))`);latencies.push(Date.now()-start);}
+        for(const ch of text){const start=Date.now();await Input.dispatchKeyEvent({type:'keyDown',key:ch,text:ch});await Input.dispatchKeyEvent({type:'keyUp',key:ch});await ev(`new Promise((resolve,reject)=>{const timeout=setTimeout(()=>reject(Error('Typing frame timeout')),10000);requestAnimationFrame(()=>requestAnimationFrame(()=>{clearTimeout(timeout);resolve(true);}));})`);latencies.push(Date.now()-start);}
         const endMs=await ev(`performance.mark('coral-typing-end').startTime`);
         longTasks=await ev(`window.__typingLongTasks.concat(window.__typingObserver.takeRecords().map(e=>({startMs:e.startTime,ms:e.duration})))`);
         longTasks=longTasks.filter(t=>t.startMs<endMs && t.startMs+t.ms>startMs);
