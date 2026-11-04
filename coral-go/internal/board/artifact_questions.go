@@ -92,5 +92,8 @@ func (s *Store) SetArtifactQuestionByOperator(ctx context.Context, boardID, hex,
 	_, err := s.db.ExecContext(ctx, `INSERT INTO artifact_questions (board_id, hex, question, session_id, asked_at) VALUES (?, ?, ?, ?, ?)
 		ON CONFLICT(board_id, hex) DO UPDATE SET question = excluded.question, session_id = excluded.session_id, asked_at = excluded.asked_at`,
 		boardID, hex, question, OperatorQuestionSession, at.UTC().Format(time.RFC3339))
+	if err == nil {
+		s.NoteArtifactsChanged(boardID) // the question is on the row of the list (#13522: the kept list is built again when the revision moves)
+	}
 	return err
 }
