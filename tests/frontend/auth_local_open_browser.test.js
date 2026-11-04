@@ -271,10 +271,14 @@ const ATTACK = {
             if (back.status !== 0) { failed++; console.log(`  FAIL - the runner's password was not set back: ${(back.stderr || '').slice(0, 300)}`); }
         }
     } finally {
-        for (const c of pages) await c.close().catch(() => {});
-        for (const id of contexts) await browser.Target.disposeBrowserContext({ browserContextId: id }).catch(() => {});
-        await browser.close();
+        // Closing is bounded: a CDP call whose answer never comes (a page or context that is already gone, a browser that exits first) used to hang the suite for the runner's whole 180 s after the last case had printed ok
+        // (trial-248, run 41897148416: all 7 ok, then "[runner] TIMEOUT"). `.catch` only handles a rejection, never a silence, so each step races a short timer, and the suite ends with an explicit exit below.
+        const bounded = p => Promise.race([Promise.resolve(p).catch(() => {}), new Promise(r => setTimeout(r, 5000).unref())]);
+        for (const c of pages) await bounded(c.close());
+        for (const id of contexts) await bounded(browser.Target.disposeBrowserContext({ browserContextId: id }));
+        await bounded(browser.close());
     }
     if (failed) { console.log(`auth_local_open_browser: ${failed} failed`); process.exit(1); }
     console.log('auth_local_open_browser: all passed');
+    process.exit(0); // nothing is left to wait for: a socket or timer still open must not keep the runner waiting
 })().catch(e => { console.error(e); process.exit(1); });
