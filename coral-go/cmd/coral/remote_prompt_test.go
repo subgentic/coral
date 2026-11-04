@@ -36,3 +36,17 @@ func TestPromptRemoteAccessDefaultsToNo(t *testing.T) {
 		assert.True(t, promptRemoteAccess(strings.NewReader(in), &bytes.Buffer{}, false), "input %q", in)
 	}
 }
+
+// The WSL2 install walk (task #485): a Windows browser reaches a WSL2 Coral at http://localhost with remote access off (WSL forwards
+// localhost, and Coral handles that relay), so the note must not tell a WSL2 user to turn on plain-HTTP remote access or forward ports.
+func TestPromptRemoteAccessWSL2NoteDoesNotPushRemoteAccess(t *testing.T) {
+	for _, tlsOn := range []bool{false, true} {
+		var out bytes.Buffer
+		promptRemoteAccess(strings.NewReader("\n"), &out, tlsOn)
+		o := out.String()
+		assert.Contains(t, o, "WSL2")
+		assert.Contains(t, o, "http://localhost")
+		assert.NotContains(t, o, "need to either enable")
+		assert.NotContains(t, o, "port forwarding")
+	}
+}
