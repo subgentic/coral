@@ -298,6 +298,9 @@ export function createArtifactsList({ inbox = false } = {}) {
         } finally { model.bulkBusy = false; }
     }
     const reviewFiles = items => items.filter(it => managedHex(it)).map(it => ({ project: inbox ? it.board_id : model.project, hex: managedHex(it), key: artifactKey(it) }));
+    /** A phone's selection bar is one line: Cancel, the count and the three dots (#13396, found by #13387: five text actions made a strip with Send for review off the screen's edge). Every action is in the menu, the review ones first. */
+    const phoneBarActions = acts => [...acts.filter(a => /review/i.test(a.label)), ...acts.filter(a => !/review/i.test(a.label))].map(a => ({ ...a, more: true }));
+
     function artifactBulkActions() {
         const finish = (key, ok, failed, verb) => {
             if (key === model.key) { for (const k of ok) artifactState.selected.delete(k); draw(); root?.querySelector('.list-bar-search')?.focus({ preventScroll: true }); }
@@ -386,7 +389,7 @@ export function createArtifactsList({ inbox = false } = {}) {
             const table = artifactTable({
                 showUploader: !model.scope,
                 label: `Artifacts, ${model.items.length}`, ...(inbox ? { layout: 'fixed' } : {}), bare: !!model.scope || phoneTeam, compact: !!model.scope, fold: model.scope ? 'none' : 'column', foldAt: 40, rows: shown, groupBy: by ? (it) => groupHead(it, by, shown, !model.hasMore) : undefined, rowKey: itemKey, current: detailKey(), sortBar: inbox && !phoneTeam, state: artifactState, rowName: item => Tags.nameWithTags(readableName(item), item.tags),
-                selectable: model.scope ? null : { contextKey: model.key, canSelect: item => !!linkOf(item)?.preview, actions: artifactBulkActions(), onChange: keys => Toolbar.mountSelection(toolbarRow, keys.size ? table.bar : null), ...(phoneTeam ? { longPress: true, iconBar: true, clearLabel: 'Cancel' } : {}) },
+                selectable: model.scope ? null : { contextKey: model.key, canSelect: item => !!linkOf(item)?.preview, actions: phoneTeam ? phoneBarActions(artifactBulkActions()) : artifactBulkActions(), onChange: keys => Toolbar.mountSelection(toolbarRow, keys.size ? table.bar : null), ...(phoneTeam ? { longPress: true, iconBar: true, clearLabel: 'Cancel' } : {}) },
                 open: (item, tr) => openArtifact(item, tr.querySelector('.dt-primary')),
                 paged: model.hasMore || model.truncated,
                 onPageSort: sort => setFilters({ ...model.filters, sort }),
