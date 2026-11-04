@@ -50,7 +50,7 @@ var reviewedFileOpens = map[string]string{
 	"system_bounds.go:readImportFile:OpenNoFollow":                        "#3583: bounded import (no link followed, regular file, size cap)",
 	"team_artifacts.go:readArtifactSidecar:ReadFile":                      "a managed artifact's hex name, lower-cased and checked",
 	"artifact_comments.go:readSmallFile:Open":                             "an artifact's sidecar by its 64-hex name (checked lower-case hex before the call), read to a byte cap",
-	"team_artifacts.go:uploadDirCache.list:ReadFile":                      "names read from the server's uploads folder",
+	"team_artifacts.go:readUploadRecordFile:ReadFile":                     "a record named by uploadDirCache.list from the server's uploads folder (only <64 hex>.json), read by the cache's workers",
 	"task_artifact_vet.go:BoardHandler.objectSidecar:ReadFile":            "a managed artifact's 64-hex id (managedArtifactID), Lstat'ed as a regular file under the bound first (#4379)",
 	"cross_team_attach.go:BoardHandler.crossTeamRecord:ReadFile":          "a 64-hex id under <data>/artifacts/<kind>/<hash of the board>, Lstat'ed as a regular file under the bound first (#4379)",
 	"cross_team_pending.go:readPending:ReadFile":                          "a file in <data>/artifacts/pending/<hash of the board>, listed from that folder, Lstat'ed as a regular file under the bound first (#4440)",
