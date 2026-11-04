@@ -361,6 +361,19 @@ export function boardFetch(teamKey, suffix, options) {
     return fetch(serverUrl(`/api/board/${encodeURIComponent(name)}${suffix || ''}`, server), options);
 }
 
+/** One page of a team's artifacts that carry the tag (#13161: a computer answers at most 50 a request). `at` is the walk's place, { cursor: '', offset: 0 }; the computer's own cursor is used when it gives one. */
+export function boardArtifactPage(teamKey, tag, at) {
+    const where = at.cursor ? `&cursor=${encodeURIComponent(at.cursor)}` : at.offset ? `&offset=${at.offset}` : '';
+    return boardFetch(teamKey, `/artifacts?tag=${tag}&limit=50${where}`);
+}
+/** Moves the walk to the next page of `data` (a page's answer); false when that was the last. It advances by what the computer returned, never by what was asked: an older Coral answers 200, a newer one 50, and the cursor, when there is one, is the place. */
+export function nextArtifactPage(at, data) {
+    const list = (data && data.artifacts) || [];
+    if (!data || !data.has_more || !list.length) return false;
+    if (data.next_cursor) at.cursor = data.next_cursor; else at.offset += list.length;
+    return true;
+}
+
 // ── Validated GETs (#3439) ───────────────────────────────────────────────
 // A poll whose answer is often unchanged sends the last answer's validator back (If-None-Match)
 // and, on a 304, reuses that answer: no body crosses the network, through Coral Hub too (which

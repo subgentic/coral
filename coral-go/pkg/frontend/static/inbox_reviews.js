@@ -3,7 +3,7 @@ import { setReviewCacheReader } from './ask_filter.js';
 /* Review artifacts use the same owner-protected team list and tags routes as Artifacts.
  * After the Inbox first opens, keep its badge updated on other tabs without eager startup reads. */
 import { fetchProjects, sourcesKey } from './board_fetch.js';
-import { boardFetch, keyLabel, splitKey } from './server_base.js';
+import { boardFetch, boardArtifactPage, nextArtifactPage, keyLabel, splitKey } from './server_base.js';
 import { hideAsksWhen } from './ask_filter.js';
 import { importOnce } from './import_once.js';
 
@@ -82,13 +82,13 @@ export function reviewGroups(rows) {
 /** One team's files tagged for review (not saved, available), every page: the rows the Inbox reads, for one team. */
 async function readTeam(team, mutedOut = null, stamp = {}) {
     const rows = [], seen = new Set();
-    for (let offset = 0; offset <= 10000; offset += 200) {
-        const r = await boardFetch(team, `/artifacts?tag=for%20review&limit=200&offset=${offset}`);
+    for (let at = { cursor: '', offset: 0 }, pages = 0; pages < 200; pages++) { // 50 a page, by the computer's cursor (#13161)
+        const r = await boardArtifactPage(team, 'for%20review', at);
         if (r.status === 403 || r.status === 404) break; // inaccessible teams never contribute rows
         if (!r.ok) throw new Error('Could not read review artifacts');
         const data = await r.json();
         const token = artifactRevision(data.artifacts_rev);
-        stamp.rev = offset === 0 ? token : stamp.rev === token ? token : null;
+        stamp.rev = pages === 0 ? token : stamp.rev === token ? token : null;
         for (const a of data.artifacts || []) {
             const decidedWithNews = a.new_comments > 0 && (a.tags?.includes('approved') || a.tags?.includes('denied')) && !a.tags.includes('for review'); // a file the Operator decided that agents replied about in their thread: the server puts it in this list (#12097), marked and counted once
             if (!(a.tags?.includes('for review') || decidedWithNews) || a.tags.includes('saved') || a.tags.includes('ignored') || a.tags.includes('superseded') || (a.tags.includes('changes requested') && !(a.new_comments > 0)) || !a.available || seen.has(a.id)) continue; // changes requested without news is the agent's turn (needsYouFile's rule, #11985, #12026); // changes requested: the agent's turn, so the file leaves Needs you and its counts; its next version comes back as a new item (#11985). Artifacts and the goal still show it as changes requested // a saved file stays tagged for review (its decisions work) but is not in Needs you (#11641)
@@ -98,7 +98,7 @@ async function readTeam(team, mutedOut = null, stamp = {}) {
             if (a.muted === true) { if (mutedOut) mutedOut.push({ ...a, team, hex, reviewKey: `${team}:${a.id}` }); continue; } // the Operator's settings keep this kind (or team) out of Needs you (#12144): not a row, not counted, listed under the Muted line
             rows.push({ ...a, team, hex, reviewKey: `${team}:${a.id}` });
         }
-        if (!data.has_more || !(data.artifacts || []).length) break;
+        if (!nextArtifactPage(at, data)) break;
     }
     return rows;
 }
@@ -138,16 +138,18 @@ export function refreshReviews(force = false) {
                     }
                     const stamp = {};
                     got.rows = await readTeam(team, mutedHere, stamp);
-                    try { // the saved files of this team: one page, a failure here leaves the others alone
-                        const r = await boardFetch(team, '/artifacts?tag=saved&limit=200');
-                        if (r.ok) {
+                    try { // the saved files of this team, every page (50 a request, #13161): a failure here leaves the others alone
+                        for (let at = { cursor: '', offset: 0 }, pages = 0; pages < 200; pages++) {
+                            const r = await boardArtifactPage(team, 'saved', at);
+                            if (!r.ok) { loadedRevisions.delete(team); break; }
                             const data = await r.json();
-                            loadedRevisions.set(team, stamp.rev === artifactRevision(data.artifacts_rev) ? stamp.rev : null);
+                            if (pages === 0) loadedRevisions.set(team, stamp.rev === artifactRevision(data.artifacts_rev) ? stamp.rev : null);
                             for (const a of data.artifacts || []) {
                                 const hex = /(?:sha256:|coral:\/\/artifacts\/)?([a-f0-9]{64})$/i.exec(a.uri || a.digest || a.id || '')?.[1];
                                 if (a.tags?.includes('saved') && a.tags.includes('for review') && a.available && hex) got.saved.push({ ...a, team, hex, reviewKey: `${team}:${a.id}` });
                             }
-                        } else loadedRevisions.delete(team);
+                            if (!nextArtifactPage(at, data)) break;
+                        }
                     } catch { loadedRevisions.delete(team); got.saved = saved.filter(a => a.team === team); }
                 } catch {
                     got.rows = items.filter(a => a.team === team);
@@ -184,13 +186,13 @@ if (typeof document !== 'undefined') document.addEventListener('coral:servers-up
 
 /** The artifact's tags as the server has them now, read right before a write: the tags route replaces the whole list, so a tag someone added since the last refresh would be lost from the row's copy. null when it is no longer a for-review artifact. */
 export async function currentTags(row) {
-    for (let offset = 0; offset <= 10000; offset += 200) {
-        const r = await boardFetch(row.team, `/artifacts?tag=for%20review&limit=200&offset=${offset}`);
+    for (let at = { cursor: '', offset: 0 }, pages = 0; pages < 200; pages++) { // 50 a page, by the computer's cursor (#13161)
+        const r = await boardArtifactPage(row.team, 'for%20review', at);
         if (!r.ok) throw new Error(`Could not read the current tags (HTTP ${r.status}).`);
         const data = await r.json(), list = data.artifacts || [];
         const hit = list.find(a => a.id === row.id);
         if (hit) return hit.tags || [];
-        if (!data.has_more || !list.length) return null;
+        if (!nextArtifactPage(at, data)) return null;
     }
     return null;
 }
