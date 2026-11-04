@@ -92,9 +92,9 @@ async function readTeam(team, mutedOut = null) {
     }
     return rows;
 }
-/** The files for review on one goal of one team that nobody decided (one row per file, as Needs you has them): a goal page asks only its own team, not every team (#11913). */
 /** The rows of one team, as Needs you has them (newest version of each file): a link to one file reads only its own team (#13116), not every team. */
 export async function reviewsOfTeam(team) { return collapseVersions((await readTeam(team)).sort(byAge)); }
+/** The files for review on one goal of one team that nobody decided (one row per file, as Needs you has them): a goal page asks only its own team, not every team (#11913). */
 export async function reviewsOfGoal(team, goalId) {
     return collapseVersions((await readTeam(team)).sort(byAge)).filter(a => String(a.goal_id) === String(goalId));
 }
