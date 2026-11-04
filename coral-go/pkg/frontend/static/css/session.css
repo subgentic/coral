@@ -876,6 +876,7 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
 .gs-ahead { color: var(--success); }
 .gs-behind { color: var(--warning); }
 .gs-dirty { color: var(--text-muted); }
+.gs-paused { color: var(--text-secondary); font-style: italic; cursor: help; } /* live git updates paused for the folder (#13092): the count beside it is the last read */
 
 /* Per-agent branch line, shown only for agents on their own worktree */
 

@@ -256,6 +256,7 @@ export function buildSessionTooltip(s, opts = {}) {
     ];
     if (s.current_directory || s.working_directory) { const dir = s.current_directory || s.working_directory; work.push({ label: 'Directory', text: _shortPath(dir, 3), title: dir }); } // where it is now (#11704)
     if (s.changed_file_count > 0) work.push({ label: 'Files changed', text: String(s.changed_file_count) });
+    if (s.git_state?.paused) work.push({ label: 'Live updates', text: `Paused: the count is the last one read (${Math.max(s.git_state.dirty || 0, s.git_state.paused.changes || 0)} files). In Files, press Refresh or Turn on live updates.` });
     if (hasWorkingDisplayHint(s)) work.push({ label: 'Permission', text: 'Codex’s terminal shows activity. Permission is not confirmed resolved; queued messages remain held.' });
     if (s.board_project) {
         const ttUnread = sessionUnreadCount(s);
@@ -289,6 +290,9 @@ export function getDotClass(s) {
     return sessionStateInfo(s).dot;
 }
 
+/** What a paused folder's marker says on hover and to a screen reader (#13092). */
+const PAUSED_HELP = 'Live updates are paused for this folder because git is slow here: the change count is the last one read. Open Files and press Refresh, or Turn on live updates.';
+
 /** Compact "↑2 ↓1 ●3" divergence summary for a session's git_state, or ''.
  *  Ahead/behind are measured against the repo's default branch. */
 export function _gitStateSummary(gs) {
@@ -297,7 +301,10 @@ export function _gitStateSummary(gs) {
     const parts = [];
     if (gs.ahead) parts.push(`<span class="gs-ahead" title="${escapeAttr(gs.ahead)} commit${gs.ahead !== 1 ? 's' : ''} ahead of ${escapeAttr(base)}">↑${gs.ahead}</span>`);
     if (gs.behind) parts.push(`<span class="gs-behind" title="${escapeAttr(gs.behind)} commit${gs.behind !== 1 ? 's' : ''} behind ${escapeAttr(base)}">↓${gs.behind}</span>`);
-    if (gs.dirty) parts.push(`<span class="gs-dirty" title="${escapeAttr(gs.dirty)} uncommitted file${gs.dirty !== 1 ? 's' : ''}">●${gs.dirty}</span>`);
+    const paused = gs.paused && typeof gs.paused === 'object' ? gs.paused : null; // live git updates are paused for this folder (#13092): the count is the last one read
+    const dirty = paused ? Math.max(gs.dirty || 0, paused.changes || 0) : gs.dirty;
+    if (dirty) parts.push(`<span class="gs-dirty" title="${escapeAttr(dirty)} uncommitted file${dirty !== 1 ? 's' : ''}${paused ? ' (last count read)' : ''}">●${dirty}</span>`);
+    if (paused) parts.push(`<span class="gs-paused" tabindex="0" title="${escapeAttr(PAUSED_HELP)}" aria-label="${escapeAttr('Live updates paused. ' + PAUSED_HELP)}">paused</span>`);
     return parts.join(' ');
 }
 
