@@ -571,6 +571,9 @@ func (h *SessionsHandler) agentRow(trace *phaseTrace, agent AgentInfo, lv liveIn
 		"last_message":          lastMessageRow(h, sid, agent.WorkingDir, agent.AgentType, skipExpensive, startedEv(latestEv, d.started[sid]) != ""), // {role, text, at} of the newest message, null at none (#11097)
 		"enrichment_pending":    skipExpensive && !sleeping,
 	}
+	if b := blockedField(sid, agent.AgentType, sleeping); b != nil {
+		entry["blocked"] = b // only a row that is blocked has the key (#13486)
+	}
 	withDisplayActivityHint(entry, displayHint, displayHintAt)
 	// Always present (false/""/null too): the dashboard merges entries, so
 	// an omitted false would leave the AUTO chip on after it was turned off.

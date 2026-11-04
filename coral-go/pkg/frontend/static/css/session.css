@@ -253,6 +253,7 @@
 .tt-state-needs-input       { color: var(--warning); font-weight: var(--fw-strong); }
 .tt-state-done              { color: var(--success); font-weight: var(--fw-strong); }
 .tt-state-stuck             { color: var(--danger); font-weight: var(--fw-strong); }
+.tt-state[class*="tt-state-blocked"] { color: var(--danger); font-weight: var(--fw-strong); } /* "Blocked: Codex refuses its model ..." (#13486): the class is built from the whole label */
 .tt-state-idle              { color: var(--text-muted); }
 .tt-unread                   { color: var(--warning); font-weight: var(--fw-strong); }
 

@@ -324,7 +324,7 @@ export function _renderSessionItem(s, groupName, isCompact, collapsed, teamDefau
         + (ctxHigh ? `, context ${s.context_pct >= 100 ? 'full' : Math.round(s.context_pct) + '%'}` : '')
         + (unreadCount > 0 ? `, ${unreadCount} unread` : '')
         + (heldChip ? ', message held' : ''); // the row's one chip says it in words: the name says it too (QA Engineer, #9723)
-    const stuckClass = stateInfo.key === 'stuck' ? ' is-stuck' : '';
+    const stuckClass = stateInfo.key === 'stuck' || stateInfo.key === 'blocked' ? ' is-stuck' : '';
     const avatar = avatarOf(s, identity, groupName);
     return `<li class="session-group-item list-row${isActive ? ' active list-row-current' : ''}${compactClass}${collapsedClass}${sleepingClass}${attentionClass}${stuckClass}${staleClass}"
         draggable="${stale ? 'false' : 'true'}"${stale ? ` aria-disabled="true" title="${escapeAttr(staleReason(s))}"` : ''}
@@ -346,7 +346,7 @@ export function _renderSessionItem(s, groupName, isCompact, collapsed, teamDefau
                 ${stale ? '' : waitingBadge + heldChip + sleepChip + wakeBtn + sleepBtn}
                 ${stale ? '' : kebabMenu}
             </div>
-            <span class="session-status-line">${escapeHtml(stateInfo.label)}</span>
+            <span class="session-status-line">${escapeHtml(stateInfo.short || stateInfo.label)}</span>
             <span class="session-preview" aria-hidden="true">${escapeHtml(previewOf(s, identity))}</span>
             ${rowLinesHtml(s)}
         </div>

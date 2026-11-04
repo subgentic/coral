@@ -125,8 +125,9 @@ func screenModelRefusedSized(rt AgentRuntime) (func(ctx context.Context, a Agent
 			return "", false
 		}
 		model, found := ptymanager.CodexModelRefusedOnScreen(screen)
-		mu.Lock()
 		now := time.Now()
+		ptymanager.NoteCodexModelRefusal(a.SessionID, model, found, now) // the live list and the chat say it from this read (#13486)
+		mu.Lock()
 		for id, e := range cache {
 			if now.Sub(e.at) >= screenCacheMaxAge {
 				delete(cache, id) // a session not looked at for a long while: ended, or no longer asked about

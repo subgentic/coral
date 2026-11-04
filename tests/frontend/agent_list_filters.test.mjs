@@ -17,7 +17,7 @@ assert.equal(isFiltered(EMPTY), false); assert.equal(isFiltered({ ...EMPTY, sort
 for (const k of ['state', 'board', 'machine']) assert.equal(isFiltered({ ...EMPTY, [k]: k === 'state' ? 'idle' : 'x' }), true, k);
 
 // the state groups: what the session states map to
-const keys = { needs_input: 'needs_input', working: 'working', sleeping: 'asleep', idle: 'idle', your_turn: 'idle', waiting_on: 'idle', task_idle: 'idle', check_terminal: 'idle', stuck: 'idle' };
+const keys = { needs_input: 'needs_input', working: 'working', sleeping: 'asleep', idle: 'idle', your_turn: 'idle', waiting_on: 'idle', task_idle: 'idle', check_terminal: 'idle', stuck: 'idle', blocked: 'idle' };
 for (const [k, g] of Object.entries(keys)) assert.equal(stateGroup(k), g, k);
 assert.deepEqual(STATES, ['needs_input', 'working', 'idle', 'asleep']);
 
