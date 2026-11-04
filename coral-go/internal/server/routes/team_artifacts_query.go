@@ -27,10 +27,10 @@ import (
 // (so % and _ are ordinary characters), the rest are enum words, names compared for equality, and times.
 
 var teamArtifactParamNames = map[string]bool{"limit": true, "offset": true, "session_id": true,
-	"q": true, "kind": true, "origin": true, "by": true, "board": true, "kept": true, "starred": true, "task": true, "goal": true, "tag": true, "since": true, "until": true, "sort": true, "cursor": true, "versions": true, "read": true}
+	"q": true, "kind": true, "origin": true, "by": true, "board": true, "kept": true, "starred": true, "task": true, "goal": true, "tag": true, "since": true, "until": true, "sort": true, "cursor": true, "versions": true, "read": true, "facets": true}
 
 // teamArtifactQueryParams are the parameters that make the reply a query (the others are the list's original ones).
-var teamArtifactQueryParams = []string{"q", "kind", "origin", "by", "board", "kept", "starred", "task", "goal", "tag", "since", "until", "sort", "cursor", "versions", "read"}
+var teamArtifactQueryParams = []string{"q", "kind", "origin", "by", "board", "kept", "starred", "task", "goal", "tag", "since", "until", "sort", "cursor", "versions", "read", "facets"}
 
 var (
 	teamArtifactKinds   = []string{"image", "pdf", "text", "other"}
@@ -71,6 +71,7 @@ type teamArtifactQuery struct {
 	collapse bool // versions=newest (#11700): the versions of one file are one row, the newest; the totals and the tag counts follow
 	cursor   *teamArtifactCursor
 	finger   string
+	facets   []string // facets=team,by,goal (#13172): the distinct values of the matching set, each with its own filter left out
 }
 
 type teamArtifactCursor struct {
@@ -228,6 +229,20 @@ func parseTeamArtifactQuery(vals url.Values) (*teamArtifactQuery, error) {
 			q.read = &b
 		default:
 			return nil, taErr("read must be 1 or 0")
+		}
+	}
+	if v, ok, serr := taSingle("facets", vals["facets"]); serr != nil {
+		return nil, serr
+	} else if ok {
+		seen := map[string]bool{}
+		for _, f := range strings.Split(v, ",") {
+			if f != "team" && f != "by" && f != "goal" {
+				return nil, taErr("facets is a list of team, by and goal")
+			}
+			if !seen[f] {
+				seen[f] = true
+				q.facets = append(q.facets, f)
+			}
 		}
 	}
 	if v, ok, serr := taSingle("starred", vals["starred"]); serr != nil {
@@ -670,11 +685,12 @@ func clipKey(s string, n int) string {
 // teamArtifactSelection is one page of a query over a collected list.
 type teamArtifactSelection struct {
 	page    []teamArtifact
-	total   int            // the rows the filters matched
-	start   int            // where the page starts in them
-	hasMore bool           // another page follows
-	next    string         // its cursor ("" when none)
-	tags    map[string]int // the tag words of the whole list, with their counts (the Tag filter's choices)
+	total   int                             // the rows the filters matched
+	start   int                             // where the page starts in them
+	hasMore bool                            // another page follows
+	next    string                          // its cursor ("" when none)
+	tags    map[string]int                  // the tag words of the whole list, with their counts (the Tag filter's choices)
+	facets  map[string][]artifactFacetValue // facets=: the distinct values of the matching set (#13172), nil when none were asked for
 }
 
 // selectTeamArtifacts filters, sorts and pages items (the collected, merged list) by q: the one rule behind a team's list and the cross-team list.
@@ -704,35 +720,67 @@ func (h *BoardHandler) selectTeamArtifacts(r *http.Request, items []teamArtifact
 	if q.collapse {
 		counts = teamTagCountsByFile(items) // files, not versions (#11700)
 	}
-	var set []teamArtifact
-	for _, it := range items {
-		if q.cheapMatch(it, kept, starred) {
-			set = append(set, it)
+	// filtered is the matching set of a query (qq): the cheap filters, then the ones that need each file's sidecar (search, kind). The facets run it again with one filter left out.
+	filtered := func(qq *teamArtifactQuery) (set []teamArtifact, enriched bool) {
+		for _, it := range items {
+			if qq.cheapMatch(it, kept, starred) {
+				set = append(set, it)
+			}
 		}
+		if qq.needsEnrichment() {
+			enriched = true
+			for i := range set {
+				enrichTeamArtifact(&set[i], dir)
+				finishTeamArtifactName(&set[i])
+				if tunneled {
+					redactItemForTunnel(&set[i]) // the sidecar's name and type are new text
+				}
+			}
+			var out []teamArtifact
+			for _, it := range set {
+				if qq.textMatch(it) && qq.kindMatch(it) {
+					out = append(out, it)
+				}
+			}
+			set = out
+		}
+		return set, enriched
 	}
-	enriched := false
-	if q.needsEnrichment() {
-		enriched = true
-		for i := range set {
-			enrichTeamArtifact(&set[i], dir)
-			finishTeamArtifactName(&set[i])
-			if tunneled {
-				redactItemForTunnel(&set[i]) // the sidecar's name and type are new text
+	set, enriched := filtered(q)
+	var facets map[string][]artifactFacetValue
+	if len(q.facets) > 0 {
+		facets = map[string][]artifactFacetValue{}
+		for _, f := range q.facets {
+			qq := *q
+			own := set
+			switch f {
+			case "by":
+				if len(qq.by) > 0 {
+					qq.by = nil
+					own, _ = filtered(&qq)
+				}
+			case "team":
+				if len(qq.boards) > 0 {
+					qq.boards = nil
+					own, _ = filtered(&qq)
+				}
+			case "goal":
+				if qq.goal != 0 {
+					qq.goal = 0
+					own, _ = filtered(&qq)
+				}
 			}
-		}
-		var out []teamArtifact
-		for _, it := range set {
-			if q.textMatch(it) && q.kindMatch(it) {
-				out = append(out, it)
+			if q.collapse {
+				own = collapseVersions(append([]teamArtifact(nil), own...)) // files, not versions, as the totals say
 			}
+			facets[f] = artifactFacetOf(f, own)
 		}
-		set = out
 	}
 	if q.collapse {
 		set = collapseVersions(set) // after the filters: a version that matches stands for its file, as Needs you does (#11700)
 	}
 	sort.SliceStable(set, func(i, j int) bool { return artifactAfter(q.sortName, keyOf(set[j]), keyOf(set[i])) })
-	sel := &teamArtifactSelection{total: len(set), tags: counts}
+	sel := &teamArtifactSelection{total: len(set), tags: counts, facets: facets}
 	start := offset
 	if q.cursor != nil {
 		ck := artifactSortKey{At: q.cursor.At, Name: q.cursor.Name, Size: q.cursor.Size, Type: q.cursor.Type, Tags: q.cursor.Tags, Uploader: q.cursor.Uploader, TaskID: q.cursor.TaskID, Source: q.cursor.Source, Index: q.cursor.Index, ID: q.cursor.ID}
@@ -804,6 +852,9 @@ func (h *BoardHandler) queryTeamArtifacts(w http.ResponseWriter, r *http.Request
 	}
 	if len(sel.tags) > 0 {
 		resp["tag_counts"] = sel.tags
+	}
+	if sel.facets != nil {
+		resp["facets"] = sel.facets
 	}
 	if sessionFilter != "" {
 		resp["session_id"] = sessionFilter
@@ -887,4 +938,66 @@ func artifactIsRead(it teamArtifact) bool {
 		}
 	}
 	return false
+}
+
+// artifactFacetValue is one choice of a facet: the value, how many files (versions without versions=newest) of the matching set have it, and a goal's number.
+type artifactFacetValue struct {
+	V  string `json:"v"`
+	N  int    `json:"n"`
+	ID int64  `json:"id,omitempty"`
+}
+
+// maxFacetValues is how many choices one facet answers: the most files first, then by name. A computer with more says so by the count of what is left out (the page's filter box still takes any word).
+const maxFacetValues = 100
+
+// artifactFacetOf counts the values of one facet over a set of rows, after the viewer's redaction (the set was redacted for a Hub viewer already).
+func artifactFacetOf(facet string, set []teamArtifact) []artifactFacetValue {
+	counts := map[string]*artifactFacetValue{}
+	add := func(v string, id int64) {
+		if v == "" {
+			return
+		}
+		key := v
+		if id != 0 {
+			key = strconv.FormatInt(id, 10) + "\x00" + v
+		}
+		if c, ok := counts[key]; ok {
+			c.N++
+			return
+		}
+		counts[key] = &artifactFacetValue{V: v, N: 1, ID: id}
+	}
+	for _, it := range set {
+		switch facet {
+		case "by":
+			if who := ptrOr(it.ProducedBy); who != "" {
+				add(who, 0)
+			} else {
+				add(it.SentBy, 0)
+			}
+		case "team":
+			add(it.Team, 0)
+		case "goal":
+			if it.GoalID != nil {
+				add(it.GoalTitle, *it.GoalID)
+			}
+		}
+	}
+	out := make([]artifactFacetValue, 0, len(counts))
+	for _, c := range counts {
+		out = append(out, *c)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].N != out[j].N {
+			return out[i].N > out[j].N
+		}
+		if out[i].V != out[j].V {
+			return out[i].V < out[j].V
+		}
+		return out[i].ID < out[j].ID
+	})
+	if len(out) > maxFacetValues {
+		out = out[:maxFacetValues]
+	}
+	return out
 }
