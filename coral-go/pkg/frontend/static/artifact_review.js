@@ -34,14 +34,14 @@ export async function reviewStateOf(team, hex) {
 
 const timeWords = at => { const t = Date.parse(at); return Number.isNaN(t) ? '' : new Date(t).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }); };
 
-async function decide(team, row, decision, reason, note) {
-    const r = await boardFetch(team, `/artifacts/${encodeURIComponent(row.id)}/review`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(reason ? { decision, reason } : note ? { decision, note } : { decision }) });
+async function decide(team, row, decision, reason, note, quiet = false) {
+    const r = await boardFetch(team, `/artifacts/${encodeURIComponent(row.id)}/review`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ decision, ...(reason ? { reason } : {}), ...(note ? { note } : {}), ...(quiet ? { quiet: true } : {}) }) });
     const body = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(body.message || body.error || `Could not save the review (HTTP ${r.status}).`);
+    if (!r.ok) { const error = new Error(body.message || body.error || `Could not save the review (HTTP ${r.status}).`); error.status = r.status; error.code = body.code; throw error; }
     return body;
 }
 
-/** Approving or denying a version settles the ones before it quietly (no review or message): locally their 'for review' tag comes off; through the Hub the quiet Dismiss decision keeps the restricted tags route out of it. Resolves { settled, failed }. */
+/** Approving or denying a version settles the ones before it quietly (no review or message): locally their 'for review' tag comes off; through the Hub automatic superseded settlement keeps the restricted tags route out of it. Resolves { settled, failed }. */
 async function settleEarlierVersions(m, row) {
     let settled = 0, failed = 0;
     for (const e of m.earlierVersions(row)) {
@@ -49,16 +49,16 @@ async function settleEarlierVersions(m, row) {
             const current = await m.currentTags(e);
             if (current !== null) {
                 if (isCloud()) {
-                    // Hub tags may only change read (#13117). Dismiss is the
-                    // existing quiet decision: no verdict or agent notice.
-                    await decide(e.team, e, 'ignore');
+                    // Automatic settlement is superseded, not an Operator dismissal.
+                    // The server omits the Inbox action event for quiet cleanup.
+                    await decide(e.team, e, 'ignore', undefined, undefined, true);
                 } else {
                     const r = await boardFetch(e.team, `/artifacts/${encodeURIComponent(e.id)}/tags`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tags: current.filter(t => t !== 'for review') }) });
                     if (!r.ok) throw new Error(`HTTP ${r.status}`);
                 }
             }
             settled++;
-        } catch { failed++; }
+        } catch (e) { if (e.status === 409 && e.code === 'not_for_review') settled++; else failed++; }
     }
     return { settled, failed };
 }

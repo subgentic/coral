@@ -20,9 +20,10 @@ const HEX = n => String(n).repeat(64);
                 const url=new URL(String(u),location.href), p=url.pathname;window.__requests.push(p+url.search);
                 const review=/^\\/api\\/remote\\/m1\\/api\\/board\\/same-team\\/artifacts\\/([a-f0-9]{64})\\/review$/.exec(p);
                 if(review && o.method==='POST') {
-                    const a=window.__files.find(a=>a.id===review[1]), decision=JSON.parse(o.body).decision;
-                    window.__decisions.push({id:a.id,decision});
-                    if(decision==='ignore')a.tags=[...a.tags.filter(t=>t!=='ignored'),'ignored'];
+                    const a=window.__files.find(a=>a.id===review[1]), {decision,quiet}=JSON.parse(o.body);
+                    window.__decisions.push({id:a.id,decision,...(quiet?{quiet:true}:{})});
+                    if(decision==='ignore' && quiet)a.tags=[...a.tags.filter(t=>!['for review','read','changes requested','saved','ignored'].includes(t)),'superseded'];
+                    else if(decision==='ignore')a.tags=[...a.tags.filter(t=>t!=='for review' && t!=='ignored'),'ignored'];
                     else a.tags=[...a.tags.filter(t=>t!=='for review'),decision==='approve'?'approved':'denied'];
                     return json({tags:a.tags,review:{state:decision==='approve'?'approved':'denied'},delivered:false,reason:'no_uploader'});
                 }
@@ -84,7 +85,8 @@ const HEX = n => String(n).repeat(64);
             const result=await ev(`(async()=>{const m=await import(${S}+'inbox_reviews.js');await m.refreshReviews(true);const row=m.reviewItems().find(a=>a.hex==='${HEX(2)}');const r=await import(${S}+'artifact_review.js');const out=await r.${decision==='approve'?'approveRow':'denyRow'}(row.team,row${decision==='deny' ? ", 'Does not meet the requirements'" : ''});await m.refreshReviews(true);return {earlier:out.earlier,oldStillNeeded:m.reviewItems().some(a=>a.hex==='${HEX(3)}')};})()`);
             assert.deepEqual(result.earlier,{settled:1,failed:0},decision+': earlier version settles under the strict Hub rule');
             assert.equal(result.oldStillNeeded,false,decision+': earlier version stays out after a fresh read');
-            assert.deepEqual(await ev(`window.__decisions`),[{id:HEX(2),decision},{id:HEX(3),decision:'ignore'}],decision+': old version gets a quiet dismissal, no extra approval/verdict');
+            assert.deepEqual(await ev(`window.__decisions`),[{id:HEX(2),decision},{id:HEX(3),decision:'ignore',quiet:true}],decision+': old version is automatically superseded, no Operator dismissal or extra verdict');
+            assert.equal(await ev(`window.__files.find(a=>a.id==='${HEX(3)}').tags.includes('superseded') && !window.__files.find(a=>a.id==='${HEX(3)}').tags.includes('ignored')`),true,decision+': automatic settlement stays out of Dismissed');
             assert.deepEqual(await ev(`window.__rejects`),[],decision+': no forbidden tags PUT');
         }
         // The shared writer is guarded even if a future caller forgets to hide
