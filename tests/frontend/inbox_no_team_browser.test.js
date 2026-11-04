@@ -14,7 +14,7 @@ const BASE = require('./test_base').BASE;
             await ev(`(async () => {
                 const { state } = await import((window.__coralStatic || '/static/') + 'state.js');
                 state.hub = ${remote}; state.serversKnown = true;
-                state.servers = ${remote ? "[{id:'solo-pc',name:'Solo computer',status:'online'}]" : '[]'};
+                state.servers = ${remote ? "[{id:'solo-pc',name:'Solo computer',status:'online',owner_stamp:true}]" : '[]'};
                 localStorage.removeItem('coral-inbox-needs-filters');
                 window.__soloWrites = []; window.__soloReads = []; window.__soloTags = ['for review'];
                 const original = window.fetch;
@@ -24,7 +24,9 @@ const BASE = require('./test_base').BASE;
                     const target = ${remote ? "'/api/remote/solo-pc'" : "''"};
                     const p = u.pathname.startsWith(target) ? u.pathname.slice(target.length) : u.pathname;
                     const item = {id:'${'ab'.repeat(32)}',name:'Solo report.txt',team:'No team',board_id:'~no-team',available:true,media_type:'text/plain',size:12,created_at:new Date().toISOString(),produced_by:'Solo writer',session_id:'solo',tags:window.__soloTags,review_question:'Is this ready to ship?'};
+                    if (p.endsWith('/comments')) return json({comments:[],you:{can_comment:true,can_lock:true},locked:false});
                     if (p === '/api/board/projects') return json([]);
+                    if (${remote} && u.pathname === '/api/team-artifacts') return json({artifacts:[],has_more:false});
                     if (p === '/api/team-artifacts') { window.__soloReads.push(u.pathname); return json({artifacts:[item],has_more:false,total:1}); }
                     if (p.includes('/artifacts/') && p.endsWith('/tags')) {
                         if (opts.method === 'PUT') { window.__soloTags=JSON.parse(opts.body).tags; window.__soloWrites.push(window.__soloTags); }
@@ -44,6 +46,7 @@ const BASE = require('./test_base').BASE;
             await ev(`document.querySelector('#group-table-view .inbox-review-name').click(); true`);
             await waitFor(`!document.getElementById('artifact-viewer')?.hidden`, 'solo file opens');
             await waitFor(`window.__soloWrites.some(tags=>tags.includes('read'))`, 'opening marks read');
+            await waitFor(`Array.from(document.querySelectorAll('.artifact-review-approve,.artifact-review-changes,.ac-toggle')).filter(e=>!e.hidden && e.getClientRects().length).length===3`, 'viewer decisions and comments available');
         }
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
