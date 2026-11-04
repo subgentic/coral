@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -54,8 +55,20 @@ func TestRefreshFilesOnABigRepoRunsOnePassAndSendsTheCap(t *testing.T) {
 	require.NoError(t, ss.RegisterLiveSession(context.Background(), &store.LiveSession{SessionID: sid, AgentType: "claude", AgentName: name, WorkingDir: repo}))
 
 	var passes atomic.Int64
-	refreshComputeHook = func() { passes.Add(1); time.Sleep(400 * time.Millisecond) }
+	var keysSeen atomic.Value // the key a running pass is held under (QA's survivor a: the handler passes the agent's name)
+	refreshComputeHook = func() {
+		passes.Add(1)
+		refreshFlights.mu.Lock()
+		for k := range refreshFlights.calls {
+			keysSeen.Store(k)
+		}
+		refreshFlights.mu.Unlock()
+		time.Sleep(400 * time.Millisecond)
+	}
 	t.Cleanup(func() { refreshComputeHook = func() {} })
+	oldSlow := gitguard.SlowPass
+	t.Cleanup(func() { gitguard.SlowPass = oldSlow })
+	gitguard.SlowPass = time.Nanosecond // every pass is slow, so a call that is counted as a pass is a strike (QA's survivor b)
 
 	type answer struct {
 		Files   []store.ChangedFile `json:"files"`
@@ -86,6 +99,12 @@ func TestRefreshFilesOnABigRepoRunsOnePassAndSendsTheCap(t *testing.T) {
 	resp.Body.Close()
 
 	require.EqualValues(t, 1, passes.Load(), "six calls at once and a seventh just after are one pass of git, not seven")
+	k, _ := keysSeen.Load().(string)
+	require.True(t, strings.HasSuffix(k, "\x00"+name), "the pass is held under a key that names the agent: %q", k)
+	realRepo, err := filepath.EvalSymlinks(repo)
+	require.NoError(t, err)
+	_, pausedNow := gitguard.Get(realRepo)
+	require.False(t, pausedNow, "one pass is one strike: the calls that shared it were not counted as passes of their own")
 	for i, a := range answers {
 		require.Len(t, a.Files, refreshFilesCap, "answer %d: the list is cut at the cap (%s)", i, a.Message)
 		require.Equal(t, n, a.Total, "answer %d says how many files changed in all", i)
@@ -173,4 +192,94 @@ func TestRefreshFilesPausesASlowFolderAndRefreshRunsOnePass(t *testing.T) {
 	sixth := post("")
 	require.EqualValues(t, 5, passes.Load(), "live again: the page's refresh runs git")
 	require.Nil(t, sixth["paused"])
+}
+
+// 35,000 changed files (#13079, the Operator's repository): a refresh runs, and the server keeps answering its other routes quickly while git works: the list is cut before it is stored, so no long write holds the
+// database, and the refresh itself is one pass.
+func TestServerStaysResponsiveWhileA35kFileRepoIsRefreshed(t *testing.T) {
+	if testing.Short() {
+		t.Skip("writes 35,000 files")
+	}
+	gitguard.Reset()
+	t.Cleanup(gitguard.Reset)
+	_, handler, terminal, ss := setupSessionsTestServer(t)
+	router := chi.NewRouter()
+	router.Post("/api/sessions/live/{name}/files/refresh", handler.RefreshFiles)
+	router.Get("/api/sessions/live/{name}/events", handler.ListEvents)
+	server := httptest.NewServer(router)
+	t.Cleanup(server.Close)
+	repo := t.TempDir()
+	git := func(args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", append([]string{"-C", repo}, args...)...)
+		cmd.Env = append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "HOME="+repo)
+		out, err := cmd.CombinedOutput()
+		require.NoError(t, err, "git %v: %s", args, out)
+	}
+	git("init", "-q")
+	git("config", "user.email", "t@example.invalid")
+	git("config", "user.name", "t")
+	require.NoError(t, os.WriteFile(filepath.Join(repo, "README.md"), []byte("hi\n"), 0o644))
+	git("add", "-A")
+	git("commit", "-qm", "init")
+	const n = 35000
+	write := func(content string) {
+		for d := 0; d < 350; d++ {
+			dir := filepath.Join(repo, fmt.Sprintf("gen%03d", d))
+			require.NoError(t, os.MkdirAll(dir, 0o755))
+			for i := 0; i < n/350; i++ {
+				require.NoError(t, os.WriteFile(filepath.Join(dir, fmt.Sprintf("f%03d.txt", i)), []byte(content), 0o644))
+			}
+		}
+	}
+	write("x\n")
+	git("add", "-A")
+	git("commit", "-qm", "files")
+	write("changed\n") // 35,000 tracked files, all modified
+	const sid = "00000000-0000-0000-0000-00000000d3d3"
+	name := "claude-" + sid
+	terminal.addSession(name, repo)
+	require.NoError(t, ss.RegisterLiveSession(context.Background(), &store.LiveSession{SessionID: sid, AgentType: "claude", AgentName: name, WorkingDir: repo}))
+
+	type answer struct {
+		Files []store.ChangedFile `json:"files"`
+		Total int                 `json:"total_changed"`
+	}
+	done := make(chan answer, 1)
+	started := time.Now()
+	go func() {
+		req, _ := http.NewRequest("POST", server.URL+"/api/sessions/live/"+name+"/files/refresh", bytes.NewBufferString(`{"session_id":"`+sid+`"}`))
+		resp, err := http.DefaultClient.Do(req)
+		var a answer
+		if err == nil {
+			_ = json.NewDecoder(resp.Body).Decode(&a)
+			resp.Body.Close()
+		}
+		done <- a
+	}()
+	var worst time.Duration
+	probes := 0
+	var a answer
+loop:
+	for {
+		select {
+		case a = <-done:
+			break loop
+		default:
+		}
+		t0 := time.Now()
+		resp, err := http.Get(server.URL + "/api/sessions/live/" + name + "/events?session_id=" + sid)
+		require.NoError(t, err)
+		resp.Body.Close()
+		if d := time.Since(t0); d > worst {
+			worst = d
+		}
+		probes++
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Logf("refresh of %d files took %s; %d probes, slowest %s", n, time.Since(started).Round(time.Millisecond), probes, worst.Round(time.Millisecond))
+	require.Equal(t, n, a.Total, "every changed file is counted")
+	require.Len(t, a.Files, refreshFilesCap, "and the list sent is the cap")
+	require.Less(t, worst, 200*time.Millisecond, "another route answers in under 200 ms while the refresh runs")
+	require.Greater(t, probes, 2, "the refresh took long enough to be probed")
 }
