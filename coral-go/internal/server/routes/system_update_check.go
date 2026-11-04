@@ -98,6 +98,12 @@ func (h *UpdateRelaunchHandler) CheckNow(w http.ResponseWriter, r *http.Request)
 	if !h.localOnly(w, r) {
 		return
 	}
+	h.startCheck(w, r, nil, map[string]any{"ok": true})
+}
+
+// startCheck is the one place a check starts (a person's Check now and the Hub owner's check-hub): not checkable is a 409 with the reason, one a minute and one at a time, in the background; started runs once
+// the check is accepted (the Hub's audit row); accepted is the 202 body.
+func (h *UpdateRelaunchHandler) startCheck(w http.ResponseWriter, r *http.Request, started func(), accepted map[string]any) {
 	rec, err := h.Updater.Record(r.Context())
 	if err != nil {
 		slog.Warn("[update] status unavailable for a check", "error", err)
@@ -129,6 +135,9 @@ func (h *UpdateRelaunchHandler) CheckNow(w http.ResponseWriter, r *http.Request)
 	}
 	h.lastManual = now
 	h.checkMu.Unlock()
+	if started != nil {
+		started()
+	}
 	safego.Go("update check", func() {
 		defer h.checking.Store(false)
 		ctx, cancel := context.WithTimeout(context.Background(), checkRunLimit)
@@ -139,7 +148,32 @@ func (h *UpdateRelaunchHandler) CheckNow(w http.ResponseWriter, r *http.Request)
 			slog.Info("[update] check finished", "result", res)
 		}
 	})
-	writeJSON(w, http.StatusAccepted, map[string]any{"ok": true})
+	writeJSON(w, http.StatusAccepted, accepted)
+}
+
+// CheckHub: POST /api/system/update/check-hub (#13258). Coral Hub's owner asks this computer to check for an update now and stage it; it never installs (the relaunch, with its acknowledgement, is a separate step). It
+// takes nothing: no body, no query (a version, a URL, a channel or anything else named is a 400), and what to fetch is decided by this computer's own updater from its fixed source and its signature pins. It is the
+// relaunch's own gate: the stamped owner, the person's switch (hub_relaunch_updates, off until they turn it on), the cap and the Operator opt-out; with the switch off it does nothing. One a minute, one at a time, 202, in the
+// background; each call is an audit row with the Hub user. The answer is a closed set of words: no path, no updater text.
+func (h *UpdateRelaunchHandler) CheckHub(w http.ResponseWriter, r *http.Request) {
+	if !h.on() {
+		errNotFound(w, "not found")
+		return
+	}
+	id := h.identify(r)
+	if !id.owner {
+		h.refuse(w, r, id, nil, http.StatusForbidden, "owner_only", "only the account this computer is linked to can ask it to check for an update from Coral Hub", nil)
+		return
+	}
+	if reason, code := h.gate(r.Context(), id); reason != "" {
+		h.refuse(w, r, id, nil, http.StatusForbidden, code, "this computer does not allow Coral Hub to check for or install updates", nil)
+		return
+	}
+	if r.URL.RawQuery != "" || r.ContentLength != 0 || len(r.TransferEncoding) > 0 {
+		h.refuse(w, r, id, nil, http.StatusBadRequest, "no_arguments", "this takes no arguments: Coral decides what to fetch", nil)
+		return
+	}
+	h.startCheck(w, r, func() { h.audit(r.Context(), id, nil, "check_started") }, map[string]any{"ok": true, "state": "checking"})
 }
 
 // SetAuto: PUT /api/system/update/settings {"auto": bool}: whether Coral checks for updates (and keeps one staged) by itself. The one object, one field, at most 1 KB.

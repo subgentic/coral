@@ -119,6 +119,7 @@ var operatorOnlyRoutes = map[string]string{
 	"POST /api/system/update/install":        "install the staged update (Windows)",
 	"POST /api/system/update/relaunch-local": "relaunch Coral into the staged update from this computer",
 	"POST /api/system/update/check":          "check for an update now",
+	"POST /api/system/update/check-hub":      "Coral Hub's owner asks this computer to check for an update now",
 	"PUT /api/system/update/settings":        "change whether Coral checks for updates automatically",
 	// #4065: the models each agent CLI offers. Reading runs no CLI, but agents have no use for
 	// it; a refresh runs the user's CLIs (rate limited) and is the Operator's.

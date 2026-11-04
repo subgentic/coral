@@ -161,6 +161,10 @@ func TestTheOwnerTableAgreesWithTheHandWrittenListItReplaced(t *testing.T) {
 			if m == http.MethodPost && strings.HasPrefix(p, "/api/board/") && (strings.HasSuffix(p, "/goal-images") || strings.HasSuffix(p, "/goals")) { // and the goal create, which names them
 				continue
 			}
+			// Asking this computer to check for an update (#13258) is the owner's alone through the hub: the old list never had it.
+			if m == http.MethodPost && p == UpdateCheckPath {
+				continue
+			}
 			// Chief's state (#11470) is the owner's alone through the hub: the old list never had it.
 			if m == http.MethodGet && p == "/api/chief" {
 				continue

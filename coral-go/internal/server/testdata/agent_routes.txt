@@ -444,6 +444,7 @@ b POST /api/system/update/install
 b POST /api/system/update/relaunch
 b POST /api/system/update/relaunch-local
 b POST /api/system/update/check
+b POST /api/system/update/check-hub
 b POST /api/tags
 b POST /api/tasks/run
 b POST /api/tasks/runs/{runID}/kill
