@@ -33,6 +33,8 @@ Paginated, filterable list of historical sessions. Supports both agent sessions 
 | `min_duration_sec` | int | | Minimum session duration in seconds |
 | `max_duration_sec` | int | | Maximum session duration in seconds |
 
+The merged `type=all` list reads at most 20,000 agent chats to put the group chats among them by time: a page past that (`page` times `page_size` above 20,000) is empty or short and the answer says `"window_capped": true` and `"max_page"` (the last page served). Pages inside the window have neither key; `total` is always the true count.
+
 **Response:**
 ```json
 {
@@ -250,7 +252,9 @@ Git commit snapshots captured during the session.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `limit` | int | 20 | Max number of commits to return |
+| `limit` | int | 20 | Max number of commits to return (up to 200), oldest first |
+
+The answer also has `total` (every commit of the session) and `has_more` (more than `limit`): there is no cursor.
 
 **Response:**
 ```json

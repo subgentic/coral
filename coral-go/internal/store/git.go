@@ -326,6 +326,23 @@ func (s *GitStore) GetGitSnapshotsForSession(ctx context.Context, sessionID stri
 	return sanitizeAll(snaps, err)
 }
 
+// CountGitSnapshotsForSession is how many commits GetGitSnapshotsForSession would return without its limit: the session's own, else (as there) those in the time range its index row gives (#13289).
+func (s *GitStore) CountGitSnapshotsForSession(ctx context.Context, sessionID string) (int, error) {
+	var n int
+	if err := s.db.GetContext(ctx, &n, `SELECT COUNT(*) FROM git_snapshots WHERE session_id = ?`, sessionID); err != nil || n > 0 {
+		return n, err
+	}
+	var idx struct {
+		FirstTS *string `db:"first_timestamp"`
+		LastTS  *string `db:"last_timestamp"`
+	}
+	if err := s.db.GetContext(ctx, &idx, "SELECT first_timestamp, last_timestamp FROM session_index WHERE session_id = ?", sessionID); err != nil || idx.FirstTS == nil || idx.LastTS == nil {
+		return 0, nil
+	}
+	err := s.db.GetContext(ctx, &n, `SELECT COUNT(*) FROM git_snapshots WHERE commit_timestamp >= ? AND commit_timestamp <= ?`, *idx.FirstTS, *idx.LastTS)
+	return n, err
+}
+
 // ReplaceChangedFiles replaces changed-file records for an agent/session and diff mode.
 // Each (session, diff_mode) pair is cached independently so switching modes is instant.
 func (s *GitStore) ReplaceChangedFiles(ctx context.Context, agentName, workingDir string, files []ChangedFile, sessionID *string, diffMode string) error {
