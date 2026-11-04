@@ -72,6 +72,7 @@ func TestFilesGetIgnoresTheRefreshFlagsAndThePostStillHonoursThem(t *testing.T) 
 
 	post := func(query string) {
 		t.Helper()
+		defer forgetRefreshResults() // a reused answer must not stand for the next question (see forgetRefreshResults)
 		req, _ := http.NewRequest("POST", server.URL+"/api/sessions/live/"+name+"/files/refresh"+query, bytes.NewBufferString(`{"session_id":"`+sid+`"}`))
 		resp, err := http.DefaultClient.Do(req)
 		require.NoError(t, err)

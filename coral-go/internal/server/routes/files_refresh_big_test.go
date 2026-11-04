@@ -154,6 +154,7 @@ func TestRefreshFilesPausesASlowFolderAndRefreshRunsOnePass(t *testing.T) {
 	t.Cleanup(func() { refreshComputeHook = func() {} })
 	post := func(query string) map[string]any {
 		t.Helper()
+		defer forgetRefreshResults() // each call is a new question: a pass slow enough to be reused (a loaded machine) must not answer the next one
 		req, _ := http.NewRequest("POST", server.URL+"/api/sessions/live/"+name+"/files/refresh"+query, bytes.NewBufferString(`{"session_id":"`+sid+`"}`))
 		resp, err := http.DefaultClient.Do(req)
 		require.NoError(t, err)
@@ -282,4 +283,12 @@ loop:
 	require.Len(t, a.Files, refreshFilesCap, "and the list sent is the cap")
 	require.Less(t, worst, 200*time.Millisecond, "another route answers in under 200 ms while the refresh runs")
 	require.Greater(t, probes, 2, "the refresh took long enough to be probed")
+}
+
+// forgetRefreshResults drops the answers the refresh flights keep for reuse. A pass that took longer than refreshReuseOver is answered again for as long as it took, so on a loaded machine a test that asks twice
+// and counts the passes saw one where it expected two ("expected 2, saw 1", a flake of the gate); a test that counts passes calls this after each answer.
+func forgetRefreshResults() {
+	refreshFlights.mu.Lock()
+	refreshFlights.recent = map[string]refreshRecent{}
+	refreshFlights.mu.Unlock()
 }
