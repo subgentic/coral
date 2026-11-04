@@ -12,6 +12,7 @@ const started = new Promise(resolve => { entered = resolve; });
 globalThis.fetch = async (url, options = {}) => {
     reads++;
     const u = new URL(url, 'http://localhost');
+    if (u.pathname === '/api/team-artifacts') return Response.json({artifacts:[],has_more:false});
     if(u.pathname==='/api/board/projects')return Response.json([{project:'a'}]);
     if(u.pathname.endsWith('/tags')) {
         if(fail)return Response.json({error:'Try again'}, {status:500});
@@ -50,6 +51,7 @@ let token = 100, rows = [row(301)], hold = false, resolveList, sawList;
 let heldList = new Promise(resolve => { sawList = resolve; });
 globalThis.fetch = async url => {
     const u = new URL(url, 'http://localhost');
+    if (u.pathname === '/api/team-artifacts') return Response.json({artifacts:[],has_more:false});
     if (u.pathname === '/api/board/projects') return Response.json([{ project: 'a' }]);
     if (u.pathname.endsWith('/status')) return Response.json({ artifacts_rev: token });
     const data = { artifacts: u.searchParams.get('tag') === 'saved' ? [] : rows.slice(), has_more: false, artifacts_rev: token };
@@ -82,6 +84,7 @@ const listStarted = new Promise(resolve => { inList = resolve; });
 let pauseFirst = true;
 globalThis.fetch = async url => {
     const u = new URL(url, 'http://localhost');
+    if (u.pathname === '/api/team-artifacts') return Response.json({artifacts:[],has_more:false});
     if (u.pathname === '/api/board/projects') { projectScans++; return Response.json([]); }
     if (u.pathname.endsWith('/projects')) return Response.json([{ project: 'alpha' }]);
     if (u.pathname.endsWith('/status')) return Response.json({ artifacts_rev: 201 });
