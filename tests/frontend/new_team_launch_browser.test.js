@@ -9,7 +9,7 @@ const { install: installNT, N, T, openNewTeam, scenarios, stubModels } = require
 const BASE = require('./test_base').BASE;
 const { removeBoards } = require('./helpers/board_cleanup');
 
-const REQUEST_KEYS = ['board_name', 'working_dir', 'agent_type', 'flags', 'agents', 'board_server', 'worktree', 'base_branch', 'working_mode', 'health_monitor'];
+const REQUEST_KEYS = ['board_name', 'working_dir', 'agent_type', 'flags', 'agents', 'board_server', 'worktree', 'base_branch', 'working_mode', 'health_monitor', 'home_folder_ask'];
 const AGENT_KEYS = ['name', 'prompt', 'icon', 'capabilities', 'agent_type', 'model', 'thinking', 'flags', 'permission_mode']; // permission_mode is Default only (#10362)
 
 (async () => {
