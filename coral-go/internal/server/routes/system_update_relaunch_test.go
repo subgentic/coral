@@ -430,13 +430,13 @@ func TestAStaleTokenGetsTheNewListAndANewToken(t *testing.T) {
 }
 
 func TestTheTokenIsBoundToTheIdentityAndExpires(t *testing.T) {
-	// Two owners of a machine enrolled without a label: a token issued to one does not verify for the other.
+	// A machine enrolled without an owner label (linked before it was recorded) refuses even the owner's relaunch (#13258: the relaunch row is the owner's alone and needs the label): it must link again.
 	e := newRelaunchEnv(t)
 	e.label = ""
 	tok := e.token(ownerA)
 	code, out := e.post(ack(tok), hubHdr(ownerB))
-	assert.Equal(t, 409, code)
-	assert.Equal(t, "stale_ack", out["code"])
+	assert.Equal(t, 403, code)
+	assert.Equal(t, "relink_needed", out["code"], "a distinct answer: link this computer again, not 'you are not the owner'")
 	assert.Zero(t, e.up.applyCount())
 
 	// A token with its payload or MAC changed does not verify.

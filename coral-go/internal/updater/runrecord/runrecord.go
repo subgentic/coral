@@ -30,7 +30,7 @@ type Record struct {
 var envAllowed = map[string]bool{
 	"HOMEBREW_PREFIX": true, // where a Homebrew cask is looked for, by the updater's install check (#5280 step 3 B)
 	"CORAL_DATA_DIR":  true, "CORAL_DIR": true, "CORAL_HOST": true, "CORAL_HUB": true, "CORAL_STRICT_LOCAL_AUTH": true, "CORAL_DB_ENCRYPTION": true,
-	"CORAL_CLOUD_URL": true, "CORAL_CLOUD_CONNECT": true, "CORAL_CLOUD_MAX_MODE": true, "CORAL_TLS_CERT": true, "CORAL_TLS_KEY": true, "CORAL_TMUX_BIN": true,
+	"CORAL_CLOUD_URL": true, "CORAL_CLOUD_CONNECT": true, "CORAL_CLOUD_MAX_MODE": true, "CORAL_ALLOW_HUB_UPDATE": true, "CORAL_TLS_CERT": true, "CORAL_TLS_KEY": true, "CORAL_TMUX_BIN": true,
 	"CORAL_NO_AUTO_LOOPBACK": true, "CORAL_STALL_WATCHDOG": true,
 	"PATH": true, "HOME": true, "USER": true, "LOGNAME": true, "SHELL": true, "LANG": true, "LC_ALL": true, "TZ": true, "TMPDIR": true, "TERM": true,
 	"XDG_RUNTIME_DIR": true, "XDG_DATA_HOME": true, "XDG_CONFIG_HOME": true, "XDG_STATE_HOME": true,

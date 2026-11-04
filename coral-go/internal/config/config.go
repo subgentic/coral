@@ -111,6 +111,11 @@ type Config struct {
 	// Empty leaves the saved setting alone (view if none).
 	CloudMaxMode string
 
+	// AllowHubUpdate is the launch-time form of the local switch "Let Coral Hub relaunch this Coral to install updates" (hub_relaunch_updates): --allow-hub-update or CORAL_ALLOW_HUB_UPDATE=1, for a
+	// computer nobody sits at (a remote instance managed from the Hub). Whoever starts the process is its owner; it only turns the switch ON, at every start, and everything that still gates a
+	// Hub relaunch (the stamped owner, the access cap, the cap on relaunches, the Operator's opt-out, the agents guard) is unchanged (#13258).
+	AllowHubUpdate bool
+
 	// BootstrapFile and ProofFile name a one-time Coral Hub credential and its
 	// optional proof (--bootstrap-file, --proof-file), redeemed at startup when
 	// this server has no identity yet (#3149). Paths only: a credential is never
@@ -170,6 +175,7 @@ func Load(dataDir ...string) *Config {
 		CloudURLExplicit: envURLSet && CloudURLSetting(envURL, envURLSet) != "",
 		CloudConnect:     cloudConnectFromEnv(os.Getenv("CORAL_CLOUD_CONNECT")),
 		CloudMaxMode:     strings.ToLower(strings.TrimSpace(os.Getenv("CORAL_CLOUD_MAX_MODE"))),
+		AllowHubUpdate:   Truthy(os.Getenv("CORAL_ALLOW_HUB_UPDATE")),
 		coralDir:         coralDir,
 		DBPath:           filepath.Join(coralDir, "sessions.db"),
 		DBBusyTimeoutMS:  5000,
