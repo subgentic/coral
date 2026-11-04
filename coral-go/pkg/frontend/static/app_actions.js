@@ -14,7 +14,7 @@ import { connectTerminalWs, disconnectTerminalWs } from './xterm_renderer.js';
 import { saveNotes, generateSummary, toggleNotesEdit, cancelNotesEdit, switchHistoryTab } from './notes.js';
 import { addTagToSession, removeTagFromSession, showTagDropdown, hideTagDropdown, createTag } from './tags.js';
 import { hideTaskDetailModal, showCreateTaskModal, hideCreateTaskModal, completeAgentTask, _doCompleteAgentTask, showAgentTaskDetailModal } from './tasks.js';
-import { openFilePreview, openFileEdit, refreshChangedFiles, copyFilePath } from './changed_files.js';
+import { openFilePreview, openFileEdit, refreshChangedFiles, copyFilePath, turnOnLiveFiles } from './changed_files.js';
 import { activateCustomView } from './custom_views.js';
 
 import { popoutRetry } from './popout.js';
@@ -235,6 +235,7 @@ registerActions({
     'session-restart': () => window.restartSession(),
     'popout-retry': () => window.popoutRetry(),
     'files-refresh': () => window.refreshChangedFiles(),
+    'files-live-on': () => turnOnLiveFiles(),
     'task-create-show': () => window.showCreateTaskModal(),
 });
 
