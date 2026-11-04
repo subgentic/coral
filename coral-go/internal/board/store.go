@@ -29,6 +29,7 @@ type Store struct {
 	settingsPending         map[string]*settingsPending // by board
 	activityMu              sync.Mutex                  // one writer of the Activity record's chain at a time (operator_actions.go)
 	dbPath                  string                      // the board file's path (the disk the message search index is built on)
+	lastRead                atomic.Int64                // when the board was last read (unix nanoseconds): the index check waits until nobody is reading (#13310)
 	db                      *sqlx.DB
 	readDB                  *sqlx.DB
 	sessionsDB              *sqlx.DB                            // optional reference to the main sessions DB for cross-DB queries
@@ -59,6 +60,7 @@ func isInMemoryPath(dbPath string) bool {
 }
 
 func (s *Store) reader() *sqlx.DB {
+	s.lastRead.Store(time.Now().UnixNano()) // the board is being read: the one-time index check waits for a quiet moment (message_fts.go, #13310)
 	if s.readDB != nil {
 		return s.readDB
 	}

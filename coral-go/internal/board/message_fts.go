@@ -458,6 +458,34 @@ var (
 	messageIndexCheckMaxMessages = int64(500000)
 )
 
+// The check is one statement that holds the writer's connection and a core for about 1.5 s per 50,000 messages (#13310: it landed in a page's first load and the first read took 2.4 s). It cannot be cut into batches, so it
+// is moved to a moment nobody is reading the board: after messageIndexCheckDelay it waits until the board has not been read for messageIndexQuiet, looking every messageIndexQuietPoll, and runs anyway after
+// messageIndexQuietWaitMax so a board that is always being read is still checked.
+var (
+	messageIndexQuiet        = 10 * time.Second
+	messageIndexQuietPoll    = 2 * time.Second
+	messageIndexQuietWaitMax = 30 * time.Minute
+	messageIndexCheckHook    = func() {} // a test counts the runs
+)
+
+// waitForQuietBoard returns when nobody has read the board for messageIndexQuiet, or after messageIndexQuietWaitMax, or when ctx ends (it reports false then).
+func (s *Store) waitForQuietBoard(ctx context.Context) bool {
+	deadline := time.Now().Add(messageIndexQuietWaitMax)
+	for {
+		if ctx.Err() != nil {
+			return false // the store was closed (or the check cancelled): never run a check on it, quiet or not
+		}
+		if time.Since(time.Unix(0, s.lastRead.Load())) >= messageIndexQuiet || time.Now().After(deadline) {
+			return true
+		}
+		select {
+		case <-ctx.Done():
+			return false
+		case <-time.After(messageIndexQuietPoll):
+		}
+	}
+}
+
 func (s *Store) startMessageSearchIndexCheck() {
 	ctx, cancel := context.WithCancel(context.Background())
 	if old := s.msgIndexCheckStop.Swap(&cancel); old != nil {
@@ -470,6 +498,10 @@ func (s *Store) startMessageSearchIndexCheck() {
 			return
 		case <-time.After(messageIndexCheckDelay):
 		}
+		if !s.waitForQuietBoard(ctx) {
+			return
+		}
+		messageIndexCheckHook()
 		if _, err := s.CheckMessageSearchIndex(ctx); err != nil && ctx.Err() == nil {
 			log.Printf("board: checking the message search index: %v", err)
 		}
