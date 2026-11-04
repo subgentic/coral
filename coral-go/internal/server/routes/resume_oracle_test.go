@@ -557,23 +557,24 @@ func (h *SessionsHandler) resumeBefore4809(w http.ResponseWriter, r *http.Reques
 	// The launch command is built before the terminal is touched: when it can't be built
 	// (#3601 W12), the resume fails with the old agent still running.
 	cmd, err := launchCommand(agentImpl, agent.LaunchParams{
-		SessionID:       newSessionID,
-		SessionName:     newSessionName,
-		ProtocolPath:    h.protocolPath(),
-		ResumeSessionID: body.SessionID,
-		WorkingDir:      workdir,
-		CLIPath:         agent.ResolveCLIPath(userSettings, agentType), // Settings > CLI paths (#3205)
-		BoardName:       storedBoard,
-		BoardLabel:      h.boardLabel(storedBoard),
-		Role:            role,
-		Prompt:          storedPrompt,
-		PromptOverrides: promptOverrides(userSettings),
-		BoardType:       storedBoardType,
-		Tools:           storedTools,
-		PermissionMode:  userSettings["default_permission_mode"],
-		CoralDir:        h.cfg.CoralDir(),
-		CoralHost:       h.cfg.AgentHost(),
-		CoralPort:       h.cfg.Port,
+		SessionID:        newSessionID,
+		SessionName:      newSessionName,
+		ProtocolPath:     h.protocolPath(),
+		EmbeddedProtocol: true, // #13523: a resumed team agent carries the compiled-in protocol when no file reads, as the real resume does
+		ResumeSessionID:  body.SessionID,
+		WorkingDir:       workdir,
+		CLIPath:          agent.ResolveCLIPath(userSettings, agentType), // Settings > CLI paths (#3205)
+		BoardName:        storedBoard,
+		BoardLabel:       h.boardLabel(storedBoard),
+		Role:             role,
+		Prompt:           storedPrompt,
+		PromptOverrides:  promptOverrides(userSettings),
+		BoardType:        storedBoardType,
+		Tools:            storedTools,
+		PermissionMode:   userSettings["default_permission_mode"],
+		CoralDir:         h.cfg.CoralDir(),
+		CoralHost:        h.cfg.AgentHost(),
+		CoralPort:        h.cfg.Port,
 	})
 	if err != nil {
 		errInternalServer(w, err.Error())
