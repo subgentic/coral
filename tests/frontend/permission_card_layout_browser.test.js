@@ -35,7 +35,10 @@ const SHAPES = {
         const d = document.querySelector('dialog.inbox-ask-dialog[open]'); if (!d) return null;
         const R = e => e.getBoundingClientRect(), dr = R(d), vw = innerWidth, vh = innerHeight;
         const vis = e => e.getClientRects().length > 0;
-        const parts = [...d.querySelectorAll('h2, .inbox-ask-sub, .inbox-ask-text, .inbox-ask-offers-list > button, .inbox-ask-buttons > button')].filter(vis).map(e => ({ cls: e.className || e.tagName, r: R(e), over: e.scrollWidth - e.clientWidth, t: e.textContent.slice(0, 24) }));
+        const body = d.querySelector('.inbox-card-body'), br = body ? R(body) : null;
+        // a part inside the scrolling body counts by what shows: the body clips it, so a choice scrolled out of sight is under nothing (its box still reaches the footer's rows, which is not an overlap)
+        const shown = (e, r) => { if (!br || !body.contains(e)) return r; const l = Math.max(r.left, br.left), t = Math.max(r.top, br.top), rt = Math.min(r.right, br.right), b = Math.min(r.bottom, br.bottom); return rt > l && b > t ? { left: l, top: t, right: rt, bottom: b } : null; };
+        const parts = [...d.querySelectorAll('h2, .inbox-ask-sub, .inbox-ask-text, .inbox-ask-offers-list > button, .inbox-ask-buttons > button')].filter(vis).map(e => ({ cls: e.className || e.tagName, r: shown(e, R(e)), over: e.scrollWidth - e.clientWidth, t: e.textContent.slice(0, 24) })).filter(p => p.r);
         const inter = (a, b) => Math.min(a.right, b.right) - Math.max(a.left, b.left) > 1 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 1;
         const overlaps = []; for (let i = 0; i < parts.length; i++) for (let j = i + 1; j < parts.length; j++) if (inter(parts[i].r, parts[j].r)) overlaps.push(parts[i].t + ' x ' + parts[j].t);
         const past = parts.filter(p => p.r.right > dr.right + 1 || p.r.left < dr.left - 1).map(p => p.t);
