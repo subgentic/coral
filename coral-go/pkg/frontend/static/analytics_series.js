@@ -24,7 +24,8 @@ const STEP_WORD = { '5m': 'each 5 minutes', '1h': 'each hour', '1d': 'each day' 
 const svg = (tag, attrs, text) => { const e = document.createElementNS('http://www.w3.org/2000/svg', tag); for (const k in attrs || {}) e.setAttribute(k, attrs[k]); if (text != null) e.textContent = text; return e; };
 /** How much larger the axis text is drawn than its design size (200% text, a large-text setting): the margins grow with it so a label is not cut off (#13065). */
 function textScale(host) {
-    const p = svg('svg', { class: 'viz-svg', 'aria-hidden': 'true' }), t = svg('text', {}, '0'); p.append(t); p.style.cssText = 'position:absolute;visibility:hidden;width:0;height:0';
+    const p = svg('svg', { 'aria-hidden': 'true' }), t = svg('text', {}, '0'); t.style.fontSize = 'var(--fs-sm)'; p.append(t); // not a .viz-svg: a chart drawn is counted by that class (analytics_agent_draws_browser)
+    p.style.cssText = 'position:absolute;visibility:hidden;width:0;height:0';
     host.append(p); const px = parseFloat(getComputedStyle(t).fontSize) || 11; p.remove(); return Math.max(1, px / 11);
 }
 /** Date ticks that would run into each other are left out: the last one stays first, then the first, then the middle ones (#13065). Needs the svg in the page. */
