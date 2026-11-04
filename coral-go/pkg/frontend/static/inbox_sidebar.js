@@ -21,7 +21,7 @@ import { operatorAsks, refreshOperatorAsks, askLine, askPlain, askKey, openAskDi
 import { go, note, backIs, currentRoute } from './nav.js';
 
 import { build, keyRoute, parse as parseRoute, inboxFolderPath, BOARDS_FOLDER, BOARDS_SUB } from './routes.js';
-import { sessionServer, normServer, keyLabel, identityKey, splitKey, goalTeamKey, nativeInbox, decisionNeedsPerson, LOCAL_SERVER, boardFetch } from './server_base.js';
+import { sessionServer, normServer, keyLabel, identityKey, splitKey, goalTeamKey, nativeInbox, nativeNeeds, decisionNeedsPerson, LOCAL_SERVER, boardFetch } from './server_base.js';
 import { teamLabel } from './server_status.js';
 import { showView, showToast, OPERATOR_ID } from './utils.js';
 import { registerActions, textOf } from './actions.js';
@@ -119,7 +119,8 @@ const $ = id => document.getElementById(id);
 /** The Hub-served dashboard's own Inbox (Goal #100, nativeInbox()): Needs you, Tasks and Saved are the Hub's own pages, drawn in the centre in a frame at the constant addresses below (the addresses coral-hub gave on the board, Oct 27);
  *  the chat folders are native, and so are Goals (GET /api/goals, a View route of every online computer) and Artifacts (GET /api/team-artifacts: a View route the Hub answers owner_only for a grantee, who then has no Artifacts folder, #11071). */
 const HUB_FRAMES = { needs: '/inbox/hub/needs', tasks: '/inbox/hub/tasks', saved: '/inbox/hub/saved' };
-const GROUPS = nativeInbox() ? [{ key: 'needs', label: 'Needs you', frame: HUB_FRAMES.needs }, { key: 'tasks', label: 'Tasks', frame: HUB_FRAMES.tasks }, { key: 'goals', label: 'Goals' }, { key: 'artifacts', label: 'Artifacts' }, { key: 'saved', label: 'Saved for later', frame: HUB_FRAMES.saved }].map(g => ({ ...g, search: g.frame ? 'Search the Inbox' : g.key === 'goals' ? 'Search goals' : 'Search artifacts', short: 'Search' })) : [
+const hubFrame = key => (nativeInbox() && HUB_FRAMES[key] && !(key === 'needs' && nativeNeeds()) ? HUB_FRAMES[key] : ''); // a Hub page's address, or '' when the folder is Coral's own (Needs you with the Hub's `needs: 'native'`, #13446)
+const GROUPS = nativeInbox() ? [{ key: 'needs', label: 'Needs you', ...(nativeNeeds() ? {} : { frame: HUB_FRAMES.needs }) }, { key: 'tasks', label: 'Tasks', frame: HUB_FRAMES.tasks }, { key: 'goals', label: 'Goals' }, { key: 'artifacts', label: 'Artifacts' }, { key: 'saved', label: 'Saved for later', frame: HUB_FRAMES.saved }].map(g => ({ ...g, search: g.frame ? 'Search the Inbox' : g.key === 'needs' ? 'Search needs you' : g.key === 'goals' ? 'Search goals' : 'Search artifacts', short: 'Search' })) : [
     { key: 'needs', label: 'Needs you', search: 'Search needs you', short: 'Search' },
     { key: 'tasks', label: 'Tasks', search: 'Search tasks', short: 'Search' },
     { key: 'goals', label: 'Goals', search: 'Search goals', short: 'Search' }, // the open goals of every team the person runs (GET /api/goals): the team page's goal row plus a Team column (#7776)
@@ -925,11 +926,11 @@ function hubFrameTable(key) {
 registerGroupSource('hub-inbox', {
     holdRedraw: true, // not redrawn under a held pointer (#12636): a row answered elsewhere would move the one under the finger
     signature: () => JSON.stringify([state.hub, state.servers]),
-    toolbar: key => HUB_FRAMES[key] && nativeInbox() ? null : key === 'needs' ? inboxNeedsToolbar() : key === 'tasks' ? inboxTaskToolbar() : key === 'goals' ? inboxGoalsToolbar() : key === 'saved' ? inboxSavedToolbar() : key === 'activity' ? inboxActivityToolbar() : CH.CHAT_KEY.test(key) ? inboxChatsToolbar(key) : key === 'artifacts' ? IA.artifactsToolbar(() => renderFolderCounts()) : ({ search: { id: 'inbox-search', label: 'Search the Inbox' } }), // the page's toolbar line, the same shape for Needs you, Tasks and Saved (#7723)
+    toolbar: key => hubFrame(key) ? null : key === 'needs' ? inboxNeedsToolbar() : key === 'tasks' ? inboxTaskToolbar() : key === 'goals' ? inboxGoalsToolbar() : key === 'saved' ? inboxSavedToolbar() : key === 'activity' ? inboxActivityToolbar() : CH.CHAT_KEY.test(key) ? inboxChatsToolbar(key) : key === 'artifacts' ? IA.artifactsToolbar(() => renderFolderCounts()) : ({ search: { id: 'inbox-search', label: 'Search the Inbox' } }), // the page's toolbar line, the same shape for Needs you, Tasks and Saved (#7723)
     keys: () => GROUPS.map(g => g.key),
     redraw: () => renderInboxNav(true),
     table: key => {
-        if (nativeInbox() && HUB_FRAMES[key]) return hubFrameTable(key);
+        if (hubFrame(key)) return hubFrameTable(key);
         if (key === 'needs') {
             askBlockers();
             // the goal its task serves (#7302) is a column when any row has one; the goal's cell opens it on its board
@@ -1054,7 +1055,7 @@ function setGroup(key, { auto = false } = {}) {
         if (input.placeholder !== (g.short || g.search)) input.placeholder = g.short || g.search;
         if (input.getAttribute('aria-label') !== g.search) input.setAttribute('aria-label', g.search); // the name stays whole whatever the placeholder says (a placeholder as short as the box's default no longer skips it)
         if (input.value !== text) input.value = text;
-        const hubPage = nativeInbox() && !!HUB_FRAMES[key]; input.disabled = hubPage; setHidden(input.closest('.sidebar-search'), hubPage || !!g); importOnce('./phone_bar.js').then(m => m.repaintPhoneBarSearch()); // a tab with its own search box (a Hub page, and each of the Inbox's own tabs) has one search: this box is not shown above it, and the phone's top bar drops its field (#11838, #11859)
+        const hubPage = !!hubFrame(key); input.disabled = hubPage; setHidden(input.closest('.sidebar-search'), hubPage || !!g); importOnce('./phone_bar.js').then(m => m.repaintPhoneBarSearch()); // a tab with its own search box (a Hub page, and each of the Inbox's own tabs) has one search: this box is not shown above it, and the phone's top bar drops its field (#11838, #11859)
     }
     const btn = document.querySelector('.sidebar-pane[data-pane="hub-inbox"] [data-display-button]');
     if (btn) { setHidden(btn, key !== 'saved'); syncDisplayPanels(); }
@@ -1084,7 +1085,7 @@ export function setInboxSearch(value) {
 /** The search box was typed in: it narrows the group on screen (Saved's is the server's search). */
 export function filterInbox(value) {
     const text = String(value || '').trim();
-    if (nativeInbox() && HUB_FRAMES[group]) return; // a Hub page has its own search
+    if (hubFrame(group)) return; // a Hub page has its own search
     if (group === 'saved') { queries.saved = text; saved.setSavedQuery(text); return; }
     if (group === 'artifacts') { IA.setArtifactSearch(text); return; } // the folder's own search box shows the same text
     queries[group] = CH.CHAT_KEY.test(group) || group === 'tasks' ? text : text.toLowerCase();

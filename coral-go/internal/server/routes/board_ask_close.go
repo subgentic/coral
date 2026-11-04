@@ -18,6 +18,9 @@ import (
 // closed one, so a question answered in chat or in an artifact comment stayed open and the health check repeated it. The asker, the Operator or the board's orchestrator may close it, with a note that says where
 // it was answered (shown with the ask). The caller is the one the identity layer proves, as for any board write.
 func (h *BoardHandler) CloseAsk(w http.ResponseWriter, r *http.Request) {
+	if refuseNonOwner(w, r) { // through the Hub (#13450) a question is put away, or brought back, by the account this computer is linked to and nobody else: a grantee, a viewer and a guide get 403 owner_only before anything below reads the body
+		return
+	}
 	project := urlParam(r, "project")
 	id, err := parseID(chi.URLParam(r, "messageID"))
 	if err != nil || id <= 0 {
@@ -55,9 +58,6 @@ func (h *BoardHandler) CloseAsk(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if body.Undo {
-		if refuseNonOwner(w, r) { // through the Hub only the account this computer is linked to (a grantee is refused; the Hub's tier table does not offer this route at all)
-			return
-		}
 		if !humanInputCaller(r) { // an Ignore is the Operator's: the agent that asked, the orchestrator and every other token are refused, so no agent reopens what the Operator put away (Security's SHOULD on #11576)
 			writeError(w, http.StatusForbidden, "owner_only", "only the person at this computer can open a question again")
 			return
