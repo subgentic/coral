@@ -42,12 +42,12 @@ const { coralReady } = require('./helpers/wait');
                 assert.ok(p.head && p.add && p.close, at + 'Add task and Close goal are in the header row: ' + JSON.stringify(p));
                 assert.equal(p.bar, false, at + 'there is no bar at the bottom of the page');
                 assert.equal(await ev(`!!document.querySelector('${mount} .goal-head-actions .goals-not-yet')`), false, at + 'a goal with an open task has no Not yet: its item is not in Needs you (#12248)');
-                assert.ok(p.order && p.primary, at + 'Add task first, Close goal the primary after it: ' + JSON.stringify(p));
+                if (!mobile) assert.ok(p.order && p.primary, at + 'Add task first, Close goal the primary after it: ' + JSON.stringify(p)); // a phone keeps one button, Add task, and Close goal is in More (#13119, goal_head_phone_browser)
                 assert.equal(p.label, `Close goal: ${TITLE}`, at + 'Close goal is still named for its goal');
-                assert.ok(p.closeRight >= p.headRight - 2 && p.closeRight <= p.vw, at + 'the buttons end at the right edge of the header: ' + JSON.stringify(p));
+                if (!mobile) assert.ok(p.closeRight >= p.headRight - 2 && p.closeRight <= p.vw, at + 'the buttons end at the right edge of the header: ' + JSON.stringify(p));
                 assert.ok(!p.clipped && !p.sideways, at + 'nothing is clipped or scrolls sideways: ' + JSON.stringify(p));
                 assert.ok(p.headBottom <= p.listTop, at + 'the header is above the goal\'s tasks: ' + JSON.stringify(p));
-                if (mobile) assert.ok(p.addH >= 43.5 && p.closeH >= 43.5, at + 'the buttons are 44 px targets: ' + JSON.stringify(p));
+                if (mobile) assert.ok(p.addH >= 43.5, at + 'the buttons are 44 px targets: ' + JSON.stringify(p));
                 await shot(`goal-head-${width}-${mount.slice(1)}`);
             }
         }
