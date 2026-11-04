@@ -34,12 +34,13 @@ EXTRA = {
     # Which artifact a shortened link means (#9841): resolveArtifactRefs reads the repeatable link from the query map, which the scan above does not follow (not named ref: that name is a file reference here).
     'GET /api/artifacts/resolve': {'link'},
     # facets (#13172): facets=team,by,goal, the distinct values of the matching set with their counts, each with its own filter left out (parseTeamArtifactQuery; a closed list of three words). Added on both artifact list rows, with the Hub told.
+    # muted (#13172): muted=1|0, the files the Operator's inbox settings mute or the ones they do not (parseTeamArtifactQuery; a plain flag, only the Operator's own read marks a row muted). Added on both artifact list rows, with the Hub told.
     # read (#13162): Needs you's unread filter, read=0|1, applied by the computer before the page is cut (parseTeamArtifactQuery, a plain flag: no file reference). Added on both artifact list rows, with the Hub told.
     # The Team Artifacts list's query (#4572): parseTeamArtifactQuery reads these from a url.Values it is handed, not from the request,
     # which the scan above does not follow. Search, filters, sort and cursor paging on the existing route.
-    'GET /api/board/{}/artifacts': {'q', 'kind', 'origin', 'by', 'board', 'kept', 'starred', 'task', 'goal', 'tag', 'since', 'until', 'sort', 'cursor', 'versions', 'read', 'facets'},
+    'GET /api/board/{}/artifacts': {'q', 'kind', 'origin', 'by', 'board', 'kept', 'starred', 'task', 'goal', 'tag', 'since', 'until', 'sort', 'cursor', 'versions', 'read', 'facets', 'muted'},
     # The cross-team artifact list (Goal #62): ListAllTeamArtifacts hands the team route's query parser a url.Values it parsed itself, plus team, limit and offset, which the scan above does not follow.
-    'GET /api/team-artifacts': {'team', 'q', 'kind', 'origin', 'by', 'board', 'kept', 'starred', 'task', 'goal', 'tag', 'since', 'until', 'sort', 'cursor', 'limit', 'offset', 'versions', 'read', 'facets'},
+    'GET /api/team-artifacts': {'team', 'q', 'kind', 'origin', 'by', 'board', 'kept', 'starred', 'task', 'goal', 'tag', 'since', 'until', 'sort', 'cursor', 'limit', 'offset', 'versions', 'read', 'facets', 'muted'},
     # The board message search (#4745): SearchMessages reads these from a url.Values it parsed itself (a mistyped query string is refused,
     # not dropped), which the scan above does not follow.
     'GET /api/board/{}/messages/search': {'q', 'from', 'mentions', 'since', 'until', 'sort', 'limit', 'cursor', 'for_subscriber'},
