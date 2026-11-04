@@ -304,7 +304,7 @@ POST /api/board/{project}/agents/{subscriber}/wake never
 POST /api/board/{project}/artifacts/{id}/review interact
 POST /api/board/{project}/asks/{messageID}/buttons/{buttonID}/claim interact
 POST /api/board/{project}/asks/{messageID}/buttons/{buttonID}/settle interact
-POST /api/board/{project}/asks/{messageID}/close never
+POST /api/board/{project}/asks/{messageID}/close interact
 POST /api/board/{project}/clashes never
 POST /api/board/{project}/cross-team-links never
 POST /api/board/{project}/cross-team/disable launch
