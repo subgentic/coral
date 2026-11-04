@@ -186,6 +186,10 @@ body.panel-dragging .sidebar {
     /* The header row is 57 px from the top of the column to its rule (10 + 36 + 10 + the 1 px rule) on every tab: one component, one height (UI/UX's spec said 53; #7443). A tab without Display options is the same height, its search is wider. */
 }
 
+/* Chief's entry slot above New agent (#13167): its room is reserved from the first paint (the slot is there, invisible, until Chief's answer fills it), so the late answer moves nothing below it. These rules are in the start stylesheet on purpose: chief.css loads with the answer. */
+.sidebar-footer:has(> .sidebar-chief-slot:not([hidden])) { flex-wrap: wrap; row-gap: 8px; }
+.sidebar-chief-slot { flex: 1 0 100%; min-width: 0; min-height: 36px; }
+.sidebar-chief-slot[data-pending] { visibility: hidden; }
 .sidebar-footer {
     padding: 12px 12px 20px;
     border-top: 1px solid var(--border);
