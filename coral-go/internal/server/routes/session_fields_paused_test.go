@@ -32,4 +32,19 @@ func TestGitListFieldsMarksAFolderWithPausedLiveUpdates(t *testing.T) {
 	_, _, state = gitListFields(other)
 	_, has := state.(map[string]any)["paused"]
 	require.False(t, has, "another folder is not marked")
+
+	// UI Reviewer's MUST on #13092: the paused total is the Files list's comparison (committed changes included), never the uncommitted count: a clean worktree stays at 0 dirty.
+	clean := &store.GitSnapshot{Branch: "feature", WorkingDirectory: "/work/clean", DirtyCount: 0, BaseBranch: "main"}
+	gitguard.Pause("/work/clean", 20, time.Second)
+	_, _, state = gitListFields(clean)
+	gs = state.(map[string]any)
+	require.Equal(t, 0, gs["dirty"], "a clean worktree has no uncommitted files, paused or not")
+	require.Equal(t, 20, gs["paused"].(map[string]any)["changes"], "the 20 are the comparison's total, said as such")
+
+	few := &store.GitSnapshot{Branch: "feature", WorkingDirectory: "/work/few", DirtyCount: 3, BaseBranch: "main"}
+	gitguard.Pause("/work/few", 2, time.Second)
+	_, _, state = gitListFields(few)
+	gs = state.(map[string]any)
+	require.Equal(t, 2, gs["paused"].(map[string]any)["changes"], "the comparison's total is not raised to the uncommitted count")
+	require.Equal(t, 3, gs["dirty"])
 }

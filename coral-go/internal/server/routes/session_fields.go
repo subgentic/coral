@@ -44,7 +44,7 @@ func gitListFields(git *store.GitSnapshot) (branch, repoName, gitState any) {
 			"dirty":       git.DirtyCount,
 		}
 		if isPaused {
-			state["paused"] = map[string]any{"changes": max(pz.Changes, git.DirtyCount), "took_ms": pz.TookMs}
+			state["paused"] = map[string]any{"changes": pz.Changes, "took_ms": pz.TookMs} // the files the Files list compared when it was last read (the selected comparison, committed ones included): not the uncommitted count, which stays dirty
 		}
 		gitState = state
 	}

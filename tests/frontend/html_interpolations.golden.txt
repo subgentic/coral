@@ -374,13 +374,13 @@
 1	session_rows.js	stuckClass
 1	session_rows.js	terminalGoneChip(s)
 1	session_rows.js	typeTag
-1	session_state.js	dirty
 1	session_state.js	group(chips, 'tt-agent')
 1	session_state.js	group(head, 'tt-head')
 1	session_state.js	group(usage, 'tt-usage')
 1	session_state.js	group(work, 'tt-work')
 1	session_state.js	gs.ahead
 1	session_state.js	gs.behind
+1	session_state.js	gs.dirty
 1	session_state.js	ttUnread
 1	sessions.js	EMOJI_CATEGORIES.map(cat => ` <div class="emoji-picker-category">${escapeHtml(cat.name)}</div> <div class="emo
 2	sessions.js	cat.emojis.map(e => `<button class="btn btn-quiet btn-icon emoji-picker-btn" data-emoji="${escapeAttr(e)}">${e
