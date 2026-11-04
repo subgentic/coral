@@ -27,3 +27,7 @@
 
 /* Keep the title and controls whole when large text makes the player taller. */
 .artifact-viewer.avc-video .artifact-viewer-header { flex-shrink: 0; }
+/* Focus/scrollIntoView must scroll the panes, never move the fixed header away. */
+.artifact-viewer.avc-video .artifact-viewer-content { overflow: clip; }
+/* This frame has no padded edge for the shared footer's negative margin. */
+.artifact-viewer.avc-video .artifact-viewer-foot { flex-shrink: 0; margin: 0; }
