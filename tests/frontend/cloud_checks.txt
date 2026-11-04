@@ -309,3 +309,4 @@ node launch_cards_goal_desc.test.js
 node cloud_signin_leaving.test.js
 
 node hub_world_scope.test.js
+node home_folder_ask.test.mjs

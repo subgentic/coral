@@ -238,6 +238,14 @@ func (h *SessionsHandler) WakeSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// The folder the wake will use: the team's home folder when one applies, else the row's. The home folder itself is asked about once (#13425).
+	wakeDir := sess.WorkingDir
+	if dir := h.teamHomeFolder(ctx, sess); dir != "" {
+		wakeDir = dir
+	}
+	if askAboutHomeFolder(w, r, wakeDir, r.URL.Query().Get("confirm_home_folder") == "1") {
+		return
+	}
 	if err := h.wakeExistingSession(ctx, sess); err != nil {
 		log.Printf("Failed to wake session %s: %v", sessionID[:8], err)
 		if errors.Is(err, ErrStillInOldTmux) {

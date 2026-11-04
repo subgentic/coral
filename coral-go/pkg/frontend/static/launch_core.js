@@ -8,6 +8,7 @@ import { blockedReason } from './hub_access.js';
 import { loadLiveSessions } from './api.js';
 import { isHub, normServer, LOCAL_SERVER, noteBoardLabels } from './server_base.js';
 import { chooseBoard, retryPayload, isBoardNameExists } from './board_choice.js';
+import { isHomeFolderAsk, askHomeFolder } from './home_folder_ask.js';
 import { serverLabel, launchBlockReason, postLaunch, waitForLaunched } from './launch_server.js';
 const { launchFlags } = await importOnce('./launch_flags.js');
 const { launch } = await importOnce('./launch_state.js');
@@ -132,6 +133,11 @@ export async function _launchOn(server, path, payload, agentType, { dirInput = n
         const retry = retryPayload(payload, pick);
         if (!retry) return null; // cancelled: nothing launched
         res = await postLaunch(server, path, retry);
+    }
+    // The home folder itself (#13425): the person is asked once; Launch anyway sends the same launch with confirm_home_folder.
+    if (!res.ok && isHomeFolderAsk(res.status, res.data)) {
+        if (!(await askHomeFolder('Launch', res.data.message))) return null; // Pick a folder: nothing launched, the dialog stays for the change
+        res = await postLaunch(server, path, { ...payload, confirm_home_folder: true });
     }
     if (res.ok && res.data && res.data.board_id) noteBoardLabels([res.data], 'board_id', server); // the board it joined or started
     // A team in which no member started (#122): the answer carries each member's error. A caller that shows them per member (the team dialog, the

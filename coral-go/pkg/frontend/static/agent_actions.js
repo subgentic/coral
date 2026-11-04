@@ -11,6 +11,7 @@ import { importOnce } from './import_once.js';
 import { resolveSessionIdentity } from './session_state.js';
 import { agentWords, whatStaysKill, WHAT_STAYS_ARCHIVE, WHAT_STAYS_SLEEP } from './agent_words.js';
 import { applySleepingView } from './sleeping_view.js';
+import { isHomeFolderAsk, askHomeFolder } from './home_folder_ask.js';
 
 // What Kill does with the agent's terminal log, said in every Kill confirmation (#4399): it is kept, on both terminal backends
 // (#4437: tmux's KillSession no longer removes it), in <data dir>/logs.
@@ -116,10 +117,13 @@ export async function setAgentAutoSleep(name, agentType, sessionId, mode) {
 export function toggleAgentSleep(name, agentType, sessionId, action) {
     const server = serverForSession(name, sessionId);
     // Resolves true when the server applied the action.
-    const doIt = async () => {
+    const doIt = async (confirmHome) => { // true only from the home-folder question below (a confirm dialog may pass other arguments)
         try {
-            const resp = await serverFetch(server, `/api/sessions/live/${encodeURIComponent(sessionId)}/${action}`, { method: 'POST' });
+            const resp = await serverFetch(server, `/api/sessions/live/${encodeURIComponent(sessionId)}/${action}${confirmHome === true ? '?confirm_home_folder=1' : ''}`, { method: 'POST' });
             const data = await resp.json();
+            if (action === 'wake' && confirmHome !== true && isHomeFolderAsk(resp.status, data)) { // the home folder itself (#13425): asked once, Wake anyway sends it again
+                return (await askHomeFolder('Wake', data.message)) ? doIt(true) : false;
+            }
             if (!data.ok) { showToast(data.error || 'Failed to toggle sleep', true); return false; }
             const sleeping = !!data.sleeping;
             const s = state.liveSessions.find(s => s.session_id === sessionId && sessionServer(s) === server);
