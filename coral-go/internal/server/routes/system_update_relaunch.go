@@ -281,7 +281,7 @@ func (h *UpdateRelaunchHandler) identify(r *http.Request) callerIdentity {
 // relinkNeeded: the request carries a stamped owner marker for a personal machine, but this computer was linked to Coral Hub before it recorded its owner label, so the routes that need the label (the relaunch and the
 // Hub's check) refuse even the owner until the computer is linked again. A distinct answer (#13258, Security's INFO): the Hub user is told what to do, not that they are not the owner.
 func (h *UpdateRelaunchHandler) relinkNeeded(r *http.Request) bool {
-	id := identifyOwner(r, h.OwnerUser, h.OwnerRecord, &h.noLabelLogged)
+	id := stampedOwnerOf(r, h.OwnerUser, h.OwnerRecord, &h.noLabelLogged) // the stamp checks live in hub_owner.go only (TestTheOwnerDecisionHasOneImplementation)
 	return id.owner && !id.team && routeNeedsOwnerLabel(r) && !ownerLabelRecordedWith(r, h.OwnerUser)
 }
 

@@ -326,6 +326,11 @@ func ownerSeveralClearsIn(now time.Time) time.Duration {
 //
 // The machine's own record decides which rules apply, before any marker is read (#7061): a team's machine runs identifyTeamOwner and nothing else (the personal owner marker is not an owner there,
 // whatever else the request carries), a personal one runs what follows, and a record that cannot be read or understood is no owner.
+// stampedOwnerOf is identifyOwner for a caller that must see who the stamp says, before the label rules refuse it (the relink answer of the Hub update routes, #13258): the stamp checks stay in this file.
+func stampedOwnerOf(r *http.Request, ownerUser func(context.Context) (string, error), record func(context.Context) (string, string, error), noLabelLogged *sync.Once) callerIdentity {
+	return identifyOwner(r, ownerUser, record, noLabelLogged)
+}
+
 func identifyOwner(r *http.Request, ownerUser func(context.Context) (string, error), record func(context.Context) (string, string, error), noLabelLogged *sync.Once) callerIdentity {
 	var id callerIdentity
 	if !cloud.TunneledAuthentic(r) {
