@@ -51,34 +51,42 @@ func (h *TokenUsageHandler) ListUsage(w http.ResponseWriter, r *http.Request) {
 		filter.TeamID = &id
 	}
 
-	records, err := h.ts.ListUsage(r.Context(), filter)
+	limit, after, ok := usagePageParams(w, q)
+	if !ok {
+		return
+	}
+	// One page and its place are cut in SQL (limit+1 rows say whether there is more); the totals and the per-agent rows are added up in SQL over every match (#13218).
+	rows, err := h.ts.ListUsagePage(r.Context(), filter, after, limit+1)
 	if err != nil {
 		errInternalServer(w, err.Error())
 		return
 	}
-
-	page, nextCursor, ok := pageUsage(w, q, records)
-	if !ok {
+	tot, err := h.ts.UsageTotalsFor(r.Context(), filter)
+	if err != nil {
+		errInternalServer(w, err.Error())
 		return
 	}
+	agents, err := h.ts.UsageByAgent(r.Context(), filter)
+	if err != nil {
+		errInternalServer(w, err.Error())
+		return
+	}
+	nextCursor := ""
+	if len(rows) > limit {
+		rows = rows[:limit]
+		last := rows[limit-1]
+		nextCursor = base64.RawURLEncoding.EncodeToString([]byte(last.RecordedAt + "|" + last.SessionID))
+	}
+	if rows == nil {
+		rows = []store.TokenUsage{}
+	}
 
-	// Compute aggregated totals
-	var totalInput, totalOutput, totalCacheRead, totalCacheWrite, totalTokens int64
-	var totalCost float64
 	var firstMessage, lastMessage time.Time
-	for _, r := range records {
-		totalInput += int64(r.InputTokens)
-		totalOutput += int64(r.OutputTokens)
-		totalCacheRead += int64(r.CacheReadTokens)
-		totalCacheWrite += int64(r.CacheWriteTokens)
-		totalTokens += int64(r.TotalTokens)
-		totalCost += r.CostUSD
-		if ts, err := time.Parse(time.RFC3339Nano, r.SessionStartAt); err == nil && (firstMessage.IsZero() || ts.Before(firstMessage)) {
-			firstMessage = ts
-		}
-		if ts, err := time.Parse(time.RFC3339Nano, r.LastActivityAt); err == nil && (lastMessage.IsZero() || ts.After(lastMessage)) {
-			lastMessage = ts
-		}
+	if ts, err := time.Parse(time.RFC3339Nano, tot.FirstStart); err == nil {
+		firstMessage = ts
+	}
+	if ts, err := time.Parse(time.RFC3339Nano, tot.LastActivity); err == nil {
+		lastMessage = ts
 	}
 	var executionTimeSec int64
 	if !firstMessage.IsZero() && !lastMessage.IsZero() && lastMessage.After(firstMessage) {
@@ -86,18 +94,18 @@ func (h *TokenUsageHandler) ListUsage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
-		"records":     page,
-		"total":       len(records),
+		"records":     rows,
+		"total":       tot.Sessions,
 		"next_cursor": nextCursor,
-		"agents":      usageByAgent(records),
+		"agents":      agents,
 		"totals": map[string]any{
-			"input_tokens":       totalInput,
-			"output_tokens":      totalOutput,
-			"cache_read_tokens":  totalCacheRead,
-			"cache_write_tokens": totalCacheWrite,
-			"total_tokens":       totalTokens,
-			"cost_usd":           totalCost,
-			"num_sessions":       len(records),
+			"input_tokens":       tot.InputTokens,
+			"output_tokens":      tot.OutputTokens,
+			"cache_read_tokens":  tot.CacheReadTokens,
+			"cache_write_tokens": tot.CacheWriteTokens,
+			"total_tokens":       tot.TotalTokens,
+			"cost_usd":           tot.CostUSD,
+			"num_sessions":       tot.Sessions,
 			"first_message_at":   formatOptionalTime(firstMessage),
 			"last_message_at":    formatOptionalTime(lastMessage),
 			"execution_time_sec": executionTimeSec,
@@ -105,71 +113,31 @@ func (h *TokenUsageHandler) ListUsage(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// usagePageSize is the most session rows one request answers (#13187): the rest come by next_cursor. The totals and the per-agent rows are over every match, not the page.
+// usagePageSize is the most session rows one request answers (#13187): the rest come by next_cursor.
 const usagePageSize = 50
 
-// pageUsage cuts the rows (already filtered, newest activity first, then session id) to one page: limit=N (1..50, default 50) and cursor, which the previous answer's next_cursor gives.
-// The cursor names the last row sent (its recorded_at and session id), so a row that lands between two requests moves the front, not the place: no row is sent twice or skipped after the cursor.
-func pageUsage(w http.ResponseWriter, q url.Values, rows []store.TokenUsage) (page []store.TokenUsage, next string, ok bool) {
-	limit := usagePageSize
+// usagePageParams reads limit=N (1..50, default 50) and cursor (the previous answer's next_cursor: the last row sent, its recorded_at and session id; 200 characters at most).
+// A bad one is a 400. The cursor is only a position in the list, never a query or a path.
+func usagePageParams(w http.ResponseWriter, q url.Values) (limit int, after *store.UsageAfter, ok bool) {
+	limit = usagePageSize
 	if v := q.Get("limit"); v != "" {
 		n, err := strconv.Atoi(v)
 		if err != nil || n < 1 || n > usagePageSize {
 			errBadRequest(w, "limit must be 1 to 50")
-			return nil, "", false
+			return 0, nil, false
 		}
 		limit = n
 	}
-	start := 0
 	if c := q.Get("cursor"); c != "" {
 		raw, err := base64.RawURLEncoding.DecodeString(c)
 		at, id, found := strings.Cut(string(raw), "|")
 		if err != nil || len(c) > 200 || !found {
 			errBadRequest(w, "invalid cursor")
-			return nil, "", false
+			return 0, nil, false
 		}
-		start = sort.Search(len(rows), func(i int) bool { // the first row after the cursor's place in the order
-			if rows[i].RecordedAt != at {
-				return rows[i].RecordedAt < at
-			}
-			return rows[i].SessionID > id
-		})
+		after = &store.UsageAfter{RecordedAt: at, SessionID: id}
 	}
-	end := start + limit
-	if end >= len(rows) {
-		return append([]store.TokenUsage{}, rows[start:]...), "", true
-	}
-	last := rows[end-1]
-	return append([]store.TokenUsage{}, rows[start:end]...), base64.RawURLEncoding.EncodeToString([]byte(last.RecordedAt + "|" + last.SessionID)), true
-}
-
-// usageByAgent adds up every matching row by agent (a session's name, else its id): what the team's usage table shows, so it need not read every row.
-func usageByAgent(rows []store.TokenUsage) []map[string]any {
-	idx := map[string]int{}
-	out := []map[string]any{}
-	for _, r := range rows {
-		name := r.AgentName
-		if name == "" {
-			name = r.SessionID
-		}
-		if name == "" {
-			name = "Unknown agent"
-		}
-		i, seen := idx[name]
-		if !seen {
-			i = len(out)
-			idx[name] = i
-			out = append(out, map[string]any{"name": name, "input_tokens": int64(0), "output_tokens": int64(0), "cache_read_tokens": int64(0), "cache_write_tokens": int64(0), "cost_usd": 0.0, "num_turns": int64(0)})
-		}
-		a := out[i]
-		a["input_tokens"] = a["input_tokens"].(int64) + int64(r.InputTokens)
-		a["output_tokens"] = a["output_tokens"].(int64) + int64(r.OutputTokens)
-		a["cache_read_tokens"] = a["cache_read_tokens"].(int64) + int64(r.CacheReadTokens)
-		a["cache_write_tokens"] = a["cache_write_tokens"].(int64) + int64(r.CacheWriteTokens)
-		a["cost_usd"] = a["cost_usd"].(float64) + r.CostUSD
-		a["num_turns"] = a["num_turns"].(int64) + int64(r.NumTurns)
-	}
-	return out
+	return limit, after, true
 }
 
 func formatOptionalTime(t time.Time) string {

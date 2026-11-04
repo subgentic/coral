@@ -6,7 +6,7 @@ Read token and cost records captured by Coral's agent usage hooks.
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/api/token-usage` | Records plus totals; filters: `session_id`, `board_name`, `team_id`, `since`. |
+| `GET` | `/api/token-usage` | One page of session records (newest activity first) plus totals and a per-agent sum: `limit` (1 to 50, default 50) and `cursor` (the last answer's `next_cursor`); filters: `session_id`, `board_name`, `team_id`, `since`. |
 | `GET` | `/api/token-usage/summary` | Totals grouped by agent type, agent, model and thinking level (`by_agent_type`, `by_agent`, `by_model`, `by_thinking`); optional `since`. `by_thinking` is kept by UTC hour, so a `since` inside an hour includes the whole hour. |
 | `GET` | `/api/token-usage/session/{sessionID}/turns` | Per-turn and cumulative cost for a session. |
 | `GET` | `/api/token-usage/timeseries` | Bucketed cost and tokens; `interval` accepts `5m`, `1h`, or `1d` and defaults to `1h` for a range of up to 7 days and to `1d` for a longer one (no `since` is all history, so `1d`); optional `since`. |
@@ -16,7 +16,7 @@ Read token and cost records captured by Coral's agent usage hooks.
 **An agent's session token** gets 403 `forbidden_for_agent` on `GET /api/token-usage` (the list: every session's records) and `GET /api/token-usage/by-branch`; both are the Operator's. `GET /api/token-usage/session/{sessionID}/turns` answers it for its own session and the sessions on its own board, and 403 `forbidden_other_session` for another. The Operator, the dashboard and the command line are not limited.
 
 `since` is an RFC 3339 timestamp. Monetary values are USD. The list endpoint
-returns `{ "records": [...], "totals": {...} }`; grouping endpoints return
+returns `{ "records": [...], "total": N, "next_cursor": "...", "agents": [...], "totals": {...} }`: `records` is one page of at most 50 sessions (not every row), `total` is the count of every matching session, `next_cursor` is empty on the last page and otherwise goes back as `cursor` for the next 50, and `totals` and `agents` (one sum per agent: `name`, `input_tokens`, `output_tokens`, `cache_read_tokens`, `cache_write_tokens`, `cost_usd`, `num_turns`) cover every matching session, not only the page; a bad `limit` or `cursor` is a 400; grouping endpoints return
 their named collection (`by_agent_type`, `turns`, `buckets`, `teams`, or
 `branches`) and, where applicable, a `totals` object.
 

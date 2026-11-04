@@ -1,10 +1,13 @@
 package routes
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -94,8 +97,19 @@ func TestListUsagePagesFiftyWithATrueTotal(t *testing.T) {
 
 func TestListUsageRefusesABadLimitOrCursor(t *testing.T) {
 	_, _, router := setupTokenUsageTest(t)
-	for _, q := range []string{"?limit=0", "?limit=51", "?limit=x", "?cursor=!!!", "?cursor=bm9waXBl"} {
+	for _, q := range []string{"?limit=0", "?limit=51", "?limit=x", "?cursor=!!!", "?cursor=bm9waXBl", "?cursor=" + strings.Repeat("A", 300), "?cursor=" + base64.RawURLEncoding.EncodeToString([]byte(strings.Repeat("x", 200)+"|s"))} {
 		code, _ := getUsagePage(t, router, q)
 		assert.Equal(t, http.StatusBadRequest, code, q)
 	}
+}
+
+// An agent reads this file to learn the route: it must say the list is one page of 50 with next_cursor, total and agents, not every row (#13218).
+func TestTokenUsageDocSaysTheListIsPaged(t *testing.T) {
+	b, err := os.ReadFile("../../../agent_docs/token-usage.md")
+	require.NoError(t, err)
+	doc := string(b)
+	for _, want := range []string{"50", "next_cursor", "total", "agents", "limit", "cursor"} {
+		assert.Contains(t, doc, want)
+	}
+	assert.NotContains(t, doc, "Records plus totals", "the old line reads as every row")
 }
