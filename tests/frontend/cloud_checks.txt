@@ -320,3 +320,6 @@ node hub_review_settlement.test.mjs
 node team_launch_settings_launch_flag.test.mjs
 node agent_info_sections.test.mjs
 node home_folder_ask.test.mjs
+node artifact_comment_send_queue.test.mjs
+
+node artifact_comment_ask_context.test.mjs
