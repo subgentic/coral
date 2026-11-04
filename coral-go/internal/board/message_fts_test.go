@@ -440,14 +440,23 @@ func TestMessageSearchIndexIsCheckedAfterOpen(t *testing.T) {
 	require.NoError(t, s.Close())
 
 	defer func(d time.Duration) { messageIndexCheckDelay = d }(messageIndexCheckDelay)
-	messageIndexCheckDelay = 400 * time.Millisecond
+	messageIndexCheckDelay = 10 * time.Millisecond
 	defer func(q, p time.Duration) { messageIndexQuiet, messageIndexQuietPoll = q, p }(messageIndexQuiet, messageIndexQuietPoll)
 	messageIndexQuiet, messageIndexQuietPoll = 10*time.Millisecond, 10*time.Millisecond // this test reads the board every 50 ms while it waits: a quiet gap is 10 ms
+	// The check is held at its hook until the test lets it go, so "it has not run yet" is a fact and not a race with a clock: on a loaded run the first query used to come more than the delay after the open, and the
+	// check had run (the flake of a full ./internal/board run, #13310).
+	release := make(chan struct{})
+	var releaseOnce sync.Once
+	letGo := func() { releaseOnce.Do(func() { close(release) }) }
+	defer letGo()
+	defer func() { messageIndexCheckHook = func() {} }()
+	messageIndexCheckHook = func() { <-release }
 	s, err = NewStoreWithKey(path, "")
 	require.NoError(t, err)
 	defer s.Close()
 	a, b := queryBoth(t, s, MessageQueryParams{Q: []string{"heron"}, Limit: []string{"50"}})
 	require.NotEqual(t, b.Total, a.Total, "just after open the stale index still misses the edited word (the check has not run yet)")
+	letGo() // now the check may run: it does, without anyone asking
 	// A read that lands while the rebuild drops and makes the index again can answer with an error ("database schema has changed"): the poll treats an error as "not yet", and only the answer after it counts.
 	// 60 s, not 10: on a loaded runner the check's own wait and the rebuild are slow, and the wait is for an event, not a speed.
 	require.Eventually(t, func() bool {
