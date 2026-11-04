@@ -420,6 +420,14 @@ class SecurityTests(Base):
         self.assertEqual(self.ci('_stop', '1700000000000-abcd').returncode, 0)
         p.wait(timeout=10)
 
+    def test_a_symlink_left_where_the_temp_folder_was_never_gets_its_target_removed(self):
+        outside = os.path.join(self.d, 'outside')
+        os.makedirs(outside)
+        wr(os.path.join(outside, 'keep.txt'), 'precious')
+        self.submit('mac', 'normal', ['sh', '-c', 'rm -rf "$TMPDIR" && ln -s %s "$TMPDIR"' % outside])
+        self.assertEqual(self.ci('run', '--machine', 'mac', '--once', '--no-post').returncode, 0)
+        self.assertEqual(rd(os.path.join(outside, 'keep.txt')), 'precious')
+
     def test_the_ssh_command_notices_a_dead_connection(self):
         r = subprocess.run([sys.executable, '-c', 'import sys; sys.path.insert(0, %r); import ci; print(" ".join(ci.ssh_cmd()))' % os.path.dirname(CI)], env={'PATH': SYSPATH, 'HOME': self.d}, capture_output=True, text=True)
         self.assertIn('ServerAliveInterval=', r.stdout, r.stdout + r.stderr)
