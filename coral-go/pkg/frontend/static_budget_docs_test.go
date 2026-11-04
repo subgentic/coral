@@ -72,8 +72,11 @@ func TestTheUnsyncedDocsEstimateMatchesTheSyncedGzip(t *testing.T) {
 			est += gzippedSize(b)
 		}
 	}
-	if d := synced - est; d > 1024 || d < -1024 {
-		t.Errorf("the synced tree is %d bytes and the unsynced estimate %d: more than 1 KiB apart (docs %d)", synced, est, docs)
+	// to within a KiB, or 2% of the docs' size: Go's own gzip at its best level is a different compressor from the gzip -9 that tools/sync-agent-docs.sh runs, and a newer Go compresses these docs
+	// about 0.8% smaller than gzip -9 does (Go 1.27.3: 2,611 bytes under 315,105), which is no change in what ships.
+	tol := max(int64(1024), docs/50)
+	if d := synced - est; d > tol || d < -tol {
+		t.Errorf("the synced tree is %d bytes and the unsynced estimate %d: more than %d bytes apart (docs %d)", synced, est, tol, docs)
 	}
 }
 
