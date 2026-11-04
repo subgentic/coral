@@ -1,7 +1,7 @@
 // #13503: a goal create, close or update through the Coral Hub carries the Hub's preview token. With the Hub's boot value goal_preview off (a computer's own dashboard, the self-hosted Hub) the write is exactly what it always was;
 // with it on, the preview comes first, the write carries X-Hub-Goal-Preview and the SAME bytes, every write is previewed again, a token that ran out is asked for once more, and each of the Hub's words is one plain sentence.
 import assert from 'node:assert/strict';
-import { goalWrite, PREVIEW_HEADER, checkGoalBody, writeEach, BULK_GAP_MS, computerHasOperatorRoutes, offersOperatorChanges, OPERATOR_ROUTES_SINCE } from '../../coral-go/pkg/frontend/static/goal_write.js';
+import { goalWrite, PREVIEW_HEADER, checkGoalBody, writeEach, BULK_GAP_MS, computerHasOperatorRoutes, offersOperatorChanges, operatorChangesNeedNewer, operatorChangesNote, OPERATOR_ROUTES_SINCE } from '../../coral-go/pkg/frontend/static/goal_write.js';
 import { PREVIEW_WORDS } from '../../coral-go/pkg/frontend/static/goal_words.js';
 import { LOCAL_SERVER } from '../../coral-go/pkg/frontend/static/server_base.js';
 
@@ -143,6 +143,12 @@ for (const [resp, word] of [[json({ error: 'mode_too_low' }, 403), 'mode_too_low
     assert.equal(offersOperatorChanges('srv1', { cloud: false, hub: true, has: yes }), true, "through our own Hub: a computer that has them");
     assert.equal(offersOperatorChanges('srv1', { cloud: false, hub: true, has: no }), false, 'through our own Hub: an older computer: hidden');
     assert.equal(offersOperatorChanges('srv1', { cloud: false, hub: false, has: yes }), false, 'neither Hub nor a local key: nothing to offer');
+    // the note says why only where an older computer behind a Hub hides them
+    assert.equal(operatorChangesNote(), 'Change driver and Move need Coral 2.0.50 on this computer.');
+    assert.equal(operatorChangesNeedNewer('srv1', { cloud: true, hub: false, has: no }), true); assert.equal(operatorChangesNeedNewer('srv1', { cloud: false, hub: true, has: no }), true);
+    assert.equal(operatorChangesNeedNewer('srv1', { cloud: true, hub: false, has: yes }), false, 'a computer that has them: no note');
+    assert.equal(operatorChangesNeedNewer(LOCAL_SERVER, { cloud: false, hub: false, has: no }), false, "a computer's own dashboard: no note");
+    assert.equal(operatorChangesNeedNewer(LOCAL_SERVER, { cloud: true, hub: false, has: no }), false, "coral-hub's own local: nothing to say");
 }
 // a bulk close with the preview on: one at a time, a pause between goals (about 10 a minute), progress said, and the Hub's 429 stops it (never loops, never retries); with it off: no pause, no limit
 {

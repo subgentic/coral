@@ -14,7 +14,8 @@ export const PREVIEW_HEADER = 'X-Hub-Goal-Preview';
 export const GOAL_ACTIONS = ['goal_create', 'goal_close', 'goal_update', 'goal_driver', 'goal_move'];
 
 /** The Coral that has the Operator's two goal routes (/driver and /move through a Hub, #13517): a Hub page in front of an older computer must not offer buttons that would only say not found. The prerelease floor '-0' counts a 2.0.50 candidate. */
-export const OPERATOR_ROUTES_SINCE = '2.0.50-0';
+export const OPERATOR_ROUTES_VERSION = '2.0.50';
+export const OPERATOR_ROUTES_SINCE = `${OPERATOR_ROUTES_VERSION}-0`;
 /** Whether the computer a team is on reports a Coral that has them; a version it does not report (or one that cannot be read) is no. */
 export function computerHasOperatorRoutes(server, entryOf = serverEntry) {
     const c = compareVersions(serverVersion(entryOf(server)), OPERATOR_ROUTES_SINCE);
@@ -24,6 +25,12 @@ export function computerHasOperatorRoutes(server, entryOf = serverEntry) {
 export function offersOperatorChanges(server, { cloud = isCloud(), hub = isHub(), has = computerHasOperatorRoutes } = {}) {
     if (server === LOCAL_SERVER) return !cloud; // the Hub's own "local" is no computer behind coral-hub's Hub; on a computer's own dashboard (and a self-hosted Hub's own boards) it is this build
     return (cloud || hub) && has(server);
+}
+
+/** The words under the goal's actions when an older computer behind a Hub hides Change driver and Move, and whether that is the case. */
+export const operatorChangesNote = () => `Change driver and Move need Coral ${OPERATOR_ROUTES_VERSION} on this computer.`;
+export function operatorChangesNeedNewer(server, { cloud = isCloud(), hub = isHub(), has = computerHasOperatorRoutes } = {}) {
+    return server !== LOCAL_SERVER && (cloud || hub) && !has(server);
 }
 
 /** A refused answer as the editor reads it: {code: the Hub's word, error: our sentence} with the status. */

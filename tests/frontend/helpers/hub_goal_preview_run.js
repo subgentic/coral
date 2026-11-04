@@ -41,6 +41,7 @@ async function run(flag) {
             await ev(`import(${S} + 'goal_view.js').then(async v => { const a = await import(${S} + 'goals_adapter.js'); const host = document.createElement('div'); host.id = 'gp-old'; document.body.appendChild(host); v.mountGoal(host, { team: '@srv1/team-a', id: 8, goal: a.toGoal({ id: 8, title: 'Older computer', state: 'active', outcome: 'o', done_when: 'd', rollup: { open: 0, done: 0, total: 0 } }), back() {}, refresh() {} }); return true; })`);
             await waitFor(`!!document.querySelector('#gp-old .goals-close')`, `${tag}: a goal page of the older computer`, 8000);
             assert.deepEqual(await ev(`({ driver: !!document.querySelector('#gp-old .goals-change-driver'), move: !!document.querySelector('#gp-old .goals-move') })`), { driver: false, move: false }, `${tag}: no Change driver and no Move for a computer that reports 2.0.49`);
+            assert.equal(await ev(`(document.querySelector('#gp-old .goals-ops-note') || {}).textContent`), 'Change driver and Move need Coral 2.0.50 on this computer.', `${tag}: and the page says why`);
             await ev(`document.getElementById('gp-old').remove(); import(${S} + 'state.js').then(m => { for (const s of m.state.servers || []) s.coral_version = '2.0.50'; return true; })`);
 
             // #13517: through a Hub the goal page offers Change driver and Move to another team (the goal's own computer does them); with goal_preview each is previewed, then written with the token

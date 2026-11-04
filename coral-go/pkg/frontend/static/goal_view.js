@@ -2,7 +2,7 @@
 import { loadStyles } from './lazy_styles.js';
 import { openTask } from './task_navigation.js';
 import { boardFetch, keyLabel, serverUrl, splitKey, remoteServer, LOCAL_SERVER } from './server_base.js';
-const { goalWrite, offersOperatorChanges } = await importOnce('./goal_write.js'); // a goal close or update is previewed first when the Hub asks for it (#13503)
+const { goalWrite, offersOperatorChanges, operatorChangesNeedNewer, operatorChangesNote } = await importOnce('./goal_write.js'); // a goal close or update is previewed first when the Hub asks for it (#13503)
 import { OPERATOR_ID, copyText, showToast } from './utils.js';
 import { whenText } from './when_text.js';
 import { toTaskPage, toGoal, errorOf } from './goals_adapter.js';
@@ -185,6 +185,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
             acts.append(moreMenu(`goal-more-${g.id}`, menuItems.map(a => ({ label: a.label, title: a.title, ariaLabel: a.aria, className: a.cls.replace(/^btn( btn-primary)? ?/, ''), run: a.run })), { label: 'More goal actions' }));
         }
         row.append(acts); main.append(row);
+        if (W.isOpenGoal(g) && operatorChangesNeedNewer(sp.server)) { const note = el('p', 'goals-note goals-ops-note', operatorChangesNote()); note.setAttribute('role', 'note'); main.append(note); } // an older computer behind a Hub: the two buttons are hidden, and the page says why (#13517)
         const h = el('h2', 'goals-detail-title', g.title); h.tabIndex = -1; if (phone) { h.title = g.title; row.classList.add('goal-head-phone'); } h.id = 'goals-detail-title';
         row.append(h); // the title is in the header row: a phone puts the back beside it and the link and actions under (team_page.css), as on the task page
         foldWayBack(main, '.goals-back', '.goals-detail-title');
