@@ -370,7 +370,7 @@ function assertFits(v, what) {
             const tab2 = await openTab({ contextId: ctx2, width: 390, height: 844, mobile: true });
             tabs.push(tab2);
             v = await show(tab2, A, eighty);
-            v = await settled(tab2, 'the chosen 13 drawn on a phone', 'v.font === 13', 8000).catch(() => v);
+            v = await settled(tab2, 'the chosen 13 drawn on a phone', 'v.font === 13', 30000); // Settings can arrive after the initial phone default on a loaded runner; keep the bounded wait's diagnostic on failure
             assert.equal(v.font, 13, 'a chosen 13 (the old default) is a choice: it stays 13 on a phone');
             await tab2.close(); tabs.pop();
         } finally { await guard.restore(); }
