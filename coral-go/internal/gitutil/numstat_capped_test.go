@@ -247,3 +247,9 @@ func TestCappedNumstatBatchesALongListOfNamesUnderTheCommandLineLimit(t *testing
 	}
 	assert.Equal(t, 25, total)
 }
+
+// The Orchestrator's tiny assert on #13181: the production batch size fits a Windows command line (32 KB in all; the git path, the options and the separators are on it too).
+func TestTheProductionNumstatBatchFitsAWindowsCommandLine(t *testing.T) {
+	assert.LessOrEqual(t, numstatArgBytes, 32<<10, "the names of one batch leave room for the rest of the command under the 32 KB limit")
+	assert.Equal(t, 20<<10, numstatArgBytes, "and it is the size the commit says")
+}
