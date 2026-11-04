@@ -329,13 +329,13 @@ def run_one(machine, post=True):
     if not pend:
         return 'empty'
     job = pend[0]
+    busy = machine_idle(machine)  # BEFORE the lock: the mini's mini-idle counts a held lock (ours too) as busy
+    if busy:
+        return 'machine busy: ' + busy[0]
     why = lock_acquire(machine, job)
     if why:
         return why
     try:
-        busy = machine_idle(machine)
-        if busy:
-            return 'machine busy: ' + busy[0]
         src = os.path.join(mdir(machine, 'pending'), job['id'] + '.json')
         runp = os.path.join(mdir(machine, 'running'), job['id'] + '.json')
         try:

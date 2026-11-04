@@ -39,7 +39,7 @@ class Base(unittest.TestCase):
         with open(os.path.join(self.minibin, 'mini-lock'), 'w') as f:
             f.write('#!/bin/sh\nL=%s/minilock\ncase "$1" in acquire) mkdir "$L" 2>/dev/null && { echo "$*" >> %s/minilock.log; exit 0; } || exit 1;; release) rm -rf "$L"; echo "release" >> %s/minilock.log;; esac\n' % (self.d, self.d, self.d))
         with open(os.path.join(self.minibin, 'mini-idle'), 'w') as f:
-            f.write('#!/bin/sh\n[ -e %s/mini-busy ] && exit 1\nexit 0\n' % self.d)
+            f.write('#!/bin/sh\n[ -e %s/mini-busy ] && exit 1\n[ -d %s/minilock ] && exit 1  # like the real mini-idle: a held lock, even ours, counts as busy\nexit 0\n' % (self.d, self.d))
         for n in ('mini-lock', 'mini-idle'):
             os.chmod(os.path.join(self.minibin, n), 0o755)
         self.env = {'PATH': self.stubs + ':' + SYSPATH, 'HOME': self.d, 'CI_HOME': self.home, 'STUB_LOG': self.log, 'STUB_PS': self.psfile, 'CI_OWNER': 'tester',
