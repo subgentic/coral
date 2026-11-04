@@ -2,7 +2,9 @@
  * the chief_name, chief_avatar, chief_avatar_letter and chief_fronts settings and gives them cleaned through GET /api/chief. This module draws the avatar, reads the look and puts it on the /chief page: the header's
  * name and avatar, the page title, and (by the --chief-color and --chief-letter variables chief.css reads) the avatar beside each of Chief's chat bubbles. Everything is set as text, never as HTML. Lazy: only /chief
  * and Settings > Chief load it. */
-import { serverFetch, contextServer } from './server_base.js';
+import { serverFetch, contextServer, isCloud } from './server_base.js';
+import { showToast } from './utils.js';
+import { importOnce } from './import_once.js';
 import { loadStyles } from './lazy_styles.js';
 await loadStyles('chief.css');
 
@@ -45,6 +47,13 @@ export async function showChiefFace(label, identity) {
     const server = contextServer();
     const look = await readChief();
     if (server !== contextServer() || !look || !label || !label.isConnected) return;
+    if (!isCloud() && !document.getElementById('chief-checks-open')) {
+        const actions = label.closest('.terminal-header');
+        if (actions) {
+            const b = el('button', 'btn btn-quiet terminal-header-btn', 'Checks'); b.id = 'chief-checks-open'; b.type = 'button'; b.setAttribute('aria-label', 'Manage Chief checks and sources');
+            b.addEventListener('click', async () => { try { const m = await importOnce('./chief_checks.js'); await m.showChiefChecks(); } catch { showToast('Checks could not be opened. Try again.', true); } }); actions.append(b);
+        }
+    }
     const name = look.name || identity;
     label.textContent = name;
     let head = document.getElementById('chief-avatar-head');
