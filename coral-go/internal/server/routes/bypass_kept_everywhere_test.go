@@ -185,8 +185,8 @@ func TestAnUnrecordedRowTakesTheModeItsTranscriptStartedIn(t *testing.T) {
 			sid := "88888888-4444-5555-6666-000000000001"
 			sname := naming.SessionName(at.Claude, sid)
 			file := filepath.Join(t.TempDir(), "transcript.jsonl")
-			line := `{"type":"user","cwd":"` + rig.workdir + `","permissionMode":"` + started + `","message":{"role":"user","content":"hi"}}` + "\n" +
-				`{"type":"user","cwd":"` + rig.workdir + `","permissionMode":"bypassPermissions","message":{"role":"user","content":"later"}}` + "\n"
+			line := `{"type":"user","cwd":` + jsonString(rig.workdir) + `,"permissionMode":"` + started + `","message":{"role":"user","content":"hi"}}` + "\n" +
+				`{"type":"user","cwd":` + jsonString(rig.workdir) + `,"permissionMode":"bypassPermissions","message":{"role":"user","content":"later"}}` + "\n"
 			require.NoError(t, os.WriteFile(file, []byte(line), 0o600))
 			require.NoError(t, rig.ss.UpsertSessionIndex(ctx, &store.SessionIndex{SessionID: sid, SourceType: at.Claude, SourceFile: file}))
 			require.NoError(t, rig.ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid, AgentType: at.Claude, AgentName: "Frontend Dev", WorkingDir: rig.workdir}))
@@ -240,7 +240,7 @@ func TestATranscriptWithAnOddModeWakesInDefaultAndRecordsNothing(t *testing.T) {
 			ctx := context.Background()
 			sid := "99999999-4444-5555-6666-000000000001"
 			file := filepath.Join(t.TempDir(), "transcript.jsonl")
-			require.NoError(t, os.WriteFile(file, []byte(`{"type":"user","cwd":"`+rig.workdir+`","permissionMode":"`+odd+`","message":{"role":"user","content":"hi"}}`+"\n"), 0o600))
+			require.NoError(t, os.WriteFile(file, []byte(`{"type":"user","cwd":`+jsonString(rig.workdir)+`,"permissionMode":"`+odd+`","message":{"role":"user","content":"hi"}}`+"\n"), 0o600))
 			require.NoError(t, rig.ss.UpsertSessionIndex(ctx, &store.SessionIndex{SessionID: sid, SourceType: at.Claude, SourceFile: file}))
 			require.NoError(t, rig.ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid, AgentType: at.Claude, AgentName: "Frontend Dev", WorkingDir: rig.workdir}))
 			cmd := rig.wake(t, sid)
@@ -263,7 +263,7 @@ func TestAResumeTakesAndRecordsTheModeItsTranscriptStartedIn(t *testing.T) {
 	sid := "aaaaaaaa-4444-5555-6666-000000000002"
 	sname := naming.SessionName(at.Claude, sid)
 	file := filepath.Join(t.TempDir(), "transcript.jsonl")
-	require.NoError(t, os.WriteFile(file, []byte(`{"type":"user","cwd":"`+rig.workdir+`","permissionMode":"bypassPermissions","message":{"role":"user","content":"hi"}}`+"\n"), 0o600))
+	require.NoError(t, os.WriteFile(file, []byte(`{"type":"user","cwd":`+jsonString(rig.workdir)+`,"permissionMode":"bypassPermissions","message":{"role":"user","content":"hi"}}`+"\n"), 0o600))
 	require.NoError(t, rig.ss.UpsertSessionIndex(ctx, &store.SessionIndex{SessionID: sid, SourceType: at.Claude, SourceFile: file}))
 	require.NoError(t, rig.ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid, AgentType: at.Claude, AgentName: "Frontend Dev", WorkingDir: rig.workdir}))
 	require.NoError(t, rig.term.CreateSession(ctx, sname, rig.workdir))
