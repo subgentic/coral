@@ -27,7 +27,10 @@ const { framesJs } = require('./helpers/wait');
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
             await ev(`(async () => { T.state.liveSessions = ${JSON.stringify(ROWS)}; T.render.renderLiveSessions(T.state.liveSessions); return true; })()`);
-            await waitFor(`document.querySelectorAll('${root} .session-group-item').length >= 6`, `${label}: the rows (six awake agents, and the sleeping one as a row or in a summary)`, 6000);
+            // a list shows five awake agents and folds the rest under "Show N more" (FOLDER_SHOWN in session_rows.js): six awake stub rows put the sixth behind it. Open it, then wait for the last row by its id.
+            await waitFor(`document.querySelectorAll('${root} .session-group-item').length >= 5`, `${label}: the first rows`, 6000);
+            await ev(`document.querySelector('${root} .folder-more-row .row-btn[aria-expanded="false"]')?.click(); true`);
+            await waitFor(`!!document.querySelector('${root} .session-group-item[data-session-id="b7"]')`, `${label}: the sixth awake row (b7) after Show more; rows drawn: ` + (await ev(`[...document.querySelectorAll('${root} .session-group-item')].map(li => li.dataset.sessionId).join(',')`)), 6000);
             const read = () => ev(`(() => { const out = {}; for (const li of document.querySelectorAll('${root} .session-group-item')) { const chip = li.querySelector('.session-state-pill'), dot = li.querySelector('.session-dot'), st = li.querySelector('.session-status-line');
                 out[li.dataset.sessionId] = { state: li.dataset.state, aria: li.getAttribute('aria-label') || '', chip: chip && chip.getClientRects().length ? chip.textContent.trim() : null, chipTitle: chip ? chip.getAttribute('title') || '' : '', dotClass: dot ? dot.className : '', status: st && st.getClientRects().length ? st.textContent.trim() : null, h: Math.round(li.getBoundingClientRect().height), imgs: li.querySelectorAll('img').length }; } return out; })()`);
             const at = zoom => `${label}${zoom ? ' at ' + zoom + ' text' : ''}`;
