@@ -94,6 +94,11 @@ func TestPrepareHermesHomeSeedsFromThePersonAndNeverWritesThere(t *testing.T) {
 	assert.Equal(t, "some/model", cfg["model"], "the person's other settings are kept")
 	assert.Equal(t, map[string]any{"backend": "local"}, cfg["terminal"])
 	assert.NotContains(t, cfg, "hooks_auto_accept")
+	assert.NotContains(t, readAll(t, filepath.Join(home, "config.yaml")), "own-hook", "the person's outbound hook is never carried")
+	if !hermesHooksInstalled {
+		assert.NotContains(t, cfg, "hooks", "Windows: no hook at all (hermesToolTrusted refuses there)")
+		return
+	}
 	hooks, _ := cfg["hooks"].(map[string]any)
 	require.Len(t, hooks, len(hermesHookEvents), "Coral's events and no other (the person's outbound hook is gone)")
 	for _, ev := range hermesHookEvents {
@@ -120,6 +125,11 @@ func TestHermesAllowlistHoldsOnlyCoralsEntriesWithTheToolsRealMtime(t *testing.T
 	require.NoError(t, err)
 	var list hermesAllowlist
 	require.NoError(t, json.Unmarshal(b, &list))
+	assert.NotContains(t, string(b), "own-hook", "the person's approval is not carried")
+	if !hermesHooksInstalled {
+		assert.Empty(t, list.Approvals, "Windows: no hook, so nothing approved")
+		return
+	}
 	require.Len(t, list.Approvals, len(hermesHookEvents))
 	cfg := readYAML(t, filepath.Join(home, "config.yaml"))
 	for i, ev := range hermesHookEvents {
@@ -132,6 +142,10 @@ func TestHermesAllowlistHoldsOnlyCoralsEntriesWithTheToolsRealMtime(t *testing.T
 	}
 	assert.NotContains(t, string(b), "own-hook", "the person's approval is not carried")
 }
+
+// hermesHooksInstalled: Coral installs its Hermes hooks only where hermesToolTrusted can trust the hook tool. On Windows it never can (hermes_trust_windows.go:
+// Hermes on Windows has not been tried with Coral, #11715), so there the tests expect no hook and no approval, never a skip.
+const hermesHooksInstalled = runtime.GOOS != "windows"
 
 // testSID is a canonical Coral session id: the name of an agent's home.
 const testSID = "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d"
@@ -227,7 +241,11 @@ func TestAnExistingConfigIsKeptAndTheHooksAreRestored(t *testing.T) {
 	cfg = readYAML(t, cfgPath)
 	assert.Equal(t, "chosen/here", cfg["model"])
 	assert.NotContains(t, readAll(t, cfgPath), "evil.sh")
-	assert.Len(t, cfg["hooks"], len(hermesHookEvents))
+	if hermesHooksInstalled {
+		assert.Len(t, cfg["hooks"], len(hermesHookEvents))
+	} else {
+		assert.NotContains(t, cfg, "hooks", "Windows: the planted hook is removed and none is put back")
+	}
 
 	t.Setenv("CORAL_HOOK_DIR", t.TempDir()) // no hook tool there
 	_, err = PrepareHermesHome(r.data, "t", testSID, r.person, time.Now())
