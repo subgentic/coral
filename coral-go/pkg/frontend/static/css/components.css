@@ -3761,7 +3761,7 @@ body:has(#launch-modal[style*="flex"] :is(#launch-tmux-slot, #team-tmux-slot)[da
 #settings-cloud .cloud-command-row .btn { flex: none; margin: 0; }
 @container settingspane (max-width: 40rem) { .net-level-row { grid-template-columns: minmax(0, 1fr); } }
 /* New Agent (#5990): a Launch that is off (the CLI it needs is missing) looks off; the line under the folder is its reason. */
-.launch-dir-note { margin: 6px 0 0; }
+.launch-dir-note { margin: 6px 0 0; overflow-wrap: anywhere; }
 
 /* Default models (#6042): four short boxes, two by two, not four full-width boxes stacked (the loudest block of Settings > Agents for a rarely changed setting); one column on a phone. */
 /* The whole deletion-request identifier stays readable on a narrow Settings row. */

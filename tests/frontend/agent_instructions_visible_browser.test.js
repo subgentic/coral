@@ -13,6 +13,7 @@ const { coralReady } = require('./helpers/wait');
         await Page.addScriptToEvaluateOnNewDocument({ source: `window.__m.add('with-instr', 'x', 0, { sleeping: false }); window.__m.add('no-instr', 'y', 0, { sleeping: false });` });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
+        await waitFor(`!!window.T.state.liveSessions.find(s => s.name === 'with-instr')`, 'the mocked live list holds the agent (on a slow runner coralReady returns before it)', 15000); // #13510: the first attempt on Windows found no row and failed at once
         await ev(`(() => { const r = window.T.state.liveSessions.find(s => s.name === 'with-instr'); r.prompt = ${JSON.stringify(LONG)}; return !!r; })()`);
 
         console.log('1. the empty chat shows the instructions on one line, with Edit');

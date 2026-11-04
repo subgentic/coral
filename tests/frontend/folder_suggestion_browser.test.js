@@ -69,6 +69,18 @@ const { existing: recentsExist } = require('./helpers/recent_dirs');
             assert.equal(s.tip, s.value, 'the whole path is the tooltip');
             assert.match(s.label, /^Folder for this team/, 'the field is named for what it is: ' + s.label);
         });
+        // #13510: on the Windows runner the note held "D:\\a\\_temp\\coral-cdp-...": a backslash path has no place to break, so at 390 px and 200% text it ran past the dialog and was cut
+        // (phone_targets_census_b failed its first attempt on it). The note wraps anywhere in a path as long as the dialog is wide. Checked with a Windows-shaped path on any computer.
+        await S.run('New team: a long Windows path in the note wraps inside the dialog (390 px, 200% text)', async () => {
+            await client.Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+            await ev(`document.documentElement.style.fontSize = '200%'; true`);
+            const r = await ev(`(() => { const n = document.getElementById('launch-team-dir-suggest'); n.hidden = false;
+                n.textContent = 'D:\\a\\_temp\\coral-cdp-6L5Vl7\\shard1-1\\home\\Coral\\first-team. The team\'s agents work in this folder. Coral creates it for you.';
+                const box = n.getBoundingClientRect(), up = n.parentElement.getBoundingClientRect();
+                return { over: n.scrollWidth - n.clientWidth, right: Math.round(box.right), parentRight: Math.round(up.right), vw: innerWidth }; })()`);
+            await client.Emulation.clearDeviceMetricsOverride(); await ev(`document.documentElement.style.fontSize = ''; true`);
+            assert.ok(r.over <= 1 && r.right <= r.parentRight + 1, 'the note stays inside its dialog: ' + JSON.stringify(r));
+        });
         S.finish();
     } finally { try { await client.close(); } catch (e) {} }
 })().catch(e => { console.error(e); process.exit(1); });
