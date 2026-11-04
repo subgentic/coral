@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -106,13 +107,28 @@ func TestAHubVerdictNeedsTheStoredDigestToMatchTheId(t *testing.T) {
 		hub      bool
 		stamp    bool // the self-hosted hub's signed owner stamp, no tunnel
 		want     int
+		tweak    func(t *testing.T, dir, id string) // what is done to the stored object before the verdict
 	}{
-		"stamped, digest confirmed":          {true, false, true, http.StatusOK},
-		"stamped, no digest record":          {false, false, true, http.StatusConflict},
-		"through the Hub, digest confirmed":  {true, true, false, http.StatusOK},
-		"through the Hub, no digest record":  {false, true, false, http.StatusConflict},
-		"on this computer, no digest record": {false, false, false, http.StatusOK},
-		"on this computer, digest confirmed": {true, false, false, http.StatusOK},
+		"through the Hub, the sidecar names another digest": {true, true, false, http.StatusConflict, func(t *testing.T, dir, id string) {
+			other := sha256.Sum256([]byte("other bytes"))
+			meta, _ := json.Marshal(agentArtifactMeta{Name: "m", MediaType: "text/markdown", Size: 9, Digest: "sha256:" + hex.EncodeToString(other[:])})
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "artifacts", "objects", id+".json"), meta, 0o644))
+		}},
+		"through the Hub, the object is a symlink to a real file": {true, true, false, http.StatusConflict, func(t *testing.T, dir, id string) {
+			obj := filepath.Join(dir, "artifacts", "objects", id)
+			real := filepath.Join(dir, "elsewhere")
+			b, err := os.ReadFile(obj)
+			require.NoError(t, err)
+			require.NoError(t, os.WriteFile(real, b, 0o644))
+			require.NoError(t, os.Remove(obj))
+			require.NoError(t, os.Symlink(real, obj))
+		}},
+		"stamped, digest confirmed":          {true, false, true, http.StatusOK, nil},
+		"stamped, no digest record":          {false, false, true, http.StatusConflict, nil},
+		"through the Hub, digest confirmed":  {true, true, false, http.StatusOK, nil},
+		"through the Hub, no digest record":  {false, true, false, http.StatusConflict, nil},
+		"on this computer, no digest record": {false, false, false, http.StatusOK, nil},
+		"on this computer, digest confirmed": {true, false, false, http.StatusOK, nil},
 	} {
 		srv, h, coralDir := teamArtifactServer(t)
 		_ = srv
@@ -134,6 +150,9 @@ func TestAHubVerdictNeedsTheStoredDigestToMatchTheId(t *testing.T) {
 		subscribeSession(t, h, "alpha", "Alice", sessAlice)
 		subscribeSession(t, h, "alpha", "Bob", sessBob)
 		id := storeManagedArtifact(t, coralDir, "# the plan "+name, true, c.withMeta)
+		if c.tweak != nil {
+			c.tweak(t, coralDir, id)
+		}
 		completeWithArtifactsAs(t, h, "alpha", "Alice", "A work", []board.TaskArtifact{{Name: "plan.md", URI: "coral://artifacts/" + id}})
 		e := &reviewEnv{srv: s, h: h, id: id, name: "plan.md"}
 		e.tag(t, `["for review"]`)
