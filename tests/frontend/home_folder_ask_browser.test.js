@@ -19,6 +19,8 @@ const { coralReady } = require('./helpers/wait');
                 if (!wake && !launch) return R(u, o);
                 const body = o.body ? JSON.parse(o.body) : {}, confirmed = body.confirm_home_folder === true;
                 window.__sent.push({ route: wake ? 'wake' : 'launch', search: url.search, body });
+                // a board of that name exists (the server asks this first): the person's choice must still be in the request that Launch anyway sends (UI Reviewer's MUST on 19662b2bb)
+                if (launch && window.__dup && !body.board_id && !body.new_board) return json({ error: 'board_name_exists', code: 'board_name_exists', message: 'exists', candidates: [{ board_id: 'chosen-team-id', board_label: 'Dup', members: 2, live_agents: 1 }] }, 409);
                 if (!confirmed) return json({ ok: false, code: 'home_folder', error: 'This agent will work in your whole home folder; pick a project folder?', message: 'This agent will work in your whole home folder; pick a project folder?' }, 409);
                 return json(wake ? { ok: true, sleeping: false } : { ok: true, session_id: 'hf-1', name: 'x' }, 200); };
             return true; })()`);
@@ -45,6 +47,20 @@ const { coralReady } = require('./helpers/wait');
         await waitFor(`window.__r && window.__r.ok === true`, 'Launch anyway launches', 6000);
         sent = await ev(`window.__sent`);
         assert.equal(sent.length, 2); assert.equal(sent[1].body.confirm_home_folder, true); assert.equal(sent[1].body.home_folder_ask, true); assert.equal(sent[1].body.working_dir, '/home/x', 'the same launch');
+
+        // a duplicate board name, then the home folder: each choice survives into the confirmed launch
+        for (const [choice, selector, check] of [['Join it', '#confirm-modal-none, .board-choice-modal button[data-board-id]', b => b.board_id === 'chosen-team-id' && b.board_name === 'chosen-team-id'], ['Create another', '.board-choice-modal button[data-action="new"]', b => b.new_board === true]]) {
+            await ev(`window.__sent.length = 0; window.__dup = true; window.__r = 'pending'; import(${S} + 'launch_core.js').then(m => m._launchOn('local', '/api/sessions/launch', { agent_type: 'claude', working_dir: '/home/x', board_name: 'Dup' }, 'claude')).then(v => { window.__r = v; }); true`);
+            await waitFor(`!!document.querySelector('.board-choice-modal')`, 'the duplicate-name choice opens (' + choice + ')', 8000);
+            await ev(`document.querySelector(${JSON.stringify(selector.split(', ').pop())}).click(); true`);
+            await waitFor(`document.getElementById('confirm-modal') && getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, 'then the home-folder question opens (' + choice + ')', 8000);
+            await ev(`document.getElementById('confirm-modal-yes').click(); true`);
+            await waitFor(`window.__r && window.__r.ok === true`, 'Launch anyway launches (' + choice + ')', 6000);
+            const last = (await ev(`window.__sent`)).pop().body;
+            assert.ok(check(last), choice + ': the chosen board is kept in the confirmed launch: ' + JSON.stringify(last));
+            assert.equal(last.confirm_home_folder, true);
+        }
+        await ev(`window.__dup = false; true`);
 
         // a wake: the first request says home_folder_ask; Wake anyway sends it again with confirm_home_folder
         await ev(`window.__sent.length = 0; window.__w = 'pending'; import(${S} + 'agent_actions.js').then(m => m.toggleAgentSleep('x', 'claude', 'hf-1', 'wake')).then(v => { window.__w = v; }); true`);
