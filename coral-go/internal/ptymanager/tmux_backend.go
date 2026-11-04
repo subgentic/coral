@@ -495,7 +495,10 @@ func (b *TmuxBackend) Replay(name string) ([]byte, error) {
 	ctx := context.Background()
 	content, capErr := b.client.CapturePaneRawTarget(ctx, name+".0", 200)
 	if capErr == nil && content != "" {
-		return []byte(content), nil
+		// capture-pane is a row snapshot, not the original terminal stream:
+		// its LF separators must also return the cursor to column zero. A
+		// normal xterm LF retains the column and staircases every next row.
+		return []byte(strings.ReplaceAll(content, "\n", "\r\n")), nil
 	}
 
 	return data, err
