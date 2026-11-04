@@ -198,7 +198,7 @@ func TestChiefRunRequiresIdempotencyKeyBeforeCreatingWork(t *testing.T) {
 	sched := background.NewJobScheduler(h.sched, time.Minute)
 	h.SetScheduler(sched)
 	t.Cleanup(func() { require.True(t, sched.WaitWatchers(time.Second)) })
-	for _, key := range []string{"", "short", strings.Repeat("x", 129)} {
+	for _, key := range []string{"", "short", strings.Repeat("x", 129), "manual-\x07-key"} {
 		code, out := chiefHandlerCall(t, h, "POST", fmt.Sprintf("/api/chief/checks/%d/run", c.ID), nil, key, true, "")
 		require.Equal(t, 400, code, out)
 	}
@@ -215,4 +215,30 @@ func TestChiefHandlerLocalPersonGuardsAreDefenceInDepth(t *testing.T) {
 	require.Equal(t, 404, code, out)
 	code, out = chiefHandlerCall(t, h, http.MethodGet, "/api/chief/checks", nil, "", true, "")
 	require.Equal(t, 200, code, out)
+}
+
+func TestChiefGrantingCurrentConsentDoesNotAuthorizeAnOldSnapshot(t *testing.T) {
+	rig, h, c := chiefTestCheck(t, true)
+	ctx := context.Background()
+	// A broken snapshot guard still cannot attempt a real wake in this test.
+	rig.agent(2, "Awake", false)
+	grant, err := rig.h.bs.GetOrchGrant(ctx, "team-a")
+	require.NoError(t, err)
+	grant.MaxLive = 1
+	require.NoError(t, rig.h.bs.SetOrchGrant(ctx, grant, "Operator"))
+	tr, err := h.sched.BeginChiefTrigger(ctx, c.ID, 1, "no-consent-slot", time.Now())
+	require.NoError(t, err)
+	require.False(t, tr.WakeIfAsleep)
+	c.WakeIfAsleep = true
+	_, err = h.sched.SaveChiefCheck(ctx, *c)
+	require.NoError(t, err)
+	require.Error(t, h.deliverTrigger(ctx, tr.ID, "delivery"))
+	got, err := h.sched.ChiefTrigger(ctx, tr.ID)
+	require.NoError(t, err)
+	require.Equal(t, "held", got.Delivery)
+	require.Equal(t, "wake_consent_required", got.DeliveryError)
+	require.Zero(t, chiefMessages(t, rig))
+	var wakes int
+	require.NoError(t, rig.h.bs.Reader().GetContext(ctx, &wakes, `SELECT COUNT(*) FROM board_lifecycle_log WHERE project='team-a'`))
+	require.Zero(t, wakes)
 }
