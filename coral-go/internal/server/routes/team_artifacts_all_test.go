@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -227,4 +229,41 @@ func TestAllTeamArtifactsListsTheFilesOfAgentsWithoutATeam(t *testing.T) {
 	require.Equal(t, []string{"screen.png"}, names(only.Artifacts), "the Team filter takes No team")
 	notThem := getAllTeamArtifacts(t, srv, "?team=alpha", http.StatusOK)
 	require.NotContains(t, names(notThem.Artifacts), "screen.png", "a team's filter leaves the no-team files out")
+}
+
+// #13151: the Inbox's sidebar count is `all` of this route read with versions=newest: the files of every team, not their versions. `all` and each team's own `all` counted every version (20,013 for 213 files at the
+// scale of the Operator's Hub: 21,117 for 647), while `total` and the per-team route already counted files (#11700).
+func TestAllTeamArtifactsAllCountsFilesNotVersionsWithVersionsNewest(t *testing.T) {
+	t.Parallel()
+	srv, h := allTeamArtifactsServer(t)
+	const alice, bob = "00000000-0000-4000-8000-0000000000a1", "00000000-0000-4000-8000-0000000000b2"
+	subscribeSession(t, h, "alpha", "Alice", alice)
+	subscribeSession(t, h, "beta", "Bob", bob)
+	up := func(session, name, body, at string) {
+		t.Helper()
+		id := storeTyped(t, h.coralDir, body, name, "text/markdown")
+		dir := uploadsDir(h.coralDir, session)
+		require.NoError(t, os.MkdirAll(dir, 0o755))
+		rec, _ := json.Marshal(agentUploadRecord{agentArtifactMeta: agentArtifactMeta{Name: name, MediaType: "text/markdown", Size: int64(len(body)), Digest: "sha256:" + id}, CreatedAt: at})
+		require.NoError(t, os.WriteFile(filepath.Join(dir, id+".json"), rec, 0o644))
+	}
+	up(alice, "design.md", "d1", "2026-10-01T10:00:00Z")
+	up(alice, "design.md", "d2", "2026-10-02T10:00:00Z")
+	up(alice, "design.md", "d3", "2026-10-03T10:00:00Z")
+	up(alice, "other.md", "o1", "2026-10-04T10:00:00Z")
+	up(bob, "plan.md", "p1", "2026-10-05T10:00:00Z")
+	up(bob, "plan.md", "p2", "2026-10-06T10:00:00Z")
+
+	versions := getAllTeamArtifacts(t, srv, "?limit=1&versions=all", http.StatusOK)
+	require.Equal(t, 6, versions.All, "every version, as asked")
+	files := getAllTeamArtifacts(t, srv, "?limit=1&versions=newest", http.StatusOK)
+	require.Equal(t, 3, files.Total, "the files, as before")
+	require.Equal(t, 3, files.All, "the unfiltered count is the files too, not the 6 versions")
+	byTeam := map[string]int{}
+	for _, ref := range files.Teams {
+		byTeam[ref.BoardID] = ref.All
+	}
+	require.Equal(t, map[string]int{"alpha": 2, "beta": 1}, byTeam, "and so is each team's own count")
+	plain := getAllTeamArtifacts(t, srv, "?limit=1", http.StatusOK)
+	require.Equal(t, 6, plain.All, "without versions=newest a version is a row, as it always was")
 }
