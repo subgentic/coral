@@ -19,11 +19,16 @@ const { coralReady } = require('./helpers/wait');
     let sid = null, sname = null; const files = [];
     const tagsOf = async hex => (await api('GET', `/api/board/${B}/artifacts?limit=50`)).body.artifacts.find(a => a.id === hex || (a.uri || '').includes(hex))?.tags || [];
     const until = async (hex, want, what) => { for (let i = 0; i < 40; i++) { if ((await tagsOf(hex)).includes('for review') === want) return; await sleep(250); /* sleep-ok: a bounded poll of the server's own state, 40 tries */ } assert.fail(`${what}: tags ${JSON.stringify(await tagsOf(hex))}`); };
-    // a phone's row: the mail row's open button holds the title, the uploader and the time: the row is found by its title, and its Details control opens the sheet
-    const rowOf = name => `[...document.querySelectorAll('#team-panel-artifacts [data-artifact-id]')].find(b => (b.querySelector('.dt-mail-title') || b).textContent.trim().startsWith(${JSON.stringify(name)}))`;
+    // a phone's row on the team page is a mail row with two buttons: the select/avatar button and the open button (.dt-mail-open, data-artifact-id), whose text holds the title, the uploader and the time; there is no Details control.
+    // The open button is the way in: the row is found by its title, and the pane it opens carries the row's actions.
     const openSheet = async name => {
-        const found = await ev(`(() => { const b = ${rowOf(name)}; if (!b) return 'no row'; const tr = b.closest('tr'), d = tr && tr.querySelector('.artifact-details'); if (!d) return 'no Details control'; d.click(); return 'ok'; })()`);
+        const found = await ev(`(() => { const b = [...document.querySelectorAll('#team-panel-artifacts [data-artifact-id]')].find(x => (x.querySelector('.dt-mail-title') || x).textContent.trim().startsWith(${JSON.stringify(name)})); if (!b) return 'no row'; b.click(); return 'ok'; })()`);
         assert.equal(found, 'ok', `${name}: ${found}`);
+    };
+    // an action is looked for in the pane that is open (it may redraw in place after a send), then, if it is not there, in the pane opened again from the row
+    const showAction = async (text, name) => {
+        const there = await waitFor(`${btn(text)}.length > 0`, `${text} in the open pane`, 3000).then(() => true, () => false);
+        if (!there) { await openSheet(name); await waitFor(`${btn(text)}.length > 0`, `${text} after opening ${name} again`, 10000); }
     };
     const dialogBox = () => ev(`(() => { const d = document.querySelector('dialog.send-review-dialog[open]'); if (!d) return null; const r = d.getBoundingClientRect(), small = [...d.querySelectorAll('button')].filter(b => b.getBoundingClientRect().height < 43.5).map(b => b.textContent), i = d.querySelector('input').getBoundingClientRect();
         return { cx: Math.round((r.left + r.right) / 2), cy: Math.round((r.top + r.bottom) / 2), vw: innerWidth, vh: innerHeight, left: Math.round(r.left), right: Math.round(r.right), top: Math.round(r.top), bottom: Math.round(r.bottom), small, inputRight: Math.round(i.right), docOver: document.documentElement.scrollWidth - innerWidth }; })()`);
@@ -44,7 +49,7 @@ const { coralReady } = require('./helpers/wait');
 
         console.log('1. A phone\'s sheet offers Send for review as a 44 px target; the question dialog is centred, its buttons are 44 px, nothing is wider than the screen');
         await openSheet('plan.txt');
-        await waitFor(`${btn('Send for review')}.length > 0`, 'Send for review in the sheet', 10000);
+        await showAction('Send for review', 'plan.txt');
         assert.equal((await ev(`${btn('Remove from review')}.length`)), 0, 'a file that is not for review does not offer Remove');
         const target = await ev(`Math.round(${btn('Send for review')}[0].getBoundingClientRect().height)`);
         assert.ok(target >= 43.5, 'Send for review is a 44 px touch target: ' + target);
@@ -70,8 +75,7 @@ const { coralReady } = require('./helpers/wait');
         await ev(`(() => { const i = document.querySelector('dialog.send-review-dialog[open] input'); i.value = 'Approve this plan?'; document.querySelector('dialog.send-review-dialog[open] .send-review-go').click(); return true; })()`);
         await until(files[0], true, 'plan.txt is for review');
         await waitFor(`!document.querySelector('dialog.send-review-dialog')`, 'the dialog closed after sending', 4000);
-        await openSheet('plan.txt');
-        await waitFor(`${btn('Remove from review')}.length > 0`, 'Remove from review in the sheet', 10000);
+        await showAction('Remove from review', 'plan.txt');
         assert.equal((await ev(`${btn('Send for review')}.length`)), 0, 'a file that is for review does not offer Send');
         await ev(`${btn('Remove from review')}[0].click(); true`);
         await until(files[0], false, 'plan.txt is out of review');
