@@ -53,6 +53,12 @@ const { removeBoards } = require('./helpers/board_cleanup');
             const room = r.kind === 'other' ? r.line + 1 : 0.5;
             check(r.withIcon >= r.without - 0.5 && r.withIcon - r.without < room, `390 px: a ${r.kind} row keeps its height with the icon${r.kind === 'other' ? ' (a question: at most one more line)' : ''} (${r.withIcon} with, ${r.without} without): ${r.text}`);
         }
+        // the Operator's decision on #13144: the file name has room. Two review rows whose names differ (plan-a.md, plan-b.md) show DIFFERENT visible text at 390 (the "p…" cut made them look the same), and "waiting N min" is under the name, not beside it.
+        const vis = await ev(`(() => [...document.querySelectorAll('${T} tbody tr')].filter(tr => tr.querySelector('.inbox-review-from')).map(tr => { const el = tr.querySelector('.inbox-review-name'), box = el.getBoundingClientRect(), tn = [...el.childNodes].find(n => n.nodeType === 3); let seen = ''; if (tn) for (let k = 0; k < tn.length; k++) { const r = document.createRange(); r.setStart(tn, k); r.setEnd(tn, k + 1); const q = r.getBoundingClientRect(); if (q.width && q.right <= box.right + 0.5 && q.top >= box.top - 1 && q.bottom <= box.bottom + 1) seen += tn.data[k]; }
+            const w = tr.querySelector('[data-key=waiting]'), wr = w ? w.getBoundingClientRect() : null; return { name: el.textContent, seen, waitingBelowName: !!wr && wr.top >= box.bottom - 1, waitingText: w ? w.textContent.trim() : '' }; }))()`);
+        check(vis.length >= 2, '390 px: two review rows are in the list: ' + JSON.stringify(vis));
+        if (vis.length >= 2) check(new Set(vis.map(v => v.seen)).size === vis.length && vis.every(v => v.seen.length > 2), '390 px: review rows with different names show different visible text, more than a letter and a dot: ' + JSON.stringify(vis));
+        for (const v of vis) check(v.waitingBelowName && /waiting/.test(v.waitingText), '390 px: a review row says "waiting N min" under the file name: ' + JSON.stringify(v));
         const { themeJs } = require('./helpers/theme');
         for (const theme of ['dark', 'light']) {
             await ev(`${themeJs(theme)}; true`); await ev(framesJs(8));
