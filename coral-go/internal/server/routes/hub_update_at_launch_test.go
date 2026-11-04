@@ -15,8 +15,8 @@ import (
 	"github.com/subgentic/coral/internal/store/storetest"
 )
 
-// #13258: Settings says "on (set at launch)" beside the Hub update switch when --allow-hub-update / CORAL_ALLOW_HUB_UPDATE set it: the status carries hub_relaunch_updates_at_launch only while the switch is on
-// and the server was started asking for it; a person who turned it off in Settings (until the next start) no longer sees the words.
+// #13258: Settings says "on (set at launch)" beside the Hub update switch when --allow-hub-update / CORAL_ALLOW_HUB_UPDATE set it: the status carries hub_relaunch_updates_at_launch whenever the server was started with the flag
+// and the server was started asking for it; while the flag is set the status says so even when the person turned the switch off (it comes back at the next start).
 func TestStatusSaysTheHubUpdateSwitchWasSetAtLaunch(t *testing.T) {
 	status := func(t *testing.T, atLaunch bool, saved string) map[string]any {
 		t.Helper()
@@ -42,10 +42,10 @@ func TestStatusSaysTheHubUpdateSwitchWasSetAtLaunch(t *testing.T) {
 	assert.Equal(t, true, on["hub_relaunch_updates_at_launch"], "on, set at launch")
 	_, present := status(t, false, "true")["hub_relaunch_updates_at_launch"]
 	assert.False(t, present, "turned on in Settings, not at launch: no words")
+	// the flag is reported while it is set, even after the person turned the switch off: Settings then says it comes back at the next start
 	off := status(t, true, "false")
 	assert.Equal(t, false, off["hub_relaunch_updates"])
-	_, present = off["hub_relaunch_updates_at_launch"]
-	assert.False(t, present, "turned off since the launch: the words go with it")
+	assert.Equal(t, true, off["hub_relaunch_updates_at_launch"], "turned off since the launch, but the flag will turn it on again at the next start")
 }
 
 func localStatusRequest() *http.Request {

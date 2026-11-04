@@ -229,12 +229,12 @@ export async function fetchHubRelaunch() {
         const resp = await fetch(ROUTES.cloudStatus);
         if (!resp.ok) return null;
         const d = await resp.json(), v = d.hub_relaunch_updates;
-        hubRelaunchAtLaunch = v === true && d.hub_relaunch_updates_at_launch === true; // the switch is on because the server was started with --allow-hub-update / CORAL_ALLOW_HUB_UPDATE (#13258)
+        hubRelaunchAtLaunch = d.hub_relaunch_updates_at_launch === true; // the server was started with --allow-hub-update / CORAL_ALLOW_HUB_UPDATE (#13258): on says so, and an off lasts only until the next start
         return typeof v === 'boolean' ? v : null;
     } catch { return null; }
 }
 let hubRelaunchAtLaunch = false;
-/** Whether the switch the last fetchHubRelaunch read was set at launch (Settings says "On (set at launch)"). */
+/** Whether the last fetchHubRelaunch read says the server was started with the launch flag (Settings says "On (set at launch)", or that an off lasts only until the next start). */
 export const hubRelaunchSetAtLaunch = () => hubRelaunchAtLaunch;
 
 /** Ask the updater to look for a release now (false when the server has no such route). */

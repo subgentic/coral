@@ -30,7 +30,7 @@ type cloudStatus struct {
 	RedactTokens bool `json:"redact_tokens"`
 	// HubRelaunchUpdates is the local switch "Let Coral Hub relaunch this Coral to install updates" (#5280).
 	HubRelaunchUpdates bool `json:"hub_relaunch_updates"`
-	// HubRelaunchUpdatesAtLaunch: the switch above was set at launch (--allow-hub-update, CORAL_ALLOW_HUB_UPDATE); Settings shows "on (set at launch)" (#13258).
+	// HubRelaunchUpdatesAtLaunch: the server was started with --allow-hub-update / CORAL_ALLOW_HUB_UPDATE, which turns the switch above on at every start: Settings shows "On (set at launch)" while it is on, and says turning it off lasts only until the next start (#13258).
 	HubRelaunchUpdatesAtLaunch bool `json:"hub_relaunch_updates_at_launch,omitempty"`
 	// HubRelaunchNeedsHere: on Windows an update installs only when a person at this computer approves it, so the switch above cannot let Coral Hub install; the page says so (#7338).
 	HubRelaunchNeedsHere bool `json:"hub_relaunch_needs_here,omitempty"`
@@ -77,7 +77,7 @@ func (h *CloudHandler) status() cloudStatus {
 		}
 	}
 	out := cloudStatus{Status: st, AllowHubAutoAccept: allow, MaxModeSaved: modeSaved, RedactTokens: redact, HubRelaunchUpdates: relaunch, HubRelaunchNeedsHere: relaunchNeedsLocalApproval, HubRelaunchAvailable: updateRelaunchFeature, HubCrossTeamSettings: crossTeam, AllowHubAutoAcceptChanged: changed, Bootstrap: boot, OfferAtLaunch: h.OfferAtLaunch}
-	out.HubRelaunchUpdatesAtLaunch = h.HubUpdateAtLaunch && relaunch
+	out.HubRelaunchUpdatesAtLaunch = h.HubUpdateAtLaunch
 	if missing, known := h.ownerLabelState(context.Background()); known && missing {
 		out.OwnerLabelMissing = true
 	}

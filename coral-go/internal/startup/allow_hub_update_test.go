@@ -49,3 +49,14 @@ func TestApplyAllowHubUpdate(t *testing.T) {
 		})
 	}
 }
+
+// Never break Coral on a start (the Security review's INFO 3, a must by that rule): a switch that cannot be saved is a warning and Coral goes on starting.
+func TestApplyAllowHubUpdateNeverStopsAStart(t *testing.T) {
+	dir := t.TempDir()
+	db, err := storetest.Open(t, filepath.Join(dir, "sessions.db"))
+	require.NoError(t, err)
+	require.NoError(t, db.Close()) // a store that cannot be written
+	cfg := config.Load(dir)
+	cfg.AllowHubUpdate = true
+	assert.NoError(t, applyAllowHubUpdate(context.Background(), db, cfg), "a warning in the log, not a refusal to start")
+}

@@ -15,7 +15,7 @@ import { isSignedOut } from './overload.js';
 import { importOnce } from './import_once.js';
 const { morePermsWords, operatorLine, spellCode, OFF_TEXT, LEVEL_NOW, HUB_ACCESS_URL, EXPIRED_TEXT, codeExpired, autoAcceptChangedText, severalAccountsText } = await importOnce('./cloud_words.js');
 export const { enrolledRetrying, rekeyText, describe } = await importOnce('./cloud_words.js');
-const { HUB_RELAUNCH_ON, HUB_RELAUNCH_OFF, HUB_RELAUNCH_WINDOWS, HUB_RELAUNCH_AT_LAUNCH } = await importOnce('./update_words.js'); // a lazy module loads the others through importOnce, so a failed load is retried
+const { HUB_RELAUNCH_ON, HUB_RELAUNCH_OFF, HUB_RELAUNCH_WINDOWS, HUB_RELAUNCH_AT_LAUNCH, HUB_RELAUNCH_OFF_AT_LAUNCH, HUB_RELAUNCH_OFF_TOAST_AT_LAUNCH } = await importOnce('./update_words.js'); // a lazy module loads the others through importOnce, so a failed load is retried
 
 const STATUS_URL = '/api/cloud/status';
 // 'Let Coral Hub act as the Operator' (#3377): a local-only owner setting. The route answers only
@@ -72,7 +72,7 @@ class CloudPanel {
     hubRelaunchWords(box) {
         const t = this.part('hub-relaunch-state');
         if (!t || !box) return;
-        t.textContent = this.hubRelaunchNeedsHere ? HUB_RELAUNCH_WINDOWS : box.checked ? (this.hubRelaunchAtLaunch ? HUB_RELAUNCH_AT_LAUNCH : HUB_RELAUNCH_ON) : HUB_RELAUNCH_OFF; // Windows: Coral Hub cannot install, whatever the switch says (#7338)
+        t.textContent = this.hubRelaunchNeedsHere ? HUB_RELAUNCH_WINDOWS : box.checked ? (this.hubRelaunchAtLaunch ? HUB_RELAUNCH_AT_LAUNCH : HUB_RELAUNCH_ON) : (this.hubRelaunchAtLaunch ? HUB_RELAUNCH_OFF_AT_LAUNCH : HUB_RELAUNCH_OFF); // Windows: Coral Hub cannot install, whatever the switch says (#7338)
         box.setAttribute('aria-describedby', 'settings-cloud-hub-relaunch-desc settings-cloud-hub-relaunch-state');
     }
 
@@ -222,7 +222,7 @@ class CloudPanel {
         const hubRelaunch = this.part('hub-relaunch');
         if (hubRelaunch) hubRelaunch.checked = st.hub_relaunch_updates === true; // an explicit true only: the server's default is off
         this.hubRelaunchNeedsHere = st.hub_relaunch_needs_here === true;
-        this.hubRelaunchAtLaunch = st.hub_relaunch_updates_at_launch === true; // the switch was set when this Coral started (#13258): "On (set at launch)"
+        this.hubRelaunchAtLaunch = st.hub_relaunch_updates_at_launch === true; // this Coral was started with --allow-hub-update / CORAL_ALLOW_HUB_UPDATE (#13258): "On (set at launch)", and an off lasts only until the next start
         // Coral Hub's relaunch exists only in a build that has the feature (#7343): without it the switch does nothing, so neither the switch nor its sentence is drawn
         for (const id of ['settings-cloud-hub-relaunch-row', 'settings-cloud-hub-relaunch-state']) { const el = this.root.querySelector('#' + id); if (el) el.hidden = st.hub_relaunch_available !== true; }
         this.hubRelaunchWords(hubRelaunch);
@@ -518,7 +518,7 @@ class CloudPanel {
         });
         this.part('owner-record')?.addEventListener('click', () => this.confirmOwner());
         this.part('redact-tokens')?.addEventListener('change', (e) => this.act('PUT', '/api/cloud/redact-tokens', { redact: e.target.checked }, e.target.checked ? 'Saved. Tokens are hidden from view-only hub users.' : 'Saved. Tokens are visible to view-only hub users.'));
-        this.part('hub-relaunch')?.addEventListener('change', (e) => { this.hubRelaunchAtLaunch = false; this.hubRelaunchWords(e.target); this.act('PUT', '/api/cloud/hub-relaunch', { allow: e.target.checked }, e.target.checked ? 'Saved. Coral Hub may relaunch Coral to install updates.' : 'Saved. Coral Hub may not relaunch Coral.'); });
+        this.part('hub-relaunch')?.addEventListener('change', (e) => { this.hubRelaunchWords(e.target); this.act('PUT', '/api/cloud/hub-relaunch', { allow: e.target.checked }, e.target.checked ? 'Saved. Coral Hub may relaunch Coral to install updates.' : (this.hubRelaunchAtLaunch ? HUB_RELAUNCH_OFF_TOAST_AT_LAUNCH : 'Saved. Coral Hub may not relaunch Coral.')); });
         this.part('hub-cross-team')?.addEventListener('change', (e) => this.act('PUT', '/api/cloud/hub-cross-team', { allow: e.target.checked }, e.target.checked ? 'Saved. Coral Hub may change cross-team settings.' : 'Saved. Coral Hub may not change cross-team settings.'));
         this.part('hub-operator')?.addEventListener('change', (e) => this.setHubOperator(!e.target.checked)); // the checkbox is "let", the stored setting is "disabled": the opposite
     }
