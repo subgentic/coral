@@ -38,13 +38,15 @@ const BOARDS = 9;
             task: [3, 'team-3', `import(${S}+'team_task_artifacts.js').then(async m => { const links = await m.taskResultLinks('@m1/team-3', { id: 7 }); const host = document.createElement('div'); host.id = 'task-links'; host.append(...links); document.body.append(host); host.querySelector('button').click(); return true; })`],
         };
         for (const [how, [n, board, open]] of Object.entries(clicks)) {
+            await ev(`document.querySelector('#artifact-viewer .artifact-viewer-close')?.click(); true`); // the viewer of the step before is closed: its own late reads are not this click's
+            await ev(`new Promise(r => setTimeout(r, 1500))`); // sleep-ok: the step before has finished its reads
             await ev(`window.__requests.length = 0; window.__puts.length = 0; true`);
             await ev(open);
             await waitFor(`window.__files[${n - 1}].tags.includes('read')`, `opening the file by ${how} marks it read`, 15000);
             await ev(`new Promise(r => setTimeout(r, 1500))`); // sleep-ok: the scan a click used to start finishes before it is counted
             const lists = (await ev(`window.__requests.slice()`)).filter(r => /\/artifacts\?tag=/.test(r));
             const boardsRead = new Set(lists.map(r => /board\/(team-\d+)\//.exec(r)?.[1]));
-            assert.ok(boardsRead.size <= 1 && (boardsRead.size === 0 || boardsRead.has(board)), `${how}: one click read the review lists of ${boardsRead.size} boards (${lists.length} list requests); the file's own board is enough`);
+            assert.ok(boardsRead.size <= 1 && (boardsRead.size === 0 || boardsRead.has(board)), `${how}: one click read the review lists of ${boardsRead.size} boards (${lists.length} list requests: ${lists.join(' , ')}); the file's own board is enough`);
             assert.ok(lists.length <= 3, `${how}: one click made ${lists.length} review/saved list requests: ${lists.join(' , ')}`);
             assert.equal(await ev(`window.__puts.length`), 1, `${how}: the file was tagged read once`);
             const reqs = await ev(`window.__requests.slice()`); // the 404s the Hub's operator saw: each is asked at most once per open, and a 404 draws nothing again (UI Accessibility's SHOULD on #13489)
