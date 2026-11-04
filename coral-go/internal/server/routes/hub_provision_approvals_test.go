@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -111,4 +112,26 @@ func TestApprovalsPlanOnAnotherComputerInstallsNothing(t *testing.T) {
 	assert.Empty(t, me.ownerGiven, "nothing was installed on another computer")
 	_, ok, _ := me.e.h.store.OwnerSecret(context.Background(), "ssh-box")
 	assert.False(t, ok, "and nothing was saved")
+}
+
+// The real installOwner (not a test's stand-in) runs the command of the release folder ownerFolder names (#13272, QA Reviewer 2): the far computer's release when an approvals plan read it, this hub's otherwise.
+func TestTheRealInstallOwnerRunsTheFolderOwnerFolderNames(t *testing.T) {
+	me := newManageEnv(t)
+	dir := t.TempDir()
+	seen := filepath.Join(dir, "seen")
+	ssh := filepath.Join(dir, "ssh")
+	require.NoError(t, os.WriteFile(ssh, []byte("#!/bin/sh\nfor a in \"$@\"; do last=\"$a\"; done\ncat >/dev/null\nprintf %s \"$last\" > '"+seen+"'\nexit 0\n"), 0o700))
+	pr := NewProvisioner(me.e.h.store)
+	pr.runner = sshprov.Runner{SSH: ssh}
+	pr.version = "2.0.10"
+	tg, err := sshTargetOf("user@box.example.com:22")
+	require.NoError(t, err)
+	for ownerVersion, want := range map[string]string{"2.0.9": "/2.0.9/root/coral", "": "/2.0.10/root/coral"} {
+		p := &provisionPlan{Target: tg, ServerID: "ssh-box", ownerVersion: ownerVersion}
+		require.NoError(t, pr.installOwner(context.Background(), p, strings.Repeat("ab", 32)))
+		got, err := os.ReadFile(seen)
+		require.NoError(t, err)
+		assert.Contains(t, string(got), want, "the far computer answered %q", ownerVersion)
+		assert.Contains(t, string(got), "hub-owner-secret")
+	}
 }

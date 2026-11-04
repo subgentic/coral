@@ -523,3 +523,34 @@ func TestInstallOwnerSecretFailureKeepsTheSecretOutOfTheKeptStderr(t *testing.T)
 		t.Errorf("the rest of the message was lost: %q", oe.Stderr)
 	}
 }
+
+// What withoutSecret takes out of the kept stderr (#13272, QA Reviewer 2's pins on #13251): each rule alone, and the length of a hex run that goes.
+func TestWithoutSecretEachRuleAlone(t *testing.T) {
+	secret := strings.Repeat("ab", 32)
+	payload := `{"remote":"ssh-box","secret":"` + secret + `"}`
+	if got := withoutSecret("x "+secret+" y", secret, payload); got != "x [secret] y" {
+		t.Errorf("the secret alone: %q", got)
+	}
+	if got := withoutSecret("bad "+payload, secret, payload); got != "bad [stdin]" {
+		t.Errorf("the whole payload: %q", got)
+	}
+	if got := withoutSecret("no secret here, id ssh-box", secret, payload); got != "no secret here, id ssh-box" {
+		t.Errorf("plain text changed: %q", got)
+	}
+}
+
+func TestWithoutSecretHexThreshold(t *testing.T) {
+	secret, payload := strings.Repeat("ab", 32), "p"
+	if got := withoutSecret("k "+strings.Repeat("a", 15)+" k", secret, payload); got != "k "+strings.Repeat("a", 15)+" k" {
+		t.Errorf("15 hex digits are kept: %q", got)
+	}
+	if got := withoutSecret("k "+strings.Repeat("a", 16)+" k", secret, payload); got != "k [hex] k" {
+		t.Errorf("16 hex digits go: %q", got)
+	}
+	if got := withoutSecret("k "+strings.Repeat("A", 20)+" k", secret, payload); got != "k [hex] k" {
+		t.Errorf("upper case too: %q", got)
+	}
+	if got := withoutSecret("a deadbeef and cafe", secret, payload); got != "a deadbeef and cafe" {
+		t.Errorf("a short hex word is kept: %q", got)
+	}
+}
