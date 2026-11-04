@@ -125,7 +125,7 @@ func TestAHubTagsWriteFailsClosedWhenTheStoredTagsCannotBeReadAndRepeatsAreOnce(
 	assert.Equal(t, []string{"read"}, all[id])
 
 	require.NoError(t, e.h.bs.Close()) // the stored tags can no longer be read
-	tags, err := e.h.hubArtifactTags(context.Background(), "tag-team", id, []string{"read"})
+	tags, _, err := e.h.hubArtifactTags(context.Background(), "tag-team", id, []string{"read"})
 	assert.Error(t, err, "no stored list to judge by: refused, never accepted unchecked")
 	assert.Nil(t, tags)
 }

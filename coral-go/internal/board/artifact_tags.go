@@ -130,11 +130,33 @@ func (s *Store) ArtifactTags(ctx context.Context, boardID string) (map[string][]
 
 // SetArtifactTags makes tags (already normalised, at most MaxArtifactTags) the whole set of the object's tags on the board.
 func (s *Store) SetArtifactTags(ctx context.Context, boardID, hex string, tags []string) error {
+	return s.setArtifactTags(ctx, boardID, hex, tags, nil, false)
+}
+
+// ErrArtifactTagsChanged: the tags of the object are not what the caller read, so a write built on that read was not made (#13129).
+var ErrArtifactTagsChanged = errors.New("the artifact's tags changed since they were read")
+
+// SetArtifactTagsIf is SetArtifactTags as a compare-and-set (#13129): the write is made only if the object's tags, read in the same transaction, are exactly was (as a set); otherwise nothing is written and the
+// error is ErrArtifactTagsChanged. A write that was worked out from a list read earlier (a Hub write judged against the stored tags) can therefore never overwrite a tag edit that landed in between.
+func (s *Store) SetArtifactTagsIf(ctx context.Context, boardID, hex string, was, tags []string) error {
+	return s.setArtifactTags(ctx, boardID, hex, tags, was, true)
+}
+
+func (s *Store) setArtifactTags(ctx context.Context, boardID, hex string, tags, was []string, check bool) error {
 	tx, err := s.db.BeginTxx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
+	if check {
+		var have []string
+		if err := tx.SelectContext(ctx, &have, `SELECT tag FROM artifact_tags WHERE board_id = ? AND hex = ? ORDER BY tag`, boardID, hex); err != nil {
+			return err
+		}
+		if !sameTagSet(have, was) {
+			return ErrArtifactTagsChanged
+		}
+	}
 	if _, err := tx.ExecContext(ctx, `DELETE FROM artifact_tags WHERE board_id = ? AND hex = ?`, boardID, hex); err != nil {
 		return err
 	}
@@ -149,6 +171,22 @@ func (s *Store) SetArtifactTags(ctx context.Context, boardID, hex string, tags [
 		}
 	}
 	return tx.Commit()
+}
+
+// sameTagSet says a and b hold the same tags, whatever their order or repeats.
+func sameTagSet(a, b []string) bool {
+	in := map[string]bool{}
+	for _, t := range a {
+		in[t] = true
+	}
+	seen := map[string]bool{}
+	for _, t := range b {
+		if !in[t] {
+			return false
+		}
+		seen[t] = true
+	}
+	return len(seen) == len(in)
 }
 
 // AddArtifactTags adds tags (already cleaned) to the object's tags on the board, up to MaxArtifactTags in all and MaxBoardArtifactTagRows on the board: what is over is left off. It reports the object's tags after.
