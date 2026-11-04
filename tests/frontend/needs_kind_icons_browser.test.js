@@ -1,7 +1,7 @@
 // #13144 (the operator: 'lets add some icons on the left here to distinguish between the different types of requests in the inbox'): a Needs you row starts with a small icon for its kind, named for a screen reader,
 // and the row keeps its height. A: every kind the Inbox shows (needs_filters.js KINDS: permission, question, needs input, file to review, failed run, to approve, goal looks done, skill to approve, welcome) gets its
 // own icon with the kind's word as its label, drawn in the icon font in the secondary colour, and no text of its own. B: in the real table, at 1280 and 390, a waiting agent's row has its icon in front of the
-// agent's button (which stays the click target), the row text is unchanged, and the row is exactly as tall with the icon as without it.
+// agent's button (on a phone, in the row's own line before the title: the mail row's button holds it; it stays the click target), the row text is unchanged, and the row is exactly as tall with the icon as without it.
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const { INBOX_WORLD } = require('./helpers/inbox_world');
@@ -37,9 +37,9 @@ const { coralReady, framesJs } = require('./helpers/wait');
             // B: in the real table: the icon leads the agent's button, the click target stays, the row's height is the same without it
             const row = await ev(`(() => { const tr = document.querySelector('${T} tbody tr'), td = tr.querySelector('td'), i = tr.querySelector('.inbox-kind-icon'), btn = tr.querySelector('.dt-primary'), h = () => Math.round(tr.getBoundingClientRect().height);
                 if (!i) return null; const withIcon = h(), t = tr.textContent; i.style.display = 'none'; const without = h(); i.style.display = '';
-                return { label: i.getAttribute('aria-label'), kind: i.dataset.kind, before: !!(i.compareDocumentPosition(btn) & Node.DOCUMENT_POSITION_FOLLOWING), withIcon, without, hasName: /Backend Dev/.test(t), noLigatureText: !/lock|help_outline|rate_review/.test(t), inCell: td.contains(i), iconRight: Math.round(i.getBoundingClientRect().right), btnLeft: Math.round(btn.getBoundingClientRect().left), color: getComputedStyle(i).color }; })()`);
+                return { label: i.getAttribute('aria-label'), kind: i.dataset.kind, mail: !!btn.contains(i), before: btn.contains(i) ? !!(i.compareDocumentPosition(tr.querySelector('.dt-mail-title')) & Node.DOCUMENT_POSITION_FOLLOWING) : !!(i.compareDocumentPosition(btn) & Node.DOCUMENT_POSITION_FOLLOWING), withIcon, without, hasName: /Backend Dev/.test(t), noLigatureText: !/lock|help_outline|rate_review/.test(t), inCell: td.contains(i), iconRight: Math.round(i.getBoundingClientRect().right), btnLeft: Math.round(btn.getBoundingClientRect().left), color: getComputedStyle(i).color }; })()`);
             check(!!row && row.label === 'Permission' && row.kind === 'permission' && row.inCell, at + 'the permission row has its icon: ' + JSON.stringify(row));
-            check(!!row && row.before && row.iconRight <= row.btnLeft + 1, at + 'the icon is in front of the agent, not over it: ' + JSON.stringify(row));
+            check(!!row && row.before && (row.mail || row.iconRight <= row.btnLeft + 1), at + 'the icon is in front of the agent (on a phone: before the title in the row\'s line), not over it: ' + JSON.stringify(row));
             check(!!row && row.withIcon === row.without, at + `the row keeps its height (${row && row.withIcon} with the icon, ${row && row.without} without)`);
             check(!!row && row.hasName && row.noLigatureText, at + 'the row text is its words, no icon names: ' + JSON.stringify(row));
             await shot(`needs_kind_icons_${w}`);
