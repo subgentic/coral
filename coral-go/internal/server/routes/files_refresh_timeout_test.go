@@ -20,13 +20,13 @@ import (
 	"github.com/subgentic/coral/internal/store"
 )
 
-// timeoutRig is a folder of one commit and n new files with its refresh route, for the tests of a pass whose git runs out of time.
-type timeoutRig struct {
+// refreshTimeoutRig is a folder of one commit and n new files with its refresh route, for the tests of a pass whose git runs out of time.
+type refreshTimeoutRig struct {
 	post func(query string) map[string]any
 	repo string
 }
 
-func newTimeoutRig(t *testing.T, sid string, newFiles int) *timeoutRig {
+func newRefreshTimeoutRig(t *testing.T, sid string, newFiles int) *refreshTimeoutRig {
 	t.Helper()
 	gitguard.Reset()
 	t.Cleanup(gitguard.Reset)
@@ -68,7 +68,7 @@ func newTimeoutRig(t *testing.T, sid string, newFiles int) *timeoutRig {
 		refreshFlights.mu.Unlock()
 		return out
 	}
-	return &timeoutRig{post: post, repo: repo}
+	return &refreshTimeoutRig{post: post, repo: repo}
 }
 
 // answerFilePaths is the names of the files in an answer's list.
@@ -90,7 +90,7 @@ func gitOutOfTime(t *testing.T) {
 
 // A refresh whose git runs out of time used to answer an empty list with a count of 0 and wipe the stored list; now it says timed_out, keeps the last good list and its count, and leaves the stored list as it was.
 func TestAGitRefreshThatTimesOutSaysSoAndKeepsTheLastList(t *testing.T) {
-	rig := newTimeoutRig(t, "00000000-0000-0000-0000-00000000e4e4", 5)
+	rig := newRefreshTimeoutRig(t, "00000000-0000-0000-0000-00000000e4e4", 5)
 	first := rig.post("")
 	require.Len(t, first["files"], 5)
 	require.Equal(t, false, first["timed_out"], "a pass that finished is not timed out")
@@ -112,7 +112,7 @@ func TestAGitRefreshThatTimesOutSaysSoAndKeepsTheLastList(t *testing.T) {
 
 // With no last good list there is nothing to keep: the answer is empty and says why, instead of "0 changed".
 func TestAGitRefreshThatTimesOutWithNoLastListIsEmptyAndSaysSo(t *testing.T) {
-	rig := newTimeoutRig(t, "00000000-0000-0000-0000-00000000e5e5", 3)
+	rig := newRefreshTimeoutRig(t, "00000000-0000-0000-0000-00000000e5e5", 3)
 	gitOutOfTime(t)
 	first := rig.post("?manual=1")
 	require.Equal(t, true, first["timed_out"])
