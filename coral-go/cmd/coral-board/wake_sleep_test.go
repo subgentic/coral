@@ -88,3 +88,23 @@ func TestWakeEscapesTheMemberNameInThePathAndCleansTheNameItPrints(t *testing.T)
 	assert.Equal(t, "/api/board/team/agents/Dev%20A/wake", uris[0])
 	assert.Equal(t, "/api/board/team/agents/Dev%2FOps/sleep", uris[1], "a slash is not a second path segment")
 }
+
+// The Orchestrator's tiny test on #13285: a board name with a space is one escaped path segment too.
+func TestWakeEscapesABoardNameWithASpaceInThePath(t *testing.T) {
+	var uris []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Path == "/api/health" {
+			_, _ = w.Write([]byte(`{"status":"ok","version":"test"}`))
+			return
+		}
+		uris = append(uris, r.RequestURI)
+		_, _ = w.Write([]byte(`{"ok":true,"slept":"Dev"}`))
+	}))
+	defer srv.Close()
+	gs := &goalServer{Server: srv, reply: map[string]string{}}
+	res := goalRun(t, gs, "sleep", "--board", "my team", "Dev")
+	require.Equal(t, 0, res.code, res.stderr)
+	require.Len(t, uris, 1)
+	assert.Equal(t, "/api/board/my%20team/agents/Dev/sleep", uris[0], "the board name is one escaped segment, a space is %20")
+}
