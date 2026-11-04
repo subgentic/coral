@@ -17,7 +17,7 @@ import { pendingProposals, refreshProposals, onProposalsChanged } from './propos
 import { goalDoneCount } from './goal_done.js';
 import { skillCount } from './needs_skills.js';
 import { operatorAsks, refreshOperatorAsks, onOperatorAsksChanged } from './operator_asks.js';
-import { isCloud, nativeInbox, sessionServer } from './server_base.js';
+import { isCloud, nativeInbox, nativeNeeds, sessionServer } from './server_base.js';
 import { importOnce } from './import_once.js';
 import { markReady } from './ready.js';
 import { resolveSessionIdentity, sessionStateInfo, askWords } from './session_state.js';
@@ -60,7 +60,7 @@ export function updateInboxTab() {
     const badge = document.getElementById('nav-tab-hub-inbox-badge');
     if (!badge) return;
     refreshReviews();
-    if (!isCloud()) refreshOperatorAsks(); // the questions asked of the Operator are read from this Coral too (#11417)
+    if (!isCloud() || nativeNeeds()) refreshOperatorAsks(); // Coral's own Needs you table on the Hub reads them from each online computer too (#13450); the questions asked of the Operator are read from this Coral too (#11417)
     syncWelcome(); // a welcome step seen is remembered (#11443); the items are not in the badge
     refreshProposals(); // after the Inbox was first opened, and at most once in 20 seconds (proposals_state.js)
     if (!isCloud()) refreshRuns(); // the runs are read from this Coral only, and only once the Inbox or Automations has been shown
