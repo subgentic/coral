@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/store"
+	"github.com/subgentic/coral/pkg/redact"
 )
 
 // #13522: the built list of a team's artifacts is kept for a walk of its pages. These tests pin that it is kept (a walk builds it once), and that every input of the list shows on the next read: no stale list.
@@ -241,4 +243,106 @@ func TestKeptListIsNeverAnotherCallersView(t *testing.T) {
 			check()
 		}
 	})
+}
+
+// The kept list is handed to a request as it is (no copy per page: a walk of 20,000 rows copied them for every page), so no request may write to it. Every way of reading it runs here, one after the other, and the
+// kept rows are the same after all of them: the owner's two query paths, a filtered and a sorted one, a Hub owner (whose rows the query redacts in place), a guest and an agent. And the list a caller gets from
+// projectArtifactItems is its own: it changes every field of it and reads again.
+func TestNoRequestCanChangeTheKeptList(t *testing.T) {
+	_, h, coralDir := teamArtifactServer(t)
+	prev := artifactCircle
+	w := &world{sessions: map[string]string{"s-a": gaBoard, "a1": gaBoard}, owners: map[string]artifactPrincipal{gaBoard: hubOwner(aliceUser)}}
+	circle := w.circle()
+	circle.PrivateArtifacts = h.bs.PrivateArtifacts
+	SetArtifactCircle(circle)
+	t.Cleanup(func() { SetArtifactCircle(prev) })
+	ctx := context.Background()
+	record := func(id string) {
+		dir := uploadsDir(coralDir, "s-a")
+		require.NoError(t, os.MkdirAll(dir, 0o755))
+		b, _ := json.Marshal(agentUploadRecord{agentArtifactMeta: agentArtifactMeta{Name: "file-" + id[:4] + ".md", MediaType: "text/markdown", Size: 4, Digest: id}, CreatedAt: time.Now().UTC().Format(time.RFC3339), Board: gaBoard})
+		require.NoError(t, os.WriteFile(filepath.Join(dir, id+".json"), b, 0o644))
+	}
+	record(gaMine)
+	record(gaPrivate)
+	subscribeSession(t, h, gaBoard, "Ann", "s-a")
+	require.NoError(t, h.bs.SetArtifactPrivate(ctx, gaPrivate, true, "Operator"))
+	require.NoError(t, h.bs.SetArtifactTags(ctx, gaBoard, gaMine, []string{"for review", "notes"}))
+	require.NoError(t, h.bs.SetArtifactTags(ctx, gaBoard, gaPrivate, []string{"for review"}))
+	_, err := h.bs.SetArtifactKind(ctx, gaBoard, gaMine, board.KindRelease, "sess", time.Now())
+	require.NoError(t, err)
+	withLabel(t, ownerLabel, nil)
+	time.Sleep(uploadDirSettle + 300*time.Millisecond)
+
+	serve := func(wrap func(*http.Request) *http.Request) *httptest.Server {
+		r := chi.NewRouter()
+		r.Get("/api/board/{project}/artifacts", func(rw http.ResponseWriter, rq *http.Request) { h.ListTeamArtifacts(rw, wrap(rq)) })
+		s := httptest.NewServer(r)
+		t.Cleanup(s.Close)
+		return s
+	}
+	withHeaders := func(hdr map[string]string) func(*http.Request) *http.Request {
+		return func(rq *http.Request) *http.Request {
+			for k, v := range hdr {
+				rq.Header.Set(k, v)
+			}
+			return rq
+		}
+	}
+	callers := map[string]*httptest.Server{
+		"owner":     serve(asPerson),
+		"hub owner": serve(withHeaders(ownerHeaders(ownerLabel))),
+		"guest":     serve(withHeaders(gaGuide(gaDana))),
+		"agent": serve(func(rq *http.Request) *http.Request {
+			return rq.WithContext(context.WithValue(rq.Context(), verifiedSessionKey{}, &store.SessionTokenOwner{SessionID: "a1"}))
+		}),
+	}
+	queries := []string{"", "?limit=1", "?limit=1&offset=1", "?tag=for%20review&limit=1", "?q=file&limit=5", "?sort=name&limit=5", "?kind=release", "?versions=newest&limit=5"}
+
+	snapshot := func() string {
+		h.itemsCache.mu.Lock()
+		defer h.itemsCache.mu.Unlock()
+		require.Len(t, h.itemsCache.entries, 1, "one kept list for this board")
+		raw, err := json.Marshal(h.itemsCache.entries[0].items)
+		require.NoError(t, err)
+		var managed []string
+		for _, it := range h.itemsCache.entries[0].items {
+			managed = append(managed, it.managed)
+		}
+		return string(raw) + "|" + strings.Join(managed, ",")
+	}
+	origRedactor := shownRedactor // a Hub viewer's rows are redacted in place by the query: with a redactor that hides every text, a write to the kept rows shows at once
+	shownRedactor = func() redact.Redactor { return redact.Refuse }
+	t.Cleanup(func() { shownRedactor = origRedactor })
+	getTeamArtifacts(t, callers["owner"], "/api/board/"+gaBoard+"/artifacts", 200) // builds the kept list
+	before := snapshot()
+	require.Contains(t, before, gaMine)
+	for name, srv := range callers {
+		for _, q := range queries {
+			resp, err := http.Get(srv.URL + "/api/board/" + gaBoard + "/artifacts" + q)
+			require.NoError(t, err)
+			resp.Body.Close()
+			require.Equal(t, before, snapshot(), "%s %s changed the kept list", name, q)
+		}
+	}
+
+	// the list a caller gets is its own: every field written, then read again
+	ownerReq := func() *http.Request { return asPerson(httptest.NewRequest(http.MethodGet, "/x", nil)) }
+	first, _, err := h.projectArtifactItems(ownerReq(), gaBoard, "")
+	require.NoError(t, err)
+	wasJSON, _ := json.Marshal(first)
+	for i := range first {
+		first[i].Name, first[i].Private, first[i].Kind, first[i].NewComments = "changed", !first[i].Private, "changed", 99
+		if len(first[i].Tags) > 0 {
+			first[i].Tags[0] = "changed"
+		}
+		if first[i].Size != nil {
+			*first[i].Size = 12345
+		}
+	}
+	again, _, err := h.projectArtifactItems(ownerReq(), gaBoard, "")
+	require.NoError(t, err)
+	againJSON, _ := json.Marshal(again)
+	require.JSONEq(t, string(wasJSON), string(againJSON), "a caller that changes its list changes nothing for the next")
+	require.Equal(t, before, snapshot())
 }

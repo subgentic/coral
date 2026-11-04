@@ -31,10 +31,11 @@ type teamItemsKey struct {
 }
 
 type teamItemsEntry struct {
-	key       teamItemsKey
-	at        time.Time
-	items     []teamArtifact
-	truncated bool
+	key        teamItemsKey
+	at         time.Time
+	items      []teamArtifact // read-only once kept: no request may write to it (it is handed out as it is)
+	truncated  bool
+	anyPrivate bool // some row carries a private mark: a caller who may not see them needs a copy with them taken off
 }
 
 type teamItemsCache struct {
@@ -50,8 +51,8 @@ func (c *teamItemsCache) clock() time.Time {
 	return time.Now()
 }
 
-// get is a copy of the entry for key, or false (a copy: the caller applies its own parts to it).
-func (c *teamItemsCache) get(key teamItemsKey) ([]teamArtifact, bool, bool) {
+// get is the kept list for key, or false. It is NOT a copy: the slice is shared by every request and is read-only (a request that has to change a row copies it first: see teamItemsView).
+func (c *teamItemsCache) get(key teamItemsKey) (items []teamArtifact, truncated, anyPrivate, ok bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	for i, e := range c.entries {
@@ -60,11 +61,11 @@ func (c *teamItemsCache) get(key teamItemsKey) ([]teamArtifact, bool, bool) {
 		}
 		if c.clock().Sub(e.at) > teamItemsTTL {
 			c.entries = append(c.entries[:i], c.entries[i+1:]...)
-			return nil, false, false
+			return nil, false, false, false
 		}
-		return append([]teamArtifact(nil), e.items...), e.truncated, true
+		return e.items, e.truncated, e.anyPrivate, true
 	}
-	return nil, false, false
+	return nil, false, false, false
 }
 
 // put keeps items (the caller keeps its own copy) under key and drops the entries of the same board and filter that an older revision made, and the oldest beyond teamItemsEntries.
@@ -79,6 +80,12 @@ func (c *teamItemsCache) put(key teamItemsKey, items []teamArtifact, truncated b
 		kept = append(kept, e)
 	}
 	e := &teamItemsEntry{key: key, at: c.clock(), items: append([]teamArtifact(nil), items...), truncated: truncated}
+	for i := range e.items {
+		if e.items[i].Private {
+			e.anyPrivate = true
+			break
+		}
+	}
 	c.entries = append([]*teamItemsEntry{e}, kept...)
 	if len(c.entries) > teamItemsEntries {
 		c.entries = c.entries[:teamItemsEntries]
@@ -105,4 +112,45 @@ func (h *BoardHandler) teamItemsSubscribers(subscribers map[string]string) strin
 		fmt.Fprintf(&b, "%s=%s@%d;", name, sid, mod)
 	}
 	return b.String()
+}
+
+// cloneTeamRows is a list of rows of one's own: the rows by value, and what their pointer and slice fields point to copied, so a caller that writes through them (the size, a tag) changes nothing in the kept list the rows
+// came from. The request's view (projectArtifactItemsView) shares the kept list and only reads it; the callers that may write get this (projectArtifactItems).
+func cloneTeamRows(in []teamArtifact) []teamArtifact {
+	out := make([]teamArtifact, len(in))
+	copy(out, in)
+	for i := range out {
+		r := &out[i]
+		if r.Size != nil {
+			v := *r.Size
+			r.Size = &v
+		}
+		if r.GoalID != nil {
+			v := *r.GoalID
+			r.GoalID = &v
+		}
+		if r.SessionID != nil {
+			v := *r.SessionID
+			r.SessionID = &v
+		}
+		if r.ProducedBy != nil {
+			v := *r.ProducedBy
+			r.ProducedBy = &v
+		}
+		if r.WaitsOnThis != nil {
+			v := *r.WaitsOnThis
+			r.WaitsOnThis = &v
+		}
+		if r.Review != nil {
+			v := *r.Review
+			r.Review = &v
+		}
+		if r.Tags != nil {
+			r.Tags = append([]string(nil), r.Tags...)
+		}
+		if r.AlsoReceivedFrom != nil {
+			r.AlsoReceivedFrom = append([]string(nil), r.AlsoReceivedFrom...)
+		}
+	}
+	return out
 }

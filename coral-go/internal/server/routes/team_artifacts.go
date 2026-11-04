@@ -111,6 +111,7 @@ type teamArtifact struct {
 
 	index      int
 	managed    string // 64-hex Coral object id for coral-managed artifacts
+	fromRecord bool   // an upload row whose record holds the name, the type and the digest: the list needs no read of the sidecar for it (#13552)
 	uploadTask int64  // the task an upload's record says it is linked to (#7739): shown only once the board says the task is the team's (linkUploadTasks)
 }
 
@@ -184,7 +185,7 @@ func (h *BoardHandler) ListTeamArtifacts(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	artifactsRev := h.bs.ArtifactsRevision(project)
-	items, scanTruncated, err := h.projectArtifactItems(r, project, sessionFilter)
+	items, scanTruncated, _, err := h.projectArtifactItemsView(r, project, sessionFilter) // read-only: the query below filters into a new slice, and the page below is copied before a row of it is changed (#13552)
 	if err != nil {
 		errInternalServer(w, "could not list artifacts")
 		return
@@ -209,7 +210,7 @@ func (h *BoardHandler) ListTeamArtifacts(w http.ResponseWriter, r *http.Request)
 	if end > len(items) {
 		end = len(items)
 	}
-	page := items[offset:end]
+	page := append([]teamArtifact(nil), items[offset:end]...) // this page's own rows: the list it was cut from may be the kept one
 	dir := h.artifactObjectDir()
 	starred, serr := h.bs.StarredArtifactIDs(r.Context()) // a bookmark: an unreadable set leaves the rows unstarred
 	if serr != nil {
@@ -245,30 +246,101 @@ func (h *BoardHandler) ListTeamArtifacts(w http.ResponseWriter, r *http.Request)
 // projectArtifactItems is a team's artifact list as the team route builds it, before any query: the task results, the uploads of its agents, the cross-team rows and the upload task links, cut to what the caller may read.
 // sessionFilter keeps one session's uploads (only a session of this board).
 func (h *BoardHandler) projectArtifactItems(r *http.Request, project, sessionFilter string) ([]teamArtifact, bool, error) {
-	subscribers, err := h.bs.TeamSubscriberSessions(r.Context(), project)
+	items, truncated, aliased, err := h.projectArtifactItemsView(r, project, sessionFilter)
 	if err != nil {
 		return nil, false, err
 	}
+	if aliased {
+		items = cloneTeamRows(items) // a caller that writes to its rows (or through them) gets its own list
+	}
+	return items, truncated, nil
+}
+
+// projectArtifactItemsView is projectArtifactItems for a caller that only READS the rows (the team list's query: it filters into a new slice and copies the rows of its page before it changes one). shared says the
+// rows are the kept list's (aliased: the slice itself, or a copy of it that still shares what the rows point to), which no request may write to or through; a request whose parts need a row changed (the new-comments counts, a kind or a muted team, a private mark taken off, a Hub viewer's redaction) gets its own
+// copy, and one that changes nothing, the Operator's walk of a big board, copies nothing: 20,000 rows were copied for every page (#13552).
+func (h *BoardHandler) projectArtifactItemsView(r *http.Request, project, sessionFilter string) (items []teamArtifact, scanTruncated, aliased bool, err error) {
+	subscribers, err := h.bs.TeamSubscriberSessions(r.Context(), project)
+	if err != nil {
+		return nil, false, false, err
+	}
 	// The revision is read BEFORE the data: a write during the build leaves the entry older than the next token (see teamItemsCache).
 	key := teamItemsKey{project: project, session: sessionFilter, rev: h.bs.ArtifactsRevision(project), subscribers: h.teamItemsSubscribers(subscribers)}
-	items, scanTruncated, hit := h.itemsCache.get(key)
+	items, scanTruncated, anyPrivate, hit := h.itemsCache.get(key)
+	shared := hit // the slice is the kept one (own() copies it by value); the rows keep sharing what they point to either way
 	if !hit {
 		items, scanTruncated, err = h.buildProjectArtifactItems(r, project, sessionFilter, subscribers)
 		if err != nil {
-			return nil, false, err
+			return nil, false, false, err
 		}
 		h.itemsCache.put(key, items, scanTruncated)
+		for i := range items {
+			if items[i].Private {
+				anyPrivate = true
+				break
+			}
+		}
 	}
-	// What depends on the caller, or on settings that do not move the revision, is applied to this request's copy.
-	h.attachNewComments(r, items)
-	h.attachArtifactKinds(r, project, items)
-	items = filterReadable(r, h.coralDir, items) // an agent's list holds only what the one read check lets it read, so the totals and the cursor count nothing else (#5577)
-	if !ownerSeesPrivateMarks(r) {
+	own := func() { // the first write to a shared list copies it
+		if shared {
+			items = append([]teamArtifact(nil), items...)
+			shared = false
+		}
+	}
+	ctx := r.Context()
+	// What depends on the caller, or on settings that do not move the revision, is applied to this request's own view.
+	if h.commentNews != nil && len(items) > 0 && operatorOrKeyCaller(r) {
+		if news, nerr := h.commentNews(ctx); nerr == nil && len(news) > 0 {
+			own()
+			for i := range items {
+				items[i].NewComments = news[items[i].ID]
+			}
+		}
+	}
+	if len(items) > 0 && operatorOrKeyCaller(r) {
+		if kinds, kerr := h.bs.ArtifactKindsOf(ctx, project); kerr == nil {
+			prefs := h.inboxPrefs(ctx)
+			for i := range items {
+				if items[i].managed == "" {
+					continue
+				}
+				kind := kinds[items[i].managed]
+				setKind := kind != "" && kind != board.KindFile
+				muted := prefs.muted(project, kind)
+				if !setKind && !muted {
+					continue
+				}
+				own()
+				if setKind {
+					items[i].Kind = kind
+				}
+				if muted {
+					items[i].Muted = true
+				}
+			}
+		}
+	}
+	if filtered := filterReadable(r, h.coralDir, items); !sameList(filtered, items) { // an agent's list holds only what the one read check lets it read, so the totals and the cursor count nothing else (#5577)
+		items, shared = filtered, false // a new slice: this request's own
+	}
+	if anyPrivate && !ownerSeesPrivateMarks(r) {
+		own()
 		for i := range items {
 			items[i].Private = false // the marks are kept with the list; this caller may not see them
 		}
 	}
-	return items, scanTruncated, nil
+	if shared && cloud.Tunneled(r) {
+		own() // a Hub viewer's rows are redacted in place by the query
+	}
+	return items, scanTruncated, hit, nil
+}
+
+// sameList says a and b are the one slice (the same first row, the same length): filterReadable answers the list it was given when it has nothing to take out.
+func sameList(a, b []teamArtifact) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	return len(a) == 0 || &a[0] == &b[0]
 }
 
 // buildProjectArtifactItems is the part of the list that is the team's own (the same for every caller): the task results, the uploads of its agents, the cross-team rows, the upload task links and the tags.
@@ -446,6 +518,9 @@ func enrichTeamArtifact(it *teamArtifact, objectDir string) {
 		}
 		size := blob.Size()
 		it.Size, it.Available = &size, true
+		if it.fromRecord { // the upload record already holds the name, the type and the digest (the sidecar is the same text): the blob's own stat above is the one check of the file (#13552)
+			return
+		}
 		meta, ok := readArtifactSidecar(path + ".json")
 		if !ok {
 			return
@@ -786,6 +861,7 @@ func (c *uploadDirCache) merge(items []teamArtifact, coralDir string, sessions m
 				ID: u.id, Name: u.rec.Name, MediaType: u.rec.MediaType, CreatedAt: u.rec.CreatedAt, Size: sizeOfRecord(u.rec.Size),
 				Source: "upload", URI: "coral://artifacts/" + u.id, Digest: u.rec.Digest,
 				ReferenceCount: 1, SessionID: &sid, managed: u.id, uploadTask: u.rec.TaskID,
+				fromRecord: u.rec.Name != "" && !digestLikeName.MatchString(u.rec.Name) && u.rec.MediaType != "" && u.rec.Digest != "",
 			}
 			if producer != "" {
 				p := producer
