@@ -166,14 +166,11 @@ func (h *BoardHandler) ReviewArtifact(w http.ResponseWriter, r *http.Request) {
 	// unread when it wakes: nothing is woken). An artifact with no recorded uploader is approved with no message.
 	if project == noTeamBoardID { // an agent on no team has no board: the notice is typed into the session that uploaded the file (#13539)
 		decision := map[string]string{board.ReviewApproved: board.ActApprove, board.ReviewDenied: board.ActDeny}[state]
-		notice := reviewNotice("x", item.Name, id, nil)
-		if note := noticeData(body.Note, reviewReasonCap, nil); state == board.ReviewApproved && note != "" {
-			notice = reviewNoteNotice("x", item.Name, id, note, nil)
-		}
+		notice := typedNoTeamApproved(item.Name, id, body.Note)
 		if state == board.ReviewDenied {
-			notice = denyNotice("x", item.Name, id, noticeData(body.Reason, reviewReasonCap, nil), nil)
+			notice = typedNoTeamDenied(item.Name, id, body.Reason)
 		}
-		delivered, why := h.tellNoTeamUploaderOf(r.Context(), id, noTeamNoticeLine(notice, "x"))
+		delivered, why := h.tellNoTeamUploaderOf(r.Context(), id, notice)
 		h.tellChief(context.WithoutCancel(r.Context()), decision, "file", project, item.Name, "")
 		out["delivered"] = delivered
 		if !delivered {

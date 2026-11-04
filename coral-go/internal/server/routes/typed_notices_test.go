@@ -36,6 +36,10 @@ func TestTypedNoticeCensus(t *testing.T) {
 		typedcensus.C("agent UI action", uiActionPrompt(7, "panel-1", 3), uiActionPrompt(7, "panel-1", 3)),
 		typedcensus.C("review pool", reviewPoolNudge, reviewPoolNudge),
 		typedcensus.C("send now", board.NudgeText(3), board.NudgeText(1)),
+		typedcensus.C("no-team approval", typedNoTeamApproved("report.md", strings.Repeat("a", 64), ""), typedNoTeamApproved(h, strings.Repeat("a", 64), "")),
+		typedcensus.C("no-team approval with a note", typedNoTeamApproved("report.md", strings.Repeat("a", 64), "Tidy the title."), typedNoTeamApproved(h, strings.Repeat("a", 64), h)),
+		typedcensus.C("no-team denial", typedNoTeamDenied("report.md", strings.Repeat("a", 64), "Wrong template."), typedNoTeamDenied(h, strings.Repeat("a", 64), h)),
+		typedcensus.C("no-team comment", typedNoTeamComment(strings.Repeat("a", 64), "Please add the Q4 table.", "report.md"), typedNoTeamComment(strings.Repeat("a", 64), h, h)),
 	}
 	typedcensus.Run(t, cases)
 }
@@ -77,6 +81,7 @@ func TestEveryTypedSenderIsInTheCensus(t *testing.T) {
 		typedcensus.S("claude_artifact_nudge.go", `text, what)`, 1, "the nudger's deliver: forwards claudeArtifactNudgeText"),
 		typedcensus.S("claude_artifact_nudge.go", `claudeArtifactNudgeText`, 1, "census: artifact reminder"),
 		typedcensus.S("review_pool.go", `reviewPoolNudge`, 1, "census"),
+		typedcensus.S("no_team_notice.go", `board.OneLine(text), "artifact review"`, 1, "tellNoTeamUploader: forwards the text of the builders listed here (census: no-team approval, denial, comment)"),
 		typedcensus.S("agent_exited.go", `term.SendInput(ctx, terminalinput.Coral, name, text, agentType, sessionID)`, 1, "deliverAutomated's own send: types the text of its callers, listed here"),
 		typedcensus.S("sessions_input.go", `body.Command, body.AgentType`, 1, "exception: POST /send by a caller that is not a person (an agent's tool, a script): the caller's own words, through the gate and its exited-pane guard; who may send is checked before"),
 		typedcensus.S("sessions_input.go", `"/keys"`, 1, "exception: POST /keys by a caller that is not a person: the caller's own keys, through the gate"),

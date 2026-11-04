@@ -150,3 +150,39 @@ func TestADecisionOrCommentOnBytesTwoNoTeamAgentsUploadedTellsNoneOfThem(t *test
 	assert.Empty(t, mock.sentTo(name))
 	assert.Empty(t, mock.sentTo(otherName))
 }
+
+// The guards that stand between a no-team notice and the terminal (QA Reviewer 2's SHOULDs on #13539): an asleep uploader is not typed into, the owner's comments are rate limited as every sent comment is, and a
+// comment the redactor cannot make safe is not typed. Each tells nobody and the decision or comment stands.
+func TestTheGuardsBeforeANoTeamNoticeIsTyped(t *testing.T) {
+	h, mock, name, id, _ := noTeamNoticeRig(t)
+	_, sh, _, _ := setupSessionsTestServer(t)
+	sh.SetBoardHandler(h)
+	req := httptest.NewRequest(http.MethodPost, "/api/artifacts/"+id+"/comments", nil)
+	caller := commentCaller{Issuer: "local", Subject: "owner"}
+
+	// a sleeping uploader
+	h.sessionAsleep = func(context.Context, string) bool { return true }
+	code, out := decideNoTeam(h, id, `{"decision":"approve"}`)
+	require.Equal(t, http.StatusOK, code, "%v", out)
+	assert.Equal(t, false, out["delivered"])
+	assert.Equal(t, "asleep_or_gone", out["reason"], "an asleep agent is not typed into")
+	assert.Equal(t, autoDelivery{Reason: "asleep_or_gone"}, sh.deliverNoTeamComment(req, caller, store.ArtifactComment{Body: "A comment."}, id))
+	assert.Empty(t, mock.sentTo(name))
+	h.sessionAsleep = nil
+
+	// a comment the redactor cannot make safe: nothing is typed
+	redactCommentFailsFor = func(text string) bool { return strings.Contains(text, "unredactable") }
+	t.Cleanup(func() { redactCommentFailsFor = nil })
+	assert.Equal(t, autoDelivery{Reason: "redaction_unavailable"}, sh.deliverNoTeamComment(req, caller, store.ArtifactComment{Body: "An unredactable comment."}, id))
+	assert.Empty(t, mock.sentTo(name), "a comment the redactor cannot make safe is not typed")
+	redactCommentFailsFor = nil
+
+	// the hourly limit of sent comments
+	var last autoDelivery
+	limited := commentCaller{Issuer: "local", Subject: "owner-for-the-limit"} // its own count: the cases above spent none of it
+	for i := 0; i <= sendLimitPerHour; i++ {
+		last = sh.deliverNoTeamComment(req, limited, store.ArtifactComment{Body: "Another comment."}, id)
+	}
+	assert.Equal(t, autoDelivery{Reason: "rate_limited"}, last, "past sendLimitPerHour comments an hour the next is not typed")
+	assert.Len(t, mock.sentTo(name), sendLimitPerHour, "exactly the allowed ones were typed")
+}
