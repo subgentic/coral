@@ -106,4 +106,26 @@ await new Promise(r => setTimeout(r, 60)); // sleep-ok: past every hold timer
 assert.ok(peakRunning <= rl.MAX_IN_FLIGHT, 'answered requests free their slot once: at most 6 ran together, saw ' + peakRunning);
 rl.remoteLimitHooks.holdMs = 30000;
 
+// the slot is given back ONCE (#13360, QA's SHOULD on #13351): six requests hang, the hold passes, the seventh starts, then the six answer late. Their late answers must not give back slots they no longer hold: with the
+// freed flag removed each late answer released a second slot, so more than 6 ran at once afterwards.
+reset(); hubCap = 100;
+rl.remoteLimitHooks.holdMs = 20;
+let live = 0, peakLive = 0;
+const enter = () => { live++; peakLive = Math.max(peakLive, live); };
+const answers = [];
+const hangThenAnswer = () => new Promise(res => { enter(); answers.push(() => { live--; res(new Response('{}', { status: 200 })); }); });
+const sixHung = Array.from({ length: rl.MAX_IN_FLIGHT }, () => rl.limited('lane-late', 'GET', null, hangThenAnswer));
+const seventhDone = rl.limited('lane-late', 'GET', null, async () => { enter(); await new Promise(r => setTimeout(r, 5)); live--; return new Response('{}', { status: 200 }); }); // sleep-ok: a request that takes a moment
+await seventhDone; // it started once the hold gave a slot back, and it finished
+for (const answer of answers) answer(); // the six answer late, after their hold
+await Promise.all(sixHung);
+// a burst after the late answers: if each late answer had freed a second slot the lane would now allow 12 together
+const burst = await Promise.all(Array.from({ length: 24 }, () => rl.limited('lane-late', 'GET', null, async () => { enter(); await new Promise(r => setTimeout(r, 5)); live--; return new Response('{}', { status: 200 }); }))); // sleep-ok: a request that takes a moment
+assert.ok(burst.every(x => x.status === 200), 'the burst was answered');
+assert.ok(peakLive <= rl.MAX_IN_FLIGHT + 1, 'in flight never goes past the 6 slots plus the one request that took a given-back slot: ' + peakLive);
+const afterLate = (() => { let l = 0, p = 0; return { start: () => { l++; p = Math.max(p, l); }, end: () => { l--; }, peak: () => p }; })();
+await Promise.all(Array.from({ length: 24 }, () => rl.limited('lane-late', 'GET', null, async () => { afterLate.start(); await new Promise(r => setTimeout(r, 5)); afterLate.end(); return new Response('{}', { status: 200 }); }))); // sleep-ok: a request that takes a moment
+assert.ok(afterLate.peak() <= rl.MAX_IN_FLIGHT, 'after the late answers the lane still allows 6 at once, not 12: ' + afterLate.peak());
+rl.remoteLimitHooks.holdMs = 30000;
+
 console.log('remote_limit: ok');
