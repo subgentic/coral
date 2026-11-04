@@ -323,3 +323,8 @@ node home_folder_ask.test.mjs
 node artifact_comment_send_queue.test.mjs
 
 node artifact_comment_ask_context.test.mjs
+node chief_checks_model.test.mjs
+
+node chief_checks_state_api.test.mjs
+
+node chief_checks_lan.test.mjs

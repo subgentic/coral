@@ -46,7 +46,11 @@ and references: `routed` requires a same-board `task_id`; `waiting_on_operator`
 requires `ask_id` attributed to the original receiving session; optional
 `brief_id` must name that session's actual board message. Other states are
 `open` and `done`. Agents using `daily_brief` must link an actual brief before
-marking a result done; the person may explicitly resolve it. The CLI is:
+marking a result done. The person may resolve (`done`) or reopen (`open`) with
+only `state`; this atomically preserves the latest stored agent summary and all
+`task_id`, `ask_id`, and `brief_id` links. Report fields from an older client are
+ignored for person actions. The person cannot report `routed` or
+`waiting_on_operator`. The CLI is:
 
     coral-agent check state ID --state done --summary 'Short result'
 

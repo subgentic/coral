@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import {installDom,importUi} from './helpers/jsdom_env.mjs';
+installDom({mode:'local'});
+const calls=[];
+globalThis.fetch=window.fetch=async(url,options)=>{calls.push({url,body:JSON.parse(options.body)});return new Response('{}',{headers:{'Content-Type':'application/json'}});};
+const {setTriggerState}=await importUi('chief_checks_api');
+const cached={id:17,summary:'Outdated list summary',task_id:3,ask_id:4,brief_id:5};
+await setTriggerState(cached,'done');await setTriggerState(cached,'open');
+assert.deepEqual(calls.map(c=>c.body),[{state:'done'},{state:'open'}],'person mutations send only state, never cached report fields');
+assert.ok(calls.every(c=>c.url.endsWith('/api/chief/triggers/17/state')));
+console.log('chief_checks_state_api: state-only wire payloads pass');
