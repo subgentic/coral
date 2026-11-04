@@ -180,6 +180,9 @@ func (h *BoardHandler) ListAllTeamArtifacts(w http.ResponseWriter, r *http.Reque
 	if len(sel.tags) > 0 {
 		resp["tag_counts"] = sel.tags
 	}
+	if sel.facets != nil {
+		resp["facets"] = sel.facets
+	}
 	writeJSON(w, http.StatusOK, resp)
 }
 
