@@ -84,8 +84,8 @@ const B = 'bigboard-13326-' + TAG, SESSION = '13326000-0000-4000-8000-' + String
         await new Promise(r => setTimeout(r, Math.max(0, 20000 - (Date.now() - loadFrom)))); // sleep-ok: the budget is for a page that has settled (20 s after its load)
         await ev(`(() => { if (typeof window.switchNavTab === 'function') window.switchNavTab('agents'); return true; })()`);
         await new Promise(r => setTimeout(r, 500)); // sleep-ok: the tab switch finishes
-        // The Inbox leaves its table in the page when the person goes to another tab, so reopening it showed old rows at 0 ms (#13397): the rows are cleared first, and the time is the redraw's (a table with no rows has to be drawn again).
-        await ev(`(() => { const v = document.getElementById('group-table-view'); if (v) v.replaceChildren(); return true; })()`);
+        // The Inbox leaves its table in the page when the person goes to another tab, so reopening it showed old rows at 0 ms (#13397): the rows are cleared first, with the table's drawn marker (sidebar_groups.js drawTable skips a table whose marker matches), and the time is the redraw's.
+        await ev(`(() => { const v = document.getElementById('group-table-view'); if (v) { v.replaceChildren(); delete v.dataset.drawn; } return true; })()`);
         results.needsYouWarmMs = await ev(`(async () => { if (typeof window.switchNavTab !== 'function') return -1; window.switchNavTab('hub-inbox'); const v = await window.__until(() => document.querySelectorAll('#group-table-view tbody tr').length > 0); return v === null ? -2 : Math.round(v); })()`);
         // 4. typing in the agent's command box: long tasks while 60 keys go in one at a time
         await ev(`window.selectLiveSession(${JSON.stringify(agent.session_name)}, 'terminal', ${JSON.stringify(agent.session_id)}); true`);
