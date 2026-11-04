@@ -598,6 +598,8 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 
 /* A Needs you row's kind icon (#13144, needs_filters.js kindIcon): a small leading glyph, the sidebar's secondary colour, no taller than the row's text line so the row keeps its height. The glyph is drawn here from data-kind (icons in the font subset). */
 .material-icons.inbox-kind-icon { font-size: 1.2em; margin-block: -0.3em; color: var(--text-secondary); align-self: center; margin-right: 6px; vertical-align: middle; } /* the size follows the row's own text and the block margins take its extra height back, so at any text size the icon never sets the line (the row is as tall with it as without) */
+.dt-person:has(> .inbox-kind-icon) { position: relative; padding-left: calc(1.2em + 6px); } /* a computer's Needs you row (#13144): the icon sits in the person cell's left padding, out of the flow, so it can set no line or row height at any text size (it was a flex item and added 1 to 4 px at 200% text, whatever its own height) */
+.dt-person > .material-icons.inbox-kind-icon { position: absolute; left: 0; top: 50%; transform: translateY(-50%); margin: 0; height: auto; line-height: 1; font-size: 1.2em; }
 .dt-mail-title > .material-icons.inbox-kind-icon { vertical-align: -0.2em; margin-block: -0.3em; margin-right: 6px; } /* inside a phone row's title (the line's cut and wraps act on the title): no taller than the text's own line */
 .inbox-kind-icon::before { content: 'help_outline'; }
 .inbox-kind-icon[data-kind="permission"]::before { content: 'lock'; }
