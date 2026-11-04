@@ -51,9 +51,9 @@ const B = {
     const t = await beat(browser, "c1")
     await t.go("/agents"); await t.cap("One place for every agent you run."); await sleep(1800)
     await t.click(t.page.locator("button:text-is('New agent') >> visible=true").last()); await sleep(1200); await shot(t, "c1-dialog")
-    await t.page.mouse.move(578, 440, { steps: 25 }); await sleep(300); await t.page.mouse.click(578, 440); await sleep(1500)   // the card is not a button: by position
+    await t.page.mouse.move(578, 440, { steps: 25 }); await sleep(300); await t.page.mouse.click(578, 440)   // the card is not a button: by position
+    await t.page.locator("input[type=text] >> visible=true").first().fill("~/projects/skyline"); await sleep(1500)   // at once: the default is the demo's scratch path
     await t.cap("Pick a folder.")
-    const folder = t.page.locator("input[value*='first-agent'], input[type=text] >> visible=true").first(); await t.move(folder); await folder.fill("~/projects/skyline"); await sleep(700)   // the default shows the demo's scratch path
     await t.click(t.page.locator("button:text-is('Next') >> visible=true").first()); await sleep(1800)
     await t.cap("Start from a persona, or from blank.")
     await t.click(t.page.locator("button:text-is('Next') >> visible=true").first()); await sleep(2200)
@@ -103,6 +103,26 @@ const B = {
     await page.goto(BASE + "/agents/" + sid(story.askQuestionAgent), { waitUntil: "domcontentloaded" }); await sleep(2500)
     const box = page.getByPlaceholder(new RegExp("Message " + story.askQuestionAgent)); await box.click(); await page.keyboard.type("MOCK_ASK_QUESTION"); await page.keyboard.press("Enter"); await sleep(3500)
     await ctx.close(); return "prompts " + ((story.prompts || []).length + 1)
+  },
+  async real() { // the one real-CLI shot (the Operator's call): a real Claude Code launched in the demo's empty HOME, shown on its Terminal view, nothing typed.
+    // REAL_CLAUDE=<path of the claude CLI>. Its text is read from the server first and printed for a person to read: an account name or email would stop the shot.
+    const cli = process.env.REAL_CLAUDE; if (!cli || !fs.existsSync(cli)) throw new Error("set REAL_CLAUDE to the claude CLI")
+    const H = { Authorization: "Bearer " + key(), "Content-Type": "application/json" }
+    const put = (p) => fetch(BASE + "/api/settings", { method: "PUT", headers: H, body: JSON.stringify({ cli_path_claude: p }) })
+    await put(cli)
+    try {
+      const r = await fetch(BASE + "/api/sessions/launch-team", { method: "POST", headers: H, body: JSON.stringify({ board_name: "solo", working_dir: REPO, agents: [{ agent_type: "claude", name: "Claude", prompt: "Skyline sample." }] }) })
+      const j = await r.json(); if (!j.ok) throw new Error("the real launch was refused: " + JSON.stringify(j).slice(0, 200))
+      const id = j.agents[0].session_id; await sleep(9000)
+      let cap = await (await fetch(BASE + "/api/sessions/live/claude-" + id + "/capture", { headers: H })).text(); try { cap = JSON.parse(cap).capture || "" } catch (e) { /* plain text */ }
+      fs.writeFileSync(S + "/work/real-terminal.txt", cap); console.error("REAL TERMINAL TEXT:\n" + cap.replace(/\n{3,}/g, "\n").slice(0, 1500))
+      const bad = [/\/tmp\//, /\/Users\//, /@[\w-]+\.[a-z]{2,}/i, /Welcome back/i, /scratchpad/, /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i].map((re) => (cap.match(re) || [])[0]).filter(Boolean)
+      if (bad.length) throw new Error("the real terminal shows: " + bad.join(" | "))
+      const t = await beat(browser, "real")
+      await t.go("/agents/" + id); await t.cap("Any CLI agent runs in Coral just as it does in your terminal.")
+      await t.click(t.page.locator("button[aria-label='Terminal view']")); await sleep(7000)
+      return await t.finish()
+    } finally { await put(S + "/bin/mock-agent") }
   },
   async c2() { // terminal first (it is the CLI), then the chat view of the same agent
     await termCheck("Orchestrator")
@@ -259,11 +279,10 @@ const B = {
   async c9() { // Analytics: totals, the spend chart, cost by provider, model and team
     const t = await beat(browser, "c9")
     await t.page.addInitScript(() => setInterval(() => document.querySelectorAll("[class*=toast]").forEach((e) => e.remove()), 150))   // a restart notice from re-opening the rig is not part of the story
-    await t.go("/analytics"); await t.cap("What did the team cost?")
-    await sleep(2500)
+    await t.go("/analytics"); await sleep(600)
     const range = t.page.locator("select:has(option)").filter({ has: t.page.locator("option", { hasText: /7 days|week/i }) }).first()   // the time range: a week, so the invented history shows
     if (await range.count()) { const label = await range.evaluate((el) => [...el.options].find((o) => /7 days|week/i.test(o.text))?.text); await t.move(range); await range.selectOption({ label }); await sleep(3500) } else await shot(t, "c9-norange")
-    await t.cap("A week of spend, by day.")
+    await t.cap("What did the team cost? A week, by day.")
     await sleep(2500)
     await t.page.mouse.move(900, 500, { steps: 15 }); await t.page.mouse.wheel(0, 450); await t.cap("By provider, model and team."); await sleep(3500)
     await t.page.mouse.wheel(0, 450); await sleep(3500)
