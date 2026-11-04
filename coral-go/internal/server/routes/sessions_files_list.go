@@ -533,6 +533,9 @@ const refreshRootTTL = 5 * time.Second
 // gitProbeHook runs before each git probe of the refresh path that is not the pass itself (tests: count the probes, make one slow).
 var gitProbeHook = func() {}
 
+// refreshRootNow is the clock of the folder cache (tests move it).
+var refreshRootNow = time.Now
+
 type refreshRoot struct {
 	dir string
 	at  time.Time
@@ -542,7 +545,7 @@ type refreshRoot struct {
 func (h *SessionsHandler) refreshWorkdir(ctx context.Context, name, sessionID string) string {
 	key := fmt.Sprintf("%s\x00%s\x00%t\x00%t", name, sessionID, followOn(ctx), strictIdentity(ctx))
 	if v, ok := h.refreshRoots.Load(key); ok {
-		if rr := v.(refreshRoot); time.Since(rr.at) < refreshRootTTL {
+		if rr := v.(refreshRoot); refreshRootNow().Sub(rr.at) < refreshRootTTL {
 			return rr.dir
 		}
 	}
@@ -552,6 +555,13 @@ func (h *SessionsHandler) refreshWorkdir(ctx context.Context, name, sessionID st
 		h.refreshRoots.Delete(key)
 		return ""
 	}
-	h.refreshRoots.Store(key, refreshRoot{dir: dir, at: time.Now()})
+	now := refreshRootNow()
+	h.refreshRoots.Store(key, refreshRoot{dir: dir, at: now})
+	h.refreshRoots.Range(func(k, v any) bool { // entries of ended sessions are not kept: every miss sweeps the expired ones (Security's INFO a on #13079)
+		if now.Sub(v.(refreshRoot).at) >= refreshRootTTL {
+			h.refreshRoots.Delete(k)
+		}
+		return true
+	})
 	return dir
 }

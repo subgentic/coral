@@ -92,3 +92,65 @@ func TestARepositoryWhoseOnlySlowPartIsFindingItIsPausedToo(t *testing.T) {
 	_, paused = gitguard.Get(realRepo)
 	require.True(t, paused, "two slow requests pause the folder, though the pass itself is fast")
 }
+
+// The folder cache (QA Reviewer 2's SHOULD on #13079): its expiry on a clock the test moves, a miss that is not kept, the key that keeps agents and follow on/off apart, and the sweep of entries of ended sessions.
+func cacheRows(h *SessionsHandler) (n int) {
+	h.refreshRoots.Range(func(_, _ any) bool { n++; return true })
+	return n
+}
+
+func TestTheRefreshFolderCacheExpiresKeepsKeysApartAndSweeps(t *testing.T) {
+	_, handler, terminal, ss := setupSessionsTestServer(t)
+	mk := func(sid, dir string) string {
+		name := "claude-" + sid
+		terminal.addSession(name, dir)
+		require.NoError(t, ss.RegisterLiveSession(context.Background(), &store.LiveSession{SessionID: sid, AgentType: "claude", AgentName: name, WorkingDir: dir}))
+		return name
+	}
+	repoA, repoB := t.TempDir(), t.TempDir()
+	for _, d := range []string{repoA, repoB} {
+		cmd := consoletest.HiddenCommand("git", "-C", d, "init", "-q")
+		out, err := cmd.CombinedOutput()
+		require.NoError(t, err, string(out))
+	}
+	nameA := mk("00000000-0000-0000-0000-0000000130e1", repoA)
+	nameB := mk("00000000-0000-0000-0000-0000000130e2", repoB)
+	var probes atomic.Int64
+	gitProbeHook = func() { probes.Add(1) }
+	now := time.Now()
+	refreshRootNow = func() time.Time { return now }
+	t.Cleanup(func() { gitProbeHook = func() {}; refreshRootNow = time.Now })
+	ctx := context.Background()
+	realA, _ := filepath.EvalSymlinks(repoA)
+	realB, _ := filepath.EvalSymlinks(repoB)
+
+	require.Equal(t, realA, handler.refreshWorkdir(ctx, nameA, ""))
+	require.Equal(t, realA, handler.refreshWorkdir(ctx, nameA, ""))
+	require.EqualValues(t, 1, probes.Load(), "the second ask inside the 5 s is the kept folder")
+	now = now.Add(refreshRootTTL - time.Millisecond)
+	handler.refreshWorkdir(ctx, nameA, "")
+	require.EqualValues(t, 1, probes.Load(), "still kept 1 ms before the end")
+	now = now.Add(time.Millisecond)
+	handler.refreshWorkdir(ctx, nameA, "")
+	require.EqualValues(t, 2, probes.Load(), "at 5 s the folder is resolved again")
+
+	require.Equal(t, realB, handler.refreshWorkdir(ctx, nameB, ""))
+	require.EqualValues(t, 3, probes.Load(), "another agent is its own entry")
+	require.Equal(t, realA, handler.refreshWorkdir(ctx, nameA, ""))
+	require.EqualValues(t, 3, probes.Load(), "and does not disturb the first")
+	followCtx := context.WithValue(ctx, followKey{}, true)
+	handler.refreshWorkdir(followCtx, nameA, "")
+	require.EqualValues(t, 4, probes.Load(), "follow on is a different entry from follow off")
+	handler.refreshWorkdir(followCtx, nameA, "")
+	require.EqualValues(t, 4, probes.Load())
+
+	require.Equal(t, "", handler.refreshWorkdir(ctx, "claude-no-such-agent", ""), "an agent with no folder resolves to nothing")
+	before := probes.Load()
+	handler.refreshWorkdir(ctx, "claude-no-such-agent", "")
+	require.EqualValues(t, before+1, probes.Load(), "a miss is not kept: the next ask looks again")
+
+	require.Equal(t, 3, cacheRows(handler), "A, B and A with follow")
+	now = now.Add(10 * refreshRootTTL) // the sessions ended; a later lookup of one agent sweeps the others
+	handler.refreshWorkdir(ctx, nameB, "")
+	require.Equal(t, 1, cacheRows(handler), "only the entry just made is kept")
+}
