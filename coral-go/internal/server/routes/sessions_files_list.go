@@ -189,17 +189,15 @@ func (h *SessionsHandler) refreshFilesInner(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	key := refreshFlightKey(workdir, h.getDiffMode(r.Context()), sessionID, follow, name)
-	res, ok := refreshFlights.do(r.Context(), key, manual, func() refreshedFiles {
+	res, ran, ok := refreshFlights.do(r.Context(), key, manual, func() refreshedFiles {
 		return h.computeRefreshedFiles(context.WithoutCancel(r.Context()), name, sessionID, workdir, follow)
 	})
 	if !ok {
 		return // the page went away while it waited
 	}
 	var pausedNow any
-	if res.took > gitguard.SlowPass {
-		gitguard.Pause(workdir, res.total, res.took) // this pass was slow: no more live passes for the folder
-	} else if manual {
-		gitguard.Resume(workdir) // an on-demand pass that came back fast: live updates are back on by themselves
+	if ran {
+		gitguard.Observe(workdir, res.total, res.took) // a slow pass is a strike (two in a row pause the folder); a fast one clears them and turns live updates back on if they were paused
 	}
 	if pz, isPaused := gitguard.Get(workdir); isPaused {
 		pausedNow = pz
@@ -416,14 +414,14 @@ const refreshReuseOver = 250 * time.Millisecond
 
 var refreshFlights = &refreshFlight{calls: map[string]*refreshCall{}, recent: map[string]refreshRecent{}}
 
-// do returns the answer for key, running fn if nobody is; false when ctx ended while waiting. fresh asks for a new pass whatever was just answered (a person's Refresh); a pass already running is still shared.
+// do returns the answer for key, running fn if nobody is (ran: this call ran the pass; false when it shared one); ok is false when ctx ended while waiting. fresh asks for a new pass whatever was just answered (a person's Refresh); a pass already running is still shared.
 // The pass is left cleanly even if fn panics: the key is freed and the waiters released (they get an empty answer), so one panic cannot make every later refresh of the folder wait.
-func (f *refreshFlight) do(ctx context.Context, key string, fresh bool, fn func() refreshedFiles) (refreshedFiles, bool) {
+func (f *refreshFlight) do(ctx context.Context, key string, fresh bool, fn func() refreshedFiles) (res refreshedFiles, ran, ok bool) {
 	f.mu.Lock()
 	if rc, ok := f.recent[key]; ok {
 		if !fresh && time.Now().Before(rc.until) {
 			f.mu.Unlock()
-			return rc.res, true
+			return rc.res, false, true
 		}
 		delete(f.recent, key)
 	}
@@ -431,9 +429,9 @@ func (f *refreshFlight) do(ctx context.Context, key string, fresh bool, fn func(
 		f.mu.Unlock()
 		select {
 		case <-c.done:
-			return c.res, true
+			return c.res, false, true
 		case <-ctx.Done():
-			return refreshedFiles{}, false
+			return refreshedFiles{}, false, false
 		}
 	}
 	c := &refreshCall{done: make(chan struct{})}
@@ -457,7 +455,7 @@ func (f *refreshFlight) do(ctx context.Context, key string, fresh bool, fn func(
 	}()
 	c.res = fn()
 	c.ok = true
-	return c.res, true
+	return c.res, true, true
 }
 
 // refreshFlightKey is what one pass of git is shared by: the folder, the mode, the session, the follow state and the agent. The agent too: a pass stores that agent's own list and reads its own events, and an agent

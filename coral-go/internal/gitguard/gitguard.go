@@ -14,6 +14,12 @@ import (
 // SlowPass is how long one pass of git for a folder may take before the folder is paused.
 var SlowPass = 2 * time.Second
 
+// StrikesToPause is how many slow passes in a row pause a folder: one slow pass (a build running, a cold disk cache) does not.
+const StrikesToPause = 2
+
+// RetryAfter is how long a paused folder waits before the poller tries it again by itself; a pass that comes back fast turns live updates back on.
+var RetryAfter = 10 * time.Minute
+
 // Paused is what is known about a paused folder: how many files had changed and how long the pass took.
 type Paused struct {
 	Changes int       `json:"changes"`
@@ -24,6 +30,7 @@ type Paused struct {
 var (
 	mu     sync.Mutex
 	paused = map[string]Paused{}
+	strike = map[string]int{} // slow passes in a row for a folder that is not paused yet (memory only)
 	path   string
 )
 
@@ -45,7 +52,7 @@ func Init(dir string) {
 func Reset() {
 	mu.Lock()
 	defer mu.Unlock()
-	paused, path = map[string]Paused{}, ""
+	paused, strike, path = map[string]Paused{}, map[string]int{}, ""
 }
 
 // Get reports whether folder is paused.
@@ -87,4 +94,37 @@ func save() {
 	if os.WriteFile(tmp, b, 0o600) == nil {
 		_ = os.Rename(tmp, path)
 	}
+}
+
+// Observe records one pass of git for folder and says whether the folder is paused afterwards. A fast pass clears the folder's slow passes and turns live updates back on if they were paused (a manual Refresh or the
+// poller's retry); a slow pass is a strike, and StrikesToPause in a row pause the folder; a slow pass of a paused folder keeps it paused and starts its retry wait again. changes is the Files list's total (0 when unknown).
+func Observe(folder string, changes int, took time.Duration) bool {
+	mu.Lock()
+	defer mu.Unlock()
+	if took <= SlowPass {
+		delete(strike, folder)
+		if _, ok := paused[folder]; ok {
+			delete(paused, folder)
+			save()
+		}
+		return false
+	}
+	if _, ok := paused[folder]; !ok {
+		strike[folder]++
+		if strike[folder] < StrikesToPause {
+			return false
+		}
+		delete(strike, folder)
+	}
+	paused[folder] = Paused{Changes: changes, TookMs: took.Milliseconds(), At: time.Now().UTC()}
+	save()
+	return true
+}
+
+// RetryDue reports whether a paused folder has waited RetryAfter since it was paused or last tried, and is due a pass of the poller's own.
+func RetryDue(folder string, now time.Time) bool {
+	mu.Lock()
+	defer mu.Unlock()
+	p, ok := paused[folder]
+	return ok && now.Sub(p.At) >= RetryAfter
 }
