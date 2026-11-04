@@ -162,22 +162,6 @@
       "description": "Build the dashboard"
     },
     {
-      "agent": "Backend",
-      "kind": "question",
-      "header": "Units",
-      "question": "Show temperatures in Celsius or Fahrenheit by default?",
-      "options": [
-        [
-          "Celsius",
-          "Metric, as most of the world reads it"
-        ],
-        [
-          "Fahrenheit",
-          "US-style, as an option later"
-        ]
-      ]
-    },
-    {
       "agent": "Designer",
       "kind": "permission",
       "command": "git push origin theme-dark",
@@ -381,5 +365,26 @@
     "Frontend": "You are the Skyline frontend engineer: the forecast cards, city search and the theme.",
     "Designer": "You are the Skyline designer: the look in dark and light, the icons and the charts.",
     "Reviewer": "You review Skyline's changes: read the diff, run the tests, approve or ask for changes."
-  }
+  },
+  "mockPrompts": {
+    "question": {
+      "header": "Units",
+      "question": "Show temperatures in Celsius or Fahrenheit by default?",
+      "options": [
+        {
+          "label": "Celsius",
+          "description": "Metric, as most of the world reads it"
+        },
+        {
+          "label": "Fahrenheit",
+          "description": "US-style, as an option later"
+        }
+      ]
+    },
+    "permission": {
+      "command": "npm run build",
+      "description": "Build the dashboard"
+    }
+  },
+  "askQuestionAgent": "Backend"
 }

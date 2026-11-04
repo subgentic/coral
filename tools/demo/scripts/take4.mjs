@@ -38,7 +38,7 @@ const typeInto = async (t, box, text, ms = 22) => { await t.move(box); for (cons
 // The terminal is drawn on a canvas, so the on-screen text scan cannot read it: read the pane's text from the server and scan it with the same patterns plus the mock's own giveaways.
 async function termCheck(name) {
   const r = await fetch(BASE + "/api/sessions/live/claude-" + sid(name) + "/capture", { headers: { Authorization: "Bearer " + key() } })
-  const text = await r.text()
+  const raw = await r.text(); let text = raw; try { text = JSON.parse(raw).capture || "" } catch (e) { /* plain text */ }
   const bad = [/\/tmp\//, /\/private\/var\//, /session_id/i, /\bport=\d+/, /\bboard=/, /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i, /\bb-[a-z0-9]{8,}\b/, /\b[0-9a-f]{32,}\b/i, /coral:\/\//, /\/Users\//, /scratchpad/]
   const hit = bad.map((re) => (text.match(re) || [])[0]).filter(Boolean)
   if (r.status !== 200 || !text.trim()) throw new Error("the terminal text could not be read (" + r.status + "): do not film it blind")
@@ -81,7 +81,7 @@ const B = {
     }
     flushClaims()
     for (const [f, src] of Object.entries(story.repo.change)) fs.copyFileSync(path.resolve(SEED, "..", src), REPO + "/" + f)
-    for (const d of inbox) { agent(d.agent, "coral-agent", "artifact", "upload", SEED + "/" + d.file, "--name", d.name, "--tag", "for review", "--question", d.question); await sleep(1500) }
+    for (const d of inbox) { agent(d.agent, "coral-agent", "artifact", "upload", SEED + "/" + d.file, "--name", d.name, "--no-task", "--tag", "for review", "--question", d.question); await sleep(1500) }
     for (const c of story.chatter) { agent(c[0], "coral-board", "post", c[1]); await sleep(900) }
     const ctx = await browser.newContext({ storageState: S + "/work/state.json", viewport: { width: 1600, height: 900 } }); const page = await ctx.newPage()   // hide the welcome items
     await page.goto(BASE + "/inbox/needs", { waitUntil: "domcontentloaded" }); await sleep(3000)
@@ -97,29 +97,12 @@ const B = {
     }
     await ctx.close(); return "chats " + chats.length
   },
-  async prompts() { // not recorded: the themed permission prompts and a question, fired just before the Inbox is shown (an agent's next turn clears its own)
-    for (const p of story.prompts || []) { if (p.kind === "permission") askPermission(p.agent, p.command, p.description); else askQuestion(p.agent, p.header, p.question, p.options); await sleep(1200) }
-    return "prompts " + (story.prompts || []).length
-  },
-  async real() { // the one real-CLI shot (the Operator's call): a real Claude Code launched in the demo's empty HOME, shown on its Terminal view, nothing typed.
-    // REAL_CLAUDE=<path of the claude CLI>. Its text is read from the server first (termCheck) and printed for a person to read: an account name or email would stop the shot.
-    const cli = process.env.REAL_CLAUDE; if (!cli || !fs.existsSync(cli)) throw new Error("set REAL_CLAUDE to the claude CLI")
-    const H = { Authorization: "Bearer " + key(), "Content-Type": "application/json" }
-    const put = (p) => fetch(BASE + "/api/settings", { method: "PUT", headers: H, body: JSON.stringify({ cli_path_claude: p }) })
-    await put(cli)
-    try {
-      const r = await fetch(BASE + "/api/sessions/launch-team", { method: "POST", headers: H, body: JSON.stringify({ board_name: "solo", working_dir: REPO, agents: [{ agent_type: "claude", name: "Claude", prompt: "Skyline sample." }] }) })
-      const j = await r.json(); if (!j.ok) throw new Error("the real launch was refused: " + JSON.stringify(j).slice(0, 200))
-      const id = j.agents[0].session_id; await sleep(9000)
-      const cap = await (await fetch(BASE + "/api/sessions/live/claude-" + id + "/capture", { headers: H })).text()
-      fs.writeFileSync(S + "/work/real-terminal.txt", cap); console.error("REAL TERMINAL TEXT:\n" + cap.slice(0, 1500))
-      const bad = [/\/tmp\//, /\/Users\//, /@[\w-]+\.[a-z]{2,}/i, /Welcome back/i, /scratchpad/, /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i].map((re) => (cap.match(re) || [])[0]).filter(Boolean)
-      if (bad.length) throw new Error("the real terminal shows: " + bad.join(" | "))
-      const t = await beat(browser, "real")
-      await t.go("/agents/" + id); await t.cap("Or the real thing: any CLI agent runs in Coral as it does in your terminal.")
-      await t.click(t.page.locator("button[aria-label='Terminal view']")); await sleep(7000)
-      return await t.finish()
-    } finally { await put(S + "/bin/mock-agent") }
+  async prompts() { // not recorded: the themed permission prompts (hook events) and the question the mock raises itself (answerable in the Inbox), fired just before the Inbox is shown (an agent's next turn clears its own)
+    for (const p of story.prompts || []) { askPermission(p.agent, p.command, p.description); await sleep(1200) }
+    const ctx = await browser.newContext({ storageState: S + "/work/state.json", viewport: { width: 1600, height: 900 } }); const page = await ctx.newPage()
+    await page.goto(BASE + "/agents/" + sid(story.askQuestionAgent), { waitUntil: "domcontentloaded" }); await sleep(2500)
+    const box = page.getByPlaceholder(new RegExp("Message " + story.askQuestionAgent)); await box.click(); await page.keyboard.type("MOCK_ASK_QUESTION"); await page.keyboard.press("Enter"); await sleep(3500)
+    await ctx.close(); return "prompts " + ((story.prompts || []).length + 1)
   },
   async c2() { // terminal first (it is the CLI), then the chat view of the same agent
     await termCheck("Orchestrator")
@@ -203,21 +186,23 @@ const B = {
     await t.cap("The agent answers, and adds a task.")
     const seen = () => t.page.locator("text=" + goalComment.replyFind).first().waitFor({ state: "visible", timeout: 5000 }).then(() => true).catch(() => false)
     let shown = await seen()
-    for (let k = 0; k < 3 && !shown; k++) { await t.click(t.page.locator("text=Tasks >> visible=true").last()); await sleep(1200); await t.click(t.page.locator("text=Comments >> visible=true").last()); shown = await seen() }   // the panel did not take the answer live: draw it again
+    for (let k = 0; k < 3 && !shown; k++) {   // an open comment panel only reads its thread when it opens: go to the goals list and open the goal again (no page reload)
+      await t.click(t.page.locator("text=Goals >> visible=true").first()); await sleep(1500)
+      await t.click(t.page.locator(`text=${story.goal.title} >> visible=true`).first()); await sleep(2000)
+      await t.click(t.page.locator("text=Comments >> visible=true").last()); shown = await seen()
+    }
     if (!shown) { await shot(t, "c5-noreply"); throw new Error("the agent's answer never showed on the goal") }
     await sleep(4500)
     return t.finish()
   },
-  async c6() { // the Inbox: an agent's question, answered right there (no jump to the agent)
+  async c6() { // the Inbox: the agent's question has its answers on the row; answer it right there
     const t = await beat(browser, "c6")
     await t.go("/inbox/needs"); await t.cap("Your Inbox: everything that is waiting on you.")
-    await sleep(3000)
-    const q = t.page.locator("text=Celsius or Fahrenheit >> visible=true").first()
-    await t.click(q); await sleep(1500); await shot(t, "c6-opened")   // the row opens its answer
+    await sleep(3500)
+    const row = t.page.locator("text=Celsius or Fahrenheit >> visible=true").first()
+    await t.move(row); await sleep(1200)
     await t.cap("Answer an agent's question without leaving the Inbox.")
-    const opt = t.page.locator("button:has-text('Celsius') >> visible=true").first()
-    if (!(await opt.count())) throw new Error("no answer button for the question: see work/x-c6-opened.png")
-    await t.click(opt); await sleep(3500)
+    await t.click(t.page.locator("button:text-is('Celsius') >> visible=true").first()); await sleep(4000)
     return t.finish()
   },
   async c7() { // a document to review: comment on it, the new version comes back at once, and Compare
@@ -248,7 +233,11 @@ const B = {
     // the agent's answer must be on screen: wait for it, draw the panel again (Comments button) if it does not come, and fail the take rather than film a silent agent
     const answered = () => t.page.locator(`text=${live.replyFind}`).first().waitFor({ state: "visible", timeout: 6000 }).then(() => true).catch(() => false)
     let ok = await answered()
-    for (let k = 0; k < 3 && !ok; k++) { await t.click(t.page.getByRole("button", { name: /^Comments/ })); await sleep(900); await t.click(t.page.getByRole("button", { name: /^Comments/ })); await sleep(900); ok = await answered() }
+    for (let k = 0; k < 3 && !ok; k++) {   // the open dialog reads its thread when it opens: close it and open the file again (no page reload)
+      await t.click(t.page.locator("button:text-is('Close') >> visible=true").last()); await sleep(1200)
+      await t.click(t.page.locator(`text=${live.name} >> visible=true`).first()); await sleep(2000)
+      await t.click(t.page.getByRole("button", { name: /^Comments/ })); ok = await answered()
+    }
     if (!ok) { await shot(t, "c7-noreply"); throw new Error("the agent's answer never showed on screen") }
     await sleep(3500)
     await t.cap("And the new version, with what changed.")   // the version chip, then Compare
