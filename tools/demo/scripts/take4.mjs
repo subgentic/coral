@@ -206,14 +206,16 @@ const B = {
     await sleep(4500)
     return t.finish()
   },
-  async c6() { // the Inbox: an agent's question, Open agent, answer it
+  async c6() { // the Inbox: an agent's question, answered right there (no jump to the agent)
     const t = await beat(browser, "c6")
     await t.go("/inbox/needs"); await t.cap("Your Inbox: everything that is waiting on you.")
     await sleep(3000)
-    await t.move(t.page.locator("text=Celsius or Fahrenheit >> visible=true").first()); await sleep(800)
-    await t.click(t.page.locator("text=Celsius or Fahrenheit >> visible=true").first().locator("xpath=ancestor::*[.//button[normalize-space()='Open agent']][1]//button[normalize-space()='Open agent']")); await sleep(3500)
-    await t.cap("Open the agent that asked.")
-    await sleep(2500)
+    const q = t.page.locator("text=Celsius or Fahrenheit >> visible=true").first()
+    await t.click(q); await sleep(1500); await shot(t, "c6-opened")   // the row opens its answer
+    await t.cap("Answer an agent's question without leaving the Inbox.")
+    const opt = t.page.locator("button:has-text('Celsius') >> visible=true").first()
+    if (!(await opt.count())) throw new Error("no answer button for the question: see work/x-c6-opened.png")
+    await t.click(opt); await sleep(3500)
     return t.finish()
   },
   async c7() { // a document to review: comment on it, the new version comes back at once, and Compare
