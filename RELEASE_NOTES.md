@@ -1,5 +1,53 @@
 # Release Notes
 
+## v2.0.47 — A big repository refreshes faster, and a paused folder runs no git
+
+### Changes
+
+#### What you will notice first
+
+- **A big tree's refresh is numbered for the rows kept only**: the Files panel's changed-files refresh on a very large repository reads the changed names first (no file content) and counts lines only for the rows it keeps, which took a refresh of a 35,000-change tree from 1.25 s to 0.25 s (#13155).
+- **A session's events are read through its own index**, instead of all the agent's rows (the old read cost 11 ms at 60,000 rows and grew with them) (#13155).
+- **A paused folder runs no git**: a folder paused for being too slow to follow live runs no git on a refresh, and finding the repository is counted once and kept for 5 seconds (#13079, from the far computer that called the refresh every 4 seconds).
+
+#### Known issues
+
+- **macOS: the tmux change (#12836) can make macOS ask once more, only after tmux restarts (a full restart of your agents or a reboot).** Coral's tmux server and guardian are now their own responsible process, so macOS may ask, per folder, whether `tmux` (or `coral`) may reach Documents, Desktop or Downloads. Full Disk Access you gave Coral.app does not carry over: if you gave Coral Full Disk Access, add `tmux` and `coral` too (both in `Coral.app/Contents/MacOS`). The staged tmux copy (each Coral version keeps its own under `tmux-bin/`) asks again after a tmux change. Say yes once; if you say no, nothing is lost, the agent just cannot read that folder.
+- **Windows: in-app update does not work from 2.0.0 through 2.0.6.** If you're on one of those, download and install the MSI by hand; from 2.0.7 on, in-app update works.
+- **macOS: a Coral of 2.0.5 or earlier cannot install updates in-app; install 2.0.6 or later by hand once.**
+- **OpenCode agents are tested on macOS and Linux; OpenCode on Windows is not yet tested end to end.**
+- **Hermes agents are still experimental.**
+- Setting up a computer over SSH is supported from a macOS or Linux hub, and is not yet tested from a Windows hub.
+
+#### For Coral Hub
+
+- **`release-diff` output** (`go run ./internal/releasediff/cmd/release-diff v2.0.46 <head>`):
+
+  ### Tunnel routes, v2.0.46 to 525ad5f72
+
+  No route was added, removed or changed.
+
+  ### Board settings keys (BoardSettings, HealthSettings included), v2.0.46 to 525ad5f72
+
+  No key was added, removed or changed.
+
+  ### What Coral Hub compiles in or embeds, v2.0.46 to 525ad5f72
+
+  No file changed in any of them: `pkg/hubproxy`, `pkg/hubowner`, `pkg/redact`, `pkg/tunnel`, `pkg/frontend`, `agent_docs`.
+
+  ### Coral packages compiled into the Hub through its imports, v2.0.46 to 525ad5f72
+
+  Unchanged: `internal/fsreplace`, `internal/httputil`, `internal/logsafe`, `internal/safego`, `internal/secfile`, `internal/secrets`, `pkg/redact/betterleaks`.
+
+- **No Hub-visible change**: no route, setting key, token or framed path changed, and no file the Hub embeds or compiles in changed; the Files route answers the same fields (faster on a big tree).
+- **Ready signals, hooks, tokens, framed paths**: unchanged.
+
+
+#### For developers and releases
+
+- A flurry of test-only commits made the browser gate steady: the sign-in-through-the-button suite (`auth_local_open`) now takes the exact tab, clicks in one step and prints what it saw on a miss; the Hub suites' shared fixture grants its network permission only where a suite opts in (`hub_world.js`, with a test pinning the default); the Hub announcements and the keyboard census wait for the page they test to settle; the phone terminal font test waits for the chosen size.
+- `TestDownloadInterceptScript` waits for the outcome instead of a fixed 30 ms (a Windows runner flake, #13225); `TestProcUsageAgreesWithGopsutil` allows `max(256 KiB, 10%)`; the files-refresh tests forget stored passes before each ask.
+
 ## v2.0.46 — The Inbox opens a file at once and follows it when it settles, artifact reviews remember their layout, and a Windows start with no terminal says why
 
 ### Changes
