@@ -77,8 +77,9 @@ try {
         assert.ok(!document.getElementById('inbox-frame'), 'no frame for the whole tab: the Inbox is drawn');
         const nav = () => [...document.querySelectorAll('#inbox-nav-list button')];
         const words = nav().map(b => b.textContent.replace(/^[a-z_]+(?=[A-Z])/, '').replace(/\d+$/, '').trim()); // a chat folder's count (#10319) is not part of its name
-        for (const w of ['Needs you', 'Tasks', 'Goals', 'Saved for later', 'All chats', 'Board history', 'Starred']) assert.ok(words.includes(w), `${w} is in the folder list: ${words}`);
-        for (const w of ['Artifacts', 'Saved']) assert.ok(!words.some(x => x === w || x.startsWith(w + ' ') && !x.startsWith('Saved for')), `${w} is not a cloud folder`);
+        for (const w of ['Needs you', 'Tasks', 'Goals', 'Saved', 'All chats', 'Board history', 'Starred']) assert.ok(words.includes(w), `${w} is in the folder list: ${words}`);
+        assert.ok(!words.some(x => x === 'Saved for later'), 'the word is Saved, as on a computer (#13256)'); // the Hub's sidebar uses local's words; hub_inbox_sidebar_groups_browser checks the groups and their order
+        for (const w of ['Artifacts']) assert.ok(!words.some(x => x === w || x.startsWith(w + ' ')), `${w} is not a cloud folder`);
         nav().find(b => /Needs you/.test(b.textContent)).click(); await settle(300);
         const frame = document.querySelector('#group-table-view iframe');
         assert.equal(frame && frame.getAttribute('src'), '/inbox/hub/needs', 'Needs you is the Hub page, at its constant address');
