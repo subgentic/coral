@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -185,6 +186,8 @@ func TestExitNoticeSkipsAgentsWokenAndCleansNames(t *testing.T) {
 
 func TestAutoResumeIsBoundedAndOnlyTheOperatorResetsIt(t *testing.T) {
 	r := newExitRig(t)
+	// A retained-pane wake now opens the log; mirror startup's private log directory.
+	require.NoError(t, os.MkdirAll(r.h.cfg.LogDir, 0700))
 	ctx := context.Background()
 	require.NoError(t, r.ss.SetSetting(ctx, AutoResumeSetting, "true"))
 	a := r.agent(1, "Backend Dev", "API Error: 429")
@@ -331,6 +334,8 @@ func TestTeamLaunchOf15AnswersAtOnceAndStartsAllLater(t *testing.T) {
 // session token) leaves it, so agents waking each other can't defeat the 3-attempt stop.
 func TestOnlyAPersonsWakeResetsTheAutoResumeCount(t *testing.T) {
 	r := newExitRig(t)
+	// A retained-pane wake now opens the log; mirror startup's private log directory.
+	require.NoError(t, os.MkdirAll(r.h.cfg.LogDir, 0700))
 	id := r.agent(1, "Backend Dev", "429")
 	r.h.setAutoResumeAttempt(id, 3)
 	wake := func(person bool) int {
