@@ -5,9 +5,8 @@
  *
  * The tab buttons stay the real ones (their counts and handlers move with them): a hidden tab only
  * gets .tab-hidden, and the order is the DOM order. What is read back is checked against the page's own
- * tab ids (unknown and repeated ids dropped, missing ones last). The locked tab (Chat when the agent is on a
- * board, else the context's first tab) can be put anywhere but can't be hidden, so the row is never empty, and a hidden tab
- * that is open falls back to it. */
+ * tab ids (unknown and repeated ids dropped, missing ones last). Every tab may be hidden;
+ * a hidden open tab falls back to the first visible tab, or an empty state when none remain. */
 import { PHONE_QUERY } from './phone_layout.js';
 import { registerActions } from './actions.js';
 import { escapeHtml, escapeAttr } from './utils.js';
@@ -67,17 +66,10 @@ function available(ctx) {
 
 const byDefault = ids => ids.slice().sort((a, b) => defaultOrder.indexOf(a) - defaultOrder.indexOf(b));
 
-function lockedId(ids) {
-    return ids.includes('board') ? 'board' : byDefault(ids)[0];
-}
-
-/** The ids in the user's order: their saved order, then any tab they have not placed. The locked tab (Chat) can sit anywhere the
- *  user put it; one the saved order lacks goes first. */
+/** The saved order, followed by tabs the user has not placed. */
 function orderedIds(ctx, ids) {
-    const locked = lockedId(ids);
     const saved = prefs[ctx].order.filter(id => ids.includes(id));
-    const rest = byDefault(ids.filter(id => !saved.includes(id)));
-    return locked && !saved.includes(locked) ? [locked, ...saved, ...rest.filter(id => id !== locked)] : [...saved, ...rest];
+    return [...saved, ...byDefault(ids.filter(id => !saved.includes(id)))];
 }
 
 /** Put the saved choice on the real tab row. Safe to call at any time; it only changes what differs. */
@@ -89,8 +81,7 @@ export function applyTabPrefs() {
     const ctx = contextOf();
     const avail = available(ctx);
     const ids = avail.map(b => b.dataset.tab);
-    const locked = lockedId(ids);
-    const hidden = new Set(prefs[ctx].hidden.filter(id => id !== locked));
+    const hidden = new Set(prefs[ctx].hidden);
     for (const b of tabButtons()) b.classList.toggle('tab-hidden', ids.includes(b.dataset.tab) && hidden.has(b.dataset.tab));
     const want = orderedIds(ctx, ids);
     // Moving a focused button would drop its focus, so only reorder when the order differs.
@@ -98,15 +89,26 @@ export function applyTabPrefs() {
         const anchor = document.getElementById('agentic-tab-customize');
         for (const id of want) bar.insertBefore(document.getElementById(`agentic-tab-${id}`), anchor);
     }
+    const first = want.find(id => !hidden.has(id));
+    const block = bar.closest('.agentic-block');
+    let emptyPanel = document.getElementById('agentic-panel-no-tabs');
+    if (!first && !emptyPanel && block) {
+        emptyPanel = document.createElement('div');
+        emptyPanel.id = 'agentic-panel-no-tabs';
+        emptyPanel.className = 'agentic-panel';
+        emptyPanel.textContent = 'All tabs are hidden. Use Customize tabs to show a tab.';
+        block.appendChild(emptyPanel);
+    }
     const active = bar.querySelector('.agentic-tab.active');
-    if (active?.classList.contains('tab-hidden') && locked) window.switchAgenticTab?.(locked, 'top');
+    if (!first || !active || active.classList.contains('tab-hidden')) window.switchAgenticTab?.(first || 'no-tabs', 'top');
+    if (first) emptyPanel?.remove();
 }
 
-/** For switchAgenticTab: a tab the user hid is not opened; the locked tab is. */
+/** A hidden tab opens the first visible tab, or the empty state. */
 export function openableTab(tabName) {
     const b = document.getElementById(`agentic-tab-${tabName}`);
-    if (!b?.classList.contains('tab-hidden')) return tabName;
-    return lockedId(available(contextOf()).map(x => x.dataset.tab)) || tabName;
+    if (b && !b.classList.contains('tab-hidden')) return tabName;
+    return available(contextOf()).find(x => !x.classList.contains('tab-hidden'))?.dataset.tab || 'no-tabs';
 }
 
 // ── The popover ────────────────────────────────────────────────────────────
@@ -115,7 +117,6 @@ function rowsHTML(ctx) {
     ensureLoaded();
     const avail = available(ctx);
     const ids = orderedIds(ctx, avail.map(b => b.dataset.tab));
-    const locked = lockedId(ids);
     const hidden = new Set(prefs[ctx].hidden);
     return ids.map((id, i) => {
         const b = document.getElementById(`agentic-tab-${id}`);
@@ -123,14 +124,12 @@ function rowsHTML(ctx) {
         const glyph = b.querySelector('.material-icons')?.textContent || '';
         const svg = glyph ? null : b.querySelector('svg'); // Saved draws its bookmark as an inline SVG, not a font glyph
         const iconHtml = glyph ? `<span class="material-icons tc-icon" aria-hidden="true">${escapeHtml(glyph)}</span>` : svg ? `<span class="tc-icon tc-icon-svg" aria-hidden="true">${svg.outerHTML}</span>` : '';
-        const isLocked = id === locked;
-        const on = isLocked || !hidden.has(id);
+        const on = !hidden.has(id);
         return `<li class="tc-row" draggable="true" data-tab="${escapeAttr(id)}">
             <span class="material-icons tc-grip" aria-hidden="true">drag_indicator</span>
-            <label class="tc-label"><input type="checkbox" class="tc-check" data-tab="${escapeAttr(id)}"${on ? ' checked' : ''}${isLocked ? ' disabled' : ''}
-                aria-label="Show ${escapeAttr(name)}${isLocked ? ' (always shown)' : ''}">
+            <label class="tc-label"><input type="checkbox" class="tc-check" data-tab="${escapeAttr(id)}"${on ? ' checked' : ''}
+                aria-label="Show ${escapeAttr(name)}">
                 ${iconHtml}<span class="tc-name">${escapeHtml(name)}</span></label>
-            ${isLocked ? '<span class="material-icons tc-lock" aria-hidden="true" title="Always shown">lock</span>' : ''}
             <span class="tc-sp"></span>
             <button type="button" class="tc-move" data-tab="${escapeAttr(id)}" data-dir="-1" aria-label="Move ${escapeAttr(name)} up"${i === 0 ? ' aria-disabled="true"' : ''}><span class="material-icons" aria-hidden="true">keyboard_arrow_up</span></button>
             <button type="button" class="tc-move" data-tab="${escapeAttr(id)}" data-dir="1" aria-label="Move ${escapeAttr(name)} down"${i === ids.length - 1 ? ' aria-disabled="true"' : ''}><span class="material-icons" aria-hidden="true">keyboard_arrow_down</span></button>
