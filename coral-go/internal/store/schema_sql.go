@@ -3,6 +3,25 @@
 package store
 
 const schemaSQL = `
+CREATE TABLE IF NOT EXISTS chief_checks (
+ id INTEGER PRIMARY KEY AUTOINCREMENT, job_id INTEGER NOT NULL UNIQUE REFERENCES scheduled_jobs(id),
+ revision INTEGER NOT NULL DEFAULT 1, name TEXT NOT NULL, instruction TEXT NOT NULL,
+ target_board TEXT NOT NULL,target_session TEXT NOT NULL,notify_mode TEXT NOT NULL,
+ source_key TEXT NOT NULL DEFAULT '',wake_if_asleep INTEGER NOT NULL DEFAULT 0,
+ schedule_kind TEXT NOT NULL,every_minutes INTEGER NOT NULL DEFAULT 0,at_time TEXT NOT NULL DEFAULT '',deleted INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS chief_triggers (
+ id INTEGER PRIMARY KEY AUTOINCREMENT,check_id INTEGER NOT NULL REFERENCES chief_checks(id),run_id INTEGER NOT NULL DEFAULT 0,
+ delivery_key TEXT NOT NULL UNIQUE,check_name TEXT NOT NULL,instruction TEXT NOT NULL,target_board TEXT NOT NULL,target_session TEXT NOT NULL,notify_mode TEXT NOT NULL,wake_if_asleep INTEGER NOT NULL,
+ state TEXT NOT NULL DEFAULT 'open',delivery TEXT NOT NULL DEFAULT 'pending',delivery_error TEXT NOT NULL DEFAULT '',
+ reminder TEXT NOT NULL DEFAULT 'none',reminder_error TEXT NOT NULL DEFAULT '',message_id INTEGER NOT NULL DEFAULT 0,
+ summary TEXT NOT NULL DEFAULT '',task_id INTEGER NOT NULL DEFAULT 0,ask_id INTEGER NOT NULL DEFAULT 0,brief_id INTEGER NOT NULL DEFAULT 0,
+ created_at INTEGER NOT NULL,updated_at INTEGER NOT NULL,reminded_at INTEGER NOT NULL DEFAULT 0,lease_until INTEGER NOT NULL DEFAULT 0
+);
+CREATE UNIQUE INDEX IF NOT EXISTS chief_one_open ON chief_triggers(check_id) WHERE state!='done';
+CREATE INDEX IF NOT EXISTS chief_trigger_outbox ON chief_triggers(delivery,lease_until,id);
+CREATE TABLE IF NOT EXISTS chief_run_keys (check_id INTEGER NOT NULL,request_key TEXT NOT NULL,trigger_id INTEGER NOT NULL REFERENCES chief_triggers(id),PRIMARY KEY(check_id,request_key));
+
 CREATE TABLE IF NOT EXISTS agent_ui_panels (
  session_id TEXT NOT NULL, id TEXT NOT NULL, title TEXT NOT NULL,
  html TEXT NOT NULL, revision INTEGER NOT NULL, updated_at TEXT NOT NULL,

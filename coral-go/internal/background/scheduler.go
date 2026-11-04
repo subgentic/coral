@@ -109,6 +109,9 @@ func (e *ConcurrencyLimitError) Error() string {
 
 // JobScheduler polls scheduled_jobs, fires due runs, and manages watchdog goroutines.
 type JobScheduler struct {
+	checkDeliveryFn func(context.Context, store.ScheduledJob, int64) error
+	checkPollFn     func(context.Context)
+
 	store          *store.ScheduleStore
 	sessionStore   *store.SessionStore
 	lastEventType  func(ctx context.Context, sessionID string) (last string, stopFailed bool) // the type of the agent's last event (stop, tool_use...), "" for none, and whether a stop was a failed turn (an API error); nil: not known (#6898)
@@ -200,6 +203,9 @@ func (s *JobScheduler) tick(ctx context.Context) error {
 		return nil // No cron evaluator configured
 	}
 
+	if s.checkPollFn != nil {
+		s.checkPollFn(ctx)
+	}
 	jobs, err := s.store.ListScheduledJobs(ctx, true)
 	if err != nil {
 		return err
@@ -327,7 +333,9 @@ func (s *JobScheduler) startRun(ctx context.Context, job store.ScheduledJob, now
 	s.runningMu.Unlock()
 
 	// Dispatch based on job type
-	if job.JobType == "workflow" && job.WorkflowID != nil {
+	if job.JobType == "check" {
+		s.deliverCheckRun(runID, job)
+	} else if job.JobType == "workflow" && job.WorkflowID != nil {
 		go func() {
 			defer safego.Recover("background/scheduler:s.triggerWorkflowForJob")
 			s.triggerWorkflowForJob(runID, job, trigger)
