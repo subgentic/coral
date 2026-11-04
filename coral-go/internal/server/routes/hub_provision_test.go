@@ -209,8 +209,49 @@ func TestProvisionUnknownHostShowsTheScannedKeyAndTrustsOnlyThatAfterAccept(t *t
 	_, err = os.Stat(pe.known)
 	assert.True(t, os.IsNotExist(err))
 
+	// a bare accept_keys, or one that echoes other fingerprints than the ones shown, is refused whatever else it says (#13088): the confirmation is of THESE keys
+	shown := keys[0].(map[string]any)["fingerprint"].(string)
+	base := map[string]any{"accept_terms": true, "terms_sha256": terms.EULADigest(), "accept_keys": true}
+	withFPs := func(f ...string) map[string]any {
+		m := map[string]any{}
+		for k, v := range base {
+			m[k] = v
+		}
+		m["key_fingerprints"] = f
+		return m
+	}
+	for name, body := range map[string]map[string]any{
+		"bare true":          base,
+		"empty list":         withFPs(),
+		"another key":        withFPs("SHA256:" + base64.RawStdEncoding.EncodeToString(make([]byte, 32))),
+		"shown plus another": withFPs(shown, "SHA256:other"),
+		"shown twice":        withFPs(shown, shown),
+		"a prefix":           withFPs(shown[:len(shown)-1]),
+		"wrong case":         withFPs(strings.ToLower(shown)),
+	} {
+		code, rv := pe.do("POST", "/api/servers/provision/"+plan+"/run", body)
+		assert.Equal(t, 400, code, name)
+		assert.Contains(t, rv["error"], "not the ones this computer has now", name)
+		_, err = os.Stat(pe.known)
+		assert.True(t, os.IsNotExist(err), name+": a key was trusted on a confirmation of other keys")
+	}
+	_, vv := pe.do("GET", "/api/servers/provision/"+plan, nil)
+	assert.Equal(t, "needs_keys", vv["phase"], "a refused confirmation leaves the plan waiting for the real one")
+	// a key that changed between the scan and the click: the plan now holds another key, so the fingerprint the person confirmed is stale and nothing is trusted
+	pl := pe.p.plan(plan)
+	pl.mu.Lock()
+	held := pl.keys
+	pl.keys = []sshprov.HostKey{{Host: "box.example.com", Type: "ssh-ed25519", Blob: "AAAA", Fingerprint: "SHA256:changedkey"}}
+	pl.mu.Unlock()
+	code, rv := pe.do("POST", "/api/servers/provision/"+plan+"/run", withFPs(shown))
+	assert.Equal(t, 400, code, "a confirmation of the key that was shown, for a plan that now holds another")
+	assert.Contains(t, rv["error"], "not the ones this computer has now")
+	pl.mu.Lock()
+	pl.keys = held
+	pl.mu.Unlock()
+
 	// a key sent by the browser is not read at all: the one trusted is the scanned one
-	code, v = pe.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{"accept_terms": true, "terms_sha256": terms.EULADigest(), "accept_keys": true, "host_keys": []map[string]string{{"host": "evil", "type": "ssh-ed25519", "blob": "AAAA"}}})
+	code, v = pe.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{"accept_terms": true, "terms_sha256": terms.EULADigest(), "accept_keys": true, "key_fingerprints": []string{shown}, "host_keys": []map[string]string{{"host": "evil", "type": "ssh-ed25519", "blob": "AAAA"}}})
 	require.Equal(t, 202, code, "%v", v)
 	b, err := os.ReadFile(pe.known)
 	require.NoError(t, err)

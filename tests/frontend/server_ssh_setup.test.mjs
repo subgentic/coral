@@ -83,7 +83,7 @@ function fresh() { const host = doc.createElement('div'); doc.body.append(host);
 
     btn(host, 'Set up').click();
     await until(() => runBody, 'the run');
-    assert.deepEqual(runBody, { accept_keys: true, backend: 'pty' }, 'only the key confirmation and the backend choice (pty by default) are sent: no key, and no terms (the hub makes the acceptance from its own)');
+    assert.deepEqual(runBody, { accept_keys: true, key_fingerprints: ['SHA256:abc<img src=x onerror=alert(1)>'], backend: 'pty' }, 'the key confirmation with the fingerprints that were shown (the hub trusts only those), and the backend choice (pty by default): no key, and no terms (the hub makes the acceptance from its own)');
     await until(() => host.textContent.includes('Done. The computer is in your list.'), 'the progress to finish');
     assert.ok(changed >= 1, 'the server list was not told');
     btn(host, 'Close').click();
@@ -413,6 +413,7 @@ for (const field of ['dataDir', 'port']) {
         btn(host, 'Set up').click();
         await until(() => runBody, 'the run');
         assert.equal(runBody.accept_keys, true, label + 'the confirmation is sent once the box is ticked and the field valid');
+        assert.deepEqual(runBody.key_fingerprints, ['SHA256:abc'], label + 'and it echoes the fingerprint that was shown');
     }
 }
 // both fields together: fixing one does not open a gate the other holds

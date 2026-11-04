@@ -505,6 +505,9 @@ func (pr *Provisioner) fail(p *provisionPlan, step, sentence string) {
 
 type runRequest struct {
 	AcceptKeys bool `json:"accept_keys"` // the fingerprints shown are the ones the owner means to trust
+	// KeyFingerprints are the SHA256 fingerprints of the host keys the page showed the person and they confirmed. With accept_keys they must be exactly the fingerprints of the keys held under the plan (#13088): a script or
+	// a page bug that sends a bare true, or a key that changed between the scan and the click, is refused (400) and nothing is trusted.
+	KeyFingerprints []string `json:"key_fingerprints"`
 	// AcceptTerms and TermsSHA256 are what an older page sent. They are ignored: the acceptance the far computer records is this hub's own, from its EULA marker, never one a request names.
 	AcceptTerms bool   `json:"accept_terms"`
 	TermsSHA256 string `json:"terms_sha256"`
@@ -573,6 +576,10 @@ func (pr *Provisioner) Run(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case p.phase == phaseConnected:
 		p.phase, p.acceptance = phaseRunning, acceptance
+	case p.phase == phaseKeys && req.AcceptKeys && !sameKeyFingerprints(p.keys, req.KeyFingerprints):
+		p.mu.Unlock()
+		errBadRequest(w, "the host keys shown are not the ones this computer has now: check the fingerprints again before confirming")
+		return
 	case p.phase == phaseKeys && req.AcceptKeys:
 		keys = append(keys, p.keys...)
 		p.phase, p.acceptance = phaseTrusting, acceptance
@@ -1037,4 +1044,22 @@ func (pr *Provisioner) ForgetKey(w http.ResponseWriter, r *http.Request) {
 	p.steps = planSteps()
 	p.mu.Unlock()
 	writeJSON(w, http.StatusOK, p.view())
+}
+
+// sameKeyFingerprints reports whether the fingerprints the page echoed are exactly those of the keys held under the plan: the same set, each one once, none missing and none extra, and at least one. Nothing is trusted on less.
+func sameKeyFingerprints(held []sshprov.HostKey, echoed []string) bool {
+	if len(held) == 0 || len(echoed) != len(held) {
+		return false
+	}
+	want := map[string]int{}
+	for _, k := range held {
+		want[k.Fingerprint]++
+	}
+	for _, f := range echoed {
+		if want[f] == 0 {
+			return false
+		}
+		want[f]--
+	}
+	return true
 }
