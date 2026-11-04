@@ -206,6 +206,7 @@ node automation_filters.test.mjs
 node inbox_servers.test.mjs
 node inbox_reviews.test.mjs
 node inbox_reviews_query.test.mjs
+node review_counts.test.mjs
 node artifact_review_words.test.mjs
 node inbox_reviews_cloud.test.mjs
 node task_list_data.test.mjs

@@ -11,7 +11,7 @@ import { syncWelcome } from './welcome_items.js';
 
 import { state } from './state.js';
 import { reportInboxOpened } from './dashboard_analytics.js';
-import { unreadReviewItems, refreshReviews } from './ask_filter.js';
+import { unreadReviewItems, unreadReviewCount, setReviewCounter, refreshReviews } from './ask_filter.js';
 import { failedUnread, refreshRuns, onRunsChanged } from './automation_runs.js';
 import { pendingProposals, refreshProposals, onProposalsChanged } from './proposals_state.js';
 import { goalDoneCount } from './goal_done.js';
@@ -52,6 +52,19 @@ function tellAttention(n) {
     importOnce('./attention.js').then(m => { attentionReady = true; m.setAttentionTotal(n); });
 }
 
+// The files waiting for the Operator are counted by each computer after the first paint, at idle (#13172): the badge shows them without the Inbox having been opened and without reading a page of any team. The module is loaded then, not at startup.
+let countsAsked = false, countsRefresh = null;
+function scheduleReviewCounts() {
+    if (countsRefresh) { countsRefresh(); return; }
+    if (countsAsked) return;
+    countsAsked = true;
+    const go = () => importOnce('./review_counts.js').then(m => {
+        setReviewCounter(m.countedUnread);
+        countsRefresh = () => m.refreshCounts().then(changed => { if (changed) updateInboxTab(); }).catch(() => {});
+        countsRefresh();
+    }).catch(() => {});
+    if (typeof requestIdleCallback === 'function') requestIdleCallback(go, { timeout: 4000 }); else setTimeout(go, 2000);
+}
 /** Keep the tab's badge (and, where the dashboard builds its own Inbox, the Needs you list) in step with the live list. Safe to call often (after each list update). */
 export function updateInboxTab() {
     const tab = document.getElementById('nav-tab-hub-inbox');
@@ -60,11 +73,12 @@ export function updateInboxTab() {
     const badge = document.getElementById('nav-tab-hub-inbox-badge');
     if (!badge) return;
     refreshReviews();
+    scheduleReviewCounts();
     if (!isCloud()) refreshOperatorAsks(); // the questions asked of the Operator are read from this Coral too (#11417)
     syncWelcome(); // a welcome step seen is remembered (#11443); the items are not in the badge
     refreshProposals(); // after the Inbox was first opened, and at most once in 20 seconds (proposals_state.js)
     if (!isCloud()) refreshRuns(); // the runs are read from this Coral only, and only once the Inbox or Automations has been shown
-    const n = waitingCount() + unreadReviewItems().length + failedUnread().length + pendingProposals().length + operatorAsks().length + goalDoneCount() + skillCount(); // a goal that looks done is one item (#11825); a review artifact the operator has read stays listed but is not counted (#9277); a failed run nobody has opened is (#9296)
+    const n = waitingCount() + unreadReviewCount() + failedUnread().length + pendingProposals().length + operatorAsks().length + goalDoneCount() + skillCount(); // a goal that looks done is one item (#11825); a review artifact the operator has read stays listed but is not counted (#9277); a failed run nobody has opened is (#9296)
     const text = n > 9 ? '9+' : n > 0 ? String(n) : ''; // two characters at most: the pill fits the tabs' own 24 px gap, so the gap after Inbox is the same as the others (#9821); the exact count is in the tab's name
     // Only what changed is written: nav_tabs.js redraws the row on any change to it, and this runs for every message of the feed (setting hidden to
     // the value it has is still a change to a MutationObserver).
@@ -72,7 +86,7 @@ export function updateInboxTab() {
     if (badge.hidden !== (n === 0)) badge.hidden = n === 0;
     const phone = document.getElementById('phone-nav-inbox-badge'); // the phone's floating nav carries the same count (#11116)
     if (phone) { if (phone.textContent !== text) phone.textContent = text; if (phone.hidden !== (n === 0)) phone.hidden = n === 0; }
-    const label = n > 0 ? unreadReviewItems().length || failedUnread().length || operatorAsks().length ? `Inbox, ${n} need your attention` : `Inbox, ${n} waiting for input` : null;
+    const label = n > 0 ? unreadReviewCount() || failedUnread().length || operatorAsks().length ? `Inbox, ${n} need your attention` : `Inbox, ${n} waiting for input` : null;
     if (tab.getAttribute('aria-label') !== label) { if (label) tab.setAttribute('aria-label', label); else tab.removeAttribute('aria-label'); }
     setInboxCount('needs', n);
     tellAttention(n);

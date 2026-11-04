@@ -8,6 +8,7 @@ import { SORT_PARAM } from './filter_model.js';
 import { hideAsksWhen } from './ask_filter.js';
 import { importOnce } from './import_once.js';
 
+let loadedOnce = false; // the full read has run once: its rows (the page's own rules) are the badge's count from then on (ask_filter.unreadReviewCount)
 let items = [], saved = [], muted = [], errors = [], pending = null, lastRead = 0, revision = 0, changed = () => { if (typeof document !== 'undefined') document.dispatchEvent(new Event('coral:reviews-changed')); };
 let activated = false;
 // One row per artifact (#11533): versions (same uploader, team, name) are one item, the newest, with `earlier`.
@@ -239,6 +240,7 @@ export function refreshReviews(force = false) {
             for (const g of results) { next.push(...g.rows); nextSaved.push(...g.saved); nextMuted.push(...g.mutedHere); if (g.failed) failed.push(g.failed); }
             if (started !== revision) return;
             items = next.sort(byAge); saved = nextSaved.sort(byAge); muted = nextMuted.sort(byAge);
+            loadedOnce = true;
             errors = failed;
         } catch { errors = ['Review artifacts could not be refreshed.']; }
         changed();
@@ -325,4 +327,4 @@ export function markOpenedRead(hex) {
 }
 
 
-setReviewCacheReader(unreadReviewItems, refreshReviews);
+setReviewCacheReader(unreadReviewItems, refreshReviews, () => loadedOnce);

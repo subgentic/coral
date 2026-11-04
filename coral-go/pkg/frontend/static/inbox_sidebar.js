@@ -19,6 +19,7 @@ const { mutedReviewItems, mutedWords, reviewItems, unreadReviewItems, reviewErro
 import { failedUnread, finishedUnread, refreshRuns, markSeen, runRoute, failureWords } from './automation_runs.js';
 import { operatorAsks, refreshOperatorAsks, askLine, askPlain, askKey, openAskDialog, askSubjects, askSubjectWords } from './operator_asks.js';
 import { go, note, backIs, currentRoute } from './nav.js';
+import { unreadReviewCount } from './ask_filter.js'; // the files waiting: the full read's once it has run, else what the computers counted (#13172)
 
 import { build, keyRoute, parse as parseRoute, inboxFolderPath, BOARDS_FOLDER, BOARDS_SUB } from './routes.js';
 import { sessionServer, normServer, keyLabel, identityKey, splitKey, goalTeamKey, nativeInbox, decisionNeedsPerson, LOCAL_SERVER, boardFetch } from './server_base.js';
@@ -707,7 +708,7 @@ const savedCounts = () => saved.savedView().totals;
 /** The number beside a folder. Needs you counts what the Inbox badge counts (an alarm: an agent, a review, a run, a proposal, a question); the welcome items are listed but are not alarms, so they are not in either (#11622). */
 /** The goals agents proposed that wait for the Operator (a row in Needs you): the Goals folder counts them, it said 0 while one waited (#11894). */
 const goalProposals = () => pendingProposals().filter(p => p.kind === 'goal');
-const countOf = key => key === 'needs' ? waitingSessions().length + unreadReviewItems().length + failedUnread().length + pendingProposals().length + goalDoneRows().filter(needsUnread).length + skillCount() + operatorAsks().length + recordRows().length : key === 'tasks' ? taskRows().length : key === 'goals' ? goals.length + goalProposals().length : key === 'artifacts' ? IA.artifactCount() ?? undefined : key === 'saved' ? savedCounts().open + savedFiles().length : undefined;
+const countOf = key => key === 'needs' ? waitingSessions().length + unreadReviewCount() + failedUnread().length + pendingProposals().length + goalDoneRows().filter(needsUnread).length + skillCount() + operatorAsks().length + recordRows().length : key === 'tasks' ? taskRows().length : key === 'goals' ? goals.length + goalProposals().length : key === 'artifacts' ? IA.artifactCount() ?? undefined : key === 'saved' ? savedCounts().open + savedFiles().length : undefined;
 /** The folders of the Inbox (#7785, the mailbox mock): one view list, a name and a count each. Needs you, Tasks and Saved open their table in the centre; */
 const FOLDER_ICONS = { needs: 'notifications', tasks: 'checklist', goals: 'flag', saved: 'saved-bookmark', artifacts: 'inventory_2', activity: 'checklist',
     chats: 'chat_bubble_outline', [BOARDS_FOLDER]: 'forum', 'chats-notes': 'edit_note', 'chats-starred': 'star', 'chats-active': 'bolt', 'chats-archived': 'folder' }; // UI/UX's existing subset choices (#8866); tagged folders keep their colour dot
