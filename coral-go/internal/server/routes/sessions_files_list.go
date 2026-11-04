@@ -225,6 +225,9 @@ type refreshedFiles struct {
 	took     time.Duration
 }
 
+// refreshGitTimeout is how long one pass of the changed-files queries may run (a package var: the 35,000-file test gives a loaded machine longer).
+var refreshGitTimeout = 10 * time.Second
+
 // refreshComputeHook runs at the start of every pass (tests: count passes, make one slow).
 var refreshComputeHook = func() {}
 
@@ -247,7 +250,7 @@ func (h *SessionsHandler) computeRefreshedFiles(ctx0 context.Context, name, sess
 	}
 
 	// Run git diff --numstat to get changed files
-	ctx, cancel := context.WithTimeout(ctx0, 10*time.Second)
+	ctx, cancel := context.WithTimeout(ctx0, refreshGitTimeout)
 	defer cancel()
 
 	diffMode := h.getDiffMode(ctx0)
