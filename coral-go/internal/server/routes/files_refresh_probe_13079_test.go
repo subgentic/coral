@@ -53,6 +53,7 @@ func refreshProbeRig(t *testing.T) (url, name, sid, repo string) {
 
 func postRefresh(t *testing.T, url, name, sid string) {
 	t.Helper()
+	forgetRefreshResults() // a cold git pass over refreshReuseOver would be reused by the next ask, which then is not a pass of its own and counts no strike
 	req, _ := http.NewRequest("POST", url+"/api/sessions/live/"+name+"/files/refresh", bytes.NewBufferString(`{"session_id":"`+sid+`"}`))
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
