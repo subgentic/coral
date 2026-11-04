@@ -15,7 +15,10 @@ const { pathToFileURL } = require('node:url');
     const fire = t => (listeners[t] || []).forEach(fn => fn({}));
     globalThis.location = { protocol: 'https:', host: 'hub.example', origin: 'https://hub.example', pathname: '/agents/@srv/abc123', search: '', hash: '', href: 'https://hub.example/agents/@srv/abc123', replace: u => replaced.push(u) };
     const boot = { textContent: JSON.stringify({ mode: 'cloud' }) };
-    const body = { classList: { add() {}, contains() { return false; } }, dataset: {}, append() {} };
+    const body = { classList: { add() {}, contains() { return false; } }, dataset: {}, append() {}, appendChild() {}, getAttribute() { return null; }, setAttribute() {}, style: {} };
+    globalThis.MutationObserver = class { observe() {} disconnect() {} }; globalThis.ResizeObserver = globalThis.MutationObserver; globalThis.IntersectionObserver = globalThis.MutationObserver; // what websocket.js touches when it is imported
+    globalThis.matchMedia = () => ({ matches: false, addEventListener() {}, addListener() {} }); globalThis.requestAnimationFrame = fn => setTimeout(fn, 0);
+    globalThis.CustomEvent = class { constructor(t, o) { this.type = t; this.detail = o && o.detail; } };
     globalThis.document = { addEventListener() {}, getElementById: id => (id === 'coral-boot' ? boot : null), querySelector() { return null; }, body, createElement: () => ({ style: {}, classList: { add() {} }, setAttribute() {}, append() {}, addEventListener() {}, dataset: {} }), createTextNode: t => ({ nodeType: 3, t }) };
     globalThis.localStorage = { getItem() { return null; }, setItem() {}, removeItem() {} };
     let sessionAnswer = null;
@@ -50,11 +53,21 @@ const { pathToFileURL } = require('node:url');
     assert.equal(await still, false);
     assert.equal(replaced.length, 1, 'the same answer on a page that stays still goes to sign-in');
 
-    // the feed's signed-out hook and the fetch wrapper go through the helper, with no replace of their own
-    const ws = fs.readFileSync(path.join(dir, 'websocket.js'), 'utf8');
+    // the live feed's signed-out hook, called as the feed calls it once the browser is confirmed signed out (QA Reviewer 2: the hook itself, not a regex over its source)
+    const feed = await import(pathToFileURL(path.join(dir, 'websocket.js')).href);
+    replaced.length = 0; fire('pageshow');
+    feed.feedHooks.signedOut();
+    assert.equal(replaced.length, 1, 'a still page: the feed hook sends it to sign-in');
+    replaced.length = 0; fire('beforeunload');
+    feed.feedHooks.signedOut();
+    assert.deepEqual(replaced, [], 'a leaving page: the feed hook sends nothing');
+    fire('pageshow'); location.pathname = '/signin';
+    feed.feedHooks.signedOut();
+    assert.deepEqual(replaced, [], 'on the sign-in page itself it still does nothing');
+    location.pathname = '/agents/@srv/abc123';
+
+    // and the one place that replaces to sign-in in cloud.js is the helper (the fetch wrapper's 401 is the browser suite's, hub_signin_late_401_browser)
     const cl = fs.readFileSync(path.join(dir, 'cloud.js'), 'utf8');
-    assert.ok(!/location\.replace\(signInUrl\(\)\)/.test(ws), 'websocket.js sends no location.replace(signInUrl()) of its own');
-    assert.match(ws, /signedOut\(\) \{[^}]*goToSignIn\(\)/, 'the feed hook calls goToSignIn');
     assert.equal((cl.match(/location\.replace\(signInUrl\(\)\)/g) || []).length, 1, 'cloud.js replaces to sign-in in one place, the helper');
     console.log('cloud_signin_leaving: ok');
 })().catch(e => { console.error(e); process.exit(1); });
