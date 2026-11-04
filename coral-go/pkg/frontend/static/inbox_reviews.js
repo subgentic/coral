@@ -2,7 +2,7 @@ import { artifactRevision, artifactsUnchanged, onArtifactsRev } from './artifact
 import { setReviewCacheReader } from './ask_filter.js';
 /* Review artifacts use the same owner-protected team list and tags routes as Artifacts.
  * After the Inbox first opens, keep its badge updated on other tabs without eager startup reads. */
-import { fetchProjects, sourcesKey } from './board_fetch.js';
+import { fetchReviewProjects, sourcesKey } from './board_fetch.js';
 import { boardFetch, boardArtifactPage, nextArtifactPage, keyLabel, splitKey } from './server_base.js';
 import { hideAsksWhen } from './ask_filter.js';
 import { importOnce } from './import_once.js';
@@ -127,7 +127,7 @@ export function refreshReviews(force = false) {
     lastRead = Date.now();
     pending = (async () => {
         try {
-            const projects = await fetchProjects();
+            const projects = await fetchReviewProjects();
             const results = new Array(projects.length);
             const readOne = async (i) => {
                 const team = projects[i].project, mutedHere = [], got = { rows: [], saved: [], mutedHere, failed: '' };

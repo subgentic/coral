@@ -132,3 +132,15 @@ export async function fetchSubscribers(project) {
     const resp = await boardFetch(project, `/subscribers`);
     return await resp.json();
 }
+
+/** Review-only storage for files uploaded by agents without a team. Never add it to team choices. */
+export async function fetchReviewProjects() {
+    const projects = await fetchProjects();
+    const sources = [...(isCloud() ? [] : ['local']), ...onlineRemotes().map(s => s.id)];
+    const keys = new Set(projects.map(p => p.project));
+    for (const server of sources) {
+        const project = identityKey(server, '~no-team');
+        if (!keys.has(project)) projects.push({ project, server });
+    }
+    return projects;
+}
