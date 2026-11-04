@@ -91,7 +91,28 @@ export function renderCaptureText(el, text) {
     renderer.render(el, text);
 }
 
+/** One poll of the open agent at a time (#13079): the timer beats every 500 ms (3 s in Chat), and a server that takes 5 s to answer had 10 to 20 polls on the way at once, each adding the work that made it slow.
+ *  A beat while the last poll of the same agent is still out does nothing (a poll out for 30 s is given up on, so a hung request cannot stop them for good), and after a slow answer the next waits as long as that
+ *  one took, so a server that is struggling is asked less often, not more. */
+const POLL_STUCK_MS = 30000, POLL_SLOW_MS = 1000;
+let _pollOut = null; // { key, at }
+let _pollSlow = null; // { key, until }: the agent's last poll was slow
 export async function refreshCapture() {
+    const s = state.currentSession;
+    if (!s || s.type !== "live") return;
+    const key = currentServer() + ' ' + s.name;
+    const now = Date.now();
+    if (_pollOut && _pollOut.key === key && now - _pollOut.at < POLL_STUCK_MS) return;
+    if (_pollSlow && _pollSlow.key === key && _pollSlow.until > now) return;
+    const mine = _pollOut = { key, at: now };
+    try { await pollCaptureOnce(); } finally {
+        const took = Date.now() - now;
+        if (_pollOut === mine) _pollOut = null;
+        _pollSlow = took > POLL_SLOW_MS ? { key, until: Date.now() + took } : null;
+    }
+}
+
+async function pollCaptureOnce() {
     if (!state.currentSession || state.currentSession.type !== "live") return;
 
     // Skip polling when the tab is not visible (saves CPU in background tabs).
