@@ -596,3 +596,42 @@ func TestTheIndexCheckRunsAfterTheLongestWaitOnABoardThatIsNeverQuiet(t *testing
 	defer s.Close()
 	require.Eventually(t, func() bool { _ = s.reader(); return ran.Load() == 1 }, 10*time.Second, 20*time.Millisecond, "never quiet: checked after the longest wait")
 }
+
+// QA Reviewer 2's SHOULD on #13310: a check never runs on a store that was closed (its context ended) during the quiet wait, even when the board is already quiet at that moment.
+func TestTheIndexCheckNeverRunsOnAStoreClosedDuringTheQuietWait(t *testing.T) {
+	// the wait itself: a context that has ended is a stop, whatever the quiet says
+	s := &Store{}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	defer func(q time.Duration) { messageIndexQuiet = q }(messageIndexQuiet)
+	messageIndexQuiet = 0 // quiet already: the case that ran the check
+	require.False(t, s.waitForQuietBoard(ctx), "a cancelled wait stops")
+
+	// the whole path: the store is closed while the check waits; the hook is never called
+	t.Setenv(messageSearchIndexEnv, "on")
+	path := filepath.Join(t.TempDir(), "board_closed.db")
+	st, err := NewStoreWithKey(path, "")
+	require.NoError(t, err)
+	bg := context.Background()
+	_, err = sub(st, bg, "proj", "dev", "Backend Dev")
+	require.NoError(t, err)
+	for i := 0; i < 10; i++ {
+		_, err := st.PostMessage(bg, "proj", "dev", fmt.Sprintf("%s #%d", ftsTexts[i%len(ftsTexts)], i), nil)
+		require.NoError(t, err)
+	}
+	require.NoError(t, st.BuildMessageSearchIndex(bg))
+	require.NoError(t, st.Close())
+	defer func(d, q, p, m time.Duration) {
+		messageIndexCheckDelay, messageIndexQuiet, messageIndexQuietPoll, messageIndexQuietWaitMax = d, q, p, m
+		messageIndexCheckHook = func() {}
+	}(messageIndexCheckDelay, messageIndexQuiet, messageIndexQuietPoll, messageIndexQuietWaitMax)
+	messageIndexCheckDelay, messageIndexQuiet, messageIndexQuietPoll, messageIndexQuietWaitMax = 5*time.Millisecond, time.Hour, 20*time.Millisecond, time.Hour
+	var ran atomic.Int64
+	messageIndexCheckHook = func() { ran.Add(1) }
+	st, err = NewStoreWithKey(path, "")
+	require.NoError(t, err)
+	messageIndexQuiet = 0 // from now the board counts as quiet at every look
+	require.NoError(t, st.Close())
+	time.Sleep(300 * time.Millisecond) // sleep-ok: nothing should happen; wait out several looks to show no run follows the close
+	require.EqualValues(t, 0, ran.Load(), "closed during the wait: no check")
+}

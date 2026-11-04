@@ -472,6 +472,9 @@ var (
 func (s *Store) waitForQuietBoard(ctx context.Context) bool {
 	deadline := time.Now().Add(messageIndexQuietWaitMax)
 	for {
+		if ctx.Err() != nil {
+			return false // the store was closed (or the check cancelled): never run a check on it, quiet or not
+		}
 		if time.Since(time.Unix(0, s.lastRead.Load())) >= messageIndexQuiet || time.Now().After(deadline) {
 			return true
 		}
