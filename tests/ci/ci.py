@@ -59,10 +59,41 @@ def write_json(path, obj):
     os.replace(tmp, path)
 
 
+JOB_ID_RE = re.compile(r'^\d{13}-[0-9a-f]{4}$')
+OWNER_RE = re.compile(r'^[a-z0-9-]{1,40}$')
+CLOSED_URL = 'http://127.0.0.1:1'  # a job's CORAL_URL: nothing answers there, so a scratch coral-board / coral-agent in a job cannot post to the live board
+
+
 def lint(cmd):
     for pat, what in FORBIDDEN:
         if re.search(pat, cmd):
             return 'refused: the command names ' + what + '; a queued job never touches the real Coral, starts an app or kills processes by name'
+    return ''
+
+
+def validate_job(job):
+    """Everything a job file must satisfy, checked again when it runs (the file may have been written by hand or changed since submit); returns a reason or ''."""
+    if not isinstance(job, dict):
+        return 'not a job'
+    if not isinstance(job.get('id'), str) or not JOB_ID_RE.match(job['id']):
+        return 'bad job id'
+    if job.get('machine') not in MACHINES or job.get('priority') not in PRIORITIES:
+        return 'bad machine or priority'
+    if not isinstance(job.get('owner'), str) or not OWNER_RE.match(job['owner']):
+        return 'bad owner name (only a-z, 0-9 and - are allowed)'
+    t = job.get('task')
+    if not isinstance(t, int) or isinstance(t, bool) or t < 1:
+        return 'bad task number'
+    to = job.get('timeout')
+    if not isinstance(to, int) or isinstance(to, bool) or not 1 <= to <= MAX_TIMEOUT:
+        return 'bad timeout (1 to %d seconds)' % MAX_TIMEOUT
+    if not isinstance(job.get('cmd'), str) or not job['cmd'].strip() or not isinstance(job.get('cwd'), str):
+        return 'bad command or folder'
+    why = lint(job['cmd'])
+    if why:
+        return why
+    if re.search(r'\.coral(/|$)', job['cwd']) or re.search(r'\.coral(/|$)', os.path.realpath(os.path.expanduser(job['cwd']))):
+        return 'refused: the working folder is under ~/.coral'
     return ''
 
 
@@ -79,7 +110,7 @@ def cmd_submit(a):
         sys.exit('--task must be a task number (the result is posted there)')
     if not 1 <= a.timeout <= MAX_TIMEOUT:
         sys.exit('--timeout must be 1 to %d seconds' % MAX_TIMEOUT)
-    owner = os.environ.get('CI_OWNER') or os.environ.get('CORAL_SUBSCRIBER_ID') or os.environ.get('USER') or 'agent'
+    owner = slug(os.environ.get('CI_OWNER') or os.environ.get('CORAL_SUBSCRIBER_ID') or os.environ.get('USER') or 'agent')[:40].strip('-') or 'agent'
     cwd = a.cwd or (os.getcwd() if a.machine == 'mac' else '~/coral-test/' + slug(owner))
     if re.search(r'\.coral(/|$)', cwd):
         sys.exit('refused: the working folder is under ~/.coral')
@@ -100,9 +131,11 @@ def jobs_in(machine, sub):
     for fn in os.listdir(d):
         if fn.endswith('.json'):
             try:
-                out.append(read_job(os.path.join(d, fn)))
+                j = read_job(os.path.join(d, fn))
             except (OSError, ValueError):
-                pass
+                continue
+            if isinstance(j, dict) and j.get('id') == fn[:-5] and JOB_ID_RE.match(fn[:-5]) and j.get('priority') in PRIORITIES and isinstance(j.get('submitted_ms'), int):
+                out.append(j)  # (a file that is not a well-formed job is set aside by run_one, never ordered or used as a path)
     return sorted(out, key=order_key) if sub == 'pending' else sorted(out, key=lambda j: j['id'])
 
 
@@ -121,11 +154,13 @@ def cmd_status(a):
 
 
 def cmd_cancel(a):
+    if not JOB_ID_RE.match(a.id):
+        sys.exit('bad job id: %r (a job id looks like 1700000000000-ab12)' % a.id)
     for m in MACHINES:
         p = os.path.join(mdir(m, 'pending'), a.id + '.json')
         if os.path.exists(p):
             j = read_job(p)
-            me = os.environ.get('CI_OWNER') or os.environ.get('CORAL_SUBSCRIBER_ID') or os.environ.get('USER')
+            me = slug(os.environ.get('CI_OWNER') or os.environ.get('CORAL_SUBSCRIBER_ID') or os.environ.get('USER'))[:40].strip('-')
             if j['owner'] != me and not a.force:
                 sys.exit('job %s belongs to %s (use --force to cancel another agent\'s job)' % (a.id, j['owner']))
             j.update(status='cancelled', ended_ms=now_ms())
@@ -146,7 +181,7 @@ def job_env(job, tmp):
         env['GOMODCACHE'] = HOME + '/coral-test/.cache/go-mod'
     else:
         env['PATH'] = '%s/.local/go/bin:%s/.local/node/bin:%s' % (HOME, HOME, env.get('PATH', '/usr/bin:/bin:/usr/sbin:/sbin'))
-    env.update(TMPDIR=tmp, CORAL_DATA_DIR=os.path.join(tmp, 'data'), CORAL_TELEMETRY_DISABLED='1', CI_JOB_ID=job['id'], CI_JOB_TASK=str(job['task']))
+    env.update(TMPDIR=tmp, CORAL_DATA_DIR=os.path.join(tmp, 'data'), CORAL_TELEMETRY_DISABLED='1', CI_JOB_ID=job['id'], CI_JOB_TASK=str(job['task']), CORAL_URL=CLOSED_URL)
     return env
 
 
@@ -155,8 +190,43 @@ def tmp_for(job):
     return os.path.join(base, job['id'])
 
 
+def pgid_file(job_id):
+    d = os.path.join(ci_home(), 'pgids')
+    os.makedirs(d, exist_ok=True)
+    return os.path.join(d, job_id)
+
+
+def kill_group(pgid, first=signal.SIGTERM, wait=5.0):
+    """TERM, then KILL, the process group `pgid` (a group this tool made for one job)."""
+    for sig in (first, signal.SIGKILL):
+        try:
+            os.killpg(pgid, sig)
+        except (ProcessLookupError, PermissionError):
+            return
+        end = time.time() + (wait if sig != signal.SIGKILL else 0)
+        while time.time() < end:
+            try:
+                os.killpg(pgid, 0)
+            except (ProcessLookupError, PermissionError):
+                return
+            time.sleep(0.1)
+
+
+def safe_rmtree(tmp, base):
+    """Remove the job's temp folder only when its real path is inside the real path of its owner's base folder under /private/tmp."""
+    rb, rt = os.path.realpath(base), os.path.realpath(tmp)
+    if rb.startswith('/private/tmp/') and rt.startswith(rb + '/') and os.path.isdir(rt) and not os.path.islink(tmp):
+        shutil.rmtree(rt, ignore_errors=True)
+
+
 def exec_job(job, out):
-    """Run job['cmd'] in its own process group with the time limit, copying its output to `out` (a file object); returns the result dict."""
+    """Run job['cmd'] in its own process group with the time limit, copying its output to `out` (a file object); returns the result dict. Whatever stops this process (a signal, Ctrl-C)
+    stops the job's group first."""
+    why = validate_job(job)
+    if why:
+        out.write('ci: refused to run: %s\n' % why)
+        out.flush()
+        return {'exit': 126, 'timed_out': False, 'seconds': 0.0, 'refused': why}
     tmp = tmp_for(job)
     os.makedirs(os.path.join(tmp, 'data'), exist_ok=True)
     cwd = os.path.expanduser(job['cwd'])
@@ -168,30 +238,40 @@ def exec_job(job, out):
         out.write('ci: could not start: %s\n' % e)
         out.flush()
         return {'exit': 127, 'timed_out': False, 'seconds': 0.0}
+    pf = pgid_file(job['id'])
+    with open(pf, 'w') as f:
+        f.write('%d\n' % p.pid)
+    old = {}
+    def stop(signum, _frame):
+        raise SystemExit(128 + signum)
+    for sg in (signal.SIGTERM, signal.SIGHUP, signal.SIGINT):
+        try:
+            old[sg] = signal.signal(sg, stop)
+        except ValueError:  # not the main thread
+            pass
     try:
-        res['exit'] = p.wait(timeout=job['timeout'])
-    except subprocess.TimeoutExpired:
-        res['timed_out'] = True
-        for sig, wait in ((signal.SIGTERM, 10), (signal.SIGKILL, 10)):  # only this job's own process group
+        try:
+            res['exit'] = p.wait(timeout=job['timeout'])
+        except subprocess.TimeoutExpired:
+            res['timed_out'] = True
+            kill_group(p.pid, wait=10)
             try:
-                os.killpg(p.pid, sig)
-            except ProcessLookupError:
-                break
-            try:
-                p.wait(timeout=wait)
-                break
+                p.wait(timeout=10)
             except subprocess.TimeoutExpired:
-                continue
-        res['exit'] = 124
-        out.write('\nci: time limit of %ds reached; the job\'s process group was stopped\n' % job['timeout'])
-    try:  # nothing of the job is left behind in its group
-        os.killpg(p.pid, signal.SIGKILL)
-    except (ProcessLookupError, PermissionError):
-        pass
+                pass
+            res['exit'] = 124
+            out.write('\nci: time limit of %ds reached; the job\'s process group was stopped\n' % job['timeout'])
+    finally:
+        kill_group(p.pid, wait=3)  # a stop of this runner, or nothing of the job left behind in its group
+        for sg, h in old.items():
+            signal.signal(sg, h)
+        try:
+            os.remove(pf)
+        except OSError:
+            pass
+        out.flush()
+        safe_rmtree(tmp, os.path.dirname(tmp))
     res['seconds'] = round(time.time() - start, 1)
-    out.flush()
-    if tmp.startswith('/private/tmp/') and os.path.isdir(tmp):
-        shutil.rmtree(tmp, ignore_errors=True)
     return res
 
 
@@ -207,6 +287,17 @@ def cmd_install(a):
     print('installed: %s (use %s submit ...)' % (d, w))
 
 
+def cmd_stop(a):  # hidden: `python3 - _stop <job id>` on the mini: stop a job whose runner is gone (its ssh dropped)
+    if not JOB_ID_RE.match(a.job):
+        sys.exit('bad job id')
+    try:
+        pgid = int(rd(pgid_file(a.job)).strip())
+    except (OSError, ValueError):
+        return
+    if pgid > 1:
+        kill_group(pgid, wait=3)
+
+
 def cmd_exec(a):  # hidden: `python3 - _exec <b64 job>` on the mini, the program text on stdin; prints the job's output, then a result line
     job = json.loads(base64.b64decode(a.job))
     sys.stdout.flush()
@@ -217,7 +308,7 @@ def cmd_exec(a):  # hidden: `python3 - _exec <b64 job>` on the mini, the program
 # ---- machines: lock, idle ---------------------------------------------------------------------------------------------------------------------------------------------------------
 
 def ssh_cmd():
-    return shlex.split(os.environ.get('CI_SSH') or 'ssh -o BatchMode=yes -o ConnectTimeout=15 mini')
+    return shlex.split(os.environ.get('CI_SSH') or 'ssh -o BatchMode=yes -o ConnectTimeout=15 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 mini')
 
 
 def mini_bin():
@@ -315,26 +406,59 @@ def post_result(job, res, logpath):
     except (OSError, subprocess.SubprocessError):
         pass
     state = 'TIMED OUT' if res.get('timed_out') else ('PASSED' if res['exit'] == 0 else 'FAILED')
-    text = '@%s ci job %s on %s (%s): %s, exit=%s, %ss\ncommand: %s\n' % (job['owner'], job['id'], job['machine'], job['priority'], state, res['exit'], res.get('seconds'), job['cmd'][:300])
+    text = 'ci job %s for %s on %s (%s): %s, exit=%s, %ss\ncommand: %s\n' % (job['id'], job['owner'], job['machine'], job['priority'], state, res['exit'], res.get('seconds'), job['cmd'][:300])
     text += ('log: ' + uri + '\n' if uri else 'log: ' + logpath + ' (not uploaded)\n') + 'last lines:\n' + tail
+    text = text.replace('@', '')  # a job's text never mentions (notifies) anyone
     try:
         subprocess.run(['coral-board', 'post', '--task', str(job['task']), '-'], input=text, capture_output=True, text=True, timeout=60)
     except (OSError, subprocess.SubprocessError) as e:
         print('ci: could not post the result: %s' % e, file=sys.stderr)
 
 
+def set_aside_bad_files(machine):
+    """A pending file that is not a well-formed job (bad name, id that differs from its name, unreadable) is moved to done/ as refused-*; its name is never used to build a path."""
+    d, dd = mdir(machine, 'pending'), mdir(machine, 'done')
+    ok = {j['id'] for j in jobs_in(machine, 'pending')}
+    for fn in os.listdir(d):
+        if fn.endswith('.json') and fn[:-5] not in ok:
+            os.replace(os.path.join(d, fn), os.path.join(dd, 'refused-%d-%s' % (now_ms(), re.sub(r'[^A-Za-z0-9.]', '_', fn))))
+
+
+def refuse(machine, job, why):
+    src = os.path.join(mdir(machine, 'pending'), job['id'] + '.json')
+    if os.path.exists(src):
+        job.update(status='refused', reason=why, ended_ms=now_ms())
+        write_json(os.path.join(mdir(machine, 'done'), job['id'] + '.json'), job)
+        os.remove(src)
+    return 'refused job %s: %s' % (job['id'], why)
+
+
 def run_one(machine, post=True):
     """Run the best pending job if the machine is free. Returns 'ran', 'empty' or a reason it did not."""
+    set_aside_bad_files(machine)
     pend = jobs_in(machine, 'pending')
     if not pend:
         return 'empty'
     job = pend[0]
+    why = validate_job(job)
+    if why:  # re-lint at run time: a refused job never runs, and is finished as 'refused'
+        return refuse(machine, job, why)
     busy = machine_idle(machine)  # BEFORE the lock: the mini's mini-idle counts a held lock (ours too) as busy
     if busy:
         return 'machine busy: ' + busy[0]
     why = lock_acquire(machine, job)
     if why:
         return why
+    stopped = [True]  # becomes False once the job's result is recorded
+    runp = os.path.join(mdir(machine, 'running'), job['id'] + '.json')
+    old = {}
+    def stop(signum, _frame):
+        raise SystemExit(128 + signum)
+    for sg in (signal.SIGTERM, signal.SIGHUP):
+        try:
+            old[sg] = signal.signal(sg, stop)
+        except ValueError:
+            pass
     try:
         src = os.path.join(mdir(machine, 'pending'), job['id'] + '.json')
         runp = os.path.join(mdir(machine, 'running'), job['id'] + '.json')
@@ -351,12 +475,21 @@ def run_one(machine, post=True):
                 with open(os.path.abspath(__file__)) as srcf:
                     p = subprocess.Popen(ssh_cmd() + ['python3', '-', '_exec', payload], stdin=srcf, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
                 buf = []
-                for line in p.stdout:
-                    if line.startswith('@@CI_RESULT '):
-                        buf = json.loads(line[len('@@CI_RESULT '):])
-                    else:
-                        out.write(line)
-                p.wait()
+                try:
+                    for line in p.stdout:
+                        if line.startswith('@@CI_RESULT '):
+                            buf = json.loads(line[len('@@CI_RESULT '):])
+                        else:
+                            out.write(line)
+                    p.wait()
+                finally:
+                    if p.poll() is None:  # this runner is being stopped: close the ssh
+                        p.terminate()
+                    if not buf:  # no result line (the ssh dropped, or we were stopped): the job may still run over there; stop its group
+                        try:
+                            ssh_run('python3 - _stop %s' % job['id'], input=rd(os.path.abspath(__file__)), timeout=60)
+                        except (OSError, subprocess.SubprocessError):
+                            pass
                 res = buf if isinstance(buf, dict) and 'exit' in buf else {'exit': 255, 'timed_out': False, 'seconds': None}
             else:
                 res = exec_job(job, out)
@@ -365,8 +498,18 @@ def run_one(machine, post=True):
         os.remove(runp)
         if post:
             post_result(job, res, logpath)
+        stopped[0] = False
         return 'ran'
     finally:
+        if stopped[0] and os.path.exists(runp):  # the runner was stopped mid-job: the job's group is already stopped; finish its record
+            try:
+                job.update(status='stopped', exit=143, ended_ms=now_ms())
+                write_json(os.path.join(mdir(machine, 'done'), job['id'] + '.json'), job)
+                os.remove(runp)
+            except OSError:
+                pass
+        for sg, h in old.items():
+            signal.signal(sg, h)
         lock_release(machine)
 
 
@@ -377,9 +520,10 @@ def cmd_run(a):
         if r != last and r != 'ran':
             print('%s: %s' % (time.strftime('%H:%M:%S'), r), flush=True)
         last = r
+        done = r == 'ran' or r.startswith('refused')  # a refused job is finished: look at the next one at once
         if a.once:
-            sys.exit(0 if r in ('ran', 'empty') else 3)
-        if r != 'ran':
+            sys.exit(0 if done or r == 'empty' else 3)
+        if not done:
             time.sleep(a.poll)
 
 
@@ -412,6 +556,9 @@ def main():
     e = sp.add_parser('_exec')
     e.add_argument('job')
     e.set_defaults(f=cmd_exec)
+    x = sp.add_parser('_stop')
+    x.add_argument('job')
+    x.set_defaults(f=cmd_stop)
     args = ap.parse_args()
     if args.cmd == 'submit' and args.command and args.command[0] == '--':
         args.command = args.command[1:]

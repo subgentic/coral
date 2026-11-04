@@ -26,6 +26,19 @@ ci install                                                       # copy the tool
 - The job gets a scrubbed environment: no `CORAL_*`, `CLAUDE*`, `ANTHROPIC*`, `TMUX` or `SSH_AUTH_SOCK` of the submitter; an isolated `TMPDIR` and `CORAL_DATA_DIR` (under `/private/tmp/ci-<owner>/<job>` here, `/private/tmp/coral-test-<owner>/<job>` on the mini, removed after the job); `CORAL_TELEMETRY_DISABLED=1`; Go and Node on the `PATH`.
 - A command that names `~/.coral`, port 8420, `pkill`, `killall`, `sudo`, `open -...`, the tray or the app, `launchctl` or `coral open` is refused at submit time. The job's own command must start its server on a free port with `--cloud-url off --no-browser` (the suite runner `tests/frontend/run_cdp_suites.mjs` does) and run Chrome headless.
 - It never starts a window, never touches the real Coral, and never kills anything outside the job's own process group.
+- Added after Security's review (#13408):
+  - `CORAL_URL` in a job is `http://127.0.0.1:1` (nothing answers there), so a scratch `coral-board` or `coral-agent` inside a job cannot reach the live board.
+  - A job id must be exactly `<13 digits>-<4 hex>` at `cancel` and at run time, and a pending file whose name differs from its id is set aside (`done/refused-*`), never used to build a path. The job's temp folder is removed only when its real path is inside its owner's folder under `/private/tmp`.
+  - The job file is linted again when it runs (the denylist, `~/.coral` in the folder, task number, timeout, owner name, machine, priority): a failing job is finished as `refused` and never starts.
+  - Owner names are reduced to `a-z`, `0-9` and `-` at submit.
+  - When `ci run` is stopped (TERM, HUP, Ctrl-C) the job's process group is stopped first, the job is recorded as `stopped` and the lock released. On the mini the ssh has `ServerAliveInterval=15` and `ServerAliveCountMax=3`, and a runner that loses the connection runs `_stop <job id>` over a new ssh to stop the job's group there (the group id is kept in `~/ci-queue/pgids/<job id>` while the job runs).
+  - The posted text never contains `@` (nobody is mentioned by a job's output or command).
+
+## Limits (read before relying on it)
+
+- The denylist is a typo guard, not a security boundary: quoting (`.cor""al`), a script file or an environment variable get past it. The queue is for agents of one team that mean well; it keeps accidents out.
+- The job runs as the same user with the real `HOME`, and variables such as `GH_TOKEN` or `AWS_*` still pass through (only `CORAL_*`, `CLAUDE*`, `ANTHROPIC*`, `TMUX` and `SSH_AUTH_SOCK` are removed). Fine for same-user agents; do not queue a job whose command prints its environment.
+- The mac lock's takeover of a dead runner's lock has a narrow race: two runners that both see the dead pid at the same moment can remove each other's new lock (the slower one's `rmtree`). It needs two runners started on the same machine, which the setup does not do (one runner per machine).
 
 ## Examples
 

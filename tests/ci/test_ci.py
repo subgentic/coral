@@ -224,8 +224,9 @@ class RunTests(Base):
         r = self.ci('run', '--machine', 'mac', '--once', '--no-post', env={'CORAL_URL': 'http://127.0.0.1:8420', 'CORAL_PORT': '8420', 'CORAL_SESSION_TOKEN': 'secret', 'CORAL_DATA_DIR': os.path.expanduser('~/.coral'), 'TMUX': '/tmp/x,1,0'})
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         env = dict(l.split('=', 1) for l in rd(out).splitlines() if '=' in l)
-        for k in ('CORAL_URL', 'CORAL_PORT', 'CORAL_SESSION_TOKEN', 'TMUX'):
+        for k in ('CORAL_PORT', 'CORAL_SESSION_TOKEN', 'TMUX'):
             self.assertNotIn(k, env)
+        self.assertEqual(env['CORAL_URL'], 'http://127.0.0.1:1', 'a closed URL: a scratch coral-board in a job cannot reach the live board')
         self.assertTrue(env['CORAL_DATA_DIR'].startswith('/private/tmp/ci-tester/'), env['CORAL_DATA_DIR'])
         self.assertEqual(env['CORAL_TELEMETRY_DISABLED'], '1')
         self.assertTrue(env['TMPDIR'].startswith('/private/tmp/ci-tester/'))
@@ -239,7 +240,15 @@ class RunTests(Base):
         self.assertIn('exit=0', log)
         self.assertIn('line-two', log)
         self.assertIn('coral://artifacts/abc123', log)
-        self.assertIn('@tester', log)
+        self.assertIn('tester', log)
+        self.assertNotIn('@', log.split('coral-board post', 1)[1], 'a posted text never mentions anyone')
+
+    def test_an_at_sign_in_a_jobs_output_or_command_is_dropped_from_the_post(self):
+        self.submit('mac', 'normal', ['sh', '-c', 'echo "ping @Operator and @QA"'], task=9)
+        self.assertEqual(self.ci('run', '--machine', 'mac', '--once').returncode, 0)
+        body = self.stub_log().split('coral-board post', 1)[1]
+        self.assertIn('ping Operator and QA', body)
+        self.assertNotIn('@', body)
 
     def test_a_failing_job_is_reported_as_failed(self):
         self.submit('mac', 'normal', ['sh', '-c', 'echo bad; exit 3'])
@@ -310,6 +319,104 @@ class MiniTests(Base):
         done = os.path.join(self.home, 'mini', 'done')
         j = jl(os.path.join(done, os.listdir(done)[0]))
         self.assertTrue(j['timed_out'])
+
+
+class SecurityTests(Base):
+    def hand_job(self, machine, jid, **over):
+        j = {'id': jid, 'machine': machine, 'priority': 'normal', 'task': 5, 'owner': 'tester', 'cmd': 'echo ok', 'cwd': self.d, 'timeout': 60, 'submitted_ms': 1700000000000}
+        j.update(over)
+        os.makedirs(os.path.join(self.home, machine, 'pending'), exist_ok=True)
+        wr(os.path.join(self.home, machine, 'pending', jid + '.json'), json.dumps(j))
+        return j
+
+    def done_files(self, machine):
+        d = os.path.join(self.home, machine, 'done')
+        return sorted(os.listdir(d)) if os.path.isdir(d) else []
+
+    def test_cancel_and_run_never_use_a_job_id_that_is_not_the_exact_format(self):
+        victim = os.path.join(self.d, 'victim')
+        os.makedirs(victim)
+        wr(os.path.join(victim, 'x.json'), json.dumps({'owner': 'tester'}))
+        self.assertNotEqual(self.ci('cancel', '../../../../' + victim.lstrip('/') + '/x').returncode, 0)
+        self.assertTrue(os.path.exists(os.path.join(victim, 'x.json')))
+        os.makedirs(os.path.join(self.home, 'mac', 'pending'))
+        j = self.hand_job('mac', '../../evil')  # a file whose id is a path
+        wr(os.path.join(self.home, 'mac', 'pending', 'weird.json'), json.dumps(dict(j, id='1700000000000-abcd')))  # a name that differs from its id
+        r = self.ci('run', '--machine', 'mac', '--once', '--no-post')
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(os.listdir(os.path.join(self.home, 'mac', 'pending')), [], 'both files were set aside')
+        self.assertTrue(all(f.startswith('refused-') for f in self.done_files('mac')), self.done_files('mac'))
+
+    def test_an_owner_name_with_a_path_in_it_never_runs_and_never_makes_a_folder(self):
+        marker = os.path.join(self.d, 'ran')
+        self.hand_job('mac', '1700000000000-abcd', owner='../../../../Users/x', cmd='touch %s' % marker)
+        self.assertEqual(self.ci('run', '--machine', 'mac', '--once', '--no-post').returncode, 0)
+        self.assertFalse(os.path.exists(marker))
+        self.assertEqual(jl(os.path.join(self.home, 'mac', 'done', '1700000000000-abcd.json'))['status'], 'refused')
+
+    def test_a_job_file_is_linted_again_when_it_runs(self):
+        marker = os.path.join(self.d, 'ran')
+        for n, over in enumerate(({'cmd': 'touch %s; echo pkill' % marker}, {'cmd': 'touch %s' % marker, 'timeout': 999999}, {'cmd': 'touch %s' % marker, 'cwd': os.path.expanduser('~/.coral/x')},
+                                  {'cmd': 'touch %s; echo 8420' % marker}, {'cmd': 'touch %s' % marker, 'timeout': 'forever'}, {'cmd': 'touch %s' % marker, 'task': 'x'})):
+            self.hand_job('mac', '17000000000%02d-abcd' % n, **over)
+        for _ in range(6):
+            self.assertEqual(self.ci('run', '--machine', 'mac', '--once', '--no-post').returncode, 0)
+        self.assertFalse(os.path.exists(marker), 'a refused job must not run')
+        self.assertEqual([jl(os.path.join(self.home, 'mac', 'done', f))['status'] for f in self.done_files('mac')], ['refused'] * 6)
+
+    def test_owner_names_are_reduced_to_a_z_0_9_and_dash(self):
+        jid = self.submit('mac', 'normal', ['echo', 'x'])
+        self.assertEqual(self.ci('submit', '--machine', 'mac', '--task', '7', '--', 'echo', 'y', env={'CI_OWNER': '../Evil Name@x'}).returncode, 0)
+        owners = {jl(os.path.join(self.home, 'mac', 'pending', f))['owner'] for f in os.listdir(os.path.join(self.home, 'mac', 'pending'))}
+        self.assertEqual(owners, {'tester', 'evil-name-x'})
+
+    def _start_runner_and_stop_it(self, machine):
+        pidfile = os.path.join(self.d, 'child.pid')
+        self.submit(machine, 'normal', ['sh', '-c', 'sleep 60 & echo $! > %s; wait' % pidfile], timeout=120)
+        e = dict(self.env)
+        p = subprocess.Popen([sys.executable, CI, 'run', '--machine', machine, '--once', '--no-post'], env=e, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        for _ in range(100):
+            if os.path.exists(pidfile) and rd(pidfile).strip():
+                break
+            time.sleep(0.1)
+        child = int(rd(pidfile))
+        p.terminate()  # the runner is stopped (not the job's own time limit)
+        p.wait(timeout=30)
+        for _ in range(50):
+            try:
+                os.kill(child, 0)
+            except ProcessLookupError:
+                break
+            time.sleep(0.1)
+        else:
+            os.kill(child, 9)
+            self.fail('the job\'s child is still running after its runner was stopped')
+        return p
+
+    def test_stopping_the_runner_stops_the_jobs_group_and_frees_the_lock_on_the_mac(self):
+        self._start_runner_and_stop_it('mac')
+        self.assertFalse(os.path.exists(os.path.join(self.home, 'mac.lock')), 'the lock is released')
+        self.assertEqual(os.listdir(os.path.join(self.home, 'mac', 'running')), [])
+        self.assertEqual([jl(os.path.join(self.home, 'mac', 'done', f))['status'] for f in self.done_files('mac')], ['stopped'])
+
+    def test_stopping_the_runner_stops_the_jobs_group_and_frees_the_lock_on_the_mini(self):
+        self._start_runner_and_stop_it('mini')
+        self.assertFalse(os.path.exists(os.path.join(self.d, 'minilock')), 'the mini lock is released')
+        self.assertEqual([jl(os.path.join(self.home, 'mini', 'done', f))['status'] for f in self.done_files('mini')], ['stopped'])
+
+    def test_the_remote_stop_kills_a_group_by_its_job_id_and_refuses_other_ids(self):
+        p = subprocess.Popen(['sleep', '60'], start_new_session=True)
+        os.makedirs(os.path.join(self.home, 'pgids'))
+        wr(os.path.join(self.home, 'pgids', '1700000000000-abcd'), '%d\n' % p.pid)
+        self.assertNotEqual(self.ci('_stop', '../x').returncode, 0)
+        self.assertIsNone(p.poll())
+        self.assertEqual(self.ci('_stop', '1700000000000-abcd').returncode, 0)
+        p.wait(timeout=10)
+
+    def test_the_ssh_command_notices_a_dead_connection(self):
+        r = subprocess.run([sys.executable, '-c', 'import sys; sys.path.insert(0, %r); import ci; print(" ".join(ci.ssh_cmd()))' % os.path.dirname(CI)], env={'PATH': SYSPATH, 'HOME': self.d}, capture_output=True, text=True)
+        self.assertIn('ServerAliveInterval=', r.stdout, r.stdout + r.stderr)
+        self.assertIn('ServerAliveCountMax=', r.stdout)
 
 
 if __name__ == '__main__':
