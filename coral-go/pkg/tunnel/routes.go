@@ -300,6 +300,10 @@ var routeTable = cat(
 	// (the artifact's name quoted as cleaned data), "changes" only records the state (the comment itself is the comment route above; its send to an agent stays unlisted). The OWNER's alone: a guest or a grantee is refused
 	// by the machine before the handler runs. Interact, as a comment is: it moves no work and runs nothing.
 	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/board/{project}/artifacts/{id}/review")),
+	// Sending a file for review and taking it out again (#13217): the Operator's own change of the file's review state, the tag "for review" and its question, which through the Hub the tags route no longer carries (it may
+	// only add or remove "read", #13117). The OWNER's alone, like the review itself; Interact, as the review and the tags are: it moves no work and runs nothing.
+	owner(OwnerRefuse, rules(http.MethodPut, TierInteract, "/api/board/{project}/artifacts/{id}/review")),
+	owner(OwnerRefuse, rules(http.MethodDelete, TierInteract, "/api/board/{project}/artifacts/{id}/review")),
 	// Marking a file read when it is opened for review is a write of the artifact's tags (PUT .../artifacts/{id}/tags, #12742): through the Hub it is the OWNER's alone, the machine refuses anyone else before the handler runs, and
 	// the handler checks a closed body for a request that came through the Hub (the tags of the local route, narrowed to a-z, 0-9, space and hyphen). Interact: it moves no work and runs nothing; it only records what the Operator has seen.
 	owner(OwnerRefuse, rules(http.MethodPut, TierInteract, "/api/board/{project}/artifacts/{id}/tags")),
