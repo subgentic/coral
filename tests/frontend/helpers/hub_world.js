@@ -15,7 +15,7 @@ async function setupHubWorld({ client, Page, Emulation, width, height, mobile, i
         await Fetch.enable({ patterns: [{ urlPattern: `${BASE}/*`, resourceType: 'Document', requestStage: 'Response' }] });
         safePaused(client, async e => {
             // hubPages: the Hub's own pages the Inbox frames (/inbox/hub/needs, /tasks, /saved) are a stand-in page here (the isolated server has none, and a frame of the dashboard itself would not say what it shows)
-            if (hubPages && /^\/inbox\/hub\//.test(new URL(e.request.url).pathname)) {
+            if (hubPages && (/^\/inbox\/hub\//.test(new URL(e.request.url).pathname) || new URL(e.request.url).pathname === '/inbox')) {
                 const what = new URL(e.request.url).pathname.split('/').pop();
                 const page = `<!doctype html><meta charset="utf-8"><title>Coral Hub</title><body style="margin:0;font:16px system-ui;background:#18181c;color:#e8e8ec"><main style="padding:24px"><p style="color:#a0a0aa;margin:0 0 16px;font-size:13px">Stand-in for the Hub's own ${what} page, framed by the Inbox: it starts at its list, with no title of its own (the Inbox page above it has one).</p><div style="border:1px solid #34343c;border-radius:8px;padding:12px 16px;margin-bottom:10px">Review agent on Laptop waits for your answer<br><small style="color:#a0a0aa">4 min ago</small></div><div style="border:1px solid #34343c;border-radius:8px;padding:12px 16px">Pick the release date<br><small style="color:#a0a0aa">Task for you, high</small></div></main>`;
                 return Fetch.fulfillRequest({ requestId: e.requestId, responseCode: 200, responseHeaders: [{ name: 'Content-Type', value: 'text/html; charset=utf-8' }], body: Buffer.from(page).toString('base64') });

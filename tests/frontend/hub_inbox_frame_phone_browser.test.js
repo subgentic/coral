@@ -24,9 +24,35 @@ const NAMES = { needs: 'Needs you', tasks: 'Tasks', saved: 'Saved for later' };
     };
     const measurements = [];
     const probe = () => ev(`(() => { const v = document.getElementById('group-table-view'), f = v.querySelector('iframe.inbox-frame'), r = f.getBoundingClientRect(), cs = getComputedStyle(v); return { src: f.getAttribute('src'), heading: (document.getElementById('group-table-title') || {}).textContent || null, headBox: (h => h ? [Math.round(h.getBoundingClientRect().width), Math.round(h.getBoundingClientRect().height)] : null)(document.querySelector('#group-table-view .group-table-head')), left: Math.round(r.left), right: Math.round(r.right), width: Math.round(r.width), vw: innerWidth, padL: parseFloat(cs.paddingLeft), padR: parseFloat(cs.paddingRight), padT: parseFloat(cs.paddingTop), fillAbove: getComputedStyle(f).backgroundColor, frameBottom: r.bottom, navTop: document.querySelector('.phone-nav').getBoundingClientRect().top, navHeight: document.querySelector('.phone-nav').getBoundingClientRect().height, viewBottom: v.getBoundingClientRect().bottom, padB: cs.paddingBottom, frameHeight: r.height, navPadB: getComputedStyle(document.querySelector('.phone-nav')).paddingBottom, rootFont: getComputedStyle(document.documentElement).fontSize, ancestors: (() => { const rows = []; for (let n = v; n; n = n.parentElement) { const c = getComputedStyle(n), b = n.getBoundingClientRect(); rows.push({ id: n.id, tag: n.tagName, class: n.className, top: b.top, bottom: b.bottom, height: b.height, cssHeight: c.height, minHeight: c.minHeight, flex: c.flex, overflow: c.overflow, paddingBottom: c.paddingBottom }); } return rows; })() }; })()`);
+    let nativeInbox = false;
     try {
-        await setupHubWorld({ client, Page, Emulation, width: 390, height: 844, mobile: true, inbox: 'native', hubPages: true });
+        await setupHubWorld({ client, Page, Emulation, width: 390, height: 844, mobile: true, inbox: () => nativeInbox, hubPages: true });
         const failures = [];
+        // The older Hub pin frames the whole Inbox in #inbox-view, rather than
+        // individual folders in #group-table-view. It has no floating New button.
+        for (const inset of [0, 34]) {
+            await Emulation.setSafeAreaInsetsOverride({ insets: { top: 0, bottom: inset, left: 0, right: 0 } });
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
+            await waitFor(`typeof window.switchNavTab === 'function' && !!window.__coralReady`, 'the dashboard');
+            await coralReady('startup', 'liveList', 'settings');
+            await ev(`window.switchNavTab('hub-inbox'); true`);
+            await waitFor(`!!document.querySelector('#inbox-view > #inbox-frame')`, 'the whole Hub Inbox frame');
+            await ev(framesJs(6));
+            const p = await ev(`(() => {
+                const view = document.getElementById('inbox-view'), frame = document.getElementById('inbox-frame');
+                const nav = document.querySelector('.phone-nav'), fab = document.querySelector('.phone-fab');
+                return { frameBottom: frame.getBoundingClientRect().bottom, navTop: nav.getBoundingClientRect().top,
+                    navPadB: parseFloat(getComputedStyle(nav).paddingBottom), padB: getComputedStyle(view).paddingBottom,
+                    fabShown: !!fab && getComputedStyle(fab).display !== 'none' && fab.getBoundingClientRect().height > 0 };
+            })()`);
+            measurements.push({ where: 'whole Inbox inset ' + inset, ...p });
+            console.log('whole Inbox inset ' + inset + ' ' + JSON.stringify(p));
+            await shot('whole-inbox-' + inset);
+            assert.equal(p.fabShown, false, 'the Hub Inbox has no floating New button');
+            assert.equal(p.navPadB, 8 + inset, 'the whole Inbox safe-area override applies');
+            if (Math.abs(p.frameBottom - p.navTop) > 1) failures.push('whole Inbox inset ' + inset + ': frame bottom must meet the docked bar top ' + JSON.stringify(p));
+        }
+        nativeInbox = true;
         for (const [group, src] of [['needs', '/inbox/hub/needs'], ['tasks', '/inbox/hub/tasks'], ['saved', '/inbox/hub/saved']]) {
             for (const theme of ['dark', 'light']) for (const font of [16, 32]) for (const inset of [0, 34]) {
             await Emulation.setSafeAreaInsetsOverride({ insets: { top: 0, bottom: inset, left: 0, right: 0 } });
@@ -34,6 +60,9 @@ const NAMES = { needs: 'Needs you', tasks: 'Tasks', saved: 'Saved for later' };
             await ev(`document.documentElement.setAttribute('data-theme', '${theme}'); document.documentElement.style.fontSize = '${font}px'; true`);
             await ev(framesJs(6));
             const p = await probe();
+            const local = await ev(`(() => { const v = document.getElementById('inbox-view'); return { framed: !!v.querySelector(':scope > #inbox-frame'), pad: parseFloat(getComputedStyle(v).paddingBottom) }; })()`);
+            assert.equal(local.framed, false, 'native Inbox is not mistaken for the Hub frame');
+            assert.ok(local.pad >= 72 + 96 + inset, 'local Inbox retains its floating-button clearance');
             assert.equal(p.src, src, `${group}: the frame is the Hub page at its constant address`);
             assert.equal(p.heading, NAMES[group], `${group}, 390: the page's heading is still in the page, for a screen reader ${JSON.stringify(p)}`);
             assert.ok(p.headBox && p.headBox[0] <= 1 && p.headBox[1] <= 1, `${group}, 390: but it is not drawn under the folder button (the button names the page) ${JSON.stringify(p)}`);
