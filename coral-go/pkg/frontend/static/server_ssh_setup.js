@@ -187,7 +187,7 @@ export function mountSshSetup(host, { mode = 'setup', server = null, action = nu
         if (kind() === SETUP && !portOk(st.port)) { st.error = portProblem(st.port); draw(); return; } // never sent without the folder, which would start it in the default one
         st.busy = true; st.error = ''; draw();
         const body = {};
-        if (st.plan.host_keys && st.plan.host_keys.length) body.accept_keys = true;
+        if (st.plan.host_keys && st.plan.host_keys.length) { body.accept_keys = true; body.key_fingerprints = st.plan.host_keys.map(k => k.fingerprint); } // the fingerprints the person saw and confirmed: the hub trusts the keys only when these are exactly the ones it holds (#13088)
         if (kind() === REMOVE) body.confirm = st.typed.trim();
         if (kind() === SETUP) { body.backend = st.backend === 'tmux' ? 'tmux' : 'pty'; const d = cleanDataDir(st.dataDir); if (d) body.data_dir = d; const pt = String(st.port || '').trim(); if (pt && portOk(pt) && Number(pt) !== 8420) body.port = Number(pt); }
         if (kind() === UPGRADE && downgrade()) body.allow_downgrade = !!st.allowDowngrade;
