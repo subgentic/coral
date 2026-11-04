@@ -17,10 +17,13 @@ import (
 // on the board closed one, so the board still counted it open and the health check repeated it. The asker, the Operator or the board's orchestrator closes it, and the note says where it was answered.
 
 const askUsageText = `Usage: coral-board ask close <message-id> --note "where it was answered" [--board <project>]
+       coral-board ask withdraw <message-id> [--note "why"] [--board <project>]
        coral-board ask clash <task:N|goal:N|artifact:DIGEST> <message-id> <message-id> [--board <project>]
 
   close   Close a question (post --ask) that was answered somewhere the board did not see (chat, an artifact comment). Nobody owes an answer afterwards and the
           health check stops repeating it. The asker, the Operator or the board's orchestrator may close it; the note is shown with the question.
+  withdraw  Take back a question you asked (post --ask), for example after you asked again with a fix: it leaves the Operator's Needs you and the health check, and is
+          shown as "withdrawn by <you>". Only the agent that asked, or the board's orchestrator, may withdraw it; the Operator ignores one instead.
   clash   Two people (at least one a guide) gave different directions on one task, goal or artifact: give the two message ids. Coral puts ONE question to the
           Operator that quotes both and holds the work on it until they decide; you pick neither. Filing the same one again changes nothing.`
 
@@ -38,7 +41,7 @@ func cmdAsk() {
 		cmdAskClash(args)
 		return
 	}
-	if sub != "close" {
+	if sub != "close" && sub != "withdraw" {
 		fmt.Fprintf(os.Stderr, "Unknown ask command %q.\n%s\n", sub, askUsageText)
 		clierr.Exit1()
 	}
@@ -51,12 +54,13 @@ func cmdAsk() {
 		fmt.Fprintf(os.Stderr, "Error: %q is not a message id.\n%s\n", args[0], askUsageText)
 		clierr.Exit1()
 	}
-	fs := flag.NewFlagSet("ask-close", flag.ContinueOnError)
+	withdraw := sub == "withdraw"
+	fs := flag.NewFlagSet("ask-"+sub, flag.ContinueOnError)
 	note := fs.String("note", "", "Where it was answered")
 	board := fs.String("board", "", "The board (default: the one you joined)")
 	clihelp.ParseFlags(fs, args[1:], func() string { return askUsageText })
 	*note = flagText(*note, "close note")
-	if strings.TrimSpace(*note) == "" {
+	if !withdraw && strings.TrimSpace(*note) == "" {
 		fmt.Fprintf(os.Stderr, "A note is required: say where it was answered.\n%s\n", askUsageText)
 		clierr.Exit1()
 	}
@@ -70,6 +74,11 @@ func cmdAsk() {
 		project = st.Project
 	}
 	path := fmt.Sprintf("/%s/asks/%d/close", url.PathEscape(project), id)
+	if withdraw {
+		goalCall("POST", path, map[string]any{"subscriber_id": resolveSubscriberID(), "withdraw": true, "note": strings.TrimSpace(*note)}, "withdrawing the question", 200)
+		fmt.Printf("Withdrew the question in message #%d.\n", id)
+		return
+	}
 	goalCall("POST", path, map[string]any{"subscriber_id": resolveSubscriberID(), "note": *note}, "closing the question", 200)
 	fmt.Printf("Closed the question in message #%d.\n", id)
 }

@@ -27,7 +27,8 @@ func (h *BoardHandler) CloseAsk(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		SubscriberID string `json:"subscriber_id"` // accepted for the command line's sake and ignored: the verified caller closes
 		Note         string `json:"note"`
-		Undo         bool   `json:"undo"` // open the question again (the Operator's Undo of an Ignore, #11552): no note, the same callers, nothing posted
+		Withdraw     bool   `json:"withdraw"` // the asker (or the board's orchestrator) takes the question back (#13147): the note is "withdrawn by <who>", the reason after it is optional
+		Undo         bool   `json:"undo"`     // open the question again (the Operator's Undo of an Ignore, #11552): no note, the same callers, nothing posted
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		errBadRequest(w, "invalid JSON")
@@ -41,6 +42,9 @@ func (h *BoardHandler) CloseAsk(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	note := strings.TrimSpace(clitext.Clean(body.Note))
+	if body.Withdraw && !body.Undo {
+		note = withdrawnNote(actor, note)
+	}
 	if note == "" && !body.Undo {
 		errBadRequest(w, "a note is required: say where it was answered")
 		return
@@ -52,6 +56,10 @@ func (h *BoardHandler) CloseAsk(w http.ResponseWriter, r *http.Request) {
 	}
 	if !h.mayCloseAsk(r, project, actor, asker) {
 		writeError(w, http.StatusForbidden, "not_allowed", "only the asker, the Operator or the board's orchestrator may close a question")
+		return
+	}
+	if body.Withdraw && !body.Undo && !h.mayWithdrawAsk(r, project, actor, asker) {
+		writeError(w, http.StatusForbidden, "not_allowed", "only the agent that asked, or the board's orchestrator, may withdraw a question (the Operator ignores one)")
 		return
 	}
 	if body.Undo {
@@ -87,7 +95,24 @@ func (h *BoardHandler) CloseAsk(w http.ResponseWriter, r *http.Request) {
 		h.recordActivity(r, board.ActIgnore, "question", strconv.FormatInt(id, 10), project, "", note)
 		inboxActioned(r, tracking.InboxAsk, "", "dismiss", time.Time{}) // the Inbox's numbers (#7512)
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "closed_by": actor})
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "closed_by": actor, "withdrawn": body.Withdraw})
+}
+
+// withdrawnNote is the note a withdrawn question carries: who took it back, and why when they said.
+func withdrawnNote(actor, reason string) string {
+	note := "withdrawn by " + actor
+	if reason != "" {
+		note += ": " + reason
+	}
+	return note
+}
+
+// mayWithdrawAsk: only the agent that asked, or the board's orchestrator (#13147). The Operator is not one: a question is the Operator's to answer or ignore, and a withdraw is the asker taking it back.
+func (h *BoardHandler) mayWithdrawAsk(r *http.Request, project, actor, asker string) bool {
+	if strings.EqualFold(actor, "Operator") {
+		return false
+	}
+	return h.mayCloseAsk(r, project, actor, asker)
 }
 
 // mayCloseAsk: the asker, the Operator, or the board's orchestrator.

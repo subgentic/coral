@@ -42,3 +42,27 @@ func TestAskCloseNeedsANoteAndAnId(t *testing.T) {
 	assert.Equal(t, 5, res.code, "a refusal ends the command with the refusal exit code")
 	assert.Contains(t, res.stderr, "closing the question")
 }
+
+// #13147: coral-board ask withdraw <id> [--note "why"]: no note needed, the request says withdraw, and it prints what it did.
+func TestAskWithdrawNeedsNoNoteAndSaysWithdraw(t *testing.T) {
+	gs := newGoalServer(t)
+	res := goalRun(t, gs, "ask", "withdraw", "#163626")
+	require.Equal(t, 0, res.code, res.stderr)
+	assert.Equal(t, "Withdrew the question in message #163626.\n", res.stdout)
+	reqs := gs.requests()
+	require.Len(t, reqs, 1)
+	assert.Contains(t, reqs[0], "POST /api/board/team/asks/163626/close? ")
+	assert.Equal(t, map[string]any{"subscriber_id": "Tester", "withdraw": true, "note": ""}, bodyOf(t, reqs[0]))
+
+	res = goalRun(t, gs, "ask", "withdraw", "5", "--note", "asked again in #9")
+	require.Equal(t, 0, res.code, res.stderr)
+	assert.Equal(t, "asked again in #9", bodyOf(t, gs.requests()[1])["note"])
+
+	res = goalRun(t, gs, "ask", "withdraw")
+	assert.Equal(t, 1, res.code)
+	assert.Contains(t, res.stderr, "ask withdraw")
+	gs.setStatus(403)
+	res = goalRun(t, gs, "ask", "withdraw", "5")
+	assert.Equal(t, 5, res.code)
+	assert.Contains(t, res.stderr, "withdrawing the question")
+}
