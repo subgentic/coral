@@ -276,26 +276,42 @@ func (s *Store) GetProposal(ctx context.Context, project string, id int64) (*Pro
 	return &p, nil
 }
 
-// ListProposals are a board's proposals in the states named (all of them when none), oldest first; project "" lists every board's (the Operator's Needs you).
+// ListProposals are a board's proposals in the states named (all of them when none), oldest first, at most 500; project "" lists every board's (the Operator's Needs you). ListProposalsPage reaches the rest.
 func (s *Store) ListProposals(ctx context.Context, project string, states ...string) ([]Proposal, error) {
-	q := `SELECT id, board_id, kind, title, payload, proposer, goal_proposal_id, state, reason, created_at, expires_at, decided_at, created_ref, notified, claimed_at, claim_title FROM board_proposals WHERE 1 = 1`
-	var args []any
+	out, _, err := s.ListProposalsPage(ctx, project, 0, 500, states...)
+	return out, err
+}
+
+// ListProposalsPage is one page of proposals by id: those with an id above afterID (0: from the first), at most limit, and the true number the project and states match (the cursor left out) (#13188).
+// The caller asks for limit rows and knows there is more when the answer is full and the total is larger than what it has passed.
+func (s *Store) ListProposalsPage(ctx context.Context, project string, afterID int64, limit int, states ...string) ([]Proposal, int, error) {
+	where, args := ` WHERE 1 = 1`, []any{}
 	if project != "" {
-		q += ` AND board_id = ?`
+		where += ` AND board_id = ?`
 		args = append(args, project)
 	}
 	if len(states) > 0 {
-		q += ` AND state IN (` + strings.TrimSuffix(strings.Repeat("?,", len(states)), ",") + `)`
+		where += ` AND state IN (` + strings.TrimSuffix(strings.Repeat("?,", len(states)), ",") + `)`
 		for _, st := range states {
 			args = append(args, st)
 		}
 	}
-	q += ` ORDER BY id LIMIT 500`
+	var total int
+	if err := s.db.GetContext(ctx, &total, `SELECT COUNT(*) FROM board_proposals`+where, args...); err != nil {
+		return nil, 0, err
+	}
+	q := `SELECT id, board_id, kind, title, payload, proposer, goal_proposal_id, state, reason, created_at, expires_at, decided_at, created_ref, notified, claimed_at, claim_title FROM board_proposals` + where
+	if afterID > 0 {
+		q += ` AND id > ?`
+		args = append(args, afterID)
+	}
+	q += ` ORDER BY id LIMIT ?`
+	args = append(args, limit)
 	var out []Proposal
 	if err := s.db.SelectContext(ctx, &out, q, args...); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	return out, nil
+	return out, total, nil
 }
 
 // ExpireProposals marks every pending proposal past its time as expired and returns them (the handler tells each proposer once). They are kept: the Operator sees them as expired.

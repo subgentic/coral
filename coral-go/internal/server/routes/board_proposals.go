@@ -233,7 +233,12 @@ func (h *BoardHandler) ListProposals(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	rows, err := h.bs.ListProposals(r.Context(), project, states...)
+	// limit (1 to 500, 500 by default as always) and cursor (the last answer's next_cursor, an id) page the list; total is every proposal these filters match (#13188).
+	limit, after, ok := idPageParams(w, r, 500, 500)
+	if !ok {
+		return
+	}
+	rows, total, err := h.bs.ListProposalsPage(r.Context(), project, after, limit+1, states...)
 	if err != nil {
 		proposalInternal(w, "the proposals could not be listed", err)
 		return
@@ -251,7 +256,13 @@ func (h *BoardHandler) ListProposals(w http.ResponseWriter, r *http.Request) {
 		}
 		out = append(out, proposalRow{Proposal: p, BoardLabel: label})
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"proposals": out})
+	resp := map[string]any{"proposals": out, "total": total, "has_more": false}
+	if len(rows) > limit {
+		resp["proposals"] = out[:limit]
+		resp["has_more"] = true
+		resp["next_cursor"] = encodeIDCursor(rows[limit-1].ID)
+	}
+	writeJSON(w, http.StatusOK, resp)
 }
 
 // ApproveProposal: POST /api/board/{project}/proposals/{id}/approve, optionally {"title","body","outcome","done_when","priority","assigned_to"} to edit before it is made. The goal or task is made once.

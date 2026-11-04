@@ -1,8 +1,11 @@
 package routes
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -16,6 +19,7 @@ import (
 // board, the whole question as text:
 //
 //	GET /api/operator-asks -> [{board, kind: "ask"|"wait", id, asker, text, cut, at}]
+//	GET /api/operator-asks?paged=1[&limit=N][&cursor=C] -> {asks: [...], total, has_more, next_cursor}: newest first, 50 a page (1 to 200), every open question reachable (#13188)
 //
 // The reply is the board post the dashboard already makes (POST /api/board/{board}/messages with reply_to and the asker's @name): a reply to an ask answers it, and any post of the Operator's ends a wait. So
 // this route only reads. It is the Operator's alone: a person's own dashboard or signed command line, never an agent's token or a script; through Coral Hub the owner's alone.
@@ -52,6 +56,10 @@ func (h *BoardHandler) OperatorAsks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if refuseUnlessPerson(w, r, "read the questions asked of them") {
+		return
+	}
+	paged, pagedLimit, pagedAfter, ok := operatorAsksPageParams(w, r)
+	if !ok {
 		return
 	}
 	ctx := r.Context()
@@ -100,6 +108,10 @@ func (h *BoardHandler) OperatorAsks(w http.ResponseWriter, r *http.Request) {
 			rows = append(rows, operatorAskRow{Board: p.Project, BoardLabel: clitext.CleanName(p.BoardLabel), Kind: "wait", ID: q.ID, Asker: clitext.CleanName(q.SubscriberID), Text: text, Cut: cut, At: q.CreatedAt})
 		}
 	}
+	if paged { // ?paged=1 (#13188): newest first, every open question reachable by next_cursor, the true total
+		writeJSON(w, http.StatusOK, pageOperatorAsks(rows, pagedLimit, pagedAfter))
+		return
+	}
 	sort.SliceStable(rows, func(i, j int) bool { return rows[i].At < rows[j].At })
 	if len(rows) > operatorAsksMax {
 		rows = rows[len(rows)-operatorAsksMax:]
@@ -118,4 +130,92 @@ func operatorAskText(s string) (string, bool) {
 		s = s[:len(s)-1]
 	}
 	return s, true
+}
+
+// operatorAsksPageParams reads ?paged=1[&limit=N][&cursor=C] (#13188). Without paged the answer stays the bare array it was (coral-hub parses it so), and limit and cursor are ignored as they were.
+func operatorAsksPageParams(w http.ResponseWriter, r *http.Request) (paged bool, limit int, after *operatorAskPos, ok bool) {
+	q := r.URL.Query()
+	if !q.Has("paged") {
+		return false, 0, nil, true // as before: any other parameter is ignored
+	}
+	if q.Get("paged") != "1" || len(q["paged"]) != 1 {
+		errBadRequest(w, "paged must be 1")
+		return false, 0, nil, false
+	}
+	limit = 50
+	if v := q.Get("limit"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 1 || n > 200 {
+			errBadRequest(w, "limit must be 1 to 200")
+			return false, 0, nil, false
+		}
+		limit = n
+	}
+	if c := q.Get("cursor"); c != "" {
+		pos, good := decodeOperatorAskPos(c)
+		if !good {
+			errBadRequest(w, "invalid cursor")
+			return false, 0, nil, false
+		}
+		after = &pos
+	}
+	return true, limit, after, true
+}
+
+// operatorAskPos is a place in the newest-first list: the last row sent.
+type operatorAskPos struct {
+	At    string `json:"a"`
+	Board string `json:"b"`
+	Kind  string `json:"k"`
+	ID    int64  `json:"i"`
+}
+
+func decodeOperatorAskPos(c string) (operatorAskPos, bool) {
+	var p operatorAskPos
+	if len(c) > 1024 {
+		return p, false
+	}
+	raw, err := base64.RawURLEncoding.DecodeString(c)
+	if err != nil || json.Unmarshal(raw, &p) != nil || p.At == "" || p.ID <= 0 {
+		return p, false
+	}
+	return p, true
+}
+
+// askBefore is the newest-first order: later time first, then board, kind and id, so no two rows tie.
+func askBefore(a, b operatorAskRow) bool {
+	if a.At != b.At {
+		return a.At > b.At
+	}
+	if a.Board != b.Board {
+		return a.Board < b.Board
+	}
+	if a.Kind != b.Kind {
+		return a.Kind < b.Kind
+	}
+	return a.ID < b.ID
+}
+
+// pageOperatorAsks answers one page of the open questions: newest first, at most limit past the cursor's place, with the true total and next_cursor when there is more.
+func pageOperatorAsks(rows []operatorAskRow, limit int, after *operatorAskPos) map[string]any {
+	sort.SliceStable(rows, func(i, j int) bool { return askBefore(rows[i], rows[j]) })
+	start := 0
+	if after != nil {
+		at := operatorAskRow{At: after.At, Board: after.Board, Kind: after.Kind, ID: after.ID}
+		start = sort.Search(len(rows), func(i int) bool { return askBefore(at, rows[i]) }) // the first row after the place
+	}
+	end := start + limit
+	out := map[string]any{"asks": []operatorAskRow{}, "total": len(rows), "has_more": false}
+	if end < len(rows) {
+		last := rows[end-1]
+		raw, _ := json.Marshal(operatorAskPos{At: last.At, Board: last.Board, Kind: last.Kind, ID: last.ID})
+		out["has_more"] = true
+		out["next_cursor"] = base64.RawURLEncoding.EncodeToString(raw)
+	} else {
+		end = len(rows)
+	}
+	if start < end {
+		out["asks"] = rows[start:end]
+	}
+	return out
 }
