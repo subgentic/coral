@@ -240,6 +240,9 @@ CREATE TABLE IF NOT EXISTS skills_loaded (
 	PRIMARY KEY (session_id, skill_id)
 );
 
+-- RecordSkillLoad's age sweep reads by last_at on every load: an index, so it is a range scan and not a walk of the table.
+CREATE INDEX IF NOT EXISTS idx_skills_loaded_last_at ON skills_loaded(last_at);
+
 CREATE TABLE IF NOT EXISTS skills_refused (
 	digest TEXT PRIMARY KEY,
 	at     TEXT NOT NULL,
