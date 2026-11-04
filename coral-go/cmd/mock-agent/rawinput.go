@@ -395,10 +395,10 @@ func runRawInput(dir, sessionID, settingsFile string, turn func(string)) {
 			}
 			switch kind {
 			case "permission_request": // the tool call's request, then the notification that follows it, as Claude Code sends them
-				hooks.fire("PermissionRequest", map[string]any{"tool_name": "Bash", "tool_use_id": "toolu_mock_" + name, "tool_input": map[string]any{"command": loadPromptCfg().Permission.Command, "description": loadPromptCfg().Permission.Description}})
+				hooks.fire("PermissionRequest", map[string]any{"tool_name": "Bash", "tool_use_id": "toolu_mock_" + name, "tool_input": loadPromptCfg().permissionRequestInput()})
 				hooks.fire("Notification", map[string]any{"notification_type": "permission_prompt", "message": "Claude needs your permission to use Bash"})
 			case "question_request": // Claude's AskUserQuestion: a permission request of the tool, as Coral reads a question (#10168)
-				hooks.fire("PermissionRequest", map[string]any{"tool_name": "AskUserQuestion", "tool_use_id": "toolu_mock_q_" + name, "tool_input": map[string]any{"questions": []any{map[string]any{"header": loadPromptCfg().Question.Header, "multiSelect": false, "question": loadPromptCfg().Question.Question, "options": loadPromptCfg().questionOptions()}}}})
+				hooks.fire("PermissionRequest", map[string]any{"tool_name": "AskUserQuestion", "tool_use_id": "toolu_mock_q_" + name, "tool_input": loadPromptCfg().questionRequestInput()})
 			case "question_answered":
 				hooks.fire("PostToolUse", map[string]any{"tool_name": "AskUserQuestion", "tool_use_id": "toolu_mock_q_" + name, "tool_response": map[string]any{"answers": map[string]any{loadPromptCfg().Question.Question: loadPromptCfg().Question.Options[0].Label}}})
 				hooks.fire("Stop", map[string]any{"stop_hook_active": false})

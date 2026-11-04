@@ -99,3 +99,12 @@ func (c promptCfg) questionOptions() []any {
 	}
 	return out
 }
+
+// permissionRequestInput and questionRequestInput are the tool_input of the PermissionRequest hooks the mock fires for MOCK_ASK_PERMISSION and MOCK_ASK_QUESTION.
+func (c promptCfg) permissionRequestInput() map[string]any {
+	return map[string]any{"command": c.Permission.Command, "description": c.Permission.Description}
+}
+
+func (c promptCfg) questionRequestInput() map[string]any {
+	return map[string]any{"questions": []any{map[string]any{"header": c.Question.Header, "multiSelect": false, "question": c.Question.Question, "options": c.questionOptions()}}}
+}

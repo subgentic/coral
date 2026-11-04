@@ -384,6 +384,9 @@ func short(id string) string {
 func printOneShot(in io.Reader, out io.Writer) {
 	prompt, _ := io.ReadAll(io.LimitReader(in, 1<<20))
 	result := "Mock agent goal"
+	if g := strings.TrimSpace(os.Getenv("MOCK_AGENT_GOAL")); g != "" { // MOCK_AGENT_GOAL: the goal text a one-shot gives when there is no latest request (the demo film shows it on a hover card)
+		result = g
+	}
 	if _, rest, ok := strings.Cut(string(prompt), "LATEST USER REQUEST:\n"); ok {
 		if line, _, _ := strings.Cut(rest, "\n"); strings.TrimSpace(line) != "" {
 			result = strings.TrimSpace(line)
