@@ -152,6 +152,13 @@ func TestRefreshFilesPausesASlowFolderAndRefreshRunsOnePass(t *testing.T) {
 	var passes atomic.Int64
 	refreshComputeHook = func() { passes.Add(1) }
 	t.Cleanup(func() { refreshComputeHook = func() {} })
+	// A pass that takes longer than refreshReuseOver (git on Windows often does) is shared with the next ordinary refresh for as long as it took (refreshFlight.do), so the passes this test counts would
+	// be answered from that stored result: it forgets the stored results after each answer, to count each pass the page asks for.
+	forgetRecent := func() {
+		refreshFlights.mu.Lock()
+		clear(refreshFlights.recent)
+		refreshFlights.mu.Unlock()
+	}
 	post := func(query string) map[string]any {
 		t.Helper()
 		req, _ := http.NewRequest("POST", server.URL+"/api/sessions/live/"+name+"/files/refresh"+query, bytes.NewBufferString(`{"session_id":"`+sid+`"}`))
@@ -160,6 +167,7 @@ func TestRefreshFilesPausesASlowFolderAndRefreshRunsOnePass(t *testing.T) {
 		defer resp.Body.Close()
 		var out map[string]any
 		require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
+		forgetRecent()
 		return out
 	}
 
@@ -222,6 +230,10 @@ func TestServerStaysResponsiveWhileA35kFileRepoIsRefreshed(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(repo, "README.md"), []byte("hi\n"), 0o644))
 	git("add", "-A")
 	git("commit", "-qm", "init")
+	// Listing 35,000 modified files takes git longer than the pass's 10 s on a slow Windows disk: the pass then answers with nothing (git ended), which is not what this test measures. It gets room.
+	oldTimeout := refreshGitTimeout
+	refreshGitTimeout = 3 * time.Minute
+	t.Cleanup(func() { refreshGitTimeout = oldTimeout })
 	const n = 35000
 	write := func(content string) {
 		for d := 0; d < 350; d++ {
