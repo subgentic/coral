@@ -322,7 +322,7 @@ function render() {
         ? (_editing === _open ? `<section class="servers-page" id="server-row-${escHtml(_open)}" tabindex="-1" data-id="${escHtml(_open)}">${back}${formHtml()}</section>` : pageHtml(page))
         : `${many && _editing === null ? topBar : ''}
             ${table}
-            ${!remotes.length && !_loadError ? `<p class="empty-state empty-state-tight">${serversFiltered() ? 'No computers match this search.' : 'No remote computers yet.'}</p>` : ''}
+            ${!remotes.length && !_loadError ? `<p class="empty-state empty-state-tight">${serversFiltered() ? 'No computers match this search.' : 'No computers connected yet. Add one to see its agents here.'}</p>` : ''}
             ${_editing !== null ? formHtml() : many ? '' : '<div class="servers-form-actions"><button type="button" class="btn" data-action="ssh-setup">Set up over SSH</button><button type="button" class="btn btn-primary" data-action="add">Add computer</button></div>'}`;
     m.innerHTML = `${_open && page ? '' : '<div class="servers-intro"><p class="servers-intro-line">Computers whose agents and teams appear in this hub.</p><details class="servers-intro-more"><summary>About API keys</summary><p>The hub stores each computer\'s API key (encrypted); a key grants full control of that computer.</p></details></div>'}
             ${_loadError ? `<div class="servers-form-error" role="alert">${escHtml(_loadError)}</div>` : ''}
