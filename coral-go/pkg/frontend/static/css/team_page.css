@@ -263,6 +263,9 @@
 @media (max-width: 760px) {
     .goal-back-row > .phone-title-row { flex: 1 1 100%; min-width: 0; padding-block: 8px; }
     .goal-back-row .phone-title-row > .goals-detail-title { white-space: normal; overflow: visible; text-overflow: clip; } /* the goal's title is the page's content: it wraps and is read whole, not cut to one line with dots */
+    .goal-back-row.goal-head-phone .phone-title-row > .goals-detail-title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; } /* a goal's title is two lines at most on a phone (#13119, the Operator: three lines was clutter); the whole title is its tooltip and the goal's own text is below */
+    .goal-head-phone > .goal-head-actions { flex: 1 1 100%; justify-content: flex-start; margin-left: 0; } /* the one button and More under the title, from the left, not a wrapped row at the right */
+    .goal-head-actions .task-more-btn { min-height: 44px; }
 }
 @media (max-width: 760px) {
     .inbox-goal-page > .view-list { display: block; padding: 12px 16px 0; }

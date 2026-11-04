@@ -6,6 +6,7 @@ import { OPERATOR_ID, copyText, showToast } from './utils.js';
 import { whenText } from './when_text.js';
 import { toTaskPage, toGoal, errorOf } from './goals_adapter.js';
 import { importOnce } from './import_once.js';
+import { isPhoneLayout } from './phone_layout.js';
 const { agentLink } = await importOnce('./agent_link.js'); // an agent's name is one shared helper (#12182)
 import { foldWayBack } from './way_back.js';
 import * as W from './goal_words.js';
@@ -23,6 +24,7 @@ const linkedDd = (text, server, checklist = true) => { // checklist: false where
     return d;
 }; // a coral://artifacts/<hex> in a goal's words is a link (#11416)
 const { openDetailPane, closeDetailPane } = await importOnce('./detail_pane.js'); // the one shared pane (#8914): a goal's task or artifact opens in it, beside the list
+const { moreMenu } = await importOnce('./more_menu.js'); // lazy: its failure is retried (the shared More menu, #13119)
 const DT = await importOnce('./data_table.js');
 const { el } = DT;
 const TV = await importOnce('./tasks_view.js');
@@ -145,35 +147,43 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         }
         // Add task and Close goal (Reopen for a closed one), at the top right of the page's header
         const acts = el('div', 'goal-head-actions');
-        acts.append(btn('btn goals-add-task', 'Add task', () => { (window.showCreateTaskModal || (() => {}))({ project: model.project, goal_id: g.id, onCreated: loadGoals }); }));
-        // A goal that looks done has its item in Needs you with Close goal, Not yet and Dismiss; its page offers the first two too (#12248): Not yet hides the item until a task is added
+        // On a phone the header keeps ONE button and a More menu with the rest (#13119, the Operator: "very cluttered"; the same rule as the task page's bar, #9076). The primary is Close goal for a goal that looks done
+        // and for a closed one Reopen, otherwise Add task; Copy for an agent is in the menu too, not wedged into the driver line.
+        const phone = isPhoneLayout();
         const sp = splitKey(model.project);
+        const act = [];  // { key, cls, label, aria, title, run, primary }
+        act.push({ key: 'add', cls: 'btn goals-add-task', label: 'Add task', run: () => { (window.showCreateTaskModal || (() => {}))({ project: model.project, goal_id: g.id, onCreated: loadGoals }); } });
+        // A goal that looks done has its item in Needs you with Close goal, Not yet and Dismiss; its page offers the first two too (#12248): Not yet hides the item until a task is added
         if (looksDone(g) && sp.server === LOCAL_SERVER && !hiddenList().some(e => e === `${sp.name}|${g.id}|${W.allTasksOf(g.rollup)}` || e === `${sp.name}|${g.id}|*`)) {
-            const ny = btn('btn goals-not-yet', 'Not yet', async () => {
-                ny.disabled = true;
+            act.push({ key: 'notyet', cls: 'btn goals-not-yet', label: 'Not yet', aria: `Not yet: ${g.title}`, title: 'Hide this goal\'s item from Needs you until a task is added', run: async () => {
+                const ny = acts.querySelector('.goals-not-yet'); if (ny) ny.disabled = true;
                 try {
                     const undo = await hideGoalDone(sp.name, g, 'not-yet');
-                    ny.remove(); // the item is gone from Needs you, so the choice is too; Undo puts both back
-                    showToast('Hidden from Needs you until a task is added', false, 30000, { action: { label: 'Undo', onClick: async () => { try { await undo(); ny.disabled = false; acts.append(ny); } catch { /* it stays hidden */ } } } });
-                } catch (e) { ny.disabled = false; showToast(`Not saved: ${e && e.message ? e.message : 'try again'}`, true); }
-            });
-            ny.title = 'Hide this goal\'s item from Needs you until a task is added';
-            ny.setAttribute('aria-label', `Not yet: ${g.title}`);
-            acts.append(ny);
+                    if (ny) ny.remove(); // the item is gone from Needs you, so the choice is too; Undo puts both back
+                    showToast('Hidden from Needs you until a task is added', false, 30000, { action: { label: 'Undo', onClick: async () => { try { await undo(); if (phone) loadGoals(); else if (ny) { ny.disabled = false; acts.append(ny); } } catch { /* it stays hidden */ } } } });
+                } catch (e) { if (ny) ny.disabled = false; showToast(`Not saved: ${e && e.message ? e.message : 'try again'}`, true); }
+            } });
         }
         if (W.isOpenGoal(g) && sp.server === LOCAL_SERVER) { // the Operator's own two changes, made on this computer's server (#12693)
-            const dv = btn('btn goals-change-driver', 'Change driver', () => importOnce('./goal_operator_dialogs.js').then(m => m.openChangeDriver({ project: sp.name, goal: g, onClose: () => dv.focus(),
-                onDone: async driver => { say(driver ? `Driver changed to ${driver}` : 'Driver cleared'); showToast(driver ? `Driver changed to ${driver}` : 'Driver cleared'); await loadGoals(); } })));
-            dv.setAttribute('aria-label', `Change driver: ${g.title}`);
-            const mv = btn('btn goals-move', 'Move to another team', () => importOnce('./goal_operator_dialogs.js').then(m => m.openMoveGoal({ project: sp.name, goal: g, openTasks: W.openTasksOf(g.rollup), onClose: () => mv.focus(),
-                onMoved: async (out, label) => { showToast(`Goal given to ${label} as goal #${out.goal.id}`); closeGoal(); await loadGoals(); } })));
-            mv.setAttribute('aria-label', `Move to another team: ${g.title}`);
-            acts.append(dv, mv);
+            act.push({ key: 'driver', cls: 'btn goals-change-driver', label: 'Change driver', aria: `Change driver: ${g.title}`, run: () => importOnce('./goal_operator_dialogs.js').then(m => m.openChangeDriver({ project: sp.name, goal: g, onClose: () => (acts.querySelector('.goals-change-driver') || main.querySelector('.goals-back'))?.focus(),
+                onDone: async driver => { say(driver ? `Driver changed to ${driver}` : 'Driver cleared'); showToast(driver ? `Driver changed to ${driver}` : 'Driver cleared'); await loadGoals(); } })) });
+            act.push({ key: 'move', cls: 'btn goals-move', label: 'Move to another team', aria: `Move to another team: ${g.title}`, run: () => importOnce('./goal_operator_dialogs.js').then(m => m.openMoveGoal({ project: sp.name, goal: g, openTasks: W.openTasksOf(g.rollup), onClose: () => (acts.querySelector('.goals-move') || main.querySelector('.goals-back'))?.focus(),
+                onMoved: async (out, label) => { showToast(`Goal given to ${label} as goal #${out.goal.id}`); closeGoal(); await loadGoals(); } })) });
         }
-        if (W.isOpenGoal(g)) { const cb = btn('btn btn-primary goals-close', 'Close goal', () => openClose(g)); cb.setAttribute('aria-label', `Close goal: ${g.title}`); acts.append(cb); } // named for its goal: the Close dialog's own button is just Close goal
-        else if (W.isClosedGoal(g)) acts.append(btn('btn goals-reopen', 'Reopen', () => reopenGoal(g)));
+        if (W.isOpenGoal(g)) act.push({ key: 'close', cls: 'btn btn-primary goals-close', label: 'Close goal', aria: `Close goal: ${g.title}`, run: () => openClose(g) }); // named for its goal: the Close dialog's own button is just Close goal
+        else if (W.isClosedGoal(g)) act.push({ key: 'reopen', cls: 'btn goals-reopen', label: 'Reopen', run: () => reopenGoal(g) });
+        const makeBtn = a => { const b = btn(a.cls, a.label, a.run); if (a.aria) b.setAttribute('aria-label', a.aria); if (a.title) b.title = a.title; return b; };
+        if (!phone) { for (const k of ['add', 'notyet', 'driver', 'move', 'close', 'reopen']) { const a = act.find(x => x.key === k); if (a) acts.append(makeBtn(a)); } }
+        else {
+            const primaryKey = act.some(a => a.key === 'reopen') ? 'reopen' : (act.some(a => a.key === 'notyet') ? 'close' : 'add'); // a goal that looks done: Close goal; otherwise the commonest, Add task
+            const primary = act.find(a => a.key === primaryKey); if (primary.key === 'add') primary.cls = 'btn btn-primary goals-add-task';
+            acts.append(makeBtn(primary));
+            const menuItems = [...act.filter(a => a !== primary && a.key !== 'close'), { key: 'copy', cls: 'goal-copy-agent', label: 'Copy for an agent', title: 'Copies a line to paste to an agent: it runs coral-board goal brief for this goal', run: () => { copyText(W.agentBriefLine(g)).then(ok => showToast(ok ? 'Copied: paste it to an agent' : 'Could not copy', !ok)); } }];
+            const closeItem = act.find(a => a.key === 'close' && a !== primary); if (closeItem) menuItems.push(closeItem);
+            acts.append(moreMenu(`goal-more-${g.id}`, menuItems.map(a => ({ label: a.label, title: a.title, ariaLabel: a.aria, className: a.cls.replace(/^btn( btn-primary)? ?/, ''), run: a.run })), { label: 'More goal actions' }));
+        }
         row.append(acts); main.append(row);
-        const h = el('h2', 'goals-detail-title', g.title); h.tabIndex = -1; h.id = 'goals-detail-title';
+        const h = el('h2', 'goals-detail-title', g.title); h.tabIndex = -1; if (phone) { h.title = g.title; row.classList.add('goal-head-phone'); } h.id = 'goals-detail-title';
         row.append(h); // the title is in the header row: a phone puts the back beside it and the link and actions under (team_page.css), as on the task page
         foldWayBack(main, '.goals-back', '.goals-detail-title');
         const line = el('div', 'goals-detail-line'); line.append(stateChip(g));
@@ -181,7 +191,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         // A small quiet button at the end of the detail line (#11004, Goal #153): copies one line to paste to an agent, which then runs `coral-board goal brief` to read the goal's open tasks and artifacts
         const copyBtn = btn('btn btn-small goal-copy-agent', 'Copy for an agent', () => { copyText(W.agentBriefLine(g)).then(ok => showToast(ok ? 'Copied: paste it to an agent' : 'Could not copy', !ok)); });
         copyBtn.title = 'Copies a line to paste to an agent: it runs coral-board goal brief for this goal';
-        line.append(copyBtn);
+        if (!phone) line.append(copyBtn); // on a phone it is in the header's More menu (#13119)
         main.append(line);
         const waitNote = el('p', 'goals-note goal-reviews-waiting'); waitNote.hidden = true; main.append(waitNote); // files for review on this goal that were never answered (Beta #11837 G): said while any wait, whatever the goal's state
         paintWaiting(g, waitNote);
