@@ -46,8 +46,12 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await ev(`document.documentElement.style.fontSize = '100%'; true`);
         // the same rows are as tall at 390 with the icon as without it: a review row's file name stays on its first line (#13144, UI Reviewer)
         await ev(framesJs(6));
-        const tall = await ev(`(() => [...document.querySelectorAll('${T} tbody tr')].map(tr => { const i = tr.querySelector('.inbox-kind-icon'); if (!i) return null; const h = () => Math.round(tr.getBoundingClientRect().height * 100) / 100, w = h(); i.style.display = 'none'; const wo = h(); i.style.display = ''; return { text: tr.textContent.replace(/\\s+/g, ' ').slice(0, 30), withIcon: w, without: wo }; }).filter(Boolean))()`);
-        for (const r of tall) check(Math.abs(r.withIcon - r.without) < 0.5, `390 px: a row keeps its height with the icon (${r.withIcon} with, ${r.without} without): ${r.text}`);
+        const tall = await ev(`(() => [...document.querySelectorAll('${T} tbody tr')].map(tr => { const i = tr.querySelector('.inbox-kind-icon'); if (!i) return null; const h = () => Math.round(tr.getBoundingClientRect().height * 100) / 100, w = h(); i.style.display = 'none'; const wo = h(); i.style.display = ''; const nm = tr.querySelector('.inbox-review-name, .dt-subtitle'); return { kind: i.dataset.kind, line: (nm && parseFloat(getComputedStyle(nm).lineHeight)) || 20, text: tr.textContent.replace(/\\s+/g, ' ').slice(0, 30), withIcon: w, without: wo }; }).filter(Boolean))()`);
+        // a question's name may take two lines on a phone by design (#11894), so an icon that takes width can push a title near the wrap point onto its second line: a question row may be at most ONE line taller (a runaway change still fails); every other kind keeps its height exactly
+        for (const r of tall) {
+            const room = r.kind === 'other' ? r.line + 1 : 0.5;
+            check(r.withIcon >= r.without - 0.5 && r.withIcon - r.without < room, `390 px: a ${r.kind} row keeps its height with the icon${r.kind === 'other' ? ' (a question: at most one more line)' : ''} (${r.withIcon} with, ${r.without} without): ${r.text}`);
+        }
         const { themeJs } = require('./helpers/theme');
         for (const theme of ['dark', 'light']) {
             await ev(`${themeJs(theme)}; true`); await ev(framesJs(8));
