@@ -687,6 +687,14 @@ async function clearOrigin(shard) {
     for (const t of targetInfos) {
       if (t.type === 'page' && t.targetId !== targetId) await bounded(client.send('Target.closeTarget', { targetId: t.targetId }), 'Target.closeTarget').catch(() => {});
     }
+    // A closed tab can still be listed for a moment, and a suite that picks its page from the list (or connects with CDP({port}), which takes the first one) could get it (#13332): wait,
+    // bounded, until the fresh tab is the only page; say so when it is not, so a leftover is a line in the run and not a mystery in a server log.
+    let pages = [];
+    for (const end = Date.now() + 5000; ; await sleep(50)) {
+      pages = (await bounded(client.send('Target.getTargets'), 'Target.getTargets')).targetInfos.filter(t => t.type === 'page');
+      if (pages.length === 1 || Date.now() > end) break;
+    }
+    if (pages.length !== 1) console.log(`  [runner] shard ${shard.n}: ${pages.length} pages are still open after the clean-up (${pages.map(t => (t.url || '').split('?')[0].slice(0, 60)).join(', ')})`);
     // Chrome answers 'Internal error' to this on the browser target, so it is sent through a page session
     // (the fresh tab: the call clears the named origin, not the page's own).
     const { sessionId } = await bounded(client.send('Target.attachToTarget', { targetId, flatten: true }), 'Target.attachToTarget');

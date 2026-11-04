@@ -432,6 +432,7 @@ async function run() {
     const audit3 = auditRouting(t3.requests, { agent_type: 'terminal', session_id: sid, name: aname, tmux_session: `terminal-${sid}` });
     check('30 cross-profile viewer also sends only the exact tuple', audit3.length === 0, JSON.stringify(audit3.slice(0, 3)));
     await t3.close();
+    { const b = await browserClient(); await b.Target.disposeBrowserContext({ browserContextId: ctx }).catch(() => {}); await b.close(); } // the context step 30 made goes with its tab (#13332)
 
     // 33: the resolver must derive state exactly like the list row. It used to
     // treat ANY trailing notification as "waiting for input", and the popout
