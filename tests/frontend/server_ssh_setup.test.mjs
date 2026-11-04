@@ -377,4 +377,62 @@ for (const [phase, word] of [['done', /Done/], ['failed', /did not|could not|Cou
     assert.deepEqual(runBody, { backend: 'pty' }, 'port 8420 is the default and is not sent');
 }
 
+// ── the host-key confirmation is its own gate: no field's validity, redraw or correction can open Set up while the box is unticked (#13081, UI Reviewer's MUST) ──
+for (const field of ['dataDir', 'port']) {
+    for (const order of ['untick-then-fix', 'fix-then-untick']) {
+        hub({ keys: [{ host: 'box.example.com', type: 'ssh-ed25519', fingerprint: 'SHA256:abc' }] });
+        const host = fresh();
+        mountSshSetup(host, { mode: 'setup', pollMs: 5 });
+        await until(() => $(host, '#ssh-picked'), 'the form');
+        $(host, '#ssh-host').value = 'user@box.example.com'; $(host, '#ssh-host').dispatchEvent(new dom.window.Event('input'));
+        $(host, 'form').dispatchEvent(new dom.window.Event('submit', { cancelable: true }));
+        await until(() => btn(host, 'Connect'), 'the plan');
+        btn(host, 'Connect').click();
+        await until(() => $(host, '#ssh-keys-ok'), 'the host keys');
+        const id = field === 'port' ? '#ssh-port-input' : '#ssh-datadir-input';
+        const bad = field === 'port' ? '80' : '../x', good = field === 'port' ? '8461' : '.coral';
+        const type = (v) => { const i = $(host, id); i.value = v; i.dispatchEvent(new dom.window.Event('input')); };
+        const box = () => $(host, '#ssh-keys-ok');
+        const label = `${field}, ${order}: `;
+        assert.equal(btn(host, 'Set up').disabled, true, label + 'closed until the keys are confirmed');
+        type(bad);
+        if (order === 'untick-then-fix') { box().click(); box().click(); } // ticked, then unticked: each is a redraw while the field is invalid
+        else { box().click(); }          // ticked while the field is invalid
+        type(good);
+        if (order === 'fix-then-untick') box().click(); // unticked after the field became valid
+        assert.equal(box().checked, false, label + 'the box is unticked');
+        assert.equal(btn(host, 'Set up').disabled, true, label + 'Set up stays closed with the box unticked, whatever the field did');
+        btn(host, 'Set up').click(); // even a click that reaches run() sends nothing
+        await new Promise(r => setTimeout(r, 30));
+        assert.equal(runBody, null, label + 'nothing was sent without the confirmation');
+        box().click();
+        assert.equal(btn(host, 'Set up').disabled, false, label + 'ticked and valid: open');
+        type(bad);
+        assert.equal(btn(host, 'Set up').disabled, true, label + 'ticked but invalid: closed again');
+        type(good);
+        btn(host, 'Set up').click();
+        await until(() => runBody, 'the run');
+        assert.equal(runBody.accept_keys, true, label + 'the confirmation is sent once the box is ticked and the field valid');
+    }
+}
+// both fields together: fixing one does not open a gate the other holds
+{
+    hub({ keys: [{ host: 'box.example.com', type: 'ssh-ed25519', fingerprint: 'SHA256:abc' }] });
+    const host = fresh();
+    mountSshSetup(host, { mode: 'setup', pollMs: 5 });
+    await until(() => $(host, '#ssh-picked'), 'the form');
+    $(host, '#ssh-host').value = 'user@box.example.com'; $(host, '#ssh-host').dispatchEvent(new dom.window.Event('input'));
+    $(host, 'form').dispatchEvent(new dom.window.Event('submit', { cancelable: true }));
+    await until(() => btn(host, 'Connect'), 'the plan');
+    btn(host, 'Connect').click();
+    await until(() => $(host, '#ssh-keys-ok'), 'the host keys');
+    const type = (id, v) => { const i = $(host, id); i.value = v; i.dispatchEvent(new dom.window.Event('input')); };
+    $(host, '#ssh-keys-ok').click();
+    type('#ssh-datadir-input', '../x'); type('#ssh-port-input', '80');
+    type('#ssh-port-input', '8461');
+    assert.equal(btn(host, 'Set up').disabled, true, 'the folder is still invalid: closed');
+    type('#ssh-datadir-input', '.coral');
+    assert.equal(btn(host, 'Set up').disabled, false, 'both valid and the keys confirmed: open');
+}
+
 console.log('server_ssh_setup: ok');
