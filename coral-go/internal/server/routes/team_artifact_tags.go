@@ -234,10 +234,11 @@ func (h *BoardHandler) askerUploaded(session, id string) bool {
 	return ok
 }
 
-// hubArtifactTags is the tags of a write that came through Coral Hub (#12742, #13117), judged against the list the server holds, never the client's word for what is there. The tags of a file are this computer's: a Hub
-// write may only ADD or REMOVE "read" (the Hub passes this computer's read mark through). Any other difference from the stored list, a tag added or a tag removed, is refused and nothing is stored. The request is a set:
-// the same tags in another order, or a repeat of the stored list, changes nothing, and what is stored keeps its order ("read" goes on the end). Marking a file read is never refused for the five-tag count, since it adds
-// nothing else. The local rule (1 to 24 letters, digits, spaces or hyphens) still holds for every tag in the request.
+// hubArtifactTags is the tags of a write that came through Coral Hub (#12742, #13117, #13450), judged against the list the server holds, never the client's word for what is there. The tags of a file are this computer's:
+// a Hub write, which is the owner's alone (the route refuses anyone else before this runs), may only ADD or REMOVE one of THREE fixed marks, "read" (the file was opened), "saved" and "ignored" (the owner's Save and Ignore in
+// the Needs you table drawn on the Hub). Any other difference from the stored list, a tag added or a tag removed, is refused and nothing is stored: a stored tag the write does not name is never dropped. The request is a set:
+// the same tags in another order, or a repeat of the stored list, changes nothing, and what is stored keeps its order (the marks added go on the end, in the order read, saved, ignored). Marking a file read adds nothing else
+// and is never refused for the five-tag count; adding "saved" or "ignored" is (a sixth tag is refused). The local rule (1 to 24 letters, digits, spaces or hyphens) still holds for every tag in the request.
 func (h *BoardHandler) hubArtifactTags(ctx context.Context, project, id string, raw []string) ([]string, error) {
 	want := map[string]bool{}
 	for _, r := range raw {
@@ -257,26 +258,46 @@ func (h *BoardHandler) hubArtifactTags(ctx context.Context, project, id string, 
 		had[t] = true
 	}
 	for t := range want {
-		if !had[t] && t != hubMarkTag {
-			return nil, fmt.Errorf("%w: through Coral Hub only the tag %q can be added or removed, and %q is not on this file", board.ErrArtifactTag, hubMarkTag, t)
+		if !had[t] && !hubMarkTags[t] {
+			return nil, fmt.Errorf("%w: through Coral Hub only the tags %s can be added or removed, and %q is not on this file", board.ErrArtifactTag, hubMarkList, t)
 		}
 	}
 	for t := range had {
-		if !want[t] && t != hubMarkTag {
-			return nil, fmt.Errorf("%w: through Coral Hub only the tag %q can be added or removed, and %q is on this file", board.ErrArtifactTag, hubMarkTag, t)
+		if !want[t] && !hubMarkTags[t] {
+			return nil, fmt.Errorf("%w: through Coral Hub only the tags %s can be added or removed, and %q is on this file", board.ErrArtifactTag, hubMarkList, t)
 		}
 	}
-	out := make([]string, 0, len(stored)+1)
+	out := make([]string, 0, len(stored)+len(hubMarkOrder))
 	for _, t := range stored {
-		if t != hubMarkTag || want[t] {
+		if !hubMarkTags[t] || want[t] {
 			out = append(out, t)
 		}
 	}
-	if want[hubMarkTag] && !had[hubMarkTag] {
-		out = append(out, hubMarkTag)
+	// the marks that are in the write and were not on the file, appended in a fixed order
+	addedChoice := false
+	for _, m := range hubMarkOrder {
+		if want[m] && !had[m] {
+			out = append(out, m)
+			if m != hubMarkRead {
+				addedChoice = true
+			}
+		}
+	}
+	if addedChoice && len(out) > board.MaxArtifactTags {
+		return nil, fmt.Errorf("%w: at most %d tags on an artifact", board.ErrArtifactTag, board.MaxArtifactTags)
 	}
 	return out, nil
 }
 
-// hubMarkTag is the one tag a write through Coral Hub may add or remove: the file was opened (#13117).
-const hubMarkTag = "read"
+// The marks a write through Coral Hub may add or remove (#13117, #13450): the file was opened, the owner saved it, the owner put it away. A fixed list, never free text.
+const (
+	hubMarkRead    = "read"
+	hubMarkSaved   = "saved"
+	hubMarkIgnored = "ignored"
+	hubMarkList    = `"read", "saved" and "ignored"`
+)
+
+var (
+	hubMarkOrder = []string{hubMarkRead, hubMarkSaved, hubMarkIgnored}
+	hubMarkTags  = map[string]bool{hubMarkRead: true, hubMarkSaved: true, hubMarkIgnored: true}
+)
