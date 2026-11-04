@@ -9,6 +9,7 @@
 // model (default claude-opus-5-5), so stress and soak runs read real transcripts.
 // MOCK_AGENT_REPLY_DELAY=<seconds> keeps each turn's prompt in the transcript at once and writes the reply after the delay (a slow first answer); MOCK_AGENT_EXIT_ON_INPUT=1 makes it die
 // when it is first asked something, before any reply (#6050).
+// MOCK_AGENT_QUIET=1 (quiet.go, #13180) prints none of the "[mock-agent] ..." lines to the terminal (ids, port, transcript path), only a plain banner; unset, nothing changes.
 // MOCK_AGENT_MODELS=1 (models_reply.go, #13180) answers Coral's model query (stream-json initialize) with a model list, so the New agent dialog shows models; unset, nothing changes.
 // MOCK_AGENT_REPLIES=<file> (replies.go, #13180) scripts the answers: a JSON array of {when, text, tool}, matched by a keyword in the prompt or in order; unset, the answers are the canned ones.
 // MOCK_AGENT_READY=1 (ready.go, #10010) is a CLI that is up and waiting: the input box, the first hook event and a canned reply in the transcript for each message.
@@ -157,7 +158,7 @@ func main() {
 	}
 
 	// Log startup
-	fmt.Fprintf(os.Stderr, "[mock-agent] started session_id=%s session_name=%s board=%s port=%s\n",
+	sayErrf("[mock-agent] started session_id=%s session_name=%s board=%s port=%s\n",
 		short(sessionID), sessionName, boardName, port)
 
 	// Post an introduction
@@ -169,17 +170,17 @@ func main() {
 	var tr *transcript
 	if writeTranscript {
 		if tr = newTranscript(sessionID, model); tr != nil {
-			fmt.Fprintf(os.Stderr, "[mock-agent] writing a transcript: %s\n", tr.path)
+			sayErrf("[mock-agent] writing a transcript: %s\n", tr.path)
 		}
 	}
 	turn := func(prompt string) {
 		// MOCK_AGENT_EXIT_ON_INPUT=1: a CLI that dies when it is first asked something, before any reply (the person sees the prompt go and nothing come back).
 		if os.Getenv("MOCK_AGENT_EXIT_ON_INPUT") == "1" && prompt != "ready" {
-			fmt.Fprintf(os.Stderr, "[mock-agent] exiting on input, no reply\n")
+			sayErrf("[mock-agent] exiting on input, no reply\n")
 			os.Exit(1)
 		}
 		if err := tr.Turn(prompt); err != nil {
-			fmt.Fprintf(os.Stderr, "[mock-agent] transcript: %v\n", err)
+			sayErrf("[mock-agent] transcript: %v\n", err)
 		}
 	}
 
@@ -194,7 +195,7 @@ func main() {
 		sc := bufio.NewScanner(os.Stdin)
 		sc.Buffer(make([]byte, 64*1024), 1024*1024)
 		for sc.Scan() {
-			fmt.Printf("[mock-agent] input: %s\n", sc.Text())
+			sayf("[mock-agent] input: %s\n", sc.Text())
 			turn(sc.Text())
 		}
 	}()
@@ -211,7 +212,7 @@ func main() {
 			turn("ready")
 		}
 		<-sig
-		fmt.Fprintf(os.Stderr, "[mock-agent] shutting down session=%s\n", short(sessionID))
+		sayErrf("[mock-agent] shutting down session=%s\n", short(sessionID))
 		return
 	}
 
@@ -222,14 +223,14 @@ func main() {
 	for {
 		select {
 		case <-sig:
-			fmt.Fprintf(os.Stderr, "[mock-agent] shutting down session=%s\n", short(sessionID))
+			sayErrf("[mock-agent] shutting down session=%s\n", short(sessionID))
 			return
 		case <-ticker.C:
 			count++
 			// Read messages (exercises the read path)
 			if boardName != "" {
 				msgs := readMessages(baseURL, boardName)
-				fmt.Fprintf(os.Stderr, "[mock-agent] heartbeat #%d board=%s msgs=%d\n", count, boardName, msgs)
+				sayErrf("[mock-agent] heartbeat #%d board=%s msgs=%d\n", count, boardName, msgs)
 			}
 			// Post a heartbeat every 3rd tick
 			if boardName != "" && count%3 == 0 {
@@ -306,7 +307,7 @@ func post(baseURL, board, sessionName, message string) {
 		cmd := exec.Command(cb, "post", "--broadcast", message) // the stand-in has no one to tell: the operator's opt-out (#11441)
 		cmd.Env = append(os.Environ(), "CORAL_URL="+baseURL)
 		if out, err := cmd.CombinedOutput(); err != nil {
-			fmt.Fprintf(os.Stderr, "[mock-agent] coral-board post failed: %v %s\n", err, out)
+			sayErrf("[mock-agent] coral-board post failed: %v %s\n", err, out)
 		}
 		return
 	}

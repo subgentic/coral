@@ -64,7 +64,7 @@ func applyReadyMode(writeTranscript bool) bool {
 		os.Setenv("MOCK_AGENT_IDLE", "1")
 	}
 	if !readyTranscriptSafe() {
-		fmt.Fprintln(os.Stderr, "[mock-agent] ready mode: no transcript is written: HOME is not under a temp folder and CLAUDE_PROJECTS_DIR is not set, so it would go to the real ~/.claude/projects. Start the server with its own HOME under /tmp, or set CLAUDE_PROJECTS_DIR.")
+		sayErrln("[mock-agent] ready mode: no transcript is written: HOME is not under a temp folder and CLAUDE_PROJECTS_DIR is not set, so it would go to the real ~/.claude/projects. Start the server with its own HOME under /tmp, or set CLAUDE_PROJECTS_DIR.")
 		return writeTranscript
 	}
 	return true
@@ -106,7 +106,7 @@ func applyControl(box *inputBox, line string) (handled, waiting bool) {
 			secs = 3600 // an hour at most: a number that overflows a Duration is not a wait
 		}
 		box.busyFor = time.Duration(secs * float64(time.Second))
-		fmt.Printf("\r\n[mock-agent] working for %gs\r\n", secs)
+		sayf("\r\n[mock-agent] working for %gs\r\n", secs)
 		return true, true
 	}
 	switch line {
@@ -130,15 +130,15 @@ func applyControl(box *inputBox, line string) (handled, waiting bool) {
 		return true, true
 	case "MOCK_STUCK_ENTER":
 		box.noSubmit = true
-		fmt.Print("\r\n[mock-agent] Enter no longer submits\r\n")
+		say("\r\n[mock-agent] Enter no longer submits\r\n")
 		return true, false
 	case "MOCK_EXIT":
-		fmt.Print("\r\n[mock-agent] exiting on request\r\n")
+		say("\r\n[mock-agent] exiting on request\r\n")
 		time.Sleep(300 * time.Millisecond) // the line's UserPromptSubmit hook is on its way: let it go first
 		exitNow(0)
 		return true, false
 	case "MOCK_GO_DEAF":
-		fmt.Print("\r\n[mock-agent] not reading input any more\r\n")
+		say("\r\n[mock-agent] not reading input any more\r\n")
 		box.deaf = true
 		return true, false
 	}

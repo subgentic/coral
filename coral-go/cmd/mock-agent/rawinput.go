@@ -115,7 +115,7 @@ func (b *inputBox) holdIfBusy(line string) bool {
 		return false
 	}
 	t.queue = append(t.queue, line)
-	fmt.Printf("[mock-agent] queued (sends when the turn ends): %q\r\n", line)
+	sayf("[mock-agent] queued (sends when the turn ends): %q\r\n", line)
 	return true
 }
 
@@ -216,12 +216,12 @@ func (b *inputBox) feed(data []byte, submit func(string)) {
 			switch c {
 			case '\r':
 				answer := b.typed.String()
-				fmt.Printf("\r\n[mock-agent] PROMPT ANSWERED by text: %q\r\n", answer)
+				sayf("\r\n[mock-agent] PROMPT ANSWERED by text: %q\r\n", answer)
 				b.promptOpen, b.question, b.textOption, b.typing = false, false, false, false
 				b.typed.Reset()
 				b.tell("question_answered_text\x00" + answer)
 			case 0x1b:
-				fmt.Print("\r\n[mock-agent] prompt dismissed\r\n")
+				say("\r\n[mock-agent] prompt dismissed\r\n")
 				b.promptOpen, b.question, b.textOption, b.typing = false, false, false, false
 				b.typed.Reset()
 				b.tell("permission_dismissed")
@@ -244,9 +244,9 @@ func (b *inputBox) feed(data []byte, submit func(string)) {
 			switch c {
 			case '\r', '1', '2', '3', '4', '5', '6', '7', '8', '9': // Enter takes the marked option; a digit takes that option, as the CLI's menus do (the dashboard's answer buttons send the digit)
 				if c == '\r' {
-					fmt.Print("\r\n[mock-agent] PROMPT ANSWERED by an Enter (option 1)\r\n")
+					say("\r\n[mock-agent] PROMPT ANSWERED by an Enter (option 1)\r\n")
 				} else {
-					fmt.Printf("\r\n[mock-agent] PROMPT ANSWERED by a digit (option %c)\r\n", c)
+					sayf("\r\n[mock-agent] PROMPT ANSWERED by a digit (option %c)\r\n", c)
 				}
 				b.promptOpen, b.textOption = false, false
 				if b.question {
@@ -256,7 +256,7 @@ func (b *inputBox) feed(data []byte, submit func(string)) {
 					b.tell("permission_answered")
 				}
 			case 0x1b:
-				fmt.Print("\r\n[mock-agent] prompt dismissed\r\n")
+				say("\r\n[mock-agent] prompt dismissed\r\n")
 				b.promptOpen, b.question, b.textOption = false, false, false
 				b.tell("permission_dismissed")
 			}
@@ -268,7 +268,7 @@ func (b *inputBox) feed(data []byte, submit func(string)) {
 			s := b.text.String()
 			b.text.Reset()
 			b.pasted = false
-			fmt.Printf("\r\x1b[K[mock-agent] raw: %q\r\n", s)
+			sayf("\r\x1b[K[mock-agent] raw: %q\r\n", s)
 			if b.holdIfBusy(s) { // the agent is working: the line waits for the turn's end (#10672)
 				continue
 			}
@@ -357,7 +357,7 @@ func runRawInput(dir, sessionID, settingsFile string, turn func(string)) {
 		if old, err := term.MakeRaw(int(os.Stdin.Fd())); err == nil {
 			defer term.Restore(int(os.Stdin.Fd()), old)
 		} else {
-			fmt.Fprintf(os.Stderr, "[mock-agent] raw mode: %v\r\n", err)
+			sayErrf("[mock-agent] raw mode: %v\r\n", err)
 		}
 	}
 	if os.Getenv("MOCK_AGENT_BRACKETED_PASTE") != "0" {
@@ -369,11 +369,14 @@ func runRawInput(dir, sessionID, settingsFile string, turn func(string)) {
 	}
 	f, err := os.OpenFile(filepath.Join(dir, name+".raw"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "[mock-agent] raw log: %v\r\n", err)
+		sayErrf("[mock-agent] raw log: %v\r\n", err)
 		return
 	}
 	defer f.Close()
-	fmt.Print("[mock-agent] raw input ready\r\n")
+	say("[mock-agent] raw input ready\r\n")
+	if quietMode() {
+		fmt.Print(quietBanner)
+	}
 	if d := startDelay(); d > 0 { // a CLI that takes its time to come up (#10299): no first event and no input box until then
 		time.Sleep(d)
 	}

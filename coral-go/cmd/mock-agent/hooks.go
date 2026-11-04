@@ -15,7 +15,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"os"
 	"os/exec"
 	"strings"
@@ -108,7 +107,7 @@ func (h *hookRunner) fire(event string, extra map[string]any) {
 		cmd := exec.CommandContext(ctx, words[0], words[1:]...)
 		cmd.Stdin = bytes.NewReader(payload)
 		if out, err := cmd.CombinedOutput(); err != nil {
-			fmt.Fprintf(os.Stderr, "[mock-agent] %s hook failed: %v %s\r\n", event, err, bytes.TrimSpace(out))
+			sayErrf("[mock-agent] %s hook failed: %v %s\r\n", event, err, bytes.TrimSpace(out))
 		}
 		cancel()
 	}
