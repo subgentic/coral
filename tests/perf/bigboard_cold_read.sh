@@ -4,7 +4,7 @@
 #   PERF_RUN=1 FIXTURE=<bigboard fixture> OUT=<empty folder> [BIN=<a coral build>] [SECONDS_PROFILE=8] bash tests/perf/bigboard_cold_read.sh
 #
 # Starts the plain build (or BIN) on a COPY of FIXTURE/data (own port 8746, pprof 8747, mock-agent sandbox, --cloud-url off), starts a CPU profile, then makes the page's first
-# calls once each, timed: the board's artifacts list (cold), team-artifacts, the board's tasks, then the same artifacts list again (warm). OUT gets cold.pb.gz (read it with
+# calls once each, timed: the board's artifacts list (cold), team-artifacts, the board's own tasks (/api/board/<id>/tasks), all boards' tasks, then the same artifacts list again (warm). OUT gets cold.pb.gz (read it with
 # `go tool pprof -top -cum OUT/cold.pb.gz`), reads.txt (route, HTTP status, seconds, bytes) and the server log. Kills only its own server.
 set -uo pipefail
 export CORAL_TELEMETRY_DISABLED=1
@@ -30,6 +30,6 @@ get() { curl -s -m 120 -o /tmp/bb-cold.$$ -w "$1 %{http_code} %{time_total}s %{s
 echo "server up; board $BOARD; the first call comes right after the profile starts" | tee "$OUT/reads.txt"
 curl -s -m $((SECS + 30)) -o "$OUT/cold.pb.gz" "http://127.0.0.1:$PPORT/debug/pprof/profile?seconds=$SECS" &
 PROF=$!; sleep 1
-{ get "/api/board/$BOARD/artifacts"; get "/api/team-artifacts"; get "/api/board/tasks"; get "/api/board/$BOARD/artifacts"; get "/api/board/$BOARD/artifacts?limit=50"; } | tee -a "$OUT/reads.txt"
+{ get "/api/board/$BOARD/artifacts"; get "/api/team-artifacts"; get "/api/board/$BOARD/tasks"; get "/api/board/tasks"; get "/api/board/$BOARD/artifacts"; get "/api/board/$BOARD/artifacts?limit=50"; } | tee -a "$OUT/reads.txt"
 wait "$PROF"; rm -f /tmp/bb-cold.$$
 ls -la "$OUT/cold.pb.gz" | awk '{print "profile bytes", $5}' | tee -a "$OUT/reads.txt"
