@@ -4,6 +4,7 @@ package main
 
 import (
 	"encoding/json"
+	"os"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -16,7 +17,8 @@ func runDownloadScript(t *testing.T, node, pageURL, href, download, mode string,
 	t.Helper()
 	harness := `
 const page = new URL(process.argv[1]);
-const [href, download, mode, haveNative, cd, size] = [process.argv[3], process.argv[4], process.argv[5], process.argv[6] === 'true', process.argv[7], process.argv[8]];
+const [href, download, mode, haveNative, size] = [process.argv[3], process.argv[4], process.argv[5], process.argv[6] === 'true', process.argv[7]];
+const cd = process.env.CORAL_TEST_DISPOSITION;
 global.location = { href: page.href, origin: page.origin };
 class Anchor { constructor() { this.tagName = 'A'; this.href = new URL(href, page).href; } hasAttribute(n) { return n === 'download' && download !== '-'; } getAttribute(n) { return n === 'download' && download !== '' ? download : (n === 'download' ? '' : null); } click() { this.passed = true; } }
 global.HTMLAnchorElement = Anchor;
@@ -36,7 +38,11 @@ eval(process.argv[2]);
   await new Promise(r => setTimeout(r, 30));
   console.log(JSON.stringify({ saved, prevented, passed: !!a.passed, told }));
 })();`
-	out, err := exec.Command(node, "-e", harness, pageURL, downloadInterceptScript, href, download, mode, map[bool]string{true: "true", false: "false"}[haveNative], disposition, strconv.Itoa(size)).CombinedOutput()
+	// The Content-Disposition header goes through the environment, not the command line: a header with double quotes (filename="report.md") is mangled by Windows command-line
+	// quoting on some runs (#13225, saved=[] for exactly the cases with quotes), and an environment value is not parsed.
+	cmd := exec.Command(node, "-e", harness, pageURL, downloadInterceptScript, href, download, mode, map[bool]string{true: "true", false: "false"}[haveNative], strconv.Itoa(size))
+	cmd.Env = append(os.Environ(), "CORAL_TEST_DISPOSITION="+disposition)
+	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("node: %v\n%s", err, out)
 	}
@@ -81,9 +87,9 @@ func TestDownloadInterceptScript(t *testing.T) {
 		{"attachment", strings.Repeat("ab", 32)},
 		{"-", strings.Repeat("ab", 32)},
 	} {
-		saved, _, _, _ = runDownloadScript(t, node, page, hash, "", "script", true, c.header, 10)
+		saved, _, _, told := runDownloadScript(t, node, page, hash, "", "script", true, c.header, 10)
 		if len(saved) != 1 || !strings.HasPrefix(saved[0], c.want+":") {
-			t.Errorf("Content-Disposition %q: saved=%v, want the name %q", c.header, saved, c.want)
+			t.Errorf("Content-Disposition %q: saved=%v told=%v, want the name %q", c.header, saved, told, c.want)
 		}
 	}
 	// the link's own download name wins over the server's
