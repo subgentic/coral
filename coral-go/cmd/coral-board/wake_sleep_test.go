@@ -64,3 +64,27 @@ func TestWakeAndSleepNeedAMemberAndSayTheServersRefusal(t *testing.T) {
 		assert.Empty(t, res.stdout, "nothing is said to have happened")
 	}
 }
+
+// QA Reviewer 2's SHOULD on #13224 (#13285): the member's name is one escaped path segment: a space is %20, a slash is %2F (it is not a second segment). The name the server answers with is cleaned before it is printed.
+func TestWakeEscapesTheMemberNameInThePathAndCleansTheNameItPrints(t *testing.T) {
+	var uris []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Path == "/api/health" {
+			_, _ = w.Write([]byte(`{"status":"ok","version":"test"}`))
+			return
+		}
+		uris = append(uris, r.RequestURI)
+		_, _ = w.Write([]byte(`{"ok":true,"woke":"Dev\u001b[31m A"}`))
+	}))
+	defer srv.Close()
+	gs := &goalServer{Server: srv, reply: map[string]string{}}
+	res := goalRun(t, gs, "wake", "Dev A")
+	require.Equal(t, 0, res.code, res.stderr)
+	assert.NotContains(t, res.stdout, "\x1b", "the server's name is cleaned before it reaches the terminal")
+	res = goalRun(t, gs, "sleep", "Dev/Ops")
+	require.Equal(t, 0, res.code, res.stderr)
+	require.Len(t, uris, 2)
+	assert.Equal(t, "/api/board/team/agents/Dev%20A/wake", uris[0])
+	assert.Equal(t, "/api/board/team/agents/Dev%2FOps/sleep", uris[1], "a slash is not a second path segment")
+}

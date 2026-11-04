@@ -99,3 +99,17 @@ func TestAPostNeverAsksAboutThePosterTheOperatorOrAll(t *testing.T) {
 	require.Len(t, notes, 1)
 	assert.Equal(t, "Dev", notes[0]["name"])
 }
+
+// Security's INFO a on #13224 (#13285): the suggested command is shell-quoted, not Go-quoted: a member name may hold $, a backtick, a double or a single quote inside it, and a copy of the sentence must run nothing. The text is
+// pinned for the plain name too.
+func TestTheSuggestedWakeCommandIsQuotedForAShell(t *testing.T) {
+	assert.Equal(t, "'Dev A'", shellQuote("Dev A"))
+	assert.Equal(t, "'a$(touch x)b'", shellQuote("a$(touch x)b"), "no expansion inside single quotes")
+	assert.Equal(t, "'x`id`y'", shellQuote("x`id`y"))
+	assert.Equal(t, `'say "hi"'`, shellQuote(`say "hi"`))
+	assert.Equal(t, `'it'\''s'`, shellQuote("it's"), "a single quote is closed, escaped and reopened")
+	assert.Equal(t, "'Dev/Ops'", shellQuote("Dev/Ops"))
+	assert.Equal(t, "Dev A is asleep; the message waits until it wakes. The Operator's wake grant is on, so you may wake it: coral-board wake 'Dev A'.",
+		restSentence("Dev A", restAsleep, true), "the notice's own text is pinned")
+	assert.Equal(t, "Dev A is asleep; the message waits until it wakes.", restSentence("Dev A", restAsleep, false), "no hint for a worker")
+}

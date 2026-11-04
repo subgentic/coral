@@ -2,7 +2,6 @@ package routes
 
 import (
 	"context"
-	"strconv"
 	"strings"
 
 	"github.com/subgentic/coral/internal/board"
@@ -72,7 +71,7 @@ func restSentence(name, state string, mayWake bool) string {
 	default:
 		s = name + " is asleep; the message waits until it wakes."
 		if mayWake {
-			s += " The Operator's wake grant is on, so you may wake it: coral-board wake " + strconv.Quote(name) + "."
+			s += " The Operator's wake grant is on, so you may wake it: coral-board wake " + shellQuote(name) + "."
 		}
 	}
 	return s
@@ -105,4 +104,10 @@ func (h *BoardHandler) postRestNotes(ctx context.Context, project, poster string
 		out = append(out, map[string]any{"name": name, "state": state, "note": restSentence(name, state, mayWake && state == restAsleep)})
 	}
 	return out
+}
+
+// shellQuote is name as one word of a POSIX shell: in single quotes, a single quote in it written '\”. A member name may hold $, a backtick or a double quote inside it (only its ends are checked), and a
+// sentence that suggests a command must not make a copy of it run anything (#13285). Go's own quoting is not a shell's.
+func shellQuote(name string) string {
+	return "'" + strings.ReplaceAll(name, "'", `'\''`) + "'"
 }

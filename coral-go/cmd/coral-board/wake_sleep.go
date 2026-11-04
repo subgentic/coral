@@ -10,6 +10,7 @@ import (
 
 	"github.com/subgentic/coral/internal/clierr"
 	"github.com/subgentic/coral/internal/clihelp"
+	"github.com/subgentic/coral/internal/clitext"
 )
 
 // coral-board wake <member> and coral-board sleep <member> (#13224): the board's Orchestrator wakes an agent that is asleep, or puts an awake one to sleep, with the Operator's grant (Team settings, the Orchestrator's
@@ -76,6 +77,7 @@ func cmdWakeSleep(sleep bool) {
 			break
 		}
 	}
+	who = clitext.Clean(who) // the server cleans names; what reaches the terminal is cleaned here too, so it does not depend on that (#13285)
 	if sleep {
 		fmt.Printf("Put %s to sleep.\n", who)
 		return
