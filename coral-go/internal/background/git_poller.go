@@ -2,6 +2,7 @@
 package background
 
 import (
+	"bufio"
 	"context"
 	"crypto/sha256"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -553,6 +555,54 @@ func statusEntries(out []byte) []statusEntry {
 	return entries
 }
 
+// untrackedFolderFileLimit bounds how many files of untracked folders are listed in one pass: past the stored cap nobody reads them, and a folder of build output can hold millions.
+const untrackedFolderFileLimit = maxChangedFiles + 1
+
+// expandUntrackedFolders replaces each untracked folder git status names ('gen/', status normal shows a folder whole) with the files in it that are not ignored, so 3,000 new files are
+// 3,000 entries and not one 'gen/' (#13079). One ls-files call for all the folders, read until the limit.
+func expandUntrackedFolders(ctx context.Context, workdir string, entries []statusEntry) []statusEntry {
+	var dirs []string
+	for _, e := range entries {
+		if e.code == "??" && strings.HasSuffix(e.path, "/") {
+			dirs = append(dirs, e.path)
+		}
+	}
+	if len(dirs) == 0 {
+		return entries
+	}
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	cmd := gitutil.Command(ctx, workdir, append([]string{"ls-files", "--others", "--exclude-standard", "-z", "--"}, dirs...)...)
+	pipe, err := cmd.StdoutPipe()
+	if err != nil || cmd.Start() != nil {
+		return entries
+	}
+	var files []string
+	rd := bufio.NewReader(pipe)
+	for len(files) < untrackedFolderFileLimit {
+		rec, err := rd.ReadString(0)
+		if len(rec) > 1 {
+			files = append(files, strings.TrimSuffix(rec, "\x00"))
+		}
+		if err != nil {
+			break
+		}
+	}
+	cancel()
+	_ = cmd.Wait()
+	out := make([]statusEntry, 0, len(entries)+len(files))
+	for _, e := range entries {
+		if e.code == "??" && strings.HasSuffix(e.path, "/") {
+			continue
+		}
+		out = append(out, e)
+	}
+	for _, f := range files {
+		out = append(out, statusEntry{code: "??", path: f})
+	}
+	return out
+}
+
 // queryChangedFiles runs its own status; the poller passes the one queryGit ran instead
 // (queryChangedFilesFrom).
 func queryChangedFiles(ctx context.Context, workdir string) ([]store.ChangedFile, error) {
@@ -632,6 +682,7 @@ func queryChangedFilesFrom(ctx context.Context, workdir, mode string, status []b
 		return nil, fmt.Errorf("git status --porcelain: %w", statusErr)
 	}
 	if entries := statusEntries(status); withTree && len(entries) > 0 { // the last commit alone has no working-tree status or new files
+		entries = expandUntrackedFolders(ctx, workdir, entries)
 		// New files' line counts are read inside the working tree, held open once per pass.
 		countRoot, rootErr := safefs.OpenRoot(workdir)
 		if rootErr != nil {
@@ -683,6 +734,8 @@ func queryChangedFilesFrom(ctx context.Context, workdir, mode string, status []b
 	for _, f := range fileMap {
 		files = append(files, f)
 	}
+	// By name, always: the list is cut at maxChangedFiles and hashed in this order, so a map's random order kept a different 2000 files on every pass and rewrote them each time (#13079).
+	sort.Slice(files, func(i, j int) bool { return files[i].Filepath < files[j].Filepath })
 
 	if len(files) > 5000 {
 		logger.Warn("large changed file set", "file_count", len(files), "base", base)
