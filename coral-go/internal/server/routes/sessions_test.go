@@ -386,6 +386,20 @@ func (m *mockSessionTerminal) setOutput(name, output string) {
 	m.outputs[name] = output
 }
 
+// sentToSession are the commands sent to one session (recorded under its name or under name.pane), in the order they were sent. sentCommands flattens a map, so its order is random: a test that needs
+// "the second launch's command" asks for the session (#13556).
+func (m *mockSessionTerminal) sentToSession(name string) []string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	var commands []string
+	for key, cmds := range m.sent {
+		if key == name || strings.HasPrefix(key, name+".") {
+			commands = append(commands, cmds...)
+		}
+	}
+	return commands
+}
+
 func (m *mockSessionTerminal) sentCommands() []string {
 	m.mu.Lock()
 	defer m.mu.Unlock()
