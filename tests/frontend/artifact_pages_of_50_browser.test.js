@@ -39,6 +39,9 @@ const hexOf = i => String(i + 1).padStart(64, 'a').replace(/^a+/, m => m.replace
             const found = await ev(`(async () => { const M = await import(${S} + 'inbox_reviews.js'); await M.refreshReviews(true); const names = M.reviewItems().map(a => a.name), sv = M.savedFiles().map(a => a.name); return { n: names.length, distinct: new Set(names).size, saved: sv.length, savedDistinct: new Set(sv).size }; })()`);
             assert.deepEqual(found, { n: N, distinct: N, saved: N, savedDistinct: N }, `${mode} computer: the scan finds all ${N} files for review and all ${N} saved files, each once: ${JSON.stringify(found)}`);
             const sizes = await ev(`window.__calls.filter(c => /tag=for/.test(c)).length`);
+            const asked = await ev(`window.__calls.map(c => (/limit=(\\d+)/.exec(c) || [])[1])`);
+            assert.ok(asked.length > 0 && asked.every(l => l === '200'), `${mode} computer: every page is asked for 200 (the old walk's size; asking for 50 made the first read of a 10,000-file board four times the requests): ${JSON.stringify(asked)}`);
+            if (mode === 'old') assert.equal(sizes, 1, `an older computer answers the 200 asked: 130 files are one read of for review, not ${sizes}`);
             if (mode === 'new') assert.ok(sizes >= 3, `a computer of 50 a page took ${sizes} reads of for review for 130 files`);
             assert.ok(sizes <= 6, `${mode} computer: the walk ended, no page was asked for again and again: ${sizes} reads of for review`);
             const state = await ev(`(async () => { const R = await import(${S} + 'artifact_review.js'); const s = await R.reviewStateOf('t1', '${'0'.repeat(61)}120'); return s ? s.state : null; })()`);
