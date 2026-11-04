@@ -151,3 +151,19 @@ export function agentBriefLine(goal) {
 export const waitingReviewsHead = n => `${n} ${n === 1 ? 'file' : 'files'} for review on this goal ${n === 1 ? 'is' : 'are'} still waiting for you.`;
 export const waitingReviewsStay = n => `${n === 1 ? 'It stays' : 'They stay'} in Needs you after the goal is closed.`;
 export const waitingReviewsLine = n => `${n} ${n === 1 ? 'file' : 'files'} for this goal ${n === 1 ? 'is' : 'are'} waiting for your review.`;
+
+/** What the Hub's goal preview says, by its word (#13503, coral-hub's contract): one plain sentence for each, in the editor's own error line. The word is the Hub's (`{error: word}`); the sentence is ours. */
+export const PREVIEW_WORDS = {
+    preview_required: 'The Hub needs to check this change first, and the check did not go with it. Try again.',
+    preview_invalid: 'This was not the change the Hub checked, so nothing was changed. Try again.',
+    preview_expired: 'The Hub\'s check of this change ran out. Try again.',
+    preview_used: 'This change was already made.',
+    outcome_unknown: 'The computer restarted before this was sent, so nothing was changed. Refresh the list and try again.',
+    mode_too_low: 'Coral Hub\'s access to this computer is below Interact, so nothing was changed. The owner of the computer can raise it.',
+    bad_request: 'The Hub did not accept this change. Check the text and try again.',
+    busy: 'The Hub is busy with other changes. Try again in half a minute.',
+    too_many_requests: 'Too many changes in a minute. Try again in half a minute.',
+    preview_unavailable: 'This computer has not finished starting, so the Hub cannot check changes yet. Try again in a moment.',
+    unreachable: 'The Hub cannot reach this computer right now. Try again in a moment.',
+    too_large: 'That text is too long for the Hub to check.',
+};

@@ -2,6 +2,7 @@
 import { loadStyles } from './lazy_styles.js';
 import { openTask } from './task_navigation.js';
 import { boardFetch, keyLabel, serverUrl, splitKey, remoteServer, LOCAL_SERVER } from './server_base.js';
+const { goalWrite } = await importOnce('./goal_write.js'); // a goal close or update is previewed first when the Hub asks for it (#13503)
 import { OPERATOR_ID, copyText, showToast } from './utils.js';
 import { whenText } from './when_text.js';
 import { toTaskPage, toGoal, errorOf } from './goals_adapter.js';
@@ -460,7 +461,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
 
     async function reopenGoal(g) {
         try {
-            const r = await boardFetch(model.project, `/goals/${g.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: OPERATOR_ID, state: 'active' }) });
+            const r = await goalWrite(model.project, 'goal_update', g.id, `/goals/${g.id}`, 'PATCH', { subscriber_id: OPERATOR_ID, state: 'active' });
             if (!r.ok) throw await failure(r);
             say(W.reopenedText);
             await loadGoals();
@@ -503,7 +504,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
             const as = form.querySelector('input[name="goal-close-state"]:checked')?.value === 'dropped' ? 'dropped' : 'done';
             const why = reason.value.trim() || W.closeReasonDefault(as); // the server needs one line; a person is not made to write it
             try {
-                const r = await boardFetch(model.project, `/goals/${g.id}/close`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: OPERATOR_ID, reason: why, state: as }) });
+                const r = await goalWrite(model.project, 'goal_close', g.id, `/goals/${g.id}/close`, 'POST', { subscriber_id: OPERATOR_ID, reason: why, state: as });
                 if (!r.ok) throw await failure(r);
                 dlg.close();
                 say(W.closedAsText(as, open));

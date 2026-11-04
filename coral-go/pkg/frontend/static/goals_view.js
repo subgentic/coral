@@ -5,6 +5,7 @@
 import { loadStyles } from './lazy_styles.js';
 import { state } from './state.js';
 import { boardFetch, splitKey, LOCAL_SERVER } from './server_base.js';
+const { goalWrite } = await importOnce('./goal_write.js'); // a goal close is previewed first when the Hub asks for it (#13503)
 import { OPERATOR_ID, showToast } from './utils.js';
 import { onGoalsSeq } from './goals_feed.js';
 import { pollEvery } from './overload.js';
@@ -117,7 +118,7 @@ function goalBulkActions() {
             if (model.bulkBusy || !reason) return; model.bulkBusy = true;
             const project = model.project, tableState = goalsTableState; let done = 0, failed = 0;
             for (const g of rows) { try {
-                const r = await boardFetch(project, `/goals/${g.id}/close`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: OPERATOR_ID, state: as, reason }) });
+                const r = await goalWrite(project, 'goal_close', g.id, `/goals/${g.id}/close`, 'POST', { subscriber_id: OPERATOR_ID, state: as, reason });
                 if (!r.ok) throw new Error('Close failed'); tableState.selected.delete(String(g.id)); done++;
             } catch { failed++; } }
             model.bulkBusy = false; showToast(`Closed ${done} goals${failed ? `; ${failed} failed and remain selected` : ''}`, !!failed);
