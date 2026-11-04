@@ -128,4 +128,58 @@ await Promise.all(Array.from({ length: 24 }, () => rl.limited('lane-late', 'GET'
 assert.ok(afterLate.peak() <= rl.MAX_IN_FLIGHT, 'after the late answers the lane still allows 6 at once, not 12: ' + afterLate.peak());
 rl.remoteLimitHooks.holdMs = 30000;
 
+// ── #13379, the #13304 review's SHOULDs: four behaviours no test pinned ──────────────────────────────────────────────────────────────────────────────────────────────
+const within = (promise, ms) => Promise.race([promise.then(() => 'done', () => 'done'), new Promise(r => setTimeout(() => r('stuck'), ms))]); // sleep-ok: a request that must NOT be stuck
+const peakOf = async (n, laneName, sendOf) => { let live = 0, peak = 0; await Promise.all(Array.from({ length: n }, () => rl.limited(laneName, 'GET', null, async () => { live++; peak = Math.max(peak, live); try { return await sendOf(); } finally { live--; } }))); return peak; };
+
+// (a) a send that throws gives its slot back: six network errors must not stall that computer's reads
+reset(); hubCap = 100; rl.remoteLimitHooks.holdMs = 30000; // the hold timer is not what frees them here
+const failing = Array.from({ length: rl.MAX_IN_FLIGHT + 2 }, () => rl.limited('lane-err', 'GET', null, async () => { throw new TypeError('network error'); }));
+const settledAll = Promise.allSettled(failing);
+assert.equal(await within(settledAll, 500), 'done', 'eight network errors in a row all settle: a failed send gives its slot back (with six leaked slots the seventh and eighth would wait forever)');
+const errs = await settledAll;
+assert.ok(errs.every(e => e.status === 'rejected' && e.reason instanceof TypeError), 'each network error reaches its caller, not swallowed');
+assert.equal(await within(rl.limited('lane-err', 'GET', null, async () => new Response('{}', { status: 200 })), 300), 'done', 'after six network errors a read on that computer still runs: the failed sends gave their slots back');
+assert.equal(await peakOf(rl.MAX_IN_FLIGHT, 'lane-err', () => new Promise(r => setTimeout(() => r(new Response('{}')), 10))), rl.MAX_IN_FLIGHT, 'and the lane still allows all 6 at once'); // sleep-ok: a request that takes a moment
+
+// (b) only a 503 is retried: other answers, 5xx included, are the answer on the first send
+for (const status of [500, 502, 504, 429, 404]) {
+    reset(); n = 0;
+    r = await rl.limited('lane-status', 'GET', null, async () => { n++; return new Response('{}', { status }); });
+    assert.equal(r.status, status); assert.equal(n, 1, `a ${status} is not asked again`); assert.equal(slept.length, 0, `and nothing waited for a ${status}`);
+}
+
+// (c) an aborted request leaves the queue
+// c1: already aborted before it is queued: it rejects, is never sent and takes no slot
+reset();
+const gone = new AbortController(); gone.abort();
+let sentAborted = false;
+await assert.rejects(rl.limited('lane-abort', 'GET', gone.signal, async () => { sentAborted = true; return new Response('{}'); }), e => e.name === 'AbortError');
+assert.equal(sentAborted, false, 'a request aborted before it was queued is never sent');
+assert.equal(await peakOf(rl.MAX_IN_FLIGHT, 'lane-abort', () => new Promise(r => setTimeout(() => r(new Response('{}')), 10))), rl.MAX_IN_FLIGHT, 'and it took no slot: all 6 still run together'); // sleep-ok: a request that takes a moment
+// c2: aborted while it waits for its turn: its place in the queue goes with it, so when the others finish the lane is whole again
+reset();
+let freeSix; const gateSix = new Promise(res => { freeSix = res; });
+const sixHeld = Array.from({ length: rl.MAX_IN_FLIGHT }, () => rl.limited('lane-queue', 'GET', null, async () => { await gateSix; return new Response('{}'); }));
+const quitter = new AbortController();
+const quit = rl.limited('lane-queue', 'GET', quitter.signal, async () => new Response('{}'));
+quitter.abort();
+await assert.rejects(quit, e => e.name === 'AbortError');
+freeSix(); await Promise.all(sixHeld);
+assert.equal(await peakOf(rl.MAX_IN_FLIGHT, 'lane-queue', () => new Promise(r => setTimeout(() => r(new Response('{}')), 10))), rl.MAX_IN_FLIGHT, 'the aborted waiter left no hole in the lane: all 6 run together again'); // sleep-ok: a request that takes a moment
+// c3: aborted during the retry wait after a 503: AbortError, and no second send
+reset(); n = 0;
+const midWait = new AbortController();
+rl.remoteLimitHooks.sleep = async ms => { slept.push(ms); midWait.abort(); }; // the person leaves while the retry waits
+await assert.rejects(rl.limited('lane-wait', 'GET', midWait.signal, async () => { n++; return new Response('{}', { status: 503 }); }), e => e.name === 'AbortError');
+assert.equal(n, 1, 'aborted during the retry wait: it is not sent again');
+rl.remoteLimitHooks.sleep = async ms => { slept.push(ms); };
+
+// (d) the same-origin check: only requests to this page's own origin are limited; another origin's /api/remote/ path is none of this limiter's
+reset(); hubCap = 100;
+reset(); await Promise.all(Array.from({ length: 10 }, () => window.fetch('/api/remote/ws-own/api/x'))); const own = peak['ws-own'];
+reset(); await Promise.all(Array.from({ length: 10 }, () => window.fetch('https://elsewhere.test/api/remote/ws-other/api/x'))); const other = peak['ws-other'];
+assert.ok(own <= rl.MAX_IN_FLIGHT, 'this page\'s own /api/remote requests are limited: ' + own);
+assert.equal(other, 10, 'another origin\'s are passed straight through, not limited: ' + other);
+
 console.log('remote_limit: ok');
