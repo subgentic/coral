@@ -109,14 +109,14 @@ type provisionPlan struct {
 	steps         []provisionStep
 	keys          []sshprov.HostKey // held here: what is trusted is THIS, never a key from a request
 	// acceptance is what the far Coral is given on stdin: this hub's own terms version and digest and who. It is made by the server from the hub's own marker, never from the request; nil on a tier that skips the EULA.
-	acceptance []byte
-	system     string
-	created    time.Time
-	cancel     context.CancelFunc
-	failure    string
-	keyChanged bool           // the failure was a host key that no longer matches: the owner may forget the saved one (#12056)
-	ownerVersion string // an approvals plan: the release the far computer runs, whose own `hub-owner-secret` takes the secret
-	forgotten  []provisionKey // the key the owner had Coral forget: shown beside the one the computer presents now, so the two can be compared
+	acceptance   []byte
+	system       string
+	created      time.Time
+	cancel       context.CancelFunc
+	failure      string
+	keyChanged   bool           // the failure was a host key that no longer matches: the owner may forget the saved one (#12056)
+	ownerVersion string         // an approvals plan: the release the far computer runs, whose own `hub-owner-secret` takes the secret
+	forgotten    []provisionKey // the key the owner had Coral forget: shown beside the one the computer presents now, so the two can be compared
 }
 
 const (
@@ -286,13 +286,7 @@ func NewProvisioner(s *store.RemoteServerStore) *Provisioner {
 	pr.checkHealth = pr.realCheckHealth
 	pr.eula = hubEULAState
 	pr.installOwner = func(ctx context.Context, p *provisionPlan, secret string) error {
-		v := pr.version
-		p.mu.Lock()
-		if sshprov.ValidVersion(p.ownerVersion) {
-			v = p.ownerVersion
-		}
-		p.mu.Unlock()
-		return pr.runner.InstallOwnerSecret(ctx, p.Target, v, p.ServerID, secret)
+		return pr.runner.InstallOwnerSecret(ctx, p.Target, pr.ownerFolder(p), p.ServerID, secret)
 	}
 	return pr
 }

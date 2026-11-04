@@ -3,6 +3,8 @@ package routes
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -86,4 +88,27 @@ func TestApprovalsPlanIsNotOfferedForAComputerAddedByURL(t *testing.T) {
 	require.NoError(t, err)
 	code, _ := me.do("POST", "/api/servers/provision/plan", map[string]any{"server_id": "web", "action": "approvals"})
 	assert.Equal(t, 400, code)
+}
+
+// QA Reviewer 2's pins on #13251. The release folder that takes the secret is the one the computer runs, and this hub's own only when that is unknown or not a plain version.
+func TestOwnerFolderIsTheReleaseTheComputerRunsElseThisHubs(t *testing.T) {
+	pr := &Provisioner{version: "2.0.10"}
+	for in, want := range map[string]string{"2.0.9": "2.0.9", "2.0.9-rc.1": "2.0.9-rc.1", "": "2.0.10", "../x": "2.0.10", "2.0.9; rm -rf ~": "2.0.10", "v2": "2.0.10"} {
+		p := &provisionPlan{ownerVersion: in}
+		assert.Equal(t, want, pr.ownerFolder(p), "the far computer answered %q", in)
+	}
+}
+
+// A computer that is not the one that was set up gets nothing: no secret is made, none is installed, none is saved, and the person sees why.
+func TestApprovalsPlanOnAnotherComputerInstallsNothing(t *testing.T) {
+	me := newManageEnv(t)
+	require.NoError(t, os.WriteFile(filepath.Join(me.home, ".coral-server", "instance-id"), []byte("00000000-0000-4000-8000-000000000000\n"), 0o600))
+	_, v := me.plan(t, "approvals", nil)
+	plan := v["plan"].(string)
+	me.connectAndRun(t, plan, map[string]any{}, 202)
+	failed := me.waitPhase(t, plan, "failed")
+	assert.Contains(t, failed["error"], "not the computer that was set up", "the person sees the refusal")
+	assert.Empty(t, me.ownerGiven, "nothing was installed on another computer")
+	_, ok, _ := me.e.h.store.OwnerSecret(context.Background(), "ssh-box")
+	assert.False(t, ok, "and nothing was saved")
 }

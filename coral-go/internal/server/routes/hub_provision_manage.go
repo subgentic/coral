@@ -177,6 +177,16 @@ func (pr *Provisioner) identity(ctx context.Context, p *provisionPlan, row *stor
 	return true
 }
 
+// ownerFolder is the release folder whose own `hub-owner-secret` takes the secret: the release the computer runs when an approvals plan read it (and it is a plain version), else this hub's.
+func (pr *Provisioner) ownerFolder(p *provisionPlan) string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if sshprov.ValidVersion(p.ownerVersion) {
+		return p.ownerVersion
+	}
+	return pr.version
+}
+
 // installOwnerLogged installs the secret and, when that fails, logs why (#13230: an owner install that failed was silent, and the person was left with Send to agent hidden and no way to see why). The exit code and
 // the start of the far computer's stderr go to the hub's log; the person is shown a fixed sentence.
 func (pr *Provisioner) installOwnerLogged(ctx context.Context, p *provisionPlan, secret string) error {
