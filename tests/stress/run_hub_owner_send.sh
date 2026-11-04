@@ -9,7 +9,7 @@
 #   - the person signed in at the hub sends to the remote's agent: the remote's chat shows it as the person's (coral_notice false), not as a Coral reminder;
 #   - a script that holds the hub's API key sends to the same agent: it reaches it, unstamped, and the chat shows it as Coral's (coral_notice true);
 #   - the owner's message over 64 KB gets the hub's clear refusal (413, hub_message_too_long, not_sent) and nothing of it reaches the agent; a script's over-64 KB message goes through whole.
-# It fails on a build from before #13456 (the owner's message shows as a notice, the long one is not refused). Never touches ~/.coral or :8420; E2E_HUB_PORT and E2E_REMOTE_PORT move the
+# Each of these is asserted. It fails on a build from before #13456 (the owner's message shows as a notice, the long one is not refused and reaches the agent). Never touches ~/.coral or :8420; E2E_HUB_PORT and E2E_REMOTE_PORT move the
 # ports; KEEP=1 keeps the temp folder (its logs) after the run.
 set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -122,13 +122,31 @@ log "chat as the remote reads it:"; sed 's/^/[e2e]   /' "$W/chatflags.txt"
 check "the owner's message shows as the person's (not a Coral notice)" 'grep -q "^OWNER coral_notice=False" "$W/chatflags.txt"' "$(cat "$W/chatflags.txt")"
 check "the script's message shows as Coral's (a notice)" 'grep -q "^SCRIPT coral_notice=True" "$W/chatflags.txt"' "$(cat "$W/chatflags.txt")"
 
-# over 64 KB
-BIG=$(python3 -c "print('E2E-BIG-' + 'x' * 70000)")
-OB=$(hperson POST "/api/remote/r1/api/sessions/live/$NAME/send" -d "$(sendbody "$BIG")" -w ' HTTP:%{http_code}')
+# over 64 KB: the owner's is refused whole at the hub (nothing reaches the agent); a script's has no stamp to give and goes through whole
+BIG_OWNER=$(python3 -c "print('E2E-BIG-OWNER-' + 'x' * 70000)")
+BIG_SCRIPT=$(python3 -c "print('E2E-BIG-SCRIPT-' + 'x' * 70000)")
+OB=$(hperson POST "/api/remote/r1/api/sessions/live/$NAME/send" -d "$(sendbody "$BIG_OWNER")" -w ' HTTP:%{http_code}')
 check "the owner's over-64 KB message gets the clear refusal (413 hub_message_too_long, not_sent)" '[[ "$OB" == *"HTTP:413"* && "$OB" == *"hub_message_too_long"* && "$OB" == *"not_sent"* ]]' "${OB:0:300}"
-SB=$(hscript POST "/api/remote/r1/api/sessions/live/$NAME/send" -d "$(sendbody "$BIG")" -w ' HTTP:%{http_code}')
-log "a script's over-64 KB send: ${SB: -40}"
-CAP=$(rapi GET "/api/sessions/live/$NAME/capture?agent_type=claude&session_id=$SID" | jget "d.get('capture') or ''" | tr -d '\n')
-log "owner big message reached the agent's terminal? $([[ "$CAP" == *E2E-BIG-* ]] && echo 'something with E2E-BIG is there (may be the script one)' || echo no)"
+SB=$(hscript POST "/api/remote/r1/api/sessions/live/$NAME/send" -d "$(sendbody "$BIG_SCRIPT")" -w ' HTTP:%{http_code}')
+check "a script's over-64 KB message is accepted through the hub (200, ok)" '[[ "$SB" == *"HTTP:200"* && "$SB" == *"\"ok\":true"* ]]' "${SB: -120}"
+sleep 4 # sleep-ok: the mock agent writes the message into its transcript
+rapi GET "/api/sessions/live/$NAME/chat?session_id=$SID&agent_type=claude&after=0&limit=100" > "$W/chat2.json"
+python3 - "$W/chat2.json" > "$W/bigflags.txt" <<'PYEOF'
+import sys, json
+d = json.load(open(sys.argv[1]))
+owner = script = 0
+script_whole = False
+for m in d.get('messages', []):
+    t = m.get('text') or m.get('content') or ''
+    if not isinstance(t, str): t = json.dumps(t)
+    if 'E2E-BIG-OWNER-' in t: owner += 1
+    if 'E2E-BIG-SCRIPT-' in t:
+        script += 1
+        if t.count('x') >= 70000: script_whole = True
+print('owner_big_in_chat=%d script_big_in_chat=%d script_whole=%s' % (owner, script, script_whole))
+PYEOF
+log "over-64 KB messages in the remote's chat: $(cat "$W/bigflags.txt")"
+check "nothing of the owner's over-64 KB message reached the agent" 'grep -q "owner_big_in_chat=0" "$W/bigflags.txt"' "$(cat "$W/bigflags.txt")"
+check "the script's over-64 KB message reached the agent whole (all 70,000 characters)" 'grep -q "script_big_in_chat=[1-9]" "$W/bigflags.txt" && grep -q "script_whole=True" "$W/bigflags.txt"' "$(cat "$W/bigflags.txt")"
 log "RESULT: $PASS passed, $FAIL failed"
 exit $FAIL
