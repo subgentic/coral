@@ -161,3 +161,89 @@ func TestCappedNumstatInANestedTreeMatchesThePlainCountsForTheRowsKept(t *testin
 		}
 	}
 }
+
+func gitRun(t *testing.T, dir string, args ...string) {
+	t.Helper()
+	out, err := exec.Command("git", append([]string{"-C", dir, "-c", "user.email=a@b", "-c", "user.name=x", "-c", "commit.gpgsign=false"}, args...)...).CombinedOutput()
+	require.NoError(t, err, string(out))
+}
+
+func numstatRows(t *testing.T, out []byte) map[string]string {
+	t.Helper()
+	rows := map[string]string{}
+	for _, rec := range strings.Split(string(out), "\x00") {
+		if parts := strings.SplitN(rec, "\t", 3); len(parts) == 3 && parts[2] != "" {
+			rows[parts[2]] = parts[0] + "\t" + parts[1]
+		}
+	}
+	return rows
+}
+
+// QA Reviewer 2's SHOULDs on 825be2245 (#13181), the mutants that survived: names are taken literally (a name that reads as a glob is itself, and matches nothing else), a rename above the cap is a delete and an add (not a
+// rename record the reader cannot place), and a long list of names goes in batches that fit a command line.
+func TestCappedNumstatTakesNamesLiterallyAndRenamesAsADeleteAndAnAdd(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.MkdirAll(dir, 0o755))
+	gitRun(t, dir, "init", "-q", ".")
+	for i := 0; i < 30; i++ {
+		require.NoError(t, os.WriteFile(filepath.Join(dir, fmt.Sprintf("f%04d.txt", i)), []byte("base\n"), 0o644))
+	}
+	for _, n := range []string{"[x].txt", "x.txt", "A-old.txt"} { // "[x].txt" is a glob that matches "x.txt"
+		require.NoError(t, os.WriteFile(filepath.Join(dir, n), []byte("base\nbase2\nbase3\n"), 0o644))
+	}
+	gitRun(t, dir, "add", "-A")
+	gitRun(t, dir, "commit", "-qm", "base")
+	for i := 0; i < 30; i++ {
+		require.NoError(t, os.WriteFile(filepath.Join(dir, fmt.Sprintf("f%04d.txt", i)), []byte("base\nmore\n"), 0o644))
+	}
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "[x].txt"), []byte("base\nbase2\nbase3\nchanged\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "x.txt"), []byte("base\nbase2\nbase3\nchanged\nchanged2\n"), 0o644))
+	gitRun(t, dir, "mv", "A-old.txt", "A-new.txt") // a rename: both names are changed paths, and git would pair them
+	ctx := context.Background()
+
+	// limit 10: "A-new.txt", "A-old.txt" and "[x].txt" sort first ("A" and "[" before "f"); "x.txt" is beyond the cut
+	out, more, err := CappedNumstat(ctx, dir, []string{"HEAD"}, 10, true)
+	require.NoError(t, err)
+	rows := numstatRows(t, out)
+	assert.Equal(t, "1\t0", rows["[x].txt"], "the name is itself, taken literally")
+	assert.NotContains(t, rows, "x.txt", "and the glob it reads as does not pull in the file it would match, beyond the cut")
+	assert.Contains(t, rows, "A-old.txt", "a rename above the cap: the old name is a row of its own")
+	assert.Contains(t, rows, "A-new.txt", "and so is the new one")
+	assert.Equal(t, "0\t3", rows["A-old.txt"], "the old file's three lines are gone")
+	assert.Equal(t, "3\t0", rows["A-new.txt"], "and the new one's three are added")
+	assert.Equal(t, 34-10, more, "the rest of the 34 changed names (30 + [x] + x + old + new) are counted, not numbered")
+}
+
+func TestCappedNumstatBatchesALongListOfNamesUnderTheCommandLineLimit(t *testing.T) {
+	dir := t.TempDir()
+	gitRun(t, dir, "init", "-q", ".")
+	long := strings.Repeat("n", 100)
+	var names []string
+	for i := 0; i < 30; i++ {
+		n := fmt.Sprintf("%s-%02d.txt", long, i)
+		names = append(names, n)
+		require.NoError(t, os.WriteFile(filepath.Join(dir, n), []byte("base\n"), 0o644))
+	}
+	gitRun(t, dir, "add", "-A")
+	gitRun(t, dir, "commit", "-qm", "base")
+	for _, n := range names {
+		require.NoError(t, os.WriteFile(filepath.Join(dir, n), []byte("base\nmore\n"), 0o644))
+	}
+	old := numstatArgBytes
+	numstatArgBytes = 1000 // about nine of these names to a command
+	var batches []int
+	numstatBatchHook = func(n int) { batches = append(batches, n) }
+	t.Cleanup(func() { numstatArgBytes = old; numstatBatchHook = func(int) {} })
+	out, more, err := CappedNumstat(context.Background(), dir, []string{"HEAD"}, 25, true)
+	require.NoError(t, err)
+	rows := numstatRows(t, out)
+	assert.Len(t, rows, 25, "every kept name is numbered, across the batches")
+	assert.Equal(t, 5, more)
+	assert.GreaterOrEqual(t, len(batches), 3, "25 names of 103 bytes under a 1,000-byte line are three batches or more, not one")
+	total := 0
+	for _, n := range batches {
+		assert.LessOrEqual(t, n, 10, "no batch is more than fits")
+		total += n
+	}
+	assert.Equal(t, 25, total)
+}
