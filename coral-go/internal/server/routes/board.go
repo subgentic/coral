@@ -217,6 +217,7 @@ func (h *BoardHandler) SetArtifactNudger(n *ClaudeArtifactNudger) { h.artifactNu
 func (h *BoardHandler) SetAutoAttacher(a *AutoAttacher) { h.autoAttach = a }
 
 func (h *BoardHandler) SetTaskArtifactWriter(coralDir string, fn func(context.Context, *board.Task, string) error) {
+	bindArtifactRevisions(coralDir, h.bs)
 	h.coralDir = coralDir
 	h.writeTaskArtifact = fn
 }
@@ -270,6 +271,8 @@ func (h *BoardHandler) persistTaskArtifact(ctx context.Context, task *board.Task
 	}
 	if err := h.writeTaskArtifact(ctx, task, h.taskArtifactPath(task.BoardID, task.ID)); err != nil {
 		slog.Warn("persist task changes artifact failed", "task_id", task.ID, "board", task.BoardID, "error", err)
+	} else if h.bs != nil {
+		h.bs.NoteArtifactsChanged(task.BoardID)
 	}
 }
 

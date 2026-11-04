@@ -47,14 +47,16 @@ const wsListBuildTimeout = 30 * time.Second
 // wsTick is one tick's data for every connection. It is read-only once
 // published: connections only read the maps and encode them.
 type wsTick struct {
-	sessions    []map[string]any  // the coral_update list: local, then remote
-	current     map[string]string // diff key -> serialized entry
-	byKey       map[string]map[string]any
-	servers     []background.RemoteServerStatus
-	hasRemotes  bool
-	serversJSON string
-	activeRuns  []map[string]any
-	runsJSON    string
+	artifactsRev  map[string]uint64
+	artifactsJSON string
+	sessions      []map[string]any  // the coral_update list: local, then remote
+	current       map[string]string // diff key -> serialized entry
+	byKey         map[string]map[string]any
+	servers       []background.RemoteServerStatus
+	hasRemotes    bool
+	serversJSON   string
+	activeRuns    []map[string]any
+	runsJSON      string
 	// The boards' goals briefs (#7116): the boards that have goals, with how many are open and their change counter, and the totals; empty when no board has any (nothing is added to a frame then).
 	goals     map[string]board.GoalsBrief
 	goalsJSON string
@@ -75,19 +77,21 @@ const (
 
 // wsLocalPart is this server's sessions and job runs, serialized.
 type wsLocalPart struct {
-	builtAt    time.Time
-	kickGen    uint64 // wsTickCache.kickGen when the build started
-	hasRemotes bool   // whether entries carry server: "local"
-	err        error
-	sessions   []map[string]any
-	keys       []string // diff key per session; "" is sent but not diffed
-	serialized []string
-	activeRuns []map[string]any
-	runsJSON   string
-	goals      map[string]board.GoalsBrief
-	goalsJSON  string
-	goalEvents map[string][]board.GoalEvent // the window of the boards with goals (#7355)
-	reused     int                          // rows whose serialized form came from the previous tick (#4308)
+	artifactsRev  map[string]uint64
+	artifactsJSON string
+	builtAt       time.Time
+	kickGen       uint64 // wsTickCache.kickGen when the build started
+	hasRemotes    bool   // whether entries carry server: "local"
+	err           error
+	sessions      []map[string]any
+	keys          []string // diff key per session; "" is sent but not diffed
+	serialized    []string
+	activeRuns    []map[string]any
+	runsJSON      string
+	goals         map[string]board.GoalsBrief
+	goalsJSON     string
+	goalEvents    map[string][]board.GoalEvent // the window of the boards with goals (#7355)
+	reused        int                          // rows whose serialized form came from the previous tick (#4308)
 }
 
 // wsRemotePart is the hub's remote view, serialized.
@@ -258,6 +262,11 @@ func (h *SessionsHandler) buildWSLocalPart(r *http.Request, hasRemotes bool, pre
 			p.goalEvents = h.goalEventsFor(ctx, briefs, prev)
 		}
 	}
+	if h.bs != nil {
+		p.artifactsRev = h.bs.ArtifactRevisions()
+		b, _ := json.Marshal(p.artifactsRev)
+		p.artifactsJSON = string(b)
+	}
 	p.builtAt = time.Now()
 	return p
 }
@@ -313,16 +322,18 @@ func (h *SessionsHandler) buildWSRemotePart(gen uint64, genOK bool) *wsRemotePar
 func assembleWSTick(local *wsLocalPart, remote *wsRemotePart) *wsTick {
 	n := len(local.sessions) + len(remote.sessions)
 	t := &wsTick{
-		sessions:    make([]map[string]any, 0, n),
-		current:     make(map[string]string, n),
-		byKey:       make(map[string]map[string]any, n),
-		hasRemotes:  remote.snap.Configured(),
-		activeRuns:  local.activeRuns,
-		runsJSON:    local.runsJSON,
-		serversJSON: remote.serversJSON,
-		goals:       local.goals,
-		goalsJSON:   local.goalsJSON,
-		goalEvents:  local.goalEvents,
+		sessions:      make([]map[string]any, 0, n),
+		current:       make(map[string]string, n),
+		byKey:         make(map[string]map[string]any, n),
+		hasRemotes:    remote.snap.Configured(),
+		activeRuns:    local.activeRuns,
+		runsJSON:      local.runsJSON,
+		serversJSON:   remote.serversJSON,
+		goals:         local.goals,
+		goalsJSON:     local.goalsJSON,
+		goalEvents:    local.goalEvents,
+		artifactsRev:  local.artifactsRev,
+		artifactsJSON: local.artifactsJSON,
 	}
 	for _, g := range local.goals {
 		t.goalsOpen += g.Open

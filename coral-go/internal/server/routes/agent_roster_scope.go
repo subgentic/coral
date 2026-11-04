@@ -119,6 +119,12 @@ func scopeRowsForAgent(rows []map[string]any, ownerSessionID string) []map[strin
 func scopeTickForAgent(tick *wsTick, ownerSessionID string) *wsTick {
 	board := agentBoardOf(tick.sessions, ownerSessionID)
 	t := *tick
+	t.artifactsRev = map[string]uint64{}
+	if n, ok := tick.artifactsRev[board]; ok && board != "" {
+		t.artifactsRev[board] = n
+	}
+	b, _ := json.Marshal(t.artifactsRev)
+	t.artifactsJSON = string(b)
 	t.sessions = make([]map[string]any, 0, len(tick.sessions))
 	copies := make(map[uintptr]map[string]any)
 	dropped := make(map[uintptr]bool) // another server's rows: an agent's socket carries none of them

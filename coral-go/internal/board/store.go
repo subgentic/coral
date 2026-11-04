@@ -24,6 +24,7 @@ import (
 
 // Store provides message board operations with its own SQLite database.
 type Store struct {
+	artifactsRevision       artifactRevisions
 	settingsMu              sync.Mutex                  // the settings changes waiting to be told to a team's Orchestrator (settings_notice.go)
 	settingsPending         map[string]*settingsPending // by board
 	activityMu              sync.Mutex                  // one writer of the Activity record's chain at a time (operator_actions.go)

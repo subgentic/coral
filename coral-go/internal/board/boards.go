@@ -280,6 +280,7 @@ func (s *Store) RenameBoard(ctx context.Context, id, label string) error {
 	if n, _ := res.RowsAffected(); n == 0 {
 		return ErrBoardNotFound
 	}
+	s.NoteArtifactsChanged(id) // aggregate artifact rows carry this label
 	return nil
 }
 

@@ -732,6 +732,9 @@ func (s *Store) completeTaskWithArtifacts(ctx context.Context, project string, t
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
+	if len(artifacts) > 0 {
+		s.NoteArtifactsChanged(project)
+	}
 	s.computeAndStoreTaskCost(ctx, project, taskID)
 	return s.getTaskByID(ctx, project, taskID)
 }

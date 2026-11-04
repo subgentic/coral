@@ -111,6 +111,9 @@ func (h *SessionsHandler) agentReplyArtifactComment(w http.ResponseWriter, r *ht
 		slog.Warn("[artifact comments] agent reply failed", "error", err)
 		errInternalServer(w, "could not save the reply")
 	default:
+		if h.bs != nil {
+			h.bs.NoteAllArtifactsChanged()
+		}
 		slog.Info("[artifact comments] agent replied into an asked thread", "artifact", id, "comment", t.ID, "agent", name, "board", t.Board)
 		writeJSON(w, http.StatusCreated, h.commentView(caller, c, false, false))
 	}

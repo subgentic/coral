@@ -108,6 +108,7 @@ func (h *BoardHandler) ListAllTeamArtifacts(w http.ResponseWriter, r *http.Reque
 		errBadRequest(w, fmt.Sprintf("offset must be an integer between 0 and %d", maxTeamArtifactOffset))
 		return
 	}
+	artifactsRev := h.bs.ArtifactsRevision("")
 	projects, err := h.bs.ListProjects(r.Context())
 	if err != nil {
 		errInternalServer(w, "could not list artifacts")
@@ -170,8 +171,13 @@ func (h *BoardHandler) ListAllTeamArtifacts(w http.ResponseWriter, r *http.Reque
 	if refs == nil {
 		refs = []teamArtifactTeamRef{}
 	}
-	resp := map[string]any{
-		"artifacts": sel.page, "limit": limit, "offset": sel.start, "has_more": sel.hasMore, "truncated": truncated || cut,
+	anchor := ""
+	if len(projects) > 0 {
+		anchor = projects[0].Project
+	}
+	resp := map[string]any{"artifacts_board": anchor,
+		"artifacts_rev": artifactsRev,
+		"artifacts":     sel.page, "limit": limit, "offset": sel.start, "has_more": sel.hasMore, "truncated": truncated || cut,
 		"total": sel.total, "all": all, "teams": refs,
 	}
 	if sel.next != "" {

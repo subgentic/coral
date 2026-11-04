@@ -767,7 +767,7 @@ func (h *BoardHandler) selectTeamArtifacts(r *http.Request, items []teamArtifact
 }
 
 // queryTeamArtifacts answers a query over items (the collected, merged list). It writes the reply.
-func (h *BoardHandler) queryTeamArtifacts(w http.ResponseWriter, r *http.Request, project string, items []teamArtifact, truncated bool, limit, offset int, sessionFilter string, q *teamArtifactQuery) {
+func (h *BoardHandler) queryTeamArtifacts(w http.ResponseWriter, r *http.Request, project string, items []teamArtifact, truncated bool, limit, offset int, sessionFilter string, q *teamArtifactQuery, artifactsRev uint64) {
 	all := len(items)
 	if q != nil && q.collapse {
 		all = len(collapseVersions(items)) // the unfiltered total counts files, not versions (#11700)
@@ -780,7 +780,8 @@ func (h *BoardHandler) queryTeamArtifacts(w http.ResponseWriter, r *http.Request
 	h.addWaitsOnThis(r, project, sel.page)
 	h.attachSeriesVersions(sel.page, project)
 	resp := map[string]any{
-		"project": project, "artifacts": sel.page, "limit": limit, "offset": sel.start,
+		"artifacts_rev": artifactsRev,
+		"project":       project, "artifacts": sel.page, "limit": limit, "offset": sel.start,
 		"has_more": sel.hasMore, "truncated": truncated, "total": sel.total, "all": all,
 	}
 	if sel.next != "" {

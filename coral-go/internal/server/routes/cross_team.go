@@ -422,6 +422,7 @@ func (h *BoardHandler) UpdateBoardSettings(w http.ResponseWriter, r *http.Reques
 			slog.Warn("cross-team: could not log a list edit", "board", project, "error", err)
 		}
 	}
+	h.bs.NoteArtifactsChanged(project)
 	writeJSON(w, http.StatusOK, settings)
 }
 

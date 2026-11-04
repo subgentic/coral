@@ -59,6 +59,7 @@ func (s *Store) SetArtifactQuestion(ctx context.Context, boardID, hex, question,
 		boardID, hex, question, session, at.UTC().Format(time.RFC3339)); err != nil {
 		return false, err
 	}
+	s.NoteArtifactsChanged(boardID)
 	var got string
 	if err := s.db.GetContext(ctx, &got, `SELECT question FROM artifact_questions WHERE board_id = ? AND hex = ?`, boardID, hex); err != nil {
 		return false, err

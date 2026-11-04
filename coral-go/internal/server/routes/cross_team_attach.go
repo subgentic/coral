@@ -310,7 +310,12 @@ func (h *BoardHandler) boardRecordDir(kind, board string) string {
 // writeCrossTeamRecord stores rec as <dir>/<id>.json. A shared row is replaced by a newer send of the
 // same object; a received row is write-once (Security's C1 review (b)): the first receipt's
 // provenance stands, and a later one never rewrites where the file came from.
-func (h *BoardHandler) writeCrossTeamRecord(kind string, rec crossTeamArtifactRecord) error {
+func (h *BoardHandler) writeCrossTeamRecord(kind string, rec crossTeamArtifactRecord) (errOut error) {
+	defer func() {
+		if errOut == nil && h.bs != nil {
+			h.bs.NoteArtifactsChanged(rec.Board)
+		}
+	}()
 	if !objectNameRe.MatchString(rec.ID) { // an id read from a file or a message is a 64-digit hex name before it is joined onto a folder (#5305)
 		return errors.New("not an artifact id")
 	}

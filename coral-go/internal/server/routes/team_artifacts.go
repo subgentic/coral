@@ -182,6 +182,7 @@ func (h *BoardHandler) ListTeamArtifacts(w http.ResponseWriter, r *http.Request)
 		errBadRequest(w, "session_id must be at most 128 characters without control characters")
 		return
 	}
+	artifactsRev := h.bs.ArtifactsRevision(project)
 	items, scanTruncated, err := h.projectArtifactItems(r, project, sessionFilter)
 	if err != nil {
 		errInternalServer(w, "could not list artifacts")
@@ -196,7 +197,7 @@ func (h *BoardHandler) ListTeamArtifacts(w http.ResponseWriter, r *http.Request)
 		}
 	}
 	if tq != nil {
-		h.queryTeamArtifacts(w, r, project, items, scanTruncated, limit, offset, sessionFilter, tq)
+		h.queryTeamArtifacts(w, r, project, items, scanTruncated, limit, offset, sessionFilter, tq, artifactsRev)
 		return
 	}
 	end := offset + limit
@@ -230,7 +231,8 @@ func (h *BoardHandler) ListTeamArtifacts(w http.ResponseWriter, r *http.Request)
 		page = []teamArtifact{}
 	}
 	resp := map[string]any{
-		"project": project, "artifacts": page, "limit": limit, "offset": offset,
+		"artifacts_rev": artifactsRev,
+		"project":       project, "artifacts": page, "limit": limit, "offset": offset,
 		"has_more": hasMore, "truncated": scanTruncated,
 	}
 	if sessionFilter != "" {

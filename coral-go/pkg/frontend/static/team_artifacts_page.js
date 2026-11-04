@@ -1,4 +1,5 @@
-import { serverColumns, serverOf, serverLabel, multipleServers, readInboxArtifacts } from './inbox_servers.js';
+import { artifactRevision, artifactsUnchanged, onArtifactsRev } from './artifacts_feed.js';
+import { serverColumns, serverOf, serverLabel, multipleServers, readInboxArtifacts, inboxArtifactsUnchanged } from './inbox_servers.js';
 import { teamLabel } from './server_status.js';
 import { state } from './state.js';
 /* The team page's Artifacts tab (#7453): the team's artifacts as a table (Name, Type, Size, Task, Created) under the search, Filters and Sort bar the old tab had, and the document in the detail pane. The name opens the pane: the preview, every detail the old
@@ -50,6 +51,13 @@ export function createArtifactsList({ inbox = false } = {}) {
 
     const PAGE = 100;
     const model = { project: '', scope: null, key: '', loaded: false, items: [], hasMore: false, cursor: '', counts: null, truncated: false, loading: false, error: '', loadingMore: false, filters: { ...F.EMPTY }, kept: new Set(), tagCounts: {}, gen: 0, controller: null, teams: [] };
+    let loadedToken = null, loadedKey = '', loadedSnapshot = null, refreshNeeded = false;
+    onArtifactsRev((team, rev, reconnect) => {
+        if (!reconnect && !inbox && team !== model.project) return;
+        if (reconnect) { loadedToken = null; loadedSnapshot = null; }
+        refreshNeeded = true;
+        refreshQuiet();
+    });
     let root = null, hooks = {}, bar = null, barKey = '';
     let pendingBoard = null, labelTimer = null, retryLabels = false;
     function clearPendingBoard() { clearTimeout(labelTimer); labelTimer = null; pendingBoard = null; }
@@ -191,13 +199,14 @@ export function createArtifactsList({ inbox = false } = {}) {
             const matched = Number.isSafeInteger(data.total) ? data.total : model.items.length;
             model.counts = { matched, all: Number.isSafeInteger(data.all) ? Math.max(data.all, matched) : matched, truncated: !!data.truncated };
             if (!append) model.kept = await loadKept();
+            loadedKey = model.key; loadedToken = artifactRevision(data.artifacts_rev); loadedSnapshot = data.artifact_revisions || null;
             model.loaded = true;
             hooks.onCount?.(model.counts.all, false);
         } catch (e) {
             if (gen !== model.gen || e.name === 'AbortError') return;
             model.error = e.message || 'Unable to load artifacts.';
         } finally {
-            if (gen === model.gen) { model.controller = null; model.loading = false; model.loadingMore = false; draw(); }
+            if (gen === model.gen) { model.controller = null; model.loading = false; model.loadingMore = false; draw(); if (refreshNeeded && !reading) queueMicrotask(refreshQuiet); }
         }
     }
 
@@ -227,10 +236,16 @@ export function createArtifactsList({ inbox = false } = {}) {
 
     // The tab keeps itself current (it had a Refresh icon, #7686): when the window comes back to the front and on a slow read while it is on screen; a list the person paged further is left as it is.
     let watching = false, reading = false;
-    function refreshQuiet() {
+    async function refreshQuiet() {
         if (!root || !root.isConnected || !root.getClientRects().length || document.hidden || reading || retryLabels || !model.key || model.loading || model.loadingMore || model.items.length > PAGE) return;
         reading = true;
-        loadArtifacts({ keep: true }).finally(() => { reading = false; });
+        const key = model.key;
+        try {
+            const dirty = refreshNeeded; refreshNeeded = false;
+            const unchanged = !dirty && loadedKey === key && (inbox ? await inboxArtifactsUnchanged(loadedSnapshot) : !(model.scope && model.scope.standalone) && await artifactsUnchanged(model.project, loadedToken));
+            if (key !== model.key) return;
+            if (!unchanged || refreshNeeded) { refreshNeeded = false; await loadArtifacts({ keep: true }); }
+        } finally { reading = false; if (refreshNeeded) refreshQuiet(); }
     }
     function watch() {
         if (watching) return;

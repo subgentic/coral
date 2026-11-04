@@ -142,6 +142,9 @@ func (h *SessionsHandler) runPrune(ctx context.Context, o pruneOptions) (*pruneR
 		return nil, errPruneBusy
 	}
 	defer pruneRunning.Unlock()
+	if !o.DryRun && h.bs != nil {
+		defer h.bs.NoteAllArtifactsChanged()
+	}
 	if o.Now.IsZero() {
 		o.Now = time.Now()
 	}
