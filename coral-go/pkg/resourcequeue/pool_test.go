@@ -119,7 +119,6 @@ func TestPoolsAreRefusedWhenMalformed(t *testing.T) {
 		"a pool member":    {Key: "p3", Members: []string{"heavy"}},
 		"duplicate":        {Key: "p4", Members: []string{"mini", "mini"}},
 		"too many":         {Key: "p5", Members: []string{"mini", "mini", "mini", "mini", "mini", "mini", "mini", "mini", "mini"}},
-		"with a match":     {Key: "p6", Members: []string{"mini"}, Match: []string{"go test ./..."}},
 		"a member's slots": {Key: "p7", Members: []string{"mini"}, Slots: 3},
 	} {
 		assert.ErrorIs(t, q.Define(r), ErrBadResource, name)
@@ -220,4 +219,14 @@ func TestAnAgentHoldsAtMostOneSlotAcrossAPoolAndItsMembers(t *testing.T) {
 	assert.Equal(t, 0, q.held("mini"), "released through the pool's name, held through the member's")
 	require.NoError(t, q.Release("mac-heavy", "a"))
 	assert.Equal(t, 0, q.held("mac-heavy"), "and the other way")
+}
+
+// #13751: a pool may carry a Match, and the hook then claims the pool.
+func TestAPoolMayCarryAMatchAndAnyMatchSeesIt(t *testing.T) {
+	q, _ := poolFixture(t, Config{})
+	require.NoError(t, q.Define(Resource{Key: "movable", Members: []string{"mac-heavy", "mini"}, Match: []string{"go test ./..."}}))
+	st, err := q.Status("movable")
+	require.NoError(t, err)
+	assert.Equal(t, []string{"go test ./..."}, st.Resource.Match)
+	assert.True(t, q.AnyMatch())
 }
