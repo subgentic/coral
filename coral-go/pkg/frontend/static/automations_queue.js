@@ -67,7 +67,7 @@ export function queueItems() {
     for (const r of resources) {
         const holders = r.holders || [], queue = r.queue || [], head = { resource: r.name, machine: r.machine || '', slots: r.slots, used: holders.length, waiting: queue.length };
         if (!holders.length && !queue.length) rows.push({ ...head, key: `${r.name}-free`, id: 0, state: 'free', agent: '', note: '', task: 0, place: 0, last: true, first: true });
-        holders.forEach(e => rows.push({ ...head, key: `${r.name}-${e.id}`, id: e.id, state: 'holding', agent: e.agent, note: e.note || '', task: e.task || 0, project: e.project || '', goal_id: e.goal_id || 0, goal_title: e.goal_title || '', stuck: e.stuck || '', stuck_min: e.stuck_min || 0, place: 0, lease_until: e.lease_until, enqueued_at: e.enqueued_at, pinned: !!e.pinned }));
+        holders.forEach(e => rows.push({ ...head, key: `${r.name}-${e.id}`, id: e.id, state: 'holding', agent: e.agent, note: e.note || '', task: e.task || 0, project: e.project || '', goal_id: e.goal_id || 0, goal_title: e.goal_title || '', member: e.member || '', heldOn: e.machine || '', stuck: e.stuck || '', stuck_min: e.stuck_min || 0, place: 0, lease_until: e.lease_until, enqueued_at: e.enqueued_at, pinned: !!e.pinned }));
         queue.forEach((e, i) => rows.push({ ...head, key: `${r.name}-${e.id}`, id: e.id, state: 'waiting', agent: e.agent, note: e.note || '', task: e.task || 0, project: e.project || '', goal_id: e.goal_id || 0, goal_title: e.goal_title || '', place: e.place || i + 1, first: i === 0, last: i === queue.length - 1, enqueued_at: e.enqueued_at, pinned: !!e.pinned }));
     }
     return rows;
@@ -143,7 +143,7 @@ function neighbour(row) {
 
 /** A holder the Orchestrator was told is stuck (#13705): at a prompt for a person, or idle, while others wait. */
 const stuckWords = r => (r.stuck === 'prompt' ? `At a prompt waiting for a person for ${r.stuck_min} min` : `Idle for ${r.stuck_min} min`);
-const stateWord = row => (row.state === 'holding' ? (row.stuck ? `Stuck ${row.stuck_min} min` : 'Holding') : row.state === 'waiting' ? `Waiting, place ${row.place}` : 'Free');
+const stateWord = row => (row.state === 'holding' ? (row.stuck ? `Stuck ${row.stuck_min} min` : `Holding${row.heldOn ? ' on ' + row.heldOn : ''}`) : row.state === 'waiting' ? `Waiting, place ${row.place}` : 'Free');
 
 const openTaskPage = (r, from) => importOnce('./task_navigation.js').then(m => m.openTask(r.project, r.task, from, { from: '' }));
 const openGoalPage = r => importOnce('./task_goals.js').then(m => m.openGoalOnTeamPage(r.project, r.goal_id));
