@@ -421,3 +421,39 @@ func TestTeamArtifactsListTTLCountsFromTheStartOfTheBuild(t *testing.T) {
 	getTeamArtifacts(t, srv, "/api/board/alpha/artifacts?limit=10", 200)
 	require.EqualValues(t, 2, n.Load(), "and the fast build after it is kept")
 }
+
+// The request that BUILDS the list reads it too: its rows must not share what they point to with the entry kept for the next (Security's SHOULD on #13552: a cross-caller leak on a cold read).
+func TestNoWriteThroughTheColdReadReachesTheKeptList(t *testing.T) {
+	_, h, coralDir := teamArtifactServer(t)
+	ctx := context.Background()
+	subscribeSession(t, h, "alpha", "Alice", sessAlice)
+	id := writeUpload(t, coralDir, sessAlice, "# one\n", "one.md", "2026-10-09T10:00:00Z")
+	require.NoError(t, h.bs.SetArtifactTags(ctx, "alpha", id, []string{"for review", "notes"}))
+	time.Sleep(uploadDirSettle + 500*time.Millisecond)
+	ownerReq := func() *http.Request { return asPerson(httptest.NewRequest(http.MethodGet, "/x", nil)) }
+	builds := countBuilds(t)
+	cold, _, err := h.projectArtifactItems(ownerReq(), "alpha", "") // the miss: this request builds the list
+	require.NoError(t, err)
+	require.EqualValues(t, 1, builds.Load(), "the first read builds the list")
+	require.NotEmpty(t, cold)
+	was, _ := json.Marshal(cold)
+	for i := range cold { // write through every pointer and slice the rows hold
+		if cold[i].Size != nil {
+			*cold[i].Size = 99999
+		}
+		if cold[i].ProducedBy != nil {
+			*cold[i].ProducedBy = "changed"
+		}
+		if cold[i].SessionID != nil {
+			*cold[i].SessionID = "changed"
+		}
+		for j := range cold[i].Tags {
+			cold[i].Tags[j] = "changed"
+		}
+	}
+	warm, _, err := h.projectArtifactItems(ownerReq(), "alpha", "") // the hit
+	require.NoError(t, err)
+	require.EqualValues(t, 1, builds.Load(), "the second read is the kept list")
+	now, _ := json.Marshal(warm)
+	require.JSONEq(t, string(was), string(now), "what the building request wrote through its rows never reached the kept list")
+}
