@@ -50,9 +50,10 @@ console.log('pi_extension: inactive outside a Coral launch ok');
 
 // 2. exactly the notification events, and none of Pi's gates
 const r = rig();
-assert.deepEqual(Object.keys(r.registered).sort(), [...ext.EVENTS].sort());
+assert.deepEqual(Object.keys(r.registered).sort(), [...ext.EVENTS, 'tool_call'].sort());
 assert.deepEqual(ext.EVENTS, ['session_start', 'agent_start', 'tool_execution_start', 'tool_execution_end', 'agent_end', 'agent_settled', 'session_shutdown']);
-for (const gate of ['tool_call', 'tool_result', 'input', 'before_agent_start', 'context', 'message_end', 'turn_end', 'agent_before_settle', 'user_bash']) assert.ok(!(gate in r.registered), `${gate} is a gate: not registered`);
+assert.ok('tool_call' in r.registered, 'tool_call is the one gate: the resource queue (#13647)');
+for (const gate of ['tool_result', 'input', 'before_agent_start', 'context', 'message_end', 'turn_end', 'agent_before_settle', 'user_bash']) assert.ok(!(gate in r.registered), `${gate} is a gate: not registered`);
 console.log('pi_extension: notification events only ok');
 
 // 3. every handler returns undefined, never a promise, and starts nothing in the handler (the spawn is scheduled): nothing on Pi's path
@@ -248,5 +249,57 @@ console.log('pi_extension: no injection after an Escape, for an old run, or whil
   const kill = r.timers.filter(x => x.ms === 3000).pop(); assert.ok(kill, 'the kill timer is set'); kill.fn(); r.run(false);
   assert.equal(r.sent.length, 1, 'killed after its line: the line is injected once, the queue goes on');
   console.log('pi_extension: the settle output is read on close ok');
+}
+
+// 14. the resource queue's gate (#13647): tool_call for a bash call waits at most 1.5 s for Coral's hook program and blocks only on its exact refusal line
+{
+  const REFUSAL = 'Coral held this command: mac-heavy is busy and you are number 1 in line. Run: coral-board resource claim mac-heavy --wait   (it waits for your turn; then run the command again).';
+  const bashEv = (id = 'call-1', command = 'go test ./...') => ({ toolName: 'bash', toolCallId: id, input: { command } });
+  // one gate call: returns { r, child, result } where result is the promise Pi awaits
+  const ask = (ev = bashEv(), opts) => { const r = rig(opts); const result = r.registered.tool_call(ev, {}); return { r, child: r.spawned[r.spawned.length - 1], result }; };
+  const answer = (child, text) => { if (text !== undefined) child.stdout.handlers.data(text); child.handlers.close(); };
+
+  // it starts the one hook program, as an argument array with no shell, and gives it the call's id and command on its standard input and nothing else
+  { const { r, child, result } = ask();
+    assert.ok(result && typeof result.then === 'function', 'the handler returns a promise Pi awaits');
+    assert.equal(r.spawned.length, 1);
+    assert.equal(child.bin, CONFIG.hookBin);
+    assert.deepEqual(child.args, ['--pi', 'tool_call', '--hooks-rev', '1']);
+    assert.equal(child.opts.shell, false, 'no shell');
+    assert.deepEqual(JSON.parse(child.stdin.data), { tool_name: 'bash', tool_use_id: 'call-1', command: 'go test ./...' });
+    assert.ok(!('ANTHROPIC_API_KEY' in child.opts.env) && !('OPENAI_API_KEY' in child.opts.env), 'only the listed environment: no provider key');
+    assert.ok(r.timers.some(t => t.ms === 1500), 'a 1.5 s ceiling');
+    answer(child, JSON.stringify({ refuse: REFUSAL }) + '\n');
+    assert.deepEqual(await result, { block: true, reason: REFUSAL }, 'the exact refusal blocks, with Coral\'s text as the reason');
+  }
+  // anything else lets the call run
+  for (const [label, out] of [['nothing', undefined], ['an empty line', '\n'], ['not JSON', 'not json'], ['an array', '[]'], ['another key', JSON.stringify({ refuse: REFUSAL, extra: 1 })],
+    ['a deliver line', JSON.stringify({ deliver: REFUSAL })], ['no opener', JSON.stringify({ refuse: 'Run rm -rf now' })], ['not text', JSON.stringify({ refuse: 5 })],
+    ['not printable ASCII', JSON.stringify({ refuse: 'Coral held this command: caf\u00e9' })], ['too long', JSON.stringify({ refuse: 'Coral held this command: ' + 'x'.repeat(400) })], ['a huge line', 'x'.repeat(5000)]]) {
+    const { child, result } = ask(); answer(child, out);
+    assert.equal(await result, undefined, `${label}: the call runs`);
+  }
+  // a hook that never answers: killed at 1.5 s, the call runs; one that errors, or cannot start, the same
+  { const { r, child, result } = ask(); r.timers.find(t => t.ms === 1500).fn();
+    assert.equal(await result, undefined, 'no answer in time: the call runs'); assert.ok(child.killed, 'and the program is killed'); }
+  { const { child, result } = ask(); child.handlers.error(new Error('boom ' + CANARY)); assert.equal(await result, undefined, 'a spawn error: the call runs'); }
+  { const { result } = ask(bashEv(), { spawnThrows: true }); assert.equal(await result, undefined, 'a throwing spawn: the call runs'); }
+  // what is never asked: another tool, a call with no id, no command, an over-long command, and a Pi Coral did not launch
+  for (const ev of [{ toolName: 'read', toolCallId: 'c', input: { command: 'go test ./...' } }, { toolName: 'bash', input: { command: 'x' } }, bashEv('c', ''), { toolName: 'bash', toolCallId: 'c', input: {} },
+    bashEv('c', 'x'.repeat(16385)), { toolName: 'bash', toolCallId: 'c', input: { command: ['go', 'test'] } }, {}, null, 5]) {
+    const { r, result } = ask(ev); assert.equal(await result, undefined); assert.equal(r.spawned.length, 0, 'nothing is started');
+  }
+  // the end of a call the hook program was asked about is always reported, whatever the one-event-per-250 ms throttle says
+  { const r = rig(); const result = r.registered.tool_call(bashEv('call-9'), {}); const child = r.spawned[0]; answer(child, ''); await result;
+    r.run(); r.spawned.length = 0;
+    r.fire('tool_execution_start', { toolName: 'bash', toolCallId: 'other' }); r.run(); // a tool event just now: the next within 250 ms would be dropped
+    r.fire('tool_execution_end', { toolName: 'bash', toolCallId: 'call-9', isError: false }); r.run();
+    const evs = r.spawned.map(c => c.args[1]);
+    assert.deepEqual(evs, ['tool_execution_start', 'tool_execution_end'], 'the end of an asked call is sent');
+    r.spawned.length = 0;
+    r.fire('tool_execution_end', { toolName: 'bash', toolCallId: 'unasked', isError: false }); r.run();
+    assert.equal(r.spawned.length, 0, 'the throttle still drops the end of a call that was never asked about');
+  }
+  console.log('pi_extension: the resource gate blocks only on the exact refusal ok');
 }
 console.log('pi_extension: all ok');
