@@ -26,7 +26,7 @@ const ROWS=[row(5,'rejected'),row(4,'pending'),row(3,'approved'),row(2,'approved
   assert.match((await list())[0],/Other publisher/,'version ascending sorts the displayed approved versions');
   await ev(`document.querySelector('#skills-view .dt-sort[data-key=version]').click();true`);
   assert.match((await list())[0],/Designer description v3/,'version descending works');
-  assert.equal(await ev(`[...document.querySelectorAll('#skills-view button')].find(b=>b.textContent==='v4 waiting').getAttribute('aria-label')`),'Review version 4 of testing-on-the-mac-mini, waiting for approval');
+  assert.equal(await ev(`[...document.querySelectorAll('#skills-view button')].find(b=>b.textContent==='v4 waiting').getAttribute('aria-label')`),'v4 waiting: review version 4 of testing-on-the-mac-mini');
   await ev(`(()=>{const b=[...document.querySelectorAll('#skills-view button')].find(b=>b.textContent==='v4 waiting');b.closest('tr').querySelector('.dt-primary').focus();window.__detailGets=[];return true;})()`);
   await client.Input.dispatchKeyEvent({type:'keyDown',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
   await client.Input.dispatchKeyEvent({type:'keyUp',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});

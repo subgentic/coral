@@ -115,7 +115,7 @@ function drawList() {
             const cell = el('span', '', `v${r.version}`), pending = r.pendingVersion;
             if (pending && pending.id !== r.id) {
                 const review = button('btn btn-small', `v${pending.version} waiting`, e => { e.stopPropagation(); loadOne(pending.id); });
-                review.setAttribute('aria-label', `Review version ${pending.version} of ${r.name}, waiting for approval`);
+                review.setAttribute('aria-label', `v${pending.version} waiting: review version ${pending.version} of ${r.name}`);
                 cell.append(' ', review);
             }
             return cell;
