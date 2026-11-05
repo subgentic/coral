@@ -44,6 +44,9 @@ func newReplyEnv(t *testing.T) *replyEnv {
 				req = withActor(req, Actor{Kind: ActorToken, Name: strings.TrimPrefix(a, "token:")})
 			case a == "operator":
 				req = withActor(req, Actor{Kind: ActorOperator, Name: "Operator"})
+			case a == "operator-person": // the dashboard's own click: the Operator, and a person to humanInputCaller (#13609)
+				req = withActor(req, Actor{Kind: ActorOperator, Name: "Operator"})
+				req = req.WithContext(context.WithValue(req.Context(), callerKindKey{}, callerDashCookie))
 			}
 			next.ServeHTTP(w, req)
 		})

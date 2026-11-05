@@ -11,7 +11,7 @@ const { STARTER, MAX_TAGS, MAX_LEN, normalizeTag } = await importOnce('./artifac
 /** Replaces the tags of one stored file; resolves to the tags the server kept, rejects with its words. */
 async function putTags(project, hex, tags) {
     if (isCloud()) throw new Error('Artifact tags cannot be edited through Coral Hub.'); // read marks use inbox_reviews; all other mutations need their own decision route (#13117)
-    const r = await boardFetch(project, `/artifacts/${hex}/tags`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tags }) });
+    const r = await boardFetch(project, `/artifacts/${hex}/tags`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Coral-Click': 'tags' }, body: JSON.stringify({ tags }) }); // the tag editor's click: the server records it (#13609)
     const d = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(d.error || `Coral said ${r.status}`);
     return Array.isArray(d.tags) ? d.tags : tags;
