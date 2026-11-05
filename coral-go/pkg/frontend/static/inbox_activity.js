@@ -5,6 +5,7 @@
 import { importOnce } from './import_once.js';
 import { requestJson } from './request_json.js';
 import { teamLabel } from './server_status.js';
+import { activityWords } from './operator_activity_words.js';
 import { loadStyles } from './lazy_styles.js';
 const DT = await importOnce('./data_table.js');
 const AF = await importOnce('./operator_activity_filters.js'); // lazy, as the sidebar loads it: its failure is retried
@@ -17,7 +18,7 @@ const state = DT.tableState();
 let onChange = () => {};
 
 /** The words of what was done. */
-export const actionWord = r => AF.ACTION_LABEL[r.action] || r.action;
+export const actionWord = activityWords;
 const KIND_WORD = { file: 'a file', question: 'a question', goal: 'a goal', proposal: 'a proposal', message: 'a message', task: 'a task', agent: 'an agent', chat: 'a chat', run: 'a run', workflow_run: 'a workflow run', job_run: 'an automation run', setting: 'a row in Needs you', goal_request: 'a goal request' };
 /** What it was done to: the item's title when the record kept one (words an agent wrote), else the kind. */
 export const itemWords = r => r.title || KIND_WORD[r.item_kind] || 'an item';
@@ -59,7 +60,7 @@ export const total = () => rows.length;
 /** The page's table spec for the sidebar's group table. `open` has { file(row), goal(row), question(row) }: how a row's item opens (the sidebar knows the routes). */
 export function spec(f, open) {
     const list = filtered(f);
-    const opens = r => (r.item_kind === 'file' && r.version) || (['goal', 'question'].includes(r.item_kind) && /^\d+$/.test(r.item_id));
+    const opens = r => (r.item_kind === 'file' && r.version) || (['goal', 'question', 'task'].includes(r.item_kind) && /^\d+$/.test(r.item_id));
     return { title: 'Activity', noun: ['action', 'actions'], rows: list,
         empty: { line: !loaded || loading ? 'Reading the record…' : failed ? (denied ? 'Only the account this computer is linked to can see the Activity record.' : 'The record could not be read.') : AF.isFiltered(f) ? 'No action matches the search and filters.' : 'Nothing yet.',
             hint: loaded && !failed && !AF.isFiltered(f) ? 'Each time you approve, ask for changes, deny, ignore or answer something in Needs you, a line is added here.' : undefined },
@@ -69,10 +70,10 @@ export function spec(f, open) {
             const words = checkWords(check);
             if (words) { const n = DT.el('p', `activity-check${check && !check.intact ? ' activity-check-broken' : ''}`, words); n.setAttribute('role', check && !check.intact ? 'alert' : 'status'); wrap.append(n); }
             const t = DT.dataTable({ label: `Activity, ${list.length}`, rows: list, rowKey: r => r.id, state, rowName: r => `${actionWord(r)} ${itemWords(r)}`, oneLine: true, resize: true, sortBar: false,
-                open: r => { if (r.item_kind === 'file' && r.version) open.file(r); else if (r.item_kind === 'goal') open.goal(r); else if (r.item_kind === 'question' && opens(r)) open.question(r); },
+                open: r => { if (r.item_kind === 'file' && r.version) open.file(r); else if (r.item_kind === 'goal') open.goal(r); else if (r.item_kind === 'question' && opens(r)) open.question(r); else if (r.item_kind === 'task' && opens(r)) open.task(r); },
                 mail: r => ({ lead: { icon: 'checklist', square: true, name: actionWord(r) }, title: itemWords(r), team: teamOf(r), snippet: r.note || fromWords(r), state: actionWord(r), time: DT.timeCell(r.at).textContent }),
                 columns: [ // narrowing drops From (62 rem), then Team (52), then When (36), then You did (16): the data table's own thresholds, so the On column (the item) never shrinks (the table rules' R2)
-                    { key: 'action', label: 'You did', sort: true, sortValue: actionWord, line: 2, width: '12rem', dropAt: 16, cell: r => { const w = DT.el('span', 'activity-did', actionWord(r)); if (r.note) w.append(DT.el('span', 'activity-note', ` “${r.note}”`)); return w; } },
+                    { key: 'action', label: 'You did', sort: true, sortValue: actionWord, line: 2, width: '12rem', dropAt: 16, cell: r => { const w = DT.el('span', 'activity-did', actionWord(r)); return w; } },
                     { key: 'item', label: 'On', primary: true, width: 'grow', sort: true, sortValue: itemWords, line: 1, cell: r => (opens(r) ? DT.primaryButton(itemWords(r), `Open ${itemWords(r)}`) : DT.el('span', 'activity-item', itemWords(r))) },
                     { key: 'team', label: 'Team', sort: true, sortValue: teamOf, line: 2, width: '9rem', dropAt: 52, cell: teamOf },
                     { key: 'from', label: 'From', sort: true, sortValue: fromWords, line: 2, tone: 'tertiary', width: '11rem', dropAt: 62, cell: fromWords },

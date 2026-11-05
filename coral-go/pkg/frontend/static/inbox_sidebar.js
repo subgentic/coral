@@ -1040,7 +1040,7 @@ registerGroupSource('hub-inbox', {
                     columns: GC.goalColumns({ teamOf: goalTeam }, ['state', 'goal', 'team', 'progress', 'updated']).flatMap(c => c.key === 'team' ? [...serverColumns().map(x => ({ ...x, width: '8rem', dropAt: 52 })), c] : [c]) }); if (phone) setTimeout(mountBar, 0); return table.el; } };
         }
         if (key === 'artifacts') return IA.artifactsSpec();
-        if (key === 'activity') return AC.spec(activityFilters, { file: r => importOnce('./artifact_viewer.js').then(m => m.openArtifactViewer(r.version, { filename: r.title || 'file', board: r.team })), goal: r => go({ ...folderRoute, id: r.team, item: Number(r.item_id) }), question: r => go(keyRoute('team', r.team, 'messages', Number(r.item_id))) });
+        if (key === 'activity') return AC.spec(activityFilters, { file: r => importOnce('./artifact_viewer.js').then(m => m.openArtifactViewer(r.version, { filename: r.title || 'file', board: r.team })), goal: r => go({ ...folderRoute, id: r.team, item: Number(r.item_id) }), question: r => go(keyRoute('team', r.team, 'messages', Number(r.item_id))), task: r => openItemRoute('tasks', r.team, Number(r.item_id), `${r.team}#${r.item_id}`) });
         if (key === 'saved') return savedListSpec();
         return null;
     },
