@@ -14,7 +14,7 @@ const QUEUE = [
     { name: 'mac-heavy', slots: 2, machine: 'Mac', max_lease_seconds: 2700, holders: [macHold], queue: [] }, // the pool's hold on it: its slot is in use, the row is under the pool
     { name: 'mini', slots: 1, machine: 'Mini', max_lease_seconds: 2700, holders: [miniHold], queue: [] },
 ];
-const STUB = `(() => { const real = window.fetch; window.__queueTickMs = 1000; window.__queue = ${JSON.stringify(QUEUE)}; window.fetch = (u, o) => /\\/api\\/resources$/.test(String(u)) && (!o || !o.method || o.method === 'GET') ? Promise.resolve(new Response(JSON.stringify({ resources: window.__queue }), { status: 200, headers: { 'Content-Type': 'application/json' } })) : real(u, o); })();`;
+const STUB = `(() => { const real = window.fetch; window.__queueTickMs = 3600000; /* the clock tick cannot redraw: only the data can */ window.__queue = ${JSON.stringify(QUEUE)}; window.fetch = (u, o) => /\\/api\\/resources$/.test(String(u)) && (!o || !o.method || o.method === 'GET') ? Promise.resolve(new Response(JSON.stringify({ resources: window.__queue }), { status: 200, headers: { 'Content-Type': 'application/json' } })) : real(u, o); })();`;
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -43,7 +43,7 @@ const STUB = `(() => { const real = window.fetch; window.__queueTickMs = 1000; w
             assert.ok(groups.some(g => /^heavy: 3 of 3 in use, 1 waiting/.test(g) || /^heavy: 2 of 3 in use, 1 waiting/.test(g)), at + 'the pool group counts its members slots in use: ' + JSON.stringify(groups));
             // only the machine of a hold changes: the table is drawn again (the machine is part of what it shows)
             await ev(`window.__queue[0].holders[0] = { ...window.__queue[0].holders[0], machine: 'Mac Studio' }; true`);
-            await waitFor(`/Holding on Mac Studio/.test(document.getElementById('group-table-view').textContent)`, at + 'a machine alone changing is drawn: ' + (await ev(`document.getElementById('group-table-view').textContent.replace(/\\s+/g, ' ').slice(0, 300)`)), 8000);
+            await waitFor(`/Holding on Mac Studio/.test(document.getElementById('group-table-view').textContent)`, at + 'a machine alone changing is drawn by the next read, with no clock tick to help: ' + (await ev(`document.getElementById('group-table-view').textContent.replace(/\\s+/g, ' ').slice(0, 300)`)), 14000);
             assert.equal(await ev(`document.documentElement.scrollWidth <= document.documentElement.clientWidth`), true, at + 'no sideways scroll');
         }
         console.log('PASS the Queue folder with a pool: machine on desktop and phone, stuck, once under the pool, redraw on a machine change');
