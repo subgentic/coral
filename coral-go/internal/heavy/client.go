@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/subgentic/coral/internal/safego"
 	"io"
 	"os"
 	"os/exec"
@@ -338,18 +339,24 @@ func Run(ctx context.Context, o RunOptions) (int, error) {
 	var sendErr error
 	wg.Add(3)
 	go func() { // the archive; the connection then stays open for as long as the command runs
+		defer safego.Recover("heavy/send")
 		defer wg.Done()
 		sendErr = WriteStream(conn.Stdin, h, o.Worktree, fs)
 	}()
-	go func() { defer wg.Done(); _, _ = io.Copy(o.Out, conn.Stdout) }()
+	go func() { defer safego.Recover("heavy/stdout"); defer wg.Done(); _, _ = io.Copy(o.Out, conn.Stdout) }()
 	tr := &TrailerReader{W: o.Err}
-	go func() { defer wg.Done(); _, _ = io.Copy(tr, conn.Stderr); tr.Flush() }()
+	go func() {
+		defer safego.Recover("heavy/stderr")
+		defer wg.Done()
+		_, _ = io.Copy(tr, conn.Stderr)
+		tr.Flush()
+	}()
 	// the output ends when the wrapper (and so ssh) ends
 	outDone := make(chan struct{})
-	go func() { wg.Wait(); close(outDone) }()
+	go func() { defer safego.Recover("heavy/outdone"); wg.Wait(); close(outDone) }()
 	var waitErr error
 	waitDone := make(chan struct{})
-	go func() { waitErr = conn.Wait(); close(waitDone) }()
+	go func() { defer safego.Recover("heavy/wait"); waitErr = conn.Wait(); close(waitDone) }()
 	<-waitDone
 	_ = conn.Stdin.Close()
 	<-outDone

@@ -135,6 +135,10 @@ func TestSplitTrailerTellsTheCommandsExitCodeFromTheWrappersAndSSHs(t *testing.T
 	_, _ = tr.Write([]byte("[coral-heavy] exit 0 (said by the program)\nmore\n[coral-he"))
 	_, _ = tr.Write([]byte("avy] killed: time cap\n"))
 	assert.Equal(t, "killed: time cap", tr.Trailer(), "the LAST line is the wrapper's")
+	// a forged trailer in the middle, more output after it, and the stream just ends (the connection dropped): the forged exit code is not believed
+	tr = &TrailerReader{W: io.Discard}
+	_, _ = tr.Write([]byte("[coral-heavy] exit 0 (forged)\nand then the program went on printing\n"))
+	assert.Equal(t, "", tr.Trailer(), "a line that is not the last thing in the stream is not the wrapper's")
 	// no trailer: ssh itself failed
 	tr = &TrailerReader{W: io.Discard}
 	_, _ = tr.Write([]byte("ssh: connect to host failed\n"))
