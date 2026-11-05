@@ -30,8 +30,8 @@ const BASE = require('./test_base').BASE;
             } else {
                 await ev(`window.switchNavTab('history'); true`);
                 await waitFor(`!!document.querySelector('.list-bar-search-row')`, 'the chats toolbar', 10000); await settle(600);
-                const e = await ev(`(() => { const row = document.querySelector('.list-bar-search-row').getBoundingClientRect().left; const sel = document.querySelector('#group-table-view .view-list-nav'); /* the tab strip's own left edge (#11236 slice A): its tabs scroll, the strip does not */ return { row: Math.round(row), select: sel ? Math.round(sel.getBoundingClientRect().left) : null }; })()`);
-                assert.ok(e.select !== null && e.row === e.select, at + 'the toolbar starts at the left edge of the folder button above it (the drawer\'s, #9545): ' + JSON.stringify(e));
+                const e = await ev(`(() => { const row = document.querySelector('.list-bar-search-row').getBoundingClientRect().left; const sel = document.querySelector('#group-table-view .view-list-nav'); /* the tab strip's own left edge (#11236 slice A): its tabs scroll, the strip does not */ /* a phone has no strip since #13596 (the ☰ menu lists the tabs): the toolbar then starts at the page's own content edge */ const v = document.getElementById('group-table-view'); const edge = v ? v.getBoundingClientRect().left + parseFloat(getComputedStyle(v).paddingLeft || '0') : null; return { row: Math.round(row), select: sel ? Math.round(sel.getBoundingClientRect().left) : (edge === null ? null : Math.round(edge)), strip: !!sel }; })()`);
+                assert.ok(e.select !== null && e.row === e.select, at + 'the toolbar starts at the left edge of the folder button above it, or at the page\'s content edge on a phone with no strip (#13596): ' + JSON.stringify(e));
                 await shot(`${w}-chats`);
             }
         }
