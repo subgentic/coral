@@ -16,7 +16,7 @@ const fs = require('node:fs');
     const drawer = () => ev(`(() => { const m = document.getElementById('nav-more-menu'); if (!m || m.hidden) return null; return { rows: [...m.querySelectorAll('.nav-drawer-folder')].map(b => ({ label: b.querySelector('.nav-drawer-label').textContent, count: (b.querySelector('.nav-drawer-count') || {}).textContent || '', current: b.getAttribute('aria-current') === 'true' })) }; })()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
-        for (const [label, w, h, mobile] of [['390', 390, 844, true], ['1280', 1280, 800, false]]) {
+        for (const [label, w, h, mobile] of [['390', 390, 844, true], ['620', 620, 800, true], ['700', 700, 800, true], ['1280', 1280, 800, false]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
             await coralReady(ev);
@@ -27,7 +27,10 @@ const fs = require('node:fs');
             await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
             await waitFor(`!!document.querySelector('#group-table-view .list-bar-search')`, `${label}: the Needs you page`, 10000);
             await new Promise(r => setTimeout(r, 500)); // sleep-ok: the page settles after its first draw
-            if (mobile) {
+            if (mobile && w === 700) {
+                const s = await strip();
+                check(`${label}: from 640 to 767 px the Inbox keeps its tab strip (the old view dropdown is the pill there)`, s.tabs > 0, JSON.stringify(s));
+            } else if (mobile) {
                 const s = await strip();
                 check(`${label}: no tab strip, no tab, no way-back link, nothing wider than the screen`, s.tablist === 0 && s.tabs === 0 && s.back === 0 && s.over <= 0, JSON.stringify(s));
                 check(`${label}: the page's title is visible as the open folder's name (not one pixel)`, s.title && s.title.text === 'Needs you' && s.title.w > 20 && s.title.h > 10, JSON.stringify(s.title));

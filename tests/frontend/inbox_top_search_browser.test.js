@@ -17,7 +17,7 @@ const FOLDERS = [['needs', 'Search needs you'], ['tasks', 'Search tasks'], ['goa
         return { top: vis(t), topName: t && t.getAttribute('aria-label'), topPh: t && t.placeholder, topRect: vis(t) ? r(t) : null, box: vis(q), boxName: q && q.getAttribute('aria-label'), toggle: vis(tog), menu: vis(document.querySelector('header.top-bar .phone-menu-btn')), over: document.documentElement.scrollWidth - innerWidth }; })()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
-        for (const [label, w, h, mobile] of [['390', 390, 844, true], ['432', 432, 700, true], ['1280', 1280, 800, false]]) {
+        for (const [label, w, h, mobile] of [['390', 390, 844, true], ['432', 432, 700, true], ['620', 620, 800, true], ['700', 700, 800, true], ['1280', 1280, 800, false]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
             await coralReady(ev);
@@ -32,7 +32,9 @@ const FOLDERS = [['needs', 'Search needs you'], ['tasks', 'Search tasks'], ['goa
                 await new Promise(r => setTimeout(r, 400)); // sleep-ok: the top field follows the page's redraw on the next frame
                 const s = await state();
                 if (key === 'needs') await shot(`top-search-needs-${w}`);
-                if (mobile) {
+                if (mobile && w === 700) {
+                    check(`${label}/${key}: between 640 and 767 px the view dropdown is still the pill: the page keeps its own box named "${name}", the pill has no search`, !s.top && s.box && s.boxName === name, JSON.stringify(s));
+                } else if (mobile) {
                     check(`${label}/${key}: the top pill is the search field, named "${name}"`, s.top && s.topName === name + ' from the top bar' && s.topPh === name, JSON.stringify(s));
                     check(`${label}/${key}: the box under the tabs is not drawn, the Filters icon is, the hamburger is, nothing is wider than the screen`, !s.box && s.toggle && s.menu && s.over <= 0, JSON.stringify(s));
                     check(`${label}/${key}: the field is in the top bar and fills the row beside the hamburger`, s.topRect && s.topRect.t < 80 && s.topRect.r - s.topRect.l >= 200, JSON.stringify(s.topRect));

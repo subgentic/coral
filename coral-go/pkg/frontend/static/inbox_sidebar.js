@@ -14,6 +14,7 @@ import { doneGoals, nextQuietEnd, quietEndsAt, hideGoalDone, setGoalDoneCount, i
  * The one search box searches the group on screen: it narrows the rows of Needs you and Tasks, and is the Saved search (the server matches, so it covers every saved message). Saved's Filters and Sort
  * are in Display options. The hub's own framed /inbox is not this: it keeps the frame, full width (inbox_tab.js). */
 import { state } from './state.js';
+import { isPhoneBar } from './phone_layout.js';
 
 const { mutedReviewItems, mutedWords, reviewItems, unreadReviewItems, reviewErrors, refreshReviews, reviewGroups, setReviewRead, markOpenedReadVisibly, isRead, savedFiles } = await importOnce('./inbox_reviews.js');
 import { failedUnread, finishedUnread, refreshRuns, markSeen, runRoute, failureWords } from './automation_runs.js';
@@ -1046,7 +1047,7 @@ registerGroupSource('hub-inbox', {
         if (key === 'saved') return savedListSpec();
         return null;
     },
-    lead: () => ({ none: true }), // a phone has no tab strip (#13596): the ☰ drawer lists the folders (phone_drawer.js, from state.inboxFolderRows)
+    lead: () => { if (isPhoneBar()) return { none: true }; const here = navCurrent(), sections = folderSections(); return { signature: JSON.stringify([here, sections.map(sec => [sec.title, sec.items.map(i => i.key)])]), node: () => VL.build({ id: 'inbox-folders-page', label: 'Inbox views', sections, current: here, onPick: pickFolder, drawer: true, tabs: true }) }; }, // a phone: the folders are one select on top of the table
     isEmpty: () => false, // the tab opens its group's table itself (showInbox)
     showList: () => { closePage(false); window.switchNavTab?.('hub-inbox'); },
     empty: () => { closePage(false); window.switchNavTab?.('hub-inbox'); },

@@ -1363,7 +1363,7 @@
 #mobile-agent-list .phone-bar .phone-bar-pill { flex: 1 1 0; min-width: 0; margin: 0; }
 @media (max-width: 300px) { body.live-session-active:not(.popout-mode) .terminal-header { flex-wrap: wrap; } } /* a phone at 200% zoom is 195 px wide: the row wraps before ⋯ is cut off (phone_layout) */
 /* #12698: the bar includes PHONE_QUERY's landscape phones; the cards below keep their 600px breakpoint. */
-@media (max-width: 600px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
+@media (max-width: 639px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) { /* PHONE_BAR_QUERY (phone_layout.js): the width the old top pill was a button for (layout.css, #9021), #13591 */
     body.agent-home-active header.top-bar { display: none; }
     body.agent-home-active { --top-bar-height: env(safe-area-inset-top, 0px); }
     #mobile-agent-list .mobile-list-header { padding: calc(8px + env(safe-area-inset-top, 0px)) 8px 4px; gap: 4px; flex-wrap: wrap; justify-content: flex-start; align-items: center; }

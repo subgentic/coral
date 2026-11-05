@@ -2,6 +2,7 @@
  * Every top-level screen draws it from here, so the views cannot drift apart: Home puts its search in the pill, every other view puts its title in it (a heading, not a button: it has no title attribute, so no tooltip
  * lands on it). A drill-down has no ☰ and no avatar: its own bar (a ← and the title) is not this one. The look is css/mobile.css's `.phone-bar`; tests/frontend/phone_bar_browser.test.js measures every view's bar against Home's. */
 
+import { isPhoneBar } from './phone_layout.js';
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
 
 /** The bar. `pill` is the node that sits in the middle (Home's search row); without one the pill is the view's title (text set by setPhoneBarTitle). */
@@ -52,7 +53,7 @@ function paintTitle(words) {
         const target = searchTarget();
         let input = t.querySelector('.phone-bar-search');
         for (const w of document.querySelectorAll('.list-bar-search-wrap.phone-searched')) if (!target || target.closest('.list-bar-search-wrap') !== w) w.classList.remove('phone-searched'); // the page box the pill stands in for is not drawn
-        if (target?.classList.contains('list-bar-search')) target.closest('.list-bar-search-wrap').classList.add('phone-searched');
+        if (target?.classList.contains('list-bar-search') && isPhoneBar()) target.closest('.list-bar-search-wrap').classList.add('phone-searched');
         if (!target) { input?.remove(); continue; }
         if (!input) {
             input = document.createElement('input'); input.type = 'search'; input.className = 'phone-bar-search'; input.autocomplete = 'off'; input.enterKeyHint = 'search';
