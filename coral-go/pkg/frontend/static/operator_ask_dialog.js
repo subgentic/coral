@@ -52,7 +52,7 @@ export function openAskDialog(a, onDone, runners = {}) {
     let offered = null;
     if (offers.length) { // what the asker offered: one tap per choice, each with what it does
         offered = document.createElement('section'); offered.className = 'inbox-ask-offers'; offered.setAttribute('aria-label', `Buttons ${markHidden(a.asker, { strict: true })} offered`);
-        const head = document.createElement('p'); head.className = 'inbox-ask-offers-head'; head.textContent = offers.every(b => isReply(b.action)) ? 'Choose a reply, or write your own.' : 'Choose an action, or write a reply below.';
+        const head = document.createElement('p'); head.className = 'inbox-ask-offers-head'; head.textContent = offers.every(b => isReply(b.action)) ? 'Choose a reply, or write your own.' : 'Choose an action, or write a reply.';
         const list = document.createElement('div'); list.className = 'inbox-ask-offers-list';
         const choices = [];
         for (const b of offers) {
