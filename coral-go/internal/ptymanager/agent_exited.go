@@ -5,6 +5,8 @@ import (
 	"log/slog"
 	"path"
 	"strings"
+	"sync/atomic"
+	"time"
 
 	at "github.com/subgentic/coral/internal/agenttypes"
 	"github.com/subgentic/coral/internal/logparse"
@@ -125,6 +127,50 @@ func UnknownShell(ctx context.Context, term any, name, agentType, sessionID stri
 	sh, ok := c.AgentUnknownShell(ctx, name, agentType, sessionID)
 	if !ok {
 		return ""
+	}
+	return sh
+}
+
+// The settle window of a launch (#13658): how long it waits for a shell that looks unknown to go away before it refuses, and how often it looks again. A freshly created pane's shell is still starting, and a child
+// shell of that startup (an rc file, a version manager, a prompt's setup) is, for a moment, what the process walk calls a shell of unknown contents; under load the moment is long enough for Coral's one look to land
+// in it. A shell a person started stays, so it is still refused, a window later. Atomics, so a test sets them with SetUnknownShellSettle and no goroutine another test left reads a plain variable (#5266).
+var (
+	unknownShellSettle atomic.Int64 // nanoseconds
+	unknownShellPoll   atomic.Int64
+)
+
+func init() {
+	unknownShellSettle.Store(int64(2 * time.Second))
+	unknownShellPoll.Store(int64(150 * time.Millisecond))
+}
+
+// SetUnknownShellSettle sets the settle window and the poll interval, and returns what puts them back (for the tests).
+func SetUnknownShellSettle(window, poll time.Duration) (restore func()) {
+	w, p := unknownShellSettle.Swap(int64(window)), unknownShellPoll.Swap(int64(poll))
+	return func() { unknownShellSettle.Store(w); unknownShellPoll.Store(p) }
+}
+
+// SettledUnknownShell is UnknownShell with a settle window: a shell that is named is looked for again until TWO looks in a row, one poll apart, name none, or the settle window has passed, and only a shell still named
+// is returned (Security's SHOULD on #13658: the process walk can miss a shell for a moment, and one missed look must not type a launch line into a person's shell). The rule of the guard is unchanged (a shell of unknown
+// contents gets no launch line); only a shell that was never one is no longer mistaken for one. "" when none at the first look (one look, no wait, for a terminal with nothing named).
+func SettledUnknownShell(ctx context.Context, term any, name, agentType, sessionID string) string {
+	sh := UnknownShell(ctx, term, name, agentType, sessionID)
+	if sh == "" {
+		return ""
+	}
+	deadline := time.Now().Add(time.Duration(unknownShellSettle.Load()))
+	clean := 0                                     // clean looks in a row since a shell was last named
+	for clean > 0 || time.Now().Before(deadline) { // a clean look is confirmed by one more even past the window's end
+		select {
+		case <-ctx.Done():
+			return sh // the caller gave up: the last named shell stands
+		case <-time.After(time.Duration(unknownShellPoll.Load())):
+		}
+		if now := UnknownShell(ctx, term, name, agentType, sessionID); now != "" {
+			sh, clean = now, 0
+		} else if clean++; clean >= 2 {
+			return ""
+		}
 	}
 	return sh
 }
