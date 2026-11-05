@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -82,6 +83,12 @@ func TestACopyRunFromAnotherFolderIsPortableWhateverIsRegistered(t *testing.T) {
 // The update rehearsal's "ask" row put a shim beside the real coral-update and renamed the real one (coral-update.real): the status then said "this program is not coral-update", the install was not an
 // install, and the server offered no ack (reason unsupported_install). Only a program named coral-update, in a folder of the release, is an install: the rehearsal asks the real program in a COPY of the install.
 func TestOnlyAProgramNamedCoralUpdateIsAnInstall(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		// apply.Linux judges a folder by its owner (a uid, -1 on Windows) and its volume's atomic swap, so on Windows
+		// the folder is "unwritable"/no_atomic_swap whatever its name: the rule under test is the Linux one (the
+		// Windows installs are covered by the describeRegistered tests above). Red on windows-tests in trial-250.
+		t.Skip("the Linux install rule: a Windows folder has no uid and no atomic swap")
+	}
 	dir := t.TempDir()
 	for _, n := range []string{"coral", "coral-update"} {
 		require.NoError(t, os.WriteFile(filepath.Join(dir, n), []byte("x"), 0o755))
