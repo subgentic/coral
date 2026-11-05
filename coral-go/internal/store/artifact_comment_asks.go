@@ -1,10 +1,10 @@
 package store
 
 import (
-	"sync"
 	"context"
 	"database/sql"
 	"errors"
+	"sync"
 	"time"
 )
 
@@ -12,11 +12,11 @@ import (
 
 // The limits of an ask, enforced here whatever calls it.
 const (
-	AskTTL           = 24 * time.Hour // an ask is open this long
+	AskTTL = 24 * time.Hour // an ask is open this long
 	// UploaderRepliesPerHour is how many replies an agent may leave on ONE file in an hour when it was never asked into the thread, because it uploaded the file (#13762, Security's cap).
 	UploaderRepliesPerHour = 10
-	MaxAskReplies    = 5              // replies one agent may leave in one asked thread
-	MaxAskReplyBytes = 8 << 10        // bytes in one reply
+	MaxAskReplies          = 5       // replies one agent may leave in one asked thread
+	MaxAskReplyBytes       = 8 << 10 // bytes in one reply
 )
 
 var (

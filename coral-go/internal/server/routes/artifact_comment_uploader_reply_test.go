@@ -15,6 +15,14 @@ import (
 // file with no ask row, within Security's limits: only the verified uploader on that board, a reply in an existing open thread (never a new comment), the same cap per thread, 10 an hour on a file, authored as itself,
 // and no ask row, no wake, nothing for any other agent. The Operator's Send to agent stays the only way an agent is asked in.
 
+// reviewComment is the Operator's comment on a file IN REVIEW as the dashboard makes it: notify_agent false, so it is not sent to the agent that uploaded the file (#11420) and no ask row exists: the Operator's case.
+func (rig *cmtRig) reviewComment(body string) int64 {
+	rig.t.Helper()
+	code, out := rig.do("POST", cp(cmtDoc), cmtAsOwner, map[string]any{"body": body, "anchor": anchorOf("the lock"), "board": "team-a", "notify_agent": false})
+	require.Equal(rig.t, http.StatusCreated, code, fmt.Sprint(out))
+	return int64(out["id"].(float64))
+}
+
 func (rig *cmtRig) stored() []store.ArtifactComment {
 	rig.t.Helper()
 	list, err := rig.ss.ListArtifactComments(rig.t.Context(), cmtDoc, "", nil)
@@ -26,8 +34,7 @@ func TestTheAgentThatUploadedTheFileRepliesInAThreadItWasNeverSentAndTheAskTable
 	rig := newCmtRig(t)
 	rig.agent(1, "Dev", false)
 	rig.uploadedBySession(sendSid(1), "team-a")
-	rig.tag("for review") // the Operator's comment on a file in review is NOT sent to its uploader (#11420): no ask row exists, as in the Operator's case
-	cid := rig.ownerComment("Is the nested field 1-2x slower?")
+	cid := rig.reviewComment("Is the nested field 1-2x slower?")
 
 	code, rep := rig.reply(cid, asAgentSession(1), "Yes, about 1.5x on the 5,000 row set.")
 	require.Equal(t, http.StatusCreated, code, "the uploader answers the comment it was told to read: "+fmt.Sprint(rep))
@@ -47,8 +54,7 @@ func TestOnlyTheUploaderRepliesAndOnlyInAnOpenExistingThread(t *testing.T) {
 	rig.agent(1, "Dev", false)
 	rig.agent(2, "QA", false)
 	rig.uploadedBySession(sendSid(1), "team-a")
-	rig.tag("for review") // the Operator's comment on a file in review is NOT sent to its uploader (#11420): no ask row exists, as in the Operator's case
-	cid := rig.ownerComment("hello")
+	cid := rig.reviewComment("hello")
 
 	code, out := rig.reply(cid, asAgentSession(2), "me too")
 	assert.Equal(t, http.StatusForbidden, code, "an agent on the board that did not upload the file")
@@ -63,7 +69,7 @@ func TestOnlyTheUploaderRepliesAndOnlyInAnOpenExistingThread(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, code, "only a reply in the thread's own first comment")
 
 	// a resolved thread is closed to it
-	other := rig.ownerComment("another")
+	other := rig.reviewComment("another")
 	rc, _ := rig.do("POST", fmt.Sprintf("%s/%d/resolve", cp(cmtDoc), other), cmtAsOwner, nil)
 	require.Equal(t, http.StatusOK, rc)
 	code, out = rig.reply(other, asAgentSession(1), "late")
@@ -76,8 +82,7 @@ func TestTheUploadersRepliesAreCappedPerThreadAndPerFilePerHour(t *testing.T) {
 	rig := newCmtRig(t)
 	rig.agent(1, "Dev", false)
 	rig.uploadedBySession(sendSid(1), "team-a")
-	rig.tag("for review") // the Operator's comment on a file in review is NOT sent to its uploader (#11420): no ask row exists, as in the Operator's case
-	cid := rig.ownerComment("a long discussion")
+	cid := rig.reviewComment("a long discussion")
 	for i := 0; i < store.MaxAskReplies; i++ {
 		code, rep := rig.reply(cid, asAgentSession(1), fmt.Sprintf("reply %d", i))
 		require.Equal(t, http.StatusCreated, code, fmt.Sprint(i, rep))
@@ -89,12 +94,12 @@ func TestTheUploadersRepliesAreCappedPerThreadAndPerFilePerHour(t *testing.T) {
 	// the file's hourly cap across threads: MaxAskReplies were used above; more threads, up to the hour's 10
 	used := store.MaxAskReplies
 	for used < store.UploaderRepliesPerHour {
-		next := rig.ownerComment(fmt.Sprintf("thread %d", used))
+		next := rig.reviewComment(fmt.Sprintf("thread %d", used))
 		code, rep := rig.reply(next, asAgentSession(1), "ok")
 		require.Equal(t, http.StatusCreated, code, fmt.Sprint(used, rep))
 		used++
 	}
-	last := rig.ownerComment("one more thread")
+	last := rig.reviewComment("one more thread")
 	code, rep = rig.reply(last, asAgentSession(1), "over the hour's cap")
 	assert.Equal(t, http.StatusTooManyRequests, code, fmt.Sprint(rep))
 	assert.Equal(t, "reply_rate", rep["code"])
@@ -105,7 +110,6 @@ func TestTheUploaderOnARemoteComputerRepliesToACommentTheOperatorNeverSent(t *te
 	rig := newCmtRig(t)
 	rig.agent(1, "Dev", false)
 	rig.uploadedBySession(sendSid(1), "team-a")
-	rig.tag("for review") // the Operator's comment on a file in review is NOT sent to its uploader (#11420): no ask row exists, as in the Operator's case
 	code, out := rig.do("POST", cp(cmtDoc), cmtAsKey, map[string]any{"body": "Is this 1-2x slower?", "anchor": anchorOf("the lock"), "board": "team-a"})
 	require.Equal(t, http.StatusCreated, code, fmt.Sprint(out))
 	cid := int64(out["id"].(float64))

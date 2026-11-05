@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/subgentic/coral/internal/cloud"
-	"github.com/subgentic/coral/internal/ptr"
 	"github.com/subgentic/coral/internal/naming"
+	"github.com/subgentic/coral/internal/ptr"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/pkg/tunnel"
 )
