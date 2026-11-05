@@ -518,7 +518,13 @@ func viewerName(c commentCaller) string {
 // PGPASSWORD=, Cookie:, --password VALUE: a value the scanner would keep). The keyword rules apply regardless of the Hub setting and of whether a hub is
 // connected; only the owner's own switch, CORAL_REDACT_KEYWORDS=off in the environment, still turns them off, as everywhere else. A comment is at most 8 KB,
 // so the cost is nothing, and a typed secret should not sit in sessions.db.
+// redactCommentFailsFor is a test seam: when it is set and says true for a text, the redactor is "unavailable" for it (ok false), as it is when the real one errors.
+var redactCommentFailsFor func(text string) bool
+
 func redactComment(text string) (string, bool) {
+	if redactCommentFailsFor != nil && redactCommentFailsFor(text) {
+		return "", false
+	}
 	b, err := secrets.HubRedactor(func() bool { return true }).Text([]byte(text))
 	if err != nil {
 		return "", false

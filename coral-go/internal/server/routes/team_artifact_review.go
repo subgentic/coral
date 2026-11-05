@@ -180,6 +180,21 @@ func (h *BoardHandler) ReviewArtifact(w http.ResponseWriter, r *http.Request) {
 	}
 	// Tell the uploader: one board message from the Operator, on the path every board notice takes (the agent is nudged when its recorded CLI is at a prompt; an agent that is asleep or ended finds it
 	// unread when it wakes: nothing is woken). An artifact with no recorded uploader is approved with no message.
+	if project == noTeamBoardID { // an agent on no team has no board: the notice is typed into the session that uploaded the file (#13539)
+		decision := map[string]string{board.ReviewApproved: board.ActApprove, board.ReviewDenied: board.ActDeny}[state]
+		notice := typedNoTeamApproved(item.Name, id, body.Note)
+		if state == board.ReviewDenied {
+			notice = typedNoTeamDenied(item.Name, id, body.Reason)
+		}
+		delivered, why := h.tellNoTeamUploaderOf(r.Context(), id, notice)
+		h.tellChief(context.WithoutCancel(r.Context()), decision, "file", project, item.Name, "")
+		out["delivered"] = delivered
+		if !delivered {
+			out["reason"] = why
+		}
+		writeJSON(w, http.StatusOK, out)
+		return
+	}
 	subs, err := h.bs.ListSubscribers(r.Context(), project)
 	if err != nil {
 		_ = h.bs.UndoArtifactReview(r.Context(), change)

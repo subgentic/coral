@@ -35,6 +35,9 @@ func (h *SessionsHandler) deliverOperatorComment(r *http.Request, caller comment
 	if team, gid, ok := parseGoalSubject(id); ok { // a goal's comment goes to the goal's owner (#11955)
 		return h.deliverGoalComment(r, caller, c, id, team, gid)
 	}
+	if b == noTeamBoardID { // a file an agent on no team sent for review: no board, so the comment is typed into the session that uploaded it (#13539)
+		return h.deliverNoTeamComment(r, caller, c, id)
+	}
 	if b == "" || h.bs == nil || h.ss == nil {
 		return autoDelivery{Reason: "no_uploader"}
 	}

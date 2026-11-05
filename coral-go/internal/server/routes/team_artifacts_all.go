@@ -215,6 +215,25 @@ func (h *BoardHandler) noTeamManagedArtifact(ctx context.Context, id string) (te
 }
 
 func (h *BoardHandler) standaloneUploads(ctx context.Context, have []teamArtifact, projects []board.ProjectInfo) []teamArtifact {
+	sessions := h.noTeamUploadSessions(ctx, projects)
+	if sessions == nil {
+		return nil
+	}
+	listed := make(map[string]bool, len(have))
+	for _, it := range have {
+		listed[it.ID] = true
+	}
+	var out []teamArtifact
+	for _, it := range h.uploads.merge(nil, h.coralDir, sessions) {
+		if !listed[it.ID] {
+			out = append(out, it)
+		}
+	}
+	return out
+}
+
+// noTeamUploadSessions are the sessions that have an upload folder and belong to no team, the most recent maxStandaloneUploadSessions of them (nil when the folder cannot be read).
+func (h *BoardHandler) noTeamUploadSessions(ctx context.Context, projects []board.ProjectInfo) map[string]string {
 	inTeam := map[string]bool{} // an agent of a team is that team's, whichever teams the request asked for
 	for _, p := range projects {
 		if subs, err := h.bs.TeamSubscriberSessions(ctx, p.Project); err == nil {
@@ -250,15 +269,21 @@ func (h *BoardHandler) standaloneUploads(ctx context.Context, have []teamArtifac
 	for _, f := range folders {
 		sessions[f.id] = ""
 	}
-	listed := make(map[string]bool, len(have))
-	for _, it := range have {
-		listed[it.ID] = true
+	return sessions
+}
+
+// noTeamUploaders are the sessions of agents on no team that hold an upload record of the object id: more than one when the same bytes were uploaded by two agents (#13539).
+func (h *BoardHandler) noTeamUploaders(ctx context.Context, id string) []string {
+	projects, err := h.bs.ListProjects(ctx)
+	if err != nil {
+		return nil
 	}
-	var out []teamArtifact
-	for _, it := range h.uploads.merge(nil, h.coralDir, sessions) {
-		if !listed[it.ID] {
-			out = append(out, it)
+	var out []string
+	for sid := range h.noTeamUploadSessions(ctx, projects) {
+		if _, ok := readUploadRecord(h.coralDir, sid, id); ok {
+			out = append(out, sid)
 		}
 	}
+	sort.Strings(out)
 	return out
 }
