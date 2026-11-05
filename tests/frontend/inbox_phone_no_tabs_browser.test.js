@@ -32,7 +32,7 @@ const fs = require('node:fs');
                 const s = await strip();
                 check(`${label}: from 640 to 767 px the Inbox keeps its tab strip (the old view dropdown is the pill there)`, s.tablist > 0, JSON.stringify(s));
             } else if (mobile) {
-                if (w === 390) await themes('phone-no-tabs-page-390');
+                await themes(`phone-no-tabs-page-${w}`);
                 const s = await strip();
                 check(`${label}: no tab strip, no tab, no way-back link, nothing wider than the screen`, s.tablist === 0 && s.tabs === 0 && s.back === 0 && s.over <= 0, JSON.stringify(s));
                 check(`${label}: the page's title is visible as the open folder's name (not one pixel)`, s.title && s.title.text === 'Needs you' && s.title.w > 20 && s.title.h > 10, JSON.stringify(s.title));
@@ -43,13 +43,13 @@ const fs = require('node:fs');
                 check(`${label}: the drawer lists every Inbox folder: Needs you, Tasks, Goals, Saved, Artifacts, Activity, the chats`, ['Needs you', 'Tasks', 'Goals', 'Saved', 'Artifacts', 'Activity', 'All chats'].every(n => names.includes(n)), JSON.stringify(names));
                 check(`${label}: the open folder is marked, alone`, d.rows.filter(r => r.current).map(r => r.label).join() === 'Needs you', JSON.stringify(d.rows.filter(r => r.current)));
                 check(`${label}: Needs you shows its count`, /2/.test((d.rows.find(r => r.label === 'Needs you') || {}).count), JSON.stringify(d.rows.find(r => r.label === 'Needs you')));
-                await themes('phone-no-tabs-drawer-390');
+                await themes(`phone-no-tabs-drawer-${w}`);
                 await ev(`[...document.querySelectorAll('#nav-more-menu .nav-drawer-folder')].find(b => b.querySelector('.nav-drawer-label').textContent === 'Goals').click(); true`);
                 await waitFor(`(document.querySelector('header.top-bar .phone-bar-search') || {}).placeholder === 'Search goals'`, 'the Goals page: the pill searches goals', 10000);
                 await new Promise(r => setTimeout(r, 300)); // sleep-ok: the drawer closes
                 const s2 = await strip();
                 check(`${label}: Goals opened from the drawer: still no strip, its title is the visible name`, s2.tablist === 0 && s2.title && s2.title.text === 'Goals', JSON.stringify(s2));
-                await themes('phone-no-tabs-goals-390');
+                await themes(`phone-no-tabs-goals-${w}`);
                 await ev(`document.querySelector('header.top-bar .phone-menu-btn').click(); true`);
                 await waitFor(`!!document.querySelector('#nav-more-menu .nav-drawer-folder')`, 'the drawer again', 8000);
                 d = await drawer();
