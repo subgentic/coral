@@ -455,8 +455,15 @@ class SecurityTests(Base):
         self.addCleanup(shutil.rmtree, d, ignore_errors=True)
         return d
 
+    def _outside_private_tmp(self):
+        # really outside /private/tmp whatever TMPDIR is (a runner whose TMPDIR is under /private/tmp made self.d inside it, and the tool then rightly removed it)
+        d = tempfile.mkdtemp(prefix='ci-outside-', dir='/var/tmp')
+        self.assertFalse(os.path.realpath(d).startswith('/private/tmp/'), d)
+        self.addCleanup(shutil.rmtree, d, ignore_errors=True)
+        return d
+
     def test_safe_rmtree_clause_base_must_be_under_private_tmp(self):  # clause 1 alone: everything else holds
-        outside = os.path.join(self.d, 'outside')  # not under /private/tmp
+        outside = self._outside_private_tmp()
         os.makedirs(os.path.join(outside, 'job1'))
         wr(os.path.join(outside, 'job1', 'keep.txt'), 'precious')
         link = os.path.join(self._under_private_tmp(), 'base')
