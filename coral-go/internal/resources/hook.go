@@ -220,6 +220,23 @@ func (h *Hook) TurnEnded(session string) {
 		return
 	}
 	h.endHands(session, "", "turn ended")
+	// A tool call cannot outlive its turn: a call that never reported its end (Codex's command that outlives its yield sends no PostToolUse) is over. The auto-claims of the session stop counting it as running, and
+	// the sweep then keeps the slot only for as long as the work the call started still runs (#13732).
+	h.mu.Lock()
+	changed := false
+	for _, ah := range h.hold {
+		if ah.session == session && len(ah.calls) > 0 {
+			ah.calls = map[string]bool{}
+			changed = true
+		}
+	}
+	h.mu.Unlock()
+	if changed {
+		snap := h.snapshot() // after the calls are gone from the hold: the session is then one the sweep asks about
+		h.mu.Lock()
+		defer h.mu.Unlock()
+		h.sweepLocked(snap)
+	}
 }
 
 // Hook is the shell hook's state: which auto-claims are held for which calls.
@@ -442,8 +459,8 @@ func (h *Hook) snapshot() map[string][]string {
 	}
 	h.mu.Lock()
 	var names []string
-	for _, ah := range h.hold {
-		if len(ah.calls) == 0 {
+	for k, ah := range h.hold {
+		if len(ah.calls) == 0 || h.pastFirstLeaseLocked(k, ah) { // a call that never reported its end is believed only within the first lease: after it, the work must be seen
 			names = append(names, ah.name)
 		}
 	}
@@ -528,7 +545,8 @@ func (h *Hook) sweepLocked(snap map[string][]string) {
 			h.releaseLocked(k, ah, "cap")
 			continue
 		}
-		if len(ah.calls) > 0 || h.startedWorkRuns(ah, st.Resource, snap) {
+		openCall := len(ah.calls) > 0 && now.Sub(ah.granted) <= lease // a call that never reported its end holds the claim for the first lease only: a renewal never passes it without the work still running (#13743)
+		if openCall || h.startedWorkRuns(ah, st.Resource, snap) {
 			_, _ = h.m.Queue().Renew(k.resource, k.agent)
 			continue
 		}
@@ -569,6 +587,22 @@ func (h *Hook) startedWorkRuns(ah *autoHold, res resourcequeue.Resource, snap ma
 		}
 	}
 	return false
+}
+
+// pastFirstLeaseLocked says whether the claim has been held longer than its resource's lease (h.mu held).
+func (h *Hook) pastFirstLeaseLocked(k holdKey, ah *autoHold) bool {
+	if ah.granted.IsZero() {
+		return false
+	}
+	st, err := h.m.Queue().Status(k.resource)
+	if err != nil {
+		return false
+	}
+	lease := st.Resource.MaxLease
+	if lease <= 0 {
+		lease = resourcequeue.DefaultLease
+	}
+	return h.o.Now().Sub(ah.granted) > lease
 }
 
 func (h *Hook) releaseLocked(k holdKey, ah *autoHold, why string) {
