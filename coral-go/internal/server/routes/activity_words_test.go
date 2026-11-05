@@ -119,4 +119,27 @@ func TestTheReadButtonsAndTheTagEditorAreRowsAndAnOpenIsNot(t *testing.T) {
 	assert.Equal(t, board.ActMarkUnread, rows[2]["action"])
 	assert.Equal(t, id, rows[2]["item_id"])
 	assert.Equal(t, "file", rows[2]["item_kind"])
+
+	// an agent's call (no person's caller kind) to the same route with the same header: the write is made, no row is (the person-only guard on a handler-asked row)
+	ar := chi.NewRouter()
+	ar.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			next.ServeHTTP(w, req.WithContext(context.WithValue(req.Context(), callerKindKey{}, callerAgentNoToken)))
+		})
+	})
+	ar.Use(ActivityRecorder(e.h.bs))
+	ar.Put("/api/board/{project}/artifacts/{id}/tags", e.h.SetArtifactTags)
+	asrv := httptest.NewServer(ar)
+	t.Cleanup(asrv.Close)
+	before := len(activityList(t, srv.URL))
+	for _, click := range []string{"read", "tags"} {
+		req, err := http.NewRequest(http.MethodPut, asrv.URL+"/api/board/tag-team/artifacts/"+id+"/tags", strings.NewReader(`{"tags":["internal"]}`))
+		require.NoError(t, err)
+		req.Header.Set("X-Coral-Click", click)
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		resp.Body.Close()
+		require.Equal(t, http.StatusOK, resp.StatusCode, "the agent's write itself is made")
+	}
+	assert.Len(t, activityList(t, srv.URL), before, "an agent's call writes no row, whatever header it sends")
 }

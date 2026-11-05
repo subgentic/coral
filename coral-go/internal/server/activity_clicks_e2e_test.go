@@ -172,6 +172,9 @@ func TestMoreOperatorClicksAreInTheActivityRecord(t *testing.T) {
 			return click{name: "dismiss a welcome item", method: "PUT", path: "/api/settings", body: `{"inbox_welcome":"off"}`, action: board.ActInboxHide, kind: "setting"}
 		},
 		func() click {
+			return click{name: "a welcome item done", method: "PUT", path: "/api/settings", body: `{"inbox_welcome_done":"tour"}`, action: board.ActInboxHide, kind: "setting"}
+		},
+		func() click {
 			return click{name: "dismiss a goal-looks-done row", method: "PUT", path: "/api/settings", body: `{"goal_done_hidden":"[]"}`, action: board.ActInboxHide, kind: "setting"}
 		},
 	}
