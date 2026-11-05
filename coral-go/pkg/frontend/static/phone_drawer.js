@@ -55,7 +55,7 @@ export function drawerTop() {
     if (ctx === 'hub-inbox' || ctx === 'history') { // the Inbox, its Tasks and Chats: the Inbox's folders with their counts
         const rows = state.inboxFolderRows?.(); // every folder of the Inbox, as its sidebar lists them (#13596: a phone has no tab strip)
         if (rows) {
-            const PLAIN = { 'saved-bookmark': 'bookmark' };
+            const PLAIN = { 'saved-bookmark': 'star' };
             for (const sec of rows.sections) {
                 if (sec.title && rows.sections.length > 1 && sec.items.length > 1) out.push(el('div', 'nav-drawer-group', sec.title));
                 for (const it of sec.items) out.push(row(PLAIN[it.icon] || (/^[a-z_]+$/.test(it.icon || '') ? it.icon : 'folder'), it.label, it.count, () => { window.switchNavTab?.('hub-inbox'); importOnce('./inbox_tab.js').then(() => rows.pick(it.key)); }, it.key === rows.current));
