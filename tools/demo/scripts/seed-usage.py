@@ -18,7 +18,7 @@ rng = random.Random(214)   # the same made-up history every run
 # model: (share of an agent's rows, $ per million input, $ per million output)
 MODELS = {"claude-opus-5-5": (15.0, 75.0), "claude-sonnet-5-5": (3.0, 15.0), "claude-haiku-5-5": (0.8, 4.0)}
 WEIGHT = {"Orchestrator": ["claude-opus-5-5"] * 3 + ["claude-sonnet-5-5"], "Backend": ["claude-sonnet-5-5"] * 3 + ["claude-opus-5-5"],
-          "Frontend": ["claude-sonnet-5-5"] * 3 + ["claude-haiku-5-5"], "Designer": ["claude-sonnet-5-5", "claude-haiku-5-5"], "Reviewer": ["claude-haiku-5-5"] * 2 + ["claude-sonnet-5-5"]}
+          "Frontend": ["claude-sonnet-5-5"] * 3 + ["claude-haiku-5-5"], "Designer": ["claude-sonnet-5-5", "claude-haiku-5-5"], "Lead Developer": ["claude-sonnet-5-5"] * 3 + ["claude-opus-5-5"], "QA Engineer": ["claude-haiku-5-5", "claude-sonnet-5-5"], "Reviewer": ["claude-haiku-5-5"] * 2 + ["claude-sonnet-5-5"]}
 con = sqlite3.connect(db, timeout=30)
 con.execute("PRAGMA busy_timeout=30000")
 agents = con.execute("SELECT DISTINCT session_id, agent_name, team_id, board_name FROM token_usage WHERE agent_name IN (%s)" % ",".join("?" * len(WEIGHT)), list(WEIGHT)).fetchall()

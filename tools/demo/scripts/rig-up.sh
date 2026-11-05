@@ -23,12 +23,13 @@ stop_demo
 if [ -z "$RESUME" ]; then
   mkdir -p "$S/work"; rm -rf "$S/data" "$S/home" "$S/work/claude-projects" "$S/work/envdump" "$S/work/state.json" "$S/work/launch.json"
   mkdir -p "$S/data" "$S/home" "$S/work/claude-projects" "$S/work/envdump"
+  mkdir -p "$S/home/.claude"; echo "{}" > "$S/home/.claude/settings.json"   # a settings file Coral can record folder trust in: no first-run notice in the film
 # the throwaway project the agents "work on" (story.json)
   node "$HERE/setup.mjs" repo || exit 1
 fi
 cd "$S/home"
 # the scripted answers of the mock agents (MOCK_AGENT_REPLIES): one entry per agent, keyed by its [Name] tag, from story.json
-python3 -I -c "import json,sys;d=json.load(open(sys.argv[1]));print(json.dumps([c['reply'] for c in d['chats']]+[{'text':x} for x in d.get('fillers',[])]))" "$HERE/../story.json" > "$S/work/replies.json"
+python3 -I -c "import json,sys;d=json.load(open(sys.argv[1]));print(json.dumps([c['reply'] for c in d['chats']]+([d['goalChat']['reply']] if 'goalChat' in d else [])+[{'text':x} for x in d.get('fillers',[])]))" "$HERE/../story.json" > "$S/work/replies.json"
 python3 -I -c "import json,sys;print(json.dumps(json.load(open(sys.argv[1]))['mockPrompts']))" "$HERE/../story.json" > "$S/work/prompts.json"   # the words of the prompts the mock raises (MOCK_PROMPTS_FILE)
 nohup env -i HOME="$S/home" PATH="$S/bin:/usr/bin:/bin" CORAL_DATA_DIR="$S/data" CORAL_TELEMETRY_DISABLED=1 CORAL_HOOK_DIR="$S/bin" \
   MOCK_AGENT_READY=1 MOCK_AGENT_MODELS=1 MOCK_AGENT_QUIET=1 MOCK_AGENT_GOAL="$(python3 -I -c "import json,sys;print(json.load(open(sys.argv[1]))['goal']['title'])" "$HERE/../story.json")" MOCK_PROMPTS_FILE="$S/work/prompts.json" MOCK_AGENT_REPLIES="$S/work/replies.json" MOCK_AGENT_ENV_DUMP="$S/work/envdump" CLAUDE_PROJECTS_DIR="$S/work/claude-projects" \
