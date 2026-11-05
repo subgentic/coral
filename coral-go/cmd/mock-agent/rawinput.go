@@ -410,7 +410,7 @@ func runRawInput(dir, sessionID, settingsFile string, turn func(string)) {
 			default:
 				if rest, ok := strings.CutPrefix(kind, "bash:"); ok { // MOCK_BASH: a tool call of its own, on its own goroutine so a long command holds nothing else
 					mode, command, _ := strings.Cut(rest, ":")
-					go runMockBash(hooks, name, mode, command)
+					go runMockBash(hooks, name, mode, command, func() { drawBox(box) })
 				}
 			}
 		}

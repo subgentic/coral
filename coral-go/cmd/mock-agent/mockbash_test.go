@@ -36,12 +36,12 @@ func TestMockBashStopsWhenTheHookDeniesAndRunsWhenItDoesNot(t *testing.T) {
 	}
 	marker := filepath.Join(dir, "ran")
 	deny := mk("deny", `{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"busy: number 2"}}`)
-	runMockBash(deny, "a", "wait", "touch "+marker)
+	runMockBash(deny, "a", "wait", "touch "+marker, nil)
 	if _, err := os.Stat(marker); err == nil {
 		t.Fatal("a denied command ran")
 	}
 	allow := mk("allow", "")
-	runMockBash(allow, "a", "wait", "touch "+marker)
+	runMockBash(allow, "a", "wait", "touch "+marker, nil)
 	if _, err := os.Stat(marker); err != nil {
 		t.Fatal("an allowed command did not run")
 	}

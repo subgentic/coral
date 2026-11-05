@@ -28,8 +28,13 @@ func parseMockBash(line string) (mode, command string, ok bool) {
 }
 
 // runMockBash is one such call.
-func runMockBash(h *hookRunner, name, mode, command string) {
-	defer h.fire("Stop", map[string]any{"stop_hook_active": false}) // the turn ends after the call, as Claude Code's does: Coral holds typed input while a turn runs, so without it the next line would wait forever
+func runMockBash(h *hookRunner, name, mode, command string, redraw func()) {
+	defer func() { // the turn ends after the call, as Claude Code's does: Coral holds typed input while a turn runs, so without the Stop the next line would wait forever
+		if redraw != nil {
+			redraw() // an empty input box again: Coral will not type into a box that still shows a line
+		}
+		h.fire("Stop", map[string]any{"stop_hook_active": false})
+	}()
 	id := fmt.Sprintf("toolu_mockbash_%s_%d", name, mockBashSeq.Add(1))
 	if reason := h.fireResult("PreToolUse", map[string]any{"tool_name": "Bash", "tool_use_id": id, "tool_input": map[string]any{"command": command}}); reason != "" {
 		sayf("\r\n[mock-agent] bash REFUSED: %s\r\n", strings.Join(strings.Fields(reason), " "))
