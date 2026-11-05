@@ -17,6 +17,7 @@ import (
 
 	"github.com/subgentic/coral/internal/clihelp"
 	"github.com/subgentic/coral/internal/heavy"
+	"github.com/subgentic/coral/internal/safego"
 )
 
 const heavyUsageText = `Usage: coral-board heavy run [--pool heavy] [--timeout 90m] -- <command...>
@@ -86,8 +87,9 @@ func cmdHeavy() {
 		Granted bool `json:"granted"`
 		Place   int  `json:"place"`
 		Entry   struct {
-			Member  string `json:"member"`
-			Machine string `json:"machine"`
+			Member     string `json:"member"`
+			Machine    string `json:"machine"`
+			LeaseUntil string `json:"lease_until"`
 		} `json:"entry"`
 	}
 	last := -1
@@ -126,11 +128,44 @@ func cmdHeavy() {
 		return
 	}
 	fmt.Printf("[heavy] %s: running on %s\n", *pool, plainText(where))
+	// the slot is a lease: a run longer than it renews it while it runs (or the next agent is given the machine under it), and a run that has lost the slot is stopped
+	runCtx, cancelRun := context.WithCancel(ctx)
+	defer cancelRun()
+	lost := make(chan struct{})
+	var lease time.Duration
+	if t, err := time.Parse(time.RFC3339Nano, res.Entry.LeaseUntil); err == nil {
+		lease = time.Until(t)
+	}
+	go func() {
+		defer safego.Recover("heavy/renew")
+		tick := time.NewTicker(heavyRenewEvery(lease))
+		defer tick.Stop()
+		for {
+			select {
+			case <-runCtx.Done():
+				return
+			case <-tick.C:
+				if _, status, err := resourceCall("POST", "/"+*pool+"/renew", map[string]any{"subscriber_id": me}); err == nil && status == http.StatusConflict {
+					close(lost) // not ours any more: kicked, or the lease ran out
+					cancelRun()
+					return
+				}
+			}
+		}
+	}()
 	var code int
 	if mini {
-		code = heavyRunRemote(ctx, command, *timeout)
+		code = heavyRunRemote(runCtx, command, *timeout)
 	} else {
-		code = heavyRunLocal(ctx, command)
+		code = heavyRunLocal(runCtx, command)
+	}
+	select {
+	case <-lost:
+		fmt.Printf("[heavy] this run lost its slot of %s (kicked, or its lease ran out): it was stopped so it does not run beside the next agent's\n", *pool)
+		if code == 0 {
+			code = 1
+		}
+	default:
 	}
 	release()
 	fmt.Printf("[heavy] %s given back (exit %d)\n", *pool, code)
@@ -139,9 +174,28 @@ func cmdHeavy() {
 	}
 }
 
+// heavyRenewFloor is the shortest renew interval; a test shortens it.
+var heavyRenewFloor = 5 * time.Second
+
+// heavyRenewEvery is how often a run renews its slot: a third of the lease it was given, within 5 seconds and 5 minutes (60 seconds when the lease is not known).
+func heavyRenewEvery(lease time.Duration) time.Duration {
+	if lease <= 0 {
+		return 60 * time.Second
+	}
+	d := lease / 3
+	if d < heavyRenewFloor {
+		d = heavyRenewFloor
+	}
+	if d > 5*time.Minute {
+		d = 5 * time.Minute
+	}
+	return d
+}
+
 // heavyRunLocal runs the command here, in this folder, with this environment: the pool gave the Mac.
 func heavyRunLocal(ctx context.Context, command string) int {
 	c := exec.CommandContext(ctx, "sh", "-c", command)
+	heavyOwnGroup(c) // its own process group, killed whole when the run is stopped: the shell dying alone would leave the command running
 	c.Stdin, c.Stdout, c.Stderr = os.Stdin, os.Stdout, os.Stderr
 	if err := c.Run(); err != nil {
 		if ee, ok := err.(*exec.ExitError); ok {

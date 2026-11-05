@@ -14,10 +14,12 @@ import (
 // #13750: coral-board heavy run: claim the pool, run on the machine the grant names.
 
 type heavyStub struct {
-	mu     sync.Mutex
-	reqs   []string
-	grants []string // the claim answers, in order (the last repeats)
-	n      int
+	mu          sync.Mutex
+	reqs        []string
+	grants      []string // the claim answers, in order (the last repeats)
+	n           int
+	renewStatus int // 0: 200; else the renew answer (409: the slot is no longer ours)
+	renews      int
 }
 
 func (s *heavyStub) handler(w http.ResponseWriter, r *http.Request) {
@@ -39,6 +41,14 @@ func (s *heavyStub) handler(w http.ResponseWriter, r *http.Request) {
 		}
 		w.Write([]byte(g))
 		return
+	}
+	if strings.HasSuffix(r.URL.Path, "/renew") {
+		s.renews++
+		if s.renewStatus != 0 {
+			w.WriteHeader(s.renewStatus)
+			w.Write([]byte(`{"error":"not_holder"}`))
+			return
+		}
 	}
 	w.Write([]byte(`{}`))
 }
@@ -160,5 +170,45 @@ func TestHeavyCommandJoinsAnArgumentListWithQuotingAndKeepsOneArgumentAsAShellLi
 	}
 	if got := heavyCommand([]string{"cd x && go test | tail"}); got != "cd x && go test | tail" {
 		t.Errorf("one argument is a shell line as it is: %q", got)
+	}
+}
+
+// QA Reviewer 2's MUST on #13750: a heavy run longer than its lease must renew it, or the slot goes to the next agent while the run is still using the machine.
+func TestAHeavyRunLongerThanItsLeaseRenewsTheSlotWhileItRuns(t *testing.T) {
+	prevFloor := heavyRenewFloor
+	heavyRenewFloor = 50 * time.Millisecond
+	defer func() { heavyRenewFloor = prevFloor }()
+	soon := time.Now().Add(900 * time.Millisecond).UTC().Format(time.RFC3339Nano)
+	s := &heavyStub{grants: []string{`{"granted":true,"place":0,"entry":{"id":1,"member":"mac-heavy","machine":"Mac","lease_until":"` + soon + `"}}`}}
+	out, code := runHeavy(t, s, "run", "--", "sleep 2; echo finished")
+	if code != 0 || !strings.Contains(out, "finished") {
+		t.Fatalf("code=%d out=%q", code, out)
+	}
+	if s.renews < 1 {
+		t.Fatalf("a run longer than its lease renews it while it runs: %d renewals, %v", s.renews, s.reqs)
+	}
+}
+
+func TestAHeavyRunThatLosesItsSlotIsStoppedAndSaysSo(t *testing.T) {
+	prevFloor := heavyRenewFloor
+	heavyRenewFloor = 50 * time.Millisecond
+	defer func() { heavyRenewFloor = prevFloor }()
+	soon := time.Now().Add(600 * time.Millisecond).UTC().Format(time.RFC3339Nano)
+	s := &heavyStub{renewStatus: 409, grants: []string{`{"granted":true,"place":0,"entry":{"id":1,"member":"mac-heavy","machine":"Mac","lease_until":"` + soon + `"}}`}}
+	start := time.Now()
+	out, code := runHeavy(t, s, "run", "--", "sleep 30; echo should-not-print")
+	if code == 0 || strings.Contains(out, "should-not-print") || time.Since(start) > 10*time.Second {
+		t.Fatalf("a run that has lost its slot is stopped: code=%d after %v out=%q", code, time.Since(start), out)
+	}
+	if !strings.Contains(out, "lost its slot") {
+		t.Fatalf("and says why: %q", out)
+	}
+}
+
+func TestTheRenewIntervalIsAThirdOfTheLeaseWithinLimits(t *testing.T) {
+	for in, want := range map[time.Duration]time.Duration{45 * time.Minute: 5 * time.Minute, 90 * time.Second: 30 * time.Second, 3 * time.Second: 5 * time.Second, 0: 60 * time.Second} {
+		if got := heavyRenewEvery(in); got != want {
+			t.Errorf("lease %v: renew every %v, want %v", in, got, want)
+		}
 	}
 }
