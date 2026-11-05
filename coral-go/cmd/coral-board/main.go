@@ -134,6 +134,8 @@ func main() {
 		cmdHealth()
 	case "queue":
 		cmdQueue()
+	case "resource":
+		cmdResource()
 	case "send":
 		cmdSend()
 	case "targets":
@@ -231,6 +233,8 @@ Commands:
                                Read or update custom team rules (mode unchanged)
                                (changing them is Operator only; reading works)
   queue [--json]               The merge queue: approved tasks whose patches have not landed
+  resource list|status|claim|release|renew|define|remove|move|kick
+                               Claim a slot of a shared resource (the Mac, the mini) and wait your turn; see: coral-board resource
   health ack <id>              Mark a health-check item handled: the item that ends
                                with [ack <id>] (orchestrator or Operator)
   search "<text>" [--from NAME] [--mentions NAME] [--since T] [--until T] [--sort newest|oldest] [--limit N] [--cursor C] [--json]

@@ -1493,6 +1493,7 @@
     body[data-hub-state="disconnected"] .phone-bar .phone-account-btn::after { background: var(--warning); }
 }
 @media (max-width: 600px) {
+    body[data-phone-fab="automations"]:has(#group-table-view[data-group="automations:queue"]) .phone-fab { display: none; } /* the Queue folder has nothing to create: no + there (#13651) */
     body[data-phone-fab="automations"] .automations-create, body[data-phone-fab="automations"] .automations-act { display: none; } /* the + at the bottom right makes a job or a workflow: the toolbar's create buttons are not drawn (#11239 slice A) */
     body:has(#scheduler-view[data-phone-item]:not([style*="display: none"])) .phone-nav, body:has(#scheduler-view[data-phone-item]:not([style*="display: none"])) .phone-fab, body:has(#workflows-view[data-phone-item]:not([style*="display: none"])) .phone-nav, body:has(#workflows-view[data-phone-item]:not([style*="display: none"])) .phone-fab, body:has(#docs-view[data-phone-item]:not([style*="display: none"])) .phone-nav, body:has(#cost-dashboard-view[data-phone-item]:not([style*="display: none"])) .phone-nav, body:has(#servers-view[data-phone-item]:not([style*="display: none"])) .phone-nav { display: none; } /* a job or a workflow opened is a page of its own (a drill-down): no nav and no + over its footer */
 }
