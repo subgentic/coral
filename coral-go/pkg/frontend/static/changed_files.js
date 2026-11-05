@@ -671,16 +671,20 @@ export async function refreshChangedFiles(quiet = false, auto = false) { // quie
 // A late file read can arrive after the person started typing. Keep polling/model updates live,
 // but paint the list once typing pauses; a first 500-row population cannot reuse old rows.
 const FILES_TYPING_IDLE_MS = 300;
-let _lastTypingAt = -Infinity, _typingPaintTimer = 0;
+let _lastTypingAt = -Infinity, _typingPaintTimer = 0, _typingPaintFor = '';
 const typingField = e => !!e && (e.id === 'command-input' || e.classList?.contains('xterm-helper-textarea'));
 function queueTypingPaint() {
     clearTimeout(_typingPaintTimer);
-    _typingPaintTimer = setTimeout(() => { _typingPaintTimer = 0; renderChangedFiles(); }, FILES_TYPING_IDLE_MS);
+    _typingPaintFor = _keyOf(state.currentSession);
+    _typingPaintTimer = setTimeout(() => { _typingPaintTimer = 0; if (_typingPaintFor === _keyOf(state.currentSession)) renderChangedFiles(); }, FILES_TYPING_IDLE_MS);
 }
 function noteFilesTyping(e) {
     if (!typingField(e.target)) return;
     _lastTypingAt = performance.now();
-    if (_typingPaintTimer) queueTypingPaint();
+    if (_typingPaintTimer) {
+        if (_typingPaintFor === _keyOf(state.currentSession)) queueTypingPaint();
+        else { clearTimeout(_typingPaintTimer); _typingPaintTimer = 0; } // the pending list belonged to another agent
+    }
 }
 document.addEventListener('input', noteFilesTyping, true);
 document.addEventListener('keydown', e => {
