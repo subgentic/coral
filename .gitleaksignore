@@ -341,3 +341,9 @@ fa6d4836cf31643b77e807664a850d91da9cf491:coral-go/internal/httputil/pooled_isola
 fb89d19a6e5bfb68447eef30ad11ee86beb17f16:tests/frontend/fixtures/settings_modal_trace.json:generic-api-key:8
 fc48435a747c156183d13ceb7d0f840ba2eb7b92:coral-go/internal/sshprov/start_test.go:generic-api-key:14
 fe65aa06ddb791c936669cd5695a44be670ec666:coral-go/internal/agent/summary_redact_test.go:aws-access-token:18
+
+# triaged after the list above (#13519): the three AWS-shaped fake key ids in QA's redaction tests (commit d024f9413 on qa-13461-wording: "the AWS key id in the three redaction tables is an obviously invented one"),
+# one fingerprint each. A fingerprint holds its commit id, so these are used only while that commit keeps its id: when the branch lands rebased, QA's 'gitleaks:allow' comments on those three lines keep the rule satisfied.
+d024f94132f33d22320ab6da094a94e85d4b010a:coral-go/internal/agent/first_user_message_test.go:aws-access-token:118
+d024f94132f33d22320ab6da094a94e85d4b010a:coral-go/internal/agent/summary_redact_test.go:aws-access-token:18
+d024f94132f33d22320ab6da094a94e85d4b010a:coral-go/internal/server/routes/agent_history_excerpt_redact_test.go:aws-access-token:14
