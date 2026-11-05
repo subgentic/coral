@@ -82,6 +82,7 @@ type mockSessionTerminal struct {
 	sessions         map[string]*ptymanager.PaneInfo
 	outputs          map[string]string
 	sent             map[string][]string
+	sentOrder        []string // every command SendInput took, in the order it was sent, whichever session it went to (#13565: sent is a map, and ranging over it is in a random order)
 	captures         []string
 	findTypes        []string                          // the agent type each FindSession was asked for, in order (#8973: a restart that switches provider finds the old terminal by the old type)
 	raw              map[string][]string               // keys sent with SendRawInput
@@ -198,6 +199,7 @@ func (m *mockSessionTerminal) SendInput(_ context.Context, o terminalinput.Origi
 		return fmt.Errorf("session %q not found", name)
 	}
 	m.sent[name] = append(m.sent[name], command)
+	m.sentOrder = append(m.sentOrder, command)
 	m.noteOrigin(name, o)
 	return nil
 }
@@ -274,6 +276,7 @@ func (m *mockSessionTerminal) SendToTarget(ctx context.Context, _ terminalinput.
 		return m.sendErr
 	}
 	m.sent[target] = append(m.sent[target], command)
+	m.sentOrder = append(m.sentOrder, command)
 	return nil
 }
 func (m *mockSessionTerminal) SendTerminalInput(_ context.Context, _ terminalinput.Origin, _, _ string) error {
@@ -386,14 +389,25 @@ func (m *mockSessionTerminal) setOutput(name, output string) {
 	m.outputs[name] = output
 }
 
-func (m *mockSessionTerminal) sentCommands() []string {
+// sentToSession are the commands sent to one session (recorded under its name or under name.pane), in the order they were sent. sentCommands flattens a map, so its order is random: a test that needs
+// "the second launch's command" asks for the session (#13556).
+func (m *mockSessionTerminal) sentToSession(name string) []string {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	var commands []string
-	for _, cmds := range m.sent {
-		commands = append(commands, cmds...)
+	for key, cmds := range m.sent {
+		if key == name || strings.HasPrefix(key, name+".") || strings.HasPrefix(key, name+":") {
+			commands = append(commands, cmds...)
+		}
 	}
 	return commands
+}
+
+// sentCommands is every command sent, in the order it was sent (not grouped by session: a test that wants one session's commands uses sentToSession).
+func (m *mockSessionTerminal) sentCommands() []string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return append([]string(nil), m.sentOrder...)
 }
 
 // setupSessionsTestServer creates a test HTTP server with a SessionsHandler and all routes.
@@ -3495,5 +3509,24 @@ func TestSessionsList_RowCarriesWhenItsGoalWasWritten(t *testing.T) {
 			assert.Contains(t, r, "summary_at", "the key is always there")
 			assert.Nil(t, r["summary_at"], "no goal, no age")
 		}
+	}
+}
+
+// #13565 (QA's #13556 finding): sentCommands once flattened a Go map, so the commands of two launches came back in a random order and a test that read the first launch's prompt as sentCommands()[0] failed about
+// half the time. It returns the commands in the order they were sent, whichever session they went to.
+func TestSentCommandsAreInTheOrderTheyWereSentAcrossSessions(t *testing.T) {
+	for round := 0; round < 200; round++ {
+		term := newMockTerminal()
+		names := []string{"claude-a", "claude-b", "codex-c", "claude-d", "pi-e", "claude-f"}
+		var want []string
+		for i, n := range names {
+			term.addSession(n, "/tmp/x")
+			for j := 0; j < 2; j++ {
+				cmd := fmt.Sprintf("%s #%d.%d", n, i, j)
+				require.NoError(t, term.SendInput(context.Background(), terminalinput.Coral, n, cmd, "", ""))
+				want = append(want, cmd)
+			}
+		}
+		require.Equal(t, want, term.sentCommands(), "round %d: the commands are in send order, not map order", round)
 	}
 }

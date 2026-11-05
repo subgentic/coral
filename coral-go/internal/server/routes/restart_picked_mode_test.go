@@ -55,7 +55,6 @@ func TestARestartWithAPickedModeRestartsInIt(t *testing.T) {
 				req["permission_mode"] = *c.pick
 			}
 			body, _ := json.Marshal(req)
-			before := len(term.sentCommands())
 			resp, err := http.Post(server.URL+"/api/sessions/live/"+sn+"/restart", "application/json", bytes.NewReader(body))
 			require.NoError(t, err)
 			defer resp.Body.Close()
@@ -64,7 +63,7 @@ func TestARestartWithAPickedModeRestartsInIt(t *testing.T) {
 			require.NoError(t, json.NewDecoder(resp.Body).Decode(&res))
 			var cmd string
 			require.Eventually(t, func() bool { // the restart types the new session's own launch line; other sessions of the run are not this one's
-				for _, x := range term.sentCommands()[before:] {
+				for _, x := range term.sentToSession(res["session_name"].(string)) {
 					if strings.Contains(x, res["session_name"].(string)) {
 						cmd = x
 						return true
