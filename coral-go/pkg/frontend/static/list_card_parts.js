@@ -48,10 +48,11 @@ export function deleteTeamItem(boardName) {
 // the check off, so the last state seen for the team stands until a row says otherwise.
 const _healthSeen = new Map(); // team (board) name -> the last team_health_on a row of it carried
 export function teamHealthBtn(boardName, boardSessions) {
-    if (isCloud() || splitKey(boardName).server !== LOCAL_SERVER) return ''; // Hub does not serve this local-only settings section
     const row = boardSessions.find(s => typeof s.team_health_on === 'boolean');
     if (row) _healthSeen.set(boardName, row.team_health_on);
     if (!_healthSeen.get(boardName)) return '';
+    // A remote/Hub header keeps the on-state signal without offering unavailable settings.
+    if (isCloud() || splitKey(boardName).server !== LOCAL_SERVER) return `<span class="team-health-btn is-on" role="img" aria-label="Health monitor is on" title="Health monitor is on">${SVGO.o5}<path d="M3 12h4l2.5-6 4 12 2.5-6H21"/></svg></span>`;
     const label = `Health monitor settings for ${keyLabel(boardName)}`;
     return `<button type="button" class="btn btn-quiet btn-icon btn-xs folder-copy-btn team-health-btn is-on" data-on-click="team-health" data-board="${escapeAttr(boardName)}" title="${escapeAttr(label)}" aria-label="${escapeAttr(label)}">${SVGO.o5}<path d="M3 12h4l2.5-6 4 12 2.5-6H21"/></svg></button>`;
 }
