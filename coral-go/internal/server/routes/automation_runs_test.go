@@ -279,3 +279,33 @@ func TestAutomationRunsRowsCarryWhatTheOldReadsCarried(t *testing.T) {
 	assert.Equal(t, "wf-name", w["workflow_name"])
 	assert.EqualValues(t, wf, w["workflow_id"])
 }
+
+// QA Reviewer 2's SHOULD on #13183: a job run and a workflow run with the SAME time and the SAME id (their ids come from two tables, so id 1 exists in both) are told apart by the cursor's kind, or a page boundary between
+// them loses one. One run of each kind at one instant, a page of one: both are returned, once each, and in the order the list promises (kind, descending, after time and id).
+func TestAutomationRunsCursorTellsAJobRunFromAWorkflowRunOfTheSameTimeAndId(t *testing.T) {
+	f := newRunsFixture(t)
+	at := time.Date(2026, 11, 1, 12, 0, 0, 0, time.UTC)
+	jobRunID := f.jobRun(t, f.job(t, "one-job"), at, "completed")
+	wfRunID := f.workflowRun(t, f.workflow(t, "one-workflow"), at, "manual", nil)
+	require.Equal(t, jobRunID, wfRunID, "the premise: both tables hand out id 1 first, so the two runs share time and id")
+
+	var kinds []string
+	cursor := ""
+	for page := 0; page < 4; page++ {
+		p := url.Values{"limit": {"1"}}
+		if cursor != "" {
+			p.Set("cursor", cursor)
+		}
+		code, a, body := f.get(t, p)
+		require.Equal(t, 200, code, body)
+		assert.Equal(t, 2, a.Total)
+		for _, r := range a.Runs {
+			kinds = append(kinds, fmt.Sprint(r["kind"]))
+		}
+		if !a.HasMore {
+			break
+		}
+		cursor = a.NextCursor
+	}
+	assert.Equal(t, []string{"workflow", "job"}, kinds, "both runs, once each, across the boundary between them")
+}
