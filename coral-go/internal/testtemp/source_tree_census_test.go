@@ -41,6 +41,13 @@ var mkdirTempFileBases = map[string]map[string]string{
 	"internal/testtemp/owner_windows_test.go":       {"parent": "the test's own folder"},
 }
 
+// os.Mkdir and os.MkdirAll with a RELATIVE folder (a literal that is not absolute, or one built from filepath.Abs(".")) make it inside the package's source folder too (QA Reviewer 2's SHOULD on
+// #13745). Table: the two golden-file regenerations, which write the checked-in testdata folder on purpose when the update flag is given.
+var relativeMkdirs = map[string]string{
+	"internal/tmux/terminalinput_golden_test.go:\"testdata\"":       "regenerates the checked-in golden folder, behind the update flag",
+	"internal/ptymanager/terminalinput_golden_test.go:\"testdata\"": "regenerates the checked-in golden folder, behind the update flag",
+}
+
 func moduleRoot(t *testing.T) string {
 	t.Helper()
 	dir, err := os.Getwd()
@@ -79,14 +86,36 @@ func TestNoTestMakesAFolderInsideTheSourceTree(t *testing.T) {
 		rel = filepath.ToSlash(rel)
 		ast.Inspect(f, func(n ast.Node) bool {
 			c, ok := n.(*ast.CallExpr)
-			if !ok || len(c.Args) < 2 {
+			if !ok || len(c.Args) < 1 {
 				return true
 			}
 			sel, ok := c.Fun.(*ast.SelectorExpr)
-			if !ok || sel.Sel.Name != "MkdirTemp" {
+			if !ok {
 				return true
 			}
 			if x, ok := sel.X.(*ast.Ident); !ok || x.Name != "os" {
+				return true
+			}
+			if sel.Sel.Name == "Mkdir" || sel.Sel.Name == "MkdirAll" {
+				if len(c.Args) < 1 {
+					return true
+				}
+				var buf bytes.Buffer
+				_ = printer.Fprint(&buf, fset, c.Args[0])
+				arg := buf.String()
+				relative := strings.Contains(arg, `Abs(".")`) || strings.HasPrefix(arg, `filepath.Join(".",`)
+				if lit, ok := c.Args[0].(*ast.BasicLit); ok && lit.Kind == token.STRING {
+					v := strings.Trim(lit.Value, "\"`")
+					relative = relative || !(strings.HasPrefix(v, "/") || strings.HasPrefix(v, `\\`) || (len(v) > 1 && v[1] == ':'))
+				}
+				if relative {
+					if _, ok := relativeMkdirs[rel+":"+arg]; !ok {
+						bad = append(bad, rel+": os."+sel.Sel.Name+"("+arg+", ...) makes a RELATIVE folder, inside the source tree, at "+fset.Position(c.Pos()).String())
+					}
+				}
+				return true
+			}
+			if sel.Sel.Name != "MkdirTemp" {
 				return true
 			}
 			seen++
