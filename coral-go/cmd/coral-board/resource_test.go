@@ -140,3 +140,21 @@ func TestResourceCommandsRefuseBadInputAndReportServerRefusals(t *testing.T) {
 		t.Error("a refusal did not end the command with an error")
 	}
 }
+
+// A short lease says its seconds (it read "over" for anything under half a minute: found in the end-to-end run).
+func TestLeaseWordsSaysWhatIsLeft(t *testing.T) {
+	at := func(d time.Duration) string { return time.Now().Add(d).UTC().Format(time.RFC3339) }
+	for _, c := range []struct {
+		in, want string
+	}{{at(20 * time.Second), "[lease "}, {at(45 * time.Minute), "[lease 45m0s left]"}, {at(-time.Minute), "lease over"}} {
+		if got := leaseWords(c.in); !strings.Contains(got, c.want) {
+			t.Errorf("%s: %q does not contain %q", c.in, got, c.want)
+		}
+	}
+	if got := leaseWords(at(20 * time.Second)); !strings.Contains(got, "s left]") || strings.Contains(got, "over") {
+		t.Errorf("20 s left reads %q", got)
+	}
+	if leaseWords("not a time") != "" {
+		t.Error("a bad time prints something")
+	}
+}

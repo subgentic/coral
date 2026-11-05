@@ -135,13 +135,18 @@ func taskWords(e resEntry) string {
 }
 
 func leaseWords(lease string) string {
-	if t, err := time.Parse(time.RFC3339, lease); err == nil {
-		if d := time.Until(t).Round(time.Minute); d > 0 {
-			return fmt.Sprintf(" [lease %s left]", d)
-		}
-		return " [lease over: it ends at the next look]"
+	t, err := time.Parse(time.RFC3339, lease)
+	if err != nil {
+		return ""
 	}
-	return ""
+	switch d := time.Until(t); {
+	case d <= 0:
+		return " [lease over: it ends at the next look]"
+	case d < time.Minute:
+		return fmt.Sprintf(" [lease %ds left]", int(d.Seconds()))
+	default:
+		return fmt.Sprintf(" [lease %s left]", d.Round(time.Minute))
+	}
 }
 
 func resourceList(rest []string) {
