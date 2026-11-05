@@ -51,7 +51,6 @@ import (
 	rekortilespb "github.com/sigstore/rekor-tiles/v2/pkg/generated/protobuf"
 	rekornote "github.com/sigstore/rekor-tiles/v2/pkg/note"
 	"github.com/sigstore/rekor/pkg/generated/models"
-	"github.com/sigstore/rekor/pkg/pki"
 	"github.com/sigstore/rekor/pkg/types"
 	dsseEntry "github.com/sigstore/rekor/pkg/types/dsse"
 	"github.com/sigstore/rekor/pkg/types/hashedrekord"
@@ -635,7 +634,7 @@ func generateRekorEntry(kind, version string, artifact []byte, cert []byte, sig 
 func createEntry(ctx context.Context, kind, apiVersion string, blobBytes, certBytes, sigBytes []byte, algorithmDetails signature.AlgorithmDetails) (types.EntryImpl, error) {
 	props := types.ArtifactProperties{
 		PublicKeyBytes: [][]byte{certBytes},
-		PKIFormat:      string(pki.X509),
+		PKIFormat:      "x509", // rekor's pki.X509; the pki package is not imported, since it links every format, the unmaintained x/crypto/openpgp among them (GO-2026-5932): nothing in this module links openpgp
 	}
 	switch kind {
 	case rekord.KIND, intoto.KIND, dsseEntry.KIND:
