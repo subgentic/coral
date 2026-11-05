@@ -9,6 +9,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/resources"
 	"github.com/subgentic/coral/pkg/resourcequeue"
@@ -112,7 +113,7 @@ func (h *ResourcesHandler) List(w http.ResponseWriter, r *http.Request) {
 // Get answers GET /api/resources/{name}.
 func (h *ResourcesHandler) Get(w http.ResponseWriter, r *http.Request) {
 	h.reap()
-	st, err := h.M.Queue().Status(urlParam(r, "name"))
+	st, err := h.M.Queue().Status(chi.URLParam(r, "name"))
 	if err != nil {
 		h.fail(w, err)
 		return
@@ -151,7 +152,7 @@ func (h *ResourcesHandler) Claim(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.reap()
-	name := urlParam(r, "name")
+	name := chi.URLParam(r, "name")
 	res, err := h.M.Claim(r.Context(), name, who, cleanText(body.Note, 200))
 	if err != nil {
 		h.fail(w, err)
@@ -170,7 +171,8 @@ func (h *ResourcesHandler) Release(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if err := h.M.Queue().Release(urlParam(r, "name"), who); err != nil {
+	h.reap()
+	if err := h.M.Queue().Release(chi.URLParam(r, "name"), who); err != nil {
 		h.fail(w, err)
 		return
 	}
@@ -183,7 +185,8 @@ func (h *ResourcesHandler) Renew(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	e, err := h.M.Queue().Renew(urlParam(r, "name"), who)
+	h.reap() // a lease that ran out is over: it cannot be renewed
+	e, err := h.M.Queue().Renew(chi.URLParam(r, "name"), who)
 	if err != nil {
 		h.fail(w, err)
 		return
@@ -241,7 +244,7 @@ func (h *ResourcesHandler) Define(w http.ResponseWriter, r *http.Request) {
 		errBadRequest(w, "invalid JSON")
 		return
 	}
-	name := urlParam(r, "name")
+	name := chi.URLParam(r, "name")
 	if !resourceNameRe.MatchString(name) || body.Slots < 1 || body.Slots > 100 || body.MaxLeaseS < 0 || body.MaxLeaseS > 24*3600 || len(body.Allowed) > 100 {
 		errBadRequest(w, "name: letters, digits, dot, dash and underscore, up to 64; slots 1 to 100; a lease up to a day; at most 100 allowed agents")
 		return
@@ -265,7 +268,7 @@ func (h *ResourcesHandler) Remove(w http.ResponseWriter, r *http.Request) {
 	if !h.manager(w, r) {
 		return
 	}
-	if err := h.M.Queue().Remove(urlParam(r, "name")); err != nil {
+	if err := h.M.Queue().Remove(chi.URLParam(r, "name")); err != nil {
 		h.fail(w, err)
 		return
 	}
@@ -273,7 +276,7 @@ func (h *ResourcesHandler) Remove(w http.ResponseWriter, r *http.Request) {
 }
 
 func entryID(w http.ResponseWriter, r *http.Request) (int64, bool) {
-	id, err := strconv.ParseInt(urlParam(r, "id"), 10, 64)
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err != nil || id < 1 {
 		errBadRequest(w, "entry id")
 		return 0, false

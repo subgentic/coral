@@ -266,3 +266,41 @@ func TestManyAgentsAtOnceNeverShareASlot(t *testing.T) {
 	assert.Empty(t, st.Queue)
 	assert.Len(t, q.All(), 1)
 }
+
+// The Orchestrator's ruling (#13613): no starvation is the intent, so with the defaults a waiting entry gains one whole rank step of the board's task priorities (10) in about 30 minutes.
+func TestWithTheDefaultsWaitingCrossesOneRankStepInHalfAnHour(t *testing.T) {
+	q, c := fixture(t, Config{})
+	claim(t, q, "mac", "holder", 0)
+	claim(t, q, "mac", "low-waiting", 0)
+	c.add(31 * time.Minute)
+	claim(t, q, "mac", "fresh-medium", 10)
+	st, _ := q.Status("mac")
+	assert.Equal(t, []string{"low-waiting", "fresh-medium"}, names(st.Queue), "a low task that has waited half an hour is not behind a fresh medium one")
+	claim(t, q, "mac", "fresh-high", 20)
+	st, _ = q.Status("mac")
+	assert.Equal(t, "fresh-high", st.Queue[0].Agent, "but it does not pass a class two steps up")
+}
+
+func TestRemovingAResourceDropsItsEntriesSoARedefinedOneStartsEmpty(t *testing.T) {
+	q, _ := fixture(t, Config{})
+	claim(t, q, "mac", "a", 0)
+	claim(t, q, "mac", "b", 0)
+	require.NoError(t, q.Remove("mac"))
+	require.NoError(t, q.Define(Resource{Key: "mac", Slots: 1}))
+	st, _ := q.Status("mac")
+	assert.Empty(t, st.Holders, "nobody inherits a slot of the old resource")
+	assert.Empty(t, st.Queue)
+	assert.Empty(t, q.Snapshot().Entries)
+}
+
+func TestOnGrantIsCalledWhenMoreSlotsOrAKickGrantTheWaiting(t *testing.T) {
+	var granted []string
+	q, _ := fixture(t, Config{OnGrant: func(e Entry) { granted = append(granted, e.Agent) }})
+	h := claim(t, q, "mac", "holder", 0)
+	claim(t, q, "mac", "w1", 0)
+	claim(t, q, "mac", "w2", 0)
+	require.NoError(t, q.Define(Resource{Key: "mac", Slots: 2}))
+	assert.Equal(t, []string{"w1"}, granted, "a slot added to the resource grants the next in line, and says so")
+	require.NoError(t, q.Cancel(h.Entry.ID))
+	assert.Equal(t, []string{"w1", "w2"}, granted, "a kick grants the next in line, and says so")
+}

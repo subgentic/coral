@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
@@ -240,4 +241,17 @@ func TestResourceNamesNotesAndListsAreClean(t *testing.T) {
 	assert.LessOrEqual(t, len([]rune(note)), 200, "a note is cut")
 	assert.NotContains(t, note, "\u001b")
 	assert.NotContains(t, note, "\u0007")
+}
+
+// Renew and Release look at the lease first, as claim and the reads do: a lease that ran out is over, and cannot be renewed just because the timer has not run yet.
+func TestALeaseThatRanOutCannotBeRenewed(t *testing.T) {
+	g := newResRig(t)
+	g.subscribe("alpha", "Dev A", "Developer", false)
+	g.do("operator", "PUT", "/api/resources/mac-heavy", map[string]any{"slots": 1, "max_lease_seconds": 1})
+	code, _ := g.do("token:Dev A", "POST", "/api/resources/mac-heavy/claim", map[string]any{})
+	require.Equal(t, 200, code)
+	time.Sleep(1200 * time.Millisecond) // sleep-ok: a one-second lease running out in real time
+	code, out := g.do("token:Dev A", "POST", "/api/resources/mac-heavy/renew", map[string]any{})
+	assert.Equal(t, 409, code, "%v", out)
+	assert.Equal(t, "not_holder", out["code"])
 }

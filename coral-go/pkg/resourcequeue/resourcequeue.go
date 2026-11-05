@@ -86,8 +86,8 @@ type Config struct {
 const (
 	DefaultLease       = 30 * time.Minute
 	DefaultMaxPerAgent = 3
-	DefaultAgeStep     = 10 * time.Minute
-	DefaultAgeCap      = 5
+	DefaultAgeStep     = 3 * time.Minute // 10 points in about 30 minutes of waiting: one rank step of the board's task priorities (0, 10, 20, 30), so nothing starves behind a steady stream of the next class up
+	DefaultAgeCap      = 10
 )
 
 // Persister keeps the state between runs.

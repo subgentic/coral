@@ -16,7 +16,7 @@ coral-board resource release mac-heavy                                      # al
 - `--timeout 30m` gives up after that long, leaves the line and exits 4.
 - Always release. In a script: `trap 'coral-board resource release mac-heavy' EXIT`, then claim. A slot is also a lease (30 minutes unless the resource says otherwise): for a longer run, `coral-board resource renew mac-heavy` before it runs out. When the lease ends, or you are no longer on a board, the slot goes to the next in line.
 - `coral-board resource list` shows every resource: who holds each slot, since when, how long the lease has left, and the line in order (you are marked). `resource status <name>` shows one.
-- Your place is ranked by the task you are working on (critical, high, medium, low), then first come first served; a long wait slowly raises it. You never set a priority. The Orchestrator can move you.
+- Your place is ranked by the task you are working on (critical, high, medium, low), then first come first served; waiting raises it by one whole class (10 points) in about 30 minutes, so nothing waits forever behind a stream of more important work. You never set a priority. The Orchestrator can move you.
 
 Do not post "starting a heavy run" and "run finished" notes for a resource you claim: the queue is the record.
 
