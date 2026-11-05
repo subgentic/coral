@@ -11,6 +11,7 @@ import (
 
 	_ "modernc.org/sqlite"
 
+	"github.com/subgentic/coral/internal/safego"
 	"github.com/subgentic/coral/pkg/resourcequeue"
 )
 
@@ -70,7 +71,10 @@ func OpenHistory(path string) (*History, error) {
 	h.prune(time.Now())
 	h.private()
 	h.wg.Add(1)
-	go h.run()
+	go func() {
+		defer safego.Recover("resources/history") // a panic in the writer loses analytics, never the server
+		h.run()
+	}()
 	return h, nil
 }
 

@@ -217,7 +217,7 @@ func (s *Store) HeavyPosts(ctx context.Context, team string, since, until time.T
 		q += ` AND m.project = ?`
 		full = append(full, team)
 	}
-	q += ` ORDER BY m.created_at`
+	q += ` ORDER BY m.created_at, m.id`
 	var rows []struct {
 		Who, Text, At string
 	}
