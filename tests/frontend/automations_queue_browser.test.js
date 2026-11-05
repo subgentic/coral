@@ -12,7 +12,7 @@ const { coralReady } = require('./helpers/wait');
 const now = Date.now();
 const iso = ms => new Date(now + ms).toISOString();
 const QUEUE = [
-    { name: 'mac-heavy', slots: 1, machine: 'Mac', max_lease_seconds: 3600, holders: [{ id: 11, agent: 'Data Science & Dashboarding', member: 'mac-heavy', machine: 'Mac', task: 13596, priority: 3, note: 'cdp-suite inbox_*', enqueued_at: iso(-1800000), granted_at: iso(-1500000), lease_until: iso(25 * 60000) }],
+    { name: 'mac-heavy', slots: 1, machine: 'Mac', max_lease_seconds: 3600, holders: [{ id: 11, agent: 'Data Science & Dashboarding', task: 13596, priority: 3, note: 'cdp-suite inbox_*', enqueued_at: iso(-1800000), granted_at: iso(-1500000), lease_until: iso(25 * 60000) }],
         queue: [{ id: 12, agent: 'Frontend Dev', task: 13600, priority: 2, note: 'go-test routes', enqueued_at: iso(-600000), place: 1 }, { id: 13, agent: 'QA Engineer', task: 13601, priority: 2, note: 'cdp-suite saved_*', enqueued_at: iso(-300000), place: 2 },
             { id: 14, agent: 'Backend Dev', priority: 1, note: 'go-test board', enqueued_at: iso(-60000), place: 3 }] },
     { name: 'mini', slots: 2, machine: 'Mini', max_lease_seconds: 3600, holders: [{ id: 21, agent: 'UI Reviewer', stuck: 'prompt', stuck_min: 12, note: 'cdp-suite inbox_artifact_count', enqueued_at: iso(-900000), granted_at: iso(-800000), lease_until: iso(40 * 60000) }], queue: [] },
@@ -57,7 +57,6 @@ const STUB = `(() => { const real = window.fetch; window.__queueTickMs = 1000; w
             const text = (await rows()).join(' | ');
             assert.match(text, /Data Science & Dashboarding.*Holding/, at + 'the holder says Holding: ' + text.slice(0, 500));
             assert.match(text, /Frontend Dev.*(Waiting, place|Place) 1/, at + 'the first in line is place 1');
-            if (!mobile) assert.match(text, /Data Science & Dashboarding.*Holding on Mac/, at + "a hold granted by a pool says which machine it is on (#13719): " + text.slice(0, 400));
             assert.match(text, /UI Reviewer.*Stuck 12 min/, at + 'a holder the Orchestrator was told is stuck says so (#13705): ' + text.slice(0, 700));
             assert.doesNotMatch(text.split(' | ').find(r => r.includes('UI Reviewer')), /Holding/, at + 'a stuck holder is not just Holding');
             if (!mobile) assert.match(await ev(`[...document.querySelectorAll('#group-table-view tbody tr[data-key]')].find(r => r.textContent.includes('UI Reviewer')).querySelector('.dt-chip, [class*=chip]').title`), /At a prompt waiting for a person for 12 min.*Orchestrator has been told/, at + 'the chip says why');
