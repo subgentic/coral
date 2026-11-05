@@ -534,7 +534,7 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
     .inbox-needs-results .dt-row:has(.inbox-review-item > .inbox-review-from) > [data-key=waiting] { order: 4; flex: 1 1 100%; align-self: auto; text-align: start; line-height: var(--lh-label); } /* a narrow phone's review row (#13144, the Operator: give the file name room): "waiting N min" goes under the file name and the line under it, so the name has the whole first line beside the sender; the row may be one line taller. Permission rows and questions (no sender span) keep theirs on the right. */
 }
 /* The phone's cell is narrow: the line wraps so "2 earlier versions" is not cut off (#11776). */
-.dt-folded .inbox-review-item:has(> .inbox-kind-icon) > .inbox-review-name { min-width: 0; } /* a narrow row (a phone, an item cell about 130 px wide): the file name's 44 px minimum width, the sender, the gaps and the kind icon no longer fit on one line, so the name wrapped to a line of its own and the row grew; with no minimum the name takes what is left and is cut with an ellipsis, as it was with no icon (#13144, measured: the row is 77 px with or without the icon) */
+.dt-folded .inbox-kind-row .inbox-review-item > .inbox-review-name { min-width: 0; } /* a narrow row (a phone, an item cell about 130 px wide): the file name's 44 px minimum width, the sender, the gaps and the kind icon no longer fit on one line, so the name wrapped to a line of its own and the row grew; with no minimum the name takes what is left and is cut with an ellipsis, as it was with no icon (#13144, measured: the row is 77 px with or without the icon) */
 .dt-folded .inbox-review-item { flex-wrap: wrap; }
 .dt-folded .inbox-review-item > .inbox-review-name { flex: 1 1 0; }
 .inbox-needs-results tr:has(.inbox-review-item) .dt-subtitle { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; white-space: normal; margin-top: 2px; }
@@ -582,7 +582,7 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 .inbox-answers .inbox-answer { max-width: 100%; height: auto; min-height: 32px; white-space: normal; text-align: left; overflow-wrap: anywhere; } /* a long choice wraps its words inside its column, never clipped at the cell's edge (#11728) */
 .inbox-answered { color: var(--text-secondary); }
 .inbox-only-reject { color: var(--text-secondary); font-size: .85em; flex: 1 1 100%; } /* a request that can only be rejected (#11399): said in words, on its own line under the No */
-@media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) { .inbox-answers .inbox-answer { flex: 0 1 auto; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: var(--control-touch-height, 44px); min-width: var(--control-touch-height, 44px); } }
+@media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) { .inbox-answers .inbox-answer { flex: 1 1 auto; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: var(--control-touch-height, 44px); min-width: var(--control-touch-height, 44px); } }
 .dt-mail-cell:has(> .inbox-answers) { flex-wrap: wrap; }
 .dt-mail-cell > .inbox-answers { flex: 1 1 100%; padding: 0 12px 8px 56px; } /* under the mail line, in line with its text */
 .dt-mail-cell > .inbox-answers:empty { display: none; }
@@ -608,10 +608,15 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 .dt-table .inbox-kind-row > td[data-key="agent"] { padding-left: 3.5rem; }
 .inbox-kind-column { position: absolute; inset: 0 auto 0 0; width: 3rem; display: flex; align-items: center; justify-content: center; pointer-events: none; }
 .dt-box.dt-folded .inbox-kind-row { padding-left: 3.5rem; }
+.dt-box.dt-folded .inbox-kind-column { justify-content: flex-start; padding-left: 16px; box-sizing: border-box; }
 .dt-box.dt-folded .inbox-kind-row > td[data-key="agent"] { padding-left: 0; }
-.dt-box.dt-mail-on tr.dt-mailed:has(.dt-mail-kind) { position: relative; padding-left: 3rem; }
-.dt-mail-kind > .dt-mail-lead { position: absolute; inset: 0 auto 0 0; width: 3rem; }
-.dt-mail-kind > .inbox-answers { padding-left: 4px; }
+/* Choices keep the full row width (#10874); only title/excerpt share the icon gutter. */
+.dt-box.dt-mail-on tr.dt-mailed:has(.dt-mail-kind) { padding-left: 0; }
+.dt-box.dt-mail-on tr.dt-mailed > td.dt-mail-kind { display: grid; grid-template-columns: 3rem minmax(0, 1fr) auto; }
+.dt-mail-kind > .dt-mail-lead { position: static; width: 3rem; grid-column: 1; grid-row: 1; }
+.dt-mail-kind > .dt-mail-open { grid-column: 2; grid-row: 1; }
+.dt-mail-kind > :is(.dt-mail-more, .dt-mail-more-gap) { grid-column: 3; grid-row: 1; }
+.dt-mail-kind > .inbox-answers { grid-column: 1 / -1; grid-row: 2; padding-left: 0; }
 .material-icons.inbox-kind-icon { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 2rem; height: 2rem; margin: 0; border-radius: var(--radius-lg); font-size: var(--needs-icon-size); line-height: 1; color: var(--needs-icon-indigo-fg); background: var(--needs-icon-indigo-bg); }
 .inbox-kind-icon[data-kind="review"] { color: var(--needs-icon-green-fg); background: var(--needs-icon-green-bg); }
 .inbox-kind-icon[data-kind="proposal"], .inbox-kind-icon[data-kind="goal_done"] { color: var(--needs-icon-purple-fg); background: var(--needs-icon-purple-bg); }

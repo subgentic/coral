@@ -43,6 +43,8 @@ const TEAM = `plo-${Date.now() % 100000}`;
         // the team page's Actions menu: every row is a plain row (no border, no box), like Add agent and Sleep Team
         await ev(`window.hideLaunchModal && window.hideLaunchModal(); true`);
         await installTP(ev); await seed(ev, TEAM); await openTeam(ev, waitFor, TEAM);
+        // Move before opening: measuring immediately after a hover exit can catch its fade.
+        await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: 1, y: 1 });
         await ev(`document.getElementById('team-page-more').click(); true`);
         await waitFor(`!document.getElementById('team-page-more-menu').hidden`, 'the Actions menu', 6000);
         const rowsBox = await ev(`[...document.querySelectorAll('#team-page-more-menu > button')].filter(b => b.getClientRects().length).map(b => { const c = getComputedStyle(b); return { text: b.textContent.trim().slice(0, 24), border: c.borderTopWidth, bg: c.backgroundColor }; })`);

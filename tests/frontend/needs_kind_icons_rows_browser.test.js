@@ -11,6 +11,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
     const check = (ok, what) => { if (!ok) failures.push(what); };
     const T = '#group-table-view', S = `(window.__coralStatic || '/static/')`;
     try {
+        await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: 1, y: 1 });
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false }); await Emulation.setTouchEmulationEnabled({ enabled: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
@@ -102,8 +103,8 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await waitFor(`document.querySelector('${T} .dt-mail-kind') && document.querySelectorAll('${T} .inbox-answer').length === 3`, 'the agent phone mail row', 15000);
         for (const width of [390, 320]) {
             await Emulation.setDeviceMetricsOverride({ width, height: 900, deviceScaleFactor: 1, mobile: true }); await ev(framesJs(8));
-            const row = await ev(`(() => { const tr = document.querySelector('${T} .dt-mailed'), i = tr.querySelector('.inbox-kind-icon').getBoundingClientRect(), r = tr.getBoundingClientRect(), text = tr.querySelector('.dt-mail-text').getBoundingClientRect(); return { center: Math.abs((i.top + i.bottom - r.top - r.bottom) / 2), right: i.right, textLeft: text.left, overflow: document.documentElement.scrollWidth > innerWidth }; })()`);
-            check(row.center <= 2 && row.textLeft >= row.right + 4 && !row.overflow, width + 'px: phone mail gutter spans the full row: ' + JSON.stringify(row));
+            const row = await ev(`(() => { const tr = document.querySelector('${T} .dt-mailed'), i = tr.querySelector('.inbox-kind-icon').getBoundingClientRect(), r = tr.querySelector('.dt-mail-open').getBoundingClientRect(), text = tr.querySelector('.dt-mail-text').getBoundingClientRect(); return { center: Math.abs((i.top + i.bottom - r.top - r.bottom) / 2), right: i.right, textLeft: text.left, overflow: document.documentElement.scrollWidth > innerWidth }; })()`);
+            check(row.center <= 2 && row.textLeft >= row.right + 4 && !row.overflow, width + 'px: phone gutter spans title/excerpt; choices use the full row: ' + JSON.stringify(row));
         }
         for (const theme of ['dark', 'light']) {
             await ev(`${themeJs(theme)}; true`); await ev(framesJs(4));

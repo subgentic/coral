@@ -64,6 +64,7 @@ export function openAskDialog(a, onDone, runners = {}) {
             const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'btn'; const label = binary ? (b.label === 'Yes' ? 'Approve' : 'Deny') : markHidden(b.label, { strict: true }); btn.textContent = label; btn.dataset.buttonId = String(b.id);
             const what = document.createElement('span'); what.className = 'inbox-ask-offer-what sr-only'; what.textContent = buttonWords(b);
             btn.setAttribute('aria-label', `${label}: ${what.textContent}`); btn.title = what.textContent;
+            if (binary) { const icon = document.createElement('span'); icon.className = 'material-icons'; icon.setAttribute('aria-hidden', 'true'); icon.textContent = b.label === 'Yes' ? 'check' : 'close'; btn.replaceChildren(icon); btn.classList.add('btn-icon'); btn.setAttribute('aria-label', `${label}, sends ${b.label} with any draft text and pictures`); btn.title = btn.getAttribute('aria-label'); }
             btn.addEventListener('click', async () => {
                 if (sending || (binary && picturesBlocked())) return;
                 sending = true; err.textContent = ''; sync();
@@ -100,7 +101,7 @@ export function openAskDialog(a, onDone, runners = {}) {
     const compose = document.createElement('div'); compose.className = 'inbox-ask-compose';
     const addSlot = document.createElement('div'); addSlot.className = 'inbox-ask-attach'; pics.append(addSlot);
     const sendRow = document.createElement('div'); sendRow.className = 'inbox-ask-sendrow'; const pickSlot = document.createElement('span'); pickSlot.className = 'inbox-ask-pick'; sendRow.append(pickSlot, send); addSlot.append(sendRow); // Add image on the left, Send reply on the right, the pictures note under them (#13148)
-    if (offered && binary) { offered.classList.add('inbox-ask-yes-no'); compose.append(offered); }
+    if (offered && binary) { offered.classList.add('inbox-ask-yes-no'); offered.replaceChildren(offered.querySelector('.inbox-ask-offers-list')); sendRow.insertBefore(offered, send); }
     compose.append(label, pics, err);
     dlg.append(title, sub, ...(links.hidden ? [] : [links]), reading, compose, foot);
     if (!fromAnotherComputer(a)) { // the picture is stored on the question's own team, as a goal's pictures are

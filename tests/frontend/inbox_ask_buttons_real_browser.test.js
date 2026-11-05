@@ -53,20 +53,20 @@ async function httpJson(method, path, body, headers = {}) {
             await waitFor(`!!(${row})`, width + ': explicit question in phone/desktop list', 15000);
             await ev(`(${row}).querySelector('button[aria-label^="Answer the question of"]').click(); true`);
             await waitFor(`!!document.querySelector('dialog.inbox-ask-dialog[open]')`, 'yes/no question opens', 6000);
-            const geometry = await ev(`(() => { const d = document.querySelector('dialog.inbox-ask-dialog'), buttons = [...d.querySelectorAll('.inbox-ask-offer button')], label = d.querySelector('.inbox-ask-label').getBoundingClientRect(); return { labels: buttons.map(b => b.textContent), buttons: buttons.map(b => { const r = b.getBoundingClientRect(); return { h: r.height, w: r.width, right: r.right, left: r.left, above: r.bottom <= label.top }; }), compose: !!d.querySelector('.inbox-ask-compose .inbox-ask-offers'), box: !!d.querySelector('textarea'), scrolls: document.documentElement.scrollWidth > innerWidth }; })()`);
-            if (JSON.stringify(geometry.labels) !== JSON.stringify(['Approve', 'Deny']) || !geometry.compose || !geometry.box || geometry.scrolls || geometry.buttons.some(b => b.h < 44 || b.w < 44 || !b.above)) geometryFailures.push(width + ': ' + JSON.stringify(geometry));
+            const geometry = await ev(`(() => { const d = document.querySelector('dialog.inbox-ask-dialog'), buttons = [...d.querySelectorAll('.inbox-ask-offer button')], box = d.querySelector('textarea').getBoundingClientRect(), send = d.querySelector('.inbox-ask-send').getBoundingClientRect(); return { labels: buttons.map(b => b.getAttribute('aria-label').split(',')[0]), buttons: buttons.map(b => { const r = b.getBoundingClientRect(); return { h: r.height, w: r.width, right: r.right, left: r.left, below: r.top >= box.bottom && Math.abs(r.top - send.top) <= 2 }; }), compose: !!d.querySelector('.inbox-ask-compose .inbox-ask-offers'), box: !!d.querySelector('textarea'), scrolls: document.documentElement.scrollWidth > innerWidth }; })()`);
+            if (JSON.stringify(geometry.labels) !== JSON.stringify(['Approve', 'Deny']) || !geometry.compose || !geometry.box || geometry.scrolls || geometry.buttons.some(b => b.h < 44 || b.w < 44 || !b.below)) geometryFailures.push(width + ': ' + JSON.stringify(geometry));
             if ([390, 1280].includes(width) && process.env.CORAL_SCREENSHOT_DIR) { const fs = require('node:fs'); fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR, { recursive: true }); fs.writeFileSync(process.env.CORAL_SCREENSHOT_DIR + '/yes-no-' + width + '.png', Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }
             await ev(`document.querySelector('dialog.inbox-ask-dialog .inbox-ask-buttons .btn').click(); true`);
         }
-        assert.deepEqual(geometryFailures, [], 'explicit yes/no decisions sit beside the reply box, with 44px targets');
+        assert.deepEqual(geometryFailures, [], 'explicit yes/no icon decisions sit below the reply box beside Send reply, with 44px targets');
         await ev(`import(${S} + 'operator_ask_dialog.js').then(m => m.openAskDialog(${JSON.stringify((await mine()).find(a => a.id === ambiguous))})); true`);
         assert.equal(await ev(`document.querySelectorAll('dialog.inbox-ask-dialog .inbox-ask-offer button').length`), 0, 'an unmarked alternative, even saying Yes or no, has no quick decisions');
         await ev(`document.querySelector('dialog.inbox-ask-dialog textarea').value = 'Re-shoot'; document.querySelector('dialog.inbox-ask-dialog .inbox-ask-send').click(); true`);
         await waitFor(`!document.querySelector('dialog.inbox-ask-dialog[open]')`, 'ordinary written reply remains available', 6000);
         await ev(`import(${S} + 'operator_ask_dialog.js').then(m => m.openAskDialog(${JSON.stringify(binaryAsk)})); true`);
         await waitFor(`!!document.querySelector('dialog.inbox-ask-dialog[open]')`, 'ready for real approval', 6000);
-        assert.equal(await ev(`(() => { const b = [...document.querySelectorAll('dialog.inbox-ask-dialog .inbox-ask-offer button')].find(b => b.textContent === 'Approve'); b.focus(); return document.activeElement === b; })()`), true, 'Approve is keyboard reachable');
-        await ev(`(() => { const original = window.fetch; window.__yesNoClaims = 0; window.fetch = function(u, ...args) { if (String(u).endsWith('/claim')) window.__yesNoClaims++; return original.call(this, u, ...args); }; const b = [...document.querySelectorAll('dialog.inbox-ask-dialog .inbox-ask-offer button')].find(b => b.textContent === 'Approve'); b.dispatchEvent(new MouseEvent('click', { bubbles: true })); b.dispatchEvent(new MouseEvent('click', { bubbles: true })); return true; })()`);
+        assert.equal(await ev(`(() => { const b = [...document.querySelectorAll('dialog.inbox-ask-dialog .inbox-ask-offer button')].find(b => b.getAttribute('aria-label')?.startsWith('Approve,')); b.focus(); return document.activeElement === b; })()`), true, 'Approve is keyboard reachable');
+        await ev(`(() => { const original = window.fetch; window.__yesNoClaims = 0; window.fetch = function(u, ...args) { if (String(u).endsWith('/claim')) window.__yesNoClaims++; return original.call(this, u, ...args); }; const b = [...document.querySelectorAll('dialog.inbox-ask-dialog .inbox-ask-offer button')].find(b => b.getAttribute('aria-label')?.startsWith('Approve,')); b.dispatchEvent(new MouseEvent('click', { bubbles: true })); b.dispatchEvent(new MouseEvent('click', { bubbles: true })); return true; })()`);
         await waitFor(`!document.querySelector('dialog.inbox-ask-dialog[open]')`, 'real Yes reply closes the panel', 6000);
         assert.equal(await ev('window.__yesNoClaims'), 1, 'double click claims only once');
         assert.ok(!(await mine()).some(a => a.id === binary), 'real Yes reply closes the ask');
@@ -79,7 +79,7 @@ async function httpJson(method, path, body, headers = {}) {
         const noAsk = (await mine()).find(a => a.id === noId);
         await ev(`import(${S} + 'operator_ask_dialog.js').then(m => m.openAskDialog(${JSON.stringify(noAsk)})); true`);
         await waitFor(`!!document.querySelector('dialog.inbox-ask-dialog[open]')`, 'ready for real denial', 6000);
-        await ev(`[...document.querySelectorAll('dialog.inbox-ask-dialog .inbox-ask-offer button')].find(b => b.textContent === 'Deny').click(); true`);
+        await ev(`[...document.querySelectorAll('dialog.inbox-ask-dialog .inbox-ask-offer button')].find(b => b.getAttribute('aria-label')?.startsWith('Deny,')).click(); true`);
         await waitFor(`!document.querySelector('dialog.inbox-ask-dialog[open]')`, 'No closes the panel', 6000);
         assert.ok(!(await mine()).some(a => a.id === noId), 'Deny closes the real question');
         const noMessages = await httpJson('GET', '/api/board/' + B + '/messages?subscriber_id=Button%20Walker', undefined, tok);
@@ -108,12 +108,15 @@ async function httpJson(method, path, body, headers = {}) {
                 await ev(`window.__releaseDraftUpload(); true`);
                 await waitFor(`document.querySelector('dialog.inbox-ask-dialog .ac-thumb-ready') && !document.querySelector('dialog.inbox-ask-dialog .inbox-ask-send').disabled`, 'real uploaded screenshot ready', 10000);
             }
+            await waitFor(`!!document.querySelector('dialog.inbox-ask-dialog .ac-add-image')`, 'attachment button ready for stable tab order', 6000);
             await ev(`document.querySelector('dialog.inbox-ask-dialog textarea').focus(); true`);
-            await key('Tab', true);
-            assert.equal(await ev('document.activeElement.textContent'), 'Deny', 'real Shift+Tab from composer reaches Deny');
-            await key('Tab', true);
-            assert.equal(await ev('document.activeElement.textContent'), 'Approve', 'real Shift+Tab reaches Approve');
-            if (decision === 'Deny') { await key('Tab'); assert.equal(await ev('document.activeElement.textContent'), 'Deny', 'real Tab reaches Deny'); }
+            await key('Tab');
+            assert.equal(await ev(`document.activeElement.title`), 'Add image', 'real Tab reaches the attachment button below the draft');
+            await key('Tab');
+            assert.match(await ev(`document.activeElement.getAttribute('aria-label')`), /^Approve, sends Yes/, 'real Tab reaches Approve');
+            await key('Tab');
+            assert.match(await ev(`document.activeElement.getAttribute('aria-label')`), /^Deny, sends No/, 'real Tab reaches Deny');
+            if (decision === 'Approve') { await key('Tab', true); assert.match(await ev(`document.activeElement.getAttribute('aria-label')`), /^Approve, sends Yes/, 'real Shift+Tab returns to Approve'); }
             await key('Enter');
             await waitFor(`!document.querySelector('dialog.inbox-ask-dialog[open]')`, 'Enter sends the decision and draft', 6000);
             const sent = await httpJson('GET', '/api/board/' + B + '/messages?subscriber_id=Button%20Walker', undefined, tok);

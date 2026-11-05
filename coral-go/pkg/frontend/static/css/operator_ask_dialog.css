@@ -42,8 +42,10 @@
 .inbox-ask-dialog .inbox-ask-box { min-height: 9em; }
 .inbox-ask-reading .inbox-ask-offers { margin-top: 16px; }
 
-/* Binary decisions stay with the reply box at every width; ordinary offered actions follow the question. */
-.inbox-ask-yes-no { margin-bottom: 16px; }
-.inbox-ask-yes-no .inbox-ask-offers-list { display: flex; flex-wrap: wrap; gap: 8px; }
-.inbox-ask-yes-no .inbox-ask-offer { flex: 1 1 6rem; min-width: 0; }
-.inbox-ask-yes-no .inbox-ask-offer .btn { width: 100%; min-width: 44px; min-height: 44px; }
+/* Binary decisions sit below the draft, directly beside Send reply. */
+.inbox-ask-sendrow:has(.inbox-ask-yes-no) { gap: 6px; }
+.inbox-ask-sendrow .inbox-ask-yes-no { display: flex; flex: none; margin: 0; margin-left: auto; }
+.inbox-ask-yes-no .inbox-ask-offers-list { display: flex; flex-wrap: nowrap; gap: 6px; }
+.inbox-ask-yes-no .inbox-ask-offer { flex: none; width: 44px; min-width: 44px; }
+.inbox-ask-yes-no .inbox-ask-offer .btn { width: 44px; min-width: 44px; min-height: 44px; padding: 0; }
+.inbox-ask-sendrow:has(.inbox-ask-yes-no) .inbox-ask-send { margin-left: 0; min-height: 44px; }

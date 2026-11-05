@@ -61,8 +61,10 @@ const { coralReady } = require('./helpers/wait');
         await waitFor(`!!document.querySelector('#group-table-view .dt-box.dt-one-line')`, 'a one-line table on a phone', 5000);
         const p = await ev(`(() => { const rows = [...document.querySelectorAll('#group-table-view .dt-table tbody tr')]; return { h: rows.map(r => Math.round(r.getBoundingClientRect().height)), over: document.documentElement.scrollWidth - innerWidth, head: getComputedStyle(document.querySelector('#group-table-view thead')).display }; })()`);
         assert.equal(p.head, 'none', 'a phone\'s rows are mail rows (#9545): no column heads, and no Sort row (a mail list has none)'); assert.ok(p.h.every(h => h >= 44), '44 px rows ' + JSON.stringify(p.h)); assert.ok(p.over <= 1, 'no sideways scroll');
-        await ev(`document.querySelectorAll('#group-table-view .dt-table tbody tr .dt-primary').forEach((b, i) => b.setAttribute('data-axp', String(i))); true`);
-        const axn = await axName(client, '[data-axp="0"]'); assert.match(axn && axn.name, /^.+, Active, .+$/, `a goal's phone button is "<goal>, <state>, <time>" as Chrome computes it (its state is on the row's second line: #9747): ${axn && axn.name}`);
+        await ev(`document.querySelectorAll('#group-table-view .dt-table tbody tr .dt-primary').forEach((b, i) => b.setAttribute('data-axp', b.querySelector('.dt-mail-title')?.textContent === 'Ship the mailbox' ? 'with-tasks' : String(i))); true`);
+        // The first sorted goal can be Explore goals (no tasks, so its time/state is just Active).
+        // Pin the goal with a known 0/3 rollup; never assume the first returned row has progress.
+        const axn = await axName(client, '[data-axp="with-tasks"]'); assert.match(axn && axn.name, /^Ship the mailbox, Active, Active \u00b7 0\/3$/, `a goal's phone button is "<goal>, <state>, <time>" as Chrome computes it (its state is on the row's second line: #9747): ${axn && axn.name}`);
         console.log('   ✓');
         console.log('PASS Inbox Goals folder: every team\'s open goals as the goal row with a Team column');
     } finally { await removeBoards(ev, [A, B]).catch(() => {}); await client.close(); }
