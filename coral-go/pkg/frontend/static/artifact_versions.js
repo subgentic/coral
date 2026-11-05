@@ -3,6 +3,7 @@
  * text is set with textContent. The server's list is GET /api/artifacts/{digest}/versions (an artifact in no series is a 404: no bar). A switch and a compare are said once in a polite line. */
 import { serverUrl, artifactPath } from './server_base.js';
 import { el } from './dom_el.js';
+import { pollEvery } from './overload.js';
 
 const btn = (cls, text, label) => { const b = el('button', 'btn btn-small ' + cls, text); b.type = 'button'; if (label) b.setAttribute('aria-label', label); return b; };
 const sr = (text) => el('span', 'sr-only', text);
@@ -59,6 +60,19 @@ export function attachVersions(dialog, hooks) {
     (dialog.querySelector('.artifact-viewer-chips') || dialog.querySelector('.artifact-viewer-header')).append(bar); // the version chip is on the header's one row (#12223)
     dialog.append(live);
     const st = { hex: null, server: undefined, rows: null, listOpen: false, comparing: false, view: 'changes', gen: 0, abort: null };
+    let liveTimer = 0, liveBusy = -1;
+    async function refreshVersions() {
+        if (!st.hex || dialog.hidden || !dialog.isConnected || st.comparing || st.listOpen || liveBusy === st.gen) return;
+        const gen = st.gen, hex = st.hex, server = st.server;
+        liveBusy = gen;
+        try {
+            const rows = await load(hex, server);
+            if (gen !== st.gen || hex !== st.hex || server !== st.server || dialog.hidden || st.comparing || st.listOpen || !rows || JSON.stringify(rows) === JSON.stringify(st.rows)) return;
+            st.rows = rows;
+            draw();
+            say('A new version is available');
+        } finally { if (liveBusy === gen) liveBusy = -1; }
+    }
     const cur = () => st.rows ? st.rows.findIndex(r => r.digest === st.hex) : -1;
     const nameOf = (r) => `v${r.version}`;
 
@@ -249,10 +263,13 @@ export function attachVersions(dialog, hooks) {
     return {
         /** A version of an artifact is on show: draw the bar when it is one of a series. `switched` says it was chosen from the bar (said once, and the keyboard stays on the bar). */
         async open(hex, server, { switched = false } = {}) {
+            st.gen++;
+            clearInterval(liveTimer);
+            liveTimer = pollEvery(refreshVersions, Number(globalThis.__coralVersionsPollMs) || 8000, { machine: () => st.server || '' });
             const same = st.rows && st.hex !== hex && st.server === server && st.rows.some(r => r.digest === hex);
             st.hex = hex; st.server = server; st.listOpen = false;
             if (!switched) { st.comparing = false; dialog.classList.remove('av-comparing', 'av-keep-wide'); }
-            if (!same && !(st.rows && st.rows.some(r => r.digest === hex))) { st.rows = null; draw(); const gen = ++st.gen; const rows = await load(hex, server); if (gen !== st.gen || st.hex !== hex) return; st.rows = rows; }
+            if (!same && !(st.rows && st.rows.some(r => r.digest === hex))) { st.rows = null; draw(); const gen = st.gen; const rows = await load(hex, server); if (gen !== st.gen || st.hex !== hex) return; st.rows = rows; }
             draw();
             if (switched && !bar.hidden) {
                 const row = st.rows[cur()], w = whenOf(row.at);
@@ -260,7 +277,7 @@ export function attachVersions(dialog, hooks) {
                 bar.querySelector('.av-current')?.focus();
             }
         },
-        close() { st.gen++; st.abort?.abort(); st.rows = null; st.hex = null; st.comparing = false; st.listOpen = false; dialog.classList.remove('av-comparing', 'av-has-versions', 'av-keep-wide'); bar.hidden = true; bar.replaceChildren(); },
+        close() { clearInterval(liveTimer); liveTimer = 0; st.gen++; st.abort?.abort(); st.rows = null; st.hex = null; st.comparing = false; st.listOpen = false; dialog.classList.remove('av-comparing', 'av-has-versions', 'av-keep-wide'); bar.hidden = true; bar.replaceChildren(); },
         comparing: () => st.comparing,
     };
 }
