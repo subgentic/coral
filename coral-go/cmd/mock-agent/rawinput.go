@@ -335,8 +335,9 @@ func runRawInput(dir, sessionID, settingsFile string, turn func(string)) {
 		case "MOCK_BRACKETED_ON":
 			fmt.Print("\x1b[?2004h")
 		}
-		events <- func() { hooks.fire("UserPromptSubmit", map[string]any{"prompt": s}) } // first: a menu's request must come after the submit it answers, or the submit clears the wait
-		control, waiting := applyControl(box, s)                                         // MOCK_ASK_QUESTION, MOCK_ASK_PERMISSION, MOCK_GO_DEAF: no turn of its own (ready.go)
+		submitsInFlight.Add(1)
+		events <- func() { hooks.fire("UserPromptSubmit", map[string]any{"prompt": s}); submitsInFlight.Add(-1) } // first: a menu's request must come after the submit it answers, or the submit clears the wait
+		control, waiting := applyControl(box, s)                                                                  // MOCK_ASK_QUESTION, MOCK_ASK_PERMISSION, MOCK_GO_DEAF: no turn of its own (ready.go)
 		if !control {
 			turn(s)
 		}

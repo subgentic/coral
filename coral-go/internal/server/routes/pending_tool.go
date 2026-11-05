@@ -361,6 +361,8 @@ func (h *SessionsHandler) notePendingToolEvent(sessionID, eventType, toolUseID s
 		h.resourceHook.After(sessionID, toolUseID)
 	case "session_reset", "session_end":
 		h.resourceHook.SessionEnded(sessionID)
+	case "stop":
+		h.resourceHook.TurnEnded(sessionID) // the turn is over: a hand claim whose call never reported its end goes back (#13718)
 	}
 	switch eventType { // the calls in flight, whichever the single slot below holds (#6687)
 	case "tool_use":
@@ -516,6 +518,18 @@ func (h *SessionsHandler) patternKillRefusal(ctx context.Context, owner *store.S
 		return "" // the refusal is the Claude CLI's hook answer
 	}
 	return shellkill.PatternKill(command) // bounded: a command past a bound runs
+}
+
+// ToolCallsInFlight are the tool_use ids of the calls the session has started and not finished (#13718): the hand claim of an agent is one of them. A claim is tied to all of them, so a parallel call that ends first cannot free
+// a claim that belongs to another; it can only hold a little longer (the lease, the turn's end and the work it started still end it).
+func (h *SessionsHandler) ToolCallsInFlight(sessionID string) []string {
+	h.pending.mu.Lock()
+	defer h.pending.mu.Unlock()
+	var ids []string
+	for id := range h.pending.calls[sessionID] {
+		ids = append(ids, id)
+	}
+	return ids
 }
 
 // SetResourceHook wires the resource queue's shell hook (#13645).

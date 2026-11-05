@@ -171,3 +171,19 @@ func TestResourceDefineSendsEveryMatch(t *testing.T) {
 		t.Fatalf("match sent: %v", s.bodies[0])
 	}
 }
+
+// #13718: the claim names the shell that runs coral-board (its parent), so the server can keep a background job's slot while its work runs; every claim (and each look again while waiting) carries it.
+func TestAClaimSendsItsParentProcessSoABackgroundJobCanKeepTheSlot(t *testing.T) {
+	s := &resStub{grantAt: 2}
+	if _, exited := runResource(t, s, "claim", "mac-heavy", "--wait"); exited {
+		t.Fatal("exited")
+	}
+	if len(s.bodies) < 2 {
+		t.Fatalf("want a claim and a look again, got %d", len(s.bodies))
+	}
+	for _, b := range s.bodies {
+		if got, _ := b["parent_pid"].(float64); int(got) != os.Getppid() {
+			t.Fatalf("parent_pid %v, want %d: %v", b["parent_pid"], os.Getppid(), b)
+		}
+	}
+}

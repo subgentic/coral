@@ -93,3 +93,37 @@ type SnapshotRow struct {
 	PID, PPID int
 	ExeFile   string
 }
+
+// Descendants is every process below root (its children, theirs and so on), not root itself.
+func Descendants(procs []Proc, root int) []Proc {
+	kids := map[int][]Proc{}
+	for _, p := range procs {
+		kids[p.PPID] = append(kids[p.PPID], p)
+	}
+	var out []Proc
+	seen := map[int]bool{root: true}
+	queue := []int{root}
+	for len(queue) > 0 {
+		at := queue[0]
+		queue = queue[1:]
+		for _, k := range kids[at] {
+			if seen[k.PID] {
+				continue
+			}
+			seen[k.PID] = true
+			out = append(out, k)
+			queue = append(queue, k.PID)
+		}
+	}
+	return out
+}
+
+// Find is the process with this pid.
+func Find(procs []Proc, pid int) (Proc, bool) {
+	for _, p := range procs {
+		if p.PID == pid {
+			return p, true
+		}
+	}
+	return Proc{}, false
+}

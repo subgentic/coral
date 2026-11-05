@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/subgentic/coral/internal/proctree"
 	"github.com/subgentic/coral/pkg/resourcequeue"
 )
 
@@ -27,6 +28,8 @@ type HookOptions struct {
 	ClaimWindow time.Duration
 	// Event is told of each auto-claim, refusal and release (the Operator's Activity); nil: nothing is told.
 	Event func(HookEvent)
+	// Procs lists the machine's processes (ps), for a hand claim's work (#13718); ok false: not known, and a claim then follows its tool call alone. nil: the claim follows its call alone.
+	Procs func() ([]proctree.Proc, bool)
 }
 
 // HookEvent says what the hook did. Pattern is the manager's pattern, never the command.
@@ -52,12 +55,180 @@ type autoHold struct {
 	window  time.Time       // before this a slot with no call yet is kept for its agent
 }
 
+// handBind is what a hand claim (coral-board resource claim, run by an agent) is tied to: the tool call it was made in and, for a job that outlives the call (Claude's run_in_background, Codex's background terminal), the work
+// the call started under the claiming shell.
+type handBind struct {
+	session string          // the session id
+	calls   map[string]bool // the tool calls in flight when the claim was made (it is one of them: a client cannot say which, so the claim waits for all of them)
+	shell   int             // the shell that ran the claim, in the agent's own process tree (0: not known or not believed: the claim follows its call alone)
+	shellAt string          // that shell's command line at the claim: a shell that exec'd the job has another one later
+	before  map[int]bool    // the processes below the shell at the claim: older jobs of a persistent shell are not this call's work
+	ended   bool            // the call (or its turn) has ended: the slot goes back as soon as the work is gone too
+}
+
+// BindHand ties the hold or place agent has of resource to the tool call it was claimed in (#13718, the Operator: "coral tracks the tool call the agent does and when it's finished, release the slot"), and to the work the call
+// starts under the claiming shell `shell` (the CLI's parent; believed only when it is in agentPID's own process tree). The slot goes back when the call has ended AND that work is gone: a foreground command ends both together,
+// a background job keeps the slot for as long as it runs (a persistent shell's older jobs do not count), a crashed agent's session frees it. A forgotten release cannot hold the line. A claim with no tool call (the Operator's
+// command line) is never bound: it keeps its lease. The lease still ends any claim.
+func (h *Hook) BindHand(session, agent, resource string, toolCalls []string, shell, agentPID int) {
+	b := handBind{session: session, calls: map[string]bool{}}
+	for _, c := range toolCalls {
+		if c != "" {
+			b.calls[c] = true
+		}
+	}
+	if h == nil || session == "" || len(b.calls) == 0 { // no known call: nothing to tie it to, the lease alone ends it
+		return
+	}
+	if shell > 1 && agentPID > 1 && h.o.Procs != nil {
+		if procs, ok := h.o.Procs(); ok { // ps, never under the lock
+			if _, inTree := findBelow(procs, agentPID, shell); inTree {
+				me, _ := proctree.Find(procs, shell)
+				b.shell, b.shellAt, b.before = shell, me.Command, map[int]bool{}
+				for _, d := range proctree.Descendants(procs, shell) {
+					b.before[d.PID] = true
+				}
+			}
+		}
+	}
+	h.mu.Lock()
+	h.hand[holdKey{resource, agent}] = b
+	h.mu.Unlock()
+}
+
+// findBelow finds pid among the processes below root.
+func findBelow(procs []proctree.Proc, root, pid int) (proctree.Proc, bool) {
+	for _, p := range proctree.Descendants(procs, root) {
+		if p.PID == pid {
+			return p, true
+		}
+	}
+	return proctree.Proc{}, false
+}
+
+// workRuns says whether what the call started under the bound shell still runs: the shell became the job (another command line), or a process that was not there at the claim is below it.
+func (b handBind) workRuns(procs []proctree.Proc) bool {
+	if b.shell <= 1 {
+		return false
+	}
+	me, alive := proctree.Find(procs, b.shell)
+	if !alive {
+		return false
+	}
+	if me.Command != b.shellAt {
+		return true
+	}
+	for _, d := range proctree.Descendants(procs, b.shell) {
+		if !b.before[d.PID] {
+			return true
+		}
+	}
+	return false
+}
+
+// handsWork reads the process list once (never under the lock), only when some ended hand claim has a shell to look at.
+func (h *Hook) handsWork(want func(handBind) bool) ([]proctree.Proc, bool) {
+	if h.o.Procs == nil {
+		return nil, false
+	}
+	h.mu.Lock()
+	need := false
+	for _, b := range h.hand {
+		if b.shell > 1 && want(b) {
+			need = true
+			break
+		}
+	}
+	h.mu.Unlock()
+	if !need {
+		return nil, false
+	}
+	return h.o.Procs()
+}
+
+// endHands says that the call (or, with call "", the whole turn) of the session has ended: each of its hand claims whose work is gone goes back now, the rest when it is (Sweep).
+func (h *Hook) endHands(session, call, why string) {
+	procs, known := h.handsWork(func(b handBind) bool { return b.session == session && (call == "" || b.calls[call]) })
+	h.mu.Lock()
+	var gone []holdKey
+	for k, b := range h.hand {
+		if b.session != session || (call != "" && !b.calls[call]) {
+			continue
+		}
+		if call != "" {
+			delete(b.calls, call) // one of the calls it waits for ended
+			if len(b.calls) > 0 {
+				continue // others that were in flight with the claim have not: it may be theirs
+			}
+		}
+		if known && b.workRuns(procs) {
+			b.ended = true
+			h.hand[k] = b
+			continue
+		}
+		gone = append(gone, k)
+		delete(h.hand, k)
+	}
+	h.mu.Unlock()
+	h.giveBack(gone, why)
+}
+
+func (h *Hook) giveBack(keys []holdKey, why string) {
+	for _, k := range keys {
+		if err := h.m.Queue().Release(k.resource, k.agent); err == nil { // already released by hand: nothing to do
+			h.event(HookEvent{Kind: "released", Resource: k.resource, Agent: k.agent, Why: why})
+		}
+	}
+}
+
+// sweepHands gives back the hand claims that have ended and whose work is gone, and forgets those whose slot or place is no longer there (a lease ran out, a person kicked it).
+func (h *Hook) sweepHands() {
+	procs, known := h.handsWork(func(b handBind) bool { return b.ended })
+	h.mu.Lock()
+	var gone []holdKey
+	for k, b := range h.hand {
+		if b.ended && !(known && b.workRuns(procs)) {
+			gone = append(gone, k)
+			delete(h.hand, k)
+			continue
+		}
+		if st, err := h.m.Queue().Status(k.resource); err != nil || !hasEntry(st, k.agent) {
+			delete(h.hand, k)
+		}
+	}
+	h.mu.Unlock()
+	h.giveBack(gone, "job ended")
+}
+
+func hasEntry(st resourcequeue.Status, agent string) bool {
+	for _, e := range st.Holders {
+		if e.Agent == agent {
+			return true
+		}
+	}
+	for _, e := range st.Queue {
+		if e.Agent == agent {
+			return true
+		}
+	}
+	return false
+}
+
+// TurnEnded is the end of the session's turn: the safety net for a tool call that never reported its end.
+func (h *Hook) TurnEnded(session string) {
+	if h == nil {
+		return
+	}
+	h.endHands(session, "", "turn ended")
+}
+
 // Hook is the shell hook's state: which auto-claims are held for which calls.
 type Hook struct {
 	m    *Manager
 	o    HookOptions
 	mu   sync.Mutex
 	hold map[holdKey]*autoHold
+	hand map[holdKey]handBind // slots an agent claimed by hand, each tied to the tool call it was claimed in (#13718)
 
 	pmu   sync.Mutex // the process lists below, never held while a list is read
 	procs map[string]*procEntry
@@ -89,7 +260,7 @@ func NewHook(m *Manager, o HookOptions) *Hook {
 	if o.ClaimWindow <= 0 {
 		o.ClaimWindow = 2 * time.Minute
 	}
-	return &Hook{m: m, o: o, hold: map[holdKey]*autoHold{}, procs: map[string]*procEntry{}}
+	return &Hook{m: m, o: o, hold: map[holdKey]*autoHold{}, hand: map[holdKey]handBind{}, procs: map[string]*procEntry{}}
 }
 
 func (h *Hook) event(e HookEvent) {
@@ -204,6 +375,7 @@ func (h *Hook) After(session, toolUseID string) {
 	if h == nil {
 		return
 	}
+	h.endHands(session, toolUseID, "call ended")
 	h.mu.Lock()
 	for k, ah := range h.hold {
 		if ah.session != session {
@@ -232,6 +404,16 @@ func (h *Hook) SessionEnded(session string) {
 		return
 	}
 	h.mu.Lock()
+	var gone []holdKey
+	for k, b := range h.hand {
+		if b.session == session {
+			gone = append(gone, k)
+			delete(h.hand, k)
+		}
+	}
+	h.mu.Unlock()
+	h.giveBack(gone, "gone") // the agent is gone: its jobs are not a reason to keep the slot
+	h.mu.Lock()
 	defer h.mu.Unlock()
 	for k, ah := range h.hold {
 		if ah.session == session {
@@ -246,6 +428,7 @@ func (h *Hook) Sweep() {
 	if h == nil {
 		return
 	}
+	h.sweepHands()
 	snap := h.snapshot()
 	h.mu.Lock()
 	defer h.mu.Unlock()
