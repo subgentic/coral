@@ -10,7 +10,9 @@ package resourcequeue
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 )
@@ -23,6 +25,7 @@ var (
 	ErrNotHolder   = errors.New("resourcequeue: this agent does not hold a slot of this resource")
 	ErrNoEntry     = errors.New("resourcequeue: no such entry")
 	ErrBadResource = errors.New("resourcequeue: a resource needs a name and at least one slot")
+	ErrBadMatch    = errors.New("resourcequeue: a match is 1 to 8 words of letters, digits and . / _ : = @ % + , -, up to 200 characters, in all at most 20 of them")
 )
 
 // Resource is a thing with slots.
@@ -32,6 +35,7 @@ type Resource struct {
 	Machine  string        // where it is, for people to read; not interpreted
 	MaxLease time.Duration // a claim is held this long unless renewed (0: DefaultLease)
 	Allowed  []string      // agents that may claim it; empty: everyone
+	Match    []string      // shell commands that claim it by themselves (the hook, #13645): each a list of words that must appear in order in one simple command, such as "go test ./..."; empty: no hook
 }
 
 // Claimant is who asks, and how much it matters.
@@ -167,14 +171,40 @@ func (r *Resource) lease() time.Duration {
 	return DefaultLease
 }
 
+// matchWord is one word of a match: no quote, no space, no control character, nothing a shell would read as more than a word.
+var matchWord = regexp.MustCompile(`^[A-Za-z0-9._/:=@%+,-]{1,64}$`)
+
+// ValidMatch checks a resource's match list: at most 20 matches, each 1 to 8 words, 200 characters at most.
+func ValidMatch(match []string) error {
+	if len(match) > 20 {
+		return ErrBadMatch
+	}
+	for _, m := range match {
+		words := strings.Fields(m)
+		if len(m) > 200 || len(words) < 1 || len(words) > 8 || strings.Join(words, " ") != m {
+			return ErrBadMatch
+		}
+		for _, w := range words {
+			if !matchWord.MatchString(w) {
+				return ErrBadMatch
+			}
+		}
+	}
+	return nil
+}
+
 // Define makes a resource, or changes the slots, machine, lease and allowed list of one that exists. More slots grant the waiting at once; fewer never take a slot from a holder (the holds run out).
 func (q *Queue) Define(r Resource) error {
 	if r.Key == "" || r.Slots < 1 {
 		return ErrBadResource
 	}
+	if err := ValidMatch(r.Match); err != nil {
+		return err
+	}
 	q.mu.Lock()
 	cp := r
 	cp.Allowed = append([]string(nil), r.Allowed...)
+	cp.Match = append([]string(nil), r.Match...)
 	q.res[r.Key] = &cp
 	granted := q.fill(r.Key)
 	err := q.save()
@@ -361,6 +391,18 @@ func (q *Queue) Cancel(id int64) error {
 	q.mu.Unlock()
 	q.notify(granted)
 	return err
+}
+
+// AnyMatch reports whether any resource has a match list (the shell hook has work only then).
+func (q *Queue) AnyMatch() bool {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	for _, r := range q.res {
+		if len(r.Match) > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 // Status describes one resource.

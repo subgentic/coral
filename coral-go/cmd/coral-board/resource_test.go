@@ -159,3 +159,15 @@ func TestLeaseWordsSaysWhatIsLeft(t *testing.T) {
 		t.Error("a bad time prints something")
 	}
 }
+
+func TestResourceDefineSendsEveryMatch(t *testing.T) {
+	s := &resStub{}
+	out, exited := runResource(t, s, "define", "mac-heavy", "--slots", "1", "--match", "go test ./...", "--match", "node run_cdp_suites.mjs")
+	if exited || !strings.Contains(out, "Defined mac-heavy") {
+		t.Fatalf("exited=%v out=%q", exited, out)
+	}
+	got, _ := s.bodies[0]["match"].([]any)
+	if len(got) != 2 || got[0] != "go test ./..." || got[1] != "node run_cdp_suites.mjs" {
+		t.Fatalf("match sent: %v", s.bodies[0])
+	}
+}

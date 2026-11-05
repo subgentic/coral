@@ -31,6 +31,7 @@ import (
 type ResourcesHandler struct {
 	M     *resources.Manager
 	Board *board.Store
+	Hook  *resources.Hook // the shell hook, swept with every call (#13645); may be nil
 }
 
 type entryView struct {
@@ -52,6 +53,7 @@ type resourceView struct {
 	Machine  string      `json:"machine,omitempty"`
 	MaxLease int         `json:"max_lease_seconds"`
 	Allowed  []string    `json:"allowed,omitempty"`
+	Match    []string    `json:"match,omitempty"`
 	Holders  []entryView `json:"holders"`
 	Queue    []entryView `json:"queue"`
 }
@@ -70,7 +72,7 @@ func viewStatus(st resourcequeue.Status) resourceView {
 	if lease <= 0 {
 		lease = resourcequeue.DefaultLease
 	}
-	v := resourceView{Name: st.Resource.Key, Slots: st.Resource.Slots, Machine: st.Resource.Machine, MaxLease: int(lease / time.Second), Allowed: st.Resource.Allowed, Holders: []entryView{}, Queue: []entryView{}}
+	v := resourceView{Name: st.Resource.Key, Slots: st.Resource.Slots, Machine: st.Resource.Machine, MaxLease: int(lease / time.Second), Allowed: st.Resource.Allowed, Match: st.Resource.Match, Holders: []entryView{}, Queue: []entryView{}}
 	for _, e := range st.Holders {
 		v.Holders = append(v.Holders, viewEntry(e, 0))
 	}
@@ -90,7 +92,7 @@ func (h *ResourcesHandler) fail(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusConflict, "queue_full", err.Error())
 	case errors.Is(err, resourcequeue.ErrNotHolder):
 		writeError(w, http.StatusConflict, "not_holder", err.Error())
-	case errors.Is(err, resourcequeue.ErrBadResource):
+	case errors.Is(err, resourcequeue.ErrBadResource), errors.Is(err, resourcequeue.ErrBadMatch):
 		errBadRequest(w, err.Error())
 	default:
 		errInternalServer(w, err.Error())
@@ -98,7 +100,10 @@ func (h *ResourcesHandler) fail(w http.ResponseWriter, err error) {
 }
 
 // reap keeps the line honest on every call: leases that ran out end and agents that are gone are dropped before the answer is made.
-func (h *ResourcesHandler) reap() { _, _ = h.M.Queue().Reap() }
+func (h *ResourcesHandler) reap() {
+	_, _ = h.M.Queue().Reap()
+	h.Hook.Sweep() // the hook's claims that should end (a nil Hook does nothing)
+}
 
 // List answers GET /api/resources.
 func (h *ResourcesHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -239,6 +244,7 @@ func (h *ResourcesHandler) Define(w http.ResponseWriter, r *http.Request) {
 		Machine   string   `json:"machine"`
 		MaxLeaseS int      `json:"max_lease_seconds"`
 		Allowed   []string `json:"allowed"`
+		Match     []string `json:"match"`
 	}
 	if err := decodeJSONMax(w, r, &body, 8192); err != nil {
 		errBadRequest(w, "invalid JSON")
@@ -255,7 +261,7 @@ func (h *ResourcesHandler) Define(w http.ResponseWriter, r *http.Request) {
 			allowed = append(allowed, a)
 		}
 	}
-	if err := h.M.Queue().Define(resourcequeue.Resource{Key: name, Slots: body.Slots, Machine: cleanText(body.Machine, 128), MaxLease: time.Duration(body.MaxLeaseS) * time.Second, Allowed: allowed}); err != nil {
+	if err := h.M.Queue().Define(resourcequeue.Resource{Key: name, Slots: body.Slots, Machine: cleanText(body.Machine, 128), MaxLease: time.Duration(body.MaxLeaseS) * time.Second, Allowed: allowed, Match: body.Match}); err != nil {
 		h.fail(w, err)
 		return
 	}

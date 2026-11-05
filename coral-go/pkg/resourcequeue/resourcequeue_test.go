@@ -304,3 +304,15 @@ func TestOnGrantIsCalledWhenMoreSlotsOrAKickGrantTheWaiting(t *testing.T) {
 	require.NoError(t, q.Cancel(h.Entry.ID))
 	assert.Equal(t, []string{"w1", "w2"}, granted, "a kick grants the next in line, and says so")
 }
+
+func TestAResourcesMatchListIsKeptCheckedAndCopied(t *testing.T) {
+	q, _ := fixture(t, Config{})
+	in := []string{"go test ./...", "node run_cdp_suites.mjs"}
+	require.NoError(t, q.Define(Resource{Key: "mac", Slots: 1, Match: in}))
+	in[0] = "changed afterwards"
+	st, _ := q.Status("mac")
+	assert.Equal(t, []string{"go test ./...", "node run_cdp_suites.mjs"}, st.Resource.Match, "the queue keeps its own copy")
+	for _, bad := range [][]string{{""}, {"  go test"}, {"go  test"}, {`go test "x"`}, {"go test $(x)"}, {"a b c d e f g h i"}, {"go;ls"}, {"go\ttest"}, make([]string, 21)} {
+		assert.ErrorIs(t, q.Define(Resource{Key: "mac", Slots: 1, Match: bad}), ErrBadMatch, "%q", bad)
+	}
+}
