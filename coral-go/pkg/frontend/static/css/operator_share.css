@@ -1,7 +1,7 @@
 /* Share a file with an agent (#11376): the button and line above an agent's Artifacts list, and the drop target over it while a file is dragged in. */
 .share-drop { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 0 16px; }
 .share-drop:has(.share-drop-status:empty) { display: none; }
-.share-drop-pick { width: 28px; height: 28px; min-width: 24px; }
+.share-drop-pick { position: relative; flex: none; width: 28px; height: 28px; min-width: 24px; } /* not the Filters toggle (.list-bar-toggle names that, and the suites and the panel look it up by that class) */
 @media (pointer: coarse) { .share-drop-pick { width: 44px; height: 44px; } }
 .share-drop-status { flex: 1 1 100%; margin: 0; min-height: 0; color: var(--text-secondary); font-size: var(--fs-md); overflow-wrap: anywhere; }
 .share-drop-status:empty { display: none; }
