@@ -48,7 +48,7 @@ export function mountOperatorShare(root, ctx) {
     const S = root._share = { ctx, busy: false, live: true };
     const row = el('div', 'share-drop');
     // One small + beside the search box (the operator, #13584): its tip carries the explanation, the More menu offers the same action, and a drop on the tab still works.
-    const pick = el('button', 'btn btn-quiet btn-icon sidebar-collapse-btn list-bar-toggle share-drop-pick'); pick.type = 'button'; pick.setAttribute('aria-label', 'Upload a file');
+    const pick = el('button', 'btn btn-quiet btn-icon sidebar-collapse-btn share-drop-pick'); pick.type = 'button'; pick.setAttribute('aria-label', 'Upload a file');
     const plus = el('span', 'material-icons', 'add'); plus.setAttribute('aria-hidden', 'true'); pick.append(plus);
     // who can read the files and who is told: for a keyboard or screen-reader user too, not only a pointer's tip (UI Accessibility, #13584)
     const desc = el('span', 'sr-only'); desc.id = `share-drop-desc-${++descSeq}`; pick.setAttribute('aria-describedby', desc.id);
