@@ -51,6 +51,7 @@ const { coralReady } = require('./helpers/wait');
             // Pause: the banner shows, the item says Resume
             await choose('Pause board');
             await waitFor(`getComputedStyle(document.getElementById('board-chat-paused-banner')).display !== 'none'`, `${tag}: paused: the banner shows`, 6000);
+            check(`${tag}: pausing is announced in a polite live region`, await ev(`(() => { const r = document.getElementById('board-chat-pause-status'); return !!r && r.getAttribute('role') === 'status' && r.getAttribute('aria-live') === 'polite' && /Board paused/.test(r.textContent); })()`));
             await ev(`document.querySelector('${head} .list-bar-more-btn').click(); true`);
             check(`${tag}: paused: the item says Resume board`, (await items()).some(x => x[0] === 'Resume board') && !(await items()).some(x => x[0] === 'Pause board'));
             if (process.env.CORAL_SCREENSHOT_DIR) require('node:fs').writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/board-head-${view.w}-${theme}-paused.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64'));
@@ -59,6 +60,7 @@ const { coralReady } = require('./helpers/wait');
             await ev(`document.querySelector('${head} .list-bar-more-btn').click(); true`);
             await choose('Resume board');
             await waitFor(`getComputedStyle(document.getElementById('board-chat-paused-banner')).display === 'none'`, `${tag}: resumed: no banner`, 6000);
+            check(`${tag}: resuming is announced too`, await ev(`/Board resumed/.test(document.getElementById('board-chat-pause-status').textContent)`));
             // Export: select mode starts, and the item says how to stop
             await choose('Export');
             check(`${tag}: Export starts select mode (the select bar is up)`, await ev(`!!document.getElementById('board-chat-select-bar') && getComputedStyle(document.getElementById('board-chat-select-bar')).display !== 'none'`));
@@ -71,10 +73,16 @@ const { coralReady } = require('./helpers/wait');
             await choose('Show as chat');
             check(`${tag}: Show as chat switches the board to chat`, await ev(`import(${S} + 'board_table.js').then(m => m.boardView())`) === 'chat');
             await ev(`document.querySelector('${head} .list-bar-more-btn').click(); true`);
+            await ev(`document.querySelector('${head} .list-bar-more-btn').click(); true`);
+            check(`${tag}: in Chat view the menu leaves out Expand all and Collapse all (the table's)`, !(await items()).some(x => x[0] === 'Expand all' || x[0] === 'Collapse all') && (await items()).some(x => x[0] === 'Jump to latest message'));
+            await ev(`document.querySelector('${head} .list-bar-more-btn').click(); true`);
             check(`${tag}: and the item then says Show as table`, (await items()).some(x => x[0] === 'Show as table'));
             await ev(`document.querySelector('${head} .list-bar-more-btn').click(); true`);
             await choose('Show as table');
             check(`${tag}: and back`, await ev(`import(${S} + 'board_table.js').then(m => m.boardView())`) === 'table');
+            await ev(`document.querySelector('${head} .list-bar-more-btn').click(); true`);
+            check(`${tag}: and Table view has them again`, (await items()).some(x => x[0] === 'Expand all') && (await items()).some(x => x[0] === 'Collapse all'));
+            await ev(`document.querySelector('${head} .list-bar-more-btn').click(); true`);
             // the Board page writes the pause too: the dock's banner and menu follow
             await require('./helpers/team_board').openBoardPage(ev, waitFor, board); // the Board page is the team page's Messages tab (#8129)
             await ev(`import(${S} + 'message_board.js').then(m => m.toggleBoardPause()).then(() => true)`);

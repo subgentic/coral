@@ -68,6 +68,7 @@ const _dockSearchHooks = {
     expandAll: () => setAllRows(document.getElementById('board-panel-msgs'), true),
     collapseAll: () => setAllRows(document.getElementById('board-panel-msgs'), false),
     moreItems: () => _dockMoreItems(),
+    tableView: () => boardView() === 'table',
     noMatch: () => (_boardChatScope && _boardChatReader ? { text: `No match in what ${_boardChatReader.name} reads` } : null),
 };
 
@@ -115,7 +116,7 @@ export function showBoardChatTab(boardName, agent = null) {
             </div>
             <div class="notice notice-error notice-bar notice-center board-paused-banner" id="board-chat-paused-banner" style="display:none">Board reads are paused — agents cannot see new messages</div>
             <div class="board-chat-msgs-wrap">
-                <div id="board-chat-earlier-status" class="sr-only" role="status" aria-live="polite"></div><!-- #7762: "50 earlier messages loaded" -->
+                <div id="board-chat-earlier-status" class="sr-only" role="status" aria-live="polite"></div><div id="board-chat-pause-status" class="sr-only" role="status" aria-live="polite"></div><!-- the pause, said once it changes (#13585: its button is gone) --><!-- #7762: "50 earlier messages loaded" -->
                 <div id="board-chat-loading" class="mb-earlier-loading" hidden aria-hidden="true">Loading earlier messages&hellip;</div>
                 <div class="board-chat-messages" id="board-panel-msgs"></div>
             </div>
@@ -637,10 +638,13 @@ async function _sendBoardChat(boardName) {
 (window.__coral ||= {})._sendBoardChat = _sendBoardChat;
 
 /** The board's pause as the dock shows it: the state the menu words come from, and the banner. Also called by the Board page when it pauses or resumes the board. */
-export function _setBoardChatPaused(paused) {
+export function _setBoardChatPaused(paused, say = true) {
+    const changed = _boardChatPaused !== !!paused;
     _boardChatPaused = !!paused;
     const banner = document.getElementById('board-chat-paused-banner');
     if (banner) banner.style.display = _boardChatPaused ? '' : 'none';
+    const live = document.getElementById('board-chat-pause-status');
+    if (live && say && changed) live.textContent = _boardChatPaused ? 'Board paused: agents stop receiving new messages.' : 'Board resumed: agents receive messages again.'; // a polite live region, as the pause icon's name used to change under the reader
 }
 (window.__coral ||= {})._setBoardChatPaused = _setBoardChatPaused;
 
@@ -657,7 +661,7 @@ async function _checkBoardPauseState(boardName) {
     try {
         const resp = await boardFetch(boardName, `/paused`);
         const data = await resp.json();
-        _setBoardChatPaused(!!data.paused);
+        _setBoardChatPaused(!!data.paused, false); // the state on arrival is read, not announced
     } catch { /* ignore */ }
 }
 
