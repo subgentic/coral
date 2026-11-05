@@ -337,3 +337,4 @@ node goal_write.test.mjs
 node hub_update_launch_words.test.mjs
 node activity_click_header.test.mjs
 node own_rows.test.js
+node artifact_comment_ask_computer.test.mjs
