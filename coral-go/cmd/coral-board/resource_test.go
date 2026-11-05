@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -151,7 +152,7 @@ func TestLeaseWordsSaysWhatIsLeft(t *testing.T) {
 			t.Errorf("%s: %q does not contain %q", c.in, got, c.want)
 		}
 	}
-	if got := leaseWords(at(20 * time.Second)); !strings.Contains(got, "s left]") || strings.Contains(got, "over") {
+	if got := leaseWords(at(20 * time.Second)); !regexp.MustCompile(`\[lease (19|20)s left\]`).MatchString(got) {
 		t.Errorf("20 s left reads %q", got)
 	}
 	if leaseWords("not a time") != "" {
