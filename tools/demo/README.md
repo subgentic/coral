@@ -97,3 +97,19 @@ node endcard.mjs                       # the ending: a card with the text coralh
 ```
 
 Notes: take a beat again on a fresh rig where you can (`c4`, `c5` and `c7` create things that exist afterwards); `RESUME=1 ./rig-up.sh` starts the server again on a stopped rig's data, enough for `c9` (Analytics). Native menus (the model list) are not drawn in a recording, so `c1` steps through them; some goal-panel boxes do not take sent keys in a recording, so `c5` and `c7` grow the box's value with the page's own input events. The flash check is in the skill `making-coral-demo-film`.
+
+## Film v8 (`take8.mjs`, `encode8.sh`): the story in the Operator's order
+
+The film the README's GIF comes from: a welcome on an empty Inbox, a team created on screen (name, folder, members, the first task, Launch), a goal started from the team's own page, the work divided (tasks handed to agents, each taking its own, their files attached, the page kept at the bottom through Tasks, Artifacts and Comments), a chat with the goal's driver and its update, an agent's question opened and answered from the Inbox, a file reviewed (comment, the agent's answer and a new draft, Approve), a recording of the video-comments feature, and Analytics.
+
+```
+NOLAUNCH=1 ./rig-up.sh                  # an empty demo Coral (no team: the film creates it)
+node take8.mjs d1 sync                  # the welcome and the team on screen; then read the agents' ids
+node take8.mjs d2 d3 d4 ask             # goal, work divided, the driver's chat, a question raised
+python3 -I seed-usage.py                # a week of invented usage, after the agents have answered once
+node take8.mjs d5 d6 d7                 # the Inbox question, the review, Analytics
+./prep-edit.sh <recording.mp4> "<caption>"   # a screen recording laid on the film's background with its caption band (the video-comments clip)
+node endcard.mjs; ./encode8.sh          # the film (cross-fades), the README GIF (the review beat) and the poster
+```
+
+Two things the take scripts work around, both in Coral itself: an open document does not show a new comment reply or a new version until it is closed and opened again (the review beat cuts that reopen out of the recording: `cutStart` / `cutEnd` in `lib.mjs`), and the real Claude Code shot of v6 is out of this film.
