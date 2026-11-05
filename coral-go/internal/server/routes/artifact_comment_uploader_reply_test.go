@@ -26,6 +26,7 @@ func TestTheAgentThatUploadedTheFileRepliesInAThreadItWasNeverSentAndTheAskTable
 	rig := newCmtRig(t)
 	rig.agent(1, "Dev", false)
 	rig.uploadedBySession(sendSid(1), "team-a")
+	rig.tag("for review") // the Operator's comment on a file in review is NOT sent to its uploader (#11420): no ask row exists, as in the Operator's case
 	cid := rig.ownerComment("Is the nested field 1-2x slower?")
 
 	code, rep := rig.reply(cid, asAgentSession(1), "Yes, about 1.5x on the 5,000 row set.")
@@ -46,6 +47,7 @@ func TestOnlyTheUploaderRepliesAndOnlyInAnOpenExistingThread(t *testing.T) {
 	rig.agent(1, "Dev", false)
 	rig.agent(2, "QA", false)
 	rig.uploadedBySession(sendSid(1), "team-a")
+	rig.tag("for review") // the Operator's comment on a file in review is NOT sent to its uploader (#11420): no ask row exists, as in the Operator's case
 	cid := rig.ownerComment("hello")
 
 	code, out := rig.reply(cid, asAgentSession(2), "me too")
@@ -74,6 +76,7 @@ func TestTheUploadersRepliesAreCappedPerThreadAndPerFilePerHour(t *testing.T) {
 	rig := newCmtRig(t)
 	rig.agent(1, "Dev", false)
 	rig.uploadedBySession(sendSid(1), "team-a")
+	rig.tag("for review") // the Operator's comment on a file in review is NOT sent to its uploader (#11420): no ask row exists, as in the Operator's case
 	cid := rig.ownerComment("a long discussion")
 	for i := 0; i < store.MaxAskReplies; i++ {
 		code, rep := rig.reply(cid, asAgentSession(1), fmt.Sprintf("reply %d", i))
@@ -102,6 +105,7 @@ func TestTheUploaderOnARemoteComputerRepliesToACommentTheOperatorNeverSent(t *te
 	rig := newCmtRig(t)
 	rig.agent(1, "Dev", false)
 	rig.uploadedBySession(sendSid(1), "team-a")
+	rig.tag("for review") // the Operator's comment on a file in review is NOT sent to its uploader (#11420): no ask row exists, as in the Operator's case
 	code, out := rig.do("POST", cp(cmtDoc), cmtAsKey, map[string]any{"body": "Is this 1-2x slower?", "anchor": anchorOf("the lock"), "board": "team-a"})
 	require.Equal(t, http.StatusCreated, code, fmt.Sprint(out))
 	cid := int64(out["id"].(float64))

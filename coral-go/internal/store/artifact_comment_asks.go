@@ -216,7 +216,7 @@ func (s *SessionStore) CreateUploaderReply(ctx context.Context, c ArtifactCommen
 		return ArtifactComment{}, ErrAskReplyCap
 	}
 	var inHour int
-	since := now.Add(-time.Hour).UTC().Format(time.RFC3339Nano)
+	since := now.Add(-time.Hour).UTC().Format(ISOFormat) // a fixed-width cutoff: the stored times are compared to the second
 	if err := s.db.GetContext(ctx, &inHour, `SELECT COUNT(*) FROM artifact_comments WHERE artifact_id = ? AND author_kind = 'agent' AND author_subject = ? AND created_at >= ?`, c.ArtifactID, c.AuthorSubject, since); err != nil {
 		return ArtifactComment{}, err
 	}
