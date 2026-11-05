@@ -2,7 +2,7 @@
 import { importOnce } from './import_once.js';
 import { isSignedOut } from './overload.js';
 import { scrollBehavior } from './motion.js';
-import { decisionNeedsPerson, normServer } from './server_base.js';
+import { decisionNeedsPerson, normServer, boardTeamKey } from './server_base.js';
 import { state } from './state.js';
 const api = await importOnce('./artifact_comments_api.js');
 const askUi = await importOnce('./artifact_comment_send.js');
@@ -61,7 +61,7 @@ export function createAsk({ st, panel, render, announce, refresh, ownHex }) {
         panel.querySelector('.ac-ask')?.scrollIntoView({ block: 'nearest', behavior: scrollBehavior() });
         try {
             const { refreshTeamAvailability } = await importOnce('./team_availability.js');
-            const data = await refreshTeamAvailability(k.context.board, true);
+            const data = await refreshTeamAvailability(boardTeamKey(k.context.server, k.context.board), true); // the team of the computer the FILE is on (#13687): a bare board id is asked of this computer, which has no such board for a remote computer's team
             if (!current(k)) return;
             k.agents = askUi.pickableAgents(data && data.agents);
         } catch { if (!current(k)) return; k.agents = 'error'; }
