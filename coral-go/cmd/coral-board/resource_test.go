@@ -119,7 +119,7 @@ func TestResourceListPrintsHoldersAndTheLineAndStripsControlCharacters(t *testin
 	defer func() { rawOutput = false }()
 	s := &resStub{}
 	out, _ := runResource(t, s, "list")
-	for _, want := range []string{"mac-heavy: 1 of 1 slot(s) held on mac", "holds   #1 DevA (task #7): gate", "<- you"} {
+	for _, want := range []string{"mac-heavy: 1 of 1 slot(s) held on mac", "holds   #1 Dev[31mA (task #7): gate", "<- you"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("missing %q in %q", want, out)
 		}
