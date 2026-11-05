@@ -68,9 +68,19 @@ const STUB = `(() => {
             await open(view);
             await showAgent({ board_project: TEAM });
             await waitFor(`!!document.querySelector('${root} .share-drop-pick')`, at + 'the Upload button', 10000);
-            const ui = await ev(`(() => { const b = document.querySelector('${root} .share-drop-pick'), r = b.getBoundingClientRect(); return { name: b.getAttribute('aria-label'), text: b.textContent, h: Math.round(r.height), hint: document.querySelector('${root} .share-drop-hint').textContent }; })()`);
-            check(at + 'a button named for the agent, and a line that says who can read the file and who is told', ui.name === 'Upload a file for Share Agent' && ui.text === 'Upload a file' && /Every agent on this team can read them; only Share Agent is told/.test(ui.hint), JSON.stringify(ui));
-            if (view.phone) check(at + 'the button is a 44 px target on a phone', ui.h >= 44, String(ui.h));
+            await shot(`operator-share-bar-${view.w}`);
+            const ui = await ev(`(() => { const b = document.querySelector('${root} .share-drop-pick'), r = b.getBoundingClientRect(), s = document.querySelector('${root} .list-bar-search-row .list-bar-search-wrap'); return { name: b.getAttribute('aria-label'), text: b.textContent.trim(), title: b.title, w: Math.round(r.width), h: Math.round(r.height), inSearchRow: !!b.closest('.list-bar-search-row'), afterSearch: !!s && s.compareDocumentPosition(b) === Node.DOCUMENT_POSITION_FOLLOWING, hint: !!document.querySelector('${root} .share-drop-hint'), visibleText: [...document.querySelectorAll('${root} .share-drop')].map(x => x.textContent.trim()).join('') }; })()`);
+            check(at + 'one small + button beside the search box named "Upload a file", the explanation in its tip, no line of text', ui.name === 'Upload a file' && ui.text === 'add' && /Every agent on this team can read them; only Share Agent is told/.test(ui.title) && ui.inSearchRow && ui.afterSearch && !ui.hint && ui.visibleText === '', JSON.stringify(ui));
+            check(at + 'the button is at least 24 px (44 px on a phone)', view.phone ? ui.h >= 44 && ui.w >= 44 : ui.w >= 24 && ui.h >= 24 && ui.w <= 40, `${ui.w}x${ui.h}`);
+            // the same action is in the More menu
+            await ev(`document.querySelector('${root} .list-bar-more-btn').click(); true`);
+            const menu = await ev(`[...document.querySelectorAll('${root} .list-bar-more-menu .menu-item')].map(x => x.textContent)`);
+            check(at + 'the More menu offers "Upload a file"', menu.includes('Upload a file'), JSON.stringify(menu));
+            await ev(`(() => { window.__picked = 0; const i = document.querySelector('${root}')._share && [...document.querySelectorAll('${root} input[type=file]')][0]; i.addEventListener('click', e => { window.__picked++; e.preventDefault(); }); [...document.querySelectorAll('${root} .list-bar-more-menu .menu-item')].find(x => x.textContent === 'Upload a file').click(); return true; })()`);
+            check(at + 'choosing it opens the file picker', await ev('window.__picked') === 1);
+            // the + button is keyboard-reachable and opens the picker too
+            await ev(`document.querySelector('${root} .share-drop-pick').focus(); document.querySelector('${root} .share-drop-pick').click(); true`);
+            check(at + 'the + button opens the file picker', await ev('window.__picked') === 2);
             // the drop target while a file is dragged over, and gone after it leaves
             await ev(`(() => { const dt = new DataTransfer(); dt.items.add(new File(['x'], 'a.txt')); document.querySelector('${root}').dispatchEvent(new DragEvent('dragenter', { bubbles: true, cancelable: true, dataTransfer: dt })); return true; })()`);
             const over = await ev(`(() => { const r = document.querySelector('${root}'), t = r.querySelector('.share-drop-target'); return { on: r.classList.contains('share-drop-on'), shown: t.getClientRects().length > 0, text: t.textContent }; })()`);

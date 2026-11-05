@@ -228,6 +228,7 @@ export function createArtifactsList({ inbox = false } = {}) {
         const plain = !!(model.scope && model.scope.standalone); // an agent with no team: its list has no search or filters, only the More icon
         // The list's other action behind the More icon (#7686); Refresh is gone: the tab reads itself again (watch below).
         const more = [{ label: 'Copy publishing instructions', run: async () => { try { await navigator.clipboard.writeText(AGENT_ARTIFACT_PROMPT); showToast('Publishing instructions copied'); } catch { showToast('The instructions could not be copied', true); } } }];
+        if (model.scope && !plain && !external) more.push({ label: 'Upload a file', run: () => root?._share?.choose() }); // the same action as the + beside the search (#13584)
         if (!plain) { bar = buildBar(setFilters, { page: true, personal: !!model.scope, more, moreNoun: 'artifact', hooks: { onPanel: open => savePanelOpen(panel, filterKey(), open) } }); bar.setOpen(loadPanelOpen(panel, filterKey())); }
         const title = el('span', 'sr-only', inbox ? 'Artifacts of every team' : model.scope ? `Artifacts of ${model.scope.name}` : `Artifacts of ${keyLabel(model.project)}`); // the tab names the list: no label beside the search (UI/UX, #7622);
         if (plain) { const node = el('div', 'team-artifacts-plain-head'); node.append(title, buildMoreMenu('ta-plain', more, 'artifact')); bar = { node, names() {}, set() {}, setOpen() {} }; }
@@ -605,6 +606,7 @@ export function createArtifactsList({ inbox = false } = {}) {
         } else if (root._share) importOnce('./operator_share.js').then(m => m.unmountOperatorShare(root)).catch(() => {}); // an agent with no team: nothing to share with
         watch();
         draw();
+        root._share?.attach(); // the + goes beside the search once the bar is drawn
         if (scope && sameKey && model.loaded) return Promise.resolve(); // an agent's tab drawn again (another tab and back) keeps its list until Refresh or another agent
         return loadArtifacts();
     }
