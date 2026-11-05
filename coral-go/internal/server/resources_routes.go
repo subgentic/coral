@@ -21,9 +21,10 @@ func (s *Server) registerResources(r chi.Router, sess *routes.SessionsHandler) {
 		return
 	}
 	mgr, err := resources.Open(resources.Options{
-		Path:       filepath.Join(s.cfg.CoralDir(), "resources.json"),
-		Priorities: resources.BoardPriorities{Store: s.boardStore},
-		Alive:      func(agent string) bool { return agentStillOnABoard(s, agent) },
+		Path:        filepath.Join(s.cfg.CoralDir(), "resources.json"),
+		HistoryPath: filepath.Join(s.cfg.CoralDir(), "resource_history.db"), // the record of the queue's use (#13671): its own small file, so a file that fails loses analytics only
+		Priorities:  resources.BoardPriorities{Store: s.boardStore},
+		Alive:       func(agent string) bool { return agentStillOnABoard(s, agent) },
 	})
 	if err != nil {
 		slog.Warn("resource queue is off", "error", err)

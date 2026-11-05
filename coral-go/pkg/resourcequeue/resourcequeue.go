@@ -44,6 +44,8 @@ type Claimant struct {
 	Task     int    // what it is working on, for people to read (0: none)
 	Priority int    // bigger goes first; supplied by the caller from the agent's task and goal
 	Note     string // why, for people to read
+	Via      string // how the claim came: "hook" for the shell hook's own, "" for a person's or an agent's (#13671)
+	Pattern  string // for a hook claim, the resource's match pattern that fired (never the command)
 }
 
 // Entry is one agent's place in a resource's line, or its hold of a slot.
@@ -83,7 +85,56 @@ type Config struct {
 	AgeStep     time.Duration           // every AgeStep spent waiting is worth one point of priority (0: DefaultAgeStep; negative: no aging)
 	AgeCap      int                     // aging adds at most this many points (0: DefaultAgeCap)
 	OnGrant     func(Entry)             // called, outside the lock, for each entry that is granted by a release, a reap or a reorder (not for a claim answered at once: its Result says so)
+	OnEvent     func(Event)             // called, outside the lock, for each change (#13671, the analytics' record): a panic in it is dropped, and it must not block (the Manager's history queues and returns)
 	Persist     Persister               // optional: the state is saved after each change
+}
+
+// Event is one change in a queue, for the record of its use (#13671): who, which resource, how long it waited or held. It carries no command and no note.
+type Event struct {
+	At       time.Time
+	Kind     string // enqueued, granted, released, cancelled (left the line), kicked (a person removed it), expired (the lease ran out), gone (the agent's session ended), renewed
+	Resource string
+	Agent    string
+	Task     int
+	Entry    int64
+	Via      string
+	Pattern  string
+	Wait     time.Duration // granted: time in line; cancelled and kicked while waiting: time waited
+	Held     time.Duration // released, kicked, expired and gone while holding: time held
+}
+
+// note records an event of e, to be told to the sink after the lock is let go.
+func (q *Queue) note(kind string, e *Entry) {
+	if q.cfg.OnEvent == nil {
+		return
+	}
+	now := q.now()
+	ev := Event{At: now, Kind: kind, Resource: e.Resource, Agent: e.Agent, Task: e.Task, Entry: e.ID, Via: e.Via, Pattern: e.Pattern}
+	if e.Waiting() {
+		ev.Wait = now.Sub(e.Enqueued)
+	} else {
+		ev.Held = now.Sub(e.Granted)
+		if kind == "granted" {
+			ev.Held, ev.Wait = 0, e.Granted.Sub(e.Enqueued)
+		}
+	}
+	q.pend = append(q.pend, ev)
+}
+
+// unlockEmit lets the lock go and then tells the sink of what changed: outside the lock, and a sink that panics changes nothing.
+func (q *Queue) unlockEmit() {
+	evs := q.pend
+	q.pend = nil
+	q.mu.Unlock()
+	if q.cfg.OnEvent == nil {
+		return
+	}
+	for _, ev := range evs {
+		func() {
+			defer func() { _ = recover() }()
+			q.cfg.OnEvent(ev)
+		}()
+	}
 }
 
 // Defaults.
@@ -114,6 +165,7 @@ type Queue struct {
 	res     map[string]*Resource
 	entries []*Entry
 	nextID  int64
+	pend    []Event // events noted under the lock, told to the sink after it (OnEvent)
 }
 
 // New makes an empty Queue, or one loaded from cfg.Persist.
@@ -237,11 +289,11 @@ func (q *Queue) Claim(key string, who Claimant) (Result, error) {
 	q.mu.Lock()
 	r, ok := q.res[key]
 	if !ok {
-		q.mu.Unlock()
+		q.unlockEmit()
 		return Result{}, ErrNoResource
 	}
 	if !allowed(r, who.Agent) {
-		q.mu.Unlock()
+		q.unlockEmit()
 		return Result{}, ErrNotAllowed
 	}
 	if e := q.entryOf(key, who.Agent); e != nil {
@@ -250,7 +302,7 @@ func (q *Queue) Claim(key string, who Claimant) (Result, error) {
 		}
 		res := q.resultOf(e)
 		err := q.save()
-		q.mu.Unlock()
+		q.unlockEmit()
 		return res, err
 	}
 	waiting := 0 // across every resource: one agent cannot fill the lines
@@ -260,23 +312,24 @@ func (q *Queue) Claim(key string, who Claimant) (Result, error) {
 		}
 	}
 	if waiting >= q.maxPer() {
-		q.mu.Unlock()
+		q.unlockEmit()
 		return Result{}, ErrQueueFull
 	}
 	e := &Entry{ID: q.nextID, Resource: key, Claimant: who, Enqueued: q.now()}
 	q.nextID++
 	q.entries = append(q.entries, e)
+	q.note("enqueued", e)
 	q.fill(key)
 	res := q.resultOf(e)
 	err := q.save()
-	q.mu.Unlock()
+	q.unlockEmit()
 	return res, err
 }
 
 // Renew extends the holder's lease to a full lease from now.
 func (q *Queue) Renew(key, agent string) (Entry, error) {
 	q.mu.Lock()
-	defer q.mu.Unlock()
+	defer q.unlockEmit()
 	r, ok := q.res[key]
 	if !ok {
 		return Entry{}, ErrNoResource
@@ -286,6 +339,7 @@ func (q *Queue) Renew(key, agent string) (Entry, error) {
 		return Entry{}, ErrNotHolder
 	}
 	e.Lease = q.now().Add(r.lease())
+	q.note("renewed", e)
 	return *e, q.save()
 }
 
@@ -293,18 +347,23 @@ func (q *Queue) Renew(key, agent string) (Entry, error) {
 func (q *Queue) Release(key, agent string) error {
 	q.mu.Lock()
 	if _, ok := q.res[key]; !ok {
-		q.mu.Unlock()
+		q.unlockEmit()
 		return ErrNoResource
 	}
 	e := q.entryOf(key, agent)
 	if e == nil {
-		q.mu.Unlock()
+		q.unlockEmit()
 		return ErrNotHolder
+	}
+	if e.Waiting() {
+		q.note("cancelled", e)
+	} else {
+		q.note("released", e)
 	}
 	q.drop(e.ID)
 	granted := q.fill(key)
 	err := q.save()
-	q.mu.Unlock()
+	q.unlockEmit()
 	q.notify(granted)
 	return err
 }
@@ -319,6 +378,11 @@ func (q *Queue) Reap() (ended []Entry, err error) {
 		dead := q.cfg.Alive != nil && !q.cfg.Alive(e.Claimant.Agent)
 		expired := !e.Waiting() && !e.Lease.IsZero() && !now.Before(e.Lease)
 		if dead || expired {
+			if dead {
+				q.note("gone", e)
+			} else {
+				q.note("expired", e)
+			}
 			ended = append(ended, *e)
 			keys[e.Resource] = true
 			continue
@@ -331,7 +395,7 @@ func (q *Queue) Reap() (ended []Entry, err error) {
 		granted = append(granted, q.fill(k)...)
 	}
 	err = q.save()
-	q.mu.Unlock()
+	q.unlockEmit()
 	q.notify(granted)
 	return ended, err
 }
@@ -342,7 +406,7 @@ func (q *Queue) Move(id int64, how string) error {
 	q.mu.Lock()
 	e := q.byID(id)
 	if e == nil || !e.Waiting() {
-		q.mu.Unlock()
+		q.unlockEmit()
 		return ErrNoEntry
 	}
 	line := q.line(e.Resource)
@@ -361,7 +425,7 @@ func (q *Queue) Move(id int64, how string) error {
 	case "down":
 		to = min(at+1, len(line)-1)
 	default:
-		q.mu.Unlock()
+		q.unlockEmit()
 		return fmt.Errorf("resourcequeue: move %q: up, down or first", how)
 	}
 	line = append(line[:at], line[at+1:]...)
@@ -371,7 +435,7 @@ func (q *Queue) Move(id int64, how string) error {
 	}
 	granted := q.fill(e.Resource)
 	err := q.save()
-	q.mu.Unlock()
+	q.unlockEmit()
 	q.notify(granted)
 	return err
 }
@@ -381,14 +445,15 @@ func (q *Queue) Cancel(id int64) error {
 	q.mu.Lock()
 	e := q.byID(id)
 	if e == nil {
-		q.mu.Unlock()
+		q.unlockEmit()
 		return ErrNoEntry
 	}
 	key := e.Resource
+	q.note("kicked", e)
 	q.drop(id)
 	granted := q.fill(key)
 	err := q.save()
-	q.mu.Unlock()
+	q.unlockEmit()
 	q.notify(granted)
 	return err
 }
@@ -543,6 +608,7 @@ func (q *Queue) fill(key string) []Entry {
 		e.Granted = q.now()
 		e.Lease = e.Granted.Add(r.lease())
 		granted = append(granted, *e)
+		q.note("granted", e)
 	}
 	return granted
 }
