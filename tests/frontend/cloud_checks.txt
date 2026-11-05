@@ -205,6 +205,7 @@ node analytics_efficiency.test.mjs
 node analytics_tabs.test.mjs
 node inbox_vs_chat_model.test.mjs
 node operator_activity_filters.test.mjs
+node operator_activity_words.test.mjs
 node analytics_tabs_realistic.test.mjs
 node artifact_sort_words.test.mjs
 node automation_filters.test.mjs

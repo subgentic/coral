@@ -10,6 +10,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/subgentic/coral/internal/board"
+	"github.com/subgentic/coral/internal/store"
 )
 
 // #13609: the Operator's clicks in the Inbox and on the task pages are in the Activity record. Each case drives the real router as the person at this computer (no token) and then as an agent (its session token
@@ -190,4 +191,79 @@ func TestMoreOperatorClicksAreInTheActivityRecord(t *testing.T) {
 		require.Equal(t, c.action, got[0].Action, c.name)
 		require.Equal(t, c.kind, got[0].ItemKind, c.name)
 	}
+}
+
+// #13621: a row links to what its click made. The new goal's, task's and bookmark's numbers are in the rows of goal_create, task_create and saved_add, and a failed run's row says whether it was a job's or a workflow's. Each is
+// read back from GET /api/activity, the way the Inbox's Activity folder reads it.
+func TestRowsNameWhatTheirClickMadeAndTheKindOfRun(t *testing.T) {
+	srv, ts, _ := strictServer(t, false)
+	ctx := context.Background()
+	_, err := srv.boardStore.Subscribe(ctx, "team", "Lead", "Lead", "", nil, "all")
+	require.NoError(t, err)
+	msg, err := srv.boardStore.PostMessage(ctx, "team", "Lead", "a note worth keeping", nil)
+	require.NoError(t, err)
+	person := map[string]string{"Origin": ts.URL, "Sec-Fetch-Site": "same-origin"}
+	do := func(method, path, body string) (int, string) {
+		t.Helper()
+		req, err := http.NewRequest(method, ts.URL+path, strings.NewReader(body))
+		require.NoError(t, err)
+		req.Header.Set("Content-Type", "application/json")
+		for k, v := range person {
+			req.Header.Set(k, v)
+		}
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		b, _ := io.ReadAll(resp.Body)
+		return resp.StatusCode, string(b)
+	}
+	idOf := func(out string) string {
+		var v struct {
+			ID int64 `json:"id"`
+		}
+		require.NoError(t, json.Unmarshal([]byte(out), &v), out)
+		require.NotZero(t, v.ID, out)
+		return itoa(v.ID)
+	}
+	code, out := do("POST", "/api/board/team/goals", `{"subscriber_id":"Operator","title":"A new goal","outcome":"o","done_when":"d"}`)
+	require.Less(t, code, 300, out)
+	goalID := idOf(out)
+	code, out = do("POST", "/api/board/team/tasks", `{"title":"New one","subscriber_id":"Operator"}`)
+	require.Less(t, code, 300, out)
+	taskID := idOf(out)
+	code, out = do("POST", "/api/saved", `{"kind":"board","ref":"team","key":"`+itoa(msg.ID)+`","title":"a note","snippet":"a note worth keeping","team":"team","author":"Lead"}`)
+	require.Less(t, code, 300, out)
+	savedID := idOf(out)
+	job, err := store.NewScheduleStore(srv.db).CreateScheduledJob(ctx, &store.ScheduledJob{Name: "j", CronExpr: "* * * * *", RepoPath: "/tmp", Prompt: "p", Enabled: 1})
+	require.NoError(t, err)
+	_, err = store.NewScheduleStore(srv.db).CreateScheduledRun(ctx, job.ID, "2026-10-26T00:00:00Z", "failed") // so the two runs' numbers differ: a swapped kind cannot pass by luck
+	require.NoError(t, err)
+	jobRun, err := store.NewScheduleStore(srv.db).CreateScheduledRun(ctx, job.ID, "2026-10-27T00:00:00Z", "failed")
+	require.NoError(t, err)
+	require.NotEqual(t, jobRun, int64(1))
+	wf, err := store.NewWorkflowStore(srv.db).CreateWorkflow(ctx, &store.Workflow{Name: "w", StepsJSON: `[]`, DefaultAgentJSON: "{}", BaseBranch: "main", MaxDurationS: 60, Enabled: 1})
+	require.NoError(t, err)
+	wfRun, err := store.NewWorkflowStore(srv.db).CreateWorkflowRun(ctx, wf.ID, "api", nil)
+	require.NoError(t, err)
+	for _, p := range []string{"/api/workflows/runs/" + itoa(wfRun.ID) + "/seen", "/api/scheduled/runs/" + itoa(jobRun) + "/seen"} {
+		code, out = do("POST", p, ``)
+		require.Less(t, code, 300, p+" "+out)
+	}
+	code, out = do("GET", "/api/activity", "")
+	require.Equal(t, http.StatusOK, code, out)
+	var list struct {
+		Actions []board.OperatorAction `json:"actions"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(out), &list))
+	got := map[string]board.OperatorAction{}
+	for _, a := range list.Actions {
+		got[a.Action+"/"+a.ItemKind] = a
+	}
+	require.Equal(t, goalID, got[board.ActGoalCreate+"/goal"].ItemID, "the new goal's number")
+	require.Equal(t, "A new goal", got[board.ActGoalCreate+"/goal"].Title)
+	require.Equal(t, taskID, got[board.ActTaskCreate+"/task"].ItemID, "the new task's number")
+	require.Equal(t, "New one", got[board.ActTaskCreate+"/task"].Title)
+	require.Equal(t, savedID, got[board.ActSavedAdd+"/message"].ItemID, "the new bookmark's number")
+	require.Equal(t, itoa(wfRun.ID), got[board.ActRunSeen+"/workflow_run"].ItemID, "a workflow's run")
+	require.Equal(t, itoa(jobRun), got[board.ActRunSeen+"/job_run"].ItemID, "an automation job's run")
 }
