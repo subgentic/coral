@@ -23,7 +23,7 @@ const BASE = require('./test_base').BASE;
             await waitFor(`!!window.__asked.some(a => /build failed/i.test(a.q || ''))`, `${w}: the chats read carries the words`, { timeout: 10000 });
             await waitFor(`document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group)').length >= 1`, `${w}: the list`, { timeout: 8000 });
             await settle(300);
-            const r = await ev(`(() => { const box = [...document.querySelectorAll('#inbox-search, #group-table-view input[type=search], #group-table-view .list-bar-search input')].filter(e => e.getClientRects().length).map(e => e.value);
+            const r = await ev(`(() => { const box = [...document.querySelectorAll('.phone-bar-search, #inbox-search, #group-table-view input[type=search], #group-table-view .list-bar-search input')].filter(e => e.getClientRects().length).map(e => e.value);
                 return { box, rows: [...document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group)')].map(r => r.innerText.replace(/\\s+/g, ' ').slice(0, 60)), group: document.getElementById('group-table-view').dataset.group }; })()`);
             assert.equal(r.group, 'hub-inbox:chats', `${w}: the Inbox's All chats is open: ${JSON.stringify(r)}`);
             assert.ok(r.box.some(v => v === 'build failed'), `${w}: the words are in the search box: ${JSON.stringify(r)}`);

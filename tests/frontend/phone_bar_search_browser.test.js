@@ -1,5 +1,5 @@
 // A search field in the phone's top bar on every top-level screen that has a search (#11476, Gmail's "Search in mail"): at 390 px the bar's pill is a field whose placeholder says what it searches (Inbox, Chats, Automations,
-// Analytics, Docs); what is typed goes into that view's own search (the sidebar's, hidden on a phone); the Inbox has none here, its tabs have a box of their own (#11859), so the view filters as it does anywhere; each view keeps its own words; a screen with no search (Computers) keeps its title.
+// Analytics, Docs); what is typed goes into that view's own search (the sidebar's, hidden on a phone); on the Inbox it is the open tab's own search (#13591, "Search needs you"), the page's box not drawn; each view keeps its own words; a screen with no search (Computers) keeps its title.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { coralReady } = require('./helpers/wait');
@@ -14,10 +14,11 @@ const { coralReady } = require('./helpers/wait');
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
         await coralReady(ev);
         const field = () => ev(`(() => { const i = [...document.querySelectorAll('.phone-bar-search')].find(e => e.getClientRects().length); return i ? { placeholder: i.placeholder, value: i.value, label: i.getAttribute('aria-label'), h: Math.round(i.getBoundingClientRect().height), title: i.closest('.phone-bar-title').textContent } : null; })()`);
-        // Inbox: its tabs each have a search box of their own, so the bar has no second one (#11859): the page's box alone
+        // Inbox: the pill is the open tab's own search (#13591): its words, the page's box not drawn
         await ev(`window.switchNavTab('hub-inbox'); true`);
-        await waitFor(`!!document.querySelector('#inbox-needs-search') && document.querySelector('#inbox-needs-search').getClientRects().length > 0`, 'the Inbox page has its own search', 8000);
-        check(!(await ev(`[...document.querySelectorAll('.phone-bar-search')].some(e => e.getClientRects().length)`)), 'the Inbox bar has no search field of its own: the page\'s box is the only one');
+        await waitFor(`!!document.querySelector('#inbox-needs-search')`, 'the Inbox page has its search', 8000);
+        await waitFor(`[...document.querySelectorAll('.phone-bar-search')].some(e => e.getClientRects().length && e.placeholder === 'Search needs you')`, 'the Inbox pill is the Needs you search', 8000);
+        check(await ev(`document.querySelector('#inbox-needs-search').getClientRects().length === 0`), 'the Inbox page\'s own box is not drawn: the pill is the only search');
         // Automations: the pill is a search field with a name and a 44 px height
         await ev(`window.switchNavTab('automations'); true`);
         await waitFor(`[...document.querySelectorAll('.phone-bar-search')].some(e => e.getClientRects().length && /Automations/.test(e.placeholder))`, 'Automations has a search in its bar', 8000);

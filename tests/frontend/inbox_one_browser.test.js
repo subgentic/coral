@@ -85,12 +85,14 @@ const AGENTS = (waiting) => waiting ? [
             assert.equal(await ev(`document.getElementById('inbox-title') === null && document.getElementById('inbox-tablist') === null`), true, at + 'the old title and tab strip are gone');
 
             if (mobile) {
-                await waitFor(`!!document.querySelector('#group-table-view .view-list-nav .view-list-item') && document.getElementById('group-table-view').getClientRects().length > 0`, at + 'the phone opens on the table with the folders\' tab strip on top', 10000);
+                await waitFor(`!!document.querySelector('#group-table-view .inbox-folder-toolbar') && document.getElementById('group-table-view').getClientRects().length > 0`, at + 'the phone opens on the table with the folder\'s title row on top and no tab strip (#13596)', 10000);
+                assert.equal(await ev(`[...document.querySelectorAll('#group-table-view .view-list-nav, #group-table-view [role=tablist]')].filter(e => e.getClientRects().length).length`), 0, at + 'no tab strip on a phone');
                 assert.equal(await ev(`[...document.querySelectorAll('#mobile-inbox-list .sidebar-hide-btn')].some(b => b.getClientRects().length > 0)`), false, at + 'no Hide on a phone');
-                assert.equal(await ev(`(() => { const sel = document.querySelector('#group-table-view .view-list-nav').getBoundingClientRect(), nxt = document.querySelector('#group-table-view .gt-toolbar, #group-table-view .group-table-head').getBoundingClientRect(); return nxt.top - sel.bottom >= 8; })()`), true, at + 'the folders\' tab strip does not touch the field under it: 8 px (#7851)');
                 await shot(`inbox-one-list-${w}`);
-                await ev(`document.querySelector('#group-table-view .view-list-item[data-key="tasks"]').click(); true`);
-                await waitFor(`!!document.querySelector('#group-table-view .dt-primary')`, at + 'the Tasks tab opens Tasks', 8000);
+                await ev(`document.querySelector('header.top-bar .phone-menu-btn').click(); true`);
+                await waitFor(`!!document.querySelector('#nav-more-menu .nav-drawer-folder')`, at + 'the drawer lists the folders', 8000);
+                await ev(`[...document.querySelectorAll('#nav-more-menu .nav-drawer-folder')].find(b => b.querySelector('.nav-drawer-label').textContent === 'Tasks').click(); true`);
+                await waitFor(`!!document.querySelector('#group-table-view .dt-primary')`, at + 'the Tasks folder of the drawer opens Tasks', 8000);
                 await ev(`document.querySelector('#group-table-view .dt-primary').click(); true`);
                 await waitFor(`document.getElementById('inbox-page').getClientRects().length > 0 && !!document.querySelector('#inbox-page .ibx-reply-input')`, at + 'the task as a screen of its own', 10000);
                 assert.equal(await ev(`document.querySelector('#inbox-page .goals-back').textContent.trim()`), '\u2190 Tasks', at + 'with the way back, to the folder it came from');

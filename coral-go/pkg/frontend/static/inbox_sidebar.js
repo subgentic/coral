@@ -14,6 +14,7 @@ import { doneGoals, nextQuietEnd, quietEndsAt, hideGoalDone, setGoalDoneCount, i
  * The one search box searches the group on screen: it narrows the rows of Needs you and Tasks, and is the Saved search (the server matches, so it covers every saved message). Saved's Filters and Sort
  * are in Display options. The hub's own framed /inbox is not this: it keeps the frame, full width (inbox_tab.js). */
 import { state } from './state.js';
+import { isPhoneBar } from './phone_layout.js';
 
 const { mutedReviewItems, mutedWords, reviewItems, unreadReviewItems, reviewErrors, refreshReviews, reviewsChangedOnServer, reviewGroups, setReviewRead, markOpenedReadVisibly, isRead, savedFiles } = await importOnce('./inbox_reviews.js');
 import { failedUnread, finishedUnread, refreshRuns, markSeen, runRoute, failureWords } from './automation_runs.js';
@@ -732,6 +733,8 @@ const folderSections = () => {
     return [...sections, ...CH.chatSections(), ...boardSection()].map(section => ({ ...section, items: section.items.map(item => ({ ...item, tip: FOLDER_TIPS[item.key], icon: FOLDER_ICONS[item.key] || (item.key.startsWith(BOARD_ITEM) ? 'forum' : undefined) || (item.key.startsWith('chats-cli-') ? `cli:${item.key.slice(10)}` : undefined) })) }));
 };
 let _navKey = null, _folders = null, _poll = 0;
+/** What the phone's ☰ drawer lists for the Inbox (#13596): every folder the sidebar has, with its count, the open one marked, and the pick. Read when the drawer opens. */
+state.inboxFolderRows = () => ({ sections: folderSections().filter(sec => !sec.items.some(it => String(it.key).startsWith(BOARD_ITEM))), current: navCurrent(), pick: pickFolder });
 /** A folder was picked: a page that is open gives way, and the folder's table opens with the keyboard at its heading. */
 function pickFolder(key) {
     if (key.startsWith(BOARD_ITEM)) { openItemRoute(BOARDS_SUB, key.slice(BOARD_ITEM.length), null, key); return; } // a board of the phone drawer's Boards group: its messages, in the Inbox
@@ -1044,7 +1047,7 @@ registerGroupSource('hub-inbox', {
         if (key === 'saved') return savedListSpec();
         return null;
     },
-    lead: () => { const here = navCurrent(), sections = folderSections(); return { signature: JSON.stringify([here, sections.map(sec => [sec.title, sec.items.map(i => i.key)])]), node: () => VL.build({ id: 'inbox-folders-page', label: 'Inbox views', sections, current: here, onPick: pickFolder, drawer: true, tabs: true }) }; }, // a phone: the folders are one select on top of the table
+    lead: () => { if (isPhoneBar()) return { none: true }; const here = navCurrent(), sections = folderSections(); return { signature: JSON.stringify([here, sections.map(sec => [sec.title, sec.items.map(i => i.key)])]), node: () => VL.build({ id: 'inbox-folders-page', label: 'Inbox views', sections, current: here, onPick: pickFolder, drawer: true, tabs: true }) }; }, // a phone: the folders are one select on top of the table
     isEmpty: () => false, // the tab opens its group's table itself (showInbox)
     showList: () => { closePage(false); window.switchNavTab?.('hub-inbox'); },
     empty: () => { closePage(false); window.switchNavTab?.('hub-inbox'); },

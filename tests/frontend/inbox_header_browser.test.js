@@ -47,7 +47,7 @@ const FOLDERS = [['needs', '/inbox/needs', 'Needs you'], ['tasks', '/inbox/tasks
                 if (key === 'goals' || key === 'tasks') await shot(`inbox-header-${key}-${label}-${label === '1280' ? 'light' : 'dark'}`, label === '1280' ? 'light' : 'dark');
                 check(`${name}: the title is the first thing of the toolbar's row (the page's title id), and there is no row of its own`, g && g.title === title && g.id === 'group-table-title' && !g.oldHead && /^inbox-folder-head/.test(g.order || 'inbox-folder-head') , JSON.stringify(g));
                 if (mobile) {
-                    check(`${name}: a phone's row is the search and the icon on one line; the title is for screen readers (one pixel)`, g.headBox.w <= 1 && g.headBox.h <= 1 && Math.abs(g.searchY - g.iconY) <= 6 && g.rowH <= 64 && g.over <= 0 && !g.pillsShown && !g.rowSelect, JSON.stringify(g));
+                    check(`${name}: a phone's row is the folder's name at the left and the Filters icon at the right (the top pill is the search, #13591; no tab strip, #13596)`, g.headBox.w > 20 && g.headBox.h >= 20 && g.searchW === 0 && g.rowH <= 64 && g.over <= 0 && !g.pillsShown && !g.rowSelect, JSON.stringify(g));
                 } else {
                     const ys = [g.titleY, g.searchY, g.iconY, g.pillsY].filter(y => y != null);
                     check(`${name}: the title, the search${g.pillsShown ? ', the pills' : ''} and the icon are on one line (same centre) and the row is one line high`, ys.length >= 3 && Math.max(...ys) - Math.min(...ys) <= 6 && g.rowH <= 64 && g.over <= 0, JSON.stringify(g));
@@ -59,7 +59,7 @@ const FOLDERS = [['needs', '/inbox/needs', 'Needs you'], ['tasks', '/inbox/tasks
                     await ev(`document.documentElement.style.fontSize = '32px'; true`); await settle(400);
                     const z = await ev(`(() => { const row = document.querySelector('#group-table-view .inbox-folder-toolbar .list-bar-search-row'), t = row.querySelector('.list-bar-toggle').getBoundingClientRect(), q = row.querySelector('input[type=search]').getBoundingClientRect(); return { iconRight: Math.round(t.right), iconW: Math.round(t.width), iconH: Math.round(t.height), searchW: Math.round(q.width), vw: innerWidth, over: document.documentElement.scrollWidth - innerWidth }; })()`);
                     if (key === 'goals') await shot('inbox-header-goals-390-200pct-dark', 'dark');
-                    check(`${name} at 200% text: the Filters icon is whole inside the screen (44 px or more) and the search shrinks to fit`, z.iconRight <= z.vw && z.iconW >= 44 && z.iconH >= 44 && z.searchW >= 100 && z.over <= 0, JSON.stringify(z));
+                    check(`${name} at 200% text: the Filters icon is whole inside the screen (44 px or more) and the search shrinks to fit`, z.iconRight <= z.vw && z.iconW >= 44 && z.iconH >= 44 && z.over <= 0, JSON.stringify(z));
                     await ev(`document.documentElement.style.fontSize = ''; true`); await settle(300);
                 }
                 if (key === 'goals' || key === 'tasks') {

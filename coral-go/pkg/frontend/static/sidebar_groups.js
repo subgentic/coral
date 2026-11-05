@@ -167,8 +167,8 @@ function drawTable() {
     if (!host || !tables.length) return false;
     // a phone's way back to the list is in the table's own title row, not a row of its own above it (#7722)
     // A source with a `lead` (the Inbox: its view list as one select, #7785) puts that on top of the table on a phone instead: the select is the way to the other views, so there is no way back to a list.
-    const lead = isPhoneLayout() && src.lead ? src.lead() : null;
-    const back = isPhoneLayout() && !lead ? `<button type="button" class="back-link group-table-back" data-on-click="sgroup-list" data-kind="${escapeAttr(open.kind)}">\u2190 ${escapeHtml(TAB_NAME[open.kind] || 'List')}</button>` : '';
+    const lead0 = isPhoneLayout() && src.lead ? src.lead() : null, lead = lead0 && !lead0.none ? lead0 : null; // lead.none (the Inbox, #13596): no strip and no way back either, the ☰ drawer lists the folders
+    const back = isPhoneLayout() && !lead0 ? `<button type="button" class="back-link group-table-back" data-on-click="sgroup-list" data-kind="${escapeAttr(open.kind)}">\u2190 ${escapeHtml(TAB_NAME[open.kind] || 'List')}</button>` : '';
     const bar = src.toolbar ? src.toolbar(open.key) : null;
     const html = (bar && !bar.node ? toolbarHtml(bar, tables[0]) : '') + tables.map((x, i) => tableHtml(x, i, i ? '' : back, !!bar)).join('');
     host.dataset.group = open.kind + ':' + open.key; // which table is on screen (saved.js asks for the Inbox's Saved)

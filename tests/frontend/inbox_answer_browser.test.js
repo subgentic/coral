@@ -46,12 +46,12 @@ const { coralReady } = require('./helpers/wait');
                 const g = await ev(`(() => { const bs = [...document.querySelectorAll('#group-table-view .inbox-answer')].map(b => b.getBoundingClientRect()), row = document.querySelector('#group-table-view .inbox-answers').getBoundingClientRect(); return { left: Math.round(bs[0].left), right: Math.round(bs[bs.length - 1].right), rowW: Math.round(row.width), vw: innerWidth }; })()`);
                 assert.ok(g.left <= 28 && g.right >= g.vw - 28, '390: the pair spans the row, no 56 px indent: ' + JSON.stringify(g));
             }
-            if (mobile) { // a toast is not drawn over the folder picker of the phone's list (#10525)
+            if (mobile) { // a toast is not drawn over the page's title row of the phone's list (#10525, #13596)
                 await ev(`import((window.__coralStatic || '/static/') + 'utils.js').then(m => m.showToast('A notice for the Inbox', false, 60000)); true`);
                 await waitFor(`!!document.querySelector('#notices .toast')`, '390: a toast', 5000);
                 await new Promise(r => setTimeout(r, 500)); // sleep-ok: the toast column places itself under what it must not cover
-                const clear = await ev(`(() => { const t = document.querySelector('#notices .toast').getBoundingClientRect(), p = document.querySelector('#group-table-view .view-list-trigger').getBoundingClientRect(); return { toastTop: Math.round(t.top), pickerBottom: Math.round(p.bottom), pickerTop: Math.round(p.top) }; })()`);
-                assert.ok(clear.toastTop >= clear.pickerBottom, `390: the toast starts below the folder picker ${JSON.stringify(clear)}`);
+                const clear = await ev(`(() => { const t = document.querySelector('#notices .toast').getBoundingClientRect(), p = document.querySelector('#group-table-view .list-bar-search-row').getBoundingClientRect(); return { toastTop: Math.round(t.top), pickerBottom: Math.round(p.bottom), pickerTop: Math.round(p.top) }; })()`);
+                assert.ok(clear.toastTop >= clear.pickerBottom, `390: the toast starts below the page's title and Filters row (the phone has no folder picker, #13596) ${JSON.stringify(clear)}`);
                 await ev(`document.querySelectorAll('#notices .toast').forEach(t => t.remove()); true`);
             }
             await shot(`inbox-answer-${w}`);
