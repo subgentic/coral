@@ -27,7 +27,7 @@ outputs:
     value: ${{ steps.key.outputs.paths }}
   cache-hit:
     description: '"true" when the caches were restored under exactly cache-key'
-    value: ${{ steps.restore.outputs.cache-hit }}
+    value: ${{ steps.restore-retry.outputs.cache-hit || steps.restore.outputs.cache-hit }}
 runs:
   using: composite
   steps:
@@ -65,6 +65,23 @@ runs:
     - name: Restore the Go caches (saved by main)
       id: restore
       if: inputs.cache == 'restore'
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ steps.key.outputs.paths }}
+        key: ${{ steps.key.outputs.key }}
+        restore-keys: ${{ steps.key.outputs.prefix }}
+    # A cache service that times out (ETIMEDOUT, v2.0.52's macOS amd64 job) comes back as a restore that found nothing, and then the verify below sees an empty
+    # module cache and fails the job for a network blip. One more try after a short wait; a second miss goes on to the verify exactly as before, which is
+    # unchanged: the retry only fills the cache, it never skips or loosens the go.sum check (tests/release/setup_go_macos_retry_test.sh, #13568's sibling).
+    - name: Wait before retrying a restore that found nothing
+      if: inputs.cache == 'restore' && steps.restore.outputs.cache-matched-key == ''
+      shell: bash
+      run: |
+        echo "::warning::the Go cache restore found nothing (a timeout of the cache service looks the same); trying once more in 20 s"
+        sleep 20
+    - name: Retry the Go cache restore once
+      id: restore-retry
+      if: inputs.cache == 'restore' && steps.restore.outputs.cache-matched-key == ''
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ${{ steps.key.outputs.paths }}
