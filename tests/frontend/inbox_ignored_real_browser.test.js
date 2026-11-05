@@ -5,6 +5,7 @@ const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
 const { coralReady, framesJs } = require('./helpers/wait');
+const { ownRows } = require('./helpers/own_rows');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -49,12 +50,13 @@ const { coralReady, framesJs } = require('./helpers/wait');
         await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('artifacts')).then(() => true)`);
         const before = await settled("c['For review'] >= 4 && c.All >= c['For review']", 'the pills with both of this run\'s files for review');
         check((await api('POST', `/api/board/${B}/artifacts/${ids['put-away.md']}/review`, { decision: 'ignore' })).status === 200, 'the file was ignored through the real route');
-        const after = await settled(`c.Dismissed === ${before.Dismissed + 1} && c['For review'] === ${before['For review'] - 1}`, 'the pills after the ignore: For review down one, Dismissed up one');
-        check(after.All === before.All, 'the All count did not move: ' + JSON.stringify([before, after]));
+        const after = await settled(`c.Dismissed >= ${before.Dismissed + 1}`, 'the Dismissed pill gained the ignored file (at least: other suites may dismiss too, #13389)');
+        const own = ownRows(((await api('GET', `/api/board/${B}/artifacts`)).body.artifacts) || [], () => true).map(x => x.name).sort(); // this run's board only: ignoring a file does not delete it
+        check(JSON.stringify(own) === JSON.stringify(['keep-me.md', 'put-away.md']), 'both of this run\'s files are still listed: ' + JSON.stringify(own));
         const names = await pills();
         check(names.map(t => t.replace(/ \d+$/, '')).join() === 'All,For review,Dismissed', 'the pills are All, For review, Dismissed in order: ' + JSON.stringify(names));
         await ev(`[...document.querySelectorAll('${T} button')].find(b => /^Dismissed \\d+$/.test((b.textContent || '').trim())).click(); true`);
-        await waitFor(`document.querySelectorAll('${T} tbody tr').length === ${after.Dismissed} && [...document.querySelectorAll('${T} tbody tr')].some(r => /put-away\\.md/.test(r.textContent)) && ![...document.querySelectorAll('${T} tbody tr')].some(r => /keep-me\\.md/.test(r.textContent))`, 'the list is the dismissed files (this run\'s put-away.md among them, keep-me.md not)', 15000);
+        await waitFor(`[...document.querySelectorAll('${T} tbody tr')].some(r => /put-away\\.md/.test(r.textContent)) && ![...document.querySelectorAll('${T} tbody tr')].some(r => /keep-me\\.md/.test(r.textContent))`, 'the list is the dismissed files (this run\'s put-away.md among them, keep-me.md not)', 15000);
 
         // the file's actions have Unignore
         await ev(`const row = [...document.querySelectorAll('${T} tbody tr')].find(r => /put-away\\.md/.test(r.textContent)); row.querySelector('.dt-primary, .inbox-review-name, td button').click(); true`);
