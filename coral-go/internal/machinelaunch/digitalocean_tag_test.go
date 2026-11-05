@@ -19,6 +19,7 @@ type fakeDO struct {
 	tags      map[string]bool
 	firewalls map[string][]string // id -> tags
 	failFW    bool                // the firewall create fails after the tag was made
+	droplets  map[string]int      // tag -> droplets that still carry it
 	deletes   []string
 }
 
@@ -37,6 +38,13 @@ func newFakeDO(t *testing.T) (*fakeDO, *DigitalOcean) {
 			}
 			f.tags[in.Name] = true
 			writeJSON(w, http.StatusCreated, map[string]any{"tag": map[string]any{"name": in.Name}})
+		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/tags/"):
+			name := strings.TrimPrefix(r.URL.Path, "/tags/")
+			if !f.tags[name] {
+				writeJSON(w, http.StatusNotFound, map[string]any{"id": "not_found", "message": "not found"})
+				return
+			}
+			writeJSON(w, http.StatusOK, map[string]any{"tag": map[string]any{"name": name, "resources": map[string]any{"droplets": map[string]any{"count": f.droplets[name]}}}})
 		case r.Method == http.MethodDelete && strings.HasPrefix(r.URL.Path, "/tags/"):
 			name := strings.TrimPrefix(r.URL.Path, "/tags/")
 			f.deletes = append(f.deletes, name)
@@ -103,6 +111,18 @@ func TestDeletingTheFirewallDeletesTheLaunchTagAndOnlyThat(t *testing.T) {
 	assert.Equal(t, []string{tag}, f.deletes)
 	assert.ErrorIs(t, d.DeleteFirewall(t.Context(), fwUUID), ErrNotFound, "one already gone is ErrNotFound, and no tag is deleted for it")
 	assert.Equal(t, []string{tag}, f.deletes)
+}
+
+// The droplet delete before the firewall's can have failed: the tag then stays on the machine that may still exist, so the checks that look for it by the label still find it (Security's SHOULD).
+func TestATagADropletStillCarriesIsNotDeleted(t *testing.T) {
+	f, d := newFakeDO(t)
+	const tag = "coral-launch-0123456789abcdef0123456789abcdef"
+	_, err := d.CreateFirewall(t.Context(), FirewallSpec{Name: "coral-fw-m1", Tag: tag})
+	require.NoError(t, err)
+	f.droplets = map[string]int{tag: 1}
+	require.NoError(t, d.DeleteFirewall(t.Context(), fwUUID))
+	assert.True(t, f.tags[tag], "a droplet still carries it: the label stays")
+	assert.Empty(t, f.deletes)
 }
 
 func TestAFirewallThatCannotBeMadeLeavesNoTagBehind(t *testing.T) {

@@ -170,6 +170,20 @@ func (d *DigitalOcean) deleteLaunchTag(name string) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
+	// A tag some droplet still carries is left alone: deleting it would strip the launch label from a machine that may still exist (the droplet delete before it can have failed), and the checks
+	// that look for that machine by the label would no longer find it (Security, #13592). A tag that cannot be read is left too.
+	var got struct {
+		Tag struct {
+			Resources struct {
+				Droplets struct {
+					Count int `json:"count"`
+				} `json:"droplets"`
+			} `json:"resources"`
+		} `json:"tag"`
+	}
+	if d.do(ctx, "read a tag", http.MethodGet, "/tags/"+name, nil, nil, &got) != nil || got.Tag.Resources.Droplets.Count > 0 {
+		return
+	}
 	_ = d.do(ctx, "delete a tag", http.MethodDelete, "/tags/"+name, nil, nil, nil)
 }
 
