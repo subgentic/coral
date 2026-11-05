@@ -230,6 +230,10 @@ jobs:
         shell: bash
         run: bash tools/sync-agent-docs.sh
       - name: vet and test the GUI programs with cgo (coral-app with the webview tag, coral-tray)
+        id: gui
+        # A failure here must not skip the package, the MSI and the smoke below (a red GUI test hid that the smoke never ran, #13225): the step goes on, and the last step of the job
+        # fails the job when this one failed, so the job stays red.
+        continue-on-error: true
         shell: pwsh
         working-directory: coral-go
         env:
@@ -316,6 +320,12 @@ jobs:
           if ($env:MSI_PATH) { $smoke.Msi = $env:MSI_PATH } else { Write-Host "the installer did not change: the MSI is not built or checked" }
           ./tests/release/smoke_windows.ps1 @smoke
           if ($LASTEXITCODE -ne 0) { throw "smoke_windows.ps1 failed" }
+      - name: The GUI programs' vet or test failed (the package, the MSI and the smoke above still ran)
+        if: always() && steps.gui.outcome == 'failure'
+        shell: pwsh
+        run: |
+          Write-Host "::error::go vet or go test of the GUI programs failed: the package build, the MSI and the smoke test above ran anyway, and this step keeps the job red"
+          exit 1
 
   # The dashboard's node tests (npm run test:cloud), on Windows as cloud-tests.yml runs them on Linux: path, line-ending and
   # child-process differences (#94) were invisible to CI. Nothing is cached; install scripts never run.
