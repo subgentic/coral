@@ -4,8 +4,9 @@ import { renderMarkdownStrict } from './utils.js';
 import { whenText } from './when_text.js';
 import { loadStyles } from './lazy_styles.js';
 import { showToast } from './notifications.js';
+import { decisionNeedsPerson } from './server_base.js';
 import { importOnce } from './import_once.js';
-import { askParts, askSubjects, fromAnotherComputer, buttonsOf, buttonWords, claimButton, settleButton, wakeMember, refreshOperatorAsks, replyToAsk, forgetAsk } from './operator_asks.js';
+import { askParts, askSubjects, fromAnotherComputer, buttonsOf, yesNoButtons, buttonWords, claimButton, settleButton, wakeMember, refreshOperatorAsks, replyToAsk, forgetAsk } from './operator_asks.js';
 await loadStyles('operator_ask_dialog.css');
 
 const isReply = action => /^reply$/.test(action);
@@ -47,21 +48,23 @@ export function openAskDialog(a, onDone, runners = {}) {
     row.append(close, ...(dismiss.hidden ? [] : [dismiss])); // Close and Dismiss stay in the footer; Send reply is on the row right under the reply box (#13148, the Operator: 'The send reply is too far away from text input')
     let tray = null;
     const finish = () => { if (tray) tray.destroy(); dlg.close(); dlg.remove(); if (onDone) onDone(); };
-    const sync = () => { send.disabled = !!tray && (tray.busy() || tray.failed()); }; // Send waits for a picture going up, and for a failed one to be taken out
-    const offers = fromAnotherComputer(a) ? [] : buttonsOf(a); // a question from another computer through the Hub keeps the plain Reply and Close
+    let sending = false; const choices = [];
+    const sync = () => { send.disabled = sending || (!!tray && (tray.busy() || tray.failed())); choices.forEach(c => { c.disabled = sending; }); }; // Send waits for a picture going up, and for a failed one to be taken out
+    const binary = yesNoButtons(a);
+    const offers = (fromAnotherComputer(a) && (!binary || decisionNeedsPerson(a.server))) ? [] : buttonsOf(a); // remote binary replies use the owner-stamped claim route; other remote actions keep Reply and Close
     let offered = null;
     if (offers.length) { // what the asker offered: one tap per choice, each with what it does
         offered = document.createElement('section'); offered.className = 'inbox-ask-offers'; offered.setAttribute('aria-label', `Buttons ${markHidden(a.asker, { strict: true })} offered`);
         const head = document.createElement('p'); head.className = 'inbox-ask-offers-head'; head.textContent = offers.every(b => isReply(b.action)) ? 'Choose a reply, or write your own.' : 'Choose an action, or write a reply.';
         const list = document.createElement('div'); list.className = 'inbox-ask-offers-list';
-        const choices = [];
         for (const b of offers) {
             const item = document.createElement('div'); item.className = 'inbox-ask-offer';
-            const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'btn'; btn.textContent = markHidden(b.label, { strict: true }); btn.dataset.buttonId = String(b.id);
+            const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'btn'; const label = binary ? (b.label === 'Yes' ? 'Approve' : 'Deny') : markHidden(b.label, { strict: true }); btn.textContent = label; btn.dataset.buttonId = String(b.id);
             const what = document.createElement('span'); what.className = 'inbox-ask-offer-what sr-only'; what.textContent = buttonWords(b);
-            btn.setAttribute('aria-label', `${markHidden(b.label, { strict: true })}: ${what.textContent}`); btn.title = what.textContent;
+            btn.setAttribute('aria-label', `${label}: ${what.textContent}`); btn.title = what.textContent;
             btn.addEventListener('click', async () => {
-                err.textContent = ''; choices.forEach(c => { c.disabled = true; }); send.disabled = true;
+                if (sending) return;
+                sending = true; err.textContent = ''; sync();
                 try {
                     const got = await claimButton(a, b); // the stored action, whatever the label says
                     if (isReply(got.action)) { forgetAsk(a); refreshOperatorAsks(true); finish(); showToast(`Sent: ${markHidden(got.label, { strict: true })}`); return; }
@@ -79,7 +82,7 @@ export function openAskDialog(a, onDone, runners = {}) {
                         if (!navigates) await settleButton(a, b, 'failed').catch(() => {}); // give a failed wake back; navigation never claims an answer
                     }
                     refreshOperatorAsks(true);
-                } catch (e) { err.textContent = e.message || 'Not done.'; choices.forEach(c => { c.disabled = false; }); send.disabled = false; }
+                } catch (e) { err.textContent = e.message || 'Not done.'; sending = false; sync(); }
             });
             choices.push(btn); item.append(btn, what); list.append(item);
         }
@@ -89,10 +92,11 @@ export function openAskDialog(a, onDone, runners = {}) {
     const foot = document.createElement('div'); foot.className = 'inbox-ask-foot'; foot.append(row); // Reply attachments belong with the reply box; the footer holds its final actions
     const reading = document.createElement('div'); reading.className = 'inbox-ask-reading'; reading.tabIndex = -1;
     if (!whole.hidden) reading.append(whole);
-    if (offered) reading.append(offered);
+    if (offered && !binary) reading.append(offered);
     const compose = document.createElement('div'); compose.className = 'inbox-ask-compose';
     const addSlot = document.createElement('div'); addSlot.className = 'inbox-ask-attach'; pics.append(addSlot);
     const sendRow = document.createElement('div'); sendRow.className = 'inbox-ask-sendrow'; const pickSlot = document.createElement('span'); pickSlot.className = 'inbox-ask-pick'; sendRow.append(pickSlot, send); addSlot.append(sendRow); // Add image on the left, Send reply on the right, the pictures note under them (#13148)
+    if (offered && binary) { offered.classList.add('inbox-ask-yes-no'); compose.append(offered); }
     compose.append(label, pics, err);
     dlg.append(title, sub, ...(links.hidden ? [] : [links]), reading, compose, foot);
     if (!fromAnotherComputer(a)) { // the picture is stored on the question's own team, as a goal's pictures are
@@ -107,17 +111,19 @@ export function openAskDialog(a, onDone, runners = {}) {
     }
     close.addEventListener('click', finish);
     dismiss.addEventListener('click', async () => {
-        err.textContent = ''; dismiss.disabled = true; send.disabled = true;
+        if (sending) return;
+        sending = true; err.textContent = ''; dismiss.disabled = true; sync();
         try { const m = await importOnce('./ask_ignore.js'); await m.ignoreAsk(a, markHidden(a.asker, { strict: true })); forgetAsk(a); finish(); }
-        catch (e) { err.textContent = e.message || 'Could not dismiss it.'; dismiss.disabled = false; sync(); }
+        catch (e) { err.textContent = e.message || 'Could not dismiss it.'; dismiss.disabled = false; sending = false; sync(); }
     });
     dlg.addEventListener('cancel', e => { e.preventDefault(); finish(); });
     box.addEventListener('keydown', e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !send.disabled) { e.preventDefault(); send.click(); } }); // Ctrl or Cmd+Enter sends, as the task page's reply box does (#13148)
     send.addEventListener('click', async () => {
-        err.textContent = ''; send.disabled = true;
+        if (sending) return;
+        sending = true; err.textContent = ''; sync();
         const links = tray ? tray.hexes().map(h => `coral://artifacts/${h}`) : []; // each picture is named by its artifact link, which the board and the agents read
         try { await replyToAsk(a, [box.value.trim(), links.join('\n')].filter(Boolean).join('\n\n')); finish(); }
-        catch (e) { err.textContent = e.message || 'Not sent.'; sync(); box.focus(); } // the text stays
+        catch (e) { err.textContent = e.message || 'Not sent.'; sending = false; sync(); box.focus(); } // the text stays
     });
     document.body.append(dlg);
     dlg.showModal();

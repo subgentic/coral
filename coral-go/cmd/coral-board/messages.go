@@ -113,7 +113,7 @@ func cmdPost() {
 	// Parse --to flag and collect remaining args as the message
 	var toNames, filePath, taskArg, assignArg, goalArg, titleArg, priorityArg, replyArg, guideArg string
 	var buttons []string // --button 'Label=action[:arg]', repeatable: the server checks each one (#11643)
-	ask, broadcast := false, false
+	ask, broadcast, yesNo := false, false, false
 	var msgParts []string
 	literal := false
 	for i := 2; i < len(os.Args); i++ {
@@ -132,6 +132,8 @@ func cmdPost() {
 		} else if opt == "--task" && i+1 < len(os.Args) {
 			taskArg = os.Args[i+1]
 			i++
+		} else if opt == "--yes-no" {
+			yesNo = true
 		} else if opt == "--ask" {
 			ask = true
 		} else if os.Args[i] == "--broadcast" {
@@ -216,6 +218,13 @@ func cmdPost() {
 	if guideArg != "" && !ask {
 		fmt.Fprintln(os.Stderr, "Error: --guide is for a question to a guide: post --ask --guide <label> \"text\"")
 		os.Exit(2)
+	}
+	if yesNo {
+		if !ask || guideArg != "" || len(buttons) != 0 {
+			fmt.Fprintln(os.Stderr, "Error: --yes-no requires --ask to @Operator and cannot be combined with --guide or --button")
+			os.Exit(2)
+		}
+		buttons = []string{"Yes=reply", "No=reply"}
 	}
 	if len(buttons) > 0 && (!ask || guideArg != "") {
 		fmt.Fprintln(os.Stderr, "Error: --button goes on a question to the Operator: post --ask --button 'Label=action' \"@Operator <question>\"")
@@ -338,6 +347,9 @@ func cmdPost() {
 		}
 		if a, ok := result["ask"].(map[string]any); ok {
 			fmt.Printf("  A question to %s: open until each has answered (they answer with  coral-board post --reply-to %.0f \"...\"  or a post that @mentions you).\n", joinAnyStrings(a["to"]), id)
+		}
+		if ask {
+			fmt.Println("  For a yes/no question to the Operator, use post --ask --yes-no: Approve sends Yes and Deny sends No. Other choices need explicit --button labels or a written reply.")
 		}
 	} else {
 		fmt.Fprintln(os.Stderr, "Error: Coral accepted the request but returned no message id")

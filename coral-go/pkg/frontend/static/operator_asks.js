@@ -95,6 +95,13 @@ export const fromAnotherComputer = a => isCloud() || (!!a && typeof a.server ===
 /** The buttons of a question that can still be used: only a question (not a wait) has them, and a used one is gone. */
 export const buttonsOf = a => (a && a.kind === 'ask' && Array.isArray(a.buttons) ? a.buttons.filter(b => b && b.state === 'pending' && Number.isFinite(Number(b.id)) && typeof b.label === 'string' && typeof b.action === 'string') : []);
 
+/** Only an explicit, complete Yes/No reply declaration gets Approve/Deny (#13735).
+ * No inspection of question prose, synonyms, punctuation, hidden text or extra actions. */
+export const yesNoButtons = a => {
+    const buttons = buttonsOf(a);
+    return buttons.length === 2 && buttons.every(b => /^reply$/.test(b.action) && !b.arg) && buttons.some(b => b.label === 'Yes') && buttons.some(b => b.label === 'No');
+};
+
 // The reply action is tested as a pattern, not a quoted word: tests/frontend/icon_names.mjs reads every quoted word that is a Material icon's name as an icon the font must hold, and reply is one.
 const isReply = action => /^reply$/.test(action);
 
@@ -112,7 +119,7 @@ export function buttonWords(b) {
 
 const buttonUrl = (a, b, verb) => `/api/board/${encodeURIComponent(a.board)}/asks/${encodeURIComponent(a.id)}/buttons/${encodeURIComponent(b.id)}/${verb}`;
 async function buttonCall(a, b, verb, body) {
-    const resp = await fetch(buttonUrl(a, b, verb), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
+    const resp = await serverFetch(a.server, buttonUrl(a, b, verb), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
     let data = null; try { data = await resp.json(); } catch { /* no body */ }
     if (!resp.ok) throw new Error((data && (data.message || data.error)) || `Not done (HTTP ${resp.status}).`);
     return data || {};

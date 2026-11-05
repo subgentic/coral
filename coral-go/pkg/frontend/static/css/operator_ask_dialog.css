@@ -41,3 +41,9 @@
 /* #13583: quick choices follow the question; the reply keeps the freed lines and grows with input. */
 .inbox-ask-dialog .inbox-ask-box { min-height: 9em; }
 .inbox-ask-reading .inbox-ask-offers { margin-top: 16px; }
+
+/* Binary decisions stay with the reply box at every width; ordinary offered actions follow the question. */
+.inbox-ask-yes-no { margin-bottom: 16px; }
+.inbox-ask-yes-no .inbox-ask-offers-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.inbox-ask-yes-no .inbox-ask-offer { flex: 1 1 6rem; min-width: 0; }
+.inbox-ask-yes-no .inbox-ask-offer .btn { width: 100%; min-width: 44px; min-height: 44px; }

@@ -39,6 +39,60 @@ async function httpJson(method, path, body, headers = {}) {
         const ask = async (text, buttons) => { const r = await httpJson('POST', `/api/board/${B}/messages`, { subscriber_id: 'Button Walker', content: text, ask: true, buttons }, tok); assert.equal(r.status, 200, JSON.stringify(r)); return r.data.id; };
         const mine = async () => { const r = await person('GET', '/api/operator-asks'); assert.equal(r.status, 200); return r.data.filter(a => a.board === B); };
 
+        // #13735: explicit yes/no pair only; wording alone never creates a decision.
+        const binary = await ask('@Operator May I publish the approved release? (yes-no)', ['Yes=reply', 'No=reply']);
+        const ambiguous = await ask('@Operator Send it as is, or re-shoot? Yes or no? (unmarked)', []);
+        const binaryAsk = (await mine()).find(a => a.id === binary);
+        const geometryFailures = [];
+        for (const width of [1280, 390, 320, 1440]) {
+            await Emulation.setDeviceMetricsOverride({ width, height: 900, deviceScaleFactor: 1, mobile: width < 768 });
+            await Emulation.setTouchEmulationEnabled({ enabled: width < 768 });
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
+            await ev(`window.switchNavTab('hub-inbox'); import(${S} + 'operator_asks.js').then(m => m.refreshOperatorAsks(true)).then(() => import(${S} + 'inbox_tab.js')).then(m => m.selectInboxTab('needs')).then(() => true)`);
+            const row = `[...document.querySelectorAll('#group-table-view tbody tr')].find(r => r.textContent.includes('(yes-no)'))`;
+            await waitFor(`!!(${row})`, width + ': explicit question in phone/desktop list', 15000);
+            await ev(`(${row}).querySelector('button[aria-label^="Answer the question of"]').click(); true`);
+            await waitFor(`!!document.querySelector('dialog.inbox-ask-dialog[open]')`, 'yes/no question opens', 6000);
+            const geometry = await ev(`(() => { const d = document.querySelector('dialog.inbox-ask-dialog'), buttons = [...d.querySelectorAll('.inbox-ask-offer button')], label = d.querySelector('.inbox-ask-label').getBoundingClientRect(); return { labels: buttons.map(b => b.textContent), buttons: buttons.map(b => { const r = b.getBoundingClientRect(); return { h: r.height, w: r.width, right: r.right, left: r.left, above: r.bottom <= label.top }; }), compose: !!d.querySelector('.inbox-ask-compose .inbox-ask-offers'), box: !!d.querySelector('textarea'), scrolls: document.documentElement.scrollWidth > innerWidth }; })()`);
+            if (JSON.stringify(geometry.labels) !== JSON.stringify(['Approve', 'Deny']) || !geometry.compose || !geometry.box || geometry.scrolls || geometry.buttons.some(b => b.h < 44 || b.w < 44 || !b.above)) geometryFailures.push(width + ': ' + JSON.stringify(geometry));
+            if ([390, 1280].includes(width) && process.env.CORAL_SCREENSHOT_DIR) { const fs = require('node:fs'); fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR, { recursive: true }); fs.writeFileSync(process.env.CORAL_SCREENSHOT_DIR + '/yes-no-' + width + '.png', Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }
+            await ev(`document.querySelector('dialog.inbox-ask-dialog .inbox-ask-buttons .btn').click(); true`);
+        }
+        assert.deepEqual(geometryFailures, [], 'explicit yes/no decisions sit beside the reply box, with 44px targets');
+        await ev(`import(${S} + 'operator_ask_dialog.js').then(m => m.openAskDialog(${JSON.stringify((await mine()).find(a => a.id === ambiguous))})); true`);
+        assert.equal(await ev(`document.querySelectorAll('dialog.inbox-ask-dialog .inbox-ask-offer button').length`), 0, 'an unmarked alternative, even saying Yes or no, has no quick decisions');
+        await ev(`document.querySelector('dialog.inbox-ask-dialog textarea').value = 'Re-shoot'; document.querySelector('dialog.inbox-ask-dialog .inbox-ask-send').click(); true`);
+        await waitFor(`!document.querySelector('dialog.inbox-ask-dialog[open]')`, 'ordinary written reply remains available', 6000);
+        await ev(`import(${S} + 'operator_ask_dialog.js').then(m => m.openAskDialog(${JSON.stringify(binaryAsk)})); true`);
+        await waitFor(`!!document.querySelector('dialog.inbox-ask-dialog[open]')`, 'ready for real approval', 6000);
+        assert.equal(await ev(`(() => { const b = [...document.querySelectorAll('dialog.inbox-ask-dialog .inbox-ask-offer button')].find(b => b.textContent === 'Approve'); b.focus(); return document.activeElement === b; })()`), true, 'Approve is keyboard reachable');
+        await ev(`(() => { const original = window.fetch; window.__yesNoClaims = 0; window.fetch = function(u, ...args) { if (String(u).endsWith('/claim')) window.__yesNoClaims++; return original.call(this, u, ...args); }; const b = [...document.querySelectorAll('dialog.inbox-ask-dialog .inbox-ask-offer button')].find(b => b.textContent === 'Approve'); b.dispatchEvent(new MouseEvent('click', { bubbles: true })); b.dispatchEvent(new MouseEvent('click', { bubbles: true })); return true; })()`);
+        await waitFor(`!document.querySelector('dialog.inbox-ask-dialog[open]')`, 'real Yes reply closes the panel', 6000);
+        assert.equal(await ev('window.__yesNoClaims'), 1, 'double click claims only once');
+        assert.ok(!(await mine()).some(a => a.id === binary), 'real Yes reply closes the ask');
+        const delivered = await httpJson('GET', '/api/board/' + B + '/messages?subscriber_id=Button%20Walker', undefined, tok);
+        assert.equal(delivered.status, 200, JSON.stringify(delivered));
+        assert.equal(delivered.data.filter(m => m.subscriber_id === 'Operator' && m.content.includes('button labelled "Yes"')).length, 1, 'the agent receives exactly one real Yes reply');
+        const activity = await person('GET', '/api/activity');
+        assert.ok(activity.data.actions.some(a => a.item_kind === 'question' && String(a.item_id) === String(binary) && a.note === 'Yes'), 'approval appears in real Activity: ' + JSON.stringify(activity.data));
+        const noId = await ask('@Operator May I delete the temporary screenshots? (deny)', ['Yes=reply', 'No=reply']);
+        const noAsk = (await mine()).find(a => a.id === noId);
+        await ev(`import(${S} + 'operator_ask_dialog.js').then(m => m.openAskDialog(${JSON.stringify(noAsk)})); true`);
+        await waitFor(`!!document.querySelector('dialog.inbox-ask-dialog[open]')`, 'ready for real denial', 6000);
+        await ev(`[...document.querySelectorAll('dialog.inbox-ask-dialog .inbox-ask-offer button')].find(b => b.textContent === 'Deny').click(); true`);
+        await waitFor(`!document.querySelector('dialog.inbox-ask-dialog[open]')`, 'No closes the panel', 6000);
+        assert.ok(!(await mine()).some(a => a.id === noId), 'Deny closes the real question');
+        const noMessages = await httpJson('GET', '/api/board/' + B + '/messages?subscriber_id=Button%20Walker', undefined, tok);
+        assert.equal(noMessages.data.filter(m => m.subscriber_id === 'Operator' && m.content.includes('button labelled "No"')).length, 1, 'Deny delivers the real No reply to the asker');
+        const qualification = await ev(`import(${S} + 'operator_asks.js').then(m => [
+            { kind: 'ask', text: 'Yes or no?' },
+            { kind: 'wait', buttons: ${JSON.stringify(binaryAsk.buttons)} },
+            { kind: 'ask', buttons: [{ id: 1, state: 'pending', label: 'Approve', action: 'reply' }, { id: 2, state: 'pending', label: 'Deny', action: 'reply' }] },
+            { kind: 'ask', buttons: [{ id: 1, state: 'pending', label: 'Yes', action: 'open:new-agent' }, { id: 2, state: 'pending', label: 'No', action: 'reply' }] }
+        ].map(a => m.yesNoButtons(a)))`);
+        assert.deepEqual(qualification, [false, false, false, false], 'only complete explicit Yes/No replies qualify');
+        const denied = await httpJson('POST', '/api/board/' + B + '/asks/' + binary + '/buttons/' + binaryAsk.buttons[1].id + '/claim', {}, tok);
+        assert.equal(denied.status, 403, 'an agent cannot send a decision as the Operator');
         // an agent's token cannot use a button, and a bad declaration is refused whole
         const bad = await httpJson('POST', `/api/board/${B}/messages`, { subscriber_id: 'Button Walker', content: '@Operator no?', ask: true, buttons: ['Run it=run:rm -rf /'] }, tok);
         assert.equal(bad.status, 400, 'a bad button refuses the post: ' + JSON.stringify(bad));

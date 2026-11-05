@@ -159,3 +159,30 @@ func TestPostAskButtonsAreSentAndRefusedOffAnAsk(t *testing.T) {
 	}
 	assert.Empty(t, srv2.requests(), "a bad option sends nothing")
 }
+
+// #13735: a binary declaration is deliberate; ordinary prose never adds choices.
+func TestPostYesNoUsesExistingReplyButtons(t *testing.T) {
+	srv := newRecordingServer(t)
+	dir := subscribedDataDir(t, srv.URL)
+	res := runBoard(t, srv.URL, dir, "post", "--ask", "--yes-no", "@Operator May I ship?")
+	require.Equal(t, 0, res.code, res.stderr)
+	require.Len(t, srv.requests(), 1)
+	assert.Contains(t, srv.requests()[0], `"buttons":["Yes=reply","No=reply"]`)
+	assert.Contains(t, srv.requests()[0], `"content":"@Operator May I ship?"`)
+	assert.Contains(t, res.stdout, "--yes-no", "the ask response teaches the explicit flag")
+	res = runBoard(t, srv.URL, dir, "post", "--ask", "@Operator Send it as is, or re-shoot? Yes or no?")
+	require.Equal(t, 0, res.code, res.stderr)
+	assert.NotContains(t, srv.requests()[1], `"buttons"`, "wording never creates decisions")
+
+	bad := newRecordingServer(t)
+	badDir := subscribedDataDir(t, bad.URL)
+	for _, args := range [][]string{
+		{"post", "--yes-no", "@Operator hi"},
+		{"post", "--ask", "--yes-no", "--guide", "g1", "hi"},
+		{"post", "--ask", "--yes-no", "--button", "Other=reply", "@Operator hi"},
+	} {
+		res := runBoard(t, bad.URL, badDir, args...)
+		assert.Equal(t, 2, res.code, res.stderr)
+	}
+	assert.Empty(t, bad.requests(), "invalid combinations send nothing")
+}
