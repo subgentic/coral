@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -682,4 +683,73 @@ func TestARealHubListRedactsTheReviewQuestionBeforeItMatchesQ(t *testing.T) {
 	assert.Contains(t, get("q="+prefix, false), "report.md", "on this computer the token's start is in the question: the file matches")
 	assert.NotContains(t, get("q="+prefix, true), "report.md", "through the Hub the question is redacted before the match: the token's start finds nothing")
 	assert.Contains(t, get("q="+url.QueryEscape("deploy with"), true), "report.md", "the words around the token match the shown text")
+}
+
+// #13614 (Security's SHOULD on the fast path of selectTeamArtifacts): a Hub viewer's list of the for-review tag with no q, no kind, no collapse and the plain sort (the list the Needs you walks, which keeps its
+// matching rows as positions) is redacted before the page is cut, never past 50 a page, and a walk of it by the cursor returns every file once, in the order of the plain list.
+func TestAHubWalkOfTheForReviewTagIsRedactedAndReturnsEveryFileOnce(t *testing.T) {
+	resetOwnerState(t)
+	withLabel(t, ownerLabel, nil)
+	e := newTagEnv(t)
+	ctx := context.Background()
+	secret := "ghp_" + strings.Repeat("a1B2c3D4e5", 4)
+	const n = 120
+	want := map[string]bool{}
+	for i := 0; i < n; i++ {
+		name := fmt.Sprintf("walk-%03d.md", i)
+		id := storeManagedArtifact(t, e.coralDir, fmt.Sprintf("walk body %d", i), true, true)
+		completeWithArtifacts(t, e.h, "tag-team", "Make "+name, []board.TaskArtifact{{Name: name, URI: "coral://artifacts/" + id}})
+		e.uploadedBy(t, "sess-dev", id)
+		e.h.applyManifestTags(ctx, "tag-team", "sess-dev", false, []board.TaskArtifact{{Name: name, URI: "coral://artifacts/" + id, Tags: []string{"for review"}, Question: fmt.Sprintf("Deploy %d with %s ok?", i, secret)}})
+		want[name] = true
+	}
+	hubGet := func(query string) (map[string]any, string) {
+		req, err := http.NewRequest(http.MethodGet, e.srv.URL+"/api/board/tag-team/artifacts?"+query, nil)
+		require.NoError(t, err)
+		for k, v := range ownerHeaders(ownerLabel) {
+			req.Header.Set(k, v)
+		}
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		raw, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, resp.StatusCode, string(raw))
+		var out map[string]any
+		require.NoError(t, json.Unmarshal(raw, &out))
+		return out, string(raw)
+	}
+	seen := map[string]int{}
+	var order []string
+	cursor, pages := "", 0
+	for pages < 20 {
+		query := "tag=for%20review&limit=200" // asked for more than the cap: the page is cut to 50
+		if cursor != "" {
+			query += "&cursor=" + url.QueryEscape(cursor)
+		}
+		out, raw := hubGet(query)
+		pages++
+		names := namesOf(out)
+		assert.LessOrEqual(t, len(names), 50, "a page is at most 50")
+		assert.NotContains(t, raw, secret, "the token in a review question is redacted before the page is written, on every page")
+		for _, name := range names {
+			if want[name] {
+				seen[name]++
+				order = append(order, name)
+			}
+		}
+		more, _ := out["has_more"].(bool)
+		next, _ := out["next_cursor"].(string)
+		if !more || next == "" {
+			break
+		}
+		cursor = next
+	}
+	assert.GreaterOrEqual(t, pages, 3, "120 files are at least three pages of 50")
+	assert.Len(t, seen, n, "every file is in the walk")
+	for name, c := range seen {
+		assert.Equal(t, 1, c, name+" once")
+	}
+	plain, _ := hubGet("tag=for%20review&limit=50")
+	assert.Equal(t, namesOf(plain), order[:len(namesOf(plain))], "the walk starts with the first page of the plain list, in its order")
 }
