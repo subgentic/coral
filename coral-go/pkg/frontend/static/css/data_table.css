@@ -522,6 +522,7 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 
 /* A Needs you row in three lines (#11719, the operator's Gmail comment; the mockup needs_row_three_lines): the top line is who it is from and the file's name, and at the right how long it has waited (or the buttons, at hover); the two lines under it say why it needs you, cut with an ellipsis. Team, Goal and the task link are not on the row (they are in the opened file and in the filters). */
 .inbox-needs-results tr:has(.inbox-review-item) > td { vertical-align: top; padding-block: 8px; height: auto; }
+@media (min-width: 768px) { .inbox-needs-results tr:has(.inbox-review-item) > td:has(.inbox-review-actions) { vertical-align: middle; } } /* #13586: a row's actions are centred on the row, not hung from its top line (here, not in needs_actions.css: a table rule belongs in data_table.css, data_table_census) */
 .inbox-review-item { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
 .inbox-review-from { flex: none; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--fw-strong); }
 .inbox-review-from::after { content: " \00b7"; font-weight: var(--fw-regular); color: var(--text-muted); }
