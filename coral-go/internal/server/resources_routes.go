@@ -17,6 +17,8 @@ import (
 // registerResources serves the resource queue (#13613). Its state is one file under the data folder; a file that cannot be read leaves the routes out and says why, never an empty queue (an agent that holds
 // the Mac would be forgotten) and never a server that does not start (upgrades must not break Coral).
 func (s *Server) registerResources(r chi.Router, sess *routes.SessionsHandler) {
+	rq := routes.NewResourceQueueAnalyticsHandler(nil, s.boardStore)
+	r.Get("/api/analytics/resource-queue", rq.Read) // how much the queue is used and whether it helps (#13671): numbers only, the Operator's alone, this computer only; there with no queue too (it says so)
 	if s.boardStore == nil {
 		return
 	}
@@ -30,6 +32,8 @@ func (s *Server) registerResources(r chi.Router, sess *routes.SessionsHandler) {
 		slog.Warn("resource queue is off", "error", err)
 		return
 	}
+	s.resourceMgr = mgr
+	rq.SetManager(mgr)
 	hook := resources.NewHook(mgr, resources.HookOptions{
 		Agent: func(ctx context.Context, sessionName string) (string, bool) {
 			sub, err := s.boardStore.GetSubscriptionBySessionName(ctx, sessionName)

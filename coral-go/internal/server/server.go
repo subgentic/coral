@@ -9,6 +9,7 @@ import (
 	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/opencode"
 	"github.com/subgentic/coral/internal/operatortouch"
+	"github.com/subgentic/coral/internal/resources"
 	"github.com/subgentic/coral/internal/safego"
 	"html/template"
 	"io"
@@ -53,6 +54,7 @@ var staticFS = frontend.Static
 
 // Server holds dependencies and exposes the HTTP router.
 type Server struct {
+	resourceMgr     *resources.Manager // the resource queue, when it is open (its history file closes with the server, #13671)
 	cloudHandler    *routes.CloudHandler
 	cloudMgr        atomic.Pointer[cloud.Manager] // the connector, once SetCloud runs (#3966)
 	hubSignin       *auth.HubSignin               // Sign in with Coral Hub (#3966)
@@ -249,6 +251,9 @@ const closeWait = 5 * time.Second
 // server has stopped; it is safe to call more than once.
 func (s *Server) Close() {
 	s.closeOnce.Do(func() {
+		if s.resourceMgr != nil {
+			s.resourceMgr.Close() // writes what the history still holds
+		}
 		if s.opencode != nil {
 			s.opencode.Close() // every opencode server Coral started ends with it, by its own pid
 		}
