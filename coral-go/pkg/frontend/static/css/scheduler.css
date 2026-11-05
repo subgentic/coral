@@ -250,3 +250,14 @@
 .queue-actions { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; }
 .queue-act:disabled, .queue-act:disabled:hover { border-color: transparent; background: transparent; }
 .queue-act.queue-sure { color: var(--danger, var(--text-primary)); border-color: currentColor; }
+
+/* The Queue folder's history of runs (#13724): a heading with its two filters over a second table, then Show more. */
+.qh-section { margin-top: 20px; }
+.qh-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 0 8px; }
+.qh-title { margin: 0; font-size: var(--fs-lg); color: var(--text-primary); } /* an h3: bold by default */
+.qh-filters { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; }
+.qh-field { display: inline-flex; align-items: center; gap: 6px; color: var(--text-secondary); font-size: var(--fs-md); }
+.qh-field-label { white-space: nowrap; }
+.qh-filter { max-width: 12rem; min-height: 32px; }
+.qh-more { margin: 10px 0 4px; }
+@media (max-width: 767px), (pointer: coarse) { .qh-filters { margin-left: 0; width: 100%; } .qh-field { flex: 1 1 8rem; } .qh-filter { min-height: 44px; flex: 1; max-width: none; } .qh-more { min-height: 44px; width: 100%; } }

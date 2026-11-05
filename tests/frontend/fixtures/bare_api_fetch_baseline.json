@@ -9,6 +9,10 @@
       "count": 1,
       "reason": "Recent runs (#13183) are this computer's jobs and workflows runs: Automations has no server switch and the route is not on the Hub's allowlist"
     },
+    "automations_queue_history.js": {
+      "count": 1,
+      "reason": "the history of the Queue folder's runs reads this computer's own record (GET /api/analytics/resource-queue/runs, the Operator's alone and never through the Hub); Automations is local-only, as the live queue above it"
+    },
     "automations_queue.js": {
       "count": 1,
       "reason": "the Queue folder of Automations reads this computer's own resource queue (GET /api/resources); Automations is local-only, as the jobs and workflows its other folders read with bare fetches"
