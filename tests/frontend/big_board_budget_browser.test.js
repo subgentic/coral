@@ -97,6 +97,10 @@ const B = 'bigboard-13326-' + TAG, SESSION = '13326000-0000-4000-8000-' + String
         // 4. typing in the agent's command box: long tasks while 60 keys go in one at a time
         await ev(`window.selectLiveSession(${JSON.stringify(agent.session_name)}, 'terminal', ${JSON.stringify(agent.session_id)}); true`);
         await waitFor(`!!document.getElementById('command-input')`, 'the command box', 15000);
+        // The typing budget is for typing, not for the first terminal build: the command box exists before the terminal library has loaded and the terminal is built (the xterm scripts and a 150 ms listener in app.js), and on a
+        // slow runner that work landed in the first keys (2 of 10 on the CI runner, on v2.0.51's head too, #13389). Wait for the terminal and then for the page to be quiet (no long animation frame for 700 ms).
+        await waitFor(`!!document.querySelector('.xterm')`, 'the agent terminal is built', 30000).catch(() => {}); // a terminal that never builds is not this budget's failure
+        await ev(`new Promise(done => { let last = performance.now(); try { new PerformanceObserver(() => { last = performance.now(); }).observe({ type: 'long-animation-frame' }); } catch (e) {} const t = setInterval(() => { if (performance.now() - last > 700) { clearInterval(t); done(true); } }, 100); setTimeout(() => { clearInterval(t); done(false); }, 20000); })`);
         await ev(`(() => { window.__lt = []; window.__ltWhat = []; window.__keyAt = []; const t0 = performance.now(); window.__t0 = t0;
             try { new PerformanceObserver(l => { for (const e of l.getEntries()) window.__lt.push(e.duration); }).observe({ type: 'longtask' }); } catch (e) {}
             // what ran (a long task names only its container; a long animation frame names the scripts, Chrome 123+): kept so a failure says which key, how long and which script (#13389)
