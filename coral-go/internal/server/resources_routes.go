@@ -29,6 +29,7 @@ func (s *Server) registerResources(r chi.Router, sess *routes.SessionsHandler) {
 		slog.Warn("resource queue is off", "error", err)
 		return
 	}
+	s.resourceQueue = mgr.Queue()
 	hook := resources.NewHook(mgr, resources.HookOptions{
 		Procs: func() ([]proctree.Proc, bool) {
 			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)

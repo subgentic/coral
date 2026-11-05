@@ -3,6 +3,7 @@ package background
 import (
 	"context"
 	"fmt"
+	"github.com/subgentic/coral/pkg/resourcequeue"
 	"log/slog"
 	"sort"
 	"strings"
@@ -37,6 +38,9 @@ type BoardHealthMonitor struct {
 	limit func(ctx context.Context, a AgentInfo) (resets time.Duration, blocked bool)
 	// refused says whether a live Codex agent's model is refused by its login, and which model (#13480); nil: nothing is. Such an agent also counts as blocked in limit, so every gate that skips a usage-limited agent skips it.
 	refused func(ctx context.Context, a AgentInfo) (model string, refused bool)
+
+	// queue lists the resource lines (pkg/resourcequeue.Queue.All); nil: none (#13707)
+	queue func() []resourcequeue.Status
 
 	// paused says whether a board is paused: nothing is nudged on it, and the check says so (#11182); nil: not said.
 	paused func(project string) bool

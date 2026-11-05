@@ -10,6 +10,7 @@ import (
 	"github.com/subgentic/coral/internal/opencode"
 	"github.com/subgentic/coral/internal/operatortouch"
 	"github.com/subgentic/coral/internal/safego"
+	"github.com/subgentic/coral/pkg/resourcequeue"
 	"html/template"
 	"io"
 	"log"
@@ -60,6 +61,7 @@ type Server struct {
 	cfg             *config.Config
 	db              *store.DB
 	boardStore      *board.Store
+	resourceQueue   *resourcequeue.Queue // the resource lines (registerResources); nil when the queue is off
 	backend         ptymanager.TerminalBackend
 	terminal        ptymanager.SessionTerminal
 	keyStore        *auth.KeyStore
@@ -504,6 +506,9 @@ func (s *Server) StartMachineHealth(ctx context.Context, wd *stallwatch.Watchdog
 		s.sessHandler.SetMachineHealth(sampler)
 	}
 }
+
+// ResourceQueue is the resource queue's lines, for the health check (#13707); nil when the queue is off.
+func (s *Server) ResourceQueue() *resourcequeue.Queue { return s.resourceQueue }
 
 func (s *Server) BoardStore() *board.Store {
 	return s.boardStore
