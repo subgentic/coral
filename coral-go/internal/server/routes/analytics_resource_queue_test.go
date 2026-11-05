@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/resources"
 	"github.com/subgentic/coral/pkg/resourcequeue"
@@ -98,6 +99,19 @@ func TestTheResourceQueueReadCountsUseWaitsAndTheBeforeAfterWithoutAnyText(t *te
 	assert.EqualValues(t, 1200, r0["wait_median_s"], "b waited twenty minutes (the other grant waited none: median of 0 and 1200 is the upper middle)")
 	assert.InDelta(t, 30.0/(7*24*60), r0["busy_pct"].(float64)/100, 0.0001, "thirty minutes held of seven days on one slot")
 	assert.Equal(t, true, out["history"])
+	hours := out["by_hour"].([]any)
+	require.Len(t, hours, 24, "a bucket for each hour of the day (UTC)")
+	h16 := hours[16].(map[string]any)["by_resource"].(map[string]any)
+	assert.EqualValues(t, 2, h16["mac-heavy"], "both claims were made in the 16:00 hour")
+	assert.EqualValues(t, 0, len(hours[3].(map[string]any)["by_resource"].(map[string]any)), "an hour with no claim has none")
+	var today map[string]any
+	for _, d := range out["per_day"].([]any) {
+		if d.(map[string]any)["day"] == "2026-11-05" {
+			today = d.(map[string]any)
+		}
+	}
+	require.NotNil(t, today)
+	assert.EqualValues(t, 2, today["by_resource"].(map[string]any)["mac-heavy"], "the day's claims, by resource")
 	agents := out["by_agent"].([]any)
 	assert.Len(t, agents, 2)
 	pats := out["by_pattern"].([]any)
@@ -124,4 +138,43 @@ func TestTheResourceQueueReadIsThePersonsAloneAndThisComputersAndCutsDays(t *tes
 		code, _ := getRQ(t, srv.URL, bad, nil)
 		assert.Equal(t, http.StatusBadRequest, code, bad)
 	}
+}
+
+func TestTheBeforeAfterCutSplitsTheGoLiveDayAtTheCutAndNeverCountsAnEventOnBothSides(t *testing.T) {
+	h := &ResourceQueueAnalyticsHandler{}
+	cut := QueueGoLive
+	day := func(hh, mm int) time.Time { return time.Date(2026, 11, 5, hh, mm, 0, 0, time.UTC) }
+	posts := []board.HeavyPost{
+		{Who: "A", Text: "waiting for the Orchestrator", At: day(15, 0)}, // before the cut, same day
+		{Who: "B", Text: "waiting for the Orchestrator", At: day(17, 0)}, // after it
+		{Who: "B", Text: "need the next isolated perf slot", At: day(18, 0)},
+	}
+	runs := []board.HeavyRun{{Who: "A", Machine: "Mac", Start: day(14, 0), End: day(18, 0)}, {Who: "B", Machine: "Mac", Start: day(15, 0), End: day(17, 0)}}
+	now := day(20, 0)
+	since := time.Date(2026, 11, 4, 0, 0, 0, 0, time.UTC)
+	out := h.beforeAfter(runs, posts, nil, true, since, now)
+	b, s := out["before"].(rqSpan), out["since"].(rqSpan)
+	assert.InDelta(t, 1.0, b.SlotPostsPerDay*b.Days, 0.1, "one slot post before the cut (rates are rounded)")
+	assert.InDelta(t, 2.0, s.SlotPostsPerDay*s.Days, 0.1, "two after it")
+	assert.InDelta(t, 60.0, b.OverlapMinPerDay*b.Days, 2, "the overlap 15:00-16:00 is before")
+	assert.InDelta(t, 60.0, s.OverlapMinPerDay*s.Days, 2, "16:00-17:00 is since")
+
+	// a range that begins after the go-live has no before side at all, and since starts at the range
+	later := time.Date(2026, 11, 5, 17, 0, 0, 0, time.UTC)
+	out = h.beforeAfter(runs, posts, nil, true, later, now)
+	b, s = out["before"].(rqSpan), out["since"].(rqSpan)
+	assert.Equal(t, 0.0, b.Days, "nothing of the range is before the queue")
+	assert.InDelta(t, 3.0/24, s.Days, 0.01, "since is only the range's own three hours")
+	assert.Equal(t, 0.0, s.OverlapMinPerDay, "the overlap ended at 17:00, before this range began")
+	_ = cut
+}
+
+func TestTheSinceWaitIsUnavailableNotZeroWhenTheQueueHasNoRecord(t *testing.T) {
+	h := &ResourceQueueAnalyticsHandler{}
+	now := time.Date(2026, 11, 6, 10, 0, 0, 0, time.UTC)
+	out := h.beforeAfter(nil, nil, nil, false, time.Date(2026, 11, 4, 0, 0, 0, 0, time.UTC), now)
+	s := out["since"].(rqSpan)
+	assert.True(t, s.WaitUnavailable, "no record: the queue's own wait cannot be said")
+	out = h.beforeAfter(nil, nil, nil, true, time.Date(2026, 11, 4, 0, 0, 0, 0, time.UTC), now)
+	assert.False(t, out["since"].(rqSpan).WaitUnavailable)
 }

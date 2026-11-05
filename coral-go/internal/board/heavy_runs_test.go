@@ -83,3 +83,23 @@ func TestHeavyPostsReadsThePostsOfAWindowAndNeverASystemPost(t *testing.T) {
 	assert.Contains(t, got[0].Text, "HEAVY RUN START")
 	assert.NotEmpty(t, got[0].Who)
 }
+
+func TestOverlapMinutesInAWindowClipsRunsAtItsEdges(t *testing.T) { // the cut falls inside a day: a run is split at it, never counted on both sides
+	runs := []HeavyRun{
+		{Who: "A", Machine: "Mac", Start: at(14, 0), End: at(18, 0)},
+		{Who: "B", Machine: "Mac", Start: at(15, 0), End: at(17, 0)}, // overlap 15:00-17:00
+	}
+	cut := at(16, 0)
+	before := OverlapMinutesIn(runs, at(0, 0), cut)
+	since := OverlapMinutesIn(runs, cut, at(23, 0))
+	assert.Equal(t, 60, before, "15:00 to 16:00 is before the cut")
+	assert.Equal(t, 60, since, "16:00 to 17:00 is after it")
+	assert.Equal(t, 120, OverlapMinutes(runs)["2026-11-04"]["Mac"], "the day's total is both halves, each counted once")
+	assert.Equal(t, 0, OverlapMinutesIn(runs, at(19, 0), at(23, 0)), "a window with no run in it has no overlap")
+}
+
+func TestPostsInAWindowAreThoseWithinItsEdges(t *testing.T) {
+	posts := []HeavyPost{{Who: "A", Text: "waiting for the Orchestrator", At: at(15, 59)}, {Who: "B", Text: "waiting for the Orchestrator", At: at(16, 0)}}
+	assert.Equal(t, 1, len(PostsIn(posts, at(0, 0), at(16, 0))), "a post at the cut belongs to the since side")
+	assert.Equal(t, 1, len(PostsIn(posts, at(16, 0), at(23, 0))))
+}

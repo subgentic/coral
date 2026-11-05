@@ -234,3 +234,38 @@ func (s *Store) HeavyPosts(ctx context.Context, team string, since, until time.T
 	}
 	return out, nil
 }
+
+// OverlapMinutesIn is the minutes in [from, to) in which two or more runs were on one machine: each run is clipped to the window first, so a window's edge (the go-live cut inside a day) splits a run
+// and no minute is counted on both sides of it.
+func OverlapMinutesIn(runs []HeavyRun, from, to time.Time) int {
+	var clipped []HeavyRun
+	for _, r := range runs {
+		if r.Start.Before(from) {
+			r.Start = from
+		}
+		if r.End.After(to) {
+			r.End = to
+		}
+		if r.End.After(r.Start) {
+			clipped = append(clipped, r)
+		}
+	}
+	total := 0
+	for _, machines := range OverlapMinutes(clipped) {
+		for _, m := range machines {
+			total += m
+		}
+	}
+	return total
+}
+
+// PostsIn is the posts with from <= at < to: a post at the edge belongs to the later window.
+func PostsIn(posts []HeavyPost, from, to time.Time) []HeavyPost {
+	var out []HeavyPost
+	for _, p := range posts {
+		if !p.At.Before(from) && p.At.Before(to) {
+			out = append(out, p)
+		}
+	}
+	return out
+}

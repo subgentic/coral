@@ -96,20 +96,27 @@ type rqAgent struct {
 	Hours float64 `json:"hours"`
 }
 
+// rqHour is the claims granted in one hour of the day (UTC), summed over the range, for each resource.
+type rqHour struct {
+	Hour       int            `json:"hour"`
+	ByResource map[string]int `json:"by_resource"`
+}
+
 type rqPattern struct {
 	Pattern string `json:"pattern"`
 	Holds   int    `json:"holds"`
 }
 
 type rqDay struct {
-	Day         string `json:"day"`
-	Claims      int    `json:"claims"`
-	Refused     int    `json:"refused"`
-	Kicked      int    `json:"kicked"`
-	Expired     int    `json:"expired"`
-	OverlapMac  int    `json:"overlap_mac_min"`
-	OverlapMini int    `json:"overlap_mini_min"`
-	SlotPosts   int    `json:"slot_posts"`
+	Day         string         `json:"day"`
+	Claims      int            `json:"claims"`
+	Refused     int            `json:"refused"`
+	Kicked      int            `json:"kicked"`
+	Expired     int            `json:"expired"`
+	ByResource  map[string]int `json:"by_resource"` // claims granted that day, for each resource
+	OverlapMac  int            `json:"overlap_mac_min"`
+	OverlapMini int            `json:"overlap_mini_min"`
+	SlotPosts   int            `json:"slot_posts"`
 }
 
 // rqSpan is one side of the cut.
@@ -119,6 +126,7 @@ type rqSpan struct {
 	SlotPostsPerDay  float64 `json:"slot_posts_per_day"`
 	WaitMedianMin    float64 `json:"wait_median_min"` // before: estimated from the posts; since: the queue's own waits (0 samples: -1)
 	WaitSamples      int     `json:"wait_samples"`
+	WaitUnavailable  bool    `json:"wait_unavailable"` // the queue's own record is not available: not "no samples"
 	Runs             int     `json:"runs"`
 }
 
@@ -160,7 +168,7 @@ func (h *ResourceQueueAnalyticsHandler) Read(w http.ResponseWriter, r *http.Requ
 		}
 		out["dropped"] = m.History().Dropped()
 	}
-	out["resources"], out["by_agent"], out["by_pattern"], out["per_day"], out["queue_wait_s"] = h.fromHistory(m, evs, since, until, now)
+	out["resources"], out["by_agent"], out["by_pattern"], out["per_day"], out["by_hour"], out["queue_wait_s"] = h.fromHistory(m, evs, since, until, now)
 
 	var posts []board.HeavyPost
 	if h.bs != nil {
@@ -174,7 +182,6 @@ func (h *ResourceQueueAnalyticsHandler) Read(w http.ResponseWriter, r *http.Requ
 	runs := board.HeavyRuns(posts, now)
 	overlap := board.OverlapMinutes(runs)
 	slots := board.SlotRequestPosts(posts)
-	waits := board.SlotWaits(posts, runs)
 	unclosed := 0
 	for _, r := range runs {
 		if r.Unclosed {
@@ -183,7 +190,7 @@ func (h *ResourceQueueAnalyticsHandler) Read(w http.ResponseWriter, r *http.Requ
 	}
 	out["heavy"] = map[string]any{"runs": len(runs), "unclosed": unclosed, "overlap_by_day": overlap, "slot_posts_by_day": slots}
 	out["per_day"] = mergeDays(out["per_day"].([]rqDay), overlap, slots, since, until)
-	out["before_after"] = h.beforeAfter(runs, posts, evs, overlap, slots, waits, since, now)
+	out["before_after"] = h.beforeAfter(runs, posts, evs, m != nil && m.History() != nil, since, now)
 	writeJSON(w, http.StatusOK, out)
 }
 
@@ -207,7 +214,7 @@ func mergeDays(days []rqDay, overlap map[string]map[string]int, slots map[string
 	return out
 }
 
-func (h *ResourceQueueAnalyticsHandler) fromHistory(m *resources.Manager, evs []resourcequeue.Event, since, until, now time.Time) (any, any, any, []rqDay, any) {
+func (h *ResourceQueueAnalyticsHandler) fromHistory(m *resources.Manager, evs []resourcequeue.Event, since, until, now time.Time) (any, any, any, []rqDay, []rqHour, any) {
 	type acc struct {
 		rqResource
 		waits []time.Duration
@@ -244,6 +251,10 @@ func (h *ResourceQueueAnalyticsHandler) fromHistory(m *resources.Manager, evs []
 		return days[k]
 	}
 	var allWaits []time.Duration
+	hours := make([]rqHour, 24)
+	for i := range hours {
+		hours[i] = rqHour{Hour: i, ByResource: map[string]int{}}
+	}
 	for _, e := range evs {
 		a := get(e.Resource)
 		d := day(e.At)
@@ -251,6 +262,11 @@ func (h *ResourceQueueAnalyticsHandler) fromHistory(m *resources.Manager, evs []
 		case "granted":
 			a.Claims++
 			d.Claims++
+			if d.ByResource == nil {
+				d.ByResource = map[string]int{}
+			}
+			d.ByResource[e.Resource]++
+			hours[e.At.UTC().Hour()].ByResource[e.Resource]++
 			a.waits = append(a.waits, e.Wait)
 			allWaits = append(allWaits, e.Wait)
 			if e.Wait < time.Second {
@@ -339,11 +355,13 @@ func (h *ResourceQueueAnalyticsHandler) fromHistory(m *resources.Manager, evs []
 	if ps == nil {
 		ps = []rqPattern{}
 	}
-	return rs, as, ps, ds, map[string]any{"median": int64(median(allWaits).Seconds()), "p90": int64(p90(allWaits).Seconds()), "n": len(allWaits)}
+	return rs, as, ps, ds, hours, map[string]any{"median": int64(median(allWaits).Seconds()), "p90": int64(p90(allWaits).Seconds()), "n": len(allWaits)}
 }
 
-// beforeAfter cuts the range at QueueGoLive: the days before it (from the posts alone) and since (the posts, and the queue's own waits). A side with no whole day in the range says so by Days = 0.
-func (h *ResourceQueueAnalyticsHandler) beforeAfter(runs []board.HeavyRun, posts []board.HeavyPost, evs []resourcequeue.Event, overlap map[string]map[string]int, slots map[string]int, waits []board.SlotWait, since, now time.Time) map[string]any {
+// beforeAfter cuts the range at QueueGoLive, to the minute: the posts and run minutes before the cut are one side, those from the cut on the other (a run or an overlap that crosses the cut is split, a post at the cut
+// is "since"), so nothing is counted on both sides. A side with nothing of the range in it says so by Days = 0. recorded says whether the queue's own record is available: without it the since wait is unavailable,
+// never "no samples".
+func (h *ResourceQueueAnalyticsHandler) beforeAfter(runs []board.HeavyRun, posts []board.HeavyPost, evs []resourcequeue.Event, recorded bool, since, now time.Time) map[string]any {
 	cut := QueueGoLive
 	side := func(from, to time.Time, queueWaits bool) rqSpan {
 		var sp rqSpan
@@ -351,39 +369,30 @@ func (h *ResourceQueueAnalyticsHandler) beforeAfter(runs []board.HeavyRun, posts
 			return sp
 		}
 		sp.Days = math.Round(to.Sub(from).Hours()/24*100) / 100
-		var ov, sl int
-		for d, m := range overlap {
-			t, _ := time.Parse("2006-01-02", d)
-			if !t.Before(from.Truncate(24*time.Hour)) && t.Before(to) {
-				ov += m["Mac"] + m["mini"]
-			}
-		}
-		for d, n := range slots {
-			t, _ := time.Parse("2006-01-02", d)
-			if !t.Before(from.Truncate(24*time.Hour)) && t.Before(to) {
-				sl += n
-			}
-		}
+		days := to.Sub(from).Hours() / 24
+		in := board.PostsIn(posts, from, to)
+		sp.OverlapMinPerDay = math.Round(float64(board.OverlapMinutesIn(runs, from, to))/days*10) / 10
+		sp.SlotPostsPerDay = math.Round(float64(countPosts(board.SlotRequestPosts(in)))/days*10) / 10
 		for _, r := range runs {
 			if !r.Start.Before(from) && r.Start.Before(to) {
 				sp.Runs++
 			}
 		}
-		sp.OverlapMinPerDay = math.Round(float64(ov)/sp.Days*10) / 10
-		sp.SlotPostsPerDay = math.Round(float64(sl)/sp.Days*10) / 10
 		var ws []time.Duration
 		if queueWaits {
+			if !recorded {
+				sp.WaitUnavailable = true
+				sp.WaitMedianMin = -1
+				return sp
+			}
 			for _, e := range evs {
 				if e.Kind == "granted" && !e.At.Before(from) && e.At.Before(to) {
 					ws = append(ws, e.Wait)
 				}
 			}
 		} else {
-			for _, w := range waits {
-				t, _ := time.Parse("2006-01-02", w.Day)
-				if !t.Before(from.Truncate(24*time.Hour)) && t.Before(to) {
-					ws = append(ws, w.Wait)
-				}
+			for _, w := range board.SlotWaits(in, runs) {
+				ws = append(ws, w.Wait)
 			}
 		}
 		sp.WaitSamples = len(ws)
@@ -393,7 +402,21 @@ func (h *ResourceQueueAnalyticsHandler) beforeAfter(runs []board.HeavyRun, posts
 		}
 		return sp
 	}
-	before := side(since, cut, false)
-	after := side(cut, now, true)
-	return map[string]any{"cut": cut.Format(time.RFC3339), "before": before, "since": after}
+	after := since
+	if cut.After(after) {
+		after = cut
+	}
+	beforeEnd := cut
+	if now.Before(beforeEnd) {
+		beforeEnd = now
+	}
+	return map[string]any{"cut": cut.Format(time.RFC3339), "before": side(since, beforeEnd, false), "since": side(after, now, true)}
+}
+
+func countPosts(byDay map[string]int) int {
+	n := 0
+	for _, c := range byDay {
+		n += c
+	}
+	return n
 }
