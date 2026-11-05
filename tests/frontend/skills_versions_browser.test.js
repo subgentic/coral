@@ -1,5 +1,6 @@
 // #13580: one row per publisher/name, latest approved plus a pending approval entry; full history in detail.
 const assert=require('node:assert/strict');
+const fs=require('node:fs');
 const {connect}=require('./agent_view_harness');
 const {coralReady}=require('./helpers/wait');
 const BASE=require('./test_base').BASE;
@@ -16,6 +17,7 @@ const ROWS=[row(5,'rejected'),row(4,'pending'),row(3,'approved'),row(2,'approved
   await ev(`(()=>{const real=window.fetch,rows=${JSON.stringify(ROWS)},json=b=>Promise.resolve(new Response(JSON.stringify(b),{status:200,headers:{'Content-Type':'application/json'}}));window.fetch=(u,o)=>{const p=new URL(String(u),location.href);if(p.pathname==='/api/skills')return json({skills:rows.filter(r=>!p.searchParams.get('status')||r.status===p.searchParams.get('status'))});const hit=rows.find(r=>p.pathname==='/api/skills/'+r.id);if(hit)return json({skill:hit,files:[{path:'SKILL.md',size:20,kind:'instructions',sha256:'f'.repeat(64)}],contents:{'SKILL.md':'Instructions for version '+hit.version},warnings:[],hosts:[]});return real(u,o);};return true;})()`);
   await show();
   await waitFor(`document.querySelector('#skills-view tbody tr')`,'skills list');
+  if(process.env.CORAL_SCREENSHOT_DIR){fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR,{recursive:true});fs.writeFileSync(process.env.CORAL_SCREENSHOT_DIR+'/skills-1280.png',Buffer.from((await Page.captureScreenshot({format:'png'})).data,'base64'));}
   assert.equal((await list()).length,2,'one row per skill and publisher');
   const texts=await list();assert.ok(texts.some(t=>t.includes('Designer description v3')&&t.includes('v3')&&t.includes('Approved')&&t.includes('v4 waiting')),JSON.stringify(texts));
   assert.ok(texts.some(t=>t.includes('Other publisher description v2')), 'same name from another publisher stays separate');
