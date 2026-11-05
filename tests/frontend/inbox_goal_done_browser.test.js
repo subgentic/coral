@@ -77,14 +77,18 @@ const B = 'goal-done-' + Date.now().toString(36);
             assert.ok(g.fits, `${theme}: nothing is cut off in the actions cell: ` + JSON.stringify(g));
         }
         // the same row in a list that also has a review row (a review row alone wants 15rem: the goal row's four controls decide, whichever kinds are listed with it)
-        await ev(`(() => { const original = window.fetch; window.fetch = (url, opts = {}) => { const u = new URL(String(url), location.origin);
+        const stub = `(() => { const original = window.fetch; window.fetch = (url, opts = {}) => { const u = new URL(String(url), location.origin);
             if ((opts.method || 'GET') === 'GET' && u.pathname === '/api/board/${B}/artifacts' && u.searchParams.get('tag') === 'for review') return Promise.resolve(new Response(JSON.stringify({ project: '${B}', has_more: false, artifacts: [{ id: 'a'.repeat(64), name: 'plan-mixed.md', media_type: 'text/markdown', size: 30, created_at: new Date().toISOString(), source: 'upload', available: true, tags: ['for review'], produced_by: 'Boss', review_question: 'Ship it?' }] }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
-            return original(url, opts); }; return true; })()`);
-        await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
-        await waitFor(`/plan-mixed/.test(document.querySelector('${T}')?.textContent || '') && /looks done/.test(document.querySelector('${T}')?.textContent || '')`, 'a review row and the goal row in one list', 20000);
+            return original(url, opts); }; })();`;
+        const stubId = (await Page.addScriptToEvaluateOnNewDocument({ source: stub })).identifier; // before the page's first read: a late stub sat behind the list already read
+        try {
+            await openNeeds();
+            try { await waitFor(`/plan-mixed/.test(document.querySelector('${T}')?.textContent || '') && /looks done/.test(document.querySelector('${T}')?.textContent || '')`, 'a review row and the goal row in one list', 20000); }
+            catch (e) { assert.fail('the mixed list did not appear; rows: ' + JSON.stringify(await ev(`[...document.querySelectorAll('${T} tbody tr')].map(r => r.textContent.replace(/\\s+/g, ' ').trim().slice(0, 80))`))); }
         const mixed = await ev(`(() => { const tr = [...document.querySelectorAll('${T} tbody tr')].find(r => /looks done/.test(r.textContent)), box = tr.querySelector('.inbox-goaldone-actions'), td = box.closest('td'), R = e => e.getBoundingClientRect(), bs = [...box.querySelectorAll(':scope > button, :scope > .inbox-row-more > button')].filter(b => R(b).width > 0), cell = R(td), c = e => (R(e).top + R(e).bottom) / 2;
             return { n: bs.length, inside: bs.every(b => R(b).left >= cell.left - 1 && R(b).right <= cell.right + 1), spread: Math.max(...bs.map(c)) - Math.min(...bs.map(c)), cellW: Math.round(cell.width), fits: box.scrollWidth <= box.clientWidth + 1, align: getComputedStyle(td).verticalAlign }; })()`);
         assert.ok(mixed.n >= 3 && mixed.inside && mixed.spread <= 1 && mixed.fits && mixed.align === 'middle' && mixed.cellW >= 17 * 16 - 2, 'with a review row listed too, the goal row keeps its controls inside the cell, on one line, centred, in a 17rem column: ' + JSON.stringify(mixed));
+        } finally { await Page.removeScriptToEvaluateOnNewDocument({ identifier: stubId }); }
         await Emulation.setEmulatedMedia({ features: [] });
         await openNeeds();
         await waitFor(`/looks done/.test(document.querySelector('${T}')?.textContent || '')`, 'the goal item again', 20000);
