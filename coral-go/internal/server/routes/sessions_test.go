@@ -396,7 +396,7 @@ func (m *mockSessionTerminal) sentToSession(name string) []string {
 	defer m.mu.Unlock()
 	var commands []string
 	for key, cmds := range m.sent {
-		if key == name || strings.HasPrefix(key, name+".") {
+		if key == name || strings.HasPrefix(key, name+".") || strings.HasPrefix(key, name+":") {
 			commands = append(commands, cmds...)
 		}
 	}
