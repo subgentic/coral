@@ -255,3 +255,20 @@ func TestALeaseThatRanOutCannotBeRenewed(t *testing.T) {
 	assert.Equal(t, 409, code, "%v", out)
 	assert.Equal(t, "not_holder", out["code"])
 }
+
+// The match list (#13645): set by the Operator or an Orchestrator with the other fields, shown back, refused when it is not words.
+func TestDefineTakesAMatchListAndShowsItBack(t *testing.T) {
+	g := newResRig(t)
+	code, out := g.do("operator", "PUT", "/api/resources/mac-heavy", map[string]any{"slots": 1, "match": []string{"go test ./...", "node run_cdp_suites.mjs"}})
+	assert.Equal(t, 200, code)
+	assert.Equal(t, []any{"go test ./...", "node run_cdp_suites.mjs"}, out["match"])
+	_, got := g.do("operator", "GET", "/api/resources/mac-heavy", nil)
+	assert.Equal(t, []any{"go test ./...", "node run_cdp_suites.mjs"}, got["match"])
+	for _, bad := range []any{[]string{`go test "x"`}, []string{"go test $(x)"}, []string{""}} {
+		code, _ := g.do("operator", "PUT", "/api/resources/mac-heavy", map[string]any{"slots": 1, "match": bad})
+		assert.Equal(t, 400, code, "%v", bad)
+	}
+	g.subscribe("alpha", "Plain Dev", "Developer", false)
+	code, _ = g.do("token:Plain Dev", "PUT", "/api/resources/mac-heavy", map[string]any{"slots": 1, "match": []string{"go test"}})
+	assert.Equal(t, 403, code, "an agent cannot add patterns: they decide what the hook claims")
+}

@@ -5,6 +5,7 @@
 #
 #   bash tests/stress/run.sh                          this board stress test
 #   bash tests/stress/run.sh --identity [--strict]    session tokens and impersonation (run_identity.sh)
+#   bash tests/stress/run.sh --resource-hook          the resource queue's shell hook, two agents (run_resource_hook.sh)
 #   bash tests/stress/run.sh --kill-all               folder Kill all in the real dashboard
 #   bash tests/stress/run.sh --goals [--repeat N]     goals integration, incl. `coral-board goal brief` by a mock agent (Goal #153)
 #   bash tests/stress/run.sh --send-after-restart [--repeat N]
@@ -27,6 +28,9 @@ if [[ "${1:-}" == "--identity" ]]; then
     # Identity (#3387, #3418): session tokens, attribution, impersonation, sign-in links, scale; --identity --strict
     # runs the same with --strict-local-auth (phase 2).
     exec bash "$SCRIPT_DIR/run_identity.sh" "${2:-}"
+elif [[ "${1:-}" == "--resource-hook" ]]; then
+    # The resource queue's shell hook (#13645): a heavy command claims, is held, releases, and a backgrounded run keeps the slot.
+    exec bash "$SCRIPT_DIR/run_resource_hook.sh"
 elif [[ "${1:-}" == "--search" ]]; then
     # Agent search (#11005): board search at the own reach, the doors around it, identity, reach, restart and wake, log bounds; strict.
     exec bash "$SCRIPT_DIR/run_search.sh"

@@ -13,6 +13,7 @@ import (
 	"unicode/utf8"
 
 	at "github.com/subgentic/coral/internal/agenttypes"
+	"github.com/subgentic/coral/internal/resources"
 	"github.com/subgentic/coral/internal/sessionstate"
 	setreg "github.com/subgentic/coral/internal/settings"
 	"github.com/subgentic/coral/internal/shellkill"
@@ -323,6 +324,12 @@ func (h *SessionsHandler) SetPendingTool(w http.ResponseWriter, r *http.Request)
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "refuse": shellkill.Message(why)})
 		return
 	}
+	if refuse := h.resourceRefusal(r.Context(), owner, body.ToolName, body.ToolUseID, body.ToolInput); refuse != "" {
+		// A heavy command that must wait for a slot of a shared machine (#13645): held with its place in line. Not run, so not pending; the log has the resource, never the command.
+		slog.Info("[resource] a command was held for a slot", "session", owner.SessionName)
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "refuse": refuse})
+		return
+	}
 	h.hints.forget(body.SessionID) // a blocking tool may open a prompt: read the screen again
 	t := newPendingTool(body.ToolUseID, body.ToolName, body.ToolInput, time.Now())
 	h.pending.set(body.SessionID, t)
@@ -337,6 +344,12 @@ func (h *SessionsHandler) notePendingToolEvent(sessionID, eventType, toolUseID s
 	defer h.wakeCodexPermissionWatches(sessionID)
 	if sessionID == "" {
 		return
+	}
+	switch eventType { // the resource queue's slot for a heavy call goes back when the call ends, or the session does (#13645)
+	case "tool_use":
+		h.resourceHook.After(sessionID, toolUseID)
+	case "session_reset", "session_end":
+		h.resourceHook.SessionEnded(sessionID)
 	}
 	switch eventType { // the calls in flight, whichever the single slot below holds (#6687)
 	case "tool_use":
@@ -492,4 +505,23 @@ func (h *SessionsHandler) patternKillRefusal(ctx context.Context, owner *store.S
 		return "" // the refusal is the Claude CLI's hook answer
 	}
 	return shellkill.PatternKill(command) // bounded: a command past a bound runs
+}
+
+// SetResourceHook wires the resource queue's shell hook (#13645).
+func (h *SessionsHandler) SetResourceHook(hook *resources.Hook) { h.resourceHook = hook }
+
+// resourceRefusal is the text a heavy Bash command is held with when the shared machine it needs is busy (#13645), or "" to let it run. Everything cheap that decides whether to read the command comes
+// first, as for the pattern-kill guard: no hook, a tool that is not Bash and an agent that is not Claude (the refusal is the Claude CLI's hook answer) never make the server read an agent's command.
+func (h *SessionsHandler) resourceRefusal(ctx context.Context, owner *store.SessionTokenOwner, tool, toolUseID string, input map[string]any) string {
+	if h.resourceHook == nil || tool != "Bash" || input == nil || owner == nil || !h.resourceHook.Active() { // Active: no resource has a match, so nothing below is read
+		return ""
+	}
+	command, _ := input["command"].(string)
+	if command == "" {
+		return ""
+	}
+	if ls, err := h.ss.GetLiveSession(ctx, owner.SessionID); err != nil || ls == nil || ls.AgentType != at.Claude {
+		return ""
+	}
+	return h.resourceHook.Before(ctx, owner.SessionID, owner.SessionName, toolUseID, command)
 }
