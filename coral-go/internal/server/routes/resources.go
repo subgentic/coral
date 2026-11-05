@@ -166,7 +166,6 @@ func (h *ResourcesHandler) addGoals(ctx context.Context, views []resourceView) {
 	})
 }
 
-
 // addStuck marks the holders the watcher has told the Orchestrator of (#13705): the Queue folder shows them as Stuck.
 func (h *ResourcesHandler) addStuck(views []resourceView) {
 	if h.Watch == nil {
