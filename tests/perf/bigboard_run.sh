@@ -11,13 +11,18 @@
 set -uo pipefail
 export CORAL_TELEMETRY_DISABLED=1
 if [[ "${PERF_RUN:-}" != "1" ]]; then echo "[bigboard-run] opt-in: set PERF_RUN=1" >&2; exit 2; fi
+if [[ "${TYPING_GATE:-}" == 1 && "${TYPING_TRACE:-}" != 1 ]]; then echo "[bigboard-run] TYPING_GATE requires TYPING_TRACE=1" >&2; exit 2; fi
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 [[ -n "${FIXTURE:-}" && -f "$FIXTURE/fixture.json" && -x "$FIXTURE/bin/coral" ]] || { echo "[bigboard-run] FIXTURE must be a bigboard_seed.sh fixture" >&2; exit 2; }
 [[ -n "${OUT:-}" ]] || { echo "[bigboard-run] set OUT to a results folder" >&2; exit 2; }
+BIN="${BIN:-$FIXTURE/bin/coral}"
+[[ -x "$BIN" ]] || { echo "[bigboard-run] BIN must be executable" >&2; exit 2; }
 PORT="${PORT:-8742}"; HUBPORT="${HUBPORT:-8743}"; IDLE_S="${IDLE_S:-60}"
 [[ "$PORT" != 8420 && "$HUBPORT" != 8420 ]] || { echo "[bigboard-run] refusing :8420" >&2; exit 2; }
 for p in "$PORT" "$HUBPORT"; do lsof -nP -iTCP:"$p" -sTCP:LISTEN >/dev/null 2>&1 && { echo "[bigboard-run] port $p is in use" >&2; exit 2; }; done
 mkdir -p "$OUT"; OUT="$(cd "$OUT" && pwd)"
+source "$HERE/typing_measure_gate.sh"
+typing_gate_failed=0
 source "$HERE/../lib/mock_sandbox.sh"
 source "$HERE/bigboard_lib.sh"
 log() { echo "[bigboard-run] $*"; }
@@ -56,13 +61,13 @@ measure() {  # measure LOGFILE ENV... -- ARGS: runs bigboard_measure.mjs, up to 
   done
   return $rc
 }
-{ echo "commit $(cat "$FIXTURE/commit.txt")"; echo "load $(uptime | sed 's/.*load averages*: //')"; sysctl -n machdep.cpu.brand_string 2>/dev/null; } > "$OUT/machine.txt"
+{ echo "fixture commit $(cat "$FIXTURE/commit.txt")"; echo "candidate ${CANDIDATE_REV:-fixture build}"; echo "binary $BIN"; echo "load $(uptime | sed 's/.*load averages*: //')"; sysctl -n machdep.cpu.brand_string 2>/dev/null; } > "$OUT/machine.txt"
 log "copying the fixture data"
 cp -R "$FIXTURE/data" "$WORK/data"
 rm -f "$WORK/data/coral-server.lock" "$WORK/data/login_token"
 PPROF_PORT="${PPROF_PORT:-8744}"
 export CORAL_PPROF_ADDR="127.0.0.1:$PPROF_PORT"; [[ -n "${DEBUG_PHASES:-}" ]] && export CORAL_DEBUG_PHASES=1   # the measured server only (the hub must not bind the same address)
-start local "$FIXTURE/bin/coral" "$WORK/data" "$PORT"
+start local "$BIN" "$WORK/data" "$PORT"
 unset CORAL_PPROF_ADDR CORAL_DEBUG_PHASES
 SRV=$LAST_PID
 KEY="$(tr -d '[:space:]' < "$WORK/data/api_key")"; write_auth_header "$WORK/auth.hdr" "$KEY"
@@ -80,14 +85,18 @@ for n in $LIVE; do
   api GET /api/sessions/live | python3 -I -c 'import sys,json; d=json.load(sys.stdin); r=d if isinstance(d,list) else d.get("sessions",[]); print("live rows:", len(r), "sleeping:", sum(1 for x in r if x.get("sleeping")))' | tee -a "$OUT/machine.txt"
   sleep 5
   log "measuring locally with $n live agents (idle ${IDLE_S}s)"
-  measure "$OUT/local-$n.log" API_KEY_FILE="$WORK/data/api_key" IDLE_S="$IDLE_S" PPROF_URL="http://127.0.0.1:$PPROF_PORT" PROFILE_PREFIX="$OUT/cpu-$n-agents" node "$HERE/bigboard_measure.mjs" "http://127.0.0.1:$PORT" "" "$OUT/local-$n.json"; echo "local-$n measure exit=$?"
+  if [[ "${TYPING_TRACE:-}" == 1 ]]; then
+    run_bigboard_measure "local-$n" "$OUT/local-$n.log" env PERF_RUN=1 API_KEY_FILE="$WORK/data/api_key" IDLE_S="$IDLE_S" PPROF_URL="http://127.0.0.1:$PPROF_PORT" PROFILE_PREFIX="$OUT/cpu-$n-agents" node "$HERE/bigboard_measure.mjs" "http://127.0.0.1:$PORT" "" "$OUT/local-$n.json" || typing_gate_failed=1
+  else
+    measure "$OUT/local-$n.log" API_KEY_FILE="$WORK/data/api_key" IDLE_S="$IDLE_S" PPROF_URL="http://127.0.0.1:$PPROF_PORT" PROFILE_PREFIX="$OUT/cpu-$n-agents" node "$HERE/bigboard_measure.mjs" "http://127.0.0.1:$PORT" "" "$OUT/local-$n.json"; echo "local-$n measure exit=$?"
+  fi
   ps -o rss= -p "$SRV" | awk -v n="$n" '{printf "server RSS at %s live agents: %.0f MB\n", n, $1/1024}' | tee -a "$OUT/machine.txt"
   LAST_N=$n
 done
 
 if [[ "${HUB:-}" == 1 ]]; then
   mkdir -p "$WORK/hub"
-  start hub "$FIXTURE/bin/coral" "$WORK/hub" "$HUBPORT" --hub
+  start hub "$BIN" "$WORK/hub" "$HUBPORT" --hub
   HUBKEY="$(tr -d '[:space:]' < "$WORK/hub/api_key")"
   write_auth_header "$WORK/hub-auth.hdr" "$HUBKEY"   # the keys go in files, not on curl's command line (another account's ps could read them)
   ( umask 077; printf '{"id":"bigboard","label":"bigboard","url":"http://127.0.0.1:%s","api_key":"%s","allow_private":true}' "$PORT" "$KEY" > "$WORK/hub-add.body" )
@@ -95,7 +104,13 @@ if [[ "${HUB:-}" == 1 ]]; then
   log "hub add server: HTTP $code"; head -c 300 "$OUT/hub-add.json"; echo
   sleep 5
   log "measuring through the hub with $LAST_N live agents (idle ${IDLE_S}s)"
-  measure "$OUT/hub.log" IDLE_S="$IDLE_S" node "$HERE/bigboard_measure.mjs" "http://127.0.0.1:$HUBPORT" "$WORK/hub/login_token" "$OUT/hub-$LAST_N.json"; echo "hub measure exit=$?"
+  if [[ "${TYPING_TRACE:-}" == 1 ]]; then
+    run_bigboard_measure hub "$OUT/hub.log" env PERF_RUN=1 TYPING_TARGETS="${HUB_TYPING_TARGETS:-composer,terminal}" API_KEY_FILE="$WORK/hub/api_key" IDLE_S="$IDLE_S" node "$HERE/bigboard_measure.mjs" "http://127.0.0.1:$HUBPORT" "$WORK/hub/login_token" "$OUT/hub-$LAST_N.json" || typing_gate_failed=1
+  else
+    measure "$OUT/hub.log" IDLE_S="$IDLE_S" node "$HERE/bigboard_measure.mjs" "http://127.0.0.1:$HUBPORT" "$WORK/hub/login_token" "$OUT/hub-$LAST_N.json"; echo "hub measure exit=$?"
+  fi
 fi
 python3 -I "$HERE/bigboard_table.py" "$OUT" > "$OUT/ranked.md" && head -40 "$OUT/ranked.md"
 log "results in $OUT"
+
+exit "$typing_gate_failed"
