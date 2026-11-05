@@ -5,8 +5,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -130,4 +132,32 @@ func TestAnOversizeWidenedClickIsRefusedOnlyWhereItWouldHaveBeenSigned(t *testin
 	s1.mu.Lock()
 	assert.Empty(t, s1.header.Get(hubowner.Header))
 	s1.mu.Unlock()
+}
+
+// Security's SHOULD on #13725: clicks that arrive while the remote's health is being read share that one read, and a hanging remote is asked once, not once per click.
+func TestClicksThatArriveWhileTheRemoteIsBeingAskedShareOneHealthRead(t *testing.T) {
+	var health atomic.Int32
+	var s seenReq
+	inner := s.handler()
+	rem := httptest.NewServer(keyed(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/health" {
+			health.Add(1)
+			time.Sleep(300 * time.Millisecond) // a slow remote: every click below arrives while this read is in flight
+			_, _ = io.WriteString(w, `{"status":"ok","hub_owner_routes":2}`)
+			return
+		}
+		inner.ServeHTTP(w, r)
+	})))
+	t.Cleanup(rem.Close)
+	hub := hubOver(t, rem)
+	var wg sync.WaitGroup
+	for i := 0; i < 8; i++ {
+		wg.Add(1)
+		go func() { defer wg.Done(); post(t, hub, completePath, `{"n":1}`, true, person) }()
+	}
+	wg.Wait()
+	assert.EqualValues(t, 1, health.Load(), "eight clicks, one health read")
+	s.mu.Lock()
+	assert.NotEmpty(t, s.header.Get(hubowner.Header), "and the answer they shared was used: the clicks were signed")
+	s.mu.Unlock()
 }

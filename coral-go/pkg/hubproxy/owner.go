@@ -40,8 +40,14 @@ func sessionSignedIn(ctx context.Context) bool {
 // remoteGenerations remembers, per remote, which generation of the owner-stamp allowlist its health answer says it accepts (hub_owner_routes), for generationTTL: a hub asks a remote only when a widened route is about
 // to be signed, at most once a minute. A remote that does not say (an older Coral) accepts generation 1, the original eight; a remote that cannot be asked is taken at the last answer or at 1.
 type remoteGenerations struct {
-	mu sync.Mutex
-	m  map[string]generationEntry
+	mu       sync.Mutex
+	m        map[string]generationEntry
+	inflight map[string]*generationCall // a health read in progress, shared by every click that arrives meanwhile (Security's SHOULD on #13725)
+}
+
+type generationCall struct {
+	done chan struct{}
+	gen  int
 }
 
 type generationEntry struct {
@@ -55,10 +61,25 @@ const generationTTL = time.Minute
 func (h *Handler) remoteGeneration(ctx context.Context, id string, t Target) int {
 	h.gens.mu.Lock()
 	e, ok := h.gens.m[id]
-	h.gens.mu.Unlock()
 	if ok && time.Since(e.at) < generationTTL {
+		h.gens.mu.Unlock()
 		return e.gen
 	}
+	if c, busy := h.gens.inflight[id]; busy { // another click is already asking this remote: wait for that answer, do not ask again
+		h.gens.mu.Unlock()
+		select {
+		case <-c.done:
+			return c.gen
+		case <-ctx.Done():
+			return 1
+		}
+	}
+	call := &generationCall{done: make(chan struct{})}
+	if h.gens.inflight == nil {
+		h.gens.inflight = map[string]*generationCall{}
+	}
+	h.gens.inflight[id] = call
+	h.gens.mu.Unlock()
 	gen := 1
 	if ok {
 		gen = e.gen // asked before: an unreachable remote keeps its last answer
@@ -79,6 +100,9 @@ func (h *Handler) remoteGeneration(ctx context.Context, id string, t Target) int
 		h.gens.m = map[string]generationEntry{}
 	}
 	h.gens.m[id] = generationEntry{gen: gen, at: time.Now()}
+	delete(h.gens.inflight, id)
+	call.gen = gen
+	close(call.done)
 	h.gens.mu.Unlock()
 	return gen
 }
