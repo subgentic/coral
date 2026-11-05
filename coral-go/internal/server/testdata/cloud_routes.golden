@@ -21,6 +21,8 @@ DELETE /api/board/{project}/waits never
 DELETE /api/chief/checks/{checkID} never
 DELETE /api/folder-tags/{folderName}/{tagID} never
 DELETE /api/pinned-folders launch
+DELETE /api/resources/entries/{id} never
+DELETE /api/resources/{name} never
 DELETE /api/saved/{id} interact
 DELETE /api/scheduled/jobs/{jobID} never
 DELETE /api/sessions/history/{sessionID}/tags/{tagID} never
@@ -142,6 +144,8 @@ GET /api/needs-you view
 GET /api/operator-asks view
 GET /api/pinned-folders view
 GET /api/proposals view
+GET /api/resources never
+GET /api/resources/{name} never
 GET /api/saved view
 GET /api/saved/{id}/message view
 GET /api/scheduled/jobs view
@@ -384,6 +388,10 @@ POST /api/hub-auto-accept launch
 POST /api/indexer/refresh never
 POST /api/notifications never
 POST /api/pinned-folders launch
+POST /api/resources/entries/{id}/move never
+POST /api/resources/{name}/claim never
+POST /api/resources/{name}/release never
+POST /api/resources/{name}/renew never
 POST /api/saved interact
 POST /api/scheduled/jobs never
 POST /api/scheduled/jobs/init-repo never
@@ -497,6 +505,7 @@ PUT /api/cloud/hub-relaunch never
 PUT /api/cloud/max-mode never
 PUT /api/cloud/redact-tokens never
 PUT /api/custom-models launch
+PUT /api/resources/{name} never
 PUT /api/scheduled/jobs/{jobID} never
 PUT /api/sessions/history/{sessionID}/notes never
 PUT /api/sessions/live/{name}/display-name interact

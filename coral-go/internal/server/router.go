@@ -427,6 +427,7 @@ func (s *Server) registerSessions(r *chi.Mux, h *routeHandlers) {
 	r.Post("/api/sessions/live/{sessionID}/archive", sessHandler.ArchiveSession)
 	r.Post("/api/sessions/live/{sessionID}/unarchive", sessHandler.UnarchiveSession)
 
+	s.registerResources(r) // the resource queue (#13613)
 	// Agent tasks
 	sessHandler.RegisterAgentArtifacts(r)
 	sessHandler.RegisterArtifactComments(r) // #5176
