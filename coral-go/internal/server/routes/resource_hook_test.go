@@ -89,6 +89,16 @@ func TestAHeavyBashCommandClaimsASlotAtTheHookPostAndGivesItBackWhenTheCallEnds(
 	tokC := agentToken(t, h, sidC, "codex-"+sidC)
 	assert.Nil(t, post(tokC, sidC, "Bash", "t6", heavy)["refuse"], "the refusal is the Claude CLI's answer: another agent is not held")
 	assert.Empty(t, holders(), "and claims nothing")
+	// QA Reviewer 2: even with the machine BUSY a non-Claude agent is neither refused nor queued (it could not read the refusal)
+	_, err = mgr.Claim(ctx, "mac-heavy", "Agent A", "explicit")
+	require.NoError(t, err)
+	assert.Nil(t, post(tokC, sidC, "Bash", "t7", heavy)["refuse"], "a Codex agent's heavy command on a busy machine runs")
+	st, _ = mgr.Queue().Status("mac-heavy")
+	assert.Empty(t, st.Queue, "and does not join the line")
+	// the command cap: a command over 64 KB is never read (a hostile one costs the server nothing)
+	require.NoError(t, mgr.Queue().Release("mac-heavy", "Agent A"))
+	assert.Nil(t, post(tokB, sidB, "Bash", "t8", strings.Repeat("x", 70<<10)+" ; go test ./...")["refuse"])
+	assert.Empty(t, holders(), "an oversized command claims nothing")
 }
 
 func TestASessionThatEndsGivesItsHeavySlotBack(t *testing.T) {

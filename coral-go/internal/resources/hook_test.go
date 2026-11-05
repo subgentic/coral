@@ -149,7 +149,7 @@ func TestACallThatReturnsWhileItsWorkRunsKeepsTheSlotUntilTheWorkIsGone(t *testi
 	g.mu.Lock()
 	g.procs["s-a"] = nil
 	g.mu.Unlock()
-	g.add(time.Second)
+	g.add(4 * time.Second) // past the few seconds a process list is reused
 	assert.Empty(t, g.holders(), "the work is gone: the slot goes back")
 }
 
@@ -203,4 +203,42 @@ func TestTheHookClaimsForTheSessionsOwnAgentOnly(t *testing.T) {
 	g.h.After("s-b", "call-1")
 	g.h.SessionEnded("s-b")
 	assert.Equal(t, []string{"Agent A"}, g.holders())
+}
+
+// QA Reviewer 2 / the Orchestrator: this hook is on every agent's Bash call, so reading the process list (ps, up to 3 s) never holds up another agent's call, and with no resource matching nothing is looked up.
+func TestASlowProcessListNeverHoldsUpAnotherAgentsCall(t *testing.T) {
+	g := newHookRig(t)
+	require.Equal(t, "", g.h.Before(t.Context(), "s-a", "s-a", "call-1", heavy))
+	block, entered := make(chan struct{}), make(chan struct{}, 4)
+	g.h.o.Commands = func(string) []string { entered <- struct{}{}; <-block; return nil }
+	done := make(chan struct{})
+	go func() { g.h.After("s-a", "call-1"); close(done) }() // A's call ended: the hook now asks what A's agent still runs, and that read is slow
+	select {
+	case <-entered:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the process list was never read")
+	}
+	answered := make(chan string, 1)
+	go func() { answered <- g.h.Before(t.Context(), "s-b", "s-b", "call-2", heavy) }()
+	select {
+	case msg := <-answered:
+		assert.Contains(t, msg, "mac-heavy is busy", "B is answered while A's process list is still being read")
+	case <-time.After(2 * time.Second):
+		close(block) // let the stuck calls end, then fail
+		t.Fatal("B's call waited for A's slow process list")
+	}
+	assert.Equal(t, []string{"Agent A"}, g.holders(), "A keeps the slot meanwhile: an unknown list is taken as work still running")
+	close(block)
+	<-done
+	assert.Equal(t, []string{"Agent B"}, g.holders(), "the list came back empty: A's slot goes to B, who was waiting")
+}
+
+func TestWithNoMatchingResourceNothingIsLookedUp(t *testing.T) {
+	g := newHookRig(t)
+	require.NoError(t, g.m.Queue().Define(resourcequeue.Resource{Key: "mac-heavy", Slots: 1}))
+	assert.False(t, g.h.Active(), "no resource has a match")
+	require.NoError(t, g.m.Queue().Define(resourcequeue.Resource{Key: "mac-heavy", Slots: 1, Match: []string{"go test ./..."}}))
+	assert.True(t, g.h.Active())
+	var none *Hook
+	assert.False(t, none.Active())
 }

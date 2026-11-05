@@ -57,6 +57,27 @@ type Hook struct {
 	o    HookOptions
 	mu   sync.Mutex
 	hold map[holdKey]*autoHold
+
+	pmu   sync.Mutex // the process lists below, never held while a list is read
+	procs map[string]*procEntry
+}
+
+// procEntry is the last process list read for a session name. Reading one runs ps (up to 3 s), so it is never done under the hook's lock, is reused for procTTL, and a read already under way is not waited for:
+// the stale list (or, with none, "still running") answers instead, so one slow ps never holds up another agent's Bash call.
+type procEntry struct {
+	cmds     []string
+	at       time.Time
+	inflight bool
+}
+
+const procTTL = 3 * time.Second
+
+// Active reports whether any resource has a match: with none the hook has nothing to do, and a caller skips every lookup before it.
+func (h *Hook) Active() bool {
+	if h == nil || h.m == nil {
+		return false
+	}
+	return h.m.Queue().AnyMatch()
 }
 
 // NewHook makes the hook over a Manager.
@@ -67,7 +88,7 @@ func NewHook(m *Manager, o HookOptions) *Hook {
 	if o.ClaimWindow <= 0 {
 		o.ClaimWindow = 2 * time.Minute
 	}
-	return &Hook{m: m, o: o, hold: map[holdKey]*autoHold{}}
+	return &Hook{m: m, o: o, hold: map[holdKey]*autoHold{}, procs: map[string]*procEntry{}}
 }
 
 func (h *Hook) event(e HookEvent) {
@@ -82,7 +103,7 @@ func (h *Hook) Before(ctx context.Context, session, name, toolUseID, command str
 		return ""
 	}
 	agent, ok := h.o.Agent(ctx, name)
-	if !ok || agent == "" {
+	if !ok {
 		return ""
 	}
 	var res resourcequeue.Resource
@@ -96,9 +117,10 @@ func (h *Hook) Before(ctx context.Context, session, name, toolUseID, command str
 	if pattern == "" {
 		return ""
 	}
+	snap := h.snapshot()
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	h.sweepLocked()
+	h.sweepLocked(snap)
 	key := holdKey{res.Key, agent}
 	st, err := h.m.Queue().Status(res.Key)
 	if err != nil {
@@ -177,13 +199,16 @@ func (h *Hook) After(session, toolUseID string) {
 		return
 	}
 	h.mu.Lock()
-	defer h.mu.Unlock()
 	for _, ah := range h.hold {
 		if ah.session == session {
 			delete(ah.calls, toolUseID)
 		}
 	}
-	h.sweepLocked()
+	h.mu.Unlock()
+	snap := h.snapshot() // after the call is gone from the hold: its session is then one the sweep asks about
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.sweepLocked(snap)
 }
 
 // SessionEnded gives back every auto-claim of the session (it stopped, or was reset or ended).
@@ -206,12 +231,67 @@ func (h *Hook) Sweep() {
 	if h == nil {
 		return
 	}
+	snap := h.snapshot()
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	h.sweepLocked()
+	h.sweepLocked(snap)
 }
 
-func (h *Hook) sweepLocked() {
+// snapshot reads, outside the lock, the process lists of the sessions whose holds have no call running (the only ones the sweep asks about).
+func (h *Hook) snapshot() map[string][]string {
+	if h.o.Commands == nil {
+		return nil
+	}
+	h.mu.Lock()
+	var names []string
+	for _, ah := range h.hold {
+		if len(ah.calls) == 0 {
+			names = append(names, ah.name)
+		}
+	}
+	h.mu.Unlock()
+	out := map[string][]string{}
+	for _, n := range names {
+		out[n] = h.processes(n)
+	}
+	return out
+}
+
+// processes is the session's running command lines: the cached list while it is fresh, a fresh read otherwise, and the stale list when a read is already under way.
+func (h *Hook) processes(name string) []string {
+	h.pmu.Lock()
+	e := h.procs[name]
+	if e == nil {
+		e = &procEntry{}
+		h.procs[name] = e
+	}
+	if !e.at.IsZero() && h.o.Now().Sub(e.at) < procTTL {
+		c := e.cmds
+		h.pmu.Unlock()
+		return c
+	}
+	if e.inflight {
+		c := e.cmds
+		unknown := e.at.IsZero()
+		h.pmu.Unlock()
+		if unknown {
+			return []string{unknownRunning} // no list yet: the work is assumed to run, so a slot is never freed on a guess
+		}
+		return c
+	}
+	e.inflight = true
+	h.pmu.Unlock()
+	cmds := h.o.Commands(name)
+	h.pmu.Lock()
+	e.cmds, e.at, e.inflight = cmds, h.o.Now(), false
+	h.pmu.Unlock()
+	return cmds
+}
+
+// unknownRunning stands for a process list that is not known yet; it matches whatever the resource's patterns are (see startedWorkRuns).
+const unknownRunning = "\x00unknown"
+
+func (h *Hook) sweepLocked(snap map[string][]string) {
 	now := h.o.Now()
 	for k, ah := range h.hold {
 		st, err := h.m.Queue().Status(k.resource)
@@ -250,7 +330,7 @@ func (h *Hook) sweepLocked() {
 			h.releaseLocked(k, ah, "cap")
 			continue
 		}
-		if len(ah.calls) > 0 || h.startedWorkRuns(ah, st.Resource) {
+		if len(ah.calls) > 0 || h.startedWorkRuns(ah, st.Resource, snap) {
 			_, _ = h.m.Queue().Renew(k.resource, k.agent)
 			continue
 		}
@@ -267,11 +347,22 @@ func (h *Hook) sweepLocked() {
 
 // startedWorkRuns reports whether a process the session's agent started, and that matches the resource's patterns, still runs: a call that returned while its work goes on (an &, nohup, a script that forks the suite)
 // keeps the slot until that work is gone.
-func (h *Hook) startedWorkRuns(ah *autoHold, res resourcequeue.Resource) bool {
+func (h *Hook) startedWorkRuns(ah *autoHold, res resourcequeue.Resource, snap map[string][]string) bool {
 	if h.o.Commands == nil {
 		return false
 	}
-	for _, c := range h.o.Commands(ah.name) {
+	cmds, ok := snap[ah.name]
+	if !ok { // the hold had a call running when the lists were read: use the last list, never a read under the lock
+		h.pmu.Lock()
+		if e := h.procs[ah.name]; e != nil {
+			cmds = e.cmds
+		}
+		h.pmu.Unlock()
+	}
+	for _, c := range cmds {
+		if c == unknownRunning {
+			return true
+		}
 		if _, hit := MatchCommand(c, res.Match); hit {
 			return true
 		}

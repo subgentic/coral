@@ -513,11 +513,11 @@ func (h *SessionsHandler) SetResourceHook(hook *resources.Hook) { h.resourceHook
 // resourceRefusal is the text a heavy Bash command is held with when the shared machine it needs is busy (#13645), or "" to let it run. Everything cheap that decides whether to read the command comes
 // first, as for the pattern-kill guard: no hook, a tool that is not Bash and an agent that is not Claude (the refusal is the Claude CLI's hook answer) never make the server read an agent's command.
 func (h *SessionsHandler) resourceRefusal(ctx context.Context, owner *store.SessionTokenOwner, tool, toolUseID string, input map[string]any) string {
-	if h.resourceHook == nil || tool != "Bash" || input == nil || owner == nil {
+	if h.resourceHook == nil || tool != "Bash" || input == nil || owner == nil || !h.resourceHook.Active() { // Active: no resource has a match, so nothing below is read
 		return ""
 	}
 	command, _ := input["command"].(string)
-	if command == "" || len(command) > 64<<10 {
+	if command == "" {
 		return ""
 	}
 	if ls, err := h.ss.GetLiveSession(ctx, owner.SessionID); err != nil || ls == nil || ls.AgentType != at.Claude {

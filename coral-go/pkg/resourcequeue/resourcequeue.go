@@ -393,6 +393,18 @@ func (q *Queue) Cancel(id int64) error {
 	return err
 }
 
+// AnyMatch reports whether any resource has a match list (the shell hook has work only then).
+func (q *Queue) AnyMatch() bool {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	for _, r := range q.res {
+		if len(r.Match) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
 // Status describes one resource.
 func (q *Queue) Status(key string) (Status, error) {
 	q.mu.Lock()
