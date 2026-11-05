@@ -106,17 +106,39 @@ func TestRemoteBoardPollerSendsNoKeyToAnotherURL(t *testing.T) {
 func TestRemoteKeyForSkipsSSHAndUnreadableKeys(t *testing.T) {
 	ctx := context.Background()
 	reg := fakeKeyRegistry{
-		servers: []store.RemoteServer{{ID: "s", URL: "http://h:1", Transport: "ssh"}, {ID: "u", URL: "http://h:2", Transport: "http"}, {ID: "k", URL: "http://h:3", Transport: "http"}},
+		servers: []store.RemoteServer{{ID: "s", URL: "http://h:1", Transport: "ssh"}, {ID: "u", URL: "https://h:2", Transport: "http"}, {ID: "k", URL: "https://h:3", Transport: "http"}},
 		keys:    map[string]string{"s": "ssh-key", "k": "good"},
 	}
 	f := RemoteKeyFor(reg)
 	_, ok := f(ctx, "http://h:1")
 	assert.False(t, ok, "an ssh server's URL is not an address to send a key to")
-	_, ok = f(ctx, "http://h:2")
+	_, ok = f(ctx, "https://h:2")
 	assert.False(t, ok, "a key that cannot be read gives none")
-	k, ok := f(ctx, "http://h:3/")
+	k, ok := f(ctx, "https://h:3/")
 	assert.True(t, ok)
 	assert.Equal(t, "good", k)
-	_, ok = f(ctx, "http://H:3")
+	_, ok = f(ctx, "https://H:3")
 	assert.False(t, ok, "the match is exact, host case included")
+}
+
+// Security's INFO on #13695: the key is not sent over plain http to a host that is not this computer.
+func TestRemoteKeyForNeverSendsAKeyInClearToAnotherHost(t *testing.T) {
+	ctx := context.Background()
+	reg := fakeKeyRegistry{
+		servers: []store.RemoteServer{
+			{ID: "a", URL: "http://203.0.113.5:8420", Transport: "http"}, {ID: "b", URL: "https://203.0.113.6:8420", Transport: "http"},
+			{ID: "c", URL: "http://127.0.0.1:8420", Transport: "http"}, {ID: "d", URL: "http://localhost:8420", Transport: "http"}, {ID: "e", URL: "http://remote.example.com", Transport: "http"},
+		},
+		keys: map[string]string{"a": "ka", "b": "kb", "c": "kc", "d": "kd", "e": "ke"},
+	}
+	f := RemoteKeyFor(reg)
+	_, ok := f(ctx, "http://203.0.113.5:8420")
+	assert.False(t, ok, "plain http to another host: no key")
+	_, ok = f(ctx, "http://remote.example.com")
+	assert.False(t, ok, "plain http to a named host: no key")
+	for url, want := range map[string]string{"https://203.0.113.6:8420": "kb", "http://127.0.0.1:8420": "kc", "http://localhost:8420": "kd"} {
+		k, ok := f(ctx, url)
+		assert.True(t, ok, url)
+		assert.Equal(t, want, k, url)
+	}
 }
