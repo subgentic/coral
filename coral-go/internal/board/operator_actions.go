@@ -72,6 +72,29 @@ const (
 	ActWaitDismiss  = "wait_dismiss"
 	ActWaitSend     = "wait_send"
 	ActMessage      = "message" // a message the Operator posted to a team's board
+	// Slice 2 (#13609): the rest of the Inbox, Files, Saved and Chats clicks.
+	ActMarkUnread     = "mark_unread" // with ActMarkRead: the explicit Mark read and Mark unread buttons (opening a file marks it read by itself: not a click)
+	ActFileTags       = "file_tags"   // the tag editor of a file
+	ActFileStar       = "file_star"
+	ActFileUnstar     = "file_unstar"
+	ActFileKeep       = "file_keep"
+	ActFileRelease    = "file_release"
+	ActFileDelete     = "file_delete"
+	ActFileShare      = "file_share" // a file shared with an agent
+	ActSavedAdd       = "saved_add"
+	ActSavedUpdate    = "saved_update" // Done or Reopen on a saved message
+	ActSavedRemove    = "saved_remove"
+	ActChatFlag       = "chat_flag" // star or archive of a chat
+	ActChatSend       = "chat_send" // the chat composer's Send to an agent
+	ActRunSeen        = "run_seen"  // a failed run opened or dismissed
+	ActAgentsRecord   = "agents_record"
+	ActGoalCreate     = "goal_create"
+	ActGoalEdit       = "goal_edit" // a goal's words, or Reopen
+	ActGoalDriver     = "goal_driver"
+	ActGoalMove       = "goal_move"
+	ActGoalRequestAdd = "goal_request_accept"
+	ActGoalRequestNo  = "goal_request_decline"
+	ActInboxHide      = "inbox_hide" // Dismiss or Not yet on a goal-looks-done row, a welcome item's Dismiss: kept in settings
 )
 
 // ActivityMeta is what a handler knows about the action, set on the context so the store's own transaction can write the row: the actor and source come from the verified request, never the body.

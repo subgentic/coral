@@ -2,7 +2,12 @@ package routes
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
+
+	"github.com/go-chi/chi/v5"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -74,4 +79,44 @@ func TestAnyOtherMessageTheOperatorSendsIsARowAndAnAgentsIsNot(t *testing.T) {
 	code, _, b = e.do("POST", "/api/board/p/messages", `{"subscriber_id":"Operator","as":"Operator","content":"@Lead hold on","dry_run":true}`, map[string]string{"X-Test-Actor": "operator-person"})
 	require.Equal(t, 200, code, string(b))
 	require.Len(t, wordRows(t, e.bs), 1)
+}
+
+// #13609 slice 2: the Mark read and Mark unread buttons and the tag editor are rows, told apart by the page's X-Coral-Click header; opening a file marks it read with no header and is no click. The row is read back
+// from GET /api/activity.
+func TestTheReadButtonsAndTheTagEditorAreRowsAndAnOpenIsNot(t *testing.T) {
+	e := newTagEnv(t)
+	r := chi.NewRouter()
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) { next.ServeHTTP(w, asPerson(req)) })
+	})
+	r.Use(ActivityRecorder(e.h.bs))
+	r.Put("/api/board/{project}/artifacts/{id}/tags", e.h.SetArtifactTags)
+	r.Get("/api/activity", e.h.ListActivity)
+	srv := httptest.NewServer(r)
+	t.Cleanup(srv.Close)
+	id := e.ids["report.md"]
+	put := func(body, click string) {
+		req, err := http.NewRequest(http.MethodPut, srv.URL+"/api/board/tag-team/artifacts/"+id+"/tags", strings.NewReader(body))
+		require.NoError(t, err)
+		if click != "" {
+			req.Header.Set("X-Coral-Click", click)
+		}
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		resp.Body.Close()
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+	}
+	put(`{"tags":["read"]}`, "") // opening the file
+	require.Empty(t, activityList(t, srv.URL), "an open is not a click")
+	put(`{}`, "read")
+	put(`{"tags":["read"]}`, "read")
+	put(`{"tags":["internal","final"]}`, "tags")
+	rows := activityList(t, srv.URL) // newest first
+	require.Len(t, rows, 3)
+	assert.Equal(t, board.ActFileTags, rows[0]["action"])
+	assert.Equal(t, "internal, final", rows[0]["note"])
+	assert.Equal(t, board.ActMarkRead, rows[1]["action"])
+	assert.Equal(t, board.ActMarkUnread, rows[2]["action"])
+	assert.Equal(t, id, rows[2]["item_id"])
+	assert.Equal(t, "file", rows[2]["item_kind"])
 }

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -190,6 +191,16 @@ func (h *BoardHandler) SetArtifactTags(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		errInternalServer(w, "could not change the tags")
 		return
+	}
+	switch r.Header.Get("X-Coral-Click") { // the page says which button this was; opening a file marks it read with no header and is not a click (#13609)
+	case "read":
+		if slices.Contains(tags, "read") {
+			noteActivity(r, board.ActMarkRead, "file", id, project, "", "")
+		} else {
+			noteActivity(r, board.ActMarkUnread, "file", id, project, "", "")
+		}
+	case "tags":
+		noteActivity(r, board.ActFileTags, "file", id, project, "", strings.Join(tags, ", "))
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"id": id, "tags": tags})
 }

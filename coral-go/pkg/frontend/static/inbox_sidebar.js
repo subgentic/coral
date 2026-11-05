@@ -316,7 +316,7 @@ function needsBulkActions() {
     const reviews = rows => rows.length > 0 && rows.every(s => s.review && !decisionNeedsPerson(splitKey(s.review.team).server));
     const markable = rows => rows.length > 0 && rows.every(s => s.goalDone || (s.review && !decisionNeedsPerson(splitKey(s.review.team).server))); // a file and a goal that looks done are read and unread the same way (#12029)
     const readOf = s => s.goalDone ? isGoalDoneRead(goalTeamHere(s.goalDone), s.goalDone) : isRead(s.review);
-    const setReadOf = (s, read) => s.goalDone ? (read ? markGoalDoneRead : markGoalDoneUnread)(goalTeamHere(s.goalDone), s.goalDone) : setReviewRead(s.review, read);
+    const setReadOf = (s, read) => s.goalDone ? (read ? markGoalDoneRead : markGoalDoneUnread)(goalTeamHere(s.goalDone), s.goalDone) : setReviewRead(s.review, read, { click: true });
     const tell = async (text, announce = text, opts) => { const { showToast, announceNotice } = await importOnce('./notifications.js'); showToast(text, false, undefined, opts); announceNotice(announce); };
     const each = async (rows, fn) => { let ok = 0; const bad = []; for (const s of rows) { try { await fn(s); ok++; } catch (e) { bad.push(e && e.message ? e.message : 'not saved'); } } return { ok, bad }; };
     const words = (verb, r, total) => r.bad.length ? `${verb} ${r.ok} of ${total}: ${r.bad[0]}` : `${verb} ${r.ok}`;
@@ -369,7 +369,7 @@ export function reviewActions(row, inSaved = false) { // inSaved (#11641, #11799
     const unsave = b => { b.disabled = true; errorText.textContent = '';
         return importOnce('./artifact_review.js').then(async ({ unsaveRow }) => { await unsaveRow(row.team, row); sayLive(`${file} is back in Needs you.`); }).catch(error => failed(b, error)); };
     box._ignore = ignore; // a swipe on a phone is the same Dismiss (#11642)
-    const unread = b => { b.disabled = true; errorText.textContent = ''; return setReviewRead(row, false).then(() => sayLive(`Marked ${file} unread.`)).catch(error => failed(b, error)); };
+    const unread = b => { b.disabled = true; errorText.textContent = ''; return setReviewRead(row, false, { click: true }).then(() => sayLive(`Marked ${file} unread.`)).catch(error => failed(b, error)); };
     const bookmark = !inSaved && !isPhoneLayout() && !decisionNeedsPerson(splitKey(row.team).server); // the star's slot is Save for later (#11672, the operator): a bookmark button; a phone has it in the three dots
     let saveButton = null; // Save for later: an icon beside Request changes (the third button of the row), in the dots on a phone
     if (bookmark) { const mark = DT.el('button', 'btn btn-quiet btn-icon inbox-bookmark'); mark.type = 'button'; mark.setAttribute('data-slot', 'save'); mark.setAttribute('aria-label', `Save for later: ${file}`); mark.title = 'Save for later'; mark.append(bookmarkIcon()); mark.addEventListener('click', () => save(mark)); saveButton = mark; }

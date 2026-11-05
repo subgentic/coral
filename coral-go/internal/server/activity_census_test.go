@@ -17,53 +17,30 @@ import (
 // activityByHandler), or it is not an Inbox action and the list says why. Document and video comments are excluded by name (the Operator's call). activityGaps is the work left of #13609: it
 // only shrinks, and the test fails a route that is listed there and recorded too.
 
-// activityByHandler: the handler writes the row itself (in the store transaction of the decision, or after the post), for a person only.
+// activityByHandler: the handler writes the row itself (in the store transaction of the decision, after the post, or by asking the recorder), for a person only.
 var activityByHandler = map[string]string{
 	"DELETE /api/board/{project}/artifacts/{id}/review":                   "take out of review (unsend_review)",
 	"POST /api/board/{project}/artifacts/{id}/review":                     "a file's review: approve, changes, deny, ignore, unignore, save, unsave, supersede (board.DecideArtifactReview and friends)",
 	"POST /api/board/{project}/asks/{messageID}/buttons/{buttonID}/claim": "an ask button's click (answer)",
 	"POST /api/board/{project}/asks/{messageID}/close":                    "a question's Ignore and Put back (ignore, unignore)",
+	"POST /api/board/{project}/goal-images":                               "a picture for the goal being written: the goal's own row (goal_create or goal_edit) is the click",
 	"POST /api/board/{project}/goals/{goalID}/close":                      "close a goal (goal_close)",
 	"POST /api/board/{project}/messages":                                  "a message or a typed answer by the Operator: PostMessage writes message or answer",
+	"POST /api/board/{project}/operator-artifacts/message":                "the message that tells the agent about the shared file: the same click as the upload, which has the row (file_share)",
 	"POST /api/board/{project}/proposals/{id}/approve":                    "a proposal's approve",
 	"POST /api/board/{project}/proposals/{id}/reject":                     "a proposal's reject",
 	"POST /api/board/{project}/tasks/{taskID}/reply":                      "the Operator's words on a task: ReplyToTask writes task_reply",
 	"POST /api/system/update/check-hub":                                   "the Hub owner's update check (hub_update_check)",
 	"POST /api/system/update/relaunch":                                    "the Hub owner's relaunch (hub_update_relaunch)",
 	"PUT /api/board/{project}/artifacts/{id}/review":                      "send for review (send_review)",
+	"PUT /api/board/{project}/artifacts/{id}/tags":                        "the Mark read and Mark unread buttons and the tag editor: the handler asks the recorder for a row by the page's X-Coral-Click header (read or tags); opening a file marks it read with no header, and is not a click",
+	"PUT /api/settings":                                                   "a goal-looks-done Dismiss or Not yet and a welcome item's Dismiss: the handler asks the recorder for an inbox_hide row when one of those settings is written",
 }
 
-// activityGaps: Inbox or chat actions that write no row yet (#13609, slice 2). Each one leaves this list when its row is written and tested.
-var activityGaps = map[string]string{
-	"DELETE /api/artifacts/series/{series_id}":                    "delete a file's series (slice 2)",
-	"DELETE /api/artifacts/{id}":                                  "delete a file (slice 2)",
-	"DELETE /api/artifacts/{id}/keep":                             "release a file (slice 2)",
-	"DELETE /api/artifacts/{id}/star":                             "unstar a file (slice 2)",
-	"DELETE /api/saved/{id}":                                      "remove a saved message (slice 2)",
-	"PATCH /api/board/{project}/goals/{goalID}":                   "reopen or edit a goal (slice 2)",
-	"PATCH /api/saved/{id}":                                       "Done or Reopen on a saved message (slice 2)",
-	"PATCH /api/sessions/history/{sessionID}/flags":               "star or archive a chat (slice 2)",
-	"POST /api/board/{project}/goal-images":                       "a picture for a goal (slice 2)",
-	"POST /api/board/{project}/goal-requests/{requestID}/accept":  "accept a goal request (slice 2)",
-	"POST /api/board/{project}/goal-requests/{requestID}/decline": "decline a goal request (slice 2)",
-	"POST /api/board/{project}/goals":                             "new goal (slice 2)",
-	"POST /api/board/{project}/goals/{goalID}/driver":             "change a goal's driver (slice 2)",
-	"POST /api/board/{project}/goals/{goalID}/move":               "move a goal to another team (slice 2)",
-	"POST /api/board/{project}/messages/mark-read":                "Mark read in the team's own views (slice 2: only the explicit buttons)",
-	"POST /api/board/{project}/operator-artifacts":                "share a file with an agent (slice 2)",
-	"POST /api/board/{project}/operator-artifacts/message":        "the message that tells the agent about a shared file (slice 2)",
-	"POST /api/saved":                                             "bookmark a message (slice 2)",
-	"POST /api/scheduled/runs/{runID}/seen":                       "a failed run's Open and Dismiss (slice 2)",
-	"POST /api/sessions/live/{name}/send":                         "the chat composer's Send to an agent (slice 2)",
-	"POST /api/sessions/record-agents":                            "Record for all agents (slice 2)",
-	"POST /api/workflows/runs/{runID}/seen":                       "a failed run's Open and Dismiss (slice 2)",
-	"PUT /api/artifacts/{id}/keep":                                "keep a file (slice 2)",
-	"PUT /api/artifacts/{id}/star":                                "star a file (slice 2)",
-	"PUT /api/board/{project}/artifacts/{id}/tags":                "mark read, mark unread and tag edits on a file (slice 2)",
-	"PUT /api/settings":                                           "Inbox hides kept in settings: goal-done Dismiss and Not yet, welcome Dismiss (slice 2)",
-}
+// activityGaps: Inbox or chat actions that write no row yet. Empty since #13609 slice 2; a gap found later is listed here with why, and leaves when its row is written and tested.
+var activityGaps = map[string]string{}
 
-// activityCommentsOut: comments, out of the audit by the Operator\'s call.
+// activityCommentsOut: comments, out of the audit by the Operator's call.
 var activityCommentsOut = map[string]string{
 	"DELETE /api/artifacts/{id}/comments/lock":        "document and video comments are out of the audit (the Operator's call, 2026-11-05)",
 	"DELETE /api/artifacts/{id}/comments/{cid}":       "document and video comments are out of the audit (the Operator's call, 2026-11-05)",
@@ -148,6 +125,7 @@ var activityNotAnInboxAction = map[string]string{
 	"POST /api/board/{project}/groups/{groupID}/members":                   "a team's own settings and plumbing (members, modes, links, relays), not an Inbox action",
 	"POST /api/board/{project}/health/ack":                                 "a team's own settings and plumbing (members, modes, links, relays), not an Inbox action",
 	"POST /api/board/{project}/hub-notice":                                 "a team's own settings and plumbing (members, modes, links, relays), not an Inbox action",
+	"POST /api/board/{project}/messages/mark-read":                         "read marks of a team's board made by agents and the command line; the dashboard never calls it (the Inbox's Mark read is a file tag, recorded by the tags handler)",
 	"POST /api/board/{project}/pause":                                      "a team's own settings and plumbing (members, modes, links, relays), not an Inbox action",
 	"POST /api/board/{project}/relay-messages":                             "a team's own settings and plumbing (members, modes, links, relays), not an Inbox action",
 	"POST /api/board/{project}/reminder":                                   "a team's own settings and plumbing (members, modes, links, relays), not an Inbox action",

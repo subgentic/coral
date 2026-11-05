@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"strings"
@@ -99,4 +100,91 @@ func TestOperatorClicksAreInTheActivityRecord(t *testing.T) {
 
 func tpath(id int64, tail string) string {
 	return "/api/board/team/tasks/" + itoa(id) + tail
+}
+
+// #13609 slice 2: the rest of the Inbox, Saved, Chats and Goals clicks, through the real router, as the person and then as an agent.
+func TestMoreOperatorClicksAreInTheActivityRecord(t *testing.T) {
+	srv, ts, _ := strictServer(t, false)
+	ctx := context.Background()
+	_, err := srv.boardStore.Subscribe(ctx, "team", "Lead", "Lead", "", nil, "all")
+	require.NoError(t, err)
+	msg, err := srv.boardStore.PostMessage(ctx, "team", "Lead", "a note worth keeping", nil)
+	require.NoError(t, err)
+	goal, err := srv.boardStore.CreateGoal(ctx, "team", board.GoalInput{Title: "Ship it", Outcome: "o", DoneWhen: "d", CreatedBy: "Lead"})
+	require.NoError(t, err)
+	do := func(method, path, body string, hdr map[string]string) (int, string) {
+		t.Helper()
+		req, err := http.NewRequest(method, ts.URL+path, strings.NewReader(body))
+		require.NoError(t, err)
+		req.Header.Set("Content-Type", "application/json")
+		for k, v := range hdr {
+			req.Header.Set(k, v)
+		}
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		b, _ := io.ReadAll(resp.Body)
+		return resp.StatusCode, string(b)
+	}
+	rows := func() []board.OperatorAction {
+		got, _, err := srv.boardStore.ActivityPage(ctx, board.ActivityFilter{Limit: board.ActivityMaxLimit})
+		require.NoError(t, err)
+		return got
+	}
+	person := map[string]string{"Origin": ts.URL, "Sec-Fetch-Site": "same-origin"}
+	type click struct {
+		name, method, path, body string
+		hdr                      map[string]string
+		action, kind             string
+	}
+	saved := func() string { // the bookmark's id, once added
+		code, out := do("GET", "/api/saved", "", person)
+		require.Less(t, code, 300, out)
+		var l struct {
+			Items []struct {
+				ID int64 `json:"id"`
+			} `json:"items"`
+		}
+		require.NoError(t, json.Unmarshal([]byte(out), &l))
+		require.NotEmpty(t, l.Items, out)
+		return itoa(l.Items[0].ID)
+	}
+	cases := []func() click{
+		func() click {
+			return click{name: "new goal", method: "POST", path: "/api/board/team/goals", body: `{"subscriber_id":"Operator","title":"A new goal","outcome":"o","done_when":"d"}`, action: board.ActGoalCreate, kind: "goal"}
+		},
+		func() click {
+			return click{name: "reopen a goal", method: "PATCH", path: "/api/board/team/goals/" + itoa(goal.ID), body: `{"subscriber_id":"Operator","state":"active"}`, action: board.ActGoalEdit, kind: "goal"}
+		},
+		func() click {
+			return click{name: "bookmark a message", method: "POST", path: "/api/saved", body: `{"kind":"board","ref":"team","key":"` + itoa(msg.ID) + `","title":"a note","snippet":"a note worth keeping","team":"team","author":"Lead"}`, action: board.ActSavedAdd, kind: "message"}
+		},
+		func() click {
+			return click{name: "saved Done", method: "PATCH", path: "/api/saved/" + saved(), body: `{"done":true}`, action: board.ActSavedUpdate, kind: "message"}
+		},
+		func() click {
+			return click{name: "saved Remove", method: "DELETE", path: "/api/saved/" + saved(), body: ``, action: board.ActSavedRemove, kind: "message"}
+		},
+		func() click {
+			return click{name: "star a chat", method: "PATCH", path: "/api/sessions/history/board%3Ateam/flags", body: `{"starred":true}`, action: board.ActChatFlag, kind: "chat"}
+		},
+		func() click {
+			return click{name: "dismiss a welcome item", method: "PUT", path: "/api/settings", body: `{"inbox_welcome":"off"}`, action: board.ActInboxHide, kind: "setting"}
+		},
+		func() click {
+			return click{name: "dismiss a goal-looks-done row", method: "PUT", path: "/api/settings", body: `{"goal_done_hidden":"[]"}`, action: board.ActInboxHide, kind: "setting"}
+		},
+	}
+	for _, mk := range cases {
+		c := mk()
+		before := len(rows())
+		code, out := do(c.method, c.path, c.body, map[string]string{"X-Coral-Session-Token": "not-a-real-token"})
+		require.Len(t, rows(), before, "%s: an agent's call is no click (%d %s)", c.name, code, out)
+		code, out = do(c.method, c.path, c.body, person)
+		require.Less(t, code, 300, "%s: %s", c.name, out)
+		got := rows()
+		require.Len(t, got, before+1, "%s: one row for the click", c.name)
+		require.Equal(t, c.action, got[0].Action, c.name)
+		require.Equal(t, c.kind, got[0].ItemKind, c.name)
+	}
 }

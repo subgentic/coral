@@ -43,7 +43,28 @@ var activityRoutes = map[string]activityRoute{
 	"POST /api/sessions/live/{name}/answer-prompt":        {board.ActPromptAnswer, "agent", "name", ""},
 	"POST /api/sessions/live/{name}/dismiss-wait":         {board.ActWaitDismiss, "agent", "name", ""},
 	"POST /api/sessions/live/{name}/waiting/dismiss":      {board.ActWaitDismiss, "agent", "name", ""},
-	"POST /api/sessions/live/{name}/waiting/send":         {board.ActWaitSend, "agent", "name", ""},
+	"PUT /api/artifacts/{id}/star":                        {board.ActFileStar, "file", "id", ""},
+	"DELETE /api/artifacts/{id}/star":                     {board.ActFileUnstar, "file", "id", ""},
+	"PUT /api/artifacts/{id}/keep":                        {board.ActFileKeep, "file", "id", ""},
+	"DELETE /api/artifacts/{id}/keep":                     {board.ActFileRelease, "file", "id", ""},
+	"DELETE /api/artifacts/{id}":                          {board.ActFileDelete, "file", "id", ""},
+	"DELETE /api/artifacts/series/{series_id}":            {board.ActFileDelete, "file", "series_id", ""},
+	"POST /api/board/{project}/operator-artifacts":        {board.ActFileShare, "file", "", "project"},
+	"POST /api/saved":                                             {board.ActSavedAdd, "message", "", ""},
+	"PATCH /api/saved/{id}":                                       {board.ActSavedUpdate, "message", "id", ""},
+	"DELETE /api/saved/{id}":                                      {board.ActSavedRemove, "message", "id", ""},
+	"PATCH /api/sessions/history/{sessionID}/flags":               {board.ActChatFlag, "chat", "sessionID", ""},
+	"POST /api/workflows/runs/{runID}/seen":                       {board.ActRunSeen, "run", "runID", ""},
+	"POST /api/scheduled/runs/{runID}/seen":                       {board.ActRunSeen, "run", "runID", ""},
+	"POST /api/sessions/record-agents":                            {board.ActAgentsRecord, "agent", "", ""},
+	"POST /api/board/{project}/goals":                             {board.ActGoalCreate, "goal", "", "project"},
+	"PATCH /api/board/{project}/goals/{goalID}":                   {board.ActGoalEdit, "goal", "goalID", "project"},
+	"POST /api/board/{project}/goals/{goalID}/driver":             {board.ActGoalDriver, "goal", "goalID", "project"},
+	"POST /api/board/{project}/goals/{goalID}/move":               {board.ActGoalMove, "goal", "goalID", "project"},
+	"POST /api/board/{project}/goal-requests/{requestID}/accept":  {board.ActGoalRequestAdd, "goal_request", "requestID", "project"},
+	"POST /api/board/{project}/goal-requests/{requestID}/decline": {board.ActGoalRequestNo, "goal_request", "requestID", "project"},
+	"POST /api/sessions/live/{name}/send":                         {board.ActChatSend, "agent", "name", ""},
+	"POST /api/sessions/live/{name}/waiting/send":                 {board.ActWaitSend, "agent", "name", ""},
 }
 
 // ActivityRoutes is the table's keys and the action each writes, for the census test.
@@ -67,6 +88,8 @@ func ActivityRecorder(bs *board.Store) func(http.Handler) http.Handler {
 				return
 			}
 			ww := chimw.NewWrapResponseWriter(w, r.ProtoMajor)
+			pend := &activityPending{}
+			r = r.WithContext(context.WithValue(r.Context(), activityPendingKey{}, pend))
 			next.ServeHTTP(ww, r)
 			status := ww.Status()
 			if status == 0 {
@@ -77,6 +100,12 @@ func ActivityRecorder(bs *board.Store) func(http.Handler) http.Handler {
 			}
 			rctx := chi.RouteContext(r.Context())
 			if rctx == nil {
+				return
+			}
+			if pend.set { // a handler that knows more than its route does (the body, a header) said which row this click is
+				if humanInputCaller(r) {
+					_ = bs.RecordActivity(context.WithoutCancel(r.Context()), activityMetaFor(r, pend.title, pend.note), pend.action, pend.kind, pend.item, "", pend.team)
+				}
 				return
 			}
 			ar, ok := activityRoutes[r.Method+" "+rctx.RoutePattern()]
@@ -99,6 +128,13 @@ func ActivityRecorder(bs *board.Store) func(http.Handler) http.Handler {
 					}
 				}
 			}
+			if ar.Kind == "goal" && team != "" {
+				if id, err := strconv.ParseInt(item, 10, 64); err == nil && id > 0 {
+					if g, err := bs.GetGoal(ctx, team, id); err == nil && g != nil {
+						title = g.Title
+					}
+				}
+			}
 			_ = bs.RecordActivity(ctx, activityMetaFor(r, title, ""), ar.Action, ar.Kind, item, "", team)
 		})
 	}
@@ -110,4 +146,19 @@ func (h *BoardHandler) recordWords(r *http.Request, action, kind, item, team, ti
 		return
 	}
 	_ = h.bs.RecordActivity(context.WithoutCancel(r.Context()), activityMetaFor(r, title, words), action, kind, item, "", team)
+}
+
+type activityPendingKey struct{}
+
+// activityPending is the row a handler asked for: the recorder writes it after the handler answered 2xx, for a person only, so the handler never checks the caller or the status itself.
+type activityPending struct {
+	set                                   bool
+	action, kind, item, team, title, note string
+}
+
+// noteActivity asks the recorder for a row for this request's click; the last call wins. Outside the recorder (a handler called on its own in a test) it does nothing.
+func noteActivity(r *http.Request, action, kind, item, team, title, note string) {
+	if p, _ := r.Context().Value(activityPendingKey{}).(*activityPending); p != nil {
+		*p = activityPending{true, action, kind, item, team, title, note}
+	}
 }

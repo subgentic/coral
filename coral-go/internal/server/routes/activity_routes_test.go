@@ -48,7 +48,7 @@ func TestEveryRecordedRouteWritesItsRowForAPersonOnly(t *testing.T) {
 			r.Use(ActivityRecorder(bs))
 			status := c.status
 			r.MethodFunc(method, pattern, func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(status) })
-			path := strings.NewReplacer("{project}", "p", "{taskID}", "7", "{name}", "agent-1").Replace(pattern)
+			path := strings.NewReplacer("{project}", "p", "{taskID}", "7", "{name}", "agent-1", "{id}", "abc", "{series_id}", "ser", "{sessionID}", "s-1", "{runID}", "9", "{goalID}", "3", "{requestID}", "4").Replace(pattern)
 			req := httptest.NewRequest(method, path, nil)
 			r.ServeHTTP(httptest.NewRecorder(), req)
 			rows, _, err := bs.ActivityPage(context.Background(), board.ActivityFilter{Limit: board.ActivityMaxLimit})

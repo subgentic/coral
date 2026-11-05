@@ -202,13 +202,13 @@ export async function currentTags(row) {
 }
 
 /** Add or remove the 'read' tag, keeping the other tags as they are now; the row stays in the list and the counts follow at once. Throws with the server's words when the save fails (the row keeps its tags). */
-export async function setReviewRead(row, read, { fresh = false } = {}) { // fresh: the row's tags were read a moment ago from its own team (a file's open), so the list is not walked again before the write
+export async function setReviewRead(row, read, { fresh = false, click = false } = {}) { // click: the Operator pressed Mark read or Mark unread (the server records it, #13609); opening a file marks it read with no click // fresh: the row's tags were read a moment ago from its own team (a file's open), so the list is not walked again before the write
     const current = fresh ? (row.tags || []) : await currentTags(row);
     if (current === null) { revision++; items = items.filter(a => a.reviewKey !== row.reviewKey); changed(); return; } // someone settled it meanwhile: nothing to write
     const rest = current.filter(t => t !== 'read');
     const tags = read ? [...rest, 'read'] : rest;
     const r = await boardFetch(row.team, `/artifacts/${encodeURIComponent(row.id)}/tags`, {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tags }),
+        method: 'PUT', headers: { 'Content-Type': 'application/json', ...(click ? { 'X-Coral-Click': 'read' } : {}) }, body: JSON.stringify({ tags }),
     });
     if (!r.ok) {
         const body = await r.json().catch(() => ({}));
