@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/subgentic/coral/internal/safego"
 	"io"
 	"os"
 	"os/exec"
@@ -148,6 +149,7 @@ func Serve(ctx context.Context, in io.Reader, out, errw io.Writer, cfg Config) i
 	done := make(chan struct{})
 	defer close(done)
 	go func() {
+		defer safego.Recover("heavy/ctx")
 		select {
 		case <-ctx.Done():
 			kill("stopped")
@@ -156,6 +158,7 @@ func Serve(ctx context.Context, in io.Reader, out, errw io.Writer, cfg Config) i
 	}()
 	if cfg.WatchStdin {
 		go func() { // the client keeps its end open while the command runs: its end ending is the connection ending
+			defer safego.Recover("heavy/stdin")
 			_, _ = io.Copy(io.Discard, in)
 			select {
 			case <-done:
@@ -167,16 +170,18 @@ func Serve(ctx context.Context, in io.Reader, out, errw io.Writer, cfg Config) i
 	var copiers sync.WaitGroup
 	copiers.Add(2)
 	go func() {
+		defer safego.Recover("heavy/errcopy")
 		defer copiers.Done()
 		_, _ = io.Copy(&guarded{w: errw, drop: func() { kill("connection dropped") }}, errR)
 	}()
 	go func() {
+		defer safego.Recover("heavy/outcopy")
 		defer copiers.Done()
 		_, _ = io.Copy(&guarded{w: out, drop: func() { kill("connection dropped") }}, outR)
 	}()
 	werr := cmd.Wait() // the command itself has ended (or been killed)
 	drained := make(chan struct{})
-	go func() { copiers.Wait(); close(drained) }()
+	go func() { defer safego.Recover("heavy/drain"); copiers.Wait(); close(drained) }()
 	select {
 	case <-drained:
 	case <-time.After(3 * time.Second): // something that left the group still holds the pipe: the output stops here
