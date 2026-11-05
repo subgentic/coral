@@ -578,7 +578,10 @@ type artifactSortKey struct {
 	ID       string
 }
 
-func keyOf(it teamArtifact) artifactSortKey {
+func keyOf(it teamArtifact) artifactSortKey { return keyOfP(&it) }
+
+// keyOfP is keyOf for a row in a list: no copy of the row (a row is large, and a walk of a big board made a key of every row for every page).
+func keyOfP(it *teamArtifact) artifactSortKey {
 	size := int64(-1)
 	if it.Size != nil {
 		size = *it.Size
@@ -752,21 +755,32 @@ func (h *BoardHandler) selectTeamArtifacts(r *http.Request, items []teamArtifact
 	if fast {
 		n = len(idx)
 	}
-	rowAt := func(i int) teamArtifact {
+	rowAt := func(i int) *teamArtifact {
 		if fast {
-			return items[idx[i]]
+			return &items[idx[i]]
 		}
-		return set[i]
+		return &set[i]
+	}
+	// The plain orders (newest, oldest) differ by the date, task, source and place before the id, whose key is a hash: two rows that differ in those are compared without hashing (a walk checked every row of a
+	// 20,000 row list for every page); equal there, the whole key decides, as before.
+	plain := q.sortName == "" || q.sortName == "newest" || q.sortName == "oldest"
+	tuple := func(it *teamArtifact) artifactSortKey {
+		return artifactSortKey{At: it.CreatedAt, TaskID: it.TaskID, Source: it.Source, Index: it.index}
+	}
+	outOfOrder := func(prev, next *teamArtifact) bool {
+		if plain {
+			if a, b := tuple(prev), tuple(next); a != b {
+				return artifactAfter(q.sortName, a, b)
+			}
+		}
+		return artifactAfter(q.sortName, keyOfP(prev), keyOfP(next))
 	}
 	inOrder := true // the list is kept newest first: a walk of its pages finds it in order, and does not sort 20,000 rows for every page (#13522); each row's key is made once for the check
 	if n > 1 {
-		var prev artifactSortKey = keyOf(rowAt(0))
 		for i := 1; i < n && inOrder; i++ {
-			next := keyOf(rowAt(i))
-			if artifactAfter(q.sortName, prev, next) { // the comparator's own test (less(i, i-1)): this row would sort before the one above it
+			if outOfOrder(rowAt(i-1), rowAt(i)) { // the comparator's own test (less(i, i-1)): this row would sort before the one above it
 				inOrder = false
 			}
-			prev = next
 		}
 	}
 	if !inOrder && fast { // out of order: the sort below needs the rows themselves (the rare case)
@@ -786,7 +800,7 @@ func (h *BoardHandler) selectTeamArtifacts(r *http.Request, items []teamArtifact
 	start := offset
 	if q.cursor != nil {
 		ck := artifactSortKey{At: q.cursor.At, Name: q.cursor.Name, Size: q.cursor.Size, Type: q.cursor.Type, Tags: q.cursor.Tags, Uploader: q.cursor.Uploader, TaskID: q.cursor.TaskID, Source: q.cursor.Source, Index: q.cursor.Index, ID: q.cursor.ID}
-		start = sort.Search(n, func(i int) bool { return artifactAfter(q.sortName, keyOf(rowAt(i)), ck) })
+		start = sort.Search(n, func(i int) bool { return artifactAfter(q.sortName, keyOfP(rowAt(i)), ck) })
 	}
 	if start > n {
 		start = n
