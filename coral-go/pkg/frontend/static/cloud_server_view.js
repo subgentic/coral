@@ -133,7 +133,7 @@ function updateBadge(e, id) {
 /** The table's version cell mark: "Update available" as plain text, not a button (a row has one action, opening the computer's page, where the Update button stays; #13258). */
 function updateMark(e) {
     const n = updateNotice(e);
-    return n ? h('span', { className: `chip server-update-badge server-update-${n.level}`, title: n.text, text: n.label }) : null;
+    return n ? h('span', { className: `chip server-update-badge server-update-${n.level}`, title: n.text, text: n.level === 'available' ? 'Update available' : n.label }) : null; // in words: the chip's own short 'Update' is for the page's button
 }
 
 /** Change a server's hub access (view | interact | launch; launch is "up to what the computer allows"). Immediate, no dialog. Focus stays on the select. */
