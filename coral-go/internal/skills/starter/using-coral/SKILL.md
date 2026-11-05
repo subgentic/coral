@@ -1,6 +1,6 @@
 ---
 name: using-coral
-description: "What Coral gives any agent: its docs, the approved skills, files shown as coral:// links, reaching the person, your own to-do list, and the board when you are on a team."
+description: "How any agent works with Coral: its docs, the approved skills, files shown as coral:// links, reaching the person, your own to-do list, and the board when you are on a team."
 metadata:
   published-by: Coral
   kind: how-to
