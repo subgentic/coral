@@ -248,7 +248,9 @@ const B = {
     await t.go("/inbox/needs")
     const row = t.page.locator(`text=${live.name} >> visible=true`).first()
     await row.waitFor({ state: "visible", timeout: 12000 })
-    await t.click(row); await sleep(2200)
+    // show how the file is reached: the Inbox list with the file on it, the cursor goes to the row and opens it
+    await t.cap("A file an agent wants reviewed waits in your Inbox."); await sleep(1500)
+    await t.move(row, 35); await sleep(500); await t.cap(""); await row.click(); await sleep(2200)
     await t.cap("A file to review, with everything it says.")
     await t.page.mouse.wheel(0, 500); await sleep(2500); await t.page.mouse.wheel(0, -500); await sleep(1000)
     await t.click(t.page.getByRole("button", { name: /^Comments/ })); await sleep(900)
@@ -279,10 +281,10 @@ const B = {
     if (!ok) { await shot(t, "c7-noreply"); try { console.error("THREAD: " + agent(live.agent, "coral-agent", "artifact", "comments", link).slice(0, 700)) } catch (e) { console.error("thread read failed") }; throw new Error("the agent's answer never showed on screen") }
     await sleep(1500)
     await t.cap("And the new version, with what changed.")   // the version chip, then Compare
-    await shot(t, "c7-before-chip"); await t.click(t.page.getByRole("button", { name: /v\d+ of \d+/ }).first()); await sleep(1200); await shot(t, "c7-after-chip")
-    await t.click(t.page.getByText("Open the latest").first()); await sleep(2000); await shot(t, "c7-latest")
+    await shot(t, "c7-before-chip"); await t.click(t.page.getByRole("button", { name: /v\d+ of \d+/ }).first()); await sleep(700); await shot(t, "c7-after-chip")
+    await t.click(t.page.getByText("Open the latest").first()); await sleep(1200); await shot(t, "c7-latest")
     await t.click(t.page.getByRole("button", { name: /v\d+ of \d+/ }).first()); await sleep(900); await shot(t, "c7-menu2")
-    await t.click(t.page.getByText(/Compare/).first()); await sleep(4500)
+    await t.click(t.page.getByText(/Compare/).first()); await sleep(2800)
     return t.finish()
   },
   async c8() { // the agent's changes: the expanded diff
