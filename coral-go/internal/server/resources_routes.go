@@ -45,6 +45,18 @@ func (s *Server) registerResources(r chi.Router, sess *routes.SessionsHandler) {
 	if sess != nil {
 		sess.SetResourceHook(hook)
 	}
+	s.goBackground(func(ctx context.Context) { // slots whose call ended while a background job ran go back when the job does, even with no API call to sweep them
+		t := time.NewTicker(15 * time.Second)
+		defer t.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-t.C:
+				hook.Sweep()
+			}
+		}
+	})
 	h := &routes.ResourcesHandler{M: mgr, Board: s.boardStore, Hook: hook}
 	if sess != nil {
 		h.ToolCall = sess.CurrentToolCall // an agent's hand claim is tied to the tool call it is made in (#13718)

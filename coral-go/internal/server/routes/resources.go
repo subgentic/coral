@@ -131,6 +131,7 @@ func (h *ResourcesHandler) Get(w http.ResponseWriter, r *http.Request) {
 type agentBody struct {
 	SubscriberID string `json:"subscriber_id"`
 	Note         string `json:"note"`
+	ParentPID    int    `json:"parent_pid,omitempty"` // a claim by an agent: the shell that ran coral-board (a job in the background keeps the slot while it runs, #13718)
 }
 
 // agent reads the body and the verified name of the caller.
@@ -166,7 +167,7 @@ func (h *ResourcesHandler) Claim(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if owner, ok := VerifiedSession(r.Context()); ok && owner != nil && h.Hook != nil && h.ToolCall != nil { // an agent's claim belongs to the tool call it is made in (#13718)
-		h.Hook.BindHand(owner.SessionID, who, name, h.ToolCall(owner.SessionID))
+		h.Hook.BindHand(owner.SessionID, who, name, h.ToolCall(owner.SessionID), body.ParentPID)
 	}
 	code := http.StatusOK
 	if !res.Granted {

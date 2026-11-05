@@ -27,6 +27,8 @@ type HookOptions struct {
 	ClaimWindow time.Duration
 	// Event is told of each auto-claim, refusal and release (the Operator's Activity); nil: nothing is told.
 	Event func(HookEvent)
+	// PidAlive says whether a process is running (a hand claim's shell, #13718); nil: the platform's own check.
+	PidAlive func(pid int) bool
 }
 
 // HookEvent says what the hook did. Pattern is the manager's pattern, never the command.
@@ -52,47 +54,103 @@ type autoHold struct {
 	window  time.Time       // before this a slot with no call yet is kept for its agent
 }
 
-// handBind is the tool call a hand claim (coral-board resource claim, run by an agent) was made in.
+// handBind is what a hand claim (coral-board resource claim, run by an agent) is tied to: the tool call it was made in and, for a job that outlives the call (Claude's run_in_background, Codex's background terminal),
+// the claiming shell's process.
 type handBind struct {
 	session string // the session id
 	call    string // the tool_use id
+	pid     int    // the shell that ran the claim (0: not known)
+	ended   bool   // the call (or its turn) has ended: the slot goes back as soon as the process is gone too
 }
 
-// BindHand ties the hold or place agent has of resource to the tool call it was claimed in (#13718, the Operator: "coral tracks the tool call the agent does and when it's finished, release the slot"). When that call ends, or
-// the agent's turn or session does, the slot goes back with no release command, so a forgotten release cannot hold the line. A claim with no tool call (the Operator's command line) is never bound: it keeps its lease.
-func (h *Hook) BindHand(session, agent, resource, toolUseID string) {
+// BindHand ties the hold or place agent has of resource to the tool call it was claimed in (#13718, the Operator: "coral tracks the tool call the agent does and when it's finished, release the slot"), and to the claiming
+// process pid. The slot goes back when the call has ended AND that process is gone: a foreground command ends both together, a background job keeps the slot for as long as it runs, a crashed agent's session frees it. A forgotten release
+// cannot hold the line. A claim with no tool call (the Operator's command line) is never bound: it keeps its lease. The lease still ends any claim.
+func (h *Hook) BindHand(session, agent, resource, toolUseID string, pid int) {
 	if h == nil || session == "" || toolUseID == "" {
 		return
 	}
 	h.mu.Lock()
-	h.hand[holdKey{resource, agent}] = handBind{session: session, call: toolUseID}
+	h.hand[holdKey{resource, agent}] = handBind{session: session, call: toolUseID, pid: pid}
 	h.mu.Unlock()
 }
 
-// releaseHands gives back the hand claims for which match is true.
-func (h *Hook) releaseHands(match func(handBind) bool, why string) {
+func (h *Hook) pidAlive(pid int) bool {
+	if pid <= 0 {
+		return false
+	}
+	if h.o.PidAlive != nil {
+		return h.o.PidAlive(pid)
+	}
+	return processAlive(pid)
+}
+
+// endHands says that the call (or, with call "", the whole turn) of the session has ended: each of its hand claims whose process is gone goes back now, the rest when their process is gone (Sweep).
+func (h *Hook) endHands(session, call, why string) {
 	h.mu.Lock()
 	var gone []holdKey
 	for k, b := range h.hand {
-		if match(b) {
-			gone = append(gone, k)
-			delete(h.hand, k)
+		if b.session != session || (call != "" && b.call != call) {
+			continue
 		}
+		if h.pidAlive(b.pid) {
+			b.ended = true
+			h.hand[k] = b
+			continue
+		}
+		gone = append(gone, k)
+		delete(h.hand, k)
 	}
 	h.mu.Unlock()
-	for _, k := range gone {
+	h.giveBack(gone, why)
+}
+
+func (h *Hook) giveBack(keys []holdKey, why string) {
+	for _, k := range keys {
 		if err := h.m.Queue().Release(k.resource, k.agent); err == nil { // already released by hand: nothing to do
 			h.event(HookEvent{Kind: "released", Resource: k.resource, Agent: k.agent, Why: why})
 		}
 	}
 }
 
-// TurnEnded gives back every hand claim of the session when its turn ends: the safety net for a tool call that never reported its end.
+// sweepHands gives back the hand claims that have ended and whose process is gone, and forgets those whose slot or place is no longer there (a lease ran out, a person kicked it).
+func (h *Hook) sweepHands() {
+	h.mu.Lock()
+	var gone []holdKey
+	for k, b := range h.hand {
+		if b.ended && !h.pidAlive(b.pid) {
+			gone = append(gone, k)
+			delete(h.hand, k)
+			continue
+		}
+		if st, err := h.m.Queue().Status(k.resource); err != nil || !hasEntry(st, k.agent) {
+			delete(h.hand, k)
+		}
+	}
+	h.mu.Unlock()
+	h.giveBack(gone, "job ended")
+}
+
+func hasEntry(st resourcequeue.Status, agent string) bool {
+	for _, e := range st.Holders {
+		if e.Agent == agent {
+			return true
+		}
+	}
+	for _, e := range st.Queue {
+		if e.Agent == agent {
+			return true
+		}
+	}
+	return false
+}
+
+// TurnEnded is the end of the session's turn: the safety net for a tool call that never reported its end.
 func (h *Hook) TurnEnded(session string) {
 	if h == nil {
 		return
 	}
-	h.releaseHands(func(b handBind) bool { return b.session == session }, "turn ended")
+	h.endHands(session, "", "turn ended")
 }
 
 // Hook is the shell hook's state: which auto-claims are held for which calls.
@@ -248,7 +306,7 @@ func (h *Hook) After(session, toolUseID string) {
 	if h == nil {
 		return
 	}
-	h.releaseHands(func(b handBind) bool { return b.session == session && b.call == toolUseID }, "call ended")
+	h.endHands(session, toolUseID, "call ended")
 	h.mu.Lock()
 	for k, ah := range h.hold {
 		if ah.session != session {
@@ -276,7 +334,16 @@ func (h *Hook) SessionEnded(session string) {
 	if h == nil {
 		return
 	}
-	h.releaseHands(func(b handBind) bool { return b.session == session }, "gone")
+	h.mu.Lock()
+	var gone []holdKey
+	for k, b := range h.hand {
+		if b.session == session {
+			gone = append(gone, k)
+			delete(h.hand, k)
+		}
+	}
+	h.mu.Unlock()
+	h.giveBack(gone, "gone") // the agent is gone: its jobs are not a reason to keep the slot
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	for k, ah := range h.hold {
@@ -292,6 +359,7 @@ func (h *Hook) Sweep() {
 	if h == nil {
 		return
 	}
+	h.sweepHands()
 	snap := h.snapshot()
 	h.mu.Lock()
 	defer h.mu.Unlock()

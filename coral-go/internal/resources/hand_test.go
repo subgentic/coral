@@ -16,7 +16,7 @@ func (g *hookRig) handClaim(session, agent, call string) {
 	res, err := g.m.Claim(context.Background(), "mac-heavy", agent, "by hand")
 	require.NoError(g.t, err)
 	_ = res
-	g.h.BindHand(session, agent, "mac-heavy", call)
+	g.h.BindHand(session, agent, "mac-heavy", call, 0)
 }
 
 func TestAHandClaimIsGivenBackWhenItsToolCallEnds(t *testing.T) {
@@ -74,4 +74,49 @@ func TestAClaimWithNoToolCallStaysUntilItsLease(t *testing.T) {
 	assert.Equal(t, []string{"Operator"}, g.holders())
 	g.add(31 * time.Minute)
 	assert.Empty(t, g.holders(), "its lease ends it, as before")
+}
+
+// A job run in the background outlives its tool call (Claude's run_in_background, Codex's background terminal): the claim is also bound to the claiming shell's process and goes back only when BOTH the call has ended AND that process is gone.
+func (g *hookRig) bgClaim(session, agent, call string, pid int) {
+	g.t.Helper()
+	_, err := g.m.Claim(context.Background(), "mac-heavy", agent, "bg")
+	require.NoError(g.t, err)
+	g.mu.Lock()
+	g.pids[pid] = true
+	g.mu.Unlock()
+	g.h.BindHand(session, agent, "mac-heavy", call, pid)
+}
+
+func (g *hookRig) die(pid int) { g.mu.Lock(); delete(g.pids, pid); g.mu.Unlock() }
+
+func TestABackgroundClaimLivesAsLongAsItsProcessAfterItsCallEnds(t *testing.T) {
+	g := newHookRig(t)
+	g.bgClaim("s-a", "Agent A", "call-1", 4242)
+	g.h.After("s-a", "call-1") // the call returned at once, the job goes on
+	g.h.Sweep()
+	assert.Equal(t, []string{"Agent A"}, g.holders(), "the job still runs: the slot stays")
+	g.h.TurnEnded("s-a") // the agent's turn ended while the job runs: still held
+	g.h.Sweep()
+	assert.Equal(t, []string{"Agent A"}, g.holders())
+	g.die(4242)
+	g.h.Sweep()
+	assert.Empty(t, g.holders(), "the job's process is gone and its call has ended: the slot goes back")
+}
+
+func TestAForegroundClaimEndsWithItsCallAndAProcessThatDiesFirstDoesNotFreeItEarly(t *testing.T) {
+	g := newHookRig(t)
+	g.bgClaim("s-a", "Agent A", "call-1", 11)
+	g.die(11) // the process is gone but the call has not ended (a slow PostToolUse): not freed yet
+	g.h.Sweep()
+	assert.Equal(t, []string{"Agent A"}, g.holders(), "the call has not ended")
+	g.h.After("s-a", "call-1")
+	assert.Empty(t, g.holders(), "both ended: freed at the call's end")
+}
+
+func TestACrashedSessionFreesABackgroundClaimWhateverItsProcess(t *testing.T) {
+	g := newHookRig(t)
+	g.bgClaim("s-a", "Agent A", "call-1", 77)
+	g.h.After("s-a", "call-1")
+	g.h.SessionEnded("s-a") // the agent is gone: its jobs are not a reason to keep the slot
+	assert.Empty(t, g.holders())
 }

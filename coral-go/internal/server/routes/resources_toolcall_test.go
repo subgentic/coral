@@ -56,3 +56,37 @@ func TestAnAgentsHandClaimEndsWithItsToolCallAndTheOperatorsDoesNot(t *testing.T
 	hook.TurnEnded("sid-a")
 	assert.Equal(t, 1, holders(), "a claim with no tool call keeps its lease")
 }
+
+// #13718: a claim made by a job in the background names the shell that ran it: its slot outlives the tool call while that process runs.
+func TestAClaimNamesItsShellSoABackgroundJobKeepsTheSlotAfterItsCall(t *testing.T) {
+	g := newResRig(t)
+	g.subscribe("alpha", "Dev A", "Developer", false)
+	alive := true
+	hook := resources.NewHook(g.mgr, resources.HookOptions{PidAlive: func(pid int) bool { return pid == 4321 && alive }})
+	h := &ResourcesHandler{M: g.mgr, Board: g.bs, Hook: hook, ToolCall: func(string) string { return "call-1" }}
+	r := chi.NewRouter()
+	r.Post("/api/resources/{name}/claim", h.Claim)
+	r.Put("/api/resources/{name}", h.Define)
+	r.Get("/api/resources/{name}", h.Get)
+	g.r = r
+	g.do("operator", "PUT", "/api/resources/mac-heavy", map[string]any{"slots": 1})
+	var buf bytes.Buffer
+	require.NoError(t, json.NewEncoder(&buf).Encode(map[string]any{"subscriber_id": "Dev A", "parent_pid": 4321}))
+	req := httptest.NewRequest("POST", "/api/resources/mac-heavy/claim", &buf)
+	req.Header.Set("Content-Type", "application/json")
+	req = withActor(req, Actor{Kind: ActorToken, Name: "Dev A", Session: "claude-sid-a"})
+	req = req.WithContext(context.WithValue(req.Context(), verifiedSessionKey{}, &store.SessionTokenOwner{SessionID: "sid-a", SessionName: "claude-sid-a"}))
+	rec := httptest.NewRecorder()
+	g.r.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code)
+	holders := func() int {
+		_, st := g.do("operator", "GET", "/api/resources/mac-heavy", nil)
+		return len(st["holders"].([]any))
+	}
+	hook.After("sid-a", "call-1") // the call returned at once, the job runs on
+	hook.Sweep()
+	assert.Equal(t, 1, holders(), "the job's shell is alive: the slot stays")
+	alive = false
+	hook.Sweep()
+	assert.Equal(t, 0, holders(), "the job ended: the slot went back")
+}

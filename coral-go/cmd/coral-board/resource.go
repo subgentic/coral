@@ -204,7 +204,7 @@ func resourceClaim(rest []string) {
 	note := fs.String("note", "", "why, for the others to read")
 	clihelp.ParseFlags(fs, rest[1:], func() string { return resourceUsageText })
 	me := resolveSubscriberID()
-	body := map[string]any{"subscriber_id": me, "note": flagText(*note, "note")}
+	body := map[string]any{"subscriber_id": me, "note": flagText(*note, "note"), "parent_pid": os.Getppid()} // the shell that runs this command: a job in the background keeps the slot while it runs
 	data, status, err := resourceCall("POST", "/"+name+"/claim", body)
 	if err != nil || (status != http.StatusOK && status != http.StatusAccepted) {
 		resourceFail("Could not claim "+rest[0], err, status, data)
