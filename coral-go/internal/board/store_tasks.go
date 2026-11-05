@@ -141,6 +141,7 @@ func (s *Store) CreateTaskWithOpts(ctx context.Context, project, title, body, pr
 	}
 	taskID, _ := result.LastInsertId()
 	// Keep new tasks unclaimable until configuration and dependencies are stored.
+	// #13566: not a writer of what the team's artifact list reads (lst_art_refs: the task's artifacts and the completion review's submitter, time and artifacts, and the columns of a task that has artifacts): a new task has no artifacts: the list only walks tasks that have some
 	if err := saveWorkflow(ctx, s.db, taskID, w); err != nil {
 		return nil, err
 	}
@@ -808,6 +809,7 @@ func snapshotClaimWorkflow(ctx context.Context, tx *sqlx.Tx, project string, tas
 		w.Instructions += "\n\nTeam working instructions:\n" + joinModeInstruction(ReviewTagRule, mode.Instructions) // every team, with no setting (#11424): what is the Operator's to look at, and what is not
 	}
 	w.Inputs = inputs
+	// #13566: not a writer of what the team's artifact list reads (lst_art_refs: the task's artifacts and the completion review's submitter, time and artifacts, and the columns of a task that has artifacts): the inputs seen at a claim: not artifacts
 	return saveWorkflow(ctx, tx, taskID, w)
 }
 

@@ -879,6 +879,7 @@ func (s *Store) RecordAmendIdentity(ctx context.Context, project string, id int6
 		w.AmendIdentity = map[string]string{}
 	}
 	w.AmendIdentity[fmt.Sprint(revision)] = identity
+	// #13566: not a writer of what the team's artifact list reads (lst_art_refs: the task's artifacts and the completion review's submitter, time and artifacts, and the columns of a task that has artifacts): the amendment's identity: not artifacts
 	if err := saveWorkflow(ctx, tx, id, w); err != nil {
 		return err
 	}
