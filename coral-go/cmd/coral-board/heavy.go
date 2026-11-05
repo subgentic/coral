@@ -159,20 +159,31 @@ func cmdHeavy() {
 	} else {
 		code = heavyRunLocal(runCtx, command)
 	}
+	wasLost := false
 	select {
 	case <-lost:
+		wasLost = true
 		fmt.Printf("[heavy] this run lost its slot of %s (kicked, or its lease ran out): it was stopped so it does not run beside the next agent's\n", *pool)
-		if code == 0 {
-			code = 1
-		}
 	default:
 	}
+	code = heavyFinalCode(code, wasLost)
 	release()
 	fmt.Printf("[heavy] %s given back (exit %d)\n", *pool, code)
 	if code != 0 {
 		exitFn(code)
 	}
 }
+
+// heavyFinalCode is the exit code of a run: the command's own, except that a run which lost its slot never reports success (it ran, or ended, without the machine being its own).
+func heavyFinalCode(code int, lostSlot bool) int {
+	if lostSlot && code == 0 {
+		return 1
+	}
+	return code
+}
+
+// heavyTestTransport lets a test put a stub where ssh would be (a package variable no agent can set); nil in use.
+var heavyTestTransport heavy.Transport
 
 // heavyRenewFloor is the shortest renew interval; a test shortens it.
 var heavyRenewFloor = 5 * time.Second
@@ -237,6 +248,9 @@ func heavyRunRemote(ctx context.Context, command string, timeout time.Duration) 
 		}
 	}
 	tr, ok := heavyTransportOverride()
+	if heavyTestTransport != nil {
+		tr, ok = heavyTestTransport, true
+	}
 	if !ok {
 		tr, err = heavy.SSHTransport(heavyMiniAlias)
 		if err != nil {
