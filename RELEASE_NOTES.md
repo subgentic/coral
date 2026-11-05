@@ -1,5 +1,144 @@
 # Release Notes
 
+## v2.0.49 — Comment on a video, set up Chief's checks, and a question before an agent works in your home folder
+
+### Changes
+
+#### What you will notice first
+
+- **Comment on a video.** A video in the review panel has a timeline: click it to comment at that moment, with comments sent in time order, and the bars stay put while you scroll.
+- **Set up Chief's checks on a screen.** A list of checks with an editor, a Run now button, the sources Chief can read, and a record of triggers you resolve or reopen.
+- **A question before an agent works in your whole home folder.** Starting or waking an agent in your home folder asks once, with a way to pick a folder or go ahead.
+- **More of an agent in its Info dialog.** A Skills row (what it loaded, and how many times) and a Memory row (its instruction and memory files, each opened read-only), next to the MCP row.
+- **Type icons on Needs you rows.** Each row has an icon at the left for what it is.
+- **A Codex agent whose model is refused shows as blocked, not idle.** The health check names the agent and the model and says to change the model or log Codex in again, and no nudges are typed into it meanwhile.
+
+#### Fixed
+
+- **An agent whose program has ended shows as ended** after one check, not two, and a wake restarts it instead of saying it is not asleep.
+- **An ended agent whose program you restarted by hand is awake again** on its own, only when it is that agent's own program running.
+- **Wake and sleep reach agents whose names have a slash.**
+- **On a phone, Send for review and Remove from review are on screen.** The Artifacts selection bar is one line, with the review actions first in the three-dot menu.
+- **Terminals no longer draw as a staircase after a restart,** and an agent's terminal keeps logging after a wake.
+- **Chief's Run now works over plain http on your home network,** a missing trigger says so, and a failed save stays visible.
+
+#### Through Coral Hub
+
+- **A file that already has a decision keeps it.** Through Coral Hub, a file that already has an approve, changes or deny decision won't take a different one, and can't be sent for review again or taken back.
+- **Older files can't be decided through Coral Hub.** Older files that have no digest, or are not on this computer, can't be approved, sent back for changes or denied through Coral Hub: open them on the computer.
+- **You can decide a computer's proposal through a self-hosted Hub,** and your own message to an agent shows as yours.
+- **Ignore and Undo on a question work through a self-hosted Hub** and are recorded in Activity.
+- **Opening one file reads only its own team's lists,** so it opens faster.
+- **A file's earlier versions show their comments through Coral Hub.**
+
+#### Known issues
+
+- **macOS: the tmux change (#12836) can make macOS ask once more, only after tmux restarts (a full restart of your agents or a reboot).** Coral's tmux server and guardian are now their own responsible process, so macOS may ask, per folder, whether `tmux` (or `coral`) may reach Documents, Desktop or Downloads. Full Disk Access you gave Coral.app does not carry over: if you gave Coral Full Disk Access, add `tmux` and `coral` too (both in `Coral.app/Contents/MacOS`). The staged tmux copy (each Coral version keeps its own under `tmux-bin/`) asks again after a tmux change. Say yes once; if you say no, nothing is lost, the agent just cannot read that folder.
+- **Windows: in-app update does not work from 2.0.0 through 2.0.6.** If you're on one of those, download and install the MSI by hand; from 2.0.7 on, in-app update works.
+- **macOS: a Coral of 2.0.5 or earlier cannot install updates in-app; install 2.0.6 or later by hand once.**
+- **OpenCode agents are tested on macOS and Linux; OpenCode on Windows is not yet tested end to end.**
+- **Hermes agents are still experimental.**
+- Setting up a computer over SSH is supported from a macOS or Linux hub, and is not yet tested from a Windows hub.
+
+#### For Coral Hub
+
+- **`release-diff` output** (`go run ./internal/releasediff/cmd/release-diff v2.0.48 7105770e6`):
+
+  ### Tunnel routes, v2.0.48 to 7105770e6
+
+  Changed (1)
+
+  - `POST /api/board/{project}/asks/{messageID}/close`: never to interact owner-only
+
+  ### Board settings keys (BoardSettings, HealthSettings included), v2.0.48 to 7105770e6
+
+  No key was added, removed or changed.
+
+  ### What Coral Hub compiles in or embeds, v2.0.48 to 7105770e6
+
+  `pkg/hubproxy`: 1 file of Go code changed (+8, -1)
+
+  - `coral-go/pkg/hubproxy/handler.go`: +8, -1
+  - test files, not compiled by the Hub: 1 file (+72, -0)
+
+  `pkg/hubowner`: 1 file of Go code changed (+12, -2)
+
+  - `coral-go/pkg/hubowner/hubowner.go`: +12, -2
+  - test files, not compiled by the Hub: 1 file (+13, -3)
+
+  `pkg/tunnel`: 2 files of Go code changed (+4, -1)
+
+  - `coral-go/pkg/tunnel/routes.go`: +3, -0
+  - `coral-go/pkg/tunnel/routes_query.go`: +1, -1
+  - test files, not compiled by the Hub: 5 files (+221, -0)
+
+  `pkg/frontend`: 45 files the Hub embeds changed (+817, -90)
+
+  - `coral-go/pkg/frontend/static/agent_actions.js`: +8, -2
+  - `coral-go/pkg/frontend/static/agent_info_sections.js`: +64, -0
+  - `coral-go/pkg/frontend/static/artifact_comment_ask.js`: +30, -16
+  - `coral-go/pkg/frontend/static/artifact_comment_composer.js`: +2, -2
+  - `coral-go/pkg/frontend/static/artifact_comment_send.js`: +1, -1
+  - `coral-go/pkg/frontend/static/artifact_comment_send_queue.js`: +20, -0
+  - `coral-go/pkg/frontend/static/artifact_comments.js`: +31, -10
+  - `coral-go/pkg/frontend/static/artifact_comments_api.js`: +3, -2
+  - `coral-go/pkg/frontend/static/artifact_preview.js`: +2, -2
+  - `coral-go/pkg/frontend/static/artifact_video_comments.js`: +92, -0
+  - `coral-go/pkg/frontend/static/artifact_viewer.js`: +3, -3
+  - `coral-go/pkg/frontend/static/chief_check_editor.js`: +70, -0
+  - `coral-go/pkg/frontend/static/chief_checks.js`: +155, -0
+  - `coral-go/pkg/frontend/static/chief_checks_api.js`: +19, -0
+  - `coral-go/pkg/frontend/static/chief_checks_model.js`: +36, -0
+  - `coral-go/pkg/frontend/static/chief_look.js`: +10, -1
+  - `coral-go/pkg/frontend/static/chief_setup.js`: +3, -0
+  - `coral-go/pkg/frontend/static/css/artifact-video-comments.css`: +33, -0
+  - `coral-go/pkg/frontend/static/css/chief-checks.css`: +39, -0
+  - `coral-go/pkg/frontend/static/css/components.css`: +6, -0
+  - `coral-go/pkg/frontend/static/css/data_table.css`: +19, -0
+  - `coral-go/pkg/frontend/static/css/needs_phone.css`: +1, -1
+  - `coral-go/pkg/frontend/static/css/popout.css`: +1, -0
+  - `coral-go/pkg/frontend/static/css/session.css`: +1, -0
+  - `coral-go/pkg/frontend/static/data_table.js`: +4, -3
+  - `coral-go/pkg/frontend/static/display_activity_hint.js`: +1, -1
+  - `coral-go/pkg/frontend/static/home_folder_ask.js`: +18, -0
+  - `coral-go/pkg/frontend/static/inbox_link.js`: +1, -1
+  - `coral-go/pkg/frontend/static/inbox_proposals.js`: +3, -0
+  - `coral-go/pkg/frontend/static/inbox_reviews.js`: +14, -9
+  - `coral-go/pkg/frontend/static/inbox_sidebar.js`: +12, -10
+  - `coral-go/pkg/frontend/static/inbox_tab.js`: +2, -2
+  - `coral-go/pkg/frontend/static/info_dialog.js`: +15, -0
+  - `coral-go/pkg/frontend/static/launch_core.js`: +10, -2
+  - `coral-go/pkg/frontend/static/needs_filters.js`: +12, -0
+  - `coral-go/pkg/frontend/static/popout.js`: +4, -3
+  - `coral-go/pkg/frontend/static/proposals_state.js`: +23, -8
+  - `coral-go/pkg/frontend/static/server_base.js`: +10, -0
+  - `coral-go/pkg/frontend/static/session_header_updates.js`: +1, -1
+  - `coral-go/pkg/frontend/static/session_rows.js`: +2, -2
+  - `coral-go/pkg/frontend/static/session_state.js`: +19, -0
+  - `coral-go/pkg/frontend/static/team_artifacts_page.js`: +4, -1
+  - `coral-go/pkg/frontend/static/team_task_artifacts.js`: +7, -6
+  - `coral-go/pkg/frontend/static/welcome_swipe.js`: +2, -1
+  - `coral-go/pkg/frontend/templates/includes/modals.html`: +4, -0
+  - test files, not compiled by the Hub: 1 file (+2, -1)
+
+  `agent_docs`: 1 file the Hub embeds changed (+1, -1)
+
+  - `coral-go/agent_docs/board.md`: +1, -1
+
+  Unchanged: `pkg/redact`.
+
+  ### Coral packages compiled into the Hub through its imports, v2.0.48 to 7105770e6
+
+  Unchanged: `internal/fsreplace`, `internal/httputil`, `internal/logsafe`, `internal/safego`, `internal/secfile`, `internal/secrets`, `pkg/redact/betterleaks`.
+
+- **Changed through the tunnel:** `POST /api/board/{project}/asks/{messageID}/close` is now reachable at interact, owner-only (it was never). The connector admits `series=1` on `GET /api/artifacts/{id}/comments`.
+- **Ready signals, hooks, tokens, framed paths**: unchanged.
+
+#### For developers and releases
+
+- Test-only fixes after the first gate: the join census lists `videoCommentArtifact` and `storedDigestMatches`, the CI queue tool's tests turn telemetry off, the launch request pins know `home_folder_ask`, and the phone Needs you, bulk-actions, whole-document-comment and banner suites follow the new layouts.
+- The static-tree budget is raised to 5,824,512 bytes (the tree plus 64 KiB).
+
 ## v2.0.48 — Send a file to Needs you, Sleep an agent with no terminal, and Chief in the menus
 
 ### Changes
