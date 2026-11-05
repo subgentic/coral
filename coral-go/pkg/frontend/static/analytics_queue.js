@@ -19,7 +19,8 @@ export function durWords(seconds) {
 const minWords = (m) => (m < 0 ? 'no samples' : durWords(m * 60));
 const perDay = (n, unit) => `${String(Math.round(n * 10) / 10).replace(/\.0$/, '')} ${unit} a day`;
 /** A side's number: a rate once the side spans a day, else its total "so far" (twenty minutes of data says nothing about a day). */
-const rateWords = (sp, total, perDayValue, unit) => (sp.days >= 1 ? perDay(perDayValue || 0, unit) : `${total || 0} ${unit} so far`);
+const unitFor = (n, unit) => (unit === 'posts' && Number(n) === 1 ? 'post' : unit);
+const rateWords = (sp, total, perDayValue, unit) => (sp.days >= 1 ? perDay(perDayValue || 0, unitFor(perDayValue, unit)) : `${total || 0} ${unitFor(total, unit)} so far`);
 const pctWords = (p) => `${String(Math.round(p * 10) / 10).replace(/\.0$/, '')}%`;
 const say = (text, status = false) => { const p = el('p', 'atab-say', text); if (status) p.setAttribute('role', 'status'); return p; }; // role=status only on the lines that appear when something is empty or went wrong: the explanations stay quiet when the period changes
 

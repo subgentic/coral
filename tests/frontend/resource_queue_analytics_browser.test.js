@@ -117,7 +117,7 @@ const BODY = () => ({
             await waitFor(`/7 min so far/.test(document.getElementById('cost-resource-queue').textContent)`, 'so far', 8000);
             const all = await text('#cost-resource-queue');
             assert.ok(!/350/.test(all) && !/50 posts a day/.test(all), 'no extrapolated rate: ' + all.slice(0, 400));
-            assert.match(all, /1 posts so far/); assert.ok(!/% less than before|% more than before/.test(all), 'no change is claimed from minutes of data');
+            assert.match(all, /1 post so far/); assert.ok(!/1 posts/.test(all), 'singular for one'); assert.ok(!/% less than before|% more than before/.test(all), 'no change is claimed from minutes of data');
             assert.match(all, /totals only, a rate needs a day/);
             await set(BODY()); await refresh();
             await waitFor(`/5 min a day/.test(document.getElementById('cost-resource-queue').textContent)`, 'back', 8000);
