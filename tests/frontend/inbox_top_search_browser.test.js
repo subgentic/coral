@@ -3,6 +3,7 @@
 // What is typed there filters the page as the old box did. At 1280 nothing changes: the page keeps its own box and the top bar has no search field. Drives Chrome over CDP on the isolated dev server.
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 const FOLDERS = [['needs', 'Search needs you'], ['tasks', 'Search tasks'], ['goals', 'Search goals']];
 
 (async () => {
@@ -17,7 +18,7 @@ const FOLDERS = [['needs', 'Search needs you'], ['tasks', 'Search tasks'], ['goa
         for (const [label, w, h, mobile] of [['390', 390, 844, true], ['1280', 1280, 800, false]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady(ev);
             await ev(`(() => { window.__m.add('Frontend Dev', 'A', 4, { sleeping: false, board_project: 'team-a', session_id: 'fe-id' }); window.__m.add('Backend Dev', 'B', 4, { sleeping: false, board_project: 'team-a', session_id: 'be-id' }); return true; })()`);
             await waitFor(`(window.__qaState && window.__qaState.liveSessions || []).length === 2`, 'two agents', 8000);
             await ev(`(async () => { window.__qaState.liveSessions = window.__qaState.liveSessions.map(s => ({ ...s, waiting_for_input: true, waiting_kind: 'permission', waiting_since: new Date(Date.now() - 180000).toISOString() })); (await import((window.__coralStatic || '/static/') + 'inbox_tab.js')).updateInboxTab(); return true; })()`); // two agents wait, so Needs you has a page
