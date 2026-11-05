@@ -9,6 +9,7 @@ import (
 
 	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/ptr"
+	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/pkg/tunnel"
 )
@@ -54,7 +55,7 @@ func (h *SessionsHandler) agentReplyArtifactComment(w http.ResponseWriter, r *ht
 	// The agent must be the session that was asked: live, awake, on the comment's board, and the board not paused.
 	ls, err := h.ss.GetLiveSession(r.Context(), caller.Subject)
 	if err != nil || ls == nil || ls.IsSleeping == 1 || ls.IsArchived == 1 || t.Board == "" || ptr.Value(ls.BoardName) != t.Board {
-		commentRefuse(w, http.StatusForbidden, "not_asked", "this agent was not asked into that thread")
+		commentRefuse(w, http.StatusForbidden, "not_asked", notAskedWords)
 		return
 	}
 	if h.boardHandler != nil && h.boardHandler.IsPaused(t.Board) {
@@ -77,11 +78,15 @@ func (h *SessionsHandler) agentReplyArtifactComment(w http.ResponseWriter, r *ht
 	if !h.commentRate(w, caller) {
 		return
 	}
-	// The one atomic check, which also counts this reply.
+	// The one atomic check, which also counts this reply. An agent that was never asked but uploaded the file replies on its own file without an ask row (#13762, below).
+	viaUpload := false
 	switch err := h.ss.ReserveAskReply(r.Context(), t.ID, caller.Subject, len(body), time.Now()); {
 	case errors.Is(err, store.ErrAskNone):
-		commentRefuse(w, http.StatusForbidden, "not_asked", "this agent was not asked into that thread")
-		return
+		if !h.uploaderMayReply(r, id, *ls, t) {
+			commentRefuse(w, http.StatusForbidden, "not_asked", notAskedWords)
+			return
+		}
+		viaUpload = true
 	case errors.Is(err, store.ErrAskClosed):
 		commentRefuse(w, http.StatusConflict, "ask_ended", "the ask has ended")
 		return
@@ -97,24 +102,68 @@ func (h *SessionsHandler) agentReplyArtifactComment(w http.ResponseWriter, r *ht
 		return
 	}
 	name := cleanCommentName(agentLabel(*ls))
-	c, err := h.ss.CreateArtifactComment(r.Context(), store.ArtifactComment{ArtifactID: id, Board: t.Board, ParentID: &t.ID, Body: body,
-		AuthorIssuer: caller.Issuer, AuthorSubject: caller.Subject, AuthorName: name, AuthorKind: commentCallerAgent})
+	reply := store.ArtifactComment{ArtifactID: id, Board: t.Board, ParentID: &t.ID, Body: body,
+		AuthorIssuer: caller.Issuer, AuthorSubject: caller.Subject, AuthorName: name, AuthorKind: commentCallerAgent}
+	var c store.ArtifactComment
+	if viaUpload {
+		c, err = h.ss.CreateUploaderReply(r.Context(), reply, time.Now()) // no ask row was reserved: the caps are counted with the insert
+		switch {
+		case errors.Is(err, store.ErrAskReplyCap):
+			commentRefuse(w, http.StatusConflict, "reply_limit", "this agent has left the most replies it may in that thread")
+			return
+		case errors.Is(err, store.ErrUploaderHourCap):
+			commentRefuse(w, http.StatusTooManyRequests, "reply_rate", "this agent has left the most replies it may on that file in an hour: wait, or ask the Operator to press Send to agent on a comment")
+			return
+		}
+	} else {
+		c, err = h.ss.CreateArtifactComment(r.Context(), reply)
+	}
+	release := func() {
+		if !viaUpload {
+			h.ss.ReleaseAskReply(r.Context(), t.ID, caller.Subject)
+		}
+	}
 	switch {
 	case errors.Is(err, store.ErrCommentEmpty):
-		h.ss.ReleaseAskReply(r.Context(), t.ID, caller.Subject)
+		release()
 		errBadRequest(w, "a reply needs some text")
 	case errors.Is(err, store.ErrTooManyComments), errors.Is(err, store.ErrBadParent), errors.Is(err, store.ErrCommentTooLong):
-		h.ss.ReleaseAskReply(r.Context(), t.ID, caller.Subject)
+		release()
 		commentRefuse(w, http.StatusConflict, "reply_not_kept", "the reply could not be kept")
 	case err != nil:
-		h.ss.ReleaseAskReply(r.Context(), t.ID, caller.Subject)
+		release()
 		slog.Warn("[artifact comments] agent reply failed", "error", err)
 		errInternalServer(w, "could not save the reply")
 	default:
 		if h.bs != nil {
 			h.bs.NoteAllArtifactsChanged()
 		}
-		slog.Info("[artifact comments] agent replied into an asked thread", "artifact", id, "comment", t.ID, "agent", name, "board", t.Board)
+		slog.Info("[artifact comments] agent replied into a thread", "via", map[bool]string{true: "its own upload (never asked)", false: "an ask"}[viaUpload], "artifact", id, "comment", t.ID, "agent", name, "board", t.Board)
 		writeJSON(w, http.StatusCreated, h.commentView(caller, c, false, false))
 	}
+}
+
+// notAskedWords is the refusal an agent gets for a thread it has no way into: the Operator has not sent it the comment and it did not upload the file.
+const notAskedWords = "this agent was not asked into that thread: ask the Operator to press Send to agent on that comment"
+
+// uploaderMayReply says an agent that was never asked into a thread may still reply on a file it uploaded (#13762, Security's limits): the verified agent (the session of this request) must hold the file's own upload
+// record, be a subscriber of the comment's board with its live session on it, and the thread must be open (not deleted, not resolved) and top-level. It opens no ask and wakes no agent; the caps are the store's.
+func (h *SessionsHandler) uploaderMayReply(r *http.Request, id string, ls store.LiveSession, t store.ArtifactComment) bool {
+	if t.ResolvedAt != nil || t.DeletedAt != nil || t.ParentID != nil || t.Board == "" || h.bs == nil {
+		return false
+	}
+	if _, ok := readUploadRecord(h.cfg.CoralDir(), ls.SessionID, id); !ok {
+		return false
+	}
+	subs, err := h.bs.ListSubscribers(r.Context(), t.Board)
+	if err != nil {
+		return false
+	}
+	self := naming.SessionName(ls.AgentType, ls.SessionID)
+	for _, sub := range subs {
+		if sub.SessionName == self {
+			return true
+		}
+	}
+	return false
 }

@@ -1,6 +1,7 @@
 package store
 
 import (
+	"sync"
 	"context"
 	"database/sql"
 	"errors"
@@ -12,6 +13,8 @@ import (
 // The limits of an ask, enforced here whatever calls it.
 const (
 	AskTTL           = 24 * time.Hour // an ask is open this long
+	// UploaderRepliesPerHour is how many replies an agent may leave on ONE file in an hour when it was never asked into the thread, because it uploaded the file (#13762, Security's cap).
+	UploaderRepliesPerHour = 10
 	MaxAskReplies    = 5              // replies one agent may leave in one asked thread
 	MaxAskReplyBytes = 8 << 10        // bytes in one reply
 )
@@ -23,6 +26,8 @@ var (
 	ErrAskClosed = errors.New("the ask has ended")
 	// ErrAskReplyCap: the agent has left all the replies it may.
 	ErrAskReplyCap = errors.New("the agent has left the most replies it may in that thread")
+	// ErrUploaderHourCap: an agent that was never asked into a thread, replying on a file it uploaded (#13762), has left the most replies it may on that file in an hour.
+	ErrUploaderHourCap = errors.New("the agent has left the most replies it may on that file in an hour")
 	// ErrAskReplyTooBig: a reply over MaxAskReplyBytes.
 	ErrAskReplyTooBig = errors.New("the reply is too long")
 )
@@ -190,4 +195,33 @@ func (s *SessionStore) MarkAskNudged(ctx context.Context, askID int64, now time.
 func (s *SessionStore) ClearAskNudged(ctx context.Context, askID int64) error {
 	_, err := s.db.ExecContext(ctx, `UPDATE artifact_comment_asks SET nudged_at = NULL WHERE id = ? AND replies = 0`, askID)
 	return err
+}
+
+// uploaderReplyMu makes the counting and the insert of an uploader's reply one step: the caps below hold for replies at once (the asked agent's reply counts the same way, in ReserveAskReply).
+var uploaderReplyMu sync.Mutex
+
+// CreateUploaderReply stores the reply of an agent that uploaded the file and was never asked into the thread (#13762, Security's six limits): at most MaxAskReplies replies of that agent in the thread, at most
+// UploaderRepliesPerHour on the file in an hour; the first over is ErrAskReplyCap, the second ErrUploaderHourCap. It opens no ask row. The caller has checked who the agent is and that the thread is open.
+func (s *SessionStore) CreateUploaderReply(ctx context.Context, c ArtifactComment, now time.Time) (ArtifactComment, error) {
+	if c.ParentID == nil {
+		return ArtifactComment{}, ErrBadParent
+	}
+	uploaderReplyMu.Lock()
+	defer uploaderReplyMu.Unlock()
+	var inThread int
+	if err := s.db.GetContext(ctx, &inThread, `SELECT COUNT(*) FROM artifact_comments WHERE parent_id = ? AND author_kind = 'agent' AND author_subject = ? AND deleted_at IS NULL`, *c.ParentID, c.AuthorSubject); err != nil {
+		return ArtifactComment{}, err
+	}
+	if inThread >= MaxAskReplies {
+		return ArtifactComment{}, ErrAskReplyCap
+	}
+	var inHour int
+	since := now.Add(-time.Hour).UTC().Format(time.RFC3339Nano)
+	if err := s.db.GetContext(ctx, &inHour, `SELECT COUNT(*) FROM artifact_comments WHERE artifact_id = ? AND author_kind = 'agent' AND author_subject = ? AND created_at >= ?`, c.ArtifactID, c.AuthorSubject, since); err != nil {
+		return ArtifactComment{}, err
+	}
+	if inHour >= UploaderRepliesPerHour {
+		return ArtifactComment{}, ErrUploaderHourCap
+	}
+	return s.CreateArtifactComment(ctx, c)
 }
