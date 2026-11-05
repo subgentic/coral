@@ -63,10 +63,21 @@ const { coralReady } = require('./helpers/wait');
             // Home's ⋯: 44 px, each row and each team
             const k = await ev(`[...document.querySelectorAll('#mobile-session-list .sidebar-kebab-btn')].filter(b => b.getClientRects().length).map(b => { const r = b.getBoundingClientRect(); return [b.getAttribute('aria-label'), Math.round(r.width), Math.round(r.height)]; })`);
             assert.ok(k.length >= 2 && k.every(x => x[1] >= 44 && x[2] >= 44), `${tag}: Home's ⋯ buttons are 44 px: ${JSON.stringify(k)}`);
-            // Inbox
+            // Inbox below 640 px: menu buttons replace hidden tabs and expose the current folder.
             await ev(`document.querySelector('.phone-nav-slot[data-phone-nav=nav-inbox]').click(); true`);
-            await waitFor(`!!document.querySelector('#group-table-view [role=tab]') && document.querySelector('#group-table-view [role=tab]').getClientRects().length > 0`, `${tag}: the Inbox strip`, 10000);
-            await probe('Inbox', tag);
+            await waitFor(`document.getElementById('group-table-title')?.getClientRects().length > 0`, `${tag}: Inbox`, 10000);
+            assert.equal(await ev(`[...document.querySelectorAll('#group-table-view [role=tab]')].filter(e => e.getClientRects().length).length`), 0, `${tag}: no hidden-strip tab is visible`);
+            await ev(`[...document.querySelectorAll('.phone-menu-btn')].find(e => e.getClientRects().length).click(); true`);
+            await waitFor(`!!document.querySelector('#nav-more-menu:not([hidden]) .nav-drawer-folder[aria-current="true"]')`, `${tag}: current folder in menu`, 6000);
+            assert.equal(await ev(`document.querySelectorAll('#nav-more-menu .nav-drawer-folder[aria-current="true"]').length`), 1, `${tag}: one current menu folder`);
+            await ev(`[...document.querySelectorAll('#nav-more-menu .nav-drawer-folder')].find(e => e.querySelector('.nav-drawer-label').textContent === 'Goals').focus(); true`);
+            await press('Enter', 13);
+            await waitFor(`document.getElementById('group-table-title')?.textContent === 'Goals'`, `${tag}: Enter on the menu button opens Goals`, 8000);
+            // Keep the strip's roving-focus contract at the width that still draws it.
+            await Emulation.setDeviceMetricsOverride({ width: 700, height: 844, deviceScaleFactor: 1, mobile: true });
+            await waitFor(`!!document.querySelector('#group-table-view [role=tab]') && document.querySelector('#group-table-view [role=tab]').getClientRects().length > 0`, `${tag}: 700 px Inbox strip`, 10000);
+            await probe('700 px Inbox', tag);
+            await Emulation.setDeviceMetricsOverride({ width: w, height: 844, deviceScaleFactor: 1, mobile: true });
             // Automations
             await ev(`window.switchNavTab('automations'); true`);
             await waitFor(`!!document.querySelector('#group-table-view [role=tab]') && document.querySelector('#group-table-view [aria-label="Automations folders"]')`, `${tag}: the Automations strip`, 10000);
