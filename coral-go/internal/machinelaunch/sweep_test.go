@@ -192,7 +192,8 @@ func TestSweepAFailedDeleteIsPrintedAndNotClean(t *testing.T) {
 	}
 }
 
-// The package has no delete-by-tag call: a delete request names a droplet id and never a tag (limit 2).
+// The package has no delete-by-tag call: a delete request names a droplet id and never a tag (limit 2). The one delete that names a tag is of the TAG ITSELF (DELETE /tags/coral-launch-...: the label a
+// launch made for its firewall, #13592), which removes no droplet; it is allowed on that exact path only, and deleteLaunchTag refuses any name that does not start with coral-launch-.
 func TestNoDeleteByTagAnywhere(t *testing.T) {
 	files, _ := filepath.Glob("*.go")
 	for _, f := range files {
@@ -204,6 +205,9 @@ func TestNoDeleteByTagAnywhere(t *testing.T) {
 			t.Fatal(err)
 		}
 		for i, line := range strings.Split(string(b), "\n") {
+			if strings.Contains(line, "MethodDelete") && strings.Contains(line, `"/tags/"+name`) && strings.Contains(line, "delete a tag") {
+				continue
+			}
 			if strings.Contains(line, "MethodDelete") && (strings.Contains(strings.ToLower(line), "tag") || strings.Contains(line, "?")) {
 				t.Errorf("%s:%d: a delete that names a tag or a query: %s", f, i+1, strings.TrimSpace(line))
 			}
