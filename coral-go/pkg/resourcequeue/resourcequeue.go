@@ -36,7 +36,7 @@ type Resource struct {
 	Machine  string        // where it is, for people to read; not interpreted
 	MaxLease time.Duration // a claim is held this long unless renewed (0: DefaultLease)
 	Allowed  []string      // agents that may claim it; empty: everyone
-	Members  []string      // a pool (#13719): the resources whose slots this one hands out, in the order they are tried; a pool has no slots of its own, no Match and is claimed by hand until the shell hook knows machines
+	Members  []string      // a pool (#13719): the resources whose slots this one hands out, in the order they are tried; a pool has no slots of its own; its Match makes the shell hook claim the pool (a grant on another machine is told to the agent, #13751)
 	Match    []string      // shell commands that claim it by themselves (the hook, #13645): each a list of words that must appear in order in one simple command, such as "go test ./..."; empty: no hook
 }
 
@@ -254,7 +254,7 @@ func ValidMatch(match []string) error {
 // Define makes a resource, or changes the slots, machine, lease and allowed list of one that exists. More slots grant the waiting at once; fewer never take a slot from a holder (the holds run out).
 func (q *Queue) Define(r Resource) error {
 	pool := len(r.Members) > 0
-	if r.Key == "" || (!pool && r.Slots < 1) || (pool && (r.Slots != 0 || len(r.Match) > 0)) {
+	if r.Key == "" || (!pool && r.Slots < 1) || (pool && r.Slots != 0) {
 		return ErrBadResource
 	}
 	if err := ValidMatch(r.Match); err != nil {

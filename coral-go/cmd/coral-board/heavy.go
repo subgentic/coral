@@ -33,9 +33,7 @@ Commands for the Mac only (those that name ~/.coral or port 8420) are refused on
 const heavyMiniAlias = "coral-heavy-mini"
 
 // heavyOnMini says whether a pool grant is the mini (by the member's name or its machine).
-func heavyOnMini(member, machine string) bool {
-	return strings.EqualFold(member, "mini") || strings.EqualFold(machine, "mini")
-}
+func heavyOnMini(member, machine string) bool { return heavy.OnMini(member, machine) }
 
 var heavyWord = regexp.MustCompile(`^[A-Za-z0-9_./:=@%+,-]+$`)
 
