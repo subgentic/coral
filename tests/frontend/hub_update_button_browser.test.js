@@ -27,9 +27,13 @@ const { coralReady } = require('./helpers/wait');
             const host = document.createElement('div'); host.id = 'ub-host'; document.body.appendChild(host); return true; })()`);
         await ev(`import(${S} + 'state.js').then(m => { m.state.hub = true; m.state.servers = [{ id: 'm1', status: 'online', update: 'available', latest_coral: '1.4.131', coral_version: '1.4.100' }]; return true; })`);
         await ev(`import(${S} + 'servers.js').then(m => m.renderServersInto(document.getElementById('ub-host'), { source: 'cloud' }))`);
-        await waitFor(`!!document.querySelector('#ub-host .server-update-badge')`, 'the update badge is on the row', 8000);
-        assert.equal(await ev(`document.querySelector('#ub-host .server-update-badge').tagName`), 'BUTTON', 'the badge is a button, not a link');
-        const press = () => ev(`document.querySelector('#ub-host .server-update-badge').click(); true`);
+        // the table's version cell shows a plain mark (a row has one action: it opens the page); the Update button is on the computer's page
+        await waitFor(`!!document.querySelector('#ub-host .server-update-badge')`, 'the update mark is on the row', 8000);
+        assert.equal(await ev(`document.querySelector('#ub-host tr.cs-row .server-update-badge').tagName`), 'SPAN', 'the row shows a mark, not a second button');
+        await ev(`document.querySelector('#ub-host .cs-toggle').click(); true`);
+        await waitFor(`!!document.querySelector('#ub-host .servers-page button.server-update-badge')`, 'the Update button is on the computer page', 8000);
+        assert.equal(await ev(`document.querySelector('#ub-host .servers-page .server-update-badge').tagName`), 'BUTTON', 'the badge is a button, not a link');
+        const press = () => ev(`document.querySelector('#ub-host .servers-page .server-update-badge').click(); true`);
         const dialogOpen = () => ev(`(() => { const d = document.getElementById('update-confirm-modal'); return !!d && d.style.display !== 'none'; })()`);
         const closeDialog = () => ev(`(() => { const d = document.getElementById('update-confirm-modal'); if (d) d.style.display = 'none'; window.__calls.length = 0; return true; })()`);
 

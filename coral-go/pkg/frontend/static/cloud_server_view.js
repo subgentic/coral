@@ -130,6 +130,12 @@ function updateBadge(e, id) {
         title: n.text, 'aria-label': n.text, text: n.label });
 }
 
+/** The table's version cell mark: "Update available" as plain text, not a button (a row has one action, opening the computer's page, where the Update button stays; #13258). */
+function updateMark(e) {
+    const n = updateNotice(e);
+    return n ? h('span', { className: `chip server-update-badge server-update-${n.level}`, title: n.text, text: n.label }) : null;
+}
+
 /** Change a server's hub access (view | interact | launch; launch is "up to what the computer allows"). Immediate, no dialog. Focus stays on the select. */
 async function setAccess(s, value) {
     await call(s.id, 'PATCH', { access_mode: value });
@@ -304,7 +310,7 @@ function serversTable(shown) {
         name: s => nameCell(s, live(s), s.online === true),
         // The dot beside the name is the computer's health (#3446): when it is not fine the words say so here, beside Online, not only in the dot's tooltip (#12878: an amber dot was unexplained).
         status: s => { if (s.online !== true) return 'Offline'; const hl = live(s).machine_health; return hl && (hl.status === 'busy' || hl.status === 'stalled') ? `Online, ${healthStatusText(hl)}` : 'Online'; },
-        version: s => { const v = serverVersion(live(s)), upd = updateBadge(live(s), s.id), f = document.createDocumentFragment(); f.append(h('span', { text: v ? v : '—' })); if (upd) f.append(' ', upd); return f; },
+        version: s => { const v = serverVersion(live(s)), upd = updateMark(live(s)), f = document.createDocumentFragment(); f.append(h('span', { text: v ? v : '—' })); if (upd) f.append(' ', upd); return f; },
         agents: s => String(serverAgentCount(live(s))),
         needs: s => { const n = needsCount(s); if (!n) return ''; const e = h('span', { className: 'cs-needs', text: String(n) }); e.title = `${n} agent${n === 1 ? '' : 's'} waiting for you`; return e; },
         seen: s => seenWords(s),

@@ -1494,6 +1494,7 @@ body .terminal-header { flex-wrap: wrap; height: auto; min-height: 36px; row-gap
 }
 .server-update-badge.server-update-required { color: var(--warning); }
 .server-update-badge:hover { text-decoration: underline; }
+button.server-update-badge { background: transparent; font: inherit; cursor: pointer; } /* the Update button (#13258): the badge look, not the browser's grey button */
 .cs-update-required { color: var(--warning); }
 /* The hub relaunch's "Updating" badge (#5355): read-only, a word, not a link or a control; the row keeps its height. */
 .server-relaunch-badge { margin-left: var(--space-xs); white-space: nowrap; color: var(--text-primary); background: var(--bg-hover); border: 1px solid var(--border); cursor: default; }
