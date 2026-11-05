@@ -91,6 +91,39 @@ async function httpJson(method, path, body, headers = {}) {
             { kind: 'ask', buttons: [{ id: 1, state: 'pending', label: 'Yes', action: 'open:new-agent' }, { id: 2, state: 'pending', label: 'No', action: 'reply' }] }
         ].map(a => m.yesNoButtons(a)))`);
         assert.deepEqual(qualification, [false, false, false, false], 'only complete explicit Yes/No replies qualify');
+        // #13735 draft follow-up: genuine Tab/Enter activation keeps words and images.
+        const key = async (name, shift = false) => { const code = name === 'Tab' ? 9 : 13, args = { key: name, code: name, windowsVirtualKeyCode: code, modifiers: shift ? 8 : 0 }; await client.Input.dispatchKeyEvent({ type: 'keyDown', ...args, ...(name === 'Enter' ? { text: '\r' } : {}) }); await client.Input.dispatchKeyEvent({ type: 'keyUp', ...args }); };
+        for (const [draft, image, decision] of [['Keep the original filename.', false, 'Approve'], ['', true, 'Deny'], ['Keep both my explanation and screenshot.', true, 'Approve']]) {
+            const draftId = await ask('@Operator May I proceed? (draft preservation)', ['Yes=reply', 'No=reply']);
+            const draftAsk = (await mine()).find(a => a.id === draftId);
+            await ev(`import(${S} + 'operator_ask_dialog.js').then(m => m.openAskDialog(${JSON.stringify(draftAsk)})); true`);
+            await waitFor(`!!document.querySelector('dialog.inbox-ask-dialog[open]')`, 'draft question opens', 6000);
+            await ev(`document.querySelector('dialog.inbox-ask-dialog textarea').value = ${JSON.stringify(draft)}; true`);
+            if (image) {
+                await waitFor(`!!document.querySelector('dialog.inbox-ask-dialog input[type=file]')`, 'image picker ready', 6000);
+                await ev(`(() => { const original = window.fetch; window.fetch = (u, o) => { if (String(u).includes('/goal-images') && o?.method === 'POST') { window.fetch = original; return new Promise(resolve => { window.__releaseDraftUpload = () => resolve(original(u, o)); }); } return original(u, o); }; return true; })()`);
+                await ev(`(async () => { const c = document.createElement('canvas'); c.width = 8; c.height = 8; c.getContext('2d').fillRect(0,0,8,8); const blob = await new Promise(r => c.toBlob(r, 'image/png')); const dt = new DataTransfer(); dt.items.add(new File([blob], 'draft.png', { type: 'image/png' })); const input = document.querySelector('dialog.inbox-ask-dialog input[type=file]'); input.files = dt.files; input.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+                await waitFor(`!!document.querySelector('dialog.inbox-ask-dialog .ac-thumb-uploading') && !!window.__releaseDraftUpload`, 'image upload deliberately in flight', 6000);
+                assert.ok(await ev(`[...document.querySelectorAll('dialog.inbox-ask-dialog .inbox-ask-offer button')].every(b => b.disabled)`), 'quick decisions wait for pending pictures');
+                await ev(`window.__releaseDraftUpload(); true`);
+                await waitFor(`document.querySelector('dialog.inbox-ask-dialog .ac-thumb-ready') && !document.querySelector('dialog.inbox-ask-dialog .inbox-ask-send').disabled`, 'real uploaded screenshot ready', 10000);
+            }
+            await ev(`document.querySelector('dialog.inbox-ask-dialog textarea').focus(); true`);
+            await key('Tab', true);
+            assert.equal(await ev('document.activeElement.textContent'), 'Deny', 'real Shift+Tab from composer reaches Deny');
+            await key('Tab', true);
+            assert.equal(await ev('document.activeElement.textContent'), 'Approve', 'real Shift+Tab reaches Approve');
+            if (decision === 'Deny') { await key('Tab'); assert.equal(await ev('document.activeElement.textContent'), 'Deny', 'real Tab reaches Deny'); }
+            await key('Enter');
+            await waitFor(`!document.querySelector('dialog.inbox-ask-dialog[open]')`, 'Enter sends the decision and draft', 6000);
+            const sent = await httpJson('GET', '/api/board/' + B + '/messages?subscriber_id=Button%20Walker', undefined, tok);
+            const expected = decision === 'Approve' ? 'Yes' : 'No';
+            const replies = sent.data.filter(m => m.subscriber_id === 'Operator' && m.content.startsWith('@Button Walker ' + expected));
+            assert.equal(replies.length, 1, 'one complete reply is delivered, not a button click that loses the draft: ' + JSON.stringify(sent.data));
+            if (draft) assert.ok(replies[0].content.includes(draft), 'the complete typed draft is delivered');
+            if (image) assert.match(replies[0].content, /coral:\/\/artifacts\/[a-f0-9]{64}/, 'the real uploaded image is included');
+            assert.ok(!(await mine()).some(a => a.id === draftId), 'the draft reply closes its question');
+        }
         const denied = await httpJson('POST', '/api/board/' + B + '/asks/' + binary + '/buttons/' + binaryAsk.buttons[1].id + '/claim', {}, tok);
         assert.equal(denied.status, 403, 'an agent cannot send a decision as the Operator');
         // an agent's token cannot use a button, and a bad declaration is refused whole

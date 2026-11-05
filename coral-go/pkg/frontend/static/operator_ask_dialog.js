@@ -49,7 +49,9 @@ export function openAskDialog(a, onDone, runners = {}) {
     let tray = null;
     const finish = () => { if (tray) tray.destroy(); dlg.close(); dlg.remove(); if (onDone) onDone(); };
     let sending = false; const choices = [];
-    const sync = () => { send.disabled = sending || (!!tray && (tray.busy() || tray.failed())); choices.forEach(c => { c.disabled = sending; }); }; // Send waits for a picture going up, and for a failed one to be taken out
+    const picturesBlocked = () => !!tray && (tray.busy() || tray.failed());
+    const replyText = () => [box.value.trim(), tray ? tray.hexes().map(h => `coral://artifacts/${h}`).join('\n') : ''].filter(Boolean).join('\n\n');
+    const sync = () => { send.disabled = sending || picturesBlocked(); choices.forEach(c => { c.disabled = sending || (binary && picturesBlocked()); }); }; // Send waits for a picture going up, and for a failed one to be taken out
     const binary = yesNoButtons(a);
     const offers = (fromAnotherComputer(a) && (!binary || decisionNeedsPerson(a.server))) ? [] : buttonsOf(a); // remote binary replies use the owner-stamped claim route; other remote actions keep Reply and Close
     let offered = null;
@@ -63,9 +65,11 @@ export function openAskDialog(a, onDone, runners = {}) {
             const what = document.createElement('span'); what.className = 'inbox-ask-offer-what sr-only'; what.textContent = buttonWords(b);
             btn.setAttribute('aria-label', `${label}: ${what.textContent}`); btn.title = what.textContent;
             btn.addEventListener('click', async () => {
-                if (sending) return;
+                if (sending || (binary && picturesBlocked())) return;
                 sending = true; err.textContent = ''; sync();
                 try {
+                    const draft = replyText();
+                    if (binary && draft) { await replyToAsk(a, `${b.label}\n\n${draft}`); finish(); showToast(`Sent: ${b.label} with your reply`); return; }
                     const got = await claimButton(a, b); // the stored action, whatever the label says
                     if (isReply(got.action)) { forgetAsk(a); refreshOperatorAsks(true); finish(); showToast(`Sent: ${markHidden(got.label, { strict: true })}`); return; }
                     const navigates = ['open:new-agent', 'open:task', 'open:artifact'].includes(got.action);
@@ -86,7 +90,7 @@ export function openAskDialog(a, onDone, runners = {}) {
             });
             choices.push(btn); item.append(btn, what); list.append(item);
         }
-        const hint = document.createElement('p'); hint.className = 'inbox-ask-offers-hint'; hint.textContent = offers.every(b => isReply(b.action)) ? 'Replies are sent as you.' : 'These actions run as you when you choose one.';
+        const hint = document.createElement('p'); hint.className = 'inbox-ask-offers-hint'; hint.textContent = binary ? 'Sends Yes or No with any text and pictures below.' : offers.every(b => isReply(b.action)) ? 'Replies are sent as you.' : 'These actions run as you when you choose one.';
         offered.append(head, list, hint);
     }
     const foot = document.createElement('div'); foot.className = 'inbox-ask-foot'; foot.append(row); // Reply attachments belong with the reply box; the footer holds its final actions
@@ -119,10 +123,9 @@ export function openAskDialog(a, onDone, runners = {}) {
     dlg.addEventListener('cancel', e => { e.preventDefault(); finish(); });
     box.addEventListener('keydown', e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !send.disabled) { e.preventDefault(); send.click(); } }); // Ctrl or Cmd+Enter sends, as the task page's reply box does (#13148)
     send.addEventListener('click', async () => {
-        if (sending) return;
+        if (sending || picturesBlocked()) return;
         sending = true; err.textContent = ''; sync();
-        const links = tray ? tray.hexes().map(h => `coral://artifacts/${h}`) : []; // each picture is named by its artifact link, which the board and the agents read
-        try { await replyToAsk(a, [box.value.trim(), links.join('\n')].filter(Boolean).join('\n\n')); finish(); }
+        try { await replyToAsk(a, replyText()); finish(); }
         catch (e) { err.textContent = e.message || 'Not sent.'; sending = false; sync(); box.focus(); } // the text stays
     });
     document.body.append(dlg);
