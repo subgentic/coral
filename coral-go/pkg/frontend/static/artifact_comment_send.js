@@ -33,6 +33,14 @@ function askableState(a) {
     return { can: true, why: '' };
 }
 
+/** Why the picker is empty (#13687), in plain words: which computer was asked, how many agents it listed, and how many of those cannot be named (no role on the team, or a terminal). The computer argument is its name, or empty for this computer. */
+export function emptyWords(computer, listed, shown) {
+    const where = computer ? `the computer ${computer}` : 'this computer';
+    if (!listed) return `No agent on this board can be asked: ${where} lists no agent on it.`;
+    const dropped = listed - shown;
+    return `No agent on this board can be asked: ${where} lists ${listed} agent${listed === 1 ? '' : 's'}, ${dropped} without a role on the team or a terminal.`;
+}
+
 /** The agents of the board that can be named in a send: the status list's agents that have a role (the name the board knows them by) and are not terminals; ordered as listed. */
 export function pickableAgents(list) {
     const out = [];
@@ -56,7 +64,7 @@ export function buildSendBlock(x) {
     box.append(el('p', 'ac-ask-note', 'Each agent you pick gets this comment as a message. They answer in this thread.'));
     if (x.agents === null) { box.append(el('p', 'ac-ask-note', 'Looking for the agents on this board…')); }
     else if (x.agents === 'error') { box.append(el('p', 'ac-error', 'The agents of this board could not be read.')); }
-    else if (!x.agents.length) { box.append(el('p', 'ac-ask-note', 'No agent on this board can be asked.')); }
+    else if (!x.agents.length) { box.append(el('p', 'ac-ask-note', x.empty || 'No agent on this board can be asked.')); }
     else {
         const list = el('ul', 'ac-ask-list');
         const full = x.picked.size >= MAX_AGENTS;
