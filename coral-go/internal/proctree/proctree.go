@@ -6,6 +6,7 @@ package proctree
 import (
 	"bufio"
 	"context"
+	"os"
 	"os/exec"
 	"runtime"
 	"strconv"
@@ -74,9 +75,19 @@ func CommandsBelow(ctx context.Context, root int) (cmds []string, ok bool) {
 	}
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
-	out, err := exec.CommandContext(ctx, "ps", "-axo", "pid=,ppid=,command=").Output()
+	out, err := exec.CommandContext(ctx, psPath(), "-axo", "pid=,ppid=,command=").Output()
 	if err != nil {
 		return nil, false
 	}
 	return Below(Parse(string(out)), root), true
+}
+
+// psPath is ps by its absolute path, not by the name on the server's PATH (Security's INFO, #13645).
+func psPath() string {
+	for _, p := range []string{"/bin/ps", "/usr/bin/ps"} {
+		if _, err := os.Stat(p); err == nil {
+			return p
+		}
+	}
+	return "ps"
 }
