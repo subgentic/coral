@@ -35,3 +35,14 @@ test('a remote goal comment image uses that computer goal-images route', async (
     await api.uploadCommentImage(goalSubject('@m1/dev', 5), 'm1', new Blob(['image'], { type: 'image/png' }), null, 'dev');
     assert.equal(calls[0].url, '/api/remote/m1/api/board/dev/goal-images');
 });
+
+test('the self-hosted Hub own team comments remain local even while a remote team is selected', async () => {
+    state.hub = true; state.selectedTeam = '@m2/dev';
+    const host = document.createElement('div'); document.body.append(host);
+    const mounted = mountGoalComments(host, { team: 'dev', goalId: 5 });
+    assert.deepEqual(opened, ['goal:dev:5', 'local', 'dev']);
+    calls.length = 0;
+    await api.listComments(...opened);
+    assert.equal(calls[0].url, '/api/artifacts/goal:dev:5/comments?state=all&board=dev');
+    mounted.destroy();
+});
