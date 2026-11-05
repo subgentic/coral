@@ -117,7 +117,7 @@ const { coralReady } = require('./helpers/wait');
         assert.equal(await icon(), null, 'a new team has the check off: no icon, the settings are reached from the info button');
         await render(true);
         await ev(`document.querySelector('.team-health-btn').focus(); true`);
-        await client.Input.dispatchKeyEvent({ type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
+        await client.Input.dispatchKeyEvent({ type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r' });
         await client.Input.dispatchKeyEvent({ type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
         await waitFor(`!!document.querySelector('#team-settings-workspace .sv[data-ready]') && !!document.querySelector('#team-settings-health [name=on]')`, 'the Settings tab with the Health check section', 15000);
         assert.equal(await ev(`document.querySelector('#team-settings-workspace .settings-pane[data-section=health]')?.hidden`), false, 'pulse opens Health check directly');
