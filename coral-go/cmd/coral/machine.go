@@ -138,6 +138,7 @@ func runMachine(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	size := fs.String("size", "s-2vcpu-4gb", "the provider's size slug")
 	image := fs.String("image", "", "the provider's image slug (default: the provider's Ubuntu LTS)")
 	agents := fs.String("agents", "", "agent CLIs to install: claude, codex and pi, each pinned as NAME@VERSION; agy (Antigravity) only as agy@sha256:HEX, the SHA-256 of the installer script you checked")
+	egressSelfTest := fs.Bool("egress-self-test", false, "after the machine has closed SSH, run the egress check on the machine itself and report PASS/FAIL lines through Coral Hub (evidence for a test, never a control; adds no way in; off by default)")
 	maxMode := fs.String("max-mode", "view", "the most Coral Hub may do on the machine: view (the default), interact or launch: interact and launch are asked for explicitly")
 	coralVersion := fs.String("coral-version", "", "the Coral release to install (default: this binary's version)")
 	yes := fs.Bool("yes", false, "go on without asking (the price is still printed)")
@@ -224,7 +225,7 @@ func runMachine(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if npmAgentsIn(agentList) { // said in plain words, to the person, before any secret is read or any call is made (Security's condition on the operator-only cut, #9934)
 		fmt.Fprintln(stderr, "coral machine launch: note: the npm agent packages are installed by exact version from "+machinelaunch.NPMRegistry+" with install scripts OFF, by a non-root user; their CONTENT is NOT yet hash-verified (a lockfile with pinned hashes comes before any other account may launch).")
 	}
-	_, err = machineUserData(checkKeys, checkSource, *maxMode, version, digests, *hubURL, agentList) // the flags are checked by the builder before any secret is read or any call is made
+	_, err = machineUserData(checkKeys, checkSource, *maxMode, version, digests, *hubURL, agentList, *egressSelfTest) // the flags are checked by the builder before any secret is read or any call is made
 	checkKeys.Destroy()
 	if err != nil {
 		return fail("%v", err)
@@ -295,7 +296,7 @@ func runMachine(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	deps := machinelaunch.Deps{
 		Provider: p, Hub: hub, Out: stdout, Interrupt: second, Bootstrap: newMachineBootstrap(), Isolate: true, State: launchState, // every launch makes its own VPC and firewall and keeps its ids (#10918)
 		UserData: func(keys *machinelaunch.BootKeys) (string, error) {
-			return machineUserData(keys, source, *maxMode, version, digests, *hubURL, agentList)
+			return machineUserData(keys, source, *maxMode, version, digests, *hubURL, agentList, *egressSelfTest)
 		},
 	}
 	if f, ok := stdin.(*os.File); ok && isTerminal(f) && *tokenFile != "-" && *keyFile != "-" {

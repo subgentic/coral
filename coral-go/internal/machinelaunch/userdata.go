@@ -40,6 +40,8 @@ type UserDataSpec struct {
 	// version: the installer script is fetched to a file, checked against that SHA-256 and only then run, and it runs only when this says so. Every installer fetched on the machine is pinned this
 	// way, none is piped into a shell. The names come from the one table of CLIs (internal/agent).
 	Agents []string
+	// EgressSelfTest adds the egress self-test (egress_selftest.go, #13575): off by default, and the default user-data does not mention it.
+	EgressSelfTest bool
 	// HostPrivateKey and HostPublicKey are the SINGLE-USE ed25519 host key pair the machine presents, which the launcher pinned in advance (coral-hub Security's ruling on #10917: sshd needs the private half, and the
 	// provider has no console output to read a machine-made key from). It is the one secret in the user-data: it proves the machine's identity to the launcher for the length of the launch, and the finish step on the
 	// machine stops and masks sshd and deletes it. HostPrivateKey is the OpenSSH PEM, HostPublicKey its authorized_keys line; they must be one pair.
@@ -256,8 +258,13 @@ func BuildUserData(spec UserDataSpec) (string, error) {
 	for _, f := range EgressFiles() { // #10918: every non-root user is off the metadata service and the private ranges (egress.go)
 		emitFile(f.Path, f.Mode, f.Content)
 	}
+	if spec.EgressSelfTest {
+		for _, f := range EgressSelfTestFiles() {
+			emitFile(f.Path, f.Mode, f.Content)
+		}
+	}
 	emitFile("/usr/local/sbin/coral-machine-setup", "0700", setupScript(spec.CoralVersion, spec.CoralDigests))
-	emitFile("/usr/local/sbin/coral-machine-finish", "0700", finishScript(len(agents) > 0))
+	emitFile("/usr/local/sbin/coral-machine-finish", "0700", finishScriptWith(len(agents) > 0, spec.EgressSelfTest))
 	if len(agents) > 0 {
 		emitFile("/usr/local/sbin/coral-machine-agents", "0700", agentsScript(agents))
 	}
@@ -400,7 +407,10 @@ WantedBy=timers.target
 
 // finishScript is the root step that ends the bootstrap window: sshd stopped and kept off, port 22 closed, the launch key and the host keys removed, Coral enabled for the next boot, and then the agent CLIs
 // (when there are any and Coral is up). It can run twice (the timer after the launcher) and never fails the machine.
-func finishScript(withAgents bool) string {
+func finishScript(withAgents bool) string { return finishScriptWith(withAgents, false) }
+
+// finishScriptWith adds, when the launch asked for it, the egress self-test as the very last act: after SSH is closed and the keys are gone, started without waiting (a slow check never holds this unit).
+func finishScriptWith(withAgents, selfTest bool) string {
 	var s strings.Builder
 	p := func(format string, a ...any) { fmt.Fprintf(&s, format+"\n", a...) }
 	p("#!/bin/sh")
@@ -434,6 +444,11 @@ func finishScript(withAgents bool) string {
 	}
 	p("# Nothing may start this unit again, with agents or without: the path and the timer are switched off for good (and stay off after a reboot).")
 	p("systemctl disable --now coral-finish.timer coral-finish.path 2>/dev/null || true")
+	if selfTest {
+		p("# the egress self-test (#13575, opt-in): the last act, after every line above that closes SSH; evidence only")
+		p("systemctl enable %s 2>/dev/null || true", selftestUnitName)
+		p("systemctl start --no-block %s 2>/dev/null || true", selftestUnitName)
+	}
 	if withAgents {
 		p("exit $rc") // the machine is enrolled and SSH is closed by now: a failed agent makes this unit FAIL (named in the journal by coral-machine-agents), never a silent success
 		return s.String()
