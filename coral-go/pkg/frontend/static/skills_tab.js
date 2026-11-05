@@ -7,6 +7,7 @@ import { requestJson } from './api.js';
 import { note, currentRoute } from './nav.js';
 import { isPhoneLayout } from './phone_layout.js';
 import { SKILL_FOLDERS } from './routes.js';
+const { latestSkillRows, skillVersions } = await importOnce('./skill_versions.js');
 const DT = await importOnce('./data_table.js');
 const VL = await importOnce('./view_list.js'); // the folders in the sidebar (and a phone's strip), as Automations and the Inbox have them (#12997)
 await loadStyles('skills.css');
@@ -38,7 +39,7 @@ export async function loadSkillsBadge() {
 async function loadList() {
     try {
         everyRow = (await requestJson('GET', '/api/skills')).skills || []; // the whole store: the folders' counts do not move with the status filter
-        rows = showStatus ? everyRow.filter(r => r.status === showStatus) : everyRow;
+        rows = latestSkillRows(everyRow, showStatus);
         loadError = '';
     } catch (e) { rows = []; everyRow = []; loadError = e.message || 'The skills could not be read'; }
 }
@@ -49,7 +50,7 @@ const KIND_OF = { imported: 'operator', 'agent-created': 'agent', 'coral-skills'
 const FOLDER_LABEL = { '': 'All skills', imported: 'Imported', 'agent-created': 'Agent created', 'coral-skills': 'Coral skills' };
 const inFolder = (r, f) => !f || r.publisher_kind === KIND_OF[f];
 const sections = () => [{ title: 'Skills', items: ['', ...SKILL_FOLDERS].map(key => {
-    const mine = everyRow.filter(r => inFolder(r, key)), waiting = key === 'agent-created' ? mine.filter(r => r.status === 'pending').length : 0;
+    const mine = latestSkillRows(everyRow).filter(r => inFolder(r, key)), waiting = key === 'agent-created' ? mine.filter(r => r.pendingVersion).length : 0;
     return { key: key || 'all', label: FOLDER_LABEL[key], count: waiting ? `${waiting} of ${mine.length}` : mine.length, alert: waiting > 0 }; // what waits on the Operator is said on Agent created, red, as Needs you says its unread
 }) }];
 let sideFolders = null;
@@ -66,9 +67,10 @@ const matches = r => !query || `${r.name} ${r.description} ${publisher(r)}`.toLo
 
 async function loadOne(id) {
     open = { id, data: null, error: '', busy: false, acked: false, fileShown: null, opened: new Set() };
+    const view = open;
     draw();
-    try { open.data = await requestJson('GET', `/api/skills/${encodeURIComponent(id)}`); }
-    catch (e) { open.error = e.status === 404 ? 'This skill no longer exists.' : (e.message || 'The skill could not be read'); }
+    try { const data = await requestJson('GET', `/api/skills/${encodeURIComponent(id)}`); if (open !== view) return; view.data = data; }
+    catch (e) { if (open !== view) return; view.error = e.status === 404 ? 'This skill no longer exists.' : (e.message || 'The skill could not be read'); }
     draw();
 }
 
@@ -109,14 +111,18 @@ function drawList() {
         { key: 'name', label: 'Name', primary: true, width: 'grow', sort: true, sortValue: r => r.name.toLowerCase(), line: 1, cell: r => r.name },
         { key: 'description', label: 'Description', width: '16rem', line: 2, cell: r => r.description, narrowHide: true },
         { key: 'by', label: 'Published by', width: '10rem', sort: true, sortValue: publisher, cell: publisher },
-        { key: 'version', label: 'Version', width: '5rem', align: 'end', sort: 'number', sortValue: r => r.version, cell: r => `v${r.version}` },
+        { key: 'version', label: 'Version', width: '10rem', align: 'end', sort: 'number', sortValue: r => r.version, cell: r => {
+            const cell = el('span', '', `v${r.version}`), pending = r.pendingVersion;
+            if (pending && pending.id !== r.id) cell.append(' ', button('btn btn-small', `v${pending.version} waiting`, e => { e.stopPropagation(); loadOne(pending.id); }));
+            return cell;
+        } },
         { key: 'status', label: 'Status', width: '9rem', sort: true, sortValue: r => r.status, cell: r => { const [word, cls] = STATUS[r.status] || [r.status, '']; return DT.chip(word, cls); } },
         { key: 'scripts', label: 'Scripts', width: '5rem', align: 'end', sort: true, sortValue: r => (r.has_scripts || r.not_reviewable ? 1 : 0), cell: r => (r.has_scripts ? 'yes' : r.not_reviewable ? 'files' : '-'), narrowHide: true },
         { key: 'updated', label: 'Updated', width: '7rem', fixed: true, sort: 'date', sortValue: r => r.decided_at || r.created_at, cell: r => DT.timeCell(r.decided_at || r.created_at) },
     ];
     const shown = rows.filter(r => inFolder(r, folder) && matches(r));
     page.append(DT.dataTable({ label: `${FOLDER_LABEL[folder]}, ${shown.length}`, rows: shown, rowKey: r => r.id, rowName: r => r.name, state: tableState, columns, open: r => loadOne(r.id),
-        ...(isPhoneLayout() ? { bare: true, sortBar: false, mail: r => ({ lead: { icon: 'auto_awesome', square: true, name: r.name }, title: r.name, snippet: r.description, state: (STATUS[r.status] || [r.status])[0], time: DT.timeCell(r.decided_at || r.created_at).textContent, mark: r.status === 'pending' ? 'attention' : undefined }) } : {}), // a phone's rows run edge to edge like the Inbox lists (#12957, the Operator's note on #12997): the shared mail row, no bordered box
+        ...(isPhoneLayout() ? { bare: true, sortBar: false, mail: r => ({ lead: { icon: 'auto_awesome', square: true, name: r.name }, title: r.name, snippet: r.description, state: (STATUS[r.status] || [r.status])[0] + (r.pendingVersion && r.pendingVersion.id !== r.id ? ` · v${r.pendingVersion.version} waiting` : ''), time: DT.timeCell(r.decided_at || r.created_at).textContent, mark: r.pendingVersion ? 'attention' : undefined }) } : {}), // a phone's rows run edge to edge like the Inbox lists (#12957, the Operator's note on #12997): the shared mail row, no bordered box
         empty: { line: showStatus || folder || query ? 'No skill in this list.' : 'No skills yet.', hint: 'Import a skill, or an agent can publish one with coral-agent skills publish.' } }).el);
     return page;
 }
@@ -158,6 +164,12 @@ function drawDetail() {
     const meta = el('div', 'skills-meta');
     meta.append(el('span', '', `Published by ${publisher(s)}`), el('span', '', `Digest ${short(s.digest)}`), el('span', '', `${files.length} file${files.length === 1 ? '' : 's'}`));
     page.append(meta, el('p', 'skills-note', s.description));
+    const versions = skillVersions(everyRow, s);
+    if (versions.length > 1) {
+        const history = el('details', 'skills-section'), summary = el('summary', '', `Versions (${versions.length})`), list = el('ul');
+        for (const v of versions) { const item = el('li'); item.append(button('btn btn-small', `v${v.version} · ${(STATUS[v.status] || [v.status])[0]}${v.id === s.id ? ' · current view' : ''}`, () => loadOne(v.id))); list.append(item); }
+        history.append(summary, list); page.append(history);
+    }
     if (s.status === 'removed') { page.append(el('p', 'skills-note', 'This skill was removed.')); return page; }
     let unopenedEl = null;
     if (s.status === 'pending') {
