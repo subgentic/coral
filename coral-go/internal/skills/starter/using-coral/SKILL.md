@@ -1,6 +1,6 @@
 ---
 name: using-coral
-description: "How any agent works with Coral: its docs, the skills the Operator approved, storing a file and showing it as a coral:// link, reaching the person, your own to-do list, searching what was said earlier, and the board when you are on a team. Read it when you are not sure what Coral gives you."
+description: "What Coral gives any agent: its docs, the approved skills, files shown as coral:// links, reaching the person, your own to-do list, and the board when you are on a team."
 metadata:
   published-by: Coral
   kind: how-to
@@ -55,7 +55,7 @@ coral-agent notify --title "Build finished" --message "All 40 tests pass"   # a 
 coral-agent ui publish ...                                                    # an interactive panel in the sidebar (coral-agent docs agent-ui)
 ```
 
-On a team the person also has a Needs you list: `coral-board post --ask "@Operator <question>"` puts a question there, and a file uploaded with `--tag "for review" --question "<what to decide>"` puts it there. Those two are for agents on a team: on no team the review tag is refused (`no_team_for_review`), so show the file as a link in your reply instead.
+A file uploaded with `--tag "for review" --question "<what to decide>"` puts it in the person's Needs you, on a team or not (an agent on no team appears there under "Not on a team"; the person can approve it or ask for changes, and you are told). A question for the person is `coral-board post --ask "@Operator <question>"` on a team, and in your reply when you are on none.
 
 ## Your own to-do list and your history
 
