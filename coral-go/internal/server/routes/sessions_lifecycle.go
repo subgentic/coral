@@ -29,7 +29,8 @@ import (
 func sendLaunchCommand(ctx context.Context, terminal ptymanager.SessionTerminal, target, command string) error {
 	// Read at the moment of typing, which may be a spaced start's later slot: a shell of unknown contents in the terminal (git-bash,
 	// WSL) gets no launch line (Security on #216).
-	if sh := ptymanager.UnknownShell(ctx, terminal, strings.TrimSuffix(target, ".0"), "", ""); sh != "" {
+	// A freshly created pane's shell may still be starting (a child shell of its startup looks like a shell of unknown contents for a moment, #13658): the shell is looked at again for a short window before it is refused.
+	if sh := ptymanager.SettledUnknownShell(ctx, terminal, strings.TrimSuffix(target, ".0"), "", ""); sh != "" {
 		return errors.New(ptymanager.UnknownShellRefusal(sh))
 	}
 	send := terminal.SendToTarget
