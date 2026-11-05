@@ -143,7 +143,7 @@ const stateWord = row => (row.state === 'holding' ? 'Holding' : row.state === 'w
 
 /** The Queue folder's table. */
 export function queueTable(rows, narrowed) {
-    return { title: 'Queue', noun: ['entry', 'entries'], rows,
+    return { title: 'Queue (experimental)', noun: ['entry', 'entries'], rows,
         empty: { line: narrowed ? 'No entry matches the search.' : loaded ? 'No resource is defined.' : 'Reading the queue.', hint: narrowed || !loaded ? '' : 'An Orchestrator defines a resource with coral-board resource; agents claim a slot before a heavy run and wait in line when it is taken.' },
         signature: JSON.stringify([denied, rows.map(r => [r.key, r.state, r.place, r.agent, r.note, r.used, r.slots, r.waiting, r.lease_until, r.first, r.last, r.state === 'holding' ? leaseWords(r) : r.state === 'waiting' ? waitWords(r) : ''])]), // the words of the clock are in it: the table is drawn again when they change
         node: () => DT.dataTable({
