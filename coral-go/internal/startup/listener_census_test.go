@@ -189,6 +189,7 @@ func TestEveryWildcardAddressAndHostWriteIsCensused(t *testing.T) {
 		"internal/background/git_poller.go:lookupPR":        `not an address: the "::" in a cache key`,
 		"internal/config/hosts.go:IsWildcardHost":           "compares",
 		"internal/hooks/identity.go:configuredHosts":        "compares CORAL_HOST: a wildcard is not a place to dial",
+		"internal/hooks/hooks.go:CoralBase":                 "compares CORAL_HOST (#13695, C7): a wildcard address is not dialable, so a hook dials 127.0.0.1 instead",
 		"internal/startup/startup_listen.go:widenForRemote": "the one place a wildcard host is set: only when remote access is on and no host was asked for",
 	}
 	found := map[string]bool{}
