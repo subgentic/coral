@@ -18,6 +18,9 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 // The token wait: generous, since a healthy launch writes it in well under a second.
 const TOKEN_DEADLINE_MS = 30000;
 
+// A launch refused because the pane's shell is still starting is asked again: this many tries, this far apart.
+const LAUNCH_TRIES = 4, LAUNCH_RETRY_MS = 500;
+
 // Stand-ins can overlap (terminal_switch launches two), and each one's cli_path_claude replaces the last. What to give back is the value from before the FIRST live one,
 // and only when the LAST one stops: restoring each stand-in's own "previous value" left the earlier stand-in's deleted script as the server's path, which a later suite on
 // the same server (settings_modal_trace) then showed. OURS is every script this process set, so a path someone else set is still never overwritten (#4354).
@@ -98,6 +101,12 @@ async function launchStandIn(api, { workingDir = '', displayName = 'Stand-in Age
     const started = Date.now();
     try {
         launch = await api('POST', '/api/sessions/launch', { working_dir: workingDir, agent_type: 'claude', display_name: displayName });
+        // Under load the new pane's shell can still be starting (its own startup runs a child shell) when Coral looks at what runs in it, and the launch is refused with 'this terminal is running /bin/zsh: Coral can't
+        // see what runs in it' (500, after 124 ms: 2 of 14 loaded heap_growth runs). The refusal is the guard doing its job, so the answer is to launch again a moment later, not to loosen the guard (#13389).
+        for (let tries = 1; tries < LAUNCH_TRIES && launch && launch.status >= 500 && /this terminal is running/.test(JSON.stringify(launch.data || '')); tries++) {
+            await sleep(LAUNCH_RETRY_MS);
+            launch = await api('POST', '/api/sessions/launch', { working_dir: workingDir, agent_type: 'claude', display_name: displayName });
+        }
     } catch (e) {
         await stop(); // the caller never gets stop(), so undo the setting here
         throw e;
