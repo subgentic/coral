@@ -91,6 +91,9 @@ func TestOperatorClicksAreInTheActivityRecord(t *testing.T) {
 		require.Equal(t, c.action, got[0].Action, c.name)
 		require.Equal(t, c.kind, got[0].ItemKind, c.name)
 		require.Equal(t, "local", got[0].Actor, c.name)
+		if c.action != board.ActTaskCreate { // the row names the task by its stored title (a create has no id yet)
+			require.Contains(t, []string{"A task", "A draft", "Renamed"}, got[0].Title, c.name)
+		}
 	}
 }
 
