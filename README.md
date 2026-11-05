@@ -32,6 +32,18 @@
 </p>
 
 <p align="center">
+  <img width="100%" alt="A short demo: a team of agents launches, a document arrives in the Inbox, you comment on it and the agent updates it" src="assets/demo/coral-demo-inbox.gif" />
+  <br>
+  <sub>A document lands in the Inbox, you comment, the agent answers and updates it. (Sample data; staged with scripted agents.)</sub>
+</p>
+
+<p align="center">
+  <img alt="A file in Coral's review space: version 2 of 2 with Compare, and Approve and Request changes" src="assets/readme/review-approve.png" width="100%" />
+  <br>
+  <sub>A file an agent made, waiting for your review: read it, Approve or Request changes. (Sample data.)</sub>
+</p>
+
+<p align="center">
   
 <img width="100%" alt="Needs You for review and questions" src="https://github.com/user-attachments/assets/2c995cf7-7a5b-4be0-94ad-ee5e3efd4552" />
 
@@ -52,6 +64,12 @@ curl -fsSL \
   https://raw.githubusercontent.com/subgentic/coral/main/install.sh \
   | bash
 ```
+
+<p align="center">
+  <img alt="Compare: what changed between version 1 and version 2 of a file, the added line marked" src="assets/readme/review-compare.png" width="100%" />
+  <br>
+  <sub>Compare with the earlier version: what changed, marked. (Sample data.)</sub>
+</p>
 
 Coral wraps the agent CLIs you already use (Claude Code, Codex, Antigravity, Pi and OpenCode, and Hermes, which is experimental). It calls no AI API itself: your keys, your subscriptions, your tools. It runs as one Go binary on your laptop or a remote box.
 
