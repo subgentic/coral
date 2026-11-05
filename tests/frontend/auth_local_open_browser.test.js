@@ -46,16 +46,20 @@ const ATTACK = {
             const body = ATTACK[new URL(p.request.url).pathname] || 'not found';
             return c.Fetch.fulfillRequest({ requestId: p.requestId, responseCode: body === 'not found' ? 404 : 200, responseHeaders: [{ name: 'Content-Type', value: 'text/html; charset=utf-8' }], body: Buffer.from(body).toString('base64') });
         });
-        const reqs = []; const byId = new Map(); const log = [];
+        const reqs = []; const hops = new Map(); const log = [];
+        // One request id carries every hop of a redirect (the button's POST, then the 303's GET), and the three events of a hop do not arrive in a fixed order: Network.requestWillBeSentExtraInfo (the headers the browser REALLY sent:
+        // Origin, Sec-Fetch-*) may come after responseReceived, or after the next hop's requestWillBeSent. So the hops of an id are a list, in order, a hop outside this server is kept as a placeholder so the order holds, the
+        // extra info goes to the first hop that has not had its own, and a case that reads the headers waits for r.sent as well as the status (trial-250 gate: 'Origin undefined, answered 303').
         c.Network.requestWillBeSent(e => {
-            // A redirect hop keeps the request's id: the answer that redirected belongs to the request before it (the 303 that follows the button's POST).
-            if (e.redirectResponse && byId.has(e.requestId)) byId.get(e.requestId).status = e.redirectResponse.status;
-            if (!e.request.url.startsWith(BASE)) return;
-            const r = { url: e.request.url.replace(BASE, '').replace(/login_token=[^&]+/, 'login_token=<redacted>'), method: e.request.method, headers: {} };
-            reqs.push(r); byId.set(e.requestId, r);
+            const list = hops.get(e.requestId) || []; hops.set(e.requestId, list);
+            if (e.redirectResponse && list.length) list[list.length - 1].status = e.redirectResponse.status; // the answer that redirected belongs to the hop before it
+            const mine = e.request.url.startsWith(BASE);
+            const r = { url: e.request.url.replace(BASE, '').replace(/login_token=[^&]+/, 'login_token=<redacted>'), method: e.request.method, headers: {}, outside: !mine };
+            list.push(r);
+            if (mine) reqs.push(r);
         });
-        c.Network.requestWillBeSentExtraInfo(e => { const r = byId.get(e.requestId); if (r) r.headers = Object.fromEntries(Object.entries(e.headers).map(([k, v]) => [k.toLowerCase(), v])); });
-        c.Network.responseReceived(e => { const r = byId.get(e.requestId); if (r) r.status = e.response.status; });
+        c.Network.requestWillBeSentExtraInfo(e => { const r = (hops.get(e.requestId) || []).find(x => !x.sent); if (r) { r.headers = Object.fromEntries(Object.entries(e.headers).map(([k, v]) => [k.toLowerCase(), v])); r.sent = true; } });
+        c.Network.responseReceived(e => { const list = hops.get(e.requestId); const r = list && list[list.length - 1]; if (r) r.status = e.response.status; });
         c.on('Log.entryAdded', e => log.push(e.entry.text));
         const ev = async x => { const r = await c.Runtime.evaluate({ expression: x, returnByValue: true, awaitPromise: true }); if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description || r.exceptionDetails.text || JSON.stringify(r.exceptionDetails)); return r.result.value; };
         const waitFor = async (expr, what, ms = 8000) => {
@@ -165,7 +169,7 @@ const ATTACK = {
                 const p = await freshPage();
                 await p.c.Page.navigate({ url: site + '/post.html' });
                 await p.waitFor(`location.href.startsWith('${BASE}/auth/local') && document.readyState === 'complete'`, 'the form POST to land');
-                await until(() => localOpen(p.reqs).some(r => r.status), 'the answer to the POST');
+                await until(() => localOpen(p.reqs).some(r => r.status && r.sent), 'the answer to the POST');
                 const posts = localOpen(p.reqs);
                 assert.equal(posts.length, 1, JSON.stringify(p.reqs));
                 assert.equal(posts[0].headers['sec-fetch-site'], sfs);
@@ -229,7 +233,7 @@ const ATTACK = {
                 const promised = proof.note; // one snapshot: no DOM access after an awaited status request
                 assert.ok(/asks you to create a password/i.test(promised) && !/without a password/i.test(promised), 'the note says the password prompt comes next, and promises no way around it: ' + promised);
                 await clickLocalOpen(p);
-                await until(() => localOpen(p.reqs).some(r => r.status), 'the answer to the button request');
+                await until(() => localOpen(p.reqs).some(r => r.status && r.sent), 'the answer to the button request');
                 const posts = localOpen(p.reqs);
                 assert.equal(posts.length, 1, JSON.stringify(p.reqs.map(r => r.method + ' ' + r.url)));
                 const sent = `Origin ${posts[0].headers['origin']}, Sec-Fetch-Site ${posts[0].headers['sec-fetch-site']}, answered ${posts[0].status}`;
