@@ -18,8 +18,8 @@ export function confirmTeamWorkspaceChange() {
 }
 
 /** Open the team's settings (#8853: a popout over the page on screen; the team page has no Settings tab). */
-export function showTeamWorkingModeWorkspace(team) {
-    return importOnce('./team_settings_modal.js').then(m => m.openTeamSettings(team));
+export function showTeamWorkingModeWorkspace(team, options = {}) {
+    return importOnce('./team_settings_modal.js').then(m => m.openTeamSettings(team, options));
 }
 
 export function jsonError(response, fallback) {

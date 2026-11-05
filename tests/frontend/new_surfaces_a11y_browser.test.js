@@ -185,7 +185,7 @@ const { coralReady } = require('./helpers/wait');
                 r.flushLiveSessionsRender(); r.renderLiveSessions(state.liveSessions); return true; })`);
             await waitFor(`!!document.querySelector('.team-health-btn')`, 'the health icon', 5000);
             const hb = await ax('.team-health-btn');
-            assert.equal(hb.role, 'button'); assert.match(hb.name, /Team health monitor: (on|off)/, hb.name);
+            assert.equal(hb.role, 'button'); assert.match(hb.name, /Health monitor settings for /, hb.name);
             assert.equal(await ev(`document.querySelector('.team-health-btn').tabIndex >= 0`), true, 'the keyboard reaches it');
             assert.equal(await ev(`document.querySelector('.team-health-btn').hasAttribute('aria-pressed')`), false, 'it opens the settings, it does not toggle: its state is in its name, not a pressed state');
         }

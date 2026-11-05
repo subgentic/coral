@@ -248,7 +248,7 @@
 1	launch_core.js	failList
 1	launch_core.js	started
 1	list_card_parts.js	PIN_ICON
-1	list_card_parts.js	SVGO.o5
+2	list_card_parts.js	SVGO.o5
 4	list_card_parts.js	icon
 1	markdown.js	HL_MARK
 2	message_board.js	p.message_count

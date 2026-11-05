@@ -79,7 +79,7 @@ function settingsViewOptions(st) {
         mode: 'settings',
         label: 'Team settings sections', groupLabel: 'Team settings group',
         lead: 'Only the Operator on this computer can change these.',
-        group: _lastSection,
+        group: st.options.section || _lastSection,
         onGroup: id => { _lastSection = id; },
         words: { failed: 'Could not save: ' },
         failure: m => m.replace(/^Could not save( the health check)?\.?\s*/i, '') || m,

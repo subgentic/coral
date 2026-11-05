@@ -1,6 +1,6 @@
 /* Pieces the agent list's team and folder cards share: the pin item, the icons, a row's name with its server, the team's accent, Kill All and the health icon (moved out of render.js, #4996; no behaviour change). */
 import { launchBlockedReason } from './hub_access.js';
-import { splitKey, LOCAL_SERVER, keyLabel } from './server_base.js';
+import { splitKey, LOCAL_SERVER, keyLabel, isCloud } from './server_base.js';
 import { escapeAttr, escapeHtml } from './utils.js';
 import { isPinnedDir } from './pinned_folders.js';
 import { serverLabel, serversShown, statusMeta } from './server_status.js';
@@ -51,7 +51,9 @@ export function teamHealthBtn(boardName, boardSessions) {
     const row = boardSessions.find(s => typeof s.team_health_on === 'boolean');
     if (row) _healthSeen.set(boardName, row.team_health_on);
     if (!_healthSeen.get(boardName)) return '';
-    const label = 'Team health monitor: on';
+    // A remote/Hub header keeps the on-state signal without offering unavailable settings.
+    if (isCloud() || splitKey(boardName).server !== LOCAL_SERVER) return `<span class="team-health-btn is-on" role="img" aria-label="Health monitor is on" title="Health monitor is on">${SVGO.o5}<path d="M3 12h4l2.5-6 4 12 2.5-6H21"/></svg></span>`;
+    const label = `Health monitor settings for ${keyLabel(boardName)}`;
     return `<button type="button" class="btn btn-quiet btn-icon btn-xs folder-copy-btn team-health-btn is-on" data-on-click="team-health" data-board="${escapeAttr(boardName)}" title="${escapeAttr(label)}" aria-label="${escapeAttr(label)}">${SVGO.o5}<path d="M3 12h4l2.5-6 4 12 2.5-6H21"/></svg></button>`;
 }
 
