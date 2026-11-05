@@ -320,7 +320,7 @@
 @media (max-width: 767px) { /* a phone's panel is a sheet over the list, one column, its own scroll; the page behind keeps its scroll, nothing traps the focus (UI/UX on #8681) */
     .inbox-folder-toolbar { position: relative; }
     .inbox-folder-toolbar .list-bar-menu.list-bar-sheet { position: absolute; left: 0; right: 0; z-index: 20; max-height: 60vh; overflow-y: auto; box-sizing: border-box; padding: 12px; background: var(--bg-secondary); border: 1px solid var(--border-light); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); grid-template-columns: minmax(0, 1fr); }
-    .inbox-folder-head { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); } /* the folder select names the page and carries its count: the title is for screen readers (and the focus when there is no search box) */
+    .inbox-folder-head { max-width: none; flex: 1 1 auto; } /* a phone has no tab strip (#13596) and the top pill is the search: the page's title and count are the visible name of the open folder, the Filters icon at the right */
 }
 @container inboxfolder (max-width: 46rem) { /* the title, the search at its minimum, the pills and the icon no longer fit one line: the pills are the panel's select */
     .inbox-folder-toolbar .team-tb-pills { display: none; }
