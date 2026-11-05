@@ -19,6 +19,7 @@ var routeQueries = map[string]string{
 	"GET /api/artifacts/resolve":                  "link",
 	"GET /api/artifacts/{}":                       "open=1,v=2",
 	"GET /api/artifacts/{}/comments":              "board,series=1,state",
+	"GET /api/automations/runs":                   "cursor,limit,q,result,unread",
 	"GET /api/board/tasks":                        "assigned_to,board,created_by,created_since,cursor,fields,goal_id,has_cost,id,limit,order,parked,priority,q,sort,status,updated_since,verification",
 	"GET /api/board/{}/artifacts":                 "board,by,cursor,goal,kept,kind,limit,offset,origin,q,session_id,since,sort,starred,tag,task,until,versions=newest",
 	"GET /api/board/{}/goals":                     "cursor,limit,state",

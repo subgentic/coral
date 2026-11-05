@@ -8,6 +8,7 @@ const { installGuard, reached } = require('./helpers/silent_dismiss');
 const { connect } = require('./agent_view_harness');
 const { setTheme } = require('./helpers/contrast');
 const { oneLinePerRow } = require('./helpers/row_lines');
+const { AUTO_RUNS_STUB } = require('./helpers/automation_runs_stub');
 const BASE = require('./test_base').BASE;
 
 const STUB = `(() => {
@@ -61,7 +62,7 @@ const STUB = `(() => {
     const pathname = () => ev(`location.pathname`);
     const S = `(window.__coralStatic || '/static/')`;
     try {
-        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: STUB });
+        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: STUB }); await Page.addScriptToEvaluateOnNewDocument({ source: AUTO_RUNS_STUB }); // Recent runs reads the computer's page route (#13183): the stub answers it from its two run lists
         for (const [w, h, mobile] of [[1280, 820, false], [390, 844, true]]) {
             const at = `${w}px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
@@ -139,7 +140,7 @@ const STUB = `(() => {
             await ev(`window.__wfRuns.find(r => r.id === 200).seen_at = new Date().toISOString(); import(${S} + 'automation_runs.js').then(m => m.refreshRuns(true)).then(() => true)`);
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr[data-key] .automations-unread').length === 0`, `${at}the last unread run was opened on another screen: it lost its dot here too`, 8000);
             // no runs at all: one line and its hint
-            await ev(`window.__jobRuns = []; window.__wfRuns = []; import(${S} + 'automation_runs.js').then(m => m.refreshRuns(true)).then(() => true)`);
+            await ev(`window.__jobRuns = []; window.__wfRuns = []; import(${S} + 'automation_runs.js').then(m => m.refreshRuns(true).then(() => m.refreshRunsPage())).then(() => true)`);
             await waitFor(`!!document.querySelector('#group-table-view .empty-state .empty-state-line')`, `${at}the empty folder`, 8000);
             assert.equal(await ev(`document.querySelector('#group-table-view .empty-state .empty-state-line').textContent`), 'Nothing has run yet.', `${at}one empty line`);
             console.log(`${at}ok`);
