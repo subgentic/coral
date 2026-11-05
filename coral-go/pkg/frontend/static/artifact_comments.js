@@ -174,7 +174,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         if (k.id) { const t = panel.querySelector(`[data-focus-id="${k.id}"]`); if (t) { t.focus({ preventScroll: true }); return; } } // a control whose words flip (Show / Hide earlier versions) is found by its id, not its text
         const scope = k.card ? panel.querySelector(`.ac-card[data-id="${k.card}"], .ac-reply[data-id="${k.card}"]`) : panel;
         const cand = scope ? [...scope.querySelectorAll('button, textarea, a')].filter(n => n.classList.contains(k.cls) && (n.textContent || '').trim() === k.text) : [];
-        const target = cand[0] || panel.querySelector('.ac-card.ac-active') || panel.querySelector('.ac-filter[aria-pressed="true"]');
+        const target = (k.cls === 'ac-lock' && panel.querySelector('.ac-lock')) || cand[0] || panel.querySelector('.ac-card.ac-active') || panel.querySelector('.ac-filter[aria-pressed="true"]');
         if (target) { if (!target.matches('button, textarea, a')) target.tabIndex = -1; target.focus({ preventScroll: true }); }
     }
     function render() {
@@ -191,6 +191,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         const h = el('h3', 'ac-title', 'Comments'); h.append(el('span', 'ac-count', String(openCount())));
         opts.onCanWrite?.(!!(st.data && st.data.canComment && !st.data.locked)); // the viewer shows Mark up only to someone who can comment (#12394)
         opts.onCount?.(openCount()); // a goal's Comments tab says how many are open (#11955)
+        opts.onState?.({ composing: !!(st.composing && st.composing.anchor), count: openCount() }); // a file's diff (#13528): its icon says the count, and closes an empty thread whose composer was cancelled
         head.append(h);
         // Comments of earlier versions: hidden unless chosen, with how many (and how many of those still need an answer) so they stay findable (#13606).
         const earlierAll = allThreads().filter(t => isEarlier(t.c) && !t.c.deleted);
@@ -209,9 +210,17 @@ export function attachComments(dialog, body, host, opts = {}) {
             sr.addEventListener('click', () => { st.showResolved = !st.showResolved; render(); });
             head.append(sr);
         }
+        const d = st.data;
+        if (d.canLock) { // one small lock beside the heading (#13578): closed lock = locked; the explanation is its tip, not a box
+            const why = d.locked ? 'Comments are locked: nobody can add comments to this file. Press to unlock.' : 'Locking stops anyone adding comments to this file. You can unlock it any time.';
+            const lock = el('button', 'btn btn-quiet btn-icon btn-xs ac-lock'); lock.type = 'button';
+            lock.append(el('span', 'material-icons', d.locked ? 'lock' : 'lock_open'));
+            lock.setAttribute('aria-label', d.locked ? 'Unlock comments' : 'Lock comments'); lock.setAttribute('aria-pressed', String(!!d.locked)); lock.title = why;
+            lock.addEventListener('click', async () => { try { await api.setLocked(st.hex, st.server, !d.locked); await refresh(); } catch (e) { showToast(e.message, true); } });
+            head.append(lock);
+        }
         const close = btn('ac-sheet-close ic-close', '', 'Hide the comments'); close.addEventListener('click', () => { userSet(false); toggle.focus(); }); head.append(close);
         panel.append(head);
-        const d = st.data;
         if (d.locked) panel.append(el('p', 'ac-note ac-locked', d.canLock ? 'Comments are locked: nobody can add comments to this file. You can unlock it any time.' : 'Comments are locked: read only.'));
         else if (!d.canComment) panel.append(el('p', 'ac-note ac-readonly', d.reason || 'You can read the comments here but not write them.'));
         const setup = !d.locked && askSetup();
@@ -227,12 +236,6 @@ export function attachComments(dialog, body, host, opts = {}) {
             });
             panel.append(n, go);
         }
-        if (d.canLock) {
-            const why = d.locked ? 'Comments are locked: nobody can add comments to this file. You can unlock it any time.' : 'Locking stops anyone adding comments to this file. You can unlock it any time.';
-            const lock = btn('ac-lock', d.locked ? 'Unlock comments' : 'Lock comments'); lock.title = why;
-            lock.addEventListener('click', async () => { try { await api.setLocked(st.hex, st.server, !d.locked); await refresh(); } catch (e) { showToast(e.message, true); } });
-            panel.append(lock); if (!d.locked) panel.append(el('p', 'ac-note ac-lock-note', why)); // locked: the note above says it
-        }
         const wrap = el('ul', 'ac-list');
         const shownAll = list.filter(t => st.showResolved || !t.c.resolved);
         const shown = shownAll.filter(t => groupOf(t.c) === 'main');
@@ -247,12 +250,12 @@ export function attachComments(dialog, body, host, opts = {}) {
             d.addEventListener('toggle', () => { st.groupOpen[g] = d.open; });
             li.append(d); wrap.append(li);
         }
-        if (!shownAll.length) wrap.append(el('p', 'empty-state empty-state-tight', st.text ? 'No open comments. Select some text to add one.' : opts.words?.empty || 'No open comments. Use the button below to comment on the whole document.'));
+        if (!shownAll.length && !opts.compact) wrap.append(el('p', 'empty-state empty-state-tight', st.text ? 'No open comments. Select some text to add one.' : opts.words?.empty || 'No open comments. Use the button below to comment on the whole document.'));
         panel.append(wrap);
         const sendable = list.map(t => t.c).filter(c => canAsk(c) && !d.locked);
         if (st.video && sendable.length) { const sendAll = btn('ac-send-open', `Send ${plural(sendable.length, 'open comment')} to an agent`); sendAll.addEventListener('click', () => openMany(sendable)); panel.append(sendAll); }
         if (st.composing && st.composing.anchor) panel.append(composer());
-        else if (d.canComment && !d.locked) {
+        else if (d.canComment && !d.locked && !opts.compact) {
             const whole = btn('ac-whole', st.video ? 'Comment at playhead' : opts.words?.whole || 'Comment on the whole document'); whole.addEventListener('click', () => { const time = st.video?.current(); st.composing = { anchor: opts.wholeAnchor ? opts.wholeAnchor() : { whole: true }, ...time, ...(time ? { timeLabel: stampRange(time) } : {}) }; st.error = ''; render(); panel.querySelector('.ac-input')?.focus(); });
             panel.append(whole);
         }
@@ -491,6 +494,8 @@ export function attachComments(dialog, body, host, opts = {}) {
             if (cm.tray) cm.tray.add([new File([blob], name || 'marked-picture.png', { type: blob.type })]);
             return true;
         },
+        /** Whether a comment is being written now (a draft stays while the panel is hidden). */
+        isComposing: () => !!(st.composing && st.composing.anchor),
         /** A comment on an anchor the caller made (the lines selected in an agent's diff, #12536): the composer opens on it, in the panel. Resolves false when this person cannot comment here. */
         composeOn(anchor) {
             if (!st.hex || !st.data || !st.data.canComment || st.data.locked) return false;
