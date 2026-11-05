@@ -145,6 +145,8 @@ func (s *Server) useMiddleware(r *chi.Mux) {
 	// Idempotency-Key for the six routes that start something, through Coral Hub (#5841): last, so that only a request the layers above admitted is recorded.
 	// The routes are named once, by tunnel.ForwardsIdempotencyKey, which is also what the connector and the hub proxy forward the header by.
 	r.Use(routes.NewIdempotency().Middleware)
+	// The Operator's clicks that are recorded by their route (#13609): after the handler answered 2xx, for a person only.
+	r.Use(routes.ActivityRecorder(s.boardStore))
 }
 
 // registerAuth: the health check and the sign-in routes.

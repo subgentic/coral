@@ -9,6 +9,8 @@ export const ACTION_LABEL = {
     approve: 'Approved', changes: 'Asked for changes', deny: 'Denied', ignore: 'Dismissed', supersede: 'Superseded older version', unignore: 'Put back', save: 'Saved for later', unsave: 'Moved back to Needs you',
     undone: 'Undone (the agent could not be told)', answer: 'Answered', dismiss: 'Dismissed', goal_close: 'Closed a goal', mark_read: 'Marked read',
     send_review: 'Sent for review', unsend_review: 'Taken out of review',
+    message: 'Sent a message', task_create: 'Created a task', task_complete: 'Completed a task', task_cancel: 'Cancelled a task', task_publish: 'Published a task', task_edit: 'Changed a task', task_remind: 'Reminded about a task',
+    task_park: 'Parked or released a task', task_reply: 'Replied on a task', prompt_answer: "Answered an agent's prompt", wait_dismiss: 'Dismissed a waiting agent', wait_send: 'Sent held words to an agent',
     hub_update_check: 'Coral Hub checked for an update', hub_update_relaunch: 'Coral Hub relaunched into an update',
 };
 export const ACTIONS = Object.keys(ACTION_LABEL);

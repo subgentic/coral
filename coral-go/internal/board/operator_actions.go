@@ -58,6 +58,20 @@ const (
 	// ActHubUpdateCheck and ActHubUpdateRelaunch: Coral Hub's owner had this computer check for an update, or relaunch into one it staged (#13340, #13258). The row names the Hub user.
 	ActHubUpdateCheck    = "hub_update_check"
 	ActHubUpdateRelaunch = "hub_update_relaunch"
+	// The rest of what the Operator does in the Inbox and the task pages (#13609): every click that changes something is a row. A task action's item is the task (kind "task"), and an agent
+	// action's item is the agent's session name (kind "agent").
+	ActTaskCreate   = "task_create"
+	ActTaskComplete = "task_complete"
+	ActTaskCancel   = "task_cancel"
+	ActTaskPublish  = "task_publish"
+	ActTaskEdit     = "task_edit"   // the words, the owner, the priority or the goal of a task
+	ActTaskRemind   = "task_remind" // a nudge, a reminder, or stopping one
+	ActTaskPark     = "task_park"   // park, put back, or release a task
+	ActTaskReply    = "task_reply"  // the Operator's words on a task
+	ActPromptAnswer = "prompt_answer"
+	ActWaitDismiss  = "wait_dismiss"
+	ActWaitSend     = "wait_send"
+	ActMessage      = "message" // a message the Operator posted to a team's board
 )
 
 // ActivityMeta is what a handler knows about the action, set on the context so the store's own transaction can write the row: the actor and source come from the verified request, never the body.

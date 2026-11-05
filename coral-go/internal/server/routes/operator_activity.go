@@ -138,6 +138,8 @@ func (h *BoardHandler) ListActivity(w http.ResponseWriter, r *http.Request) {
 var activityActions = map[string]bool{
 	board.ActApprove: true, board.ActChanges: true, board.ActDeny: true, board.ActIgnore: true, board.ActSupersede: true, board.ActUnignore: true, board.ActSave: true, board.ActUnsave: true, board.ActUndone: true,
 	board.ActAnswer: true, board.ActDismiss: true, board.ActGoalDone: true, board.ActProposal: true, board.ActMarkRead: true, board.ActGoalReview: true, board.ActSendReview: true, board.ActUnsendReview: true, board.ActHubUpdateCheck: true, board.ActHubUpdateRelaunch: true,
+	board.ActTaskCreate: true, board.ActTaskComplete: true, board.ActTaskCancel: true, board.ActTaskPublish: true, board.ActTaskEdit: true, board.ActTaskRemind: true, board.ActTaskPark: true, board.ActTaskReply: true,
+	board.ActPromptAnswer: true, board.ActWaitDismiss: true, board.ActWaitSend: true, board.ActMessage: true,
 	board.ActSkillApprove: true, board.ActSkillReject: true, board.ActSkillRemove: true, board.ActSkillImport: true, board.ActSkillScriptsAck: true, board.ActSkillSecretAck: true,
 }
 
