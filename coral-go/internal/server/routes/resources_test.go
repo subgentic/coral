@@ -272,3 +272,27 @@ func TestDefineTakesAMatchListAndShowsItBack(t *testing.T) {
 	code, _ = g.do("token:Plain Dev", "PUT", "/api/resources/mac-heavy", map[string]any{"slots": 1, "match": []string{"go test"}})
 	assert.Equal(t, 403, code, "an agent cannot add patterns: they decide what the hook claims")
 }
+
+// #13706: a wait that ended without a turn (the CLI's --timeout) asks to keep its place: it stays in line for a grace and the same claim again is the same place; a plain release still drops it.
+func TestAWaitThatTimedOutKeepsItsPlaceAndAPlainReleaseDropsIt(t *testing.T) {
+	g := newResRig(t)
+	for _, n := range []string{"Dev A", "Dev B", "Dev C"} {
+		g.subscribe("alpha", n, "Developer", false)
+	}
+	g.do("operator", "PUT", "/api/resources/mac-heavy", map[string]any{"slots": 1})
+	g.do("token:Dev A", "POST", "/api/resources/mac-heavy/claim", map[string]any{})
+	_, b := g.do("token:Dev B", "POST", "/api/resources/mac-heavy/claim", map[string]any{})
+	assert.EqualValues(t, 1, b["place"])
+	_, c := g.do("token:Dev C", "POST", "/api/resources/mac-heavy/claim", map[string]any{})
+	assert.EqualValues(t, 2, c["place"])
+
+	code, _ := g.do("token:Dev B", "POST", "/api/resources/mac-heavy/release", map[string]any{"keep_place": true})
+	assert.Equal(t, 200, code)
+	_, b = g.do("token:Dev B", "POST", "/api/resources/mac-heavy/claim", map[string]any{})
+	assert.EqualValues(t, 1, b["place"], "the same claim again is the same place, not the back of the line")
+
+	code, _ = g.do("token:Dev C", "POST", "/api/resources/mac-heavy/release", map[string]any{})
+	assert.Equal(t, 200, code)
+	_, c = g.do("token:Dev C", "POST", "/api/resources/mac-heavy/claim", map[string]any{})
+	assert.EqualValues(t, 2, c["place"], "a plain release leaves the line: the claim again joins behind")
+}

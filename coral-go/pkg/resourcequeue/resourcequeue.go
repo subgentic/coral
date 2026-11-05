@@ -55,6 +55,7 @@ type Entry struct {
 	Granted  time.Time // zero while waiting
 	Lease    time.Time // when the hold ends unless renewed; zero while waiting
 	Pin      int       // a person's override: bigger is nearer the front among the waiting (set by Move)
+	Away     time.Time // #13706: the agent's wait ended without a turn (its --timeout, its tool call) and its place is kept until this time; a claim from it again clears it. Zero: present
 }
 
 // Waiting reports whether the entry is still in line.
@@ -89,6 +90,8 @@ type Config struct {
 // Defaults.
 const (
 	DefaultLease       = 30 * time.Minute
+	DefaultAwayGrace   = 10 * time.Minute // how long a place is kept for an agent whose wait ended without a turn (#13706)
+	AwayClaimWindow    = 2 * time.Minute  // how long a slot that came to such a place waits for its agent before it passes on
 	DefaultMaxPerAgent = 3
 	DefaultAgeStep     = 3 * time.Minute // 10 points in about 30 minutes of waiting: one rank step of the board's task priorities (0, 10, 20, 30), so nothing starves behind a steady stream of the next class up
 	DefaultAgeCap      = 10
@@ -248,6 +251,12 @@ func (q *Queue) Claim(key string, who Claimant) (Result, error) {
 		if who.Priority > e.Priority {
 			e.Priority = who.Priority
 		}
+		if !e.Away.IsZero() { // the agent is back (#13706): its place is its own again, and a slot that came while it was away becomes a whole lease
+			e.Away = time.Time{}
+			if !e.Waiting() {
+				e.Lease = q.now().Add(r.lease())
+			}
+		}
 		res := q.resultOf(e)
 		err := q.save()
 		q.mu.Unlock()
@@ -309,6 +318,33 @@ func (q *Queue) Release(key, agent string) error {
 	return err
 }
 
+// Leave is for an agent whose wait ended without a turn (its --timeout, the tool call it waited in): a place in line is kept for grace, the agent's own claim again takes it back at the same place, and
+// when the grace ends (Reap) it goes. A slot that comes to such a place waits AwayClaimWindow for its agent, then passes on. A slot the agent already holds is given back, as Release does (#13706).
+func (q *Queue) Leave(key, agent string, grace time.Duration) error {
+	q.mu.Lock()
+	if _, ok := q.res[key]; !ok {
+		q.mu.Unlock()
+		return ErrNoResource
+	}
+	e := q.entryOf(key, agent)
+	if e == nil {
+		q.mu.Unlock()
+		return ErrNotHolder
+	}
+	if !e.Waiting() || grace <= 0 {
+		q.drop(e.ID)
+		granted := q.fill(key)
+		err := q.save()
+		q.mu.Unlock()
+		q.notify(granted)
+		return err
+	}
+	e.Away = q.now().Add(grace)
+	err := q.save()
+	q.mu.Unlock()
+	return err
+}
+
 // Reap ends the holds whose lease ran out and drops the entries of agents that are no longer alive, then grants the waiting. Call it from a timer; every other call also keeps the line honest.
 func (q *Queue) Reap() (ended []Entry, err error) {
 	q.mu.Lock()
@@ -318,6 +354,11 @@ func (q *Queue) Reap() (ended []Entry, err error) {
 	for _, e := range q.entries {
 		dead := q.cfg.Alive != nil && !q.cfg.Alive(e.Claimant.Agent)
 		expired := !e.Waiting() && !e.Lease.IsZero() && !now.Before(e.Lease)
+		if e.Waiting() && !e.Away.IsZero() && !now.Before(e.Away) { // a place kept for an agent that did not come back (#13706)
+			ended = append(ended, *e)
+			keys[e.Resource] = true
+			continue
+		}
 		if dead || expired {
 			ended = append(ended, *e)
 			keys[e.Resource] = true
@@ -542,6 +583,9 @@ func (q *Queue) fill(key string) []Entry {
 		e := line[0]
 		e.Granted = q.now()
 		e.Lease = e.Granted.Add(r.lease())
+		if !e.Away.IsZero() { // its agent is not waiting any more: a short window to come back, then the slot passes on
+			e.Lease = e.Granted.Add(min(r.lease(), AwayClaimWindow))
+		}
 		granted = append(granted, *e)
 	}
 	return granted

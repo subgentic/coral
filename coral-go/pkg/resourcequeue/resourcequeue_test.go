@@ -316,3 +316,81 @@ func TestAResourcesMatchListIsKeptCheckedAndCopied(t *testing.T) {
 		assert.ErrorIs(t, q.Define(Resource{Key: "mac", Slots: 1, Match: bad}), ErrBadMatch, "%q", bad)
 	}
 }
+
+// #13706: an agent whose wait ended without a turn (the CLI's --timeout, its tool call ending) keeps its place for a grace instead of rejoining at the back.
+func TestAPlaceLeftWithAGraceIsKeptAndTheSameClaimTakesItBack(t *testing.T) {
+	q, c := fixture(t, Config{})
+	claim(t, q, "mac", "holder", 0)
+	claim(t, q, "mac", "first", 0)
+	claim(t, q, "mac", "me", 0)
+	claim(t, q, "mac", "last", 0)
+	require.NoError(t, q.Leave("mac", "first", 10*time.Minute))
+	c.add(9 * time.Minute)
+	st, _ := q.Status("mac")
+	assert.Equal(t, []string{"first", "me", "last"}, names(st.Queue), "the place is kept inside the grace")
+	r := claim(t, q, "mac", "first", 0)
+	assert.Equal(t, 1, r.Place, "the same claim again is the same entry, at the same place")
+	c.add(20 * time.Minute)
+	_, err := q.Reap()
+	require.NoError(t, err)
+	st, _ = q.Status("mac")
+	assert.Equal(t, []string{"first", "me", "last"}, names(st.Queue), "a claim that came back is present again: no grace runs on it")
+}
+
+func TestAPlaceLeftAndNeverTakenBackGoesWhenTheGraceEnds(t *testing.T) {
+	q, c := fixture(t, Config{})
+	claim(t, q, "mac", "holder", 0)
+	claim(t, q, "mac", "gone", 0)
+	claim(t, q, "mac", "next", 0)
+	require.NoError(t, q.Leave("mac", "gone", 10*time.Minute))
+	c.add(10*time.Minute + time.Second)
+	_, err := q.Reap()
+	require.NoError(t, err)
+	st, _ := q.Status("mac")
+	assert.Equal(t, []string{"next"}, names(st.Queue), "after the grace the place is gone")
+}
+
+func TestASlotThatComesToAPlaceLeftWaitsOnlyAShortWhileForItsAgent(t *testing.T) {
+	var granted []string
+	q, c := fixture(t, Config{OnGrant: func(e Entry) { granted = append(granted, e.Agent) }})
+	claim(t, q, "mac", "holder", 0)
+	claim(t, q, "mac", "away", 0)
+	claim(t, q, "mac", "next", 0)
+	require.NoError(t, q.Leave("mac", "away", 10*time.Minute))
+	require.NoError(t, q.Release("mac", "holder"))
+	st, _ := q.Status("mac")
+	require.Equal(t, []string{"away"}, names(st.Holders))
+	assert.Equal(t, AwayClaimWindow, st.Holders[0].Lease.Sub(st.Holders[0].Granted), "an agent that is not there has a short window, not the whole lease")
+	c.add(AwayClaimWindow + time.Second)
+	_, err := q.Reap()
+	require.NoError(t, err)
+	st, _ = q.Status("mac")
+	assert.Equal(t, []string{"next"}, names(st.Holders), "unclaimed, the slot passes to the next in line")
+}
+
+func TestAnAgentThatComesBackToASlotGivenWhileAwayKeepsItForAWholeLease(t *testing.T) {
+	q, c := fixture(t, Config{})
+	claim(t, q, "mac", "holder", 0)
+	claim(t, q, "mac", "away", 0)
+	require.NoError(t, q.Leave("mac", "away", 10*time.Minute))
+	require.NoError(t, q.Release("mac", "holder"))
+	c.add(AwayClaimWindow / 2)
+	r := claim(t, q, "mac", "away", 0)
+	require.True(t, r.Granted)
+	assert.Equal(t, DefaultLease, r.Entry.Lease.Sub(c.now()), "back in time: a whole lease from now")
+	c.add(AwayClaimWindow + time.Second)
+	_, err := q.Reap()
+	require.NoError(t, err)
+	st, _ := q.Status("mac")
+	assert.Equal(t, []string{"away"}, names(st.Holders))
+}
+
+func TestLeavingAHoldIsReleasingItAndLeavingNothingIsAnError(t *testing.T) {
+	q, _ := fixture(t, Config{})
+	claim(t, q, "mac", "a", 0)
+	claim(t, q, "mac", "b", 0)
+	require.NoError(t, q.Leave("mac", "a", time.Minute))
+	st, _ := q.Status("mac")
+	assert.Equal(t, []string{"b"}, names(st.Holders), "a slot given back at once, as Release does")
+	assert.ErrorIs(t, q.Leave("mac", "nobody", time.Minute), ErrNotHolder)
+}

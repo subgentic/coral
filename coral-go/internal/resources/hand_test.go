@@ -33,16 +33,26 @@ func TestAHandClaimIsGivenBackWhenItsToolCallEnds(t *testing.T) {
 	assert.Empty(t, g.holders(), "the call ended: the slot went back with no release command")
 }
 
-func TestAWaitingHandClaimLeavesTheLineWhenItsCallEndsAndTheNextIsGranted(t *testing.T) {
+func TestAWaitingHandClaimKeepsItsPlaceForAGraceWhenItsCallEnds(t *testing.T) {
 	g := newHookRig(t)
 	g.handClaim("s-a", "Agent A", "call-a")
 	g.handClaim("s-b", "Agent B", "call-b") // waits
 	require.Len(t, g.queue(), 1)
-	g.h.After("s-b", "call-b") // its --wait ended (timeout, cancel): it leaves the line, as today
-	assert.Empty(t, g.queue())
+	g.h.After("s-b", "call-b") // its --wait ended (timeout, cancel): #13706, the place is kept for a grace, not dropped
+	require.Len(t, g.queue(), 1, "the place is still in line")
+	assert.Equal(t, "Agent B", g.queue()[0].Agent)
+	assert.False(t, g.queue()[0].Away.IsZero(), "and marked as kept for an agent that is away")
 	assert.Equal(t, []string{"Agent A"}, g.holders(), "the holder is untouched")
 	g.h.After("s-a", "call-a")
-	assert.Empty(t, g.holders())
+	assert.Equal(t, []string{"Agent B"}, g.holders(), "a slot that comes to the kept place is Agent B's, for the short window")
+}
+
+func TestAWaitingHandClaimOfASessionThatEndedLeavesTheLineAtOnce(t *testing.T) {
+	g := newHookRig(t)
+	g.handClaim("s-a", "Agent A", "call-a")
+	g.handClaim("s-b", "Agent B", "call-b") // waits
+	g.h.SessionEnded("s-b")
+	assert.Empty(t, g.queue(), "a gone agent keeps no place")
 }
 
 func TestAReleaseByHandThenAnotherClaimIsBoundToTheNewCall(t *testing.T) {
@@ -194,4 +204,19 @@ func TestAClaimWithNoKnownCallOrAnEmptyIdIsNeverBound(t *testing.T) {
 	g.h.After("s-a", "")
 	g.h.TurnEnded("s-b")
 	assert.Equal(t, []string{"Agent A"}, g.holders(), "no call to tie it to: its lease alone ends it")
+}
+
+// #13706, the Orchestrator's second case: a wait that ended (its tool call over) and the agent's held command run again must be the SAME place, not the back of the line.
+func TestAKeptPlaceIsTheSamePlaceWhenTheHeldCommandIsRunAgain(t *testing.T) {
+	g := newHookRig(t)
+	g.handClaim("s-a", "Agent A", "call-a")
+	g.handClaim("s-b", "Agent B", "call-b") // waits at 1
+	g.handClaim("s-c", "Agent C", "call-c") // waits at 2
+	g.h.After("s-b", "call-b")              // B's wait ended
+	msg := g.h.Before(t.Context(), "s-b", "s-b", "call-b2", heavy)
+	assert.Contains(t, msg, "number 1 in line", "B is still first, not behind C")
+	q := g.queue()
+	require.Len(t, q, 2)
+	assert.Equal(t, "Agent B", q[0].Agent)
+	assert.True(t, q[0].Away.IsZero(), "and it is present again: no grace runs on it")
 }
