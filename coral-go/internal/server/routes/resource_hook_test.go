@@ -87,8 +87,10 @@ func TestAHeavyBashCommandClaimsASlotAtTheHookPostAndGivesItBackWhenTheCallEnds(
 	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sidC, AgentType: "codex", AgentName: "Codex", WorkingDir: "/w"}))
 	members["codex-"+sidC] = "Agent C"
 	tokC := agentToken(t, h, sidC, "codex-"+sidC)
-	assert.Nil(t, post(tokC, sidC, "Bash", "t6", heavy)["refuse"], "the refusal is the Claude CLI's answer: another agent is not held")
-	assert.Empty(t, holders(), "and claims nothing")
+	assert.Nil(t, post(tokC, sidC, "Bash", "t6", heavy)["refuse"], "a Codex on a free machine runs the command (#13647)")
+	assert.Equal(t, []string{"Agent C"}, holders(), "and holds the slot meanwhile")
+	h.notePendingToolEvent(sidC, "tool_use", "t6")
+	assert.Empty(t, holders())
 }
 
 func TestASessionThatEndsGivesItsHeavySlotBack(t *testing.T) {
@@ -112,4 +114,49 @@ func TestASessionThatEndsGivesItsHeavySlotBack(t *testing.T) {
 	h.notePendingToolEvent(sid, "session_end", "")
 	st, _ = mgr.Queue().Status("mac-heavy")
 	assert.Empty(t, st.Holders)
+}
+
+// #13647: a Codex agent's shell command is held like Claude's, by the live session's agent type (not its name), for the shell tool names Codex's hooks use and only when the command is one plain string; an argument
+// list is not joined and read, another tool is untouched, and Claude's other tool names stay untouched.
+func TestACodexShellCommandIsHeldLikeClaudesAndAnArgumentListIsNotRead(t *testing.T) {
+	server, h, _, ss := setupSessionsTestServer(t)
+	ctx := context.Background()
+	mgr, err := resources.Open(resources.Options{AgeStep: -1})
+	require.NoError(t, err)
+	require.NoError(t, mgr.Queue().Define(resourcequeue.Resource{Key: "mac-heavy", Slots: 1, Match: []string{"go test ./..."}}))
+	sidX, sidY := "eeeeeeee-13647-a000-0000-000000000001", "eeeeeeee-13647-b000-0000-000000000002"
+	members := map[string]string{}
+	for sid, c := range map[string][2]string{sidX: {"codex", "Codex X"}, sidY: {"codex", "Codex Y"}} {
+		require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid, AgentType: c[0], AgentName: c[1], WorkingDir: "/w"}))
+		members[c[0]+"-"+sid] = c[1]
+	}
+	h.SetResourceHook(resources.NewHook(mgr, resources.HookOptions{Agent: func(_ context.Context, name string) (string, bool) { m, ok := members[name]; return m, ok }}))
+	tokX, tokY := agentToken(t, h, sidX, "codex-"+sidX), agentToken(t, h, sidY, "codex-"+sidY)
+	post := func(tok, sid, tool, id string, input map[string]any) map[string]any {
+		body, _ := json.Marshal(map[string]any{"session_id": sid, "tool_use_id": id, "tool_name": tool, "tool_input": input})
+		req, _ := http.NewRequest("POST", server.URL+"/api/sessions/live/x/pending-tool", strings.NewReader(string(body)))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set(store.SessionTokenHeader, tok)
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		var out map[string]any
+		_ = json.NewDecoder(resp.Body).Decode(&out)
+		return out
+	}
+	holders := func() int { st, _ := mgr.Queue().Status("mac-heavy"); return len(st.Holders) }
+	const heavy = "cd coral-go && SECRET=hunter2 go test ./... | tail"
+
+	assert.Nil(t, post(tokX, sidX, "shell", "c1", map[string]any{"command": []any{"bash", "-lc", heavy}})["refuse"], "an argument list is not read: it runs")
+	assert.Zero(t, holders(), "and claims nothing")
+	assert.Nil(t, post(tokX, sidX, "apply_patch", "c2", map[string]any{"command": heavy})["refuse"], "another tool is untouched")
+	assert.Zero(t, holders())
+	assert.Nil(t, post(tokX, sidX, "exec_command", "c3", map[string]any{"cmd": heavy})["refuse"], "a plain string in cmd is read: a free machine runs it")
+	assert.Equal(t, 1, holders())
+	out := post(tokY, sidY, "Bash", "c4", map[string]any{"command": heavy})
+	refuse, _ := out["refuse"].(string)
+	assert.Contains(t, refuse, "number 1 in line", "a second Codex is held")
+	assert.NotContains(t, refuse, "hunter2")
+	h.notePendingToolEvent(sidX, "tool_use", "c3")
+	assert.Equal(t, 1, holders(), "the slot goes to the one waiting")
 }

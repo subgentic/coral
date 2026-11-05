@@ -47,6 +47,7 @@ type autoHold struct {
 	name    string // its name
 	pattern string
 	calls   map[string]bool // tool_use ids of the matched calls still running
+	refused map[string]bool // tool_use ids of the matched calls this hook held: a CLI that ran one anyway says so at its end (#13647)
 	granted time.Time       // first seen holding the slot
 	window  time.Time       // before this a slot with no call yet is kept for its agent
 }
@@ -123,7 +124,7 @@ func (h *Hook) Before(ctx context.Context, session, name, toolUseID, command str
 		if err != nil {
 			return "" // queue trouble never stops a command
 		}
-		ah := &autoHold{entry: r.Entry.ID, session: session, name: name, pattern: pattern, calls: map[string]bool{}}
+		ah := &autoHold{entry: r.Entry.ID, session: session, name: name, pattern: pattern, calls: map[string]bool{}, refused: map[string]bool{}}
 		h.hold[key] = ah
 		if r.Granted {
 			ah.calls[toolUseID] = true
@@ -131,12 +132,17 @@ func (h *Hook) Before(ctx context.Context, session, name, toolUseID, command str
 			h.event(HookEvent{Kind: "claimed", Resource: res.Key, Pattern: pattern, Agent: agent, Session: session})
 			return ""
 		}
+		ah.refused[toolUseID] = true
 		h.event(HookEvent{Kind: "refused", Resource: res.Key, Pattern: pattern, Agent: agent, Session: session})
 		return refusal(res.Key, r.Place)
 	}
 	// in the line already (this agent's earlier refused call, or an explicit claim): still waiting
 	if ah := h.hold[key]; ah != nil {
 		ah.session = session
+		if ah.refused == nil {
+			ah.refused = map[string]bool{}
+		}
+		ah.refused[toolUseID] = true
 	}
 	_, place := placeOf(st, agent)
 	h.event(HookEvent{Kind: "refused", Resource: res.Key, Pattern: pattern, Agent: agent, Session: session})
@@ -178,9 +184,18 @@ func (h *Hook) After(session, toolUseID string) {
 	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	for _, ah := range h.hold {
-		if ah.session == session {
-			delete(ah.calls, toolUseID)
+	for k, ah := range h.hold {
+		if ah.session != session {
+			continue
+		}
+		delete(ah.calls, toolUseID)
+		if ah.refused[toolUseID] { // a call this hook held has ended: the CLI ran it anyway (it ignored the refusal). Its work runs, so its waiting place goes; a place that was granted since is its own, and stays
+			delete(ah.refused, toolUseID)
+			if st, err := h.m.Queue().Status(k.resource); err == nil {
+				if _, holding := entryOf(st, k.agent); !holding {
+					h.releaseLocked(k, ah, "ran anyway")
+				}
+			}
 		}
 	}
 	h.sweepLocked()
