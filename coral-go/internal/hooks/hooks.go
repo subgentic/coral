@@ -11,11 +11,13 @@ import (
 	"github.com/subgentic/coral/internal/executil"
 	"github.com/subgentic/coral/internal/tmux"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -27,7 +29,17 @@ func CoralBase() string {
 	if u := os.Getenv("CORAL_URL"); u != "" {
 		return strings.TrimRight(u, "/")
 	}
-	port := os.Getenv("CORAL_PORT")
+	port := strings.TrimSpace(os.Getenv("CORAL_PORT"))
+	host := strings.TrimSpace(os.Getenv("CORAL_HOST"))
+	if host != "" { // coral-board honours CORAL_HOST/CORAL_PORT the same way (#13695, C7); a wildcard bind address is not dialable
+		if host == "0.0.0.0" || host == "::" {
+			host = "127.0.0.1"
+		}
+		if port == "" {
+			port = strconv.Itoa(config.DefaultPort)
+		}
+		return "http://" + net.JoinHostPort(host, port)
+	}
 	if port == "" {
 		// Nothing says where Coral is: the address the running server recorded in its lock file, else the platform's own default (8450 on Windows,
 		// 8420 elsewhere): 8420 on Windows sent a command typed in a plain terminal to the wrong port, where this platform's Coral never listens (#235).
