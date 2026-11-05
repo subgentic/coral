@@ -1,0 +1,54 @@
+// The Inbox's search on a phone is the top pill (#13591, the Operator's screenshot): under 640 px, on an Inbox page with a search box (Needs you, Tasks, Goals) the pill at the top is that page's search
+// field, named for the open tab ("Search needs you", "Search tasks", ...), and the box under the tabs is not drawn; the Filters icon stays in the page, and the hamburger still opens the views.
+// What is typed there filters the page as the old box did. At 1280 nothing changes: the page keeps its own box and the top bar has no search field. Drives Chrome over CDP on the isolated dev server.
+const { connect } = require('./agent_view_harness');
+const BASE = require('./test_base').BASE;
+const FOLDERS = [['needs', 'Search needs you'], ['tasks', 'Search tasks'], ['goals', 'Search goals']];
+
+(async () => {
+    const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
+    const results = [];
+    const check = (label, cond, detail) => { results.push(!!cond); console.log(`[${cond ? 'PASS' : 'FAIL'}] ${label}${detail !== undefined ? ' - ' + detail : ''}`); };
+    const state = () => ev(`(() => { const vis = e => !!e && e.getClientRects().length > 0, t = document.getElementById('top-search'), q = document.querySelector('#inbox-view .list-bar-search'), tog = document.querySelector('#inbox-view .list-bar-toggle');
+        const r = e => { const b = e.getBoundingClientRect(); return { l: Math.round(b.left), r: Math.round(b.right), t: Math.round(b.top), b: Math.round(b.bottom) }; };
+        return { top: vis(t), topName: t && t.getAttribute('aria-label'), topPh: t && t.placeholder, topRect: vis(t) ? r(t) : null, box: vis(q), boxName: q && q.getAttribute('aria-label'), toggle: vis(tog), menu: vis(document.getElementById('top-menu-btn')), over: document.documentElement.scrollWidth - innerWidth }; })()`);
+    try {
+        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        for (const [label, w, h, mobile] of [['390', 390, 844, true], ['1280', 1280, 800, false]]) {
+            await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
+            await ev(`window.__coralReady.then(() => true)`);
+            await ev(`window.switchNavTab('hub-inbox'); true`);
+            await waitFor(`document.querySelectorAll('.view-list-item').length > 3`, 'the folders', 10000);
+            for (const [key, name] of FOLDERS) {
+                await ev(`(() => { const all = [...document.querySelectorAll('.view-list-item[data-key="${key}"]')]; (all.find(b => b.getClientRects().length > 0) || all[0]).click(); return true; })()`);
+                await waitFor(`!!document.querySelector('#inbox-view .list-bar-search')`, `${label}: the ${key} page's toolbar`, 10000);
+                await new Promise(r => setTimeout(r, 400)); // sleep-ok: the top field follows the page's redraw on the next frame
+                const s = await state();
+                if (mobile) {
+                    check(`${label}/${key}: the top pill is the search field, named "${name}"`, s.top && s.topName === name && s.topPh === name, JSON.stringify(s));
+                    check(`${label}/${key}: the box under the tabs is not drawn, the Filters icon is, the hamburger is, nothing is wider than the screen`, !s.box && s.toggle && s.menu && s.over <= 0, JSON.stringify(s));
+                    check(`${label}/${key}: the field is in the top bar and fills the row beside the hamburger`, s.topRect && s.topRect.t < 80 && s.topRect.r - s.topRect.l >= 200, JSON.stringify(s.topRect));
+                } else {
+                    check(`${label}/${key}: the page keeps its own box named "${name}" and the top bar has no search field`, !s.top && s.box && s.boxName === name, JSON.stringify(s));
+                }
+            }
+            if (mobile) {
+                // typing in the top field reaches the page's search: a word that matches nothing shows the page's empty state, and clearing it brings the page back
+                await ev(`(() => { const d = [...document.querySelectorAll('.view-list-item[data-key="needs"]')]; (d.find(b => b.getClientRects().length > 0) || d[0]).click(); return true; })()`);
+                await waitFor(`document.getElementById('top-search') && document.getElementById('top-search').getAttribute('aria-label') === 'Search needs you'`, 'back on Needs you', 5000);
+                await ev(`window.__seen = []; document.querySelector('#inbox-view .list-bar-search').addEventListener('input', e => window.__seen.push(e.target.value)); document.getElementById('top-search').focus(); true`);
+                await client.Input.insertText({ text: 'zzqq' }); await new Promise(r => setTimeout(r, 300)); // sleep-ok: the page debounces typing
+                check(`390: typing in the top field reaches the page's search box`, JSON.stringify(await ev(`window.__seen`)).includes('zzqq') && (await ev(`document.querySelector('#inbox-view .list-bar-search').value`)) === 'zzqq', JSON.stringify(await ev(`window.__seen`)));
+                await ev(`(() => { const d = [...document.querySelectorAll('.view-list-item[data-key="tasks"]')]; (d.find(b => b.getClientRects().length > 0) || d[0]).click(); return true; })()`);
+                await waitFor(`document.getElementById('top-search').getAttribute('aria-label') === 'Search tasks'`, 'Tasks', 5000);
+                check(`390: another tab's field has that tab's own words, not what was typed on Needs you`, (await ev(`document.getElementById('top-search').value`)) !== 'zzqq', await ev(`document.getElementById('top-search').value`));
+                await ev(`window.switchNavTab('agents'); true`); await new Promise(r => setTimeout(r, 300)); // sleep-ok: the field follows the view away
+                check(`390: on another view the pill is the view's name again and the top field is gone`, !(await state()).top && (await ev(`document.getElementById('top-menu-label').getClientRects().length > 0`)));
+            }
+        }
+    } finally { await client.close(); }
+    const failed = results.filter(r => !r).length;
+    if (failed) { console.log(`${failed} FAILED`); process.exit(1); }
+    console.log(`PASS the Inbox's search is the top pill on a phone (${results.length} checks)`);
+})().catch(e => { console.error(e); process.exit(1); });
