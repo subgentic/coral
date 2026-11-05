@@ -51,7 +51,9 @@ func checkKnownFlags(args []string) error {
 	case "queue":
 		spec = jsonOnly
 	case "resource":
-		spec = clihelp.FlagSpec{Bools: []string{"--json", "--wait"}, Values: []string{"--timeout", "--note", "--slots", "--machine", "--lease", "--allow", "--match"}, Positional: 3}
+		spec = clihelp.FlagSpec{Bools: []string{"--json", "--wait"}, Values: []string{"--timeout", "--note", "--slots", "--machine", "--lease", "--allow", "--match", "--pool"}, Positional: 3}
+	case "heavy":
+		spec = clihelp.FlagSpec{Values: []string{"--pool", "--timeout"}, Positional: -1} // everything after -- is the command
 	case "ask":
 		spec = clihelp.FlagSpec{Values: []string{"--note", "--board"}, Positional: 4}
 	case "goal":
