@@ -51,17 +51,26 @@ const BODY = () => ({
             assert.ok((await ev(`window.__reqs`)).some(r => /days=7/.test(r)), 'asked for 7 days');
             const k = await ev(`[...document.querySelectorAll('#cost-resource-queue .atab-kpi')].map(x => x.textContent.replace(/\\s+/g, ' ').trim())`);
             assert.match(k[0], /Overlapping heavy runs, before.*40 min a day/, JSON.stringify(k));
-            assert.match(k[1], /since the queue.*5 min a day.*88% less than before/, JSON.stringify(k));
+            assert.match(k[1], /since the queue.*5 min a day.*87% less than before/, JSON.stringify(k));
             assert.match(k[2], /Slot-request posts, since.*3 posts a day.*75% less than before/, JSON.stringify(k));
-            assert.match(k[3], /Median wait for a machine, since.*3 min.*about 14 min \(an estimate\)/, JSON.stringify(k));
+            assert.match(k[3], /Median wait for a slot, since.*3 min.*about 14 min \(an estimate\)/, JSON.stringify(k));
             assert.equal(await ev(`document.querySelectorAll('#cost-resource-queue .atab-kpi-d.atab-good').length`), 2, 'lower is shown as good');
+        });
+        await run('the four KPI cards and the panels sit inside the view at 1280 and at 390', async () => {
+            const inside = () => ev(`(() => { const host = document.getElementById('cost-resource-queue').getBoundingClientRect(); const bad = [...document.querySelectorAll('#cost-resource-queue .atab-kpi, #cost-resource-queue .atab-card')].filter(e => { const r = e.getBoundingClientRect(); return r.right > host.right + 1 || r.left < host.left - 1; }).map(e => e.className + ' ' + Math.round(e.getBoundingClientRect().right) + '>' + Math.round(host.right)); return bad; })()`);
+            assert.deepEqual(await inside(), [], 'at 1280');
+            await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await refresh();
+            await waitFor(`document.querySelectorAll('#cost-resource-queue .atab-kpi').length === 4`, 'the view on a phone', 10000);
+            assert.deepEqual(await inside(), [], 'at 390');
+            await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false }); await refresh();
+            await waitFor(`document.querySelectorAll('#cost-resource-queue .atab-kpi').length === 4`, 'back at 1280', 10000);
         });
         await run('the before/after table gives each side its days and its numbers, and says the before is an estimate', async () => {
             const t = await text('#cost-resource-queue .atab-card:has(table), #cost-resource-queue .atab-card');
             const all = await text('#cost-resource-queue');
             assert.match(all, /Before \(4\.67 days\)/); assert.match(all, /Since \(2 days\)/);
-            assert.match(all, /Heavy runs overlapping on one machine\s*40 min a day\s*5 min a day/, all.slice(0, 600));
-            assert.match(all, /Median wait for a machine\s*about 14 min\s*3 min/);
+            assert.match(all, /Heavy runs overlapping on one computer\s*40 min a day\s*5 min a day/, all.slice(0, 600));
+            assert.match(all, /Median wait for a slot\s*about 14 min\s*3 min/);
             assert.match(all, /they are estimates/);
             assert.ok(t.length > 0);
         });
@@ -73,8 +82,9 @@ const BODY = () => ({
         });
         await run('the resource table, the holds by agent and by command', async () => {
             const all = await text('#cost-resource-queue');
-            assert.match(all, /mac-heavy\s*23\s*61%\s*2 min\s*11 min\s*40%\s*19\s*4\s*3\s*1\s*0/, all.slice(all.indexOf('Use of each'), all.indexOf('Use of each') + 400));
-            assert.match(all, /mini\s*4\s*12\.5%\s*0 s\s*30 s\s*100%\s*0\s*4\s*0\s*0\s*1/);
+            assert.match(all, /mac-heavy\s*23\s*61%\s*2 min \/ 11 min\s*40%\s*19 \/ 4\s*3 \/ 1 \/ 0/, all.slice(all.indexOf('Use of each'), all.indexOf('Use of each') + 400));
+            assert.match(all, /mini\s*4\s*12\.5%\s*0 s \/ 30 s\s*100%\s*0 \/ 4\s*0 \/ 0 \/ 1/);
+            assert.equal(await ev(`document.querySelector('#cost-resource-queue .atab-card:has(.dt-table, table)')?.textContent.includes('columns hidden') || [...document.querySelectorAll('#cost-resource-queue .atab-card')].some(c => /columns hidden/.test(c.textContent))`), false, 'the resource table hides no column at 1280');
             assert.match(all, /Frontend Dev\s*9 holds · 4\.5 h/); assert.match(all, /go test \.\/\.\.\.\s*12 holds/);
             assert.match(all, /never the command itself/);
         });
@@ -110,13 +120,13 @@ const BODY = () => ({
             const all = await text('#cost-resource-queue');
             for (const w of ['40 min a day', '5 min a day', 'mac-heavy', 'Frontend Dev', 'Holds by command']) assert.ok(all.includes(w), w);
             if (process.env.RQ_SHOTS) for (const [w, h, mob] of [[1280, 1000, false], [390, 844, true]]) for (const theme of ['light', 'dark']) {
-                await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 2, mobile: mob });
+                await Emulation.setDeviceMetricsOverride({ width: w, height: mob ? 3600 : 2600, deviceScaleFactor: 1, mobile: mob }); // tall: the view scrolls inside its own box, so the shot shows all of it
                 await refresh(); if (mob) await open();
                 await waitFor(`document.querySelectorAll('#cost-resource-queue .atab-kpi').length === 4`, 'drawn', 10000);
                 await ev(`document.documentElement.setAttribute('data-theme', '${theme}'); window.scrollTo(0, 0); true`);
                 await new Promise(r => setTimeout(r, 700)); // sleep-ok: the repaint
-                const clip = await ev(`(() => { const r = document.getElementById('cost-resource-queue').getBoundingClientRect(); return { x: Math.max(0, r.left), y: Math.max(0, r.top), width: Math.min(r.width, innerWidth), height: Math.min(r.height, 3000), scale: 1 }; })()`);
-                require('node:fs').writeFileSync(`${process.env.RQ_SHOTS}-${w}-${theme}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png', clip, captureBeyondViewport: true })).data, 'base64'));
+                const clip = await ev(`(() => { const r = document.getElementById('cost-resource-queue').getBoundingClientRect(); return { x: 0, y: Math.max(0, r.top - 8), width: innerWidth, height: Math.min(r.height + 16, innerHeight - Math.max(0, r.top - 8)), scale: 1 }; })()`);
+                require('node:fs').writeFileSync(`${process.env.RQ_SHOTS}-${w}-${theme}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png', clip })).data, 'base64'));
             }
         });
     } finally { await client.close(); }

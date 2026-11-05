@@ -14,6 +14,7 @@ export const VIEWS = [
     { key: 'usage', label: 'Usage', question: 'Where does the usage go, day by day?' }, // the three below Overview (#11222): Overview stays the landing page
     { key: 'operator', label: 'Operator interaction', question: 'How often does the Operator have to step in?' },
     { key: 'inbox-' + 'chat', label: 'Inbox vs chat', question: 'Am I switching to the Inbox?' }, // #12158: the share of what the Operator does in the Inbox, and whether it is rising
+    { key: 'resource-queue', label: 'Resource queue', question: 'Is the queue helping us coordinate?' }, // #13671: how much the resource queue is used and whether heavy runs stopped overlapping
     { key: 'comm', label: 'Team communication', question: 'Who talks to whom, and how much?' },
     { key: 'per-commit', label: 'Tokens per commit', question: 'What did each commit cost?' },
     { key: 'task-time', label: 'Task time', question: 'How long do tasks take?' },

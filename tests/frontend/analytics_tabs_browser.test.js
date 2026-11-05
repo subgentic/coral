@@ -51,7 +51,7 @@ const TURNS = [{ timestamp: day(7) + 'T14:12:00.000Z', model: 'claude-fable-5-1'
 
         await run('the sidebar lists Overview first, then the four new views, below it', async () => {
             const names = await ev(`[...document.querySelectorAll('#cost-nav-list .row-btn')].map(b => b.textContent.trim())`);
-            assert.deepEqual(names.slice(0, 5), ['Overview', 'Usage', 'Operator interaction', 'Inbox vs chat', 'Team communication'], JSON.stringify(names));
+            assert.deepEqual(names.slice(0, 6), ['Overview', 'Usage', 'Operator interaction', 'Inbox vs chat', 'Resource queue', 'Team communication'], JSON.stringify(names));
         });
 
         for (const [w, theme] of [[1440, 'dark'], [1440, 'light'], [390, 'dark'], [390, 'light']]) {
