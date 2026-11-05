@@ -32,6 +32,8 @@ type ResourcesHandler struct {
 	M     *resources.Manager
 	Board *board.Store
 	Hook  *resources.Hook // the shell hook, swept with every call (#13645); may be nil
+	// ToolCall is the tool_use id of the call the session is running now (the Bash call that runs coral-board resource claim), "" when not known (#13718); nil: hand claims are not tied to a call.
+	ToolCall func(sessionID string) string
 }
 
 type entryView struct {
@@ -162,6 +164,9 @@ func (h *ResourcesHandler) Claim(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		h.fail(w, err)
 		return
+	}
+	if owner, ok := VerifiedSession(r.Context()); ok && owner != nil && h.Hook != nil && h.ToolCall != nil { // an agent's claim belongs to the tool call it is made in (#13718)
+		h.Hook.BindHand(owner.SessionID, who, name, h.ToolCall(owner.SessionID))
 	}
 	code := http.StatusOK
 	if !res.Granted {

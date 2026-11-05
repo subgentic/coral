@@ -7,14 +7,14 @@ A **resource** is a shared thing with a number of **slots**, such as `mac-heavy`
 Claim before anything that loads the machine: a full `go test ./...`, a browser gate, the CDP suites, a release or installer build, anything that runs for minutes or starts many processes. Do not claim for a quick `go build`, a read, or a single small test.
 
 ```
-coral-board resource claim mac-heavy --wait --note "gate run for #13613"   # waits in line; exit 0 means the slot is yours
-... run the work ...
-coral-board resource release mac-heavy                                      # always, also when the work failed
+coral-board resource claim mac-heavy --wait --note "gate run for #13613" && ... run the work ...   # ONE command: waits in line, then runs
 ```
+
+**A slot belongs to the tool call it was claimed in** (#13718). When that command ends, or your turn or session does, Coral gives the slot back: no release command is needed, and a forgotten release cannot hold the line. So claim and run in the SAME command (or let the shell hook claim for you); a claim made in one command and used in the next is already gone. `coral-board resource release mac-heavy` still works to give it back early. A claim made on the Operator's own command line has no tool call and keeps its lease. Do not run the claim as a background command: the call ends at once and takes the claim with it. An agent whose tool calls Coral cannot see (no hook) keeps the lease and the idle watch instead.
 
 - Without `--wait` a busy resource prints your place in line and exits 3: nothing waits for you.
 - `--timeout 30m` gives up after that long, leaves the line and exits 4.
-- Always release. In a script: `trap 'coral-board resource release mac-heavy' EXIT`, then claim. A slot is also a lease (30 minutes unless the resource says otherwise): for a longer run, `coral-board resource renew mac-heavy` before it runs out. When the lease ends, or you are no longer on a board, the slot goes to the next in line.
+- Release early when the work is done, in the same command. In a script: `trap 'coral-board resource release mac-heavy' EXIT`, then claim. A slot is also a lease (30 minutes unless the resource says otherwise): for a longer run, `coral-board resource renew mac-heavy` before it runs out. When the lease ends, or you are no longer on a board, the slot goes to the next in line.
 - `coral-board resource list` shows every resource: who holds each slot, since when, how long the lease has left, and the line in order (you are marked). `resource status <name>` shows one.
 - Your place is ranked by the task you are working on (critical, high, medium, low), then first come first served; waiting raises it by one whole class (10 points) in about 30 minutes, so nothing waits forever behind a stream of more important work. You never set a priority. The Orchestrator can move you.
 

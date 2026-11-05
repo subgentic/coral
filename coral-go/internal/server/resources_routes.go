@@ -46,6 +46,9 @@ func (s *Server) registerResources(r chi.Router, sess *routes.SessionsHandler) {
 		sess.SetResourceHook(hook)
 	}
 	h := &routes.ResourcesHandler{M: mgr, Board: s.boardStore, Hook: hook}
+	if sess != nil {
+		h.ToolCall = sess.CurrentToolCall // an agent's hand claim is tied to the tool call it is made in (#13718)
+	}
 	r.Get("/api/resources", h.List)
 	r.Get("/api/resources/{name}", h.Get)
 	r.Post("/api/resources/{name}/claim", h.Claim)

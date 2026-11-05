@@ -52,12 +52,56 @@ type autoHold struct {
 	window  time.Time       // before this a slot with no call yet is kept for its agent
 }
 
+// handBind is the tool call a hand claim (coral-board resource claim, run by an agent) was made in.
+type handBind struct {
+	session string // the session id
+	call    string // the tool_use id
+}
+
+// BindHand ties the hold or place agent has of resource to the tool call it was claimed in (#13718, the Operator: "coral tracks the tool call the agent does and when it's finished, release the slot"). When that call ends, or
+// the agent's turn or session does, the slot goes back with no release command, so a forgotten release cannot hold the line. A claim with no tool call (the Operator's command line) is never bound: it keeps its lease.
+func (h *Hook) BindHand(session, agent, resource, toolUseID string) {
+	if h == nil || session == "" || toolUseID == "" {
+		return
+	}
+	h.mu.Lock()
+	h.hand[holdKey{resource, agent}] = handBind{session: session, call: toolUseID}
+	h.mu.Unlock()
+}
+
+// releaseHands gives back the hand claims for which match is true.
+func (h *Hook) releaseHands(match func(handBind) bool, why string) {
+	h.mu.Lock()
+	var gone []holdKey
+	for k, b := range h.hand {
+		if match(b) {
+			gone = append(gone, k)
+			delete(h.hand, k)
+		}
+	}
+	h.mu.Unlock()
+	for _, k := range gone {
+		if err := h.m.Queue().Release(k.resource, k.agent); err == nil { // already released by hand: nothing to do
+			h.event(HookEvent{Kind: "released", Resource: k.resource, Agent: k.agent, Why: why})
+		}
+	}
+}
+
+// TurnEnded gives back every hand claim of the session when its turn ends: the safety net for a tool call that never reported its end.
+func (h *Hook) TurnEnded(session string) {
+	if h == nil {
+		return
+	}
+	h.releaseHands(func(b handBind) bool { return b.session == session }, "turn ended")
+}
+
 // Hook is the shell hook's state: which auto-claims are held for which calls.
 type Hook struct {
 	m    *Manager
 	o    HookOptions
 	mu   sync.Mutex
 	hold map[holdKey]*autoHold
+	hand map[holdKey]handBind // slots an agent claimed by hand, each tied to the tool call it was claimed in (#13718)
 
 	pmu   sync.Mutex // the process lists below, never held while a list is read
 	procs map[string]*procEntry
@@ -89,7 +133,7 @@ func NewHook(m *Manager, o HookOptions) *Hook {
 	if o.ClaimWindow <= 0 {
 		o.ClaimWindow = 2 * time.Minute
 	}
-	return &Hook{m: m, o: o, hold: map[holdKey]*autoHold{}, procs: map[string]*procEntry{}}
+	return &Hook{m: m, o: o, hold: map[holdKey]*autoHold{}, hand: map[holdKey]handBind{}, procs: map[string]*procEntry{}}
 }
 
 func (h *Hook) event(e HookEvent) {
@@ -204,6 +248,7 @@ func (h *Hook) After(session, toolUseID string) {
 	if h == nil {
 		return
 	}
+	h.releaseHands(func(b handBind) bool { return b.session == session && b.call == toolUseID }, "call ended")
 	h.mu.Lock()
 	for k, ah := range h.hold {
 		if ah.session != session {
@@ -231,6 +276,7 @@ func (h *Hook) SessionEnded(session string) {
 	if h == nil {
 		return
 	}
+	h.releaseHands(func(b handBind) bool { return b.session == session }, "gone")
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	for k, ah := range h.hold {
