@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { installDom, importUi } from './helpers/jsdom_env.mjs';
 const scenario = process.argv[2];
 if (!scenario) {
-    for (const name of ['local', 'self-hosted', 'refused', 'error', 'array', 'true', 'hung']) {
+    for (const name of ['local', 'self-hosted', 'refused', 'error', 'array', 'true', 'hung', 'yes']) {
         const r = spawnSync(process.execPath, [fileURLToPath(import.meta.url), name], { encoding: 'utf8' });
         assert.equal(r.status, 0, name + '\n' + r.stdout + r.stderr);
     }
@@ -18,7 +18,7 @@ if (!scenario) {
         calls++; assert.equal(url, '/api/account');
         if (scenario === 'hung') return new Promise(resolve => { release = resolve; });
         if (scenario === 'error') throw new Error('offline');
-        return { ok: scenario !== 'refused', json: async () => scenario === 'array' ? [{ needs_native: true, goal_preview: true }] : { needs_native: true, goal_preview: true } };
+        return { ok: scenario !== 'refused', json: async () => scenario === 'yes' ? { needs_native: 'yes', goal_preview: 'yes' } : scenario === 'array' ? [{ needs_native: true, goal_preview: true }] : { needs_native: true, goal_preview: true } };
     };
     const base = await importUi('server_base');
     const { state } = await importUi('state');
