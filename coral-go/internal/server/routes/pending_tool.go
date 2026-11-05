@@ -291,6 +291,8 @@ func (h *SessionsHandler) SetPendingTool(w http.ResponseWriter, r *http.Request)
 		ToolUseID string         `json:"tool_use_id"`
 		ToolName  string         `json:"tool_name"`
 		ToolInput map[string]any `json:"tool_input"`
+		// GateOnly asks only whether the resource queue holds this call (Pi's extension, #13647): the answer is {"ok":true} or the refusal, and nothing about the call is recorded.
+		GateOnly bool `json:"gate_only"`
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		errBadRequest(w, "invalid JSON")
@@ -318,6 +320,15 @@ func (h *SessionsHandler) SetPendingTool(w http.ResponseWriter, r *http.Request)
 	}
 	body.ToolName = truncateUTF8(body.ToolName, 200)
 	body.ToolUseID = truncateUTF8(body.ToolUseID, 200)
+	if body.GateOnly { // the verified session only (above): the queue's answer for this call, and nothing recorded
+		answer := map[string]any{"ok": true}
+		if refuse := h.resourceRefusal(r.Context(), owner, body.ToolName, body.ToolUseID, body.ToolInput); refuse != "" {
+			slog.Info("[resource] a command was held for a slot", "session", owner.SessionName)
+			answer["refuse"] = refuse
+		}
+		writeJSON(w, http.StatusOK, answer)
+		return
+	}
 	if why := h.patternKillRefusal(r.Context(), owner, body.ToolName, body.ToolInput); why != "" {
 		// The command is not run, so it is not a pending tool. The hook turns this into the CLI's refusal; only the reason is logged, never the command.
 		slog.Info("[guard] a command that stops processes by a pattern was refused", "session", owner.SessionName, "why", why)
@@ -528,7 +539,13 @@ func (h *SessionsHandler) resourceRefusal(ctx context.Context, owner *store.Sess
 			command, _ = input["command"].(string)
 		}
 	case at.Codex:
-		command = codexShellCommand(input)
+		if tool != "bash" { // "bash" is Pi's tool name
+			command = codexShellCommand(input)
+		}
+	case at.Pi: // Pi's extension asks before a bash call (gate_only); its tool is "bash" with the command in one string
+		if tool == "bash" {
+			command, _ = input["command"].(string)
+		}
 	}
 	if command == "" || len(command) > 64<<10 {
 		return ""
@@ -537,7 +554,7 @@ func (h *SessionsHandler) resourceRefusal(ctx context.Context, owner *store.Sess
 }
 
 // shellToolNames are the tools a shell command comes in: Claude's Bash, and the names Codex's hooks give one (0.155.1 says Bash; codexShellTools in the hook program is the same list).
-var shellToolNames = map[string]bool{"Bash": true, "shell": true, "exec_command": true, "local_shell": true}
+var shellToolNames = map[string]bool{"Bash": true, "shell": true, "exec_command": true, "local_shell": true, "bash": true}
 
 // codexShellCommand is the command line of a Codex shell call, read only when it is one plain string (command, or cmd). A call that gives an argument list (bash, -lc, text) has no readable command here: it is not
 // joined and matched, it runs (Security's rule on #13647; a list is parsed only by a rule that is tested).

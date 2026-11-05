@@ -120,13 +120,17 @@ func TestPiExtensionRegistersNotificationEventsOnly(t *testing.T) {
 		got = append(got, e[1])
 	}
 	assert.Equal(t, want, got)
-	assert.Equal(t, 1, strings.Count(piExtensionSource, "pi.on("), "one registration site, over EVENTS")
-	for _, gate := range []string{"tool_call", "tool_result", "input", "before_agent_start", "context", "context_with_system", "before_provider_request", "before_provider_headers", "message_end", "turn_end", "agent_before_settle", "user_bash", "session_before_switch", "session_before_fork", "session_before_compact"} {
+	assert.Equal(t, 2, strings.Count(piExtensionSource, "pi.on("), "two registration sites: the notification events (over EVENTS) and the one gate, tool_call (#13647)")
+	assert.Equal(t, 1, strings.Count(piExtensionSource, "pi.on('tool_call', gate)"), "the gate is registered once, and only for tool_call")
+	for _, gate := range []string{"tool_result", "input", "before_agent_start", "context", "context_with_system", "before_provider_request", "before_provider_headers", "message_end", "turn_end", "agent_before_settle", "user_bash", "session_before_switch", "session_before_fork", "session_before_compact"} {
 		for _, g := range regexp.MustCompile(`['"]`+gate+`['"]`).FindAllString(regexp.MustCompile(`(?m)//.*$`).ReplaceAllString(piExtensionSource, ""), -1) {
 			t.Errorf("the extension names the gate event %s (%s): it registers notification events only", gate, g)
 		}
 	}
 	code := regexp.MustCompile(`(?m)//.*$`).ReplaceAllString(piExtensionSource, "") // the comments say what it never does; only the code is checked
+	// tool_call is the one gate (the resource queue, #13647): named in its registration and as the hook program's argument, nowhere else.
+	assert.Equal(t, 2, strings.Count(code, "'tool_call'"), "tool_call appears in the registration and in the hook program's arguments only")
+	assert.Contains(t, code, "['--pi', 'tool_call', '--hooks-rev'")
 	for _, banned := range []string{"await ", "async ", "execSync", "spawnSync", "child_process.exec(", "require('node:net')", "require('node:http')", "require('node:https')", "fetch(", "writeFile", "appendFile", "XMLHttpRequest", "eval(", "new Function"} {
 		assert.NotContains(t, code, banned, "the extension never %s", banned)
 	}

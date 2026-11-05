@@ -3,9 +3,11 @@
 // in ~/.pi or in Pi's settings. It does NOT talk to Coral itself: it starts Coral's own hook program (`coral-hook-agentic-state --pi <event>`, the path written below by Coral) with a minimal JSON on its standard input.
 //
 // What it must never do (Security's conditions, design note v2):
-//   - block, delay, change or cancel anything in Pi: it registers only NOTIFICATION events (EVENTS), never a gate (tool_call, tool_result, input, before_agent_start, context*, message_end, turn_end, ...), returns
-//     undefined from every handler, never awaits (Pi awaits an async handler: a 3 s wait there holds the run), and swallows every error (a throw in some Pi handlers would block a tool);
-//   - read or send a prompt, a tool's arguments or result, a message, a key or a file: the payload is the allow-list below (an event's name, a tool NAME, flags, the model and thinking-level NAMES, token counts);
+//   - block, delay, change or cancel anything in Pi, except ONE thing (#13647, the resource queue): its NOTIFICATION events (EVENTS) return undefined and never await, and the only gate is tool_call for a bash
+//     call, which waits at most GATE_MS for Coral's hook program and blocks only when the program's one line of output is exactly Coral's fixed refusal (see gate below); anything else, an error or a timeout lets the
+//     call run. Every error is swallowed (a throw in some Pi handlers would block a tool);
+//   - read or send a prompt, a tool's arguments or result, a message, a key or a file: the payload is the allow-list below (an event's name, a tool NAME, flags, the model and thinking-level NAMES, token counts), and
+//     the one exception: a bash call's command line (at most CMD_MAX characters) goes to the hook program alone, to be matched against the resource queue's patterns, and is never kept or logged here;
 //   - start anything but the one hook program (an argument array, no shell, the path a JSON string written by Coral), or pass it anything but the variables Coral listed (an allow-list, never Pi's whole environment,
 //     so no provider key reaches a child);
 //   - write a file, open a socket, or load other code.
@@ -28,6 +30,11 @@ const NOTICE_OPENER = '[Coral board] ';        // the fixed start of what Coral 
 const NOTICE_MAX = 300;                         // its longest, in characters
 const NOTICE_TEXT = /^[\x20-\x7e]+$/;           // printable ASCII, one line
 const STDOUT_MAX = 1024;                        // what is read of a hook's standard output
+const GATE_MS = 1500;                           // the longest a bash call waits for Coral's hook program (a ceiling, not a delay: the program answers at once when no resource has patterns)
+const CMD_MAX = 16384;                          // the longest bash command forwarded; a longer one is not asked about and runs
+const REFUSE_OPENER = 'Coral held this command: '; // the fixed start of Coral's refusal (resources.refusal)
+const REFUSE_MAX = 400;                         // its longest, in characters
+const ASKED_MAX = 64;                           // bash call ids remembered, so their end is always reported (the throttle never drops it)
 const INJECT_EVERY_MS = 30 * 1000;              // at most one injection this often
 const INJECT_WINDOW_MS = 10 * 60 * 1000, INJECT_PER_WINDOW = 3; // and three in this window
 
@@ -39,6 +46,7 @@ function create(deps) {
   const active = !!(config && typeof config.hookBin === 'string' && config.hookBin && Array.isArray(config.envNames) && env.CORAL_SESSION_NAME);
   const childEnv = () => { const out = {}; for (const k of config.envNames) { if (typeof k === 'string' && env[k] !== undefined) out[k] = env[k]; } return out; };
   const queue = []; let sending = false; let lastTool = -Infinity;
+  const asked = new Set(); // ids of bash calls the hook program was asked about: their end is reported whatever the throttle says, so a held slot is given back
   const usage = { input: 0, output: 0, cost: 0, turns: 0, model: undefined, seen: false };
   let running = false; // an agent run has started and not settled
   let runs = 0;        // how many runs have started: a settle's delivery is for the latest run only
@@ -91,9 +99,10 @@ function create(deps) {
     start(item, () => setTimer(drain, 0));
   }
   const tool = (event, e, extra) => {
-    const t = now(); if (t - lastTool < TOOL_EVERY_MS) return; lastTool = t;
     const toolName = name(e && e.toolName, 60); if (!toolName) return;
     const id = name(e && e.toolCallId, 128);
+    const mustSend = event === 'tool_execution_end' && id && asked.delete(id); // the end of a call the queue may hold a slot for
+    if (!mustSend) { const t = now(); if (t - lastTool < TOOL_EVERY_MS) return; lastTool = t; }
     send(event, { tool_name: toolName, ...(id ? { tool_use_id: id } : {}), ...extra });
   };
   const noteUsage = e => {
@@ -127,6 +136,39 @@ function create(deps) {
     running = false;
     start({ event: 'session_shutdown', payload: p }, null);
   };
+  // The resource queue's gate (#13647): a bash call is shown to Coral's hook program (`--pi tool_call`, the command on its standard input as JSON) before it runs, and waits for its one line of output. Pi blocks the call only
+  // when that line is exactly {"refuse": "<Coral's fixed text>"}: one key, printable ASCII, starts with Coral's opener, at most REFUSE_MAX characters; the reason Pi shows is that text, never anything of the command.
+  // Anything else, an error, a missing program or no answer in GATE_MS lets the call run (a guard against overlap, not a gate on work).
+  function gate(e) {
+    try {
+      if (!active || closing || !e || e.toolName !== 'bash') return undefined;
+      const id = name(e.toolCallId, 128);
+      const command = e.input && e.input.command;
+      if (!id || typeof command !== 'string' || !command || command.length > CMD_MAX) return undefined;
+      return new Promise(resolve => {
+        let done = false; let out = ''; let timer = null;
+        const finish = value => { if (done) return; done = true; resolve(value); };
+        const verdict = () => {
+          if (!out || out.length > STDOUT_MAX) return undefined;
+          let parsed; try { parsed = JSON.parse(out); } catch (x) { return undefined; }
+          if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return undefined;
+          const keys = Object.keys(parsed); const text = parsed.refuse;
+          if (keys.length !== 1 || keys[0] !== 'refuse' || typeof text !== 'string') return undefined;
+          if (text.length > REFUSE_MAX || !text.startsWith(REFUSE_OPENER) || !NOTICE_TEXT.test(text)) return undefined;
+          return { block: true, reason: text };
+        };
+        try {
+          const child = spawn(config.hookBin, ['--pi', 'tool_call', '--hooks-rev', String(config.rev || 1)], { detached: true, stdio: ['pipe', 'pipe', 'ignore'], env: childEnv(), windowsHide: true, shell: false });
+          child.on('error', () => finish(undefined));
+          child.on('close', () => { if (asked.size >= ASKED_MAX) asked.clear(); asked.add(id); finish(verdict()); });
+          if (child.stdout) { child.stdout.on('error', () => {}); child.stdout.on('data', c => { if (out.length <= STDOUT_MAX) out += String(c).slice(0, STDOUT_MAX + 1 - out.length); }); }
+          if (child.stdin) { child.stdin.on('error', () => {}); child.stdin.end(JSON.stringify({ tool_name: 'bash', tool_use_id: id, command })); }
+          timer = setTimer(() => { try { child.kill(); } catch (x) { /* gone already */ } finish(undefined); }, GATE_MS); if (timer && timer.unref) timer.unref();
+          child.unref();
+        } catch (x) { finish(undefined); }
+      });
+    } catch (x) { return undefined; }
+  }
   const handlers = {
     session_start: e => send('session_start', { reason: name(e && e.reason, 20) }),
     agent_start: () => { running = true; runs += 1; send('agent_start', {}); },
@@ -139,6 +181,7 @@ function create(deps) {
   return function register(pi) {
     if (!active) return;
     piRef = pi;
+    try { pi.on('tool_call', gate); } catch (e) { /* a Pi that does not know tool_call: no gate */ }
     for (const ev of EVENTS) {
       try { pi.on(ev, (event) => { try { handlers[ev](event); } catch (e) { /* never into Pi */ } return undefined; }); } catch (e) { /* an event this Pi does not know */ }
     }

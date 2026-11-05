@@ -33,6 +33,10 @@ func main() {
 	if !ok {
 		return
 	}
+	if opts.piGate { // Pi's resource gate (pi_gate.go): one line of refusal on standard output or nothing, and no event is recorded
+		runPiGate(d)
+		return
+	}
 	agyEvent := opts.agyEvent
 	agyModel := agyModelOf(d, agyEvent)               // read before fromAgy rewrites the payload
 	agyConversation := agyConversationOf(d, agyEvent) // read before fromAgy rewrites the payload
@@ -320,6 +324,7 @@ func claudePermissionMode(d map[string]any) string {
 type hookArgs struct {
 	sessionClear bool   // --session-clear: a /clear
 	agyEvent     string // --agy <event>: an Antigravity hook
+	piGate       bool   // --pi tool_call: Coral's Pi extension asks whether a bash call must wait for a shared machine's slot (pi_gate.go)
 	piEvent      string // --pi <event>: Coral's Pi extension (pi_events.go); only an event of piEventNames
 	hermesEvent  string // --hermes <event>: Coral's entry in Hermes's config.yaml (hermes_events.go); only an event of hermesEventNames
 	hooksRev     int    // --hooks-rev N: the hook set's revision (#3655 F3); 0 when absent or not a positive number
@@ -335,6 +340,7 @@ func parseArgs(args []string) hookArgs {
 			o.agyEvent = args[i+1]
 		case arg == "--pi" && i+1 < len(args):
 			o.piEvent = piEventNames[args[i+1]]
+			o.piGate = args[i+1] == "tool_call"
 		case arg == "--hermes" && i+1 < len(args):
 			o.hermesEvent = hermesEventNames[args[i+1]]
 		case arg == "--hooks-rev" && i+1 < len(args):
