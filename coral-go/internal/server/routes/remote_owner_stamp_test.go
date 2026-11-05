@@ -146,3 +146,66 @@ func TestAWidenedClickIsSignedOnlyForASignInSessionAndARemoteThatAcceptsIt(t *te
 	}), "this computer's own browser (sign-in off) had a widened click signed")
 	assert.Empty(t, send(func(r *http.Request) { r.Header.Set("Authorization", "Bearer the-hubs-own-key") }), "a script's widened click was signed")
 }
+
+// #13725 (Security's INFO 7): the widened routes carry deletes and goal edits on the dashboard cookie, so a page on ANOTHER SITE that rides a valid cookie must be refused at the hub by the global foreign-origin guard
+// (#3511, the real ForeignBrowserWrites ahead of the identity layer and the mount, as router.go orders them) and never reach the remote: not the click, not the generation read, not a stamp.
+func TestACrossSitePageRidingASignInCookieIsRefusedAtTheHubAndNothingIsSigned(t *testing.T) {
+	db, err := storetest.Open(t, filepath.Join(t.TempDir(), "s.db"))
+	require.NoError(t, err)
+	t.Cleanup(func() { db.Close() })
+	var mu sync.Mutex
+	var stamp string
+	reached := 0
+	rem := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.ReadAll(r.Body)
+		mu.Lock()
+		reached++
+		if r.URL.Path != "/api/health" {
+			stamp = r.Header.Get(hubowner.Header)
+		}
+		mu.Unlock()
+		if r.URL.Path == "/api/health" {
+			_, _ = io.WriteString(w, `{"status":"ok","hub_owner_routes":2}`)
+		}
+	}))
+	t.Cleanup(rem.Close)
+	o := NewIdentityObserver(db, nil, func(*http.Request) bool { return true }) // every request holds a valid sign-in cookie
+	o.SetVerifiers(func(*http.Request) bool { return true }, nil)
+	r := chi.NewRouter()
+	r.Use(ForeignBrowserWrites(nil))
+	r.Use(o.Middleware)
+	target := proxy.HTTPTarget{URL: rem.URL, AllowPrivate: true, OwnerSecret: strings.Repeat("ab", 32), RemoteID: "ssh-box"}
+	target.APIKey = remoteStampTestKey
+	MountRemoteProxy(r, ownerResolver{target})
+	hub := httptest.NewServer(r)
+	t.Cleanup(hub.Close)
+	send := func(mutate func(*http.Request)) (int, string) {
+		req, _ := http.NewRequest("POST", hub.URL+"/api/remote/ssh-box/api/board/team/tasks/5/complete", strings.NewReader(`{"note":"done"}`))
+		req.Header.Set("Content-Type", "application/json")
+		mutate(req)
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		b, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		return resp.StatusCode, string(b)
+	}
+	for name, mutate := range map[string]func(*http.Request){
+		"another site's Origin":    func(r *http.Request) { r.Header.Set("Origin", "http://evil.example") },
+		"Sec-Fetch-Site":           func(r *http.Request) { r.Header.Set("Sec-Fetch-Site", "cross-site") },
+		"a repeated Origin header": func(r *http.Request) { r.Header.Add("Origin", hub.URL); r.Header.Add("Origin", "http://evil.example") },
+	} {
+		code, body := send(mutate)
+		assert.Equal(t, http.StatusForbidden, code, name)
+		assert.Contains(t, body, "foreign_origin", name)
+	}
+	mu.Lock()
+	assert.Zero(t, reached, "the remote was not reached at all: no click, no generation read")
+	assert.Empty(t, stamp, "nothing was signed")
+	mu.Unlock()
+	// the page's own origin with the same cookie: signed
+	code, _ := send(func(r *http.Request) { r.Header.Set("Origin", hub.URL); r.Header.Set("Sec-Fetch-Site", "same-origin") })
+	assert.Equal(t, http.StatusOK, code)
+	mu.Lock()
+	assert.NotEmpty(t, stamp, "the dashboard's own page was signed")
+	mu.Unlock()
+}
