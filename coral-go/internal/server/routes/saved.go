@@ -15,6 +15,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/pkg/redact"
@@ -271,6 +272,7 @@ func (h *SystemHandler) SavedAdd(w http.ResponseWriter, r *http.Request) {
 		errInternalServer(w, "could not save the message")
 		return
 	}
+	noteActivity(r, board.ActSavedAdd, "message", strconv.FormatInt(out.ID, 10), "", "", "") // the row names the bookmark that now exists, so it can be opened (#13621)
 	writeJSON(w, http.StatusOK, out)
 }
 

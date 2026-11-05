@@ -206,6 +206,7 @@ func (h *BoardHandler) CreateGoal(w http.ResponseWriter, r *http.Request) {
 	h.announceGoalDriver(project, actor, g, "")
 	h.announceGoalToOrchestrator(project, actor, g)
 	h.markMadeByOrchestrator(r.Context(), project, g)
+	noteActivity(r, board.ActGoalCreate, "goal", strconv.FormatInt(g.ID, 10), project, g.Title, "") // the new goal's number, so the row opens it (#13621)
 	writeJSON(w, http.StatusCreated, g)
 }
 

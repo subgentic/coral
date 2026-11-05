@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -225,6 +226,7 @@ func (h *BoardHandler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		errInternalServer(w, err.Error()) // the task was made, its reminder was not
 		return
 	}
+	noteActivity(r, board.ActTaskCreate, "task", strconv.FormatInt(task.ID, 10), project, task.Title, "") // the new task's number, so the row opens it (#13621)
 	writeJSON(w, http.StatusCreated, task)
 }
 
