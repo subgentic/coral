@@ -81,3 +81,11 @@ func TestEveryCoralAgentCommandTheUsingCoralSkillNamesExists(t *testing.T) {
 		assert.Regexp(t, "(?m)^\\s*"+first+"\\b", usage, "coral-agent "+first+" is named by the skill but is not a coral-agent command")
 	}
 }
+
+// agy takes the whole launch text as ONE command-line argument (-i), and on Windows an embedded double quote ends that argument early: the text after it was split off as another argument (windows-tests on the
+// trial-250 gate, TestAnOptionLikePromptReachesEveryCLIAsThePrompt: "-i" followed by the text up to ...--ask "@Operator, then <question>`...). So the launch section holds no double quote at all.
+func TestTheLaunchSectionHoldsNoDoubleQuote(t *testing.T) {
+	section := LaunchSection()
+	require.NotEmpty(t, section)
+	assert.NotContains(t, section, `"`, "an embedded double quote splits agy's -i argument on Windows")
+}
