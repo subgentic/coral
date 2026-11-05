@@ -362,7 +362,7 @@ function assertFits(v, what) {
             const tab = await openTab({ contextId: ctx, width: 390, height: 844, mobile: true });
             tabs.push(tab);
             v = await show(tab, A, eighty);
-            v = await settled(tab, 'the chosen 14 drawn on a phone', 'v.font === 14', 8000).catch(() => v); // the size is read from the settings as the terminal is built: wait for it, then say what was drawn
+            v = await settled(tab, 'the chosen 14 drawn on a phone', 'v.font === 14', 30000).catch(() => v); // the size is read from the settings as the terminal is built: wait for it (Settings can arrive after the phone default on a loaded runner, as the 13 step below allows: 8 s was the retry-pass in trial-250's gate), then say what was drawn
             assert.equal(v.font, 14, 'a chosen 14 is drawn at 14 on a phone');
             await tab.close(); tabs.pop();
             assert.equal((await put({ terminal_font_size: '13' })).status, 200);
