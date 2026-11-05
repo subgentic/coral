@@ -63,6 +63,7 @@ const STUB = `(() => { const real = window.fetch; window.__calls = []; window.__
             assert.match(text, /cdp-suite inbox_\*/, at + 'the note is the pattern as text');
             assert.equal(await ev(`/rm -rf|\\$\\(/.test(document.getElementById('group-table-view').textContent)`), false, at + 'no command is shown');
             assert.equal(await ev(`document.documentElement.scrollWidth <= document.documentElement.clientWidth`), true, at + 'no sideways scroll');
+            assert.equal(await ev(`[...document.querySelectorAll('.phone-fab')].some(e => e.getClientRects().length > 0)`), false, at + 'no + button on the Queue folder: nothing to create');
             await themed('automations-queue', w);
 
             // the actions: desktop buttons, a phone's ⋯ menu
