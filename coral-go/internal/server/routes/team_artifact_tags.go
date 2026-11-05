@@ -110,6 +110,9 @@ func (h *BoardHandler) teamHasManagedArtifact(ctx context.Context, project, id s
 
 // teamManagedArtifact is the team's row for the object id (its name, and who uploaded it), or false when it is not one of the team's.
 func (h *BoardHandler) teamManagedArtifact(ctx context.Context, project, id string) (teamArtifact, bool) {
+	if project == noTeamBoardID { // the files of agents on no team (#13532)
+		return h.noTeamManagedArtifact(ctx, id)
+	}
 	subscribers, err := h.bs.TeamSubscriberSessions(ctx, project)
 	if err != nil {
 		return teamArtifact{}, false

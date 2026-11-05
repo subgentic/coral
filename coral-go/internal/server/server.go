@@ -130,8 +130,9 @@ func NewWithKey(cfg *config.Config, db *store.DB, backend ptymanager.TerminalBac
 		agent.SetBoardGoalsBrief(boardGoalsPromptBlock(boardStore)) // an agent's board system prompt lists the board's open goals (#7296)
 	}
 	if db != nil {
-		routes.SetUploaderLookup(routes.NewUploaderLookup(store.NewSessionStore(db), boardStore)) // each upload records its board, agent and role (#5575)
-		routes.SetArtifactCircle(routes.NewArtifactCircle(store.NewSessionStore(db), boardStore)) // the one artifact read check: an agent reads what its team's owner owns (#5577)
+		routes.SetUploaderLookup(routes.NewUploaderLookup(store.NewSessionStore(db), boardStore))       // each upload records its board, agent and role
+		routes.SetUploaderTeamCheck(routes.NewUploaderTeamCheck(store.NewSessionStore(db), boardStore)) // the one decision that must not guess: a file for review needs to know the team (#13527) (#5575)
+		routes.SetArtifactCircle(routes.NewArtifactCircle(store.NewSessionStore(db), boardStore))       // the one artifact read check: an agent reads what its team's owner owns (#5577)
 	}
 	applyBoardRekeys(context.Background(), boardStore, db, cfg.CoralDir())
 

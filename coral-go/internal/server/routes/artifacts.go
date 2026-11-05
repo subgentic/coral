@@ -229,6 +229,28 @@ func (h *SessionsHandler) uploadAgentArtifact(w http.ResponseWriter, r *http.Req
 		reviewQuestion = q
 	}
 
+	// The board a file for review is kept under (#13527): the uploader's team, or the reserved key for an agent on none. It is told from the CHECKED lookup, so a store that cannot answer is a 500 and never a "no team"
+	// that files the review under the wrong key (Security's INFO on #13524).
+	uploadForReview := hasTag(board.CleanArtifactTags(r.URL.Query()["tag"]), tagForReview)
+	reviewBoard := ""
+	if uploadForReview {
+		team, terr := uploaderTeamChecked(sid)
+		if terr != nil {
+			slog.Warn("[artifacts] the team of an upload for review could not be checked", "error", terr)
+			errInternalServer(w, "could not check the agent's team")
+			return
+		}
+		if reviewBoard = team; reviewBoard == "" {
+			reviewBoard = noTeamBoardID
+		}
+	}
+	boardOfUpload := func() string { // what the upload's tags, question and kind are kept under
+		if reviewBoard != "" {
+			return reviewBoard
+		}
+		b, _, _ := uploaderOf(sid)
+		return b
+	}
 	// The kind of a file for review (#12144): checked against the task rows and the roster before a byte is stored; no --kind is a plain file.
 	kind, kindRefused := h.uploadKindFor(r.Context(), r, taskID, hasTag(board.CleanArtifactTags(r.URL.Query()["tag"]), tagForReview))
 	if kindRefused != "" {
@@ -321,7 +343,7 @@ func (h *SessionsHandler) uploadAgentArtifact(w http.ResponseWriter, r *http.Req
 	// else's plain file for review by uploading the identical bytes with --kind. The asked kind is then ignored, and the reply says so.
 	kindIgnored := false
 	if kind != "" && h.bs != nil {
-		if teamBoard, _, _ := uploaderOf(sid); teamBoard != "" {
+		if teamBoard := boardOfUpload(); teamBoard != "" {
 			onList := false
 			if pre, perr := h.bs.ArtifactTags(r.Context(), teamBoard); perr != nil || len(pre[hexID]) > 0 {
 				onList = true // already tagged on this board, or not readable: never written on a guess
@@ -336,7 +358,7 @@ func (h *SessionsHandler) uploadAgentArtifact(w http.ResponseWriter, r *http.Req
 	}
 	var tags []string
 	if asked := board.CleanArtifactTags(r.URL.Query()["tag"]); len(asked) > 0 { // --tag (#8583): the team's tags of this object, added to what it already has
-		if teamBoard, _, _ := uploaderOf(sid); teamBoard != "" && h.bs != nil {
+		if teamBoard := boardOfUpload(); teamBoard != "" && h.bs != nil {
 			var terr error
 			if tags, terr = h.bs.AddArtifactTags(r.Context(), teamBoard, hexID, asked); terr != nil {
 				slog.Warn("[artifacts] the tags of an upload were not recorded", "digest", hexID, "error", terr)
@@ -349,14 +371,14 @@ func (h *SessionsHandler) uploadAgentArtifact(w http.ResponseWriter, r *http.Req
 		}
 	}
 	if kind != "" && h.bs != nil { // the checked kind of this file, written once (the same bytes uploaded again cannot change it)
-		if teamBoard, _, _ := uploaderOf(sid); teamBoard != "" {
+		if teamBoard := boardOfUpload(); teamBoard != "" {
 			if _, kerr := h.bs.SetArtifactKind(r.Context(), teamBoard, hexID, kind, sid, time.Now()); kerr != nil {
 				slog.Warn("[artifacts] the kind of an upload for review was not recorded", "digest", hexID, "error", kerr)
 			}
 		}
 	}
 	if reviewQuestion != "" && h.bs != nil && hasTag(tags, tagForReview) { // kept with the upload's own session: no other agent's tag or question changes it, and a person's edit of the tags does not drop it
-		if teamBoard, _, _ := uploaderOf(sid); teamBoard != "" {
+		if teamBoard := boardOfUpload(); teamBoard != "" {
 			if _, qerr := h.bs.SetArtifactQuestion(r.Context(), teamBoard, hexID, reviewQuestion, sid, time.Now()); qerr != nil {
 				slog.Warn("[artifacts] the question of an upload for review was not recorded", "digest", hexID, "error", qerr)
 			}
@@ -619,3 +641,7 @@ func notViewableForReview(name, mediaType string) string {
 
 // questionRequiredText is the refusal of the "for review" tag on an upload with no question.
 const questionRequiredText = "a file tagged \"for review\" needs --question \"<what the Operator is to decide, one line, at most 140 characters>\" (for example --question \"Approve this phone layout for the Goals list?\"): the review row shows it above the file. Test screenshots and logs are not for review: upload them without the tag and link them in your post."
+
+// noTeamBoardID is the reserved key a no-team agent's files for review are kept under (#13527): an agent that belongs to no team has no board, and everything a file for review keeps (its tags, its question, its kind) is
+// keyed by a board. It is not a board anyone can have (a team's id is a name; this starts with a tilde) and no team route is ever given it; the Inbox's list of the files of agents with no team reads it, and nothing else does.
+const noTeamBoardID = "~no-team"

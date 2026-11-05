@@ -2,7 +2,7 @@ import { artifactRevision, artifactsUnchanged, onArtifactsRev } from './artifact
 import { setReviewCacheReader } from './ask_filter.js';
 /* Review artifacts use the same owner-protected team list and tags routes as Artifacts.
  * After the Inbox first opens, keep its badge updated on other tabs without eager startup reads. */
-import { fetchProjects, sourcesKey } from './board_fetch.js';
+import { fetchReviewProjects, sourcesKey } from './board_fetch.js';
 import { boardFetch, boardArtifactPage, nextArtifactPage, keyLabel, splitKey } from './server_base.js';
 import { hideAsksWhen } from './ask_filter.js';
 import { importOnce } from './import_once.js';
@@ -90,6 +90,7 @@ async function readTeam(team, mutedOut = null, stamp = {}) {
         const token = artifactRevision(data.artifacts_rev);
         stamp.rev = pages === 0 ? token : stamp.rev === token ? token : null;
         for (const a of data.artifacts || []) {
+            if (splitKey(team).name === '~no-team' && a.board_id !== '~no-team') continue;
             const decidedWithNews = a.new_comments > 0 && (a.tags?.includes('approved') || a.tags?.includes('denied')) && !a.tags.includes('for review'); // a file the Operator decided that agents replied about in their thread: the server puts it in this list (#12097), marked and counted once
             if (!(a.tags?.includes('for review') || decidedWithNews) || a.tags.includes('saved') || a.tags.includes('ignored') || a.tags.includes('superseded') || (a.tags.includes('changes requested') && !(a.new_comments > 0)) || !a.available || seen.has(a.id)) continue; // changes requested without news is the agent's turn (needsYouFile's rule, #11985, #12026); // changes requested: the agent's turn, so the file leaves Needs you and its counts; its next version comes back as a new item (#11985). Artifacts and the goal still show it as changes requested // a saved file stays tagged for review (its decisions work) but is not in Needs you (#11641)
             const hex = /(?:sha256:|coral:\/\/artifacts\/)?([a-f0-9]{64})$/i.exec(a.uri || a.digest || a.id || '')?.[1];
@@ -129,7 +130,7 @@ export function refreshReviews(force = false, { reuse = false } = {}) { // reuse
     lastRead = Date.now();
     pending = (async () => {
         try {
-            const projects = await fetchProjects();
+            const projects = await fetchReviewProjects();
             const results = new Array(projects.length);
             const readOne = async (i) => {
                 const team = projects[i].project, mutedHere = [], got = { rows: [], saved: [], mutedHere, failed: '' };
@@ -148,7 +149,7 @@ export function refreshReviews(force = false, { reuse = false } = {}) { // reuse
                             if (pages === 0) loadedRevisions.set(team, stamp.rev === artifactRevision(data.artifacts_rev) ? stamp.rev : null);
                             for (const a of data.artifacts || []) {
                                 const hex = /(?:sha256:|coral:\/\/artifacts\/)?([a-f0-9]{64})$/i.exec(a.uri || a.digest || a.id || '')?.[1];
-                                if (a.tags?.includes('saved') && a.tags.includes('for review') && a.available && hex) got.saved.push({ ...a, team, hex, reviewKey: `${team}:${a.id}` });
+                                if ((splitKey(team).name !== '~no-team' || a.board_id === '~no-team') && a.tags?.includes('saved') && a.tags.includes('for review') && a.available && hex) got.saved.push({ ...a, team, hex, reviewKey: `${team}:${a.id}` });
                             }
                             if (!nextArtifactPage(at, data)) break;
                         }

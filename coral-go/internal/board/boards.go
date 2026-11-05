@@ -87,7 +87,7 @@ const adoptBoardsSQL = `
 			FROM board_message_counts c WHERE NOT EXISTS (SELECT 1 FROM boards b WHERE b.id = c.project)
 		UNION ALL SELECT t.b, (SELECT MIN(created_at) FROM board_tasks WHERE board_id = t.b)
 			FROM task_boards t WHERE t.b IS NOT NULL AND NOT EXISTS (SELECT 1 FROM boards b WHERE b.id = t.b)
-	) WHERE key <> '' GROUP BY key`
+	) WHERE key <> '' AND key NOT LIKE '~%' GROUP BY key`
 
 // boardIDShape is the shape of a generated board id.
 var boardIDShape = regexp.MustCompile(`^b-[a-z2-7]{10}$`)
@@ -134,6 +134,9 @@ var betweenContentAndBoardRow func()
 // execEnsuringBoard runs one INSERT of a board's content (a message, a subscriber, a task, a goal) and records the board's row in the same transaction. The board database has one writer, so a DELETE of the
 // board runs before both or after both: it can no longer land between them and leave the row of a board it just deleted, with nothing in it (#11007).
 func (s *Store) execEnsuringBoard(ctx context.Context, key, query string, args ...any) (sql.Result, error) {
+	if ReservedBoardKey(key) { // every write that would make a board by naming it comes through here (a subscription, a message, a task, a goal, a proposal): a key that starts with ~ is Coral's own and is never made (#13527)
+		return nil, ErrReservedBoardName
+	}
 	tx, err := s.db.BeginTxx(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -442,3 +445,10 @@ func (s *Store) BoardRekeys(ctx context.Context) (map[string]string, error) {
 	}
 	return out, nil
 }
+
+// ReservedBoardKey reports whether a board key is Coral's own, not a team's: it starts with a tilde. A no-team agent's files for review are kept under such a key ("~no-team", #13527), and a team of that
+// key would read them, so no board is ever made with one. A new board's name cannot start with one either (NewNameProblem allows only a letter or a digit first).
+func ReservedBoardKey(key string) bool { return strings.HasPrefix(key, "~") }
+
+// ErrReservedBoardName is the refusal of a write that would make a board whose key starts with a tilde.
+var ErrReservedBoardName = &GoalError{"reserved_board_name", "a board name that starts with ~ is reserved: choose another board name"}

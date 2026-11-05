@@ -304,6 +304,7 @@ export function isBoardAnswerPending(project, answered) {
 export function keyLabel(key) {
     const k = String(key ?? '');
     const name = splitKey(k).name;
+    if (name === '~no-team') return 'Not on a team';
     const label = _boardLabels.get(k) || name;
     const same = _labelKeys.get(label.toLowerCase());
     return same && same.size > 1 && label !== name ? `${label} (${shortKey(name)})` : label;
@@ -367,6 +368,8 @@ export function boardFetch(teamKey, suffix, options) {
 /** One page of a team's artifacts that carry the tag (#13161: a computer answers at most 50 a request, an older one up to what is asked; the walk asks for 200, the page the walk always asked for, and takes what comes: asking for 50 made the first read of a big board four times as many requests, 17 s against 5 s on the 10,000-file board). `at` is the walk's place, { cursor: '', offset: 0 }; the computer's own cursor is used when it gives one. */
 export function boardArtifactPage(teamKey, tag, at) {
     const where = at.cursor ? `&cursor=${encodeURIComponent(at.cursor)}` : at.offset ? `&offset=${at.offset}` : '';
+    const key = splitKey(teamKey);
+    if (key.name === '~no-team') return serverFetch(key.server, `/api/team-artifacts?team=No%20team&tag=${tag}&limit=200${where}`);
     return boardFetch(teamKey, `/artifacts?tag=${tag}&limit=200${where}`);
 }
 /** Moves the walk to the next page of `data` (a page's answer); false when that was the last. It advances by what the computer returned, never by what was asked: an older Coral answers 200, a newer one 50, and the cursor, when there is one, is the place. */

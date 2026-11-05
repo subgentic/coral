@@ -5,6 +5,7 @@ package routes
 // (board_id, team). The same owner rule as the team route (the Operator's, or the owner through Coral Hub); GET /api/artifacts is the machine-wide store list and stays as it is.
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -154,9 +155,9 @@ func (h *BoardHandler) ListAllTeamArtifacts(w http.ResponseWriter, r *http.Reque
 	if len(teams) == 0 || wanted[noTeamLabel] {
 		if rows := h.standaloneUploadItems(r, items, projects); len(rows) > 0 {
 			for i := range rows {
-				rows[i].Team = noTeamLabel
+				rows[i].Team, rows[i].BoardID = noTeamLabel, noTeamBoardID // the board key a file for review is kept under (#13527): the Inbox reads the row as a review of that key
 			}
-			refs = append(refs, teamArtifactTeamRef{Team: noTeamLabel, All: filesOrVersions(tq, rows)})
+			refs = append(refs, teamArtifactTeamRef{BoardID: noTeamBoardID, Team: noTeamLabel, All: filesOrVersions(tq, rows)})
 			items = append(items, rows...)
 		}
 	}
@@ -191,9 +192,32 @@ func (h *BoardHandler) ListAllTeamArtifacts(w http.ResponseWriter, r *http.Reque
 
 // standaloneUploadItems are the uploaded files of the sessions that have an upload folder, belong to no team and whose files no row in have lists: the agents without a team. At most maxStandaloneUploadSessions folders are read, the newest first (a folder's own modification time).
 func (h *BoardHandler) standaloneUploadItems(r *http.Request, have []teamArtifact, projects []board.ProjectInfo) []teamArtifact {
+	out := filterReadable(r, h.coralDir, h.standaloneUploads(r.Context(), have, projects))
+	// What a no-team agent sent for review is kept under the reserved key (#13527): its tags, question and kind are read from there, so the file is a row Needs you shows, with the question it asks.
+	h.attachArtifactTags(r.Context(), noTeamBoardID, out)
+	h.attachArtifactKinds(r, noTeamBoardID, out)
+	return out
+}
+
+// noTeamManagedArtifact is the upload of an agent on no team whose stored object is id (#13532): what a decision on the reserved key is made about. It is the same set the Inbox lists, before the read check
+// (the person deciding is the one who may read it).
+func (h *BoardHandler) noTeamManagedArtifact(ctx context.Context, id string) (teamArtifact, bool) {
+	projects, err := h.bs.ListProjects(ctx)
+	if err != nil {
+		return teamArtifact{}, false
+	}
+	for _, it := range h.standaloneUploads(ctx, nil, projects) {
+		if it.managed == id {
+			return it, true
+		}
+	}
+	return teamArtifact{}, false
+}
+
+func (h *BoardHandler) standaloneUploads(ctx context.Context, have []teamArtifact, projects []board.ProjectInfo) []teamArtifact {
 	inTeam := map[string]bool{} // an agent of a team is that team's, whichever teams the request asked for
 	for _, p := range projects {
-		if subs, err := h.bs.TeamSubscriberSessions(r.Context(), p.Project); err == nil {
+		if subs, err := h.bs.TeamSubscriberSessions(ctx, p.Project); err == nil {
 			for _, sid := range subs {
 				inTeam[sid] = true
 			}
@@ -231,7 +255,7 @@ func (h *BoardHandler) standaloneUploadItems(r *http.Request, have []teamArtifac
 		listed[it.ID] = true
 	}
 	var out []teamArtifact
-	for _, it := range filterReadable(r, h.coralDir, h.uploads.merge(nil, h.coralDir, sessions)) {
+	for _, it := range h.uploads.merge(nil, h.coralDir, sessions) {
 		if !listed[it.ID] {
 			out = append(out, it)
 		}
