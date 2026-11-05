@@ -264,7 +264,18 @@ func TestEveryLaunchedAgentHasUsingCoralAttachedAndItIsNotInTheNote(t *testing.T
 	require.NoError(t, err)
 	require.Len(t, attached, 1, "a plain agent has it attached")
 	assert.Equal(t, using.ID, attached[0].SkillID)
-	cmds := e.prompts()[len(e.prompts())-1]
+	var cmds string
+	require.Eventually(t, func() bool {
+		for _, command := range e.terminal.sentToSession(out["session_name"].(string)) {
+			if match := promptFileRe.FindStringSubmatch(command); match != nil {
+				body, err := os.ReadFile(match[1])
+				require.NoError(t, err)
+				cmds = string(body)
+				return true
+			}
+		}
+		return false
+	}, 10*time.Second, 5*time.Millisecond, "the second launch sent its own prompt")
 	assert.NotContains(t, cmds, "Skills the Operator approved for this work", "a default skill is not put in the launch note")
 
 	sk := approvedSkill(t, e.ss, "release-notes", "Writes release notes from merged PRs.", 1)

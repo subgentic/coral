@@ -47,9 +47,21 @@ func TestTeamResetKeepsAMembersRawCodexPermissionFlag(t *testing.T) {
 			rr := httptest.NewRecorder()
 			h.ResetTeam(rr, dropAt2(httptest.NewRequest(http.MethodPost, "/reset", nil), map[string]string{"boardName": launched.Board}))
 			require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
-			cmds := term.sentCommands()
-			require.Len(t, cmds, 4, "two more starts after the reset")
-			for _, c := range cmds[2:] {
+			var reset struct {
+				Agents []struct {
+					SessionName string `json:"session_name"`
+				} `json:"agents"`
+			}
+			require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &reset))
+			require.Len(t, reset.Agents, 2)
+			var cmds []string
+			for _, agent := range reset.Agents {
+				require.NotEmpty(t, agent.SessionName)
+				commands := term.sentToSession(agent.SessionName)
+				require.Len(t, commands, 1, "the reset member sent its own launch")
+				cmds = append(cmds, commands...)
+			}
+			for _, c := range cmds {
 				assert.Equal(t, 1, strings.Count(c, " --sandbox ")+strings.Count(c, "--dangerously-bypass-approvals-and-sandbox"), "one permission setting: %s", flagsOnly(c))
 				assert.Contains(t, c, tc.want, "after the reset: %s", flagsOnly(c))
 			}
