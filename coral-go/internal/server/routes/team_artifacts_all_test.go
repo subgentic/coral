@@ -26,6 +26,7 @@ type allTeamArtifactsResponse struct {
 	Total      int                   `json:"total"`
 	All        int                   `json:"all"`
 	NextCursor string                `json:"next_cursor"`
+	Rev        uint64                `json:"artifacts_rev"`
 	Teams      []teamArtifactTeamRef `json:"teams"`
 }
 
