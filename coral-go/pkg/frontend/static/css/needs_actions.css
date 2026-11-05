@@ -13,7 +13,7 @@
 
 /* Keep the three goal answers together without taking room from Team at desktop widths. */
 @media (min-width: 768px) {
-    .inbox-needs-results .inbox-goaldone-actions { column-gap: 4px; }
+    .inbox-needs-results .inbox-goaldone-actions { column-gap: 4px; flex-wrap: nowrap; } /* the three goal answers together (a050cd6d9) and on one line (#13586): one rule, the census counts a selector once per media block */
     .inbox-needs-results .inbox-goaldone-actions > .btn { padding-inline: 4px; }
 }
 
@@ -21,7 +21,6 @@
    Dismiss keeps no fill (the least emphasised) but has an outline, in the secondary text colour (4.5:1 on both themes). */
 @media (min-width: 768px) {
     .inbox-needs-results tr:has(.inbox-review-item) > td:has(.inbox-review-actions) { vertical-align: middle; }
-    .inbox-needs-results .inbox-goaldone-actions { flex-wrap: nowrap; }
 }
 .inbox-review-actions > .btn.btn-quiet.btn-small:not(.btn-icon) { border-color: var(--text-muted); color: var(--text-secondary); }
 .inbox-review-actions > .btn.btn-quiet.btn-small:not(.btn-icon):hover { border-color: var(--text-secondary); color: var(--text-primary); }
