@@ -16,6 +16,7 @@ import (
 	"github.com/subgentic/coral/internal/agentprio"
 	"github.com/subgentic/coral/internal/auth"
 	"github.com/subgentic/coral/internal/background"
+	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/inputlog"
 	"github.com/subgentic/coral/internal/ptymanager"
 	setreg "github.com/subgentic/coral/internal/settings"
@@ -113,6 +114,12 @@ func (h *SystemHandler) PutSettings(w http.ResponseWriter, r *http.Request) {
 	applyLiveSettings(values)
 	if setreg.Has(values, setreg.GoalDoneHidden) { // the Inbox's "goal looks done" row hidden (Not yet, Dismiss): the Inbox's numbers (#7512)
 		inboxActioned(r, tracking.InboxGoalDone, "", "hide", time.Time{})
+	}
+	for _, key := range []string{"goal_done_hidden", "inbox_welcome", "inbox_welcome_done"} { // a Dismiss or a Not yet kept in the settings is the Operator's click too (#13609)
+		if _, ok := values[key]; ok {
+			noteActivity(r, board.ActInboxHide, "setting", key, "", "", "")
+			break
+		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }

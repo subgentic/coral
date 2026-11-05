@@ -18,7 +18,7 @@ let onChange = () => {};
 
 /** The words of what was done. */
 export const actionWord = r => AF.ACTION_LABEL[r.action] || r.action;
-const KIND_WORD = { file: 'a file', question: 'a question', goal: 'a goal', proposal: 'a proposal', message: 'a message' };
+const KIND_WORD = { file: 'a file', question: 'a question', goal: 'a goal', proposal: 'a proposal', message: 'a message', task: 'a task', agent: 'an agent', chat: 'a chat', run: 'a run', setting: 'a row in Needs you', goal_request: 'a goal request' };
 /** What it was done to: the item's title when the record kept one (words an agent wrote), else the kind. */
 export const itemWords = r => r.title || KIND_WORD[r.item_kind] || 'an item';
 /** Where it was done from: the server decides this computer or Coral Hub; the phone hint is only what the page said about itself. */

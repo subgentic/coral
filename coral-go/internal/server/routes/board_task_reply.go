@@ -3,8 +3,10 @@ package routes
 import (
 	"log/slog"
 	"net/http"
+	"strconv"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/subgentic/coral/internal/board"
 )
 
 // ReplyToTask answers a task (#5463, coral-hub's inbox): one ordinary board message linked to the task (message.task_id) whose text starts with a mention of the task's creator,
@@ -46,6 +48,7 @@ func (h *BoardHandler) ReplyToTask(w http.ResponseWriter, r *http.Request) {
 			slog.Warn("board reply not recorded", "board", project, "message", msg.ID, "error", err)
 		}
 	}
+	h.recordWords(r, board.ActTaskReply, "task", strconv.FormatInt(taskID, 10), project, task.Title, in.Content) // the Operator's words on a task (#13609)
 	notified := reply.notified
 	if notified == nil {
 		notified = []string{}
