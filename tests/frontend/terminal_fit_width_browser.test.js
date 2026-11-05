@@ -119,14 +119,14 @@ const VIEW = `(async () => {
 const PHONE_BASE = 10; // a phone-wide window with no size chosen in Settings draws at 10 px (terminal_font.js, #6577); a desktop at 13
 
 // fitDefault: false stores the person's choice "off" before the page runs, so the steps that start from the full-size terminal keep doing so now that a phone starts with Fit width on (#6783); true leaves the device with no choice made.
-async function openTab({ contextId, width, height, mobile, fakeHubView = false, dpr = 1, fitDefault = false }) {
+async function openTab({ contextId, width, height, mobile, fakeHubView = false, dpr = 1, fitDefault = false, settingsDelay = 0 }) {
     const b = await browserClient();
     const { targetId } = await b.Target.createTarget({ url: 'about:blank', browserContextId: contextId });
     await b.close();
     const client = await CDP({ port: CDP_PORT, target: targetId });
     const { Page, Runtime, Emulation } = client;
     await Promise.all([Page.enable(), Runtime.enable()]);
-    await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD + (fakeHubView ? 'window.__fakeHubView = true;' : '') + (fitDefault ? '' : `try { if (localStorage.getItem('coral-terminal-fit-width') === null) localStorage.setItem('coral-terminal-fit-width', '0'); } catch {}`) });
+    await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD + (settingsDelay ? `(() => { const f = window.fetch; window.fetch = (u, o) => { const p = f(u, o); return /\\/api\\/settings(\\?|$)/.test(String(u)) && !(o && o.method && o.method !== 'POST' && o.method !== 'PUT') ? new Promise((r, j) => setTimeout(() => p.then(r, j), ${settingsDelay})) : p; }; })();` : '') + (fakeHubView ? 'window.__fakeHubView = true;' : '') + (fitDefault ? '' : `try { if (localStorage.getItem('coral-terminal-fit-width') === null) localStorage.setItem('coral-terminal-fit-width', '0'); } catch {}`) });
     await Emulation.setDeviceMetricsOverride({ width, height, deviceScaleFactor: dpr, mobile });
     await Emulation.setTouchEmulationEnabled({ enabled: !!mobile }); // a phone has a coarse pointer
     await Page.bringToFront();
@@ -359,7 +359,7 @@ function assertFits(v, what) {
         try {
             assert.equal((await put({ terminal_font_size: '14' })).status, 200);
             const ctx = await newContext(); contexts.push(ctx);
-            const tab = await openTab({ contextId: ctx, width: 390, height: 844, mobile: true });
+            const tab = await openTab({ contextId: ctx, width: 390, height: 844, mobile: true, settingsDelay: 3000 }); // Settings reach the page 3 s after the terminal was built (#13389)
             tabs.push(tab);
             v = await show(tab, A, eighty);
             v = await settled(tab, 'the chosen 14 drawn on a phone', 'v.font === 14', 30000).catch(() => v); // the size is read from the settings as the terminal is built: wait for it (Settings can arrive after the phone default on a loaded runner, as the 13 step below allows: 8 s was the retry-pass in trial-250's gate), then say what was drawn

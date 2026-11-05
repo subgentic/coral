@@ -6,7 +6,7 @@
 
 import { state } from './state.js';
 import { fetchSystemStatus } from './system_status.js';
-import { updateTerminalTheme } from './xterm_renderer.js';
+import { updateTerminalTheme, applySettingsFont } from './xterm_renderer.js';
 import { browserLocal } from './safe_storage.js';
 import { onBuilt } from './lazy_dom.js';
 import { isCloud } from './server_base.js';
@@ -176,6 +176,7 @@ export async function loadSettings() {
             s.git_diff_mode = 'branch_point';
         }
         state.settings = s;
+        applySettingsFont();
         window.syncDisplayMenu?.();
 
         const telemetry = document.getElementById('settings-telemetry-enabled');
