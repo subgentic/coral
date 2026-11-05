@@ -628,3 +628,25 @@ func TestTeamArtifactsSearchMatchesTheReviewQuestionTheGoalAndTheTeam(t *testing
 		require.Equal(t, want, qq.textMatch(it), q)
 	}
 }
+
+// Security's MUST on #13614 (the search, #13162): through Coral Hub the reply is redacted AFTER the handler matched, so q must match what the Hub viewer is SHOWN, not the raw text, or q finds what the redaction hides a prefix at a
+// time. A review question (agent-written, up to 140 characters) or a team name holding a token: q set to the token's start finds nothing in tunnel mode; the redacted text still matches.
+func TestTheSearchOfAHubViewerCannotProbeARedactedReviewQuestionOrTeam(t *testing.T) {
+	secret := "ghp_" + strings.Repeat("a1B2c3D4e5", 4)
+	raw := teamArtifact{Name: "plan.md", ReviewQuestion: "Deploy with " + secret + " ok?", Team: "team-" + secret}
+	match := func(it teamArtifact, q string) bool {
+		qq := teamArtifactQuery{q: strings.ToLower(q)}
+		return qq.textMatch(it)
+	}
+	// on this computer's own list, the raw text matches (the Operator's own data)
+	assert.True(t, match(raw, secret[:12]), "locally the token's start is in the question")
+	// the way the tunnel path does it: redact the item, then match
+	hub := raw
+	redactItemForTunnel(&hub)
+	assert.False(t, match(hub, secret[:12]), "through the Hub the token's start finds nothing in the question")
+	assert.False(t, match(hub, "team-"+secret[:12]), "nor in the team")
+	assert.NotContains(t, hub.ReviewQuestion, secret)
+	assert.NotContains(t, hub.Team, secret)
+	assert.True(t, match(hub, "deploy with"), "the words around the token still match: the shown text is searched")
+	assert.True(t, match(hub, strings.ToLower(hub.ReviewQuestion[len("Deploy with "):len("Deploy with ")+4])), "and so does the marker that replaced the token")
+}

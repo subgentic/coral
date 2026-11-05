@@ -542,6 +542,7 @@ func shownText(s string) string {
 func redactItemForTunnel(it *teamArtifact) {
 	it.Name, it.TaskTitle, it.MediaType = shownText(it.Name), shownText(it.TaskTitle), shownText(it.MediaType)
 	it.GoalTitle = shownText(it.GoalTitle)
+	it.ReviewQuestion, it.Team = shownText(it.ReviewQuestion), shownText(it.Team) // textMatch reads both (#13162's search): matched raw, q would find what the redaction hides, a prefix at a time
 	if len(it.Tags) > 0 {
 		tags := make([]string, len(it.Tags))
 		for i, t := range it.Tags {
