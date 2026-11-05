@@ -1,5 +1,6 @@
 /* Activity summaries use recorded fields only; old rows without sender/choice details stay explicit about what is known. */
-import { ACTION_LABEL } from './operator_activity_filters.js';
+import { importOnce } from './import_once.js';
+const { ACTION_LABEL } = await importOnce('./operator_activity_filters.js');
 const TASK_VERB = { task_create: 'created', task_complete: 'completed', task_cancel: 'cancelled', task_publish: 'published', task_edit: 'changed', task_remind: 'sent a reminder about', task_park: 'parked or released', task_reply: 'replied on' };
 export function activityWords(row) {
     const quote = row.note ? `: “${row.note}”` : '';
