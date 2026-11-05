@@ -1,6 +1,7 @@
 package store
 
 import (
+	"errors"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -24,6 +25,9 @@ func TestSessionTokensAreWrittenOnlyWhereTheCacheIsInvalidated(t *testing.T) {
 	var found []string
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
+			if errors.Is(err, fs.ErrNotExist) {
+				return nil // a temporary directory another package's test made and removed while this walk ran (routes' nativehome-*, #13389): not a source file
+			}
 			return err
 		}
 		if d.IsDir() {
@@ -41,6 +45,9 @@ func TestSessionTokensAreWrittenOnlyWhereTheCacheIsInvalidated(t *testing.T) {
 		}
 		b, err := os.ReadFile(path)
 		if err != nil {
+			if errors.Is(err, fs.ErrNotExist) {
+				return nil // removed since the directory was read (a test's temporary file in another package)
+			}
 			return err
 		}
 		if write.Match(b) {
