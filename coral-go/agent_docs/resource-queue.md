@@ -1,5 +1,7 @@
 # Resource queue
 
+> **Experimental.** The resource queue is new: its commands, limits and the Queue folder may change, and a claim that fails should never stop your work (the hook fails open).
+
 A **resource** is a shared thing with a number of **slots**, such as `mac-heavy` (the Mac: one heavy run at a time) or `mini` (the Mac mini). Instead of asking the Orchestrator whether the Mac is free, an agent **claims** a slot, waits in line if it is taken, and **releases** it when done. The queue is the Mac's and the mini's own answer to "who has it, and when is my turn".
 
 ## For an agent

@@ -29,7 +29,7 @@ const FOLDERS = [
     { key: 'recent', label: 'Recent runs', noun: ['run', 'runs'], search: 'Search recent runs', attention: true },
     { key: 'jobs', label: 'Jobs', noun: ['job', 'jobs'], search: 'Search jobs' },
     { key: 'workflows', label: 'Workflows', noun: ['workflow', 'workflows'], search: 'Search workflows' },
-    { key: 'queue', label: 'Queue', noun: ['entry', 'entries'], search: 'Search the queue', resources: true },
+    { key: 'queue', label: 'Queue (experimental)', noun: ['entry', 'entries'], search: 'Search the queue', resources: true },
 ];
 const folderOf = key => FOLDERS.find(f => f.key === key) || null;
 const routeOf = (folder, id, run) => ({ view: 'automations', folder, ...(id ? { id } : {}), ...(run ? { run } : {}) });
