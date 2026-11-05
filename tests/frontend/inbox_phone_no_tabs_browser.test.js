@@ -32,6 +32,7 @@ const fs = require('node:fs');
                 const s = await strip();
                 check(`${label}: from 640 to 767 px the Inbox keeps its tab strip (the old view dropdown is the pill there)`, s.tablist > 0, JSON.stringify(s));
             } else if (mobile) {
+                if (w === 390) await themes('phone-no-tabs-page-390');
                 const s = await strip();
                 check(`${label}: no tab strip, no tab, no way-back link, nothing wider than the screen`, s.tablist === 0 && s.tabs === 0 && s.back === 0 && s.over <= 0, JSON.stringify(s));
                 check(`${label}: the page's title is visible as the open folder's name (not one pixel)`, s.title && s.title.text === 'Needs you' && s.title.w > 20 && s.title.h > 10, JSON.stringify(s.title));
