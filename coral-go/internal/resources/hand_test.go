@@ -18,7 +18,7 @@ func (g *hookRig) handClaim(session, agent, call string) {
 	res, err := g.m.Claim(context.Background(), "mac-heavy", agent, "by hand")
 	require.NoError(g.t, err)
 	_ = res
-	g.h.BindHand(session, agent, "mac-heavy", call, 0, 0)
+	g.h.BindHand(session, agent, "mac-heavy", []string{call}, 0, 0)
 }
 
 func TestAHandClaimIsGivenBackWhenItsToolCallEnds(t *testing.T) {
@@ -101,7 +101,7 @@ func (g *hookRig) bgClaim(session, agent, call string, shell int) {
 	g.t.Helper()
 	_, err := g.m.Claim(context.Background(), "mac-heavy", agent, "bg")
 	require.NoError(g.t, err)
-	g.h.BindHand(session, agent, "mac-heavy", call, shell, agentPID)
+	g.h.BindHand(session, agent, "mac-heavy", []string{call}, shell, agentPID)
 }
 
 func TestAForegroundClaimIsGivenBackAtTheEndOfItsCallEvenInAShellThatKeepsRunning(t *testing.T) {
@@ -171,4 +171,27 @@ func TestAPidOutsideTheAgentsProcessTreeIsNotBelievedAndACrashedSessionFreesEver
 	g.h.After("s-b", "call-2")
 	g.h.SessionEnded("s-b") // the agent is gone: its jobs are not a reason to keep the slot
 	assert.Empty(t, g.holders())
+}
+
+// Tools run in parallel, and a client cannot say which of the calls in flight is its own: the claim is tied to all of them and goes back when the LAST has ended, so a sibling that ends first cannot free it (it only holds a little longer).
+func TestAClaimMadeAmongParallelCallsWaitsForAllOfThem(t *testing.T) {
+	g := newHookRig(t)
+	_, err := g.m.Claim(context.Background(), "mac-heavy", "Agent A", "")
+	require.NoError(t, err)
+	g.h.BindHand("s-a", "Agent A", "mac-heavy", []string{"call-1", "call-2"}, 0, 0) // the claim is in call-1 or call-2
+	g.h.After("s-a", "call-2")                                                      // the other call ends first
+	assert.Equal(t, []string{"Agent A"}, g.holders(), "it may be call-1's: not freed yet")
+	g.h.After("s-a", "call-1")
+	assert.Empty(t, g.holders(), "every call it could belong to has ended")
+}
+
+func TestAClaimWithNoKnownCallOrAnEmptyIdIsNeverBound(t *testing.T) {
+	g := newHookRig(t)
+	_, err := g.m.Claim(context.Background(), "mac-heavy", "Agent A", "")
+	require.NoError(t, err)
+	g.h.BindHand("s-a", "Agent A", "mac-heavy", nil, 0, 0)
+	g.h.BindHand("s-a", "Agent A", "mac-heavy", []string{""}, 0, 0) // an empty id (a hook that sent none) must not match an After with an empty id
+	g.h.After("s-a", "")
+	g.h.TurnEnded("s-b")
+	assert.Equal(t, []string{"Agent A"}, g.holders(), "no call to tie it to: its lease alone ends it")
 }

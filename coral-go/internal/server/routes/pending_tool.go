@@ -520,12 +520,16 @@ func (h *SessionsHandler) patternKillRefusal(ctx context.Context, owner *store.S
 	return shellkill.PatternKill(command) // bounded: a command past a bound runs
 }
 
-// CurrentToolCall is the tool_use id of the call the session has started most recently and not finished (#13718): the call a hand claim is made in. "" when none is known.
-func (h *SessionsHandler) CurrentToolCall(sessionID string) string {
-	if t, ok := h.pending.get(sessionID, time.Now()); ok {
-		return t.ToolUseID
+// ToolCallsInFlight are the tool_use ids of the calls the session has started and not finished (#13718): the hand claim of an agent is one of them. A claim is tied to all of them, so a parallel call that ends first cannot free
+// a claim that belongs to another; it can only hold a little longer (the lease, the turn's end and the work it started still end it).
+func (h *SessionsHandler) ToolCallsInFlight(sessionID string) []string {
+	h.pending.mu.Lock()
+	defer h.pending.mu.Unlock()
+	var ids []string
+	for id := range h.pending.calls[sessionID] {
+		ids = append(ids, id)
 	}
-	return ""
+	return ids
 }
 
 // SetResourceHook wires the resource queue's shell hook (#13645).

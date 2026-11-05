@@ -16,6 +16,7 @@ import (
 	"github.com/subgentic/coral/internal/proctree"
 	"github.com/subgentic/coral/internal/resources"
 	"github.com/subgentic/coral/internal/store"
+	"github.com/subgentic/coral/pkg/resourcequeue"
 )
 
 // #13718: a claim an agent makes by hand belongs to the tool call it is made in: when the call ends the slot goes back, with no release command. The Operator's own claim has no call and keeps its lease.
@@ -23,7 +24,7 @@ func TestAnAgentsHandClaimEndsWithItsToolCallAndTheOperatorsDoesNot(t *testing.T
 	g := newResRig(t)
 	g.subscribe("alpha", "Dev A", "Developer", false)
 	hook := resources.NewHook(g.mgr, resources.HookOptions{})
-	h := &ResourcesHandler{M: g.mgr, Board: g.bs, Hook: hook, ToolCall: func(sid string) string { return "call-" + sid }}
+	h := &ResourcesHandler{M: g.mgr, Board: g.bs, Hook: hook, ToolCalls: func(sid string) []string { return []string{"call-" + sid} }}
 	r := chi.NewRouter()
 	r.Post("/api/resources/{name}/claim", h.Claim)
 	r.Put("/api/resources/{name}", h.Define)
@@ -70,7 +71,7 @@ func TestAClaimNamesItsShellSoABackgroundJobKeepsTheSlotAfterItsCall(t *testing.
 		defer mu.Unlock()
 		return append([]proctree.Proc(nil), procs...), true
 	}})
-	h := &ResourcesHandler{M: g.mgr, Board: g.bs, Hook: hook, ToolCall: func(string) string { return "call-1" }, AgentPID: func(string) int { return 999 }}
+	h := &ResourcesHandler{M: g.mgr, Board: g.bs, Hook: hook, ToolCalls: func(string) []string { return []string{"call-1"} }, AgentPID: func(string) int { return 999 }}
 	r := chi.NewRouter()
 	r.Post("/api/resources/{name}/claim", h.Claim)
 	r.Put("/api/resources/{name}", h.Define)
@@ -113,7 +114,7 @@ func TestAClaimWhoseParentIsNotBelowTheAgentFollowsItsCallAlone(t *testing.T) {
 		g.subscribe("alpha", "Dev A", "Developer", false)
 		procs := []proctree.Proc{{PID: 999, PPID: 1, Command: "claude"}, {PID: 888, PPID: 1, Command: "daemon"}, {PID: 5000, PPID: 888, Command: "busy"}}
 		hook := resources.NewHook(g.mgr, resources.HookOptions{Procs: func() ([]proctree.Proc, bool) { return procs, true }})
-		h := &ResourcesHandler{M: g.mgr, Board: g.bs, Hook: hook, ToolCall: func(string) string { return "call-1" }, AgentPID: func(string) int { return 999 }}
+		h := &ResourcesHandler{M: g.mgr, Board: g.bs, Hook: hook, ToolCalls: func(string) []string { return []string{"call-1"} }, AgentPID: func(string) int { return 999 }}
 		r := chi.NewRouter()
 		r.Post("/api/resources/{name}/claim", h.Claim)
 		r.Put("/api/resources/{name}", h.Define)
@@ -135,20 +136,40 @@ func TestAClaimWhoseParentIsNotBelowTheAgentFollowsItsCallAlone(t *testing.T) {
 	}
 }
 
-// #13718: the call a hand claim is tied to is the one the PreToolUse post recorded, for a command that matches no resource too.
-func TestTheCurrentToolCallIsTheOneThePreToolUsePostRecorded(t *testing.T) {
+// #13718: the calls a hand claim is tied to are those the PreToolUse posts recorded and the PostToolUse events have not finished; and the Stop event of a turn, which the server's event path hands to the hook, frees a claim whose call never reported its end (route level, not only the hook).
+func TestTheCallsInFlightAreThoseRecordedAndTheStopEventFreesAHandClaim(t *testing.T) {
 	server, h, _, ss := setupSessionsTestServer(t)
 	ctx := context.Background()
 	sid := "eeeeeeee-13718-a000-0000-000000000001"
 	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid, AgentType: "claude", AgentName: "Agent A", WorkingDir: "/w"}))
 	tok := agentToken(t, h, sid, "claude-"+sid)
-	body, _ := json.Marshal(map[string]any{"session_id": sid, "tool_use_id": "toolu_9", "tool_name": "Bash", "tool_input": map[string]any{"command": "echo hi"}})
-	req, _ := http.NewRequest("POST", server.URL+"/api/sessions/live/x/pending-tool", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set(store.SessionTokenHeader, tok)
-	resp, err := http.DefaultClient.Do(req)
+	mgr, err := resources.Open(resources.Options{AgeStep: -1})
 	require.NoError(t, err)
-	resp.Body.Close()
-	assert.Equal(t, "toolu_9", h.CurrentToolCall(sid))
-	assert.Equal(t, "", h.CurrentToolCall("someone-else"))
+	require.NoError(t, mgr.Queue().Define(resourcequeue.Resource{Key: "mac-heavy", Slots: 1}))
+	hook := resources.NewHook(mgr, resources.HookOptions{})
+	h.SetResourceHook(hook)
+	pre := func(id string) {
+		body, _ := json.Marshal(map[string]any{"session_id": sid, "tool_use_id": id, "tool_name": "Bash", "tool_input": map[string]any{"command": "echo hi"}})
+		req, _ := http.NewRequest("POST", server.URL+"/api/sessions/live/x/pending-tool", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set(store.SessionTokenHeader, tok)
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		resp.Body.Close()
+	}
+	pre("toolu_1")
+	pre("toolu_2") // a parallel call
+	assert.ElementsMatch(t, []string{"toolu_1", "toolu_2"}, h.ToolCallsInFlight(sid))
+	assert.Empty(t, h.ToolCallsInFlight("someone-else"))
+	h.notePendingToolEvent(sid, "tool_use", "toolu_1") // its PostToolUse
+	assert.ElementsMatch(t, []string{"toolu_2"}, h.ToolCallsInFlight(sid))
+
+	_, err = mgr.Claim(ctx, "mac-heavy", "Agent A", "")
+	require.NoError(t, err)
+	hook.BindHand(sid, "Agent A", "mac-heavy", h.ToolCallsInFlight(sid), 0, 0)
+	st, _ := mgr.Queue().Status("mac-heavy")
+	require.Len(t, st.Holders, 1)
+	h.notePendingToolEvent(sid, "stop", "") // the turn ends and the call never reported: the safety net
+	st, _ = mgr.Queue().Status("mac-heavy")
+	assert.Len(t, st.Holders, 0, "the Stop event reached the hook through the server's own event path")
 }

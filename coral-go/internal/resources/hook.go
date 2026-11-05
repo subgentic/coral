@@ -58,23 +58,28 @@ type autoHold struct {
 // handBind is what a hand claim (coral-board resource claim, run by an agent) is tied to: the tool call it was made in and, for a job that outlives the call (Claude's run_in_background, Codex's background terminal), the work
 // the call started under the claiming shell.
 type handBind struct {
-	session string       // the session id
-	call    string       // the tool_use id
-	shell   int          // the shell that ran the claim, in the agent's own process tree (0: not known or not believed: the claim follows its call alone)
-	shellAt string       // that shell's command line at the claim: a shell that exec'd the job has another one later
-	before  map[int]bool // the processes below the shell at the claim: older jobs of a persistent shell are not this call's work
-	ended   bool         // the call (or its turn) has ended: the slot goes back as soon as the work is gone too
+	session string          // the session id
+	calls   map[string]bool // the tool calls in flight when the claim was made (it is one of them: a client cannot say which, so the claim waits for all of them)
+	shell   int             // the shell that ran the claim, in the agent's own process tree (0: not known or not believed: the claim follows its call alone)
+	shellAt string          // that shell's command line at the claim: a shell that exec'd the job has another one later
+	before  map[int]bool    // the processes below the shell at the claim: older jobs of a persistent shell are not this call's work
+	ended   bool            // the call (or its turn) has ended: the slot goes back as soon as the work is gone too
 }
 
 // BindHand ties the hold or place agent has of resource to the tool call it was claimed in (#13718, the Operator: "coral tracks the tool call the agent does and when it's finished, release the slot"), and to the work the call
 // starts under the claiming shell `shell` (the CLI's parent; believed only when it is in agentPID's own process tree). The slot goes back when the call has ended AND that work is gone: a foreground command ends both together,
 // a background job keeps the slot for as long as it runs (a persistent shell's older jobs do not count), a crashed agent's session frees it. A forgotten release cannot hold the line. A claim with no tool call (the Operator's
 // command line) is never bound: it keeps its lease. The lease still ends any claim.
-func (h *Hook) BindHand(session, agent, resource, toolUseID string, shell, agentPID int) {
-	if h == nil || session == "" || toolUseID == "" {
+func (h *Hook) BindHand(session, agent, resource string, toolCalls []string, shell, agentPID int) {
+	b := handBind{session: session, calls: map[string]bool{}}
+	for _, c := range toolCalls {
+		if c != "" {
+			b.calls[c] = true
+		}
+	}
+	if h == nil || session == "" || len(b.calls) == 0 { // no known call: nothing to tie it to, the lease alone ends it
 		return
 	}
-	b := handBind{session: session, call: toolUseID}
 	if shell > 1 && agentPID > 1 && h.o.Procs != nil {
 		if procs, ok := h.o.Procs(); ok { // ps, never under the lock
 			if _, inTree := findBelow(procs, agentPID, shell); inTree {
@@ -143,12 +148,18 @@ func (h *Hook) handsWork(want func(handBind) bool) ([]proctree.Proc, bool) {
 
 // endHands says that the call (or, with call "", the whole turn) of the session has ended: each of its hand claims whose work is gone goes back now, the rest when it is (Sweep).
 func (h *Hook) endHands(session, call, why string) {
-	procs, known := h.handsWork(func(b handBind) bool { return b.session == session && (call == "" || b.call == call) })
+	procs, known := h.handsWork(func(b handBind) bool { return b.session == session && (call == "" || b.calls[call]) })
 	h.mu.Lock()
 	var gone []holdKey
 	for k, b := range h.hand {
-		if b.session != session || (call != "" && b.call != call) {
+		if b.session != session || (call != "" && !b.calls[call]) {
 			continue
+		}
+		if call != "" {
+			delete(b.calls, call) // one of the calls it waits for ended
+			if len(b.calls) > 0 {
+				continue // others that were in flight with the claim have not: it may be theirs
+			}
 		}
 		if known && b.workRuns(procs) {
 			b.ended = true
