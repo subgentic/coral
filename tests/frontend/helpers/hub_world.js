@@ -64,7 +64,7 @@ async function setupHubWorld({ client, Page, Emulation, width, height, mobile, i
    window.fetch=(u,o={})=>{
     const p=new URL(String(u),location.href); const m=(o.method||'GET').toUpperCase();
     if(p.pathname==='/auth/session')return json({authenticated:true,email:'tester@example.com',csrf:'test'});
-    if(p.pathname==='/api/account')return json({artifacts_tab:true,artifacts_frame:true});
+    if(p.pathname==='/api/account'){ const boot=JSON.parse(document.getElementById('coral-boot').textContent); return json({artifacts_tab:true,artifacts_frame:true,needs_native:boot.needs==='native',goal_preview:boot.goal_preview===true}); }
     if(p.pathname==='/api/sessions/live')return json({sessions:window.__noComputers?[]:[['m1','Review agent'],['m1','Docs agent'],['m2','Build agent']].map(([server,name],i)=>({session_id:'hub-agent-'+i,name:'hub-agent-'+i,display_name:name,agent_type:'claude',working_directory:'/tmp/hub-agent-'+i,server,sleeping:false,archived:false,status:'idle'})),servers:window.__noComputers?[]:computers});
     if(p.pathname==='/api/servers')return json({servers:computers});
     if(p.pathname==='/api/settings'&&m==='GET')return json({settings:{}});

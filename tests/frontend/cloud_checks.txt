@@ -336,3 +336,5 @@ node chief_checks_lan.test.mjs
 node goal_write.test.mjs
 node hub_update_launch_words.test.mjs
 node activity_click_header.test.mjs
+
+node cloud_account_flags.test.mjs
