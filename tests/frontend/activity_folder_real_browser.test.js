@@ -33,12 +33,13 @@ const HEX = 'c'.repeat(64);
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await load();
         assert.ok((await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: 'orch', job_title: 'Orchestrator', session_name: 'claude-' + SID })).status < 300);
-        // The record is append-only and the server is shared by repeats of this suite (#13176): a run does not own it. The goals carry this run's id, the rows and the count are read
-        // against what the record held before, and the row edited in step 5 is put back, so a second run on the same server sees the same page as the first.
+        // The record is append-only and the server is shared by repeats of this suite (#13176) and by the other suites of the shard: a run does not own it. The goals carry this run's id and the rows counted are the ones about
+        // those goals (never the record's total, which other suites change at any moment), and the row edited in step 5 is put back, so a second run on the same server sees the same page as the first.
         const FIRST = 'First importer goal ' + B, SECOND = 'Second importer goal ' + B;
-        const before = await api('GET', '/api/activity');
-        assert.equal(before.status, 200, JSON.stringify(before));
-        const N0 = (before.body.actions || []).length;
+        // The record is shared by the whole shard: other suites write rows of their own at any time, so this run counts only its own rows (the two goals' titles), never the record's total. One row of someone else's,
+        // on this run's own board, is written here so the page always holds a row that is not this run's: a count or a filter that is not about the goals' titles cannot pass by luck.
+        const other = await api('POST', `/api/board/${B}/tasks`, { subscriber_id: 'Operator', title: 'a row that is not about the goals' });
+        assert.ok(other.status < 300, JSON.stringify(other));
         for (const [title, why] of [[FIRST, 'shipped it'], [SECOND, 'not needed any more']]) {
             const g = await api('POST', `/api/board/${B}/goals`, { subscriber_id: 'Operator', title, outcome: 'o', done_when: 'd' });
             assert.equal(g.status, 201, JSON.stringify(g));
@@ -49,14 +50,15 @@ const HEX = 'c'.repeat(64);
 
         console.log('1. The folder lists what was done, to what, where, from where; the check is said above it');
         await openFolder(false);
-        const mine = `[...document.querySelectorAll('#group-table-view tbody tr')].filter(r => r.textContent.includes(${JSON.stringify(B)}))`;
+        const mine = `[...document.querySelectorAll('#group-table-view tbody tr')].filter(r => r.textContent.includes(${JSON.stringify(FIRST)}) || r.textContent.includes(${JSON.stringify(SECOND)}))`; // only this run's goals' rows
         await waitFor(`${mine}.length === 4`, 'this run\'s four rows (each goal is created and then closed: a row for each, #13609)', 10000);
         const t = await ev(`document.getElementById('group-table-view').textContent.replace(/\\s+/g, ' ')`);
         assert.match(t, /Closed a goal/); assert.match(t, /Created a goal/); assert.ok(t.includes(SECOND) && t.includes(FIRST), 'both of this run\'s goals are listed');
         // the action identity of this run's rows: two creates and two closes, and each goal has one of each
         const words = await ev(`${mine}.map(r => (r.textContent.includes('Closed a goal') ? 'close' : r.textContent.includes('Created a goal') ? 'create' : '?') + ':' + (r.textContent.includes(${JSON.stringify(FIRST)}) ? 'first' : r.textContent.includes(${JSON.stringify(SECOND)}) ? 'second' : '?'))`);
         assert.deepEqual([...words].sort(), ['close:first', 'close:second', 'create:first', 'create:second'], `each goal has a created row and a closed row: ${JSON.stringify(words)}`); assert.match(t, /this computer/); assert.match(t, /not needed any more/);
-        assert.match(await ev(`document.querySelector('.activity-check').textContent`), new RegExp(`^${N0 + 4} actions in the record, none changed outside Coral\\. Edits made outside Coral are shown unless the whole record was rewritten\\.$`));
+        const checkText = await ev(`document.querySelector('.activity-check').textContent`); // the record's whole count is the shard's, not this run's: only what the line says is checked, never the number
+        assert.match(checkText, /^\d+ actions in the record, none changed outside Coral\. Edits made outside Coral are shown unless the whole record was rewritten\.$/);
         assert.equal(await ev(`document.querySelector('.activity-check').getAttribute('role')`), 'status');
         assert.match(await ev(`document.querySelector('#group-table-view tbody tr').textContent`), new RegExp(SECOND), 'newest first');
         console.log('   ✓');
