@@ -245,3 +245,8 @@
 
 /* A run that has stayed pending: the page says so under the header, with a Refresh (#10120). */
 .sched-still-waiting { margin: 8px 0; color: var(--text-secondary); font-size: var(--fs-md); }
+
+/* The Queue folder's row actions (#13651): First, Up, Down and Kick in one line; one that is off is plain muted text, not a box (the first in line cannot move up). */
+.queue-actions { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; }
+.queue-act:disabled, .queue-act:disabled:hover { border-color: transparent; background: transparent; }
+.queue-act.queue-sure { color: var(--danger, var(--text-primary)); border-color: currentColor; }

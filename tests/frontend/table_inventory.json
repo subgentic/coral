@@ -38,6 +38,12 @@
    "covered_by": "tasks"
   },
   {
+   "file": "automations_queue.js",
+   "calls": 1,
+   "surface": "Automations: the resource queue (holders and the waiting line)",
+   "covered_by": "tasks"
+  },
+  {
    "file": "cost_dashboard.js",
    "calls": 2,
    "surface": "Cost dashboard tables",
