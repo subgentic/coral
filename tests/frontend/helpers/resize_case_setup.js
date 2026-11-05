@@ -12,6 +12,7 @@ const AUTO = `${SETUP} ${DATA_WORLD}; host.remove(); const world=window.fetch; w
     if(p==='/api/workflows')return json({workflows:${JSON.stringify(workflows)}});
     if(p==='/api/workflows/7')return json(${JSON.stringify(workflow)});
     if(p==='/api/scheduled/runs/recent')return json({runs:[{id:101,job_id:5,job_name:'Daily check',status:'running',started_at:'2026-11-01T01:00:00Z'},{id:102,job_id:5,job_name:'Daily check',status:'failed',exit_code:1,started_at:'2026-11-01T00:00:00Z'}]});
+    if(p==='/api/automations/runs')return json({runs:[{kind:'job',id:101,job_id:5,job_name:'Daily check',status:'running',started_at:'2026-11-01T01:00:00Z'},{kind:'job',id:102,job_id:5,job_name:'Daily check',status:'failed',exit_code:1,started_at:'2026-11-01T00:00:00Z'},{kind:'workflow',...${JSON.stringify(RUN)}},{kind:'workflow',...${JSON.stringify(RUN_OK)}}],has_more:false,next_cursor:'',total:4});
     if(p==='/api/workflows/runs/recent')return json({runs:[${JSON.stringify(RUN)},${JSON.stringify(RUN_OK)}]});
     if(p==='/api/scheduled/jobs/5/runs')return json({runs:[{id:101,scheduled_at:'2026-11-01T01:00:00Z',status:'completed',session_id:'one'},{id:102,scheduled_at:'2026-11-01T00:00:00Z',status:'failed',session_id:'two'}],total:2});return world(u,o);};`;
 module.exports.AUTO = AUTO;
