@@ -243,7 +243,7 @@ export function attachReview(d, { reload }) {
             const m = await importOnce('./artifact_send_review.js');
             if (c.inReview) { await m.removeFromReview(c.team, c.hex); showToast('Removed from review'); }
             else { const q = await m.askReviewQuestion({ count: 1, name: c.filename }); if (q === null) return; await m.sendForReview(c.team, c.hex, q); showToast('Sent for review: it is in Needs you'); }
-            importOnce('./inbox_reviews.js').then(x => x.refreshReviews(true)).catch(() => {});
+            importOnce('./inbox_reviews.js').then(x => { x.reviewsChangedOnServer(); return x.refreshReviews(true); }).catch(() => {});
             reload();
         } catch (e) { showToast(e.message, true); }
     });
@@ -266,7 +266,7 @@ export function attachReview(d, { reload }) {
             const r = sent.results[0];
             if (!sent.ok || !r || (r.state !== 'sent' && r.state !== 'already_asked')) throw new Error(r ? `${who}: ${resultWords(r)}. The request is in the comments.` : (sent.error || 'The agent could not be asked.'));
             await decide(cur.team, cur.row, 'changes');
-            importOnce('./inbox_reviews.js').then(m => m.refreshReviews(true)).catch(() => {});
+            importOnce('./inbox_reviews.js').then(m => { m.reviewsChangedOnServer(); return m.refreshReviews(true); }).catch(() => {});
             showToast(`Changes requested. ${who} was asked.`);
             text.value = ''; tray.clear(); done = true; openForm(false); show({ ...cur, state: 'changes' }); changes.focus({ preventScroll: true }); reload();
         } catch (err) { error.textContent = err.message; } finally { sending = false; syncSend(); text.readOnly = false; }
