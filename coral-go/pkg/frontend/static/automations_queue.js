@@ -128,7 +128,7 @@ export function queueTable(rows, narrowed) {
                 ...(denied ? [] : [{ key: 'actions', label: 'Actions', width: '17rem', cell: actionsCell }]),
             ],
             mail: r => ({ lead: { icon: r.state === 'holding' ? 'lock' : r.state === 'waiting' ? 'hourglass_empty' : 'check_circle', square: true, name: stateWord(r) }, title: r.state === 'free' ? `${r.resource}: all slots free` : r.agent,
-                snippet: r.state === 'free' ? '' : `${r.resource}${r.note ? ' · ' + r.note : ''}`, state: stateWord(r), time: r.state === 'holding' ? leaseWords(r) : r.state === 'waiting' ? waitWords(r) : '',
+                snippet: r.state === 'free' ? '' : `${r.resource}${r.note ? ' · ' + r.note : ''}`, state: stateWord(r), time: r.state === 'holding' ? `Holding \u00b7 ${leaseWords(r)}` : r.state === 'waiting' ? `Place ${r.place} \u00b7 ${waitWords(r)}` : '',
                 actions: rowActions(r).map(a => ({ label: a.label, title: a.title, run: a.run })) }),
         }).el };
 }

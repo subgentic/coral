@@ -46,18 +46,18 @@ const STUB = `(() => { const real = window.fetch; window.__calls = []; window.__
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
             await coralReady(ev, 'startup', 'liveList', 'settings');
-            await ev(`localStorage.clear(); window.openAutomationsFolder('queue'); true`);
-            await waitFor(`document.querySelectorAll('#group-table-view tbody tr[data-key]').length === 6`, at + 'the six rows of the queue (4 entries, 1 holder of the mini, the idle resource)', 10000);
+            await ev(`window.__errs = []; addEventListener('error', e => window.__errs.push(String(e.message))); addEventListener('unhandledrejection', e => window.__errs.push(String(e.reason && e.reason.stack || e.reason))); localStorage.clear(); window.openAutomationsFolder('queue'); true`);
+            try { await waitFor(`document.querySelectorAll('#group-table-view tbody tr[data-key]').length === 6`, at + 'the six rows of the queue (4 entries, 1 holder of the mini, the idle resource)', 10000); } catch (e) { throw new Error(e.message + ' | ' + JSON.stringify(await ev(`({ path: location.pathname, rows: document.querySelectorAll('#group-table-view tbody tr[data-key]').length, text: document.getElementById('group-table-view').innerText.slice(0, 300), queue: window.__queue && window.__queue.length, errs: window.__errs })`))); }
             assert.equal(await ev(`location.pathname`), '/automations/queue', at + "the address is the folder's");
             const list = mobile ? `[...document.querySelectorAll('#group-table-view .view-list-select option')].map(o => o.textContent.trim())` : `[...document.querySelectorAll('.view-list-item')].map(b => b.textContent.trim())`;
             assert.ok((await ev(list)).some(t => /^Queue\s*\(?5\)?$/.test(t)), at + 'the folder list has Queue with its five entries: ' + JSON.stringify(await ev(list)));
             assert.deepEqual(await groups(), ['mac-heavy: 1 of 1 in use, 3 waiting, on Mac', 'mini: 1 of 2 in use, on Mini', 'spare: 0 of 3 in use'], at + 'a group per resource with its slots, line and machine');
             assert.deepEqual(await agents(), ['Data Science & Dashboarding', 'Frontend Dev', 'QA Engineer', 'Backend Dev', 'UI Reviewer', ...(mobile ? ['spare: all slots free'] : [])], at + 'the holder first, then the line in order');
             const text = (await rows()).join(' | ');
-            assert.match(text, /Data Science & Dashboarding.*Holding/, at + 'the holder says Holding');
-            assert.match(text, /Frontend Dev.*Waiting, place 1/, at + 'the first in line is place 1');
-            assert.match(text, /QA Engineer.*Waiting, place 2/, at + 'the next is place 2');
-            assert.match(text, /Backend Dev.*Waiting, place 3/, at + 'then place 3');
+            assert.match(text, /Data Science & Dashboarding.*Holding/, at + 'the holder says Holding: ' + text.slice(0, 500));
+            assert.match(text, /Frontend Dev.*(Waiting, place|Place) 1/, at + 'the first in line is place 1');
+            assert.match(text, /QA Engineer.*(Waiting, place|Place) 2/, at + 'the next is place 2');
+            assert.match(text, /Backend Dev.*(Waiting, place|Place) 3/, at + 'then place 3');
             assert.match(text, /2[0-9] min left|25 min left|24 min left/, at + "the holder's lease left is said");
             assert.match(text, /Waiting \d+ min|Waiting \d+ s/, at + 'a waiting entry says how long it has waited');
             assert.match(text, /cdp-suite inbox_\*/, at + 'the note is the pattern as text');
