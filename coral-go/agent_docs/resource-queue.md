@@ -20,6 +20,9 @@ coral-board resource claim mac-heavy --wait --note "gate run for #13613" && ... 
 
 Do not post "starting a heavy run" and "run finished" notes for a resource you claim: the queue is the record.
 
+
+**A holder stuck at a prompt** (#13705). A command that waits for a person to approve it has already taken its slot (the hook claims before the prompt), so the others wait for nothing. Coral reads each holder's state: after 5 minutes at a prompt (or idle with nothing running, for an agent whose calls Coral cannot see) the Orchestrator is told on the holder's board; after 10 it is told again and the Queue folder shows the holder as **Stuck**. Coral never takes the slot itself: the command waiting for its approval would then run beside the next holder's. The Orchestrator or the Operator kicks the holder (`coral-board resource kick <id>`). An agent whose background job holds the slot is working, not stuck.
+
 ## For the Orchestrator and the Operator
 
 - Define resources: `coral-board resource define mac-heavy --slots 1 --machine mac --lease 30m` (and `mini`). `--allow a,b` limits who may claim one. `--match "go test ./..."` (repeat it) turns on the shell hook for the resource (below). Names are letters, digits, dot, dash and underscore.

@@ -20,6 +20,15 @@ const (
 	StuckSecond = 10 * time.Minute
 )
 
+// GuardIdle is the signal after the idle rule (#13718): an agent whose turn is over but whose background job holds the slot is working, not stuck, so "idle" stands only when the agent's process tree is known and empty. A prompt
+// stands as it is (a command waiting for its approval has not started anything), and anything else is passed on unchanged.
+func GuardIdle(kind string, since time.Time, procsKnown bool, running int) (string, time.Time) {
+	if kind == SignalIdle && (!procsKnown || running > 0) {
+		return "", time.Time{}
+	}
+	return kind, since
+}
+
 // WatchOptions says how the Watcher sees an agent and who it tells.
 type WatchOptions struct {
 	// Signal is what Coral knows of the agent: its kind (SignalPrompt, SignalIdle or "") and since when it has been in that state. "" or a zero time: working, or not known, so nothing is done.

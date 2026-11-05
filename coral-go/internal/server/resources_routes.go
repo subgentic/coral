@@ -57,7 +57,12 @@ func (s *Server) registerResources(r chi.Router, sess *routes.SessionsHandler) {
 			if err != nil || sub == nil || sub.SessionName == "" || sess == nil {
 				return "", time.Time{} // not readable: left alone
 			}
-			return sess.ResourceSignal(naming.SessionIDFromName(sub.SessionName))
+			kind, since := sess.ResourceSignal(naming.SessionIDFromName(sub.SessionName))
+			if kind == resources.SignalIdle {
+				cmds, known := s.commandsBelowSessionKnown(sub.SessionName)
+				return resources.GuardIdle(kind, since, known, len(cmds))
+			}
+			return kind, since
 		},
 		Notify: func(agent, text string) { // the Orchestrator of the holder's team; a failed post loses the notice only
 			sub, err := s.boardStore.GetSubscription(context.Background(), agent)
@@ -125,19 +130,21 @@ func (s *Server) sessionPID(sessionName string) int {
 // commandsBelowSession is the command lines of the processes the session's agent has started that still run, or nil when that is not known (no per-session process, no ps): the hook then gives a slot back
 // when the call ends.
 func (s *Server) commandsBelowSession(sessionName string) []string {
+	cmds, _ := s.commandsBelowSessionKnown(sessionName)
+	return cmds
+}
+
+// commandsBelowSessionKnown is commandsBelowSession with whether the answer is known: an empty list that is known means nothing runs below the agent, an unknown one says nothing.
+func (s *Server) commandsBelowSessionKnown(sessionName string) ([]string, bool) {
 	p, ok := s.backend.(ptymanager.SessionPIDProvider)
 	if !ok {
-		return nil
+		return nil, false
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	pid, err := p.SessionPID(ctx, sessionName)
 	if err != nil || pid <= 1 {
-		return nil
+		return nil, false
 	}
-	cmds, ok := proctree.CommandsBelow(ctx, pid)
-	if !ok {
-		return nil
-	}
-	return cmds
+	return proctree.CommandsBelow(ctx, pid)
 }
