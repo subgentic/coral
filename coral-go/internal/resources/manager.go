@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"time"
@@ -43,25 +44,37 @@ type Options struct {
 	OnGrant     func(resourcequeue.Entry) // told when a waiting agent gets its slot
 	AgeStep     time.Duration             // see resourcequeue.Config
 	MaxPerAgent int
+	HistoryPath string // the file that keeps the record of the queue's use (#13671; "": none). A file that cannot be opened loses the record only.
 }
 
 // Manager is the queue plus the board's ranking.
 type Manager struct {
-	q   *resourcequeue.Queue
-	pri Priorities
+	q    *resourcequeue.Queue
+	pri  Priorities
+	hist *History
 }
 
 // Open makes the Manager, loading the state file when there is one. A file that cannot be read is an error, never an empty queue: an agent holding the Mac would be forgotten.
 func Open(o Options) (*Manager, error) {
 	cfg := resourcequeue.Config{Now: o.Now, Alive: o.Alive, OnGrant: o.OnGrant, AgeStep: o.AgeStep, MaxPerAgent: o.MaxPerAgent}
+	var hist *History
+	if o.HistoryPath != "" {
+		if h, err := OpenHistory(o.HistoryPath); err != nil {
+			slog.Warn("resource history is off", "error", err) // analytics are lost, never the queue
+		} else {
+			hist = h
+			cfg.OnEvent = h.Add
+		}
+	}
 	if o.Path != "" {
 		cfg.Persist = filePersister{path: o.Path}
 	}
 	q, err := resourcequeue.New(cfg)
 	if err != nil {
+		hist.Close()
 		return nil, err
 	}
-	return &Manager{q: q, pri: o.Priorities}, nil
+	return &Manager{q: q, pri: o.Priorities, hist: hist}, nil
 }
 
 // Queue is the underlying queue, for the calls this package does not wrap.
@@ -69,7 +82,30 @@ func (m *Manager) Queue() *resourcequeue.Queue { return m.q }
 
 // Claim asks for a slot for agent, ranked by its task (a failed lookup ranks 0 rather than refusing the claim).
 func (m *Manager) Claim(ctx context.Context, resource, agent, note string) (resourcequeue.Result, error) {
-	who := resourcequeue.Claimant{Agent: agent, Note: note}
+	return m.claim(ctx, resource, resourcequeue.Claimant{Agent: agent, Note: note})
+}
+
+// ClaimAuto is the shell hook's claim (#13645): the same as Claim, marked as the hook's own with the pattern that fired (the record keeps the pattern, never the command).
+func (m *Manager) ClaimAuto(ctx context.Context, resource, agent, pattern string) (resourcequeue.Result, error) {
+	return m.claim(ctx, resource, resourcequeue.Claimant{Agent: agent, Note: "auto: " + pattern, Via: "hook", Pattern: pattern})
+}
+
+// History is the record of the queue's use, nil when none is kept.
+func (m *Manager) History() *History { return m.hist }
+
+// Record adds an event the queue does not know of (a refusal by the hook) to the record.
+func (m *Manager) Record(e resourcequeue.Event) {
+	if e.At.IsZero() {
+		e.At = time.Now().UTC()
+	}
+	m.hist.Add(e)
+}
+
+// Close writes what the record still holds and closes it.
+func (m *Manager) Close() { m.hist.Close() }
+
+func (m *Manager) claim(ctx context.Context, resource string, who resourcequeue.Claimant) (resourcequeue.Result, error) {
+	agent := who.Agent
 	if m.pri != nil {
 		if task, prio, err := m.pri.Of(ctx, agent); err == nil {
 			who.Task, who.Priority = task, prio

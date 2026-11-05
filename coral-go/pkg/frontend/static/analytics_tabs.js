@@ -13,17 +13,20 @@ import { loadStyles } from './lazy_styles.js';
 import { importOnce } from './import_once.js';
 await loadStyles('analytics_tabs.css');
 const V = await importOnce('./analytics_viz.js'); // a lazy module loads the others it needs through importOnce, so a failed load is retried
-const D = await importOnce('./analytics_tabs_data.js'); // not in the start's stylesheet: it arrives before the page is drawn (#10706)
+const D = await importOnce('./analytics_tabs_data.js');
+const Q = await importOnce('./analytics_queue.js'); // the Resource queue view (#13671) // not in the start's stylesheet: it arrives before the page is drawn (#10706)
 const { el } = V;
 const TEAM_KEY = 'coral-activity-team';
 const INBOX_GUEST_LINE = 'Inbox vs chat is for the person at this computer only: it is a record of what they did.';
 const GUEST_LINE = 'Operator interaction and Team communication are visible to the owner of this Coral only. Usage is available to you.';
+const RQ = 'resource-queue';
 const IVC = 'inbox-' + 'chat'; // the Inbox-versus-chat tab's key, spelled in two parts: the icon-name lint reads a quoted inbox as an icon name
 const tabs = {
     usage: { range: '14d', metric: 'cost', group: 'agent', day: -1, data: null, status: 'loading', seq: 0, turns: null },
     operator: { range: '14d', team: '', data: null, status: 'loading', seq: 0 },
     [IVC]: { range: '30d', team: '', day: -1, data: null, status: 'loading', seq: 0 }, // Inbox versus chat (#12158): all teams at first
     comm: { range: '14d', team: '', data: null, status: 'loading', seq: 0 },
+    [RQ]: { range: '7d', data: null, status: 'loading', seq: 0 }, // the resource queue (#13671): this computer's, no team
 };
 const hosts = {};
 let boards = { keys: [], at: 0 };
@@ -49,7 +52,7 @@ export async function showTab(key, host, force = false) {
     hosts[key] = host;
     const m = tabs[key];
     if (key === IVC) await readBoards(); // every team unless one is chosen
-    else if (key !== 'usage') {
+    else if (key !== 'usage' && key !== RQ) {
         await readBoards();
         const list = teams(), saved = browserLocal.get(TEAM_KEY) || '';
         m.team = list.includes(m.team) ? m.team : (list.includes(saved) ? saved : (list[0] || ''));
@@ -68,6 +71,12 @@ async function load(key) {
             if (seq !== m.seq) return;
             if (!r.ok) throw new Error(String(r.status));
             m.data = (await r.json()).buckets || []; m.status = 'ok'; m.day = -1; m.turns = null;
+        } else if (key === RQ) {
+            const r = await serverFetch('local', `/api/analytics/resource-queue?days=${D.daysOf(m.range)}`);
+            if (seq !== m.seq) return;
+            if (r.status === 401 || r.status === 403 || r.status === 404) { m.status = 'guest'; m.data = null; draw(key); return; }
+            if (!r.ok) throw new Error(String(r.status));
+            m.data = await r.json(); m.status = 'ok';
         } else if (key === IVC) {
             const team = m.team ? splitKey(m.team).name : '';
             const r = await serverFetch('local', `/api/analytics/inbox-vs-chat?days=${D.daysOf(m.range)}${team ? `&team=${encodeURIComponent(team)}` : ''}`);
@@ -94,7 +103,9 @@ const reload = (key) => { const m = tabs[key]; m.data = null; m.status = 'loadin
 function filterBar(key) {
     const m = tabs[key], bar = el('div', 'atab-filters');
     bar.append(V.selectField('Period', D.RANGES, m.range, v => { m.range = v; reload(key); }));
-    if (key === 'usage') {
+    if (key === RQ) {
+        // the period alone: the queue is this computer's, not a team's
+    } else if (key === 'usage') {
         bar.append(V.selectField('Group by', [['agent', 'Agent'], ['team', 'Team'], ['provider', 'Agent type'], ['model', 'Model']], m.group, v => { m.group = v; reload(key); }));
         bar.append(V.segment('Chart shows', D.METRICS, m.metric, v => { m.metric = v; m.day = -1; m.turns = null; draw(key); }));
     } else {
@@ -111,11 +122,11 @@ function draw(key) {
     const host = hosts[key]; if (!host || !host.isConnected) return;
     const m = tabs[key], root = el('div', 'atab' + (phone() ? ' atab-phone' : ''));
     root.append(filterBar(key));
-    if (m.status === 'guest') root.append(say(key === IVC ? INBOX_GUEST_LINE : GUEST_LINE));
+    if (m.status === 'guest') root.append(say(key === IVC ? INBOX_GUEST_LINE : key === RQ ? Q.QUEUE_GUEST_LINE : GUEST_LINE));
     else if (m.status === 'noteam') root.append(say('No team has a board yet. Start a team and its numbers appear here.'));
     else if (m.status === 'error') { const p = say('This could not be read.'); const b = el('button', 'btn btn-small', 'Retry'); b.type = 'button'; b.addEventListener('click', () => reload(key)); p.append(' ', b); root.append(p); }
     else if (!m.data) root.append(say('Loading…'));
-    else root.append(...({ usage: drawUsage, operator: drawOperator, [IVC]: drawInbox, comm: drawComm }[key])(m));
+    else root.append(...({ usage: drawUsage, operator: drawOperator, [IVC]: drawInbox, comm: drawComm, [RQ]: mm => Q.drawQueue(mm.data, phone()) }[key])(m));
     const focus = host.contains(document.activeElement) ? document.activeElement.getAttribute('aria-label') : null;
     host.replaceChildren(root);
     if (focus) {
