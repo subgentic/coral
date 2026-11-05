@@ -4,7 +4,7 @@
   "app_actions.js": 4,
   "app_wiring.js": 3,
   "artifact_download.js": 1,
-  "board_chat.js": 11,
+  "board_chat.js": 10,
   "board_choice.js": 1,
   "board_controls.js": 1,
   "board_export.js": 4,
