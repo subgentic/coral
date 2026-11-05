@@ -1,0 +1,272 @@
+[
+  {
+    "uri": "coral://artifacts/c3d33095080c0a8bfec983a3d46ca1d623178bb00219381184860d2fbd6e2b90",
+    "score": 3,
+    "producer": "Frontend Dev",
+    "message": 174790,
+    "file": "scratchpad/13728-corpus/c3d33095080c0a8bfec983a3d46ca1d623178bb00219381184860d2fbd6e2b90.md",
+    "bytes": 2593,
+    "sha256": "c3d33095080c0a8bfec983a3d46ca1d623178bb00219381184860d2fbd6e2b90"
+  },
+  {
+    "uri": "coral://artifacts/59a65d7ddbd8c8c3a2d05838994e70f373277e3c8d85cd454e71d1f6f8cfcdeb",
+    "score": 3,
+    "producer": "Frontend Dev",
+    "message": 174720,
+    "file": "scratchpad/13728-corpus/59a65d7ddbd8c8c3a2d05838994e70f373277e3c8d85cd454e71d1f6f8cfcdeb.md",
+    "bytes": 2511,
+    "sha256": "59a65d7ddbd8c8c3a2d05838994e70f373277e3c8d85cd454e71d1f6f8cfcdeb"
+  },
+  {
+    "uri": "coral://artifacts/fec5e259e1388c0767eadb728753bca409e5483366c78cb7040bb750b14b7804",
+    "score": 3,
+    "producer": "Frontend Dev",
+    "message": 174444,
+    "file": "scratchpad/13728-corpus/fec5e259e1388c0767eadb728753bca409e5483366c78cb7040bb750b14b7804.md",
+    "bytes": 3676,
+    "sha256": "fec5e259e1388c0767eadb728753bca409e5483366c78cb7040bb750b14b7804"
+  },
+  {
+    "uri": "coral://artifacts/e16c1a72cfd793d84c054e065b62191dce4b26de17da584644756eb704be8449",
+    "score": 3,
+    "producer": "Frontend Dev",
+    "message": 174414,
+    "file": "scratchpad/13728-corpus/e16c1a72cfd793d84c054e065b62191dce4b26de17da584644756eb704be8449.md",
+    "bytes": 1986,
+    "sha256": "e16c1a72cfd793d84c054e065b62191dce4b26de17da584644756eb704be8449"
+  },
+  {
+    "uri": "coral://artifacts/e315fe7f9608e7bb3522121a228a7ecd5097e196597c2bd83d58d6f52734f3ee",
+    "score": 3,
+    "producer": "Frontend Dev",
+    "message": 174371,
+    "file": "scratchpad/13728-corpus/e315fe7f9608e7bb3522121a228a7ecd5097e196597c2bd83d58d6f52734f3ee.md",
+    "bytes": 1994,
+    "sha256": "e315fe7f9608e7bb3522121a228a7ecd5097e196597c2bd83d58d6f52734f3ee"
+  },
+  {
+    "uri": "coral://artifacts/476c9b0b4cbc5fb0a4cd2de16e11d675489197f9e4ed76eb5bdae6783bc1ffc8",
+    "score": 3,
+    "producer": "Orchestrator",
+    "message": 174303,
+    "file": "scratchpad/13728-corpus/476c9b0b4cbc5fb0a4cd2de16e11d675489197f9e4ed76eb5bdae6783bc1ffc8.md",
+    "bytes": 3277,
+    "sha256": "476c9b0b4cbc5fb0a4cd2de16e11d675489197f9e4ed76eb5bdae6783bc1ffc8"
+  },
+  {
+    "uri": "coral://artifacts/5d0e32b06ef22f0272d297de9f045da50b38bd292350488de116aa3d9b67b7a6",
+    "score": 3,
+    "producer": "Frontend Dev",
+    "message": 171126,
+    "file": "scratchpad/13728-corpus/5d0e32b06ef22f0272d297de9f045da50b38bd292350488de116aa3d9b67b7a6.md",
+    "bytes": 1433,
+    "sha256": "5d0e32b06ef22f0272d297de9f045da50b38bd292350488de116aa3d9b67b7a6"
+  },
+  {
+    "uri": "coral://artifacts/1685ba02b596a1ba677bf665af29ecc734e892b48d91023ba980deb00b9d1faa",
+    "score": 3,
+    "producer": "Frontend Dev",
+    "message": 168972,
+    "file": "scratchpad/13728-corpus/1685ba02b596a1ba677bf665af29ecc734e892b48d91023ba980deb00b9d1faa.md",
+    "bytes": 3853,
+    "sha256": "1685ba02b596a1ba677bf665af29ecc734e892b48d91023ba980deb00b9d1faa"
+  },
+  {
+    "uri": "coral://artifacts/e1234a35f47781861bb8741e4c9ff97c3860622eed77338943a3af6ff7023118",
+    "score": 3,
+    "producer": "Frontend Dev",
+    "message": 168593,
+    "file": "scratchpad/13728-corpus/e1234a35f47781861bb8741e4c9ff97c3860622eed77338943a3af6ff7023118.md",
+    "bytes": 2196,
+    "sha256": "e1234a35f47781861bb8741e4c9ff97c3860622eed77338943a3af6ff7023118"
+  },
+  {
+    "uri": "coral://artifacts/862e3b02c1900dcb286a039de85210361def41350de45ee759197137e86d572a",
+    "score": 3,
+    "producer": "Frontend Dev",
+    "message": 167930,
+    "file": "scratchpad/13728-corpus/862e3b02c1900dcb286a039de85210361def41350de45ee759197137e86d572a.md",
+    "bytes": 3340,
+    "sha256": "862e3b02c1900dcb286a039de85210361def41350de45ee759197137e86d572a"
+  },
+  {
+    "uri": "coral://artifacts/da590516475157ab825ff21010aa84917e50fecaf7b7c970f24db3236d5d53b7",
+    "score": 3,
+    "producer": "Frontend Dev",
+    "message": 167889,
+    "file": "scratchpad/13728-corpus/da590516475157ab825ff21010aa84917e50fecaf7b7c970f24db3236d5d53b7.md",
+    "bytes": 3044,
+    "sha256": "da590516475157ab825ff21010aa84917e50fecaf7b7c970f24db3236d5d53b7"
+  },
+  {
+    "uri": "coral://artifacts/6534666febae7810d154b66bdca9888ab1bdf70f66028a84218312279047bffe",
+    "score": 3,
+    "producer": "Frontend Dev",
+    "message": 167455,
+    "file": "scratchpad/13728-corpus/6534666febae7810d154b66bdca9888ab1bdf70f66028a84218312279047bffe.md",
+    "bytes": 3613,
+    "sha256": "6534666febae7810d154b66bdca9888ab1bdf70f66028a84218312279047bffe"
+  },
+  {
+    "uri": "coral://artifacts/03081f1cbf912a89ad9e3cc0cb9affabafa5c5dc6eaf4dd99323451d6decb4f1",
+    "score": 3,
+    "producer": "Frontend Dev",
+    "message": 159505,
+    "file": "scratchpad/13728-corpus/03081f1cbf912a89ad9e3cc0cb9affabafa5c5dc6eaf4dd99323451d6decb4f1.md",
+    "bytes": 90364,
+    "sha256": "03081f1cbf912a89ad9e3cc0cb9affabafa5c5dc6eaf4dd99323451d6decb4f1"
+  },
+  {
+    "uri": "coral://artifacts/2e6c02df2b496267c81f382356a0e0faba14fe5f68dc391c9a0ec9f704333660",
+    "score": 3,
+    "producer": "Frontend Dev",
+    "message": 159454,
+    "file": "scratchpad/13728-corpus/2e6c02df2b496267c81f382356a0e0faba14fe5f68dc391c9a0ec9f704333660.md",
+    "bytes": 7302,
+    "sha256": "2e6c02df2b496267c81f382356a0e0faba14fe5f68dc391c9a0ec9f704333660"
+  },
+  {
+    "uri": "coral://artifacts/47d371ac9330fe414b0261ac457c59e67f6cbc0ae492adebfd6a31eb6f4d41a8",
+    "score": 3,
+    "producer": "Frontend Dev",
+    "message": 159322,
+    "file": "scratchpad/13728-corpus/47d371ac9330fe414b0261ac457c59e67f6cbc0ae492adebfd6a31eb6f4d41a8.md",
+    "bytes": 29312,
+    "sha256": "47d371ac9330fe414b0261ac457c59e67f6cbc0ae492adebfd6a31eb6f4d41a8"
+  },
+  {
+    "uri": "coral://artifacts/539a4ec07b913ff32e8fc170863cddd947d5c6ca960532d2112af54358baeb09",
+    "score": 3,
+    "producer": "Frontend Dev",
+    "message": 159249,
+    "file": "scratchpad/13728-corpus/539a4ec07b913ff32e8fc170863cddd947d5c6ca960532d2112af54358baeb09.md",
+    "bytes": 34736,
+    "sha256": "539a4ec07b913ff32e8fc170863cddd947d5c6ca960532d2112af54358baeb09"
+  },
+  {
+    "uri": "coral://artifacts/1f894b865c92ae998833361dd60808ab233455bb9499e4b609869579644376ed",
+    "score": 3,
+    "producer": "Frontend Dev",
+    "message": 158890,
+    "file": "scratchpad/13728-corpus/1f894b865c92ae998833361dd60808ab233455bb9499e4b609869579644376ed.md",
+    "bytes": 34077,
+    "sha256": "1f894b865c92ae998833361dd60808ab233455bb9499e4b609869579644376ed"
+  },
+  {
+    "uri": "coral://artifacts/e8ebc2b1540fc384a318b458699485a16dc7f3617c03e62438d27a5110e64952",
+    "score": 3,
+    "producer": "Frontend Dev",
+    "message": 158844,
+    "file": "scratchpad/13728-corpus/e8ebc2b1540fc384a318b458699485a16dc7f3617c03e62438d27a5110e64952.md",
+    "bytes": 303564,
+    "sha256": "e8ebc2b1540fc384a318b458699485a16dc7f3617c03e62438d27a5110e64952"
+  },
+  {
+    "uri": "coral://artifacts/d9b5b584a611276822ffbd7665c1fce0ee24d8285704ba02105e87c45d7619b2",
+    "score": 3,
+    "producer": "Coral Task Queue",
+    "message": 154802,
+    "file": "scratchpad/13728-corpus/d9b5b584a611276822ffbd7665c1fce0ee24d8285704ba02105e87c45d7619b2.md",
+    "bytes": 4641,
+    "sha256": "d9b5b584a611276822ffbd7665c1fce0ee24d8285704ba02105e87c45d7619b2"
+  },
+  {
+    "uri": "coral://artifacts/ec0ff6580dc959a5f2f94cb9281478995536043f5b4e70f16e240b12d41a8081",
+    "score": 3,
+    "producer": "Orchestrator",
+    "message": 152646,
+    "file": "scratchpad/13728-corpus/ec0ff6580dc959a5f2f94cb9281478995536043f5b4e70f16e240b12d41a8081.md",
+    "bytes": 2828,
+    "sha256": "ec0ff6580dc959a5f2f94cb9281478995536043f5b4e70f16e240b12d41a8081"
+  },
+  {
+    "uri": "coral://artifacts/655f46a80cfee8cba906e50467a285414cdb66729362b78cb1d804922eca162a",
+    "score": 3,
+    "producer": "Beta Tester",
+    "message": 151531,
+    "file": "scratchpad/13728-corpus/655f46a80cfee8cba906e50467a285414cdb66729362b78cb1d804922eca162a.md",
+    "bytes": 4442,
+    "sha256": "655f46a80cfee8cba906e50467a285414cdb66729362b78cb1d804922eca162a"
+  },
+  {
+    "uri": "coral://artifacts/ad2d7a56143900635fb0afe3792c2ff6a5cbfc4e54d89a5aac5057361b5ae26a",
+    "score": 3,
+    "producer": "Coral Task Queue",
+    "message": 151173,
+    "file": "scratchpad/13728-corpus/ad2d7a56143900635fb0afe3792c2ff6a5cbfc4e54d89a5aac5057361b5ae26a.md",
+    "bytes": 3845,
+    "sha256": "ad2d7a56143900635fb0afe3792c2ff6a5cbfc4e54d89a5aac5057361b5ae26a"
+  },
+  {
+    "uri": "coral://artifacts/e5a82ab2d13bbf5fc6415689b9ce44d587651ad4ce740c86bdf2d652c123f537",
+    "score": 3,
+    "producer": "Beta Tester",
+    "message": 150140,
+    "file": "scratchpad/13728-corpus/e5a82ab2d13bbf5fc6415689b9ce44d587651ad4ce740c86bdf2d652c123f537.md",
+    "bytes": 2336,
+    "sha256": "e5a82ab2d13bbf5fc6415689b9ce44d587651ad4ce740c86bdf2d652c123f537"
+  },
+  {
+    "uri": "coral://artifacts/9ecac330f88a7480413385f82924ad268b5a1549041d25839479517b929ed147",
+    "score": 3,
+    "producer": "Coral Task Queue",
+    "message": 150089,
+    "file": "scratchpad/13728-corpus/9ecac330f88a7480413385f82924ad268b5a1549041d25839479517b929ed147.md",
+    "bytes": 7256,
+    "sha256": "9ecac330f88a7480413385f82924ad268b5a1549041d25839479517b929ed147"
+  },
+  {
+    "uri": "coral://artifacts/cfdfff4926600b1af6992ca448b7771ceedfa7e90e8e3c8447110f8478b7e01a",
+    "score": 3,
+    "producer": "Coral Task Queue",
+    "message": 149788,
+    "file": "scratchpad/13728-corpus/cfdfff4926600b1af6992ca448b7771ceedfa7e90e8e3c8447110f8478b7e01a.md",
+    "bytes": 2076,
+    "sha256": "cfdfff4926600b1af6992ca448b7771ceedfa7e90e8e3c8447110f8478b7e01a"
+  },
+  {
+    "uri": "coral://artifacts/7e6a72b339713dc5c4b798d45f97a1f68d57c833bcaf2a6b413557e89917f5c4",
+    "score": 0,
+    "producer": "DevOps Engineer",
+    "message": 173072,
+    "file": "scratchpad/13728-corpus/7e6a72b339713dc5c4b798d45f97a1f68d57c833bcaf2a6b413557e89917f5c4.md",
+    "bytes": 8399,
+    "sha256": "7e6a72b339713dc5c4b798d45f97a1f68d57c833bcaf2a6b413557e89917f5c4"
+  },
+  {
+    "uri": "coral://artifacts/cacab52196d9a2086bfd89e4b9015b94b91c94984dcf766bae74c80cde1fc5b9",
+    "score": 0,
+    "producer": "Hermes Agent Investigation",
+    "message": 171111,
+    "file": "scratchpad/13728-corpus/cacab52196d9a2086bfd89e4b9015b94b91c94984dcf766bae74c80cde1fc5b9.md",
+    "bytes": 6642,
+    "sha256": "cacab52196d9a2086bfd89e4b9015b94b91c94984dcf766bae74c80cde1fc5b9"
+  },
+  {
+    "uri": "coral://artifacts/2142b68c3b1aa8ab9566c684d639b6e3bae13fe168c760807abdd7b952c6f94a",
+    "score": 0,
+    "producer": "Lead Developer",
+    "message": 167906,
+    "file": "scratchpad/13728-corpus/2142b68c3b1aa8ab9566c684d639b6e3bae13fe168c760807abdd7b952c6f94a.md",
+    "bytes": 11563,
+    "sha256": "2142b68c3b1aa8ab9566c684d639b6e3bae13fe168c760807abdd7b952c6f94a"
+  },
+  {
+    "uri": "coral://artifacts/3bcb5c65bf14d8adffbaca87ab310147a37b0e58430ef63124f7363d44506411",
+    "score": 0,
+    "producer": "Orchestrator",
+    "message": 167857,
+    "file": "scratchpad/13728-corpus/3bcb5c65bf14d8adffbaca87ab310147a37b0e58430ef63124f7363d44506411.md",
+    "bytes": 13417,
+    "sha256": "3bcb5c65bf14d8adffbaca87ab310147a37b0e58430ef63124f7363d44506411"
+  },
+  {
+    "uri": "coral://artifacts/a42566209ce5c75c53d873234021daeaa61c485564d441822c0d810f070c2a4e",
+    "score": 0,
+    "producer": "QA Engineer",
+    "message": 167836,
+    "file": "scratchpad/13728-corpus/a42566209ce5c75c53d873234021daeaa61c485564d441822c0d810f070c2a4e.md",
+    "bytes": 5837,
+    "sha256": "a42566209ce5c75c53d873234021daeaa61c485564d441822c0d810f070c2a4e"
+  }
+]
