@@ -35,7 +35,7 @@ export function openAskDialog(a, onDone, runners = {}) {
     importOnce('./artifact_refs.js').then(m => { if (whole.isConnected) m.linkArtifactRefsIn(whole, { asWritten: true }); }).catch(() => {}); // a file named in the question opens in the viewer, the words as written (#12361); plain text until the helper is there
     whole.hidden = !parts.body && !a.cut; // an empty question has no body
     const label = document.createElement('label'); label.className = 'inbox-ask-label'; label.textContent = 'Your reply';
-    const box = document.createElement('textarea'); box.className = 'field inbox-ask-box'; box.rows = 2; box.placeholder = 'Write a reply…'; box.maxLength = 8000; label.append(box);
+    const box = document.createElement('textarea'); box.className = 'field inbox-ask-box'; box.rows = 6; box.placeholder = 'Write a reply…'; box.maxLength = 8000; label.append(box);
     box.addEventListener('input', () => { box.style.height = 'auto'; box.style.height = `${box.scrollHeight + box.offsetHeight - box.clientHeight}px`; });
     const pics = document.createElement('div'); pics.className = 'inbox-ask-pics'; // pictures for the reply (#12173): the comment composer's tray, loaded with the dialog
     const err = document.createElement('p'); err.className = 'inbox-ask-error'; err.setAttribute('role', 'alert');
@@ -52,7 +52,7 @@ export function openAskDialog(a, onDone, runners = {}) {
     let offered = null;
     if (offers.length) { // what the asker offered: one tap per choice, each with what it does
         offered = document.createElement('section'); offered.className = 'inbox-ask-offers'; offered.setAttribute('aria-label', `Buttons ${markHidden(a.asker, { strict: true })} offered`);
-        const head = document.createElement('p'); head.className = 'inbox-ask-offers-head'; head.textContent = offers.every(b => isReply(b.action)) ? 'Choose a reply, or write your own below.' : 'Choose an action, or write a reply below.';
+        const head = document.createElement('p'); head.className = 'inbox-ask-offers-head'; head.textContent = offers.every(b => isReply(b.action)) ? 'Choose a reply, or write your own.' : 'Choose an action, or write a reply below.';
         const list = document.createElement('div'); list.className = 'inbox-ask-offers-list';
         const choices = [];
         for (const b of offers) {
@@ -89,10 +89,11 @@ export function openAskDialog(a, onDone, runners = {}) {
     const foot = document.createElement('div'); foot.className = 'inbox-ask-foot'; foot.append(row); // Reply attachments belong with the reply box; the footer holds its final actions
     const reading = document.createElement('div'); reading.className = 'inbox-ask-reading'; reading.tabIndex = -1;
     if (!whole.hidden) reading.append(whole);
+    if (offered) reading.append(offered);
     const compose = document.createElement('div'); compose.className = 'inbox-ask-compose';
     const addSlot = document.createElement('div'); addSlot.className = 'inbox-ask-attach'; pics.append(addSlot);
     const sendRow = document.createElement('div'); sendRow.className = 'inbox-ask-sendrow'; const pickSlot = document.createElement('span'); pickSlot.className = 'inbox-ask-pick'; sendRow.append(pickSlot, send); addSlot.append(sendRow); // Add image on the left, Send reply on the right, the pictures note under them (#13148)
-    compose.append(...(offered ? [offered] : []), label, pics, err);
+    compose.append(label, pics, err);
     dlg.append(title, sub, ...(links.hidden ? [] : [links]), reading, compose, foot);
     if (!fromAnotherComputer(a)) { // the picture is stored on the question's own team, as a goal's pictures are
         Promise.all([importOnce('./artifact_comment_images.js'), importOnce('./artifact_comments_api.js')]).then(([m, api]) => {
