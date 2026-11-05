@@ -74,7 +74,7 @@ const sections = () => [{ title: 'Needs attention', items: FOLDERS.filter(f => f
 function renderNav(force = false) {
     const list = $('automations-nav-list');
     if (!list) return;
-    const key = JSON.stringify([folder, sections(), filtersOf('jobs'), filtersOf('workflows'), filtersOf('running'), filtersOf('failed'), openJobId(), W.openWorkflowId(), liveRuns().map(r => r.id), filtersOf('recent'), AR.recentRuns().map(r => [r.key, r.run.status, AR.isUnread(r)]), AR.pagedSignature(), AQ.queueDenied(), AQ.queueTick(), AQ.queueItems().map(r => [r.key, r.state, r.place, r.lease_until, r.agent]),
+    const key = JSON.stringify([folder, sections(), filtersOf('jobs'), filtersOf('workflows'), filtersOf('running'), filtersOf('failed'), openJobId(), W.openWorkflowId(), liveRuns().map(r => r.id), filtersOf('recent'), AR.recentRuns().map(r => [r.key, r.run.status, AR.isUnread(r)]), AR.pagedSignature(), AQ.queueDenied(), AQ.historyVersion(), AQ.queueTick(), AQ.queueItems().map(r => [r.key, r.state, r.place, r.lease_until, r.agent]),
         rowsOf('jobs').map(i => [i.id, i.name, i.enabled, i.at, i.run && i.run.status, i.run && i.run.id, runsWords(i)]), rowsOf('workflows').map(i => [i.id, i.name, i.enabled, i.stepCount, i.usedBy, i.run && i.run.status, i.run && i.run.id])]);
     if (!force && key === navKey) return;
     navKey = key;
@@ -269,7 +269,7 @@ export function noteJobDeleted(name) {
 }
 function folderTable(key) {
     const f = folderOf(key), rows = rowsOf(key), filt = filtersOf(key), narrowed = AF.isFiltered(filt) || filt.q;
-    if (key === 'queue') return AQ.queueTable(rows, !!filt.q);
+    if (key === 'queue') return AQ.queueTable(rows, !!filt.q, filt.q);
     if (key === 'recent') { AR.ensureRunsPage({ q: filt.q, result: filt.result }); return recentTable(rows, narrowed); } // the page of this search and Result filter (a no-op when it is the one loaded or on its way)
     if (f.attention) return attentionTable(key, rows, narrowed);
     const base = { title: f.label, noun: f.noun, rows, status: key === 'jobs' ? _gone : '',
@@ -331,6 +331,7 @@ function mount() {
     AR.startRuns();
     W.refreshWorkflows();
     AQ.onQueueChanged(() => renderNav());
+    AQ.onHistoryChanged(() => renderNav());
     AQ.refreshQueue(); // the Queue folder's count in the list
 }
 

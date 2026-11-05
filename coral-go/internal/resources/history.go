@@ -62,8 +62,13 @@ func OpenHistory(path string) (*History, error) {
 	db.SetMaxOpenConns(1)
 	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS resource_events (
 		at INTEGER NOT NULL, kind TEXT NOT NULL, resource TEXT NOT NULL, agent TEXT NOT NULL, task INTEGER NOT NULL DEFAULT 0,
-		entry INTEGER NOT NULL DEFAULT 0, via TEXT NOT NULL DEFAULT '', pattern TEXT NOT NULL DEFAULT '', wait_ms INTEGER NOT NULL DEFAULT 0, held_ms INTEGER NOT NULL DEFAULT 0);
+		entry INTEGER NOT NULL DEFAULT 0, via TEXT NOT NULL DEFAULT '', pattern TEXT NOT NULL DEFAULT '', wait_ms INTEGER NOT NULL DEFAULT 0, held_ms INTEGER NOT NULL DEFAULT 0,
+		project TEXT NOT NULL DEFAULT '', why TEXT NOT NULL DEFAULT '');
 		CREATE INDEX IF NOT EXISTS resource_events_at ON resource_events(at)`); err != nil {
+		_ = db.Close()
+		return nil, err
+	}
+	if err := migrate(db); err != nil {
 		_ = db.Close()
 		return nil, err
 	}
@@ -97,8 +102,8 @@ func (h *History) run() {
 		if h.writeGate != nil {
 			h.writeGate()
 		}
-		_, err := h.db.Exec(`INSERT INTO resource_events (at, kind, resource, agent, task, entry, via, pattern, wait_ms, held_ms) VALUES (?,?,?,?,?,?,?,?,?,?)`,
-			e.At.UnixMilli(), e.Kind, e.Resource, e.Agent, e.Task, e.Entry, e.Via, e.Pattern, e.Wait.Milliseconds(), e.Held.Milliseconds())
+		_, err := h.db.Exec(`INSERT INTO resource_events (at, kind, resource, agent, task, entry, via, pattern, wait_ms, held_ms, project, why) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+			e.At.UnixMilli(), e.Kind, e.Resource, e.Agent, e.Task, e.Entry, e.Via, e.Pattern, e.Wait.Milliseconds(), e.Held.Milliseconds(), e.Project, e.Why)
 		if err != nil {
 			slog.Warn("resource history write failed", "error", err) // the detail is the log's; the queue goes on
 			h.dropped.Add(1)
@@ -166,7 +171,7 @@ func (h *History) Events(since, until time.Time) ([]resourcequeue.Event, error) 
 	if h == nil {
 		return nil, fmt.Errorf("resources: no history")
 	}
-	rows, err := h.db.Query(`SELECT at, kind, resource, agent, task, entry, via, pattern, wait_ms, held_ms FROM resource_events WHERE at >= ? AND at < ? ORDER BY at, rowid`, since.UnixMilli(), until.UnixMilli())
+	rows, err := h.db.Query(`SELECT at, kind, resource, agent, task, entry, via, pattern, wait_ms, held_ms, project, why FROM resource_events WHERE at >= ? AND at < ? ORDER BY at, rowid`, since.UnixMilli(), until.UnixMilli())
 	if err != nil {
 		return nil, err
 	}
@@ -175,7 +180,7 @@ func (h *History) Events(since, until time.Time) ([]resourcequeue.Event, error) 
 	for rows.Next() {
 		var e resourcequeue.Event
 		var at, wait, held int64
-		if err := rows.Scan(&at, &e.Kind, &e.Resource, &e.Agent, &e.Task, &e.Entry, &e.Via, &e.Pattern, &wait, &held); err != nil {
+		if err := rows.Scan(&at, &e.Kind, &e.Resource, &e.Agent, &e.Task, &e.Entry, &e.Via, &e.Pattern, &wait, &held, &e.Project, &e.Why); err != nil {
 			return nil, err
 		}
 		e.At, e.Wait, e.Held = time.UnixMilli(at).UTC(), time.Duration(wait)*time.Millisecond, time.Duration(held)*time.Millisecond

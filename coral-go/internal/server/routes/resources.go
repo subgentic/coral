@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"regexp"
@@ -35,16 +36,19 @@ type ResourcesHandler struct {
 }
 
 type entryView struct {
-	ID       int64  `json:"id"`
-	Agent    string `json:"agent"`
-	Task     int    `json:"task,omitempty"`
-	Priority int    `json:"priority"`
-	Note     string `json:"note,omitempty"`
-	Enqueued string `json:"enqueued_at"`
-	Granted  string `json:"granted_at,omitempty"`
-	Lease    string `json:"lease_until,omitempty"`
-	Pinned   bool   `json:"pinned,omitempty"`
-	Place    int    `json:"place,omitempty"`
+	ID        int64  `json:"id"`
+	Agent     string `json:"agent"`
+	Task      int    `json:"task,omitempty"`
+	Project   string `json:"project,omitempty"` // the task's board (#13704)
+	GoalID    int64  `json:"goal_id,omitempty"` // the task's goal, read from the board with the list (#13704)
+	GoalTitle string `json:"goal_title,omitempty"`
+	Priority  int    `json:"priority"`
+	Note      string `json:"note,omitempty"`
+	Enqueued  string `json:"enqueued_at"`
+	Granted   string `json:"granted_at,omitempty"`
+	Lease     string `json:"lease_until,omitempty"`
+	Pinned    bool   `json:"pinned,omitempty"`
+	Place     int    `json:"place,omitempty"`
 }
 
 type resourceView struct {
@@ -59,7 +63,7 @@ type resourceView struct {
 }
 
 func viewEntry(e resourcequeue.Entry, place int) entryView {
-	v := entryView{ID: e.ID, Agent: e.Agent, Task: e.Task, Priority: e.Priority, Note: e.Note, Enqueued: e.Enqueued.UTC().Format(time.RFC3339), Pinned: e.Pin > 0, Place: place}
+	v := entryView{ID: e.ID, Agent: e.Agent, Task: e.Task, Project: e.Project, Priority: e.Priority, Note: e.Note, Enqueued: e.Enqueued.UTC().Format(time.RFC3339), Pinned: e.Pin > 0, Place: place}
 	if !e.Granted.IsZero() {
 		v.Granted = e.Granted.UTC().Format(time.RFC3339)
 		v.Lease = e.Lease.UTC().Format(time.RFC3339)
@@ -112,7 +116,45 @@ func (h *ResourcesHandler) List(w http.ResponseWriter, r *http.Request) {
 	for _, st := range h.M.Queue().All() {
 		out = append(out, viewStatus(st))
 	}
+	h.addGoals(r.Context(), out)
 	writeJSON(w, http.StatusOK, map[string]any{"resources": out})
+}
+
+// addGoals gives each entry whose task has a goal that goal's id and title (#13704, the Queue folder links it): one lookup per board for every task on it, never one per row. A board that cannot be read leaves its entries without a goal: the line itself is unaffected.
+func (h *ResourcesHandler) addGoals(ctx context.Context, views []resourceView) {
+	if h.Board == nil {
+		return
+	}
+	ids := map[string][]int64{}
+	seen := map[string]bool{}
+	each := func(f func(*entryView)) {
+		for i := range views {
+			for j := range views[i].Holders {
+				f(&views[i].Holders[j])
+			}
+			for j := range views[i].Queue {
+				f(&views[i].Queue[j])
+			}
+		}
+	}
+	each(func(e *entryView) {
+		k := e.Project + "#" + strconv.Itoa(e.Task)
+		if e.Project != "" && e.Task > 0 && !seen[k] {
+			seen[k] = true
+			ids[e.Project] = append(ids[e.Project], int64(e.Task))
+		}
+	})
+	goals := map[string]map[int64]board.TaskGoalRef{}
+	for project, list := range ids {
+		if g, err := h.Board.TaskGoals(ctx, project, list); err == nil {
+			goals[project] = g
+		}
+	}
+	each(func(e *entryView) {
+		if g, ok := goals[e.Project][int64(e.Task)]; ok && e.Project != "" {
+			e.GoalID, e.GoalTitle = g.ID, g.Title
+		}
+	})
 }
 
 // Get answers GET /api/resources/{name}.

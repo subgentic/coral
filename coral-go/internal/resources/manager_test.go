@@ -18,9 +18,9 @@ import (
 
 type fakePrio map[string][2]int
 
-func (f fakePrio) Of(_ context.Context, agent string) (int, int, error) {
+func (f fakePrio) Of(_ context.Context, agent string) (int, string, int, error) {
 	v := f[agent]
-	return v[0], v[1], nil
+	return v[0], "", v[1], nil
 }
 
 func order(t *testing.T, m *Manager, key string) []string {

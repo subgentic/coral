@@ -43,6 +43,12 @@ func rqServer(t *testing.T, rig *cmtRig, person bool) (*httptest.Server, *resour
 		}
 		h.Read(w, req)
 	})
+	r.Get("/api/analytics/resource-queue/runs", func(w http.ResponseWriter, req *http.Request) {
+		if person {
+			req = req.WithContext(context.WithValue(req.Context(), callerKindKey{}, callerDashCookie))
+		}
+		h.Runs(w, req)
+	})
 	s := httptest.NewServer(r)
 	t.Cleanup(s.Close)
 	return s, m, clk
@@ -180,4 +186,100 @@ func TestTheSinceWaitIsUnavailableNotZeroWhenTheQueueHasNoRecord(t *testing.T) {
 	assert.True(t, s.WaitUnavailable, "no record: the queue's own wait cannot be said")
 	out = h.beforeAfter(nil, nil, nil, true, time.Date(2026, 11, 4, 0, 0, 0, 0, time.UTC), now)
 	assert.False(t, out["since"].(rqSpan).WaitUnavailable)
+}
+
+func getRuns(t *testing.T, base, query string, hdr map[string]string) (int, map[string]any) {
+	t.Helper()
+	req, err := http.NewRequest("GET", base+"/api/analytics/resource-queue/runs"+query, nil)
+	require.NoError(t, err)
+	for k, v := range hdr {
+		req.Header.Set(k, v)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	var out map[string]any
+	_ = json.NewDecoder(resp.Body).Decode(&out)
+	return resp.StatusCode, out
+}
+
+// #13724: the history of the runs: each entry that ended, with its task's goal read from the board, the machine of its resource, no note and no command; the Operator's alone and this computer's.
+func TestTheRunsReadListsEndedEntriesWithGoalMachineAndNoText(t *testing.T) {
+	rig := newCmtRig(t)
+	srv, m, clk := rqServer(t, rig, true)
+	ctx := context.Background()
+	require.NoError(t, m.Queue().Define(resourcequeue.Resource{Key: "mac-heavy", Slots: 1, Machine: "Mac Studio"}))
+	goal, err := rig.h.bs.CreateGoal(ctx, "team", board.GoalInput{Title: "Queue history", Outcome: "x", DoneWhen: "y", CreatedBy: "Dev"})
+	require.NoError(t, err)
+	task, err := rig.h.bs.CreateTask(ctx, "team", "t", "", "high", "Dev", "Dev")
+	require.NoError(t, err)
+	require.NoError(t, rig.h.bs.SetTaskGoal(ctx, "team", task.ID, &goal.ID))
+	clk.t = time.Date(2026, 11, 5, 16, 0, 0, 0, time.UTC)
+	_, err = m.ClaimAuto(ctx, "mac-heavy", "a", "go test ./...")
+	require.NoError(t, err)
+	_, err = m.Claim(ctx, "mac-heavy", "b", "a private note that must never be sent")
+	require.NoError(t, err)
+	clk.t = clk.t.Add(5 * time.Minute)
+	require.NoError(t, m.Queue().ReleaseWhy("mac-heavy", "a", "call ended"))
+	clk.t = clk.t.Add(7 * time.Minute)
+	require.NoError(t, m.Queue().Release("mac-heavy", "b"))
+	m.History().Flush()
+	// give a's row its board and task the way the manager would with a priorities source
+	m.History().Add(resourcequeue.Event{At: clk.t, Kind: "enqueued", Resource: "mac-heavy", Agent: "c", Task: int(task.ID), Project: "team", Entry: 99})
+	m.History().Add(resourcequeue.Event{At: clk.t.Add(time.Minute), Kind: "released", Resource: "mac-heavy", Agent: "c", Task: int(task.ID), Project: "team", Entry: 99, Why: "cap"})
+	m.History().Flush()
+
+	code, out := getRuns(t, srv.URL, "", nil)
+	require.Equal(t, http.StatusOK, code, out)
+	raw, _ := json.Marshal(out)
+	assert.NotContains(t, string(raw), "private note", "no note")
+	assert.NotContains(t, string(raw), "a private", "no note")
+	runs := out["runs"].([]any)
+	require.Len(t, runs, 3)
+	c := runs[0].(map[string]any) // newest first
+	assert.Equal(t, "c", c["agent"])
+	assert.Equal(t, "cap", c["end"])
+	assert.EqualValues(t, task.ID, c["task"])
+	assert.Equal(t, "team", c["project"])
+	assert.EqualValues(t, goal.ID, c["goal_id"])
+	assert.Equal(t, "Queue history", c["goal_title"])
+	assert.Equal(t, "Mac Studio", c["machine"])
+	a := runs[2].(map[string]any)
+	assert.Equal(t, "call_ended", a["end"])
+	assert.Equal(t, "go test ./...", a["pattern"])
+	assert.EqualValues(t, 300, a["held_s"])
+	assert.Equal(t, "hook", a["via"])
+	assert.Contains(t, out["resources"], "mac-heavy")
+	assert.ElementsMatch(t, []any{"a", "b", "c"}, out["agents"].([]any))
+
+	_, f := getRuns(t, srv.URL, "?agent=b", nil)
+	assert.Len(t, f["runs"], 1)
+	_, q := getRuns(t, srv.URL, "?q=studio", nil)
+	assert.Len(t, q["runs"], 3, "a search for the machine finds the runs on its resources")
+	_, g := getRuns(t, srv.URL, "?q=time+cap", nil)
+	assert.Len(t, g["runs"], 1, "how it ended, in the page's words")
+	_, g = getRuns(t, srv.URL, "?q=kicked", nil)
+	assert.Len(t, g["runs"], 0)
+}
+
+func TestTheRunsReadIsThePersonsAloneAndThisComputersAndSaysSoWithNoRecord(t *testing.T) {
+	rig := newCmtRig(t)
+	notPerson, _, _ := rqServer(t, rig, false)
+	code, _ := getRuns(t, notPerson.URL, "", nil)
+	assert.Equal(t, http.StatusForbidden, code)
+	srv, _, _ := rqServer(t, rig, true)
+	code, _ = getRuns(t, srv.URL, "", map[string]string{tunnel.ViaHeader: cloud.ViaSecret(), tunnel.HubRoleHeader: "owner", tunnel.HubUserHeader: "hub-user-1234abcd"})
+	assert.Equal(t, http.StatusForbidden, code, "not through the Hub")
+	code, _ = getRuns(t, srv.URL, "?before=junk", nil)
+	assert.Equal(t, http.StatusBadRequest, code, "a bad cursor")
+	none := &ResourceQueueAnalyticsHandler{}
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/api/analytics/resource-queue/runs", nil)
+	req = req.WithContext(context.WithValue(req.Context(), callerKindKey{}, callerDashCookie))
+	none.Runs(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code)
+	var out map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &out))
+	assert.Equal(t, false, out["history"], "no record: the page says so, it is not an empty list")
+	assert.Empty(t, out["runs"])
 }

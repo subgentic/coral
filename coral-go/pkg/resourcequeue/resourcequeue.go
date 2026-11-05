@@ -42,6 +42,7 @@ type Resource struct {
 type Claimant struct {
 	Agent    string // who (a session or member id)
 	Task     int    // what it is working on, for people to read (0: none)
+	Project  string // the board that task is on (task numbers repeat across boards; #13704 links to it), "" when there is no task
 	Priority int    // bigger goes first; supplied by the caller from the agent's task and goal
 	Note     string // why, for people to read
 	Via      string // how the claim came: "hook" for the shell hook's own, "" for a person's or an agent's (#13671)
@@ -97,6 +98,8 @@ type Event struct {
 	Agent    string
 	Task     int
 	Entry    int64
+	Project  string // the board of the entry's task (#13724: the history links the task), "" with no task
+	Why      string // for a release, the reason the caller gave (the shell hook's "call ended", "unclaimed", "cap", "gone"); "" for a person's own release
 	Via      string
 	Pattern  string
 	Wait     time.Duration // granted: time in line; cancelled and kicked while waiting: time waited
@@ -109,7 +112,7 @@ func (q *Queue) note(kind string, e *Entry) {
 		return
 	}
 	now := q.now()
-	ev := Event{At: now, Kind: kind, Resource: e.Resource, Agent: e.Agent, Task: e.Task, Entry: e.ID, Via: e.Via, Pattern: e.Pattern}
+	ev := Event{At: now, Kind: kind, Resource: e.Resource, Agent: e.Agent, Task: e.Task, Entry: e.ID, Project: e.Project, Via: e.Via, Pattern: e.Pattern}
 	if e.Waiting() {
 		ev.Wait = now.Sub(e.Enqueued)
 	} else {
@@ -344,7 +347,10 @@ func (q *Queue) Renew(key, agent string) (Entry, error) {
 }
 
 // Release gives up a slot, or leaves the line; the next in line is granted.
-func (q *Queue) Release(key, agent string) error {
+func (q *Queue) Release(key, agent string) error { return q.ReleaseWhy(key, agent, "") }
+
+// ReleaseWhy is Release with the reason the caller gives, told to the OnEvent sink with the release (the shell hook ends a hold because its call ended, it was never used, or it ran too long).
+func (q *Queue) ReleaseWhy(key, agent, why string) error {
 	q.mu.Lock()
 	if _, ok := q.res[key]; !ok {
 		q.unlockEmit()
@@ -359,6 +365,9 @@ func (q *Queue) Release(key, agent string) error {
 		q.note("cancelled", e)
 	} else {
 		q.note("released", e)
+	}
+	if why != "" && len(q.pend) > 0 {
+		q.pend[len(q.pend)-1].Why = why
 	}
 	q.drop(e.ID)
 	granted := q.fill(key)

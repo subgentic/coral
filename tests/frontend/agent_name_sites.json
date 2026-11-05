@@ -52,6 +52,10 @@
     {
       "file": "task_detail_html.js",
       "what": "a task's page: Assigned To, Created By, Completed by"
+    },
+    {
+      "file": "automations_queue.js",
+      "what": "the agent of a holder or a waiting entry in the Queue folder (#13704)"
     }
   ],
   "pending": [],

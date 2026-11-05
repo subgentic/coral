@@ -9,6 +9,9 @@ import { announceNotice } from './notifications.js';
 import { pollEvery } from './overload.js';
 import { importOnce } from './import_once.js';
 const DT = await importOnce('./data_table.js');
+const { agentLink } = await importOnce('./agent_link.js');
+const H = await importOnce('./automations_queue_history.js'); // the history of the runs, under the live table (#13724)
+const { liveAgentOf, openAgent } = await importOnce('./agent_live.js'); // the one way an agent's name opens its chat (#12168); a task and a goal open where their own links do (opened when clicked)
 
 const POLL_MS = 5000;
 let resources = [], loaded = false, denied = false, timer = 0, tickTimer = 0, listeners = new Set(), wanted = false, reading = null, pendingFocus = null;
@@ -23,6 +26,8 @@ const emit = () => {
 };
 export const onQueueChanged = fn => { listeners.add(fn); };
 export const queueDenied = () => denied;
+export const historyVersion = () => H.historyVersion();
+export const onHistoryChanged = fn => H.onHistoryChanged(fn);
 /** Changes every half minute: the table's key carries it, so the lease left and the waiting times keep counting between data changes. */
 export const queueTick = () => Math.floor(Date.now() / TICK_MS);
 
@@ -37,7 +42,7 @@ export async function refreshQueue() {
             const next = Array.isArray(body && body.resources) ? body.resources : [];
             const same = loaded && JSON.stringify(next) === JSON.stringify(resources);
             resources = next; loaded = true;
-            if (!same) emit();
+            if (!same) { emit(); H.queueMoved(); } // an entry that ended is a new run in the history
         } catch { /* the next poll */ } finally { reading = null; }
     })();
     return reading;
@@ -46,6 +51,7 @@ export async function refreshQueue() {
 /** Start or stop the polling: on while the Queue folder is the one on screen. */
 export function watchQueue(on) {
     wanted = !!on;
+    H.watchHistory(on);
     if (!wanted) { clearInterval(timer); clearInterval(tickTimer); timer = 0; tickTimer = 0; return; }
     refreshQueue();
     if (!timer) timer = pollEvery(() => { if (wanted) refreshQueue(); }, POLL_MS);
@@ -65,8 +71,8 @@ export function queueItems() {
     for (const r of resources) {
         const holders = r.holders || [], queue = r.queue || [], head = { resource: r.name, machine: r.machine || '', slots: r.slots, used: holders.length, waiting: queue.length };
         if (!holders.length && !queue.length) rows.push({ ...head, key: `${r.name}-free`, id: 0, state: 'free', agent: '', note: '', task: 0, place: 0, last: true, first: true });
-        holders.forEach(e => rows.push({ ...head, key: `${r.name}-${e.id}`, id: e.id, state: 'holding', agent: e.agent, note: e.note || '', task: e.task || 0, place: 0, lease_until: e.lease_until, enqueued_at: e.enqueued_at, pinned: !!e.pinned }));
-        queue.forEach((e, i) => rows.push({ ...head, key: `${r.name}-${e.id}`, id: e.id, state: 'waiting', agent: e.agent, note: e.note || '', task: e.task || 0, place: e.place || i + 1, first: i === 0, last: i === queue.length - 1, enqueued_at: e.enqueued_at, pinned: !!e.pinned }));
+        holders.forEach(e => rows.push({ ...head, key: `${r.name}-${e.id}`, id: e.id, state: 'holding', agent: e.agent, note: e.note || '', task: e.task || 0, project: e.project || '', goal_id: e.goal_id || 0, goal_title: e.goal_title || '', place: 0, lease_until: e.lease_until, enqueued_at: e.enqueued_at, pinned: !!e.pinned }));
+        queue.forEach((e, i) => rows.push({ ...head, key: `${r.name}-${e.id}`, id: e.id, state: 'waiting', agent: e.agent, note: e.note || '', task: e.task || 0, project: e.project || '', goal_id: e.goal_id || 0, goal_title: e.goal_title || '', place: e.place || i + 1, first: i === 0, last: i === queue.length - 1, enqueued_at: e.enqueued_at, pinned: !!e.pinned }));
     }
     return rows;
 }
@@ -141,26 +147,46 @@ function neighbour(row) {
 
 const stateWord = row => (row.state === 'holding' ? 'Holding' : row.state === 'waiting' ? `Waiting, place ${row.place}` : 'Free');
 
+const openTaskPage = (r, from) => importOnce('./task_navigation.js').then(m => m.openTask(r.project, r.task, from, { from: '' }));
+const openGoalPage = r => importOnce('./task_goals.js').then(m => m.openGoalOnTeamPage(r.project, r.goal_id));
+const goalWords = r => `#${r.goal_id} ${r.goal_title}`;
+/** The links of one row (#13704): the agent opens its chat, the task its page, the goal its page on the team's. A row with no task has no task or goal link; a task with no goal has no goal link. */
+const taskLink = r => (r.task && r.project ? DT.link(`#${r.task}`, ev => openTaskPage(r, ev && ev.currentTarget)) : r.task ? DT.el('span', '', `#${r.task}`) : '');
+const goalLink = r => { if (!(r.goal_id && r.project)) return ''; const b = DT.link(goalWords(r), () => openGoalPage(r)); b.classList.add('queue-goal'); b.title = goalWords(r); b.setAttribute('aria-label', `Open goal ${goalWords(r)}`); return b; };
+
+/** On a phone the row is a card: the links are its first actions (Agent, Task, Goal), each a button with its own name. */
+const linkActions = r => (r.state === 'free' ? [] : [
+    ...(liveAgentOf(r.agent, { board: r.project }) ? [{ label: `Open ${r.agent}`, title: `Open ${r.agent}`, run: () => openAgent(liveAgentOf(r.agent, { board: r.project })) }] : []),
+    ...(r.task && r.project ? [{ label: `Task #${r.task}`, title: `Open task #${r.task}`, link: true, run: () => openTaskPage(r, null) }] : []),
+    ...(r.goal_id && r.project ? [{ label: `Goal #${r.goal_id}`, title: `Open goal ${goalWords(r)}`, link: true, run: () => openGoalPage(r) }] : [])]);
+
 /** The Queue folder's table. */
-export function queueTable(rows, narrowed) {
+export function queueTable(rows, narrowed, q = '') {
+    H.setSearch(q); // the folder's search box finds runs in the history too (the server searches)
     return { title: 'Queue (experimental)', noun: ['entry', 'entries'], rows,
-        empty: { line: narrowed ? 'No entry matches the search.' : loaded ? 'No resource is defined.' : 'Reading the queue.', hint: narrowed || !loaded ? '' : 'An Orchestrator defines a resource with coral-board resource; agents claim a slot before a heavy run and wait in line when it is taken.' },
-        signature: JSON.stringify([denied, rows.map(r => [r.key, r.state, r.place, r.agent, r.note, r.used, r.slots, r.waiting, r.lease_until, r.first, r.last, r.state === 'holding' ? leaseWords(r) : r.state === 'waiting' ? waitWords(r) : ''])]), // the words of the clock are in it: the table is drawn again when they change
-        node: () => DT.dataTable({
+        // no `empty`: the history below the live table is always drawn, so a live list with no row says so itself (liveTable) and the page keeps the history
+        signature: JSON.stringify([denied, H.historySignature(), rows.map(r => [r.key, r.state, r.place, r.agent, r.project, r.goal_id, r.goal_title, r.note, r.used, r.slots, r.waiting, r.lease_until, r.first, r.last, r.state === 'holding' ? leaseWords(r) : r.state === 'waiting' ? waitWords(r) : ''])]), // the words of the clock are in it: the table is drawn again when they change
+        node: () => { const page = DT.el('div', 'queue-page'); page.append(liveTable(), H.historySection()); return page; },
+    };
+    function liveTable() {
+        if (!rows.length) { const e = DT.el('div', 'empty-state'); e.append(DT.el('p', 'empty-state-line', narrowed ? 'No entry matches the search.' : loaded ? 'No resource is defined.' : 'Reading the queue.')); if (!narrowed && loaded) e.append(DT.el('p', 'empty-state-hint', 'An Orchestrator defines a resource with coral-board resource; agents claim a slot before a heavy run and wait in line when it is taken.')); return e; }
+        return DT.dataTable({
             label: `Queue, ${rows.length}`, rows, oneLine: true, resize: true, keepOrder: true, rowKey: r => r.key, rowName: r => (r.state === 'free' ? `${r.resource}, all free` : `${r.agent}, ${stateWord(r)}, ${r.resource}`),
             groupBy: groupOf,
             columns: [ // a narrow list drops the note (62 rem), then the task and the time (52): the data_table.css steps are 62, 52, 36, 28 and 16, no other number hides a column
-                { key: 'agent', label: 'Agent', primary: true, width: 'grow', cell: r => (r.state === 'free' ? DT.el('span', 'dt-time', 'All slots free') : DT.el('span', 'queue-agent', r.agent)) },
+                { key: 'agent', label: 'Agent', primary: true, width: 'grow', cell: r => (r.state === 'free' ? DT.el('span', 'dt-time', 'All slots free') : agentLink(r.agent, { board: r.project, cls: 'queue-agent' })) },
                 { key: 'state', label: 'State', width: '8.5rem', cell: r => (r.state === 'free' ? '' : DT.chip(stateWord(r), r.state === 'holding' ? 'goal-state-task-active' : '')) },
                 { key: 'why', label: 'Note', width: '12rem', dropAt: 62, tone: 'tertiary', cell: r => r.note || '' },
-                { key: 'task', label: 'Task', width: '6rem', dropAt: 52, tone: 'tertiary', cell: r => (r.task ? `#${r.task}` : '') },
+                { key: 'task', label: 'Task', width: '5rem', dropAt: 52, cell: taskLink },
+                { key: 'goal', label: 'Goal', width: '9rem', dropAt: 52, cell: goalLink },
                 { key: 'time', label: 'Lease left / waited', width: '9rem', dropAt: 52, tone: 'tertiary', cell: r => (r.state === 'holding' ? leaseWords(r) : r.state === 'waiting' ? waitWords(r) : '') },
-                ...(denied ? [] : [{ key: 'actions', label: 'Move or kick', width: '17rem', cell: actionsCell }]),
+                ...(denied ? [] : [{ key: 'actions', label: 'Move or kick', width: '14rem', cell: actionsCell }]),
             ],
             mail: r => ({ lead: { icon: r.state === 'holding' ? 'lock' : r.state === 'waiting' ? 'hourglass_empty' : 'check_circle', square: true, name: stateWord(r) }, title: r.state === 'free' ? `${r.resource}: all slots free` : r.agent,
                 snippet: r.state === 'free' ? '' : `${r.resource}${r.note ? ' · ' + r.note : ''}`, state: stateWord(r), time: r.state === 'holding' ? `Holding \u00b7 ${leaseWords(r)}` : r.state === 'waiting' ? `Place ${r.place} \u00b7 ${waitWords(r)}` : '',
-                actions: rowActions(r).map(a => ({ label: a.label, title: a.title, off: a.off, ...(a.kick ? { confirm: 'Confirm kick', onArm: () => announceNotice(`Press Confirm kick to remove ${r.agent} from ${r.resource}.`) } : {}), run: () => { noteFocus(a.kick ? neighbour(r)[0] : r.id, a.label); a.run(); } })) }),
-        }).el };
+                actions: [...linkActions(r), ...rowActions(r)].map(a => ({ label: a.label, title: a.title, off: a.off, ...(a.kick ? { confirm: 'Confirm kick', onArm: () => announceNotice(`Press Confirm kick to remove ${r.agent} from ${r.resource}.`) } : {}), run: () => { noteFocus(a.kick ? neighbour(r)[0] : r.id, a.label); a.run(); } })) }),
+        }).el;
+    }
 }
 
-export const queueSearch = (rows, q) => { const t = String(q || '').trim().toLowerCase(); return t ? rows.filter(r => [r.resource, r.machine, r.agent, r.note, r.task ? `#${r.task}` : ''].some(s => String(s).toLowerCase().includes(t))) : rows; };
+export const queueSearch = (rows, q) => { const t = String(q || '').trim().toLowerCase(); return t ? rows.filter(r => [r.resource, r.machine, r.agent, r.note, r.task ? `#${r.task}` : '', r.goal_title || ''].some(s => String(s).toLowerCase().includes(t))) : rows; };
