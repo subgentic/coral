@@ -135,7 +135,7 @@ export function refreshReviews(force = false, { reuse = false } = {}) { // reuse
             const readOne = async (i) => {
                 const team = projects[i].project, mutedHere = [], got = { rows: [], saved: [], mutedHere, failed: '' };
                 try {
-                    if (!force && await artifactsUnchanged(team, loadedRevisions.get(team))) {
+                    if (!force && await artifactsUnchanged(team, loadedRevisions.get(team), splitKey(team).name === '~no-team')) {
                         results[i] = { rows: items.filter(a => a.team === team), saved: saved.filter(a => a.team === team), mutedHere: muted.filter(a => a.team === team), failed: '' };
                         return;
                     }
