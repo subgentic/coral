@@ -668,7 +668,27 @@ export async function refreshChangedFiles(quiet = false, auto = false) { // quie
     if (btn) setTimeout(() => btn.classList.remove('refreshing'), 300);
 }
 
+// A late file read can arrive after the person started typing. Keep polling/model updates live,
+// but paint the list once typing pauses; a first 500-row population cannot reuse old rows.
+const FILES_TYPING_IDLE_MS = 300;
+let _lastTypingAt = -Infinity, _typingPaintTimer = 0;
+const typingField = e => !!e && (e.id === 'command-input' || e.classList?.contains('xterm-helper-textarea'));
+function queueTypingPaint() {
+    clearTimeout(_typingPaintTimer);
+    _typingPaintTimer = setTimeout(() => { _typingPaintTimer = 0; renderChangedFiles(); }, FILES_TYPING_IDLE_MS);
+}
+function noteFilesTyping(e) {
+    if (!typingField(e.target)) return;
+    _lastTypingAt = performance.now();
+    if (_typingPaintTimer) queueTypingPaint();
+}
+document.addEventListener('input', noteFilesTyping, true);
+document.addEventListener('keydown', e => {
+    if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key?.length === 1 || ['Backspace', 'Delete', 'Enter'].includes(e.key) || e.isComposing)) noteFilesTyping(e);
+}, true);
  function renderChangedFiles() {
+    if (typingField(document.activeElement) && performance.now() - _lastTypingAt < FILES_TYPING_IDLE_MS) { queueTypingPaint(); return; }
+    if (_typingPaintTimer) { clearTimeout(_typingPaintTimer); _typingPaintTimer = 0; }
     const list = document.getElementById('changed-files-list');
     const titleEl = document.getElementById('changed-files-title');
     const countEl = document.getElementById('files-bar-count');
@@ -794,8 +814,10 @@ export async function refreshChangedFiles(quiet = false, auto = false) { // quie
     // Expand all (#11350) is on the list's first line, not in the header: the header keeps its size when the first list arrives (#7671).
     const expandAll = plain ? '' : `<button type="button" class="btn btn-quiet btn-xs files-expand-all" data-on-click="files-expand-all" aria-label="${escapeAttr(expandAllLabel)}">${escapeHtml(expandAllText)}</button>`;
     // Reusing unchanged rows avoids tearing down thousands of layout objects when an async read lands during typing (#13666).
-    if (!sameAgent) for (const slot of list.querySelectorAll('.file-diff')) slot.replaceChildren(); // never keep another agent's editor
-    morphHtml(list, `${staleNoteHtml()}<div class="files-legend"><span>New files are green, deleted ones red, the rest changed.</span>${expandAll}</div>${rowsHtml}`);
+    const replaceEditors = !sameAgent && !!list.querySelector('.file-diff:not([hidden])');
+    const listHtml = `${staleNoteHtml()}<div class="files-legend"><span>New files are green, deleted ones red, the rest changed.</span>${expandAll}</div>${rowsHtml}`;
+    if (replaceEditors) list.innerHTML = listHtml; // another agent gets fresh editor slots and their state
+    else morphHtml(list, listHtml);
     for (const fresh of list.querySelectorAll('.file-diff')) { const old = kept.get(fresh.dataset.filepath); if (old && old !== fresh && !fresh.hidden) { old.id = fresh.id; fresh.replaceWith(old); if (old.querySelector('.diff-comments')) importOnce('./diff_comments.js').then(m => m.placeDiffCommentIcon(old)).catch(() => {}); /* its comment icon goes back in the new row (#13528) */ } }
     if (scroller && scrolled) {
         scroller.scrollTop = scrolled;

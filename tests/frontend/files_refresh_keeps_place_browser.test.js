@@ -46,6 +46,15 @@ const FILES = {
             await waitFor(`document.getElementById('changed-files-title').getClientRects().length > 0`, `${tag}: the Files header on screen`, 8000);
             await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'changed_files.js'); await m.loadChangedFiles('wp', 'wp-id'); return true; })()`);
             await waitFor(`document.querySelectorAll('#changed-files-list .file-item').length === 2`, `${tag}: the two changed files`, 8000);
+            // A file read that lands during real input paints after typing pauses, rather than blocking a key.
+            await ev(`window.setLiveViewMode('chat'); document.getElementById('command-input').focus(); true`);
+            await client.Input.insertText({ text: 'typing while files arrive' });
+            await ev(`window.__files['typing.txt'] = { status: 'added', original: '', current: 'new\\n', additions: 1, deletions: 0 }; import((window.__coralStatic || '/static/') + 'changed_files.js').then(m => m.loadChangedFiles('wp', 'wp-id')).then(() => true)`);
+            check(`${tag}: a file arrival does not paint inside the typing burst`, !await ev(`!!document.querySelector('#changed-files-list .file-item[data-filepath="typing.txt"]')`));
+            await client.Input.insertText({ text: ' still typing' });
+            await waitFor(`!!document.querySelector('#changed-files-list .file-item[data-filepath="typing.txt"]')`, `${tag}: deferred file arrival paints after input settles`, 8000);
+            await ev(`delete window.__files['typing.txt']; import((window.__coralStatic || '/static/') + 'changed_files.js').then(m => m.loadChangedFiles('wp', 'wp-id')).then(() => true)`);
+            await waitFor(`document.querySelectorAll('#changed-files-list .file-item').length === 2`, `${tag}: original files restored`, 8000);
             await ev(`document.querySelector('#changed-files-list .files-expand-all').click(); true`);
             await waitFor(`!!document.querySelector('#changed-files-list .file-diff[data-filepath="e.go"] .cm-line') && !!document.querySelector('#changed-files-list .file-diff[data-filepath="a.go"] .cm-line')`, `${tag}: both diffs drawn`, 10000);
             // open one collapsed "unchanged lines" block in e.go and scroll the panel into it
