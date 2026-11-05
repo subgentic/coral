@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/subgentic/coral/internal/agent"
+	"github.com/subgentic/coral/internal/linktest"
 	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/store"
@@ -96,7 +97,7 @@ func TestAHermesFirstMessageThatIsALinkIsNotTyped(t *testing.T) {
 	require.NoError(t, os.WriteFile(target, []byte("LINKED SECRET"), 0o600))
 	p := agent.HermesFirstMessagePath(data, "team-a", sid)
 	require.NoError(t, os.MkdirAll(filepath.Dir(p), 0o700))
-	require.NoError(t, os.Symlink(target, p))
+	linktest.Symlink(t, target, p)
 	require.NoError(t, h.startAgentCLI(context.Background(), "team-a", "hermes", name, "hermes chat"))
 	time.Sleep(300 * time.Millisecond)
 	for _, s := range sentTo(term, name) {

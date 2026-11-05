@@ -14,6 +14,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/linktest"
 )
 
 // Untracked folders in the changes views (#12524). A BIG untracked folder (more than 20 files, or 256 KiB) is one entry, as `git status` shows it: a sync tool's trace folder of hundreds of files is not a row
@@ -225,7 +227,7 @@ func TestALinkInAnUntrackedFolderIsNotFollowedForItsSize(t *testing.T) {
 	tree(t, repo, "linked", 5)
 	big := filepath.Join(t.TempDir(), "big.bin")
 	require.NoError(t, os.WriteFile(big, []byte(strings.Repeat("x", 1<<20)), 0o644))
-	require.NoError(t, os.Symlink(big, filepath.Join(repo, "linked", "to-big")))
+	linktest.Symlink(t, big, filepath.Join(repo, "linked", "to-big"))
 	out, err := h.generateChangesDiff(context.Background(), repo)
 	require.NoError(t, err)
 	got := string(out)
