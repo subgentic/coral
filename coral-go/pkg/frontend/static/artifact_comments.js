@@ -124,7 +124,7 @@ export function attachComments(dialog, body, host, opts = {}) {
             st.data = data; st.gone = false;
             if (!st.visibilitySet) {
                 st.visibilitySet = true;
-                setSheet(remembered() ?? (st.video ? true : opts.toggleHost ? !phone.matches && openCount() > 0 : false)); // the viewer: closed until the person opens it, and then as they left it, so the file has the whole width (#12225); the docked preview keeps opening when there are comments
+                setSheet(opts.initialOpen ?? remembered() ?? (st.video ? true : opts.toggleHost ? !phone.matches && openCount() > 0 : false)); // the viewer: closed until the person opens it, and then as they left it, so the file has the whole width (#12225); the docked preview keeps opening when there are comments
             }
         } catch (e) {
             if (hex !== st.hex || gen !== ctxGen) return;
@@ -212,7 +212,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         }
         const d = st.data;
         if (d.canLock) { // one small lock beside the heading (#13578): closed lock = locked; the explanation is its tip, not a box
-            const why = d.locked ? 'Comments are locked: nobody can add comments to this file. Press to unlock.' : 'Locking stops anyone adding comments to this file. You can unlock it any time.';
+            const why = d.locked ? `Comments are locked: nobody can add comments to this ${opts.words?.subject || 'file'}. Press to unlock.` : `Locking stops anyone adding comments to this ${opts.words?.subject || 'file'}. You can unlock it any time.`;
             const lock = el('button', 'btn btn-quiet btn-icon btn-xs ac-lock'); lock.type = 'button';
             lock.append(el('span', 'material-icons', d.locked ? 'lock' : 'lock_open'));
             lock.setAttribute('aria-label', d.locked ? 'Unlock comments' : 'Lock comments'); lock.setAttribute('aria-pressed', String(!!d.locked)); lock.title = why;
@@ -221,7 +221,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         }
         const close = btn('ac-sheet-close ic-close', '', 'Hide the comments'); close.addEventListener('click', () => { userSet(false); toggle.focus(); }); head.append(close);
         panel.append(head);
-        if (d.locked) panel.append(el('p', 'ac-note ac-locked', d.canLock ? 'Comments are locked: nobody can add comments to this file. You can unlock it any time.' : 'Comments are locked: read only.'));
+        if (d.locked) panel.append(el('p', 'ac-note ac-locked', d.canLock ? `Comments are locked: nobody can add comments to this ${opts.words?.subject || 'file'}. You can unlock it any time.` : 'Comments are locked: read only.'));
         else if (!d.canComment) panel.append(el('p', 'ac-note ac-readonly', d.reason || 'You can read the comments here but not write them.'));
         const setup = !d.locked && askSetup();
         if (setup) { // Send to agent is not offered: say why, and where it is set up (#13230)
