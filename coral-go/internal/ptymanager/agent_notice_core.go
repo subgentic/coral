@@ -354,7 +354,6 @@ func decideWinText(src procSource, root int, rec winProc, recorded bool) (bool, 
 // Reading the terminal's processes can fail for a moment while programs start and end below the agent (a snapshot taken mid-change, a handle
 // refused for an instant): one failed read is not "the processes cannot be read". textReadTries fresh reads are taken, textReadGap apart, and the
 // text is refused as unreadable only when every one fails (#470).
-// Five reads 20 ms apart (80 ms), not three 10 ms apart: trial-250's fourth head on Windows got one "unreadable" in 100 sends from a runner that stalled the shell's handle for longer.
 // Five reads 20 ms apart (80 ms), not three 10 ms apart: the fourth head of trial-250 on Windows got one "unreadable" in 100 sends from a runner that stalled the shell's handle for longer.
 const (
 	textReadTries = 5
