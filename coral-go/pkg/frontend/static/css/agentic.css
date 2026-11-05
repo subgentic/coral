@@ -179,7 +179,6 @@ body.panel-dragging .agentic-state {
 .tc-label .tc-icon-svg svg { width: 1.125rem; height: 1.125rem; }
 .tc-row:has(.tc-check:not(:checked)) .tc-name,
 .tc-row:has(.tc-check:not(:checked)) .tc-icon { opacity: 0.5; }
-.tc-lock { font-size: var(--fs-lg); color: var(--text-secondary); }
 .tc-sp { flex: 1; }
 .tc-move {
     display: inline-flex; align-items: center; justify-content: center;
