@@ -550,3 +550,13 @@ b DELETE /api/chief/checks/{checkID}
 b POST /api/chief/checks/{checkID}/run
 b GET /api/chief/triggers
 a POST /api/chief/triggers/{triggerID}/state
+# #13613: the resource queue. An agent claims, releases and renews a slot and reads the line; defining, removing and reordering are for the Operator or an Orchestrator, which the handler decides (an Orchestrator is an agent token, so these are not operatorOnlyRoutes).
+a DELETE /api/resources/entries/{id}
+a DELETE /api/resources/{name}
+a GET /api/resources
+a GET /api/resources/{name}
+a POST /api/resources/entries/{id}/move
+a POST /api/resources/{name}/claim
+a POST /api/resources/{name}/release
+a POST /api/resources/{name}/renew
+a PUT /api/resources/{name}
