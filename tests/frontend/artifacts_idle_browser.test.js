@@ -20,7 +20,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
             window.fetch = (u, o) => {
                 const url = new URL(String(u), location.href);
                 if (url.pathname === '/api/board/projects') return json([{ project: team }]);
-                if (url.pathname === '/api/board/' + team + '/status') { probe.statuses++; return probe.fail ? json({}, 503) : json(probe.legacy ? {} : { artifacts_rev: probe.rev, artifacts_all_rev: probe.rev }); }
+                if (url.pathname === '/api/board/' + team + '/status' || url.pathname === '/api/board/~no-team/status') { probe.statuses++; return probe.fail ? json({}, 503) : json(probe.legacy ? {} : { artifacts_rev: url.pathname.includes('~no-team') ? probe.rev + 1000 : probe.rev, artifacts_all_rev: probe.rev }); }
                 if (url.pathname === '/api/system/artifact-store/kept') return json({ kept: [] });
                 if (url.pathname === '/api/team-artifacts') { probe.lists++; return json({ artifacts: probe.rows.map(a => ({ ...a, board_id: team, team })), teams: [], artifacts_board: team, artifacts_rev: probe.rev, all: probe.rows.length, total: probe.rows.length, has_more: false }); }
                 if (url.pathname === '/api/board/' + team + '/artifacts') {
