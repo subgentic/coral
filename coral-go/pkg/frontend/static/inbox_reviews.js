@@ -221,6 +221,9 @@ export async function setReviewRead(row, read, { fresh = false } = {}) { // fres
     changed();
 }
 
+/** A decision put a row back (Undo of Dismiss, Move to Needs you): a read in flight took its lists before the write, so its answer is stale. Moving the revision makes that read be discarded, and the forced read that follows is a new one (#13601). */
+export function reviewsChangedOnServer() { revision++; }
+
 /** The Operator decided a review (Approve): the row is out of the list at once, and a read that was already in flight cannot put it back. */
 export function settleReview(row) {
     revision++;
