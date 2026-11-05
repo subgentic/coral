@@ -25,6 +25,7 @@ var (
 	ErrNotHolder   = errors.New("resourcequeue: this agent does not hold a slot of this resource")
 	ErrNoEntry     = errors.New("resourcequeue: no such entry")
 	ErrBadResource = errors.New("resourcequeue: a resource needs a name and at least one slot")
+	ErrInPool      = errors.New("resourcequeue: the resource is a member of a pool: remove the pool first")
 	ErrBadMatch    = errors.New("resourcequeue: a match is 1 to 8 words of letters, digits and . / _ : = @ % + , -, up to 200 characters, in all at most 20 of them")
 )
 
@@ -35,6 +36,7 @@ type Resource struct {
 	Machine  string        // where it is, for people to read; not interpreted
 	MaxLease time.Duration // a claim is held this long unless renewed (0: DefaultLease)
 	Allowed  []string      // agents that may claim it; empty: everyone
+	Members  []string      // a pool (#13719): the resources whose slots this one hands out, in the order they are tried; a pool has no slots of its own, no Match and is claimed by hand until the shell hook knows machines
 	Match    []string      // shell commands that claim it by themselves (the hook, #13645): each a list of words that must appear in order in one simple command, such as "go test ./..."; empty: no hook
 }
 
@@ -57,6 +59,7 @@ type Entry struct {
 	Enqueued time.Time
 	Granted  time.Time // zero while waiting
 	Lease    time.Time // when the hold ends unless renewed; zero while waiting
+	Member   string    // on a pool's entry that holds a slot: the member (the machine) it was granted, "" otherwise (#13719)
 	Pin      int       // a person's override: bigger is nearer the front among the waiting (set by Move)
 	Away     time.Time // #13706: the agent's wait ended without a turn (its --timeout, its tool call) and its place is kept until this time; a claim from it again clears it. Zero: present
 }
@@ -250,14 +253,20 @@ func ValidMatch(match []string) error {
 
 // Define makes a resource, or changes the slots, machine, lease and allowed list of one that exists. More slots grant the waiting at once; fewer never take a slot from a holder (the holds run out).
 func (q *Queue) Define(r Resource) error {
-	if r.Key == "" || r.Slots < 1 {
+	pool := len(r.Members) > 0
+	if r.Key == "" || (!pool && r.Slots < 1) || (pool && (r.Slots != 0 || len(r.Match) > 0)) {
 		return ErrBadResource
 	}
 	if err := ValidMatch(r.Match); err != nil {
 		return err
 	}
 	q.mu.Lock()
+	if err := q.checkPoolLocked(r); err != nil {
+		q.mu.Unlock()
+		return err
+	}
 	cp := r
+	cp.Members = append([]string(nil), r.Members...)
 	cp.Allowed = append([]string(nil), r.Allowed...)
 	cp.Match = append([]string(nil), r.Match...)
 	q.res[r.Key] = &cp
@@ -268,12 +277,55 @@ func (q *Queue) Define(r Resource) error {
 	return err
 }
 
-// Remove deletes a resource and every entry on it.
+// MaxMembers is how many resources one pool may be made of.
+const MaxMembers = 8
+
+// checkPoolLocked refuses a pool that names itself, a pool, a resource that does not exist or one twice, and a resource that is a member of a pool becoming a pool (pools do not nest).
+func (q *Queue) checkPoolLocked(r Resource) error {
+	if len(r.Members) > 0 {
+		if len(r.Members) > MaxMembers {
+			return ErrBadResource
+		}
+		seen := map[string]bool{}
+		for _, m := range r.Members {
+			mr, ok := q.res[m]
+			if !ok || m == r.Key || seen[m] || len(mr.Members) > 0 {
+				return ErrBadResource
+			}
+			seen[m] = true
+		}
+		if len(q.poolsWith(r.Key)) > 0 {
+			return ErrBadResource // it is a member of a pool: a member is not a pool
+		}
+	} else if old, ok := q.res[r.Key]; ok && len(old.Members) > 0 {
+		return nil // a pool redefined as a plain resource: allowed, its entries go with the pool's slots (see Define)
+	}
+	return nil
+}
+
+// poolsWith are the pools that have key as a member.
+func (q *Queue) poolsWith(key string) []string {
+	var out []string
+	for k, r := range q.res {
+		for _, m := range r.Members {
+			if m == key {
+				out = append(out, k)
+			}
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+// Remove deletes a resource and every entry on it. A resource that is in a pool is not removed from under it.
 func (q *Queue) Remove(key string) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	if _, ok := q.res[key]; !ok {
 		return ErrNoResource
+	}
+	if len(q.poolsWith(key)) > 0 {
+		return ErrInPool
 	}
 	delete(q.res, key)
 	kept := q.entries[:0]
@@ -345,7 +397,7 @@ func (q *Queue) Renew(key, agent string) (Entry, error) {
 	if e == nil || e.Waiting() {
 		return Entry{}, ErrNotHolder
 	}
-	e.Lease = q.now().Add(r.lease())
+	e.Lease = q.now().Add(q.leaseOf(e, r))
 	q.note("renewed", e)
 	return *e, q.save()
 }
@@ -621,24 +673,65 @@ func (q *Queue) line(key string) []*Entry {
 	return w
 }
 
+// held is how many slots of key are in use: the holds on it, and the holds of its pools that were granted this member.
 func (q *Queue) held(key string) int {
 	n := 0
 	for _, e := range q.entries {
-		if e.Resource == key && !e.Waiting() {
+		if !e.Waiting() && (e.Resource == key || e.Member == key) {
 			n++
 		}
 	}
 	return n
 }
 
-// fill grants the waiting, in line order, while slots are free. It returns the entries it granted.
+// leaseOf is how long a hold lasts: the member's lease for a pool's entry (the machine it runs on), else the resource's own.
+func (q *Queue) leaseOf(e *Entry, r *Resource) time.Duration {
+	if e.Member != "" {
+		if m := q.res[e.Member]; m != nil {
+			return m.lease()
+		}
+	}
+	return r.lease()
+}
+
+// fill grants the waiting of key, and of what shares its slots: when key is a pool its members' own lines too (a pool hold that went frees a slot for them), when it is a member the pools it is in.
 func (q *Queue) fill(key string) []Entry {
+	granted := q.fillOne(key)
+	if r, ok := q.res[key]; ok && len(r.Members) > 0 {
+		for _, m := range r.Members {
+			granted = append(granted, q.fillOne(m)...)
+		}
+	} else {
+		for _, p := range q.poolsWith(key) {
+			granted = append(granted, q.fillOne(p)...)
+		}
+	}
+	return granted
+}
+
+// fillOne grants the waiting of one resource, in line order, while slots are free; a pool takes the first member (in its order) that has one. It returns the entries it granted.
+func (q *Queue) fillOne(key string) []Entry {
 	r, ok := q.res[key]
 	if !ok {
 		return nil
 	}
 	var granted []Entry
-	for q.held(key) < r.Slots {
+	for {
+		slot := key
+		if len(r.Members) > 0 {
+			slot = ""
+			for _, m := range r.Members {
+				if mr := q.res[m]; mr != nil && q.held(m) < mr.Slots {
+					slot = m
+					break
+				}
+			}
+			if slot == "" {
+				break
+			}
+		} else if q.held(key) >= r.Slots {
+			break
+		}
 		var e *Entry
 		for _, x := range q.line(key) {
 			if x.Away.IsZero() { // an agent that is away is skipped (#13706): the slot goes to the next one who is here, and the absent one keeps its place at the front
@@ -650,7 +743,10 @@ func (q *Queue) fill(key string) []Entry {
 			break
 		}
 		e.Granted = q.now()
-		e.Lease = e.Granted.Add(r.lease())
+		if len(r.Members) > 0 {
+			e.Member = slot
+		}
+		e.Lease = e.Granted.Add(q.leaseOf(e, r))
 		granted = append(granted, *e)
 		q.note("granted", e)
 	}
@@ -671,8 +767,15 @@ func (q *Queue) resultOf(e *Entry) Result {
 
 func (q *Queue) status(r *Resource) Status {
 	st := Status{Resource: *r, Now: q.now()}
+	if len(r.Members) > 0 { // a pool reads as the sum of its members' slots
+		for _, m := range r.Members {
+			if mr := q.res[m]; mr != nil {
+				st.Resource.Slots += mr.Slots
+			}
+		}
+	}
 	for _, e := range q.entries {
-		if e.Resource == r.Key && !e.Waiting() {
+		if !e.Waiting() && (e.Resource == r.Key || e.Member == r.Key) { // a member's holders include the pool's holds on it
 			st.Holders = append(st.Holders, *e)
 		}
 	}

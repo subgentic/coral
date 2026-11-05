@@ -25,6 +25,9 @@ Do not post "starting a heavy run" and "run finished" notes for a resource you c
 
 **A holder stuck at a prompt** (#13705). A command that waits for a person to approve it has already taken its slot (the hook claims before the prompt), so the others wait for nothing. Coral reads each holder's state: after 5 minutes at a prompt (or idle with nothing running, for an agent whose calls Coral cannot see) the Orchestrator is told on the holder's board; after 10 it is told again and the Queue folder shows the holder as **Stuck**. Coral never takes the slot itself: the command waiting for its approval would then run beside the next holder's. The Orchestrator or the Operator kicks the holder (`coral-board resource kick <id>`). An agent whose background job holds the slot is working, not stuck.
 
+
+**A pool** (#13719). The Operator or an Orchestrator can define a pool, one resource made of others: `coral-board resource define heavy --pool mac-heavy,mini`. `coral-board resource claim heavy --wait` is granted the first free slot of any member, in the order listed, and waits in ONE line for the pool; the answer says which machine you got ("You hold a slot of heavy on Mac mini"). A pool and its members share the slots (a hand claim on `mac-heavy` and a claim on `heavy` count against the same two slots), the lease is the member's, and the Queue folder shows each hold with its machine. A pool takes no `--match` yet: the shell hook claims a member (today's behaviour) until it learns to tell an agent that its slot is on another machine. A resource in a pool is not removed until the pool is.
+
 ## For the Orchestrator and the Operator
 
 - Define resources: `coral-board resource define mac-heavy --slots 1 --machine mac --lease 30m` (and `mini`). `--allow a,b` limits who may claim one. `--match "go test ./..."` (repeat it) turns on the shell hook for the resource (below). Names are letters, digits, dot, dash and underscore.

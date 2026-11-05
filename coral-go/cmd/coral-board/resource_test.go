@@ -190,3 +190,39 @@ func TestAClaimSendsItsParentProcessSoABackgroundJobCanKeepTheSlot(t *testing.T)
 		}
 	}
 }
+
+// #13719: a pool is defined with --pool a,b (no --slots), a claim on it says which machine it was granted, and the list names the members and each holder's machine.
+func TestResourceDefineAPoolSendsItsMembersAndNeedsNoSlots(t *testing.T) {
+	s := &resStub{}
+	out, exited := runResource(t, s, "define", "heavy", "--pool", "mac-heavy,mini")
+	if exited || !strings.Contains(out, "Defined heavy") || !strings.Contains(out, "mac-heavy, mini") {
+		t.Fatalf("exited=%v out=%q", exited, out)
+	}
+	got, _ := s.bodies[0]["members"].([]any)
+	if len(got) != 2 || got[0] != "mac-heavy" || got[1] != "mini" {
+		t.Fatalf("members sent: %v", s.bodies[0])
+	}
+	if _, has := s.bodies[0]["slots"]; has && s.bodies[0]["slots"] != float64(0) {
+		t.Fatalf("a pool has no slots of its own: %v", s.bodies[0])
+	}
+	_, exited = runResource(t, &resStub{}, "define", "heavy", "--pool", "mini", "--slots", "2")
+	if !exited {
+		t.Fatal("a pool with slots must be refused")
+	}
+}
+
+func TestAPoolClaimAndListSayWhichMachine(t *testing.T) {
+	s := &resStub{status: 200, respText: `{"granted":true,"place":0,"entry":{"id":4,"member":"mini","machine":"Mac mini"}}`}
+	out, exited := runResource(t, s, "claim", "heavy")
+	if exited || !strings.Contains(out, "on Mac mini") || !strings.Contains(out, "mini") {
+		t.Fatalf("exited=%v out=%q", exited, out)
+	}
+	list := captureStdout(t, func() {
+		printResource(resView{Name: "heavy", Slots: 2, Members: []string{"mac-heavy", "mini"}, Holders: []resEntry{{ID: 4, Agent: "Dev A", Member: "mini", Machine: "Mac mini"}}}, "Me")
+	})
+	for _, want := range []string{"pool of mac-heavy, mini", "Dev A", "on Mac mini"} {
+		if !strings.Contains(list, want) {
+			t.Fatalf("the list lacks %q: %q", want, list)
+		}
+	}
+}
