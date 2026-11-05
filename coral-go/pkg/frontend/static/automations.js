@@ -20,6 +20,7 @@ const IT = await importOnce('./inbox_toolbar.js');
 const AF = await importOnce('./automation_filters.js');
 const W = await importOnce('./workflows.js');
 const AR = await importOnce('./automation_runs.js');
+const AQ = await importOnce('./automations_queue.js'); // the Queue folder: this computer's resource queue (#13651)
 
 const $ = id => document.getElementById(id);
 const FOLDERS = [
@@ -28,6 +29,7 @@ const FOLDERS = [
     { key: 'recent', label: 'Recent runs', noun: ['run', 'runs'], search: 'Search recent runs', attention: true },
     { key: 'jobs', label: 'Jobs', noun: ['job', 'jobs'], search: 'Search jobs' },
     { key: 'workflows', label: 'Workflows', noun: ['workflow', 'workflows'], search: 'Search workflows' },
+    { key: 'queue', label: 'Queue', noun: ['entry', 'entries'], search: 'Search the queue', resources: true },
 ];
 const folderOf = key => FOLDERS.find(f => f.key === key) || null;
 const routeOf = (folder, id, run) => ({ view: 'automations', folder, ...(id ? { id } : {}), ...(run ? { run } : {}) });
@@ -57,21 +59,22 @@ const runningItems = () => { const live = liveJobIds(); return [...allJobs().fil
 const failedItems = () => [...allJobs(), ...allWorkflows()].filter(i => i.result === 'failed');
 /** Every run of every job and workflow, newest first (automation_runs.js), as items the folder's filters match: the Result filter and the search by name. */
 const recentItems = () => AR.recentRuns().map(r => ({ ...r, id: r.key, enabled: true, runs: '', agent: '', does: '', stepTypes: [], last: r.atMs })); // at stays the run's start time (a string: the Started column)
-const ITEMS = { jobs: allJobs, workflows: allWorkflows, running: runningItems, failed: failedItems, recent: recentItems };
+const ITEMS = { jobs: allJobs, workflows: allWorkflows, running: runningItems, failed: failedItems, recent: recentItems, queue: AQ.queueItems };
 const folderFilters = key => { const f = filtersOf(key); return folderOf(key).attention && f.sort === 'next' ? { ...f, sort: 'last' } : f; }; // what needs attention is read newest first unless the person chose an order
-const rowsOf = key => AF.ordered(ITEMS[key]().filter(i => AF.matches(i, filtersOf(key))), folderFilters(key));
+const rowsOf = key => key === 'queue' ? AQ.queueSearch(AQ.queueItems(), filtersOf('queue').q) : AF.ordered(ITEMS[key]().filter(i => AF.matches(i, filtersOf(key))), folderFilters(key));
 const runsWords = i => i.runs === 'workflow' ? `Workflow ${nameOfWorkflow(i.job.workflow_id) || i.job.workflow_id}` : `Agent prompt (${AF.AGENT_LABEL[i.agent] || i.agent})`;
 const stepsWords = i => `${i.stepCount} step${i.stepCount === 1 ? '' : 's'}`;
 const usedByWords = i => (i.usedBy ? `${i.usedBy} job${i.usedBy === 1 ? '' : 's'}` : 'No jobs');
-const countOf = key => (key === 'recent' ? AR.unreadCount() : ITEMS[key]().length); // Recent runs counts the runs not opened yet, the others their rows
+const countOf = key => (key === 'recent' ? AR.unreadCount() : key === 'queue' ? AQ.queueCount() : ITEMS[key]().length); // Recent runs counts the runs not opened yet, the others their rows
 
 // ── The folders ──────────────────────────────────────────────────────────
 const sections = () => [{ title: 'Needs attention', items: FOLDERS.filter(f => f.attention).map(f => ({ key: f.key, label: f.label, count: countOf(f.key), alert: f.key === 'failed' })) },
-    { title: 'Library', items: FOLDERS.filter(f => !f.attention).map(f => ({ key: f.key, label: f.label, count: countOf(f.key) })) }];
+    { title: 'Library', items: FOLDERS.filter(f => !f.attention && !f.resources).map(f => ({ key: f.key, label: f.label, count: countOf(f.key) })) },
+    { title: 'Resources', items: FOLDERS.filter(f => f.resources).map(f => ({ key: f.key, label: f.label, count: countOf(f.key) })) }];
 function renderNav(force = false) {
     const list = $('automations-nav-list');
     if (!list) return;
-    const key = JSON.stringify([folder, sections(), filtersOf('jobs'), filtersOf('workflows'), filtersOf('running'), filtersOf('failed'), openJobId(), W.openWorkflowId(), liveRuns().map(r => r.id), filtersOf('recent'), AR.recentRuns().map(r => [r.key, r.run.status, AR.isUnread(r)]),
+    const key = JSON.stringify([folder, sections(), filtersOf('jobs'), filtersOf('workflows'), filtersOf('running'), filtersOf('failed'), openJobId(), W.openWorkflowId(), liveRuns().map(r => r.id), filtersOf('recent'), AR.recentRuns().map(r => [r.key, r.run.status, AR.isUnread(r)]), AQ.queueItems().map(r => [r.key, r.state, r.place, r.lease_until, r.agent]),
         rowsOf('jobs').map(i => [i.id, i.name, i.enabled, i.at, i.run && i.run.status, i.run && i.run.id, runsWords(i)]), rowsOf('workflows').map(i => [i.id, i.name, i.enabled, i.stepCount, i.usedBy, i.run && i.run.status, i.run && i.run.id])]);
     if (!force && key === navKey) return;
     navKey = key;
@@ -86,6 +89,7 @@ function pickFolder(key) { if (folderOf(key)) go(routeOf(key)); }
 function setFolder(key) {
     if (!folderOf(key)) key = 'jobs';
     folder = key;
+    AQ.watchQueue(key === 'queue'); // the queue is read every few seconds while its folder is on screen
     const input = $('automations-search'), f = folderOf(key);
     if (input) {
         if (input.getAttribute('aria-label') !== f.search) input.setAttribute('aria-label', f.search);
@@ -125,6 +129,7 @@ function newMenu() {
 /** The create actions at the toolbar's right: New job, or New workflow with Build with agent beside it (the agent that builds a workflow with you). */
 function createAction(key) {
     if (key === 'jobs') return button('New job', 'job-new');
+    if (key === 'queue') return null; // nothing to create: an Orchestrator defines resources with coral-board resource
     if (folderOf(key).attention) return newMenu();
     const box = document.createElement('span'); box.className = 'automations-create';
     box.append(button('Build with agent', 'wf-build-agent', 'btn', 'smart_toy'), button('New workflow', 'wf-create'));
@@ -135,16 +140,16 @@ function toolbarOf(key) {
     if (!bars.has(key)) {
         bars.set(key, IT.folderToolbar({
             idp: `automations-${key}`, noun: f.noun[0], searchLabel: f.search,
-            sorts: { values: AF.SORTS, labels: AF.SORT_LABEL, aria: `Sort ${f.noun[1]}` },
+            ...(f.resources ? {} : { sorts: { values: AF.SORTS, labels: AF.SORT_LABEL, aria: `Sort ${f.noun[1]}` } }), // the queue is in the line's order, not sorted
             fields: FIELDS[key](),
             model: { EMPTY: AF.EMPTY, clean: AF.clean, chips: AF.chips, isFiltered: AF.isFiltered, without: AF.without },
         }, next => { setFilters(key, next); renderNav(true); }));
     }
-    const filt = filtersOf(key), rows = ITEMS[key]().filter(i => AF.matches(i, { ...filt, state: '' }));
+    const filt = filtersOf(key), rows = f.resources ? [] : ITEMS[key]().filter(i => AF.matches(i, { ...filt, state: '' }));
     const counts = AF.STATES.map(s => rows.filter(i => i.enabled === (s === 'active')).length);
     const node = bars.get(key).draw({
         filters: filt,
-        pills: f.attention ? null : { label: `Show ${f.noun[1]} that are`, current: filt.state || 'all',
+        pills: f.attention || f.resources ? null : { label: `Show ${f.noun[1]} that are`, current: filt.state || 'all',
             items: [{ key: 'all', label: 'All', count: rows.length }, ...AF.STATES.map((s, i) => ({ key: s, label: AF.STATE_LABEL[s], count: counts[i] }))],
             onPick: pick => { setFilters(key, { ...filtersOf(key), state: pick === 'all' ? '' : pick }); renderNav(true); } },
         action: createAction(key),
@@ -261,6 +266,7 @@ export function noteJobDeleted(name) {
 }
 function folderTable(key) {
     const f = folderOf(key), rows = rowsOf(key), filt = filtersOf(key), narrowed = AF.isFiltered(filt) || filt.q;
+    if (key === 'queue') return AQ.queueTable(rows, !!filt.q);
     if (key === 'recent') return recentTable(rows, narrowed);
     if (f.attention) return attentionTable(key, rows, narrowed);
     const base = { title: f.label, noun: f.noun, rows, status: key === 'jobs' ? _gone : '',
@@ -321,6 +327,8 @@ function mount() {
     AR.onRunsChanged(() => renderNav());
     AR.startRuns();
     W.refreshWorkflows();
+    AQ.onQueueChanged(() => renderNav());
+    AQ.refreshQueue(); // the Queue folder's count in the list
 }
 
 /** Called by switchNavTab('automations'): the folders are drawn and the folder that was on screen opens, unless an item's page is the address (the route handler opens that). */
