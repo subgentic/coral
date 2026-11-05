@@ -26,7 +26,10 @@ const STUB = `(() => { const real = window.fetch; window.__queueTickMs = 1000; w
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
             await coralReady(ev, 'startup', 'liveList', 'settings');
-            await ev(`(async () => { const st = await import(${S} + 'state.js'); st.state.liveSessions = [{ session_id: 'sess-ds', name: 'ds', agent_type: 'claude', board_subscriber_id: 'Data Science & Dashboarding', board_project: 'coral-go-team' }];
+            await ev(`(async () => { const st = await import(${S} + 'state.js'); st.state.liveSessions = [ // a remote namesake of each is listed FIRST: the queue is this computer's, so the local session (or plain text when there is none) must win
+                    { session_id: 'sess-ds-remote', name: 'ds-remote', agent_type: 'claude', server: 'm1', board_subscriber_id: 'Data Science & Dashboarding', board_project: 'coral-go-team' },
+                    { session_id: 'sess-fd-remote', name: 'fd-remote', agent_type: 'claude', server: 'm1', board_subscriber_id: 'Frontend Dev', board_project: 'coral-go-team' },
+                    { session_id: 'sess-ds', name: 'ds', agent_type: 'claude', board_subscriber_id: 'Data Science & Dashboarding', board_project: 'coral-go-team' }];
                 window.__opened = []; window.selectLiveSession = (...a) => { window.__opened.push(['agent', ...a.map(x => (x && x.session_id) || x)]); }; window.openTeamPage = (t, o) => { window.__opened.push(['team', t, JSON.stringify(o)]); return Promise.resolve(); }; window.switchNavTab = (...a) => { window.__opened.push(['nav', ...a.slice(0, 1)]); }; })(); true`);
             await ev(`history.pushState(null, '', '/automations/queue'); window.dispatchEvent(new PopStateEvent('popstate')); true`);
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr[data-key]').length === 3`, at + 'the three rows', 10000);
@@ -36,6 +39,10 @@ const STUB = `(() => { const real = window.fetch; window.__queueTickMs = 1000; w
                 // the agent
                 assert.equal(await ev(`${row('Data Science')}.querySelector('.queue-agent').tagName`), 'BUTTON', at + 'a running holder is the shared agent link');
                 assert.equal(await ev(`${row('Gone Agent')}.querySelector('.queue-agent').tagName`), 'SPAN', at + 'an agent that is gone is text');
+                assert.equal(await ev(`${row('Frontend Dev')}.querySelector('.queue-agent').tagName`), 'SPAN', at + 'an agent that runs only on another computer is text here, never its remote namesake');
+                assert.equal(await ev(`${row('Data Science')}.querySelector('.queue-agent').dataset.agentLink`), 'sess-ds', at + 'the local session, not the remote namesake listed first');
+                const keys = await ev(`(() => { const out = []; for (const b of [${row('Data Science')}.querySelector('.queue-agent'), ${row('Data Science')}.querySelector('td:nth-child(4) button'), ${row('Data Science')}.querySelector('button.queue-goal')]) { b.focus(); out.push(document.activeElement === b && b.tabIndex >= 0 && b.tagName === 'BUTTON'); } return out; })()`);
+                assert.deepEqual(keys, [true, true, true], at + 'the agent, task and goal links are buttons the keyboard reaches: ' + JSON.stringify(keys));
                 // the task and the goal
                 const seen = await ev(`(() => { const vis = e => !!e && e.getClientRects().length > 0 && e.getBoundingClientRect().width > 0; const r = ${row('Data Science')}, a = r.querySelector('.queue-agent'); return { goal: vis(r.querySelector('button.queue-goal')), head: [...document.querySelectorAll('#group-table-view thead th')].some(h => h.textContent.trim() === 'Goal' && vis(h)), agentWhole: a.scrollWidth <= a.clientWidth + 1 }; })()`);
                 assert.deepEqual(seen, { goal: true, head: true, agentWhole: true }, at + 'the Goal column is on screen at this width and the longest agent name is not cut: ' + JSON.stringify(seen));
@@ -50,15 +57,28 @@ const STUB = `(() => { const real = window.fetch; window.__queueTickMs = 1000; w
                 await ev(`${row('Data Science')}.querySelector('button.queue-goal').click(); true`);
                 await waitFor(`window.__opened.length >= 2`, at + 'the clicks reach their targets: ' + JSON.stringify(await ev('window.__opened')), 6000);
                 const opened = await ev(`window.__opened`);
+                const ag = opened.find(o => o[0] === 'agent');
+                assert.deepEqual(ag && ag.slice(1), ['ds', 'claude', 'sess-ds', 'local'], at + "the agent opens the LOCAL session on this computer, as the shared link does elsewhere: " + JSON.stringify(opened));
                 assert.ok(opened.some(o => o[0] === 'team' && o[1] === 'coral-go-team' && /"tab":"tasks"/.test(o[2]) && /13596/.test(o[2])), at + 'the task opens its page on its board: ' + JSON.stringify(opened));
                 await waitFor(`window.__opened.some(o => o[0] === 'nav')`, at + "the goal link goes to the team's page (Agents tab first): " + JSON.stringify(await ev('window.__opened')), 6000);
                 await waitFor(`/^\\/team\\/coral-go-team\\/goals\\/225/.test(location.pathname)`, at + "the goal opens at its own address on the team's page: " + (await ev('location.pathname')), 8000);
                 assert.equal(await ev(`${row('Frontend Dev')}.querySelectorAll('button[aria-label^="Move"], button[aria-label^="Kick"], .queue-act').length > 0`), true, at + 'Move and Kick are still there');
             } else {
-                await ev(`${row('Data Science')}.querySelector('.dt-mail-more-toggle').click(); true`);
-                await waitFor(`!!document.querySelector('.dt-mail-menu:not([hidden])')`, at + 'the card menu', 4000);
-                const items = await ev(`[...document.querySelectorAll('.dt-mail-menu:not([hidden]) .menu-item')].map(b => b.textContent.trim())`);
-                assert.deepEqual(items.slice(0, 3), ['Open Data Science & Dashboarding', 'Task #13596', 'Goal #225'], at + 'the card starts with the three jumps: ' + JSON.stringify(items));
+                const menu = async () => { await ev(`${row('Data Science')}.querySelector('.dt-mail-more-toggle').click(); true`); await waitFor(`!!document.querySelector('.dt-mail-menu:not([hidden])')`, at + 'the card menu', 4000); };
+                const items = async () => ev(`[...document.querySelectorAll('.dt-mail-menu:not([hidden]) .menu-item')].map(b => b.textContent.trim())`);
+                const pick = async label => { await menu(); await ev(`[...document.querySelectorAll('.dt-mail-menu:not([hidden]) .menu-item')].find(b => b.textContent.trim() === ${JSON.stringify(label)}).click(); true`); };
+                await menu();
+                const its = await items();
+                assert.deepEqual(its.slice(0, 3), ['Open Data Science & Dashboarding', 'Task #13596', 'Goal #225'], at + 'the card starts with the three jumps: ' + JSON.stringify(its));
+                await ev(`document.activeElement && document.activeElement.blur(); document.body.click(); true`);
+                await pick('Open Data Science & Dashboarding');
+                await waitFor(`window.__opened.some(o => o[0] === 'agent')`, at + 'the phone agent jump selects a session: ' + JSON.stringify(await ev('window.__opened')), 6000);
+                assert.deepEqual((await ev(`window.__opened.find(o => o[0] === 'agent')`)).slice(1), ['ds', 'claude', 'sess-ds', 'local'], at + 'the phone jump opens the LOCAL session');
+                await pick('Task #13596');
+                await waitFor(`window.__opened.some(o => o[0] === 'team' && /"tab":"tasks"/.test(o[2]))`, at + 'the phone task jump opens the task: ' + JSON.stringify(await ev('window.__opened')), 6000);
+                assert.ok((await ev(`window.__opened.find(o => o[0] === 'team' && /"tab":"tasks"/.test(o[2]))`)).slice(1).join(' ').includes('13596'), at + 'the right task');
+                await pick('Goal #225');
+                await waitFor(`/^\\/team\\/coral-go-team\\/goals\\/225/.test(location.pathname)`, at + 'the phone goal jump opens the goal: ' + (await ev('location.pathname')), 8000);
             }
             assert.equal(await ev(`document.documentElement.scrollWidth <= document.documentElement.clientWidth`), true, at + 'no sideways scroll');
         }
