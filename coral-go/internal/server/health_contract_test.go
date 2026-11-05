@@ -49,9 +49,10 @@ func TestHealthEndpointContract(t *testing.T) {
 			keys = append(keys, k)
 		}
 		sort.Strings(keys)
-		assert.Equal(t, []string{"hub", "hub_owner_stamp", "hub_owner_stamp_at", "instance_id", "status", "version"}, keys, "exact field set")
+		assert.Equal(t, []string{"hub", "hub_owner_routes", "hub_owner_stamp", "hub_owner_stamp_at", "instance_id", "status", "version"}, keys, "exact field set")
 		assert.Equal(t, false, body["hub_owner_stamp"], "no owner stamp secret is installed here (#11378)")
 		assert.Equal(t, "", body["hub_owner_stamp_at"], "and so there is no time for it")
+		assert.EqualValues(t, hubowner.RoutesVersion, body["hub_owner_routes"], "the generation of the owner-stamp allowlist this computer accepts (#13694): a hub stamps a widened route only for a remote that lists it")
 		assert.IsType(t, "", body["instance_id"], "the id of this server run (#245): a command checks it before it sends a credential to the address in the lock file")
 		assert.Equal(t, "ok", body["status"])
 		assert.IsType(t, "", body["version"])

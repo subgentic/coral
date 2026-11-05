@@ -46,32 +46,111 @@ const Skew = 30 * time.Second
 // secretBytes is the length of a secret, hex-encoded in its file and on the wire between the hub and the human act.
 const secretBytes = 32
 
-// routes are the ONLY routes a stamp is made for or accepted on: the Operator's decisions that need a person. Keyed "METHOD pattern"; a {name} matches one segment.
-var routes = []string{
-	"POST /api/board/{project}/artifacts/{id}/review",
-	"POST /api/artifacts/{id}/comments/{cid}/send",
-	"POST /api/sessions/live/{name}/send",              // #13456: the owner's own message to an agent through the hub: a person's input on the remote, not automation
-	"POST /api/board/{project}/proposals/{id}/approve", // #13454: the owner's decision on a team's proposed goal or task, made at the hub: a person's act on the remote
-	"POST /api/board/{project}/proposals/{id}/reject",
-	"POST /api/board/{project}/asks/{messageID}/close", // Ignore, and Undo of an Ignore, of a question in Needs you (#13462): the Operator's own action, recorded and counted as theirs only when a person made it
-	"POST /api/board/{project}/goals/{id}/driver",      // #13517: the owner's change of who drives a goal, made at the hub: a person's act on the remote
-	"POST /api/board/{project}/goals/{id}/move",        // #13517: and the move of a goal to another team
+// RoutesVersion is the generation of the allowlist below: 1 is the first eight routes, 2 (#13694) adds every Operator click that writes an Activity row and the decisions that need a person. A remote says in
+// its health answer which generation it accepts; a hub stamps a route only when the remote's generation is at least the route's (a stamp on a route an older remote does not list is refused 403, where an
+// unstamped call still goes through as a key caller). The remote still checks every stamp against its own list, so a wrong number gets a 403 and never more power.
+const RoutesVersion = 2
+
+type route struct {
+	pattern string
+	since   int // the RoutesVersion that added it
 }
 
-// MustBeSigned reports whether a request is one whose words are the person's own and become automation on the remote when no stamp goes with it: the owner's message to an agent (#13456). The hub refuses such a
-// request that is too big to stamp (MaxBody) with a clear answer instead of sending it unstamped, so a long message never silently loses its author. path is the decoded path without its query.
+// routes are the ONLY routes a stamp is made for or accepted on: the Operator's decisions and clicks that need a person. Keyed "METHOD pattern"; a {name} matches one segment. The list grows only in the tiers
+// of #13694 (Security): A, the clicks that write an Activity row; B, the person-gated decisions outside the Activity table. Comment and goal images stay out (a body over MaxBody is never stamped), and
+// neverStamped in hubowner_test.go names what must never be here (code and settings of the computer itself).
+var routes = []route{
+	{"POST /api/board/{project}/artifacts/{id}/review", 1},
+	{"POST /api/artifacts/{id}/comments/{cid}/send", 1},
+	{"POST /api/sessions/live/{name}/send", 1},              // #13456: the owner's own message to an agent through the hub: a person's input on the remote, not automation
+	{"POST /api/board/{project}/proposals/{id}/approve", 1}, // #13454: the owner's decision on a team's proposed goal or task, made at the hub: a person's act on the remote
+	{"POST /api/board/{project}/proposals/{id}/reject", 1},
+	{"POST /api/board/{project}/asks/{messageID}/close", 1}, // Ignore, and Undo of an Ignore, of a question in Needs you (#13462)
+	{"POST /api/board/{project}/goals/{id}/driver", 1},      // #13517: the owner's change of who drives a goal
+	{"POST /api/board/{project}/goals/{id}/move", 1},        // #13517: and the move of a goal to another team
+
+	// Tier A (#13694): the Operator's clicks that write an Activity row on the remote (routes/activity_routes.go and the handlers' own rows).
+	{"POST /api/board/{project}/tasks", 2},
+	{"POST /api/board/{project}/tasks/{id}/complete", 2},
+	{"POST /api/board/{project}/tasks/{id}/cancel", 2},
+	{"POST /api/board/{project}/tasks/{id}/publish", 2},
+	{"PATCH /api/board/{project}/tasks/{id}", 2},
+	{"PATCH /api/board/{project}/tasks/{id}/amend", 2},
+	{"PUT /api/board/{project}/tasks/{id}/goal", 2},
+	{"POST /api/board/{project}/tasks/{id}/reassign", 2},
+	{"POST /api/board/{project}/tasks/{id}/nudge", 2},
+	{"POST /api/board/{project}/tasks/{id}/reminder", 2},
+	{"DELETE /api/board/{project}/tasks/{id}/reminder", 2},
+	{"POST /api/board/{project}/tasks/{id}/park", 2},
+	{"DELETE /api/board/{project}/tasks/{id}/park", 2},
+	{"POST /api/board/{project}/tasks/{id}/release", 2},
+	{"POST /api/board/{project}/tasks/{id}/approve", 2},
+	{"POST /api/board/{project}/tasks/{id}/reject", 2},
+	{"POST /api/board/{project}/tasks/{id}/send-back", 2},
+	{"POST /api/board/{project}/tasks/{id}/reply", 2},
+	{"POST /api/board/{project}/messages", 2},
+	{"POST /api/sessions/live/{name}/answer-prompt", 2},
+	{"POST /api/sessions/live/{name}/dismiss-wait", 2},
+	{"POST /api/sessions/live/{name}/waiting/dismiss", 2},
+	{"POST /api/sessions/live/{name}/waiting/send", 2},
+	{"PUT /api/artifacts/{id}/star", 2},
+	{"DELETE /api/artifacts/{id}/star", 2},
+	{"PUT /api/artifacts/{id}/keep", 2},
+	{"DELETE /api/artifacts/{id}/keep", 2},
+	{"DELETE /api/artifacts/{id}", 2},
+	{"DELETE /api/artifacts/series/{series_id}", 2},
+	{"POST /api/board/{project}/operator-artifacts", 2},
+	{"PUT /api/board/{project}/artifacts/{id}/review", 2},
+	{"DELETE /api/board/{project}/artifacts/{id}/review", 2},
+	{"PUT /api/board/{project}/artifacts/{id}/tags", 2},
+	{"POST /api/saved", 2},
+	{"PATCH /api/saved/{id}", 2},
+	{"DELETE /api/saved/{id}", 2},
+	{"PATCH /api/sessions/history/{sessionID}/flags", 2},
+	{"POST /api/workflows/runs/{runID}/seen", 2},
+	{"POST /api/scheduled/runs/{runID}/seen", 2},
+	{"POST /api/sessions/record-agents", 2},
+	{"POST /api/board/{project}/goals", 2},
+	{"PATCH /api/board/{project}/goals/{id}", 2},
+	{"POST /api/board/{project}/goals/{id}/close", 2},
+	{"POST /api/board/{project}/goal-requests/{id}/accept", 2},
+	{"POST /api/board/{project}/goal-requests/{id}/decline", 2},
+	// Tier B: the person-gated decisions outside the Activity table.
+	{"POST /api/board/{project}/asks/{messageID}/buttons/{buttonID}/claim", 2},
+	{"POST /api/board/{project}/asks/{messageID}/buttons/{buttonID}/settle", 2},
+	{"POST /api/board/{project}/operator-artifacts/message", 2},
+}
+
+// MustBeSigned reports whether a request is one whose words are the person's own and become automation on the remote when no stamp goes with it: the owner's message to an agent (#13456) and, since
+// #13694, every widened route (Security: a body over MaxBody is not a normal click, and a refusal never sends the Operator's act with a lesser identity). The hub refuses such a request that is too big
+// to stamp with a clear answer instead of sending it unstamped. path is the decoded path without its query.
 func MustBeSigned(method, path string) bool {
-	return Allowed(method, path) && strings.HasPrefix(strings.Trim(path, "/"), "api/sessions/live/")
+	if !Allowed(method, path) {
+		return false
+	}
+	return strings.HasPrefix(strings.Trim(path, "/"), "api/sessions/live/") || since(method, path) > 1
 }
 
 // Routes lists the allowlist, for census tests on both sides.
-func Routes() []string { return append([]string(nil), routes...) }
+func Routes() []string {
+	out := make([]string, len(routes))
+	for i, r := range routes {
+		out[i] = r.pattern
+	}
+	return out
+}
 
-// Allowed reports whether a request is on the allowlist. path is the decoded path without its query.
-func Allowed(method, path string) bool {
+// AllowedAt is Allowed for a remote that accepts the allowlist of generation version (its health answer's number): a route added after that is not stamped for it.
+func AllowedAt(method, path string, version int) bool {
+	s := since(method, path)
+	return s > 0 && s <= version
+}
+
+// since is the generation that added the route a request is on (0: not on the list).
+func since(method, path string) int {
 	segs := strings.Split(strings.Trim(path, "/"), "/")
 	for _, r := range routes {
-		m, p, _ := strings.Cut(r, " ")
+		m, p, _ := strings.Cut(r.pattern, " ")
 		if m != method {
 			continue
 		}
@@ -88,11 +167,14 @@ func Allowed(method, path string) bool {
 			}
 		}
 		if ok {
-			return true
+			return r.since
 		}
 	}
-	return false
+	return 0
 }
+
+// Allowed reports whether a request is on the allowlist. path is the decoded path without its query.
+func Allowed(method, path string) bool { return since(method, path) > 0 }
 
 // NewSecret makes a secret: 32 random bytes as 64 lower-case hex digits.
 func NewSecret() (string, error) {
