@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -85,7 +86,9 @@ func TestTheStateIsKeptInAPrivateFileAndComesBack(t *testing.T) {
 	require.NoError(t, err)
 	fi, err := os.Stat(path)
 	require.NoError(t, err)
-	assert.Equal(t, os.FileMode(0o600), fi.Mode().Perm())
+	if runtime.GOOS != "windows" { // Windows has no permission bits: a file in the user's own data folder is private by its folder's access list
+		assert.Equal(t, os.FileMode(0o600), fi.Mode().Perm())
+	}
 	again, err := Open(Options{Path: path})
 	require.NoError(t, err)
 	st, err := again.Queue().Status("mac")
