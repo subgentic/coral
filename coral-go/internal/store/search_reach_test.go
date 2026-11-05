@@ -1,6 +1,7 @@
 package store
 
 import (
+	"errors"
 	"context"
 	"database/sql"
 	"fmt"
@@ -158,10 +159,16 @@ func TestSearchReach_ANewMemberRowStartsAtOwn(t *testing.T) {
 func TestSearchReach_OnlyCreateTeamMemberInsertsMemberRows(t *testing.T) {
 	var inserts []string
 	require.NoError(t, filepath.WalkDir("..", func(path string, d fs.DirEntry, err error) error {
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil // a temporary directory another package's test made and removed while this walk ran (routes' nativehome-*, #13389)
+		}
 		if err != nil || d.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
 			return err
 		}
 		raw, rerr := os.ReadFile(path)
+		if errors.Is(rerr, fs.ErrNotExist) {
+			return nil
+		}
 		require.NoError(t, rerr)
 		if strings.Contains(strings.ToLower(string(raw)), "into team_members") {
 			inserts = append(inserts, filepath.ToSlash(path))

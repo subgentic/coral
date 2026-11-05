@@ -1,6 +1,7 @@
 package store
 
 import (
+	"errors"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -81,6 +82,9 @@ func goFilesUnderInternal(t *testing.T) map[string]*ast.File {
 	fset := token.NewFileSet()
 	out := map[string]*ast.File{}
 	err := filepath.WalkDir("..", func(path string, d fs.DirEntry, err error) error {
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil // a temporary directory another package's test made and removed while this walk ran (routes' nativehome-*, #13389)
+		}
 		if err != nil {
 			return err
 		}
