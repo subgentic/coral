@@ -44,7 +44,7 @@ export function createAsk({ st, panel, render, announce, refresh, ownHex }) {
     const redrawStatus = id => { const p = panel.querySelector(`.ac-card[data-id="${id}"] .ac-ask-status`); if (p) fillStatus(p, id); };
     function askBlock() {
         const k = st.ask;
-        return askUi.buildSendBlock({ id: k.id, board: st.board, agents: k.agents, picked: k.picked, asked: k.queue.length > 1 ? new Map() : askedNow(k.id), count: k.queue.length, results: k.results, busy: k.busy, error: k.error,
+        return askUi.buildSendBlock({ id: k.id, board: st.board, agents: k.agents, empty: k.empty, picked: k.picked, asked: k.queue.length > 1 ? new Map() : askedNow(k.id), count: k.queue.length, results: k.results, busy: k.busy, error: k.error,
             onToggle: (role) => { if (k.picked.has(role)) k.picked.delete(role); else if (k.picked.size < askUi.MAX_AGENTS) k.picked.add(role); redrawAsk(role); },
             onCancel: () => { st.ask = null; render(); panel.querySelector(`.ac-card[data-id="${k.id}"] .ac-ask-open`)?.focus(); },
             onSend: () => sendAsk() });
@@ -64,6 +64,8 @@ export function createAsk({ st, panel, render, announce, refresh, ownHex }) {
             const data = await refreshTeamAvailability(boardTeamKey(k.context.server, k.context.board), true); // the team of the computer the FILE is on (#13687): a bare board id is asked of this computer, which has no such board for a remote computer's team
             if (!current(k)) return;
             k.agents = askUi.pickableAgents(data && data.agents);
+            const named = normServer(k.context.server) === 'local' ? '' : String((state.servers || []).find(s => s.id === k.context.server)?.name || k.context.server);
+            k.empty = askUi.emptyWords ? askUi.emptyWords(named, ((data && data.agents) || []).length, k.agents.length) : ''; // why it is empty, said on the picker (#13687)
         } catch { if (!current(k)) return; k.agents = 'error'; }
         redrawAsk();
         panel.querySelector('.ac-ask input[type="checkbox"]:not(:disabled)')?.focus();
