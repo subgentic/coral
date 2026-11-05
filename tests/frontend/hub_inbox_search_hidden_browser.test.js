@@ -21,14 +21,15 @@ const { coralReady, framesJs } = require('./helpers/wait');
         await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab(${JSON.stringify(group)})).then(() => true)`);
         await ev(framesJs(8));
     };
+    const want = (mobile, group, own) => [mobile && group !== 'artifacts' ? 'phone-bar-search' : own]; // on a phone the pill is the page's search and the page's box is not drawn; Files has its own kind of box
     const OWN = { needs: 'inbox-needs-search', tasks: 'inbox-tk-search', goals: 'inbox-goals-search', artifacts: 'ia-search', saved: 'inbox-saved-search', chats: 'inbox-chats-search', 'chats-active': 'inbox-chats-search' };
     try {
         await Page.enable();
         for (const [w, mobile] of [[1280, false], [390, true]]) for (const [group, own] of Object.entries(OWN)) {
             await open(w, mobile, group);
-            await waitFor(`!!document.getElementById(${JSON.stringify(own)})?.getClientRects().length`, `local ${group}: the page's own box`, 10000);
+            await waitFor(`!!document.getElementById(${JSON.stringify(own)})`, `local ${group}: the page's own box`, 10000); await ev(framesJs(4));
             const b = await boxes();
-            assert.deepEqual(b, [own], `local ${group}, ${w} px: one search box, the page's: ${JSON.stringify(b)}`);
+            assert.deepEqual(b, want(mobile, group, own), `local ${group}, ${w} px: one search box (on a phone the top pill stands in for the page's, #13591): ${JSON.stringify(b)}`);
             if (group === 'needs') await shot(`one-search-local-needs-${w}`);
         }
         await setupHubWorld({ client, Page, Emulation, width: 1280, height: 800, mobile: false, inbox: 'native' });
@@ -39,8 +40,8 @@ const { coralReady, framesJs } = require('./helpers/wait');
                 if (group === 'needs') await shot(`one-search-hub-needs-${w}`);
             }
             for (const [group, own] of [['goals', 'inbox-goals-search'], ['artifacts', 'ia-search']]) {
-                await open(w, mobile, group); await waitFor(`!!document.getElementById(${JSON.stringify(own)})?.getClientRects().length`, `Hub ${group}: the page's own box`, 10000);
-                const b = await boxes(); assert.deepEqual(b, [own], `Hub ${group}, ${w} px: one search box, the page's: ${JSON.stringify(b)}`);
+                await open(w, mobile, group); await waitFor(`!!document.getElementById(${JSON.stringify(own)})`, `Hub ${group}: the page's own box`, 10000); await ev(framesJs(4));
+                const b = await boxes(); assert.deepEqual(b, want(mobile, group, own), `Hub ${group}, ${w} px: one search box (on a phone the top pill stands in for the page's, #13591): ${JSON.stringify(b)}`);
             }
         }
         console.log('hub_inbox_search_hidden_browser: ok');
