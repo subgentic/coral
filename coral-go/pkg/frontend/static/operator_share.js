@@ -9,6 +9,7 @@ import { loadStyles } from './lazy_styles.js';
 const { el } = await importOnce('./data_table.js');
 await loadStyles('operator_share.css');
 
+let descSeq = 0;
 const MAX_BYTES = 64 * 1024 * 1024; // the store's limit for one file (the same as an agent's upload)
 const NAME_MAX = 160;
 const FILES_MAX = 20; // the most one message names
@@ -46,24 +47,30 @@ export function mountOperatorShare(root, ctx) {
     if (root._share) { const S = root._share; S.ctx = ctx; S.attach(); S.sync(); return; }
     const S = root._share = { ctx, busy: false, live: true };
     const row = el('div', 'share-drop');
-    const pick = el('button', 'btn btn-small share-drop-pick', 'Upload a file'); pick.type = 'button';
+    // One small + beside the search box (the operator, #13584): its tip carries the explanation, the More menu offers the same action, and a drop on the tab still works.
+    const pick = el('button', 'btn btn-quiet btn-icon sidebar-collapse-btn list-bar-toggle share-drop-pick'); pick.type = 'button'; pick.setAttribute('aria-label', 'Upload a file');
+    const plus = el('span', 'material-icons', 'add'); plus.setAttribute('aria-hidden', 'true'); pick.append(plus);
+    // who can read the files and who is told: for a keyboard or screen-reader user too, not only a pointer's tip (UI Accessibility, #13584)
+    const desc = el('span', 'sr-only'); desc.id = `share-drop-desc-${++descSeq}`; pick.setAttribute('aria-describedby', desc.id);
     const input = el('input'); input.type = 'file'; input.multiple = true; input.hidden = true; input.tabIndex = -1; input.setAttribute('aria-hidden', 'true');
-    const hint = el('span', 'share-drop-hint');
     const status = el('p', 'share-drop-status'); status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
     const target = el('div', 'share-drop-target'); target.setAttribute('aria-hidden', 'true');
-    row.append(pick, hint, input, status);
-    S.attach = () => { // the row above the list and the target over it (again, for an agent that has a team after one that had none)
+    row.append(input, status);
+    S.choose = () => { if (S.live && !S.busy) input.click(); }; // the More menu's "Upload a file"
+    S.attach = () => { // the + beside the search box, the status row above the list and the target over it (again, for an agent that has a team after one that had none, and after the bar is drawn)
         S.live = true;
+        const search = root.querySelector('.list-bar-search-row .list-bar-search-wrap');
+        if (search && pick.previousElementSibling !== search) { search.after(pick); pick.after(desc); }
         if (!row.isConnected) { const body = root.querySelector('.team-artifacts-body'); if (body) root.insertBefore(row, body); else root.prepend(row); }
         if (!target.isConnected) root.append(target);
     };
-    S.detach = () => { S.live = false; depth = 0; root.classList.remove('share-drop-on'); row.remove(); target.remove(); };
+    S.detach = () => { S.live = false; depth = 0; root.classList.remove('share-drop-on'); row.remove(); pick.remove(); desc.remove(); target.remove(); };
     let depth = 0;
     S.attach();
     S.sync = () => {
         const n = visibleName(S.ctx.name || 'this agent');
-        pick.setAttribute('aria-label', `Upload a file for ${n}`);
-        hint.textContent = `Drop files here or press the button. Every agent on this team can read them; only ${n} is told.`;
+        desc.textContent = `Every agent on this team can read the files; only ${n} is told.`;
+        pick.title = `Upload a file. You can also drop files here. Every agent on this team can read them; only ${n} is told.`;
         target.textContent = `Drop to share with ${n}`;
     };
     S.sync();
