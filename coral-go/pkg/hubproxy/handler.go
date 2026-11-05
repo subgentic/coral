@@ -25,6 +25,7 @@ type Handler struct {
 	resolver Resolver
 	opts     Options
 	optErr   error // invalid Options: every WebSocket upgrade is refused
+	gens     remoteGenerations
 }
 
 // New returns a proxy Handler. Mount it with chi on a pattern containing a
@@ -141,8 +142,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.proxyHTTP(w, r, id, t, dec, rawPath)
 }
 
-// stampedGeneration is the generation of the owner-stamp allowlist this hub stamps for EVERY remote: the original eight (#13694). The widened routes (hubowner.RoutesVersion 2) are stamped only for a remote whose health
-// answer says it lists them (hub_owner_routes), and only while sign-in is on at this hub (Security's conditions); that Hub-side step is the Hub Lead's, until it lands no widened route is stamped here.
+// stampedGeneration is the generation of the owner-stamp allowlist this hub signs for EVERY remote and every signed-in owner: the original eight (#13694). The widened routes (hubowner.RoutesVersion 2) are signed only for a
+// person who holds a sign-in session at this hub and only for a remote whose health answer says it lists them (hub_owner_routes): stampGeneration (owner.go, #13725).
 const stampedGeneration = 1
 
 func (h *Handler) proxyHTTP(w http.ResponseWriter, r *http.Request, id string, t Target, dec, raw string) {
@@ -159,7 +160,7 @@ func (h *Handler) proxyHTTP(w http.ResponseWriter, r *http.Request, id string, t
 	// stamp can bind it, and put back; a bigger one is sent unstamped and the remote refuses it.
 	var stampBody []byte
 	var stamper OwnerStamper
-	if s, ok := t.(OwnerStamper); ok && signedInOwner(r.Context()) && hubowner.AllowedAt(r.Method, dec, stampedGeneration) {
+	if s, ok := t.(OwnerStamper); ok && signedInOwner(r.Context()) && hubowner.AllowedAt(r.Method, dec, h.stampGeneration(r.Context(), id, t, r.Method, dec)) {
 		b, err := io.ReadAll(io.LimitReader(r.Body, hubowner.MaxBody+1))
 		if err == nil && len(b) <= hubowner.MaxBody {
 			stamper, stampBody = s, b

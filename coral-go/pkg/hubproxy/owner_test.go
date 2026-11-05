@@ -28,7 +28,11 @@ func ownerHub(t *testing.T, res *fakeResolver) *httptest.Server {
 	r.Handle("/api/remote/{server}/*", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if req.Header.Get("X-Test-Person") == "1" {
 			req = req.WithContext(WithSignedInOwner(req.Context()))
+			if req.Header.Get("X-Test-Session") == "1" {
+				req = req.WithContext(WithSessionSignedIn(req.Context())) // the identity layer's dashboard cookie (routes.MountRemoteProxy)
+			}
 		}
+		req.Header.Del("X-Test-Session")
 		req.Header.Del("X-Test-Person")
 		h.ServeHTTP(w, req)
 	}))
