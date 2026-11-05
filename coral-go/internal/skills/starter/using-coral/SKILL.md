@@ -16,7 +16,7 @@ Coral, for any agent (the whole guide is the skill `using-coral`: find it with `
 - Files: `coral-agent artifact upload <file>` stores a report or a file; show it to the person as the `coral://artifacts/<digest>` link it returns, never as a local path.
 - The person: you are talking with them in this conversation, so put what they must read or decide in your reply. `coral-agent notify --title <T> --message <M>` shows a notice on their dashboard, `coral-agent ui publish` puts an interactive panel in their sidebar.
 - Your own to-do list: `coral-agent task add|list|current|complete`. What was said earlier: `coral-agent history search <query>`.
-- On a team: `coral-board read` and `coral-board post` are how you talk with it, and a question for the Operator goes to their Needs you with `coral-board post --ask "@Operator <question>"`.
+- On a team: `coral-board read` and `coral-board post` are how you talk with it, and a question for the Operator goes to their Needs you with `coral-board post --ask` (name @Operator in it).
 <!-- launch-section:end -->
 
 ## Docs

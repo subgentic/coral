@@ -12,6 +12,17 @@ import (
 	"github.com/subgentic/coral/internal/skills"
 )
 
+// launchFileRe finds the temp files a launch command names: a Unix path (/tmp/x/coral_settings_y.json) or a Windows one (C:\Users\x\AppData\Local\Temp\coral-agent-1\coral_settings_y.json), quoted or not.
+// The Unix-only pattern this replaced found nothing on Windows, so windows-tests saw no instructions at all (#13523, trial-250 gate).
+var launchFileRe = regexp.MustCompile(`(?:[A-Za-z]:[\\/]|/)[^\s'"]+?\.(?:json|md|txt)`)
+
+func TestLaunchFileReFindsUnixAndWindowsPaths(t *testing.T) {
+	cmd := `export A=1; claude --settings '/tmp/coral-agent-1/coral_settings_x.json' -- "$(cat '/tmp/coral-agent-1/coral_prompt_x.txt')"`
+	win := "$env:A='1'; claude --settings 'C:\\Users\\run\\AppData\\Local\\Temp\\coral-agent-1\\coral_settings_x.json' -- (Get-Content -Raw -LiteralPath 'C:\\Users\\run\\AppData\\Local\\Temp\\coral-agent-1\\coral_prompt_x.txt')"
+	assert.Equal(t, []string{"/tmp/coral-agent-1/coral_settings_x.json", "/tmp/coral-agent-1/coral_prompt_x.txt"}, launchFileRe.FindAllString(cmd, -1))
+	assert.Equal(t, []string{"C:\\Users\\run\\AppData\\Local\\Temp\\coral-agent-1\\coral_settings_x.json", "C:\\Users\\run\\AppData\\Local\\Temp\\coral-agent-1\\coral_prompt_x.txt"}, launchFileRe.FindAllString(win, -1))
+}
+
 // launchText is everything a launch hands the CLI as instructions: the command and the temp files it names (the Claude settings file, Codex's developer_instructions file, the prompt files).
 func launchText(t *testing.T, typ string, p LaunchParams) string {
 	t.Helper()
@@ -22,7 +33,7 @@ func launchText(t *testing.T, typ string, p LaunchParams) string {
 	cmd, err := GetAgent(typ).LaunchCommand(p)
 	require.NoError(t, err)
 	text := cmd
-	for _, m := range regexp.MustCompile(`(/[^\s'"]+\.(?:json|md|txt))`).FindAllString(cmd, -1) {
+	for _, m := range launchFileRe.FindAllString(cmd, -1) {
 		if b, err := os.ReadFile(m); err == nil {
 			text += "\n" + string(b)
 		}
