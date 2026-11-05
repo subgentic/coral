@@ -628,7 +628,7 @@ func TestTheIndexCheckNeverRunsOnAStoreClosedDuringTheQuietWait(t *testing.T) {
 		_, err := st.PostMessage(bg, "proj", "dev", fmt.Sprintf("%s #%d", ftsTexts[i%len(ftsTexts)], i), nil)
 		require.NoError(t, err)
 	}
-	require.NoError(t, st.BuildMessageSearchIndex(bg))
+	buildAfterOpenBuild(t, st, bg) // the open starts a build of its own: wait for it, then build (#13389)
 	require.NoError(t, st.Close())
 	defer func(d, q, p, m time.Duration) {
 		messageIndexCheckDelay, messageIndexQuiet, messageIndexQuietPoll, messageIndexQuietWaitMax = d, q, p, m
