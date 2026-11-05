@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -423,4 +424,112 @@ func countPosts(byDay map[string]int) int {
 		n += c
 	}
 	return n
+}
+
+// rqRun is one run of the history (#13724): an entry of the queue that ended. Numbers, names and times only: no note and no command (the pattern is the hook's matched pattern).
+type rqRun struct {
+	Key       string `json:"key"`
+	Entry     int64  `json:"id"`
+	Resource  string `json:"resource"`
+	Machine   string `json:"machine,omitempty"`
+	Agent     string `json:"agent"`
+	Task      int    `json:"task,omitempty"`
+	Project   string `json:"project,omitempty"`
+	GoalID    int64  `json:"goal_id,omitempty"`
+	GoalTitle string `json:"goal_title,omitempty"`
+	Via       string `json:"via,omitempty"`
+	Pattern   string `json:"pattern,omitempty"`
+	Enqueued  string `json:"enqueued_at,omitempty"`
+	Started   string `json:"started_at,omitempty"`
+	Ended     string `json:"ended_at"`
+	WaitS     int64  `json:"wait_s"`
+	HeldS     int64  `json:"held_s"`
+	End       string `json:"end"`
+}
+
+// Runs answers GET /api/analytics/resource-queue/runs?resource=&agent=&q=&before=&limit= (#13724): one page (at most 50) of the entries that ended, newest first, read from the queue's record, with each task's goal
+// read from the board (one lookup per board for the page, never per row) and the machine of each resource. `next` is the cursor for the next page ("" at the end); `resources` and `agents` are what the record has, to filter by.
+// The Operator's alone and read only, on this computer.
+func (h *ResourceQueueAnalyticsHandler) Runs(w http.ResponseWriter, r *http.Request) {
+	if cloud.Tunneled(r) || r.Header.Get(tunnel.ViaHeader) != "" {
+		commentRefuse(w, http.StatusForbidden, "not_through_hub", "the resource queue's history is on this computer only")
+		return
+	}
+	if !operatorOnly(w, r) {
+		return
+	}
+	m := h.manager()
+	out := map[string]any{"history": m != nil && m.History() != nil, "runs": []rqRun{}, "next": "", "resources": []string{}, "agents": []string{}}
+	if m == nil || m.History() == nil {
+		writeJSON(w, http.StatusOK, out)
+		return
+	}
+	q := r.URL.Query()
+	limit := resources.RunsPageSize
+	if v := q.Get("limit"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n <= 0 {
+			errBadRequest(w, "limit is a positive number")
+			return
+		}
+		if n < limit {
+			limit = n
+		}
+	}
+	machines := map[string]string{}
+	for _, st := range m.Queue().All() {
+		machines[st.Resource.Key] = st.Resource.Machine
+	}
+	m.History().Flush()
+	page, err := m.History().RunsOn(resources.RunsQuery{Resource: q.Get("resource"), Agent: q.Get("agent"), Search: q.Get("q"), Before: q.Get("before"), Limit: limit}, machines)
+	if err != nil {
+		if strings.Contains(err.Error(), "not a cursor") {
+			errBadRequest(w, "before is the cursor of an earlier page")
+			return
+		}
+		slog.Error("resource history runs read failed", "error", err)
+		errInternalServer(w, "the read failed")
+		return
+	}
+	runs := make([]rqRun, 0, len(page.Runs))
+	ids := map[string][]int64{}
+	seen := map[string]bool{}
+	for _, x := range page.Runs {
+		v := rqRun{Key: x.Key, Entry: x.Entry, Resource: x.Resource, Machine: machines[x.Resource], Agent: x.Agent, Task: x.Task, Project: x.Project, Via: x.Via, Pattern: x.Pattern,
+			Ended: x.Ended.Format(time.RFC3339), WaitS: int64(x.Wait.Seconds()), HeldS: int64(x.Held.Seconds()), End: x.End}
+		if !x.Enqueued.IsZero() {
+			v.Enqueued = x.Enqueued.Format(time.RFC3339)
+		}
+		if !x.Granted.IsZero() {
+			v.Started = x.Granted.Format(time.RFC3339)
+		}
+		runs = append(runs, v)
+		if k := x.Project + "#" + strconv.Itoa(x.Task); x.Project != "" && x.Task > 0 && !seen[k] {
+			seen[k] = true
+			ids[x.Project] = append(ids[x.Project], int64(x.Task))
+		}
+	}
+	if h.bs != nil {
+		goals := map[string]map[int64]board.TaskGoalRef{}
+		for project, list := range ids {
+			if g, err := h.bs.TaskGoals(r.Context(), project, list); err == nil { // a board that cannot be read leaves its rows without a goal
+				goals[project] = g
+			}
+		}
+		for i := range runs {
+			if g, ok := goals[runs[i].Project][int64(runs[i].Task)]; ok && runs[i].Project != "" {
+				runs[i].GoalID, runs[i].GoalTitle = g.ID, g.Title
+			}
+		}
+	}
+	out["runs"], out["next"] = runs, page.Next
+	out["resources"], out["agents"] = nonNil(page.Resources), nonNil(page.Agents)
+	writeJSON(w, http.StatusOK, out)
+}
+
+func nonNil(s []string) []string {
+	if s == nil {
+		return []string{}
+	}
+	return s
 }

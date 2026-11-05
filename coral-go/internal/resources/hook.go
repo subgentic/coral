@@ -389,7 +389,7 @@ func (h *Hook) startedWorkRuns(ah *autoHold, res resourcequeue.Resource, snap ma
 }
 
 func (h *Hook) releaseLocked(k holdKey, ah *autoHold, why string) {
-	_ = h.m.Queue().Release(k.resource, k.agent)
+	_ = h.m.Queue().ReleaseWhy(k.resource, k.agent, why)
 	delete(h.hold, k)
 	h.event(HookEvent{Kind: "released", Resource: k.resource, Pattern: ah.pattern, Agent: k.agent, Session: ah.session, Why: why})
 }

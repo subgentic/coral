@@ -90,3 +90,20 @@ func TestASinkThatPanicsOrReadsTheQueueNeverBreaksAClaim(t *testing.T) {
 	assert.True(t, r.Granted, "the claim stands whatever the sink does")
 	require.NoError(t, q.Release("mac", "a"))
 }
+
+func TestAnEventCarriesTheBoardOfTheTaskAndAHookReleaseTheReasonItGives(t *testing.T) {
+	s := &sink{}
+	q, _ := fixture(t, Config{OnEvent: s.add})
+	_, err := q.Claim("mac", Claimant{Agent: "a", Task: 7, Project: "team"})
+	require.NoError(t, err)
+	assert.Equal(t, "team", s.ev[0].Project)
+	require.NoError(t, q.ReleaseWhy("mac", "a", "call ended"))
+	rel := s.last()
+	assert.Equal(t, "released", rel.Kind)
+	assert.Equal(t, "call ended", rel.Why)
+	assert.Equal(t, "team", rel.Project)
+	_, err = q.Claim("mac", Claimant{Agent: "b"})
+	require.NoError(t, err)
+	require.NoError(t, q.Release("mac", "b"))
+	assert.Equal(t, "", s.last().Why, "a hand release says no reason of its own")
+}

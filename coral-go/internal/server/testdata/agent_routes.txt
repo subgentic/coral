@@ -64,6 +64,7 @@ b GET /api/analytics/activity
 b GET /api/analytics/efficiency
 b GET /api/analytics/inbox-vs-chat
 b GET /api/analytics/resource-queue
+b GET /api/analytics/resource-queue/runs
 b GET /api/artifacts
 a GET /api/artifacts/series/{series_id}
 a GET /api/artifacts/series/{series_id}/versions

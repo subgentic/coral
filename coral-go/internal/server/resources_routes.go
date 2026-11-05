@@ -18,7 +18,8 @@ import (
 // the Mac would be forgotten) and never a server that does not start (upgrades must not break Coral).
 func (s *Server) registerResources(r chi.Router, sess *routes.SessionsHandler) {
 	rq := routes.NewResourceQueueAnalyticsHandler(nil, s.boardStore)
-	r.Get("/api/analytics/resource-queue", rq.Read) // how much the queue is used and whether it helps (#13671): numbers only, the Operator's alone, this computer only; there with no queue too (it says so)
+	r.Get("/api/analytics/resource-queue", rq.Read)      // how much the queue is used and whether it helps (#13671): numbers only, the Operator's alone, this computer only; there with no queue too (it says so)
+	r.Get("/api/analytics/resource-queue/runs", rq.Runs) // the history of the runs (#13724): names and times, the Operator's alone, this computer only
 	if s.boardStore == nil {
 		return
 	}
