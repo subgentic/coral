@@ -33,15 +33,24 @@ const B = {
     await t.click(t.page.locator("button:text-is('Next') >> visible=true").first()); await sleep(1400)
     await t.cap("A team is a set of agents with roles. The Orchestrator plans and hands out the work.")
     await sleep(2200)
-    await t.click(t.page.locator("button:text-is('Edit') >> visible=true").first()); await sleep(1200)
-    await t.cap("Each agent has its own CLI and model.")
-    const sel = t.page.locator("select >> visible=true").first(); await t.move(sel); await sel.focus(); await sleep(700)
-    for (let i = 0; i < 3; i++) { await t.page.keyboard.press("ArrowDown"); await sleep(900) }   // a native menu is not drawn in a recording: step through the models instead
-    await t.page.keyboard.press("Home"); await sleep(400)
-    await t.click(t.page.locator("button:text-is('Save member') >> visible=true").first()); await sleep(900)
+    // (the Edit member screen and its model list are out, at the Operator's word)
     await t.click(t.page.locator("button:text-is('Next') >> visible=true").first()); await sleep(1200)
+    await t.cap("Tell the team what to work on. It goes to the Orchestrator first.")
+    const first = t.page.getByPlaceholder(/For example: build/).locator("visible=true").first()
+    await t.click(first); await t.page.keyboard.type("Plan the first week for Skyline, a five-day weather forecast app.", { delay: 35 }); await sleep(600)
+    // the goal comes next, as its own step: do not also save this one as the team's goal (the switch is found from its label, climbing to the control beside it)
+    const sw = await t.page.evaluate(() => {
+      const el = [...document.querySelectorAll("*")].find((e) => e.children.length === 0 && /Also save this/.test(e.textContent || "")); let n = el
+      for (let i = 0; n && i < 6; i++, n = n.parentElement) {
+        const c = n.querySelector("input[type=checkbox],[role=switch],[role=checkbox],button[aria-pressed],button[aria-checked]")
+        if (c) { const on = c.checked === true || c.getAttribute("aria-checked") === "true" || c.getAttribute("aria-pressed") === "true"; if (on) c.click(); return (on ? "turned off " : "already off ") + c.tagName }
+      }
+      return "not found"
+    })
+    console.error("team goal switch: " + sw)
+    await sleep(800)
     await t.cap("Launch it. The agents start together.")
-    await sleep(1200)
+    await sleep(1000)
     await t.click(t.page.locator("button:text-is('Launch team') >> visible=true").first()); await sleep(4500)
     await t.cap("Every agent is on your list, on one shared board.")
     await sleep(3000)
@@ -55,7 +64,11 @@ const B = {
   },
   async d2() { // give the team a goal: a name, a description, a done-when and a picture
     const t = await beat(browser, "d2")
-    await t.go("/inbox/goals"); await t.cap("Now give the team a goal, in plain words.")
+    // from the team's own page: its Goals tab, then New goal, so it is plain that the goal goes to this team
+    await t.go("/agents"); await t.cap("Now give the team a goal.")
+    await t.click(t.page.locator(`text=${story.team} >> visible=true`).first()); await sleep(1500)
+    await t.click(t.page.getByRole("tab", { name: /^Goals/ }).or(t.page.locator("button:text-is('Goals'), a:text-is('Goals')")).locator("visible=true").first()); await sleep(1500)
+    await t.cap("Create a new goal, in plain words.")
     await t.click(t.page.locator("button:has-text('New goal') >> visible=true").first()); await sleep(1200)
     const title = t.page.getByPlaceholder("Name the goal"); await t.click(title); await t.page.keyboard.type(goal.title, { delay: 40 }); await sleep(500)
     const body = t.page.locator("[contenteditable=true]:visible, textarea:visible").first(); await t.click(body)
@@ -76,33 +89,30 @@ const B = {
     await t.click(t.page.locator("button:has-text('Create goal') >> visible=true").first()); await t.cap(""); await sleep(1500)
     return t.finish()
   },
-  async d3() { // the work divided: the Orchestrator hands out tasks, each agent takes its own, and what they make is attached to the tasks
+  async d3() { // the work divided: the Orchestrator hands out tasks, each agent takes its own, what they make is attached to the tasks. The page stays at the bottom: tasks, artifacts, comments.
     const gid = goalId(goal.title); if (!gid) throw new Error("the goal is not there")
     const plan = [["Write the forecast contract", WORKERS[0], "forecast-api.md"], ["Measure the forecast error", WORKERS[1], "accuracy.csv"], ["Build the five-day forecast cards", WORKERS[0], null], ["Write the beta test plan", WORKERS[1], "test-plan.md"], ["Add the units switch", WORKERS[0], null]]
     const t = await beat(browser, "d3")
+    const bottom = async () => { await t.page.mouse.move(900, 500); await t.page.mouse.wheel(0, 3000); await sleep(450) }   // the page grows as rows arrive: back to the bottom each time
     await t.go("/inbox/goals"); await t.cap("The Orchestrator is the goal's driver. It splits the goal into tasks.")
-    await t.click(t.page.locator(`text=${goal.title} >> visible=true`).first()); await sleep(1800)
-    await t.page.mouse.move(900, 600, { steps: 15 }); await t.page.mouse.wheel(0, 760); await sleep(1000)   // down to the task table: the tasks and who has them are on screen
-    const pending = []
+    await t.click(t.page.locator(`text=${goal.title} >> visible=true`).first()); await sleep(1200)
+    await bottom()
+    for (const [title, who] of plan) { board("task", "add", title, "--goal", String(gid), "--assignee", who); await sleep(700); await bottom() }
+    await t.cap("Each task goes to an agent. They work in parallel."); await sleep(1500)
     for (const [title, who, file] of plan) {
-      board("task", "add", title, "--goal", String(gid), "--assignee", who); await sleep(1500)
-      pending.push([title, who, file])
-    }
-    await t.cap("Each task goes to an agent. They work in parallel.")
-    await t.page.mouse.wheel(0, 700); await sleep(1200)   // the page is taller now: down to the task table, who has each task
-    await sleep(800)
-    for (const [title, who, file] of pending) {
       const id = taskId(title)
       try { agent(who, "coral-board", "task", "claim", String(id)) } catch (e) { console.error("claim failed: " + title) }
       if (file) { fs.writeFileSync(S + "/work/att-" + file, fs.readFileSync(SEED + "/" + file, "utf8") + "\n(" + title + ", " + Date.now() + ")\n"); try { agent(who, "coral-agent", "artifact", "upload", S + "/work/att-" + file, "--name", file, "--task", String(id)) } catch (e) { console.error("upload failed: " + file) } }
       try { agent(who, "coral-board", "task", "complete", String(id), "--message", "Done.") } catch (e) { console.error("complete failed: " + title) }
-      await sleep(1200)
+      await bottom()
     }
+    await sleep(1200)
     await t.cap("What they make is attached to their tasks.")
-    await t.click(t.page.locator("text=Artifacts >> visible=true").last()); await sleep(900)
-    await t.page.mouse.wheel(0, 700); await sleep(1500)
-    await t.click(t.page.locator("text=/forecast-api|accuracy|test-plan/ >> visible=true").first()); await sleep(3500)
-    await t.page.keyboard.press("Escape"); await sleep(800)
+    await t.click(t.page.locator("text=Artifacts >> visible=true").last()); await sleep(700); await bottom(); await sleep(1200)
+    await t.click(t.page.locator("text=/forecast-api|accuracy|test-plan/ >> visible=true").first()); await sleep(3000)
+    await t.page.keyboard.press("Escape"); await sleep(600)
+    await t.cap("And you can comment on the goal right there.")
+    await t.click(t.page.locator("text=Comments >> visible=true").last()); await sleep(700); await bottom(); await sleep(2200)
     return t.finish()
   },
   async d4() { // talk to the goal's driver in its chat: a question, and a real update back
