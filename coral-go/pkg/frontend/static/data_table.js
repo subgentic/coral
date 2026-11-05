@@ -117,7 +117,7 @@ export const compareBy = (col) => { // exported for its unit test (data_table_co
 };
 
 /** The phone's mail row (#9545, UI/UX's spec): a 44 px leading target holding a 32 px avatar, the title and the first words of what it says on one line, the time at the right, and under the line (Needs you only) the ask.
- *  A caller opts in with `mail(row) -> { actions?: [{ label, title?, run(button) }] (a ⋯ button at the row's right opens them, #137104), lead: { text, name?, square?, icon? }, kindIcon? (a node drawn before the title), title, snippet?, state?, ask?, askTag?, time?, unread?, mark?, data?, tip?, team?, teamAlways?, nameTeam?, snippetTip? }` (nameTeam: the team is in the button's name but not drawn on the line, so Needs you is one line, #9986) (state: the word the row shows for what it is in (a task's Queued, In review), said in the button's name after the title, so a screen reader hears <name>, <state> (#9747)) (team: after the title in tertiary, always when teamAlways, else only for a title two rows share) (data: attributes for the open button, as `{ taskId: 5 }` is data-task-id="5"); on a phone the row is this cell alone (the columns are the desktop's), and its button is the row's open control.
+ *  A caller opts in with `mail(row) -> { actions?: [{ label, title?, off?, confirm?, onArm?, run(button) }] (a ⋯ button at the row's right opens them, #137104), lead: { text, name?, square?, icon? }, kindIcon? (a node drawn before the title), title, snippet?, state?, ask?, askTag?, time?, unread?, mark?, data?, tip?, team?, teamAlways?, nameTeam?, snippetTip? }` (nameTeam: the team is in the button's name but not drawn on the line, so Needs you is one line, #9986) (state: the word the row shows for what it is in (a task's Queued, In review), said in the button's name after the title, so a screen reader hears <name>, <state> (#9747)) (team: after the title in tertiary, always when teamAlways, else only for a title two rows share) (data: attributes for the open button, as `{ taskId: 5 }` is data-task-id="5"); on a phone the row is this cell alone (the columns are the desktop's), and its button is the row's open control.
  *  `unread` makes the title 600 (a read one is 500) and draws an accent dot under the time that is named "Unread" for a screen reader: a list says it only where a read state exists (Needs you; chats, boards and tasks through inbox_read.js, #9687). `mark: 'attention'` is the amber dot under the time and outranks the unread dot (one dot a row). A desktop table takes `unread(row)` for the same look as a `dt-unread` row. Text is set with textContent only. */
 const MAIL_QUERY = '(max-width: 767px)';
 let rowMenus = 0;
@@ -131,7 +131,16 @@ function rowMore(actions, label) {
     const menu = el('div', 'menu dt-mail-menu'); menu.id = `${id}-menu`; menu.hidden = true; menu.setAttribute('role', 'menu'); menu.setAttribute('aria-label', `Actions for ${label}`);
     for (const a of actions) {
         const b = el('button', 'menu-item', a.label); b.type = 'button'; b.setAttribute('role', 'menuitem'); if (a.title) b.title = a.title;
-        b.addEventListener('click', async e => { e.stopPropagation(); (await importOnce('./menu_button.js')).closeMenus({ restoreFocus: true }); a.run(b); });
+        if (a.off) { b.disabled = true; b.setAttribute('aria-disabled', 'true'); } // an action that is off right now stays in the menu, said off (the first in a line cannot move up)
+        b.addEventListener('click', async e => {
+            e.stopPropagation();
+            if (a.confirm && !b.dataset.armed) { // an action that asks once more (Kick): the first press says so in the item's words and keeps the menu open, the second does it
+                b.dataset.armed = '1'; b.textContent = a.confirm; if (a.onArm) a.onArm(b);
+                setTimeout(() => { delete b.dataset.armed; b.textContent = a.label; }, 10000);
+                return;
+            }
+            (await importOnce('./menu_button.js')).closeMenus({ restoreFocus: true }); a.run(b);
+        });
         menu.append(b);
     }
     toggle.addEventListener('click', async e => { e.stopPropagation(); (await importOnce('./menu_button.js')).toggleMenu(toggle); });
