@@ -3,8 +3,10 @@
 package routes
 
 import (
+	"database/sql"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/subgentic/coral/internal/claudeartifact"
 	"log/slog"
@@ -85,6 +87,9 @@ func (h *BoardHandler) PostMessage(w http.ResponseWriter, r *http.Request) {
 		if body, ok = readGuideMessage(w, r); !ok {
 			return
 		}
+		if h.refuseReplyToOperatorAsk(w, r, project, body.ReplyTo) { // a guide is no owner: an answer to the Operator's question is refused before anything else is said about it (#13491)
+			return
+		}
 		if body.ReplyTo != 0 { // a guide may reply only to a question put to them that is still open (S3): the label is the stamp's, never a field
 			open, err := h.bs.GuideAskOpenFor(r.Context(), project, body.ReplyTo, g.Label, g.Since, time.Now())
 			if err != nil {
@@ -98,6 +103,9 @@ func (h *BoardHandler) PostMessage(w http.ResponseWriter, r *http.Request) {
 		}
 	} else {
 		derr = decodeJSON(r, &body)
+		if derr == nil && h.refuseReplyToOperatorAsk(w, r, project, body.ReplyTo) {
+			return
+		}
 	}
 	var answer *taskReply
 	if derr == nil && len(body.TaskID) > 0 && string(body.TaskID) != "null" {
@@ -841,4 +849,31 @@ func (h *BoardHandler) listMessagesPaged(w http.ResponseWriter, r *http.Request,
 		}
 	}
 	writeJSON(w, http.StatusOK, out)
+}
+
+// refuseReplyToOperatorAsk answers 403 owner_only to a reply_to that targets a question put to the Operator when the request came through Coral Hub and is not the owner's (a grantee, a viewer, a guide) (#13491):
+// answering the Operator is the owner's alone. It reports whether it refused. A plain post, a reply to any other message and a request from this computer are not touched. The message is read only for a
+// request that could be refused.
+func (h *BoardHandler) refuseReplyToOperatorAsk(w http.ResponseWriter, r *http.Request, project string, replyTo int64) bool {
+	if replyTo <= 0 || !cloud.Tunneled(r) || hubOwnerRequest(r).owner {
+		return false
+	}
+	asked, err := h.bs.GetMessageByID(r.Context(), project, replyTo)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false // no such message on this board: the 400 for it is the handler's own, further on
+	}
+	if err != nil {
+		errInternalServer(w, "could not check what this reply answers") // a request that could be refused is never let through on a failed lookup (Security's SHOULD on #13491)
+		return true
+	}
+	if asked == nil || asked.Ask == nil {
+		return false
+	}
+	for _, to := range asked.Ask.To {
+		if board.IsOperatorName(to) {
+			writeJSON(w, http.StatusForbidden, map[string]string{"code": "owner_only", "error": "through Coral Hub only the account this computer is linked to can answer a question put to the Operator"})
+			return true
+		}
+	}
+	return false
 }
