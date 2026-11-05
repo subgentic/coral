@@ -369,7 +369,7 @@ export function boardFetch(teamKey, suffix, options) {
 export function boardArtifactPage(teamKey, tag, at) {
     const where = at.cursor ? `&cursor=${encodeURIComponent(at.cursor)}` : at.offset ? `&offset=${at.offset}` : '';
     const key = splitKey(teamKey);
-    if (key.name === '~no-team') return serverFetch(key.server, `/api/team-artifacts?team=No%20team&tag=${tag}&limit=200${where}`);
+    if (key.name === '~no-team') return serverFetch(key.server, `/api/team-artifacts?team=No%20team&team=Not%20on%20a%20team&tag=${tag}&limit=200${where}`);
     return boardFetch(teamKey, `/artifacts?tag=${tag}&limit=200${where}`);
 }
 /** Moves the walk to the next page of `data` (a page's answer); false when that was the last. It advances by what the computer returned, never by what was asked: an older Coral answers 200, a newer one 50, and the cursor, when there is one, is the place. */

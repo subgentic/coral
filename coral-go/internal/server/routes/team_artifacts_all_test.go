@@ -197,7 +197,7 @@ func TestAllTeamArtifactsCursorsDoNotCrossRoutes(t *testing.T) {
 }
 
 // #10312: the Inbox's Artifacts folder and an agent's own Artifacts tab list the same files. A file an agent with no team uploaded (a pasted screenshot) is in the agent's tab, so it is in the folder too,
-// under "No team"; a file a team already lists is not repeated; the Team filter takes "No team".
+// under "Not on a team"; a file a team already lists is not repeated; the Team filter takes "Not on a team".
 func TestAllTeamArtifactsListsTheFilesOfAgentsWithoutATeam(t *testing.T) {
 	_, h := setupBoardTestServer(t)
 	coralDir := t.TempDir()
@@ -214,8 +214,8 @@ func TestAllTeamArtifactsListsTheFilesOfAgentsWithoutATeam(t *testing.T) {
 	got := getAllTeamArtifacts(t, srv, "", http.StatusOK)
 	require.Equal(t, 1, got.All, "the standalone agent's file is in the folder")
 	require.Equal(t, []string{"screen.png"}, names(got.Artifacts))
-	require.Equal(t, "No team", got.Artifacts[0].Team)
-	require.Equal(t, []teamArtifactTeamRef{{BoardID: noTeamBoardID, Team: "No team", All: 1}}, got.Teams)
+	require.Equal(t, "Not on a team", got.Artifacts[0].Team)
+	require.Equal(t, []teamArtifactTeamRef{{BoardID: noTeamBoardID, Team: "Not on a team", All: 1}}, got.Teams)
 	require.Equal(t, noTeamBoardID, got.Artifacts[0].BoardID, "the row carries the reserved key a file for review is kept under (#13527)")
 
 	subscribeSession(t, h, "alpha", "Alice", "00000000-0000-4000-8000-0000000000a1")
@@ -229,8 +229,11 @@ func TestAllTeamArtifactsListsTheFilesOfAgentsWithoutATeam(t *testing.T) {
 		}
 	}
 
-	only := getAllTeamArtifacts(t, srv, "?team=No+team", http.StatusOK)
-	require.Equal(t, []string{"screen.png"}, names(only.Artifacts), "the Team filter takes No team")
+	only := getAllTeamArtifacts(t, srv, "?team=Not+on+a+team", http.StatusOK)
+	require.Equal(t, []string{"screen.png"}, names(only.Artifacts), "the Team filter takes Not on a team")
+	legacy := getAllTeamArtifacts(t, srv, "?team=No+team", http.StatusOK)
+	require.Equal(t, []string{"screen.png"}, names(legacy.Artifacts), "an older Hub filter still finds the renamed group")
+	require.Equal(t, "Not on a team", legacy.Artifacts[0].Team)
 	notThem := getAllTeamArtifacts(t, srv, "?team=alpha", http.StatusOK)
 	require.NotContains(t, names(notThem.Artifacts), "screen.png", "a team's filter leaves the no-team files out")
 }
@@ -273,7 +276,7 @@ func TestAllTeamArtifactsAllCountsFilesNotVersionsWithVersionsNewest(t *testing.
 }
 
 // #13163 (QA Reviewer 2's SHOULD on #13151): the no-team group's own count is files too. Reverting only the no-team ref in ListAllTeamArtifacts (filesOrVersions to len(rows)) left the test above green, because it
-// had only team files. A file with no team that has three versions is one file with versions=newest, and three rows without it; the Team filter "No team" agrees.
+// had only team files. A file with no team that has three versions is one file with versions=newest, and three rows without it; the Team filter "Not on a team" agrees.
 func TestAllTeamArtifactsCountsAFileWithNoTeamAsAFileNotItsVersions(t *testing.T) {
 	t.Parallel()
 	srv, h := allTeamArtifactsServer(t)
@@ -294,7 +297,7 @@ func TestAllTeamArtifactsCountsAFileWithNoTeamAsAFileNotItsVersions(t *testing.T
 	noTeamAll := func(q string) (all, group int) {
 		got := getAllTeamArtifacts(t, srv, q, http.StatusOK)
 		for _, ref := range got.Teams {
-			if ref.Team == "No team" {
+			if ref.Team == "Not on a team" {
 				group = ref.All
 			}
 		}
@@ -302,9 +305,9 @@ func TestAllTeamArtifactsCountsAFileWithNoTeamAsAFileNotItsVersions(t *testing.T
 	}
 	all, group := noTeamAll("?limit=1&versions=newest")
 	require.Equal(t, 2, all, "the list's own count is the two files, not the four versions")
-	require.Equal(t, 2, group, "and so is the No team group's: the file counts once")
-	all, group = noTeamAll("?limit=1&team=No+team&versions=newest")
-	require.Equal(t, 2, all, "the No team filter agrees")
+	require.Equal(t, 2, group, "and so is the Not on a team group's: the file counts once")
+	all, group = noTeamAll("?limit=1&team=Not+on+a+team&versions=newest")
+	require.Equal(t, 2, all, "the Not on a team filter agrees")
 	require.Equal(t, 2, group)
 	all, group = noTeamAll("?limit=1&versions=all")
 	require.Equal(t, 4, all, "as asked, every version is a row")
@@ -312,7 +315,7 @@ func TestAllTeamArtifactsCountsAFileWithNoTeamAsAFileNotItsVersions(t *testing.T
 }
 
 // A file a no-team agent sent for review is a review row in the Inbox's list (#13527): its tag and the question it asks are read from the reserved key, the for-review filter finds it, and a file that was not sent
-// for review stays a plain row. The row carries the reserved board key and the No team label.
+// for review stays a plain row. The row carries the reserved board key and the Not on a team label.
 func TestAllTeamArtifactsShowsAFileANoTeamAgentSentForReviewWithItsQuestion(t *testing.T) {
 	_, h := setupBoardTestServer(t)
 	coralDir := t.TempDir()
@@ -335,7 +338,7 @@ func TestAllTeamArtifactsShowsAFileANoTeamAgentSentForReviewWithItsQuestion(t *t
 	row := got.Artifacts[0]
 	assert.Equal(t, []string{"for review"}, row.Tags)
 	assert.Equal(t, "Ship the Q4 report?", row.ReviewQuestion, "the question reaches the Operator with it")
-	assert.Equal(t, "No team", row.Team)
+	assert.Equal(t, "Not on a team", row.Team)
 	assert.Equal(t, noTeamBoardID, row.BoardID)
 	all := getAllTeamArtifacts(t, srv, "", http.StatusOK)
 	assert.ElementsMatch(t, []string{"report.md", "run.log"}, names(all.Artifacts), "the plain file is still listed, with no review")
