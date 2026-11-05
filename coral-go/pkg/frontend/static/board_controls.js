@@ -3,7 +3,6 @@ import { importOnce } from './import_once.js';
 import { build, keyRoute } from './routes.js';
 import { showToast } from './utils.js';
 import { boardFetch, pathId, teamFetch } from './server_base.js';
-import { paintPauseButton } from './board_pause_button.js';
 import { bs } from './board_state.js';
 const { renderMessages } = await importOnce('./board_window.js'); // a part of the board page's group: loaded with it
 
@@ -30,7 +29,7 @@ export async function loadPausedState(project) {
 
 function updatePauseButton() {
     // the page's own item is text; the team panel's button is an icon that one function paints (#5491)
-    paintPauseButton(document.getElementById('board-chat-pause-btn'), bs.isPaused);
+    window.__coral?._setBoardChatPaused?.(bs.isPaused); // the team panel's Board tab says it in its ... menu and its banner (#13585)
     const btn = document.getElementById('mb-pause-btn');
     if (!btn) return;
     // A sleeping team's board is paused by the sleep: one name for the way out, Wake Team, here and in the Sleep item (#12335).

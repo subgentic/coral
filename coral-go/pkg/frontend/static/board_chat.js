@@ -16,13 +16,13 @@ import { resolveBoardArtifacts } from './board_artifacts.js';
 import { initGrowingTextarea } from './growing_textarea.js';
 import { announceNotice } from './notifications.js';
 import { outcomeUnknownLine } from './outcome_unknown.js';
-import { paintPauseButton as _paintPauseButton } from './board_pause_button.js';
-import { setAllRows, applyAskUpdates, onRowActions, boardView, saveBoardView, rowParts, applyView, mountTableTools, forgetOpenRows, refreshReplies, retagMentions, watchFold, dayLineBefore } from './board_table.js'; // the Board as a table (#7922): the team page's module at dock width
+import { setAllRows, applyAskUpdates, onRowActions, boardView, saveBoardView, rowParts, applyView, forgetOpenRows, refreshReplies, retagMentions, watchFold, dayLineBefore } from './board_table.js'; // the Board as a table (#7922): the team page's module at dock width
 import { messageTimeHtml } from './message_time.js';
 import { keyRoute, build } from './routes.js';
 import { browserLocal } from './safe_storage.js';
 import { createBoardSearch } from './board_search.js';
 import { menuMove } from './menu_keys.js';
+import { state } from './state.js';
 
 // ── Board (right-panel tab) ──────────────────────────────────────
 let _boardChatTimer = null;
@@ -46,6 +46,7 @@ const _BOARD_CHAT_PAGE = 50;
 const _BOARD_CHAT_KEEP = 300;
 let _boardChatSelectMode = false;
 let _boardChatSelectedIds = new Set();
+let _boardChatPaused = false; // the board's pause, read by the ... menu (its item says Pause board or Resume board) and shown by the banner
 
 // An agent's dock shows what that agent would read (#8484): the messages its read delivers (its @mentions, @all and the rest of the server's one rule), asked of the board with for_subscriber.
 // The Orchestrator's dock, and an agent with no member id, shows the whole board; the team page's Board tab is the whole board for everyone.
@@ -66,14 +67,13 @@ const _dockSearchHooks = {
     latest: () => { const box = document.getElementById('board-panel-msgs'); if (box) box.scrollTop = box.scrollHeight; },
     expandAll: () => setAllRows(document.getElementById('board-panel-msgs'), true),
     collapseAll: () => setAllRows(document.getElementById('board-panel-msgs'), false),
+    moreItems: () => _dockMoreItems(),
     noMatch: () => (_boardChatScope && _boardChatReader ? { text: `No match in what ${_boardChatReader.name} reads` } : null),
 };
 
 // What a rebuild used to reset and a kept panel must reset itself on a switch: select mode, an open @-mention list, the title.
 function _resetBoardPanelForSwitch(panel, boardName) {
     if (_boardChatSelectMode) {
-        const btn = panel.querySelector('.board-select-btn');
-        if (btn) { btn.classList.remove('active'); btn.setAttribute('aria-pressed', 'false'); }
         const inputPane = document.getElementById('board-chat-input-pane');
         if (inputPane) inputPane.style.display = '';
         const bar = document.getElementById('board-chat-select-bar');
@@ -81,7 +81,7 @@ function _resetBoardPanelForSwitch(panel, boardName) {
     }
     const mention = document.getElementById('board-mention-dropdown');
     if (mention && mention.style.display !== 'none') mention.style.display = 'none';
-    const title = panel.querySelector('.board-chat-title');
+    const title = panel.querySelector('.board-chat-name');
     const label = keyLabel(boardName);
     if (title && title.textContent !== label) title.textContent = label;
 }
@@ -111,9 +111,7 @@ export function showBoardChatTab(boardName, agent = null) {
         // Populate the board tab content (visibility managed by switchAgenticTab)
         panel.innerHTML = `
             <div class="board-chat-header">
-                <a class="board-chat-title" href="#" data-on-click="board-chat-open" data-board="${escapeAttr(boardName)}" title="Open full board view">${escapeHtml(keyLabel(boardName))}</a>
-                <button class="btn btn-quiet btn-icon btn-small btn-nav board-icon-btn" id="board-chat-pause-btn" data-on-click="board-chat-pause" data-board="${escapeAttr(boardName)}" aria-label="Pause board" title="Pause board: stops agents from receiving new messages until resumed"><span class="material-icons" aria-hidden="true">pause</span></button>
-                <button class="btn btn-quiet btn-icon btn-small btn-nav board-select-btn board-icon-btn" data-on-click="board-chat-select" aria-label="Export messages" aria-pressed="false" title="Export: select messages to export as Markdown"><span class="material-icons" aria-hidden="true">download</span></button>
+                <span class="board-chat-name sr-only" data-board="${escapeAttr(boardName)}">${escapeHtml(keyLabel(boardName))}</span>
             </div>
             <div class="notice notice-error notice-bar notice-center board-paused-banner" id="board-chat-paused-banner" style="display:none">Board reads are paused — agents cannot see new messages</div>
             <div class="board-chat-msgs-wrap">
@@ -143,7 +141,6 @@ export function showBoardChatTab(boardName, agent = null) {
         if (carried) document.getElementById('board-panel-msgs').replaceWith(carried);
 
         initGrowingTextarea(document.getElementById('board-panel-input'));
-        mountDockTableSwitch(panel);
 
     panel.dataset.board = boardName;
     }
@@ -412,8 +409,6 @@ function _renderBoardPanelMessages(msgsEl, scrollToBottom) {
 function _toggleBoardChatSelect() {
     _boardChatSelectMode = !_boardChatSelectMode;
     _boardChatSelectedIds.clear();
-    const btn = document.querySelector('.board-select-btn');
-    if (btn) { btn.classList.toggle('active', _boardChatSelectMode); btn.setAttribute('aria-pressed', String(_boardChatSelectMode)); }
     // Hide chat input when in select mode
     const inputPane = document.getElementById('board-chat-input-pane');
     if (inputPane) inputPane.style.display = _boardChatSelectMode ? 'none' : '';
@@ -449,8 +444,6 @@ export function _boardChatSelectNone() {
 export function _cancelBoardChatSelect() {
     _boardChatSelectMode = false;
     _boardChatSelectedIds.clear();
-    const btn = document.querySelector('.board-select-btn');
-    if (btn) { btn.classList.remove('active'); btn.setAttribute('aria-pressed', 'false'); }
     // Restore chat input
     const inputPane = document.getElementById('board-chat-input-pane');
     if (inputPane) inputPane.style.display = '';
@@ -521,17 +514,23 @@ export async function _exportBoardChatSelected() {
 
 let _boardChatReplyTo = null; // { id, name }: the message the box's text answers (Reply), sent as reply_to while the text still starts with the name
 
-/** The Table | Chat switch in the tab's head line (the choice is the team page's: one remembered setting). */
-function mountDockTableSwitch(panel) {
-    const head = panel.querySelector('.board-chat-header');
-    if (!head || head.querySelector(':scope > .mb-table-tools')) return;
-    mountTableTools(head, { view: boardView(), pills: false, onView: v => {
-        saveBoardView(v);
-        const box = document.getElementById('board-panel-msgs');
-        const bottom = box && box.scrollTop >= box.scrollHeight - box.clientHeight - 20;
-        if (box) { applyView(box, v); if (bottom) box.scrollTop = box.scrollHeight; }
-    } });
-    head.insertBefore(head.querySelector(':scope > .mb-table-tools'), head.querySelector('#board-chat-pause-btn'));
+/** The dock's ... menu (the search row's, #13585 the Operator): Show as table or chat (the choice is the team page's: one remembered setting), Pause or Resume the board, Export and the full board come first, then its
+ *  own Expand, Collapse and Jump items. The paused state stays on the board as its banner. Drawn each time the menu opens, from the state. */
+function _dockMoreItems() {
+    const boardName = _activeBoardChat;
+    const toChat = boardView() !== 'chat';
+    return [
+        { label: toChat ? 'Show as chat' : 'Show as table', run: () => {
+            const v = toChat ? 'chat' : 'table';
+            saveBoardView(v);
+            const box = document.getElementById('board-panel-msgs');
+            const bottom = box && box.scrollTop >= box.scrollHeight - box.clientHeight - 20;
+            if (box) { applyView(box, v); if (bottom) box.scrollTop = box.scrollHeight; }
+        } },
+        { label: _boardChatPaused ? 'Resume board' : 'Pause board', run: () => boardName && _toggleBoardChatPause(boardName) },
+        { label: _boardChatSelectMode ? 'Stop exporting' : 'Export', run: () => _toggleBoardChatSelect() },
+        { label: 'Open full board', run: () => { const s = state.currentSession; if (boardName) window.selectBoardProject(boardName, null, s && s.type === 'live' ? { backTo: s } : {}); } },
+    ];
 }
 
 /** The search row under the scope row (or the head): the board's search bar in the dock. */
@@ -637,17 +636,20 @@ async function _sendBoardChat(boardName) {
 }
 (window.__coral ||= {})._sendBoardChat = _sendBoardChat;
 
-export async function _toggleBoardChatPause(boardName) {
-    const btn = document.getElementById('board-chat-pause-btn');
+/** The board's pause as the dock shows it: the state the menu words come from, and the banner. Also called by the Board page when it pauses or resumes the board. */
+export function _setBoardChatPaused(paused) {
+    _boardChatPaused = !!paused;
     const banner = document.getElementById('board-chat-paused-banner');
-    const wasPaused = btn?.classList.contains('mb-action-danger');
+    if (banner) banner.style.display = _boardChatPaused ? '' : 'none';
+}
+(window.__coral ||= {})._setBoardChatPaused = _setBoardChatPaused;
+
+export async function _toggleBoardChatPause(boardName) {
+    const wasPaused = _boardChatPaused;
     const endpoint = wasPaused ? 'resume' : 'pause';
     try {
         await boardFetch(boardName, `/${endpoint}`, { method: 'POST' });
-        _paintPauseButton(btn, !wasPaused);
-        if (banner) {
-            banner.style.display = wasPaused ? 'none' : '';
-        }
+        _setBoardChatPaused(!wasPaused);
     } catch { /* ignore */ }
 }
 
@@ -655,12 +657,7 @@ async function _checkBoardPauseState(boardName) {
     try {
         const resp = await boardFetch(boardName, `/paused`);
         const data = await resp.json();
-        const btn = document.getElementById('board-chat-pause-btn');
-        const banner = document.getElementById('board-chat-paused-banner');
-        _paintPauseButton(btn, !!data.paused);
-        if (banner) {
-            banner.style.display = data.paused ? '' : 'none';
-        }
+        _setBoardChatPaused(!!data.paused);
     } catch { /* ignore */ }
 }
 

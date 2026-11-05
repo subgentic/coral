@@ -3,7 +3,6 @@
    smaller touch sizes in mobile.css and popout.css. Fine pointers (mouse,
    trackpad) keep the desktop layout: nothing here applies to them. */
 @media (pointer: coarse) {
-    .board-chat-header .board-chat-title { min-width: var(--control-touch-height, 44px); }
     .list-row { min-height: var(--control-touch-height, 44px); }
     .board-card-agents .session-group-item, .session-list .session-group-item.list-row { min-height: var(--control-touch-height, 44px); } /* a team's agent rows were held at 36 px by their own rule (#10341): the tablet's sidebar is the phone's rows */
     .working-mode-docs-link { display: flex; align-items: center; min-height: var(--control-touch-height, 44px); } /* the docs link under Team working mode is a control: its own line, a 44 px target (it was 15 px) */
@@ -58,10 +57,7 @@
        password field (it floated at half the field's height). */
     .live-view-toggle-btn,
     #chat-find-btn,
-    .board-chat-toolbar .btn-nav,
-    #board-chat-pause-btn,
-    .board-select-btn,
-    .board-chat-title {
+    .board-chat-toolbar .btn-nav {
         min-width: var(--control-touch-height);
         min-height: var(--control-touch-height);
     }
@@ -74,10 +70,6 @@
     /* The 44 px Save and Copy hang under a message (45 px with their gap): the message's own bottom margin (22 px) plus the 24 px they need, so they sit in the gap and not over the next message. */
     .chat-prose.chat-messages .chat-bubble.assistant, .chat-prose.chat-messages .chat-bubble.human { margin-bottom: 46px; }
     .chat-bubble.human .chat-save-btn { right: 6px; }
-    .board-chat-title {
-        display: inline-flex;
-        align-items: center;
-    }
 
     /* Scenes added in #4086: the Launch dialog's Back arrow and its Permissions toggle, the Servers form's fields, the goal button in an
        agent row (it only showed in landscape), and the "Details" disclosure inside a Servers row's error line (the hit area grows, the

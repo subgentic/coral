@@ -142,6 +142,8 @@ export function createBoardSearch(idp) {
 
     /** The same search again (the list it searches changed): ask for the matches again and go to the newest. */
 
+    // The ... menu's items. The dock adds its own first (hooks.moreItems, #13585: Show as table or chat, Pause, Export), whose words depend on state, so its menu is drawn again each time it opens.
+    const baseMore = () => [{ label: 'Expand all', run: () => _hooks.expandAll() }, { label: 'Collapse all', run: () => _hooks.collapseAll() }, { label: 'Jump to first message', run: () => _hooks.first() }, { label: 'Jump to latest message', run: () => _hooks.latest() }];
     /** The tools row in its place for this board (a fresh search); hooks: {me, redraw(), jumpTo(id), first(), latest()}. */
     function mountBoardSearch(host, project, hooks) {
         _hooks = hooks;
@@ -153,7 +155,7 @@ export function createBoardSearch(idp) {
             _status = null;
         }
         if (!_bar) {
-            _bar = buildListBar({ ...specFor(idp), moreNoun: 'board', more: [{ label: 'Expand all', run: () => _hooks.expandAll() }, { label: 'Collapse all', run: () => _hooks.collapseAll() }, { label: 'Jump to first message', run: () => _hooks.first() }, { label: 'Jump to latest message', run: () => _hooks.latest() }] }, run);
+            _bar = buildListBar({ ...specFor(idp), moreNoun: 'board', more: hooks.moreItems ? () => [...hooks.moreItems(), ...baseMore()] : baseMore() }, run);
             for (const b of _bar.node.querySelectorAll('.list-bar-more-menu button')) if (b.textContent === 'Expand all' || b.textContent === 'Collapse all') b.dataset.tableOnly = '1'; // shown with the table (board_table.js applyView)
             _status = make('div', 'mb-search-status'); _status.hidden = true;
             _results = make('span', 'mb-search-results'); _results.setAttribute('role', 'status'); _results.setAttribute('aria-live', 'polite');

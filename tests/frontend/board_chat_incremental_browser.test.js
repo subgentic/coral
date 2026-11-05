@@ -128,17 +128,18 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         check('a draft in the board textarea survives a switch within the same board', await ev(`document.getElementById('board-panel-input').value`) === 'a draft I have not sent');
         check('and the header, input pane and textarea are the same elements', await ev(`document.querySelector('#agentic-panel-board .board-chat-header') === window.__hdr && document.getElementById('board-chat-input-pane') === window.__pane && document.getElementById('board-panel-input') === window.__ta`));
         // Select mode is reset by a switch, as the rebuild used to do.
-        await ev(`document.querySelector('#agentic-panel-board .board-select-btn').click(); true`);
+        await ev(`(() => { document.querySelector('#agentic-panel-board .board-chat-search .list-bar-more-btn').click(); [...document.querySelectorAll('#agentic-panel-board .board-chat-search .list-bar-more-menu .menu-item')].find(x => x.textContent === 'Export').click(); return true; })()`);
+        await waitFor(`!!document.getElementById('board-chat-select-bar') && document.getElementById('board-chat-select-bar').style.display !== 'none'`, 'select mode starts', 5000);
         check('select mode starts', await ev(`document.getElementById('board-chat-select-bar') && document.getElementById('board-chat-select-bar').style.display !== 'none' && document.getElementById('board-chat-input-pane').style.display === 'none'`));
         await ev(`import(${S} + 'render.js').then(m => { m.showBoardChatTab(${JSON.stringify(board)}); return true; })`);
-        check('a switch ends select mode: bar hidden, input pane back, Export button not active', await ev(`(() => { const bar = document.getElementById('board-chat-select-bar'); return (!bar || bar.style.display === 'none') && document.getElementById('board-chat-input-pane').style.display === '' && !document.querySelector('#agentic-panel-board .board-select-btn').classList.contains('active'); })()`));
+        check('a switch ends select mode: bar hidden, input pane back, the menu offers Export again', await ev(`(() => { const bar = document.getElementById('board-chat-select-bar'); return (!bar || bar.style.display === 'none') && document.getElementById('board-chat-input-pane').style.display === '' && (document.querySelector('#agentic-panel-board .board-chat-search .list-bar-more-btn').click(), ![...document.querySelectorAll('#agentic-panel-board .board-chat-search .list-bar-more-menu .menu-item')].some(x => x.textContent === 'Stop exporting')); })()`));
         check('the draft is still there', await ev(`document.getElementById('board-panel-input').value`) === 'a draft I have not sent');
         // A different board gets its own panel (and an empty draft).
         const other = board + '-other';
         await ev(`import(${S} + 'render.js').then(m => { m.showBoardChatTab(${JSON.stringify(other)}); return true; })`);
-        check('a different board gets a new panel with an empty draft', await ev(`document.getElementById('board-panel-input') !== window.__ta && document.getElementById('board-panel-input').value === '' && document.querySelector('#agentic-panel-board .board-chat-title').dataset.board === ${JSON.stringify(other)}`));
+        check('a different board gets a new panel with an empty draft', await ev(`document.getElementById('board-panel-input') !== window.__ta && document.getElementById('board-panel-input').value === '' && document.querySelector('#agentic-panel-board .board-chat-name').dataset.board === ${JSON.stringify(other)}`));
         await ev(`import(${S} + 'render.js').then(m => { m.showBoardChatTab(${JSON.stringify(board)}); return true; })`);
-        check('and coming back to the first board builds its panel again, with its messages', await ev(`document.getElementById('board-panel-input').value === '' && document.querySelector('#agentic-panel-board .board-chat-title').dataset.board === ${JSON.stringify(board)}`));
+        check('and coming back to the first board builds its panel again, with its messages', await ev(`document.getElementById('board-panel-input').value === '' && document.querySelector('#agentic-panel-board .board-chat-name').dataset.board === ${JSON.stringify(board)}`));
         await waitFor(`document.querySelectorAll('#board-panel-msgs .mb-message').length === 4`, 'the messages back', { timeout: 8000, soft: true });
         check('with the four messages', await ev(`document.querySelectorAll('#board-panel-msgs .mb-message').length`) === 4);
     } catch (e) {

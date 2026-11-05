@@ -63,7 +63,7 @@ const H1 = '1'.repeat(64), H2 = '2'.repeat(64), H3 = '3'.repeat(64);
             if (view.phone) await ev(`(() => { const side = document.getElementById('agentic-state'); if (side && side.getBoundingClientRect().width === 0) window.toggleAgenticPanel(true); return true; })()`);
             await waitFor(`document.querySelectorAll('#agentic-panel-board .mb-message').length === 4`, `${tag}: the four messages`, 8000);
             // Attachments live in each message's expanded body; this suite audits the Chat view.
-            await ev(`document.querySelector('#agentic-panel-board .mb-view-btn[data-view="chat"]').click(); true`);
+            await ev(`(() => { document.querySelector('#agentic-panel-board .board-chat-search .list-bar-more-btn').click(); [...document.querySelectorAll('#agentic-panel-board .board-chat-search .list-bar-more-menu .menu-item')].find(x => x.textContent === 'Show as chat')?.click(); return true; })()`);
             await waitFor(`document.querySelector('#agentic-panel-board .mb-attachment')?.getClientRects().length > 0`, `${tag}: the visible attachment`, 5000);
             const s = await snapshot();
             check(`${tag}: the inbound message shows its two real files as chips, in order, and drops the entries without a real id (${s.chips.map(c => c.name).join(' | ')})`, s.chips.length === 3 && s.chips[0].name === 'report.md' && s.chips[1].name === 'shot.png' && s.chips[2].name === '<img src=x onerror="window.__pwn=1">.txt', JSON.stringify(s.chips.map(c => c.name)));
