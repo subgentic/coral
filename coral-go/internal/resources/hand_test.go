@@ -195,3 +195,21 @@ func TestAClaimWithNoKnownCallOrAnEmptyIdIsNeverBound(t *testing.T) {
 	g.h.TurnEnded("s-b")
 	assert.Equal(t, []string{"Agent A"}, g.holders(), "no call to tie it to: its lease alone ends it")
 }
+
+// Security's check: a shell named by a claim is believed only below the agent. A process OUTSIDE the agent's tree that keeps running (and starts work) past the call's end cannot keep the slot.
+func TestABusyProcessOutsideTheAgentsTreeCannotKeepTheSlotPastTheCallsEnd(t *testing.T) {
+	g := newHookRig(t)
+	g.setProcs(proctree.Proc{PID: agentPID, PPID: 1, Command: "claude"}, proctree.Proc{PID: 500, PPID: agentPID, Command: "sh"},
+		proctree.Proc{PID: 900, PPID: 1, Command: "someone else's shell"})
+	g.bgClaim("s-a", "Agent A", "call-1", 900)                          // names a shell that is not the agent's
+	g.addProc(proctree.Proc{PID: 901, PPID: 900, Command: "busy work"}) // it starts work and keeps running
+	g.h.After("s-a", "call-1")
+	assert.Empty(t, g.holders(), "the call ended and the shell is not below the agent: freed, however busy that process is")
+	g.h.Sweep()
+	assert.Empty(t, g.holders())
+	// the same claim naming the agent's own shell, with work under it, does hold: only the tree check differs
+	g.bgClaim("s-b", "Agent B", "call-2", 500)
+	g.addProc(proctree.Proc{PID: 502, PPID: 500, Command: "go test ./..."})
+	g.h.After("s-b", "call-2")
+	assert.Equal(t, []string{"Agent B"}, g.holders(), "the control: below the agent, the work holds it")
+}
