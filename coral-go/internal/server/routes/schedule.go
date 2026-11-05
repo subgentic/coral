@@ -515,6 +515,12 @@ func (h *ScheduleHandler) MarkRunSeen(w http.ResponseWriter, r *http.Request) {
 		if job, err := h.sched.GetScheduledJob(r.Context(), run.JobID); err == nil && job != nil {
 			name = job.Name
 		}
+		if run.DisplayName != nil && *run.DisplayName != "" {
+			name = *run.DisplayName
+		}
+		if name == "" || name == "__oneshot__" {
+			name = "Job " + strconv.FormatInt(run.JobID, 10)
+		}
 		noteActivity(r, board.ActRunSeen, "job_run", strconv.FormatInt(run.JobID, 10)+":"+strconv.FormatInt(runID, 10), "", name, "")
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "run_id": runID})

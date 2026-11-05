@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { activityWords } from '../../coral-go/pkg/frontend/static/operator_activity_words.js';
+import { activityWords, jobRunParts } from '../../coral-go/pkg/frontend/static/operator_activity_words.js';
 import { ACTION_LABEL, ACTIONS } from '../../coral-go/pkg/frontend/static/operator_activity_filters.js';
 assert.equal(activityWords({action:'answer',item_kind:'question',title:'Ada',note:'Ship it'}), 'You answered Ada’s question: “Ship it”');
 assert.equal(activityWords({action:'answer',item_kind:'question',note:'Yes'}), 'You answered a question: “Yes”');
@@ -20,3 +20,7 @@ for(const [,name] of registered.matchAll(/board\.(Act\w+):\s*true/g)) {
     assert.ok(activityWords({action:value,item_kind:'task',item_id:'12',title:'Title'}) !== value, value);
 }
 console.log('operator_activity_words: summaries, historical fallbacks and every recorded action covered');
+
+assert.deepEqual(jobRunParts('41:73'), {jobId:41,runId:73});
+for(const id of ['73','0:73','41:0','-1:2','1:2:3','1.5:2','1e2:3','9007199254740992:1','1:9007199254740992']) assert.equal(jobRunParts(id), null, id);
+console.log('job-run ids preserve unequal parent/run ids and reject unsafe historical values');

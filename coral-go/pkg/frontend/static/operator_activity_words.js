@@ -13,3 +13,11 @@ export function activityWords(row) {
     if (row.action === 'wait_send') return `You sent held words to ${row.title || row.item_id || 'an agent'}`;
     return `${ACTION_LABEL[row.action] || row.action}${quote}`;
 }
+
+/** New job-run records carry the parent job and run id; older bare ids have no safe parent. */
+export function jobRunParts(value) {
+    const match = /^([1-9]\d*):([1-9]\d*)$/.exec(String(value || ''));
+    if (!match) return null;
+    const jobId = Number(match[1]), runId = Number(match[2]);
+    return Number.isSafeInteger(jobId) && Number.isSafeInteger(runId) ? { jobId, runId } : null;
+}
