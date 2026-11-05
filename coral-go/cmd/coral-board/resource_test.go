@@ -113,6 +113,9 @@ func TestResourceClaimWaitGivesUpAndLeavesTheLine(t *testing.T) {
 	if last != "POST /api/resources/mac-heavy/release" {
 		t.Fatalf("a claim that gave up must leave the line, last request: %s", last)
 	}
+	if keep, _ := s.bodies[len(s.bodies)-1]["keep_place"].(bool); !keep {
+		t.Fatalf("a wait that timed out asks to KEEP its place for the grace (#13706), body: %v", s.bodies[len(s.bodies)-1])
+	}
 }
 
 func TestResourceListPrintsHoldersAndTheLineAndStripsControlCharacters(t *testing.T) {
