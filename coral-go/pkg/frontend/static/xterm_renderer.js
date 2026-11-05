@@ -1060,6 +1060,16 @@ export function isTerminalWsOpen() {
     return !!terminalWs && terminalWs.readyState === WebSocket.OPEN;
 }
 
+/** Settings can arrive after the terminal was built (a phone opened straight on an agent): the size the person chose is drawn as soon as they are here (#13389). */
+export function applySettingsFont() {
+    if (!terminal) return;
+    const chosen = terminalFontFor((state.settings || {}).terminal_font_size);
+    if (chosen === _baseFont) return;
+    _baseFont = chosen;
+    _setFont(chosen);
+    fitTerminal();
+}
+
 export function getTerminalCols() {
     return terminal ? terminal.cols : null;
 }
