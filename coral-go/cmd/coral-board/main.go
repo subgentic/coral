@@ -136,6 +136,8 @@ func main() {
 		cmdQueue()
 	case "resource":
 		cmdResource()
+	case "heavy":
+		cmdHeavy()
 	case "send":
 		cmdSend()
 	case "targets":

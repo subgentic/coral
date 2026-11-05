@@ -74,6 +74,8 @@ func TestCheckKnownFlagsAcceptsWhatTheCommandsTake(t *testing.T) {
 		{"task", "add", "a title", "--body", "x"}, // not in the table: its own parser
 		{"post", "--broadcast", "--nope"},         // post's own check handles its text
 		{"wait", "--timeout", "1m"},
+		{"resource", "define", "heavy", "--pool", "mac-heavy,mini"}, // #13719: --pool is a value option of define
+		{"heavy", "run", "--timeout", "30m", "--", "go", "test", "./..."},
 	} {
 		assert.NoError(t, checkKnownFlags(args), "%v", args)
 	}
@@ -344,4 +346,9 @@ func TestUnknownTaskSubcommandIsUsage(t *testing.T) {
 	res := runBoard(t, srv.URL, subscribedDataDir(t, srv.URL), "task", "frobnicate")
 	assert.Equal(t, 2, res.code, res.stderr)
 	assert.Contains(t, res.stderr, "Unknown task subcommand")
+}
+
+func TestHeavyRunRejectsAnUnknownOption(t *testing.T) {
+	assert.Error(t, checkKnownFlags([]string{"heavy", "run", "--nope", "--", "true"}))
+	assert.Error(t, checkKnownFlags([]string{"heavy", "run", "--timeout"}), "a value option with no value")
 }
