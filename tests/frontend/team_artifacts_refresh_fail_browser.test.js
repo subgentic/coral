@@ -1,9 +1,9 @@
-// A Refresh that fails keeps the agent's artifacts table on screen (#6509), and Retry then asks for the first page again: the list is the new answer, not the old rows with a next page appended (QA). The first page is 100 rows (the table is the team page's, #7622).
+// A Refresh that fails keeps the agent's artifacts table on screen (#6509), and Retry then asks for the first page again: the list is the new answer, not the old rows with a next page appended (QA). The first page is 50 rows, a computer's most for a request (#13161; the table is the team page's, #7622).
 // Against a stubbed board route.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { framesJs, coralReady } = require('./helpers/wait');
-const N = 100, TEAM = 'll-team-' + Date.now().toString(36);
+const N = 50, TEAM = 'll-team-' + Date.now().toString(36);
 const items = Array.from({ length: N }, (_, i) => ({ name: `report-${String(i).padStart(3, '0')}.md`, media_type: 'text/markdown', size: 2048 + i, task_id: 100 + i, task_title: 'Task ' + i, produced_by: 'll-agent', created_at: new Date(Date.UTC(2026, 9, 10, 10, 0, N - 1 - i)).toISOString(), uri: 'coral://artifacts/' + String(i % 256).toString(16).padStart(2, '0').repeat(32).slice(0, 62) + String(1000 + i).slice(-2).padStart(2, '0'), available: true, inline: false }));
 
 (async () => {
@@ -38,7 +38,7 @@ const items = Array.from({ length: N }, (_, i) => ({ name: `report-${String(i).p
         await ev(`${framesJs(3)}`);
         await waitFor(`document.querySelectorAll('${ROWS}').length === ${N}`, 'the rows drawn again', 6000).catch(() => {});
         const kept = await names();
-        check('the 100 rows are still there once each, with the error shown and a Retry', kept.length === N && new Set(kept).size === N && await ev(`!!document.querySelector('#agentic-panel-artifacts-view .team-artifacts-retry')`), `${kept.length} rows`);
+        check(`the ${N} rows are still there once each, with the error shown and a Retry`, kept.length === N && new Set(kept).size === N && await ev(`!!document.querySelector('#agentic-panel-artifacts-view .team-artifacts-retry')`), `${kept.length} rows`);
 
         console.log('2. Retry asks for the first page again: the list becomes the new answer');
         // the board changed meanwhile: 5 fewer artifacts, one renamed
