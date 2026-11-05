@@ -220,9 +220,9 @@ func (h *SessionsHandler) resumeCommand(ctx context.Context, p *restartPlan, age
 		return "", refuse
 	}
 	cmd, err := h.launchCommand(ctx, agentImpl, agent.LaunchParams{
-		SessionID:       p.newSessionID,
-		SessionName:     p.newSessionName,
-		ProtocolPath:    h.protocolPath(),
+		SessionID:    p.newSessionID,
+		SessionName:  p.newSessionName,
+		ProtocolPath: h.protocolPath(), EmbeddedProtocol: true,
 		ResumeSessionID: resumeID,
 		Flags:           p.flags,
 		WorkingDir:      p.workdir,

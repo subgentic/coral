@@ -9,8 +9,20 @@ import (
 	"path/filepath"
 	"strings"
 
+	coral "github.com/subgentic/coral"
 	"github.com/subgentic/coral/internal/logsafe"
 )
+
+// protocolText is the protocol a launch carries: the file ProtocolPath names when it reads, else the protocol compiled into the program for an agent on a board (#13523), else "".
+func protocolText(params LaunchParams) string {
+	if t := readProtocolFile(params.ProtocolPath); t != "" {
+		return t
+	}
+	if params.EmbeddedProtocol && params.BoardName != "" {
+		return coral.Protocol
+	}
+	return ""
+}
 
 // readProtocolFile reads the protocol file and returns its content, or "" on error.
 func readProtocolFile(path string) string {

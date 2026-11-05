@@ -182,9 +182,9 @@ func (h *SessionsHandler) prepareWake(ctx context.Context, ls *store.LiveSession
 	}
 
 	launchParams := agent.LaunchParams{
-		SessionID:       ls.SessionID,
-		SessionName:     sessionName,
-		ProtocolPath:    h.protocolPath(),
+		SessionID:    ls.SessionID,
+		SessionName:  sessionName,
+		ProtocolPath: h.protocolPath(), EmbeddedProtocol: true,
 		ResumeSessionID: ls.SessionID,
 		Flags:           flags,
 		WorkingDir:      ls.WorkingDir,

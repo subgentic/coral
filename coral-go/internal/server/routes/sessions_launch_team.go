@@ -710,7 +710,7 @@ func (h *SessionsHandler) launchTeamMember(ctx context.Context, body launchTeamR
 		return map[string]any{"name": def.Name, "error": launchErrText(ctx, err)}, classifyLaunchError(err)
 	}
 	sessionID := result["session_id"].(string)
-	if err := h.ss.AttachSkillsRetry(ctx, sessionID, skillRows); err != nil {
+	if err := h.ss.AttachSkillsRetry(ctx, sessionID, h.withDefaultSkills(ctx, skillRows)); err != nil {
 		log.Printf("[launch-team] the skills attached to %q were not saved: %v", def.Name, err)
 	}
 	if worktreePath != "" {

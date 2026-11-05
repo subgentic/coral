@@ -297,11 +297,11 @@ func launchParamsFor(cfg *config.Config, sessionID, sessionName, protocolPath, d
 	return agent.LaunchParams{
 		SessionID:    sessionID,
 		SessionName:  sessionName,
-		ProtocolPath: protocolPath,
-		WorkingDir:   dir,
-		CoralHost:    cfg.AgentHost(),
-		CoralPort:    cfg.Port,
-		CoralDir:     cfg.CoralDir(),
+		ProtocolPath: protocolPath, EmbeddedProtocol: true,
+		WorkingDir: dir,
+		CoralHost:  cfg.AgentHost(),
+		CoralPort:  cfg.Port,
+		CoralDir:   cfg.CoralDir(),
 	}
 }
 
