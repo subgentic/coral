@@ -709,14 +709,26 @@ func (h *BoardHandler) selectTeamArtifacts(r *http.Request, items []teamArtifact
 	if q.collapse {
 		counts = teamTagCountsByFile(items) // files, not versions (#11700)
 	}
+	// A list with no text match, kind filter, name-like sort or collapse (the Operator's walk of the for-review tag, a page after a page) keeps the matching rows as positions in items: a copy of every matching row, for every page of a
+	// big board, was 20,000 rows allocated 400 times (#13614: the walk at the 50 cap). Only the page's own rows are copied out below.
+	fast := !q.needsEnrichment() && !q.collapse
 	var set []teamArtifact
-	for _, it := range items {
-		if q.cheapMatch(it, kept, starred) {
-			set = append(set, it)
+	var idx []int
+	if fast {
+		for i := range items {
+			if q.cheapMatch(items[i], kept, starred) {
+				idx = append(idx, i)
+			}
+		}
+	} else {
+		for _, it := range items {
+			if q.cheapMatch(it, kept, starred) {
+				set = append(set, it)
+			}
 		}
 	}
 	enriched := false
-	if q.needsEnrichment() {
+	if !fast && q.needsEnrichment() {
 		enriched = true
 		for i := range set {
 			enrichTeamArtifact(&set[i], dir)
@@ -736,36 +748,63 @@ func (h *BoardHandler) selectTeamArtifacts(r *http.Request, items []teamArtifact
 	if q.collapse {
 		set = collapseVersions(set) // after the filters: a version that matches stands for its file, as Needs you does (#11700)
 	}
+	n := len(set)
+	if fast {
+		n = len(idx)
+	}
+	rowAt := func(i int) teamArtifact {
+		if fast {
+			return items[idx[i]]
+		}
+		return set[i]
+	}
 	inOrder := true // the list is kept newest first: a walk of its pages finds it in order, and does not sort 20,000 rows for every page (#13522); each row's key is made once for the check
-	if len(set) > 1 {
-		var prev artifactSortKey = keyOf(set[0])
-		for i := 1; i < len(set) && inOrder; i++ {
-			next := keyOf(set[i])
+	if n > 1 {
+		var prev artifactSortKey = keyOf(rowAt(0))
+		for i := 1; i < n && inOrder; i++ {
+			next := keyOf(rowAt(i))
 			if artifactAfter(q.sortName, prev, next) { // the comparator's own test (less(i, i-1)): this row would sort before the one above it
 				inOrder = false
 			}
 			prev = next
 		}
 	}
+	if !inOrder && fast { // out of order: the sort below needs the rows themselves (the rare case)
+		set = make([]teamArtifact, 0, len(idx))
+		for _, i := range idx {
+			set = append(set, items[i])
+		}
+		fast, idx = false, nil
+	}
 	if !inOrder {
 		sort.SliceStable(set, func(i, j int) bool { return artifactAfter(q.sortName, keyOf(set[j]), keyOf(set[i])) })
 	}
-	sel := &teamArtifactSelection{total: len(set), tags: counts}
+	if !fast {
+		n = len(set)
+	}
+	sel := &teamArtifactSelection{total: n, tags: counts}
 	start := offset
 	if q.cursor != nil {
 		ck := artifactSortKey{At: q.cursor.At, Name: q.cursor.Name, Size: q.cursor.Size, Type: q.cursor.Type, Tags: q.cursor.Tags, Uploader: q.cursor.Uploader, TaskID: q.cursor.TaskID, Source: q.cursor.Source, Index: q.cursor.Index, ID: q.cursor.ID}
-		start = sort.Search(len(set), func(i int) bool { return artifactAfter(q.sortName, keyOf(set[i]), ck) })
+		start = sort.Search(n, func(i int) bool { return artifactAfter(q.sortName, keyOf(rowAt(i)), ck) })
 	}
-	if start > len(set) {
-		start = len(set)
+	if start > n {
+		start = n
 	}
 	end := start + limit
-	if end > len(set) {
-		end = len(set)
+	if end > n {
+		end = n
 	}
 	sel.start = start
-	sel.hasMore = end < len(set)
-	sel.page = set[start:end]
+	sel.hasMore = end < n
+	if fast {
+		sel.page = make([]teamArtifact, 0, end-start) // this page's own rows: the list they come from is the kept one
+		for _, i := range idx[start:end] {
+			sel.page = append(sel.page, items[i])
+		}
+	} else {
+		sel.page = set[start:end]
+	}
 	if !enriched {
 		for i := range sel.page {
 			enrichTeamArtifact(&sel.page[i], dir)
