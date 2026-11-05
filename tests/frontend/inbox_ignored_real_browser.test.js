@@ -18,7 +18,11 @@ const { coralReady, framesJs } = require('./helpers/wait');
     // The pills count every board's files on this server, and other suites' rows come and go while this one runs (a shared shard: the first attempt in CI read "All 9" where it expected its own two). So the
     // test never asserts a total: it reads the pills with the run's own two files in, puts one away through the real route and checks what MOVED (For review down one, Dismissed up one, All the same).
     const counts = async () => { const o = { All: 0, 'For review': 0, Dismissed: 0 }; for (const t of await pills()) { const m = /^(All|For review|Dismissed) (\d+)$/.exec(t); if (m) o[m[1]] = Number(m[2]); } return o; };
-    const settled = async (want, what) => { const end = Date.now() + 20000; let c; while (Date.now() < end) { c = await counts(); if (want(c)) return c; await new Promise(r => setTimeout(r, 250)); } failures.push(what + ': ' + JSON.stringify(c)); return c; };
+    // wait (helpers/wait.js, no fixed sleep) until the pills, read in the page as c = {All, 'For review', Dismissed}, satisfy the expression; then return them
+    const settled = async (expr, what) => {
+        await waitFor(`(() => { const c = { All: 0, 'For review': 0, Dismissed: 0 }; for (const b of document.querySelectorAll('${T} button')) { const m = /^(All|For review|Dismissed) (\\d+)$/.exec((b.textContent || '').trim()); if (m) c[m[1]] = Number(m[2]); } return !!(${expr}); })()`, what, 20000).catch(e => failures.push(what + ': ' + e.message));
+        return counts();
+    };
     let sid = null, sname = null, sid2 = null, sname2 = null;
     const B2 = 'ignfx-' + Date.now().toString(36);
     try {
@@ -43,9 +47,9 @@ const { coralReady, framesJs } = require('./helpers/wait');
 
         await ev(`window.switchNavTab('hub-inbox'); true`);
         await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('artifacts')).then(() => true)`);
-        const before = await settled(c => c['For review'] >= 3 && c.All >= c['For review'], 'the pills with both of this run\'s files for review');
+        const before = await settled("c['For review'] >= 4 && c.All >= c['For review']", 'the pills with both of this run\'s files for review');
         check((await api('POST', `/api/board/${B}/artifacts/${ids['put-away.md']}/review`, { decision: 'ignore' })).status === 200, 'the file was ignored through the real route');
-        const after = await settled(c => c.Dismissed === before.Dismissed + 1 && c['For review'] === before['For review'] - 1, 'the pills after the ignore: For review down one, Dismissed up one');
+        const after = await settled(`c.Dismissed === ${before.Dismissed + 1} && c['For review'] === ${before['For review'] - 1}`, 'the pills after the ignore: For review down one, Dismissed up one');
         check(after.All === before.All, 'the All count did not move: ' + JSON.stringify([before, after]));
         const names = await pills();
         check(names.map(t => t.replace(/ \d+$/, '')).join() === 'All,For review,Dismissed', 'the pills are All, For review, Dismissed in order: ' + JSON.stringify(names));
