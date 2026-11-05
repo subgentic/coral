@@ -17,7 +17,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
         for (const variant of ['scrollThenPress', 'noScroll']) {
             await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await ev(`localStorage.clear(); sessionStorage.clear(); true`);
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev); await ev(`try { localStorage.setItem('coral-artifact-comments-earlier', 'show'); } catch (e) {} true`); // these suites are about the carried comments of earlier versions: shown (#13606 hides them by default)
             await ev(STUB);
             await ev(`(async () => { const st = await import(${S} + 'state.js'); st.state.liveSessions = ['Security Reviewer', 'QA Engineer', 'Frontend Dev'].map((n, i) => ({ session_id: 'sess-' + i, name: 'a' + i, agent_type: 'claude', board_subscriber_id: n, board_project: 'team-a' })); window.__opened = null; window.__clicks = 0; window.selectLiveSession = (...a) => { window.__opened = a; };
                 document.addEventListener('click', e => { if (e.target.closest && e.target.closest('.agent-link')) window.__clicks++; }, true); return true; })()`);
