@@ -113,7 +113,11 @@ function drawList() {
         { key: 'by', label: 'Published by', width: '10rem', sort: true, sortValue: publisher, cell: publisher },
         { key: 'version', label: 'Version', width: '10rem', align: 'end', sort: 'number', sortValue: r => r.version, cell: r => {
             const cell = el('span', '', `v${r.version}`), pending = r.pendingVersion;
-            if (pending && pending.id !== r.id) cell.append(' ', button('btn btn-small', `v${pending.version} waiting`, e => { e.stopPropagation(); loadOne(pending.id); }));
+            if (pending && pending.id !== r.id) {
+                const review = button('btn btn-small', `v${pending.version} waiting`, e => { e.stopPropagation(); loadOne(pending.id); });
+                review.setAttribute('aria-label', `Review version ${pending.version} of ${r.name}, waiting for approval`);
+                cell.append(' ', review);
+            }
             return cell;
         } },
         { key: 'status', label: 'Status', width: '9rem', sort: true, sortValue: r => r.status, cell: r => { const [word, cls] = STATUS[r.status] || [r.status, '']; return DT.chip(word, cls); } },

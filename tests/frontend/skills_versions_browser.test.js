@@ -14,7 +14,7 @@ const ROWS=[row(5,'rejected'),row(4,'pending'),row(3,'approved'),row(2,'approved
   await Page.enable();await Page.addScriptToEvaluateOnNewDocument({source:PRELOAD});
   await Emulation.setDeviceMetricsOverride({width:1280,height:900,deviceScaleFactor:1,mobile:false});
   await Page.navigate({url:BASE+'/'});await Page.loadEventFired();await install();await coralReady(ev);
-  await ev(`(()=>{const real=window.fetch,rows=${JSON.stringify(ROWS)},json=b=>Promise.resolve(new Response(JSON.stringify(b),{status:200,headers:{'Content-Type':'application/json'}}));window.fetch=(u,o)=>{const p=new URL(String(u),location.href);if(p.pathname==='/api/skills')return json({skills:rows.filter(r=>!p.searchParams.get('status')||r.status===p.searchParams.get('status'))});const hit=rows.find(r=>p.pathname==='/api/skills/'+r.id);if(hit)return json({skill:hit,files:[{path:'SKILL.md',size:20,kind:'instructions',sha256:'f'.repeat(64)}],contents:{'SKILL.md':'Instructions for version '+hit.version},warnings:[],hosts:[]});return real(u,o);};return true;})()`);
+  await ev(`(()=>{window.__detailGets=[];const real=window.fetch,rows=${JSON.stringify(ROWS)},json=b=>Promise.resolve(new Response(JSON.stringify(b),{status:200,headers:{'Content-Type':'application/json'}}));window.fetch=(u,o)=>{const p=new URL(String(u),location.href);if(p.pathname==='/api/skills')return json({skills:rows.filter(r=>!p.searchParams.get('status')||r.status===p.searchParams.get('status'))});const hit=rows.find(r=>p.pathname==='/api/skills/'+r.id);if(hit){window.__detailGets.push(hit.id);return json({skill:hit,files:[{path:'SKILL.md',size:20,kind:'instructions',sha256:'f'.repeat(64)}],contents:{'SKILL.md':'Instructions for version '+hit.version},warnings:[],hosts:[]});}return real(u,o);};return true;})()`);
   await ev(`window.switchNavTab('skills');true`);
   await show();
   await waitFor(`document.querySelector('#skills-view tbody tr')`,'skills list');
@@ -26,8 +26,14 @@ const ROWS=[row(5,'rejected'),row(4,'pending'),row(3,'approved'),row(2,'approved
   assert.match((await list())[0],/Other publisher/,'version ascending sorts the displayed approved versions');
   await ev(`document.querySelector('#skills-view .dt-sort[data-key=version]').click();true`);
   assert.match((await list())[0],/Designer description v3/,'version descending works');
+  assert.equal(await ev(`[...document.querySelectorAll('#skills-view button')].find(b=>b.textContent==='v4 waiting').getAttribute('aria-label')`),'Review version 4 of testing-on-the-mac-mini, waiting for approval');
+  await ev(`(()=>{const b=[...document.querySelectorAll('#skills-view button')].find(b=>b.textContent==='v4 waiting');b.closest('tr').querySelector('.dt-primary').focus();window.__detailGets=[];return true;})()`);
+  await client.Input.dispatchKeyEvent({type:'keyDown',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
+  await client.Input.dispatchKeyEvent({type:'keyUp',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
+  assert.equal(await ev(`document.activeElement.textContent`),'v4 waiting','Tab order is row then pending button');
   await ev(`[...document.querySelectorAll('#skills-view button')].find(b=>b.textContent==='v4 waiting').click();true`);
   await waitFor(`document.querySelector('#skills-view h2')?.textContent.includes('version 4')`,'pending version detail');
+  assert.deepEqual(await ev(`window.__detailGets`),['4'.repeat(32)],'pending click opens only the pending version, not the row');
   assert.ok(await ev(`[...document.querySelectorAll('#skills-view button')].some(b=>b.textContent==='Approve')`),'pending approval remains actionable');
   await ev(`document.querySelector('#skills-view details').open=true;true`);
   const history=await ev(`[...document.querySelectorAll('#skills-view details button')].map(b=>b.textContent)`);
