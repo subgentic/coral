@@ -30,14 +30,19 @@ func TestGuardParentHelper(t *testing.T) {
 		t.Skip("run by the guardian tests, as the process that is killed")
 	}
 	b := NewPTYBackend()
-	cmd := strings.Replace(strings.Replace(attached, "%s", "", 1), "%s", filepath.Join(dir, "child"), 1)
+	slow := "" // CORAL_GUARD_TEST_SLOWSTART=<seconds>: the child starts that late, as it does on a loaded machine (#13709)
+	if v := os.Getenv("CORAL_GUARD_TEST_SLOWSTART"); v != "" {
+		slow = "select(undef, undef, undef, " + v + ");"
+	}
+	cmd := strings.Replace(strings.Replace(attached, "%s", slow, 1), "%s", filepath.Join(dir, "child"), 1)
 	if os.Getenv("CORAL_GUARD_TEST_LATE") == "1" { // a helper that is orphaned six seconds in (descendant_sampler_unix_test.go)
 		cmd = lateDetachCmd(filepath.Join(dir, "child"))
 	}
 	if err := b.Spawn("claude-00000000-0000-4000-8000-000000006129", "claude", dir, "00000000-0000-4000-8000-000000006129", cmd, 80, 24); err != nil {
 		t.Fatal(err)
 	}
-	for end := time.Now().Add(5 * time.Second); time.Now().Before(end); time.Sleep(20 * time.Millisecond) {
+	// The test waits up to a minute for the child's pid (pidFrom): this wait must not be shorter, or a clean-quit helper leaves before a slow child has started and the test never gets a pid (#13709).
+	for end := time.Now().Add(time.Minute); time.Now().Before(end); time.Sleep(20 * time.Millisecond) {
 		if _, err := os.Stat(filepath.Join(dir, "child")); err == nil {
 			break
 		}
@@ -97,6 +102,13 @@ func TestAgentsEndWhenCoralIsKilled(t *testing.T) {
 
 func TestACleanQuitLeavesNoGuardian(t *testing.T) {
 	_, guardianPID, parent, _ := runGuardParent(t, true)
+	parent.Wait()
+	waitGone(t, guardianPID, 10*time.Second)
+}
+
+// #13709: a child that starts later than the helper used to wait (5 s) still gets a clean quit with no guardian left: the helper waits for the child as long as the test does.
+func TestACleanQuitWithASlowStartingChildLeavesNoGuardian(t *testing.T) {
+	_, guardianPID, parent, _ := runGuardParent(t, true, "CORAL_GUARD_TEST_SLOWSTART=6")
 	parent.Wait()
 	waitGone(t, guardianPID, 10*time.Second)
 }

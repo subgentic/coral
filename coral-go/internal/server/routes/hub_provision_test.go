@@ -17,6 +17,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -117,6 +118,8 @@ exit 0
 	r.Post("/api/servers/provision/{plan}/forget-key", pr.ForgetKey)
 	r.Delete("/api/servers/provision/{plan}", pr.Cancel)
 	pe.e, pe.p, pe.dir, pe.router, pe.known, pe.sshLog, pe.keyBlob = e, pr, dir, r, known, log, b64
+	// A run is a background writer in the folder above (ssh.log, config): a test that does not wait for it leaves it writing when the folder is removed ('TempDir RemoveAll cleanup: directory not empty', #13709, #11635). Cleanups run last in, first out, so this one runs before that removal.
+	t.Cleanup(pe.quiesce)
 	return pe
 }
 
@@ -143,6 +146,29 @@ func decodeMap(w *httptest.ResponseRecorder) map[string]any {
 	m := map[string]any{}
 	_ = jsonUnmarshal(w.Body.Bytes(), &m)
 	return m
+}
+
+// quiesce waits (up to 30 s) until no plan is connecting, trusting or running, so no goroutine of the Provisioner still writes into the test's folder.
+func (pe *provEnv) quiesce() {
+	busy := func() bool {
+		pe.p.mu.Lock()
+		plans := make([]*provisionPlan, 0, len(pe.p.plans))
+		for _, p := range pe.p.plans {
+			plans = append(plans, p)
+		}
+		pe.p.mu.Unlock()
+		for _, p := range plans {
+			p.mu.Lock()
+			ph := p.phase
+			p.mu.Unlock()
+			if ph == phaseRunning || ph == phaseTrusting || ph == phaseConnecting {
+				return true
+			}
+		}
+		return false
+	}
+	for end := time.Now().Add(30 * time.Second); busy() && time.Now().Before(end); time.Sleep(20 * time.Millisecond) {
+	}
 }
 
 func (pe *provEnv) waitPhase(t *testing.T, plan, want string) map[string]any {
@@ -939,4 +965,25 @@ func TestProvisionTwoHeldKeysAreConfirmedAsTheSetNotACount(t *testing.T) {
 	code, rv = run(fp(blobB), fp(blobA))
 	assert.NotEqual(t, 400, code, "B then A is the same set as A then B, so the confirmation is accepted: %v", rv)
 	assert.NotContains(t, fmt.Sprint(rv["error"]), "not the ones this computer has now", "it got past the fingerprint check (the fake second key is not one the trust step can save, so the run itself ends there)")
+}
+
+// #13709: a test that starts a run and ends does not leave it writing into the folder that is removed: the env waits for the run before the removal. The install step here finishes 300 ms after the test body is over.
+func TestProvEnvWaitsForARunBeforeItsFolderIsRemoved(t *testing.T) {
+	var finished atomic.Bool
+	t.Run("a run is left going", func(t *testing.T) {
+		pe := newProvEnv(t, "known", "Linux x86_64", true)
+		pe.p.install = func(_ context.Context, p *provisionPlan, _ sshprov.Arch) error {
+			time.Sleep(300 * time.Millisecond)
+			_ = os.WriteFile(filepath.Join(pe.dir, "late-write"), []byte("x"), 0o600) // what the run writes into the folder
+			finished.Store(true)
+			p.setStep("install", stepOK, "Installed.")
+			return nil
+		}
+		_, v := pe.do("POST", "/api/servers/provision/plan", map[string]any{"target": "user@box.example.com"})
+		plan := v["plan"].(string)
+		pe.do("POST", "/api/servers/provision/"+plan+"/connect", nil)
+		code, _ := pe.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{})
+		require.Equal(t, 202, code)
+	})
+	assert.True(t, finished.Load(), "the run was waited for before the test's folder went")
 }
