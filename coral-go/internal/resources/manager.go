@@ -18,8 +18,8 @@ import (
 
 // Priorities says how much an agent's claim matters and what it is working on.
 type Priorities interface {
-	// Of answers the agent's current task (0: none) and the priority to rank its claim by (bigger first).
-	Of(ctx context.Context, agent string) (task int, priority int, err error)
+	// Of answers the agent's current task (0: none), the board it is on, and the priority to rank its claim by (bigger first).
+	Of(ctx context.Context, agent string) (task int, project string, priority int, err error)
 }
 
 // TaskRank maps a board task priority to the number the queue ranks by: critical 30, high 20, medium 10, low and anything else 0.
@@ -107,8 +107,8 @@ func (m *Manager) Close() { m.hist.Close() }
 func (m *Manager) claim(ctx context.Context, resource string, who resourcequeue.Claimant) (resourcequeue.Result, error) {
 	agent := who.Agent
 	if m.pri != nil {
-		if task, prio, err := m.pri.Of(ctx, agent); err == nil {
-			who.Task, who.Priority = task, prio
+		if task, project, prio, err := m.pri.Of(ctx, agent); err == nil {
+			who.Task, who.Project, who.Priority = task, project, prio
 		}
 	}
 	return m.q.Claim(resource, who)

@@ -42,6 +42,7 @@ type Resource struct {
 type Claimant struct {
 	Agent    string // who (a session or member id)
 	Task     int    // what it is working on, for people to read (0: none)
+	Project  string // the board that task is on (task numbers repeat across boards; #13704 links to it), "" when there is no task
 	Priority int    // bigger goes first; supplied by the caller from the agent's task and goal
 	Note     string // why, for people to read
 	Via      string // how the claim came: "hook" for the shell hook's own, "" for a person's or an agent's (#13671)

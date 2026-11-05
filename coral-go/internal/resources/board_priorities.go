@@ -10,10 +10,10 @@ import (
 type BoardPriorities struct{ Store *board.Store }
 
 // Of implements Priorities.
-func (b BoardPriorities) Of(ctx context.Context, agent string) (int, int, error) {
-	id, _, prio, ok, err := b.Store.ClaimedTaskAnywhere(ctx, agent)
+func (b BoardPriorities) Of(ctx context.Context, agent string) (int, string, int, error) {
+	id, project, prio, ok, err := b.Store.ClaimedTaskAnywhere(ctx, agent)
 	if err != nil || !ok {
-		return 0, 0, err
+		return 0, "", 0, err
 	}
-	return int(id), TaskRank(prio), nil
+	return int(id), project, TaskRank(prio), nil
 }

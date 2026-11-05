@@ -2,7 +2,7 @@
 import { importOnce } from './import_once.js';
 import { isSignedOut } from './overload.js';
 import { scrollBehavior } from './motion.js';
-import { decisionNeedsPerson, normServer } from './server_base.js';
+import { decisionNeedsPerson, normServer, boardTeamKey } from './server_base.js';
 import { state } from './state.js';
 const api = await importOnce('./artifact_comments_api.js');
 const askUi = await importOnce('./artifact_comment_send.js');
@@ -38,7 +38,7 @@ export function createAsk({ st, panel, render, announce, refresh, ownHex }) {
         const asked = [...askedNow(id)]; p.replaceChildren();
         if (!asked.length) { p.textContent = 'Not sent to an agent yet'; return; }
         p.append('Sent to ');
-        asked.forEach(([role, words], i) => { if (i) p.append(', '); p.append(agentLink(names.get(role) || role, { board: st.board }), ` (${words.replace(/^./, c => c.toLowerCase())})`); });
+        asked.forEach(([role, words], i) => { if (i) p.append(', '); p.append(agentLink(names.get(role) || role, { board: boardTeamKey(st.server, st.board) }), ` (${words.replace(/^./, c => c.toLowerCase())})`); });
     };
     const statusWords = id => { const p = document.createElement('p'); fillStatus(p, id); return p.textContent; };
     const redrawStatus = id => { const p = panel.querySelector(`.ac-card[data-id="${id}"] .ac-ask-status`); if (p) fillStatus(p, id); };
