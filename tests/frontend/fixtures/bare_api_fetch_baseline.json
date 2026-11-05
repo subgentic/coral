@@ -53,10 +53,6 @@
       "count": 7,
       "reason": "Automations (scheduled jobs and workflows) run on this computer: the page has no server for them"
     },
-    "search_access.js": {
-      "count": 2,
-      "reason": "Settings > Security of this computer: the Hub's dialog is read-only and reads its own record"
-    },
     "team_artifacts_page.js": {
       "count": 1,
       "reason": "the Keep list is this computer's own store (/api/system/artifact-store/kept): asked only when local() is true (not through the Hub, not for another computer)"

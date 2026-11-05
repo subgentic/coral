@@ -339,3 +339,6 @@ node activity_click_header.test.mjs
 node own_rows.test.js
 node artifact_comment_ask_computer.test.mjs
 node artifact_comment_send_empty.test.mjs
+
+node remote_search_access.test.mjs
+node remote_goal_comments.test.mjs
