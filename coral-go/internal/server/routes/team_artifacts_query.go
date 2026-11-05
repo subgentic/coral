@@ -592,7 +592,7 @@ func keyOfP(it *teamArtifact) artifactSortKey {
 		tie = it.BoardID + "\x00" + it.ID // the cross-team list: one digest in two teams is two rows, in a total order
 	}
 	sum := sha256.Sum256([]byte(tie))
-	return artifactSortKey{Uploader: clipKey(strings.ToLower(artifactUploaderLabel(it)), cursorTextRunes), At: it.CreatedAt, Name: clipKey(strings.ToLower(it.Name), cursorTextRunes), Size: size, Type: strings.ToLower(strings.TrimSpace(it.MediaType)), Tags: clipKey(strings.Join(it.Tags, " "), 64), TaskID: it.TaskID, Source: it.Source, Index: it.index, ID: hex.EncodeToString(sum[:])}
+	return artifactSortKey{Uploader: clipKey(strings.ToLower(artifactUploaderLabel(*it)), cursorTextRunes), At: it.CreatedAt, Name: clipKey(strings.ToLower(it.Name), cursorTextRunes), Size: size, Type: strings.ToLower(strings.TrimSpace(it.MediaType)), Tags: clipKey(strings.Join(it.Tags, " "), 64), TaskID: it.TaskID, Source: it.Source, Index: it.index, ID: hex.EncodeToString(sum[:])}
 }
 
 // newestAfter: a comes after b in the plain list's order (newest first; ties by task id, source, position, then id, so it is total).
