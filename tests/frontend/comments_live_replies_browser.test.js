@@ -15,7 +15,7 @@ const HEX = 'e'.repeat(64);
     const shot = async name => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const sleep = ms => new Promise(r => setTimeout(r, ms)); // sleep-ok: the poll is on a timer: a stretch with no change is the thing measured
     const STUB = `(() => {
-        const real = window.fetch; window.__gets = 0; window.__hold = null; window.__byBoard = null;
+        const real = window.fetch; window.__versionGets = 0; window.__versions = []; window.__gets = 0; window.__hold = null; window.__byBoard = null;
         const OWNER = { kind: 'owner', issuer: 'local', subject: 'Operator' };
         window.__cs = Array.from({ length: 30 }, (_, i) => ({ id: i + 1, parent_id: null, anchor: { whole: true }, body: 'Comment number ' + (i + 1) + ' on the whole file.', author: OWNER, created_at: new Date(Date.now() - (40 - i) * 60000).toISOString() }));
         const json = (o, status) => new Response(JSON.stringify(o), { status: status || 200, headers: { 'Content-Type': 'application/json' } });
@@ -24,6 +24,7 @@ const HEX = 'e'.repeat(64);
                 const board = new URL(url, location.origin).searchParams.get('board') || '', list = (window.__byBoard && window.__byBoard[board]) || window.__cs;
                 if (window.__hold && window.__hold.board === board) await window.__hold.p;
                 return json({ comments: list.map(c => ({ ...c, deleted: false, mine: true, can: { reply: true, edit: true, delete: true, resolve: true } })), locked: false, you: { kind: 'owner', name: 'Operator', can_comment: true, can_lock: true } }); }
+            if (url.includes('/api/artifacts/${HEX}/versions')) { window.__versionGets++; return json(window.__versions); }
             if (url.includes('/api/artifacts/${HEX}')) return new Response('# A note\\n\\nSome words.', { status: 200, headers: { 'Content-Type': 'text/markdown' } });
             return real(u, o); };
         return true; })()`;
@@ -37,7 +38,7 @@ const HEX = 'e'.repeat(64);
     try {
         await Page.enable();
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
-        await Page.addScriptToEvaluateOnNewDocument({ source: 'window.__coralCommentsPollMs = 400;' });
+        await Page.addScriptToEvaluateOnNewDocument({ source: 'window.__coralCommentsPollMs = 400; window.__coralVersionsPollMs = 400;' });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false }); await Emulation.setTouchEmulationEnabled({ enabled: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
         await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
@@ -55,6 +56,11 @@ const HEX = 'e'.repeat(64);
         assert.ok(Math.abs(after - top) <= 2, `the scroll is kept (${top} before, ${after} after)`);
         await shot('comments-live-reply');
         console.log('   ✓');
+
+        // #13579: a newly uploaded version is discovered without closing the review dialog.
+        await ev(`window.__versions = [{ digest: '${HEX}', version: 1, at: '2026-11-01T00:00:00Z', name: 'note.md' }, { digest: '${'f'.repeat(64)}', version: 2, at: '2026-11-02T00:00:00Z', name: 'note.md' }]; true`);
+        await waitFor(`document.querySelector('#artifact-viewer .av-current')?.textContent.includes('v1 of 2')`, 'new version chip while the same document stays open', 6000);
+        assert.ok((await ev(`document.querySelector('#artifact-viewer .artifact-viewer-body').textContent`)).includes('Some words.'), 'discovering a version keeps the document on show');
 
         console.log('2. A thread that did not change is not redrawn (a draft or the focus is not disturbed)');
         await ev(`document.querySelector('.ac-panel .ac-card').dataset.mark = 'same'; window.__g0 = window.__gets; true`);
@@ -106,10 +112,11 @@ const HEX = 'e'.repeat(64);
         console.log('   ✓');
 
         console.log('6. A closed viewer reads nothing');
-        await ev(`window.__g1 = window.__gets; true`);
+        await ev(`window.__v1 = window.__versionGets; window.__g1 = window.__gets; true`);
         await sleep(1500); // sleep-ok: a closed viewer's silence is the thing measured
         const idle = await ev(`window.__gets - window.__g1`);
         assert.equal(idle, 0, 'no reads after the viewer closed: ' + idle);
+        assert.equal(await ev(`window.__versionGets - window.__v1`), 0, 'no version reads after closing');
         console.log('   ✓');
         console.log('PASS comments live: a reply shows without reopening, scroll and edit kept, an unchanged thread is not redrawn, a late answer of another context or a closed viewer is never shown, a closed viewer reads nothing');
     } finally { await client.close(); }
