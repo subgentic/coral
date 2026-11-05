@@ -29,7 +29,7 @@ const fs = require('node:fs');
             await new Promise(r => setTimeout(r, 500)); // sleep-ok: the page settles after its first draw
             if (mobile && w === 700) {
                 const s = await strip();
-                check(`${label}: from 640 to 767 px the Inbox keeps its tab strip (the old view dropdown is the pill there)`, s.tabs > 0, JSON.stringify(s));
+                check(`${label}: from 640 to 767 px the Inbox keeps its tab strip (the old view dropdown is the pill there)`, s.tablist > 0, JSON.stringify(s));
             } else if (mobile) {
                 const s = await strip();
                 check(`${label}: no tab strip, no tab, no way-back link, nothing wider than the screen`, s.tablist === 0 && s.tabs === 0 && s.back === 0 && s.over <= 0, JSON.stringify(s));

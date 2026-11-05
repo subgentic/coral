@@ -18,7 +18,7 @@ const { coralReady } = require('./helpers/wait');
             scrim: shown(scrim), focus: document.activeElement === tr ? 'trigger' : nav.contains(document.activeElement) ? 'nav' : document.activeElement.tagName, title: (document.querySelector('#group-table-title') || {}).textContent, win: innerWidth }; })()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
-        for (const [w, h, mobile] of [[1280, 820, false], [390, 844, true], [412, 915, true]]) {
+        for (const [w, h, mobile] of [[1280, 820, false], [700, 844, true], [740, 915, true]]) { // the tab strip is the phone layout from 640 to 767 px; under 640 the Inbox has none (#13596: inbox_phone_no_tabs)
             const at = `${w}px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);

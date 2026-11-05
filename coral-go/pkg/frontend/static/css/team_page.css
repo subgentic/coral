@@ -320,7 +320,7 @@
 @media (max-width: 767px) { /* a phone's panel is a sheet over the list, one column, its own scroll; the page behind keeps its scroll, nothing traps the focus (UI/UX on #8681) */
     .inbox-folder-toolbar { position: relative; }
     .inbox-folder-toolbar .list-bar-menu.list-bar-sheet { position: absolute; left: 0; right: 0; z-index: 20; max-height: 60vh; overflow-y: auto; box-sizing: border-box; padding: 12px; background: var(--bg-secondary); border: 1px solid var(--border-light); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); grid-template-columns: minmax(0, 1fr); }
-    .inbox-folder-head { max-width: none; flex: 1 1 auto; } /* a phone has no tab strip (#13596) and the top pill is the search: the page's title and count are the visible name of the open folder, the Filters icon at the right */
+    .inbox-folder-head { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); } /* the folder select names the page and carries its count: the title is for screen readers (and the focus when there is no search box) */
 }
 @container inboxfolder (max-width: 46rem) { /* the title, the search at its minimum, the pills and the icon no longer fit one line: the pills are the panel's select */
     .inbox-folder-toolbar .team-tb-pills { display: none; }
@@ -489,3 +489,7 @@ dialog.inbox-deny-dialog { position: fixed; inset: 0; margin: auto; height: fit-
 .gr-add { display: flex; gap: 8px; flex-wrap: wrap; }
 .gr-add input { flex: 1 1 12rem; min-width: 0; }
 @media (max-width: 600px) { .gr-guide { grid-template-columns: minmax(0, 1fr) auto; } .gr-label { grid-column: 1 / -1; } .gr-guide .btn, .gr-add .btn, .gr-guide input, .gr-add input { min-height: 44px; } }
+
+@media (max-width: 639px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) { /* PHONE_BAR_QUERY: the Inbox has no tab strip here (#13596) and the top pill is its search: the page's title and count are the open folder's visible name, the Filters icon at the right. Other pages (Jobs, Workflows) keep their strip and the one-pixel title. */
+    #group-table-view[data-group^="hub-inbox"] .inbox-folder-head { position: static; width: auto; height: auto; margin: 0 4px 0 0; overflow: visible; clip-path: none; max-width: none; flex: 1 1 auto; }
+}

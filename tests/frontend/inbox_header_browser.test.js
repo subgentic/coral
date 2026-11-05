@@ -47,7 +47,7 @@ const FOLDERS = [['needs', '/inbox/needs', 'Needs you'], ['tasks', '/inbox/tasks
                 if (key === 'goals' || key === 'tasks') await shot(`inbox-header-${key}-${label}-${label === '1280' ? 'light' : 'dark'}`, label === '1280' ? 'light' : 'dark');
                 check(`${name}: the title is the first thing of the toolbar's row (the page's title id), and there is no row of its own`, g && g.title === title && g.id === 'group-table-title' && !g.oldHead && /^inbox-folder-head/.test(g.order || 'inbox-folder-head') , JSON.stringify(g));
                 if (mobile) {
-                    check(`${name}: a phone's row is the Filters icon alone (the top pill is the search, #13591); the title is for screen readers (one pixel)`, g.headBox.w <= 1 && g.headBox.h <= 1 && g.searchW === 0 && g.rowH <= 64 && g.over <= 0 && !g.pillsShown && !g.rowSelect, JSON.stringify(g));
+                    check(`${name}: a phone's row is the folder's name at the left and the Filters icon at the right (the top pill is the search, #13591; no tab strip, #13596)`, g.headBox.w > 20 && g.headBox.h >= 20 && g.searchW === 0 && g.rowH <= 64 && g.over <= 0 && !g.pillsShown && !g.rowSelect, JSON.stringify(g));
                 } else {
                     const ys = [g.titleY, g.searchY, g.iconY, g.pillsY].filter(y => y != null);
                     check(`${name}: the title, the search${g.pillsShown ? ', the pills' : ''} and the icon are on one line (same centre) and the row is one line high`, ys.length >= 3 && Math.max(...ys) - Math.min(...ys) <= 6 && g.rowH <= 64 && g.over <= 0, JSON.stringify(g));
