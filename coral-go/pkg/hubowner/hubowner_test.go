@@ -56,8 +56,8 @@ func TestAStampIsBoundToEverythingItCovers(t *testing.T) {
 	}{
 		"another body":      {nil, method, path, path, `{"decision":"changes"}`, ErrBad},
 		"another target":    {nil, method, path, path + "?x=1", body, ErrBad},
-		"another method":    {nil, "PUT", path, path, body, ErrRoute},
-		"another route":     {nil, method, "/api/saved", "/api/saved", body, ErrRoute},
+		"another method":    {nil, "PATCH", path, path, body, ErrRoute},
+		"another route":     {nil, method, "/api/hub-auto-accept", "/api/hub-auto-accept", body, ErrRoute},
 		"another remote id": {func(v *Verifier) { v.RemoteID = "other-box" }, method, path, path, body, ErrBad},
 		"another secret":    {func(v *Verifier) { v.Secret = strings.Repeat("cd", 32) }, method, path, path, body, ErrBad},
 		"no secret":         {func(v *Verifier) { v.Secret = "" }, method, path, path, body, ErrNoSecret},
@@ -162,7 +162,6 @@ func TestAllowedIsTheListedDecisionsAndNothingElse(t *testing.T) {
 	}
 	for _, bad := range []struct{ m, p string }{
 		{"GET", "/api/board/team/artifacts/abc/review"},
-		{"PUT", "/api/board/team/artifacts/abc/review"},
 		{"POST", "/api/board/team/artifacts/abc/review/extra"},
 		{"POST", "/api/board/team/artifacts//review"},
 		{"POST", "/api/board//artifacts/abc/review"},
@@ -176,16 +175,12 @@ func TestAllowedIsTheListedDecisionsAndNothingElse(t *testing.T) {
 		{"POST", "/api/board/team/asks/42/close/extra"},
 		{"POST", "/api/board/team/asks//close"},
 		{"POST", "/api/board//asks/42/close"},
-		{"POST", "/api/board/team/asks/42/buttons/b/claim"},
 		{"GET", "/api/board/team/goals/7/driver"}, // #13517: only the two writes, on one goal of one board
 		{"PUT", "/api/board/team/goals/7/move"},
 		{"POST", "/api/board/team/goals/7/driver/extra"},
 		{"POST", "/api/board/team/goals//driver"},
 		{"POST", "/api/board//goals/7/move"},
 		{"POST", "/api/board/team/goals/7/drive"},
-		{"POST", "/api/board/team/goals/7/close"},
-		{"PATCH", "/api/board/team/goals/7"},
-		{"DELETE", "/api/artifacts/abc"},
 		{"POST", ""},
 		{"POST", "/"},
 	} {
@@ -193,8 +188,49 @@ func TestAllowedIsTheListedDecisionsAndNothingElse(t *testing.T) {
 			t.Errorf("%v allowed", bad)
 		}
 	}
-	if len(Routes()) != 8 {
-		t.Errorf("the allowlist has %d routes: a new one needs a reason and a review", len(Routes()))
+	if n := len(Routes()); n != 56 {
+		t.Errorf("the allowlist has %d routes: a new one needs a reason and a review (Security's tiers, #13694)", n)
+	}
+	first := 0
+	for _, r := range routes {
+		if r.since == 1 {
+			first++
+		}
+	}
+	if first != 8 {
+		t.Errorf("generation 1 has %d routes, it is the original 8 and never changes", first)
+	}
+}
+
+// #13694: a hub stamps a route only when the remote's generation covers it; an older remote keeps getting the original eight and nothing else.
+func TestARouteIsStampedOnlyForARemoteThatListsIt(t *testing.T) {
+	for _, c := range []struct {
+		m, p    string
+		v       int
+		allowed bool
+		must    bool
+	}{
+		{"POST", "/api/board/t/artifacts/a/review", 1, true, false},
+		{"POST", "/api/board/t/tasks/7/complete", 1, false, true},
+		{"POST", "/api/board/t/tasks/7/complete", 2, true, true},
+		{"POST", "/api/board/t/tasks/7/complete", 0, false, true},
+		{"DELETE", "/api/artifacts/abc", 1, false, true},
+		{"DELETE", "/api/artifacts/abc", 2, true, true},
+		{"POST", "/api/board/t/asks/9/buttons/b/settle", 2, true, true},
+		{"POST", "/api/sessions/live/x/send", 1, true, true},
+		{"POST", "/api/skills/3/approve", 2, false, false},
+		{"POST", "/api/artifacts/abc/comment-images", 2, false, false},
+		{"POST", "/api/board/t/goal-images", 2, false, false},
+	} {
+		if got := AllowedAt(c.m, c.p, c.v); got != c.allowed {
+			t.Errorf("AllowedAt(%s %s, %d) = %v, want %v", c.m, c.p, c.v, got, c.allowed)
+		}
+		if got := MustBeSigned(c.m, c.p); got != c.must {
+			t.Errorf("MustBeSigned(%s %s) = %v, want %v", c.m, c.p, got, c.must)
+		}
+	}
+	if RoutesVersion != 2 {
+		t.Errorf("RoutesVersion = %d: it moves with a widening, and the remote's health answer reports it", RoutesVersion)
 	}
 }
 

@@ -159,7 +159,7 @@ func (s *Server) registerAuth(r *chi.Mux) {
 		// "version" is additive; older hubs ignore unknown fields.
 		// "hub" tells the frontend whether to show the multi-server UI.
 		// "instance_id" names this server run: a command that found its address in the data folder's lock file checks it before it sends a credential (config.VerifiedServer).
-		json.NewEncoder(w).Encode(map[string]any{"status": "ok", "version": config.ReportedVersion(), "hub": s.cfg.HubMode, "instance_id": s.cfg.InstanceID, "hub_owner_stamp": hubowner.Installed(s.cfg.CoralDir()), "hub_owner_stamp_at": stampAt(s.identity)})
+		json.NewEncoder(w).Encode(map[string]any{"status": "ok", "version": config.ReportedVersion(), "hub": s.cfg.HubMode, "instance_id": s.cfg.InstanceID, "hub_owner_stamp": hubowner.Installed(s.cfg.CoralDir()), "hub_owner_stamp_at": stampAt(s.identity), "hub_owner_routes": hubowner.RoutesVersion})
 	})
 
 	// Auth endpoints

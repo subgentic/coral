@@ -23,6 +23,9 @@ func MountRemoteProxy(r chi.Router, resolver proxy.Resolver) {
 		// need a person signed (#11378). The proxy signs only the two allowlisted routes and only for a target that holds a secret.
 		if humanInputCaller(req) {
 			req = req.WithContext(proxy.WithSignedInOwner(req.Context()))
+			if kind, _ := req.Context().Value(callerKindKey{}).(string); kind == callerDashCookie {
+				req = req.WithContext(proxy.WithSessionSignedIn(req.Context())) // a real sign-in session: the widened routes (#13694) are signed only for it (#13725)
+			}
 		}
 		h.ServeHTTP(w, req)
 	}))

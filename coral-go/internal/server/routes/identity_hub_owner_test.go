@@ -113,8 +113,8 @@ func TestAStampThatIsNotGenuineIsRefusedNeverIgnored(t *testing.T) {
 		"another route": {true, "/api/board/team/artifacts/other/review", body, func(t *testing.T, r *http.Request) {
 			r.Header.Set(hubowner.Header, stampFor(t, "POST", stampRoute, body, time.Now()))
 		}},
-		"a route off the list": {true, "/api/saved", body, func(t *testing.T, r *http.Request) {
-			r.Header.Set(hubowner.Header, stampFor(t, "POST", "/api/saved", body, time.Now()))
+		"a route off the list": {true, "/api/hub-auto-accept", body, func(t *testing.T, r *http.Request) { // a settings route of the computer itself: never stamped (#13694's deny list)
+			r.Header.Set(hubowner.Header, stampFor(t, "POST", "/api/hub-auto-accept", body, time.Now()))
 		}},
 		"a stale stamp": {true, stampRoute, body, func(t *testing.T, r *http.Request) {
 			r.Header.Set(hubowner.Header, stampFor(t, "POST", stampRoute, body, time.Now().Add(-time.Minute)))
