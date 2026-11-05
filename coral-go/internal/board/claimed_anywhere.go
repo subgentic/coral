@@ -19,3 +19,21 @@ func (s *Store) ClaimedTaskAnywhere(ctx context.Context, member string) (taskID 
 	}
 	return rows[0].ID, rows[0].BoardID, rows[0].Priority, true, nil
 }
+
+// IsOrchestratorAnywhere reports whether member is an Orchestrator on any board it is subscribed to (the same rule a board uses: it can peek, or its id or job title says so).
+func (s *Store) IsOrchestratorAnywhere(ctx context.Context, member string) (bool, error) {
+	var rows []struct {
+		ID    string `db:"subscriber_id"`
+		Title string `db:"job_title"`
+		Peek  int    `db:"can_peek"`
+	}
+	if err := s.reader().SelectContext(ctx, &rows, `SELECT subscriber_id, job_title, can_peek FROM board_subscribers WHERE subscriber_id = ? COLLATE NOCASE AND is_active = 1`, member); err != nil {
+		return false, err
+	}
+	for _, r := range rows {
+		if isOrchestrator(r.ID, r.Title, r.Peek) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
