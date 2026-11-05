@@ -199,6 +199,11 @@ async function connect(opts = {}) {
         // detach it and drive sleeping/awake changes through handleCoralMessage instead.
         ws.feedHooks.schedule = () => {};
         if (state.coralWs) { state.coralWs.onmessage = null; state.coralWs.onclose = null; state.coralWs.close(); }
+        // A feed update that landed before this detach (after the page's list load, before here) already replaced the mocked agents with that empty list, and nothing draws them again:
+        // agent_instructions_browser waited 15 s for its rows once in the trial-250 gate. Read the mocked list again when an agent is missing (agent_view_harness_feed_race_browser).
+        if (!location.pathname.startsWith('/agent/') && Object.values(window.__m.agents).some(a => !(state.liveSessions || []).some(s => s.session_id === a.session_id))) {
+            await (await import((window.__coralStatic||'/static/')+'api.js')).loadLiveSessions();
+        }
 
         window.__rendered = () => {
             const out = [];
