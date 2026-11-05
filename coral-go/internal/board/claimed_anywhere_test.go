@@ -39,3 +39,29 @@ func TestClaimedTaskAnywhereIsTheMostImportantInProgressTaskOnAnyBoard(t *testin
 	_, _, _, ok, _ = s.ClaimedTaskAnywhere(ctx, "Someone Else")
 	assert.False(t, ok)
 }
+
+// A forgotten old task must not outrank today's work at the same priority (#13656: Frontend Dev's hold showed an old task #65 beside its real #13666): equal priority, the task claimed most recently ranks the agent.
+func TestClaimedTaskAnywhereTiesGoToTheMostRecentlyClaimed(t *testing.T) {
+	s := testStore(t)
+	ctx := context.Background()
+	for _, b := range []string{"alpha", "beta"} {
+		_, err := s.Subscribe(ctx, b, "Dev", "Dev", "", nil, "")
+		require.NoError(t, err)
+	}
+	old, err := s.CreateTask(ctx, "alpha", "forgotten", "", "high", "Dev", "Dev")
+	require.NoError(t, err)
+	_, err = s.ClaimTask(ctx, "alpha", "Dev", old.ID)
+	require.NoError(t, err)
+	cur, err := s.CreateTask(ctx, "beta", "today's", "", "high", "Dev", "Dev")
+	require.NoError(t, err)
+	_, err = s.ClaimTask(ctx, "beta", "Dev", cur.ID)
+	require.NoError(t, err)
+	_, err = s.db.Exec(`UPDATE board_tasks SET claimed_at = '2026-10-01T10:00:00Z' WHERE id = ?`, old.ID)
+	require.NoError(t, err)
+	_, err = s.db.Exec(`UPDATE board_tasks SET claimed_at = '2026-11-05T10:00:00Z' WHERE id = ?`, cur.ID)
+	require.NoError(t, err)
+	id, project, _, ok, err := s.ClaimedTaskAnywhere(ctx, "Dev")
+	require.NoError(t, err)
+	assert.True(t, ok)
+	assert.Equal(t, [2]any{cur.ID, "beta"}, [2]any{id, project}, "the task claimed last, not the oldest")
+}
