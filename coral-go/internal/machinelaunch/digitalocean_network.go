@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 )
 
 var (
@@ -100,10 +101,15 @@ func (d *DigitalOcean) CreateFirewall(ctx context.Context, spec FirewallSpec) (F
 			return Firewall{}, fmt.Errorf("digitalocean: %w", err)
 		}
 	}
+	// A firewall applies to droplets by tag, and DigitalOcean refuses one whose tag does not exist (422 "tag ... does not exist"): the tag is made first, here, and removed again with the firewall.
+	if err := d.createTag(ctx, spec.Tag); err != nil {
+		return Firewall{}, err
+	}
 	var out struct {
 		Firewall doFirewall `json:"firewall"`
 	}
 	if err := d.do(ctx, "create a firewall", http.MethodPost, "/firewalls", nil, firewallBody(spec.Name, spec.Tag, spec.SSHFrom), &out); err != nil {
+		d.deleteLaunchTag(spec.Tag) // the firewall that needed it was not made
 		return Firewall{}, err
 	}
 	if !doUUIDRe.MatchString(out.Firewall.ID) {
@@ -120,12 +126,65 @@ func (d *DigitalOcean) CloseFirewall(ctx context.Context, fw Firewall) error {
 	return d.do(ctx, "close a firewall", http.MethodPut, "/firewalls/"+fw.ID, nil, firewallBody(fw.Name, fw.Tag, nil), nil)
 }
 
-// DeleteFirewall removes a firewall; one already gone is ErrNotFound.
+// DeleteFirewall removes a firewall; one already gone is ErrNotFound. The launch tag it was made for (CreateFirewall made it) goes with it, once the firewall is gone.
 func (d *DigitalOcean) DeleteFirewall(ctx context.Context, id string) error {
 	if !doUUIDRe.MatchString(id) {
 		return errors.New("digitalocean: the id is not a firewall id")
 	}
-	return d.do(ctx, "delete a firewall", http.MethodDelete, "/firewalls/"+id, nil, nil, nil)
+	var tags []string
+	var got struct {
+		Firewall doFirewall `json:"firewall"`
+	}
+	if d.do(ctx, "read a firewall", http.MethodGet, "/firewalls/"+id, nil, nil, &got) == nil { // an unreadable firewall is still deleted: only the tag clean-up is skipped
+		tags = got.Firewall.Tags
+	}
+	if err := d.do(ctx, "delete a firewall", http.MethodDelete, "/firewalls/"+id, nil, nil, nil); err != nil {
+		return err
+	}
+	for _, t := range tags {
+		d.deleteLaunchTag(t)
+	}
+	return nil
+}
+
+// launchTagPrefix is the start of every tag a launch makes (newLaunchTag): the only tags this tool ever deletes. A person's own tags are never touched.
+const launchTagPrefix = "coral-launch-"
+
+// createTag makes the tag a firewall will apply to (POST /tags). One that already exists is fine.
+func (d *DigitalOcean) createTag(ctx context.Context, name string) error {
+	if !strings.HasPrefix(name, launchTagPrefix) || !tagRe.MatchString(name) {
+		return errors.New("digitalocean: the tag is not one a launch makes")
+	}
+	err := d.do(ctx, "create a tag", http.MethodPost, "/tags", nil, map[string]string{"name": name}, nil)
+	var ae *APIError
+	if errors.As(err, &ae) && ae.Status == http.StatusUnprocessableEntity && strings.Contains(strings.ToLower(ae.Message), "already") {
+		return nil
+	}
+	return err
+}
+
+// deleteLaunchTag removes a launch's tag (DELETE /tags/{name}), on its own short deadline and whatever the answer: a tag left behind is empty and costs nothing, and the delete that called this has succeeded.
+func (d *DigitalOcean) deleteLaunchTag(name string) {
+	if !strings.HasPrefix(name, launchTagPrefix) || !tagRe.MatchString(name) {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	// A tag some droplet still carries is left alone: deleting it would strip the launch label from a machine that may still exist (the droplet delete before it can have failed), and the checks
+	// that look for that machine by the label would no longer find it (Security, #13592). A tag that cannot be read is left too.
+	var got struct {
+		Tag struct {
+			Resources struct {
+				Droplets struct {
+					Count int `json:"count"`
+				} `json:"droplets"`
+			} `json:"resources"`
+		} `json:"tag"`
+	}
+	if d.do(ctx, "read a tag", http.MethodGet, "/tags/"+name, nil, nil, &got) != nil || got.Tag.Resources.Droplets.Count > 0 {
+		return
+	}
+	_ = d.do(ctx, "delete a tag", http.MethodDelete, "/tags/"+name, nil, nil, nil)
 }
 
 // ListVPCs returns the VPCs this tool made (named VPCPrefix...).

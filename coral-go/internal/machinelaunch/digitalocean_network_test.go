@@ -72,9 +72,12 @@ func TestCreateFirewallAllowsSSHFromOneAddressAndNothingElseInbound(t *testing.T
 		} `json:"inbound_rules"`
 		Outbound []map[string]any `json:"outbound_rules"`
 	}
-	require.NoError(t, json.Unmarshal(s.requests[0].Body, &got))
+	require.Len(t, s.requests, 2, "the launch tag is made first, then the firewall (#13592)")
 	assert.Equal(t, "POST", s.requests[0].Method)
-	assert.Equal(t, "/firewalls", s.requests[0].Path)
+	assert.Equal(t, "/tags", s.requests[0].Path)
+	require.NoError(t, json.Unmarshal(s.requests[1].Body, &got))
+	assert.Equal(t, "POST", s.requests[1].Method)
+	assert.Equal(t, "/firewalls", s.requests[1].Path)
 	assert.Equal(t, []string{"coral-launch-abc"}, got.Tags)
 	require.Len(t, got.Inbound, 1, "one inbound rule")
 	assert.Equal(t, "tcp", got.Inbound[0].Protocol)
