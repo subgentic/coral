@@ -15,21 +15,21 @@ export async function copyMessageLink(id) {
     try { await navigator.clipboard.writeText(url); showToast('Link copied'); } catch { showToast('Could not copy the link', true); }
 }
 
-export async function loadPausedState(project) {
+export async function loadPausedState(project, say = true) {
     try {
         const resp = await boardFetch(project, `/paused`);
         const data = await resp.json();
         bs.isPaused = !!data.paused;
-        updatePauseButton();
+        updatePauseButton(say);
     } catch (e) {
         bs.isPaused = false;
-        updatePauseButton();
+        updatePauseButton(say);
     }
 }
 
-function updatePauseButton() {
+function updatePauseButton(say = true) {
     // the page's own item is text; the team panel's button is an icon that one function paints (#5491)
-    window.__coral?._setBoardChatPaused?.(bs.isPaused); // the team panel's Board tab says it in its ... menu and its banner (#13585)
+    window.__coral?._setBoardChatPaused?.(bs.isPaused, say); // the team panel's Board tab says it in its ... menu and its banner (#13585)
     const btn = document.getElementById('mb-pause-btn');
     if (!btn) return;
     // A sleeping team's board is paused by the sleep: one name for the way out, Wake Team, here and in the Sleep item (#12335).
@@ -107,7 +107,7 @@ function updateSleepUI() {
         const text = banner.querySelector('.mb-sleep-text');
         if (text) text.textContent = 'This team is sleeping. Messages are paused until you use Wake Team (Actions menu or the Sleep button).';
     }
-    updatePauseButton();
+    updatePauseButton(false); // Repainting sleep controls is not a pause change.
     const input = document.getElementById('mb-post-input');
     const sendBtn = document.querySelector('#mb-board .btn-primary');
     if (input) {

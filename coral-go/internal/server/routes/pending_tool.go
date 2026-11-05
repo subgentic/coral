@@ -13,6 +13,7 @@ import (
 	"unicode/utf8"
 
 	at "github.com/subgentic/coral/internal/agenttypes"
+	"github.com/subgentic/coral/internal/resources"
 	"github.com/subgentic/coral/internal/sessionstate"
 	setreg "github.com/subgentic/coral/internal/settings"
 	"github.com/subgentic/coral/internal/shellkill"
@@ -290,6 +291,8 @@ func (h *SessionsHandler) SetPendingTool(w http.ResponseWriter, r *http.Request)
 		ToolUseID string         `json:"tool_use_id"`
 		ToolName  string         `json:"tool_name"`
 		ToolInput map[string]any `json:"tool_input"`
+		// GateOnly asks only whether the resource queue holds this call (Pi's extension, #13647): the answer is {"ok":true} or the refusal, and nothing about the call is recorded.
+		GateOnly bool `json:"gate_only"`
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		errBadRequest(w, "invalid JSON")
@@ -317,10 +320,25 @@ func (h *SessionsHandler) SetPendingTool(w http.ResponseWriter, r *http.Request)
 	}
 	body.ToolName = truncateUTF8(body.ToolName, 200)
 	body.ToolUseID = truncateUTF8(body.ToolUseID, 200)
+	if body.GateOnly { // the verified session only (above): the queue's answer for this call, and nothing recorded
+		answer := map[string]any{"ok": true}
+		if refuse := h.resourceRefusal(r.Context(), owner, body.ToolName, body.ToolUseID, body.ToolInput); refuse != "" {
+			slog.Info("[resource] a command was held for a slot", "session", owner.SessionName)
+			answer["refuse"] = refuse
+		}
+		writeJSON(w, http.StatusOK, answer)
+		return
+	}
 	if why := h.patternKillRefusal(r.Context(), owner, body.ToolName, body.ToolInput); why != "" {
 		// The command is not run, so it is not a pending tool. The hook turns this into the CLI's refusal; only the reason is logged, never the command.
 		slog.Info("[guard] a command that stops processes by a pattern was refused", "session", owner.SessionName, "why", why)
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "refuse": shellkill.Message(why)})
+		return
+	}
+	if refuse := h.resourceRefusal(r.Context(), owner, body.ToolName, body.ToolUseID, body.ToolInput); refuse != "" {
+		// A heavy command that must wait for a slot of a shared machine (#13645): held with its place in line. Not run, so not pending; the log has the resource, never the command.
+		slog.Info("[resource] a command was held for a slot", "session", owner.SessionName)
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "refuse": refuse})
 		return
 	}
 	h.hints.forget(body.SessionID) // a blocking tool may open a prompt: read the screen again
@@ -337,6 +355,12 @@ func (h *SessionsHandler) notePendingToolEvent(sessionID, eventType, toolUseID s
 	defer h.wakeCodexPermissionWatches(sessionID)
 	if sessionID == "" {
 		return
+	}
+	switch eventType { // the resource queue's slot for a heavy call goes back when the call ends, or the session does (#13645)
+	case "tool_use":
+		h.resourceHook.After(sessionID, toolUseID)
+	case "session_reset", "session_end":
+		h.resourceHook.SessionEnded(sessionID)
 	}
 	switch eventType { // the calls in flight, whichever the single slot below holds (#6687)
 	case "tool_use":
@@ -492,4 +516,52 @@ func (h *SessionsHandler) patternKillRefusal(ctx context.Context, owner *store.S
 		return "" // the refusal is the Claude CLI's hook answer
 	}
 	return shellkill.PatternKill(command) // bounded: a command past a bound runs
+}
+
+// SetResourceHook wires the resource queue's shell hook (#13645).
+func (h *SessionsHandler) SetResourceHook(hook *resources.Hook) { h.resourceHook = hook }
+
+// resourceRefusal is the text a heavy shell command is held with when the shared machine it needs is busy (#13645, #13647), or "" to let it run. Everything cheap that decides whether to read the command comes
+// first, as for the pattern-kill guard: no hook, a tool that is no shell command and an agent that is neither Claude nor Codex (the refusal is the CLI's own hook answer: Claude's permissionDecision deny, which
+// Codex's PreToolUse takes in the same words) never make the server read an agent's command.
+func (h *SessionsHandler) resourceRefusal(ctx context.Context, owner *store.SessionTokenOwner, tool, toolUseID string, input map[string]any) string {
+	if h.resourceHook == nil || !shellToolNames[tool] || input == nil || owner == nil || !h.resourceHook.Active() { // Active: no resource has a match, so nothing below is read
+		return ""
+	}
+	ls, err := h.ss.GetLiveSession(ctx, owner.SessionID)
+	if err != nil || ls == nil {
+		return ""
+	}
+	command := ""
+	switch ls.AgentType {
+	case at.Claude:
+		if tool == "Bash" {
+			command, _ = input["command"].(string)
+		}
+	case at.Codex:
+		if tool != "bash" { // "bash" is Pi's tool name
+			command = codexShellCommand(input)
+		}
+	case at.Pi: // Pi's extension asks before a bash call (gate_only); its tool is "bash" with the command in one string
+		if tool == "bash" {
+			command, _ = input["command"].(string)
+		}
+	}
+	if command == "" || len(command) > 64<<10 {
+		return ""
+	}
+	return h.resourceHook.Before(ctx, owner.SessionID, owner.SessionName, toolUseID, command)
+}
+
+// shellToolNames are the tools a shell command comes in: Claude's Bash, and the names Codex's hooks give one (0.155.1 says Bash; codexShellTools in the hook program is the same list).
+var shellToolNames = map[string]bool{"Bash": true, "shell": true, "exec_command": true, "local_shell": true, "bash": true}
+
+// codexShellCommand is the command line of a Codex shell call, read only when it is one plain string (command, or cmd). A call that gives an argument list (bash, -lc, text) has no readable command here: it is not
+// joined and matched, it runs (Security's rule on #13647; a list is parsed only by a rule that is tested).
+func codexShellCommand(input map[string]any) string {
+	if s, ok := input["command"].(string); ok {
+		return s
+	}
+	s, _ := input["cmd"].(string)
+	return s
 }

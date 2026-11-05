@@ -109,6 +109,10 @@ func applyControl(box *inputBox, line string) (handled, waiting bool) {
 		sayf("\r\n[mock-agent] working for %gs\r\n", secs)
 		return true, true
 	}
+	if mode, command, ok := parseMockBash(line); ok { // a Bash tool call through the hooks (mockbash.go)
+		box.tell("bash:" + mode + ":" + command)
+		return true, false
+	}
 	switch line {
 	case "MOCK_ASK_PERMISSION":
 		box.promptOpen, box.question = true, false

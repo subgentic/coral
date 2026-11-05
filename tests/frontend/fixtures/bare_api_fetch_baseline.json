@@ -9,6 +9,10 @@
       "count": 1,
       "reason": "Recent runs (#13183) are this computer's jobs and workflows runs: Automations has no server switch and the route is not on the Hub's allowlist"
     },
+    "automations_queue.js": {
+      "count": 1,
+      "reason": "the Queue folder of Automations reads this computer's own resource queue (GET /api/resources); Automations is local-only, as the jobs and workflows its other folders read with bare fetches"
+    },
     "board_export.js": {
       "count": 1,
       "reason": "the live list is the merged list of every computer ({sessions, servers}); the code below it keeps this board's server"

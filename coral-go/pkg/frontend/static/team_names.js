@@ -19,7 +19,7 @@ const liveOf = id => (id ? (state.liveSessions || []).find(x => x.session_id ===
 /** { name, color } of the team of a live row, or null when there is none to say (one team, no team, an agent no longer listed). color is the person's own pick, or ''. */
 export function teamOf(row) {
     if (!row || !row.board_project || !manyTeams()) return null;
-    return { name: keyLabel(row.board_project), color: _getBoardColor(row.board_project) || '' };
+    return { name: keyLabel(teamKey(row)), color: _getBoardColor(row.board_project) || '' };
 }
 /** The same for a chat (history) row, through its session id. */
 export const teamOfChat = chat => teamOf(liveOf(chat && chat.session_id));

@@ -1,5 +1,5 @@
 /* The shared Inbox component (#5750 design, #5754 phase 1): "Tasks for you" (a list; each task opens inline to its full text and a reply box) and "Read the whole message" for a Saved for later item.
- * Coral owns it; Coral Hub mounts the same file at its Coral pin (see INBOX.md next to this folder's static/ for the contract, the adapter and the integrity attribute the hub puts on its script tag).
+ * Coral owns it; Coral Hub mounts the same file at its Coral pin (see INBOX.md in the team's internal repository for the contract, the adapter and the integrity attribute the hub puts on its script tag).
  *
  * It knows nothing of Coral's pages. Everything it needs from its host comes through an ADAPTER: a plain object of functions, never evaluated text:
  *   listTasks()                              -> [{ id, project, board, title, priority, status, created_by, updated_at, created_at, revision }]   the tasks assigned to the Operator, open ones

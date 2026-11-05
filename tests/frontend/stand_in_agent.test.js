@@ -45,6 +45,30 @@ function makeApi(initialCliPath) {
         await h.stop();
         assert.equal(settings.cli_path_claude, '/someone/else', 'stop does not overwrite a value changed since its own PUT');
     }
+    // 3b. A launch the guard refused because the pane's shell was still starting ('this terminal is running /bin/zsh', 500, seen under load) is asked again and the stand-in comes up; any other 500 is not retried (#13389).
+    {
+        const refusal = { status: 500, data: { error: "pty launch command failed: this terminal is running /bin/zsh: Coral can't see what runs in it, so it typed nothing." } };
+        let launches = 0;
+        const api = async (method, p) => {
+            if (p === '/api/settings' && method === 'GET') return { status: 200, data: { settings: {} } };
+            if (p === '/api/sessions/launch') { launches++; return launches < 3 ? refusal : { status: 200, data: { session_id: 's1', session_name: 'claude-s1' } }; }
+            return { status: 200, data: {} };
+        };
+        const h = await launchStandIn(api, { deadlineMs: 50 });
+        assert.equal(h.sid, 's1', 'the third launch came up');
+        assert.equal(launches, 3, 'two refusals, then the launch that worked');
+        await h.stop();
+        let other = 0;
+        const api2 = async (method, p) => {
+            if (p === '/api/settings' && method === 'GET') return { status: 200, data: { settings: {} } };
+            if (p === '/api/sessions/launch') { other++; return { status: 500, data: { error: 'something else broke' } }; }
+            return { status: 200, data: {} };
+        };
+        const h2 = await launchStandIn(api2, { deadlineMs: 50 });
+        assert.equal(other, 1, 'a 500 that is not the shell refusal is asked once');
+        assert.equal(h2.sid, undefined);
+        await h2.stop();
+    }
     // 4. A caller that never calls stop() (it threw between the launch and its own cleanup list, #5077) still gets the path back when its process ends, and the scripts' folder is gone.
     {
         const fs = require('node:fs'), os = require('node:os'), path = require('node:path');

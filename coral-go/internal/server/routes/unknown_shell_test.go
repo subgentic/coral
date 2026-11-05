@@ -3,7 +3,9 @@ package routes
 import (
 	"context"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
@@ -64,4 +66,38 @@ func TestALaunchLineIsNotTypedIntoAShellOfUnknownContents(t *testing.T) {
 	term.other["claude-x"] = "" // none: typed as before
 	require.NoError(t, sendLaunchCommand(context.Background(), term, "claude-x", "claude --resume"))
 	_ = terminalinput.Internal
+}
+
+// #13658: the check is made again for a short window before a launch line is refused, because a new pane's shell is still starting and a child shell of that startup is, for a moment, what the process walk
+// calls a shell of unknown contents. A shell that goes away within the window is no refusal and the line is typed; one that stays is refused, as before.
+type startupShellTerminal struct {
+	*fgSessionTerminal
+	looks atomic.Int32
+	until int32 // the looks that still find a shell
+}
+
+func (s *startupShellTerminal) AgentUnknownShell(context.Context, string, string, string) (string, bool) {
+	if s.looks.Add(1) <= s.until {
+		return "/bin/zsh", true
+	}
+	return "", true
+}
+
+func TestALaunchLineWaitsOutAStartupChildShellAndStillRefusesAShellThatStays(t *testing.T) {
+	_, _, mock, _ := setupSessionsTestServer(t)
+	t.Cleanup(ptymanager.SetUnknownShellSettle(400*time.Millisecond, 20*time.Millisecond))
+
+	// a pane whose shell is still starting: the first looks find a child shell, a later one the prompt
+	starting := &startupShellTerminal{fgSessionTerminal: newFGTerminal(mock), until: 2}
+	require.NoError(t, sendLaunchCommand(context.Background(), starting, "claude-y", "claude --resume"), "the startup settled: the line is typed")
+	assert.Equal(t, int32(4), starting.looks.Load(), "it looked again until two looks in a row found no shell")
+	assert.NotEmpty(t, starting.sentTo("claude-y"), "and the line went to the pane")
+
+	// a shell a person started stays: refused after the window
+	staying := &startupShellTerminal{fgSessionTerminal: newFGTerminal(mock), until: 1 << 30}
+	err := sendLaunchCommand(context.Background(), staying, "claude-z", "claude --resume")
+	require.Error(t, err)
+	assert.Equal(t, ptymanager.UnknownShellRefusal("/bin/zsh"), err.Error())
+	assert.Empty(t, staying.sentTo("claude-z"), "no launch line typed into a shell of unknown contents")
+	assert.Greater(t, staying.looks.Load(), int32(2), "it looked more than once before it refused")
 }

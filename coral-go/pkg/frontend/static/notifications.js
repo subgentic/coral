@@ -223,8 +223,9 @@ function placeNotices() {
     const teamTabs = document.getElementById("team-tabs-row"); // nor is its tab strip (Goals, Agents, Tasks, Artifacts): a toast over it hid the tabs until it left (#11026)
     const inboxTabs = document.querySelector(".view-list-nav"); // the Inbox's phone tab strip (Needs you, Tasks, Goals...) is not covered either (#11694)
     const goalHead = document.querySelector(".goal-back-row, .goals-back"), goalTitle = document.querySelector(".goals-detail-title"); // a goal's page: its way back and its title are not covered either (#11034)
+    const inboxRow = document.querySelector(".list-bar-search-wrap.phone-searched")?.parentElement; // a phone's Inbox page has no tab strip (#13596): its title and Filters row, under the pill, is not covered either
     const bottomOf = e => (e && e.getClientRects().length ? Math.round(e.getBoundingClientRect().bottom) : 0);
-    const headBottom = Math.max(bottomOf(head), bottomOf(listTitle), bottomOf(teamHead), bottomOf(teamTabs), bottomOf(inboxTabs), bottomOf(goalHead), bottomOf(goalTitle));
+    const headBottom = Math.max(bottomOf(head), bottomOf(listTitle), bottomOf(teamHead), bottomOf(teamTabs), bottomOf(inboxTabs), bottomOf(inboxRow), bottomOf(inboxRow ? document.getElementById("group-table-title") : null), bottomOf(goalHead), bottomOf(goalTitle));
     let topPx = Math.max(bar ? Math.round(bar.getBoundingClientRect().bottom) : 0, banner ? Math.round(banner.getBoundingClientRect().bottom) : 0, headBottom, 0) + 8;
     // A text field just under that line (the list's filter box), or a phone list's view picker (the button naming the folder: "Needs you", #10525), is not covered either (#10458): the column starts below it. Only a field the card would reach is looked at, so a form further down never moves it.
     const shown = document.getElementById("notices");
@@ -253,9 +254,9 @@ function placeNotices() {
         if (c.right > n.left + 1 && c.left < n.right - 1 && c.top < window.innerHeight) aboveCard = Math.min(Math.ceil(window.innerHeight - c.top) + 8, Math.max(0, window.innerHeight - n.height - 8 - (bar ? Math.round(bar.getBoundingClientRect().bottom) : 0)));
     }
     notices?.style.setProperty("--notice-bottom", `${Math.max(20, pinned ? Math.ceil(window.innerHeight - pinned.top) + 8 : 0, aboveComposer, aboveCard)}px`);
-    // With the Inbox's list on a phone (its tab strip is on screen) the column sits at the bottom, above the bottom bar: a toast at the top covered the first rows and took a finger meant for one (#11768).
+    // With the Inbox's list on a phone (its title row or, once, its tab strip is on screen) the column sits at the bottom, above the bottom bar: a toast at the top covered the first rows and took a finger meant for one (#11768).
     const phoneBar = document.getElementById("phone-nav"), barRect = phoneBar && phoneBar.getClientRects().length ? phoneBar.getBoundingClientRect() : null;
-    if (notices) { const low = bottomOf(inboxTabs) > 0; notices.toggleAttribute("data-bottom", low); if (low) notices.style.setProperty("--notice-bottom", `${barRect ? Math.ceil(window.innerHeight - barRect.top) + 8 : 20}px`); }
+    if (notices) { const low = bottomOf(inboxTabs) > 0 || bottomOf(inboxRow) > 0; /* the Inbox's list on a phone: the old tab strip or, now there is none (#13596), its title row */ notices.toggleAttribute("data-bottom", low); if (low) notices.style.setProperty("--notice-bottom", `${barRect ? Math.ceil(window.innerHeight - barRect.top) + 8 : 20}px`); }
     if (!placeNotices._wired) {
         placeNotices._wired = true; window.addEventListener("resize", placeNotices);
         if (typeof ResizeObserver === 'function') { const observer = new ResizeObserver(placeNotices); if (bar) observer.observe(bar); if (banner) observer.observe(banner); }

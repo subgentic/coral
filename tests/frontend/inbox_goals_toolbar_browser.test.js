@@ -45,8 +45,8 @@ const GOALS = [
 
             check(`${label}: ${label === '390' ? 'opening the folder does not put the keyboard on the search box: a phone starts at the first row or the heading (#9985)' : "opening the folder puts the focus on the page's search box, not on the heading"}`, await ev(`(() => { const a = document.activeElement; const inSearch = !!a && a.matches('input[type=search]') && !!a.closest('.inbox-folder-toolbar'); return ${label === '390' ? '!a || !/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)' : 'inSearch'}; })()`), await ev(`document.activeElement && (document.activeElement.id || document.activeElement.className || document.activeElement.tagName)`));
             const g = await geometry();
-            check(`${label}: the Goals page has a search box named "Search goals" and the Filters icon in the same row, to its right`, g && g.qName === 'Search goals' && g.sameRow && g.right && /Filters/.test(g.toggleName), JSON.stringify(g));
-            if (mobile) check(`${label}: the pills are not in the row (one select in the Filters sheet since #8700), the search keeps at least 10rem, nothing is wider than the screen`, g && !g.select && !g.pills && g.searchW >= 160 && g.over <= 0, JSON.stringify(g));
+            check(`${label}: the Goals page has a search box named "Search goals" and the Filters icon in the same row, to its right`, g && g.qName === 'Search goals' && (mobile ? g.searchW === 0 : g.sameRow && g.right) && /Filters/.test(g.toggleName), JSON.stringify(g));
+            if (mobile) check(`${label}: the pills are not in the row (one select in the Filters sheet since #8700), the page's box is not drawn (the top pill is the search, #13591), nothing is wider than the screen`, g && !g.select && !g.pills && g.searchW === 0 && g.over <= 0, JSON.stringify(g));
             else check(`${label}: the state pills are in the row (All, Active, Blocked, Proposed, Done) with their counts`, g && g.pills && (await ev(`[...document.querySelectorAll('.team-tb-pills .goals-chip')].map(b => b.textContent.trim()).join('|')`)) === 'All 5|Active 2|Blocked 1|Proposed 1|Done 1');
 
             await pick('blocked'); await settle(300);

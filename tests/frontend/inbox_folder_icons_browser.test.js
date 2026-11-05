@@ -54,7 +54,13 @@ const ICONS = { needs: 'notifications', tasks: 'checklist', goals: 'flag', saved
                 assert.equal(row.hidden, 'true'); assert.equal(row.letter, letter);
             }
             assert.equal(probe.overflow, false, `${label}: no page overflow`);
-            if (width === 390) assert.ok(await ev(`[...document.querySelectorAll('#group-table-view .view-list-nav .view-list-item')].filter(b => b.getClientRects().length).length >= 4`), `${label}: the phone's folder tab strip is drawn`);
+            if (width === 390) { // no tab strip on a phone (#13596): the ☰ drawer lists the folders, each with its icon
+                assert.equal(await ev(`[...document.querySelectorAll('#group-table-view .view-list-nav .view-list-item')].filter(b => b.getClientRects().length).length`), 0, `${label}: the phone draws no folder tab strip`);
+                await ev(`document.querySelector('header.top-bar .phone-menu-btn').click(); true`);
+                await waitFor(`document.querySelectorAll('#nav-more-menu .nav-drawer-folder').length >= 4`, `${label}: the drawer lists the folders`, 8000);
+                assert.ok(await ev(`[...document.querySelectorAll('#nav-more-menu .nav-drawer-folder')].every(b => b.querySelector('.material-icons') && b.querySelector('.nav-drawer-label'))`), `${label}: each drawer folder has an icon and a name`);
+                await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); true`);
+            }
             await shot(label);
             console.log('PASS ' + label + ': folder icons, provider marks, labels and counts');
         }

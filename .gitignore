@@ -55,11 +55,13 @@ icons/main_loop.mp4
 coral-go/Users*.coral/*
 
 
-# Private session summaries, and the links to the private notes repository (tools/link-internal.sh)
+# Private session summaries, and the links to the private notes repository (run ../coral-internal/tools/link-internal.sh from this checkout)
 .claude/task_summaries.md
 .claude/task_summaries.local.md
 .claude/skills
 .claude/commands
+.claude/settings.json
+.claude/statusline-command.sh
 
 # go build with no -o leaves the program in the package's own folder (coral-go/cmd/<name>/<name>[.exe]): never to be committed
 /coral-go/cmd/*/*.exe

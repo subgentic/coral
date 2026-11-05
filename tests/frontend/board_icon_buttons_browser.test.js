@@ -83,6 +83,14 @@ const { coralReady } = require('./helpers/wait');
             await ev(`document.querySelector('${head} .list-bar-more-btn').click(); true`);
             check(`${tag}: and Table view has them again`, (await items()).some(x => x[0] === 'Expand all') && (await items()).some(x => x[0] === 'Collapse all'));
             await ev(`document.querySelector('${head} .list-bar-more-btn').click(); true`);
+            // Arrival sync paints an already-paused board without announcing an action.
+            await ev(`fetch('/api/board/${board}/pause', { method: 'POST' }).then(r => r.status)`);
+            await ev(`window.__coral._setBoardChatPaused(false, false); document.getElementById('board-chat-pause-status').textContent = ''; true`);
+            await require('./helpers/team_board').openBoardPage(ev, waitFor, board);
+            await waitFor(`getComputedStyle(document.getElementById('board-chat-paused-banner')).display !== 'none'`, `${tag}: paused state synced on arrival`, 6000);
+            check(`${tag}: arriving on an already-paused Board page is silent`, await ev(`document.getElementById('board-chat-pause-status').textContent`) === '');
+            await ev(`import(${S} + 'message_board.js').then(m => m.toggleBoardPause()).then(() => true)`);
+            check(`${tag}: a real resume from the page is announced`, await ev(`/Board resumed/.test(document.getElementById('board-chat-pause-status').textContent)`));
             // the Board page writes the pause too: the dock's banner and menu follow
             await require('./helpers/team_board').openBoardPage(ev, waitFor, board); // the Board page is the team page's Messages tab (#8129)
             await ev(`import(${S} + 'message_board.js').then(m => m.toggleBoardPause()).then(() => true)`);

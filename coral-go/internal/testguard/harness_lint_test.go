@@ -55,7 +55,6 @@ var allowlistReasons = map[string]string{
 	"tools/test-macos-app.sh":                        "launches the built macOS app (coral-tray) on purpose, in a data folder and HOME of its own (#4960); no agents, so nothing for a stub CLI to guard",
 	"tests/integration/agent_permissions/harness.sh": "launches REAL agent CLIs on purpose to exercise a real CLI; a stub that exits 1 would break it",
 	"tests/release/screens/seed.mjs":                 "only drives the private server that run.sh starts under coral_test_sandbox (an isolated HOME and a stub for every agent CLI first on PATH); it launches mock agents (cli_path_claude is the mock) and never starts a server itself (#11216)",
-	"tools/dev-screenshot.sh":                        "developer screenshot helper, not a test harness: a throwaway /tmp data dir, no agents, CORAL_NO_DEMO_SEED set so nothing is launched",
 }
 
 // launchesCoralServer reports whether the content starts the coral server binary: it must both

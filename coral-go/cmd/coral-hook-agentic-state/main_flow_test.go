@@ -34,6 +34,7 @@ type flowRun struct {
 	stdin     []byte
 	turnEnd   string   // what Coral answers to a turn-end question
 	failEvent bool     // Coral answers the events post with a 500
+	pretool   string   // what Coral answers to the pending-tool post (a refusal, #13647); "" is {}
 	env       []string // more of the hook's environment
 }
 
@@ -81,6 +82,8 @@ func runFlow(t *testing.T, run flowRun) flowResult {
 				answer = `{"handoff":false}`
 			}
 			_, _ = w.Write([]byte(answer))
+		case run.pretool != "" && strings.HasSuffix(r.URL.Path, "/pending-tool"):
+			_, _ = w.Write([]byte(run.pretool))
 		case run.failEvent && strings.HasSuffix(r.URL.Path, "/events"):
 			http.Error(w, `{"error":"boom"}`, http.StatusInternalServerError)
 		default:

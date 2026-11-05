@@ -420,6 +420,7 @@
 .dt-mail-more-toggle { flex: none; width: var(--table-touch); min-height: var(--table-touch); }
 .dt-mail-more-gap { flex: none; width: var(--table-touch); } /* the room of a ⋯ on a row that has none, in a list where another has one */
 .dt-mail-menu .menu-item { white-space: normal; overflow-wrap: anywhere; }
+.dt-mail-menu .menu-item:disabled { color: var(--text-muted); cursor: default; opacity: 0.6; } /* an action that is off right now stays in the menu, dimmed and said off (#13651) */
 .dt-mail-menu { position: absolute; right: 8px; top: calc(100% - 8px); z-index: 30; }
 .dt-mail-open:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .dt-mail-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
@@ -454,7 +455,7 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 .dt-box.dt-mail-on tr.dt-mailed.dt-selected { background: var(--table-selected); }
 @media (max-width: 767px) { /* a phone: what is selected takes the toolbar's line (UI/UX's spec: the app bar becomes the selection bar): the count and the actions, the search and the Select button out of the way */
     .gt-toolbar.team-toolbar-selecting { flex-wrap: wrap; }
-    .gt-toolbar.team-toolbar-selecting > :is(.list-bar-search-wrap, .dt-select-toggle, .btn-icon) { display: none; } /* the toolbar's sort icon is not left alone on a blank row under the selection bar (#11778) */
+    .gt-toolbar.team-toolbar-selecting > :is(.list-bar-search-wrap, .dt-select-toggle, .btn-icon, .inbox-folder-head) { display: none; } /* the toolbar's sort icon is not left alone on a blank row under the selection bar (#11778) */
     .gt-toolbar.team-toolbar-selecting > .team-tb-selection { flex: 1 1 100%; }
     .list-bar-bar:has(> .team-toolbar-selecting) { position: sticky; top: 0; z-index: 25; background: var(--bg-primary); } /* a phone's selection bar is the top row of the screen and stays there while the list scrolls (#11707, the operator's comment 28) */
 }

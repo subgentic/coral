@@ -13,6 +13,7 @@ const { framesJs, coralReady } = require('./helpers/wait');
 const { removeBoards } = require('./helpers/board_cleanup');
 const { launchStandIn } = require('./helpers/stand_in_agent');
 const BASE = require('./test_base').BASE;
+const { nodeGrowth, nodeBound, totalFloorGrowth, totalFloorBound } = require('./helpers/heap_bounds');
 async function httpJson(method, path, body) {
     const r = await fetch(BASE + path, { method, headers: { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
     let data = null; try { data = await r.json(); } catch { /* no body */ }
@@ -68,7 +69,9 @@ async function httpJson(method, path, body) {
     const metrics = async () => {
         mark('metrics: collectGarbage'); await HeapProfiler.collectGarbage(); await HeapProfiler.collectGarbage();
         mark('metrics: Performance.getMetrics'); const m = Object.fromEntries((await Performance.getMetrics()).metrics.map(x => [x.name, x.value]));
-        return { heapMB: m.JSHeapUsedSize / 1048576, nodes: m.Nodes, listeners: m.JSEventListeners, documents: m.Documents };
+        // the elements really in the page (shadow roots included): the browser's own `Nodes` also holds detached nodes the collector has not taken yet, which move by a couple of hundred under load (helpers/heap_bounds.js)
+        const live = await ev(`(() => { let c = 0; const st = [document.documentElement]; while (st.length) { const e = st.pop(); c++; if (e.shadowRoot) st.push(e.shadowRoot); for (const k of e.children || []) st.push(k); } return c; })()`);
+        return { heapMB: m.JSHeapUsedSize / 1048576, nodes: m.Nodes, live, listeners: m.JSEventListeners, documents: m.Documents };
     };
     const snapshot = async name => {
         if (!process.env.HEAP_SNAPSHOT_DIR) return;
@@ -181,12 +184,14 @@ async function httpJson(method, path, body) {
         const grew = (a, b) => b - a;
         // bounds per round after the warm-up (a leak of a node, a listener or a few KB a round shows over the rounds; caches that are bounded do not)
         assert.ok(grew(base.heapMB, end.heapMB) <= 3 + 0.05 * per, `the heap after GC grew ${grew(base.heapMB, end.heapMB).toFixed(1)} MB over ${per} rounds (bound ${(3 + 0.05 * per).toFixed(1)}): ${row(base)} -> ${row(end)}`);
-        // The node count of one sample moves a few hundred up and down between samples (a render that has just run, a card still being removed: Windows' windows-latest runner showed 10983, 11164, 11038, 11148, 11389 in a row,
-        // with nothing growing, #12266), so the end is the median of the last five samples: a leak is a climb through all of them, and the median climbs with it.
-        const tailNodes = series.slice(-5).map(x => x.nodes).sort((x, y) => x - y)[Math.floor(Math.min(5, series.length) / 2)];
-        assert.ok(grew(base.nodes, tailNodes) <= 100 + per / 2, `DOM nodes grew ${grew(base.nodes, tailNodes)} over ${per} rounds (the median of the last five samples; the last one was ${end.nodes})`);
+        // Two node counts (helpers/heap_bounds.js, pinned by heap_growth_bounds.test.js with series measured on the mini): the LIVE nodes take two values 26 apart, so their growth is the mean of the last five samples
+        // minus the mean of the first three, against a node a round; the browser's own total also holds detached nodes the collector has not taken, and rose in one step by 193 and stayed there in a loaded run with nothing
+        // leaking (#13622), so its growth is the lowest of the last five minus the lowest of the first three, against a loose bound.
+        const liveGrowth = nodeGrowth(series), totalGrowth = totalFloorGrowth(series);
+        assert.ok(liveGrowth <= nodeBound(per), `live DOM nodes: the mean of the last five samples grew ${liveGrowth.toFixed(1)} over the mean of the first three after ${per} rounds (bound ${nodeBound(per)}; the last sample was ${end.live})`);
+        assert.ok(totalGrowth <= totalFloorBound(per), `the browser's node total (detached nodes included): the lowest of the last five samples grew ${totalGrowth} over the lowest of the first three after ${per} rounds (bound ${totalFloorBound(per)}; the last sample was ${end.nodes})`);
         assert.ok(grew(base.listeners, end.listeners) <= 40 + per / 5, `event listeners grew ${grew(base.listeners, end.listeners)} over ${per} rounds`);
         assert.ok(grew(base.documents, end.documents) <= 3, `documents grew ${grew(base.documents, end.documents)} (detached frames or windows)`);
-        console.log(`PASS heap growth: ${per} rounds after a ${WARM}-round warm-up: heap ${grew(base.heapMB, end.heapMB).toFixed(1)} MB, nodes ${grew(base.nodes, end.nodes)}, listeners ${grew(base.listeners, end.listeners)}`);
+        console.log(`PASS heap growth: ${per} rounds after a ${WARM}-round warm-up: heap ${grew(base.heapMB, end.heapMB).toFixed(1)} MB, nodes ${grew(base.nodes, end.nodes)} (live ${grew(base.live, end.live)}), listeners ${grew(base.listeners, end.listeners)}`);
     } finally { mark('cleanup: removeBoards'); await removeBoards(ev, [boardName]); mark('cleanup: stopping the stand-in agents'); for (const si of standIns) await si.stop().catch(() => {}); mark('cleanup: closing the page'); await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });

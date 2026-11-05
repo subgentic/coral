@@ -489,3 +489,8 @@ dialog.inbox-deny-dialog { position: fixed; inset: 0; margin: auto; height: fit-
 .gr-add { display: flex; gap: 8px; flex-wrap: wrap; }
 .gr-add input { flex: 1 1 12rem; min-width: 0; }
 @media (max-width: 600px) { .gr-guide { grid-template-columns: minmax(0, 1fr) auto; } .gr-label { grid-column: 1 / -1; } .gr-guide .btn, .gr-add .btn, .gr-guide input, .gr-add input { min-height: 44px; } }
+
+@media (max-width: 639px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) { /* PHONE_BAR_QUERY: the Inbox has no tab strip here (#13596) and the top pill is its search: the page's title and count are the open folder's visible name, the Filters icon at the right. Other pages (Jobs, Workflows) keep their strip and the one-pixel title. */
+    #group-table-view[data-group^="hub-inbox"] .inbox-folder-head { position: static; width: auto; height: auto; margin: 0 4px 0 0; overflow: visible; clip-path: none; max-width: none; flex: 1 1 auto; }
+    #group-table-view[data-group^="hub-inbox"] .inbox-artifacts-main > .group-table-head { position: static; width: auto; height: auto; min-height: var(--control-touch-height, 44px); padding: 0 4px; margin: 0; overflow: visible; clip: auto; white-space: normal; } /* Files: the heading and count are the visible name too */
+}

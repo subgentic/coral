@@ -41,6 +41,9 @@ const { coralReady } = require('./helpers/wait');
             await waitFor(`document.querySelectorAll('${T} tbody tr').length >= 8`, at + 'welcome, review and question rows', 15000);
             await new Promise(r => setTimeout(r, 500)); // sleep-ok: the table settles after its first draw
 
+            assert.equal(await ev(`(document.querySelector('#group-table-view .view-list-nav')?.getClientRects().length || 0)`), 0, at + 'row actions remain usable without the Inbox strip');
+            assert.equal(await ev(`document.getElementById('group-table-title').textContent`), 'Needs you', at + 'the current folder name stays visible');
+
             const rowOf = name => `[...document.querySelectorAll('${T} tbody tr')].find(r => r.textContent.includes(${JSON.stringify(name)}))`;
             const point = async name => ev(`(() => { const r = ${rowOf(name)}; r.scrollIntoView({ block: 'center' }); const b = r.getBoundingClientRect(); return { x: b.left + b.width * 0.35, y: b.top + b.height * 0.35 }; })()`); // the row's own box, off its two links
             const touch = (type, p) => client.Input.dispatchTouchEvent({ type, touchPoints: type === 'touchEnd' ? [] : [{ x: p.x, y: p.y, id: 1 }] });

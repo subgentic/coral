@@ -1363,7 +1363,7 @@
 #mobile-agent-list .phone-bar .phone-bar-pill { flex: 1 1 0; min-width: 0; margin: 0; }
 @media (max-width: 300px) { body.live-session-active:not(.popout-mode) .terminal-header { flex-wrap: wrap; } } /* a phone at 200% zoom is 195 px wide: the row wraps before ⋯ is cut off (phone_layout) */
 /* #12698: the bar includes PHONE_QUERY's landscape phones; the cards below keep their 600px breakpoint. */
-@media (max-width: 600px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
+@media (max-width: 639px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) { /* PHONE_BAR_QUERY (phone_layout.js): the width the old top pill was a button for (layout.css, #9021), #13591 */
     body.agent-home-active header.top-bar { display: none; }
     body.agent-home-active { --top-bar-height: env(safe-area-inset-top, 0px); }
     #mobile-agent-list .mobile-list-header { padding: calc(8px + env(safe-area-inset-top, 0px)) 8px 4px; gap: 4px; flex-wrap: wrap; justify-content: flex-start; align-items: center; }
@@ -1375,6 +1375,9 @@
     .phone-bar .phone-bar-title { display: flex; align-items: center; height: 48px; box-sizing: border-box; padding: 0 18px; border: 0; border-radius: 24px; background: var(--bg-secondary); color: var(--text-primary); font-size: var(--fs-lg); font-weight: var(--fw-regular); line-height: var(--lh-label); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } /* a view's name in the pill: the same box as Home's search (48 px, fully rounded, filled, no border); a heading, with no title attribute, so no tooltip lands on it */
     .phone-bar .phone-bar-title .phone-bar-search { flex: 1 1 auto; min-width: 0; width: 100%; height: 100%; padding: 0; margin: 0; border: 0; outline: 0; background: transparent; color: var(--text-primary); font: inherit; } /* the view's search, in the pill (#11476) */
     .phone-bar .phone-bar-title:has(.phone-bar-search) .phone-bar-title-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; } /* the title stays for a screen reader: the field says what it searches */
+    .nav-more-menu.nav-drawer .nav-drawer-folder.is-current { font-weight: var(--fw-strong, 600); box-shadow: inset 3px 0 0 var(--accent); background: var(--bg-hover, var(--bg-secondary)); } /* the open folder (#13596) */
+    .list-bar-search-wrap.phone-searched { display: none; } /* the pill is this page's search field (#13591) */
+    .list-bar-search-row:has(> .phone-searched) { justify-content: flex-end; } /* the Filters icon keeps the right end of the row, where it sat beside the box */
     .phone-bar .phone-bar-title:has(.phone-bar-search):focus-within { box-shadow: 0 0 0 2px var(--accent); }
     header.top-bar > .phone-bar { display: flex; }
     header.top-bar > :not(.phone-bar) { display: none !important; } /* the old pill, the views menu, Home and the gear: the one bar replaces them on a phone */
@@ -1493,6 +1496,7 @@
     body[data-hub-state="disconnected"] .phone-bar .phone-account-btn::after { background: var(--warning); }
 }
 @media (max-width: 600px) {
+    body[data-phone-fab="automations"]:has(#group-table-view[data-group="automations:queue"]) .phone-fab { display: none; } /* the Queue folder has nothing to create: no + there (#13651) */
     body[data-phone-fab="automations"] .automations-create, body[data-phone-fab="automations"] .automations-act { display: none; } /* the + at the bottom right makes a job or a workflow: the toolbar's create buttons are not drawn (#11239 slice A) */
     body:has(#scheduler-view[data-phone-item]:not([style*="display: none"])) .phone-nav, body:has(#scheduler-view[data-phone-item]:not([style*="display: none"])) .phone-fab, body:has(#workflows-view[data-phone-item]:not([style*="display: none"])) .phone-nav, body:has(#workflows-view[data-phone-item]:not([style*="display: none"])) .phone-fab, body:has(#docs-view[data-phone-item]:not([style*="display: none"])) .phone-nav, body:has(#cost-dashboard-view[data-phone-item]:not([style*="display: none"])) .phone-nav, body:has(#servers-view[data-phone-item]:not([style*="display: none"])) .phone-nav { display: none; } /* a job or a workflow opened is a page of its own (a drill-down): no nav and no + over its footer */
 }
