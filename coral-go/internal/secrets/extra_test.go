@@ -183,7 +183,7 @@ func TestAnInvisibleCharacterInsideAKeyDoesNotHideIt(t *testing.T) {
 	assert.Equal(t, plain, string(out))
 }
 
-// #5943: betterleaks' gcp-api-key drops a finding whose entropy is 4.0 or less (a placeholder filter), and about one random Google key in 2000 is that low, so a real key was shown whole
+// #5943: betterleaks' gcp-api-key drops a finding whose entropy is 4.0 or less (a placeholder filter), and about one random Google key in 2000 is that low, so a generated key-shaped string (a harness draw, not a real key) was shown whole
 // (AIza_99wwxuvvooOGwerO9eA2evoewoN2IQNrx9, 3.98). Coral's own rule has no entropy filter and keeps the library's other protections.
 func TestAGoogleKeyOfLowEntropyIsMasked(t *testing.T) {
 	require.NoError(t, Init())

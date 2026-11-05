@@ -60,7 +60,7 @@ var extraRules = []extraRule{
 	// names: ordinary text has none (the repository's own docs and sources hold two, both test secrets).
 	{re: regexp.MustCompile(`(?i)\b(?:x-?api-?key|api-?key|x-?api-?token|x-?auth-?token|x-?access-?token|x-?auth-?key|x-?secret(?:-?key)?|x-?api-?secret|private-?token|x-(?:[a-z0-9]+-)*(?:key|token|secret))\b["']?[ \t]*:[ \t]*["']?([A-Za-z0-9._~+/=-]{8,})`), group: 1, ok: headerKeyValueOK},
 	// A Google API key, AIza + 35 letters, digits, "_" or "-" (#5943). betterleaks' gcp-api-key drops a finding whose entropy is 4.0 or less, to skip placeholders, and about one random key in
-	// 2000 is that low (3.98 for AIza_99wwxuvvooOGwerO9eA2evoewoN2IQNrx9), so a real key was shown whole. This rule has no entropy filter; it keeps the library's other protections: its list of
+	// 2000 is that low (3.98 for AIza_99wwxuvvooOGwerO9eA2evoewoN2IQNrx9), so a generated key-shaped string (a harness draw, not a real key) was shown whole. This rule has no entropy filter; it keeps the library's other protections: its list of
 	// documented example keys and a run of eight or more of one character (AIzaaaaa...) are not keys. Over-masking a placeholder is the safe direction. Where the library needs the key to be
 	// followed by a quote, a space, ";", a line end or the end of the text, this needs only that no key character follows, so a key before "," ")" "&" or "." is masked too.
 	{re: regexp.MustCompile(`\b(AIza[\w-]{35})(?:[^\w-]|$)`), group: 1, ok: googleKeyOK},
