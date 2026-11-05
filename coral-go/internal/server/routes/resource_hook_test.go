@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -249,4 +250,48 @@ func TestAPiGateAskIsAnsweredByTheQueueAndRecordsNothing(t *testing.T) {
 	_, out = post(tokP, sidP, "bash", "p3", true, map[string]any{"command": []any{"go", "test", "./..."}})
 	assert.Nil(t, out["refuse"], "an argument list is not read")
 	assert.Equal(t, []string{"Pi Q"}, holders(), "none of those claimed a slot")
+}
+
+// QA Reviewer 2's SHOULD on #13647: with no resource that has a match, the route asks Active() first and reads nothing: the hook is never asked who the agent is (Before's first step), whatever the agent type or
+// tool. With a match defined the same posts do reach it.
+func TestNoResourceWithAMatchMeansTheRouteNeverReachesTheHook(t *testing.T) {
+	server, h, _, ss := setupSessionsTestServer(t)
+	ctx := context.Background()
+	mgr, err := resources.Open(resources.Options{AgeStep: -1})
+	require.NoError(t, err)
+	require.NoError(t, mgr.Queue().Define(resourcequeue.Resource{Key: "mac-heavy", Slots: 1})) // no match
+	var asked int
+	var mu sync.Mutex
+	h.SetResourceHook(resources.NewHook(mgr, resources.HookOptions{Agent: func(context.Context, string) (string, bool) {
+		mu.Lock()
+		asked++
+		mu.Unlock()
+		return "Some Agent", true
+	}}))
+	type agent struct{ typ, tool, sid string }
+	agents := []agent{{"claude", "Bash", "eeeeeeee-13647-f000-0000-000000000006"}, {"codex", "Bash", "eeeeeeee-13647-f000-0000-000000000007"}, {"pi", "bash", "eeeeeeee-13647-f000-0000-000000000008"}}
+	post := func(a agent, gate bool) {
+		require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: a.sid, AgentType: a.typ, AgentName: "n-" + a.typ, WorkingDir: "/w"}))
+		tok := agentToken(t, h, a.sid, a.typ+"-"+a.sid)
+		body, _ := json.Marshal(map[string]any{"session_id": a.sid, "tool_use_id": "u1", "tool_name": a.tool, "tool_input": map[string]any{"command": "go test ./..."}, "gate_only": gate})
+		req, _ := http.NewRequest("POST", server.URL+"/api/sessions/live/x/pending-tool", strings.NewReader(string(body)))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set(store.SessionTokenHeader, tok)
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		resp.Body.Close()
+	}
+	for _, a := range agents {
+		post(a, a.typ == "pi")
+	}
+	mu.Lock()
+	assert.Zero(t, asked, "no resource has a match: the hook is never reached")
+	mu.Unlock()
+	require.NoError(t, mgr.Queue().Define(resourcequeue.Resource{Key: "mac-heavy", Slots: 1, Match: []string{"go test ./..."}}))
+	for _, a := range agents {
+		post(a, a.typ == "pi")
+	}
+	mu.Lock()
+	assert.Equal(t, len(agents), asked, "with a match defined every agent's call reaches the hook")
+	mu.Unlock()
 }
