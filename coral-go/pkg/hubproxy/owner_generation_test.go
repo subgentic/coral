@@ -161,3 +161,61 @@ func TestClicksThatArriveWhileTheRemoteIsBeingAskedShareOneHealthRead(t *testing
 	assert.NotEmpty(t, s.header.Get(hubowner.Header), "and the answer they shared was used: the clicks were signed")
 	s.mu.Unlock()
 }
+
+// QA Reviewer 2's SHOULDs on #13725. (1) A remote that answered generation 1 and then cannot be asked (its kept answer expired, its health fails): the widened click stays unstamped: the fallback is the last answer or 1,
+// never the maximum. (2) A health body that says hub_owner_routes: 0 is taken as generation 1, not as "nothing allowed" or as the maximum.
+func TestAnExpiredGenerationThatCannotBeReaskedFallsBackToTheLastAnswerNotTheMaximum(t *testing.T) {
+	old := generationTTL
+	t.Cleanup(func() { generationTTL = old })
+	var failing atomic.Bool
+	var health atomic.Int32
+	var s seenReq
+	inner := s.handler()
+	rem := httptest.NewServer(keyed(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/health" {
+			health.Add(1)
+			if failing.Load() {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			_, _ = io.WriteString(w, `{"status":"ok","hub_owner_routes":1}`)
+			return
+		}
+		inner.ServeHTTP(w, r)
+	})))
+	t.Cleanup(rem.Close)
+	hub := hubOver(t, rem)
+	post(t, hub, completePath, `{"n":1}`, true, person)
+	s.mu.Lock()
+	assert.Empty(t, s.header.Get(hubowner.Header), "a generation 1 remote: unstamped")
+	s.mu.Unlock()
+	generationTTL = 0 // the kept answer is expired: the next click asks again
+	failing.Store(true)
+	post(t, hub, completePath, `{"n":2}`, true, person)
+	s.mu.Lock()
+	assert.Empty(t, s.header.Get(hubowner.Header), "its health failed on the second ask: still unstamped, the fallback is not the maximum")
+	s.mu.Unlock()
+	assert.EqualValues(t, 2, health.Load(), "the second click did ask again")
+}
+
+func TestAHealthBodyThatSaysZeroRoutesIsGenerationOne(t *testing.T) {
+	var s seenReq
+	inner := s.handler()
+	rem := httptest.NewServer(keyed(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/health" {
+			_, _ = io.WriteString(w, `{"status":"ok","hub_owner_routes":0}`)
+			return
+		}
+		inner.ServeHTTP(w, r)
+	})))
+	t.Cleanup(rem.Close)
+	hub := hubOver(t, rem)
+	post(t, hub, completePath, `{"n":1}`, true, person)
+	s.mu.Lock()
+	assert.Empty(t, s.header.Get(hubowner.Header), "hub_owner_routes 0: the widened click is unstamped")
+	s.mu.Unlock()
+	post(t, hub, reviewPath, `{"decision":"approve"}`, true, person)
+	s.mu.Lock()
+	assert.NotEmpty(t, s.header.Get(hubowner.Header), "and the original eight are still signed")
+	s.mu.Unlock()
+}

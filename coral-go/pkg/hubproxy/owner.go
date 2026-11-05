@@ -55,7 +55,7 @@ type generationEntry struct {
 	at  time.Time
 }
 
-const generationTTL = time.Minute
+var generationTTL = time.Minute // a variable only so a test can expire the kept answer
 
 // remoteGeneration is the allowlist generation remote id accepts, read from its /api/health when the kept answer is older than generationTTL.
 func (h *Handler) remoteGeneration(ctx context.Context, id string, t Target) int {
