@@ -225,7 +225,7 @@ function placeNotices() {
     const goalHead = document.querySelector(".goal-back-row, .goals-back"), goalTitle = document.querySelector(".goals-detail-title"); // a goal's page: its way back and its title are not covered either (#11034)
     const inboxRow = document.querySelector(".list-bar-search-wrap.phone-searched")?.parentElement; // a phone's Inbox page has no tab strip (#13596): its title and Filters row, under the pill, is not covered either
     const bottomOf = e => (e && e.getClientRects().length ? Math.round(e.getBoundingClientRect().bottom) : 0);
-    const headBottom = Math.max(bottomOf(head), bottomOf(listTitle), bottomOf(teamHead), bottomOf(teamTabs), bottomOf(inboxTabs), bottomOf(inboxRow), bottomOf(goalHead), bottomOf(goalTitle));
+    const headBottom = Math.max(bottomOf(head), bottomOf(listTitle), bottomOf(teamHead), bottomOf(teamTabs), bottomOf(inboxTabs), bottomOf(inboxRow), bottomOf(inboxRow ? document.getElementById("group-table-title") : null), bottomOf(goalHead), bottomOf(goalTitle));
     let topPx = Math.max(bar ? Math.round(bar.getBoundingClientRect().bottom) : 0, banner ? Math.round(banner.getBoundingClientRect().bottom) : 0, headBottom, 0) + 8;
     // A text field just under that line (the list's filter box), or a phone list's view picker (the button naming the folder: "Needs you", #10525), is not covered either (#10458): the column starts below it. Only a field the card would reach is looked at, so a form further down never moves it.
     const shown = document.getElementById("notices");
