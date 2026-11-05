@@ -582,7 +582,7 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 .inbox-answers .inbox-answer { max-width: 100%; height: auto; min-height: 32px; white-space: normal; text-align: left; overflow-wrap: anywhere; } /* a long choice wraps its words inside its column, never clipped at the cell's edge (#11728) */
 .inbox-answered { color: var(--text-secondary); }
 .inbox-only-reject { color: var(--text-secondary); font-size: .85em; flex: 1 1 100%; } /* a request that can only be rejected (#11399): said in words, on its own line under the No */
-@media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) { .inbox-answers .inbox-answer { flex: 1 1 0; min-height: var(--control-touch-height, 44px); min-width: var(--control-touch-height, 44px); } }
+@media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) { .inbox-answers .inbox-answer { flex: 0 1 auto; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: var(--control-touch-height, 44px); min-width: var(--control-touch-height, 44px); } }
 .dt-mail-cell:has(> .inbox-answers) { flex-wrap: wrap; }
 .dt-mail-cell > .inbox-answers { flex: 1 1 100%; padding: 0 12px 8px 56px; } /* under the mail line, in line with its text */
 .dt-mail-cell > .inbox-answers:empty { display: none; }
