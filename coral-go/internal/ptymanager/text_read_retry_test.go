@@ -117,3 +117,23 @@ func TestAChildReaderRefusesOnlyWhenTheFreshReadAgrees(t *testing.T) {
 	assert.False(t, refused, "a clean first read stands: no second read is asked for")
 	assert.Equal(t, 1, *reads)
 }
+
+// trial-250's windows-tests (fourth head): TestShortLivedChildrenOfTheAgentNeverRefuseIt got "the terminal's processes could not be read" once in 100 sends while hooks started and ended below the
+// agent, on a loaded runner: the shell's handle was refused for longer than three reads 10 ms apart. A stall of four reads is still a stall, not "unreadable": more reads, further apart.
+func TestTheShellUnreadableForAFewReadsInARowIsStillReadAgain(t *testing.T) {
+	const root = 10
+	good := newFake().add(1, root, 100, kindVerifiedShell)
+	noRoot := newFake()
+	reads := 0
+	src := func() (procSource, error) {
+		reads++
+		if reads <= 4 {
+			return noRoot, nil
+		}
+		return good, nil
+	}
+	refused, why, err := textRefusedWithRetry(src, root, winProc{}, false)
+	assert.NoError(t, err)
+	assert.False(t, refused, "the shell unreadable for four reads, then read: not refused (%s)", why)
+	assert.Equal(t, 5, reads)
+}
