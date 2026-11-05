@@ -97,12 +97,18 @@ const B = 'bigboard-13326-' + TAG, SESSION = '13326000-0000-4000-8000-' + String
         // 4. typing in the agent's command box: long tasks while 60 keys go in one at a time
         await ev(`window.selectLiveSession(${JSON.stringify(agent.session_name)}, 'terminal', ${JSON.stringify(agent.session_id)}); true`);
         await waitFor(`!!document.getElementById('command-input')`, 'the command box', 15000);
-        await ev(`(() => { window.__lt = []; try { new PerformanceObserver(l => { for (const e of l.getEntries()) window.__lt.push(e.duration); }).observe({ type: 'longtask' }); } catch (e) {} const c = document.getElementById('command-input'); c.focus(); return true; })()`);
+        await ev(`(() => { window.__lt = []; window.__ltWhat = []; window.__keyAt = []; const t0 = performance.now(); window.__t0 = t0;
+            try { new PerformanceObserver(l => { for (const e of l.getEntries()) window.__lt.push(e.duration); }).observe({ type: 'longtask' }); } catch (e) {}
+            // what ran (a long task names only its container; a long animation frame names the scripts, Chrome 123+): kept so a failure says which key, how long and which script (#13389)
+            try { new PerformanceObserver(l => { for (const e of l.getEntries()) window.__ltWhat.push({ at: Math.round(e.startTime - t0), ms: Math.round(e.duration), block: Math.round(e.blockingDuration || 0), scripts: (e.scripts || []).map(x => ({ ms: Math.round(x.duration), invoker: String(x.invoker || '').slice(0, 80), fn: String(x.sourceFunctionName || '').slice(0, 60), src: String(x.sourceURL || '').split('/').slice(-2).join('/'), type: x.invokerType })).slice(0, 4) })); }).observe({ type: 'long-animation-frame', buffered: false }); } catch (e) {}
+            const c = document.getElementById('command-input'); c.focus(); return true; })()`);
         for (const ch of 'the quick brown fox jumps over the lazy dog, a few more words to type in the box') {
+            await ev(`window.__keyAt.push(Math.round(performance.now() - window.__t0)); true`);
             await Input.dispatchKeyEvent({ type: 'keyDown', key: ch, text: ch }); await Input.dispatchKeyEvent({ type: 'keyUp', key: ch });
             await nextFrame(); await new Promise(r => setTimeout(r, 20)); // sleep-ok: a typist's pace
         }
         const lt = await ev(`window.__lt.slice()`);
+        const ltWhat = lt.length ? await ev(`({ frames: window.__ltWhat.filter(f => f.ms > 50), keysAt: window.__keyAt })`) : null; // only when a long task happened: which frame, at which key, running which script
         results.typingLongestTaskMs = Math.round(Math.max(0, ...lt)); results.typingLongTasks = lt.length;
         if (results.needsYouEarlyMs < 0 || results.needsYouWarmMs < 0) console.log('inbox probe: ' + JSON.stringify(await ev(`(() => { const v = document.getElementById('group-table-view'); const t = document.getElementById('nav-tab-hub-inbox'); return { tab: !!t, tabActive: t && t.classList.contains('active'), viewShown: v && v.getClientRects().length, rows: v && v.querySelectorAll('tr').length, text: (v && v.textContent || '').trim().slice(0, 200), inboxBadge: (document.getElementById('nav-tab-hub-inbox-badge') || {}).textContent }; })()`)));
         if (process.env.CORAL_BIGBOARD_OUT) fs.writeFileSync(process.env.CORAL_BIGBOARD_OUT, JSON.stringify({ results, budget: BUDGET, files: FILES, versions: VERSIONS }, null, 1)); // a passing suite prints nothing: this keeps the numbers
@@ -111,7 +117,7 @@ const B = 'bigboard-13326-' + TAG, SESSION = '13326000-0000-4000-8000-' + String
         assert.ok(results.firstLoadMs <= BUDGET.firstLoadMs, `first load to an interactive agent list took ${results.firstLoadMs} ms, over ${BUDGET.firstLoadMs} ms`);
         assert.ok(results.needsYouEarlyMs >= 0 && results.needsYouEarlyMs <= BUDGET.needsYouEarlyMs, `Needs you within 20 s of a load took ${results.needsYouEarlyMs} ms (-1: no Inbox tab, -2: no rows), over ${BUDGET.needsYouEarlyMs} ms`);
         assert.ok(results.needsYouWarmMs >= 0 && results.needsYouWarmMs <= BUDGET.needsYouWarmMs, `Needs you on a settled page took ${results.needsYouWarmMs} ms (-1: no Inbox tab, -2: no rows), over ${BUDGET.needsYouWarmMs} ms`);
-        assert.ok(results.typingLongestTaskMs <= BUDGET.longTaskMs, `typing had a long task of ${results.typingLongestTaskMs} ms (${results.typingLongTasks} long tasks), over ${BUDGET.longTaskMs} ms`);
+        assert.ok(results.typingLongestTaskMs <= BUDGET.longTaskMs, `typing had a long task of ${results.typingLongestTaskMs} ms (${results.typingLongTasks} long tasks), over ${BUDGET.longTaskMs} ms; what ran: ${JSON.stringify(ltWhat && ltWhat.frames)} (ms into typing; keys were typed at ${JSON.stringify(ltWhat && ltWhat.keysAt && ltWhat.keysAt.slice(0, 80))})`);
         console.log('PASS big board budgets: first load, Needs you (early and settled) and typing inside the goal\'s budgets');
     } finally { await cleanUp(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
