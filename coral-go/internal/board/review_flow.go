@@ -175,7 +175,11 @@ func (s *Store) HandToOrchestrator(ctx context.Context, project string, id int64
 	if err := saveWorkflow(ctx, tx, id, w); err != nil {
 		return "", nil, err
 	}
-	return orch, reopened, tx.Commit()
+	if err = tx.Commit(); err != nil {
+		return orch, reopened, err
+	}
+	s.NoteArtifactsChanged(project) // the completion review is released: its files leave the list's rows (#13522)
+	return orch, reopened, nil
 }
 
 // reopenReviews starts the next round with the last round's reviewers (#3787): each one's review
@@ -297,6 +301,7 @@ func (s *Store) DelegateReview(ctx context.Context, project string, id int64, ac
 		w.ReviewRounds = append(w.ReviewRounds, round)
 	}
 	w.ReviewInPool = false // reviewers were named: the pool has nothing left to give
+	// #13566: not a writer of what the team's artifact list reads (lst_art_refs: the task's artifacts and the completion review's submitter, time and artifacts, and the columns of a task that has artifacts): it records the round and opens the reviewers' own tasks, never the reviewed task's artifacts or completion review
 	if err := saveWorkflow(ctx, s.db, id, w); err != nil {
 		return nil, nil, err
 	}
@@ -426,6 +431,7 @@ func (s *Store) reviewVerdictAt(ctx context.Context, project string, id int64, a
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
+	s.NoteArtifactsChanged(project) // a rejection clears the completion review the list shows, an approval completes the task (its time is the files' time) (#13566)
 	if v.Task, err = s.GetTask(ctx, project, id); err != nil {
 		return nil, err
 	}
@@ -531,6 +537,7 @@ func finishReviewTask(ctx context.Context, tx *sqlx.Tx, project string, reviewTa
 		return err
 	}
 	rw.Outcome = outcome
+	// #13566: not a writer of what the team's artifact list reads (lst_art_refs: the task's artifacts and the completion review's submitter, time and artifacts): it finishes the reviewer's OWN task, which has none; the verdict that calls it notes the revision.
 	return saveWorkflow(ctx, tx, reviewTaskID, rw)
 }
 

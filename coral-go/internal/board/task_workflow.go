@@ -732,7 +732,7 @@ func (s *Store) completeTaskWithArtifacts(ctx context.Context, project string, t
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
-	if len(artifacts) > 0 {
+	if len(artifacts) > 0 || (w.CompletionReview != nil && len(w.CompletionReview.Artifacts) > 0) { // a task completed with none still has the files of its completion review, and completing it sets their time (#13566)
 		s.NoteArtifactsChanged(project)
 	}
 	s.computeAndStoreTaskCost(ctx, project, taskID)
@@ -879,6 +879,7 @@ func (s *Store) RecordAmendIdentity(ctx context.Context, project string, id int6
 		w.AmendIdentity = map[string]string{}
 	}
 	w.AmendIdentity[fmt.Sprint(revision)] = identity
+	// #13566: not a writer of what the team's artifact list reads (lst_art_refs: the task's artifacts and the completion review's submitter, time and artifacts, and the columns of a task that has artifacts): the amendment's identity: not artifacts
 	if err := saveWorkflow(ctx, tx, id, w); err != nil {
 		return err
 	}

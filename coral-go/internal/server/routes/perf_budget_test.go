@@ -45,23 +45,7 @@ func TestBigBoardRoutesStayInsideTheirBudgets(t *testing.T) {
 	subscribeSession(t, h, "alpha", "Alice", sessAlice)
 	ctx := context.Background()
 
-	// 20,000 uploads: 200 files x 100 versions, each a stored blob with its sidecar and the upload record, as a real one has.
-	dir := uploadsDir(coralDir, sessAlice)
-	objDir := filepath.Join(coralDir, "artifacts", "objects")
-	require.NoError(t, os.MkdirAll(dir, 0o755))
-	require.NoError(t, os.MkdirAll(objDir, 0o755))
-	base := time.Now().UTC().Add(-48 * time.Hour)
-	for i := 0; i < 20000; i++ {
-		name := fmt.Sprintf("doc-%03d.md", i%200)
-		content := fmt.Sprintf("version %d of %s\n", i/200, name)
-		sum := sha256.Sum256([]byte(content + name))
-		id := hex.EncodeToString(sum[:])
-		require.NoError(t, os.WriteFile(filepath.Join(objDir, id), []byte(content), 0o644))
-		meta, _ := json.Marshal(agentArtifactMeta{Name: name, MediaType: "text/markdown", Size: int64(len(content)), Digest: "sha256:" + id})
-		require.NoError(t, os.WriteFile(filepath.Join(objDir, id+".json"), meta, 0o644))
-		rec, _ := json.Marshal(agentUploadRecord{agentArtifactMeta: agentArtifactMeta{Name: name, MediaType: "text/markdown", Size: int64(len(content)), Digest: "sha256:" + id}, CreatedAt: base.Add(time.Duration(i) * time.Second).Format(time.RFC3339)})
-		require.NoError(t, os.WriteFile(filepath.Join(dir, id+".json"), rec, 0o644))
-	}
+	seedBigUploads(t, coralDir, 20000) // 20,000 uploads: 200 files x 100 versions
 	// 2,000 tasks.
 	for i := 0; i < 2000; i++ {
 		_, err := h.bs.CreateTask(ctx, "alpha", fmt.Sprintf("task %04d", i), "a body of a few words", "medium", "Alice")
@@ -146,4 +130,28 @@ func TestBigBoardRoutesStayInsideTheirBudgets(t *testing.T) {
 			t.Errorf("%s: the first read took %.1f ms, over its %.0f ms budget (%s)", res.b.name, res.cold, res.b.coldMs, res.b.path)
 		}
 	}
+}
+
+// seedBigUploads writes n uploads for session sessAlice into coralDir: 200 files x n/200 versions, each a stored blob with its sidecar and the upload record, as a real one has. It returns the digests, newest last.
+func seedBigUploads(t *testing.T, coralDir string, n int) []string {
+	t.Helper()
+	var ids []string
+	dir := uploadsDir(coralDir, sessAlice)
+	objDir := filepath.Join(coralDir, "artifacts", "objects")
+	require.NoError(t, os.MkdirAll(dir, 0o755))
+	require.NoError(t, os.MkdirAll(objDir, 0o755))
+	base := time.Now().UTC().Add(-48 * time.Hour)
+	for i := 0; i < n; i++ {
+		name := fmt.Sprintf("doc-%03d.md", i%200)
+		content := fmt.Sprintf("version %d of %s\n", i/200, name)
+		sum := sha256.Sum256([]byte(content + name))
+		id := hex.EncodeToString(sum[:])
+		require.NoError(t, os.WriteFile(filepath.Join(objDir, id), []byte(content), 0o644))
+		meta, _ := json.Marshal(agentArtifactMeta{Name: name, MediaType: "text/markdown", Size: int64(len(content)), Digest: "sha256:" + id})
+		require.NoError(t, os.WriteFile(filepath.Join(objDir, id+".json"), meta, 0o644))
+		rec, _ := json.Marshal(agentUploadRecord{agentArtifactMeta: agentArtifactMeta{Name: name, MediaType: "text/markdown", Size: int64(len(content)), Digest: "sha256:" + id}, CreatedAt: base.Add(time.Duration(i) * time.Second).Format(time.RFC3339)})
+		require.NoError(t, os.WriteFile(filepath.Join(dir, id+".json"), rec, 0o644))
+		ids = append(ids, id)
+	}
+	return ids
 }

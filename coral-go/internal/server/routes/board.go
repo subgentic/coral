@@ -29,6 +29,7 @@ func taskClaimNudge(taskID int64) string {
 
 // BoardHandler handles message board HTTP endpoints.
 type BoardHandler struct {
+	itemsCache  teamItemsCache   // the built list of a team's artifacts, kept for a walk of its pages (#13522)
 	goalDoneNow func() time.Time // the clock of the "Goal looks done" quiet period (#12161); nil is time.Now
 	// goalDoneQuiet reads the quiet period (goal_done_quiet_minutes, #12161); nil: 15 minutes.
 	goalDoneQuietFn func(ctx context.Context) time.Duration

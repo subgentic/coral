@@ -67,6 +67,7 @@ func (s *Store) PutReviewInPool(ctx context.Context, project string, id int64, a
 	if wanted == 1 {
 		w.ReviewersWanted = 0 // the default is not written
 	}
+	// #13566: not a writer of what the team's artifact list reads (lst_art_refs: the task's artifacts and the completion review's submitter, time and artifacts, and the columns of a task that has artifacts): pool bookkeeping in the workflow: no artifacts, no completion review
 	if err := saveWorkflow(ctx, tx, id, w); err != nil {
 		return false, err
 	}
@@ -232,6 +233,7 @@ func (s *Store) takePoolReview(ctx context.Context, project string, id int64, re
 	if len(cur.Reviewers) >= max(1, w.ReviewersWanted) {
 		w.ReviewInPool = false
 	}
+	// #13566: not a writer of what the team's artifact list reads (lst_art_refs: the task's artifacts and the completion review's submitter, time and artifacts, and the columns of a task that has artifacts): it claims a place in the pool and opens the reviewer's own task
 	if err := saveWorkflow(ctx, tx, id, w); err != nil {
 		fail("the pool review could not be taken")
 		return nil, err
@@ -278,6 +280,7 @@ func (s *Store) releasePoolPlace(ctx context.Context, project string, id, review
 			break
 		}
 		w.ReviewInPool = true
+		// #13566: not a writer of what the team's artifact list reads (lst_art_refs: the task's artifacts and the completion review's submitter, time and artifacts, and the columns of a task that has artifacts): it gives a pool place back: the reviewer's own task and the pool flag
 		if err := saveWorkflow(ctx, tx, id, w); err != nil {
 			tx.Rollback()
 			return

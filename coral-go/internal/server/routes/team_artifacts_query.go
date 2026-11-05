@@ -715,7 +715,20 @@ func (h *BoardHandler) selectTeamArtifacts(r *http.Request, items []teamArtifact
 	if q.collapse {
 		set = collapseVersions(set) // after the filters: a version that matches stands for its file, as Needs you does (#11700)
 	}
-	sort.SliceStable(set, func(i, j int) bool { return artifactAfter(q.sortName, keyOf(set[j]), keyOf(set[i])) })
+	inOrder := true // the list is kept newest first: a walk of its pages finds it in order, and does not sort 20,000 rows for every page (#13522); each row's key is made once for the check
+	if len(set) > 1 {
+		var prev artifactSortKey = keyOf(set[0])
+		for i := 1; i < len(set) && inOrder; i++ {
+			next := keyOf(set[i])
+			if artifactAfter(q.sortName, prev, next) { // the comparator's own test (less(i, i-1)): this row would sort before the one above it
+				inOrder = false
+			}
+			prev = next
+		}
+	}
+	if !inOrder {
+		sort.SliceStable(set, func(i, j int) bool { return artifactAfter(q.sortName, keyOf(set[j]), keyOf(set[i])) })
+	}
 	sel := &teamArtifactSelection{total: len(set), tags: counts}
 	start := offset
 	if q.cursor != nil {

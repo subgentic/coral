@@ -166,6 +166,9 @@ func (s *Store) StartArtifactReview(ctx context.Context, boardID, hex string, at
 	if err := tx.Commit(); err != nil {
 		return nil, "", err
 	}
+	if !waiting {
+		s.NoteArtifactsChanged(boardID) // the tags, the sent time and the cleared decision are on the row of the list (#13522: the kept list is built again when the revision moves)
+	}
 	return out, decided, nil
 }
 

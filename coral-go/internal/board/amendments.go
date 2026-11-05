@@ -140,6 +140,7 @@ func (s *Store) AmendTask(ctx context.Context, project string, taskID int64, act
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
+	s.NoteArtifactsChanged(project) // what the team's artifact list shows of this task changed (#13522: the kept list is built again when the revision moves)
 	return s.getTaskByID(ctx, project, taskID)
 }
 

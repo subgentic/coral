@@ -141,6 +141,7 @@ func (s *Store) CreateTaskWithOpts(ctx context.Context, project, title, body, pr
 	}
 	taskID, _ := result.LastInsertId()
 	// Keep new tasks unclaimable until configuration and dependencies are stored.
+	// #13566: not a writer of what the team's artifact list reads (lst_art_refs: the task's artifacts and the completion review's submitter, time and artifacts, and the columns of a task that has artifacts): a new task has no artifacts: the list only walks tasks that have some
 	if err := saveWorkflow(ctx, s.db, taskID, w); err != nil {
 		return nil, err
 	}
@@ -700,12 +701,22 @@ func (s *Store) ClaimTask(ctx context.Context, project, subscriberID string, req
 			continue
 		}
 		s.recordClaimSession(ctx, project, subscriberID, taskID)
+		s.noteClaimedTaskFiles(ctx, project, taskID)
 		return s.getTaskByID(ctx, project, taskID)
 	}
 	if reviewsOnly && !named { // nothing of its own: the oldest pooled review that matches its areas
 		return s.ClaimPoolReview(ctx, project, subscriberID, 0)
 	}
 	return nil, nil
+}
+
+// noteClaimedTaskFiles moves the board's artifacts revision after a claim of a task that already has files (one sent back and claimed again): the claim sets its assigned_to and session_id, which the team's
+// artifact list attributes its files by (#13566). A task with no files is no row of the list: no note, so a claim of one stirs nothing.
+func (s *Store) noteClaimedTaskFiles(ctx context.Context, project string, taskID int64) {
+	var has int
+	if err := s.db.GetContext(ctx, &has, `SELECT has_artifacts FROM task_workflows WHERE task_id = ?`, taskID); err == nil && has == 1 {
+		s.NoteArtifactsChanged(project)
+	}
 }
 
 // errSlotHeld is the refusal of a claim by an agent that has a task in progress.
@@ -808,6 +819,7 @@ func snapshotClaimWorkflow(ctx context.Context, tx *sqlx.Tx, project string, tas
 		w.Instructions += "\n\nTeam working instructions:\n" + joinModeInstruction(ReviewTagRule, mode.Instructions) // every team, with no setting (#11424): what is the Operator's to look at, and what is not
 	}
 	w.Inputs = inputs
+	// #13566: not a writer of what the team's artifact list reads (lst_art_refs: the task's artifacts and the completion review's submitter, time and artifacts, and the columns of a task that has artifacts): the inputs seen at a claim: not artifacts
 	return saveWorkflow(ctx, tx, taskID, w)
 }
 

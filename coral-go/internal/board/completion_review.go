@@ -126,6 +126,7 @@ func (s *Store) SubmitCompletionReviewAtRevisionAndCandidate(ctx context.Context
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
+	s.NoteArtifactsChanged(project) // what the team's artifact list shows of this task changed (#13522: the kept list is built again when the revision moves)
 	return s.GetTask(ctx, project, id)
 }
 
@@ -170,5 +171,6 @@ func (s *Store) ReleaseCompletionReview(ctx context.Context, project string, id 
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
+	s.NoteArtifactsChanged(project) // what the team's artifact list shows of this task changed (#13522: the kept list is built again when the revision moves)
 	return s.GetTask(ctx, project, id)
 }

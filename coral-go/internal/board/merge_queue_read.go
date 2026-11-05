@@ -231,5 +231,6 @@ func (s *Store) MarkLanded(ctx context.Context, project string, id int64, actor 
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
+	s.NoteArtifactsChanged(project) // what the team's artifact list shows of this task changed (#13522: the kept list is built again when the revision moves)
 	return s.getTaskByID(ctx, project, id)
 }

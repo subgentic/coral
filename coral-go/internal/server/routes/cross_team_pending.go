@@ -237,5 +237,9 @@ func (h *BoardHandler) noteAlsoReceived(first, later crossTeamArtifactRecord) {
 	}
 	if err := fsreplace.Rename(tmp.Name(), filepath.Join(dir, first.ID+".json")); err != nil {
 		slog.Warn("cross-team artifact: could not record a later receipt", "board", first.Board, "id", first.ID, "error", err)
+		return
+	}
+	if h.bs != nil {
+		h.bs.NoteArtifactsChanged(first.Board) // the row shows where else the file came from (#13522: the kept list is built again when the revision moves)
 	}
 }
