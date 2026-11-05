@@ -9,6 +9,7 @@ const fs = require('node:fs');
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const shot = async name => { const dir = process.env.CORAL_SCREENSHOT_DIR; if (!dir) return; fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(`${dir}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
+    const themes = async name => { for (const t of ['dark', 'light']) { await Emulation.setEmulatedMedia({ features: [{ name: 'prefers-color-scheme', value: t }] }); await new Promise(r => setTimeout(r, 250)); await shot(`${name}-${t}`); } await Emulation.setEmulatedMedia({ features: [{ name: 'prefers-color-scheme', value: 'dark' }] }); }; // sleep-ok: the theme repaints before the shot
     const results = [];
     const check = (label, cond, detail) => { results.push(!!cond); console.log(`[${cond ? 'PASS' : 'FAIL'}] ${label}${detail !== undefined ? ' - ' + detail : ''}`); };
     const strip = () => ev(`(() => { const vis = e => !!e && e.getClientRects().length > 0; const h = document.getElementById('group-table-view'); return { tablist: [...h.querySelectorAll('[role=tablist], .view-list-nav, .view-list-drawer')].filter(vis).length, tabs: [...h.querySelectorAll('[role=tab]')].filter(vis).length, back: [...h.querySelectorAll('.group-table-back')].filter(vis).length,
@@ -41,13 +42,13 @@ const fs = require('node:fs');
                 check(`${label}: the drawer lists every Inbox folder: Needs you, Tasks, Goals, Saved, Artifacts, Activity, the chats`, ['Needs you', 'Tasks', 'Goals', 'Saved', 'Artifacts', 'Activity', 'All chats'].every(n => names.includes(n)), JSON.stringify(names));
                 check(`${label}: the open folder is marked, alone`, d.rows.filter(r => r.current).map(r => r.label).join() === 'Needs you', JSON.stringify(d.rows.filter(r => r.current)));
                 check(`${label}: Needs you shows its count`, /2/.test((d.rows.find(r => r.label === 'Needs you') || {}).count), JSON.stringify(d.rows.find(r => r.label === 'Needs you')));
-                await shot('phone-no-tabs-drawer-390');
+                await themes('phone-no-tabs-drawer-390');
                 await ev(`[...document.querySelectorAll('#nav-more-menu .nav-drawer-folder')].find(b => b.querySelector('.nav-drawer-label').textContent === 'Goals').click(); true`);
                 await waitFor(`(document.querySelector('header.top-bar .phone-bar-search') || {}).placeholder === 'Search goals'`, 'the Goals page: the pill searches goals', 10000);
                 await new Promise(r => setTimeout(r, 300)); // sleep-ok: the drawer closes
                 const s2 = await strip();
                 check(`${label}: Goals opened from the drawer: still no strip, its title is the visible name`, s2.tablist === 0 && s2.title && s2.title.text === 'Goals', JSON.stringify(s2));
-                await shot('phone-no-tabs-goals-390');
+                await themes('phone-no-tabs-goals-390');
                 await ev(`document.querySelector('header.top-bar .phone-menu-btn').click(); true`);
                 await waitFor(`!!document.querySelector('#nav-more-menu .nav-drawer-folder')`, 'the drawer again', 8000);
                 d = await drawer();
