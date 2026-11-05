@@ -160,3 +160,78 @@ func TestACodexShellCommandIsHeldLikeClaudesAndAnArgumentListIsNotRead(t *testin
 	h.notePendingToolEvent(sidX, "tool_use", "c3")
 	assert.Equal(t, 1, holders(), "the slot goes to the one waiting")
 }
+
+// #13647, Pi: the extension asks before a bash call (gate_only): the live session's agent type decides, the queue's answer is the refusal or {"ok":true}, and nothing about the call is recorded (it is not a pending
+// tool). The end of the call (the extension's tool_execution_end, as the hook's tool_use event with the call id) gives the slot back.
+func TestAPiGateAskIsAnsweredByTheQueueAndRecordsNothing(t *testing.T) {
+	server, h, _, ss := setupSessionsTestServer(t)
+	ctx := context.Background()
+	mgr, err := resources.Open(resources.Options{AgeStep: -1})
+	require.NoError(t, err)
+	require.NoError(t, mgr.Queue().Define(resourcequeue.Resource{Key: "mac-heavy", Slots: 1, Match: []string{"go test ./..."}}))
+	sidP, sidQ, sidC := "eeeeeeee-13647-c000-0000-000000000003", "eeeeeeee-13647-d000-0000-000000000004", "eeeeeeee-13647-e000-0000-000000000005"
+	members := map[string]string{}
+	for sid, c := range map[string][3]string{sidP: {"pi", "Pi P", "pi"}, sidQ: {"pi", "Pi Q", "pi"}, sidC: {"claude", "Claude C", "claude"}} {
+		require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid, AgentType: c[0], AgentName: c[1], WorkingDir: "/w"}))
+		members[c[2]+"-"+sid] = c[1]
+	}
+	h.SetResourceHook(resources.NewHook(mgr, resources.HookOptions{Agent: func(_ context.Context, name string) (string, bool) { m, ok := members[name]; return m, ok }}))
+	tokP, tokQ, tokC := agentToken(t, h, sidP, "pi-"+sidP), agentToken(t, h, sidQ, "pi-"+sidQ), agentToken(t, h, sidC, "claude-"+sidC)
+	post := func(tok, sid, tool, id string, gate bool, input map[string]any) (int, map[string]any) {
+		body, _ := json.Marshal(map[string]any{"session_id": sid, "tool_use_id": id, "tool_name": tool, "tool_input": input, "gate_only": gate})
+		req, _ := http.NewRequest("POST", server.URL+"/api/sessions/live/x/pending-tool", strings.NewReader(string(body)))
+		req.Header.Set("Content-Type", "application/json")
+		if tok != "" {
+			req.Header.Set(store.SessionTokenHeader, tok)
+		}
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		var out map[string]any
+		_ = json.NewDecoder(resp.Body).Decode(&out)
+		return resp.StatusCode, out
+	}
+	holders := func() []string {
+		st, _ := mgr.Queue().Status("mac-heavy")
+		var out []string
+		for _, e := range st.Holders {
+			out = append(out, e.Agent)
+		}
+		return out
+	}
+	const heavy = "cd coral-go && SECRET=hunter2 go test ./... | tail"
+	cmd := map[string]any{"command": heavy}
+
+	code, out := post("", sidP, "bash", "p1", true, cmd)
+	assert.Equal(t, http.StatusUnauthorized, code, "only the verified session may ask")
+	assert.Nil(t, out["refuse"])
+	code, out = post(tokP, sidP, "bash", "p1", true, cmd)
+	require.Equal(t, http.StatusOK, code)
+	assert.Nil(t, out["refuse"], "a free machine: the call runs")
+	assert.Equal(t, []string{"Pi P"}, holders(), "and the slot is held while it runs")
+	_, pending := h.pending.get(sidP, time.Now())
+	assert.False(t, pending, "a gate ask records no pending tool")
+
+	_, out = post(tokQ, sidQ, "bash", "q1", true, cmd)
+	refuse, _ := out["refuse"].(string)
+	assert.True(t, strings.HasPrefix(refuse, "Coral held this command: "), refuse)
+	assert.Contains(t, refuse, "number 1 in line")
+	assert.NotContains(t, refuse, "hunter2", "the command is never repeated")
+	_, pending = h.pending.get(sidQ, time.Now())
+	assert.False(t, pending)
+
+	// the end of P's call, by its id, gives the slot to Q; another call's end does not
+	h.notePendingToolEvent(sidP, "tool_use", "some-other-call")
+	assert.Equal(t, []string{"Pi P"}, holders())
+	h.notePendingToolEvent(sidP, "tool_use", "p1")
+	assert.Equal(t, []string{"Pi Q"}, holders())
+
+	// what is not asked about: a tool that is not bash, a Claude session that sends the lowercase name, a command that is not a string
+	_, out = post(tokP, sidP, "read", "p2", true, cmd)
+	assert.Nil(t, out["refuse"])
+	_, out = post(tokC, sidC, "bash", "c1", true, cmd)
+	assert.Nil(t, out["refuse"], "the lowercase name is Pi's: a Claude session is read only as Bash")
+	_, out = post(tokP, sidP, "bash", "p3", true, map[string]any{"command": []any{"go", "test", "./..."}})
+	assert.Nil(t, out["refuse"], "an argument list is not read")
+	assert.Equal(t, []string{"Pi Q"}, holders(), "none of those claimed a slot")
+}
